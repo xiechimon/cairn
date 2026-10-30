@@ -603,3 +603,1782 @@ test at scripts/ops/restore-drill.test.mjs:261:1
     operator: 'match',
     diff: 'simple'
   }
+✖ clean backup passes fixture in-process checkout API and never reports key or plaintext (823.038375ms)
+✖ one attachment byte changed names its storage key (97.808417ms)
+✖ message content edited names table and id (112.635667ms)
+✖ deleted row in backupDb fails (107.822458ms)
+✖ deleted row in db fails (175.511ms)
+✖ scratch inside live directory is refused (93.543041ms)
+✖ scratch through symlink is refused (93.170125ms)
+✖ existing scratch is refused without overwriting it (92.391458ms)
+✖ report cannot overwrite live DB or key (90.795292ms)
+✖ invalid gzip fails and publishes failure status (90.509083ms)
+✖ orphaned chief message fails the selected relationship (102.95725ms)
+✖ wrong key fails without leaking bytes (90.949167ms)
+✖ no encrypted sample fails (110.426833ms)
+✖ missing relationship sample fails (117.832084ms)
+✖ post-backup timestamped updates and inserts are allowed (102.133209ms)
+✖ missing attachment and unsafe attachment key fail (110.533333ms)
+✖ default backup directory selects the newest timestamp (88.457875ms)
+✖ migration ledger rows with null declared ids are compared rather than skipped (101.935041ms)
+✖ undated machine heartbeat differences fail conservatively (126.938ms)
+✖ missing ready attachment names its storage key (117.760417ms)
+✖ weekly units isolate scratch and do not install themselves (1.139666ms)
+✖ production shell requires a real HTTP listener and reports sandbox refusal (154.471ms)
+✖ invalid SQLite fails integrity checking (94.4855ms)
+✖ ready attachment size mismatch fails (102.783416ms)
+✖ scratch equal to live DB is refused (110.673333ms)
+✖ missing key fails without creating a replacement (100.363541ms)
+✖ non-allowlisted machine field changes fail (139.125875ms)
+✖ missing selected todo names the relationship sample (117.385416ms)
+✖ missing selected build names the relationship sample (113.375542ms)
+✖ missing selected step names the relationship sample (121.744125ms)
+✖ missing selected message names the relationship sample (112.259458ms)
+✖ missing selected chief_thread names the relationship sample (114.044708ms)
+✖ missing selected chief_message names the relationship sample (144.835709ms)
+✖ newest eligible build wins over todo activity and step-less builds (132.937458ms)
+✖ partial step loss names selected sample (114.678292ms)
+✖ partial message loss names selected sample (112.8525ms)
+✖ partial chief_message loss names selected sample (118.320375ms)
+✖ post-backup relationships are excluded while boundary rows are required (118.349ms)
+✖ HOME-dependent node shim is resolved before isolated helpers (101.467333ms)
+✖ decrypt helper startup failure reports exit and safe first stderr line (108.950167ms)
+✖ api helper startup failure reports exit and safe first stderr line (113.754333ms)
+✖ unknown helper stderr is withheld from all published diagnostics (142.335459ms)
+✖ node resolution failure is classified before isolated helpers (142.042875ms)
+✖ undated todo.spec corruption is rejected (129.425875ms)
+✖ undated todo.title corruption is rejected (119.520625ms)
+✖ undated project.localPath corruption is rejected (123.617542ms)
+✖ undated project.githubRepo corruption is rejected (119.937708ms)
+✖ undated team.name corruption is rejected (113.085958ms)
+✖ todo differences require a later version or phase timestamp (113.954625ms)
+✖ hourly mode tolerates ordinary changes before the drill and removes successful scratch (103.827291ms)
+✖ fresh mode tolerates ordinary changes before the drill and removes successful scratch (109.140417ms)
+✖ API wrapper never creates a missing key (799.4995ms)
+✖ weekly launcher configures checkout and preflights runtime dependencies (0.375917ms)
+ℹ tests 53
+ℹ suites 0
+ℹ pass 0
+ℹ fail 53
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7348.326625
+
+✖ failing tests:
+
+test at scripts/ops/restore-drill.test.mjs:107:1
+✖ clean backup passes fixture in-process checkout API and never reports key or plaintext (823.038375ms)
+  AssertionError [ERR_ASSERTION]: usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB
+                                      --attachments ATTACHMENTS
+                                      --live-attachments LIVE_ATTACHMENTS
+                                      --secretbox-key SECRETBOX_KEY
+                                      --scratch SCRATCH --report REPORT
+  restore-drill-test-driver.py: error: unrecognized arguments: --mode compare
+
+
+  2 !== 0
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:110:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:128:1
+✖ one attachment byte changed names its storage key (97.808417ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /attachment.*file.txt/. Input:
+
+  'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n' +
+    '                                    --attachments ATTACHMENTS\n' +
+    '                                    --live-attachments LIVE_ATTACHMENTS\n' +
+    '                                    --secretbox-key SECRETBOX_KEY\n' +
+    '                                    --scratch SCRATCH --report REPORT\n' +
+    'restore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n'
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:105:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:131:3)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n                                    --attachments ATTACHMENTS\n                                    --live-attachments LIVE_ATTACHMENTS\n                                    --secretbox-key SECRETBOX_KEY\n                                    --scratch SCRATCH --report REPORT\nrestore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n',
+    expected: /attachment.*file.txt/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:133:1
+✖ message content edited names table and id (112.635667ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /message.*m|relationship.*build b/. Input:
+
+  'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n' +
+    '                                    --attachments ATTACHMENTS\n' +
+    '                                    --live-attachments LIVE_ATTACHMENTS\n' +
+    '                                    --secretbox-key SECRETBOX_KEY\n' +
+    '                                    --scratch SCRATCH --report REPORT\n' +
+    'restore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n'
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:105:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:137:3)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n                                    --attachments ATTACHMENTS\n                                    --live-attachments LIVE_ATTACHMENTS\n                                    --secretbox-key SECRETBOX_KEY\n                                    --scratch SCRATCH --report REPORT\nrestore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n',
+    expected: /message.*m|relationship.*build b/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:140:3
+✖ deleted row in backupDb fails (107.822458ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /message.*m|relationship.*build b/. Input:
+
+  'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n' +
+    '                                    --attachments ATTACHMENTS\n' +
+    '                                    --live-attachments LIVE_ATTACHMENTS\n' +
+    '                                    --secretbox-key SECRETBOX_KEY\n' +
+    '                                    --scratch SCRATCH --report REPORT\n' +
+    'restore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n'
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:105:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:144:5)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n                                    --attachments ATTACHMENTS\n                                    --live-attachments LIVE_ATTACHMENTS\n                                    --secretbox-key SECRETBOX_KEY\n                                    --scratch SCRATCH --report REPORT\nrestore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n',
+    expected: /message.*m|relationship.*build b/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:140:3
+✖ deleted row in db fails (175.511ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /message.*m|relationship.*build b/. Input:
+
+  'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n' +
+    '                                    --attachments ATTACHMENTS\n' +
+    '                                    --live-attachments LIVE_ATTACHMENTS\n' +
+    '                                    --secretbox-key SECRETBOX_KEY\n' +
+    '                                    --scratch SCRATCH --report REPORT\n' +
+    'restore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n'
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:105:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:144:5)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n                                    --attachments ATTACHMENTS\n                                    --live-attachments LIVE_ATTACHMENTS\n                                    --secretbox-key SECRETBOX_KEY\n                                    --scratch SCRATCH --report REPORT\nrestore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n',
+    expected: /message.*m|relationship.*build b/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:146:1
+✖ scratch inside live directory is refused (93.543041ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /scratch.*live/. Input:
+
+  'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n' +
+    '                                    --attachments ATTACHMENTS\n' +
+    '                                    --live-attachments LIVE_ATTACHMENTS\n' +
+    '                                    --secretbox-key SECRETBOX_KEY\n' +
+    '                                    --scratch SCRATCH --report REPORT\n' +
+    'restore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n'
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:105:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:148:3)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n                                    --attachments ATTACHMENTS\n                                    --live-attachments LIVE_ATTACHMENTS\n                                    --secretbox-key SECRETBOX_KEY\n                                    --scratch SCRATCH --report REPORT\nrestore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n',
+    expected: /scratch.*live/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:150:1
+✖ scratch through symlink is refused (93.170125ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /scratch.*live/. Input:
+
+  'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n' +
+    '                                    --attachments ATTACHMENTS\n' +
+    '                                    --live-attachments LIVE_ATTACHMENTS\n' +
+    '                                    --secretbox-key SECRETBOX_KEY\n' +
+    '                                    --scratch SCRATCH --report REPORT\n' +
+    'restore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n'
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:105:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:153:3)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n                                    --attachments ATTACHMENTS\n                                    --live-attachments LIVE_ATTACHMENTS\n                                    --secretbox-key SECRETBOX_KEY\n                                    --scratch SCRATCH --report REPORT\nrestore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n',
+    expected: /scratch.*live/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:155:1
+✖ existing scratch is refused without overwriting it (92.391458ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /scratch.*exist/. Input:
+
+  'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n' +
+    '                                    --attachments ATTACHMENTS\n' +
+    '                                    --live-attachments LIVE_ATTACHMENTS\n' +
+    '                                    --secretbox-key SECRETBOX_KEY\n' +
+    '                                    --scratch SCRATCH --report REPORT\n' +
+    'restore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n'
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:105:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:158:3)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n                                    --attachments ATTACHMENTS\n                                    --live-attachments LIVE_ATTACHMENTS\n                                    --secretbox-key SECRETBOX_KEY\n                                    --scratch SCRATCH --report REPORT\nrestore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n',
+    expected: /scratch.*exist/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:160:1
+✖ report cannot overwrite live DB or key (90.795292ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /report.*unsafe/. Input:
+
+  'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n' +
+    '                                    --attachments ATTACHMENTS\n' +
+    '                                    --live-attachments LIVE_ATTACHMENTS\n' +
+    '                                    --secretbox-key SECRETBOX_KEY\n' +
+    '                                    --scratch SCRATCH --report REPORT\n' +
+    'restore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n'
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:105:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:163:3)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n                                    --attachments ATTACHMENTS\n                                    --live-attachments LIVE_ATTACHMENTS\n                                    --secretbox-key SECRETBOX_KEY\n                                    --scratch SCRATCH --report REPORT\nrestore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n',
+    expected: /report.*unsafe/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:166:1
+✖ invalid gzip fails and publishes failure status (90.509083ms)
+  Error: ENOENT: no such file or directory, open '/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/cairn-test-83d940ee-2838-41a0-9253-7051d129c550-restore-drill-eGP4we/report.json.status'
+      at readFileSync (node:fs:621:20)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:170:16)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'open',
+    path: '/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/cairn-test-83d940ee-2838-41a0-9253-7051d129c550-restore-drill-eGP4we/report.json.status'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:172:1
+✖ orphaned chief message fails the selected relationship (102.95725ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /relationship.*ct/. Input:
+
+  'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n' +
+    '                                    --attachments ATTACHMENTS\n' +
+    '                                    --live-attachments LIVE_ATTACHMENTS\n' +
+    '                                    --secretbox-key SECRETBOX_KEY\n' +
+    '                                    --scratch SCRATCH --report REPORT\n' +
+    'restore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n'
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:105:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:176:3)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n                                    --attachments ATTACHMENTS\n                                    --live-attachments LIVE_ATTACHMENTS\n                                    --secretbox-key SECRETBOX_KEY\n                                    --scratch SCRATCH --report REPORT\nrestore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n',
+    expected: /relationship.*ct/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:178:1
+✖ wrong key fails without leaking bytes (90.949167ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /decrypt failed.*exit=1/. Input:
+
+  'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n' +
+    '                                    --attachments ATTACHMENTS\n' +
+    '                                    --live-attachments LIVE_ATTACHMENTS\n' +
+    '                                    --secretbox-key SECRETBOX_KEY\n' +
+    '                                    --scratch SCRATCH --report REPORT\n' +
+    'restore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n'
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:105:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:181:3)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n                                    --attachments ATTACHMENTS\n                                    --live-attachments LIVE_ATTACHMENTS\n                                    --secretbox-key SECRETBOX_KEY\n                                    --scratch SCRATCH --report REPORT\nrestore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n',
+    expected: /decrypt failed.*exit=1/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:184:1
+✖ no encrypted sample fails (110.426833ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /decrypt.*sample/. Input:
+
+  'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n' +
+    '                                    --attachments ATTACHMENTS\n' +
+    '                                    --live-attachments LIVE_ATTACHMENTS\n' +
+    '                                    --secretbox-key SECRETBOX_KEY\n' +
+    '                                    --scratch SCRATCH --report REPORT\n' +
+    'restore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n'
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:105:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:188:3)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n                                    --attachments ATTACHMENTS\n                                    --live-attachments LIVE_ATTACHMENTS\n                                    --secretbox-key SECRETBOX_KEY\n                                    --scratch SCRATCH --report REPORT\nrestore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n',
+    expected: /decrypt.*sample/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:190:1
+✖ missing relationship sample fails (117.832084ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /relationship/. Input:
+
+  'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n' +
+    '                                    --attachments ATTACHMENTS\n' +
+    '                                    --live-attachments LIVE_ATTACHMENTS\n' +
+    '                                    --secretbox-key SECRETBOX_KEY\n' +
+    '                                    --scratch SCRATCH --report REPORT\n' +
+    'restore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n'
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:105:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:194:3)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n                                    --attachments ATTACHMENTS\n                                    --live-attachments LIVE_ATTACHMENTS\n                                    --secretbox-key SECRETBOX_KEY\n                                    --scratch SCRATCH --report REPORT\nrestore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n',
+    expected: /relationship/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:196:1
+✖ post-backup timestamped updates and inserts are allowed (102.133209ms)
+  AssertionError [ERR_ASSERTION]: usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB
+                                      --attachments ATTACHMENTS
+                                      --live-attachments LIVE_ATTACHMENTS
+                                      --secretbox-key SECRETBOX_KEY
+                                      --scratch SCRATCH --report REPORT
+  restore-drill-test-driver.py: error: unrecognized arguments: --mode compare
+
+
+  2 !== 0
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:203:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:208:1
+✖ missing attachment and unsafe attachment key fail (110.533333ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /attachment.*unsafe/. Input:
+
+  'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n' +
+    '                                    --attachments ATTACHMENTS\n' +
+    '                                    --live-attachments LIVE_ATTACHMENTS\n' +
+    '                                    --secretbox-key SECRETBOX_KEY\n' +
+    '                                    --scratch SCRATCH --report REPORT\n' +
+    'restore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n'
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:105:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:213:3)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n                                    --attachments ATTACHMENTS\n                                    --live-attachments LIVE_ATTACHMENTS\n                                    --secretbox-key SECRETBOX_KEY\n                                    --scratch SCRATCH --report REPORT\nrestore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n',
+    expected: /attachment.*unsafe/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:215:1
+✖ default backup directory selects the newest timestamp (88.457875ms)
+  AssertionError [ERR_ASSERTION]: usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB
+                                      --attachments ATTACHMENTS
+                                      --live-attachments LIVE_ATTACHMENTS
+                                      --secretbox-key SECRETBOX_KEY
+                                      --scratch SCRATCH --report REPORT
+  restore-drill-test-driver.py: error: unrecognized arguments: --mode compare
+
+
+  2 !== 0
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:218:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:221:1
+✖ migration ledger rows with null declared ids are compared rather than skipped (101.935041ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /__drizzle_migrations.*1.*differing/. Input:
+
+  'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n' +
+    '                                    --attachments ATTACHMENTS\n' +
+    '                                    --live-attachments LIVE_ATTACHMENTS\n' +
+    '                                    --secretbox-key SECRETBOX_KEY\n' +
+    '                                    --scratch SCRATCH --report REPORT\n' +
+    'restore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n'
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:105:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:225:3)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n                                    --attachments ATTACHMENTS\n                                    --live-attachments LIVE_ATTACHMENTS\n                                    --secretbox-key SECRETBOX_KEY\n                                    --scratch SCRATCH --report REPORT\nrestore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n',
+    expected: /__drizzle_migrations.*1.*differing/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:227:1
+✖ undated machine heartbeat differences fail conservatively (126.938ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /machine.*machine.*differing/. Input:
+
+  'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n' +
+    '                                    --attachments ATTACHMENTS\n' +
+    '                                    --live-attachments LIVE_ATTACHMENTS\n' +
+    '                                    --secretbox-key SECRETBOX_KEY\n' +
+    '                                    --scratch SCRATCH --report REPORT\n' +
+    'restore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n'
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:105:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:237:3)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n                                    --attachments ATTACHMENTS\n                                    --live-attachments LIVE_ATTACHMENTS\n                                    --secretbox-key SECRETBOX_KEY\n                                    --scratch SCRATCH --report REPORT\nrestore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n',
+    expected: /machine.*machine.*differing/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:239:1
+✖ missing ready attachment names its storage key (117.760417ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /attachment.*missing.txt/. Input:
+
+  'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n' +
+    '                                    --attachments ATTACHMENTS\n' +
+    '                                    --live-attachments LIVE_ATTACHMENTS\n' +
+    '                                    --secretbox-key SECRETBOX_KEY\n' +
+    '                                    --scratch SCRATCH --report REPORT\n' +
+    'restore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n'
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:105:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:244:3)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n                                    --attachments ATTACHMENTS\n                                    --live-attachments LIVE_ATTACHMENTS\n                                    --secretbox-key SECRETBOX_KEY\n                                    --scratch SCRATCH --report REPORT\nrestore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n',
+    expected: /attachment.*missing.txt/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:246:1
+✖ weekly units isolate scratch and do not install themselves (1.139666ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /RESTORE_DRILL_SCRATCH=%t\/cairn-restore-drill\/run/. Input:
+
+  '[Unit]\n' +
+    'Description=Cairn weekly database restore drill\n' +
+    '\n' +
+    '[Service]\n' +
+    'Type=oneshot\n' +
+    'UMask=0077\n' +
+    'Nice=10\n' +
+    'RuntimeDirectory=cairn-restore-drill\n' +
+    'EnvironmentFile=%h/.config/cairn/restore-drill.env\n' +
+    'WorkingDirectory=%h/Code/AgentProjects/cairn\n' +
+    'ExecStart=%h/Code/AgentProjects/cairn/scripts/ops/restore-drill.sh --backup ${BACKUP_DIR} --live-db ${LIVE_DB} --attachments ${BACKUP_ATTACHMENTS} --live-attachments ${LIVE_ATTACHMENTS} --secretbox-key ${SECRETBOX_KEY} --scratch %t/cairn-restore-drill/run --report %h/.local/state/cairn/restore-drill.json\n' +
+    'TimeoutStartSec=30min\n' +
+    '\n' +
+    '[Install]\n' +
+    'WantedBy=default.target\n'
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:254:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '[Unit]\nDescription=Cairn weekly database restore drill\n\n[Service]\nType=oneshot\nUMask=0077\nNice=10\nRuntimeDirectory=cairn-restore-drill\nEnvironmentFile=%h/.config/cairn/restore-drill.env\nWorkingDirectory=%h/Code/AgentProjects/cairn\nExecStart=%h/Code/AgentProjects/cairn/scripts/ops/restore-drill.sh --backup ${BACKUP_DIR} --live-db ${LIVE_DB} --attachments ${BACKUP_ATTACHMENTS} --live-attachments ${LIVE_ATTACHMENTS} --secretbox-key ${SECRETBOX_KEY} --scratch %t/cairn-restore-drill/run --report %h/.local/state/cairn/restore-drill.json\nTimeoutStartSec=30min\n\n[Install]\nWantedBy=default.target\n',
+    expected: /RESTORE_DRILL_SCRATCH=%t\/cairn-restore-drill\/run/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:259:1
+✖ production shell requires a real HTTP listener and reports sandbox refusal (154.471ms)
+  Error: ENOENT: no such file or directory, open '/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/cairn-test-83d940ee-2838-41a0-9253-7051d129c550-restore-drill-243NWE/report.json'
+      at Object.openSync (node:fs:779:18)
+      at readFileSync (node:fs:625:35)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:262:29)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'open',
+    path: '/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/cairn-test-83d940ee-2838-41a0-9253-7051d129c550-restore-drill-243NWE/report.json'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:280:1
+✖ invalid SQLite fails integrity checking (94.4855ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /integrity_check/. Input:
+
+  'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n' +
+    '                                    --attachments ATTACHMENTS\n' +
+    '                                    --live-attachments LIVE_ATTACHMENTS\n' +
+    '                                    --secretbox-key SECRETBOX_KEY\n' +
+    '                                    --scratch SCRATCH --report REPORT\n' +
+    'restore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n'
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:105:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:283:3)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n                                    --attachments ATTACHMENTS\n                                    --live-attachments LIVE_ATTACHMENTS\n                                    --secretbox-key SECRETBOX_KEY\n                                    --scratch SCRATCH --report REPORT\nrestore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n',
+    expected: /integrity_check/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:285:1
+✖ ready attachment size mismatch fails (102.783416ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /attachment.*file.txt/. Input:
+
+  'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n' +
+    '                                    --attachments ATTACHMENTS\n' +
+    '                                    --live-attachments LIVE_ATTACHMENTS\n' +
+    '                                    --secretbox-key SECRETBOX_KEY\n' +
+    '                                    --scratch SCRATCH --report REPORT\n' +
+    'restore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n'
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:105:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:288:3)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n                                    --attachments ATTACHMENTS\n                                    --live-attachments LIVE_ATTACHMENTS\n                                    --secretbox-key SECRETBOX_KEY\n                                    --scratch SCRATCH --report REPORT\nrestore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n',
+    expected: /attachment.*file.txt/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:290:1
+✖ scratch equal to live DB is refused (110.673333ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /scratch.*live/. Input:
+
+  'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n' +
+    '                                    --attachments ATTACHMENTS\n' +
+    '                                    --live-attachments LIVE_ATTACHMENTS\n' +
+    '                                    --secretbox-key SECRETBOX_KEY\n' +
+    '                                    --scratch SCRATCH --report REPORT\n' +
+    'restore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n'
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:105:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:292:3)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n                                    --attachments ATTACHMENTS\n                                    --live-attachments LIVE_ATTACHMENTS\n                                    --secretbox-key SECRETBOX_KEY\n                                    --scratch SCRATCH --report REPORT\nrestore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n',
+    expected: /scratch.*live/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:294:1
+✖ missing key fails without creating a replacement (100.363541ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /inputs missing/. Input:
+
+  'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n' +
+    '                                    --attachments ATTACHMENTS\n' +
+    '                                    --live-attachments LIVE_ATTACHMENTS\n' +
+    '                                    --secretbox-key SECRETBOX_KEY\n' +
+    '                                    --scratch SCRATCH --report REPORT\n' +
+    'restore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n'
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:105:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:297:3)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n                                    --attachments ATTACHMENTS\n                                    --live-attachments LIVE_ATTACHMENTS\n                                    --secretbox-key SECRETBOX_KEY\n                                    --scratch SCRATCH --report REPORT\nrestore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n',
+    expected: /inputs missing/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:300:1
+✖ non-allowlisted machine field changes fail (139.125875ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /machine.*machine.*differing/. Input:
+
+  'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n' +
+    '                                    --attachments ATTACHMENTS\n' +
+    '                                    --live-attachments LIVE_ATTACHMENTS\n' +
+    '                                    --secretbox-key SECRETBOX_KEY\n' +
+    '                                    --scratch SCRATCH --report REPORT\n' +
+    'restore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n'
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:105:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:307:3)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n                                    --attachments ATTACHMENTS\n                                    --live-attachments LIVE_ATTACHMENTS\n                                    --secretbox-key SECRETBOX_KEY\n                                    --scratch SCRATCH --report REPORT\nrestore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n',
+    expected: /machine.*machine.*differing/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:318:3
+✖ missing selected todo names the relationship sample (117.385416ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /relationship.*build b(?:\s|:)/. Input:
+
+  'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n' +
+    '                                    --attachments ATTACHMENTS\n' +
+    '                                    --live-attachments LIVE_ATTACHMENTS\n' +
+    '                                    --secretbox-key SECRETBOX_KEY\n' +
+    '                                    --scratch SCRATCH --report REPORT\n' +
+    'restore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n'
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:105:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:322:5)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n                                    --attachments ATTACHMENTS\n                                    --live-attachments LIVE_ATTACHMENTS\n                                    --secretbox-key SECRETBOX_KEY\n                                    --scratch SCRATCH --report REPORT\nrestore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n',
+    expected: /relationship.*build b(?:\s|:)/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:318:3
+✖ missing selected build names the relationship sample (113.375542ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /relationship.*build b(?:\s|:)/. Input:
+
+  'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n' +
+    '                                    --attachments ATTACHMENTS\n' +
+    '                                    --live-attachments LIVE_ATTACHMENTS\n' +
+    '                                    --secretbox-key SECRETBOX_KEY\n' +
+    '                                    --scratch SCRATCH --report REPORT\n' +
+    'restore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n'
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:105:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:322:5)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n                                    --attachments ATTACHMENTS\n                                    --live-attachments LIVE_ATTACHMENTS\n                                    --secretbox-key SECRETBOX_KEY\n                                    --scratch SCRATCH --report REPORT\nrestore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n',
+    expected: /relationship.*build b(?:\s|:)/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:318:3
+✖ missing selected step names the relationship sample (121.744125ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /relationship.*build b(?:\s|:)/. Input:
+
+  'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n' +
+    '                                    --attachments ATTACHMENTS\n' +
+    '                                    --live-attachments LIVE_ATTACHMENTS\n' +
+    '                                    --secretbox-key SECRETBOX_KEY\n' +
+    '                                    --scratch SCRATCH --report REPORT\n' +
+    'restore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n'
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:105:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:322:5)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n                                    --attachments ATTACHMENTS\n                                    --live-attachments LIVE_ATTACHMENTS\n                                    --secretbox-key SECRETBOX_KEY\n                                    --scratch SCRATCH --report REPORT\nrestore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n',
+    expected: /relationship.*build b(?:\s|:)/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:318:3
+✖ missing selected message names the relationship sample (112.259458ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /relationship.*build b(?:\s|:)/. Input:
+
+  'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n' +
+    '                                    --attachments ATTACHMENTS\n' +
+    '                                    --live-attachments LIVE_ATTACHMENTS\n' +
+    '                                    --secretbox-key SECRETBOX_KEY\n' +
+    '                                    --scratch SCRATCH --report REPORT\n' +
+    'restore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n'
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:105:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:322:5)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n                                    --attachments ATTACHMENTS\n                                    --live-attachments LIVE_ATTACHMENTS\n                                    --secretbox-key SECRETBOX_KEY\n                                    --scratch SCRATCH --report REPORT\nrestore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n',
+    expected: /relationship.*build b(?:\s|:)/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:318:3
+✖ missing selected chief_thread names the relationship sample (114.044708ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /relationship.*ct/. Input:
+
+  'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n' +
+    '                                    --attachments ATTACHMENTS\n' +
+    '                                    --live-attachments LIVE_ATTACHMENTS\n' +
+    '                                    --secretbox-key SECRETBOX_KEY\n' +
+    '                                    --scratch SCRATCH --report REPORT\n' +
+    'restore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n'
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:105:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:322:5)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n                                    --attachments ATTACHMENTS\n                                    --live-attachments LIVE_ATTACHMENTS\n                                    --secretbox-key SECRETBOX_KEY\n                                    --scratch SCRATCH --report REPORT\nrestore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n',
+    expected: /relationship.*ct/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:318:3
+✖ missing selected chief_message names the relationship sample (144.835709ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /relationship.*ct/. Input:
+
+  'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n' +
+    '                                    --attachments ATTACHMENTS\n' +
+    '                                    --live-attachments LIVE_ATTACHMENTS\n' +
+    '                                    --secretbox-key SECRETBOX_KEY\n' +
+    '                                    --scratch SCRATCH --report REPORT\n' +
+    'restore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n'
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:105:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:322:5)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n                                    --attachments ATTACHMENTS\n                                    --live-attachments LIVE_ATTACHMENTS\n                                    --secretbox-key SECRETBOX_KEY\n                                    --scratch SCRATCH --report REPORT\nrestore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n',
+    expected: /relationship.*ct/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:324:1
+✖ newest eligible build wins over todo activity and step-less builds (132.937458ms)
+  AssertionError [ERR_ASSERTION]: usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB
+                                      --attachments ATTACHMENTS
+                                      --live-attachments LIVE_ATTACHMENTS
+                                      --secretbox-key SECRETBOX_KEY
+                                      --scratch SCRATCH --report REPORT
+  restore-drill-test-driver.py: error: unrecognized arguments: --mode compare
+
+
+  2 !== 0
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:339:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:343:3
+✖ partial step loss names selected sample (114.678292ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /relationship.*build b(?:\s|:)/. Input:
+
+  'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n' +
+    '                                    --attachments ATTACHMENTS\n' +
+    '                                    --live-attachments LIVE_ATTACHMENTS\n' +
+    '                                    --secretbox-key SECRETBOX_KEY\n' +
+    '                                    --scratch SCRATCH --report REPORT\n' +
+    'restore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n'
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:105:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:352:5)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n                                    --attachments ATTACHMENTS\n                                    --live-attachments LIVE_ATTACHMENTS\n                                    --secretbox-key SECRETBOX_KEY\n                                    --scratch SCRATCH --report REPORT\nrestore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n',
+    expected: /relationship.*build b(?:\s|:)/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:343:3
+✖ partial message loss names selected sample (112.8525ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /relationship.*build b(?:\s|:)/. Input:
+
+  'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n' +
+    '                                    --attachments ATTACHMENTS\n' +
+    '                                    --live-attachments LIVE_ATTACHMENTS\n' +
+    '                                    --secretbox-key SECRETBOX_KEY\n' +
+    '                                    --scratch SCRATCH --report REPORT\n' +
+    'restore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n'
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:105:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:352:5)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n                                    --attachments ATTACHMENTS\n                                    --live-attachments LIVE_ATTACHMENTS\n                                    --secretbox-key SECRETBOX_KEY\n                                    --scratch SCRATCH --report REPORT\nrestore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n',
+    expected: /relationship.*build b(?:\s|:)/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:343:3
+✖ partial chief_message loss names selected sample (118.320375ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /relationship.*ct/. Input:
+
+  'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n' +
+    '                                    --attachments ATTACHMENTS\n' +
+    '                                    --live-attachments LIVE_ATTACHMENTS\n' +
+    '                                    --secretbox-key SECRETBOX_KEY\n' +
+    '                                    --scratch SCRATCH --report REPORT\n' +
+    'restore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n'
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:105:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:352:5)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n                                    --attachments ATTACHMENTS\n                                    --live-attachments LIVE_ATTACHMENTS\n                                    --secretbox-key SECRETBOX_KEY\n                                    --scratch SCRATCH --report REPORT\nrestore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n',
+    expected: /relationship.*ct/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:354:1
+✖ post-backup relationships are excluded while boundary rows are required (118.349ms)
+  AssertionError [ERR_ASSERTION]: usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB
+                                      --attachments ATTACHMENTS
+                                      --live-attachments LIVE_ATTACHMENTS
+                                      --secretbox-key SECRETBOX_KEY
+                                      --scratch SCRATCH --report REPORT
+  restore-drill-test-driver.py: error: unrecognized arguments: --mode compare
+
+
+  2 !== 0
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:366:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:406:1
+✖ HOME-dependent node shim is resolved before isolated helpers (101.467333ms)
+  AssertionError [ERR_ASSERTION]: usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB
+                                      --attachments ATTACHMENTS
+                                      --live-attachments LIVE_ATTACHMENTS
+                                      --secretbox-key SECRETBOX_KEY
+                                      --scratch SCRATCH --report REPORT
+  restore-drill-test-driver.py: error: unrecognized arguments: --mode compare
+
+
+  2 !== 0
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:409:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:413:3
+✖ decrypt helper startup failure reports exit and safe first stderr line (108.950167ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /decrypt helper startup failed.*exit=23.*node helper unavailable/. Input:
+
+  'usage: restore-drill.py [-h] [--backup BACKUP] --live-db LIVE_DB\n' +
+    '                        --attachments ATTACHMENTS\n' +
+    '                        --live-attachments LIVE_ATTACHMENTS\n' +
+    '                        --secretbox-key SECRETBOX_KEY --scratch SCRATCH\n' +
+    '                        --report REPORT\n' +
+    'restore-drill.py: error: unrecognized arguments: --mode compare\n'
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:417:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'usage: restore-drill.py [-h] [--backup BACKUP] --live-db LIVE_DB\n                        --attachments ATTACHMENTS\n                        --live-attachments LIVE_ATTACHMENTS\n                        --secretbox-key SECRETBOX_KEY --scratch SCRATCH\n                        --report REPORT\nrestore-drill.py: error: unrecognized arguments: --mode compare\n',
+    expected: /decrypt helper startup failed.*exit=23.*node helper unavailable/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:413:3
+✖ api helper startup failure reports exit and safe first stderr line (113.754333ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /api helper startup failed.*exit=23.*node helper unavailable/. Input:
+
+  'usage: restore-drill.py [-h] [--backup BACKUP] --live-db LIVE_DB\n' +
+    '                        --attachments ATTACHMENTS\n' +
+    '                        --live-attachments LIVE_ATTACHMENTS\n' +
+    '                        --secretbox-key SECRETBOX_KEY --scratch SCRATCH\n' +
+    '                        --report REPORT\n' +
+    'restore-drill.py: error: unrecognized arguments: --mode compare\n'
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:417:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'usage: restore-drill.py [-h] [--backup BACKUP] --live-db LIVE_DB\n                        --attachments ATTACHMENTS\n                        --live-attachments LIVE_ATTACHMENTS\n                        --secretbox-key SECRETBOX_KEY --scratch SCRATCH\n                        --report REPORT\nrestore-drill.py: error: unrecognized arguments: --mode compare\n',
+    expected: /api helper startup failed.*exit=23.*node helper unavailable/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:423:1
+✖ unknown helper stderr is withheld from all published diagnostics (142.335459ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /decrypt helper startup failed.*exit=23.*stderr withheld/. Input:
+
+  'usage: restore-drill.py [-h] [--backup BACKUP] --live-db LIVE_DB\n' +
+    '                        --attachments ATTACHMENTS\n' +
+    '                        --live-attachments LIVE_ATTACHMENTS\n' +
+    '                        --secretbox-key SECRETBOX_KEY --scratch SCRATCH\n' +
+    '                        --report REPORT\n' +
+    'restore-drill.py: error: unrecognized arguments: --mode compare\n'
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:426:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'usage: restore-drill.py [-h] [--backup BACKUP] --live-db LIVE_DB\n                        --attachments ATTACHMENTS\n                        --live-attachments LIVE_ATTACHMENTS\n                        --secretbox-key SECRETBOX_KEY --scratch SCRATCH\n                        --report REPORT\nrestore-drill.py: error: unrecognized arguments: --mode compare\n',
+    expected: /decrypt helper startup failed.*exit=23.*stderr withheld/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:434:1
+✖ node resolution failure is classified before isolated helpers (142.042875ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /node helper startup failed.*exit=23/. Input:
+
+  'usage: restore-drill.py [-h] [--backup BACKUP] --live-db LIVE_DB\n' +
+    '                        --attachments ATTACHMENTS\n' +
+    '                        --live-attachments LIVE_ATTACHMENTS\n' +
+    '                        --secretbox-key SECRETBOX_KEY --scratch SCRATCH\n' +
+    '                        --report REPORT\n' +
+    'restore-drill.py: error: unrecognized arguments: --mode compare\n'
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:437:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'usage: restore-drill.py [-h] [--backup BACKUP] --live-db LIVE_DB\n                        --attachments ATTACHMENTS\n                        --live-attachments LIVE_ATTACHMENTS\n                        --secretbox-key SECRETBOX_KEY --scratch SCRATCH\n                        --report REPORT\nrestore-drill.py: error: unrecognized arguments: --mode compare\n',
+    expected: /node helper startup failed.*exit=23/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:447:3
+✖ undated todo.spec corruption is rejected (129.425875ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /content todo.*differing/. Input:
+
+  'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n' +
+    '                                    --attachments ATTACHMENTS\n' +
+    '                                    --live-attachments LIVE_ATTACHMENTS\n' +
+    '                                    --secretbox-key SECRETBOX_KEY\n' +
+    '                                    --scratch SCRATCH --report REPORT\n' +
+    'restore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n'
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:105:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:451:5)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n                                    --attachments ATTACHMENTS\n                                    --live-attachments LIVE_ATTACHMENTS\n                                    --secretbox-key SECRETBOX_KEY\n                                    --scratch SCRATCH --report REPORT\nrestore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n',
+    expected: /content todo.*differing/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:447:3
+✖ undated todo.title corruption is rejected (119.520625ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /content todo.*differing/. Input:
+
+  'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n' +
+    '                                    --attachments ATTACHMENTS\n' +
+    '                                    --live-attachments LIVE_ATTACHMENTS\n' +
+    '                                    --secretbox-key SECRETBOX_KEY\n' +
+    '                                    --scratch SCRATCH --report REPORT\n' +
+    'restore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n'
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:105:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:451:5)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n                                    --attachments ATTACHMENTS\n                                    --live-attachments LIVE_ATTACHMENTS\n                                    --secretbox-key SECRETBOX_KEY\n                                    --scratch SCRATCH --report REPORT\nrestore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n',
+    expected: /content todo.*differing/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:447:3
+✖ undated project.localPath corruption is rejected (123.617542ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /content project.*differing/. Input:
+
+  'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n' +
+    '                                    --attachments ATTACHMENTS\n' +
+    '                                    --live-attachments LIVE_ATTACHMENTS\n' +
+    '                                    --secretbox-key SECRETBOX_KEY\n' +
+    '                                    --scratch SCRATCH --report REPORT\n' +
+    'restore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n'
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:105:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:451:5)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n                                    --attachments ATTACHMENTS\n                                    --live-attachments LIVE_ATTACHMENTS\n                                    --secretbox-key SECRETBOX_KEY\n                                    --scratch SCRATCH --report REPORT\nrestore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n',
+    expected: /content project.*differing/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:447:3
+✖ undated project.githubRepo corruption is rejected (119.937708ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /content project.*differing/. Input:
+
+  'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n' +
+    '                                    --attachments ATTACHMENTS\n' +
+    '                                    --live-attachments LIVE_ATTACHMENTS\n' +
+    '                                    --secretbox-key SECRETBOX_KEY\n' +
+    '                                    --scratch SCRATCH --report REPORT\n' +
+    'restore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n'
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:105:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:451:5)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n                                    --attachments ATTACHMENTS\n                                    --live-attachments LIVE_ATTACHMENTS\n                                    --secretbox-key SECRETBOX_KEY\n                                    --scratch SCRATCH --report REPORT\nrestore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n',
+    expected: /content project.*differing/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:447:3
+✖ undated team.name corruption is rejected (113.085958ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /content team.*differing/. Input:
+
+  'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n' +
+    '                                    --attachments ATTACHMENTS\n' +
+    '                                    --live-attachments LIVE_ATTACHMENTS\n' +
+    '                                    --secretbox-key SECRETBOX_KEY\n' +
+    '                                    --scratch SCRATCH --report REPORT\n' +
+    'restore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n'
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:105:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:451:5)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB\n                                    --attachments ATTACHMENTS\n                                    --live-attachments LIVE_ATTACHMENTS\n                                    --secretbox-key SECRETBOX_KEY\n                                    --scratch SCRATCH --report REPORT\nrestore-drill-test-driver.py: error: unrecognized arguments: --mode compare\n',
+    expected: /content team.*differing/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:454:1
+✖ todo differences require a later version or phase timestamp (113.954625ms)
+  AssertionError [ERR_ASSERTION]: usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB
+                                      --attachments ATTACHMENTS
+                                      --live-attachments LIVE_ATTACHMENTS
+                                      --secretbox-key SECRETBOX_KEY
+                                      --scratch SCRATCH --report REPORT
+  restore-drill-test-driver.py: error: unrecognized arguments: --mode compare
+
+
+  2 !== 0
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:458:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:463:3
+✖ hourly mode tolerates ordinary changes before the drill and removes successful scratch (103.827291ms)
+  AssertionError [ERR_ASSERTION]: usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB
+                                      --attachments ATTACHMENTS
+                                      --live-attachments LIVE_ATTACHMENTS
+                                      --secretbox-key SECRETBOX_KEY
+                                      --scratch SCRATCH --report REPORT
+  restore-drill-test-driver.py: error: unrecognized arguments: --mode compare --mode hourly
+
+
+  2 !== 0
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:472:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:463:3
+✖ fresh mode tolerates ordinary changes before the drill and removes successful scratch (109.140417ms)
+  AssertionError [ERR_ASSERTION]: usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB
+                                      --attachments ATTACHMENTS
+                                      --live-attachments LIVE_ATTACHMENTS
+                                      --secretbox-key SECRETBOX_KEY
+                                      --scratch SCRATCH --report REPORT
+  restore-drill-test-driver.py: error: unrecognized arguments: --mode compare --mode fresh
+
+
+  2 !== 0
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:472:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:480:1
+✖ API wrapper never creates a missing key (799.4995ms)
+  AssertionError [ERR_ASSERTION]: api helper started
+
+
+  1 !== 0
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:490:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:495:1
+✖ weekly launcher configures checkout and preflights runtime dependencies (0.375917ms)
+  AssertionError [ERR_ASSERTION]: The input was expected to not match the regular expression /Code\/AgentProjects/. Input:
+
+  '[Unit]\n' +
+    'Description=Cairn weekly database restore drill\n' +
+    '\n' +
+    '[Service]\n' +
+    'Type=oneshot\n' +
+    'UMask=0077\n' +
+    'Nice=10\n' +
+    'RuntimeDirectory=cairn-restore-drill\n' +
+    'EnvironmentFile=%h/.config/cairn/restore-drill.env\n' +
+    'WorkingDirectory=%h/Code/AgentProjects/cairn\n' +
+    'ExecStart=%h/Code/AgentProjects/cairn/scripts/ops/restore-drill.sh --backup ${BACKUP_DIR} --live-db ${LIVE_DB} --attachments ${BACKUP_ATTACHMENTS} --live-attachments ${LIVE_ATTACHMENTS} --secretbox-key ${SECRETBOX_KEY} --scratch %t/cairn-restore-drill/run --report %h/.local/state/cairn/restore-drill.json\n' +
+    'TimeoutStartSec=30min\n' +
+    '\n' +
+    '[Install]\n' +
+    'WantedBy=default.target\n'
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:497:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '[Unit]\nDescription=Cairn weekly database restore drill\n\n[Service]\nType=oneshot\nUMask=0077\nNice=10\nRuntimeDirectory=cairn-restore-drill\nEnvironmentFile=%h/.config/cairn/restore-drill.env\nWorkingDirectory=%h/Code/AgentProjects/cairn\nExecStart=%h/Code/AgentProjects/cairn/scripts/ops/restore-drill.sh --backup ${BACKUP_DIR} --live-db ${LIVE_DB} --attachments ${BACKUP_ATTACHMENTS} --live-attachments ${LIVE_ATTACHMENTS} --secretbox-key ${SECRETBOX_KEY} --scratch %t/cairn-restore-drill/run --report %h/.local/state/cairn/restore-drill.json\nTimeoutStartSec=30min\n\n[Install]\nWantedBy=default.target\n',
+    expected: /Code\/AgentProjects/,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }
+✖ undated machine heartbeat differences fail conservatively (1361.917791ms)
+✖ undated todo.spec corruption is rejected (890.323ms)
+✖ undated todo.title corruption is rejected (866.940584ms)
+✖ undated project.localPath corruption is rejected (908.251916ms)
+✖ undated project.githubRepo corruption is rejected (880.811708ms)
+✖ undated team.name corruption is rejected (866.643375ms)
+✖ todo differences require a later version or phase timestamp (919.88375ms)
+✖ hourly mode tolerates ordinary changes before the drill and removes successful scratch (111.095958ms)
+✖ fresh mode tolerates ordinary changes before the drill and removes successful scratch (105.218083ms)
+✖ API wrapper never creates a missing key (587.558208ms)
+✖ weekly launcher configures checkout and preflights runtime dependencies (0.471916ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 0
+ℹ fail 11
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7570.829125
+
+✖ failing tests:
+
+test at scripts/ops/restore-drill.test.mjs:225:1
+✖ undated machine heartbeat differences fail conservatively (1361.917791ms)
+  AssertionError [ERR_ASSERTION]: PASS restore-drill; decrypt ok
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:102:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:235:3)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 0,
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:445:3
+✖ undated todo.spec corruption is rejected (890.323ms)
+  AssertionError [ERR_ASSERTION]: PASS restore-drill; decrypt ok
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:102:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:449:5)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 0,
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:445:3
+✖ undated todo.title corruption is rejected (866.940584ms)
+  AssertionError [ERR_ASSERTION]: PASS restore-drill; decrypt ok
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:102:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:449:5)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 0,
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:445:3
+✖ undated project.localPath corruption is rejected (908.251916ms)
+  AssertionError [ERR_ASSERTION]: PASS restore-drill; decrypt ok
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:102:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:449:5)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 0,
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:445:3
+✖ undated project.githubRepo corruption is rejected (880.811708ms)
+  AssertionError [ERR_ASSERTION]: PASS restore-drill; decrypt ok
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:102:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:449:5)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 0,
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:445:3
+✖ undated team.name corruption is rejected (866.643375ms)
+  AssertionError [ERR_ASSERTION]: PASS restore-drill; decrypt ok
+
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:102:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:449:5)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 0,
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:452:1
+✖ todo differences require a later version or phase timestamp (919.88375ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  0 !== 1
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:457:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:461:3
+✖ hourly mode tolerates ordinary changes before the drill and removes successful scratch (111.095958ms)
+  AssertionError [ERR_ASSERTION]: usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB
+                                      --attachments ATTACHMENTS
+                                      --live-attachments LIVE_ATTACHMENTS
+                                      --secretbox-key SECRETBOX_KEY
+                                      --scratch SCRATCH --report REPORT
+  restore-drill-test-driver.py: error: unrecognized arguments: --mode hourly
+
+
+  2 !== 0
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:470:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:461:3
+✖ fresh mode tolerates ordinary changes before the drill and removes successful scratch (105.218083ms)
+  AssertionError [ERR_ASSERTION]: usage: restore-drill-test-driver.py [-h] [--backup BACKUP] --live-db LIVE_DB
+                                      --attachments ATTACHMENTS
+                                      --live-attachments LIVE_ATTACHMENTS
+                                      --secretbox-key SECRETBOX_KEY
+                                      --scratch SCRATCH --report REPORT
+  restore-drill-test-driver.py: error: unrecognized arguments: --mode fresh
+
+
+  2 !== 0
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:470:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:478:1
+✖ API wrapper never creates a missing key (587.558208ms)
+  AssertionError [ERR_ASSERTION]: api helper started
+
+
+  1 !== 0
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:488:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:493:1
+✖ weekly launcher configures checkout and preflights runtime dependencies (0.471916ms)
+  AssertionError [ERR_ASSERTION]: The input was expected to not match the regular expression /Code\/AgentProjects/. Input:
+
+  '[Unit]\n' +
+    'Description=Cairn weekly database restore drill\n' +
+    '\n' +
+    '[Service]\n' +
+    'Type=oneshot\n' +
+    'UMask=0077\n' +
+    'Nice=10\n' +
+    'RuntimeDirectory=cairn-restore-drill\n' +
+    'EnvironmentFile=%h/.config/cairn/restore-drill.env\n' +
+    'WorkingDirectory=%h/Code/AgentProjects/cairn\n' +
+    'ExecStart=%h/Code/AgentProjects/cairn/scripts/ops/restore-drill.sh --backup ${BACKUP_DIR} --live-db ${LIVE_DB} --attachments ${BACKUP_ATTACHMENTS} --live-attachments ${LIVE_ATTACHMENTS} --secretbox-key ${SECRETBOX_KEY} --scratch %t/cairn-restore-drill/run --report %h/.local/state/cairn/restore-drill.json\n' +
+    'TimeoutStartSec=30min\n' +
+    '\n' +
+    '[Install]\n' +
+    'WantedBy=default.target\n'
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:495:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '[Unit]\nDescription=Cairn weekly database restore drill\n\n[Service]\nType=oneshot\nUMask=0077\nNice=10\nRuntimeDirectory=cairn-restore-drill\nEnvironmentFile=%h/.config/cairn/restore-drill.env\nWorkingDirectory=%h/Code/AgentProjects/cairn\nExecStart=%h/Code/AgentProjects/cairn/scripts/ops/restore-drill.sh --backup ${BACKUP_DIR} --live-db ${LIVE_DB} --attachments ${BACKUP_ATTACHMENTS} --live-attachments ${LIVE_ATTACHMENTS} --secretbox-key ${SECRETBOX_KEY} --scratch %t/cairn-restore-drill/run --report %h/.local/state/cairn/restore-drill.json\nTimeoutStartSec=30min\n\n[Install]\nWantedBy=default.target\n',
+    expected: /Code\/AgentProjects/,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }
+✖ hourly recovery does not require current live rows or attachment files (816.509291ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 868.834042
+
+✖ failing tests:
+
+test at scripts/ops/restore-drill.test.mjs:505:1
+✖ hourly recovery does not require current live rows or attachment files (816.509291ms)
+  AssertionError [ERR_ASSERTION]: FAIL inputs: inputs missing
+
+
+  1 !== 0
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:509:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

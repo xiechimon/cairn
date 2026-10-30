@@ -5,5 +5,5 @@ Level: 2
 Safeguard: Explicit fixture regressions for invalid SQLite, attachment size, missing key, live DB scratch equality and strict machine fields
 Intercepts: 0
 Recurrences: 0
-Notes: Initial 17 cases ran red before implementation; supplemental passing cases cannot establish test-first ordering. They make these edge behaviors executable, while the acceptance record explicitly limits the process claim.
+Notes: Initial 17 cases ran red before implementation; supplemental passing cases cannot establish test-first ordering. The first review-round red invocation supplied an unsupported mode; the focused rerun reproduced the intended content failures before implementation. They make these edge behaviors executable, while the acceptance record explicitly limits the process claim.
 ---

@@ -1165,7 +1165,7 @@
   },
   "verification-command-context": {
     "Intercepts": 1,
-    "Recurrences": 0
+    "Recurrences": 1
   },
   "verifier-container-evidence": {
     "Intercepts": 1,

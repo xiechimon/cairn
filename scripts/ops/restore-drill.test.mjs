@@ -75,6 +75,8 @@ function fixture() {
         production ? 'bash' : 'python3',
         [
           production ? script : join(root, 'scripts/ops/restore-drill-test-driver.py'),
+          '--mode',
+          'compare',
           '--backup',
           backup,
           '--live-db',
@@ -222,7 +224,7 @@ test('migration ledger rows with null declared ids are compared rather than skip
   f.pack();
   fails(f, /__drizzle_migrations.*1.*differing/);
 });
-test('machine heartbeat allowlist is reported while machine name remains strict', () => {
+test('undated machine heartbeat differences fail conservatively', () => {
   const f = fixture();
   const team = sql(f.db, 'select id from team limit 1');
   for (const db of [f.db, f.backupDb])
@@ -232,11 +234,7 @@ test('machine heartbeat allowlist is reported while machine name remains strict'
     );
   f.pack();
   sql(f.db, 'update machine set lastSeenAt=2');
-  const r = f.run();
-  assert.equal(r.status, 0, r.stderr);
-  const report = JSON.parse(readFileSync(f.report));
-  assert.equal(report.tables.machine.allowedMutable, 1);
-  assert.match(report.tables.machine.allowlist.reason, /heartbeat/);
+  fails(f, /machine.*machine.*differing/);
 });
 test('missing ready attachment names its storage key', () => {
   const f = fixture();
@@ -253,7 +251,7 @@ test('weekly units isolate scratch and do not install themselves', () => {
   const timer = readFileSync(join(root, 'scripts/ops/systemd/cairn-restore-drill.timer'), 'utf8');
   assert.match(service, /UMask=0077/);
   assert.match(service, /RuntimeDirectory=cairn-restore-drill/);
-  assert.match(service, /--scratch %t\/cairn-restore-drill\/run/);
+  assert.match(service, /RESTORE_DRILL_SCRATCH=%t\/cairn-restore-drill\/run/);
   assert.match(timer, /OnCalendar=weekly/);
   assert.match(timer, /Persistent=true/);
 });
@@ -438,3 +436,117 @@ test('node resolution failure is classified before isolated helpers', () => {
   const r = f.run([], true, nodeShim(f, 'resolve'));
   assert.match(r.stderr, /node helper startup failed.*exit=23/);
 });
+
+for (const [table, field, value] of [
+  ['todo', 'spec', 'corrupt spec'],
+  ['todo', 'title', 'corrupt title'],
+  ['project', 'localPath', '/wrong'],
+  ['project', 'githubRepo', 'wrong/repo'],
+  ['team', 'name', 'Wrong team'],
+])
+  test(`undated ${table}.${field} corruption is rejected`, () => {
+    const f = fixture();
+    sql(f.backupDb, `update ${table} set ${field}='${value}'`);
+    f.pack();
+    fails(f, new RegExp(`content ${table}.*differing`));
+  });
+
+test('todo differences require a later version or phase timestamp', () => {
+  const f = fixture();
+  sql(f.db, "update todo set spec='later',v=v+1");
+  const r = f.run();
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(JSON.parse(readFileSync(f.report)).tables.todo.changedAfterBackup, 1);
+});
+
+for (const mode of ['hourly', 'fresh'])
+  test(`${mode} mode tolerates ordinary changes before the drill and removes successful scratch`, () => {
+    const f = fixture();
+    sql(
+      f.db,
+      `update message set content='"updated in place"';
+      update chief_message set content='changed',createdAt=2;
+      update secret set name='renamed';
+      delete from attachment;
+      insert into todo(id,teamId,projectId,title,phaseAt,seqNum)
+        select 'new-todo',teamId,projectId,'New',1,2 from todo where id='t'`,
+    );
+    const r = f.run(['--mode', mode]);
+    assert.equal(r.status, 0, r.stderr);
+    const report = JSON.parse(readFileSync(f.report));
+    assert.equal(report.mode, mode);
+    assert.equal(existsSync(f.scratch), false);
+    if (mode === 'hourly') assert.deepEqual(report.tables, {});
+    else assert.equal(report.tables.todo.identical, 2);
+  });
+
+test('API wrapper never creates a missing key', () => {
+  const f = fixture();
+  const home = join(f.dir, 'api-home');
+  mkdirSync(join(home, 'server'), { recursive: true });
+  copyFileSync(f.db, join(home, 'server/server.db'));
+  const sentinel = join(f.dir, 'must-not-create.key');
+  const r = spawnSync(
+    'node',
+    [
+      '--import',
+      'tsx',
+      join(root, 'scripts/ops/restore-drill-api.mts'),
+      home,
+      '--in-process-fixture',
+    ],
+    {
+      cwd: join(root, 'apps/server'),
+      encoding: 'utf8',
+      timeout: 30000,
+      env: { ...process.env, RESTORE_DRILL_KEY_PATH: sentinel },
+    },
+  );
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(existsSync(sentinel), false);
+  assert.equal(existsSync(join(root, 'apps/server/--in-process-fixture')), false);
+});
+
+test('weekly launcher configures checkout and preflights runtime dependencies', () => {
+  const service = readFileSync(
+    join(root, 'scripts/ops/systemd/cairn-restore-drill.service'),
+    'utf8',
+  );
+  assert.doesNotMatch(service, /Code\/AgentProjects/);
+  assert.match(service, /\$\{CAIRN_CHECKOUT\}/);
+  const launcher = readFileSync(join(root, 'scripts/ops/restore-drill-service.sh'), 'utf8');
+  for (const tool of ['node', 'python3', 'sqlite3']) assert.ok(launcher.includes(tool));
+  assert.match(launcher, /tsx/);
+  assert.match(launcher, /--mode fresh/);
+});
+
+test('hourly recovery does not require current live rows or attachment files', () => {
+  const f = fixture();
+  sql(f.db, 'drop table message; delete from todo; delete from attachment');
+  const r = f.run(['--mode', 'hourly', '--live-attachments', join(f.dir, 'absent-live-files')]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(JSON.parse(readFileSync(f.report)).api.count, 1);
+});
+
+for (const [table, field, value] of [
+  ['agent', 'persona', 'builder'],
+  ['agent', 'tools', '["wrong"]'],
+  ['agent', 'secrets', '["wrong"]'],
+  ['tag', 'name', 'Wrong tag'],
+  ['tag', 'color', '#000000'],
+])
+  test(`undated ${table}.${field} corruption is rejected`, () => {
+    const f = fixture();
+    const team = sql(f.db, 'select id from team limit 1');
+    for (const db of [f.db, f.backupDb]) {
+      sql(
+        db,
+        table === 'agent'
+          ? `insert into agent(id,teamId,displayName) values('test-agent','${team}','Agent')`
+          : "insert into tag(id,projectId,name) values('test-tag','p','Tag')",
+      );
+    }
+    sql(f.backupDb, `update ${table} set ${field}='${value}'`);
+    f.pack();
+    fails(f, new RegExp(`content ${table}.*differing`));
+  });

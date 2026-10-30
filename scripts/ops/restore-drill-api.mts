@@ -4,13 +4,13 @@ import { createApp } from '../../apps/server/src/app.js';
 import { openDbWithHandle } from '../../apps/server/src/db/client.js';
 import { team, todo } from '../../apps/server/src/db/schema.js';
 import { seed } from '../../apps/server/src/db/seed.js';
-import { createKeyfileSecretBox } from '../../apps/server/src/lib/secret-box.js';
+import { createEphemeralSecretBox } from '../../apps/server/src/lib/secret-box.js';
 import { ConversationStreamHub, TeamStreamHub } from '../../apps/server/src/services/events.js';
 import { MachineWakeHub } from '../../apps/server/src/services/machine-wake-hub.js';
 
 console.error('api helper started');
 
-const [home, key, mode] = process.argv.slice(2);
+const [home, mode] = process.argv.slice(2);
 const dataDir = join(home, 'server');
 const opened = openDbWithHandle(join(dataDir, 'server.db'));
 const seeded = seed(opened.db);
@@ -20,7 +20,7 @@ const app = createApp({
   hub: new TeamStreamHub(),
   convHub: new ConversationStreamHub(),
   machineHub: new MachineWakeHub(),
-  secretBox: createKeyfileSecretBox(key),
+  secretBox: createEphemeralSecretBox(),
   vapidKeys: null,
   pingIntervalMs: 3600000,
   claimHoldMs: 250,

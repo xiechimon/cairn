@@ -11,7 +11,7 @@ spec.loader.exec_module(drill)
 
 
 def fixture_api(db, home, env, report, node):
-    run = subprocess.run([node, '--import', 'tsx', str(drill.ROOT / 'scripts/ops/restore-drill-api.mts'), str(home), sys.argv[sys.argv.index('--secretbox-key') + 1], '--in-process-fixture'], cwd=drill.ROOT / 'apps/server', env=env, capture_output=True, text=True, timeout=30)
+    run = subprocess.run([node, '--import', 'tsx', str(drill.ROOT / 'scripts/ops/restore-drill-api.mts'), str(home), '--in-process-fixture'], cwd=drill.ROOT / 'apps/server', env=env, capture_output=True, text=True, timeout=30)
     if run.returncode:
         raise RuntimeError('fixture in-process API failed')
     report['api'] = json.loads(run.stdout)

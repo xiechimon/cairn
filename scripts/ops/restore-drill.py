@@ -18,26 +18,6 @@ import urllib.parse
 import urllib.request
 
 
-MUTABLE_COLUMNS = {
-    'machine': ('online tokenHash apiKeyId latestCliVersion enabledRuntimes claudeCodeReport claudeRateLimits maxConcurrent maxConcurrentOverridden lastSeenAt capabilities', 'Machine registration, configuration and heartbeat update without updatedAt.'),
-    'todo': ('title spec phase phaseAt orderIndex assignment latestBuildId lastRunAt hasChanges hasPlan blockedBy v ownerId output userSpecAttachmentIds userMessageAttachmentIds', 'Todo edits and lifecycle transitions use phaseAt and v rather than updatedAt.'),
-    'build': ('planDocId errorMessage prUrl prNumber changes diffHash baseSha harnessHash reportAttachmentId', 'Build execution and review metadata are updated in place.'),
-    'step': ('machineId status quotaBlock fallback sessionId checkpointCommit claimedAt lastHeartbeatAt finishedAt prompt freshSession skillInjection blockerHandoff holdReason holdUntil holdCount', 'Step execution, claim and heartbeat state are updated in place.'),
-    'token_usage': ('input output cacheRead cacheWrite costInput costOutput costCacheRead costCacheWrite costTotal', 'Usage totals accumulate during execution.'),
-    'notification': ('readAt', 'Reading a notification changes readAt.'),
-    'schedule': ('nextRunAt', 'The scheduler advances nextRunAt after execution.'),
-    'chief': ('charter watches wakes lastTurnAt tz agentId', 'Chief configuration and turn state have no updatedAt.'),
-    'branch_sync': ('status errorMessage startedAt finishedAt', 'Synchronization lifecycle advances in place.'),
-    'attachment': ('status', 'Pending uploads transition to ready or failed.'),
-    'tag': ('name color v', 'Tag edits are versioned by v.'),
-    'team': ('name plan avatarStyle autonomyPaused firstPrReportPromptEnabled firstPrReportPromptDismissedAt firstPrReportPromptFirstPrAt firstPrReportPromptFirstPrNumber', 'Team preferences and onboarding state are edited in place.'),
-    'user': ('displayName avatarUrl', 'Profile edits have no updatedAt.'),
-    'project': ('name splitPolicy description repoKind repoName githubRepo localPath autonomy', 'Project settings have no updatedAt.'),
-    'agent': ('displayName description status avatarUrl provider modelId thinkingLevel persona machineId tools secrets defaultSkill skillsAllowlist mcpServers maxConcurrentTasks requiredCapabilities fallbackModels', 'Agent configuration has no updatedAt.'),
-    'member_activity': ('at', 'Member activity stores the latest write time.'),
-    'autonomy_state': ('lastStartedAt baselineSha lastBlockedReason lastEvaluatedAt', 'Autonomy evaluation state advances in place.'),
-    'schedule_report': ('decidedAt decidedBy appliedAt', 'Review and application of a generated report advance in place.'),
-}
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -99,10 +79,6 @@ def compare(restored, live, stamp, report):
             copies.append(rows)
         old, current = copies
         counts = dict(identical=0, changedAfterBackup=0, missing=0, differing=0, allowedMutable=0, addedAfterBackup=0)
-        allowed, reason = MUTABLE_COLUMNS.get(table, ('', ''))
-        allowed = set(allowed.split()) & set(fields)
-        if allowed:
-            counts['allowlist'] = {'columns': sorted(allowed), 'reason': reason, 'limit': 'Changes to these columns cannot be dated; all other columns remain strict.'}
         for key in old.keys() | current.keys():
             a, b = old.get(key), current.get(key)
             label = '/'.join(str((a or b)[i]) for i in key_indices)
@@ -117,8 +93,8 @@ def compare(restored, live, stamp, report):
                 counts['identical'] += 1
             elif 'updatedAt' in fields and b[fields.index('updatedAt')] is not None and b[fields.index('updatedAt')] > stamp:
                 counts['changedAfterBackup'] += 1
-            elif all(field in allowed or cell(x) == cell(y) for field, x, y in zip(fields, a, b)):
-                counts['allowedMutable'] += 1
+            elif table in {'todo', 'tag'} and (('v' in fields and b[fields.index('v')] > a[fields.index('v')]) or (table == 'todo' and b[fields.index('phaseAt')] > stamp)):
+                counts['changedAfterBackup'] += 1
             else:
                 counts['differing'] += 1
                 errors.append(f'content {table} {label}: differing row')
@@ -222,7 +198,7 @@ def api(db, home, env, report, node):
     env = dict(env, CAIRN_HOME=str(home), CAIRN_SKILLS_DIR=str(home / 'skills'), CAIRN_MCP_CONFIG=str(home / 'mcp.json'), HOST='127.0.0.1', PORT='0', NODE_ENV='production', LOG_LEVEL='info')
     stderr = tempfile.TemporaryFile(mode='w+')
     try:
-        process = subprocess.Popen([node, '--import', 'tsx', str(ROOT / 'scripts/ops/restore-drill-api.mts'), str(home), env['RESTORE_DRILL_KEY_PATH']], cwd=ROOT / 'apps/server', env=env, stdout=subprocess.PIPE, stderr=stderr, text=True)
+        process = subprocess.Popen([node, '--import', 'tsx', str(ROOT / 'scripts/ops/restore-drill-api.mts'), str(home)], cwd=ROOT / 'apps/server', env=env, stdout=subprocess.PIPE, stderr=stderr, text=True)
     except OSError as error:
         stderr.close()
         raise helper_failure('api', error.errno, '') from None
@@ -268,7 +244,7 @@ def api(db, home, env, report, node):
             total += len(todos)
         if total != sum(expected.values()):
             raise RuntimeError('api /api/todos total mismatch')
-        report['api'] = {'count': total, 'teams': len(teams), 'surface': 'checkout server HTTP on restored fixture or host DB', 'provider': 'not exercised'}
+        report['api'] = {'count': total, 'teams': len(teams), 'surface': 'createApp wrapper serving GET /api/todos on restored DB', 'provider': 'not exercised'}
     finally:
         process.terminate()
         try:
@@ -292,6 +268,7 @@ def publish(path, report):
 def main():
     os.umask(0o077)
     parser = argparse.ArgumentParser()
+    parser.add_argument('--mode', choices=['fresh', 'hourly', 'compare'], default='fresh')
     parser.add_argument('--backup', default='.')
     for name in ['live-db', 'attachments', 'live-attachments', 'secretbox-key', 'scratch', 'report']:
         parser.add_argument('--' + name, required=True)
@@ -305,23 +282,30 @@ def main():
     if unsafe_report or inside(report_path, scratch) or inside(Path(str(report_path) + '.status'), scratch):
         print('FAIL report unsafe location', file=sys.stderr)
         return 1
-    report = {'ok': False, 'at': datetime.datetime.now(datetime.timezone.utc).isoformat(), 'tables': {}}
+    report = {'ok': False, 'at': datetime.datetime.now(datetime.timezone.utc).isoformat(), 'tables': {}, 'mode': args.mode}
     item = 'inputs'
     try:
         if inside(scratch, live.parent) or scratch == live or any(inside(p, scratch) for p in [live, key, backup, attachment_copy, attachment_live]):
             raise RuntimeError('scratch overlaps live data or input')
         if scratch.exists():
             raise RuntimeError('scratch already exists; use a new directory')
-        if not live.is_file() or not key.is_file() or not backup.is_file() or not attachment_copy.is_dir() or not attachment_live.is_dir():
+        if (args.mode != 'hourly' and not live.is_file()) or not key.is_file() or (args.mode != 'fresh' and not backup.is_file()) or (args.mode != 'fresh' and not attachment_copy.is_dir()) or (args.mode != 'hourly' and not attachment_live.is_dir()):
             raise RuntimeError('inputs missing')
+        scratch.mkdir(parents=True)
+        if args.mode == 'fresh':
+            item = 'fresh backup'
+            backup_dir = scratch / 'backup'
+            attachment_copy = scratch / 'attachments'
+            subprocess.run(['bash', str(ROOT / 'scripts/ops/backup-server-db.sh'), '--db', str(live), '--out', str(backup_dir), '--attachments', str(attachment_live), '--attachments-out', str(attachment_copy)], check=True, capture_output=True, timeout=600)
+            backup = sorted(backup_dir.glob('server-db-????????T??????Z.db.gz'))[-1]
         match = re.fullmatch(r'server-db-(\d{8}T\d{6}Z)\.db\.gz', backup.name)
         if not match:
             raise RuntimeError('backup timestamp filename invalid')
         stamp = datetime.datetime.strptime(match[1], '%Y%m%dT%H%M%SZ').replace(tzinfo=datetime.timezone.utc).timestamp() * 1000
         report['backupTimestamp'] = match[1]
-        scratch.mkdir(parents=True)
         item = 'snapshot sqlite3 .backup'
-        subprocess.run(['sqlite3', '-readonly', str(live), '.timeout 10000', '.backup live-snapshot.db'], cwd=scratch, check=True, capture_output=True, timeout=60)
+        if args.mode != 'hourly':
+            subprocess.run(['sqlite3', '-readonly', str(live), '.timeout 10000', '.backup live-snapshot.db'], cwd=scratch, check=True, capture_output=True, timeout=60)
         home = scratch / 'home'
         server_dir = home / 'server'
         server_dir.mkdir(parents=True)
@@ -329,30 +313,32 @@ def main():
         item = 'restore gzip'
         with gzip.open(backup, 'rb') as source, restored_path.open('xb') as dest:
             shutil.copyfileobj(source, dest)
-        with readonly(restored_path) as db, readonly(scratch / 'live-snapshot.db') as snapshot:
+        with readonly(restored_path) as db, readonly(restored_path if args.mode == 'hourly' else scratch / 'live-snapshot.db') as snapshot:
             item = 'integrity_check'
             if list(db.execute('pragma integrity_check')) != [('ok',)]:
                 raise RuntimeError('integrity_check failed')
             report['integrity'] = 'ok'
             item = 'relationships'
-            relationships(db, snapshot, stamp, report)
+            relationships(db, db if args.mode == 'hourly' else snapshot, stamp, report)
             item = 'foreign_key_check'
             if list(db.execute('pragma foreign_key_check')):
                 raise RuntimeError('foreign_key_check failed')
             report['foreignKeys'] = 'ok'
             item = 'content'
-            compare(db, snapshot, stamp, report)
+            if args.mode != 'hourly':
+                compare(db, snapshot, stamp, report)
             item = 'attachments'
-            attachments(db, attachment_copy, attachment_live, report)
+            attachments(db, attachment_copy, attachment_copy if args.mode == 'hourly' else attachment_live, report)
             item = 'node resolution'
             node = resolve_node()
             env = {k: v for k, v in os.environ.items() if k in ['PATH', 'TMPDIR', 'SYSTEMROOT']}
             env['HOME'] = str(home)
             item = 'decrypt'
             decrypt(db, key, env, report, node)
-            env['RESTORE_DRILL_KEY_PATH'] = str(key)
             item = 'api'
             api(db, home, env, report, node)
+        item = 'scratch cleanup'
+        shutil.rmtree(scratch)
         report['ok'] = True
     except Exception as error:
         safe_error = str(error) if isinstance(error, RuntimeError) else type(error).__name__
