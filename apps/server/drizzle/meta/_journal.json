@@ -540,6 +540,13 @@
       "when": 1793386640593,
       "tag": "0076_claude_subscription",
       "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "6",
+      "when": 1793390215484,
+      "tag": "0077_team_claude_usage",
+      "breakpoints": true
     }
   ]
 }

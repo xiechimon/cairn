@@ -47,6 +47,7 @@ export function toTeamRecord(row: typeof team.$inferSelect): TeamRecord {
     name: row.name,
     createdAt: row.createdAt,
     plan: row.plan,
+    claudeUsage: row.claudeUsage,
     avatarStyle: row.avatarStyle,
     autonomyPaused: row.autonomyPaused,
     maxAutonomousMergesPerDay: row.maxAutonomousMergesPerDay,

@@ -9,6 +9,7 @@ import {
   CLAUDE_SUBSCRIPTION_PROVIDER_ID,
   claudeRateBlock,
   claudeRateProbeAt,
+  parseLocalMergeInstruction,
 } from '@cairn/shared';
 import { and, eq, or } from 'drizzle-orm';
 import {
@@ -17,11 +18,14 @@ import {
   chief,
   chiefThread,
   machine,
+  provider,
   type QuotaWaitRow,
   step,
+  team,
   todo,
 } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
+import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import {
   agentForStep,
   capabilityGatePasses,
@@ -30,6 +34,7 @@ import {
 } from './dispatch-eligibility.js';
 import { isChiefConversation, type MachineDeps, stepTeamId } from './machine-deps.js';
 import { effectiveModel } from './model-fallback.js';
+import { isClaudeModel } from './model-routing.js';
 import { notifyQuotaWait } from './notifications.js';
 import { publishStepRow } from './quota-wait.js';
 import { getTodo } from './todos.js';
@@ -105,19 +110,83 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
   const now = nowMs();
   const machines = deps.db.select().from(machine).where(eq(machine.teamId, teamId)).all();
   const byId = new Map(machines.map((row) => [row.id, row]));
+  const subscriptionOnly =
+    deps.db.select().from(team).where(eq(team.id, teamId)).get()?.claudeUsage !== 'allow-paid';
+  const providers = deps.db.select().from(provider).where(eq(provider.teamId, teamId)).all();
+  const activeSubscription = hasActiveClaudeSubscription(deps, teamId);
   let changed = false;
   const consider = (
     stepRow: StepRow,
     agentRow: AgentRow,
     todoRow: typeof todo.$inferSelect | null,
   ) => {
+    if (stepRow.kind === 'merge' && parseLocalMergeInstruction(stepRow.prompt) !== null) return;
+    const model = effectiveModel(agentRow, stepRow);
+    const owner = agentRow.machineId ? byId.get(agentRow.machineId) : undefined;
+    const ownerBlock = owner ? claudeRateBlock(owner.claudeRateLimits ?? [], now) : null;
+    const paidTakeover =
+      ownerBlock !== null &&
+      machines.some(
+        (row) =>
+          row.online &&
+          runtimeGatePasses(row, model.provider) &&
+          capabilityGatePasses(row, agentRow) &&
+          claudeRateBlock(row.claudeRateLimits ?? [], now) === null &&
+          /api[-_ ]?key/i.test(row.claudeCodeReport?.auth?.method ?? ''),
+      );
+    const custom = providers.find((entry) => entry.providerId === model.provider);
+    const claude =
+      isClaudeModel(model.provider, model.modelId) || custom?.api === 'anthropic-messages';
+    const paid =
+      stepRuntimeFor(model.provider) !== 'claude-code' ||
+      (!activeSubscription &&
+        (paidTakeover || /api[-_ ]?key/i.test(owner?.claudeCodeReport?.auth?.method ?? '')));
+    if (subscriptionOnly && claude && paid) {
+      if (stepRow.status !== 'pending' && stepRow.status !== 'waiting_quota') return;
+      if (
+        stepRow.quotaBlock?.source === 'subscription_policy' &&
+        stepRow.status === 'waiting_quota'
+      )
+        return;
+      const quota: QuotaWaitRow = {
+        kind: 'quota',
+        providerId: model.provider ?? CLAUDE_SUBSCRIPTION_PROVIDER_ID,
+        label: null,
+        reason: 'subscription-only',
+        retryAfterMs: null,
+        firstSeenAt: now,
+        lastAt: now,
+        attempts: 1,
+        probeAt: now + 7 * 24 * 60 * 60 * 1000,
+        source: 'subscription_policy',
+      };
+      if (
+        writeClaudeQuota(deps, stepRow.id, todoRow?.id ?? null, {
+          status: 'waiting_quota',
+          quotaBlock: quota,
+        })
+      )
+        changed = true;
+      return;
+    }
+    if (
+      stepRow.status === 'waiting_quota' &&
+      stepRow.quotaBlock?.source === 'subscription_policy'
+    ) {
+      if (
+        writeClaudeQuota(deps, stepRow.id, todoRow?.id ?? null, {
+          status: 'pending',
+          quotaBlock: null,
+        })
+      )
+        changed = true;
+      stepRow = { ...stepRow, status: 'pending', quotaBlock: null };
+    }
     if (!usesClaudeCode(agentRow, stepRow)) return;
     if (stepRow.status === 'waiting_quota' && stepRow.quotaBlock?.source !== 'claude_rate_limit') {
       return;
     }
     if (stepRow.status !== 'pending' && stepRow.status !== 'waiting_quota') return;
-    const owner = agentRow.machineId ? byId.get(agentRow.machineId) : undefined;
-    const ownerBlock = owner ? claudeRateBlock(owner.claudeRateLimits ?? [], now) : null;
     const runnable = machines.some((row) => {
       if (!row.online) return false;
       if (!runtimeGatePasses(row, 'claude-code')) return false;
