@@ -392,9 +392,23 @@ export async function finishStep(
       })
       .run();
   }
-  db.delete(stopPending).where(eq(stopPending.conversationId, stepRow.buildId)).run();
-  if (recoverClaudeRateLimitFailure(deps, stepRow, outcome)) return;
+  db.delete(stopPending).where(eq(stopPending.stepId, stepId)).run();
   const worker = workerStepContext(deps, stepRow);
+  if (
+    db.select({ archiveStop: step.archiveStop }).from(step).where(eq(step.id, stepId)).get()
+      ?.archiveStop != null
+  ) {
+    releaseUnconsumedSteer(db, stepRow);
+    if (worker?.agentRow)
+      recordProviderOutcome(effectiveModel(worker.agentRow, stepRow).provider, outcome, false);
+    if (outcome.skillInjectionFacts !== undefined)
+      recordSkillInjectionCheck(deps, stepRow, outcome.skillInjectionFacts);
+    applyStoppedStep(deps, stepId);
+    publishStepStatus(deps, stepId);
+    emitRuntimeStepSpan(deps.db, stepId);
+    return;
+  }
+  if (recoverClaudeRateLimitFailure(deps, stepRow, outcome)) return;
   const zeroUsage = worker !== null && isZeroUsageSilentSuccess(stepRow.kind, outcome);
   if (worker?.agentRow) {
     recordProviderOutcome(effectiveModel(worker.agentRow, stepRow).provider, outcome, zeroUsage);

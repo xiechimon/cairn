@@ -12,6 +12,7 @@ import {
   notification,
   project,
   step,
+  stopPending,
   team,
   todo,
 } from '../src/db/schema.js';
@@ -634,3 +635,42 @@ test('a late landing for a failed local command restores a refused admission exa
   expect(f.s.db.select().from(autonomousMergeAdmission).get()?.state).toBe('merged');
   expect(f.s.db.select().from(step).where(eq(step.id, row.id)).get()?.status).toBe('failed');
 });
+
+for (const outcome of ['merged', 'held', 'recheck', 'checks-failed'] as const) {
+  test(`local merge ${outcome} explicitly clears its pending stop and archive marker`, async () => {
+    const f = await fixture();
+    await enqueueLocalMerge(f.deps, 'build', 'main');
+    const row = f.s.db
+      .select()
+      .from(step)
+      .all()
+      .find((r) => r.kind === 'merge')!;
+    f.s.db
+      .update(step)
+      .set({ status: 'claimed', machineId: 'machine', archiveStop: 'requested' })
+      .where(eq(step.id, row.id))
+      .run();
+    f.s.db
+      .insert(stopPending)
+      .values({ conversationId: 'build', stepId: row.id, discard: false, createdAt: Date.now() })
+      .run();
+    const command = JSON.parse(row.prompt ?? '{}').command;
+    applyLocalMergeReport(
+      f.deps,
+      { ...row, status: 'claimed', machineId: 'machine', archiveStop: 'requested' },
+      {
+        command,
+        result:
+          outcome === 'merged'
+            ? { outcome, commit: 'f'.repeat(40) }
+            : { outcome, reason: 'worktree-dirty' },
+      },
+    );
+    expect(f.s.db.select().from(step).where(eq(step.id, row.id)).get()).toMatchObject({
+      status: 'done',
+      archiveStop: null,
+    });
+    expect(f.s.db.select().from(stopPending).all()).toEqual([]);
+    expect(f.s.db.select().from(todo).get()?.phase).toBe(outcome === 'merged' ? 'done' : 'review');
+  });
+}

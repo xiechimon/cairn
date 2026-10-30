@@ -321,8 +321,11 @@ export function applyStoppedStep(deps: BuildDeps, stepId: string): void {
   const stepRow = db.select().from(step).where(eq(step.id, stepId)).get();
   if (!stepRow) throw new NotFoundError(`step ${stepId}`);
   releaseUnissuedMergeAdmission(db, stepRow);
-  db.update(step).set({ status: 'stopped', finishedAt: nowMs() }).where(eq(step.id, stepId)).run();
-  db.delete(stopPending).where(eq(stopPending.conversationId, stepRow.buildId)).run();
+  db.update(step)
+    .set({ status: 'stopped', finishedAt: nowMs(), archiveStop: null })
+    .where(eq(step.id, stepId))
+    .run();
+  db.delete(stopPending).where(eq(stopPending.stepId, stepId)).run();
   const stoppedRow = db.select().from(step).where(eq(step.id, stepId)).get();
   if (stoppedRow) publishStepRow(deps, stoppedRow);
   const buildRow = db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
@@ -334,12 +337,12 @@ export function applyStoppedStep(deps: BuildDeps, stepId: string): void {
   if (!todoRow) return;
   const desired = afterStopPhaseByBuild.get(buildRow.id);
   afterStopPhaseByBuild.delete(buildRow.id);
-  if (desired === 'keep') return;
-  if (desired != null) {
+  if (stepRow.archiveStop === null && desired === 'keep') return;
+  if (desired != null && desired !== 'keep') {
     landReservedPhase(deps, todoRow, desired);
     return;
   }
-  if (hasLeftExecution(todoRow.phase)) return;
+  if (todoRow.latestBuildId !== buildRow.id || hasLeftExecution(todoRow.phase)) return;
   const target = stopFallbackPhase(db, buildRow);
   if (todoRow.phase === target) return;
   db.update(todo)
@@ -356,7 +359,7 @@ function releaseZombieQueued(
   todoRow: typeof todo.$inferSelect,
 ): void {
   const { db } = deps;
-  if (todoRow.phase !== 'queued') return;
+  if (todoRow.archivedAt !== null || todoRow.phase !== 'queued') return;
   if (buildRow.errorMessage === null) {
     db.update(build).set({ errorMessage: STOP_MESSAGE }).where(eq(build.id, buildRow.id)).run();
   }
@@ -417,9 +420,16 @@ function stopStepKeepPhase(deps: BuildDeps, stepId: string): void {
   const { db } = deps;
   const stepRow = db.select().from(step).where(eq(step.id, stepId)).get();
   if (!stepRow) throw new NotFoundError(`step ${stepId}`);
+  if (stepRow.archiveStop !== null) {
+    applyStoppedStep(deps, stepId);
+    return;
+  }
   releaseUnissuedMergeAdmission(db, stepRow);
-  db.update(step).set({ status: 'stopped', finishedAt: nowMs() }).where(eq(step.id, stepId)).run();
-  db.delete(stopPending).where(eq(stopPending.conversationId, stepRow.buildId)).run();
+  db.update(step)
+    .set({ status: 'stopped', finishedAt: nowMs(), archiveStop: null })
+    .where(eq(step.id, stepId))
+    .run();
+  db.delete(stopPending).where(eq(stopPending.stepId, stepId)).run();
   const stoppedRow = db.select().from(step).where(eq(step.id, stepId)).get();
   if (stoppedRow) publishStepRow(deps, stoppedRow);
   const buildRow = db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
@@ -462,6 +472,22 @@ export function stopActiveStepsAfterExit(deps: BuildDeps, todoId: string): void 
   prepareStopFor(deps, todoId, 'exit');
 }
 
+export function stopActiveStepsForArchive(deps: BuildDeps, todoId: string): void {
+  const rows = deps.db
+    .select({ stepRow: step, teamId: todo.teamId })
+    .from(step)
+    .innerJoin(build, eq(step.buildId, build.id))
+    .innerJoin(todo, eq(build.todoId, todo.id))
+    .where(and(eq(todo.id, todoId), inArray(step.status, ['pending', 'claimed', 'waiting_quota'])))
+    .all();
+  for (const { stepRow, teamId } of rows) {
+    deps.db.update(step).set({ archiveStop: 'requested' }).where(eq(step.id, stepRow.id)).run();
+    deps.db.delete(stopPending).where(eq(stopPending.stepId, stepRow.id)).run();
+    if (stepRow.status !== 'claimed') applyStoppedStep(deps, stepRow.id);
+    else deps.machineHub?.stopSignal(teamId, stepRow.id);
+  }
+}
+
 function prepareStopFor(
   deps: BuildDeps,
   todoId: string,
@@ -501,7 +527,11 @@ function prepareStopFor(
 }
 
 export function sweepZombieQueuedTodos(deps: BuildDeps, _now: number = nowMs()): number {
-  const rows = deps.db.select().from(todo).where(eq(todo.phase, 'queued')).all();
+  const rows = deps.db
+    .select()
+    .from(todo)
+    .where(and(eq(todo.phase, 'queued'), isNull(todo.archivedAt)))
+    .all();
   let released = 0;
   for (const todoRow of rows) {
     if (todoRow.latestBuildId === null) continue;
@@ -640,6 +670,7 @@ export function startBuilds(
             .from(build)
             .where(eq(build.id, todoRecord.latestBuildId))
             .get();
+    if (todoRecord.archivedAt != null) throw new HttpError(409, 'Unarchive to continue');
     assertSplitProposalExecutable(previous?.errorMessage ?? null);
   }
   const created: BuildRecord[] = [];
@@ -912,6 +943,7 @@ function applyBuildConfirm(deps: BuildDeps, buildId: string, actorName: string):
   assertSplitProposalExecutable(row.errorMessage);
   const todoRecord = getTodo(deps, row.todoId);
   if (!todoRecord) throw new NotFoundError(`todo ${row.todoId}`);
+  if (todoRecord.archivedAt != null) throw new HttpError(409, 'Unarchive to continue');
   if (todoRecord.phase !== 'confirm') {
     throw new HttpError(409, `确认仅适用于待确认（confirm）关口，当前相位 ${todoRecord.phase}`);
   }
@@ -940,6 +972,7 @@ export async function applyBuildStepAction(
   assertSplitProposalExecutable(row.errorMessage);
   let todoRecord = getTodo(deps, row.todoId);
   if (!todoRecord) throw new NotFoundError(`todo ${row.todoId}`);
+  if (todoRecord.archivedAt != null) throw new HttpError(409, 'Unarchive to continue');
   const actorName = actor ?? deps.user.displayName;
 
   if (body.action === 'restart') {
@@ -1226,6 +1259,7 @@ export async function requestMerge(
   if (!row) throw new NotFoundError(`build ${buildId}`);
   let todoRow = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
   if (!todoRow) throw new NotFoundError(`todo ${row.todoId}`);
+  if (todoRow.archivedAt !== null) throw new HttpError(409, 'Unarchive to continue');
   if (todoRow.output === 'info') throw new HttpError(409, INFO_CARD_MERGE_REFUSAL);
   const inFlight = deps.db
     .select({ id: step.id })
@@ -1874,6 +1908,14 @@ export function applyStepFailure(
   preservedCommits?: readonly string[],
 ): void {
   const { db } = deps;
+  db.delete(stopPending).where(eq(stopPending.stepId, stepRow.id)).run();
+  if (
+    db.select({ archiveStop: step.archiveStop }).from(step).where(eq(step.id, stepRow.id)).get()
+      ?.archiveStop != null
+  ) {
+    applyStoppedStep(deps, stepRow.id);
+    return;
+  }
   releaseUnissuedMergeAdmission(db, stepRow);
   const errorMessage =
     rawErrorMessage.trim() === '' ? `${stepRow.kind} 步异常结束，未上报原因` : rawErrorMessage;
@@ -1921,7 +1963,7 @@ export function applyStepFailure(
     blocked: false,
     report: report ?? reportedVerdictHeads(failedStep, { commit: failedStep.checkpointCommit }),
   });
-  if (todoRow && canTransitionPhase(todoRow.phase, 'failed')) {
+  if (todoRow && todoRow.archivedAt === null && canTransitionPhase(todoRow.phase, 'failed')) {
     setTodoPhase(deps, todoRow.id, 'failed');
   }
 }
@@ -1959,7 +2001,7 @@ export function sweepAbandonedBuildSteps(deps: BuildDeps, now: number = nowMs())
     .innerJoin(todo, eq(build.todoId, todo.id))
     .where(
       and(
-        inArray(todo.phase, ['closed', 'done']),
+        or(isNotNull(todo.archivedAt), inArray(todo.phase, ['closed', 'done'])),
         inArray(step.status, ['pending', 'waiting_quota']),
       ),
     )
@@ -1989,7 +2031,13 @@ export function sweepAbandonedBuildSteps(deps: BuildDeps, now: number = nowMs())
       const progressed =
         row.lastHeartbeatAt !== null && row.lastHeartbeatAt > (row.claimedAt ?? row.createdAt);
       if (machineRow === undefined || !machineRow.online || !progressed) {
-        if (todoRow.phase === 'closed' || todoRow.phase === 'done') stopStepKeepPhase(deps, row.id);
+        if (
+          row.archiveStop !== null ||
+          todoRow.archivedAt !== null ||
+          todoRow.phase === 'closed' ||
+          todoRow.phase === 'done'
+        )
+          stopStepKeepPhase(deps, row.id);
         else releaseClaimedStep(deps, row, todoRow);
       }
     }
@@ -2001,6 +2049,10 @@ function releaseClaimedStep(
   row: typeof step.$inferSelect,
   todoRow: typeof todo.$inferSelect,
 ): void {
+  if (row.archiveStop !== null) {
+    applyStoppedStep(deps, row.id);
+    return;
+  }
   if (row.kind === 'merge' && row.prompt?.includes('"local-merge"')) {
     const projectRow = projectOfTodo(deps.db, todoRow);
     if (projectRow && projectMergeConfigOf(projectRow).mergePolicy === 'autonomous') return;
@@ -2103,7 +2155,11 @@ export const PLAN_AUTO_CONFIRM_GRACE_MS = 10 * 60_000;
 export function sweepPlanAutoConfirm(deps: BuildDeps, now: number = nowMs()): void {
   const waiting = deps.db.select().from(todo).where(eq(todo.phase, 'confirm')).all();
   for (const todoRow of waiting) {
-    if (todoRow.latestBuildId === null || now - todoRow.phaseAt < PLAN_AUTO_CONFIRM_GRACE_MS) {
+    if (
+      todoRow.archivedAt !== null ||
+      todoRow.latestBuildId === null ||
+      now - todoRow.phaseAt < PLAN_AUTO_CONFIRM_GRACE_MS
+    ) {
       continue;
     }
     const buildId = todoRow.latestBuildId;
@@ -2201,6 +2257,11 @@ export function completeStep(
 ): void {
   const stepRow = deps.db.select().from(step).where(eq(step.id, stepId)).get();
   if (!stepRow) throw new NotFoundError(`step ${stepId}`);
+  deps.db.delete(stopPending).where(eq(stopPending.stepId, stepId)).run();
+  if (stepRow.archiveStop !== null) {
+    applyStoppedStep(deps, stepId);
+    return;
+  }
   const buildRow = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
   if (!buildRow) {
     deps.db
@@ -2221,7 +2282,12 @@ export function completeStep(
   }
   const reserved = afterStopPhaseByBuild.get(buildRow.id);
   const staleBuild = todoRow.latestBuildId !== null && todoRow.latestBuildId !== buildRow.id;
-  if (reserved !== undefined || staleBuild || hasLeftExecution(todoRow.phase)) {
+  if (
+    todoRow.archivedAt !== null ||
+    reserved !== undefined ||
+    staleBuild ||
+    hasLeftExecution(todoRow.phase)
+  ) {
     afterStopPhaseByBuild.delete(buildRow.id);
     deps.db
       .update(step)

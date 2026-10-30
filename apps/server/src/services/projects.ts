@@ -11,7 +11,17 @@ import {
 } from '@cairn/shared';
 import { and, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { agentMemory, build, chief, project, schedule, step, tag, todo } from '../db/schema.js';
+import {
+  agentMemory,
+  build,
+  chief,
+  project,
+  schedule,
+  step,
+  stopPending,
+  tag,
+  todo,
+} from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
 import { githubRepoReachable } from '../lib/github.js';
@@ -81,7 +91,10 @@ export function deleteProject(deps: ProjectDeps, id: string): boolean {
           .map((r) => r.id)
       : [];
   db.transaction((tx) => {
-    if (buildIds.length > 0) tx.delete(step).where(inArray(step.buildId, buildIds)).run();
+    if (buildIds.length > 0) {
+      tx.delete(stopPending).where(inArray(stopPending.conversationId, buildIds)).run();
+      tx.delete(step).where(inArray(step.buildId, buildIds)).run();
+    }
     tx.delete(schedule).where(eq(schedule.projectId, id)).run();
     tx.delete(tag).where(eq(tag.projectId, id)).run();
     if (todoIds.length > 0) tx.delete(todo).where(inArray(todo.id, todoIds)).run();

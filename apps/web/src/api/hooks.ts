@@ -647,6 +647,37 @@ export function useApiMutations(teamId: string | undefined) {
       }) => api.patch<TodoRecord>(`/api/todos/${input.id}`, input.body),
       onSuccess: invalidateAll,
     }),
+    setTodoArchived: useMutation({
+      mutationFn: (input: { id: string; archived: boolean }) =>
+        api.post<TodoRecord>(`/api/todos/${input.id}/${input.archived ? 'archive' : 'unarchive'}`),
+      onMutate: async (input) => {
+        await Promise.all([
+          qc.cancelQueries({ queryKey: ['todo', input.id] }),
+          qc.cancelQueries({ queryKey: ['todos', teamId] }),
+        ]);
+        const previous = qc.getQueryData<TodoRecord>(['todo', input.id]);
+        const previousList = qc.getQueryData<TodoRecord[]>(['todos', teamId]);
+        const archivedAt = input.archived ? Date.now() : null;
+        qc.setQueryData<TodoRecord>(['todo', input.id], (record) =>
+          record ? { ...record, archivedAt } : record,
+        );
+        qc.setQueryData<TodoRecord[]>(['todos', teamId], (records) =>
+          records?.map((record) => (record.id === input.id ? { ...record, archivedAt } : record)),
+        );
+        return { previous, previousList };
+      },
+      onSuccess: (record) => {
+        qc.setQueryData(['todo', record.id], record);
+        qc.setQueryData<TodoRecord[]>(['todos', teamId], (records) =>
+          records?.map((row) => (row.id === record.id ? record : row)),
+        );
+        invalidateAll();
+      },
+      onError: (_error, input, context) => {
+        qc.setQueryData(['todo', input.id], context?.previous);
+        qc.setQueryData(['todos', teamId], context?.previousList);
+      },
+    }),
     deleteTodo: useMutation({
       mutationFn: (id: string) => api.del<void>(`/api/todos/${id}`),
       onSuccess: invalidateAll,

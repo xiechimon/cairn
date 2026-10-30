@@ -1,6 +1,6 @@
 import type { NeedsYouQuery, NeedsYouReason } from '@cairn/shared';
 import { isProviderAuthFailure } from '@cairn/shared';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { build, project, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
@@ -53,7 +53,13 @@ export function listNeedsYou(deps: BuildDeps, teamId: string, now = nowMs()): Ne
   const rows = deps.db
     .select()
     .from(todo)
-    .where(and(eq(todo.teamId, teamId), inArray(todo.phase, ['confirm', 'review', 'failed'])))
+    .where(
+      and(
+        eq(todo.teamId, teamId),
+        isNull(todo.archivedAt),
+        inArray(todo.phase, ['confirm', 'review', 'failed']),
+      ),
+    )
     .all();
   const buildIds = rows.flatMap((row) => (row.latestBuildId === null ? [] : [row.latestBuildId]));
   const buildById = new Map(
@@ -98,7 +104,11 @@ export function listNeedsYou(deps: BuildDeps, teamId: string, now = nowMs()): Ne
 }
 
 export async function sweepFailedRetries(deps: BuildDeps): Promise<void> {
-  const rows = deps.db.select().from(todo).where(eq(todo.phase, 'failed')).all();
+  const rows = deps.db
+    .select()
+    .from(todo)
+    .where(and(eq(todo.phase, 'failed'), isNull(todo.archivedAt)))
+    .all();
   for (const row of rows) {
     if (row.latestBuildId === null) continue;
     const buildRow = deps.db.select().from(build).where(eq(build.id, row.latestBuildId)).get();
