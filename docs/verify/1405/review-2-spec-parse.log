@@ -1,4 +1,0 @@
-$ node scripts/spec-parse-gate.mjs
-[spec-parse-gate] apps/web/e2e: 1391 tests in 198 files collected, disk count matches (3.3s)
-[spec-parse-gate] integration/test: 65 test files parsed clean by tsc (2.5s)
-[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.

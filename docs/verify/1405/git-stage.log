@@ -1,4 +1,0 @@
-Attempt: git add with explicit task file paths.
-Observed output:
-fatal: Unable to create '/Users/xmon/Code/AgentProjects/cairn/.git/worktrees/b0-1405-brakes/index.lock': Operation not permitted
-No files were staged and no commit was created.

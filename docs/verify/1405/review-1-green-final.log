@@ -1,9 +1,0 @@
-
- RUN  v5.0.1 /Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-1405-brakes
-
- ❯ |@cairn/shared| test/snapshot.test.ts (79 tests | 1 failed) 554ms
-   ❯ record shapes, 24-table projection -- zod -> JSON Schema snapshot (21)
-     × team 101ms
- ❯ |@xiechimon/cairn| test/pr-reconcile.test.ts (187 tests | 1 failed) 131418ms
-   ❯ #1403 [66] live GitHub response shapes (captured over REST, see docs/verify/1403) (4)
-     × [66a] an open PR (pulls/1414): no merge commit, even though GitHub sends its test-merge sha 114ms

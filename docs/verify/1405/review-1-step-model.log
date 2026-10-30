@@ -1,3 +1,0 @@
-tla2tools.jar not found at /Users/xmon/.cache/cairn/tla2tools-1.7.4.jar
-fetch it (2,274,532 bytes) with:
-  mkdir -p "/Users/xmon/.cache/cairn" && curl -fsSL -o "/Users/xmon/.cache/cairn/tla2tools-1.7.4.jar" https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar
