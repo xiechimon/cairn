@@ -88,7 +88,7 @@ describe('/api/mcp auth surface (02 section 7.2: Bearer <apiKey>; mcpAccess gate
   });
 });
 
-describe('/api/mcp 24-tool whitelist shape-preserving (02/A10; r3 section 6 matrix 1:1)', () => {
+describe('/api/mcp tool whitelist preserves legacy tools and adds Thread entry', () => {
   test('initialize → serverInfo + capabilities.tools', async () => {
     const s = bootServer();
     const key = await issueMcpKey(s, { read: ALL_READ, write: ALL_WRITE });
@@ -104,14 +104,14 @@ describe('/api/mcp 24-tool whitelist shape-preserving (02/A10; r3 section 6 matr
     s.dispose();
   });
 
-  test('full grant -> tools/list exactly 24 items = registry list (11 read + 13 write)', async () => {
+  test('full grant -> tools/list exactly 29 items = registry list (14 read + 15 write)', async () => {
     const s = bootServer();
     const key = await issueMcpKey(s, { read: ALL_READ, write: ALL_WRITE });
     const res = await rpc(s.app, key, 'tools/list', {});
     const body = res.body as JsonRpcResponse;
     const names = (body.result?.tools ?? []).map((t) => t.name).sort();
     expect(names).toEqual(MCP_TOOL_REGISTRY.map((t) => t.name).sort());
-    expect(names).toHaveLength(24);
+    expect(names).toHaveLength(29);
     s.dispose();
   });
 

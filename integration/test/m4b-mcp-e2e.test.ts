@@ -233,9 +233,9 @@ describe('M4b MCP server face E2E: real sdk Client against /api/mcp (02 §7.2)',
     await client.close();
   }, 120_000);
 
-  test('registry allowlist shape: 24 = 11 read + 13 write (02/A10 single-source cross-check)', () => {
-    expect(MCP_TOOL_REGISTRY).toHaveLength(24);
-    expect(MCP_TOOL_REGISTRY.filter((t) => t.kind === 'read')).toHaveLength(11);
-    expect(MCP_TOOL_REGISTRY.filter((t) => t.kind === 'write')).toHaveLength(13);
+  test('registry allowlist shape: 29 = 14 read + 15 write, including Thread entry', () => {
+    expect(MCP_TOOL_REGISTRY).toHaveLength(29);
+    expect(MCP_TOOL_REGISTRY.filter((t) => t.kind === 'read')).toHaveLength(14);
+    expect(MCP_TOOL_REGISTRY.filter((t) => t.kind === 'write')).toHaveLength(15);
   });
 });
