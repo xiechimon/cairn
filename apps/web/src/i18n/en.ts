@@ -180,6 +180,9 @@ export const EN: Record<string, string> = {
   'AI 审核进行中…': 'AI review in progress…',
   提及: 'Mention',
   停止: 'Stop',
+  丢弃修改: 'Discard changes',
+  '取消失败，请重试。': 'Failed to cancel. Try again.',
+  '丢弃本轮修改？': 'Discard this round’s changes?',
   // #1250（ADR 0018 层 1）verify 步状态与 fan-out 面。
   验证中: 'Verifying',
   验证通过: 'Verification passed',

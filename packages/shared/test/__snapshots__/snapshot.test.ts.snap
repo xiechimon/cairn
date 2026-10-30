@@ -3526,6 +3526,37 @@ exports[`body/envelope schema snapshots > conversationMessagesResponse > convers
       "type": "array",
     },
     "nextCursor": {},
+    "queuedMessages": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "content": {
+            "type": "string",
+          },
+          "createdAt": {
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer",
+          },
+          "error": {
+            "type": [
+              "string",
+              "null",
+            ],
+          },
+          "id": {
+            "type": "string",
+          },
+        },
+        "required": [
+          "id",
+          "content",
+          "createdAt",
+        ],
+        "type": "object",
+      },
+      "type": "array",
+    },
     "steerPending": {
       "items": {},
       "type": "array",

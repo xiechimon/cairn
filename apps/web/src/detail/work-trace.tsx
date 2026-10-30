@@ -107,6 +107,8 @@ function WorkStepRow({ step, enter, t }: { step: WorkStep; enter: boolean; t: TF
               data-testid="work-spinner"
               aria-label={t('执行中')}
             />
+          ) : step.cancelled ? (
+            <span data-testid="work-cancelled">{t('已取消')}</span>
           ) : step.unfinished ? (
             <CircleDashed data-testid="work-unfinished" aria-label={t('未完成')} />
           ) : step.error ? (

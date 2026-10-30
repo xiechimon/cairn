@@ -32,7 +32,7 @@ export function useDetailComposer(input: DetailComposerInput) {
   const onSend = live
     ? (text: string) => {
         if (text !== '') input.scrollToEnd();
-        if (phase === 'confirm' && buildId && text !== '') {
+        if (phase === 'confirm' && !running && buildId && text !== '') {
           mutations.stepAction.mutate({
             buildId,
             body: {
@@ -44,11 +44,7 @@ export function useDetailComposer(input: DetailComposerInput) {
           });
           return;
         }
-        if (
-          (phase === 'done' || phase === 'building' || (phase === 'review' && running)) &&
-          buildId &&
-          text !== ''
-        ) {
+        if ((phase === 'done' || phase === 'building' || running) && buildId && text !== '') {
           return mutations.sendSteer
             .mutateAsync({ conversationId: buildId, content: text })
             .then(() => {

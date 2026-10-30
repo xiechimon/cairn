@@ -80,6 +80,7 @@ import {
   message,
   plan as planTable,
   project,
+  queuedMessage,
   steerPending,
   step,
   stopPending,
@@ -194,10 +195,15 @@ function publishBuild(deps: BuildDeps, row: BuildRow): BuildRecord {
   return record;
 }
 
+interface BuildSteerOptions {
+  allowReviewContinuation?: boolean;
+  afterTurn?: boolean;
+}
+
 function continuationTodo(
   deps: BuildDeps,
   buildRow: BuildRow,
-  allowReviewContinuation: boolean,
+  options: BuildSteerOptions,
 ): TodoRow {
   const row = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
   const active = deps.db
@@ -210,9 +216,23 @@ function continuationTodo(
       ),
     )
     .get();
+  const stopped =
+    deps.db
+      .select({ id: step.id })
+      .from(step)
+      .where(and(eq(step.buildId, buildRow.id), eq(step.status, 'stopped')))
+      .get() !== undefined;
+  const resumable =
+    row?.phase === 'done' ||
+    (options.allowReviewContinuation === true && row?.phase === 'review') ||
+    (options.afterTurn === true &&
+      row !== undefined &&
+      (['planning', 'building', 'confirm', 'review', 'failed'].includes(row.phase) ||
+        (row.phase === 'todo' && stopped)));
   if (
     !row ||
-    (row.phase !== 'done' && !(allowReviewContinuation && row.phase === 'review')) ||
+    row.archivedAt !== null ||
+    !resumable ||
     row.latestBuildId !== buildRow.id ||
     active
   ) {
@@ -227,13 +247,14 @@ function continuationTodo(
 export async function sendBuildSteer(
   deps: BuildDeps,
   conversationId: string,
-  body: { content: string },
-  options: { allowReviewContinuation?: boolean } = {},
+  body: { content: string; queuedMessageId?: string },
+  options: BuildSteerOptions | boolean = {},
 ): Promise<{
   conversationId: string;
   message: { id: string; role: 'user'; content: string; createdAt: number };
   delivered: 'steer' | 'new-turn';
 }> {
+  const continuationOptions = typeof options === 'boolean' ? { afterTurn: options } : options;
   const { db } = deps;
   const buildRow = db.select().from(build).where(eq(build.id, conversationId)).get();
   if (!buildRow) throw new HttpError(404, `conversation ${conversationId}`);
@@ -244,10 +265,17 @@ export async function sendBuildSteer(
     .all()
     .at(-1);
   let todoRow = db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
+  if (
+    !todoRow ||
+    todoRow.archivedAt !== null ||
+    todoRow.latestBuildId !== conversationId ||
+    todoRow.phase === 'closed'
+  )
+    throw new HttpError(409, 'Task cannot accept a message');
   let targetBuildId = conversationId;
   let prClosed: 'closed' | null = null;
   if (!running) {
-    todoRow = continuationTodo(deps, buildRow, options.allowReviewContinuation === true);
+    todoRow = continuationTodo(deps, buildRow, continuationOptions);
     if (projectOfTodo(db, todoRow)?.repoKind === 'local') {
       const admission = db
         .select()
@@ -270,7 +298,7 @@ export async function sendBuildSteer(
     }
     if (githubPrOf(deps, todoRow, buildRow.prNumber) !== null) {
       const outcome = await probeReworkTargetPr(deps, buildRow, todoRow, true);
-      todoRow = continuationTodo(deps, buildRow, options.allowReviewContinuation === true);
+      todoRow = continuationTodo(deps, buildRow, continuationOptions);
       if (outcome === 'merged') {
         throw new HttpError(
           409,
@@ -281,69 +309,101 @@ export async function sendBuildSteer(
       if (prClosed === 'closed') targetBuildId = newUuidv7();
     }
   }
-  const now = nowMs();
-  const messageRow = {
-    id: newRecordId(),
-    role: 'user' as const,
-    content: body.content,
-    createdAt: now,
-  };
-  if (targetBuildId !== conversationId) {
-    db.insert(build)
-      .values({
-        id: targetBuildId,
-        todoId: buildRow.todoId,
-        withPlan: false,
-        prevPhase: 'done',
-        triggerSource: 'user',
-        createdAt: now,
-      })
-      .run();
-    insertMessageRow(deps, targetBuildId, {
+  return db.transaction(() => {
+    if (
+      body.queuedMessageId !== undefined &&
+      !db
+        .select({ id: queuedMessage.id })
+        .from(queuedMessage)
+        .where(
+          and(
+            eq(queuedMessage.id, body.queuedMessageId),
+            eq(queuedMessage.conversationId, conversationId),
+          ),
+        )
+        .get()
+    )
+      throw new HttpError(409, 'Queued message was already delivered');
+    const now = nowMs();
+    const messageRow = {
       id: newRecordId(),
-      role: 'system',
-      content:
-        prClosed === 'closed'
-          ? buildReworkNewBranchNote({
-              prNumber: buildRow.prNumber,
-              prUrl: buildRow.prUrl,
-              branch: conversationBranch(targetBuildId),
-              outcome: 'closed',
-            })
-          : `The previous build was merged locally. Continuing this task on a new branch: ${conversationBranch(targetBuildId)}.`,
+      role: 'user' as const,
+      content: body.content,
       createdAt: now,
-    });
-  }
-  insertMessageRow(deps, targetBuildId, messageRow);
-  if (running) {
-    db.insert(steerPending)
-      .values({ conversationId, stepId: running.id, content: body.content, createdAt: now })
-      .onConflictDoUpdate({
-        target: steerPending.conversationId,
-        set: { stepId: running.id, content: body.content, createdAt: now },
-      })
-      .run();
-  }
-  if (todoRow) {
-    addUserMessageAttachmentGrants(db, todoRow.id, todoRow.teamId, body.content);
-    if (running) {
-      deps.machineHub?.steerSignal(todoRow.teamId, running.id);
-    } else {
-      db.update(build)
-        .set({ errorMessage: null, prevPhase: todoRow.phase })
-        .where(eq(build.id, targetBuildId))
+    };
+    if (targetBuildId !== conversationId) {
+      db.insert(build)
+        .values({
+          id: targetBuildId,
+          todoId: buildRow.todoId,
+          withPlan: false,
+          prevPhase: todoRow?.phase ?? 'done',
+          triggerSource: 'user',
+          createdAt: now,
+        })
         .run();
-      setTodoPhase(deps, todoRow.id, 'queued', { lastRunAt: now, latestBuildId: targetBuildId });
-      enqueueStep(deps, targetBuildId, 'build', todoRow.teamId, body.content);
-      const continued = db.select().from(build).where(eq(build.id, targetBuildId)).get();
-      if (continued) publishBuild(deps, continued);
+      insertMessageRow(deps, targetBuildId, {
+        id: newRecordId(),
+        role: 'system',
+        content:
+          prClosed === 'closed'
+            ? buildReworkNewBranchNote({
+                prNumber: buildRow.prNumber,
+                prUrl: buildRow.prUrl,
+                branch: conversationBranch(targetBuildId),
+                outcome: 'closed',
+              })
+            : `The previous build was merged locally. Continuing this task on a new branch: ${conversationBranch(targetBuildId)}.`,
+        createdAt: now,
+      });
     }
-  }
-  return {
-    conversationId: targetBuildId,
-    message: messageRow,
-    delivered: running ? 'steer' : 'new-turn',
-  };
+    insertMessageRow(deps, targetBuildId, messageRow);
+    if (running) {
+      db.insert(steerPending)
+        .values({ conversationId, stepId: running.id, content: body.content, createdAt: now })
+        .onConflictDoUpdate({
+          target: steerPending.conversationId,
+          set: { stepId: running.id, content: body.content, createdAt: now },
+        })
+        .run();
+    }
+    if (todoRow) {
+      addUserMessageAttachmentGrants(db, todoRow.id, todoRow.teamId, body.content);
+      if (running) {
+        deps.machineHub?.steerSignal(todoRow.teamId, running.id);
+      } else {
+        db.update(build)
+          .set({ errorMessage: null, prevPhase: todoRow?.phase ?? 'done' })
+          .where(eq(build.id, targetBuildId))
+          .run();
+        const nextPhase =
+          todoRow.phase === 'building' || todoRow.phase === 'planning' ? todoRow.phase : 'queued';
+        setTodoPhase(deps, todoRow.id, nextPhase, { lastRunAt: now, latestBuildId: targetBuildId });
+        const previousWork = db
+          .select({ kind: step.kind })
+          .from(step)
+          .where(and(eq(step.buildId, conversationId), inArray(step.kind, ['plan', 'build'])))
+          .orderBy(desc(step.createdAt))
+          .get();
+        enqueueStep(
+          deps,
+          targetBuildId,
+          continuationOptions.afterTurn && previousWork?.kind === 'plan' ? 'plan' : 'build',
+          todoRow.teamId,
+          body.content,
+        );
+        const continued = db.select().from(build).where(eq(build.id, targetBuildId)).get();
+        if (continued) publishBuild(deps, continued);
+      }
+    }
+    if (body.queuedMessageId !== undefined)
+      db.delete(queuedMessage).where(eq(queuedMessage.id, body.queuedMessageId)).run();
+    return {
+      conversationId: targetBuildId,
+      message: messageRow,
+      delivered: running ? ('steer' as const) : ('new-turn' as const),
+    };
+  });
 }
 
 export async function messageTodo(
