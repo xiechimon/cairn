@@ -1,225 +1,24 @@
-Baseline: origin/main ecbb5e8878cee303ee9504385551f41ccddd4b2b
-Each fixture changes the in-memory workflow only; original assertions are unchanged.
-
-=== control: real workflow: GREEN (accepted by main) ===
-✔ the changeset config ignores exactly the private workspace packages and keeps the rest publishable (3.244625ms)
-✔ the release workflow publishes through OIDC without a token or a bot pull request (0.150708ms)
-✔ every release action pins a full commit SHA with a version note (0.212584ms)
-✔ packing inherits read permissions and publishing alone can request an OIDC token (0.443667ms)
-✔ the publish job sets up Node without restoring a shared dependency cache (0.143166ms)
-✔ the publish job installs only root dependencies without scripts and never builds or publishes unpacked packages (0.2075ms)
-✔ the pack job packs tarballs before uploading the release artifact (0.64325ms)
-✔ the publish job downloads the packed artifact before publishing (0.318709ms)
-✔ pending changesets warn without controlling release steps (0.290459ms)
-✔ the publish job configures a tagger before publishing (0.207ms)
-✔ the publish step always publishes packed tarballs with explicit pnpm provenance (0.47675ms)
-✔ the publish job pushes tags after an attempted publish even if publishing fails (0.175625ms)
-✔ pull requests validate release configuration for every workspace manifest (0.137667ms)
-✔ every publishable package names this repository for provenance (1.6935ms)
-ℹ tests 14
-ℹ suites 0
-ℹ pass 14
-ℹ fail 0
-ℹ cancelled 0
-ℹ skipped 0
-ℹ todo 0
-ℹ duration_ms 72.978625
-
-
-=== 1: top-level OIDC permission: GREEN (accepted by main) ===
-✔ the changeset config ignores exactly the private workspace packages and keeps the rest publishable (1.409125ms)
-✔ the release workflow publishes through OIDC without a token or a bot pull request (0.13925ms)
-✔ every release action pins a full commit SHA with a version note (0.198958ms)
-✔ packing inherits read permissions and publishing alone can request an OIDC token (0.4215ms)
-✔ the publish job sets up Node without restoring a shared dependency cache (0.124417ms)
-✔ the publish job installs only root dependencies without scripts and never builds or publishes unpacked packages (0.209792ms)
-✔ the pack job packs tarballs before uploading the release artifact (0.2135ms)
-✔ the publish job downloads the packed artifact before publishing (0.134791ms)
-✔ pending changesets warn without controlling release steps (0.205542ms)
-✔ the publish job configures a tagger before publishing (0.139542ms)
-✔ the publish step always publishes packed tarballs with explicit pnpm provenance (0.156375ms)
-✔ the publish job pushes tags after an attempted publish even if publishing fails (0.122708ms)
-✔ pull requests validate release configuration for every workspace manifest (0.117666ms)
-✔ every publishable package names this repository for provenance (0.329125ms)
-ℹ tests 14
-ℹ suites 0
-ℹ pass 14
-ℹ fail 0
-ℹ cancelled 0
-ℹ skipped 0
-ℹ todo 0
-ℹ duration_ms 54.153417
-
-
-=== 2: rebuild in publish: GREEN (accepted by main) ===
-✔ the changeset config ignores exactly the private workspace packages and keeps the rest publishable (1.491041ms)
-✔ the release workflow publishes through OIDC without a token or a bot pull request (0.150708ms)
-✔ every release action pins a full commit SHA with a version note (0.2065ms)
-✔ packing inherits read permissions and publishing alone can request an OIDC token (0.511292ms)
-✔ the publish job sets up Node without restoring a shared dependency cache (0.198375ms)
-✔ the publish job installs only root dependencies without scripts and never builds or publishes unpacked packages (0.231208ms)
-✔ the pack job packs tarballs before uploading the release artifact (0.22875ms)
-✔ the publish job downloads the packed artifact before publishing (0.14075ms)
-✔ pending changesets warn without controlling release steps (0.186459ms)
-✔ the publish job configures a tagger before publishing (0.139834ms)
-✔ the publish step always publishes packed tarballs with explicit pnpm provenance (0.163625ms)
-✔ the publish job pushes tags after an attempted publish even if publishing fails (0.122542ms)
-✔ pull requests validate release configuration for every workspace manifest (0.111542ms)
-✔ every publishable package names this repository for provenance (0.34925ms)
-ℹ tests 14
-ℹ suites 0
-ℹ pass 14
-ℹ fail 0
-ℹ cancelled 0
-ℹ skipped 0
-ℹ todo 0
-ℹ duration_ms 51.11075
-
-
-=== 3: recursive build in publish: GREEN (accepted by main) ===
-✔ the changeset config ignores exactly the private workspace packages and keeps the rest publishable (1.362875ms)
-✔ the release workflow publishes through OIDC without a token or a bot pull request (0.134167ms)
-✔ every release action pins a full commit SHA with a version note (0.207375ms)
-✔ packing inherits read permissions and publishing alone can request an OIDC token (0.426ms)
-✔ the publish job sets up Node without restoring a shared dependency cache (0.12975ms)
-✔ the publish job installs only root dependencies without scripts and never builds or publishes unpacked packages (0.201292ms)
-✔ the pack job packs tarballs before uploading the release artifact (0.208667ms)
-✔ the publish job downloads the packed artifact before publishing (0.132792ms)
-✔ pending changesets warn without controlling release steps (0.179416ms)
-✔ the publish job configures a tagger before publishing (0.133333ms)
-✔ the publish step always publishes packed tarballs with explicit pnpm provenance (0.153042ms)
-✔ the publish job pushes tags after an attempted publish even if publishing fails (0.127416ms)
-✔ pull requests validate release configuration for every workspace manifest (0.111417ms)
-✔ every publishable package names this repository for provenance (0.326542ms)
-ℹ tests 14
-ℹ suites 0
-ℹ pass 14
-ℹ fail 0
-ℹ cancelled 0
-ℹ skipped 0
-ℹ todo 0
-ℹ duration_ms 49.4755
-
-
-=== 4: renamed plan output: GREEN (accepted by main) ===
-✔ the changeset config ignores exactly the private workspace packages and keeps the rest publishable (1.378542ms)
-✔ the release workflow publishes through OIDC without a token or a bot pull request (0.131ms)
-✔ every release action pins a full commit SHA with a version note (0.2035ms)
-✔ packing inherits read permissions and publishing alone can request an OIDC token (0.398417ms)
-✔ the publish job sets up Node without restoring a shared dependency cache (0.128208ms)
-✔ the publish job installs only root dependencies without scripts and never builds or publishes unpacked packages (0.21825ms)
-✔ the pack job packs tarballs before uploading the release artifact (0.261625ms)
-✔ the publish job downloads the packed artifact before publishing (0.163292ms)
-✔ pending changesets warn without controlling release steps (0.197375ms)
-✔ the publish job configures a tagger before publishing (0.141958ms)
-✔ the publish step always publishes packed tarballs with explicit pnpm provenance (0.163709ms)
-✔ the publish job pushes tags after an attempted publish even if publishing fails (0.126584ms)
-✔ pull requests validate release configuration for every workspace manifest (0.114917ms)
-✔ every publishable package names this repository for provenance (0.336959ms)
-ℹ tests 14
-ℹ suites 0
-ℹ pass 14
-ℹ fail 0
-ℹ cancelled 0
-ℹ skipped 0
-ℹ todo 0
-ℹ duration_ms 47.311333
-
-
-=== 5: filtered build in publish: GREEN (accepted by main) ===
-✔ the changeset config ignores exactly the private workspace packages and keeps the rest publishable (1.418375ms)
-✔ the release workflow publishes through OIDC without a token or a bot pull request (0.132375ms)
-✔ every release action pins a full commit SHA with a version note (0.207333ms)
-✔ packing inherits read permissions and publishing alone can request an OIDC token (0.411083ms)
-✔ the publish job sets up Node without restoring a shared dependency cache (0.125042ms)
-✔ the publish job installs only root dependencies without scripts and never builds or publishes unpacked packages (0.209167ms)
-✔ the pack job packs tarballs before uploading the release artifact (0.205458ms)
-✔ the publish job downloads the packed artifact before publishing (0.134375ms)
-✔ pending changesets warn without controlling release steps (0.185083ms)
-✔ the publish job configures a tagger before publishing (0.13375ms)
-✔ the publish step always publishes packed tarballs with explicit pnpm provenance (0.153167ms)
-✔ the publish job pushes tags after an attempted publish even if publishing fails (0.119667ms)
-✔ pull requests validate release configuration for every workspace manifest (0.108417ms)
-✔ every publishable package names this repository for provenance (0.30125ms)
-ℹ tests 14
-ℹ suites 0
-ℹ pass 14
-ℹ fail 0
-ℹ cancelled 0
-ℹ skipped 0
-ℹ todo 0
-ℹ duration_ms 46.960584
-
-
-=== 6: pack in publish: GREEN (accepted by main) ===
-✔ the changeset config ignores exactly the private workspace packages and keeps the rest publishable (1.349084ms)
-✔ the release workflow publishes through OIDC without a token or a bot pull request (0.131083ms)
-✔ every release action pins a full commit SHA with a version note (0.202708ms)
-✔ packing inherits read permissions and publishing alone can request an OIDC token (0.414042ms)
-✔ the publish job sets up Node without restoring a shared dependency cache (0.124333ms)
-✔ the publish job installs only root dependencies without scripts and never builds or publishes unpacked packages (0.206459ms)
-✔ the pack job packs tarballs before uploading the release artifact (0.204292ms)
-✔ the publish job downloads the packed artifact before publishing (0.1345ms)
-✔ pending changesets warn without controlling release steps (0.18025ms)
-✔ the publish job configures a tagger before publishing (0.134208ms)
-✔ the publish step always publishes packed tarballs with explicit pnpm provenance (0.156417ms)
-✔ the publish job pushes tags after an attempted publish even if publishing fails (0.120542ms)
-✔ pull requests validate release configuration for every workspace manifest (0.112ms)
-✔ every publishable package names this repository for provenance (0.307583ms)
-ℹ tests 14
-ℹ suites 0
-ℹ pass 14
-ℹ fail 0
-ℹ cancelled 0
-ℹ skipped 0
-ℹ todo 0
-ℹ duration_ms 48.947708
-
-
-=== 7: cache action in publish: RED (already rejected by main) ===
-✔ the changeset config ignores exactly the private workspace packages and keeps the rest publishable (1.453042ms)
-✔ the release workflow publishes through OIDC without a token or a bot pull request (0.137458ms)
-✖ every release action pins a full commit SHA with a version note (1.550792ms)
-✔ packing inherits read permissions and publishing alone can request an OIDC token (0.416958ms)
-✔ the publish job sets up Node without restoring a shared dependency cache (0.127334ms)
-✔ the publish job installs only root dependencies without scripts and never builds or publishes unpacked packages (0.198209ms)
-✔ the pack job packs tarballs before uploading the release artifact (0.209959ms)
-✔ the publish job downloads the packed artifact before publishing (0.1355ms)
-✔ pending changesets warn without controlling release steps (0.204166ms)
-✔ the publish job configures a tagger before publishing (0.134291ms)
-✔ the publish step always publishes packed tarballs with explicit pnpm provenance (0.168958ms)
-✔ the publish job pushes tags after an attempted publish even if publishing fails (0.1235ms)
-✔ pull requests validate release configuration for every workspace manifest (0.10275ms)
-✔ every publishable package names this repository for provenance (0.591209ms)
-ℹ tests 14
-ℹ suites 0
-ℹ pass 13
-ℹ fail 1
-ℹ cancelled 0
-ℹ skipped 0
-ℹ todo 0
-ℹ duration_ms 50.590875
-
-✖ failing tests:
-
-test at ../../../../../../../../private<temporary-directory>/release-config.test.mjs:76:1
-✖ every release action pins a full commit SHA with a version note (1.550792ms)
-  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /^ +(?:- )?uses: [^@\s]+@[a-f0-9]{40} # v\d+\.\d+\.\d+$/. Input:
-  
-  '      - uses: actions/cache@v4'
-  
-      at TestContext.<anonymous> (file:///private<temporary-directory>/release-config.test.mjs:78:12)
-      at Test.runInAsyncScope (node:async_hooks:226:14)
-      at Test.run (node:internal/test_runner/test:1402:25)
-      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
-      at Test.postRun (node:internal/test_runner/test:1542:19)
-      at Test.run (node:internal/test_runner/test:1467:12)
-      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
-    generatedMessage: true,
-    code: 'ERR_ASSERTION',
-    actual: '      - uses: actions/cache@v4',
-    expected: /^ +(?:- )?uses: [^@\s]+@[a-f0-9]{40} # v\d+\.\d+\.\d+$/,
-    operator: 'match',
-    diff: 'simple'
-  }
-
+Unchanged workflow: ACCEPT (14 main tests)
+Fixture 1: top-level OIDC permission: ACCEPT (14 main tests)
+Fixture 2: rebuild in publish: ACCEPT (14 main tests)
+Fixture 3: recursive build in publish: ACCEPT (14 main tests)
+Fixture 4: renamed plan output: ACCEPT (14 main tests)
+Fixture 5: filtered build in publish: ACCEPT (14 main tests)
+Fixture 6: pack in publish: ACCEPT (14 main tests)
+Fixture 7: cache action in publish: REJECT (14 main tests)
+  Failed: every release action pins a full commit SHA with a version note
+Fixture 8: comment before an appended publish command: ACCEPT (14 main tests)
+Fixture 9: flow-style build step: ACCEPT (14 main tests)
+Fixture 10: extra spaces before a run key: ACCEPT (14 main tests)
+Fixture 11: quoted run key: ACCEPT (14 main tests)
+Fixture 12: space before a uses colon: ACCEPT (14 main tests)
+Fixture 13: unquoted install continuation: ACCEPT (14 main tests)
+Fixture 14: fourth job with OIDC permission: ACCEPT (14 main tests)
+Fixture 15: publish step shell: ACCEPT (14 main tests)
+Fixture 16: publish step environment injection: ACCEPT (14 main tests)
+Fixture 17: publish checkout ref input: ACCEPT (14 main tests)
+Fixture 18: different publish checkout SHA: ACCEPT (14 main tests)
+Fixture 19: publish job container: ACCEPT (14 main tests)
+Fixture 20: top-level OIDC permission after a comment: ACCEPT (14 main tests)
+Fixture 21: top-level env between pack and publish: ACCEPT (14 main tests)
+Main accepted 20/21 fixtures; rejected 1/21.

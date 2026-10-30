@@ -80,19 +80,10 @@ test('every release action pins a full commit SHA with a version note', () => {
   }
 });
 
-test('release jobs run only after their required dependencies and package count checks', () => {
+test('the pack job depends on config and runs only on pushes', () => {
   const pack = jobConfig('pack');
   assert.match(pack, /^ {4}if: github\.event_name == 'push'$/m);
   assert.match(pack, /^ {4}needs: config$/m);
-  const publish = jobConfig('publish');
-  assert.match(publish, /^ {4}needs: pack$/m);
-  assert.match(publish, /^ {4}if: needs\.pack\.outputs\.count != '0'$/m);
-});
-
-test('the publish job sets up Node without restoring a shared dependency cache', () => {
-  const setupNode = jobSteps('publish').find((step) => step.includes('uses: actions/setup-node@'));
-  assert.ok(setupNode, 'the publish job must set up Node');
-  assert.doesNotMatch(setupNode, /^\s*cache:/m);
 });
 
 test('the pack job packs tarballs before uploading the release artifact', () => {
@@ -121,12 +112,6 @@ test('the publish job downloads the packed artifact before publishing', () => {
   );
   assert.ok(download >= 0, 'the publish job must download the release artifact');
   assert.ok(publish > download, 'the publish job must download tarballs before publishing');
-  assert.match(
-    steps[download],
-    /actions\/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333\b/,
-  );
-  assert.match(steps[download], /^ {10}name: release-pack$/m);
-  assert.match(steps[download], /^ {10}path: release-pack$/m);
 });
 
 test('pending changesets warn without controlling release steps', () => {
@@ -155,18 +140,7 @@ test('the publish job configures a tagger before publishing', () => {
   assert.ok(publish > identity, 'the publish job must configure a tagger before publishing');
 });
 
-test('the publish step always publishes packed tarballs with explicit pnpm provenance', () => {
-  const publish = jobSteps('publish').find((step) =>
-    /\bchangeset publish --from-pack-dir release-pack\b/.test(step),
-  );
-  assert.ok(publish, 'the publish job must publish packed tarballs');
-  assert.match(publish, /^ {8}id: publish$/m);
-  assert.doesNotMatch(publish, /^ {8}if:/m);
-  assert.match(publish, /^ {8}env:\n(?: {10}.+\n)*? {10}PNPM_CONFIG_PROVENANCE: 'true'$/m);
-  assert.match(publish, /^ {8}env:\n(?: {10}.+\n)*? {10}PNPM_CONFIG_IGNORE_SCRIPTS: 'true'$/m);
-});
-
-test('the publish job pushes tags after an attempted publish even if publishing fails', () => {
+test('the publish job pushes tags after publishing', () => {
   const steps = jobSteps('publish');
   const publish = steps.findIndex((step) =>
     /\bchangeset publish --from-pack-dir release-pack\b/.test(step),
@@ -174,17 +148,6 @@ test('the publish job pushes tags after an attempted publish even if publishing 
   const push = steps.findIndex((step) => /^ {8}run: git push origin --tags$/m.test(step));
   assert.ok(publish >= 0, 'the publish job must publish packed tarballs');
   assert.ok(push > publish, 'the publish job must push tags after publishing');
-  assert.equal(
-    steps[push].match(/^ {8}if: (.+)$/m)?.[1],
-    `\${{ !cancelled() && steps.publish.outcome != 'skipped' }}`,
-    'the tag push must require an attempted publish and run unless cancelled',
-  );
-});
-
-test('pull requests validate release configuration for every workspace manifest', () => {
-  const pullRequest = workflow.match(/^ {2}pull_request:\n[\s\S]*?(?=^\S)/m)?.[0];
-  assert.ok(pullRequest, 'the release workflow must handle pull requests');
-  assert.match(pullRequest, /^ {4}paths:\n(?: {6}.+\n)*? {6}- '\*\*\/package\.json'\s*$/m);
 });
 
 test('every publishable package names this repository for provenance', () => {
@@ -208,81 +171,102 @@ test('every publishable package names this repository for provenance', () => {
   }
 });
 
-function workflowBlocks(text, key, indentation) {
-  const lines = text.split('\n');
-  const header = new RegExp(`^ {${indentation}}${key}:(.*)$`);
-  return lines.flatMap((line, index) => {
-    const match = line.match(header);
-    if (!match) return [];
-    const body = [];
-    for (const next of lines.slice(index + 1)) {
-      if (next.trim() && next.search(/\S/) <= indentation) break;
-      body.push(next.trim());
-    }
-    return [{ value: match[1].trim(), body: body.filter(Boolean) }];
-  });
-}
+const expectedReleaseHeader = `name: release
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - '.changeset/**'
+      - '.github/workflows/release.yml'
+      - '**/package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'scripts/release-config.test.mjs'
+
+concurrency:
+  group: release-\${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+`;
+
+const expectedPublishJob = `  publish:
+    needs: pack
+    if: needs.pack.outputs.count != '0'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+      - name: Install dependencies without scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts --filter .
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-pack
+          path: release-pack
+      - name: Configure tag identity
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+      - name: Publish to npm
+        id: publish
+        env:
+          PNPM_CONFIG_PROVENANCE: 'true'
+          PNPM_CONFIG_IGNORE_SCRIPTS: 'true'
+        run: pnpm exec changeset publish --from-pack-dir release-pack
+      - name: Push release tags
+        if: \${{ !cancelled() && steps.publish.outcome != 'skipped' }}
+        run: git push origin --tags
+`;
 
 function releaseWorkflowViolations(text) {
   const violations = [];
-  const topPermissions = workflowBlocks(text, 'permissions', 0);
-  if (!isDeepStrictEqual(topPermissions, [{ value: '', body: ['contents: read'] }])) {
-    violations.push('top-level permissions must be exactly contents: read');
+  const jobsLine = text.match(/^jobs:\n/m);
+  const publishLine = text.match(/^ {2}publish:\n/m);
+  const hasBoundaries = Boolean(jobsLine && publishLine && jobsLine.index < publishLine.index);
+  if (!jobsLine || text.slice(0, jobsLine.index + jobsLine[0].length) !== expectedReleaseHeader) {
+    violations.push('release workflow header must match the pinned text');
   }
-  for (const name of ['config', 'pack', 'publish']) {
-    if (!new RegExp(`^ {2}${name}:$`, 'm').test(text)) {
-      violations.push(`${name} job must exist`);
-    }
+  if (!publishLine || text.slice(publishLine.index) !== expectedPublishJob) {
+    violations.push('publish job must match the pinned text');
   }
-  if (violations.some((violation) => violation.endsWith('job must exist'))) return violations;
-  for (const name of ['config', 'pack']) {
-    if (workflowBlocks(jobConfig(name, text), 'permissions', 4).length !== 0) {
-      violations.push(`${name} permissions must be inherited without a job declaration`);
-    }
+  const precedingJobs = hasBoundaries
+    ? text.slice(jobsLine.index + jobsLine[0].length, publishLine.index)
+    : '';
+  const jobNames = precedingJobs.split('\n').filter((line) => /^ {0,2}[^\s#]/.test(line));
+  const hasExpectedJobs = hasBoundaries && isDeepStrictEqual(jobNames, ['  config:', '  pack:']);
+  if (!hasExpectedJobs) {
+    violations.push('jobs must be exactly config, pack and publish');
   }
-  const publishPermissions = workflowBlocks(jobConfig('publish', text), 'permissions', 4);
-  for (const block of publishPermissions) block.body.sort();
   if (
-    !isDeepStrictEqual(publishPermissions, [
-      { value: '', body: ['contents: write', 'id-token: write'] },
-    ])
+    text.split('id-token').length - 1 !== 1 ||
+    !hasBoundaries ||
+    !text.slice(publishLine.index).includes('id-token')
   ) {
-    violations.push('publish permissions must be exactly contents: write and id-token: write');
+    violations.push('only publish may request id-token');
   }
-  const publishSteps = jobSteps('publish', text).map((step) => `        ${step}`);
-  const actions = publishSteps.flatMap((step) =>
-    workflowBlocks(step, 'uses', 8).map((block) => block.value.split('@')[0]),
-  );
-  if (
-    !isDeepStrictEqual(actions, [
-      'actions/checkout',
-      'pnpm/action-setup',
-      'actions/setup-node',
-      'actions/download-artifact',
-    ])
-  ) {
-    violations.push('publish uses actions must match the exact ordered repository list');
+  if (precedingJobs.includes('permissions')) {
+    violations.push('config and pack must not declare permissions');
   }
-  const commands = publishSteps.flatMap((step) =>
-    workflowBlocks(step, 'run', 8).flatMap((block) =>
-      (block.value === '|' ? block.body.join('\n').trim() : block.value).split('\n'),
-    ),
-  );
-  if (
-    !isDeepStrictEqual(commands, [
-      'pnpm install --frozen-lockfile --ignore-scripts --filter .',
-      "git config user.name 'github-actions[bot]'",
-      "git config user.email '41898282+github-actions[bot]@users.noreply.github.com'",
-      'pnpm exec changeset publish --from-pack-dir release-pack',
-      'git push origin --tags',
-    ])
-  ) {
-    violations.push('publish run commands must match the exact ordered command list');
-  }
+  if (!hasExpectedJobs) return violations;
   const pack = jobConfig('pack', text);
-  const outputs = workflowBlocks(pack, 'outputs', 4);
+  const outputs = [...pack.matchAll(/^ {4}outputs:([^\n]*)\n((?: {6}[^\n]*\n)*)/gm)];
   if (
-    !isDeepStrictEqual(outputs, [{ value: '', body: [`count: \${{ steps.plan.outputs.count }}`] }])
+    outputs.length !== 1 ||
+    outputs[0][1] !== '' ||
+    outputs[0][2] !== `      count: \${{ steps.plan.outputs.count }}\n`
   ) {
     violations.push('pack job outputs must contain only count mapped to steps.plan.outputs.count');
   }
@@ -306,19 +290,19 @@ const workflowFixtures = [
     name: '1: top-level OIDC permission',
     before: 'permissions:\n  contents: read',
     after: 'permissions:\n  contents: read\n  id-token: write',
-    rule: 'top-level permissions',
+    rule: 'release workflow header must match the pinned text',
   },
   {
     name: '2: rebuild in publish',
     before: '      - name: Publish to npm',
     after: '      - run: pnpm rebuild\n      - name: Publish to npm',
-    rule: 'publish run commands',
+    rule: 'publish job must match the pinned text',
   },
   {
     name: '3: recursive build in publish',
     before: '      - name: Publish to npm',
     after: '      - run: pnpm -r build\n      - name: Publish to npm',
-    rule: 'publish run commands',
+    rule: 'publish job must match the pinned text',
   },
   {
     name: '4: renamed plan output',
@@ -330,20 +314,107 @@ const workflowFixtures = [
     name: '5: filtered build in publish',
     before: '      - name: Publish to npm',
     after: '      - run: pnpm --filter @xiechimon/cairn build\n      - name: Publish to npm',
-    rule: 'publish run commands',
+    rule: 'publish job must match the pinned text',
   },
   {
     name: '6: pack in publish',
     before: '      - name: Publish to npm',
     after:
       '      - run: pnpm exec changeset pack --out-dir release-pack\n      - name: Publish to npm',
-    rule: 'publish run commands',
+    rule: 'publish job must match the pinned text',
   },
   {
     name: '7: cache action in publish',
     before: '      - name: Publish to npm',
     after: '      - uses: actions/cache@v4\n      - name: Publish to npm',
-    rule: 'publish uses actions',
+    rule: 'publish job must match the pinned text',
+  },
+  {
+    name: '8: comment before an appended publish command',
+    before: '        run: git push origin --tags\n',
+    after: '        run: git push origin --tags\n  # x\n      - run: curl x\n',
+    rule: 'publish job must match the pinned text',
+  },
+  {
+    name: '9: flow-style build step',
+    before: '      - name: Publish to npm',
+    after: '      - {run: pnpm -r build}\n      - name: Publish to npm',
+    rule: 'publish job must match the pinned text',
+  },
+  {
+    name: '10: extra spaces before a run key',
+    before: '      - name: Publish to npm',
+    after: '      -   run: pnpm rebuild\n      - name: Publish to npm',
+    rule: 'publish job must match the pinned text',
+  },
+  {
+    name: '11: quoted run key',
+    before: '      - name: Publish to npm',
+    after: '      - "run": pnpm rebuild\n      - name: Publish to npm',
+    rule: 'publish job must match the pinned text',
+  },
+  {
+    name: '12: space before a uses colon',
+    before: '      - name: Publish to npm',
+    after: '      - uses : actions/cache@v4\n      - name: Publish to npm',
+    rule: 'publish job must match the pinned text',
+  },
+  {
+    name: '13: unquoted install continuation',
+    before: '        run: pnpm install --frozen-lockfile --ignore-scripts --filter .\n',
+    after:
+      '        run: pnpm install --frozen-lockfile --ignore-scripts --filter .\n          ; pnpm -r build\n',
+    rule: 'publish job must match the pinned text',
+  },
+  {
+    name: '14: fourth job with OIDC permission',
+    before: '  publish:\n',
+    after: '  evil:\n    permissions:\n      id-token: write\n  publish:\n',
+    rule: 'jobs must be exactly config, pack and publish',
+  },
+  {
+    name: '15: publish step shell',
+    before: '        id: publish\n',
+    after: '        id: publish\n        shell: node {0}\n',
+    rule: 'publish job must match the pinned text',
+  },
+  {
+    name: '16: publish step environment injection',
+    before: "          PNPM_CONFIG_PROVENANCE: 'true'\n",
+    after: "          PNPM_CONFIG_PROVENANCE: 'true'\n          NODE_OPTIONS: --require ./x.js\n",
+    rule: 'publish job must match the pinned text',
+  },
+  {
+    name: '17: publish checkout ref input',
+    before: '          fetch-depth: 0\n',
+    after: '          fetch-depth: 0\n          ref: evil\n',
+    rule: 'publish job must match the pinned text',
+  },
+  {
+    name: '18: different publish checkout SHA',
+    before:
+      '      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0\n        with:\n          fetch-depth: 0',
+    after:
+      '      - uses: actions/checkout@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa # v5.1.0\n        with:\n          fetch-depth: 0',
+    rule: 'publish job must match the pinned text',
+  },
+  {
+    name: '19: publish job container',
+    before: '  publish:\n',
+    after: '  publish:\n    container: evil/image\n',
+    rule: 'publish job must match the pinned text',
+  },
+  {
+    name: '20: top-level OIDC permission after a comment',
+    before: 'permissions:\n  contents: read\n',
+    after: 'permissions:\n  contents: read\n# scope\n  id-token: write\n',
+    rule: 'release workflow header must match the pinned text',
+  },
+  {
+    name: '21: top-level env between pack and publish',
+    before: '  publish:\n',
+    after: 'env:\n  NODE_OPTIONS: --require ./x.js\n  publish:\n',
+    rule: 'jobs must be exactly config, pack and publish',
   },
 ];
 
@@ -367,3 +438,13 @@ for (const { name, before, after, rule } of workflowFixtures) {
     );
   });
 }
+
+test('missing workflow boundary lines are violations rather than exceptions', () => {
+  for (const [line, rule] of [
+    ['jobs:\n', 'release workflow header must match the pinned text'],
+    ['  publish:\n', 'publish job must match the pinned text'],
+  ]) {
+    assert.equal(workflow.split(line).length - 1, 1);
+    assert.ok(releaseWorkflowViolations(workflow.replace(line, '')).includes(rule));
+  }
+});
