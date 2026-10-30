@@ -1,6 +1,6 @@
 {
   "frozenFrom": {
-    "sha": "84f2889d312153ea05fd05067dcc1940f5cf5a18",
+    "sha": "cf22369330fc0e9980089e85a67805ee0445d65e",
     "date": "2026-10-30"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
@@ -146,8 +146,8 @@
     },
     "panel.tsx": {
       "kind": "adapter",
-      "reason": "Resting content container with its own skin tier; Card stays a pure layout shell so the upstream re-pull conflict surface (#414/#423/#425 deviations) does not double.",
-      "hash": "268acc40a288ecf22da51dc889e6dee25d8134df8403304a8c39f617ff4e6a9e"
+      "reason": "Resting content container with its own skin tier; Card stays a pure layout shell so the upstream re-pull conflict surface (#414/#423/#425 deviations) does not double. Card radius token; the first row draws no top rule.",
+      "hash": "8dc38e163aa6801b9a1859342040556a2b6dc0af7856a8fb7e2c5a2a6b831ece"
     },
     "popover.tsx": {
       "kind": "registry",
@@ -210,8 +210,8 @@
     },
     "toaster.tsx": {
       "kind": "adapter",
-      "reason": "#631: sonner official recipe adapted to the repo theme inversion (MutationObserver on the root class; dark is the :root default) + popover-family token skin, zero new color values. #1236: toastSuccess helper next to toastError (delegated-action receipts).",
-      "hash": "6e044ec3d511347cc7ee3d7bcd2557bed1d95a39bcbd6bf44ebbae8d2a058502"
+      "reason": "#631: sonner official recipe adapted to the repo theme inversion (MutationObserver on the root class; dark is the :root default) + popover-family token skin, zero new color values. #1236: toastSuccess helper next to toastError (delegated-action receipts). The official recipe's lucide status icons, tinted with the status tokens, and the popover radius.",
+      "hash": "382101350d55b854b87e0cb626f80f88904ea25ea0063f78e52b740d4bdc5955"
     },
     "tooltip.tsx": {
       "kind": "registry",
