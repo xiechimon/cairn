@@ -37,10 +37,11 @@ import type {
 import { AGENT_TODO_MAX_ITEMS, CLAUDE_TODO_STATUS_STATES } from '@cairn/shared';
 import { z } from 'zod';
 import { claudeCodeAuthFailureMessage } from '../claude-code-auth.js';
+import { credentialRedactor } from '../credential-output.js';
 import { ensureTeamSkillsPlugin } from '../team-skills.js';
 import { SessionNotResumableError } from './errors.js';
 import { isLearnedNoVision, rememberNoVision } from './image-support.js';
-import { claudeTelemetryEnv } from './otel.js';
+import { claudeCliEnv, claudeTelemetryEnv, PiStepSpanSink } from './otel.js';
 import {
   appendSkillsCatalog,
   collectDeniedSkillDirs,
@@ -431,6 +432,7 @@ class ClaudeSessionHandle implements AgentSessionHandle {
       input: AsyncQueue<SDKUserMessage>;
       onClaudeRateLimit?: (notice: ClaudeRateLimitNotice) => void;
     },
+    private readonly spans?: PiStepSpanSink,
   ) {
     this.q = q;
     this.sessionId = opts.sessionId;
@@ -452,23 +454,29 @@ class ClaudeSessionHandle implements AgentSessionHandle {
           this.onClaudeRateLimit?.(notice);
         }
         for (const ev of events) {
+          if (ev.type === 'toolcall_end') {
+            if ('isError' in ev.call) {
+              this.spans?.toolEnd(ev.call.id, Date.now(), ev.call.result, ev.call.isError ?? false);
+            } else {
+              this.spans?.toolStart(ev.call.id, Date.now(), ev.call.name, ev.call.arguments);
+            }
+          }
           this.queue.push(ev);
           if (TERMINAL_EVENT_TYPES.includes(ev.type)) {
-            this.finish();
             return;
           }
         }
         this.flushSteers();
       }
-      this.finish();
     } catch (err) {
       if (this.stopping) {
-        this.queue.end();
         return;
       }
       const message = err instanceof Error ? err.message : String(err);
       this.queue.push({ type: 'error', error: { message, retryable: false } });
+    } finally {
       this.finish();
+      await this.spans?.flush();
     }
   }
 
@@ -881,13 +889,16 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
         }
       : {}),
     ...(parts.resumeId !== null ? { resume: parts.resumeId } : { sessionId: parts.sessionId }),
-    ...(parts.skillDenyRules !== undefined && parts.skillDenyRules.length > 0
-      ? { settings: { permissions: { deny: [...parts.skillDenyRules] } } }
-      : {}),
+    settings: {
+      env: claudeCliEnv({}),
+      ...(parts.skillDenyRules !== undefined && parts.skillDenyRules.length > 0
+        ? { permissions: { deny: [...parts.skillDenyRules] } }
+        : {}),
+    },
     ...(parts.executablePath !== undefined
       ? { pathToClaudeCodeExecutable: parts.executablePath }
       : {}),
-    ...(parts.env !== undefined ? { env: { ...process.env, ...parts.env } } : {}),
+    env: claudeCliEnv({ ...process.env, ...parts.env }),
     ...(parts.plugins !== undefined && parts.plugins.length > 0 ? { plugins: parts.plugins } : {}),
     abortController: parts.abortController,
   };
@@ -1010,16 +1021,29 @@ export class ClaudeCodeBackend implements AgentBackend {
     const input = new AsyncQueue<SDKUserMessage>();
     if (opts.prompt !== undefined) input.push(buildUserMessage(opts.prompt, opts.promptImages));
     const q = query({ prompt: input.iterable(), options: sdkOptions });
-    return new ClaudeSessionHandle(q, {
-      sessionId,
-      cwd: opts.cwd,
-      state,
-      abort,
-      input,
-      ...(opts.onClaudeRateLimit !== undefined
-        ? { onClaudeRateLimit: opts.onClaudeRateLimit }
-        : {}),
-    });
+    const spans =
+      opts.telemetry !== undefined
+        ? new PiStepSpanSink(
+            opts.telemetry,
+            { provider: opts.provider.providerId, model: opts.modelId },
+            undefined,
+            credentialRedactor(sdkOptions.env?.CLAUDE_CODE_OAUTH_TOKEN),
+          )
+        : undefined;
+    return new ClaudeSessionHandle(
+      q,
+      {
+        sessionId,
+        cwd: opts.cwd,
+        state,
+        abort,
+        input,
+        ...(opts.onClaudeRateLimit !== undefined
+          ? { onClaudeRateLimit: opts.onClaudeRateLimit }
+          : {}),
+      },
+      spans,
+    );
   }
 }
 
