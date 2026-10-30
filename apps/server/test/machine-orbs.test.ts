@@ -245,3 +245,24 @@ test('closed ids from a slow poll survive intervening local sweeps', async () =>
     await handle.done;
   }
 });
+
+test('rejects an orb cleanup body over 64 KiB before parsing it', async () => {
+  const s = bootServer();
+  const machineId = insertMachine(s);
+  const token = 'orb-cleanup-test-token';
+  s.db
+    .update(machine)
+    .set({ tokenHash: hashCredential(token) })
+    .where(eq(machine.id, machineId))
+    .run();
+  try {
+    const response = await s.app.request('/api/machine/orbs/closed', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ conversationIds: ['closed-build'], padding: 'x'.repeat(70_000) }),
+    });
+    expect(response.status).toBe(413);
+  } finally {
+    s.dispose();
+  }
+});
