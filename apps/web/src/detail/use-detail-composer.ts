@@ -32,7 +32,7 @@ export function useDetailComposer(input: DetailComposerInput) {
   const onSend = live
     ? (text: string) => {
         if (text !== '') input.scrollToEnd();
-        if (phase === 'confirm' && !running && buildId && text !== '') {
+        if (phase === 'confirm' && buildId && text !== '') {
           mutations.stepAction.mutate({
             buildId,
             body: {
