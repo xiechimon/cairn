@@ -73,17 +73,21 @@ export function writeBrief(opts: {
   caseInsensitiveFs: boolean;
 }): BriefHandle {
   const { cwd, backendId, content, caseInsensitiveFs } = opts;
-  const block = buildBlock(content);
+  let block = buildBlock(content);
   const target = resolveBriefTarget(readdirSync(cwd), backendId, { caseInsensitiveFs });
   reconcileBriefLeftovers(cwd, caseInsensitiveFs, target.file);
 
   const path = join(cwd, target.file);
   const existing = readIfPresent(path);
+  const found = existing === null ? null : locateMarkerBlock(existing);
+  if (backendId === 'claude-code' && (existing === null || found?.begin === 0)) {
+    const guidance = readIfPresent(join(cwd, 'AGENTS.md'));
+    if (guidance !== null) block = buildBlock(`${guidance.trimEnd()}${SEP}${content}`);
+  }
   if (existing === null) {
     writeFileSync(path, block);
     return { path, file: target.file, mode: 'create' };
   }
-  const found = locateMarkerBlock(existing);
   if (found !== null) {
     writeFileSync(path, existing.slice(0, found.begin) + block + existing.slice(found.end));
     return { path, file: target.file, mode: found.begin === 0 ? 'create' : 'append' };
