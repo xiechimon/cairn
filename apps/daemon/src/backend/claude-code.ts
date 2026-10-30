@@ -408,6 +408,13 @@ class ClaudeSessionHandle implements AgentSessionHandle {
   private readonly q: Query;
   private readonly abort: AbortController;
   private readonly onClaudeRateLimit: ((notice: ClaudeRateLimitNotice) => void) | undefined;
+  private readonly runningTools = new Set<string>();
+  private readonly pendingSteers: {
+    message: SDKUserMessage;
+    text: string;
+    resolve: () => void;
+    reject: (error: Error) => void;
+  }[] = [];
   private closed = false;
   private stopping = false;
 
@@ -442,14 +449,19 @@ class ClaudeSessionHandle implements AgentSessionHandle {
           this.onClaudeRateLimit?.(notice);
         }
         for (const ev of events) {
+          if (ev.type === 'toolcall_end') {
+            if (ev.call.result === undefined) this.runningTools.add(ev.call.id);
+            else this.runningTools.delete(ev.call.id);
+          }
           this.queue.push(ev);
           if (TERMINAL_EVENT_TYPES.includes(ev.type)) {
             this.finish();
             return;
           }
         }
+        this.flushSteers();
       }
-      this.queue.end();
+      this.finish();
     } catch (err) {
       if (this.stopping) {
         this.queue.end();
@@ -457,21 +469,36 @@ class ClaudeSessionHandle implements AgentSessionHandle {
       }
       const message = err instanceof Error ? err.message : String(err);
       this.queue.push({ type: 'error', error: { message, retryable: false } });
-      this.queue.end();
+      this.finish();
     }
   }
 
   private finish(): void {
     if (this.closed) return;
     this.closed = true;
+    for (const pending of this.pendingSteers.splice(0)) {
+      pending.reject(new Error('claude-code session closed before steer delivery'));
+    }
     this.input.end();
     this.queue.end();
     if (!this.abort.signal.aborted) this.abort.abort();
   }
 
   async steer(text: string, images?: readonly DeliveredImage[]): Promise<void> {
-    this.input.push(buildUserMessage(text, images));
-    this.queue.push({ type: 'steer', text });
+    if (this.closed) throw new Error('claude-code session closed before steer delivery');
+    return new Promise<void>((resolve, reject) => {
+      this.pendingSteers.push({ message: buildUserMessage(text, images), text, resolve, reject });
+      this.flushSteers();
+    });
+  }
+
+  private flushSteers(): void {
+    if (this.closed || this.runningTools.size > 0) return;
+    for (const pending of this.pendingSteers.splice(0)) {
+      this.input.push(pending.message);
+      this.queue.push({ type: 'steer', text: pending.text });
+      pending.resolve();
+    }
   }
 
   async stop(): Promise<void> {
