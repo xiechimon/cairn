@@ -305,7 +305,7 @@
   },
   "direct-vitest-skipped-slot": {
     "Intercepts": 1,
-    "Recurrences": 0
+    "Recurrences": 1
   },
   "directory-wide-absence-assertion": {
     "Intercepts": 1,
@@ -817,7 +817,7 @@
   },
   "prepush-selftest-not-run": {
     "Intercepts": 0,
-    "Recurrences": 1
+    "Recurrences": 2
   },
   "prepush-skipped-ui-gates": {
     "Intercepts": 2,

@@ -17,6 +17,7 @@ import { docReaderTests } from './doc-reader-tests.mjs';
 import { readEvents, recordAll } from './lessons-ledger-gate.mjs';
 import {
   ciOnlyScripts,
+  ciOnlyTestSteps,
   gateOf,
   hasCode,
   localOnly,
@@ -599,8 +600,13 @@ test('every node --test step in any workflow runs locally when its tests, source
   assert.equal(steps.length, written.length, 'every node --test step is parsed');
   assert.ok(steps.some(({ workflow }) => workflow === '.github/workflows/silent-revert-gate.yml'));
   assert.ok(steps.some(({ tests }) => tests.includes('scripts/lane-model-policy.test.mjs')));
+  assert.ok(steps.some(({ tests }) => tests.some((test) => test in ciOnlyTestSteps)));
   for (const { workflow, tests } of steps) {
     const step = ['node', '--test', ...tests].join(' ');
+    if (tests.some((test) => test in ciOnlyTestSteps)) {
+      assert.ok(!prepushPlan([workflow]).some((args) => args.join(' ') === step), step);
+      continue;
+    }
     for (const path of [workflow, tests[0], tests[0].replace(/\.test\.mjs$/, '.mjs')]) {
       assert.equal(
         prepushPlan([path]).filter((args) => args.join(' ') === step).length,

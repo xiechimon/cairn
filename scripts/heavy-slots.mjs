@@ -154,14 +154,21 @@ function createExclusive(path) {
   }
 }
 
-export function slotLockDir(env, platform = process.platform) {
+export function slotLockDir(
+  env,
+  platform = process.platform,
+  darwinTemp = () => spawnSync('getconf', ['DARWIN_USER_TEMP_DIR'], { encoding: 'utf8' }),
+) {
   if (env.CAIRN_HEAVY_SLOTS_DIR) return env.CAIRN_HEAVY_SLOTS_DIR;
-  const darwin =
-    platform === 'darwin'
-      ? spawnSync('getconf', ['DARWIN_USER_TEMP_DIR'], { encoding: 'utf8' })
-      : null;
-  const base = darwin?.status === 0 && darwin.stdout.trim() ? darwin.stdout.trim() : tmpdir();
-  return join(base, 'cairn-heavy-slots');
+  if (platform !== 'darwin') return join(tmpdir(), 'cairn-heavy-slots');
+  const result = darwinTemp();
+  if (result.status === 0 && result.stdout.trim())
+    return join(result.stdout.trim(), 'cairn-heavy-slots');
+  if (env.TMPDIR)
+    throw new Error(
+      'heavy-slots: getconf DARWIN_USER_TEMP_DIR failed and TMPDIR is overridden, so the shared slot directory is unknown; set CAIRN_HEAVY_SLOTS_DIR',
+    );
+  return join(tmpdir(), 'cairn-heavy-slots');
 }
 
 export async function acquireSlot({ env = process.env, wait = true, log = console.error } = {}) {

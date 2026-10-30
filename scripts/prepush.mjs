@@ -26,6 +26,11 @@ export const ciOnlyScripts = {
     'reads the PR event payload and issue labels through the GitHub token',
 };
 
+export const ciOnlyTestSteps = {
+  'scripts/ops/backup-server-db.test.mjs':
+    'needs GNU rsync 3.x and the rrsync script the ops-backup-test job downloads',
+};
+
 export const selfTests = [
   'scripts/prepush.test.mjs',
   'scripts/heavy-slots.test.mjs',
@@ -150,6 +155,7 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
                 ),
             ),
           )
+          .filter(({ tests }) => !tests.some((test) => test in ciOnlyTestSteps))
           .map(({ tests }) => ['node', '--test', ...tests])
           .filter((step) => !required.some((args) => args.join(' ') === step.join(' '))),
         ['node', 'scripts/prepush-vitest.mjs'],

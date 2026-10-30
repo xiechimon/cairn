@@ -169,16 +169,24 @@ setTimeout(() => process.exit(0), ${lingerMs});
   );
 
 test('an overridden TMPDIR on macOS does not move the shared lock directory', () => {
-  const darwinTemp = spawnSync('getconf', ['DARWIN_USER_TEMP_DIR'], {
-    encoding: 'utf8',
-  }).stdout.trim();
-  if (process.platform === 'darwin')
-    assert.equal(
-      slotLockDir({ TMPDIR: '/private/tmp/sandbox-override' }, 'darwin'),
-      join(darwinTemp, 'cairn-heavy-slots'),
-    );
-  assert.equal(slotLockDir({ TMPDIR: '/x', CAIRN_HEAVY_SLOTS_DIR: '/locks' }, 'darwin'), '/locks');
-  assert.equal(slotLockDir({}, 'linux'), join(tmpdir(), 'cairn-heavy-slots'));
+  const failed = () => ({ status: 71, stdout: '' });
+  assert.equal(
+    slotLockDir({ TMPDIR: '/private/tmp/sandbox-override' }, 'darwin', () => ({
+      status: 0,
+      stdout: '/var/folders/ab/T/\n',
+    })),
+    '/var/folders/ab/T/cairn-heavy-slots',
+  );
+  assert.throws(
+    () => slotLockDir({ TMPDIR: '/private/tmp/sandbox-override' }, 'darwin', failed),
+    /set CAIRN_HEAVY_SLOTS_DIR/,
+  );
+  assert.equal(slotLockDir({}, 'darwin', failed), join(tmpdir(), 'cairn-heavy-slots'));
+  assert.equal(
+    slotLockDir({ TMPDIR: '/x', CAIRN_HEAVY_SLOTS_DIR: '/locks' }, 'darwin', failed),
+    '/locks',
+  );
+  assert.equal(slotLockDir({ TMPDIR: '/x' }, 'linux'), join(tmpdir(), 'cairn-heavy-slots'));
 });
 
 test('slot count defaults to 2 and falls back to 1 with a warning for bad values', () => {
