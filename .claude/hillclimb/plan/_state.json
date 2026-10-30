@@ -6,6 +6,18 @@
       "label": "plan ok",
       "kind": "binary",
       "better": "higher"
+    },
+    {
+      "id": "revision_ok",
+      "label": "revision ok",
+      "kind": "binary",
+      "better": "higher"
+    },
+    {
+      "id": "nofeedback_ok",
+      "label": "no-feedback ok",
+      "kind": "binary",
+      "better": "lower"
     }
   ],
   "perf_fields": [
@@ -40,6 +52,8 @@
     "integration/eval/chief-dispatch/stack.mts",
     "integration/eval/chief-dispatch/repo-seed/README.md",
     "integration/eval/plan/grade.mts",
+    "integration/eval/plan/run.mts",
+    "integration/eval/plan/seed.mts",
     ".claude/hillclimb/plan/cases.json",
     "apps/server/src/services/chief.ts",
     "apps/server/src/services/chief-tools.ts",

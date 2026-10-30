@@ -26,7 +26,8 @@ import {
   type MemoryRowLite,
 } from '../memory-regression/grade.mts';
 import { readMemoryRows, seedMemories } from '../memory-regression/seed.mts';
-import { gradePlanCase, isPlanCase, type PlanCase } from '../plan/grade.mts';
+import { gradePlanCase, isPlanCase, isPlanRevisionCase, type PlanCase } from '../plan/grade.mts';
+import { buildPlanRevisionTranscript, runPlanRevisionCase } from '../plan/run.mts';
 import { gradeRoutingCase, isRoutingCase, type RoutingCase } from '../project-routing/grade.mts';
 import { seedRoutingProjects } from '../project-routing/seed.mts';
 import { type Case, gradeCase, type RosterAgent } from './grade.mts';
@@ -146,6 +147,28 @@ async function runCase(
       memoryAfter: [],
       chiefSystemPrompt: learned.chiefSystemPrompt,
       grade: learned.grade,
+    };
+  }
+  if (isPlanCase(input) && isPlanRevisionCase(input)) {
+    const revised = await runPlanRevisionCase(input, {
+      roster: ROSTER,
+      model: CHIEF_MODEL,
+      timeoutMs: ctx.timeoutS > 0 ? ctx.timeoutS * 1000 : 300_000,
+      arms: 'all',
+    });
+    return {
+      output: revised.output,
+      transcript: buildPlanRevisionTranscript(revised, input),
+      model: revised.model,
+      usage: revised.usage,
+      stop_reason: revised.stop_reason,
+      evidence: revised.evidence,
+      truncated: revised.truncated,
+      agentIds: revised.agentIds,
+      projectIds: {},
+      memoryAfter: [],
+      chiefSystemPrompt: revised.chiefSystemPrompt,
+      grade: revised.grade,
     };
   }
   const { stack, world, projectIds } = await freshStack(input);
@@ -600,6 +623,11 @@ async function main() {
                 if (isLearnCase(c)) {
                   if (run.grade === undefined)
                     throw new Error(`learn case ${c.id} returned no grade`);
+                  return run.grade;
+                }
+                if (isPlanCase(c) && isPlanRevisionCase(c)) {
+                  if (run.grade === undefined)
+                    throw new Error(`plan revision case ${c.id} returned no grade`);
                   return run.grade;
                 }
                 if (isPlanCase(c)) return gradePlanCase(c, { evidence: run.evidence });
