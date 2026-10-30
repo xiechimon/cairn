@@ -51,7 +51,7 @@ function expectOneCardShape(p: CardProbe) {
     expect(row.bottom, 'F4: 1px divider in --border between rows').toBe(`1px ${p.border}`);
   }
   for (const row of p.rows) expect(row.bg, 'F5: row fill').toBe('rgba(0, 0, 0, 0)');
-  expect(p.cardBg).toBe('rgb(254, 254, 251)');
+  expect(p.cardBg).toBe('rgb(253, 253, 251)');
   expect(p.cardShadow, 'F7: 1px outline at 2x').toContain(`${p.border} 0px 0px 0px 1px`);
   expect(
     p.rows.map((r) => r.label),

@@ -91,7 +91,7 @@ for (const theme of ['light', 'dark'] as const) {
     const [first] = faces;
     expect(first.value.trackHeight).toBe(32);
     expect(first.value.trackPadding).toBe('2px');
-    expect(first.value.trackRadius).toBe('6px');
+    expect(first.value.trackRadius).toBe('8px');
     expect(first.value.optionHeight).toBe(28);
     expect(first.value.optionRadius).toBe('4px');
     expect(first.value.selectedRing).toBe(true);
@@ -100,10 +100,10 @@ for (const theme of ['light', 'dark'] as const) {
     expect(first.value.idleInk).not.toBe(first.value.selectedInk);
     expect(first.value.selectedBg).not.toBe(first.value.trackBg);
     if (theme === 'light') {
-      expect(first.value.trackBg).toBe('rgb(241, 240, 235)');
-      expect(first.value.selectedBg).toBe('rgb(254, 254, 251)');
-      expect(first.value.selectedInk).toBe('rgb(20, 38, 30)');
-      expect(first.value.idleInk).toBe('rgb(70, 80, 72)');
+      expect(first.value.trackBg).toBe('rgb(230, 231, 225)');
+      expect(first.value.selectedBg).toBe('rgb(253, 253, 251)');
+      expect(first.value.selectedInk).toBe('rgb(29, 35, 31)');
+      expect(first.value.idleInk).toBe('rgb(75, 83, 77)');
     }
     for (const { name, value } of faces.slice(1)) {
       expect({ name, ...value }).toEqual({ name, ...first.value });

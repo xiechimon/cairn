@@ -1,7 +1,7 @@
 import { expect, type Page, test } from '@playwright/test';
 import { evidencePanelShot } from './evidence';
 
-test('CDS composer: 12px radius, shadow-composer ladder, 6px send, 384 max-h', async ({ page }) => {
+test('CDS composer: 14px radius, shadow-composer ladder, 8px send, 384 max-h', async ({ page }) => {
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=16');
   await page.waitForSelector('[data-testid="composer-card"]');
 
@@ -29,14 +29,14 @@ test('CDS composer: 12px radius, shadow-composer ladder, 6px send, 384 max-h', a
     };
   });
 
-  expect(m.radiusComposer).toBe('12px');
-  expect(m.radius).toBe('12px');
+  expect(m.radiusComposer).toBe('14px');
+  expect(m.radius).toBe('14px');
   expect(m.border).toBe('0px');
   expect(m.composerMaxH).toBe('384px');
   expect(m.shadow).not.toBe('none');
   expect(m.shadow).toContain('0px 0px 0px 1px');
   expect(m.composerShadow).toContain('0px 0px 0px 1px');
-  expect(m.sendRadius).toBe('6px');
+  expect(m.sendRadius).toBe('8px');
   expect(m.bubbleAnim).toContain('message-fade-up');
 });
 

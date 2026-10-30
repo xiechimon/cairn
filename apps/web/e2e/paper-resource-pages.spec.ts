@@ -34,11 +34,11 @@ for (const [name, url, rows] of [
   ['secrets', '/app/resources/secrets?scenario=agent-detail-secrets', 2],
   ['machines', '/app/resources/machines?scenario=06', 2],
 ] as const) {
-  test(`${name} list: one settings card of 52px rows, 10px corner`, async ({ page }) => {
+  test(`${name} list: one settings card of 52px rows, 14px corner`, async ({ page }) => {
     await light(page, url);
     const cards = page.locator('[data-testid="page-col"] .settings-card');
     await expect(cards).toHaveCount(1);
-    await expect(cards).toHaveCSS('border-top-left-radius', '10px');
+    await expect(cards).toHaveCSS('border-top-left-radius', '14px');
     const heights = await cards.evaluate((el) =>
       [...el.children].map((row) => row.getBoundingClientRect().height),
     );
@@ -53,15 +53,15 @@ test('machines: `添加机器` sits in the top bar, no dashed full-width bar', a
   await expect(page.locator('[data-testid="page-col"] button.border-dashed')).toHaveCount(0);
   const local = page.locator('div[data-kind="local"]');
   await expect(local).toContainText('在线');
-  await expect(local.locator('[data-on]')).toHaveCSS('background-color', 'rgb(52, 143, 79)');
+  await expect(local.locator('[data-on]')).toHaveCSS('background-color', 'rgb(95, 143, 79)');
 });
 
 test('providers runtime tabs: canvas track, chosen tab white with a 1px ring', async ({ page }) => {
   await light(page, '/app/resources/providers?scenario=06');
   const list = page.getByRole('tablist', { name: '模型服务' });
-  await expect(list).toHaveCSS('background-color', 'rgb(241, 240, 235)');
+  await expect(list).toHaveCSS('background-color', 'rgb(230, 231, 225)');
   const chosen = list.getByRole('tab', { selected: true });
-  await expect(chosen).toHaveCSS('background-color', 'rgb(254, 254, 251)');
+  await expect(chosen).toHaveCSS('background-color', 'rgb(253, 253, 251)');
   const ring = await chosen.evaluate((el) => getComputedStyle(el).boxShadow);
   expect(ring).toContain('0px 0px 0px 1px');
   await expect(chosen).toHaveCSS('height', '28px');

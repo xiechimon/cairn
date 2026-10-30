@@ -12,10 +12,10 @@ for (const theme of ['light', 'dark'] as const) {
       return {
         bodyWeight: getComputedStyle(document.body).fontWeight,
         cardTitleWeight: getComputedStyle(document.querySelector('.todo-card-title')!).fontWeight,
-        interLoaded: document.fonts.check('400 14px "inter"'),
+        bodyFontLoaded: document.fonts.check('400 14px "instrumentSans"'),
       };
     });
-    expect(m.interLoaded).toBe(true);
+    expect(m.bodyFontLoaded).toBe(true);
     expect(m.bodyWeight).toBe('400');
     expect(m.cardTitleWeight).toBe('500');
   });
@@ -184,7 +184,7 @@ for (const theme of ['light', 'dark'] as const) {
     });
     expect(ring.style).toBe('solid');
     expect(ring.w).toBe('2px');
-    expect(ring.color).toBe(theme === 'dark' ? 'rgb(228, 182, 92)' : 'rgb(32, 89, 67)');
+    expect(ring.color).toBe(theme === 'dark' ? 'rgb(156, 199, 139)' : 'rgb(63, 108, 53)');
   });
 }
 
@@ -240,8 +240,8 @@ for (const theme of ['light', 'dark'] as const) {
     const destructive = await resolveToken(page, '--destructive');
     const card = await resolveToken(page, '--card');
 
-    expect(destructive).toBe(theme === 'dark' ? 'rgb(242, 136, 129)' : 'rgb(182, 50, 45)');
-    expect(card).toBe(theme === 'dark' ? 'rgb(24, 32, 28)' : 'rgb(254, 254, 251)');
+    expect(destructive).toBe(theme === 'dark' ? 'rgb(240, 154, 136)' : 'rgb(163, 58, 42)');
+    expect(card).toBe(theme === 'dark' ? 'rgb(34, 39, 35)' : 'rgb(253, 253, 251)');
     expect(await contrastOf(page, destructive, card)).toBeGreaterThanOrEqual(4.5);
   });
 
@@ -250,8 +250,8 @@ for (const theme of ['light', 'dark'] as const) {
     await page.goto('/app?scenario=01&view=board');
     const bg = await resolveToken(page, '--card-button');
     const fg = await resolveToken(page, '--text-on-accent');
-    expect(bg).toBe(theme === 'dark' ? 'rgb(228, 182, 92)' : 'rgb(146, 99, 0)');
-    expect(fg).toBe(theme === 'dark' ? 'rgb(7, 26, 19)' : 'rgb(255, 255, 255)');
+    expect(bg).toBe(theme === 'dark' ? 'rgb(235, 181, 80)' : 'rgb(154, 101, 0)');
+    expect(fg).toBe(theme === 'dark' ? 'rgb(26, 20, 4)' : 'rgb(255, 255, 255)');
     expect(await contrastOf(page, fg, bg)).toBeGreaterThanOrEqual(4.5);
   });
 

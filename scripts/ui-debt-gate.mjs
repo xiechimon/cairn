@@ -9,13 +9,7 @@ const WEB_SRC = join(REPO_ROOT, 'apps/web/src');
 const BASELINE_PATH = join(REPO_ROOT, 'scripts/ui-debt-baseline.json');
 const BASELINE_REL = 'scripts/ui-debt-baseline.json';
 
-const WHITELIST = [
-  'styles/app.css',
-  'styles/fonts.css',
-  'styles/motion.css',
-  'styles/shadcn.css',
-  'styles/tokens.css',
-];
+const WHITELIST = ['styles/app.css', 'styles/fonts.css', 'styles/motion.css', 'styles/shadcn.css'];
 
 const CONTROL_TAGS = ['button', 'input', 'select', 'textarea'];
 const CONTROLS_EXCLUDED_PREFIX = 'components/ui/';
