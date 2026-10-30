@@ -18,15 +18,19 @@ import { readConversationPage } from './conversation-page.js';
 import { queueTaskMessage } from './task-message-queue.js';
 import { toTodoRecord } from './todos.js';
 
+const content = z
+  .string()
+  .max(32 * 1024)
+  .refine((value) => value.trim().length > 0, 'Must not be blank');
 const nonblank = z.string().refine((value) => value.trim().length > 0, 'Must not be blank');
 
 export const THREAD_TOOL_SCHEMAS = {
-  start_thread: { projectId: nonblank, content: nonblank },
+  start_thread: { projectId: nonblank, content },
   threads_waiting_on_me: { projectId: nonblank.optional() },
   read_thread: { threadId: nonblank, before: nonblank.optional() },
   reply_thread: {
     threadId: nonblank,
-    content: nonblank.optional(),
+    content: content.optional(),
     projectId: nonblank.optional(),
     mode: z.enum(['queue', 'steer']).optional(),
     requestId: nonblank.optional(),
@@ -103,7 +107,10 @@ function pendingQuestions(db: Db, threadId: string) {
     });
 }
 
-function coordinatorSummary(db: Db, row: typeof chiefThread.$inferSelect) {
+function coordinatorSummary(
+  db: Db,
+  row: Pick<typeof chiefThread.$inferSelect, 'id' | 'chiefId' | 'teamId' | 'title' | 'updatedAt'>,
+) {
   const questions = pendingQuestions(db, row.id);
   const turns = db
     .select({ status: step.status })
@@ -156,7 +163,11 @@ export async function executeThreadMcpTool(
       const result = sendChiefMessage(deps, teamId, { ...input, threadId: null });
       deps.convHub?.publishMessage(result.thread.id, result.message);
       return {
-        thread: { id: result.thread.id, projectId: input.projectId, status: 'working' },
+        thread: {
+          id: result.thread.id,
+          projectId: input.projectId,
+          status: coordinatorSummary(db, result.thread).status,
+        },
         message: result.message,
       };
     }

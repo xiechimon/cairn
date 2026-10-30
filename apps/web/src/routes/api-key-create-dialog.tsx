@@ -7,7 +7,12 @@ import { DialogShell } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
 import { useI18n } from '../i18n/provider.js';
 
-const TOOL_NAMES = MCP_TOOL_REGISTRY.map((tool) => tool.grant);
+const READ_GRANTS: readonly string[] = MCP_TOOL_REGISTRY.filter((tool) => tool.kind === 'read').map(
+  (tool) => tool.grant,
+);
+const WRITE_GRANTS: readonly string[] = MCP_TOOL_REGISTRY.filter(
+  (tool) => tool.kind === 'write',
+).map((tool) => tool.grant);
 
 export interface ApiKeyCreateBody {
   name: string | null;
@@ -39,8 +44,8 @@ export function ApiKeyCreateDialog({ open, onClose, onCreate }: ApiKeyCreateDial
     return next;
   };
   const grantAll = () => {
-    setRead(new Set(TOOL_NAMES));
-    setWrite(new Set(TOOL_NAMES));
+    setRead(new Set(READ_GRANTS));
+    setWrite(new Set(WRITE_GRANTS));
     setGitAccess(true);
     setMcpAccess(true);
     setMachineAccess(true);
@@ -58,7 +63,10 @@ export function ApiKeyCreateDialog({ open, onClose, onCreate }: ApiKeyCreateDial
       gitAccess,
       mcpAccess,
       machineAccess,
-      toolGrants: { read: [...read], write: [...write] },
+      toolGrants: {
+        read: [...read].filter((grant) => READ_GRANTS.includes(grant)),
+        write: [...write].filter((grant) => WRITE_GRANTS.includes(grant)),
+      },
     });
     onClose();
   };
@@ -88,18 +96,24 @@ export function ApiKeyCreateDialog({ open, onClose, onCreate }: ApiKeyCreateDial
           />
         </FormField>
         <div className="flex flex-col gap-1.5">
-          {/* biome-ignore lint/a11y/noLabelWithoutControl: Base UI Checkbox.Root renders its hidden native input inside this label at runtime; the static check cannot see through the component. */}
-          <label className="inline-flex cursor-pointer items-center gap-2 text-ui text-content-secondary">
+          <label
+            htmlFor="apikey-git-access"
+            className="inline-flex cursor-pointer items-center gap-2 text-ui text-content-secondary"
+          >
             <Checkbox
+              id="apikey-git-access"
               checked={gitAccess}
               onCheckedChange={setGitAccess}
               aria-label={t('Git 读写（托管仓库 push/pull）')}
             />
             {t('Git 读写（托管仓库 push/pull）')}
           </label>
-          {/* biome-ignore lint/a11y/noLabelWithoutControl: Base UI Checkbox.Root renders its hidden native input inside this label at runtime; the static check cannot see through the component. */}
-          <label className="inline-flex cursor-pointer items-center gap-2 text-ui text-content-secondary">
+          <label
+            htmlFor="apikey-mcp-access"
+            className="inline-flex cursor-pointer items-center gap-2 text-ui text-content-secondary"
+          >
             <Checkbox
+              id="apikey-mcp-access"
               checked={mcpAccess}
               onCheckedChange={setMcpAccess}
               aria-label={t('MCP 访问（MCP 客户端接入）')}
@@ -132,22 +146,26 @@ export function ApiKeyCreateDialog({ open, onClose, onCreate }: ApiKeyCreateDial
             <span className="w-8 text-center">{t('读')}</span>
             <span className="w-8 text-center">{t('写')}</span>
           </div>
-          {TOOL_NAMES.map((tool) => (
+          {MCP_TOOL_REGISTRY.map(({ grant: tool, kind }) => (
             <div key={tool} className="flex items-center gap-2 py-1 text-meta">
               <span className="flex-1 text-content-secondary">{tool}</span>
               <span className="w-8 text-center text-content-tertiary">
-                <Checkbox
-                  checked={read.has(tool)}
-                  onCheckedChange={() => setRead((set) => toggle(set, tool))}
-                  aria-label={`${t('读')} ${tool}`}
-                />
+                {kind === 'read' && (
+                  <Checkbox
+                    checked={read.has(tool)}
+                    onCheckedChange={() => setRead((set) => toggle(set, tool))}
+                    aria-label={`${t('读')} ${tool}`}
+                  />
+                )}
               </span>
               <span className="w-8 text-center text-content-tertiary">
-                <Checkbox
-                  checked={write.has(tool)}
-                  onCheckedChange={() => setWrite((set) => toggle(set, tool))}
-                  aria-label={`${t('写')} ${tool}`}
-                />
+                {kind === 'write' && (
+                  <Checkbox
+                    checked={write.has(tool)}
+                    onCheckedChange={() => setWrite((set) => toggle(set, tool))}
+                    aria-label={`${t('写')} ${tool}`}
+                  />
+                )}
               </span>
             </div>
           ))}

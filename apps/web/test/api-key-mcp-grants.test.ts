@@ -17,10 +17,10 @@ describe('API key MCP grant selection', () => {
     const html = renderToStaticMarkup(
       createElement(ApiKeyCreateDialog, { open: true, onClose: vi.fn(), onCreate: vi.fn() }),
     );
-    for (const { grant } of MCP_TOOL_REGISTRY) {
+    for (const { grant, kind } of MCP_TOOL_REGISTRY) {
       expect(html, grant).toContain(`>${grant}</span>`);
-      expect(html, grant).toContain(`aria-label="读 ${grant}"`);
-      expect(html, grant).toContain(`aria-label="写 ${grant}"`);
+      expect(html, grant).toContain(`aria-label="${kind === 'read' ? '读' : '写'} ${grant}"`);
+      expect(html, grant).not.toContain(`aria-label="${kind === 'read' ? '写' : '读'} ${grant}"`);
     }
     expect(html).not.toContain('aria-label="读 todos"');
     expect(html).toContain('Start Thread');

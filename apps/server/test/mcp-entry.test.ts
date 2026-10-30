@@ -2,7 +2,7 @@ import { chiefIdFormat, orchestrationSourceRef } from '@cairn/shared';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { eq } from 'drizzle-orm';
-import { describe, expect, onTestFinished, test } from 'vitest';
+import { describe, expect, onTestFinished, test, vi } from 'vitest';
 import {
   agent,
   build,
@@ -340,6 +340,166 @@ describe('Coordinator terminal entry through an MCP client', () => {
       expect((await client.listTools()).tools.map((tool) => tool.name)).toEqual([name]);
     }
   });
+
+  test('write Thread grants in the read column neither register nor authorize write tools', async () => {
+    const s = bootServer();
+    const client = await connect(s, ['Projects', ...WRITE], []);
+    expect((await client.listTools()).tools.map((tool) => tool.name)).toEqual(['projects']);
+    for (const name of ['start_thread', 'reply_thread']) {
+      const result = await client.callTool({
+        name,
+        arguments: { projectId: 'missing', threadId: 'missing', content: 'Denied' },
+      });
+      expect(result.isError).toBe(true);
+      expect(JSON.stringify(result)).toContain('not found');
+    }
+    expect(s.db.select().from(chiefThread).all()).toEqual([]);
+  });
+
+  test.each(['start', 'coordinator reply', 'work queue', 'work steer'] as const)(
+    '%s bounds content before creating messages or turns',
+    async (entry) => {
+      const { s, client, projectId, threadId } = await world();
+      insertWork(s, projectId, 'bounded-work', 'building');
+      s.db
+        .insert(step)
+        .values({
+          id: 'bounded-step',
+          buildId: 'run-bounded-work',
+          kind: 'build',
+          status: 'claimed',
+          createdAt: 1,
+        })
+        .run();
+      const name = entry === 'start' ? 'start_thread' : 'reply_thread';
+      const args =
+        entry === 'start'
+          ? { projectId }
+          : {
+              threadId: entry === 'coordinator reply' ? threadId : 'bounded-work',
+              mode: entry === 'work steer' ? 'steer' : 'queue',
+            };
+      const before = {
+        threads: s.db.select().from(chiefThread).all(),
+        chiefMessages: s.db.select().from(chiefMessage).all(),
+        messages: s.db.select().from(message).all(),
+        steps: s.db.select().from(step).all(),
+      };
+      const rejected = await client.callTool({
+        name,
+        arguments: { ...args, content: 'x'.repeat(32 * 1024 + 1) },
+      });
+      expect(rejected.isError).toBe(true);
+      expect(s.db.select().from(chiefThread).all()).toEqual(before.threads);
+      expect(s.db.select().from(chiefMessage).all()).toEqual(before.chiefMessages);
+      expect(s.db.select().from(message).all()).toEqual(before.messages);
+      expect(s.db.select().from(step).all()).toEqual(before.steps);
+      expect(s.db.select().from(queuedMessage).all()).toEqual([]);
+      expect(s.db.select().from(steerPending).all()).toEqual([]);
+      await call(client, name, { ...args, content: 'x'.repeat(32 * 1024) });
+    },
+  );
+
+  test.each(['archived', 'closed', 'mismatched run'] as const)(
+    'rejects MCP steering of a work Thread with %s state without side effects',
+    async (state) => {
+      const { s, client, projectId } = await world();
+      insertWork(s, projectId, 'guarded-work', 'building');
+      insertWork(s, projectId, 'other-work', 'building');
+      s.db
+        .insert(step)
+        .values({
+          id: 'guarded-step',
+          buildId: 'run-guarded-work',
+          kind: 'build',
+          status: 'claimed',
+          createdAt: 1,
+        })
+        .run();
+      s.db
+        .update(todo)
+        .set(
+          state === 'archived'
+            ? { archivedAt: 1 }
+            : state === 'closed'
+              ? { phase: 'closed' }
+              : { latestBuildId: 'run-other-work' },
+        )
+        .where(eq(todo.id, 'guarded-work'))
+        .run();
+      const before = s.db.select().from(step).all();
+      const signal = vi.spyOn(s.machineHub, 'steerSignal');
+      const result = await client.callTool({
+        name: 'reply_thread',
+        arguments: { threadId: 'guarded-work', mode: 'steer', content: 'Rejected' },
+      });
+      expect(result.isError).toBe(true);
+      expect(s.db.select().from(message).all()).toEqual([]);
+      expect(s.db.select().from(steerPending).all()).toEqual([]);
+      expect(s.db.select().from(queuedMessage).all()).toEqual([]);
+      expect(s.db.select().from(step).all()).toEqual(before);
+      expect(signal).not.toHaveBeenCalled();
+    },
+  );
+
+  test('rejects an obsolete run ID and steers only the current work Thread run', async () => {
+    const { s, client, projectId } = await world();
+    insertWork(s, projectId, 'newer-work', 'building');
+    s.db
+      .insert(build)
+      .values({
+        id: 'old-run',
+        todoId: 'newer-work',
+        withPlan: false,
+        triggerSource: 'user',
+        createdAt: 0,
+      })
+      .run();
+    for (const id of ['old-run', 'run-newer-work'])
+      s.db
+        .insert(step)
+        .values({ id: `step-${id}`, buildId: id, kind: 'build', status: 'claimed', createdAt: 1 })
+        .run();
+    const rejected = await client.callTool({
+      name: 'reply_thread',
+      arguments: { threadId: 'old-run', mode: 'steer', content: 'Rejected' },
+    });
+    expect(rejected.isError).toBe(true);
+    expect(s.db.select().from(steerPending).all()).toEqual([]);
+    await call(client, 'reply_thread', {
+      threadId: 'newer-work',
+      mode: 'steer',
+      content: 'Current',
+    });
+    expect(s.db.select().from(steerPending).all()).toMatchObject([
+      { conversationId: 'run-newer-work', content: 'Current' },
+    ]);
+  });
+
+  test.each([
+    ['done', 'idle'],
+    ['failed', 'failed'],
+  ] as const)(
+    'returns the current start status after a turn becomes %s',
+    async (turnStatus, expected) => {
+      const s = bootServer();
+      bindCoordinator(s);
+      const projectId = await postProject(s.app);
+      const client = await connect(s);
+      const wake = vi.spyOn(s.machineHub, 'wake').mockImplementation(() => {
+        s.db.update(step).set({ status: turnStatus }).where(eq(step.kind, 'chief')).run();
+      });
+      const started = await call(client, 'start_thread', {
+        projectId,
+        content: 'Immediate completion',
+      });
+      wake.mockRestore();
+      expect(started.thread.status).toBe(expected);
+      expect(
+        (await call(client, 'read_thread', { threadId: started.thread.id })).thread.status,
+      ).toBe(expected);
+    },
+  );
 
   test('every new tool is hidden and refused without its grant', async () => {
     const s = bootServer();

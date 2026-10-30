@@ -35,6 +35,14 @@ codex mcp add cairn --url "$CAIRN_MCP_URL" --bearer-token-env-var CAIRN_API_KEY
 
 Codex stores the environment variable name, so `CAIRN_API_KEY` must also be exported when starting `codex`.
 
+For non-interactive execution, approve this server's tools explicitly:
+
+```sh
+codex exec -c 'mcp_servers.cairn.default_tools_approval_mode="approve"' "<prompt>"
+```
+
+Measured in the [Codex real session](real-sessions/codex.txt): omitting this override with approval policy `never` refused the first MCP call. The same setting can be placed under `[mcp_servers.cairn]` in private Codex configuration.
+
 ### pi
 
 ```sh
@@ -69,7 +77,7 @@ Tests were written before the tools. The initial run had 7 failures because the 
 
 The shared vocabulary test pins all 29 grants/tool pairs. The existing snapshot pins the original 24-tool prefix for backward compatibility and explicitly asserts all five new grants. A failing web test also exposed the existing key dialog's tool-name/grant-label mismatch; the dialog now takes the server's grant labels from the registry.
 
-## Validation
+## Initial implementation validation
 
 Measured locally; final related tests use Node 24.14.0 through fnm. No dependency rebuild, installation script, dependency change, or lockfile change was needed.
 
@@ -82,7 +90,7 @@ Measured locally; final related tests use Node 24.14.0 through fnm. No dependenc
 | `pnpm --filter @cairn/web e2e:affected` | 26 passed across four selected specs. |
 | `pnpm --filter @cairn/web e2e:affected -- apps/web/e2e/focus-ring-clip.spec.ts` | 3 passed, including the grant-submission case and existing focus-ring regressions. |
 | Installed harness setup commands with isolated config readback | 10 assertions passed; [setup-check.txt](setup-check.txt). |
-| Security/independent review | Two confirmed non-security findings fixed; [review and limits](security-review.md). |
+| Security/independent review | Initial count/spec corrections; superseded by the follow-up findings in [review and limits](security-review.md). |
 | `pnpm prepush` | Pass: 20 checks, including lint, typecheck, spec parsing, affected-test coverage, and comment discipline. |
 
 ```sh
@@ -93,7 +101,28 @@ Additional broad check: `pnpm exec vitest run --changed` selects unrelated daemo
 
 The key-dialog browser evidence uses a mocked API and no model/provider; it proves the grant-selection/submission behavior only. The live path is covered by the real-session evidence below. [Result metadata](cairn-mcp-entry-key-evidence/result.json).
 
-![API key dialog with the new Thread write grants selected; browser with mocked API](cairn-mcp-entry-key-evidence/thread-key-grants.png)
+![Initial implementation API key dialog; browser with mocked API](cairn-mcp-entry-key-evidence/thread-key-grants.png)
+
+## Security follow-up validation
+
+This revision preserves the grant-kind hotfix from #2308. The key dialog and Grant all now place each grant only in its registry kind column; MCP tests reject new write tools listed under read. Thread content is limited to 32,768 JavaScript string code units. Runtime regressions confirm that existing work-steer guards already reject archived/closed Threads and invalid run targets, without changing `message_todo`. Start status now uses the same calculation as `read_thread`. See [findings and review limits](security-review.md).
+
+The grant-submission browser tests moved from `focus-ring-clip.spec.ts` to `api-key-grants.spec.ts`; the affected-surface mapping covers both API-key source files. The focus-ring spec retains its geometry tests. The initial validation table above records the earlier implementation run, not the results of this follow-up.
+
+Measured on the follow-up working tree with Node 24.14.0 through fnm:
+
+| Check | Result |
+| --- | --- |
+| `pnpm lint` | Pass; one informational diagnostic in unchanged Feishu tests. |
+| `pnpm typecheck` | Pass across all workspace packages. |
+| `pnpm spec:parse` | Pass: 1,417 browser tests in 206 files collected; 67 integration files parsed. |
+| Eight related Vitest files | 135 passed: MCP entry 21, MCP face 11, token auth 45, legacy worker messaging 14, steer 24, composer queue/stop 16, web grants 1, MCP integration 3. |
+| `pnpm exec vitest run --changed` with the related file filters | 114 passed across seven selected files. |
+| `pnpm --filter @cairn/web e2e:affected` | 95 passed across ten selected specs, including both API-key grant cases and both focus-ring cases. |
+| New API-key spec mapping | Coverage check reports zero uncovered specs; dry-run selects it for both API-key source paths. |
+
+The first post-fix browser run caught a grant-array ordering regression (94 passed, 1 failed). Submission now preserves selection order while filtering by kind; the final 95-test run above passed. Browser evidence remains a mocked-API result; no new real-provider session is claimed.
+
 
 ## Real-session evidence
 
