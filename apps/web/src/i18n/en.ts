@@ -198,7 +198,6 @@ export const EN: Record<string, string> = {
   查看命令说明: 'Show command help',
   命令说明: 'Command help',
   '团队技能来自技能页面（共 {count} 个）': 'Team skills come from the Skills page ({count} total)',
-  '停止当前这一轮？': 'Stop this round?',
   '停止排队？': 'Stop queueing?',
   '任务回到排队前的状态。': 'The task goes back to where it was before it was queued.',
   '丢弃本轮修改——方案和代码回到上一个版本':
