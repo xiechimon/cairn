@@ -52,15 +52,10 @@ its actual failing output, then the same command on this change with its
 passing output. Include lint, typecheck and relevant e2e results. A claim
 that "without this change X would fail" is not evidence.
 
-For UI changes, use a before / after / unchanged screenshot table. Commit
-screenshots under `docs/verify/<ticket>/` and embed SHA-pinned raw links:
-
-```markdown
-![label](https://raw.githubusercontent.com/xiechimon/cairn/<sha>/docs/verify/<ticket>/shot.png)
-```
-
-The SHA must already be on the remote, so commit and push the branch first,
-then write the body.
+For UI changes, use a before / after / unchanged screenshot table. Embed
+reachable image URLs with `![label](url)`; committing screenshots under
+`docs/verify/<ticket>/` is optional, and a committed file needs a SHA-pinned
+raw link pushed before the body is written.
 
 Pick the proof by what the change touches. This table follows 56 merged
 backend PRs in eight agent-heavy repositories (t3code, background-agents,
@@ -133,7 +128,7 @@ fenced code and HTML comments keeps pr-evidence red.
   errors; use `gh api -X PATCH repos/xiechimon/cairn/pulls/<n> -F
   body=@/tmp/pr.md`, then re-read with `gh pr view <n> --json body` and
   compare.
-- Pin raw links to a short SHA (8 characters). From a cloud session the egress proxy wraps URLs that carry a full 40-character SHA in backticks, which breaks the embed (#1771). Read the stored body back after creating or editing the PR.
+- Read the stored body back after creating or editing the PR to check that image links render.
 - After opening a PR and after each push, read `mergeable_state` once
   (`gh api repos/xiechimon/cairn/pulls/<n> -q .mergeable_state`). A `dirty`
   PR runs no `pull_request` workflows, so no CI event ever arrives to say

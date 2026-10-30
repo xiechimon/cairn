@@ -35,6 +35,6 @@ Notes on scope:
 ## Consequences
 
 - Both copies of the D4 list — `PROTECTED_PATH_GLOBS` in `packages/shared/src/records/merge-gate.ts` (the merge readiness gate) and `PROTECTED` in `.claude/workflows/pr-gate.js` (the bootstrap pr-gate) — carry the six new globs item-for-item in the same order; an existing unit test pins the two lists against each other.
-- New unit tests cover every new path, case variants, and lookalikes that must stay in the auto-merge set (`apps/server/test/merge-gate-paths.test.ts`, `scripts/pr-gate-selfcheck.mjs`).
+- New unit tests cover every new path, case variants, and lookalikes that must stay in the auto-merge set (`apps/server/test/merge-gate-paths.test.ts`).
 - PRs touching only the eval ruler can no longer auto-merge under `autonomous` policy; they always route to a human, same as gate-source PRs.
 - Bench iteration slows down (every question/case edit needs a human merge). That is the intended cost: the ruler changes less often than the code it measures, and each change is one review away.

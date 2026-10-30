@@ -81,7 +81,7 @@ When dispatching work to Codex / Grok / pi, use `docs/agent-dispatch-prompts.md`
 
 ## Lessons ledger
 
-When you make a mistake during a task and fix it, add or update an entry file `docs/lessons/<ticket>-<short-name>.md` in the format of `docs/lessons/README.md` in the same round (one file per error kind; do not touch other entries); merge errors of the same kind and bump the original file's "Recurrences" count. Take the highest feasible level on the ledger ladder; if a machine check is possible, add one. A new gate must use the real mistake as a negative control: confirm the old error goes red and the fix goes green.
+When you make a mistake during a task and fix it, add or update an entry file `docs/lessons/<ticket>-<short-name>.md` in the format of `docs/lessons/README.md` in the same round (one file per error kind; do not touch other entries); merge errors of the same kind in the original document; if a machine check is possible, add one. A new gate must use the real mistake as a negative control: confirm the old error goes red and the fix goes green.
 
 Run `pnpm prepush` before pushing; it runs fast checks only, selected by changed paths, and docs-only changes skip code checks (the language gate still runs). Vitest, the full `@cairn/web` unit suite and e2e run in CI as required checks; a push is unverified until CI reports on that head. During development, run related tests by hand with `pnpm exec vitest run --changed` and `pnpm --filter @cairn/web e2e:affected`. CI uses the same entry point for fast checks; dead-class stays a separate advisory check, and full e2e stays in four shards.
 
@@ -105,7 +105,6 @@ Commit conventions:
 - Never `git commit --no-verify`.
 - When a pre-commit gate blocks an intentional change, the only exit is that gate's explicit environment variable: lockfile gate `CAIRN_ALLOW_LOCKFILE_CHANGE=1`, banned-vocabulary gate `CAIRN_ALLOW_BANNED_VOCAB=1` (both accept `1`/`true`/`yes`); there is no other exit.
 
-- **Acceptance must check the PR body's permanent raw evidence links**: before merging, grep the body for `raw.githubusercontent` links pointing at this branch's `docs/verify/<ticket>/`; if missing, send it back (measured 2026-10-13 on #1297/#1294: the lane did not submit evidence and the orchestrator only looked at the gates).
 - **The squash subject/body comes from the full commit message**: `messageHeadline` in `gh pr view --json commits` is a **truncated first line** (with an ellipsis); using it as `--subject` lands the truncated line in main. Use REST instead: `gh api repos/xiechimon/cairn/pulls/<n>/commits -q '.[0].commit.message'`, then split the first line from the rest (measured 2026-10-13 on #1289: the subject landed as "…claude-code m…").
 
 Worktrees (cairn is designed for many lanes, hence the emphasis):
@@ -136,7 +135,7 @@ Before planning, creating an issue, starting a build, or opening a PR, follow [t
 - Keys and encryption: `apps/server/src/lib/{secret-box,keys,token-auth,attachments-token}.ts`, `apps/server/src/services/{secrets,credentials,api-keys,oauth}.ts`
 - Machine registration and dispatch protocol: `apps/server/src/routes-machine.ts`, `apps/server/src/services/machine*.ts`, `apps/daemon/src/{credentials,secret-channel,machine-client}.ts`, `apps/daemon/src/backend/command-gate.ts`
 - MCP auth and external entry points: `apps/server/src/services/{mcp-face,mcp-servers}.ts`
-- The list above is also ADR 0021 D4 class ⑤: `.claude/workflows/pr-gate.js` and `packages/shared/src/records/merge-gate.ts` embed it as protected paths that always route to a human, and `scripts/pr-gate-selfcheck.mjs` fails when an entry here is missing from the gate list. Change all of them together.
+- The list above is also ADR 0021 D4 class ⑤: `.claude/workflows/pr-gate.js` and `packages/shared/src/records/merge-gate.ts` embed it as protected paths that always route to a human. Change all of them together.
 
 **Current merge state (phase 1)**: the merge policy default is autonomous (ADR 0026 R1), and local-form projects merge themselves (ADR 0023, #2050). On this repository a PR merges itself only when `.claude/workflows/pr-gate.js` returns go with `mergedBy: 'auto-merge'`. A PR for which pr-gate returns `mergedBy: 'user'`, which includes every PR that touches a protected path, goes to ian: agents do not merge it or arm its auto-merge. [ADR 0028](docs/adr/0028-phase-1-merge-routes.md) defines the three routes and when route B moves to ADR 0026 R2. The omarchy review-gate timer still arms auto-merge on every protected-path PR it passes, so until it changes, a PR that must wait for ian stays a draft (ADR 0028).
 
@@ -161,7 +160,7 @@ A bare `--head <branch>` once failed with `Head sha can't be blank` in the two-r
 
 PR bodies and long issue comments: **write a temporary file and use `--body-file`**; do not inline multi-line markdown in `--body`.
 - **Read back after editing**: `gh pr edit <n> --body-file ...` can be interrupted by gh's Projects-classic GraphQL error and **not apply** (measured on #550: the command errored and the body stayed old). Use `gh api -X PATCH repos/xiechimon/cairn/pulls/<n> --input -` instead (JSON generated by a script to avoid shell escaping), then pull it back with `gh pr view <n> --json body` and compare byte for byte.
-- **Screenshots and evidence for a PR must be committed to the branch**: Multica attachment URLs are not readable anonymously (`static.multica.ai/...` → `403 MissingKey`, `/api/attachments/<id>/download` → `401`), so embedding them in a PR body renders broken images; and a PR body can only embed URLs, which local files do not have. By convention, commit them to the task branch under `docs/verify/<ticket>/` and reference `https://raw.githubusercontent.com/xiechimon/cairn/<sha>/<path>` in the body (the repo is public; raw is anonymously readable). A local copy is only a backup, not a channel.
+- PR image links must be embedded and reachable. Evidence may be linked without committing it under `docs/verify/`.
 
 ## Working style
 

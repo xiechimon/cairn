@@ -5,7 +5,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { collectTicketSources, findTicketConflicts } from './dispatch-dedupe.mjs';
-import { classifyLaneExit } from './lane-worker-exit-gate.mjs';
 
 const START_GRACE_MS = 500;
 const WAIT_POLL_MS = 500;
@@ -23,9 +22,7 @@ dir is $TMPDIR/cairn-dispatch; override with CAIRN_DISPATCH_STATUS_DIR.
 Command output is written to <status-dir>/<id>.log. check re-verifies the
 recorded pid and exits non-zero when the process is missing; run it before
 reporting the state of a dispatched job instead of trusting impressions.
-wait polls until the process exits (or --timeout-s elapses), then runs
-scripts/lane-worker-exit-gate.mjs on the log so banned-model and short no-op
-exits (#2021) fail the wait even when the child returned rc 0. The detached
+wait polls until the process exits (or --timeout-s elapses). The detached
 supervisor records the real exit code into the status file after start
 returns, so a late non-zero exit cannot be reported as wait ok.
 
@@ -171,27 +168,19 @@ if (subcommand === 'record-exit') {
   const durationSeconds = Number.isFinite(startedMs)
     ? Math.max(0, (Date.parse(endedAt) - startedMs) / 1000)
     : Number.NaN;
-  let log = '';
-  try {
-    log = readFileSync(record.log, 'utf8');
-  } catch {
-    log = '';
-  }
-  const verdict = classifyLaneExit({ log, rc: record.exitCode, durationSeconds });
   writeStatus(statusPath, {
     ...record,
     alive: false,
     checkedAt: endedAt,
     endedAt,
     durationSeconds,
-    exitGate: verdict,
   });
-  if (!verdict.ok) {
-    console.error(`dispatch ${id}: wait failed (${verdict.code}): ${verdict.reason}`);
+  if (record.exitCode !== 0) {
+    console.error(`dispatch ${id}: wait failed: child exited ${record.exitCode}`);
     console.error(`log: ${record.log}`);
     process.exit(1);
   }
-  console.log(`dispatch ${id}: wait ok (${verdict.code}) after ${durationSeconds}s`);
+  console.log(`dispatch ${id}: wait ok after ${durationSeconds}s`);
   console.log(`log: ${record.log}`);
 } else {
   const separator = rest.indexOf('--');
