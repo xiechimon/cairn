@@ -1,12 +1,13 @@
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
-import { agent, step as stepTable } from '../src/db/schema.js';
+import { agent, step as stepTable, todo } from '../src/db/schema.js';
 import { createEphemeralSecretBox, SecretBoxError } from '../src/lib/secret-box.js';
 import { startBuilds } from '../src/services/builds.js';
 import { resolveStepCredentials } from '../src/services/credentials.js';
+import { stepToken } from '../src/services/machine-step-token.js';
 import { createProvider } from '../src/services/providers.js';
 import { createSecret } from '../src/services/secrets.js';
-import { bootServer, postProject, req } from './helpers.js';
+import { bootServer, insertMachine, postProject, req } from './helpers.js';
 
 const RELAY_KEY = 'sk-relay-per-step';
 const STRIPE_VALUE = 'sk_live_stripe';
@@ -157,4 +158,82 @@ describe('resolveStepCredentials (per-step dispatch interface surface)', () => {
     const orphaned = { db: s.db, box: createEphemeralSecretBox() };
     expect(() => resolveStepCredentials(orphaned, buildStepId)).toThrow(SecretBoxError);
   });
+});
+
+describe('subscription credential dispatch', () => {
+  test('only Claude Code steps receive the newest unexpired team subscription', async () => {
+    const s = await withAgentStack();
+    const path = `/api/teams/${s.team.id}/claude-subscriptions`;
+    const token =
+      'sk-ant-oat01-private-subscription-for-credential-test-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz';
+    const saved = await req(s.app, 'POST', path, { label: 'Personal', token });
+    expect(saved.status).toBe(201);
+    const buildStep = addStep(s, s.buildId, 'build');
+    expect(resolveStepCredentials(s.keysvc, buildStep).claudeSubscriptionToken).toBeUndefined();
+    s.db.update(agent).set({ provider: 'claude-code' }).where(eq(agent.id, 'agent-xiaolin')).run();
+    expect(resolveStepCredentials(s.keysvc, buildStep).claudeSubscriptionToken).toBe(token);
+    expect(resolveStepCredentials(s.keysvc, buildStep).secrets).not.toHaveProperty(
+      'CLAUDE_CODE_OAUTH_TOKEN',
+    );
+    await req(s.app, 'POST', path, {
+      label: 'Expired',
+      token:
+        'sk-ant-oat01-expired-token-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz',
+      expiresAt: 1,
+    });
+    expect(resolveStepCredentials(s.keysvc, buildStep).claudeSubscriptionToken).toBe(token);
+    await req(s.app, 'POST', path, {
+      label: 'Replacement',
+      token:
+        'sk-ant-oat01-replacement-token-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz',
+    });
+    expect(resolveStepCredentials(s.keysvc, buildStep).claudeSubscriptionToken).toBe(
+      'sk-ant-oat01-replacement-token-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz',
+    );
+  });
+});
+
+test('planning with a pi agent cannot receive the build agent subscription', async () => {
+  const s = await withAgentStack();
+  await req(s.app, 'POST', `/api/teams/${s.team.id}/claude-subscriptions`, {
+    label: 'Personal',
+    token:
+      'sk-ant-oat01-private-planning-test-token-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz',
+  });
+  s.db.update(agent).set({ provider: 'claude-code' }).where(eq(agent.id, 'agent-xiaolin')).run();
+  s.db
+    .insert(agent)
+    .values({
+      id: 'pi-planner',
+      teamId: s.team.id,
+      displayName: 'Planner',
+      provider: 'r3-gw',
+      modelId: 'stub-model',
+    })
+    .run();
+  s.db
+    .update(todo)
+    .set({ assignment: { plan: { agentId: 'pi-planner' }, build: { agentId: 'agent-xiaolin' } } })
+    .where(eq(todo.id, s.todoId))
+    .run();
+  expect(resolveStepCredentials(s.keysvc, s.stepId).claudeSubscriptionToken).toBeUndefined();
+});
+
+test('finished steps retain provider-key responses', async () => {
+  const s = await withAgentStack();
+  const machineId = insertMachine(s, { name: 'finished-provider' });
+  const stepId = addStep(s, s.buildId, 'build');
+  const deps = {
+    ...s.svc,
+    box: s.secretBox,
+    reposDir: s.reposDir,
+    attachmentsDir: s.attachmentsDir,
+    skillsDir: s.skillsDir,
+  };
+  for (const status of ['claimed', 'done'] as const) {
+    s.db.update(stepTable).set({ machineId, status }).where(eq(stepTable.id, stepId)).run();
+    expect((await stepToken(deps, machineId, stepId)).provider).toMatchObject({
+      apiKey: RELAY_KEY,
+    });
+  }
 });

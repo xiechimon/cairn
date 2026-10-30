@@ -504,9 +504,11 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
   });
 });
 
-describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; #310 +attachment; #319 +branch_sync; spec 12 +github_connection; spec 13 −skill −mcp_server; XMON-109 +skill_audit; XMON-108 +shell_command; #1029 −document_diff; #1137 +webhook_token; #1404 +gate_*; #1491 +autonomy_state +member_activity; #1686 +push_subscription)', () => {
+describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; #310 +attachment; #319 +branch_sync; spec 12 +github_connection; spec 13 −skill −mcp_server; XMON-109 +skill_audit; XMON-108 +shell_command; #1029 −document_diff; #1137 +webhook_token; #1404 +gate_*; #1491 +autonomy_state +member_activity; #1686 +push_subscription; #2243 +claude_subscription)', () => {
   it('DB table registry keeps schedules and drops whats_new, webhook_token, and shell_command (#1796)', () => {
-    expect(DB_TABLES).toHaveLength(45);
+    expect(DB_TABLES).toHaveLength(46);
+    expect(DB_TABLES).toContain('claude_subscription');
+    expect(INTERNAL_ONLY_TABLES).toContain('claude_subscription');
     expect(DB_TABLES).toContain('autonomous_merge_admission');
     expect(INTERNAL_ONLY_TABLES).toContain('autonomous_merge_admission');
     expect(DB_TABLES).toContain('autonomy_state');

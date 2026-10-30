@@ -1371,4 +1371,9 @@ export const EN: Record<string, string> = {
   '解除后需要重新填写才能恢复连接。':
     'Re-entering the fields is required to reconnect after unbinding.',
   解除飞书绑定确认: 'Unbind Feishu confirmation',
+  '删除 Claude 订阅连接': 'Delete Claude subscription',
+  '删除 Claude 订阅连接？': 'Delete Claude subscription?',
+  '删除 Claude 订阅连接失败，请重试。': 'Could not delete the Claude subscription. Try again.',
+  '删除「{name}」后，后续步骤将无法使用此连接。':
+    'After deleting "{name}", future steps cannot use this connection.',
 };
