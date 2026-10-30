@@ -195,3 +195,18 @@ Retro applied: the existing verification-command-context lesson (#1686) now incl
 Unverified limits: no host or GitHub access, live production recovery, real-provider execution, installed timer, live HTTP success, timeout injection, missing/executable-permission races, malformed success protocol injection, production permissions or scale. Unknown safe stderr that is outside the fixed allowlist is conservatively withheld. No UI or screenshot claim is made. Evidence remains local and uncommitted as requested; it does not establish delivered verification, remote evidence availability or CI success.
 
 Host acceptance still required: run the Operation command on omarchy against server-db-20261030T060001Z.db.gz, the existing key and real attachment paths, using a fresh scratch directory and the original shim PATH. Inspect JSON and status for decryption and HTTP success. If a helper fails, verify its startup/runtime class and exit diagnostic without publishing private host reports. No host execution was attempted here. No commit, push, PR, full e2e or pnpm build was run.
+
+## omarchy runs on real backups (dispatcher, 2026-10-30)
+
+Run from a separate clone under `/mnt/fast/tmp/b0/cairn`; the live server and its data were only read.
+
+| Run | Backup | Result | Report |
+| --- | --- | --- | --- |
+| 1, commit 22a07309 | server-db-20261030T050019Z | FAIL relationships: messages looked up by step id; the server keys them by build id (0 of 14752 messages carry a step id). Fixed in fccfecc0 | not kept |
+| 2, commit fccfecc0 | server-db-20261030T060001Z | 40 tables, attachments and relationships pass; FAIL decrypt: the mise `node` shim exits under the scratch HOME, reported as a decryption failure. Fixed in b2fbb4fb | not kept |
+| 3, commit b2fbb4fb | server-db-20261030T060001Z | PASS: integrity, foreign keys, 40 tables, 9 ready attachments, build with 2 steps and 139 messages, chief thread with 6 messages, decrypt ok, `/api/todos` 83 rows from a server on the restored copy | `omarchy/drill-20261030T063338Z.json` |
+| Negative: one message edited in the backup | same | FAIL content: message `msg-rsHA8F_TBVuBt1PbSWZPd-40`: differing row | `omarchy/neg-edit-message.json` |
+| Negative: one `todo_tag` row deleted from the backup | same | FAIL content: todo_tag ...: missing row | `omarchy/neg-drop-row.json` |
+| Negative: first byte of one attachment changed in a copy of the attachment backup | same | FAIL attachments: ...png: missing, size or sha256 mismatch | `omarchy/neg-attachment-byte.json` |
+
+The reports hold ids and counts only; they were checked for the key bytes and for token prefixes before commit. The weekly timer is not installed yet.
