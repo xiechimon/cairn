@@ -12,6 +12,7 @@ import {
   exists,
   gte,
   isNotNull,
+  isNull,
   like,
   notExists,
   notInArray,
@@ -264,6 +265,7 @@ function projectInFlight(db: Db, projectId: string): number {
         and(
           eq(todo.projectId, projectId),
           eq(todo.sourceKind, 'github-issue'),
+          isNull(todo.archivedAt),
           notInArray(todo.phase, NOT_IN_FLIGHT),
         ),
       )
@@ -464,7 +466,7 @@ export function createIssueIntake(
           })
           .from(todo)
           .innerJoin(project, eq(project.id, todo.projectId))
-          .where(eq(todo.id, todoId))
+          .where(and(eq(todo.id, todoId), isNull(todo.archivedAt)))
           .get();
         dropped =
           row === undefined
@@ -863,7 +865,7 @@ export function createIssueIntake(
         const fresh = deps.db
           .select({ phase: todo.phase })
           .from(todo)
-          .where(and(eq(todo.id, t.id), noDeliveredPr(), noOpenChildren()))
+          .where(and(eq(todo.id, t.id), isNull(todo.archivedAt), noDeliveredPr(), noOpenChildren()))
           .get();
         if (fresh === undefined || fresh.phase !== t.phase) {
           tally.closeSkipped += 1;
@@ -974,6 +976,7 @@ export function createIssueIntake(
           and(
             eq(todo.sourceKind, 'github-issue'),
             isNotNull(todo.sourceRef),
+            isNull(todo.archivedAt),
             notInArray(todo.phase, CLOSE_RECONCILE_SKIPPED),
             noDeliveredPr(),
             noOpenChildren(),

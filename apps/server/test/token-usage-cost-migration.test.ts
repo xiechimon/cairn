@@ -43,16 +43,11 @@ test('upgrading from 0057 preserves ambiguous legacy zeros instead of guessing t
     sqlite
       .prepare('INSERT INTO project (id, teamId, name) VALUES (?, ?, ?)')
       .run('project-old-cost', teamId, 'Legacy');
-    db.insert(schema.todo)
-      .values({
-        id: 'todo-old-cost',
-        teamId,
-        projectId: 'project-old-cost',
-        title: 'Legacy',
-        phaseAt: 1,
-        seqNum: 1,
-      })
-      .run();
+    sqlite
+      .prepare(
+        'INSERT INTO todo (id, teamId, projectId, title, phaseAt, seqNum) VALUES (?, ?, ?, ?, ?, ?)',
+      )
+      .run('todo-old-cost', teamId, 'project-old-cost', 'Legacy', 1, 1);
     db.insert(schema.build)
       .values({
         id: 'build-old-cost',

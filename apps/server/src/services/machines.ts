@@ -113,12 +113,25 @@ export function fetchStop(
     .from(stopPending)
     .where(eq(stopPending.conversationId, stepRow.buildId))
     .get();
-  if (!pending) return { discard: null };
-  db.delete(stopPending).where(eq(stopPending.conversationId, stepRow.buildId)).run();
-  if (pending.stepId !== stepId) {
-    return { discard: null };
+  if (pending) {
+    const target = db
+      .select({ status: step.status })
+      .from(step)
+      .where(eq(step.id, pending.stepId))
+      .get();
+    if (
+      pending.stepId === stepId ||
+      target === undefined ||
+      !['pending', 'claimed', 'waiting_quota'].includes(target.status)
+    ) {
+      db.delete(stopPending).where(eq(stopPending.conversationId, pending.conversationId)).run();
+    }
   }
-  return { discard: pending.discard };
+  if (stepRow.archiveStop === 'requested') {
+    db.update(step).set({ archiveStop: 'acknowledged' }).where(eq(step.id, stepId)).run();
+    return { discard: false };
+  }
+  return { discard: pending?.stepId === stepId ? pending.discard : null };
 }
 
 export function findMachineByToken(db: Db, token: string) {

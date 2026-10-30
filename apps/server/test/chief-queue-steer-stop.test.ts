@@ -10,6 +10,7 @@ import {
   provider as providerTable,
   steerPending,
   step as stepTable,
+  stopPending,
   todo as todoTable,
 } from '../src/db/schema.js';
 import { providerHealth } from '../src/services/provider-health.js';
@@ -461,6 +462,8 @@ describe('stop (T5)', () => {
     const w = await setupWorld();
     await w.send('第一句');
     const running = await w.claim();
+    await w.stop();
+    expect(w.s.db.select().from(stopPending).all()).toHaveLength(1);
     w.s.db
       .update(stepTable)
       .set({ lastHeartbeatAt: Date.now() - 10 * 60_000 })
@@ -469,6 +472,8 @@ describe('stop (T5)', () => {
     const res = await w.stop();
     expect(await res.json()).toEqual({ delegated: false });
     expect(w.stepRow(running!.step.id)?.status).toBe('stopped');
+    expect(w.s.db.select().from(stopPending).all()).toEqual([]);
+    expect(w.stepRow(running!.step.id)?.archiveStop).toBeNull();
     expect(w.messages().some((m) => m.id === `chief-stop-${running!.step.id}`)).toBe(true);
     expect((await w.thread()).activeRun).toBeNull();
   });

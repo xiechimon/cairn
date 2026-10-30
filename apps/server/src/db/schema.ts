@@ -94,6 +94,7 @@ export const todo = sqliteTable(
     spec: text('spec').notNull().default(''),
     phase: text('phase').$type<Phase>().notNull().default('todo'),
     phaseAt: epochMs('phaseAt').notNull(),
+    archivedAt: epochMs('archivedAt'),
     seqNum: integer('seqNum').notNull(),
     orderIndex: real('orderIndex').notNull().default(0),
     assignment: json<Assignment | null>('assignment'),
@@ -192,6 +193,7 @@ export const step = sqliteTable(
       .$type<'pending' | 'claimed' | 'done' | 'failed' | 'stopped' | 'waiting_quota'>()
       .notNull()
       .default('pending'),
+    archiveStop: text('archiveStop').$type<'requested' | 'acknowledged' | null>(),
     quotaBlock: json<QuotaWaitRow>('quotaBlock'),
     fallback: json<StepFallbackRow>('fallback'),
     sessionId: text('sessionId'),

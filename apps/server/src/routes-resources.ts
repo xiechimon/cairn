@@ -14,7 +14,7 @@ import {
   skillRecordSchema,
   THINKING_LEVELS,
 } from '@cairn/shared';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import type { AppContext } from './context.js';
 import { agent, machine, provider, todo } from './db/schema.js';
@@ -219,7 +219,11 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   app.get('/api/teams/:id/progress', (c) => {
     const id = c.req.param('id');
     requireTeam(ctx, id);
-    const rows = ctx.db.select({ phase: todo.phase }).from(todo).where(eq(todo.teamId, id)).all();
+    const rows = ctx.db
+      .select({ phase: todo.phase })
+      .from(todo)
+      .where(and(eq(todo.teamId, id), isNull(todo.archivedAt)))
+      .all();
     const byPhase: Record<string, number> = Object.fromEntries(PHASE_VALUES.map((p) => [p, 0]));
     for (const r of rows) byPhase[r.phase] = (byPhase[r.phase] ?? 0) + 1;
     return c.json({ todos: { total: rows.length, byPhase } });

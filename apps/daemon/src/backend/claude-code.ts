@@ -87,6 +87,7 @@ export function todoFromTodoWrite(name: unknown, input: unknown): AgentTodoItem[
 
 export interface ClaudeMapState {
   calls: Map<string, ToolCallRecord>;
+  runningTools: Set<string>;
   interrupted: boolean;
   usage: AgentTokenUsage;
   sessionId: string | null;
@@ -102,6 +103,7 @@ export function createClaudeMapState(opts?: {
 }): ClaudeMapState {
   return {
     calls: new Map(),
+    runningTools: new Set(),
     interrupted: false,
     usage: [],
     sessionId: null,
@@ -229,6 +231,7 @@ export function mapClaudeMessage(msg: SDKMessage, state: ClaudeMapState): StepEv
             ...(todo !== null ? { todo } : {}),
           };
           state.calls.set(call.id, call);
+          state.runningTools.add(call.id);
           out.push({ type: 'toolcall_end', call });
         }
       }
@@ -254,6 +257,7 @@ export function mapClaudeMessage(msg: SDKMessage, state: ClaudeMapState): StepEv
           is_error?: boolean;
         };
         if (b.type !== 'tool_result' || typeof b.tool_use_id !== 'string') continue;
+        state.runningTools.delete(b.tool_use_id);
         const pending = state.calls.get(b.tool_use_id);
         if (!pending) continue;
         const final: ToolCallRecord = {
@@ -408,6 +412,12 @@ class ClaudeSessionHandle implements AgentSessionHandle {
   private readonly q: Query;
   private readonly abort: AbortController;
   private readonly onClaudeRateLimit: ((notice: ClaudeRateLimitNotice) => void) | undefined;
+  private readonly pendingSteers: {
+    message: SDKUserMessage;
+    text: string;
+    resolve: () => void;
+    reject: (error: Error) => void;
+  }[] = [];
   private closed = false;
   private stopping = false;
 
@@ -448,8 +458,9 @@ class ClaudeSessionHandle implements AgentSessionHandle {
             return;
           }
         }
+        this.flushSteers();
       }
-      this.queue.end();
+      this.finish();
     } catch (err) {
       if (this.stopping) {
         this.queue.end();
@@ -457,21 +468,36 @@ class ClaudeSessionHandle implements AgentSessionHandle {
       }
       const message = err instanceof Error ? err.message : String(err);
       this.queue.push({ type: 'error', error: { message, retryable: false } });
-      this.queue.end();
+      this.finish();
     }
   }
 
   private finish(): void {
     if (this.closed) return;
     this.closed = true;
+    for (const pending of this.pendingSteers.splice(0)) {
+      pending.reject(new Error('claude-code session closed before steer delivery'));
+    }
     this.input.end();
     this.queue.end();
     if (!this.abort.signal.aborted) this.abort.abort();
   }
 
   async steer(text: string, images?: readonly DeliveredImage[]): Promise<void> {
-    this.input.push(buildUserMessage(text, images));
-    this.queue.push({ type: 'steer', text });
+    if (this.closed) throw new Error('claude-code session closed before steer delivery');
+    return new Promise<void>((resolve, reject) => {
+      this.pendingSteers.push({ message: buildUserMessage(text, images), text, resolve, reject });
+      this.flushSteers();
+    });
+  }
+
+  private flushSteers(): void {
+    if (this.closed || this.state.runningTools.size > 0) return;
+    for (const pending of this.pendingSteers.splice(0)) {
+      this.input.push(pending.message);
+      this.queue.push({ type: 'steer', text: pending.text });
+      pending.resolve();
+    }
   }
 
   async stop(): Promise<void> {

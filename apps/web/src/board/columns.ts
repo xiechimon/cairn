@@ -30,7 +30,7 @@ export const COLUMNS: BoardColumnDef[] = [
     dropPhase: 'todo',
     name: '待开始',
     status: 'idle',
-    accepts: (t) => t.phase === 'todo',
+    accepts: (t) => t.archivedAt == null && t.phase === 'todo',
   },
   {
     id: 'building',
@@ -38,14 +38,17 @@ export const COLUMNS: BoardColumnDef[] = [
     startGate: true,
     name: '执行中',
     status: 'running',
-    accepts: (t) => (IN_PROGRESS_PHASES as readonly string[]).includes(t.phase),
+    accepts: (t) =>
+      t.archivedAt == null && (IN_PROGRESS_PHASES as readonly string[]).includes(t.phase),
   },
   {
     id: 'pending',
     dropPhase: 'review',
     name: '待处理',
     status: 'attention',
-    accepts: (t) => t.phase === 'confirm' || t.phase === 'review' || t.phase === 'failed',
+    accepts: (t) =>
+      t.archivedAt == null &&
+      (t.phase === 'confirm' || t.phase === 'review' || t.phase === 'failed'),
   },
   {
     id: 'done',
@@ -53,11 +56,12 @@ export const COLUMNS: BoardColumnDef[] = [
     name: '已完成',
     status: 'done',
     label: '最近 7 天',
-    accepts: (t) => t.phase === 'done' || t.phase === 'closed',
+    accepts: (t) => t.archivedAt != null || t.phase === 'done' || t.phase === 'closed',
   },
 ];
 
 export function canDropOnColumn(todo: TodoRecord, columnId: string): boolean {
+  if (todo.archivedAt != null) return false;
   const src = COLUMNS.find((c) => c.accepts(todo));
   const dst = COLUMNS.find((c) => c.id === columnId);
   if (src == null || dst == null || src.id === dst.id) return false;

@@ -92,6 +92,7 @@ function claimCandidates(deps: MachineDeps, _machineId: string, teamId: string):
       and(
         eq(step.status, 'pending'),
         eq(todo.teamId, teamId),
+        isNull(todo.archivedAt),
         or(isNull(step.holdUntil), lte(step.holdUntil, sql`${nowMs()}`)),
       ),
     )
@@ -366,7 +367,8 @@ async function tryClaim(
         and(
           eq(step.buildId, cand.stepRow.buildId),
           sql`${step.sessionId} is not null`,
-          ...(cand.stepRow.kind === 'build' && cand.buildRow.prevPhase === 'done'
+          ...(cand.stepRow.kind === 'build' &&
+          (cand.buildRow.prevPhase === 'done' || cand.buildRow.prevPhase === 'review')
             ? [eq(step.kind, 'build')]
             : []),
         ),
