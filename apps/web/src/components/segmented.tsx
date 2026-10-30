@@ -25,7 +25,7 @@ interface SegmentedProps<T extends string> {
 }
 
 const TRACK_CLS =
-  'inline-flex h-8 w-fit items-center justify-center gap-0.5 rounded-md bg-canvas p-0.5 text-content-secondary group-data-[orientation=horizontal]/tabs:h-8';
+  'inline-flex h-8 w-fit items-center justify-center gap-0.5 rounded-md bg-canvas p-0.5 text-content-secondary group-data-horizontal/tabs:h-8';
 
 const OPTION_CLS =
   "relative inline-flex h-7 flex-none items-center justify-center gap-1.5 rounded-(--cds-radius-md) border-0 px-3 py-0 text-ui font-normal whitespace-nowrap text-content-secondary transition-[color,background-color,box-shadow] duration-(--dur-fast) ease-out hover:text-foreground dark:text-content-secondary dark:hover:text-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5";

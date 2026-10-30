@@ -1,7 +1,7 @@
 {
   "frozenFrom": {
-    "sha": "96cad4f3bd787682c9ba3c6d684dce7089c32f61",
-    "date": "2026-10-30"
+    "sha": "1b84a9bf84690b0ff1e70d6333f67f11e8a37503",
+    "date": "2026-10-26"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
   "files": {
@@ -88,9 +88,8 @@
     "field.tsx": {
       "kind": "registry",
       "upstreamItem": "field",
-      "status": "deviated",
-      "hash": "62bad08942b02b36581b0d6a20aba1fb410cfef130be25881e4523a8f728bd0a",
-      "reason": "Upstream orientation variants (data-horizontal:/data-vertical:) never match: Base UI sets data-orientation, so they are rewritten to data-[orientation=horizontal|vertical]; e2e/orientation-variants.spec.ts pins the rendered result."
+      "status": "pristine",
+      "hash": "1d0df9a94372f632929cd3d46e846d15a4d8963c378a6085970a029db6641adc"
     },
     "input-group.tsx": {
       "kind": "registry",
@@ -165,9 +164,8 @@
     "separator.tsx": {
       "kind": "registry",
       "upstreamItem": "separator",
-      "status": "deviated",
-      "hash": "6194e1cd046480bb68f8fd39e21f79c44c1bdaaa9dd41f66ca810045b31d00ae",
-      "reason": "Upstream orientation variants (data-horizontal:/data-vertical:) never match: Base UI sets data-orientation, so they are rewritten to data-[orientation=horizontal|vertical]; e2e/orientation-variants.spec.ts pins the rendered result."
+      "status": "pristine",
+      "hash": "b53eaa272d315cc6ec4cc26eaaea96282c177b0466e923e5d703a0edcc6161b0"
     },
     "skeleton.tsx": {
       "kind": "registry",
@@ -190,8 +188,8 @@
       "kind": "registry",
       "upstreamItem": "tabs",
       "status": "deviated",
-      "reason": "#644 TabsIndicator zero-chrome pass-through (Base UI writes active-tab geometry into inline custom properties; pill shape carried by consumer CSS) — retention deferred to #1009 chief-face construction (#982 verdict). Segmented/bare handwritten skin variants retired per #991; default/line = the upstream native data-[variant] mechanism. Upstream orientation variants (data-horizontal:/data-vertical:) never match: Base UI sets data-orientation, so they are rewritten to data-[orientation=horizontal|vertical]; e2e/orientation-variants.spec.ts pins the rendered result.",
-      "hash": "72e00bb8f0f4b1b8c1de82b2257ee93bc428a268f2306f36a9873167ad8c0d02"
+      "reason": "#644 TabsIndicator zero-chrome pass-through (Base UI writes active-tab geometry into inline custom properties; pill shape carried by consumer CSS) — retention deferred to #1009 chief-face construction (#982 verdict). Segmented/bare handwritten skin variants retired per #991; default/line = the upstream native data-[variant] mechanism.",
+      "hash": "779b8d6eb7967e69f92aab3771ac37073849e3ca328b91a1a80beaffeecd09e5"
     },
     "tag-chip.tsx": {
       "kind": "adapter",
