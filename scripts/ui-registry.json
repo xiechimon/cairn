@@ -61,6 +61,12 @@
       "reason": "#952 tri-state semantic mapping, zero skin: Indicator renders MinusIcon when indeterminate — the upstream mixed state reuses the check glyph, losing the partial-vs-full selection distinction the board filter select-all row relies on (#982: real functional gaps stay, skin goes). Hand-built V2 skin and motion retired per #982/#991; geometry/color = upstream verbatim.",
       "hash": "61fd728ca5f894124652f299e7d3545bd3c902835383985cde025b1a87b7d14d"
     },
+    "collapsible.tsx": {
+      "kind": "registry",
+      "upstreamItem": "collapsible",
+      "status": "pristine",
+      "hash": "e0b1a35bb2730dabee4c2181efea3e4cb0e6a4774fb2a03de033c60daf61e079"
+    },
     "dialog-shell.tsx": {
       "kind": "adapter",
       "reason": "Paper dialog adapter (apps/web/DESIGN.md 弹窗与菜单) over the registry dialog item: regular faces compose DialogContent/DialogTitle/DialogDescription/DialogClose and own the Paper skin here so dialog.tsx stays pristine (sheet surface, 16px corners, --dialog-shadow, S/M/L widths via --dialog-w-*, 16px title + 12px sub-line + 28px ghost close, body as the only scroll box, split footer with a left hint). Repo behavior contracts kept as semantic mapping (#193 three-segment cap + dialog-head/body/foot testids, #389 finalFocus, #73 retained-mount open flag, #318 layered dismiss, #68 family close law). viewportRoot and bare modes keep the legacy direct-primitive mechanism (search-panel / new-task-dialog own their geometry); zIndex/onBackdropClick/backdropClassName serve only those two modes. Exports the shared Paper pieces (DIALOG_* classes, DialogFootRow, dialogWidth) for AlertDialogShell and direct registry Dialog consumers.",
@@ -213,6 +219,12 @@
       "status": "deviated",
       "reason": "#733 single z ladder (z-50 → z-(--z-dialog)): the portaled tooltip rides the repo overlay-ladder slot like dropdown-menu/popover — values are identical today, the token keeps the ladder the single z truth.",
       "hash": "3e8c1afd2c5d630af385dc67bd519000d1ae9c5495016c1112b245a429e07cf9"
+    },
+    "trace.tsx": {
+      "kind": "registry",
+      "upstreamItem": "trace",
+      "status": "pristine",
+      "hash": "2c638f3af6c0400eb516fc7ced69bf4e903760fb98b3004f663dd1f08e20d7dc"
     }
   }
 }
