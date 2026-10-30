@@ -297,6 +297,7 @@ export type WorkStep =
       error: boolean;
       running: boolean;
       unfinished: boolean;
+      cancelled?: boolean;
       seconds: number | null;
     };
 

@@ -87,3 +87,19 @@ test('a call cut off in an earlier step stays unfinished when the same build res
   });
   expect(items[0]).toMatchObject({ steps: [{ running: false, unfinished: true }, { running: true, unfinished: false }] });
 });
+
+test('only calls interrupted by a stopped step are labelled cancelled after continuation', () => {
+  const items = mapTranscript({
+    messages: [
+      { id: 'cut', role: 'assistant', createdAt: 1000, content: { kind: 'toolcall', call: { id: 'cut', name: 'bash', arguments: { command: 'pnpm test' } } } },
+      { id: 'complete', role: 'assistant', createdAt: 1100, content: { kind: 'toolcall', call: { id: 'complete', name: 'read', arguments: {}, result: 'done' } } },
+      { id: 'live', role: 'assistant', createdAt: 6000, content: { kind: 'toolcall', call: { id: 'live', name: 'bash', arguments: { command: 'pnpm lint' } } } },
+    ],
+    steps: [
+      { id: 'stopped', buildId: 'build', kind: 'build', status: 'stopped', machineId: null, createdAt: 500, checkpointCommit: null, skillInjection: null },
+      { id: 'next', buildId: 'build', kind: 'build', status: 'claimed', machineId: null, createdAt: 5000, checkpointCommit: null, skillInjection: null },
+    ],
+    plans: [], build: null, todo: todo(12, 'building'), machineName: null, userName: 'Owner', liveText: '',
+  });
+  expect(items[0]).toMatchObject({ steps: [{ cancelled: true, running: false }, { cancelled: false }, { cancelled: false, running: true }] });
+});

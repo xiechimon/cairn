@@ -44,11 +44,7 @@ export function useDetailComposer(input: DetailComposerInput) {
           });
           return;
         }
-        if (
-          (phase === 'done' || phase === 'building' || (phase === 'review' && running)) &&
-          buildId &&
-          text !== ''
-        ) {
+        if ((phase === 'done' || phase === 'building' || running) && buildId && text !== '') {
           return mutations.sendSteer
             .mutateAsync({ conversationId: buildId, content: text })
             .then(() => {

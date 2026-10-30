@@ -273,6 +273,21 @@ export const branchSync = sqliteTable('branch_sync', {
   finishedAt: epochMs('finishedAt'),
 });
 
+export const queuedMessage = sqliteTable(
+  'queued_message',
+  {
+    id: text('id').primaryKey(),
+    conversationId: text('conversationId')
+      .notNull()
+      .references(() => build.id, { onDelete: 'cascade' }),
+    content: text('content').notNull(),
+    deliverAfterStop: integer('deliverAfterStop', { mode: 'boolean' }).notNull().default(false),
+    error: text('error'),
+    createdAt: epochMs('createdAt').notNull(),
+  },
+  (t) => [index('queued_message_conversation_idx').on(t.conversationId, t.createdAt)],
+);
+
 export const steerPending = sqliteTable('steer_pending', {
   conversationId: text('conversationId').primaryKey(),
   stepId: text('stepId').notNull(),

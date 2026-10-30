@@ -217,3 +217,13 @@ export function pauseSchedule(deps: ScheduleDeps, id: string, reason: string): v
     .where(eq(schedule.id, id))
     .run();
 }
+
+export const ARCHIVED_SCHEDULE_PAUSE_REASON = 'Task archived';
+
+export function pauseTodoSchedule(deps: ScheduleDeps, todoId: string, reason: string): void {
+  deps.db
+    .update(schedule)
+    .set({ enabled: false, nextRunAt: null, pausedReason: reason })
+    .where(eq(schedule.todoId, todoId))
+    .run();
+}

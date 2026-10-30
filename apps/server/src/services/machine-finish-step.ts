@@ -90,6 +90,7 @@ import {
 import { markModelDead } from './model-liveness.js';
 import { notifyModelFallback } from './notifications.js';
 import { applyQuotaWaitStep } from './quota-wait.js';
+import { drainTaskMessageQueue } from './task-message-queue.js';
 import { costFromRates, ratesForModel } from './token-usage-cost.js';
 
 function holdStepForQuota(
@@ -194,6 +195,17 @@ function recordSkillInjectionCheck(
 }
 
 export async function finishStep(
+  deps: MachineDeps,
+  machineId: string,
+  stepId: string,
+  body: MachineDoneBody,
+): Promise<void> {
+  await finishStepReport(deps, machineId, stepId, body);
+  const row = deps.db.select().from(step).where(eq(step.id, stepId)).get();
+  if (row && !isChiefConversation(row.buildId)) await drainTaskMessageQueue(deps, row.buildId);
+}
+
+async function finishStepReport(
   deps: MachineDeps,
   machineId: string,
   stepId: string,
