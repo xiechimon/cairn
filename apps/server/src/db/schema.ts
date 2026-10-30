@@ -412,8 +412,9 @@ export const pushDelivery = sqliteTable('push_delivery', {
   teamId: text('teamId').notNull(),
   createdAt: epochMs('createdAt').notNull(),
   receivedAt: epochMs('receivedAt'),
+  fallbackClaimedAt: epochMs('fallbackClaimedAt'),
   alertStatus: text('alertStatus').$type<
-    'pending' | 'received' | 'fallback-accepted' | 'undelivered'
+    'pending' | 'sending' | 'received' | 'fallback-accepted' | 'undelivered'
   >(),
 });
 

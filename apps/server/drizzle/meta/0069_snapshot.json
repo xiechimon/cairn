@@ -2719,6 +2719,13 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'unknown'"
+        },
+        "fallbackClaimedAt": {
+          "name": "fallbackClaimedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {},

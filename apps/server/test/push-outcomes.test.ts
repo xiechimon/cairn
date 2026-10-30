@@ -301,68 +301,78 @@ test.each([true, false])(
   },
 );
 
-test('pending messages survive closing and reopening the database', async () => {
-  const directory = mkdtempSync(join(tmpdir(), 'push-restart-'));
-  const path = join(directory, 'test.db');
-  const first = openDbWithHandle(path);
-  first.db
-    .insert(pushDelivery)
-    .values({
-      id: 'restart',
-      userId: 'u',
-      teamId: 't',
-      message,
-      createdAt: Date.now() - 600_001,
-      alertStatus: 'pending',
-    })
-    .run();
-  first.close();
-  const second = openDbWithHandle(path);
-  try {
-    const fallback = { send: vi.fn().mockResolvedValue(undefined) };
-    await sweepPendingPushAlerts(second.db, fallback);
-    expect(fallback.send).toHaveBeenCalledWith(message, 'restart');
-    expect(second.db.select().from(pushDelivery).get()?.alertStatus).toBe('fallback-accepted');
-  } finally {
-    second.close();
-    rmSync(directory, { recursive: true, force: true });
-  }
-});
-
-test('scheduler recovers overdue alerts at startup and on periodic ticks', async () => {
-  const s = setup(0);
-  vi.useFakeTimers();
-  vi.stubEnv('CAIRN_ALERT_EMAIL_TO', '');
-  const insert = (id: string) =>
-    s.db
+test.each(['pending', 'sending'] as const)(
+  '%s messages survive closing and reopening the database',
+  async (status) => {
+    const directory = mkdtempSync(join(tmpdir(), 'push-restart-'));
+    const path = join(directory, 'test.db');
+    const first = openDbWithHandle(path);
+    first.db
       .insert(pushDelivery)
       .values({
-        id,
-        userId: s.user.id,
-        teamId: s.team.id,
+        id: 'restart',
+        userId: 'u',
+        teamId: 't',
         message,
         createdAt: Date.now() - 600_001,
-        alertStatus: 'pending',
+        alertStatus: status,
+        fallbackClaimedAt: status === 'sending' ? Date.now() - 35_001 : null,
       })
       .run();
-  const scheduler = createScheduler(s.svc, { tickMs: 100 });
-  try {
-    insert('startup');
-    scheduler.start();
-    await vi.advanceTimersByTimeAsync(0);
-    expect(
-      s.db.select().from(pushDelivery).where(eq(pushDelivery.id, 'startup')).get()?.alertStatus,
-    ).toBe('undelivered');
-    insert('periodic');
-    await vi.advanceTimersByTimeAsync(100);
-    expect(
-      s.db.select().from(pushDelivery).where(eq(pushDelivery.id, 'periodic')).get()?.alertStatus,
-    ).toBe('undelivered');
-  } finally {
-    scheduler.stop();
-    vi.unstubAllEnvs();
-  }
-});
+    first.close();
+    const second = openDbWithHandle(path);
+    try {
+      const fallback = { send: vi.fn().mockResolvedValue(undefined) };
+      await sweepPendingPushAlerts(second.db, fallback);
+      expect(fallback.send).toHaveBeenCalledWith(message, 'restart');
+      await sweepPendingPushAlerts(second.db, fallback);
+      expect(fallback.send).toHaveBeenCalledTimes(1);
+      expect(second.db.select().from(pushDelivery).get()?.alertStatus).toBe('fallback-accepted');
+    } finally {
+      second.close();
+      rmSync(directory, { recursive: true, force: true });
+    }
+  },
+);
+
+test.each(['pending', 'sending'] as const)(
+  'scheduler recovers overdue %s alerts at startup and on periodic ticks',
+  async (status) => {
+    const s = setup(0);
+    vi.useFakeTimers();
+    vi.stubEnv('CAIRN_ALERT_EMAIL_TO', '');
+    const insert = (id: string) =>
+      s.db
+        .insert(pushDelivery)
+        .values({
+          id,
+          userId: s.user.id,
+          teamId: s.team.id,
+          message,
+          createdAt: Date.now() - 600_001,
+          alertStatus: status,
+          fallbackClaimedAt: Date.now() - 35_001,
+        })
+        .run();
+    const scheduler = createScheduler(s.svc, { tickMs: 100 });
+    try {
+      insert('startup');
+      scheduler.start();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(
+        s.db.select().from(pushDelivery).where(eq(pushDelivery.id, 'startup')).get()?.alertStatus,
+      ).toBe('undelivered');
+      insert('periodic');
+      await vi.advanceTimersByTimeAsync(100);
+      expect(
+        s.db.select().from(pushDelivery).where(eq(pushDelivery.id, 'periodic')).get()?.alertStatus,
+      ).toBe('undelivered');
+    } finally {
+      scheduler.stop();
+      vi.unstubAllEnvs();
+    }
+  },
+);
 
 test('library socket timeout is unknown and still sends fallback', async () => {
   const s = setup();
@@ -371,5 +381,128 @@ test('library socket timeout is unknown and still sends fallback', async () => {
   const result = await sendMustReachAlert(s.db, s.keys, s.user.id, s.team.id, message, fallback);
   expect(result).toMatchObject({ push: { status: 'unknown' }, alertStatus: 'fallback-accepted' });
   expect(s.db.select().from(pushDelivery).get()?.pushStatus).toBe('unknown');
+  expect(fallback.send).toHaveBeenCalledTimes(1);
+});
+
+test('recovery skips an alert completed by its active sender while another fallback waits', async () => {
+  const s = setup();
+  vi.useFakeTimers();
+  vi.spyOn(webpush, 'sendNotification').mockResolvedValue(accepted);
+  let release = () => {};
+  const blocked = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const fallback = {
+    send: vi.fn(async (_message, id: string) => {
+      if (id === 'A') await blocked;
+    }),
+  };
+  s.db
+    .insert(pushDelivery)
+    .values({
+      id: 'A',
+      userId: s.user.id,
+      teamId: s.team.id,
+      message,
+      createdAt: Date.now() - 600_001,
+      alertStatus: 'pending',
+    })
+    .run();
+  const active = sendMustReachAlert(s.db, s.keys, s.user.id, s.team.id, message, fallback, 'B');
+  await vi.advanceTimersByTimeAsync(0);
+  vi.setSystemTime(Date.now() + 600_001);
+  const sweep = sweepPendingPushAlerts(s.db, fallback);
+  await vi.advanceTimersByTimeAsync(1_000);
+  expect(await active).toMatchObject({ alertStatus: 'fallback-accepted' });
+  release();
+  await sweep;
+  expect(fallback.send.mock.calls.map((call) => call[1])).toEqual(['A', 'B']);
+});
+
+test('recovery claims fallback across separate database handles before dispatch', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'push-claim-'));
+  const path = join(directory, 'test.db');
+  const first = openDbWithHandle(path);
+  const second = openDbWithHandle(path);
+  let release = () => {};
+  const blocked = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const fallback = { send: vi.fn(() => blocked) };
+  try {
+    first.db
+      .insert(pushDelivery)
+      .values({
+        id: 'claim',
+        userId: 'u',
+        teamId: 't',
+        message,
+        createdAt: Date.now() - 600_001,
+        alertStatus: 'pending',
+      })
+      .run();
+    const owner = sweepPendingPushAlerts(first.db, fallback);
+    const contender = sweepPendingPushAlerts(second.db, fallback);
+    const statusDuringSend = second.db.select().from(pushDelivery).get()?.alertStatus;
+    const dispatchCount = fallback.send.mock.calls.length;
+    release();
+    await Promise.all([owner, contender]);
+    expect(statusDuringSend).toBe('sending');
+    expect(dispatchCount).toBe(1);
+    expect(second.db.select().from(pushDelivery).get()?.alertStatus).toBe('fallback-accepted');
+  } finally {
+    release();
+    first.close();
+    second.close();
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('fallback waiter stops after the send timeout without taking a live claim', async () => {
+  const s = setup();
+  vi.useFakeTimers();
+  const loud = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+  vi.spyOn(webpush, 'sendNotification').mockImplementation(async () => {
+    s.db.update(pushDelivery).set({ alertStatus: 'sending', fallbackClaimedAt: Date.now() }).run();
+    throw new Error('network');
+  });
+  const fallback = { send: vi.fn().mockResolvedValue(undefined) };
+  let result: Awaited<ReturnType<typeof sendMustReachAlert>> | undefined;
+  const pending = sendMustReachAlert(s.db, s.keys, s.user.id, s.team.id, message, fallback).then(
+    (value) => {
+      result = value;
+    },
+  );
+  await vi.advanceTimersByTimeAsync(29_999);
+  expect(result).toBeUndefined();
+  await vi.advanceTimersByTimeAsync(1);
+  expect(result?.alertStatus).toBe('undelivered');
+  expect(fallback.send).not.toHaveBeenCalled();
+  expect(s.db.select().from(pushDelivery).get()?.alertStatus).toBe('sending');
+  expect(loud).toHaveBeenCalledWith(expect.stringContaining('UNDELIVERED'));
+  await pending;
+});
+
+test('recovery leaves fresh fallback claims alone until the timeout margin expires', async () => {
+  const s = setup(0);
+  vi.useFakeTimers();
+  const claimedAt = Date.now();
+  s.db
+    .insert(pushDelivery)
+    .values({
+      id: 'fresh-claim',
+      userId: s.user.id,
+      teamId: s.team.id,
+      message,
+      createdAt: claimedAt - 600_001,
+      alertStatus: 'sending',
+      fallbackClaimedAt: claimedAt,
+    })
+    .run();
+  const fallback = { send: vi.fn().mockResolvedValue(undefined) };
+  await sweepPendingPushAlerts(s.db, fallback, claimedAt + 34_999);
+  expect(fallback.send).not.toHaveBeenCalled();
+  await sweepPendingPushAlerts(s.db, fallback, claimedAt + 35_001);
+  await sweepPendingPushAlerts(s.db, fallback, claimedAt + 35_001);
   expect(fallback.send).toHaveBeenCalledTimes(1);
 });

@@ -2,11 +2,14 @@ import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { pushDelivery } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { type PushMessage, type PushOutcome, sendPushToUser, type VapidKeys } from './push.js';
+
+const fallbackSendTimeoutMs = 30_000;
+const fallbackRecoveryMarginMs = 5_000;
 
 export interface AlertFallback {
   send(message: PushMessage, id: string): Promise<void>;
@@ -53,7 +56,7 @@ export function smtpAlertFallback(env: NodeJS.ProcessEnv = process.env): AlertFa
               '--silent',
               '--show-error',
               '--max-time',
-              '30',
+              String(fallbackSendTimeoutMs / 1_000),
               '--config',
               '-',
               '--upload-file',
@@ -75,17 +78,24 @@ export function smtpAlertFallback(env: NodeJS.ProcessEnv = process.env): AlertFa
   };
 }
 
-const fallbackInFlight = new WeakMap<
-  Db,
-  Map<string, Promise<'fallback-accepted' | 'undelivered'>>
->();
+type AlertStatus = 'received' | 'fallback-accepted' | 'undelivered';
+
+function staleFallbackClaim(now: number) {
+  return and(
+    eq(pushDelivery.alertStatus, 'sending'),
+    sql`coalesce(${pushDelivery.fallbackClaimedAt}, ${pushDelivery.createdAt}) <= ${now - fallbackSendTimeoutMs - fallbackRecoveryMarginMs}`,
+  );
+}
+
+const fallbackInFlight = new WeakMap<Db, Map<string, Promise<AlertStatus>>>();
 
 async function settleFallback(
   db: Db,
   id: string,
   message: PushMessage,
   fallback?: AlertFallback | null,
-): Promise<'fallback-accepted' | 'undelivered'> {
+  recoveryNow?: number,
+): Promise<AlertStatus> {
   let running = fallbackInFlight.get(db);
   if (!running) {
     running = new Map();
@@ -94,6 +104,40 @@ async function settleFallback(
   const existing = running.get(id);
   if (existing) return existing;
   const pending = (async () => {
+    const waitDeadline = Date.now() + fallbackSendTimeoutMs;
+    let claimedAt: number;
+    for (;;) {
+      const row = db.select().from(pushDelivery).where(eq(pushDelivery.id, id)).get();
+      if (!row) throw new Error(`Missing push alert ${id}`);
+      if (
+        row.alertStatus === 'received' ||
+        row.alertStatus === 'fallback-accepted' ||
+        row.alertStatus === 'undelivered'
+      )
+        return row.alertStatus;
+      claimedAt = Date.now();
+      const claimed = db
+        .update(pushDelivery)
+        .set({ alertStatus: 'sending', fallbackClaimedAt: claimedAt })
+        .where(
+          and(
+            eq(pushDelivery.id, id),
+            or(
+              eq(pushDelivery.alertStatus, 'pending'),
+              staleFallbackClaim(recoveryNow ?? claimedAt),
+            ),
+          ),
+        )
+        .returning({ id: pushDelivery.id })
+        .get();
+      if (claimed) break;
+      const remaining = waitDeadline - Date.now();
+      if (remaining <= 0) {
+        process.stderr.write(`ALERT UNDELIVERED ${id}: fallback claim wait timed out\n`);
+        return 'undelivered';
+      }
+      await new Promise((resolve) => setTimeout(resolve, Math.min(100, remaining)));
+    }
     let alertStatus: 'fallback-accepted' | 'undelivered' = 'undelivered';
     try {
       const channel = fallback === undefined ? smtpAlertFallback() : fallback;
@@ -104,7 +148,16 @@ async function settleFallback(
     } catch {
       process.stderr.write(`ALERT FALLBACK FAILED ${id}\n`);
     }
-    db.update(pushDelivery).set({ alertStatus }).where(eq(pushDelivery.id, id)).run();
+    db.update(pushDelivery)
+      .set({ alertStatus })
+      .where(
+        and(
+          eq(pushDelivery.id, id),
+          eq(pushDelivery.alertStatus, 'sending'),
+          eq(pushDelivery.fallbackClaimedAt, claimedAt),
+        ),
+      )
+      .run();
     if (alertStatus === 'undelivered') process.stderr.write(`ALERT UNDELIVERED ${id}\n`);
     return alertStatus;
   })();
@@ -121,15 +174,21 @@ export async function sweepPendingPushAlerts(
   fallback?: AlertFallback | null,
   now = Date.now(),
 ): Promise<void> {
-  const rows = db.select().from(pushDelivery).where(eq(pushDelivery.alertStatus, 'pending')).all();
-  for (const row of rows) {
+  const rows = db
+    .select()
+    .from(pushDelivery)
+    .where(or(eq(pushDelivery.alertStatus, 'pending'), staleFallbackClaim(now)))
+    .all();
+  for (const snapshot of rows) {
+    const row = db.select().from(pushDelivery).where(eq(pushDelivery.id, snapshot.id)).get();
+    if (row?.alertStatus !== 'pending' && row?.alertStatus !== 'sending') continue;
     const deadline = row.createdAt + 600_000;
-    if (row.receivedAt !== null && row.receivedAt <= deadline) {
+    if (row.alertStatus === 'pending' && row.receivedAt !== null && row.receivedAt <= deadline) {
       db.update(pushDelivery)
         .set({ alertStatus: 'received' })
         .where(and(eq(pushDelivery.id, row.id), eq(pushDelivery.alertStatus, 'pending')))
         .run();
-    } else if (deadline <= now) {
+    } else if (row.alertStatus === 'sending' || deadline <= now) {
       await settleFallback(
         db,
         row.id,
@@ -140,6 +199,7 @@ export async function sweepPendingPushAlerts(
           tag: row.id,
         },
         fallback,
+        now,
       );
     }
   }
@@ -171,11 +231,13 @@ export async function sendMustReachAlert(
       if (row?.alertStatus === 'fallback-accepted' || row?.alertStatus === 'undelivered')
         return { push, alertStatus: row.alertStatus };
       if (row?.receivedAt !== null && row?.receivedAt !== undefined && row.receivedAt <= deadline) {
-        db.update(pushDelivery)
+        const received = db
+          .update(pushDelivery)
           .set({ alertStatus: 'received' })
-          .where(eq(pushDelivery.id, id))
-          .run();
-        return { push, alertStatus: 'received' };
+          .where(and(eq(pushDelivery.id, id), eq(pushDelivery.alertStatus, 'pending')))
+          .returning({ id: pushDelivery.id })
+          .get();
+        if (received) return { push, alertStatus: 'received' };
       }
       const remaining = deadline - Date.now();
       if (remaining <= 0) break;

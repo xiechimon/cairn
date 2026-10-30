@@ -6,5 +6,6 @@ CREATE TABLE `push_delivery` (
 	`teamId` text NOT NULL,
 	`createdAt` integer NOT NULL,
 	`receivedAt` integer,
+	`fallbackClaimedAt` integer,
 	`alertStatus` text
 );
