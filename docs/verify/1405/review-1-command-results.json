@@ -1,0 +1,57 @@
+{
+  "baseCommit": "63aad9906a7951256350eddfd810f954f18b6249",
+  "surface": "local in-process server and SQLite fixtures",
+  "providerMode": "stub for focused runtime tests; not exercised by static checks",
+  "results": [
+    {
+      "command": "focused six-file acceptance",
+      "artifact": "review-1-acceptance-final.log",
+      "exitCode": 0,
+      "testsPassed": 466
+    },
+    {
+      "command": "schema, vocabulary and snapshot tests",
+      "artifact": "review-1-registry-green.log",
+      "exitCode": 0,
+      "testsPassed": 125,
+      "overlapWithFocused": 79
+    },
+    {
+      "command": "supplemental in-flight guard test",
+      "artifact": "review-1-inflight-guard.log",
+      "exitCode": 0,
+      "testsPassed": 1
+    },
+    {
+      "command": "lint, typecheck, spec:parse, db:check and discipline gates",
+      "artifact": "review-1-final-gates.log",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm lint after formatting supplemental test",
+      "artifact": "review-1-lint-last.log",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm exec vitest run --changed --maxWorkers 1",
+      "artifact": "review-1-changed-complete.log",
+      "exitCode": 130,
+      "result": "interrupted; unverified"
+    },
+    {
+      "command": "step and merge formal model scripts",
+      "artifacts": [
+        "review-1-step-model.log",
+        "review-1-merge-model.log"
+      ],
+      "exitCode": 2,
+      "result": "unverified; TLC jar unavailable"
+    },
+    {
+      "command": "loopback HTTP listener probe",
+      "artifact": "review-1-loopback.log",
+      "exitCode": 1,
+      "result": "listen EPERM"
+    }
+  ]
+}

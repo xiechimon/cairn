@@ -1,0 +1,3 @@
+note: 0008_snapshot.json: journal entry exists but snapshot file is missing; drizzle skips it in the chain
+note: 0018_snapshot.json: journal entry exists but snapshot file is missing; drizzle skips it in the chain
+drizzle guard passed: linear snapshot chain, no parent collisions

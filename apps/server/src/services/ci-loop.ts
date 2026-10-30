@@ -20,6 +20,7 @@ import {
 } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { emitRuntimeBuildSpan } from '../runtime-otel.js';
+import { recoverAutonomousMerges, settleAutonomousMerge } from './autonomous-merge.js';
 import {
   type BuildDeps,
   enqueueStep,
@@ -520,6 +521,15 @@ export function createCiPoller(
       pull = page.notModified ? (entry?.pull ?? null) : page.pull;
       pullCache.set(key, { etag: page.etag, pull });
     }
+    if (pull !== null) {
+      const mergedAt = pull.mergedAt === null ? NaN : Date.parse(pull.mergedAt);
+      settleAutonomousMerge(
+        deps.db,
+        cand.buildId,
+        pull.merged ? 'merged' : 'refused',
+        Number.isFinite(mergedAt) ? mergedAt : now,
+      );
+    }
     const branch = conversationBranch(cand.buildId);
     const foreign = pull !== null && hasPullFields(pull) && !isOwnPull(pull, branch);
     if (pull === null || (pull.state === 'open' && !foreign)) {
@@ -980,6 +990,7 @@ export function createCiPoller(
 
   async function sweepOnce(now: number): Promise<void> {
     sweepStartedAt = nowMs();
+    await recoverAutonomousMerges(deps, run.githubFetch, now, CI_POLL_INTERVAL_MS);
     const candidates = deps.db
       .select({ buildId: build.id, todoId: todo.id })
       .from(build)

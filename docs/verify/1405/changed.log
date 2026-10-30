@@ -1,0 +1,149 @@
+
+ RUN  v5.0.1 /Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-1405-brakes
+
+(node:243) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:571) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ |@cairn/web| test/i18n-coverage.test.ts (5 tests | 1 failed) 13441ms
+   ❯ EN dict liveness (1)
+     × every key appears as a literal somewhere in src/ (no dead entries) 12736ms
+web push delivery failed
+ ❯ |@xiechimon/cairn| test/push.test.ts (40 tests | 7 failed) 9077ms
+   ❯ subscription authorization boundaries (4)
+     × delivers only to the requested owner and team 333ms
+   ❯ delivery: only decisions push immediately (4)
+     × parallel delivery reaches a live endpoint while another is stalled 182ms
+   ❯ digest routing: merged, failed, plan-ready, review queue; 410 prunes (7)
+     × PATCH todo phase to confirm queues for the digest and sends no immediate push 369ms
+     × queues build review for the digest without an immediate push 326ms
+     × queues merged PR reconciliation for the digest without an immediate push 314ms
+     × queues failed work for the digest without an immediate push 119ms
+     × prunes a 410 subscription while delivering to live subscriptions 253ms
+ ❯ |@xiechimon/cairn| test/skill-write.test.ts (30 tests | 1 failed) 12988ms
+   ❯ machine-wire skill listing and on-demand fetch (GET /api/machine/skills/{stepId}[/file]) (8)
+     × M5: an over-limit file no longer fails the whole package -- an asset past the per-file gate enters the listing with its real size and is delivered byte-complete; a total over the old package gate still gets a listing 5416ms
+ ❯ |@xiechimon/cairn| test/git-hosting.test.ts (11 tests | 11 skipped) 10015ms
+ ❯ |@xiechimon/cairn| test/m3b-machine-git.test.ts (12 tests | 1 failed) 30648ms
+   ❯ merge 202 delegated -> merge step lands (02 section 4.2/A6; r3 section 3.6 server-side main verify) (2)
+     × merge step done(commit) -> bare repo main fast-forward + timeline 🎉 5079ms
+ ❯ |@xiechimon/cairn| test/attachment-gc.test.ts (15 tests | 1 failed) 36920ms
+   ❯ attachment gc -- scheduler cadence (3)
+     × a large transcript corpus does not block the event loop during a tick 30010ms
+ ❯ |@xiechimon/cairn| test/trajectory-failure-replay.test.ts (10 tests | 2 failed) 60075ms
+   × enqueue posts TRACE items to the Langfuse annotation queue and never touches the bank 30022ms
+   × intake promotes only COMPLETED queue items into the bank 30012ms
+ ❯ |@xiechimon/cairn| test/trajectory-reflect.test.ts (12 tests | 12 failed) 120260ms
+   × reflects only builds that turned green after failing or were sent back by a human 10023ms
+   × drops candidates that copy GitHub issue text 10006ms
+   × an invalid reflection fails the run without output 10002ms
+   × reflect requires arguments, endpoint and a fresh output path 10007ms
+   × memory candidates land as pending, deduplicated, and never in agent memory 10003ms
+   × a lesson already in memory is skipped, an overlapping one records the conflict 10081ms
+   × needs evidence from two different builds, then a successful recurrence promotes it 10014ms
+   × human confirmation promotes only with two builds of evidence 10008ms
+   × guard candidates go to a local JSONL pool, merged across runs 10038ms
+   × skill candidates become patch drafts that apply to the current skill file 10010ms
+   × curate rejects fenced issue text and builds it cannot place 10001ms
+   × a dismissed candidate absorbs later recurrences and is never promoted 10006ms
+ ❯ |@xiechimon/cairn| test/split-rejected-proposal.test.ts (44 tests | 3 failed) 47294ms
+   × human validates a 12000-node cycle without losing its rejection contract 6100ms
+   × shadow validates a 12000-node cycle without losing its rejection contract 9943ms
+   × auto validates a 12000-node cycle without losing its rejection contract 5611ms
+ ❯ |@xiechimon/cairn| test/trajectory-outcome.test.ts (6 tests | 6 failed) 60035ms
+   × merged, closed-unmerged and reverted builds export with matching outcomes 10010ms
+   × a revert after the 7 day window does not count, and a later PR on the same ticket marks the fix 10002ms
+   × a merge newer than 7 days leaves the revert window open and reports it 10004ms
+   × builds without a merge or close record keep every outcome field null 10002ms
+   × a close followed by a later merge counts as merged, and the latest record wins 10004ms
+   × traj:export feeds traj:label: failed packs get labeled, successful packs are skipped 10002ms
+ ❯ |@xiechimon/cairn| test/trajectory-reflect-curate.test.ts (9 tests | 9 failed) 90067ms
+   × ENV_VARS.trajectoryReflectCurate names the schedule flag 10046ms
+   × loadConfig reads the reflect-curate schedule flag 10005ms
+   × trajectoryReflectCurateRunOf is null when the schedule flag is off 10002ms
+   × trajectoryReflectCurateRunOf stays off without reflector credentials 10003ms
+   × createScheduler in index.ts ends with trajectoryReflectCurateRunOf after export 10001ms
+   × export and outcome runOf helpers still exist for the prior slots 10002ms
+   × sweepReflectCurate reflects then curates a daily export once 10002ms
+   × sweepReflectCurate opens GitHub issues for new guards when asked 10001ms
+   × REFLECT_CURATE_INTERVAL_MS matches the daily trajectory cadence 10002ms
+ ❯ |@xiechimon/cairn| test/build-diff-fulltext.test.ts (4 tests | 1 failed) 18834ms
+   ❯ GET /api/builds/{id}/changes/file (#224 diff full-text read surface) (4)
+     × 404 surface: unknown build / non-managed project / conv branch not pushed / file missing / directory path 5348ms
+ ❯ |@xiechimon/cairn| test/trajectory-attribution.test.ts (9 tests | 9 failed) 90066ms
+   × labels only failed packs and leaves merged or pending packs untouched 10009ms
+   × stable output: relabeling the same input yields the same structure 10002ms
+   × rejects a labeler that is the tested model, with or without provider prefix 10003ms
+   × does not call the labeler for packs that are already labeled 10001ms
+   × a verdict outside the vocabularies or pointing at a missing message fails the run without output 10002ms
+   × refuses to overwrite an existing output file 10008ms
+   × requires --in, --out and --model 10021ms
+   × summary prints a (where, why) count table sorted by count 10003ms
+   × summary merges several files and rejects an invalid pack 10004ms
+Switched to a new branch 'work'
+Switched to branch 'main'
+ ❯ |@xiechimon/cairn| test/trajectory-push.test.ts (20 tests | 16 failed) 489496ms
+   × maps one build to one trace: invoke_agent root, a span per step, chat and execute_tool under each step 30018ms
+   × carries GenAI convention fields and cairn.* fields 30018ms
+   × pushing the same pack twice sends byte-identical trace and span ids 30010ms
+   × different builds get different trace ids and disjoint span ids 30008ms
+   × redacts secrets in every string that leaves the machine 30021ms
+   × maps Claude session shapes: tool_use blocks, tool_result in user rows, snake_case usage 30004ms
+   × a pack without steps or timestamps still yields a deterministic root span 30006ms
+   × accepts an endpoint that already ends with /v1/traces 30009ms
+   × rejects bad input before sending anything 30007ms
+   × a non-2xx reply fails the run, names the status and leaks neither headers nor body 30011ms
+   × a second push of the same traces to the same endpoint sends nothing and reports the skip 30030ms
+   × only traces not yet pushed are sent when a later file adds a build 30004ms
+   × --force pushes every span again 30014ms
+   × a different endpoint is a different target and gets the full push 30004ms
+   × the record is keyed without credentials, so rotating the key does not repush 30009ms
+   × traces delivered before a failure stay recorded and are skipped on retry 30010ms
+ ❯ |@xiechimon/cairn-cli| test/tag-tool.test.ts (11 tests | 3 failed) 33519ms
+   ❯ create_tag — github shape real push (HTTP + x-access-token Basic auth stand-in) (3)
+     × failure mode 9: per-step credentials injected, real HTTP push succeeds, refs/tags land on the remote 5011ms
+     × failure mode 10: credential expired mid-step (server rejects token) → readable auth-failure original text 5002ms
+     × failure mode 11: push refused — remote already has a same-named tag with a different value → git refusal original text 5054ms
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+ ❯ |@xiechimon/cairn-cli| test/workspace-hooks.test.ts (10 tests | 1 failed) 1743ms
+   ❯ workspace hook primitive (#1149) (10)
+     × failure mode 4: timeout → the whole process group is killed (hung grandchildren all die) + timeout-shaped error 224ms
+ ❯ |@xiechimon/cairn-cli| test/local-executor.test.ts (4 tests | 1 failed) 10124ms
+   ❯ per-step credential argv discipline (spec 12 G2-T2: capturing fork+exec command lines) (1)
+     × failure mode 5: token never enters argv throughout credential-bearing clone/fetch/push; carried by the env credential.helper (positive control) 2863ms
+ ❯ |@xiechimon/cairn-cli| test/provider-response.test.ts (14 tests | 14 skipped) 10009ms
+ ❯ |@xiechimon/cairn-cli| test/git-loopback-proxy.test.ts (8 tests | 8 failed) 4460ms
+   ❯ git subprocess reaches the loopback server bypassing the global http.proxy (#1635) (8)
+     × precondition: the global proxy really hijacks git without the exemption (rule out false green) 766ms
+     × machine-path clone of the 127.0.0.1 server succeeds without the proxy 507ms
+     × integration path (per-step credentials) clone of the 127.0.0.1 server succeeds without the proxy 444ms
+     × localhost spelling also connects directly 455ms
+     × [::1] spelling also connects directly 473ms
+     × fetch from the loopback server also connects directly 648ms
+     × non-loopback remotes keep the user's http.proxy 561ms
+     × the user's existing NO_PROXY entries are kept, non-loopback hosts still go through the proxy 599ms
+ ❯ |@xiechimon/cairn-cli| test/git.test.ts (95 tests | 2 failed) 152020ms
+   ❯ gitCredentialEnv — the helper answers only for the host the credential was issued to (#1484) (20)
+     × failure mode 5: origin repointed to another host via set-url → push / tagPush / fetch send no credential; the bound host still authenticates 30021ms
+     × failure mode 5: insteadOf rewrites the bound host to another host → no credential sent 30019ms
+ ❯ |@xiechimon/cairn-cli| test/ask-channel.test.ts (11 tests | 4 failed) 40070ms
+   ❯ #1049 machine-client askUser loop (4)
+     × pending resend with same requestId (D4 idempotent) → resolves once answered 10027ms
+     × transient 5xx does not end the wait (answer arrives after retry) 10002ms
+     × signal is the only exit: abort throws (no infinite wait) 10021ms
+     × server 4xx throws on first occurrence (protocol fact, not retried) 10004ms
+ ❯ |@xiechimon/cairn-cli| test/local-merge.test.ts (13 tests | 1 failed) 44902ms
+   × a default ref rewind between the last read and landing fails the compare-and-swap 5032ms
+
+Agent stopped this run after confirming loopback listen EPERM. Tool-reported exit code: 130. No complete-suite result is claimed.

@@ -100,6 +100,7 @@ import {
 import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
 import { emitRuntimeBuildSpan } from '../runtime-otel.js';
 import { addUserMessageAttachmentGrants } from './attachment-authorization.js';
+import { claimAutonomousMerge, settleAutonomousMerge } from './autonomous-merge.js';
 import { recordBuildFeedback } from './build-provenance.js';
 import { askQuestionContentOf } from './chief-questions.js';
 import { DONE_ROW } from './delivery-rows.js';
@@ -310,6 +311,7 @@ export function applyStoppedStep(deps: BuildDeps, stepId: string): void {
   const { db } = deps;
   const stepRow = db.select().from(step).where(eq(step.id, stepId)).get();
   if (!stepRow) throw new NotFoundError(`step ${stepId}`);
+  if (stepRow.kind === 'merge') settleAutonomousMerge(db, stepRow.buildId, 'refused');
   db.update(step).set({ status: 'stopped', finishedAt: nowMs() }).where(eq(step.id, stepId)).run();
   db.delete(stopPending).where(eq(stopPending.conversationId, stepRow.buildId)).run();
   const stoppedRow = db.select().from(step).where(eq(step.id, stepId)).get();
@@ -406,6 +408,7 @@ function stopStepKeepPhase(deps: BuildDeps, stepId: string): void {
   const { db } = deps;
   const stepRow = db.select().from(step).where(eq(step.id, stepId)).get();
   if (!stepRow) throw new NotFoundError(`step ${stepId}`);
+  if (stepRow.kind === 'merge') settleAutonomousMerge(db, stepRow.buildId, 'refused');
   db.update(step).set({ status: 'stopped', finishedAt: nowMs() }).where(eq(step.id, stepId)).run();
   db.delete(stopPending).where(eq(stopPending.conversationId, stepRow.buildId)).run();
   const stoppedRow = db.select().from(step).where(eq(step.id, stepId)).get();
@@ -1231,19 +1234,14 @@ export async function requestMerge(
   if (pr !== null) {
     return mergeThroughGithub(deps, row, pr.prNumber, pr.repoRef, actor ?? deps.user.displayName);
   }
-  restoreFailedReview(deps, row);
-  if (todoRow.phase === 'failed') {
-    // biome-ignore lint/style/noNonNullAssertion: restoreFailedReview transitions phase in place, never deletes the row; second get() must match the first
-    todoRow = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get()!;
-  }
-  assertPhaseTransition(todoRow.phase, 'done');
-  assertMergeTools(deps, todoRow);
-  insertGateAnnouncement(deps, buildId, MERGE_ANNOUNCEMENT, actor ?? deps.user.displayName);
   const projectRow = projectOfTodo(deps.db, todoRow);
   if (
     projectRow?.repoKind === 'local' &&
     projectMergeConfigOf(projectRow).mergePolicy === 'autonomous'
   ) {
+    if (todoRow.phase === 'failed') assertDeliveredBuild(deps, row);
+    else assertPhaseTransition(todoRow.phase, 'done');
+    assertMergeTools(deps, todoRow);
     const git = deps.gitOps ?? systemGitOps;
     const localPath = projectRow.localPath;
     if (localPath === null) {
@@ -1253,8 +1251,17 @@ export async function requestMerge(
     if (listing === null || listing.defaultBranch === null) {
       throw new HttpError(409, '无法读取本地仓库默认分支，拒绝走未受控合并');
     }
-    const local = await enqueueLocalMerge(deps, buildId, listing.defaultBranch);
-    if (local.enqueued) return { delegated: true };
+    const local = await enqueueLocalMerge(
+      deps,
+      buildId,
+      listing.defaultBranch,
+      false,
+      todoRow.phase === 'failed',
+    );
+    if (local.enqueued) {
+      insertGateAnnouncement(deps, buildId, MERGE_ANNOUNCEMENT, actor ?? deps.user.displayName);
+      return { delegated: true };
+    }
     const blocking = local.readiness?.blockers ?? [];
     if (blocking.length > 0) {
       throw new HttpError(
@@ -1264,6 +1271,15 @@ export async function requestMerge(
     }
     throw new HttpError(409, '本地合并未通过关口判定，无法落地');
   }
+  restoreFailedReview(deps, row);
+  if (todoRow.phase === 'failed') {
+    const restored = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
+    if (!restored) throw new NotFoundError(`todo ${row.todoId}`);
+    todoRow = restored;
+  }
+  assertPhaseTransition(todoRow.phase, 'done');
+  assertMergeTools(deps, todoRow);
+  insertGateAnnouncement(deps, buildId, MERGE_ANNOUNCEMENT, actor ?? deps.user.displayName);
   enqueueStep(deps, buildId, 'merge', todoRow.teamId);
   return { delegated: true };
 }
@@ -1718,11 +1734,14 @@ async function mergeThroughGithub(
       );
     }
     const titled = `${pull.title} (#${prNumber})`;
+    claimAutonomousMerge(deps.db, row.id);
     const result = await githubMergePull(fetchImpl, token, repoRef.owner, repoRef.repo, prNumber, {
       sha: checkpoint,
       commitTitle: CLOSING_SHAPE.test(pull.title) ? `Merge pull request #${prNumber}` : titled,
       commitMessage: closingLine(before.todoRow, repoRef) ?? PLAIN_MERGE_BODY,
     });
+    if (result.kind === 'merged' || result.kind === 'refused' || result.kind === 'rate-limited')
+      settleAutonomousMerge(deps.db, row.id, result.kind === 'merged' ? 'merged' : 'refused');
     if (result.kind === 'rate-limited') {
       const { limit } = result;
       const when =
@@ -1837,6 +1856,7 @@ export function applyStepFailure(
   preservedCommits?: readonly string[],
 ): void {
   const { db } = deps;
+  if (stepRow.kind === 'merge') settleAutonomousMerge(db, stepRow.buildId, 'refused');
   const errorMessage =
     rawErrorMessage.trim() === '' ? `${stepRow.kind} 步异常结束，未上报原因` : rawErrorMessage;
   db.update(step)
@@ -1963,6 +1983,10 @@ function releaseClaimedStep(
   row: typeof step.$inferSelect,
   todoRow: typeof todo.$inferSelect,
 ): void {
+  if (row.kind === 'merge' && row.prompt?.includes('"local-merge"')) {
+    failStepWithEvents(deps, row, 'Local merge command was abandoned; request a new judgment');
+    return;
+  }
   deps.db.update(step).set({ status: 'pending', machineId: null }).where(eq(step.id, row.id)).run();
   const released = deps.db.select().from(step).where(eq(step.id, row.id)).get();
   if (released) {

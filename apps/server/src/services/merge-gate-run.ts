@@ -25,6 +25,7 @@ import {
 } from '../db/schema.js';
 import { githubCreateIssue } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { autonomousMergePolicy } from './autonomous-merge.js';
 import type { BuildDeps } from './builds.js';
 import { agentForStep } from './dispatch-eligibility.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
@@ -243,8 +244,12 @@ export async function evaluateMergeGate(
     author: authorAgent !== null ? { id: authorAgent.id, model: authorAgent.modelId ?? '' } : null,
     policy: {
       mergePolicy: projectMergeConfigOf(projectRow).mergePolicy,
-      autonomyPaused: false,
-      dailyCapReached: false,
+      ...autonomousMergePolicy(
+        deps.db,
+        todoRow.teamId,
+        projectMergeConfigOf(projectRow),
+        opts.now ?? nowMs(),
+      ),
     },
     build: {
       isGithubPr: true,

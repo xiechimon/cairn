@@ -9,6 +9,7 @@ import { eq } from 'drizzle-orm';
 import { build, step, todo } from '../db/schema.js';
 import { conflict } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
+import { claimAutonomousMerge, settleAutonomousMerge } from './autonomous-merge.js';
 import { type BuildDeps, completeStep, enqueueStep } from './builds.js';
 import { triggerChiefWakes } from './chief.js';
 import { localGateFacts } from './local-merge-facts.js';
@@ -16,17 +17,29 @@ import type { MachineDeps } from './machine-deps.js';
 import { publishStepStatus, upsertMessage } from './machine-deps.js';
 import type { mergeReadiness } from './merge-gate/readiness.js';
 import { notifyTodoPhase } from './notifications.js';
-import { getTodo } from './todos.js';
+import { getTodo, setTodoPhase } from './todos.js';
 
 export async function enqueueLocalMerge(
   deps: BuildDeps,
   buildId: string,
   defaultBranch: string,
   approved = false,
+  restoreFailed = false,
 ): Promise<{ enqueued: boolean; readiness: ReturnType<typeof mergeReadiness> | null }> {
-  const facts = await localGateFacts(deps, buildId, defaultBranch);
+  const facts = await localGateFacts(
+    deps,
+    buildId,
+    defaultBranch,
+    restoreFailed
+      ? (inputs) => ({ ...inputs, build: { ...inputs.build, phase: 'review' } })
+      : undefined,
+  );
   if (facts === null) throw conflict('Local merge requires a local project');
   const { readiness, judgedBase, judgedDigest } = facts;
+  const brake = readiness.blockers.find(
+    (b) => b.code === 'autonomy-paused' || b.code === 'daily-cap',
+  );
+  if (brake) throw conflict(`${brake.code}: autonomous local merging is blocked`);
   const inputs = facts.inputs;
   const config = { mergePolicy: inputs.policy.mergePolicy, localChecks: facts.requiredChecks };
   const lands = config.mergePolicy === 'autonomous' || (approved && config.mergePolicy === 'human');
@@ -60,17 +73,21 @@ export async function enqueueLocalMerge(
         : `${todoRow.title}\n\nCloses ${source.owner}/${source.repo}#${source.issueNumber}`,
     identity: { name: deps.user.displayName, email: 'cairn@localhost' },
   });
-  enqueueStep(
-    deps,
-    buildId,
-    'merge',
-    todoRow.teamId,
-    JSON.stringify({
-      kind: 'local-merge',
-      command,
-      judgedDigest,
-    }),
-  );
+  deps.db.transaction(() => {
+    claimAutonomousMerge(deps.db, buildId);
+    if (restoreFailed) setTodoPhase(deps, todoRow.id, 'review');
+    enqueueStep(
+      deps,
+      buildId,
+      'merge',
+      todoRow.teamId,
+      JSON.stringify({
+        kind: 'local-merge',
+        command,
+        judgedDigest,
+      }),
+    );
+  });
   return { enqueued: true, readiness };
 }
 
@@ -93,6 +110,7 @@ export function applyLocalMergeReport(
     throw conflict('Local merge project changed');
   if (row.status !== 'claimed') return true;
   const { result } = report;
+  settleAutonomousMerge(deps.db, row.buildId, result.outcome === 'merged' ? 'merged' : 'refused');
   deps.db
     .update(step)
     .set({

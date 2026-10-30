@@ -1,0 +1,14 @@
+
+ RUN  v5.0.1 /Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-1405-brakes
+
+
+  Snapshots  1 updated 
+ Test Files  1 passed (1)
+      Tests  1 passed | 78 skipped (79)
+   Start at  15:05:36
+   Duration  10.33s (transform 73%, import 26%)
+
+  Transform  |@cairn/shared| transforming modules took 5.19s · 73% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+

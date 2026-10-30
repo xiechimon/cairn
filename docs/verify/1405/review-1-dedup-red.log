@@ -1,0 +1,37 @@
+
+ RUN  v5.0.1 /Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-1405-brakes
+
+ ❯ |@xiechimon/cairn| test/autonomous-merge.test.ts (24 tests | 1 failed | 23 skipped) 1340ms
+   × a previous-day admission suppresses a delayed legacy success row on the next day 1327ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/autonomous-merge.test.ts > a previous-day admission suppresses a delayed legacy success row on the next day
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ test/autonomous-merge.test.ts:355:110
+    353|   settleAutonomousMerge(s.db, 'a', 'merged', Date.parse('2030-01-01T23…
+    354|   s.db.insert(message).values({ id: 'delayed', conversationId: 'a', ro…
+    355|   expect(autonomousMergePolicy(s.db, s.team.id, config, Date.parse('20…
+       |                                                                                                              ^
+    356| });
+    357|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 23 skipped (24)
+   Start at  15:02:13
+   Duration  43.12s (transform 72%, import 25%, tests 3%)
+
+  Transform  |@xiechimon/cairn| transforming modules took 30.47s · 72% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+

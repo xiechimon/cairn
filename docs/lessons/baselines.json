@@ -51,6 +51,18 @@
     "Intercepts": 2,
     "Recurrences": 1
   },
+  "admission-history-queries": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "admission-table-registry": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "admission-transcript-envelope": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "an-e2e-shard-went-red-on-a-spec-the-branch": {
     "Intercepts": 1,
     "Recurrences": 0
@@ -235,6 +247,10 @@
     "Intercepts": 0,
     "Recurrences": 0
   },
+  "completion-close-evidence": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "completion-fixtures-called-public-github": {
     "Intercepts": 5,
     "Recurrences": 0
@@ -280,6 +296,10 @@
     "Recurrences": 0
   },
   "deep-split-dependency-traversal": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "deployment-root-composition": {
     "Intercepts": 0,
     "Recurrences": 0
   },
@@ -423,6 +443,10 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
+  "fixture-count-arithmetic": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
   "fixture-display-name-as-enum": {
     "Intercepts": 1,
     "Recurrences": 0
@@ -452,6 +476,10 @@
     "Recurrences": 0
   },
   "gate-retry-metadata-changed-the-established-wake-prefix": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "gate-verdict-layout": {
     "Intercepts": 1,
     "Recurrences": 0
   },
@@ -551,6 +579,10 @@
     "Intercepts": 0,
     "Recurrences": 0
   },
+  "inherited-commit-identity": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "inline-diagnostic-syntax": {
     "Intercepts": 1,
     "Recurrences": 0
@@ -615,6 +647,10 @@
     "Intercepts": 0,
     "Recurrences": 0
   },
+  "malformed-review-page": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "memory-retry-fingerprint": {
     "Intercepts": 3,
     "Recurrences": 0
@@ -631,6 +667,10 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
+  "merge-gate-product": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "merge-head-entered-by-hand": {
     "Intercepts": 2,
     "Recurrences": 1
@@ -638,6 +678,10 @@
   "merge-on-stale-green-check": {
     "Intercepts": 0,
     "Recurrences": 1
+  },
+  "merge-patch-defaults": {
+    "Intercepts": 0,
+    "Recurrences": 0
   },
   "merged-translation-key-collision": {
     "Intercepts": 1,
@@ -747,8 +791,16 @@
     "Intercepts": 5,
     "Recurrences": 0
   },
+  "partial-workflow-invariant-bypassed": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "patch-digest-fixture-hash": {
     "Intercepts": 2,
+    "Recurrences": 0
+  },
+  "pending-admission-lifecycle": {
+    "Intercepts": 0,
     "Recurrences": 0
   },
   "pkill-f-killed-own-shell": {
@@ -773,6 +825,10 @@
   },
   "pnpm-test-filter": {
     "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "pr-detail-timestamp": {
+    "Intercepts": 0,
     "Recurrences": 0
   },
   "pr-head-not-refreshed-before-verification": {
@@ -835,6 +891,10 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
+  "push-exit-masked-by-tee": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "push-oid-hook-bypass": {
     "Intercepts": 0,
     "Recurrences": 0
@@ -845,6 +905,10 @@
   },
   "random-candidate-ids-beginning-with-a-hyphen-were-parsed-as": {
     "Intercepts": 3,
+    "Recurrences": 0
+  },
+  "rate-assertion": {
+    "Intercepts": 0,
     "Recurrences": 0
   },
   "react-children-in-create-element": {
@@ -895,6 +959,10 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
+  "resolver-status": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
   "rest-projection-missing-field": {
     "Intercepts": 1,
     "Recurrences": 0
@@ -905,6 +973,10 @@
   },
   "retry-test-faked-the-push-wrapper": {
     "Intercepts": 2,
+    "Recurrences": 0
+  },
+  "review-fix-copied-rule-text": {
+    "Intercepts": 0,
     "Recurrences": 0
   },
   "review-qualification": {
@@ -1003,6 +1075,10 @@
     "Intercepts": 0,
     "Recurrences": 0
   },
+  "spoken-verdict-step-id": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "squash-used-moving-remote-ref": {
     "Intercepts": 1,
     "Recurrences": 0
@@ -1035,6 +1111,10 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
+  "supplemental-test-chronology": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "tabular-nums-widened-hyphen": {
     "Intercepts": 1,
     "Recurrences": 0
@@ -1051,6 +1131,10 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
+  "team-cap-scope": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "test-fixture-types": {
     "Intercepts": 1,
     "Recurrences": 0
@@ -1062,6 +1146,10 @@
   "test-spreads-unknown-response-body": {
     "Intercepts": 2,
     "Recurrences": 0
+  },
+  "test-syntax": {
+    "Intercepts": 2,
+    "Recurrences": 1
   },
   "the-export-target-was-compared-as-path-text-only-so": {
     "Intercepts": 1,
@@ -1192,6 +1280,14 @@
     "Recurrences": 0
   },
   "weekly-transcript-archive": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "workflow-self-trigger": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "workflow-trigger-boundary": {
     "Intercepts": 0,
     "Recurrences": 0
   },

@@ -1,0 +1,40 @@
+apps/server/drizzle/0069_team_merge_admissions.sql
+apps/server/drizzle/meta/0069_snapshot.json
+apps/server/drizzle/meta/_journal.json
+apps/server/src/db/schema.ts
+apps/server/src/db/seed.ts
+apps/server/src/lib/github.ts
+apps/server/src/routes-core.ts
+apps/server/src/services/autonomous-merge.ts
+apps/server/src/services/builds.ts
+apps/server/src/services/ci-loop.ts
+apps/server/src/services/machine-claim.ts
+apps/server/src/services/projects.ts
+apps/server/test/autonomous-merge.test.ts
+apps/server/test/local-merge-landing.test.ts
+apps/server/test/merge-gate-product.test.ts
+apps/server/test/pr-merge-api.test.ts
+apps/server/test/pr-reconcile.test.ts
+apps/server/test/schema.test.ts
+packages/shared/src/records/first-pr-report.ts
+packages/shared/src/records/project.ts
+packages/shared/src/records/team.ts
+packages/shared/src/tables.ts
+packages/shared/test/__snapshots__/snapshot.test.ts.snap
+packages/shared/test/vocabulary.test.ts
+docs/lessons/1405-admission-history-queries.md
+docs/lessons/1405-admission-table-registry.md
+docs/lessons/1405-pending-admission-lifecycle.md
+docs/lessons/1405-pr-detail-timestamp.md
+docs/lessons/1405-supplemental-test-chronology.md
+docs/lessons/1405-team-cap-scope.md
+docs/lessons/1481-zsh-nomatch-search.md
+docs/lessons/baselines.json
+docs/lessons/events.jsonl
+docs/verify/1405/README.md
+docs/verify/1405/red.log
+docs/verify/1405/green.log
+
+Additional review-1 evidence files are contained in docs/verify/1405/.
+projects.ts removes the inherited project cap field and is unchanged relative to HEAD.
+Inherited implementation files local-merge.ts, local-merge-facts.ts and merge-gate-run.ts remain present without new edits in this round.

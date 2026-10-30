@@ -1,0 +1,87 @@
+
+ RUN  v5.0.1 /Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-1405-brakes
+
+ ❯ |@xiechimon/cairn| test/local-merge-landing.test.ts (25 tests | 2 failed) 1116ms
+   × a local candidate blocked by pause leaves the next worker candidate claimable 34ms
+   × a local candidate blocked by cap leaves the next worker candidate claimable 46ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/local-merge-landing.test.ts > a local candidate blocked by pause leaves the next worker candidate claimable
+HttpError: autonomy-paused: local merge was not issued
+ ❯ conflict src/lib/errors.ts:19:10
+     17|
+     18| export function conflict(message: string): HttpError {
+     19|   return new HttpError(409, message);
+       |          ^
+     20| }
+     21|
+ ❯ tryClaim src/services/machine-claim.ts:398:39
+ ❯ claimStep src/services/machine-claim.ts:547:17
+ ❯ test/local-merge-landing.test.ts:500:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  |@xiechimon/cairn| test/local-merge-landing.test.ts > a local candidate blocked by cap leaves the next worker candidate claimable
+AssertionError: expected 'F-KaXA--KLJfd_ROyhPe2' to be 'next-step' // Object.is equality
+
+Expected: "next-step"
+Received: "F-KaXA--KLJfd_ROyhPe2"
+
+ ❯ test/local-merge-landing.test.ts:500:94
+    498|     f.s.db.insert(build).values({ id: 'next', todoId: 'next', withPlan…
+    499|     f.s.db.insert(step).values({ id: 'next-step', buildId: 'next', kin…
+    500|     expect((await claimStep(f.deps, 'worker', f.s.team.id, 0, 'http://…
+       |                                                                                              ^
+    501|     expect(f.s.db.select().from(step).all().find(r => r.kind === 'merg…
+    502|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 23 passed (25)
+   Start at  14:54:53
+   Duration  6.40s (transform 59%, import 23%, tests 18%)
+
+  Transform  |@xiechimon/cairn| transforming modules took 3.72s · 59% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+
+
+ RUN  v5.0.1 /Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-1405-brakes
+
+ ❯ |@xiechimon/cairn| test/local-merge-landing.test.ts (26 tests | 1 failed | 25 skipped) 227ms
+   × changed local authorization releases the reservation before skipping the command 225ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/local-merge-landing.test.ts > changed local authorization releases the reservation before skipping the command
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ test/local-merge-landing.test.ts:511:96
+    509|   f.s.db.update(project).set({ repoKind: 'hosted' }).run();
+    510|   await claimStep(f.deps, 'worker', f.s.team.id, 0, 'http://localhost'…
+    511|   expect(f.s.db.select().from(message).all().some(row => row.id === 'a…
+       |                                                                                                ^
+    512| });
+    513|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 25 skipped (26)
+   Start at  14:56:27
+   Duration  4.45s (transform 64%, import 31%, tests 5%)
+
+  Transform  |@xiechimon/cairn| transforming modules took 2.74s · 64% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+

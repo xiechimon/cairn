@@ -1,0 +1,114 @@
+
+ RUN  v5.0.1 /Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-1405-brakes
+
+ ❯ |@xiechimon/cairn| test/pr-merge-api.test.ts (143 tests | 8 failed) 267965ms
+   ❯ #1403 segment 2b: the server merges the PR through the GitHub API (136)
+     × [2b-D25] a merge step completes on a GitHub build with a PR → stays in review, one row naming the PR; a later GitHub merge is finished by the reconcile 5915ms
+     × [2b-D35] a leftover merge step pushes a merge of the default branch after the PR merged on GitHub → that commit is not the build’s last pushed work; the sweep finishes the card 6477ms
+     × [2b-M1] a card that is closed (cancelled or reset, #1505) → no merge: refused before any request 6532ms
+     × [2b-M2] the card is closed while the PR read is in flight (#1505) → no PUT, nothing written 5542ms
+     × [2b-M2] the card is todo while the PR read is in flight (#1505) → no PUT, nothing written 5774ms
+     × [2b-M3] the todo points at another team’s GitHub project (#1497) → not GitHub form: no GitHub request 8724ms
+     × [2b-D26] the token travels only in the Authorization header 10244ms
+     × [2b-D27] REST: 202 {delegated:true} when GitHub merges; 409 {error} when it refuses 10006ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D25] a merge step completes on a GitHub build with a PR → stays in review, one row naming the PR; a later GitHub merge is finished by the reconcile
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/pr-merge-api.test.ts:1237:3
+    1236|   });
+    1237|
+    1238|   test('[2b-D25] a merge step completes on a GitHub build with a PR → …
+       |  ^
+    1239|     const w = makeWorld();
+    1240|     const mergeStepId = `step-merge-old-${w.buildId}`;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+ FAIL  |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D35] a leftover merge step pushes a merge of the default branch after the PR merged on GitHub → that commit is not the build’s last pushed work; the sweep finishes the card
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/pr-merge-api.test.ts:1284:3
+    1283|   });
+    1284|
+    1285|   test('[2b-D35] a leftover merge step pushes a merge of the default b…
+       |  ^
+    1286|     const w = makeWorld({ pull: { state: 'closed', merged: true, merge…
+    1287|     w.fake.compareStatus = 'behind';
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯
+
+ FAIL  |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-M1] a card that is closed (cancelled or reset, #1505) → no merge: refused before any request
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/pr-merge-api.test.ts:1355:41
+    1354|   });
+    1355|
+    1356|   test.each(['closed', 'todo'] as const)(
+       |                                        ^
+    1357|     '[2b-M1] a card that is %s (cancelled or reset, #1505) → no merge:…
+    1358|     async (phase) => {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/8]⎯
+
+ FAIL  |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-M2] the card is closed while the PR read is in flight (#1505) → no PUT, nothing written
+ FAIL  |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-M2] the card is todo while the PR read is in flight (#1505) → no PUT, nothing written
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/pr-merge-api.test.ts:1367:41
+    1366|   );
+    1367|
+    1368|   test.each(['closed', 'todo'] as const)(
+       |                                        ^
+    1369|     '[2b-M2] the card is %s while the PR read is in flight (#1505) → n…
+    1370|     async (phase) => {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/8]⎯
+
+ FAIL  |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-M3] the todo points at another team’s GitHub project (#1497) → not GitHub form: no GitHub request
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/pr-merge-api.test.ts:1383:3
+    1382|   );
+    1383|
+    1384|   test('[2b-M3] the todo points at another team’s GitHub project (#149…
+       |  ^
+    1385|     const w = makeWorld();
+    1386|     const other = 'team-other-m3';
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/8]⎯
+
+ FAIL  |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D26] the token travels only in the Authorization header
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/pr-merge-api.test.ts:1397:3
+    1396|   });
+    1397|
+    1398|   test('[2b-D26] the token travels only in the Authorization header', …
+       |  ^
+    1399|     const merged = makeWorld();
+    1400|     await requestMerge(merged.deps, merged.buildId);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/8]⎯
+
+ FAIL  |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D27] REST: 202 {delegated:true} when GitHub merges; 409 {error} when it refuses
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/pr-merge-api.test.ts:1417:3
+    1416|   });
+    1417|
+    1418|   test('[2b-D27] REST: 202 {delegated:true} when GitHub merges; 409 {e…
+       |  ^
+    1419|     const ok = makeWorld();
+    1420|     const res = await req(ok.s.app, 'POST', `/api/builds/${ok.buildId}…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/8]⎯
+
+
+ Test Files  1 failed | 3 passed (4)
+      Tests  8 failed | 169 passed (177)
+   Start at  13:31:30
+   Duration  283.83s (tests 84%, transform 11%, import 5%)
+

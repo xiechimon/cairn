@@ -1,0 +1,14 @@
+lessons ledger recorded 1 of 1 events
+---
+Title: lessons escalation: zsh-nomatch-search recurred after its safeguard (1481-zsh-nomatch-search.md)
+Labels: correction
+---
+
+The same kind of error reappeared after its safeguard landed, so the ledger counts it as a recurrence.
+
+- Category key: zsh-nomatch-search
+- Ledger entry: docs/lessons/1481-zsh-nomatch-search.md
+- Suggested stronger safeguard: move the safeguard from level 2 to level 1
+lessons counters written
+lessons counters written
+lessons ledger ok

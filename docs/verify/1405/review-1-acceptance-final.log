@@ -1,0 +1,9 @@
+
+ RUN  v5.0.1 /Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-1405-brakes
+
+
+ Test Files  6 passed (6)
+      Tests  466 passed (466)
+   Start at  15:08:47
+   Duration  147.54s (tests 81%, import 13%, transform 6%)
+

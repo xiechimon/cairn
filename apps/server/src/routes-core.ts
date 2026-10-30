@@ -54,6 +54,13 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     if (body.autonomyPaused !== undefined) {
       ctx.db.update(team).set({ autonomyPaused: body.autonomyPaused }).where(eq(team.id, id)).run();
     }
+    if (body.maxAutonomousMergesPerDay !== undefined) {
+      ctx.db
+        .update(team)
+        .set({ maxAutonomousMergesPerDay: body.maxAutonomousMergesPerDay })
+        .where(eq(team.id, id))
+        .run();
+    }
     const prompt = setFirstPrReportPrompt(ctx.db, id, body.firstPrReportPrompt ?? {});
     const row = ctx.db.select().from(team).where(eq(team.id, id)).get();
     return c.json({

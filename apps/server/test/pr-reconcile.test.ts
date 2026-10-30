@@ -2263,6 +2263,7 @@ describe('#1403 [66] live GitHub response shapes (captured over REST, see docs/v
     expect(page?.pull).toEqual({
       state: 'open',
       merged: false,
+      mergedAt: null,
       mergeCommitSha: null,
       mergedBy: null,
       headSha: '9fa4ed90fa76bc7d7a82c7ffe20ab3782dc2cddd',
@@ -2287,6 +2288,7 @@ describe('#1403 [66] live GitHub response shapes (captured over REST, see docs/v
       state: 'closed',
       merged: true,
       mergeCommitSha: MAIN_NEWER,
+      mergedAt: '2026-10-21T07:54:00Z',
       mergedBy: 'xiechimon',
       headSha: '815d5b73f70829d44d6895e1a7a51e13bc6a0555',
       headRef: 'claude/optimistic-albattani-r5pmfn',

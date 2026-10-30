@@ -1,0 +1,6 @@
+
+ RUN  v5.0.1 /Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-1405-brakes
+
+ ❯ |@cairn/shared| test/snapshot.test.ts (79 tests | 1 failed) 312ms
+   ❯ record shapes, 24-table projection -- zod -> JSON Schema snapshot (21)
+     × team 61ms

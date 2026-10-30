@@ -22,6 +22,7 @@ import {
 import { and, asc, eq, isNull, lte, or, sql } from 'drizzle-orm';
 import { agent, build, chief, chiefThread, machine, skillAudit, step, todo } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { autonomousMergePolicy } from './autonomous-merge.js';
 import { blockerHandoffForClaim } from './blocker-handoff.js';
 import { failStepWithEvents, mergedPrElsewhere } from './builds.js';
 import { chiefClaimContext, parseChiefTrigger } from './chief.js';
@@ -383,6 +384,18 @@ async function tryClaim(
         ? await mergedPrElsewhere(deps, cand.todoRow.id, cand.stepRow.buildId)
         : null;
     const blockerHandoff = await blockerHandoffForClaim(deps, cand.stepRow, cand.todoRow);
+    if (localMerge !== null) {
+      const currentProject = projectOfTodo(db, cand.todoRow);
+      if (!currentProject) continue;
+      const brake = autonomousMergePolicy(
+        db,
+        cand.todoRow.teamId,
+        projectMergeConfigOf(currentProject),
+        nowMs(),
+        cand.stepRow.buildId,
+      );
+      if (brake.autonomyPaused || brake.dailyCapReached) continue;
+    }
     const claimedAt = nowMs();
     let won = false;
     try {

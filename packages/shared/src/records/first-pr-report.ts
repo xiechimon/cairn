@@ -26,10 +26,17 @@ export const patchTeamBodySchema = z
   .object({
     firstPrReportPrompt: patchFirstPrReportPromptSchema.optional(),
     autonomyPaused: z.boolean().optional(),
+    maxAutonomousMergesPerDay: z.number().int().nonnegative().optional(),
   })
-  .refine((body) => body.firstPrReportPrompt !== undefined || body.autonomyPaused !== undefined, {
-    message: 'At least one team setting is required',
-  });
+  .refine(
+    (body) =>
+      body.firstPrReportPrompt !== undefined ||
+      body.autonomyPaused !== undefined ||
+      body.maxAutonomousMergesPerDay !== undefined,
+    {
+      message: 'At least one team setting is required',
+    },
+  );
 export type PatchTeamBody = z.infer<typeof patchTeamBodySchema>;
 
 export const FIRST_PR_DISCUSSION_CATEGORY = 'Q&A';

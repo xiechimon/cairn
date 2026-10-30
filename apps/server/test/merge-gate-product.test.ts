@@ -1,4 +1,8 @@
-import { parseReviewPromptMeta, REVIEW_VERDICT_KIND } from '@cairn/shared';
+import {
+  DEFAULT_AUTONOMY_SETTINGS,
+  parseReviewPromptMeta,
+  REVIEW_VERDICT_KIND,
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test } from 'vitest';
 import {
@@ -12,6 +16,7 @@ import {
   message,
   project,
   step,
+  team,
   todo,
 } from '../src/db/schema.js';
 import { completeStep } from '../src/services/builds.js';
@@ -543,3 +548,26 @@ describe('in-product merge gate', () => {
     expect(gateRunMismatch('pass', null)).toBe(false);
   });
 });
+
+test.each(['autonomy-paused', 'daily-cap'] as const)(
+  '#1405 GitHub evaluation reads %s from current database policy',
+  async (code) => {
+    const w = await world();
+    if (code === 'autonomy-paused')
+      w.s.db.update(team).set({ autonomyPaused: true }).where(eq(team.id, w.s.team.id)).run();
+    else {
+      w.s.db.update(team).set({ maxAutonomousMergesPerDay: 0 }).run();
+      const row = w.s.db.select().from(project).get();
+      if (!row) throw new Error('missing project');
+      w.s.db
+        .update(project)
+        .set({
+          autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, ...row.autonomy },
+        })
+        .where(eq(project.id, row.id))
+        .run();
+    }
+    const readiness = await evaluateMergeGate(w.s.svc, w.buildId, { port: scriptedPort([]) });
+    expect(readiness?.blockers.map((b) => b.code)).toContain(code);
+  },
+);

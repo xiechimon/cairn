@@ -1,0 +1,22 @@
+{
+  "testedBase": "63aad9906a7951256350eddfd810f954f18b6249",
+  "surface": "local-server-sqlite-fixtures",
+  "github": "stub",
+  "localGitOps": "stub",
+  "files": {
+    "apps/server/src/lib/github.ts": "f34da60b2302423b4f87d12cf45764f030a7f5fc2c5f7b7b30becb52e6a5c6c4",
+    "apps/server/src/services/autonomous-merge.ts": "92088934e952f56c1f24e5ccd8deb8ea1f727d468b0e0781236a17e33b2a5912",
+    "apps/server/src/services/builds.ts": "75c5fed2f878347bf4513cb9bbb200d2b5ace24bc24a3abd0fb509d0e4919875",
+    "apps/server/src/services/ci-loop.ts": "28886ca4a4139c28822bf2e0e18eeac934a0f6376fa13184dda67be53c076239",
+    "apps/server/src/services/local-merge-facts.ts": "19452f16090a93f6b3a0ed4a7ae82afe7c22fc87dd7906d0462c0ae979176729",
+    "apps/server/src/services/local-merge.ts": "9e3945607a1a6b20ed9e071c569b30b7bae3e5ab173a5535794af43abaa6f770",
+    "apps/server/src/services/machine-claim.ts": "29496b6f023c6762adc6d4aa7526191d6e767aa8678b3db180974c3fdccefe11",
+    "apps/server/src/services/merge-gate-run.ts": "52fccf907405a3706672e7db19dacfd240bf30b09377e76b268bc235f59c9151",
+    "apps/server/src/services/projects.ts": "2281831b497da025150e53ca973df835bbf193d13f429f5d89c04f13da7d6bfa",
+    "apps/server/test/autonomous-merge.test.ts": "e6ce9fe79dd581fe627a60162c43be4cdc9fcc27c34ce4c848cad50c0a66560f",
+    "apps/server/test/local-merge-landing.test.ts": "088bcdc449a295dc8265f5a82a3efbfaf57cd6ce4dfde265c43770458bc28713",
+    "apps/server/test/merge-gate-product.test.ts": "f3fde87fb900d9beb3fceb1aa424c3edf463db92e2f74987efe5339352b59576",
+    "apps/server/test/pr-merge-api.test.ts": "e57540b34dfe2e5ecc44b870daa9c8c0ae2ee44e985fbc2ad6e8708b4fa6f842",
+    "packages/shared/src/records/project.ts": "c934b5c89f8fcacf67a53d41e7d40168223aa5e7cd3dccb42704fea45c29cd74"
+  }
+}

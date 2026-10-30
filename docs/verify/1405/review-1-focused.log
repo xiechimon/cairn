@@ -1,0 +1,35 @@
+
+ RUN  v5.0.1 /Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-1405-brakes
+
+ ✓ |@xiechimon/cairn| test/autonomous-merge.test.ts > team cap schema rejects negative, fractional and infinite limits 5ms
+ ✓ |@xiechimon/cairn| test/autonomous-merge.test.ts > SQLite admission persists its claim and holds an unknown response across midnight 401ms
+ ✓ |@xiechimon/cairn| test/autonomous-merge.test.ts > landed time rather than admission time determines the UTC day and refused requests release capacity 193ms
+ ✓ |@xiechimon/cairn| test/autonomous-merge.test.ts > human policy creates no autonomous record and does not spend capacity 151ms
+ ✓ |@xiechimon/cairn| test/autonomous-merge.test.ts > a completed admission and its legacy success message count once 226ms
+ ✓ |@xiechimon/cairn| test/autonomous-merge.test.ts > a queued local reservation is rechecked without counting its own slot twice 166ms
+ ✓ |@xiechimon/cairn| test/autonomous-merge.test.ts > admission transcript records use the existing JSON string envelope 228ms
+ ✓ |@xiechimon/cairn| test/autonomous-merge.test.ts > merge configuration patches do not synthesize omitted defaulted fields 2ms
+ ✓ |@xiechimon/cairn| test/autonomous-merge.test.ts > updating checks preserves an existing human policy and zero cap 90ms
+ ✓ |@xiechimon/cairn| test/autonomous-merge.test.ts > team cap is stored and returned by the team settings API 170ms
+ ✓ |@xiechimon/cairn| test/autonomous-merge.test.ts > stale unknown GitHub admission is reconciled from open provider state 329ms
+ ✓ |@xiechimon/cairn| test/autonomous-merge.test.ts > stale unknown GitHub admission is reconciled from closed provider state 446ms
+ ✓ |@xiechimon/cairn| test/autonomous-merge.test.ts > stale unknown GitHub admission is reconciled from merged provider state 1186ms
+ ✓ |@xiechimon/cairn| test/autonomous-merge.test.ts > stale unknown GitHub admission is reconciled from unreadable provider state 192ms
+ ✓ |@xiechimon/cairn| test/autonomous-merge.test.ts > stale local admission releases a failed command after restart 168ms
+ ✓ |@xiechimon/cairn| test/autonomous-merge.test.ts > stale local admission releases a stopped command after restart 817ms
+ ✓ |@xiechimon/cairn| test/autonomous-merge.test.ts > stale local admission releases a missing command after restart 184ms
+ ✓ |@xiechimon/cairn| test/autonomous-merge.test.ts > local admission releases immediately when command is failed 349ms
+ ✓ |@xiechimon/cairn| test/autonomous-merge.test.ts > local admission releases immediately when command is cancelled 290ms
+ ✓ |@xiechimon/cairn| test/autonomous-merge.test.ts > legacy human-policy merge messages do not consume autonomous capacity 194ms
+ ✓ |@xiechimon/cairn| test/autonomous-merge.test.ts > evaluation SQL bounds transcript and step history with a large unrelated message table 881ms
+ ✓ |@xiechimon/cairn| test/autonomous-merge.test.ts > team settings reject negative and fractional caps without changing the stored limit 205ms
+
+ Test Files  1 passed (1)
+      Tests  22 passed (22)
+   Start at  15:00:26
+   Duration  18.46s (transform 39%, tests 38%, import 22%)
+
+  Transform  |@xiechimon/cairn| transforming modules took 7.02s · 39% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+
