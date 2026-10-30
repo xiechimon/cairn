@@ -113,3 +113,9 @@ playwright-report/
 
 # gardener weekly sweep output (#1617): local run default; CI uploads it as an artifact
 .gardener/
+apps/web/.ds-sync/
+apps/web/ds-bundle/
+apps/web/.design-sync-css/
+apps/web/.design-sync/.cache/
+apps/web/.design-sync/learnings/
+apps/web/.design-sync/node_modules
