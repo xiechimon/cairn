@@ -155,6 +155,7 @@ jobs:
     needs: pack
     if: needs.pack.outputs.count != '0'
     runs-on: ubuntu-latest
+    environment: npm
     permissions:
       contents: write
       id-token: write
@@ -308,6 +309,11 @@ export const workflowFixtures = [
     before: '    needs: config\n',
     after: '    needs: config\n    "\\x70ermissions":\n      "id-\\x74oken": write\n',
   },
+  {
+    name: '23: environment removed from publish',
+    before: '    runs-on: ubuntu-latest\n    environment: npm\n',
+    after: '    runs-on: ubuntu-latest\n',
+  },
 ];
 
 test('the release workflow matches the pinned text', () => {
@@ -326,6 +332,11 @@ test('the pinned workflow grants an OIDC token only after the publish job begins
     expectedReleaseWorkflow.indexOf('id-token: write') >
       expectedReleaseWorkflow.indexOf('  publish:'),
   );
+});
+
+test('the pinned workflow names the npm environment exactly once inside the publish job', () => {
+  assert.equal(expectedReleaseWorkflow.split('\n    environment: npm\n').length - 1, 1);
+  assert.match(expectedReleaseWorkflow, /^ {2}publish:\n(?: {4}.*\n)* {4}environment: npm\n/m);
 });
 
 for (const { name, before, after } of workflowFixtures) {

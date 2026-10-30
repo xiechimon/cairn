@@ -77,6 +77,7 @@ jobs:
     needs: pack
     if: needs.pack.outputs.count != '0'
     runs-on: ubuntu-latest
+    environment: npm
     permissions:
       contents: write
       id-token: write
