@@ -1419,3 +1419,33 @@ test('a later successful rerun does not move the first green completion', async 
   expectState(await invoke(['--started-at', '2026-10-29T00:00:00Z']), 'complete', 0);
   assert.ok(state.calls.some(({ args }) => args.some((arg) => arg.includes('filter=all'))));
 });
+
+for (const [pauseHour, resumeHour, completionHour, expected] of [
+  [9, 30, 8, 'failed'],
+  [2, 10, 12, 'complete'],
+]) {
+  test(`pause at ${pauseHour}, resume at ${resumeHour}, completion at ${completionHour}: ${expected}`, async () => {
+    const path = join(stateRoot, `completion-pause-${pauseHour}.json`);
+    const { state, deps, invoke } = harness();
+    const at = (hour) => new Date(now.getTime() + hour * 3600000).toISOString();
+    state.stdout = 'pending';
+    await invoke(['--state', path]);
+    deps.now = () => new Date(at(pauseHour));
+    expectState(await invoke(['--state', path, '--pause', 'owner']), 'paused', 20);
+    deps.now = () => new Date(at(resumeHour));
+    state.stdout = 'pass';
+    for (const item of state.issues)
+      item.timelineItems.nodes[0].closer.mergedAt = at(completionHour);
+    for (const run of state.checks[tip][0].check_runs) run.completed_at = at(completionHour);
+    if (completionHour > resumeHour) {
+      state.stdout = 'pending';
+      await invoke(['--state', path]);
+      deps.now = () => new Date(at(completionHour));
+      state.stdout = 'pass';
+    }
+    expectState(await invoke(['--state', path]), expected, expected === 'complete' ? 0 : 30);
+    assert.deepEqual(JSON.parse(readFileSync(path, 'utf8')).pauseIntervals.slice(0, 1), [
+      { startedAt: at(pauseHour), endedAt: at(resumeHour) },
+    ]);
+  });
+}

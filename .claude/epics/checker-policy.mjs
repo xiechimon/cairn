@@ -119,6 +119,17 @@ function requiredCheckFailures({ sha, runs }, requiredChecks) {
       : [`required check "${name}" is not successful on ${sha}`];
   });
 }
+export function activeHoursAt(startedAt, pauseIntervals, at) {
+  const end = Date.parse(at);
+  let cursor = Math.min(Date.parse(startedAt), end);
+  let active = 0;
+  for (const interval of pauseIntervals) {
+    const pauseStart = Math.min(end, Math.max(cursor, Date.parse(interval.startedAt)));
+    active += pauseStart - cursor;
+    cursor = Math.max(pauseStart, Math.min(end, Date.parse(interval.endedAt ?? at)));
+  }
+  return (active + end - cursor) / 3600000;
+}
 export function decideEpic(facts) {
   try {
     const { manifest, issues, commits, checks, now, startedAt, pause, fail } = facts;
@@ -198,8 +209,7 @@ export function decideEpic(facts) {
     for (const check of checks)
       if (check.status !== 'passed')
         reasons.push(`Check "${check.name}" ${check.status}: ${check.reason}`);
-    const activeHours =
-      facts.activeHours ?? (startedAt ? (Date.parse(now) - Date.parse(startedAt)) / 3600000 : 0);
+    const activeHours = activeHoursAt(startedAt ?? now, facts.pauseIntervals ?? [], now);
     const complete =
       items.every((item) => item.status === 'done') &&
       mainGreen &&
@@ -232,8 +242,7 @@ export function decideEpic(facts) {
       completedAt = new Date(Math.max(...completionTimes.map((time) => Date.parse(time)))).toISOString();
     }
     const elapsed = complete
-      ? activeHours - Math.max(0, Date.parse(now) - Date.parse(completedAt)) / 3600000 >
-        manifest.maxHours
+      ? activeHoursAt(startedAt ?? now, facts.pauseIntervals ?? [], completedAt) > manifest.maxHours
       : activeHours >= manifest.maxHours;
     let state = 'incomplete';
     if (fail) {

@@ -4,6 +4,7 @@ import { homedir, tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import {
+  activeHoursAt,
   decideEpic,
   errorMessage,
   isoPattern,
@@ -86,6 +87,20 @@ export async function main(argv, deps = {}) {
           Number.isFinite(Date.parse(persisted.updatedAt)) &&
           Number.isFinite(persisted.activeHours) &&
           persisted.activeHours >= 0 &&
+          (persisted.pauseIntervals === undefined ||
+            (Array.isArray(persisted.pauseIntervals) &&
+              persisted.pauseIntervals.every(
+                (interval, index, intervals) =>
+                  isoPattern.test(interval.startedAt) &&
+                  Number.isFinite(Date.parse(interval.startedAt)) &&
+                  Date.parse(interval.startedAt) >=
+                    Date.parse(index ? intervals[index - 1].endedAt : persisted.startedAt) &&
+                  (interval.endedAt === null
+                    ? index === intervals.length - 1
+                    : isoPattern.test(interval.endedAt) &&
+                      Number.isFinite(Date.parse(interval.endedAt)) &&
+                      Date.parse(interval.endedAt) >= Date.parse(interval.startedAt)),
+              ))) &&
           persisted.failureHistory &&
           typeof persisted.failureHistory === 'object' &&
           !Array.isArray(persisted.failureHistory),
@@ -96,12 +111,11 @@ export async function main(argv, deps = {}) {
       'Missing state requires --started-at',
     );
     const originalStart = persisted?.startedAt ?? startedAt;
-    const activeHours =
-      (persisted?.activeHours ?? 0) +
-      (!persisted || ['incomplete', 'unknown'].includes(persisted.phase)
-        ? Math.max(0, Date.parse(timestamp) - Date.parse(persisted?.updatedAt ?? originalStart)) /
-          3600000
-        : 0);
+    const pauseIntervals = structuredClone(persisted?.pauseIntervals ?? []);
+    if (pauseIntervals.at(-1)?.endedAt === null) pauseIntervals.at(-1).endedAt = timestamp;
+    else if (persisted && !['incomplete', 'unknown'].includes(persisted.phase))
+      pauseIntervals.push({ startedAt: persisted.updatedAt, endedAt: timestamp });
+    const activeHours = activeHoursAt(originalStart, pauseIntervals, timestamp);
     persistResult = (decision) => {
       if (decision.state === 'unknown' && persisted?.phase === 'failed')
         decision = { ...decision, state: 'failed', reasons: [persisted.pauseReason] };
@@ -121,6 +135,12 @@ export async function main(argv, deps = {}) {
         startedAt: originalStart,
         activeHours: decision.facts?.activeHours ?? activeHours,
         updatedAt: decision.facts?.now ?? timestamp,
+        pauseIntervals: [
+          ...pauseIntervals,
+          ...(!['incomplete', 'unknown'].includes(decision.state)
+            ? [{ startedAt: decision.facts?.now ?? timestamp, endedAt: null }]
+            : []),
+        ],
         failureHistory,
       };
       mkdirSync(dirname(statePath), { recursive: true });
@@ -316,8 +336,8 @@ export async function main(argv, deps = {}) {
       checks,
       now: observedAt,
       startedAt: originalStart,
-      activeHours:
-        activeHours + Math.max(0, Date.parse(observedAt) - Date.parse(timestamp)) / 3600000,
+      activeHours: activeHoursAt(originalStart, pauseIntervals, observedAt),
+      pauseIntervals,
       pause: values.pause ?? null,
       fail: values.fail ?? (persisted?.phase === 'failed' ? persisted.pauseReason : null),
     };
