@@ -21,7 +21,6 @@ import { Bubble, BubbleContent } from '../components/ui/bubble.js';
 import { Button } from '../components/ui/button.js';
 import { Marker, MarkerContent } from '../components/ui/marker.js';
 import { Message, MessageAvatar, MessageContent } from '../components/ui/message.js';
-import { Panel, PanelLabel, PanelRow, PanelValue } from '../components/ui/panel.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { Select, SelectContent, SelectItem, SelectValue } from '../components/ui/select.js';
 import { Skeleton } from '../components/ui/skeleton.js';
@@ -177,31 +176,13 @@ export function SettingsSection() {
   );
 }
 
-export function PanelSection() {
+export function AvatarSection() {
   return (
     <Section
-      id="panel"
-      title="Panel and avatar"
-      lede="Panels hold resting key-value content. Avatars are seeded from the name, so the same person always looks the same."
+      id="avatar"
+      title="Avatar"
+      lede="Avatars are seeded from the name, so the same person always looks the same. A busy agent's avatar spins."
     >
-      <Specimen title="Panel" note="quiet and outlined tiers">
-        {(['quiet', 'outlined'] as const).map((variant) => (
-          <Cell key={variant} label={variant}>
-            <Panel variant={variant} className="w-64 px-4 py-2">
-              {[
-                ['Branch', 'fix/frozen-lockfile'],
-                ['Machine', 'omarchy'],
-                ['Started', '12 min ago'],
-              ].map(([k, v]) => (
-                <PanelRow key={k} className="flex justify-between py-1.5">
-                  <PanelLabel className="text-meta text-content-tertiary">{k}</PanelLabel>
-                  <PanelValue className="text-meta text-foreground">{v}</PanelValue>
-                </PanelRow>
-              ))}
-            </Panel>
-          </Cell>
-        ))}
-      </Specimen>
       <Specimen title="Seeded avatar">
         {[
           { size: 'size-6', label: '24' },

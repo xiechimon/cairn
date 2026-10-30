@@ -60,6 +60,7 @@ import { useChiefRoot } from '../chief/chief-root.js';
 import { inflightOrchestrationFor } from '../chief/orchestration-inflight.js';
 import { useOrchestrateStart } from '../chief/use-orchestrate-start.js';
 import { Button } from '../components/ui/button.js';
+import { Spinner } from '../components/ui/spinner.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { blockDemoWrite, DEMO_MODE } from '../demo/demo-gate.js';
 import { AcceptDialog } from '../detail/accept-dialog.js';
@@ -784,6 +785,7 @@ export function TodoDetailPage() {
                   onClick={unarchiveTask}
                   disabled={mutations.setTodoArchived.isPending}
                 >
+                  {mutations.setTodoArchived.isPending && <Spinner data-icon="inline-start" />}
                   {t('Unarchive to continue')}
                 </Button>
               </div>
