@@ -92,8 +92,7 @@
       "issue": 2284,
       "dependsOn": [
         "key-isolation"
-      ],
-      "humanHeld": true
+      ]
     },
     {
       "id": "codex-probe",
