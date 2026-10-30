@@ -88,6 +88,11 @@ function lookupRef(responder, number) {
   return responder.refs?.[key] ?? responder.refs?.[number] ?? null;
 }
 
+function isAncestorOf(cwd, sha, ref = 'origin/main') {
+  if (!sha) return false;
+  return tryGitAt(cwd, ['merge-base', '--is-ancestor', sha, ref]).ok;
+}
+
 function expandSha(cwd, sha) {
   if (!sha || typeof sha !== 'string') return null;
   const result = tryGitAt(cwd, ['rev-parse', '--verify', `${sha}^{commit}`]);
@@ -651,6 +656,8 @@ function buildCase(trace, location, { cwd }) {
   const fixingSha = expandSha(cwd, trace.fixingSha ?? trace.followUpSha);
   if (!introducingSha) return { ok: false, reason: 'introducing-sha-unresolvable' };
   if (!fixingSha) return { ok: false, reason: 'fixing-sha-unresolvable' };
+  if (!isAncestorOf(cwd, introducingSha) || !isAncestorOf(cwd, fixingSha))
+    return { ok: false, reason: 'unreachable-from-mainline' };
   const parent = tryGitAt(cwd, ['rev-parse', '--verify', `${introducingSha}^`]);
   if (!parent.ok) return { ok: false, reason: 'replay-base-missing' };
   const replayBase = parent.stdout.trim();
@@ -778,6 +785,12 @@ function validateBankCase(bankCase, { cwd, schema }) {
   if (!introducingSha) errors.push('introducingSha is not in history');
   if (!fixingSha) errors.push('fixingSha is not in history');
   if (!replayBase) errors.push('replay base is not in history');
+  if (introducingSha && !isAncestorOf(cwd, introducingSha))
+    errors.push('introducingSha is unreachable from origin/main');
+  if (fixingSha && !isAncestorOf(cwd, fixingSha))
+    errors.push('fixingSha is unreachable from origin/main');
+  if (replayBase && !isAncestorOf(cwd, replayBase))
+    errors.push('replay base is unreachable from origin/main');
   if (introducingSha && replayBase) {
     const parent = tryGitAt(cwd, ['rev-parse', '--verify', `${introducingSha}^`]);
     if (!parent.ok || parent.stdout.trim() !== replayBase)

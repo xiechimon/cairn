@@ -67,6 +67,12 @@ range, and a replayable introducing parent enter `cases/`. Unresolved,
 multiple-origin, outside-window, missing provenance, empty locations, and
 non-replayable histories stay in `candidates.json`.
 
+Replayability requires mainline reachability. The introducing SHA, fixing SHA
+and replay base must be ancestors of `origin/main`; a commit that exists only in
+a side branch or in a rewritten history is not replayable, so export records
+`unreachable-from-mainline` and validation fails the case. This catches cases
+left behind by a mainline history rewrite.
+
 Repeated export is deterministic: the same origin PR, fix SHA, path, and line
 range map to one case id and rewrite the same bytes.
 
@@ -77,9 +83,10 @@ node scripts/escape-trace.mjs validate-cases integration/eval/review/cases
 ```
 
 Validation checks schema fields, forbidden reviewer-input keys, resolvable
-SHAs, that the replay base is the introducing parent, and that the defect line
-range exists in the introducing tree. The empty bank passes. Local prepush and
-CI run the same command through `scripts/prepush.mjs`.
+SHAs, mainline reachability of those SHAs, that the replay base is the
+introducing parent, and that the defect line range exists in the introducing
+tree. The empty bank passes. Local prepush and CI run the same command through
+`scripts/prepush.mjs`.
 
 ## Handoff for #1779
 
