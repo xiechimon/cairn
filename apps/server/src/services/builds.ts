@@ -228,7 +228,7 @@ export async function sendBuildSteer(
   deps: BuildDeps,
   conversationId: string,
   body: { content: string },
-  options: { allowReviewContinuation?: boolean } = {},
+  options: { allowReviewContinuation?: boolean; human?: boolean } = {},
 ): Promise<{
   conversationId: string;
   message: { id: string; role: 'user'; content: string; createdAt: number };
@@ -283,7 +283,8 @@ export async function sendBuildSteer(
   }
   const now = nowMs();
   const messageRow = {
-    id: newRecordId(),
+    id: options.human ? `human-${newRecordId()}` : newRecordId(),
+    actor: options.human ? deps.user.displayName : null,
     role: 'user' as const,
     content: body.content,
     createdAt: now,
@@ -808,6 +809,7 @@ export function startBuilds(
     withPlan: boolean;
     triggerSource?: TriggerSource;
     scheduledBy?: string;
+    prompt?: string;
   },
 ): BuildRecord[] {
   const triggerSource = input.triggerSource ?? 'user';
@@ -866,7 +868,7 @@ export function startBuilds(
       id,
       firstKind,
       todoRecord.teamId,
-      withRetryLessons(undefined, firstKind, lessons),
+      withRetryLessons(input.prompt, firstKind, lessons),
     );
     setTodoPhase(deps, todoId, 'queued', {
       assignment: input.assignment,

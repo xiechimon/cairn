@@ -1,9 +1,9 @@
 import type { CreateScheduleBody, ScheduleKind, ScheduleRecord } from '@cairn/shared';
 import { SCHEDULE_MINUTE_STEPS } from '@cairn/shared';
 import { CronExpressionParser } from 'cron-parser';
-import { and, eq, isNotNull, lte } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, like, lte, max } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { schedule, todo } from '../db/schema.js';
+import { build, message, schedule, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import type { TeamStreamHub } from './events.js';
@@ -15,6 +15,13 @@ export interface ScheduleDeps {
 }
 
 type ScheduleRow = typeof schedule.$inferSelect;
+
+export const WORKER_SCHEDULE_MIN_INTERVAL_MS = 15 * 60_000;
+export const WORKER_SCHEDULE_RUN_LIMIT = 10;
+
+export function isWorkerSchedule(createdBy: string): boolean {
+  return createdBy.startsWith('worker:');
+}
 
 export function serverTimezone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -136,6 +143,7 @@ export function listSchedules(deps: ScheduleDeps, teamId: string): ScheduleRecor
 export function createSchedule(
   deps: ScheduleDeps,
   input: CreateScheduleBody & { teamId: string; createdBy: string },
+  options: { allowAnyMinute?: boolean } = {},
 ): ScheduleRecord {
   const todoRow = deps.db.select().from(todo).where(eq(todo.id, input.todoId)).get();
   if (!todoRow || todoRow.teamId !== input.teamId) {
@@ -151,7 +159,7 @@ export function createSchedule(
   } catch {
     throw new HttpError(400, 'invalid schedule timezone');
   }
-  if (input.kind === 'once') assertMinuteStep(input.at, tz);
+  if (input.kind === 'once' && !options.allowAnyMinute) assertMinuteStep(input.at, tz);
   const now = nowMs();
   const id = newRecordId();
   const at = input.at ?? null;
@@ -226,4 +234,109 @@ export function pauseTodoSchedule(deps: ScheduleDeps, todoId: string, reason: st
     .set({ enabled: false, nextRunAt: null, pausedReason: reason })
     .where(eq(schedule.todoId, todoId))
     .run();
+}
+
+export function parseThreadCadence(
+  cadence: string,
+  fromMs = nowMs(),
+): { kind: 'once'; at: number } | { kind: 'cron'; cron: string; at: null } {
+  const relative = /^in ([1-9]\d*) (seconds?|minutes?|hours?|days?)$/.exec(cadence);
+  if (relative) {
+    const units: Record<string, number> = {
+      second: 1000,
+      minute: 60_000,
+      hour: 3_600_000,
+      day: 86_400_000,
+    };
+    const unit = relative[2]?.replace(/s$/, '') ?? '';
+    const at = fromMs + Number(relative[1]) * (units[unit] ?? 0);
+    if (!Number.isSafeInteger(at) || at > 8_640_000_000_000_000) {
+      throw new HttpError(400, 'invalid schedule delay');
+    }
+    assertWorkerScheduleInterval({ kind: 'once', at, tz: serverTimezone(), cron: null }, fromMs);
+    return { kind: 'once', at };
+  }
+  if (cadence.startsWith('at ')) {
+    const timestamp = cadence.slice(3);
+    const at = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(
+      timestamp,
+    )
+      ? Date.parse(timestamp)
+      : Number.NaN;
+    const wallClock = Date.parse(`${timestamp.slice(0, 19)}Z`);
+    if (
+      !Number.isSafeInteger(at) ||
+      at <= fromMs ||
+      !Number.isSafeInteger(wallClock) ||
+      new Date(wallClock).toISOString().slice(0, 19) !== timestamp.slice(0, 19)
+    ) {
+      throw new HttpError(400, 'invalid schedule timestamp: expected a future ISO timestamp');
+    }
+    assertWorkerScheduleInterval({ kind: 'once', at, tz: serverTimezone(), cron: null }, fromMs);
+    return { kind: 'once', at };
+  }
+  if (cadence.split(/\s+/).length !== 5) {
+    throw new HttpError(
+      400,
+      'invalid schedule cadence: expected a delay, ISO timestamp or five-field cron',
+    );
+  }
+  assertWorkerScheduleInterval(
+    { kind: 'cron', at: null, tz: serverTimezone(), cron: cadence },
+    fromMs,
+  );
+  return { kind: 'cron', cron: cadence, at: null };
+}
+
+export function assertWorkerScheduleInterval(
+  cadence: Pick<ScheduleRow, 'kind' | 'at' | 'tz' | 'cron'>,
+  fromMs: number,
+  checkOnce = true,
+): void {
+  const first = computeNextRunAt(cadence.kind, cadence.at, cadence.tz, fromMs, cadence.cron);
+  const interval =
+    cadence.kind === 'once'
+      ? checkOnce
+        ? first - fromMs
+        : WORKER_SCHEDULE_MIN_INTERVAL_MS
+      : computeNextRunAt(cadence.kind, cadence.at, cadence.tz, first, cadence.cron) - first;
+  if (interval < WORKER_SCHEDULE_MIN_INTERVAL_MS) {
+    throw new HttpError(400, 'worker schedules require an interval of at least 15 minutes');
+  }
+}
+
+export function workerScheduleRunHistory(
+  deps: ScheduleDeps,
+  todoId: string,
+): { consecutive: number; lastRunAt: number | null } {
+  const lastHuman =
+    deps.db
+      .select({ at: max(message.createdAt) })
+      .from(message)
+      .innerJoin(build, eq(message.conversationId, build.id))
+      .where(
+        and(
+          eq(build.todoId, todoId),
+          eq(message.role, 'user'),
+          like(message.id, 'human-%'),
+          isNotNull(message.actor),
+        ),
+      )
+      .get()?.at ?? null;
+  const recent = deps.db
+    .select()
+    .from(build)
+    .where(and(eq(build.todoId, todoId), eq(build.triggerSource, 'schedule')))
+    .orderBy(desc(build.createdAt), desc(build.id))
+    .limit(WORKER_SCHEDULE_RUN_LIMIT)
+    .all();
+  let consecutive = 0;
+  for (const row of recent) {
+    if (lastHuman !== null && row.createdAt <= lastHuman) break;
+    consecutive++;
+  }
+  return {
+    consecutive,
+    lastRunAt: recent[0]?.createdAt ?? null,
+  };
 }

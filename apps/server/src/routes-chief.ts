@@ -116,7 +116,7 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
     const conversationId = c.req.param('id');
     if (!isChiefConversation(conversationId)) {
       const body = parseWith(buildSteerBodySchema, await jsonBody(c), 'body');
-      const result = await sendBuildSteer(svc, conversationId, body);
+      const result = await sendBuildSteer(svc, conversationId, body, { human: true });
       return c.json(result, 201);
     }
     const raw = (await jsonBody(c)) as { content?: unknown; projectId?: unknown };
