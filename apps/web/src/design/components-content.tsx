@@ -36,7 +36,17 @@ import {
   TraceLine,
   TraceTitle,
 } from '../components/ui/trace.js';
-import { FileText, Key, Lock, Paperclip, Search, Sparkle, Terminal, X } from '../icons/index.js';
+import {
+  FileText,
+  Key,
+  Lock,
+  Paperclip,
+  Search,
+  Server,
+  Sparkle,
+  Terminal,
+  X,
+} from '../icons/index.js';
 import { Cell, Section, Specimen } from './specimen.js';
 
 const LANGS = [
@@ -68,7 +78,7 @@ export function EmptySection() {
         <Specimen title="Read-only empty state" note="A hint explains why there is no action">
           <EmptyState
             className="w-full"
-            icon={Lock}
+            icon={Server}
             title="No machines"
             description="Machines appear here after they register with this server."
             hint={{ icon: Lock, text: 'Only the owner can add machines' }}
@@ -248,7 +258,7 @@ export function ConversationSection() {
             </MessageContent>
           </Message>
           <Message className="gap-2.5">
-            <MessageAvatar>
+            <MessageAvatar className="mt-0.5 self-start">
               <SeededAvatar name="chief" fallback="/avatar-robot-1.svg" className="size-6" />
             </MessageAvatar>
             <MessageContent>

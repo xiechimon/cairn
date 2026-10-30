@@ -1,5 +1,6 @@
 'use client';
 
+import { CircleCheck, Info, LoaderCircle, OctagonX, TriangleAlert } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { useEffect, useState } from 'react';
 import { Toaster as Sonner, type ToasterProps, toast } from 'sonner';
@@ -36,11 +37,19 @@ function Toaster({ ...props }: ToasterProps) {
       theme={theme}
       position="bottom-left"
       className="group"
+      icons={{
+        success: <CircleCheck className="size-4 text-running-text" />,
+        info: <Info className="size-4" />,
+        warning: <TriangleAlert className="size-4 text-(--badge-attention)" />,
+        error: <OctagonX className="size-4 text-destructive" />,
+        loading: <LoaderCircle className="size-4 animate-spin motion-reduce:animate-none" />,
+      }}
       style={
         {
           '--normal-bg': 'var(--popover)',
           '--normal-text': 'var(--popover-foreground)',
           '--normal-border': 'var(--border)',
+          '--border-radius': 'var(--radius-popover)',
         } as CSSProperties
       }
       {...props}

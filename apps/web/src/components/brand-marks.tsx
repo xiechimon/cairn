@@ -1,7 +1,3 @@
-//
-//
-//
-
 import type { SVGProps } from 'react';
 
 export function PiMark({ width = 16, height = 16, ...props }: SVGProps<SVGSVGElement>) {
@@ -22,11 +18,10 @@ export function PiMark({ width = 16, height = 16, ...props }: SVGProps<SVGSVGEle
 
 export function GeminiMark({ width = 16, height = 16, ...props }: SVGProps<SVGSVGElement>) {
   return (
-    <svg aria-hidden="true" width={width} height={height} viewBox="0 0 16 16" {...props}>
-      <circle cx="8" cy="8" r="7" fill="#4285F4" />
+    <svg aria-hidden="true" width={width} height={height} viewBox="0 0 24 24" {...props}>
       <path
-        fill="#FFFFFF"
-        d="M4.2 8a3.8 3.8 0 0 1 6.5-2.7l-1 1A2.4 2.4 0 1 0 10.4 9H8V7.6h4v4h-1.4V10A3.8 3.8 0 0 1 4.2 8Z"
+        fill="#3186FF"
+        d="M11.04 19.32Q12 21.51 12 24q0-2.49.93-4.68.96-2.19 2.58-3.81t3.81-2.55Q21.51 12 24 12q-2.49 0-4.68-.93a12.3 12.3 0 0 1-3.81-2.58 12.3 12.3 0 0 1-2.58-3.81Q12 2.49 12 0q0 2.49-.96 4.68-.93 2.19-2.55 3.81a12.3 12.3 0 0 1-3.81 2.58Q2.49 12 0 12q2.49 0 4.68.96 2.19.93 3.81 2.55t2.55 3.81"
       />
     </svg>
   );
