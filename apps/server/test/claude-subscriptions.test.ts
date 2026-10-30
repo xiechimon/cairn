@@ -7,7 +7,10 @@ import { bootServer, req } from './helpers.js';
 const TOKEN =
   'sk-ant-oat01-subscription-test-private-token-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz';
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 describe('Claude subscription connections', () => {
   test('seals independent connections and never returns or logs the token', async () => {
@@ -66,9 +69,11 @@ describe('Claude subscription connections', () => {
       max_tokens: 1,
       messages: [{ role: 'user', content: 'Hi' }],
     });
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 10_000);
     fetchStub.mockResolvedValue(new Response(TOKEN, { status: 401 }));
     const rejected = await req(s.app, 'POST', `${path}/${id}/verify`);
     expect(await rejected.json()).toEqual({ ok: false });
+    clock.mockReturnValue(Date.now() + 10_000);
     fetchStub.mockRejectedValue(new Error(`upstream ${TOKEN}`));
     const failed = await req(s.app, 'POST', `${path}/${id}/verify`);
     expect(await failed.json()).toEqual({ ok: false });
@@ -111,17 +116,13 @@ test.each([
   expect(logs.join('')).not.toContain(token);
 });
 
-test('server provider verification uses only the designated daemon backend bridge', () => {
+test('server source does not import daemon source', () => {
   const directory = new URL('../src/', import.meta.url);
   for (const path of readdirSync(directory, { recursive: true, encoding: 'utf8' })) {
     if (!path.endsWith('.ts')) continue;
     const source = readFileSync(new URL(path, directory), 'utf8');
     const imports = source.match(/from ['"][^'"]*daemon\/src\/[^'"]+['"]/g) ?? [];
-    expect(imports, path).toEqual(
-      path === 'services/claude-subscriptions.ts'
-        ? ["from '../../../daemon/src/backend/claude-subscription.js'"]
-        : [],
-    );
+    expect(imports, path).toEqual([]);
   }
 });
 
@@ -153,4 +154,51 @@ test('accepts a correctly prefixed token at the minimum length without returning
   });
   expect(response.status).toBe(201);
   expect(await response.text()).not.toContain(token);
+});
+
+test('verification limits concurrent and repeated calls per connection for ten seconds', async () => {
+  let now = Date.now();
+  vi.spyOn(Date, 'now').mockImplementation(() => now);
+  const logs: string[] = [];
+  const s = bootServer({ logger: pino({ level: 'trace' }, { write: (line) => logs.push(line) }) });
+  const path = `/api/teams/${s.team.id}/claude-subscriptions`;
+  const ids: string[] = [];
+  for (const label of ['Personal', 'Work']) {
+    const response = await req(s.app, 'POST', path, { label, token: TOKEN });
+    expect(response.status).toBe(201);
+    ids.push(((await response.json()) as { id: string }).id);
+  }
+  let complete!: (response: Response) => void;
+  const pending = new Promise<Response>((resolve) => {
+    complete = resolve;
+  });
+  const fetchStub = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+  fetchStub.mockReturnValueOnce(pending);
+  vi.stubGlobal('fetch', fetchStub);
+  const first = req(s.app, 'POST', `${path}/${ids[0]}/verify`);
+  await vi.waitFor(() => expect(fetchStub).toHaveBeenCalledTimes(1));
+  const limited = await req(s.app, 'POST', `${path}/${ids[0]}/verify`);
+  expect(limited.status).toBe(429);
+  const message = await limited.text();
+  expect(message).toContain('10 seconds');
+  expect(message).not.toContain(TOKEN);
+  expect(fetchStub).toHaveBeenCalledTimes(1);
+  expect((await req(s.app, 'POST', `${path}/${ids[1]}/verify`)).status).toBe(200);
+  complete(new Response(null, { status: 200 }));
+  expect((await first).status).toBe(200);
+  now += 9_999;
+  expect((await req(s.app, 'POST', `${path}/${ids[0]}/verify`)).status).toBe(429);
+  expect(fetchStub).toHaveBeenCalledTimes(2);
+  now += 1;
+  fetchStub.mockResolvedValue(new Response(TOKEN, { status: 401 }));
+  const failed = await req(s.app, 'POST', `${path}/${ids[0]}/verify`);
+  expect(failed.status).toBe(200);
+  expect(await failed.json()).toEqual({ ok: false });
+  expect((await req(s.app, 'POST', `${path}/${ids[0]}/verify`)).status).toBe(429);
+  expect((await req(s.app, 'POST', `${path}/missing/verify`)).status).toBe(404);
+  expect(
+    (await req(s.app, 'POST', `/api/teams/other/claude-subscriptions/${ids[0]}/verify`)).status,
+  ).toBe(404);
+  expect(fetchStub).toHaveBeenCalledTimes(3);
+  expect(logs.join('')).not.toContain(TOKEN);
 });

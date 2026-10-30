@@ -1,13 +1,15 @@
 import type { ClaudeSubscription, CreateClaudeSubscription, SecretBox } from '@cairn/shared';
 import { and, desc, eq, gt, isNull, or } from 'drizzle-orm';
-import { verifyClaudeSubscription } from '../../../daemon/src/backend/claude-subscription.js';
 import type { Db } from '../db/client.js';
 import { claudeSubscription } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { verifyClaudeSubscription } from './claude-subscription-verification.js';
 
 type Deps = { db: Db; box: SecretBox };
 type Row = typeof claudeSubscription.$inferSelect;
+
+const verificationWindows = new WeakMap<Db, Map<string, number>>();
 
 function toRecord(row: Row): ClaudeSubscription {
   return {
@@ -60,6 +62,19 @@ export async function verifySubscriptionConnection(
     .get();
   if (!row) throw notFound('Claude subscription connection');
   if (row.expiresAt !== null && row.expiresAt <= nowMs()) return { ok: false };
+  const now = nowMs();
+  const windows = verificationWindows.get(deps.db) ?? new Map<string, number>();
+  for (const [connectionId, retryAt] of windows) {
+    if (retryAt <= now) windows.delete(connectionId);
+  }
+  if (windows.has(row.id)) {
+    throw new HttpError(
+      429,
+      'Please wait 10 seconds between verification attempts for this connection.',
+    );
+  }
+  windows.set(row.id, now + 10_000);
+  verificationWindows.set(deps.db, windows);
   try {
     return { ok: await verifyClaudeSubscription(deps.box.open(row.tokenCipher)) };
   } catch {
