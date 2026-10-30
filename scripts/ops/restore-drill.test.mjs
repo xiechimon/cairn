@@ -91,6 +91,22 @@ function fixture() {
           scratch,
           '--report',
           report,
+          ...(extra.includes('hourly')
+            ? [
+                '--backup',
+                (() => {
+                  const recent = join(
+                    dir,
+                    `server-db-${new Date()
+                      .toISOString()
+                      .replaceAll(/[-:]/g, '')
+                      .replace(/\.\d{3}Z$/, 'Z')}.db.gz`,
+                  );
+                  copyFileSync(backup, recent);
+                  return recent;
+                })(),
+              ]
+            : []),
           ...extra,
         ],
         { encoding: 'utf8', timeout: 60000, env },
@@ -237,6 +253,7 @@ test('weekly units isolate scratch and do not install themselves', () => {
     'utf8',
   );
   const timer = readFileSync(join(root, 'scripts/ops/systemd/cairn-restore-drill.timer'), 'utf8');
+  assert.doesNotMatch(service, /WantedBy=/);
   assert.match(service, /UMask=0077/);
   assert.match(service, /RuntimeDirectory=cairn-restore-drill/);
   assert.match(service, /RESTORE_DRILL_SCRATCH=%t\/cairn-restore-drill\/run/);
@@ -300,7 +317,7 @@ for (const [table, id] of [
   ['build', 'b', 'id'],
   ['step', 's', 'buildId'],
   ['message', 'm', 'conversationId'],
-  ['chief_thread', 'ct', 'id'],
+  ['chief_thread', 'chief-ct', 'id'],
   ['chief_message', 'cm', 'threadId'],
 ])
   test(`missing selected ${table} names the relationship sample`, () => {
@@ -335,7 +352,7 @@ for (const table of ['step', 'message', 'chief_message'])
         ? "insert into step(id,buildId,kind,createdAt) values('extra','b','build',1)"
         : table === 'message'
           ? `insert into message(id,conversationId,role,content,createdAt) values('extra','b','user','"extra"',1)`
-          : `insert into chief_message(id,threadId,role,content,createdAt) values('extra','ct','user','"extra"',1)`;
+          : `insert into chief_message(id,threadId,role,content,createdAt) values('extra','chief-ct','user','"extra"',1)`;
     sql(f.db, query);
     fails(f, table === 'chief_message' ? /relationship.*ct/ : /relationship.*build b(?:\s|:)/);
   });
@@ -347,7 +364,7 @@ test('post-backup relationships are excluded while boundary rows are required', 
     insert into build(id,todoId,withPlan,triggerSource,createdAt) values('future','t',0,'user',1793404801000);
     insert into step(id,buildId,kind,createdAt) values('future-step','future','build',1793404801000),('later-step','b','build',1793404801000);
     insert into message(id,conversationId,role,content,createdAt) values('later-message','b','user','"later"',1793404801000);
-    insert into chief_message(id,threadId,role,content,createdAt) values('later-chief','ct','user','"later"',1793404801000);
+    insert into chief_message(id,threadId,role,content,createdAt) values('later-chief','chief-ct','user','"later"',1793404801000);
   `,
   );
   const r = f.run();
@@ -453,7 +470,7 @@ for (const mode of ['hourly', 'fresh'])
     sql(
       f.db,
       `update message set content='"updated in place"';
-      update chief_message set content='changed',createdAt=2;
+      update chief_message set content='"changed"',createdAt=2;
       update secret set name='renamed';
       delete from attachment;
       insert into todo(id,teamId,projectId,title,phaseAt,seqNum)
@@ -505,7 +522,7 @@ test('weekly launcher configures checkout and preflights runtime dependencies', 
   const launcher = readFileSync(join(root, 'scripts/ops/restore-drill-service.sh'), 'utf8');
   for (const tool of ['node', 'python3', 'sqlite3']) assert.ok(launcher.includes(tool));
   assert.match(launcher, /tsx/);
-  assert.match(launcher, /--mode fresh/);
+  assert.match(launcher, /for current in fresh hourly/);
 });
 
 test('hourly recovery does not require current live rows or attachment files', () => {
@@ -630,4 +647,51 @@ for table, allowed, strict in [
     { cwd: root, encoding: 'utf8' },
   );
   assert.equal(r.status, 0, r.stderr + r.stdout);
+});
+
+for (const mode of ['fresh', 'hourly'])
+  test(`round2 ${mode} status names mode and API reads a chief thread`, () => {
+    const f = fixture();
+    const r = f.run(['--mode', mode]);
+    assert.equal(r.status, 0, r.stderr);
+    const report = JSON.parse(readFileSync(f.report));
+    assert.equal(report.api.chiefThread, 'chief-ct');
+    assert.match(
+      readFileSync(`${f.report}.status`, 'utf8'),
+      new RegExp(`PASS restore-drill ${mode} ok`),
+    );
+  });
+for (const hours of [3, -1])
+  test(`round2 hourly rejects archive age ${hours} hours`, () => {
+    const f = fixture();
+    const stamp = new Date(Date.now() - hours * 3600000)
+      .toISOString()
+      .replaceAll(/[-:]/g, '')
+      .replace(/\.\d{3}Z$/, 'Z');
+    const backup = join(f.dir, `server-db-${stamp}.db.gz`);
+    copyFileSync(f.backup, backup);
+    const r = f.run(['--mode', 'hourly', '--backup', backup]);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /backup age/);
+  });
+test('round2 hourly rejects corrupt newest SQLite archive', () => {
+  const f = fixture();
+  writeFileSync(f.backup, gzipSync(Buffer.from('not sqlite')));
+  const r = f.run(['--mode', 'hourly']);
+  assert.notEqual(r.status, 0);
+  assert.match(r.stderr, /integrity_check/);
+});
+test('round2 fresh backup failure preserves safe step and withholds secrets', () => {
+  const f = fixture();
+  const bin = join(f.dir, 'failure-bin');
+  mkdirSync(bin);
+  writeFileSync(join(bin, 'rsync'), '#!/bin/sh\necho "fixture plaintext secret" >&2\nexit 23\n');
+  chmodSync(join(bin, 'rsync'), 0o700);
+  const r = f.run(['--mode', 'fresh'], false, {
+    ...process.env,
+    PATH: `${bin}:${process.env.PATH}`,
+  });
+  assert.notEqual(r.status, 0);
+  assert.match(r.stderr, /fresh backup.*copy attachments/);
+  assert.doesNotMatch(readFileSync(f.report, 'utf8') + r.stderr, /fixture plaintext secret/);
 });

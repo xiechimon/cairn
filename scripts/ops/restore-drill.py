@@ -255,7 +255,13 @@ def api(db, home, env, report, node):
             total += len(todos)
         if total != sum(expected.values()):
             raise RuntimeError('api /api/todos total mismatch')
-        report['api'] = {'count': total, 'teams': len(teams), 'surface': 'createApp wrapper serving GET /api/todos on restored DB', 'provider': 'not exercised'}
+        thread = report['relationships']['chiefThread']
+        with opener.open(f'http://127.0.0.1:{port}/api/conversations/{urllib.parse.quote(thread, safe="")}/messages', timeout=5) as response:
+            payload = json.load(response)
+        expected_messages = [r[0] for r in db.execute('select id from chief_message where threadId=? order by id', (thread,))]
+        if not isinstance(payload, dict) or sorted(row['id'] for row in payload.get('messages', [])) != expected_messages:
+            raise RuntimeError('api chief thread messages mismatch')
+        report['api'] = {'chiefThread': thread, 'chiefMessages': len(expected_messages), 'count': total, 'teams': len(teams), 'surface': 'createApp wrapper serving todos and chief thread messages on restored DB', 'provider': 'not exercised'}
     finally:
         process.terminate()
         try:
@@ -269,7 +275,7 @@ def api(db, home, env, report, node):
 
 def publish(path, report):
     path.parent.mkdir(parents=True, exist_ok=True)
-    for target, content in [(path, json.dumps(report, indent=2) + '\n'), (Path(str(path) + '.status'), f"{report['at']} {'PASS' if report['ok'] else 'FAIL'} restore-drill {report.get('error', 'ok')}\n")]:
+    for target, content in [(path, json.dumps(report, indent=2) + '\n'), (Path(str(path) + '.status'), f"{report['at']} {'PASS' if report['ok'] else 'FAIL'} restore-drill {report['mode']} {report.get('error', 'ok')}\n")]:
         with tempfile.NamedTemporaryFile(mode='w', dir=target.parent, delete=False) as stream:
             stream.write(content)
             temporary = stream.name
@@ -307,13 +313,22 @@ def main():
             item = 'fresh backup'
             backup_dir = scratch / 'backup'
             attachment_copy = scratch / 'attachments'
-            subprocess.run(['bash', str(ROOT / 'scripts/ops/backup-server-db.sh'), '--db', str(live), '--out', str(backup_dir), '--attachments', str(attachment_live), '--attachments-out', str(attachment_copy)], check=True, capture_output=True, timeout=600)
+            run = subprocess.run(['bash', str(ROOT / 'scripts/ops/backup-server-db.sh'), '--db', str(live), '--out', str(backup_dir), '--attachments', str(attachment_live), '--attachments-out', str(attachment_copy)], capture_output=True, text=True, timeout=600)
+            if run.returncode:
+                steps = ['sqlite3 .backup', 'integrity_check', 'gzip', 'copy attachments', 'list ready attachments in the db copy', 'sqlite3 not on PATH', 'gzip not on PATH', 'rsync not on PATH']
+                step = next((step for step in steps if any(line.endswith('FAIL ' + step) for line in run.stderr.splitlines())), 'backup step failed; stderr withheld')
+                raise RuntimeError(f'exit={run.returncode}; {step}')
             backup = sorted(backup_dir.glob('server-db-????????T??????Z.db.gz'))[-1]
         match = re.fullmatch(r'server-db-(\d{8}T\d{6}Z)\.db\.gz', backup.name)
         if not match:
             raise RuntimeError('backup timestamp filename invalid')
         stamp = datetime.datetime.strptime(match[1], '%Y%m%dT%H%M%SZ').replace(tzinfo=datetime.timezone.utc).timestamp() * 1000
         report['backupTimestamp'] = match[1]
+        if args.mode == 'hourly':
+            age = time.time() - stamp / 1000
+            if age < 0 or age > 7200:
+                raise RuntimeError('backup age outside 0 to 2 hours')
+            report['backupAgeSeconds'] = age
         item = 'snapshot sqlite3 .backup'
         if args.mode != 'hourly':
             subprocess.run(['sqlite3', '-readonly', str(live), '.timeout 10000', '.backup live-snapshot.db'], cwd=scratch, check=True, capture_output=True, timeout=60)

@@ -7,3 +7,5 @@ Intercepts: 0
 Recurrences: 0
 Notes: The launcher changes into the configured server package before importing tsx. A scratch checkout whose path contains spaces verifies command and working-directory propagation; Linux systemd parsing remains host acceptance.
 ---
+
+Round 2 executes both modes in the launcher fixture, pins separate report paths, checks rsync/gzip preflight and prohibits service install targets. The weekly timer is the only installable unit.

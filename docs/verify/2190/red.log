@@ -2521,3 +2521,390 @@ test at scripts/ops/restore-drill.test.mjs:582:1
     operator: 'strictEqual',
     diff: 'simple'
   }
+✔ configured service launcher rejects missing node (77.688792ms)
+✔ configured service launcher rejects missing python3 (31.927583ms)
+✔ configured service launcher rejects missing sqlite3 (64.749333ms)
+✖ configured service launcher rejects missing rsync (421.47725ms)
+✖ configured service launcher rejects missing gzip (379.150625ms)
+✔ configured service launcher rejects missing tsx (426.303875ms)
+✖ configured service launcher uses the configured checkout and fresh mode (430.935458ms)
+✔ scripts/ops/restore-drill-service.test.mjs (1037.930584ms)
+✖ weekly units isolate scratch and do not install themselves (22.203ms)
+✖ round2 fresh status names mode and API reads a chief thread (27038.852292ms)
+✖ round2 hourly status names mode and API reads a chief thread (7410.723625ms)
+✖ round2 hourly rejects archive age 3 hours (98.336292ms)
+✖ round2 hourly rejects archive age -1 hours (88.1545ms)
+✔ round2 hourly rejects corrupt newest SQLite archive (1064.943ms)
+✖ round2 fresh backup failure preserves safe step and withholds secrets (1137.428625ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 2
+ℹ fail 6
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 38306.469416
+
+✖ failing tests:
+
+test at scripts/ops/restore-drill.test.mjs:236:1
+✖ weekly units isolate scratch and do not install themselves (22.203ms)
+  AssertionError [ERR_ASSERTION]: The input was expected to not match the regular expression /WantedBy=/. Input:
+
+  '[Unit]\n' +
+    'Description=Cairn weekly database restore drill\n' +
+    '\n' +
+    '[Service]\n' +
+    'Type=oneshot\n' +
+    'UMask=0077\n' +
+    'Nice=10\n' +
+    'RuntimeDirectory=cairn-restore-drill\n' +
+    'EnvironmentFile=%h/.config/cairn/restore-drill.env\n' +
+    'Environment=RESTORE_DRILL_SCRATCH=%t/cairn-restore-drill/run\n' +
+    'Environment=RESTORE_DRILL_REPORT=%h/.local/state/cairn/restore-drill.json\n' +
+    'ExecStart=/bin/bash -c \'exec /bin/bash "$${CAIRN_CHECKOUT}/scripts/ops/restore-drill-service.sh"\'\n' +
+    'TimeoutStartSec=30min\n' +
+    '\n' +
+    '[Install]\n' +
+    'WantedBy=default.target\n'
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2190-restore-drill/scripts/ops/restore-drill.test.mjs:242:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '[Unit]\nDescription=Cairn weekly database restore drill\n\n[Service]\nType=oneshot\nUMask=0077\nNice=10\nRuntimeDirectory=cairn-restore-drill\nEnvironmentFile=%h/.config/cairn/restore-drill.env\nEnvironment=RESTORE_DRILL_SCRATCH=%t/cairn-restore-drill/run\nEnvironment=RESTORE_DRILL_REPORT=%h/.local/state/cairn/restore-drill.json\nExecStart=/bin/bash -c \'exec /bin/bash "$${CAIRN_CHECKOUT}/scripts/ops/restore-drill-service.sh"\'\nTimeoutStartSec=30min\n\n[Install]\nWantedBy=default.target\n',
+    expected: /WantedBy=/,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:639:3
+✖ round2 fresh status names mode and API reads a chief thread (27038.852292ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  undefined !== 'ct'
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2190-restore-drill/scripts/ops/restore-drill.test.mjs:644:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at node:internal/test_runner/test:1305:31
+      at node:internal/process/task_queues:151:7
+      at AsyncResource.runInAsyncScope (node:async_hooks:226:14)
+      at AsyncResource.runMicrotask (node:internal/process/task_queues:148:8) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'ct',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:639:3
+✖ round2 hourly status names mode and API reads a chief thread (7410.723625ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  undefined !== 'ct'
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2190-restore-drill/scripts/ops/restore-drill.test.mjs:644:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'ct',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:648:3
+✖ round2 hourly rejects archive age 3 hours (98.336292ms)
+  Error: ENOENT: no such file or directory, copyfile '/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/cairn-test-0bdb4083-10c4-4e72-bd83-b6d43ecb270a-restore-drill-Q9vZa2/server-db-20261030T000000Z.db.gz' -> '/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/cairn-test-0bdb4083-10c4-4e72-bd83-b6d43ecb270a-restore-drill-Q9vZa2/server-db-20261030T082958Z.db.gz'
+      at copyFileSync (node:fs:3781:11)
+      at file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2190-restore-drill/scripts/ops/restore-drill.test.mjs:95:187
+      at Object.run (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2190-restore-drill/scripts/ops/restore-drill.test.mjs:95:234)
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2190-restore-drill/scripts/ops/restore-drill.test.mjs:653:17)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'copyfile',
+    path: '/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/cairn-test-0bdb4083-10c4-4e72-bd83-b6d43ecb270a-restore-drill-Q9vZa2/server-db-20261030T000000Z.db.gz',
+    dest: '/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/cairn-test-0bdb4083-10c4-4e72-bd83-b6d43ecb270a-restore-drill-Q9vZa2/server-db-20261030T082958Z.db.gz'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:648:3
+✖ round2 hourly rejects archive age -1 hours (88.1545ms)
+  Error: ENOENT: no such file or directory, copyfile '/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/cairn-test-0bdb4083-10c4-4e72-bd83-b6d43ecb270a-restore-drill-BByHXu/server-db-20261030T000000Z.db.gz' -> '/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/cairn-test-0bdb4083-10c4-4e72-bd83-b6d43ecb270a-restore-drill-BByHXu/server-db-20261030T082958Z.db.gz'
+      at copyFileSync (node:fs:3781:11)
+      at file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2190-restore-drill/scripts/ops/restore-drill.test.mjs:95:187
+      at Object.run (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2190-restore-drill/scripts/ops/restore-drill.test.mjs:95:234)
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2190-restore-drill/scripts/ops/restore-drill.test.mjs:653:17)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'copyfile',
+    path: '/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/cairn-test-0bdb4083-10c4-4e72-bd83-b6d43ecb270a-restore-drill-BByHXu/server-db-20261030T000000Z.db.gz',
+    dest: '/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/cairn-test-0bdb4083-10c4-4e72-bd83-b6d43ecb270a-restore-drill-BByHXu/server-db-20261030T082958Z.db.gz'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:664:1
+✖ round2 fresh backup failure preserves safe step and withholds secrets (1137.428625ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /fresh backup.*copy attachments/. Input:
+
+  'FAIL fresh backup: CalledProcessError\n'
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2190-restore-drill/scripts/ops/restore-drill.test.mjs:672:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL fresh backup: CalledProcessError\n',
+    expected: /fresh backup.*copy attachments/,
+    operator: 'match',
+    diff: 'simple'
+  }
+✖ weekly units isolate scratch and do not install themselves (69.259541ms)
+✖ round2 fresh status names mode and API reads a chief thread (22881.730083ms)
+✖ round2 hourly status names mode and API reads a chief thread (7632.832208ms)
+✖ round2 hourly rejects archive age 3 hours (4635.105ms)
+✖ round2 hourly rejects archive age -1 hours (5080.173083ms)
+✔ round2 hourly rejects corrupt newest SQLite archive (1145.263292ms)
+✖ round2 fresh backup failure preserves safe step and withholds secrets (1016.295583ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 5
+ℹ fail 9
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 43537.671375
+
+✖ failing tests:
+
+test at scripts/ops/restore-drill-service.test.mjs:9:3
+✖ configured service launcher rejects missing rsync (421.47725ms)
+  AssertionError [ERR_ASSERTION]: Expected "actual" to be strictly unequal to: 0
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2190-restore-drill/scripts/ops/restore-drill-service.test.mjs:42:14)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 0,
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill-service.test.mjs:9:3
+✖ configured service launcher rejects missing gzip (379.150625ms)
+  AssertionError [ERR_ASSERTION]: Expected "actual" to be strictly unequal to: 0
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2190-restore-drill/scripts/ops/restore-drill-service.test.mjs:42:14)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 0,
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill-service.test.mjs:9:3
+✖ configured service launcher uses the configured checkout and fresh mode (430.935458ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /--mode\nhourly/. Input:
+
+  '/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/cairn-test-0a9f2068-98fa-4b0e-8820-5f54d7fb3b0b-restore-service-fJuPf6/checkout with spaces\n' +
+    '--mode\n' +
+    'fresh\n' +
+    '--live-db\n' +
+    '/fixture/server.db\n' +
+    '--attachments\n' +
+    '/fixture/archive\n' +
+    '--live-attachments\n' +
+    '/fixture/attachments\n' +
+    '--secretbox-key\n' +
+    '/fixture/key\n' +
+    '--scratch\n' +
+    '/fixture/scratch\n' +
+    '--report\n' +
+    '/fixture/report\n'
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2190-restore-drill/scripts/ops/restore-drill-service.test.mjs:48:14)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/cairn-test-0a9f2068-98fa-4b0e-8820-5f54d7fb3b0b-restore-service-fJuPf6/checkout with spaces\n--mode\nfresh\n--live-db\n/fixture/server.db\n--attachments\n/fixture/archive\n--live-attachments\n/fixture/attachments\n--secretbox-key\n/fixture/key\n--scratch\n/fixture/scratch\n--report\n/fixture/report\n',
+    expected: /--mode\nhourly/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:235:1
+✖ weekly units isolate scratch and do not install themselves (69.259541ms)
+  AssertionError [ERR_ASSERTION]: The input was expected to not match the regular expression /WantedBy=/. Input:
+
+  '[Unit]\n' +
+    'Description=Cairn weekly database restore drill\n' +
+    '\n' +
+    '[Service]\n' +
+    'Type=oneshot\n' +
+    'UMask=0077\n' +
+    'Nice=10\n' +
+    'RuntimeDirectory=cairn-restore-drill\n' +
+    'EnvironmentFile=%h/.config/cairn/restore-drill.env\n' +
+    'Environment=RESTORE_DRILL_SCRATCH=%t/cairn-restore-drill/run\n' +
+    'Environment=RESTORE_DRILL_REPORT=%h/.local/state/cairn/restore-drill.json\n' +
+    'ExecStart=/bin/bash -c \'exec /bin/bash "$${CAIRN_CHECKOUT}/scripts/ops/restore-drill-service.sh"\'\n' +
+    'TimeoutStartSec=30min\n' +
+    '\n' +
+    '[Install]\n' +
+    'WantedBy=default.target\n'
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2190-restore-drill/scripts/ops/restore-drill.test.mjs:241:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '[Unit]\nDescription=Cairn weekly database restore drill\n\n[Service]\nType=oneshot\nUMask=0077\nNice=10\nRuntimeDirectory=cairn-restore-drill\nEnvironmentFile=%h/.config/cairn/restore-drill.env\nEnvironment=RESTORE_DRILL_SCRATCH=%t/cairn-restore-drill/run\nEnvironment=RESTORE_DRILL_REPORT=%h/.local/state/cairn/restore-drill.json\nExecStart=/bin/bash -c \'exec /bin/bash "$${CAIRN_CHECKOUT}/scripts/ops/restore-drill-service.sh"\'\nTimeoutStartSec=30min\n\n[Install]\nWantedBy=default.target\n',
+    expected: /WantedBy=/,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:638:3
+✖ round2 fresh status names mode and API reads a chief thread (22881.730083ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  undefined !== 'ct'
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2190-restore-drill/scripts/ops/restore-drill.test.mjs:643:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at node:internal/test_runner/test:1305:31
+      at node:internal/process/task_queues:151:7
+      at AsyncResource.runInAsyncScope (node:async_hooks:226:14)
+      at AsyncResource.runMicrotask (node:internal/process/task_queues:148:8) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'ct',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:638:3
+✖ round2 hourly status names mode and API reads a chief thread (7632.832208ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  undefined !== 'ct'
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2190-restore-drill/scripts/ops/restore-drill.test.mjs:643:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'ct',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:647:3
+✖ round2 hourly rejects archive age 3 hours (4635.105ms)
+  AssertionError [ERR_ASSERTION]: Expected "actual" to be strictly unequal to: 0
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2190-restore-drill/scripts/ops/restore-drill.test.mjs:653:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 0,
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:647:3
+✖ round2 hourly rejects archive age -1 hours (5080.173083ms)
+  AssertionError [ERR_ASSERTION]: Expected "actual" to be strictly unequal to: 0
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2190-restore-drill/scripts/ops/restore-drill.test.mjs:653:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 0,
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:663:1
+✖ round2 fresh backup failure preserves safe step and withholds secrets (1016.295583ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /fresh backup.*copy attachments/. Input:
+
+  'FAIL fresh backup: CalledProcessError\n'
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2190-restore-drill/scripts/ops/restore-drill.test.mjs:671:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL fresh backup: CalledProcessError\n',
+    expected: /fresh backup.*copy attachments/,
+    operator: 'match',
+    diff: 'simple'
+  }

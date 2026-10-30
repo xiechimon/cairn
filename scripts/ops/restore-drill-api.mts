@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import { join } from 'node:path';
 import { createApp } from '../../apps/server/src/app.js';
 import { openDbWithHandle } from '../../apps/server/src/db/client.js';
-import { team, todo } from '../../apps/server/src/db/schema.js';
+import { chiefMessage, chiefThread, team, todo } from '../../apps/server/src/db/schema.js';
 import { seed } from '../../apps/server/src/db/seed.js';
 import { createEphemeralSecretBox } from '../../apps/server/src/lib/secret-box.js';
 import { ConversationStreamHub, TeamStreamHub } from '../../apps/server/src/services/events.js';
@@ -49,8 +49,29 @@ if (mode === '--in-process-fixture') {
   if (count !== opened.db.select().from(todo).all().length) {
     throw new Error('fixture API count mismatch');
   }
+  const thread = opened.db.select().from(chiefThread).get();
+  if (!thread) throw new Error('fixture chief thread missing');
+  const response = await app.request(
+    `/api/conversations/${encodeURIComponent(thread.id)}/messages`,
+  );
+  if (response.status !== 200) throw new Error('fixture chief thread API failed');
+  const payload = await response.json();
+  const expected = opened.db
+    .select()
+    .from(chiefMessage)
+    .all()
+    .filter((row) => row.threadId === thread.id)
+    .map((row) => row.id)
+    .sort();
+  if (
+    JSON.stringify(payload.messages.map((row: { id: string }) => row.id).sort()) !==
+    JSON.stringify(expected)
+  )
+    throw new Error('fixture chief messages mismatch');
   console.log(
     JSON.stringify({
+      chiefThread: thread.id,
+      chiefMessages: expected.length,
       count,
       surface: 'fixture real Hono route, in-process transport',
       provider: 'not exercised',
@@ -59,7 +80,11 @@ if (mode === '--in-process-fixture') {
   opened.close();
 } else {
   const server = createServer(async (request, response) => {
-    if (request.method !== 'GET' || !request.url?.startsWith('/api/todos?')) {
+    if (
+      request.method !== 'GET' ||
+      (!request.url?.startsWith('/api/todos?') &&
+        !/^\/api\/conversations\/[^/]+\/messages$/.test(request.url ?? ''))
+    ) {
       response.writeHead(404).end();
       return;
     }

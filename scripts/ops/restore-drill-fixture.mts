@@ -38,7 +38,7 @@ upsertMessage(
 const thread = db
   .insert(chiefThread)
   .values({
-    id: 'ct',
+    id: 'chief-ct',
     chiefId: 'c',
     userId: 'u',
     teamId,
