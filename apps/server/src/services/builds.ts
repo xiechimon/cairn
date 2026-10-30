@@ -110,11 +110,18 @@ import { agentForStep } from './dispatch-eligibility.js';
 import { stepActivityAt } from './dispatch-timeouts.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { markFirstPrPromptDue } from './first-pr-report.js';
-import { githubRepoOfProject, hasRepoBinding, projectOfTodo, readBuildChanges } from './git.js';
+import {
+  githubRepoOfProject,
+  hasRepoBinding,
+  projectOfTodo,
+  readBuildChanges,
+  repoDirFor,
+} from './git.js';
 import { readGithubAutonomyPause } from './github-autonomy-brake.js';
 import { githubTokenOrNull, teamGithubToken } from './github-connection.js';
 import { githubText } from './github-text.js';
 import type { HarnessEvalDispatchPort } from './harness-eval-coordinator.js';
+import { buildHostedMergeInstruction } from './hosted-merge-instruction.js';
 import { storeInfoReport } from './info-handoff.js';
 import { enqueueLocalMerge } from './local-merge.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
@@ -1466,7 +1473,7 @@ export async function requestMerge(
     const local = await enqueueLocalMerge(
       deps,
       buildId,
-      listing.defaultBranch,
+      projectRow.baseBranch ?? listing.defaultBranch,
       false,
       todoRow.phase === 'failed',
     );
@@ -1492,7 +1499,19 @@ export async function requestMerge(
   assertPhaseTransition(todoRow.phase, 'done');
   assertMergeTools(deps, todoRow);
   insertGateAnnouncement(deps, buildId, MERGE_ANNOUNCEMENT, actor ?? deps.user.displayName);
-  enqueueStep(deps, buildId, 'merge', todoRow.teamId);
+  let prompt: string | undefined;
+  if (projectRow?.repoKind === 'hosted' && projectRow.repoName !== null) {
+    if (deps.reposDir === undefined) throw new HttpError(409, 'Hosted repository unavailable');
+    const dir = repoDirFor(deps.reposDir, todoRow.teamId, projectRow.repoName);
+    const { defaultBranch } = await systemGitOps.listBranches(dir);
+    prompt = buildHostedMergeInstruction({
+      projectId: projectRow.id,
+      repoName: projectRow.repoName,
+      baseBranch: projectRow.baseBranch ?? defaultBranch ?? 'main',
+      configuredBaseBranch: projectRow.baseBranch,
+    });
+  }
+  enqueueStep(deps, buildId, 'merge', todoRow.teamId, prompt);
   return { delegated: true };
 }
 
@@ -1901,10 +1920,11 @@ async function mergeThroughGithub(
         `PR #${prNumber} 的作者对仓库没有写权限（author_association ${githubText(pull.authorAssociation ?? '缺失')}），cairn 不经 API 合并它：请在 GitHub 上核对后合并（${hint}）。`,
       );
     }
-    if (pull.baseRef !== pull.defaultBranch) {
+    const baseBranch = projectOfTodo(deps.db, before.todoRow)?.baseBranch ?? pull.defaultBranch;
+    if (pull.baseRef !== baseBranch) {
       throw new HttpError(
         409,
-        `PR #${prNumber} 的目标分支「${githubText(pull.baseRef)}」不是默认分支「${githubText(pull.defaultBranch)}」，cairn 只把改动合进默认分支：请在 GitHub 上核对这张 PR。`,
+        `PR #${prNumber} targets branch "${githubText(pull.baseRef)}" instead of project base branch "${githubText(baseBranch)}". Check the PR base on GitHub before merging.`,
       );
     }
     if (pull.merged) {

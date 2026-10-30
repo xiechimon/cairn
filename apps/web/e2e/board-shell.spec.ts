@@ -162,11 +162,16 @@ test('a 390px needs-you row shows the whole title and keeps its actions on scree
   expect(rowBox.y + rowBox.height).toBeLessThanOrEqual(bar.y);
 });
 
-test('a 390px home scrolls as one page down to its last row', async ({ page }) => {
+test('a 390px home scrolls down to its last row above the pinned composer', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/app?scenario=board-inbox');
-  await page.getByTestId('chief-home').evaluate((el) => el.scrollTo(0, el.scrollHeight));
-  await expect(page.getByTestId('home-done-row').last()).toBeInViewport();
+  await page.getByTestId('chief-home-scroll').evaluate((el) => el.scrollTo(0, el.scrollHeight));
+  const lastRow = page.getByTestId('home-done-row').last();
+  await expect(lastRow).toBeInViewport();
+  const rowBox = await lastRow.boundingBox();
+  const composer = await page.getByTestId('chief-home').locator('.chief-composer').boundingBox();
+  expect(rowBox && composer).toBeTruthy();
+  if (rowBox && composer) expect(rowBox.y + rowBox.height).toBeLessThanOrEqual(composer.y);
 });
 
 test('a short phone screen scrolls the board as one page to reach the last group', async ({

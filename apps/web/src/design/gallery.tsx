@@ -27,7 +27,7 @@ import {
   ShapeSection,
   TypeSection,
 } from './foundations.js';
-import { BoardPattern, ProvidersPattern } from './patterns.js';
+import { ProvidersPattern } from './patterns.js';
 import { ScreensSection } from './screens.js';
 import { GroupTitle } from './specimen.js';
 
@@ -70,7 +70,6 @@ const NAV = [
     id: 'patterns',
     title: 'Patterns',
     items: [
-      ['board', 'Board'],
       ['providers', 'Empty to filled'],
       ['screens', 'Screens'],
     ],
@@ -220,7 +219,6 @@ export function Gallery() {
             title="Patterns"
             lede="Page prototypes composed from the components above, with working interactions."
           />
-          <BoardPattern />
           <ProvidersPattern />
           <ScreensSection theme={theme} />
         </div>

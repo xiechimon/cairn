@@ -273,13 +273,31 @@ const LEGACY_WORK_BRANCH_NOTE_TAIL =
   '。工作区已检出该分支——本步的全部提交与推送都必须落在它上面：不要创建或切换到自己的分支，不要另开 worktree 或 clone 到别处干活；开 Pull Request 时 head 分支也必须是它。';
 const WORK_BRANCH_NOTE_TAIL = `${LEGACY_WORK_BRANCH_NOTE_TAIL}\n${GITHUB_OVERLAP_RULE}`;
 
-export function buildWorkBranchNote(branch: string): string {
-  return `${WORK_BRANCH_NOTE_HEAD}${branch}${WORK_BRANCH_NOTE_TAIL}`;
+export function buildWorkBranchNote(branch: string, baseBranch?: string | null): string {
+  const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
+  const base =
+    baseBranch == null
+      ? ''
+      : `\nPR base branch: ${baseBranch}. When opening a PR, use gh pr create --base ${quote(baseBranch)} --head ${quote(branch)}. Keep this base even when the repository default differs.\n`;
+  return `${WORK_BRANCH_NOTE_HEAD}${branch}${base}${WORK_BRANCH_NOTE_TAIL}`;
 }
 
-export function appendWorkBranchNote(prompt: string, branch: string): string {
-  if (prompt.includes(WORK_BRANCH_NOTE_HEAD)) return prompt;
-  const note = buildWorkBranchNote(branch);
+export function appendWorkBranchNote(
+  prompt: string,
+  branch: string,
+  baseBranch?: string | null,
+): string {
+  const note = buildWorkBranchNote(branch, baseBranch);
+  const start = prompt.indexOf(WORK_BRANCH_NOTE_HEAD);
+  if (start !== -1) {
+    for (const tail of [WORK_BRANCH_NOTE_TAIL, LEGACY_WORK_BRANCH_NOTE_TAIL]) {
+      const end = prompt.indexOf(tail, start);
+      if (end !== -1) {
+        return `${prompt.slice(0, start)}${note}${prompt.slice(end + tail.length)}`;
+      }
+    }
+    return prompt;
+  }
   return prompt === '' ? note : `${prompt}\n${note}`;
 }
 

@@ -236,12 +236,17 @@ export async function finishStep(
         token,
         repo.owner,
         repo.repo,
-        { head: `${repo.owner}:${branch}`, state: 'open' },
+        {
+          head: `${repo.owner}:${branch}`,
+          state: 'open',
+          ...(project?.baseBranch != null ? { base: project.baseBranch } : {}),
+        },
       );
       const own = pulls
         ?.filter(
           (pull) =>
             pull.state === 'open' &&
+            (project?.baseBranch == null || pull.baseRef === project.baseBranch) &&
             pull.headRef === branch &&
             pull.headRepoId !== null &&
             pull.headRepoId === pull.baseRepoId,

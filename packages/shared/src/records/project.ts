@@ -20,6 +20,7 @@ export const projectRecordSchema = z.object({
   repoName: z.string().optional(),
   githubRepo: z.string().optional(),
   localPath: z.string().optional(),
+  baseBranch: z.string().nullable().optional(),
   mergePolicy: mergePolicySchema.optional(),
   localChecks: z.array(z.string().min(1)).optional(),
   cloneUrl: z.string().optional(),
@@ -75,6 +76,29 @@ export const patchProjectBodySchema = z
     repoKind: projectRepoKindSchema.optional(),
     githubRepo: z.string().optional(),
     localPath: z.string().nullish(),
+    baseBranch: z
+      .string()
+      .trim()
+      .min(1)
+      .refine(
+        (branch) =>
+          branch !== 'HEAD' &&
+          branch !== '@' &&
+          !branch.startsWith('-') &&
+          !branch.endsWith('.') &&
+          !branch.includes('..') &&
+          !branch.includes('@{') &&
+          !/[~^:?*[\\\s]/u.test(branch) &&
+          Array.from(branch).every(
+            (char) => char.charCodeAt(0) >= 32 && char.charCodeAt(0) !== 127,
+          ) &&
+          branch
+            .split('/')
+            .every((part) => part !== '' && !part.startsWith('.') && !part.endsWith('.lock')),
+        'Expected a Git branch name',
+      )
+      .nullable()
+      .optional(),
   })
   .strict();
 export type PatchProjectBody = z.infer<typeof patchProjectBodySchema>;

@@ -61,7 +61,7 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(page.locator('.prj-set-danger'), 'P4').toHaveCSS('border-top-left-radius', radius);
     const delBox = await del.boundingBox();
     expect(delBox?.height, 'P4').toBe(32);
-    await expect(del, 'P4').toHaveCSS('border-top-left-radius', '8px');
+    await expect(del, 'P4').toHaveCSS('border-top-left-radius', '6px');
 
     const branch = card.locator('span.prj-set-branch');
     await expect(branch, 'P5').toHaveText('main');
@@ -101,7 +101,7 @@ for (const theme of ['light', 'dark'] as const) {
     expect(nameBox?.width, 'N2').toBeLessThanOrEqual(520);
     expect(nameBox?.height, 'N2').toBe(32);
     expect(repoBox?.height, 'N2').toBe(32);
-    await expect(name, 'N2').toHaveCSS('border-top-left-radius', '8px');
+    await expect(name, 'N2').toHaveCSS('border-top-left-radius', '6px');
 
     const create = page.getByRole('button', { name: '创建项目' });
     await expect(create).toBeDisabled();

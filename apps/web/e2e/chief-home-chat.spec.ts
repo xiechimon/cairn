@@ -16,6 +16,18 @@ test.describe('home is one continuous chief chat (T1)', () => {
     await expect(page.getByTestId('home-sections')).toBeVisible();
     await expect(page.getByRole('button', { name: '总管', exact: true })).toHaveCount(0);
     await expect(page.locator('.chief-drawer')).toBeHidden();
+    const composer = await home.locator('.chief-composer').boundingBox();
+    const sections = await page.getByTestId('home-sections').boundingBox();
+    const viewport = page.viewportSize();
+    expect(composer && sections && viewport).toBeTruthy();
+    if (composer && sections && viewport) {
+      expect(composer.y + composer.height).toBeGreaterThan(viewport.height - 40);
+      expect(sections.height).toBeGreaterThan(100);
+      expect(sections.y).toBeLessThan(composer.y);
+    }
+    const input = home.getByTestId('chief-composer-input');
+    await input.focus();
+    await expect(input).not.toHaveCSS('box-shadow', /0px 0px 0px 3px/);
     await evidenceShot(page, 'home-hero.png');
   });
 

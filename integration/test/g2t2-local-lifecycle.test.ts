@@ -27,6 +27,7 @@ import {
 } from '../../apps/server/src/db/schema.js';
 import { seed } from '../../apps/server/src/db/seed.js';
 import { systemGitOps } from '../../apps/server/src/lib/git.js';
+import { requestMerge } from '../../apps/server/src/services/builds.js';
 import { TeamStreamHub } from '../../apps/server/src/services/events.js';
 import { enqueueLocalMerge } from '../../apps/server/src/services/local-merge.js';
 import { localGateFacts } from '../../apps/server/src/services/local-merge-facts.js';
@@ -273,7 +274,7 @@ describe('G2-T2 local form full lifecycle (spec 12: mirror clone + push back to 
   }, 200_000);
 });
 
-for (const checkout of ['default', 'other', 'dirty'] as const) {
+for (const checkout of ['default', 'other', 'dirty', 'configured-base'] as const) {
   test(`autonomous local landing through claim and report with a ${checkout} checkout`, async () => {
     const repo = await seedUserRepo();
     const git = async (args: string[]) => {
@@ -281,6 +282,12 @@ for (const checkout of ['default', 'other', 'dirty'] as const) {
       expect(result.code, result.stderr).toBe(0);
       return result.stdout.trim();
     };
+    const main = await headOf(repo);
+    const baseBranch = checkout === 'configured-base' ? 'dev' : 'main';
+    if (baseBranch === 'dev') {
+      await git(['checkout', '-b', 'dev']);
+      await git(['commit', '--allow-empty', '-m', 'dev base']);
+    }
     const base = await headOf(repo);
     const world = await seedWorld(
       server.url,
@@ -291,6 +298,11 @@ for (const checkout of ['default', 'other', 'dirty'] as const) {
       },
       { repoKind: 'local', localPath: repo, mergePolicy: 'autonomous' },
     );
+    if (checkout === 'configured-base') {
+      expect(
+        (await api(server.url, 'PATCH', `/api/projects/${world.projectId}`, { baseBranch })).status,
+      ).toBe(200);
+    }
     const checks = ['test -f apps/web/src/local.ts'];
     expect(
       (
@@ -355,7 +367,8 @@ for (const checkout of ['default', 'other', 'dirty'] as const) {
       ])
       .run();
     const deps = { db: server.db, hub: new TeamStreamHub(), user: seed(server.db).user };
-    const judgedDigest = (await localGateFacts(deps, buildId, 'main'))?.readiness.patchDigest ?? '';
+    const judgedDigest =
+      (await localGateFacts(deps, buildId, baseBranch))?.readiness.patchDigest ?? '';
     expect(judgedDigest).toMatch(/^pd2:/);
     server.db
       .insert(gateVerdictTable)
@@ -391,9 +404,13 @@ for (const checkout of ['default', 'other', 'dirty'] as const) {
         evaluatedAt: Date.now(),
       })
       .run();
-    const queued = await enqueueLocalMerge(deps, buildId, 'main');
-    expect(queued.readiness?.blockers).toEqual([]);
-    expect(queued.enqueued).toBe(true);
+    if (checkout === 'configured-base') {
+      expect(await requestMerge(deps, buildId)).toEqual({ delegated: true });
+    } else {
+      const queued = await enqueueLocalMerge(deps, buildId, baseBranch);
+      expect(queued.readiness?.blockers).toEqual([]);
+      expect(queued.enqueued).toBe(true);
+    }
     await waitFor(
       () =>
         server.db
@@ -404,19 +421,20 @@ for (const checkout of ['default', 'other', 'dirty'] as const) {
           .find((row) => row.kind === 'merge')?.status === 'done',
       30_000,
     );
-    const defaultHead = await git(['rev-parse', 'main']);
+    const defaultHead = await git(['rev-parse', baseBranch]);
     if (checkout === 'dirty') {
       expect(defaultHead).toBe(base);
       expect(server.todoPhase(world.todoId)).toBe('review');
       expect(readFileSync(join(repo, 'README.md'), 'utf8')).toBe('uncommitted user work\n');
     } else {
       expect(server.todoPhase(world.todoId)).toBe('done');
-      expect(await git(['rev-list', '--count', `${base}..main`])).toBe('1');
-      expect(await git(['rev-parse', 'main^'])).toBe(base);
-      expect(await git(['rev-parse', 'main^{tree}'])).toBe(
+      expect(await git(['rev-list', '--count', `${base}..${baseBranch}`])).toBe('1');
+      expect(await git(['rev-parse', `${baseBranch}^`])).toBe(base);
+      expect(await git(['rev-parse', `${baseBranch}^{tree}`])).toBe(
         await git(['rev-parse', `${head}^{tree}`]),
       );
-      expect(await headOf(repo)).toBe(checkout === 'default' ? defaultHead : base);
+      expect(await headOf(repo)).toBe(checkout === 'default' ? defaultHead : main);
+      if (checkout === 'configured-base') expect(await git(['rev-parse', 'main'])).toBe(main);
       expect(existsSync(join(repo, 'apps/web/src/local.ts'))).toBe(checkout === 'default');
     }
   }, 60_000);

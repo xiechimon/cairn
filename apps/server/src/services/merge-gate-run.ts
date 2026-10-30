@@ -278,7 +278,11 @@ export async function evaluateMergeGate(
       stepsInFlight: steps.filter((item) => (IN_FLIGHT as readonly string[]).includes(item.status))
         .length,
     },
-    repo: { owner: repo.owner, name: repo.repo, defaultBranch: facts.defaultBranch },
+    repo: {
+      owner: repo.owner,
+      name: repo.repo,
+      defaultBranch: projectRow.baseBranch ?? facts.defaultBranch,
+    },
     ticketRef,
     issueNumber: linked?.issueNumber ?? null,
     pr: facts.pr,

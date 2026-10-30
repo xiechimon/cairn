@@ -40,13 +40,13 @@
   --color-project-tile-4: var(--project-tile-4);
   --color-project-tile-5: var(--project-tile-5);
   --color-project-tile-6: var(--project-tile-6);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
+  --radius-sm: 4px;
+  --radius-md: var(--radius);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  --radius-xl: 10px;
+  --radius-2xl: 12px;
+  --radius-3xl: 16px;
+  --radius-4xl: 20px;
 }
 
 @layer base {
@@ -56,7 +56,7 @@
 }
 
 :root {
-  --radius: 0.625rem;
+  --radius: 6px;
   --top: inset 0 1px 0 rgb(255 255 255 / 0.06);
   --cds-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.35), 0 2px 8px rgb(0 0 0 / 0.25);
   --cds-shadow-md: 0 8px 28px rgb(0 0 0 / 0.55), 0 2px 8px rgb(0 0 0 / 0.35), var(--top);

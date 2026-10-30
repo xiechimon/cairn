@@ -555,6 +555,9 @@ export const EN: Record<string, string> = {
   标签: 'Tags',
   'Cairn 托管': 'Cairn hosted',
   目标分支: 'Target branch',
+  '{branch}（默认）': '{branch} (default)',
+  默认分支: 'Default branch',
+  读取失败: 'Could not load',
   // #1213/ADR 0017 双执行源：github 形态项目的 localPath 同机加速位字段。
   本机加速路径: 'Local acceleration path',
   '绝对路径，留空即清除': 'Absolute path; empty to clear',

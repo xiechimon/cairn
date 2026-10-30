@@ -6,7 +6,7 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn.teamMembersLayout', 'grid'));
 });
 
-test('agent card is a Paper card: 20px corner, white, 1px ring plus a lift', async ({ page }) => {
+test('agent card is a Paper card: 10px corner, white, 1px ring plus a lift', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
   await page.goto(ROSTER);
   const card = page.getByTestId('team-agent-card').first();
@@ -14,7 +14,7 @@ test('agent card is a Paper card: 20px corner, white, 1px ring plus a lift', asy
     const cs = getComputedStyle(el);
     return { radius: cs.borderTopLeftRadius, bg: cs.backgroundColor, shadow: cs.boxShadow };
   });
-  expect(face.radius).toBe('20px');
+  expect(face.radius).toBe('10px');
   expect(face.bg).toBe('rgb(254, 254, 251)');
   expect(face.shadow).toContain('0px 0px 0px 1px');
   expect(face.shadow).toContain('0px 1px 2px');
@@ -91,7 +91,7 @@ test('create dialog: labels point at controls, `取消` closes, `创建` sits ri
   const create = dialog.getByRole('button', { name: '创建', exact: true });
   const [c, p] = [await cancel.boundingBox(), await create.boundingBox()];
   expect(c && p && c.x + c.width <= p.x).toBe(true);
-  expect(await create.evaluate((el) => getComputedStyle(el).borderTopLeftRadius)).toBe('8px');
+  expect(await create.evaluate((el) => getComputedStyle(el).borderTopLeftRadius)).toBe('6px');
   await cancel.click();
   await expect(dialog).toBeHidden();
 });

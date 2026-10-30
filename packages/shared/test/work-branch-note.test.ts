@@ -68,3 +68,28 @@ describe('classifyUserText note-line recognition (failure modes 1/3/4/5)', () =>
     expect(classifyUserText(`另外移动端也要看一眼\n${NOTE}`.trim(), task)).toBe('user');
   });
 });
+
+test('a configured base is explicit in PR creation instructions and remains strippable', () => {
+  const note = buildWorkBranchNote(BRANCH, 'dev');
+  expect(note).toContain('gh pr create --base');
+  expect(note).toContain("--base 'dev'");
+  const prompt = appendWorkBranchNote(TASK_TEXT, BRANCH, 'dev');
+  expect(prompt).toContain("--base 'dev'");
+  expect(stripWorkBranchNote(prompt)).toBe(TASK_TEXT);
+  expect(classifyUserText(prompt, { title: TITLE, spec: SPEC })).toBe('task-prompt');
+});
+
+test('a resumed head-only note is updated with the configured base without duplication', () => {
+  const old = appendWorkBranchNote(TASK_TEXT, BRANCH);
+  const updated = appendWorkBranchNote(old, BRANCH, 'dev');
+  expect(updated).toContain("--base 'dev'");
+  expect(updated.split('工作分支注记：')).toHaveLength(2);
+  expect(appendWorkBranchNote(updated, BRANCH, 'dev')).toBe(updated);
+});
+
+test('resetting the base to null replaces a resumed explicit base note', () => {
+  const previous = appendWorkBranchNote(TASK_TEXT, BRANCH, 'dev');
+  const reset = appendWorkBranchNote(previous, BRANCH, null);
+  expect(reset).not.toContain('--base');
+  expect(reset).toBe(appendWorkBranchNote(TASK_TEXT, BRANCH, null));
+});

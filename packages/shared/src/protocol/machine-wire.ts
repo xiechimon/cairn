@@ -159,6 +159,7 @@ export const claimedStepSchema = z.object({
           kind: z.enum(PROJECT_REPO_KINDS),
           cloneUrl: z.string(),
           localPath: z.string().optional(),
+          baseBranch: z.string().nullable().optional(),
         })
         .nullable(),
     })

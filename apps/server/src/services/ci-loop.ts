@@ -14,7 +14,6 @@ import {
   githubRequiredChecks,
   hasPullFields,
   isFullSha,
-  isOwnOpenDefaultPull,
   isOwnPull,
   WRITE_AUTHOR_ASSOCIATIONS,
 } from '../lib/github.js';
@@ -456,6 +455,7 @@ export function createCiPoller(
     if (projRow === undefined || ref === null) return null;
     return {
       teamId: projRow.teamId,
+      baseBranch: projRow.baseBranch,
       fullName: `${ref.owner}/${ref.repo}`,
       owner: ref.owner,
       repo: ref.repo,
@@ -529,7 +529,9 @@ export function createCiPoller(
       const state = pull?.mergeableState ?? null;
       if (
         pull !== null &&
-        isOwnOpenDefaultPull(pull, branch) &&
+        hasPullFields(pull) &&
+        isOwnPull(pull, branch) &&
+        pull.baseRef === (target.baseBranch ?? pull.defaultBranch) &&
         freshReviewRow(cand.todoId, cand.buildId)?.archivedAt === null &&
         (state === 'dirty' || state === 'behind') &&
         !pushNotSeen(cand.buildId, pull.headSha, now) &&
@@ -541,7 +543,7 @@ export function createCiPoller(
             cand,
             todoRow.teamId,
             { prNumber, prUrl: buildRow.prUrl },
-            pull.defaultBranch,
+            target.baseBranch ?? pull.defaultBranch,
             true,
           );
           if (done === 'appended') {
@@ -551,7 +553,7 @@ export function createCiPoller(
         } else {
           hintOnce(
             cand.buildId,
-            `PR #${prNumber} 落后于默认分支「${githubText(pull.defaultBranch)}」。cairn 不替人更新分支，合并由人做：在 GitHub 上点 Update branch（即 PUT pulls/${prNumber}/update-branch，带 expected_head_sha 为当前 head），CI 重跑后再合并。`,
+            `PR #${prNumber} 落后于默认分支「${githubText(target.baseBranch ?? pull.defaultBranch)}」。cairn 不替人更新分支，合并由人做：在 GitHub 上点 Update branch（即 PUT pulls/${prNumber}/update-branch，带 expected_head_sha 为当前 head），CI 重跑后再合并。`,
             roundStart(deps, cand.buildId),
           );
         }
@@ -577,7 +579,7 @@ export function createCiPoller(
     const recorded = {
       number: prNumber,
       baseRepoId: pull.baseRepoId,
-      defaultBranch: pull.defaultBranch,
+      defaultBranch: target.baseBranch ?? pull.defaultBranch,
       owner: pull.baseOwner ?? target.owner,
     };
     if (foreign) {
@@ -619,10 +621,10 @@ export function createCiPoller(
       return;
     }
     if (pull.merged) {
-      if (pull.baseRef !== pull.defaultBranch) {
+      if (pull.baseRef !== (target.baseBranch ?? pull.defaultBranch)) {
         hintOnce(
           cand.buildId,
-          `PR #${prNumber} 合并进了分支「${githubText(pull.baseRef)}」，不是默认分支「${githubText(pull.defaultBranch)}」，改动还没进默认分支。任务留在审核关口，由人决定下一步。`,
+          `PR #${prNumber} 合并进了分支「${githubText(pull.baseRef)}」，不是默认分支「${githubText(target.baseBranch ?? pull.defaultBranch)}」，改动还没进默认分支。任务留在审核关口，由人决定下一步。`,
           since,
         );
         tally.hinted += 1;
@@ -721,10 +723,10 @@ export function createCiPoller(
       tally.reviewPending += 1;
       return;
     }
-    if (pull.baseRef !== pull.defaultBranch) {
+    if (pull.baseRef !== (target.baseBranch ?? pull.defaultBranch)) {
       hintOnce(
         cand.buildId,
-        `PR #${prNumber} 的目标分支是「${githubText(pull.baseRef)}」，不是默认分支「${githubText(pull.defaultBranch)}」；它在 GitHub 关闭且未合并，可能是从工作分支往别的分支开的另一张 PR。对账不据它打回；任务留在审核关口，由人核对这张 PR。`,
+        `PR #${prNumber} 的目标分支是「${githubText(pull.baseRef)}」，不是默认分支「${githubText(target.baseBranch ?? pull.defaultBranch)}」；它在 GitHub 关闭且未合并，可能是从工作分支往别的分支开的另一张 PR。对账不据它打回；任务留在审核关口，由人核对这张 PR。`,
         since,
       );
       tally.hinted += 1;
@@ -819,7 +821,12 @@ export function createCiPoller(
     }
     grindPullCache.set(key, { etag: pullPage.etag, pull });
     const branch = conversationBranch(cand.buildId);
-    const own = isOwnOpenDefaultPull(pull, branch);
+    const baseBranch = target.baseBranch ?? pull.defaultBranch;
+    const own =
+      hasPullFields(pull) &&
+      isOwnPull(pull, branch) &&
+      pull.baseRef === baseBranch &&
+      pull.state === 'open';
     if (own && pull.headSha === null) {
       tally.unreadable += 1;
       return;
@@ -837,14 +844,14 @@ export function createCiPoller(
         cand,
         todoRow.teamId,
         { prNumber: buildRow.prNumber, prUrl: buildRow.prUrl },
-        pull.defaultBranch,
+        baseBranch,
         false,
       );
       if (done === 'failed') tally.failed += 1;
       else tally.appended += 1;
       return;
     }
-    const reqKey = `${target.fullName}\u0000${pull.defaultBranch}`;
+    const reqKey = `${target.fullName}\u0000${baseBranch}`;
     let required = requiredCache.get(reqKey);
     if (
       required === undefined ||
@@ -860,7 +867,7 @@ export function createCiPoller(
         grindToken,
         target.owner,
         target.repo,
-        pull.defaultBranch,
+        baseBranch,
       );
       required = { at: now, names };
       requiredCache.set(reqKey, required);

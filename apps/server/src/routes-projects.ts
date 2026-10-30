@@ -165,7 +165,7 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
 
   app.get('/api/projects/:id/branches', async (c) => {
     const row = requireProject(ctx, c.req.param('id'));
-    return c.json(await readBranches(ctx, row.id));
+    return c.json(await readBranches({ ...ctx, box: ctx.secretBox }, row.id));
   });
 
   app.get('/api/projects/:id/commits', async (c) => {

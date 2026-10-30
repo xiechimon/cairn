@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "bfa6f750-2310-4ba5-b42b-6c3ce3e37e07",
+  "id": "388c8f82-77ae-48b0-88df-8f283cb3bbe6",
   "prevId": "4ff9baad-bb74-44d2-82a1-7b3633d82706",
   "tables": {
     "agent": {
@@ -812,13 +812,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
-        },
-        "scheduledBy": {
-          "name": "scheduledBy",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
           "autoincrement": false
         },
         "planDocId": {
@@ -2580,6 +2573,13 @@
         },
         "localPath": {
           "name": "localPath",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "baseBranch": {
+          "name": "baseBranch",
           "type": "text",
           "primaryKey": false,
           "notNull": false,

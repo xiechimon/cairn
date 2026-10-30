@@ -3,6 +3,7 @@ import {
   CHIEF_INPUT_PLACEHOLDER,
   CHIEF_INPUT_PLACEHOLDER_STEERING,
 } from '@cairn/shared';
+import { cn } from 'cn';
 import { CircleDashed } from 'lucide-react';
 import {
   type Dispatch,
@@ -37,6 +38,7 @@ import { Textarea } from '../components/ui/textarea.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { type TodoGlance, TodoGlanceContext } from '../detail/segments.js';
 import type { ChiefContent, ChiefStreamItem, Phase } from '../fixtures/records.js';
+import { useScrollFade } from '../hooks/use-scroll-fade.js';
 import { useI18n } from '../i18n/provider.js';
 import {
   ArrowDown,
@@ -75,9 +77,9 @@ const PROJECT_CHIP_CLS =
   "h-7 max-w-48 cursor-pointer gap-1.5 rounded-lg border-none bg-transparent px-2 text-meta font-normal text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-(--foreground) dark:hover:bg-(--menu-hover) aria-expanded:bg-(--menu-hover) data-[set]:bg-(--menu-hover) data-[set]:text-(--foreground) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
 
 const SEND_BTN_CLS =
-  'ml-auto cursor-pointer rounded-md border-0 bg-transparent text-(--text-tertiary) hover:bg-transparent hover:text-(--text-secondary) dark:hover:bg-transparent aria-expanded:bg-transparent active:not-aria-[haspopup]:translate-y-0';
+  'ml-auto size-7 cursor-pointer rounded-(--radius-control) border-0 bg-(--menu-hover) text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-(--text-secondary) dark:hover:bg-(--menu-hover) aria-expanded:bg-transparent active:not-aria-[haspopup]:translate-y-0';
 const SEND_ON_CLS =
-  'bg-(--card-button) text-(--text-on-accent) hover:bg-(--card-button) hover:text-(--text-on-accent)';
+  'bg-(--card-button) text-(--text-on-accent) hover:bg-(--card-button) hover:text-(--text-on-accent) dark:hover:bg-(--card-button)';
 const STOP_ON_CLS =
   'bg-(--foreground) text-(--background) hover:bg-(--foreground) hover:text-(--background) dark:hover:bg-(--foreground)';
 
@@ -386,6 +388,8 @@ export function ChiefConversation({
   );
   const empty = (chief.stream?.length ?? 0) === 0;
   const heroLayout = home && empty && !heroCollapsed;
+  const heroScrollRef = useRef<HTMLDivElement | null>(null);
+  useScrollFade(heroScrollRef, { enabled: heroLayout });
   const stopMode = chief.running === true && wire.draft === '' && onStop != null;
   const withdraw =
     onWithdraw == null
@@ -419,6 +423,56 @@ export function ChiefConversation({
       onWithdraw={withdraw}
       onSteer={onSteer}
     />
+  );
+  const intro = (
+    <>
+      {!chief.bound && (
+        <div
+          data-testid="chief-gate"
+          className={`${home ? 'mx-auto mt-4 w-[calc(100%-2rem)] max-w-182' : 'mx-4'} flex h-14 flex-none items-center gap-3 rounded-(--radius-card) bg-(--card) pr-3 pl-4 text-ui text-(--text-secondary) ring-1 ring-(--border)`}
+        >
+          <span>{t('请先为总管选择一个 Agent。')}</span>
+          <Button
+            className={`ml-auto cursor-pointer ${DIALOG_PRIMARY_BUTTON}`}
+            onClick={onSettings}
+          >
+            {t('设置')}
+          </Button>
+        </div>
+      )}
+      {chief.examples && (
+        <div className="flex-none">
+          <h2
+            className={`text-center font-serif text-heading font-medium text-(--foreground) ${
+              chief.bound ? 'mt-14' : 'mt-16'
+            }`}
+          >
+            {t('选择一个主题开始')}
+          </h2>
+          <div
+            className={`${home ? 'mx-auto w-[calc(100%-2rem)] max-w-182 grid-cols-1 sm:grid-cols-2' : 'mx-8 grid-cols-2'} mt-3 mb-4 grid gap-2.5`}
+            data-testid="chief-examples"
+          >
+            {chief.examples.map((ex) => {
+              const Icon = EXAMPLE_ICONS[ex.icon];
+              return (
+                <Button
+                  variant="ghost"
+                  className="h-16 w-full cursor-pointer justify-start gap-3 rounded-(--radius-card) border-none bg-(--card) px-3 text-left whitespace-normal font-normal ring-1 ring-(--border) hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover) aria-expanded:bg-transparent active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto"
+                  key={ex.text}
+                  onClick={onSend != null ? () => void onSend(ex.text, chipProjectId) : undefined}
+                >
+                  <span className="flex size-6 flex-none items-center justify-center text-(--text-tertiary)">
+                    <Icon width={16} height={16} />
+                  </span>
+                  <span className="text-meta leading-5 text-(--text-secondary)">{t(ex.text)}</span>
+                </Button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </>
   );
   return (
     <>
@@ -546,80 +600,46 @@ export function ChiefConversation({
         )}
       </header>
 
-      {heroLayout && hero}
-      {!chief.bound && (
+      {heroLayout ? (
         <div
-          data-testid="chief-gate"
-          className={`${home ? 'mx-auto mt-4 w-[calc(100%-2rem)] max-w-182' : 'mx-4'} flex h-14 flex-none items-center gap-3 rounded-(--radius-card) bg-(--card) pr-3 pl-4 text-ui text-(--text-secondary) ring-1 ring-(--border)`}
+          ref={heroScrollRef}
+          data-testid="chief-home-scroll"
+          className="scroll-fade min-h-0 flex-1 overflow-y-auto pb-6"
         >
-          <span>{t('请先为总管选择一个 Agent。')}</span>
-          <Button
-            className={`ml-auto cursor-pointer ${DIALOG_PRIMARY_BUTTON}`}
-            onClick={onSettings}
-          >
-            {t('设置')}
-          </Button>
+          {hero}
+          {intro}
+          {below}
         </div>
-      )}
-      {chief.examples && (
-        <div className="flex-none">
-          <h2
-            className={`text-center font-serif text-heading font-medium text-(--foreground) ${
-              chief.bound ? 'mt-14' : 'mt-16'
-            }`}
-          >
-            {t('选择一个主题开始')}
-          </h2>
-          <div
-            className={`${home ? 'mx-auto w-[calc(100%-2rem)] max-w-182 grid-cols-1 sm:grid-cols-2' : 'mx-8 grid-cols-2'} mt-3 mb-4 grid gap-2.5`}
-            data-testid="chief-examples"
-          >
-            {chief.examples.map((ex) => {
-              const Icon = EXAMPLE_ICONS[ex.icon];
-              return (
-                <Button
-                  variant="ghost"
-                  className="h-16 w-full cursor-pointer justify-start gap-3 rounded-(--radius-card) border-none bg-(--card) px-3 text-left whitespace-normal font-normal ring-1 ring-(--border) hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover) aria-expanded:bg-transparent active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto"
-                  key={ex.text}
-                  onClick={onSend != null ? () => void onSend(ex.text, chipProjectId) : undefined}
-                >
-                  <span className="flex size-6 flex-none items-center justify-center text-(--text-tertiary)">
-                    <Icon width={16} height={16} />
-                  </span>
-                  <span className="text-meta leading-5 text-(--text-secondary)">{t(ex.text)}</span>
-                </Button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-      {!heroLayout && (
-        <MessageScroller className={SCROLLER_ROOT_CLS}>
-          <FadeScrollerViewport data-testid="chief-body">
-            <MessageScrollerContent
-              className={home ? SCROLLER_CONTENT_HOME_CLS : SCROLLER_CONTENT_CLS}
-              data-testid="chief-stream"
-            >
-              <TodoGlanceContext.Provider value={glances}>
-                {day == null ? (
-                  rows.map(streamRow)
-                ) : (
-                  <>
-                    <div data-testid="chief-earlier" className="opacity-60">
-                      {rows.slice(0, day.earlier).map(streamRow)}
-                    </div>
-                    {day.today}
-                    {rows.slice(day.earlier).map(streamRow)}
-                  </>
-                )}
-              </TodoGlanceContext.Provider>
-            </MessageScrollerContent>
-          </FadeScrollerViewport>
-          <JumpToLatestButton>
-            <ArrowDown width={16} height={16} />
-            <span className="sr-only">{t('滚动到最新')}</span>
-          </JumpToLatestButton>
-        </MessageScroller>
+      ) : (
+        <>
+          {intro}
+          <MessageScroller className={SCROLLER_ROOT_CLS}>
+            <FadeScrollerViewport data-testid="chief-body">
+              <MessageScrollerContent
+                className={home ? SCROLLER_CONTENT_HOME_CLS : SCROLLER_CONTENT_CLS}
+                data-testid="chief-stream"
+              >
+                <TodoGlanceContext.Provider value={glances}>
+                  {day == null ? (
+                    rows.map(streamRow)
+                  ) : (
+                    <>
+                      <div data-testid="chief-earlier" className="opacity-60">
+                        {rows.slice(0, day.earlier).map(streamRow)}
+                      </div>
+                      {day.today}
+                      {rows.slice(day.earlier).map(streamRow)}
+                    </>
+                  )}
+                </TodoGlanceContext.Provider>
+              </MessageScrollerContent>
+            </FadeScrollerViewport>
+            <JumpToLatestButton>
+              <ArrowDown width={16} height={16} />
+              <span className="sr-only">{t('滚动到最新')}</span>
+            </JumpToLatestButton>
+          </MessageScroller>
+        </>
       )}
 
       {chief.outage != null ? (
@@ -630,14 +650,14 @@ export function ChiefConversation({
         )
       )}
       <div
-        className={`chief-composer ${home ? HOME_COMPOSER_CLS : 'mx-4 my-2.5'} [&>.attachment-strip]:mt-2 rounded-(--radius-composer) border-0 bg-card dark:bg-(--secondary) px-3 pt-3 pb-2.5 shadow-(--shadow-composer) transition-[box-shadow] duration-[220ms] ease-(--ease-out-expo) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)`}
+        className={`chief-composer ${home ? HOME_COMPOSER_CLS : 'mx-4 my-2.5'} [&>.attachment-strip]:mt-2 rounded-(--radius-composer) border-0 bg-card px-3.5 pt-3 pb-2.5 shadow-(--shadow-composer) transition-[box-shadow] duration-[220ms] ease-(--ease-out-expo) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)`}
         style={home ? { viewTransitionName: 'chief-composer' } : undefined}
       >
         <div className="relative">
           <Textarea
             ref={attachComposer}
             data-testid="chief-composer-input"
-            className="h-15 max-h-30 min-h-0 resize-none overflow-y-auto rounded-none border-none bg-transparent p-0 font-sans text-ui leading-5 text-(--foreground) md:text-ui tabular-nums shadow-none field-sizing-fixed placeholder:text-(--text-secondary) focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none dark:bg-transparent"
+            className="h-10 max-h-30 min-h-0 resize-none overflow-y-auto rounded-none border-none bg-transparent p-0 font-sans text-ui leading-5 text-(--foreground) md:text-ui tabular-nums shadow-none field-sizing-fixed placeholder:text-(--text-secondary) focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none dark:bg-transparent"
             readOnly={onSend == null}
             value={wire.draft}
             onChange={wire.handleChange}
@@ -772,7 +792,7 @@ export function ChiefConversation({
               variant="ghost"
               size="icon"
               aria-label={t('停止总管这次回复')}
-              className={`${SEND_BTN_CLS} ${STOP_ON_CLS}`}
+              className={cn(SEND_BTN_CLS, STOP_ON_CLS)}
               onClick={onStop}
             >
               <span className="size-2.5 rounded-(--cds-radius-xs) bg-current" />
@@ -782,7 +802,7 @@ export function ChiefConversation({
               variant="ghost"
               size="icon"
               aria-label={t('发送')}
-              className={wire.draft !== '' ? `${SEND_BTN_CLS} ${SEND_ON_CLS}` : SEND_BTN_CLS}
+              className={cn(SEND_BTN_CLS, wire.draft !== '' && SEND_ON_CLS)}
               onClick={wire.send}
             >
               <ArrowUp width={16} height={16} />
@@ -805,7 +825,6 @@ export function ChiefConversation({
           skillCount={helpSkillCount}
         />
       </div>
-      {heroLayout && below}
       <DialogShell
         title={t('恢复到此处')}
         open={rewindConfirm !== null}
