@@ -1,0 +1,5 @@
+53458d4a0b978fccce536768152389f7bbcd20556b34c2490792ef9919c959fe  scripts/ops/secret-reach/canary.sh
+71f87a3c3d7cc8325e801d9b85e2e7bf3cd273eb64977b366783df957baff525  scripts/ops/secret-reach/setup-runner-linux.sh
+2ceae0794c9acc1e19b2006a63a44ffa062210ccbc16feff0835e58fb123c020  scripts/ops/secret-reach/round2.test.mjs
+7fb93a23248c7d9d5e86ec75304c5088b1600677fdafdb9ff3a1f1c7f7033bfe  scripts/ops/secret-reach/setup-runner-linux.test.mjs
+943d559610233affc65d3b9954169ea2dff05aa576d50176bcf99e07363e6e31  scripts/prepush.mjs

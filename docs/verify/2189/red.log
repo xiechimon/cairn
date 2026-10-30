@@ -1291,3 +1291,319 @@ test at scripts/ops/secret-reach/round2.test.mjs:17:1
     operator: 'strictEqual',
     diff: 'simple'
   }
+
+CURRENT APPROACH AFTER ROUND 3
+✔ broker rejects other repositories, permissions and malformed requests before HTTP (0.617209ms)
+✔ broker signs JWT and sends only fixed repository permissions (4.684041ms)
+﹣ socket enforces framing, mode and preserves existing paths (2.446625ms) # Sandbox denies Unix socket binding
+✔ broker rejects unsafe listener configuration before binding (0.379167ms)
+﹣ runner client obtains token through socket without reading owner configuration (0.629834ms) # Sandbox denies Unix socket binding
+✔ CLI rejects empty and nonnumeric GID before reading owner key (173.51325ms)
+﹣ broker removes socket on SIGTERM (40.12075ms) # Sandbox denies Unix socket binding
+﹣ broker removes socket on SIGINT (38.238875ms) # Sandbox denies Unix socket binding
+✔ dispatcher checker delegates read-only validation and preserves named failures (38.897458ms)
+✔ memory probe selects a readable mapped address and never zero (0.688ms)
+✔ client rejects relative sockets before connecting (0.306209ms)
+✔ secret tests run in the ops CI job and local prepush plan (0.88725ms)
+✔ broker refuses GID 0 (1.890792ms)
+✔ broker refuses GID -1 (0.09325ms)
+✔ Bash HTTP-only canary probes every URL and identity with empty arrays (281.71025ms)
+✔ maps EACCES classification (34.245458ms)
+✔ maps EPERM classification (32.054625ms)
+✔ maps ENOENT classification (32.480375ms)
+✔ Linux canary rechecks discovered self Tailscale addresses (698.942167ms)
+✔ operations documentation names actual protection probes and Mac token limits (0.530167ms)
+✖ HTTP_PROXY probes both identities on every direct and proxy endpoint with 200 (487.12375ms)
+✖ HTTP_PROXY probes both identities on every direct and proxy endpoint with 204 (432.050083ms)
+✖ HTTP_PROXY probes both identities on every direct and proxy endpoint with 299 (409.927959ms)
+✖ HTTP_PROXY probes both identities on every direct and proxy endpoint with 401 (396.353417ms)
+✖ HTTP_PROXY probes both identities on every direct and proxy endpoint with transport (398.085916ms)
+✖ HTTPS_PROXY probes both identities on every direct and proxy endpoint with 200 (338.624167ms)
+✖ HTTPS_PROXY probes both identities on every direct and proxy endpoint with 204 (337.970834ms)
+✖ HTTPS_PROXY probes both identities on every direct and proxy endpoint with 299 (340.506334ms)
+✖ HTTPS_PROXY probes both identities on every direct and proxy endpoint with 401 (331.002166ms)
+✖ HTTPS_PROXY probes both identities on every direct and proxy endpoint with transport (335.5135ms)
+✖ all skipped process channels fail without claiming isolation (200.603083ms)
+✔ canary readable reports all channels without content (128.235458ms)
+✔ canary unreadable reports all channels without content (111.817875ms)
+✔ canary missing reports all channels without content (17.549958ms)
+✔ canary missing-parent reports all channels without content (17.802541ms)
+✔ canary validates arguments and reports process channels (21.865125ms)
+✔ setup dry run describes operations and leaves scratch unchanged (7.961917ms)
+✔ Mac settings deny both secret trees and preserve network configuration (1.2065ms)
+✔ HTTP channel tests anonymous and each supplied identity without leaking responses (240.185833ms)
+✔ HTTP denial does not report readable (249.372709ms)
+✖ setup unavailable removes an existing privileged primary group and preserves quarantine on rerun (1570.885667ms)
+✔ writes are absent-resource deletes, an absent PR merge, or current-main no-op (2.400083ms)
+✔ main update requires a valid current SHA (0.397584ms)
+✔ authorized main updates and merges fail and requests serialize safe bodies (1.42375ms)
+✔ branch protection refusal and absent merge are accepted (0.310167ms)
+✔ generic validation failure does not establish branch protection (0.1585ms)
+ℹ tests 46
+ℹ suites 0
+ℹ pass 30
+ℹ fail 12
+ℹ cancelled 0
+ℹ skipped 4
+ℹ todo 0
+ℹ duration_ms 5162.224167
+
+✖ failing tests:
+
+test at scripts/ops/secret-reach/round2.test.mjs:111:5
+✖ HTTP_PROXY probes both identities on every direct and proxy endpoint with 200 (487.12375ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  0 !== 1
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/round2.test.mjs:123:14)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/secret-reach/round2.test.mjs:111:5
+✖ HTTP_PROXY probes both identities on every direct and proxy endpoint with 204 (432.050083ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  0 !== 1
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/round2.test.mjs:123:14)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/secret-reach/round2.test.mjs:111:5
+✖ HTTP_PROXY probes both identities on every direct and proxy endpoint with 299 (409.927959ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  0 !== 1
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/round2.test.mjs:123:14)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/secret-reach/round2.test.mjs:111:5
+✖ HTTP_PROXY probes both identities on every direct and proxy endpoint with 401 (396.353417ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  4 !== 8
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/round2.test.mjs:125:14)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 4,
+    expected: 8,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/secret-reach/round2.test.mjs:111:5
+✖ HTTP_PROXY probes both identities on every direct and proxy endpoint with transport (398.085916ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  4 !== 8
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/round2.test.mjs:125:14)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 4,
+    expected: 8,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/secret-reach/round2.test.mjs:111:5
+✖ HTTPS_PROXY probes both identities on every direct and proxy endpoint with 200 (338.624167ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  0 !== 1
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/round2.test.mjs:123:14)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/secret-reach/round2.test.mjs:111:5
+✖ HTTPS_PROXY probes both identities on every direct and proxy endpoint with 204 (337.970834ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  0 !== 1
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/round2.test.mjs:123:14)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/secret-reach/round2.test.mjs:111:5
+✖ HTTPS_PROXY probes both identities on every direct and proxy endpoint with 299 (340.506334ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  0 !== 1
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/round2.test.mjs:123:14)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/secret-reach/round2.test.mjs:111:5
+✖ HTTPS_PROXY probes both identities on every direct and proxy endpoint with 401 (331.002166ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  4 !== 8
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/round2.test.mjs:125:14)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 4,
+    expected: 8,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/secret-reach/round2.test.mjs:111:5
+✖ HTTPS_PROXY probes both identities on every direct and proxy endpoint with transport (335.5135ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  4 !== 8
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/round2.test.mjs:125:14)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 4,
+    expected: 8,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/secret-reach/round2.test.mjs:140:1
+✖ all skipped process channels fail without claiming isolation (200.603083ms)
+  AssertionError [ERR_ASSERTION]: Expected "actual" to be strictly unequal to: 0
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/round2.test.mjs:146:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 0,
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/secret-reach/setup-runner-linux.test.mjs:21:3
+✖ setup unavailable removes an existing privileged primary group and preserves quarantine on rerun (1570.885667ms)
+  AssertionError [ERR_ASSERTION]: file:///private/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/runner-fixture-ghpvN9/bin/tailscale:10
+  if (['tailscale', 'nft', 'iptables', 'ip6tables', 'systemctl'].includes(command)) throw new Error('Removed dependency invoked');
+                                                                                          ^
+
+  Error: Removed dependency invoked
+      at file:///private/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/runner-fixture-ghpvN9/bin/tailscale:10:89
+      at ModuleJob.run (node:internal/modules/esm/module_job:569:25)
+      at async node:internal/modules/esm/loader:650:26
+      at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+  Node.js v26.8.1
+
+
+  1 !== 0
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/setup-runner-linux.test.mjs:120:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

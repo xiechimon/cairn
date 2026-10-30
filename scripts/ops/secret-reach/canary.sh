@@ -18,12 +18,13 @@ done
 tmp=$(mktemp -d) || exit 2
 trap 'rm -rf "$tmp"' EXIT
 result=0
+ran=0
 probe() {
   local channel="$1" path="$2" tool="$3"
   shift 3
   if ! command -v "$tool" >/dev/null; then
     printf 'SKIPPED %s %s\n' "$channel" "$path"
-  elif "$@" > "$tmp/output" 2>/dev/null; then
+  elif ran=$((ran + 1)) && "$@" > "$tmp/output" 2>/dev/null; then
     printf 'READ %s %s %s bytes\n' "$channel" "$path" "$(wc -c < "$tmp/output" | tr -d ' ')"
     result=1
   else
@@ -59,6 +60,7 @@ if [ -n "$pid" ]; then
         else
           status=$(cat "$tmp/mem-status")
           printf '%s mem %s\n' "$status" "$path"
+          [ "$status" = SKIPPED ] || ran=$((ran + 1))
           [ "$status" != READ ] || result=1
         fi
       else
@@ -86,22 +88,34 @@ for server_url in ${server_urls[@]+"${server_urls[@]}"}; do
   IFS=',' read -r -a logins <<< "$tailscale_users"
   identities+=(${logins[@]+"${logins[@]}"})
   [ -n "$tailscale_users" ] || identities+=(secret-reach-probe)
-  for login in "${identities[@]}"; do
-    [ -n "$login" ] || continue
-    headers=()
-    [ "$login" = anonymous ] || headers=(-H "tailscale-user-login: $login")
-    if ! command -v curl >/dev/null; then
-      printf 'SKIPPED http %s %s\n' "$login" "$server_url"
-    elif status=$(curl --insecure --noproxy '*' --max-time 10 -s -o /dev/null -w '%{http_code}' ${headers[@]+"${headers[@]}"} "${server_url%/}/api/teams"); then
-      if [[ "$status" = 2[0-9][0-9] ]]; then
-        printf 'READ http %s %s %s\n' "$login" "$status" "$server_url"
-        result=1
+  routes=(direct)
+  proxies=('')
+  for proxy in "${HTTP_PROXY:-}" "${HTTPS_PROXY:-}"; do
+    [ -n "$proxy" ] || continue
+    routes+=(proxy)
+    proxies+=("$proxy")
+  done
+  for ((route=0; route<${#routes[@]}; route++)); do
+    proxy_args=(--noproxy '*')
+    [ "${routes[$route]}" = direct ] || proxy_args=(--noproxy '' --proxy "${proxies[$route]}")
+    for login in "${identities[@]}"; do
+      [ -n "$login" ] || continue
+      headers=()
+      [ "$login" = anonymous ] || headers=(-H "tailscale-user-login: $login")
+      if ! command -v curl >/dev/null; then
+        printf 'SKIPPED http %s %s\n' "$login" "$server_url"
+      elif ran=$((ran + 1)) && status=$(curl --insecure "${proxy_args[@]}" --max-time 10 -s -o /dev/null -w '%{http_code}' ${headers[@]+"${headers[@]}"} "${server_url%/}/api/teams"); then
+        if [[ "$status" = 2[0-9][0-9] ]]; then
+          printf 'READ http %s %s %s %s\n' "$login" "$status" "$server_url" "${routes[$route]}"
+          result=1
+        else
+          printf 'BLOCKED http %s %s %s\n' "$login" "$status" "$server_url"
+        fi
       else
-        printf 'BLOCKED http %s %s %s\n' "$login" "$status" "$server_url"
+        printf 'BLOCKED http %s transport %s\n' "$login" "$server_url"
       fi
-    else
-      printf 'BLOCKED http %s transport %s\n' "$login" "$server_url"
-    fi
+    done
   done
 done
+[ "$ran" -gt 0 ] || result=1
 exit "$result"

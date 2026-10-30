@@ -169,3 +169,271 @@
 ℹ skipped 0
 ℹ todo 0
 ℹ duration_ms 2246.792
+
+CURRENT APPROACH AFTER ROUND 3
+✔ broker rejects other repositories, permissions and malformed requests before HTTP (0.954875ms)
+✔ broker signs JWT and sends only fixed repository permissions (2.544958ms)
+﹣ socket enforces framing, mode and preserves existing paths (1.728375ms) # Sandbox denies Unix socket binding
+✔ broker rejects unsafe listener configuration before binding (0.305334ms)
+﹣ runner client obtains token through socket without reading owner configuration (0.559584ms) # Sandbox denies Unix socket binding
+✔ CLI rejects empty and nonnumeric GID before reading owner key (169.981875ms)
+﹣ broker removes socket on SIGTERM (38.061416ms) # Sandbox denies Unix socket binding
+﹣ broker removes socket on SIGINT (34.67075ms) # Sandbox denies Unix socket binding
+✔ memory probe selects a readable mapped address and never zero (0.461917ms)
+✔ client rejects relative sockets before connecting (0.365541ms)
+✔ secret tests run in the ops CI job and local prepush plan (0.523708ms)
+✔ broker refuses GID 0 (2.130292ms)
+✔ broker refuses GID -1 (0.235791ms)
+✔ Bash HTTP-only canary probes every URL and identity with empty arrays (224.950625ms)
+✔ maps EACCES classification (34.520209ms)
+✔ maps EPERM classification (31.811625ms)
+✔ maps ENOENT classification (30.160833ms)
+✔ Linux canary rechecks discovered self Tailscale addresses (508.522916ms)
+✔ operations documentation names actual protection probes and Mac token limits (0.312917ms)
+✔ HTTP_PROXY probes both identities on every direct and proxy endpoint with 200 (353.028542ms)
+ℹ BLOCKED http anonymous 401 http://localhost:8787
+BLOCKED http owner 401 http://localhost:8787
+READ http anonymous 200 http://localhost:8787 proxy
+READ http owner 200 http://localhost:8787 proxy
+BLOCKED http anonymous 401 https://fixture.example
+BLOCKED http owner 401 https://fixture.example
+READ http anonymous 200 https://fixture.example proxy
+READ http owner 200 https://fixture.example proxy
+✔ HTTP_PROXY probes both identities on every direct and proxy endpoint with 204 (351.507916ms)
+ℹ BLOCKED http anonymous 401 http://localhost:8787
+BLOCKED http owner 401 http://localhost:8787
+READ http anonymous 204 http://localhost:8787 proxy
+READ http owner 204 http://localhost:8787 proxy
+BLOCKED http anonymous 401 https://fixture.example
+BLOCKED http owner 401 https://fixture.example
+READ http anonymous 204 https://fixture.example proxy
+READ http owner 204 https://fixture.example proxy
+✔ HTTP_PROXY probes both identities on every direct and proxy endpoint with 299 (353.495416ms)
+ℹ BLOCKED http anonymous 401 http://localhost:8787
+BLOCKED http owner 401 http://localhost:8787
+READ http anonymous 299 http://localhost:8787 proxy
+READ http owner 299 http://localhost:8787 proxy
+BLOCKED http anonymous 401 https://fixture.example
+BLOCKED http owner 401 https://fixture.example
+READ http anonymous 299 https://fixture.example proxy
+READ http owner 299 https://fixture.example proxy
+✔ HTTP_PROXY probes both identities on every direct and proxy endpoint with 401 (353.31775ms)
+ℹ BLOCKED http anonymous 401 http://localhost:8787
+BLOCKED http owner 401 http://localhost:8787
+BLOCKED http anonymous 401 http://localhost:8787
+BLOCKED http owner 401 http://localhost:8787
+BLOCKED http anonymous 401 https://fixture.example
+BLOCKED http owner 401 https://fixture.example
+BLOCKED http anonymous 401 https://fixture.example
+BLOCKED http owner 401 https://fixture.example
+✔ HTTP_PROXY probes both identities on every direct and proxy endpoint with transport (351.753625ms)
+ℹ BLOCKED http anonymous 401 http://localhost:8787
+BLOCKED http owner 401 http://localhost:8787
+BLOCKED http anonymous transport http://localhost:8787
+BLOCKED http owner transport http://localhost:8787
+BLOCKED http anonymous 401 https://fixture.example
+BLOCKED http owner 401 https://fixture.example
+BLOCKED http anonymous transport https://fixture.example
+BLOCKED http owner transport https://fixture.example
+✔ HTTPS_PROXY probes both identities on every direct and proxy endpoint with 200 (367.015ms)
+ℹ BLOCKED http anonymous 401 http://localhost:8787
+BLOCKED http owner 401 http://localhost:8787
+READ http anonymous 200 http://localhost:8787 proxy
+READ http owner 200 http://localhost:8787 proxy
+BLOCKED http anonymous 401 https://fixture.example
+BLOCKED http owner 401 https://fixture.example
+READ http anonymous 200 https://fixture.example proxy
+READ http owner 200 https://fixture.example proxy
+✔ HTTPS_PROXY probes both identities on every direct and proxy endpoint with 204 (382.334541ms)
+ℹ BLOCKED http anonymous 401 http://localhost:8787
+BLOCKED http owner 401 http://localhost:8787
+READ http anonymous 204 http://localhost:8787 proxy
+READ http owner 204 http://localhost:8787 proxy
+BLOCKED http anonymous 401 https://fixture.example
+BLOCKED http owner 401 https://fixture.example
+READ http anonymous 204 https://fixture.example proxy
+READ http owner 204 https://fixture.example proxy
+✔ HTTPS_PROXY probes both identities on every direct and proxy endpoint with 299 (371.660916ms)
+ℹ BLOCKED http anonymous 401 http://localhost:8787
+BLOCKED http owner 401 http://localhost:8787
+READ http anonymous 299 http://localhost:8787 proxy
+READ http owner 299 http://localhost:8787 proxy
+BLOCKED http anonymous 401 https://fixture.example
+BLOCKED http owner 401 https://fixture.example
+READ http anonymous 299 https://fixture.example proxy
+READ http owner 299 https://fixture.example proxy
+✔ HTTPS_PROXY probes both identities on every direct and proxy endpoint with 401 (380.304458ms)
+ℹ BLOCKED http anonymous 401 http://localhost:8787
+BLOCKED http owner 401 http://localhost:8787
+BLOCKED http anonymous 401 http://localhost:8787
+BLOCKED http owner 401 http://localhost:8787
+BLOCKED http anonymous 401 https://fixture.example
+BLOCKED http owner 401 https://fixture.example
+BLOCKED http anonymous 401 https://fixture.example
+BLOCKED http owner 401 https://fixture.example
+✔ HTTPS_PROXY probes both identities on every direct and proxy endpoint with transport (370.875041ms)
+ℹ BLOCKED http anonymous 401 http://localhost:8787
+BLOCKED http owner 401 http://localhost:8787
+BLOCKED http anonymous transport http://localhost:8787
+BLOCKED http owner transport http://localhost:8787
+BLOCKED http anonymous 401 https://fixture.example
+BLOCKED http owner 401 https://fixture.example
+BLOCKED http anonymous transport https://fixture.example
+BLOCKED http owner transport https://fixture.example
+✔ all skipped process channels fail without claiming isolation (182.285667ms)
+✔ canary readable reports all channels without content (109.886459ms)
+✔ canary unreadable reports all channels without content (104.835125ms)
+✔ canary missing reports all channels without content (14.679666ms)
+✔ canary missing-parent reports all channels without content (15.3ms)
+✔ canary validates arguments and reports process channels (21.991042ms)
+✔ setup dry run describes operations and leaves scratch unchanged (7.621167ms)
+✔ Mac settings deny both secret trees and preserve network configuration (0.626125ms)
+✔ HTTP channel tests anonymous and each supplied identity without leaking responses (179.300417ms)
+✔ HTTP denial does not report readable (180.268375ms)
+✔ setup unavailable removes an existing privileged primary group and preserves quarantine on rerun (2709.230333ms)
+✔ writes are absent-resource deletes, an absent PR merge, or current-main no-op (1.19325ms)
+✔ main update requires a valid current SHA (0.245416ms)
+✔ authorized main updates and merges fail and requests serialize safe bodies (0.372458ms)
+✔ branch protection refusal and absent merge are accepted (0.258ms)
+✔ generic validation failure does not establish branch protection (0.156417ms)
+ℹ tests 45
+ℹ suites 0
+ℹ pass 41
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 4
+ℹ todo 0
+ℹ duration_ms 4706.833
+✔ broker rejects other repositories, permissions and malformed requests before HTTP (2.059584ms)
+✔ broker signs JWT and sends only fixed repository permissions (7.678833ms)
+﹣ socket enforces framing, mode and preserves existing paths (4.718333ms) # Sandbox denies Unix socket binding
+✔ broker rejects unsafe listener configuration before binding (0.862625ms)
+﹣ runner client obtains token through socket without reading owner configuration (1.54ms) # Sandbox denies Unix socket binding
+✔ CLI rejects empty and nonnumeric GID before reading owner key (585.853125ms)
+﹣ broker removes socket on SIGTERM (112.880334ms) # Sandbox denies Unix socket binding
+﹣ broker removes socket on SIGINT (107.700959ms) # Sandbox denies Unix socket binding
+✔ memory probe selects a readable mapped address and never zero (0.827375ms)
+✔ client rejects relative sockets before connecting (0.472708ms)
+✔ secret tests run in the ops CI job and local prepush plan (0.836084ms)
+✔ broker refuses GID 0 (1.609125ms)
+✔ broker refuses GID -1 (0.178333ms)
+✔ Bash HTTP-only canary probes every URL and identity with empty arrays (375.052208ms)
+✔ maps EACCES classification (98.577ms)
+✔ maps EPERM classification (108.322875ms)
+✔ maps ENOENT classification (106.039583ms)
+✔ Linux canary rechecks discovered self Tailscale addresses (610.003709ms)
+✔ operations documentation names actual protection probes and Mac token limits (1.12375ms)
+✔ HTTP_PROXY probes both identities on every direct and proxy endpoint with 200 (453.285333ms)
+ℹ BLOCKED http anonymous 401 http://localhost:8787
+BLOCKED http owner 401 http://localhost:8787
+READ http anonymous 200 http://localhost:8787 proxy
+READ http owner 200 http://localhost:8787 proxy
+BLOCKED http anonymous 401 https://fixture.example
+BLOCKED http owner 401 https://fixture.example
+READ http anonymous 200 https://fixture.example proxy
+READ http owner 200 https://fixture.example proxy
+✔ HTTP_PROXY probes both identities on every direct and proxy endpoint with 204 (551.31475ms)
+ℹ BLOCKED http anonymous 401 http://localhost:8787
+BLOCKED http owner 401 http://localhost:8787
+READ http anonymous 204 http://localhost:8787 proxy
+READ http owner 204 http://localhost:8787 proxy
+BLOCKED http anonymous 401 https://fixture.example
+BLOCKED http owner 401 https://fixture.example
+READ http anonymous 204 https://fixture.example proxy
+READ http owner 204 https://fixture.example proxy
+✔ HTTP_PROXY probes both identities on every direct and proxy endpoint with 299 (528.241958ms)
+ℹ BLOCKED http anonymous 401 http://localhost:8787
+BLOCKED http owner 401 http://localhost:8787
+READ http anonymous 299 http://localhost:8787 proxy
+READ http owner 299 http://localhost:8787 proxy
+BLOCKED http anonymous 401 https://fixture.example
+BLOCKED http owner 401 https://fixture.example
+READ http anonymous 299 https://fixture.example proxy
+READ http owner 299 https://fixture.example proxy
+✔ HTTP_PROXY probes both identities on every direct and proxy endpoint with 401 (423.506ms)
+ℹ BLOCKED http anonymous 401 http://localhost:8787
+BLOCKED http owner 401 http://localhost:8787
+BLOCKED http anonymous 401 http://localhost:8787
+BLOCKED http owner 401 http://localhost:8787
+BLOCKED http anonymous 401 https://fixture.example
+BLOCKED http owner 401 https://fixture.example
+BLOCKED http anonymous 401 https://fixture.example
+BLOCKED http owner 401 https://fixture.example
+✔ HTTP_PROXY probes both identities on every direct and proxy endpoint with transport (400.970208ms)
+ℹ BLOCKED http anonymous 401 http://localhost:8787
+BLOCKED http owner 401 http://localhost:8787
+BLOCKED http anonymous transport http://localhost:8787
+BLOCKED http owner transport http://localhost:8787
+BLOCKED http anonymous 401 https://fixture.example
+BLOCKED http owner 401 https://fixture.example
+BLOCKED http anonymous transport https://fixture.example
+BLOCKED http owner transport https://fixture.example
+✔ HTTPS_PROXY probes both identities on every direct and proxy endpoint with 200 (449.197167ms)
+ℹ BLOCKED http anonymous 401 http://localhost:8787
+BLOCKED http owner 401 http://localhost:8787
+READ http anonymous 200 http://localhost:8787 proxy
+READ http owner 200 http://localhost:8787 proxy
+BLOCKED http anonymous 401 https://fixture.example
+BLOCKED http owner 401 https://fixture.example
+READ http anonymous 200 https://fixture.example proxy
+READ http owner 200 https://fixture.example proxy
+✔ HTTPS_PROXY probes both identities on every direct and proxy endpoint with 204 (475.630917ms)
+ℹ BLOCKED http anonymous 401 http://localhost:8787
+BLOCKED http owner 401 http://localhost:8787
+READ http anonymous 204 http://localhost:8787 proxy
+READ http owner 204 http://localhost:8787 proxy
+BLOCKED http anonymous 401 https://fixture.example
+BLOCKED http owner 401 https://fixture.example
+READ http anonymous 204 https://fixture.example proxy
+READ http owner 204 https://fixture.example proxy
+✔ HTTPS_PROXY probes both identities on every direct and proxy endpoint with 299 (581.051291ms)
+ℹ BLOCKED http anonymous 401 http://localhost:8787
+BLOCKED http owner 401 http://localhost:8787
+READ http anonymous 299 http://localhost:8787 proxy
+READ http owner 299 http://localhost:8787 proxy
+BLOCKED http anonymous 401 https://fixture.example
+BLOCKED http owner 401 https://fixture.example
+READ http anonymous 299 https://fixture.example proxy
+READ http owner 299 https://fixture.example proxy
+✔ HTTPS_PROXY probes both identities on every direct and proxy endpoint with 401 (444.254167ms)
+ℹ BLOCKED http anonymous 401 http://localhost:8787
+BLOCKED http owner 401 http://localhost:8787
+BLOCKED http anonymous 401 http://localhost:8787
+BLOCKED http owner 401 http://localhost:8787
+BLOCKED http anonymous 401 https://fixture.example
+BLOCKED http owner 401 https://fixture.example
+BLOCKED http anonymous 401 https://fixture.example
+BLOCKED http owner 401 https://fixture.example
+✔ HTTPS_PROXY probes both identities on every direct and proxy endpoint with transport (400.311ms)
+ℹ BLOCKED http anonymous 401 http://localhost:8787
+BLOCKED http owner 401 http://localhost:8787
+BLOCKED http anonymous transport http://localhost:8787
+BLOCKED http owner transport http://localhost:8787
+BLOCKED http anonymous 401 https://fixture.example
+BLOCKED http owner 401 https://fixture.example
+BLOCKED http anonymous transport https://fixture.example
+BLOCKED http owner transport https://fixture.example
+✔ all skipped process channels fail without claiming isolation (190.210041ms)
+✔ canary readable reports all channels without content (376.239042ms)
+✔ canary unreadable reports all channels without content (483.271ms)
+✔ canary missing reports all channels without content (59.219792ms)
+✔ canary missing-parent reports all channels without content (57.931ms)
+✔ canary validates arguments and reports process channels (85.019917ms)
+✔ setup dry run describes operations and leaves scratch unchanged (32.570125ms)
+✔ Mac settings deny both secret trees and preserve network configuration (0.899958ms)
+✔ HTTP channel tests anonymous and each supplied identity without leaking responses (237.447ms)
+✔ HTTP denial does not report readable (244.482875ms)
+✔ setup unavailable removes an existing privileged primary group and preserves quarantine on rerun (6036.316791ms)
+✔ writes are absent-resource deletes, an absent PR merge, or current-main no-op (5.470875ms)
+✔ main update requires a valid current SHA (0.467833ms)
+✔ authorized main updates and merges fail and requests serialize safe bodies (1.6615ms)
+✔ branch protection refusal and absent merge are accepted (0.495666ms)
+✔ generic validation failure does not establish branch protection (0.285375ms)
+ℹ tests 45
+ℹ suites 0
+ℹ pass 41
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 4
+ℹ todo 0
+ℹ duration_ms 6306.748042

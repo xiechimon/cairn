@@ -1,3 +1,27 @@
+# Current approach after review round 3
+
+The API path is closed by #2057, not by this branch. #2057 must trust the identity header only on an owner-only Unix socket; TCP always needs the token. Run the runner-side canary after both changes are deployed. Earlier firewall evidence below is historical and superseded.
+
+Historical measurements motivating this decision: a forged identity header reached the direct API, the Tailscale serve URL exposed the same route, and round 3 reached the owner API through sing-box at loopback port 7890 with the forged header (HTTP 200). These are dispatcher/user-reported historical measurements, not rerun in this sandbox.
+
+## Current failure modes (before implementation)
+
+| Failure mode | Test or unverified limit |
+| --- | --- |
+| Setup still invokes or installs firewall/systemd files | Setup scratch fixture rejects firewall calls and generated files |
+| Removing firewall also removes identity, modes or quarantine safety | Setup fixture checks groups, modes, unsafe ancestors, symlinks and stable quarantine reruns |
+| Proxy bypass hides an owner-run forwarder | Curl argument fixture covers HTTP_PROXY and HTTPS_PROXY with NO_PROXY set |
+| Anonymous or forged identity omitted for an endpoint or leg | Curl fixture checks each URL and identity on direct and proxy legs |
+| Any 2xx incorrectly accepted | Status matrix includes 200, 204 and 299; denial and transport failure controls |
+| Everything SKIPPED exits successfully | PID-only non-Linux fixture; missing-curl-only execution remains unverified |
+| Removed test remains in prepush or CI misses new tests | Existing review plan test checks all test paths; CI wildcard remains current |
+| Existing file/memory/broker behavior regresses | Existing Node suite; sandbox socket skips remain unverified |
+| Real host API auth, proxy routing or cross-user access differs | Unverified: deploy both branches and run runner canary on host |
+
+GitHub overlap lookup is unavailable under the explicit sandbox constraint. Continue assigned #2189 branch; #2057 is separate related product work. No absence-of-overlap claim.
+
+---
+
 # Ticket 2189 evidence
 
 Review round 1 fixes are uncommitted, as requested. Historical dispatcher evidence is already on the branch. No push, PR, build, full e2e, remote action, live UI, daemon or LLM run occurred in this round. GitHub overlap lookup is unavailable by task constraint; no absence claim is made. No third-party package API was added.
@@ -139,3 +163,23 @@ Run the Linux socket, broker token and cross-user file/memory checks described a
 ## Review round 2 retro
 
 Applied `.claude/skills/retro-cairn/SKILL.md`. Four reviewed error classes now have executable regressions: self-address firewall coverage/checking, empty-array canary execution, maps-refusal classification and root broker groups. This round also corrected fixture source escaping/argument injection and an assertion that confused expanded runtime rules with source variables; the actual failed runs are retained. Five ticket-specific ledger entries document these safeguards at level 2. No unrelated lesson entries or baseline counters were rewritten.
+
+## Current approach acceptance record (supersedes firewall acceptance above)
+
+Tested commit: `937d2726cbf3fb2fdf661e4d3ef3acfe59421b5c` plus the uncommitted current diff. Source hashes are in `current-source.sha256`. This is local-only evidence: no commit, push, PR or delivered verification is claimed. No live app, daemon or real provider ran. No external package API was introduced.
+
+| Supported claim | Command | Surface / provider | Artifact | Result and limits |
+| --- | --- | --- | --- | --- |
+| New regressions reject the old approach | `node --test scripts/ops/secret-reach/*.test.mjs` | Scratch setup, curl and OS executable stubs / no provider | `red.log`, section CURRENT APPROACH AFTER ROUND 3 | Exit 1 before implementation: proxy, all-skipped and removed-dependency regressions fail |
+| Setup preserves group isolation, modes, quarantine, preflight rejection and rerun safety without firewall calls or files | Same command | Real shell and scratch filesystem; identity/ownership commands stubbed / no provider | `green.log`, current section | Exit 0; no real user, chown or host security claim |
+| Every URL gets anonymous and forged-header direct/proxy probes; 200/204/299 fail, 401 and transport failure classify as blocked | Same command | Real Bash, curl argv/status stub with HTTP_PROXY or HTTPS_PROXY and NO_PROXY=* / no provider | `green.log`, current section | 45 tests: 41 pass, 4 socket skips; actual curl wire traffic and sing-box forwarding unverified |
+| All-skipped process-only execution fails | Same command | Non-Linux uname stub / no provider | `green.log`, current section | Pass; missing-curl-only execution not independently exercised |
+| CI wildcard and updated explicit prepush list cover current tests | Same command; `node --test scripts/prepush.test.mjs` | Plan/source regression and isolated CLI fixtures / no provider | `green.log`, `current-prepush-plan.log` | 46 prepush tests pass; CI run line is unchanged and was run exactly locally; GitHub CI unverified |
+| Required static and collection checks pass | `pnpm lint`; `pnpm typecheck`; `pnpm exec vitest run --changed`; `pnpm spec:parse` | Static/selection/collection / no provider | `current-lint.log`, `current-typecheck.log`, `current-vitest.log`, `current-spec-parse.log` | All exit 0; lint has one existing informational diagnostic; Vitest selects no tests; 1391 web cases collected, 65 integration files parsed; no e2e executed |
+| Shell syntax and repository prose checks pass | `bash -n scripts/ops/secret-reach/canary.sh scripts/ops/secret-reach/setup-runner-linux.sh`; English, comment and lessons ledger gates | Static / no provider | `current-shell.log`, `current-english.log`, `current-comments.log`, `current-ledger.log` | Exit 0 |
+
+Mechanism evidence is the executed scratch setup and curl argument/status diagnostics, not a claim that host authentication works. No screenshots are presented. Automated checks are not independent review or security review. A later delivery must commit these artifacts and use SHA-pinned raw links in its PR; that condition remains unverified by instruction.
+
+After both this branch and #2057 are deployed, run the operations guide's owner-positive and runner-negative canaries on omarchy. Supply every configured allowed identity and actual loopback/serve URL; preserve HTTP_PROXY/HTTPS_PROXY in the runner invocation to exercise sing-box. Check both direct and proxy HTTP responses with no token. Transport errors do not prove authentication correctness. Inspect actual identities, sudoers, ACLs, file ownership, quarantine, Linux process access and broker socket/token behavior. Existing firewall deployment cleanup, if any previous setup was applied, is host work and is not performed by the revised setup. GitHub and omarchy are unavailable here.
+
+Current retro: applied `.claude/skills/retro-cairn/SKILL.md`. One process error was corrected: tee initially replaced historical acceptance logs. Their base prefixes are restored byte-for-byte, current runs appended, and prefix comparison rejects the replacement-only form and accepts the restored form. See `docs/lessons/2189-evidence-log-overwrite.md`.

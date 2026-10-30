@@ -94,7 +94,6 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
       'node',
       '--test',
       'scripts/ops/secret-reach/broker.test.mjs',
-      'scripts/ops/secret-reach/check-rules.test.mjs',
       'scripts/ops/secret-reach/round2.test.mjs',
       'scripts/ops/secret-reach/review.test.mjs',
       'scripts/ops/secret-reach/secret-reach.test.mjs',
