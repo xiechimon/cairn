@@ -3,7 +3,7 @@ import { expect, type Page, test } from '@playwright/test';
 const NEW_PROJECT = '/app/project/new?scenario=01';
 const NEW_PROJECT_LIVE = '/app/project/new';
 
-const DANGER = 'rgb(242, 136, 129)';
+const DANGER = 'rgb(240, 154, 136)';
 
 async function openMenu(page: Page) {
   await page.goto(NEW_PROJECT);

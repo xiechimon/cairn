@@ -421,7 +421,7 @@ export async function handleMcpRequest(
   const ctx: McpCallerCtx = {
     teamId: key.teamId,
     user: deps.user,
-    grants: new Set([...key.toolGrants.read, ...key.toolGrants.write]),
+    grants: grantsByKind(key.toolGrants),
   };
   const server = buildMcpFaceServer(deps, ctx);
   const transport = new WebStandardStreamableHTTPServerTransport({
@@ -435,6 +435,14 @@ export async function handleMcpRequest(
     await transport.close().catch(() => {});
     await server.close().catch(() => {});
   }
+}
+
+function grantsByKind(toolGrants: { read: string[]; write: string[] }): Set<string> {
+  return new Set(
+    MCP_TOOL_REGISTRY.filter((tool) => toolGrants[tool.kind].includes(tool.grant)).map(
+      (tool) => tool.grant,
+    ),
+  );
 }
 
 export function grantedToolNames(grants: ReadonlySet<string>): string[] {

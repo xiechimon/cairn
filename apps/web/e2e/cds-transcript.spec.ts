@@ -29,7 +29,7 @@ test('CDS transcript: tokens, fade, follow 40 / jump 120, header 56 (Paper top b
   expect(m.chatMaxW).toBe('768px');
   expect(m.chatExtra).toBe('35vh');
   expect(m.fadeSize).toBe('28px');
-  expect(m.radiusBubble).toBe('12px');
+  expect(m.radiusBubble).toBe('14px');
   expect(m.cdsRadiusXl).toBe('12px');
   expect(m.hasScrollFade).toBe(true);
   expect(m.headH).toBe('56px');

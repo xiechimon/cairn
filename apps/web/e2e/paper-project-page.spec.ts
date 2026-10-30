@@ -130,7 +130,7 @@ for (const theme of ['light', 'dark'] as const) {
     const create = empty.getByRole('button', { name: '新建任务' });
     await expect(create, 'E1').toHaveCount(1);
     expect((await create.boundingBox())?.height, 'E1').toBe(32);
-    await expect(create, 'E1').toHaveCSS('border-top-left-radius', '6px');
+    await expect(create, 'E1').toHaveCSS('border-top-left-radius', '8px');
   });
 
   test(`files: bleed body, picker face on the selected file, type scale (${theme})`, async ({

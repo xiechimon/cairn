@@ -37,11 +37,25 @@ export function daemonOtelFromEnv(env: NodeJS.ProcessEnv): DaemonOtel | null {
 export function claudeTelemetryEnv(ctx: StepOtelContext): Record<string, string> {
   return {
     TRACEPARENT: otlpTraceparent(ctx.traceId, ctx.stepSpanId),
-    CLAUDE_CODE_ENABLE_TELEMETRY: '1',
-    CLAUDE_CODE_ENHANCED_TELEMETRY_BETA: '1',
-    OTEL_TRACES_EXPORTER: 'otlp',
-    OTEL_EXPORTER_OTLP_ENDPOINT: ctx.exporterEndpoint,
-    OTEL_EXPORTER_OTLP_HEADERS: ctx.exporterHeaders,
+    ...claudeCliEnv({}),
+  };
+}
+
+const CLI_EXPORT_KEY = /^(OTEL_|CAIRN_OTEL_|ANT_OTEL_|BETA_TRACING_|ENABLE_BETA_TRACING_)/;
+
+export function claudeCliEnv(env: NodeJS.ProcessEnv): Record<string, string> {
+  const filtered: Record<string, string> = {};
+  for (const [key, value] of Object.entries(env)) {
+    if (value === undefined || CLI_EXPORT_KEY.test(key)) continue;
+    filtered[key] = value;
+  }
+  return {
+    ...filtered,
+    CLAUDE_CODE_ENABLE_TELEMETRY: '0',
+    CLAUDE_CODE_ENHANCED_TELEMETRY_BETA: '0',
+    OTEL_SDK_DISABLED: 'true',
+    ENABLE_BETA_TRACING_DETAILED: '0',
+    BETA_TRACING_ENDPOINT: '',
   };
 }
 
@@ -63,6 +77,7 @@ export class PiStepSpanSink {
     private readonly ctx: StepOtelContext,
     private readonly fallback: ProviderModelRef,
     private readonly log?: (msg: string) => void,
+    private readonly redact?: <T>(value: T) => T,
   ) {}
 
   chat(
@@ -131,10 +146,12 @@ export class PiStepSpanSink {
     }
     if (this.spans.length === 0) return;
     const target: OtlpTarget = { url: new URL(this.ctx.tracesUrl), headers: this.ctx.headers };
-    const request = redactSecrets(otlpTracesRequest(RESOURCE, SCOPE, this.spans))
-      .value as ReturnType<typeof otlpTracesRequest>;
     try {
-      await postOtlpTraces(target, request);
+      const request = otlpTracesRequest(RESOURCE, SCOPE, this.spans);
+      const redacted = redactSecrets(this.redact?.(request) ?? request).value as ReturnType<
+        typeof otlpTracesRequest
+      >;
+      await postOtlpTraces(target, redacted);
     } catch (error) {
       this.log?.(`otel push failed: ${error instanceof Error ? error.message : String(error)}`);
     }

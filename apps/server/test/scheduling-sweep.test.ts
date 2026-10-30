@@ -7,10 +7,10 @@ import {
   project as projectTable,
   todo as todoTable,
 } from '../src/db/schema.js';
-import type { FetchLike } from '../src/lib/github.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { latestScheduleReport } from '../src/services/scheduling/store.js';
 import { createScheduling, inFlightIssues } from '../src/services/scheduling/sweep.js';
+import { type GhResponse, githubFake } from './fakes/github.js';
 import { bootServer, type TestServer } from './helpers.js';
 
 const OWNER = 'xiechimon';
@@ -24,34 +24,20 @@ afterEach(() => {
   for (const s of servers.splice(0)) s.dispose();
 });
 
-interface GhRoute {
-  status?: number;
-  body?: unknown;
-  raw?: string;
-}
-
-export function githubFake(routes: Record<string, GhRoute>) {
+function schedulingGithub(routes: Record<string, GhResponse>) {
   let mainSha = MAIN_SHA;
   const calls: string[] = [];
-  const impl = (async (input: string, init?: { method?: string }) => {
-    const url = new URL(String(input));
-    calls.push(`${init?.method ?? 'GET'} ${url.pathname}`);
-    let route = routes[url.pathname];
-    if (url.pathname === `/repos/${REPO}/branches/main`) {
-      route = { body: { name: 'main', commit: { sha: mainSha } } };
-    }
-    if (route === undefined) route = { status: 404, body: { message: 'Not Found' } };
-    const status = route.status ?? 200;
-    return {
-      ok: status >= 200 && status < 300,
-      status,
-      headers: { get: () => null },
-      json: async () => route.body,
-      text: async () => route.raw ?? JSON.stringify(route.body ?? null),
-    };
-  }) as FetchLike;
+  const fake = githubFake(REPO, {
+    handle: (url, init) => {
+      calls.push(`${init?.method ?? 'GET'} ${url.pathname}`);
+      if (url.pathname === `/repos/${REPO}/branches/main`) {
+        return { body: { name: 'main', commit: { sha: mainSha } } };
+      }
+      return routes[url.pathname] ?? { status: 404, body: { message: 'Not Found' } };
+    },
+  });
   return {
-    impl,
+    impl: fake.impl,
     calls,
     routes,
     advance: (sha: string) => {
@@ -75,7 +61,7 @@ function openIssue(number: number, over: Record<string, unknown> = {}) {
 }
 
 function world(issues: unknown[], pulls: unknown[] = []) {
-  const mock = githubFake({
+  const mock = schedulingGithub({
     [`/repos/${REPO}/issues`]: { body: issues },
     [`/repos/${REPO}/pulls`]: { body: pulls },
     [`/repos/${REPO}/pulls/1500`]: { body: { body: 'Closes #1528' } },

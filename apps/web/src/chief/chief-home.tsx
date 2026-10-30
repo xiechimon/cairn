@@ -110,7 +110,7 @@ export function ChiefHome({
       data-testid="chief-home-hero"
       className="mx-auto w-[calc(100%-2rem)] max-w-182 flex-none pt-[6vh]"
     >
-      <h2 className="m-0 font-serif text-page font-normal text-foreground text-balance">
+      <h2 className="m-0 font-heading text-page font-normal text-foreground text-balance">
         {greeting}
       </h2>
       <div data-testid="chief-home-summary" className="mt-2 text-ui text-content-secondary">
@@ -134,7 +134,7 @@ export function ChiefHome({
         </p>
       )}
       <header>
-        <h2 className="m-0 font-serif text-page font-normal text-foreground text-balance">
+        <h2 className="m-0 font-heading text-page font-normal text-foreground text-balance">
           {greeting}
         </h2>
         <p className="mt-2 mb-0 text-ui text-content-tertiary">

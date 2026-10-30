@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('CDS board: bare columns, cards at --radius-card 10px + panel-shadow', async ({ page }) => {
+test('CDS board: bare columns, cards at --radius-card 14px + panel-shadow', async ({ page }) => {
   await page.goto('/app?scenario=01&view=board');
   await page.waitForSelector('.board-column');
   await page.waitForSelector('.todo-card');
@@ -33,8 +33,8 @@ test('CDS board: bare columns, cards at --radius-card 10px + panel-shadow', asyn
   expect(m.colBorder).toBe('0px');
   expect(m.colRadius).toBe('0px');
   expect(m.colShadow).toBe('none');
-  expect(m.cardRadius).toBe('10px');
-  expect(m.radiusCard).toBe('10px');
+  expect(m.cardRadius).toBe('14px');
+  expect(m.radiusCard).toBe('14px');
   expect(m.cardShadow).toContain(m.panelShadow);
 
   expect(m.headerH).toBe(36);

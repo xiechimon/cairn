@@ -136,7 +136,10 @@ export function Gallery() {
             className="size-4 bg-foreground"
             style={{ mask: 'url(/logo-mark.svg) center / contain no-repeat' }}
           />
-          <span className="text-heading font-semibold" style={{ fontFamily: 'var(--font-serif)' }}>
+          <span
+            className="text-heading font-semibold"
+            style={{ fontFamily: 'var(--font-display)' }}
+          >
             Cairn
           </span>
         </a>

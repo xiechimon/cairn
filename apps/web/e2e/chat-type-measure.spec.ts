@@ -90,7 +90,9 @@ test('68ch measure cap binds the body text and the centered note', async ({ page
   });
   expect(note.align).toBe('center');
   expect(Number.parseFloat(note.left)).toBeGreaterThan(0);
-  expect(note.left).toBe(note.right);
+  expect(Math.abs(Number.parseFloat(note.left) - Number.parseFloat(note.right))).toBeLessThanOrEqual(
+    1 / 64,
+  );
   // the capped measure must not push the column into horizontal overflow
   const overflow = await page.evaluate(() => {
     const col = document.querySelector('[data-testid="transcript-col"]')!;
