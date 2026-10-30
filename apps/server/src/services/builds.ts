@@ -398,6 +398,11 @@ export async function sendBuildSteer(
     }
     if (body.queuedMessageId !== undefined)
       db.delete(queuedMessage).where(eq(queuedMessage.id, body.queuedMessageId)).run();
+    if (targetBuildId !== conversationId)
+      db.update(queuedMessage)
+        .set({ conversationId: targetBuildId })
+        .where(eq(queuedMessage.conversationId, conversationId))
+        .run();
     return {
       conversationId: targetBuildId,
       message: messageRow,

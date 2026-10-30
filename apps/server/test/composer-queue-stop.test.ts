@@ -4,15 +4,17 @@ import {
   build,
   machine as machineTable,
   message,
+  project,
   step,
   stopPending,
   todo,
 } from '../src/db/schema.js';
+import type { FetchLike } from '../src/lib/github.js';
 import { failStepWithEvents } from '../src/services/builds.js';
 import { bootServer, issueApiKey, postProject, req } from './helpers.js';
 
-async function runningTask() {
-  const s = bootServer();
+async function runningTask(opts: { githubFetch?: FetchLike } = {}) {
+  const s = bootServer(opts);
   const projectId = await postProject(s.app);
   s.db
     .insert(todo)
@@ -66,8 +68,8 @@ async function runningTask() {
       steerPending: string[];
       queuedMessages?: { id: string; content: string }[];
     }>;
-  const finish = (status: 'success' | 'stopped' | 'failed') =>
-    s.app.request('/api/machine/done/running', {
+  const finish = (status: 'success' | 'stopped' | 'failed', stepId = 'running') =>
+    s.app.request(`/api/machine/done/${stepId}`, {
       method: 'POST',
       headers: { authorization: `Bearer ${machine.token}`, 'content-type': 'application/json' },
       body: JSON.stringify({ status, sessionId: 'builder-session', hasChanges: true }),
@@ -271,4 +273,50 @@ test('idle discard is rejected without changing earlier rounds', async () => {
   expect(commands.filter((event) => (event as { type: string }).type === 'sync')).toEqual([]);
   expect(w.s.db.select().from(build).get()?.changes).toEqual(changes);
   expect(w.s.db.select().from(step).all()).toHaveLength(1);
+});
+
+test('a closed PR continuation carries the remaining queue into the new build', async () => {
+  let pullState = 'open';
+  const w = await runningTask({
+    githubFetch: async () => Response.json({ state: pullState, merged: false }),
+  });
+  const task = w.s.db.select().from(todo).where(eq(todo.id, 'task')).get()!;
+  w.s.db
+    .update(project)
+    .set({ repoKind: 'github', githubRepo: 'demo-owner/demo-repo' })
+    .where(eq(project.id, task.projectId))
+    .run();
+  w.s.db
+    .update(build)
+    .set({ prNumber: 43, prUrl: 'https://github.com/demo-owner/demo-repo/pull/43' })
+    .where(eq(build.id, 'build'))
+    .run();
+  expect((await w.send({ content: 'A', mode: 'queue' })).status).toBe(201);
+  expect((await w.send({ content: 'B', mode: 'queue' })).status).toBe(201);
+  const queuedB = (await w.face()).queuedMessages![1]!;
+  pullState = 'closed';
+  expect((await w.finish('success')).status).toBe(200);
+  const newBuildId = w.s.db.select().from(todo).where(eq(todo.id, 'task')).get()!.latestBuildId!;
+  expect(newBuildId).not.toBe('build');
+  const response = await req(w.s.app, 'GET', `/api/conversations/${newBuildId}/messages`);
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({
+    messages: expect.arrayContaining([expect.objectContaining({ role: 'user', content: 'A' })]),
+    queuedMessages: [{ ...queuedB, conversationId: newBuildId }],
+    steerPending: [],
+  });
+  expect(await w.face()).toMatchObject({ queuedMessages: [] });
+  expect(w.s.db.select().from(message).where(eq(message.content, 'A')).all()).toHaveLength(1);
+  const next = w.s.db.select().from(step).where(eq(step.buildId, newBuildId)).get()!;
+  expect(next).toMatchObject({ status: 'pending', prompt: 'A' });
+  const machineId = w.s.db.select().from(step).where(eq(step.id, 'running')).get()!.machineId;
+  w.s.db.update(step).set({ status: 'claimed', machineId }).where(eq(step.id, next.id)).run();
+  expect((await w.finish('success', next.id)).status).toBe(200);
+  expect(w.s.db.select().from(step).where(eq(step.buildId, newBuildId)).all()).toMatchObject([
+    { id: next.id, status: 'done', prompt: 'A' },
+    { status: 'pending', prompt: 'B' },
+  ]);
+  expect(w.s.db.select().from(message).where(eq(message.content, 'B')).all()).toHaveLength(1);
+  const finalResponse = await req(w.s.app, 'GET', `/api/conversations/${newBuildId}/messages`);
+  expect(await finalResponse.json()).toMatchObject({ queuedMessages: [] });
 });
