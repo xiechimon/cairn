@@ -36,7 +36,7 @@ Security surfaces (keep this list synchronized with `.claude/workflows/pr-gate.j
 ## Merge routes
 
 - Required CI checks must pass on the PR's current head before an agent enables merge; a local pass does not substitute for CI.
-- Agents may enable merge only when `.claude/workflows/pr-gate.js` returns go with `mergedBy: 'auto-merge'`; protected-path PRs and every other route go to ian. Never merge or arm auto-merge on ian's route unless ian authorizes it in chat.
+- Agents may enable merge only when `.claude/workflows/pr-gate.js` returns go with `mergedBy: 'auto-merge'` ([ADR 0028](docs/adr/0028-phase-1-merge-routes.md)); protected-path PRs and every other route go to ian. Never merge or arm auto-merge on ian's route unless ian authorizes it in chat.
 - ian may admin-merge. That authority does not extend to agents.
 - Never add the `needs-decision` label. Agents decide by their own recommendation, say what they chose and why in chat, and continue; ask ian for payments, credentials, intended-behavior or ADR changes, and decisions explicitly routed to him.
 - Before asking ian about a PR with auto-merge armed, disarm it with `gh pr merge <n> --disable-auto`.
