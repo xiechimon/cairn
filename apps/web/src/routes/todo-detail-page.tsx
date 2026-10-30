@@ -104,6 +104,7 @@ import { MoreMenu } from '../overlay/more-menu.js';
 import { SearchPanel, useSearchState } from '../overlay/search-panel.js';
 import { SHEET_PANEL } from '../pages/shell.js';
 import { PHASE_UI } from '../phase.js';
+import { useThreadPresence } from '../pwa/thread-presence.js';
 import { safeLocalStorage } from '../safe-storage.js';
 import { readStoredTheme } from '../theme.js';
 
@@ -168,6 +169,7 @@ export function TodoDetailPage() {
   const todoQ = useTodo(live ? id : undefined, live);
   const todosQ = useTodos(teamId, live);
   const wireTodo = todoQ.data ?? null;
+  useThreadPresence(teamId, wireTodo?.id, live);
   const buildId = wireTodo?.latestBuildId ?? null;
   const buildQ = useBuild(buildId, live);
   const gateQ = useBuildGate(buildId, live);

@@ -11,6 +11,7 @@ import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import type { OAuthClientConfig } from './oauth.js';
 import type { VapidKeys } from './push.js';
+import { pendingWorkerQuestion, pushWorkerQuestion } from './thread-push.js';
 
 export function isChiefConversation(id: string): boolean {
   return isChiefConversationId(id);
@@ -92,9 +93,19 @@ type MessageRowInput = {
 };
 
 export function upsertMessage(
-  deps: { db: Db; convHub?: ConversationStreamHub },
+  deps: {
+    db: Db;
+    convHub?: ConversationStreamHub;
+    user?: UserRecord;
+    vapidKeys?: VapidKeys | null;
+  },
   row: MessageRowInput & { conversationId: string },
 ): void {
+  const question = row.role === 'assistant' ? pendingWorkerQuestion(row.content) : null;
+  const prior =
+    question !== null && deps.user !== undefined
+      ? deps.db.select().from(message).where(eq(message.id, row.id)).get()
+      : undefined;
   deps.db
     .insert(message)
     .values(row)
@@ -104,6 +115,13 @@ export function upsertMessage(
     })
     .run();
   deps.convHub?.publishMessage(row.conversationId, row);
+  if (
+    deps.user !== undefined &&
+    question !== null &&
+    pendingWorkerQuestion(prior?.content) === null
+  ) {
+    pushWorkerQuestion({ ...deps, user: deps.user }, row.conversationId, question);
+  }
 }
 
 export function upsertChiefRow(

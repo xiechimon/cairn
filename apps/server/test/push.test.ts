@@ -800,12 +800,11 @@ describe('digest routing: merged, failed, plan-ready, review queue; 410 prunes',
     }
   });
 
-  test('queues merged PR reconciliation for the digest without an immediate push', async () => {
+  test('pushes user-started PR completion once without a completion digest', async () => {
     const fake = await fakePushServer();
     const s = bootServer({ pushEndpointHosts: TEST_PUSH_HOSTS });
     try {
       const endpoint = fake.endpoint('/merged');
-      await subscribe(s.app, s.team.id, endpoint, 'https://cairn.example');
       const todo = await makeTodo(s);
       setTodoPhase(s.svc, todo.id, 'confirm');
       setTodoPhase(s.svc, todo.id, 'building');
@@ -823,11 +822,11 @@ describe('digest routing: merged, failed, plan-ready, review queue; 410 prunes',
         })
         .run();
       setTodoPhase(s.svc, todo.id, 'review');
+      await subscribe(s.app, s.team.id, endpoint, 'https://cairn.example');
       finishTodoDone(s.svc, todo.id, buildId);
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      expect(fake.requests).toHaveLength(0);
+      await expect.poll(() => fake.requests.length, { timeout: 5_000 }).toBe(1);
       const rows = digestRows(s);
-      expect(rows.some((row) => row.body.includes('PR #42'))).toBe(true);
+      expect(rows.some((row) => row.body.includes('PR #42'))).toBe(false);
     } finally {
       fake.close();
       s.dispose();
@@ -861,7 +860,7 @@ describe('digest routing: merged, failed, plan-ready, review queue; 410 prunes',
       setTodoPhase(s.svc, todo.id, 'building');
       setTodoPhase(s.svc, todo.id, 'done');
       setTodoPhase(s.svc, todo.id, 'done');
-      expect(digestRows(s).filter((row) => row.title === 'Task completed')).toHaveLength(1);
+      expect(digestRows(s).filter((row) => row.title === '任务已完成')).toHaveLength(1);
       expect(send).not.toHaveBeenCalled();
     } finally {
       send.mockRestore();

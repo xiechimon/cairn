@@ -26,6 +26,7 @@ import { useI18n } from '../i18n/provider.js';
 import { ChevronDown, SquarePen } from '../icons/index.js';
 import { DeleteProjectConfirm } from '../overlay/delete-project-confirm.js';
 import { ProjectAutonomyCard } from './project-autonomy-card.js';
+import { ProjectBaseBranchSelect } from './project-base-branch-select.js';
 import { PageShell, TabGroup } from './shell.js';
 
 const TABS = [
@@ -60,11 +61,11 @@ export function ProjectSettingsPage() {
     ? wireProject
       ? {
           name: wireProject.name,
-          branch: 'main',
+          branch: wireProject.baseBranch ?? '',
           files: [],
           repoName: wireProject.repoName ?? wireProject.githubRepo ?? wireProject.localPath ?? '',
           hosted: wireProject.repoKind === 'hosted',
-          defaultBranch: 'main',
+          defaultBranch: wireProject.baseBranch ?? '',
           description: wireProject.description ?? null,
         }
       : undefined
@@ -197,12 +198,16 @@ export function ProjectSettingsPage() {
             <SettingsRow label={t('仓库')}>{project?.repoName ?? ''}</SettingsRow>
           )}
           <SettingsRow label={t('目标分支')}>
-            <span
-              className={`prj-set-branch inline-flex w-32 items-center justify-between border px-2.5 font-mono ${SETTINGS_SELECT_TRIGGER_CLS}`}
-            >
-              {project?.defaultBranch ?? 'main'}
-              <ChevronDown width={14} height={14} className={ROW_ICON_CLS} />
-            </span>
+            {live && wireProject?.repoKind !== undefined ? (
+              <ProjectBaseBranchSelect project={wireProject} />
+            ) : (
+              <span
+                className={`prj-set-branch inline-flex w-32 items-center justify-between border px-2.5 font-mono ${SETTINGS_SELECT_TRIGGER_CLS}`}
+              >
+                {project?.defaultBranch ?? 'main'}
+                <ChevronDown width={14} height={14} className={ROW_ICON_CLS} />
+              </span>
+            )}
           </SettingsRow>
           {live && wireProject?.repoKind === 'github' && (
             <SettingsRow label={t('本机加速路径')}>

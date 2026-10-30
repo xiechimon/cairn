@@ -77,6 +77,7 @@ export const project = sqliteTable('project', {
   repoName: text('repoName'),
   githubRepo: text('githubRepo'),
   localPath: text('localPath'),
+  baseBranch: text('baseBranch'),
   autonomy: json<(AutonomySettings & Partial<ProjectMergeConfig>) | null>('autonomy'),
 });
 
@@ -151,6 +152,7 @@ export const build = sqliteTable('build', {
   withPlan: bool('withPlan').notNull(),
   prevPhase: text('prevPhase').$type<Phase | null>(),
   triggerSource: text('triggerSource').$type<TriggerSource>().notNull(),
+  scheduledBy: text('scheduledBy'),
   planDocId: text('planDocId'),
   errorMessage: text('errorMessage'),
   prUrl: text('prUrl'),

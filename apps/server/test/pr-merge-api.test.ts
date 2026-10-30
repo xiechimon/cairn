@@ -778,7 +778,7 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     const w = makeWorld({ pull: { baseRef: 'release' } });
     const err = await refusal(requestMerge(w.deps, w.buildId));
     expect(err.status).toBe(409);
-    expect(err.message).toContain('默认分支');
+    expect(err.message).toContain('project base branch');
     expect(w.fake.puts()).toEqual([]);
     expectUntouched(w);
   });

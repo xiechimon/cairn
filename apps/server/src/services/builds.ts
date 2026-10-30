@@ -110,11 +110,18 @@ import { agentForStep } from './dispatch-eligibility.js';
 import { stepActivityAt } from './dispatch-timeouts.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { markFirstPrPromptDue } from './first-pr-report.js';
-import { githubRepoOfProject, hasRepoBinding, projectOfTodo, readBuildChanges } from './git.js';
+import {
+  githubRepoOfProject,
+  hasRepoBinding,
+  projectOfTodo,
+  readBuildChanges,
+  repoDirFor,
+} from './git.js';
 import { readGithubAutonomyPause } from './github-autonomy-brake.js';
 import { githubTokenOrNull, teamGithubToken } from './github-connection.js';
 import { githubText } from './github-text.js';
 import type { HarnessEvalDispatchPort } from './harness-eval-coordinator.js';
+import { buildHostedMergeInstruction } from './hosted-merge-instruction.js';
 import { storeInfoReport } from './info-handoff.js';
 import { enqueueLocalMerge } from './local-merge.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
@@ -123,8 +130,9 @@ import { bindGateVerdict } from './merge-gate/verdict.js';
 import { githubGatePort } from './merge-gate-github.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { assertPhaseTransition, canTransitionPhase } from './phase.js';
+import { planHasOpenDecisions } from './plan-decisions.js';
 import { projectMergeConfigOf } from './projects.js';
-import { queuePushDigest, type VapidKeys } from './push.js';
+import type { VapidKeys } from './push.js';
 import { publishStepRow, toQuotaWait } from './quota-wait.js';
 import { retryLessonsOf } from './retry-lessons.js';
 import { assertSplitProposalExecutable } from './split-proposal.js';
@@ -399,7 +407,9 @@ function landReservedPhase(
       .where(eq(todo.id, todoRow.id))
       .run();
     const record = getTodo(deps, todoRow.id);
-    if (record) deps.hub.publishTodoDoc(record.teamId, record);
+    if (record) {
+      deps.hub.publishTodoDoc(record.teamId, record);
+    }
   }
   if (desired === 'done') {
     settleSplitOnDone(deps, todoRow.id);
@@ -797,6 +807,7 @@ export function startBuilds(
     assignment: Assignment;
     withPlan: boolean;
     triggerSource?: TriggerSource;
+    scheduledBy?: string;
   },
 ): BuildRecord[] {
   const triggerSource = input.triggerSource ?? 'user';
@@ -835,6 +846,7 @@ export function startBuilds(
         withPlan: input.withPlan,
         prevPhase: todoRecord.phase,
         triggerSource,
+        scheduledBy: input.scheduledBy ?? null,
         planDocId: null,
         errorMessage: null,
         prUrl: null,
@@ -1461,7 +1473,7 @@ export async function requestMerge(
     const local = await enqueueLocalMerge(
       deps,
       buildId,
-      listing.defaultBranch,
+      projectRow.baseBranch ?? listing.defaultBranch,
       false,
       todoRow.phase === 'failed',
     );
@@ -1487,7 +1499,19 @@ export async function requestMerge(
   assertPhaseTransition(todoRow.phase, 'done');
   assertMergeTools(deps, todoRow);
   insertGateAnnouncement(deps, buildId, MERGE_ANNOUNCEMENT, actor ?? deps.user.displayName);
-  enqueueStep(deps, buildId, 'merge', todoRow.teamId);
+  let prompt: string | undefined;
+  if (projectRow?.repoKind === 'hosted' && projectRow.repoName !== null) {
+    if (deps.reposDir === undefined) throw new HttpError(409, 'Hosted repository unavailable');
+    const dir = repoDirFor(deps.reposDir, todoRow.teamId, projectRow.repoName);
+    const { defaultBranch } = await systemGitOps.listBranches(dir);
+    prompt = buildHostedMergeInstruction({
+      projectId: projectRow.id,
+      repoName: projectRow.repoName,
+      baseBranch: projectRow.baseBranch ?? defaultBranch ?? 'main',
+      configuredBaseBranch: projectRow.baseBranch,
+    });
+  }
+  enqueueStep(deps, buildId, 'merge', todoRow.teamId, prompt);
   return { delegated: true };
 }
 
@@ -1896,10 +1920,11 @@ async function mergeThroughGithub(
         `PR #${prNumber} 的作者对仓库没有写权限（author_association ${githubText(pull.authorAssociation ?? '缺失')}），cairn 不经 API 合并它：请在 GitHub 上核对后合并（${hint}）。`,
       );
     }
-    if (pull.baseRef !== pull.defaultBranch) {
+    const baseBranch = projectOfTodo(deps.db, before.todoRow)?.baseBranch ?? pull.defaultBranch;
+    if (pull.baseRef !== baseBranch) {
       throw new HttpError(
         409,
-        `PR #${prNumber} 的目标分支「${githubText(pull.baseRef)}」不是默认分支「${githubText(pull.defaultBranch)}」，cairn 只把改动合进默认分支：请在 GitHub 上核对这张 PR。`,
+        `PR #${prNumber} targets branch "${githubText(pull.baseRef)}" instead of project base branch "${githubText(baseBranch)}". Check the PR base on GitHub before merging.`,
       );
     }
     if (pull.merged) {
@@ -2312,8 +2337,6 @@ function planContractOfStep(
   return checkPlanContract(latest.content);
 }
 
-const OPEN_DECISION_HEADING = /^(open questions|decisions needed|decision points)$/i;
-
 export const PLAN_AUTO_CONFIRM_GRACE_MS = 10 * 60_000;
 
 export function sweepPlanAutoConfirm(deps: BuildDeps, now: number = nowMs()): void {
@@ -2342,31 +2365,7 @@ export function sweepPlanAutoConfirm(deps: BuildDeps, now: number = nowMs()): vo
     if (liveStep !== undefined) continue;
     const latestPlan = latestPlanRow(deps, buildId);
     if (latestPlan === undefined || !checkPlanContract(latestPlan.content).ok) continue;
-    const planLines = latestPlan.content
-      .replace(/\r\n?/g, '\n')
-      .split('\n')
-      .map((l) => l.trim());
-    let openDecisions = false;
-    for (let i = 0; i < planLines.length && !openDecisions; i++) {
-      const name = (planLines[i] ?? '')
-        .replace(/^#{1,6}\s+/, '')
-        .replace(/\s+#+$/, '')
-        .replace(/\*\*|__/g, '')
-        .replace(/\s*[:：]$/, '')
-        .trim();
-      if (!OPEN_DECISION_HEADING.test(name)) continue;
-      const own = /^(#{1,6})\s/.exec(planLines[i] ?? '')?.[1]?.length;
-      const sectionLevel = own ?? (/^=+$/.test(planLines[i + 1] ?? '') ? 1 : 2);
-      for (const next of planLines.slice(i + 1)) {
-        if (next === '' || /^(=+|-+)$/.test(next)) continue;
-        const nextLevel = /^(#{1,6})\s/.exec(next)?.[1]?.length;
-        if (nextLevel !== undefined && nextLevel <= sectionLevel) break;
-        if (/^([-*]\s*)?(none|n\/a|nothing)\.?$/i.test(next)) break;
-        openDecisions = true;
-        break;
-      }
-    }
-    if (openDecisions) continue;
+    if (planHasOpenDecisions(latestPlan.content)) continue;
     const mergePolicy = projectMergeConfigSchema.parse({
       mergePolicy: projectOfTodo(deps.db, todoRow)?.autonomy?.mergePolicy,
     }).mergePolicy;
@@ -2722,19 +2721,6 @@ export function finishTodoDone(deps: BuildDeps, todoId: string, buildId: string)
   });
   advanceSplitWaves(deps, todoId);
   emitRuntimeBuildSpan(deps.db, buildId, 'done');
-  const todoRow = deps.db.select().from(todo).where(eq(todo.id, todoId)).get();
-  if (todoRow !== undefined) {
-    const buildRow = deps.db.select().from(build).where(eq(build.id, buildId)).get();
-    queuePushDigest(deps.db, deps.user.id, todoRow.teamId, {
-      title: 'PR 已合并',
-      body:
-        buildRow?.prNumber != null
-          ? `PR #${buildRow.prNumber} 已合并：#${todoRow.seqNum} ${todoRow.title}`
-          : `#${todoRow.seqNum} ${todoRow.title}`,
-      href: `/app/todo/${todoId}`,
-      tag: `${deps.user.id}:${todoId}`,
-    });
-  }
   markFirstPrPromptDue(deps.db, buildId);
 }
 
