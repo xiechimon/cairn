@@ -67,7 +67,7 @@ Read the PR opener and all commit authors with `gh pr view <n> --json author,com
 
 - Bot-opened PRs require exactly one commit authored by `Cairnwright` before a rebase merge. Check that neither its author name nor email contains `cairnwright[bot]`. Use the dispatcher's `~/.cairn/tools/merge-pr.sh` after inspecting its source and usage on the dispatch host. If the helper is unavailable or authorship is wrong, return the PR to the dispatcher for preparation.
 - Human-opened PRs use `gh pr merge <n> --squash --auto` after checking that none of their commit authors contains `cairnwright[bot]`.
-- Both paths require a pr-gate go with `mergedBy: 'auto-merge'` (every other PR goes to ian), fully checked Acceptance and no `needs-decision` label. After merging, verify the resulting main commit's author and its `commit-author` Actions result.
+- Both paths require a pr-gate go with `mergedBy: 'auto-merge'` (every other PR goes to ian), no unchecked tasks anywhere in the body and no `needs-decision` label. After merging, verify the resulting main commit's author and its `commit-author` Actions result.
 
 Squashing a bot-opened PR can attribute the main commit to the bot opener even when the branch commit has the required author. Rebase preserves the prepared commit's author. A later green push checks its own pushed range; historical bot commits outside that range are excluded, and their authorship remains unchanged.
 

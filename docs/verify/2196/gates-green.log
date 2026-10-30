@@ -1,0 +1,323 @@
+
+$ python3 scripts/pr-evidence-gate.test.py
+...............................
+----------------------------------------------------------------------
+Ran 31 tests in 1.493s
+
+OK
+Exit status: 0
+
+$ python3 scripts/pr-tasks-gate.test.py
+............
+----------------------------------------------------------------------
+Ran 12 tests in 0.760s
+
+OK
+Exit status: 0
+
+$ python3 scripts/pr-evidence-archive.test.py
+.............
+----------------------------------------------------------------------
+Ran 13 tests in 0.632s
+
+OK
+Exit status: 0
+
+$ node scripts/pr-gate-selfcheck.mjs
+PASS  clean change: go, auto-merge
+PASS  C-quoted path (core.quotePath on) is rejected
+PASS  unquoted non-ASCII ADR path routes to the user
+PASS  CI-called script outside the *gate* glob routes to the user
+PASS  rename out of a protected path (list built without --no-renames) is caught
+PASS  deletedFiles and linesChanged are each required
+PASS  deleted test file routes to the user
+PASS  over 800 lines routes to the user
+PASS  over 40 files routes to the user
+PASS  linesChanged must be a non-negative integer
+PASS  a path with a shell character is rejected
+PASS  CI gate helpers and data anywhere under scripts/ route to the user
+PASS  gate files outside root scripts/ route to the user (run 4)
+PASS  files that steer agents route to the user (run 4)
+PASS  a path a reviewer adds to protectedPaths routes to the user
+PASS  product source, tests, e2e and evidence do not route to the user
+PASS  paths outside the auto-merge set route to the user (run 5)
+PASS  agent-steering files the name list missed route to the user (run 5)
+PASS  eval ruler paths route to the user as protected (ADR 0025)
+PASS  harness eval dispatch tooling routes to the user as protected (#1614)
+PASS  case variants of protected paths route to the user (run 5)
+PASS  a protected path only the safety reviewer lists is matched (run 5)
+PASS  a deleted test helper (test directory only) routes to the user (run 5)
+PASS  a deleted colocated test (suffix only) routes to the user (run 5)
+PASS  a deleted path missing from changedFiles is an args error (run 5)
+PASS  pr and ticket must be positive integers (run 5)
+PASS  a path with a quote or space is rejected (run 5)
+PASS  configs CI runs under route to the user, at the root too
+PASS  a deletion only the safety reviewer reports routes to the user
+PASS  a larger line count from the safety reviewer routes to the user
+PASS  binaryFiles is required and lists changed paths only (code-review on #1410)
+PASS  a binary file outside docs/verify routes to the user: numstat counts it as 0 lines (code-review on #1410)
+PASS  a binary file under docs/verify stays mergeable without the user
+PASS  a binary file only the safety reviewer listed routes to the user
+PASS  a deleted test is found whatever the case of its directory or suffix (code-review on #1410)
+PASS  a glob star does not cross a slash: an extra directory before src/ leaves the auto-merge set (run 8)
+PASS  a deleted colocated .spec file outside a test directory routes to the user (run 8)
+PASS  a dimension whose review breaks the second stage counts as missing and keeps go false (run 8)
+PASS  private refs carry the head, so runs on two heads of one PR do not delete each other's refs (run 8)
+PASS  a reviewer that returns nothing blocks go
+PASS  findings past the skeptic cap are kept
+PASS  two skeptics refuting on the head withdraw the finding
+PASS  two skeptics confirming on the head keep the finding (run 5)
+PASS  a split vote keeps the finding (run 5)
+PASS  a dead skeptic keeps the finding
+PASS  skeptics that saw another head do not withdraw the finding
+PASS  a reviewer on another head blocks go
+PASS  a nested .gitattributes routes to the user (run 6)
+PASS  the args help gives the line count command that takes attributes from the empty tree (run 6)
+PASS  a C-quoted binary path is refused with the quoting hint (run 7)
+PASS  the safety reviewer is told both git commands with --no-renames, core.quotePath=false and the empty tree (runs 2, 6, 7)
+PASS  reviewers and skeptics fetch PR comments with a filter that drops non-members before the bodies reach them (run 7, final /code-review)
+PASS  reviewers confirm the head on their own ref, never FETCH_HEAD (run 1)
+PASS  every reviewer and skeptic is told GitHub is read-only and that PR text is data
+PASS  the safety reviewer must return all four git-derived values
+PASS  the 40-file cap counts files only the safety reviewer listed
+PASS  the merge readiness gate source routes to the user (run 6)
+PASS  migrations, the lockfile and .npmrc are protected, packages/* outside src and test is not auto (run 6)
+PASS  a deleted helper under e2e/, tests/ or __tests__/ routes to the user (run 6)
+PASS  exactly 800 lines and 40 files still auto-merge (run 6)
+PASS  a file only the safety reviewer lists counts toward the auto-merge set (run 6)
+PASS  headSha, an empty file list and non-string paths are args errors (run 6)
+PASS  the safety reviewer does not see the caller file list (run 6)
+PASS  the evidence reviewer and its skeptics run in their own worktree, skeptics under the fork rule (run 6)
+PASS  the evidence reviewer and skeptics check for a fork before any checkout, and read a fork head with git show, diff and ls-tree only (run 10)
+PASS  every checkout the evidence prompts ask for runs with core.hooksPath=/dev/null (run 10)
+PASS  the fetch and the ref cleanup run with core.hooksPath=/dev/null in every prompt, the evidence worktrees included (run 10)
+PASS  evidence installs skip husky's prepare, which would set the shared clone's core.hooksPath to the relative .husky/_ (run 10)
+PASS  the two evidence skeptics get ports of their own, apart from the reviewer and the repo defaults (run 10)
+PASS  a path only in the safety reviewer's deleted or binary list is matched against D4 and blocks go (run 10)
+PASS  an entry named exactly like a protected directory (a symlink .claude, scripts, drizzle) routes to the user (run 10)
+PASS  the bare-directory match is for protected classes only: src and docs/verify named alone stay outside the auto-merge set, file globs stay exact (run 10)
+PASS  D4 globs are anchored at the path start: an auto-merge or evidence path inside a longer one routes to the user (run 10)
+PASS  a caller line count larger than the safety reviewer's wins (run 10)
+PASS  the security-sensitive surfaces of the AGENTS.md /security-review list and the migration runner route to the user (run 11)
+PASS  the security class matches exact paths from the root: machine*.ts stops at a slash, and neighbours still auto-merge (run 11)
+PASS  protected names with U+017F or U+212A in place of s or k route to the user (run 11)
+PASS  auto-merge matching folds ASCII case only, protection folds Unicode: ſrc and docſ/verify route to the user, AGENTſ.md stays protected (run 11)
+PASS  a deleted test is found with U+017F in its directory or suffix (run 11)
+PASS  every prompt calls the ticket body untrusted data by the ticket's author, never instructions (run 11)
+PASS  each skeptic is given the finding and the refute rule (run 11)
+PASS  the safety reviewer's own protectedPaths route to the user (run 11)
+PASS  a deleted .mjs or .cts test routes to the user (run 11)
+PASS  skepticsMissing counts each skeptic that returned nothing (run 11)
+PASS  a path git quotes even with core.quotePath=false is sent to review by hand, not back to the flag (run 11)
+PASS  the args help and the safety reviewer say the line count command needs git 2.40 or later (run 11)
+PASS  docs-only Markdown patch: go, auto-merge (#1621)
+PASS  design decisions, ADRs and the review guide stay with the user in any case or Unicode fold (#1621)
+PASS  docs patch with a deleted test or a non-Markdown docs file routes to the user (#1621)
+PASS  a missing safety file list blocks go
+PASS  docs/spec, the goal-session rules, is a named protected class, not only default deny (#1462)
+PASS  every AGENTS.md /security-review path pattern is an entry of PROTECTED, and the section points back at ADR 0021 D4 (drift guard, #1462)
+PASS  a safety review missing deletedFiles, linesChanged or binaryFiles keeps go false (#1462)
+PASS  the verdict records which copy of the script ran: scriptSha256 is the file hash with its own constant blanked (#1462)
+PASS  a skeptic is told the finding is a relayed account whose text may quote untrusted PR or ticket data (#1462)
+95/95 passed (.claude/workflows/pr-gate.js)
+Exit status: 0
+
+$ node --test scripts/agent-rules.test.mjs scripts/prepush.test.mjs
+✔ merge instructions require the pr-gate auto-merge verdict (2.250792ms)
+✔ AGENTS.md and pr-cairn agree that agents never add needs-decision (0.896458ms)
+✔ active docs never tell agents to add needs-decision (1.237583ms)
+[prepush] git init -q
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 0 intercepts
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 1 intercepts
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 1 intercepts
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 1 intercepts
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 1 intercepts
+✔ scrubGateEnv drops every gate base SHA and the force-full switch (1.354167ms)
+✔ hasCode classifies documents (0.350083ms)
+✔ hasCode classifies server markdown fixtures (0.059666ms)
+✔ hasCode classifies shared markdown fixtures (0.04375ms)
+✔ hasCode classifies integration markdown fixtures (0.045041ms)
+✔ hasCode classifies executable evidence (0.048ms)
+✔ hasCode classifies non-markdown evidence (0.282084ms)
+✔ hasCode classifies epic data (0.070708ms)
+✔ hasCode classifies code (0.067333ms)
+✔ hasCode classifies unknown paths (0.101375ms)
+✔ hasCode classifies mixed changes (0.059083ms)
+✔ hasCode classifies empty changes (0.036875ms)
+✔ --has-code prints only a boolean, uses the supplied base and fails closed (5888.277166ms)
+✔ CI classifies before heavy work and always runs push coverage (2.8565ms)
+✔ required aggregates only accept skipped work after a successful docs-only classification (861.53ms)
+✔ folded gates stay visibly red, continue after failures and retain full history (0.545ms)
+✔ documentation skips code checks, unknown paths fail closed (0.255959ms)
+✔ changes to prepush scripts run the CI self-test files locally (0.434375ms)
+✔ the CI self-test step runs selfTests through prepush and names no self-test file itself (0.183167ms)
+✔ --self-test runs exactly the selfTests files, skips change detection and fails with them (1078.740334ms)
+✔ escape-trace tests stay mandatory for every code prepush plan (0.120167ms)
+✔ the recording gate runs in local prepush, in CI prepush and in the CI self-test step (0.092625ms)
+✔ a ledger entry change runs the ledger gate even when only documents changed (0.07ms)
+✔ local code checks include both UI gates and affected e2e (0.045958ms)
+✔ every CI node scripts step also runs in local prepush or is listed as CI-only (0.297834ms)
+✔ a web change runs the whole web unit suite, which catches tests that read sources instead of importing them (0.042209ms)
+✔ local gates default their base to the merge-base, not the moving origin/main tip (6.53825ms)
+✔ affected e2e receives non-markdown evidence paths as code (0.053292ms)
+✔ e2e coverage check passes on the real suite and names an unmapped spec (324.970833ms)
+✔ a board card source change selects the spec that reads its title (102.851125ms)
+✔ CI shares the plan but keeps advisory and full e2e in separate jobs (0.323791ms)
+✔ CLI skips real document changes and rejects a missing base (2302.964291ms)
+✔ a stale local origin/main is refreshed by fetch before computing changes (769.578208ms)
+✔ fetch failure falls back to the local origin/main and prints a stale notice (495.82475ms)
+✔ prepush vitest only forgives files listed as known local red (1.178542ms)
+✔ plan children do not inherit the git hook repository binding (49.236708ms)
+✔ only gate scripts are mapped to a ledger category when a step goes red (0.151709ms)
+✔ a gate that blocks a push records one intercept for every entry whose safeguard names it (33.026167ms)
+✔ a red gate step leaves the repository untouched and still exits non-zero (99.603708ms)
+✔ retrying the same gate on the same branch after another commit records nothing new (217.294125ms)
+✔ CAIRN_GATE_LOG appends the gate-red events for a CI job to collect (213.708625ms)
+✔ a checkout without docs/lessons, or CAIRN_LESSONS_LEDGER=0, leaves the tree untouched (1.679167ms)
+✔ logging is opt-in and never projects counters into the checkout (9.250791ms)
+✔ CI doc-reader checks select the real codeowners reader for identity documentation (29.587458ms)
+✔ workflow preserves comments about external behavior (0.320083ms)
+✔ forced push coverage preserves the English gate range across multiple commits (415.186417ms)
+ℹ tests 49
+ℹ suites 0
+ℹ pass 49
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 13073.769958
+Exit status: 0
+
+$ pnpm typecheck
+$ pnpm -r typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/daemon typecheck$ tsc --noEmit
+apps/web typecheck$ tsc --noEmit
+apps/server typecheck$ tsc --noEmit
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+Exit status: 0
+
+$ pnpm lint
+$ biome ci .
+[0mapps/server/test/feishu-config.test.ts[0m[0m:[0m[0m144[0m[0m:[0m[0m7[0m[0m [0m[0m]8;;https://biomejs.dev/linter/rules/use-flat-map\lint/complexity/useFlatMap]8;;\[0m[0m [0m[0m[30m[47m FIXABLE [0m[0m [0m[0m━━━━━━━━━━━━━━━━━━[0m[0m
+
+[0m[0m  [0m[0m[1m[34mℹ[0m[0m [0m[0m[34mThe call chain [0m[0m[1m[34m.map().flat()[0m[0m[34m can be replaced with a single [0m[0m[1m[34m.flatMap()[0m[0m[34m call.[0m[0m
+[0m[0m  [0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m142 │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m{[0m[0m [0m[0md[0m[0mb[0m[0m:[0m[0m [0m[0ms[0m[0m.[0m[0md[0m[0mb[0m[0m,[0m[0m [0m[0mb[0m[0mo[0m[0mx[0m[0m:[0m[0m [0m[0ms[0m[0m.[0m[0ms[0m[0me[0m[0mc[0m[0mr[0m[0me[0m[0mt[0m[0mB[0m[0mo[0m[0mx[0m[0m [0m[0m}[0m[0m,[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m143 │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0ms[0m[0m.[0m[0mt[0m[0me[0m[0ma[0m[0mm[0m[0m.[0m[0mi[0m[0md[0m[0m,[0m[0m
+[0m[0m  [0m[0m[1m[31m>[0m[0m [0m[0m[1m144 │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0ms[0m[0m.[0m[0md[0m[0mb[0m[0m
+[0m[0m  [0m[0m [0m[0m [0m[0m [0m[0m[1m   │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m
+[0m[0m  [0m[0m[1m[31m>[0m[0m [0m[0m[1m145 │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m.[0m[0ms[0m[0me[0m[0ml[0m[0me[0m[0mc[0m[0mt[0m[0m([0m[0m)[0m[0m
+[0m[0m  [0m[0m[1m[31m>[0m[0m [0m[0m[1m146 │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m.[0m[0mf[0m[0mr[0m[0mo[0m[0mm[0m[0m([0m[0mf[0m[0me[0m[0mi[0m[0ms[0m[0mh[0m[0mu[0m[0mB[0m[0mi[0m[0mn[0m[0md[0m[0mi[0m[0mn[0m[0mg[0m[0m)[0m[0m
+[0m[0m  [0m[0m[1m[31m>[0m[0m [0m[0m[1m147 │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m.[0m[0ma[0m[0ml[0m[0ml[0m[0m([0m[0m)[0m[0m
+[0m[0m  [0m[0m[1m[31m>[0m[0m [0m[0m[1m148 │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m.[0m[0mm[0m[0ma[0m[0mp[0m[0m([0m[0m([0m[0mr[0m[0mo[0m[0mw[0m[0m)[0m[0m [0m[0m=[0m[0m>[0m[0m [0m[0m[[0m[0mr[0m[0mo[0m[0mw[0m[0m.[0m[0ma[0m[0mp[0m[0mp[0m[0mI[0m[0md[0m[0mC[0m[0mi[0m[0mp[0m[0mh[0m[0me[0m[0mr[0m[0m,[0m[0m [0m[0mr[0m[0mo[0m[0mw[0m[0m.[0m[0ma[0m[0mp[0m[0mp[0m[0mS[0m[0me[0m[0mc[0m[0mr[0m[0me[0m[0mt[0m[0mC[0m[0mi[0m[0mp[0m[0mh[0m[0me[0m[0mr[0m[0m][0m[0m)[0m[0m
+[0m[0m  [0m[0m[1m[31m>[0m[0m [0m[0m[1m149 │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m.[0m[0mf[0m[0ml[0m[0ma[0m[0mt[0m[0m([0m[0m)[0m[0m,[0m[0m
+[0m[0m  [0m[0m [0m[0m [0m[0m [0m[0m[1m   │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m150 │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m)[0m[0m,[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m151 │ [0m[0m [0m[0m [0m[0m)[0m[0m.[0m[0mt[0m[0mo[0m[0mE[0m[0mq[0m[0mu[0m[0ma[0m[0ml[0m[0m([0m[0m{[0m[0m}[0m[0m)[0m[0m;[0m[0m
+[0m[0m  [0m[0m
+[0m[0m  [0m[0m[1m[34mℹ[0m[0m [0m[0m[34mUsing [0m[0m[1m[34m.flatMap()[0m[0m[34m avoids the creation of an intermediate array.[0m[0m
+[0m[0m  [0m[0m
+[0m[0m  [0m[0m[1m[34mℹ[0m[0m [0m[0m[34mSafe fix: Replace the chain with [0m[0m[1m[34m.flatMap()[0m[0m[34m.[0m[0m
+[0m[0m  [0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m146[0m[0m [0m[0m[1m146[0m[0m[1m │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m.[0m[0mf[0m[0mr[0m[0mo[0m[0mm[0m[0m([0m[0mf[0m[0me[0m[0mi[0m[0ms[0m[0mh[0m[0mu[0m[0mB[0m[0mi[0m[0mn[0m[0md[0m[0mi[0m[0mn[0m[0mg[0m[0m)[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m147[0m[0m [0m[0m[1m147[0m[0m[1m │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m.[0m[0ma[0m[0ml[0m[0ml[0m[0m([0m[0m)[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m148[0m[0m [0m[0m [0m[0m [0m[0m [0m[0m[1m │ [0m[0m[31m-[0m[0m [0m[0m[2m[31m·[0m[0m[2m[31m·[0m[0m[2m[31m·[0m[0m[2m[31m·[0m[0m[2m[31m·[0m[0m[2m[31m·[0m[0m[2m[31m·[0m[0m[2m[31m·[0m[0m[31m.[0m[0m[1m[31mm[0m[0m[1m[31ma[0m[0m[1m[31mp[0m[0m[31m([0m[0m[31m([0m[0m[31mr[0m[0m[31mo[0m[0m[31mw[0m[0m[31m)[0m[0m[2m[31m·[0m[0m[31m=[0m[0m[31m>[0m[0m[2m[31m·[0m[0m[31m[[0m[0m[31mr[0m[0m[31mo[0m[0m[31mw[0m[0m[31m.[0m[0m[31ma[0m[0m[31mp[0m[0m[31mp[0m[0m[31mI[0m[0m[31md[0m[0m[31mC[0m[0m[31mi[0m[0m[31mp[0m[0m[31mh[0m[0m[31me[0m[0m[31mr[0m[0m[31m,[0m[0m[2m[31m·[0m[0m[31mr[0m[0m[31mo[0m[0m[31mw[0m[0m[31m.[0m[0m[31ma[0m[0m[31mp[0m[0m[31mp[0m[0m[31mS[0m[0m[31me[0m[0m[31mc[0m[0m[31mr[0m[0m[31me[0m[0m[31mt[0m[0m[31mC[0m[0m[31mi[0m[0m[31mp[0m[0m[31mh[0m[0m[31me[0m[0m[31mr[0m[0m[31m][0m[0m[1m[31m)[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m149[0m[0m [0m[0m [0m[0m [0m[0m [0m[0m[1m │ [0m[0m[31m-[0m[0m [0m[0m[1m[2m[31m·[0m[0m[1m[2m[31m·[0m[0m[1m[2m[31m·[0m[0m[1m[2m[31m·[0m[0m[1m[2m[31m·[0m[0m[1m[2m[31m·[0m[0m[1m[2m[31m·[0m[0m[1m[2m[31m·[0m[0m[1m[31m.[0m[0m[1m[31mf[0m[0m[1m[31ml[0m[0m[1m[31ma[0m[0m[1m[31mt[0m[0m[1m[31m([0m[0m[31m)[0m[0m[31m,[0m[0m
+[0m[0m  [0m[0m  [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m[1m148[0m[0m[1m │ [0m[0m[32m+[0m[0m [0m[0m[2m[32m·[0m[0m[2m[32m·[0m[0m[2m[32m·[0m[0m[2m[32m·[0m[0m[2m[32m·[0m[0m[2m[32m·[0m[0m[2m[32m·[0m[0m[2m[32m·[0m[0m[32m.[0m[0m[1m[32mf[0m[0m[1m[32ml[0m[0m[1m[32ma[0m[0m[1m[32mt[0m[0m[1m[32mM[0m[0m[1m[32ma[0m[0m[1m[32mp[0m[0m[32m([0m[0m[32m([0m[0m[32mr[0m[0m[32mo[0m[0m[32mw[0m[0m[32m)[0m[0m[2m[32m·[0m[0m[32m=[0m[0m[32m>[0m[0m[2m[32m·[0m[0m[32m[[0m[0m[32mr[0m[0m[32mo[0m[0m[32mw[0m[0m[32m.[0m[0m[32ma[0m[0m[32mp[0m[0m[32mp[0m[0m[32mI[0m[0m[32md[0m[0m[32mC[0m[0m[32mi[0m[0m[32mp[0m[0m[32mh[0m[0m[32me[0m[0m[32mr[0m[0m[32m,[0m[0m[2m[32m·[0m[0m[32mr[0m[0m[32mo[0m[0m[32mw[0m[0m[32m.[0m[0m[32ma[0m[0m[32mp[0m[0m[32mp[0m[0m[32mS[0m[0m[32me[0m[0m[32mc[0m[0m[32mr[0m[0m[32me[0m[0m[32mt[0m[0m[32mC[0m[0m[32mi[0m[0m[32mp[0m[0m[32mh[0m[0m[32me[0m[0m[32mr[0m[0m[32m][0m[0m[32m)[0m[0m[32m,[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m150[0m[0m [0m[0m[1m149[0m[0m[1m │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m)[0m[0m,[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m151[0m[0m [0m[0m[1m150[0m[0m[1m │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m)[0m[0m.[0m[0mt[0m[0mo[0m[0mE[0m[0mq[0m[0mu[0m[0ma[0m[0ml[0m[0m([0m[0m{[0m[0m}[0m[0m)[0m[0m;[0m[0m
+[0m[0m  [0m[0m
+[0m
+[0m[34mChecked 1256 files in 998[0m[0m[2m[34mms[0m[0m[34m.[0m[0m[34m No fixes applied.[0m[0m
+[0m[0m[34mFound [0m[0m[34m1[0m[0m[34m info.[0m
+Exit status: 0
+
+$ node scripts/english-only-gate.mjs
+english-only-gate: 0 line(s) with Chinese text
+Exit status: 0
+
+$ node scripts/comment-discipline-gate.mjs
+comment-discipline-gate: 0 new comment line(s)
+Exit status: 0
+
+$ node scripts/single-use-helper-gate.mjs
+single-use-helper-gate: 0 single-use helper(s)
+Exit status: 0
+
+$ node scripts/ci-job-structure-gate.mjs
+ci-job-structure: GREEN (every named step sits in its pinned job)
+Exit status: 0
+
+$ node scripts/pr-evidence-workflow-gate.mjs
+pr-evidence-workflow: GREEN (required-check shape intact)
+Exit status: 0
+
+$ pnpm spec:parse
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1391 tests in 198 files collected, disk count matches (1.5s)
+[spec-parse-gate] integration/test: 65 test files parsed clean by tsc (1.8s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+Exit status: 0
+
+$ node scripts/lessons-ledger-gate.mjs
+lessons ledger ok
+Exit status: 0
+
+$ git diff --exit-code HEAD -- .github/workflows/ci.yml scripts/prepush.mjs
+Exit status: 0
+
+$ git diff --exit-code origin/main...HEAD -- .github/workflows/ci.yml scripts/prepush.mjs
+Exit status: 0
+
+$ git diff --check
+Exit status: 0
+
+$ git diff --cached --exit-code
+Exit status: 0
+
+$ node --test scripts/agent-rules.test.mjs
+✔ merge instructions require the pr-gate auto-merge verdict (1.671208ms)
+✔ AGENTS.md and pr-cairn agree that agents never add needs-decision (0.624833ms)
+✔ active docs never tell agents to add needs-decision (0.969292ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 119.73725
+Exit status: 0
+
+$ python3 scripts/pr-evidence-gate.test.py SectionContractTests.test_weekly_workflow_body_with_real_rendered_summary_passes -v
+test_weekly_workflow_body_with_real_rendered_summary_passes (__main__.SectionContractTests.test_weekly_workflow_body_with_real_rendered_summary_passes) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.240s
+
+OK
+Exit status: 0
+
+# round 3 fix: pr-tasks-gate.test.py
+.............
+----------------------------------------------------------------------
+Ran 13 tests in 4.197s
+
+OK
+# pr-evidence-gate.test.py
+................................
+----------------------------------------------------------------------
+Ran 32 tests in 13.937s
+
+OK

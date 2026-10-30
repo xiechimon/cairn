@@ -1,17 +1,10 @@
 name: pr-evidence
 
-# PR body evidence gate (#750, #939, #940, #1079; tasks check added by
-# #1240; decision guard added 2026-10-21 after #1435): the body must answer the "Upstream"
-# and "Verified" template sections, image links (any host by extension; media
-# hosts by URL shape) must be embedded (`![...]()`, not `[...]()`) and must
-# answer HTTP 200, and the body's Acceptance section must carry at least one
-# task-list item with none unchecked.
-#
 # The decision guard: a PR carrying the `needs-decision` label is red here
 # until a person removes the label, and while the label is on, a run also
-# disarms GitHub auto-merge on the PR. An unchecked Acceptance item adds the
-# label. This is what keeps a merge from landing while a human decision is
-# pending, which happened on 2026-10-21 (#1435: auto-merge was armed, the
+# disarms GitHub auto-merge on the PR. An unchecked task only turns the
+# pr-tasks step red and never adds the label. This keeps a merge from landing
+# while a human decision is pending, which happened on 2026-10-21 (#1435: auto-merge was armed, the
 # orchestrator edited the body green while still asking the user, and the
 # merge fired when `check` passed; this job was advisory then). The job is a
 # required status check on main (pinned to the Actions app), so a red run
@@ -116,7 +109,7 @@ jobs:
         if: ${{ !cancelled() && steps.pr.outcome == 'success' }}
         run: python3 scripts/pr-evidence-gate.py "$RUNNER_TEMP/pr-body.md" "$RUNNER_TEMP/pr-evidence-context.json"
 
-      - name: Check PR body tasks (Acceptance checklist exists and is fully checked)
+      - name: Check PR body tasks (no unchecked task anywhere)
         if: ${{ !cancelled() && steps.pr.outcome == 'success' }}
         run: |
           set -o pipefail
@@ -130,7 +123,7 @@ jobs:
 
       # A pending decision must not be racing an armed auto-merge: whenever
       # the needs-decision label is on, auto-merge is disarmed. An unchecked
-      # Acceptance item only turns the pr-tasks step red and never adds the
+      # task only turns the pr-tasks step red and never adds the
       # label, so checking the item turns the PR green with no manual label
       # removal. Disabling an unarmed auto-merge is a no-op and uses the
       # workflow token, so it does not trigger another workflow run.

@@ -317,7 +317,7 @@
   },
   "direct-vitest-skipped-slot": {
     "Intercepts": 1,
-    "Recurrences": 0
+    "Recurrences": 1
   },
   "directory-wide-absence-assertion": {
     "Intercepts": 1,
@@ -332,6 +332,10 @@
     "Recurrences": 0
   },
   "dispatch-without-duplicate-check": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "docs-only-predicate-too-narrow": {
     "Intercepts": 0,
     "Recurrences": 0
   },
@@ -579,6 +583,10 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
+  "incomplete-legacy-review-waiver": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "infinity-lost-in-json": {
     "Intercepts": 0,
     "Recurrences": 0
@@ -652,6 +660,10 @@
     "Recurrences": 0
   },
   "malformed-review-page": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "markdown-comment-visibility": {
     "Intercepts": 0,
     "Recurrences": 0
   },
@@ -831,6 +843,10 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
+  "pr-body-consumer-drift": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "pr-detail-timestamp": {
     "Intercepts": 0,
     "Recurrences": 0
@@ -839,9 +855,13 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
-  "prepush-selftest-not-run": {
+  "prepush-duplicate-suites": {
     "Intercepts": 0,
     "Recurrences": 0
+  },
+  "prepush-selftest-not-run": {
+    "Intercepts": 0,
+    "Recurrences": 2
   },
   "prepush-skipped-ui-gates": {
     "Intercepts": 2,

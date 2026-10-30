@@ -1,8 +1,8 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { appendFileSync, existsSync, mkdirSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { acquireSlot, leaseEnv, slotPortReport } from './heavy-slots.mjs';
+import { acquireSlot, leaseEnv } from './heavy-slots.mjs';
 import { interceptEventsForGate, loadLedger } from './lessons-ledger-gate.mjs';
 import { scrubGitEnv } from './scrub-git-env.mjs';
 
@@ -24,6 +24,11 @@ export const ciOnlyScripts = {
   'scripts/check-closing-keyword.mjs': 'reads the PR event payload (GITHUB_EVENT_PATH)',
   'scripts/baseline-owner-gate.mjs':
     'reads the PR event payload and issue labels through the GitHub token',
+};
+
+export const ciOnlyTestSteps = {
+  'scripts/ops/backup-server-db.test.mjs':
+    'needs GNU rsync 3.x and the rrsync script the ops-backup-test job downloads',
 };
 
 export const selfTests = [
@@ -56,14 +61,38 @@ export const localOnly = [
   ['node', 'scripts/lint-warning-cap.mjs'],
 ];
 
-const DOCS = /(?:\.md$|^LICENSE$)/;
+const SOURCE_TREES = /^(apps|packages|integration)\//;
+const MARKDOWN = /(?:\.md$|^LICENSE$)/;
+const DATA =
+  /\.(?:png|jpe?g|gif|webp|svg|webm|mp4|log|txt|json|jsonl|ndjson|csv|drawio|diff|html)$/;
+const EXECUTABLE = /\.(?:[cm]?[jt]sx?|sh|bash|zsh|py)$/;
+
+function isDocument(path) {
+  if (SOURCE_TREES.test(path)) return false;
+  if (MARKDOWN.test(path)) return true;
+  if (!path.startsWith('docs/') || !DATA.test(path)) return false;
+  const dir = join(root, dirname(path));
+  return !existsSync(dir) || !readdirSync(dir).some((name) => EXECUTABLE.test(name));
+}
 
 export function hasCode(paths) {
-  return paths.some(
-    (path) =>
-      !path.startsWith('.claude/epics/') &&
-      (/^(apps|packages|integration)\//.test(path) || !DOCS.test(path)),
-  );
+  return paths.some((path) => !path.startsWith('.claude/epics/') && !isDocument(path));
+}
+
+export function workflowTestSteps(workflows = join(root, '.github/workflows')) {
+  if (!existsSync(workflows)) return [];
+  return readdirSync(workflows)
+    .filter((name) => name.endsWith('.yml'))
+    .flatMap((name) =>
+      [
+        ...readFileSync(join(workflows, name), 'utf8').matchAll(
+          /node --test((?: [\w./-]+\.test\.mjs)+)/g,
+        ),
+      ].map((match) => ({
+        workflow: `.github/workflows/${name}`,
+        tests: match[1].trim().split(' '),
+      })),
+    );
 }
 
 export function prepushPlan(paths, mode = 'local', forceFull = false) {
@@ -72,7 +101,7 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
   const language = ['node', 'scripts/english-only-gate.mjs'];
   const ledgerGate = ['node', 'scripts/lessons-ledger-gate.mjs'];
   const codePaths = paths.filter((path) => hasCode([path]));
-  const docPaths = paths.filter((path) => DOCS.test(path));
+  const docPaths = paths.filter(isDocument);
   if (codePaths.length === 0 && !forceFull) {
     const checks = [language];
     if (paths.some((path) => path === 'docs/lessons.md' || path.startsWith('docs/lessons/')))
@@ -116,12 +145,20 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
         )
           ? [selfTest]
           : []),
-        ['node', 'scripts/prepush-vitest.mjs'],
-        ...(paths.some((path) => path.startsWith('apps/web/'))
-          ? [['pnpm', '--filter', '@cairn/web', 'test']]
-          : []),
+        ...workflowTestSteps()
+          .filter(({ workflow, tests }) =>
+            paths.some(
+              (path) =>
+                path === workflow ||
+                tests.some(
+                  (test) => path === test || path === test.replace(/\.test\.mjs$/, '.mjs'),
+                ),
+            ),
+          )
+          .filter(({ tests }) => !tests.some((test) => test in ciOnlyTestSteps))
+          .map(({ tests }) => ['node', '--test', ...tests])
+          .filter((step) => !required.some((args) => args.join(' ') === step.join(' '))),
         ...advisory,
-        ['pnpm', '--filter', '@cairn/web', 'e2e:affected', '--', ...codePaths],
       ];
 }
 
@@ -249,14 +286,7 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
             args[0]?.slice(2) ?? 'local',
             process.env.PREPUSH_FORCE_FULL === 'true',
           );
-  const lease = plan.length > 0 ? await acquireSlot() : null;
-  if (lease !== null && plan.some((step) => step.includes('e2e:affected'))) {
-    const conflict = slotPortReport({ slot: lease.slot });
-    if (conflict !== null) {
-      console.error(conflict);
-      process.exit(1);
-    }
-  }
+  const lease = plan.some((step) => step.includes('e2e')) ? await acquireSlot() : null;
   runPlan(plan, { cwd: root, env: leaseEnv(lease) });
   console.log(`[prepush] PASS (${plan.length} checks)`);
 }

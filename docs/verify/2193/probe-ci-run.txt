@@ -1,0 +1,14 @@
+# Probe PR #2194 (base claude/2193-docs-only-ci, one changed file: docs/verify/2193/probe.log)
+# ci run 41012126413, jobs: name, conclusion, started, completed
+changes	success	2026-10-30T06:06:20Z	2026-10-30T06:06:33Z
+gates	success	2026-10-30T06:06:20Z	2026-10-30T06:07:04Z
+check-core	success	2026-10-30T06:06:34Z	2026-10-30T06:07:37Z
+e2e-gate	success	2026-10-30T06:06:35Z	2026-10-30T06:06:38Z
+ops-backup-test	skipped	2026-10-30T06:06:33Z	2026-10-30T06:06:33Z
+pack-smoke	skipped	2026-10-30T06:06:33Z	2026-10-30T06:06:33Z
+dead-class-gate	skipped	2026-10-30T06:06:33Z	2026-10-30T06:06:33Z
+e2e	skipped	2026-10-30T06:06:33Z	2026-10-30T06:06:33Z
+vitest-light	skipped	2026-10-30T06:06:33Z	2026-10-30T06:06:33Z
+vitest-integration	skipped	2026-10-30T06:06:33Z	2026-10-30T06:06:33Z
+check	success	2026-10-30T06:07:39Z	2026-10-30T06:07:42Z
+# run wall time 06:06:20 -> 06:07:42 = 82 s; #2188 (same kind of change on main's classifier) ran e2e x4 and both vitest jobs, 05:10 -> 05:18

@@ -1,0 +1,259 @@
+[prepush] git init -q
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 0 intercepts
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 1 intercepts
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 1 intercepts
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 1 intercepts
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 1 intercepts
+✔ scrubGateEnv drops every gate base SHA and the force-full switch (15.93425ms)
+✔ hasCode classifies documents (1.7075ms)
+✔ hasCode classifies server markdown fixtures (0.170667ms)
+✔ hasCode classifies shared markdown fixtures (0.13275ms)
+✔ hasCode classifies integration markdown fixtures (0.15425ms)
+✔ hasCode classifies executable evidence (0.129542ms)
+✖ hasCode classifies non-markdown evidence (1.182167ms)
+✖ hasCode classifies the #2188 lessons and evidence change (0.213292ms)
+✔ hasCode classifies epic data (0.146959ms)
+✔ hasCode classifies code (2.719916ms)
+✔ hasCode classifies unknown paths (0.189875ms)
+✔ hasCode classifies mixed changes (0.147875ms)
+✔ hasCode classifies empty changes (0.09675ms)
+✔ --has-code prints only a boolean, uses the supplied base and fails closed (5694.185417ms)
+✔ CI classifies before heavy work and always runs push coverage (4.28625ms)
+✔ required aggregates only accept skipped work after a successful docs-only classification (7053.507583ms)
+✔ folded gates stay visibly red, continue after failures and retain full history (2.299458ms)
+✔ documentation skips code checks, unknown paths fail closed (1.89675ms)
+✔ changes to prepush scripts run the CI self-test files locally (2.814542ms)
+✔ the CI self-test step runs selfTests through prepush and names no self-test file itself (0.706125ms)
+✔ --self-test runs exactly the selfTests files, skips change detection and fails with them (4048.718792ms)
+✔ escape-trace tests stay mandatory for every code prepush plan (0.622375ms)
+✔ the recording gate runs in local prepush, in CI prepush and in the CI self-test step (0.364ms)
+✔ a ledger entry change runs the ledger gate even when only documents changed (0.240083ms)
+✔ local code checks include both UI gates and affected e2e (0.143583ms)
+✔ every CI node scripts step also runs in local prepush or is listed as CI-only (0.793667ms)
+✔ a web change runs the whole web unit suite, which catches tests that read sources instead of importing them (0.166541ms)
+✔ local gates default their base to the merge-base, not the moving origin/main tip (12.408125ms)
+✖ affected e2e receives executable evidence as code and data evidence as documents (1.843416ms)
+✖ a docs-only data change still runs every test that reads the changed file (1.612833ms)
+✖ a silent-revert gate change runs its CI test step locally, and only locally (1.183334ms)
+✔ e2e coverage check passes on the real suite and names an unmapped spec (720.654292ms)
+✔ a board card source change selects the spec that reads its title (244.88175ms)
+✔ CI shares the plan but keeps advisory and full e2e in separate jobs (2.016167ms)
+✔ CLI skips real document changes and rejects a missing base (6160.325459ms)
+✔ a stale local origin/main is refreshed by fetch before computing changes (2854.004083ms)
+✔ fetch failure falls back to the local origin/main and prints a stale notice (2430.657167ms)
+✔ prepush vitest only forgives files listed as known local red (2.636417ms)
+✔ plan children do not inherit the git hook repository binding (291.048875ms)
+✔ only gate scripts are mapped to a ledger category when a step goes red (0.603833ms)
+✔ a gate that blocks a push records one intercept for every entry whose safeguard names it (215.437709ms)
+✔ a red gate step leaves the repository untouched and still exits non-zero (99.642208ms)
+✔ retrying the same gate on the same branch after another commit records nothing new (261.987083ms)
+✔ CAIRN_GATE_LOG appends the gate-red events for a CI job to collect (281.261708ms)
+✔ a checkout without docs/lessons, or CAIRN_LESSONS_LEDGER=0, leaves the tree untouched (5.411792ms)
+✔ logging is opt-in and never projects counters into the checkout (52.32675ms)
+✔ CI doc-reader checks select the real codeowners reader for identity documentation (91.68775ms)
+✔ workflow preserves comments about external behavior (2.303459ms)
+✔ forced push coverage preserves the English gate range across multiple commits (1589.695333ms)
+ℹ tests 49
+ℹ suites 0
+ℹ pass 44
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 32359.1165
+
+✖ failing tests:
+
+test at scripts/prepush.test.mjs:83:3
+✖ hasCode classifies non-markdown evidence (1.182167ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2193-docs-only-ci/scripts/prepush.test.mjs:84:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/prepush.test.mjs:83:3
+✖ hasCode classifies the #2188 lessons and evidence change (0.213292ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2193-docs-only-ci/scripts/prepush.test.mjs:84:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/prepush.test.mjs:535:1
+✖ affected e2e receives executable evidence as code and data evidence as documents (1.843416ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+      'pnpm',
+      '--filter',
+      '@cairn/web',
+      'e2e:affected',
+      '--',
+  +   'docs/verify/1/shot.png',
+      'docs/verify/2136/review-check.test.mjs',
+      'scripts/evidence-prune.mjs'
+    ]
+  
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2193-docs-only-ci/scripts/prepush.test.mjs:544:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 'pnpm', '--filter', '@cairn/web', 'e2e:affected', '--', 'docs/verify/1/shot.png', 'docs/verify/2136/review-check.test.mjs', 'scripts/evidence-prune.mjs' ],
+    expected: [ 'pnpm', '--filter', '@cairn/web', 'e2e:affected', '--', 'docs/verify/2136/review-check.test.mjs', 'scripts/evidence-prune.mjs' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/prepush.test.mjs:562:1
+✖ a docs-only data change still runs every test that reads the changed file (1.612833ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+      [
+        'node',
+        'scripts/english-only-gate.mjs'
+      ],
+      [
+        'node',
+  +     'scripts/ui-debt-gate.mjs'
+  -     'scripts/lessons-ledger-gate.mjs'
+      ],
+      [
+        'node',
+  +     'scripts/ui-drift-gate.mjs'
+  -     'scripts/doc-reader-tests.mjs',
+  -     'docs/lessons/events.jsonl',
+  -     'docs/verify/920/wire-new/manifest-new.json'
+      ],
+  +   [
+  +     'python3',
+  +     'scripts/pr-evidence-archive.test.py'
+  +   ],
+  +   [
+  +     'pnpm',
+  +     'lint'
+  +   ],
+  +   [
+  +     'pnpm',
+  +     'typecheck'
+  +   ],
+  +   [
+  +     'pnpm',
+  +     'spec:parse'
+  +   ],
+  +   [
+  +     'node',
+  +     'scripts/recording-gate.mjs'
+  +   ],
+  +   [
+  +     'node',
+  +     'scripts/e2e-affected.mjs',
+  +     '--check-coverage'
+  +   ],
+  +   [
+  +     'node',
+  +     '--test',
+  +     'docs/verify/1542/reach.test.mjs'
+  +   ],
+  +   [
+  +     'node',
+  +     '--test',
+  +     'scripts/escape-trace.test.mjs'
+  +   ],
+  +   [
+  +     'node',
+  +     'scripts/escape-trace.mjs',
+  +     'validate-cases',
+  +     'integration/eval/review/cases'
+  +   ],
+  +   [
+  +     'node',
+  +     '--test',
+  +     'scripts/review-escapes.test.mjs'
+  +   ],
+  +   [
+  +     'node',
+  +     '--test',
+  +     'scripts/escape-eval-loop.test.mjs'
+  +   ],
+  +   [
+  +     'node',
+  +     'scripts/lessons-ledger-gate.mjs'
+  +   ],
+  +   [
+  +     'python3',
+  +     'scripts/pr-evidence-gate.test.py'
+  +   ]
+    ]
+  
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2193-docs-only-ci/scripts/prepush.test.mjs:564:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ [ 'node', 'scripts/english-only-gate.mjs' ], [ 'node', 'scripts/ui-debt-gate.mjs' ], [ 'node', 'scripts/ui-drift-gate.mjs' ], [ 'python3', 'scripts/pr-evidence-archive.test.py' ], [ 'pnpm', 'lint' ], [ 'pnpm', 'typecheck' ], [ 'pnpm', 'spec:parse' ], [ 'node', 'scripts/recording-gate.mjs' ], [ 'node', 'scripts/e2e-affected.mjs', '--check-coverage' ], [ 'node', '--test', 'docs/verify/1542/reach.test.mjs' ], [ 'node', '--test', 'scripts/escape-trace.test.mjs' ], [ 'node', 'scripts/escape-trace.mjs', 'validate-cases', 'integration/eval/review/cases' ], [ 'node', '--test', 'scripts/review-escapes.test.mjs' ], [ 'node', '--test', 'scripts/escape-eval-loop.test.mjs' ], [ 'node', 'scripts/lessons-ledger-gate.mjs' ], [ 'python3', 'scripts/pr-evidence-gate.test.py' ] ],
+    expected: [ [ 'node', 'scripts/english-only-gate.mjs' ], [ 'node', 'scripts/lessons-ledger-gate.mjs' ], [ 'node', 'scripts/doc-reader-tests.mjs', 'docs/lessons/events.jsonl', 'docs/verify/920/wire-new/manifest-new.json' ] ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/prepush.test.mjs:582:1
+✖ a silent-revert gate change runs its CI test step locally, and only locally (1.183334ms)
+  AssertionError [ERR_ASSERTION]: scripts/silent-revert-gate.mjs
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2193-docs-only-ci/scripts/prepush.test.mjs:598:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
