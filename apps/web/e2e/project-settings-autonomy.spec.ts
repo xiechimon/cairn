@@ -162,7 +162,7 @@ test('project page: a github-backed project opens on the tasks tab, not the plac
   await stubWorld(page);
   await page.goto(`/app/project/${GITHUB_PROJECT_ID}`);
   await expect(page.getByText('GitHub 仓库项目的文件在 GitHub 上查看')).toHaveCount(0);
-  await expect(page.getByRole('tab', { name: '任务' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('.page-tabs-group').getByRole('tab', { name: '任务' })).toHaveAttribute('aria-selected', 'true');
 });
 
 test('project page: an explicit ?tab=files still opens the files tab on a github-backed project', async ({
@@ -170,5 +170,5 @@ test('project page: an explicit ?tab=files still opens the files tab on a github
 }) => {
   await stubWorld(page);
   await page.goto(`/app/project/${GITHUB_PROJECT_ID}?tab=files`);
-  await expect(page.getByRole('tab', { name: '文件' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('.page-tabs-group').getByRole('tab', { name: '文件' })).toHaveAttribute('aria-selected', 'true');
 });
