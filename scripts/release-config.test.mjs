@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { test } from 'node:test';
+import { isDeepStrictEqual } from 'node:util';
 
 const root = resolve(import.meta.dirname, '..');
 const workflow = readFileSync(resolve(root, '.github/workflows/release.yml'), 'utf8');
@@ -52,16 +53,16 @@ test('the changeset config ignores exactly the private workspace packages and ke
   }
 });
 
-function jobConfig(name) {
-  const job = workflow.match(
+function jobConfig(name, text = workflow) {
+  const job = text.match(
     new RegExp(`^ {2}${name}:\\n[\\s\\S]*?(?=^ {2}\\S|(?![\\s\\S]))`, 'm'),
   )?.[0];
   assert.ok(job, `the ${name} job must exist`);
   return job;
 }
 
-function jobSteps(name) {
-  return jobConfig(name)
+function jobSteps(name, text = workflow) {
+  return jobConfig(name, text)
     .split(/^ {6}- (?=[a-z][a-z-]*:)/m)
     .slice(1);
 }
@@ -79,15 +80,11 @@ test('every release action pins a full commit SHA with a version note', () => {
   }
 });
 
-test('packing inherits read permissions and publishing alone can request an OIDC token', () => {
-  assert.match(workflow, /^permissions:\n {2}contents: read$/m);
+test('release jobs run only after their required dependencies and package count checks', () => {
   const pack = jobConfig('pack');
-  assert.doesNotMatch(pack, /id-token|^ {4}permissions:/m);
   assert.match(pack, /^ {4}if: github\.event_name == 'push'$/m);
   assert.match(pack, /^ {4}needs: config$/m);
   const publish = jobConfig('publish');
-  assert.match(publish, /^ {4}permissions:\n(?: {6}.+\n)*? {6}id-token: write$/m);
-  assert.match(publish, /^ {4}permissions:\n(?: {6}.+\n)*? {6}contents: write$/m);
   assert.match(publish, /^ {4}needs: pack$/m);
   assert.match(publish, /^ {4}if: needs\.pack\.outputs\.count != '0'$/m);
 });
@@ -96,21 +93,6 @@ test('the publish job sets up Node without restoring a shared dependency cache',
   const setupNode = jobSteps('publish').find((step) => step.includes('uses: actions/setup-node@'));
   assert.ok(setupNode, 'the publish job must set up Node');
   assert.doesNotMatch(setupNode, /^\s*cache:/m);
-});
-
-test('the publish job installs only root dependencies without scripts and never builds or publishes unpacked packages', () => {
-  const steps = jobSteps('publish');
-  const install = steps.find((step) => /\bpnpm install\b/.test(step));
-  assert.ok(install, 'the publish job must install dependencies');
-  assert.match(install, /\bpnpm install --frozen-lockfile --ignore-scripts\b/);
-  assert.match(install, /--filter \.(?=\s|$)/);
-  for (const step of steps) {
-    assert.doesNotMatch(step, /\bpnpm (?:run )?release:publish\b/);
-    assert.doesNotMatch(step, /\bpnpm (?:run )?build\b/);
-    for (const command of step.matchAll(/\bchangeset publish([^\n]*)/g)) {
-      assert.match(command[1], /--from-pack-dir release-pack\b/);
-    }
-  }
 });
 
 test('the pack job packs tarballs before uploading the release artifact', () => {
@@ -129,8 +111,6 @@ test('the pack job packs tarballs before uploading the release artifact', () => 
   const plan = steps.findIndex((step) => /^ {8}id: plan$/m.test(step));
   assert.ok(plan > pack && plan < upload, 'the pack job must count the plan before uploading');
   assert.match(steps[plan], /release-pack\/publish-plan\.json/);
-  assert.match(steps[plan], /GITHUB_OUTPUT/);
-  assert.match(jobConfig('pack'), /^ {6}count: \$\{\{ steps\.plan\.outputs\.count \}\}$/m);
 });
 
 test('the publish job downloads the packed artifact before publishing', () => {
@@ -227,3 +207,163 @@ test('every publishable package names this repository for provenance', () => {
     );
   }
 });
+
+function workflowBlocks(text, key, indentation) {
+  const lines = text.split('\n');
+  const header = new RegExp(`^ {${indentation}}${key}:(.*)$`);
+  return lines.flatMap((line, index) => {
+    const match = line.match(header);
+    if (!match) return [];
+    const body = [];
+    for (const next of lines.slice(index + 1)) {
+      if (next.trim() && next.search(/\S/) <= indentation) break;
+      body.push(next.trim());
+    }
+    return [{ value: match[1].trim(), body: body.filter(Boolean) }];
+  });
+}
+
+function releaseWorkflowViolations(text) {
+  const violations = [];
+  const topPermissions = workflowBlocks(text, 'permissions', 0);
+  if (!isDeepStrictEqual(topPermissions, [{ value: '', body: ['contents: read'] }])) {
+    violations.push('top-level permissions must be exactly contents: read');
+  }
+  for (const name of ['config', 'pack', 'publish']) {
+    if (!new RegExp(`^ {2}${name}:$`, 'm').test(text)) {
+      violations.push(`${name} job must exist`);
+    }
+  }
+  if (violations.some((violation) => violation.endsWith('job must exist'))) return violations;
+  for (const name of ['config', 'pack']) {
+    if (workflowBlocks(jobConfig(name, text), 'permissions', 4).length !== 0) {
+      violations.push(`${name} permissions must be inherited without a job declaration`);
+    }
+  }
+  const publishPermissions = workflowBlocks(jobConfig('publish', text), 'permissions', 4);
+  for (const block of publishPermissions) block.body.sort();
+  if (
+    !isDeepStrictEqual(publishPermissions, [
+      { value: '', body: ['contents: write', 'id-token: write'] },
+    ])
+  ) {
+    violations.push('publish permissions must be exactly contents: write and id-token: write');
+  }
+  const publishSteps = jobSteps('publish', text).map((step) => `        ${step}`);
+  const actions = publishSteps.flatMap((step) =>
+    workflowBlocks(step, 'uses', 8).map((block) => block.value.split('@')[0]),
+  );
+  if (
+    !isDeepStrictEqual(actions, [
+      'actions/checkout',
+      'pnpm/action-setup',
+      'actions/setup-node',
+      'actions/download-artifact',
+    ])
+  ) {
+    violations.push('publish uses actions must match the exact ordered repository list');
+  }
+  const commands = publishSteps.flatMap((step) =>
+    workflowBlocks(step, 'run', 8).flatMap((block) =>
+      (block.value === '|' ? block.body.join('\n').trim() : block.value).split('\n'),
+    ),
+  );
+  if (
+    !isDeepStrictEqual(commands, [
+      'pnpm install --frozen-lockfile --ignore-scripts --filter .',
+      "git config user.name 'github-actions[bot]'",
+      "git config user.email '41898282+github-actions[bot]@users.noreply.github.com'",
+      'pnpm exec changeset publish --from-pack-dir release-pack',
+      'git push origin --tags',
+    ])
+  ) {
+    violations.push('publish run commands must match the exact ordered command list');
+  }
+  const pack = jobConfig('pack', text);
+  const outputs = workflowBlocks(pack, 'outputs', 4);
+  if (
+    !isDeepStrictEqual(outputs, [{ value: '', body: [`count: \${{ steps.plan.outputs.count }}`] }])
+  ) {
+    violations.push('pack job outputs must contain only count mapped to steps.plan.outputs.count');
+  }
+  const plans = jobSteps('pack', text).filter((step) => /^ {8}id: plan$/m.test(step));
+  const plan = plans.join('\n');
+  const outputWrites = [
+    ...plan.matchAll(/\bfs\.appendFileSync\(process\.env\.GITHUB_OUTPUT,\s*`([^`]*)`\);/g),
+  ].map((match) => match[1]);
+  if (
+    plans.length !== 1 ||
+    !isDeepStrictEqual(outputWrites, [`count=\${count}\\n`]) ||
+    [...plan.matchAll(/\bGITHUB_OUTPUT\b/g)].length !== 1
+  ) {
+    violations.push('pack plan output key must be exactly count with no additional output writes');
+  }
+  return violations;
+}
+
+const workflowFixtures = [
+  {
+    name: '1: top-level OIDC permission',
+    before: 'permissions:\n  contents: read',
+    after: 'permissions:\n  contents: read\n  id-token: write',
+    rule: 'top-level permissions',
+  },
+  {
+    name: '2: rebuild in publish',
+    before: '      - name: Publish to npm',
+    after: '      - run: pnpm rebuild\n      - name: Publish to npm',
+    rule: 'publish run commands',
+  },
+  {
+    name: '3: recursive build in publish',
+    before: '      - name: Publish to npm',
+    after: '      - run: pnpm -r build\n      - name: Publish to npm',
+    rule: 'publish run commands',
+  },
+  {
+    name: '4: renamed plan output',
+    before: `count=\${count}`,
+    after: `total=\${count}`,
+    rule: 'pack plan output key',
+  },
+  {
+    name: '5: filtered build in publish',
+    before: '      - name: Publish to npm',
+    after: '      - run: pnpm --filter @xiechimon/cairn build\n      - name: Publish to npm',
+    rule: 'publish run commands',
+  },
+  {
+    name: '6: pack in publish',
+    before: '      - name: Publish to npm',
+    after:
+      '      - run: pnpm exec changeset pack --out-dir release-pack\n      - name: Publish to npm',
+    rule: 'publish run commands',
+  },
+  {
+    name: '7: cache action in publish',
+    before: '      - name: Publish to npm',
+    after: '      - uses: actions/cache@v4\n      - name: Publish to npm',
+    rule: 'publish uses actions',
+  },
+];
+
+test('the release workflow satisfies the exact security invariants', () => {
+  assert.deepEqual(releaseWorkflowViolations(workflow), []);
+});
+
+for (const { name, before, after, rule } of workflowFixtures) {
+  test(`the exact security invariants reject fixture ${name}`, () => {
+    assert.equal(
+      workflow.split(before).length - 1,
+      1,
+      `fixture replacement must match once: ${before}`,
+    );
+    const fixture = workflow.replace(before, after);
+    const violations = releaseWorkflowViolations(fixture);
+    assert.ok(violations.length > 0, `${name} must break ${rule}`);
+    assert.ok(
+      violations.some((violation) => violation.includes(rule)),
+      violations.join('\n'),
+    );
+  });
+}

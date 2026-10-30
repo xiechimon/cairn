@@ -1,0 +1,29 @@
+✔ the changeset config ignores exactly the private workspace packages and keeps the rest publishable (1.962375ms)
+✔ the release workflow publishes through OIDC without a token or a bot pull request (0.183583ms)
+✔ every release action pins a full commit SHA with a version note (0.256542ms)
+✔ release jobs run only after their required dependencies and package count checks (0.23875ms)
+✔ the publish job sets up Node without restoring a shared dependency cache (0.187791ms)
+✔ the pack job packs tarballs before uploading the release artifact (0.272541ms)
+✔ the publish job downloads the packed artifact before publishing (0.168583ms)
+✔ pending changesets warn without controlling release steps (0.198541ms)
+✔ the publish job configures a tagger before publishing (0.14775ms)
+✔ the publish step always publishes packed tarballs with explicit pnpm provenance (0.236834ms)
+✔ the publish job pushes tags after an attempted publish even if publishing fails (0.725417ms)
+✔ pull requests validate release configuration for every workspace manifest (0.13025ms)
+✔ every publishable package names this repository for provenance (0.392167ms)
+✔ the release workflow satisfies the exact security invariants (0.94025ms)
+✔ the exact security invariants reject fixture 1: top-level OIDC permission (0.190209ms)
+✔ the exact security invariants reject fixture 2: rebuild in publish (0.14525ms)
+✔ the exact security invariants reject fixture 3: recursive build in publish (0.137625ms)
+✔ the exact security invariants reject fixture 4: renamed plan output (0.1355ms)
+✔ the exact security invariants reject fixture 5: filtered build in publish (0.141625ms)
+✔ the exact security invariants reject fixture 6: pack in publish (0.130375ms)
+✔ the exact security invariants reject fixture 7: cache action in publish (0.125167ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 53.40925
