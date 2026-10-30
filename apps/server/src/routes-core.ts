@@ -11,6 +11,7 @@ import { agentRecordOf, jsonBody, requireTeam, SESSION_COOKIE } from './routes-h
 import { readBackupHealth } from './services/backup-status.js';
 import { createSerialConnection } from './services/events.js';
 import { readFirstPrReportPrompt, setFirstPrReportPrompt } from './services/first-pr-report.js';
+import { pauseTeamGithubRepos } from './services/github-autonomy-brake.js';
 
 export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
   app.use('/api/*', async (c, next) => {
@@ -53,6 +54,24 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     const body = parseWith(patchTeamBodySchema, await jsonBody(c), 'body');
     if (body.autonomyPaused !== undefined) {
       ctx.db.update(team).set({ autonomyPaused: body.autonomyPaused }).where(eq(team.id, id)).run();
+    }
+    if (body.autonomyPaused === true) {
+      await pauseTeamGithubRepos(
+        {
+          db: ctx.db,
+          box: ctx.secretBox,
+          githubFetch: ctx.githubFetch,
+          oauthClient: ctx.oauthClient,
+        },
+        id,
+      );
+    }
+    if (body.maxAutonomousMergesPerDay !== undefined) {
+      ctx.db
+        .update(team)
+        .set({ maxAutonomousMergesPerDay: body.maxAutonomousMergesPerDay })
+        .where(eq(team.id, id))
+        .run();
     }
     const prompt = setFirstPrReportPrompt(ctx.db, id, body.firstPrReportPrompt ?? {});
     const row = ctx.db.select().from(team).where(eq(team.id, id)).get();

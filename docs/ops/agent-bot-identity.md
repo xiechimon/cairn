@@ -71,6 +71,10 @@ Read the PR opener and all commit authors with `gh pr view <n> --json author,com
 
 Squashing a bot-opened PR can attribute the main commit to the bot opener even when the branch commit has the required author. Rebase preserves the prepared commit's author. A later green push checks its own pushed range; historical bot commits outside that range are excluded, and their authorship remains unchanged.
 
+The product merge API enforces this boundary for `xiechimon/cairn` (case-insensitive): an open PR must have a nonempty opener login, account type `User`, and no `[bot]` login suffix before the server sends its SHA-bound squash request. Bot or unknown opener identity returns HTTP 409 without writing merge messages, changing steps, or changing the task phase. The opener comes from the pull response's `user` object, independently of `author_association`. Other repositories retain their existing merge behavior. Already-merged PR reconciliation remains available.
+
+This prevents unsafe squash through the product API only. Direct GitHub merges and the external dispatcher still require identity preparation, rebase, and verification of the resulting main commit and Actions run. Historical failed commits are retained.
+
 This repository documents the external helper contract. Its implementation is outside this checkout and must be inspected separately before changing dispatcher behavior.
 
 ## Commit preparation

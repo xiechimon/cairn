@@ -43,11 +43,16 @@ export interface GateReadRequest {
 }
 
 export interface GateReadCache {
+  autonomyPause: Map<string, { at: number; paused: boolean }>;
   bodies: Map<string, { etag: string; body: unknown }>;
   present: Set<string>;
 }
 
-export const newGateReadCache = (): GateReadCache => ({ bodies: new Map(), present: new Set() });
+export const newGateReadCache = (): GateReadCache => ({
+  bodies: new Map(),
+  present: new Set(),
+  autonomyPause: new Map(),
+});
 
 export interface GateEvidencePresence {
   sha: string;

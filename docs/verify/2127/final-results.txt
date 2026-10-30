@@ -1,0 +1,10 @@
+[prepush] git fetch origin main failed (exit 255); using local origin/main, which may be stale
+english-only-gate: 0 line(s) with Chinese text
+comment-discipline-gate: 0 new comment line(s)
+single-use-helper-gate: 0 single-use helper(s)
+ Test Files  193 passed (193)
+      Tests  2606 passed (2606)
+ Test Files  1 passed (1)
+      Tests  8 passed (8)
+  26 passed (1.0m)
+[prepush] PASS (30 checks)

@@ -31,7 +31,12 @@ export const projectMergeConfigSchema = z.object({
   localChecks: z.array(z.string().min(1)).default([]),
 });
 export type ProjectMergeConfig = z.infer<typeof projectMergeConfigSchema>;
-export const patchProjectMergeConfigSchema = projectMergeConfigSchema.partial().strict();
+export const patchProjectMergeConfigSchema = z
+  .object({
+    mergePolicy: projectMergeConfigSchema.shape.mergePolicy.unwrap().optional(),
+    localChecks: projectMergeConfigSchema.shape.localChecks.unwrap().optional(),
+  })
+  .strict();
 export type PatchProjectMergeConfig = z.infer<typeof patchProjectMergeConfigSchema>;
 export const githubRepoRefSchema = z.object({
   owner: z.string(),

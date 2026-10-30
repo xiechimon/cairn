@@ -7,6 +7,7 @@ import { and, asc, eq, inArray, isNotNull, notInArray } from 'drizzle-orm';
 import { build, gateState, gateVerdict, step, todo } from '../db/schema.js';
 import { systemGitOps } from '../lib/git.js';
 import { nowMs } from '../lib/ids.js';
+import { autonomousMergePolicy } from './autonomous-merge.js';
 import type { BuildDeps } from './builds.js';
 import { projectOfTodo } from './git.js';
 import { createHarnessEvalCoordinator } from './harness-eval-coordinator.js';
@@ -133,7 +134,10 @@ export async function localGateFacts(
       : ('malformed' as const);
   const built: GateInputs = {
     author: null,
-    policy: { mergePolicy: config.mergePolicy, autonomyPaused: false, dailyCapReached: false },
+    policy: {
+      mergePolicy: config.mergePolicy,
+      ...autonomousMergePolicy(deps.db, todoRow.teamId, config),
+    },
     build: {
       isGithubPr: false,
       repoKind: 'local',

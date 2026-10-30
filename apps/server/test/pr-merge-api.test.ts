@@ -51,7 +51,9 @@ interface PullFake {
   defaultBranch?: string;
   mergeCommitSha?: string | null;
   mergedBy?: string | null;
+  mergedAt?: string;
   authorAssociation?: string;
+  opener?: unknown;
 }
 
 interface Recorded {
@@ -88,6 +90,8 @@ class GithubFake {
   getAnswer: Answer | null = null;
   onGet: (() => Promise<void> | void) | null = null;
   onPut: (() => Promise<void> | void) | null = null;
+  onMarker: (() => Promise<void> | void) | null = null;
+  markerAnswer: Answer = { status: 200, body: [] };
   compareStatus = 'identical';
   constructor(
     readonly pulls: Record<number, PullFake>,
@@ -116,6 +120,12 @@ class GithubFake {
       }
       return reply(a.status, a.raw ?? JSON.stringify(a.body ?? {}), a.headers);
     }
+    if (url.includes('/issues?')) {
+      await this.onMarker?.();
+      const a = this.markerAnswer;
+      throwIfFault(a);
+      return reply(a.status, a.raw ?? JSON.stringify(a.body ?? {}));
+    }
     if (url.includes('/compare/')) {
       return reply(200, JSON.stringify({ status: this.compareStatus }));
     }
@@ -140,9 +150,10 @@ class GithubFake {
         merged: p.merged,
         ...(p.title === null ? {} : { title: p.title ?? PR_TITLE }),
         author_association: p.authorAssociation ?? 'OWNER',
+        user: p.opener === undefined ? { login: 'octo', type: 'User' } : p.opener,
         merge_commit_sha: p.merged ? (p.mergeCommitSha ?? MERGE_SHA) : 'e'.repeat(40),
         merged_by: p.merged && p.mergedBy != null ? { login: p.mergedBy } : null,
-        merged_at: p.merged ? new Date().toISOString() : null,
+        merged_at: p.merged ? (p.mergedAt ?? new Date().toISOString()) : null,
         closed_at: p.state === 'closed' ? new Date().toISOString() : null,
         head: {
           sha: p.headSha ?? CP,
@@ -306,7 +317,8 @@ function makeWorld(opts: WorldOpts = {}): World {
     systemRows: () =>
       messages()
         .filter((r) => r.role === 'system')
-        .map((r) => (typeof r.content === 'string' ? r.content : JSON.stringify(r.content))),
+        .map((r) => (typeof r.content === 'string' ? r.content : JSON.stringify(r.content)))
+        .filter((content) => !content.includes('"kind":"autonomous-merge-admission"')),
     userRows: () =>
       messages()
         .filter((r) => r.role === 'user')
@@ -344,12 +356,60 @@ function expectUntouched(w: World, phase: Phase = 'review'): void {
 }
 
 describe('#1403 segment 2b: the server merges the PR through the GitHub API', () => {
+  test.each([
+    { login: 'cairnwright[bot]', type: 'Bot' },
+    { login: 'cairnwright[bot]', type: 'User' },
+    { login: 'another[bot]', type: 'Bot' },
+    null,
+    {},
+    { login: 'octo' },
+    { login: '', type: 'User' },
+    { login: 123, type: 'User' },
+    { login: 'octo', type: 'Unknown' },
+  ])('#2127 refuses unsafe or unknown Cairn PR opener %j without mutations', async (opener) => {
+    const w = makeWorld({ githubRepo: 'Xiechimon/CAIRN', pull: { opener }, pendingVerify: true });
+    const beforeSteps = w.steps();
+    const response = await req(w.s.app, 'POST', `/api/builds/${w.buildId}/merge`);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: expect.stringContaining('merge-pr.sh') });
+    expect(w.fake.puts()).toEqual([]);
+    expect(w.steps()).toEqual(beforeSteps);
+    expectUntouched(w);
+  });
+
+  test.each([
+    ['xiechimon/cairn', { login: 'octo', type: 'User' }],
+    ['octo/demo', { login: 'cairnwright[bot]', type: 'Bot' }],
+    ['octo/demo', null],
+  ])('#2127 preserves SHA-bound squash for eligible opener in %s', async (githubRepo, opener) => {
+    const w = makeWorld({ githubRepo, pull: { opener } });
+    await requestMerge(w.deps, w.buildId);
+    expect(w.fake.puts()).toHaveLength(1);
+    expect(JSON.parse(w.fake.puts()[0]?.body ?? 'null')).toMatchObject({
+      sha: CP,
+      merge_method: 'squash',
+    });
+    expect(w.phase()).toBe('done');
+  });
+
+  test('#2127 already merged bot PR can restore a failed card without another merge', async () => {
+    const w = makeWorld({
+      githubRepo: 'xiechimon/cairn',
+      phase: 'failed',
+      pull: { state: 'closed', merged: true, opener: { login: 'cairnwright[bot]', type: 'Bot' } },
+    });
+    await requestMerge(w.deps, w.buildId);
+    expect(w.fake.puts()).toEqual([]);
+    expect(w.phase()).toBe('review');
+  });
+
   test('[2b-D1] review card, own open PR at the last checkpoint → one PUT with sha, squash and the PR title; rows; done', async () => {
     const w = makeWorld({ pendingVerify: true });
     const result = await requestMerge(w.deps, w.buildId, 'Xmon');
     expect(result).toEqual({ delegated: true });
     expect(w.fake.requests.map((r) => `${r.method} ${r.url}`)).toEqual([
       'GET https://api.github.com/repos/octo/demo/pulls/201',
+      'GET https://api.github.com/repos/octo/demo/issues?state=open&labels=autonomy-paused&per_page=100&page=1',
       'PUT https://api.github.com/repos/octo/demo/pulls/201/merge',
     ]);
     const put = w.fake.puts()[0] as Recorded;
@@ -1370,4 +1430,328 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     expect(body.error).toContain('Pull Request is not mergeable');
     expectUntouched(no);
   });
+});
+
+describe('#1405 autonomy brakes at the GitHub write boundary', () => {
+  test('a pause introduced during the PR read returns HTTP 409 without a PUT or task writes', async () => {
+    const w = makeWorld();
+    w.fake.onGet = () => {
+      w.s.db
+        .update(teamTable)
+        .set({ autonomyPaused: true })
+        .where(eq(teamTable.id, w.s.team.id))
+        .run();
+    };
+    const response = await req(w.s.app, 'POST', `/api/builds/${w.buildId}/merge`);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: expect.stringContaining('autonomy-paused') });
+    expect(w.fake.puts()).toHaveLength(0);
+    expectUntouched(w);
+  });
+
+  test('ten durable same-day Cairn merges block the default cap', async () => {
+    const w = makeWorld();
+    for (let n = 0; n < 10; n++) {
+      w.s.db
+        .insert(messageTable)
+        .values({
+          id: `landed-${n}`,
+          conversationId: w.buildId,
+          role: 'system',
+          content: `PR #${n} 已由 cairn 经 GitHub 合并（squash，合并提交 abcdefg）`,
+          createdAt: Date.now(),
+        })
+        .run();
+    }
+    const before = w.systemRows();
+    const err = await refusal(requestMerge(w.deps, w.buildId));
+    expect(err.status).toBe(409);
+    expect(err.message).toContain('daily-cap');
+    expect(w.fake.puts()).toHaveLength(0);
+    expect(w.systemRows()).toEqual(before);
+    expect(w.phase()).toBe('review');
+  });
+
+  test('human policy remains available while paused and at a zero autonomous cap', async () => {
+    const w = makeWorld({ mergePolicy: 'human' });
+    w.s.db
+      .update(teamTable)
+      .set({ autonomyPaused: true })
+      .where(eq(teamTable.id, w.s.team.id))
+      .run();
+    w.s.db
+      .update(projectTable)
+      .set({
+        autonomy: {
+          ...DEFAULT_AUTONOMY_SETTINGS,
+          mergePolicy: 'human',
+        },
+      })
+      .run();
+    await requestMerge(w.deps, w.buildId);
+    expect(w.fake.puts()).toHaveLength(1);
+    expect(w.phase()).toBe('done');
+  });
+
+  test('an unknown merge response cannot issue a second autonomous PUT', async () => {
+    const w = makeWorld();
+    w.fake.mergeAnswer = 'timeout';
+    await requestMerge(w.deps, w.buildId);
+    const err = await refusal(requestMerge(w.deps, w.buildId));
+    expect(err.status).toBe(409);
+    expect(w.fake.puts()).toHaveLength(1);
+    expect(w.phase()).toBe('review');
+  });
+
+  test('different builds racing for the final team slot issue exactly one PUT', async () => {
+    const w = makeWorld();
+    w.s.db.update(teamTable).set({ maxAutonomousMergesPerDay: 1 }).run();
+    w.s.db
+      .update(projectTable)
+      .set({
+        autonomy: {
+          ...DEFAULT_AUTONOMY_SETTINGS,
+          mergePolicy: 'autonomous',
+        },
+      })
+      .run();
+    const original = w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get();
+    if (!original) throw new Error('missing todo');
+    w.s.db
+      .insert(todoTable)
+      .values({ ...original, id: 'racer-todo', seqNum: 2, latestBuildId: 'racer-build' })
+      .run();
+    w.s.db
+      .insert(buildTable)
+      .values({
+        id: 'racer-build',
+        todoId: 'racer-todo',
+        withPlan: false,
+        triggerSource: 'user',
+        createdAt: Date.now(),
+        prNumber: 202,
+      })
+      .run();
+    w.s.db
+      .insert(stepTable)
+      .values({
+        id: 'racer-step',
+        buildId: 'racer-build',
+        kind: 'build',
+        status: 'done',
+        checkpointCommit: CP,
+        createdAt: Date.now(),
+      })
+      .run();
+    w.fake.pulls[202] = {
+      state: 'open',
+      merged: false,
+      headRef: conversationBranch('racer-build'),
+    };
+    const outcomes = await Promise.allSettled([
+      requestMerge(w.deps, w.buildId),
+      requestMerge(w.deps, 'racer-build'),
+    ]);
+    expect(outcomes.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    expect(w.fake.puts()).toHaveLength(1);
+    const rejected = outcomes.find((r) => r.status === 'rejected');
+    expect(rejected?.status === 'rejected' ? rejected.reason.status : null).toBe(409);
+  });
+
+  test('yesterday merges do not consume the current UTC day', async () => {
+    const w = makeWorld();
+    const midnight = Date.parse(`${new Date().toISOString().slice(0, 10)}T00:00:00Z`);
+    for (let n = 0; n < 10; n++)
+      w.s.db
+        .insert(messageTable)
+        .values({
+          id: `yesterday-${n}`,
+          conversationId: w.buildId,
+          role: 'system',
+          content: `PR #${n} 已由 cairn 经 GitHub 合并（squash，合并提交 abcdefg）`,
+          createdAt: midnight - 1,
+        })
+        .run();
+    await requestMerge(w.deps, w.buildId);
+    expect(w.fake.puts()).toHaveLength(1);
+  });
+});
+
+test('#1405 reconcile settles an uncertain admission without another PUT', async () => {
+  const w = makeWorld();
+  w.fake.mergeAnswer = 'timeout';
+  await requestMerge(w.deps, w.buildId);
+  const pull = w.fake.pulls[201];
+  if (!pull) throw new Error('missing pull');
+  pull.state = 'closed';
+  pull.merged = true;
+  pull.mergedBy = 'octo';
+  pull.mergedAt = '2026-10-29T23:59:59.999Z';
+  await w.sweep();
+  const record = w.s.db
+    .select()
+    .from(messageTable)
+    .where(eq(messageTable.id, `autonomous-merge-${w.buildId}`))
+    .get();
+  expect(JSON.parse(String(record?.content))).toMatchObject({
+    state: 'merged',
+    landedAt: Date.parse('2026-10-29T23:59:59.999Z'),
+  });
+  expect(w.fake.puts()).toHaveLength(1);
+});
+
+test('#1405 an open poll cannot release the tenth slot after an unknown merge', async () => {
+  const w = makeWorld();
+  for (let n = 0; n < 9; n++)
+    w.s.db
+      .insert(messageTable)
+      .values({
+        id: `landed-${n}`,
+        conversationId: w.buildId,
+        role: 'system',
+        content: `PR #${n} 已由 cairn 经 GitHub 合并`,
+        createdAt: Date.now(),
+      })
+      .run();
+  w.fake.mergeAnswer = 'timeout';
+  await requestMerge(w.deps, w.buildId);
+  expect((await refusal(requestMerge(w.deps, w.buildId))).status).toBe(409);
+  await createCiPoller(w.deps, { githubFetch: w.fake.fetch }).sweep();
+  expect((await refusal(requestMerge(w.deps, w.buildId))).status).toBe(409);
+  expect(w.fake.puts()).toHaveLength(1);
+});
+
+test('#1405 reconcile keeps the reservation while a merge response is still in flight', async () => {
+  const w = makeWorld();
+  let reservedDuringPut = false;
+  w.fake.onPut = async () => {
+    await createCiPoller(w.deps, { githubFetch: w.fake.fetch }).sweep();
+    reservedDuringPut = w.s.db
+      .select()
+      .from(messageTable)
+      .all()
+      .some((row) => row.id === `autonomous-merge-${w.buildId}`);
+  };
+  await requestMerge(w.deps, w.buildId);
+  expect(reservedDuringPut).toBe(true);
+});
+
+test('#1405 nine landed merges and an open poll during the tenth PUT cannot admit an eleventh', async () => {
+  const w = makeWorld();
+  const original = w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get();
+  if (!original) throw new Error('missing todo');
+  w.s.db
+    .insert(todoTable)
+    .values({ ...original, id: 'racer-todo', seqNum: 2, latestBuildId: 'racer-build' })
+    .run();
+  w.s.db
+    .insert(buildTable)
+    .values({
+      id: 'racer-build',
+      todoId: 'racer-todo',
+      withPlan: false,
+      triggerSource: 'user',
+      createdAt: Date.now(),
+      prNumber: 202,
+    })
+    .run();
+  w.s.db
+    .insert(stepTable)
+    .values({
+      id: 'racer-step',
+      buildId: 'racer-build',
+      kind: 'build',
+      status: 'done',
+      checkpointCommit: CP,
+      createdAt: Date.now(),
+    })
+    .run();
+  w.fake.pulls[202] = { state: 'open', merged: false, headRef: conversationBranch('racer-build') };
+  for (let n = 0; n < 9; n++) {
+    w.s.db
+      .insert(buildTable)
+      .values({
+        id: `landed-build-${n}`,
+        todoId: w.todoId,
+        withPlan: false,
+        triggerSource: 'user',
+        createdAt: Date.now(),
+      })
+      .run();
+    w.s.db
+      .insert(messageTable)
+      .values({
+        id: `landed-${n}`,
+        conversationId: `landed-build-${n}`,
+        role: 'system',
+        content: `PR #${n} 已由 cairn 经 GitHub 合并`,
+        createdAt: Date.now(),
+      })
+      .run();
+  }
+  let releasePut = () => {};
+  const held = new Promise<void>((resolve) => {
+    releasePut = resolve;
+  });
+  let enteredPut = () => {};
+  const entered = new Promise<void>((resolve) => {
+    enteredPut = resolve;
+  });
+  let merging: Promise<unknown> | undefined;
+  w.fake.onPut = async () => {
+    if (w.fake.puts().length === 1) {
+      enteredPut();
+      await held;
+    }
+  };
+  w.fake.onGet = async () => {
+    w.fake.onGet = null;
+    merging = requestMerge(w.deps, w.buildId);
+    await entered;
+  };
+  try {
+    await w.sweep();
+    const outcome = await Promise.allSettled([requestMerge(w.deps, 'racer-build')]);
+    expect(outcome[0]).toMatchObject({ status: 'rejected', reason: { status: 409 } });
+    expect(w.fake.puts()).toHaveLength(1);
+  } finally {
+    releasePut();
+    await merging;
+  }
+  expect(w.phase()).toBe('done');
+  expect(w.fake.puts()).toHaveLength(1);
+});
+
+test.each(['open', 'network', 'malformed'] as const)(
+  '#1405 GitHub marker %s blocks a merge with a false team flag and no PUT',
+  async (mode) => {
+    const w = makeWorld();
+    w.fake.markerAnswer =
+      mode === 'open'
+        ? { status: 200, body: [{ number: 7 }] }
+        : mode === 'network'
+          ? 'network'
+          : { status: 200, body: {} };
+    expect(
+      w.s.db.select().from(teamTable).where(eq(teamTable.id, w.s.team.id)).get()?.autonomyPaused,
+    ).toBe(false);
+    const err = await refusal(requestMerge(w.deps, w.buildId));
+    expect(err.message).toContain('autonomy-paused');
+    expect(w.fake.puts()).toHaveLength(0);
+    expect(
+      w.s.db.select().from(teamTable).where(eq(teamTable.id, w.s.team.id)).get()?.autonomyPaused,
+    ).toBe(true);
+    expectUntouched(w);
+  },
+);
+
+test('#1405 a card closed during the uncached marker read cannot merge', async () => {
+  const w = makeWorld();
+  w.fake.onMarker = () => {
+    w.s.db.update(todoTable).set({ phase: 'closed' }).where(eq(todoTable.id, w.todoId)).run();
+  };
+  await expect(requestMerge(w.deps, w.buildId)).rejects.toThrow(
+    'illegal phase transition: closed -> done',
+  );
+  expect(w.fake.puts()).toHaveLength(0);
 });

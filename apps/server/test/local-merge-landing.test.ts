@@ -3,18 +3,23 @@ import { eq } from 'drizzle-orm';
 import { afterEach, expect, test } from 'vitest';
 import {
   agent as agentTable,
+  autonomousMergeAdmission,
   build,
   gateState,
   gateVerdict,
+  machine,
+  message,
   notification,
   project,
   step,
+  team,
   todo,
 } from '../src/db/schema.js';
 import { systemGitOps } from '../src/lib/git.js';
-import { requestMerge } from '../src/services/builds.js';
+import { requestMerge, sweepAbandonedBuildSteps } from '../src/services/builds.js';
 import { applyLocalMergeReport, enqueueLocalMerge } from '../src/services/local-merge.js';
 import { localGateFacts } from '../src/services/local-merge-facts.js';
+import { claimStep } from '../src/services/machine-claim.js';
 import { bootServer } from './helpers.js';
 
 const disposals: (() => void)[] = [];
@@ -369,4 +374,263 @@ test('a local project without a stored path fails closed instead of the legacy m
     .all()
     .filter((r) => r.kind === 'merge');
   expect(merges).toHaveLength(0);
+});
+
+test('#1405 paused local readiness blocks enqueue without task mutation', async () => {
+  const f = await fixture();
+  f.s.db.update(team).set({ autonomyPaused: true }).where(eq(team.id, f.s.team.id)).run();
+  const before = f.s.db.select().from(todo).all();
+  const facts = await localGateFacts(f.deps, 'build', 'main');
+  expect(facts?.readiness.blockers.map((b) => b.code)).toContain('autonomy-paused');
+  await expect(enqueueLocalMerge(f.deps, 'build', 'main')).rejects.toMatchObject({ status: 409 });
+  expect(f.s.db.select().from(todo).all()).toEqual(before);
+  expect(
+    f.s.db
+      .select()
+      .from(step)
+      .all()
+      .filter((r) => r.kind === 'merge'),
+  ).toHaveLength(0);
+});
+
+test('#1405 zero cap blocks local readiness and issuance', async () => {
+  const f = await fixture();
+  f.s.db.update(team).set({ maxAutonomousMergesPerDay: 0 }).run();
+  f.s.db
+    .update(project)
+    .set({
+      autonomy: {
+        ...DEFAULT_AUTONOMY_SETTINGS,
+        mergePolicy: 'autonomous',
+        localChecks: ['true'],
+      },
+    })
+    .run();
+  expect(
+    (await localGateFacts(f.deps, 'build', 'main'))?.readiness.blockers.map((b) => b.code),
+  ).toContain('daily-cap');
+  await expect(enqueueLocalMerge(f.deps, 'build', 'main')).rejects.toMatchObject({ status: 409 });
+});
+
+test('#1405 pause after local evaluation starts prevents issuance and announcements', async () => {
+  const f = await fixture();
+  const deps = {
+    ...f.deps,
+    gitOps: {
+      ...fakeGitOps,
+      localCompareFiles: async () => {
+        f.s.db.update(team).set({ autonomyPaused: true }).where(eq(team.id, f.s.team.id)).run();
+        return fakeGitOps.localCompareFiles();
+      },
+    },
+  };
+  await expect(requestMerge(deps, 'build')).rejects.toMatchObject({ status: 409 });
+  expect(
+    f.s.db
+      .select()
+      .from(step)
+      .all()
+      .filter((r) => r.kind === 'merge'),
+  ).toHaveLength(0);
+});
+
+test.each(['pause', 'cap'] as const)(
+  '#1405 local worker claim rechecks %s after enqueue without task mutation',
+  async (brake) => {
+    const f = await fixture();
+    f.s.db
+      .insert(machine)
+      .values({
+        id: 'worker',
+        teamId: f.s.team.id,
+        name: 'Worker',
+        online: true,
+        enabledRuntimes: ['pi'],
+      })
+      .run();
+    f.s.db
+      .update(agentTable)
+      .set({ provider: 'stub-gw', modelId: 'stub', machineId: 'worker' })
+      .run();
+    await enqueueLocalMerge(f.deps, 'build', 'main');
+    if (brake === 'pause') f.s.db.update(team).set({ autonomyPaused: true }).run();
+    else f.s.db.update(team).set({ maxAutonomousMergesPerDay: 0 }).run();
+    if (brake === 'cap')
+      f.s.db
+        .update(project)
+        .set({
+          autonomy: {
+            ...DEFAULT_AUTONOMY_SETTINGS,
+            mergePolicy: 'autonomous',
+            localChecks: ['true'],
+          },
+        })
+        .run();
+    const before = f.s.db.select().from(step).all();
+    const beforeTodo = f.s.db.select().from(todo).all();
+    const beforeMessages = f.s.db.select().from(message).all();
+    await expect(
+      claimStep(f.deps, 'worker', f.s.team.id, 0, 'http://localhost'),
+    ).resolves.toBeNull();
+    expect(f.s.db.select().from(step).all()).toEqual(before);
+    expect(f.s.db.select().from(todo).all()).toEqual(beforeTodo);
+    expect(f.s.db.select().from(message).all()).toEqual(beforeMessages);
+  },
+);
+
+test('#1405 a paused failed local card is not restored before rejecting the merge', async () => {
+  const f = await fixture();
+  f.s.db.update(todo).set({ phase: 'failed' }).run();
+  f.s.db.update(team).set({ autonomyPaused: true }).run();
+  const before = f.s.db.select().from(todo).all();
+  await expect(requestMerge(f.deps, 'build')).rejects.toMatchObject({ status: 409 });
+  expect(f.s.db.select().from(todo).all()).toEqual(before);
+});
+
+for (const brake of ['pause', 'cap'] as const) {
+  test(`a local candidate blocked by ${brake} leaves the next worker candidate claimable`, async () => {
+    const f = await fixture();
+    f.s.db
+      .insert(machine)
+      .values({
+        id: 'worker',
+        teamId: f.s.team.id,
+        name: 'Worker',
+        online: true,
+        enabledRuntimes: ['pi'],
+      })
+      .run();
+    f.s.db
+      .update(agentTable)
+      .set({ provider: 'stub-gw', modelId: 'stub', machineId: 'worker' })
+      .run();
+    await enqueueLocalMerge(f.deps, 'build', 'main');
+    if (brake === 'pause') f.s.db.update(team).set({ autonomyPaused: true }).run();
+    else
+      await f.s.app.request(`/api/teams/${f.s.team.id}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ maxAutonomousMergesPerDay: 0 }),
+      });
+    f.s.db
+      .insert(todo)
+      .values({
+        id: 'next',
+        teamId: f.s.team.id,
+        projectId: 'project',
+        title: 'Next',
+        phase: 'queued',
+        phaseAt: 0,
+        seqNum: 2,
+        latestBuildId: 'next',
+        assignment: { plan: null, build: { agentId: 'agent' } },
+      })
+      .run();
+    f.s.db
+      .insert(build)
+      .values({
+        id: 'next',
+        todoId: 'next',
+        withPlan: false,
+        triggerSource: 'user',
+        createdAt: Date.now(),
+      })
+      .run();
+    f.s.db
+      .insert(step)
+      .values({ id: 'next-step', buildId: 'next', kind: 'build', createdAt: Date.now() + 1000 })
+      .run();
+    expect((await claimStep(f.deps, 'worker', f.s.team.id, 0, 'http://localhost'))?.step.id).toBe(
+      'next-step',
+    );
+    expect(
+      f.s.db
+        .select()
+        .from(step)
+        .all()
+        .find((r) => r.kind === 'merge')?.status,
+    ).toBe('pending');
+  });
+}
+
+test('changed local authorization releases the reservation before skipping the command', async () => {
+  const f = await fixture();
+  await enqueueLocalMerge(f.deps, 'build', 'main');
+  f.s.db
+    .insert(machine)
+    .values({
+      id: 'worker',
+      teamId: f.s.team.id,
+      name: 'Worker',
+      online: true,
+      enabledRuntimes: ['pi'],
+    })
+    .run();
+  f.s.db.update(project).set({ repoKind: 'hosted' }).run();
+  await claimStep(f.deps, 'worker', f.s.team.id, 0, 'http://localhost');
+  expect(
+    f.s.db
+      .select()
+      .from(message)
+      .all()
+      .some((row) => row.id === 'autonomous-merge-build'),
+  ).toBe(false);
+});
+
+for (const policy of ['autonomous', 'human'] as const) {
+  test(`${policy} abandoned local command preserves its policy path`, async () => {
+    const f = await fixture(policy);
+    await enqueueLocalMerge(f.deps, 'build', 'main', true);
+    const row = f.s.db
+      .select()
+      .from(step)
+      .all()
+      .find((r) => r.kind === 'merge');
+    if (!row) throw new Error('missing merge');
+    f.s.db
+      .update(step)
+      .set({ status: 'claimed', claimedAt: Date.now() - 200_000 })
+      .where(eq(step.id, row.id))
+      .run();
+    sweepAbandonedBuildSteps(f.deps);
+    expect(f.s.db.select().from(step).where(eq(step.id, row.id)).get()?.status).toBe(
+      policy === 'human' ? 'pending' : 'claimed',
+    );
+    if (policy === 'autonomous') {
+      expect(f.s.db.select().from(autonomousMergeAdmission).get()?.state).toBe('pending');
+      f.s.db.update(step).set({ status: 'failed' }).where(eq(step.id, row.id)).run();
+      applyLocalMergeReport(
+        f.deps,
+        { ...row, status: 'failed' },
+        {
+          command: JSON.parse(row.prompt ?? '{}').command,
+          result: { outcome: 'merged', commit: 'f'.repeat(40) },
+        },
+      );
+      expect(f.s.db.select().from(autonomousMergeAdmission).get()?.state).toBe('merged');
+    }
+  });
+}
+
+test('a late landing for a failed local command restores a refused admission exactly once', async () => {
+  const f = await fixture();
+  await enqueueLocalMerge(f.deps, 'build', 'main');
+  const row = f.s.db
+    .select()
+    .from(step)
+    .all()
+    .find((r) => r.kind === 'merge');
+  if (!row) throw new Error('missing merge');
+  f.s.db.update(step).set({ status: 'failed' }).where(eq(step.id, row.id)).run();
+  f.s.db.delete(autonomousMergeAdmission).run();
+  f.s.db.delete(message).where(eq(message.id, 'autonomous-merge-build')).run();
+  const report = {
+    command: JSON.parse(row.prompt ?? '{}').command,
+    result: { outcome: 'merged' as const, commit: 'f'.repeat(40) },
+  };
+  applyLocalMergeReport(f.deps, { ...row, status: 'failed' }, report);
+  applyLocalMergeReport(f.deps, { ...row, status: 'failed' }, report);
+  expect(f.s.db.select().from(autonomousMergeAdmission).all()).toHaveLength(1);
+  expect(f.s.db.select().from(autonomousMergeAdmission).get()?.state).toBe('merged');
+  expect(f.s.db.select().from(step).where(eq(step.id, row.id)).get()?.status).toBe('failed');
 });
