@@ -30,8 +30,7 @@
     {
       "id": "push",
       "issue": 2228,
-      "dependsOn": [],
-      "humanHeld": true
+      "dependsOn": []
     },
     {
       "id": "snooze",
