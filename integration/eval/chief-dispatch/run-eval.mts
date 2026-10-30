@@ -27,6 +27,8 @@ import {
 } from '../memory-regression/grade.mts';
 import { readMemoryRows, seedMemories } from '../memory-regression/seed.mts';
 import { gradePlanCase, isPlanCase, type PlanCase } from '../plan/grade.mts';
+import { isRevisionCase, type RevisionCase } from '../plan/revision-grade.mts';
+import { revisionEvidence, revisionRunRecord, runRevisionCase } from '../plan/revision-run.mts';
 import { gradeRoutingCase, isRoutingCase, type RoutingCase } from '../project-routing/grade.mts';
 import { seedRoutingProjects } from '../project-routing/seed.mts';
 import { type Case, gradeCase, type RosterAgent } from './grade.mts';
@@ -72,7 +74,7 @@ const PRICES: Record<string, { in: number; out: number; cacheRead: number }> = {
   'deepseek-v4-pro': { in: 0.955, out: 1.911, cacheRead: 0.08 },
 };
 
-type EvalCase = Case | MemoryCase | RoutingCase | LearnCase | PlanCase;
+type EvalCase = Case | MemoryCase | RoutingCase | LearnCase | PlanCase | RevisionCase;
 
 async function loadCases(): Promise<EvalCase[]> {
   const d = JSON.parse(readFileSync(join(ARGS.flow, 'cases.json'), 'utf8')) as {
@@ -146,6 +148,29 @@ async function runCase(
       memoryAfter: [],
       chiefSystemPrompt: learned.chiefSystemPrompt,
       grade: learned.grade,
+    };
+  }
+  if (isRevisionCase(input)) {
+    const revised = await runRevisionCase(input, {
+      roster: ROSTER,
+      model: CHIEF_MODEL,
+      ...(ARGS.promptSet !== undefined ? { promptSet: ARGS.promptSet } : {}),
+      timeoutMs: ctx.timeoutS > 0 ? ctx.timeoutS * 1000 : 300_000,
+    });
+    const headline = revised.feedbackArm;
+    return {
+      output: headline.revision.planContent ?? '',
+      transcript: revisionRunRecord(revised),
+      model: revised.model,
+      usage: revised.usage,
+      stop_reason: 'revision',
+      evidence: revisionEvidence(revised),
+      truncated: false,
+      agentIds: {},
+      projectIds: {},
+      memoryAfter: [],
+      chiefSystemPrompt: null,
+      grade: revised.grade,
     };
   }
   const { stack, world, projectIds } = await freshStack(input);
@@ -603,6 +628,11 @@ async function main() {
                   return run.grade;
                 }
                 if (isPlanCase(c)) return gradePlanCase(c, { evidence: run.evidence });
+                if (isRevisionCase(c)) {
+                  if (run.grade === undefined)
+                    throw new Error(`revision case ${c.id} returned no grade`);
+                  return run.grade;
+                }
                 if (isRoutingCase(c)) return gradeRoutingCase(c, run.evidence, run.projectIds);
                 if (isMemoryCase(c))
                   return gradeMemoryCase(c, {

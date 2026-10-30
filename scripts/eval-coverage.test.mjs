@@ -2,9 +2,14 @@ import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import test from 'node:test';
-import { loadEvalCoverage, renderEvalCoverage, staleScoredFlows } from './eval-coverage.mjs';
+import {
+  loadEvalCoverage,
+  loadRepoEvalCoverage,
+  renderEvalCoverage,
+  staleScoredFlows,
+} from './eval-coverage.mjs';
 
 const repo = 'xiechimon/cairn';
 
@@ -166,6 +171,11 @@ test('coverage rows report scored, built-not-run, none, and tests only', () => {
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('every flow committed under .claude/hillclimb has a capability row', () => {
+  const { unlisted } = loadRepoEvalCoverage(resolve(import.meta.dirname, '..'));
+  assert.deepEqual(unlisted, []);
 });
 
 test('the staleness gate flags a scored flow older than 30 days', () => {

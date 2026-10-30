@@ -89,6 +89,7 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
     ['pnpm', 'typecheck'],
     ['pnpm', 'spec:parse'],
     ['node', 'scripts/recording-gate.mjs'],
+    ['node', '--test', 'scripts/eval-coverage.test.mjs'],
     ['node', 'scripts/e2e-affected.mjs', '--check-coverage'],
     ['node', '--test', 'docs/verify/1542/reach.test.mjs'],
     ['node', '--test', 'scripts/escape-trace.test.mjs'],

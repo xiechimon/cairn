@@ -30,6 +30,11 @@
     "ticket": 1838
   },
   {
+    "capability": "plan revision",
+    "flow": "plan-revision",
+    "ticket": 1966
+  },
+  {
     "capability": "coding"
   },
   {

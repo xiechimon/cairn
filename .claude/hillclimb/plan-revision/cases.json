@@ -1,0 +1,38 @@
+{
+  "flow": "plan-revision",
+  "note": "Paired revision execution on the real build step path. Each case seeds a prior plan into the build branch and the plan table, then rejects it through POST /api/builds/:id/steps {action:'revision'} so the replan prompt carries the feedback. The feedback arm must reach the artifact: a new plan version whose Changes section drops the rejected approach, names the real cause, and keeps requirements that were already correct. The no-feedback control runs the same revision from equivalent isolated state with the feedback withheld and must fail those requirements. expect.defect and expect.drop are checked inside the Changes section only; expect.keep is checked on the whole document. Assistant prose never counts. Missing or failed steps are harness errors, never a score.",
+  "roster": [
+    {
+      "key": "code",
+      "displayName": "Code",
+      "modelId": "glm-5.3",
+      "description": "Owns server, daemon, and shared package implementation and fixes. Does not own UI layout."
+    }
+  ],
+  "cases": [
+    {
+      "id": "revision-001-feedback-pins-the-defect",
+      "tags": [
+        "revision",
+        "feedback-dependent"
+      ],
+      "prompt": "Export button does nothing on Safari. Plan the fix and cover verification.",
+      "priorPlan": "## Context\nKind: fix\nSafari ignores the download attribute on a blob URL, so the export silently does nothing.\n\n## Changes\nAppend more logging around the download path.\n\n## Edge cases\n- Empty export payload.\n\n## Verification\n- `apps/web/e2e/export-download.spec.ts` passes\n",
+      "feedback": "Find the cause. It is the download attribute on a blob URL, and adding logging does not fix it. Keep the existing verification step.",
+      "expect": {
+        "kind": "revision",
+        "defect": [
+          "download attribute",
+          "blob url"
+        ],
+        "drop": [
+          "logging"
+        ],
+        "keep": [
+          "export-download.spec.ts"
+        ],
+        "minPlanChars": 120
+      }
+    }
+  ]
+}

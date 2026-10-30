@@ -1,0 +1,55 @@
+{
+  "schema": "hillclimb/v2",
+  "metrics": [
+    {
+      "id": "revision_ok",
+      "label": "revision ok",
+      "kind": "binary",
+      "better": "higher"
+    },
+    {
+      "id": "control_flipped",
+      "label": "control fails",
+      "kind": "binary",
+      "better": "higher"
+    }
+  ],
+  "perf_fields": [
+    {
+      "id": "in_tokens",
+      "label": "in tok"
+    },
+    {
+      "id": "out_tokens",
+      "label": "out tok"
+    },
+    {
+      "id": "cache_read_tokens",
+      "label": "cache rd"
+    },
+    {
+      "id": "tool_calls",
+      "label": "tools"
+    },
+    {
+      "id": "cost_usd",
+      "label": "cost $",
+      "unit": "usd"
+    },
+    {
+      "id": "latency_s",
+      "label": "latency",
+      "unit": "s"
+    }
+  ],
+  "harness_paths": [
+    "integration/eval/plan/revision-arm.mts",
+    "integration/eval/plan/revision-run.mts",
+    "integration/eval/plan/revision-grade.mts",
+    "integration/eval/chief-dispatch/stack.mts",
+    ".claude/hillclimb/plan-revision/cases.json",
+    "apps/server/src/services/builds.ts",
+    "packages/shared/src/records/prompts.ts",
+    "apps/daemon/src/runner.ts"
+  ]
+}
