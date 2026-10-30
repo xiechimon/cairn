@@ -65,6 +65,12 @@ for (const [name, paths, expected] of [
   ],
   ['non-markdown evidence', ['docs/verify/1/result.json', 'docs/verify/1/shot.png'], false],
   [
+    'unknown or executable-like files under docs',
+    ['docs/verify/1/drive.tsx', 'docs/verify/1/run', 'docs/verify/1/notes.yaml'],
+    true,
+  ],
+  ['data beside an executable check', ['docs/verify/2136/fixture.json'], true],
+  [
     'the #2188 lessons and evidence change',
     [
       'docs/lessons/1678-no-verify-fixup-commit.md',
@@ -584,6 +590,12 @@ test('a docs-only data change still runs every test that reads the changed file'
 
 test('every node --test step in any workflow runs locally when its tests, sources or workflow change', () => {
   const steps = workflowTestSteps();
+  const written = readdirSync('.github/workflows')
+    .filter((name) => name.endsWith('.yml'))
+    .flatMap(
+      (name) => readFileSync(join('.github/workflows', name), 'utf8').match(/node --test\b/g) ?? [],
+    );
+  assert.equal(steps.length, written.length, 'every node --test step is parsed');
   assert.ok(steps.some(({ workflow }) => workflow === '.github/workflows/silent-revert-gate.yml'));
   assert.ok(steps.some(({ tests }) => tests.includes('scripts/lane-model-policy.test.mjs')));
   for (const { workflow, tests } of steps) {
@@ -596,33 +608,6 @@ test('every node --test step in any workflow runs locally when its tests, source
       );
     }
   }
-});
-
-test('a silent-revert gate change runs its CI test step locally, and only locally', () => {
-  const step = [
-    'node',
-    '--test',
-    'scripts/github-overlap.test.mjs',
-    'scripts/silent-revert-gate.test.mjs',
-  ];
-  const ciStep = readFileSync('.github/workflows/silent-revert-gate.yml', 'utf8');
-  assert.ok(ciStep.includes(`run: ${step.join(' ')}\n`));
-  for (const path of [
-    'scripts/silent-revert-gate.mjs',
-    'scripts/silent-revert-gate.test.mjs',
-    'scripts/github-overlap.mjs',
-    'scripts/github-overlap.test.mjs',
-    '.github/workflows/silent-revert-gate.yml',
-  ]) {
-    assert.ok(
-      prepushPlan([path]).some((args) => args.join(' ') === step.join(' ')),
-      path,
-    );
-    assert.ok(!prepushPlan([path], 'ci').some((args) => args.join(' ') === step.join(' ')), path);
-  }
-  assert.ok(
-    !prepushPlan(['apps/web/src/main.tsx']).some((args) => args.join(' ') === step.join(' ')),
-  );
 });
 
 test('e2e coverage check passes on the real suite and names an unmapped spec', () => {

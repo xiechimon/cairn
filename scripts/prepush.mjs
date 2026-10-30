@@ -58,11 +58,19 @@ export const localOnly = [
 
 const SOURCE_TREES = /^(apps|packages|integration)\//;
 const MARKDOWN = /(?:\.md$|^LICENSE$)/;
-const EXECUTABLE = /\.(?:[cm]?[jt]s|sh|py)$/;
+const DATA =
+  /\.(?:png|jpe?g|gif|webp|svg|webm|mp4|log|txt|json|jsonl|ndjson|csv|drawio|diff|html)$/;
+const EXECUTABLE = /\.(?:[cm]?[jt]sx?|sh|bash|zsh|py)$/;
+
+function besideExecutable(path) {
+  const dir = join(root, dirname(path));
+  return existsSync(dir) && readdirSync(dir).some((name) => EXECUTABLE.test(name));
+}
 
 function isDocument(path) {
   if (SOURCE_TREES.test(path)) return false;
-  return MARKDOWN.test(path) || (path.startsWith('docs/') && !EXECUTABLE.test(path));
+  if (MARKDOWN.test(path)) return true;
+  return path.startsWith('docs/') && DATA.test(path) && !besideExecutable(path);
 }
 
 export function hasCode(paths) {
