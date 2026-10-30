@@ -13,6 +13,7 @@ import {
   type MergeReadiness,
   RECORDING_EXTENSION,
 } from '@cairn/shared/merge-gate';
+import { CORRECTION_GUARD_MISSING, correctionDoneCheck } from './correction.js';
 import { computePatchDigest } from './digest.js';
 import { qualifyingEvidenceLinks } from './evidence-link.js';
 import { isLiveHarnessAttempt } from './harness-eval-route.js';
@@ -56,6 +57,7 @@ export interface GateCompareCommit {
 }
 
 export interface GateInputs {
+  correction?: boolean;
   author?: { id: string; model: string } | null;
   policy: { mergePolicy: MergePolicy; autonomyPaused: boolean; dailyCapReached: boolean };
   build: {
@@ -320,6 +322,17 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
   if (pr !== null && (pr.baseBehindBy === null ? compare !== null : pr.baseBehindBy !== 0)) {
     block('pr-behind-base');
   }
+  if (
+    i.correction &&
+    compare !== null &&
+    !correctionDoneCheck(
+      compare.files
+        .filter((file) => file.status !== 'removed')
+        .map((file) => ({ path: file.filename, additions: file.additions })),
+    )
+  ) {
+    block('verify-missing', CORRECTION_GUARD_MISSING);
+  }
   let D: string | null = null;
   if (compare !== null) {
     const digest = computePatchDigest(compare.files, {
@@ -498,7 +511,12 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
     .sort(([a], [b]) => (ORDER.get(a) ?? 0) - (ORDER.get(b) ?? 0))
     .map(([code, detail]) => {
       const meta = META.get(code);
-      return { code, class: meta?.class ?? 'human', label: meta?.label ?? code, detail };
+      return {
+        code,
+        class: detail.includes(CORRECTION_GUARD_MISSING) ? 'human' : (meta?.class ?? 'human'),
+        label: meta?.label ?? code,
+        detail,
+      };
     });
   return {
     ready: blockers.length === 0,

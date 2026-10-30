@@ -1,0 +1,10 @@
+[Unit]
+Description=Tighten the Cairn lint debt baseline by one measured step
+
+[Service]
+Type=oneshot
+Environment=PATH=%h/.local/share/fnm/aliases/default/bin:%h/.local/share/pnpm:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=%h/.config/cairn/gardener.env
+ExecStart=/usr/bin/bash -c 'cd "$${CAIRN_REPO:?Set CAIRN_REPO in gardener.env}" && exec node scripts/gardener-ratchet.mjs'
+TimeoutStartSec=5min
+UMask=0077

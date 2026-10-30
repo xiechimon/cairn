@@ -9,9 +9,11 @@ import { systemGitOps } from '../lib/git.js';
 import { nowMs } from '../lib/ids.js';
 import { autonomousMergePolicy } from './autonomous-merge.js';
 import type { BuildDeps } from './builds.js';
+import { isCorrectionTask, recordCorrectionGuard } from './correction.js';
 import { projectOfTodo } from './git.js';
 import { createHarnessEvalCoordinator } from './harness-eval-coordinator.js';
 import { productionHarnessEvalConfig } from './harness-eval-production.js';
+import { correctionDoneCheck } from './merge-gate/correction.js';
 import { judgeMergeReadinessWithHarnessEval } from './merge-gate/harness-eval-judge.js';
 import { type GateInputs, mergeReadiness } from './merge-gate/readiness.js';
 import { projectMergeConfigOf } from './projects.js';
@@ -87,6 +89,20 @@ export async function localGateFacts(
       : await (deps.gitOps ?? systemGitOps)
           .localCompareFiles(projectRow.localPath, baseSha, headSha)
           .catch((): 'malformed' => 'malformed');
+  if (isCorrectionTask(deps.db, todoRow.id) && headSha !== null) {
+    recordCorrectionGuard(
+      deps.db,
+      buildId,
+      headSha,
+      compareFiles !== 'malformed'
+        ? correctionDoneCheck(
+            compareFiles
+              .filter((file) => file.status !== 'removed')
+              .map((file) => ({ path: file.filename, additions: file.additions })),
+          )
+        : null,
+    );
+  }
   const state = deps.db.select().from(gateState).where(eq(gateState.buildId, buildId)).get();
   const inFlight = deps.db
     .select({ id: step.id })
@@ -133,6 +149,7 @@ export async function localGateFacts(
         }
       : ('malformed' as const);
   const built: GateInputs = {
+    correction: isCorrectionTask(deps.db, todoRow.id),
     author: null,
     policy: {
       mergePolicy: config.mergePolicy,
