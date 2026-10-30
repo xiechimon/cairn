@@ -21,4 +21,5 @@ Fixture 18: different publish checkout SHA: ACCEPT (14 main tests)
 Fixture 19: publish job container: ACCEPT (14 main tests)
 Fixture 20: top-level OIDC permission after a comment: ACCEPT (14 main tests)
 Fixture 21: top-level env between pack and publish: ACCEPT (14 main tests)
-Main accepted 20/21 fixtures; rejected 1/21.
+Fixture 22: escaped pack OIDC permission keys: ACCEPT (14 main tests)
+Main accepted 21/22 fixtures; rejected 1/22; errors 0/22.
