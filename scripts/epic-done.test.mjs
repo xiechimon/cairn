@@ -1357,6 +1357,42 @@ test('completion policy stays inside the owned manifest boundary', () => {
   assert.match(owners, /^\/\.claude\/epics\/\*\* @xiechimon$/m);
 });
 
+test('v2 accepts a commit closer that is the squash merge commit of its merged PR', async () => {
+  const { state, invoke } = batchHarness();
+  state.manifest.items = [{ id: 'one', issue: 1234, dependsOn: [] }];
+  state.issues = [issue(1234)];
+  state.issues[0].timelineItems.nodes[0].closer = {
+    __typename: 'Commit',
+    oid: closing,
+    associatedPullRequests: connection([
+      { number: 88, merged: true, mergedAt: date, mergeCommit: commit(closing) },
+    ]),
+  };
+  const result = await invoke();
+  expectState(result, 'complete', 0);
+  assert.equal(result.items[0].pr, 88);
+  const graphql = JSON.parse(
+    state.calls.find(({ args }) => args[1] === 'graphql').options.input,
+  ).query;
+  assert.ok(graphql.includes('associatedPullRequests'));
+});
+
+test('v2 rejects a commit closer whose associated merged PR has a different merge commit', async () => {
+  const { state, invoke } = batchHarness();
+  state.manifest.items = [{ id: 'one', issue: 1234, dependsOn: [] }];
+  state.issues = [issue(1234)];
+  state.issues[0].timelineItems.nodes[0].closer = {
+    __typename: 'Commit',
+    oid: closing,
+    associatedPullRequests: connection([
+      { number: 88, merged: true, mergedAt: date, mergeCommit: commit(outside) },
+    ]),
+  };
+  const result = await invoke();
+  expectState(result, 'paused', 20);
+  assert.deepEqual(result.needsOwner, ['one']);
+});
+
 test('v2 last merged closing PR must have its merge commit on main', async () => {
   const { state, invoke } = batchHarness();
   state.manifest.items = [{ id: 'one', issue: 1234, dependsOn: [] }];

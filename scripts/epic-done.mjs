@@ -24,7 +24,7 @@ export { decideEpic, validateManifest } from '../.claude/epics/checker-policy.mj
 const query = `query($owner: String!, $name: String!, $number: Int!) { repository(owner: $owner, name: $name) { issue(number: $number) {
   number state stateReason labels(first: 100) { nodes { name } pageInfo { hasNextPage } }
   timelineItems(last: 1, itemTypes: [CLOSED_EVENT]) { nodes { ... on ClosedEvent { createdAt closer {
-    __typename ... on PullRequest { number merged mergedAt mergeCommit { oid } } ... on Commit { oid }
+    __typename ... on PullRequest { number merged mergedAt mergeCommit { oid } } ... on Commit { oid associatedPullRequests(first: 5) { nodes { number merged mergedAt mergeCommit { oid } } } }
   } } } }
   closedByPullRequestsReferences(first: 100, includeClosedPrs: true) { nodes { number state isDraft merged mergeCommit { oid } labels(first: 100) { nodes { name } pageInfo { hasNextPage } } } pageInfo { hasNextPage } }
 } } }`;
@@ -227,7 +227,14 @@ export async function main(argv, deps = {}) {
         }
       }
       const linkedPulls = nodes(issue.closedByPullRequestsReferences, 'linked PRs');
-      const mergedPull = closer?.__typename === 'PullRequest' && closer.merged ? closer : null;
+      const squashPull =
+        closer?.__typename === 'Commit'
+          ? (closer.associatedPullRequests?.nodes ?? []).find(
+              (pull) => pull?.merged === true && pull.mergeCommit?.oid === closer.oid,
+            )
+          : undefined;
+      const mergedPull =
+        closer?.__typename === 'PullRequest' && closer.merged ? closer : (squashPull ?? null);
       return {
         mergedPr: positiveInteger(mergedPull?.number),
         pr: mergedPull?.number ?? linkedPulls.find((pull) => pull.state === 'OPEN')?.number ?? null,
