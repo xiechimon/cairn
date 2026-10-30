@@ -232,7 +232,7 @@ class ProseCapTests(unittest.TestCase):
 
     def verdict(self, body):
         output = io.StringIO()
-        with patch.object(sys, 'argv', ['pr-evidence-gate.py']), patch.dict(gate.os.environ, {'PR_BODY': body}), patch.object(gate, 'http_code', return_value='200'), patch.object(gate, 'archive_verdict', return_value='archived'), contextlib.redirect_stdout(output):
+        with patch.object(sys, 'argv', ['pr-evidence-gate.py']), patch.dict(gate.os.environ, {'PR_BODY': body}), patch.object(gate, 'http_code', return_value='200'), contextlib.redirect_stdout(output):
             result = gate.main()
         return result, output.getvalue()
 
