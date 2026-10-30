@@ -573,18 +573,19 @@ test('a docs-only data change still runs every test that reads the changed file'
     ['node', 'scripts/lessons-ledger-gate.mjs'],
     ['node', 'scripts/doc-reader-tests.mjs', 'docs/lessons/events.jsonl', data],
   ]);
-  const grep = (doc) => {
-    const result = spawnSync(
-      'git',
-      ['-c', 'color.ui=never', 'grep', '-l', '-F', '-e', doc, '--', '*.test.ts', '*.test.mjs'],
-      { encoding: 'utf8' },
-    );
-    return result.status === 0 ? result.stdout.split('\n').filter(Boolean) : [];
-  };
   assert.ok(
-    docReaderTests([data], grep, []).vitest.includes(
-      'apps/daemon/test/skills-version-skew.test.ts',
-    ),
+    docReaderTests(
+      [data],
+      (doc) => {
+        const result = spawnSync(
+          'git',
+          ['-c', 'color.ui=never', 'grep', '-l', '-F', '-e', doc, '--', '*.test.ts', '*.test.mjs'],
+          { encoding: 'utf8' },
+        );
+        return result.status === 0 ? result.stdout.split('\n').filter(Boolean) : [];
+      },
+      [],
+    ).vitest.includes('apps/daemon/test/skills-version-skew.test.ts'),
   );
 });
 

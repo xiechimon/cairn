@@ -154,14 +154,14 @@ function createExclusive(path) {
   }
 }
 
-function systemTempDir(platform) {
-  if (platform !== 'darwin') return tmpdir();
-  const result = spawnSync('getconf', ['DARWIN_USER_TEMP_DIR'], { encoding: 'utf8' });
-  return result.status === 0 && result.stdout.trim() ? result.stdout.trim() : tmpdir();
-}
-
 export function slotLockDir(env, platform = process.platform) {
-  return env.CAIRN_HEAVY_SLOTS_DIR || join(systemTempDir(platform), 'cairn-heavy-slots');
+  if (env.CAIRN_HEAVY_SLOTS_DIR) return env.CAIRN_HEAVY_SLOTS_DIR;
+  const darwin =
+    platform === 'darwin'
+      ? spawnSync('getconf', ['DARWIN_USER_TEMP_DIR'], { encoding: 'utf8' })
+      : null;
+  const base = darwin?.status === 0 && darwin.stdout.trim() ? darwin.stdout.trim() : tmpdir();
+  return join(base, 'cairn-heavy-slots');
 }
 
 export async function acquireSlot({ env = process.env, wait = true, log = console.error } = {}) {
