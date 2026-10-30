@@ -9,8 +9,8 @@ export function toastError(title: string, error: unknown): void {
   toast.error(title, reason !== null ? { description: reason } : undefined);
 }
 
-export function toastSuccess(title: string): void {
-  toast.success(title);
+export function toastSuccess(title: string, action?: { label: string; onClick: () => void }): void {
+  toast.success(title, action ? { action } : undefined);
 }
 
 function useSonnerTheme(): ToasterProps['theme'] {

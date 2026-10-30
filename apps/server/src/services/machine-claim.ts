@@ -92,6 +92,7 @@ function claimCandidates(deps: MachineDeps, _machineId: string, teamId: string):
       and(
         eq(step.status, 'pending'),
         eq(todo.teamId, teamId),
+        isNull(todo.archivedAt),
         or(isNull(step.holdUntil), lte(step.holdUntil, sql`${nowMs()}`)),
       ),
     )

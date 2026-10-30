@@ -76,6 +76,7 @@ export const todoRecordSchema = z.object({
   spec: z.string(),
   phase: phaseSchema,
   phaseAt: epochMs,
+  archivedAt: epochMs.nullish(),
   seqNum: z.number().int(),
   orderIndex: z.number(),
   tagIds: z.array(recordId),

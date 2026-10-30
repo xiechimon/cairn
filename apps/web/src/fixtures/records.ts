@@ -45,6 +45,7 @@ export interface TodoRecord {
   spec: string;
   phase: Phase;
   phaseAt: number;
+  archivedAt?: number | null;
   seqNum: number;
   orderIndex: number;
   tagIds: string[];
