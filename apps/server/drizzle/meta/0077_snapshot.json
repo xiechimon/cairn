@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "6276383a-305b-4b84-9e65-49cc1029b4a4",
+  "id": "9beed6d9-2ba6-4a4c-a5f7-30cdbcc47622",
   "prevId": "a24faa5e-4e95-407a-8d3e-18f63fc454b0",
   "tables": {
     "agent": {
@@ -3025,6 +3025,82 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "queued_message": {
+      "name": "queued_message",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "conversationId": {
+          "name": "conversationId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "content": {
+          "name": "content",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "deliverAfterStop": {
+          "name": "deliverAfterStop",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "error": {
+          "name": "error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "queued_message_conversation_idx": {
+          "name": "queued_message_conversation_idx",
+          "columns": [
+            "conversationId",
+            "createdAt"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "queued_message_conversationId_build_id_fk": {
+          "name": "queued_message_conversationId_build_id_fk",
+          "tableFrom": "queued_message",
+          "tableTo": "build",
+          "columnsFrom": [
+            "conversationId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "schedule": {
       "name": "schedule",
       "columns": {
@@ -3761,14 +3837,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'free'"
-        },
-        "claudeUsage": {
-          "name": "claudeUsage",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'subscription-only'"
         },
         "avatarStyle": {
           "name": "avatarStyle",

@@ -237,6 +237,16 @@ export const conversationMessagesResponseSchema = z.object({
   chips: z.unknown(),
   historyEpoch: z.number().int(),
   steerPending: z.array(z.unknown()),
+  queuedMessages: z
+    .array(
+      z.object({
+        id: recordId,
+        content: z.string(),
+        createdAt: epochMs,
+        error: z.string().nullable().optional(),
+      }),
+    )
+    .optional(),
   activeRun: activeRunSchema,
   nextCursor: z.unknown(),
 });
@@ -246,6 +256,10 @@ export const STOP_MESSAGE = '已取消';
 
 export const buildSteerBodySchema = z.object({
   content: z.string().min(1),
+  mode: z.literal('queue').optional(),
+  deliverAfterStop: z.boolean().optional(),
+  cancelQueued: z.boolean().optional(),
+  queuedMessageId: recordId.optional(),
 });
 export type BuildSteerBody = z.infer<typeof buildSteerBodySchema>;
 
