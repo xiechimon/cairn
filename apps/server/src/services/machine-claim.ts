@@ -363,7 +363,15 @@ async function tryClaim(
     const prior = db
       .select({ sessionId: step.sessionId, machineId: step.machineId, fallback: step.fallback })
       .from(step)
-      .where(and(eq(step.buildId, cand.stepRow.buildId), sql`${step.sessionId} is not null`))
+      .where(
+        and(
+          eq(step.buildId, cand.stepRow.buildId),
+          sql`${step.sessionId} is not null`,
+          ...(cand.stepRow.kind === 'build' && cand.buildRow.prevPhase === 'done'
+            ? [eq(step.kind, 'build')]
+            : []),
+        ),
+      )
       .orderBy(asc(step.createdAt))
       .all();
     const latestPrior = prior.length > 0 ? (prior[prior.length - 1] ?? null) : null;

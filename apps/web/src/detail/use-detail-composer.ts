@@ -1,5 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react';
 import type { useApiMutations } from '../api/hooks.js';
+import { toastError } from '../components/ui/toaster.js';
 import { blockDemoWrite, DEMO_MODE } from '../demo/demo-gate.js';
 import type { Phase } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
@@ -43,12 +44,20 @@ export function useDetailComposer(input: DetailComposerInput) {
           });
           return;
         }
-        if ((phase === 'building' || (phase === 'review' && running)) && buildId && text !== '') {
+        if (
+          (phase === 'done' || phase === 'building' || (phase === 'review' && running)) &&
+          buildId &&
+          text !== ''
+        ) {
           return mutations.sendSteer
             .mutateAsync({ conversationId: buildId, content: text })
             .then(() => {
               input.clearDraft();
               return undefined;
+            })
+            .catch((error: unknown) => {
+              if (phase === 'done') toastError(t('发送失败，请重试。'), error);
+              throw error;
             });
         }
         if (phase === 'review' && !running && buildId && text !== '') {

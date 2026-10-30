@@ -1,5 +1,5 @@
 import { execFileSync, spawn } from 'node:child_process';
-import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 
 const HOME = process.env.HOME;
 const REPO = 'xiechimon/cairn';
@@ -29,6 +29,7 @@ const repoProtected = () => {
 };
 
 mkdirSync(`${STATE}/runs`, { recursive: true });
+mkdirSync(`${STATE}/disarmed`, { recursive: true });
 const record = (pr, fields) => {
   appendFileSync(
     `${STATE}/runs.jsonl`,
@@ -40,6 +41,37 @@ const gh = (args) =>
   execFileSync('gh', ['-R', REPO, ...args], { encoding: 'utf8', maxBuffer: 64 << 20 });
 const asBot = (args, input) =>
   execFileSync(BOT, args, { encoding: 'utf8', input, cwd: MAIN, maxBuffer: 64 << 20 });
+
+const disarmedFile = (pr) => `${STATE}/disarmed/${pr.number}`;
+const disarm = (pr) => {
+  const armed = pr.autoMergeRequest;
+  const method = armed && !armed.enabledBy?.login?.endsWith('[bot]') ? armed.mergeMethod : null;
+  if (method) writeFileSync(disarmedFile(pr), method.toLowerCase());
+  try {
+    asBot(['gh', 'pr', 'merge', String(pr.number), '-R', REPO, '--disable-auto']);
+  } catch {}
+};
+const rearm = (pr) => {
+  let method;
+  try {
+    method = readFileSync(disarmedFile(pr), 'utf8').trim();
+  } catch {
+    return;
+  }
+  try {
+    gh(['pr', 'merge', String(pr.number), '--auto', `--${method}`]);
+  } catch (e) {
+    console.log(`#${pr.number}: re-arming auto-merge failed; retrying next round\n${e.message}`);
+    return;
+  }
+  rmSync(disarmedFile(pr));
+  record(pr, { action: 'rearmed', method });
+  console.log(`#${pr.number}: re-armed auto-merge (${method}) that the gate had disarmed`);
+};
+const passedFor = (body, sha) =>
+  new RegExp(
+    `^<!-- review-gate:${sha} -->\\n\\*\\*Independent review gate: PASS\\*\\*(?: \\(carried over\\))? for `,
+  ).test(body);
 
 export function finalVerdict(out) {
   const lines = out.split('\n');
@@ -67,7 +99,7 @@ try {
       '--limit',
       '100',
       '--json',
-      'number,isDraft,headRefOid,headRefName,files,title,labels',
+      'number,isDraft,headRefOid,headRefName,files,title,labels,autoMergeRequest',
     ]),
   );
   execFileSync(BOT, ['git', 'fetch', '-q', 'origin', 'main'], { cwd: MAIN });
@@ -95,7 +127,10 @@ try {
     const comments = JSON.parse(
       gh(['pr', 'view', String(pr.number), '--json', 'comments']),
     ).comments;
-    if (comments.some((c) => c.body.includes(marker))) continue;
+    if (comments.some((c) => c.body.includes(marker))) {
+      if (comments.some((c) => passedFor(c.body, pr.headRefOid))) rearm(pr);
+      continue;
+    }
     execFileSync(
       BOT,
       [
@@ -133,6 +168,7 @@ try {
         `${marker}\n**Independent review gate: PASS** (carried over) for \`${pr.headRefOid.slice(0, 8)}\`: same patch as the reviewed head \`${from.slice(0, 8)}\`; only the base moved.\n<!-- review-gate-patch:${patch} -->`,
       );
       record(pr, { verdict: 'pass', action: 'carried-over', from });
+      rearm(pr);
       console.log(`#${pr.number}: PASS carried over from ${from.slice(0, 8)} (patch unchanged)`);
       continue;
     }
@@ -143,7 +179,18 @@ try {
           /Independent review gate: BLOCK/.test(c.body),
       )
       .at(-1);
-    todo.push({ ...pr, touched, marker, patch, lane, lastBlock: lastBlock?.body });
+    const pendingMarker = `<!-- review-gate-pending:${pr.headRefOid} -->`;
+    const pendingNoted = comments.some((c) => c.body.includes(pendingMarker));
+    todo.push({
+      ...pr,
+      touched,
+      marker,
+      patch,
+      lane,
+      lastBlock: lastBlock?.body,
+      pendingMarker,
+      pendingNoted,
+    });
   }
   const PRIORITY = (() => {
     try {
@@ -259,9 +306,15 @@ ${
     });
     if (!verdict) {
       console.log(`no verdict for #${pr.number}; rc=${run.status}\n${run.stderr.slice(-800)}`);
-      try {
-        asBot(['gh', 'pr', 'merge', String(pr.number), '-R', REPO, '--disable-auto']);
-      } catch {}
+      if (pr.autoMergeRequest && !pr.pendingNoted) {
+        try {
+          asBot(
+            ['gh', 'pr', 'comment', String(pr.number), '-R', REPO, '--body-file', '-'],
+            `${pr.pendingMarker}\n**Independent review gate: no verdict yet** for \`${pr.headRefOid.slice(0, 8)}\`: the reviewer run ended without a verdict, so auto-merge is paused. The gate retries on its next round and re-arms auto-merge once a later run passes.`,
+          );
+        } catch {}
+      }
+      disarm(pr);
       return /no usable model/.test(run.stderr) && !run.excluded ? 'no-model' : 'none';
     }
     const body =
@@ -269,11 +322,8 @@ ${
         ? `${pr.marker}\n**Independent review gate: PASS** for \`${pr.headRefOid.slice(0, 8)}\`.\n<!-- review-gate-patch:${pr.patch} -->`
         : `${pr.marker}\n**Independent review gate: BLOCK** for \`${pr.headRefOid.slice(0, 8)}\`.\n\n${review}\n<!-- review-gate-patch:${pr.patch} -->`;
     asBot(['gh', 'pr', 'comment', String(pr.number), '-R', REPO, '--body-file', '-'], body);
-    if (verdict !== 'pass') {
-      try {
-        asBot(['gh', 'pr', 'merge', String(pr.number), '-R', REPO, '--disable-auto']);
-      } catch {}
-    }
+    if (verdict === 'pass') rearm(pr);
+    else disarm(pr);
     console.log(`#${pr.number}: ${verdict}`);
     return verdict;
   };
