@@ -232,7 +232,8 @@ export function decideEpic(facts) {
       completedAt = new Date(Math.max(...completionTimes.map((time) => Date.parse(time)))).toISOString();
     }
     const elapsed = complete
-      ? Date.parse(completedAt) > Date.parse(startedAt) + manifest.maxHours * 3600000
+      ? activeHours - Math.max(0, Date.parse(now) - Date.parse(completedAt)) / 3600000 >
+        manifest.maxHours
       : activeHours >= manifest.maxHours;
     let state = 'incomplete';
     if (fail) {

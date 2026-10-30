@@ -1287,6 +1287,45 @@ test('a gathering error still preserves the first start and active budget', asyn
   expectState(await invoke(['--state', path]), 'failed', 30);
 });
 
+for (const command of ['gh', 'git', 'node']) {
+  test(`a failed batch survives a ${command} gathering error and recovery`, async () => {
+    const path = join(stateRoot, `failed-${command}.json`);
+    const { state, invoke } = harness();
+    expectState(await invoke(['--state', path, '--fail', 'explicit stop']), 'failed', 30);
+    const failed = JSON.parse(readFileSync(path, 'utf8'));
+    state.intercept = (file) => {
+      if (file === command) throw new Error('gathering interrupted');
+    };
+    expectState(await invoke(['--state', path]), 'unknown', 2, /gathering interrupted/);
+    const interrupted = JSON.parse(readFileSync(path, 'utf8'));
+    assert.equal(interrupted.phase, 'failed');
+    assert.equal(interrupted.pauseReason, failed.pauseReason);
+    state.intercept = undefined;
+    expectState(await invoke(['--state', path]), 'failed', 30, /explicit stop/);
+  });
+}
+
+test('completion after a resumed pause uses only active hours', async () => {
+  const path = join(stateRoot, 'resumed-completion.json');
+  const { state, deps, invoke } = batchHarness();
+  deps.now = () => new Date(now.getTime() + 3600000);
+  expectState(await invoke(['--state', path, '--pause', 'owner']), 'paused', 20);
+  deps.now = () => new Date(now.getTime() + 25 * 3600000);
+  expectState(await invoke(['--state', path]), 'incomplete', 10);
+  const completedAt = new Date(now.getTime() + 26 * 3600000).toISOString();
+  deps.now = () => new Date(completedAt);
+  state.issues = state.manifest.items.map((item, index) => {
+    const value = issue(item.issue);
+    value.timelineItems.nodes[0].closer.number = 100 + index;
+    value.timelineItems.nodes[0].closer.mergedAt = completedAt;
+    return value;
+  });
+  for (const run of state.checks[tip][0].check_runs) run.completed_at = completedAt;
+  const result = await invoke(['--state', path]);
+  expectState(result, 'complete', 0);
+  assert.equal(result.facts.activeHours, 2);
+});
+
 test('late local verification does not move historical completion', async () => {
   const { state, deps, invoke } = harness();
   state.manifest.maxHours = 1;

@@ -103,6 +103,8 @@ export async function main(argv, deps = {}) {
           3600000
         : 0);
     persistResult = (decision) => {
+      if (decision.state === 'unknown' && persisted?.phase === 'failed')
+        decision = { ...decision, state: 'failed', reasons: [persisted.pauseReason] };
       const failureHistory = Object.assign(Object.create(null), persisted?.failureHistory ?? {});
       for (const item of decision.items ?? []) {
         if (item.status === 'done') continue;
