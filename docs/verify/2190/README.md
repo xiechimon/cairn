@@ -73,3 +73,16 @@ Final measured scratch result: Node 24.14.0, 78 tests passed, zero failed, 91.55
 The authoritative round 2 red run recorded 14 selected tests, 9 failures and 5 passes against the prior implementation. Historical logs and the discarded age-harness invocation are preserved; only the intended assertion failures support red-before-fix claims. Log trailing whitespace is normalized for repository hygiene.
 
 Changed paths are listed in round2-files.txt. Tested implementation, tests and service unit bytes are identified in round2-tested-files.sha256. Static service checks do not establish a running Linux unit. No final independent review verdict is claimed.
+
+## omarchy runs at d392ffae (current head, dispatcher, 2026-10-30)
+
+| Run | Result | Report |
+| --- | --- | --- |
+| `--mode fresh` on the live instance | PASS restore-drill fresh ok | `omarchy-head/head-fresh.json` |
+| `--mode hourly` on the newest kept backup | PASS restore-drill hourly ok | `omarchy-head/head-hourly.json` |
+| `--mode compare`, clean control: a backup taken seconds before | PASS restore-drill compare ok | `omarchy-head/head-neg-clean-control.json` |
+| `--mode compare`, one message edited in that backup | FAIL content message ...: differing row | `omarchy-head/head-neg-edit-message.json` |
+| `--mode compare`, one `todo_tag` row deleted | FAIL content todo_tag ...: missing row | `omarchy-head/head-neg-drop-row.json` |
+| `--mode compare`, first byte of one attachment changed | FAIL attachments ...png: missing, size or sha256 mismatch | `omarchy-head/head-neg-attachment-byte.json` |
+
+The earlier `omarchy/` reports were taken at b2fbb4fb, before the modes existed; they record how the first real runs found the drill's own bugs.
