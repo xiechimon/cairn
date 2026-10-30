@@ -29,10 +29,10 @@
 test at scripts/ops/restore-drill.test.mjs:52:1
 ✖ clean backup passes real checkout API and never reports key or plaintext (1292.255167ms)
   AssertionError [ERR_ASSERTION]: bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory
-  
-  
+
+
   127 !== 0
-  
+
       at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:55:10)
       at Test.runInAsyncScope (node:async_hooks:226:14)
       at Test.run (node:internal/test_runner/test:1402:25)
@@ -49,9 +49,9 @@ test at scripts/ops/restore-drill.test.mjs:52:1
 test at scripts/ops/restore-drill.test.mjs:66:1
 ✖ one attachment byte changed names its storage key (486.279334ms)
   AssertionError [ERR_ASSERTION]: The input did not match the regular expression /attachment.*file.txt/. Input:
-  
+
   'bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory\n'
-  
+
       at fails (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:50:10)
       at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:66:143)
       at Test.runInAsyncScope (node:async_hooks:226:14)
@@ -71,9 +71,9 @@ test at scripts/ops/restore-drill.test.mjs:66:1
 test at scripts/ops/restore-drill.test.mjs:67:1
 ✖ message content edited names table and id (568.691292ms)
   AssertionError [ERR_ASSERTION]: The input did not match the regular expression /message.*m/. Input:
-  
+
   'bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory\n'
-  
+
       at fails (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:50:10)
       at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:67:161)
       at Test.runInAsyncScope (node:async_hooks:226:14)
@@ -93,9 +93,9 @@ test at scripts/ops/restore-drill.test.mjs:67:1
 test at scripts/ops/restore-drill.test.mjs:68:40
 ✖ deleted row in backupDb fails (496.466375ms)
   AssertionError [ERR_ASSERTION]: The input did not match the regular expression /message.*m/. Input:
-  
+
   'bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory\n'
-  
+
       at fails (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:50:10)
       at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:68:166)
       at Test.runInAsyncScope (node:async_hooks:226:14)
@@ -115,9 +115,9 @@ test at scripts/ops/restore-drill.test.mjs:68:40
 test at scripts/ops/restore-drill.test.mjs:68:40
 ✖ deleted row in db fails (456.776917ms)
   AssertionError [ERR_ASSERTION]: The input did not match the regular expression /message.*m/. Input:
-  
+
   'bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory\n'
-  
+
       at fails (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:50:10)
       at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:68:166)
       at Test.runInAsyncScope (node:async_hooks:226:14)
@@ -137,9 +137,9 @@ test at scripts/ops/restore-drill.test.mjs:68:40
 test at scripts/ops/restore-drill.test.mjs:69:1
 ✖ scratch inside live directory is refused (445.714875ms)
   AssertionError [ERR_ASSERTION]: The input did not match the regular expression /scratch.*live/. Input:
-  
+
   'bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory\n'
-  
+
       at fails (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:50:10)
       at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:69:79)
       at Test.runInAsyncScope (node:async_hooks:226:14)
@@ -159,9 +159,9 @@ test at scripts/ops/restore-drill.test.mjs:69:1
 test at scripts/ops/restore-drill.test.mjs:70:1
 ✖ scratch through symlink is refused (460.846417ms)
   AssertionError [ERR_ASSERTION]: The input did not match the regular expression /scratch.*live/. Input:
-  
+
   'bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory\n'
-  
+
       at fails (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:50:10)
       at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:70:126)
       at Test.runInAsyncScope (node:async_hooks:226:14)
@@ -181,9 +181,9 @@ test at scripts/ops/restore-drill.test.mjs:70:1
 test at scripts/ops/restore-drill.test.mjs:71:1
 ✖ existing scratch is refused without overwriting it (450.790208ms)
   AssertionError [ERR_ASSERTION]: The input did not match the regular expression /scratch.*exist/. Input:
-  
+
   'bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory\n'
-  
+
       at fails (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:50:10)
       at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:71:111)
       at Test.runInAsyncScope (node:async_hooks:226:14)
@@ -203,9 +203,9 @@ test at scripts/ops/restore-drill.test.mjs:71:1
 test at scripts/ops/restore-drill.test.mjs:72:1
 ✖ report cannot overwrite live DB or key (440.980917ms)
   AssertionError [ERR_ASSERTION]: The input did not match the regular expression /report.*unsafe/. Input:
-  
+
   'bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory\n'
-  
+
       at fails (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:50:10)
       at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:72:113)
       at Test.runInAsyncScope (node:async_hooks:226:14)
@@ -242,9 +242,9 @@ test at scripts/ops/restore-drill.test.mjs:73:1
 test at scripts/ops/restore-drill.test.mjs:74:1
 ✖ foreign key violation fails (459.908959ms)
   AssertionError [ERR_ASSERTION]: The input did not match the regular expression /foreign_key_check/. Input:
-  
+
   'bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory\n'
-  
+
       at fails (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:50:10)
       at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:74:139)
       at Test.runInAsyncScope (node:async_hooks:226:14)
@@ -264,9 +264,9 @@ test at scripts/ops/restore-drill.test.mjs:74:1
 test at scripts/ops/restore-drill.test.mjs:75:1
 ✖ wrong key fails without leaking bytes (446.681417ms)
   AssertionError [ERR_ASSERTION]: The input did not match the regular expression /decrypt/. Input:
-  
+
   'bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory\n'
-  
+
       at fails (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:50:10)
       at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:75:145)
       at Test.runInAsyncScope (node:async_hooks:226:14)
@@ -286,9 +286,9 @@ test at scripts/ops/restore-drill.test.mjs:75:1
 test at scripts/ops/restore-drill.test.mjs:76:1
 ✖ no encrypted sample fails (483.439625ms)
   AssertionError [ERR_ASSERTION]: The input did not match the regular expression /decrypt.*sample/. Input:
-  
+
   'bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory\n'
-  
+
       at fails (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:50:10)
       at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:76:158)
       at Test.runInAsyncScope (node:async_hooks:226:14)
@@ -308,9 +308,9 @@ test at scripts/ops/restore-drill.test.mjs:76:1
 test at scripts/ops/restore-drill.test.mjs:77:1
 ✖ missing relationship sample fails (531.773916ms)
   AssertionError [ERR_ASSERTION]: The input did not match the regular expression /relationship/. Input:
-  
+
   'bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory\n'
-  
+
       at fails (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:50:10)
       at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:77:151)
       at Test.runInAsyncScope (node:async_hooks:226:14)
@@ -330,10 +330,10 @@ test at scripts/ops/restore-drill.test.mjs:77:1
 test at scripts/ops/restore-drill.test.mjs:78:1
 ✖ post-backup timestamped updates and inserts are allowed (596.0235ms)
   AssertionError [ERR_ASSERTION]: bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory
-  
-  
+
+
   127 !== 0
-  
+
       at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:78:306)
       at Test.runInAsyncScope (node:async_hooks:226:14)
       at Test.run (node:internal/test_runner/test:1402:25)
@@ -352,9 +352,9 @@ test at scripts/ops/restore-drill.test.mjs:78:1
 test at scripts/ops/restore-drill.test.mjs:79:1
 ✖ missing attachment and unsafe attachment key fail (611.914917ms)
   AssertionError [ERR_ASSERTION]: The input did not match the regular expression /attachment.*unsafe/. Input:
-  
+
   'bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory\n'
-  
+
       at fails (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:50:10)
       at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:79:199)
       at Test.runInAsyncScope (node:async_hooks:226:14)
@@ -374,10 +374,10 @@ test at scripts/ops/restore-drill.test.mjs:79:1
 test at scripts/ops/restore-drill.test.mjs:80:1
 ✖ default backup directory selects the newest timestamp (550.406209ms)
   AssertionError [ERR_ASSERTION]: bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory
-  
-  
+
+
   127 !== 0
-  
+
       at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:80:137)
       at Test.runInAsyncScope (node:async_hooks:226:14)
       at Test.run (node:internal/test_runner/test:1402:25)
@@ -390,5 +390,216 @@ test at scripts/ops/restore-drill.test.mjs:80:1
     actual: 127,
     expected: 0,
     operator: 'strictEqual',
+    diff: 'simple'
+  }
+✔ clean backup passes fixture in-process checkout API and never reports key or plaintext (5400.690875ms)
+✔ one attachment byte changed names its storage key (361.919375ms)
+✔ message content edited names table and id (373.626125ms)
+✔ deleted row in backupDb fails (356.386708ms)
+✔ deleted row in db fails (327.105625ms)
+✔ scratch inside live directory is refused (211.496666ms)
+✔ scratch through symlink is refused (205.517625ms)
+✔ existing scratch is refused without overwriting it (199.202667ms)
+✔ report cannot overwrite live DB or key (174.978667ms)
+✔ invalid gzip fails and publishes failure status (214.621791ms)
+✔ orphaned chief message fails the selected relationship (268.327125ms)
+✖ wrong key fails without leaking bytes (583.643042ms)
+✔ no encrypted sample fails (301.855ms)
+✔ missing relationship sample fails (426.407792ms)
+✔ post-backup timestamped updates and inserts are allowed (3188.648667ms)
+✔ missing attachment and unsafe attachment key fail (296.664208ms)
+✔ default backup directory selects the newest timestamp (2512.973791ms)
+✔ migration ledger rows with null declared ids are compared rather than skipped (280.77775ms)
+✔ machine heartbeat allowlist is reported while machine name remains strict (2983.523958ms)
+✔ missing ready attachment names its storage key (305.833792ms)
+✔ weekly units isolate scratch and do not install themselves (1.264958ms)
+✔ production shell requires a real HTTP listener and reports sandbox refusal (3885.757084ms)
+✔ invalid SQLite fails integrity checking (342.315375ms)
+✔ ready attachment size mismatch fails (283.031959ms)
+✔ scratch equal to live DB is refused (158.238584ms)
+✔ missing key fails without creating a replacement (169.982ms)
+✔ non-allowlisted machine field changes fail (340.494542ms)
+✔ missing selected todo names the relationship sample (292.7555ms)
+✔ missing selected build names the relationship sample (230.9695ms)
+✔ missing selected step names the relationship sample (226.43875ms)
+✔ missing selected message names the relationship sample (223.322458ms)
+✔ missing selected chief_thread names the relationship sample (226.987292ms)
+✔ missing selected chief_message names the relationship sample (229.091083ms)
+✔ newest eligible build wins over todo activity and step-less builds (1690.713416ms)
+✔ partial step loss names selected sample (215.102292ms)
+✔ partial message loss names selected sample (227.221416ms)
+✔ partial chief_message loss names selected sample (215.353583ms)
+✔ post-backup relationships are excluded while boundary rows are required (1571.810375ms)
+✖ HOME-dependent node shim is resolved before isolated helpers (433.901ms)
+✖ decrypt helper startup failure reports exit and safe first stderr line (399.738041ms)
+✖ api helper startup failure reports exit and safe first stderr line (606.727209ms)
+✖ unknown helper stderr is withheld from all published diagnostics (420.140875ms)
+✖ node resolution failure is classified before isolated helpers (1899.169166ms)
+ℹ tests 43
+ℹ suites 0
+ℹ pass 37
+ℹ fail 6
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 33549.335375
+
+✖ failing tests:
+
+test at scripts/ops/restore-drill.test.mjs:176:1
+✖ wrong key fails without leaking bytes (583.643042ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /decrypt failed.*exit=1/. Input:
+
+  'FAIL decrypt: decrypt failed\n'
+
+      at fails (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:103:10)
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:179:3)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL decrypt: decrypt failed\n',
+    expected: /decrypt failed.*exit=1/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:405:1
+✖ HOME-dependent node shim is resolved before isolated helpers (433.901ms)
+  AssertionError [ERR_ASSERTION]: FAIL decrypt: decrypt failed
+
+
+  1 !== 0
+
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:408:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:412:3
+✖ decrypt helper startup failure reports exit and safe first stderr line (399.738041ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /decrypt helper startup failed.*exit=23.*node helper unavailable/. Input:
+
+  'FAIL decrypt: decrypt failed\n'
+
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:416:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL decrypt: decrypt failed\n',
+    expected: /decrypt helper startup failed.*exit=23.*node helper unavailable/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:412:3
+✖ api helper startup failure reports exit and safe first stderr line (606.727209ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /api helper startup failed.*exit=23.*node helper unavailable/. Input:
+
+  'FAIL api: api startup failed or timed out\n'
+
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:416:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL api: api startup failed or timed out\n',
+    expected: /api helper startup failed.*exit=23.*node helper unavailable/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:419:1
+✖ unknown helper stderr is withheld from all published diagnostics (420.140875ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /decrypt helper startup failed.*exit=23.*stderr withheld/. Input:
+
+  'FAIL decrypt: decrypt failed\n'
+
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:422:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL decrypt: decrypt failed\n',
+    expected: /decrypt helper startup failed.*exit=23.*stderr withheld/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:426:1
+✖ node resolution failure is classified before isolated helpers (1899.169166ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /node helper startup failed.*exit=23/. Input:
+
+  'FAIL api: api listen failed: EPERM\n'
+
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:429:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL api: api listen failed: EPERM\n',
+    expected: /node helper startup failed.*exit=23/,
+    operator: 'match',
+    diff: 'simple'
+  }
+✖ production shell requires a real HTTP listener and reports sandbox refusal (4077.514417ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4187.061208
+
+✖ failing tests:
+
+test at scripts/ops/restore-drill.test.mjs:261:1
+✖ production shell requires a real HTTP listener and reports sandbox refusal (4077.514417ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /exit=1/. Input:
+
+  'api: api listen failed: EPERM'
+
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:270:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'api: api listen failed: EPERM',
+    expected: /exit=1/,
+    operator: 'match',
     diff: 'simple'
   }

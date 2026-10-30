@@ -8,6 +8,8 @@ import { createKeyfileSecretBox } from '../../apps/server/src/lib/secret-box.js'
 import { ConversationStreamHub, TeamStreamHub } from '../../apps/server/src/services/events.js';
 import { MachineWakeHub } from '../../apps/server/src/services/machine-wake-hub.js';
 
+console.error('api helper started');
+
 const [home, key, mode] = process.argv.slice(2);
 const dataDir = join(home, 'server');
 const opened = openDbWithHandle(join(dataDir, 'server.db'));

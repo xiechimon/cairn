@@ -174,7 +174,28 @@ def relationships(db, live, stamp, report):
     report['relationships'] = dict(todo=todo_id, build=build_id, **samples, chiefThread=chief[0], chiefMessages=actual, cutoff=stamp)
 
 
-def decrypt(db, key, env, report):
+def helper_failure(label, code, stderr, started=False):
+    lines = [line for line in stderr.splitlines() if line != label + ' helper started']
+    first = lines[0] if lines else ''
+    safe = first if first in {'decrypt failed', 'node helper unavailable', 'api helper failed'} else 'stderr withheld' if first else 'stderr empty'
+    kind = 'failed' if started else 'helper startup failed'
+    return RuntimeError(f'{label} {kind}; exit={code}; {safe}')
+
+
+def resolve_node():
+    try:
+        run = subprocess.run(['node', '-p', 'process.execPath'], text=True, capture_output=True, timeout=30)
+    except OSError as error:
+        raise helper_failure('node', error.errno, '') from None
+    except subprocess.TimeoutExpired:
+        raise helper_failure('node', 'timeout', '') from None
+    path = run.stdout.strip()
+    if run.returncode or not Path(path).is_absolute() or not Path(path).is_file():
+        raise helper_failure('node', run.returncode, run.stderr)
+    return path
+
+
+def decrypt(db, key, env, report, node):
     candidates = [('secret', 'valueCipher'), ('provider', 'apiKeyCipher'), ('github_connection', 'accessTokenCipher'), ('feishu_binding', 'appSecretCipher')]
     envelope = None
     for table, column in candidates:
@@ -185,16 +206,26 @@ def decrypt(db, key, env, report):
                 break
     if not envelope:
         raise RuntimeError('decrypt: no encrypted sample')
-    run = subprocess.run(['node', '--import', 'tsx', str(ROOT / 'scripts/ops/restore-drill-decrypt.mts'), str(key)], cwd=ROOT / 'apps/server', env=env, input=envelope, text=True, capture_output=True, timeout=30)
+    try:
+        run = subprocess.run([node, '--import', 'tsx', str(ROOT / 'scripts/ops/restore-drill-decrypt.mts'), str(key)], cwd=ROOT / 'apps/server', env=env, input=envelope, text=True, capture_output=True, timeout=30)
+    except OSError as error:
+        raise helper_failure('decrypt', error.errno, '') from None
+    except subprocess.TimeoutExpired:
+        raise helper_failure('decrypt', 'timeout', '') from None
     if run.returncode or run.stdout.strip() != 'decrypt ok':
-        raise RuntimeError('decrypt failed')
+        raise helper_failure('decrypt', run.returncode, run.stderr, 'decrypt helper started' in run.stderr.splitlines())
     report['decryption'] = 'decrypt ok'
 
 
-def api(db, home, env, report):
+def api(db, home, env, report, node):
     expected = dict(db.execute('select teamId,count(*) from todo group by teamId'))
     env = dict(env, CAIRN_HOME=str(home), CAIRN_SKILLS_DIR=str(home / 'skills'), CAIRN_MCP_CONFIG=str(home / 'mcp.json'), HOST='127.0.0.1', PORT='0', NODE_ENV='production', LOG_LEVEL='info')
-    process = subprocess.Popen(['node', '--import', 'tsx', str(ROOT / 'scripts/ops/restore-drill-api.mts'), str(home), env['RESTORE_DRILL_KEY_PATH']], cwd=ROOT / 'apps/server', env=env, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+    stderr = tempfile.TemporaryFile(mode='w+')
+    try:
+        process = subprocess.Popen([node, '--import', 'tsx', str(ROOT / 'scripts/ops/restore-drill-api.mts'), str(home), env['RESTORE_DRILL_KEY_PATH']], cwd=ROOT / 'apps/server', env=env, stdout=subprocess.PIPE, stderr=stderr, text=True)
+    except OSError as error:
+        stderr.close()
+        raise helper_failure('api', error.errno, '') from None
     try:
         port = None
         selector = selectors.DefaultSelector()
@@ -207,7 +238,14 @@ def api(db, home, env, report):
             try:
                 item = json.loads(line)
                 if item.get('error'):
-                    raise RuntimeError('api listen failed: ' + (item.get('code') if item.get('code') in ['EPERM', 'EACCES', 'EADDRINUSE'] else 'unknown'))
+                    code = item.get('code') if item.get('code') in ['EPERM', 'EACCES', 'EADDRINUSE'] else 'unknown'
+                    try:
+                        process.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                        process.wait()
+                    stderr.seek(0)
+                    raise RuntimeError(f'api listen failed: {code}; ' + str(helper_failure('api', process.returncode, stderr.read(), True)))
                 if item.get('port') and item.get('dataDir') == str(home / 'server'):
                     port = item['port']
                     break
@@ -215,7 +253,9 @@ def api(db, home, env, report):
                 pass
         selector.close()
         if port is None:
-            raise RuntimeError('api startup failed or timed out')
+            stderr.seek(0)
+            diagnostic = stderr.read()
+            raise helper_failure('api', process.poll() if process.poll() is not None else 'timeout', diagnostic, 'api helper started' in diagnostic.splitlines())
         total = 0
         teams = [r[0] for r in db.execute('select id from team')]
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -237,6 +277,7 @@ def api(db, home, env, report):
             process.kill()
             process.wait()
         process.stdout.close()
+        stderr.close()
 
 
 def publish(path, report):
@@ -303,13 +344,15 @@ def main():
             compare(db, snapshot, stamp, report)
             item = 'attachments'
             attachments(db, attachment_copy, attachment_live, report)
+            item = 'node resolution'
+            node = resolve_node()
             env = {k: v for k, v in os.environ.items() if k in ['PATH', 'TMPDIR', 'SYSTEMROOT']}
             env['HOME'] = str(home)
             item = 'decrypt'
-            decrypt(db, key, env, report)
+            decrypt(db, key, env, report, node)
             env['RESTORE_DRILL_KEY_PATH'] = str(key)
             item = 'api'
-            api(db, home, env, report)
+            api(db, home, env, report, node)
         report['ok'] = True
     except Exception as error:
         safe_error = str(error) if isinstance(error, RuntimeError) else type(error).__name__

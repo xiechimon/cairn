@@ -150,3 +150,48 @@ Host acceptance remains unverified: execute the Operation command above on omarc
 Final measured node:test result: 38 passed, 0 failed. The original regression run had 38 cases, 20 passed and 18 failed; it includes expected original-code failures and is not a final acceptance run. Logs redact the local home/worktree prefix. No code changes were made between the timeout attempt and the successful isolated rerun.
 
 Additional measured static checks: `node scripts/english-only-gate.mjs`, `node scripts/comment-discipline-gate.mjs`, and the final `node scripts/lessons-ledger-gate.mjs` each exited 0; artifacts are relationships-english.log, relationships-comments.log and relationships-lessons.log. These are static checks, not independent review.
+
+## Node isolation follow-up (failure modes recorded before implementation)
+
+Base: fccfecc020c48b2b228864179712a36dfee1469a. Network overlap lookup is unavailable; this extends the assigned existing ticket only.
+
+| Failure mode | Test or unverified limit |
+| --- | --- |
+| HOME-dependent PATH shim fails under isolation | Fake shim permits caller HOME only; clean fixture drill must pass |
+| Decrypt helper never starts | Injected executable failure must name startup, exit 23 and safe first stderr line |
+| API helper never starts | Production API executable failure must name startup and exit 23 |
+| Wrong key is mistaken for startup failure | Wrong-key test requires decryption failure and exit 1 |
+| Unknown stderr exposes secrets | Injected secret stderr is omitted from report and status |
+| Node resolution fails in caller environment | Resolution failure test requires node startup failure |
+| Helper hangs or exits without valid protocol output | Timeout/protocol errors remain failures; timeout injection unverified |
+| API fails after startup, binding, reads or counts fail | Existing production-shell and fixture route cases; real host HTTP remains unverified |
+
+New regressions will be run red before implementation. Existing red.log and green.log are historical; their contents will be retained before appending this round.
+
+API bind refusals must also retain the helper exit status: the production-shell EPERM case asserts exit=1 before the diagnostic change.
+
+## Node isolation acceptance record
+
+Measured on base fccfecc020c48b2b228864179712a36dfee1469a plus the uncommitted files identified in node-tested-files.sha256. All runtime cases use synthetic scratch data and the checkout encryption implementation; provider mode is **not exercised**. No external package API was added or changed.
+
+The caller resolves Node once with inherited HOME and environment using node -p process.execPath. Decrypt and API then use that absolute executable under scratch HOME. Fixed stderr markers establish whether helper code started after module loading. Only an exact allowlist of fixed diagnostic strings is published from the first non-marker stderr line; unknown stderr is withheld. Decrypt errors print only fixed strings. API listen errors retain their safe error code and the exited helper status. A timeout has no completed exit code and is labeled exit=timeout; OS execution errors carry errno in the exit field, rather than an observed child exit status.
+
+| Supported claim | Command | Artifact | Measured result |
+| --- | --- | --- | --- |
+| Old implementation reproduces shim and classification failures | node --test scripts/ops/restore-drill.test.mjs | red.log, appended follow-up run | 43 tests, 37 pass and 6 fail at intended assertions |
+| API bind failure originally omits child exit status | node --test --test-name-pattern='production shell' scripts/ops/restore-drill.test.mjs | red.log, final focused run | 1 expected failure, missing exit=1 |
+| Absolute executable survives HOME isolation; startup failures differ from wrong-key failures; unknown stderr is withheld | node --test scripts/ops/restore-drill.test.mjs | green.log, final full run | Exit 0, 43 passed and 0 failed |
+| Real API bootstrap reports sandbox bind refusal and exit status | Production-shell case in same command | green.log | EPERM refusal asserted; successful HTTP transport remains unverified |
+| Lint | pnpm lint | node-lint.log | Exit 0, existing informational useFlatMap diagnostic |
+| Types | pnpm typecheck | node-typecheck.log | Exit 0 |
+| Changed Vitest selection | pnpm exec vitest run --changed | node-vitest.log | Exit 0, no selected tests; ops coverage comes from node:test |
+| Spec parsing | pnpm spec:parse | node-spec-parse.log | Exit 0, 1391 web tests collected and 65 integration files parsed |
+| Lesson, language and comment checks | node scripts/lessons-ledger-gate.mjs; node scripts/english-only-gate.mjs; node scripts/comment-discipline-gate.mjs | node-lessons.log, node-english.log, node-comments.log | Final checks exit 0; lesson log also retains rejected event-record attempts |
+
+The initial lint run found formatting and shell-quoting escape diagnostics in the new test; quoting was corrected and the file was formatted before rerunning lint and all 43 tests. Runtime logs retain earlier rounds followed by this round; local home/worktree paths, ANSI styling and trailing whitespace are normalized for publication. Historical JSON reports elsewhere in this directory are not evidence for this follow-up.
+
+Retro applied: the existing verification-command-context lesson (#1686) now includes this recurrence and executable regressions. The event log records local-task-2190 as a local task identifier, not a GitHub PR. No independent review was performed; automated checks do not establish review or evidence sufficiency.
+
+Unverified limits: no host or GitHub access, live production recovery, real-provider execution, installed timer, live HTTP success, timeout injection, missing/executable-permission races, malformed success protocol injection, production permissions or scale. Unknown safe stderr that is outside the fixed allowlist is conservatively withheld. No UI or screenshot claim is made. Evidence remains local and uncommitted as requested; it does not establish delivered verification, remote evidence availability or CI success.
+
+Host acceptance still required: run the Operation command on omarchy against server-db-20261030T060001Z.db.gz, the existing key and real attachment paths, using a fresh scratch directory and the original shim PATH. Inspect JSON and status for decryption and HTTP success. If a helper fails, verify its startup/runtime class and exit diagnostic without publishing private host reports. No host execution was attempted here. No commit, push, PR, full e2e or pnpm build was run.

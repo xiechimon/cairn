@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import {
+  chmodSync,
   copyFileSync,
   existsSync,
   mkdirSync,
@@ -69,7 +70,7 @@ function fixture() {
     pack,
     scratch,
     report,
-    run: (extra = [], production = false) =>
+    run: (extra = [], production = false, env = process.env) =>
       spawnSync(
         production ? 'bash' : 'python3',
         [
@@ -90,7 +91,7 @@ function fixture() {
           report,
           ...extra,
         ],
-        { encoding: 'utf8', timeout: 60000 },
+        { encoding: 'utf8', timeout: 60000, env },
       ),
     attachments,
     liveAttachments,
@@ -175,7 +176,7 @@ test('orphaned chief message fails the selected relationship', () => {
 test('wrong key fails without leaking bytes', () => {
   const f = fixture();
   writeFileSync(f.key, `${Buffer.alloc(32, 7).toString('base64')}\n`);
-  fails(f, /decrypt/);
+  fails(f, /decrypt failed.*exit=1/);
   assert.ok(!readFileSync(f.report, 'utf8').includes(Buffer.alloc(32, 7).toString('base64')));
 });
 test('no encrypted sample fails', () => {
@@ -266,6 +267,7 @@ test('production shell requires a real HTTP listener and reports sandbox refusal
     assert.equal(report.fixtureOnly, undefined);
   } else {
     assert.match(report.error, /api.*listen failed: EPERM/);
+    assert.match(report.error, /exit=1/);
     assert.match(r.stderr, /FAIL api/);
     assert.equal(report.ok, false);
   }
@@ -371,4 +373,68 @@ test('post-backup relationships are excluded while boundary rows are required', 
   const backupStamp = Date.parse('2026-10-30T00:00:00Z');
   sql(f.db, `update message set createdAt=${backupStamp} where id='later-message'`);
   fails(f, /relationship.*build b(?:\s|:)/, ['--scratch', join(f.dir, 'boundary-scratch')]);
+});
+
+function nodeShim(f, mode, diagnostic = 'node helper unavailable') {
+  const bin = join(f.dir, 'bin');
+  mkdirSync(bin);
+  const shim = join(bin, 'node');
+  const quote = (value) => `'${value.replaceAll("'", "'\"'\"'")}'`;
+  writeFileSync(
+    shim,
+    `#!/bin/bash
+if [ "$1" = "-p" ]; then
+  if [ "${mode}" = "resolve" ]; then exit 23; fi
+  if [ "${mode}" = "home" ]; then exec ${quote(process.execPath)} "$@"; fi
+  printf '%s\n' ${quote(shim)}
+  exit 0
+fi
+if [ "${mode}" = "home" ] && [ "$HOME" != ${quote(process.env.HOME)} ]; then
+  echo 'mise ERROR home unavailable' >&2
+  exit 23
+fi
+case "$*" in
+  *restore-drill-${mode}.mts*)
+    printf '%s\n' ${quote(diagnostic)} >&2
+    echo 'second line must not be reported' >&2
+    exit 23;;
+esac
+exec ${quote(process.execPath)} "$@"
+`,
+  );
+  chmodSync(shim, 0o700);
+  return { ...process.env, PATH: `${bin}:${process.env.PATH}` };
+}
+test('HOME-dependent node shim is resolved before isolated helpers', () => {
+  const f = fixture();
+  const r = f.run([], false, nodeShim(f, 'home'));
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(JSON.parse(readFileSync(f.report)).decryption, 'decrypt ok');
+});
+for (const mode of ['decrypt', 'api'])
+  test(`${mode} helper startup failure reports exit and safe first stderr line`, () => {
+    const f = fixture();
+    const r = f.run([], true, nodeShim(f, mode));
+    assert.notEqual(r.status, 0);
+    assert.match(
+      r.stderr,
+      new RegExp(`${mode} helper startup failed.*exit=23.*node helper unavailable`),
+    );
+    assert.doesNotMatch(r.stderr, /decrypt failed|second line/);
+  });
+test('unknown helper stderr is withheld from all published diagnostics', () => {
+  const f = fixture();
+  const r = f.run([], true, nodeShim(f, 'decrypt', 'fixture plaintext secret'));
+  assert.match(r.stderr, /decrypt helper startup failed.*exit=23.*stderr withheld/);
+  for (const text of [
+    r.stderr,
+    readFileSync(f.report, 'utf8'),
+    readFileSync(`${f.report}.status`, 'utf8'),
+  ])
+    assert.doesNotMatch(text, /fixture plaintext secret/);
+});
+test('node resolution failure is classified before isolated helpers', () => {
+  const f = fixture();
+  const r = f.run([], true, nodeShim(f, 'resolve'));
+  assert.match(r.stderr, /node helper startup failed.*exit=23/);
 });

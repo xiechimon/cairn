@@ -33,3 +33,165 @@
 ℹ skipped 0
 ℹ todo 0
 ℹ duration_ms 99621.3735
+✔ clean backup passes fixture in-process checkout API and never reports key or plaintext (3346.816167ms)
+✔ one attachment byte changed names its storage key (218.824209ms)
+✔ message content edited names table and id (255.358ms)
+✔ deleted row in backupDb fails (280.946333ms)
+✔ deleted row in db fails (243.336708ms)
+✔ scratch inside live directory is refused (153.419125ms)
+✔ scratch through symlink is refused (150.42675ms)
+✔ existing scratch is refused without overwriting it (165.50225ms)
+✔ report cannot overwrite live DB or key (175.077625ms)
+✔ invalid gzip fails and publishes failure status (241.089583ms)
+✔ orphaned chief message fails the selected relationship (256.444209ms)
+✔ wrong key fails without leaking bytes (703.369958ms)
+✔ no encrypted sample fails (378.245583ms)
+✔ missing relationship sample fails (284.508208ms)
+✔ post-backup timestamped updates and inserts are allowed (2534.737709ms)
+✔ missing attachment and unsafe attachment key fail (458.365792ms)
+✔ default backup directory selects the newest timestamp (2265.35575ms)
+✔ migration ledger rows with null declared ids are compared rather than skipped (303.776125ms)
+✔ machine heartbeat allowlist is reported while machine name remains strict (1904.765416ms)
+✔ missing ready attachment names its storage key (335.884708ms)
+✔ weekly units isolate scratch and do not install themselves (1.464916ms)
+✔ production shell requires a real HTTP listener and reports sandbox refusal (12219.285208ms)
+✔ invalid SQLite fails integrity checking (1309.476834ms)
+✔ ready attachment size mismatch fails (1402.857625ms)
+✔ scratch equal to live DB is refused (1047.891667ms)
+✔ missing key fails without creating a replacement (1027.453583ms)
+✔ non-allowlisted machine field changes fail (1549.199459ms)
+✔ missing selected todo names the relationship sample (2408.723958ms)
+✔ missing selected build names the relationship sample (1618.699417ms)
+✔ missing selected step names the relationship sample (1213.156666ms)
+✔ missing selected message names the relationship sample (1372.633917ms)
+✔ missing selected chief_thread names the relationship sample (979.315666ms)
+✔ missing selected chief_message names the relationship sample (3380.814042ms)
+✔ newest eligible build wins over todo activity and step-less builds (9379.38425ms)
+✔ partial step loss names selected sample (377.155291ms)
+✔ partial message loss names selected sample (678.852042ms)
+✔ partial chief_message loss names selected sample (526.893333ms)
+✔ post-backup relationships are excluded while boundary rows are required (4465.192375ms)
+✔ HOME-dependent node shim is resolved before isolated helpers (3019.655416ms)
+✔ decrypt helper startup failure reports exit and safe first stderr line (559.484375ms)
+✔ api helper startup failure reports exit and safe first stderr line (874.941917ms)
+✔ unknown helper stderr is withheld from all published diagnostics (547.505958ms)
+✔ node resolution failure is classified before isolated helpers (648.031375ms)
+ℹ tests 43
+ℹ suites 0
+ℹ pass 43
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 66010.749
+✔ clean backup passes fixture in-process checkout API and never reports key or plaintext (4363.335125ms)
+✔ one attachment byte changed names its storage key (378.489917ms)
+✔ message content edited names table and id (383.710709ms)
+✔ deleted row in backupDb fails (283.906458ms)
+✔ deleted row in db fails (348.819625ms)
+✔ scratch inside live directory is refused (250.488917ms)
+✔ scratch through symlink is refused (186.129291ms)
+✔ existing scratch is refused without overwriting it (170.421541ms)
+✔ report cannot overwrite live DB or key (150.646625ms)
+✔ invalid gzip fails and publishes failure status (206.986458ms)
+✔ orphaned chief message fails the selected relationship (241.053541ms)
+✔ wrong key fails without leaking bytes (669.253083ms)
+✔ no encrypted sample fails (312.199041ms)
+✔ missing relationship sample fails (239.877166ms)
+✔ post-backup timestamped updates and inserts are allowed (2745.606125ms)
+✔ missing attachment and unsafe attachment key fail (308.032459ms)
+✔ default backup directory selects the newest timestamp (2290.28475ms)
+✔ migration ledger rows with null declared ids are compared rather than skipped (371.360792ms)
+✔ machine heartbeat allowlist is reported while machine name remains strict (5399.707083ms)
+✔ missing ready attachment names its storage key (384.411083ms)
+✔ weekly units isolate scratch and do not install themselves (1.09025ms)
+✔ production shell requires a real HTTP listener and reports sandbox refusal (3168.52925ms)
+✔ invalid SQLite fails integrity checking (317.294291ms)
+✔ ready attachment size mismatch fails (233.468041ms)
+✔ scratch equal to live DB is refused (152.293541ms)
+✔ missing key fails without creating a replacement (147.81275ms)
+✔ non-allowlisted machine field changes fail (278.871375ms)
+✔ missing selected todo names the relationship sample (316.530458ms)
+✔ missing selected build names the relationship sample (232.623666ms)
+✔ missing selected step names the relationship sample (243.4535ms)
+✔ missing selected message names the relationship sample (266.761875ms)
+✔ missing selected chief_thread names the relationship sample (247.020834ms)
+✔ missing selected chief_message names the relationship sample (264.8085ms)
+✔ newest eligible build wins over todo activity and step-less builds (2788.012958ms)
+✔ partial step loss names selected sample (398.490041ms)
+✔ partial message loss names selected sample (366.368ms)
+✔ partial chief_message loss names selected sample (323.351083ms)
+✔ post-backup relationships are excluded while boundary rows are required (4883.442833ms)
+✔ HOME-dependent node shim is resolved before isolated helpers (2510.619375ms)
+✔ decrypt helper startup failure reports exit and safe first stderr line (732.237584ms)
+✔ api helper startup failure reports exit and safe first stderr line (1047.498167ms)
+✔ unknown helper stderr is withheld from all published diagnostics (598.51575ms)
+✔ node resolution failure is classified before isolated helpers (473.552375ms)
+ℹ tests 43
+ℹ suites 0
+ℹ pass 43
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 39991.525
+✔ production shell requires a real HTTP listener and reports sandbox refusal (3126.760542ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3230.659459
+✔ clean backup passes fixture in-process checkout API and never reports key or plaintext (2841.433709ms)
+✔ one attachment byte changed names its storage key (381.388167ms)
+✔ message content edited names table and id (225.092583ms)
+✔ deleted row in backupDb fails (276.886209ms)
+✔ deleted row in db fails (224.857084ms)
+✔ scratch inside live directory is refused (118.788042ms)
+✔ scratch through symlink is refused (117.902959ms)
+✔ existing scratch is refused without overwriting it (142.987792ms)
+✔ report cannot overwrite live DB or key (174.056375ms)
+✔ invalid gzip fails and publishes failure status (183.829292ms)
+✔ orphaned chief message fails the selected relationship (180.740708ms)
+✔ wrong key fails without leaking bytes (473.976458ms)
+✔ no encrypted sample fails (271.693709ms)
+✔ missing relationship sample fails (180.224042ms)
+✔ post-backup timestamped updates and inserts are allowed (1169.163542ms)
+✔ missing attachment and unsafe attachment key fail (177.095167ms)
+✔ default backup directory selects the newest timestamp (1145.794333ms)
+✔ migration ledger rows with null declared ids are compared rather than skipped (181.841ms)
+✔ machine heartbeat allowlist is reported while machine name remains strict (2105.291375ms)
+✔ missing ready attachment names its storage key (290.008417ms)
+✔ weekly units isolate scratch and do not install themselves (1.049625ms)
+✔ production shell requires a real HTTP listener and reports sandbox refusal (1984.656083ms)
+✔ invalid SQLite fails integrity checking (171.345708ms)
+✔ ready attachment size mismatch fails (156.463625ms)
+✔ scratch equal to live DB is refused (107.261125ms)
+✔ missing key fails without creating a replacement (103.174125ms)
+✔ non-allowlisted machine field changes fail (197.427125ms)
+✔ missing selected todo names the relationship sample (299.127042ms)
+✔ missing selected build names the relationship sample (178.727042ms)
+✔ missing selected step names the relationship sample (169.705166ms)
+✔ missing selected message names the relationship sample (153.966542ms)
+✔ missing selected chief_thread names the relationship sample (161.822417ms)
+✔ missing selected chief_message names the relationship sample (164.409542ms)
+✔ newest eligible build wins over todo activity and step-less builds (1169.265167ms)
+✔ partial step loss names selected sample (157.14125ms)
+✔ partial message loss names selected sample (157.714208ms)
+✔ partial chief_message loss names selected sample (149.258041ms)
+✔ post-backup relationships are excluded while boundary rows are required (1202.276958ms)
+✔ HOME-dependent node shim is resolved before isolated helpers (2563.108292ms)
+✔ decrypt helper startup failure reports exit and safe first stderr line (755.232084ms)
+✔ api helper startup failure reports exit and safe first stderr line (1208.755333ms)
+✔ unknown helper stderr is withheld from all published diagnostics (578.553917ms)
+✔ node resolution failure is classified before isolated helpers (483.410959ms)
+ℹ tests 43
+ℹ suites 0
+ℹ pass 43
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 23378.39575
