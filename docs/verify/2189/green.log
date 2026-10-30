@@ -1,0 +1,17 @@
+✔ broker rejects other repositories, permissions and malformed requests before HTTP (9.757708ms)
+✔ broker signs JWT and sends only fixed repository permissions (266.747125ms)
+﹣ socket enforces framing, mode and preserves existing paths (22.240792ms) # Sandbox denies Unix socket binding
+✔ canary readable reports all channels without content (833.087ms)
+✔ canary unreadable reports all channels without content (1674.934292ms)
+✔ canary missing reports all channels without content (1203.146667ms)
+✔ canary validates arguments and reports process channels (95.1095ms)
+✔ setup dry run describes operations and leaves scratch unchanged (29.771792ms)
+✔ setup removes an existing privileged primary group and preserves quarantine on rerun (10743.785875ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 11680.751625

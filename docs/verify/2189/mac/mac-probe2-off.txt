@@ -1,0 +1,7 @@
+tmp=/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T//probe.Jvaw
+link created
+READ symlink
+READ cp
+READ dd
+READ node
+READ git-no-index

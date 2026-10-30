@@ -1,0 +1,54 @@
+Warning: claude.ai MCP servers blocked by enterprise policy: claude.ai Claude Docs, claude.ai Vercel, claude.ai Supabase, claude.ai Notion, claude.ai Figma
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+Output of each command, in order:
+
+1) `gh api user -q .login`
+```
+xiechimon
+```
+
+2) `git ls-remote origin refs/heads/main`
+```
+54195adb0806fd11632109cb74e3af423b98c0b8	refs/heads/main
+```
+
+3) `curl -sS -o /dev/null -w "%{http_code}" https://registry.npmjs.org/`
+```
+200
+```
+
+4) `wc -c ~/.cairn/cairnwright.private-key.pem`
+```
+Exit code 1
+wc: /Users/xmon/.cairn/cairnwright.private-key.pem: open: Operation not permitted
+```
+
+5) `python3 -c "print(len(open(\"/Users/xmon/.cairn/server/secretbox.key\").read()))"`
+```
+Exit code 1
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    print(len(open("/Users/xmon/.cairn/server/secretbox.key").read()))
+              ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 1] Operation not permitted: '/Users/xmon/.cairn/server/secretbox.key'
+```
+
+6) `sh /tmp/b0/sbx/probe-home.sh` (first 3 of 4 lines)
+```
+mktemp: mkdtemp failed on /tmp/b0/sbx/probe.iwQp: Operation not permitted
+ln: /l: Operation not permitted
+BLOCKED symlink
+```
+The fourth line was `BLOCKED node`.
+
+Commands 4 and 5 are blocked by the sandbox. Both key paths appear in the session's sandbox `denyOnly` read list, so the "Operation not permitted" is the sandbox enforcing that rule, not a missing file. I did not try to get around it. Command 6 failed the same way: the sandbox blocked writes under `/tmp/b0/sbx`, and the probe reports the symlink and node checks as blocked. I did not read or change the probe script.
+
+SUMMARY:
+1. OK
+2. OK
+3. OK
+4. FAIL (sandbox denies read of `~/.cairn/cairnwright.private-key.pem`)
+5. FAIL (sandbox denies read of `~/.cairn/server/secretbox.key`)
+6. FAIL (sandbox denies writes under `/tmp/b0/sbx`; symlink and node blocked)
+
+To get 4 and 5, the sandbox read rules for those two paths would need to change, which is your call. For 6, the probe needs a sandbox-writable location, or you can run it outside the sandbox yourself.

@@ -1,0 +1,8 @@
+54195adb0806fd11632109cb74e3af423b98c0b8
+4986ec4f5a56bb2265b8ca7c2086c8407a8316dc2e1723b0d5f0668805f3ad4d  scripts/ops/secret-reach/broker.mjs
+97911112c6d989fb2a7fc06cee8e5038e84b22bff555ed531c8ad0ae54882c75  scripts/ops/secret-reach/broker.test.mjs
+b035059639b17ec9810e4a26b6bd8b85fa2e187786e5fa804ce10523fa0d00f2  scripts/ops/secret-reach/canary.sh
+c2357a8895d6d9680e52948b3c9b77c82d077430a57619991a53127b0c62488c  scripts/ops/secret-reach/claude-sandbox-settings.json
+c1f41e7de2f3aa65afc145307cfe1a7f1e5fba46dfdd2587a0fa23fa0fc3d446  scripts/ops/secret-reach/secret-reach.test.mjs
+a33c988f67943332b4852cb357ff481dc377aeb80c001fd51ca29ed3e0b94edd  scripts/ops/secret-reach/setup-runner-linux.sh
+8395c1b2dea2a7e6cab04e1f2109e410e1207ebda21b0e969e7e829d0d297d88  scripts/ops/secret-reach/setup-runner-linux.test.mjs

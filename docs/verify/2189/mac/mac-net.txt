@@ -1,0 +1,33 @@
+Warning: claude.ai MCP servers blocked by enterprise policy: claude.ai Claude Docs, claude.ai Vercel, claude.ai Supabase, claude.ai Notion, claude.ai Figma
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+Results, run one at a time. Each output is shown as returned, with no workarounds attempted.
+
+1) `gh api user -q .login`
+```
+Get "https://api.github.com/user": tls: failed to verify certificate: x509: OSStatus -26276
+```
+(exit code 1)
+
+2) `git ls-remote origin refs/heads/main | head -n 3`
+```
+fatal: unable to access 'https://github.com/xiechimon/cairn.git/': Failed to connect to 127.0.0.1 port 7890 after 1 ms: Couldn't connect to server
+```
+
+3) `curl -sS -o /dev/null -w "%{http_code}" https://registry.npmjs.org/`
+```
+200
+```
+
+4) `cat ~/.cairn/cairnwright.private-key.pem | head -c 20`
+```
+cat: /Users/xmon/.cairn/cairnwright.private-key.pem: Operation not permitted
+```
+The sandbox denies reads of this file (it is on the session's `denyOnly` list), so I did not try to get around it.
+
+SUMMARY:
+1. gh api user: FAIL. The TLS certificate check for api.github.com fails (OSStatus -26276).
+2. git ls-remote origin: FAIL. Git is set to use a proxy at 127.0.0.1:7890, which is not listening.
+3. npm registry: OK. It returned HTTP 200.
+4. Private key read: FAIL. The sandbox blocks the read with "Operation not permitted".
+
+The GitHub failures (1 and 2) look like local network or proxy configuration. That is my inference from the error text, not something I checked. Once the GitHub connection works, rerun commands 1 and 2. Command 4 needs the sandbox to allow that file, which is your decision to make.

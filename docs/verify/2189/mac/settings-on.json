@@ -1,0 +1,2 @@
+{"sandbox":{"enabled":true,"autoAllowBashIfSandboxed":true,"allowUnsandboxedCommands":false},
+ "permissions":{"deny":["Read(/tmp/b0/sbx/secret/**)","Read(//private/tmp/b0/sbx/secret/**)"]}}

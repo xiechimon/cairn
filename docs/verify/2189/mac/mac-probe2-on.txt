@@ -1,0 +1,10 @@
+Warning: claude.ai MCP servers blocked by enterprise policy: claude.ai Claude Docs, claude.ai Vercel, claude.ai Supabase, claude.ai Notion, claude.ai Figma
+```
+tmp=/tmp/claude-501/probe.Ey0a
+link created
+BLOCKED symlink
+BLOCKED cp
+BLOCKED dd
+BLOCKED node
+BLOCKED git-no-index rc=1
+```

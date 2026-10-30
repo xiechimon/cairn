@@ -1,0 +1,11 @@
+Warning: claude.ai MCP servers blocked by enterprise policy: claude.ai Claude Docs, claude.ai Vercel, claude.ai Supabase, claude.ai Notion, claude.ai Figma
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+The command ran once and printed:
+
+```
+BLOCKED symlink
+BLOCKED cp
+BLOCKED dd
+```
+
+The output names three operations (symlink, cp, dd) as blocked. I haven't looked at the script to see what it's checking.

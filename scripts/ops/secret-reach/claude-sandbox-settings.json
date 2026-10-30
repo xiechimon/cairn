@@ -1,0 +1,19 @@
+{
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true,
+    "allowUnsandboxedCommands": false,
+    "enableWeakerNetworkIsolation": true,
+    "network": {
+      "allowLocalBinding": true,
+      "httpProxyPort": 7890
+    }
+  },
+  "permissions": {
+    "deny": [
+      "Read(~/.cairn/cairnwright.private-key.pem)",
+      "Read(~/.cairn/server/secretbox.key)",
+      "Read(~/.tds/server/secretbox.key)"
+    ]
+  }
+}

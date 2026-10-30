@@ -1,0 +1,7 @@
+Warning: claude.ai MCP servers blocked by enterprise policy: claude.ai Claude Docs, claude.ai Vercel, claude.ai Supabase, claude.ai Notion, claude.ai Figma
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+```
+READ symlink 17B
+READ cp 17B
+READ dd 17B
+```
