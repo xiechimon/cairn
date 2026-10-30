@@ -112,8 +112,8 @@ test('active row = sheet fill + hairline ring + accent icon', async ({ page }) =
   });
   expect(m.bg).toBe(m.hover);
   expect(m.ring).toBe('none');
-  expect(m.accent).toBe('#173a2f');
-  expect(m.icon).toBe('rgb(23, 58, 47)');
+  expect(m.accent).toBe('#926300');
+  expect(m.icon).toBe('rgb(146, 99, 0)');
 });
 
 test('`资源` folds by default, opens to an indented sub-list, survives reload', async ({ page }) => {

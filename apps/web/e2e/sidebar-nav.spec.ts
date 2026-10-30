@@ -104,16 +104,13 @@ test('hover tints the row — dark default + light theme', async ({ page }) => {
 
   expect(await pillBg(row)).toBe('rgba(0, 0, 0, 0)');
   await row.hover();
-  // --sidebar-hover dark = 5% warm white over the sidebar layer (#128),
-  // reached over the 150ms color step
-  await expect.poll(() => pillBg(row)).toBe('rgba(255, 252, 248, 0.05)');
+  await expect.poll(() => pillBg(row)).toBe('rgba(235, 245, 238, 0.05)');
 
   await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
   await page.goto('/app?scenario=01');
   const lightRow = page.getByRole('complementary').getByRole('link', { name: '定时' });
   await lightRow.hover();
-  // --sidebar-hover light = DESIGN.md hover #e8dec5 (Paper Grouped sidebar)
-  await expect.poll(() => pillBg(lightRow)).toBe('rgb(232, 222, 197)');
+  await expect.poll(() => pillBg(lightRow)).toBe('rgb(232, 230, 224)');
 });
 
 test('rail hover tints the row', async ({ page }) => {
@@ -123,7 +120,7 @@ test('rail hover tints the row', async ({ page }) => {
 
   expect(await pillBg(row)).toBe('rgba(0, 0, 0, 0)');
   await row.hover();
-  await expect.poll(() => pillBg(row)).toBe('rgba(255, 252, 248, 0.05)');
+  await expect.poll(() => pillBg(row)).toBe('rgba(235, 245, 238, 0.05)');
 });
 
 test('selected row keeps its sheet fill under hover', async ({ page }) => {

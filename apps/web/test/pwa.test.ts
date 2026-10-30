@@ -14,7 +14,7 @@ const MANIFEST_BRAND = {
 
 const MANIFEST_SCREENSHOT_LABEL = 'Cairn task board — humans direct, agents execute';
 
-const MANIFEST_DARK_PAPER = '#1a1612';
+const MANIFEST_DARK_CANVAS = '#0a110e';
 
 describe('PWA files', () => {
   it('manifest.webmanifest carries the Cairn brand, Paper colors and shipped screenshots', () => {
@@ -22,8 +22,8 @@ describe('PWA files', () => {
     expect(shipped.name).toBe(MANIFEST_BRAND.name);
     expect(shipped.short_name).toBe(MANIFEST_BRAND.shortName);
     expect(shipped.description).toBe(MANIFEST_BRAND.description);
-    expect(shipped.theme_color).toBe(MANIFEST_DARK_PAPER);
-    expect(shipped.background_color).toBe(MANIFEST_DARK_PAPER);
+    expect(shipped.theme_color).toBe(MANIFEST_DARK_CANVAS);
+    expect(shipped.background_color).toBe(MANIFEST_DARK_CANVAS);
     expect(shipped.related_applications).toBeUndefined();
     expect(shipped.screenshots).toEqual([
       {

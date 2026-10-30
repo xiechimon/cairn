@@ -1,10 +1,10 @@
+import type { SessionOpts } from '@cairn/shared';
 import {
   otlpStepSpanIdOfBuild,
   otlpTraceIdOfBuild,
   parseOtlpTarget,
-  type SessionOpts,
   stepOtelContext,
-} from '@cairn/shared';
+} from '@cairn/shared/otel';
 import { describe, expect, test } from 'vitest';
 import { daemonOtelFromEnv } from '../src/backend/otel.js';
 import { boot, CLAIMED, FakeMachineApi, fakeBackend, waitFor } from './machine-loop-harness.js';

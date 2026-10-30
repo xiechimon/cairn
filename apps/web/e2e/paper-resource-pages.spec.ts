@@ -53,15 +53,15 @@ test('machines: `添加机器` sits in the top bar, no dashed full-width bar', a
   await expect(page.locator('[data-testid="page-col"] button.border-dashed')).toHaveCount(0);
   const local = page.locator('div[data-kind="local"]');
   await expect(local).toContainText('在线');
-  await expect(local.locator('[data-on]')).toHaveCSS('background-color', 'rgb(95, 143, 90)');
+  await expect(local.locator('[data-on]')).toHaveCSS('background-color', 'rgb(52, 143, 79)');
 });
 
 test('providers runtime tabs: canvas track, chosen tab white with a 1px ring', async ({ page }) => {
   await light(page, '/app/resources/providers?scenario=06');
   const list = page.getByRole('tablist', { name: '模型服务' });
-  await expect(list).toHaveCSS('background-color', 'rgb(239, 230, 208)');
+  await expect(list).toHaveCSS('background-color', 'rgb(241, 240, 235)');
   const chosen = list.getByRole('tab', { selected: true });
-  await expect(chosen).toHaveCSS('background-color', 'rgb(255, 253, 246)');
+  await expect(chosen).toHaveCSS('background-color', 'rgb(254, 254, 251)');
   const ring = await chosen.evaluate((el) => getComputedStyle(el).boxShadow);
   expect(ring).toContain('0px 0px 0px 1px');
   await expect(chosen).toHaveCSS('height', '28px');

@@ -9,7 +9,7 @@ test('account: `退出登录` / `删除` / `更换` removed (avatar stays)', asy
   await expect(page.locator('.account-swap')).toHaveCount(0);
   await expect(page.locator('.account-avatar img')).toBeVisible();
 
-  await expect(page.locator('.account-card .settings-row')).toHaveCount(3);
+  await expect(page.locator('.account-card .settings-row')).toHaveCount(2);
   await expect(page.locator('.account-card')).not.toContainText('邮箱');
 });
 

@@ -254,7 +254,11 @@ export function InputSection() {
     >
       <Specimen title="Fields">
         <Cell label="default">
-          <Input className={`${FORM_CONTROL_CLS} w-60`} placeholder="Name this task" />
+          <Input
+            aria-label="Task name"
+            className={`${FORM_CONTROL_CLS} w-60`}
+            placeholder="Name this task"
+          />
         </Cell>
         <Cell label="disabled">
           <Input className={`${FORM_CONTROL_CLS} w-60`} value="main" disabled readOnly />
@@ -265,6 +269,7 @@ export function InputSection() {
               <Search />
             </InputGroupAddon>
             <InputGroupInput
+              aria-label="Search tasks"
               placeholder="Search tasks"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -332,7 +337,7 @@ export function ChoiceSection() {
   const [checks, setChecks] = useState({ tests: true, lint: false });
   const [notify, setNotify] = useState(true);
   const [view, setView] = useState<'list' | 'grid' | 'board'>('board');
-  const [density, setDensity] = useState<'comfortable' | 'compact'>('comfortable');
+  const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
   const [tab, setTab] = useState<'overview' | 'memory' | 'permissions'>('overview');
   const all = checks.tests && checks.lint;
   const some = checks.tests || checks.lint;
@@ -422,16 +427,17 @@ export function ChoiceSection() {
       <Specimen
         title="Segmented"
         note="SegmentedRadio picks a value, SegmentedTabs switches a view"
-        code={`<SegmentedRadio label="Density" value={v} onChange={set} options={[…]} />\n<SegmentedTabs value={v} onChange={set} options={[…]} slide />`}
+        code={`<SegmentedRadio label="Frequency" value={v} onChange={set} options={[…]} />\n<SegmentedTabs value={v} onChange={set} options={[…]} slide />`}
       >
         <Cell label="radio, text">
           <SegmentedRadio
-            label="Density"
-            value={density}
-            onChange={setDensity}
+            label="Frequency"
+            value={frequency}
+            onChange={setFrequency}
             options={[
-              { value: 'comfortable', label: 'Comfortable' },
-              { value: 'compact', label: 'Compact' },
+              { value: 'daily', label: 'Daily' },
+              { value: 'weekly', label: 'Weekly' },
+              { value: 'monthly', label: 'Monthly' },
             ]}
           />
         </Cell>

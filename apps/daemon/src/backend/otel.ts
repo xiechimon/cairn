@@ -2,6 +2,11 @@ import { randomBytes } from 'node:crypto';
 import {
   chatAttributes,
   executeToolAttributes,
+  type ProviderModelRef,
+  redactSecrets,
+  type TokenCounts,
+} from '@cairn/shared';
+import {
   OTLP_SPAN_KIND,
   OTLP_STATUS_ERROR,
   type OtlpSpan,
@@ -10,14 +15,11 @@ import {
   otlpNanos,
   otlpTraceparent,
   otlpTracesRequest,
-  type ProviderModelRef,
   parseOtlpTarget,
   postOtlpTraces,
-  redactSecrets,
   type StepOtelContext,
   stepOtelContext,
-  type TokenCounts,
-} from '@cairn/shared';
+} from '@cairn/shared/otel';
 
 const SCOPE = 'cairn.daemon';
 const RESOURCE = { 'service.name': 'cairn' } as const;

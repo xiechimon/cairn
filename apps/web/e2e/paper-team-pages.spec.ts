@@ -15,7 +15,7 @@ test('agent card is a Paper card: 20px corner, white, 1px ring plus a lift', asy
     return { radius: cs.borderTopLeftRadius, bg: cs.backgroundColor, shadow: cs.boxShadow };
   });
   expect(face.radius).toBe('20px');
-  expect(face.bg).toBe('rgb(255, 253, 246)');
+  expect(face.bg).toBe('rgb(254, 254, 251)');
   expect(face.shadow).toContain('0px 0px 0px 1px');
   expect(face.shadow).toContain('0px 1px 2px');
 });

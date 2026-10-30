@@ -1,5 +1,5 @@
 import { cn } from 'cn';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import designDoc from '../../DESIGN.md?raw';
 import { Button } from '../components/ui/button.js';
 import { docChecks, type GalleryTheme, parseFrontmatter } from './design-doc.js';
@@ -187,9 +187,9 @@ export function FoundationsHero({ theme }: { theme: GalleryTheme }) {
     <div className="grid grid-cols-1 items-end gap-12 pt-6 lg:grid-cols-2">
       <div>
         <p className="m-0 max-w-100 text-card-title text-content-secondary">
-          Warm paper, dense rows, one accent. Surfaces stack like stones, each layer a step
-          {theme === 'dark' ? ' lighter' : ' whiter'} than the one below, and the accent sits on top
-          as the marker.
+          Pine & Brass: stone paper, pine ink, one brass accent. Surfaces stack like stones, each
+          layer a step {theme === 'dark' ? 'lighter' : 'whiter'} than the one below, and the brass
+          sits on top as the marker.
         </p>
         <a
           href="#doc-check"
@@ -317,6 +317,11 @@ export function ColorSection() {
 
 function Swatch({ name, cssVar }: { name: string; cssVar: string }) {
   const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const timer = window.setTimeout(() => setCopied(false), 1200);
+    return () => window.clearTimeout(timer);
+  }, [copied]);
   const value = rgba(`var(${cssVar})`);
   const shown = value.a < 0.999 ? computedColor(`var(${cssVar})`) : tokenHex(cssVar);
   return (
@@ -324,9 +329,10 @@ function Swatch({ name, cssVar }: { name: string; cssVar: string }) {
       variant="ghost"
       className="h-auto flex-col items-stretch gap-0 overflow-hidden border-border bg-card p-0 text-left font-normal hover:bg-card hover:shadow-(--e1) dark:hover:bg-card"
       onClick={() => {
-        void navigator.clipboard?.writeText(`var(${cssVar})`);
-        setCopied(true);
-        window.setTimeout(() => setCopied(false), 1200);
+        navigator.clipboard
+          ?.writeText(`var(${cssVar})`)
+          .then(() => setCopied(true))
+          .catch(() => setCopied(false));
       }}
     >
       <span
@@ -456,6 +462,7 @@ export function ElevationSection() {
 
 export function MotionSection() {
   const [played, setPlayed] = useState(false);
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   return (
     <Section
       id="motion"
@@ -477,10 +484,10 @@ export function MotionSection() {
                 </div>
                 <div className="relative h-1 flex-auto rounded-full bg-(--running-track)">
                   <span
-                    className="absolute -top-1.5 size-4 rounded-full bg-(--card-button) shadow-(--e1) motion-reduce:transition-none"
+                    className="absolute -top-1.5 size-4 rounded-full bg-(--card-button) shadow-(--e1)"
                     style={{
                       left: played ? 'calc(100% - 1rem)' : 0,
-                      transition: `left ${duration} var(${m.ease})`,
+                      transition: reduceMotion ? 'none' : `left ${duration} var(${m.ease})`,
                     }}
                   />
                 </div>

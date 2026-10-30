@@ -51,7 +51,13 @@ import { PhaseTransitionError } from './phase.js';
 import { digestSlotDueAt, digestSlotsDue, sweepPushDigest } from './push.js';
 import { sweepPendingPushAlerts } from './push-alerts.js';
 import { sweepQuotaWaitSteps } from './quota-wait.js';
-import { computeNextRunAt, dueSchedules, isRecurring, updateNextRunAt } from './schedules.js';
+import {
+  computeNextRunAt,
+  dueSchedules,
+  isRecurring,
+  pauseSchedule,
+  updateNextRunAt,
+} from './schedules.js';
 import { createScheduling, SCHEDULE_INTERVAL_MS, type SchedulingRun } from './scheduling/sweep.js';
 
 export interface SchedulerOptions {
@@ -274,6 +280,15 @@ export function createScheduler(
         deps.db.delete(schedule).where(eq(schedule.id, row.id)).run();
         continue;
       }
+      let nextRunAt: number | null = null;
+      if (isRecurring(row.kind)) {
+        try {
+          nextRunAt = computeNextRunAt(row.kind, row.at, row.tz, now, row.cron);
+        } catch (err) {
+          pauseSchedule(deps, row.id, err instanceof Error ? err.message : String(err));
+          continue;
+        }
+      }
       try {
         cancelGateBuild(deps.db, deps.hub, row.todoId);
         startBuilds(deps, {
@@ -285,17 +300,15 @@ export function createScheduler(
         });
       } catch (err) {
         if (err instanceof PhaseTransitionError) {
-          if (isRecurring(row.kind) && row.at !== null) {
-            updateNextRunAt(deps, row.id, computeNextRunAt(row.kind, row.at, row.tz, now));
-          }
+          if (isRecurring(row.kind)) updateNextRunAt(deps, row.id, nextRunAt);
           continue;
         }
         throw err;
       }
       if (!isRecurring(row.kind)) {
         deps.db.delete(schedule).where(eq(schedule.id, row.id)).run();
-      } else if (row.at !== null) {
-        updateNextRunAt(deps, row.id, computeNextRunAt(row.kind, row.at, row.tz, now));
+      } else {
+        updateNextRunAt(deps, row.id, nextRunAt);
       }
     }
     sweepIdleChiefUnread(deps, now);

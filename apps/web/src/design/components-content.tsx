@@ -6,7 +6,6 @@ import {
   SettingsDangerZone,
   SettingsHeader,
   SettingsRow,
-  SettingsSegmented,
   SettingsSelectTrigger,
 } from '../components/settings-list.js';
 import {
@@ -117,7 +116,6 @@ export function EmptySection() {
 }
 
 export function SettingsSection() {
-  const [density, setDensity] = useState<'comfortable' | 'compact'>('comfortable');
   const [lang, setLang] = useState('en');
   const [sound, setSound] = useState(false);
   return (
@@ -135,17 +133,6 @@ export function SettingsSection() {
             action={<Button variant="ghost">Edit name</Button>}
           />
           <SettingsCard>
-            <SettingsRow label="Density" hint="Compact fits more cards on the board.">
-              <SettingsSegmented
-                label="Density"
-                value={density}
-                onChange={setDensity}
-                options={[
-                  { value: 'comfortable', label: 'Comfortable' },
-                  { value: 'compact', label: 'Compact' },
-                ]}
-              />
-            </SettingsRow>
             <SettingsRow label="Language">
               <Select
                 value={lang}

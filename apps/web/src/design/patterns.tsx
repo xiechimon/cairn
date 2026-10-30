@@ -304,6 +304,7 @@ export function ProvidersPattern() {
               </InputGroupAddon>
               <InputGroupInput
                 autoFocus
+                aria-label="Search providers"
                 placeholder="Search providers"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}

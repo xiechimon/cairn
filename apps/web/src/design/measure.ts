@@ -26,6 +26,7 @@ export function computedColor(expr: string): string {
 
 export function computedLength(expr: string): string {
   const el = probeElement();
+  el.style.width = '';
   el.style.width = expr;
   return getComputedStyle(el).width;
 }

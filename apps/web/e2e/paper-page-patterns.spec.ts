@@ -32,7 +32,7 @@ test('account settings rows are equal 52px with no doubled edge divider (S1, S2)
   await setTheme(page, 'light');
   await page.goto('/app/account?scenario=13');
   const rows = page.locator('.account-card > .settings-row');
-  await expect(rows).toHaveCount(3);
+  await expect(rows).toHaveCount(2);
   const faces = await rows.evaluateAll((els) =>
     els.map((el) => {
       const cs = getComputedStyle(el);
@@ -46,15 +46,15 @@ test('account settings rows are equal 52px with no doubled edge divider (S1, S2)
   expect(
     faces.map((f) => f.h),
     'S1',
-  ).toEqual([52, 52, 52]);
+  ).toEqual([52, 52]);
   expect(
     faces.map((f) => f.top),
     'S2: no row draws a top divider',
-  ).toEqual(['0px', '0px', '0px']);
+  ).toEqual(['0px', '0px']);
   expect(
     faces.map((f) => f.bottom),
     'S2: dividers between rows only',
-  ).toEqual(['1px', '1px', '0px']);
+  ).toEqual(['1px', '0px']);
 });
 
 for (const theme of ['light', 'dark'] as const) {
