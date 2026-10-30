@@ -3,6 +3,7 @@ import { runInNewContext } from 'node:vm';
 import { api, disarmAutoMerge, markers, pages, repo } from './autonomy-brake.mjs';
 
 const batchHead = /^B\d+\//;
+const mergerTrailer = 'Merged-by: cairn-batch-merger';
 const requiredChecks = ['check', 'pack-smoke', 'e2e-gate', 'pr-evidence'];
 const log = (pr, action, reasons) =>
   console.log(
@@ -112,17 +113,9 @@ function eligibility(number, expectedHead, dailyCap) {
   )
     reasons.push('review-not-pass');
   const today = new Date().toISOString().slice(0, 10);
-  let merged = 0;
-  for (let page = 1; ; page++) {
-    const closed = api(
-      `repos/${repo}/pulls?state=closed&sort=updated&direction=desc&per_page=100&page=${page}`,
-    );
-    for (const pull of closed) {
-      if (pull.updated_at.slice(0, 10) < today) break;
-      if (batchHead.test(pull.head.ref) && pull.merged_at?.slice(0, 10) === today) merged++;
-    }
-    if (closed.length < 100 || closed.some((pull) => pull.updated_at.slice(0, 10) < today)) break;
-  }
+  const merged = pages(`repos/${repo}/commits?sha=main&since=${today}T00:00:00Z&per_page=100`)
+    .flat()
+    .filter((commit) => commit.commit.message.split('\n').includes(mergerTrailer)).length;
   if (merged >= dailyCap) reasons.push('daily-cap');
   if (markers().length) reasons.push('autonomy-paused');
   return { pr, reasons };
@@ -172,6 +165,7 @@ try {
       const body = commits
         .map((commit) => commit.commit.message.split('\n').slice(1).join('\n').trim())
         .filter(Boolean)
+        .concat(mergerTrailer)
         .join('\n\n');
       result = eligibility(candidate.number, candidate.head.sha, dailyCap);
       if (result.reasons.length) {
