@@ -28,6 +28,7 @@ export interface PlanRevisionStage {
 
 export interface PlanRevisionArmResult {
   threadId: string;
+  chiefSystemPrompt: string | null;
   home: string;
   seededTodos: PlanTodoRow[];
   finalTodos: PlanTodoRow[];
@@ -38,6 +39,7 @@ export interface PlanRevisionArmResult {
 }
 
 export interface PlanRevisionRun {
+  chiefSystemPrompt: string | null;
   feedback?: PlanRevisionArmResult;
   control?: PlanRevisionArmResult;
   grade: { grade: Record<string, number>; explanation: Record<string, string> };
@@ -222,6 +224,7 @@ async function runOneArm(
     });
     return {
       threadId: initial.threadId,
+      chiefSystemPrompt: stack.lastChiefSystemPrompt(),
       home: stack.home,
       seededTodos,
       finalTodos,
@@ -327,5 +330,6 @@ export async function runPlanRevisionCase(
     stop_reason: headline.toolCalls.length > 0 ? 'tool_use' : 'end_turn',
     truncated: false,
     agentIds: {},
+    chiefSystemPrompt: feedback?.chiefSystemPrompt ?? control?.chiefSystemPrompt ?? null,
   };
 }

@@ -654,8 +654,10 @@ function emptyEvidence(over: Partial<TurnEvidence> = {}): TurnEvidence {
 
 describe('buildPlanRevisionTranscript', () => {
   const fixtureRun: PlanRevisionRun = {
+    chiefSystemPrompt: null,
     feedback: {
       threadId: 'fb-thread',
+      chiefSystemPrompt: null,
       home: '/tmp/fb',
       seededTodos: [
         { id: 's1', title: 'Add logging', spec: 'Add logging to the export handler.' },
@@ -704,6 +706,7 @@ describe('buildPlanRevisionTranscript', () => {
     },
     control: {
       threadId: 'ctl-thread',
+      chiefSystemPrompt: null,
       home: '/tmp/ctl',
       seededTodos: [{ id: 'c1', title: 'Add logging', spec: 'Add logging to the export handler.' }],
       finalTodos: [{ id: 'c1', title: 'Add logging', spec: 'Add logging to the export handler.' }],

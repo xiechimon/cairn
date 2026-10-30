@@ -167,6 +167,7 @@ async function runCase(
       agentIds: revised.agentIds,
       projectIds: {},
       memoryAfter: [],
+      chiefSystemPrompt: revised.chiefSystemPrompt,
       grade: revised.grade,
     };
   }
