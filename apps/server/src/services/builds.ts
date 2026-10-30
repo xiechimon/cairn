@@ -2641,7 +2641,6 @@ export function finishTodoDone(deps: BuildDeps, todoId: string, buildId: string)
     .from(todo)
     .where(eq(todo.id, todoId))
     .get()?.phase;
-  if (current === 'done') return;
   if (current !== undefined) assertPhaseTransition(current, 'done');
   stopUnclaimedGateSteps(deps, buildId);
   setTodoPhase(deps, todoId, 'done');

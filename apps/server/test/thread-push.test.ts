@@ -122,7 +122,10 @@ describe('terminal thread push routing', () => {
       const startedAt = Date.now();
       if (phase === 'done') {
         finishTodoDone(s.svc, s.record.id, 'build');
-        finishTodoDone(s.svc, s.record.id, 'build');
+        expect(() => finishTodoDone(s.svc, s.record.id, 'build')).toThrow(
+          'illegal phase transition: done -> done',
+        );
+        setTodoPhase(s.svc, s.record.id, 'done');
       } else {
         setTodoPhase(s.svc, s.record.id, phase);
         setTodoPhase(s.svc, s.record.id, phase);
