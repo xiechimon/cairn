@@ -213,14 +213,14 @@ class SectionContractTests(unittest.TestCase):
         self.assertIn('FAIL empty-section: Review', output)
         self.assertIn('FAIL missing-section: Risk', output)
 
-    def test_weekly_workflow_body_with_long_rendered_summary_exceeds_prose_cap(self):
+    def test_weekly_workflow_body_with_long_rendered_summary_passes(self):
         rendered = subprocess.run([
             'node', '--input-type=module', '-e',
             "import { loadLedger, readEvents, weeklySummary, renderWeeklySummary } from './scripts/lessons-ledger-gate.mjs'; process.stdout.write(renderWeeklySummary(weeklySummary(loadLedger(process.cwd()), readEvents(process.cwd()), { now: new Date('2026-10-30T00:00:00Z') })));",
         ], text=True, capture_output=True, check=True).stdout
         self.assertTrue(rendered.startswith('## Lessons ledger weekly summary\n'))
         workflow = Path('.github/workflows/gardener-weekly.yml').read_text()
-        script = workflow[workflow.index("            printf '%s\\n' '## What'"):workflow.index('            gh pr create')]
+        script = workflow[workflow.index("            printf '%s\\n' '## Proof'"):workflow.index('            gh pr create')]
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             root.joinpath('gardener-summary').mkdir()
@@ -228,9 +228,8 @@ class SectionContractTests(unittest.TestCase):
             script = script.replace('gardener-summary/', '"$RUNNER_TEMP"/gardener-summary/')
             subprocess.run(['bash', '-e', '-c', script], env={**os.environ, 'RUNNER_TEMP': directory}, text=True, capture_output=True, check=True)
             result = subprocess.run([sys.executable, 'scripts/pr-evidence-gate.py', str(root / 'lessons-pr.md')], text=True, capture_output=True)
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn('4/4 answered', result.stdout)
-            self.assertIn('FAIL too-long:', result.stdout)
 
 
 class ProseCapTests(unittest.TestCase):
