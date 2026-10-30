@@ -1,0 +1,24 @@
+#!/usr/bin/env node
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+
+const deadline = performance.now() + 9_000;
+const cwd = fileURLToPath(new URL('../', import.meta.url));
+
+for (const [command, args] of [
+  ['git', ['fetch']],
+  ['pnpm', ['install', '--frozen-lockfile', '--offline']],
+]) {
+  const remaining = Math.floor(deadline - performance.now());
+  if (remaining <= 0) break;
+  const result = spawnSync(command, args, {
+    cwd,
+    env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+    stdio: 'inherit',
+    timeout: remaining,
+    killSignal: 'SIGKILL',
+  });
+  if (result.error || result.status !== 0) {
+    console.error(`Resume: ${command} did not complete; continuing the session.`);
+  }
+}

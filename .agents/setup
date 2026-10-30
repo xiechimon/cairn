@@ -1,0 +1,12 @@
+#!/bin/sh
+set -eu
+
+cd "$(dirname "$0")/.."
+corepack enable
+pnpm install --frozen-lockfile
+pnpm exec husky
+if ! test -x .husky/_/pre-push; then
+  echo "Setup failed: .husky/_/pre-push is missing or not executable."
+  exit 1
+fi
+PLAYWRIGHT_BROWSERS_PATH="$HOME/.cache/ms-playwright" pnpm exec playwright install chromium
