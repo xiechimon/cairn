@@ -4250,38 +4250,88 @@ exports[`body/envelope schema snapshots > createProjectBody > createProjectBody.
 exports[`body/envelope schema snapshots > createScheduleBody > createScheduleBody.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "additionalProperties": false,
-  "properties": {
-    "at": {
-      "maximum": 9007199254740991,
-      "minimum": -9007199254740991,
-      "type": "integer",
-    },
-    "kind": {
-      "enum": [
-        "once",
-        "hourly",
-        "daily",
-        "weekly",
+  "oneOf": [
+    {
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "maximum": 9007199254740991,
+          "minimum": -9007199254740991,
+          "type": "integer",
+        },
+        "cron": {
+          "not": {},
+        },
+        "enabled": {
+          "type": "boolean",
+        },
+        "kind": {
+          "enum": [
+            "once",
+            "hourly",
+            "daily",
+            "weekly",
+          ],
+          "type": "string",
+        },
+        "projectId": {
+          "type": "string",
+        },
+        "prompt": {
+          "type": "string",
+        },
+        "todoId": {
+          "type": "string",
+        },
+        "tz": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "todoId",
+        "kind",
+        "at",
       ],
-      "type": "string",
+      "type": "object",
     },
-    "projectId": {
-      "type": "string",
+    {
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "type": "null",
+        },
+        "cron": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "enabled": {
+          "type": "boolean",
+        },
+        "kind": {
+          "const": "cron",
+          "type": "string",
+        },
+        "projectId": {
+          "type": "string",
+        },
+        "prompt": {
+          "type": "string",
+        },
+        "todoId": {
+          "type": "string",
+        },
+        "tz": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "todoId",
+        "kind",
+        "cron",
+      ],
+      "type": "object",
     },
-    "todoId": {
-      "type": "string",
-    },
-    "tz": {
-      "type": "string",
-    },
-  },
-  "required": [
-    "todoId",
-    "kind",
-    "at",
   ],
-  "type": "object",
 }
 `;
 
@@ -8723,6 +8773,15 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > sch
     "createdBy": {
       "type": "string",
     },
+    "cron": {
+      "type": [
+        "string",
+        "null",
+      ],
+    },
+    "enabled": {
+      "type": "boolean",
+    },
     "id": {
       "type": "string",
     },
@@ -8732,8 +8791,27 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > sch
         "hourly",
         "daily",
         "weekly",
+        "cron",
       ],
       "type": "string",
+    },
+    "lastRunAt": {
+      "anyOf": [
+        {
+          "maximum": 9007199254740991,
+          "minimum": -9007199254740991,
+          "type": "integer",
+        },
+        {
+          "type": "null",
+        },
+      ],
+    },
+    "lastRunStatus": {
+      "type": [
+        "string",
+        "null",
+      ],
     },
     "nextRunAt": {
       "anyOf": [
@@ -8747,7 +8825,16 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > sch
         },
       ],
     },
+    "pausedReason": {
+      "type": [
+        "string",
+        "null",
+      ],
+    },
     "projectId": {
+      "type": "string",
+    },
+    "prompt": {
       "type": "string",
     },
     "teamId": {
@@ -8807,9 +8894,15 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > sch
     "projectId",
     "todoId",
     "kind",
+    "cron",
+    "prompt",
+    "enabled",
     "at",
     "tz",
     "nextRunAt",
+    "lastRunAt",
+    "lastRunStatus",
+    "pausedReason",
     "createdBy",
     "todo",
   ],

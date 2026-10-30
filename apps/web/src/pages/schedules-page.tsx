@@ -74,7 +74,7 @@ const monthDay = (ts: number, t: TFunc) => {
 const dayWord = (ts: number, now: number, t: TFunc) =>
   monthDay(ts, t) === monthDay(now, t) ? t('今天') : monthDay(ts, t);
 
-type ScheduleKind = ScheduleRecord['kind'];
+type ScheduleKind = Exclude<ScheduleRecord['kind'], 'cron'>;
 
 const FREQ_LABEL: Record<ScheduleKind, string> = {
   hourly: '每小时',
@@ -90,6 +90,7 @@ const RUN_WORD: Record<ScheduleRecord['kind'], string> = {
   daily: '每天运行',
   weekly: '每周运行',
   once: '运行一次',
+  cron: 'Cron',
 };
 
 const FORM_ROW_CLS =
@@ -151,7 +152,7 @@ function ScheduleCard({
       <div className="flex min-w-0 flex-1 flex-col">
         <span className="truncate text-ui text-foreground">{`#${schedule.todo.seqNum} ${schedule.todo.title}`}</span>
         <span className="truncate text-meta text-content-tertiary">
-          {`${monthDay(schedule.at, t)} ${hourMinute(schedule.at)} ${t(RUN_WORD[schedule.kind])} · ${t(
+          {`${schedule.kind === 'cron' ? '' : `${monthDay(schedule.at, t)} ${hourMinute(schedule.at)} `}${t(RUN_WORD[schedule.kind])} · ${t(
             '下次 {day} {time}',
             {
               day: dayWord(schedule.nextRunAt, now, t),

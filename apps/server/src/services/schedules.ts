@@ -51,8 +51,15 @@ export function isRecurring(kind: ScheduleKind): kind is Exclude<ScheduleKind, '
   return kind !== 'once';
 }
 
-export function cronExpressionFor(kind: ScheduleKind, atMs: number, tz: string): string | null {
+export function cronExpressionFor(
+  kind: ScheduleKind,
+  atMs: number | null,
+  tz: string,
+  cron: string | null = null,
+): string | null {
   if (!isRecurring(kind)) return null;
+  if (kind === 'cron') return cron;
+  if (atMs === null) throw new HttpError(400, 'missing schedule anchor');
   const { minute, hour, dow } = wallClockParts(atMs, tz);
   switch (kind) {
     case 'hourly':
@@ -66,18 +73,24 @@ export function cronExpressionFor(kind: ScheduleKind, atMs: number, tz: string):
 
 export function computeNextRunAt(
   kind: ScheduleKind,
-  atMs: number,
+  atMs: number | null,
   tz: string,
   fromMs: number,
+  cron: string | null = null,
 ): number {
-  if (!isRecurring(kind)) return atMs;
-  const expr = cronExpressionFor(kind, atMs, tz);
-  if (expr === null) throw new Error(`unreachable: recurring kind expected, got ${kind}`);
-  const interval = CronExpressionParser.parse(expr, {
-    tz,
-    currentDate: new Date(fromMs),
-  });
-  return interval.next().getTime();
+  if (!isRecurring(kind)) {
+    if (atMs === null) throw new HttpError(400, 'missing schedule anchor');
+    return atMs;
+  }
+  const expr = cronExpressionFor(kind, atMs, tz, cron);
+  if (expr === null) throw new HttpError(400, 'missing schedule cron expression');
+  try {
+    return CronExpressionParser.parse(expr, { tz, currentDate: new Date(fromMs) })
+      .next()
+      .getTime();
+  } catch {
+    throw new HttpError(400, 'invalid schedule cron expression or timezone');
+  }
 }
 
 export function toScheduleRecord(deps: ScheduleDeps, row: ScheduleRow): ScheduleRecord | null {
@@ -90,9 +103,15 @@ export function toScheduleRecord(deps: ScheduleDeps, row: ScheduleRow): Schedule
     projectId: row.projectId,
     todoId: row.todoId,
     kind: row.kind,
+    cron: row.cron,
+    prompt: row.prompt,
+    enabled: row.enabled,
     at: row.at,
     tz: row.tz,
     nextRunAt: row.nextRunAt,
+    lastRunAt: row.lastRunAt,
+    lastRunStatus: row.lastRunStatus,
+    pausedReason: row.pausedReason,
     createdBy: row.createdBy,
     todo: {
       seqNum: todoRow.seqNum,
@@ -119,29 +138,46 @@ export function createSchedule(
   input: CreateScheduleBody & { teamId: string; createdBy: string },
 ): ScheduleRecord {
   const todoRow = deps.db.select().from(todo).where(eq(todo.id, input.todoId)).get();
-  if (!todoRow) throw new HttpError(404, `todo ${input.todoId} not found`);
+  if (!todoRow || todoRow.teamId !== input.teamId) {
+    throw new HttpError(404, `todo ${input.todoId} not found`);
+  }
   const projectId = input.projectId ?? todoRow.projectId;
   if (projectId !== todoRow.projectId) {
     throw new HttpError(400, 'invalid projectId: todo belongs to another project');
   }
   const tz = input.tz ?? serverTimezone();
-  if (!isRecurring(input.kind)) assertMinuteStep(input.at, tz);
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: tz }).format();
+  } catch {
+    throw new HttpError(400, 'invalid schedule timezone');
+  }
+  if (input.kind === 'once') assertMinuteStep(input.at, tz);
   const now = nowMs();
   const id = newRecordId();
-  const nextRunAt = computeNextRunAt(input.kind, input.at, tz, now);
+  const at = input.at ?? null;
+  const cron = cronExpressionFor(input.kind, at, tz, input.cron ?? null);
+  const nextRunAt = computeNextRunAt(input.kind, at, tz, now, cron);
+  const values = {
+    id,
+    teamId: input.teamId,
+    projectId,
+    todoId: input.todoId,
+    kind: input.kind,
+    at,
+    cron,
+    prompt: input.prompt ?? '',
+    enabled: input.enabled ?? true,
+    tz,
+    nextRunAt,
+    lastRunAt: null,
+    lastRunStatus: null,
+    pausedReason: null,
+    createdBy: input.createdBy,
+  };
   deps.db
     .insert(schedule)
-    .values({
-      id,
-      teamId: input.teamId,
-      projectId,
-      todoId: input.todoId,
-      kind: input.kind,
-      at: input.at,
-      tz,
-      nextRunAt,
-      createdBy: input.createdBy,
-    })
+    .values(values)
+    .onConflictDoUpdate({ target: schedule.todoId, set: values })
     .run();
   const row = deps.db.select().from(schedule).where(eq(schedule.id, id)).get();
   const record = row ? toScheduleRecord(deps, row) : null;
@@ -160,10 +196,24 @@ export function dueSchedules(deps: ScheduleDeps, nowMsValue: number): ScheduleRo
   return deps.db
     .select()
     .from(schedule)
-    .where(and(isNotNull(schedule.nextRunAt), lte(schedule.nextRunAt, nowMsValue)))
+    .where(
+      and(
+        eq(schedule.enabled, true),
+        isNotNull(schedule.nextRunAt),
+        lte(schedule.nextRunAt, nowMsValue),
+      ),
+    )
     .all();
 }
 
 export function updateNextRunAt(deps: ScheduleDeps, id: string, nextRunAt: number | null): void {
   deps.db.update(schedule).set({ nextRunAt }).where(eq(schedule.id, id)).run();
+}
+
+export function pauseSchedule(deps: ScheduleDeps, id: string, reason: string): void {
+  deps.db
+    .update(schedule)
+    .set({ enabled: false, nextRunAt: null, pausedReason: reason })
+    .where(eq(schedule.id, id))
+    .run();
 }
