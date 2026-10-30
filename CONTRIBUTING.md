@@ -57,7 +57,9 @@ A maintainer reviews every pull request, and an AI reviewer may also comment. A 
 
 ## Releases
 
-Releases are automated with [changesets](https://changesets.dev). Add a changeset for any pull request that changes a publishable package (`pnpm changeset`), and the `release` workflow opens a `Version Packages` pull request when it merges to main. Merging that pull request publishes `@xiechimon/cairn` and `@xiechimon/cairn-cli` to npm and tags each release. Publishing runs under the repository's `NPM_TOKEN` secret, which only the owner can set.
+Releases use [changesets](https://changesets.dev). Add a changeset with `pnpm changeset` for any pull request that changes a publishable package. When the pull request should ship, run `pnpm release:version` in it to bump package versions and write changelogs, then include those changes in the pull request for normal review and merge.
+
+After merge to main, the `release` workflow publishes new versions of `@xiechimon/cairn` and `@xiechimon/cairn-cli` to npm through npm Trusted Publishing (OIDC) and pushes the release tags. Versions already on npm are skipped. Pending changesets on main cause the workflow to publish nothing and leave a warning naming them. Publishing needs no token or repository secret.
 
 ## License
 
