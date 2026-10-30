@@ -1,0 +1,26 @@
+✔ the db-only call writes one verified copy into --out and rotates to --keep (359.510959ms)
+✔ a full run copies db and attachments locally and to an rrsync receiver, without secrets (1002.002417ms)
+✔ later runs add files on both sides and never delete or overwrite (1376.141708ms)
+✔ a failed push exits non-zero, names the step, and keeps the local copy (820.926417ms)
+✔ an unreadable db fails at the backup step and writes or pushes nothing (58.1035ms)
+✔ bad arguments exit 2 before anything is written (93.648667ms)
+✔ an attachment is copied only once its row is ready and its size matches (6131.83675ms)
+✔ a run whose copy name already exists fails and keeps the existing copy (91.979958ms)
+✔ a rewritten step session lands as a new version on both sides (2155.905875ms)
+✔ an equal-size step session rewrite with the same mtime still lands as a new version (1557.881458ms)
+✔ sends one authenticated alert for the given user and prints receipt outcome (17.686333ms)
+✔ rejects unauthorized instances and never reports fallback as a phone receipt (0.845167ms)
+✔ pending status is polled until receipt and the deadline bounds polling (7.476083ms)
+✔ required alert displays before posting its authenticated id even with a focused page (18.16075ms)
+✔ failed display never posts a receipt (1.179542ms)
+✔ ordinary foreground pushes still display (0.581875ms)
+✔ receipt works without a stored token and refuses external receipt URLs (0.830292ms)
+✔ ops tests run in prepush and the backup CI job and journal ends with a newline (0.279208ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 13811.304083

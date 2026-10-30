@@ -1,0 +1,41 @@
+
+ RUN  v5.0.1 <worktree>
+
+(node:68335) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:69862) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ |@xiechimon/cairn| test/trajectory-outcome.test.ts (6 tests | 6 failed) 60165ms
+   × merged, closed-unmerged and reverted builds export with matching outcomes 10078ms
+   × a revert after the 7 day window does not count, and a later PR on the same ticket marks the fix 10009ms
+   × a merge newer than 7 days leaves the revert window open and reports it 10002ms
+   × builds without a merge or close record keep every outcome field null 10002ms
+   × a close followed by a later merge counts as merged, and the latest record wins 10009ms
+   × traj:export feeds traj:label: failed packs get labeled, successful packs are skipped 10004ms
+ ❯ |@xiechimon/cairn| test/attachment-gc.test.ts (15 tests | 1 failed) 32372ms
+   ❯ attachment gc -- scheduler cadence (3)
+     × a large transcript corpus does not block the event loop during a tick 30027ms
+ ❯ |@xiechimon/cairn| test/git-hosting.test.ts (11 tests | 11 skipped) 10015ms
+ ❯ |@xiechimon/cairn| test/trajectory-reflect.test.ts (12 tests | 12 failed) 120279ms
+   × reflects only builds that turned green after failing or were sent back by a human 10056ms
+   × drops candidates that copy GitHub issue text 10150ms
+   × an invalid reflection fails the run without output 10005ms
+   × reflect requires arguments, endpoint and a fresh output path 10005ms
+   × memory candidates land as pending, deduplicated, and never in agent memory 10002ms
+   × a lesson already in memory is skipped, an overlapping one records the conflict 10006ms
+   × needs evidence from two different builds, then a successful recurrence promotes it 10002ms
+   × human confirmation promotes only with two builds of evidence 10002ms
+   × guard candidates go to a local JSONL pool, merged across runs 10027ms
+   × skill candidates become patch drafts that apply to the current skill file 10008ms
+   × curate rejects fenced issue text and builds it cannot place 10007ms
+   × a dismissed candidate absorbs later recurrences and is never promoted 10003ms
+ ❯ |@xiechimon/cairn| test/trajectory-attribution.test.ts (9 tests | 9 failed) 90071ms
+   × labels only failed packs and leaves merged or pending packs untouched 10015ms
+   × stable output: relabeling the same input yields the same structure 10002ms
+   × rejects a labeler that is the tested model, with or without provider prefix 10001ms
+   × does not call the labeler for packs that are already labeled 10006ms
+   × a verdict outside the vocabularies or pointing at a missing message fails the run without output 10005ms
+   × refuses to overwrite an existing output file 10012ms
+   × requires --in, --out and --model 10001ms
+   × summary prints a (where, why) count table sorted by count 10002ms
+   × summary merges several files and rejects an invalid pack 10016ms

@@ -1,0 +1,30 @@
+{
+  "testedBaseCommit": "54195adb0806fd11632109cb74e3af423b98c0b8",
+  "testedRevision": "working tree changes on the tested base commit; source hashes identify the final selected green run and the code prepared for the requested local commit, which is blocked by sandbox permissions",
+  "broaderChangedRunRevision": "earlier mixed working-tree revisions; interrupted and not final-source acceptance",
+  "sourceTreeSha256": "64c58ed8fede3fcb8b1b1fe74c68479138d5daa212ffb30ac3f733dfeb25cb2d",
+  "files": {
+    "apps/server/drizzle/0069_push_delivery.sql": "3f9f8c8f4312fa8ce499a0db6f77330920be6d8be38f723c4e0251aa35c31263",
+    "apps/server/drizzle/meta/0069_snapshot.json": "f94fc8ee7a607501bdcc01f5f07540470ddcda62e6d0f8923893149d8ed09bb8",
+    "apps/server/drizzle/meta/_journal.json": "e1cfdf4f3d7955da1f6c111c4509260b431e8448bed3a214cd460fb7be6a14cd",
+    "apps/server/src/db/schema.ts": "c5f1157180bc608afa724e8583f4ea1a62c6bf19c514aea01f8ec9937afb803a",
+    "apps/server/src/routes-push.ts": "85f04812b2f833e944282820a632e350d8efa5627ce19601bf6b59fb7c3a84cf",
+    "apps/server/src/services/push-alerts.ts": "7499fd8bd8860ce5e8da242d8c55685e9925c069e22de932ea738061d8f10c05",
+    "apps/server/src/services/push.ts": "071ee5019a596e1ecad3805923bc8ade56ded6e94d5c749f618885c49284ef61",
+    "apps/server/test/push-outcomes.test.ts": "3c73a1d80e0713643d3c6bda618f4a5f25ae978cb23c225b1866a93075138643",
+    "apps/server/test/push-smtp.test.ts": "a6aab0a5347a03130708953c6d5a8c25f49d6da9d5c0de27963c873a6fd68fd2",
+    "apps/server/test/push.test.ts": "09b5370ad1c2e4148914d6989e0b70dc43a7a94424f697ca5e234b4b6c1d7b72",
+    "apps/server/test/schema.test.ts": "a6f58594b9d80d5f879f53b1b1fec25c65e96d0b3a591728e81f628d07c3a5ed",
+    "apps/web/public/sw.js": "5d6007ca12fff3996c50f1ba077bf84f6d9b9235aa128e0948012e16dd1e1757",
+    "apps/web/src/api/auth.ts": "b7dc5b7f16a5df22f986e0a4899b1f368ee59fb3870a73bd8af773f04c94c561",
+    "apps/web/src/pwa/register.tsx": "b31fe6a62aadec0a4b311398ccd8c88ad3a3c6280bfc46947ade309a5449ef8a",
+    "apps/web/test/push-auth.test.ts": "970ac66261b2d1504afc5c79e511a0189f0804320f995213bf28e207e3a27f8b",
+    "packages/shared/src/protocol/rest.ts": "6af05653e3ab4e321e1d709ac958d9ef452895c2a23ab065cb7dd824cce20461",
+    "packages/shared/src/tables.ts": "501bf23d382099e0b16d003a8b06ae0dea991a75eae1c9f2cfc5acbcbddaf715",
+    "packages/shared/test/__snapshots__/snapshot.test.ts.snap": "e14b4133094148188cdce2770fa66ab2e64874ec3c2aa2e1ea849336bce80284",
+    "packages/shared/test/vocabulary.test.ts": "24b467e0cd39a1e1581dbeaf6a925490ed2823559f1810a76185a5dc7032c7fb",
+    "scripts/ops/push-test.mjs": "12f425612cb7a23fde97a0c053d4e45e920ff9930d7b9fed739a7f934511f556",
+    "scripts/ops/push-test.test.mjs": "a6f9e0f21e7a788ff1880b276819b50b422edc81dad0986fda9c5c3b1d3c13b0",
+    "scripts/ops/push-worker.test.mjs": "1988afa916a99806b375ef97f1c94e6a82931f71e8cc5bff7642c737bf8e8285"
+  }
+}

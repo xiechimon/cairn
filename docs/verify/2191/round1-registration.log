@@ -1,0 +1,12 @@
+✔ changes to prepush scripts run the CI self-test files locally (28.503667ms)
+✔ the CI self-test step runs selfTests through prepush and names no self-test file itself (30.934875ms)
+✔ --self-test runs exactly the selfTests files, skips change detection and fails with them (21931.74325ms)
+✔ the recording gate runs in local prepush, in CI prepush and in the CI self-test step (55.054292ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 25263.371083

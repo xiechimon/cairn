@@ -1,0 +1,10 @@
+
+ RUN  v5.0.1 <worktree>
+
+ ❯ |@cairn/shared| test/snapshot.test.ts (79 tests | 1 failed) 38ms
+   ❯ protocol vocabulary snapshot (02 §5/§6 canonical) (16)
+     × web REST endpoint vocabulary (02 §6.1) 4ms
+(node:41676) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:41688) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
