@@ -1,4 +1,4 @@
-import { CHIEF_REMOTE_TOOLS } from '@cairn/shared';
+import { MCP_TOOL_REGISTRY } from '@cairn/shared';
 import { useState } from 'react';
 import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
 import { Button } from '../components/ui/button.js';
@@ -7,7 +7,7 @@ import { DialogShell } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
 import { useI18n } from '../i18n/provider.js';
 
-const TOOL_NAMES = CHIEF_REMOTE_TOOLS.map((tool) => tool.name);
+const TOOL_NAMES = MCP_TOOL_REGISTRY.map((tool) => tool.grant);
 
 export interface ApiKeyCreateBody {
   name: string | null;
