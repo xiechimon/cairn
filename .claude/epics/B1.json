@@ -1,0 +1,165 @@
+{
+  "epic": "B1",
+  "items": [
+    {
+      "id": "sidebar-threads",
+      "issue": 2224,
+      "dependsOn": [],
+      "humanHeld": true
+    },
+    {
+      "id": "unread",
+      "issue": 2225,
+      "dependsOn": [
+        "sidebar-threads"
+      ]
+    },
+    {
+      "id": "home-layout",
+      "issue": 2226,
+      "dependsOn": [
+        "sidebar-threads"
+      ],
+      "humanHeld": true
+    },
+    {
+      "id": "archive",
+      "issue": 2227,
+      "dependsOn": []
+    },
+    {
+      "id": "push",
+      "issue": 2228,
+      "dependsOn": [],
+      "humanHeld": true
+    },
+    {
+      "id": "snooze",
+      "issue": 2229,
+      "dependsOn": [
+        "sidebar-threads",
+        "push"
+      ]
+    },
+    {
+      "id": "sidebar-groups",
+      "issue": 2230,
+      "dependsOn": [
+        "sidebar-threads",
+        "archive",
+        "snooze"
+      ],
+      "humanHeld": true
+    },
+    {
+      "id": "continue-thread",
+      "issue": 2231,
+      "dependsOn": []
+    },
+    {
+      "id": "message-todo",
+      "issue": 2232,
+      "dependsOn": [
+        "continue-thread"
+      ]
+    },
+    {
+      "id": "composer-queue-stop",
+      "issue": 2233,
+      "dependsOn": [
+        "continue-thread"
+      ]
+    },
+    {
+      "id": "steer-order",
+      "issue": 2234,
+      "dependsOn": []
+    },
+    {
+      "id": "turn-folding",
+      "issue": 2235,
+      "dependsOn": [],
+      "humanHeld": true
+    },
+    {
+      "id": "thread-report",
+      "issue": 2236,
+      "dependsOn": []
+    },
+    {
+      "id": "agent-attachments",
+      "issue": 2237,
+      "dependsOn": [],
+      "humanHeld": true
+    },
+    {
+      "id": "schedule-data",
+      "issue": 2238,
+      "dependsOn": []
+    },
+    {
+      "id": "schedule-tools",
+      "issue": 2239,
+      "dependsOn": [
+        "schedule-data"
+      ],
+      "humanHeld": true
+    },
+    {
+      "id": "schedule-continue",
+      "issue": 2240,
+      "dependsOn": [
+        "schedule-tools",
+        "continue-thread"
+      ]
+    },
+    {
+      "id": "schedule-ui",
+      "issue": 2241,
+      "dependsOn": [
+        "schedule-tools"
+      ],
+      "humanHeld": true
+    },
+    {
+      "id": "snooze-ends",
+      "issue": 2242,
+      "dependsOn": [
+        "snooze",
+        "schedule-continue"
+      ]
+    },
+    {
+      "id": "claude-subscription",
+      "issue": 2243,
+      "dependsOn": [],
+      "humanHeld": true
+    },
+    {
+      "id": "base-branch",
+      "issue": 2244,
+      "dependsOn": []
+    },
+    {
+      "id": "agents-md",
+      "issue": 2245,
+      "dependsOn": []
+    }
+  ],
+  "requiredChecks": [
+    "check",
+    "pack-smoke",
+    "e2e-gate"
+  ],
+  "checks": [
+    {
+      "name": "checker tests pass",
+      "run": [
+        "node",
+        "--test",
+        "scripts/epic-done.test.mjs"
+      ]
+    }
+  ],
+  "maxHours": 96
+}
