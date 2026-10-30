@@ -134,7 +134,7 @@ function globToRegExp(glob, { protect = false } = {}) {
   }
   return new RegExp(`^${re}${tail ? '(?:/.*)?' : ''}$`, protect ? 'iu' : 'i')
 }
-const SCRIPT_SHA256 = '5233082290c1477fcc3e391eb900514e73a305e37d99e9127c91eff73e416446'
+const SCRIPT_SHA256 = 'fde93dec0355f8a54419143f3f001a527bc3383868e1c5943b0917664967d396'
 const PROTECTED_RE = PROTECTED.map((glob) => globToRegExp(glob, { protect: true }))
 const AUTO_MERGE_RE = AUTO_MERGE.map(globToRegExp)
 const isProtected = (f) => PROTECTED_RE.some((re) => re.test(f))
@@ -230,7 +230,7 @@ const DIMENSIONS = [
   },
   {
     key: 'tests',
-    prompt: `Dimension: tests and failure modes. Take the failure modes and acceptance items from ticket #${ticket}. For each failure mode, find the test at the head that covers it and judge whether it would fail on origin/main (tests come before the implementation in this repo). Flag deleted or weakened tests and assertions a no-op implementation would pass. Check that every acceptance item ticked in the PR body has evidence at the head. For a docs-only diff, check that each ticked item is backed by the diff or by the Verified section.`,
+    prompt: `Dimension: tests and failure modes. Take the failure modes and acceptance items from ticket #${ticket}. For each failure mode, find the test at the head that covers it and judge whether it would fail on origin/main (tests come before the implementation in this repo). Flag deleted or weakened tests and assertions a no-op implementation would pass. Check that every claim in the PR body's Proof section has evidence at the head. For a docs-only diff, check that each claim in Proof is backed by the diff or by the quoted command output.`,
   },
   {
     key: 'safety',
@@ -239,7 +239,7 @@ const DIMENSIONS = [
   {
     key: 'evidence',
     isolation: 'worktree',
-    prompt: `Dimension: evidence. ${WORKTREE_RULES} For a fork head, check the links only and say so in checked. Every raw.githubusercontent.com link in the PR body must point into docs/verify/ of this change at a commit that is an ancestor of ${headSha}, and must return HTTP 200. For a head in ${REPO}, re-run at most three of the narrowest commands quoted in the PR's Verified section (one vitest file, one gate script, pnpm typecheck) after the install, and compare with the pasted output. If you start a server or e2e, use VERIFY_PORT=8793 VERIFY_WEB_PORT=5275 E2E_AFFECTED_PORT=8397 and stop what you started. For a docs-only diff, skip the install and check the quoted commands against the repository directly. A quoted result you cannot reproduce is blocking.`,
+    prompt: `Dimension: evidence. ${WORKTREE_RULES} For a fork head, check the links only and say so in checked. Every raw.githubusercontent.com link in the PR body must point into docs/verify/ of this change at a commit that is an ancestor of ${headSha}, and must return HTTP 200. For a head in ${REPO}, re-run at most three of the narrowest commands quoted in the PR's Proof section (one vitest file, one gate script, pnpm typecheck) after the install, and compare with the pasted output. If you start a server or e2e, use VERIFY_PORT=8793 VERIFY_WEB_PORT=5275 E2E_AFFECTED_PORT=8397 and stop what you started. For a docs-only diff, skip the install and check the quoted commands against the repository directly. A quoted result you cannot reproduce is blocking.`,
   },
 ]
 
