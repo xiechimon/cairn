@@ -54,6 +54,11 @@ async function setup(page: Page, phase = 'building', archivedAt: number | null =
   await page.route('**/api/**', (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
+    if (
+      path === '/api/teams/team-archive/presence' &&
+      (request.method() === 'POST' || request.method() === 'DELETE')
+    )
+      return route.fulfill({ json: { ok: true } });
     if (path.endsWith('/archive') || path.endsWith('/unarchive')) {
       actions.push(path);
       todo = {
