@@ -118,7 +118,14 @@ function sweep(paused) {
             run.pull_requests.some((pull) => pull.number === pr.number),
         )
         .sort((a, b) => b.id - a.id)[0];
-      if (latest) api(`repos/${repo}/actions/runs/${latest.id}/rerun`, {});
+      if (latest) {
+        try {
+          api(`repos/${repo}/actions/runs/${latest.id}/rerun`, {});
+        } catch (error) {
+          const run = api(`repos/${repo}/actions/runs/${latest.id}`);
+          if (!['queued', 'in_progress'].includes(run.status)) throw error;
+        }
+      }
       if (allowed || !pr.auto_merge) continue;
       const result = JSON.parse(
         execFileSync(

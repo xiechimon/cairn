@@ -24,6 +24,8 @@ if (path === 'graphql') {
  if(args.includes('pullRequestId=bad')) process.exit(1);
  console.log(JSON.stringify({data:{disablePullRequestAutoMerge:{pullRequest:{number:1}}}}));
 } else if (path.includes('/issues?')) console.log(JSON.stringify([d.issues ?? []]));
+else if (path.endsWith('/rerun') && d.rerunFailure) process.exit(1);
+else if (path === 'repos/owner/repo/actions/runs/90') console.log(JSON.stringify({status:d.runStatus}));
 else if (path.includes('/actions/workflows/')) console.log(JSON.stringify([{workflow_runs:d.runs ?? []}]));
 else if (path.includes('/labels?')) console.log(JSON.stringify([d.labels ?? []]));
 else if (path.includes('/pulls?')) console.log(JSON.stringify([d.pulls ?? []]));
@@ -199,3 +201,20 @@ test('a new paused head fails the PR check and publishes a failure status', (t) 
   assert.equal(r.status, 1);
   assert.match(f.calls(), /statuses\/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/);
 });
+
+for (const status of ['queued', 'in_progress', 'completed'])
+  test(`failed rerun with current status ${status}`, (t) => {
+    const f = fixture(t, {
+      issues: [{ number: 5 }],
+      pulls: [
+        { number: 7, node_id: 'good', head: { sha: 'a'.repeat(40) }, auto_merge: {}, labels: [] },
+      ],
+      runs: [{ id: 90, head_sha: 'a'.repeat(40), pull_requests: [{ number: 7 }] }],
+      rerunFailure: true,
+      runStatus: status,
+    });
+    const r = f.run(['sweep']);
+    assert.equal(r.status, status === 'completed' ? 1 : 0, r.stderr);
+    assert.match(f.calls(), /"repos\/owner\/repo\/actions\/runs\/90"/);
+    assert.equal(f.calls().includes('pullRequestId=good'), status !== 'completed');
+  });
