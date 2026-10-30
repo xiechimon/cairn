@@ -38,6 +38,17 @@ describe('parseFrontmatter', () => {
   it('ignores lines after the closing fence', () => {
     expect(parseFrontmatter(DOC)['colors-dark']?.canvas).toBe('#1a1612');
   });
+
+  it('reads double-quoted values and arrays', () => {
+    const doc = parseFrontmatter(`---\ncolors:\n  ink: "#2b2620"\n  project-tiles: ["#c06a43"]\n---\n`);
+    expect(doc.colors?.ink).toBe('#2b2620');
+    expect(doc.colors?.['project-tiles']).toEqual(['#c06a43']);
+  });
+
+  it('reads a file saved with CRLF line endings', () => {
+    const doc = parseFrontmatter('---\r\ncolors:\r\n  canvas: \'#efe6d0\'\r\n---\r\n');
+    expect(doc.colors?.canvas).toBe('#efe6d0');
+  });
 });
 
 describe('docChecks', () => {
@@ -62,6 +73,13 @@ describe('docChecks', () => {
       kind: 'length',
     });
     expect(unmapped).toEqual(['online-ring']);
+  });
+
+  it('treats only project-tiles as tile slots and reports other arrays as unmapped', () => {
+    const doc = parseFrontmatter(`---\ncolors:\n  chart-colors: ['#111111', '#222222']\n---\n`);
+    const { checks, unmapped } = docChecks(doc, 'light');
+    expect(checks).toEqual([]);
+    expect(unmapped).toEqual(['chart-colors']);
   });
 
   it('reads the dark block for the dark theme and skips radii with no token', () => {

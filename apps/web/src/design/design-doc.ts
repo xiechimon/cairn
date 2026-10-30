@@ -49,13 +49,15 @@ export const RADIUS_EXPRS: Record<string, string> = {
 };
 
 const SECTION_RE = /^([\w-]+):\s*$/;
-const ENTRY_RE = /^ {2}([\w-]+):\s*(\[[^\]]*\]|'[^']*'|[^#\s][^#]*?)\s*(?:#.*)?$/;
+const ENTRY_RE = /^ {2}([\w-]+):\s*(\[[^\]]*\]|'[^']*'|"[^"]*"|[^#\s][^#]*?)\s*(?:#.*)?$/;
+const QUOTED_RE = /^(['"])(.*)\1$/;
+const TILE_KEY = 'project-tiles';
 
 export function parseFrontmatter(markdown: string): Frontmatter {
-  const block = markdown.split(/^---$/m)[1] ?? '';
+  const block = markdown.split(/^---\r?$/m)[1] ?? '';
   const out: Frontmatter = {};
   let section: Record<string, FrontmatterValue> | null = null;
-  for (const line of block.split('\n')) {
+  for (const line of block.split(/\r?\n/)) {
     const head = SECTION_RE.exec(line);
     if (head?.[1] != null) {
       section = {};
@@ -66,8 +68,8 @@ export function parseFrontmatter(markdown: string): Frontmatter {
     if (entry?.[1] == null || entry[2] == null || section == null) continue;
     const raw = entry[2];
     section[entry[1]] = raw.startsWith('[')
-      ? [...raw.matchAll(/'([^']+)'/g)].flatMap((m) => (m[1] == null ? [] : [m[1]]))
-      : raw.replace(/^'(.*)'$/, '$1');
+      ? [...raw.matchAll(/(['"])([^'"]+)\1/g)].flatMap((m) => (m[2] == null ? [] : [m[2]]))
+      : raw.replace(QUOTED_RE, '$2');
   }
   return out;
 }
@@ -81,6 +83,10 @@ export function docChecks(
   const unmapped: string[] = [];
   for (const [key, value] of Object.entries(colors)) {
     if (Array.isArray(value)) {
+      if (key !== TILE_KEY) {
+        unmapped.push(key);
+        continue;
+      }
       value.forEach((expected, i) => {
         checks.push({
           key: `${key}-${i + 1}`,

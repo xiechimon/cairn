@@ -74,10 +74,10 @@ const NAV = [
 function useActiveSection(): string {
   const [active, setActive] = useState('color');
   useEffect(() => {
-    const sections = [...document.querySelectorAll<HTMLElement>('[data-gallery-section]')];
     let frame = 0;
     const update = () => {
       frame = 0;
+      const sections = [...document.querySelectorAll<HTMLElement>('[data-gallery-section]')];
       const line = window.innerHeight * 0.25;
       const current = sections.filter((s) => s.getBoundingClientRect().top <= line).at(-1);
       setActive(current?.id ?? sections[0]?.id ?? '');
@@ -112,6 +112,30 @@ export function Gallery() {
     else delete document.documentElement.dataset.density;
     setDensity(next);
   };
+  const controls = (
+    <>
+      <SegmentedRadio
+        label="Theme"
+        value={theme}
+        onChange={changeTheme}
+        className="w-full"
+        options={[
+          { value: 'dark', label: 'Dark' },
+          { value: 'light', label: 'Light' },
+        ]}
+      />
+      <SegmentedRadio
+        label="Density"
+        value={density}
+        onChange={changeDensity}
+        className="w-full"
+        options={[
+          { value: 'comfortable', label: 'Comfortable' },
+          { value: 'compact', label: 'Compact' },
+        ]}
+      />
+    </>
+  );
 
   return (
     <div className="flex min-h-screen bg-canvas text-foreground">
@@ -154,30 +178,12 @@ export function Gallery() {
             </div>
           ))}
         </nav>
-        <div className="mt-auto flex flex-col gap-3 px-1 pt-6">
-          <SegmentedRadio
-            label="Theme"
-            value={theme}
-            onChange={changeTheme}
-            className="w-full"
-            options={[
-              { value: 'dark', label: 'Dark' },
-              { value: 'light', label: 'Light' },
-            ]}
-          />
-          <SegmentedRadio
-            label="Density"
-            value={density}
-            onChange={changeDensity}
-            className="w-full"
-            options={[
-              { value: 'comfortable', label: 'Comfortable' },
-              { value: 'compact', label: 'Compact' },
-            ]}
-          />
-        </div>
+        <div className="mt-auto flex flex-col gap-3 px-1 pt-6">{controls}</div>
       </aside>
       <main id="top" className="min-w-0 flex-auto bg-background md:border-l md:border-border">
+        <div className="sticky top-0 z-(--z-docked) flex flex-wrap items-center gap-2 border-b border-border bg-background px-4 py-2.5 md:hidden">
+          {controls}
+        </div>
         <div className="mx-auto max-w-250 px-6 pb-40 md:px-12">
           <div key={`${theme}-${density}`}>
             <GroupTitle

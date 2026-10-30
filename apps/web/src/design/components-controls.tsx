@@ -254,7 +254,11 @@ export function InputSection() {
     >
       <Specimen title="Fields">
         <Cell label="default">
-          <Input className={`${FORM_CONTROL_CLS} w-60`} placeholder="Name this task" />
+          <Input
+            aria-label="Task name"
+            className={`${FORM_CONTROL_CLS} w-60`}
+            placeholder="Name this task"
+          />
         </Cell>
         <Cell label="disabled">
           <Input className={`${FORM_CONTROL_CLS} w-60`} value="main" disabled readOnly />
@@ -265,6 +269,7 @@ export function InputSection() {
               <Search />
             </InputGroupAddon>
             <InputGroupInput
+              aria-label="Search tasks"
               placeholder="Search tasks"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
