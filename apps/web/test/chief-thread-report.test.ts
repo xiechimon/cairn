@@ -9,6 +9,7 @@ const REPORT = {
   phase: 'done',
   seqNum: 9,
   title: 'Repair board counts',
+  wakeStepId: 'step',
 };
 
 function row(id: string, role: MessageRow['role'], content: unknown): MessageRow {
@@ -65,23 +66,53 @@ describe('chief thread reports', () => {
     expect(items[1]).toMatchObject({ kind: 'user', text: 'Check task progress' });
   });
 
-  test('a report only hides the immediately following matching wake', () => {
+  test('a report only hides its identified wake, leaving another wake of the same kind visible', () => {
     const items = mapChiefStream([
       row('report', 'system', JSON.stringify(REPORT)),
-      row('user-done', 'user', '[wake:settle] The task is done.'),
+      row('user-step', 'user', '[wake:settle] The task is done.'),
       row('user-later', 'user', '[wake:settle] A later task is done.'),
     ]);
     expect(items).toHaveLength(2);
     expect(items[1]).toMatchObject({ kind: 'user', text: 'A later task is done.' });
   });
 
-  test('intervening messages break the pairing between a report and a wake', () => {
+  test('a busy chief reply between a report and its prompt does not reveal the wake instructions', () => {
     const items = mapChiefStream([
       row('report', 'system', JSON.stringify(REPORT)),
       row('reply', 'assistant', 'A separate turn has finished.'),
-      row('user-later', 'user', '[wake:settle] A later task is done.'),
+      row('user-step', 'user', '[wake:settle] The task is done.'),
+      row('wake-reply', 'assistant', 'The worker result has been checked.'),
     ]);
-    expect(items[2]).toMatchObject({ kind: 'user', text: 'A later task is done.' });
+    expect(items.map((item) => item.kind)).toEqual(['thread-report', 'robot', 'robot']);
+    expect(items[1]).toMatchObject({ markdown: 'A separate turn has finished.' });
+    expect(items[2]).toMatchObject({ markdown: 'The worker result has been checked.' });
+  });
+
+  test('two queued reports hide exactly their own prompts despite intervening replies', () => {
+    const secondReport = { ...REPORT, todoId: 'todo-2', seqNum: 10, wakeStepId: 'second-step' };
+    const items = mapChiefStream([
+      row('report-1', 'system', JSON.stringify(REPORT)),
+      row('report-2', 'system', JSON.stringify(secondReport)),
+      row('busy-reply', 'assistant', 'The current turn has finished.'),
+      row('user-step', 'user', '[wake:settle] Internal first task instructions'),
+      row('first-reply', 'assistant', 'The first task has finished.'),
+      row('user-second-step', 'user', '[wake:settle] Internal second task instructions'),
+      row('second-reply', 'assistant', 'The second task has finished.'),
+      row('user-non-report-step', 'user', '[wake:settle] Check another task'),
+    ]);
+    expect(items.map((item) => item.kind)).toEqual([
+      'thread-report', 'thread-report', 'robot', 'robot', 'robot', 'user',
+    ]);
+    expect(items.at(-1)).toMatchObject({ kind: 'user', text: 'Check another task' });
+  });
+
+  test('legacy reports without a step association still render without hiding a wake', () => {
+    const items = mapChiefStream([
+      row('legacy-report', 'system', JSON.stringify({ ...REPORT, wakeStepId: undefined })),
+      row('user-step', 'user', '[wake:settle] Legacy task completion'),
+    ]);
+    expect(items[0]).toMatchObject({ kind: 'thread-report', id: 'legacy-report' });
+    expect(items[1]).toMatchObject({ kind: 'user', text: 'Legacy task completion' });
   });
 
   test('a report does not hide a wake from a different phase', () => {
@@ -113,7 +144,7 @@ describe('chief thread reports', () => {
       ),
       row('user-s1', 'user', 'Check task progress'),
       row('reply-s1', 'assistant', 'The task is running.'),
-      row('report', 'system', JSON.stringify(REPORT)),
+      row('report', 'system', JSON.stringify({ ...REPORT, wakeStepId: 's2' })),
       row('user-s2', 'user', '[wake:settle] The task is done.'),
       row('reply-s2', 'assistant', 'The result has been confirmed.'),
     ]);

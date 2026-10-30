@@ -54,6 +54,7 @@ describe('worker reports in the chief conversation', () => {
       const rows = await messages();
       expect(rows).toHaveLength(1);
       const report = rows[0]!;
+      const wake = H.s.db.select().from(step).where(eq(step.buildId, H.threadId)).get()!;
       expect(report.role).toBe('system');
       expect(JSON.parse(report.content as string)).toEqual({
         kind: 'thread-report',
@@ -61,9 +62,9 @@ describe('worker reports in the chief conversation', () => {
         phase,
         seqNum: 1,
         title: 'Repair board counts',
+        wakeStepId: wake.id,
       });
       expect(publish).toHaveBeenCalledWith(H.threadId, expect.objectContaining(report));
-      const wake = H.s.db.select().from(step).where(eq(step.buildId, H.threadId)).get()!;
       expect(wake.prompt).toMatch(/^\[wake:(settle|failed|gate)\]/);
       expect(report.createdAt).toBeLessThanOrEqual(wake.createdAt);
       upsertChiefRow(deps, {
@@ -79,6 +80,31 @@ describe('worker reports in the chief conversation', () => {
       expect(await messages()).toHaveLength(2);
     },
   );
+
+  test('two reports queued behind a busy chief identify distinct wake steps', async () => {
+    const { deps, todoId: firstId } = await seedTask(true);
+    const { todoId: secondId } = await seedTask(true);
+    const current = sendChiefMessage(deps, H.teamId, {
+      threadId: H.threadId,
+      content: 'Check current progress',
+    });
+    H.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, current.message.id)).run();
+    setTodoPhase(deps, firstId, 'done');
+    setTodoPhase(deps, secondId, 'done');
+    const reports = (await messages())
+      .filter((message) => message.role === 'system')
+      .map(
+        (message) =>
+          JSON.parse(message.content as string) as { todoId: string; wakeStepId: string },
+      );
+    expect(reports).toHaveLength(2);
+    expect(new Set(reports.map((report) => report.wakeStepId)).size).toBe(2);
+    for (const report of reports) {
+      const wake = H.s.db.select().from(step).where(eq(step.id, report.wakeStepId)).get();
+      expect(wake).toMatchObject({ buildId: H.threadId, kind: 'chief', status: 'pending' });
+      expect(wake?.prompt).toContain(`任务 #${getTodo(deps, report.todoId)!.seqNum}`);
+    }
+  });
 
   test('unwatched tasks do not report into chief conversations', async () => {
     const { deps, todoId } = await seedTask(false);

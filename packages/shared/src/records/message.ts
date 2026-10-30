@@ -110,6 +110,7 @@ export const threadReportContentSchema = z.object({
   phase: z.enum(['done', 'failed', 'review']),
   seqNum: z.number().int().positive(),
   title: z.string(),
+  wakeStepId: recordId.optional(),
 });
 export type ThreadReportContent = z.infer<typeof threadReportContentSchema>;
 
