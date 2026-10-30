@@ -688,8 +688,9 @@ export function ProjectPage() {
   const { search } = useLocation();
   const [searchParams] = useSearchParams();
   const fixture = resolveScenario(searchParams);
+  const tabParam = searchParams.get('tab');
   const [chosenTab, setTab] = useState<'tasks' | 'files' | null>(
-    searchParams.get('tab') === 'tasks' ? 'tasks' : (fixture.projectTab ?? null),
+    tabParam === 'tasks' || tabParam === 'files' ? tabParam : (fixture.projectTab ?? null),
   );
   const [seg, setSeg] = useState<'files' | 'history'>('files');
   const { live, teamId } = useLiveData();
