@@ -108,9 +108,10 @@ export function applyLocalMergeReport(
   const record = buildRow ? getTodo(deps, buildRow.todoId) : null;
   if (!record || record.projectId !== command.projectId)
     throw conflict('Local merge project changed');
-  if (row.status !== 'claimed') return true;
   const { result } = report;
-  settleAutonomousMerge(deps.db, row.buildId, result.outcome === 'merged' ? 'merged' : 'refused');
+  if (result.outcome === 'merged') settleAutonomousMerge(deps.db, row.buildId, 'merged');
+  if (row.status !== 'claimed') return true;
+  if (result.outcome !== 'merged') settleAutonomousMerge(deps.db, row.buildId, 'refused');
   deps.db
     .update(step)
     .set({

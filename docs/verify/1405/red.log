@@ -1464,3 +1464,853 @@ AssertionError: expected [ 'user', 'team', 'project', …(40) ] to have a length
    Start at  15:14:41
    Duration  583ms (transform 68%, import 29%, tests 2%, worker 1%)
 
+
+
+Review round 2
+
+ RUN  v5.0.1 /Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-1405-brakes
+
+ ❯ |@xiechimon/cairn| test/autonomous-merge.test.ts (26 tests | 3 failed) 1208ms
+   × abandoned autonomous local commands retain their reservation without being reissued 60ms
+   × late landing after refused settlement is counted exactly once 41ms
+   × recovery cannot release an admission inside the request timeout even with a shorter caller window 67ms
+ ❯ |@xiechimon/cairn| test/local-merge-landing.test.ts (28 tests | 2 failed) 1466ms
+   × autonomous abandoned local command preserves its policy path 73ms
+   × human abandoned local command preserves its policy path 69ms
+ ❯ |@xiechimon/cairn| test/pr-merge-api.test.ts (145 tests | 1 failed) 5206ms
+   × #1405 an open poll cannot release the tenth slot after an unknown merge 37ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/autonomous-merge.test.ts > abandoned autonomous local commands retain their reservation without being reissued
+AssertionError: expected 'failed' to be 'claimed' // Object.is equality
+
+Expected: "claimed"
+Received: "failed"
+
+ ❯ test/autonomous-merge.test.ts:361:50
+    359|     .run();
+    360|   sweepAbandonedBuildSteps(s.svc, Date.now());
+    361|   expect(s.db.select().from(step).get()?.status).toBe('claimed');
+       |                                                  ^
+    362|   expect(() => claimAutonomousMerge(s.db, 'b')).toThrow('daily-cap');
+    363| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
+
+ FAIL  |@xiechimon/cairn| test/autonomous-merge.test.ts > late landing after refused settlement is counted exactly once
+AssertionError: expected [] to have a length of 1 but got +0
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ test/autonomous-merge.test.ts:392:62
+    390|   settleAutonomousMerge(s.db, 'a', 'merged');
+    391|   settleAutonomousMerge(s.db, 'a', 'merged');
+    392|   expect(s.db.select().from(autonomousMergeAdmission).all()).toHaveLen…
+       |                                                              ^
+    393|   expect(autonomousMergePolicy(s.db, s.team.id, config).dailyCapReache…
+    394| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯
+
+ FAIL  |@xiechimon/cairn| test/autonomous-merge.test.ts > recovery cannot release an admission inside the request timeout even with a shorter caller window
+AssertionError: expected "vi.fn()" to not be called at all, but actually been called 1 times
+
+Received:
+
+  1st vi.fn() call:
+
+    Array [
+      "https://api.github.com/repos/owner/repo/pulls/1",
+      Object {
+        "headers": Object {
+          "accept": "application/vnd.github+json",
+          "user-agent": "cairn-server",
+          "x-github-api-version": "2022-11-28",
+        },
+        "signal": AbortSignal {
+          Symbol(kEvents): undefined,
+          Symbol(events.maxEventTargetListeners): 0,
+          Symbol(events.maxEventTargetListenersWarned): false,
+          Symbol(kHandlers): undefined,
+          Symbol(kAborted): false,
+          Symbol(kReason): undefined,
+          Symbol(kComposite): false,
+          Symbol(kTimeout): true,
+        },
+      },
+    ]
+
+
+Number of calls: 1
+
+ ❯ test/autonomous-merge.test.ts:403:21
+    401|   const fetch = vi.fn();
+    402|   await recoverAutonomousMerges({ ...s.svc, box: s.secretBox }, fetch,…
+    403|   expect(fetch).not.toHaveBeenCalled();
+       |                     ^
+    404|   expect(() => claimAutonomousMerge(s.db, 'b')).toThrow('daily-cap');
+    405| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯
+
+ FAIL  |@xiechimon/cairn| test/local-merge-landing.test.ts > autonomous abandoned local command preserves its policy path
+AssertionError: expected 'failed' to be 'claimed' // Object.is equality
+
+Expected: "claimed"
+Received: "failed"
+
+ ❯ test/local-merge-landing.test.ts:589:81
+    587|     f.s.db.update(step).set({ status: 'claimed', claimedAt: Date.now()…
+    588|     sweepAbandonedBuildSteps(f.deps);
+    589|     expect(f.s.db.select().from(step).where(eq(step.id, row.id)).get()…
+       |                                                                                 ^
+    590|     if (policy === 'autonomous') {
+    591|       expect(f.s.db.select().from(autonomousMergeAdmission).get()?.sta…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯
+
+ FAIL  |@xiechimon/cairn| test/local-merge-landing.test.ts > human abandoned local command preserves its policy path
+AssertionError: expected 'failed' to be 'pending' // Object.is equality
+
+Expected: "pending"
+Received: "failed"
+
+ ❯ test/local-merge-landing.test.ts:589:81
+    587|     f.s.db.update(step).set({ status: 'claimed', claimedAt: Date.now()…
+    588|     sweepAbandonedBuildSteps(f.deps);
+    589|     expect(f.s.db.select().from(step).where(eq(step.id, row.id)).get()…
+       |                                                                                 ^
+    590|     if (policy === 'autonomous') {
+    591|       expect(f.s.db.select().from(autonomousMergeAdmission).get()?.sta…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯
+
+ FAIL  |@xiechimon/cairn| test/pr-merge-api.test.ts > #1405 an open poll cannot release the tenth slot after an unknown merge
+Error: expected requestMerge to refuse
+ ❯ refusal test/pr-merge-api.test.ts:336:9
+    334|     throw err;
+    335|   }
+    336|   throw new Error('expected requestMerge to refuse');
+       |         ^
+    337| }
+    338|
+ ❯ test/pr-merge-api.test.ts:1602:11
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/6]⎯
+
+
+ Test Files  3 failed (3)
+      Tests  6 failed | 193 passed (199)
+   Start at  16:22:16
+   Duration  6.58s (tests 67%, transform 17%, import 15%)
+
+
+ RUN  v5.0.1 /Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-1405-brakes
+
+ ❯ |@xiechimon/cairn| test/autonomous-merge.test.ts (25 tests | 7 failed) 756ms
+   × stale local admission retains a failed command with unknown repository state 35ms
+   × stale local admission retains a stopped command with unknown repository state 28ms
+   × issued local admission remains pending when command is failed 29ms
+   × issued local admission remains pending when command is cancelled 28ms
+   × abandoned autonomous local commands retain their reservation without being reissued 29ms
+   × late landing after refused settlement is counted exactly once 28ms
+   × recovery cannot release an admission inside the request timeout even with a shorter caller window 28ms
+ ❯ |@xiechimon/cairn| test/local-merge-landing.test.ts (29 tests | 3 failed) 952ms
+   × autonomous abandoned local command preserves its policy path 34ms
+   × human abandoned local command preserves its policy path 30ms
+   × a late landing for a failed local command restores a refused admission exactly once 32ms
+ ❯ |@xiechimon/cairn| test/pr-merge-api.test.ts (146 tests | 2 failed) 4275ms
+   × #1405 an open poll cannot release the tenth slot after an unknown merge 35ms
+   × #1405 nine landed merges and an open poll during the tenth PUT cannot admit an eleventh 48ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 12 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/autonomous-merge.test.ts > stale local admission retains a failed command with unknown repository state
+ FAIL  |@xiechimon/cairn| test/autonomous-merge.test.ts > stale local admission retains a stopped command with unknown repository state
+AssertionError: expected [Function] to throw an error
+
+- Expected:
+null
+
++ Received:
+undefined
+
+ ❯ test/autonomous-merge.test.ts:238:51
+    236|     };
+    237|     await createCiPoller(deps, { githubFetch: vi.fn() }).sweep(Date.no…
+    238|     expect(() => claimAutonomousMerge(s.db, 'a')).toThrow('already adm…
+       |                                                   ^
+    239|   });
+    240| }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/12]⎯
+
+ FAIL  |@xiechimon/cairn| test/autonomous-merge.test.ts > issued local admission remains pending when command is failed
+ FAIL  |@xiechimon/cairn| test/autonomous-merge.test.ts > issued local admission remains pending when command is cancelled
+AssertionError: expected [Function] to throw an error
+
+- Expected:
+null
+
++ Received:
+undefined
+
+ ❯ test/autonomous-merge.test.ts:261:51
+    259|     if (action === 'failed') failStepWithEvents(s.svc, row, 'daemon fa…
+    260|     else applyStoppedStep(s.svc, row.id);
+    261|     expect(() => claimAutonomousMerge(s.db, 'a')).toThrow('already adm…
+       |                                                   ^
+    262|   });
+    263| }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/12]⎯
+
+ FAIL  |@xiechimon/cairn| test/autonomous-merge.test.ts > abandoned autonomous local commands retain their reservation without being reissued
+AssertionError: expected 'failed' to be 'claimed' // Object.is equality
+
+Expected: "claimed"
+Received: "failed"
+
+ ❯ test/autonomous-merge.test.ts:360:50
+    358|     .run();
+    359|   sweepAbandonedBuildSteps(s.svc, Date.now());
+    360|   expect(s.db.select().from(step).get()?.status).toBe('claimed');
+       |                                                  ^
+    361|   expect(() => claimAutonomousMerge(s.db, 'b')).toThrow('daily-cap');
+    362| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/12]⎯
+
+ FAIL  |@xiechimon/cairn| test/autonomous-merge.test.ts > late landing after refused settlement is counted exactly once
+AssertionError: expected [] to have a length of 1 but got +0
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ test/autonomous-merge.test.ts:391:62
+    389|   settleAutonomousMerge(s.db, 'a', 'merged');
+    390|   settleAutonomousMerge(s.db, 'a', 'merged');
+    391|   expect(s.db.select().from(autonomousMergeAdmission).all()).toHaveLen…
+       |                                                              ^
+    392|   expect(autonomousMergePolicy(s.db, s.team.id, config).dailyCapReache…
+    393| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/12]⎯
+
+ FAIL  |@xiechimon/cairn| test/autonomous-merge.test.ts > recovery cannot release an admission inside the request timeout even with a shorter caller window
+AssertionError: expected "vi.fn()" to not be called at all, but actually been called 1 times
+
+Received:
+
+  1st vi.fn() call:
+
+    Array [
+      "https://api.github.com/repos/owner/repo/pulls/1",
+      Object {
+        "headers": Object {
+          "accept": "application/vnd.github+json",
+          "user-agent": "cairn-server",
+          "x-github-api-version": "2022-11-28",
+        },
+        "signal": AbortSignal {
+          Symbol(kEvents): undefined,
+          Symbol(events.maxEventTargetListeners): 0,
+          Symbol(events.maxEventTargetListenersWarned): false,
+          Symbol(kHandlers): undefined,
+          Symbol(kAborted): false,
+          Symbol(kReason): undefined,
+          Symbol(kComposite): false,
+          Symbol(kTimeout): true,
+        },
+      },
+    ]
+
+
+Number of calls: 1
+
+ ❯ test/autonomous-merge.test.ts:402:21
+    400|   const fetch = vi.fn();
+    401|   await recoverAutonomousMerges({ ...s.svc, box: s.secretBox }, fetch,…
+    402|   expect(fetch).not.toHaveBeenCalled();
+       |                     ^
+    403|   expect(() => claimAutonomousMerge(s.db, 'b')).toThrow('daily-cap');
+    404| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/12]⎯
+
+ FAIL  |@xiechimon/cairn| test/local-merge-landing.test.ts > autonomous abandoned local command preserves its policy path
+AssertionError: expected 'failed' to be 'claimed' // Object.is equality
+
+Expected: "claimed"
+Received: "failed"
+
+ ❯ test/local-merge-landing.test.ts:589:81
+    587|     f.s.db.update(step).set({ status: 'claimed', claimedAt: Date.now()…
+    588|     sweepAbandonedBuildSteps(f.deps);
+    589|     expect(f.s.db.select().from(step).where(eq(step.id, row.id)).get()…
+       |                                                                                 ^
+    590|     if (policy === 'autonomous') {
+    591|       expect(f.s.db.select().from(autonomousMergeAdmission).get()?.sta…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/12]⎯
+
+ FAIL  |@xiechimon/cairn| test/local-merge-landing.test.ts > human abandoned local command preserves its policy path
+AssertionError: expected 'failed' to be 'pending' // Object.is equality
+
+Expected: "pending"
+Received: "failed"
+
+ ❯ test/local-merge-landing.test.ts:589:81
+    587|     f.s.db.update(step).set({ status: 'claimed', claimedAt: Date.now()…
+    588|     sweepAbandonedBuildSteps(f.deps);
+    589|     expect(f.s.db.select().from(step).where(eq(step.id, row.id)).get()…
+       |                                                                                 ^
+    590|     if (policy === 'autonomous') {
+    591|       expect(f.s.db.select().from(autonomousMergeAdmission).get()?.sta…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/12]⎯
+
+ FAIL  |@xiechimon/cairn| test/local-merge-landing.test.ts > a late landing for a failed local command restores a refused admission exactly once
+AssertionError: expected [] to have a length of 1 but got +0
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ test/local-merge-landing.test.ts:611:64
+    609|   applyLocalMergeReport(f.deps, { ...row, status: 'failed' }, report);
+    610|   applyLocalMergeReport(f.deps, { ...row, status: 'failed' }, report);
+    611|   expect(f.s.db.select().from(autonomousMergeAdmission).all()).toHaveL…
+       |                                                                ^
+    612|   expect(f.s.db.select().from(autonomousMergeAdmission).get()?.state).…
+    613|   expect(f.s.db.select().from(step).where(eq(step.id, row.id)).get()?.…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/12]⎯
+
+ FAIL  |@xiechimon/cairn| test/pr-merge-api.test.ts > #1405 an open poll cannot release the tenth slot after an unknown merge
+Error: expected requestMerge to refuse
+ ❯ refusal test/pr-merge-api.test.ts:336:9
+    334|     throw err;
+    335|   }
+    336|   throw new Error('expected requestMerge to refuse');
+       |         ^
+    337| }
+    338|
+ ❯ test/pr-merge-api.test.ts:1602:11
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/12]⎯
+
+ FAIL  |@xiechimon/cairn| test/pr-merge-api.test.ts > #1405 nine landed merges and an open poll during the tenth PUT cannot admit an eleventh
+AssertionError: expected { status: 'fulfilled', …(1) } to match object { status: 'rejected', …(1) }
+(2 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "reason": {
+-     "status": 409,
+-   },
+-   "status": "rejected",
++   "status": "fulfilled",
+  }
+
+ ❯ test/pr-merge-api.test.ts:1650:24
+    1648|     await w.sweep();
+    1649|     const outcome = await Promise.allSettled([requestMerge(w.deps, 'ra…
+    1650|     expect(outcome[0]).toMatchObject({ status: 'rejected', reason: { s…
+       |                        ^
+    1651|     expect(w.fake.puts()).toHaveLength(1);
+    1652|   } finally {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/12]⎯
+
+
+ Test Files  3 failed (3)
+      Tests  12 failed | 188 passed (200)
+   Start at  16:23:32
+   Duration  5.51s (tests 63%, transform 20%, import 16%)
+
+
+ RUN  v5.0.1 /Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-1405-brakes
+
+ ❯ |@xiechimon/cairn| test/pr-reconcile.test.ts (187 tests | 20 failed) 11439ms
+   ❯ #1403 PR reconcile for review-phase builds (118)
+     × ⑤ phase moved by a person during the network window → no write 43ms
+     × ⑨b a second build records the PR the older build opened (its head is the older build's branch, #1217 / #1195) → foreign: stays in review, one hint, no merged row 39ms
+     × ⑯ the todo gets a new current build during the network window → no write 30ms
+     × ㉓ phase moved by a person while compare is in flight → no write 32ms
+     × ㉕ a checkpoint that is not a 40-hex sha is not put into a request URL 33ms
+     × ㉚ merged, the response has no head sha, the build has a checkpoint → not finished 32ms
+     × ㉗ a merged response without base is not taken as a merge into the default branch 32ms
+     × ㉗ a merged response without base.ref is not taken as a merge into the default branch 31ms
+     × ㉗ a merged response without default_branch is not taken as a merge into the default branch 31ms
+     × ㉘ a merge step starts while the pulls read is in flight → no write 32ms
+     × ㉘ a merge step starts while the compare read is in flight → no write 32ms
+     × ㊽ the card leaves review during the second unreadable compare → no hint 36ms
+     × [62a] a fork PR with the same branch name, merged → the card is neither failed nor finished; one hint 47ms
+     × [62d] a merged PR whose head repo is null (fork deleted) is foreign: one hint per round, counted, kept in the cache 53ms
+     × [69] every review candidate lands in exactly one bucket of the sweep log, also after its hint is written 74ms
+   ❯ #1403 segment 2: the PR the build tracks (65)
+     × [s2-A9] the recorded PR is another build's (9b shape) and this build has its own PR → its own PR is recorded, no foreign hint 59ms
+     × [s2-A7b] the recorded PR is foreign and a step starts while the list read is in flight → no write 65ms
+     × [s2-A9c] the recorded PR is foreign and the list read fails (502) → the hint as before; the branch is listed again after ten minutes 71ms
+     × [s2-A9c] the recorded PR is foreign and the list read fails (throw) → the hint as before; the branch is listed again after ten minutes 80ms
+     × [2b-P4] the recorded PR is foreign and the card leaves review while the list read is in flight → no write 63ms
+ ❯ |@xiechimon/cairn| test/autonomous-merge.test.ts (33 tests | 7 failed) 5791ms
+   × raw merged foreign observation cannot settle a pending admission 186ms
+   × raw merged fork observation cannot settle a pending admission 127ms
+   × raw merged wrong-base observation cannot settle a pending admission 183ms
+   × raw merged missing-base observation cannot settle a pending admission 157ms
+   × raw merged phase-change observation cannot settle a pending admission 115ms
+   × raw merged diverged observation cannot settle a pending admission 114ms
+   × stale completed local steps cannot independently record an accepted landing 118ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 27 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/autonomous-merge.test.ts > raw merged foreign observation cannot settle a pending admission
+ FAIL  |@xiechimon/cairn| test/autonomous-merge.test.ts > raw merged fork observation cannot settle a pending admission
+ FAIL  |@xiechimon/cairn| test/autonomous-merge.test.ts > raw merged wrong-base observation cannot settle a pending admission
+ FAIL  |@xiechimon/cairn| test/autonomous-merge.test.ts > raw merged missing-base observation cannot settle a pending admission
+ FAIL  |@xiechimon/cairn| test/autonomous-merge.test.ts > raw merged phase-change observation cannot settle a pending admission
+ FAIL  |@xiechimon/cairn| test/autonomous-merge.test.ts > raw merged diverged observation cannot settle a pending admission
+AssertionError: expected 'merged' to be 'pending' // Object.is equality
+
+Expected: "pending"
+Received: "merged"
+
+ ❯ test/autonomous-merge.test.ts:435:71
+    433|     });
+    434|     await createCiPoller({ ...s.svc, box: s.secretBox }, { githubFetch…
+    435|     expect(s.db.select().from(autonomousMergeAdmission).get()?.state).…
+       |                                                                       ^
+    436|     expect(s.db.select().from(message).all().filter((row) => String(ro…
+    437|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/27]⎯
+
+ FAIL  |@xiechimon/cairn| test/autonomous-merge.test.ts > stale completed local steps cannot independently record an accepted landing
+AssertionError: expected 'merged' to be 'pending' // Object.is equality
+
+Expected: "pending"
+Received: "merged"
+
+ ❯ test/autonomous-merge.test.ts:464:69
+    462|   s.db.insert(step).values({ id: 'merge', buildId: 'a', kind: 'merge',…
+    463|   await recoverAutonomousMerges({ ...s.svc, box: s.secretBox }, vi.fn(…
+    464|   expect(s.db.select().from(autonomousMergeAdmission).get()?.state).to…
+       |                                                                     ^
+    465| });
+    466|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/27]⎯
+
+ FAIL  |@xiechimon/cairn| test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > ⑤ phase moved by a person during the network window → no write
+AssertionError: expected [ Array(1) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "{\"kind\":\"autonomous-merge-admission\",\"teamId\":\"MRcOgj4eR9skc0ISZD928\",\"state\":\"merged\",\"landedAt\":1793349927830}",
++ ]
+
+ ❯ test/pr-reconcile.test.ts:553:28
+    551|     ).sweep();
+    552|     expect(w.todoRow().phase).toBe('closed');
+    553|     expect(w.systemRows()).toEqual([]);
+       |                            ^
+    554|   });
+    555|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/27]⎯
+
+ FAIL  |@xiechimon/cairn| test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > ⑨b a second build records the PR the older build opened (its head is the older build's branch, #1217 / #1195) → foreign: stays in review, one hint, no merged row
+AssertionError: expected [ …(2) ] to have a length of 1 but got 2
+
+- Expected
++ Received
+
+- 1
++ 2
+
+ ❯ test/pr-reconcile.test.ts:644:21
+    642|       .filter((r) => r.role === 'system' && r.conversationId === curre…
+    643|       .map((r) => String(r.content));
+    644|     expect(current).toHaveLength(1);
+       |                     ^
+    645|     expect(current[0]).toContain('PR #201');
+    646|     expect(current[0]).toContain(conversationBranch(String(currentBuil…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/27]⎯
+
+ FAIL  |@xiechimon/cairn| test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > ⑯ the todo gets a new current build during the network window → no write
+AssertionError: expected [ Array(1) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "{\"kind\":\"autonomous-merge-admission\",\"teamId\":\"Mu0fiqOZx5EX2J71krmMw\",\"state\":\"merged\",\"landedAt\":1793349928622}",
++ ]
+
+ ❯ test/pr-reconcile.test.ts:836:28
+    834|     ).sweep();
+    835|     expect(w.todoRow().phase).toBe('review');
+    836|     expect(w.systemRows()).toEqual([]);
+       |                            ^
+    837|   });
+    838|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/27]⎯
+
+ FAIL  |@xiechimon/cairn| test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > ㉓ phase moved by a person while compare is in flight → no write
+AssertionError: expected [ Array(1) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "{\"kind\":\"autonomous-merge-admission\",\"teamId\":\"3J8bo9fo3mNSGPTy1mHBX\",\"state\":\"merged\",\"landedAt\":1793349928974}",
++ ]
+
+ ❯ test/pr-reconcile.test.ts:995:28
+    993|     expect(mock.compareRequests()).toHaveLength(1);
+    994|     expect(w.todoRow().phase).toBe('closed');
+    995|     expect(w.systemRows()).toEqual([]);
+       |                            ^
+    996|   });
+    997|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/27]⎯
+
+ FAIL  |@xiechimon/cairn| test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > ㉕ a checkpoint that is not a 40-hex sha is not put into a request URL
+AssertionError: expected [ …(2) ] to have a length of 1 but got 2
+
+- Expected
++ Received
+
+- 1
++ 2
+
+ ❯ test/pr-reconcile.test.ts:1067:28
+    1065|     expect(mock.requests.some((u) => u.includes('/compare/'))).toBe(fa…
+    1066|     expect(w.todoRow().phase).toBe('review');
+    1067|     expect(w.systemRows()).toHaveLength(1);
+       |                            ^
+    1068|     expect(w.systemRows()[0]).not.toContain('../../user');
+    1069|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/27]⎯
+
+ FAIL  |@xiechimon/cairn| test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > ㉚ merged, the response has no head sha, the build has a checkpoint → not finished
+AssertionError: expected [ Array(1) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "{\"kind\":\"autonomous-merge-admission\",\"teamId\":\"iLDwEe_5T-Dl_vOe_Av8Z\",\"state\":\"merged\",\"landedAt\":1793349929253}",
++ ]
+
+ ❯ test/pr-reconcile.test.ts:1149:28
+    1147|     expect(w.todoRow().phase).toBe('review');
+    1148|     expect(mock.compareRequests()).toEqual([]);
+    1149|     expect(w.systemRows()).toEqual([]);
+       |                            ^
+    1150|   });
+    1151|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/27]⎯
+
+ FAIL  |@xiechimon/cairn| test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > ㉗ a merged response without base is not taken as a merge into the default branch
+AssertionError: expected [ Array(1) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "{\"kind\":\"autonomous-merge-admission\",\"teamId\":\"UhBbF3d0fpgdIUEyFVc5R\",\"state\":\"merged\",\"landedAt\":1793349929284}",
++ ]
+
+ ❯ test/pr-reconcile.test.ts:1167:30
+    1165|       ).sweep();
+    1166|       expect(w.todoRow().phase).toBe('review');
+    1167|       expect(w.systemRows()).toEqual([]);
+       |                              ^
+    1168|       const tally = info.mock.calls.at(-1)?.[0] as Record<string, numb…
+    1169|       expect(tally.reviewUnreadable).toBe(1);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/27]⎯
+
+ FAIL  |@xiechimon/cairn| test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > ㉗ a merged response without base.ref is not taken as a merge into the default branch
+AssertionError: expected [ Array(1) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "{\"kind\":\"autonomous-merge-admission\",\"teamId\":\"DLrztbrQS725ZLMgmKQ0U\",\"state\":\"merged\",\"landedAt\":1793349929316}",
++ ]
+
+ ❯ test/pr-reconcile.test.ts:1167:30
+    1165|       ).sweep();
+    1166|       expect(w.todoRow().phase).toBe('review');
+    1167|       expect(w.systemRows()).toEqual([]);
+       |                              ^
+    1168|       const tally = info.mock.calls.at(-1)?.[0] as Record<string, numb…
+    1169|       expect(tally.reviewUnreadable).toBe(1);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/27]⎯
+
+ FAIL  |@xiechimon/cairn| test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > ㉗ a merged response without default_branch is not taken as a merge into the default branch
+AssertionError: expected [ Array(1) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "{\"kind\":\"autonomous-merge-admission\",\"teamId\":\"pgz0MF6qFbc745Vgh6dLw\",\"state\":\"merged\",\"landedAt\":1793349929347}",
++ ]
+
+ ❯ test/pr-reconcile.test.ts:1167:30
+    1165|       ).sweep();
+    1166|       expect(w.todoRow().phase).toBe('review');
+    1167|       expect(w.systemRows()).toEqual([]);
+       |                              ^
+    1168|       const tally = info.mock.calls.at(-1)?.[0] as Record<string, numb…
+    1169|       expect(tally.reviewUnreadable).toBe(1);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/27]⎯
+
+ FAIL  |@xiechimon/cairn| test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > ㉘ a merge step starts while the pulls read is in flight → no write
+AssertionError: expected [ Array(1) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "{\"kind\":\"autonomous-merge-admission\",\"teamId\":\"RJdb0dgoDvAfpJZqAdU9E\",\"state\":\"merged\",\"landedAt\":1793349929379}",
++ ]
+
+ ❯ test/pr-reconcile.test.ts:1201:30
+    1199|       ).sweep();
+    1200|       expect(w.todoRow().phase).toBe('review');
+    1201|       expect(w.systemRows()).toEqual([]);
+       |                              ^
+    1202|     },
+    1203|   );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/27]⎯
+
+ FAIL  |@xiechimon/cairn| test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > ㉘ a merge step starts while the compare read is in flight → no write
+AssertionError: expected [ Array(1) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "{\"kind\":\"autonomous-merge-admission\",\"teamId\":\"hxyB-n112jRxXpST3iZtX\",\"state\":\"merged\",\"landedAt\":1793349929411}",
++ ]
+
+ ❯ test/pr-reconcile.test.ts:1201:30
+    1199|       ).sweep();
+    1200|       expect(w.todoRow().phase).toBe('review');
+    1201|       expect(w.systemRows()).toEqual([]);
+       |                              ^
+    1202|     },
+    1203|   );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/27]⎯
+
+ FAIL  |@xiechimon/cairn| test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > ㊽ the card leaves review during the second unreadable compare → no hint
+AssertionError: expected [ Array(1) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "{\"kind\":\"autonomous-merge-admission\",\"teamId\":\"xI_pHE3HFo0_ShC_WIbqL\",\"state\":\"merged\",\"landedAt\":1793349930127}",
++ ]
+
+ ❯ test/pr-reconcile.test.ts:1502:28
+    1500|     expect(mock.compareRequests()).toHaveLength(2);
+    1501|     expect(w.todoRow().phase).toBe('closed');
+    1502|     expect(w.systemRows()).toEqual([]);
+       |                            ^
+    1503|   });
+    1504|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/27]⎯
+
+ FAIL  |@xiechimon/cairn| test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [62a] a fork PR with the same branch name, merged → the card is neither failed nor finished; one hint
+AssertionError: expected [ …(2) ] to have a length of 1 but got 2
+
+- Expected
++ Received
+
+- 1
++ 2
+
+ ❯ test/pr-reconcile.test.ts:1792:20
+    1790|       expect(w.stepRows().find((r) => r.kind === 'verify')?.status).to…
+    1791|       const rows = w.systemRows();
+    1792|       expect(rows).toHaveLength(1);
+       |                    ^
+    1793|       expect(rows[0]).toContain(`PR #${w.prNumber}`);
+    1794|       expect(rows[0]).toContain(conversationBranch(w.buildId));
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/27]⎯
+
+ FAIL  |@xiechimon/cairn| test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [62d] a merged PR whose head repo is null (fork deleted) is foreign: one hint per round, counted, kept in the cache
+AssertionError: expected [ …(2) ] to have a length of 1 but got 2
+
+- Expected
++ Received
+
+- 1
++ 2
+
+ ❯ test/pr-reconcile.test.ts:1845:20
+    1843|       expect(w.buildRow().errorMessage).toBeNull();
+    1844|       const rows = w.systemRows();
+    1845|       expect(rows).toHaveLength(1);
+       |                    ^
+    1846|       expect(rows[0]).toContain(`PR #${w.prNumber}`);
+    1847|       expect(rows[0]).toContain(conversationBranch(w.buildId));
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/27]⎯
+
+ FAIL  |@xiechimon/cairn| test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [69] every review candidate lands in exactly one bucket of the sweep log, also after its hint is written
+AssertionError: expected [ { …(6) }, { …(6) }, { …(6) }, …(2) ] to have a length of 3 but got 5
+
+- Expected
++ Received
+
+- 3
++ 5
+
+ ❯ test/pr-reconcile.test.ts:2140:17
+    2138|       .all()
+    2139|       .filter((r) => r.role === 'system');
+    2140|     expect(all).toHaveLength(3);
+       |                 ^
+    2141|   });
+    2142|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/27]⎯
+
+ FAIL  |@xiechimon/cairn| test/pr-reconcile.test.ts > #1403 segment 2: the PR the build tracks > [s2-A9] the recorded PR is another build's (9b shape) and this build has its own PR → its own PR is recorded, no foreign hint
+AssertionError: expected [ …(2) ] to have a length of 1 but got 2
+
+- Expected
++ Received
+
+- 1
++ 2
+
+ ❯ test/pr-reconcile.test.ts:2571:18
+    2569|       .filter((r) => r.role === 'system' && r.conversationId === curre…
+    2570|       .map((r) => String(r.content));
+    2571|     expect(rows).toHaveLength(1);
+       |                  ^
+    2572|     expect(rows[0]).toContain('#201');
+    2573|     expect(rows[0]).toContain('#305');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/27]⎯
+
+ FAIL  |@xiechimon/cairn| test/pr-reconcile.test.ts > #1403 segment 2: the PR the build tracks > [s2-A7b] the recorded PR is foreign and a step starts while the list read is in flight → no write
+AssertionError: expected [ { …(6) } ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "actor": null,
++     "content": "{\"kind\":\"autonomous-merge-admission\",\"teamId\":\"KEhkfCL1BPgFjpExfax3a\",\"state\":\"merged\",\"landedAt\":1793349933564}",
++     "conversationId": "build-new-ll0r3i",
++     "createdAt": 1793349933564,
++     "id": "autonomous-merge-build-new-ll0r3i",
++     "role": "system",
++   },
++ ]
+
+ ❯ test/pr-reconcile.test.ts:2612:18
+    2610|       .all()
+    2611|       .filter((r) => r.role === 'system');
+    2612|     expect(rows).toEqual([]);
+       |                  ^
+    2613|   });
+    2614|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/27]⎯
+
+ FAIL  |@xiechimon/cairn| test/pr-reconcile.test.ts > #1403 segment 2: the PR the build tracks > [s2-A9c] the recorded PR is foreign and the list read fails (502) → the hint as before; the branch is listed again after ten minutes
+ FAIL  |@xiechimon/cairn| test/pr-reconcile.test.ts > #1403 segment 2: the PR the build tracks > [s2-A9c] the recorded PR is foreign and the list read fails (throw) → the hint as before; the branch is listed again after ten minutes
+AssertionError: expected [ { …(6) }, { …(6) } ] to have a length of 1 but got 2
+
+- Expected
++ Received
+
+- 1
++ 2
+
+ ❯ test/pr-reconcile.test.ts:2711:21
+    2709|         .all()
+    2710|         .filter((r) => r.role === 'system' && r.conversationId === cur…
+    2711|       expect(hints).toHaveLength(1);
+       |                     ^
+    2712|       expect(String(hints[0]?.content)).toContain('PR #201 的 head');
+    2713|       mock.branchPulls = [{ number: 305 }];
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/27]⎯
+
+ FAIL  |@xiechimon/cairn| test/pr-reconcile.test.ts > #1403 segment 2: the PR the build tracks > [2b-P4] the recorded PR is foreign and the card leaves review while the list read is in flight → no write
+AssertionError: expected [ Array(1) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "{\"kind\":\"autonomous-merge-admission\",\"teamId\":\"TUBUu4UMzzWAtRcJ6mcrp\",\"state\":\"merged\",\"landedAt\":1793349935174}",
++ ]
+
+ ❯ test/pr-reconcile.test.ts:3025:29
+    3023|     expect(f.mock.listRequests()).toHaveLength(1);
+    3024|     expect(f.currentPr()).toBe(201);
+    3025|     expect(f.currentRows()).toEqual([]);
+       |                             ^
+    3026|   });
+    3027|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/27]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  27 failed | 193 passed (220)
+   Start at  16:45:23
+   Duration  25.57s (tests 73%, import 16%, transform 11%)
+

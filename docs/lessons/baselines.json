@@ -407,6 +407,10 @@
     "Intercepts": 0,
     "Recurrences": 0
   },
+  "evidence-history-overwrite": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "evidence-log-whitespace": {
     "Intercepts": 1,
     "Recurrences": 0

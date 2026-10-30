@@ -1,0 +1,41 @@
+
+ RUN  v5.0.1 /Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-1405-brakes
+
+ ❯ |@xiechimon/cairn| test/git-hosting.test.ts (11 tests | 11 skipped) 10010ms
+ ❯ |@xiechimon/cairn| test/skill-write.test.ts (30 tests | 1 failed) 11903ms
+   ❯ machine-wire skill listing and on-demand fetch (GET /api/machine/skills/{stepId}[/file]) (8)
+     × M5: an over-limit file no longer fails the whole package -- an asset past the per-file gate enters the listing with its real size and is delivered byte-complete; a total over the old package gate still gets a listing 7363ms
+stderr | test/github-writeback.test.ts > title write-back and claim meta (B family) > W11/B3 title backfill on a not-yet-created task: local only, zero PATCH outbound (the later-created issue naturally uses the current title)
+self issue create failed for todo 2_iUcnLJGrcJWDhM5Bg-5: github api 502: https://api.github.com/repos/octo/alpha/issues
+
+ ❯ |@xiechimon/cairn| test/local-merge-facts.test.ts (13 tests | 2 failed) 36246ms
+   ❯ localGateFacts: persisted rows become the gate inputs a local project is judged on (13)
+     × a missing build checkpoint fails closed instead of judging an empty patch 6563ms
+     × the stored gate state binds the judged digest only when it was computed at the same head 14275ms
+ ❯ |@xiechimon/cairn| test/github-writeback.test.ts (22 tests | 3 failed) 45618ms
+   ❯ title write-back and claim meta (B family) (4)
+     × W11/B3 title backfill on a not-yet-created task: local only, zero PATCH outbound (the later-created issue naturally uses the current title) 6254ms
+   ❯ GET /api/todos/{id}/github-issue read-only echo (D family) (2)
+     × W16a created -> 200 with the upstream current values {number,title,state} (the data fetched once on entry) 5870ms
+     × W16b family cannot be fetched -> non-200: not-yet-created 404 / local task 404 / issue deleted 404 / connection removed 404 7365ms
+ ❯ |@xiechimon/cairn| test/m3b-machine-git.test.ts (12 tests | 8 failed) 60298ms
+   ❯ claim payload repo binding slot (M3b worktree contract wiring, 02 section 3/5.5) (1)
+     × hosted project -> project.repo {kind:hosted, cloneUrl=/git/<teamId>/<repoName>} 6404ms
+   ❯ per-step one-time git credential (02 section 5.4/8; relay tool name matches push_credential r5 section 3.1) (2)
+     × token/{stepId} -> git {username,password}; revoked after done (revoke = row delete) 6842ms
+   ❯ plan.md artifact upload (02 section 4.2 / r5 section 4: plan is a file, version = file version) (1)
+     × upload-urls plan.md -> plan v1 + build.planDocId; replan round -> v2 7772ms
+   ❯ done commit report = per-step checkpoint (r3 section 3.5 "restore here" data surface) (1)
+     × step.checkpointCommit persisted 5106ms
+   ❯ merge 202 delegated -> merge step lands (02 section 4.2/A6; r3 section 3.6 server-side main verify) (2)
+     × merge step done(commit) -> bare repo main fast-forward + timeline 🎉 5556ms
+     × not fast-forward (main advanced during the merge window) -> step failed + todo failed (failure only human rerun, 02/A6) 5405ms
+   ❯ #1487 merge step in flight when the card leaves review: success report not landed; repeated merge request 409 (4)
+     × failure mode 1b: report arrives while card still in review, closed during the landing git check -> still not fast-forwarded 7236ms
+     × failure mode 2: closed then reopened to to-do -> also not landed, card still todo 5022ms
+ ❯ |@xiechimon/cairn| test/patch-todo-reset-gate.test.ts (13 tests | 1 failed) 16241ms
+   ❯ the PATCH phase=todo reset gate (#1486) (13)
+     × 失败方式 1：已开始的 done 卡 {"hasChanges":true} → 409 指向 /reset，卡不动 5192ms
+ ❯ |@xiechimon/cairn| test/attachment-gc.test.ts (15 tests | 1 failed) 93289ms
+   ❯ attachment gc -- scheduler cadence (3)
+     × a large transcript corpus does not block the event loop during a tick 72662ms

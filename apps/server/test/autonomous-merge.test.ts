@@ -1,14 +1,24 @@
 import {
+  conversationBranch,
   DEFAULT_AUTONOMY_SETTINGS,
   patchProjectMergeConfigSchema,
   patchTeamBodySchema,
 } from '@cairn/shared';
 import { eq, sql } from 'drizzle-orm';
 import { afterEach, expect, test, vi } from 'vitest';
-import { build, message, project, step, team, todo } from '../src/db/schema.js';
+import {
+  autonomousMergeAdmission,
+  build,
+  message,
+  project,
+  step,
+  team,
+  todo,
+} from '../src/db/schema.js';
 import {
   autonomousMergePolicy,
   claimAutonomousMerge,
+  recoverAutonomousMerges,
   settleAutonomousMerge,
 } from '../src/services/autonomous-merge.js';
 import {
@@ -218,16 +228,15 @@ for (const state of ['open', 'closed', 'merged', 'unreadable'] as const) {
   });
 }
 
-for (const status of ['failed', 'stopped', 'missing'] as const) {
-  test(`stale local admission releases a ${status} command after restart`, async () => {
+for (const status of ['failed', 'stopped'] as const) {
+  test(`stale local admission retains a ${status} command with unknown repository state`, async () => {
     const { s } = fixture();
     s.db.update(project).set({ repoKind: 'local' }).run();
     claimAutonomousMerge(s.db, 'a');
-    if (status !== 'missing')
-      s.db
-        .insert(step)
-        .values({ id: 'merge', buildId: 'a', kind: 'merge', status, createdAt: Date.now() })
-        .run();
+    s.db
+      .insert(step)
+      .values({ id: 'merge', buildId: 'a', kind: 'merge', status, createdAt: Date.now() })
+      .run();
     const deps = {
       ...s.svc,
       box: s.secretBox,
@@ -235,12 +244,12 @@ for (const status of ['failed', 'stopped', 'missing'] as const) {
       attachmentsDir: s.attachmentsDir,
     };
     await createCiPoller(deps, { githubFetch: vi.fn() }).sweep(Date.now() + 60_001);
-    expect(() => claimAutonomousMerge(s.db, 'a')).not.toThrow();
+    expect(() => claimAutonomousMerge(s.db, 'a')).toThrow('already admitted');
   });
 }
 
 for (const action of ['failed', 'cancelled'] as const) {
-  test(`local admission releases immediately when command is ${action}`, () => {
+  test(`issued local admission remains pending when command is ${action}`, () => {
     const { s } = fixture();
     claimAutonomousMerge(s.db, 'a');
     s.db
@@ -258,7 +267,7 @@ for (const action of ['failed', 'cancelled'] as const) {
     if (!row) throw new Error('missing step');
     if (action === 'failed') failStepWithEvents(s.svc, row, 'daemon failed');
     else applyStoppedStep(s.svc, row.id);
-    expect(() => claimAutonomousMerge(s.db, 'a')).not.toThrow();
+    expect(() => claimAutonomousMerge(s.db, 'a')).toThrow('already admitted');
   });
 }
 
@@ -341,7 +350,7 @@ test('team settings reject negative and fractional caps without changing the sto
   expect(s.db.select().from(team).get()?.maxAutonomousMergesPerDay).toBe(1);
 });
 
-test('abandoned local commands fail and release their reservation instead of being issued twice', () => {
+test('abandoned autonomous local commands retain their reservation without being reissued', () => {
   const { s } = fixture();
   claimAutonomousMerge(s.db, 'a');
   s.db
@@ -357,8 +366,8 @@ test('abandoned local commands fail and release their reservation instead of bei
     })
     .run();
   sweepAbandonedBuildSteps(s.svc, Date.now());
-  expect(s.db.select().from(step).get()?.status).toBe('failed');
-  expect(() => claimAutonomousMerge(s.db, 'a')).not.toThrow();
+  expect(s.db.select().from(step).get()?.status).toBe('claimed');
+  expect(() => claimAutonomousMerge(s.db, 'b')).toThrow('daily-cap');
 });
 
 test('a previous-day admission suppresses a delayed legacy success row on the next day', () => {
@@ -379,4 +388,150 @@ test('a previous-day admission suppresses a delayed legacy success row on the ne
     autonomousMergePolicy(s.db, s.team.id, config, Date.parse('2030-01-02T00:00:02Z'))
       .dailyCapReached,
   ).toBe(false);
+});
+
+test('late landing after refused settlement is counted exactly once', () => {
+  const { s, config } = fixture();
+  claimAutonomousMerge(s.db, 'a');
+  settleAutonomousMerge(s.db, 'a', 'refused');
+  settleAutonomousMerge(s.db, 'a', 'merged');
+  settleAutonomousMerge(s.db, 'a', 'merged');
+  expect(s.db.select().from(autonomousMergeAdmission).all()).toHaveLength(1);
+  expect(autonomousMergePolicy(s.db, s.team.id, config).dailyCapReached).toBe(true);
+});
+
+test('recovery cannot release an admission inside the request timeout even with a shorter caller window', async () => {
+  const { s } = fixture();
+  s.db.update(project).set({ repoKind: 'github', githubRepo: 'owner/repo' }).run();
+  s.db.update(build).set({ prNumber: 1 }).run();
+  claimAutonomousMerge(s.db, 'a');
+  const fetch = vi.fn();
+  await recoverAutonomousMerges({ ...s.svc, box: s.secretBox }, fetch, Date.now() + 15_000, 1);
+  expect(fetch).not.toHaveBeenCalled();
+  expect(() => claimAutonomousMerge(s.db, 'b')).toThrow('daily-cap');
+});
+
+for (const rejection of [
+  'foreign',
+  'fork',
+  'wrong-base',
+  'missing-base',
+  'phase-change',
+  'diverged',
+] as const) {
+  test(`raw merged ${rejection} observation cannot settle a pending admission`, async () => {
+    const { s } = fixture();
+    s.db.update(project).set({ repoKind: 'github', githubRepo: 'owner/repo' }).run();
+    s.db.update(build).set({ prNumber: 1 }).where(eq(build.id, 'a')).run();
+    s.db.update(todo).set({ phase: 'review', latestBuildId: 'a' }).where(eq(todo.id, 'a')).run();
+    s.db
+      .insert(step)
+      .values({
+        id: 'checkpoint',
+        buildId: 'a',
+        kind: 'build',
+        status: 'done',
+        checkpointCommit: 'a'.repeat(40),
+        createdAt: 0,
+      })
+      .run();
+    claimAutonomousMerge(s.db, 'a');
+    const githubFetch = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      if (rejection === 'phase-change')
+        s.db.update(todo).set({ phase: 'closed' }).where(eq(todo.id, 'a')).run();
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: () => null },
+        text: async () => '',
+        json: async () =>
+          url.includes('/compare/')
+            ? { status: 'diverged' }
+            : url.includes('/pulls?')
+              ? []
+              : {
+                  state: 'closed',
+                  merged: true,
+                  merged_at: '2030-01-01T00:00:00Z',
+                  head: {
+                    ref: rejection === 'foreign' ? 'other' : conversationBranch('a'),
+                    sha: rejection === 'diverged' ? 'b'.repeat(40) : 'a'.repeat(40),
+                    repo: { id: rejection === 'fork' ? 2 : 1 },
+                  },
+                  base: {
+                    ...(rejection === 'missing-base'
+                      ? {}
+                      : { ref: rejection === 'wrong-base' ? 'release' : 'main' }),
+                    repo: { id: 1, default_branch: 'main' },
+                  },
+                },
+      };
+    });
+    await createCiPoller({ ...s.svc, box: s.secretBox }, { githubFetch }).sweep(
+      Date.now() + 60_001,
+    );
+    expect(s.db.select().from(autonomousMergeAdmission).get()?.state).toBe('pending');
+    expect(
+      s.db
+        .select()
+        .from(message)
+        .all()
+        .filter((row) => String(row.content).includes('"state":"merged"')),
+    ).toHaveLength(0);
+  });
+}
+
+test('reconcile accepts a late landing after refusal once with the provider timestamp', async () => {
+  const { s } = fixture();
+  s.db.update(project).set({ repoKind: 'github', githubRepo: 'owner/repo' }).run();
+  s.db.update(build).set({ prNumber: 1 }).where(eq(build.id, 'a')).run();
+  s.db.update(todo).set({ phase: 'review', latestBuildId: 'a' }).where(eq(todo.id, 'a')).run();
+  claimAutonomousMerge(s.db, 'a');
+  settleAutonomousMerge(s.db, 'a', 'refused');
+  const githubFetch = vi.fn(async () => ({
+    ok: true,
+    status: 200,
+    headers: { get: () => null },
+    text: async () => '',
+    json: async () => ({
+      state: 'closed',
+      merged: true,
+      merged_at: '2030-01-01T00:00:00Z',
+      head: { ref: conversationBranch('a'), sha: 'a'.repeat(40), repo: { id: 1 } },
+      base: { ref: 'main', repo: { id: 1, default_branch: 'main' } },
+    }),
+  }));
+  const poller = createCiPoller({ ...s.svc, box: s.secretBox }, { githubFetch });
+  await poller.sweep();
+  await poller.sweep();
+  expect(s.db.select().from(todo).where(eq(todo.id, 'a')).get()?.phase).toBe('done');
+  expect(s.db.select().from(autonomousMergeAdmission).all()).toMatchObject([
+    { buildId: 'a', state: 'merged', landedAt: Date.parse('2030-01-01T00:00:00Z') },
+  ]);
+});
+
+test('stale completed local steps cannot independently record an accepted landing', async () => {
+  const { s } = fixture();
+  s.db.update(project).set({ repoKind: 'local' }).run();
+  claimAutonomousMerge(s.db, 'a');
+  s.db
+    .insert(step)
+    .values({
+      id: 'merge',
+      buildId: 'a',
+      kind: 'merge',
+      status: 'done',
+      checkpointCommit: 'a'.repeat(40),
+      createdAt: Date.now(),
+      finishedAt: Date.now(),
+    })
+    .run();
+  await recoverAutonomousMerges(
+    { ...s.svc, box: s.secretBox },
+    vi.fn(),
+    Date.now() + 60_001,
+    60_000,
+  );
+  expect(s.db.select().from(autonomousMergeAdmission).get()?.state).toBe('pending');
 });

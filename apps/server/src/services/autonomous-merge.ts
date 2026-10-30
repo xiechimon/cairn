@@ -1,5 +1,5 @@
 import type { ProjectMergeConfig } from '@cairn/shared';
-import { and, desc, eq, gte, isNull, lt, or } from 'drizzle-orm';
+import { and, eq, gte, isNull, lt, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   autonomousMergeAdmission,
@@ -197,7 +197,8 @@ export function settleAutonomousMerge(
       .from(autonomousMergeAdmission)
       .where(eq(autonomousMergeAdmission.buildId, buildId))
       .get();
-    if (!admission || admission.state === 'merged') return;
+    if (admission?.state === 'merged') return;
+    if (!admission && outcome === 'refused') return;
     const id = `autonomous-merge-${buildId}`;
     if (outcome === 'refused') {
       tx.delete(autonomousMergeAdmission)
@@ -208,20 +209,37 @@ export function settleAutonomousMerge(
         .run();
       return;
     }
-    tx.update(autonomousMergeAdmission)
-      .set({ state: 'merged', landedAt })
-      .where(eq(autonomousMergeAdmission.buildId, buildId))
-      .run();
-    tx.update(message)
-      .set({
-        content: JSON.stringify({
-          kind: KIND,
-          teamId: admission.teamId,
-          state: 'merged',
-          landedAt,
-        }),
+    const context = tx
+      .select({ todo, project })
+      .from(build)
+      .innerJoin(todo, eq(build.todoId, todo.id))
+      .innerJoin(project, eq(todo.projectId, project.id))
+      .where(eq(build.id, buildId))
+      .get();
+    if (
+      !admission &&
+      (!context || projectMergeConfigOf(context.project).mergePolicy !== 'autonomous')
+    )
+      return;
+    const teamId = admission?.teamId ?? context?.todo.teamId;
+    if (!teamId) return;
+    tx.insert(autonomousMergeAdmission)
+      .values({
+        buildId,
+        teamId,
+        state: 'merged',
+        createdAt: admission?.createdAt ?? landedAt,
+        landedAt,
       })
-      .where(eq(message.id, id))
+      .onConflictDoUpdate({
+        target: autonomousMergeAdmission.buildId,
+        set: { state: 'merged', landedAt },
+      })
+      .run();
+    const content = JSON.stringify({ kind: KIND, teamId, state: 'merged', landedAt });
+    tx.insert(message)
+      .values({ id, conversationId: buildId, role: 'system', content, createdAt: landedAt })
+      .onConflictDoUpdate({ target: message.id, set: { content } })
       .run();
   });
 }
@@ -238,7 +256,7 @@ export async function recoverAutonomousMerges(
     .where(
       and(
         eq(autonomousMergeAdmission.state, 'pending'),
-        lt(autonomousMergeAdmission.createdAt, now - windowMs),
+        lt(autonomousMergeAdmission.createdAt, now - Math.max(windowMs, 60_000)),
       ),
     )
     .all();
@@ -251,10 +269,7 @@ export async function recoverAutonomousMerges(
         .innerJoin(project, eq(todo.projectId, project.id))
         .where(eq(build.id, admission.buildId))
         .get();
-      if (!context) {
-        settleAutonomousMerge(deps.db, admission.buildId, 'refused');
-        continue;
-      }
+      if (!context) continue;
       const target = githubRepoOfProject(context.project);
       if (target && context.build.prNumber !== null) {
         const token = await githubTokenOrNull(deps, admission.teamId);
@@ -265,42 +280,9 @@ export async function recoverAutonomousMerges(
           target.repo,
           context.build.prNumber,
         );
-        if (page?.pull) {
-          const mergedAt = page.pull.mergedAt === null ? NaN : Date.parse(page.pull.mergedAt);
-          settleAutonomousMerge(
-            deps.db,
-            admission.buildId,
-            page.pull.merged ? 'merged' : 'refused',
-            Number.isFinite(mergedAt) ? mergedAt : now,
-          );
+        if (page?.pull && !page.pull.merged) {
+          settleAutonomousMerge(deps.db, admission.buildId, 'refused');
         }
-        continue;
-      }
-      if (context.project.repoKind !== 'local') continue;
-      const command = deps.db
-        .select()
-        .from(step)
-        .where(
-          and(
-            eq(step.buildId, admission.buildId),
-            eq(step.kind, 'merge'),
-            gte(step.createdAt, admission.createdAt),
-          ),
-        )
-        .orderBy(desc(step.createdAt))
-        .get();
-      if (
-        !command ||
-        command.status === 'failed' ||
-        command.status === 'stopped' ||
-        command.status === 'done'
-      ) {
-        settleAutonomousMerge(
-          deps.db,
-          admission.buildId,
-          command?.status === 'done' && command.checkpointCommit !== null ? 'merged' : 'refused',
-          command?.finishedAt ?? now,
-        );
       }
     } catch {}
   }

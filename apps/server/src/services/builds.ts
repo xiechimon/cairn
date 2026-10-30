@@ -307,11 +307,18 @@ function stopFallbackPhase(db: Db, buildRow: BuildRow): Phase {
   return buildRow.prevPhase ?? 'todo';
 }
 
+function releaseUnissuedMergeAdmission(db: Db, row: typeof step.$inferSelect): void {
+  if (row.kind !== 'merge') return;
+  if (row.prompt?.includes('"local-merge"') && (row.status === 'claimed' || row.claimedAt !== null))
+    return;
+  settleAutonomousMerge(db, row.buildId, 'refused');
+}
+
 export function applyStoppedStep(deps: BuildDeps, stepId: string): void {
   const { db } = deps;
   const stepRow = db.select().from(step).where(eq(step.id, stepId)).get();
   if (!stepRow) throw new NotFoundError(`step ${stepId}`);
-  if (stepRow.kind === 'merge') settleAutonomousMerge(db, stepRow.buildId, 'refused');
+  releaseUnissuedMergeAdmission(db, stepRow);
   db.update(step).set({ status: 'stopped', finishedAt: nowMs() }).where(eq(step.id, stepId)).run();
   db.delete(stopPending).where(eq(stopPending.conversationId, stepRow.buildId)).run();
   const stoppedRow = db.select().from(step).where(eq(step.id, stepId)).get();
@@ -408,7 +415,7 @@ function stopStepKeepPhase(deps: BuildDeps, stepId: string): void {
   const { db } = deps;
   const stepRow = db.select().from(step).where(eq(step.id, stepId)).get();
   if (!stepRow) throw new NotFoundError(`step ${stepId}`);
-  if (stepRow.kind === 'merge') settleAutonomousMerge(db, stepRow.buildId, 'refused');
+  releaseUnissuedMergeAdmission(db, stepRow);
   db.update(step).set({ status: 'stopped', finishedAt: nowMs() }).where(eq(step.id, stepId)).run();
   db.delete(stopPending).where(eq(stopPending.conversationId, stepRow.buildId)).run();
   const stoppedRow = db.select().from(step).where(eq(step.id, stepId)).get();
@@ -1856,7 +1863,7 @@ export function applyStepFailure(
   preservedCommits?: readonly string[],
 ): void {
   const { db } = deps;
-  if (stepRow.kind === 'merge') settleAutonomousMerge(db, stepRow.buildId, 'refused');
+  releaseUnissuedMergeAdmission(db, stepRow);
   const errorMessage =
     rawErrorMessage.trim() === '' ? `${stepRow.kind} 步异常结束，未上报原因` : rawErrorMessage;
   db.update(step)
@@ -1984,8 +1991,8 @@ function releaseClaimedStep(
   todoRow: typeof todo.$inferSelect,
 ): void {
   if (row.kind === 'merge' && row.prompt?.includes('"local-merge"')) {
-    failStepWithEvents(deps, row, 'Local merge command was abandoned; request a new judgment');
-    return;
+    const projectRow = projectOfTodo(deps.db, todoRow);
+    if (projectRow && projectMergeConfigOf(projectRow).mergePolicy === 'autonomous') return;
   }
   deps.db.update(step).set({ status: 'pending', machineId: null }).where(eq(step.id, row.id)).run();
   const released = deps.db.select().from(step).where(eq(step.id, row.id)).get();

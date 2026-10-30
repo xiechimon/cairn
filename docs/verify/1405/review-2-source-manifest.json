@@ -1,0 +1,15 @@
+{
+  "base": "06b6d6acdb031802b56afbf28658a8a40740263d",
+  "surface": "in-process server and SQLite fixtures",
+  "providerMode": "stub",
+  "files": {
+    "apps/server/src/services/autonomous-merge.ts": "b9e54bbb6174547786c74cf7692158c68de6d20b6f25e69f1a8aae35d16b9f80",
+    "apps/server/src/services/builds.ts": "2b6849db7de405153d1c3f2e33b4e21d7a03792b2a4a2eb43bd47cf61d6b9683",
+    "apps/server/src/services/ci-loop.ts": "10b5412cee584ba38ab4574d5bd18477065583b13cc1de99e0aca1e6e5247b54",
+    "apps/server/src/services/local-merge.ts": "4cfccb6bd1b24b7536b6a0685179a44fc9fdbb10e405fce0d3a7347683ddf0f3",
+    "apps/server/test/autonomous-merge.test.ts": "f39bb3e7cff19c0125dfba6f3a6462d37ec8f3b981597dece6a91df08ff0320e",
+    "apps/server/test/local-merge-landing.test.ts": "a987b350e0deef017f62c1c27aa2b576973a8b2f7a0055bbb766e78a13520a28",
+    "apps/server/test/pr-merge-api.test.ts": "01af7b0bf61d1402f5ea281ec09a7d6c5ce1a410cef9420d6f6df9a4cc478e15",
+    "docs/verify/1405/evidence-history.test.mjs": "ae8a2a74bf7b9b89960445aae34b2d5fff48b77b6b3b5745b4ad5756de8f9258"
+  }
+}

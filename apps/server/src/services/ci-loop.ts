@@ -521,15 +521,6 @@ export function createCiPoller(
       pull = page.notModified ? (entry?.pull ?? null) : page.pull;
       pullCache.set(key, { etag: page.etag, pull });
     }
-    if (pull !== null) {
-      const mergedAt = pull.mergedAt === null ? NaN : Date.parse(pull.mergedAt);
-      settleAutonomousMerge(
-        deps.db,
-        cand.buildId,
-        pull.merged ? 'merged' : 'refused',
-        Number.isFinite(mergedAt) ? mergedAt : now,
-      );
-    }
     const branch = conversationBranch(cand.buildId);
     const foreign = pull !== null && hasPullFields(pull) && !isOwnPull(pull, branch);
     if (pull === null || (pull.state === 'open' && !foreign)) {
@@ -701,6 +692,13 @@ export function createCiPoller(
           return;
         }
       }
+      const mergedAt = pull.mergedAt === null ? NaN : Date.parse(pull.mergedAt);
+      settleAutonomousMerge(
+        deps.db,
+        cand.buildId,
+        'merged',
+        Number.isFinite(mergedAt) ? mergedAt : now,
+      );
       const detail = [
         pull.mergeCommitSha === null
           ? null

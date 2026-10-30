@@ -1,0 +1,19 @@
+
+ RUN  v5.0.1 /Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-1405-brakes
+
+ ❯ |@xiechimon/cairn| test/git-hosting.test.ts (11 tests | 11 skipped) 10004ms
+web push delivery failed
+ ❯ |@xiechimon/cairn| test/push.test.ts (40 tests | 7 failed) 1190ms
+   ❯ subscription authorization boundaries (4)
+     × delivers only to the requested owner and team 49ms
+   ❯ delivery: only decisions push immediately (4)
+     × parallel delivery reaches a live endpoint while another is stalled 60ms
+   ❯ digest routing: merged, failed, plan-ready, review queue; 410 prunes (7)
+     × PATCH todo phase to confirm queues for the digest and sends no immediate push 51ms
+     × queues build review for the digest without an immediate push 39ms
+     × queues merged PR reconciliation for the digest without an immediate push 27ms
+     × queues failed work for the digest without an immediate push 43ms
+     × prunes a 410 subscription while delivering to live subscriptions 72ms
+ ❯ |@xiechimon/cairn| test/attachment-gc.test.ts (15 tests | 1 failed) 30816ms
+   ❯ attachment gc -- scheduler cadence (3)
+     × a large transcript corpus does not block the event loop during a tick 30012ms

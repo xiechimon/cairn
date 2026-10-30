@@ -1,0 +1,13 @@
+{
+  "base": "06b6d6acdb031802b56afbf28658a8a40740263d",
+  "state": "uncommitted overlay, including pre-existing changes",
+  "files": {
+    "apps/server/src/services/autonomous-merge.ts": "7fa28fc64a535e1079129d31f0fc24a56083aba4b223fd2143d1ab589e6488a8",
+    "apps/server/src/services/builds.ts": "2b6849db7de405153d1c3f2e33b4e21d7a03792b2a4a2eb43bd47cf61d6b9683",
+    "apps/server/src/services/ci-loop.ts": "3beccfb04819666d1025c1dbbd72448ec9bb716e4c3f6031258bc5dc4c62444c",
+    "apps/server/src/services/local-merge.ts": "4cfccb6bd1b24b7536b6a0685179a44fc9fdbb10e405fce0d3a7347683ddf0f3",
+    "apps/server/test/autonomous-merge.test.ts": "74a698288252df9ea1b237772be27747ac69ed11d0392dc8b89ca0e72e107736",
+    "apps/server/test/local-merge-landing.test.ts": "a987b350e0deef017f62c1c27aa2b576973a8b2f7a0055bbb766e78a13520a28",
+    "apps/server/test/pr-merge-api.test.ts": "01af7b0bf61d1402f5ea281ec09a7d6c5ce1a410cef9420d6f6df9a4cc478e15"
+  }
+}

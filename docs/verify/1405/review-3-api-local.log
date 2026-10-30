@@ -1,0 +1,184 @@
+
+ RUN  v5.0.1 /Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-1405-brakes
+
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > #2127 refuses unsafe or unknown Cairn PR opener {"login":"cairnwright[bot]","type":"Bot"} without mutations 272ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > #2127 refuses unsafe or unknown Cairn PR opener {"login":"cairnwright[bot]","type":"User"} without mutations 122ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > #2127 refuses unsafe or unknown Cairn PR opener {"login":"another[bot]","type":"Bot"} without mutations 114ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > #2127 refuses unsafe or unknown Cairn PR opener null without mutations 84ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > #2127 refuses unsafe or unknown Cairn PR opener {} without mutations 84ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > #2127 refuses unsafe or unknown Cairn PR opener {"login":"octo"} without mutations 192ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > #2127 refuses unsafe or unknown Cairn PR opener {"login":"","type":"User"} without mutations 95ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > #2127 refuses unsafe or unknown Cairn PR opener {"login":123,"type":"User"} without mutations 101ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > #2127 refuses unsafe or unknown Cairn PR opener {"login":"octo","type":"Unknown"} without mutations 93ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > #2127 preserves SHA-bound squash for eligible opener in xiechimon/cairn 115ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > #2127 preserves SHA-bound squash for eligible opener in octo/demo 96ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > #2127 preserves SHA-bound squash for eligible opener in octo/demo 83ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > #2127 already merged bot PR can restore a failed card without another merge 87ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D1] review card, own open PR at the last checkpoint → one PUT with sha, squash and the PR title; rows; done 93ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D2] closing line for an issue of the same repository 91ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D2] closing line for a self-created issue, owner and repo in another case 93ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D2] closing line for an issue of another repository 94ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D2] closing line for an orchestration source 91ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D2] closing line for an orchestration source holding an issue-shaped ref 95ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D2] closing line for a malformed issue ref 81ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D2] closing line for no source 87ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D41] a PR title with a closing keyword and a reference (a same-repository reference) → the commit title is cairn’s own 80ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D41] a PR title with a closing keyword and a reference (upper case with a colon and another repository) → the commit title is cairn’s own 78ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D41] a PR title with a closing keyword and a reference (an issue URL) → the commit title is cairn’s own 70ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D41] a PR title with a closing keyword and a reference (a GH- reference) → the commit title is cairn’s own 68ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D41] a PR title with a closing keyword and a reference (no space after the colon) → the commit title is cairn’s own 64ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D41] a PR title with a closing keyword and a reference (a second keyword after a harmless one) → the commit title is cairn’s own 63ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D41b] a PR title without a closing shape (a keyword followed by a word) keeps the PR title 63ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D41b] a PR title without a closing shape (a keyword inside another word) keeps the PR title 62ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D41b] a PR title without a closing shape (a reference with no keyword) keeps the PR title 70ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D41b] a PR title without a closing shape ([2b-D41c] a title ending in "fix") keeps the PR title 64ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D41b] a PR title without a closing shape ([2b-D41c] a title ending in "close") keeps the PR title 67ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D41b] a PR title without a closing shape ([2b-D41c] a title ending in "resolved") keeps the PR title 65ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D41b] a PR title without a closing shape ([2b-D41c] a keyword at the end, before the appended (#n)) keeps the PR title 64ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D43] the self-created issue is recorded while the PR read is in flight → the closing line reads the re-read todo 65ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D42] no closing line → commit_message is still sent (cairn’s own line), so the repository default (the PR body) is not used 59ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D3] no GitHub connection → 409 asking to connect GitHub; no request, no row, no step 55ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D3b] a connection the box cannot decrypt → the same 409; no request 54ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D30] the build is not the todo’s current build → 409; no request 49ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D31] a claimed verify step on the build → 409 naming the step; no request 58ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D31] a claimed review step on the build → 409 naming the step; no request 60ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D31] a pending build step on the build → 409 naming the step; no request 61ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D31] a merge step queued before the upgrade on the build → 409 naming the step; no request 57ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D31b] a step claimed while the PR read is in flight → 409; no PUT 60ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D32] failed card, no GitHub connection → the refusal says how this card gets finished (the reconcile reads only review cards) 57ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D32] failed card, the PR head moved → the refusal says how this card gets finished (the reconcile reads only review cards) 52ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D32] failed card, no checkpoint → the refusal says how this card gets finished (the reconcile reads only review cards) 53ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D37] failed card whose PR is already merged on GitHub → restored to review with one row, 202, no PUT; the next sweep finishes it 129ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D39] failed card, the merged PR is a fork’s PR → 409, the card stays failed 66ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D39] failed card, the merged PR is an outsider’s PR → 409, the card stays failed 61ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D39] failed card, the merged PR is a PR merged into another branch → 409, the card stays failed 65ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D38] the PR’s author has no write access (NONE) → 409; no PUT 61ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D38] the PR’s author has no write access (CONTRIBUTOR) → 409; no PUT 102ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D3c] the server has no secret box → 409 naming the server key, not the connection 132ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D4] the PR head is not the last pushed commit → 409 naming both short shas; no PUT 174ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D5] no checkpoint → 409; no PUT, and no request carries it 71ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D5] a short sha → 409; no PUT, and no request carries it 71ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D5] upper-case hex → 409; no PUT, and no request carries it 71ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D5] a ref-like value → 409; no PUT, and no request carries it 71ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D6] the PR is already merged → 409 saying the reconcile finishes it; no PUT; the next sweep does 103ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D7] the PR is closed and not merged → 409; no PUT 72ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D8] the head repository is another one (a fork) → 409; no PUT 65ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D8] the head repository is gone (null) → 409; no PUT 61ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D8] the head branch is not the build’s conversation branch → 409; no PUT 63ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D9] the PR targets a branch other than the default → 409; no PUT 65ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D9b] the read lacks the title → 409 (unreadable); no PUT 68ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D44a] the PR read fails (404) → 409 read failed; no PUT; nothing written 68ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D44a] the PR read fails (429) → 409 read failed; no PUT; nothing written 58ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D44a] the PR read fails (403 with x-ratelimit-remaining 0) → 409 read failed; no PUT; nothing written 57ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D44a] the PR read fails (403 naming a secondary rate limit) → 409 read failed; no PUT; nothing written 57ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D44a] the PR read fails (500) → 409 read failed; no PUT; nothing written 60ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D44a] the PR read fails (502 with an HTML page) → 409 read failed; no PUT; nothing written 60ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D44a] the PR read fails (200 whose body is not JSON) → 409 read failed; no PUT; nothing written 59ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D44a] the PR read fails (200 whose body is a JSON array) → 409 read failed; no PUT; nothing written 56ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D44a] the PR read fails (a timeout) → 409 read failed; no PUT; nothing written 48ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D44a] the PR read fails (a network error) → 409 read failed; no PUT; nothing written 48ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D44c] failed card, the PR read fails (429) → 409; the card stays failed with no row 49ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D44c] failed card, the PR read fails (503) → 409; the card stays failed with no row 50ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D44c] failed card, the PR read fails (a network error) → 409; the card stays failed with no row 52ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D44d] a read failure does not stick: the next press reads again and merges 57ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D10] PUT answers 405 → 409 with GitHub’s message; nothing written; a second press tries again 58ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D10] PUT answers 409 → 409 with GitHub’s message; nothing written; a second press tries again 61ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D10] PUT answers 422 → 409 with GitHub’s message; nothing written; a second press tries again 55ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D10] PUT answers 404 → 409 with GitHub’s message; nothing written; a second press tries again 54ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D10] PUT answers 403 → 409 with GitHub’s message; nothing written; a second press tries again 54ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D10b/D29] the refusal text is cleaned: format characters removed, 100 characters at most 50ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D11] PUT answers 401 → 409 asking to reconnect GitHub; nothing written 50ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D12] PUT answers 200 with merged false → a refusal; nothing written 52ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D13/D14] PUT gives no clear answer (a timeout) → 202, the announcement and one row; review stays 52ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D13/D14] PUT gives no clear answer (a network error) → 202, the announcement and one row; review stays 51ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D13/D14] PUT gives no clear answer (500) → 202, the announcement and one row; review stays 51ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D13/D14] PUT gives no clear answer (502) → 202, the announcement and one row; review stays 51ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D13/D14] PUT gives no clear answer (503) → 202, the announcement and one row; review stays 50ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D13/D14] PUT gives no clear answer (200 that is not JSON) → 202, the announcement and one row; review stays 50ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D13/D14] PUT gives no clear answer (200 without merged) → 202, the announcement and one row; review stays 51ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D13/D14] PUT gives no clear answer (200 merged without sha) → 202, the announcement and one row; review stays 51ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D40] PUT is rate-limited (429 with x-ratelimit-reset) → 409 with GitHub’s message and the reset time when known; nothing written 54ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D40] PUT is rate-limited (403 with x-ratelimit-remaining 0) → 409 with GitHub’s message and the reset time when known; nothing written 45ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D40] PUT is rate-limited (403 with retry-after) → 409 with GitHub’s message and the reset time when known; nothing written 43ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D40] PUT is rate-limited (403 naming a secondary rate limit) → 409 with GitHub’s message and the reset time when known; nothing written 43ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D40c] rate-limited with retry-after next to a later x-ratelimit-reset (a secondary limit) → the wait shown follows retry-after first and ignores malformed values 43ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D40c] rate-limited with an empty x-ratelimit-reset → the wait shown follows retry-after first and ignores malformed values 40ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D40c] rate-limited with an empty retry-after → the wait shown follows retry-after first and ignores malformed values 38ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D40c] rate-limited with a fractional retry-after → the wait shown follows retry-after first and ignores malformed values 39ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D40c] rate-limited with an x-ratelimit-reset beyond any date → the wait shown follows retry-after first and ignores malformed values 40ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D40b] failed card, PUT rate-limited → 409, the card stays failed with no row 39ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D13b] after no clear answer, a sweep that reads the PR merged finishes the card once 62ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D13c] after no clear answer, a sweep that reads the PR open changes nothing 40ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D15] two presses at once → one GET, one PUT; the other press gets 409 62ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D16] the reconcile sweeps while the PUT is in flight and the PR reads merged → it neither reads nor writes 47ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D28] the reconcile sweeps while the PR read is in flight → it neither reads nor writes 46ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D17a] the card is closed while the PR read is in flight → refused at the re-read; no PUT 43ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D17b] the card is closed while the PUT is in flight and GitHub merges → the rows, no throw, phase stays closed 40ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D18a] failed card that can be restored, GitHub merges → restored, then done 43ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D18b] failed card that can be restored, GitHub refuses → stays failed, no row 40ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D18c] failed card that can be restored, no clear answer → restored to review with the row 42ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D19] failed card whose build leg did not finish → the existing 409; no request 37ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D20] the permission gate refuses before any request 39ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D21] a building card → 409; no request, no row 38ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D21b] a done card → illegal phase transition; no request 36ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D22] githubRepo with a ".." segment → the merge step as before; no request 37ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D23] local repository under human → the merge step as before; its done finishes the card 39ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D23b] local repository under autonomous without a stored path → refused, no ungated merge 40ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D24] GitHub form without a recorded PR → the merge step as before; its done finishes the card 40ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D25] a merge step completes on a GitHub build with a PR → stays in review, one row naming the PR; a later GitHub merge is finished by the reconcile 47ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D34] a merge step completes while the card cannot reach done (planning) → illegal phase transition, no row 38ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D35] a leftover merge step pushes a merge of the default branch after the PR merged on GitHub → that commit is not the build’s last pushed work; the sweep finishes the card 51ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D36] a merge step pushed its merge of the default branch to the open PR → the API merge binds sha to that commit 46ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-S1] a list answer of 404 or 429 is classified without reading its body; a 403 without rate-limit headers reads it 2ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-M1] a card that is closed (cancelled or reset, #1505) → no merge: refused before any request 41ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-M1] a card that is todo (cancelled or reset, #1505) → no merge: refused before any request 36ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-M2] the card is closed while the PR read is in flight (#1505) → no PUT, nothing written 38ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-M2] the card is todo while the PR read is in flight (#1505) → no PUT, nothing written 38ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-M3] the todo points at another team’s GitHub project (#1497) → not GitHub form: no GitHub request 38ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D26] the token travels only in the Authorization header 80ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D27] REST: 202 {delegated:true} when GitHub merges; 409 {error} when it refuses 84ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1405 autonomy brakes at the GitHub write boundary > a pause introduced during the PR read returns HTTP 409 without a PUT or task writes 40ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1405 autonomy brakes at the GitHub write boundary > ten durable same-day Cairn merges block the default cap 40ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1405 autonomy brakes at the GitHub write boundary > human policy remains available while paused and at a zero autonomous cap 40ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1405 autonomy brakes at the GitHub write boundary > an unknown merge response cannot issue a second autonomous PUT 42ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1405 autonomy brakes at the GitHub write boundary > different builds racing for the final team slot issue exactly one PUT 67ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1405 autonomy brakes at the GitHub write boundary > yesterday merges do not consume the current UTC day 51ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1405 reconcile settles an uncertain admission without another PUT 124ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1405 an open poll cannot release the tenth slot after an unknown merge 95ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1405 reconcile keeps the reservation while a merge response is still in flight 73ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts > #1405 nine landed merges and an open poll during the tenth PUT cannot admit an eleventh 89ms
+ ✓ |@xiechimon/cairn| test/local-merge-landing.test.ts > a ready local autonomous judgment enqueues exactly one bound merge 122ms
+ ✓ |@xiechimon/cairn| test/local-merge-landing.test.ts > human never enqueues autonomous landing 62ms
+ ✓ |@xiechimon/cairn| test/local-merge-landing.test.ts > shadow never enqueues autonomous landing 59ms
+ ✓ |@xiechimon/cairn| test/local-merge-landing.test.ts > a build without stored verdicts cannot enqueue landing 53ms
+ ✓ |@xiechimon/cairn| test/local-merge-landing.test.ts > a gate state that was computed at another head does not lend its judgment 52ms
+ ✓ |@xiechimon/cairn| test/local-merge-landing.test.ts > a hosted project is not handed to the local executor 50ms
+ ✓ |@xiechimon/cairn| test/local-merge-landing.test.ts > merged records the outcome and only confirmed landing finishes the card 104ms
+ ✓ |@xiechimon/cairn| test/local-merge-landing.test.ts > held records the outcome and only confirmed landing finishes the card 72ms
+ ✓ |@xiechimon/cairn| test/local-merge-landing.test.ts > recheck records the outcome and only confirmed landing finishes the card 80ms
+ ✓ |@xiechimon/cairn| test/local-merge-landing.test.ts > checks-failed records the outcome and only confirmed landing finishes the card 87ms
+ ✓ |@xiechimon/cairn| test/local-merge-landing.test.ts > requestMerge is what turns a ready local judgment into a landing command, not a test 80ms
+ ✓ |@xiechimon/cairn| test/local-merge-landing.test.ts > a human project keeps its untouched branch-only merge when a person asks for it 74ms
+ ✓ |@xiechimon/cairn| test/local-merge-landing.test.ts > a shadow project keeps its untouched branch-only merge when a person asks for it 68ms
+ ✓ |@xiechimon/cairn| test/local-merge-landing.test.ts > an autonomous request that the gate still blocks is refused instead of landing 66ms
+ ✓ |@xiechimon/cairn| test/local-merge-landing.test.ts > an autonomous request whose default branch cannot be discovered fails closed instead of the legacy merge 637ms
+ ✓ |@xiechimon/cairn| test/local-merge-landing.test.ts > an autonomous request whose repository read fails fails closed instead of the legacy merge 306ms
+ ✓ |@xiechimon/cairn| test/local-merge-landing.test.ts > a local project without a stored path fails closed instead of the legacy merge 243ms
+ ✓ |@xiechimon/cairn| test/local-merge-landing.test.ts > #1405 paused local readiness blocks enqueue without task mutation 206ms
+ ✓ |@xiechimon/cairn| test/local-merge-landing.test.ts > #1405 zero cap blocks local readiness and issuance 749ms
+ ✓ |@xiechimon/cairn| test/local-merge-landing.test.ts > #1405 pause after local evaluation starts prevents issuance and announcements 322ms
+ ✓ |@xiechimon/cairn| test/local-merge-landing.test.ts > #1405 local worker claim rechecks pause after enqueue without task mutation 389ms
+ ✓ |@xiechimon/cairn| test/local-merge-landing.test.ts > #1405 local worker claim rechecks cap after enqueue without task mutation 248ms
+ ✓ |@xiechimon/cairn| test/local-merge-landing.test.ts > #1405 a paused failed local card is not restored before rejecting the merge 185ms
+ ✓ |@xiechimon/cairn| test/local-merge-landing.test.ts > a local candidate blocked by pause leaves the next worker candidate claimable 500ms
+ ✓ |@xiechimon/cairn| test/local-merge-landing.test.ts > a local candidate blocked by cap leaves the next worker candidate claimable 412ms
+ ✓ |@xiechimon/cairn| test/local-merge-landing.test.ts > changed local authorization releases the reservation before skipping the command 142ms
+ ✓ |@xiechimon/cairn| test/local-merge-landing.test.ts > autonomous abandoned local command preserves its policy path 291ms
+ ✓ |@xiechimon/cairn| test/local-merge-landing.test.ts > human abandoned local command preserves its policy path 91ms
+ ✓ |@xiechimon/cairn| test/local-merge-landing.test.ts > a late landing for a failed local command restores a refused admission exactly once 110ms
+
+ Test Files  2 passed (2)
+      Tests  175 passed (175)
+   Start at  16:49:55
+   Duration  25.50s (tests 62%, transform 25%, import 13%)
+

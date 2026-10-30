@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { afterEach, expect, test } from 'vitest';
 import {
   agent as agentTable,
+  autonomousMergeAdmission,
   build,
   gateState,
   gateVerdict,
@@ -15,7 +16,7 @@ import {
   todo,
 } from '../src/db/schema.js';
 import { systemGitOps } from '../src/lib/git.js';
-import { requestMerge } from '../src/services/builds.js';
+import { requestMerge, sweepAbandonedBuildSteps } from '../src/services/builds.js';
 import { applyLocalMergeReport, enqueueLocalMerge } from '../src/services/local-merge.js';
 import { localGateFacts } from '../src/services/local-merge-facts.js';
 import { claimStep } from '../src/services/machine-claim.js';
@@ -574,4 +575,62 @@ test('changed local authorization releases the reservation before skipping the c
       .all()
       .some((row) => row.id === 'autonomous-merge-build'),
   ).toBe(false);
+});
+
+for (const policy of ['autonomous', 'human'] as const) {
+  test(`${policy} abandoned local command preserves its policy path`, async () => {
+    const f = await fixture(policy);
+    await enqueueLocalMerge(f.deps, 'build', 'main', true);
+    const row = f.s.db
+      .select()
+      .from(step)
+      .all()
+      .find((r) => r.kind === 'merge');
+    if (!row) throw new Error('missing merge');
+    f.s.db
+      .update(step)
+      .set({ status: 'claimed', claimedAt: Date.now() - 200_000 })
+      .where(eq(step.id, row.id))
+      .run();
+    sweepAbandonedBuildSteps(f.deps);
+    expect(f.s.db.select().from(step).where(eq(step.id, row.id)).get()?.status).toBe(
+      policy === 'human' ? 'pending' : 'claimed',
+    );
+    if (policy === 'autonomous') {
+      expect(f.s.db.select().from(autonomousMergeAdmission).get()?.state).toBe('pending');
+      f.s.db.update(step).set({ status: 'failed' }).where(eq(step.id, row.id)).run();
+      applyLocalMergeReport(
+        f.deps,
+        { ...row, status: 'failed' },
+        {
+          command: JSON.parse(row.prompt ?? '{}').command,
+          result: { outcome: 'merged', commit: 'f'.repeat(40) },
+        },
+      );
+      expect(f.s.db.select().from(autonomousMergeAdmission).get()?.state).toBe('merged');
+    }
+  });
+}
+
+test('a late landing for a failed local command restores a refused admission exactly once', async () => {
+  const f = await fixture();
+  await enqueueLocalMerge(f.deps, 'build', 'main');
+  const row = f.s.db
+    .select()
+    .from(step)
+    .all()
+    .find((r) => r.kind === 'merge');
+  if (!row) throw new Error('missing merge');
+  f.s.db.update(step).set({ status: 'failed' }).where(eq(step.id, row.id)).run();
+  f.s.db.delete(autonomousMergeAdmission).run();
+  f.s.db.delete(message).where(eq(message.id, 'autonomous-merge-build')).run();
+  const report = {
+    command: JSON.parse(row.prompt ?? '{}').command,
+    result: { outcome: 'merged' as const, commit: 'f'.repeat(40) },
+  };
+  applyLocalMergeReport(f.deps, { ...row, status: 'failed' }, report);
+  applyLocalMergeReport(f.deps, { ...row, status: 'failed' }, report);
+  expect(f.s.db.select().from(autonomousMergeAdmission).all()).toHaveLength(1);
+  expect(f.s.db.select().from(autonomousMergeAdmission).get()?.state).toBe('merged');
+  expect(f.s.db.select().from(step).where(eq(step.id, row.id)).get()?.status).toBe('failed');
 });

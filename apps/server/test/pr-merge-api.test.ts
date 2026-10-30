@@ -1591,16 +1591,25 @@ test('#1405 reconcile settles an uncertain admission without another PUT', async
   expect(w.fake.puts()).toHaveLength(1);
 });
 
-test('#1405 a user can retry an unknown merge after reconcile observes the PR still open', async () => {
+test('#1405 an open poll cannot release the tenth slot after an unknown merge', async () => {
   const w = makeWorld();
+  for (let n = 0; n < 9; n++)
+    w.s.db
+      .insert(messageTable)
+      .values({
+        id: `landed-${n}`,
+        conversationId: w.buildId,
+        role: 'system',
+        content: `PR #${n} 已由 cairn 经 GitHub 合并`,
+        createdAt: Date.now(),
+      })
+      .run();
   w.fake.mergeAnswer = 'timeout';
   await requestMerge(w.deps, w.buildId);
   expect((await refusal(requestMerge(w.deps, w.buildId))).status).toBe(409);
   await createCiPoller(w.deps, { githubFetch: w.fake.fetch }).sweep();
-  w.fake.mergeAnswer = { status: 200, body: { merged: true, sha: MERGE_SHA } };
-  await requestMerge(w.deps, w.buildId);
-  expect(w.fake.puts()).toHaveLength(2);
-  expect(w.phase()).toBe('done');
+  expect((await refusal(requestMerge(w.deps, w.buildId))).status).toBe(409);
+  expect(w.fake.puts()).toHaveLength(1);
 });
 
 test('#1405 reconcile keeps the reservation while a merge response is still in flight', async () => {
@@ -1616,4 +1625,90 @@ test('#1405 reconcile keeps the reservation while a merge response is still in f
   };
   await requestMerge(w.deps, w.buildId);
   expect(reservedDuringPut).toBe(true);
+});
+
+test('#1405 nine landed merges and an open poll during the tenth PUT cannot admit an eleventh', async () => {
+  const w = makeWorld();
+  const original = w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get();
+  if (!original) throw new Error('missing todo');
+  w.s.db
+    .insert(todoTable)
+    .values({ ...original, id: 'racer-todo', seqNum: 2, latestBuildId: 'racer-build' })
+    .run();
+  w.s.db
+    .insert(buildTable)
+    .values({
+      id: 'racer-build',
+      todoId: 'racer-todo',
+      withPlan: false,
+      triggerSource: 'user',
+      createdAt: Date.now(),
+      prNumber: 202,
+    })
+    .run();
+  w.s.db
+    .insert(stepTable)
+    .values({
+      id: 'racer-step',
+      buildId: 'racer-build',
+      kind: 'build',
+      status: 'done',
+      checkpointCommit: CP,
+      createdAt: Date.now(),
+    })
+    .run();
+  w.fake.pulls[202] = { state: 'open', merged: false, headRef: conversationBranch('racer-build') };
+  for (let n = 0; n < 9; n++) {
+    w.s.db
+      .insert(buildTable)
+      .values({
+        id: `landed-build-${n}`,
+        todoId: w.todoId,
+        withPlan: false,
+        triggerSource: 'user',
+        createdAt: Date.now(),
+      })
+      .run();
+    w.s.db
+      .insert(messageTable)
+      .values({
+        id: `landed-${n}`,
+        conversationId: `landed-build-${n}`,
+        role: 'system',
+        content: `PR #${n} 已由 cairn 经 GitHub 合并`,
+        createdAt: Date.now(),
+      })
+      .run();
+  }
+  let releasePut = () => {};
+  const held = new Promise<void>((resolve) => {
+    releasePut = resolve;
+  });
+  let enteredPut = () => {};
+  const entered = new Promise<void>((resolve) => {
+    enteredPut = resolve;
+  });
+  let merging: Promise<unknown> | undefined;
+  w.fake.onPut = async () => {
+    if (w.fake.puts().length === 1) {
+      enteredPut();
+      await held;
+    }
+  };
+  w.fake.onGet = async () => {
+    w.fake.onGet = null;
+    merging = requestMerge(w.deps, w.buildId);
+    await entered;
+  };
+  try {
+    await w.sweep();
+    const outcome = await Promise.allSettled([requestMerge(w.deps, 'racer-build')]);
+    expect(outcome[0]).toMatchObject({ status: 'rejected', reason: { status: 409 } });
+    expect(w.fake.puts()).toHaveLength(1);
+  } finally {
+    releasePut();
+    await merging;
+  }
+  expect(w.phase()).toBe('done');
+  expect(w.fake.puts()).toHaveLength(1);
 });

@@ -1,9 +1,9 @@
 ---
-Category: Pending autonomous merge reservations survived terminal outcomes and reconciliation early returns
+Category: Autonomous merge admissions were released or retained without authoritative landing state
 Source: #1405 (2026-10-30)
-Level: 2
-Safeguard: Admission lifecycle regressions cover provider open, closed, merged and unreadable states, missing and terminal local steps, cancellation, authorization failure and abandonment
+Level: 1
+Safeguard: Reconcile records landings only at its accepted own-default-branch merge result; recovery never records raw GitHub or local-step landings; accepted API and local report settlement remains idempotent and reconstructs refused admissions; since 2026-10-30
 Intercepts: 0
-Recurrences: 0
-Notes: The original failures are preserved in review-1-red.log and review-1-candidates-red.log; abandonment has its own negative control. Recovery inspects stale reservations independently of task phase and containment decisions.
+Recurrences: 2
+Notes: Review round 3 reproduces 20 reconcile regressions and seven new pending-admission failures before the fix. The rejection matrix covers foreign, fork, wrong-base, missing-base, phase-change and divergent-checkpoint observations, including stale recovery. The accepted late-landing test checks the persisted provider timestamp and one admission. Raw local completed steps cannot bypass report acceptance. Prior evidence is retained.
 ---
