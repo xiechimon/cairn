@@ -97,6 +97,8 @@ spacing:
   menu-row-height: 32px
 ---
 
+Live gallery: run `pnpm --filter @cairn/web dev` and open `/design.html`. It renders the shipped components and page patterns on the real tokens, and its Doc check section compares this frontmatter with the rendered values in both themes.
+
 ## Direction
 
 Cairn is an orchestration board for multi-lane coding agents. The user is a keyboard-first engineer who opens the board dozens of times a day; the core question is "what is waiting for me".
