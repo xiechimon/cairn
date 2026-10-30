@@ -89,9 +89,15 @@
                 "group": [
                   "@agentclientprotocol/sdk",
                   "@agentclientprotocol/sdk/*",
-                  "@agentclientprotocol/sdk/*/*"
+                  "@agentclientprotocol/sdk/*/*",
+                  "@agentclientprotocol/claude-agent-acp",
+                  "@agentclientprotocol/claude-agent-acp/*",
+                  "@agentclientprotocol/claude-agent-acp/*/*",
+                  "@zed-industries/codex-acp",
+                  "@zed-industries/codex-acp/*",
+                  "@zed-industries/codex-acp/*/*"
                 ],
-                "message": "缝纪律（ACP）：@agentclientprotocol/sdk 只许经 AgentBackend 缝消费——实现唯一落点 apps/daemon/src/backend/acp.ts。"
+                "message": "Seam discipline (ACP): ACP SDK and adapters may only be consumed through apps/daemon/src/backend/."
               },
               {
                 "group": ["@opentelemetry/*", "@opentelemetry/*/*"],

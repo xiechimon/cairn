@@ -15,7 +15,7 @@ import {
   isBackendRuntimeId,
   ORPHAN_WORKTREE_TTL_MS,
 } from '@cairn/shared';
-import { createGeminiBackend } from './backend/acp.js';
+import { configuredAcpBackends, createGeminiBackend } from './backend/acp.js';
 import { createClaudeCodeBackend } from './backend/claude-code.js';
 import { type DaemonOtel, daemonOtelFromEnv } from './backend/otel.js';
 import { createPiBackend, piSessionPolicyLine } from './backend/pi.js';
@@ -109,6 +109,7 @@ export function portBaseForSlot(slot: number): number {
 
 export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> {
   const { config, paths, logger } = opts;
+  const acpBackends = configuredAcpBackends(process.env.CAIRN_ACP_AGENTS);
   ensureStateDirs(paths);
   loadOrCreateDeviceJson(paths);
   setupProxy(logger, opts.proxyEnv ?? process.env, config.serverUrl);
@@ -196,7 +197,15 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   let geminiBackend: AgentBackend | null = opts.geminiBackend ?? null;
   let claudeAnnounced = false;
   let geminiAnnounced = false;
-  const backendFor = (agentProviderId: string | null | undefined): AgentBackend => {
+  const backendFor = (
+    agentProviderId: string | null | undefined,
+    agentId?: string,
+  ): AgentBackend => {
+    const acp = agentId !== undefined ? acpBackends.get(agentId) : undefined;
+    if (acp) {
+      logger.machine(`ACP adapter ${acp.capabilities.name} selected for agent ${agentId}`);
+      return acp;
+    }
     if (agentProviderId === 'gemini') {
       if (!geminiAnnounced) {
         logger.raw('Loading gemini runtime…');
