@@ -21,6 +21,7 @@ import type {
   ProviderCompat,
   ProviderModel,
   RequiredCapabilities,
+  ScheduleKind,
   ScheduleReport,
   SkillInjectionRecord,
   SplitPolicy,
@@ -302,13 +303,22 @@ export const schedule = sqliteTable(
       .references(() => team.id),
     projectId: text('projectId').notNull(),
     todoId: text('todoId').notNull(),
-    kind: text('kind').$type<'once' | 'hourly' | 'daily' | 'weekly'>().notNull(),
+    kind: text('kind').$type<ScheduleKind>().notNull(),
+    cron: text('cron'),
+    prompt: text('prompt').notNull().default(''),
+    enabled: bool('enabled').notNull().default(true),
     at: epochMs('at'),
     tz: text('tz').notNull(),
     nextRunAt: epochMs('nextRunAt'),
+    lastRunAt: epochMs('lastRunAt'),
+    lastRunStatus: text('lastRunStatus'),
+    pausedReason: text('pausedReason'),
     createdBy: text('createdBy').notNull(),
   },
-  (t) => [index('schedule_nextRunAt_idx').on(t.nextRunAt)],
+  (t) => [
+    index('schedule_nextRunAt_idx').on(t.nextRunAt),
+    uniqueIndex('schedule_todoId_unique').on(t.todoId),
+  ],
 );
 
 export const notification = sqliteTable(

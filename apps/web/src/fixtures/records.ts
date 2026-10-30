@@ -127,7 +127,7 @@ export interface ScheduleRecord {
   teamId: string;
   projectId: string;
   todoId: string;
-  kind: 'hourly' | 'daily' | 'weekly' | 'once';
+  kind: 'hourly' | 'daily' | 'weekly' | 'once' | 'cron';
   at: number;
   tz: string;
   nextRunAt: number;
