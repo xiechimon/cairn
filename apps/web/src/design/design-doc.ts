@@ -37,7 +37,7 @@ export const COLOR_VARS: Record<string, string> = {
 };
 
 export const RADIUS_EXPRS: Record<string, string> = {
-  field: 'calc(var(--radius) * 0.8)',
+  field: 'var(--radius-md)',
   control: 'var(--radius-control)',
   'menu-item': 'var(--radius-menu-item)',
   sheet: 'var(--edge-radius)',

@@ -71,15 +71,15 @@ fonts:
   sans: var(--font-inter) + PingFang SC
   mono: var(--font-jetbrains-mono)
 rounded:
-  field: 8px         # rounded-md: inputs, selects, segmented tracks, dialog and form primary buttons
-  control: 10px      # --radius-control = rounded-lg: default Button, icon buttons, project avatars
-  menu-item: 12px    # --radius-menu-item = menu radius minus the 6px menu padding
-  sheet: 16px        # --edge-radius: dialogs, ⌘K
-  menu: 18px         # --radius-popover: menus, floating surfaces, dropdowns
-  bubble: 18px       # --radius-bubble: user chat bubble
-  card: 20px         # --radius-card: one corner for every card-like surface
-  composer: 20px     # --radius-composer
-  window: 20px       # --radius-window: chief window
+  field: 6px         # rounded-md: inputs, selects, segmented tracks, dialog and form primary buttons
+  control: 6px       # --radius-control = rounded-lg: default Button, icon buttons, project avatars
+  menu-item: 6px     # --radius-menu-item = menu radius minus the 6px menu padding
+  card: 10px         # --radius-card = rounded-xl: one corner for every card-like surface
+  sheet: 12px        # --edge-radius: dialogs, ⌘K
+  menu: 12px         # --radius-popover: menus, floating surfaces, dropdowns
+  bubble: 12px       # --radius-bubble: user chat bubble
+  composer: 12px     # --radius-composer
+  window: 12px       # --radius-window: chief window
   full: 9999px
 spacing:
   grid: 4px
@@ -113,7 +113,7 @@ Reference mockup: [`docs/board-paper-r5.html`](docs/board-paper-r5.html); open i
 - **Three-tier shadow ladder** (`tokens.css`, #1428): `--e1` cards and rows, `--e2` menus and floating surfaces, `--e3` dialogs and floating windows. Each tier carries its own 1px ring at the end (`--e1` uses `line`; `--e2`/`--e3` use `--elevated-ring`, which is `--border-soft` in light and `--ring-inset-highlight` in dark, where `line` is invisible on the surface base). Light shadows are tinted pine-ink (`rgb(16 32 26 / a)`) rather than neutral black so they sit in the paper, and no extra border is drawn on the surface; surfaces that draw their own `--edge-ring` (the notification strip, the chief window, the FAB) take the pool of the same tier: `--cds-shadow-sm` / `-md` / `-lg` — one ring per edge. Old slot names like `--panel-shadow` / `--shadow-popover` / `--dialog-shadow` are aliases; the hover / focus slots are states, not tiers.
 - **Four ink steps**: `ink` headings and body text; `ink-2` nav, buttons, descriptions; `ink-3` meta information; `ink-4` decorative icons only. The lightest text ever uses is `ink-3`.
 - **Contrast (light, measured, WCAG 2.x)**: on the card, `ink` is 15.68, `ink-2` 8.31, `ink-3` 5.41, `accent` 4.69, `running-text` 6.45, `destructive` 5.97; `icon` is 3.60 (the 3:1 non-text gate); `ink-3` on canvas is 4.79. White text on the `accent` background is 4.73; `on-primary` on `primary` is 10.67. `ink-4` is decorative only. `ink-3` on `--secondary` (light `#edebe5`, the same value as the shadcn surface variables `--muted` and `--accent` — the latter is not the brand color `accent`; the secondary backgrounds are input-box cards, diff block headers, tool-call pills, and the like) is 4.58 and `ink-2` there is 7.04 (#1442, guarded by `e2e/a11y-axe.spec.ts`). White text on the six light project tiles measures 5.63–6.85. Action links swap to `spot-text-on-tint` on the `accent-hover` background, because `accent` on it drops to 4.32.
-- **Focus ring**: `--focus-ring` is pine `#205943` in light (8.1 on the card) and brass `#e4b65c` in dark, so keyboard focus never reads as "needs you" in light.
+- **Focus ring**: `--focus-ring` is pine `#205943` in light (8.1 on the card) and brass `#e4b65c` in dark, so keyboard focus never reads as "needs you" in light. Buttons, checkboxes, switches and badges draw it as a 2px outline 2px outside the box. Text fields (`Input`, `Textarea`, `SelectTrigger`, the `InputGroup` shell) turn their own border `--focus-ring` and add a 3px `--focus-halo` (the ring at 22%) instead, so the field reads as one shape, not a box inside a box.
 - **Brand marks keep the icon colors**: the chief launcher disc (`--fab-surface` `#173a2f`, `--fab-mark` `#f2ead7`) uses the exact colors of the Cairn app icon in both themes; `--primary` is the nearest UI pine, not the icon file.
 - **Status chips use five distinct hues**: idle neutral, plan slate blue, confirm brass, done leaf green, failed rust (`--chip-*-bg` / `--chip-*-fg`, every pair 6.6+ in light and 7.8+ in dark). Plan is deliberately not brass: only "needs you" may look like the accent.
 - **Accent discipline**: `accent` is used only for: needs-your-attention states and counts, action links on cards, icons of the active nav item, and count-badge backgrounds. It is never decorative and never a large-area background.
@@ -160,7 +160,7 @@ From top to bottom:
 - While the first board read is in flight, each column shows two skeleton cards (registry `Skeleton`) in the card shape, so the layout does not jump when data lands.
 
 ### Task card
-- `card` surface, 20px corner (`--radius-card`), a `line` 1px hairline ring plus one very light pine-ink shadow (`0 1px 2px`, 5% in light; together they are `--e1`), so the edge is crisp, never soft. On hover the ring deepens and the shadow rises to `0 6px 16px -2px` at 9% (150ms ease-out). No second large blur shadow.
+- `card` surface, 10px corner (`--radius-card`), a `line` 1px hairline ring plus one very light pine-ink shadow (`0 1px 2px`, 5% in light; together they are `--e1`), so the edge is crisp, never soft. On hover the ring deepens and the shadow rises to `0 6px 16px -2px` at 9% (150ms ease-out). No second large blur shadow.
 - In-flight orchestration (start was pressed, the chief has not dispatched yet): a todo card swaps `开始` for a footer `编排中 · reason` (waiting for X to come online / missing capability / queued) plus `查看会话` on the right; a failed card swaps `重试` for an inert `编排中`. Nothing is layered over the meta line.
 - A failed orchestration shows a short plain summary (`orchestrationErrorSummary`: connection dropped, timed out, out of quota, context too long, bad key, provider unavailable); the raw provider error stays in the `title` tooltip and never wraps character by character on the card.
 - Structure: title (at most two lines), then one meta line (project, #number, tag, time; never wraps; when space runs out the tag truncates first and the project keeps at least five characters), then a footer by status. The tag icon uses the user's tag color; the tag name uses the meta ink.
@@ -173,7 +173,7 @@ From top to bottom:
 - No solid buttons on cards.
 
 ### Buttons
-- Primary button: shadcn Button default tier, `primary` background, 10px radius (`rounded-lg` = `--radius-control`), 32px tall. Inside dialogs, forms and empty states `DIALOG_PRIMARY_BUTTON` narrows the corner to 8px (`rounded-md`).
+- Primary button: shadcn Button default tier, `primary` background, 6px radius (`rounded-lg` = `--radius-control`), 32px tall. `DIALOG_PRIMARY_BUTTON` in dialogs, forms and empty states uses the same 6px (`rounded-md`).
 - Secondary button: a text button that gains a light background on hover.
 - Card actions: `accent` text links + icon, with the `accent-hover` background on hover.
 
@@ -200,18 +200,18 @@ See "Page patterns · Settings list" below.
 Pages like settings, resources, team, and project share the pieces below. A new page composes these pieces first and does not build its own cards, empty states, or forms inside the page. All pieces live in `src/components/`; all values go through tokens and the six font sizes.
 
 ### Card radius: one corner
-- **Token**: `--radius-card` = 20px (`rounded.card`), the class `rounded-(--radius-card)`, or `CARD_RADIUS_CLS` exported by `settings-list.tsx`.
+- **Token**: `--radius-card` = 10px (`rounded.card`), the class `rounded-(--radius-card)`, or `CARD_RADIUS_CLS` exported by `settings-list.tsx`.
 - **Used on**: every card-like surface — task cards, cards being dragged, settings cards, team / agent cards, grouped resource-row cards, one-off notice cards.
-- **Not in this list**: dialogs and the ⌘K panel are the sheet tier at 16px (`--edge-radius`); menus and floating surfaces use `--radius-popover` (18px, see "Dialogs and menus" below); buttons, icon buttons and project avatars are 10px (`--radius-control`); inputs and selects are 8px (`rounded-md`).
-- The registry `Card` ships with `rounded-xl` (14px), which must be replaced with `--radius-card` when used as a card.
-- Do: one corner for all cards on a page. Do not: write 12px / 14px cards into a page, or mix two card corners on one page.
+- **Not in this list**: dialogs and the ⌘K panel are the sheet tier at 12px (`--edge-radius`); menus and floating surfaces use `--radius-popover` (12px, see "Dialogs and menus" below); buttons, icon buttons, project avatars, inputs and selects are 6px (`--radius-control`, `rounded-md`).
+- The registry `Card` ships with `rounded-xl`, which equals `--radius-card` (10px).
+- Do: one corner for all cards on a page. Do not: write 12px / 16px cards into a page, or mix two card corners on one page.
 
 ### Empty state
 Piece: `EmptyState` in `src/components/empty-state.tsx` (the base is the registry `Empty`).
 - **Icon**: a lucide line icon, 24px, stroke 1.75, `ink-3` (`text-content-tertiary`), no background tile.
 - **Title**: `h2`, `text-card-title` 500 `ink`.
 - **Description**: `text-meta` `ink-3`, at most 320px wide (about 44ch), centered, `text-balance`.
-- **Primary action** (optional): shadcn Button default tier, `primary` background, 32px, 8px corner (`DIALOG_PRIMARY_BUTTON`). An empty state has at most one primary action.
+- **Primary action** (optional): shadcn Button default tier, `primary` background, 32px, 6px corner (`DIALOG_PRIMARY_BUTTON`). An empty state has at most one primary action.
 - **Hint line** (optional): one `text-meta` `ink-3` line below the primary action, optionally preceded by a 12px icon (`ink-4`), explaining read-only or permission reasons.
 - **Used on**: list pages with no data (API keys, schedules, skills, MCP, keys…). The copy is translated by the caller before being passed in.
 - Do: a bare icon + title + one sentence. Do not: an icon tile with a colored background (neither orange nor beige), a `size="sm"` small button, two side-by-side primary buttons, or a "View docs" external link.
@@ -222,15 +222,15 @@ Pieces: `src/components/settings-list.tsx`. The account page's "edit name" heade
 - **One card** (`SettingsCard`): white background, `line` 1px outer ring, `--radius-card`; rows carry no background color (no two-tone cards).
 - **Row** (`SettingsRow`): minimum height 52px, 16px left and right; a `text-ui` `ink` label on the left (optionally with one `text-meta` `ink-3` description line), controls on the right. Rows with two-line content grow naturally. Custom rows that do not go through `SettingsRow` use `SETTINGS_ROW_CLS`.
 - **Dividers are drawn only between rendered rows**: `divide-y` on the card, rows rendered conditionally, never hidden with CSS. A hidden row is still a sibling node and would draw a second border at the top of the card.
-- **Controls are framed, one kind each**: dropdown = white background + `line` 1px ring + 8px radius + 32px tall (`SETTINGS_SELECT_TRIGGER_CLS`, the same string as the form's `FORM_CONTROL_CLS`); single-choice segmented = `SettingsSegmented` (i.e. `SegmentedRadio`, see "Segmented control" below); switch = shadcn Switch with ink on-state.
-- **Danger zone** (`SettingsDangerZone`): a separate card at the very end of the page, one row: label + description on the left, a Button with `variant="destructive"` on the right, 32px with the standard 10px button corner. Clicking opens a confirm layer first; it never deletes directly.
+- **Controls are framed, one kind each**: dropdown = white background + `line` 1px ring + 6px radius + 32px tall (`SETTINGS_SELECT_TRIGGER_CLS`, the same string as the form's `FORM_CONTROL_CLS`); single-choice segmented = `SettingsSegmented` (i.e. `SegmentedRadio`, see "Segmented control" below); switch = shadcn Switch with ink on-state.
+- **Danger zone** (`SettingsDangerZone`): a separate card at the very end of the page, one row: label + description on the left, a Button with `variant="destructive"` on the right, 32px with the standard 6px button corner. Clicking opens a confirm layer first; it never deletes directly.
 - Do: header + one card + equal-height rows. Do not: a large avatar occupying a row, rows with background tints, a rounded-pill delete button, or danger actions mixed into ordinary settings cards.
 
 ### Forms
 Piece: `src/components/form-layout.tsx` (the base is the registry `Field` family).
 - **Stack** (`FormStack`): fields stacked vertically, 16px between fields, at most 520px wide, left-aligned.
 - **Field** (`FormField`): label on top (`text-ui` 500 `ink`, `htmlFor` pointing at the control), the control, and an optional help line (`text-meta` `ink-3`) below.
-- **Controls**: Input / SelectTrigger with `FORM_CONTROL_CLS`: 32px tall, white background, `line` 1px ring, 8px radius, `text-ui`.
+- **Controls**: Input / SelectTrigger with `FORM_CONTROL_CLS`: 32px tall, white background, `line` 1px ring, 6px radius, `text-ui`.
 - **Action row** (`FormActions`): the last row of the form, right-aligned; an optional text button (such as `取消`) on the left, the shadcn Button default primary on the right. When the form cannot submit, the button's own `disabled` state paints it `secondary` with secondary ink at full opacity (`DIALOG_PRIMARY_BUTTON`); no separate gray bar.
 - Do: a narrow column, labels on top, the primary button on the right. Do not: inputs spanning the whole column, full-width gray submit bars, or two-column forms with labels beside inputs.
 
@@ -239,7 +239,7 @@ Piece: `src/components/segmented.tsx`. One appearance, two semantics:
 - **`SegmentedTabs`**: switches views — each option controls a panel or a route (agent overview / memory / permissions, project tasks | files, files | history, list | grid, team grid | org chart, provider runtime, branch dialog, chief settings). The base is the registry `Tabs`, keeping `tablist` / `tab` semantics.
 - **`SegmentedRadio`**: picks a value in a form or settings (appearance in the user menu, schedule frequency). `radiogroup` / `radio` semantics; arrow keys move and select, roving tabindex. Use it for "selecting a value that will be persisted"; use tabs for "which block to look at".
 - **If it does not fit, switch to a dropdown**: when the option labels at 12px padding do not fit the column width, do not shrink the text and do not truncate — use the form Select instead (`SelectTrigger` + `FORM_CONTROL_CLS`). Example: the API protocol in the new-provider dialog (the three protocol names need about 460px; the dialog column is 416px wide).
-- **Appearance**: track 32px tall, 2px inset, 8px radius, background `canvas` — one paper token; options 28px tall, 6px radius, 12px left/right padding for text options, and pure-icon options are 28px squares (must carry an `ariaLabel`). Unselected text is `ink-2`, turning to `ink` on hover, with no background tint; the selected option = white background (`card`) + `line` 1px ring + one extremely light shadow, text 500 `ink`. The accent is not used. Disabled items use the primitive's own translucency.
+- **Appearance**: track 32px tall, 2px inset, 6px radius, background `canvas` — one paper token; options 28px tall, 4px radius, 12px left/right padding for text options, and pure-icon options are 28px squares (must carry an `ariaLabel`). Unselected text is `ink-2`, turning to `ink` on hover, with no background tint; the selected option = white background (`card`) + `line` 1px ring + one extremely light shadow, text 500 `ink`. The accent is not used. Disabled items use the primitive's own translucency.
 - **Focus**: mouse clicks show no ring. Keyboard `:focus-visible` is a 2px `--focus-ring` ring, **inset** inside the option box (`outline-offset: -2px`, the `[data-segmented="option"]` rule in `styles/app.css`): options are only 2px apart, and an outer ring would press onto the neighbor.
 - **Sliding**: `slide` makes the white tab slide between options on a 150ms underlying pill (only chief settings uses it, #644).
 - Do: assemble every segmented control from these two pieces; e2e handles attach via `className` (track) and `optionHandle` (option). Do not: hand-write `role="radiogroup"` / `role="tab"`, or restyle `TabsList` / `TabsTrigger` directly in a page — `scripts/ui-drift-gate.mjs` G7 will block it.
@@ -247,16 +247,16 @@ Piece: `src/components/segmented.tsx`. One appearance, two semantics:
 ### Dialogs and menus
 Pieces: `src/components/ui/dialog-shell.tsx` (`DialogShell` + the exported `DIALOG_*` pieces, `DialogFootRow`, `dialogWidth`), `alert-dialog-shell.tsx` (confirm surfaces), `dropdown-menu.tsx` / `popover.tsx` (menus and floating surfaces). `dialog.tsx` / `alert-dialog.tsx` / `select.tsx` are pristine registry pieces; their Paper skin lives in the `[data-slot=…]` rules and tokens of `styles/app.css`.
 - **Backdrop**: one layer of light-ink dim `--dialog-backdrop` (light `rgb(16 32 26 / 0.18)`), no blur. All dialogs, confirm surfaces, and ⌘K share this layer; there is no dark curtain.
-- **Surface**: `sheet` background (`--dialog-surface`), 16px radius (`--edge-radius`), `--dialog-shadow` (= `--e3`: two soft shadows + a 1px `line` ring).
+- **Surface**: `sheet` background (`--dialog-surface`), 12px radius (`--edge-radius`), `--dialog-shadow` (= `--e3`: two soft shadows + a 1px `line` ring).
 - **Three widths** (`size`, `--dialog-w-*`, clamped with `min(100% - 2rem, …)` on narrow screens):
   - S 400: keys, API keys, delete and other confirmations, short forms.
   - M 480: skills, most new-entity forms (agent, schedule, charter, review, request changes).
   - L 640: multi-step flows and long lists (add machine, provider selector, GitHub issue, raw error, attachment preview, new task).
 - **Head**: 16px serif title (`text-heading`) + an optional 12px `ink-3` subtitle line (`subtitle`); a 28px ghost close button in the top-right corner. The close button is last in the DOM, and initial focus lands on the first field.
 - **Body**: the single scrolling box (`min-h-0`), with 20px left/right padding that also serves as room for the focus ring. The panel is capped at `100vh - 64px`; in short viewports the body scrolls and the foot stays on screen.
-- **Foot (split)**: a 12px `ink-3` hint or status on the left (`hint`: doc links, shortcuts, waiting states, page numbers), the action group on the right. The primary action is the shadcn Button default (`primary` background, 32px, 8px corner, `DIALOG_PRIMARY_BUTTON`), the secondary action is a ghost text button (`DIALOG_TEXT_BUTTON`), and danger confirmations switch to `destructive`. With no hint the actions still align right. No background band, no divider line.
+- **Foot (split)**: a 12px `ink-3` hint or status on the left (`hint`: doc links, shortcuts, waiting states, page numbers), the action group on the right. The primary action is the shadcn Button default (`primary` background, 32px, 6px corner, `DIALOG_PRIMARY_BUTTON`), the secondary action is a ghost text button (`DIALOG_TEXT_BUTTON`), and danger confirmations switch to `destructive`. With no hint the actions still align right. No background band, no divider line.
 - **Grouped selector** (providers): a search box on top, then groups under small headings (`text-caption` 500 `ink-3`); each row is 40px = a 22px first-letter tile (white background + `line` ring) + name + an `ink-3` tag on the right (OAuth / not yet enabled). Hover and keyboard focus = the selector's selected row (white card + hairline ring). Disabled rows drop the text to `ink-3` and show no hover. Search filters across groups and whole empty groups hide; "Other · custom endpoint" is always there.
-- **Menus** (the Paper menu — `DropdownMenu` / `Popover` / the Select popup are the same surface, #1767): `popover` background, 18px radius (`--radius-popover`), 6px padding (`--menu-pad`), `--shadow-popover` (= `--e2`: soft shadow + 1px ring). Rows are 32px tall with a concentric 12px radius (`--radius-menu-item` = popover radius minus padding), 13.5px text, 15px `ink-3` icons, hover `menu-hover`; shortcut hints right-aligned in `text-caption` `ink-3`; dividers 1px, inset 6px left and right; group labels `text-caption` 500 `ink-3`. Danger rows use `destructive` for text and icon, hover `danger-soft`. Segmented controls inside menus use `SegmentedRadio` / `SegmentedTabs`; do not hand-roll them.
+- **Menus** (the Paper menu — `DropdownMenu` / `Popover` / the Select popup are the same surface, #1767): `popover` background, 12px radius (`--radius-popover`), 6px padding (`--menu-pad`), `--shadow-popover` (= `--e2`: soft shadow + 1px ring). Rows are 32px tall with a concentric 6px radius (`--radius-menu-item` = popover radius minus padding), 13.5px text, 15px `ink-3` icons, hover `menu-hover`; shortcut hints right-aligned in `text-caption` `ink-3`; dividers 1px, inset 6px left and right; group labels `text-caption` 500 `ink-3`. Danger rows use `destructive` for text and icon, hover `danger-soft`. Segmented controls inside menus use `SegmentedRadio` / `SegmentedTabs`; do not hand-roll them.
 - Do: one width tier per dialog, hints left and actions right, equal-height menu rows. Do not: a dark or blurred backdrop, full-width submit bars, a gray-background foot band, outline secondary buttons, or small gray 12px menus.
 - `e2e/paper-overlays.spec.ts` pins the backdrop color, the three widths, the split foot, the menu row height, and the grouped selector; `e2e/color-freeze.spec.ts` pins `dialog-backdrop` / `menu-hover`.
 
@@ -314,10 +314,10 @@ Cairn UI rules (source: apps/web/DESIGN.md):
 - Spacing on the 4px grid. No arbitrary px values (text-[13px], ml-[10.5px]).
 - Every status = icon + color + label. Lucide icons, stroke 1.75.
 - Primary button = shadcn default Button on --primary (light pine #143e2e with cream text, dark cream with pine text), 10px corners (8px inside dialogs and forms), 32px tall. Card actions = accent text links. No solid buttons on cards.
-- Radii: card 20px, menu 18px, dialog 16px, menu row 12px, button 10px, input 8px.
-- Dialogs: DialogShell with size s (400) / m (480) / l (640), light dim backdrop (no blur), 16px sans title + optional 12px sub-line, split footer (12px ink-3 hint left, actions right, primary button). Menus: popover color, 18px corners, 6px padding, 32px rows with 12px corners, 13.5px text, 15px ink-3 icons, --menu-hover, danger rows in destructive.
+- Radii: menu and dialog 12px, card 10px, button, input and menu row 6px.
+- Dialogs: DialogShell with size s (400) / m (480) / l (640), light dim backdrop (no blur), 16px sans title + optional 12px sub-line, split footer (12px ink-3 hint left, actions right, primary button). Menus: popover color, 12px corners, 6px padding, 32px rows with 6px corners, 13.5px text, 15px ink-3 icons, --menu-hover, danger rows in destructive.
 - Segmented controls only from components/segmented.tsx: SegmentedTabs for view switches, SegmentedRadio for value pickers. Canvas track, white selected option with a 1px ring, inset keyboard ring. Never hand-roll role=tab/radio or restyle TabsList.
-- One card corner: --radius-card (20px) on every card-like surface. Pages compose EmptyState / SettingsHeader+SettingsCard+SettingsRow / FormStack+FormField+FormActions; no tinted icon tiles, no full-width submit bars, no two-tone cards, no pill buttons.
+- One card corner: --radius-card (10px) on every card-like surface. Pages compose EmptyState / SettingsHeader+SettingsCard+SettingsRow / FormStack+FormField+FormActions; no tinted icon tiles, no full-width submit bars, no two-tone cards, no pill buttons.
 - Sidebar = Grouped: workspace row (16px spiral mark from logo-mark.svg in ink, serif name), New task button, Workbench / Needs me / Schedules, Projects, collapsed Resources, user row with machine status.
 - Use components/ui primitives and tokens; no hex in components.
 ```

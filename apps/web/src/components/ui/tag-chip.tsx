@@ -13,12 +13,13 @@ export function TagChip({ tag, className }: TagChipProps) {
   return (
     <Badge
       className={cn(
-        'tag-chip max-w-40 justify-start gap-0 text-(--text-on-accent) text-ellipsis transition-none',
+        'tag-chip max-w-40 justify-start gap-0 text-(--text-on-accent) transition-none',
         className,
       )}
       style={{ backgroundColor: tag.color }}
+      title={tag.name}
     >
-      {tag.name}
+      <span className="min-w-0 truncate">{tag.name}</span>
     </Badge>
   );
 }
