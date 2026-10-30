@@ -30,6 +30,7 @@ import {
   type GithubLabeledIssuesPage,
   GithubRateLimitedError,
   type GithubRepoPermission,
+  githubCloseIssue,
   githubCollaboratorPermission,
   githubIssueClosingPulls,
   githubIssueEvents,
@@ -116,6 +117,7 @@ export interface IssueIntakeTally {
   orchestrated: number;
   closed: number;
   closeSkipped: number;
+  githubIssuesClosed: number;
   rateLimited: number;
   gated: number;
   errors: number;
@@ -178,6 +180,7 @@ function emptyTally(): IssueIntakeTally {
     orchestrated: 0,
     closed: 0,
     closeSkipped: 0,
+    githubIssuesClosed: 0,
     rateLimited: 0,
     gated: 0,
     errors: 0,
@@ -244,6 +247,7 @@ function newestLabeler(data: IssueHistory): { labeler: string } | AppLabel | { r
 
 type LinkedPullVerdict =
   | { ok: true }
+  | { closeGithub: { pr: number } }
   | { notTaken: 'not-eligible'; reason: 'open-linked-pull' | 'merged-linked-pull'; pr: number }
   | { notTaken: 'unverifiable'; reason: string };
 
@@ -579,6 +583,14 @@ export function createIssueIntake(
             }
           }
         }
+        if ('ok' in links && byNumber.size === 1) {
+          const closingPull = closing.pulls.find(
+            (pull) => pull.repo.toLowerCase() === sameRepo && pull.merged,
+          );
+          if (closingPull !== undefined && !byNumber.get(closingPull.number)?.closed) {
+            links = { closeGithub: { pr: closingPull.number } };
+          }
+        }
         if ('ok' in links) {
           for (const [number, evidence] of byNumber) {
             if (evidence.merged) {
@@ -608,6 +620,36 @@ export function createIssueIntake(
         },
         'issue intake candidate not taken',
       );
+      return 'not-taken';
+    }
+    if ('closeGithub' in links) {
+      if (
+        claimedRefs(row.teamId).has(githubIssueSourceRef(owner, repo, issueNumber).toLowerCase())
+      ) {
+        tally.claimed += 1;
+        return 'not-taken';
+      }
+      try {
+        await githubCloseIssue(run.githubFetch, access.token, owner, repo, issueNumber, {
+          stateReason: 'completed',
+        });
+        tally.githubIssuesClosed += 1;
+        log(
+          { projectId: row.id, issue: issueNumber, pr: links.closeGithub.pr },
+          'issue intake closed github issue after merged closing pull request',
+        );
+      } catch (err) {
+        tally.errors += 1;
+        log(
+          {
+            projectId: row.id,
+            issue: issueNumber,
+            pr: links.closeGithub.pr,
+            err: errText(err),
+          },
+          'issue intake github issue close failed',
+        );
+      }
       return 'not-taken';
     }
     if (projectAtInFlightCap(deps.db, row.id)) {

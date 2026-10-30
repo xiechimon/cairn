@@ -1,0 +1,82 @@
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1962/apps/server
+
+ ❯ test/issue-intake.test.ts (204 tests | 3 failed) 8782ms
+   ❯ 15 linked pull requests (14)
+     × a sole merged closing pull request closes the issue on GitHub with no task creation, and a later sweep does not import it 41ms
+   ❯ 16 merged closing PR (11)
+     × contradictory closed-unmerged and merged observations of the same PR never close or import 42ms
+     × a candidate claimed during link reads belongs to task reconciliation 42ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/issue-intake.test.ts > 15 linked pull requests > a sole merged closing pull request closes the issue on GitHub with no task creation, and a later sweep does not import it
+AssertionError: expected { state: 'closed', …(1) } to deeply equal { state: 'closed', …(1) }
+
+- Expected
++ Received
+
+  {
+    "state": "closed",
+-   "state_reason": "completed",
++   "state_reason": "not_planned",
+  }
+
+ ❯ test/issue-intake.test.ts:3354:45
+    3352|     ).toHaveLength(1);
+    3353|     const patch = w.gh.calls.find((c) => c.method === 'PATCH');
+    3354|     expect(JSON.parse(patch?.body ?? '{}')).toEqual({ state: 'closed',…
+       |                                             ^
+    3355|     expect(w.gh.calls.filter((c) => c.method === 'POST' && c.path.ends…
+    3356|     expect(w.s.db.select().from(buildTable).all()).toHaveLength(0);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  test/issue-intake.test.ts > 16 merged closing PR > contradictory closed-unmerged and merged observations of the same PR never close or import
+AssertionError: expected [ { host: 'api.github.com', …(6) } ] to have a length of +0 but got 1
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ test/issue-intake.test.ts:3494:60
+    3492|     await w.intake.sweep();
+    3493|     expect(takenNumbers(w.s)).toEqual([]);
+    3494|     expect(w.gh.calls.filter((c) => c.method === 'PATCH')).toHaveLengt…
+       |                                                            ^
+    3495|   });
+    3496|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  test/issue-intake.test.ts > 16 merged closing PR > a candidate claimed during link reads belongs to task reconciliation
+AssertionError: expected [ { host: 'api.github.com', …(6) } ] to have a length of +0 but got 1
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ test/issue-intake.test.ts:3542:60
+    3540|     });
+    3541|     await w.intake.sweep();
+    3542|     expect(w.gh.calls.filter((c) => c.method === 'PATCH')).toHaveLengt…
+       |                                                            ^
+    3543|     expect(takenNumbers(w.s)).toEqual([1406]);
+    3544|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 201 passed (204)
+   Start at  09:01:14
+   Duration  10.61s (tests 83%, transform 12%, import 5%)
+
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /mnt/fast/lanes/cairn-1962/apps/server
+
