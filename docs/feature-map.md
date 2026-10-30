@@ -51,14 +51,14 @@ Judgment = title keyword match, first rule in the table wins, and no match = Gen
 |---|---|
 | `changes` | `Classify changes` |
 | `check` | `Aggregate check parts` |
-| `check-core` | `Conflict markers` / `Lane file gate (#1199)` / `Test spawn gate` / `PR evidence workflow shape gate` / `CI job structure gate (#1557)` / `UI registry gate (#989)` / `UI consumer shape gate (#1054)` / `Install dependencies` / `Prepush checks (#1533)` / `Upload safeguard interceptions` / `PR evidence regression tests` / `Prepush self-test` / `verify-cairn CLI self-test (#1402)` / `Drizzle snapshot chain guard` / `Drizzle migration drift check` / `pr-gate self-check (#1401)` / `Lint warning cap gate (#1192)` |
+| `check-core` | `Conflict markers` / `UI registry gate (#989)` / `UI consumer shape gate (#1054)` / `Install dependencies` / `Prepush checks (#1533)` / `PR evidence regression tests` / `Prepush self-test` / `verify-cairn CLI self-test (#1402)` / `Drizzle snapshot chain guard` / `Drizzle migration drift check` / `Lint warning cap gate (#1192)` |
 | `vitest-light` | `Install dependencies` / `Test (vitest, light project)` |
 | `vitest-integration` | `Install dependencies` / `Install Playwright chromium` / `Test (vitest, integration stack)` |
 | `e2e` | `Install dependencies` / `Install Playwright chromium` / `E2E (shard ${{ matrix.shard }}/4, #693)` / `CSS mechanism gate (#747)` |
 | `e2e-gate` | `Aggregate e2e shards` |
 | `pack-smoke` | `Install dependencies` / `Pack smoke (main package tarball, bare node)` |
 | `dead-class-gate` | `Install dependencies` / `Dead class gate (#1036)` |
-| `gates` | `Issue label gate` / `Feature map staleness gate (#1160)` / `Comment discipline gate (advisory, #1520)` / `Probe reach gate (advisory, #1542)` / `Single-use helper gate (advisory, #1543)` / `Package names in install commands exist on npm` / `Funding links gate (#2002)` / `Dispatch agent start/check round trip (#1556)` / `Closing keyword gate (advisory, #1541)` / `Baseline ratchet gate and gardener sweep self-test (#1617)` |
+| `gates` | `Comment discipline gate (advisory, #1520)` / `Probe reach gate (advisory, #1542)` / `Dispatch agent start/check round trip (#1556)` / `Gardener sweep self-test (#1617)` |
 | `ops-backup-test` | `Server backup script against an rrsync receiver (#2163)` |
 
 ### 0.6 Known limitations (recorded as-is in the first version)
@@ -160,7 +160,7 @@ Ordering: by tier (Differentiation surface → Runtime axis → General surface)
 | [#1153](https://github.com/xiechimon/cairn/issues/1153) `tracer: 持续派发环端到端——投喂到 review，中途静默死机换机续跑` | Differentiation surface | Done | `fdd19e6ef:docs/verify/1153/` |
 | [#1160](https://github.com/xiechimon/cairn/issues/1160) `scripts: feature-map 陈旧闸——机器核对 verify-pacman map 引用与当前树（#1156 漏拦根因）` | Differentiation surface | Done | `fdb191efd:docs/verify/1160/` |
 | [#1195](https://github.com/xiechimon/cairn/issues/1195) `build artifact gate reports zero-changes when the agent commits on a non-conv branch (PR delivered anyway)` | Differentiation surface | Done | `docs/verify/1195/`<br>`apps/daemon/test/runner-branch-drift.test.ts`<br>`apps/daemon/test/workspace.test.ts`<br>`apps/server/test/artifact-gate.test.ts`<br>`apps/server/test/pr-reconcile.test.ts` |
-| [#1203](https://github.com/xiechimon/cairn/issues/1203) `plan.md handoff collides with repo checkout: move it out of the repo and backstop with lane-file-gate` | Differentiation surface | Done | `apps/daemon/test/runner-local.test.ts`<br>`packages/shared/test/plan-first-round-prompt.test.ts` |
+| [#1203](https://github.com/xiechimon/cairn/issues/1203) `plan.md handoff collides with repo checkout: keep it outside the repository` | Differentiation surface | Done | `apps/daemon/test/runner-local.test.ts`<br>`packages/shared/test/plan-first-round-prompt.test.ts` |
 | [#1204](https://github.com/xiechimon/cairn/issues/1204) `Rework loop broken: change-request from review fails with 'plan 步无指派 Agent' when assignment.plan is null; rework also drops session context` | Differentiation surface | Done | `apps/server/test/rework-plan-fallback.test.ts` |
 | [#1208](https://github.com/xiechimon/cairn/issues/1208) `Machine pin from composer is ignored by dispatch: plan and build steps both run on the unpinned machine` | Differentiation surface | Done | `docs/verify/1208/` |
 | [#1236](https://github.com/xiechimon/cairn/issues/1236) `web: 完成任务确认 dialog 点击后相位不变（rework 卡必现，普通卡亦曾现）` | Differentiation surface | Done | `a41d24e8c:docs/verify/1236/`<br>`integration/test/done-dialog-e2e.test.ts` |
@@ -182,7 +182,7 @@ Ordering: by tier (Differentiation surface → Runtime axis → General surface)
 | [#1541](https://github.com/xiechimon/cairn/issues/1541) `Review finding: PR body names an issue but no branch commit carries the closing keyword` | Differentiation surface | Done | `docs/verify/1541/`<br>`apps/server/test/scheduling-plan.test.ts` |
 | [#1542](https://github.com/xiechimon/cairn/issues/1542) `Review finding: new e2e spec or probe not reached by the affected-set map or registry` | Differentiation surface | Done | `docs/verify/1542/`<br>`apps/server/test/scheduling-plan.test.ts` |
 | [#1543](https://github.com/xiechimon/cairn/issues/1543) `Review finding: single-use non-exported helper left in the file` | Differentiation surface | Done | `docs/verify/1543/`<br>`apps/server/test/scheduling-plan.test.ts` |
-| [#1561](https://github.com/xiechimon/cairn/issues/1561) `single-use-helper-gate：既有大函数被改动就标红，白名单要整段函数文本` | Differentiation surface | Done | `docs/verify/1561/` |
+| [#1561](https://github.com/xiechimon/cairn/issues/1561) `Handle existing helper changes and exact allowlist entries` | Differentiation surface | Done | `docs/verify/1561/` |
 | [#1605](https://github.com/xiechimon/cairn/issues/1605) `eval: harness 改动采纳闸——三道统计闸 + 封存测试集` | Differentiation surface | Done | `apps/server/test/adoption-protected-paths.test.ts` |
 | [#1617](https://github.com/xiechimon/cairn/issues/1617) `每日园丁巡检：自动收紧技术债基线，坏写法先加闸再清理` | Differentiation surface | In progress | `docs/verify/1617/` |
 | [#1621](https://github.com/xiechimon/cairn/issues/1621) `自治合并试点：纯文档与纯测试 PR 闸全绿即由 cairn 自己合并` | Differentiation surface | Done | `apps/server/test/merge-gate-paths.test.ts`<br>`apps/server/test/merge-gate-readiness.test.ts` |
@@ -1203,8 +1203,6 @@ The date is that file's git commit date.
 Status is `scored`, `built-not-run`, `none`, or `tests only, no eval needed`.
 A directory under `.claude/hillclimb/` that contains `cases.json` and is not named
 by a capability makes the generator fail.
-The feature-map staleness gate flags a scored flow whose date is more than 30 days
-before today.
 
 | Capability | Eval flow | Cases | Latest score | Date | Model | Status |
 |---|---|---|---|---|---|---|

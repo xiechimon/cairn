@@ -1,0 +1,32 @@
+Final command per script: git grep -n -F <script stem> -- scripts/ .github/ package.json biome.json .husky/ docs/ .claude/skills/ .claude/workflows/ :!docs/lessons/*.md :!docs/verify/** :!docs/research/**
+
+single-use-helper-gate.mjs: no live references (git grep exit 1)
+feature-map-staleness-gate.mjs: no live references (git grep exit 1)
+pr-gate-selfcheck.mjs: no live references (git grep exit 1)
+ci-job-structure-gate.mjs: no live references (git grep exit 1)
+pr-evidence-workflow-gate.mjs: no live references (git grep exit 1)
+baseline-owner-gate.mjs: no live references (git grep exit 1)
+baseline-ratchet-gate.mjs: no live references (git grep exit 1)
+lane-file-gate.mjs: no live references (git grep exit 1)
+test-spawn-gate.mjs: no live references (git grep exit 1)
+lane-worker-exit-gate.mjs: no live references (git grep exit 1)
+issue-label-gate.mjs: no live references (git grep exit 1)
+check-closing-keyword.mjs: no live references (git grep exit 1)
+funding-yml-gate.mjs: no live references (git grep exit 1)
+npm-command-gate.mjs: no live references (git grep exit 1)
+recording-gate.mjs: no live references (git grep exit 1)
+lessons-ledger-gate.mjs: no live references (git grep exit 1)
+lessons-weekly.mjs: no live references (git grep exit 1)
+feature-map-daily-check: no live references (git grep exit 1)
+ci-job-structure-baseline.json: no live references (git grep exit 1)
+single-use-helper-allowlist.json: no live references (git grep exit 1)
+feature-map-staleness-baseline.json: no live references (git grep exit 1)
+recordInterception: no live references (git grep exit 1)
+gateLogPath: no live references (git grep exit 1)
+CAIRN_GATE_LOG: no live references (git grep exit 1)
+lessons:table: no live references (git grep exit 1)
+
+Preserved historical inputs outside the live search scope:
+apps/server/test/fixtures/1583-2026-10-23-open.json
+apps/server/test/fixtures/github/gate-check-runs-39a108e.json
+integration/eval/harbor/bench-v0.json

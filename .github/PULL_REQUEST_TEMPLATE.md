@@ -4,7 +4,7 @@
 
 ## Proof
 
-<!-- Code: name the test, quote its failure on main, show it passing here; for performance a before/after table, for daemons and CLIs a short real-run transcript. UI: a before/after/unchanged screenshot table with SHA-pinned raw links under docs/verify/<ticket>/. End with one "Not verified:" line. Per change type: .claude/skills/pr-cairn/SKILL.md. -->
+<!-- Code: name the test, quote its failure on main, show it passing here; for performance a before/after table, for daemons and CLIs a short real-run transcript. UI: a before/after/unchanged screenshot table with reachable image links. End with one "Not verified:" line. Per change type: .claude/skills/pr-cairn/SKILL.md. -->
 
 ## Review
 

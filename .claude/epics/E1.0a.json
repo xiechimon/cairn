@@ -41,7 +41,7 @@
       "run": [
         "node",
         "-e",
-        "const fs=require('fs'),cp=require('child_process');const bad=[];\nconst adrs=fs.readdirSync('docs/adr').filter(f=>/^\\d{4}-.*\\.md$/.test(f)&&f.slice(0,4)>'0027');\nconst hit=adrs.find(f=>{const s=fs.readFileSync('docs/adr/'+f,'utf8');return s.includes('ADR 0026')&&s.includes('R2')&&s.includes('⑤')&&/phase 1/i.test(s)&&s.includes('2026-10-29')&&/ian/.test(s)});\nif(!hit)bad.push('no ADR numbered above 0027 amends ADR 0026 R2 for class ⑤ in phase 1 with the 2026-10-29 decision');\nelse if(!fs.readFileSync('AGENTS.md','utf8').includes(hit))bad.push('AGENTS.md does not link '+hit);\nconst blob=cp.execFileSync('git',['hash-object','docs/adr/0026-machine-trust-replaces-human-merge-gates.md'],{encoding:'utf8'}).trim();\nif(blob!=='b7168be5570cc1a394dfba8f6c827778dd14abbb')bad.push('ADR 0026 was edited in place');\nif(bad.length){console.error(bad.join('\\n'));process.exit(1)}"
+        "const fs=require('fs'),cp=require('child_process');const bad=[];\nconst adrs=fs.readdirSync('docs/adr').filter(f=>/^\\d{4}-.*\\.md$/.test(f)&&f.slice(0,4)>'0027');\nconst hit=adrs.find(f=>{const s=fs.readFileSync('docs/adr/'+f,'utf8');return s.includes('ADR 0026')&&s.includes('R2')&&s.includes('\u2464')&&/phase 1/i.test(s)&&s.includes('2026-10-29')&&/ian/.test(s)});\nif(!hit)bad.push('no ADR numbered above 0027 amends ADR 0026 R2 for class \u2464 in phase 1 with the 2026-10-29 decision');\nelse if(!fs.readFileSync('AGENTS.md','utf8').includes(hit))bad.push('AGENTS.md does not link '+hit);\nconst blob=cp.execFileSync('git',['hash-object','docs/adr/0026-machine-trust-replaces-human-merge-gates.md'],{encoding:'utf8'}).trim();\nif(blob!=='b7168be5570cc1a394dfba8f6c827778dd14abbb')bad.push('ADR 0026 was edited in place');\nif(bad.length){console.error(bad.join('\\n'));process.exit(1)}"
       ]
     },
     {
@@ -50,13 +50,6 @@
         "node",
         "-e",
         "const s=require('fs').readFileSync('AGENTS.md','utf8');const bad=[];\nif(s.includes('--add-label needs-decision'))bad.push('AGENTS.md still tells agents to add needs-decision');\nif(!/never add[s]? (the )?`?needs-decision`?/i.test(s))bad.push('AGENTS.md must say agents never add needs-decision');\nif(!s.includes('CAIRN_DECIDED=1'))bad.push('AGENTS.md lost the CAIRN_DECIDED=1 removal rule');\nif(!/already on/i.test(s))bad.push('AGENTS.md must keep that a label already on blocks merging');\nif(bad.length){console.error(bad.join('\\n'));process.exit(1)}"
-      ]
-    },
-    {
-      "name": "pr-gate selfcheck passes",
-      "run": [
-        "node",
-        "scripts/pr-gate-selfcheck.mjs"
       ]
     }
   ],

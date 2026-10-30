@@ -1,0 +1,81 @@
+M = modified, D = deleted, ?? = new. No files are staged and no commit was made.
+
+ M .claude/epics/E1.0a.json
+ M .claude/skills/pr-cairn/SKILL.md
+ M .claude/skills/retro-cairn/SKILL.md
+ M .claude/skills/verify-cairn/SKILL.md
+ M .github/PULL_REQUEST_TEMPLATE.md
+ M .github/workflows/ci.yml
+ D .github/workflows/feature-map-daily-check.yml
+ M .github/workflows/gardener-weekly.yml
+ M .gitignore
+ M .husky/pre-commit
+ M AGENTS.md
+ M apps/server/src/services/merge-gate/readiness.ts
+ M apps/server/test/merge-gate-readiness.test.ts
+ M docs/README.md
+ M docs/adr/0025-eval-surface-into-d4-protected-paths.md
+ M docs/adr/0028-phase-1-merge-routes.md
+ M docs/agent-dispatch-prompts.md
+ M docs/feature-map.md
+ M docs/lessons/README.md
+ D docs/lessons/baselines.json
+ D docs/lessons/events.jsonl
+ M docs/ops/lane-workers.md
+ M docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md
+ M docs/spec/29-evaluation-and-data-loop.md
+ M package.json
+ M packages/shared/src/records/merge-gate.ts
+ M packages/shared/test/__snapshots__/snapshot.test.ts.snap
+ M scripts/baseline-ledger.mjs
+ D scripts/baseline-owner-gate.mjs
+ D scripts/baseline-owner-gate.test.mjs
+ D scripts/baseline-ratchet-gate.mjs
+ D scripts/baseline-ratchet-gate.test.mjs
+ D scripts/check-closing-keyword.mjs
+ D scripts/check-closing-keyword.test.mjs
+ D scripts/ci-job-structure-baseline.json
+ D scripts/ci-job-structure-gate.mjs
+ D scripts/ci-job-structure-gate.test.mjs
+ M scripts/dispatch-agent.mjs
+ M scripts/dispatch-agent.test.mjs
+ M scripts/doc-reader-tests.test.mjs
+ M scripts/eval-coverage.mjs
+ M scripts/eval-coverage.test.mjs
+ D scripts/feature-map-staleness-baseline.json
+ D scripts/feature-map-staleness-gate.mjs
+ D scripts/funding-yml-gate.mjs
+ D scripts/funding-yml-gate.test.mjs
+ M scripts/gardener-weekly.mjs
+ M scripts/gardener-weekly.test.mjs
+ D scripts/issue-label-gate.mjs
+ D scripts/lane-file-gate.mjs
+ D scripts/lane-worker-exit-gate.mjs
+ D scripts/lane-worker-exit-gate.test.mjs
+ D scripts/lessons-ledger-gate.mjs
+ D scripts/lessons-ledger-gate.test.mjs
+ D scripts/lessons-weekly.mjs
+ D scripts/lessons-weekly.test.mjs
+ D scripts/npm-command-gate.mjs
+ D scripts/npm-command-gate.test.mjs
+ M scripts/pr-evidence-archive.test.py
+ M scripts/pr-evidence-gate.py
+ M scripts/pr-evidence-gate.test.py
+ D scripts/pr-evidence-workflow-gate.mjs
+ D scripts/pr-gate-selfcheck.mjs
+ M scripts/prepush-known-red.json
+ M scripts/prepush.mjs
+ M scripts/prepush.test.mjs
+ D scripts/recording-gate.mjs
+ D scripts/recording-gate.test.mjs
+ D scripts/single-use-helper-allowlist.json
+ D scripts/single-use-helper-gate.mjs
+ D scripts/single-use-helper-gate.test.mjs
+ D scripts/test-spawn-gate.mjs
+?? .claude/skills/verify-cairn/changelog/2026-10-30-2200.md
+?? docs/lessons/2200-archived-collector-reader.md
+?? docs/lessons/2200-project-runtime-verification.md
+?? docs/verify/2200/deleted-reference-audit.log
+?? docs/verify/2200/file-changes.log
+?? docs/verify/2200/plan-before-after.log
+?? docs/verify/2200/tests-green.log

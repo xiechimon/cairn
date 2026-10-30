@@ -1,16 +1,11 @@
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { loadEvalCoverage, renderEvalCoverage, staleScoredFlows } from './eval-coverage.mjs';
+import { loadEvalCoverage, renderEvalCoverage } from './eval-coverage.mjs';
 
 const repo = 'xiechimon/cairn';
-
-function addDays(iso, days) {
-  return new Date(Date.parse(`${iso}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
-}
 
 function writeFlow(root, name, { cases, state, variants }) {
   const dir = join(root, name);
@@ -158,33 +153,7 @@ test('coverage rows report scored, built-not-run, none, and tests only', () => {
       markdown,
       /\| machine claim \| {2}\| {2}\| {2}\| {2}\| {2}\| tests only, no eval needed \|/,
     );
-    assert.deepEqual(staleScoredFlows(rows, '2026-10-31'), []);
-    assert.deepEqual(
-      staleScoredFlows(rows, '2026-11-01').map((row) => row.flow),
-      ['chief-dispatch'],
-    );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
-});
-
-test('the staleness gate flags a scored flow older than 30 days', () => {
-  const date = execFileSync(
-    'git',
-    ['log', '-1', '--format=%cs', '--', '.claude/hillclimb/chief-dispatch/baseline/results.jsonl'],
-    { encoding: 'utf8' },
-  ).trim();
-  assert.match(date, /^\d{4}-\d{2}-\d{2}$/);
-  const run = (today) =>
-    spawnSync(process.execPath, ['scripts/feature-map-staleness-gate.mjs', '--today', today], {
-      encoding: 'utf8',
-    });
-  const fresh = run(addDays(date, 30));
-  assert.equal(fresh.status, 0, fresh.stdout + fresh.stderr);
-  const stale = run(addDays(date, 31));
-  assert.notEqual(stale.status, 0);
-  assert.match(
-    stale.stdout,
-    new RegExp(`eval score for chief-dispatch is 31 days old \\(${date}\\)`),
-  );
 });
