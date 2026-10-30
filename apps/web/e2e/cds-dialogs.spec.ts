@@ -8,7 +8,7 @@ async function openSearch(page: Page) {
   await pressAndExpect(page, 'Meta+k', searchPanel(page));
 }
 
-test('CDS search panel: 12px edge-radius + de-boxed input', async ({ page }) => {
+test('CDS search panel: 18px edge-radius + de-boxed input', async ({ page }) => {
   await page.goto('/app?scenario=01');
   await openSearch(page);
   const panel = searchPanel(page);
@@ -28,15 +28,15 @@ test('CDS search panel: 12px edge-radius + de-boxed input', async ({ page }) => 
     };
   });
 
-  expect(m.edgeRadius).toBe('12px');
-  expect(m.radius).toBe('12px');
+  expect(m.edgeRadius).toBe('18px');
+  expect(m.radius).toBe('18px');
   expect(m.inputBorder).toBe('0px');
   expect(m.inputRadius).toBe('0px');
   // De-boxed: no filled input plate — transparent / none over the panel surface.
   expect(m.inputBg === 'rgba(0, 0, 0, 0)' || m.inputBg === 'transparent').toBeTruthy();
 });
 
-test('Paper user-menu: 12px + shadow-popover, no solid border', async ({ page }) => {
+test('Paper user-menu: 18px + shadow-popover, no solid border', async ({ page }) => {
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=17');
   await expect(page.locator('.user-menu')).toBeVisible();
 
@@ -57,10 +57,10 @@ test('Paper user-menu: 12px + shadow-popover, no solid border', async ({ page })
         .trim(),
     };
   });
-  expect(m.radiusPopover).toBe('12px');
-  expect(m.radius).toBe('12px');
+  expect(m.radiusPopover).toBe('18px');
+  expect(m.radius).toBe('18px');
   expect(m.border).toBe('0px');
   expect(m.shadow).not.toBe('none');
   expect(m.shadow).toContain('0px 0px 0px 1px');
-  expect(m.shadow.includes('8px 28px') || m.shadow.includes('8px 24px')).toBeTruthy();
+  expect(m.shadow.includes('10px 30px') || m.shadow.includes('12px 32px')).toBeTruthy();
 });

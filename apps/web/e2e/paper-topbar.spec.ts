@@ -8,7 +8,7 @@ const filterBtn = (page: Page) => topbar(page).getByRole('button', { name: '筛�
 const schedulesLink = (page: Page) => topbar(page).getByRole('link', { name: '定时' });
 const newTaskBar = (page: Page) => page.getByTestId('board-new-task-bar');
 
-test('bar geometry: 56px, sans page title, summary N = the `待处理` column count', async ({
+test('bar geometry: 56px, display page title, summary N = the `待处理` column count', async ({
   page,
 }) => {
   await page.goto('/app?scenario=01&view=board');
@@ -21,7 +21,7 @@ test('bar geometry: 56px, sans page title, summary N = the `待处理` column co
     const cs = getComputedStyle(el);
     return { family: cs.fontFamily, weight: cs.fontWeight };
   });
-  expect(titleStyle.family).toContain('inter');
+  expect(titleStyle.family).toContain('bricolageGrotesque');
   expect(titleStyle.family).not.toContain('sourceSerif4');
   expect(titleStyle.weight).toBe('500');
 

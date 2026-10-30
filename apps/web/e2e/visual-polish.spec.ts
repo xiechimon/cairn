@@ -65,7 +65,7 @@ for (const theme of ['light', 'dark'] as const) {
     const card = await edgeContract(page, '.todo-card');
 
     expect(card.border).toBe('0px');
-    expect(card.radius).toBe('10px');
+    expect(card.radius).toBe('14px');
     expect(card.shadow).toContain('0px 0px 0px 1px');
     expect(card.shadow).not.toContain('inset');
     expect(card.shadow).toContain(card.panelShadow);
@@ -93,7 +93,7 @@ for (const theme of ['light', 'dark'] as const) {
     const banner = await edgeContract(page, '.board-notify-banner');
 
     expect(banner.border).toBe('0px');
-    expect(banner.radius).toBe('12px');
+    expect(banner.radius).toBe('18px');
     expect(banner.shadow.startsWith(banner.ring)).toBe(true);
     expect(banner.ring.startsWith(`${banner.borderColor} `)).toBe(true);
     expect(banner.shadow).toContain(banner.cardShadow);
@@ -106,11 +106,8 @@ for (const theme of ['light', 'dark'] as const) {
     await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=17');
 
     const menu = await edgeContract(page, '.user-menu');
-    // Paper menu face: --radius-popover 10px + --shadow-popover
-    // (light: outer hairline ring + soft pool; dark: inset highlight, no
-    // solid border). Border width collapses to 0; separation rides shadow.
     expect(menu.border).toBe('0px');
-    expect(menu.radius).toBe('12px');
+    expect(menu.radius).toBe('18px');
     expect(menu.shadow).not.toBe('none');
     expect(menu.shadow).toContain('0px 0px 0px');
   });

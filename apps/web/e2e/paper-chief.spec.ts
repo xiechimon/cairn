@@ -55,14 +55,13 @@ for (const theme of ['light', 'dark'] as const) {
   test(`window: heading face, Paper gate banner and hero cards (${theme})`, async ({ page }) => {
     await setTheme(page, theme);
     const win = await openWindow(page, GATED);
-    const serif = await probe(page, 'fontFamily', 'var(--font-source-serif)');
-    const sans = await probe(page, 'fontFamily', 'var(--font-sans)');
+    const display = await probe(page, 'fontFamily', 'var(--font-display)');
     const card = await probe(page, 'backgroundColor', 'var(--card)');
     const secondary = await probe(page, 'backgroundColor', 'var(--secondary)');
 
     const chip = win.getByRole('button', { name: '主题', exact: true });
     const title = chip.locator('span').first();
-    await expect(title, 'W1').toHaveCSS('font-family', sans);
+    await expect(title, 'W1').toHaveCSS('font-family', display);
     await expect(title, 'W1').toHaveCSS('font-size', '16px');
     await expect(title, 'W1').toHaveCSS('font-weight', '500');
     const winBox = await win.boundingBox();
@@ -75,10 +74,10 @@ for (const theme of ['light', 'dark'] as const) {
     expect(await css(banner, 'box-shadow'), 'W2: 1px ring').toContain('0px 0px 0px 1px');
     const gateButton = banner.getByRole('button', { name: '设置' });
     expect((await gateButton.boundingBox())?.height, 'W2').toBe(32);
-    await expect(gateButton, 'W2').toHaveCSS('border-top-left-radius', '6px');
+    await expect(gateButton, 'W2').toHaveCSS('border-top-left-radius', '8px');
 
     const hero = win.getByRole('heading', { name: '选择一个主题开始' });
-    await expect(hero, 'W3').toHaveCSS('font-family', serif);
+    await expect(hero, 'W3').toHaveCSS('font-family', display);
     await expect(hero, 'W3').toHaveCSS('font-size', '16px');
     const example = win.getByTestId('chief-examples').getByRole('button').first();
     await expect(example, 'W3').toHaveCSS('border-top-left-radius', await token(page, '--radius-card'));
@@ -118,10 +117,10 @@ for (const theme of ['light', 'dark'] as const) {
   }) => {
     await setTheme(page, theme);
     await page.goto(SETTINGS('101'));
-    const sans = await probe(page, 'fontFamily', 'var(--font-sans)');
+    const display = await probe(page, 'fontFamily', 'var(--font-display)');
 
     const heading = page.getByRole('heading', { name: '总管设置' });
-    await expect(heading, 'S1').toHaveCSS('font-family', sans);
+    await expect(heading, 'S1').toHaveCSS('font-family', display);
     await expect(heading, 'S1').toHaveCSS('font-size', '18px');
     const bar = page.getByTestId('chief-settings-topbar');
     expect((await bar.boundingBox())?.height, 'S1').toBe(56);
