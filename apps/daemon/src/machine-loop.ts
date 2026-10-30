@@ -313,6 +313,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   });
   const sessionHandles = new Map<string, AgentSessionHandle>();
   const stepImageSupport = new Map<string, boolean | null>();
+  const stepSteeringSupport = new Map<string, boolean>();
   const stepTranscripts = new Map<string, TranscriptBuffer>();
   const stops = new StepStops();
   const inFlightChief = new Set<string>();
@@ -410,14 +411,18 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
 
   const streamCtrl = new AbortController();
   const deliverSteer = async (stepId: string): Promise<void> => {
+    if (stepSteeringSupport.get(stepId) === false) {
+      logger.step(`steer left queued (backend does not support steering) step=${stepId}`);
+      return;
+    }
     try {
-      const content = await client.steer(stepId);
-      if (content === null) return;
       const live = sessionHandles.get(stepId);
       if (live === undefined) {
         logger.step(`steer dropped (no live session) step=${stepId}`);
         return;
       }
+      const content = await client.steer(stepId);
+      if (content === null) return;
       let deliveryText = content;
       let images: DeliveredImage[] | undefined;
       try {
@@ -542,6 +547,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       skillsDir: config.skillsDir,
       sessionHandles,
       stepImageSupport,
+      stepSteeringSupport,
       stepTranscripts,
       stops,
       machineName: config.name,

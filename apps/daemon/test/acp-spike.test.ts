@@ -345,11 +345,101 @@ describe('ACP spike with a real scripted stdio child', () => {
     });
   });
 
-  test('rejects competing steering without acknowledging delivery', async () => {
+  test('rejects competing steering on a direct session call', async () => {
     const session = await adapter().createSession(opts);
     await expect(session.steer('extra')).rejects.toThrow('steer');
     await collect(session.events);
   });
+
+  test.each(['claude-code', 'codex'] as const)(
+    '%s leaves unsupported steering queued through the daemon and runner',
+    async (harness) => {
+      vi.stubEnv(
+        'CAIRN_ACP_AGENTS',
+        JSON.stringify({ a1: { harness, command: process.execPath, args: [fixture, 'cancel'] } }),
+      );
+      const api = new FakeMachineApi();
+      let pending: string | null = 'Keep this instruction queued';
+      const fetchSteer = vi.spyOn(api, 'steer').mockImplementation(async () => {
+        const content = pending;
+        pending = null;
+        return content;
+      });
+      const ack = vi.spyOn(api, 'steerAck');
+      const token = api.token.bind(api);
+      vi.spyOn(api, 'token').mockImplementation(async (stepId) => {
+        api.onStreamEvent?.({ type: 'steer', stepId });
+        return token(stepId);
+      });
+      const { handle, lines } = await boot({ api });
+      try {
+        await waitFor(() => api.parked !== null);
+        api.parked?.({
+          ...CLAIMED,
+          step: { ...CLAIMED.step, kind: 'build' },
+          instruction: 'Hello',
+          todo: undefined,
+        });
+        await waitFor(() => api.calls.some((call) => call.startsWith('transcriptDelta:s1:')));
+        expect(pending).toBe('Keep this instruction queued');
+        api.onStreamEvent?.({ type: 'steer', stepId: 's1' });
+        await waitFor(() => lines.filter((line) => line.includes('steer ')).length === 2);
+        expect(pending).toBe('Keep this instruction queued');
+        expect(fetchSteer).not.toHaveBeenCalled();
+        expect(ack).not.toHaveBeenCalled();
+      } finally {
+        api.stopResponse = false;
+        api.onStreamEvent?.({ type: 'stop', stepId: 's1' });
+        await waitFor(() => api.doneBodies.length === 1);
+        await handle.stop();
+        await handle.done;
+      }
+    },
+  );
+
+  test.each(
+    (['claude-code', 'codex'] as const).flatMap((harness) =>
+      [[], [{ slug: 'host', transport: 'http' as const, url: 'http://host' }]].map(
+        (mcpServers) => ({ harness, mcpServers }),
+      ),
+    ),
+  )(
+    '$harness rejects external MCP set $mcpServers before spawning',
+    async ({ harness, mcpServers }) => {
+      const spawnProcess = vi.fn(() => {
+        throw new Error('Adapter must not spawn');
+      });
+      const backend = createAcpBackend({ harness, command: 'must-not-spawn', spawnProcess });
+      await expect(backend.createSession({ ...opts, mcpServers })).rejects.toThrow(
+        'ACP mcpServers policy is unsupported: adapter host MCP configuration is not isolated',
+      );
+      expect(spawnProcess).not.toHaveBeenCalled();
+    },
+  );
+
+  test.each([{ mcpServers: [] }, { mcpServers: ['host'] }])(
+    'fails the daemon step for external MCP policy $mcpServers',
+    async ({ mcpServers }) => {
+      vi.stubEnv(
+        'CAIRN_ACP_AGENTS',
+        JSON.stringify({ a1: { harness: 'codex', command: 'must-not-spawn' } }),
+      );
+      const { api, handle } = await boot({});
+      try {
+        await waitFor(() => api.parked !== null);
+        api.parked?.({ ...CLAIMED, mcpServers });
+        await waitFor(() => api.doneBodies.length === 1);
+        expect(api.doneBodies[0]?.body).toMatchObject({
+          status: 'failed',
+          errorMessage:
+            'ACP mcpServers policy is unsupported: adapter host MCP configuration is not isolated',
+        });
+      } finally {
+        await handle.stop();
+        await handle.done;
+      }
+    },
+  );
 
   test('requires advertised image support and delivers pixels', async () => {
     const images = { ...opts, promptImages: [{ data: 'aA==', mimeType: 'image/png' }] };

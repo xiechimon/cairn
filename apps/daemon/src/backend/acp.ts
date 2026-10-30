@@ -334,7 +334,7 @@ class AcpBackend implements AgentBackend {
     private readonly options: GeminiBackendOptions & { adapter?: AcpBackendOptions } = {},
   ) {
     this.capabilities = options.adapter
-      ? { ...GEMINI_CAPABILITIES, name: `${options.adapter.harness}-acp` }
+      ? { ...GEMINI_CAPABILITIES, name: `${options.adapter.harness}-acp`, steering: false }
       : GEMINI_CAPABILITIES;
     if (!options.adapter) {
       this.brief = { backendId: 'gemini', composeBody: (_opts, base) => base ?? '' };
@@ -360,6 +360,10 @@ class AcpBackend implements AgentBackend {
 
   private async open(opts: SessionOpts, resumeId: string | undefined): Promise<AgentSessionHandle> {
     const adapter = this.options.adapter;
+    if (adapter && opts.mcpServers !== undefined)
+      throw new Error(
+        'ACP mcpServers policy is unsupported: adapter host MCP configuration is not isolated',
+      );
     if (
       adapter &&
       (opts.readOnly ||
@@ -367,7 +371,6 @@ class AcpBackend implements AgentBackend {
         opts.skillsAllowlist !== undefined ||
         (opts.injectedSkills?.length ?? 0) > 0 ||
         (opts.tools?.length ?? 0) > 0 ||
-        (opts.mcpServers?.length ?? 0) > 0 ||
         (opts.thinkingLevel !== undefined && opts.thinkingLevel !== 'off'))
     )
       throw new Error('ACP session policy or host tools are unsupported (fail-closed)');

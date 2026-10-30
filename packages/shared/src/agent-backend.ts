@@ -122,6 +122,7 @@ export interface AgentBackendCapabilities {
   readonly oauthProviders: readonly string[];
   readonly compaction: boolean;
   readonly sessionResume: boolean;
+  readonly steering?: boolean;
 }
 
 export interface SessionOpts {

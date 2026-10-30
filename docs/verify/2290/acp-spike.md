@@ -65,18 +65,22 @@ Measured source baseline: `apps/daemon/src/backend/claude-code.ts`, `pi.ts`, the
 | Capability | Current Claude Code backend | Current pi backend | ACP spike |
 | --- | --- | --- | --- |
 | Text, thinking, tool calls | SDK events mapped to step events | Runtime events mapped to step events | Measured with a stdio child and real step reporting; merges tool updates and excludes other sessions/history |
-| Steer | Queues input and acknowledges delivery | Runtime steer plus delivery event | Explicitly rejected; no competing `session/prompt` and no false acknowledgment |
+| Steer | Queues input and acknowledges delivery | Runtime steer plus delivery event | Measured offline: advertises `steering: false`; daemon leaves the fake server queue untouched during preparation and execution, without fetching or acknowledging; direct session calls reject |
 | Resume | Local SDK transcript ID/file | Local runtime session file | Negotiates `session/resume`, then `session/load`; rejects unsupported resume, never silently starts fresh; history is excluded from the new step |
 | Stop | SDK interrupt and abort | Runtime abort | `session/cancel`, bounded fallback and process cleanup; cooperative and ignored cancellation tested |
 | Usage | Per-model token/cache/cost rows | Per-model token/cache/cost rows | Empty usage rows; stable `usage_update` gives context-window occupancy and cumulative cost, not equivalent per-step usage |
 | Images | SDK image blocks | Model-checked runtime images | Delivered only after negotiated image capability; rejection is explicit |
 | Permissions | SDK bypass plus denied tools/read-only controls | Command/tool gate and selected built-ins | Reject by default; explicit per-agent allow-once policy; no permanent grants |
 | Host tools | In-process MCP definitions | Runtime extensions | Authenticated per-session loopback MCP bridge to existing remote/local callbacks; discovery, calls, rejection and teardown tested |
-| External MCP | Configured endpoints and managed-empty policy | Configured endpoints | Nonempty external MCP sets rejected; ambient adapter configuration is not centrally reconciled |
+| External MCP | Configured endpoints and managed-empty policy | Configured endpoints | Measured offline: any defined `mcpServers`, including `[]`, rejects before adapter spawn; daemon reports a failed step. Gemini still accepts empty and nonempty lists. Inferred limitation: absent policy can inherit ambient adapter MCP configuration; isolation is not enforced |
 | Read-only / restricted built-ins | Supported | Supported | Rejected before spawn; not approximated through prompt text |
 | Skills / thinking level | Supported through backend-specific integration | Supported through runtime integration | Skill allowlists, injected skills and non-off thinking levels rejected; team skill directory delivery is not implemented |
 | System instructions | Workspace instructions channel | Workspace instructions channel | Prepended as prompt context; not a dedicated system role |
 | Session artifact / telemetry | Native transcript and rate-limit handling | Native session artifact and telemetry | ACP session ID and Cairn transcript only; no native session file, rate-limit callback, compaction or dedicated telemetry mapping |
+
+Measured review-gate follow-up: six focused regressions failed before the fixes (two queued-steer cases and four explicit-MCP cases); the two Gemini controls passed. A further failing regression covered steering before backend selection. The queue assertions exercise the real daemon and runner with a consuming fake machine client and a scripted stdio adapter. These checks establish queue preservation without a delivery acknowledgment; automatic delivery as a later prompt and post-fix real-provider behavior remain unverified. The real-run records below describe the earlier revision and are unchanged.
+
+Measured follow-up validation with Node 24.14.0: `pnpm lint`, `pnpm typecheck` and `pnpm spec:parse` passed; the ACP, machine-backends, runner and machine-steer suites passed all 355 tests across 35 files with `--maxWorkers=2`; `pnpm prepush` passed all 20 checks. The affected-browser selector found no web surface for these seven changed files. `pnpm exec vitest run --changed --maxWorkers=2` finished with 5,751 passes, five failures and 20 skips across 427 files. All five failures reproduced in a separate checkout of baseline `64243423b`: one credential environment assertion in `local-executor.test.ts`, one missing hook PID file in `workspace-hooks.test.ts`, and three routing CLI assertions reporting unavailable boundary enforcement. The isolated baseline run had 32 passes and five failures; those files and their assertions are unchanged by this follow-up.
 
 Measured (source, not provider execution): [Claude adapter 0.99.1](https://github.com/zed-industries/claude-agent-acp/blob/v0.99.1/src/acp-agent.ts) advertises image input, HTTP MCP, session load/resume and the `_session/steering` extension. This spike does not implement that extension. [Codex adapter 0.16.0](https://github.com/zed-industries/codex-acp/blob/v0.16.0/src/codex_agent.rs) advertises image input, HTTP MCP, session load/resume and session config options. The [SDK 2.2.0 package](https://www.npmjs.com/package/@agentclientprotocol/sdk/v/2.2.0) installed here exposes stable v1 `PromptResponse.stopReason` and `UsageUpdate.used/size/cost`; the implementation was checked against its installed types and source.
 
@@ -149,7 +153,7 @@ Measured: the same ACP client ran a real Claude Code Thread and a real Codex Thr
 
 Measured gaps found only in the real runs:
 
-1. Steer silently loses the message from the agent's side: the server reports `delivered: "steer"` and shows the text, but the daemon rejects it and the agent never sees it. The server needs a delivery failure or queueing (the Claude adapter advertises prompt queueing).
+1. The recorded revision silently lost steers after the server reported `delivered: "steer"`. Measured offline after the review-gate fix: the daemon preserves the queue and sends no acknowledgment for ACP adapters. Later delivery and the server's initial delivery label remain unverified; active ACP steering is still unsupported.
 2. Permissions and host configuration leak in: the adapters take their mode (`bypassPermissions`, `agent`, `full-access`), hooks and instructions from the host CLI configuration, so the per-agent `permissions` policy was not exercised. Cairn must set the adapter mode and isolate host settings before ACP can carry policy.
 3. Usage stays empty even though Codex 2.5.0 returns per-turn token counts in `PromptResponse.usage`.
 4. Diagnostics are lost: JSON-RPC error data is dropped, so the legacy Codex failure surfaced as `Internal error`.
