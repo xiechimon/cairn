@@ -216,7 +216,7 @@ describe('buildSkillDenyRules / escapeGitignorePath (claude-code hard-block rule
     expect(rules).toEqual(['Read(//a/\\[weird\\]/**)', 'Skill(x)', 'Skill(skill:x)']);
   });
 
-  test('empty denial set = empty rule array (the criterion for not sending the settings key)', () => {
+  test('empty denial set = empty rule array', () => {
     expect(buildSkillDenyRules([])).toEqual([]);
   });
 });
@@ -245,7 +245,7 @@ describe('buildClaudeSdkOptions (spec 14 §post-ruling scope 1/2: settingSources
       ...baseParts(),
       skillDenyRules: ['Read(//skills/beta/**)', 'Skill(beta)', 'Skill(skill:beta)'],
     });
-    expect(opts.settings).toEqual({
+    expect(opts.settings).toMatchObject({
       permissions: { deny: ['Read(//skills/beta/**)', 'Skill(beta)', 'Skill(skill:beta)'] },
     });
   });
@@ -257,23 +257,30 @@ describe('buildClaudeSdkOptions (spec 14 §post-ruling scope 1/2: settingSources
     ).toBe(false);
   });
 
-  test('chief surface: settings key not sent (zero regression on CLI default behavior)', () => {
+  test('Coordinator surface: flag settings disable direct CLI telemetry', () => {
     const opts = buildClaudeSdkOptions(baseParts());
-    expect('settings' in opts).toBe(false);
+    expect(opts.settings).toEqual({
+      env: {
+        CLAUDE_CODE_ENABLE_TELEMETRY: '0',
+        CLAUDE_CODE_ENHANCED_TELEMETRY_BETA: '0',
+        OTEL_SDK_DISABLED: 'true',
+      },
+    });
   });
 
-  test('empty deny rule array = settings key not sent', () => {
+  test('empty deny rule array keeps telemetry pins without adding permission rules', () => {
     const opts = buildClaudeSdkOptions({ ...baseParts(), skillDenyRules: [] });
-    expect('settings' in opts).toBe(false);
+    expect(opts.settings).not.toHaveProperty('permissions');
+    expect(opts.settings).toHaveProperty('env.OTEL_SDK_DISABLED', 'true');
   });
 
-  test('#1148: env injection = process.env expansion + per-step overrides (SDK env whole-replacement semantics); env key not sent by default', () => {
-    expect('env' in buildClaudeSdkOptions(baseParts())).toBe(false);
+  test('env injection preserves inherited paths and per-step overrides with CLI telemetry disabled', () => {
+    expect(buildClaudeSdkOptions(baseParts()).env?.OTEL_SDK_DISABLED).toBe('true');
     const opts = buildClaudeSdkOptions({
       ...baseParts(),
       env: { CAIRN_PORT_BASE: '20100' },
     });
-    expect(opts.env).toEqual({ ...process.env, CAIRN_PORT_BASE: '20100' });
+    expect(opts.env?.CLAUDE_CODE_ENABLE_TELEMETRY).toBe('0');
     expect(opts.env?.CAIRN_PORT_BASE).toBe('20100');
     expect(opts.env?.PATH).toBe(process.env.PATH);
   });

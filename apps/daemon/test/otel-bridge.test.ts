@@ -40,20 +40,17 @@ describe('daemonOtelFromEnv', () => {
 });
 
 describe('claudeTelemetryEnv', () => {
-  test('injects TRACEPARENT and the Claude Code telemetry pins', () => {
+  test('injects TRACEPARENT while disabling unredacted CLI telemetry', () => {
     const target = parseOtlpTarget(env)!;
     const ctx = stepOtelContext('build-abc', 'step-xyz', target);
     const injected = claudeTelemetryEnv(ctx);
     expect(injected.TRACEPARENT).toBe(otlpTraceparent(ctx.traceId, ctx.stepSpanId));
     expect(injected.TRACEPARENT).toBe('00-c8e7752b66c5938fc686748fdc429fb0-68de601387c7a961-01');
-    expect(injected.CLAUDE_CODE_ENABLE_TELEMETRY).toBe('1');
-    expect(injected.CLAUDE_CODE_ENHANCED_TELEMETRY_BETA).toBe('1');
-    expect(injected.OTEL_TRACES_EXPORTER).toBe('otlp');
-    expect(injected.OTEL_EXPORTER_OTLP_ENDPOINT).toBe('http://127.0.0.1:3000/api/public/otel');
-    expect(injected.OTEL_EXPORTER_OTLP_HEADERS).toContain('x-langfuse-ingestion-version=4');
-    expect(injected.OTEL_EXPORTER_OTLP_HEADERS).toContain(
-      `authorization=Basic ${Buffer.from('pk:sk').toString('base64')}`,
-    );
+    expect(injected.CLAUDE_CODE_ENABLE_TELEMETRY).toBe('0');
+    expect(injected.CLAUDE_CODE_ENHANCED_TELEMETRY_BETA).toBe('0');
+    expect(injected.OTEL_SDK_DISABLED).toBe('true');
+    expect(injected.OTEL_EXPORTER_OTLP_ENDPOINT).toBeUndefined();
+    expect(injected.OTEL_EXPORTER_OTLP_HEADERS).toBeUndefined();
   });
 });
 
