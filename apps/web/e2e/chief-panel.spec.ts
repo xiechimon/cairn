@@ -107,7 +107,7 @@ test.describe('chief panel floating form (ADR 0013)', () => {
     // an overlay anchored to the corner, not an in-flow column (D10)
     expect(skin.position).toBe('fixed');
 
-    expect(skin.radius).toBe('12px');
+    expect(skin.radius).toBe('18px');
 
     expect(skin.shadow).not.toBe('none');
     expect(skin.shadow).toContain('inset');

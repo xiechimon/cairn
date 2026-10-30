@@ -51,6 +51,8 @@ export interface ComposerWireOptions {
   draft?: string;
   onDraftChange?: (next: string) => void;
   onSend?: (text: string) => void | Promise<void>;
+  onQueue?: (text: string) => void | Promise<void>;
+  onStopAndSend?: (text: string) => void | Promise<void>;
   onAttachment?: (files: File[]) => string[] | Promise<string[]>;
   mentionGroups?: MentionGroups;
   mentionFiles?: FileMentionEntry[];
@@ -130,6 +132,8 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     draft: draftProp,
     onDraftChange,
     onSend,
+    onQueue,
+    onStopAndSend,
     onAttachment,
     mentionGroups,
     mentionFiles,
@@ -301,21 +305,33 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     [slashOptions],
   );
 
-  const send = () => {
-    if (attachInFlightRef.current > 0) return;
+  const escapeAt = useRef<number | null>(null);
+  const sending = useRef(false);
+  const submit = (callback: typeof onSend) => {
+    if (attachInFlightRef.current > 0 || sending.current) return;
     const text = draft.trim();
     if (text === '' && !editable) {
-      onSend?.(text);
+      callback?.(text);
       return;
     }
     if (text === '') return;
-    const result = onSend?.(text);
+    const result = callback?.(text);
     if (result instanceof Promise) {
-      void result.then(() => setDraft('')).catch(() => {});
+      sending.current = true;
+      void result
+        .then(() => {
+          if (draftRef.current === draft) setDraft('');
+        })
+        .catch(() => {})
+        .finally(() => {
+          sending.current = false;
+        });
     } else {
       setDraft('');
     }
   };
+
+  const send = () => submit(onSend);
 
   const openFilePicker = () => fileInputRef.current?.click();
 
@@ -587,6 +603,35 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
       if (picked !== undefined) acceptInlineRow(picked);
       return;
     }
+    if (
+      event.key === 'Escape' &&
+      (isComposing || event.repeat) &&
+      (slashOptions?.stopAvailable || escapeAt.current !== null)
+    ) {
+      if (!isComposing) event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    if (event.key === 'Escape' && !isComposing && !event.repeat) {
+      const now = Date.now();
+      const secondEscape = escapeAt.current !== null && now - escapeAt.current <= 500;
+      if (secondEscape && onStopAndSend !== undefined) {
+        event.preventDefault();
+        event.stopPropagation();
+        escapeAt.current = null;
+        submit(onStopAndSend);
+        return;
+      }
+      if (slashOptions?.stopAvailable && slashOptions.onStop !== undefined) {
+        event.preventDefault();
+        event.stopPropagation();
+        escapeAt.current = now;
+        slashOptions.onStop();
+        return;
+      }
+    } else if (event.key !== 'Escape') {
+      escapeAt.current = null;
+    }
     if (event.key === 'Enter' && !isComposing) {
       if (
         event.shiftKey &&
@@ -608,7 +653,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
       }
       if (!event.shiftKey) {
         event.preventDefault();
-        send();
+        submit((event.metaKey || event.ctrlKey) && onQueue !== undefined ? onQueue : onSend);
       }
     }
   };

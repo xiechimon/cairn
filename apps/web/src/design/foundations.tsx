@@ -81,25 +81,24 @@ const SEMANTIC = [
 const TYPE = [
   {
     name: 'Page',
-    cls: 'text-page font-medium',
-    sample: 'Needs your attention',
+    cls: 'font-heading text-page font-[650] tracking-[-0.015em]',
+    sample: 'Waiting on you',
     token: '--type-page',
-    weight: 500,
+    weight: 650,
   },
   {
     name: 'Heading',
-    cls: 'text-heading font-medium',
-    sample: 'Running',
+    cls: 'font-heading text-heading font-[650]',
+    sample: 'Threads',
     token: '--type-heading',
-    weight: 500,
+    weight: 650,
   },
   {
     name: 'Brand',
-    cls: 'text-heading font-semibold',
-    sample: 'Cairn',
+    cls: 'font-heading text-heading font-[650]',
+    sample: 'cairn',
     token: '--type-heading',
-    weight: 600,
-    serif: true,
+    weight: 650,
   },
   {
     name: 'Card title',
@@ -183,9 +182,9 @@ export function FoundationsHero({ theme }: { theme: GalleryTheme }) {
     <div className="grid grid-cols-1 items-end gap-12 pt-6 lg:grid-cols-2">
       <div>
         <p className="m-0 max-w-100 text-card-title text-content-secondary">
-          Pine & Brass: stone paper, pine ink, one brass accent. Surfaces stack like stones, each
-          layer a step {theme === 'dark' ? 'lighter' : 'whiter'} than the one below, and the brass
-          sits on top as the marker.
+          Cairn: limestone paper, lichen ink, ochre for what waits on you. Surfaces stack like
+          stones, each layer a step {theme === 'dark' ? 'lighter' : 'whiter'} than the one below,
+          and status marks are the pebbles on the trail.
         </p>
         <a
           href="#doc-check"
@@ -236,7 +235,7 @@ export function ColorSection() {
     <Section
       id="color"
       title="Color"
-      lede="Four steps of ink on three layers of paper. One accent means it needs you, one green means it is running. Ratios are measured live against the card."
+      lede="Four steps of ink on three layers of stone. Ochre means it waits on you, green means it is working. Ratios are measured live against the card."
     >
       <Specimen title="Ink on the card" note="WCAG 2.x contrast, text needs 4.5, labeled icons 3">
         <div className="-my-3 w-full divide-y divide-border">
@@ -350,7 +349,7 @@ export function TypeSection() {
     <Section
       id="type"
       title="Type"
-      lede="Six sizes and three weights. Inter for everything you read; Source Serif only for the brand and the chief greeting."
+      lede="Six sizes. Bricolage Grotesque for titles and the brand, Instrument Sans for everything you read, JetBrains Mono for code and times."
     >
       <Specimen
         title="Scale"
@@ -363,10 +362,7 @@ export function TypeSection() {
                 <div className="font-medium text-content-secondary">{row.name}</div>
                 {computedLength(`var(${row.token})`).replace(/(\.\d)\d+/, '$1')} / {row.weight}
               </div>
-              <div
-                className={cn('min-w-0 flex-auto truncate text-foreground', row.cls)}
-                style={row.serif === true ? { fontFamily: 'var(--font-serif)' } : undefined}
-              >
+              <div className={cn('min-w-0 flex-auto truncate text-foreground', row.cls)}>
                 {row.sample}
               </div>
             </div>
@@ -463,7 +459,7 @@ export function MotionSection() {
     <Section
       id="motion"
       title="Motion"
-      lede="The paper is quiet. Every transition takes one of these durations and curves; play them together to compare."
+      lede="The stone is quiet. Every transition takes one of these durations and curves; play them together to compare."
     >
       <Specimen title="Durations and curves">
         <div className="flex w-full flex-col gap-1">

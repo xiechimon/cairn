@@ -16,6 +16,7 @@ import {
 } from '../src/services/merge-gate/github-facts.js';
 import type { GateGithubPort, GateRaw } from '../src/services/merge-gate/github-port.js';
 import { mergeReadiness } from '../src/services/merge-gate/readiness.js';
+import { type GateAnswers, githubFake } from './fakes/github.js';
 import pastMotion from './fixtures/1783-motion-pr.json' with { type: 'json' };
 
 const HEAD = 'a'.repeat(40);
@@ -112,19 +113,6 @@ const status = (context: string, state: string, over: Record<string, unknown> = 
   ...over,
 });
 
-interface Fake {
-  pull: (n: number, o: { etag: string | null }) => GateRaw;
-  branch: (name: string, o: { etag: string | null }) => GateRaw;
-  rules: (name: string, o: { page: number; perPage: number; etag: string | null }) => GateRaw;
-  compare: (base: string, head: string, o: { page: number; perPage: number }) => GateRaw;
-  checkRuns: (sha: string, o: { page: number; perPage: number; etag: string | null }) => GateRaw;
-  combinedStatus: (
-    sha: string,
-    o: { page: number; perPage: number; etag: string | null },
-  ) => GateRaw;
-  contents: (path: string, ref: string) => GateRaw;
-}
-
 const slice = <T>(list: T[], o: { page: number; perPage: number }) =>
   list.slice((o.page - 1) * o.perPage, o.page * o.perPage);
 
@@ -156,47 +144,21 @@ const listing = (...names: Array<string | { name: string; type: string }>) =>
     }),
   );
 
-function fakeGithub(over: Partial<Fake> = {}) {
-  const f: Fake = {
-    pull: () => ok(prBody(), '"pr1"'),
-    branch: () => ok(branchBody(), '"br1"'),
-    rules: () => ok([], '"ru1"'),
-    compare: comparePages(chain(EARLIER, HEAD)),
-    checkRuns: runPages([run('check', { id: 1 }), run('pr-evidence', { id: 2 })]),
-    combinedStatus: statusPages([]),
-    contents: (path, ref) =>
-      path === 'docs/verify/1404' && ref === HEAD ? listing('shot.png') : NOT_FOUND,
-    ...over,
-  };
-  const log: Array<[string, ...unknown[]]> = [];
-  let inFlight = 0;
-  let maxInFlight = 0;
-  const call = async (name: string, args: unknown[], answer: () => GateRaw): Promise<GateRaw> => {
-    log.push([name, ...args]);
-    inFlight += 1;
-    maxInFlight = Math.max(maxInFlight, inFlight);
-    try {
-      await new Promise((r) => setTimeout(r, 0));
-      return answer();
-    } finally {
-      inFlight -= 1;
-    }
-  };
-  const port: GateGithubPort = {
-    pull: (n, o) => call('pull', [n, o], () => f.pull(n, o)),
-    branch: (name, o) => call('branch', [name, o], () => f.branch(name, o)),
-    branchRules: (name, o) => call('rules', [name, o], () => f.rules(name, o)),
-    compare: (b, h, o) => call('compare', [b, h, o], () => f.compare(b, h, o)),
-    checkRuns: (sha, o) => call('checkRuns', [sha, o], () => f.checkRuns(sha, o)),
-    combinedStatus: (sha, o) => call('combinedStatus', [sha, o], () => f.combinedStatus(sha, o)),
-    contents: (path, ref) => call('contents', [path, ref], () => f.contents(path, ref)),
-    createStatus: () => Promise.reject(new Error('the shell never writes')),
-  };
-  return { port, log, maxInFlight: () => maxInFlight };
-}
+const gateDefaults: GateAnswers = {
+  pull: () => ok(prBody(), '"pr1"'),
+  branch: () => ok(branchBody(), '"br1"'),
+  rules: () => ok([], '"ru1"'),
+  compare: comparePages(chain(EARLIER, HEAD)),
+  checkRuns: runPages([run('check', { id: 1 }), run('pr-evidence', { id: 2 })]),
+  combinedStatus: statusPages([]),
+  contents: (path, ref) =>
+    path === 'docs/verify/1404' && ref === HEAD ? listing('shot.png') : NOT_FOUND,
+};
+const fakeGithub = (over: Partial<GateAnswers> = {}) =>
+  githubFake('xiechimon/cairn', { gate: { ...gateDefaults, ...over } });
 
 const read = (
-  over: Partial<Fake> = {},
+  over: Partial<GateAnswers> = {},
   cache: GateReadCache = newGateReadCache(),
   req = REQ,
 ): Promise<GateGithubFacts & { log: Array<[string, ...unknown[]]>; maxInFlight: number }> => {
@@ -604,7 +566,7 @@ describe('readGateGithubFacts: base branch, compare and required checks (F6 to F
   });
 
   test('F11 the required list: branch protection plus rulesets, null when either cannot be read', async () => {
-    const required = async (over: Partial<Fake>) => (await read(over)).checks?.required;
+    const required = async (over: Partial<GateAnswers>) => (await read(over)).checks?.required;
     expect(await required({})).toEqual(['check', 'pr-evidence']);
     expect(await required({ branch: () => NOT_FOUND })).toBeNull();
     expect(
@@ -901,7 +863,7 @@ describe('readGateGithubFacts: evidence presence (F16, F17)', () => {
   });
 
   test('F17 what a probe answer means; present is remembered for the commit, absent is not', async () => {
-    const probe = async (contents: Fake['contents']) => (await read({ contents })).evidence;
+    const probe = async (contents: GateAnswers['contents']) => (await read({ contents })).evidence;
     expect(await probe(() => NOT_FOUND)).toEqual([{ sha: HEAD, path: SHOT, present: false }]);
     for (const failure of [
       fail({ kind: 'status', status: 500, message: null }),
@@ -1083,7 +1045,7 @@ describe('readGateGithubFacts into mergeReadiness and gateStatusFor: an unusable
     (b: string, h: string, o: { page: number; perPage: number }): GateRaw =>
       o.page === 1 ? comparePages(MANY)(b, h, o) : second();
 
-  const statusOf = async (over: Partial<Fake>) => {
+  const statusOf = async (over: Partial<GateAnswers>) => {
     const f = await read(over);
     const r = mergeReadiness({
       policy: { mergePolicy: 'autonomous', autonomyPaused: false, dailyCapReached: false },

@@ -61,7 +61,7 @@ export function MenuSection() {
     <Section
       id="menu"
       title="Menu"
-      lede="One Paper surface for dropdowns, selects and popovers. Rows are 32px with concentric corners; shortcuts sit on the right; danger rows go red."
+      lede="One menu surface for dropdowns, selects and popovers. Rows are 32px with concentric corners; shortcuts sit on the right; danger rows go red."
     >
       <Specimen
         title="Dropdown menu"
