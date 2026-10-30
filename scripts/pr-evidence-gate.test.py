@@ -97,13 +97,26 @@ class SectionContractTests(unittest.TestCase):
         self.assertEqual(result, 1, output)
         for name in ('What', 'Proof', 'Review', 'Risk'):
             self.assertIn(f'FAIL empty-section: {name}', output)
-        self.assertIn('What / Proof / Review / Risk', output)
+        self.assertIn('Proof / What / Review / Risk', output)
 
     def test_repository_template_is_unanswered(self):
         body = Path('.github/PULL_REQUEST_TEMPLATE.md').read_text()
         result, output = self.verdict(body)
         self.assertEqual(result, 1, output)
         self.assertEqual(gate.section_verdicts(body), dict.fromkeys(('What', 'Proof', 'Review', 'Risk'), 'empty'))
+
+    def test_folded_review_and_risk_headings_are_found(self):
+        body = '## Proof\nOld run failed; new run passed.\n## What\nUpdate the contract.\n<details><summary>Review and risk</summary>\n\n## Review\nFresh review passed.\n## Risk\nReversible gate change.\n</details>\n'
+        result, output = self.verdict(body)
+        self.assertEqual(result, 0, output)
+        self.assertEqual(gate.section_verdicts(body), dict.fromkeys(('What', 'Proof', 'Review', 'Risk'), 'answered'))
+
+    def test_fold_markup_does_not_answer_empty_sections(self):
+        body = '## Proof\nEvidence.\n## What\n<!-- Guidance. -->\n<details><summary>Review and risk</summary>\n\n## Review\n<!-- Guidance. -->\n## Risk\n<!-- Guidance. -->\n</details>\n'
+        result, output = self.verdict(body)
+        self.assertEqual(result, 1, output)
+        for name in ('What', 'Review', 'Risk'):
+            self.assertIn(f'FAIL empty-section: {name}', output)
 
     def test_filled_four_section_body_passes_without_upstream_or_tasks(self):
         result, output = self.verdict(self.body)
@@ -200,7 +213,7 @@ class SectionContractTests(unittest.TestCase):
         self.assertIn('FAIL empty-section: Review', output)
         self.assertIn('FAIL missing-section: Risk', output)
 
-    def test_weekly_workflow_body_with_real_rendered_summary_passes(self):
+    def test_weekly_workflow_body_with_long_rendered_summary_exceeds_prose_cap(self):
         rendered = subprocess.run([
             'node', '--input-type=module', '-e',
             "import { loadLedger, readEvents, weeklySummary, renderWeeklySummary } from './scripts/lessons-ledger-gate.mjs'; process.stdout.write(renderWeeklySummary(weeklySummary(loadLedger(process.cwd()), readEvents(process.cwd()), { now: new Date('2026-10-30T00:00:00Z') })));",
@@ -215,8 +228,89 @@ class SectionContractTests(unittest.TestCase):
             script = script.replace('gardener-summary/', '"$RUNNER_TEMP"/gardener-summary/')
             subprocess.run(['bash', '-e', '-c', script], env={**os.environ, 'RUNNER_TEMP': directory}, text=True, capture_output=True, check=True)
             result = subprocess.run([sys.executable, 'scripts/pr-evidence-gate.py', str(root / 'lessons-pr.md')], text=True, capture_output=True)
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn('4/4 answered', result.stdout)
+            self.assertIn('FAIL too-long:', result.stdout)
+
+
+class ProseCapTests(unittest.TestCase):
+    def body(self, size=600, extra=''):
+        return ('## Proof\n' + 'x' * (size - len('ProofWhatChange.')) + '\n' + extra
+                + '\n## What\nChange.\n<details><summary>Review and risk</summary>\n\n'
+                + '## Review\nReviewed.\n## Risk\nReversible.\n</details>\n')
+
+    def verdict(self, body):
+        output = io.StringIO()
+        with patch.object(sys, 'argv', ['pr-evidence-gate.py']), patch.dict(gate.os.environ, {'PR_BODY': body}), patch.object(gate, 'http_code', return_value='200'), patch.object(gate, 'archive_verdict', return_value='archived'), contextlib.redirect_stdout(output):
+            result = gate.main()
+        return result, output.getvalue()
+
+    def test_601_visible_characters_fail_with_the_count(self):
+        result, output = self.verdict(self.body(601))
+        self.assertEqual(result, 1, output)
+        self.assertIn('FAIL too-long: 601 characters of prose outside tables, images, code and details (limit 600)', output)
+
+    def test_600_visible_characters_pass(self):
+        result, output = self.verdict(self.body())
+        self.assertEqual(result, 0, output)
+
+    def test_long_markdown_tables_do_not_count(self):
+        for table in ('| Before | After |\n| :--- | ---: |\n| ' + 'x' * 2000 + ' | y |',
+                      'Before | After\n--- | ---\n' + 'x' * 2000 + ' | y',
+                      '| Before |\n| --- |\n| ' + 'x' * 2000 + ' |'):
+            with self.subTest(table=table[:30]):
+                result, output = self.verdict(self.body(extra=table))
+                self.assertEqual(result, 0, output)
+
+    def test_pipe_in_prose_does_not_exempt_it(self):
+        result, output = self.verdict(self.body(extra='x | ' + 'y' * 601))
+        self.assertEqual(result, 1, output)
+        self.assertIn('FAIL too-long:', output)
+
+    def test_long_code_comments_details_and_images_do_not_count(self):
+        for extra in (
+            '```text\n' + 'x' * 2000 + '\n```',
+            '~~~text\n' + 'x' * 2000 + '\n~~~',
+            '`' + 'x' * 2000 + '`',
+            '``' + 'x' * 1000 + '`' + 'x' * 1000 + '``',
+            '<!-- ' + 'x' * 2000 + ' -->',
+            '<details open><summary>More</summary>\n' + 'x' * 2000 + '\n</details>',
+            '<DETAILS><summary>More</summary><details>' + 'x' * 1000 + '</details>' + 'x' * 1000 + '</DETAILS>',
+            '\n'.join('![long image label](https://example.org/view.png)' for _ in range(100)),
+            '\n'.join('<img alt="long image label" src="https://example.org/view.png">' for _ in range(100)),
+        ):
+            with self.subTest(extra=extra[:30]):
+                result, output = self.verdict(self.body(extra=extra))
+                self.assertEqual(result, 0, output)
+
+    def test_code_cannot_open_a_details_exemption(self):
+        result, output = self.verdict(self.body(601, '`<details>`'))
+        self.assertEqual(result, 1, output)
+        self.assertIn('FAIL too-long: 601 ', output)
+
+    def test_text_after_details_still_counts(self):
+        result, output = self.verdict(self.body(extra='<details><summary>More</summary>Hidden.</details>y'))
+        self.assertEqual(result, 1, output)
+        self.assertIn('FAIL too-long: 601 ', output)
+
+    def test_links_and_formatting_count_only_visible_characters(self):
+        result, output = self.verdict(self.body(595, '[**value**](https://example.org/' + 'x' * 1000 + ')'))
+        self.assertEqual(result, 0, output)
+        result, output = self.verdict(self.body(596, '[**value**](https://example.org/)'))
+        self.assertEqual(result, 1, output)
+        self.assertIn('FAIL too-long: 601 ', output)
+
+    def test_long_legacy_six_section_body_is_exempt(self):
+        body = ('## What\n' + 'x' * 2000 + '\n## Verified\nChecks passed.\n'
+                + '## Upstream\nNo new mechanism.\n## Risk\nReversible.\n'
+                + '## Acceptance\n- [x] Done.\n## Issues\nRelated to #2206.\n')
+        for extra in ('', '## Review\nReviewed.\n'):
+            with self.subTest(extra=extra):
+                result, output = self.verdict(body + extra)
+                self.assertEqual(result, 0, output)
+        result, output = self.verdict(body.replace('## Verified', '## Proof') + '## Review\nReviewed.\n')
+        self.assertEqual(result, 1, output)
+        self.assertIn('FAIL too-long:', output)
 
 
 def load_tests(loader, tests, pattern):

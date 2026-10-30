@@ -99,38 +99,42 @@ def is_media_host_image(url):
 
 REQUIRED_SECTIONS = ('What', 'Proof', 'Review', 'Risk')
 TEMPLATE_PATH = '.github/PULL_REQUEST_TEMPLATE.md'
-TEMPLATE_SECTIONS = REQUIRED_SECTIONS
+TEMPLATE_SECTIONS = ('Proof', 'What', 'Review', 'Risk')
 H2 = re.compile(r'^##[ \t]+(.+?)[ \t]*$', re.M)
+FOLD_MARKUP = re.compile(r'</?details\b[^>]*>|<summary\b[^>]*>.*?</summary\s*>', re.I | re.S)
+INLINE_CODE = re.compile(r'(?P<ticks>`+)(?!`).*?(?<!`)(?P=ticks)(?!`)', re.S)
+DETAILS_TAG = re.compile(r'<(?P<closing>/)?details\b[^>]*>', re.I)
+PROSE_LIMIT = 600
 
 
-def section_verdicts(body):
-    """Per section: 'answered', 'empty', 'missing', or 'legacy' for Review.
-
-    HTML comments never count as an answer, so the template's own
-    guidance (shipped as comments) cannot pass the gate untouched.
-    """
-    text = visible_markdown(body)
+def section_contents(body):
+    text = FOLD_MARKUP.sub('', visible_markdown(body))
     headers = [(m.start(), m.end(), m.group(1).strip())
                for m in H2.finditer(text)]
-    heading_names = {heading.lower() for _, _, heading in headers}
     contents = {}
     for i, (_, hend, heading) in enumerate(headers):
         nxt = headers[i + 1][0] if i + 1 < len(headers) else len(text)
         contents.setdefault(heading.lower(), text[hend:nxt])
-    legacy = (
-        {'what', 'verified', 'upstream', 'risk', 'acceptance', 'issues'} <= heading_names
-        and 'proof' not in heading_names
+    return contents
+
+
+def is_legacy_body(contents):
+    return (
+        {'what', 'verified', 'upstream', 'risk', 'acceptance', 'issues'} <= contents.keys()
+        and 'proof' not in contents
         and bool(contents['upstream'].strip())
         and TASK.search(contents['acceptance']) is not None
     )
+
+
+def section_verdicts(body):
+    contents = section_contents(body)
+    legacy = is_legacy_body(contents)
     verdicts = {}
     for name in REQUIRED_SECTIONS:
-        content = None
-        for i, (_, hend, heading) in enumerate(headers):
-            if heading.lower() == name.lower() or (name == 'Proof' and heading.lower() == 'verified'):
-                nxt = headers[i + 1][0] if i + 1 < len(headers) else len(text)
-                content = text[hend:nxt]
-                break
+        content = contents.get(name.lower())
+        if content is None and name == 'Proof':
+            content = contents.get('verified')
         if content is None:
             verdicts[name] = 'legacy' if name == 'Review' and legacy else 'missing'
         elif content.strip():
@@ -138,6 +142,45 @@ def section_verdicts(body):
         else:
             verdicts[name] = 'empty'
     return verdicts
+
+
+def prose_length(body):
+    text = INLINE_CODE.sub('', visible_markdown(body))
+    outside = []
+    depth = 0
+    cursor = 0
+    for tag in DETAILS_TAG.finditer(text):
+        if tag['closing']:
+            if depth:
+                depth -= 1
+                if depth == 0:
+                    cursor = tag.end()
+        else:
+            if depth == 0:
+                outside.append(text[cursor:tag.start()])
+                start = tag.start()
+            depth += 1
+    outside.append(text[start if depth else cursor:])
+    text = ''.join(outside)
+    text = re.sub(r'!\[[^\]]*\]\((?:[^()]|\([^()]*\))*\)', '', text)
+    text = MD_LINK.sub(lambda match: match['label'], text)
+    text = re.sub(r'<[^>]*>', '', text)
+    lines = text.splitlines()
+    prose = []
+    in_table = False
+    for index, line in enumerate(lines):
+        if in_table and '|' in line and line.strip():
+            continue
+        in_table = False
+        if '|' in line and index + 1 < len(lines):
+            cells = lines[index + 1].strip().strip('|').split('|')
+            if all(re.fullmatch(r'\s*:?-+:?\s*', cell) for cell in cells):
+                in_table = True
+                continue
+        line = re.sub(r'^\s{0,3}#{1,6}\s+|^\s*(?:>\s*|[-+*]\s+|\d+[.)]\s+)', '', line)
+        line = re.sub(r'(\*\*|__|~~|\*|_)(?=\S)(.+?)(?<=\S)\1', r'\2', line)
+        prose.append(unescape(line).strip())
+    return sum(len(line) for line in prose)
 
 
 def http_code(url):
@@ -266,6 +309,7 @@ def main():
     verdicts = section_verdicts(body)
     answered = sum(1 for v in verdicts.values() if v == 'answered')
     print(f"pr-evidence: sections: {answered}/{len(REQUIRED_SECTIONS)} answered")
+    legacy = is_legacy_body(section_contents(body))
     if verdicts.get('Review') == 'legacy':
         print("pr-evidence: legacy six-section body: Review not required")
     section_failed = False
@@ -284,6 +328,11 @@ def main():
         print("pr-evidence: the global show-me /pr template "
               "(Summary/Evidence/Merge Danger) does not satisfy this gate; "
               "use the repo skill .claude/skills/pr-cairn/SKILL.md.")
+
+    characters = prose_length(body)
+    if not legacy and characters > PROSE_LIMIT:
+        failures.append('too-long')
+        print(f"FAIL too-long: {characters} characters of prose outside tables, images, code and details (limit {PROSE_LIMIT})")
 
     links = find_links(body)
 

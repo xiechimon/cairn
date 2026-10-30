@@ -1,10 +1,12 @@
-## What
-
-<!-- In two to four sentences, explain what changed and why, the ticket, and the overlap lookup result. -->
-
 ## Proof
 
-<!-- Code: name the test, quote its failure on main, show it passing here; for performance a before/after table, for daemons and CLIs a short real-run transcript. UI: a before/after/unchanged screenshot table with SHA-pinned raw links under docs/verify/<ticket>/. End with one "Not verified:" line. Per change type: .claude/skills/pr-cairn/SKILL.md. -->
+<!-- UI: before / after / unchanged screenshot table, one value line under each image (t3code #27472 style). Backend: one line naming the test that fails on main, its failure text, and that it passes here. End with one "Not verified:" line. -->
+
+## What
+
+<!-- One line: what changed, why, ticket and overlap result. -->
+
+<details><summary>Review and risk</summary>
 
 ## Review
 
@@ -14,4 +16,4 @@
 
 <!-- State one-way or two-way door, blast radius, and whether the owner must merge. -->
 
-<!-- Upstream only when the PR adds a mechanism; closing keywords go in the commit message. -->
+</details>

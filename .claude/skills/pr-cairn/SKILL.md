@@ -13,109 +13,77 @@ it, failed, and hand-rewrote the body (#1100, #1103, #1105, #1111; issue
 #1110). When writing a PR body in this repo, follow this skill; do not use
 the global template even if it also matches.
 
-## Write it plainly
+## Body contract
 
-The body is read by someone who did not watch the work. Apply the `unslop`
-rules to it, and write like a person reporting what they did.
+Start from `.github/PULL_REQUEST_TEMPLATE.md`. Write in English for a reader
+who did not watch the work. Use this order:
 
-- No em dashes. Use a period or a comma. Rule 13.
-- No AI vocabulary: crucial, delve, robust, seamless, leverage, showcase,
-  landscape, testament, tapestry. Use the plain word. Rules 7 and 31.
-- No "not just X, but Y", no rule of three, no synonym cycling. Rules 9, 10, 11.
-- No bold label followed by a restatement of the label. Write the sentence. Rule 16.
-- No chatbot lines, no closing pleasantries. Rules 20, 22.
-- No metaphor nouns: substrate, surface, harness, ratchet, primitive, north
-  star. Name the thing. Rule 26.
-- Sentence case headings. Straight quotes. Rules 17, 19.
-- One idea per sentence. If a sentence needs a second read, split it. Rule 28.
-- Say what the change does, not how it feels. A number or a symbol beats an
-  adjective. Rules 27 and 30.
-- Describe the current state only. Do not write that something was removed,
-  retired, dropped, or "used to be" something else; the reader never saw the
-  old version, so the note is noise. Delete the thing and say what stands now.
+1. `## Proof`: for UI, a before / after / unchanged screenshot table with one
+   value line under each image, as in t3code #27472. For backend changes, one
+   line naming the test that fails on main, quoting its failure text, and
+   stating that it passes here. End with one `Not verified:` line naming
+   checks not run or unrelated failures on main.
+2. `## What`: one line explaining the change, why, the ticket and overlap result.
+3. `<details><summary>Review and risk</summary>` containing `## Review` and
+   `## Risk`, separated from the HTML tags by blank lines and closed with
+   `</details>`. Keep this block collapsed.
 
-The same rules apply to ticket bodies, commit messages, code comments and
-lane briefs.
+Review records the vendor, model, fresh context, reviewed head SHA, rounds,
+verdict and unfixed findings with reasons. Risk states one-way or two-way
+door, blast radius and whether the owner must merge. Put longer overlap
+results and optional Upstream analysis inside the details block. Include
+Upstream only when adding a mechanism; name an existing equivalent or the
+checkable reason for rejecting it.
 
-## The four required sections (exact headings)
+The gate allows at most 600 visible characters of prose outside Markdown
+tables, image embeds, fenced code, inline code spans, HTML comments and
+complete details blocks. It counts heading text and link labels, spaces
+within lines, and decoded HTML entities; formatting and whitespace between
+lines do not count. Over the limit, it reports
+`too-long: <n> characters of prose outside tables, images, code and details (limit 600)`.
+Keep Proof and What short; put supporting output in tables or code blocks.
+A section containing only fenced code or HTML comments is unanswered.
 
-### `## What`
+A legacy `## Verified` aliases Proof. The complete legacy six-section shape
+(What, Verified, Upstream, Risk, Acceptance and Issues, with an answered
+Upstream and an Acceptance task) may omit Review and is exempt from the cap.
+Use the new shape for new bodies. Any unchecked task outside fenced code and
+HTML comments still makes the task gate red, including inside details.
+Closing keywords belong in commit messages. For a multi-segment ticket,
+only the closing segment's commit message carries the parent closing keyword.
 
-In two to four sentences, explain what changed and why, the ticket it
-answers, and the overlap lookup result. Name files and symbols instead of
-describing them.
+## Screenshots
 
-### `## Proof`
+Store images on `pr-assets/<pr-number>`, created from main or as an orphan.
+Use a separate checkout so the implementation branch stays on its own work.
+For a new branch from main, the commands in that checkout are:
 
-For code, paste both halves verbatim: the command run on the old code with
-its actual failing output, then the same command on this change with its
-passing output. Include lint, typecheck and relevant e2e results. A claim
-that "without this change X would fail" is not evidence.
-
-For UI changes, use a before / after / unchanged screenshot table. Commit
-screenshots under `docs/verify/<ticket>/` and embed SHA-pinned raw links:
-
-```markdown
-![label](https://raw.githubusercontent.com/xiechimon/cairn/<sha>/docs/verify/<ticket>/shot.png)
+```sh
+git switch -c pr-assets/123 origin/main
+mkdir -p docs/verify/2206
+cp /tmp/before.png /tmp/after.png /tmp/unchanged.png docs/verify/2206/
+git add docs/verify/2206/before.png docs/verify/2206/after.png docs/verify/2206/unchanged.png
+git commit -m "docs(2206): add PR screenshots (#123)"
+git push origin HEAD
+git rev-parse HEAD
 ```
 
-The SHA must already be on the remote, so commit and push the branch first,
-then write the body.
+Substitute the actual PR and ticket numbers. Stage only the images. Embed
+links using the pushed asset commit's full SHA:
 
-Pick the proof by what the change touches. This table follows 56 merged
-backend PRs in eight agent-heavy repositories (t3code, background-agents,
-opencode, pi, inbox-zero, rakazo, optio, codex; sampled 2026-10-30); a test
-that fails on main and passes here was the proof in 24 of them, and no PR
-used a standalone curl transcript.
+```markdown
+| Before | After | Unchanged |
+| --- | --- | --- |
+| ![Before](https://raw.githubusercontent.com/xiechimon/cairn/<sha>/docs/verify/2206/before.png)<br>Value: 0 items | ![After](https://raw.githubusercontent.com/xiechimon/cairn/<sha>/docs/verify/2206/after.png)<br>Value: 1 item | ![Unchanged](https://raw.githubusercontent.com/xiechimon/cairn/<sha>/docs/verify/2206/unchanged.png)<br>Value: 2 items |
+```
 
-| Change | Proof |
-|---|---|
-| Logic, data or protocol bug | Name the test, quote its one-line failure on main, show it passing here |
-| Concurrency, leases, retries, crash recovery | A test on a real database, or one that kills the process mid-flight, with the symptom on main |
-| Database write, migration, query | A real-database test over every migration; the wrong row on main or the fixed row; a plan assertion for query changes |
-| Performance | A before / after table with data size, runs and warmup, and whether results are identical |
-| Process, daemon, CLI, deploy | A short real-run transcript: the reproduction command with output before and after |
-| External provider or model behavior | A live call matrix with numbers before and after, and the targets not covered |
-| HTTP endpoint | An integration test asserting status and body; a curl transcript is optional |
-| Visible UI | The before / after / unchanged screenshot table above |
-
-End Proof with one `Not verified:` line: what was not run, and tests that
-already fail on main for unrelated reasons. "Tests pass", a test count, a CI
-link or a bot summary is not proof. Paste the failure text itself; do not
-paraphrase it. HTML comments do not count as an answer. A legacy
-`## Verified` heading satisfies Proof. A complete legacy six-section body
-may omit Review; a body using Proof must include Review.
-
-### `## Review`
-
-Record the reviewer vendor and model, whether the context was fresh, the
-reviewed head SHA, number of rounds, verdict, and unfixed findings with
-reasons. Review findings still open must be visible here.
-
-### `## Risk`
-
-State whether this is a one-way or two-way door, the blast radius and the
-runs that checked it, and whether the owner must merge under pr-gate's
-protected-path routing.
-
-### Optional `## Upstream`
-
-Include this only when the PR adds a mechanism. Does an equivalent exist
-in the current dependencies (pi / claude-agent-sdk / code already in this
-repo)? If an equivalent was rejected, give the checkable reason (security
-boundary, different data source, different interaction semantics);
-"more controllable" or "fits our model better" do not qualify.
-
-Closing keywords belong only in commit messages. For a multi-segment ticket,
-state under What which segment closes it; only that segment's commit message
-carries the parent ticket's closing keyword.
-
-No checklist is required. Any unchecked task anywhere in the body outside
-fenced code and HTML comments keeps pr-evidence red.
+Use the side-branch commit SHA, never the implementation head or a branch
+name. Push before linking and never merge the asset branch. Keep the branch
+so the images remain reachable. Images belong outside code fences.
 
 ## Mechanics
 
-- Before opening a PR, follow `docs/agent-overlap.md`: search open issues, open PRs, and PRs merged in the last seven days, including PRs touching the changed files. Put the numbered overlap list and disposition under What. Extend an existing PR for the same ask. Explain intentional removal of recently merged work and name its PR for `silent-revert-gate`.
+- Before opening a PR, follow `docs/agent-overlap.md`: search open issues, open PRs, and PRs merged in the last seven days, including PRs touching the changed files. Put a one-line overlap result under What and longer numbered dispositions inside details. Extend an existing PR for the same ask. Explain intentional removal of recently merged work and name its PR for `silent-revert-gate`.
 
 - Write the body to a temp file; never inline multi-line markdown as
   `--body`.
@@ -123,7 +91,7 @@ fenced code and HTML comments keeps pr-evidence red.
   `gh pr create --repo xiechimon/cairn --head xiechimon:<branch> --body-file /tmp/pr.md`.
 - Run both gates locally before opening:
   `python3 scripts/pr-evidence-gate.py /tmp/pr.md` — exit 1 names each
-  problem (`missing-section` / `empty-section` / `not-embedded` /
+  problem (`missing-section` / `empty-section` / `too-long` / `not-embedded` /
   `unreachable`); then `python3 scripts/pr-tasks-gate.py /tmp/pr.md` —
   exit 1 names `unchecked-task` (a task still open anywhere in the body,
   with its line number). A body with no tasks passes.
@@ -133,7 +101,7 @@ fenced code and HTML comments keeps pr-evidence red.
   errors; use `gh api -X PATCH repos/xiechimon/cairn/pulls/<n> -F
   body=@/tmp/pr.md`, then re-read with `gh pr view <n> --json body` and
   compare.
-- Pin raw links to a short SHA (8 characters). From a cloud session the egress proxy wraps URLs that carry a full 40-character SHA in backticks, which breaks the embed (#1771). Read the stored body back after creating or editing the PR.
+- Read the stored body back after creating or editing the PR to check the full SHA-pinned image embeds.
 - After opening a PR and after each push, read `mergeable_state` once
   (`gh api repos/xiechimon/cairn/pulls/<n> -q .mergeable_state`). A `dirty`
   PR runs no `pull_request` workflows, so no CI event ever arrives to say
@@ -156,7 +124,8 @@ fenced code and HTML comments keeps pr-evidence red.
 
 | requirement | enforced by |
 |---|---|
-| `## What`, `## Proof`, `## Review`, `## Risk` answered (legacy `## Verified` aliases Proof; Upstream is optional) | pr-evidence (required check) |
+| `## Proof`, `## What`, `## Review`, `## Risk` answered, including headings inside details (legacy `## Verified` aliases Proof; Upstream is optional) | pr-evidence (required check) |
+| at most 600 visible prose characters outside tables, images, code, comments and details; complete legacy six-section bodies exempt | pr-evidence (required check) |
 | image links embedded + HTTP 200 | pr-evidence (required check) |
 | no unchecked tasks anywhere outside fenced code and HTML comments; no tasks required | pr-evidence (required check, pr-tasks step) |
 | no `needs-decision` label on the PR (a person's decision is pending) | pr-evidence (required check); while the label is on, each run also disarms auto-merge |
