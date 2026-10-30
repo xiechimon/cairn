@@ -13,73 +13,189 @@ import {
   todo,
 } from '../src/db/schema.js';
 import { seed } from '../src/db/seed.js';
+import { refreshClaudeRateParks } from '../src/services/claude-rate-limit.js';
 import { claimStep } from '../src/services/machine-claim.js';
 import { createProvider } from '../src/services/providers.js';
 import { sweepQuotaWaitSteps } from '../src/services/quota-wait.js';
 import { bootServer, insertMachine, req } from './helpers.js';
 
-test('routing endpoint returns all uses, unavailable edges, stored windows and no credentials', async () => {
+test.each([
+  { report: 'empty', models: [] },
+  { report: 'opus alias', models: [{ id: 'opus', name: 'Opus' }] },
+  { report: 'sonnet alias', models: [{ id: 'sonnet', name: 'Sonnet' }] },
+])(
+  'routing endpoint resolves Claude uses with $report, stored windows and no credentials',
+  async ({ models }) => {
+    const s = bootServer();
+    const path = `/api/teams/${s.team.id}/model-routing`;
+    const empty = await req(s.app, 'GET', path);
+    expect(empty.status).toBe(200);
+    const initial = (await empty.json()) as { edges: RoutingEdge[] };
+    expect(initial.edges.map((edge) => edge.use)).toEqual([
+      'coordinator',
+      'implementation',
+      'review',
+      'mechanical',
+      'eval',
+      'nightly-scan',
+    ]);
+    expect(initial.edges.every((edge) => edge.unavailable === true)).toBe(true);
+    const id = insertMachine(s, {
+      claudeCodeReport: {
+        installed: true,
+        hostname: 'test',
+        models,
+        auth: { state: 'logged-in', method: 'oauth' },
+      },
+    });
+    const unknownQuota = (await (await req(s.app, 'GET', path)).json()) as {
+      quota: RoutingQuota[];
+    };
+    expect(unknownQuota.quota).toEqual([]);
+    s.db
+      .update(machine)
+      .set({
+        claudeRateLimits: [
+          {
+            subscription: 'five_hour',
+            status: 'allowed',
+            utilization: 0.4,
+            resetsAt: Date.now() + 10000,
+            reportedAt: Date.now(),
+          },
+          {
+            subscription: 'seven_day',
+            status: 'allowed',
+            utilization: 0.6,
+            resetsAt: Date.now() + 100000,
+            reportedAt: Date.now(),
+          },
+        ],
+      })
+      .where(eq(machine.id, id))
+      .run();
+    const body = (await (await req(s.app, 'GET', path)).json()) as {
+      edges: RoutingEdge[];
+      connections: RoutingConnection[];
+      quota: RoutingQuota[];
+    };
+    expect(body.edges[0]).toMatchObject({ connectionId: `machine:${id}` });
+    for (const edge of body.edges.filter((entry) => entry.modelId.startsWith('claude-'))) {
+      expect(edge.connectionId).toBe(`machine:${id}`);
+      expect(edge.unavailable).toBeUndefined();
+    }
+    expect(body.quota).toMatchObject([
+      {
+        connectionId: `machine:${id}`,
+        windows: [
+          { window: '5h', usedPercent: 40 },
+          { window: 'week', usedPercent: 60 },
+        ],
+      },
+    ]);
+    expect(JSON.stringify(body)).not.toMatch(/Cipher|apiKey|tokenHash/);
+    expect((await req(s.app, 'GET', '/api/teams/other/model-routing')).status).toBe(404);
+  },
+);
+
+test('a non-Claude model using Anthropic messages stays runnable under subscription-only', async () => {
   const s = bootServer();
-  const path = `/api/teams/${s.team.id}/model-routing`;
-  const empty = await req(s.app, 'GET', path);
-  expect(empty.status).toBe(200);
-  const initial = (await empty.json()) as { edges: RoutingEdge[] };
-  expect(initial.edges.map((edge) => edge.use)).toEqual([
-    'coordinator',
-    'implementation',
-    'review',
-    'mechanical',
-    'eval',
-    'nightly-scan',
-  ]);
-  expect(initial.edges.every((edge) => edge.unavailable === true)).toBe(true);
-  const id = insertMachine(s, {
-    claudeCodeReport: {
-      installed: true,
-      hostname: 'test',
-      models: [{ id: 'claude-opus-5-5', name: 'Opus' }],
-      auth: { state: 'logged-in', method: 'oauth' },
+  const mid = insertMachine(s);
+  createProvider(
+    { db: s.db, box: s.secretBox },
+    {
+      teamId: s.team.id,
+      createdBy: s.user.id,
+      body: {
+        providerId: 'kimi',
+        label: 'Kimi',
+        api: 'anthropic-messages',
+        baseUrl: 'http://localhost:9',
+        apiKey: 'test-key',
+        models: [{ id: 'kimi-k2', name: 'Kimi K2' }],
+      },
     },
-  });
+  );
+  const body = (await (
+    await req(s.app, 'GET', `/api/teams/${s.team.id}/model-routing`)
+  ).json()) as { connections: RoutingConnection[] };
+  expect(body.connections.some((entry) => entry.models.includes('kimi-k2'))).toBe(true);
+  expect.soft(body.connections.filter((entry) => entry.vendor === 'anthropic')).toEqual([]);
   s.db
-    .update(machine)
-    .set({
-      claudeRateLimits: [
-        {
-          subscription: 'five_hour',
-          status: 'allowed',
-          utilization: 0.4,
-          resetsAt: Date.now() + 10000,
-          reportedAt: Date.now(),
-        },
-        {
-          subscription: 'seven_day',
-          status: 'allowed',
-          utilization: 0.6,
-          resetsAt: Date.now() + 100000,
-          reportedAt: Date.now(),
-        },
-      ],
+    .insert(agent)
+    .values({
+      id: 'worker',
+      teamId: s.team.id,
+      displayName: 'Worker',
+      provider: 'kimi',
+      modelId: 'kimi-k2',
+      machineId: mid,
     })
-    .where(eq(machine.id, id))
     .run();
-  const body = (await (await req(s.app, 'GET', path)).json()) as {
+  s.db.insert(project).values({ id: 'project', teamId: s.team.id, name: 'Project' }).run();
+  s.db
+    .insert(todo)
+    .values({
+      id: 'task',
+      teamId: s.team.id,
+      projectId: 'project',
+      title: 'Task',
+      phaseAt: 1,
+      seqNum: 1,
+      assignment: { plan: null, build: { agentId: 'worker' } },
+    })
+    .run();
+  s.db
+    .insert(build)
+    .values({ id: 'run', todoId: 'task', withPlan: false, triggerSource: 'user', createdAt: 1 })
+    .run();
+  s.db.insert(step).values({ id: 'pending', buildId: 'run', kind: 'build', createdAt: 1 }).run();
+  const deps = {
+    ...s.svc,
+    box: s.secretBox,
+    reposDir: s.reposDir,
+    attachmentsDir: s.attachmentsDir,
+  };
+  refreshClaudeRateParks(deps, s.team.id);
+  expect(s.db.select().from(step).where(eq(step.id, 'pending')).get()).toMatchObject({
+    status: 'pending',
+    quotaBlock: null,
+  });
+  expect(await claimStep(deps, mid, s.team.id, 0, 'http://localhost')).toMatchObject({
+    step: { id: 'pending' },
+    agent: { provider: 'kimi', modelId: 'kimi-k2' },
+  });
+});
+
+test('Codex routing omits quota windows without a server usage source', async () => {
+  const s = bootServer();
+  createProvider(
+    { db: s.db, box: s.secretBox },
+    {
+      teamId: s.team.id,
+      createdBy: s.user.id,
+      body: {
+        providerId: 'openai-codex',
+        label: 'Codex',
+        api: 'openai-responses',
+        baseUrl: 'http://localhost:9',
+        apiKey: 'test-key',
+        models: [{ id: 'gpt-6.1-sol', name: 'Sol' }],
+      },
+    },
+  );
+  const body = (await (
+    await req(s.app, 'GET', `/api/teams/${s.team.id}/model-routing`)
+  ).json()) as {
     edges: RoutingEdge[];
-    connections: RoutingConnection[];
     quota: RoutingQuota[];
   };
-  expect(body.edges[0]).toMatchObject({ connectionId: `machine:${id}` });
-  expect(body.quota).toMatchObject([
-    {
-      connectionId: `machine:${id}`,
-      windows: [
-        { window: '5h', usedPercent: 40 },
-        { window: 'week', usedPercent: 60 },
-      ],
-    },
-  ]);
-  expect(JSON.stringify(body)).not.toMatch(/Cipher|apiKey|tokenHash/);
-  expect((await req(s.app, 'GET', '/api/teams/other/model-routing')).status).toBe(404);
+  expect(body.edges.find((edge) => edge.use === 'implementation')).toMatchObject({
+    modelId: 'gpt-6.1-sol',
+    connectionId: expect.any(String),
+  });
+  expect(body.quota).toEqual([]);
+  expect(body.edges.some((edge) => edge.reason === 'codex-quota<=30%')).toBe(false);
 });
 
 test('Claude usage defaults safely, persists through reseeding and rejects invalid settings', async () => {

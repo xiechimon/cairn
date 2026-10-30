@@ -243,6 +243,50 @@ describe('claude rate limit (#1852)', () => {
     s.dispose();
   });
 
+  test('a local merge already parked by the rate limiter resumes after an allowed report', async () => {
+    const s = bootServer({ claimHoldMs: 50 });
+    const machine = await enroll(s, await issueKey(s, 'owner-key'), 'owner');
+    insertAgent(s, 'agent-cc', machine.machineId, 'claude-code');
+    const buildId = await startBuild(s, 'agent-cc');
+    await report(s, machine.token, machine.machineId, {
+      status: 'rejected',
+      rateLimitType: 'five_hour',
+      resetsAt: Date.now() + 2 * HOUR,
+    });
+    expect(stepOfBuild(s, buildId)).toMatchObject({
+      status: 'waiting_quota',
+      quotaBlock: { source: 'claude_rate_limit' },
+    });
+    s.db
+      .update(stepTable)
+      .set({
+        kind: 'merge',
+        prompt: JSON.stringify({
+          kind: 'local-merge',
+          command: {
+            projectId: 'project',
+            buildId,
+            defaultBranch: 'main',
+            workBranch: 'work',
+            judgedBase: 'a'.repeat(40),
+            judgedHead: 'b'.repeat(40),
+            judgedPatchDigest: `pd2:${'c'.repeat(64)}`,
+            localChecks: ['pnpm test'],
+            message: 'Merge work',
+            identity: { name: 'Test', email: 'test@example.com' },
+          },
+        }),
+      })
+      .where(eq(stepTable.buildId, buildId))
+      .run();
+    await report(s, machine.token, machine.machineId, {
+      status: 'allowed',
+      rateLimitType: 'five_hour',
+    });
+    expect(stepOfBuild(s, buildId)).toMatchObject({ status: 'pending', quotaBlock: null });
+    s.dispose();
+  });
+
   test('a later allowed report clears the same window and a different window stays rejected', async () => {
     const s = bootServer({ claimHoldMs: 50 });
     const machine = await enroll(s, await issueKey(s, 'omarchy-key'), 'omarchy');

@@ -18,7 +18,6 @@ import {
   chief,
   chiefThread,
   machine,
-  provider,
   type QuotaWaitRow,
   step,
   team,
@@ -112,7 +111,6 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
   const byId = new Map(machines.map((row) => [row.id, row]));
   const subscriptionOnly =
     deps.db.select().from(team).where(eq(team.id, teamId)).get()?.claudeUsage !== 'allow-paid';
-  const providers = deps.db.select().from(provider).where(eq(provider.teamId, teamId)).all();
   const activeSubscription = hasActiveClaudeSubscription(deps, teamId);
   let changed = false;
   const consider = (
@@ -120,7 +118,8 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
     agentRow: AgentRow,
     todoRow: typeof todo.$inferSelect | null,
   ) => {
-    if (stepRow.kind === 'merge' && parseLocalMergeInstruction(stepRow.prompt) !== null) return;
+    const localMerge =
+      stepRow.kind === 'merge' && parseLocalMergeInstruction(stepRow.prompt) !== null;
     const model = effectiveModel(agentRow, stepRow);
     const owner = agentRow.machineId ? byId.get(agentRow.machineId) : undefined;
     const ownerBlock = owner ? claudeRateBlock(owner.claudeRateLimits ?? [], now) : null;
@@ -134,14 +133,12 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
           claudeRateBlock(row.claudeRateLimits ?? [], now) === null &&
           /api[-_ ]?key/i.test(row.claudeCodeReport?.auth?.method ?? ''),
       );
-    const custom = providers.find((entry) => entry.providerId === model.provider);
-    const claude =
-      isClaudeModel(model.provider, model.modelId) || custom?.api === 'anthropic-messages';
+    const claude = isClaudeModel(model.provider, model.modelId);
     const paid =
       stepRuntimeFor(model.provider) !== 'claude-code' ||
       (!activeSubscription &&
         (paidTakeover || /api[-_ ]?key/i.test(owner?.claudeCodeReport?.auth?.method ?? '')));
-    if (subscriptionOnly && claude && paid) {
+    if (!localMerge && subscriptionOnly && claude && paid) {
       if (stepRow.status !== 'pending' && stepRow.status !== 'waiting_quota') return;
       if (
         stepRow.quotaBlock?.source === 'subscription_policy' &&

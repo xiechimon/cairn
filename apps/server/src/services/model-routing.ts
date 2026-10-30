@@ -9,6 +9,8 @@ import type { Db } from '../db/client.js';
 import { claudeSubscription, machine, provider, team } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 
+const CLAUDE_ROUTING_MODELS = ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'];
+
 export function isClaudeModel(providerId: string | null, modelId: string | null): boolean {
   return (
     providerId === 'anthropic' || providerId === 'claude-code' || /claude/i.test(modelId ?? '')
@@ -29,7 +31,7 @@ export function getModelRouting(db: Db, teamId: string) {
       id: row.id,
       vendor: 'anthropic',
       kind: 'subscription',
-      models: ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'],
+      models: CLAUDE_ROUTING_MODELS,
       available: row.expiresAt === null || row.expiresAt > now,
     });
   }
@@ -38,8 +40,8 @@ export function getModelRouting(db: Db, teamId: string) {
       const models = row.models
         .filter((model) =>
           vendor === 'anthropic'
-            ? isClaudeModel(row.providerId, model.id) || row.api === 'anthropic-messages'
-            : !isClaudeModel(row.providerId, model.id) && row.api !== 'anthropic-messages',
+            ? isClaudeModel(row.providerId, model.id)
+            : !isClaudeModel(row.providerId, model.id),
         )
         .map((model) => model.id);
       if (models.length === 0) continue;
@@ -61,9 +63,7 @@ export function getModelRouting(db: Db, teamId: string) {
       id,
       vendor: 'anthropic',
       kind: paid ? 'api-key' : 'subscription',
-      models: (report?.models ?? [])
-        .filter((model) => model.liveness !== 'dead')
-        .map((model) => model.id),
+      models: CLAUDE_ROUTING_MODELS,
       available:
         report?.installed === true &&
         row.online &&

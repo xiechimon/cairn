@@ -32,16 +32,26 @@ test.each(['fresh', 'upgrade'])('%s database supports subscription-only team def
       sqlite.exec("INSERT INTO team (id, name, createdAt) VALUES ('team', 'Team', 1)");
     }
     migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
-    if (mode === 'fresh')
-      sqlite.exec("INSERT INTO team (id, name, createdAt) VALUES ('team', 'Team', 1)");
-    expect(sqlite.prepare('SELECT claudeUsage FROM team').get()).toEqual({
+    if (mode === 'upgrade') {
+      expect(sqlite.prepare("SELECT claudeUsage FROM team WHERE id = 'team'").get()).toEqual({
+        claudeUsage: 'allow-paid',
+      });
+      sqlite.exec("UPDATE team SET claudeUsage = 'subscription-only' WHERE id = 'team'");
+    }
+    sqlite.exec("INSERT INTO team (id, name, createdAt) VALUES ('new-team', 'New team', 2)");
+    expect(sqlite.prepare("SELECT claudeUsage FROM team WHERE id = 'new-team'").get()).toEqual({
       claudeUsage: 'subscription-only',
     });
-    sqlite.exec("UPDATE team SET claudeUsage = 'allow-paid'");
+    sqlite.exec("UPDATE team SET claudeUsage = 'allow-paid' WHERE id = 'new-team'");
     migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
-    expect(sqlite.prepare('SELECT claudeUsage FROM team').get()).toEqual({
+    expect(sqlite.prepare("SELECT claudeUsage FROM team WHERE id = 'new-team'").get()).toEqual({
       claudeUsage: 'allow-paid',
     });
+    if (mode === 'upgrade') {
+      expect(sqlite.prepare("SELECT claudeUsage FROM team WHERE id = 'team'").get()).toEqual({
+        claudeUsage: 'subscription-only',
+      });
+    }
   } finally {
     sqlite.close();
     rmSync(directory, { recursive: true, force: true });
