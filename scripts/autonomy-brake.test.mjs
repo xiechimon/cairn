@@ -33,19 +33,22 @@ else console.log('{}');
 `,
     { mode: 0o755 },
   );
-  const run = (args, cwd = dir) =>
-    spawnSync(process.execPath, [script, ...args], {
-      cwd,
-      encoding: 'utf8',
-      env: {
-        ...process.env,
-        PATH: `${dir}:${process.env.PATH}`,
-        GITHUB_REPOSITORY: 'owner/repo',
-        CALLS: log,
-        DATA: join(dir, 'data'),
-      },
-    });
-  return { dir, run, calls: () => readFileSync(log, 'utf8') };
+  return {
+    dir,
+    run: (args, cwd = dir) =>
+      spawnSync(process.execPath, [script, ...args], {
+        cwd,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${dir}:${process.env.PATH}`,
+          GITHUB_REPOSITORY: 'owner/repo',
+          CALLS: log,
+          DATA: join(dir, 'data'),
+        },
+      }),
+    calls: () => readFileSync(log, 'utf8'),
+  };
 }
 test('status reports an open marker without writes', (t) => {
   const f = fixture(t, { issues: [{ number: 5 }] });

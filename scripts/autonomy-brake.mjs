@@ -22,7 +22,7 @@ const git = (cwd, ...args) =>
   execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 const shaPattern = /^[a-f0-9]{40}$/;
 
-function verifyRecovery(number) {
+export function verifyRecovery(number) {
   if (!/^[1-9]\d*$/.test(number ?? '')) throw new Error('A PR number is required');
   const pr = api(`repos/${repo}/pulls/${number}`);
   if (

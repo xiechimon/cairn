@@ -60,44 +60,56 @@ test.each(['after-green', 'before-green', 'no-green'] as const)(
     const main = 'a'.repeat(40);
     const target = 'b'.repeat(40);
     const green = 'c'.repeat(40);
-    const fetchImpl: typeof fetch = async (input) => {
-      const url = String(input);
-      const sha = url.match(/(?:commits\/)([a-f0-9]{40})/)?.[1];
-      if (url.includes('/check-runs'))
-        return Response.json({
-          check_runs: [
-            {
-              id: 1,
-              name: 'check',
-              status: 'completed',
-              conclusion: sha === green && mode !== 'no-green' ? 'success' : 'failure',
-              app: { slug: 'github-actions' },
-            },
-          ],
-        });
-      const order = mode === 'before-green' ? [main, green, target] : [main, target, green];
-      const index = order.indexOf(sha ?? '');
-      return Response.json({ parents: index >= 0 && index < 2 ? [{ sha: order[index + 1] }] : [] });
-    };
-    expect(await recentRecoveryTarget(fetchImpl, 'token', 'owner/repo', main, target)).toBe(
-      mode === 'after-green',
-    );
+    expect(
+      await recentRecoveryTarget(
+        (async (input) => {
+          const url = String(input);
+          const sha = url.match(/(?:commits\/)([a-f0-9]{40})/)?.[1];
+          if (url.includes('/check-runs'))
+            return Response.json({
+              check_runs: [
+                {
+                  id: 1,
+                  name: 'check',
+                  status: 'completed',
+                  conclusion: sha === green && mode !== 'no-green' ? 'success' : 'failure',
+                  app: { slug: 'github-actions' },
+                },
+              ],
+            });
+          const order = mode === 'before-green' ? [main, green, target] : [main, target, green];
+          const index = order.indexOf(sha ?? '');
+          return Response.json({
+            parents: index >= 0 && index < 2 ? [{ sha: order[index + 1] }] : [],
+          });
+        }) as typeof fetch,
+        'token',
+        'owner/repo',
+        main,
+        target,
+      ),
+    ).toBe(mode === 'after-green');
   },
 );
 
 test('marker lookup paginates past labelled pull requests', async () => {
   const pages: string[] = [];
-  const fetchImpl: typeof fetch = async (input) => {
-    const url = String(input);
-    pages.push(url);
-    return Response.json(
-      url.includes('page=2')
-        ? [{ number: 101 }]
-        : Array.from({ length: 100 }, (_, i) => ({ number: i + 1, pull_request: {} })),
-    );
-  };
   expect(
-    await readGithubAutonomyPause(fetchImpl, 'token', 'owner/repo', newGateReadCache(), 0),
+    await readGithubAutonomyPause(
+      (async (input) => {
+        const url = String(input);
+        pages.push(url);
+        return Response.json(
+          url.includes('page=2')
+            ? [{ number: 101 }]
+            : Array.from({ length: 100 }, (_, i) => ({ number: i + 1, pull_request: {} })),
+        );
+      }) as typeof fetch,
+      'token',
+      'owner/repo',
+      newGateReadCache(),
+      0,
+    ),
   ).toBe(true);
   expect(pages).toHaveLength(2);
 });
