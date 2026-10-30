@@ -29,8 +29,8 @@ who did not watch the work. Use this order:
    `</details>`. Keep this block collapsed.
 
 For code changes, use one review round. A fresh, other-vendor independent
-review is required only for protected or security paths; docs-only changes
-need no code review. After three rounds, rethink or hand the PR to ian.
+review is required only for protected or security paths, documentation
+included; other docs-only changes need no code review. After three rounds, rethink or hand the PR to ian.
 Review records the review performed, its verdict and unfixed findings with
 reasons; when independent review is required, include vendor, model, fresh
 context and reviewed head SHA. Risk states one-way or two-way

@@ -25,7 +25,8 @@ test('merge instructions require the pr-gate auto-merge verdict', () => {
   assert.ok(retro.includes("mergedBy: 'auto-merge'"), '.claude/skills/retro-cairn/SKILL.md');
   const agents = readFileSync(join(ROOT, 'AGENTS.md'), 'utf8');
   assert.match(agents, /pr-gate[^\n]*go[^\n]*`mergedBy: 'auto-merge'`/);
-  assert.match(agents, /protected-path PRs[^\n]*orchestrator or ian/i);
+  assert.match(agents, /protected-path PRs[^\n]*go to ian/i);
+  assert.match(agents, /protected or security paths always get the independent review/);
 });
 
 test('AGENTS.md and pr-cairn agree that agents never add needs-decision', () => {

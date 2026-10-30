@@ -36,8 +36,7 @@ Security surfaces (keep this list synchronized with `.claude/workflows/pr-gate.j
 ## Merge routes
 
 - Required CI checks must pass on the PR's current head before an agent enables merge; a local pass does not substitute for CI.
-- Lane and bot agents may enable merge only when `.claude/workflows/pr-gate.js` returns go with `mergedBy: 'auto-merge'`; protected-path PRs and every other route go to the orchestrator or ian.
-- The orchestrator merges the PRs it prepares, owner-routed ones included, once CI is green on the current head and the required review is done; it does not hand ian merge commands.
+- Agents may enable merge only when `.claude/workflows/pr-gate.js` returns go with `mergedBy: 'auto-merge'`; protected-path PRs and every other route go to ian. Never merge or arm auto-merge on ian's route unless ian authorizes it in chat.
 - ian may admin-merge. That authority does not extend to agents.
 - Never add the `needs-decision` label. Agents decide by their own recommendation, say what they chose and why in chat, and continue; ask ian for payments, credentials, intended-behavior or ADR changes, and decisions explicitly routed to him.
 - Before asking ian about a PR with auto-merge armed, disarm it with `gh pr merge <n> --disable-auto`.
@@ -56,7 +55,7 @@ Security surfaces (keep this list synchronized with `.claude/workflows/pr-gate.j
 - After code changes, run `pnpm lint`, `pnpm typecheck` and `pnpm spec:parse`; also run `pnpm spec:parse` after resolving e2e conflicts. Do not run `pnpm build` before committing.
 - Run `pnpm prepush` before pushing. It runs fast checks only; tests run in CI. A push is unverified until CI reports on that head. Run the exact command of any CI step your diff changes.
 - Verify mechanism changes on compiled output, runtime logs or snapshots; use `.claude/skills/verify-cairn/SKILL.md` for acceptance guidance.
-- Use one review round before opening a code PR; require a fresh, other-vendor independent review only for protected or security paths. Skip code review for docs-only changes. Fix confirmed findings and record unfixed findings with reasons in Risk.
+- Use one review round before opening a code PR; require a fresh, other-vendor independent review only for protected or security paths. Docs-only changes outside protected or security paths skip code review; protected or security paths always get the independent review. Fix confirmed findings and record unfixed findings with reasons in Risk.
 - After three review rounds, rethink the approach or hand the PR to ian.
 - Review PRs with `docs/pr-review.md`; read diffs without switching branches in a shared worktree.
 - Small changes need no issue or overlap lookup. Reuse an existing issue or PR when it already covers the request.
