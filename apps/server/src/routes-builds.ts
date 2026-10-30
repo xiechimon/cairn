@@ -39,6 +39,7 @@ import {
 import { isChiefConversation } from './services/machines.js';
 import { readMergeGateState } from './services/merge-gate-run.js';
 import { PhaseTransitionError } from './services/phase.js';
+import { drainTaskMessageQueue, readQueuedMessages } from './services/task-message-queue.js';
 
 export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
   const svc = svcOf(ctx);
@@ -98,6 +99,7 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
       chips: [],
       historyEpoch: 0,
       steerPending: readSteerPending(ctx.db, conversationId),
+      queuedMessages: readQueuedMessages(ctx.db, conversationId),
       activeRun: null,
       nextCursor: null,
     });
@@ -217,6 +219,7 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
   app.post('/api/builds/:id/stop', async (c) => {
     const body = parseWith(buildStopBodySchema, await jsonBody(c), 'body');
     const result = requestStop(svc, c.req.param('id'), body);
+    if (!result.delegated) await drainTaskMessageQueue(svc, c.req.param('id'));
     return c.json(result, result.delegated ? 202 : 200);
   });
 

@@ -20,6 +20,11 @@ import {
 import { answerQuestion, cancelQuestion, parseAnswerBody } from './services/chief-questions.js';
 import { steerChiefMessage, stopChiefTurn, withdrawChiefMessage } from './services/chief-turns.js';
 import { isChiefConversation } from './services/machines.js';
+import {
+  cancelQueuedMessage,
+  deliverQueuedMessage,
+  queueTaskMessage,
+} from './services/task-message-queue.js';
 
 export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
   const svc = svcOf(ctx);
@@ -116,7 +121,14 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
     const conversationId = c.req.param('id');
     if (!isChiefConversation(conversationId)) {
       const body = parseWith(buildSteerBodySchema, await jsonBody(c), 'body');
-      const result = await sendBuildSteer(svc, conversationId, body);
+      const result =
+        body.queuedMessageId !== undefined
+          ? body.cancelQueued
+            ? cancelQueuedMessage(svc, conversationId, body.queuedMessageId)
+            : await deliverQueuedMessage(svc, conversationId, body.queuedMessageId, true)
+          : body.mode === 'queue'
+            ? await queueTaskMessage(svc, conversationId, body.content, body.deliverAfterStop)
+            : await sendBuildSteer(svc, conversationId, body);
       return c.json(result, 201);
     }
     const raw = (await jsonBody(c)) as { content?: unknown; projectId?: unknown };
