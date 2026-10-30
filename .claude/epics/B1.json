@@ -88,8 +88,7 @@
     {
       "id": "agent-attachments",
       "issue": 2237,
-      "dependsOn": [],
-      "humanHeld": true
+      "dependsOn": []
     },
     {
       "id": "schedule-data",
@@ -101,8 +100,7 @@
       "issue": 2239,
       "dependsOn": [
         "schedule-data"
-      ],
-      "humanHeld": true
+      ]
     },
     {
       "id": "schedule-continue",
@@ -131,8 +129,7 @@
     {
       "id": "claude-subscription",
       "issue": 2243,
-      "dependsOn": [],
-      "humanHeld": true
+      "dependsOn": []
     },
     {
       "id": "base-branch",
