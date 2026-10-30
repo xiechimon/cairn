@@ -52,6 +52,7 @@ import { digestSlotDueAt, digestSlotsDue, sweepPushDigest } from './push.js';
 import { sweepPendingPushAlerts } from './push-alerts.js';
 import { sweepQuotaWaitSteps } from './quota-wait.js';
 import {
+  ARCHIVED_SCHEDULE_PAUSE_REASON,
   computeNextRunAt,
   dueSchedules,
   isRecurring,
@@ -261,6 +262,50 @@ export function createScheduler(
     if (row) hub.publishBuildDoc(todoRow.teamId, toBuildRecord(row));
   }
 
+  function fireSchedule(row: ReturnType<typeof dueSchedules>[number], now: number): void {
+    const todoRow = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
+    const projectRow = todoRow ? projectOfTodo(deps.db, todoRow) : undefined;
+    if (!todoRow || todoRow.projectId !== row.projectId || !projectRow) {
+      deps.db.delete(schedule).where(eq(schedule.id, row.id)).run();
+      return;
+    }
+    if (todoRow.archivedAt !== null) {
+      pauseSchedule(deps, row.id, ARCHIVED_SCHEDULE_PAUSE_REASON);
+      return;
+    }
+    let nextRunAt: number | null = null;
+    if (isRecurring(row.kind)) {
+      try {
+        nextRunAt = computeNextRunAt(row.kind, row.at, row.tz, now, row.cron);
+      } catch (err) {
+        pauseSchedule(deps, row.id, err instanceof Error ? err.message : String(err));
+        return;
+      }
+    }
+    try {
+      cancelGateBuild(deps.db, deps.hub, row.todoId);
+      startBuilds(deps, {
+        projectId: row.projectId,
+        todoIds: [row.todoId],
+        assignment: todoRow.assignment ?? { plan: null, build: null },
+        withPlan: false,
+        triggerSource: 'schedule',
+        scheduledBy: row.createdBy,
+      });
+    } catch (err) {
+      if (err instanceof PhaseTransitionError) {
+        if (isRecurring(row.kind)) updateNextRunAt(deps, row.id, nextRunAt);
+        return;
+      }
+      throw err;
+    }
+    if (!isRecurring(row.kind)) {
+      deps.db.delete(schedule).where(eq(schedule.id, row.id)).run();
+    } else {
+      updateNextRunAt(deps, row.id, nextRunAt);
+    }
+  }
+
   function tick(now = nowMs()): void {
     if (!alertsSweeping) {
       alertsSweeping = true;
@@ -272,44 +317,13 @@ export function createScheduler(
           alertsSweeping = false;
         });
     }
-    const due = dueSchedules(deps, now);
-    for (const row of due) {
-      const todoRow = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
-      const projectRow = todoRow ? projectOfTodo(deps.db, todoRow) : undefined;
-      if (!todoRow || todoRow.projectId !== row.projectId || !projectRow) {
-        deps.db.delete(schedule).where(eq(schedule.id, row.id)).run();
-        continue;
-      }
-      let nextRunAt: number | null = null;
-      if (isRecurring(row.kind)) {
-        try {
-          nextRunAt = computeNextRunAt(row.kind, row.at, row.tz, now, row.cron);
-        } catch (err) {
-          pauseSchedule(deps, row.id, err instanceof Error ? err.message : String(err));
-          continue;
-        }
-      }
+    for (const row of dueSchedules(deps, now)) {
       try {
-        cancelGateBuild(deps.db, deps.hub, row.todoId);
-        startBuilds(deps, {
-          projectId: row.projectId,
-          todoIds: [row.todoId],
-          assignment: todoRow.assignment ?? { plan: null, build: null },
-          withPlan: false,
-          triggerSource: 'schedule',
-          scheduledBy: row.createdBy,
-        });
+        fireSchedule(row, now);
       } catch (err) {
-        if (err instanceof PhaseTransitionError) {
-          if (isRecurring(row.kind)) updateNextRunAt(deps, row.id, nextRunAt);
-          continue;
-        }
-        throw err;
-      }
-      if (!isRecurring(row.kind)) {
-        deps.db.delete(schedule).where(eq(schedule.id, row.id)).run();
-      } else {
-        updateNextRunAt(deps, row.id, nextRunAt);
+        const reason = err instanceof Error ? err.message : String(err);
+        pauseSchedule(deps, row.id, reason);
+        process.stderr.write(`Schedule ${row.id} paused: ${reason}\n`);
       }
     }
     sweepIdleChiefUnread(deps, now);
