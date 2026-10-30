@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { runInNewContext } from 'node:vm';
 import { api, disarmAutoMerge, markers, pages, repo } from './autonomy-brake.mjs';
 
 const batchHead = /^B\d+\//;
@@ -7,6 +8,66 @@ const log = (pr, action, reasons) =>
   console.log(
     JSON.stringify({ pr: pr?.number ?? null, head: pr?.head?.sha ?? null, action, reasons }),
   );
+
+function ownerRouting(headSha) {
+  const git = (args) => execFileSync('git', args, { encoding: 'utf8' });
+  const source = git(['show', 'origin/main:.claude/workflows/pr-gate.js']);
+  const extract = (start, end) => {
+    const from = source.indexOf(start);
+    const to = source.indexOf(end, from + start.length);
+    if (from < 0 || to < 0 || source.indexOf(start, from + start.length) !== -1)
+      throw new Error('Unsupported owner routing policy');
+    return source.slice(from, to);
+  };
+  const constants = extract('const AUTO_MERGE =', 'const FILES_CMD =');
+  const routing = extract('const safety = reviewed.find', 'const checked =');
+  const range = `origin/main...${headSha}`;
+  const numstat = git([
+    '-c',
+    'core.quotePath=false',
+    '--attr-source=4b825dc642cb6eb9a060e54bf8d69288fbee4904',
+    'diff',
+    '--no-renames',
+    '--numstat',
+    range,
+  ]);
+  const changedFiles = [];
+  const binaryFiles = [];
+  let linesChanged = 0;
+  for (const row of numstat.replace(/\n$/, '').split('\n')) {
+    const match = /^(\d+|-)\t(\d+|-)\t([\p{L}\p{M}\p{N}._/@+%-]+)$/u.exec(row);
+    if (!match || (match[1] === '-') !== (match[2] === '-'))
+      throw new Error('Invalid owner routing numstat');
+    const [, added, removed, path] = match;
+    changedFiles.push(path);
+    if (added === '-') binaryFiles.push(path);
+    else linesChanged += Number(added) + Number(removed);
+  }
+  const deleted = git([
+    '-c',
+    'core.quotePath=false',
+    'diff',
+    '--no-renames',
+    '--name-only',
+    '--diff-filter=D',
+    range,
+  ]).replace(/\n$/, '');
+  const deletedFiles = deleted ? deleted.split('\n') : [];
+  if (!Number.isSafeInteger(linesChanged) || !deletedFiles.every((f) => changedFiles.includes(f)))
+    throw new Error('Invalid owner routing diff');
+  const reasons = runInNewContext(
+    `${constants}
+const matchedProtected = changedFiles.filter(isProtected);
+const reviewed = [];
+${routing}
+humanReasons`,
+    { changedFiles, deletedFiles, binaryFiles, linesChanged },
+    { timeout: 1000, contextCodeGeneration: { strings: false, wasm: false } },
+  );
+  if (!Array.isArray(reasons) || !reasons.every((reason) => typeof reason === 'string'))
+    throw new Error('Invalid owner routing result');
+  return reasons;
+}
 
 function eligibility(number, expectedHead, dailyCap) {
   const pr = api(`repos/${repo}/pulls/${number}`);
@@ -120,6 +181,17 @@ try {
         disarmAutoMerge(result.pr);
         log(result.pr, 'disarmed', []);
         log(result.pr, 'skip', ['auto-merge-rearmed']);
+        continue;
+      }
+      let ownerReasons;
+      try {
+        ownerReasons = ownerRouting(result.pr.head.sha);
+      } catch (error) {
+        log(result.pr, 'owner-routing-unavailable', [error.message]);
+        continue;
+      }
+      if (ownerReasons.length) {
+        log(result.pr, 'owner-route', ownerReasons);
         continue;
       }
       attempted = true;

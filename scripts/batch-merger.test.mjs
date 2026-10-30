@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path';
 import { test } from 'node:test';
 
 const script = resolve('scripts/batch-merger.mjs');
+const policy = readFileSync('.claude/workflows/pr-gate.js', 'utf8');
 const head = 'a'.repeat(40);
 const required = ['check', 'pack-smoke', 'e2e-gate', 'pr-evidence'];
 const pull = (number = 1) => ({
@@ -23,6 +24,9 @@ function fixture(t, overrides = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'batch-merger-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const data = {
+    policy,
+    numstat: '1\t0\tapps/web/src/page.ts\n',
+    deleted: '',
     pulls: [pull()],
     checks: required.map((name, id) => ({
       name,
@@ -45,7 +49,7 @@ function fixture(t, overrides = {}) {
   writeFileSync(join(dir, 'data'), JSON.stringify(data));
   writeFileSync(
     join(dir, 'gh'),
-    `#!/usr/bin/env node
+    `#!${process.execPath}
 const fs = require('node:fs');
 const args = process.argv.slice(2);
 fs.appendFileSync(process.env.CALLS, JSON.stringify(args)+'\\n');
@@ -60,6 +64,20 @@ else if(p.includes('/check-runs')) { if(d.checkError) process.exit(1); console.l
 else if(p.endsWith('/comments?per_page=100')) console.log(JSON.stringify([d.comments]));
 else if(p.endsWith('/commits?per_page=100')) console.log(JSON.stringify([d.commits]));
 else if(p.includes('/pulls/')) console.log(JSON.stringify(Number(p.split('/').at(-1)) >= 100 ? d.closed[Number(p.split('/').at(-1))-100] : d.fresh ?? d.pulls.find(pr=>pr.number === Number(p.split('/').at(-1)))));
+else process.exit(2);
+`,
+    { mode: 0o755 },
+  );
+  writeFileSync(
+    join(dir, 'git'),
+    `#!${process.execPath}
+const fs = require('node:fs');
+const d = JSON.parse(fs.readFileSync(process.env.DATA));
+const args = process.argv.slice(2);
+if (d.gitError) process.exit(1);
+if (args[0] === 'show') process.stdout.write(d.policy);
+else if (args.includes('--numstat')) process.stdout.write(d.numstat);
+else if (args.includes('--diff-filter=D')) process.stdout.write(d.deleted);
 else process.exit(2);
 `,
     { mode: 0o755 },
@@ -334,4 +352,40 @@ test('closed PR pages count recent merges and stop at an older update', (t) => {
   assert.ok(paths.some((path) => path?.includes('state=closed&sort=updated&direction=desc')));
   assert.ok(paths.some((path) => path?.endsWith('page=2')));
   assert.ok(!paths.some((path) => path?.endsWith('page=3') || path?.startsWith('search/')));
+});
+
+for (const [name, data, reason] of [
+  ['protected path', { numstat: '1\t0\tdocs/adr/0028.md\n' }, 'protected paths'],
+  ['outside set', { numstat: '1\t0\tREADME.md\n' }, 'outside the auto-merge set'],
+  [
+    'deleted test',
+    { numstat: '0\t1\tapps/web/src/page.test.ts\n', deleted: 'apps/web/src/page.test.ts\n' },
+    'deleted test files',
+  ],
+  [
+    'binary source',
+    { numstat: '-\t-\tapps/web/src/page.ts\n' },
+    'binary files outside docs/verify',
+  ],
+  ['line limit', { numstat: '401\t400\tapps/web/src/page.ts\n' }, '801 lines changed'],
+  [
+    'file limit',
+    { numstat: Array.from({ length: 41 }, (_, i) => `1\t0\tapps/web/src/page${i}.ts\n`).join('') },
+    '41 files changed',
+  ],
+])
+  test(`owner routing blocks ${name}`, (t) => {
+    const f = fixture(t, data);
+    assert.equal(f.merges.length, 0);
+    assert.match(f.result.stdout, /owner-route/);
+    assert.ok(f.result.stdout.includes(reason), f.result.stdout);
+  });
+for (const data of [{ gitError: true }, { policy: 'invalid policy' }, { numstat: 'invalid' }])
+  test('unavailable owner routing fails closed', (t) => {
+    const f = fixture(t, data);
+    assert.equal(f.merges.length, 0);
+    assert.match(f.result.stdout, /owner-routing-unavailable/);
+  });
+test('clean product source remains eligible', (t) => {
+  assert.equal(fixture(t).merges.length, 1);
 });
