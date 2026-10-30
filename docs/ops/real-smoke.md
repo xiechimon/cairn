@@ -13,7 +13,7 @@ systemctl --user start cairn-real-smoke.service
 node "$CAIRN_REPO/scripts/ops/check-real-smoke.mjs"
 ```
 
-When `apps/daemon/src/orb/` exists in the installed checkout, the runner creates a fresh `cairn-orb-base` clone, starts it, binds only the sandbox read-only, and runs Claude Code as `agent` through `systemd-run`. The base image must have Claude Code installed. The service user needs the same machine-manager permissions as the orb provider. Token environment values are inherited by name through `systemd-run`; values are never command arguments. Cleanup synchronously stops the container service before removing its image. Without the orb provider source, the same command runs in the host sandbox.
+With `CAIRN_EXECUTOR=orb` in `real-smoke.env`, the runner creates a fresh `cairn-orb-base` clone, starts it, binds only the sandbox read-only, and runs Claude Code as `agent` through `systemd-run`. The base image must have Claude Code installed. The service user needs the same machine-manager permissions as the orb provider. Token environment values are inherited by name through `systemd-run`; values are never command arguments. Cleanup synchronously stops the container service before removing its image. Otherwise the same command runs in the host sandbox.
 
 The runner atomically writes `{ok, at, model}` to `$CAIRN_HOME/smoke.json`, next to `daemon.json`. It writes `ok:false` before starting and only records success after a valid Claude Code result and successful cleanup. `model` comes from Claude Code's result on success. The checker prints `incomplete` and exits 1 for absent, malformed, failed, future-dated or older-than-24-hour records; a fresh successful record prints `complete` and exits 0.
 

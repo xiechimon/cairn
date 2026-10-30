@@ -14,7 +14,7 @@ const success = JSON.stringify({
   subtype: 'success',
   is_error: false,
   result: 'CAIRN_SMOKE_OK',
-  modelUsage: { 'claude-sonnet-4-6': {} },
+  modelUsage: { 'claude-sonnet-5-5': {} },
 });
 
 function fixture() {
@@ -46,7 +46,7 @@ test('host smoke uses an isolated git repo, records the actual model and removes
   assert.deepEqual(JSON.parse(readFileSync(join(f.dir, 'smoke.json'))), {
     ok: true,
     at: '2026-10-31T12:00:00.000Z',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5-5',
   });
   assert.throws(() => readFileSync(join(call.options.cwd, 'SMOKE.txt')), /ENOENT/);
 });
@@ -95,3 +95,27 @@ for (const failure of ['command', 'malformed', 'provider', 'model', 'cleanup']) 
     assert.equal(JSON.parse(readFileSync(join(f.dir, 'smoke.json'))).ok, false);
   });
 }
+
+test('orb mode follows CAIRN_EXECUTOR like the daemon', () => {
+  for (const [executor, expected] of [
+    ['orb', true],
+    [undefined, false],
+    ['host', false],
+  ]) {
+    const f = fixture();
+    const { orb: _orb, ...options } = f.options;
+    runSmoke({ ...options, env: { ...options.env, CAIRN_EXECUTOR: executor } });
+    assert.equal(
+      f.calls.some(({ argv }) => argv[0] === 'machinectl'),
+      expected,
+    );
+  }
+});
+
+test('the prompt precedes variadic flags so --mcp-config cannot swallow it', () => {
+  const f = fixture();
+  runSmoke(f.options);
+  const claude = f.calls.find(({ argv }) => argv[0] === 'claude');
+  assert.equal(claude.argv[1], 'Read SMOKE.txt and reply with only its contents.');
+  assert.equal(claude.argv.at(-2), '--mcp-config');
+});

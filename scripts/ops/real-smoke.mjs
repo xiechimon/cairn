@@ -1,13 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import {
-  chmodSync,
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  renameSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { smokeCommand } from '../../apps/daemon/src/backend/smoke-command.mjs';
@@ -15,7 +7,7 @@ import { smokeCommand } from '../../apps/daemon/src/backend/smoke-command.mjs';
 export function runSmoke({
   env = process.env,
   run = smokeCommand,
-  orb = existsSync(new URL('../../apps/daemon/src/orb/', import.meta.url)),
+  orb = env.CAIRN_EXECUTOR === 'orb',
   now = () => new Date(),
 } = {}) {
   if (env.CI && !['false', '0'].includes(env.CI)) throw new Error('Real smoke must not run in CI');
@@ -40,6 +32,7 @@ export function runSmoke({
     writeFileSync(join(sandbox, 'SMOKE.txt'), 'CAIRN_SMOKE_OK\n');
     const argv = [
       'claude',
+      'Read SMOKE.txt and reply with only its contents.',
       '--print',
       '--output-format',
       'json',
@@ -60,7 +53,6 @@ export function runSmoke({
       '--strict-mcp-config',
       '--mcp-config',
       '{"mcpServers":{}}',
-      'Read SMOKE.txt and reply with only its contents.',
     ];
     let output;
     if (orb) {
