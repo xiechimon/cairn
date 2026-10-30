@@ -184,23 +184,32 @@ test('github owner/repo backfills the repo segment once valid', async ({ page })
   await expect(name).toHaveValue('Renamed');
 });
 
-test('the name input focus ring is the global outline, not the UA default', async ({ page }) => {
+test('the name input focus is the field ring: --focus-ring border plus a 3px halo, not the UA default', async ({
+  page,
+}) => {
   await page.goto(NEW_PROJECT);
   const name = page.locator('#prj-new-name');
   await name.click();
+  const ring = await name.evaluate((el) => {
+    const probe = document.createElement('div');
+    probe.style.color = 'var(--focus-ring)';
+    el.ownerDocument.body.append(probe);
+    const color = getComputedStyle(probe).color;
+    probe.remove();
+    return color;
+  });
+  await expect.poll(() => name.evaluate((el) => getComputedStyle(el).borderTopColor)).toBe(ring);
   const cs = await name.evaluate((el) => {
     const s = getComputedStyle(el);
     return {
       outline: s.outlineStyle,
-      width: s.outlineWidth,
       shadow: s.boxShadow,
       visible: el.matches(':focus-visible'),
     };
   });
   expect(cs.visible).toBe(true);
-  expect(cs.outline).toBe('solid');
-  expect(cs.width).toBe('2px');
-  expect(cs.shadow).not.toContain('0px 0px 0px 3px');
+  expect(cs.outline).toBe('none');
+  expect(cs.shadow).toContain('0px 0px 0px 3px');
   expect(cs.shadow).not.toContain('rgb(0, 95, 204)');
 });
 

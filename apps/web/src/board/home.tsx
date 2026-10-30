@@ -340,7 +340,7 @@ export function HomeSections({
 
   return (
     <div data-testid="home-sections" className="board-inbox min-h-0 flex-1 overflow-y-auto pb-10">
-      <div className="mx-auto flex w-full max-w-198 flex-col gap-7 px-4 pt-5">
+      <div className="mx-auto flex w-full max-w-190 flex-col gap-7 px-4 pt-5">
         <HomeSection
           testId="home-needs-you"
           icon={CircleAlert}

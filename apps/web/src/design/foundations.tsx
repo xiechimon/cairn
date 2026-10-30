@@ -133,20 +133,16 @@ const TYPE = [
 
 const RADII = [
   {
-    use: 'Inputs, selects, dialog buttons',
-    expr: 'calc(var(--radius) * 0.8)',
-    token: 'rounded-md',
-  },
-  {
-    use: 'Buttons, icon buttons, avatars',
+    use: 'Buttons, inputs, selects, menu rows, avatars',
     expr: 'var(--radius-control)',
     token: '--radius-control',
   },
-  { use: 'Menu rows', expr: 'var(--radius-menu-item)', token: '--radius-menu-item' },
-  { use: 'Dialogs, ⌘K', expr: 'var(--edge-radius)', token: '--edge-radius' },
-  { use: 'Menus, popovers', expr: 'var(--radius-popover)', token: '--radius-popover' },
   { use: 'Cards', expr: 'var(--radius-card)', token: '--radius-card' },
-  { use: 'Composer, chief window', expr: 'var(--radius-composer)', token: '--radius-composer' },
+  {
+    use: 'Menus, dialogs, composer, chief window',
+    expr: 'var(--radius-popover)',
+    token: '--radius-popover',
+  },
 ];
 
 const MOTION = [

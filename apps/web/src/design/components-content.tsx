@@ -376,11 +376,14 @@ export function TraceSection() {
         </Trace>
       </Specimen>
       <Specimen title="Chief turn tools" note="the compact panel under a chief reply">
-        <Trace className="max-w-120 gap-1 rounded-(--radius-popover) bg-(--secondary) px-2 py-1.5">
-          <TraceLine status="running" className="font-mono text-caption text-(--text-tertiary)">
+        <Trace className="max-w-120 gap-1 border-l-2 border-border py-0.5 pl-3">
+          <TraceLine
+            status="running"
+            className="font-mono text-caption leading-4 text-content-tertiary"
+          >
             <TraceTitle>Calling create_todo</TraceTitle>
           </TraceLine>
-          <TraceLine className="font-mono text-caption text-(--text-tertiary)">
+          <TraceLine className="font-mono text-caption leading-4 text-content-tertiary">
             <TraceTitle>list_machines</TraceTitle>
             <TraceDescription>1s</TraceDescription>
           </TraceLine>

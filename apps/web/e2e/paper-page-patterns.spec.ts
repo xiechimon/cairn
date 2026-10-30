@@ -16,8 +16,8 @@ test('board task card and account settings card share --radius-card (R1–R3)', 
   await setTheme(page, 'light');
   await page.goto('/app?scenario=01&view=board');
   await expect(page.locator('.todo-card').first()).toBeVisible();
-  expect(await tokenRadius(page), 'R1').toBe('20px');
-  await expect(page.locator('.todo-card').first(), 'R2').toHaveCSS('border-top-left-radius', '20px');
+  expect(await tokenRadius(page), 'R1').toBe('10px');
+  await expect(page.locator('.todo-card').first(), 'R2').toHaveCSS('border-top-left-radius', '10px');
 
   await page.goto('/app/account?scenario=13');
   const card = page.locator('.account-card');
@@ -105,7 +105,7 @@ for (const theme of ['light', 'dark'] as const) {
     expect(m.button.variant, 'E3').toBe('default');
     expect(m.button.size, 'E3').toBe('default');
     expect(m.button.h, 'E3: 32px').toBe(32);
-    expect(m.button.radius, 'E3: 8px corners, not a pill').toBe('8px');
+    expect(m.button.radius, 'E3: 6px corners, not a pill').toBe('6px');
     expect(m.button.w, 'E3: not a full-width bar').toBeLessThan(m.emptyWidth / 2);
     expect(m.title, 'E4').toEqual(['14px', '500']);
     expect(m.desc, 'E4').toEqual(['12px', m.ink3]);

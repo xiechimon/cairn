@@ -229,10 +229,25 @@
   .composer textarea:focus-visible {
     outline: none;
   }
+
+  :root
+    :is([data-slot="input"], [data-slot="textarea"], [data-slot="select-trigger"]):not(
+      .border-none,
+      .border-0,
+      [aria-invalid="true"]
+    ):focus-visible,
+  :root
+    [data-slot="input-group"]:has([data-slot="input-group-control"]:focus-visible):not(
+      :has([aria-invalid="true"])
+    ) {
+    outline: none;
+    border-color: var(--focus-field-border);
+    box-shadow: 0 0 0 3px var(--focus-halo);
+  }
 }
 
 [data-slot="input"]:not(.rounded-none) {
-  border-radius: var(--cds-radius-lg);
+  border-radius: var(--radius-control);
 }
 
 [data-slot="select-content"] {

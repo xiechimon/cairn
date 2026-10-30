@@ -154,7 +154,7 @@ export function ChiefHome({
       data-testid="chief-home"
       aria-label={t('与总管的对话')}
       data-layout={empty && !heroCollapsed ? 'hero' : fresh ? 'day' : 'chat'}
-      className={`flex min-h-0 flex-1 flex-col ${empty && !heroCollapsed ? 'overflow-y-auto pb-10' : ''}`}
+      className="flex min-h-0 flex-1 flex-col"
     >
       <MessageScrollerProvider
         autoScroll={atBottom}

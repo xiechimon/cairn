@@ -107,7 +107,7 @@ test.describe('chief panel floating form (ADR 0013)', () => {
     // an overlay anchored to the corner, not an in-flow column (D10)
     expect(skin.position).toBe('fixed');
 
-    expect(skin.radius).toBe('20px');
+    expect(skin.radius).toBe('12px');
 
     expect(skin.shadow).not.toBe('none');
     expect(skin.shadow).toContain('inset');
@@ -271,9 +271,9 @@ test.describe('chief panel floating form (ADR 0013)', () => {
     const empty = await measureComposer('/app?view=board&scenario=114');
 
     expect(drafted.height).toBe(120);
-    expect(empty.height).toBe(60);
+    expect(empty.height).toBe(40);
     expect(drafted.cssHeight).toBe('120px');
-    expect(empty.cssHeight).toBe('60px');
+    expect(empty.cssHeight).toBe('40px');
 
     expect(drafted.overflowY).toBe('auto');
     expect(empty.overflowY).toBe('auto');

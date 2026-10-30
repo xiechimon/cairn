@@ -91,9 +91,9 @@ for (const theme of ['light', 'dark'] as const) {
     const [first] = faces;
     expect(first.value.trackHeight).toBe(32);
     expect(first.value.trackPadding).toBe('2px');
-    expect(first.value.trackRadius).toBe('8px');
+    expect(first.value.trackRadius).toBe('6px');
     expect(first.value.optionHeight).toBe(28);
-    expect(first.value.optionRadius).toBe('6px');
+    expect(first.value.optionRadius).toBe('4px');
     expect(first.value.selectedRing).toBe(true);
     expect(first.value.selectedWeight).toBe('500');
     expect(first.value.idleBg).toBe('rgba(0, 0, 0, 0)');

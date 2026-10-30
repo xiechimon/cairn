@@ -34,11 +34,11 @@ for (const [name, url, rows] of [
   ['secrets', '/app/resources/secrets?scenario=agent-detail-secrets', 2],
   ['machines', '/app/resources/machines?scenario=06', 2],
 ] as const) {
-  test(`${name} list: one settings card of 52px rows, 20px corner`, async ({ page }) => {
+  test(`${name} list: one settings card of 52px rows, 10px corner`, async ({ page }) => {
     await light(page, url);
     const cards = page.locator('[data-testid="page-col"] .settings-card');
     await expect(cards).toHaveCount(1);
-    await expect(cards).toHaveCSS('border-top-left-radius', '20px');
+    await expect(cards).toHaveCSS('border-top-left-radius', '10px');
     const heights = await cards.evaluate((el) =>
       [...el.children].map((row) => row.getBoundingClientRect().height),
     );
