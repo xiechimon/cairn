@@ -20,6 +20,7 @@ interface MoreMenuProps {
   canClose: boolean;
   onStop?: () => void;
   onReject?: () => void;
+  onDiscard?: () => void;
   anchor?: ComponentProps<typeof DropdownMenuContent>['anchor'];
 }
 
@@ -36,6 +37,7 @@ export function MoreMenu({
   canClose,
   onStop,
   onReject,
+  onDiscard,
   anchor,
 }: MoreMenuProps) {
   const { t } = useI18n();
@@ -44,6 +46,18 @@ export function MoreMenu({
     onClose();
   };
   const rows = [
+    ...(onDiscard
+      ? [
+          {
+            key: 'discard-changes',
+            label: t('丢弃修改'),
+            Icon: Trash2,
+            disabled: false,
+            danger: true,
+            onClick: onDiscard,
+          },
+        ]
+      : []),
     {
       key: 'complete',
       label: t('完成'),
@@ -133,7 +147,13 @@ export function MoreMenu({
             variant={row.danger === true ? 'destructive' : 'default'}
             className="more-menu-item"
             {...('action' in row ? { 'data-action': row.action } : {})}
-            data-testid={row.key === 'archive' ? 'archive-task' : undefined}
+            data-testid={
+              row.key === 'archive'
+                ? 'archive-task'
+                : row.key === 'discard-changes'
+                  ? row.key
+                  : undefined
+            }
             disabled={row.disabled}
             onClick={row.onClick}
           >

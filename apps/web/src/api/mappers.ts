@@ -584,11 +584,20 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     previousAt = m.createdAt;
     const call = toolCallOfContent(m.content);
     if (call !== null) {
+      const owner = steps
+        .filter((s) => s.createdAt <= m.createdAt)
+        .sort((a, b) => a.createdAt - b.createdAt)
+        .at(-1);
       entries.push({
         at: m.createdAt,
         item: {
           kind: '__work__',
-          step: workCall(call, seconds, claimedSince !== null && m.createdAt >= claimedSince),
+          step: workCall(
+            call,
+            seconds,
+            claimedSince !== null && m.createdAt >= claimedSince,
+            owner?.status === 'stopped',
+          ),
         },
       });
       continue;
@@ -797,6 +806,7 @@ function workCall(
   call: ToolCallRecord,
   fallbackSeconds: number | null,
   stepRunning: boolean,
+  cancelled: boolean,
 ): WorkStep {
   const args = (call.arguments ?? {}) as Record<string, unknown>;
   const name = call.name.toLowerCase();
@@ -819,6 +829,7 @@ function workCall(
     error: call.isError === true,
     running: call.result === undefined && stepRunning,
     unfinished: call.result === undefined && !stepRunning,
+    cancelled: call.result === undefined && cancelled,
     seconds,
   };
   if (name === 'read') {

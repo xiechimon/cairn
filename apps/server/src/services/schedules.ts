@@ -294,14 +294,31 @@ export function assertWorkerScheduleInterval(
   checkOnce = true,
 ): void {
   const first = computeNextRunAt(cadence.kind, cadence.at, cadence.tz, fromMs, cadence.cron);
-  const interval =
-    cadence.kind === 'once'
-      ? checkOnce
-        ? first - fromMs
-        : WORKER_SCHEDULE_MIN_INTERVAL_MS
-      : computeNextRunAt(cadence.kind, cadence.at, cadence.tz, first, cadence.cron) - first;
-  if (interval < WORKER_SCHEDULE_MIN_INTERVAL_MS) {
-    throw new HttpError(400, 'worker schedules require an interval of at least 15 minutes');
+  if (cadence.kind === 'once') {
+    if (checkOnce && first - fromMs < WORKER_SCHEDULE_MIN_INTERVAL_MS) {
+      throw new HttpError(400, 'worker schedules require an interval of at least 15 minutes');
+    }
+    return;
+  }
+  const expression = cronExpressionFor(cadence.kind, cadence.at, cadence.tz, cadence.cron);
+  if (expression === null) throw new HttpError(400, 'missing schedule cron expression');
+  try {
+    const dayMs = 24 * 60 * 60_000;
+    const fires = CronExpressionParser.parse(expression, {
+      tz: cadence.tz,
+      currentDate: new Date(first - dayMs),
+    });
+    let previous = fires.next().getTime();
+    while (previous <= first + dayMs) {
+      const next = fires.next().getTime();
+      if (next - previous < WORKER_SCHEDULE_MIN_INTERVAL_MS) {
+        throw new HttpError(400, 'worker schedules require an interval of at least 15 minutes');
+      }
+      previous = next;
+    }
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw new HttpError(400, 'invalid schedule cron expression or timezone');
   }
 }
 

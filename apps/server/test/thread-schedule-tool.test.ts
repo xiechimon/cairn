@@ -20,7 +20,10 @@ import {
 import { applyStepFailure, completeStep, messageTodo } from '../src/services/builds.js';
 import { sweepFailedRetries } from '../src/services/needs-you.js';
 import { createScheduler } from '../src/services/scheduler.js';
-import { workerScheduleRunHistory } from '../src/services/schedules.js';
+import {
+  assertWorkerScheduleInterval,
+  workerScheduleRunHistory,
+} from '../src/services/schedules.js';
 import { setTodoArchived, setTodoPhase } from '../src/services/todos.js';
 import { bindAllAgents, bootServer, issueApiKey, postProject, req } from './helpers.js';
 
@@ -399,6 +402,7 @@ describe('worker schedule security', () => {
     'rejects a worker cadence below 15 minutes: %s',
     async (cadence) => {
       const s = await world();
+      vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-10-31T08:03:00Z'));
       await s.run('schedule_create', { cadence: 'in 15 minutes', prompt: 'Original' });
       const original = s.stored();
       for (const name of ['schedule_create', 'schedule_update']) {
@@ -847,4 +851,34 @@ test('intervening non-scheduled builds cannot crowd scheduled runs out of the ca
     consecutive: 10,
     lastRunAt: lastScheduledAt,
   });
+});
+
+describe('worker cron minimum across the daily cycle', () => {
+  test.each(['2026-10-31T08:03:00Z', '2026-10-31T08:06:00Z'])(
+    'rejects hidden short gaps independently of creation time %s',
+    (now) => {
+      for (const cron of ['0,5 * * * *', '0,5 0 * * *', '0,5 0 1 * *', '0,55 0,23 * * *']) {
+        expect(() =>
+          assertWorkerScheduleInterval(
+            { kind: 'cron', at: null, tz: 'UTC', cron },
+            Date.parse(now),
+          ),
+        ).toThrow(/15 minutes/);
+      }
+    },
+  );
+
+  test.each(['*/15 * * * *', '0,15 0 1 * *', '0 0 * * *', '0,55 0,23 * * 1'])(
+    'accepts safe daily and sparse calendar gaps: %s',
+    (cron) => {
+      for (const now of ['2026-10-31T08:03:00Z', '2026-10-31T08:06:00Z']) {
+        expect(() =>
+          assertWorkerScheduleInterval(
+            { kind: 'cron', at: null, tz: 'UTC', cron },
+            Date.parse(now),
+          ),
+        ).not.toThrow();
+      }
+    },
+  );
 });
