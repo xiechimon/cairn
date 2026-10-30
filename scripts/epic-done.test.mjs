@@ -3,7 +3,12 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, join } from 'node:path';
-import { test } from 'node:test';
+import { after, test } from 'node:test';
+
+const stateRoot = mkdtempSync(join(tmpdir(), 'epic-state-tests-'));
+let stateIndex = 0;
+after(() => rmSync(stateRoot, { recursive: true, force: true }));
+
 import { decideEpic, main, validateManifest } from './epic-done.mjs';
 import { selfTests } from './prepush.mjs';
 
@@ -21,16 +26,25 @@ const issue = (number) => ({
   stateReason: 'COMPLETED',
   labels: connection([]),
   timelineItems: connection([
-    { closer: { __typename: 'PullRequest', merged: true, mergeCommit: commit(closing) } },
+    {
+      closer: {
+        __typename: 'PullRequest',
+        merged: true,
+        mergedAt: date,
+        mergeCommit: commit(closing),
+      },
+    },
   ]),
   closedByPullRequestsReferences: connection([]),
 });
 const runRecord = (sha, name, conclusion = 'success', id = 1) => ({
   id,
   head_sha: sha,
+  app: { slug: 'github-actions' },
   name,
   status: 'completed',
   conclusion,
+  completed_at: date,
 });
 const checkPage = (sha, conclusion = 'success') => ({
   total_count: 2,
@@ -122,7 +136,22 @@ function harness() {
       throw new Error(`Unexpected runner call: ${file} ${args.join(' ')}`);
     },
   };
-  return { state, deps, invoke: (args = []) => main(['E1.0a', ...args], deps) };
+  return {
+    state,
+    deps,
+    invoke: (args = []) =>
+      main(
+        [
+          'E1.0a',
+          '--state',
+          join(stateRoot, String(++stateIndex)),
+          '--started-at',
+          now.toISOString(),
+          ...args,
+        ],
+        deps,
+      ),
+  };
 }
 
 function expectState(result, state, exitCode, pattern) {
@@ -304,7 +333,7 @@ for (const outcome of [
 test('complete: closed issues, isolated remote-main checks and one green commit', async () => {
   const { state, invoke } = harness();
   const result = await invoke();
-  expectState(result, 'complete', 0, /No time cap/);
+  expectState(result, 'complete', 0);
   assert.equal(result.checks[0].status, 'passed');
   assert.equal(result.greenSha, tip);
   assert.equal(result.lastClosingSha, closing);
@@ -428,15 +457,15 @@ test('failure mode 3: a merged linked PR does not substitute for an open issue',
 test('failure mode 4: no green main commit since the last closing SHA is incomplete', async () => {
   const { state, invoke } = harness();
   state.checks = { [tip]: [checkPage(tip, 'failure')], [closing]: [checkPage(closing, 'failure')] };
-  expectState(await invoke(), 'incomplete', 10, new RegExp(`since ${closing}`));
+  expectState(await invoke(), 'incomplete', 10, new RegExp(tip));
 });
 
-test('failure mode 5: green at the closing commit still completes after later red merges', async () => {
+test('failure mode 5: older green cannot satisfy latest red main', async () => {
   const { state, invoke } = harness();
   state.checks[tip] = [checkPage(tip, 'failure')];
   const result = await invoke();
-  expectState(result, 'complete', 0);
-  assert.equal(result.greenSha, closing);
+  expectState(result, 'incomplete', 10);
+  assert.equal(result.greenSha, null);
 });
 
 test('required checks must succeed together on one eligible commit', async () => {
@@ -484,13 +513,13 @@ test('caller edits and feature HEAD do not prevent checks at remote main', async
   assert.ok(!state.calls.some(({ args }) => args[0] === 'status'));
 });
 
-test('failure mode 7: frozen manifest comes only from git show at the selected ref', async () => {
+test('failure mode 7: frozen manifest is read from main even with an identical selected ref', async () => {
   const { state, invoke } = harness();
   expectState(await invoke(['--ref', 'frozen-v1', '--repo', 'octo/repo']), 'complete', 0);
   assert.ok(
     state.calls.some(
       ({ file, args }) =>
-        file === 'git' && args[0] === 'show' && args[1] === `${closing}:.claude/epics/E1.0a.json`,
+        file === 'git' && args[0] === 'show' && args[1] === `${tip}:.claude/epics/E1.0a.json`,
     ),
   );
   assert.ok(
@@ -602,10 +631,12 @@ test('unexpected command errors and malformed command output are unknown', async
   expectState(await invoke(), 'unknown', 2);
 });
 
-test('failure mode 10: no started-at means no cap even when checks fail', async () => {
-  const { state, invoke } = harness();
-  state.stdout = 'no match';
-  expectState(await invoke(), 'incomplete', 10, /No time cap/);
+test('missing state requires an explicit start without creating a fresh state', async () => {
+  const { deps, state } = harness();
+  const path = join(stateRoot, String(++stateIndex));
+  expectState(await main(['E1.0a', '--state', path], deps), 'unknown', 2, /started-at/);
+  assert.equal(existsSync(path), false);
+  assert.equal(state.calls.length, 0);
 });
 
 test('paused: every human-wait label on issues or open linked PRs takes priority over failure', async () => {
@@ -618,7 +649,7 @@ test('paused: every human-wait label on issues or open linked PRs takes priority
           { number: 88, state: 'OPEN', labels: connection([{ name: label }]) },
         ]);
       else state.issues[0].labels = connection([{ name: label }]);
-      expectState(await invoke(['--fail', 'stop']), 'paused', 20, new RegExp(label));
+      expectState(await invoke(['--fail', 'stop']), 'failed', 30, /stop/);
     }
   }
 });
@@ -630,12 +661,7 @@ test('closed linked PR labels do not pause, while explicit pause does', async ()
     { number: 88, state: 'CLOSED', labels: connection([{ name: 'needs-decision' }]) },
   ]);
   expectState(await invoke(), 'incomplete', 10);
-  expectState(
-    await invoke(['--pause', 'quota wait', '--fail', 'stop']),
-    'paused',
-    20,
-    /quota wait/,
-  );
+  expectState(await invoke(['--pause', 'quota wait', '--fail', 'stop']), 'failed', 30, /stop/);
 });
 
 test('failed: explicit failure and elapsed maxHours apply only when not complete or paused', async () => {
@@ -657,8 +683,8 @@ test('failed: explicit failure and elapsed maxHours apply only when not complete
   state.stdout = 'pass';
   expectState(
     await invoke(['--fail', 'stop', '--pause', 'wait', '--started-at', '2026-10-29T00:00:00Z']),
-    'complete',
-    0,
+    'failed',
+    30,
   );
 });
 
@@ -669,7 +695,7 @@ test('commit closers must belong to main; the latest of multiple closing changes
   state.issues[0].timelineItems.nodes[0].closer.oid = tip;
   state.checks[tip] = [checkPage(tip, 'failure')];
   const result = await invoke();
-  expectState(result, 'incomplete', 10, new RegExp(`since ${tip}`));
+  expectState(result, 'incomplete', 10, new RegExp(tip));
   assert.equal(result.lastClosingSha, tip);
 });
 
@@ -706,13 +732,8 @@ test('JSON output contains the same decision and the pure decision does not muta
   const result = await invoke(['--json']);
   assert.deepEqual(JSON.parse(state.output[0]), result);
   const facts = structuredClone(result.facts);
-  assert.deepEqual(decideEpic(facts), {
-    state: result.state,
-    exitCode: result.exitCode,
-    reasons: result.reasons,
-    greenSha: result.greenSha,
-    lastClosingSha: result.lastClosingSha,
-  });
+  const { checks: _checks, facts: _facts, ...decision } = result;
+  assert.deepEqual(decideEpic(facts), decision);
   assert.deepEqual(facts, result.facts);
   expectState(decideEpic({}), 'unknown', 2);
 });
@@ -772,75 +793,14 @@ test('non-Error runner throws still produce unknown', async () => {
   }
 });
 
-test('check-run requests stop at the first green commit, newest first', async () => {
-  for (const newestGreen of [true, false]) {
-    const { state, invoke } = harness();
-    if (!newestGreen) state.checks[tip] = [checkPage(tip, 'failure')];
-    expectState(await invoke(), 'complete', 0);
-    const calls = state.calls.filter(({ args }) => args.some((arg) => arg.includes('/check-runs')));
-    assert.equal(calls.length, newestGreen ? 1 : 2);
-    assert.ok(calls[0].args.some((arg) => arg.includes(`/commits/${tip}/`)));
-    if (!newestGreen) assert.ok(calls[1].args.some((arg) => arg.includes(`/commits/${closing}/`)));
-    assert.ok(!state.calls.some(({ args }) => args.some((arg) => arg.includes('/commits?'))));
-  }
+test('only the latest main commit is examined', async () => {
+  const { state, invoke } = harness();
+  state.checks[tip] = [checkPage(tip, 'failure')];
+  expectState(await invoke(), 'incomplete', 10);
+  const calls = state.calls.filter(({ args }) => args.some((arg) => arg.includes('/check-runs')));
+  assert.equal(calls.length, 1);
+  assert.ok(calls[0].args.some((arg) => arg.includes(`/commits/${tip}/`)));
 });
-
-test('at most 30 eligible commits are examined, including a green thirtieth commit', async () => {
-  for (const greenIndex of [29, 30, -1]) {
-    const { state, invoke } = harness();
-    const middle = Array.from({ length: 35 }, (_, index) =>
-      (index + 1).toString(16).padStart(40, '0'),
-    );
-    state.history = [tip, ...middle, closing, older];
-    state.mainline = [...state.history];
-    state.descendants[closing] = state.history.slice(0, -1);
-    state.checks = Object.fromEntries(
-      state.history.map((sha, index) => [
-        sha,
-        [checkPage(sha, index === greenIndex ? 'success' : 'failure')],
-      ]),
-    );
-    const result = await invoke();
-    expectState(result, greenIndex === 29 ? 'complete' : 'unknown', greenIndex === 29 ? 0 : 2);
-    const calls = state.calls.filter(({ args }) => args.some((arg) => arg.includes('/check-runs')));
-    assert.equal(calls.length, 30);
-    assert.deepEqual(
-      result.facts.commits.map(({ sha }) => sha),
-      state.history.slice(0, 30),
-    );
-  }
-});
-
-for (const [count, greenIndex, expected] of [
-  [31, 30, 'unknown'],
-  [30, -1, 'incomplete'],
-  [40, 0, 'complete'],
-]) {
-  test(`${count} eligible commits with green index ${greenIndex} yield ${expected}`, async () => {
-    const { state, invoke } = harness();
-    const middle = Array.from({ length: count - 2 }, (_, index) =>
-      (index + 1).toString(16).padStart(40, '0'),
-    );
-    const eligible = [tip, ...middle, closing];
-    state.history = [...eligible, older];
-    state.mainline = [...state.history];
-    state.descendants[closing] = eligible;
-    state.checks = Object.fromEntries(
-      eligible.map((sha, index) => [
-        sha,
-        [checkPage(sha, index === greenIndex ? 'success' : 'failure')],
-      ]),
-    );
-    const result = await invoke();
-    expectState(result, expected, expected === 'unknown' ? 2 : expected === 'complete' ? 0 : 10);
-    const calls = state.calls.filter(({ args }) => args.some((arg) => arg.includes('/check-runs')));
-    assert.equal(calls.length, expected === 'complete' ? 1 : 30);
-    if (expected === 'unknown') {
-      assert.match(result.reasons.join('\n'), /1 eligible commit.*not examined/);
-      assert.match(result.reasons.join('\n'), new RegExp(closing));
-    }
-  });
-}
 
 test('no green commit reports missing and unsuccessful required checks on the newest commit', async () => {
   const { state, invoke } = harness();
@@ -917,18 +877,11 @@ test('only completed success is green, regardless of future GitHub status values
   }
 });
 
-test('partial or reordered examined commits cannot establish completion', async () => {
-  const { state, invoke } = harness();
-  state.checks[tip] = [checkPage(tip, 'failure')];
+test('missing or wrong latest commit facts cannot establish completion', async () => {
+  const { invoke } = harness();
   const result = await invoke();
-  expectState(result, 'complete', 0);
-  for (const commits of [
-    [],
-    result.facts.commits.slice(0, 1),
-    [...result.facts.commits].reverse(),
-  ]) {
+  for (const commits of [[], [{ ...result.facts.commits[0], sha: closing }]])
     expectState(decideEpic({ ...result.facts, commits }), 'unknown', 2);
-  }
 });
 
 test('empty required checks cannot establish completion without CI evidence', async () => {
@@ -1089,3 +1042,410 @@ test('the checker stays within 400 lines', () => {
   const source = readFileSync(new URL('./epic-done.mjs', import.meta.url), 'utf8');
   assert.ok(source.trimEnd().split('\n').length <= 400);
 });
+
+for (const [args, expected] of [
+  [['--pause', 'owner'], 'paused'],
+  [['--fail', 'stop'], 'failed'],
+  [['--started-at', '2026-10-29T00:00:00Z'], 'failed'],
+]) {
+  test(`stop condition ${args[0]} wins over completion`, async () => {
+    const { invoke } = harness();
+    const result = await invoke(args);
+    assert.equal(result.state, expected);
+  });
+}
+
+test('latest red main cannot borrow an older green commit', async () => {
+  const { state, invoke } = harness();
+  state.checks[tip] = [checkPage(tip, 'failure')];
+  const result = await invoke();
+  expectState(result, 'incomplete', 10);
+  assert.equal(result.mainGreen, false);
+});
+
+function batchHarness() {
+  const fixture = harness();
+  delete fixture.state.manifest.issues;
+  fixture.state.manifest.items = [
+    { id: 'owner', issue: 1234, dependsOn: [], humanHeld: true },
+    { id: 'child', issue: 1235, dependsOn: ['owner'] },
+    { id: 'grandchild', issue: 1236, dependsOn: ['child'] },
+    { id: 'independent', issue: 1237, dependsOn: [] },
+  ];
+  fixture.state.issues = [1234, 1235, 1236, 1237].map((number) => ({
+    ...issue(number),
+    state: 'OPEN',
+    stateReason: null,
+    timelineItems: connection([]),
+  }));
+  return fixture;
+}
+
+test('a human-held item blocks only its transitive dependents', async () => {
+  const { invoke } = batchHarness();
+  const result = await invoke();
+  expectState(result, 'incomplete', 10);
+  assert.deepEqual(result.humanHeld, ['owner']);
+  assert.deepEqual(result.blocked, ['child', 'grandchild']);
+  assert.deepEqual(result.ready, ['independent']);
+});
+
+test('a batch pauses only when no independent item remains ready', async () => {
+  const { state, invoke } = batchHarness();
+  state.manifest.items.pop();
+  state.issues.pop();
+  expectState(await invoke(), 'paused', 20);
+});
+
+for (const green of [true, false]) {
+  test(`all merged items with latest main green=${green}`, async () => {
+    const { state, invoke } = batchHarness();
+    state.issues = state.manifest.items.map((item, index) => {
+      const value = issue(item.issue);
+      value.timelineItems.nodes[0].closer.number = 100 + index;
+      return value;
+    });
+    state.checks[tip] = [checkPage(tip, green ? 'success' : 'failure')];
+    const result = await invoke();
+    expectState(result, green ? 'complete' : 'incomplete', green ? 0 : 10);
+    assert.ok(result.items.every((item) => item.status === 'done' && item.pr));
+  });
+}
+
+test('state preserves the original start and accumulates hours across runs', async (t) => {
+  const directory = mkdtempSync(join(tmpdir(), 'batch-state-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const path = join(directory, 'state.json');
+  const { state, deps, invoke } = batchHarness();
+  state.manifest.maxHours = 1;
+  await invoke(['--state', path]);
+  const first = JSON.parse(readFileSync(path, 'utf8'));
+  deps.now = () => new Date(now.getTime() + 3600000);
+  const result = await invoke(['--state', path, '--started-at', now.toISOString()]);
+  expectState(result, 'failed', 30);
+  const second = JSON.parse(readFileSync(path, 'utf8'));
+  assert.equal(second.startedAt, first.startedAt);
+  assert.equal(second.activeHours, 1);
+  assert.equal(second.phase, 'failed');
+});
+
+test('newest run per name wins regardless of response order', async () => {
+  for (const conclusion of ['success', 'failure', null]) {
+    const { state, invoke } = harness();
+    state.checks[tip][0].check_runs.unshift(runRecord(tip, 'check', conclusion, 9));
+    state.checks[tip][0].total_count++;
+    expectState(
+      await invoke(),
+      conclusion === 'success' ? 'complete' : 'incomplete',
+      conclusion === 'success' ? 0 : 10,
+    );
+  }
+});
+
+test('invalid DAGs fail closed before running checks', async () => {
+  for (const mutate of [
+    (items) => {
+      items[0].dependsOn = ['missing'];
+    },
+    (items) => {
+      items[0].dependsOn = ['grandchild'];
+    },
+    (items) => {
+      items[0].dependsOn = ['owner'];
+    },
+    (items) => {
+      items[1].id = 'owner';
+    },
+  ]) {
+    const { state, invoke } = batchHarness();
+    mutate(state.manifest.items);
+    expectState(await invoke(), 'unknown', 2);
+    assert.ok(!state.calls.some(({ file }) => file === 'node'));
+  }
+});
+
+test('owner-waiting open PR is reported and blocks dependents', async () => {
+  const { state, invoke } = batchHarness();
+  state.manifest.items[0].humanHeld = false;
+  state.issues[0].closedByPullRequestsReferences = connection([
+    { number: 88, state: 'OPEN', labels: connection([{ name: 'waits-ian' }]) },
+  ]);
+  const result = await invoke();
+  assert.deepEqual(result.humanHeld, ['owner']);
+  assert.equal(result.items[0].pr, 88);
+  assert.deepEqual(result.ready, ['independent']);
+});
+
+for (const closer of [
+  { __typename: 'Commit', oid: outside },
+  null,
+  { __typename: 'Commit', oid: closing },
+]) {
+  test(`v2 rejects historical merged references after last closure ${JSON.stringify(closer)}`, async () => {
+    const { state, invoke } = batchHarness();
+    state.manifest.items = [{ id: 'one', issue: 1234, dependsOn: [] }];
+    state.issues = [issue(1234)];
+    state.issues[0].timelineItems.nodes[0].closer = closer;
+    state.issues[0].closedByPullRequestsReferences = connection([
+      {
+        number: 88,
+        state: 'MERGED',
+        merged: true,
+        mergeCommit: commit(closing),
+        labels: connection([]),
+      },
+    ]);
+    const result = await invoke();
+    expectState(result, 'paused', 20);
+    assert.deepEqual(result.needsOwner, ['one']);
+    assert.equal(result.items[0].pr, null);
+  });
+}
+
+for (const reason of ['NOT_PLANNED', 'COMPLETED']) {
+  test(`closed v2 item with reason ${reason} needs owner and blocks descendants`, async () => {
+    const { state, invoke } = batchHarness();
+    state.manifest.items[0].humanHeld = false;
+    state.issues[0] = issue(1234);
+    state.issues[0].stateReason = reason;
+    if (reason === 'COMPLETED') state.issues[0].timelineItems.nodes[0].closer = null;
+    const result = await invoke();
+    assert.deepEqual(result.needsOwner, ['owner']);
+    assert.deepEqual(result.blocked, ['child', 'grandchild']);
+    assert.deepEqual(result.ready, ['independent']);
+  });
+}
+
+test('draft open PRs hold items and block dependents', async () => {
+  const { state, invoke } = batchHarness();
+  state.manifest.items[0].humanHeld = false;
+  state.issues[0].closedByPullRequestsReferences = connection([
+    { number: 88, state: 'OPEN', isDraft: true, labels: connection([]) },
+  ]);
+  const result = await invoke();
+  assert.deepEqual(result.humanHeld, ['owner']);
+  assert.deepEqual(result.blocked, ['child', 'grandchild']);
+  assert.match(
+    JSON.parse(state.calls.find(({ args }) => args[1] === 'graphql').options.input).query,
+    /isDraft/,
+  );
+});
+
+test('required checks accept only GitHub Actions runs', async () => {
+  for (const app of [undefined, { slug: 'another-app' }]) {
+    const { state, invoke } = harness();
+    state.checks[tip][0].check_runs[0].app = app;
+    expectState(await invoke(), 'incomplete', 10);
+  }
+  const { state, invoke } = harness();
+  state.checks[tip][0].check_runs.push({
+    ...runRecord(tip, 'check', 'failure', 9),
+    app: { slug: 'another-app' },
+  });
+  state.checks[tip][0].total_count++;
+  expectState(await invoke(), 'complete', 0);
+});
+
+test('older refs cannot reduce or alter the main manifest', async () => {
+  for (const replacement of [JSON.stringify({ issues: [1234] }), null]) {
+    const { state, invoke } = harness();
+    state.intercept = (file, args) => {
+      if (file === 'git' && args[0] === 'show' && args[1].startsWith(closing))
+        return replacement ?? `${JSON.stringify(state.manifest)}\n`;
+    };
+    expectState(await invoke(['--ref', 'frozen-v1']), 'unknown', 2, /manifest.*main/i);
+    assert.ok(!state.calls.some(({ file }) => file === 'node'));
+  }
+});
+
+test('paused time is excluded and failure history survives reruns', async (t) => {
+  const directory = mkdtempSync(join(tmpdir(), 'batch-paused-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const path = join(directory, 'state.json');
+  const { deps, invoke } = batchHarness();
+  await invoke(['--state', path, '--pause', 'owner']);
+  const first = JSON.parse(readFileSync(path, 'utf8'));
+  deps.now = () => new Date(now.getTime() + 24 * 3600000);
+  await invoke(['--state', path]);
+  const second = JSON.parse(readFileSync(path, 'utf8'));
+  assert.equal(second.activeHours, first.activeHours);
+  assert.deepEqual(second.failureHistory.owner.slice(0, 1), first.failureHistory.owner);
+});
+
+test('a gathering error still preserves the first start and active budget', async (t) => {
+  const directory = mkdtempSync(join(tmpdir(), 'batch-error-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const path = join(directory, 'state.json');
+  const { state, deps, invoke } = batchHarness();
+  state.manifest.maxHours = 1;
+  state.intercept = (file, args) => {
+    if (file === 'gh' && args[1] === 'graphql') throw new Error('offline');
+  };
+  expectState(await invoke(['--state', path]), 'unknown', 2);
+  state.intercept = undefined;
+  deps.now = () => new Date(now.getTime() + 3600000);
+  expectState(await invoke(['--state', path]), 'failed', 30);
+});
+
+for (const command of ['gh', 'git', 'node']) {
+  test(`a failed batch survives a ${command} gathering error and recovery`, async () => {
+    const path = join(stateRoot, `failed-${command}.json`);
+    const { state, invoke } = harness();
+    expectState(await invoke(['--state', path, '--fail', 'explicit stop']), 'failed', 30);
+    const failed = JSON.parse(readFileSync(path, 'utf8'));
+    state.intercept = (file) => {
+      if (file === command) throw new Error('gathering interrupted');
+    };
+    expectState(await invoke(['--state', path]), 'unknown', 2, /gathering interrupted/);
+    const interrupted = JSON.parse(readFileSync(path, 'utf8'));
+    assert.equal(interrupted.phase, 'failed');
+    assert.equal(interrupted.pauseReason, failed.pauseReason);
+    state.intercept = undefined;
+    expectState(await invoke(['--state', path]), 'failed', 30, /explicit stop/);
+  });
+}
+
+test('completion after a resumed pause uses only active hours', async () => {
+  const path = join(stateRoot, 'resumed-completion.json');
+  const { state, deps, invoke } = batchHarness();
+  deps.now = () => new Date(now.getTime() + 3600000);
+  expectState(await invoke(['--state', path, '--pause', 'owner']), 'paused', 20);
+  deps.now = () => new Date(now.getTime() + 25 * 3600000);
+  expectState(await invoke(['--state', path]), 'incomplete', 10);
+  const completedAt = new Date(now.getTime() + 26 * 3600000).toISOString();
+  deps.now = () => new Date(completedAt);
+  state.issues = state.manifest.items.map((item, index) => {
+    const value = issue(item.issue);
+    value.timelineItems.nodes[0].closer.number = 100 + index;
+    value.timelineItems.nodes[0].closer.mergedAt = completedAt;
+    return value;
+  });
+  for (const run of state.checks[tip][0].check_runs) run.completed_at = completedAt;
+  const result = await invoke(['--state', path]);
+  expectState(result, 'complete', 0);
+  assert.equal(result.facts.activeHours, 2);
+});
+
+test('late local verification does not move historical completion', async () => {
+  const { state, deps, invoke } = harness();
+  state.manifest.maxHours = 1;
+  let current = now;
+  deps.now = () => current;
+  state.command = () => {
+    current = new Date(now.getTime() + 3600000);
+    return 'pass';
+  };
+  expectState(await invoke(), 'complete', 0);
+});
+
+for (const stored of [null, {}, { phase: 'incomplete', activeHours: -1 }]) {
+  test(`malformed persisted state ${JSON.stringify(stored)} cannot reset counters`, async (t) => {
+    const directory = mkdtempSync(join(tmpdir(), 'batch-invalid-'));
+    t.after(() => rmSync(directory, { recursive: true, force: true }));
+    const path = join(directory, 'state.json');
+    writeFileSync(path, JSON.stringify(stored));
+    const { invoke } = harness();
+    expectState(await invoke(['--state', path]), 'unknown', 2);
+    assert.deepEqual(JSON.parse(readFileSync(path, 'utf8')), stored);
+  });
+}
+
+test('completion policy stays inside the owned manifest boundary', () => {
+  const source = readFileSync(new URL('./epic-done.mjs', import.meta.url), 'utf8');
+  assert.match(source, /from '\.\.\/\.claude\/epics\/checker-policy\.mjs'/);
+  const owners = readFileSync(new URL('../.github/CODEOWNERS', import.meta.url), 'utf8');
+  assert.match(owners, /^\/\.claude\/epics\/\*\* @xiechimon$/m);
+});
+
+test('v2 last merged closing PR must have its merge commit on main', async () => {
+  const { state, invoke } = batchHarness();
+  state.manifest.items = [{ id: 'one', issue: 1234, dependsOn: [] }];
+  state.issues = [issue(1234)];
+  state.issues[0].timelineItems.nodes[0].closer.number = 88;
+  state.issues[0].timelineItems.nodes[0].closer.mergeCommit.oid = outside;
+  const result = await invoke();
+  expectState(result, 'paused', 20, /not on main/);
+  assert.deepEqual(result.needsOwner, ['one']);
+});
+
+for (const [completedAt, expected] of [
+  ['2026-10-29T05:00:00Z', 'complete'],
+  ['2026-10-29T06:00:00Z', 'complete'],
+  ['2026-10-29T06:00:01Z', 'failed'],
+]) {
+  test(`completion at ${completedAt} checked later is ${expected}`, async () => {
+    const { state, invoke } = harness();
+    for (const item of state.issues) item.timelineItems.nodes[0].closer.mergedAt = completedAt;
+    for (const run of state.checks[tip][0].check_runs) run.completed_at = completedAt;
+    const result = await invoke(['--started-at', '2026-10-29T00:00:00Z']);
+    expectState(result, expected, expected === 'complete' ? 0 : 30);
+    assert.equal(result.completedAt, new Date(completedAt).toISOString());
+  });
+}
+
+test('incomplete batch fails when its active cap is exhausted', async () => {
+  const { invoke } = batchHarness();
+  expectState(await invoke(['--started-at', '2026-10-29T00:00:00Z']), 'failed', 30);
+});
+
+test('the latest closing merge and slowest required check both bound completion', async () => {
+  for (const source of ['merge', 'check']) {
+    const { state, invoke } = harness();
+    for (const item of state.issues)
+      item.timelineItems.nodes[0].closer.mergedAt = '2026-10-29T05:00:00Z';
+    for (const run of state.checks[tip][0].check_runs) run.completed_at = '2026-10-29T05:00:00Z';
+    if (source === 'merge') state.issues[1].timelineItems.nodes[0].closer.mergedAt = date;
+    else state.checks[tip][0].check_runs[1].completed_at = date;
+    expectState(await invoke(['--started-at', '2026-10-29T00:00:00Z']), 'failed', 30);
+  }
+});
+
+test('missing completion timestamps cannot establish completion', async () => {
+  for (const source of ['merge', 'check']) {
+    const { state, invoke } = harness();
+    if (source === 'merge') delete state.issues[0].timelineItems.nodes[0].closer.mergedAt;
+    else delete state.checks[tip][0].check_runs[0].completed_at;
+    expectState(await invoke(), 'unknown', 2, /completion time/i);
+  }
+});
+
+test('a later successful rerun does not move the first green completion', async () => {
+  const { state, invoke } = harness();
+  for (const item of state.issues)
+    item.timelineItems.nodes[0].closer.mergedAt = '2026-10-29T05:00:00Z';
+  for (const run of state.checks[tip][0].check_runs) run.completed_at = '2026-10-29T05:00:00Z';
+  state.checks[tip][0].check_runs.push(runRecord(tip, 'check', 'success', 9));
+  state.checks[tip][0].total_count++;
+  expectState(await invoke(['--started-at', '2026-10-29T00:00:00Z']), 'complete', 0);
+  assert.ok(state.calls.some(({ args }) => args.some((arg) => arg.includes('filter=all'))));
+});
+
+for (const [pauseHour, resumeHour, completionHour, expected] of [
+  [9, 30, 8, 'failed'],
+  [2, 10, 12, 'complete'],
+]) {
+  test(`pause at ${pauseHour}, resume at ${resumeHour}, completion at ${completionHour}: ${expected}`, async () => {
+    const path = join(stateRoot, `completion-pause-${pauseHour}.json`);
+    const { state, deps, invoke } = harness();
+    const at = (hour) => new Date(now.getTime() + hour * 3600000).toISOString();
+    state.stdout = 'pending';
+    await invoke(['--state', path]);
+    deps.now = () => new Date(at(pauseHour));
+    expectState(await invoke(['--state', path, '--pause', 'owner']), 'paused', 20);
+    deps.now = () => new Date(at(resumeHour));
+    state.stdout = 'pass';
+    for (const item of state.issues)
+      item.timelineItems.nodes[0].closer.mergedAt = at(completionHour);
+    for (const run of state.checks[tip][0].check_runs) run.completed_at = at(completionHour);
+    if (completionHour > resumeHour) {
+      state.stdout = 'pending';
+      await invoke(['--state', path]);
+      deps.now = () => new Date(at(completionHour));
+      state.stdout = 'pass';
+    }
+    expectState(await invoke(['--state', path]), expected, expected === 'complete' ? 0 : 30);
+    assert.deepEqual(JSON.parse(readFileSync(path, 'utf8')).pauseIntervals.slice(0, 1), [
+      { startedAt: at(pauseHour), endedAt: at(resumeHour) },
+    ]);
+  });
+}

@@ -1,201 +1,47 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
+import {
+  activeHoursAt,
+  decideEpic,
+  errorMessage,
+  isoPattern,
+  labels,
+  nodes,
+  nonempty,
+  parseShas,
+  positiveInteger,
+  requireFact,
+  shaPattern,
+  unique,
+  validateManifest,
+} from '../.claude/epics/checker-policy.mjs';
 
-const exitCodes = { unknown: 2, complete: 0, paused: 20, failed: 30, incomplete: 10 };
-const humanLabels = new Set(['needs-decision', 'waits-ian', 'ready-for-human']);
-const shaPattern = /^[a-f0-9]{40}$/;
-const isoPattern = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?(?:Z|[+-]\d\d:\d\d)$/;
+export { decideEpic, validateManifest } from '../.claude/epics/checker-policy.mjs';
+
 const query = `query($owner: String!, $name: String!, $number: Int!) { repository(owner: $owner, name: $name) { issue(number: $number) {
   number state stateReason labels(first: 100) { nodes { name } pageInfo { hasNextPage } }
-  timelineItems(last: 1, itemTypes: [CLOSED_EVENT]) { nodes { ... on ClosedEvent { closer {
-    __typename ... on PullRequest { merged mergeCommit { oid } } ... on Commit { oid }
+  timelineItems(last: 1, itemTypes: [CLOSED_EVENT]) { nodes { ... on ClosedEvent { createdAt closer {
+    __typename ... on PullRequest { number merged mergedAt mergeCommit { oid } } ... on Commit { oid }
   } } } }
-  closedByPullRequestsReferences(first: 100, includeClosedPrs: true) { nodes { number state labels(first: 100) { nodes { name } pageInfo { hasNextPage } } } pageInfo { hasNextPage } }
+  closedByPullRequestsReferences(first: 100, includeClosedPrs: true) { nodes { number state isDraft merged mergeCommit { oid } labels(first: 100) { nodes { name } pageInfo { hasNextPage } } } pageInfo { hasNextPage } }
 } } }`;
-function requireFact(condition, message) {
-  if (!condition) throw new Error(message);
-}
-function nonempty(value) {
-  return typeof value === 'string' && value.trim().length > 0 && !value.includes('\0');
-}
-function exactKeys(value, required, optional = []) {
-  return (
-    value !== null &&
-    typeof value === 'object' &&
-    !Array.isArray(value) &&
-    required.every((key) => Object.hasOwn(value, key)) &&
-    Object.keys(value).every((key) => required.includes(key) || optional.includes(key))
-  );
-}
-function positiveInteger(value) {
-  return Number.isSafeInteger(value) && value > 0;
-}
-function unique(values, valid) {
-  return Array.isArray(values) && values.every(valid) && new Set(values).size === values.length;
-}
-export function validateManifest(manifest, epic) {
-  requireFact(
-    exactKeys(manifest, ['epic', 'issues', 'requiredChecks', 'checks', 'maxHours']),
-    'Invalid manifest',
-  );
-  const { issues, requiredChecks, checks, maxHours } = manifest;
-  requireFact(
-    manifest.epic === epic &&
-      unique(issues, positiveInteger) &&
-      issues.length > 0 &&
-      unique(requiredChecks, nonempty) &&
-      requiredChecks.length > 0 &&
-      Array.isArray(checks) &&
-      new Set(checks.map((check) => check?.name)).size === checks.length &&
-      checks.every(
-        (check) =>
-          exactKeys(check, ['name', 'run'], ['expectStdoutIncludes']) &&
-          nonempty(check.name) &&
-          Array.isArray(check.run) &&
-          nonempty(check.run[0]) &&
-          check.run.every((arg) => typeof arg === 'string' && !arg.includes('\0')) &&
-          (!Object.hasOwn(check, 'expectStdoutIncludes') ||
-            typeof check.expectStdoutIncludes === 'string'),
-      ) &&
-      typeof maxHours === 'number' &&
-      Number.isFinite(maxHours * 3600000) &&
-      maxHours > 0,
-    'Invalid manifest',
-  );
-  return manifest;
-}
-function nodes(connection, context) {
-  requireFact(
-    Array.isArray(connection?.nodes) && connection.pageInfo?.hasNextPage === false,
-    `Missing or partial GitHub ${context}`,
-  );
-  return connection.nodes;
-}
-function labels(connection) {
-  return nodes(connection, 'labels').map((label) => label.name);
-}
-function errorMessage(error) {
-  const message = error instanceof Error ? error.message : String(error);
-  const stderr = error?.stderr?.toString().trim().slice(-2000);
-  return stderr ? `${message.split('\n')[0]}\n${stderr}` : message;
-}
-function parseShas(output) {
-  const shas = output.trim() ? output.trim().split('\n') : [];
-  requireFact(
-    unique(shas, (sha) => shaPattern.test(sha)),
-    'Malformed git ancestry',
-  );
-  return shas;
-}
-function issueBlocker({ number, state, stateReason, closingSha }, history) {
-  if (state !== 'CLOSED') return `Issue #${number} is open.`;
-  if (stateReason !== 'COMPLETED') return `Issue #${number} has closing reason ${stateReason}.`;
-  if (!closingSha) return `Issue #${number} has no merged PR or closing commit.`;
-  if (!history.has(closingSha)) return `Issue #${number}: ${closingSha} is not on main.`;
-  return null;
-}
-function completionWindow({ issues, history, mainline, descendants }, historySet) {
-  if (issues.some((issue) => issueBlocker(issue, historySet)))
-    return { lastClosingSha: null, eligible: [], unexamined: 0 };
-  const closingShas = new Set(issues.map((issue) => issue.closingSha));
-  const sets = [...closingShas].map((sha) => new Set(descendants[sha]));
-  const lastClosingSha = history.find((sha) => closingShas.has(sha));
-  const eligible = mainline.filter((sha) => sets.every((set) => set.has(sha)));
-  requireFact(eligible[0] === history[0], 'Missing main ancestry after closure');
-  const unexamined = Math.max(0, eligible.length - 30);
-  return { lastClosingSha, eligible: eligible.slice(0, 30), unexamined };
-}
-function requiredCheckFailures({ sha, runs }, requiredChecks) {
-  return requiredChecks.flatMap((name) => {
-    const matching = runs.filter((run) => run.name === name);
-    if (!matching.length) return [`required check "${name}" has no run on ${sha}`];
-    return matching.every((run) => run.status === 'completed' && run.conclusion === 'success')
-      ? []
-      : [`required check "${name}" is not successful on ${sha}`];
-  });
-}
-export function decideEpic(facts) {
-  try {
-    const { manifest, issues, commits, checks, now, startedAt, pause, fail } = facts;
-    validateManifest(manifest, manifest?.epic);
-    requireFact(
-      issues.length === manifest.issues.length &&
-        issues.every((issue, index) => issue.number === manifest.issues[index]) &&
-        checks.length === manifest.checks.length,
-      'Missing gathered facts',
-    );
-    const reasons = [];
-    const waiting = [];
-    const historySet = new Set(facts.history);
-    if (!startedAt) reasons.push('No time cap: --started-at was not provided.');
-    for (const issue of issues) {
-      const blocker = issueBlocker(issue, historySet);
-      if (blocker) reasons.push(blocker);
-      for (const label of issue.labels)
-        if (humanLabels.has(label)) waiting.push(`Issue #${issue.number} carries ${label}.`);
-      for (const pull of issue.linkedPulls)
-        if (pull.state === 'OPEN')
-          for (const label of pull.labels)
-            if (humanLabels.has(label))
-              waiting.push(`PR #${pull.number} for #${issue.number} carries ${label}.`);
-    }
-    const { lastClosingSha, eligible, unexamined } = completionWindow(facts, historySet);
-    const greenSha =
-      commits.find((commit) => requiredCheckFailures(commit, manifest.requiredChecks).length === 0)
-        ?.sha ?? null;
-    requireFact(
-      commits.length <= eligible.length &&
-        commits.every((commit, index) => commit.sha === eligible[index]) &&
-        (greenSha || commits.length === eligible.length),
-      'Missing or reordered examined main commits',
-    );
-    requireFact(
-      greenSha || unexamined === 0,
-      `${unexamined} eligible commit(s) not examined since last closing SHA ${lastClosingSha}; no examined commit is green.`,
-    );
-    if (lastClosingSha && !greenSha) {
-      reasons.push(`No green main commit examined since ${lastClosingSha}.`);
-      reasons.push(...requiredCheckFailures(commits[0], manifest.requiredChecks));
-    }
-    for (const check of checks)
-      if (check.status !== 'passed')
-        reasons.push(`Check "${check.name}" ${check.status.replace('-', ' ')}: ${check.reason}`);
-    const elapsed =
-      startedAt && Date.parse(now) - Date.parse(startedAt) >= manifest.maxHours * 3600000;
-    let state = 'incomplete';
-    if (lastClosingSha && greenSha && checks.every((check) => check.status === 'passed')) {
-      state = 'complete';
-      reasons.push(`Every issue is completed on main; required checks passed at ${greenSha}.`);
-    } else if (waiting.length || pause) {
-      state = 'paused';
-      reasons.push(...waiting);
-      if (pause) reasons.push(`Paused: ${pause}`);
-    } else if (fail || elapsed) {
-      state = 'failed';
-      if (fail) reasons.push(`Failed: ${fail}`);
-      if (elapsed)
-        reasons.push(`Time cap of ${manifest.maxHours} hours elapsed since ${startedAt}.`);
-    }
-    return { state, exitCode: exitCodes[state], reasons, greenSha, lastClosingSha };
-  } catch (error) {
-    return { state: 'unknown', exitCode: 2, reasons: [errorMessage(error)] };
-  }
-}
 export async function main(argv, deps = {}) {
   const run = deps.run ?? execFileSync;
   const write = deps.write ?? console.log;
   const clock = deps.now ?? (() => new Date());
   const json = argv.includes('--json');
   let result;
+  let persistResult;
   try {
     const { values, positionals } = parseArgs({
       args: argv,
       allowPositionals: true,
       options: {
         ref: { type: 'string' },
+        state: { type: 'string' },
         repo: { type: 'string', default: 'xiechimon/cairn' },
         'started-at': { type: 'string' },
         pause: { type: 'string' },
@@ -221,6 +67,99 @@ export async function main(argv, deps = {}) {
     );
     for (const name of ['pause', 'fail'])
       requireFact(values[name] === undefined || nonempty(values[name]), `Invalid --${name} reason`);
+    const statePath = resolve(
+      values.state ?? join(homedir(), '.claude', 'plans', epic, 'state.json'),
+    );
+    const timestamp = clock().toISOString();
+    let persisted;
+    try {
+      persisted = JSON.parse(readFileSync(statePath, 'utf8'));
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+    if (persisted !== undefined)
+      requireFact(
+        persisted !== null &&
+          ['unknown', 'complete', 'paused', 'failed', 'incomplete'].includes(persisted.phase) &&
+          isoPattern.test(persisted.startedAt) &&
+          Number.isFinite(Date.parse(persisted.startedAt)) &&
+          isoPattern.test(persisted.updatedAt) &&
+          Number.isFinite(Date.parse(persisted.updatedAt)) &&
+          Number.isFinite(persisted.activeHours) &&
+          persisted.activeHours >= 0 &&
+          (persisted.pauseIntervals === undefined ||
+            (Array.isArray(persisted.pauseIntervals) &&
+              persisted.pauseIntervals.every(
+                (interval, index, intervals) =>
+                  isoPattern.test(interval.startedAt) &&
+                  Number.isFinite(Date.parse(interval.startedAt)) &&
+                  Date.parse(interval.startedAt) >=
+                    Date.parse(index ? intervals[index - 1].endedAt : persisted.startedAt) &&
+                  (interval.endedAt === null
+                    ? index === intervals.length - 1
+                    : isoPattern.test(interval.endedAt) &&
+                      Number.isFinite(Date.parse(interval.endedAt)) &&
+                      Date.parse(interval.endedAt) >= Date.parse(interval.startedAt)),
+              ))) &&
+          persisted.failureHistory &&
+          typeof persisted.failureHistory === 'object' &&
+          !Array.isArray(persisted.failureHistory),
+        'Invalid persisted state',
+      );
+    requireFact(
+      persisted !== undefined || startedAt !== undefined,
+      'Missing state requires --started-at',
+    );
+    const originalStart = persisted?.startedAt ?? startedAt;
+    const pauseIntervals = structuredClone(persisted?.pauseIntervals ?? []);
+    if (pauseIntervals.at(-1)?.endedAt === null) pauseIntervals.at(-1).endedAt = timestamp;
+    else if (persisted && !['incomplete', 'unknown'].includes(persisted.phase))
+      pauseIntervals.push({ startedAt: persisted.updatedAt, endedAt: timestamp });
+    const activeHours = activeHoursAt(originalStart, pauseIntervals, timestamp);
+    persistResult = (decision) => {
+      if (decision.state === 'unknown' && persisted?.phase === 'failed')
+        decision = { ...decision, state: 'failed', reasons: [persisted.pauseReason] };
+      const failureHistory = Object.assign(Object.create(null), persisted?.failureHistory ?? {});
+      for (const item of decision.items ?? []) {
+        if (item.status === 'done') continue;
+        const entries = failureHistory[item.id] ?? [];
+        requireFact(Array.isArray(entries), 'Invalid item failure history');
+        failureHistory[item.id] = [
+          ...entries,
+          { at: timestamp, status: item.status, reasons: decision.reasons },
+        ];
+      }
+      const next = {
+        phase: decision.state,
+        pauseReason: ['paused', 'failed'].includes(decision.state) ? decision.reasons.at(-1) : null,
+        startedAt: originalStart,
+        activeHours: decision.facts?.activeHours ?? activeHours,
+        updatedAt: decision.facts?.now ?? timestamp,
+        pauseIntervals: [
+          ...pauseIntervals,
+          ...(!['incomplete', 'unknown'].includes(decision.state)
+            ? [{ startedAt: decision.facts?.now ?? timestamp, endedAt: null }]
+            : []),
+        ],
+        failureHistory,
+      };
+      mkdirSync(dirname(statePath), { recursive: true });
+      const temporaryState = `${statePath}.${process.pid}.tmp`;
+      try {
+        writeFileSync(temporaryState, `${JSON.stringify(next, null, 2)}\n`, {
+          flag: 'wx',
+          mode: 0o600,
+        });
+        renameSync(temporaryState, statePath);
+      } finally {
+        rmSync(temporaryState, { force: true });
+      }
+    };
+    persistResult({
+      state: persisted?.phase ?? 'incomplete',
+      reasons: [persisted?.pauseReason],
+      items: [],
+    });
     const options = { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, shell: false };
     options.stdio = ['pipe', 'pipe', 'pipe'];
     const execute = (file, args, extra = {}) => {
@@ -255,12 +194,15 @@ export async function main(argv, deps = {}) {
       } catch (error) {
         throw new Error(`Untrusted ref "${values.ref}": ${errorMessage(error)}`);
       }
-    const manifest = validateManifest(
-      JSON.parse(git(['show', `${manifestRef}:.claude/epics/${epic}.json`])),
-      epic,
-    );
+    const manifestSource = git(['show', `${mainSha}:.claude/epics/${epic}.json`]);
+    if (values.ref !== undefined)
+      requireFact(
+        git(['show', `${manifestRef}:.claude/epics/${epic}.json`]) === manifestSource,
+        'Selected ref manifest differs from main',
+      );
+    const manifest = validateManifest(JSON.parse(manifestSource), epic);
     const [owner, name] = values.repo.split('/');
-    const issues = manifest.issues.map((number) => {
+    const issues = (manifest.issues ?? manifest.items.map((item) => item.issue)).map((number) => {
       const payload = api(
         ['graphql', '--input', '-'],
         JSON.stringify({ query, variables: { owner, name, number } }),
@@ -284,15 +226,25 @@ export async function main(argv, deps = {}) {
           requireFact(shaPattern.test(closingSha), 'Missing closing commit');
         }
       }
+      const linkedPulls = nodes(issue.closedByPullRequestsReferences, 'linked PRs');
+      const mergedPull = closer?.__typename === 'PullRequest' && closer.merged ? closer : null;
       return {
+        mergedPr: positiveInteger(mergedPull?.number),
+        pr: mergedPull?.number ?? linkedPulls.find((pull) => pull.state === 'OPEN')?.number ?? null,
         number,
         state: issue.state,
         stateReason: issue.stateReason,
         labels: labels(issue.labels),
         closingSha,
-        linkedPulls: nodes(issue.closedByPullRequestsReferences, 'linked PRs').map((pull) => {
+        closingAt: mergedPull ? mergedPull.mergedAt : events[0]?.createdAt,
+        linkedPulls: linkedPulls.map((pull) => {
           requireFact(positiveInteger(pull?.number), `Malformed linked PR for #${number}`);
-          return { number: pull.number, state: pull.state, labels: labels(pull.labels) };
+          return {
+            number: pull.number,
+            state: pull.state,
+            isDraft: pull.isDraft,
+            labels: labels(pull.labels),
+          };
         }),
       };
     });
@@ -313,13 +265,12 @@ export async function main(argv, deps = {}) {
       ];
     }
     const ancestry = { issues, history, mainline, descendants };
-    const { eligible } = completionWindow(ancestry, historySet);
     const commits = [];
-    for (const sha of eligible) {
+    for (const sha of [mainSha]) {
       const pages = api([
         '--paginate',
         '--slurp',
-        `repos/${values.repo}/commits/${sha}/check-runs?per_page=100&filter=latest`,
+        `repos/${values.repo}/commits/${sha}/check-runs?per_page=100&filter=all`,
       ]);
       requireFact(Array.isArray(pages) && pages.length > 0, `Missing check pages for ${sha}`);
       const total = pages[0]?.total_count;
@@ -340,7 +291,6 @@ export async function main(argv, deps = {}) {
       );
       const commit = { sha, runs };
       commits.push(commit);
-      if (requiredCheckFailures(commit, manifest.requiredChecks).length === 0) break;
     }
     const temporary = mkdtempSync(join(tmpdir(), 'epic-done-'));
     const worktreePath = join(temporary, 'main');
@@ -377,20 +327,41 @@ export async function main(argv, deps = {}) {
         rmSync(temporary, { recursive: true, force: true });
       }
     }
+    const observedAt = clock().toISOString();
     const facts = {
       manifest,
       mainSha,
       ...ancestry,
       commits,
       checks,
-      now: clock().toISOString(),
-      startedAt: startedAt ?? null,
+      now: observedAt,
+      startedAt: originalStart,
+      activeHours: activeHoursAt(originalStart, pauseIntervals, observedAt),
+      pauseIntervals,
       pause: values.pause ?? null,
-      fail: values.fail ?? null,
+      fail: values.fail ?? (persisted?.phase === 'failed' ? persisted.pauseReason : null),
     };
     result = { ...decideEpic(facts), checks, facts };
+    persistResult(result);
   } catch (error) {
-    result = { state: 'unknown', exitCode: 2, reasons: [errorMessage(error)], checks: [] };
+    result = {
+      state: 'unknown',
+      exitCode: 2,
+      reasons: [errorMessage(error)],
+      checks: [],
+      items: [],
+      humanHeld: [],
+      needsOwner: [],
+      blocked: [],
+      ready: [],
+      mainSha: null,
+      mainGreen: false,
+    };
+    try {
+      persistResult?.(result);
+    } catch (stateError) {
+      result.reasons.push(errorMessage(stateError));
+    }
   }
   const text = [`state: ${result.state}`, ...result.reasons].join('\n');
   write(json ? JSON.stringify(result, null, 2) : text);
