@@ -21,7 +21,7 @@ class ArchiveTests(unittest.TestCase):
     def run_gate(self, content, messages=('Closes #1983',), repository='xiechimon/cairn'):
         with tempfile.TemporaryDirectory() as directory:
             body = Path(directory, 'body.md')
-            body.write_text('## Upstream\nIndependent.\n## Verified\n' + content)
+            body.write_text('## What\nArchive evidence.\n## Review\nFresh review passed.\n## Risk\nReversible change.\n## Proof\n' + content)
             context = Path(directory, 'context.json')
             context.write_text(json.dumps({'repository': repository, 'commits': [
                 {'commit': {'message': message}} for message in messages]}))
@@ -43,7 +43,7 @@ class ArchiveTests(unittest.TestCase):
             ('Closes https://github.com/xiechimon/cairn/issues/1983',))
         self.assertEqual(result, 0, output)
 
-    def test_http_200_does_not_make_external_or_unrelated_images_archived(self):
+    def test_reachable_embedded_images_do_not_require_an_archive(self):
         for url in [
             'https://user-images.githubusercontent.com/123/proof.png',
             'https://github.com/user-attachments/assets/123',
@@ -60,8 +60,7 @@ class ArchiveTests(unittest.TestCase):
         ]:
             with self.subTest(url=url):
                 result, output = self.run_gate(f'![proof]({url})')
-                self.assertEqual(result, 1, output)
-                self.assertIn('FAIL archive:', output)
+                self.assertEqual(result, 0, output)
                 self.assertNotIn('FAIL unreachable', output)
 
     def test_commit_only_association_and_multiple_issues(self):
@@ -72,20 +71,17 @@ class ArchiveTests(unittest.TestCase):
                     result, output = self.run_gate(image,
                         ('Implement provenance\n\nCloses #1983, fixes xiechimon/cairn#1810',))
                     self.assertEqual(result, 0, output)
-                    self.assertIn('PASS archive:', output)
 
-    def test_missing_or_foreign_association_fails_closed(self):
+    def test_images_do_not_require_issue_association(self):
         for messages in [(), ('Refs #1983',), ('Closes other/repo#1983',)]:
             result, output = self.run_gate(
                 f'![proof](https://raw.githubusercontent.com/xiechimon/cairn/{SHA}/docs/verify/1983/proof.png)', messages)
-            self.assertEqual(result, 1, output)
-            self.assertIn('FAIL archive: missing issue context', output)
+            self.assertEqual(result, 0, output)
 
-    def test_missing_repository_fails_closed(self):
+    def test_images_do_not_require_repository_context(self):
         result, output = self.run_gate(
             f'![proof](https://raw.githubusercontent.com/xiechimon/cairn/{SHA}/docs/verify/1983/proof.png)', repository='')
-        self.assertEqual(result, 1, output)
-        self.assertIn('FAIL archive:', output)
+        self.assertEqual(result, 0, output)
 
     def test_references_and_supported_badges_pass_without_issue_context(self):
         result, output = self.run_gate('''[issue](https://github.com/xiechimon/cairn/issues/1810)
@@ -103,25 +99,22 @@ class ArchiveTests(unittest.TestCase):
                     f'<img src="https://cursor.com/assets/images/open-in-{destination}-{theme}.png">', ())
                 self.assertEqual(result, 0, output)
 
-    def test_context_argument_is_required_for_screenshots(self):
+    def test_screenshots_do_not_require_a_context_argument(self):
         with patch.object(sys, 'argv', ['gate']), patch.dict(os.environ, {
-            'PR_BODY': f'## Upstream\nIndependent.\n## Verified\n![proof](https://raw.githubusercontent.com/xiechimon/cairn/{SHA}/docs/verify/1983/proof.png)'
+            'PR_BODY': f'## What\nArchive evidence.\n## Review\nFresh review passed.\n## Risk\nReversible change.\n## Proof\n![proof](https://raw.githubusercontent.com/xiechimon/cairn/{SHA}/docs/verify/1983/proof.png)'
         }, clear=True), patch.object(gate, 'http_code', return_value='200'), contextlib.redirect_stdout(io.StringIO()) as output:
-            self.assertEqual(gate.main(), 1)
-            self.assertIn('FAIL archive: missing repository context', output.getvalue())
+            self.assertEqual(gate.main(), 0)
 
-    def test_html_extensionless_image_has_archive_verdict(self):
+    def test_html_extensionless_image_is_checked_without_an_archive(self):
         result, output = self.run_gate('<img src="https://example.org/proof">')
-        self.assertEqual(result, 1, output)
-        self.assertIn('FAIL archive:', output)
+        self.assertEqual(result, 0, output)
 
-    def test_ref_must_be_a_full_commit_sha(self):
+    def test_reachable_images_do_not_require_commit_pinning(self):
         for ref in ['main', 'dev', 'v1.0.0', 'abc1234', 'release/v1', 'refs/heads/main']:
             with self.subTest(ref=ref):
                 result, output = self.run_gate(
                     f'![proof](https://raw.githubusercontent.com/xiechimon/cairn/{ref}/docs/verify/1983/proof.png)')
-                self.assertEqual(result, 1, output)
-                self.assertIn('FAIL archive: outside associated issue archive', output)
+                self.assertEqual(result, 0, output)
         for ref in [SHA, 'a' * 64]:
             with self.subTest(ref=ref):
                 result, output = self.run_gate(

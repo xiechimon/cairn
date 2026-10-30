@@ -30,7 +30,17 @@ export function ApiKeysPage() {
     ? [
         ...mapApiKeys(keysQ.data ?? []),
         ...(plaintext !== null
-          ? [{ id: 'once', name: null, masked: '', gitAccess: false, mcpAccess: false, plaintext }]
+          ? [
+              {
+                id: 'once',
+                name: null,
+                masked: '',
+                gitAccess: false,
+                mcpAccess: false,
+                machineAccess: true,
+                plaintext,
+              },
+            ]
           : []),
       ]
     : (fixture.apiKeys?.keys ?? []);

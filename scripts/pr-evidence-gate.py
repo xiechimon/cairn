@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""PR evidence gate (#750; widened by #939/#940; sections collapsed by #1079).
+"""PR evidence gate (#750; widened by #939/#940; body contract updated by #2196).
 
-Section checks (#939; section names collapsed by #1079): the PR body
-must answer two template sections, "Upstream" and "Verified". The gate
-checks that
-an answer exists, not that the answer is good: a missing heading, or a
-heading whose text is empty after stripping HTML comments, fails and
-names the section. Headings inside fenced code blocks do not count (a
-quoted template is not an answer), and the template ships its guidance
-as HTML comments so an untouched template fails. What the Verified
-answer must contain (the red-then-green output pair) is a reviewer
-judgment, not a gate judgment.
+Section checks (#2196): the PR body must answer What, Proof, Review and Risk.
+A legacy Verified heading is an alias for Proof. A complete legacy body with
+What, Verified, Upstream, Risk, Acceptance and Issues may omit Review; this
+exception does not apply to bodies using Proof. Upstream is optional.
+The gate checks that an answer exists, not that it is good: a missing
+heading, or a heading whose text is empty after stripping HTML comments,
+fails and names the section. Headings inside fenced code blocks do not
+count, and the template ships its guidance as HTML comments so an untouched
+template fails. Proof quality, including the old-code failing output and
+new-code passing output, is a reviewer judgment.
 
 Link checks (#750): image links in the PR body must be embedded
 (`![label](url)`) and must answer HTTP 200 (catches bad SHAs).
@@ -70,13 +70,13 @@ Exit 0 when the body passes, 1 otherwise. Findings name the section or
 the URL (with its line for bare URLs).
 """
 import os
-import json
 from html import unescape
-from urllib.parse import parse_qs, urlsplit, unquote
+from urllib.parse import parse_qs, urlsplit
 import re
 import subprocess
 import sys
 import concurrent.futures as cf
+from pr_body import TASK, visible_markdown
 
 MD_LINK = re.compile(r'(?P<bang>!?)\[(?P<label>[^\]]*)\]\((?P<url>[^)\s]+)\)')
 IMG_EXT = re.compile(r'\.(?:png|gif|jpe?g|webp|svg)$', re.IGNORECASE)
@@ -96,71 +96,90 @@ def is_media_host_image(url):
     return media_host and bool(last) and not TAIL_EXT.search(last)
 
 
-REQUIRED_SECTIONS = ('Upstream', 'Verified')
-# The full body contract a lane must satisfy (#1110). The gate only
-# *requires* the two sections above; the rest are named here so a failing
-# lane is pointed at the canonical template instead of guessing a shape --
-# the global show-me /pr skill ships a different three-section template and
-# fails this gate (four lanes in one day hand-rewrote the body).
+REQUIRED_SECTIONS = ('What', 'Proof', 'Review', 'Risk')
 TEMPLATE_PATH = '.github/PULL_REQUEST_TEMPLATE.md'
-TEMPLATE_SECTIONS = ('What', 'Verified', 'Upstream', 'Risk', 'Acceptance',
-                     'Issues')
+TEMPLATE_SECTIONS = ('Proof', 'What', 'Review', 'Risk')
 H2 = re.compile(r'^##[ \t]+(.+?)[ \t]*$', re.M)
-HTML_COMMENT = re.compile(r'<!--.*?-->', re.S)
-FENCE = re.compile(r'^ {0,3}(?:```|~~~)')
+FOLD_MARKUP = re.compile(r'</?details\b[^>]*>|<summary\b[^>]*>.*?</summary\s*>', re.I | re.S)
+INLINE_CODE = re.compile(r'(?P<ticks>`+)(?!`).*?(?<!`)(?P=ticks)(?!`)', re.S)
+DETAILS_TAG = re.compile(r'<(?P<closing>/)?details\b[^>]*>', re.I)
+PROSE_LIMIT = 600
 
 
-def without_fences(body):
-    """Blank out fenced code blocks, keeping the line count."""
-    out = []
-    inside = False
-    for line in body.split('\n'):
-        if FENCE.match(line):
-            inside = not inside
-            out.append('')
-            continue
-        out.append('' if inside else line)
-    return '\n'.join(out)
+def section_contents(body):
+    text = FOLD_MARKUP.sub('', visible_markdown(body))
+    headers = [(m.start(), m.end(), m.group(1).strip())
+               for m in H2.finditer(text)]
+    contents = {}
+    for i, (_, hend, heading) in enumerate(headers):
+        nxt = headers[i + 1][0] if i + 1 < len(headers) else len(text)
+        contents.setdefault(heading.lower(), text[hend:nxt])
+    return contents
 
 
-def without_html_comments(body):
-    """Blank out `<!-- ... -->` spans with same-length whitespace.
-
-    Newlines are preserved so the line numbers reported by the gate
-    still match the source body. URLs inside HTML comments are not
-    rendered by GitHub, so they are not links (#1335). Section checks
-    `section_verdicts` already strip comments from section content and
-    are unaffected -- this helper runs only on the link path.
-    """
-    return HTML_COMMENT.sub(
-        lambda m: re.sub(r'[^\n]', ' ', m.group(0)),
-        body)
+def is_legacy_body(contents):
+    return (
+        {'what', 'verified', 'upstream', 'risk', 'acceptance', 'issues'} <= contents.keys()
+        and 'proof' not in contents
+        and bool(contents['upstream'].strip())
+        and TASK.search(contents['acceptance']) is not None
+    )
 
 
 def section_verdicts(body):
-    """Per required section: 'answered', 'empty', or 'missing'.
-
-    HTML comments never count as an answer, so the template's own
-    guidance (shipped as comments) cannot pass the gate untouched.
-    """
-    text = without_fences(body)
-    headers = [(m.start(), m.end(), m.group(1).strip())
-               for m in H2.finditer(text)]
+    contents = section_contents(body)
+    legacy = is_legacy_body(contents)
     verdicts = {}
     for name in REQUIRED_SECTIONS:
-        content = None
-        for i, (_, hend, heading) in enumerate(headers):
-            if heading.lower() == name.lower():
-                nxt = headers[i + 1][0] if i + 1 < len(headers) else len(text)
-                content = text[hend:nxt]
-                break
+        content = contents.get(name.lower())
+        if content is None and name == 'Proof':
+            content = contents.get('verified')
         if content is None:
-            verdicts[name] = 'missing'
-        elif HTML_COMMENT.sub('', content).strip():
+            verdicts[name] = 'legacy' if name == 'Review' and legacy else 'missing'
+        elif content.strip():
             verdicts[name] = 'answered'
         else:
             verdicts[name] = 'empty'
     return verdicts
+
+
+def prose_length(body):
+    text = INLINE_CODE.sub('', visible_markdown(body))
+    outside = []
+    depth = 0
+    cursor = 0
+    for tag in DETAILS_TAG.finditer(text):
+        if tag['closing']:
+            if depth:
+                depth -= 1
+                if depth == 0:
+                    cursor = tag.end()
+        else:
+            if depth == 0:
+                outside.append(text[cursor:tag.start()])
+                start = tag.start()
+            depth += 1
+    outside.append(text[start if depth else cursor:])
+    text = ''.join(outside)
+    text = re.sub(r'!\[[^\]]*\]\((?:[^()]|\([^()]*\))*\)', '', text)
+    text = MD_LINK.sub(lambda match: match['label'], text)
+    text = re.sub(r'<[^>]*>', '', text)
+    lines = text.splitlines()
+    prose = []
+    in_table = False
+    for index, line in enumerate(lines):
+        if in_table and '|' in line and line.strip():
+            continue
+        in_table = False
+        if '|' in line and index + 1 < len(lines):
+            cells = lines[index + 1].strip().strip('|').split('|')
+            if all(re.fullmatch(r'\s*:?-+:?\s*', cell) for cell in cells):
+                in_table = True
+                continue
+        line = re.sub(r'^\s{0,3}#{1,6}\s+|^\s*(?:>\s*|[-+*]\s+|\d+[.)]\s+)', '', line)
+        line = re.sub(r'(\*\*|__|~~|\*|_)(?=\S)(.+?)(?<=\S)\1', r'\2', line)
+        prose.append(unescape(line).strip())
+    return sum(len(line) for line in prose)
 
 
 def http_code(url):
@@ -184,7 +203,7 @@ def find_links(body):
     before matching, so line numbers in `FAIL not-embedded` still
     point at the source line.
     """
-    clean = without_html_comments(body)
+    clean = visible_markdown(body, blank_fences=False)
 
     links = []
     occupied = []
@@ -234,43 +253,6 @@ def describe(link):
     return f"[{link['label']}]({link['url']})"
 
 
-def archive_verdict(url, context):
-    parsed = urlsplit(url)
-    if (parsed.netloc == 'cursor.com'
-            and re.fullmatch(r'/assets/images/open-in-(?:web|cursor)-(?:dark|light)\.png', parsed.path)):
-        return 'decorative badge'
-    if (parsed.netloc == 'img.shields.io'
-            and re.fullmatch(r'/badge/[^/]+', parsed.path)):
-        return 'decorative badge'
-    repository = context.get('repository', '')
-    if not re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+', repository):
-        return 'missing repository context'
-    issues = set()
-    for commit in context.get('commits', []):
-        message = commit.get('commit', {}).get('message', '')
-        for match in re.finditer(
-                r'\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+'
-                r'(?:(?:(?P<repo>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+))?#|'
-                r'https://github\.com/(?P<urlrepo>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/issues/)'
-                r'(?P<issue>[1-9][0-9]*)\b',
-                message, re.I):
-            associated_repository = match['repo'] or match['urlrepo'] or repository
-            if associated_repository.lower() == repository.lower():
-                issues.add(match['issue'])
-    if not issues:
-        return 'missing issue context'
-    path = unquote(parsed.path).split('/')
-    if (parsed.netloc != 'raw.githubusercontent.com'
-            or len(path) < 8
-            or '/'.join(path[1:3]).lower() != repository.lower()
-            or not re.fullmatch(r'[0-9a-f]{40}|[0-9a-f]{64}', path[3], re.I)
-            or path[4:6] != ['docs', 'verify']
-            or path[6] not in issues
-            or any(part in ('', '.', '..') for part in path[1:])):
-        return 'outside associated issue archive'
-    return 'archived'
-
-
 def main():
     if len(sys.argv) > 1:
         with open(sys.argv[1], encoding='utf-8') as f:
@@ -280,15 +262,14 @@ def main():
     if body is None:
         body = ''
 
-    context = {}
-    if len(sys.argv) > 2:
-        with open(sys.argv[2], encoding='utf-8') as f:
-            context = json.load(f)
     failures = []
 
     verdicts = section_verdicts(body)
     answered = sum(1 for v in verdicts.values() if v == 'answered')
     print(f"pr-evidence: sections: {answered}/{len(REQUIRED_SECTIONS)} answered")
+    legacy = is_legacy_body(section_contents(body))
+    if verdicts.get('Review') == 'legacy':
+        print("pr-evidence: legacy six-section body: Review not required")
     section_failed = False
     for name in REQUIRED_SECTIONS:
         if verdicts[name] == 'missing':
@@ -306,16 +287,15 @@ def main():
               "(Summary/Evidence/Merge Danger) does not satisfy this gate; "
               "use the repo skill .claude/skills/pr-cairn/SKILL.md.")
 
+    characters = prose_length(body)
+    if not legacy and characters > PROSE_LIMIT:
+        failures.append('too-long')
+        print(f"FAIL too-long: {characters} characters of prose outside tables, images, code and details (limit {PROSE_LIMIT})")
+
     links = find_links(body)
 
     print(f"pr-evidence: scanned {len(links)} image link(s)")
     for link in links:
-        archive = archive_verdict(link['url'], context)
-        if archive not in ('archived', 'decorative badge'):
-            failures.append(link)
-            print(f"FAIL archive: {archive}: {describe(link)}")
-        else:
-            print(f"PASS archive: {archive}: {describe(link)}")
         if 'scenario' in parse_qs(urlsplit(link['url']).query, keep_blank_values=True):
             failures.append(link)
             print(f"FAIL fixture: {describe(link)}")

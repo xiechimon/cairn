@@ -34,6 +34,7 @@ const INFERRED_ROUTES = [
   'DELETE /api/todos/{id}',
   'GET /api/projects/{id}/autonomy',
   'PATCH /api/projects/{id}/autonomy',
+  'GET /api/projects/{id}/schedule',
   'GET /api/projects/{id}/merge-policy',
   'PATCH /api/projects/{id}/merge-policy',
   'DELETE /api/projects/{id}',

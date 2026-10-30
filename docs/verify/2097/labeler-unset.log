@@ -1,0 +1,2 @@
+eval-weekly: labeler environment is unset
+exit=1

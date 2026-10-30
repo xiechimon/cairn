@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Outlet, useNavigate } from 'react-router';
+import { readStoredToken, syncPushAuthToken } from '../api/auth.js';
 
 const SW_URL = '/sw.js';
 const NAV_CACHE = 'nav';
@@ -21,6 +22,7 @@ export function PwaBridge() {
   const navigate = useNavigate();
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
+    void syncPushAuthToken(readStoredToken());
     navigator.serviceWorker.register(SW_URL).catch(() => {});
     const onMessage = (event: MessageEvent) => {
       const data = event.data as { type?: unknown; href?: unknown } | null;

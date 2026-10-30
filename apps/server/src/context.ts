@@ -1,7 +1,8 @@
-import type { SecretBox, TeamRecord, UserRecord } from '@cairn/shared';
+import type { TeamRecord, UserRecord } from '@cairn/shared';
 import type { Logger } from 'pino';
 import type { Db } from './db/client.js';
 import type { FetchLike } from './lib/github.js';
+import type { KeySecretBox } from './lib/secret-box.js';
 import type { ConversationStreamHub, TeamStreamHub } from './services/events.js';
 import type { PendingUpload } from './services/machine-uploads.js';
 import type { MachineWakeHub } from './services/machine-wake-hub.js';
@@ -14,7 +15,7 @@ export interface AppContext {
   hub: TeamStreamHub;
   machineHub: MachineWakeHub;
   convHub?: ConversationStreamHub;
-  secretBox: SecretBox;
+  secretBox: KeySecretBox;
   vapidKeys?: VapidKeys | null;
   pushEndpointHosts?: ReadonlySet<string>;
   user: UserRecord;
@@ -33,6 +34,7 @@ export interface AppContext {
   >;
   reposDir: string;
   attachmentsDir: string;
+  backupStatusPath?: string;
   skillsDir: string;
   skillSourcesPath: string;
   skillImportFetch?: SkillImportFetch;

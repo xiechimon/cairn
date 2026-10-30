@@ -1,0 +1,354 @@
+TAP version 13
+# Subtest: same-day re-run exits before flows when the review directory already exists
+ok 1 - same-day re-run exits before flows when the review directory already exists
+  ---
+  duration_ms: 9.845102
+  type: 'test'
+  ...
+# Subtest: labeler environment unset fails before a zero-pack review
+ok 2 - labeler environment unset fails before a zero-pack review
+  ---
+  duration_ms: 6.701779
+  type: 'test'
+  ...
+# Subtest: weekly script exports packs by default and echoes sampler trace hit counts
+ok 3 - weekly script exports packs by default and echoes sampler trace hit counts
+  ---
+  duration_ms: 0.256215
+  type: 'test'
+  ...
+# Subtest: week window uses portable UTC arithmetic without GNU date -d
+not ok 4 - week window uses portable UTC arithmetic without GNU date -d
+  ---
+  duration_ms: 0.916744
+  type: 'test'
+  location: '/workspace/scripts/eval-weekly-ops.test.mjs:107:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input was expected to not match the regular expression /date\s+-u\s+-d|date\s+-d\s/. Input:
+    
+    '#!/usr/bin/env bash\n' +
+      'set -euo pipefail\n' +
+      'export PATH="${HOME}/.local/share/mise/shims:${HOME}/.local/bin:/usr/local/bin:/usr/bin:${PATH}"\n' +
+      'export GIT_TERMINAL_PROMPT=0\n' +
+      '\n' +
+      'if [[ -z "${CAIRN_EVAL_RELAY_KEY:-}" || -z "${CAIRN_EVAL_RELAY_URL:-}" ]]; then\n' +
+      '  source "${HOME}/.cairn/tools/eval-env.sh"\n' +
+      'fi\n' +
+      'if [[ -z "${CAIRN_EVAL_RELAY_KEY:-}" || -z "${CAIRN_EVAL_RELAY_URL:-}" ]]; then\n' +
+      '  echo "eval-weekly: relay environment is unset" >&2\n' +
+      '  exit 1\n' +
+      'fi\n' +
+      '\n' +
+      'SUMMARIZER="${CAIRN_EVAL_SUMMARIZER:-${HOME}/.cairn/tools/weekly/baseline-record.mts}"\n' +
+      'STATE="${CAIRN_EVAL_STATE_DIR:-${HOME}/.local/state/cairn-eval}"\n' +
+      'TABLE="${STATE}/weekly.md"\n' +
+      'MODEL="${CAIRN_EVAL_WEEKLY_MODEL:-glm-5.3}"\n' +
+      'REPO="${CAIRN_EVAL_REPO:-${HOME}/lanes/cairn}"\n' +
+      'mkdir -p "${STATE}"\n' +
+      '\n' +
+      'record_dir() {\n' +
+      '  local flow="$1"\n' +
+      '  local dir="$2"\n' +
+      '  local day="$3"\n' +
+      '  node --experimental-strip-types "${SUMMARIZER}" record \\\n' +
+      '    --flow "${flow}" \\\n' +
+      '    --results "${dir}/baseline/results.jsonl" \\\n' +
+      '    --errors "${dir}/baseline/errors.jsonl" \\\n' +
+      '    --state "${dir}/_state.json" \\\n' +
+      '    --table "${TABLE}" \\\n' +
+      '    --model "${MODEL}" \\\n' +
+      '    --date "${day}"\n' +
+      '}\n' +
+      '\n' +
+      'if [[ "${1:-}" == "--record" ]]; then\n' +
+      '  record_dir "$2" "$3" "${4:-$(date -u +%Y-%m-%d)}"\n' +
+      '  exit 0\n' +
+      'fi\n' +
+      '\n' +
+      'STAMP="$(date -u +%Y%m%d)"\n' +
+      'DAY="$(date -u +%Y-%m-%d)"\n' +
+      'REVIEW_OUT="${STATE}/reviews/${DAY}"\n' +
+      'if [[ -e "${REVIEW_OUT}" ]]; then\n' +
+      '  echo "eval-weekly: review already exists for ${DAY}: ${REVIEW_OUT}" >&2\n' +
+      '  exit 0\n' +
+      'fi\n' +
+      'if [[ -z "${CAIRN_LABELER_BASE_URL:-}" || -z "${CAIRN_LABELER_API_KEY:-}" || -z "${CAIRN_LABELER_MODEL:-}" ]]; then\n' +
+      '  echo "eval-weekly: labeler environment is unset" >&2\n' +
+      '  exit 1\n' +
+      'fi\n' +
+      '\n' +
+      'WT="${HOME}/lanes/cairn-eval-${STAMP}"\n' +
+      'cleanup() {\n' +
+      '  git -C "${REPO}" worktree remove --force "${WT}" >/dev/null 2>&1 || true\n' +
+      '}\n' +
+      '\n' +
+      'git -C "${REPO}" fetch -q origin main\n' +
+      'if [[ -e "${WT}" ]]; then\n' +
+      '  echo "eval-weekly: worktree already exists: ${WT}" >&2\n' +
+      '  exit 2\n' +
+      'fi\n' +
+      'git -C "${REPO}" worktree add -q --detach "${WT}" origin/main\n' +
+      'trap cleanup EXIT\n' +
+      'head_sha="$(git -C "${WT}" rev-parse HEAD)"\n' +
+      'main_sha="$(git -C "${WT}" rev-parse origin/main)"\n' +
+      'if [[ "${head_sha}" != "${main_sha}" ]]; then\n' +
+      '  echo "eval-weekly: refusing to record; checkout ${head_sha} is not origin/main ${main_sha}" >&2\n' +
+      '  exit 2\n' +
+      'fi\n' +
+      'if [[ -n "$(git -C "${WT}" status --porcelain)" ]]; then\n' +
+      '  echo "eval-weekly: refusing to record; origin/main worktree is dirty" >&2\n' +
+      '  exit 2\n' +
+      'fi\n' +
+      '\n' +
+      'cd "${WT}"\n' +
+      'pnpm install --frozen-lockfile --ignore-scripts\n' +
+      '\n' +
+      'run_flow() {\n' +
+      '  local flow="$1"\n' +
+      '  local flow_dir="${WT}/.claude/hillclimb/${flow}"\n' +
+      '  rm -f "${flow_dir}/baseline/results.jsonl" "${flow_dir}/baseline/errors.jsonl"\n' +
+      '  echo "eval-weekly: ${flow} start"\n' +
+      '  node --import ./integration/node_modules/tsx/dist/loader.mjs integration/eval/chief-dispatch/run-eval.mts \\\n' +
+      '    --flow ".claude/hillclimb/${flow}" \\\n' +
+      '    --variant baseline \\\n' +
+      '    --model "${MODEL}" \\\n' +
+      '    --reps 3 \\\n' +
+      '    --approve-harness\n' +
+      '  mkdir -p "${STATE}/${STAMP}/${flow}/baseline"\n' +
+      '  cp -f "${flow_dir}/_state.json" "${STATE}/${STAMP}/${flow}/_state.json"\n' +
+      '  cp -f "${flow_dir}/baseline/results.jsonl" "${STATE}/${STAMP}/${flow}/baseline/results.jsonl"\n' +
+      '  if [[ -f "${flow_dir}/baseline/errors.jsonl" ]]; then\n' +
+      '    cp -f "${flow_dir}/baseline/errors.jsonl" "${STATE}/${STAMP}/${flow}/baseline/errors.jsonl"\n' +
+      '  else\n' +
+      '    : > "${STATE}/${STAMP}/${flow}/baseline/errors.jsonl"\n' +
+      '  fi\n' +
+      '  if [[ -d "${flow_dir}/baseline/traces" ]]; then\n' +
+      '    cp -R "${flow_dir}/baseline/traces" "${STATE}/${STAMP}/${flow}/baseline/"\n' +
+      '  fi\n' +
+      '  record_dir "${flow}" "${STATE}/${STAMP}/${flow}" "${DAY}"\n' +
+      '  echo "eval-weekly: ${flow} recorded"\n' +
+      '}\n' +
+      '\n' +
+      'run_flow chief-dispatch\n' +
+      'run_flow memory-regression\n' +
+      'run_flow project-routing\n' +
+      'echo "eval-weekly: table ${TABLE}"\n' +
+      '\n' +
+      'PACKS_DIR="${STATE}/${STAMP}/packs"\n' +
+      'PACKS_LABELED="${PACKS_DIR}/labeled.jsonl"\n' +
+      'if [[ -n "${CAIRN_EVAL_REVIEW_PACKS:-}" ]]; then\n' +
+      '  PACKS_LABELED="${CAIRN_EVAL_REVIEW_PACKS}"\n' +
+      'else\n' +
+      '  mkdir -p "${PACKS_DIR}"\n' +
+      '  WEEK_SINCE="$(date -u -d "${DAY} -7 days" +%Y-%m-%dT00:00:00.000Z)"\n' +
+      '  WEEK_UNTIL="$(date -u -d "${DAY} +1 day" +%Y-%m-%dT00:00:00.000Z)"\n' +
+      '  PACKS_EXPORT="${PACKS_DIR}/export.jsonl"\n' +
+      '  echo "eval-weekly: exporting packs ${WEEK_SINCE} .. ${WEEK_UNTIL}"\n' +
+      '  pnpm traj:export --since "${WEEK_SINCE}" --until "${WEEK_UNTIL}" --out "${PACKS_EXPORT}"\n' +
+      '  echo "eval-weekly: labeling packs with ${CAIRN_LABELER_MODEL}"\n' +
+      '  pnpm traj:label --in "${PACKS_EXPORT}" --out "${PACKS_LABELED}" --model "${CAIRN_LABELER_MODEL}"\n' +
+      'fi\n' +
+      '\n' +
+      'review_json="$(\n' +
+      '  node "${WT}/scripts/eval-sample-failures.mjs" \\\n' +
+      '    --week "${DAY}" \\\n' +
+      '    --flows "${STATE}/${STAMP}" \\\n' +
+      '    --out "${REVIEW_OUT}" \\\n' +
+      '    --packs "${PACKS_LABELED}"\n' +
+      ')"\n' +
+      'echo "${review_json}"\n' +
+      'packs_available="$(node -e \'const r=JSON.parse(process.argv[1]); process.stdout.write(String(r.available.packs))\' "${review_json}")"\n' +
+      'trace_hit="$(node -e \'const r=JSON.parse(process.argv[1]); process.stdout.write(String(r.traces.hit))\' "${review_json}")"\n' +
+      'trace_miss="$(node -e \'const r=JSON.parse(process.argv[1]); process.stdout.write(String(r.traces.miss))\' "${review_json}")"\n' +
+      'echo "eval-weekly: review packs=${packs_available} traces hit=${trace_hit} miss=${trace_miss}"\n' +
+      'echo "eval-weekly: review ${REVIEW_OUT}/review.json"\n'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: |-
+    #!/usr/bin/env bash
+    set -euo pipefail
+    export PATH="${HOME}/.local/share/mise/shims:${HOME}/.local/bin:/usr/local/bin:/usr/bin:${PATH}"
+    export GIT_TERMINAL_PROMPT=0
+    
+    if [[ -z "${CAIRN_EVAL_RELAY_KEY:-}" || -z "${CAIRN_EVAL_RELAY_URL:-}" ]]; then
+      source "${HOME}/.cairn/tools/eval-env.sh"
+    fi
+    if [[ -z "${CAIRN_EVAL_RELAY_KEY:-}" || -z "${CAIRN_EVAL_RELAY_URL:-}" ]]; then
+      echo "eval-weekly: relay environment is unset" >&2
+      exit 1
+    fi
+    
+    SUMMARIZER="${CAIRN_EVAL_SUMMARIZER:-${HOME}/.cairn/tools/weekly/baseline-record.mts}"
+    STATE="${CAIRN_EVAL_STATE_DIR:-${HOME}/.local/state/cairn-eval}"
+    TABLE="${STATE}/weekly.md"
+    MODEL="${CAIRN_EVAL_WEEKLY_MODEL:-glm-5.3}"
+    REPO="${CAIRN_EVAL_REPO:-${HOME}/lanes/cairn}"
+    mkdir -p "${STATE}"
+    
+    record_dir() {
+      local flow="$1"
+      local dir="$2"
+      local day="$3"
+      node --experimental-strip-types "${SUMMARIZER}" record \
+        --flow "${flow}" \
+        --results "${dir}/baseline/results.jsonl" \
+        --errors "${dir}/baseline/errors.jsonl" \
+        --state "${dir}/_state.json" \
+        --table "${TABLE}" \
+        --model "${MODEL}" \
+        --date "${day}"
+    }
+    
+    if [[ "${1:-}" == "--record" ]]; then
+      record_dir "$2" "$3" "${4:-$(date -u +%Y-%m-%d)}"
+      exit 0
+    fi
+    
+    STAMP="$(date -u +%Y%m%d)"
+    DAY="$(date -u +%Y-%m-%d)"
+    REVIEW_OUT="${STATE}/reviews/${DAY}"
+    if [[ -e "${REVIEW_OUT}" ]]; then
+      echo "eval-weekly: review already exists for ${DAY}: ${REVIEW_OUT}" >&2
+      exit 0
+    fi
+    if [[ -z "${CAIRN_LABELER_BASE_URL:-}" || -z "${CAIRN_LABELER_API_KEY:-}" || -z "${CAIRN_LABELER_MODEL:-}" ]]; then
+      echo "eval-weekly: labeler environment is unset" >&2
+      exit 1
+    fi
+    
+    WT="${HOME}/lanes/cairn-eval-${STAMP}"
+    cleanup() {
+      git -C "${REPO}" worktree remove --force "${WT}" >/dev/null 2>&1 || true
+    }
+    
+    git -C "${REPO}" fetch -q origin main
+    if [[ -e "${WT}" ]]; then
+      echo "eval-weekly: worktree already exists: ${WT}" >&2
+      exit 2
+    fi
+    git -C "${REPO}" worktree add -q --detach "${WT}" origin/main
+    trap cleanup EXIT
+    head_sha="$(git -C "${WT}" rev-parse HEAD)"
+    main_sha="$(git -C "${WT}" rev-parse origin/main)"
+    if [[ "${head_sha}" != "${main_sha}" ]]; then
+      echo "eval-weekly: refusing to record; checkout ${head_sha} is not origin/main ${main_sha}" >&2
+      exit 2
+    fi
+    if [[ -n "$(git -C "${WT}" status --porcelain)" ]]; then
+      echo "eval-weekly: refusing to record; origin/main worktree is dirty" >&2
+      exit 2
+    fi
+    
+    cd "${WT}"
+    pnpm install --frozen-lockfile --ignore-scripts
+    
+    run_flow() {
+      local flow="$1"
+      local flow_dir="${WT}/.claude/hillclimb/${flow}"
+      rm -f "${flow_dir}/baseline/results.jsonl" "${flow_dir}/baseline/errors.jsonl"
+      echo "eval-weekly: ${flow} start"
+      node --import ./integration/node_modules/tsx/dist/loader.mjs integration/eval/chief-dispatch/run-eval.mts \
+        --flow ".claude/hillclimb/${flow}" \
+        --variant baseline \
+        --model "${MODEL}" \
+        --reps 3 \
+        --approve-harness
+      mkdir -p "${STATE}/${STAMP}/${flow}/baseline"
+      cp -f "${flow_dir}/_state.json" "${STATE}/${STAMP}/${flow}/_state.json"
+      cp -f "${flow_dir}/baseline/results.jsonl" "${STATE}/${STAMP}/${flow}/baseline/results.jsonl"
+      if [[ -f "${flow_dir}/baseline/errors.jsonl" ]]; then
+        cp -f "${flow_dir}/baseline/errors.jsonl" "${STATE}/${STAMP}/${flow}/baseline/errors.jsonl"
+      else
+        : > "${STATE}/${STAMP}/${flow}/baseline/errors.jsonl"
+      fi
+      if [[ -d "${flow_dir}/baseline/traces" ]]; then
+        cp -R "${flow_dir}/baseline/traces" "${STATE}/${STAMP}/${flow}/baseline/"
+      fi
+      record_dir "${flow}" "${STATE}/${STAMP}/${flow}" "${DAY}"
+      echo "eval-weekly: ${flow} recorded"
+    }
+    
+    run_flow chief-dispatch
+    run_flow memory-regression
+    run_flow project-routing
+    echo "eval-weekly: table ${TABLE}"
+    
+    PACKS_DIR="${STATE}/${STAMP}/packs"
+    PACKS_LABELED="${PACKS_DIR}/labeled.jsonl"
+    if [[ -n "${CAIRN_EVAL_REVIEW_PACKS:-}" ]]; then
+      PACKS_LABELED="${CAIRN_EVAL_REVIEW_PACKS}"
+    else
+      mkdir -p "${PACKS_DIR}"
+      WEEK_SINCE="$(date -u -d "${DAY} -7 days" +%Y-%m-%dT00:00:00.000Z)"
+      WEEK_UNTIL="$(date -u -d "${DAY} +1 day" +%Y-%m-%dT00:00:00.000Z)"
+      PACKS_EXPORT="${PACKS_DIR}/export.jsonl"
+      echo "eval-weekly: exporting packs ${WEEK_SINCE} .. ${WEEK_UNTIL}"
+      pnpm traj:export --since "${WEEK_SINCE}" --until "${WEEK_UNTIL}" --out "${PACKS_EXPORT}"
+      echo "eval-weekly: labeling packs with ${CAIRN_LABELER_MODEL}"
+      pnpm traj:label --in "${PACKS_EXPORT}" --out "${PACKS_LABELED}" --model "${CAIRN_LABELER_MODEL}"
+    fi
+    
+    review_json="$(
+      node "${WT}/scripts/eval-sample-failures.mjs" \
+        --week "${DAY}" \
+        --flows "${STATE}/${STAMP}" \
+        --out "${REVIEW_OUT}" \
+        --packs "${PACKS_LABELED}"
+    )"
+    echo "${review_json}"
+    packs_available="$(node -e 'const r=JSON.parse(process.argv[1]); process.stdout.write(String(r.available.packs))' "${review_json}")"
+    trace_hit="$(node -e 'const r=JSON.parse(process.argv[1]); process.stdout.write(String(r.traces.hit))' "${review_json}")"
+    trace_miss="$(node -e 'const r=JSON.parse(process.argv[1]); process.stdout.write(String(r.traces.miss))' "${review_json}")"
+    echo "eval-weekly: review packs=${packs_available} traces hit=${trace_hit} miss=${trace_miss}"
+    echo "eval-weekly: review ${REVIEW_OUT}/review.json"
+    
+  operator: 'doesNotMatch'
+  stack: |-
+    TestContext.<anonymous> (file:///workspace/scripts/eval-weekly-ops.test.mjs:109:10)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: export success then label failure leaves no stuck artifacts that block retry
+not ok 5 - export success then label failure leaves no stuck artifacts that block retry
+  ---
+  duration_ms: 6.212433
+  type: 'test'
+  location: '/workspace/scripts/eval-weekly-ops.test.mjs:129:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /label failed|labeling/. Input:
+    
+    'fatal: not a git repository (or any of the parent directories): .git\n'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: |-
+    fatal: not a git repository (or any of the parent directories): .git
+    
+  operator: 'match'
+  stack: |-
+    TestContext.<anonymous> (file:///workspace/scripts/eval-weekly-ops.test.mjs:183:12)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 3
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 69.838421

@@ -1,0 +1,158 @@
+✔ the changeset config ignores exactly the private workspace packages and keeps the rest publishable (2.46725ms)
+✔ the release workflow publishes through OIDC without a token or a bot pull request (0.179708ms)
+✔ every release action pins a full commit SHA with a version note (0.301791ms)
+✔ packing inherits read permissions and publishing alone can request an OIDC token (0.660375ms)
+✔ the publish job sets up Node without restoring a shared dependency cache (0.219833ms)
+✔ the publish job installs only root dependencies without scripts and never builds or publishes unpacked packages (0.299166ms)
+✔ the pack job packs tarballs before uploading the release artifact (0.257959ms)
+✔ the publish job downloads the packed artifact before publishing (0.135875ms)
+✔ pending changesets warn without controlling release steps (0.184708ms)
+✔ the publish job configures a tagger before publishing (0.14775ms)
+✔ the publish step always publishes packed tarballs with explicit pnpm provenance (0.177042ms)
+✔ the publish job pushes tags after an attempted publish even if publishing fails (0.141917ms)
+✔ pull requests validate release configuration for every workspace manifest (0.139292ms)
+✔ every publishable package names this repository for provenance (0.361042ms)
+✔ the release workflow satisfies the exact security invariants (0.53575ms)
+✖ the exact security invariants reject fixture 1: top-level OIDC permission (0.350917ms)
+✖ the exact security invariants reject fixture 2: rebuild in publish (0.062375ms)
+✖ the exact security invariants reject fixture 3: recursive build in publish (0.047625ms)
+✖ the exact security invariants reject fixture 4: renamed plan output (0.045333ms)
+✖ the exact security invariants reject fixture 5: filtered build in publish (0.046625ms)
+✖ the exact security invariants reject fixture 6: pack in publish (0.042542ms)
+✖ the exact security invariants reject fixture 7: cache action in publish (0.041625ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 15
+ℹ fail 7
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 60.616333
+
+✖ failing tests:
+
+test at scripts/release-config.test.mjs:290:3
+✖ the exact security invariants reject fixture 1: top-level OIDC permission (0.350917ms)
+  AssertionError [ERR_ASSERTION]: 1: top-level OIDC permission must break top-level permissions
+      at TestContext.<anonymous> (file://<worktree>/scripts/release-config.test.mjs:293:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scripts/release-config.test.mjs:290:3
+✖ the exact security invariants reject fixture 2: rebuild in publish (0.062375ms)
+  AssertionError [ERR_ASSERTION]: 2: rebuild in publish must break publish run commands
+      at TestContext.<anonymous> (file://<worktree>/scripts/release-config.test.mjs:293:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scripts/release-config.test.mjs:290:3
+✖ the exact security invariants reject fixture 3: recursive build in publish (0.047625ms)
+  AssertionError [ERR_ASSERTION]: 3: recursive build in publish must break publish run commands
+      at TestContext.<anonymous> (file://<worktree>/scripts/release-config.test.mjs:293:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scripts/release-config.test.mjs:290:3
+✖ the exact security invariants reject fixture 4: renamed plan output (0.045333ms)
+  AssertionError [ERR_ASSERTION]: 4: renamed plan output must break pack plan output key
+      at TestContext.<anonymous> (file://<worktree>/scripts/release-config.test.mjs:293:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scripts/release-config.test.mjs:290:3
+✖ the exact security invariants reject fixture 5: filtered build in publish (0.046625ms)
+  AssertionError [ERR_ASSERTION]: 5: filtered build in publish must break publish run commands
+      at TestContext.<anonymous> (file://<worktree>/scripts/release-config.test.mjs:293:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scripts/release-config.test.mjs:290:3
+✖ the exact security invariants reject fixture 6: pack in publish (0.042542ms)
+  AssertionError [ERR_ASSERTION]: 6: pack in publish must break publish run commands
+      at TestContext.<anonymous> (file://<worktree>/scripts/release-config.test.mjs:293:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scripts/release-config.test.mjs:290:3
+✖ the exact security invariants reject fixture 7: cache action in publish (0.041625ms)
+  AssertionError [ERR_ASSERTION]: 7: cache action in publish must break publish uses actions
+      at TestContext.<anonymous> (file://<worktree>/scripts/release-config.test.mjs:293:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

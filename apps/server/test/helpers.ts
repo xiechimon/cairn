@@ -59,6 +59,7 @@ export function bootServer(
     webOrigin?: string;
     pushEndpointHosts?: ReadonlySet<string>;
     mcpConfigPath?: string;
+    backupStatusPath?: string;
   } = {},
 ) {
   const db = openMemoryDb();
@@ -122,6 +123,7 @@ export function bootServer(
         : {}),
       reposDir,
       attachmentsDir,
+      ...(opts.backupStatusPath !== undefined ? { backupStatusPath: opts.backupStatusPath } : {}),
       skillsDir,
       skillSourcesPath,
       ...(opts.webDir !== undefined ? { webDir: opts.webDir } : {}),
@@ -172,6 +174,7 @@ export async function issueApiKey(s: ReturnType<typeof bootServer>): Promise<str
     name: 'machine-bootstrap',
     gitAccess: false,
     mcpAccess: false,
+    machineAccess: true,
     toolGrants: { read: [], write: [] },
   });
   if (res.status !== 200 && res.status !== 201) {
@@ -224,6 +227,7 @@ export function insertGitApiKey(s: TestServer, secret: string): string {
       name: 'git-e2e',
       gitAccess: true,
       mcpAccess: false,
+      machineAccess: false,
       toolGrants: { read: [], write: [] },
       keyHash: sha256Hex(secret),
       masked: `${secret.slice(0, 12)}…`,

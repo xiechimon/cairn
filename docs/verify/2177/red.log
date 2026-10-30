@@ -1,0 +1,275 @@
+✔ the changeset config ignores exactly the private workspace packages and keeps the rest publishable (1.296167ms)
+✖ the release workflow publishes through OIDC without a token or a bot pull request (0.85725ms)
+✔ every release action pins a full commit SHA with a version note (0.272958ms)
+✖ packing inherits read permissions and publishing alone can request an OIDC token (0.153375ms)
+✖ the publish job sets up Node without restoring a shared dependency cache (0.093709ms)
+✖ the publish job installs only root dependencies without scripts and never builds or publishes unpacked packages (0.077416ms)
+✖ the pack job packs tarballs before uploading the release artifact (0.086917ms)
+✖ the publish job downloads the packed artifact before publishing (0.071334ms)
+✖ pending changesets warn without controlling release steps (0.087875ms)
+✖ the publish job configures a tagger before publishing (0.098333ms)
+✖ the publish step always publishes packed tarballs with explicit pnpm provenance (0.070041ms)
+✖ the publish job pushes tags after an attempted publish even if publishing fails (0.068542ms)
+✖ pull requests validate release configuration for every workspace manifest (0.251208ms)
+✖ every publishable package names this repository for provenance (0.80575ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 2
+ℹ fail 12
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 49.907375
+
+✖ failing tests:
+
+test at scripts/release-config.test.mjs:69:1
+✖ the release workflow publishes through OIDC without a token or a bot pull request (0.85725ms)
+  AssertionError [ERR_ASSERTION]: the release workflow must not contain changesets/action
+      at TestContext.<anonymous> (file:///private/tmp/2177-red2.8mzUGY/scripts/release-config.test.mjs:71:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scripts/release-config.test.mjs:82:1
+✖ packing inherits read permissions and publishing alone can request an OIDC token (0.153375ms)
+  AssertionError [ERR_ASSERTION]: the pack job must exist
+      at jobConfig (file:///private/tmp/2177-red2.8mzUGY/scripts/release-config.test.mjs:59:10)
+      at TestContext.<anonymous> (file:///private/tmp/2177-red2.8mzUGY/scripts/release-config.test.mjs:84:16)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scripts/release-config.test.mjs:95:1
+✖ the publish job sets up Node without restoring a shared dependency cache (0.093709ms)
+  AssertionError [ERR_ASSERTION]: the publish job must exist
+      at jobConfig (file:///private/tmp/2177-red2.8mzUGY/scripts/release-config.test.mjs:59:10)
+      at jobSteps (file:///private/tmp/2177-red2.8mzUGY/scripts/release-config.test.mjs:64:10)
+      at TestContext.<anonymous> (file:///private/tmp/2177-red2.8mzUGY/scripts/release-config.test.mjs:96:21)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scripts/release-config.test.mjs:101:1
+✖ the publish job installs only root dependencies without scripts and never builds or publishes unpacked packages (0.077416ms)
+  AssertionError [ERR_ASSERTION]: the publish job must exist
+      at jobConfig (file:///private/tmp/2177-red2.8mzUGY/scripts/release-config.test.mjs:59:10)
+      at jobSteps (file:///private/tmp/2177-red2.8mzUGY/scripts/release-config.test.mjs:64:10)
+      at TestContext.<anonymous> (file:///private/tmp/2177-red2.8mzUGY/scripts/release-config.test.mjs:102:17)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scripts/release-config.test.mjs:116:1
+✖ the pack job packs tarballs before uploading the release artifact (0.086917ms)
+  AssertionError [ERR_ASSERTION]: the pack job must exist
+      at jobConfig (file:///private/tmp/2177-red2.8mzUGY/scripts/release-config.test.mjs:59:10)
+      at jobSteps (file:///private/tmp/2177-red2.8mzUGY/scripts/release-config.test.mjs:64:10)
+      at TestContext.<anonymous> (file:///private/tmp/2177-red2.8mzUGY/scripts/release-config.test.mjs:117:17)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scripts/release-config.test.mjs:136:1
+✖ the publish job downloads the packed artifact before publishing (0.071334ms)
+  AssertionError [ERR_ASSERTION]: the publish job must exist
+      at jobConfig (file:///private/tmp/2177-red2.8mzUGY/scripts/release-config.test.mjs:59:10)
+      at jobSteps (file:///private/tmp/2177-red2.8mzUGY/scripts/release-config.test.mjs:64:10)
+      at TestContext.<anonymous> (file:///private/tmp/2177-red2.8mzUGY/scripts/release-config.test.mjs:137:17)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scripts/release-config.test.mjs:152:1
+✖ pending changesets warn without controlling release steps (0.087875ms)
+  AssertionError [ERR_ASSERTION]: the pack job must exist
+      at jobConfig (file:///private/tmp/2177-red2.8mzUGY/scripts/release-config.test.mjs:59:10)
+      at jobSteps (file:///private/tmp/2177-red2.8mzUGY/scripts/release-config.test.mjs:64:10)
+      at TestContext.<anonymous> (file:///private/tmp/2177-red2.8mzUGY/scripts/release-config.test.mjs:153:17)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scripts/release-config.test.mjs:166:1
+✖ the publish job configures a tagger before publishing (0.098333ms)
+  AssertionError [ERR_ASSERTION]: the publish job must exist
+      at jobConfig (file:///private/tmp/2177-red2.8mzUGY/scripts/release-config.test.mjs:59:10)
+      at jobSteps (file:///private/tmp/2177-red2.8mzUGY/scripts/release-config.test.mjs:64:10)
+      at TestContext.<anonymous> (file:///private/tmp/2177-red2.8mzUGY/scripts/release-config.test.mjs:167:17)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scripts/release-config.test.mjs:178:1
+✖ the publish step always publishes packed tarballs with explicit pnpm provenance (0.070041ms)
+  AssertionError [ERR_ASSERTION]: the publish job must exist
+      at jobConfig (file:///private/tmp/2177-red2.8mzUGY/scripts/release-config.test.mjs:59:10)
+      at jobSteps (file:///private/tmp/2177-red2.8mzUGY/scripts/release-config.test.mjs:64:10)
+      at TestContext.<anonymous> (file:///private/tmp/2177-red2.8mzUGY/scripts/release-config.test.mjs:179:19)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scripts/release-config.test.mjs:189:1
+✖ the publish job pushes tags after an attempted publish even if publishing fails (0.068542ms)
+  AssertionError [ERR_ASSERTION]: the publish job must exist
+      at jobConfig (file:///private/tmp/2177-red2.8mzUGY/scripts/release-config.test.mjs:59:10)
+      at jobSteps (file:///private/tmp/2177-red2.8mzUGY/scripts/release-config.test.mjs:64:10)
+      at TestContext.<anonymous> (file:///private/tmp/2177-red2.8mzUGY/scripts/release-config.test.mjs:190:17)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scripts/release-config.test.mjs:204:1
+✖ pull requests validate release configuration for every workspace manifest (0.251208ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /^ {4}paths:\n(?: {6}.+\n)*? {6}- '\*\*\/package\.json'\s*$/m. Input:
+  
+  '  pull_request:\n' +
+    '    paths:\n' +
+    "      - '.changeset/**'\n" +
+    "      - '.github/workflows/release.yml'\n" +
+    "      - 'apps/daemon/package.json'\n" +
+    "      - 'apps/server/package.json'\n" +
+    "      - 'package.json'\n" +
+    "      - 'pnpm-lock.yaml'\n" +
+    "      - 'pnpm-workspace.yaml'\n" +
+    "      - 'scripts/release-config.test.mjs'\n" +
+    '\n'
+  
+      at TestContext.<anonymous> (file:///private/tmp/2177-red2.8mzUGY/scripts/release-config.test.mjs:207:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: "  pull_request:\n    paths:\n      - '.changeset/**'\n      - '.github/workflows/release.yml'\n      - 'apps/daemon/package.json'\n      - 'apps/server/package.json'\n      - 'package.json'\n      - 'pnpm-lock.yaml'\n      - 'pnpm-workspace.yaml'\n      - 'scripts/release-config.test.mjs'\n\n",
+    expected: /^ {4}paths:\n(?: {6}.+\n)*? {6}- '\*\*\/package\.json'\s*$/m,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/release-config.test.mjs:210:1
+✖ every publishable package names this repository for provenance (0.80575ms)
+  AssertionError [ERR_ASSERTION]: @xiechimon/cairn-cli publishConfig.provenance must be true
+  + actual - expected
+  
+  + undefined
+  - true
+  
+      at TestContext.<anonymous> (file:///private/tmp/2177-red2.8mzUGY/scripts/release-config.test.mjs:212:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

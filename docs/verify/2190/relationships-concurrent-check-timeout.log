@@ -1,0 +1,112 @@
+✖ clean backup passes fixture in-process checkout API and never reports key or plaintext (30828.653375ms)
+✖ one attachment byte changed names its storage key (32541.1695ms)
+✖ message content edited names table and id (30458.892625ms)
+✔ deleted row in backupDb fails (17784.025167ms)
+✔ deleted row in db fails (2842.955125ms)
+✔ scratch inside live directory is refused (1866.738542ms)
+✔ scratch through symlink is refused (1395.805167ms)
+✔ existing scratch is refused without overwriting it (1622.313083ms)
+✔ report cannot overwrite live DB or key (1014.187833ms)
+✔ invalid gzip fails and publishes failure status (1614.455583ms)
+✔ orphaned chief message fails the selected relationship (1051.087ms)
+✔ wrong key fails without leaking bytes (2607.137708ms)
+✔ no encrypted sample fails (1095.117917ms)
+✔ missing relationship sample fails (1056.884542ms)
+✔ post-backup timestamped updates and inserts are allowed (10855.659333ms)
+✔ missing attachment and unsafe attachment key fail (540.454125ms)
+✔ default backup directory selects the newest timestamp (4155.492792ms)
+✔ migration ledger rows with null declared ids are compared rather than skipped (329.507042ms)
+✔ machine heartbeat allowlist is reported while machine name remains strict (3510.337541ms)
+✔ missing ready attachment names its storage key (453.168667ms)
+✔ weekly units isolate scratch and do not install themselves (1.368708ms)
+✔ production shell requires a real HTTP listener and reports sandbox refusal (2223.490208ms)
+✔ invalid SQLite fails integrity checking (262.691125ms)
+✔ ready attachment size mismatch fails (236.662583ms)
+✔ scratch equal to live DB is refused (153.622083ms)
+✔ missing key fails without creating a replacement (154.38275ms)
+✔ non-allowlisted machine field changes fail (280.192ms)
+✔ missing selected todo names the relationship sample (226.488375ms)
+✔ missing selected build names the relationship sample (215.456458ms)
+✔ missing selected step names the relationship sample (270.38075ms)
+✔ missing selected message names the relationship sample (255.266208ms)
+✔ missing selected chief_thread names the relationship sample (263.940041ms)
+✔ missing selected chief_message names the relationship sample (247.929833ms)
+✔ newest eligible build wins over todo activity and step-less builds (2246.241334ms)
+✔ partial step loss names selected sample (345.311417ms)
+✔ partial message loss names selected sample (366.233292ms)
+✔ partial chief_message loss names selected sample (408.835958ms)
+✔ post-backup relationships are excluded while boundary rows are required (3152.551667ms)
+ℹ tests 38
+ℹ suites 0
+ℹ pass 35
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 159688.204208
+
+✖ failing tests:
+
+test at scripts/ops/restore-drill.test.mjs:104:1
+✖ clean backup passes fixture in-process checkout API and never reports key or plaintext (30828.653375ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  null !== 0
+  
+      at fixture (file://<worktree>/scripts/ops/restore-drill.test.mjs:39:12)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:105:13)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:125:1
+✖ one attachment byte changed names its storage key (32541.1695ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  null !== 0
+  
+      at fixture (file://<worktree>/scripts/ops/restore-drill.test.mjs:39:12)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:126:13)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:130:1
+✖ message content edited names table and id (30458.892625ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  null !== 0
+  
+      at fixture (file://<worktree>/scripts/ops/restore-drill.test.mjs:39:12)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:131:13)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

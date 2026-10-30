@@ -1,0 +1,30 @@
+
+ FAIL  |@cairn/shared| test/backup-status.test.ts [ packages/shared/test/backup-status.test.ts ]
+Error: Cannot find module '../src/records/backup-status.js' imported from /Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/suspicious-mirzakhani-83ad00/packages/shared/test/backup-status.test.ts
+ ❯ test/backup-status.test.ts:2:1
+      1| import { describe, expect, test } from 'vitest';
+      2| import {
+       | ^
+      3|   BACKUP_STALE_AFTER_MS,
+      4|   type BackupStatus,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  |@xiechimon/cairn| test/backup-status.test.ts [ apps/server/test/backup-status.test.ts ]
+Error: Cannot find module '../src/services/backup-status.js' imported from /Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/suspicious-mirzakhani-83ad00/apps/server/test/backup-status.test.ts
+ ❯ test/backup-status.test.ts:8:1
+      6| import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/…
+      7| import { backupStatusPathOf, loadConfig } from '../src/config.js';
+      8| import { readBackupHealth } from '../src/services/backup-status.js';
+       | ^
+      9| import { bootServer } from './helpers.js';
+     10|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  3 failed (3)
+      Tests  no tests
+   Start at  23:06:42
+   Duration  454ms (worker 97%, environment 3%)
+

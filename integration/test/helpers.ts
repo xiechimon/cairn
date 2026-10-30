@@ -109,6 +109,7 @@ export async function bootRealServer(opts: {
         name: 'machine-bootstrap',
         gitAccess: false,
         mcpAccess: false,
+        machineAccess: true,
         toolGrants: { read: [], write: [] },
       },
     );

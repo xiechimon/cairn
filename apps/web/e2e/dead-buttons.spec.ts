@@ -227,6 +227,7 @@ test('api-keys non-empty state keeps `新建密钥` visible and opens the create
             masked: 'cairn_afe07565…',
             gitAccess: false,
             mcpAccess: false,
+            machineAccess: false,
           },
         ],
       });

@@ -101,6 +101,8 @@ export interface MockState {
   rejectSend?: boolean;
   todos?: unknown[];
   projects?: unknown[];
+  machines?: unknown[];
+  backup?: unknown;
   sendAt?: number;
 }
 
@@ -191,8 +193,9 @@ export async function mockLive(
     if (p === '/api/teams/t1/agents/agent-1') return json(AGENT);
     if (p === '/api/todos') return json(state.todos ?? [TASK]);
     if (p === '/api/projects') return json(state.projects ?? [PROJECT]);
-    if (p === '/api/teams/t1/members' || p === '/api/teams/t1/machines' || p === '/api/skills')
-      return json([]);
+    if (p === '/api/teams/t1/machines') return json(state.machines ?? []);
+    if (p === '/api/server/backup') return json(state.backup ?? { state: 'none' });
+    if (p === '/api/teams/t1/members' || p === '/api/skills') return json([]);
     return json([]);
   });
   return sent;

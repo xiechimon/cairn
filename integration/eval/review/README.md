@@ -28,9 +28,26 @@ objects:
 
 ## Produce cases
 
-`export-cases` consumes the trace JSON array from #1955 (`status`, introducing
-and fixing SHAs, original/fixing PRs, file/line evidence). On a checkout that
-already has the `trace` subcommand:
+Prefer the end-to-end loop from #1832. It collects candidates on `origin/main`,
+resolves introducing PRs, writes the weekly review-path report, exports verified
+cases into the bank, and validates the bank:
+
+```sh
+node scripts/escape-eval-loop.mjs \
+  --since 2026-10-01T00:00:00Z --until 2026-10-28T00:00:00Z \
+  --out /tmp/escape-loop \
+  --bank-out integration/eval/review \
+  --allow-network
+```
+
+Offline attribution uses `--respond-file` with recorded PR metadata instead of
+`--allow-network`. Artifacts under `--out` are `candidates.json`, `traces.json`,
+`weekly-report.json`, `weekly-report.txt`, `export-report.json`, and
+`validate-cases.json`.
+
+The stepwise commands remain available. `export-cases` consumes the trace JSON
+array from #1955 (`status`, introducing and fixing SHAs, original/fixing PRs,
+file/line evidence):
 
 ```sh
 node scripts/escape-trace.mjs candidates --since 2026-10-01T00:00:00Z --until 2026-10-28T00:00:00Z \
@@ -38,6 +55,7 @@ node scripts/escape-trace.mjs candidates --since 2026-10-01T00:00:00Z --until 20
 node scripts/escape-trace.mjs trace --respond-file /tmp/escape-respond.json \
   < /tmp/escape-candidates.json > /tmp/escape-traces.json
 node scripts/escape-trace.mjs export-cases --traces /tmp/escape-traces.json --out integration/eval/review
+node scripts/review-escapes.mjs --traces /tmp/escape-traces.json --format text
 ```
 
 Without resolved traces, pass a traces file of unresolved records. Export writes
@@ -49,6 +67,12 @@ range, and a replayable introducing parent enter `cases/`. Unresolved,
 multiple-origin, outside-window, missing provenance, empty locations, and
 non-replayable histories stay in `candidates.json`.
 
+Replayability requires mainline reachability. The introducing SHA, fixing SHA
+and replay base must be ancestors of `origin/main`; a commit that exists only in
+a side branch or in a rewritten history is not replayable, so export records
+`unreachable-from-mainline` and validation fails the case. This catches cases
+left behind by a mainline history rewrite.
+
 Repeated export is deterministic: the same origin PR, fix SHA, path, and line
 range map to one case id and rewrite the same bytes.
 
@@ -59,9 +83,10 @@ node scripts/escape-trace.mjs validate-cases integration/eval/review/cases
 ```
 
 Validation checks schema fields, forbidden reviewer-input keys, resolvable
-SHAs, that the replay base is the introducing parent, and that the defect line
-range exists in the introducing tree. The empty bank passes. Local prepush and
-CI run the same command through `scripts/prepush.mjs`.
+SHAs, mainline reachability of those SHAs, that the replay base is the
+introducing parent, and that the defect line range exists in the introducing
+tree. The empty bank passes. Local prepush and CI run the same command through
+`scripts/prepush.mjs`.
 
 ## Handoff for #1779
 

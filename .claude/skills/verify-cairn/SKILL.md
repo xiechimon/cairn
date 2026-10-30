@@ -1,11 +1,11 @@
 ---
 name: verify-cairn
-description: Behavior verification for cairn - spin up an isolated live stack (server VERIFY_PORT 8791 + vite dev VERIFY_WEB_PORT 5273, independent CAIRN_HOME scratch), Playwright walks real user journeys (new task / create API key / search / theme), evidence (screenshots + API JSON + SQLite rows) archived into docs/verify/<ticket>/ committed with the PR and referenced in the body by a commit-SHA permalink. Use when you must prove a feature really runs after a change and need reviewable evidence; fixture-surface regression goes through apps/web e2e (including the visual specs' geometric assertions), not this skill.
+description: Behavior verification for cairn - spin up an isolated live stack (server VERIFY_PORT 8791 + vite dev VERIFY_WEB_PORT 5273, independent CAIRN_HOME scratch), Playwright walks real user journeys (new task / create API key / search / theme), evidence (screenshots + API JSON + SQLite rows) available for review with optional repository archiving. Use when you must prove a feature really runs after a change and need reviewable evidence; fixture-surface regression goes through apps/web e2e (including the visual specs' geometric assertions), not this skill.
 ---
 
 # verify-cairn
 
-cairn = a todos.dev replica (React/vite web + Hono REST/SSE/SQLite server). This skill spins up an **isolated instance** (independent ports + independent data root, never touching the user's real data `~/.cairn` or the live dev stacks on 8787/5173), walks real user journeys with the repo's own Playwright chromium, produces evidence, then cleans up cleanly. Scripts all live under `scripts/`; runtime state and runtime evidence live under `.claude/` (gitignored); at wrap-up, evidence is archived into `docs/verify/<ticket>/` and enters the repo with the PR (see "evidence archive discipline").
+cairn = a todos.dev replica (React/vite web + Hono REST/SSE/SQLite server). This skill spins up an **isolated instance** (independent ports + independent data root, never touching the user's real data `~/.cairn` or the live dev stacks on 8787/5173), walks real user journeys with the repo's own Playwright chromium, produces evidence, then cleans up cleanly. Scripts all live under `scripts/`; runtime state and runtime evidence live under `.claude/` (gitignored); at wrap-up, make evidence readable to reviewers (see "Optional evidence archive").
 
 Control Glass entry (the clicks are in the scripts; this file does not restate those five journeys): `.cursor/skills/verify-cairn/SKILL.md`. The journey contracts are in `features/glass-journeys.md` (this directory's `features/` stays the canonical source; the cursor side is a link to the same directory). One-command re-run: `node .cursor/skills/verify-cairn/scripts/glass.mjs`.
 
@@ -19,9 +19,9 @@ Apply this checklist before reporting verification or handing off a delivery. Fo
 
 - Fixture screenshots cannot establish real-app behavior. Keep focused fixture UI and visual regression tests; label them as fixture evidence. Verify claims about the real app on an isolated live stack without `?scenario=`, using the relevant API, database or runtime observations alongside screenshots.
 - Stub-only runs cannot establish real-provider behavior. Keep deterministic stub regressions, including real-daemon protocol and orchestration checks; name the stubbed boundary and limit the claim to the exercised layers. A real-provider claim requires a real-provider run with recorded provider mode and runtime evidence; if credentials or access are unavailable, report that claim as unverified.
-- Local-only evidence cannot support a delivered verification claim. Commit supporting artifacts under `docs/verify/<issue>/` on the delivery branch and reference them from the PR body with commit-SHA-pinned raw links. A local run directory, external upload or another repository's or issue's archive is not that delivery's evidence. Preserve ordinary reference links as references; JSON, logs and Markdown evidence need readable links, not image embedding.
+- Make supporting evidence readable to reviewers. Committing artifacts under `docs/verify/<issue>/` is optional. Preserve ordinary reference links as references; embed image links and check that they are reachable.
 - Mechanism claims require compiled or runtime evidence of the claimed effect, such as compiled CSS, observed animation state, actual wire payloads, runtime logs or schema snapshots. Source, configuration and installed dependencies alone do not establish that the mechanism took effect. Record the artifact and the assertion it supports.
-- Separate automated checks from review. `scripts/pr-evidence-gate.py` (required by the merge gate via `pr-evidence-not-green`) rejects nonempty Verified/Upstream gaps, non-embedded image links, unreachable image URLs, fixture URLs whose query carries `scenario` (#1982), and screenshot embeds outside this repository's associated `docs/verify/<issue>/` archive (#1983). Negative controls live in `scripts/pr-evidence-gate.test.py` and `scripts/pr-evidence-archive.test.py`. The gate still does not judge evidence sufficiency, live-app origin, or real-provider execution. Stub-only runs stay a reviewer check until evidence carries machine-readable provider provenance; do not claim the gate detects them from a screenshot or a passing HTTP request.
+- Separate automated checks from review. `scripts/pr-evidence-gate.py` (required by the merge gate via `pr-evidence-not-green`) rejects missing or empty What/Proof/Review/Risk sections (legacy Verified aliases Proof; Upstream is optional), non-embedded image links, unreachable image URLs, fixture URLs whose query carries `scenario` (#1982), and screenshot embeds outside this repository's associated `docs/verify/<issue>/` archive (#1983). Negative controls live in `scripts/pr-evidence-gate.test.py` and `scripts/pr-evidence-archive.test.py`. The gate still does not judge evidence sufficiency, live-app origin, or real-provider execution. Stub-only runs stay a reviewer check until evidence carries machine-readable provider provenance; do not claim the gate detects them from a screenshot or a passing HTTP request.
 
 The implementer templates incorporate the same checklist in `docs/agent-dispatch-prompts.md#evidence-limits-checklist`. Apply it to every workflow below, including the stub LLM custom probes and fixture regressions.
 
@@ -41,7 +41,7 @@ The in-repo port fleet: **8787** server / **5173** vite / **8399** e2e. Occupant
 
 **worktree lane**: since 2026-09-28 `.claude/skills/verify-cairn/` is committed in the repo (a .gitignore nested exception), **a worktree checkout carries this skill's full copy**. Run method: `VERIFY_REPO_ROOT=<worktree absolute path>` to start the stack (the worktree must already have `pnpm install`), and **must run the scripts themselves from the worktree path** (`node <worktree>/.claude/skills/verify-cairn/scripts/...`) - running from the main-checkout path uses the main checkout's old probe scripts to verify the lane's new code, the symptom is extremely confusing (the old script times out 30s at fill, not a parse error; #386 real case burned 5 rounds to locate). **Must re-launch after changing code**: the worktree is under `.claude/worktrees/`, and vite's `**/.claude/**` watch-ignore covers the whole worktree, so changing code while the stack is running does not take effect (measured, in project memory), and what gets driven is the old code.
 
-**lane wrap-up must-do** (evidence disappearing with the worktree is this skill's biggest pit, see "evidence archive discipline"): `VERIFY_REPO_ROOT` only affects the stack and runtime state, evidence defaults to the main checkout; after running, still archive the evidence into `docs/verify/<ticket>/` on a checkout of the PR branch via `vp.mjs archive <ticket> --from <evidence dir>` (copy-only, target already exists = refuse; do not hand `cp`) and commit + check the issue acceptance boxes (see "evidence archive discipline"), otherwise once the lane wraps up and the runner is reclaimed, the verification claim is unverifiable.
+**Lane wrap-up**: `VERIFY_REPO_ROOT` controls the stack and runtime state. Evidence defaults to the main checkout so it survives worktree cleanup. Share the relevant results; archive into `docs/verify/<ticket>/` only when useful.
 
 ## Launch
 
@@ -158,33 +158,28 @@ Evidence directory = `VERIFY_EVIDENCE_DIR` (when driving via `vp.mjs drive`, def
 
 Evidence defaults to the **main checkout** rather than `VERIFY_REPO_ROOT` - a lane's stack runs in a worktree, and evidence landing in the worktree would be permanently lost when the worktree is deleted. This pit was measured in M7: the #310/#319 PR bodies claimed verify-cairn ran, but after merge the main checkout had no evidence directory at all, the verification claim unverifiable (see #345).
 
-## Evidence archive discipline (hard rule)
+## Optional evidence archive
 
-`.claude/verify-evidence/` is a gitignored local directory, **it can never enter a PR**. A delivery carrying a verify claim must archive the evidence (screenshots + API JSON + SQLite rows) into `docs/verify/<ticket>/` (`<ticket>` = issue number, currently `XMON-<n>` like XMON-104; historical pure numbers like 319 likewise) and commit it with the delivery PR. Archive via `vp.mjs archive` (#1402; the old archive.mjs deleted by XMON-63): it only copies, target already exists = refuse (add-only), the source must be named - `--from <dir>`, `VERIFY_EVIDENCE_DIR`, or explicit `--latest <n>` (the newest few under the shared evidence root, possibly another lane's). Do not use `cp -R` anymore: it silently merges and overwrites same-named directories.
+Evidence can be linked or described in the PR without committing it under `docs/verify/`.
+Embed any supplied image links and check that they return HTTP 200. Keep the probe name,
+check count, stack coordinates, provider mode, and verification limits alongside the result.
+
+When a repository archive is useful, use the add-only archive command to preserve existing files:
 
 ```sh
-VERIFY_REPO_ROOT=<PR branch checkout> node .claude/skills/verify-cairn/scripts/vp.mjs archive <ticket> --from <main checkout>/.claude/verify-evidence/<timestamp>-<probe>
-# in that checkout: git add docs/verify/<ticket> && git commit (with the delivery PR, do not open a separate PR just for archiving evidence)
-# after pushing: vp.mjs links <ticket> prints the SHA-pinned raw links
+VERIFY_REPO_ROOT=<PR branch checkout> node .claude/skills/verify-cairn/scripts/vp.mjs archive <ticket> --from <evidence directory>
 ```
 
-- **A verify claim without evidence archived in the repo with the PR is treated as unverified**, the receiver cannot re-check it.
-- **PR body inline screenshots** use the commit-SHA permalink: `![caption](https://raw.githubusercontent.com/xiechimon/cairn/<head SHA>/docs/verify/<ticket>/<file>.png)` - this repo is public, raw is anonymously readable (#587/#589 same shape); must pin the commit SHA, a branch name drifts with later pushes. GitHub has no public attachment-upload API (the `user-attachments` links from web drag-drop need a browser session); the agent flow is always "evidence into the repo + raw permalink inline".
+### Acceptance signature
 
-- **If the repo were private**, `raw.githubusercontent.com` always 404s (the CDN does not forward auth), use the `https://github.com/<owner>/<repo>/raw/<SHA>/<path>` permalink instead (viewable to logged-in viewers with repo access).
-- The PR body writes the probe name + check pass count (align with `result.json`'s ok count, do not write approximations) + stack coordinates, so the receiver can re-check against the in-repo evidence; multiple evidence groups add a `docs/verify/<ticket>/README.md` index (#587 shape).
-- **Never write "evidence at local path"**: the runner's `.claude/verify-evidence/` is unreachable to readers; the in-repo archive path + the PR body's raw link is the only credential.
-- Evidence is 200-300KB per run (mostly screenshots), acceptable volume; the truth trio (screenshot + API JSON + SQLite row) stays, archiving only changes the disk location not the convention.
+Before or after merging, reconcile the issue's Acceptance items with the delivered behavior:
 
-### Acceptance signature (hard rule, wrap up the same day as archiving)
+1. Read the issue body with `gh issue view <ticket> --json body`.
+2. Check only delivered items supported by actual results. Record the PR, merge date, results, and verification limits; link evidence when available.
+3. Write back with `gh issue edit <ticket> --body-file <tmpfile>`.
 
-Archiving evidence into the PR only completes "performance"; "signature" is still missing: the issue's Acceptance criteria checkboxes do not auto-check from `Closes #N` (#391 measured: ticket closed, evidence in the repo, three boxes still empty, user view = acceptance never happened). Before/after the PR merge, the lane must:
+Leave undelivered items unchecked and record the gap.
 
-1. `gh issue view <ticket> --json body` take the body, change the delivered `- [ ]` to `- [x]` (only check boxes with real evidence support);
-2. append the "acceptance record" section at the end of the body: PR number + merge date + evidence directory relative path (`docs/verify/<ticket>/`) + probe/e2e pass count (numbers must match the archived result.json / e2e log, no approximations);
-3. `gh issue edit <ticket> --body-file <tmpfile>` write back (long bodies forbid inline `--body`).
-
-Undelivered boxes are **not checked**, write the gap in the acceptance record. "Closing the ticket != acceptance done" - checked boxes + in-repo evidence pointer is the reviewable terminal state.
 
 ## Mechanism takes effect acceptance: artifact criteria (hard rule)
 
@@ -220,7 +215,7 @@ Also **pinned reclamation of residual daemons** (#691): ad-hoc daemons leaked by
 | `scripts/drive.mjs` | Playwright probe (usage in this doc's Drive section) |
 | `scripts/cleanup.mjs` | reclaim the stack, keep evidence |
 
-Env contract (scripts agree): `VERIFY_REPO_ROOT` / `VERIFY_RUN_DIR` / `VERIFY_PORT` / `VERIFY_WEB_PORT` / `VERIFY_EVIDENCE_DIR`. Archive via `vp.mjs archive <ticket> --from <the evidence dir drive printed>`, then commit (this doc's "evidence archive discipline").
+Env contract (scripts agree): `VERIFY_REPO_ROOT` / `VERIFY_RUN_DIR` / `VERIFY_PORT` / `VERIFY_WEB_PORT` / `VERIFY_EVIDENCE_DIR`. Optional archive: `vp.mjs archive <ticket> --from <the evidence dir drive printed>`.
 
 ## When not to use this skill
 

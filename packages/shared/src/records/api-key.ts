@@ -6,6 +6,7 @@ export const apiKeyRecordSchema = z.object({
   name: z.string().nullable(),
   gitAccess: z.boolean(),
   mcpAccess: z.boolean(),
+  machineAccess: z.boolean().default(false),
   toolGrants: z.object({
     read: z.array(z.string()),
     write: z.array(z.string()),

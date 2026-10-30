@@ -538,6 +538,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
       name: body.name ?? null,
       gitAccess: body.gitAccess,
       mcpAccess: body.mcpAccess,
+      machineAccess: body.machineAccess,
       toolGrants: body.toolGrants,
     });
     return c.json(created, 201);

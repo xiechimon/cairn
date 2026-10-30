@@ -21,6 +21,7 @@ export function toApiKeyRowView(row: ApiKeyRow): ApiKeyRowView {
     name: row.name,
     gitAccess: row.gitAccess,
     mcpAccess: row.mcpAccess,
+    machineAccess: row.machineAccess,
     toolGrants: row.toolGrants,
     masked: row.masked,
     createdAt: row.createdAt,
@@ -48,12 +49,14 @@ export function createApiKey(
     name?: string | null;
     gitAccess: boolean;
     mcpAccess: boolean;
+    machineAccess?: boolean;
     toolGrants: { read: string[]; write: string[] };
   },
 ): ApiKeyRowView & { plaintext: string } {
   const plaintext = newApiKeyPlaintext();
   const id = newRecordId();
   const createdAt = nowMs();
+  const machineAccess = input.machineAccess ?? false;
   deps.db
     .insert(apiKey)
     .values({
@@ -62,6 +65,7 @@ export function createApiKey(
       name: input.name ?? null,
       gitAccess: input.gitAccess,
       mcpAccess: input.mcpAccess,
+      machineAccess,
       toolGrants: input.toolGrants,
       keyHash: hashCredential(plaintext),
       masked: maskApiKey(plaintext),
@@ -73,6 +77,7 @@ export function createApiKey(
     name: input.name ?? null,
     gitAccess: input.gitAccess,
     mcpAccess: input.mcpAccess,
+    machineAccess,
     toolGrants: input.toolGrants,
     masked: maskApiKey(plaintext),
     createdAt,

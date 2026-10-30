@@ -1,7 +1,12 @@
 {
   "name": "@xiechimon/cairn",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xiechimon/cairn.git",
+    "directory": "apps/server"
+  },
   "type": "module",
   "engines": {
     "node": ">=22.19.0"
@@ -10,7 +15,8 @@
     "cairn": "dist/index.mjs"
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": true
   },
   "files": [
     "dist",

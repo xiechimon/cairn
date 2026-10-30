@@ -6,6 +6,7 @@ import { createApp } from './app.js';
 import { BUNDLED_FORM } from './bundle-form.js';
 import {
   attachmentsDirOf,
+  backupStatusPathOf,
   loadConfig,
   logTokenAuthStartup,
   missingRequiredTokenError,
@@ -26,6 +27,7 @@ import { loadOrCreateVapidKeys } from './services/push.js';
 import {
   createScheduler,
   issueIntakeRunOf,
+  schedulingRunOf,
   trajectoryExportRunOf,
   trajectoryOutcomeRunOf,
   trajectoryReflectCurateRunOf,
@@ -98,6 +100,7 @@ const app = createApp(
     githubFetch,
     reposDir,
     attachmentsDir,
+    backupStatusPath: backupStatusPathOf(config),
     skillsDir: config.skillsDir,
     skillSourcesPath: join(config.dataDir, 'skill-sources.json'),
     webDir: config.webDir,
@@ -141,6 +144,7 @@ const scheduler = createScheduler(
       apiKey: process.env.CAIRN_REFLECTOR_API_KEY ?? '',
     },
   }),
+  schedulingRunOf(config, { githubFetch, logger }),
 );
 scheduler.start();
 

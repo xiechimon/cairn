@@ -1,0 +1,7 @@
+# real date binary
+since=2026-10-21T00:00:00.000Z
+until=2026-10-29T00:00:00.000Z
+# PATH date stub rejecting -d (macOS-like)
+since=2026-10-21T00:00:00.000Z
+until=2026-10-29T00:00:00.000Z
+exit=0

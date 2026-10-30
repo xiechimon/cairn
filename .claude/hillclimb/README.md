@@ -4,9 +4,9 @@ Real-model eval flows live in this directory. `scripts/eval-capabilities.json` n
 
 ## Weekly rerun
 
-The timer definition schedules `chief-dispatch`, `memory-regression` and `project-routing` against `origin/main` every Monday. Its installation target is `~/.config/systemd/user/cairn-eval-weekly.timer`. Its service sources `~/.cairn/tools/eval-env.sh` before the script, which exports `CAIRN_EVAL_RELAY_URL` and `CAIRN_EVAL_RELAY_KEY` for pi's relay-186 channel (the same non-Claude models Cairn's agents use).
+The timer definition schedules `chief-dispatch`, `memory-regression` and `project-routing` against `origin/main` every Monday. Its installation target is `~/.config/systemd/user/cairn-eval-weekly.timer`. Its service sources `~/.cairn/tools/eval-env.sh` before the script, which exports `CAIRN_EVAL_RELAY_URL` and `CAIRN_EVAL_RELAY_KEY` for pi's relay-186 channel (the same non-Claude models Cairn's agents use), plus `CAIRN_LABELER_BASE_URL`, `CAIRN_LABELER_API_KEY`, and `CAIRN_LABELER_MODEL` for the weekly pack labeler. Missing labeler env fails the job before flows run; a same-day review directory under the state `reviews/<day>/` exits as a no-op before any flow is re-recorded. After the flows, the job exports the prior seven-day pack window with `pnpm traj:export`, labels failed packs with `pnpm traj:label`, and feeds the labeled export to `pnpm eval:sample-failures`, logging pack count and transcript hit/miss counts.
 
-The key stays in the process environment. Do not print it, write it into the unit, or commit it.
+The keys stay in the process environment. Do not print them, write them into the unit, or commit them.
 
 Each run appends one row per flow to `~/.local/state/cairn-eval/weekly.md` (date, model, `decision_ok` with a 95% Wilson interval, cost, chain-failure count, harness sha). That table is machine-local, so drift from the model or the relay shows up without a pull request. Chain failures stay out of the score.
 

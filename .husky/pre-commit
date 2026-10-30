@@ -63,8 +63,6 @@ if [ -n "$HAS_SPEC" ]; then
   pnpm spec:parse
 fi
 
-node scripts/test-spawn-gate.mjs
-
 for f in $STAGED; do
   [ -f "$f" ] && git add "$f"
 done

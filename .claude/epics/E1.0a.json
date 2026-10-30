@@ -1,0 +1,57 @@
+{
+  "epic": "E1.0a",
+  "issues": [
+    2165,
+    2166,
+    2167
+  ],
+  "requiredChecks": [
+    "check",
+    "pack-smoke",
+    "e2e-gate"
+  ],
+  "checks": [
+    {
+      "name": "workflow.md is retired",
+      "run": [
+        "test",
+        "!",
+        "-e",
+        ".claude/workflow.md"
+      ]
+    },
+    {
+      "name": "model policy tests pass",
+      "run": [
+        "node",
+        "--test",
+        "scripts/lane-model-policy.test.mjs"
+      ]
+    },
+    {
+      "name": "#2165 role table, banned list and consumer migration",
+      "run": [
+        "node",
+        "-e",
+        "const fs=require('fs'),cp=require('child_process');\nconst s=fs.readFileSync('AGENTS.md','utf8');const bad=[];\nconst sec=((s.split(/^## Model roles[ \\t]*$/m)[1])||'').split(/^## /m)[0];\nif(!sec.trim())bad.push('AGENTS.md has no \"## Model roles\" section');\nconst row=(role,models)=>{const l=sec.split('\\n').find(x=>x.startsWith('|')&&x.toLowerCase().includes(role));if(!l||!models.every(m=>l.includes(m)))bad.push('role row '+role+' must name '+models.join(' and '))};\nrow('orchestration',['claude-opus-5-5']);row('implementation',['gpt-6.1-sol','claude-sonnet-5-5']);row('mechanical',['claude-haiku-5-5']);\nif(!/never/i.test(sec)||!/quota/i.test(sec))bad.push('Model roles must say a run never switches models on quota exhaustion');\nif(/1M[- ]?context/i.test(s))bad.push('AGENTS.md still mentions a 1M-context rule');\nif(!/Do not use/.test(s))bad.push('AGENTS.md lost the Do not use model list');\nconst t=fs.readFileSync('scripts/lane-model-policy.test.mjs','utf8');\nif(!t.includes('AGENTS.md')||!t.includes('Model roles'))bad.push('lane-model-policy.test.mjs must read the Model roles table in AGENTS.md');\nlet hits='';try{hits=cp.execFileSync('git',['grep','-l','-F','.claude/workflow.md','--','.',':!docs/lessons',':!docs/verify',':!docs/research',':!.claude/epics',':!apps/server/test/fixtures',':!integration/eval'],{encoding:'utf8'})}catch(e){if(e.status!==1)throw e}\nif(hits.trim())bad.push('active consumers still reference .claude/workflow.md: '+hits.trim().split('\\n').join(', '));\nif(bad.length){console.error(bad.join('\\n'));process.exit(1)}"
+      ]
+    },
+    {
+      "name": "#2166 new ADR amends ADR 0026 R2 and AGENTS.md links it",
+      "run": [
+        "node",
+        "-e",
+        "const fs=require('fs'),cp=require('child_process');const bad=[];\nconst adrs=fs.readdirSync('docs/adr').filter(f=>/^\\d{4}-.*\\.md$/.test(f)&&f.slice(0,4)>'0027');\nconst hit=adrs.find(f=>{const s=fs.readFileSync('docs/adr/'+f,'utf8');return s.includes('ADR 0026')&&s.includes('R2')&&s.includes('\u2464')&&/phase 1/i.test(s)&&s.includes('2026-10-29')&&/ian/.test(s)});\nif(!hit)bad.push('no ADR numbered above 0027 amends ADR 0026 R2 for class \u2464 in phase 1 with the 2026-10-29 decision');\nelse if(!fs.readFileSync('AGENTS.md','utf8').includes(hit))bad.push('AGENTS.md does not link '+hit);\nconst blob=cp.execFileSync('git',['hash-object','docs/adr/0026-machine-trust-replaces-human-merge-gates.md'],{encoding:'utf8'}).trim();\nif(blob!=='b7168be5570cc1a394dfba8f6c827778dd14abbb')bad.push('ADR 0026 was edited in place');\nif(bad.length){console.error(bad.join('\\n'));process.exit(1)}"
+      ]
+    },
+    {
+      "name": "#2167 agents never add needs-decision",
+      "run": [
+        "node",
+        "-e",
+        "const s=require('fs').readFileSync('AGENTS.md','utf8');const bad=[];\nif(s.includes('--add-label needs-decision'))bad.push('AGENTS.md still tells agents to add needs-decision');\nif(!/never add[s]? (the )?`?needs-decision`?/i.test(s))bad.push('AGENTS.md must say agents never add needs-decision');\nif(!s.includes('CAIRN_DECIDED=1'))bad.push('AGENTS.md lost the CAIRN_DECIDED=1 removal rule');\nif(!/already on/i.test(s))bad.push('AGENTS.md must keep that a label already on blocks merging');\nif(bad.length){console.error(bad.join('\\n'));process.exit(1)}"
+      ]
+    }
+  ],
+  "maxHours": 6
+}

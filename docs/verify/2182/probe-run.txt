@@ -1,0 +1,17 @@
+
+X probe/2182-env-deny env-probe-2182 · 41000936020
+Triggered via push about 3 minutes ago
+
+JOBS
+X deny in 1s (ID 123884899319)
+
+ANNOTATIONS
+X Branch "probe/2182-env-deny" is not allowed to deploy to npm due to environment protection rules.
+deny: .github#1
+
+X The deployment was rejected or didn't satisfy other protection rules.
+deny: .github#1
+
+
+To see what failed, try: gh run view 41000936020 --log-failed
+View this run on GitHub: https://github.com/xiechimon/cairn/actions/runs/41000936020

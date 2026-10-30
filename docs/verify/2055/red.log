@@ -1,0 +1,141 @@
+
+ RUN  v5.0.1 /workspace
+
+ ❯ |@xiechimon/cairn| test/attachments.test.ts (33 tests | 7 failed) 1146ms
+   ❯ attachments -- upload side (7)
+     × uploading twice with the same grant -> 409 single-use 39ms
+   ❯ attachments -- #2055 signing key and path containment (6)
+     × forged public-constant grant with traversal key -> 401; nothing written outside 31ms
+     × grant signed on server A fails upload on server B (cross-installation) 32ms
+     × server-signed grant with no pending row -> 409; no write 30ms
+     × server-signed grant whose key differs from row.storageKey -> 409; no write 32ms
+     × consumption quota re-check rejects when team usage crosses limit 33ms
+     × teamId directory replaced with symlink outside attachmentsDir is rejected 35ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/attachments.test.ts > attachments -- upload side > uploading twice with the same grant -> 409 single-use
+AssertionError: expected 201 to be 409 // Object.is equality
+
+- Expected
++ Received
+
+- 409
++ 201
+
+ ❯ test/attachments.test.ts:301:25
+    299|         { name: 'file', filename: 'spec.md', mimeType: 'text/markdown'…
+    300|       );
+    301|       expect(r2.status).toBe(409);
+       |                         ^
+    302|       const onDisk = readFileSync(`${s.attachmentsDir}/${g.key}`);
+    303|       expect(new TextDecoder().decode(onDisk)).toBe('second\n');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/7]⎯
+
+ FAIL  |@xiechimon/cairn| test/attachments.test.ts > attachments -- #2055 signing key and path containment > forged public-constant grant with traversal key -> 401; nothing written outside
+AssertionError: expected [Function] to throw an error
+
+- Expected:
+null
+
++ Received:
+undefined
+
+ ❯ test/attachments.test.ts:345:9
+    343|           },
+    344|         ),
+    345|       ).toThrow(/401|grant/);
+       |         ^
+    346|       expect(existsSync(join(root, 'sentinel.txt'))).toBe(false);
+    347|     } finally {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/7]⎯
+
+ FAIL  |@xiechimon/cairn| test/attachments.test.ts > attachments -- #2055 signing key and path containment > grant signed on server A fails upload on server B (cross-installation)
+AssertionError: expected [Function] to throw an error
+
+- Expected:
+null
+
++ Received:
+undefined
+
+ ❯ test/attachments.test.ts:381:9
+    379|           },
+    380|         ),
+    381|       ).toThrow(/401|grant|signature/);
+       |         ^
+    382|       expect(existsSync(join(a.attachmentsDir, g.key))).toBe(false);
+    383|     } finally {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/7]⎯
+
+ FAIL  |@xiechimon/cairn| test/attachments.test.ts > attachments -- #2055 signing key and path containment > server-signed grant with no pending row -> 409; no write
+AssertionError: expected [Function] to throw an error
+
+- Expected:
+null
+
++ Received:
+undefined
+
+ ❯ test/attachments.test.ts:419:9
+    417|           },
+    418|         ),
+    419|       ).toThrow(/409|pending|missing|grant/);
+       |         ^
+    420|       expect(existsSync(join(s.attachmentsDir, key))).toBe(false);
+    421|     } finally {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/7]⎯
+
+ FAIL  |@xiechimon/cairn| test/attachments.test.ts > attachments -- #2055 signing key and path containment > server-signed grant whose key differs from row.storageKey -> 409; no write
+AssertionError: expected [Function] to throw an error
+
+- Expected:
+null
+
++ Received:
+undefined
+
+ ❯ test/attachments.test.ts:469:9
+    467|           },
+    468|         ),
+    469|       ).toThrow(/409|storageKey|key|mismatch|does not match/);
+       |         ^
+    470|       expect(existsSync(join(s.attachmentsDir, forgedKey))).toBe(false…
+    471|       expect(existsSync(join(s.attachmentsDir, g.key))).toBe(false);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/7]⎯
+
+ FAIL  |@xiechimon/cairn| test/attachments.test.ts > attachments -- #2055 signing key and path containment > consumption quota re-check rejects when team usage crosses limit
+AssertionError: expected [ 400, 409 ] to include 201
+ ❯ test/attachments.test.ts:511:26
+    509|         { name: 'file', filename: 'spec.md', mimeType: 'text/markdown'…
+    510|       );
+    511|       expect([400, 409]).toContain(res.status);
+       |                          ^
+    512|       expect(await res.text()).toMatch(/quota/);
+    513|       expect(existsSync(join(s.attachmentsDir, g.key))).toBe(false);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/7]⎯
+
+ FAIL  |@xiechimon/cairn| test/attachments.test.ts > attachments -- #2055 signing key and path containment > teamId directory replaced with symlink outside attachmentsDir is rejected
+AssertionError: expected 201 to be greater than or equal to 400
+ ❯ test/attachments.test.ts:547:26
+    545|         { name: 'file', filename: 'spec.md', mimeType: 'text/markdown'…
+    546|       );
+    547|       expect(res.status).toBeGreaterThanOrEqual(400);
+       |                          ^
+    548|       const fileName = g.key.split('/').pop() ?? '';
+    549|       expect(existsSync(join(outside, fileName))).toBe(false);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/7]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  7 failed | 26 passed (33)
+   Start at  03:56:19
+   Duration  2.72s (tests 44%, transform 38%, import 19%)
+

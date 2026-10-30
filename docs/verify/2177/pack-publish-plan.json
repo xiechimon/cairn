@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "plan": [
+    [
+      {
+        "kind": "publish",
+        "name": "@xiechimon/cairn-cli",
+        "version": "0.2.2",
+        "access": "public",
+        "tag": "latest",
+        "tarball": {
+          "path": "packages/xiechimon-cairn-cli-0.2.2.tgz",
+          "integrity": "sha256-8ASaQACqtcw/wg5K/pSmV+WzltUuP+afQuCVlT9VI7A="
+        }
+      },
+      {
+        "kind": "publish",
+        "name": "@xiechimon/cairn",
+        "version": "0.1.1",
+        "access": "public",
+        "tag": "latest",
+        "tarball": {
+          "path": "packages/xiechimon-cairn-0.1.1.tgz",
+          "integrity": "sha256-q+QuHBnJ2b1tyDcnAPFKyjNyQSGeOp46ONxG8ESY2ac="
+        }
+      }
+    ]
+  ]
+}

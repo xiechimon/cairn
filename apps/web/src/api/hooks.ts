@@ -63,7 +63,7 @@ import type {
   UpdateSkillBody,
   UserRecord,
 } from '@cairn/shared';
-import { SKILL_ENTRY_FILE } from '@cairn/shared';
+import { backupHealthSchema, backupNotice, SKILL_ENTRY_FILE } from '@cairn/shared';
 import {
   keepPreviousData,
   useMutation,
@@ -76,6 +76,7 @@ import { threadTurnInFlight } from '../chief/orchestration-inflight.js';
 import { api } from './client.js';
 
 const CHIEF_THREADS_INFLIGHT_POLL_MS = 3000;
+const BACKUP_HEALTH_POLL_MS = 5 * 60 * 1000;
 
 export type { ApiKeyRow, PlanRow };
 export type StepRow = StepJournalRow;
@@ -306,6 +307,18 @@ export const useMachines = (teamId: string | undefined, enabled: boolean) =>
     queryKey: ['machines', teamId],
     queryFn: () => api.get<MachineRecord[]>(`/api/teams/${teamId}/machines`),
     enabled: enabled && teamId !== undefined,
+  });
+
+export const useBackupNotice = (enabled: boolean) =>
+  useQuery({
+    queryKey: ['server-backup'],
+    queryFn: async () =>
+      backupNotice(
+        backupHealthSchema.safeParse(await api.get('/api/server/backup')).data,
+        Date.now(),
+      ),
+    enabled,
+    refetchInterval: BACKUP_HEALTH_POLL_MS,
   });
 
 export const useMembers = (teamId: string | undefined, enabled: boolean) =>
@@ -861,6 +874,7 @@ export function useApiMutations(teamId: string | undefined) {
         name: string | null;
         gitAccess: boolean;
         mcpAccess: boolean;
+        machineAccess: boolean;
         toolGrants: { read: string[]; write: string[] };
       }) => api.post<ApiKeyRow & { plaintext?: string }>(`/api/teams/${teamId}/api-keys`, body),
       onSuccess: invalidateAll,

@@ -12,6 +12,7 @@ export const DB_TABLES = [
   'message',
   'plan',
   'schedule',
+  'schedule_report',
   'notification',
   'agent',
   'agent_memory',
@@ -40,7 +41,9 @@ export const DB_TABLES = [
   'memory_candidate',
   'push_subscription',
   'push_digest_item',
+  'push_delivery',
   'harness_eval_attempts',
+  'autonomous_merge_admission',
 ] as const;
 
 export type DbTable = (typeof DB_TABLES)[number];
@@ -54,6 +57,7 @@ export const INTERNAL_ONLY_TABLES = [
   'attachment',
   'github_connection',
   'feishu_binding',
+  'schedule_report',
   'skill_audit',
   'gate_digest',
   'gate_round',
@@ -67,5 +71,7 @@ export const INTERNAL_ONLY_TABLES = [
   'memory_candidate',
   'push_subscription',
   'push_digest_item',
+  'push_delivery',
   'harness_eval_attempts',
+  'autonomous_merge_admission',
 ] as const;

@@ -154,11 +154,28 @@ function createExclusive(path) {
   }
 }
 
+export function slotLockDir(
+  env,
+  platform = process.platform,
+  darwinTemp = () => spawnSync('getconf', ['DARWIN_USER_TEMP_DIR'], { encoding: 'utf8' }),
+) {
+  if (env.CAIRN_HEAVY_SLOTS_DIR) return env.CAIRN_HEAVY_SLOTS_DIR;
+  if (platform !== 'darwin') return join(tmpdir(), 'cairn-heavy-slots');
+  const result = darwinTemp();
+  if (result.status === 0 && result.stdout.trim())
+    return join(result.stdout.trim(), 'cairn-heavy-slots');
+  if (env.TMPDIR)
+    throw new Error(
+      'heavy-slots: getconf DARWIN_USER_TEMP_DIR failed and TMPDIR is overridden, so the shared slot directory is unknown; set CAIRN_HEAVY_SLOTS_DIR',
+    );
+  return join(tmpdir(), 'cairn-heavy-slots');
+}
+
 export async function acquireSlot({ env = process.env, wait = true, log = console.error } = {}) {
   if (skipsQueue(env)) return null;
   const { count, warning } = slotCount(env);
   if (warning) log(`[heavy-slots] ${warning}`);
-  const dir = env.CAIRN_HEAVY_SLOTS_DIR || join(tmpdir(), 'cairn-heavy-slots');
+  const dir = slotLockDir(env);
   const slotPath = (slot) => join(dir, `slot-${slot}.lock`);
   mkdirSync(dir, { recursive: true });
 

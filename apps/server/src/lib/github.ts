@@ -88,6 +88,7 @@ export function isFullSha(value: string): boolean {
 }
 
 export interface GithubPull extends GithubPullState {
+  mergedAt: string | null;
   mergeCommitSha: string | null;
   mergedBy: string | null;
   headSha: string | null;
@@ -100,6 +101,8 @@ export interface GithubPull extends GithubPullState {
   title: string | null;
   authorAssociation: string | null;
   mergeableState: string | null;
+  openerLogin?: string | null;
+  openerType?: string | null;
 }
 
 export function hasPullFields(p: GithubPull): p is GithubPull & {
@@ -200,9 +203,11 @@ export async function githubPull(
     merged?: unknown;
     title?: unknown;
     author_association?: unknown;
+    user?: { login?: unknown; type?: unknown } | null;
     mergeable_state?: unknown;
     merge_commit_sha?: unknown;
     merged_by?: { login?: unknown } | null;
+    merged_at?: unknown;
     head?: { sha?: unknown; ref?: unknown; repo?: { id?: unknown } | null } | null;
     base?: {
       ref?: unknown;
@@ -219,6 +224,7 @@ export async function githubPull(
     pull: {
       state: raw.state,
       merged,
+      mergedAt: optString(raw.merged_at),
       mergeCommitSha:
         merged && typeof raw.merge_commit_sha === 'string' ? raw.merge_commit_sha : null,
       mergedBy: merged && typeof raw.merged_by?.login === 'string' ? raw.merged_by.login : null,
@@ -233,6 +239,8 @@ export async function githubPull(
       title: optString(raw.title),
       authorAssociation: optString(raw.author_association),
       mergeableState: optString(raw.mergeable_state),
+      openerLogin: optString(raw.user?.login),
+      openerType: optString(raw.user?.type),
     },
   };
 }
@@ -916,6 +924,59 @@ export async function githubOpenIssuesWithLabel(
   };
 }
 
+export interface GithubOpenIssueDetail extends GithubIssueSummary {
+  body: string;
+  createdAt: number;
+  updatedAt: number;
+  url: string;
+}
+
+export interface GithubOpenIssuesDetailPage {
+  issues: GithubOpenIssueDetail[];
+  next: string | null;
+}
+
+function epochOf(value: unknown): number {
+  if (typeof value !== 'string') return 0;
+  const at = Date.parse(value);
+  return Number.isFinite(at) ? at : 0;
+}
+
+export async function githubOpenIssuesDetail(
+  fetchImpl: FetchLike,
+  token: string,
+  owner: string,
+  repo: string,
+  opts: { url?: string | null; etag?: string | null } = {},
+): Promise<GithubConditionalRead<GithubOpenIssuesDetailPage> | null> {
+  const url =
+    opts.url ??
+    `https://api.github.com/${repoPath(owner, repo)}/issues?state=open` +
+      `&sort=created&direction=asc&per_page=${INTAKE_PER_PAGE}`;
+  const got = await intakeConditionalGet(fetchImpl, url, token, opts.etag);
+  if (got === null || got.notModified) return got;
+  if (!Array.isArray(got.data.body)) return null;
+  const issues: GithubOpenIssueDetail[] = [];
+  for (const raw of got.data.body as unknown[]) {
+    if (typeof raw !== 'object' || raw === null) continue;
+    const row = raw as Record<string, unknown>;
+    const projected = projectIssue(row);
+    if (projected === null) continue;
+    issues.push({
+      ...projected,
+      body: typeof row.body === 'string' ? row.body : '',
+      createdAt: epochOf(row.created_at),
+      updatedAt: epochOf(row.updated_at),
+      url: typeof row.html_url === 'string' ? row.html_url : '',
+    });
+  }
+  return {
+    notModified: false,
+    etag: got.etag,
+    data: { issues, next: nextPageUrl(got.data.link) },
+  };
+}
+
 export interface GithubIssueEvent {
   id: number;
   event: 'labeled' | 'unlabeled' | 'closed';
@@ -1261,11 +1322,16 @@ export async function githubCloseIssue(
   owner: string,
   repo: string,
   issueNumber: number,
-  comment: string,
+  opts: string | { stateReason: 'completed' },
 ): Promise<void> {
   const url = `https://api.github.com/${repoPath(owner, repo)}/issues/${issueNumber}`;
-  await writeJson(fetchImpl, 'PATCH', url, token, { state: 'closed', state_reason: 'not_planned' });
-  await writeJson(fetchImpl, 'POST', `${url}/comments`, token, { body: comment });
+  await writeJson(fetchImpl, 'PATCH', url, token, {
+    state: 'closed',
+    state_reason: typeof opts === 'string' ? 'not_planned' : opts.stateReason,
+  });
+  if (typeof opts === 'string') {
+    await writeJson(fetchImpl, 'POST', `${url}/comments`, token, { body: opts });
+  }
 }
 
 export type GithubMergeResult =

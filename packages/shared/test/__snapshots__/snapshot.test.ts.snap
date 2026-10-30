@@ -3292,6 +3292,10 @@ exports[`body/envelope schema snapshots > apiKeyRow > apiKeyRow.json 1`] = `
     "id": {
       "type": "string",
     },
+    "machineAccess": {
+      "default": false,
+      "type": "boolean",
+    },
     "masked": {
       "type": "string",
     },
@@ -3331,6 +3335,7 @@ exports[`body/envelope schema snapshots > apiKeyRow > apiKeyRow.json 1`] = `
     "name",
     "gitAccess",
     "mcpAccess",
+    "machineAccess",
     "toolGrants",
     "id",
     "masked",
@@ -6423,6 +6428,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > executor minimum-
     "mcpConfig": "CAIRN_MCP_CONFIG",
     "piCacheRetention": "CAIRN_PI_CACHE_RETENTION",
     "requireToken": "CAIRN_REQUIRE_TOKEN",
+    "scheduling": "CAIRN_SCHEDULING",
     "server": "CAIRN_SERVER",
     "skillsDir": "CAIRN_SKILLS_DIR",
     "tailscaleUsers": "CAIRN_TAILSCALE_USERS",
@@ -6685,7 +6691,6 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > merge-gate blocke
   "harness-regression-evaluating: transient, Harness regression evaluation is in progress for the current patch",
   "harness-regression-below-threshold: human, 回归评测 decision_ok 低于基线置信区间下限",
   "issue-ref-missing: human, 任务来源解不出 issue 号",
-  "evidence-link-missing: transient, PR body 缺钉在本 PR 提交上、指向本 PR 证据的 raw 永久链",
   "recording-missing: transient, Interactive or animated UI requires a recording of at most 5 MiB",
   "verify-missing: transient, 当前补丁没有验证判定",
   "verify-failed: transient, 验证未通过",
@@ -6870,6 +6875,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "message",
   "plan",
   "schedule",
+  "schedule_report",
   "notification",
   "agent",
   "agent_memory",
@@ -6898,7 +6904,9 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "memory_candidate",
   "push_subscription",
   "push_digest_item",
+  "push_delivery",
   "harness_eval_attempts",
+  "autonomous_merge_admission",
 ]
 `;
 
@@ -6938,6 +6946,11 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
   {
     "method": "GET",
     "path": "/api/teams/{id}/machines",
+  },
+  {
+    "method": "GET",
+    "note": "backup-status.json next to server.db (#2162)",
+    "path": "/api/server/backup",
   },
   {
     "method": "GET",
@@ -7160,6 +7173,18 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
   {
     "method": "DELETE",
     "path": "/api/teams/{id}/push/subscriptions",
+  },
+  {
+    "method": "POST",
+    "path": "/api/teams/{id}/push/receipts",
+  },
+  {
+    "method": "POST",
+    "path": "/api/teams/{id}/push/test",
+  },
+  {
+    "method": "GET",
+    "path": "/api/teams/{id}/push/test/{deliveryId}",
   },
   {
     "method": "POST",
@@ -7573,6 +7598,10 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > api
     "gitAccess": {
       "type": "boolean",
     },
+    "machineAccess": {
+      "default": false,
+      "type": "boolean",
+    },
     "mcpAccess": {
       "type": "boolean",
     },
@@ -7609,6 +7638,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > api
     "name",
     "gitAccess",
     "mcpAccess",
+    "machineAccess",
     "toolGrants",
   ],
   "type": "object",
@@ -8979,6 +9009,11 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tea
     },
     "id": {
       "type": "string",
+    },
+    "maxAutonomousMergesPerDay": {
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "type": "integer",
     },
     "name": {
       "type": "string",

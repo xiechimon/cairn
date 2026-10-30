@@ -1,0 +1,269 @@
+$ node scripts/prepush.mjs --self-test
+[prepush] node --test scripts/ops/push-test.test.mjs scripts/ops/push-worker.test.mjs scripts/prepush.test.mjs scripts/heavy-slots.test.mjs scripts/english-only-gate.test.mjs scripts/doc-reader-tests.test.mjs scripts/lessons-ledger-gate.test.mjs scripts/recording-gate.test.mjs scripts/lessons-weekly.test.mjs scripts/epic-done.test.mjs scripts/agent-rules.test.mjs
+✔ merge instructions require the pr-gate auto-merge verdict (5.930875ms)
+✔ AGENTS.md and pr-cairn agree that agents never add needs-decision (1.557791ms)
+✔ active docs never tell agents to add needs-decision (2.547291ms)
+✔ a doc change selects the tests that name it, split by runner (1.926584ms)
+✔ root-level doc names, integration suites and known-red files are not selected (3.75975ms)
+✔ prose flags Chinese outside code spans, fences and HTML comments (6.274292ms)
+✔ code checks comments only; UI strings and exempt paths pass (1.307041ms)
+✔ diff mode reds added Chinese lines and Chinese commit messages only (4294.339459ms)
+✔ --text checks a PR body file (506.298375ms)
+✔ caller-only required-artifact.json cannot satisfy frozen checks (1190.729292ms)
+✔ caller-only ignored-artifact.json cannot satisfy frozen checks (1010.009041ms)
+✔ tracked caller edits do not affect checks in the detached main tree (1043.905458ms)
+✔ temporary main worktree is removed after success (1464.719333ms)
+✔ temporary main worktree is removed after failure (1186.372708ms)
+✔ temporary main worktree is removed after timeout (1178.262417ms)
+✔ temporary main worktree is removed after midway error (1071.292333ms)
+✔ temporary main worktree is removed after wrong HEAD (894.466792ms)
+✔ temporary main worktree is removed after add error (1122.627625ms)
+✔ complete: closed issues, isolated remote-main checks and one green commit (2.218209ms)
+✔ failure mode 1: API errors and rate limits are unknown, even with pause or fail (5.478958ms)
+✔ failure mode 1: malformed or partial GitHub data never completes (4.624333ms)
+✔ failure mode 2: not-planned, manual and unmerged closures name the issue (8.438209ms)
+✔ failure mode 3: a merged linked PR does not substitute for an open issue (1.155792ms)
+✔ failure mode 4: no green main commit since the last closing SHA is incomplete (1.110458ms)
+✔ failure mode 5: green at the closing commit still completes after later red merges (1.333417ms)
+✔ required checks must succeed together on one eligible commit (1.491334ms)
+✔ missing, pending, skipped and neutral required checks do not count as success (11.004292ms)
+✔ caller edits and feature HEAD do not prevent checks at remote main (1.047333ms)
+✔ failure mode 7: frozen manifest comes only from git show at the selected ref (1.630333ms)
+✔ failure mode 8: invalid manifests fail closed before commands run (3.6055ms)
+✔ missing or malformed manifests and git runner failures are unknown (0.532875ms)
+✔ failure mode 9: missing commands, nonzero exits and missing expected stdout fail checks (3.381458ms)
+✔ unexpected command errors and malformed command output are unknown (1.415333ms)
+✔ failure mode 10: no started-at means no cap even when checks fail (0.628667ms)
+✔ paused: every human-wait label on issues or open linked PRs takes priority over failure (88.717833ms)
+✔ closed linked PR labels do not pause, while explicit pause does (3.270208ms)
+✔ failed: explicit failure and elapsed maxHours apply only when not complete or paused (3.754917ms)
+✔ commit closers must belong to main; the latest of multiple closing changes sets the boundary (2.095709ms)
+✔ all REST pages are consumed and incomplete check pages cannot masquerade as green (1.102584ms)
+✔ invalid CLI arguments fail before any runner executes (0.6305ms)
+✔ JSON output contains the same decision and the pure decision does not mutate facts (1.484042ms)
+✔ import has no CLI effects and the actual CLI guard emits unknown without network (435.990292ms)
+✔ CI includes this test and ownership covers the checker and frozen manifests (1.699541ms)
+✔ green side-branch commits cannot establish a green main after closure (1.275167ms)
+✔ parallel closing changes require a green main descendant of both changes (0.862541ms)
+✔ non-Error runner throws still produce unknown (0.259917ms)
+✔ check-run requests stop at the first green commit, newest first (3.046375ms)
+✔ at most 30 eligible commits are examined, including a green thirtieth commit (4.151666ms)
+✔ 31 eligible commits with green index 30 yield unknown (1.812542ms)
+✔ 30 eligible commits with green index -1 yield incomplete (1.58375ms)
+✔ 40 eligible commits with green index 0 yield complete (1.603416ms)
+✔ no green commit reports missing and unsuccessful required checks on the newest commit (1.532916ms)
+✔ remote main movement after the first read does not invalidate local checks (1.48425ms)
+✔ each command receives a 900 second timeout and a timeout fails that check (1.188333ms)
+✔ a remote main SHA missing locally stays unknown and requests an explicit fetch (1.093125ms)
+✔ only completed success is green, regardless of future GitHub status values (2.313708ms)
+✔ partial or reordered examined commits cannot establish completion (0.989917ms)
+✔ empty required checks cannot establish completion without CI evidence (0.305667ms)
+✔ untracked files before and during checks preserve every check result (0.974625ms)
+✔ default manifest is pinned to the GitHub main SHA before it is read (0.98425ms)
+✔ explicit manifest refs must resolve to ancestors of remote main (1.80425ms)
+✔ history and descendant membership do not perform repeated array scans (0.968417ms)
+✔ finding the latest closure reads issue SHAs independently of history length (20.306ms)
+✔ last closing events need nodes and bounded length without forward pageInfo (6.833416ms)
+✔ git and gh capture stderr and include it in unknown reasons (0.965125ms)
+✔ manifest check failures capture stderr tails including timeouts (2.62425ms)
+✔ the checker stays within 400 lines (0.321875ms)
+✔ slot count defaults to 2 and falls back to 1 with a warning for bad values (92.129459ms)
+✔ CI environments skip the queue (6.936542ms)
+✔ each slot owns its own e2e port and build directory (0.919583ms)
+✖ slotPortHolder names the pid, cwd and command of whatever listens on the port (15042.807583ms)
+✔ a bad slot count gets a warning and a single slot (807.053625ms)
+✔ waiters see their queue position and are served first-come first-served (936.805167ms)
+✔ kill -9 on the holder frees the slot for the queued process within 5 seconds (1135.443375ms)
+✔ a clean exit releases the slot too (629.525083ms)
+✔ simultaneous grabs for the last slot: exactly one wins, every round (18257.239792ms)
+✔ simultaneous reclaim of one dead holder: exactly one process inherits the slot (19677.097625ms)
+✔ two killed holders and several waiters: stale entries are reclaimed without double grants (2923.449375ms)
+✔ run wrapper: with 2 slots and 4 jobs at most 2 run at once and all pass (1962.758292ms)
+✔ a run wrapper inside a holder reuses its slot instead of queueing behind itself (217.679417ms)
+✔ an inherited slot variable that no live process holds is ignored (165.833666ms)
+✔ an inherited slot whose lock belongs to someone else is not reused (194.173541ms)
+✔ CI skips the queue even when every slot is taken (309.41575ms)
+✔ run wrapper passes the exit code through and frees the slot (250.431125ms)
+✔ e2e:affected queues for a slot, but a dry run never waits (255.747ms)
+✔ e2e:affected outside prepush uses only the port of the slot it acquired and releases it on exit (1035.355458ms)
+✖ a squatted slot port fails e2e:affected before playwright and names the holding process (15118.354375ms)
+✔ prepush-vitest run directly queues for a slot and only starts vitest once the holder exits (1439.637833ms)
+✔ prepush-vitest reuses the lease inherited from pnpm prepush without queueing (1141.284875ms)
+✔ prepush queues for a slot in local mode and starts once the holder is killed (5836.765792ms)
+✖ prepush reports a squatted slot port before running any check (15448.951333ms)
+✔ every migrated entry passes and the old table is gone (348.922041ms)
+✔ level 5 entry without a reason is rejected (0.814125ms)
+✔ level outside 1 to 5 is rejected (0.951084ms)
+✔ pending upgrade without a ticket is rejected, with a ticket passes (0.524ms)
+✔ the real bad note that sat on main without a ticket is rejected (149.196291ms)
+✔ file name without a ticket number is rejected (0.418917ms)
+✔ missing, reordered or malformed fields are rejected (0.897625ms)
+✔ a resurrected docs/lessons.md table is rejected (11.315459ms)
+✔ two parallel branches each adding an entry merge without conflict (1038.188708ms)
+✔ the old single table does conflict when two branches append a row (729.955167ms)
+✔ both upgrade-pending word orders and the original Chinese marker require a ticket (1.248792ms)
+✔ table generation rejects malformed entries with the ledger diagnostic (0.664167ms)
+✔ generated table keeps existing escaped pipes inside their cell (0.555792ms)
+✔ the CLI can validate and render entries from a checkout path containing spaces (679.167417ms)
+✔ replaying one gate failure twice for the same pull request counts one intercept (4.378459ms)
+✔ a new commit on the same branch does not count the interception again, a new branch does (5.265667ms)
+✔ a red gate on a pull request and on its merge counts once, and the merge a recurrence (6.480958ms)
+✔ an event from before the safeguard activated stays out of the counters (2.749458ms)
+✔ a hand-written counter drifts from the projection and the gate says so (14.027542ms)
+✔ the counters an entry already carried are frozen as its baseline, never recounted (12.458459ms)
+✔ a baseline frozen below what the entry already records is reported, never applied (6.523042ms)
+✔ a baseline left behind by a deleted entry is reported, not ignored (5.191917ms)
+✔ categories are matched by file-derived key, never by symptom prose (4.077917ms)
+✔ an ambiguous or malformed event is rejected before it reaches the log (6.933958ms)
+✔ a recurrence counts once, opens one escalation and records the issue that came back (8.40625ms)
+✔ the escalation ticket asks for the stronger rung and flags level 1, which has none (44.791084ms)
+✔ the event log rejects duplicate ids and events for categories with no entry (9.214334ms)
+✔ the window is the seven days before now, so Monday 01:23 UTC reports the week that ended (0.471375ms)
+✔ the weekly summary runs on an empty ledger and on a normal week (0.547625ms)
+✔ the idle threshold counts whole weeks since the last activity, not since a fixed date (0.195375ms)
+✔ the CLI records an event once, writes the counters and prints one escalation request (989.8475ms)
+✔ a gate failure names every entry whose safeguard points at that gate (0.449917ms)
+✔ the gate-failed command records a batch and prints one escalation per new recurrence (383.139167ms)
+✔ intercept deduplication resets at Monday UTC and ignores commits within the week (0.488791ms)
+✔ weekly deduplication also recognizes previously stored intercept ids (0.255292ms)
+lessons-weekly: could not file recurrence:xiechimon/cairn+2043:xiechimon/cairn#2043:comment-discipline: gh: HTTP 502
+✔ an empty ledger writes a report that says so and files nothing (9.891417ms)
+✔ a normal week reports its counts and leaves a filed recurrence alone (4.91975ms)
+✔ a pending escalation is filed once, and a rerun finds the issue instead of filing again (49.846625ms)
+✔ a failed issue creation leaves the recurrence pending for the next run (7.526ms)
+✔ the CLI writes the report where --out points and prints it (273.705417ms)
+✔ weekly collection deduplicates external logs and persists projected counters (32.180042ms)
+✔ merged recurrence increases file one issue and replay does not duplicate it (2449.514542ms)
+✔ sends one authenticated alert for the given user and prints receipt outcome (342.630167ms)
+✔ rejects unauthorized instances and never reports fallback as a phone receipt (40.471417ms)
+✔ pending status is polled until receipt and the deadline bounds polling (62.9795ms)
+✔ required alert displays before posting its authenticated id even with a focused page (214.143125ms)
+✔ failed display never posts a receipt (50.544917ms)
+✔ ordinary foreground pushes still display (10.326542ms)
+✔ receipt works without a stored token and refuses external receipt URLs (3.020375ms)
+✔ ops tests run in prepush and the backup CI job and journal ends with a newline (1.105333ms)
+[prepush] git init -q
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 0 intercepts
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 1 intercepts
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 1 intercepts
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 1 intercepts
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 1 intercepts
+✔ scrubGateEnv drops every gate base SHA and the force-full switch (3.318375ms)
+✔ hasCode classifies documents (0.585834ms)
+✔ hasCode classifies server markdown fixtures (0.148833ms)
+✔ hasCode classifies shared markdown fixtures (0.118875ms)
+✔ hasCode classifies integration markdown fixtures (0.126917ms)
+✔ hasCode classifies executable evidence (0.305916ms)
+✔ hasCode classifies non-markdown evidence (0.121083ms)
+✔ hasCode classifies epic data (0.162209ms)
+✔ hasCode classifies code (0.130167ms)
+✔ hasCode classifies unknown paths (0.191ms)
+✔ hasCode classifies mixed changes (0.131875ms)
+✔ hasCode classifies empty changes (0.143625ms)
+✔ --has-code prints only a boolean, uses the supplied base and fails closed (6389.981792ms)
+✔ CI classifies before heavy work and always runs push coverage (2.338292ms)
+✔ required aggregates only accept skipped work after a successful docs-only classification (3132.966334ms)
+✔ folded gates stay visibly red, continue after failures and retain full history (1.308125ms)
+✔ documentation skips code checks, unknown paths fail closed (0.6645ms)
+✔ changes to prepush scripts run the CI self-test files locally (1.521292ms)
+✔ the CI self-test step runs selfTests through prepush and names no self-test file itself (0.556333ms)
+✔ --self-test runs exactly the selfTests files, skips change detection and fails with them (2920.128417ms)
+✔ escape-trace tests stay mandatory for every code prepush plan (0.362708ms)
+✔ the recording gate runs in local prepush, in CI prepush and in the CI self-test step (0.261916ms)
+✔ a ledger entry change runs the ledger gate even when only documents changed (0.202958ms)
+✔ local code checks include both UI gates and affected e2e (0.128166ms)
+✔ every CI node scripts step also runs in local prepush or is listed as CI-only (0.485ms)
+✔ a web change runs the whole web unit suite, which catches tests that read sources instead of importing them (0.524667ms)
+✔ local gates default their base to the merge-base, not the moving origin/main tip (9.730667ms)
+✔ affected e2e receives non-markdown evidence paths as code (0.548459ms)
+✔ e2e coverage check passes on the real suite and names an unmapped spec (1333.928917ms)
+✔ a board card source change selects the spec that reads its title (265.927416ms)
+✔ CI shares the plan but keeps advisory and full e2e in separate jobs (0.903625ms)
+✔ CLI skips real document changes and rejects a missing base (22579.582583ms)
+✔ a stale local origin/main is refreshed by fetch before computing changes (9163.998958ms)
+✔ fetch failure falls back to the local origin/main and prints a stale notice (3119.581958ms)
+✔ prepush vitest only forgives files listed as known local red (4.62ms)
+✔ plan children do not inherit the git hook repository binding (405.572833ms)
+✔ only gate scripts are mapped to a ledger category when a step goes red (1.227667ms)
+✔ a gate that blocks a push records one intercept for every entry whose safeguard names it (393.6835ms)
+✔ a red gate step leaves the repository untouched and still exits non-zero (192.828417ms)
+✔ retrying the same gate on the same branch after another commit records nothing new (929.604166ms)
+✔ CAIRN_GATE_LOG appends the gate-red events for a CI job to collect (1169.282333ms)
+✔ a checkout without docs/lessons, or CAIRN_LESSONS_LEDGER=0, leaves the tree untouched (74.217ms)
+✔ logging is opt-in and never projects counters into the checkout (318.937417ms)
+✔ CI doc-reader checks select the real codeowners reader for identity documentation (319.0615ms)
+✔ workflow preserves comments about external behavior (3.874917ms)
+✔ forced push coverage preserves the English gate range across multiple commits (4543.157ms)
+✔ a copy-only web change exits 0 without a recording (1494.495167ms)
+✔ a copy-only web change with two ticket evidence directories exits 0 (1343.016667ms)
+✔ the issue example (transition: transform 200ms) with only PNGs exits 1 (1653.398375ms)
+✔ the same change plus a WebM under docs/verify/1783 exits 0 (1300.983334ms)
+✔ a 6 MB recording exits 1 with a size reason (1709.293375ms)
+✔ a recording parked outside the ticket evidence directory does not satisfy the gate (1552.854042ms)
+✔ a motion token file change with no recording exits 1 (1306.353125ms)
+✔ two ticket evidence directories in one branch exit 2 instead of picking one (1201.510208ms)
+✔ a merged PR that shipped motion with only PNGs is red on replay (real history #1972) (3209.971542ms)
+ℹ tests 196
+ℹ suites 0
+ℹ pass 193
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 103393.345625
+
+✖ failing tests:
+
+test at scripts/heavy-slots.test.mjs:197:1
+✖ slotPortHolder names the pid, cwd and command of whatever listens on the port (15042.807583ms)
+  AssertionError [ERR_ASSERTION]: /SQUATTER-READY/ never appeared on out: SQUATTER-ERROR EPERM
+  
+      at until (file://<worktree>/scripts/heavy-slots.test.mjs:73:14)
+      at async TestContext.<anonymous> (file://<worktree>/scripts/heavy-slots.test.mjs:203:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at scripts/heavy-slots.test.mjs:549:1
+✖ a squatted slot port fails e2e:affected before playwright and names the holding process (15118.354375ms)
+  AssertionError [ERR_ASSERTION]: /SQUATTER-READY/ never appeared on out: SQUATTER-ERROR EPERM
+  
+      at until (file://<worktree>/scripts/heavy-slots.test.mjs:73:14)
+      at async TestContext.<anonymous> (file://<worktree>/scripts/heavy-slots.test.mjs:558:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at scripts/heavy-slots.test.mjs:670:1
+✖ prepush reports a squatted slot port before running any check (15448.951333ms)
+  AssertionError [ERR_ASSERTION]: /SQUATTER-READY/ never appeared on out: SQUATTER-ERROR EPERM
+  
+      at until (file://<worktree>/scripts/heavy-slots.test.mjs:73:14)
+      at async TestContext.<anonymous> (file://<worktree>/scripts/heavy-slots.test.mjs:691:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+[ELIFECYCLE] Command failed with exit code 1.

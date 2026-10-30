@@ -30,9 +30,12 @@ import {
   type GithubLabeledIssuesPage,
   GithubRateLimitedError,
   type GithubRepoPermission,
+  githubCloseIssue,
   githubCollaboratorPermission,
+  githubIssueClosingPulls,
   githubIssueEvents,
   githubIssueState,
+  githubIssueTimeline,
   githubOpenIssuesWithLabel,
 } from '../lib/github.js';
 import { nowMs } from '../lib/ids.js';
@@ -114,6 +117,7 @@ export interface IssueIntakeTally {
   orchestrated: number;
   closed: number;
   closeSkipped: number;
+  githubIssuesClosed: number;
   rateLimited: number;
   gated: number;
   errors: number;
@@ -176,6 +180,7 @@ function emptyTally(): IssueIntakeTally {
     orchestrated: 0,
     closed: 0,
     closeSkipped: 0,
+    githubIssuesClosed: 0,
     rateLimited: 0,
     gated: 0,
     errors: 0,
@@ -239,6 +244,12 @@ function newestLabeler(data: IssueHistory): { labeler: string } | AppLabel | { r
   if (labeled.actor === null) return { reason: 'labeler-deleted' };
   return { labeler: labeled.actor };
 }
+
+type LinkedPullVerdict =
+  | { ok: true }
+  | { closeGithub: { pr: number } }
+  | { notTaken: 'not-eligible'; reason: 'open-linked-pull' | 'merged-linked-pull'; pr: number }
+  | { notTaken: 'unverifiable'; reason: string };
 
 export function projectAtInFlightCap(db: Db, projectId: string): boolean {
   return projectInFlight(db, projectId) >= ISSUE_INTAKE_IN_FLIGHT_CAP;
@@ -506,6 +517,139 @@ export function createIssueIntake(
           `issue intake label applied through app ${verdict.viaApp}, not taken`,
         );
       } else log(at, 'issue intake candidate not taken');
+      return 'not-taken';
+    }
+    if (projectAtInFlightCap(deps.db, row.id)) {
+      tally.atCap += 1;
+      return 'full';
+    }
+    let links: LinkedPullVerdict;
+    try {
+      const timeline = await githubIssueTimeline(
+        run.githubFetch,
+        access.token,
+        owner,
+        repo,
+        issueNumber,
+      );
+      const closing = await githubIssueClosingPulls(
+        run.githubFetch,
+        access.token,
+        owner,
+        repo,
+        issueNumber,
+      );
+      if (timeline === null) {
+        links = { notTaken: 'unverifiable', reason: 'timeline-unreadable' };
+      } else if (closing === null) {
+        links = { notTaken: 'unverifiable', reason: 'closing-pulls-unreadable' };
+      } else if (!timeline.complete) {
+        links = { notTaken: 'unverifiable', reason: 'timeline-incomplete' };
+      } else if (!closing.complete) {
+        links = { notTaken: 'unverifiable', reason: 'closing-pulls-incomplete' };
+      } else {
+        const sameRepo = `${owner}/${repo}`.toLowerCase();
+        const byNumber = new Map<number, { open: boolean; merged: boolean; closed: boolean }>();
+        for (const source of [timeline.pulls, closing.pulls]) {
+          for (const pull of source) {
+            if (pull.repo.toLowerCase() !== sameRepo) continue;
+            const cur = byNumber.get(pull.number) ?? {
+              open: false,
+              merged: false,
+              closed: false,
+            };
+            if (pull.state === 'open') cur.open = true;
+            else if (pull.merged) cur.merged = true;
+            else cur.closed = true;
+            byNumber.set(pull.number, cur);
+          }
+        }
+        links = { ok: true };
+        for (const evidence of byNumber.values()) {
+          if (evidence.open && (evidence.merged || evidence.closed)) {
+            links = { notTaken: 'unverifiable', reason: 'linked-pull-conflict' };
+            break;
+          }
+        }
+        if ('ok' in links) {
+          for (const [number, evidence] of byNumber) {
+            if (evidence.open) {
+              links = {
+                notTaken: 'not-eligible',
+                reason: 'open-linked-pull',
+                pr: number,
+              };
+              break;
+            }
+          }
+        }
+        if ('ok' in links && byNumber.size === 1) {
+          const closingPull = closing.pulls.find(
+            (pull) => pull.repo.toLowerCase() === sameRepo && pull.merged,
+          );
+          if (closingPull !== undefined && !byNumber.get(closingPull.number)?.closed) {
+            links = { closeGithub: { pr: closingPull.number } };
+          }
+        }
+        if ('ok' in links) {
+          for (const [number, evidence] of byNumber) {
+            if (evidence.merged) {
+              links = {
+                notTaken: 'not-eligible',
+                reason: 'merged-linked-pull',
+                pr: number,
+              };
+              break;
+            }
+          }
+        }
+      }
+    } catch (err) {
+      if (!(err instanceof GithubRateLimitedError)) throw err;
+      links = { notTaken: 'unverifiable', reason: 'linked-pulls-rate-limited' };
+    }
+    if ('notTaken' in links) {
+      if (links.notTaken === 'unverifiable') tally.unverifiable += 1;
+      else tally.notEligible += 1;
+      log(
+        {
+          projectId: row.id,
+          issue: issueNumber,
+          reason: links.reason,
+          ...('pr' in links ? { pr: links.pr } : {}),
+        },
+        'issue intake candidate not taken',
+      );
+      return 'not-taken';
+    }
+    if ('closeGithub' in links) {
+      if (
+        claimedRefs(row.teamId).has(githubIssueSourceRef(owner, repo, issueNumber).toLowerCase())
+      ) {
+        tally.claimed += 1;
+        return 'not-taken';
+      }
+      try {
+        await githubCloseIssue(run.githubFetch, access.token, owner, repo, issueNumber, {
+          stateReason: 'completed',
+        });
+        tally.githubIssuesClosed += 1;
+        log(
+          { projectId: row.id, issue: issueNumber, pr: links.closeGithub.pr },
+          'issue intake closed github issue after merged closing pull request',
+        );
+      } catch (err) {
+        tally.errors += 1;
+        log(
+          {
+            projectId: row.id,
+            issue: issueNumber,
+            pr: links.closeGithub.pr,
+            err: errText(err),
+          },
+          'issue intake github issue close failed',
+        );
+      }
       return 'not-taken';
     }
     if (projectAtInFlightCap(deps.db, row.id)) {

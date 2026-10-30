@@ -1,6 +1,6 @@
 ---
 name: pr-cairn
-description: Use when writing a PR body for this repo. Carries the cairn PR body contract (six sections from .github/PULL_REQUEST_TEMPLATE.md, checked by the pr-evidence CI gate) and replaces the global show-me template (Summary/Evidence/Merge Danger), which fails the gate here.
+description: Use when writing a PR body for this repo. Carries the cairn PR body contract (four required sections from .github/PULL_REQUEST_TEMPLATE.md, checked by the pr-evidence CI gate) and replaces the global show-me template (Summary/Evidence/Merge Danger), which fails the gate here.
 ---
 
 # pr-cairn — writing a PR body in cairn
@@ -13,92 +13,81 @@ it, failed, and hand-rewrote the body (#1100, #1103, #1105, #1111; issue
 #1110). When writing a PR body in this repo, follow this skill; do not use
 the global template even if it also matches.
 
-## Write it plainly
+## Body contract
 
-The body is read by someone who did not watch the work. Apply the `unslop`
-rules to it, and write like a person reporting what they did.
+Start from `.github/PULL_REQUEST_TEMPLATE.md`. Write in English for a reader
+who did not watch the work. Use this order:
 
-- No em dashes. Use a period or a comma. Rule 13.
-- No AI vocabulary: crucial, delve, robust, seamless, leverage, showcase,
-  landscape, testament, tapestry. Use the plain word. Rules 7 and 31.
-- No "not just X, but Y", no rule of three, no synonym cycling. Rules 9, 10, 11.
-- No bold label followed by a restatement of the label. Write the sentence. Rule 16.
-- No chatbot lines, no closing pleasantries. Rules 20, 22.
-- No metaphor nouns: substrate, surface, harness, ratchet, primitive, north
-  star. Name the thing. Rule 26.
-- Sentence case headings. Straight quotes. Rules 17, 19.
-- One idea per sentence. If a sentence needs a second read, split it. Rule 28.
-- Say what the change does, not how it feels. A number or a symbol beats an
-  adjective. Rules 27 and 30.
-- Describe the current state only. Do not write that something was removed,
-  retired, dropped, or "used to be" something else; the reader never saw the
-  old version, so the note is noise. Delete the thing and say what stands now.
+1. `## Proof`: for UI, a before / after / unchanged screenshot table with one
+   value line under each image, as in t3code #27472. For backend changes, one
+   line naming the test that fails on main, quoting its failure text, and
+   stating that it passes here. End with one `Not verified:` line naming
+   checks not run or unrelated failures on main.
+2. `## What`: one line explaining the change, why, and any existing ticket or known overlap.
+3. `<details><summary>Review and risk</summary>` containing `## Review` and
+   `## Risk`, separated from the HTML tags by blank lines and closed with
+   `</details>`. Keep this block collapsed.
 
-The same rules apply to ticket bodies, commit messages, code comments and
-lane briefs.
+For code changes, use one review round. A fresh, other-vendor independent
+review is required only for protected or security paths, documentation
+included; other docs-only changes need no code review. After three rounds, rethink or hand the PR to ian.
+Review records the review performed, its verdict and unfixed findings with
+reasons; when independent review is required, include vendor, model, fresh
+context and reviewed head SHA. Risk states one-way or two-way
+door, blast radius and whether the owner must merge. Put longer overlap
+results and optional Upstream analysis inside the details block. Include
+Upstream only when adding a mechanism; name an existing equivalent or the
+checkable reason for rejecting it.
 
-## The six sections (exact headings)
+The gate allows at most 600 visible characters of prose outside Markdown
+tables, image embeds, fenced code, inline code spans, HTML comments and
+complete details blocks. It counts heading text and link labels, spaces
+within lines, and decoded HTML entities; formatting and whitespace between
+lines do not count. Over the limit, it reports
+`too-long: <n> characters of prose outside tables, images, code and details (limit 600)`.
+Keep Proof and What short; put supporting output in tables or code blocks.
+A section containing only fenced code or HTML comments is unanswered.
 
-### `## What`
+A legacy `## Verified` aliases Proof. The complete legacy six-section shape
+(What, Verified, Upstream, Risk, Acceptance and Issues, with an answered
+Upstream and an Acceptance task) may omit Review and is exempt from the cap.
+Use the new shape for new bodies. Any unchecked task outside fenced code and
+HTML comments still makes the task gate red, including inside details.
+Closing keywords belong in commit messages. For a multi-segment ticket,
+only the closing segment's commit message carries the parent closing keyword.
 
-What this PR does and why, plus the ticket it answers. Prose. Say what
-changed and what it replaces or fixes; name files and symbols instead of
-describing them.
+## Screenshots
 
-Screenshots belong here when the change is visible in the running app: commit
-them under `docs/verify/<ticket>/` and embed them with a SHA-pinned raw URL
-(the repo is public, raw is anonymously readable):
+Store images on `pr-assets/<pr-number>`, created from main or as an orphan.
+Use a separate checkout so the implementation branch stays on its own work.
+For a new branch from main, the commands in that checkout are:
 
-```markdown
-![label](https://raw.githubusercontent.com/xiechimon/cairn/<sha>/docs/verify/<ticket>/shot.png)
+```sh
+git switch -c pr-assets/123 origin/main
+mkdir -p docs/verify/2206
+cp /tmp/before.png /tmp/after.png /tmp/unchanged.png docs/verify/2206/
+git add docs/verify/2206/before.png docs/verify/2206/after.png docs/verify/2206/unchanged.png
+git commit -m "docs(2206): add PR screenshots (#123)"
+git push origin HEAD
+git rev-parse HEAD
 ```
 
-The SHA must already be on the remote, so commit and push the branch first,
-then write the body.
+Substitute the actual PR and ticket numbers. Stage only the images. Embed
+links using the pushed asset commit's full SHA:
 
-### `## Verified`
+```markdown
+| Before | After | Unchanged |
+| --- | --- | --- |
+| ![Before](https://raw.githubusercontent.com/xiechimon/cairn/<sha>/docs/verify/2206/before.png)<br>Value: 0 items | ![After](https://raw.githubusercontent.com/xiechimon/cairn/<sha>/docs/verify/2206/after.png)<br>Value: 1 item | ![Unchanged](https://raw.githubusercontent.com/xiechimon/cairn/<sha>/docs/verify/2206/unchanged.png)<br>Value: 2 items |
+```
 
-Both halves pasted verbatim, not narrated: the command run on the old code
-(its actual failing output) and the same command on this change (its passing
-output — `pnpm lint` / `pnpm typecheck` / affected e2e results go here). A
-claim that "without this change X would fail" is not evidence. HTML comments
-do not count as an answer (the gate strips them).
-
-### `## Upstream`
-
-Does an equivalent exist in the current dependencies (pi / claude-agent-sdk /
-code already in this repo)? If an equivalent was rejected, give the checkable
-reason (security boundary, different data source, different interaction
-semantics); "more controllable" or "fits our model better" do not qualify. If
-the PR adds no mechanism, say so in one line. HTML comments do not count.
-
-### `## Risk`
-
-One-way or two-way door? Blast radius: what else this change can touch, and
-which runs ruled that out (name the runs).
-
-### `## Acceptance`
-
-A task-list checklist: at least one item, none unchecked at merge (the
-pr-tasks step of the pr-evidence CI gate checks both). Reconcile the
-ticket's acceptance checklist item by item, each task pointing at its
-evidence. Merge-time reconciliation items belong in the ticket, not in
-the body. If the ticket has no task surface (docs-only rename and the
-like), write exactly `- [x] no task surface: <one-line reason>`; an
-exemption line on a PR that clearly has a task surface is a reviewer
-Bad, not a gate matter.
-
-### `## Issues`
-
-`Closes #N`. The squash commit body is what actually closes the ticket —
-carry the closing keyword in the branch commit message too (PR bodies do not
-enter the squashed commit). If this PR is one segment of a multi-segment
-ticket, state which segment closes the ticket and that the squash body must
-not carry the closing keyword for the parent ticket.
+Use the side-branch commit SHA, never the implementation head or a branch
+name. Push before linking and never merge the asset branch. Keep the branch
+so the images remain reachable. Images belong outside code fences.
 
 ## Mechanics
 
-- Before opening a PR, follow `docs/agent-overlap.md`: search open issues, open PRs, and PRs merged in the last seven days, including PRs touching the changed files. Put the numbered overlap list and disposition under What. Extend an existing PR for the same ask. Explain intentional removal of recently merged work and name its PR for `silent-revert-gate`.
+- Small changes need no issue or overlap lookup. Reuse an existing issue or PR for the same ask; record known overlaps under What or inside details.
 
 - Write the body to a temp file; never inline multi-line markdown as
   `--body`.
@@ -106,17 +95,17 @@ not carry the closing keyword for the parent ticket.
   `gh pr create --repo xiechimon/cairn --head xiechimon:<branch> --body-file /tmp/pr.md`.
 - Run both gates locally before opening:
   `python3 scripts/pr-evidence-gate.py /tmp/pr.md` — exit 1 names each
-  problem (`missing-section` / `empty-section` / `not-embedded` /
+  problem (`missing-section` / `empty-section` / `too-long` / `not-embedded` /
   `unreachable`); then `python3 scripts/pr-tasks-gate.py /tmp/pr.md` —
-  exit 1 names `no-tasks` (Acceptance carries no task-list item) or
-  `unchecked-task` (a `- [ ]` still open, with its line number).
+  exit 1 names `unchecked-task` (a task still open anywhere in the body,
+  with its line number). A body with no tasks passes.
   A section whose only content is a fenced block counts as empty: put at
   least one prose line above the fence (#1785).
 - Editing an open PR: `gh pr edit` breaks on Projects-classic GraphQL
   errors; use `gh api -X PATCH repos/xiechimon/cairn/pulls/<n> -F
   body=@/tmp/pr.md`, then re-read with `gh pr view <n> --json body` and
   compare.
-- Pin raw links to a short SHA (8 characters). From a cloud session the egress proxy wraps URLs that carry a full 40-character SHA in backticks, which breaks the embed (#1771). Read the stored body back after creating or editing the PR.
+- Read the stored body back after creating or editing the PR to check the full SHA-pinned image embeds.
 - After opening a PR and after each push, read `mergeable_state` once
   (`gh api repos/xiechimon/cairn/pulls/<n> -q .mergeable_state`). A `dirty`
   PR runs no `pull_request` workflows, so no CI event ever arrives to say
@@ -127,8 +116,8 @@ not carry the closing keyword for the parent ticket.
   or file path in backticks. The pr-evidence check runs
   `node scripts/english-only-gate.mjs --text <body>` and reds otherwise;
   run it locally on `/tmp/pr.md` before opening.
-- Never add the `needs-decision` label. When a PR needs a decision, decide by your own recommendation, say in the chat what you chose and why, and keep going; only payments or the owner's own credentials go to the owner. A label that is already on keeps pr-evidence red and disarms auto-merge until it is removed.
-- Before enabling any merge, require fully checked Acceptance and no `needs-decision` label; an unchecked item keeps pr-evidence red until it is checked.
+- Never add the `needs-decision` label to a PR. Agents decide by their own recommendation, say what they chose and why in chat, and continue; decisions routed to ian follow `AGENTS.md`, "Merge routes". Before asking ian about a PR whose auto-merge is armed, disarm it with `gh pr merge <n> --disable-auto`.
+- Before an agent enables merge, require passing CI checks and a pr-gate verdict of go with `mergedBy: 'auto-merge'` (`AGENTS.md`, "Merge routes"; protected-path PRs and every other route go to ian), with no unchecked tasks anywhere in the body. ian may admin-merge; agents may not use that authority.
 - Read the PR opener and every commit author: `gh pr view <n> --json author,commits`. Follow `docs/ops/agent-bot-identity.md` for the identity checks.
 - Bot-opened PRs require exactly one commit authored by `Cairnwright` before a rebase merge. Use the dispatcher's `~/.cairn/tools/merge-pr.sh`; inspect its source and usage on the dispatch host before invoking it. If the helper is unavailable or the commit identity is wrong, stop and return the PR to the dispatcher.
 - Human-opened PRs use `gh pr merge <n> --squash --auto` after verifying their commits contain no `cairnwright[bot]` author. After a merge, read the main commit author and the `commit-author` Actions result.
@@ -139,8 +128,8 @@ not carry the closing keyword for the parent ticket.
 
 | requirement | enforced by |
 |---|---|
-| `## Verified`, `## Upstream` answered (non-empty after stripping comments) | pr-evidence (required check) |
+| `## Proof`, `## What`, `## Review`, `## Risk` answered, including headings inside details (legacy `## Verified` aliases Proof; Upstream is optional) | pr-evidence (required check) |
+| at most 600 visible prose characters outside tables, images, code, comments and details; complete legacy six-section bodies exempt | pr-evidence (required check) |
 | image links embedded + HTTP 200 | pr-evidence (required check) |
-| Acceptance carries >=1 task-list item, all checked | pr-evidence (required check, pr-tasks step) |
-| no `needs-decision` label on the PR (a person's decision is pending) | pr-evidence (required check); while the label is on, each run also disarms auto-merge |
+| no unchecked tasks anywhere outside fenced code and HTML comments; no tasks required | pr-evidence (required check, pr-tasks step) |
 | body is English (Chinese only inside backticks or fences) | pr-evidence (required check, language step) |

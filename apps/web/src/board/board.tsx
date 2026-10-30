@@ -368,6 +368,7 @@ export function BoardSurface({
           brief: (
             <DailyBrief
               todos={visibleTodos}
+              machines={fixture.resources?.machines}
               now={fixture.now}
               projectNames={fixture.projectNames}
               onAction={onAction}

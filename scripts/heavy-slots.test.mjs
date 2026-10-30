@@ -16,8 +16,15 @@ import { join, resolve } from 'node:path';
 import test from 'node:test';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
-import { skipsQueue, slotCount, slotPortHolder, slotResources } from './heavy-slots.mjs';
+import {
+  skipsQueue,
+  slotCount,
+  slotLockDir,
+  slotPortHolder,
+  slotResources,
+} from './heavy-slots.mjs';
 import { prepushModules } from './prepush.mjs';
+import { scrubGateEnv } from './scrub-git-env.mjs';
 
 const moduleUrl = pathToFileURL(resolve('scripts/heavy-slots.mjs')).href;
 const cli = resolve('scripts/heavy-slots.mjs');
@@ -34,7 +41,7 @@ const SANDBOX_PORT_BASE = 20000 + (process.pid % 1000) * 20;
 function sandbox(slots) {
   const dir = mkdtempSync(join(tmpdir(), 'heavy-slots-test-'));
   const env = {
-    ...process.env,
+    ...scrubGateEnv(),
     CAIRN_HEAVY_SLOTS: String(slots),
     CAIRN_HEAVY_SLOTS_DIR: join(dir, 'locks'),
     TMPDIR: join(dir, 'tmp'),
@@ -160,6 +167,27 @@ setTimeout(() => process.exit(0), ${lingerMs});
     ],
     { env },
   );
+
+test('an overridden TMPDIR on macOS does not move the shared lock directory', () => {
+  const failed = () => ({ status: 71, stdout: '' });
+  assert.equal(
+    slotLockDir({ TMPDIR: '/private/tmp/sandbox-override' }, 'darwin', () => ({
+      status: 0,
+      stdout: '/var/folders/ab/T/\n',
+    })),
+    '/var/folders/ab/T/cairn-heavy-slots',
+  );
+  assert.throws(
+    () => slotLockDir({ TMPDIR: '/private/tmp/sandbox-override' }, 'darwin', failed),
+    /set CAIRN_HEAVY_SLOTS_DIR/,
+  );
+  assert.equal(slotLockDir({}, 'darwin', failed), join(tmpdir(), 'cairn-heavy-slots'));
+  assert.equal(
+    slotLockDir({ TMPDIR: '/x', CAIRN_HEAVY_SLOTS_DIR: '/locks' }, 'darwin', failed),
+    '/locks',
+  );
+  assert.equal(slotLockDir({ TMPDIR: '/x' }, 'linux'), join(tmpdir(), 'cairn-heavy-slots'));
+});
 
 test('slot count defaults to 2 and falls back to 1 with a warning for bad values', () => {
   assert.deepEqual(slotCount({}), { count: 2 });
@@ -597,7 +625,7 @@ test('prepush-vitest run directly queues for a slot and only starts vitest once 
   }
 });
 
-test('prepush-vitest reuses the lease inherited from pnpm prepush without queueing', async () => {
+test('prepush-vitest reuses an inherited live lease without queueing', async () => {
   const { dir, env, cleanup } = sandbox(1);
   const { repo, withFakePnpm } = prepushVitestFixture(dir);
   try {
@@ -620,7 +648,7 @@ test('prepush-vitest reuses the lease inherited from pnpm prepush without queuei
   }
 });
 
-test('prepush queues for a slot in local mode and starts once the holder is killed', async () => {
+test('local prepush starts fast checks even when every heavy slot is occupied', async () => {
   const { dir, env, cleanup } = sandbox(1);
   const repo = join(dir, 'repo');
   mkdirSync(join(repo, 'scripts'), { recursive: true });
@@ -645,13 +673,13 @@ test('prepush queues for a slot in local mode and starts once the holder is kill
       cwd: repo,
       env: prepushEnv,
     });
-    await until(prepush, 'err', /queued, position 1/);
-    assert.doesNotMatch(prepush.out, /\[prepush\]/);
-    const killedAt = Date.now();
-    holder.child.kill('SIGKILL');
     await until(prepush, 'out', /\[prepush\] node scripts\/ui-debt-gate\.mjs/, 5_000);
-    assert.ok(Date.now() - killedAt < 5_000);
     await prepush.exited;
+    assert.doesNotMatch(prepush.err, /queued, position|acquired slot/);
+    assert.equal(
+      JSON.parse(readFileSync(join(env.CAIRN_HEAVY_SLOTS_DIR, 'slot-1.lock'), 'utf8')).pid,
+      holder.child.pid,
+    );
     appendFileSync(join(repo, 'README.md'), '');
     const ci = spawnSync(process.execPath, ['scripts/prepush.mjs'], {
       cwd: repo,
@@ -666,7 +694,7 @@ test('prepush queues for a slot in local mode and starts once the holder is kill
   }
 });
 
-test('prepush reports a squatted slot port before running any check', async () => {
+test('local prepush ignores a squatted slot port because fast checks do not bind it', async () => {
   const { dir, env, cleanup } = sandbox(1);
   const repo = join(dir, 'repo');
   mkdirSync(join(repo, 'scripts'), { recursive: true });
@@ -693,12 +721,36 @@ test('prepush reports a squatted slot port before running any check', async () =
       env: { ...env, PREPUSH_BASE_SHA: 'origin/main' },
     });
     assert.equal(await prepush.exited, 1, prepush.out + prepush.err);
-    assert.ok(
-      prepush.err.includes(`is held by pid ${squatter.child.pid}`),
-      prepush.out + prepush.err,
-    );
-    assert.ok(prepush.err.includes(squatterCwd), prepush.out + prepush.err);
-    assert.doesNotMatch(prepush.out, /\[prepush\] node scripts/);
+    assert.doesNotMatch(prepush.err, /is held by pid|acquired slot/);
+    assert.match(prepush.out, /\[prepush\] node scripts\/ui-debt-gate\.mjs/);
+    assert.equal(existsSync(env.CAIRN_HEAVY_SLOTS_DIR), false);
+  } finally {
+    cleanup();
+  }
+});
+
+test('prepush e2e shard mode still queues for a heavy slot and releases it', async () => {
+  const { dir, env, cleanup } = sandbox(1);
+  const fake = fakePnpmFixture(dir);
+  const repo = join(dir, 'repo');
+  mkdirSync(join(repo, 'scripts'), { recursive: true });
+  try {
+    for (const file of prepushModules) copyFileSync(file, join(repo, file));
+    const holder = startHolder(env);
+    await until(holder, 'out', /SLOT 1/);
+    const run = watch(process.execPath, ['scripts/prepush.mjs', '--e2e-shard', '1/4'], {
+      cwd: repo,
+      env: fake.withFakePnpm(env),
+    });
+    await until(run, 'err', /queued, position 1/);
+    assert.equal(existsSync(fake.log), false);
+    holder.child.kill('SIGKILL');
+    await until(run, 'out', /FAKE-PLAYWRIGHT-RAN/, 5_000);
+    assert.equal(await run.exited, 0, run.out + run.err);
+    const call = JSON.parse(readFileSync(fake.log, 'utf8').trim());
+    assert.deepEqual(call.argv, ['--filter', '@cairn/web', 'e2e', '--shard=1/4']);
+    assert.equal(call.CAIRN_HEAVY_SLOT, '1');
+    assert.equal(existsSync(join(env.CAIRN_HEAVY_SLOTS_DIR, 'slot-1.lock')), false);
   } finally {
     cleanup();
   }

@@ -82,6 +82,7 @@ import {
   steerPending,
   step,
   stopPending,
+  team,
   todo,
 } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
@@ -100,6 +101,7 @@ import {
 import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
 import { emitRuntimeBuildSpan } from '../runtime-otel.js';
 import { addUserMessageAttachmentGrants } from './attachment-authorization.js';
+import { claimAutonomousMerge, settleAutonomousMerge } from './autonomous-merge.js';
 import { recordBuildFeedback } from './build-provenance.js';
 import { askQuestionContentOf } from './chief-questions.js';
 import { DONE_ROW } from './delivery-rows.js';
@@ -108,6 +110,7 @@ import { stepActivityAt } from './dispatch-timeouts.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { markFirstPrPromptDue } from './first-pr-report.js';
 import { githubRepoOfProject, hasRepoBinding, projectOfTodo, readBuildChanges } from './git.js';
+import { readGithubAutonomyPause } from './github-autonomy-brake.js';
 import { githubTokenOrNull, teamGithubToken } from './github-connection.js';
 import { githubText } from './github-text.js';
 import type { HarnessEvalDispatchPort } from './harness-eval-coordinator.js';
@@ -306,10 +309,18 @@ function stopFallbackPhase(db: Db, buildRow: BuildRow): Phase {
   return buildRow.prevPhase ?? 'todo';
 }
 
+function releaseUnissuedMergeAdmission(db: Db, row: typeof step.$inferSelect): void {
+  if (row.kind !== 'merge') return;
+  if (row.prompt?.includes('"local-merge"') && (row.status === 'claimed' || row.claimedAt !== null))
+    return;
+  settleAutonomousMerge(db, row.buildId, 'refused');
+}
+
 export function applyStoppedStep(deps: BuildDeps, stepId: string): void {
   const { db } = deps;
   const stepRow = db.select().from(step).where(eq(step.id, stepId)).get();
   if (!stepRow) throw new NotFoundError(`step ${stepId}`);
+  releaseUnissuedMergeAdmission(db, stepRow);
   db.update(step).set({ status: 'stopped', finishedAt: nowMs() }).where(eq(step.id, stepId)).run();
   db.delete(stopPending).where(eq(stopPending.conversationId, stepRow.buildId)).run();
   const stoppedRow = db.select().from(step).where(eq(step.id, stepId)).get();
@@ -406,6 +417,7 @@ function stopStepKeepPhase(deps: BuildDeps, stepId: string): void {
   const { db } = deps;
   const stepRow = db.select().from(step).where(eq(step.id, stepId)).get();
   if (!stepRow) throw new NotFoundError(`step ${stepId}`);
+  releaseUnissuedMergeAdmission(db, stepRow);
   db.update(step).set({ status: 'stopped', finishedAt: nowMs() }).where(eq(step.id, stepId)).run();
   db.delete(stopPending).where(eq(stopPending.conversationId, stepRow.buildId)).run();
   const stoppedRow = db.select().from(step).where(eq(step.id, stepId)).get();
@@ -1231,19 +1243,14 @@ export async function requestMerge(
   if (pr !== null) {
     return mergeThroughGithub(deps, row, pr.prNumber, pr.repoRef, actor ?? deps.user.displayName);
   }
-  restoreFailedReview(deps, row);
-  if (todoRow.phase === 'failed') {
-    // biome-ignore lint/style/noNonNullAssertion: restoreFailedReview transitions phase in place, never deletes the row; second get() must match the first
-    todoRow = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get()!;
-  }
-  assertPhaseTransition(todoRow.phase, 'done');
-  assertMergeTools(deps, todoRow);
-  insertGateAnnouncement(deps, buildId, MERGE_ANNOUNCEMENT, actor ?? deps.user.displayName);
   const projectRow = projectOfTodo(deps.db, todoRow);
   if (
     projectRow?.repoKind === 'local' &&
     projectMergeConfigOf(projectRow).mergePolicy === 'autonomous'
   ) {
+    if (todoRow.phase === 'failed') assertDeliveredBuild(deps, row);
+    else assertPhaseTransition(todoRow.phase, 'done');
+    assertMergeTools(deps, todoRow);
     const git = deps.gitOps ?? systemGitOps;
     const localPath = projectRow.localPath;
     if (localPath === null) {
@@ -1253,8 +1260,17 @@ export async function requestMerge(
     if (listing === null || listing.defaultBranch === null) {
       throw new HttpError(409, '无法读取本地仓库默认分支，拒绝走未受控合并');
     }
-    const local = await enqueueLocalMerge(deps, buildId, listing.defaultBranch);
-    if (local.enqueued) return { delegated: true };
+    const local = await enqueueLocalMerge(
+      deps,
+      buildId,
+      listing.defaultBranch,
+      false,
+      todoRow.phase === 'failed',
+    );
+    if (local.enqueued) {
+      insertGateAnnouncement(deps, buildId, MERGE_ANNOUNCEMENT, actor ?? deps.user.displayName);
+      return { delegated: true };
+    }
     const blocking = local.readiness?.blockers ?? [];
     if (blocking.length > 0) {
       throw new HttpError(
@@ -1264,6 +1280,15 @@ export async function requestMerge(
     }
     throw new HttpError(409, '本地合并未通过关口判定，无法落地');
   }
+  restoreFailedReview(deps, row);
+  if (todoRow.phase === 'failed') {
+    const restored = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
+    if (!restored) throw new NotFoundError(`todo ${row.todoId}`);
+    todoRow = restored;
+  }
+  assertPhaseTransition(todoRow.phase, 'done');
+  assertMergeTools(deps, todoRow);
+  insertGateAnnouncement(deps, buildId, MERGE_ANNOUNCEMENT, actor ?? deps.user.displayName);
   enqueueStep(deps, buildId, 'merge', todoRow.teamId);
   return { delegated: true };
 }
@@ -1692,6 +1717,18 @@ async function mergeThroughGithub(
       });
       return { delegated: true };
     }
+    if (
+      repoRef.owner.toLowerCase() === 'xiechimon' &&
+      repoRef.repo.toLowerCase() === 'cairn' &&
+      (pull.openerType !== 'User' ||
+        !pull.openerLogin?.trim() ||
+        pull.openerLogin.toLowerCase().endsWith('[bot]'))
+    ) {
+      throw new HttpError(
+        409,
+        `PR #${prNumber} cannot be squash merged by cairn: xiechimon/cairn requires a verified human opener. Return bot-opened PRs to the dispatcher for identity preparation and rebase via ~/.cairn/tools/merge-pr.sh; restore missing opener identity before retrying.`,
+      );
+    }
     const checkpoint = lastPushedCheckpoint(deps, row.id, { mergeSteps: true });
     if (checkpoint === null || !isFullSha(checkpoint)) {
       throw new HttpError(
@@ -1706,11 +1743,23 @@ async function mergeThroughGithub(
       );
     }
     const titled = `${pull.title} (#${prNumber})`;
+    if (await readGithubAutonomyPause(fetchImpl, token, `${repoRef.owner}/${repoRef.repo}`)) {
+      deps.db
+        .update(team)
+        .set({ autonomyPaused: true })
+        .where(eq(team.id, before.todoRow.teamId))
+        .run();
+      throw new HttpError(409, 'autonomy-paused: GitHub autonomy marker is open or unreadable');
+    }
+    apiMergeGate(deps, row);
+    claimAutonomousMerge(deps.db, row.id);
     const result = await githubMergePull(fetchImpl, token, repoRef.owner, repoRef.repo, prNumber, {
       sha: checkpoint,
       commitTitle: CLOSING_SHAPE.test(pull.title) ? `Merge pull request #${prNumber}` : titled,
       commitMessage: closingLine(before.todoRow, repoRef) ?? PLAIN_MERGE_BODY,
     });
+    if (result.kind === 'merged' || result.kind === 'refused' || result.kind === 'rate-limited')
+      settleAutonomousMerge(deps.db, row.id, result.kind === 'merged' ? 'merged' : 'refused');
     if (result.kind === 'rate-limited') {
       const { limit } = result;
       const when =
@@ -1825,6 +1874,7 @@ export function applyStepFailure(
   preservedCommits?: readonly string[],
 ): void {
   const { db } = deps;
+  releaseUnissuedMergeAdmission(db, stepRow);
   const errorMessage =
     rawErrorMessage.trim() === '' ? `${stepRow.kind} 步异常结束，未上报原因` : rawErrorMessage;
   db.update(step)
@@ -1951,6 +2001,10 @@ function releaseClaimedStep(
   row: typeof step.$inferSelect,
   todoRow: typeof todo.$inferSelect,
 ): void {
+  if (row.kind === 'merge' && row.prompt?.includes('"local-merge"')) {
+    const projectRow = projectOfTodo(deps.db, todoRow);
+    if (projectRow && projectMergeConfigOf(projectRow).mergePolicy === 'autonomous') return;
+  }
   deps.db.update(step).set({ status: 'pending', machineId: null }).where(eq(step.id, row.id)).run();
   const released = deps.db.select().from(step).where(eq(step.id, row.id)).get();
   if (released) {

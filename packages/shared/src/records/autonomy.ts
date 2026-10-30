@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const AUTONOMY_KINDS = ['issue-intake', 'gardener', 'auto-merge'] as const;
+export const AUTONOMY_KINDS = ['issue-intake', 'gardener', 'auto-merge', 'scheduling'] as const;
 export const autonomyKindSchema = z.enum(AUTONOMY_KINDS);
 export type AutonomyKind = z.infer<typeof autonomyKindSchema>;
 

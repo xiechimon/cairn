@@ -21,13 +21,16 @@ import {
   gateVerdict,
   message,
   step,
+  team,
   todo,
 } from '../db/schema.js';
 import { githubCreateIssue } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { autonomousMergePolicy } from './autonomous-merge.js';
 import type { BuildDeps } from './builds.js';
 import { agentForStep } from './dispatch-eligibility.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
+import { readGithubAutonomyPause } from './github-autonomy-brake.js';
 import { teamGithubToken } from './github-connection.js';
 import { createHarnessEvalCoordinator } from './harness-eval-coordinator.js';
 import {
@@ -117,6 +120,19 @@ export async function evaluateMergeGate(
     cache = newGateReadCache();
     readCaches.set(todoRow.teamId, cache);
   }
+  const markerAccess = await teamGithubToken(deps, todoRow.teamId);
+  const githubPaused =
+    'token' in markerAccess
+      ? await readGithubAutonomyPause(
+          deps.githubFetch ?? fetch,
+          markerAccess.token,
+          `${repo.owner}/${repo.repo}`,
+          cache,
+          opts.now ?? nowMs(),
+        )
+      : false;
+  if (githubPaused && cache.autonomyPause.get(`${repo.owner}/${repo.repo}`)?.paused === true)
+    deps.db.update(team).set({ autonomyPaused: true }).where(eq(team.id, todoRow.teamId)).run();
   const harness = deps.harnessEval ?? productionHarnessEvalConfig();
   const facts = await readGateGithubFacts(
     port,
@@ -239,12 +255,18 @@ export async function evaluateMergeGate(
   const verifier =
     todoRow.assignment?.verify?.agentId != null ||
     [...agents.values()].some((item) => item.persona === 'verifier');
+  const policy = autonomousMergePolicy(
+    deps.db,
+    todoRow.teamId,
+    projectMergeConfigOf(projectRow),
+    opts.now ?? nowMs(),
+  );
   const readiness = mergeReadiness({
     author: authorAgent !== null ? { id: authorAgent.id, model: authorAgent.modelId ?? '' } : null,
     policy: {
       mergePolicy: projectMergeConfigOf(projectRow).mergePolicy,
-      autonomyPaused: false,
-      dailyCapReached: false,
+      ...policy,
+      autonomyPaused: policy.autonomyPaused || githubPaused,
     },
     build: {
       isGithubPr: true,

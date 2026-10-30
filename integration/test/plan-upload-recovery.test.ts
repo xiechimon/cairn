@@ -279,6 +279,7 @@ describe('#1026/#1028 final-report failure recovery (real process restarts)', ()
         name: 'probe-key',
         gitAccess: false,
         mcpAccess: false,
+        machineAccess: true,
         toolGrants: { read: [], write: [] },
       },
     );

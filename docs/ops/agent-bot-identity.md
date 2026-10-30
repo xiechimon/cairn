@@ -67,9 +67,13 @@ Read the PR opener and all commit authors with `gh pr view <n> --json author,com
 
 - Bot-opened PRs require exactly one commit authored by `Cairnwright` before a rebase merge. Check that neither its author name nor email contains `cairnwright[bot]`. Use the dispatcher's `~/.cairn/tools/merge-pr.sh` after inspecting its source and usage on the dispatch host. If the helper is unavailable or authorship is wrong, return the PR to the dispatcher for preparation.
 - Human-opened PRs use `gh pr merge <n> --squash --auto` after checking that none of their commit authors contains `cairnwright[bot]`.
-- Both paths require fully checked Acceptance and no `needs-decision` label. After merging, verify the resulting main commit's author and its `commit-author` Actions result.
+- Both paths require a pr-gate go with `mergedBy: 'auto-merge'` (every other PR goes to ian), no unchecked tasks anywhere in the body and no `needs-decision` label. After merging, verify the resulting main commit's author and its `commit-author` Actions result.
 
 Squashing a bot-opened PR can attribute the main commit to the bot opener even when the branch commit has the required author. Rebase preserves the prepared commit's author. A later green push checks its own pushed range; historical bot commits outside that range are excluded, and their authorship remains unchanged.
+
+The product merge API enforces this boundary for `xiechimon/cairn` (case-insensitive): an open PR must have a nonempty opener login, account type `User`, and no `[bot]` login suffix before the server sends its SHA-bound squash request. Bot or unknown opener identity returns HTTP 409 without writing merge messages, changing steps, or changing the task phase. The opener comes from the pull response's `user` object, independently of `author_association`. Other repositories retain their existing merge behavior. Already-merged PR reconciliation remains available.
+
+This prevents unsafe squash through the product API only. Direct GitHub merges and the external dispatcher still require identity preparation, rebase, and verification of the resulting main commit and Actions run. Historical failed commits are retained.
 
 This repository documents the external helper contract. Its implementation is outside this checkout and must be inspected separately before changing dispatcher behavior.
 
@@ -165,3 +169,11 @@ The dispatcher must use this preparation command for the correction, verify the 
 For #2136, the same recipe applies. Main tip `78b85594328fe2c26680060d1ad9dfa28e97d76b` and prior `c683123a69b8737ba7f2dac4cf404408e4cd4d5d` were authored as `cairnwright[bot]` after GitHub squash auto-merge of bot-opened PRs whose branch tips used the allowed `Cairnwright` identity. Preserve both historical commits and do not force-push main. Prepare one compliant correction outside both identity wrappers, keep co-author trailers, and merge by the identity-aware rebase route when the PR opener is the App. Until both the resulting main commit metadata and a later green `commit-author` Actions run are recorded, #2136 recovery remains pending. Local fixtures and this documentation change alone do not establish production recovery.
 
 The trusted main push step in `.github/workflows/commit-author.yml` runs `scripts/commit-author-recovery.test.mjs`. It executes this recipe with inherited bot identity in an isolated Git repository, preserves co-author trailers and historical commit bytes, and checks both the subsequent push range and the rejected historical range using the workflow shell.
+
+### Incident #2136
+
+The rejected main commit is `c683123a69b8737ba7f2dac4cf404408e4cd4d5d`, authored by `cairnwright[bot] <347615582+cairnwright[bot]@users.noreply.github.com>`. The [failed commit-author job](https://github.com/xiechimon/cairn/actions/runs/40801882028/job/123211659439) checked `3d76fe37f04d5cce9b9a5305bea3c68dc727859e..c683123a69b8737ba7f2dac4cf404408e4cd4d5d`. The rejection is correct; retain the workflow shell and historical commit unchanged.
+
+Use the recovery preparation recipe above, preserve co-author trailers, and verify the PR opener and every commit author before the later authorized merge. A bot-opened PR requires exactly one prepared Cairnwright commit and rebase through the inspected external helper. The dispatcher bypass responsible for this incident has not been established from this checkout.
+
+Production acceptance remains pending: record the resulting main commit's author and committer, its SHA, and the subsequent main push's green `commit-author` Actions URL before declaring recovery. Local fixture success verifies the recipe and checked ranges only. It does not establish dispatcher enforcement or production recovery; rerunning the original rejected range must still fail.

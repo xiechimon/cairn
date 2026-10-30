@@ -244,6 +244,7 @@ beforeAll(async () => {
     name: 'done-dialog-m1-key',
     gitAccess: false,
     mcpAccess: false,
+    machineAccess: true,
     toolGrants: { read: [], write: [] },
   });
   const keyBody = key.body as { plaintext?: string; record?: { plaintext?: string } };

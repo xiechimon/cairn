@@ -143,9 +143,11 @@ const BODY_WITH_INSTRUCTIONS =
 interface GhCall {
   host: string;
   path: string;
+  method: string;
   search: URLSearchParams;
   headers: Record<string, string>;
   status: number;
+  body: string | undefined;
 }
 
 interface GhResponse {
@@ -170,6 +172,26 @@ function conditional(
   return { body, headers: { etag, ...extra } };
 }
 
+interface TimelineEvent {
+  event: string;
+  source?: {
+    type?: string;
+    issue?: {
+      number: number;
+      state: 'open' | 'closed';
+      repository?: { full_name: string };
+      pull_request?: { merged_at: string | null } | null;
+    };
+  };
+}
+
+interface ClosingPullNode {
+  number: number;
+  state: 'OPEN' | 'CLOSED' | 'MERGED';
+  merged: boolean;
+  repository: { nameWithOwner: string };
+}
+
 function githubFake(repo: string) {
   const state = {
     open: LISTED.map((i) => ({ ...i })) as RawIssue[],
@@ -182,12 +204,19 @@ function githubFake(repo: string) {
       [OWNER, { body: permissionBody(OWNER, 'admin', 'admin') }],
     ]),
     listFailPages: new Set<number>(),
+    timeline: new Map<number, TimelineEvent[]>(),
+    timelineIncomplete: new Set<number>(),
+    timelineUnreadable: new Set<number>(),
+    closingPulls: new Map<number, ClosingPullNode[]>(),
+    closingIncomplete: new Set<number>(),
+    closingUnreadable: new Set<number>(),
   };
   const overrides = new Map<string, GhOverride>();
   const calls: GhCall[] = [];
   let onCall: ((path: string) => void | Promise<void>) | null = null;
 
   const base = `/repos/${repo}`.toLowerCase();
+  const sameRepo = repo.toLowerCase();
 
   function resolve(url: URL, headers: Record<string, string>): GhResponse {
     const path = url.pathname.toLowerCase();
@@ -252,6 +281,23 @@ function githubFake(repo: string) {
       const login = decodeURIComponent(permMatch[1] as string).toLowerCase();
       return state.permissions.get(login) ?? { status: 404, body: { message: 'Not Found' } };
     }
+    const timelineMatch = new RegExp(`^${base}/issues/(\\d+)/timeline$`).exec(path);
+    if (timelineMatch) {
+      const n = Number(timelineMatch[1]);
+      if (state.timelineUnreadable.has(n)) {
+        return { status: 502, body: { message: 'Bad Gateway' } };
+      }
+      const events = state.timeline.get(n) ?? [];
+      if (state.timelineIncomplete.has(n)) {
+        return {
+          body: events,
+          headers: {
+            link: `<https://evil.example/repos/${sameRepo}/issues/${n}/timeline?page=2>; rel="next"`,
+          },
+        };
+      }
+      return { body: events };
+    }
     return { status: 404, body: { message: `no fake for ${path}` } };
   }
 
@@ -261,15 +307,78 @@ function githubFake(repo: string) {
     const call: GhCall = {
       host: url.host,
       path: url.pathname,
+      method: (init?.method ?? 'GET').toUpperCase(),
       search: url.searchParams,
       headers,
       status: 0,
+      body: init?.body,
     };
     calls.push(call);
     await new Promise((r) => setTimeout(r, 0));
     if (onCall !== null) await onCall(url.pathname);
     const override = overrides.get(url.pathname);
-    const res = override !== undefined ? await override(url, headers) : resolve(url, headers);
+    let res: GhResponse;
+    if (override !== undefined) {
+      res = await override(url, headers);
+    } else if (url.pathname.toLowerCase() === '/graphql') {
+      let issueNumber: number | null = null;
+      try {
+        const parsed = JSON.parse(init?.body ?? '{}') as {
+          variables?: { number?: unknown };
+        };
+        if (typeof parsed.variables?.number === 'number') issueNumber = parsed.variables.number;
+        else issueNumber = 0;
+      } catch {
+        issueNumber = null;
+      }
+      if (issueNumber === null) {
+        res = { status: 400, body: { message: 'bad graphql body' } };
+      } else if (state.closingUnreadable.has(issueNumber)) {
+        res = { status: 502, body: { message: 'Bad Gateway' } };
+      } else {
+        const nodes = state.closingPulls.get(issueNumber) ?? [];
+        res = {
+          body: {
+            data: {
+              repository: {
+                issue: {
+                  closedByPullRequestsReferences: {
+                    pageInfo: { hasNextPage: state.closingIncomplete.has(issueNumber) },
+                    nodes,
+                  },
+                },
+              },
+            },
+          },
+        };
+      }
+    } else if (call.method === 'PATCH' || call.method === 'POST') {
+      const path = url.pathname.toLowerCase();
+      const issueMatch = new RegExp(`^${base}/issues/(\\d+)$`).exec(path);
+      const commentMatch = new RegExp(`^${base}/issues/(\\d+)/comments$`).exec(path);
+      if (issueMatch !== null && call.method === 'PATCH') {
+        try {
+          const payload = JSON.parse(String(init?.body ?? '{}')) as { state?: unknown };
+          if (payload.state === 'closed') {
+            const n = Number(issueMatch[1]);
+            state.open = state.open.filter((i) => i.number !== n);
+            const stored = state.issues.get(n);
+            if (stored !== undefined) state.issues.set(n, { ...stored, state: 'closed' });
+            res = { body: { number: n, state: 'closed' } };
+          } else {
+            res = { body: { number: Number(issueMatch[1]) } };
+          }
+        } catch {
+          res = { status: 400, body: { message: 'bad json' } };
+        }
+      } else if (commentMatch !== null && call.method === 'POST') {
+        res = { body: { id: 1 } };
+      } else {
+        res = { status: 404, body: { message: `no fake for ${path}` } };
+      }
+    } else {
+      res = resolve(url, headers);
+    }
     const status = res.status ?? 200;
     call.status = status;
     const resHeaders = Object.fromEntries(
@@ -309,6 +418,48 @@ function githubFake(repo: string) {
           ? c.path.endsWith('/permission')
           : c.path.toLowerCase() === `${base}/collaborators/${login.toLowerCase()}/permission`,
       ),
+    timelineReads: (n?: number) =>
+      calls.filter((c) =>
+        n === undefined
+          ? /\/issues\/\d+\/timeline$/.test(c.path)
+          : c.path.toLowerCase() === `${base}/issues/${n}/timeline`,
+      ),
+    graphqlReads: () => calls.filter((c) => c.path === '/graphql'),
+  };
+}
+
+function timelineCrossRef(pr: {
+  number: number;
+  state: 'open' | 'closed';
+  mergedAt: string | null;
+  repo: string;
+  isPull?: boolean;
+}): TimelineEvent {
+  const issue: NonNullable<NonNullable<TimelineEvent['source']>['issue']> = {
+    number: pr.number,
+    state: pr.state,
+    repository: { full_name: pr.repo },
+  };
+  if (pr.isPull !== false) {
+    issue.pull_request = { merged_at: pr.mergedAt };
+  }
+  return {
+    event: 'cross-referenced',
+    source: { type: 'issue', issue },
+  };
+}
+
+function closingNode(pr: {
+  number: number;
+  state: 'OPEN' | 'CLOSED' | 'MERGED';
+  merged: boolean;
+  repo: string;
+}): ClosingPullNode {
+  return {
+    number: pr.number,
+    state: pr.state,
+    merged: pr.merged,
+    repository: { nameWithOwner: pr.repo },
   };
 }
 
@@ -1471,7 +1622,12 @@ describe('14 malformed githubRepo, non-GitHub projects, two projects on one repo
       ])
       .run();
     await w.intake.sweep();
-    expect(w.gh.calls.every((c) => c.path.toLowerCase().startsWith(`/repos/${REPO}/`))).toBe(true);
+    expect(
+      w.gh.calls.every(
+        (c) =>
+          c.path.toLowerCase().startsWith(`/repos/${REPO}/`) || c.path.toLowerCase() === '/graphql',
+      ),
+    ).toBe(true);
     expect(w.gh.calls.filter((c) => c.path.toLowerCase() === `/repos/${REPO}/issues`)).toHaveLength(
       1,
     );
@@ -3004,5 +3160,452 @@ describe('27 bug issues are orchestrated reproduce-first through intake (#1618)'
     expect(text.indexOf('INTAKE-BODY-MARKER-1406')).toBeLessThan(
       text.indexOf('GitHub issue 原文结束'),
     );
+  });
+});
+
+describe('15 linked pull requests', () => {
+  test('an open same-repo linked PR prevents import and orchestration, and the log names the PR number', async () => {
+    const w = await makeWorld({ list: [1406] });
+    w.gh.state.timeline.set(1406, [
+      timelineCrossRef({
+        number: 1643,
+        state: 'open',
+        mergedAt: null,
+        repo: REPO,
+      }),
+    ]);
+    const tally = await w.intake.sweep();
+    expect(takenNumbers(w.s)).toEqual([]);
+    expect(chiefThreads(w.s)).toHaveLength(0);
+    expect(tally?.imported).toBe(0);
+    expect(tally?.orchestrated).toBe(0);
+    const skipped = w.logs.filter((l) => l.msg === 'issue intake candidate not taken');
+    expect(skipped.some((l) => l.obj.pr === 1643 && l.obj.reason === 'open-linked-pull')).toBe(
+      true,
+    );
+  });
+
+  test('the same PR closed without merge on the next sweep lets the issue import', async () => {
+    const w = await makeWorld({ list: [1406] });
+    w.gh.state.timeline.set(1406, [
+      timelineCrossRef({
+        number: 1643,
+        state: 'open',
+        mergedAt: null,
+        repo: REPO,
+      }),
+    ]);
+    await w.intake.sweep();
+    expect(takenNumbers(w.s)).toEqual([]);
+    w.gh.state.timeline.set(1406, [
+      timelineCrossRef({
+        number: 1643,
+        state: 'closed',
+        mergedAt: null,
+        repo: REPO,
+      }),
+    ]);
+    await w.intake.sweep();
+    expect(takenNumbers(w.s)).toEqual([1406]);
+    expect(chiefThreads(w.s)).toHaveLength(1);
+  });
+
+  test('a linked PR from another repository and a plain issue cross-reference do not block import', async () => {
+    const w = await makeWorld({ list: [1406] });
+    w.gh.state.timeline.set(1406, [
+      timelineCrossRef({
+        number: 3,
+        state: 'open',
+        mergedAt: null,
+        repo: 'other/repo',
+      }),
+      timelineCrossRef({
+        number: 7,
+        state: 'open',
+        mergedAt: null,
+        repo: REPO,
+        isPull: false,
+      }),
+    ]);
+    await w.intake.sweep();
+    expect(takenNumbers(w.s)).toEqual([1406]);
+  });
+
+  test('timeline complete:false, GraphQL hasNextPage, or a malformed body prevents import and logs the reason', async () => {
+    const incompleteTimeline = await makeWorld({ list: [1406] });
+    incompleteTimeline.gh.state.timelineIncomplete.add(1406);
+    await incompleteTimeline.intake.sweep();
+    expect(takenNumbers(incompleteTimeline.s)).toEqual([]);
+    expect(notTakenReasons(incompleteTimeline)).toContain('timeline-incomplete');
+
+    const incompleteClosing = await makeWorld({ list: [1406] });
+    incompleteClosing.gh.state.closingIncomplete.add(1406);
+    await incompleteClosing.intake.sweep();
+    expect(takenNumbers(incompleteClosing.s)).toEqual([]);
+    expect(notTakenReasons(incompleteClosing)).toContain('closing-pulls-incomplete');
+
+    const malformed = await makeWorld({ list: [1406] });
+    malformed.gh.overrides.set(`/repos/${REPO}/issues/1406/timeline`, () => ({
+      body: [{ event: 'cross-referenced', source: 'not-an-object' }],
+    }));
+    await malformed.intake.sweep();
+    expect(takenNumbers(malformed.s)).toEqual([]);
+    expect(notTakenReasons(malformed)).toContain('timeline-unreadable');
+  });
+
+  test('a rate-limited timeline read skips only that candidate; the next candidate and the next project in the same team are still imported', async () => {
+    const w = await makeWorld({ list: [1394, 1401] });
+    const otherId = await postGithubProject(w.s, 'other', 'xiechimon/other');
+    const otherGh = githubFake('xiechimon/other');
+    otherGh.state.open = syntheticIssues(2001, 2001);
+    const limited: GhResponse = {
+      status: 429,
+      headers: { 'retry-after': '60' },
+      body: { message: 'API rate limit exceeded' },
+    };
+    w.gh.overrides.set(`/repos/${REPO}/issues/1394/timeline`, () => limited);
+    const originalFetch = w.gh.impl;
+    const logs: LogLine[] = [];
+    const intake = createIssueIntake(
+      { ...w.s.svc, box: w.s.secretBox },
+      {
+        githubFetch: async (input, init) => {
+          const url = new URL(String(input));
+          if (url.pathname.toLowerCase().startsWith('/repos/xiechimon/other/')) {
+            return otherGh.impl(input, init);
+          }
+          return originalFetch(input, init);
+        },
+        logger: { info: (obj, msg) => logs.push({ obj: obj as Record<string, unknown>, msg }) },
+      },
+    );
+    const tally = await intake.sweep();
+    expect(
+      takenNumbers(w.s)
+        .filter((n) => n === 1401 || n === 2001)
+        .sort((a, b) => a - b),
+    ).toEqual([1401, 2001]);
+    expect(takenNumbers(w.s)).not.toContain(1394);
+    expect(tally?.rateLimited).toBe(0);
+    expect(logs.filter((l) => l.msg === 'issue intake team rate limited')).toHaveLength(0);
+    expect(
+      logs.some(
+        (l) =>
+          l.msg === 'issue intake candidate not taken' &&
+          l.obj.issue === 1394 &&
+          l.obj.reason === 'linked-pulls-rate-limited',
+      ),
+    ).toBe(true);
+    expect(otherId).toBeTruthy();
+  });
+
+  test('capacity full after labeler validation makes zero timeline or graphql calls', async () => {
+    const w = await makeWorld({ list: [1406] });
+    insertSourceTodo(w, 1001, 'building');
+    insertSourceTodo(w, 1002, 'todo');
+    w.gh.setOnCall((path) => {
+      if (path === `/repos/${REPO}/issues/1406/events`) {
+        w.gh.setOnCall(null);
+        insertSourceTodo(w, 1003, 'failed');
+      }
+    });
+    await w.intake.sweep();
+    expect(takenNumbers(w.s)).toEqual([1001, 1002, 1003]);
+    expect(w.gh.timelineReads()).toHaveLength(0);
+    expect(w.gh.graphqlReads()).toHaveLength(0);
+  });
+
+  test('capacity reached by another import during the link reads prevents this import', async () => {
+    const w = await makeWorld({ list: [1406] });
+    insertSourceTodo(w, 1001, 'building');
+    insertSourceTodo(w, 1002, 'todo');
+    w.gh.setOnCall((path) => {
+      if (path === `/repos/${REPO}/issues/1406/timeline`) {
+        w.gh.setOnCall(null);
+        insertSourceTodo(w, 1003, 'failed');
+      }
+    });
+    await w.intake.sweep();
+    expect(takenNumbers(w.s)).toEqual([1001, 1002, 1003]);
+    expect(w.gh.timelineReads(1406).length).toBeGreaterThan(0);
+  });
+
+  test('a sole merged closing pull request closes the issue on GitHub with no task creation, and a later sweep does not import it', async () => {
+    const w = await makeWorld({ list: [1406] });
+    w.gh.state.closingPulls.set(1406, [
+      closingNode({ number: 2103, state: 'MERGED', merged: true, repo: REPO }),
+    ]);
+    const first = await w.intake.sweep();
+    expect(takenNumbers(w.s)).toEqual([]);
+    expect(first?.imported).toBe(0);
+    expect(first?.githubIssuesClosed).toBe(1);
+    expect(
+      w.logs.some(
+        (l) =>
+          l.msg === 'issue intake closed github issue after merged closing pull request' &&
+          l.obj.issue === 1406 &&
+          l.obj.pr === 2103,
+      ),
+    ).toBe(true);
+    expect(
+      w.gh.calls.filter((c) => c.path === `/repos/${REPO}/issues/1406` && c.method === 'PATCH'),
+    ).toHaveLength(1);
+    const patch = w.gh.calls.find((c) => c.method === 'PATCH');
+    expect(JSON.parse(patch?.body ?? '{}')).toEqual({ state: 'closed', state_reason: 'completed' });
+    expect(
+      w.gh.calls.filter((c) => c.method === 'POST' && c.path.endsWith('/comments')),
+    ).toHaveLength(0);
+    expect(w.s.db.select().from(buildTable).all()).toHaveLength(0);
+    expect(w.gh.state.open.some((i) => i.number === 1406)).toBe(false);
+    const timelineAfterClose = w.gh.timelineReads(1406).length;
+    await w.intake.sweep();
+    expect(takenNumbers(w.s)).toEqual([]);
+    expect(w.gh.timelineReads(1406).length).toBe(timelineAfterClose);
+  });
+
+  test('a merged timeline mention without a GraphQL closing reference does not close the issue or import it', async () => {
+    const w = await makeWorld({ list: [1406] });
+    w.gh.state.timeline.set(1406, [
+      timelineCrossRef({
+        number: 77,
+        state: 'closed',
+        mergedAt: '2026-01-01T00:00:00Z',
+        repo: REPO,
+      }),
+    ]);
+    await w.intake.sweep();
+    expect(takenNumbers(w.s)).toEqual([]);
+    expect(
+      w.gh.calls.filter(
+        (c) =>
+          c.path === `/repos/${REPO}/issues/1406` && (c.method === 'PATCH' || c.method === 'POST'),
+      ),
+    ).toHaveLength(0);
+    expect(
+      w.logs.some(
+        (l) =>
+          l.msg === 'issue intake candidate not taken' &&
+          l.obj.reason === 'merged-linked-pull' &&
+          l.obj.pr === 77,
+      ),
+    ).toBe(true);
+  });
+
+  test('merged and closed-unmerged closing references defer without a GitHub write', async () => {
+    const w = await makeWorld({ list: [1406] });
+    w.gh.state.closingPulls.set(1406, [
+      closingNode({ number: 10, state: 'MERGED', merged: true, repo: REPO }),
+      closingNode({ number: 11, state: 'CLOSED', merged: false, repo: REPO }),
+    ]);
+    await w.intake.sweep();
+    expect(takenNumbers(w.s)).toEqual([]);
+    expect(
+      w.gh.calls.filter(
+        (c) =>
+          c.path === `/repos/${REPO}/issues/1406` && (c.method === 'PATCH' || c.method === 'POST'),
+      ),
+    ).toHaveLength(0);
+    expect(
+      w.logs.some(
+        (l) =>
+          l.msg === 'issue intake candidate not taken' &&
+          l.obj.reason === 'merged-linked-pull' &&
+          l.obj.pr === 10,
+      ),
+    ).toBe(true);
+  });
+
+  test('a failed GitHub issue close skips import for that candidate and later candidates in the team still run', async () => {
+    const w = await makeWorld({ list: [1394, 1401] });
+    w.gh.state.closingPulls.set(1394, [
+      closingNode({ number: 501, state: 'MERGED', merged: true, repo: REPO }),
+    ]);
+    w.gh.overrides.set(`/repos/${REPO}/issues/1394`, () => ({
+      status: 502,
+      body: { message: 'Bad Gateway' },
+    }));
+    await w.intake.sweep();
+    expect(takenNumbers(w.s)).not.toContain(1394);
+    expect(takenNumbers(w.s)).toContain(1401);
+    expect(
+      w.logs.some(
+        (l) => l.msg === 'issue intake github issue close failed' && l.obj.issue === 1394,
+      ),
+    ).toBe(true);
+  });
+
+  test('a deferred merged-linked candidate still re-reads links when the issue list answers 304', async () => {
+    const w = await makeWorld({ list: [1406] });
+    w.gh.state.timeline.set(1406, [
+      timelineCrossRef({
+        number: 77,
+        state: 'closed',
+        mergedAt: '2026-01-01T00:00:00Z',
+        repo: REPO,
+      }),
+    ]);
+    const timelineBefore = w.gh.timelineReads(1406).length;
+    const graphqlBefore = w.gh.graphqlReads().length;
+    await w.intake.sweep();
+    await w.intake.sweep();
+    expect(w.gh.listReads().some((c) => c.status === 304)).toBe(true);
+    expect(w.gh.timelineReads(1406).length).toBeGreaterThan(timelineBefore);
+    expect(w.gh.graphqlReads().length).toBeGreaterThan(graphqlBefore);
+  });
+
+  test('the same PR seen open in the timeline and MERGED in GraphQL is ambiguous and does not import', async () => {
+    const w = await makeWorld({ list: [1406] });
+    w.gh.state.timeline.set(1406, [
+      timelineCrossRef({ number: 42, state: 'open', mergedAt: null, repo: REPO }),
+    ]);
+    w.gh.state.closingPulls.set(1406, [
+      closingNode({ number: 42, state: 'MERGED', merged: true, repo: REPO }),
+    ]);
+    await w.intake.sweep();
+    expect(takenNumbers(w.s)).toEqual([]);
+    expect(notTakenReasons(w)).toContain('linked-pull-conflict');
+  });
+
+  test('two linked PRs, one open and one closed, does not import', async () => {
+    const w = await makeWorld({ list: [1406] });
+    w.gh.state.timeline.set(1406, [
+      timelineCrossRef({ number: 10, state: 'open', mergedAt: null, repo: REPO }),
+      timelineCrossRef({ number: 11, state: 'closed', mergedAt: null, repo: REPO }),
+    ]);
+    await w.intake.sweep();
+    expect(takenNumbers(w.s)).toEqual([]);
+    expect(
+      w.logs.some(
+        (l) =>
+          l.msg === 'issue intake candidate not taken' &&
+          l.obj.reason === 'open-linked-pull' &&
+          l.obj.pr === 10,
+      ),
+    ).toBe(true);
+  });
+});
+
+describe('16 merged closing PR', () => {
+  test('contradictory closed-unmerged and merged observations of the same PR never close or import', async () => {
+    const w = await makeWorld({ list: [1406] });
+    w.gh.state.timeline.set(1406, [
+      timelineCrossRef({ number: 42, state: 'closed', mergedAt: null, repo: REPO }),
+    ]);
+    w.gh.state.closingPulls.set(1406, [
+      closingNode({ number: 42, state: 'MERGED', merged: true, repo: REPO }),
+    ]);
+    await w.intake.sweep();
+    expect(takenNumbers(w.s)).toEqual([]);
+    expect(w.gh.calls.filter((c) => c.method === 'PATCH')).toHaveLength(0);
+  });
+
+  test.each([429, 502])(
+    'close PATCH failure %i stays local and retries on the next sweep',
+    async (status) => {
+      const w = await makeWorld({ list: [1394, 1401] });
+      w.gh.state.closingPulls.set(1394, [
+        closingNode({ number: 501, state: 'MERGED', merged: true, repo: REPO }),
+      ]);
+      const otherRepo = 'xiechimon/other';
+      const other = githubFake(otherRepo);
+      other.state.open = other.state.open.filter((i) => i.number === 1406);
+      await postGithubProject(w.s, 'other', otherRepo);
+      const intake = createIssueIntake(
+        { ...w.s.svc, box: w.s.secretBox },
+        {
+          githubFetch: (input, init) =>
+            String(input).includes(`/repos/${otherRepo}/`)
+              ? other.impl(input, init)
+              : w.gh.impl(input, init),
+          logger: { info: (obj, msg) => w.logs.push({ obj: obj as Record<string, unknown>, msg }) },
+        },
+      );
+      w.gh.overrides.set(`/repos/${REPO}/issues/1394`, () => ({
+        status,
+        headers: { 'retry-after': '60' },
+        body: { message: 'close failed' },
+      }));
+      await intake.sweep();
+      expect(takenNumbers(w.s)).toEqual([1401, 1406]);
+      expect(
+        w.logs.some(
+          (l) => l.msg === 'issue intake github issue close failed' && l.obj.issue === 1394,
+        ),
+      ).toBe(true);
+      w.gh.overrides.delete(`/repos/${REPO}/issues/1394`);
+      const retry = await intake.sweep();
+      expect(retry?.githubIssuesClosed).toBe(1);
+      expect(
+        w.gh.calls.filter((c) => c.method === 'PATCH' && c.path.endsWith('/1394')),
+      ).toHaveLength(2);
+      expect(takenNumbers(w.s)).toEqual([1401, 1406]);
+    },
+  );
+
+  test.each([
+    'open',
+    'timeline-incomplete',
+    'closing-incomplete',
+    'conflict',
+    'two-merged',
+    'closed-unmerged',
+  ])('%s evidence prevents a completion PATCH', async (kind) => {
+    const w = await makeWorld({ list: [1406] });
+    w.gh.state.closingPulls.set(1406, [
+      closingNode({ number: 42, state: 'MERGED', merged: true, repo: REPO }),
+    ]);
+    if (kind === 'timeline-incomplete') w.gh.state.timelineIncomplete.add(1406);
+    if (kind === 'closing-incomplete') w.gh.state.closingIncomplete.add(1406);
+    if (kind === 'open' || kind === 'conflict')
+      w.gh.state.timeline.set(1406, [
+        timelineCrossRef({
+          number: kind === 'conflict' ? 42 : 43,
+          state: 'open',
+          mergedAt: null,
+          repo: REPO,
+        }),
+      ]);
+    if (kind === 'two-merged' || kind === 'closed-unmerged')
+      w.gh.state.closingPulls.get(1406)?.push(
+        closingNode({
+          number: 43,
+          state: kind === 'two-merged' ? 'MERGED' : 'CLOSED',
+          merged: kind === 'two-merged',
+          repo: REPO,
+        }),
+      );
+    await w.intake.sweep();
+    expect(takenNumbers(w.s)).toEqual([]);
+    expect(w.gh.calls.filter((c) => c.method === 'PATCH')).toHaveLength(0);
+    expect(chiefThreads(w.s)).toHaveLength(0);
+  });
+
+  test('a candidate claimed during link reads belongs to task reconciliation', async () => {
+    const w = await makeWorld({ list: [1406] });
+    w.gh.state.closingPulls.set(1406, [
+      closingNode({ number: 42, state: 'MERGED', merged: true, repo: REPO }),
+    ]);
+    w.gh.setOnCall((path) => {
+      if (path === '/graphql') {
+        w.gh.setOnCall(null);
+        insertSourceTodo(w, 1406, 'todo');
+      }
+    });
+    await w.intake.sweep();
+    expect(w.gh.calls.filter((c) => c.method === 'PATCH')).toHaveLength(0);
+    expect(takenNumbers(w.s)).toEqual([1406]);
+  });
+
+  test('manual import still imports an issue with a merged closing PR', async () => {
+    const w = await makeWorld({ list: [1406] });
+    w.gh.state.closingPulls.set(1406, [
+      closingNode({ number: 42, state: 'MERGED', merged: true, repo: REPO }),
+    ]);
+    const res = await req(w.s.app, 'POST', `/api/projects/${w.projectId}/github/issues/import`, {
+      number: 1406,
+    });
+    expect(res.status).toBe(201);
+    expect(takenNumbers(w.s)).toEqual([1406]);
+    expect(w.gh.calls.filter((c) => c.method === 'PATCH')).toHaveLength(0);
   });
 });

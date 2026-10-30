@@ -21,6 +21,7 @@ import type {
   ProviderCompat,
   ProviderModel,
   RequiredCapabilities,
+  ScheduleReport,
   SkillInjectionRecord,
   SplitPolicy,
   StepKind,
@@ -56,6 +57,7 @@ export const team = sqliteTable('team', {
   plan: text('plan').notNull().default('free'),
   avatarStyle: text('avatarStyle'),
   autonomyPaused: bool('autonomyPaused').notNull().default(false),
+  maxAutonomousMergesPerDay: integer('maxAutonomousMergesPerDay').notNull().default(10),
   firstPrReportPromptEnabled: bool('firstPrReportPromptEnabled').notNull().default(false),
   firstPrReportPromptDismissedAt: epochMs('firstPrReportPromptDismissedAt'),
   firstPrReportPromptFirstPrAt: epochMs('firstPrReportPromptFirstPrAt'),
@@ -209,17 +211,37 @@ export const step = sqliteTable(
     index('step_status_kind_idx').on(t.status, t.kind),
     index('step_buildId_status_idx').on(t.buildId, t.status),
     index('step_kind_idx').on(t.kind),
+    index('step_merge_finished_idx').on(t.kind, t.status, t.finishedAt),
   ],
 );
 
-export const message = sqliteTable('message', {
-  id: text('id').primaryKey(),
-  conversationId: text('conversationId').notNull(),
-  role: text('role').$type<'system' | 'user' | 'assistant'>().notNull(),
-  content: json<unknown>('content').notNull(),
-  createdAt: epochMs('createdAt').notNull(),
-  actor: text('actor'),
-});
+export const message = sqliteTable(
+  'message',
+  {
+    id: text('id').primaryKey(),
+    conversationId: text('conversationId').notNull(),
+    role: text('role').$type<'system' | 'user' | 'assistant'>().notNull(),
+    content: json<unknown>('content').notNull(),
+    createdAt: epochMs('createdAt').notNull(),
+    actor: text('actor'),
+  },
+  (t) => [index('message_createdAt_idx').on(t.createdAt)],
+);
+
+export const autonomousMergeAdmission = sqliteTable(
+  'autonomous_merge_admission',
+  {
+    buildId: text('buildId').primaryKey(),
+    teamId: text('teamId').notNull(),
+    state: text('state').$type<'pending' | 'merged'>().notNull(),
+    createdAt: epochMs('createdAt').notNull(),
+    landedAt: epochMs('landedAt'),
+  },
+  (t) => [
+    index('autonomous_merge_team_state_landed_idx').on(t.teamId, t.state, t.landedAt),
+    index('autonomous_merge_pending_age_idx').on(t.state, t.createdAt),
+  ],
+);
 
 export const branchSync = sqliteTable('branch_sync', {
   id: text('id').primaryKey(),
@@ -403,6 +425,20 @@ export const pushSubscription = sqliteTable(
   (t) => [uniqueIndex('push_subscription_endpoint_unique').on(t.endpoint)],
 );
 
+export const pushDelivery = sqliteTable('push_delivery', {
+  message: json<{ title: string; body: string; href: string; tag: string }>('message'),
+  pushStatus: text('pushStatus').notNull().default('unknown'),
+  id: text('id').primaryKey(),
+  userId: text('userId').notNull(),
+  teamId: text('teamId').notNull(),
+  createdAt: epochMs('createdAt').notNull(),
+  receivedAt: epochMs('receivedAt'),
+  fallbackClaimedAt: epochMs('fallbackClaimedAt'),
+  alertStatus: text('alertStatus').$type<
+    'pending' | 'sending' | 'received' | 'fallback-accepted' | 'undelivered'
+  >(),
+});
+
 export const pushDigestItem = sqliteTable('push_digest_item', {
   id: text('id').primaryKey(),
   userId: text('userId').notNull(),
@@ -487,6 +523,7 @@ export const apiKey = sqliteTable('api_key', {
   name: text('name'),
   gitAccess: bool('gitAccess').notNull().default(false),
   mcpAccess: bool('mcpAccess').notNull().default(false),
+  machineAccess: bool('machineAccess').notNull().default(false),
   toolGrants: json<{ read: string[]; write: string[] }>('toolGrants').notNull(),
   keyHash: text('keyHash').notNull(),
   masked: text('masked').notNull(),
@@ -763,4 +800,23 @@ export const feishuBinding = sqliteTable(
     updatedAt: epochMs('updatedAt').notNull(),
   },
   (t) => [uniqueIndex('feishu_binding_openId_unique').on(t.openId)],
+);
+
+export const scheduleReport = sqliteTable(
+  'schedule_report',
+  {
+    id: text('id').primaryKey(),
+    projectId: text('projectId')
+      .notNull()
+      .references(() => project.id, { onDelete: 'cascade' }),
+    generatedAt: epochMs('generatedAt').notNull(),
+    mainSha: text('mainSha').notNull(),
+    groups: json<ScheduleReport['groups']>('groups').notNull(),
+    items: json<ScheduleReport['items']>('items').notNull(),
+    unparsedDeps: json<ScheduleReport['unparsedDeps']>('unparsedDeps').notNull(),
+    decidedAt: epochMs('decidedAt'),
+    decidedBy: text('decidedBy'),
+    appliedAt: epochMs('appliedAt'),
+  },
+  (t) => [index('schedule_report_project_idx').on(t.projectId, t.generatedAt)],
 );

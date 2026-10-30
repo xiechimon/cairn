@@ -1,0 +1,55 @@
+✔ incident handoff leaves recurrence accounting to the collector (0.592505ms)
+✖ dispatcher message exists and retains the closing trailer (0.159703ms)
+✔ recovery fixture executes the recipe without incident wording assertions (0.111987ms)
+✔ AGENTS.md separates bot rebase from human squash (4.585694ms)
+✔ .claude/skills/pr-cairn/SKILL.md separates bot rebase from human squash (0.186434ms)
+✔ docs/ops/agent-bot-identity.md separates bot rebase from human squash (0.103135ms)
+✔ documented preparation overrides inherited bot author and committer identities (34.439979ms)
+✔ identity wrappers are explicitly excluded from commit preparation (0.345758ms)
+✔ .claude/skills/pr-cairn/SKILL.md recovers through a compliant push without rewriting main (0.271542ms)
+✔ docs/ops/agent-bot-identity.md recovers through a compliant push without rewriting main (0.093069ms)
+✔ the workflow rejects bot authors and accepts Cairnwright and human authors (36.14352ms)
+✔ recovery regression is run by the trusted main workflow (0.703271ms)
+✔ incident recovery documents #2136 rejected SHAs and pending production acceptance (3.844516ms)
+✔ incident recovery preserves trailers and history while passing the actual push check (37.171239ms)
+✔ PR validation reads the explicit head without executing PR code (0.861367ms)
+✔ a bot-authored commit beneath a human tip is rejected (19.160826ms)
+✔ a squash commit authored by the bot is rejected (16.489455ms)
+✔ main push checks bot squash (18.342523ms)
+✔ main push checks bot beneath human tip (18.751122ms)
+✔ main push checks historical bot (19.493169ms)
+✔ main push checks missing before (14.853743ms)
+✔ main push checks zero before (16.204805ms)
+✔ every commit in a clean human range passes (20.121439ms)
+✔ author cairnwright[bot] <347615582+cairnwright[bot]@users.noreply.github.com> exits 1 with a bot committer (11.156933ms)
+✔ author Human <347615582+cairnwright[bot]@users.noreply.github.com> exits 1 with a bot committer (10.506578ms)
+✔ author cairnwright[bot] <other@example.com> exits 1 with a bot committer (10.049943ms)
+✔ author Human <human@example.com> exits 0 with a bot committer (11.508745ms)
+✔ author Cairnwright <cairnwright@example.com> exits 0 with a bot committer (10.116599ms)
+ℹ tests 28
+ℹ suites 0
+ℹ pass 27
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 247.60223
+
+✖ failing tests:
+
+test at docs/verify/2136/review-check.test.mjs:11:1
+✖ dispatcher message exists and retains the closing trailer (0.159703ms)
+  Error: ENOENT: no such file or directory, open 'COMMIT_MSG.txt'
+      at readFileSync (node:fs:621:20)
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-2136/docs/verify/2136/review-check.test.mjs:12:19)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'open',
+    path: 'COMMIT_MSG.txt'
+  }

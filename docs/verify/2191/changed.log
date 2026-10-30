@@ -1,0 +1,81 @@
+
+ RUN  v5.0.1 <worktree>
+
+(node:18900) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:18885) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+web push delivery failed
+ ❯ |@xiechimon/cairn| test/push.test.ts (40 tests | 7 failed) 11493ms
+   ❯ subscription authorization boundaries (4)
+     × delivers only to the requested owner and team 179ms
+   ❯ delivery: only decisions push immediately (4)
+     × parallel delivery reaches a live endpoint while another is stalled 225ms
+   ❯ digest routing: merged, failed, plan-ready, review queue; 410 prunes (7)
+     × PATCH todo phase to confirm queues for the digest and sends no immediate push 309ms
+     × queues build review for the digest without an immediate push 673ms
+     × queues merged PR reconciliation for the digest without an immediate push 144ms
+     × queues failed work for the digest without an immediate push 256ms
+     × prunes a 410 subscription while delivering to live subscriptions 185ms
+ ❯ |@xiechimon/cairn| test/skill-write.test.ts (30 tests | 1 failed) 25316ms
+   ❯ machine-wire skill listing and on-demand fetch (GET /api/machine/skills/{stepId}[/file]) (8)
+     × M5: an over-limit file no longer fails the whole package -- an asset past the per-file gate enters the listing with its real size and is delivered byte-complete; a total over the old package gate still gets a listing 10327ms
+ ❯ |@xiechimon/cairn| test/wire.test.ts (26 tests | 1 failed) 14778ms
+   ❯ the route surface = the 02 §6.1 vocabulary (4)
+     × no invented paths outside the vocabulary ([inferred] surfaces explicitly registered) 42ms
+ ❯ |@xiechimon/cairn| test/git-hosting.test.ts (11 tests | 11 skipped) 10014ms
+ ❯ |@xiechimon/cairn| test/attachment-gc.test.ts (15 tests | 1 failed) 35382ms
+   ❯ attachment gc -- scheduler cadence (3)
+     × a large transcript corpus does not block the event loop during a tick 30009ms
+ ❯ |@xiechimon/cairn| test/trajectory-reflect.test.ts (12 tests | 12 failed) 120132ms
+   × reflects only builds that turned green after failing or were sent back by a human 10026ms
+   × drops candidates that copy GitHub issue text 10001ms
+   × an invalid reflection fails the run without output 10002ms
+   × reflect requires arguments, endpoint and a fresh output path 10002ms
+   × memory candidates land as pending, deduplicated, and never in agent memory 10001ms
+   × a lesson already in memory is skipped, an overlapping one records the conflict 10003ms
+   × needs evidence from two different builds, then a successful recurrence promotes it 10001ms
+   × human confirmation promotes only with two builds of evidence 10002ms
+   × guard candidates go to a local JSONL pool, merged across runs 10003ms
+   × skill candidates become patch drafts that apply to the current skill file 10003ms
+   × curate rejects fenced issue text and builds it cannot place 10055ms
+   × a dismissed candidate absorbs later recurrences and is never promoted 10014ms
+web push delivery failed
+web push delivery failed
+web push delivery failed
+web push delivery failed
+web push delivery failed
+ALERT FALLBACK FAILED AlK42Um8OxRcTMpbVNjgc
+ALERT UNDELIVERED AlK42Um8OxRcTMpbVNjgc
+web push delivery failed
+ ❯ |@xiechimon/cairn| test/trajectory-outcome.test.ts (6 tests | 6 failed) 60041ms
+   × merged, closed-unmerged and reverted builds export with matching outcomes 10017ms
+   × a revert after the 7 day window does not count, and a later PR on the same ticket marks the fix 10001ms
+   × a merge newer than 7 days leaves the revert window open and reports it 10002ms
+   × builds without a merge or close record keep every outcome field null 10003ms
+   × a close followed by a later merge counts as merged, and the latest record wins 10007ms
+   × traj:export feeds traj:label: failed packs get labeled, successful packs are skipped 10003ms
+ ❯ |@xiechimon/cairn| test/trajectory-reflect-curate.test.ts (9 tests | 9 failed) 90069ms
+   × ENV_VARS.trajectoryReflectCurate names the schedule flag 10016ms
+   × loadConfig reads the reflect-curate schedule flag 10002ms
+   × trajectoryReflectCurateRunOf is null when the schedule flag is off 10007ms
+   × trajectoryReflectCurateRunOf stays off without reflector credentials 10002ms
+   × createScheduler in index.ts ends with trajectoryReflectCurateRunOf after export 10004ms
+   × export and outcome runOf helpers still exist for the prior slots 10001ms
+   × sweepReflectCurate reflects then curates a daily export once 10002ms
+   × sweepReflectCurate opens GitHub issues for new guards when asked 10004ms
+   × REFLECT_CURATE_INTERVAL_MS matches the daily trajectory cadence 10010ms
+ ❯ |@xiechimon/cairn| test/build-diff-fulltext.test.ts (4 tests | 2 failed) 19422ms
+   ❯ GET /api/builds/{id}/changes/file (#224 diff full-text read surface) (4)
+     × text = conv branch history state full text (not main old version); envelope passes the shared schema; nested paths same surface 5225ms
+     × 404 surface: unknown build / non-managed project / conv branch not pushed / file missing / directory path 5053ms
+ ❯ |@xiechimon/cairn| test/schema.test.ts (5 tests | 2 failed) 1567ms
+   ❯ the 37-table migration (the 01 §6 list) (4)
+     × the drizzle schema table-name set = DB_TABLES 49ms
+     × upgrades a database already migrated through the previous main migration 589ms
+
+Verification status: INTERRUPTED by control-C; command exit 130.
+The run stopped after no further output for more than nine minutes. No final suite summary was produced.
+Known route-catalog and schema failures from this pre-fix run are corrected and covered by catalog-green.log (150 passed).
+Other reported failures/timeouts remain unverified; local socket fixtures are blocked by sandbox EPERM.
+Stopped at 2026-10-30T05:58:42.076159+00:00
