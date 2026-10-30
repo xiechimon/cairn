@@ -57,9 +57,9 @@ jobs:
             git switch -c "$branch"
             git commit -m 'chore(1534): publish weekly safeguard counters'
             git push origin "HEAD:$branch"
-            printf '%s\n' '## What' '' 'Publish the collected safeguard events and projected lesson counters.' '' '## Verified' '' > "$RUNNER_TEMP/lessons-pr.md"
-            cat gardener-summary/lessons-weekly-*.md >> "$RUNNER_TEMP/lessons-pr.md"
-            printf '%s\n' '' '## Upstream' '' 'Generated data from the existing lessons ledger reducer; no new mechanism.' '' '## Risk' '' 'Ledger data only. Review category counts before merging.' '' '## Acceptance' '' '- [x] no task surface: generated ledger data only' '' '## Issues' '' 'Weekly collection for #1534.' >> "$RUNNER_TEMP/lessons-pr.md"
+            printf '%s\n' '## What' '' 'Publish the collected safeguard events and projected lesson counters.' '' '## Proof' '' > "$RUNNER_TEMP/lessons-pr.md"
+            sed 's/^## /### /' gardener-summary/lessons-weekly-*.md >> "$RUNNER_TEMP/lessons-pr.md"
+            printf '%s\n' '' '## Review' '' "Head: $(git rev-parse HEAD). No model review has run: vendor/model none, fresh context no, rounds 0, verdict pending, findings unassessed." '' '## Risk' '' 'Two-way door. Lesson data only; review category counts. The owner must merge because docs/lessons is protected.' >> "$RUNNER_TEMP/lessons-pr.md"
             gh pr create --repo '${{ github.repository }}' --head "${{ github.repository_owner }}:$branch" --title 'chore(1534): publish weekly safeguard counters' --body-file "$RUNNER_TEMP/lessons-pr.md"
           fi
 

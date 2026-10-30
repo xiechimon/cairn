@@ -40,7 +40,7 @@ Role names all in English (user-specified). Each persona's description is writte
 |---|---|---|---|
 | **Chief** (orchestrator) | chief step | `split_todo` splitting / dispatch / gate notifications / small-merge of the three review reports into go/no-go / merge-verdict advice. **No construction, no relay hops** (meta-orchestrator anti-pattern — chief's added value = splitting + gates + merge verdict, not pure routing) | dispatch decisions, split plans, go/no-go |
 | **Planner** | plan step | read the ticket + produce the four-section plan.md from the repo, no code touched | plan doc (plan.md) |
-| **Implementer** | build step | thin vertical-slice TDD per plan, committing per item, opening a six-section-body PR | branch + PR |
+| **Implementer** | build step | thin vertical-slice TDD per plan, committing per item, opening a four-section-body PR | branch + PR |
 | **CodeReviewer** | review step (one of the fan-out three perspectives, parallel, reports only, no code changes) | five-axis review + severity labels | review report |
 | **SecurityAuditor** | review step (one of the fan-out three perspectives) | OWASP-style audit; joins when the diff touches server/auth/crypto | security audit report |
 | **TestEngineer** | review step (one of the fan-out three perspectives) | coverage gaps + Prove-It | missing-test list |
