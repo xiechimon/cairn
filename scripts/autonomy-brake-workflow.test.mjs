@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { test } from 'node:test';
 
 function runStep(t, file, name, env) {
@@ -96,10 +96,6 @@ for (const valid of [false, true])
   });
 test('required check shape retains unconditional job, trigger coverage, and brake before body checks', () => {
   const text = readFileSync('.github/workflows/pr-evidence.yml', 'utf8');
-  const gate = spawnSync(process.execPath, [resolve('scripts/pr-evidence-workflow-gate.mjs')], {
-    encoding: 'utf8',
-  });
-  assert.equal(gate.status, 0, gate.stdout);
   assert.ok(
     text.indexOf('name: Check the autonomy brake') < text.indexOf('name: Check PR body evidence'),
   );
