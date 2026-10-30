@@ -22,6 +22,7 @@ export class OrbLifecycle {
       max: number;
       idleStopMs?: number;
       onStopped?: (handle: OrbHandle) => Promise<void>;
+      log?: (message: string) => void;
     },
   ) {
     this.max = options.max;
@@ -98,7 +99,11 @@ export class OrbLifecycle {
   private async stop(handle: OrbHandle): Promise<void> {
     if (!handle.running) return;
     await this.provider.stop(handle);
-    await this.options.onStopped?.(handle);
+    try {
+      await this.options.onStopped?.(handle);
+    } catch (error) {
+      this.options.log?.(`orb stopped relay failed: ${String(error)}`);
+    }
   }
 
   private wake(): void {

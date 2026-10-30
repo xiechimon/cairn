@@ -432,6 +432,12 @@ export const MACHINE_WIRE_EXTENSIONS = [
   },
   {
     method: 'GET',
+    path: '/api/machine/orbs/closed',
+    reason:
+      '[design] #2274 closed and archived build ids for orb cleanup, scoped to the authenticated machine and team',
+  },
+  {
+    method: 'GET',
     path: '/api/machine/steer',
     reason: '[设计] W3 steer 拉取-确认（06 册 D9；claimed 步单槽 pending，?stepId=）',
   },

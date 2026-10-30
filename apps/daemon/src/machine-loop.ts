@@ -70,7 +70,6 @@ export interface MachineLoopOpts {
   proxyEnv?: NodeJS.ProcessEnv;
   capEnv?: NodeJS.ProcessEnv;
   orbProvider?: OrbProvider;
-  orbClosedConversationIds?: () => Promise<readonly string[]>;
   heartbeatIntervalMs?: number;
   idleSleepPrevention?: boolean;
   orphanTtlMs?: number;
@@ -289,6 +288,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const orbs = new OrbLifecycle(orbProvider, {
     max: resolveOrbCap(capEnv, localCap),
     onStopped: (handle) => relayOrbStopped(stepDeps(), handle),
+    log: (message) => logger.workspace(message),
     ...(Number.isFinite(idleStop) && idleStop > 0 ? { idleStopMs: idleStop } : {}),
   });
   const refreshCap = async (): Promise<void> => {
@@ -384,7 +384,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     if (sweepingOrbs || orbProvider.kind !== 'orb') return;
     sweepingOrbs = true;
     void (async () => {
-      const closedConversationIds = await opts.orbClosedConversationIds?.();
+      const closedConversationIds = await client.closedOrbConversations?.();
       await orbs.sweep({
         activeConversationIds: journal.pending().map((entry) => entry.conversationId),
         closedConversationIds,
@@ -591,7 +591,10 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     let backoff = backoffBase;
     while (!stopping) {
       const workersInFlight = inFlight.size - inFlightChief.size;
-      if (!serverGates && workersInFlight > 0 && workersInFlight >= localCap) {
+      if (
+        (orbProvider.kind === 'orb' && inFlight.size >= localCap) ||
+        (!serverGates && workersInFlight > 0 && workersInFlight >= localCap)
+      ) {
         await Promise.race(inFlight.values());
         continue;
       }

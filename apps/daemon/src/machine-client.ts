@@ -44,6 +44,8 @@ import {
   type TranscriptUpload,
 } from '@cairn/shared';
 
+import { z } from 'zod';
+
 export class MachineApiError extends Error {
   constructor(
     readonly status: number,
@@ -81,6 +83,7 @@ export interface MachineApi {
     capabilities?: MachineCapabilities;
   }): Promise<void>;
   recover(): Promise<MachineRecoverResponse>;
+  closedOrbConversations?(): Promise<string[]>;
   claim(signal?: AbortSignal, body?: MachineClaimBody): Promise<ClaimedStep | null>;
   heartbeat(stepId: string, body?: MachineHeartbeatBody): Promise<void>;
   tool(stepId: string, call: ToolCallRecord): Promise<void>;
@@ -233,6 +236,12 @@ export class MachineClient implements MachineApi {
     return this.request('POST', '/api/machine/recover', {
       body: {},
       parse: (raw) => machineRecoverResponseSchema.parse(raw),
+    });
+  }
+
+  async closedOrbConversations(): Promise<string[]> {
+    return this.request('GET', '/api/machine/orbs/closed', {
+      parse: (raw) => z.array(z.string()).parse(raw),
     });
   }
 

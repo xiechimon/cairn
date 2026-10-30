@@ -47,7 +47,14 @@ describe('OrbProvider', () => {
     await provider.stop(handle);
     const restarted = new NspawnOrbProvider({ runner, stateFile });
     await restarted.ensure({ conversationId: 'C', projectId: 'P' });
-    expect(commands.map((c) => c.argv[1])).toEqual(['clone', 'start', 'poweroff', 'stop', 'start']);
+    expect(commands.map((c) => c.argv[1])).toEqual([
+      'clone',
+      'start',
+      'poweroff',
+      'stop',
+      'list',
+      'start',
+    ]);
     expect(await restarted.list()).toHaveLength(1);
   });
 
@@ -245,4 +252,85 @@ test('destroy waits for the container service to stop before removing its image'
     ['systemctl', 'stop', `systemd-nspawn@${handle.id}.service`],
     ['machinectl', 'remove', handle.id],
   ]);
+});
+
+test('persisted running handles restart after a host reboot without another clone', async () => {
+  const { provider, runner, stateFile, commands } = fixture();
+  await provider.ensure({ conversationId: 'A', projectId: 'P' });
+  const rebooted = new NspawnOrbProvider({ runner, stateFile });
+  await rebooted.ensure({ conversationId: 'A', projectId: 'P' });
+  expect(commands.filter((c) => c.argv[1] === 'start')).toHaveLength(2);
+  expect(commands.filter((c) => c.argv[1] === 'clone')).toHaveLength(1);
+});
+
+test('a missing machine and image do not abort cleanup', async () => {
+  const { provider, stateFile } = fixture();
+  await provider.ensure({ conversationId: 'A', projectId: 'P' });
+  const missing = new NspawnOrbProvider({
+    stateFile,
+    runner: async (argv) => ({
+      code: argv[1] === 'list' ? 0 : 1,
+      stdout: '',
+      stderr: 'No machine or image known',
+    }),
+  });
+  const [handle] = await missing.list();
+  handle!.running = true;
+  await expect(missing.stop(handle!)).resolves.toBeUndefined();
+  expect(handle!.running).toBe(false);
+  await expect(missing.destroy(handle!)).resolves.toBeUndefined();
+  expect(await missing.list()).toEqual([]);
+});
+
+test.each(['sweep', 'eviction'])('onStopped relay failures do not abort %s', async (source) => {
+  const { provider } = fixture();
+  const onStopped = vi.fn(async () => {
+    throw new Error('relay unavailable');
+  });
+  const log = vi.fn();
+  const lifecycle = new OrbLifecycle(provider, { max: source === 'sweep' ? 2 : 1, onStopped, log });
+  await lifecycle.run({ conversationId: 'A', projectId: 'P' }, async () => {});
+  if (source === 'sweep') {
+    await lifecycle.run({ conversationId: 'B', projectId: 'P' }, async () => {});
+    await expect(
+      lifecycle.sweep({ activeConversationIds: [], closedConversationIds: ['A', 'B'] }),
+    ).resolves.toBeUndefined();
+    expect(await provider.list()).toEqual([]);
+  } else {
+    await expect(
+      lifecycle.run({ conversationId: 'B', projectId: 'P' }, async () => 'ok'),
+    ).resolves.toBe('ok');
+  }
+  expect(onStopped).toHaveBeenCalled();
+  expect(log).toHaveBeenCalledWith(expect.stringContaining('relay unavailable'));
+});
+
+test('binds are applied once per running container and restored after restart', async () => {
+  const { provider, commands } = fixture();
+  const handle = await provider.ensure({ conversationId: 'A', projectId: 'P' });
+  const options = { binds: [{ source: '/work/A', target: '/work/A' }] };
+  await provider.exec(handle, ['true'], options);
+  await provider.exec(handle, ['true'], options);
+  expect(commands.filter((c) => c.argv[1] === 'bind')).toHaveLength(1);
+  await provider.stop(handle);
+  await provider.ensure({ conversationId: 'A', projectId: 'P' });
+  await provider.exec(handle, ['true'], options);
+  expect(commands.filter((c) => c.argv[1] === 'bind')).toHaveLength(2);
+});
+
+test('provider restart preserves a machine that is actually running', async () => {
+  const { provider, stateFile, commands, runner } = fixture();
+  await provider.ensure({ conversationId: 'A', projectId: 'P' });
+  const restarted = new NspawnOrbProvider({
+    stateFile,
+    runner: async (argv, options) => {
+      const result = await runner(argv, options);
+      return argv[1] === 'list'
+        ? { ...result, stdout: 'cairn-orb-A container systemd-nspawn linux\n' }
+        : result;
+    },
+  });
+  await restarted.ensure({ conversationId: 'A', projectId: 'P' });
+  expect(commands.filter((c) => c.argv[1] === 'start')).toHaveLength(1);
+  expect((await restarted.list())[0]?.running).toBe(true);
 });

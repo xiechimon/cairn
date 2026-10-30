@@ -135,6 +135,8 @@ export class NspawnOrbProvider implements OrbProvider {
   private readonly pending = new Map<string, Promise<OrbHandle>>();
   private readonly runner: OrbCommandRunner;
   private readonly stateFile: string | undefined;
+  private reconciled = false;
+  private readonly bound = new Map<string, Set<string>>();
 
   constructor(options: { runner?: OrbCommandRunner; stateFile?: string } = {}) {
     this.runner = options.runner ?? runOrbCommand;
@@ -159,6 +161,7 @@ export class NspawnOrbProvider implements OrbProvider {
     conversationId: string;
     projectId: string;
   }): Promise<OrbHandle> {
+    await this.reconcile();
     const startedAt = Date.now();
     let handle = this.handles.get(input.conversationId);
     if (!handle) {
@@ -194,7 +197,14 @@ export class NspawnOrbProvider implements OrbProvider {
     argv: readonly string[],
     options: OrbExecOptions,
   ): Promise<OrbExecResult> {
+    let bound = this.bound.get(handle.id);
+    if (!bound) {
+      bound = new Set();
+      this.bound.set(handle.id, bound);
+    }
     for (const bind of options.binds ?? []) {
+      const key = JSON.stringify(bind);
+      if (bound.has(key)) continue;
       await this.command([
         'machinectl',
         'bind',
@@ -204,6 +214,7 @@ export class NspawnOrbProvider implements OrbProvider {
         bind.source,
         bind.target,
       ]);
+      bound.add(key);
     }
     const env = { ...options.env, CAIRN_ORB: '1' };
     const flags = Object.entries(env).flatMap(([key, value]) =>
@@ -229,26 +240,54 @@ export class NspawnOrbProvider implements OrbProvider {
 
   async stop(handle: OrbHandle): Promise<void> {
     if (!handle.running) return;
-    await this.command(['machinectl', 'poweroff', handle.id]);
-    await this.command(['systemctl', 'stop', `systemd-nspawn@${handle.id}.service`]);
+    try {
+      await this.command(['machinectl', 'poweroff', handle.id]);
+    } catch (error) {
+      if (!/No machine|does not exist|not found/i.test(String(error))) throw error;
+      const machines = await this.runningMachines();
+      if (machines.has(handle.id)) throw error;
+      handle.running = false;
+    }
+    if (handle.running)
+      await this.command(['systemctl', 'stop', `systemd-nspawn@${handle.id}.service`]);
     handle.running = false;
+    this.bound.delete(handle.id);
     handle.notes.push(orbNote('orb: stopped'));
     this.save();
   }
 
   async destroy(handle: OrbHandle): Promise<void> {
     await this.stop(handle);
-    await this.command(['machinectl', 'remove', handle.id]);
+    const result = await this.runner(['machinectl', 'remove', handle.id]);
+    if (result.code !== 0 && !/No (?:machine|image)|does not exist|not found/i.test(result.stderr))
+      throw new Error(`machinectl remove failed (${result.code}): ${result.stderr}`);
     this.handles.delete(handle.conversationId);
     this.save();
   }
 
   async list(): Promise<OrbHandle[]> {
+    await this.reconcile();
     return [...this.handles.values()];
   }
   touch(handle: OrbHandle, now: number): void {
     handle.lastUsedAt = now;
     this.save();
+  }
+
+  private async runningMachines(): Promise<Set<string>> {
+    const result = await this.runner(['machinectl', 'list', '--no-legend', '--no-pager']);
+    if (result.code !== 0) throw new Error(`machinectl list failed: ${result.stderr}`);
+    return new Set(result.stdout.split('\n').map((line) => line.trim().split(/\s+/)[0] ?? ''));
+  }
+
+  private async reconcile(): Promise<void> {
+    if (this.reconciled) return;
+    if (this.handles.size > 0) {
+      const machines = await this.runningMachines();
+      for (const handle of this.handles.values()) handle.running = machines.has(handle.id);
+      this.save();
+    }
+    this.reconciled = true;
   }
 
   private async command(argv: readonly string[]): Promise<void> {

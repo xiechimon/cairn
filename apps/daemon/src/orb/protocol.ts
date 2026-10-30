@@ -43,7 +43,14 @@ export type OrbFrame =
   | { type: 'cancel'; id: number }
   | { type: 'reply'; id: number; value?: unknown; error?: string; status?: number; body?: string }
   | { type: 'stop'; discard: boolean }
-  | { type: 'steer'; text: string; images?: readonly { data: string; mimeType: string }[] }
+  | { type: 'session'; live: boolean }
+  | { type: 'steered'; id: number; error?: string }
+  | {
+      type: 'steer';
+      id: number;
+      text: string;
+      images?: readonly { data: string; mimeType: string }[];
+    }
   | { type: 'log'; message: string }
   | { type: 'finished' }
   | { type: 'failed'; error: string };

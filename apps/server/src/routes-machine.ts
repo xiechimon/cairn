@@ -23,10 +23,11 @@ import {
   SESSION_FILE_NAME,
   transcriptUploadSchema,
 } from '@cairn/shared';
+import { and, eq, inArray, isNotNull, or } from 'drizzle-orm';
 import type { Context, Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import type { AppContext } from './context.js';
-import type { machine as machineTable } from './db/schema.js';
+import { build, type machine as machineTable, step, todo } from './db/schema.js';
 import { HttpError, parseWith } from './lib/errors.js';
 import { newRecordId } from './lib/ids.js';
 import { matchesAllowlistedTailscaleIdentity, matchesAuthToken } from './lib/token-auth.js';
@@ -256,6 +257,24 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
   app.get('/api/machine/me', (c) => {
     const row = me(c);
     return c.json(toMachineRecord(row, machineRunningCount(deps.db, row.id)));
+  });
+
+  app.get('/api/machine/orbs/closed', (c) => {
+    const row = me(c);
+    const closed = ctx.db
+      .selectDistinct({ id: build.id })
+      .from(build)
+      .innerJoin(todo, eq(todo.id, build.todoId))
+      .innerJoin(step, eq(step.buildId, build.id))
+      .where(
+        and(
+          eq(step.machineId, row.id),
+          eq(todo.teamId, row.teamId),
+          or(inArray(todo.phase, ['closed', 'done']), isNotNull(todo.archivedAt)),
+        ),
+      )
+      .all();
+    return c.json(closed.map((conversation) => conversation.id));
   });
 
   app.post('/api/machine/presence', async (c) => {

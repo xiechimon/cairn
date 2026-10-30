@@ -1,8 +1,9 @@
 import { existsSync, mkdirSync } from 'node:fs';
-import type { AgentSessionHandle, ClaimedStep } from '@cairn/shared';
+import { join } from 'node:path';
+import type { AgentSessionHandle, ClaimedStep, MachineDoneBody } from '@cairn/shared';
 import { TranscriptBuffer } from '../journal.js';
 import { MachineApiError } from '../machine-client.js';
-import { type RunStepDeps, type RunStepOptions, runStep } from '../runner.js';
+import { type RunStepDeps, type RunStepOptions, resumePendingUpload, runStep } from '../runner.js';
 import { StepStops } from '../step-stops.js';
 import type { OrbLifecycle } from './lifecycle.js';
 import {
@@ -49,6 +50,35 @@ export async function runOrbStep(
   }, deps.heartbeatIntervalMs ?? 30_000);
   heartbeat.unref?.();
   const orbStartedAt = Date.now();
+  const completion: { reported: boolean; reporting: Promise<unknown> | null } = {
+    reported: false,
+    reporting: null,
+  };
+  let write: (data: string) => void = () => {};
+  let ready = false;
+  let ended = false;
+  let nextSteer = 0;
+  const waiting = new Set<{ resolve: () => void; reject: (error: Error) => void }>();
+  const steering = new Map<number, { resolve: () => void; reject: (error: Error) => void }>();
+  const send = (frame: OrbFrame) => write(encodeOrbFrame(frame));
+  const session: AgentSessionHandle = {
+    sessionId: claimed.session.sessionId ?? stepId,
+    events: (async function* () {})(),
+    async steer(text, images) {
+      if (ended) throw new Error('Orb worker ended');
+      if (!ready) await new Promise<void>((resolve, reject) => waiting.add({ resolve, reject }));
+      const id = nextSteer++;
+      await new Promise<void>((resolve, reject) => {
+        steering.set(id, { resolve, reject });
+        send({ type: 'steer', id, text, images });
+      });
+    },
+    async stop() {
+      send({ type: 'stop', discard: stop.request?.discard ?? false });
+    },
+    usage: () => [],
+  };
+  deps.sessionHandles?.set(stepId, session);
   try {
     await lifecycle.run(
       {
@@ -58,25 +88,19 @@ export async function runOrbStep(
       async (handle) => {
         handle.lastStepId = stepId;
         lifecycle.provider.touch(handle, Date.now());
-        let write: (data: string) => void = () => {};
-        const send = (frame: OrbFrame) => write(encodeOrbFrame(frame));
-        const session: AgentSessionHandle = {
-          sessionId: claimed.session.sessionId ?? stepId,
-          events: (async function* () {})(),
-          async steer(text, images) {
-            send({ type: 'steer', text, images });
-          },
-          async stop() {
-            send({ type: 'stop', discard: stop.request?.discard ?? false });
-          },
-          usage: () => [],
-        };
         const methods = ORB_STEP_METHODS.filter((method) => deps.client[method] !== undefined);
+        const paths = {
+          ...deps.paths,
+          chatSessionsDir: join(deps.paths.chatSessionsDir, handle.id),
+          agentRuntimeDir: join(deps.paths.agentRuntimeDir, handle.id),
+          teamSkillsCacheDir: join(deps.paths.teamSkillsCacheDir, handle.id),
+          workspacesDir: join(deps.workspacesDir, '.orbs', handle.id),
+        };
         const input: OrbStepInput = {
           claimed,
           options: { ...options, hookNotes: handle.notes.splice(0), orbStartedAt },
-          paths: deps.paths,
-          workspacesDir: deps.workspacesDir,
+          paths,
+          workspacesDir: paths.workspacesDir,
           mcpConfigPath: deps.mcpConfigPath,
           skillsDir: deps.skillsDir,
           machineName: deps.machineName,
@@ -84,13 +108,13 @@ export async function runOrbStep(
         };
         const directories = [
           deps.paths.outboxDir,
-          deps.paths.chatSessionsDir,
-          deps.paths.agentRuntimeDir,
-          deps.paths.teamSkillsCacheDir,
-          deps.paths.stepAttachmentsDir,
-          deps.paths.plansDir,
-          deps.paths.reportsDir,
-          deps.workspacesDir,
+          paths.chatSessionsDir,
+          paths.agentRuntimeDir,
+          paths.teamSkillsCacheDir,
+          join(paths.stepAttachmentsDir, stepId),
+          join(paths.plansDir, claimed.conversationId),
+          join(paths.reportsDir, claimed.conversationId),
+          paths.workspacesDir,
         ];
         for (const dir of directories) mkdirSync(dir, { recursive: true });
         const binds: { source: string; target: string; readonly?: boolean }[] = directories.map(
@@ -109,6 +133,21 @@ export async function runOrbStep(
         const requests = new Map<number, AbortController>();
         const uploads = new Set<string>();
         const receive = async (frame: OrbFrame): Promise<void> => {
+          if (frame.type === 'session') {
+            ready = frame.live;
+            if (ready) {
+              for (const waiter of waiting) waiter.resolve();
+              waiting.clear();
+            }
+            return;
+          }
+          if (frame.type === 'steered') {
+            const pending = steering.get(frame.id);
+            steering.delete(frame.id);
+            if (frame.error) pending?.reject(new Error(frame.error));
+            else pending?.resolve();
+            return;
+          }
           if (frame.type === 'finished') {
             finished = true;
             return;
@@ -141,11 +180,24 @@ export async function runOrbStep(
               const index = frame.method === 'relayTool' ? 3 : 2;
               frame.args[index] = { ...(frame.args[index] as object), signal: controller.signal };
             }
-            const value: unknown = await Reflect.apply(
-              deps.client[frame.method] as (...args: unknown[]) => unknown,
-              deps.client,
-              frame.args,
+            if (frame.method === 'done')
+              deps.journal.update(stepId, {
+                state: 'awaiting-upload',
+                doneBody: frame.args[1] as MachineDoneBody,
+              });
+            const operation = Promise.resolve(
+              Reflect.apply(
+                deps.client[frame.method] as (...args: unknown[]) => unknown,
+                deps.client,
+                frame.args,
+              ),
             );
+            if (frame.method === 'done') completion.reporting = operation;
+            const value: unknown = await operation;
+            if (frame.method === 'done') {
+              completion.reported = true;
+              deps.journal.remove(stepId);
+            }
             if (frame.method === 'uploadUrls') {
               for (const upload of (value as { uploads: { url: string }[] }).uploads)
                 uploads.add(upload.url);
@@ -164,7 +216,6 @@ export async function runOrbStep(
             requests.delete(frame.id);
           }
         };
-        deps.sessionHandles?.set(stepId, session);
         input.options.stopRequest = stop.request ?? undefined;
         try {
           const execution = lifecycle.provider.exec(handle, ['cairn', 'orb-step'], {
@@ -192,11 +243,38 @@ export async function runOrbStep(
             throw new Error(failure ?? `Orb step exited (${result.code}): ${result.stderr}`);
         } finally {
           for (const request of requests.values()) request.abort();
-          deps.sessionHandles?.delete(stepId);
         }
       },
     );
+  } catch (error) {
+    clearInterval(heartbeat);
+    if (completion.reporting) await completion.reporting.catch(() => {});
+    if (!completion.reported) {
+      const pending = deps.journal.get(stepId);
+      if (completion.reporting && pending?.doneBody) {
+        await resumePendingUpload(deps, pending, { running: options.running });
+        return;
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      deps.logger.step(`step failed: ${message}`);
+      const transcript = new TranscriptBuffer(deps.paths.outboxDir, stepId);
+      transcript.upsert({
+        id: `orb-error-${stepId}`,
+        role: 'system',
+        content: message,
+        createdAt: Date.now(),
+      });
+      const entry = deps.journal.update(stepId, {
+        state: 'awaiting-upload',
+        doneBody: { status: 'failed', errorMessage: message },
+      });
+      if (entry) await resumePendingUpload(deps, entry, { running: options.running });
+    }
   } finally {
+    ended = true;
+    const error = new Error('Orb worker ended before steer delivery');
+    for (const pending of [...waiting, ...steering.values()]) pending.reject(error);
+    deps.sessionHandles?.delete(stepId);
     clearInterval(heartbeat);
     stop.settle();
   }

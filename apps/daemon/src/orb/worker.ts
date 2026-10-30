@@ -26,7 +26,18 @@ export async function runOrbWorker(io: {
     number,
     { resolve: (value: unknown) => void; reject: (error: Error) => void }
   >();
-  const sessions = new Map<string, AgentSessionHandle>();
+  const sessions = new (class extends Map<string, AgentSessionHandle> {
+    override set(key: string, value: AgentSessionHandle): this {
+      super.set(key, value);
+      send({ type: 'session', live: true });
+      return this;
+    }
+    override delete(key: string): boolean {
+      const deleted = super.delete(key);
+      if (deleted) send({ type: 'session', live: false });
+      return deleted;
+    }
+  })();
   const stops = new StepStops();
   let nextId = 0;
   let activeStep: string | null = null;
@@ -144,7 +155,15 @@ export async function runOrbWorker(io: {
           ?.deliver(stopRequest)
           .catch((error: unknown) => send({ type: 'log', message: String(error) }));
     } else if (frame.type === 'steer' && activeStep) {
-      void sessions.get(activeStep)?.steer(frame.text, frame.images);
+      const session = sessions.get(activeStep);
+      void (
+        session
+          ? session.steer(frame.text, frame.images)
+          : Promise.reject(new Error('No live orb session'))
+      ).then(
+        () => send({ type: 'steered', id: frame.id }),
+        (error: unknown) => send({ type: 'steered', id: frame.id, error: String(error) }),
+      );
     } else if (frame.type === 'init' && !started) {
       started = true;
       void execute(frame.input)
