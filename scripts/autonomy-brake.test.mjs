@@ -24,8 +24,9 @@ if (path === 'graphql') {
  if(args.includes('pullRequestId=bad')) process.exit(1);
  console.log(JSON.stringify({data:{disablePullRequestAutoMerge:{pullRequest:{number:1}}}}));
 } else if (path.includes('/issues?')) console.log(JSON.stringify([d.issues ?? []]));
-else if (path.endsWith('/rerun') && d.rerunFailure) process.exit(1);
-else if (path === 'repos/owner/repo/actions/runs/90') console.log(JSON.stringify({status:d.runStatus}));
+else if (path.endsWith('/rerun') && d.rerunError) { console.error(d.rerunError); process.exit(1); }
+else if (path.includes('/actions/runs/') && !path.endsWith('/rerun')) console.log(JSON.stringify(d.confirmedRun ?? {}));
+else if (path.includes('/statuses/') && d.statusError) process.exit(1);
 else if (path.includes('/actions/workflows/')) console.log(JSON.stringify([{workflow_runs:d.runs ?? []}]));
 else if (path.includes('/labels?')) console.log(JSON.stringify([d.labels ?? []]));
 else if (path.includes('/pulls?')) console.log(JSON.stringify([d.pulls ?? []]));
@@ -183,7 +184,9 @@ for (const paused of [true, false])
     const f = fixture(t, {
       issues: paused ? [{ number: 5 }] : [],
       pulls: [{ number: 7, head: { sha: 'a'.repeat(40) }, auto_merge: null, labels: [] }],
-      runs: [{ id: 90, head_sha: 'a'.repeat(40), pull_requests: [{ number: 7 }] }],
+      runs: [
+        { id: 90, status: 'completed', head_sha: 'a'.repeat(40), pull_requests: [{ number: 7 }] },
+      ],
     });
     const r = f.run(['sweep']);
     assert.equal(r.status, 0, r.stderr);
@@ -202,19 +205,67 @@ test('a new paused head fails the PR check and publishes a failure status', (t) 
   assert.match(f.calls(), /statuses\/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/);
 });
 
-for (const status of ['queued', 'in_progress', 'completed'])
-  test(`failed rerun with current status ${status}`, (t) => {
+for (const status of ['queued', 'in_progress', 'waiting', 'pending', 'requested'])
+  test(`paused sweep skips latest ${status} evidence and still disarms auto-merge`, (t) => {
     const f = fixture(t, {
       issues: [{ number: 5 }],
       pulls: [
         { number: 7, node_id: 'good', head: { sha: 'a'.repeat(40) }, auto_merge: {}, labels: [] },
       ],
-      runs: [{ id: 90, head_sha: 'a'.repeat(40), pull_requests: [{ number: 7 }] }],
-      rerunFailure: true,
-      runStatus: status,
+      runs: [
+        { id: 89, status: 'completed', head_sha: 'a'.repeat(40), pull_requests: [{ number: 7 }] },
+        { id: 90, status, head_sha: 'a'.repeat(40), pull_requests: [{ number: 7 }] },
+        { id: 91, status: 'completed', head_sha: 'b'.repeat(40), pull_requests: [{ number: 7 }] },
+        { id: 92, status: 'completed', head_sha: 'a'.repeat(40), pull_requests: [{ number: 8 }] },
+      ],
     });
     const r = f.run(['sweep']);
-    assert.equal(r.status, status === 'completed' ? 1 : 0, r.stderr);
-    assert.match(f.calls(), /"repos\/owner\/repo\/actions\/runs\/90"/);
-    assert.equal(f.calls().includes('pullRequestId=good'), status !== 'completed');
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(f.calls(), /"state":"failure"/);
+    assert.doesNotMatch(f.calls(), /\/rerun/);
+    assert.match(r.stdout, /#7: disarmed/);
+  });
+
+for (const scenario of [
+  'active race',
+  'queued race',
+  'permission failure',
+  'unconfirmed race',
+  'wrong run',
+  'status failure',
+])
+  test(`sweep preserves disarming and error aggregation: ${scenario}`, (t) => {
+    const race = scenario !== 'permission failure';
+    const confirmed = ['active race', 'queued race'].includes(scenario);
+    const f = fixture(t, {
+      issues: [{ number: 5 }],
+      pulls: [
+        { number: 7, node_id: 'good', head: { sha: 'a'.repeat(40) }, auto_merge: {}, labels: [] },
+        { number: 8, node_id: 'next', head: { sha: 'b'.repeat(40) }, auto_merge: {}, labels: [] },
+      ],
+      runs: [
+        { id: 90, status: 'completed', head_sha: 'a'.repeat(40), pull_requests: [{ number: 7 }] },
+      ],
+      rerunError: race
+        ? 'gh: This workflow is already running (HTTP 403)'
+        : 'gh: Resource not accessible (HTTP 403)',
+      confirmedRun: {
+        id: 90,
+        status:
+          scenario === 'queued race'
+            ? 'queued'
+            : confirmed || scenario === 'wrong run'
+              ? 'in_progress'
+              : 'completed',
+        head_sha: scenario === 'wrong run' ? 'c'.repeat(40) : 'a'.repeat(40),
+        pull_requests: [{ number: 7 }],
+      },
+      statusError: scenario === 'status failure',
+    });
+    const r = f.run(['sweep']);
+    assert.equal(r.status, confirmed ? 0 : 1, r.stderr);
+    assert.match(r.stdout, /#7: disarmed/);
+    assert.match(r.stdout, /#8: disarmed/);
+    if (scenario !== 'status failure') assert.match(f.calls(), /actions\/runs\/90\/rerun/);
+    if (scenario === 'permission failure') assert.doesNotMatch(f.calls(), /runs\/90"/);
   });

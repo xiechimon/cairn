@@ -137,8 +137,22 @@ export function disarmAutoMerge(pr) {
 function sweep(paused) {
   let failed = false;
   for (const pr of pages(`repos/${repo}/pulls?state=open&per_page=100`).flat()) {
+    const errors = [];
+    let allowed = !paused;
     try {
-      const allowed = checkPull(pr, paused);
+      allowed = checkPull(pr, paused);
+    } catch (error) {
+      errors.push(error);
+    }
+    try {
+      if (!allowed && pr.auto_merge) {
+        disarmAutoMerge(pr);
+        console.log(`#${pr.number}: disarmed`);
+      }
+    } catch (error) {
+      errors.push(error);
+    }
+    try {
       const runs = pages(
         `repos/${repo}/actions/workflows/pr-evidence.yml/runs?event=pull_request&head_sha=${pr.head.sha}&per_page=100`,
       ).flatMap((page) => page.workflow_runs);
@@ -149,20 +163,28 @@ function sweep(paused) {
             run.pull_requests.some((pull) => pull.number === pr.number),
         )
         .sort((a, b) => b.id - a.id)[0];
-      if (latest) {
+      if (latest?.status === 'completed') {
         try {
           api(`repos/${repo}/actions/runs/${latest.id}/rerun`, {});
         } catch (error) {
-          const run = api(`repos/${repo}/actions/runs/${latest.id}`);
-          if (!['queued', 'in_progress'].includes(run.status)) throw error;
+          if (!/This workflow is already running \(HTTP 403\)/.test(String(error.stderr)))
+            throw error;
+          const current = api(`repos/${repo}/actions/runs/${latest.id}`);
+          if (
+            current.id !== latest.id ||
+            current.head_sha !== pr.head.sha ||
+            !current.pull_requests?.some((pull) => pull.number === pr.number) ||
+            !['queued', 'in_progress', 'waiting', 'pending', 'requested'].includes(current.status)
+          )
+            throw error;
         }
       }
-      if (allowed || !pr.auto_merge) continue;
-      disarmAutoMerge(pr);
-      console.log(`#${pr.number}: disarmed`);
     } catch (error) {
+      errors.push(error);
+    }
+    if (errors.length) {
       failed = true;
-      console.error(error.message);
+      for (const error of errors) console.error(error.message);
       console.log(`#${pr.number}: failed`);
     }
   }
