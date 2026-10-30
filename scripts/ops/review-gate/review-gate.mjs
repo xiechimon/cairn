@@ -1,6 +1,6 @@
 import { execFileSync, spawn } from 'node:child_process';
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { isProtected, ownerRouting } from './owner-routing.mjs';
+import { loadPolicy } from './owner-routing.mjs';
 
 const HOME = process.env.HOME;
 const REPO = process.env.REVIEW_GATE_REPO ?? 'xiechimon/cairn';
@@ -12,7 +12,10 @@ const MERGE = process.env.REVIEW_GATE_MERGE ?? `${HOME}/.cairn/tools/merge-pr.sh
 const PROMPT = process.env.REVIEW_GATE_PROMPT ?? `${HOME}/.cairn/tools/review-gate/prompt.txt`;
 const TIER = process.env.REVIEW_GATE_TIER ?? `${HOME}/.cairn/tools/governor/tier.sh`;
 const RUNS = process.env.REVIEW_GATE_RUNS ?? `${HOME}/.local/state/ai-route/runs.jsonl`;
-const needsReview = (path) => isProtected(path) || EXTRA_PROTECTED.some((re) => re.test(path));
+let policy;
+let policyError;
+const needsReview = (path) =>
+  policy.isProtected(path) || EXTRA_PROTECTED.some((re) => re.test(path));
 
 mkdirSync(`${STATE}/runs`, { recursive: true });
 const record = (pr, fields) => {
@@ -31,9 +34,12 @@ const asBot = (args, input) =>
   execFileSync(BOT, args, { encoding: 'utf8', input, cwd: MAIN, maxBuffer: 64 << 20 });
 
 const readMergeReasons = (pr) => {
+  if (policyError) throw new Error(policyError);
   const files = JSON.parse(
     gh(['api', '--paginate', '--slurp', `repos/${REPO}/pulls/${pr.number}/files?per_page=100`]),
   ).flat();
+  const head = JSON.parse(gh(['api', `repos/${REPO}/pulls/${pr.number}`])).head.sha;
+  if (head !== pr.headRefOid) throw new Error('PR head moved since review');
   if (!files.length || files.length >= 3000) throw new Error('Incomplete PR file list');
   const changedFiles = files.flatMap((file) =>
     file.previous_filename ? [file.filename, file.previous_filename] : [file.filename],
@@ -62,11 +68,14 @@ const readMergeReasons = (pr) => {
     const [additions, deletions, path] = row.split('\t');
     return additions === '-' && deletions === '-' ? [path] : [];
   });
-  const reasons = ownerRouting({
+  const reasons = policy.ownerRouting({
     changedFiles,
     deletedFiles,
     binaryFiles,
-    linesChanged: files.reduce((sum, file) => sum + file.additions + file.deletions, 0),
+    linesChanged: numstat.split('\n').reduce((sum, row) => {
+      const [added, deleted] = row.split('\t');
+      return sum + (Number(added) || 0) + (Number(deleted) || 0);
+    }, 0),
   });
   if (
     JSON.parse(
@@ -102,7 +111,10 @@ const reconcileMerge = (pr, pass) => {
     console.log(`#${pr.number}: auto-merge off: ${reasons.join('; ') || 'review did not pass'}`);
     return 'auto-merge-off';
   }
-  execFileSync(MERGE, [String(pr.number), '--auto'], { cwd: MAIN, encoding: 'utf8' });
+  execFileSync(MERGE, [String(pr.number), '--auto', '--match-head-commit', pr.headRefOid], {
+    cwd: MAIN,
+    encoding: 'utf8',
+  });
   return 'auto-merge';
 };
 
@@ -136,6 +148,19 @@ try {
     ]),
   );
   execFileSync(BOT, ['git', 'fetch', '-q', 'origin', 'main'], { cwd: MAIN });
+  try {
+    policy = loadPolicy(
+      execFileSync('git', ['show', 'origin/main:.claude/workflows/pr-gate.js'], {
+        cwd: MAIN,
+        encoding: 'utf8',
+      }),
+    );
+  } catch (error) {
+    policyError = `routing policy unavailable: ${error.message}`;
+    for (const pr of prs) reconcileMerge(pr, false);
+    process.exitCode = 1;
+  }
+  if (policyError) throw new Error(policyError);
   const checkIdx = process.argv.indexOf('--check');
   if (checkIdx > 0) {
     const files = JSON.parse(

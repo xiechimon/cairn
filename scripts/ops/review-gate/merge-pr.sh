@@ -1,6 +1,10 @@
 #!/bin/bash
 set -uo pipefail
 pr=$1; mode=${2:-}
+match_args=()
+if [ "${3:-}" = --match-head-commit ]; then
+  match_args=(--match-head-commit "${4:?Missing reviewed head}")
+fi
 R=${REVIEW_GATE_REPO:-xiechimon/cairn}
 deps=${REVIEW_GATE_DEPS:-$HOME/.cairn/tools/merge-order/deps-open.mjs}
 gate=${REVIEW_GATE_SCRIPT:-$HOME/.cairn/tools/review-gate/review-gate.mjs}
@@ -26,7 +30,7 @@ else
   run=(gh pr merge "$pr" -R "$R" --squash)
 fi
 if [ "$mode" = --auto ]; then
-  out=$("${run[@]}" --auto 2>&1) && exit 0
+  out=$("${run[@]}" "${match_args[@]}" --auto 2>&1) && exit 0
   grep -qE 'unstable status|clean status' <<<"$out" || { echo "$out" >&2; exit 1; }
 fi
-"${run[@]}"
+"${run[@]}" "${match_args[@]}"

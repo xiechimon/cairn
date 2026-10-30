@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { globToRegExp } from './owner-routing.mjs';
+import { loadPolicy } from './owner-routing.mjs';
+
+const { globToRegExp } = loadPolicy(
+  readFileSync(new URL('../../../.claude/workflows/pr-gate.js', import.meta.url), 'utf8'),
+);
 
 const cases = [
   ['.github/**', '.github/workflows/site-deploy.yml', true],

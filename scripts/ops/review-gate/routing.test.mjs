@@ -4,7 +4,11 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test } from 'node:test';
+import { loadPolicy } from './owner-routing.mjs';
 
+const { ownerRouting } = loadPolicy(
+  readFileSync(new URL('../../../.claude/workflows/pr-gate.js', import.meta.url), 'utf8'),
+);
 const roots = [];
 afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
@@ -41,6 +45,19 @@ const cases = [
     ],
   ],
   ['API failure', [file('apps/web/src/a.ts')], { apiFailure: true }],
+  [
+    'large rename',
+    [
+      file('apps/web/src/b.ts', {
+        status: 'renamed',
+        previous_filename: 'apps/web/src/a.ts',
+        additions: 0,
+        gitLines: 1800,
+      }),
+    ],
+  ],
+  ['moved head', [file('apps/web/src/a.ts')], { movedHead: true }],
+  ['policy failure', [file('apps/web/src/a.ts')], { policyFailure: true }],
   ['eligible', [file('apps/web/src/a.ts')]],
 ];
 for (const [name, files, options = {}] of cases) {
@@ -66,6 +83,8 @@ for (const [name, files, options = {}] of cases) {
           files,
           paused: options.paused,
           apiFailure: options.apiFailure,
+          movedHead: options.movedHead,
+          policyFailure: options.policyFailure,
           comments: cached
             ? [{ body: `<!-- review-gate:${sha} -->\n**Independent review gate: PASS**` }]
             : [],
@@ -74,13 +93,14 @@ for (const [name, files, options = {}] of cases) {
       const stub = join(root, 'stub');
       writeFileSync(
         stub,
-        `#!${process.execPath}\nconst fs = require('node:fs');\nconst a = process.argv.slice(2); fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify(a)+'\\n');\nconst d=JSON.parse(fs.readFileSync(${JSON.stringify(join(root, 'data.json'))}));\nif(a.includes('list') && a.includes('pr')) console.log(JSON.stringify([d.pr]));\nelse if(a.includes('list') && a.includes('issue')) console.log(JSON.stringify(d.paused?[{number:1}]:[]));\nelse if(a.includes('api')) { if(d.apiFailure) process.exit(1); console.log(JSON.stringify([d.files])); }\nelse if(a.includes('comments')) console.log(JSON.stringify({comments:d.comments}));\nelse if(a.includes('run')) console.log('VERDICT: pass');\n`,
+        `#!${process.execPath}\nconst fs = require('node:fs');\nconst a = process.argv.slice(2); fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify(a)+'\\n');\nconst d=JSON.parse(fs.readFileSync(${JSON.stringify(join(root, 'data.json'))}));\nif(a.includes('list') && a.includes('pr')) console.log(JSON.stringify([d.pr]));\nelse if(a.includes('list') && a.includes('issue')) console.log(JSON.stringify(d.paused?[{number:1}]:[]));\nelse if(a.includes('api')) { if(d.apiFailure) process.exit(1); console.log(JSON.stringify(a.some(x=>x.includes('/files?'))?[d.files]:{head:{sha:d.movedHead?'b'.repeat(40):d.pr.headRefOid}})); }\nelse if(a.includes('comments')) console.log(JSON.stringify({comments:d.comments}));\nelse if(a.includes('run')) console.log('VERDICT: pass');\n`,
         { mode: 0o755 },
       );
       const git = join(root, 'git');
       writeFileSync(
         git,
-        `#!${process.execPath}\nconst d = require(${JSON.stringify(join(root, 'data.json'))});\nif (process.argv.includes('--numstat')) for (const f of d.files) console.log((f.gitBinary || f.patch === undefined) ? '-\\t-\\t'+f.filename : '1\\t0\\t'+f.filename);\n`,
+        `#!${process.execPath}\nconst d = require(${JSON.stringify(join(root, 'data.json'))});\nif (process.argv.includes('show')) { if(d.policyFailure) console.log('invalid policy'); else console.log(require('node:fs').readFileSync(${JSON.stringify(new URL('../../../.claude/workflows/pr-gate.js', import.meta.url).pathname)}, 'utf8')); }
+if (process.argv.includes('--numstat')) for (const f of d.files) console.log((f.gitBinary || f.patch === undefined) ? '-\\t-\\t'+f.filename : (f.gitLines ?? f.additions)+'\\t'+f.deletions+'\\t'+f.filename);\n`,
         { mode: 0o755 },
       );
       const gh = join(root, 'gh');
@@ -104,13 +124,14 @@ for (const [name, files, options = {}] of cases) {
           },
         },
       );
-      assert.equal(result.status, 0, result.stderr);
+      assert.equal(result.status, options.policyFailure ? 1 : 0, result.stderr);
       const calls = readFileSync(log, 'utf8').trim().split('\n').map(JSON.parse);
       const armed = calls.some((a) => a.includes('--auto'));
       const disarmed = calls.some((a) => a.includes('--disable-auto'));
       assert.equal(armed, name === 'eligible', JSON.stringify(calls));
       assert.equal(disarmed, name !== 'eligible', JSON.stringify(calls));
-      if (!cached) assert.ok(calls.some((a) => a.includes('comment')));
+      if (armed) assert.ok(calls.some((a) => a.includes('--match-head-commit') && a.includes(sha)));
+      if (!cached && !options.policyFailure) assert.ok(calls.some((a) => a.includes('comment')));
     });
 }
 
@@ -164,7 +185,62 @@ test('standalone workflow and Node adapter return the same six isolated owner re
       () => {},
     );
     assert.equal(result.mergedBy, 'user');
+
+    assert.deepEqual(result.humanReasons, ownerRouting(args));
     assert.equal(result.humanReasons.length, 1);
     assert.ok(result.humanReasons[0].includes(reason), result.humanReasons[0]);
   }
+});
+
+test('humanReasons is exclusively one ownerRouting call', () => {
+  const source = readFileSync(
+    new URL('../../../.claude/workflows/pr-gate.js', import.meta.url),
+    'utf8',
+  );
+  assert.match(source, /const humanReasons = ownerRouting\(\{[^;]*?\}\)\s*\nconst checked/);
+  assert.equal(
+    [...source.matchAll(/humanReasons\s*(?:\.(?:push|splice|unshift)|\[|=(?!=))/g)].length,
+    1,
+  );
+});
+
+test('merge helper forwards the reviewed head to GitHub', () => {
+  const root = mkdtempSync(join(tmpdir(), 'review-gate-'));
+  roots.push(root);
+  const log = join(root, 'merge-calls');
+  const sha = 'a'.repeat(40);
+  writeFileSync(join(root, 'check.mjs'), 'process.exit(3);');
+  writeFileSync(
+    join(root, 'gh'),
+    `#!${process.execPath}
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+if (args.includes('merge')) fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify(args));
+else if (args.includes('author')) console.log('owner');
+else if (args.includes('headRefName') && !args.includes('body,headRefName')) console.log('feature/test');
+`,
+    { mode: 0o755 },
+  );
+  const result = spawnSync(
+    'bash',
+    [
+      new URL('./merge-pr.sh', import.meta.url).pathname,
+      '2186',
+      '--auto',
+      '--match-head-commit',
+      sha,
+    ],
+    {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        PATH: `${root}:${process.env.PATH}`,
+        REVIEW_GATE_SCRIPT: join(root, 'check.mjs'),
+      },
+    },
+  );
+  assert.equal(result.status, 0, result.stderr);
+  const args = JSON.parse(readFileSync(log, 'utf8'));
+  assert.ok(args.includes('--auto'));
+  assert.equal(args[args.indexOf('--match-head-commit') + 1], sha);
 });
