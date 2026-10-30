@@ -70,6 +70,7 @@ import {
 import type { Db } from '../db/client.js';
 import {
   agent,
+  autonomousMergeAdmission,
   build,
   buildFeedback,
   chief,
@@ -185,11 +186,35 @@ function publishBuild(deps: BuildDeps, row: BuildRow): BuildRecord {
   return record;
 }
 
-export function sendBuildSteer(
+function continuationTodo(deps: BuildDeps, buildRow: BuildRow): TodoRow {
+  const row = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
+  const active = deps.db
+    .select({ id: step.id })
+    .from(step)
+    .where(
+      and(
+        eq(step.buildId, buildRow.id),
+        inArray(step.status, ['pending', 'claimed', 'waiting_quota']),
+      ),
+    )
+    .get();
+  if (row?.phase !== 'done' || row.latestBuildId !== buildRow.id || active) {
+    throw new HttpError(
+      409,
+      'conversation must have an active step or be the completed task thread',
+    );
+  }
+  return row;
+}
+
+export async function sendBuildSteer(
   deps: BuildDeps,
   conversationId: string,
   body: { content: string },
-): { message: { id: string; role: 'user'; content: string; createdAt: number } } {
+): Promise<{
+  conversationId: string;
+  message: { id: string; role: 'user'; content: string; createdAt: number };
+}> {
   const { db } = deps;
   const buildRow = db.select().from(build).where(eq(build.id, conversationId)).get();
   if (!buildRow) throw new HttpError(404, `conversation ${conversationId}`);
@@ -199,8 +224,43 @@ export function sendBuildSteer(
     .where(and(eq(step.buildId, conversationId), eq(step.status, 'claimed')))
     .all()
     .at(-1);
+  let todoRow = db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
+  let targetBuildId = conversationId;
+  let prClosed: 'closed' | null = null;
   if (!running) {
-    throw new HttpError(409, 'no active step on this conversation (steer 只对运行中的会话生效)');
+    todoRow = continuationTodo(deps, buildRow);
+    if (projectOfTodo(db, todoRow)?.repoKind === 'local') {
+      const admission = db
+        .select()
+        .from(autonomousMergeAdmission)
+        .where(eq(autonomousMergeAdmission.buildId, buildRow.id))
+        .get();
+      const landedStep = db
+        .select({ id: step.id })
+        .from(step)
+        .where(
+          and(
+            eq(step.buildId, buildRow.id),
+            eq(step.kind, 'merge'),
+            eq(step.status, 'done'),
+            isNotNull(step.checkpointCommit),
+          ),
+        )
+        .get();
+      if (admission?.state === 'merged' || landedStep) targetBuildId = newUuidv7();
+    }
+    if (githubPrOf(deps, todoRow, buildRow.prNumber) !== null) {
+      const outcome = await probeReworkTargetPr(deps, buildRow, todoRow, true);
+      todoRow = continuationTodo(deps, buildRow);
+      if (outcome === 'merged') {
+        throw new HttpError(
+          409,
+          `PR #${buildRow.prNumber} is already merged. Create a new task for further changes; this task cannot merge a second delivery.`,
+        );
+      }
+      prClosed = outcome;
+      if (prClosed === 'closed') targetBuildId = newUuidv7();
+    }
   }
   const now = nowMs();
   const messageRow = {
@@ -209,20 +269,58 @@ export function sendBuildSteer(
     content: body.content,
     createdAt: now,
   };
-  insertMessageRow(deps, conversationId, messageRow);
-  db.insert(steerPending)
-    .values({ conversationId, stepId: running.id, content: body.content, createdAt: now })
-    .onConflictDoUpdate({
-      target: steerPending.conversationId,
-      set: { stepId: running.id, content: body.content, createdAt: now },
-    })
-    .run();
-  const todoRow = db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
+  if (targetBuildId !== conversationId) {
+    db.insert(build)
+      .values({
+        id: targetBuildId,
+        todoId: buildRow.todoId,
+        withPlan: false,
+        prevPhase: 'done',
+        triggerSource: 'user',
+        createdAt: now,
+      })
+      .run();
+    insertMessageRow(deps, targetBuildId, {
+      id: newRecordId(),
+      role: 'system',
+      content:
+        prClosed === 'closed'
+          ? buildReworkNewBranchNote({
+              prNumber: buildRow.prNumber,
+              prUrl: buildRow.prUrl,
+              branch: conversationBranch(targetBuildId),
+              outcome: 'closed',
+            })
+          : `The previous build was merged locally. Continuing this task on a new branch: ${conversationBranch(targetBuildId)}.`,
+      createdAt: now,
+    });
+  }
+  insertMessageRow(deps, targetBuildId, messageRow);
+  if (running) {
+    db.insert(steerPending)
+      .values({ conversationId, stepId: running.id, content: body.content, createdAt: now })
+      .onConflictDoUpdate({
+        target: steerPending.conversationId,
+        set: { stepId: running.id, content: body.content, createdAt: now },
+      })
+      .run();
+  }
   if (todoRow) {
     addUserMessageAttachmentGrants(db, todoRow.id, todoRow.teamId, body.content);
-    deps.machineHub?.steerSignal(todoRow.teamId, running.id);
+    if (running) {
+      deps.machineHub?.steerSignal(todoRow.teamId, running.id);
+    } else {
+      db.update(build)
+        .set({ errorMessage: null, prevPhase: 'done' })
+        .where(eq(build.id, targetBuildId))
+        .run();
+      setTodoPhase(deps, todoRow.id, 'queued', { lastRunAt: now, latestBuildId: targetBuildId });
+      enqueueStep(deps, targetBuildId, 'build', todoRow.teamId, body.content);
+      const continued = db.select().from(build).where(eq(build.id, targetBuildId)).get();
+      if (continued) publishBuild(deps, continued);
+    }
   }
-  return { message: messageRow };
+  return { conversationId: targetBuildId, message: messageRow };
 }
 
 export function readSteerPending(db: Db, conversationId: string): string[] {
@@ -710,9 +808,12 @@ export function maybeEnqueueVerifyStep(
       and(
         eq(step.buildId, buildId),
         eq(step.kind, 'verify'),
-        ...(opts.reverify === true
-          ? [inArray(step.status, ['pending', 'claimed', 'waiting_quota'])]
-          : []),
+        opts.reverify === true
+          ? inArray(step.status, ['pending', 'claimed', 'waiting_quota'])
+          : or(
+              inArray(step.status, ['pending', 'claimed', 'waiting_quota']),
+              gte(step.createdAt, roundStart(deps, buildId)),
+            ),
       ),
     )
     .get();
@@ -751,7 +852,14 @@ export function maybeEnqueueIndependentReview(
     .where(and(eq(step.buildId, buildId), eq(step.kind, 'review')))
     .all();
   if (reviews.some((row) => (REVIEW_IN_FLIGHT as readonly string[]).includes(row.status))) return;
-  if (reviews.some((row) => parseReviewPromptMeta(row.prompt)?.expectedHeadSha === head)) return;
+  const since = roundStart(deps, buildId);
+  if (
+    reviews.some(
+      (row) =>
+        row.createdAt >= since && parseReviewPromptMeta(row.prompt)?.expectedHeadSha === head,
+    )
+  )
+    return;
   const slotted = todoRow.assignment?.review?.agentId ?? null;
   const personaReviewer = deps.db
     .select({ id: agent.id })
@@ -850,9 +958,16 @@ async function probeReworkTargetPr(
   deps: BuildDeps,
   target: BuildRow,
   todo: { projectId: string; teamId: string },
+  requireReadable = false,
 ): Promise<'merged' | 'closed' | null> {
   if (target.prNumber === null) return null;
   const state = await probePullState(deps, todo.teamId, todo.projectId, target.prNumber);
+  if (state === null && requireReadable) {
+    throw new HttpError(
+      409,
+      `Could not read PR #${target.prNumber}. Please retry before continuing this task.`,
+    );
+  }
   if (state === null || state.state === 'open') return null;
   return state.merged ? 'merged' : 'closed';
 }

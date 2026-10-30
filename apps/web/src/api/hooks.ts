@@ -924,6 +924,9 @@ export function useApiMutations(teamId: string | undefined) {
         ),
       onSuccess: (_data, input) => {
         void qc.invalidateQueries({ queryKey: ['messages', input.conversationId] });
+        void qc.invalidateQueries({ queryKey: ['steps', input.conversationId] });
+        void qc.invalidateQueries({ queryKey: ['todo'] });
+        void qc.invalidateQueries({ queryKey: ['todos', teamId] });
       },
     }),
   };

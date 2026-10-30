@@ -646,7 +646,9 @@ export function TodoDetailPage() {
   const composerReject = !live
     ? null
     : mutations.sendSteer.isError
-      ? t('当前没有运行中的会话，消息未送出')
+      ? phase === 'done'
+        ? mutations.sendSteer.error?.message || t('发送失败，请重试。')
+        : t('当前没有运行中的会话，消息未送出')
       : stepActionFailed
         ? t('任务状态已变化，消息未送出')
         : null;

@@ -38,7 +38,12 @@ export const PHASE_UI: Record<Phase, PhaseUi> = {
     placeholder: '向 Agent 补充说明，执行过程中即可送达',
   },
   review: { chip: '审核', tone: 'confirm', action: '完成', placeholder: '请求修改…' },
-  done: { chip: '已完成', tone: 'done', action: '重开', placeholder: null },
+  done: {
+    chip: '已完成',
+    tone: 'done',
+    action: '重开',
+    placeholder: '发送消息以继续这个任务…',
+  },
   failed: {
     chip: '失败',
     tone: 'failed',
