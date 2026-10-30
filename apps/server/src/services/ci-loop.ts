@@ -20,6 +20,7 @@ import {
 } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { emitRuntimeBuildSpan } from '../runtime-otel.js';
+import { recoverAutonomousMerges, settleAutonomousMerge } from './autonomous-merge.js';
 import {
   type BuildDeps,
   enqueueStep,
@@ -37,6 +38,7 @@ import { CI_FIX_GREEN_EVENT, drainCiCorrections } from './ci-corrections.js';
 import { DONE_ROW, prClosedUnmergedRow } from './delivery-rows.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { githubTokenOrNull } from './github-connection.js';
+import { recoverRedAutonomousMain } from './github-recovery.js';
 import { githubText } from './github-text.js';
 import { evaluateMergeGate } from './merge-gate-run.js';
 import { CI_FIX_FAILURES_HEAD, CI_FIX_PROMPT_HEAD, CI_FIX_PUSH_RULE } from './retry-lessons.js';
@@ -691,6 +693,13 @@ export function createCiPoller(
           return;
         }
       }
+      const mergedAt = pull.mergedAt === null ? NaN : Date.parse(pull.mergedAt);
+      settleAutonomousMerge(
+        deps.db,
+        cand.buildId,
+        'merged',
+        Number.isFinite(mergedAt) ? mergedAt : now,
+      );
       const detail = [
         pull.mergeCommitSha === null
           ? null
@@ -980,6 +989,15 @@ export function createCiPoller(
 
   async function sweepOnce(now: number): Promise<void> {
     sweepStartedAt = nowMs();
+    await recoverAutonomousMerges(deps, run.githubFetch, now, CI_POLL_INTERVAL_MS);
+    try {
+      await recoverRedAutonomousMain(deps, run.githubFetch);
+    } catch (error) {
+      run.logger?.info(
+        { error: error instanceof Error ? error.message : String(error) },
+        'autonomous main recovery deferred',
+      );
+    }
     const candidates = deps.db
       .select({ buildId: build.id, todoId: todo.id })
       .from(build)

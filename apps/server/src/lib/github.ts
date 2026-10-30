@@ -88,6 +88,7 @@ export function isFullSha(value: string): boolean {
 }
 
 export interface GithubPull extends GithubPullState {
+  mergedAt: string | null;
   mergeCommitSha: string | null;
   mergedBy: string | null;
   headSha: string | null;
@@ -100,6 +101,8 @@ export interface GithubPull extends GithubPullState {
   title: string | null;
   authorAssociation: string | null;
   mergeableState: string | null;
+  openerLogin?: string | null;
+  openerType?: string | null;
 }
 
 export function hasPullFields(p: GithubPull): p is GithubPull & {
@@ -200,9 +203,11 @@ export async function githubPull(
     merged?: unknown;
     title?: unknown;
     author_association?: unknown;
+    user?: { login?: unknown; type?: unknown } | null;
     mergeable_state?: unknown;
     merge_commit_sha?: unknown;
     merged_by?: { login?: unknown } | null;
+    merged_at?: unknown;
     head?: { sha?: unknown; ref?: unknown; repo?: { id?: unknown } | null } | null;
     base?: {
       ref?: unknown;
@@ -219,6 +224,7 @@ export async function githubPull(
     pull: {
       state: raw.state,
       merged,
+      mergedAt: optString(raw.merged_at),
       mergeCommitSha:
         merged && typeof raw.merge_commit_sha === 'string' ? raw.merge_commit_sha : null,
       mergedBy: merged && typeof raw.merged_by?.login === 'string' ? raw.merged_by.login : null,
@@ -233,6 +239,8 @@ export async function githubPull(
       title: optString(raw.title),
       authorAssociation: optString(raw.author_association),
       mergeableState: optString(raw.mergeable_state),
+      openerLogin: optString(raw.user?.login),
+      openerType: optString(raw.user?.type),
     },
   };
 }

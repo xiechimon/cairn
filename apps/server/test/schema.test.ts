@@ -1,9 +1,9 @@
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { DB_TABLES } from '@cairn/shared';
 import Database from 'better-sqlite3';
-import { is } from 'drizzle-orm';
+import { is, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { getTableConfig, SQLiteTable } from 'drizzle-orm/sqlite-core';
@@ -18,6 +18,7 @@ describe('the schema and migration journal (the 01 §6 list)', () => {
     const names = tables.map((t) => getTableConfig(t as SQLiteTable).name).sort();
     expect(names).toEqual([...DB_TABLES].sort());
     expect(names).toHaveLength(DB_TABLES.length);
+    expect(names).toContain('autonomous_merge_admission');
     expect(names).toContain('chief');
     expect(names).toContain('attachment');
     expect(names).toContain('branch_sync');
@@ -41,6 +42,44 @@ describe('the schema and migration journal (the 01 §6 list)', () => {
     }
   });
 
+  test.each(['0067_schedule_report', '0068_odd_cloak', '0069_push_delivery'])(
+    'upgrades a database migrated through %s without rewriting its migration history',
+    (previousTag) => {
+      const previous = mkdtempSync(join(tmpdir(), 'cairn-1405-migrations-'));
+      const sqlite = new Database(':memory:');
+      const db = drizzle(sqlite, { schema });
+      try {
+        const journal = JSON.parse(
+          readFileSync(resolve(MIGRATIONS_FOLDER, 'meta/_journal.json'), 'utf8'),
+        ) as { entries: { tag: string; when: number }[] };
+        const tip = journal.entries.findIndex((entry) => entry.tag === previousTag);
+        if (tip < 0) throw new Error('previous migration missing');
+        const entries = journal.entries.slice(0, tip + 1);
+        mkdirSync(join(previous, 'meta'));
+        writeFileSync(
+          join(previous, 'meta/_journal.json'),
+          JSON.stringify({ ...journal, entries }),
+        );
+        for (const entry of entries)
+          copyFileSync(
+            resolve(MIGRATIONS_FOLDER, `${entry.tag}.sql`),
+            join(previous, `${entry.tag}.sql`),
+          );
+        migrate(db, { migrationsFolder: previous });
+        db.run(sql`INSERT INTO team (id, name, createdAt) VALUES ('legacy', 'Legacy', 0)`);
+        migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
+        const columns = db.all(sql`PRAGMA table_info(api_key)`) as { name: string }[];
+        expect(columns.some((column) => column.name === 'machineAccess')).toBe(true);
+        expect(db.select().from(schema.team).get()?.maxAutonomousMergesPerDay).toBe(10);
+        expect(db.select().from(schema.autonomousMergeAdmission).all()).toEqual([]);
+        expect(db.select().from(schema.harnessEvalAttempt).all()).toEqual([]);
+      } finally {
+        sqlite.close();
+        rmSync(previous, { recursive: true, force: true });
+      }
+    },
+  );
+
   test('upgrades a database already migrated through the previous main migration', () => {
     const journal = JSON.parse(
       readFileSync(resolve(MIGRATIONS_FOLDER, 'meta/_journal.json'), 'utf8'),
@@ -61,9 +100,16 @@ describe('the schema and migration journal (the 01 §6 list)', () => {
         );
       const db = drizzle(sqlite, { schema });
       migrate(db, { migrationsFolder: directory });
-      const before = seed(db);
+      db.run(sql`INSERT INTO team (id, name, createdAt) VALUES ('legacy', 'Legacy', 0)`);
       migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
-      expect(seed(db).user.id).toBe(before.user.id);
+      seed(db);
+      expect(
+        db
+          .select()
+          .from(schema.team)
+          .all()
+          .find((row) => row.id === 'legacy')?.maxAutonomousMergesPerDay,
+      ).toBe(10);
       expect(db.select().from(schema.pushDelivery).all()).toEqual([]);
       expect(db.select().from(schema.harnessEvalAttempt).all()).toEqual([]);
     } finally {

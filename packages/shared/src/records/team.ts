@@ -13,6 +13,7 @@ export const teamRecordSchema = z.object({
   plan: teamPlanSchema,
   avatarStyle: z.string().nullable(),
   autonomyPaused: z.boolean().optional(),
+  maxAutonomousMergesPerDay: z.number().int().nonnegative().optional(),
   firstPrReportPrompt: firstPrReportPromptSchema.optional(),
 });
 export type TeamRecord = z.infer<typeof teamRecordSchema>;
