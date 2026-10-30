@@ -11,7 +11,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./github-create-gate": "./src/github-create-gate.ts",
-    "./merge-gate": "./src/records/merge-gate.ts"
+    "./merge-gate": "./src/records/merge-gate.ts",
+    "./otel": "./src/otel.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

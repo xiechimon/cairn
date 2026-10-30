@@ -1,5 +1,5 @@
+import { GENAI_OPERATION, runtimeBuildAttributes, stepAttributes } from '@cairn/shared';
 import {
-  GENAI_OPERATION,
   OTLP_SPAN_KIND,
   OTLP_STATUS_ERROR,
   type OtlpSpan,
@@ -12,9 +12,7 @@ import {
   otlpTracesRequest,
   parseOtlpTarget,
   postOtlpTraces,
-  runtimeBuildAttributes,
-  stepAttributes,
-} from '@cairn/shared';
+} from '@cairn/shared/otel';
 import { eq } from 'drizzle-orm';
 import type { Db } from './db/client.js';
 import { build, step, todo } from './db/schema.js';
