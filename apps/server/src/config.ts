@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   ACCESS_TOKEN_FILE_NAME,
@@ -52,6 +52,7 @@ export const serverConfigSchema = z.object({
   githubOauth: z.object({ clientId: z.string(), clientSecret: z.string() }).nullable(),
   authToken: z.string().nullable(),
   tailscaleUsers: z.array(z.string()),
+  tailscaleSocket: z.string().refine(isAbsolute).nullable(),
   requireToken: z.boolean(),
   host: z.string().nullable(),
   mcpConfigPath: z.string(),
@@ -155,6 +156,7 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
       .split(',')
       .map((login) => login.trim())
       .filter((login) => login !== ''),
+    tailscaleSocket: envStr('CAIRN_TAILSCALE_SOCKET'),
     requireToken: envFlag(ENV_VARS.requireToken),
     host: envStr('HOST'),
     mcpConfigPath: resolve(
@@ -180,12 +182,9 @@ export function insecureBindWarning(config: ServerConfig): string | null {
   return `bound to ${config.host} (reachable on every interface) with ${ENV_VARS.token} unset — the API is open to all interfaces; set ${ENV_VARS.token}=<token> to require Bearer auth, or HOST=127.0.0.1 to keep it local`;
 }
 
-const LOOPBACK_BIND_HOSTS = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1', 'localhost']);
-
 export function tailscaleBindWarning(config: ServerConfig): string | null {
-  if (config.tailscaleUsers.length === 0) return null;
-  if (config.host !== null && LOOPBACK_BIND_HOSTS.has(config.host)) return null;
-  return `${ENV_VARS.tailscaleUsers} is set but HOST=${config.host ?? 'all interfaces'} is not loopback-only; set HOST=127.0.0.1 and proxy tailscale serve to http://127.0.0.1:${config.port}. Identity headers from non-loopback peers are ignored`;
+  if (config.tailscaleUsers.length === 0 || config.tailscaleSocket !== null) return null;
+  return `${ENV_VARS.tailscaleUsers} is set without CAIRN_TAILSCALE_SOCKET; identity headers are never trusted on TCP. Configure an owner-only Unix socket for tailscale serve`;
 }
 
 export function missingRequiredTokenError(config: ServerConfig): string | null {

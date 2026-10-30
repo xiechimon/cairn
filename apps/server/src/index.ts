@@ -17,6 +17,7 @@ import {
 import { openDbWithHandle } from './db/client.js';
 import { seed } from './db/seed.js';
 import { createKeyfileSecretBox } from './lib/secret-box.js';
+import { listenTailscaleSocket } from './lib/tailscale-socket.js';
 import { ConversationStreamHub, TeamStreamHub } from './services/events.js';
 import { killInFlightPick } from './services/fs-pick.js';
 import { refreshingGithubFetch } from './services/github-connection.js';
@@ -146,6 +147,8 @@ const scheduler = createScheduler(
   }),
   schedulingRunOf(config, { githubFetch, logger }),
 );
+const tailscaleServer =
+  config.tailscaleSocket === null ? null : await listenTailscaleSocket(app, config.tailscaleSocket);
 scheduler.start();
 
 const server = serve(
@@ -167,6 +170,7 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     scheduler.stop();
     killInFlightPick();
     server.close();
+    tailscaleServer?.close();
     close();
     process.exit(0);
   });

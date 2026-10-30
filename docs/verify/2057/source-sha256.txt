@@ -1,0 +1,11 @@
+c10d7a3a126140729541e7552117c35c9dc498453b466084ac621c7630e96df8  apps/server/src/config.ts
+399342ef6022ae8ef0d096bf44ec8f198720ef29f32f3f588c76610a02f65e47  apps/server/src/index.ts
+5a2abb7a6a0d75d85464a0e8628aa4c6843bad347d4fa59c6e2a4a5edaddd532  apps/server/src/lib/token-auth.ts
+4cdcbe786b2d63dcc7600dcdeec4da0a0b21a2302def763635135a1592049cb0  apps/server/src/lib/tailscale-socket.ts
+605d20bb163a8573e6df0adcf37f8c6a1935e2cb3bd9bab8d6b618f2b55434ba  apps/server/test/token-auth.test.ts
+27282d88fade7d4ffd022b0f9aabc1697f2157053254c771a28c9cf8c21f26a5  apps/server/test/enroll-confirm-auth.test.ts
+e764f7b37b06b62c48364729371d9450e3bae42c8e40dd8fe1c4332ba2801cde  apps/server/test/tailscale-socket.test.ts
+89d9897c37b37053cd4672bfc8e4fd7393fdfacf1d26857c3f989660a0b545d7  apps/web/e2e/live-server.ts
+3c09b3aeec655c4b61c538ae537eaa8333cfc593bda384c84e6f5ebc6d48f881  apps/web/e2e/token-gate.spec.ts
+e71b72448054376a0c8169c0be90610f99d6904c616106eb9e755da4513bffb3  scripts/ops/verify-tailscale-socket.mjs
+611df70314be8ba2321c4af57681efe34eb8e7bb879d548a1893c5be2c963e77  scripts/ops/verify-tailscale-socket.test.mjs

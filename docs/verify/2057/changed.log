@@ -1,0 +1,66 @@
+
+ RUN  v5.0.1 <worktree>
+
+web push delivery failed
+ ❯ |@xiechimon/cairn| test/push.test.ts (40 tests | 7 failed) 3978ms
+   ❯ subscription authorization boundaries (4)
+     × delivers only to the requested owner and team 242ms
+   ❯ delivery: only decisions push immediately (4)
+     × parallel delivery reaches a live endpoint while another is stalled 150ms
+   ❯ digest routing: merged, failed, plan-ready, review queue; 410 prunes (7)
+     × PATCH todo phase to confirm queues for the digest and sends no immediate push 118ms
+     × queues build review for the digest without an immediate push 175ms
+     × queues merged PR reconciliation for the digest without an immediate push 82ms
+     × queues failed work for the digest without an immediate push 280ms
+     × prunes a 410 subscription while delivering to live subscriptions 105ms
+ ❯ |@xiechimon/cairn| test/skill-write.test.ts (30 tests | 1 failed) 11941ms
+   ❯ machine-wire skill listing and on-demand fetch (GET /api/machine/skills/{stepId}[/file]) (8)
+     × M5: an over-limit file no longer fails the whole package -- an asset past the per-file gate enters the listing with its real size and is delivered byte-complete; a total over the old package gate still gets a listing 6608ms
+ ❯ |@xiechimon/cairn| test/git-hosting.test.ts (11 tests | 11 skipped) 10005ms
+ ❯ |@xiechimon/cairn| test/attachment-gc.test.ts (15 tests | 1 failed) 34475ms
+   ❯ attachment gc -- scheduler cadence (3)
+     × a large transcript corpus does not block the event loop during a tick 30014ms
+ ❯ |@xiechimon/cairn| test/split-rejected-proposal.test.ts (44 tests | 2 failed) 34110ms
+   × shadow validates a 12000-node cycle without losing its rejection contract 7502ms
+   × auto validates a 12000-node cycle without losing its rejection contract 10822ms
+node:events:505
+    throw er; // Unhandled 'error' event
+    ^
+
+Error: listen EPERM: operation not permitted <tmp>/c2057-oHUW7O/s
+    at Server.setupListenHandle [as _listen2] (node:net:2306:21)
+    at listenInCluster (node:net:2437:12)
+    at Server.listen (node:net:2579:5)
+    at [eval]:1:36
+    at runScriptInThisContext (node:internal/vm:219:10)
+    at node:internal/process/execution:485:12
+    at [eval]-wrapper:6:24
+    at runScriptInContext (node:internal/process/execution:483:60)
+    at evalFunction (node:internal/process/execution:317:30)
+    at evalTypeScript (node:internal/process/execution:329:3)
+Emitted 'error' event on Server instance at:
+    at emitErrorNT (node:net:2416:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+  code: 'EPERM',
+  errno: -1,
+  syscall: 'listen',
+  address: '<tmp>/c2057-oHUW7O/s',
+  port: -1
+}
+
+Node.js v26.8.1
+ ❯ |@xiechimon/cairn| test/tailscale-socket.test.ts (10 tests | 3 failed) 1476ms
+   ❯ #2057 real HTTP transport boundary (10)
+     × owner socket identity works, TCP requires bearer, socket is owner-only, enrollment uses the same boundary 273ms
+     × does not replace an active socket 2ms
+     × replaces a stale socket left by a killed owner process 138ms
+ ❯ |@xiechimon/cairn| test/trajectory-reflect-curate.test.ts (9 tests | 9 failed) 90034ms
+   × ENV_VARS.trajectoryReflectCurate names the schedule flag 10007ms
+   × loadConfig reads the reflect-curate schedule flag 10002ms
+   × trajectoryReflectCurateRunOf is null when the schedule flag is off 10001ms
+   × trajectoryReflectCurateRunOf stays off without reflector credentials 10004ms
+   × createScheduler in index.ts ends with trajectoryReflectCurateRunOf after export 10001ms
+   × export and outcome runOf helpers still exist for the prior slots 10001ms
+   × sweepReflectCurate reflects then curates a daily export once 10002ms
+   × sweepReflectCurate opens GitHub issues for new guards when asked 10010ms
+   × REFLECT_CURATE_INTERVAL_MS matches the daily trajectory cadence 10003ms

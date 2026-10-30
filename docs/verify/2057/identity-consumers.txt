@@ -1,0 +1,16 @@
+docs/feature-map.md:775:| [#1762](https://github.com/xiechimon/cairn/issues/1762) `server: Tailscale Serve identity header signs the owner in without the access token (loopback-only trust)` | General surface | Done | `apps/server/test/token-auth.test.ts`<br>`apps/web/e2e/token-gate.spec.ts` |
+docs/deploy/tailscale-mobile.md:65:Cairn trusts `Tailscale-User-Login` only for an exactly allowlisted login on the dedicated Unix listener. TCP identity headers are ignored on every address, including IPv4 and IPv6 loopback. Forwarding headers cannot change this boundary. TCP API clients and scripts must send their bearer token; daemon machine endpoints retain their separate machine credentials.
+docs/security/agent-isolation.md:34:When using Tailscale Serve, follow [the existing deployment guide](../deploy/tailscale-mobile.md). Configure `CAIRN_TAILSCALE_SOCKET` and point root-run Serve at that Unix socket. TCP headers, including loopback headers, cannot establish identity. The socket must be mode `0600` in a parent directory that is not writable by group or others. Processes sharing the server user and root can still impersonate an identity through the socket; keep untrusted executors under a separate user.
+scripts/ops/verify-tailscale-socket.mjs:35:  const identity = { 'tailscale-user-login': login };
+scripts/ops/verify-tailscale-socket.mjs:43:      { 'tailscale-user-login': `unknown-${Date.now()}@invalid` },
+apps/server/src/lib/token-auth.ts:37:  const tailscaleLogin = c.req.header('tailscale-user-login');
+apps/server/test/tailscale-socket.test.ts:77:        'tailscale-user-login': 'owner@example.com',
+apps/server/test/tailscale-socket.test.ts:88:      expect((await httpStatus(path, { 'tailscale-user-login': 'other@example.com' })).status).toBe(
+apps/server/test/enroll-confirm-auth.test.ts:203:            'Tailscale-User-Login': 'xiechimon@github',
+apps/server/test/enroll-confirm-auth.test.ts:219:            'Tailscale-User-Login': 'stranger@github',
+apps/server/test/enroll-confirm-auth.test.ts:235:            'Tailscale-User-Login': 'xiechimon@github',
+apps/server/test/token-auth.test.ts:89:            'Tailscale-User-Login': login,
+apps/server/test/token-auth.test.ts:122:            'Tailscale-User-Login': 'xiechimon@github',
+apps/server/test/token-auth.test.ts:140:            'Tailscale-User-Login': 'xiechimon@github',
+apps/server/test/token-auth.test.ts:152:    const headers = { 'Tailscale-User-Login': 'xiechimon@github' };
+apps/web/e2e/token-gate.spec.ts:161:  await page.setExtraHTTPHeaders({ 'Tailscale-User-Login': TAILSCALE_LOGIN });

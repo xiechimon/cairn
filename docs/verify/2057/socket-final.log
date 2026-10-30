@@ -1,0 +1,86 @@
+
+ RUN  v5.0.1 <worktree>
+
+node:events:505
+    throw er; // Unhandled 'error' event
+    ^
+
+Error: listen EPERM: operation not permitted <tmp>/c2057-bbEpcM/s
+    at Server.setupListenHandle [as _listen2] (node:net:2306:21)
+    at listenInCluster (node:net:2437:12)
+    at Server.listen (node:net:2579:5)
+    at [eval]:1:36
+    at runScriptInThisContext (node:internal/vm:219:10)
+    at node:internal/process/execution:485:12
+    at [eval]-wrapper:6:24
+    at runScriptInContext (node:internal/process/execution:483:60)
+    at evalFunction (node:internal/process/execution:317:30)
+    at evalTypeScript (node:internal/process/execution:329:3)
+Emitted 'error' event on Server instance at:
+    at emitErrorNT (node:net:2416:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+  code: 'EPERM',
+  errno: -1,
+  syscall: 'listen',
+  address: '<tmp>/c2057-bbEpcM/s',
+  port: -1
+}
+
+Node.js v26.8.1
+ ❯ |@xiechimon/cairn| test/tailscale-socket.test.ts (10 tests | 3 failed) 2936ms
+   ❯ #2057 real HTTP transport boundary (10)
+     × owner socket identity works, TCP requires bearer, socket is owner-only, enrollment uses the same boundary 502ms
+     × does not replace an active socket 2ms
+     × replaces a stale socket left by a killed owner process 107ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/tailscale-socket.test.ts > #2057 real HTTP transport boundary > owner socket identity works, TCP requires bearer, socket is owner-only, enrollment uses the same boundary
+Error: listen EPERM: operation not permitted <tmp>/c2057-pzYCbV/s
+ ❯ src/lib/tailscale-socket.ts:68:14
+     66|     const previousUmask = process.umask(0o177);
+     67|     try {
+     68|       server.listen(path, () => {
+       |              ^
+     69|         try {
+     70|           chmodSync(path, 0o600);
+ ❯ listenTailscaleSocket src/lib/tailscale-socket.ts:64:10
+ ❯ test/tailscale-socket.test.ts:70:24
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  |@xiechimon/cairn| test/tailscale-socket.test.ts > #2057 real HTTP transport boundary > does not replace an active socket
+Error: listen EPERM: operation not permitted <tmp>/c2057-3B7MPb/s
+ ❯ test/tailscale-socket.test.ts:140:12
+    138|     const path = socketPath();
+    139|     const active = createServer((connection) => connection.end());
+    140|     active.listen(path);
+       |            ^
+    141|     await once(active, 'listening');
+    142|     const inode = lstatSync(path).ino;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  |@xiechimon/cairn| test/tailscale-socket.test.ts > #2057 real HTTP transport boundary > replaces a stale socket left by a killed owner process
+Error: socket fixture exited before readiness: 1
+ ❯ test/tailscale-socket.test.ts:166:17
+    164|         once(child.stdout, 'data'),
+    165|         once(child, 'exit').then(([code]) => {
+    166|           throw new Error(`socket fixture exited before readiness: ${c…
+       |                 ^
+    167|         }),
+    168|       ]);
+ ❯ test/tailscale-socket.test.ts:163:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 7 passed (10)
+   Start at  16:47:15
+   Duration  12.36s (transform 51%, import 25%, tests 24%)
+
+  Transform  |@xiechimon/cairn| transforming modules took 6.14s · 51% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+

@@ -1,9 +1,16 @@
 import { timingSafeEqual } from 'node:crypto';
-import { getConnInfo } from '@hono/node-server/conninfo';
+import type { Http2Bindings, HttpBindings } from '@hono/node-server';
 import type { Context, Hono } from 'hono';
 import { sha256Hex } from './crypto.js';
 
-const LOOPBACK_PEER_ADDRESSES = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+const socketRequests = new WeakSet<Request>();
+
+export function tailscaleSocketFetch(app: Hono) {
+  return (request: Request, env: HttpBindings | Http2Bindings) => {
+    socketRequests.add(request);
+    return app.fetch(request, env);
+  };
+}
 
 const STREAM_PATH_PATTERNS = [
   /^\/api\/teams\/[^/]+\/stream$/,
@@ -38,13 +45,7 @@ export function matchesAllowlistedTailscaleIdentity(
   if (tailscaleUsers.length === 0) return false;
   const tailscaleLogin = c.req.header('tailscale-user-login');
   if (tailscaleLogin === undefined || !tailscaleUsers.includes(tailscaleLogin)) return false;
-  let peerAddress: string | undefined;
-  try {
-    peerAddress = getConnInfo(c).remote.address;
-  } catch (error) {
-    if (!(error instanceof TypeError)) throw error;
-  }
-  return peerAddress !== undefined && LOOPBACK_PEER_ADDRESSES.has(peerAddress);
+  return socketRequests.has(c.req.raw);
 }
 
 export function registerTokenAuth(

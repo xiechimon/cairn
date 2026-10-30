@@ -157,17 +157,13 @@ test('#1048 gate page guide: the en face keeps the same facts undistorted (comma
   expect(await help.innerText()).not.toMatch(new RegExp(`${ENV_VARS.token}\\s*=`));
 });
 
-test('#1762 Tailscale Serve identity: the app opens without the token prompt or a stored token', async ({
-  page,
-}) => {
+test('#2057 forged Tailscale identity on TCP still requires the token', async ({ page }) => {
   await page.setExtraHTTPHeaders({ 'Tailscale-User-Login': TAILSCALE_LOGIN });
   const firstLoad = page.waitForResponse(
-    (res) => res.url().endsWith('/api/teams') && res.status() === 200,
+    (res) => res.url().endsWith('/api/teams') && res.status() === 401,
   );
   await page.goto(`${tailscaleServer.base}/app`);
-
-  await expect(page.locator('.board-sidebar')).toBeVisible();
-  await expect(page.locator('.token-gate')).toHaveCount(0);
+  await expect(page.locator('.token-gate')).toBeVisible();
   expect((await firstLoad).request().headers().authorization).toBeUndefined();
   expect(await page.evaluate(() => localStorage.getItem('cairn.token'))).toBeNull();
 });

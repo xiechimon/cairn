@@ -178,7 +178,7 @@ describe('enroll confirm owner auth (#2053)', () => {
     expect(confirmed.status).toBe(200);
   });
 
-  test('allowlisted loopback Tailscale identity confirms without stored bearer', async () => {
+  test('allowlisted TCP loopback identity cannot confirm without bearer', async () => {
     const s = bootServer({
       authToken: OWNER_TOKEN,
       tailscaleUsers: ['xiechimon@github'],
@@ -239,13 +239,8 @@ describe('enroll confirm owner auth (#2053)', () => {
         { incoming: { socket: { remoteAddress: '127.0.0.1' } } },
       ),
     );
-    expect(confirmed.status).toBe(200);
-    const { machine } = (await confirmed.json()) as {
-      machine: { machineId: string; token: string; teamId: string };
-    };
-    expect(machine.teamId).toBe(s.team.id);
-
+    expect(confirmed.status).toBe(401);
     const poll = await reqWith(s, 'POST', '/api/machine/enroll/poll', {}, { enrollId });
-    expect(await poll.json()).toEqual({ status: 'authorized', machine });
+    expect(await poll.json()).toEqual({ status: 'pending' });
   });
 });

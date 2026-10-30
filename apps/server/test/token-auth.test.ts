@@ -96,12 +96,11 @@ describe('#1762 Tailscale Serve identity authentication', () => {
   }
 
   test.each(['127.0.0.1', '::1', '::ffff:127.0.0.1'])(
-    'loopback peer %s + allowed login -> /api/user/me 200 without token',
+    'TCP loopback peer %s + allowed login -> 401 without token',
     async (remoteAddress) => {
       const s = bootServer({ authToken: TOKEN, tailscaleUsers: ['xiechimon@github'] });
       const res = await identityRequest(s, 'xiechimon@github', remoteAddress);
-      expect(res.status).toBe(200);
-      expect((await res.json()) as { id?: string }).toEqual(s.user);
+      expect(res.status).toBe(401);
     },
   );
 
@@ -131,7 +130,7 @@ describe('#1762 Tailscale Serve identity authentication', () => {
     expect(withToken.status).toBe(200);
   });
 
-  test('loopback + allowed login stays 200 when a stale bearer is also sent', async () => {
+  test('TCP loopback + allowed login and stale bearer -> 401', async () => {
     const s = bootServer({ authToken: TOKEN, tailscaleUsers: ['xiechimon@github'] });
     const res = await Promise.resolve(
       s.app.request(
@@ -145,7 +144,7 @@ describe('#1762 Tailscale Serve identity authentication', () => {
         { incoming: { socket: { remoteAddress: '127.0.0.1' } } },
       ),
     );
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(401);
   });
 
   test('missing peer information rejects identity and preserves token fallback', async () => {
@@ -524,43 +523,37 @@ describe('#1708 startup lines (token location + one-time login link)', () => {
   });
 });
 
-describe('#1762 Tailscale identity bind warning', () => {
-  test('allowlist + non-loopback or default bind -> WARN; loopback or no allowlist -> no WARN', () => {
-    expect(
-      tailscaleBindWarning(loadConfig({ host: '0.0.0.0', tailscaleUsers: ['xiechimon@github'] })),
-    ).toMatch(/CAIRN_TAILSCALE_USERS/);
-    expect(
-      tailscaleBindWarning(loadConfig({ host: null, tailscaleUsers: ['xiechimon@github'] })),
-    ).toMatch(/127\.0\.0\.1/);
-    expect(
-      tailscaleBindWarning(loadConfig({ host: '127.0.0.1', tailscaleUsers: ['xiechimon@github'] })),
-    ).toBeNull();
-    expect(
-      tailscaleBindWarning(loadConfig({ host: '::1', tailscaleUsers: ['xiechimon@github'] })),
-    ).toBeNull();
-    expect(
-      tailscaleBindWarning(loadConfig({ host: 'localhost', tailscaleUsers: ['xiechimon@github'] })),
-    ).toBeNull();
+describe('#2057 Tailscale socket warning', () => {
+  test('allowlist without socket warns on every TCP bind, socket or no allowlist does not', () => {
+    for (const host of [null, '127.0.0.1', '::1', 'localhost', '0.0.0.0']) {
+      expect(
+        tailscaleBindWarning(
+          loadConfig({ host, tailscaleSocket: null, tailscaleUsers: ['owner'] }),
+        ),
+      ).toMatch(/CAIRN_TAILSCALE_SOCKET/);
+    }
     expect(
       tailscaleBindWarning(
-        loadConfig({ host: '192.168.1.10', tailscaleUsers: ['xiechimon@github'] }),
+        loadConfig({ tailscaleSocket: '/private/cairn.sock', tailscaleUsers: ['owner'] }),
       ),
-    ).toMatch(/Identity headers from non-loopback peers are ignored/);
-    expect(tailscaleBindWarning(loadConfig({ host: '0.0.0.0', tailscaleUsers: [] }))).toBeNull();
-  });
-
-  test('entry wiring emits one warning for an unsafe identity bind', () => {
+    ).toBeNull();
+    expect(
+      tailscaleBindWarning(loadConfig({ tailscaleSocket: null, tailscaleUsers: [] })),
+    ).toBeNull();
     const calls: string[] = [];
     warnTailscaleBind(
-      { warn: (msg: string) => calls.push(msg) },
-      loadConfig({ host: null, tailscaleUsers: ['xiechimon@github'] }),
-    );
-    warnTailscaleBind(
-      { warn: (msg: string) => calls.push(msg) },
-      loadConfig({ host: '127.0.0.1', tailscaleUsers: ['xiechimon@github'] }),
+      { warn: (line) => calls.push(line) },
+      loadConfig({ tailscaleSocket: null, tailscaleUsers: ['owner'] }),
     );
     expect(calls).toHaveLength(1);
-    expect(calls[0]).toMatch(/CAIRN_TAILSCALE_USERS/);
+  });
+
+  test('socket environment is optional and absolute', () => {
+    vi.stubEnv('CAIRN_TAILSCALE_SOCKET', '/private/cairn.sock');
+    expect(loadConfig().tailscaleSocket).toBe('/private/cairn.sock');
+    vi.stubEnv('CAIRN_TAILSCALE_SOCKET', 'relative.sock');
+    expect(() => loadConfig()).toThrow();
+    vi.unstubAllEnvs();
   });
 
   test('CAIRN_TAILSCALE_USERS maps to a trimmed allowlist without empty entries', () => {

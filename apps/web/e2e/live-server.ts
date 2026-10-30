@@ -83,6 +83,7 @@ export async function bootLiveServer(
       [ENV_VARS.webDir]: process.env.E2E_DIST_DIR ?? resolve(import.meta.dirname, '..', 'dist'),
       [ENV_VARS.token]: token ?? '',
       CAIRN_TAILSCALE_USERS: tailscaleUsers ?? '',
+      CAIRN_TAILSCALE_SOCKET: '',
     },
     stdio: ['pipe', 'ignore', 'inherit'],
   });

@@ -25,13 +25,13 @@ Run credential-holding services outside the untrusted execution identity where t
 ## Protect server access and local state
 
 1. Bind a local server explicitly to `HOST=127.0.0.1`. Set a random `CAIRN_TOKEN` and `CAIRN_REQUIRE_TOKEN=1` before startup. Protect the token from shell history, logs, and shared environment files. Require-token mode also suppresses the token-bearing startup login link.
-2. For remote access, use authenticated TLS and a firewall or private network with an explicit client allowlist. With #2053, enrollment confirmation requires the server owner bearer or an allowlisted loopback Tailscale identity when authentication is enabled; keep start/poll reachable for the CLI, and still prefer authenticated TLS plus network allowlisting for remote daemons.
+2. For remote access, use authenticated TLS and a firewall or private network with an explicit client allowlist. Enrollment confirmation requires the server owner bearer or an allowlisted Tailscale identity received on the dedicated owner-only Unix socket when authentication is enabled; keep start/poll reachable for the CLI, and still prefer authenticated TLS plus network allowlisting for remote daemons.
 3. Restrict every API key to trusted holders while #2054 is unresolved. A read-only MCP key currently also permits machine enrollment. Do not treat MCP tool grants as a complete limit on that key's authority.
 4. Before starting the daemon under its dedicated user, set `umask 077`. Make its Cairn home private and keep `machine.json` readable only by its owner. Check existing files as well as newly created ones. #2056 tracks automatic permission enforcement.
 5. Keep the server database and `secretbox.key` private. Back them up together into restricted storage. Anyone with both can decrypt stored secrets. Never mount those backups into the executor.
 6. Use encrypted transport for remote daemon connections. Do not send machine tokens, API keys, or step credential bundles over untrusted plaintext HTTP. The default loopback URL is for local use.
 
-When using Tailscale Serve, follow [the existing deployment guide](../deploy/tailscale-mobile.md). Trust identity headers only from the intended loopback proxy. Check that other local users cannot impersonate that proxy in your deployment.
+When using Tailscale Serve, follow [the existing deployment guide](../deploy/tailscale-mobile.md). Configure `CAIRN_TAILSCALE_SOCKET` and point root-run Serve at that Unix socket. TCP headers, including loopback headers, cannot establish identity. The socket must be mode `0600` in a parent directory that is not writable by group or others. Processes sharing the server user and root can still impersonate an identity through the socket; keep untrusted executors under a separate user.
 
 ## Restrict network and MCP access
 

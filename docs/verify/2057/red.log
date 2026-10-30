@@ -1,0 +1,137 @@
+
+ RUN  v5.0.1 <worktree>
+
+ ❯ |@xiechimon/cairn| test/tailscale-socket.test.ts (0 test)
+ ❯ |@xiechimon/cairn| test/enroll-confirm-auth.test.ts (6 tests | 1 failed) 388ms
+   ❯ enroll confirm owner auth (#2053) (6)
+     × allowlisted TCP loopback identity cannot confirm without bearer 29ms
+ ❯ |@xiechimon/cairn| test/token-auth.test.ts (45 tests | 6 failed) 1043ms
+   ❯ #1762 Tailscale Serve identity authentication (8)
+     × TCP loopback peer 127.0.0.1 + allowed login -> 401 without token 31ms
+     × TCP loopback peer ::1 + allowed login -> 401 without token 28ms
+     × TCP loopback peer ::ffff:127.0.0.1 + allowed login -> 401 without token 27ms
+     × TCP loopback + allowed login and stale bearer -> 401 26ms
+   ❯ #2057 Tailscale socket warning (3)
+     × allowlist without socket warns on every TCP bind, socket or no allowlist does not 1ms
+     × socket environment is optional and absolute 0ms
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/tailscale-socket.test.ts [ apps/server/test/tailscale-socket.test.ts ]
+Error: Cannot find module '../src/lib/tailscale-socket.js' imported from <worktree>/apps/server/test/tailscale-socket.test.ts
+ ❯ test/tailscale-socket.test.ts:10:1
+      8| import { serve } from '@hono/node-server';
+      9| import { afterEach, describe, expect, test } from 'vitest';
+     10| import { listenTailscaleSocket } from '../src/lib/tailscale-socket.js';
+       | ^
+     11| import { bootServer } from './helpers.js';
+     12|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/enroll-confirm-auth.test.ts > enroll confirm owner auth (#2053) > allowlisted TCP loopback identity cannot confirm without bearer
+AssertionError: expected 200 to be 401 // Object.is equality
+
+- Expected
++ Received
+
+- 401
++ 200
+
+ ❯ test/enroll-confirm-auth.test.ts:242:30
+    240|       ),
+    241|     );
+    242|     expect(confirmed.status).toBe(401);
+       |                              ^
+    243|     const poll = await reqWith(s, 'POST', '/api/machine/enroll/poll', …
+    244|     expect(await poll.json()).toEqual({ status: 'pending' });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯
+
+ FAIL  |@xiechimon/cairn| test/token-auth.test.ts > #1762 Tailscale Serve identity authentication > TCP loopback peer 127.0.0.1 + allowed login -> 401 without token
+ FAIL  |@xiechimon/cairn| test/token-auth.test.ts > #1762 Tailscale Serve identity authentication > TCP loopback peer ::1 + allowed login -> 401 without token
+ FAIL  |@xiechimon/cairn| test/token-auth.test.ts > #1762 Tailscale Serve identity authentication > TCP loopback peer ::ffff:127.0.0.1 + allowed login -> 401 without token
+AssertionError: expected 200 to be 401 // Object.is equality
+
+- Expected
++ Received
+
+- 401
++ 200
+
+ ❯ test/token-auth.test.ts:103:26
+    101|       const s = bootServer({ authToken: TOKEN, tailscaleUsers: ['xiech…
+    102|       const res = await identityRequest(s, 'xiechimon@github', remoteA…
+    103|       expect(res.status).toBe(401);
+       |                          ^
+    104|     },
+    105|   );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/8]⎯
+
+ FAIL  |@xiechimon/cairn| test/token-auth.test.ts > #1762 Tailscale Serve identity authentication > TCP loopback + allowed login and stale bearer -> 401
+AssertionError: expected 200 to be 401 // Object.is equality
+
+- Expected
++ Received
+
+- 401
++ 200
+
+ ❯ test/token-auth.test.ts:147:24
+    145|       ),
+    146|     );
+    147|     expect(res.status).toBe(401);
+       |                        ^
+    148|   });
+    149|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/8]⎯
+
+ FAIL  |@xiechimon/cairn| test/token-auth.test.ts > #2057 Tailscale socket warning > allowlist without socket warns on every TCP bind, socket or no allowlist does not
+AssertionError: expected 'CAIRN_TAILSCALE_USERS is set but HOST…' to match /CAIRN_TAILSCALE_SOCKET/
+
+- Expected:
+/CAIRN_TAILSCALE_SOCKET/
+
++ Received:
+"CAIRN_TAILSCALE_USERS is set but HOST=all interfaces is not loopback-only; set HOST=127.0.0.1 and proxy tailscale serve to http://127.0.0.1:8787. Identity headers from non-loopback peers are ignored"
+
+ ❯ test/token-auth.test.ts:529:108
+    527|   test('allowlist without socket warns on every TCP bind, socket or no…
+    528|     for (const host of [null, '127.0.0.1', '::1', 'localhost', '0.0.0.…
+    529|       expect(tailscaleBindWarning(loadConfig({ host, tailscaleSocket: …
+       |                                                                                                            ^
+    530|     }
+    531|     expect(tailscaleBindWarning(loadConfig({ tailscaleSocket: '/privat…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/8]⎯
+
+ FAIL  |@xiechimon/cairn| test/token-auth.test.ts > #2057 Tailscale socket warning > socket environment is optional and absolute
+AssertionError: expected undefined to be '/private/cairn.sock' // Object.is equality
+
+- Expected:
+"/private/cairn.sock"
+
++ Received:
+undefined
+
+ ❯ test/token-auth.test.ts:540:42
+    538|   test('socket environment is optional and absolute', () => {
+    539|     vi.stubEnv('CAIRN_TAILSCALE_SOCKET', '/private/cairn.sock');
+    540|     expect(loadConfig().tailscaleSocket).toBe('/private/cairn.sock');
+       |                                          ^
+    541|     vi.stubEnv('CAIRN_TAILSCALE_SOCKET', 'relative.sock');
+    542|     expect(() => loadConfig()).toThrow();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/8]⎯
+
+
+ Test Files  3 failed (3)
+      Tests  7 failed | 44 passed (51)
+   Start at  16:42:45
+   Duration  2.13s (tests 42%, transform 30%, import 28%)
+
