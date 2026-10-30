@@ -1,0 +1,14 @@
+@xiechimon/cairn@0.1.1 <worktree>/apps/server
+├── better-sqlite3@13.0.3 -> ./../../node_modules/.pnpm/better-sqlite3@13.0.3/node_modules/better-sqlite3
+├─┬ drizzle-kit@0.31.10 -> ./../../node_modules/.pnpm/drizzle-kit@0.31.10/node_modules/drizzle-kit
+│ ├── better-sqlite3@13.0.3 invalid: "^11.9.1" from ../../node_modules/.pnpm/drizzle-kit@0.31.10/node_modules/drizzle-kit -> ./../../node_modules/.pnpm/better-sqlite3@13.0.3/node_modules/better-sqlite3
+│ └─┬ drizzle-orm@0.45.2 invalid: "workspace:./drizzle-orm/dist" from ../../node_modules/.pnpm/drizzle-kit@0.31.10/node_modules/drizzle-kit -> ./../../node_modules/.pnpm/drizzle-orm@0.45.2_@types+better-sqlite3@9.6.0_better-sqlite3@13.0.3/node_modules/drizzle-orm
+│   └── better-sqlite3@13.0.3 deduped invalid: "^11.9.1" from ../../node_modules/.pnpm/drizzle-orm@0.45.2_@types+better-sqlite3@9.6.0_better-sqlite3@13.0.3/node_modules/drizzle-orm, "^11.9.1" from ../../node_modules/.pnpm/drizzle-orm@0.45.2_@types+better-sqlite3@9.6.0_better-sqlite3@13.0.3/node_modules/drizzle-orm -> ./../../node_modules/.pnpm/better-sqlite3@13.0.3/node_modules/better-sqlite3
+└─┬ drizzle-orm@0.45.2 -> ./../../node_modules/.pnpm/drizzle-orm@0.45.2_@types+better-sqlite3@9.6.0_better-sqlite3@13.0.3/node_modules/drizzle-orm
+  └── better-sqlite3@13.0.3 invalid: "^11.9.1" from ../../node_modules/.pnpm/drizzle-orm@0.45.2_@types+better-sqlite3@9.6.0_better-sqlite3@13.0.3/node_modules/drizzle-orm, "^11.9.1" from ../../node_modules/.pnpm/drizzle-orm@0.45.2_@types+better-sqlite3@9.6.0_better-sqlite3@13.0.3/node_modules/drizzle-orm -> ./../../node_modules/.pnpm/better-sqlite3@13.0.3/node_modules/better-sqlite3
+
+npm error code ELSPROBLEMS
+npm error invalid: better-sqlite3@13.0.3 <worktree>/node_modules/.pnpm/node_modules/better-sqlite3
+npm error invalid: better-sqlite3@13.0.3 <worktree>/node_modules/.pnpm/drizzle-orm@0.45.2_@types+better-sqlite3@9.6.0_better-sqlite3@13.0.3/node_modules/better-sqlite3
+npm error Log files were not written due to an error writing to the directory: <npm-cache>/_logs
+npm error You can rerun the command with `--loglevel=verbose` to see the logs in your terminal

@@ -3,9 +3,11 @@ import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
   copyFileSync,
+  existsSync,
   mkdirSync,
   readFileSync,
   realpathSync,
+  rmSync,
   writeFileSync,
 } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -18,7 +20,7 @@ function command(tool, args, options = {}) {
   assert.equal(result.status, 0, result.stderr);
   return result.stdout.trim();
 }
-function fixture(mode = 'good') {
+function fixture(mode = 'good', overrides = {}) {
   const root = realpathSync(makeTestTempDir('deploy-self-'));
   const repo = join(root, 'repo');
   const state = join(root, 'deploy');
@@ -58,30 +60,41 @@ function fixture(mode = 'good') {
   };
   fake(
     'git',
-    `import os,sys\nif len(sys.argv)>3 and sys.argv[3]=='fetch': sys.exit(0)\nos.execv('${realGit}', ['${realGit}']+sys.argv[1:])`,
+    `import os,sys
+if len(sys.argv)>3 and sys.argv[3]=='fetch':
+ with open(os.environ['EVENTS'],'a') as f: f.write('fetch\\n')
+ sys.exit(0)
+if os.environ.get('REQUIRE_FETCH') and 'worktree' in sys.argv and 'fetch' not in open(os.environ['EVENTS']).read(): sys.exit(1)
+os.execv('${realGit}', ['${realGit}']+sys.argv[1:])`,
   );
   fake(
     'gh',
     `import json,os,sys
 p=sys.argv[-1]; sha=os.environ['SHA']; mode=os.environ['MODE']
-if p.endswith('/pulls'): value=[[{'merged_at':'now','merge_commit_sha':sha,'base':{'ref':'main','repo':{'full_name':'xiechimon/cairn'}},'head':{'sha':'f'*40}}]]
+if '/compare/' in p: value={'status':('diverged' if mode=='off-main' else 'ahead')}
+elif p.endswith('/pulls'): value=[[{'merged_at':'now','merge_commit_sha':sha,'base':{'ref':'main','repo':{'full_name':'xiechimon/cairn'}},'head':{'sha':'f'*40}}]]
 else:
  names=['pr-evidence'] if '/'+('f'*40)+'/' in p else ['check','pack-smoke','e2e-gate']
  value=[{'check_runs':[{'id':i,'name':n,'head_sha':('f'*40 if n=='pr-evidence' else sha),'app':{'slug':'github-actions'},'status':'completed','conclusion':('failure' if mode=='red' and n=='check' else 'success')} for i,n in enumerate(names) if not((mode=='evidence' and n=='pr-evidence') or (mode=='missing-check' and n=='check'))]}]
-if mode=='pending-check': value[0]['check_runs'][0]['status']='in_progress'
-if mode=='wrong-sha': value[0]['check_runs'][0]['head_sha']='0'*40
-if mode=='superseded': value[0]['check_runs'].append(dict(value[0]['check_runs'][0], id=999, conclusion='failure'))
+if 'check-runs?' in p and mode=='pending-check': value[0]['check_runs'][0]['status']='in_progress'
+if 'check-runs?' in p and mode=='wrong-sha': value[0]['check_runs'][0]['head_sha']='0'*40
+if 'check-runs?' in p and mode=='superseded': value[0]['check_runs'].append(dict(value[0]['check_runs'][0], id=999, conclusion='failure'))
 print(json.dumps(value))`,
   );
   fake(
     'pnpm',
     `import os,sys
+with open(os.environ['EVENTS'],'a') as f: f.write('pnpm '+' '.join(sys.argv[1:])+'\\n')
 sys.exit(1 if os.environ['MODE']=='install' else 0)`,
   );
   fake(
     'node',
     `import os,sys,time,sqlite3
 from pathlib import Path
+if '-e' in sys.argv:
+ with open(os.environ['EVENTS'],'a') as f: f.write('native '+str(Path.cwd())+' '+sys.argv[-1]+'\\n')
+ sys.exit(1 if os.environ['MODE']=='native' else 0)
+with open(os.environ['EVENTS'],'a') as f: f.write('scratch PORT='+os.environ['PORT']+'\\n')
 version=(Path.cwd().parents[1]/'version').read_text()
 mode=os.environ['MODE']
 db=sqlite3.connect(Path(os.environ['CAIRN_HOME'])/'server/server.db')
@@ -93,14 +106,15 @@ while True: time.sleep(1)`,
   fake(
     'curl',
     `import os,sys,json
-if os.environ['MODE']=='health' and '18787' not in ' '.join(sys.argv): sys.exit(22)
+with open(os.environ['EVENTS'],'a') as f: f.write('curl '+sys.argv[-1]+'\\n')
+if os.environ['MODE']=='health' and (':'+os.environ.get('CAIRN_DEPLOY_SCRATCH_PORT','18787')+'/') not in sys.argv[-1]: sys.exit(22)
 print(json.dumps([{'id':'a'}] if sys.argv[-1].endswith('/api/teams') else {'id':'user'}))`,
   );
   fake(
     'systemctl',
     `import os,sys,sqlite3
 if 'show' in sys.argv:
- print('/wrong' if os.environ['MODE']=='unit-path' else os.environ['CAIRN_DEPLOY_ROOT']+'/current/apps/'+('server' if 'cairn-server.service' in sys.argv else 'daemon')); sys.exit(0)
+ print('/wrong' if os.environ['MODE']=='unit-path' else os.environ['CAIRN_DEPLOY_ROOT']+'/current/apps/'+('server' if os.environ.get('CAIRN_DEPLOY_UNITS','cairn-server.service cairn-daemon.service').split()[0] in sys.argv else 'daemon')); sys.exit(0)
 if 'stop' in sys.argv and os.environ['MODE']=='restore-late':
  db=sqlite3.connect(os.environ['DB']); db.execute("insert into todo values('late-write')"); db.commit()
 with open(os.environ['EVENTS'],'a') as f: f.write(' '.join(sys.argv[1:])+'\\n')
@@ -123,6 +137,7 @@ if 'restart' in sys.argv:
     CAIRN_DEPLOY_MACHINE: 'daemon',
     CAIRN_DEPLOY_TOKEN: 'fixture-token',
     CAIRN_DEPLOY_TIMEOUT: '1',
+    ...overrides,
   };
   return {
     root,
@@ -132,6 +147,7 @@ if 'restart' in sys.argv:
     sha,
     db,
     events,
+    env,
     run: (...args) =>
       spawnSync('bash', [script, ...(args.length ? args : [sha])], { env, encoding: 'utf8' }),
     sql: (sql) => command('sqlite3', [db, sql]),
@@ -157,7 +173,7 @@ for (const [mode, message] of [
     const result = f.run();
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, new RegExp(message));
-    assert.equal(readFileSync(f.events, 'utf8'), '');
+    assert.doesNotMatch(readFileSync(f.events, 'utf8'), /restart|stop/);
     assert.equal(realpathSync(join(f.state, 'current')), join(f.state, 'releases', f.old));
     assert.equal(f.sql('select autonomyPaused from team order by id'), '0\n1');
   });
@@ -257,4 +273,162 @@ test('restoring a drained snapshot removes its saved deployment barrier before r
   assert.equal(result.status, 0, result.stderr);
   assert.equal(f.sql("select count(*) from sqlite_master where name like 'deploy_%'"), '0');
   assert.equal(f.sql('select autonomyPaused from team order by id'), '0\n1');
+});
+
+test('install honors allowBuilds and probes native SQLite before scratch startup', () => {
+  const f = fixture();
+  const result = f.run();
+  assert.equal(result.status, 0, result.stderr);
+  const events = readFileSync(f.events, 'utf8');
+  assert.match(events, /pnpm install --frozen-lockfile\n/);
+  assert.doesNotMatch(events, /--ignore-scripts/);
+  assert.match(events, /native .*apps\/server .*require\('better-sqlite3'\).*:memory:/);
+});
+test('native probe failure refuses before scratch, drain or restart', () => {
+  const f = fixture('native');
+  const result = f.run();
+  assert.notEqual(result.status, 0);
+  assert.doesNotMatch(readFileSync(f.events, 'utf8'), /restart/);
+  assert.equal(f.sql('select autonomyPaused from team order by id'), '0\n1');
+  assert.equal(existsSync(join(f.state, 'new-scratch.log')), false);
+});
+test('check needs no bootstrap and leaves no deployment files or database', () => {
+  const f = fixture();
+  rmSync(f.state, { recursive: true });
+  rmSync(f.db);
+  f.env.CAIRN_DEPLOY_TOKEN = '';
+  f.env.CAIRN_DEPLOY_MACHINE = '';
+  const result = f.run('check', f.sha);
+  assert.equal(result.status, 0, result.stderr);
+  for (const name of ['main', 'check', 'pack-smoke', 'e2e-gate', 'pr-evidence'])
+    assert.match(result.stdout, new RegExp('PASS ' + name + ' '));
+  assert.equal(existsSync(f.state), false);
+  assert.equal(existsSync(f.db), false);
+  assert.equal(readFileSync(f.events, 'utf8'), '');
+});
+for (const mode of [
+  'red',
+  'evidence',
+  'off-main',
+  'missing-check',
+  'pending-check',
+  'wrong-sha',
+  'superseded',
+]) {
+  test('check refuses ' + mode + ' without writes', () => {
+    const f = fixture(mode);
+    const before = readFileSync(f.db);
+    const result = f.run('check', f.sha);
+    assert.notEqual(result.status, 0);
+    assert.match(
+      result.stderr,
+      new RegExp(
+        mode === 'off-main'
+          ? 'not on origin/main'
+          : mode === 'evidence'
+            ? 'pr-evidence is not success'
+            : 'check is not success',
+      ),
+    );
+    assert.deepEqual(readFileSync(f.db), before);
+    assert.equal(existsSync(join(f.state, 'lock')), false);
+    assert.equal(readFileSync(f.events, 'utf8'), '');
+  });
+}
+for (const action of ['deploy', 'check', 'restore']) {
+  test(action + ' refuses leftover drain state and names explicit recovery', () => {
+    const f = fixture();
+    command('python3', [
+      '-c',
+      "import runpy,sqlite3,sys; runpy.run_path(sys.argv[1])['drain'](sqlite3.connect(sys.argv[2]))",
+      resolve(import.meta.dirname, 'deploy-self.py'),
+      f.db,
+    ]);
+    const before = readFileSync(f.db);
+    const result = action === 'deploy' ? f.run() : f.run(action, action === 'check' ? f.sha : f.db);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /deploy-self.sh resume/);
+    assert.deepEqual(readFileSync(f.db), before);
+    assert.equal(readFileSync(f.events, 'utf8'), '');
+    const resumed = f.run('resume');
+    assert.equal(resumed.status, 0, resumed.stderr);
+    assert.match(resumed.stdout, /"id": "a", "autonomyPaused": 0/);
+    assert.match(resumed.stdout, /claim barriers removed/);
+    assert.equal(f.sql('select autonomyPaused from team order by id'), '0\n1');
+  });
+}
+test('custom instance uses only its units, URL, scratch port and backup directory', () => {
+  const f = fixture();
+  Object.assign(f.env, {
+    CAIRN_DEPLOY_UNITS: 'scratch-server.service scratch-daemon.service',
+    CAIRN_DEPLOY_URL: 'http://127.0.0.1:28887',
+    CAIRN_DEPLOY_SCRATCH_PORT: '28888',
+    CAIRN_DEPLOY_BACKUP_OUT: join(f.root, 'private-backups'),
+    CAIRN_DEPLOY_BACKUP_TIMER: 'scratch-backup.timer',
+  });
+  const result = f.run();
+  assert.equal(result.status, 0, result.stderr);
+  const events = readFileSync(f.events, 'utf8');
+  assert.match(events, /restart scratch-server.service/);
+  assert.match(events, /restart scratch-daemon.service/);
+  assert.doesNotMatch(events, /cairn-server.service|cairn-daemon.service|18787|127.0.0.1:8787/);
+  assert.match(events, /PORT=28888/);
+  assert.match(events, /127.0.0.1:28887/);
+  assert.ok(existsSync(join(f.root, 'private-backups')));
+  const snapshot = join(f.root, 'snapshot.db');
+  copyFileSync(f.db, snapshot);
+  assert.equal(f.run('restore', snapshot, '--confirm-discard').status, 0);
+  const restored = readFileSync(f.events, 'utf8');
+  assert.match(restored, /stop scratch-backup.timer/);
+  assert.match(restored, /start scratch-backup.timer/);
+  assert.doesNotMatch(restored, /cairn-db-backup.timer/);
+});
+for (const units of ['', 'one.service', 'one.service two.service three.service']) {
+  test('invalid unit inventory refuses ' + JSON.stringify(units), () => {
+    const f = fixture('good', { CAIRN_DEPLOY_UNITS: units });
+    assert.notEqual(f.run().status, 0);
+    assert.equal(readFileSync(f.events, 'utf8'), '');
+  });
+}
+test('custom instance health failure rolls back only its units', () => {
+  const f = fixture('health', {
+    CAIRN_DEPLOY_UNITS: 'scratch-server.service scratch-daemon.service',
+    CAIRN_DEPLOY_URL: 'http://127.0.0.1:28887',
+    CAIRN_DEPLOY_SCRATCH_PORT: '28888',
+  });
+  const result = f.run();
+  assert.notEqual(result.status, 0);
+  assert.equal(realpathSync(join(f.state, 'current')), join(f.state, 'releases', f.old));
+  assert.match(readFileSync(f.events, 'utf8'), /restart scratch-server.service/);
+  assert.doesNotMatch(readFileSync(f.events, 'utf8'), /cairn-server.service|cairn-daemon.service/);
+});
+
+test('deploy fetches the gated release before creating its checkout', () => {
+  const f = fixture('good', { REQUIRE_FETCH: '1' });
+  const result = f.run();
+  assert.equal(result.status, 0, result.stderr);
+});
+test('check refuses an uncheckpointed drain without changing WAL sidecars', () => {
+  const f = fixture();
+  command(
+    'python3',
+    [
+      '-c',
+      `import os,runpy,sqlite3,subprocess,sys
+from pathlib import Path
+db=Path(sys.argv[2]); connection=sqlite3.connect(db)
+connection.execute('pragma journal_mode=wal')
+runpy.run_path(sys.argv[1])['drain'](connection)
+paths=[db,Path(str(db)+'-wal'),Path(str(db)+'-shm')]
+before=[path.read_bytes() for path in paths]
+result=subprocess.run(['bash',sys.argv[3],'check',os.environ['SHA']],capture_output=True,text=True)
+assert result.returncode != 0 and 'deploy-self.sh resume' in result.stderr, result.stderr
+assert [path.read_bytes() for path in paths] == before, 'read-only check changed WAL sidecars'
+connection.close()`,
+      resolve(import.meta.dirname, 'deploy-self.py'),
+      f.db,
+      script,
+    ],
+    { env: f.env },
+  );
 });

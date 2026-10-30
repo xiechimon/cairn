@@ -1,231 +1,373 @@
-✖ red refuses before restarting units (197.056416ms)
-✖ evidence refuses before restarting units (168.222959ms)
-✖ off-main refuses before restarting units (182.275083ms)
-✖ install refuses before restarting units (165.4885ms)
-✖ migration refuses before restarting units (167.704834ms)
-✖ incompatible refuses before restarting units (165.00875ms)
-✖ drain refuses before restarting units (170.215416ms)
-✖ good deploy points current and last-good to the exact new SHA (169.397916ms)
-✖ failed health rolls code back and keeps rows written after the backup (176.93825ms)
-✖ restore previews discarded rows and refuses without explicit confirmation (174.795834ms)
-ℹ tests 10
+✔ red refuses before restarting units (4153.942084ms)
+✔ evidence refuses before restarting units (3515.063542ms)
+✔ off-main refuses before restarting units (2842.652416ms)
+✔ install refuses before restarting units (3257.373834ms)
+✔ migration refuses before restarting units (4798.1915ms)
+✔ incompatible refuses before restarting units (5987.988125ms)
+✔ drain refuses before restarting units (6273.541666ms)
+✔ missing-check refuses before restarting units (2881.574792ms)
+✔ pending-check refuses before restarting units (3436.659959ms)
+✔ wrong-sha refuses before restarting units (3756.833083ms)
+✔ superseded refuses before restarting units (2579.828458ms)
+✔ backup refuses before restarting units (4607.362625ms)
+✔ unit-path refuses before restarting units (2034.792458ms)
+✔ good deploy points current and last-good to the exact new SHA (5131.018875ms)
+✔ failed health rolls code back and keeps rows written after the backup (6668.895584ms)
+✔ restore previews discarded rows and refuses without explicit confirmation (1355.018791ms)
+✔ confirmed restore includes writes made while stopping units in its discard report (4203.409125ms)
+✔ a stale daemon heartbeat causes code rollback (6437.605125ms)
+✔ drain blocks both claim insertion and transition, then restores prior pause values (839.067875ms)
+✔ a drain setup error leaves neither a partial pause record nor changed pause values (928.933834ms)
+✔ restoring a drained snapshot removes its saved deployment barrier before restart (2282.793583ms)
+✖ install honors allowBuilds and probes native SQLite before scratch startup (4899.356417ms)
+✖ native probe failure refuses before scratch, drain or restart (5868.500458ms)
+✖ check needs no bootstrap and leaves no deployment files or database (1266.400084ms)
+✖ check refuses red without writes (1416.724209ms)
+✖ check refuses evidence without writes (1046.641541ms)
+✖ check refuses off-main without writes (1109.025875ms)
+✖ check refuses missing-check without writes (870.909291ms)
+✖ check refuses pending-check without writes (882.550708ms)
+✖ check refuses wrong-sha without writes (932.478833ms)
+✖ check refuses superseded without writes (924.528958ms)
+✖ deploy refuses leftover drain state and names explicit recovery (5180.861625ms)
+✖ check refuses leftover drain state and names explicit recovery (1431.294834ms)
+✖ restore refuses leftover drain state and names explicit recovery (1842.242709ms)
+✖ custom instance uses only its units, URL, scratch port and backup directory (2262.574625ms)
+✔ invalid unit inventory refuses "" (2493.584125ms)
+✔ invalid unit inventory refuses "one.service" (2228.415ms)
+✔ invalid unit inventory refuses "one.service two.service three.service" (2251.611542ms)
+✖ custom instance health failure rolls back only its units (1918.79775ms)
+ℹ tests 39
 ℹ suites 0
-ℹ pass 0
-ℹ fail 10
+ℹ pass 24
+ℹ fail 15
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 1870.767708
+ℹ duration_ms 119774.318291
 
 ✖ failing tests:
 
-test at scripts/ops/deploy-self.test.mjs:68:3
-✖ red refuses before restarting units (197.056416ms)
-  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /check/. Input:
-  
-  'bash: <worktree>/scripts/ops/deploy-self.sh: No such file or directory\n'
-  
-      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:71:12)
-      at Test.runInAsyncScope (node:async_hooks:226:14)
-      at Test.run (node:internal/test_runner/test:1402:25)
-      at Test.start (node:internal/test_runner/test:1262:17)
-      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+test at scripts/ops/deploy-self.test.mjs:273:1
+✖ install honors allowBuilds and probes native SQLite before scratch startup (4899.356417ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /pnpm install --frozen-lockfile\n/. Input:
+
+  'pnpm install --frozen-lockfile --ignore-scripts\n' +
+    'scratch PORT=18787\n' +
+    'curl http://127.0.0.1:18787/api/user/me\n' +
+    'curl http://127.0.0.1:18787/api/teams\n' +
+    'scratch PORT=18787\n' +
+    'curl http://127.0.0.1:18787/api/user/me\n' +
+    'curl http://127.0.0.1:18787/api/teams\n' +
+    '--user restart cairn-server.service\n' +
+    '--user restart cairn-daemon.service\n' +
+    'curl http://127.0.0.1:8787/api/user/me\n' +
+    'curl http://127.0.0.1:8787/api/teams\n'
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:278:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
     generatedMessage: true,
     code: 'ERR_ASSERTION',
-    actual: 'bash: <worktree>/scripts/ops/deploy-self.sh: No such file or directory\n',
-    expected: /check/,
+    actual: 'pnpm install --frozen-lockfile --ignore-scripts\nscratch PORT=18787\ncurl http://127.0.0.1:18787/api/user/me\ncurl http://127.0.0.1:18787/api/teams\nscratch PORT=18787\ncurl http://127.0.0.1:18787/api/user/me\ncurl http://127.0.0.1:18787/api/teams\n--user restart cairn-server.service\n--user restart cairn-daemon.service\ncurl http://127.0.0.1:8787/api/user/me\ncurl http://127.0.0.1:8787/api/teams\n',
+    expected: /pnpm install --frozen-lockfile\n/,
     operator: 'match',
     diff: 'simple'
   }
 
-test at scripts/ops/deploy-self.test.mjs:68:3
-✖ evidence refuses before restarting units (168.222959ms)
-  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /pr-evidence/. Input:
-  
-  'bash: <worktree>/scripts/ops/deploy-self.sh: No such file or directory\n'
-  
-      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:71:12)
-      at Test.runInAsyncScope (node:async_hooks:226:14)
-      at Test.run (node:internal/test_runner/test:1402:25)
-      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
-      at Test.postRun (node:internal/test_runner/test:1542:19)
-      at Test.run (node:internal/test_runner/test:1467:12)
-      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+test at scripts/ops/deploy-self.test.mjs:282:1
+✖ native probe failure refuses before scratch, drain or restart (5868.500458ms)
+  AssertionError [ERR_ASSERTION]: Expected "actual" to be strictly unequal to: 0
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:285:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
     generatedMessage: true,
     code: 'ERR_ASSERTION',
-    actual: 'bash: <worktree>/scripts/ops/deploy-self.sh: No such file or directory\n',
-    expected: /pr-evidence/,
-    operator: 'match',
+    actual: 0,
+    expected: 0,
+    operator: 'notStrictEqual',
     diff: 'simple'
   }
 
-test at scripts/ops/deploy-self.test.mjs:68:3
-✖ off-main refuses before restarting units (182.275083ms)
-  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /main/. Input:
-  
-  'bash: <worktree>/scripts/ops/deploy-self.sh: No such file or directory\n'
-  
-      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:71:12)
-      at Test.runInAsyncScope (node:async_hooks:226:14)
-      at Test.run (node:internal/test_runner/test:1402:25)
-      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
-      at Test.postRun (node:internal/test_runner/test:1542:19)
-      at Test.run (node:internal/test_runner/test:1467:12)
-      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
-    generatedMessage: true,
-    code: 'ERR_ASSERTION',
-    actual: 'bash: <worktree>/scripts/ops/deploy-self.sh: No such file or directory\n',
-    expected: /main/,
-    operator: 'match',
-    diff: 'simple'
-  }
+test at scripts/ops/deploy-self.test.mjs:290:1
+✖ check needs no bootstrap and leaves no deployment files or database (1266.400084ms)
+  AssertionError [ERR_ASSERTION]: FAIL invalid arguments
 
-test at scripts/ops/deploy-self.test.mjs:68:3
-✖ install refuses before restarting units (165.4885ms)
-  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /install/. Input:
-  
-  'bash: <worktree>/scripts/ops/deploy-self.sh: No such file or directory\n'
-  
-      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:71:12)
-      at Test.runInAsyncScope (node:async_hooks:226:14)
-      at Test.run (node:internal/test_runner/test:1402:25)
-      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
-      at Test.postRun (node:internal/test_runner/test:1542:19)
-      at Test.run (node:internal/test_runner/test:1467:12)
-      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
-    generatedMessage: true,
-    code: 'ERR_ASSERTION',
-    actual: 'bash: <worktree>/scripts/ops/deploy-self.sh: No such file or directory\n',
-    expected: /install/,
-    operator: 'match',
-    diff: 'simple'
-  }
 
-test at scripts/ops/deploy-self.test.mjs:68:3
-✖ migration refuses before restarting units (167.704834ms)
-  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /scratch/. Input:
-  
-  'bash: <worktree>/scripts/ops/deploy-self.sh: No such file or directory\n'
-  
-      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:71:12)
-      at Test.runInAsyncScope (node:async_hooks:226:14)
-      at Test.run (node:internal/test_runner/test:1402:25)
-      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
-      at Test.postRun (node:internal/test_runner/test:1542:19)
-      at Test.run (node:internal/test_runner/test:1467:12)
-      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
-    generatedMessage: true,
-    code: 'ERR_ASSERTION',
-    actual: 'bash: <worktree>/scripts/ops/deploy-self.sh: No such file or directory\n',
-    expected: /scratch/,
-    operator: 'match',
-    diff: 'simple'
-  }
+  1 !== 0
 
-test at scripts/ops/deploy-self.test.mjs:68:3
-✖ incompatible refuses before restarting units (165.00875ms)
-  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /scratch/. Input:
-  
-  'bash: <worktree>/scripts/ops/deploy-self.sh: No such file or directory\n'
-  
-      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:71:12)
-      at Test.runInAsyncScope (node:async_hooks:226:14)
-      at Test.run (node:internal/test_runner/test:1402:25)
-      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
-      at Test.postRun (node:internal/test_runner/test:1542:19)
-      at Test.run (node:internal/test_runner/test:1467:12)
-      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
-    generatedMessage: true,
-    code: 'ERR_ASSERTION',
-    actual: 'bash: <worktree>/scripts/ops/deploy-self.sh: No such file or directory\n',
-    expected: /scratch/,
-    operator: 'match',
-    diff: 'simple'
-  }
-
-test at scripts/ops/deploy-self.test.mjs:68:3
-✖ drain refuses before restarting units (170.215416ms)
-  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /drain/. Input:
-  
-  'bash: <worktree>/scripts/ops/deploy-self.sh: No such file or directory\n'
-  
-      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:71:12)
-      at Test.runInAsyncScope (node:async_hooks:226:14)
-      at Test.run (node:internal/test_runner/test:1402:25)
-      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
-      at Test.postRun (node:internal/test_runner/test:1542:19)
-      at Test.run (node:internal/test_runner/test:1467:12)
-      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
-    generatedMessage: true,
-    code: 'ERR_ASSERTION',
-    actual: 'bash: <worktree>/scripts/ops/deploy-self.sh: No such file or directory\n',
-    expected: /drain/,
-    operator: 'match',
-    diff: 'simple'
-  }
-
-test at scripts/ops/deploy-self.test.mjs:77:1
-✖ good deploy points current and last-good to the exact new SHA (169.397916ms)
-  AssertionError [ERR_ASSERTION]: bash: <worktree>/scripts/ops/deploy-self.sh: No such file or directory
-  
-  
-  127 !== 0
-  
-      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:79:10)
-      at Test.runInAsyncScope (node:async_hooks:226:14)
-      at Test.run (node:internal/test_runner/test:1402:25)
-      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
-      at Test.postRun (node:internal/test_runner/test:1542:19)
-      at Test.run (node:internal/test_runner/test:1467:12)
-      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:297:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
     generatedMessage: false,
     code: 'ERR_ASSERTION',
-    actual: 127,
+    actual: 1,
     expected: 0,
     operator: 'strictEqual',
     diff: 'simple'
   }
 
-test at scripts/ops/deploy-self.test.mjs:85:1
-✖ failed health rolls code back and keeps rows written after the backup (176.93825ms)
-  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
-  + actual - expected
-  
-  + '<fixture>/deploy/releases/9e9c9474dece9bd47931e7ada2efa2ed5110b197'
-  - '<fixture>/deploy/releases/9e9c9474dece9bd47931e7ada2efa2ed5110b197'
-  
-      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:88:10)
-      at Test.runInAsyncScope (node:async_hooks:226:14)
-      at Test.run (node:internal/test_runner/test:1402:25)
-      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
-      at Test.postRun (node:internal/test_runner/test:1542:19)
-      at Test.run (node:internal/test_runner/test:1467:12)
-      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+test at scripts/ops/deploy-self.test.mjs:305:3
+✖ check refuses red without writes (1416.724209ms)
+  AssertionError [ERR_ASSERTION]: The input was expected to not match the regular expression /invalid arguments/. Input:
+
+  'FAIL invalid arguments\n'
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:310:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
     generatedMessage: true,
     code: 'ERR_ASSERTION',
-    actual: '<fixture>/deploy/releases/9e9c9474dece9bd47931e7ada2efa2ed5110b197',
-    expected: '<fixture>/deploy/releases/9e9c9474dece9bd47931e7ada2efa2ed5110b197',
+    actual: 'FAIL invalid arguments\n',
+    expected: /invalid arguments/,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }
+
+test at scripts/ops/deploy-self.test.mjs:305:3
+✖ check refuses evidence without writes (1046.641541ms)
+  AssertionError [ERR_ASSERTION]: The input was expected to not match the regular expression /invalid arguments/. Input:
+
+  'FAIL invalid arguments\n'
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:310:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL invalid arguments\n',
+    expected: /invalid arguments/,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }
+
+test at scripts/ops/deploy-self.test.mjs:305:3
+✖ check refuses off-main without writes (1109.025875ms)
+  AssertionError [ERR_ASSERTION]: The input was expected to not match the regular expression /invalid arguments/. Input:
+
+  'FAIL invalid arguments\n'
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:310:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL invalid arguments\n',
+    expected: /invalid arguments/,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }
+
+test at scripts/ops/deploy-self.test.mjs:305:3
+✖ check refuses missing-check without writes (870.909291ms)
+  AssertionError [ERR_ASSERTION]: The input was expected to not match the regular expression /invalid arguments/. Input:
+
+  'FAIL invalid arguments\n'
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:310:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL invalid arguments\n',
+    expected: /invalid arguments/,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }
+
+test at scripts/ops/deploy-self.test.mjs:305:3
+✖ check refuses pending-check without writes (882.550708ms)
+  AssertionError [ERR_ASSERTION]: The input was expected to not match the regular expression /invalid arguments/. Input:
+
+  'FAIL invalid arguments\n'
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:310:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL invalid arguments\n',
+    expected: /invalid arguments/,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }
+
+test at scripts/ops/deploy-self.test.mjs:305:3
+✖ check refuses wrong-sha without writes (932.478833ms)
+  AssertionError [ERR_ASSERTION]: The input was expected to not match the regular expression /invalid arguments/. Input:
+
+  'FAIL invalid arguments\n'
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:310:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL invalid arguments\n',
+    expected: /invalid arguments/,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }
+
+test at scripts/ops/deploy-self.test.mjs:305:3
+✖ check refuses superseded without writes (924.528958ms)
+  AssertionError [ERR_ASSERTION]: The input was expected to not match the regular expression /invalid arguments/. Input:
+
+  'FAIL invalid arguments\n'
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:310:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL invalid arguments\n',
+    expected: /invalid arguments/,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }
+
+test at scripts/ops/deploy-self.test.mjs:317:3
+✖ deploy refuses leftover drain state and names explicit recovery (5180.861625ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /deploy-self.sh resume/. Input:
+
+  'FAIL table deploy_pause_state already exists\n'
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:323:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL table deploy_pause_state already exists\n',
+    expected: /deploy-self.sh resume/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/deploy-self.test.mjs:317:3
+✖ check refuses leftover drain state and names explicit recovery (1431.294834ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /deploy-self.sh resume/. Input:
+
+  'FAIL invalid arguments\n'
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:323:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL invalid arguments\n',
+    expected: /deploy-self.sh resume/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/deploy-self.test.mjs:317:3
+✖ restore refuses leftover drain state and names explicit recovery (1842.242709ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /deploy-self.sh resume/. Input:
+
+  'FAIL restore requires --confirm-discard; rows above would be discarded\n'
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:323:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL restore requires --confirm-discard; rows above would be discarded\n',
+    expected: /deploy-self.sh resume/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/deploy-self.test.mjs:333:1
+✖ custom instance uses only its units, URL, scratch port and backup directory (2262.574625ms)
+  AssertionError [ERR_ASSERTION]: FAIL cairn-server.service WorkingDirectory must point through current; install the drop-in
+
+
+  1 !== 0
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:343:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
     operator: 'strictEqual',
     diff: 'simple'
   }
 
-test at scripts/ops/deploy-self.test.mjs:93:1
-✖ restore previews discarded rows and refuses without explicit confirmation (174.795834ms)
-  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /discard-me/. Input:
-  
+test at scripts/ops/deploy-self.test.mjs:366:1
+✖ custom instance health failure rolls back only its units (1918.79775ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /restart scratch-server.service/. Input:
+
   ''
-  
-      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:97:45)
-      at Test.runInAsyncScope (node:async_hooks:226:14)
-      at Test.run (node:internal/test_runner/test:1402:25)
-      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
-      at Test.postRun (node:internal/test_runner/test:1542:19)
-      at Test.run (node:internal/test_runner/test:1467:12)
-      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:375:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
     generatedMessage: true,
     code: 'ERR_ASSERTION',
     actual: '',
-    expected: /discard-me/,
+    expected: /restart scratch-server.service/,
     operator: 'match',
     diff: 'simple'
   }

@@ -5,5 +5,5 @@ Level: 2
 Safeguard: The existing Biome formatter and pnpm lint
 Intercepts: 1
 Recurrences: 0
-Notes: This round's real diffs were caught by lint and re-verified after `pnpm format`; reused the existing gate, no new rule
+Notes: This round's real diffs were caught by lint and re-verified after `pnpm format`; reused the existing gate, no new rule. Ticket 1408 follow-up: lint-red.log caught unformatted deployment fixtures; the targeted Biome formatter fixed them and lint.log records re-verification
 ---

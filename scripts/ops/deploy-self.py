@@ -19,6 +19,10 @@ TIMEOUT = float(os.environ.get('CAIRN_DEPLOY_TIMEOUT', '120'))
 TOKEN = os.environ.get('CAIRN_DEPLOY_TOKEN', '')
 MACHINE = os.environ.get('CAIRN_DEPLOY_MACHINE', '')
 URL = os.environ.get('CAIRN_DEPLOY_URL', 'http://127.0.0.1:8787')
+UNITS = os.environ.get('CAIRN_DEPLOY_UNITS', 'cairn-server.service cairn-daemon.service').split()
+BACKUP_TIMER = os.environ.get('CAIRN_DEPLOY_BACKUP_TIMER', 'cairn-db-backup.timer')
+BACKUP_OUT = Path(os.environ.get('CAIRN_DEPLOY_BACKUP_OUT', str(ROOT / 'backups'))).resolve()
+SCRATCH_PORT = os.environ.get('CAIRN_DEPLOY_SCRATCH_PORT', '18787')
 REPOSITORY = 'xiechimon/cairn'
 
 
@@ -65,14 +69,16 @@ def require_checks(sha, names):
         latest = max(matches, key=lambda check: check['id']) if matches else {}
         if latest.get('status') != 'completed' or latest.get('conclusion') != 'success':
             raise RuntimeError(f'{name} is not success on {sha}')
+        print(f'PASS {name} {sha}', flush=True)
 
 
 def gate(sha):
-    git('fetch', 'origin', 'main')
-    try:
-        git('merge-base', '--is-ancestor', sha, 'origin/main')
-    except RuntimeError as error:
-        raise RuntimeError('SHA is not on origin/main') from error
+    if not re.fullmatch('[0-9a-f]{40}', sha):
+        raise RuntimeError('a full lowercase commit SHA is required')
+    comparison = json.loads(run(['gh', 'api', f'repos/{REPOSITORY}/compare/{sha}...main']))
+    if comparison.get('status') not in ('ahead', 'identical'):
+        raise RuntimeError('SHA is not on origin/main')
+    print(f'PASS main {sha}', flush=True)
     require_checks(sha, ['check', 'pack-smoke', 'e2e-gate'])
     pulls = [pull for page in pages(f'commits/{sha}/pulls') for pull in page]
     matches = [pull for pull in pulls if pull.get('merged_at') and pull.get('merge_commit_sha') == sha and pull['base']['ref'] == 'main' and pull['base']['repo']['full_name'] == REPOSITORY]
@@ -101,7 +107,7 @@ def wait_for(check, label):
 
 def scratch_server(release, home, label):
     env = {key: value for key, value in os.environ.items() if not key.startswith('CAIRN_')}
-    env.update({'HOME': str(home), 'CAIRN_HOME': str(home), 'CAIRN_TOKEN': TOKEN, 'CAIRN_REQUIRE_TOKEN': '1', 'HOST': '127.0.0.1', 'PORT': '18787', 'NODE_ENV': 'production'})
+    env.update({'HOME': str(home), 'CAIRN_HOME': str(home), 'CAIRN_TOKEN': TOKEN, 'CAIRN_REQUIRE_TOKEN': '1', 'HOST': '127.0.0.1', 'PORT': SCRATCH_PORT, 'NODE_ENV': 'production'})
     with (ROOT / f'{label}.log').open('w') as output:
         process = subprocess.Popen(['node', '--import', 'tsx', 'src/index.ts'], cwd=release / 'apps/server', env=env, stdout=output, stderr=output, start_new_session=True)
         try:
@@ -109,8 +115,8 @@ def scratch_server(release, home, label):
                 if process.poll() is not None:
                     raise RuntimeError('scratch server exited')
                 time.sleep(0.1)
-                user = read_api('http://127.0.0.1:18787', '/api/user/me')
-                teams = read_api('http://127.0.0.1:18787', '/api/teams')
+                user = read_api(f'http://127.0.0.1:{SCRATCH_PORT}', '/api/user/me')
+                teams = read_api(f'http://127.0.0.1:{SCRATCH_PORT}', '/api/teams')
                 return process.poll() is None and isinstance(user.get('id'), str) and isinstance(teams, list)
             wait_for(ready, f'scratch {label}')
         finally:
@@ -124,7 +130,7 @@ def scratch_server(release, home, label):
 
 
 def restart():
-    for unit in ['cairn-server.service', 'cairn-daemon.service']:
+    for unit in UNITS:
         run(['systemctl', '--user', 'restart', unit])
 
 
@@ -140,10 +146,14 @@ def drain(connection):
 
 def resume(connection):
     with connection:
+        restored = connection.execute('select id, paused from deploy_pause_state order by id').fetchall()
         connection.execute('update team set autonomyPaused=(select paused from deploy_pause_state where id=team.id) where id in (select id from deploy_pause_state)')
         connection.execute('drop trigger deploy_claim_barrier')
         connection.execute('drop trigger deploy_claim_insert_barrier')
         connection.execute('drop table deploy_pause_state')
+    for team_id, paused in restored:
+        print(json.dumps({'id': team_id, 'autonomyPaused': paused}), flush=True)
+    print('Restored saved team pause values; claim barriers removed', flush=True)
 
 
 def restore(snapshot, confirm):
@@ -158,7 +168,7 @@ def restore(snapshot, confirm):
         if saved.execute('pragma integrity_check').fetchone()[0] != 'ok':
             raise RuntimeError('snapshot integrity failed')
         if confirm:
-            for unit in ['cairn-daemon.service', 'cairn-server.service', 'cairn-db-backup.timer']:
+            for unit in [*reversed(UNITS), BACKUP_TIMER]:
                 run(['systemctl', '--user', 'stop', unit])
         live = sqlite3.connect(f'file:{DB}?mode=rw', uri=True)
         live.execute('attach database ? as snapshot', (str(source),))
@@ -181,7 +191,7 @@ def restore(snapshot, confirm):
         saved.close()
         log('restore', '', 'confirmed-discard')
         restart()
-        run(['systemctl', '--user', 'start', 'cairn-db-backup.timer'])
+        run(['systemctl', '--user', 'start', BACKUP_TIMER])
 
 
 def deploy(sha):
@@ -197,7 +207,7 @@ def deploy(sha):
         raise RuntimeError('last-good release is dirty')
     if sha == previous:
         raise RuntimeError('SHA is already current')
-    for unit, app in [('cairn-server.service', 'server'), ('cairn-daemon.service', 'daemon')]:
+    for unit, app in zip(UNITS, ['server', 'daemon']):
         working = run(['systemctl', '--user', 'show', unit, '--property=WorkingDirectory', '--value'])
         if working != str(ROOT / 'current' / 'apps' / app):
             raise RuntimeError(f'{unit} WorkingDirectory must point through current; install the drop-in')
@@ -205,8 +215,10 @@ def deploy(sha):
     release = ROOT / 'releases' / sha
     if release.exists():
         raise RuntimeError('release already exists; inspect and remove the failed worktree explicitly')
+    git('fetch', 'origin', 'main')
     git('worktree', 'add', '--detach', release, sha)
-    run(['pnpm', 'install', '--frozen-lockfile', '--ignore-scripts'], cwd=release)
+    run(['pnpm', 'install', '--frozen-lockfile'], cwd=release)
+    run(['node', '-e', "const Database = require('better-sqlite3'); const db = new Database(':memory:'); db.close();"], cwd=release / 'apps/server')
     connection = sqlite3.connect(f'file:{DB}?mode=rw', uri=True, timeout=10)
     if connection.execute('select lastSeenAt from machine where id=?', (MACHINE,)).fetchone() is None:
         raise RuntimeError('configured daemon machine does not exist')
@@ -224,7 +236,7 @@ def deploy(sha):
     switched = False
     try:
         wait_for(lambda: connection.execute("select count(*) from step where status='claimed'").fetchone()[0] == 0, 'drain')
-        run(['bash', Path(__file__).with_name('backup-server-db.sh'), '--db', DB, '--out', ROOT / 'backups'])
+        run(['bash', Path(__file__).with_name('backup-server-db.sh'), '--db', DB, '--out', BACKUP_OUT])
         heartbeat = connection.execute('select coalesce(lastSeenAt,0) from machine where id=?', (MACHINE,)).fetchone()[0]
         select_release(sha)
         switched = True
@@ -253,16 +265,41 @@ def deploy(sha):
         connection.close()
 
 
+def refuse_paused():
+    if not DB.exists():
+        return
+    connection = sqlite3.connect(DB.as_uri() + '?mode=ro&vfs=unix-none', uri=True)
+    try:
+        connection.execute('pragma locking_mode=exclusive')
+        if connection.execute("select 1 from sqlite_master where type='table' and name='deploy_pause_state'").fetchone():
+            raise RuntimeError('leftover deploy_pause_state; inspect release and unit state, then run deploy-self.sh resume')
+    finally:
+        connection.close()
+
+
 def main():
     os.umask(0o077)
     def interrupted(signum, frame):
         raise KeyboardInterrupt(f'signal {signum}')
     signal.signal(signal.SIGTERM, interrupted)
     if len(sys.argv) < 2 or TIMEOUT <= 0:
-        raise RuntimeError('usage: deploy-self.sh <sha> | restore <snapshot.db[.gz]> [--confirm-discard] | resume')
+        raise RuntimeError('usage: deploy-self.sh <sha> | check <sha> | restore <snapshot.db[.gz]> [--confirm-discard] | resume')
+    if sys.argv[1] != 'resume':
+        refuse_paused()
+    if sys.argv[1] == 'check':
+        if len(sys.argv) != 3:
+            raise RuntimeError('usage: deploy-self.sh check <sha>')
+        gate(sys.argv[2])
+        return
+    if len(UNITS) != 2 or len(set(UNITS)) != 2 or any(not re.fullmatch(r'[A-Za-z0-9_.@:-]+\.service', unit) for unit in UNITS):
+        raise RuntimeError('CAIRN_DEPLOY_UNITS must name server and daemon services in that order')
+    if not SCRATCH_PORT.isdecimal() or not 1 <= int(SCRATCH_PORT) <= 65535:
+        raise RuntimeError('CAIRN_DEPLOY_SCRATCH_PORT must be a TCP port')
     ROOT.mkdir(parents=True, exist_ok=True)
     with (ROOT / 'lock').open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if sys.argv[1] != 'resume':
+            refuse_paused()
         if sys.argv[1] == 'restore' and len(sys.argv) in (3, 4):
             if len(sys.argv) == 4 and sys.argv[3] != '--confirm-discard':
                 raise RuntimeError('unknown restore argument')

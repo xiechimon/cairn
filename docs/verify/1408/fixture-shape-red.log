@@ -1,0 +1,112 @@
+✔ red refuses before restarting units (3179.838084ms)
+✔ evidence refuses before restarting units (3296.789958ms)
+✔ off-main refuses before restarting units (3074.471375ms)
+✔ install refuses before restarting units (4257.700167ms)
+✔ migration refuses before restarting units (6337.606125ms)
+✔ incompatible refuses before restarting units (6560.610708ms)
+✔ drain refuses before restarting units (8383.310834ms)
+✔ missing-check refuses before restarting units (5557.617334ms)
+✖ pending-check refuses before restarting units (7896.729792ms)
+✖ wrong-sha refuses before restarting units (3967.770417ms)
+✖ superseded refuses before restarting units (4824.954833ms)
+✔ backup refuses before restarting units (6149.426958ms)
+✔ unit-path refuses before restarting units (2889.133708ms)
+✔ good deploy points current and last-good to the exact new SHA (5684.469833ms)
+✔ failed health rolls code back and keeps rows written after the backup (7559.214917ms)
+✔ restore previews discarded rows and refuses without explicit confirmation (1521.149416ms)
+✔ confirmed restore includes writes made while stopping units in its discard report (2302.3095ms)
+✔ a stale daemon heartbeat causes code rollback (7028.046625ms)
+✔ drain blocks both claim insertion and transition, then restores prior pause values (1332.259333ms)
+✔ a drain setup error leaves neither a partial pause record nor changed pause values (1036.531459ms)
+✔ restoring a drained snapshot removes its saved deployment barrier before restart (2335.754125ms)
+✔ install honors allowBuilds and probes native SQLite before scratch startup (5889.465375ms)
+✔ native probe failure refuses before scratch, drain or restart (4639.024834ms)
+✔ check needs no bootstrap and leaves no deployment files or database (1789.177708ms)
+✔ check refuses red without writes (2322.012375ms)
+✔ check refuses evidence without writes (2680.434375ms)
+✔ check refuses off-main without writes (2156.876042ms)
+✔ check refuses missing-check without writes (2260.999875ms)
+✔ check refuses pending-check without writes (1860.762042ms)
+✔ check refuses wrong-sha without writes (2084.4915ms)
+✔ check refuses superseded without writes (1712.429083ms)
+✔ deploy refuses leftover drain state and names explicit recovery (2375.959875ms)
+✔ check refuses leftover drain state and names explicit recovery (2249.8335ms)
+✔ restore refuses leftover drain state and names explicit recovery (1990.98025ms)
+✔ custom instance uses only its units, URL, scratch port and backup directory (9711.725708ms)
+✔ invalid unit inventory refuses "" (2203.477125ms)
+✔ invalid unit inventory refuses "one.service" (1752.317958ms)
+✔ invalid unit inventory refuses "one.service two.service three.service" (1474.794292ms)
+✔ custom instance health failure rolls back only its units (6873.972667ms)
+ℹ tests 39
+ℹ suites 0
+ℹ pass 36
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 153290.206917
+
+✖ failing tests:
+
+test at scripts/ops/deploy-self.test.mjs:166:3
+✖ pending-check refuses before restarting units (7896.729792ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /check/. Input:
+
+  'FAIL gh api failed (1)\n'
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:170:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL gh api failed (1)\n',
+    expected: /check/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/deploy-self.test.mjs:166:3
+✖ wrong-sha refuses before restarting units (3967.770417ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /check/. Input:
+
+  'FAIL gh api failed (1)\n'
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:170:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL gh api failed (1)\n',
+    expected: /check/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/deploy-self.test.mjs:166:3
+✖ superseded refuses before restarting units (4824.954833ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /check/. Input:
+
+  'FAIL gh api failed (1)\n'
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:170:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL gh api failed (1)\n',
+    expected: /check/,
+    operator: 'match',
+    diff: 'simple'
+  }

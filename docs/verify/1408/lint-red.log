@@ -1,0 +1,208 @@
+$ biome ci .
+apps/server/test/feishu-config.test.ts:144:7 ]8;;https://biomejs.dev/linter/rules/use-flat-map\lint/complexity/useFlatMap]8;;\  FIXABLE  ━━━━━━━━━━━━━━━━━━
+
+  ℹ The call chain .map().flat() can be replaced with a single .flatMap() call.
+
+    142 │       { db: s.db, box: s.secretBox },
+    143 │       s.team.id,
+  > 144 │       s.db
+        │       ^^^^
+  > 145 │         .select()
+  > 146 │         .from(feishuBinding)
+  > 147 │         .all()
+  > 148 │         .map((row) => [row.appIdCipher, row.appSecretCipher])
+  > 149 │         .flat(),
+        │         ^^^^^^^
+    150 │     ),
+    151 │   ).toEqual({});
+
+  ℹ Using .flatMap() avoids the creation of an intermediate array.
+
+  ℹ Safe fix: Replace the chain with .flatMap().
+
+    146 146 │           .from(feishuBinding)
+    147 147 │           .all()
+    148     │ - ········.map((row)·=>·[row.appIdCipher,·row.appSecretCipher])
+    149     │ - ········.flat(),
+        148 │ + ········.flatMap((row)·=>·[row.appIdCipher,·row.appSecretCipher]),
+    150 149 │       ),
+    151 150 │     ).toEqual({});
+
+
+scripts/ops/deploy-self.test.mjs:299:44 ]8;;https://biomejs.dev/linter/rules/use-template\lint/style/useTemplate]8;;\  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ℹ Template literals are preferred over string concatenation.
+
+    297 │   assert.equal(result.status, 0, result.stderr);
+    298 │   for (const name of ['main', 'check', 'pack-smoke', 'e2e-gate', 'pr-evidence'])
+  > 299 │     assert.match(result.stdout, new RegExp('PASS '+name+' '));
+        │                                            ^^^^^^^^^^^^^^^^
+    300 │   assert.equal(existsSync(f.state), false);
+    301 │   assert.equal(existsSync(f.db), false);
+
+  ℹ Unsafe fix: Use a template literal.
+
+    297 297 │     assert.equal(result.status, 0, result.stderr);
+    298 298 │     for (const name of ['main', 'check', 'pack-smoke', 'e2e-gate', 'pr-evidence'])
+    299     │ - ····assert.match(result.stdout,·new·RegExp('PASS·'+name+'·'));
+        299 │ + ····assert.match(result.stdout,·new·RegExp(`PASS·${name}·`));
+    300 300 │     assert.equal(existsSync(f.state), false);
+    301 301 │     assert.equal(existsSync(f.db), false);
+
+
+scripts/ops/deploy-self.test.mjs:305:8 ]8;;https://biomejs.dev/linter/rules/use-template\lint/style/useTemplate]8;;\  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ℹ Template literals are preferred over string concatenation.
+
+    303 │ });
+    304 │ for (const mode of ['red', 'evidence', 'off-main', 'missing-check', 'pending-check', 'wrong-sha', 'superseded']) {
+  > 305 │   test('check refuses '+mode+' without writes', () => {
+        │        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    306 │     const f = fixture(mode);
+    307 │     const before = readFileSync(f.db);
+
+  ℹ Unsafe fix: Use a template literal.
+
+    303 303 │   });
+    304 304 │   for (const mode of ['red', 'evidence', 'off-main', 'missing-check', 'pending-check', 'wrong-sha', 'superseded']) {
+    305     │ - ··test('check·refuses·'+mode+'·without·writes',·()·=>·{
+        305 │ + ··test(`check·refuses·${mode}·without·writes`,·()·=>·{
+    306 306 │       const f = fixture(mode);
+    307 307 │       const before = readFileSync(f.db);
+
+
+scripts/ops/deploy-self.test.mjs:317:8 ]8;;https://biomejs.dev/linter/rules/use-template\lint/style/useTemplate]8;;\  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ℹ Template literals are preferred over string concatenation.
+
+    315 │ }
+    316 │ for (const action of ['deploy', 'check', 'restore']) {
+  > 317 │   test(action+' refuses leftover drain state and names explicit recovery', () => {
+        │        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    318 │     const f = fixture();
+    319 │     command('python3', ['-c', "import runpy,sqlite3,sys; runpy.run_path(sys.argv[1])['drain'](sqlite3.connect(sys.argv[2]))", resolve(import.meta.dirname, 'deploy-self.py'), f.db]);
+
+  ℹ Unsafe fix: Use a template literal.
+
+    315 315 │   }
+    316 316 │   for (const action of ['deploy', 'check', 'restore']) {
+    317     │ - ··test(action+'·refuses·leftover·drain·state·and·names·explicit·recovery',·()·=>·{
+        317 │ + ··test(`${action}·refuses·leftover·drain·state·and·names·explicit·recovery`,·()·=>·{
+    318 318 │       const f = fixture();
+    319 319 │       command('python3', ['-c', "import runpy,sqlite3,sys; runpy.run_path(sys.argv[1])['drain'](sqlite3.connect(sys.argv[2]))", resolve(import.meta.dirname, 'deploy-self.py'), f.db]);
+
+
+scripts/ops/deploy-self.test.mjs:360:8 ]8;;https://biomejs.dev/linter/rules/use-template\lint/style/useTemplate]8;;\  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ℹ Template literals are preferred over string concatenation.
+
+    358 │ });
+    359 │ for (const units of ['', 'one.service', 'one.service two.service three.service']) {
+  > 360 │   test('invalid unit inventory refuses '+JSON.stringify(units), () => {
+        │        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    361 │     const f = fixture('good', { CAIRN_DEPLOY_UNITS: units });
+    362 │     assert.notEqual(f.run().status, 0);
+
+  ℹ Unsafe fix: Use a template literal.
+
+    358 358 │   });
+    359 359 │   for (const units of ['', 'one.service', 'one.service two.service three.service']) {
+    360     │ - ··test('invalid·unit·inventory·refuses·'+JSON.stringify(units),·()·=>·{
+        360 │ + ··test(`invalid·unit·inventory·refuses·${JSON.stringify(units)}`,·()·=>·{
+    361 361 │       const f = fixture('good', { CAIRN_DEPLOY_UNITS: units });
+    362 362 │       assert.notEqual(f.run().status, 0);
+
+
+scripts/ops/deploy-self.test.mjs:3:1 ]8;;https://biomejs.dev/assist/actions/organize-imports\assist/source/organizeImports]8;;\  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━
+
+  ✖ Sort the imported names.
+
+     1 │ import assert from 'node:assert/strict';
+     2 │ import { spawnSync } from 'node:child_process';
+   > 3 │ import {
+       │ ^^^^^^^^
+   > 4 │   chmodSync,
+        ...
+  > 11 │   writeFileSync,
+  > 12 │ } from 'node:fs';
+       │ ^^^^^^^^^^^^^^^^^
+    13 │ import { join, resolve } from 'node:path';
+    14 │ import test from 'node:test';
+
+  ℹ Safe fix: Organize imports and exports (Biome)
+
+      4   4 │     chmodSync,
+      5   5 │     copyFileSync,
+      6     │ - ··mkdirSync,
+      7     │ - ··existsSync,
+      8     │ - ··rmSync,
+      9     │ - ··readFileSync,
+     10     │ - ··realpathSync,
+          6 │ + ··existsSync,
+          7 │ + ··mkdirSync,
+          8 │ + ··readFileSync,
+          9 │ + ··realpathSync,
+         10 │ + ··rmSync,
+     11  11 │     writeFileSync,
+     12  12 │   } from 'node:fs';
+
+
+scripts/ops/deploy-self.test.mjs format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ✖ File content differs from formatting output
+
+    297 297 │     assert.equal(result.status, 0, result.stderr);
+    298 298 │     for (const name of ['main', 'check', 'pack-smoke', 'e2e-gate', 'pr-evidence'])
+    299     │ - ····assert.match(result.stdout,·new·RegExp('PASS·'+name+'·'));
+        299 │ + ····assert.match(result.stdout,·new·RegExp('PASS·'·+·name·+·'·'));
+    300 300 │     assert.equal(existsSync(f.state), false);
+    301 301 │     assert.equal(existsSync(f.db), false);
+    302 302 │     assert.equal(readFileSync(f.events, 'utf8'), '');
+    303 303 │   });
+    304     │ - for·(const·mode·of·['red',·'evidence',·'off-main',·'missing-check',·'pending-check',·'wrong-sha',·'superseded'])·{
+    305     │ - ··test('check·refuses·'+mode+'·without·writes',·()·=>·{
+        304 │ + for·(const·mode·of·[
+        305 │ + ··'red',
+        306 │ + ··'evidence',
+        307 │ + ··'off-main',
+        308 │ + ··'missing-check',
+        309 │ + ··'pending-check',
+        310 │ + ··'wrong-sha',
+        311 │ + ··'superseded',
+        312 │ + ])·{
+        313 │ + ··test('check·refuses·'·+·mode·+·'·without·writes',·()·=>·{
+    306 314 │       const f = fixture(mode);
+    307 315 │       const before = readFileSync(f.db);
+    ······· │
+    315 323 │   }
+    316 324 │   for (const action of ['deploy', 'check', 'restore']) {
+    317     │ - ··test(action+'·refuses·leftover·drain·state·and·names·explicit·recovery',·()·=>·{
+        325 │ + ··test(action·+·'·refuses·leftover·drain·state·and·names·explicit·recovery',·()·=>·{
+    318 326 │       const f = fixture();
+    319     │ - ····command('python3',·['-c',·"import·runpy,sqlite3,sys;·runpy.run_path(sys.argv[1])['drain'](sqlite3.connect(sys.argv[2]))",·resolve(import.meta.dirname,·'deploy-self.py'),·f.db]);
+        327 │ + ····command('python3',·[
+        328 │ + ······'-c',
+        329 │ + ······"import·runpy,sqlite3,sys;·runpy.run_path(sys.argv[1])['drain'](sqlite3.connect(sys.argv[2]))",
+        330 │ + ······resolve(import.meta.dirname,·'deploy-self.py'),
+        331 │ + ······f.db,
+        332 │ + ····]);
+    320 333 │       const before = readFileSync(f.db);
+    321 334 │       const result = action === 'deploy' ? f.run() : f.run(action, action === 'check' ? f.sha : f.db);
+    ······· │
+    358 371 │   });
+    359 372 │   for (const units of ['', 'one.service', 'one.service two.service three.service']) {
+    360     │ - ··test('invalid·unit·inventory·refuses·'+JSON.stringify(units),·()·=>·{
+        373 │ + ··test('invalid·unit·inventory·refuses·'·+·JSON.stringify(units),·()·=>·{
+    361 374 │       const f = fixture('good', { CAIRN_DEPLOY_UNITS: units });
+    362 375 │       assert.notEqual(f.run().status, 0);
+
+
+Checked 1257 files in 18s. No fixes applied.
+Found 2 errors.
+Found 5 infos.
+ci ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ✖ Some errors were emitted while running checks.
+
+
+[ELIFECYCLE] Command failed with exit code 1.

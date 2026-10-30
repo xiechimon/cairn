@@ -1,8 +1,8 @@
 $ biome ci .
-apps/server/test/feishu-config.test.ts:144:7 lint/complexity/useFlatMap  FIXABLE  ━━━━━━━━━━━━━━━━━━
+apps/server/test/feishu-config.test.ts:144:7 ]8;;https://biomejs.dev/linter/rules/use-flat-map\lint/complexity/useFlatMap]8;;\  FIXABLE  ━━━━━━━━━━━━━━━━━━
 
   ℹ The call chain .map().flat() can be replaced with a single .flatMap() call.
-  
+
     142 │       { db: s.db, box: s.secretBox },
     143 │       s.team.id,
   > 144 │       s.db
@@ -15,11 +15,11 @@ apps/server/test/feishu-config.test.ts:144:7 lint/complexity/useFlatMap  FIXABLE
         │         ^^^^^^^
     150 │     ),
     151 │   ).toEqual({});
-  
+
   ℹ Using .flatMap() avoids the creation of an intermediate array.
-  
+
   ℹ Safe fix: Replace the chain with .flatMap().
-  
+
     146 146 │           .from(feishuBinding)
     147 147 │           .all()
     148     │ - ········.map((row)·=>·[row.appIdCipher,·row.appSecretCipher])
@@ -27,7 +27,91 @@ apps/server/test/feishu-config.test.ts:144:7 lint/complexity/useFlatMap  FIXABLE
         148 │ + ········.flatMap((row)·=>·[row.appIdCipher,·row.appSecretCipher]),
     150 149 │       ),
     151 150 │     ).toEqual({});
-  
+
+
+scripts/ops/deploy-self.test.mjs:304:44 ]8;;https://biomejs.dev/linter/rules/use-template\lint/style/useTemplate]8;;\  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ℹ Template literals are preferred over string concatenation.
+
+    302 │   assert.equal(result.status, 0, result.stderr);
+    303 │   for (const name of ['main', 'check', 'pack-smoke', 'e2e-gate', 'pr-evidence'])
+  > 304 │     assert.match(result.stdout, new RegExp('PASS ' + name + ' '));
+        │                                            ^^^^^^^^^^^^^^^^^^^^
+    305 │   assert.equal(existsSync(f.state), false);
+    306 │   assert.equal(existsSync(f.db), false);
+
+  ℹ Unsafe fix: Use a template literal.
+
+    302 302 │     assert.equal(result.status, 0, result.stderr);
+    303 303 │     for (const name of ['main', 'check', 'pack-smoke', 'e2e-gate', 'pr-evidence'])
+    304     │ - ····assert.match(result.stdout,·new·RegExp('PASS·'·+·name·+·'·'));
+        304 │ + ····assert.match(result.stdout,·new·RegExp(`PASS·${name}·`));
+    305 305 │     assert.equal(existsSync(f.state), false);
+    306 306 │     assert.equal(existsSync(f.db), false);
+
+
+scripts/ops/deploy-self.test.mjs:318:8 ]8;;https://biomejs.dev/linter/rules/use-template\lint/style/useTemplate]8;;\  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ℹ Template literals are preferred over string concatenation.
+
+    316 │   'superseded',
+    317 │ ]) {
+  > 318 │   test('check refuses ' + mode + ' without writes', () => {
+        │        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    319 │     const f = fixture(mode);
+    320 │     const before = readFileSync(f.db);
+
+  ℹ Unsafe fix: Use a template literal.
+
+    316 316 │     'superseded',
+    317 317 │   ]) {
+    318     │ - ··test('check·refuses·'·+·mode·+·'·without·writes',·()·=>·{
+        318 │ + ··test(`check·refuses·${mode}·without·writes`,·()·=>·{
+    319 319 │       const f = fixture(mode);
+    320 320 │       const before = readFileSync(f.db);
+
+
+scripts/ops/deploy-self.test.mjs:339:8 ]8;;https://biomejs.dev/linter/rules/use-template\lint/style/useTemplate]8;;\  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ℹ Template literals are preferred over string concatenation.
+
+    337 │ }
+    338 │ for (const action of ['deploy', 'check', 'restore']) {
+  > 339 │   test(action + ' refuses leftover drain state and names explicit recovery', () => {
+        │        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    340 │     const f = fixture();
+    341 │     command('python3', [
+
+  ℹ Unsafe fix: Use a template literal.
+
+    337 337 │   }
+    338 338 │   for (const action of ['deploy', 'check', 'restore']) {
+    339     │ - ··test(action·+·'·refuses·leftover·drain·state·and·names·explicit·recovery',·()·=>·{
+        339 │ + ··test(`${action}·refuses·leftover·drain·state·and·names·explicit·recovery`,·()·=>·{
+    340 340 │       const f = fixture();
+    341 341 │       command('python3', [
+
+
+scripts/ops/deploy-self.test.mjs:387:8 ]8;;https://biomejs.dev/linter/rules/use-template\lint/style/useTemplate]8;;\  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ℹ Template literals are preferred over string concatenation.
+
+    385 │ });
+    386 │ for (const units of ['', 'one.service', 'one.service two.service three.service']) {
+  > 387 │   test('invalid unit inventory refuses ' + JSON.stringify(units), () => {
+        │        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    388 │     const f = fixture('good', { CAIRN_DEPLOY_UNITS: units });
+    389 │     assert.notEqual(f.run().status, 0);
+
+  ℹ Unsafe fix: Use a template literal.
+
+    385 385 │   });
+    386 386 │   for (const units of ['', 'one.service', 'one.service two.service three.service']) {
+    387     │ - ··test('invalid·unit·inventory·refuses·'·+·JSON.stringify(units),·()·=>·{
+        387 │ + ··test(`invalid·unit·inventory·refuses·${JSON.stringify(units)}`,·()·=>·{
+    388 388 │       const f = fixture('good', { CAIRN_DEPLOY_UNITS: units });
+    389 389 │       assert.notEqual(f.run().status, 0);
+
 
 Checked 1257 files in 16s. No fixes applied.
-Found 1 info.
+Found 5 infos.
