@@ -305,7 +305,7 @@
   },
   "direct-vitest-skipped-slot": {
     "Intercepts": 1,
-    "Recurrences": 0
+    "Recurrences": 1
   },
   "directory-wide-absence-assertion": {
     "Intercepts": 1,
@@ -320,6 +320,10 @@
     "Recurrences": 0
   },
   "dispatch-without-duplicate-check": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "docs-only-predicate-too-narrow": {
     "Intercepts": 0,
     "Recurrences": 0
   },
@@ -447,10 +451,6 @@
     "Intercepts": 4,
     "Recurrences": 2
   },
-  "fixture-production-relationships": {
-    "Intercepts": 0,
-    "Recurrences": 0
-  },
   "force-push-on-reused-branch": {
     "Intercepts": 0,
     "Recurrences": 0
@@ -515,10 +515,6 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
-  "hardcoded-service-launch": {
-    "Intercepts": 0,
-    "Recurrences": 0
-  },
   "harness-policy-dependencies": {
     "Intercepts": 6,
     "Recurrences": 0
@@ -569,10 +565,6 @@
   },
   "import-split-existing-comment": {
     "Intercepts": 1,
-    "Recurrences": 0
-  },
-  "incomplete-failure-controls": {
-    "Intercepts": 0,
     "Recurrences": 0
   },
   "infinity-lost-in-json": {
@@ -739,10 +731,6 @@
     "Intercepts": 0,
     "Recurrences": 0
   },
-  "null-migration-identity": {
-    "Intercepts": 0,
-    "Recurrences": 0
-  },
   "oauth-access-token-as-login-expiry": {
     "Intercepts": 1,
     "Recurrences": 0
@@ -829,7 +817,7 @@
   },
   "prepush-selftest-not-run": {
     "Intercepts": 0,
-    "Recurrences": 0
+    "Recurrences": 2
   },
   "prepush-skipped-ui-gates": {
     "Intercepts": 2,
@@ -956,10 +944,6 @@
     "Recurrences": 0
   },
   "restoration-fixture-parent": {
-    "Intercepts": 0,
-    "Recurrences": 0
-  },
-  "restore-api-key-isolation": {
     "Intercepts": 0,
     "Recurrences": 0
   },
@@ -1207,10 +1191,6 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
-  "undated-restore-comparison": {
-    "Intercepts": 0,
-    "Recurrences": 0
-  },
   "unformatted-integration-test": {
     "Intercepts": 3,
     "Recurrences": 0
@@ -1288,6 +1268,30 @@
     "Recurrences": 0
   },
   "zsh-readonly-status-variable": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "undated-restore-comparison": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "restore-api-key-isolation": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "fixture-production-relationships": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "null-migration-identity": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "hardcoded-service-launch": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "incomplete-failure-controls": {
     "Intercepts": 0,
     "Recurrences": 0
   }
