@@ -65,7 +65,7 @@ The release workflow builds and packs the tarballs in a job without npm publishi
 
 Publish only through the `release` workflow: both manifests set `publishConfig.provenance`, and provenance needs the CI's OIDC identity, so a publish from a laptop fails. If a tag push fails after a successful publish, run `pnpm exec changeset git-tag` and `git push origin --tags` from an up-to-date main to recreate the tags.
 
-Publishing requires a Trusted Publisher on npmjs.com for each package, with provider GitHub Actions, repository `xiechimon/cairn`, workflow file `release.yml`, and environment `npm`. The `publish` job deploys to the GitHub environment `npm`, which only `main` may deploy to. Each Trusted Publisher names environment `npm`, so a run from any other ref cannot obtain a publishing token. Renaming the workflow file breaks publishing until the Trusted Publishers are updated. Publishing needs no token or repository secret.
+Publishing requires a Trusted Publisher on npmjs.com for each package, with provider GitHub Actions, repository `xiechimon/cairn`, workflow file `release.yml`, and environment `npm`. The `publish` job deploys to the GitHub environment `npm`, which only `main` may deploy to. Each Trusted Publisher names environment `npm`. A run from another ref that declares the environment is stopped by GitHub before any step runs, and a run that omits it gets an OIDC token npm refuses to exchange. Renaming the workflow file breaks publishing until the Trusted Publishers are updated. Publishing needs no token or repository secret.
 
 ## License
 
