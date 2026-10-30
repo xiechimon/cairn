@@ -600,3 +600,694 @@ test at scripts/ops/secret-reach/setup-runner-linux.test.mjs:21:3
     operator: 'notStrictEqual',
     diff: 'simple'
   }
+✔ broker rejects other repositories, permissions and malformed requests before HTTP (2.49475ms)
+✔ broker signs JWT and sends only fixed repository permissions (10.202833ms)
+﹣ socket enforces framing, mode and preserves existing paths (6.120209ms) # Sandbox denies Unix socket binding
+✔ broker rejects unsafe listener configuration before binding (1.994709ms)
+﹣ runner client obtains token through socket without reading owner configuration (1.69075ms) # Sandbox denies Unix socket binding
+✔ CLI rejects empty and nonnumeric GID before reading owner key (310.842792ms)
+﹣ broker removes socket on SIGTERM (144.890458ms) # Sandbox denies Unix socket binding
+﹣ broker removes socket on SIGINT (97.67675ms) # Sandbox denies Unix socket binding
+✔ memory probe selects a readable mapped address and never zero (2.2055ms)
+✔ client rejects relative sockets before connecting (6.753792ms)
+✖ secret tests run in the ops CI job and local prepush plan (34.277334ms)
+✖ broker refuses GID 0 (15.4485ms)
+✔ broker refuses GID -1 (0.543875ms)
+✖ Bash HTTP-only canary probes every URL and identity with empty arrays (138.1225ms)
+✖ maps EACCES classification (111.306083ms)
+✖ maps EPERM classification (163.774792ms)
+✖ maps ENOENT classification (109.016083ms)
+✔ canary readable reports all channels without content (539.606084ms)
+✔ canary unreadable reports all channels without content (388.611166ms)
+✔ canary missing reports all channels without content (59.459459ms)
+✔ canary missing-parent reports all channels without content (59.50225ms)
+✔ canary validates arguments and reports process channels (152.130583ms)
+✔ setup dry run describes operations and leaves scratch unchanged (27.332875ms)
+✔ Mac settings deny both secret trees and preserve network configuration (1.395417ms)
+✔ HTTP channel tests anonymous and each supplied identity without leaking responses (626.242375ms)
+✔ HTTP denial does not report readable (631.182417ms)
+✖ dispatcher checker delegates read-only validation and preserves named failures (13.246333ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 325.736084
+
+✖ failing tests:
+
+test at scripts/ops/secret-reach/check-rules.test.mjs:8:1
+✖ dispatcher checker delegates read-only validation and preserves named failures (13.246333ms)
+  Error: ENOENT: no such file or directory, open '/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/check-rules.sh'
+      at readFileSync (node:fs:621:20)
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/check-rules.test.mjs:15:26)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'open',
+    path: '/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/check-rules.sh'
+  }
+✖ setup nft removes an existing privileged primary group and preserves quarantine on rerun (10467.517042ms)
+✖ setup iptables removes an existing privileged primary group and preserves quarantine on rerun (10628.7025ms)
+✔ writes are absent-resource deletes, an absent PR merge, or current-main no-op (102.107625ms)
+✔ main update requires a valid current SHA (5.539584ms)
+✔ authorized main updates and merges fail and requests serialize safe bodies (3.10425ms)
+✔ branch protection refusal and absent merge are accepted (1.769208ms)
+✔ generic validation failure does not establish branch protection (0.494917ms)
+ℹ tests 33
+ℹ suites 0
+ℹ pass 21
+ℹ fail 8
+ℹ cancelled 0
+ℹ skipped 4
+ℹ todo 0
+ℹ duration_ms 21459.836708
+
+✖ failing tests:
+
+test at scripts/ops/secret-reach/review.test.mjs:18:1
+✖ secret tests run in the ops CI job and local prepush plan (34.277334ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+    assert.ok(plan.some((step) => step.includes(`scripts/ops/secret-reach/${file}`)))
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/review.test.mjs:27:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scripts/ops/secret-reach/round2.test.mjs:9:32
+✖ broker refuses GID 0 (15.4485ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /Invalid socket group/. Input:
+
+  'Error: listen EPERM: operation not permitted /tmp/unused-round2.sock'
+
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/round2.test.mjs:10:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: listen EPERM: operation not permitted /tmp/unused-round2.sock
+        at Server.setupListenHandle [as _listen2] (node:net:2306:21)
+        at listenInCluster (node:net:2437:12)
+        at Server.listen (node:net:2579:5)
+        at file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/broker.mjs:83:12
+        at new Promise (<anonymous>)
+        at createBroker (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/broker.mjs:81:9)
+        at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/round2.test.mjs:10:24)
+        at Test.runInAsyncScope (node:async_hooks:226:14)
+        at Test.run (node:internal/test_runner/test:1402:25)
+        at Test.start (node:internal/test_runner/test:1262:17),
+    expected: /Invalid socket group/,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at scripts/ops/secret-reach/round2.test.mjs:13:1
+✖ Bash HTTP-only canary probes every URL and identity with empty arrays (138.1225ms)
+  AssertionError [ERR_ASSERTION]: /Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/canary.sh: line 51: paths[@]: unbound variable
+
+
+  1 !== 0
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/round2.test.mjs:21:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/secret-reach/round2.test.mjs:31:51
+✖ maps EACCES classification (111.306083ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  2 !== 0
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/round2.test.mjs:36:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/secret-reach/round2.test.mjs:31:51
+✖ maps EPERM classification (163.774792ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  2 !== 0
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/round2.test.mjs:36:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/secret-reach/round2.test.mjs:31:51
+✖ maps ENOENT classification (109.016083ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  2 !== 0
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/round2.test.mjs:36:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/secret-reach/setup-runner-linux.test.mjs:21:3
+✖ setup nft removes an existing privileged primary group and preserves quarantine on rerun (10467.517042ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /100\.64\.0\.7/. Input:
+
+  '#!/usr/bin/env bash\n' +
+    'set -euo pipefail\n' +
+    'if [ "${1:-start}" = stop ]; then\n' +
+    '  nft delete table inet cairn_runner 2>/dev/null || true\n' +
+    '  exit 0\n' +
+    'fi\n' +
+    'nft list table inet cairn_runner >/dev/null 2>&1 || nft add table inet cairn_runner\n' +
+    "nft -f - <<'RULES'\n" +
+    'delete table inet cairn_runner\n' +
+    'add table inet cairn_runner\n' +
+    'add chain inet cairn_runner output { type filter hook output priority -10; policy accept; }\n' +
+    'add rule inet cairn_runner output oifname "lo" tcp dport 8787 meta skuid != { 0, 1000 } reject\n' +
+    'RULES\n'
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/setup-runner-linux.test.mjs:150:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '#!/usr/bin/env bash\nset -euo pipefail\nif [ "${1:-start}" = stop ]; then\n  nft delete table inet cairn_runner 2>/dev/null || true\n  exit 0\nfi\nnft list table inet cairn_runner >/dev/null 2>&1 || nft add table inet cairn_runner\nnft -f - <<\'RULES\'\ndelete table inet cairn_runner\nadd table inet cairn_runner\nadd chain inet cairn_runner output { type filter hook output priority -10; policy accept; }\nadd rule inet cairn_runner output oifname "lo" tcp dport 8787 meta skuid != { 0, 1000 } reject\nRULES\n',
+    expected: /100\.64\.0\.7/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/secret-reach/setup-runner-linux.test.mjs:21:3
+✖ setup iptables removes an existing privileged primary group and preserves quarantine on rerun (10628.7025ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /100\.64\.0\.7/. Input:
+
+  '#!/usr/bin/env bash\n' +
+    'set -euo pipefail\n' +
+    'for tool in iptables ip6tables; do\n' +
+    '  if [ "${1:-start}" = stop ]; then\n' +
+    '    $tool -w -D OUTPUT -o lo -p tcp --dport 8787 -j CAIRN_RUNNER 2>/dev/null || true\n' +
+    '    $tool -w -F CAIRN_RUNNER 2>/dev/null || true\n' +
+    '    $tool -w -X CAIRN_RUNNER 2>/dev/null || true\n' +
+    '  else\n' +
+    '    $tool -w -N CAIRN_RUNNER 2>/dev/null || true\n' +
+    '    $tool -w -F CAIRN_RUNNER\n' +
+    '    $tool -w -A CAIRN_RUNNER -m owner --uid-owner 0 -j RETURN\n' +
+    '    $tool -w -A CAIRN_RUNNER -m owner --uid-owner 1000 -j RETURN\n' +
+    '    $tool -w -A CAIRN_RUNNER -j REJECT\n' +
+    '    $tool -w -C OUTPUT -o lo -p tcp --dport 8787 -j CAIRN_RUNNER 2>/dev/null || $tool -w -I OUTPUT 1 -o lo -p tcp --dport 8787 -j CAIRN_RUNNER\n' +
+    '  fi\n' +
+    'done\n'
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/setup-runner-linux.test.mjs:150:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '#!/usr/bin/env bash\nset -euo pipefail\nfor tool in iptables ip6tables; do\n  if [ "${1:-start}" = stop ]; then\n    $tool -w -D OUTPUT -o lo -p tcp --dport 8787 -j CAIRN_RUNNER 2>/dev/null || true\n    $tool -w -F CAIRN_RUNNER 2>/dev/null || true\n    $tool -w -X CAIRN_RUNNER 2>/dev/null || true\n  else\n    $tool -w -N CAIRN_RUNNER 2>/dev/null || true\n    $tool -w -F CAIRN_RUNNER\n    $tool -w -A CAIRN_RUNNER -m owner --uid-owner 0 -j RETURN\n    $tool -w -A CAIRN_RUNNER -m owner --uid-owner 1000 -j RETURN\n    $tool -w -A CAIRN_RUNNER -j REJECT\n    $tool -w -C OUTPUT -o lo -p tcp --dport 8787 -j CAIRN_RUNNER 2>/dev/null || $tool -w -I OUTPUT 1 -o lo -p tcp --dport 8787 -j CAIRN_RUNNER\n  fi\ndone\n',
+    expected: /100\.64\.0\.7/,
+    operator: 'match',
+    diff: 'simple'
+  }
+✖ broker refuses GID 0 (66.554292ms)
+✔ broker refuses GID -1 (0.561916ms)
+✖ Bash HTTP-only canary probes every URL and identity with empty arrays (47.754458ms)
+✖ maps EACCES classification (169.816792ms)
+✖ maps EPERM classification (133.740667ms)
+✔ maps ENOENT classification (183.348916ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 2
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 813.475542
+
+✖ failing tests:
+
+test at scripts/ops/secret-reach/round2.test.mjs:9:32
+✖ broker refuses GID 0 (66.554292ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /Invalid socket group/. Input:
+
+  'Error: listen EPERM: operation not permitted /tmp/unused-round2.sock'
+
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/round2.test.mjs:10:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: listen EPERM: operation not permitted /tmp/unused-round2.sock
+        at Server.setupListenHandle [as _listen2] (node:net:2306:21)
+        at listenInCluster (node:net:2437:12)
+        at Server.listen (node:net:2579:5)
+        at file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/broker.mjs:83:12
+        at new Promise (<anonymous>)
+        at createBroker (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/broker.mjs:81:9)
+        at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/round2.test.mjs:10:24)
+        at Test.runInAsyncScope (node:async_hooks:226:14)
+        at Test.run (node:internal/test_runner/test:1402:25)
+        at Test.start (node:internal/test_runner/test:1262:17),
+    expected: /Invalid socket group/,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at scripts/ops/secret-reach/round2.test.mjs:13:1
+✖ Bash HTTP-only canary probes every URL and identity with empty arrays (47.754458ms)
+  AssertionError [ERR_ASSERTION]: /Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/canary.sh: line 51: paths[@]: unbound variable
+
+
+  1 !== 0
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/round2.test.mjs:21:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/secret-reach/round2.test.mjs:31:51
+✖ maps EACCES classification (169.816792ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+
+  + 'SKIPPED'
+  - 'BLOCKED'
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/round2.test.mjs:38:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'SKIPPED',
+    expected: 'BLOCKED',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/secret-reach/round2.test.mjs:31:51
+✖ maps EPERM classification (133.740667ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+
+  + 'SKIPPED'
+  - 'BLOCKED'
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/round2.test.mjs:38:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'SKIPPED',
+    expected: 'BLOCKED',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+✔ broker refuses GID 0 (3.045666ms)
+✔ broker refuses GID -1 (0.305375ms)
+✔ Bash HTTP-only canary probes every URL and identity with empty arrays (661.995083ms)
+✔ maps EACCES classification (83.690333ms)
+✔ maps EPERM classification (84.358291ms)
+✔ maps ENOENT classification (81.250667ms)
+✖ Linux canary rechecks discovered self Tailscale addresses (581.113ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 6
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1699.959708
+
+✖ failing tests:
+
+test at scripts/ops/secret-reach/round2.test.mjs:41:1
+✖ Linux canary rechecks discovered self Tailscale addresses (581.113ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /https:\/\/100.64.0.7\/api\/teams/. Input:
+
+  '--noproxy * --max-time 10 -s -o /dev/null -w %{http_code} https://fixture.example/api/teams\n' +
+    '--noproxy * --max-time 10 -s -o /dev/null -w %{http_code} -H tailscale-user-login: owner https://fixture.example/api/teams\n'
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/round2.test.mjs:52:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '--noproxy * --max-time 10 -s -o /dev/null -w %{http_code} https://fixture.example/api/teams\n--noproxy * --max-time 10 -s -o /dev/null -w %{http_code} -H tailscale-user-login: owner https://fixture.example/api/teams\n',
+    expected: /https:\/\/100.64.0.7\/api\/teams/,
+    operator: 'match',
+    diff: 'simple'
+  }
+✖ setup nft removes an existing privileged primary group and preserves quarantine on rerun (758.813417ms)
+✖ setup iptables removes an existing privileged primary group and preserves quarantine on rerun (586.329292ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1464.290833
+
+✖ failing tests:
+
+test at scripts/ops/secret-reach/setup-runner-linux.test.mjs:21:3
+✖ setup nft removes an existing privileged primary group and preserves quarantine on rerun (758.813417ms)
+  AssertionError [ERR_ASSERTION]: file:///private/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/runner-fixture-kMvPha/bin/uname:9
+  if (command === 'tailscale') console.log('100.64.0.7
+                                           ^^^^^^^^^^^
+
+  SyntaxError: Invalid or unexpected token
+      at compileSourceTextModule (node:internal/modules/esm/utils:355:16)
+      at ModuleLoader.moduleStrategy (node:internal/modules/esm/translators:93:18)
+      at #translate (node:internal/modules/esm/loader:441:20)
+      at afterLoad (node:internal/modules/esm/loader:509:29)
+      at ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:514:12)
+      at #getOrCreateModuleJobAfterResolve (node:internal/modules/esm/loader:567:36)
+      at afterResolve (node:internal/modules/esm/loader:614:52)
+      at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:620:12)
+      at node:internal/modules/esm/loader:639:32
+      at TracingChannel.tracePromise (node:diagnostics_channel:547:22)
+
+  Node.js v26.8.1
+  Run with sudo on Linux
+
+
+  2 !== 0
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/setup-runner-linux.test.mjs:134:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/secret-reach/setup-runner-linux.test.mjs:21:3
+✖ setup iptables removes an existing privileged primary group and preserves quarantine on rerun (586.329292ms)
+  AssertionError [ERR_ASSERTION]: file:///private/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/runner-fixture-aDyAfu/bin/uname:9
+  if (command === 'tailscale') console.log('100.64.0.7
+                                           ^^^^^^^^^^^
+
+  SyntaxError: Invalid or unexpected token
+      at compileSourceTextModule (node:internal/modules/esm/utils:355:16)
+      at ModuleLoader.moduleStrategy (node:internal/modules/esm/translators:93:18)
+      at #translate (node:internal/modules/esm/loader:441:20)
+      at afterLoad (node:internal/modules/esm/loader:509:29)
+      at ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:514:12)
+      at #getOrCreateModuleJobAfterResolve (node:internal/modules/esm/loader:567:36)
+      at afterResolve (node:internal/modules/esm/loader:614:52)
+      at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:620:12)
+      at node:internal/modules/esm/loader:639:32
+      at TracingChannel.tracePromise (node:diagnostics_channel:547:22)
+
+  Node.js v26.8.1
+  Run with sudo on Linux
+
+
+  2 !== 0
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/setup-runner-linux.test.mjs:134:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+✔ broker rejects other repositories, permissions and malformed requests before HTTP (3.641833ms)
+✔ broker signs JWT and sends only fixed repository permissions (8.553292ms)
+﹣ socket enforces framing, mode and preserves existing paths (6.318ms) # Sandbox denies Unix socket binding
+✔ broker rejects unsafe listener configuration before binding (2.17375ms)
+﹣ runner client obtains token through socket without reading owner configuration (2.015041ms) # Sandbox denies Unix socket binding
+✖ CLI rejects empty and nonnumeric GID before reading owner key (346.13525ms)
+﹣ broker removes socket on SIGTERM (94.691041ms) # Sandbox denies Unix socket binding
+﹣ broker removes socket on SIGINT (78.387ms) # Sandbox denies Unix socket binding
+✔ broker refuses GID 0 (3.028375ms)
+✔ broker refuses GID -1 (0.243125ms)
+✔ Bash HTTP-only canary probes every URL and identity with empty arrays (464.81125ms)
+✔ maps EACCES classification (75.383959ms)
+✔ maps EPERM classification (66.090625ms)
+✔ maps ENOENT classification (74.655583ms)
+✔ Linux canary rechecks discovered self Tailscale addresses (1045.705958ms)
+✖ operations documentation names actual protection probes and Mac token limits (2.029042ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 10
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 4
+ℹ todo 0
+ℹ duration_ms 1864.102959
+
+✖ failing tests:
+
+test at scripts/ops/secret-reach/broker.test.mjs:128:1
+✖ CLI rejects empty and nonnumeric GID before reading owner key (346.13525ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /Invalid socket group/. Input:
+
+  'node:fs:780\n' +
+    '    getValidatedPath(path),\n' +
+    '    ^\n' +
+    '\n' +
+    'TypeError [ERR_INVALID_ARG_TYPE]: The "path" argument must be of type string or an instance of Buffer or URL. Received undefined\n' +
+    '    at Object.openSync (node:fs:780:5)\n' +
+    '    at readFileSync (node:fs:625:35)\n' +
+    '    at file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/broker.mjs:114:17\n' +
+    '    at ModuleJob.run (node:internal/modules/esm/module_job:569:25)\n' +
+    '    at async node:internal/modules/esm/loader:650:26\n' +
+    '    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {\n' +
+    "  code: 'ERR_INVALID_ARG_TYPE'\n" +
+    '}\n' +
+    '\n' +
+    'Node.js v26.8.1\n'
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/broker.test.mjs:135:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: `node:fs:780\n    getValidatedPath(path),\n    ^\n\nTypeError [ERR_INVALID_ARG_TYPE]: The "path" argument must be of type string or an instance of Buffer or URL. Received undefined\n    at Object.openSync (node:fs:780:5)\n    at readFileSync (node:fs:625:35)\n    at file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/broker.mjs:114:17\n    at ModuleJob.run (node:internal/modules/esm/module_job:569:25)\n    at async node:internal/modules/esm/loader:650:26\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {\n  code: 'ERR_INVALID_ARG_TYPE'\n}\n\nNode.js v26.8.1\n`,
+    expected: /Invalid socket group/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/secret-reach/round2.test.mjs:57:1
+✖ operations documentation names actual protection probes and Mac token limits (2.029042ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /GET.*branches\/main\/protection/. Input:
+
+  '# Secret reachability\n' +
+    '\n' +
+    'The server, daemon and token broker run as the existing owner. Build lanes run as `cairn-runner`, a separate locked-password system identity with its own private home. The runner belongs only to its primary group and `cairn-broker`; the setup replaces supplementary memberships, including sudo, docker and wheel. This does not revoke separately configured sudoers rules, ACLs, capabilities, existing sessions or inherited credentials. Inspect these on the host before dispatching lanes. Root remains outside this boundary.\n' +
+    '\n' +
+    'The broker keeps the App PEM in the owner process and accepts newline-delimited JSON over a Unix socket. It mints only an installation token for `xiechimon/cairn`, restricted to repository `cairn` and contents, pull requests and issues write permissions. Every caller allowed onto the socket can obtain that token; it is intentionally a repository write capability. No arbitrary GitHub API proxy exists.\n' +
+    '\n' +
+    '## One manual sudo step\n' +
+    '\n' +
+    'As the owner, inspect the script, then run once:\n' +
+    '\n' +
+    '```sh\n' +
+    'bash scripts/ops/secret-reach/setup-runner-linux.sh --dry-run\n' +
+    'sudo bash scripts/ops/secret-reach/setup-runner-linux.sh\n' +
+    '```\n' +
+    '\n' +
+    'The command preserves the owner home at 700, changes the server directory to 750, database family to owner-and-primary-group-owned 640, and moves the stale key into a unique 700 quarantine directory. It never deletes the stale key. Rerunning does not move an already quarantined key. Stop if existing identity configuration or paths differ from the documented model. Direct sudoers grants are a host audit requirement.\n' +
+    '\n' +
+    'The script validates existing paths and ancestors before any account or file mutation and refuses symlinks or non-regular database members. It detects nftables first, otherwise requires both iptables and ip6tables. `CAIRN_SERVER_PORT` defaults to 8787; set it explicitly through sudo if the server uses another port. It generates `/etc/cairn-runner-firewall/apply.sh` and `/etc/systemd/system/cairn-runner-firewall.service`, then enables the service. The OUTPUT rule on `lo` rejects TCP to that port unless the socket owner is root (tailscaled) or ian. Inspect the generated file and runtime rules on the host; other firewall managers can override or remove them. Root and owner remain trusted.\n' +
+    '\n' +
+    'To remove the rule and boot persistence, run `sudo systemctl disable --now cairn-runner-firewall.service`. The generated script also supports `sudo /etc/cairn-runner-firewall/apply.sh stop`; this removes the dedicated table/chains but leaves the unit enabled unless disabled separately. After stopping, the two named generated files can be removed. Rerun setup to reapply. Confirm owner/root access and runner rejection after application, after reboot, and rule absence after removal. Firewall enforcement and persistence remain pending host verification.\n' +
+    '\n' +
+    'Start a fresh owner session to obtain the new shared group. Create a socket parent directory outside the private home, owned by the owner and group `cairn-broker`, mode 750. Do not put the socket in a runner-writable directory. Set `CAIRN_GITHUB_APP_ID`, `CAIRN_GITHUB_INSTALLATION_ID`, `CAIRN_GITHUB_APP_KEY`, `CAIRN_BROKER_SOCKET` and non-empty numeric `CAIRN_BROKER_GID`, then run `node scripts/ops/secret-reach/broker.mjs` as the owner. Use an absolute socket path. SIGTERM and SIGINT close and unlink the socket. The broker refuses existing socket paths; after a crash, the owner must verify no broker is alive before removing a stale socket. Keep tokens out of logs and shell tracing.\n' +
+    '\n' +
+    'Request shape:\n' +
+    '\n' +
+    '```json\n' +
+    '{"type":"mint","repository":"xiechimon/cairn","permissions":{"contents":"write","pull_requests":"write","issues":"write"}}\n' +
+    '```\n' +
+    '\n' +
+    'A response contains `token` and `expires_at`; errors contain only `error`. Input is limited to 8192 bytes and connections time out after 15 seconds. HTTP requests time out after 10 seconds.\n' +
+    '\n' +
+    '## Negative controls for the dispatcher\n' +
+    '\n' +
+    'Run `node --test scripts/ops/secret-reach/*.test.mjs` on Linux, including the socket test that this sandbox cannot bind. Inspect `id cairn-runner`, sudoers, groups, ACLs and file ownership. Repeat setup and confirm state and quarantine contents remain stable. Confirm the active owner process can still read its keys and database.\n' +
+    '\n' +
+    'As the owner, check every supplied secret and DB path exists with `test -e` before switching users. A runner cannot distinguish a missing descendant behind an inaccessible directory from a real denied path. Each supplied path is an assertion of existence; MISSING is an error and fails the run. After quarantine, use the actual quarantine destination instead of the removed old path.\n' +
+    '\n' +
+    'Stage the canary script and `process-memory.mjs` together in a runner-readable directory outside the private owner home. Run the canary first as the owner against a harmless marker file (expect exit 1), then as `cairn-runner` against the App PEM, current and stale key paths, server environment, owner token, database family and server/daemon PIDs (expect exit 0 with all available channels BLOCKED). Supply the actual host paths locally; never commit environment contents or tokens. Example:\n' +
+    '\n' +
+    '```sh\n' +
+    'sudo -u cairn-runner bash scripts/ops/secret-reach/canary.sh --paths /path/to/key /path/to/server.db --pid 1234 --server-url http://127.0.0.1:8787 --tailscale-users login-one,login-two\n' +
+    '```\n' +
+    '\n' +
+    'Each line reports status, channel, path and, for successful reads, byte count. Missing executables produce SKIPPED and cannot support isolation claims. Linux memory reads use a nonzero readable address from `/proc/<pid>/maps`. Unavailable maps, no usable address, short reads and mapping errors report SKIPPED; permission rejection at the selected address reports BLOCKED. One mapping is not an exhaustive ptrace audit. The HTTP channel GETs `/api/teams` anonymously and with each comma-separated allowed login supplied via `--tailscale-users`; obtain the configured list outside this probe and never read server.env here. Any 2xx is READ and fails. Transport failure is BLOCKED for that endpoint only, not proof of auth correctness. Verify owner-positive connectivity separately. The canary tests only these channels, not all possible exfiltration mechanisms.\n' +
+    '\n' +
+    "Exercise the real broker from the runner account. Validate the returned token's repository and permissions through GitHub without printing the token. Other repositories and extra permissions must be refused. Record red and green runtime evidence, never credentials. The client requires no owner configuration or key access:\n" +
+    '\n' +
+    '```sh\n' +
+    'sudo -u cairn-runner node scripts/ops/secret-reach/token-scope-probe.mjs /absolute/broker.sock\n' +
+    '```\n' +
+    '\n' +
+    'It requests the fixed token over the socket, reads the current main SHA and sends `PATCH /repos/xiechimon/cairn/git/refs/heads/main` with that SHA and `force: false`. A 2xx fails even though the permitted update is a no-op. A generic validation error is not branch protection evidence: the response must identify protected-branch or repository-rule rejection. If main advances concurrently, rerun after inspecting the response. It also attempts `PUT /repos/xiechimon/cairn/pulls/999999999/merge`; 404 is acceptable and any 2xx fails. Confirm the named absent branch, variable, webhook ID 999999999 and PR 999999999 do not exist before probing. All other writes delete only those absent resources; never substitute an existing resource. The main response message is printed with the token redacted. Real GitHub outcomes remain host acceptance work.\n' +
+    '\n' +
+    'For Mac goal sessions, pass `--settings scripts/ops/secret-reach/claude-sandbox-settings.json` to Claude Code. It turns the Bash sandbox on, refuses unsandboxed retries, and denies both `~/.cairn/**` and `~/.tds/**`. The historical three-path settings denied the tested Mac secret paths at the OS level, so `cat`, Python, Node, `dd`, `cp`, a symlink and `git diff --no-index` all fail with `Operation not permitted`, also under `--permission-mode bypassPermissions` (Claude Code 2.1.312, measured, `docs/verify/2189/mac/`). The revised whole-directory settings require a new real Claude run. `httpProxyPort` and `allowLocalBinding` let `git` and `gh` reach the local proxy on 127.0.0.1:7890, and `enableWeakerNetworkIsolation` lets `gh` verify TLS; without them `gh api` fails with OSStatus -26276 and `git ls-remote` cannot reach the proxy. Do not add `git` or `gh` to `sandbox.excludedCommands`: excluded commands run without filesystem restrictions, and `git diff --no-index` reads any file.\n'
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/round2.test.mjs:59:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '# Secret reachability\n\nThe server, daemon and token broker run as the existing owner. Build lanes run as `cairn-runner`, a separate locked-password system identity with its own private home. The runner belongs only to its primary group and `cairn-broker`; the setup replaces supplementary memberships, including sudo, docker and wheel. This does not revoke separately configured sudoers rules, ACLs, capabilities, existing sessions or inherited credentials. Inspect these on the host before dispatching lanes. Root remains outside this boundary.\n\nThe broker keeps the App PEM in the owner process and accepts newline-delimited JSON over a Unix socket. It mints only an installation token for `xiechimon/cairn`, restricted to repository `cairn` and contents, pull requests and issues write permissions. Every caller allowed onto the socket can obtain that token; it is intentionally a repository write capability. No arbitrary GitHub API proxy exists.\n\n## One manual sudo step\n\nAs the owner, inspect the script, then run once:\n\n```sh\nbash scripts/ops/secret-reach/setup-runner-linux.sh --dry-run\nsudo bash scripts/ops/secret-reach/setup-runner-linux.sh\n```\n\nThe command preserves the owner home at 700, changes the server directory to 750, database family to owner-and-primary-group-owned 640, and moves the stale key into a unique 700 quarantine directory. It never deletes the stale key. Rerunning does not move an already quarantined key. Stop if existing identity configuration or paths differ from the documented model. Direct sudoers grants are a host audit requirement.\n\nThe script validates existing paths and ancestors before any account or file mutation and refuses symlinks or non-regular database members. It detects nftables first, otherwise requires both iptables and ip6tables. `CAIRN_SERVER_PORT` defaults to 8787; set it explicitly through sudo if the server uses another port. It generates `/etc/cairn-runner-firewall/apply.sh` and `/etc/systemd/system/cairn-runner-firewall.service`, then enables the service. The OUTPUT rule on `lo` rejects TCP to that port unless the socket owner is root (tailscaled) or ian. Inspect the generated file and runtime rules on the host; other firewall managers can override or remove them. Root and owner remain trusted.\n\nTo remove the rule and boot persistence, run `sudo systemctl disable --now cairn-runner-firewall.service`. The generated script also supports `sudo /etc/cairn-runner-firewall/apply.sh stop`; this removes the dedicated table/chains but leaves the unit enabled unless disabled separately. After stopping, the two named generated files can be removed. Rerun setup to reapply. Confirm owner/root access and runner rejection after application, after reboot, and rule absence after removal. Firewall enforcement and persistence remain pending host verification.\n\nStart a fresh owner session to obtain the new shared group. Create a socket parent directory outside the private home, owned by the owner and group `cairn-broker`, mode 750. Do not put the socket in a runner-writable directory. Set `CAIRN_GITHUB_APP_ID`, `CAIRN_GITHUB_INSTALLATION_ID`, `CAIRN_GITHUB_APP_KEY`, `CAIRN_BROKER_SOCKET` and non-empty numeric `CAIRN_BROKER_GID`, then run `node scripts/ops/secret-reach/broker.mjs` as the owner. Use an absolute socket path. SIGTERM and SIGINT close and unlink the socket. The broker refuses existing socket paths; after a crash, the owner must verify no broker is alive before removing a stale socket. Keep tokens out of logs and shell tracing.\n\nRequest shape:\n\n```json\n{"type":"mint","repository":"xiechimon/cairn","permissions":{"contents":"write","pull_requests":"write","issues":"write"}}\n```\n\nA response contains `token` and `expires_at`; errors contain only `error`. Input is limited to 8192 bytes and connections time out after 15 seconds. HTTP requests time out after 10 seconds.\n\n## Negative controls for the dispatcher\n\nRun `node --test scripts/ops/secret-reach/*.test.mjs` on Linux, including the socket test that this sandbox cannot bind. Inspect `id cairn-runner`, sudoers, groups, ACLs and file ownership. Repeat setup and confirm state and quarantine contents remain stable. Confirm the active owner process can still read its keys and database.\n\nAs the owner, check every supplied secret and DB path exists with `test -e` before switching users. A runner cannot distinguish a missing descendant behind an inaccessible directory from a real denied path. Each supplied path is an assertion of existence; MISSING is an error and fails the run. After quarantine, use the actual quarantine destination instead of the removed old path.\n\nStage the canary script and `process-memory.mjs` together in a runner-readable directory outside the private owner home. Run the canary first as the owner against a harmless marker file (expect exit 1), then as `cairn-runner` against the App PEM, current and stale key paths, server environment, owner token, database family and server/daemon PIDs (expect exit 0 with all available channels BLOCKED). Supply the actual host paths locally; never commit environment contents or tokens. Example:\n\n```sh\nsudo -u cairn-runner bash scripts/ops/secret-reach/canary.sh --paths /path/to/key /path/to/server.db --pid 1234 --server-url http://127.0.0.1:8787 --tailscale-users login-one,login-two\n```\n\nEach line reports status, channel, path and, for successful reads, byte count. Missing executables produce SKIPPED and cannot support isolation claims. Linux memory reads use a nonzero readable address from `/proc/<pid>/maps`. Unavailable maps, no usable address, short reads and mapping errors report SKIPPED; permission rejection at the selected address reports BLOCKED. One mapping is not an exhaustive ptrace audit. The HTTP channel GETs `/api/teams` anonymously and with each comma-separated allowed login supplied via `--tailscale-users`; obtain the configured list outside this probe and never read server.env here. Any 2xx is READ and fails. Transport failure is BLOCKED for that endpoint only, not proof of auth correctness. Verify owner-positive connectivity separately. The canary tests only these channels, not all possible exfiltration mechanisms.\n\nExercise the real broker from the runner account. Validate the returned token\'s repository and permissions through GitHub without printing the token. Other repositories and extra permissions must be refused. Record red and green runtime evidence, never credentials. The client requires no owner configuration or key access:\n\n```sh\nsudo -u cairn-runner node scripts/ops/secret-reach/token-scope-probe.mjs /absolute/broker.sock\n```\n\nIt requests the fixed token over the socket, reads the current main SHA and sends `PATCH /repos/xiechimon/cairn/git/refs/heads/main` with that SHA and `force: false`. A 2xx fails even though the permitted update is a no-op. A generic validation error is not branch protection evidence: the response must identify protected-branch or repository-rule rejection. If main advances concurrently, rerun after inspecting the response. It also attempts `PUT /repos/xiechimon/cairn/pulls/999999999/merge`; 404 is acceptable and any 2xx fails. Confirm the named absent branch, variable, webhook ID 999999999 and PR 999999999 do not exist before probing. All other writes delete only those absent resources; never substitute an existing resource. The main response message is printed with the token redacted. Real GitHub outcomes remain host acceptance work.\n\nFor Mac goal sessions, pass `--settings scripts/ops/secret-reach/claude-sandbox-settings.json` to Claude Code. It turns the Bash sandbox on, refuses unsandboxed retries, and denies both `~/.cairn/**` and `~/.tds/**`. The historical three-path settings denied the tested Mac secret paths at the OS level, so `cat`, Python, Node, `dd`, `cp`, a symlink and `git diff --no-index` all fail with `Operation not permitted`, also under `--permission-mode bypassPermissions` (Claude Code 2.1.312, measured, `docs/verify/2189/mac/`). The revised whole-directory settings require a new real Claude run. `httpProxyPort` and `allowLocalBinding` let `git` and `gh` reach the local proxy on 127.0.0.1:7890, and `enableWeakerNetworkIsolation` lets `gh` verify TLS; without them `gh api` fails with OSStatus -26276 and `git ls-remote` cannot reach the proxy. Do not add `git` or `gh` to `sandbox.excludedCommands`: excluded commands run without filesystem restrictions, and `git diff --no-index` reads any file.\n',
+    expected: /GET.*branches\/main\/protection/,
+    operator: 'match',
+    diff: 'simple'
+  }
+✔ broker refuses GID 0 (2.752708ms)
+✔ broker refuses GID -1 (0.264125ms)
+✖ Bash HTTP-only canary probes every URL and identity with empty arrays (469.583083ms)
+✔ maps EACCES classification (417.894541ms)
+✔ maps EPERM classification (337.756167ms)
+✔ maps ENOENT classification (149.275917ms)
+✔ Linux canary rechecks discovered self Tailscale addresses (1595.358375ms)
+✔ operations documentation names actual protection probes and Mac token limits (1.402792ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 7
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3556.256333
+
+✖ failing tests:
+
+test at scripts/ops/secret-reach/round2.test.mjs:17:1
+✖ Bash HTTP-only canary probes every URL and identity with empty arrays (469.583083ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  2 !== 4
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/round2.test.mjs:43:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 4,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

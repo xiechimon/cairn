@@ -126,7 +126,7 @@ test('runner client obtains token through socket without reading owner configura
 });
 
 test('CLI rejects empty and nonnumeric GID before reading owner key', () => {
-  for (const gid of ['', ' ', 'invalid']) {
+  for (const gid of ['', ' ', 'invalid', '0', '-1']) {
     const run = spawnSync(process.execPath, [join(import.meta.dirname, 'broker.mjs')], {
       encoding: 'utf8',
       env: { ...process.env, CAIRN_BROKER_GID: gid },

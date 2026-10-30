@@ -33,3 +33,139 @@
 ℹ skipped 4
 ℹ todo 0
 ℹ duration_ms 14999.696834
+✔ broker rejects other repositories, permissions and malformed requests before HTTP (2.5505ms)
+✔ broker signs JWT and sends only fixed repository permissions (5.875333ms)
+﹣ socket enforces framing, mode and preserves existing paths (4.688083ms) # Sandbox denies Unix socket binding
+✔ broker rejects unsafe listener configuration before binding (1.3915ms)
+﹣ runner client obtains token through socket without reading owner configuration (1.486167ms) # Sandbox denies Unix socket binding
+✔ CLI rejects empty and nonnumeric GID before reading owner key (317.221083ms)
+﹣ broker removes socket on SIGTERM (70.434625ms) # Sandbox denies Unix socket binding
+﹣ broker removes socket on SIGINT (70.323584ms) # Sandbox denies Unix socket binding
+✔ dispatcher checker delegates read-only validation and preserves named failures (42.894166ms)
+✔ memory probe selects a readable mapped address and never zero (0.783125ms)
+✔ client rejects relative sockets before connecting (0.446375ms)
+✔ secret tests run in the ops CI job and local prepush plan (0.954459ms)
+✔ broker refuses GID 0 (1.936417ms)
+✔ broker refuses GID -1 (0.143917ms)
+✔ Bash HTTP-only canary probes every URL and identity with empty arrays (414.596375ms)
+✔ maps EACCES classification (63.469041ms)
+✔ maps EPERM classification (62.136917ms)
+✔ maps ENOENT classification (57.037042ms)
+✔ Linux canary rechecks discovered self Tailscale addresses (1177.476125ms)
+✔ operations documentation names actual protection probes and Mac token limits (0.529083ms)
+✔ canary readable reports all channels without content (212.787042ms)
+✔ canary unreadable reports all channels without content (196.423792ms)
+✔ canary missing reports all channels without content (27.431791ms)
+✔ canary missing-parent reports all channels without content (32.027334ms)
+✔ canary validates arguments and reports process channels (43.656208ms)
+✔ setup dry run describes operations and leaves scratch unchanged (16.059875ms)
+✔ Mac settings deny both secret trees and preserve network configuration (0.75175ms)
+✔ HTTP channel tests anonymous and each supplied identity without leaking responses (632.05775ms)
+✔ HTTP denial does not report readable (591.006ms)
+✔ setup nft removes an existing privileged primary group and preserves quarantine on rerun (10209.526166ms)
+✔ setup iptables removes an existing privileged primary group and preserves quarantine on rerun (112094.478333ms)
+✔ writes are absent-resource deletes, an absent PR merge, or current-main no-op (3.817292ms)
+✔ main update requires a valid current SHA (0.685791ms)
+✔ authorized main updates and merges fail and requests serialize safe bodies (4.223584ms)
+✔ branch protection refusal and absent merge are accepted (0.889875ms)
+✔ generic validation failure does not establish branch protection (0.267459ms)
+ℹ tests 36
+ℹ suites 0
+ℹ pass 32
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 4
+ℹ todo 0
+ℹ duration_ms 122421.330792
+✔ broker refuses GID 0 (26.874375ms)
+✔ broker refuses GID -1 (8.971084ms)
+✔ Bash HTTP-only canary probes every URL and identity with empty arrays (729.543875ms)
+✔ maps EACCES classification (103.76575ms)
+✔ maps EPERM classification (118.959583ms)
+✔ maps ENOENT classification (117.471583ms)
+✔ Linux canary rechecks discovered self Tailscale addresses (1098.81025ms)
+✔ operations documentation names actual protection probes and Mac token limits (0.926125ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2536.637667
+✔ broker rejects other repositories, permissions and malformed requests before HTTP (1.658084ms)
+✔ broker signs JWT and sends only fixed repository permissions (8.710208ms)
+﹣ socket enforces framing, mode and preserves existing paths (9.501291ms) # Sandbox denies Unix socket binding
+✔ broker rejects unsafe listener configuration before binding (2.294583ms)
+﹣ runner client obtains token through socket without reading owner configuration (10.657125ms) # Sandbox denies Unix socket binding
+✔ CLI rejects empty and nonnumeric GID before reading owner key (669.021625ms)
+﹣ broker removes socket on SIGTERM (89.191167ms) # Sandbox denies Unix socket binding
+﹣ broker removes socket on SIGINT (89.54125ms) # Sandbox denies Unix socket binding
+✔ dispatcher checker delegates read-only validation and preserves named failures (70.17425ms)
+✔ memory probe selects a readable mapped address and never zero (1.017708ms)
+✔ client rejects relative sockets before connecting (0.649458ms)
+✔ secret tests run in the ops CI job and local prepush plan (1.503459ms)
+✔ broker refuses GID 0 (2.23925ms)
+✔ broker refuses GID -1 (0.286917ms)
+✔ Bash HTTP-only canary probes every URL and identity with empty arrays (569.288042ms)
+✔ maps EACCES classification (146.48775ms)
+✔ maps EPERM classification (109.740375ms)
+✔ maps ENOENT classification (102.676958ms)
+✔ Linux canary rechecks discovered self Tailscale addresses (1399.620916ms)
+✔ operations documentation names actual protection probes and Mac token limits (1.119917ms)
+✔ canary readable reports all channels without content (380.965917ms)
+✔ canary unreadable reports all channels without content (597.50675ms)
+✔ canary missing reports all channels without content (38.359709ms)
+✔ canary missing-parent reports all channels without content (47.776209ms)
+✔ canary validates arguments and reports process channels (54.78825ms)
+✔ setup dry run describes operations and leaves scratch unchanged (20.287834ms)
+✔ Mac settings deny both secret trees and preserve network configuration (0.897291ms)
+✔ HTTP channel tests anonymous and each supplied identity without leaking responses (411.574583ms)
+✔ HTTP denial does not report readable (442.275958ms)
+✔ setup nft removes an existing privileged primary group and preserves quarantine on rerun (13930.742167ms)
+ℹ {"backend":"nft","emitted":"delete table inet cairn_runner\nadd table inet cairn_runner\nadd chain inet cairn_runner output { type filter hook output priority -10; policy accept; }\nadd rule inet cairn_runner output oifname \"lo\" tcp dport 8787 meta skuid != { 0, 1000 } ct state new reject\nadd rule inet cairn_runner output ip daddr 100.64.0.7 meta l4proto tcp ct state new meta skuid 2000 reject\nadd rule inet cairn_runner output ip6 daddr fd7a:115c:a1e0::7 meta l4proto tcp ct state new meta skuid 2000 reject\n"}
+ℹ Missing rule: nft output hook
+ℹ Missing rule: oifname "lo" tcp dport 8787 meta skuid != { 0, 1000 } ct state new reject
+ℹ Missing rule: ip daddr 100.64.0.7 meta l4proto tcp ct state new meta skuid 2000 reject
+ℹ Missing rule: ip6 daddr fd7a:115c:a1e0::7 meta l4proto tcp ct state new meta skuid 2000 reject
+✔ setup iptables removes an existing privileged primary group and preserves quarantine on rerun (28819.27425ms)
+ℹ {"backend":"iptables","emitted":[["iptables","-w","-A","CAIRN_RUNNER","-o","lo","-p","tcp","--dport","8787","-m","conntrack","--ctstate","NEW","-m","owner","--uid-owner","0","-j","RETURN"],["iptables","-w","-A","CAIRN_RUNNER","-o","lo","-p","tcp","--dport","8787","-m","conntrack","--ctstate","NEW","-m","owner","--uid-owner","1000","-j","RETURN"],["iptables","-w","-A","CAIRN_RUNNER","-o","lo","-p","tcp","--dport","8787","-m","conntrack","--ctstate","NEW","-j","REJECT"],["iptables","-w","-A","CAIRN_RUNNER","-d","100.64.0.7","-p","tcp","-m","conntrack","--ctstate","NEW","-m","owner","--uid-owner","2000","-j","REJECT"],["ip6tables","-w","-A","CAIRN_RUNNER","-o","lo","-p","tcp","--dport","8787","-m","conntrack","--ctstate","NEW","-m","owner","--uid-owner","0","-j","RETURN"],["ip6tables","-w","-A","CAIRN_RUNNER","-o","lo","-p","tcp","--dport","8787","-m","conntrack","--ctstate","NEW","-m","owner","--uid-owner","1000","-j","RETURN"],["ip6tables","-w","-A","CAIRN_RUNNER","-o","lo","-p","tcp","--dport","8787","-m","conntrack","--ctstate","NEW","-j","REJECT"],["ip6tables","-w","-A","CAIRN_RUNNER","-d","fd7a:115c:a1e0::7","-p","tcp","-m","conntrack","--ctstate","NEW","-m","owner","--uid-owner","2000","-j","REJECT"]]}
+ℹ Missing rule: iptables -o lo -p tcp --dport 8787 -m conntrack --ctstate NEW -m owner --uid-owner 0 -j RETURN
+ℹ Missing rule: iptables -o lo -p tcp --dport 8787 -m conntrack --ctstate NEW -m owner --uid-owner 1000 -j RETURN
+ℹ Missing rule: iptables -o lo -p tcp --dport 8787 -m conntrack --ctstate NEW -j REJECT
+ℹ Missing rule: iptables -d 100.64.0.7 -p tcp -m conntrack --ctstate NEW -m owner --uid-owner 2000 -j REJECT
+ℹ Missing rule: ip6tables -o lo -p tcp --dport 8787 -m conntrack --ctstate NEW -m owner --uid-owner 0 -j RETURN
+ℹ Missing rule: ip6tables -o lo -p tcp --dport 8787 -m conntrack --ctstate NEW -m owner --uid-owner 1000 -j RETURN
+ℹ Missing rule: ip6tables -o lo -p tcp --dport 8787 -m conntrack --ctstate NEW -j REJECT
+ℹ Missing rule: ip6tables -d fd7a:115c:a1e0::7 -p tcp -m conntrack --ctstate NEW -m owner --uid-owner 2000 -j REJECT
+ℹ Missing rule: iptables OUTPUT jump
+ℹ Missing rule: ip6tables OUTPUT jump
+✔ writes are absent-resource deletes, an absent PR merge, or current-main no-op (3.945542ms)
+✔ main update requires a valid current SHA (0.6935ms)
+✔ authorized main updates and merges fail and requests serialize safe bodies (1.359666ms)
+✔ branch protection refusal and absent merge are accepted (0.732ms)
+✔ generic validation failure does not establish branch protection (0.474958ms)
+ℹ tests 36
+ℹ suites 0
+ℹ pass 32
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 4
+ℹ todo 0
+ℹ duration_ms 42889.419333
+✔ broker refuses GID 0 (5.728125ms)
+✔ broker refuses GID -1 (0.28975ms)
+✔ Bash HTTP-only canary probes every URL and identity with empty arrays (562.959875ms)
+✔ maps EACCES classification (104.079208ms)
+✔ maps EPERM classification (113.773583ms)
+✔ maps ENOENT classification (93.612375ms)
+✔ Linux canary rechecks discovered self Tailscale addresses (1154.468458ms)
+✔ operations documentation names actual protection probes and Mac token limits (1.21925ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2246.792

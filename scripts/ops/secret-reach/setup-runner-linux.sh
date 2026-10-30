@@ -44,6 +44,11 @@ else
   exit 1
 fi
 command -v systemctl >/dev/null || exit 1
+tailscale_addresses=$(tailscale ip | LC_ALL=C sort)
+[ -n "$tailscale_addresses" ] || { echo 'Missing Tailscale addresses' >&2; exit 1; }
+while IFS= read -r address; do
+  [[ "$address" =~ ^[0-9a-fA-F:.]+$ ]] || exit 1
+done <<< "$tailscale_addresses"
 getent group cairn-broker >/dev/null || { groupadd --system cairn-broker; echo 'Created cairn-broker group'; }
 getent group cairn-runner >/dev/null || { groupadd --system cairn-runner; echo 'Created cairn-runner group'; }
 if ! id cairn-runner >/dev/null 2>&1; then
@@ -77,42 +82,87 @@ if [ -e "$stale" ]; then
 fi
 echo 'Applied runner group isolation, locked password, private homes and server directory mode 750'
 install -d -m 700 -o root /etc/cairn-runner-firewall
-if [ "$backend" = nft ]; then
-  cat > /etc/cairn-runner-firewall/apply.sh <<EOF_NFT
+cat > /etc/cairn-runner-firewall/apply.sh <<EOF_CONFIG
 #!/usr/bin/env bash
 set -euo pipefail
-if [ "\${1:-start}" = stop ]; then
-  nft delete table inet cairn_runner 2>/dev/null || true
-  exit 0
+backend=$backend
+server_port=$server_port
+owner_uid=$owner_uid
+runner_uid=$(id -u cairn-runner)
+addresses='$tailscale_addresses'
+EOF_CONFIG
+cat >> /etc/cairn-runner-firewall/apply.sh <<'EOF_RULES'
+mode=${1:-start}
+missing() { echo "Missing rule: $*" >&2; exit 1; }
+if [ "$mode" = check ]; then
+  current=$(tailscale ip | LC_ALL=C sort) || missing 'Tailscale address discovery'
+  [ -n "$current" ] && [ "$current" = "$addresses" ] || missing 'current Tailscale destinations; rerun setup'
 fi
-nft list table inet cairn_runner >/dev/null 2>&1 || nft add table inet cairn_runner
-nft -f - <<'RULES'
+if [ "$backend" = nft ]; then
+  if [ "$mode" = stop ]; then
+    nft delete table inet cairn_runner 2>/dev/null || true
+    exit 0
+  fi
+  rules="add rule inet cairn_runner output oifname \"lo\" tcp dport $server_port meta skuid != { 0, $owner_uid } ct state new reject"
+  for address in $addresses; do
+    family=ip
+    [[ "$address" != *:* ]] || family=ip6
+    rules="$rules
+add rule inet cairn_runner output $family daddr $address meta l4proto tcp ct state new meta skuid $runner_uid reject"
+  done
+  if [ "$mode" = check ]; then
+    actual=$(nft -n list chain inet cairn_runner output) || missing 'nft output chain'
+    printf '%s\n' "$actual" | grep -F 'type filter hook output priority -10; policy accept;' >/dev/null || missing 'nft output hook'
+    while IFS= read -r rule; do
+      expected=${rule#add rule inet cairn_runner output }
+      printf '%s\n' "$actual" | grep -F "$expected" >/dev/null || missing "$expected"
+    done <<< "$rules"
+    exit 0
+  fi
+  nft list table inet cairn_runner >/dev/null 2>&1 || nft add table inet cairn_runner
+  nft -f - <<RULES
 delete table inet cairn_runner
 add table inet cairn_runner
 add chain inet cairn_runner output { type filter hook output priority -10; policy accept; }
-add rule inet cairn_runner output oifname "lo" tcp dport $server_port meta skuid != { 0, $owner_uid } reject
+$rules
 RULES
-EOF_NFT
 else
-  cat > /etc/cairn-runner-firewall/apply.sh <<EOF_IPTABLES
-#!/usr/bin/env bash
-set -euo pipefail
-for tool in iptables ip6tables; do
-  if [ "\${1:-start}" = stop ]; then
-    \$tool -w -D OUTPUT -o lo -p tcp --dport $server_port -j CAIRN_RUNNER 2>/dev/null || true
-    \$tool -w -F CAIRN_RUNNER 2>/dev/null || true
-    \$tool -w -X CAIRN_RUNNER 2>/dev/null || true
-  else
-    \$tool -w -N CAIRN_RUNNER 2>/dev/null || true
-    \$tool -w -F CAIRN_RUNNER
-    \$tool -w -A CAIRN_RUNNER -m owner --uid-owner 0 -j RETURN
-    \$tool -w -A CAIRN_RUNNER -m owner --uid-owner $owner_uid -j RETURN
-    \$tool -w -A CAIRN_RUNNER -j REJECT
-    \$tool -w -C OUTPUT -o lo -p tcp --dport $server_port -j CAIRN_RUNNER 2>/dev/null || \$tool -w -I OUTPUT 1 -o lo -p tcp --dport $server_port -j CAIRN_RUNNER
-  fi
-done
-EOF_IPTABLES
+  for tool in iptables ip6tables; do
+    if [ "$mode" = stop ]; then
+      $tool -w -D OUTPUT -j CAIRN_RUNNER 2>/dev/null || true
+      $tool -w -D OUTPUT -o lo -p tcp --dport "$server_port" -j CAIRN_RUNNER 2>/dev/null || true
+      $tool -w -F CAIRN_RUNNER 2>/dev/null || true
+      $tool -w -X CAIRN_RUNNER 2>/dev/null || true
+      continue
+    fi
+    if [ "$mode" != check ]; then
+      $tool -w -N CAIRN_RUNNER 2>/dev/null || true
+      $tool -w -F CAIRN_RUNNER
+      $tool -w -D OUTPUT -o lo -p tcp --dport "$server_port" -j CAIRN_RUNNER 2>/dev/null || true
+    fi
+    rule() {
+      if [ "$mode" = check ]; then
+        $tool -w -C CAIRN_RUNNER "$@" || missing "$tool $*"
+      else
+        $tool -w -A CAIRN_RUNNER "$@"
+      fi
+    }
+    rule -o lo -p tcp --dport "$server_port" -m conntrack --ctstate NEW -m owner --uid-owner 0 -j RETURN
+    rule -o lo -p tcp --dport "$server_port" -m conntrack --ctstate NEW -m owner --uid-owner "$owner_uid" -j RETURN
+    rule -o lo -p tcp --dport "$server_port" -m conntrack --ctstate NEW -j REJECT
+    for address in $addresses; do
+      if [[ "$address" = *:* ]]; then [ "$tool" = ip6tables ] || continue
+      else [ "$tool" = iptables ] || continue; fi
+      rule -d "$address" -p tcp -m conntrack --ctstate NEW -m owner --uid-owner "$runner_uid" -j REJECT
+    done
+    if [ "$mode" = check ]; then
+      $tool -w -C OUTPUT -j CAIRN_RUNNER || missing "$tool OUTPUT jump"
+    else
+      $tool -w -C OUTPUT -j CAIRN_RUNNER 2>/dev/null || $tool -w -I OUTPUT 1 -j CAIRN_RUNNER
+    fi
+  done
 fi
+EOF_RULES
 chmod 700 /etc/cairn-runner-firewall/apply.sh
 chown root:root /etc/cairn-runner-firewall/apply.sh
 cat > /etc/systemd/system/cairn-runner-firewall.service <<'EOF_SERVICE'

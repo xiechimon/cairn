@@ -18,8 +18,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   let address;
   try {
     address = memoryAddress(readFileSync(`/proc/${pid}/maps`, 'utf8'));
-  } catch {
-    console.log('SKIPPED');
+  } catch (error) {
+    console.log(['EACCES', 'EPERM'].includes(error.code) ? 'BLOCKED' : 'SKIPPED');
     process.exit(0);
   }
   if (address === null) {

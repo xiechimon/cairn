@@ -28,7 +28,7 @@ All commands test base commit `05dbbf982328f077565f8f5c540eefc880b5c214` plus th
 | --- | --- | --- | --- | --- |
 | Review regressions fail on the old implementation | `node --test scripts/ops/secret-reach/*.test.mjs` and focused Node reruns | Scratch fixtures / stubs | red.log | Nonzero runs; original evidence retained and new failures appended |
 | Required missing paths fail; readable markers are detected without contents; HTTP anonymous/forged identities detect 2xx | `node --test scripts/ops/secret-reach/*.test.mjs` | Shell on scratch files, curl executable stub / no provider | green.log | Pass; real host HTTP and cross-user access pending |
-| Memory address selection excludes zero and unreadable mappings | Same Node command | Maps string fixture / no provider | green.log | Pass; real Linux mapped-memory read pending; inaccessible maps are SKIPPED |
+| Memory address selection excludes zero and unreadable mappings | Same Node command | Maps string fixture / no provider | green.log | Pass; real Linux mapped-memory read pending; maps permission rejection is BLOCKED; other unavailable maps are SKIPPED |
 | Listener config rejects unsafe socket paths and group values before listen | Same Node command | In-process / no provider | green.log | Pass; CLI rejects empty/nonnumeric GID; signal cleanup and real socket lifecycle pending |
 | Token writes use current-main SHA with force false and nonexistent PR merge; generic validation failures do not prove protection | Same Node command | GitHub fetch stub / stub provider | green.log | Pass; real broker token and branch protection response pending |
 | Setup validates paths before account changes, changes DB owner and group, generates both firewall backends and repeats safely | Same Node command | Scratch shell, identity/chown/firewall/systemd stubs / no provider | green.log | Pass; generated files and actual scratch modes inspected; no kernel enforcement or boot acceptance |
@@ -45,7 +45,7 @@ The backup test is in the separate `ops-backup-test` CI job, but was not in `scr
 
 ## Host acceptance still pending
 
-Use `docs/ops/secret-reach.md`. Before switching users, verify every supplied path exists as the owner, including every database member; omit the old key path after quarantine and use its real destination. Run owner-positive then runner-negative file, mapped-memory and HTTP canaries with all allowed logins passed explicitly, never sourced from server.env. Runner-side canary remains pending. Inspect root and owner connectivity, both IP families, nft/iptables runtime rules, rerun stability, service boot persistence and removal. Verify identities, sudoers, ACLs and DB ownership. Start broker outside the private home; run socket/client tests and SIGTERM/SIGINT cleanup on Linux, then the token probe as runner. Record exact branch-protection response and absent-PR refusal. Rerun real Claude with the revised directory deny file while checking network access. Missing executables, inaccessible maps and socket skips do not establish isolation.
+Use `docs/ops/secret-reach.md`. Before switching users, verify every supplied path exists as the owner, including every database member; omit the old key path after quarantine and use its real destination. Run owner-positive then runner-negative file, mapped-memory and HTTP canaries with all allowed logins passed explicitly, never sourced from server.env. Runner-side canary remains pending. Inspect root and owner connectivity, both IP families, nft/iptables runtime rules, rerun stability, service boot persistence and removal. Verify identities, sudoers, ACLs and DB ownership. Start broker outside the private home; run socket/client tests and SIGTERM/SIGINT cleanup on Linux, then the token probe as runner. Record exact branch-protection response and absent-PR refusal. Rerun real Claude with the revised directory deny file while checking network access. Missing executables, missing maps and socket skips do not establish isolation.
 
 ## Retro
 
@@ -85,3 +85,57 @@ The historical token scope run predates the socket client, current-main no-op PA
 - `probe2.sh` on the App key and secretbox.key: symlink, cp, dd, node, git diff --no-index all BLOCKED (`mac/mac-committed.txt`).
 - `probe3.sh` on machine.json, github-oauth.env, credentials.enc, config.json: the sandbox denies even `stat`, so all four show as MISSING inside the session; the same script outside the sandbox reads all four (`mac/probe3-off.txt`).
 - `gh api user` and `git ls-remote origin` still work inside the session.
+
+## Review round 2 failure modes (recorded before implementation)
+
+| Failure mode | Test or limit |
+| --- | --- |
+| Runner reaches its own Tailscale serve address on any TCP port | Setup fixture checks IPv4/IPv6 destination rules without port restriction; host kernel enforcement pending |
+| Firewall rejects established teardown packets | Both generated backends must match NEW only |
+| Missing rules or changed Tailscale addresses escape dispatch checks | Checker fixture removes each rule and changes address discovery; must fail naming missing rule |
+| Empty arrays abort Bash 3.2 HTTP-only canary | Empty paths, anonymous headers and empty login fixtures run with /bin/bash |
+| Multiple URLs overwrite or reject HTTPS | Curl fixture records every endpoint with anonymous and forged headers |
+| Permission-denied maps incorrectly skipped | Injected EACCES/EPERM memory fixture must report BLOCKED |
+| Root or negative broker GID accepted | Broker validation before socket bind |
+| Documentation overclaims token probes or Mac credentials | Documentation regression; real GitHub and Mac session acceptance remain pending |
+| Tailscale discovery unavailable or empty | Setup and checker must fail closed; host address changes require rerunning setup |
+
+No GitHub overlap lookup is possible under this run's explicit network constraint. Continue the existing ticket branch; no overlap absence claim is made.
+
+
+## Ticket wording correction for the dispatcher
+
+Protection permission acceptance means GET `/repos/xiechimon/cairn/branches/main/protection` plus DELETE protection on the absent branch `cairn-scope-probe-absent`, not PUT protection on main. The current-main-SHA no-op PATCH and absent PR merge are separate probes. Update the ticket wording with this distinction when GitHub access is available; the ticket itself was not edited here.
+
+## Review round 2 acceptance record
+
+Tested base: `70cc4dda0334c1e60491df24520c1cce74d62f4a` plus this uncommitted worktree diff; source identities are recorded in `round2-tested-source.sha256`. These are local-only artifacts, not delivered verification. No commit, push, PR, GitHub ticket edit, remote host access, build, full e2e, live app, daemon, LLM or real-provider run occurred. No third-party package API was introduced. Automated checks below are not an independent review or a security review.
+
+| Supported local claim | Command | Surface and provider mode | Artifact | Result and limits |
+| --- | --- | --- | --- | --- |
+| Old behavior fails the new regressions | `node --test scripts/ops/secret-reach/*.test.mjs` and focused Node runs | Scratch files, generated shell commands, injected maps errors and curl stubs; no provider | red.log | Nonzero red runs retained, including intermediate fixture errors; trailing whitespace normalized only |
+| Both backends emit self IPv4/IPv6 runner destination rejects without a port restriction and with NEW matching, alongside the loopback rule | `node --test scripts/ops/secret-reach/*.test.mjs` | Executed setup and generated apply script in scratch filesystem; nft, iptables, identity and systemd stubs | green.log | Emitted rule payloads recorded as diagnostics. No real kernel, established-connection or reboot claim |
+| Dispatcher check rejects every missing expected rule/hook/jump and changed address discovery | Same full Node command | Generated checker execution against mocked rule listings/command responses | green.log | Missing-rule diagnostics recorded; standalone wrapper also tested with present, absent and failing installed validator. Actual nft listing serialization and firewall ordering remain host acceptance |
+| Discovery failure or empty addresses abort setup before account mutation | Same full Node command | Scratch setup with failing/empty tailscale executable | green.log | Pass; actual host command availability unverified |
+| HTTP canary accepts repeated HTTP/HTTPS URLs, probes anonymous and forged identities, and re-reads both self address families | Same full Node command; `node --test scripts/ops/secret-reach/round2.test.mjs` | Curl/tailscale executable stubs under real `/bin/bash` 3.2.57 | green.log | Full suite: 36 tests, 32 pass, 4 socket skips, zero failures. Focused final rerun: 8 pass. Synthetic default forged login is only a control; host acceptance must pass every configured allowed login and actual serve hostname |
+| EACCES/EPERM maps refusal is BLOCKED; missing maps remain SKIPPED | Same Node commands | Executed memory helper with injected filesystem error at maps read | green.log | Pass; real cross-user maps/memory refusal unverified |
+| API and CLI reject root/negative GIDs before socket binding/key access | Same full Node command | In-process validation and spawned broker CLI; no provider | green.log | Pass; socket lifecycle and token exchange remain skipped because sandbox refuses binding |
+| Documentation names GET protection and DELETE on the absent branch, Mac full-token limit, and external read-only settings copy | Same Node commands | Documentation regression; no provider | green.log | Pass as documentation check only; ticket wording correction above awaits GitHub access |
+| Repository lint | `pnpm lint` | Static; no provider | round2-lint.log | Exit 0; existing unrelated informational diagnostic retained |
+| Repository typecheck | `pnpm typecheck` | TypeScript; no provider | round2-typecheck.log | Exit 0 |
+| Changed Vitest | `pnpm exec vitest run --changed` | Test selection; no provider | round2-vitest.log | Exit 0 with no tests selected; does not replace the Node suite |
+| Spec collection | `pnpm spec:parse` | Collection and integration tsc; no provider | round2-spec-parse.log | Exit 0, 1391 web cases collected and 65 integration test files parsed; no e2e execution |
+| Prepush plan regression | `node --test scripts/prepush.test.mjs` | Isolated CLI fixtures; no provider | round2-prepush-plan.log | 46 pass, zero failures; new secret tests are explicitly listed in the plan |
+| Shell syntax and repository gates | `bash -n scripts/ops/secret-reach/{canary,setup-runner-linux,check-rules}.sh`; English, comment and lessons ledger gates | Static; no provider | round2-shell.log, round2-english.log, round2-comments.log, round2-ledger.log | Exit 0; no global ledger rewrite |
+
+The exact existing CI secret-test run line is the full Node command above and was executed locally. No workflow step was edited. No fixture or screenshot is presented as live-app evidence; no screenshot was needed for this shell task. No stub result is presented as a real-provider result. Before a later delivery, the dispatcher must commit the artifacts on this delivery branch and add SHA-pinned raw evidence links to its PR; that delivery condition is intentionally unverified here.
+
+## Review round 2 host acceptance still pending
+
+On omarchy, inspect and run setup, then run `sudo bash scripts/ops/secret-reach/check-rules.sh` before every batch. Verify current `tailscale ip` addresses match the installed rules; rerun setup after address changes. Inspect actual nft or both iptables rule sets and rule ordering. Run runner-negative HTTP canaries against loopback, the actual HTTPS serve hostname and both discovered self addresses, with every allowed login supplied, without a token. Establish owner/root positive access separately. Confirm all-port destination rejection, established teardown traffic, repeat setup, boot persistence and removal with actual kernel observations. Missing tools, discovery failures, TLS/transport errors and synthetic identities alone cannot establish that authentication or the intended firewall boundary works.
+
+Run the Linux socket, broker token and cross-user file/memory checks described above. Real GitHub protection, absent-resource responses and ticket edits remain unverified. On Mac, copy settings outside the repository, make the copy read-only and protect its parent before launching a new session; recheck the real sandbox. The session's own `gh` token remains the user's full token, outside this boundary. No claim of Mac token confinement is made.
+
+## Review round 2 retro
+
+Applied `.claude/skills/retro-cairn/SKILL.md`. Four reviewed error classes now have executable regressions: self-address firewall coverage/checking, empty-array canary execution, maps-refusal classification and root broker groups. This round also corrected fixture source escaping/argument injection and an assertion that confused expanded runtime rules with source variables; the actual failed runs are retained. Five ticket-specific ledger entries document these safeguards at level 2. No unrelated lesson entries or baseline counters were rewritten.

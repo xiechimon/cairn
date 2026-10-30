@@ -3,18 +3,18 @@ set -uo pipefail
 umask 077
 paths=()
 pid=''
-server_url=''
+server_urls=()
 tailscale_users=''
 while [ $# -gt 0 ]; do
   case "$1" in
     --paths) shift; while [ $# -gt 0 ] && [[ "$1" != --* ]]; do paths+=("$1"); shift; done ;;
-    --server-url) [ $# -ge 2 ] || exit 2; server_url="$2"; shift 2 ;;
+    --server-url) [ $# -ge 2 ] || exit 2; server_urls+=("$2"); shift 2 ;;
     --tailscale-users) [ $# -ge 2 ] || exit 2; tailscale_users="$2"; shift 2 ;;
     --pid) [ $# -ge 2 ] && [[ "$2" =~ ^[1-9][0-9]*$ ]] || exit 2; pid="$2"; shift 2 ;;
     *) exit 2 ;;
   esac
 done
-[ ${#paths[@]} -gt 0 ] || [ -n "$pid" ] || [ -n "$server_url" ] || exit 2
+[ ${#paths[@]} -gt 0 ] || [ -n "$pid" ] || [ ${#server_urls[@]} -gt 0 ] || exit 2
 tmp=$(mktemp -d) || exit 2
 trap 'rm -rf "$tmp"' EXIT
 result=0
@@ -30,7 +30,7 @@ probe() {
     printf 'BLOCKED %s %s\n' "$channel" "$path"
   fi
 }
-for path in "${paths[@]}"; do
+for path in ${paths[@]+"${paths[@]}"}; do
   [[ "$path" = /* ]] || path="$PWD/$path"
   parent=$(dirname "$path")
   while [ ! -e "$parent" ] && [ "$parent" != / ]; do parent=$(dirname "$parent"); done
@@ -69,27 +69,39 @@ if [ -n "$pid" ]; then
     fi
   done
 fi
-if [ -n "$server_url" ]; then
-  [[ "$server_url" =~ ^http://(127\.0\.0\.1|localhost|\[::1\])(:[0-9]+)?/?$ ]] || exit 2
+if [ ${#server_urls[@]} -gt 0 ] && [ "$(uname -s)" = Linux ]; then
+  if addresses=$(tailscale ip 2>/dev/null) && [ -n "$addresses" ]; then
+    while IFS= read -r address; do
+      [[ "$address" =~ ^[0-9a-fA-F:.]+$ ]] || { echo 'SKIPPED http invalid-Tailscale-address'; exit 2; }
+      if [[ "$address" = *:* ]]; then server_urls+=("https://[$address]")
+      else server_urls+=("https://$address"); fi
+    done <<< "$addresses"
+  else
+    echo 'SKIPPED http Tailscale-address-discovery'
+  fi
+fi
+for server_url in ${server_urls[@]+"${server_urls[@]}"}; do
+  [[ "$server_url" =~ ^https?://([a-zA-Z0-9.-]+|\[[0-9a-fA-F:]+\])(:[0-9]+)?/?$ ]] || exit 2
   identities=(anonymous)
   IFS=',' read -r -a logins <<< "$tailscale_users"
-  identities+=("${logins[@]}")
+  identities+=(${logins[@]+"${logins[@]}"})
+  [ -n "$tailscale_users" ] || identities+=(secret-reach-probe)
   for login in "${identities[@]}"; do
     [ -n "$login" ] || continue
     headers=()
     [ "$login" = anonymous ] || headers=(-H "tailscale-user-login: $login")
     if ! command -v curl >/dev/null; then
-      printf 'SKIPPED http %s\n' "$login"
-    elif status=$(curl --noproxy '*' --max-time 10 -s -o /dev/null -w '%{http_code}' "${headers[@]}" "${server_url%/}/api/teams"); then
+      printf 'SKIPPED http %s %s\n' "$login" "$server_url"
+    elif status=$(curl --insecure --noproxy '*' --max-time 10 -s -o /dev/null -w '%{http_code}' ${headers[@]+"${headers[@]}"} "${server_url%/}/api/teams"); then
       if [[ "$status" = 2[0-9][0-9] ]]; then
-        printf 'READ http %s %s\n' "$login" "$status"
+        printf 'READ http %s %s %s\n' "$login" "$status" "$server_url"
         result=1
       else
-        printf 'BLOCKED http %s %s\n' "$login" "$status"
+        printf 'BLOCKED http %s %s %s\n' "$login" "$status" "$server_url"
       fi
     else
-      printf 'BLOCKED http %s transport\n' "$login"
+      printf 'BLOCKED http %s transport %s\n' "$login" "$server_url"
     fi
   done
-fi
+done
 exit "$result"
