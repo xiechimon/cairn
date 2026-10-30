@@ -30,19 +30,6 @@ export function parseCapabilities(text) {
   });
 }
 
-export function daysBetween(earlier, later) {
-  const start = Date.parse(`${earlier}T00:00:00Z`);
-  const end = Date.parse(`${later}T00:00:00Z`);
-  if (!Number.isFinite(start) || !Number.isFinite(end)) return 0;
-  return Math.round((end - start) / 86_400_000);
-}
-
-export function staleScoredFlows(rows, today, maxAgeDays = 30) {
-  return rows.filter(
-    (row) => row.status === 'scored' && row.date && daysBetween(row.date, today) > maxAgeDays,
-  );
-}
-
 export function loadEvalCoverage({ capabilities, hillclimbDir, dateOf }) {
   const onDisk = existsSync(hillclimbDir)
     ? readdirSync(hillclimbDir, { withFileTypes: true })
@@ -139,8 +126,6 @@ export function renderEvalCoverage(rows, repo) {
     'Status is `scored`, `built-not-run`, `none`, or `tests only, no eval needed`.',
     'A directory under `.claude/hillclimb/` that contains `cases.json` and is not named',
     'by a capability makes the generator fail.',
-    'The feature-map staleness gate flags a scored flow whose date is more than 30 days',
-    'before today.',
     '',
     '| Capability | Eval flow | Cases | Latest score | Date | Model | Status |',
     '|---|---|---|---|---|---|---|',

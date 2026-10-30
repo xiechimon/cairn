@@ -18,6 +18,17 @@ class EvidenceGateTests(unittest.TestCase):
             result = gate.main()
         return result, output.getvalue(), probe
 
+    def test_body_without_links_passes(self):
+        result, output, probe = self.verdict('Checks passed locally.')
+        self.assertEqual(result, 0, output)
+        self.assertIn('scanned 0 image link(s)', output)
+        probe.assert_not_called()
+
+    def test_reachable_embedded_external_image_passes(self):
+        result, output, probe = self.verdict('![proof](https://example.org/proof.png)')
+        self.assertEqual(result, 0, output)
+        probe.assert_called_once_with('https://example.org/proof.png')
+
     def test_fixture_embeds_fail_for_the_fixture_reason(self):
         for path in ['view.png', 'view']:
             for query in ['scenario=board', 'scenario=', 'theme=dark&scenario=board', 'theme=dark&amp;scenario=board', 'theme=dark&#38;scenario=board']:
@@ -40,8 +51,7 @@ class EvidenceGateTests(unittest.TestCase):
                 self.assertEqual(links[0]['form'], form)
                 self.assertTrue(links[0]['embedded'])
                 result, output, probe = self.verdict(body)
-                self.assertEqual(result, 1, output)
-                self.assertIn('FAIL archive: missing repository context', output)
+                self.assertEqual(result, 0, output)
                 self.assertNotIn('FAIL not-embedded:', output)
                 probe.assert_called_once_with(url)
 

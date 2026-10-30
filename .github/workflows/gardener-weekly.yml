@@ -6,13 +6,11 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  actions: read
-  pull-requests: write
+  contents: read
   issues: write
 
 concurrency:
-  group: lessons-weekly
+  group: gardener-weekly
   cancel-in-progress: false
 
 jobs:
@@ -27,41 +25,6 @@ jobs:
         run: |
           node scripts/gardener-weekly.mjs --drift --out gardener-summary
           cat gardener-summary/weekly-*.md >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Collect safeguard interception artifacts
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          mkdir -p "$RUNNER_TEMP/gate-reds"
-          gh api --paginate 'repos/${{ github.repository }}/actions/artifacts?per_page=100' --jq '.artifacts[] | select(.expired == false and (.name | startswith("gate-reds-"))) | [.workflow_run.id, .name] | @tsv' > "$RUNNER_TEMP/gate-artifacts.tsv"
-          while IFS=$'\t' read -r run name; do
-            gh run download "$run" --name "$name" --dir "$RUNNER_TEMP/gate-reds/$name"
-          done < "$RUNNER_TEMP/gate-artifacts.tsv"
-
-      - name: Lessons ledger weekly summary (#1534)
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          node scripts/lessons-weekly.mjs --out gardener-summary --logs "$RUNNER_TEMP/gate-reds"
-          cat gardener-summary/lessons-weekly-*.md >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Publish collected ledger counters
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add docs/lessons/
-          if ! git diff --cached --quiet; then
-            branch=lessons-weekly-${{ github.run_id }}-${{ github.run_attempt }}
-            git switch -c "$branch"
-            git commit -m 'chore(1534): publish weekly safeguard counters'
-            git push origin "HEAD:$branch"
-            printf '%s\n' '## What' '' 'Publish the collected safeguard events and projected lesson counters.' '' '## Verified' '' > "$RUNNER_TEMP/lessons-pr.md"
-            cat gardener-summary/lessons-weekly-*.md >> "$RUNNER_TEMP/lessons-pr.md"
-            printf '%s\n' '' '## Upstream' '' 'Generated data from the existing lessons ledger reducer; no new mechanism.' '' '## Risk' '' 'Ledger data only. Review category counts before merging.' '' '## Acceptance' '' '- [x] no task surface: generated ledger data only' '' '## Issues' '' 'Weekly collection for #1534.' >> "$RUNNER_TEMP/lessons-pr.md"
-            gh pr create --repo '${{ github.repository }}' --head "${{ github.repository_owner }}:$branch" --title 'chore(1534): publish weekly safeguard counters' --body-file "$RUNNER_TEMP/lessons-pr.md"
-          fi
 
       - name: Upload gardener summary (#1617)
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

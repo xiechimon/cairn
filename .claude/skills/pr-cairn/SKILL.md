@@ -45,16 +45,9 @@ What this PR does and why, plus the ticket it answers. Prose. Say what
 changed and what it replaces or fixes; name files and symbols instead of
 describing them.
 
-Screenshots belong here when the change is visible in the running app: commit
-them under `docs/verify/<ticket>/` and embed them with a SHA-pinned raw URL
-(the repo is public, raw is anonymously readable):
-
-```markdown
-![label](https://raw.githubusercontent.com/xiechimon/cairn/<sha>/docs/verify/<ticket>/shot.png)
-```
-
-The SHA must already be on the remote, so commit and push the branch first,
-then write the body.
+Screenshots belong here when the change is visible in the running app. Embed
+reachable image URLs with `![label](url)`. Committing evidence under
+`docs/verify/<ticket>/` is optional.
 
 ### `## Verified`
 
@@ -116,7 +109,7 @@ not carry the closing keyword for the parent ticket.
   errors; use `gh api -X PATCH repos/xiechimon/cairn/pulls/<n> -F
   body=@/tmp/pr.md`, then re-read with `gh pr view <n> --json body` and
   compare.
-- Pin raw links to a short SHA (8 characters). From a cloud session the egress proxy wraps URLs that carry a full 40-character SHA in backticks, which breaks the embed (#1771). Read the stored body back after creating or editing the PR.
+- Read the stored body back after creating or editing the PR to check that image links render.
 - After opening a PR and after each push, read `mergeable_state` once
   (`gh api repos/xiechimon/cairn/pulls/<n> -q .mergeable_state`). A `dirty`
   PR runs no `pull_request` workflows, so no CI event ever arrives to say

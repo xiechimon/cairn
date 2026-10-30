@@ -2,10 +2,7 @@
 
 <!-- What this PR does and why, plus the ticket it answers. Prose: name the
 files and symbols that changed and what they replace or fix. Screenshots
-belong here when the change is visible in the running app; commit them under
-docs/verify/<ticket>/ and embed them as ![label](raw-url) with a SHA-pinned
-raw URL of the form https://raw.githubusercontent.com/<owner>/<repo>/<sha>/<path>
-(github.com/.../raw/ redirects and fails the reachability check). -->
+belong here when the change is visible in the running app; embed reachable image URLs as ![label](url). -->
 
 ## Verified
 
