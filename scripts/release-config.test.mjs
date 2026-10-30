@@ -4,7 +4,10 @@ import { resolve } from 'node:path';
 import { test } from 'node:test';
 
 const root = resolve(import.meta.dirname, '..');
-const workflow = readFileSync(resolve(root, '.github/workflows/release.yml'), 'utf8');
+const workflow = readFileSync(resolve(root, '.github/workflows/release.yml'), 'utf8').replace(
+  /\r\n/g,
+  '\n',
+);
 
 export function workspacePackages(rootDir = root) {
   const yaml = readFileSync(resolve(rootDir, 'pnpm-workspace.yaml'), 'utf8');
@@ -52,161 +55,6 @@ test('the changeset config ignores exactly the private workspace packages and ke
   }
 });
 
-function jobConfig(name) {
-  const job = workflow.match(
-    new RegExp(`^ {2}${name}:\\n[\\s\\S]*?(?=^ {2}\\S|(?![\\s\\S]))`, 'm'),
-  )?.[0];
-  assert.ok(job, `the ${name} job must exist`);
-  return job;
-}
-
-function jobSteps(name) {
-  return jobConfig(name)
-    .split(/^ {6}- (?=[a-z][a-z-]*:)/m)
-    .slice(1);
-}
-
-test('the release workflow publishes through OIDC without a token or a bot pull request', () => {
-  for (const forbidden of ['changesets/action', 'NPM_TOKEN', 'NODE_AUTH_TOKEN', 'registry-url']) {
-    assert.ok(!workflow.includes(forbidden), `the release workflow must not contain ${forbidden}`);
-  }
-  assert.doesNotMatch(workflow, /\bNPM_CONFIG_PROVENANCE\b/);
-});
-
-test('every release action pins a full commit SHA with a version note', () => {
-  for (const [line] of workflow.matchAll(/^.*\buses:.*$/gm)) {
-    assert.match(line, /^ +(?:- )?uses: [^@\s]+@[a-f0-9]{40} # v\d+\.\d+\.\d+$/);
-  }
-});
-
-test('packing inherits read permissions and publishing alone can request an OIDC token', () => {
-  assert.match(workflow, /^permissions:\n {2}contents: read$/m);
-  const pack = jobConfig('pack');
-  assert.doesNotMatch(pack, /id-token|^ {4}permissions:/m);
-  assert.match(pack, /^ {4}if: github\.event_name == 'push'$/m);
-  assert.match(pack, /^ {4}needs: config$/m);
-  const publish = jobConfig('publish');
-  assert.match(publish, /^ {4}permissions:\n(?: {6}.+\n)*? {6}id-token: write$/m);
-  assert.match(publish, /^ {4}permissions:\n(?: {6}.+\n)*? {6}contents: write$/m);
-  assert.match(publish, /^ {4}needs: pack$/m);
-  assert.match(publish, /^ {4}if: needs\.pack\.outputs\.count != '0'$/m);
-});
-
-test('the publish job sets up Node without restoring a shared dependency cache', () => {
-  const setupNode = jobSteps('publish').find((step) => step.includes('uses: actions/setup-node@'));
-  assert.ok(setupNode, 'the publish job must set up Node');
-  assert.doesNotMatch(setupNode, /^\s*cache:/m);
-});
-
-test('the publish job installs only root dependencies without scripts and never builds or publishes unpacked packages', () => {
-  const steps = jobSteps('publish');
-  const install = steps.find((step) => /\bpnpm install\b/.test(step));
-  assert.ok(install, 'the publish job must install dependencies');
-  assert.match(install, /\bpnpm install --frozen-lockfile --ignore-scripts\b/);
-  assert.match(install, /--filter \.(?=\s|$)/);
-  for (const step of steps) {
-    assert.doesNotMatch(step, /\bpnpm (?:run )?release:publish\b/);
-    assert.doesNotMatch(step, /\bpnpm (?:run )?build\b/);
-    for (const command of step.matchAll(/\bchangeset publish([^\n]*)/g)) {
-      assert.match(command[1], /--from-pack-dir release-pack\b/);
-    }
-  }
-});
-
-test('the pack job packs tarballs before uploading the release artifact', () => {
-  const steps = jobSteps('pack');
-  const pack = steps.findIndex((step) => /\bchangeset pack --out-dir release-pack\b/.test(step));
-  const upload = steps.findIndex((step) => step.includes('uses: actions/upload-artifact@'));
-  assert.ok(pack >= 0, 'the pack job must pack unpublished versions');
-  assert.ok(upload > pack, 'the pack job must upload the artifact after packing');
-  assert.match(
-    steps[upload],
-    /actions\/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a\b/,
-  );
-  assert.match(steps[upload], /^ {10}name: release-pack$/m);
-  assert.match(steps[upload], /^ {10}path: release-pack$/m);
-  assert.match(steps[upload], /^ {8}if: steps\.plan\.outputs\.count != '0'$/m);
-  const plan = steps.findIndex((step) => /^ {8}id: plan$/m.test(step));
-  assert.ok(plan > pack && plan < upload, 'the pack job must count the plan before uploading');
-  assert.match(steps[plan], /release-pack\/publish-plan\.json/);
-  assert.match(steps[plan], /GITHUB_OUTPUT/);
-  assert.match(jobConfig('pack'), /^ {6}count: \$\{\{ steps\.plan\.outputs\.count \}\}$/m);
-});
-
-test('the publish job downloads the packed artifact before publishing', () => {
-  const steps = jobSteps('publish');
-  const download = steps.findIndex((step) => step.includes('uses: actions/download-artifact@'));
-  const publish = steps.findIndex((step) =>
-    /\bchangeset publish --from-pack-dir release-pack\b/.test(step),
-  );
-  assert.ok(download >= 0, 'the publish job must download the release artifact');
-  assert.ok(publish > download, 'the publish job must download tarballs before publishing');
-  assert.match(
-    steps[download],
-    /actions\/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333\b/,
-  );
-  assert.match(steps[download], /^ {10}name: release-pack$/m);
-  assert.match(steps[download], /^ {10}path: release-pack$/m);
-});
-
-test('pending changesets warn without controlling release steps', () => {
-  const steps = jobSteps('pack');
-  const detection = steps.find((step) => step.includes('.changeset/*.md'));
-  assert.ok(detection, 'a step must detect pending changesets');
-  assert.match(
-    detection,
-    /::warning::Pending changesets wait for a pull request that runs pnpm release:version: /,
-  );
-  assert.doesNotMatch(detection, /^ {8}id:|GITHUB_OUTPUT/m);
-  for (const step of [...steps, ...jobSteps('publish')]) {
-    assert.doesNotMatch(step, /^ {8}if: .*pending.*$/m);
-  }
-});
-
-test('the publish job configures a tagger before publishing', () => {
-  const steps = jobSteps('publish');
-  const identity = steps.findIndex(
-    (step) => /git config user\.name\s/.test(step) && /git config user\.email\s/.test(step),
-  );
-  const publish = steps.findIndex((step) =>
-    /\bchangeset publish --from-pack-dir release-pack\b/.test(step),
-  );
-  assert.ok(identity >= 0, 'the publish job must set a git tagger name and email');
-  assert.ok(publish > identity, 'the publish job must configure a tagger before publishing');
-});
-
-test('the publish step always publishes packed tarballs with explicit pnpm provenance', () => {
-  const publish = jobSteps('publish').find((step) =>
-    /\bchangeset publish --from-pack-dir release-pack\b/.test(step),
-  );
-  assert.ok(publish, 'the publish job must publish packed tarballs');
-  assert.match(publish, /^ {8}id: publish$/m);
-  assert.doesNotMatch(publish, /^ {8}if:/m);
-  assert.match(publish, /^ {8}env:\n(?: {10}.+\n)*? {10}PNPM_CONFIG_PROVENANCE: 'true'$/m);
-  assert.match(publish, /^ {8}env:\n(?: {10}.+\n)*? {10}PNPM_CONFIG_IGNORE_SCRIPTS: 'true'$/m);
-});
-
-test('the publish job pushes tags after an attempted publish even if publishing fails', () => {
-  const steps = jobSteps('publish');
-  const publish = steps.findIndex((step) =>
-    /\bchangeset publish --from-pack-dir release-pack\b/.test(step),
-  );
-  const push = steps.findIndex((step) => /^ {8}run: git push origin --tags$/m.test(step));
-  assert.ok(publish >= 0, 'the publish job must publish packed tarballs');
-  assert.ok(push > publish, 'the publish job must push tags after publishing');
-  assert.equal(
-    steps[push].match(/^ {8}if: (.+)$/m)?.[1],
-    `\${{ !cancelled() && steps.publish.outcome != 'skipped' }}`,
-    'the tag push must require an attempted publish and run unless cancelled',
-  );
-});
-
-test('pull requests validate release configuration for every workspace manifest', () => {
-  const pullRequest = workflow.match(/^ {2}pull_request:\n[\s\S]*?(?=^\S)/m)?.[0];
-  assert.ok(pullRequest, 'the release workflow must handle pull requests');
-  assert.match(pullRequest, /^ {4}paths:\n(?: {6}.+\n)*? {6}- '\*\*\/package\.json'\s*$/m);
-});
-
 test('every publishable package names this repository for provenance', () => {
   for (const pkg of workspacePackages().filter((pkg) => pkg.private !== true)) {
     assert.equal(
@@ -227,3 +75,268 @@ test('every publishable package names this repository for provenance', () => {
     );
   }
 });
+
+const expectedReleaseWorkflow = `name: release
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - '.changeset/**'
+      - '.github/workflows/release.yml'
+      - '**/package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'scripts/release-config.test.mjs'
+
+concurrency:
+  group: release-\${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Release config invariant
+        run: node --test scripts/release-config.test.mjs
+
+  pack:
+    if: github.event_name == 'push'
+    needs: config
+    runs-on: ubuntu-latest
+    outputs:
+      count: \${{ steps.plan.outputs.count }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Detect pending changesets
+        run: |
+          shopt -s nullglob
+          pending=()
+          for file in .changeset/*.md; do
+            if [[ "$file" != ".changeset/README.md" ]]; then
+              pending+=("$file")
+            fi
+          done
+          if (( \${#pending[@]} > 0 )); then
+            echo "::warning::Pending changesets wait for a pull request that runs pnpm release:version: \${pending[*]}"
+          fi
+      - name: Pack unpublished versions
+        run: pnpm exec changeset pack --out-dir release-pack
+      - name: Count packages to publish
+        id: plan
+        run: |
+          node -e 'const fs = require("node:fs"); const { plan } = JSON.parse(fs.readFileSync("release-pack/publish-plan.json", "utf8")); const count = plan.flat().filter(entry => entry.kind === "publish").length; fs.appendFileSync(process.env.GITHUB_OUTPUT, \`count=\${count}\\n\`);'
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: steps.plan.outputs.count != '0'
+        with:
+          name: release-pack
+          path: release-pack
+
+  publish:
+    needs: pack
+    if: needs.pack.outputs.count != '0'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+      - name: Install dependencies without scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts --filter .
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-pack
+          path: release-pack
+      - name: Configure tag identity
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+      - name: Publish to npm
+        id: publish
+        env:
+          PNPM_CONFIG_PROVENANCE: 'true'
+          PNPM_CONFIG_IGNORE_SCRIPTS: 'true'
+        run: pnpm exec changeset publish --from-pack-dir release-pack
+      - name: Push release tags
+        if: \${{ !cancelled() && steps.publish.outcome != 'skipped' }}
+        run: git push origin --tags
+`;
+
+function releaseWorkflowViolations(text) {
+  return text.replace(/\r\n/g, '\n') === expectedReleaseWorkflow
+    ? []
+    : ['release workflow must match the pinned text'];
+}
+
+export const workflowFixtures = [
+  {
+    name: '1: top-level OIDC permission',
+    before: 'permissions:\n  contents: read',
+    after: 'permissions:\n  contents: read\n  id-token: write',
+  },
+  {
+    name: '2: rebuild in publish',
+    before: '      - name: Publish to npm',
+    after: '      - run: pnpm rebuild\n      - name: Publish to npm',
+  },
+  {
+    name: '3: recursive build in publish',
+    before: '      - name: Publish to npm',
+    after: '      - run: pnpm -r build\n      - name: Publish to npm',
+  },
+  {
+    name: '4: renamed plan output',
+    before: `count=\${count}`,
+    after: `total=\${count}`,
+  },
+  {
+    name: '5: filtered build in publish',
+    before: '      - name: Publish to npm',
+    after: '      - run: pnpm --filter @xiechimon/cairn build\n      - name: Publish to npm',
+  },
+  {
+    name: '6: pack in publish',
+    before: '      - name: Publish to npm',
+    after:
+      '      - run: pnpm exec changeset pack --out-dir release-pack\n      - name: Publish to npm',
+  },
+  {
+    name: '7: cache action in publish',
+    before: '      - name: Publish to npm',
+    after: '      - uses: actions/cache@v4\n      - name: Publish to npm',
+  },
+  {
+    name: '8: comment before an appended publish command',
+    before: '        run: git push origin --tags\n',
+    after: '        run: git push origin --tags\n  # x\n      - run: curl x\n',
+  },
+  {
+    name: '9: flow-style build step',
+    before: '      - name: Publish to npm',
+    after: '      - {run: pnpm -r build}\n      - name: Publish to npm',
+  },
+  {
+    name: '10: extra spaces before a run key',
+    before: '      - name: Publish to npm',
+    after: '      -   run: pnpm rebuild\n      - name: Publish to npm',
+  },
+  {
+    name: '11: quoted run key',
+    before: '      - name: Publish to npm',
+    after: '      - "run": pnpm rebuild\n      - name: Publish to npm',
+  },
+  {
+    name: '12: space before a uses colon',
+    before: '      - name: Publish to npm',
+    after: '      - uses : actions/cache@v4\n      - name: Publish to npm',
+  },
+  {
+    name: '13: unquoted install continuation',
+    before: '        run: pnpm install --frozen-lockfile --ignore-scripts --filter .\n',
+    after:
+      '        run: pnpm install --frozen-lockfile --ignore-scripts --filter .\n          ; pnpm -r build\n',
+  },
+  {
+    name: '14: fourth job with OIDC permission',
+    before: '  publish:\n',
+    after: '  evil:\n    permissions:\n      id-token: write\n  publish:\n',
+  },
+  {
+    name: '15: publish step shell',
+    before: '        id: publish\n',
+    after: '        id: publish\n        shell: node {0}\n',
+  },
+  {
+    name: '16: publish step environment injection',
+    before: "          PNPM_CONFIG_PROVENANCE: 'true'\n",
+    after: "          PNPM_CONFIG_PROVENANCE: 'true'\n          NODE_OPTIONS: --require ./x.js\n",
+  },
+  {
+    name: '17: publish checkout ref input',
+    before: '          fetch-depth: 0\n',
+    after: '          fetch-depth: 0\n          ref: evil\n',
+  },
+  {
+    name: '18: different publish checkout SHA',
+    before:
+      '      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0\n        with:\n          fetch-depth: 0',
+    after:
+      '      - uses: actions/checkout@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa # v5.1.0\n        with:\n          fetch-depth: 0',
+  },
+  {
+    name: '19: publish job container',
+    before: '  publish:\n',
+    after: '  publish:\n    container: evil/image\n',
+  },
+  {
+    name: '20: top-level OIDC permission after a comment',
+    before: 'permissions:\n  contents: read\n',
+    after: 'permissions:\n  contents: read\n# scope\n  id-token: write\n',
+  },
+  {
+    name: '21: top-level env between pack and publish',
+    before: '  publish:\n',
+    after: 'env:\n  NODE_OPTIONS: --require ./x.js\n  publish:\n',
+  },
+  {
+    name: '22: escaped pack OIDC permission keys',
+    before: '    needs: config\n',
+    after: '    needs: config\n    "\\x70ermissions":\n      "id-\\x74oken": write\n',
+  },
+];
+
+test('the release workflow matches the pinned text', () => {
+  const violations = releaseWorkflowViolations(workflow);
+  if (violations.length > 0) assert.equal(workflow, expectedReleaseWorkflow);
+  assert.deepEqual(violations, []);
+});
+
+test('the release workflow pin accepts CRLF line endings', () => {
+  assert.deepEqual(releaseWorkflowViolations(workflow.replace(/\n/g, '\r\n')), []);
+});
+
+test('the pinned workflow grants an OIDC token only after the publish job begins', () => {
+  assert.equal(expectedReleaseWorkflow.split('id-token: write').length - 1, 1);
+  assert.ok(
+    expectedReleaseWorkflow.indexOf('id-token: write') >
+      expectedReleaseWorkflow.indexOf('  publish:'),
+  );
+});
+
+for (const { name, before, after } of workflowFixtures) {
+  test(`the workflow pin rejects fixture ${name}`, () => {
+    assert.equal(
+      workflow.split(before).length - 1,
+      1,
+      `fixture replacement must match once: ${before}`,
+    );
+    assert.deepEqual(releaseWorkflowViolations(workflow.replace(before, () => after)), [
+      'release workflow must match the pinned text',
+    ]);
+  });
+}
