@@ -2283,7 +2283,7 @@ export function completeStep(
   const reserved = afterStopPhaseByBuild.get(buildRow.id);
   const staleBuild = todoRow.latestBuildId !== null && todoRow.latestBuildId !== buildRow.id;
   if (
-    todoRow.archivedAt !== null ||
+    (todoRow.archivedAt !== null && stepRow.kind !== 'merge') ||
     reserved !== undefined ||
     staleBuild ||
     hasLeftExecution(todoRow.phase)

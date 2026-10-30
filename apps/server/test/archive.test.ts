@@ -662,6 +662,10 @@ test.each(['merged', 'closed'] as const)('archived review reconciles a %s PR', a
       state: 'merged',
       landedAt: now,
     });
+  expect(await action(s, 'unarchive')).toMatchObject({
+    phase: state === 'merged' ? 'done' : 'failed',
+    archivedAt: null,
+  });
 });
 
 test('a failure handler captured before archive still honors the persisted stop after Undo', async () => {
@@ -702,3 +706,18 @@ test('archived review PR conflicts do not enqueue another build', async () => {
   expect(s.db.select().from(todo).where(eq(todo.id, 'todo-archive')).get()?.phase).toBe('review');
   expect(s.db.select().from(step).all()).toHaveLength(1);
 });
+
+test.each(['plan', 'build', 'review', 'verify'] as const)(
+  'an ordinary archived %s completion does not advance task phase',
+  async (kind) => {
+    const { s, deps } = world('review');
+    s.db.update(todo).set({ archivedAt: 123 }).where(eq(todo.id, 'todo-archive')).run();
+    s.db.update(step).set({ kind }).where(eq(step.id, 'step-archive')).run();
+    completeStep(deps, 'step-archive', { hasChanges: true });
+    expect(s.db.select().from(todo).where(eq(todo.id, 'todo-archive')).get()).toMatchObject({
+      phase: 'review',
+      archivedAt: 123,
+    });
+    expect(await action(s, 'unarchive')).toMatchObject({ phase: 'review', archivedAt: null });
+  },
+);
