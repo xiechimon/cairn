@@ -13,6 +13,7 @@ import type {
   WorktreeOps,
 } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
+import { createClaudeCodeBackend } from '../src/backend/claude-code.js';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
 import type { DaemonLogger } from '../src/log.js';
@@ -41,7 +42,11 @@ function captureLogger(): { logger: DaemonLogger; lines: string[] } {
   return { logger, lines };
 }
 
-function claimedStep(opts: { repoBound: boolean; continueSession?: string }): ClaimedStep {
+function claimedStep(opts: {
+  repoBound: boolean;
+  continueSession?: string;
+  provider?: string;
+}): ClaimedStep {
   return {
     step: { id: 's1', buildId: 'conv-1', kind: 'build', machineId: 'm1', createdAt: 1 },
     conversationId: 'conv-1',
@@ -56,7 +61,7 @@ function claimedStep(opts: { repoBound: boolean; continueSession?: string }): Cl
       id: 'a1',
       displayName: 'stub-builder',
       description: '负责构建',
-      provider: null,
+      provider: opts.provider ?? null,
       modelId: 'stub-model',
       thinkingLevel: null,
     },
@@ -262,6 +267,78 @@ async function run(opts: {
 }
 
 describe('brief wiring: write inventory and channel clearing', () => {
+  test.each(['AGENTS.md', 'CLAUDE.md'] as const)(
+    'claude-code loads repository guidance once when only %s exists',
+    async (file) => {
+      const sentinel = 'repository-guidance-sentinel';
+      let atOpen = '';
+      const { backend, seen } = stubBackend({
+        onSessionStart: (cwd) => {
+          atOpen = readFileSync(join(cwd, 'CLAUDE.md'), 'utf8');
+        },
+      });
+      const claude = createClaudeCodeBackend({});
+      const claimed = claimedStep({ repoBound: false, provider: 'claude-code' });
+      const { cwd, client } = await run({
+        claimed,
+        backend: { ...backend, capabilities: claude.capabilities, brief: claude.brief },
+        seed: (cwd) => writeFileSync(join(cwd, file), `${sentinel}\n`),
+      });
+      expect(client.doneBodies[0]?.body.status).toBe('success');
+      expect(atOpen.split(sentinel)).toHaveLength(2);
+      expect(seen[0]?.systemPrompt).toBeUndefined();
+      expect(readFileSync(join(cwd, file), 'utf8')).toBe(`${sentinel}\n`);
+      if (file === 'AGENTS.md') expect(existsSync(join(cwd, 'CLAUDE.md'))).toBe(false);
+    },
+  );
+
+  test('claude-code prefers CLAUDE.md without duplicating AGENTS.md guidance', async () => {
+    const sentinel = 'shared-repository-guidance-sentinel';
+    const claudeText = `${sentinel}\nclaude-specific-guidance\n`;
+    const agentsText = `${sentinel}\nagents-specific-guidance\n`;
+    let atOpen = '';
+    const { backend } = stubBackend({
+      onSessionStart: (cwd) => {
+        atOpen = readFileSync(join(cwd, 'CLAUDE.md'), 'utf8');
+      },
+    });
+    const claude = createClaudeCodeBackend({});
+    const claimed = claimedStep({ repoBound: false, provider: 'claude-code' });
+    const { cwd, client } = await run({
+      claimed,
+      backend: { ...backend, capabilities: claude.capabilities, brief: claude.brief },
+      seed: (cwd) => {
+        writeFileSync(join(cwd, 'CLAUDE.md'), claudeText);
+        writeFileSync(join(cwd, 'AGENTS.md'), agentsText);
+      },
+    });
+    expect(client.doneBodies[0]?.body.status).toBe('success');
+    expect(atOpen.split(sentinel)).toHaveLength(2);
+    expect(atOpen).toContain('claude-specific-guidance');
+    expect(atOpen).not.toContain('agents-specific-guidance');
+    expect(readFileSync(join(cwd, 'CLAUDE.md'), 'utf8')).toBe(claudeText);
+    expect(readFileSync(join(cwd, 'AGENTS.md'), 'utf8')).toBe(agentsText);
+  });
+
+  test('pi keeps repository guidance when only CLAUDE.md exists', async () => {
+    const sentinel = 'pi-claude-fallback-sentinel';
+    let atOpen = '';
+    const { backend } = stubBackend({
+      onSessionStart: (cwd) => {
+        atOpen = readFileSync(join(cwd, 'CLAUDE.md'), 'utf8');
+        expect(existsSync(join(cwd, 'AGENTS.md'))).toBe(false);
+      },
+    });
+    const { cwd, client } = await run({
+      claimed: claimedStep({ repoBound: false }),
+      backend,
+      seed: (cwd) => writeFileSync(join(cwd, 'CLAUDE.md'), `${sentinel}\n`),
+    });
+    expect(client.doneBodies[0]?.body.status).toBe('success');
+    expect(atOpen.split(sentinel)).toHaveLength(2);
+    expect(readFileSync(join(cwd, 'CLAUDE.md'), 'utf8')).toBe(`${sentinel}\n`);
+  });
+
   test('file already on disk at createSession, content = systemPrompt body + backend contributions (failure mode 2)', async () => {
     let atOpen: string | null = null;
     const { backend, seen } = stubBackend({

@@ -194,6 +194,28 @@ describe('reconcileBriefLeftovers: crash-leftover reconciliation', () => {
 });
 
 describe('end-to-end: full write → erase cycle', () => {
+  test('claude-code keeps AGENTS.md guidance across repeated writes without stale runtime content', () => {
+    const cwd = freshDir();
+    const userText = 'repository-guidance-sentinel\n';
+    writeFileSync(join(cwd, 'AGENTS.md'), `${userText}\n\n${blockOf('stale-pi-brief')}`);
+    writeBrief({ cwd, backendId: 'claude-code', content: 'first-brief', caseInsensitiveFs: CI });
+    const h = writeBrief({
+      cwd,
+      backendId: 'claude-code',
+      content: 'second-brief',
+      caseInsensitiveFs: CI,
+    });
+    const text = readFileSync(h.path, 'utf8');
+    expect(text.split('repository-guidance-sentinel')).toHaveLength(2);
+    expect(text).toContain('second-brief');
+    expect(text).not.toContain('first-brief');
+    expect(text).not.toContain('stale-pi-brief');
+    expect(text.split(BRIEF_MARKER_BEGIN)).toHaveLength(2);
+    cleanupBriefFile(h.path);
+    expect(existsSync(join(cwd, 'CLAUDE.md'))).toBe(false);
+    expect(readFileSync(join(cwd, 'AGENTS.md'), 'utf8')).toBe(userText);
+  });
+
   test('pi in a repo with CLAUDE.md: writes into CLAUDE.md, byte-identical after the cycle', () => {
     const cwd = freshDir();
     const path = join(cwd, 'CLAUDE.md');
