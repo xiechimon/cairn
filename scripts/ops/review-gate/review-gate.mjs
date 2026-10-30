@@ -1,21 +1,32 @@
 import { execFileSync, spawn } from 'node:child_process';
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { loadPolicy } from './owner-routing.mjs';
 
 const HOME = process.env.HOME;
-const REPO = process.env.REVIEW_GATE_REPO ?? 'xiechimon/cairn';
-const MAIN = process.env.REVIEW_GATE_MAIN ?? `${HOME}/lanes/cairn`;
-const BOT = process.env.REVIEW_GATE_BOT ?? `${HOME}/.cairn/tools/app-token/as-bot.sh`;
-const STATE = process.env.REVIEW_GATE_STATE ?? `${HOME}/.local/state/review-gate`;
+const REPO = 'xiechimon/cairn';
+const MAIN = `${HOME}/lanes/cairn`;
+const BOT = `${HOME}/.cairn/tools/app-token/as-bot.sh`;
+const STATE = `${HOME}/.local/state/review-gate`;
 const EXTRA_PROTECTED = [/^docs\/spec\//, /^integration\/eval\//, /merge-gate/, /baseline/];
-const MERGE = process.env.REVIEW_GATE_MERGE ?? `${HOME}/.cairn/tools/merge-pr.sh`;
-const PROMPT = process.env.REVIEW_GATE_PROMPT ?? `${HOME}/.cairn/tools/review-gate/prompt.txt`;
-const TIER = process.env.REVIEW_GATE_TIER ?? `${HOME}/.cairn/tools/governor/tier.sh`;
-const RUNS = process.env.REVIEW_GATE_RUNS ?? `${HOME}/.local/state/ai-route/runs.jsonl`;
-let policy;
-let policyError;
-const needsReview = (path) =>
-  policy.isProtected(path) || EXTRA_PROTECTED.some((re) => re.test(path));
+const globToRe = (g) =>
+  new RegExp(
+    `^${g
+      .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+      .replace(/\*\*\//g, '\uE000')
+      .replace(/\*\*/g, '\uE001')
+      .replace(/\*/g, '[^/]*')
+      .replace(/\uE000/g, '(?:.*/)?')
+      .replace(/\uE001/g, '.*')}$`,
+  );
+const repoProtected = () => {
+  const src = execFileSync(
+    'git',
+    ['show', 'origin/main:packages/shared/src/records/merge-gate.ts'],
+    { cwd: MAIN, encoding: 'utf8' },
+  );
+  const block = src.slice(src.indexOf('export const PROTECTED_PATH_GLOBS'));
+  const list = block.slice(block.indexOf('['), block.indexOf('];'));
+  return [...list.matchAll(/'([^']+)'/g)].map((m) => globToRe(m[1]));
+};
 
 mkdirSync(`${STATE}/runs`, { recursive: true });
 const record = (pr, fields) => {
@@ -26,97 +37,9 @@ const record = (pr, fields) => {
 };
 
 const gh = (args) =>
-  execFileSync('gh', args[0] === 'api' ? args : ['-R', REPO, ...args], {
-    encoding: 'utf8',
-    maxBuffer: 64 << 20,
-  });
+  execFileSync('gh', ['-R', REPO, ...args], { encoding: 'utf8', maxBuffer: 64 << 20 });
 const asBot = (args, input) =>
   execFileSync(BOT, args, { encoding: 'utf8', input, cwd: MAIN, maxBuffer: 64 << 20 });
-
-const readMergeReasons = (pr) => {
-  if (policyError) throw new Error(policyError);
-  const files = JSON.parse(
-    gh(['api', '--paginate', '--slurp', `repos/${REPO}/pulls/${pr.number}/files?per_page=100`]),
-  ).flat();
-  const head = JSON.parse(gh(['api', `repos/${REPO}/pulls/${pr.number}`])).head.sha;
-  if (head !== pr.headRefOid) throw new Error('PR head moved since review');
-  if (!files.length || files.length >= 3000) throw new Error('Incomplete PR file list');
-  const changedFiles = files.flatMap((file) =>
-    file.previous_filename ? [file.filename, file.previous_filename] : [file.filename],
-  );
-  const deletedFiles = files.flatMap((file) =>
-    file.status === 'removed'
-      ? [file.filename]
-      : file.status === 'renamed'
-        ? [file.previous_filename]
-        : [],
-  );
-  const numstat = execFileSync(
-    'git',
-    [
-      '-c',
-      'core.quotePath=false',
-      '--attr-source=4b825dc642cb6eb9a060e54bf8d69288fbee4904',
-      'diff',
-      '--no-renames',
-      '--numstat',
-      `origin/main...${pr.headRefOid}`,
-    ],
-    { cwd: MAIN, encoding: 'utf8', maxBuffer: 64 << 20 },
-  );
-  const binaryFiles = numstat.split('\n').flatMap((row) => {
-    const [additions, deletions, path] = row.split('\t');
-    return additions === '-' && deletions === '-' ? [path] : [];
-  });
-  const reasons = policy.ownerRouting({
-    changedFiles,
-    deletedFiles,
-    binaryFiles,
-    linesChanged: numstat.split('\n').reduce((sum, row) => {
-      const [added, deleted] = row.split('\t');
-      return sum + (Number(added) || 0) + (Number(deleted) || 0);
-    }, 0),
-  });
-  if (
-    JSON.parse(
-      gh([
-        'issue',
-        'list',
-        '--state',
-        'open',
-        '--label',
-        'autonomy-paused',
-        '--limit',
-        '1',
-        '--json',
-        'number',
-      ]),
-    ).length
-  )
-    reasons.push('autonomy-paused');
-  if (/^B[^/]*\//.test(pr.headRefName)) reasons.push('bootstrap branch');
-  return reasons;
-};
-const mergeReasons = (pr) => {
-  try {
-    return readMergeReasons(pr);
-  } catch (error) {
-    return [`merge eligibility unavailable: ${error.message}`];
-  }
-};
-const reconcileMerge = (pr, pass) => {
-  const reasons = mergeReasons(pr);
-  if (!pass || reasons.length) {
-    asBot(['gh', 'pr', 'merge', String(pr.number), '-R', REPO, '--disable-auto']);
-    console.log(`#${pr.number}: auto-merge off: ${reasons.join('; ') || 'review did not pass'}`);
-    return 'auto-merge-off';
-  }
-  execFileSync(MERGE, [String(pr.number), '--auto', '--match-head-commit', pr.headRefOid], {
-    cwd: MAIN,
-    encoding: 'utf8',
-  });
-  return 'auto-merge';
-};
 
 export function finalVerdict(out) {
   const lines = out.split('\n');
@@ -148,31 +71,19 @@ try {
     ]),
   );
   execFileSync(BOT, ['git', 'fetch', '-q', 'origin', 'main'], { cwd: MAIN });
-  try {
-    policy = loadPolicy(
-      execFileSync('git', ['show', 'origin/main:.claude/workflows/pr-gate.js'], {
-        cwd: MAIN,
-        encoding: 'utf8',
-      }),
-    );
-  } catch (error) {
-    policyError = `routing policy unavailable: ${error.message}`;
-    for (const pr of prs) reconcileMerge(pr, false);
-    process.exitCode = 1;
-  }
-  if (policyError) throw new Error(policyError);
+  const PROTECTED = [...repoProtected(), ...EXTRA_PROTECTED];
   const checkIdx = process.argv.indexOf('--check');
   if (checkIdx > 0) {
     const files = JSON.parse(
       gh(['pr', 'view', process.argv[checkIdx + 1], '--json', 'files']),
     ).files.map((f) => f.path);
     if (!files.length) process.exit(2);
-    process.exit(files.some(needsReview) ? 0 : 3);
+    process.exit(files.some((p) => PROTECTED.some((re) => re.test(p))) ? 0 : 3);
   }
   const todo = [];
   for (const pr of prs) {
     if (pr.isDraft) continue;
-    const touched = pr.files.map((f) => f.path).filter(needsReview);
+    const touched = pr.files.map((f) => f.path).filter((p) => PROTECTED.some((re) => re.test(p)));
     const optIn = pr.labels.some((l) => l.name === 'review-gate');
     const lane = pr.headRefName.match(/^lane\/(\d+)$/)?.[1];
     if (!touched.length && !optIn && !lane) continue;
@@ -180,6 +91,11 @@ try {
       touched.push(
         lane ? '(none; every lane PR is reviewed)' : '(opted in with the review-gate label)',
       );
+    const marker = `<!-- review-gate:${pr.headRefOid} -->`;
+    const comments = JSON.parse(
+      gh(['pr', 'view', String(pr.number), '--json', 'comments']),
+    ).comments;
+    if (comments.some((c) => c.body.includes(marker))) continue;
     execFileSync(
       BOT,
       [
@@ -193,16 +109,6 @@ try {
       ],
       { cwd: MAIN },
     );
-    const marker = `<!-- review-gate:${pr.headRefOid} -->`;
-    const comments = JSON.parse(
-      gh(['pr', 'view', String(pr.number), '--json', 'comments']),
-    ).comments;
-    const current = comments.find((c) => c.body.includes(marker));
-    if (current) {
-      reconcileMerge(pr, /Independent review gate: PASS/.test(current.body));
-      continue;
-    }
-    if (mergeReasons(pr).length) reconcileMerge(pr, false);
     const patch = execFileSync(
       'bash',
       [
@@ -224,7 +130,7 @@ try {
         ['gh', 'pr', 'comment', String(pr.number), '-R', REPO, '--body-file', '-'],
         `${marker}\n**Independent review gate: PASS** (carried over) for \`${pr.headRefOid.slice(0, 8)}\`: same patch as the reviewed head \`${from.slice(0, 8)}\`; only the base moved.\n<!-- review-gate-patch:${patch} -->`,
       );
-      record(pr, { verdict: 'pass', action: reconcileMerge(pr, true), from });
+      record(pr, { verdict: 'pass', action: 'carried-over', from });
       console.log(`#${pr.number}: PASS carried over from ${from.slice(0, 8)} (patch unchanged)`);
       continue;
     }
@@ -273,7 +179,7 @@ try {
   };
   const runs = (() => {
     try {
-      return readFileSync(RUNS, 'utf8')
+      return readFileSync(`${HOME}/.local/state/ai-route/runs.jsonl`, 'utf8')
         .trim()
         .split('\n')
         .map((l) => JSON.parse(l));
@@ -291,7 +197,7 @@ try {
   };
   const runReview = (pr, slot) =>
     new Promise((resolve) => {
-      const prompt = `${readFileSync(PROMPT, 'utf8')}
+      const prompt = `${readFileSync(new URL('./prompt.txt', import.meta.url), 'utf8')}
 
   PR: #${pr.number} ${pr.title}
   Review: \`git diff origin/main...review-gate-${pr.number}\` in this checkout (do not check anything out), plus \`gh pr view ${pr.number} --json title,body\`.
@@ -308,7 +214,7 @@ ${
   Protected paths touched: ${pr.touched.join(', ')}`;
       const tierEnv = pr.lane
         ? Object.fromEntries(
-            execFileSync(TIER, ['env', pr.lane, 'review'], {
+            execFileSync(`${HOME}/.cairn/tools/governor/tier.sh`, ['env', pr.lane, 'review'], {
               encoding: 'utf8',
             })
               .trim()
@@ -344,7 +250,7 @@ ${
     writeFileSync(rawFile, out);
     record(pr, {
       verdict: verdict ?? null,
-      action: 'reviewed',
+      action: verdict === 'pass' ? 'auto-merge' : 'auto-merge-off',
       rc: run.status,
       raw: rawFile,
       reviewChars: (review ?? '').length,
@@ -361,7 +267,11 @@ ${
         ? `${pr.marker}\n**Independent review gate: PASS** for \`${pr.headRefOid.slice(0, 8)}\`.\n<!-- review-gate-patch:${pr.patch} -->`
         : `${pr.marker}\n**Independent review gate: BLOCK** for \`${pr.headRefOid.slice(0, 8)}\`.\n\n${review}\n<!-- review-gate-patch:${pr.patch} -->`;
     asBot(['gh', 'pr', 'comment', String(pr.number), '-R', REPO, '--body-file', '-'], body);
-    record(pr, { verdict, action: reconcileMerge(pr, verdict === 'pass') });
+    if (verdict !== 'pass') {
+      try {
+        asBot(['gh', 'pr', 'merge', String(pr.number), '-R', REPO, '--disable-auto']);
+      } catch {}
+    }
     console.log(`#${pr.number}: ${verdict}`);
     return verdict;
   };

@@ -1,12 +1,8 @@
-import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { test } from 'node:test';
-import { loadPolicy } from './owner-routing.mjs';
 
-const { globToRegExp } = loadPolicy(
-  readFileSync(new URL('../../../.claude/workflows/pr-gate.js', import.meta.url), 'utf8'),
-);
-
+const src = readFileSync(process.argv[2], 'utf8');
+const body = src.slice(src.indexOf('const globToRe'), src.indexOf('const repoProtected'));
+const globToRe = new Function(`${body}; return globToRe;`)();
 const cases = [
   ['.github/**', '.github/workflows/site-deploy.yml', true],
   ['.github/**', '.github/x.yml', true],
@@ -17,8 +13,13 @@ const cases = [
   ['**/*.config.*', 'apps/web/src/config.ts', false],
   ['docs/adr/**', 'docs/spec/x.md', false],
 ];
-for (const [glob, path, expected] of cases) {
-  test(`${glob} matches ${path}: ${expected}`, () => {
-    assert.equal(globToRegExp(glob, { protect: true }).test(path), expected);
-  });
+let bad = 0;
+for (const [g, p, want] of cases) {
+  const got = globToRe(g).test(p);
+  if (got !== want) {
+    bad++;
+    console.log('BAD', g, p, got);
+  }
 }
+console.log(bad ? `${bad} glob cases failed` : 'glob ok');
+process.exit(bad);

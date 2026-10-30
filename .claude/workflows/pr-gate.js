@@ -134,37 +134,13 @@ function globToRegExp(glob, { protect = false } = {}) {
   }
   return new RegExp(`^${re}${tail ? '(?:/.*)?' : ''}$`, protect ? 'iu' : 'i')
 }
-const SCRIPT_SHA256 = 'd34066068ade28f50ef85a7d3b331e2e96c33af6ebb3c13ad0413615e84d9724'
+const SCRIPT_SHA256 = 'fde93dec0355f8a54419143f3f001a527bc3383868e1c5943b0917664967d396'
 const PROTECTED_RE = PROTECTED.map((glob) => globToRegExp(glob, { protect: true }))
 const AUTO_MERGE_RE = AUTO_MERGE.map(globToRegExp)
 const isProtected = (f) => PROTECTED_RE.some((re) => re.test(f))
 const MAX_LINES = 800
 const MAX_FILES = 40
 const EVIDENCE_RE = globToRegExp('docs/verify/**')
-
-function ownerRouting({ changedFiles, deletedFiles, binaryFiles, linesChanged, protectedPaths = changedFiles.filter(isProtected) }) {
-  const allDeleted = [...new Set(deletedFiles)]
-  const deletedTests = allDeleted.filter(
-    (f) => /(^|\/)(e2e|test|tests|__tests__)\//iu.test(f) || /\.(test|spec)\.[cm]?[jt]sx?$/iu.test(f),
-  )
-  const opaque = [...new Set(binaryFiles)].filter(
-    (f) => !EVIDENCE_RE.test(f),
-  )
-  const lines = linesChanged
-  const allFiles = [...new Set(changedFiles)]
-  const outside = allFiles.filter(
-    (f) => !protectedPaths.includes(f) && !isProtected(f) && !AUTO_MERGE_RE.some((re) => re.test(f)),
-  )
-  return [
-    ...(protectedPaths.length > 0 ? [`protected paths: ${protectedPaths.join(', ')}`] : []),
-    ...(outside.length > 0 ? [`outside the auto-merge set (product source, tests, docs/verify, Markdown under docs/): ${outside.join(', ')}`] : []),
-    ...(deletedTests.length > 0 ? [`deleted test files: ${deletedTests.join(', ')}`] : []),
-    ...(opaque.length > 0 ? [`binary files outside docs/verify (no line count, no readable diff): ${opaque.join(', ')}`] : []),
-    ...(lines > MAX_LINES ? [`${lines} lines changed (over ${MAX_LINES})`] : []),
-    ...(allFiles.length > MAX_FILES ? [`${allFiles.length} files changed (over ${MAX_FILES})`] : []),
-  ]
-}
-
 
 // Without --no-renames a rename lists only its new name, so a protected file
 // moved elsewhere would not match; without core.quotePath=false git C-quotes
@@ -425,13 +401,29 @@ const protectedPaths = [
 ]
 // The caller is the session that wrote the PR, so its deletion list and line
 // count are checked against the safety reviewer's: the union and the larger.
-const humanReasons = ownerRouting({
-  changedFiles: [...new Set([...changedFiles, ...unlistedFiles])],
-  deletedFiles: [...new Set([...deletedFiles, ...safetyDeleted])],
-  binaryFiles: [...new Set([...binaryFiles, ...safetyBinary])],
-  linesChanged: Math.max(linesChanged, Number.isInteger(safety?.linesChanged) ? safety.linesChanged : 0),
-  protectedPaths,
-})
+const allDeleted = [...new Set([...deletedFiles, ...safetyDeleted])]
+const deletedTests = allDeleted.filter(
+  (f) => /(^|\/)(e2e|test|tests|__tests__)\//iu.test(f) || /\.(test|spec)\.[cm]?[jt]sx?$/iu.test(f),
+)
+// A binary row (- -) adds no lines and shows reviewers no diff; one NUL byte
+// makes git treat a source file as binary even with the empty tree's attributes
+// (/code-review on #1410), so only evidence may be binary without the user.
+const opaque = [...new Set([...binaryFiles, ...safetyBinary])].filter(
+  (f) => !EVIDENCE_RE.test(f),
+)
+const lines = Math.max(linesChanged, Number.isInteger(safety?.linesChanged) ? safety.linesChanged : 0)
+const allFiles = [...new Set([...changedFiles, ...unlistedFiles])]
+const outside = allFiles.filter(
+  (f) => !protectedPaths.includes(f) && !isProtected(f) && !AUTO_MERGE_RE.some((re) => re.test(f)),
+)
+const humanReasons = [
+  ...(protectedPaths.length > 0 ? [`protected paths: ${protectedPaths.join(', ')}`] : []),
+  ...(outside.length > 0 ? [`outside the auto-merge set (product source, tests, docs/verify, Markdown under docs/): ${outside.join(', ')}`] : []),
+  ...(deletedTests.length > 0 ? [`deleted test files: ${deletedTests.join(', ')}`] : []),
+  ...(opaque.length > 0 ? [`binary files outside docs/verify (no line count, no readable diff): ${opaque.join(', ')}`] : []),
+  ...(lines > MAX_LINES ? [`${lines} lines changed (over ${MAX_LINES})`] : []),
+  ...(allFiles.length > MAX_FILES ? [`${allFiles.length} files changed (over ${MAX_FILES})`] : []),
+]
 const checked = Object.fromEntries(reviewed.map((r) => [r.key, r.review.checked]))
 
 return {

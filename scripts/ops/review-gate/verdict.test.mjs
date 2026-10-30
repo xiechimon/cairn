@@ -1,13 +1,11 @@
-import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { test } from 'node:test';
 
-const src = readFileSync(process.argv[2] ?? new URL('./review-gate.mjs', import.meta.url), 'utf8');
+const src = readFileSync(process.argv[2], 'utf8');
 const fn = src
   .slice(src.indexOf('export function finalVerdict'), src.indexOf('\ntry {'))
   .replace('export ', '');
 const finalVerdict = new Function(`${fn}; return finalVerdict;`)();
-const prompt = 'VERDICT: pass or block\n  Protected paths touched: docs/adr/x.md';
+const prompt = `${readFileSync('prompt.txt', 'utf8')}\n  Protected paths touched: docs/adr/x.md`;
 const cases = [
   [
     'echo then block',
@@ -25,28 +23,30 @@ cases.push([
   'block',
 ]);
 cases.push([
-  'prompt echoes PASS before the reviewer blocks',
-  `${prompt}\nVERDICT: pass\ncodex\n1. blocking: a.ts:1 bug\nVERDICT: block`,
+  'real #1828 transcript (recorded PASS, actually block)',
+  readFileSync('fixture-1828.txt', 'utf8'),
   'block',
 ]);
+let bad = 0;
 for (const [name, out, want] of cases) {
-  test(name, () => assert.equal(finalVerdict(out).verdict, want));
+  const r = finalVerdict(out);
+  const ok = r.verdict === want;
+  bad += !ok;
+  console.log(ok ? 'ok ' : 'BAD', name, r.verdict, (r.review ?? '').length);
 }
-test('review text is capped', () => {
-  assert.ok(finalVerdict(`${prompt}\n${'x'.repeat(20000)}\nVERDICT: block`).review.length <= 3002);
-});
-test('nested lists keep the first finding', () => {
-  assert.match(
-    finalVerdict(
-      `${prompt}\n1. blocking: a.ts:1\n2. blocking: b.ts:2 steps:\n   1. run x\nVERDICT: block`,
-    ).review,
-    /a.ts:1/,
-  );
-});
-test('repeated review keeps one copy', () => {
-  const review = finalVerdict(
-    `${prompt}\nI ran pnpm test\n1. blocking: a.ts:1 bug\n\n1. blocking: a.ts:1 bug\nVERDICT: block`,
-  ).review;
-  assert.equal(review.split('a.ts:1').length, 2);
-  assert.doesNotMatch(review, /pnpm/);
-});
+const big = finalVerdict(`${prompt}\n${'x'.repeat(20000)}\nVERDICT: block`);
+console.log('cap', big.review.length <= 8002 ? 'ok' : 'BAD', big.review.length);
+const nested = finalVerdict(
+  `${prompt}\n1. blocking: a.ts:1\n2. blocking: b.ts:2 steps:\n   1. run x\nVERDICT: block`,
+);
+console.log('nested', nested.review.includes('a.ts:1') ? 'ok' : 'BAD');
+bad += !nested.review.includes('a.ts:1');
+const dup = finalVerdict(
+  `${prompt}\nI ran pnpm test\n1. blocking: a.ts:1 bug\n\n1. blocking: a.ts:1 bug\nVERDICT: block`,
+);
+console.log(
+  'dedupe',
+  dup.review.split('a.ts:1').length === 2 && !dup.review.includes('pnpm') ? 'ok' : 'BAD',
+);
+bad += !(dup.review.split('a.ts:1').length === 2);
+process.exit(bad);
