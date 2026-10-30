@@ -2,9 +2,9 @@ import { cn } from 'cn';
 import { type RefObject, useEffect, useRef, useState } from 'react';
 import { SegmentedRadio } from '../components/segmented.js';
 import {
+  AvatarSection,
   ConversationSection,
   EmptySection,
-  PanelSection,
   SettingsSection,
   TraceSection,
 } from './components-content.js';
@@ -58,7 +58,7 @@ const NAV = [
       ['toast', 'Toast'],
       ['empty', 'Empty and loading'],
       ['settings', 'Settings list'],
-      ['panel', 'Panel and avatar'],
+      ['avatar', 'Avatar'],
       ['conversation', 'Conversation'],
       ['trace', 'Trace'],
       ['structure', 'Structure primitives'],
@@ -208,7 +208,7 @@ export function Gallery() {
           <ToastSection />
           <EmptySection />
           <SettingsSection />
-          <PanelSection />
+          <AvatarSection />
           <ConversationSection />
           <TraceSection />
           <StructureSection />

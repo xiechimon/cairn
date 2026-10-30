@@ -11,6 +11,7 @@ import { DIALOG_PRIMARY_BUTTON, DialogShell } from '../components/ui/dialog-shel
 import { Input } from '../components/ui/input.js';
 import { Label } from '../components/ui/label.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
+import { Spinner } from '../components/ui/spinner.js';
 import { Switch } from '../components/ui/switch.js';
 import { toastError } from '../components/ui/toaster.js';
 import type { BranchInfoContent } from '../fixtures/records.js';
@@ -359,6 +360,7 @@ export function SyncButton({
         mut.mutate({ machineId, directory, ref: refName, commit, force });
       }}
     >
+      {mut.isPending && <Spinner data-icon="inline-start" />}
       {t('同步')}
     </Button>
   );

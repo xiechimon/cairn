@@ -1,6 +1,6 @@
 {
   "frozenFrom": {
-    "sha": "cf22369330fc0e9980089e85a67805ee0445d65e",
+    "sha": "69d73f08e67620fcdb55beb73c28ab2d24003318",
     "date": "2026-10-30"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
@@ -144,11 +144,6 @@
       "status": "pristine",
       "hash": "dc60c69f3903e0df81ad2a2d1eaf3bce66308f0527ff7bdec905d5bf4724f2c4"
     },
-    "panel.tsx": {
-      "kind": "adapter",
-      "reason": "Resting content container with its own skin tier; Card stays a pure layout shell so the upstream re-pull conflict surface (#414/#423/#425 deviations) does not double. Card radius token; the first row draws no top rule.",
-      "hash": "8dc38e163aa6801b9a1859342040556a2b6dc0af7856a8fb7e2c5a2a6b831ece"
-    },
     "popover.tsx": {
       "kind": "registry",
       "upstreamItem": "popover",
@@ -178,6 +173,12 @@
       "upstreamItem": "skeleton",
       "status": "pristine",
       "hash": "30c21a8f3384ce62406b84c6e244bcc36738428b38d03a005fd28fdaa418e299"
+    },
+    "spinner.tsx": {
+      "kind": "registry",
+      "upstreamItem": "spinner",
+      "status": "pristine",
+      "hash": "8e45e91ea6a796d896605f971aa7fa8f803cfd1500825c1a935567f1cc47123c"
     },
     "status-chip.tsx": {
       "kind": "adapter",

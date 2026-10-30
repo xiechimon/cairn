@@ -32,7 +32,7 @@
 
 ## More preview techniques
 
-- Sub-part previews reuse their parent's composition (every Card sub-part shows the same task card, every Panel sub-part the same machine panel).
+- Sub-part previews reuse their parent's composition (every Card sub-part shows the same task card).
 - Icons in `src/icons` are not exported through the bundle; previews that need icons inline small SVGs.
 - `AttachmentGroup` scrolls sideways; its preview wrapper is 720px wide so three items fit.
 
