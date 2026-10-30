@@ -796,3 +796,48 @@ test('an evaluation started for a previous review entry cannot notify its replac
   await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
   expect(send).toHaveBeenCalledTimes(1);
 });
+
+test.each(['before evaluation', 'during evaluation'] as const)(
+  'archiving a review %s suppresses its deferred push without changing phase',
+  async (when) => {
+    const { s, buildId } = await reviewPushWorld('human');
+    const send = vi
+      .spyOn(webpush, 'sendNotification')
+      .mockResolvedValue({ statusCode: 201, body: '', headers: {} });
+    setTodoPhase(s.svc, 'todo-1794', 'review');
+    const archive = async () => {
+      const response = await s.app.request('/api/todos/todo-1794/archive', { method: 'POST' });
+      expect(response.status).toBe(200);
+    };
+    const port = scriptedPort([]);
+    let release: (() => void) | undefined;
+    if (when === 'before evaluation') await archive();
+    const evaluation = evaluateMergeGate(s.svc, buildId, {
+      port:
+        when === 'before evaluation'
+          ? port
+          : {
+              ...port,
+              pull: async (...args) => {
+                await new Promise<void>((resolve) => {
+                  release = resolve;
+                });
+                return port.pull(...args);
+              },
+            },
+    });
+    if (when === 'during evaluation') {
+      await vi.waitFor(() => expect(release).toBeDefined());
+      await archive();
+      release?.();
+    }
+    const readiness = await evaluation;
+    expect(readiness?.blockers.map((blocker) => blocker.code)).toEqual(['policy-human']);
+    expect(send).not.toHaveBeenCalled();
+    expect(s.db.select().from(todo).where(eq(todo.id, 'todo-1794')).get()).toMatchObject({
+      phase: 'review',
+      archivedAt: expect.any(Number),
+    });
+    expect(s.db.select().from(pushDelivery).get()?.pushStatus).toBe('review-pending');
+  },
+);

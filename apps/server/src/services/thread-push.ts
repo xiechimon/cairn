@@ -20,7 +20,7 @@ import {
 } from '../db/schema.js';
 import { planHasOpenDecisions } from './plan-decisions.js';
 import { projectMergeConfigOf } from './projects.js';
-import { pushToUserSafely, queuePushDigest, type VapidKeys } from './push.js';
+import { isArchivedTodoPush, pushToUserSafely, queuePushDigest, type VapidKeys } from './push.js';
 
 type ThreadPushDeps = { db: Db; user: UserRecord; vapidKeys?: VapidKeys | null };
 
@@ -101,7 +101,7 @@ export function notifyEvaluatedReview(
     .innerJoin(todo, eq(todo.id, build.todoId))
     .where(eq(build.id, buildId))
     .get()?.todo;
-  if (row?.phase !== 'review' || row.latestBuildId !== buildId) return;
+  if (row?.phase !== 'review' || row.latestBuildId !== buildId || row.archivedAt !== null) return;
   const marker = deps.db
     .select()
     .from(pushDelivery)
@@ -142,6 +142,7 @@ export function notifyEvaluatedReview(
 
 export function notifyThreadPhase(deps: ThreadPushDeps, record: TodoRecord, to: Phase): void {
   if (to !== 'confirm' && to !== 'review' && to !== 'done' && to !== 'failed') return;
+  if (isArchivedTodoPush(deps.db, record.teamId, `/app/todo/${record.id}`)) return;
   const latest = deps.db
     .select()
     .from(build)
