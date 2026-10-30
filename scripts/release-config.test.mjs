@@ -4,7 +4,10 @@ import { resolve } from 'node:path';
 import { test } from 'node:test';
 
 const root = resolve(import.meta.dirname, '..');
-const workflow = readFileSync(resolve(root, '.github/workflows/release.yml'), 'utf8');
+const workflow = readFileSync(resolve(root, '.github/workflows/release.yml'), 'utf8').replace(
+  /\r\n/g,
+  '\n',
+);
 
 export function workspacePackages(rootDir = root) {
   const yaml = readFileSync(resolve(rootDir, 'pnpm-workspace.yaml'), 'utf8');
@@ -308,11 +311,13 @@ export const workflowFixtures = [
 ];
 
 test('the release workflow matches the pinned text', () => {
-  assert.equal(workflow.replace(/\r\n/g, '\n'), expectedReleaseWorkflow);
+  const violations = releaseWorkflowViolations(workflow);
+  if (violations.length > 0) assert.equal(workflow, expectedReleaseWorkflow);
+  assert.deepEqual(violations, []);
 });
 
 test('the release workflow pin accepts CRLF line endings', () => {
-  assert.deepEqual(releaseWorkflowViolations(workflow.replace(/\r?\n/g, '\r\n')), []);
+  assert.deepEqual(releaseWorkflowViolations(workflow.replace(/\n/g, '\r\n')), []);
 });
 
 test('the pinned workflow grants an OIDC token only after the publish job begins', () => {
@@ -330,7 +335,7 @@ for (const { name, before, after } of workflowFixtures) {
       1,
       `fixture replacement must match once: ${before}`,
     );
-    assert.deepEqual(releaseWorkflowViolations(workflow.replace(before, after)), [
+    assert.deepEqual(releaseWorkflowViolations(workflow.replace(before, () => after)), [
       'release workflow must match the pinned text',
     ]);
   });

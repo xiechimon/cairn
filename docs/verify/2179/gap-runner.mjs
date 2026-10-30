@@ -31,7 +31,7 @@ for (const [before, after] of [
     1,
     `Runner replacement must match once: ${before}`,
   );
-  mainTests = mainTests.replace(before, after);
+  mainTests = mainTests.replace(before, () => after);
 }
 const runAssertions = async (candidateWorkflow) => {
   const failures = [];
@@ -78,7 +78,7 @@ for (const { name, before, after } of fixtures) {
     1,
     `Fixture replacement must match once: ${name}`,
   );
-  const { count, failures, errors } = await runAssertions(workflow.replace(before, after));
+  const { count, failures, errors } = await runAssertions(workflow.replace(before, () => after));
   let result;
   if (errors.length > 0) {
     result = 'ERROR';
