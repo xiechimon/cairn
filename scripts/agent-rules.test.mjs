@@ -7,13 +7,16 @@ import { fileURLToPath } from 'node:url';
 const ROOT = join(fileURLToPath(new URL('.', import.meta.url)), '..');
 
 test('merge instructions require the pr-gate auto-merge verdict', () => {
-  for (const file of ['AGENTS.md', 'docs/ops/agent-bot-identity.md']) {
+  for (const [file, tasks] of [
+    ['AGENTS.md', 'no unchecked tasks anywhere in the body'],
+    ['docs/ops/agent-bot-identity.md', 'no unchecked tasks anywhere in the body'],
+  ]) {
     const guidance = readFileSync(join(ROOT, file), 'utf8');
     assert.ok(
       guidance
         .split('\n')
         .includes(
-          "- Both paths require a pr-gate go with `mergedBy: 'auto-merge'` (every other PR goes to ian), fully checked Acceptance and no `needs-decision` label. After merging, verify the resulting main commit's author and its `commit-author` Actions result.",
+          `- Both paths require a pr-gate go with \`mergedBy: 'auto-merge'\` (every other PR goes to ian), ${tasks} and no \`needs-decision\` label. After merging, verify the resulting main commit's author and its \`commit-author\` Actions result.`,
         ),
       file,
     );
