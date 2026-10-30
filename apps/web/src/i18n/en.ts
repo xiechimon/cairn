@@ -72,6 +72,7 @@ export const EN: Record<string, string> = {
   '有 {n} 件事需要你处理：': '{n} need you:',
   今天的概况: "Today's overview",
   已转给任务: 'Passed to task',
+  '来自任务 #{n} {title} 的消息': 'Message from task #{n} {title}',
   定时: 'Schedules',
   '{n} 台机器在线': '{n} machines online',
   '执行中 {n}': '{n} running',
