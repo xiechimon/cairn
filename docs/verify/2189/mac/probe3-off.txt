@@ -1,0 +1,4 @@
+READ machine.json
+READ github-oauth.env
+READ credentials.enc
+READ config.json

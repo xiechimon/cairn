@@ -1,0 +1,34 @@
+Warning: claude.ai MCP servers blocked by enterprise policy: claude.ai Claude Docs, claude.ai Vercel, claude.ai Supabase, claude.ai Notion, claude.ai Figma
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+All four commands ran in order, with no retries or workarounds. Outputs, verbatim:
+
+**1) `sh /tmp/b0/sbx/probe2.sh`**
+```
+tmp=/tmp/claude-501/probe.deAS
+link created
+BLOCKED symlink
+BLOCKED cp
+BLOCKED dd
+BLOCKED node
+BLOCKED git-no-index rc=1
+```
+
+**2) `sh /tmp/b0/sbx/probe3.sh`**
+```
+MISSING /Users/xmon/.cairn/machine.json
+MISSING /Users/xmon/.cairn/github-oauth.env
+MISSING /Users/xmon/.cairn/credentials.enc
+MISSING /Users/xmon/.cairn/config.json
+```
+
+**3) `gh api user -q .login`**
+```
+xiechimon
+```
+
+**4) `git ls-remote origin refs/heads/main | cut -c1-12`**
+```
+9363aa021146
+```
+
+What this shows, from the output alone: in probe2, a symlink was created inside the sandbox, but the symlink, cp, dd, node and git-no-index steps were reported as BLOCKED (git-no-index returned rc=1). In probe3, the four `~/.cairn` files are reported as MISSING. I did not check what these probes were meant to test, so I can't say whether these results are the expected outcome.

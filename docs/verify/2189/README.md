@@ -77,3 +77,11 @@ Measured scope: the archived run proves denial only for the tested paths under t
 | Same probe with the unscoped `as-bot.sh` token | same statuses: the App installation itself has no administration permission today; the broker pins the scope if the App gains permissions | `omarchy/token-scope-probe-unscoped.txt` |
 
 The historical token scope run predates the socket client, current-main no-op PATCH and absent-PR merge probes. It does not accept those revised mechanisms. The offset-zero memory result is an invalid negative control and supports no memory-isolation claim.
+
+## Mac rerun with the committed settings file (dispatcher, after review round 1)
+
+`claude -p --permission-mode bypassPermissions --settings scripts/ops/secret-reach/claude-sandbox-settings.json` (the committed file, denying `~/.cairn/**` and `~/.tds/**`):
+
+- `probe2.sh` on the App key and secretbox.key: symlink, cp, dd, node, git diff --no-index all BLOCKED (`mac/mac-committed.txt`).
+- `probe3.sh` on machine.json, github-oauth.env, credentials.enc, config.json: the sandbox denies even `stat`, so all four show as MISSING inside the session; the same script outside the sandbox reads all four (`mac/probe3-off.txt`).
+- `gh api user` and `git ls-remote origin` still work inside the session.
