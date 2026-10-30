@@ -18,5 +18,9 @@
   {
     "file": "integration/test/routing-boundary.test.ts",
     "reason": "local environment: capability probe flags /etc/resolv.conf syscall"
+  },
+  {
+    "file": "integration/test/routing-cli.test.ts",
+    "reason": "local environment: the executor write boundary requires Linux x86_64, so every row fails on macOS with \"Linux x86_64 required\"; vitest-integration runs it on ubuntu in CI"
   }
 ]
