@@ -1,0 +1,11 @@
+✔ instance guard requires effective server home containment (1780.27375ms)
+✔ slow health barrier reinstallation renews the deadline (1221.38425ms)
+✔ restore preview stops heartbeat writers before computing a stable digest (1384.822167ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4829.366459

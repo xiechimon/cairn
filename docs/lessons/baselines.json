@@ -351,6 +351,10 @@
     "Intercepts": 0,
     "Recurrences": 0
   },
+  "duplicate-fixture-property": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "e2e-affected-arg-overflow": {
     "Intercepts": 0,
     "Recurrences": 0
@@ -454,6 +458,10 @@
   "fixture-missing-required-fields": {
     "Intercepts": 4,
     "Recurrences": 2
+  },
+  "fixture-runtime-model": {
+    "Intercepts": 0,
+    "Recurrences": 0
   },
   "force-push-on-reused-branch": {
     "Intercepts": 0,

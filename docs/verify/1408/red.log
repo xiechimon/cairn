@@ -1,189 +1,187 @@
-✔ red refuses before restarting units (1640.144791ms)
-✔ evidence refuses before restarting units (2136.362792ms)
-✔ off-main refuses before restarting units (1424.472708ms)
-✔ install refuses before restarting units (1884.954375ms)
-✔ migration refuses before restarting units (3303.02725ms)
-✔ incompatible refuses before restarting units (3827.384167ms)
-✔ drain refuses before restarting units (4150.417417ms)
-✔ missing-check refuses before restarting units (1425.581333ms)
-✔ pending-check refuses before restarting units (1425.411167ms)
-✔ wrong-sha refuses before restarting units (1421.305666ms)
-✔ superseded refuses before restarting units (1447.1655ms)
-✔ backup refuses before restarting units (2852.079125ms)
-✔ unit-path refuses before restarting units (1544.935167ms)
-✔ good deploy points current and last-good to the exact new SHA (3049.734333ms)
-✔ failed health rolls code back and keeps rows written after the backup (5534.08225ms)
-✔ restore previews discarded rows and refuses without explicit confirmation (291.581625ms)
-✖ confirmed restore includes writes made while stopping units in its discard report (245.601209ms)
-✔ a stale daemon heartbeat causes code rollback (4298.654708ms)
-✔ drain blocks both claim insertion and transition, then restores prior pause values (198.531291ms)
-✔ a drain setup error leaves neither a partial pause record nor changed pause values (207.202041ms)
-✖ restoring a drained snapshot removes its saved deployment barrier before restart (267.879375ms)
-✔ install honors allowBuilds and probes native SQLite before scratch startup (3776.448792ms)
-✔ native probe failure refuses before scratch, drain or restart (2302.80725ms)
-✔ check needs no bootstrap and leaves no deployment files or database (670.785292ms)
-✔ check refuses red without writes (602.220125ms)
-✔ check refuses evidence without writes (791.520666ms)
-✔ check refuses off-main without writes (644.141584ms)
-✔ check refuses missing-check without writes (614.134875ms)
-✔ check refuses pending-check without writes (592.881791ms)
-✔ check refuses wrong-sha without writes (632.865708ms)
-✔ check refuses superseded without writes (596.222666ms)
-✔ deploy refuses leftover drain state and names explicit recovery (353.557042ms)
-✔ check refuses leftover drain state and names explicit recovery (316.695292ms)
-✔ restore refuses leftover drain state and names explicit recovery (318.171417ms)
-✖ custom instance uses only its units, URL, scratch port and backup directory (3074.583916ms)
-✔ invalid unit inventory refuses "" (227.182542ms)
-✔ invalid unit inventory refuses "one.service" (212.778542ms)
-✔ invalid unit inventory refuses "one.service two.service three.service" (199.657917ms)
-✔ custom instance health failure rolls back only its units (4231.87875ms)
-✔ deploy fetches the gated release before creating its checkout (3043.875959ms)
-✔ check refuses an uncheckpointed drain without changing WAL sidecars (276.398958ms)
-✖ rebuild migration and heartbeat regression (3041.122ms)
-✖ old-heartbeat migration and heartbeat regression (2971.468791ms)
-✖ expired drain permits claims after an unclean exit and refusal names its deadline (201.819625ms)
-✖ resume preserves changed pause values and survives missing migration triggers (236.003833ms)
-✔ in-flight step completes while new claims remain blocked (195.9505ms)
-✖ confirmed restore failure restarts every configured service and timer (206.29725ms)
-✖ interrupt immediately after drain still restores pause state (2890.69425ms)
-ℹ tests 48
+✖ restore previews discarded rows and refuses without explicit confirmation (574.400209ms)
+✖ restore refuses custom units with live default CAIRN_DEPLOY_DB (589.496916ms)
+✖ restore refuses custom units with live default CAIRN_DEPLOY_URL (718.837375ms)
+✖ restore refuses custom units with live default CAIRN_DEPLOY_BACKUP_TIMER (777.342416ms)
+✖ resume refuses custom units with live default CAIRN_DEPLOY_DB (495.915334ms)
+✖ resume refuses custom units with live default CAIRN_DEPLOY_URL (384.19875ms)
+✖ resume refuses custom units with live default CAIRN_DEPLOY_BACKUP_TIMER (389.689333ms)
+✖ instance guard requires effective server home containment (408.835583ms)
+✖ slow health barrier reinstallation renews the deadline (404.675167ms)
+✖ SIGHUP after drain restores pause state through the real handler (3599.121792ms)
+✖ restore preview stops heartbeat writers before computing a stable digest (420.124209ms)
+ℹ tests 11
 ℹ suites 0
-ℹ pass 39
-ℹ fail 9
+ℹ pass 0
+ℹ fail 11
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 76280.872792
+ℹ duration_ms 9011.090334
 
 ✖ failing tests:
 
-test at scripts/ops/deploy-self.test.mjs:223:1
-✖ confirmed restore includes writes made while stopping units in its discard report (245.601209ms)
-  TypeError: Cannot read properties of null (reading '1')
-      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:228:71)
-      at Test.runInAsyncScope (node:async_hooks:226:14)
-      at Test.run (node:internal/test_runner/test:1402:25)
-      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
-      at Test.postRun (node:internal/test_runner/test:1542:19)
-      at Test.run (node:internal/test_runner/test:1467:12)
-      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+test at scripts/ops/deploy-self.test.mjs:227:1
+✖ restore previews discarded rows and refuses without explicit confirmation (574.400209ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /stop cairn-daemon.service[\s\S]*stop cairn-server.service[\s\S]*stop cairn-db-backup.timer/. Input:
 
-test at scripts/ops/deploy-self.test.mjs:272:1
-✖ restoring a drained snapshot removes its saved deployment barrier before restart (267.879375ms)
-  TypeError: Cannot read properties of null (reading '1')
-      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:283:71)
-      at Test.runInAsyncScope (node:async_hooks:226:14)
-      at Test.run (node:internal/test_runner/test:1402:25)
-      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
-      at Test.postRun (node:internal/test_runner/test:1542:19)
-      at Test.run (node:internal/test_runner/test:1467:12)
-      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ''
 
-test at scripts/ops/deploy-self.test.mjs:372:1
-✖ custom instance uses only its units, URL, scratch port and backup directory (3074.583916ms)
-  TypeError: Cannot read properties of null (reading '1')
-      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:392:90)
-      at Test.runInAsyncScope (node:async_hooks:226:14)
-      at Test.run (node:internal/test_runner/test:1402:25)
-      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
-      at Test.postRun (node:internal/test_runner/test:1542:19)
-      at Test.run (node:internal/test_runner/test:1467:12)
-      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
-
-test at scripts/ops/deploy-self.test.mjs:450:3
-✖ rebuild migration and heartbeat regression (3041.122ms)
-  AssertionError [ERR_ASSERTION]: FAIL no such trigger: deploy_claim_barrier
-
-
-  1 !== 0
-
-      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:453:12)
-      at Test.runInAsyncScope (node:async_hooks:226:14)
-      at Test.run (node:internal/test_runner/test:1402:25)
-      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
-      at Test.postRun (node:internal/test_runner/test:1542:19)
-      at Test.run (node:internal/test_runner/test:1467:12)
-      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
-    generatedMessage: false,
-    code: 'ERR_ASSERTION',
-    actual: 1,
-    expected: 0,
-    operator: 'strictEqual',
-    diff: 'simple'
-  }
-
-test at scripts/ops/deploy-self.test.mjs:450:3
-✖ old-heartbeat migration and heartbeat regression (2971.468791ms)
-  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
-
-  0 !== 1
-
-      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:453:12)
-      at Test.runInAsyncScope (node:async_hooks:226:14)
-      at Test.run (node:internal/test_runner/test:1402:25)
-      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
-      at Test.postRun (node:internal/test_runner/test:1542:19)
-      at Test.run (node:internal/test_runner/test:1467:12)
-      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:236:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.start (node:internal/test_runner/test:1015:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17) {
     generatedMessage: true,
     code: 'ERR_ASSERTION',
-    actual: 0,
-    expected: 1,
-    operator: 'strictEqual',
+    actual: '',
+    expected: /stop cairn-daemon.service[\s\S]*stop cairn-server.service[\s\S]*stop cairn-db-backup.timer/,
+    operator: 'match',
     diff: 'simple'
   }
 
-test at scripts/ops/deploy-self.test.mjs:469:1
-✖ expired drain permits claims after an unclean exit and refusal names its deadline (201.819625ms)
-  AssertionError [ERR_ASSERTION]: Traceback (most recent call last):
-    File "<string>", line 4, in <module>
-      assert db.execute('select deadline from deploy_pause_state').fetchone()[0] > time.time()
-             ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  sqlite3.OperationalError: no such column: deadline
+test at scripts/ops/deploy-self.test.mjs:607:5
+✖ restore refuses custom units with live default CAIRN_DEPLOY_DB (589.496916ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /live default/. Input:
 
+  'FAIL unable to open database file\n'
 
-  1 !== 0
-
-      at command (file://<worktree>/scripts/ops/deploy-self.test.mjs:21:10)
-      at pythonFixture (file://<worktree>/scripts/ops/deploy-self.test.mjs:460:3)
-      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:470:3)
-      at Test.runInAsyncScope (node:async_hooks:226:14)
-      at Test.run (node:internal/test_runner/test:1402:25)
-      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
-      at Test.postRun (node:internal/test_runner/test:1542:19)
-      at Test.run (node:internal/test_runner/test:1467:12)
-      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
-    generatedMessage: false,
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:616:14)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18) {
+    generatedMessage: true,
     code: 'ERR_ASSERTION',
-    actual: 1,
-    expected: 0,
-    operator: 'strictEqual',
+    actual: 'FAIL unable to open database file\n',
+    expected: /live default/,
+    operator: 'match',
     diff: 'simple'
   }
 
-test at scripts/ops/deploy-self.test.mjs:479:1
-✖ resume preserves changed pause values and survives missing migration triggers (236.003833ms)
+test at scripts/ops/deploy-self.test.mjs:607:5
+✖ restore refuses custom units with live default CAIRN_DEPLOY_URL (718.837375ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /live default/. Input:
+
+  'FAIL restore requires --confirm-discard <digest>; rows above would be discarded\n'
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:616:14)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL restore requires --confirm-discard <digest>; rows above would be discarded\n',
+    expected: /live default/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/deploy-self.test.mjs:607:5
+✖ restore refuses custom units with live default CAIRN_DEPLOY_BACKUP_TIMER (777.342416ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /live default/. Input:
+
+  'FAIL restore requires --confirm-discard <digest>; rows above would be discarded\n'
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:616:14)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL restore requires --confirm-discard <digest>; rows above would be discarded\n',
+    expected: /live default/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/deploy-self.test.mjs:607:5
+✖ resume refuses custom units with live default CAIRN_DEPLOY_DB (495.915334ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /live default/. Input:
+
+  'FAIL unable to open database file\n'
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:616:14)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL unable to open database file\n',
+    expected: /live default/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/deploy-self.test.mjs:607:5
+✖ resume refuses custom units with live default CAIRN_DEPLOY_URL (384.19875ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /live default/. Input:
+
+  'FAIL no such table: deploy_pause_state\n'
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:616:14)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL no such table: deploy_pause_state\n',
+    expected: /live default/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/deploy-self.test.mjs:607:5
+✖ resume refuses custom units with live default CAIRN_DEPLOY_BACKUP_TIMER (389.689333ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /live default/. Input:
+
+  'FAIL no such table: deploy_pause_state\n'
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:616:14)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL no such table: deploy_pause_state\n',
+    expected: /live default/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/deploy-self.test.mjs:621:1
+✖ instance guard requires effective server home containment (408.835583ms)
   AssertionError [ERR_ASSERTION]: Traceback (most recent call last):
     File "<string>", line 7, in <module>
-      with contextlib.redirect_stdout(output): m['resume'](db)
-                                               ~~~~~~~~~~~^^^^
-    File "<baseline>/deploy-self.py", line 151, in resume
-      connection.execute('drop trigger deploy_claim_barrier')
-      ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  sqlite3.OperationalError: no such trigger: deploy_claim_barrier
+      try: g['validate_instance']()
+           ~^^^^^^^^^^^^^^^^^^^^^
+  KeyError: 'validate_instance'
 
 
   1 !== 0
 
-      at command (file://<worktree>/scripts/ops/deploy-self.test.mjs:21:10)
-      at pythonFixture (file://<worktree>/scripts/ops/deploy-self.test.mjs:460:3)
-      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:480:3)
-      at Test.runInAsyncScope (node:async_hooks:226:14)
-      at Test.run (node:internal/test_runner/test:1402:25)
-      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
-      at Test.postRun (node:internal/test_runner/test:1542:19)
-      at Test.run (node:internal/test_runner/test:1467:12)
-      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+      at command (file://<worktree>/scripts/ops/deploy-self.test.mjs:34:10)
+      at pythonFixture (file://<worktree>/scripts/ops/deploy-self.test.mjs:481:3)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:622:3)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
     generatedMessage: false,
     code: 'ERR_ASSERTION',
     actual: 1,
@@ -192,200 +190,87 @@ test at scripts/ops/deploy-self.test.mjs:479:1
     diff: 'simple'
   }
 
-test at scripts/ops/deploy-self.test.mjs:498:1
-✖ confirmed restore failure restarts every configured service and timer (206.29725ms)
+test at scripts/ops/deploy-self.test.mjs:631:1
+✖ slow health barrier reinstallation renews the deadline (404.675167ms)
   AssertionError [ERR_ASSERTION]: Traceback (most recent call last):
-    File "<string>", line 14, in <module>
-      digest=m['discard_report'](db)
-             ~^^^^^^^^^^^^^^^^^^
-  KeyError: 'discard_report'
-
-
-  1 !== 0
-
-      at command (file://<worktree>/scripts/ops/deploy-self.test.mjs:21:10)
-      at pythonFixture (file://<worktree>/scripts/ops/deploy-self.test.mjs:460:3)
-      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:499:3)
-      at Test.runInAsyncScope (node:async_hooks:226:14)
-      at Test.run (node:internal/test_runner/test:1402:25)
-      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
-      at Test.postRun (node:internal/test_runner/test:1542:19)
-      at Test.run (node:internal/test_runner/test:1467:12)
-      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
-    generatedMessage: false,
-    code: 'ERR_ASSERTION',
-    actual: 1,
-    expected: 0,
-    operator: 'strictEqual',
-    diff: 'simple'
-  }
-
-test at scripts/ops/deploy-self.test.mjs:516:1
-✖ interrupt immediately after drain still restores pause state (2890.69425ms)
-  AssertionError [ERR_ASSERTION]: Traceback (most recent call last):
-    File "<string>", line 11, in <module>
-      assert db.execute('select autonomyPaused from team order by id').fetchall()==[(0,),(1,)]
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  AssertionError
-
-
-  1 !== 0
-
-      at command (file://<worktree>/scripts/ops/deploy-self.test.mjs:21:10)
-      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:518:3)
-      at Test.runInAsyncScope (node:async_hooks:226:14)
-      at Test.run (node:internal/test_runner/test:1402:25)
-      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
-      at Test.postRun (node:internal/test_runner/test:1542:19)
-      at Test.run (node:internal/test_runner/test:1467:12)
-      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
-    generatedMessage: false,
-    code: 'ERR_ASSERTION',
-    actual: 1,
-    expected: 0,
-    operator: 'strictEqual',
-    diff: 'simple'
-  }
-✖ confirmed restore failure restarts every configured service and timer (223.608167ms)
-✖ trigger cleanup failure cannot roll back committed pause restoration (201.791708ms)
-ℹ tests 2
-ℹ suites 0
-ℹ pass 0
-ℹ fail 2
-ℹ cancelled 0
-ℹ skipped 0
-ℹ todo 0
-ℹ duration_ms 490.663541
-
-✖ failing tests:
-
-test at scripts/ops/deploy-self.test.mjs:505:1
-✖ confirmed restore failure restarts every configured service and timer (223.608167ms)
-  AssertionError [ERR_ASSERTION]: Traceback (most recent call last):
-    File "<string>", line 22, in <module>
-      for unit in [*m['UNITS'],m['BACKUP_TIMER']]: assert ['systemctl','--user','start',unit] in events,events
-                                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  AssertionError: [['systemctl', '--user', 'stop', 'cairn-daemon.service'], ['systemctl', '--user', 'stop', 'cairn-server.service'], ['systemctl', '--user', 'stop', 'cairn-db-backup.timer']]
-
-
-  1 !== 0
-
-      at command (file://<worktree>/scripts/ops/deploy-self.test.mjs:23:10)
-      at pythonFixture (file://<worktree>/scripts/ops/deploy-self.test.mjs:462:3)
-      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:506:3)
-      at Test.runInAsyncScope (node:async_hooks:226:14)
-      at Test.run (node:internal/test_runner/test:1402:25)
-      at Test.start (node:internal/test_runner/test:1262:17)
-      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
-    generatedMessage: false,
-    code: 'ERR_ASSERTION',
-    actual: 1,
-    expected: 0,
-    operator: 'strictEqual',
-    diff: 'simple'
-  }
-
-test at scripts/ops/deploy-self.test.mjs:552:1
-✖ trigger cleanup failure cannot roll back committed pause restoration (201.791708ms)
-  AssertionError [ERR_ASSERTION]: Traceback (most recent call last):
-    File "<string>", line 14, in <module>
-      assert db.execute('select autonomyPaused from team order by id').fetchall()==[(0,),(1,)]
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  AssertionError
-
-
-  1 !== 0
-
-      at command (file://<worktree>/scripts/ops/deploy-self.test.mjs:23:10)
-      at pythonFixture (file://<worktree>/scripts/ops/deploy-self.test.mjs:462:3)
-      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:553:3)
-      at Test.runInAsyncScope (node:async_hooks:226:14)
-      at Test.run (node:internal/test_runner/test:1402:25)
-      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
-      at Test.postRun (node:internal/test_runner/test:1542:19)
-      at node:internal/test_runner/test:1305:31
-      at node:internal/process/task_queues:151:7
-      at AsyncResource.runInAsyncScope (node:async_hooks:226:14) {
-    generatedMessage: false,
-    code: 'ERR_ASSERTION',
-    actual: 1,
-    expected: 0,
-    operator: 'strictEqual',
-    diff: 'simple'
-  }
-✖ in-flight step completes while new claims remain blocked (244.791667ms)
-ℹ tests 1
-ℹ suites 0
-ℹ pass 0
-ℹ fail 1
-ℹ cancelled 0
-ℹ skipped 0
-ℹ todo 0
-ℹ duration_ms 307.381042
-
-✖ failing tests:
-
-test at scripts/ops/deploy-self.test.mjs:488:1
-✖ in-flight step completes while new claims remain blocked (244.791667ms)
-  AssertionError [ERR_ASSERTION]: Traceback (most recent call last):
-    File "<string>", line 6, in <module>
-      assert db.execute("select status from step where id='flight'").fetchone()[0]=='claimed'
-             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^
-  TypeError: 'NoneType' object is not subscriptable
-
-
-  1 !== 0
-
-      at command (file://<worktree>/scripts/ops/deploy-self.test.mjs:21:10)
-      at pythonFixture (file://<worktree>/scripts/ops/deploy-self.test.mjs:460:3)
-      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:489:3)
-      at Test.runInAsyncScope (node:async_hooks:226:14)
-      at Test.run (node:internal/test_runner/test:1402:25)
-      at Test.start (node:internal/test_runner/test:1262:17)
-      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
-    generatedMessage: false,
-    code: 'ERR_ASSERTION',
-    actual: 1,
-    expected: 0,
-    operator: 'strictEqual',
-    diff: 'simple'
-  }
-✖ barriers are reinstalled after asynchronous server migration readiness (226.26025ms)
-ℹ tests 1
-ℹ suites 0
-ℹ pass 0
-ℹ fail 1
-ℹ cancelled 0
-ℹ skipped 0
-ℹ todo 0
-ℹ duration_ms 280.257375
-
-✖ failing tests:
-
-test at scripts/ops/deploy-self.test.mjs:566:1
-✖ barriers are reinstalled after asynchronous server migration readiness (226.26025ms)
-  AssertionError [ERR_ASSERTION]: Traceback (most recent call last):
-    File "<string>", line 19, in <module>
+    File "<string>", line 16, in <module>
       m['restart'](db)
       ~~~~~~~~~~~~^^^^
-    File "<worktree>/scripts/ops/deploy-self.py", line 147, in restart
+    File "<tmp>/cairn-test-2f4b2c7c-a423-4cdb-b836-996e4664dbe5-deploy-source-ckMqMX/deploy-self.py", line 152, in restart
       run(['systemctl', '--user', 'restart', UNITS[1]])
       ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    File "<string>", line 8, in fake_run
-      assert state['migrated'],'daemon restarted before migration readiness'
-             ~~~~~^^^^^^^^^^^^
-  AssertionError: daemon restarted before migration readiness
+    File "<string>", line 11, in fake_run
+      assert db.execute('select min(deadline) from deploy_pause_state').fetchone()[0]>clock
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  AssertionError
 
 
   1 !== 0
 
-      at command (file://<worktree>/scripts/ops/deploy-self.test.mjs:23:10)
-      at pythonFixture (file://<worktree>/scripts/ops/deploy-self.test.mjs:462:3)
-      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:567:3)
-      at Test.runInAsyncScope (node:async_hooks:226:14)
-      at Test.run (node:internal/test_runner/test:1402:25)
-      at Test.start (node:internal/test_runner/test:1262:17)
-      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+      at command (file://<worktree>/scripts/ops/deploy-self.test.mjs:34:10)
+      at pythonFixture (file://<worktree>/scripts/ops/deploy-self.test.mjs:481:3)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:632:3)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/deploy-self.test.mjs:649:1
+✖ SIGHUP after drain restores pause state through the real handler (3599.121792ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  null !== 0
+
+      at command (file://<worktree>/scripts/ops/deploy-self.test.mjs:34:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:651:3)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/deploy-self.test.mjs:673:1
+✖ restore preview stops heartbeat writers before computing a stable digest (420.124209ms)
+  AssertionError [ERR_ASSERTION]: Traceback (most recent call last):
+    File "<string>", line 16, in <module>
+      try: m['restore'](snapshot,None)
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^
+    File "<tmp>/cairn-test-2f4b2c7c-a423-4cdb-b836-996e4664dbe5-deploy-source-ckMqMX/deploy-self.py", line 217, in restore
+      digest = discard_report(live)
+    File "<string>", line 11, in report
+      for unit in [*reversed(m['UNITS']),m['BACKUP_TIMER']]: assert ['systemctl','--user','stop',unit] in events
+                                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  AssertionError
+
+
+  1 !== 0
+
+      at command (file://<worktree>/scripts/ops/deploy-self.test.mjs:34:10)
+      at pythonFixture (file://<worktree>/scripts/ops/deploy-self.test.mjs:481:3)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:674:3)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
     generatedMessage: false,
     code: 'ERR_ASSERTION',
     actual: 1,

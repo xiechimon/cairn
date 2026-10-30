@@ -1,9 +1,9 @@
 ---
 Category: Deployment and restore hard-coded live unit and scratch instance settings
 Source: Ticket 1408 dispatcher review (2026-10-30)
-Level: 2
-Safeguard: All instance targets are configured through environment values and custom-instance deploy, rollback and restore fixtures reject default unit names
+Level: 1
+Safeguard: A shared mutation preflight rejects live defaults for custom units and requires the resolved DB under the server unit CAIRN_HOME before deploy, restore or resume; since 2026-10-30
 Intercepts: 0
-Recurrences: 0
-Notes: red.log captures the custom-instance failure; green.log verifies scratch units, URL, port, backup destination and timer.
+Recurrences: 1
+Notes: Round 2 red.log rejects each live-default fallback for restore and resume; green.log verifies the shared preflight and configured instance paths.
 ---

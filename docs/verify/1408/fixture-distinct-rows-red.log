@@ -1,0 +1,88 @@
+✔ red refuses before restarting units (2017.270875ms)
+✔ evidence refuses before restarting units (1851.220625ms)
+✔ off-main refuses before restarting units (1857.3805ms)
+✔ install refuses before restarting units (2741.328167ms)
+✔ migration refuses before restarting units (4821.546458ms)
+✔ incompatible refuses before restarting units (6140.043125ms)
+✔ drain refuses before restarting units (5398.335ms)
+✔ missing-check refuses before restarting units (1865.115958ms)
+✔ pending-check refuses before restarting units (2370.169167ms)
+✔ wrong-sha refuses before restarting units (3178.532125ms)
+✔ superseded refuses before restarting units (2191.75ms)
+✔ backup refuses before restarting units (4299.1975ms)
+✔ unit-path refuses before restarting units (1496.53675ms)
+✔ good deploy points current and last-good to the exact new SHA (4279.746041ms)
+✔ failed health rolls code back and keeps rows written after the backup (11703.943167ms)
+✔ restore previews discarded rows and refuses without explicit confirmation (3112.780083ms)
+✖ confirmed restore includes writes made while stopping units in its discard report (3741.303ms)
+✔ a stale daemon heartbeat causes code rollback (7636.479125ms)
+✔ drain blocks both claim insertion and transition, then restores prior pause values (623.84925ms)
+✔ a drain setup error leaves neither a partial pause record nor changed pause values (724.170833ms)
+✔ restoring a drained snapshot removes its saved deployment barrier before restart (2028.67125ms)
+✔ install honors allowBuilds and probes native SQLite before scratch startup (5297.908875ms)
+✔ native probe failure refuses before scratch, drain or restart (3271.873208ms)
+✔ check needs no bootstrap and leaves no deployment files or database (1012.073291ms)
+✔ check refuses red without writes (945.852709ms)
+✔ check refuses evidence without writes (979.809667ms)
+✔ check refuses off-main without writes (830.809334ms)
+✔ check refuses missing-check without writes (899.74675ms)
+✔ check refuses pending-check without writes (859.406125ms)
+✔ check refuses wrong-sha without writes (1038.532542ms)
+✔ check refuses superseded without writes (1808.533458ms)
+✔ deploy refuses leftover drain state and names explicit recovery (1911.887916ms)
+✔ check refuses leftover drain state and names explicit recovery (2163.770125ms)
+✔ restore refuses leftover drain state and names explicit recovery (1875.560041ms)
+✔ custom instance uses only its units, URL, scratch port and backup directory (8108.321125ms)
+✔ invalid unit inventory refuses "" (731.706292ms)
+✔ invalid unit inventory refuses "one.service" (649.028958ms)
+✔ invalid unit inventory refuses "one.service two.service three.service" (485.469292ms)
+✔ custom instance health failure rolls back only its units (5963.077625ms)
+✔ deploy fetches the gated release before creating its checkout (5311.509417ms)
+✔ check refuses an uncheckpointed drain without changing WAL sidecars (627.728417ms)
+✔ rebuild migration and heartbeat regression (3737.912416ms)
+✔ old-heartbeat migration and heartbeat regression (4779.655542ms)
+✔ expired drain permits claims after an unclean exit and refusal names its deadline (339.93175ms)
+✔ resume preserves changed pause values and survives missing migration triggers (307.455834ms)
+✔ in-flight step completes while new claims remain blocked (326.428333ms)
+✔ confirmed restore failure restarts every configured service and timer (363.753375ms)
+✔ interrupt immediately after drain still restores pause state (3416.589375ms)
+✔ trigger cleanup failure cannot roll back committed pause restoration (356.798ms)
+✔ barriers are reinstalled after asynchronous server migration readiness (368.310584ms)
+✔ restore refuses custom units with live default CAIRN_DEPLOY_DB (423.932667ms)
+✔ restore refuses custom units with live default CAIRN_DEPLOY_URL (440.36575ms)
+✔ restore refuses custom units with live default CAIRN_DEPLOY_BACKUP_TIMER (462.96325ms)
+✔ resume refuses custom units with live default CAIRN_DEPLOY_DB (409.054625ms)
+✔ resume refuses custom units with live default CAIRN_DEPLOY_URL (409.284916ms)
+✔ resume refuses custom units with live default CAIRN_DEPLOY_BACKUP_TIMER (340.672834ms)
+✔ instance guard requires effective server home containment (321.294625ms)
+✔ slow health barrier reinstallation renews the deadline (298.848917ms)
+✔ SIGHUP after drain restores pause state through the real handler (3275.667167ms)
+✔ restore preview stops heartbeat writers before computing a stable digest (269.654167ms)
+ℹ tests 60
+ℹ suites 0
+ℹ pass 59
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 140441.423333
+
+✖ failing tests:
+
+test at scripts/ops/deploy-self.test.mjs:228:1
+✖ confirmed restore includes writes made while stopping units in its discard report (3741.303ms)
+  AssertionError [ERR_ASSERTION]: Expected "actual" to be strictly unequal to: 0
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:235:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 0,
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }

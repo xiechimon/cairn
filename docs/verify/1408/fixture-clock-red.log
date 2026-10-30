@@ -1,0 +1,43 @@
+✖ slow health barrier reinstallation renews the deadline (2331.570708ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2767.985541
+
+✖ failing tests:
+
+test at scripts/ops/deploy-self.test.mjs:617:1
+✖ slow health barrier reinstallation renews the deadline (2331.570708ms)
+  AssertionError [ERR_ASSERTION]: Traceback (most recent call last):
+    File "<string>", line 16, in <module>
+      m['restart'](db)
+      ~~~~~~~~~~~~^^^^
+    File "<baseline>/deploy-self.py", line 150, in restart
+      wait_for(ready, 'server migration readiness')
+      ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    File "<baseline>/deploy-self.py", line 97, in wait_for
+      deadline = time.monotonic() + TIMEOUT
+                 ^^^^^^^^^^^^^^
+  AttributeError: type object 'Clock' has no attribute 'monotonic'
+
+
+  1 !== 0
+
+      at command (file://<worktree>/scripts/ops/deploy-self.test.mjs:23:10)
+      at pythonFixture (file://<worktree>/scripts/ops/deploy-self.test.mjs:467:3)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:618:3)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.start (node:internal/test_runner/test:1015:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

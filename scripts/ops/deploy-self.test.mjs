@@ -14,10 +14,21 @@ import { join, resolve } from 'node:path';
 import test from 'node:test';
 import { makeTestTempDir } from '../test-tmpdir.mjs';
 
-const script =
-  process.env.CAIRN_TEST_DEPLOY_SCRIPT || resolve(import.meta.dirname, 'deploy-self.sh');
-const pythonScript =
-  process.env.CAIRN_TEST_DEPLOY_PYTHON || resolve(import.meta.dirname, 'deploy-self.py');
+const sourceSnapshot = makeTestTempDir('deploy-source-');
+const script = join(sourceSnapshot, 'deploy-self.sh');
+const pythonScript = join(sourceSnapshot, 'deploy-self.py');
+copyFileSync(
+  process.env.CAIRN_TEST_DEPLOY_SCRIPT || resolve(import.meta.dirname, 'deploy-self.sh'),
+  script,
+);
+copyFileSync(
+  process.env.CAIRN_TEST_DEPLOY_PYTHON || resolve(import.meta.dirname, 'deploy-self.py'),
+  pythonScript,
+);
+copyFileSync(
+  resolve(import.meta.dirname, 'backup-server-db.sh'),
+  join(sourceSnapshot, 'backup-server-db.sh'),
+);
 function command(tool, args, options = {}) {
   const result = spawnSync(tool, args, { encoding: 'utf8', ...options });
   assert.equal(result.status, 0, result.stderr);
@@ -118,10 +129,12 @@ print(json.dumps([{'id':'a'}] if sys.argv[-1].endswith('/api/teams') else {'id':
   fake(
     'systemctl',
     `import os,sys,sqlite3
+if 'show' in sys.argv and 'Environment' in sys.argv:
+ print('Environment=CAIRN_HOME='+os.path.dirname(os.environ['DB'])); sys.exit(0)
 if 'show' in sys.argv:
  print('/wrong' if os.environ['MODE']=='unit-path' else os.environ['CAIRN_DEPLOY_ROOT']+'/current/apps/'+('server' if os.environ.get('CAIRN_DEPLOY_UNITS','cairn-server.service cairn-daemon.service').split()[0] in sys.argv else 'daemon')); sys.exit(0)
 if 'stop' in sys.argv and os.environ['MODE']=='restore-late':
- db=sqlite3.connect(os.environ['DB']); db.execute("insert into todo values('late-write')"); db.commit()
+ db=sqlite3.connect(os.environ['DB']); db.execute("insert into todo values(?)",('late-write-'+str(db.execute("select count(*) from todo").fetchone()[0]),)); db.commit()
 with open(os.environ['EVENTS'],'a') as f: f.write(' '.join(sys.argv[1:])+'\\n')
 if 'restart' in sys.argv and os.environ['MODE']=='rebuild' and 'server' in sys.argv[-1]:
  db=sqlite3.connect(os.environ['DB']); db.executescript('create table new_step as select * from step; drop table step; alter table new_step rename to step;'); db.close()
@@ -220,7 +233,11 @@ test('restore previews discarded rows and refuses without explicit confirmation'
   assert.notEqual(result.status, 0);
   assert.match(result.stdout, /discard-me/);
   assert.match(f.sql('select id from todo'), /discard-me/);
-  assert.equal(readFileSync(f.events, 'utf8'), '');
+  assert.match(
+    readFileSync(f.events, 'utf8'),
+    /stop cairn-daemon.service[\s\S]*stop cairn-server.service[\s\S]*stop cairn-db-backup.timer/,
+  );
+  assert.doesNotMatch(readFileSync(f.events, 'utf8'), /start /);
 });
 test('confirmed restore includes writes made while stopping units in its discard report', () => {
   const f = fixture('restore-late');
@@ -375,10 +392,10 @@ test('custom instance uses only its units, URL, scratch port and backup director
   const f = fixture();
   Object.assign(f.env, {
     CAIRN_DEPLOY_UNITS: 'scratch-server.service scratch-daemon.service',
+    CAIRN_DEPLOY_BACKUP_TIMER: 'scratch-backup.timer',
     CAIRN_DEPLOY_URL: 'http://127.0.0.1:28887',
     CAIRN_DEPLOY_SCRATCH_PORT: '28888',
     CAIRN_DEPLOY_BACKUP_OUT: join(f.root, 'private-backups'),
-    CAIRN_DEPLOY_BACKUP_TIMER: 'scratch-backup.timer',
   });
   const result = f.run();
   assert.equal(result.status, 0, result.stderr);
@@ -408,6 +425,7 @@ for (const units of ['', 'one.service', 'one.service two.service three.service']
 test('custom instance health failure rolls back only its units', () => {
   const f = fixture('health', {
     CAIRN_DEPLOY_UNITS: 'scratch-server.service scratch-daemon.service',
+    CAIRN_DEPLOY_BACKUP_TIMER: 'scratch-backup.timer',
     CAIRN_DEPLOY_URL: 'http://127.0.0.1:28887',
     CAIRN_DEPLOY_SCRATCH_PORT: '28888',
   });
@@ -581,4 +599,99 @@ m['restart'].__globals__['run']=fake_run
 m['restart'].__globals__['read_api']=ready
 m['restart'](db)
 m['resume'](db)`);
+});
+
+for (const action of ['restore', 'resume']) {
+  for (const setting of ['CAIRN_DEPLOY_DB', 'CAIRN_DEPLOY_URL', 'CAIRN_DEPLOY_BACKUP_TIMER']) {
+    test(action + ' refuses custom units with live default ' + setting, () => {
+      const f = fixture('good', {
+        CAIRN_DEPLOY_UNITS: 'drill-server.service drill-daemon.service',
+        CAIRN_DEPLOY_URL: 'http://127.0.0.1:28887',
+        CAIRN_DEPLOY_BACKUP_TIMER: 'drill-backup.timer',
+      });
+      delete f.env[setting];
+      const result = f.run(action, ...(action === 'restore' ? [f.db] : []));
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, /live default/);
+      assert.doesNotMatch(readFileSync(f.events, 'utf8'), /stop|start|restart/);
+    });
+  }
+}
+test('instance guard requires effective server home containment', () => {
+  pythonFixture(`g=m['main'].__globals__
+linked_home=m['DB'].parent/'linked-home'
+linked_home.symlink_to(m['DB'].parent/'outside-home',target_is_directory=True)
+for home in ['', str(m['DB'].parent)+'-sibling', str(m['DB'].parent/'other'),str(linked_home)]:
+ g['run']=lambda args: 'Environment='+('CAIRN_HOME='+home if home else '')
+ try: g['validate_instance']()
+ except RuntimeError: pass
+ else: raise AssertionError('unsafe home accepted: '+home)
+g['run']=lambda args: 'Environment="CAIRN_HOME='+str(m['DB'].parent)+'"'
+g['validate_instance']()
+spaced=m['DB'].parent/'home with spaces'; spaced.mkdir()
+g['DB']=spaced/'server.db'
+g['run']=lambda args: 'Environment=OTHER=value "CAIRN_HOME='+str(spaced)+'"'
+g['validate_instance']()`);
+});
+test('slow health barrier reinstallation renews the deadline', () => {
+  pythonFixture(`m['drain'](db)
+g=m['install_barriers'].__globals__
+initial=db.execute('select max(deadline) from deploy_pause_state').fetchone()[0]
+clock=time.time()+1200
+g['time']=type('Clock',(),{'time':staticmethod(lambda: clock),'monotonic':staticmethod(time.monotonic),'sleep':staticmethod(time.sleep)})
+def fake_run(args,**kwargs):
+ if args==['systemctl','--user','restart',m['UNITS'][1]]:
+  assert db.execute('select min(deadline) from deploy_pause_state').fetchone()[0]>clock
+ return ''
+def slow_health(url,path):
+ return [] if path.endswith('/teams') else {'id':'user'}
+g['run']=fake_run; g['read_api']=slow_health
+m['restart'](db)
+assert db.execute('select min(deadline) from deploy_pause_state').fetchone()[0]>clock
+assert db.execute('select min(deadline) from deploy_pause_state').fetchone()[0]>initial
+m['resume'](db)`);
+});
+test('SIGHUP after drain restores pause state through the real handler', () => {
+  const f = fixture();
+  command(
+    'python3',
+    [
+      '-c',
+      `import runpy,sqlite3,sys,os,signal
+m=runpy.run_path(sys.argv[1]); g=m['main'].__globals__; original=g['drain']
+def hangup(db):
+ original(db)
+ os.kill(os.getpid(),signal.SIGHUP)
+g['drain']=hangup
+sys.argv=[sys.argv[1],os.environ['SHA']]
+try: m['main']()
+except KeyboardInterrupt: pass
+else: raise AssertionError('SIGHUP did not interrupt')
+db=sqlite3.connect(os.environ['DB'])
+assert db.execute('select autonomyPaused from team order by id').fetchall()==[(0,),(1,)]
+assert not db.execute("select 1 from sqlite_master where name='deploy_pause_state'").fetchone()`,
+      pythonScript,
+    ],
+    { env: f.env },
+  );
+});
+test('restore preview stops heartbeat writers before computing a stable digest', () => {
+  pythonFixture(`from pathlib import Path
+snapshot=Path(str(m['DB'])+'.snapshot'); target=sqlite3.connect(snapshot); db.backup(target); target.close()
+g=m['restore'].__globals__; events=[]; original=g['discard_report']
+def fake_run(args,**kwargs):
+ events.append(args)
+ return ''
+def report(live):
+ for unit in [*reversed(m['UNITS']),m['BACKUP_TIMER']]: assert ['systemctl','--user','stop',unit] in events
+ return original(live)
+g['run']=fake_run; g['discard_report']=report
+output=io.StringIO()
+with contextlib.redirect_stdout(output):
+ try: m['restore'](snapshot,None)
+ except RuntimeError as error: assert 'confirm-discard' in str(error)
+assert not any('start' in args for args in events)
+digest=output.getvalue().split('DISCARD_DIGEST ')[1].split()[0]
+m['restore'](snapshot,digest)
+for unit in [*m['UNITS'],m['BACKUP_TIMER']]: assert ['systemctl','--user','start',unit] in events`);
 });

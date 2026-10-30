@@ -1,0 +1,196 @@
+$ biome ci .
+apps/server/test/feishu-config.test.ts:144:7 lint/complexity/useFlatMap  FIXABLE  ━━━━━━━━━━━━━━━━━━
+
+  ℹ The call chain .map().flat() can be replaced with a single .flatMap() call.
+
+    142 │       { db: s.db, box: s.secretBox },
+    143 │       s.team.id,
+  > 144 │       s.db
+        │       ^^^^
+  > 145 │         .select()
+  > 146 │         .from(feishuBinding)
+  > 147 │         .all()
+  > 148 │         .map((row) => [row.appIdCipher, row.appSecretCipher])
+  > 149 │         .flat(),
+        │         ^^^^^^^
+    150 │     ),
+    151 │   ).toEqual({});
+
+  ℹ Using .flatMap() avoids the creation of an intermediate array.
+
+  ℹ Safe fix: Replace the chain with .flatMap().
+
+    146 146 │           .from(feishuBinding)
+    147 147 │           .all()
+    148     │ - ········.map((row)·=>·[row.appIdCipher,·row.appSecretCipher])
+    149     │ - ········.flat(),
+        148 │ + ········.flatMap((row)·=>·[row.appIdCipher,·row.appSecretCipher]),
+    150 149 │       ),
+    151 150 │     ).toEqual({});
+
+
+scripts/ops/deploy-self.test.mjs:335:44 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ℹ Template literals are preferred over string concatenation.
+
+    333 │   assert.equal(result.status, 0, result.stderr);
+    334 │   for (const name of ['main', 'check', 'pack-smoke', 'e2e-gate', 'pr-evidence'])
+  > 335 │     assert.match(result.stdout, new RegExp('PASS ' + name + ' '));
+        │                                            ^^^^^^^^^^^^^^^^^^^^
+    336 │   assert.equal(existsSync(f.state), false);
+    337 │   assert.equal(existsSync(f.db), false);
+
+  ℹ Unsafe fix: Use a template literal.
+
+    333 333 │     assert.equal(result.status, 0, result.stderr);
+    334 334 │     for (const name of ['main', 'check', 'pack-smoke', 'e2e-gate', 'pr-evidence'])
+    335     │ - ····assert.match(result.stdout,·new·RegExp('PASS·'·+·name·+·'·'));
+        335 │ + ····assert.match(result.stdout,·new·RegExp(`PASS·${name}·`));
+    336 336 │     assert.equal(existsSync(f.state), false);
+    337 337 │     assert.equal(existsSync(f.db), false);
+
+
+scripts/ops/deploy-self.test.mjs:349:8 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ℹ Template literals are preferred over string concatenation.
+
+    347 │   'superseded',
+    348 │ ]) {
+  > 349 │   test('check refuses ' + mode + ' without writes', () => {
+        │        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    350 │     const f = fixture(mode);
+    351 │     const before = readFileSync(f.db);
+
+  ℹ Unsafe fix: Use a template literal.
+
+    347 347 │     'superseded',
+    348 348 │   ]) {
+    349     │ - ··test('check·refuses·'·+·mode·+·'·without·writes',·()·=>·{
+        349 │ + ··test(`check·refuses·${mode}·without·writes`,·()·=>·{
+    350 350 │       const f = fixture(mode);
+    351 351 │       const before = readFileSync(f.db);
+
+
+scripts/ops/deploy-self.test.mjs:370:8 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ℹ Template literals are preferred over string concatenation.
+
+    368 │ }
+    369 │ for (const action of ['deploy', 'check', 'restore']) {
+  > 370 │   test(action + ' refuses leftover drain state and names explicit recovery', () => {
+        │        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    371 │     const f = fixture();
+    372 │     command('python3', [
+
+  ℹ Unsafe fix: Use a template literal.
+
+    368 368 │   }
+    369 369 │   for (const action of ['deploy', 'check', 'restore']) {
+    370     │ - ··test(action·+·'·refuses·leftover·drain·state·and·names·explicit·recovery',·()·=>·{
+        370 │ + ··test(`${action}·refuses·leftover·drain·state·and·names·explicit·recovery`,·()·=>·{
+    371 371 │       const f = fixture();
+    372 372 │       command('python3', [
+
+
+scripts/ops/deploy-self.test.mjs:420:8 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ℹ Template literals are preferred over string concatenation.
+
+    418 │ });
+    419 │ for (const units of ['', 'one.service', 'one.service two.service three.service']) {
+  > 420 │   test('invalid unit inventory refuses ' + JSON.stringify(units), () => {
+        │        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    421 │     const f = fixture('good', { CAIRN_DEPLOY_UNITS: units });
+    422 │     assert.notEqual(f.run().status, 0);
+
+  ℹ Unsafe fix: Use a template literal.
+
+    418 418 │   });
+    419 419 │   for (const units of ['', 'one.service', 'one.service two.service three.service']) {
+    420     │ - ··test('invalid·unit·inventory·refuses·'·+·JSON.stringify(units),·()·=>·{
+        420 │ + ··test(`invalid·unit·inventory·refuses·${JSON.stringify(units)}`,·()·=>·{
+    421 421 │       const f = fixture('good', { CAIRN_DEPLOY_UNITS: units });
+    422 422 │       assert.notEqual(f.run().status, 0);
+
+
+scripts/ops/deploy-self.test.mjs:471:8 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ℹ Template literals are preferred over string concatenation.
+
+    470 │ for (const mode of ['rebuild', 'old-heartbeat']) {
+  > 471 │   test(mode + ' migration and heartbeat regression', () => {
+        │        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    472 │     const f = fixture(mode);
+    473 │     const result = f.run();
+
+  ℹ Unsafe fix: Use a template literal.
+
+    469 469 │
+    470 470 │   for (const mode of ['rebuild', 'old-heartbeat']) {
+    471     │ - ··test(mode·+·'·migration·and·heartbeat·regression',·()·=>·{
+        471 │ + ··test(`${mode}·migration·and·heartbeat·regression`,·()·=>·{
+    472 472 │       const f = fixture(mode);
+    473 473 │       const result = f.run();
+
+
+scripts/ops/deploy-self.test.mjs:607:10 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ℹ Template literals are preferred over string concatenation.
+
+    605 │ for (const action of ['restore', 'resume']) {
+    606 │   for (const setting of ['CAIRN_DEPLOY_DB', 'CAIRN_DEPLOY_URL', 'CAIRN_DEPLOY_BACKUP_TIMER']) {
+  > 607 │     test(action + ' refuses custom units with live default ' + setting, () => {
+        │          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    608 │       const f = fixture('good', {
+    609 │         CAIRN_DEPLOY_UNITS: 'drill-server.service drill-daemon.service',
+
+  ℹ Unsafe fix: Use a template literal.
+
+    605 605 │   for (const action of ['restore', 'resume']) {
+    606 606 │     for (const setting of ['CAIRN_DEPLOY_DB', 'CAIRN_DEPLOY_URL', 'CAIRN_DEPLOY_BACKUP_TIMER']) {
+    607     │ - ····test(action·+·'·refuses·custom·units·with·live·default·'·+·setting,·()·=>·{
+        607 │ + ····test(`${action}·refuses·custom·units·with·live·default·${setting}`,·()·=>·{
+    608 608 │         const f = fixture('good', {
+    609 609 │           CAIRN_DEPLOY_UNITS: 'drill-server.service drill-daemon.service',
+
+
+scripts/ops/deploy-self.test.mjs:395:5 lint/suspicious/noDuplicateObjectKeys  FIXABLE  ━━━━━━━━━━━━━
+
+  ✖ This property is later overwritten by an object member with the same name.
+
+    393 │   Object.assign(f.env, {
+    394 │     CAIRN_DEPLOY_UNITS: 'scratch-server.service scratch-daemon.service',
+  > 395 │     CAIRN_DEPLOY_BACKUP_TIMER: 'scratch-backup.timer',
+        │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    396 │     CAIRN_DEPLOY_URL: 'http://127.0.0.1:28887',
+    397 │     CAIRN_DEPLOY_SCRATCH_PORT: '28888',
+
+  ℹ Overwritten with this property.
+
+    397 │     CAIRN_DEPLOY_SCRATCH_PORT: '28888',
+    398 │     CAIRN_DEPLOY_BACKUP_OUT: join(f.root, 'private-backups'),
+  > 399 │     CAIRN_DEPLOY_BACKUP_TIMER: 'scratch-backup.timer',
+        │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    400 │   });
+    401 │   const result = f.run();
+
+  ℹ If an object property with the same name is defined multiple times (except when combining a getter with a setter), only the last definition makes it into the object and previous definitions are ignored.
+
+  ℹ Unsafe fix: Remove this property.
+
+    393 393 │     Object.assign(f.env, {
+    394 394 │       CAIRN_DEPLOY_UNITS: 'scratch-server.service scratch-daemon.service',
+    395     │ - ····CAIRN_DEPLOY_BACKUP_TIMER:·'scratch-backup.timer',
+    396 395 │       CAIRN_DEPLOY_URL: 'http://127.0.0.1:28887',
+    397 396 │       CAIRN_DEPLOY_SCRATCH_PORT: '28888',
+
+
+Checked 1257 files in 40s. No fixes applied.
+Found 1 error.
+Found 7 infos.
+ci ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ✖ Some errors were emitted while running checks.
+
+
+[ELIFECYCLE] Command failed with exit code 1.

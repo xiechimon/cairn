@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import re
 import signal
+import shlex
 import sqlite3
 import subprocess
 import sys
@@ -132,6 +133,7 @@ def scratch_server(release, home, label):
 
 def install_barriers(connection):
     with connection:
+        connection.execute('update deploy_pause_state set deadline=?', (time.time() + max(TIMEOUT * 4, 600),))
         connection.execute('drop trigger if exists deploy_claim_barrier')
         connection.execute('drop trigger if exists deploy_claim_insert_barrier')
         active = "exists(select 1 from deploy_pause_state where deadline>cast(strftime('%s','now') as integer))"
@@ -209,9 +211,10 @@ def restore(snapshot, confirm):
         if saved.execute('pragma integrity_check').fetchone()[0] != 'ok':
             raise RuntimeError('snapshot integrity failed')
         try:
-            if confirm:
-                for unit in [*reversed(UNITS), BACKUP_TIMER]:
-                    run(['systemctl', '--user', 'stop', unit])
+            for unit in [*reversed(UNITS), BACKUP_TIMER]:
+                run(['systemctl', '--user', 'stop', unit])
+            if not confirm:
+                print('Configured writers stopped; they remain stopped until confirmation or explicit operator restart', flush=True)
             with sqlite3.connect(f'file:{DB}?mode=rw', uri=True) as live:
                 live.execute('attach database ? as snapshot', (str(source),))
                 digest = discard_report(live)
@@ -328,11 +331,23 @@ def refuse_paused():
         connection.close()
 
 
+def validate_instance():
+    defaults = ['cairn-server.service', 'cairn-daemon.service']
+    if UNITS != defaults and (DB == Path('/mnt/fast/cairn/server/server.db').resolve() or BACKUP_TIMER == 'cairn-db-backup.timer' or URL.rstrip('/') == 'http://127.0.0.1:8787'):
+        raise RuntimeError('custom units must not use the live default DB, backup timer or URL')
+    environment = run(['systemctl', '--user', 'show', '-p', 'Environment', UNITS[0]])
+    values = dict(item.split('=', 1) for item in shlex.split(environment.removeprefix('Environment=')) if '=' in item)
+    home = values.get('CAIRN_HOME', '')
+    if not home or not Path(home).is_absolute() or not DB.is_relative_to(Path(home).resolve()) or DB == Path(home).resolve():
+        raise RuntimeError('DB must sit under the server unit CAIRN_HOME from systemctl Environment')
+
+
 def main():
     os.umask(0o077)
     def interrupted(signum, frame):
         raise KeyboardInterrupt(f'signal {signum}')
     signal.signal(signal.SIGTERM, interrupted)
+    signal.signal(signal.SIGHUP, interrupted)
     if len(sys.argv) < 2 or TIMEOUT <= 0:
         raise RuntimeError('usage: deploy-self.sh <sha> | check <sha> | restore <snapshot.db[.gz]> [--confirm-discard <digest>] | resume')
     if sys.argv[1] != 'resume':
@@ -346,6 +361,7 @@ def main():
         raise RuntimeError('CAIRN_DEPLOY_UNITS must name server and daemon services in that order')
     if not SCRATCH_PORT.isdecimal() or not 1 <= int(SCRATCH_PORT) <= 65535:
         raise RuntimeError('CAIRN_DEPLOY_SCRATCH_PORT must be a TCP port')
+    validate_instance()
     ROOT.mkdir(parents=True, exist_ok=True)
     with (ROOT / 'lock').open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
