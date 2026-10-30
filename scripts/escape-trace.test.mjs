@@ -1434,3 +1434,75 @@ test('successive exports preserve existing cases and only upsert matching identi
   assert.ok(names.includes(`${third.exported[0].id}.json`));
   assert.deepEqual(readFileSync(join(out, 'cases', `${firstId}.json`)), firstBytes);
 });
+
+test('export refuses a history unreachable from origin/main, keeping the case off the verified bank', (t) => {
+  const { cwd, git, commit } = fixture(t, 'escape-export-unreachable-');
+  commit('chore: seed', '2026-07-31T00:00:00Z', { 'src/flow.txt': 'alpha\n' });
+  const introducingSha = commit('feat: add buggy line (#95)', '2026-08-01T00:00:00Z', {
+    'src/flow.txt': 'alpha\nBUG\nomega\n',
+  });
+  const fixingSha = commit('fix: correct buggy line (#96)', '2026-08-08T00:00:00Z', {
+    'src/flow.txt': 'alpha\nGOOD\nomega\n',
+  });
+  git(['update-ref', 'refs/remotes/origin/main', 'HEAD~2']);
+  const out = join(cwd, 'review');
+  const result = exportCases({
+    traces: [
+      resolvedTrace({
+        introducingSha,
+        fixingSha,
+        originalPr: 95,
+        fixingPr: 96,
+        path: 'src/flow.txt',
+        start: 2,
+        end: 2,
+      }),
+    ],
+    outDir: out,
+    cwd,
+  });
+  assert.equal(result.exported.length, 0);
+  assert.equal(result.candidates.length, 1);
+  assert.equal(result.candidates[0].ineligibleReason, 'unreachable-from-mainline');
+  assert.deepEqual(
+    readdirSync(join(out, 'cases')).filter((n) => n.endsWith('.json')),
+    [],
+  );
+});
+
+test('validate refuses a case whose commits are unreachable from origin/main', (t) => {
+  const { cwd, git, commit } = fixture(t, 'escape-validate-unreachable-');
+  commit('chore: seed', '2026-07-31T00:00:00Z', { 'src/flow.txt': 'alpha\n' });
+  const introducingSha = commit('feat: add buggy line (#97)', '2026-08-01T00:00:00Z', {
+    'src/flow.txt': 'alpha\nBUG\nomega\n',
+  });
+  const fixingSha = commit('fix: correct buggy line (#98)', '2026-08-08T00:00:00Z', {
+    'src/flow.txt': 'alpha\nGOOD\nomega\n',
+  });
+  git(['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+  const out = join(cwd, 'review');
+  const good = exportCases({
+    traces: [
+      resolvedTrace({
+        introducingSha,
+        fixingSha,
+        originalPr: 97,
+        fixingPr: 98,
+        path: 'src/flow.txt',
+        start: 2,
+        end: 2,
+      }),
+    ],
+    outDir: out,
+    cwd,
+  });
+  assert.equal(good.exported.length, 1);
+  assert.equal(validateCases(join(out, 'cases'), { cwd }).ok, true);
+  git(['update-ref', 'refs/remotes/origin/main', 'HEAD~2']);
+  const validation = validateCases(join(out, 'cases'), { cwd });
+  assert.equal(validation.ok, false);
+  assert.ok(
+    validation.errors.some((error) => /unreachable|mainline/i.test(error)),
+    JSON.stringify(validation.errors),
+  );
+});
