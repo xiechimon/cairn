@@ -1,4 +1,4 @@
-import { canOrchestrate } from '@cairn/shared';
+import { canOrchestrate, STOP_MESSAGE } from '@cairn/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   useCallback,
@@ -228,6 +228,7 @@ export function TodoDetailPage() {
   const [stopOpen, setStopOpen] = useState(false);
   const [stopQueued, setStopQueued] = useState(false);
   const [stopping, setStopping] = useState(false);
+  const stopRequested = useRef(false);
 
   const phase: Phase = todo?.phase ?? 'todo';
   const donePatchPending =
@@ -235,7 +236,9 @@ export function TodoDetailPage() {
     mutations.patchTodo.variables?.body.phase === 'done' &&
     mutations.patchTodo.variables?.id === todo?.id;
   const archived = todo?.archivedAt != null;
-  const showsChanges = archived || phase === 'review' || phase === 'done' || phase === 'failed';
+  const stoppedBuild = buildQ.data?.errorMessage === STOP_MESSAGE;
+  const showsChanges =
+    archived || stoppedBuild || phase === 'review' || phase === 'done' || phase === 'failed';
   const changesQ = useBuildChanges(buildId, live && (showsChanges || compareOpen));
   const latestPlan = plansQ.data?.length ? plansQ.data[plansQ.data.length - 1] : null;
   const compareDiffQ = useDocumentDiff(
@@ -278,7 +281,10 @@ export function TodoDetailPage() {
   useConversationStream(buildId ?? undefined, live, streamHandlers);
 
   const steps = stepsQ.data ?? [];
-  const runningStep = steps.find((s) => s.status === 'claimed' || s.status === 'pending') ?? null;
+  const runningStep =
+    steps.find(
+      (s) => s.status === 'claimed' || s.status === 'pending' || s.status === 'waiting_quota',
+    ) ?? null;
   const running = runningStep !== null;
   const reviewActive = steps.some(
     (s) => s.kind === 'review' && (s.status === 'claimed' || s.status === 'pending'),
@@ -287,10 +293,14 @@ export function TodoDetailPage() {
     (s) => s.kind === 'verify' && (s.status === 'claimed' || s.status === 'pending'),
   );
   useEffect(() => {
-    if (!running) setStopping(false);
+    if (!running) {
+      setStopping(false);
+      stopRequested.current = false;
+    }
   }, [running]);
   useEffect(() => {
     setStopping(false);
+    stopRequested.current = false;
   }, [buildId]);
 
   useLayoutEffect(() => {
@@ -498,6 +508,42 @@ export function TodoDetailPage() {
     revisionAvailable: fixtureDetail?.revision != null,
   });
 
+  const stopTurn = (discard: boolean) => {
+    if (!buildId || stopRequested.current) return;
+    stopRequested.current = true;
+    setStopping(true);
+    mutations.stopBuild.mutate(
+      { buildId, discard },
+      {
+        onSuccess: (res) => {
+          if (!res.delegated) {
+            stopRequested.current = false;
+            setStopping(false);
+          }
+        },
+        onError: (error) => {
+          stopRequested.current = false;
+          setStopping(false);
+          toastError(t('停止失败，请重试。'), error);
+        },
+      },
+    );
+  };
+  const queueMessage =
+    live && buildId
+      ? (text: string, deliverAfterStop = false) => {
+          transcriptColRef.current?.scrollToEnd();
+          return mutations.sendSteer
+            .mutateAsync({
+              conversationId: buildId,
+              content: text,
+              mode: 'queue',
+              deliverAfterStop,
+            })
+            .then(() => undefined);
+        }
+      : undefined;
+
   const actionInFlight =
     live && todo != null && canOrchestrate(todo.phase)
       ? inflightOrchestrationFor(chiefThreadsQ.data, todo.seqNum) !== null
@@ -631,7 +677,10 @@ export function TodoDetailPage() {
   const mentionFiles: FileMentionEntry[] | undefined = live
     ? (filesQ.data?.files ?? []).map((f) => ({ path: f.path, type: f.type }))
     : undefined;
-  const ui = PHASE_UI[phase];
+  const stoppedBeforeStart = phase === 'todo' && steps.some((step) => step.status === 'stopped');
+  const ui = stoppedBeforeStart
+    ? { ...PHASE_UI.todo, placeholder: PHASE_UI.done.placeholder }
+    : PHASE_UI[phase];
   const detail = live ? liveDetail : fixtureDetail;
   const streaming = live ? running : view.transcript.some((item) => item.kind === 'streaming');
   const docMode =
@@ -639,7 +688,7 @@ export function TodoDetailPage() {
       ? 'diff'
       : planView
         ? 'plan'
-        : phase === 'review' || phase === 'done' || phase === 'failed'
+        : stoppedBuild || phase === 'review' || phase === 'done' || phase === 'failed'
           ? 'changes'
           : 'plan';
 
@@ -650,7 +699,7 @@ export function TodoDetailPage() {
   const composerReject = !live
     ? null
     : mutations.sendSteer.isError
-      ? phase === 'done'
+      ? phase === 'done' || mutations.sendSteer.variables?.mode === 'queue'
         ? mutations.sendSteer.error?.message || t('发送失败，请重试。')
         : t('当前没有运行中的会话，消息未送出')
       : stepActionFailed
@@ -777,6 +826,28 @@ export function TodoDetailPage() {
                   setPlanView(true);
                 }}
                 spec={live && todo.spec.trim() !== '' ? todo.spec : undefined}
+                queuedMessages={live ? messagesQ.data?.queuedMessages : undefined}
+                onCancelQueued={
+                  live && buildId
+                    ? (queuedMessageId, content) =>
+                        mutations.sendSteer.mutateAsync({
+                          conversationId: buildId,
+                          content,
+                          queuedMessageId,
+                          cancelQueued: true,
+                        })
+                    : undefined
+                }
+                onSteerQueued={
+                  live && buildId
+                    ? (queuedMessageId, content) =>
+                        mutations.sendSteer.mutateAsync({
+                          conversationId: buildId,
+                          content,
+                          queuedMessageId,
+                        })
+                    : undefined
+                }
                 autoScroll={live && view.transcript.length > 0}
               />
             )}
@@ -806,8 +877,7 @@ export function TodoDetailPage() {
                   onStop={
                     live && buildId
                       ? () => {
-                          setStopQueued(false);
-                          setStopOpen(true);
+                          stopTurn(false);
                         }
                       : undefined
                   }
@@ -816,7 +886,9 @@ export function TodoDetailPage() {
                       ? () => setOverlay({ kind: 'review' })
                       : undefined
                   }
-                  onSend={onSend}
+                  onQueue={running ? queueMessage : undefined}
+                  onStopAndSend={queueMessage ? (text) => queueMessage(text, true) : undefined}
+                  onSend={stoppedBeforeStart ? queueMessage : onSend}
                 />
               )
             )}
@@ -905,6 +977,15 @@ export function TodoDetailPage() {
               }
             : undefined
         }
+        onDiscard={
+          live && !archived && running
+            ? () => {
+                setMoreOpen(false);
+                setStopQueued(false);
+                setStopOpen(true);
+              }
+            : undefined
+        }
         onReject={
           live && !archived && phase === 'review' && buildId != null && !running
             ? () => {
@@ -945,17 +1026,7 @@ export function TodoDetailPage() {
         onClose={() => setStopOpen(false)}
         onConfirm={(discard) => {
           setStopOpen(false);
-          if (!buildId) return;
-          setStopping(true);
-          mutations.stopBuild.mutate(
-            { buildId, discard },
-            {
-              onSuccess: (res) => {
-                if (!res.delegated) setStopping(false);
-              },
-              onError: () => setStopping(false),
-            },
-          );
+          stopTurn(discard);
         }}
       />
       <AcceptDialog

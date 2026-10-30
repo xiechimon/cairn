@@ -54,6 +54,7 @@ import { notifyTodoPhase } from './notifications.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { assertPhaseTransition, canManualMovePhase } from './phase.js';
 import type { VapidKeys } from './push.js';
+import { ARCHIVED_SCHEDULE_PAUSE_REASON, pauseTodoSchedule } from './schedules.js';
 import { notifyThreadPhase } from './thread-push.js';
 import { insertGateAnnouncement } from './transcript.js';
 
@@ -232,6 +233,7 @@ export function setTodoArchived(deps: TodoDeps, id: string, archived: boolean): 
     .set({ archivedAt: archived ? nowMs() : null, v: row.v + 1 })
     .where(eq(todo.id, id))
     .run();
+  if (archived) pauseTodoSchedule(deps, id, ARCHIVED_SCHEDULE_PAUSE_REASON);
   const record = getTodo(deps, id);
   if (record) deps.hub.publishTodoDoc(record.teamId, record);
   return record;

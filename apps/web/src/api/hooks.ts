@@ -948,10 +948,23 @@ export function useApiMutations(teamId: string | undefined) {
       onSuccess: invalidateAll,
     }),
     sendSteer: useMutation({
-      mutationFn: (input: { conversationId: string; content: string }) =>
+      mutationFn: (input: {
+        conversationId: string;
+        content: string;
+        mode?: 'queue';
+        deliverAfterStop?: boolean;
+        cancelQueued?: boolean;
+        queuedMessageId?: string;
+      }) =>
         api.post<{ message: { id: string } }>(
           `/api/conversations/${input.conversationId}/messages`,
-          { content: input.content },
+          {
+            content: input.content,
+            ...(input.deliverAfterStop ? { deliverAfterStop: true } : {}),
+            ...(input.cancelQueued ? { cancelQueued: true } : {}),
+            ...(input.mode ? { mode: input.mode } : {}),
+            ...(input.queuedMessageId ? { queuedMessageId: input.queuedMessageId } : {}),
+          },
         ),
       onSuccess: (_data, input) => {
         void qc.invalidateQueries({ queryKey: ['messages', input.conversationId] });

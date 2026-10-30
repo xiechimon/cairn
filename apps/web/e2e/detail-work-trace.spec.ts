@@ -223,10 +223,12 @@ test('call details preserve commands, cap output and show edit lines', async ({ 
   await expect(block.getByTestId('edit-error')).toHaveText('old_string not found in src/other.ts');
 });
 
-test('a call cut off by a stopped run shows as unfinished, not done', async ({ page }) => {
+test('a call cut off by a stopped run shows as cancelled, not done', async ({ page }) => {
   await stubWorld(page, 'stopped');
   const cut = page.getByTestId('work-call').filter({ hasText: 'Check formatting' });
-  await expect(cut.getByTestId('work-unfinished')).toBeVisible();
+  await expect(cut.getByTestId('work-cancelled')).toBeVisible();
+  await expect(cut.getByTestId('work-cancelled')).toHaveText('已取消');
+  await expect(cut.getByTestId('work-unfinished')).toHaveCount(0);
   await expect(cut.getByLabel('已完成')).toHaveCount(0);
   await expect(page.getByTestId('work-spinner')).toHaveCount(0);
 });

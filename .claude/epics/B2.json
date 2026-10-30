@@ -124,8 +124,7 @@
       "issue": 2289,
       "dependsOn": [
         "trial-widen"
-      ],
-      "humanHeld": true
+      ]
     },
     {
       "id": "acp-spike",
