@@ -3,7 +3,12 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, join } from 'node:path';
-import { test } from 'node:test';
+import { after, test } from 'node:test';
+
+const stateRoot = mkdtempSync(join(tmpdir(), 'epic-state-tests-'));
+let stateIndex = 0;
+after(() => rmSync(stateRoot, { recursive: true, force: true }));
+
 import { decideEpic, main, validateManifest } from './epic-done.mjs';
 import { selfTests } from './prepush.mjs';
 
@@ -122,7 +127,12 @@ function harness() {
       throw new Error(`Unexpected runner call: ${file} ${args.join(' ')}`);
     },
   };
-  return { state, deps, invoke: (args = []) => main(['E1.0a', ...args], deps) };
+  return {
+    state,
+    deps,
+    invoke: (args = []) =>
+      main(['E1.0a', '--state', join(stateRoot, String(++stateIndex)), ...args], deps),
+  };
 }
 
 function expectState(result, state, exitCode, pattern) {
@@ -304,7 +314,7 @@ for (const outcome of [
 test('complete: closed issues, isolated remote-main checks and one green commit', async () => {
   const { state, invoke } = harness();
   const result = await invoke();
-  expectState(result, 'complete', 0, /No time cap/);
+  expectState(result, 'complete', 0);
   assert.equal(result.checks[0].status, 'passed');
   assert.equal(result.greenSha, tip);
   assert.equal(result.lastClosingSha, closing);
@@ -428,15 +438,15 @@ test('failure mode 3: a merged linked PR does not substitute for an open issue',
 test('failure mode 4: no green main commit since the last closing SHA is incomplete', async () => {
   const { state, invoke } = harness();
   state.checks = { [tip]: [checkPage(tip, 'failure')], [closing]: [checkPage(closing, 'failure')] };
-  expectState(await invoke(), 'incomplete', 10, new RegExp(`since ${closing}`));
+  expectState(await invoke(), 'incomplete', 10, new RegExp(tip));
 });
 
-test('failure mode 5: green at the closing commit still completes after later red merges', async () => {
+test('failure mode 5: older green cannot satisfy latest red main', async () => {
   const { state, invoke } = harness();
   state.checks[tip] = [checkPage(tip, 'failure')];
   const result = await invoke();
-  expectState(result, 'complete', 0);
-  assert.equal(result.greenSha, closing);
+  expectState(result, 'incomplete', 10);
+  assert.equal(result.greenSha, null);
 });
 
 test('required checks must succeed together on one eligible commit', async () => {
@@ -605,7 +615,7 @@ test('unexpected command errors and malformed command output are unknown', async
 test('failure mode 10: no started-at means no cap even when checks fail', async () => {
   const { state, invoke } = harness();
   state.stdout = 'no match';
-  expectState(await invoke(), 'incomplete', 10, /No time cap/);
+  expectState(await invoke(), 'incomplete', 10);
 });
 
 test('paused: every human-wait label on issues or open linked PRs takes priority over failure', async () => {
@@ -618,7 +628,7 @@ test('paused: every human-wait label on issues or open linked PRs takes priority
           { number: 88, state: 'OPEN', labels: connection([{ name: label }]) },
         ]);
       else state.issues[0].labels = connection([{ name: label }]);
-      expectState(await invoke(['--fail', 'stop']), 'paused', 20, new RegExp(label));
+      expectState(await invoke(['--fail', 'stop']), 'failed', 30, /stop/);
     }
   }
 });
@@ -630,12 +640,7 @@ test('closed linked PR labels do not pause, while explicit pause does', async ()
     { number: 88, state: 'CLOSED', labels: connection([{ name: 'needs-decision' }]) },
   ]);
   expectState(await invoke(), 'incomplete', 10);
-  expectState(
-    await invoke(['--pause', 'quota wait', '--fail', 'stop']),
-    'paused',
-    20,
-    /quota wait/,
-  );
+  expectState(await invoke(['--pause', 'quota wait', '--fail', 'stop']), 'failed', 30, /stop/);
 });
 
 test('failed: explicit failure and elapsed maxHours apply only when not complete or paused', async () => {
@@ -657,8 +662,8 @@ test('failed: explicit failure and elapsed maxHours apply only when not complete
   state.stdout = 'pass';
   expectState(
     await invoke(['--fail', 'stop', '--pause', 'wait', '--started-at', '2026-10-29T00:00:00Z']),
-    'complete',
-    0,
+    'failed',
+    30,
   );
 });
 
@@ -669,7 +674,7 @@ test('commit closers must belong to main; the latest of multiple closing changes
   state.issues[0].timelineItems.nodes[0].closer.oid = tip;
   state.checks[tip] = [checkPage(tip, 'failure')];
   const result = await invoke();
-  expectState(result, 'incomplete', 10, new RegExp(`since ${tip}`));
+  expectState(result, 'incomplete', 10, new RegExp(tip));
   assert.equal(result.lastClosingSha, tip);
 });
 
@@ -706,13 +711,8 @@ test('JSON output contains the same decision and the pure decision does not muta
   const result = await invoke(['--json']);
   assert.deepEqual(JSON.parse(state.output[0]), result);
   const facts = structuredClone(result.facts);
-  assert.deepEqual(decideEpic(facts), {
-    state: result.state,
-    exitCode: result.exitCode,
-    reasons: result.reasons,
-    greenSha: result.greenSha,
-    lastClosingSha: result.lastClosingSha,
-  });
+  const { checks: _checks, facts: _facts, ...decision } = result;
+  assert.deepEqual(decideEpic(facts), decision);
   assert.deepEqual(facts, result.facts);
   expectState(decideEpic({}), 'unknown', 2);
 });
@@ -772,75 +772,14 @@ test('non-Error runner throws still produce unknown', async () => {
   }
 });
 
-test('check-run requests stop at the first green commit, newest first', async () => {
-  for (const newestGreen of [true, false]) {
-    const { state, invoke } = harness();
-    if (!newestGreen) state.checks[tip] = [checkPage(tip, 'failure')];
-    expectState(await invoke(), 'complete', 0);
-    const calls = state.calls.filter(({ args }) => args.some((arg) => arg.includes('/check-runs')));
-    assert.equal(calls.length, newestGreen ? 1 : 2);
-    assert.ok(calls[0].args.some((arg) => arg.includes(`/commits/${tip}/`)));
-    if (!newestGreen) assert.ok(calls[1].args.some((arg) => arg.includes(`/commits/${closing}/`)));
-    assert.ok(!state.calls.some(({ args }) => args.some((arg) => arg.includes('/commits?'))));
-  }
+test('only the latest main commit is examined', async () => {
+  const { state, invoke } = harness();
+  state.checks[tip] = [checkPage(tip, 'failure')];
+  expectState(await invoke(), 'incomplete', 10);
+  const calls = state.calls.filter(({ args }) => args.some((arg) => arg.includes('/check-runs')));
+  assert.equal(calls.length, 1);
+  assert.ok(calls[0].args.some((arg) => arg.includes(`/commits/${tip}/`)));
 });
-
-test('at most 30 eligible commits are examined, including a green thirtieth commit', async () => {
-  for (const greenIndex of [29, 30, -1]) {
-    const { state, invoke } = harness();
-    const middle = Array.from({ length: 35 }, (_, index) =>
-      (index + 1).toString(16).padStart(40, '0'),
-    );
-    state.history = [tip, ...middle, closing, older];
-    state.mainline = [...state.history];
-    state.descendants[closing] = state.history.slice(0, -1);
-    state.checks = Object.fromEntries(
-      state.history.map((sha, index) => [
-        sha,
-        [checkPage(sha, index === greenIndex ? 'success' : 'failure')],
-      ]),
-    );
-    const result = await invoke();
-    expectState(result, greenIndex === 29 ? 'complete' : 'unknown', greenIndex === 29 ? 0 : 2);
-    const calls = state.calls.filter(({ args }) => args.some((arg) => arg.includes('/check-runs')));
-    assert.equal(calls.length, 30);
-    assert.deepEqual(
-      result.facts.commits.map(({ sha }) => sha),
-      state.history.slice(0, 30),
-    );
-  }
-});
-
-for (const [count, greenIndex, expected] of [
-  [31, 30, 'unknown'],
-  [30, -1, 'incomplete'],
-  [40, 0, 'complete'],
-]) {
-  test(`${count} eligible commits with green index ${greenIndex} yield ${expected}`, async () => {
-    const { state, invoke } = harness();
-    const middle = Array.from({ length: count - 2 }, (_, index) =>
-      (index + 1).toString(16).padStart(40, '0'),
-    );
-    const eligible = [tip, ...middle, closing];
-    state.history = [...eligible, older];
-    state.mainline = [...state.history];
-    state.descendants[closing] = eligible;
-    state.checks = Object.fromEntries(
-      eligible.map((sha, index) => [
-        sha,
-        [checkPage(sha, index === greenIndex ? 'success' : 'failure')],
-      ]),
-    );
-    const result = await invoke();
-    expectState(result, expected, expected === 'unknown' ? 2 : expected === 'complete' ? 0 : 10);
-    const calls = state.calls.filter(({ args }) => args.some((arg) => arg.includes('/check-runs')));
-    assert.equal(calls.length, expected === 'complete' ? 1 : 30);
-    if (expected === 'unknown') {
-      assert.match(result.reasons.join('\n'), /1 eligible commit.*not examined/);
-      assert.match(result.reasons.join('\n'), new RegExp(closing));
-    }
-  });
-}
 
 test('no green commit reports missing and unsuccessful required checks on the newest commit', async () => {
   const { state, invoke } = harness();
@@ -917,18 +856,11 @@ test('only completed success is green, regardless of future GitHub status values
   }
 });
 
-test('partial or reordered examined commits cannot establish completion', async () => {
-  const { state, invoke } = harness();
-  state.checks[tip] = [checkPage(tip, 'failure')];
+test('missing or wrong latest commit facts cannot establish completion', async () => {
+  const { invoke } = harness();
   const result = await invoke();
-  expectState(result, 'complete', 0);
-  for (const commits of [
-    [],
-    result.facts.commits.slice(0, 1),
-    [...result.facts.commits].reverse(),
-  ]) {
+  for (const commits of [[], [{ ...result.facts.commits[0], sha: closing }]])
     expectState(decideEpic({ ...result.facts, commits }), 'unknown', 2);
-  }
 });
 
 test('empty required checks cannot establish completion without CI evidence', async () => {
@@ -1088,4 +1020,217 @@ test('manifest check failures capture stderr tails including timeouts', async ()
 test('the checker stays within 400 lines', () => {
   const source = readFileSync(new URL('./epic-done.mjs', import.meta.url), 'utf8');
   assert.ok(source.trimEnd().split('\n').length <= 400);
+});
+
+for (const [args, expected] of [
+  [['--pause', 'owner'], 'paused'],
+  [['--fail', 'stop'], 'failed'],
+  [['--started-at', '2026-10-29T00:00:00Z'], 'failed'],
+]) {
+  test(`stop condition ${args[0]} wins over completion`, async () => {
+    const { invoke } = harness();
+    const result = await invoke(args);
+    assert.equal(result.state, expected);
+  });
+}
+
+test('latest red main cannot borrow an older green commit', async () => {
+  const { state, invoke } = harness();
+  state.checks[tip] = [checkPage(tip, 'failure')];
+  const result = await invoke();
+  expectState(result, 'incomplete', 10);
+  assert.equal(result.mainGreen, false);
+});
+
+function batchHarness() {
+  const fixture = harness();
+  delete fixture.state.manifest.issues;
+  fixture.state.manifest.items = [
+    { id: 'owner', issue: 1234, dependsOn: [], humanHeld: true },
+    { id: 'child', issue: 1235, dependsOn: ['owner'] },
+    { id: 'grandchild', issue: 1236, dependsOn: ['child'] },
+    { id: 'independent', issue: 1237, dependsOn: [] },
+  ];
+  fixture.state.issues = [1234, 1235, 1236, 1237].map((number) => ({
+    ...issue(number),
+    state: 'OPEN',
+    stateReason: null,
+    timelineItems: connection([]),
+  }));
+  return fixture;
+}
+
+test('a human-held item blocks only its transitive dependents', async () => {
+  const { invoke } = batchHarness();
+  const result = await invoke();
+  expectState(result, 'incomplete', 10);
+  assert.deepEqual(result.humanHeld, ['owner']);
+  assert.deepEqual(result.blocked, ['child', 'grandchild']);
+  assert.deepEqual(result.ready, ['independent']);
+});
+
+test('a batch pauses only when no independent item remains ready', async () => {
+  const { state, invoke } = batchHarness();
+  state.manifest.items.pop();
+  state.issues.pop();
+  expectState(await invoke(), 'paused', 20);
+});
+
+for (const green of [true, false]) {
+  test(`all merged items with latest main green=${green}`, async () => {
+    const { state, invoke } = batchHarness();
+    state.issues = state.manifest.items.map((item, index) => {
+      const value = issue(item.issue);
+      value.timelineItems.nodes[0].closer.number = 100 + index;
+      return value;
+    });
+    state.checks[tip] = [checkPage(tip, green ? 'success' : 'failure')];
+    const result = await invoke();
+    expectState(result, green ? 'complete' : 'incomplete', green ? 0 : 10);
+    assert.ok(result.items.every((item) => item.status === 'done' && item.pr));
+  });
+}
+
+test('state preserves the original start and accumulates hours across runs', async (t) => {
+  const directory = mkdtempSync(join(tmpdir(), 'batch-state-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const path = join(directory, 'state.json');
+  const { state, deps, invoke } = batchHarness();
+  state.manifest.maxHours = 1;
+  await invoke(['--state', path]);
+  const first = JSON.parse(readFileSync(path, 'utf8'));
+  deps.now = () => new Date(now.getTime() + 3600000);
+  const result = await invoke(['--state', path, '--started-at', now.toISOString()]);
+  expectState(result, 'failed', 30);
+  const second = JSON.parse(readFileSync(path, 'utf8'));
+  assert.equal(second.startedAt, first.startedAt);
+  assert.equal(second.activeHours, 1);
+  assert.equal(second.phase, 'failed');
+});
+
+test('newest run per name wins regardless of response order', async () => {
+  for (const conclusion of ['success', 'failure', null]) {
+    const { state, invoke } = harness();
+    state.checks[tip][0].check_runs.unshift(runRecord(tip, 'check', conclusion, 9));
+    state.checks[tip][0].total_count++;
+    expectState(
+      await invoke(),
+      conclusion === 'success' ? 'complete' : 'incomplete',
+      conclusion === 'success' ? 0 : 10,
+    );
+  }
+});
+
+test('invalid DAGs fail closed before running checks', async () => {
+  for (const mutate of [
+    (items) => {
+      items[0].dependsOn = ['missing'];
+    },
+    (items) => {
+      items[0].dependsOn = ['grandchild'];
+    },
+    (items) => {
+      items[0].dependsOn = ['owner'];
+    },
+    (items) => {
+      items[1].id = 'owner';
+    },
+  ]) {
+    const { state, invoke } = batchHarness();
+    mutate(state.manifest.items);
+    expectState(await invoke(), 'unknown', 2);
+    assert.ok(!state.calls.some(({ file }) => file === 'node'));
+  }
+});
+
+test('owner-waiting open PR is reported and blocks dependents', async () => {
+  const { state, invoke } = batchHarness();
+  state.manifest.items[0].humanHeld = false;
+  state.issues[0].closedByPullRequestsReferences = connection([
+    { number: 88, state: 'OPEN', labels: connection([{ name: 'waits-ian' }]) },
+  ]);
+  const result = await invoke();
+  assert.deepEqual(result.humanHeld, ['owner']);
+  assert.equal(result.items[0].pr, 88);
+  assert.deepEqual(result.ready, ['independent']);
+});
+
+test('v2 requires a merged PR and accepts linked closing references as fallback', async () => {
+  const { state, invoke } = batchHarness();
+  state.manifest.items = [{ id: 'one', issue: 1234, dependsOn: [] }];
+  state.issues = [issue(1234)];
+  state.issues[0].timelineItems.nodes[0].closer = { __typename: 'Commit', oid: closing };
+  expectState(await invoke(), 'incomplete', 10);
+  state.issues[0].closedByPullRequestsReferences = connection([
+    {
+      number: 88,
+      state: 'MERGED',
+      merged: true,
+      mergeCommit: commit(closing),
+      labels: connection([]),
+    },
+  ]);
+  expectState(await invoke(), 'complete', 0);
+  state.issues[0].stateReason = 'NOT_PLANNED';
+  expectState(await invoke(), 'incomplete', 10);
+});
+
+test('paused time is excluded and failure history survives reruns', async (t) => {
+  const directory = mkdtempSync(join(tmpdir(), 'batch-paused-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const path = join(directory, 'state.json');
+  const { deps, invoke } = batchHarness();
+  await invoke(['--state', path, '--pause', 'owner']);
+  const first = JSON.parse(readFileSync(path, 'utf8'));
+  deps.now = () => new Date(now.getTime() + 24 * 3600000);
+  await invoke(['--state', path]);
+  const second = JSON.parse(readFileSync(path, 'utf8'));
+  assert.equal(second.activeHours, first.activeHours);
+  assert.deepEqual(second.failureHistory.owner.slice(0, 1), first.failureHistory.owner);
+});
+
+test('a gathering error still preserves the first start and active budget', async (t) => {
+  const directory = mkdtempSync(join(tmpdir(), 'batch-error-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const path = join(directory, 'state.json');
+  const { state, deps, invoke } = batchHarness();
+  state.manifest.maxHours = 1;
+  state.intercept = (file, args) => {
+    if (file === 'gh' && args[1] === 'graphql') throw new Error('offline');
+  };
+  expectState(await invoke(['--state', path]), 'unknown', 2);
+  state.intercept = undefined;
+  deps.now = () => new Date(now.getTime() + 3600000);
+  expectState(await invoke(['--state', path]), 'failed', 30);
+});
+
+test('time spent running checks counts before declaring completion', async () => {
+  const { state, deps, invoke } = harness();
+  state.manifest.maxHours = 1;
+  let current = now;
+  deps.now = () => current;
+  state.command = () => {
+    current = new Date(now.getTime() + 3600000);
+    return 'pass';
+  };
+  expectState(await invoke(), 'failed', 30);
+});
+
+for (const stored of [null, {}, { phase: 'incomplete', activeHours: -1 }]) {
+  test(`malformed persisted state ${JSON.stringify(stored)} cannot reset counters`, async (t) => {
+    const directory = mkdtempSync(join(tmpdir(), 'batch-invalid-'));
+    t.after(() => rmSync(directory, { recursive: true, force: true }));
+    const path = join(directory, 'state.json');
+    writeFileSync(path, JSON.stringify(stored));
+    const { invoke } = harness();
+    expectState(await invoke(['--state', path]), 'unknown', 2);
+    assert.deepEqual(JSON.parse(readFileSync(path, 'utf8')), stored);
+  });
+}
+
+test('completion policy stays inside the owned manifest boundary', () => {
+  const source = readFileSync(new URL('./epic-done.mjs', import.meta.url), 'utf8');
+  assert.match(source, /from '\.\.\/\.claude\/epics\/checker-policy\.mjs'/);
+  const owners = readFileSync(new URL('../.github/CODEOWNERS', import.meta.url), 'utf8');
+  assert.match(owners, /^\/\.claude\/epics\/\*\* @xiechimon$/m);
 });
