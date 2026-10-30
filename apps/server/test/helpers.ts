@@ -96,7 +96,7 @@ export function bootServer(
   };
   const oauthStates: AppContext['oauthStates'] = new Map();
   try {
-    const app = createApp({
+    const appContext: AppContext = {
       db,
       hub,
       machineHub,
@@ -130,7 +130,8 @@ export function bootServer(
       authToken: opts.authToken ?? null,
       tailscaleUsers: opts.tailscaleUsers ?? [],
       mcpConfigPath: opts.mcpConfigPath ?? join(tmpdir(), `cairn-mcp-absent-${randomUUID()}.json`),
-    });
+    };
+    const app = createApp(appContext, opts.logger);
     try {
       onTestFinished(dispose);
     } catch {

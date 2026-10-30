@@ -1,7 +1,7 @@
 import type { ProviderConfig, SessionOpts } from '@cairn/shared';
 import { parseOtlpTarget, stepOtelContext } from '@cairn/shared/otel';
 import { describe, expect, test } from 'vitest';
-import { claudeSessionEnv } from '../src/backend/claude-code.js';
+import { buildClaudeSdkOptions, claudeSessionEnv } from '../src/backend/claude-code.js';
 
 const provider: ProviderConfig = { kind: 'api_key', providerId: 'anthropic' };
 
@@ -36,4 +36,25 @@ describe('claudeSessionEnv', () => {
     const env = claudeSessionEnv(sessionOpts({ telemetry }));
     expect(env?.TRACEPARENT).toContain('-01');
   });
+});
+
+test('subscription authentication reaches the CLI through env with subprocess scrubbing', () => {
+  const token = `sk-ant-oat01-${'s'.repeat(64)}`;
+  const env = { CLAUDE_CODE_OAUTH_TOKEN: token, CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: '1' };
+  const options = buildClaudeSdkOptions({
+    cwd: '/tmp/ws',
+    modelId: 'sonnet',
+    resumeId: null,
+    sessionId: 'env-test',
+    disallowedTools: [],
+    mcpServers: {},
+    abortController: new AbortController(),
+    env,
+  });
+  expect(options.env?.CLAUDE_CODE_OAUTH_TOKEN).toBe(token);
+  expect(options.env?.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB).toBe('1');
+  expect(options.env?.CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR).toBeUndefined();
+  expect(options.spawnClaudeCodeProcess).toBeUndefined();
+  expect(env.CLAUDE_CODE_OAUTH_TOKEN).toBe(token);
+  expect(process.env.CLAUDE_CODE_OAUTH_TOKEN).not.toBe(token);
 });

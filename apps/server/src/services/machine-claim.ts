@@ -34,6 +34,7 @@ import {
 } from './chief-digest.js';
 import { hasEarlierLiveChiefStep } from './chief-turns.js';
 import { refreshClaudeRateParks } from './claude-rate-limit.js';
+import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import {
   agentRunningCount,
   capabilityGatePasses,
@@ -153,10 +154,12 @@ function claimLocalTools(agentTools: readonly string[]): string[] {
 }
 
 function claudeCodeLoginBlocks(
+  deps: MachineDeps,
   machineRow: typeof machine.$inferSelect,
   provider: string | null | undefined,
 ): boolean {
   if (stepRuntimeFor(provider) !== 'claude-code') return false;
+  if (hasActiveClaudeSubscription(deps, machineRow.teamId)) return false;
   return claudeLoginBlocksClaim(machineRow.claudeCodeReport?.login, nowMs());
 }
 
@@ -171,7 +174,7 @@ function buildChiefClaim(
   if (!agentRow.modelId) return null;
   const model = effectiveModel(agentRow, stepRow);
   if (!machineRow || !runtimeGatePasses(machineRow, model.provider)) return null;
-  if (claudeCodeLoginBlocks(machineRow, model.provider)) return null;
+  if (claudeCodeLoginBlocks(deps, machineRow, model.provider)) return null;
   if (!capabilityGatePasses(machineRow, agentRow)) return null;
   const claimedAt = nowMs();
   const res = deps.db
@@ -353,7 +356,7 @@ async function tryClaim(
       if (runtime !== 'claude-code' || !claudeBlocked(agentRow.machineId)) continue;
     }
     if (!runtimeGatePasses(machineRow, model.provider)) continue;
-    if (claudeCodeLoginBlocks(machineRow, model.provider)) continue;
+    if (claudeCodeLoginBlocks(deps, machineRow, model.provider)) continue;
     if (!capabilityGatePasses(machineRow, agentRow)) continue;
     if (
       agentRow.maxConcurrentTasks !== null &&

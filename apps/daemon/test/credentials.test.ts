@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { pushCredential } from '../src/credentials.js';
+import { clearCredentials, pushCredential } from '../src/credentials.js';
 
 const TOKEN = {
   provider: null,
@@ -23,4 +23,15 @@ describe("pushCredential — git credential bound to the claim's cloneUrl (#1484
   test('failure mode 3: step not bound to a repo → null', () => {
     expect(pushCredential(TOKEN, null).git).toBeNull();
   });
+});
+
+test('subscription credentials are cleared with the step lifetime', () => {
+  const credentials = pushCredential(
+    { ...TOKEN, claudeSubscriptionToken: 'private-lifetime-token' },
+    null,
+  );
+  expect(credentials.claudeSubscriptionToken).toBe('private-lifetime-token');
+  expect(credentials.secrets.names).toEqual([]);
+  clearCredentials(credentials);
+  expect(credentials.claudeSubscriptionToken).toBeUndefined();
 });

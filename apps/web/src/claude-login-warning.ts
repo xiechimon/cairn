@@ -1,4 +1,4 @@
-import type { ClaudeLoginNotice } from '@cairn/shared';
+import type { ClaudeLoginNotice, ClaudeSubscription } from '@cairn/shared';
 
 type Translate = (key: string, params?: Record<string, string | number>) => string;
 
@@ -27,5 +27,26 @@ export function formatClaudeLoginWarning(
   return t(
     '{name} 上的 Claude Code 登录将在 {days} 天后过期。在该机器上运行 `claude auth login` 重新登录。',
     { name, days: notice.days },
+  );
+}
+
+export function subscriptionLoginWarning(
+  connection: ClaudeSubscription,
+  now: number,
+  t: Translate,
+): string | null {
+  if (connection.expiresAt === null || connection.expiresAt - now > 30 * 24 * 60 * 60 * 1000)
+    return null;
+  if (connection.expiresAt <= now)
+    return t(
+      '{name}: Claude subscription token expired. Run `claude setup-token` and add a new connection.',
+      { name: connection.label },
+    );
+  return t(
+    '{name}: Claude subscription token expires in {days} days. Run `claude setup-token` and add a new connection.',
+    {
+      name: connection.label,
+      days: Math.ceil((connection.expiresAt - now) / (24 * 60 * 60 * 1000)),
+    },
   );
 }

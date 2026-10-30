@@ -18,7 +18,8 @@ export async function stepToken(
   stepId: string,
 ): Promise<MachineTokenResponse> {
   const owned = ownedStep(deps, machineId, stepId);
-  if (isChiefConversation(owned.buildId)) return chiefStepToken(deps, stepId, owned.buildId);
+  if (isChiefConversation(owned.buildId))
+    return chiefStepToken(deps, stepId, owned.buildId, owned.status === 'claimed');
   const bundle = resolveStepCredentials({ db: deps.db, box: deps.box }, stepId);
   const stepRow = deps.db.select().from(step).where(eq(step.id, stepId)).get();
   const buildRow = stepRow
@@ -46,6 +47,9 @@ export async function stepToken(
       stepRow?.fallback?.model?.provider ?? agentRow?.provider,
     ),
     secrets: bundle.secrets,
+    ...(owned.status === 'claimed' && bundle.claudeSubscriptionToken !== undefined
+      ? { claudeSubscriptionToken: bundle.claudeSubscriptionToken }
+      : {}),
     git,
   };
 }
@@ -73,11 +77,17 @@ export function toProviderConfig(
 
 function chiefStepToken(
   deps: MachineDeps,
-  _stepId: string,
+  stepId: string,
   conversationId: string,
+  claimed: boolean,
 ): MachineTokenResponse {
   const threadId = conversationId;
-  const bundle = resolveChiefStepCredentials({ db: deps.db, box: deps.box }, threadId);
+  const stepRow = deps.db.select().from(step).where(eq(step.id, stepId)).get();
+  const bundle = resolveChiefStepCredentials(
+    { db: deps.db, box: deps.box },
+    threadId,
+    stepRow?.fallback?.model?.provider,
+  );
   const threadRow = deps.db.select().from(chiefThread).where(eq(chiefThread.id, threadId)).get();
   const chiefRow = threadRow
     ? deps.db.select().from(chief).where(eq(chief.id, threadRow.chiefId)).get()
@@ -88,6 +98,9 @@ function chiefStepToken(
   return {
     provider: toProviderConfig(bundle.provider, agentRow?.provider),
     secrets: bundle.secrets,
+    ...(claimed && bundle.claudeSubscriptionToken !== undefined
+      ? { claudeSubscriptionToken: bundle.claudeSubscriptionToken }
+      : {}),
     git: null,
   };
 }

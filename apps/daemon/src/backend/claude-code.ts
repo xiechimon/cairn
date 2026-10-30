@@ -579,7 +579,6 @@ function claudeProjectsRoot(): string {
   return join(root.normalize('NFC'), 'projects');
 }
 
-// Claude Code slug: realpath'd cwd, non-alphanumerics to "-", 200-char cap plus path hash, darwin NFC root.
 export function sdkTranscriptPath(cwd: string, sessionId: string): string {
   let resolved = cwd;
   try {

@@ -1,5 +1,6 @@
 import {
   capabilitiesResponseSchema,
+  createClaudeSubscriptionSchema,
   createProviderBodySchema,
   createScheduleBodySchema,
   createSkillBodySchema,
@@ -28,6 +29,12 @@ import {
   svcOf,
 } from './routes-helpers.js';
 import { createApiKey, listApiKeys } from './services/api-keys.js';
+import {
+  createClaudeSubscription,
+  deleteClaudeSubscription,
+  listClaudeSubscriptions,
+  verifySubscriptionConnection,
+} from './services/claude-subscriptions.js';
 import { homeMachineRejectReason } from './services/dispatch-eligibility.js';
 import { planDocumentDiff } from './services/documents.js';
 import {
@@ -315,6 +322,34 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   });
 
   const keysvc = { db: ctx.db, box: ctx.secretBox };
+
+  app.get('/api/teams/:id/claude-subscriptions', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    return c.json(listClaudeSubscriptions(keysvc, teamId));
+  });
+
+  app.post('/api/teams/:id/claude-subscriptions', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    const body = parseWith(createClaudeSubscriptionSchema, await jsonBody(c), 'body');
+    return c.json(createClaudeSubscription(keysvc, teamId, body), 201);
+  });
+
+  app.delete('/api/teams/:id/claude-subscriptions/:cid', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    if (!deleteClaudeSubscription(keysvc, teamId, c.req.param('cid'))) {
+      throw notFound('Claude subscription connection');
+    }
+    return c.body(null, 204);
+  });
+
+  app.post('/api/teams/:id/claude-subscriptions/:cid/verify', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    return c.json(await verifySubscriptionConnection(keysvc, teamId, c.req.param('cid')));
+  });
 
   app.get('/api/teams/:id/providers', (c) => {
     const teamId = c.req.param('id');

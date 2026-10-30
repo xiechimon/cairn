@@ -300,6 +300,7 @@ export const machineToolResponseSchema = z.union([
 ]);
 
 export const machineTokenResponseSchema = z.object({
+  claudeSubscriptionToken: z.string().optional(),
   provider: providerConfigSchema.nullable(),
   secrets: z.record(z.string(), z.string()),
   git: z
