@@ -12,4 +12,6 @@ Pick the package and a bump type (patch / minor / major), then describe the chan
 
 When the pull request should ship, run `pnpm release:version` in it to bump versions and write changelogs. Include those changes in the pull request for normal review and merge.
 
-After merge to main, the `release` workflow publishes new versions through npm Trusted Publishing (OIDC) and pushes the release tags, without a token or repository secret. Versions already on npm are skipped. Pending changesets on main publish nothing and leave a warning naming them. `pnpm exec changeset status` shows what is pending.
+After merge to main, the `release` workflow publishes unpublished versions through npm Trusted Publishing (OIDC) with provenance and pushes the release tags, including tags created before a partial publish failure. Versions already on npm are skipped. Pending changesets on main leave a warning naming them and wait for a pull request that runs `pnpm release:version`. Unpublished package versions still publish when changesets are pending. `pnpm exec changeset status` shows what is pending.
+
+Publishing requires a Trusted Publisher on npmjs.com for each package, with provider GitHub Actions, repository `xiechimon/cairn`, and workflow file `release.yml`. Renaming the workflow file breaks publishing until the Trusted Publishers are updated. Publishing needs no token or repository secret.

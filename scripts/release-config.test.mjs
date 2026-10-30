@@ -64,28 +64,42 @@ test('the release workflow publishes through OIDC without a token or a bot pull 
     assert.ok(!workflow.includes(forbidden), `the release workflow must not contain ${forbidden}`);
   }
   assert.match(workflow, /^ {2}release:\n[\s\S]*?\n {6}id-token: write\s*$/m);
+  assert.match(workflow, /^ {2}release:\n[\s\S]*?\n {6}contents: write\s*$/m);
 });
 
-test('the release job publishes only when no changesets are pending', () => {
+test('pending changesets warn without controlling release steps', () => {
   const steps = releaseSteps();
   const detection = steps.find((step) => step.includes('.changeset/*.md'));
   assert.ok(detection, 'a step must detect pending changesets');
-  const id = detection.match(/^ {8}id: (\w+)$/m)?.[1];
-  assert.ok(id, 'the changeset detection step must have an id');
-  assert.match(detection, /if \[\[ "\$file" != "\.changeset\/README\.md" \]\]/);
   assert.match(
     detection,
-    /if \(\( \$\{#pending\[@\]\} > 0 \)\); then[\s\S]*?::warning::[\s\S]*?else/,
+    /::warning::Pending changesets wait for a pull request that runs pnpm release:version: /,
   );
-  assert.match(detection, /pending=true[^\n]*>> "\$GITHUB_OUTPUT"/);
-  assert.match(detection, /pending=false[^\n]*>> "\$GITHUB_OUTPUT"/);
-  const publish = steps.find((step) => /^ {8}run: pnpm run release:publish$/m.test(step));
-  assert.ok(publish, 'the release job must run release:publish');
-  assert.ok(publish.includes(`if: steps.${id}.outputs.pending == 'false'`));
-  assert.ok(steps.indexOf(detection) < steps.indexOf(publish));
+  assert.doesNotMatch(detection, /GITHUB_OUTPUT/);
+  for (const step of steps) {
+    assert.doesNotMatch(step, /^ {8}if: .*pending.*$/m);
+  }
 });
 
-test('the release job pushes the tags changeset publish creates', () => {
+test('the release job configures a tagger before publishing', () => {
+  const steps = releaseSteps();
+  const identity = steps.findIndex(
+    (step) => /git config user\.name\s/.test(step) && /git config user\.email\s/.test(step),
+  );
+  const publish = steps.findIndex((step) => /^ {8}run: pnpm run release:publish$/m.test(step));
+  assert.ok(identity >= 0, 'the release job must set a git tagger name and email');
+  assert.ok(publish > identity, 'the release job must configure a tagger before publishing');
+});
+
+test('the release job always publishes with explicit provenance', () => {
+  const steps = releaseSteps();
+  const publish = steps.find((step) => /^ {8}run: pnpm run release:publish$/m.test(step));
+  assert.ok(publish, 'the release job must run release:publish');
+  assert.doesNotMatch(publish, /^ {8}if:/m);
+  assert.match(publish, /^ {8}env:\n(?: {10}.+\n)*? {10}NPM_CONFIG_PROVENANCE: 'true'\s*$/m);
+});
+
+test('the release job pushes tags even after a partial publish failure', () => {
   const steps = releaseSteps();
   const publish = steps.findIndex((step) => /^ {8}run: pnpm run release:publish$/m.test(step));
   const push = steps.findIndex((step) => /^ {8}run: git push origin --tags$/m.test(step));
@@ -93,13 +107,25 @@ test('the release job pushes the tags changeset publish creates', () => {
   assert.ok(push > publish, 'the release job must push tags after publishing');
   assert.equal(
     steps[push].match(/^ {8}if: (.+)$/m)?.[1],
-    steps[publish].match(/^ {8}if: (.+)$/m)?.[1],
-    'publishing and pushing tags must share the pending changeset condition',
+    `\${{ !cancelled() }}`,
+    'the tag push must run after a failed publish unless cancelled',
   );
+});
+
+test('pull requests validate release configuration for every workspace manifest', () => {
+  const workflow = readFileSync(resolve(root, '.github/workflows/release.yml'), 'utf8');
+  const pullRequest = workflow.match(/^ {2}pull_request:\n[\s\S]*?(?=^\S)/m)?.[0];
+  assert.ok(pullRequest, 'the release workflow must handle pull requests');
+  assert.match(pullRequest, /^ {4}paths:\n(?: {6}.+\n)*? {6}- '\*\*\/package\.json'\s*$/m);
 });
 
 test('every publishable package names this repository for provenance', () => {
   for (const pkg of workspacePackages().filter((pkg) => pkg.private !== true)) {
+    assert.equal(
+      pkg.publishConfig?.provenance,
+      true,
+      `${pkg.name} publishConfig.provenance must be true`,
+    );
     assert.equal(pkg.repository?.type, 'git', `${pkg.name} repository.type must be git`);
     assert.equal(
       pkg.repository?.url,

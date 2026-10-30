@@ -2,7 +2,8 @@
   "name": "@xiechimon/cairn-cli",
   "version": "0.2.2",
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": true
   },
   "license": "Apache-2.0",
   "repository": {

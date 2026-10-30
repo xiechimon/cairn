@@ -15,7 +15,8 @@
     "cairn": "dist/index.mjs"
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": true
   },
   "files": [
     "dist",

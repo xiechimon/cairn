@@ -7,9 +7,7 @@ on:
     paths:
       - '.changeset/**'
       - '.github/workflows/release.yml'
-      - 'apps/daemon/package.json'
-      - 'apps/server/package.json'
-      - 'package.json'
+      - '**/package.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
       - 'scripts/release-config.test.mjs'
@@ -55,7 +53,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Detect pending changesets
-        id: changesets
         run: |
           shopt -s nullglob
           pending=()
@@ -65,19 +62,16 @@ jobs:
             fi
           done
           if (( ${#pending[@]} > 0 )); then
-            echo "pending=true" >> "$GITHUB_OUTPUT"
-            echo "::warning::Pending changesets: ${pending[*]}. The pull request that adds a changeset must also run pnpm release:version."
-          else
-            echo "pending=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Pending changesets wait for a pull request that runs pnpm release:version: ${pending[*]}"
           fi
       - name: Configure tag identity
-        if: steps.changesets.outputs.pending == 'false'
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
       - name: Publish to npm
-        if: steps.changesets.outputs.pending == 'false'
+        env:
+          NPM_CONFIG_PROVENANCE: 'true'
         run: pnpm run release:publish
       - name: Push release tags
-        if: steps.changesets.outputs.pending == 'false'
+        if: ${{ !cancelled() }}
         run: git push origin --tags

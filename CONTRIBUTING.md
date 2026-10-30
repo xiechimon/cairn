@@ -59,7 +59,9 @@ A maintainer reviews every pull request, and an AI reviewer may also comment. A 
 
 Releases use [changesets](https://changesets.dev). Add a changeset with `pnpm changeset` for any pull request that changes a publishable package. When the pull request should ship, run `pnpm release:version` in it to bump package versions and write changelogs, then include those changes in the pull request for normal review and merge.
 
-After merge to main, the `release` workflow publishes new versions of `@xiechimon/cairn` and `@xiechimon/cairn-cli` to npm through npm Trusted Publishing (OIDC) and pushes the release tags. Versions already on npm are skipped. Pending changesets on main cause the workflow to publish nothing and leave a warning naming them. Publishing needs no token or repository secret.
+After merge to main, the `release` workflow publishes unpublished versions of `@xiechimon/cairn` and `@xiechimon/cairn-cli` to npm through npm Trusted Publishing (OIDC) with provenance and pushes the release tags, including tags created before a partial publish failure. Versions already on npm are skipped. Pending changesets on main leave a warning naming them and wait for a pull request that runs `pnpm release:version`. Unpublished package versions still publish when changesets are pending.
+
+Publishing requires a Trusted Publisher on npmjs.com for each package, with provider GitHub Actions, repository `xiechimon/cairn`, and workflow file `release.yml`. Renaming the workflow file breaks publishing until the Trusted Publishers are updated. Publishing needs no token or repository secret.
 
 ## License
 
