@@ -9,6 +9,7 @@ const script = resolve('scripts/batch-merger.mjs');
 const policy = readFileSync('.claude/workflows/pr-gate.js', 'utf8');
 const head = 'a'.repeat(40);
 const required = ['check', 'pack-smoke', 'e2e-gate', 'pr-evidence'];
+const mergedByBatch = [{ name: 'review-gate' }, { name: 'batch-merged' }];
 const pull = (number = 1) => ({
   number,
   node_id: `pr${number}`,
@@ -60,6 +61,7 @@ if(p === 'graphql') { console.log(JSON.stringify({data:{disablePullRequestAutoMe
 
 else if(p.includes('/issues?')) { if(d.markerError) process.exit(1); const countFile = process.env.DATA+'.count'; const count = fs.existsSync(countFile) ? Number(fs.readFileSync(countFile,'utf8')) : 0; fs.writeFileSync(countFile,String(count+1)); console.log(JSON.stringify([d.pauseOnSecondLookup && count > 0 ? [{number:4}] : d.issues ?? []])); }
 else if(p.includes('/pulls?')) { if(p.includes('state=closed')) { if(d.closedError) process.exit(1); console.log(JSON.stringify(d.closedPages?.[Number(new URL('https://api/'+p).searchParams.get('page') ?? 1)-1] ?? (d.closed ?? []).map(pr=>({...pr,updated_at:pr.updated_at ?? new Date().toISOString()})))); } else console.log(JSON.stringify([d.pulls])); }
+else if(p.endsWith('/labels')) { if(d.labelError) process.exit(1); console.log('[]'); }
 else if(p.includes('/check-runs')) { if(d.checkError) process.exit(1); console.log(JSON.stringify([{check_runs:d.checks}])); }
 else if(p.endsWith('/comments?per_page=100')) console.log(JSON.stringify([d.comments]));
 else if(p.endsWith('/commits?per_page=100')) console.log(JSON.stringify([d.commits]));
@@ -133,7 +135,10 @@ for (const [name, data] of [
   ],
   [
     'cap reached',
-    { args: ['--daily-cap', '1'], closed: [{ ...pull(), merged_at: new Date().toISOString() }] },
+    {
+      args: ['--daily-cap', '1'],
+      closed: [{ ...pull(), labels: mergedByBatch, merged_at: new Date().toISOString() }],
+    },
   ],
   ['recovery label', { pulls: [{ ...pull(), labels: [{ name: 'cairn-recovery' }] }] }],
   ['draft', { pulls: [{ ...pull(), draft: true }] }],
@@ -287,7 +292,12 @@ test('multi-digit merged batches consume the cap', (t) => {
   const f = fixture(t, {
     args: ['--daily-cap', '1'],
     closed: [
-      { ...pull(), head: { ...pull().head, ref: 'B12/work' }, merged_at: new Date().toISOString() },
+      {
+        ...pull(),
+        head: { ...pull().head, ref: 'B12/work' },
+        labels: mergedByBatch,
+        merged_at: new Date().toISOString(),
+      },
     ],
   });
   assert.equal(f.merges.length, 0);
@@ -336,7 +346,7 @@ test('a fresh fork head fails eligibility', (t) => {
 });
 test('closed PR pages count recent merges and stop at an older update', (t) => {
   const today = new Date().toISOString();
-  const recent = { ...pull(), updated_at: today, merged_at: today };
+  const recent = { ...pull(), labels: mergedByBatch, updated_at: today, merged_at: today };
   const f = fixture(t, {
     args: ['--daily-cap', '101'],
     closedPages: [
@@ -388,4 +398,24 @@ for (const data of [{ gitError: true }, { policy: 'invalid policy' }, { numstat:
   });
 test('clean product source remains eligible', (t) => {
   assert.equal(fixture(t).merges.length, 1);
+});
+
+test('batch merges done by hand do not consume the cap', (t) => {
+  const f = fixture(t, {
+    args: ['--daily-cap', '1'],
+    closed: [{ ...pull(), merged_at: new Date().toISOString() }],
+  });
+  assert.equal(f.result.status, 0, f.result.stderr);
+  assert.equal(f.merges.length, 1, f.result.stdout);
+});
+test('the merger labels a PR batch-merged before merging it', (t) => {
+  const f = fixture(t);
+  const label = f.calls.findIndex((args) => args[1] === 'repos/owner/repo/issues/1/labels');
+  const merge = f.calls.findIndex((args) => args[0] === 'pr' && args[1] === 'merge');
+  assert.ok(label >= 0 && merge > label, JSON.stringify(f.calls));
+});
+test('a failed batch-merged label blocks the merge', (t) => {
+  const f = fixture(t, { labelError: true });
+  assert.equal(f.result.status, 1);
+  assert.equal(f.merges.length, 0);
 });

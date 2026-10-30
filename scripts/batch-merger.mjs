@@ -3,6 +3,7 @@ import { runInNewContext } from 'node:vm';
 import { api, disarmAutoMerge, markers, pages, repo } from './autonomy-brake.mjs';
 
 const batchHead = /^B\d+\//;
+const mergedLabel = 'batch-merged';
 const requiredChecks = ['check', 'pack-smoke', 'e2e-gate', 'pr-evidence'];
 const log = (pr, action, reasons) =>
   console.log(
@@ -119,7 +120,12 @@ function eligibility(number, expectedHead, dailyCap) {
     );
     for (const pull of closed) {
       if (pull.updated_at.slice(0, 10) < today) break;
-      if (batchHead.test(pull.head.ref) && pull.merged_at?.slice(0, 10) === today) merged++;
+      if (
+        batchHead.test(pull.head.ref) &&
+        pull.merged_at?.slice(0, 10) === today &&
+        pull.labels.some((label) => label.name === mergedLabel)
+      )
+        merged++;
     }
     if (closed.length < 100 || closed.some((pull) => pull.updated_at.slice(0, 10) < today)) break;
   }
@@ -196,7 +202,8 @@ try {
         continue;
       }
       attempted = true;
-      if (!dryRun)
+      if (!dryRun) {
+        api(`repos/${repo}/issues/${candidate.number}/labels`, { labels: [mergedLabel] });
         execFileSync(
           'gh',
           [
@@ -215,6 +222,7 @@ try {
           ],
           { encoding: 'utf8', maxBuffer: 512 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] },
         );
+      }
       log(result.pr, dryRun ? 'would-merge' : 'merged', []);
     } catch (error) {
       log(candidate, 'error', [error.message]);
