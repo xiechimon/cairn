@@ -17,11 +17,12 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import { HttpError } from '../src/lib/errors.js';
-import { type FetchLike, githubListPulls } from '../src/lib/github.js';
+import { githubListPulls } from '../src/lib/github.js';
 import { type BuildDeps, completeStep, requestMerge } from '../src/services/builds.js';
 import { createCiPoller } from '../src/services/ci-loop.js';
 import { DONE_ROW } from '../src/services/delivery-rows.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
+import { type Answer, mergeGithubFake, type PullFake, type Recorded } from './fakes/github.js';
 import { bootServer, req, type TestServer } from './helpers.js';
 
 const disposables: (() => void)[] = [];
@@ -32,143 +33,7 @@ afterAll(() => {
 const CP = '1a2b3c4d'.repeat(5);
 const MERGE_SHA = '9f8e7d6c'.repeat(5);
 const TOKEN = 'gho_merge_test_token';
-const REPO_ID = 4242;
 const PR_TITLE = 'Add the reconcile hint';
-
-type Answer =
-  | { status: number; body?: unknown; raw?: string; headers?: Record<string, string> }
-  | 'timeout'
-  | 'network';
-
-interface PullFake {
-  state: 'open' | 'closed';
-  merged: boolean;
-  title?: string | null;
-  headSha?: string;
-  headRef?: string;
-  headRepoId?: number | null;
-  baseRef?: string;
-  defaultBranch?: string;
-  mergeCommitSha?: string | null;
-  mergedBy?: string | null;
-  mergedAt?: string;
-  authorAssociation?: string;
-  opener?: unknown;
-}
-
-interface Recorded {
-  method: string;
-  url: string;
-  headers: Record<string, string>;
-  body: string | undefined;
-}
-
-function reply(status: number, text: string, headers: Record<string, string> = {}) {
-  const lower = new Map(Object.entries(headers).map(([k, v]) => [k.toLowerCase(), v]));
-  return {
-    ok: status >= 200 && status < 300,
-    status,
-    headers: { get: (name: string) => lower.get(name.toLowerCase()) ?? null },
-    json: () => Promise.resolve().then(() => JSON.parse(text) as unknown),
-    text: () => Promise.resolve(text),
-  };
-}
-
-function throwIfFault(a: Answer): asserts a is Exclude<Answer, 'timeout' | 'network'> {
-  if (a === 'timeout') {
-    throw new DOMException('The operation was aborted due to timeout', 'TimeoutError');
-  }
-  if (a === 'network') throw new TypeError('fetch failed');
-}
-
-class GithubFake {
-  requests: Recorded[] = [];
-  mergeAnswer: Answer = {
-    status: 200,
-    body: { sha: MERGE_SHA, merged: true, message: 'Pull Request successfully merged' },
-  };
-  getAnswer: Answer | null = null;
-  onGet: (() => Promise<void> | void) | null = null;
-  onPut: (() => Promise<void> | void) | null = null;
-  onMarker: (() => Promise<void> | void) | null = null;
-  markerAnswer: Answer = { status: 200, body: [] };
-  compareStatus = 'identical';
-  constructor(
-    readonly pulls: Record<number, PullFake>,
-    readonly branchOf: (n: number) => string,
-  ) {}
-
-  gets = () => this.requests.filter((r) => r.method === 'GET' && /\/pulls\/\d+$/.test(r.url));
-  puts = () => this.requests.filter((r) => r.method === 'PUT');
-
-  readonly fetch: FetchLike = async (input, init) => {
-    const url = String(input);
-    const method = init?.method ?? 'GET';
-    this.requests.push({ method, url, headers: { ...(init?.headers ?? {}) }, body: init?.body });
-    const merge = url.match(/\/pulls\/(\d+)\/merge$/);
-    if (merge !== null && method === 'PUT') {
-      await this.onPut?.();
-      const a = this.mergeAnswer;
-      throwIfFault(a);
-      const pull = this.pulls[Number(merge[1])];
-      const body = a.body as { merged?: unknown; sha?: unknown } | undefined;
-      if (a.status === 200 && body?.merged === true && pull !== undefined) {
-        pull.state = 'closed';
-        pull.merged = true;
-        pull.mergeCommitSha = typeof body.sha === 'string' ? body.sha : null;
-        pull.mergedBy = 'octo';
-      }
-      return reply(a.status, a.raw ?? JSON.stringify(a.body ?? {}), a.headers);
-    }
-    if (url.includes('/issues?')) {
-      await this.onMarker?.();
-      const a = this.markerAnswer;
-      throwIfFault(a);
-      return reply(a.status, a.raw ?? JSON.stringify(a.body ?? {}));
-    }
-    if (url.includes('/compare/')) {
-      return reply(200, JSON.stringify({ status: this.compareStatus }));
-    }
-    if (/\/pulls\?/.test(url)) return reply(200, '[]');
-    if (url.includes('/check-runs')) return reply(404, '{}');
-    const m = url.match(/\/pulls\/(\d+)$/);
-    if (m === null || method !== 'GET') return reply(404, '{}');
-    await this.onGet?.();
-    const g = this.getAnswer;
-    if (g !== null) {
-      throwIfFault(g);
-      return reply(g.status, g.raw ?? JSON.stringify(g.body ?? {}), g.headers);
-    }
-    const n = Number(m[1]);
-    const p = this.pulls[n];
-    if (p === undefined) return reply(404, JSON.stringify({ message: 'Not Found' }));
-    return reply(
-      200,
-      JSON.stringify({
-        number: n,
-        state: p.state,
-        merged: p.merged,
-        ...(p.title === null ? {} : { title: p.title ?? PR_TITLE }),
-        author_association: p.authorAssociation ?? 'OWNER',
-        user: p.opener === undefined ? { login: 'octo', type: 'User' } : p.opener,
-        merge_commit_sha: p.merged ? (p.mergeCommitSha ?? MERGE_SHA) : 'e'.repeat(40),
-        merged_by: p.merged && p.mergedBy != null ? { login: p.mergedBy } : null,
-        merged_at: p.merged ? (p.mergedAt ?? new Date().toISOString()) : null,
-        closed_at: p.state === 'closed' ? new Date().toISOString() : null,
-        head: {
-          sha: p.headSha ?? CP,
-          ref: p.headRef ?? this.branchOf(n),
-          repo: p.headRepoId === null ? null : { id: p.headRepoId ?? REPO_ID },
-        },
-        base: {
-          ref: p.baseRef ?? 'main',
-          repo: { id: REPO_ID, default_branch: p.defaultBranch ?? 'main' },
-        },
-      }),
-      { etag: '"p"' },
-    );
-  };
-}
 
 interface WorldOpts {
   phase?: Phase;
@@ -187,7 +52,7 @@ interface WorldOpts {
 
 interface World {
   s: TestServer;
-  fake: GithubFake;
+  fake: ReturnType<typeof mergeGithubFake>;
   deps: BuildDeps;
   todoId: string;
   buildId: string;
@@ -211,7 +76,7 @@ function makeWorld(opts: WorldOpts = {}): World {
   const agentId = `agent-mapi-${rnd}`;
   const prNumber = opts.prNumber === undefined ? 201 : opts.prNumber;
   const repoKind = opts.repoKind ?? 'github';
-  const fake = new GithubFake(
+  const fake = mergeGithubFake(
     prNumber === null ? {} : { [prNumber]: { state: 'open', merged: false, ...opts.pull } },
     () => conversationBranch(buildId),
   );
