@@ -1,4 +1,10 @@
-import { type ClaimedStep, claimedStepSchema, DEFAULT_AUTONOMY_SETTINGS } from '@cairn/shared';
+import {
+  buildReviewStepPrompt,
+  type ClaimedStep,
+  claimedStepSchema,
+  DEFAULT_AUTONOMY_SETTINGS,
+  parseVerifyPromptMeta,
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
@@ -14,7 +20,11 @@ import {
   todo,
 } from '../src/db/schema.js';
 import type { FetchLike } from '../src/lib/github.js';
-import { enqueueStep } from '../src/services/builds.js';
+import {
+  enqueueStep,
+  maybeEnqueueIndependentReview,
+  maybeEnqueueVerifyStep,
+} from '../src/services/builds.js';
 import { MachineWakeHub } from '../src/services/machine-wake-hub.js';
 import type { TestServer } from './helpers.js';
 import { bindAllAgents, bootServer, issueApiKey, postProject, req } from './helpers.js';
@@ -144,6 +154,145 @@ describe('the steer server write surface (W3 #278)', () => {
   let w: World;
   beforeEach(async () => {
     w = await setupWorld();
+  });
+
+  test.each(['done', 'stopped'] as const)(
+    'continuation schedules fresh verification after a %s verify step',
+    async (priorStatus) => {
+      const { buildId } = await w.startBuild(false);
+      const assignment = {
+        plan: { agentId: AGENT_ID },
+        build: { agentId: AGENT_ID },
+        verify: { agentId: AGENT_ID },
+      };
+      w.s.db.update(todo).set({ assignment }).where(eq(todo.id, w.todoId)).run();
+      const initial = (await w.claim()).step!;
+      const firstDone = await call(w.s.app, 'POST', `/api/machine/done/${initial.step.id}`, {
+        cred: w.token,
+        body: {
+          status: 'success',
+          hasChanges: true,
+          commit: 'a'.repeat(40),
+          sessionId: 'builder-session',
+        },
+      });
+      expect(firstDone.status).toBe(200);
+      if (priorStatus === 'done') {
+        const verifier = (await w.claim()).step!;
+        expect(verifier.step.kind).toBe('verify');
+        const verified = await call(w.s.app, 'POST', `/api/machine/done/${verifier.step.id}`, {
+          cred: w.token,
+          body: {
+            status: 'success',
+            verifyVerdict: { passed: true, conclusion: 'Verified', evidence: [] },
+          },
+        });
+        expect(verified.status).toBe(200);
+      } else {
+        const stopped = await req(w.s.app, 'POST', `/api/builds/${buildId}/stop`, {
+          discard: false,
+        });
+        expect(stopped.status).toBe(200);
+      }
+      const finished = await req(w.s.app, 'PATCH', `/api/todos/${w.todoId}`, { phase: 'done' });
+      expect(finished.status).toBe(200);
+      const prior = w.s.db
+        .select()
+        .from(step)
+        .where(eq(step.buildId, buildId))
+        .all()
+        .find((row) => row.kind === 'verify')!;
+      expect(prior.status).toBe(priorStatus);
+      w.s.db.update(step).set({ createdAt: 1 }).where(eq(step.id, initial.step.id)).run();
+      w.s.db.update(step).set({ createdAt: 2 }).where(eq(step.id, prior.id)).run();
+      const continued = await req(w.s.app, 'POST', `/api/conversations/${buildId}/messages`, {
+        content: 'Continue with another change',
+      });
+      expect(continued.status).toBe(201);
+      const next = (await w.claim()).step!;
+      expect(next.step.kind).toBe('build');
+      const completed = await call(w.s.app, 'POST', `/api/machine/done/${next.step.id}`, {
+        cred: w.token,
+        body: { status: 'success', hasChanges: true, commit: 'b'.repeat(40) },
+      });
+      expect(completed.status).toBe(200);
+      const verifies = w.s.db
+        .select()
+        .from(step)
+        .where(eq(step.buildId, buildId))
+        .all()
+        .filter((row) => row.kind === 'verify');
+      expect(verifies).toHaveLength(2);
+      const fresh = verifies.find((row) => row.id !== prior.id)!;
+      expect(fresh.status).toBe('pending');
+      expect(parseVerifyPromptMeta(fresh.prompt)?.expectedHeadSha).toBe('b'.repeat(40));
+      const current = w.s.db.select().from(todo).where(eq(todo.id, w.todoId)).get()!;
+      maybeEnqueueVerifyStep(w.s.svc, current, buildId);
+      w.s.db.update(step).set({ status: 'done' }).where(eq(step.id, fresh.id)).run();
+      maybeEnqueueVerifyStep(w.s.svc, current, buildId);
+      expect(
+        w.s.db
+          .select()
+          .from(step)
+          .where(eq(step.buildId, buildId))
+          .all()
+          .filter((row) => row.kind === 'verify'),
+      ).toHaveLength(2);
+    },
+  );
+
+  test('a previous round review does not deduplicate the current round review', async () => {
+    const buildId = await finishBuild(w);
+    const current = w.s.db.select().from(todo).where(eq(todo.id, w.todoId)).get()!;
+    w.s.db
+      .update(project)
+      .set({ repoKind: 'github', githubRepo: 'demo-owner/demo-repo' })
+      .where(eq(project.id, current.projectId))
+      .run();
+    w.s.db.update(build).set({ prNumber: 43 }).where(eq(build.id, buildId)).run();
+    w.s.db
+      .update(step)
+      .set({ checkpointCommit: 'a'.repeat(40), createdAt: 1 })
+      .where(eq(step.buildId, buildId))
+      .run();
+    const prompt = buildReviewStepPrompt({
+      agentId: AGENT_ID,
+      gate: 'review',
+      planText: '',
+      changes: [],
+      checkout: true,
+      expectedHeadSha: 'a'.repeat(40),
+    });
+    w.s.db
+      .insert(step)
+      .values({
+        id: 'previous-round-review',
+        buildId,
+        kind: 'review',
+        status: 'done',
+        prompt,
+        createdAt: 2,
+      })
+      .run();
+    enqueueStep(w.s.svc, buildId, 'build', w.s.team.id, 'Continue this round');
+    const task = {
+      ...current,
+      assignment: {
+        plan: { agentId: AGENT_ID },
+        build: { agentId: AGENT_ID },
+        review: { agentId: AGENT_ID },
+      },
+    };
+    maybeEnqueueIndependentReview(w.s.svc, task, buildId);
+    maybeEnqueueIndependentReview(w.s.svc, task, buildId);
+    expect(
+      w.s.db
+        .select()
+        .from(step)
+        .where(eq(step.buildId, buildId))
+        .all()
+        .filter((row) => row.kind === 'review'),
+    ).toHaveLength(2);
   });
 
   test.each(['merged', 'closed', 'open', 'none', 'unreadable'] as const)(

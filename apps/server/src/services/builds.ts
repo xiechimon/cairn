@@ -808,9 +808,12 @@ export function maybeEnqueueVerifyStep(
       and(
         eq(step.buildId, buildId),
         eq(step.kind, 'verify'),
-        ...(opts.reverify === true
-          ? [inArray(step.status, ['pending', 'claimed', 'waiting_quota'])]
-          : []),
+        opts.reverify === true
+          ? inArray(step.status, ['pending', 'claimed', 'waiting_quota'])
+          : or(
+              inArray(step.status, ['pending', 'claimed', 'waiting_quota']),
+              gte(step.createdAt, roundStart(deps, buildId)),
+            ),
       ),
     )
     .get();
@@ -849,7 +852,14 @@ export function maybeEnqueueIndependentReview(
     .where(and(eq(step.buildId, buildId), eq(step.kind, 'review')))
     .all();
   if (reviews.some((row) => (REVIEW_IN_FLIGHT as readonly string[]).includes(row.status))) return;
-  if (reviews.some((row) => parseReviewPromptMeta(row.prompt)?.expectedHeadSha === head)) return;
+  const since = roundStart(deps, buildId);
+  if (
+    reviews.some(
+      (row) =>
+        row.createdAt >= since && parseReviewPromptMeta(row.prompt)?.expectedHeadSha === head,
+    )
+  )
+    return;
   const slotted = todoRow.assignment?.review?.agentId ?? null;
   const personaReviewer = deps.db
     .select({ id: agent.id })
