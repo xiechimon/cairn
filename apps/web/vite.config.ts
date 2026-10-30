@@ -29,10 +29,6 @@ export default defineConfig({
     alias: [
       { find: '@', replacement: new URL('./src', import.meta.url).pathname },
       { find: /^cn$/, replacement: new URL('./src/lib/cn.ts', import.meta.url).pathname },
-      {
-        find: /^node:crypto$/,
-        replacement: new URL('./src/node-crypto-browser.ts', import.meta.url).pathname,
-      },
     ],
   },
   server: {
