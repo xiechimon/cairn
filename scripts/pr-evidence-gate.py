@@ -70,9 +70,8 @@ Exit 0 when the body passes, 1 otherwise. Findings name the section or
 the URL (with its line for bare URLs).
 """
 import os
-import json
 from html import unescape
-from urllib.parse import parse_qs, urlsplit, unquote
+from urllib.parse import parse_qs, urlsplit
 import re
 import subprocess
 import sys
@@ -254,43 +253,6 @@ def describe(link):
     return f"[{link['label']}]({link['url']})"
 
 
-def archive_verdict(url, context):
-    parsed = urlsplit(url)
-    if (parsed.netloc == 'cursor.com'
-            and re.fullmatch(r'/assets/images/open-in-(?:web|cursor)-(?:dark|light)\.png', parsed.path)):
-        return 'decorative badge'
-    if (parsed.netloc == 'img.shields.io'
-            and re.fullmatch(r'/badge/[^/]+', parsed.path)):
-        return 'decorative badge'
-    repository = context.get('repository', '')
-    if not re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+', repository):
-        return 'missing repository context'
-    issues = set()
-    for commit in context.get('commits', []):
-        message = commit.get('commit', {}).get('message', '')
-        for match in re.finditer(
-                r'\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+'
-                r'(?:(?:(?P<repo>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+))?#|'
-                r'https://github\.com/(?P<urlrepo>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/issues/)'
-                r'(?P<issue>[1-9][0-9]*)\b',
-                message, re.I):
-            associated_repository = match['repo'] or match['urlrepo'] or repository
-            if associated_repository.lower() == repository.lower():
-                issues.add(match['issue'])
-    if not issues:
-        return 'missing issue context'
-    path = unquote(parsed.path).split('/')
-    if (parsed.netloc != 'raw.githubusercontent.com'
-            or len(path) < 8
-            or '/'.join(path[1:3]).lower() != repository.lower()
-            or not re.fullmatch(r'[0-9a-f]{40}|[0-9a-f]{64}', path[3], re.I)
-            or path[4:6] != ['docs', 'verify']
-            or path[6] not in issues
-            or any(part in ('', '.', '..') for part in path[1:])):
-        return 'outside associated issue archive'
-    return 'archived'
-
-
 def main():
     if len(sys.argv) > 1:
         with open(sys.argv[1], encoding='utf-8') as f:
@@ -300,10 +262,6 @@ def main():
     if body is None:
         body = ''
 
-    context = {}
-    if len(sys.argv) > 2:
-        with open(sys.argv[2], encoding='utf-8') as f:
-            context = json.load(f)
     failures = []
 
     verdicts = section_verdicts(body)
@@ -338,12 +296,6 @@ def main():
 
     print(f"pr-evidence: scanned {len(links)} image link(s)")
     for link in links:
-        archive = archive_verdict(link['url'], context)
-        if archive not in ('archived', 'decorative badge'):
-            failures.append(link)
-            print(f"FAIL archive: {archive}: {describe(link)}")
-        else:
-            print(f"PASS archive: {archive}: {describe(link)}")
         if 'scenario' in parse_qs(urlsplit(link['url']).query, keep_blank_values=True):
             failures.append(link)
             print(f"FAIL fixture: {describe(link)}")

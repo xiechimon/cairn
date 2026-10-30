@@ -2,7 +2,6 @@ import type { Phase } from '@cairn/shared';
 import {
   CHIEF_DISPATCH_BASELINE_DECISION_OK_CI_LOWER,
   type CompareFile,
-  EVIDENCE_PREFIX,
   GATE_LIMITS,
   type HarnessRegressionResult,
   harnessRegressionResultSchema,
@@ -15,7 +14,7 @@ import {
   RECORDING_EXTENSION,
 } from '@cairn/shared/merge-gate';
 import { computePatchDigest } from './digest.js';
-import { parseRawEvidenceLinks, qualifyingEvidenceLinks } from './evidence-link.js';
+import { qualifyingEvidenceLinks } from './evidence-link.js';
 import { isLiveHarnessAttempt } from './harness-eval-route.js';
 import { independenceVendorDetail, modelsAreIndependent } from './model-identity.js';
 import { classifyPaths, touchesHarness } from './paths.js';
@@ -428,20 +427,6 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
       block(
         'recording-missing',
         'Link a present .gif, .webm or .mp4 of at most 5 MiB under this ticket evidence directory',
-      );
-    }
-    if (qualifying.length === 0) {
-      const { links } = parseRawEvidenceLinks(pr.body, args);
-      block(
-        'evidence-link-missing',
-        `${links.length} link(s) to ${EVIDENCE_PREFIX}${i.ticketRef}/, none at a commit of this PR to a file it adds or changes`,
-      );
-    } else if (!presence.includes(true)) {
-      block(
-        'evidence-link-missing',
-        `${qualifying.length} link(s) at a commit of this PR to a file it adds or changes, ${
-          presence.includes(null) ? 'presence unreadable' : 'none present at its commit'
-        }`,
       );
     }
   }

@@ -6691,7 +6691,6 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > merge-gate blocke
   "harness-regression-evaluating: transient, Harness regression evaluation is in progress for the current patch",
   "harness-regression-below-threshold: human, 回归评测 decision_ok 低于基线置信区间下限",
   "issue-ref-missing: human, 任务来源解不出 issue 号",
-  "evidence-link-missing: transient, PR body 缺钉在本 PR 提交上、指向本 PR 证据的 raw 永久链",
   "recording-missing: transient, Interactive or animated UI requires a recording of at most 5 MiB",
   "verify-missing: transient, 当前补丁没有验证判定",
   "verify-failed: transient, 验证未通过",

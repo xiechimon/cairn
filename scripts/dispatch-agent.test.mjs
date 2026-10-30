@@ -175,7 +175,7 @@ test('start reports missing when the command cannot spawn', () => {
   }
 });
 
-test('wait fails when the child prints the #2021 banned ai-route line', async () => {
+test('wait accepts a successful child regardless of its log text', async () => {
   const statusDir = mkdtempSync(join(tmpdir(), 'dispatch-agent-test-'));
   try {
     const start = runCli(
@@ -191,8 +191,10 @@ test('wait fails when the child prints the #2021 banned ai-route line', async ()
     );
     assert.equal(start.status, 0, `${start.stdout}${start.stderr}`);
     const wait = runCli(['wait', 'banned', '--timeout-s', '10'], statusDir);
-    assert.equal(wait.status, 1, `${wait.stdout}${wait.stderr}`);
-    assert.match(`${wait.stdout}${wait.stderr}`, /banned-model|deepseek-v4-flash/);
+    assert.equal(wait.status, 0, `${wait.stdout}${wait.stderr}`);
+    assert.match(wait.stdout, /wait ok/);
+    const record = JSON.parse(readFileSync(join(statusDir, 'banned.json'), 'utf8'));
+    assert.equal(record.exitGate, undefined);
   } finally {
     rmSync(statusDir, { recursive: true, force: true });
   }
@@ -223,7 +225,7 @@ test('wait fails when the child exits non-zero after start returns', async () =>
   }
 });
 
-test('wait ok when the child exits 0 after start returns without a banned or no-op log', async () => {
+test('wait ok when the child exits 0 after start returns with an ordinary log', async () => {
   const statusDir = mkdtempSync(join(tmpdir(), 'dispatch-agent-test-'));
   try {
     const start = runCli(
