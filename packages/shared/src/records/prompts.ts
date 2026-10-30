@@ -371,6 +371,10 @@ export function orchestratePromptHead(seqNum: number): string {
   return `开始任务 #${seqNum}`;
 }
 
+export function orchestratePromptHeadOf(text: string): string | null {
+  return /^(开始任务 #\d+)\n\n编排请求：/.exec(text)?.[1] ?? null;
+}
+
 export function buildOrchestratePrompt(
   todo: {
     id: string;

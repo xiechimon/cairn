@@ -19,7 +19,7 @@
 
 (The block above is the final-state list the machine gate reads: the old track is fully deleted and the list is permanently empty; the reappearance of the `src/ui/` directory is an error.)
 
-## 2. New-track primitives (34)
+## 2. New-track primitives (36)
 
 <!-- inventory:new-track -->
 ```text
@@ -32,6 +32,7 @@ bubble.tsx               # shadcn Bubble family (Bubble/Content/Group/Reactions)
 button.tsx               # registry-same-source + in-repo semantic mapping (type=button default, data-variant/data-size observation points, #411); primary CTA = default tier (the brand tier is retired, #982/#991)
 card.tsx
 checkbox.tsx             # checkbox (registry-same-source + a one-piece zero-skin semantic mapping: indeterminate renders a dash, #952/#982); the row box = the consumer's label wrap; **do not place a bare `<input type="checkbox">`** — the browser's built-in box is a different family from the in-repo checkbox row
+collapsible.tsx          # Base UI Collapsible (Root/Trigger/Content, registry-same-source): the registryDependency of trace.tsx; reach for Trace first when the disclosure is an activity line
 dialog-shell.tsx         # shared dialog base (e2e vehicle = role=dialog accessible name + dialog-head/-body/-foot testids, spec/22 §5.5)
 dialog.tsx
 dropdown-menu.tsx        # in-repo semantic mapping: z goes through the single --z-dialog ladder (#733), Content exposes anchor (#454); motion = upstream defaults (#991 Q9)
@@ -57,6 +58,7 @@ tag-chip.tsx             # user-data-colored tag chip (tag.color via inline styl
 textarea.tsx             # multi-line input (registry-same-source); **do not place a bare `<textarea>`** — the old .dlg-form-textarea family is retired (spec/22 §5.3)
 toaster.tsx              # toast primitive (sonner, the official shadcn recipe; #631): mount <Toaster /> once at the App root, then imperative `toast.*` anywhere; **do not build another silent catch for failure feedback** — exceptions/toasts always go through it
 tooltip.tsx              # hover/focus info bubble (official-site form; z goes through the single --z-dialog ladder); the shortcut hint chip = the Tooltip+Kbd composition (#983 ruling, landed in #1008, kbd-hint.tsx retired); the App root already mounts a site-wide TooltipProvider (delay=0)
+trace.tsx                # shadcn Trace family (Trace/Line/Icon/Title/Description/Collapsible/Trigger/Content): agent activity lines (tool calls, thinking, waiting) with status running/error/pending and a collapsible detail; do not hand-write tool-call rows in chat files
 ```
 <!-- /inventory:new-track -->
 

@@ -128,7 +128,7 @@ test.describe('chief drawer model row (#615)', () => {
     await fold.click();
     const tools = page.getByTestId('chief-turn-tools');
     await expect(tools).toBeVisible();
-    await expect(tools.locator('div')).toHaveCount(2);
+    await expect(tools.locator('[data-slot="trace-line"]')).toHaveCount(2);
     await expect(tools).toContainText('create_todo');
 
     await foot.getByRole('button', { name: '收起过程' }).click();

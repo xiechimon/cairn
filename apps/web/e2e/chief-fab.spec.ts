@@ -134,9 +134,9 @@ test.describe('chief FAB brand states', () => {
     expect(look).toEqual({ wide: true, spin: 'spin' });
   });
 
-  test('unread: the pill names the count', async ({ page }) => {
+  test('unread: the pill counts unread threads, matching the tooltip', async ({ page }) => {
     await page.goto('/app?view=board&scenario=chief-unread-99');
-    await expect(page.getByRole('button', { name: '总管', exact: true })).toHaveText('99 条新消息');
+    await expect(page.getByRole('button', { name: '总管', exact: true })).toHaveText('99 个会话未读');
   });
 
   test('reduced motion: busy keeps the label but stops the spin', async ({ page }) => {

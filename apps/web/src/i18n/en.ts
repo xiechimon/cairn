@@ -102,7 +102,7 @@ export const EN: Record<string, string> = {
   '展开{label}': 'Expand {label}',
   总管: 'Chief',
   '{n} 个总管会话有未读': '{n} chief sessions have unread',
-  条新消息: 'new messages',
+  个会话未读: 'unread threads',
   '思考中…': 'Thinking…',
   返回: 'Back',
   更多: 'More',

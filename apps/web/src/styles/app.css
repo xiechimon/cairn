@@ -298,6 +298,43 @@
   bottom: calc(var(--chief-launcher-clearance) + var(--chief-launcher-inset));
 }
 
+@keyframes shimmer-sweep {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
+@utility shimmer {
+  --shimmer-spread: calc(3ch + 40px);
+  background-image: linear-gradient(
+    110deg,
+    currentColor calc(50% - var(--shimmer-spread)),
+    var(--foreground) 50%,
+    currentColor calc(50% + var(--shimmer-spread))
+  );
+  background-repeat: no-repeat;
+  background-size: calc(200% + var(--shimmer-spread) * 2) 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer-sweep 2s linear infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    background-image: none;
+    -webkit-text-fill-color: currentColor;
+  }
+}
+
+@utility shimmer-none {
+  animation: none;
+  background-image: none;
+  -webkit-text-fill-color: currentColor;
+}
+
 @media (hover: hover) and (pointer: fine) {
   .chat-row-icons .chat-copy {
     transition: opacity var(--dur-fast) var(--ease-standard);

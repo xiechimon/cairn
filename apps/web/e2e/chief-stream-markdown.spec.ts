@@ -925,7 +925,7 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
       await expect(row, tag).toHaveCount(1);
       const btn = row.getByRole('button', { name: '展开思考' });
       const m = await btn.evaluate((el) => {
-        const label = el.querySelector('span') as HTMLElement;
+        const label = el.querySelector('[data-slot="trace-title"]') as HTMLElement;
         const cs = getComputedStyle(label);
 
         const col = el.closest('[data-testid="chief-msg-col"]') as HTMLElement;

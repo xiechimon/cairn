@@ -6,6 +6,7 @@ import {
   EmptySection,
   PanelSection,
   SettingsSection,
+  TraceSection,
 } from './components-content.js';
 import {
   BadgeSection,
@@ -59,6 +60,7 @@ const NAV = [
       ['settings', 'Settings list'],
       ['panel', 'Panel and avatar'],
       ['conversation', 'Conversation'],
+      ['trace', 'Trace'],
       ['structure', 'Structure primitives'],
       ['identity', 'Agents and models'],
       ['stream', 'Live stream'],
@@ -209,6 +211,7 @@ export function Gallery() {
           <SettingsSection />
           <PanelSection />
           <ConversationSection />
+          <TraceSection />
           <StructureSection />
           <IdentitySection />
           <StreamSection />
