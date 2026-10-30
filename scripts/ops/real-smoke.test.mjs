@@ -96,7 +96,7 @@ for (const failure of ['command', 'malformed', 'provider', 'model', 'cleanup']) 
   });
 }
 
-test('orb mode follows CAIRN_EXECUTOR like the daemon', () => {
+test('orb mode follows the CAIRN_EXECUTOR=orb switch that orb-provider introduces', () => {
   for (const [executor, expected] of [
     ['orb', true],
     [undefined, false],

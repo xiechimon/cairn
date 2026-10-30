@@ -8,6 +8,9 @@ export function smokeCommand(argv, { cwd, env = process.env } = {}) {
     timeout: 120_000,
     maxBuffer: 1024 * 1024,
   });
-  if (result.error || result.status !== 0) throw new Error(`Smoke command failed: ${argv[0]}`);
+  if (result.error || result.status !== 0)
+    throw new Error(
+      `Smoke command failed: ${argv[0]} status=${result.status} signal=${result.signal} error=${result.error?.code ?? 'none'}`,
+    );
   return result.stdout;
 }

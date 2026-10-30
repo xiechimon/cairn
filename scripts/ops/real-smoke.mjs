@@ -130,8 +130,8 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
   try {
     const record = runSmoke();
     console.log(JSON.stringify(record));
-  } catch {
-    console.error('Real smoke incomplete');
+  } catch (error) {
+    console.error(`Real smoke incomplete: ${error instanceof Error ? error.message : 'unknown'}`);
     process.exitCode = 1;
   }
 }
