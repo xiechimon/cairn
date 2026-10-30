@@ -1,4 +1,4 @@
-import { CircleStop } from 'lucide-react';
+import { Archive, CircleStop } from 'lucide-react';
 import type { ComponentProps } from 'react';
 import {
   DropdownMenu,
@@ -15,6 +15,7 @@ interface MoreMenuProps {
   onDelete: () => void;
   onComplete: () => void;
   canComplete: boolean;
+  onArchive?: () => void;
   onCloseTask: () => void;
   canClose: boolean;
   onStop?: () => void;
@@ -30,6 +31,7 @@ export function MoreMenu({
   onDelete,
   onComplete,
   canComplete,
+  onArchive,
   onCloseTask,
   canClose,
   onStop,
@@ -80,6 +82,18 @@ export function MoreMenu({
       disabled: false,
       onClick: copyLink,
     },
+    ...(onArchive
+      ? [
+          {
+            key: 'archive',
+            label: t('Archive'),
+            Icon: Archive,
+            action: 'archive',
+            disabled: false,
+            onClick: onArchive,
+          },
+        ]
+      : []),
     {
       key: 'close',
       label: t('关闭'),
@@ -119,6 +133,7 @@ export function MoreMenu({
             variant={row.danger === true ? 'destructive' : 'default'}
             className="more-menu-item"
             {...('action' in row ? { 'data-action': row.action } : {})}
+            data-testid={row.key === 'archive' ? 'archive-task' : undefined}
             disabled={row.disabled}
             onClick={row.onClick}
           >

@@ -6,7 +6,7 @@ import {
   parseLocalMergeInstruction,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
-import { build, step, todo } from '../db/schema.js';
+import { build, step, stopPending, todo } from '../db/schema.js';
 import { conflict } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import { claimAutonomousMerge, settleAutonomousMerge } from './autonomous-merge.js';
@@ -116,11 +116,13 @@ export function applyLocalMergeReport(
     .update(step)
     .set({
       status: 'done',
+      archiveStop: null,
       finishedAt: nowMs(),
       ...(result.outcome === 'merged' ? { checkpointCommit: result.commit } : {}),
     })
     .where(eq(step.id, row.id))
     .run();
+  deps.db.delete(stopPending).where(eq(stopPending.stepId, row.id)).run();
   upsertMessage(deps, {
     id: `local-merge-${row.id}`,
     conversationId: row.buildId,

@@ -231,7 +231,8 @@ export function TodoDetailPage() {
     mutations.patchTodo.isPending &&
     mutations.patchTodo.variables?.body.phase === 'done' &&
     mutations.patchTodo.variables?.id === todo?.id;
-  const showsChanges = phase === 'review' || phase === 'done' || phase === 'failed';
+  const archived = todo?.archivedAt != null;
+  const showsChanges = archived || phase === 'review' || phase === 'done' || phase === 'failed';
   const changesQ = useBuildChanges(buildId, live && (showsChanges || compareOpen));
   const latestPlan = plansQ.data?.length ? plansQ.data[plansQ.data.length - 1] : null;
   const compareDiffQ = useDocumentDiff(
@@ -654,6 +655,7 @@ export function TodoDetailPage() {
         : null;
 
   const handlePrimaryAction = () => {
+    if (archived) return;
     if (live) {
       if (phase === 'todo') orchestrateStart.orchestrate({ id: todo.id, seqNum: todo.seqNum });
       else if (phase === 'confirm' && buildId)
@@ -673,6 +675,28 @@ export function TodoDetailPage() {
     }
     if (phase === 'review') setOverlay({ kind: 'accept' });
     if (phase === 'failed') setOverlay({ kind: 'rerun' });
+  };
+
+  const unarchiveTask = () => {
+    if (!live) return;
+    mutations.setTodoArchived.mutate(
+      { id: todo.id, archived: false },
+      {
+        onError: (error) => toastError(t('Could not unarchive task.'), error),
+      },
+    );
+  };
+  const archiveTask = () => {
+    setMoreOpen(false);
+    if (!live) return;
+    mutations.setTodoArchived.mutate(
+      { id: todo.id, archived: true },
+      {
+        onSuccess: () =>
+          toastSuccess(t('Task archived'), { label: t('Undo'), onClick: unarchiveTask }),
+        onError: (error) => toastError(t('Could not archive task.'), error),
+      },
+    );
   };
 
   return (
@@ -725,7 +749,7 @@ export function TodoDetailPage() {
                 <FreshBlock
                   todo={todo}
                   tags={freshTags}
-                  action={ui.action}
+                  action={archived ? null : ui.action}
                   actionInFlight={actionInFlight}
                   onAction={handlePrimaryAction}
                   hasSpec={live && todo.spec.trim() !== ''}
@@ -753,32 +777,44 @@ export function TodoDetailPage() {
                 autoScroll={live && view.transcript.length > 0}
               />
             )}
-            {ui.placeholder != null && (
-              <Composer
-                placeholder={reviewActive ? t('AI 审核进行中…') : ui.placeholder}
-                aiReview={(phase === 'confirm' || phase === 'review') && !todo.awaitingReply}
-                streaming={streaming}
-                editable={live || DEMO_MODE}
-                draft={live ? liveDraft : undefined}
-                onDraftChange={live ? setLiveDraft : undefined}
-                onAttachment={onAttachment}
-                mentionGroups={mentionGroups}
-                mentionFiles={mentionFiles}
-                onStop={
-                  live && buildId
-                    ? () => {
-                        setStopQueued(false);
-                        setStopOpen(true);
-                      }
-                    : undefined
-                }
-                onReview={
-                  live && (phase === 'confirm' || phase === 'review') && !reviewActive
-                    ? () => setOverlay({ kind: 'review' })
-                    : undefined
-                }
-                onSend={onSend}
-              />
+            {archived ? (
+              <div className="flex justify-center p-6">
+                <Button
+                  data-testid="unarchive-task"
+                  onClick={unarchiveTask}
+                  disabled={mutations.setTodoArchived.isPending}
+                >
+                  {t('Unarchive to continue')}
+                </Button>
+              </div>
+            ) : (
+              ui.placeholder != null && (
+                <Composer
+                  placeholder={reviewActive ? t('AI 审核进行中…') : ui.placeholder}
+                  aiReview={(phase === 'confirm' || phase === 'review') && !todo.awaitingReply}
+                  streaming={streaming}
+                  editable={live || DEMO_MODE}
+                  draft={live ? liveDraft : undefined}
+                  onDraftChange={live ? setLiveDraft : undefined}
+                  onAttachment={onAttachment}
+                  mentionGroups={mentionGroups}
+                  mentionFiles={mentionFiles}
+                  onStop={
+                    live && buildId
+                      ? () => {
+                          setStopQueued(false);
+                          setStopOpen(true);
+                        }
+                      : undefined
+                  }
+                  onReview={
+                    live && (phase === 'confirm' || phase === 'review') && !reviewActive
+                      ? () => setOverlay({ kind: 'review' })
+                      : undefined
+                  }
+                  onSend={onSend}
+                />
+              )
             )}
           </div>
           {detail != null && (
@@ -834,7 +870,7 @@ export function TodoDetailPage() {
             </RightPane>
           )}
         </div>
-        {ui.placeholder != null && composerReject != null && (
+        {!archived && ui.placeholder != null && composerReject != null && (
           <div className="composer-reject absolute bottom-26 left-4 right-[calc(var(--detail-pane-right)+16px)] text-center text-meta text-destructive">
             {composerReject}
           </div>
@@ -852,11 +888,12 @@ export function TodoDetailPage() {
           setDeleteOpen(true);
         }}
         onComplete={completeTask}
-        canComplete={canComplete}
+        canComplete={!archived && canComplete}
         onCloseTask={closeTask}
-        canClose={canClose}
+        canClose={!archived && canClose}
+        onArchive={live && !archived ? archiveTask : undefined}
         onStop={
-          live && phase === 'queued' && buildId != null
+          live && !archived && phase === 'queued' && buildId != null
             ? () => {
                 setMoreOpen(false);
                 setStopQueued(true);
@@ -865,7 +902,7 @@ export function TodoDetailPage() {
             : undefined
         }
         onReject={
-          live && phase === 'review' && buildId != null && !running
+          live && !archived && phase === 'review' && buildId != null && !running
             ? () => {
                 setMoreOpen(false);
                 setOverlay({ kind: 'reject' });

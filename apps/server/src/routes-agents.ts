@@ -241,6 +241,7 @@ export function registerAgentRoutes(app: Hono, ctx: AppContext): void {
     const rows = ctx.db.select().from(todo).where(eq(todo.teamId, teamId)).all();
     const inFlight = rows.filter(
       (r) =>
+        r.archivedAt === null &&
         (r.assignment?.plan?.agentId === agentId || r.assignment?.build?.agentId === agentId) &&
         (IN_PROGRESS_PHASES as readonly string[]).includes(r.phase) &&
         r.latestBuildId !== null,

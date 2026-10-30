@@ -2,6 +2,7 @@ import { Activity, Hourglass } from 'lucide-react';
 import { type Ref, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import { TOPBAR_PRIMARY_BUTTON } from '../board/filter-panel.js';
+import { Badge } from '../components/ui/badge.js';
 import { Button } from '../components/ui/button.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
 import type { TodoRecord } from '../fixtures/records.js';
@@ -72,6 +73,11 @@ export function DetailHead({
         {todo.title}
       </h1>
       <span className="flex-none text-meta tabular-nums text-content-tertiary">#{todo.seqNum}</span>
+      {todo.archivedAt != null && (
+        <Badge variant="secondary" data-testid="archived-badge">
+          {t('Archived')}
+        </Badge>
+      )}
       <Popover open={popover} onOpenChange={setPopover}>
         <PopoverTrigger
           render={
@@ -129,7 +135,8 @@ export function DetailHead({
         >
           <EllipsisVertical />
         </Button>
-        {action != null &&
+        {todo.archivedAt == null &&
+          action != null &&
           (actionInFlight === true ? (
             <Button
               className={`detail-head-action ${TOPBAR_PRIMARY_BUTTON}`}

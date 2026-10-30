@@ -1,5 +1,5 @@
 import { conversationBranch } from '@cairn/shared';
-import { and, desc, eq, isNotNull, like, ne } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, isNull, like, ne } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, step, todo } from '../db/schema.js';
 import {
@@ -440,7 +440,7 @@ export function createCiPoller(
 
   function freshGrindRow(todoId: string) {
     const row = deps.db.select().from(todo).where(eq(todo.id, todoId)).get();
-    return row !== undefined && row.phase === 'building' ? row : null;
+    return row !== undefined && row.archivedAt === null && row.phase === 'building' ? row : null;
   }
 
   function freshReviewRow(todoId: string, buildId: string) {
@@ -530,6 +530,7 @@ export function createCiPoller(
       if (
         pull !== null &&
         isOwnOpenDefaultPull(pull, branch) &&
+        freshReviewRow(cand.todoId, cand.buildId)?.archivedAt === null &&
         (state === 'dirty' || state === 'behind') &&
         !pushNotSeen(cand.buildId, pull.headSha, now) &&
         freshReviewRow(cand.todoId, cand.buildId) !== null &&
@@ -1002,7 +1003,7 @@ export function createCiPoller(
       .select({ buildId: build.id, todoId: todo.id })
       .from(build)
       .innerJoin(todo, and(eq(todo.id, build.todoId), eq(todo.latestBuildId, build.id)))
-      .where(and(isNotNull(build.prNumber), eq(todo.phase, 'building')))
+      .where(and(isNotNull(build.prNumber), isNull(todo.archivedAt), eq(todo.phase, 'building')))
       .all();
     const reviewCandidates = deps.db
       .select({ buildId: build.id, todoId: todo.id })

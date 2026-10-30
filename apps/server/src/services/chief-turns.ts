@@ -325,9 +325,10 @@ export function stopChiefTurn(
   }
   deps.db
     .update(step)
-    .set({ status: 'stopped', finishedAt: now })
+    .set({ status: 'stopped', finishedAt: now, archiveStop: null })
     .where(eq(step.id, head.id))
     .run();
+  deps.db.delete(stopPending).where(eq(stopPending.stepId, head.id)).run();
   releaseUnconsumedSteer(deps.db, head);
   recordChiefStop(deps, head);
   settleChiefActiveRun(deps.db, threadId);

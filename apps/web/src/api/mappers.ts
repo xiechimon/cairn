@@ -149,6 +149,7 @@ export function toDisplayTodo(w: WireTodo): DisplayTodo {
     spec: w.spec,
     phase: w.phase,
     phaseAt: w.phaseAt,
+    archivedAt: w.archivedAt ?? null,
     seqNum: w.seqNum,
     orderIndex: w.orderIndex,
     tagIds: w.tagIds,

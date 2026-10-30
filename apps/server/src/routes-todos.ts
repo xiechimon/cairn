@@ -23,6 +23,7 @@ import {
   advanceSplitWaves,
   prepareStopForDone,
   stopActiveStepsAfterExit,
+  stopActiveStepsForArchive,
 } from './services/builds.js';
 import { readSourceIssueEcho } from './services/github-issues.js';
 import { listNeedsYou } from './services/needs-you.js';
@@ -35,6 +36,7 @@ import {
   listTodos,
   resetTodo,
   retrySelfIssueCreate,
+  setTodoArchived,
   updateTodo,
 } from './services/todos.js';
 
@@ -125,6 +127,21 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
       (IN_PROGRESS_PHASES as readonly string[]).includes(prior.phase) &&
       record.phase === 'done';
     if (closing || exited) stopActiveStepsAfterExit(svc, id);
+    return c.json(record);
+  });
+
+  app.post('/api/todos/:id/archive', (c) => {
+    const id = c.req.param('id');
+    const record = setTodoArchived(svc, id, true);
+    if (!record) throw notFound(`todo ${id}`);
+    stopActiveStepsForArchive(svc, id);
+    return c.json(getTodo(svc, id) ?? record);
+  });
+
+  app.post('/api/todos/:id/unarchive', (c) => {
+    const id = c.req.param('id');
+    const record = setTodoArchived(svc, id, false);
+    if (!record) throw notFound(`todo ${id}`);
     return c.json(record);
   });
 

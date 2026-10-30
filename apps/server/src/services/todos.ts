@@ -19,7 +19,7 @@ import {
   PLACEHOLDER_TITLE_FALLBACK,
   parseGithubIssueSourceRef,
 } from '@cairn/shared';
-import { and, asc, eq, inArray, max, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, max, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   agent,
@@ -156,6 +156,7 @@ export function toTodoRecord(deps: TodoDeps, row: TodoRow): TodoRecord {
     spec: row.spec,
     phase: row.phase,
     phaseAt: row.phaseAt,
+    archivedAt: row.archivedAt,
     seqNum: row.seqNum,
     orderIndex: row.orderIndex,
     tagIds,
@@ -240,11 +241,26 @@ function getRow(deps: TodoDeps, id: string): TodoRow | undefined {
   return deps.db.select().from(todo).where(eq(todo.id, id)).get();
 }
 
+export function setTodoArchived(deps: TodoDeps, id: string, archived: boolean): TodoRecord | null {
+  const row = getRow(deps, id);
+  if (!row) return null;
+  if ((row.archivedAt !== null) === archived) return getTodo(deps, id);
+  deps.db
+    .update(todo)
+    .set({ archivedAt: archived ? nowMs() : null, v: row.v + 1 })
+    .where(eq(todo.id, id))
+    .run();
+  const record = getTodo(deps, id);
+  if (record) deps.hub.publishTodoDoc(record.teamId, record);
+  return record;
+}
+
 export function listTodos(
   deps: TodoDeps,
   filter: { teamId?: string; projectId?: string } = {},
 ): TodoRecord[] {
   const conds = [
+    isNull(todo.archivedAt),
     filter.teamId !== undefined ? eq(todo.teamId, filter.teamId) : undefined,
     filter.projectId !== undefined ? eq(todo.projectId, filter.projectId) : undefined,
   ].filter((c) => c !== undefined);
@@ -709,6 +725,7 @@ export function deleteTodo(deps: TodoDeps, id: string): boolean {
     .all()
     .map((r) => r.id);
   if (buildIds.length > 0) {
+    db.delete(stopPending).where(inArray(stopPending.conversationId, buildIds)).run();
     db.delete(step).where(inArray(step.buildId, buildIds)).run();
   }
   db.delete(todo).where(eq(todo.id, id)).run();
