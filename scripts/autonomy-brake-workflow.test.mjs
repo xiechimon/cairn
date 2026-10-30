@@ -164,3 +164,20 @@ for (const event of ['pull_request', 'push'])
     assert.equal(f.result.status, 0, f.result.stderr);
     assert.equal(f.calls(), '');
   });
+
+for (const paused of ['true', 'false'])
+  test(`issues event sweeps current marker state: paused=${paused}`, (t) => {
+    const f = runStep(t, '.github/workflows/autonomy-brake.yml', 'Apply the brake', {
+      EVENT_NAME: 'issues',
+      PAUSED: paused,
+      FAILED_SHA: '',
+      RUN_URL: '',
+    });
+    assert.equal(f.result.status, 0, f.result.stderr);
+    assert.equal(f.calls(), 'scripts/autonomy-brake.mjs sweep\n');
+  });
+
+test('brake sweeps share a non-cancelling concurrency group', () => {
+  const text = readFileSync('.github/workflows/autonomy-brake.yml', 'utf8');
+  assert.match(text, /^concurrency:\n {2}group: autonomy-brake\n {2}cancel-in-progress: false$/m);
+});
