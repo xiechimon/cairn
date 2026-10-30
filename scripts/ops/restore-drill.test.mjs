@@ -44,14 +44,7 @@ function fixture() {
   const team = sql(db, 'select id from team limit 1');
   sql(
     db,
-    `insert into project(id,name,teamId) values('p','Project','${team}');
-    insert into todo(id,teamId,projectId,title,phaseAt,seqNum) values('t','${team}','p','Task',1,1);
-    insert into build(id,todoId,withPlan,triggerSource,createdAt) values('b','t',0,'user',1);
-    insert into step(id,buildId,kind,createdAt) values('s','b','build',1);
-    insert into message(id,conversationId,role,content,createdAt) values('m','s','user','"original"',1);
-    insert into chief_thread(id,chiefId,userId,teamId,title,createdAt,updatedAt,sessionId,sessionOpenedAt) values('ct','c','u','${team}','Thread',1,1,'session',1);
-    insert into chief_message(id,threadId,role,content,createdAt) values('cm','ct','user','"hello"',1);
-    insert into secret(id,teamId,name,valueCipher) values('secret','${team}','fixture','${template.cipher}');
+    `insert into secret(id,teamId,name,valueCipher) values('secret','${team}','fixture','${template.cipher}');
     insert into attachment(id,teamId,createdBy,fileName,mimeType,sizeBytes,storageKey,grantId,scope,status,createdAt) values('a','${team}','u','file','text/plain',3,'file.txt','g','message','ready',1);`,
   );
   const attachments = join(dir, 'attachments');
@@ -138,14 +131,14 @@ test('message content edited names table and id', () => {
   const f = fixture();
   sql(f.backupDb, `update message set content='"edited"' where id='m'`);
   f.pack();
-  fails(f, /message.*m/);
+  fails(f, /message.*m|relationship.*build b/);
 });
 for (const side of ['backupDb', 'db'])
   test(`deleted row in ${side} fails`, () => {
     const f = fixture();
     sql(f[side], `delete from message where id='m'`);
     f.pack();
-    fails(f, /message.*m/);
+    fails(f, /message.*m|relationship.*build b/);
   });
 test('scratch inside live directory is refused', () => {
   const f = fixture();
@@ -173,11 +166,11 @@ test('invalid gzip fails and publishes failure status', () => {
   fails(f, /restore/);
   assert.match(readFileSync(`${f.report}.status`, 'utf8'), /FAIL/);
 });
-test('foreign key violation fails', () => {
+test('orphaned chief message fails the selected relationship', () => {
   const f = fixture();
   sql(f.backupDb, `update chief_message set threadId='absent'`);
   f.pack();
-  fails(f, /foreign_key_check/);
+  fails(f, /relationship.*ct/);
 });
 test('wrong key fails without leaking bytes', () => {
   const f = fixture();
@@ -201,7 +194,7 @@ test('post-backup timestamped updates and inserts are allowed', () => {
   const f = fixture();
   sql(
     f.db,
-    `update chief_thread set title='later',updatedAt=1793404801000; insert into message(id,conversationId,role,content,createdAt) values('new','s','user','"new"',1793404801000)`,
+    `update chief_thread set title='later',updatedAt=1793404801000; insert into message(id,conversationId,role,content,createdAt) values('new','b','user','"new"',1793404801000)`,
   );
   const r = f.run();
   assert.equal(r.status, 0, r.stderr);
@@ -312,4 +305,70 @@ test('non-allowlisted machine field changes fail', () => {
   f.pack();
   sql(f.db, "update machine set name='Changed'");
   fails(f, /machine.*machine.*differing/);
+});
+
+for (const [table, id] of [
+  ['todo', 't', 'id'],
+  ['build', 'b', 'id'],
+  ['step', 's', 'buildId'],
+  ['message', 'm', 'conversationId'],
+  ['chief_thread', 'ct', 'id'],
+  ['chief_message', 'cm', 'threadId'],
+])
+  test(`missing selected ${table} names the relationship sample`, () => {
+    const f = fixture();
+    sql(f.backupDb, `delete from ${table} where id='${id}'`);
+    f.pack();
+    fails(f, table.startsWith('chief') ? /relationship.*ct/ : /relationship.*build b(?:\s|:)/);
+  });
+test('newest eligible build wins over todo activity and step-less builds', () => {
+  const f = fixture();
+  for (const db of [f.db, f.backupDb])
+    sql(
+      db,
+      `
+    insert into todo(id,teamId,projectId,title,phaseAt,seqNum)
+      select 'other',teamId,projectId,'Other',0,2 from todo where id='t';
+    insert into build(id,todoId,withPlan,triggerSource,createdAt) values('newest','other',0,'user',2),('empty','t',0,'user',3);
+    insert into step(id,buildId,kind,createdAt) values('ns','newest','build',2);
+    insert into message(id,conversationId,role,content,createdAt) values('nm','newest','user','"hello"',2);
+  `,
+    );
+  f.pack();
+  const r = f.run();
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(JSON.parse(readFileSync(f.report)).relationships.build, 'newest');
+});
+for (const table of ['step', 'message', 'chief_message'])
+  test(`partial ${table} loss names selected sample`, () => {
+    const f = fixture();
+    const query =
+      table === 'step'
+        ? "insert into step(id,buildId,kind,createdAt) values('extra','b','build',1)"
+        : table === 'message'
+          ? `insert into message(id,conversationId,role,content,createdAt) values('extra','b','user','"extra"',1)`
+          : `insert into chief_message(id,threadId,role,content,createdAt) values('extra','ct','user','"extra"',1)`;
+    sql(f.db, query);
+    fails(f, table === 'chief_message' ? /relationship.*ct/ : /relationship.*build b(?:\s|:)/);
+  });
+test('post-backup relationships are excluded while boundary rows are required', () => {
+  const f = fixture();
+  sql(
+    f.db,
+    `
+    insert into build(id,todoId,withPlan,triggerSource,createdAt) values('future','t',0,'user',1793404801000);
+    insert into step(id,buildId,kind,createdAt) values('future-step','future','build',1793404801000),('later-step','b','build',1793404801000);
+    insert into message(id,conversationId,role,content,createdAt) values('later-message','b','user','"later"',1793404801000);
+    insert into chief_message(id,threadId,role,content,createdAt) values('later-chief','ct','user','"later"',1793404801000);
+  `,
+  );
+  const r = f.run();
+  assert.equal(r.status, 0, r.stderr);
+  const report = JSON.parse(readFileSync(f.report));
+  assert.equal(report.relationships.build, 'b');
+  assert.deepEqual(report.relationships.steps, ['s']);
+  assert.deepEqual(report.relationships.messages, ['m']);
+  const backupStamp = Date.parse('2026-10-30T00:00:00Z');
+  sql(f.db, `update message set createdAt=${backupStamp} where id='later-message'`);
+  fails(f, /relationship.*build b(?:\s|:)/, ['--scratch', join(f.dir, 'boundary-scratch')]);
 });

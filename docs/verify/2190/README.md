@@ -25,7 +25,7 @@ Base commit: 54195adb0806fd11632109cb74e3af423b98c0b8. Changes stay on this bran
 
 ## Evidence limits
 
-All fixture runs use synthetic data and no LLM provider. They establish local drill behavior only, not production recovery, real-provider behavior, or installed timer execution. No UI screenshots are used. Runtime artifacts are the test logs and generated JSON assertions. Automated checks are not independent review. Artifacts will be committed here; no push or PR is authorized, so SHA-pinned remote evidence links and CI verification remain unavailable.
+All fixture runs use synthetic data and no LLM provider. They establish local drill behavior only, not production recovery, real-provider behavior, or installed timer execution. No UI screenshots are used. Runtime artifacts are the test logs and generated JSON assertions. Automated checks are not independent review. Follow-up artifacts remain uncommitted as requested; no push or PR is authorized, so SHA-pinned remote evidence links and CI verification remain unavailable.
 
 Host acceptance still required: run the supplied service command with the production backup, live DB, attachment directories and existing key; inspect JSON and its `.status` sibling; verify the weekly timer with systemd after installation by the host operator. Production key recovery, filesystem permissions, data volume, backup freshness and off-site retrieval are unverified.
 
@@ -48,7 +48,7 @@ scripts/ops/restore-drill.sh \
 
 Per-table counts partition identical, changedAfterBackup, missing, differing, allowedMutable and addedAfterBackup. Missing rows on either side fail, except live-only rows with a createdAt later than the filename timestamp. Live-only rows without createdAt cannot be dated and fail conservatively. Tables without usable primary keys fail; the Drizzle migration ledger explicitly uses rowid because its declared serial IDs are null. SQLite values are compared with storage type retained, UTF-8 text bytes, blob bytes and packed floating-point bytes. File layout/page identity is not claimed.
 
-The allowlist records each column and reason in the report. These mutations cannot be dated and have their own allowedMutable count rather than being described as proven post-backup changes. Unknown non-allowlisted mutations fail conservatively. The todo sample uses phaseAt (the schema has no todo createdAt) and the newest build, then verifies steps and at least one message. It also selects a chief thread with messages. This samples relationship paths, while foreign_key_check checks declared foreign keys; it does not establish every undeclared logical relationship.
+The allowlist records each column and reason in the report. These mutations cannot be dated and have their own allowedMutable count rather than being described as proven post-backup changes. Unknown non-allowlisted mutations fail conservatively. The relationship follow-up selects the newest build in the live snapshot with at least one step at or before the backup cutoff, ordered by build.createdAt and build.id. It requires the same todo/build in the restore and identical nonempty step and build-scoped message ID lists at the cutoff. The newest eligible chief thread and its pre-backup message IDs are compared the same way. Relationship checks precede general content and foreign-key checks so sample loss names its build or thread. This samples relationship paths, while foreign_key_check checks declared foreign keys; it does not establish every undeclared logical relationship.
 
 The report is JSON and `<report>.status` is a timestamped one-line PASS/FAIL record. Each file is atomically replaced, separately; readers should use JSON as the authoritative result and check timestamps for staleness. Input/unsafe-report argument refusals may deliberately leave an older report untouched. Files use umask 0077. Error reports include table/primary-key or attachment-key identifiers, never cell contents, plaintext secrets or key bytes. Treat host reports as private operational data, not public evidence.
 
@@ -97,3 +97,56 @@ CAIRN_RESTORE_DRILL_EVIDENCE="$PWD/docs/verify/2190" node --test \
 The sandbox refused both explicit `git add` commands with `Unable to create .../.git/worktrees/b0-2190-restore-drill/index.lock: Operation not permitted`. No files were staged and no commit was created. The implementation, reports and logs remain in this worktree, uncommitted. They therefore do not yet meet the committed-delivery-evidence requirement, and no remote evidence availability is claimed. Intended commit subject: `ops(2190): restore drill compares content, attachments, relationships and decryption` (no closing line).
 
 `pnpm exec husky` was run during preparation and the subsequent read showed `.husky/_` as core.hooksPath. There is no captured pre-run value, so unchanged hook configuration is not claimed. No hook bypass or explicit git configuration override was used.
+
+## Relationship follow-up failure modes (before implementation)
+
+| Failure mode | Test or limit |
+| --- | --- |
+| Production build-scoped messages rejected | Clean migrated fixture with build-scoped messages |
+| Todo activity selects an older build; newest build has no steps | Newest eligible build regression with conflicting phaseAt and step-less decoy |
+| Restored sample differs from live selection or lacks todo/build/steps/messages | Missing selected relationship rows regressions; errors name build id |
+| Partial child loss or extra pre-backup children | Child count and identity regressions |
+| Post-backup builds, steps or messages affect sample | Backup cutoff regression, including timestamp boundary |
+| Chief thread or messages missing or counts differ | Chief relationship regressions |
+| Fixture repeats an invented relationship | Migrated schema plus typed ORM inserts and server message insert helpers; source audit below |
+| Host backup still fails | Unverified: rerun on host with newest backup and fresh scratch |
+
+## Relationship follow-up evidence and source audit
+
+Tested base commit: `22a073092b44af1b7aa1c5ab3e6728680c3da622` plus the uncommitted working-tree changes identified in `relationships-tested-files.sha256`. These checks do not test the unchanged commit alone.
+
+Measured source audit against `apps/server/src/db/schema.ts` and server write paths:
+
+| Relationship | Server write path | Fixture construction |
+| --- | --- | --- |
+| todo -> build | `services/builds.ts` start inserts build.todoId from todoId | Migrated schema, typed build insert with todo parent |
+| build -> step | `services/builds.ts` enqueue inserts step.buildId from buildId | Typed step insert using returned build.id |
+| build -> message | `services/builds.ts` inserts conversationId=stepRow.buildId; `services/machine-finish-step.ts` passes stepRow.buildId to upsertMessage; `services/merge-gate-run.ts` reads conversationId=buildId | Actual `services/machine-deps.ts` upsertMessage helper with returned build.id |
+| chief_thread -> chief_message | `services/chief.ts` send inserts threadId=threadRow.id | Typed chiefMessage insert with returned chiefThread.id |
+
+The fixture executes the checkout migrations through openDbWithHandle. Full service creation would require unrelated dispatch, notification and stream dependencies; typed ORM inserts keep this fixture focused. Types enforce columns, while the runtime regressions protect the string ownership relationship that types cannot express. No new dependency was used; the installed Drizzle 0.45.2 insert declarations were read before adding ORM calls.
+
+`relationships-red.log` is the original implementation run with production-shaped message data: the clean fixture fails the old step lookup. `relationships-green.log` is the full local node:test rerun. Missing-build-message and partial-child tests require errors naming build b; missing chief rows name ct. The newer-build regression includes an older active todo and a newer build without steps. The cutoff test excludes post-backup builds and children and requires rows exactly at the cutoff. Inclusive cutoff matches the existing content comparator; second-resolution backup filenames still cannot order writes within the capture window.
+
+`relationships-boundary-fixture-error.log` is a discarded test error, not acceptance evidence: a manually calculated timestamp was a day late. The corrected boundary uses Date.parse with an explicit UTC date. Retro applied using `.claude/skills/retro-cairn/SKILL.md`: production fixture drift is protected by migrated typed inserts, the server insert helper and regressions; the boundary mistake is recorded separately under docs/lessons.
+
+All relationship acceptance commands use a scratch SQLite fixture, no UI, and provider mode **not exercised**. Runtime assertions inspect the actual drill exit, JSON report, selected IDs and mismatch diagnostics. No fixture screenshot or stub run establishes live application or provider behavior. Automated checks are not independent review. No independent vendor review, GitHub overlap lookup, PR evidence gate, CI, committed artifact or SHA-pinned remote evidence is available in this run. Earlier fixture-report/http-report artifacts predate this follow-up and do not verify these changes. The requested no-commit restriction supersedes the earlier intended delivery commit.
+
+Host acceptance remains unverified: execute the Operation command above on omarchy with `--backup /path/to/server-db-20261030T050019Z.db.gz` (or the then-newest backup), real attachment paths and the existing key, using a fresh scratch directory. Inspect the selected build, steps, messages, chief thread/messages and cutoff in JSON plus its status. This sandbox does not establish recovery of that production backup, host HTTP binding, timer installation/execution, provider behavior or production contention/scale.
+
+| Acceptance claim | Command | Surface / provider | Artifact | Result and limits |
+| --- | --- | --- | --- | --- |
+| Original step lookup rejects production-shaped messages | `node --test scripts/ops/restore-drill.test.mjs` before implementation | Scratch fixture / not exercised | relationships-red.log | Expected nonzero; clean backup fails relationships |
+| Build selection, missing and partial relationship diagnostics, cutoff | `node --test scripts/ops/restore-drill.test.mjs` after implementation | Scratch fixture / not exercised | relationships-green.log | Exit 0, 38/38 tests passed; host acceptance remains unverified |
+| Repository lint | `pnpm lint` | Static / not exercised | relationships-lint.log | Exit 0, one existing informational diagnostic in feishu-config.test.ts |
+| Repository types | `pnpm typecheck` | Static / not exercised | relationships-typecheck.log | Exit 0 |
+| Changed Vitest tests | `pnpm exec vitest run --changed` | Local / not exercised | relationships-vitest.log | Exit 0, no test files selected; no behavioral coverage claimed |
+| Spec collection | `pnpm spec:parse` | Collection only / not exercised | relationships-spec-parse.log | Exit 0, 1391 web cases collected and 65 integration test files parsed; no e2e executed |
+| Lessons format | `node scripts/lessons-ledger-gate.mjs` | Static / not exercised | relationships-lessons.log | Exit 0 |
+| Diff whitespace | `git diff --check` | Static / not exercised | This acceptance record | Exit 0 |
+
+`relationships-concurrent-check-timeout.log` preserves the failed verification attempt: three seed subprocesses returned null status at their 30-second timeout while repository checks were running. Resource contention is an inference, not an established cause. No timeout was increased and no assertion was weakened; the node:test suite was rerun alone. Equal-count ID substitution, extra restored children, absent live build/step samples, and absent live chief samples have implementation checks but no dedicated new regression in this follow-up; those specific variants remain unverified beyond the existing missing-message regression. No full e2e, build, commit, push, PR or host action was performed.
+
+Final measured node:test result: 38 passed, 0 failed. The original regression run had 38 cases, 20 passed and 18 failed; it includes expected original-code failures and is not a final acceptance run. Logs redact the local home/worktree prefix. No code changes were made between the timeout attempt and the successful isolated rerun.
+
+Additional measured static checks: `node scripts/english-only-gate.mjs`, `node scripts/comment-discipline-gate.mjs`, and the final `node scripts/lessons-ledger-gate.mjs` each exited 0; artifacts are relationships-english.log, relationships-comments.log and relationships-lessons.log. These are static checks, not independent review.

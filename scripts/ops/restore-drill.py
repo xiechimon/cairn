@@ -148,20 +148,30 @@ def attachments(db, backup, live, report):
     report['attachments'] = {'checked': count}
 
 
-def relationships(db, report):
-    selected = db.execute('select t.id,b.id from todo t join build b on b.todoId=t.id order by t.phaseAt desc,b.createdAt desc,b.id limit 1').fetchone()
+def relationships(db, live, stamp, report):
+    selected = live.execute('select b.todoId,b.id from build b where b.createdAt<=? and exists(select 1 from step s where s.buildId=b.id and s.createdAt<=?) order by b.createdAt desc,b.id desc limit 1', (stamp, stamp)).fetchone()
     if not selected:
         raise RuntimeError('relationship todo/build: no sample')
-    steps = list(db.execute('select id from step where buildId=?', (selected[1],)))
-    messages = []
-    for step in steps:
-        messages.extend(r[0] for r in db.execute('select id from message where conversationId=?', step))
-    if not steps or not messages:
-        raise RuntimeError(f'relationship todo/build/step/message: incomplete {selected[0]}')
-    chief = db.execute('select t.id from chief_thread t join chief_message m on m.threadId=t.id order by t.createdAt desc limit 1').fetchone()
+    todo_id, build_id = selected
+    if not db.execute('select 1 from todo where id=?', (todo_id,)).fetchone() or not live.execute('select 1 from todo where id=?', (todo_id,)).fetchone() or not db.execute('select 1 from build where id=? and todoId=? and createdAt<=?', (build_id, todo_id, stamp)).fetchone():
+        raise RuntimeError(f'relationship build {build_id}: missing todo/build')
+    samples = {}
+    for table, column, parent, label in [('step', 'buildId', build_id, 'steps'), ('message', 'conversationId', build_id, 'messages')]:
+        query = f'select id from {ident(table)} where {ident(column)}=? and createdAt<=? order by id'
+        expected = [r[0] for r in live.execute(query, (parent, stamp))]
+        actual = [r[0] for r in db.execute(query, (parent, stamp))]
+        if not expected or actual != expected:
+            raise RuntimeError(f'relationship build {build_id}: {label} count or identity mismatch (live={len(expected)}, restored={len(actual)})')
+        samples[label] = actual
+    chief = live.execute('select t.id from chief_thread t where t.createdAt<=? and exists(select 1 from chief_message m where m.threadId=t.id and m.createdAt<=?) order by t.createdAt desc,t.id desc limit 1', (stamp, stamp)).fetchone()
     if not chief:
         raise RuntimeError('relationship chief_thread/messages: no sample')
-    report['relationships'] = {'todo': selected[0], 'build': selected[1], 'steps': [s[0] for s in steps], 'messages': messages, 'chiefThread': chief[0], 'chiefMessages': [r[0] for r in db.execute('select id from chief_message where threadId=?', chief)]}
+    query = 'select id from chief_message where threadId=? and createdAt<=? order by id'
+    expected = [r[0] for r in live.execute(query, (chief[0], stamp))]
+    actual = [r[0] for r in db.execute(query, (chief[0], stamp))]
+    if not db.execute('select 1 from chief_thread where id=? and createdAt<=?', (chief[0], stamp)).fetchone() or actual != expected:
+        raise RuntimeError(f'relationship chief_thread {chief[0]}: missing thread or message count or identity mismatch (live={len(expected)}, restored={len(actual)})')
+    report['relationships'] = dict(todo=todo_id, build=build_id, **samples, chiefThread=chief[0], chiefMessages=actual, cutoff=stamp)
 
 
 def decrypt(db, key, env, report):
@@ -283,6 +293,8 @@ def main():
             if list(db.execute('pragma integrity_check')) != [('ok',)]:
                 raise RuntimeError('integrity_check failed')
             report['integrity'] = 'ok'
+            item = 'relationships'
+            relationships(db, snapshot, stamp, report)
             item = 'foreign_key_check'
             if list(db.execute('pragma foreign_key_check')):
                 raise RuntimeError('foreign_key_check failed')
@@ -291,8 +303,6 @@ def main():
             compare(db, snapshot, stamp, report)
             item = 'attachments'
             attachments(db, attachment_copy, attachment_live, report)
-            item = 'relationships'
-            relationships(db, report)
             env = {k: v for k, v in os.environ.items() if k in ['PATH', 'TMPDIR', 'SYSTEMROOT']}
             env['HOME'] = str(home)
             item = 'decrypt'

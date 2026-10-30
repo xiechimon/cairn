@@ -1,0 +1,441 @@
+✖ clean backup passes fixture in-process checkout API and never reports key or plaintext (727.177834ms)
+✔ one attachment byte changed names its storage key (129.452541ms)
+✔ message content edited names table and id (135.490042ms)
+✔ deleted row in backupDb fails (138.016459ms)
+✔ deleted row in db fails (148.47375ms)
+✔ scratch inside live directory is refused (89.282584ms)
+✔ scratch through symlink is refused (89.511458ms)
+✔ existing scratch is refused without overwriting it (91.862417ms)
+✔ report cannot overwrite live DB or key (97.051875ms)
+✔ invalid gzip fails and publishes failure status (122.523916ms)
+✔ foreign key violation fails (132.874208ms)
+✖ wrong key fails without leaking bytes (125.7035ms)
+✖ no encrypted sample fails (154.490417ms)
+✔ missing relationship sample fails (148.207792ms)
+✖ post-backup timestamped updates and inserts are allowed (137.075083ms)
+✔ missing attachment and unsafe attachment key fail (148.783709ms)
+✖ default backup directory selects the newest timestamp (127.169625ms)
+✔ migration ledger rows with null declared ids are compared rather than skipped (178.287042ms)
+✖ machine heartbeat allowlist is reported while machine name remains strict (166.414542ms)
+✔ missing ready attachment names its storage key (178.166875ms)
+✔ weekly units isolate scratch and do not install themselves (0.734917ms)
+✖ production shell requires a real HTTP listener and reports sandbox refusal (191.451667ms)
+✔ invalid SQLite fails integrity checking (139.918875ms)
+✔ ready attachment size mismatch fails (126.209166ms)
+✔ scratch equal to live DB is refused (87.46375ms)
+✔ missing key fails without creating a replacement (87.740833ms)
+✔ non-allowlisted machine field changes fail (167.241ms)
+✖ missing selected todo names the relationship sample (136.692375ms)
+✖ missing selected build names the relationship sample (144.5535ms)
+✖ missing selected step names the relationship sample (138.616625ms)
+✖ missing selected message names the relationship sample (135.33125ms)
+✖ missing selected chief_thread names the relationship sample (130.738ms)
+✖ missing selected chief_message names the relationship sample (138.150625ms)
+✖ newest eligible build wins over todo activity and step-less builds (152.859209ms)
+✖ partial step loss names selected sample (141.1935ms)
+✖ partial message loss names selected sample (138.750459ms)
+✖ partial chief_message loss names selected sample (144.857666ms)
+✖ post-backup relationships are excluded while boundary rows are required (147.735792ms)
+ℹ tests 38
+ℹ suites 0
+ℹ pass 20
+ℹ fail 18
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5747.684209
+
+✖ failing tests:
+
+test at scripts/ops/restore-drill.test.mjs:111:1
+✖ clean backup passes fixture in-process checkout API and never reports key or plaintext (727.177834ms)
+  AssertionError [ERR_ASSERTION]: FAIL relationships: relationship todo/build/step/message: incomplete t
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:114:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:182:1
+✖ wrong key fails without leaking bytes (125.7035ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /decrypt/. Input:
+  
+  'FAIL relationships: relationship todo/build/step/message: incomplete t\n'
+  
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:109:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:185:3)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL relationships: relationship todo/build/step/message: incomplete t\n',
+    expected: /decrypt/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:188:1
+✖ no encrypted sample fails (154.490417ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /decrypt.*sample/. Input:
+  
+  'FAIL relationships: relationship todo/build/step/message: incomplete t\n'
+  
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:109:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:192:3)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL relationships: relationship todo/build/step/message: incomplete t\n',
+    expected: /decrypt.*sample/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:200:1
+✖ post-backup timestamped updates and inserts are allowed (137.075083ms)
+  AssertionError [ERR_ASSERTION]: FAIL relationships: relationship todo/build/step/message: incomplete t
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:207:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:219:1
+✖ default backup directory selects the newest timestamp (127.169625ms)
+  AssertionError [ERR_ASSERTION]: FAIL relationships: relationship todo/build/step/message: incomplete t
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:222:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:231:1
+✖ machine heartbeat allowlist is reported while machine name remains strict (166.414542ms)
+  AssertionError [ERR_ASSERTION]: FAIL relationships: relationship todo/build/step/message: incomplete t
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:242:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:267:1
+✖ production shell requires a real HTTP listener and reports sandbox refusal (191.451667ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /api.*listen failed: EPERM/. Input:
+  
+  'relationships: relationship todo/build/step/message: incomplete t'
+  
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:275:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'relationships: relationship todo/build/step/message: incomplete t',
+    expected: /api.*listen failed: EPERM/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:321:4
+✖ missing selected todo names the relationship sample (136.692375ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /relationship.*build b(?:\s|:)/. Input:
+  
+  'FAIL foreign_key_check: foreign_key_check failed\n'
+  
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:109:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:325:3)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL foreign_key_check: foreign_key_check failed\n',
+    expected: /relationship.*build b(?:\s|:)/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:321:4
+✖ missing selected build names the relationship sample (144.5535ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /relationship.*build b(?:\s|:)/. Input:
+  
+  'FAIL content: content build b: missing row\n'
+  
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:109:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:325:3)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL content: content build b: missing row\n',
+    expected: /relationship.*build b(?:\s|:)/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:321:4
+✖ missing selected step names the relationship sample (138.616625ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /relationship.*build b(?:\s|:)/. Input:
+  
+  'FAIL content: content step s: missing row\n'
+  
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:109:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:325:3)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL content: content step s: missing row\n',
+    expected: /relationship.*build b(?:\s|:)/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:321:4
+✖ missing selected message names the relationship sample (135.33125ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /relationship.*build b(?:\s|:)/. Input:
+  
+  'FAIL content: content message m: missing row\n'
+  
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:109:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:325:3)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL content: content message m: missing row\n',
+    expected: /relationship.*build b(?:\s|:)/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:321:4
+✖ missing selected chief_thread names the relationship sample (130.738ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /relationship.*ct/. Input:
+  
+  'FAIL foreign_key_check: foreign_key_check failed\n'
+  
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:109:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:325:3)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL foreign_key_check: foreign_key_check failed\n',
+    expected: /relationship.*ct/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:321:4
+✖ missing selected chief_message names the relationship sample (138.150625ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /relationship.*ct/. Input:
+  
+  'FAIL content: content chief_message cm: missing row\n'
+  
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:109:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:325:3)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL content: content chief_message cm: missing row\n',
+    expected: /relationship.*ct/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:327:1
+✖ newest eligible build wins over todo activity and step-less builds (152.859209ms)
+  AssertionError [ERR_ASSERTION]: FAIL relationships: relationship todo/build/step/message: incomplete t
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:338:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:342:3
+✖ partial step loss names selected sample (141.1935ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /relationship.*build b(?:\s|:)/. Input:
+  
+  'FAIL content: content step extra: missing row\n'
+  
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:109:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:350:5)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL content: content step extra: missing row\n',
+    expected: /relationship.*build b(?:\s|:)/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:342:3
+✖ partial message loss names selected sample (138.750459ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /relationship.*build b(?:\s|:)/. Input:
+  
+  'FAIL content: content message extra: missing row\n'
+  
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:109:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:350:5)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL content: content message extra: missing row\n',
+    expected: /relationship.*build b(?:\s|:)/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:342:3
+✖ partial chief_message loss names selected sample (144.857666ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /relationship.*ct/. Input:
+  
+  'FAIL content: content chief_message extra: missing row\n'
+  
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:109:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:350:5)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL content: content chief_message extra: missing row\n',
+    expected: /relationship.*ct/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:352:1
+✖ post-backup relationships are excluded while boundary rows are required (147.735792ms)
+  AssertionError [ERR_ASSERTION]: FAIL relationships: relationship todo/build/step/message: incomplete t
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:361:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
