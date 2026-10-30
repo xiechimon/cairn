@@ -3,6 +3,8 @@
 @import "tw-animate-css";
 
 @custom-variant dark (&:where(:not(.light):not(.light *)));
+@custom-variant data-horizontal (&[data-orientation="horizontal"]);
+@custom-variant data-vertical (&[data-orientation="vertical"]);
 
 @theme inline {
   --color-content-secondary: var(--text-secondary);

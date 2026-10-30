@@ -206,7 +206,12 @@ const RESOURCES = [
   'task-panel',
   'first-pr-report',
 ];
-const SHARED_SURFACE_ONLY = ['cds-motion', 'color-freeze', 'fixture-mode-chip'];
+const SHARED_SURFACE_ONLY = [
+  'cds-motion',
+  'color-freeze',
+  'fixture-mode-chip',
+  'orientation-variants',
+];
 const SECONDARY = ['title-', 'shell-', 'segmented-'];
 
 const FILE_RULES = new Map([
