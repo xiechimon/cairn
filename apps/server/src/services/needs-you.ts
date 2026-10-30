@@ -1,7 +1,7 @@
 import type { NeedsYouQuery, NeedsYouReason } from '@cairn/shared';
 import { isProviderAuthFailure } from '@cairn/shared';
-import { and, eq, inArray, isNull } from 'drizzle-orm';
-import { build, project, todo } from '../db/schema.js';
+import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { build, project, step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { applyBuildStepAction, type BuildDeps, NotFoundError } from './builds.js';
@@ -111,6 +111,13 @@ export async function sweepFailedRetries(deps: BuildDeps): Promise<void> {
     .all();
   for (const row of rows) {
     if (row.latestBuildId === null) continue;
+    const latest = deps.db
+      .select({ scheduleId: step.scheduleId })
+      .from(step)
+      .where(eq(step.buildId, row.latestBuildId))
+      .orderBy(desc(step.createdAt))
+      .get();
+    if (latest?.scheduleId != null) continue;
     const buildRow = deps.db.select().from(build).where(eq(build.id, row.latestBuildId)).get();
     if (buildRow === undefined || !owedAutomaticRetry(buildRow)) continue;
     try {

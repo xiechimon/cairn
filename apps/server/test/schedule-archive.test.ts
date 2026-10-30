@@ -50,13 +50,13 @@ describe('scheduler tick and archived tasks', () => {
       activeSchedule.nextRunAt as number,
     );
     const scheduler = createScheduler(s.svc, { tickMs: 60_000 });
-    expect(() => scheduler.tick(dueAt)).not.toThrow();
+    await expect(scheduler.tick(dueAt)).resolves.toBeUndefined();
     expect(
       s.db.select().from(schedule).where(eq(schedule.todoId, archived.id)).get(),
     ).toMatchObject({ enabled: false, nextRunAt: null, pausedReason: expect.any(String) });
     expect(s.db.select().from(todo).where(eq(todo.id, archived.id)).get()?.phase).toBe('todo');
     expect(s.db.select().from(todo).where(eq(todo.id, active.id)).get()?.phase).toBe('queued');
-    expect(() => scheduler.tick(dueAt + 600_000)).not.toThrow();
+    await expect(scheduler.tick(dueAt + 600_000)).resolves.toBeUndefined();
   });
 
   test('archiving a task pauses its schedule and unarchiving leaves it paused', async () => {

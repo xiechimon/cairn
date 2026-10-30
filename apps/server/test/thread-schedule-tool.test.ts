@@ -222,7 +222,7 @@ describe('worker thread schedule tools', () => {
     expect(response.status).toBe(201);
     completeStep(s.svc, s.claimed.step.id);
     setTodoPhase(s.svc, s.todoId, 'done');
-    createScheduler(s.svc, { tickMs: 60_000 }).tick(s.stored().nextRunAt!);
+    await createScheduler(s.svc, { tickMs: 60_000 }).tick(s.stored().nextRunAt!);
     expect((await s.claim()).instruction).toBe(prompt);
   });
 
@@ -236,21 +236,18 @@ describe('worker thread schedule tools', () => {
       completeStep(s.svc, s.claimed.step.id);
       setTodoPhase(s.svc, s.todoId, 'done');
       const scheduler = createScheduler(s.svc, { tickMs: 60_000 });
-      scheduler.tick(due);
-      const runs = s.db.select().from(build).where(eq(build.triggerSource, 'schedule')).all();
+      await scheduler.tick(due);
+      const runs = s.db.select().from(build).where(eq(build.todoId, s.todoId)).all();
       expect(runs).toHaveLength(1);
-      expect(s.db.select().from(step).where(eq(step.buildId, runs[0]!.id)).get()?.prompt).toBe(
-        `Scheduled follow-up you set earlier:\n\n${prompt}`,
-      );
-      expect(runs[0]?.scheduledBy).toBe(`worker:${s.claimed.step.id}`);
+      const fired = s.db.select().from(step).all().at(-1)!;
+      expect(fired.prompt).toBe(`Scheduled follow-up you set earlier:\n\n${prompt}`);
+      expect(fired.scheduledBy).toBe(`worker:${s.claimed.step.id}`);
       const claimed = await s.claim();
       expect(claimed.instruction).toContain(prompt);
       expect(claimed.todo?.id).toBe(s.todoId);
       if (cadence.startsWith('in ')) {
-        scheduler.tick(due + 900_000);
-        expect(
-          s.db.select().from(build).where(eq(build.triggerSource, 'schedule')).all(),
-        ).toHaveLength(1);
+        await scheduler.tick(due + 900_000);
+        expect(s.db.select().from(build).where(eq(build.todoId, s.todoId)).all()).toHaveLength(1);
       } else {
         expect(await s.run('get_schedule', {}, claimed.step.id)).toMatchObject({
           lastRunAt: due,
@@ -274,11 +271,10 @@ describe('worker thread schedule tools', () => {
       });
       completeStep(s.svc, s.claimed.step.id);
       setTodoPhase(s.svc, s.todoId, 'done');
+      const stepCount = s.db.select().from(step).all().length;
       const scheduler = createScheduler(s.svc, { tickMs: 60_000 });
-      for (let period = 0; period < 3; period++) scheduler.tick(due + period * 900_000);
-      expect(s.db.select().from(build).where(eq(build.triggerSource, 'schedule')).all()).toEqual(
-        [],
-      );
+      for (let period = 0; period < 3; period++) await scheduler.tick(due + period * 900_000);
+      expect(s.db.select().from(step).all()).toHaveLength(stepCount);
       expect(s.stored().nextRunAt).toBeNull();
     },
   );
@@ -386,7 +382,7 @@ describe('worker schedule security', () => {
     s.db.update(step).set({ status: 'done' }).where(eq(step.id, s.claimed.step.id)).run();
     s.db.update(todo).set({ phase, phaseAt: due }).where(eq(todo.id, s.todoId)).run();
     const scheduler = createScheduler(s.svc, { tickMs: 60_000 });
-    scheduler.tick(due);
+    await scheduler.tick(due);
     expect(s.db.select().from(build).where(eq(build.todoId, s.todoId)).all()).toHaveLength(1);
     expect(
       s.db.select().from(build).where(eq(build.id, s.claimed.step.buildId)).get()?.errorMessage,
@@ -394,7 +390,7 @@ describe('worker schedule security', () => {
     expect(s.db.select().from(todo).where(eq(todo.id, s.todoId)).get()?.phase).toBe(phase);
     expect(s.stored().nextRunAt).toBeGreaterThanOrEqual(due + 900_000);
     expect(s.stored().lastRunAt).toBeNull();
-    scheduler.tick(due + 900_000);
+    await scheduler.tick(due + 900_000);
     expect(s.db.select().from(build).where(eq(build.todoId, s.todoId)).all()).toHaveLength(1);
   });
 
@@ -468,13 +464,13 @@ describe('worker schedule security', () => {
       s.db.update(todo).set({ phase: 'done' }).where(eq(todo.id, s.todoId)).run();
       const scheduler = createScheduler(s.svc, { tickMs: 60_000 });
       const due = s.stored().nextRunAt!;
-      expect(() => scheduler.tick(due)).not.toThrow();
+      await expect(scheduler.tick(due)).resolves.toBeUndefined();
       expect(s.stored()).toMatchObject({
         enabled: false,
         nextRunAt: null,
         pausedReason: expect.stringMatching(/10.*human message/i),
       });
-      createScheduler(s.svc, { tickMs: 60_000 }).tick(due + 900_000);
+      await createScheduler(s.svc, { tickMs: 60_000 }).tick(due + 900_000);
       expect(
         s.db.select().from(build).where(eq(build.triggerSource, 'schedule')).all(),
       ).toHaveLength(10);
@@ -492,11 +488,13 @@ describe('worker schedule security', () => {
     );
     expect(response.status).toBe(201);
     await s.run('schedule_create', { cadence: '*/15 * * * *', prompt: 'Continue' });
+    s.db.update(step).set({ status: 'done' }).run();
     s.db.update(todo).set({ phase: 'done' }).where(eq(todo.id, s.todoId)).run();
-    createScheduler(s.svc, { tickMs: 60_000 }).tick(s.stored().nextRunAt!);
+    await createScheduler(s.svc, { tickMs: 60_000 }).tick(s.stored().nextRunAt!);
     expect(s.db.select().from(build).where(eq(build.triggerSource, 'schedule')).all()).toHaveLength(
-      11,
+      10,
     );
+    expect(workerScheduleRunHistory(s.svc, s.todoId).consecutive).toBe(1);
     expect(s.stored().enabled).toBe(true);
   });
 
@@ -533,7 +531,7 @@ describe('worker schedule security', () => {
       expect(response.status).toBe(200);
       await s.run('schedule_create', { cadence: '*/15 * * * *', prompt: 'Repeat' });
       s.db.update(todo).set({ phase: 'done' }).where(eq(todo.id, s.todoId)).run();
-      createScheduler(s.svc, { tickMs: 60_000 }).tick(s.stored().nextRunAt!);
+      await createScheduler(s.svc, { tickMs: 60_000 }).tick(s.stored().nextRunAt!);
       expect(s.stored().enabled).toBe(false);
       expect(
         s.db.select().from(build).where(eq(build.triggerSource, 'schedule')).all(),
@@ -624,7 +622,7 @@ describe('worker schedule security', () => {
       .where(eq(machine.id, s.claimed.step.machineId!))
       .run();
     const scheduler = createScheduler(s.svc, { tickMs: 60_000 });
-    expect(() => scheduler.tick(due)).not.toThrow();
+    await expect(scheduler.tick(due)).resolves.toBeUndefined();
     expect(s.stored()).toMatchObject({
       enabled: false,
       nextRunAt: null,
@@ -634,7 +632,7 @@ describe('worker schedule security', () => {
     expect(
       s.db.select().from(machine).where(eq(machine.id, s.claimed.step.machineId!)).get()?.online,
     ).toBe(false);
-    expect(() => scheduler.tick(due + 900_000)).not.toThrow();
+    await expect(scheduler.tick(due + 900_000)).resolves.toBeUndefined();
   });
 
   test('the get_schedule description discloses one-shot removal', () => {
@@ -696,22 +694,22 @@ test('the tenth scheduled run is allowed and the eleventh pauses across schedule
   s.db.update(step).set({ status: 'done' }).where(eq(step.id, s.claimed.step.id)).run();
   s.db.update(todo).set({ phase: 'done' }).where(eq(todo.id, s.todoId)).run();
   const clock = vi.spyOn(Date, 'now').mockReturnValue(due);
-  createScheduler(s.svc, { tickMs: 60_000 }).tick(due);
+  await createScheduler(s.svc, { tickMs: 60_000 }).tick(due);
   expect(s.db.select().from(build).where(eq(build.triggerSource, 'schedule')).all()).toHaveLength(
-    10,
+    9,
   );
   expect(s.stored().enabled).toBe(true);
   s.db.update(step).set({ status: 'done' }).run();
   s.db.update(todo).set({ phase: 'done' }).where(eq(todo.id, s.todoId)).run();
   clock.mockReturnValue(due + 900_000);
-  createScheduler(s.svc, { tickMs: 60_000 }).tick(due + 900_000);
+  await createScheduler(s.svc, { tickMs: 60_000 }).tick(due + 900_000);
   expect(s.stored()).toMatchObject({
     enabled: false,
     nextRunAt: null,
     pausedReason: expect.stringMatching(/10.*human message/i),
   });
   expect(s.db.select().from(build).where(eq(build.triggerSource, 'schedule')).all()).toHaveLength(
-    10,
+    9,
   );
 });
 
@@ -791,7 +789,7 @@ test.each(['auto-retry', 'chief-message'] as const)(
   '%s does not reset the ten-run schedule cap',
   async (path) => {
     const s = await withNonHumanContinuation(path, 10);
-    createScheduler(s.svc, { tickMs: 60_000 }).tick(s.due);
+    await createScheduler(s.svc, { tickMs: 60_000 }).tick(s.due);
     expect(s.stored()).toMatchObject({
       enabled: false,
       nextRunAt: null,
@@ -811,7 +809,7 @@ test.each(['auto-retry', 'chief-message'] as const)(
   '%s does not reset the fifteen-minute schedule cooldown',
   async (path) => {
     const s = await withNonHumanContinuation(path, 1);
-    createScheduler(s.svc, { tickMs: 60_000 }).tick(s.due);
+    await createScheduler(s.svc, { tickMs: 60_000 }).tick(s.due);
     expect(s.stored()).toMatchObject({
       enabled: true,
       nextRunAt: s.lastScheduledAt + 900_000,

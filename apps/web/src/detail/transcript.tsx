@@ -3,6 +3,11 @@ import { inlineSegments } from '../api/mappers.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
 import { LiveRow, LiveSignal } from '../components/chat/live-row.js';
 import { Button } from '../components/ui/button.js';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '../components/ui/collapsible.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
@@ -216,9 +221,32 @@ function Row({
       );
     case 'scheduled':
       return (
-        <div className="chat-scheduled mt-3.5 flex items-center gap-1.5 text-meta text-(--text-tertiary)">
+        <div
+          data-testid="schedule-wake-marker"
+          className="chat-scheduled mt-3.5 flex items-center gap-1.5 text-meta text-(--text-tertiary)"
+        >
           <Clock width={13} height={13} />
           {t('由定时发起')}
+        </div>
+      );
+    case 'scheduled-turn':
+      return (
+        <Collapsible className="mt-3.5" defaultOpen={false} data-testid="scheduled-turn">
+          <CollapsibleTrigger
+            render={<Button variant="ghost" className="text-meta text-(--text-secondary)" />}
+          >
+            <Clock width={13} height={13} />
+            {t('由定时发起')}
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <Transcript transcript={item.items} agent={agent} onOpenPlan={onOpenPlan} />
+          </CollapsibleContent>
+        </Collapsible>
+      );
+    case 'automation-completed':
+      return (
+        <div className="mt-3.5 text-meta text-(--text-tertiary)" data-testid="automation-completed">
+          {t('完成')}
         </div>
       );
     case 'injected-skills':

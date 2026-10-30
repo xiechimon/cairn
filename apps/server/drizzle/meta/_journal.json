@@ -547,6 +547,20 @@
       "when": 1793387626578,
       "tag": "0077_queued_message",
       "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "6",
+      "when": 1793395348078,
+      "tag": "0078_schedule_continue",
+      "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "6",
+      "when": 1793396260275,
+      "tag": "0079_schedule_retry_floor",
+      "breakpoints": true
     }
   ]
 }
