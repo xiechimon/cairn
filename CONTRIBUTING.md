@@ -63,7 +63,7 @@ After merge to main, the `release` workflow publishes unpublished versions of `@
 
 The release workflow builds and packs the tarballs in a job without npm publishing rights, and a separate job that runs no package scripts publishes them.
 
-A manual publish from a laptop needs `--no-provenance`, because provenance requires the CI's OIDC identity. If a tag push fails after a successful publish, run `pnpm exec changeset git-tag` and `git push origin --tags` from an up-to-date main to recreate the tags.
+Publish only through the `release` workflow: both manifests set `publishConfig.provenance`, and provenance needs the CI's OIDC identity, so a publish from a laptop fails. If a tag push fails after a successful publish, run `pnpm exec changeset git-tag` and `git push origin --tags` from an up-to-date main to recreate the tags.
 
 Publishing requires a Trusted Publisher on npmjs.com for each package, with provider GitHub Actions, repository `xiechimon/cairn`, and workflow file `release.yml`. Renaming the workflow file breaks publishing until the Trusted Publishers are updated. Publishing needs no token or repository secret.
 
