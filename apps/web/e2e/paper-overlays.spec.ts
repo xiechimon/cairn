@@ -52,7 +52,7 @@ for (const theme of ['light', 'dark'] as const) {
       await page.goto(SECRETS);
       return resolveColor(page, 'var(--dialog-backdrop)');
     })();
-    if (theme === 'light') expect(want).toBe('rgba(43, 38, 32, 0.14)');
+    if (theme === 'light') expect(want).toBe('rgba(16, 32, 26, 0.18)');
 
     await openFromTopbar(page, SECRETS, '添加密钥');
     const overlay = page.locator('[data-slot="dialog-overlay"]');
@@ -95,7 +95,7 @@ test('dialog widths are S 400 / M 480 / L 640', async ({ page }) => {
 test('dialog face: sheet surface, 16px corners, 16px sans title, 28px close', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
   const dialog = await openFromTopbar(page, SECRETS, '添加密钥');
-  await expect(dialog).toHaveCSS('background-color', await resolveColor(page, '#f7f1e1'));
+  await expect(dialog).toHaveCSS('background-color', await resolveColor(page, '#f9f8f4'));
   await expect(dialog).toHaveCSS('border-top-left-radius', '16px');
   const title = dialog.getByTestId('dialog-head').getByText('添加密钥');
   await expect(title).toHaveCSS('font-size', '16px');
@@ -166,7 +166,7 @@ test('Paper menu: 32px rows, 13.5px text, 15px icons, 18px panel corners, 4px pa
   await settle(menu);
   await expect(menu).toHaveCSS('border-top-left-radius', '18px');
   await expect(menu).toHaveCSS('padding-top', '6px');
-  await expect(menu).toHaveCSS('background-color', 'rgb(255, 253, 246)');
+  await expect(menu).toHaveCSS('background-color', 'rgb(254, 254, 251)');
 
   const rows = menu.getByRole('menuitem');
   const count = await rows.count();
@@ -180,7 +180,7 @@ test('Paper menu: 32px rows, 13.5px text, 15px icons, 18px panel corners, 4px pa
   }
   const copy = menu.locator('.more-menu-item', { hasText: '复制链接' });
   await copy.hover();
-  await expect(copy).toHaveCSS('background-color', await resolveColor(page, '#f6f2ec'));
+  await expect(copy).toHaveCSS('background-color', await resolveColor(page, '#f1f0eb'));
   await expect(menu.getByRole('separator')).toHaveCount(1);
   await evidenceShot(page, 'more-menu.png');
 });
@@ -214,7 +214,7 @@ test('provider picker: grouped rows, search hides empty groups', async ({ page }
   await expect(dialog.getByRole('group', { name: '订阅登录' }).locator('[data-preset-id]')).toHaveCount(2);
   const codex = dialog.locator('[data-preset-id="openai-codex"]');
   await expect(codex).toBeDisabled();
-  await expect(codex).toHaveCSS('color', await resolveColor(page, '#6f6558'));
+  await expect(codex).toHaveCSS('color', await resolveColor(page, '#666b62'));
   await evidenceShot(page, 'provider-picker.png');
 
   await dialog.getByLabel('搜索服务商...').fill('cloudflare');

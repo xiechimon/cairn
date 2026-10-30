@@ -102,4 +102,5 @@ tooltip.tsx              # hover/focus info bubble (official-site form; z goes t
 - **#409** — the per-piece tiered audit (low 2 / medium 9 / high 3)
 - **#410** — the primitives selection ruling (Base UI / `@base-ui/react`)
 - **#418** — the measured overlay-family comparison matrix
+- `design.html` (`src/design/`) — the live gallery: every piece above rendered on the real tokens, with page patterns; open `/design.html` on the web dev server
 - [DESIGN.md](./DESIGN.md) — the visual identity and the per-piece visual specs; the cross-shell seam color `--border-default` and the focus-ring canon are contracts, and changes go through the visual spec

@@ -92,14 +92,7 @@ for (const theme of ['light', 'dark'] as const) {
       expect(g.gapRight).toBeCloseTo(g.pad, 0);
       expect(g.gapBottom).toBeCloseTo(g.padBottom, 0);
 
-      const tracks = menu.locator('[data-segmented="track"]');
-      await expect(tracks).toHaveCount(2);
-      const [appearance, density] = await Promise.all([
-        tracks.nth(0).boundingBox(),
-        tracks.nth(1).boundingBox(),
-      ]);
-      expect(density!.x).toBe(appearance!.x);
-      expect(density!.width).toBe(appearance!.width);
+      await expect(menu.locator('[data-segmented="track"]')).toHaveCount(1);
     });
 
     test(`language select: padded list, pill rows concentric with the popup (${theme}, ${locale})`, async ({

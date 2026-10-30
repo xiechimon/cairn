@@ -8,8 +8,8 @@ import { expect, type Page, test } from '@playwright/test';
 
 const ROUTE = '/app?scenario=01';
 const THEME_KEY = 'cairn-theme'; // apps/web/src/theme.ts THEME_STORAGE_KEY
-const LIGHT_CHROME = '#efe6d0';
-const DARK_CHROME = '#1a1612';
+const LIGHT_CHROME = '#f1f0eb';
+const DARK_CHROME = '#0a110e';
 
 const themeColors = (page: Page) =>
   page.evaluate(() =>
@@ -116,8 +116,8 @@ async function bootSkeletonPaint(page: Page, theme: 'light' | 'dark') {
 test('boot skeleton paints the light Paper tokens before the bundle mounts', async ({ page }) => {
   const paint = await bootSkeletonPaint(page, 'light');
   expect({ page: paint.page, row: paint.row }).toEqual({
-    page: 'rgb(239, 230, 208)',
-    row: 'rgb(232, 222, 197)',
+    page: 'rgb(241, 240, 235)',
+    row: 'rgb(237, 235, 229)',
   });
   expect(paint.canvas).toBe(LIGHT_CHROME);
   expect(paint.staticChrome).toBe(paint.canvas);
@@ -126,8 +126,8 @@ test('boot skeleton paints the light Paper tokens before the bundle mounts', asy
 test('boot skeleton paints the dark tokens before the bundle mounts', async ({ page }) => {
   const paint = await bootSkeletonPaint(page, 'dark');
   expect({ page: paint.page, row: paint.row }).toEqual({
-    page: 'rgb(26, 22, 18)',
-    row: 'rgb(36, 32, 27)',
+    page: 'rgb(10, 17, 14)',
+    row: 'rgb(16, 24, 20)',
   });
   expect(paint.canvas).toBe(DARK_CHROME);
   expect(paint.staticChrome).toBe(paint.canvas);

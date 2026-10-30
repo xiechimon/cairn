@@ -53,19 +53,19 @@ function rings(shadow: string): number {
 
 const POOLS = {
   light: {
-    'cds-shadow-sm': 'rgba(80, 60, 30, 0.04) 0px 1px 2px 0px',
-    'cds-shadow-md': 'rgba(31, 27, 24, 0.1) 0px 8px 24px 0px, rgba(31, 27, 24, 0.05) 0px 2px 6px 0px',
+    'cds-shadow-sm': 'rgba(16, 32, 26, 0.05) 0px 1px 2px 0px',
+    'cds-shadow-md': 'rgba(16, 32, 26, 0.09) 0px 8px 24px 0px, rgba(16, 32, 26, 0.05) 0px 2px 6px 0px',
     'cds-shadow-lg':
-      'rgba(31, 27, 24, 0.16) 0px 16px 40px 0px, rgba(31, 27, 24, 0.06) 0px 2px 6px 0px',
+      'rgba(16, 32, 26, 0.14) 0px 16px 40px 0px, rgba(16, 32, 26, 0.06) 0px 2px 6px 0px',
   },
   dark: {
-    'cds-shadow-sm': 'rgba(0, 0, 0, 0.4) 0px 1px 2px 0px, rgba(0, 0, 0, 0.4) 0px 2px 8px 0px',
-    'cds-shadow-md': 'rgba(0, 0, 0, 0.65) 0px 8px 28px 0px, rgba(0, 0, 0, 0.45) 0px 2px 8px 0px',
+    'cds-shadow-sm': 'rgba(0, 0, 0, 0.35) 0px 1px 2px 0px, rgba(0, 0, 0, 0.25) 0px 2px 8px 0px',
+    'cds-shadow-md': 'rgba(0, 0, 0, 0.55) 0px 8px 28px 0px, rgba(0, 0, 0, 0.35) 0px 2px 8px 0px',
     'cds-shadow-lg': 'rgba(0, 0, 0, 0.5) 0px 16px 40px 0px, rgba(0, 0, 0, 0.3) 0px 2px 6px 0px',
   },
 } as const;
 
-const TOP_DARK = 'rgba(255, 255, 255, 0.08) 0px 1px 0px 0px inset';
+const TOP_DARK = 'rgba(255, 255, 255, 0.06) 0px 1px 0px 0px inset';
 // light: a zero-alpha no-op that still composes inside a comma list (`none`
 // there would void the whole box-shadow of any consumer that joins it)
 const TOP_LIGHT = 'rgba(255, 255, 255, 0) 0px 1px 0px 0px inset';

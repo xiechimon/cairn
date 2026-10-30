@@ -80,13 +80,9 @@
   --radius-bubble: 18px;
   --radius-control: 10px;
   --radius-window: 20px;
-  --top: inset 0 1px 0 rgb(255 255 255 / 0.08);
-  --cds-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.4), 0 2px 8px 0 rgb(0 0 0 / 0.4);
-  --cds-shadow-md: 0 8px 28px rgb(0 0 0 / 0.65), 0 2px 8px rgb(0 0 0 / 0.45), var(--top);
-  --cds-shadow-lg: 0 16px 40px rgb(0 0 0 / 0.5), 0 2px 6px rgb(0 0 0 / 0.3), var(--top);
   --e1: var(--cds-shadow-sm), 0 0 0 1px var(--border);
-  --e2: var(--cds-shadow-md), 0 0 0 1px var(--ring-inset-highlight);
-  --e3: var(--cds-shadow-lg), 0 0 0 1px var(--ring-inset-highlight);
+  --e2: var(--cds-shadow-md), 0 0 0 1px var(--elevated-ring);
+  --e3: var(--cds-shadow-lg), 0 0 0 1px var(--elevated-ring);
   --panel-shadow: var(--e1);
   --shadow-popover: var(--e2);
   --dialog-shadow: var(--e3);
@@ -97,17 +93,9 @@
   --plate-shadow: var(--e2);
   --chief-shadow: var(--e2);
   --card-lift: var(--panel-shadow-hover);
-  --panel-shadow-hover: 0 0 0 1px var(--border-soft), 0 4px 16px -2px rgb(0 0 0 / 0.09);
-  --shadow-composer: 0 4px 20px rgb(0 0 0 / 0.4), inset 0 0 0 var(--hairline) var(--border);
-  --shadow-composer-hover:
-    0 4px 24px rgb(0 0 0 / 0.55), inset 0 0 0 var(--hairline) var(--border-soft);
-  --shadow-composer-focus:
-    0 4px 24px rgb(0 0 0 / 0.65), inset 0 0 0 var(--hairline) var(--ring-inset-highlight),
-    0 0 0 var(--hairline) var(--ring-inset-highlight);
-  --drag-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
-  --drop-tint-border: rgb(240 146 109);
-  --drop-tint-base: rgb(240 146 109 / 0.05);
-  --drop-tint-hover: rgb(240 146 109 / 0.1);
+  --drop-tint-border: var(--card-button);
+  --drop-tint-base: color-mix(in srgb, var(--card-button) 5%, transparent);
+  --drop-tint-hover: color-mix(in srgb, var(--card-button) 10%, transparent);
   --chief-launcher-size: 40px;
   --chief-launcher-inset: 8px;
   --chief-launcher-clearance: calc(var(--chief-launcher-size) + var(--chief-launcher-inset) * 2);
@@ -165,57 +153,4 @@
   :root {
     --hairline: calc(1px / 3);
   }
-}
-
-[data-density="compact"] {
-  --rem-scale: 0.9375;
-  --pad-card: 8px;
-  --font-size-caption: calc(0.6875rem * var(--rem-scale));
-  --font-size-code: calc(0.75rem * var(--rem-scale));
-  --font-size-body: calc(0.8125rem * var(--rem-scale));
-  --font-size-heading: calc(0.875rem * var(--rem-scale));
-  --font-size-title: calc(1.25rem * var(--rem-scale));
-  --type-scale: calc(var(--rem-scale) * 17 / 16);
-  --type-page: calc(1.125rem * var(--type-scale));
-  --type-heading: calc(1rem * var(--type-scale));
-  --type-card-title: calc(0.875rem * var(--type-scale));
-  --type-ui: calc(0.84375rem * var(--type-scale));
-  --type-meta: calc(0.75rem * var(--type-scale));
-  --type-caption: calc(0.71875rem * var(--type-scale));
-}
-[data-density="compact"] [data-slot="card"] {
-  --card-spacing: 0.5rem;
-}
-[data-density="compact"] .todo-card {
-  padding: 8px 10px;
-}
-
-.light {
-  --radius-popover: 18px;
-  --radius-window: 20px;
-
-  --top: inset 0 1px 0 rgb(255 255 255 / 0);
-  --cds-shadow-sm: 0 1px 2px rgb(80 60 30 / 0.04);
-  --cds-shadow-md: 0 8px 24px rgb(31 27 24 / 0.1), 0 2px 6px rgb(31 27 24 / 0.05);
-  --cds-shadow-lg: 0 16px 40px rgb(31 27 24 / 0.16), 0 2px 6px rgb(31 27 24 / 0.06);
-  --e1: var(--cds-shadow-sm), 0 0 0 1px var(--border);
-  --e2: var(--cds-shadow-md), 0 0 0 1px var(--border-soft);
-  --e3: var(--cds-shadow-lg), 0 0 0 1px var(--border-soft);
-  --panel-shadow-hover: 0 0 0 1px var(--border-soft), 0 4px 14px rgb(80 60 30 / 0.07);
-  --shadow-composer:
-    0 1px 2px rgb(80 60 30 / 0.04), 0 6px 24px rgb(80 60 30 / 0.06),
-    inset 0 0 0 var(--hairline) var(--border-soft);
-  --shadow-composer-hover:
-    0 1px 2px rgb(80 60 30 / 0.05), 0 8px 28px rgb(80 60 30 / 0.08),
-    inset 0 0 0 var(--hairline) var(--border-soft);
-  --shadow-composer-focus:
-    0 1px 2px rgb(80 60 30 / 0.06), 0 10px 32px rgb(80 60 30 / 0.11),
-    inset 0 0 0 var(--hairline) var(--border-soft), 0 0 0 var(--hairline) var(--border-soft);
-  /* drag-tier shadow (#616) + drop-target tint: hue follows the dark side
-     (#915 spot), mirrored explicitly so .light stays the full
-     semantic-token mirror */
-  --drag-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
-  --drop-tint-border: rgb(180 83 42);
-  --drop-tint-base: rgb(180 83 42 / 0.05);
-  --drop-tint-hover: rgb(180 83 42 / 0.1);
 }

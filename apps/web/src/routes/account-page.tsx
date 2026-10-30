@@ -9,7 +9,6 @@ import {
   SETTINGS_SELECT_TRIGGER_CLS,
   SettingsCard,
   SettingsRow,
-  SettingsSegmented,
 } from '../components/settings-list.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import {
@@ -22,13 +21,6 @@ import {
 import { Switch } from '../components/ui/switch.js';
 import { toastError } from '../components/ui/toaster.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
-import {
-  applyDensity,
-  DENSITY_EVENT,
-  type Density,
-  readDomDensity,
-  readStoredDensity,
-} from '../density.js';
 import { USER_NAME } from '../fixtures/fixtures.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { LOCALE_NAMES, LOCALES } from '../i18n/locale.js';
@@ -69,20 +61,6 @@ export function AccountPage() {
   const [notifyPref, setNotifyPref] = useState<NotifyPref | null>(() =>
     readNotifyPref(safeLocalStorage()),
   );
-  const [density, setDensity] = useState<Density>(() => readStoredDensity(safeLocalStorage()));
-  const selectDensity = (next: Density) => {
-    applyDensity(next);
-    setDensity(next);
-  };
-  useEffect(() => {
-    const onDensity = (e: Event) => {
-      const detail = (e as CustomEvent<Density>).detail;
-      if (detail === 'comfortable' || detail === 'compact') setDensity(detail);
-    };
-    window.addEventListener(DENSITY_EVENT, onDensity);
-    setDensity(readDomDensity());
-    return () => window.removeEventListener(DENSITY_EVENT, onDensity);
-  }, []);
   const { permission, request } = useNotificationPermission(
     live ? null : (fixture.ui?.notificationPermission ?? 'granted'),
   );
@@ -139,25 +117,6 @@ export function AccountPage() {
                 ))}
               </SelectContent>
             </Select>
-          </SettingsRow>
-          <SettingsRow
-            label={t('密度')}
-            hint={t('紧凑会缩小字号与行距')}
-            className="account-density-row"
-          >
-            <SettingsSegmented
-              label={t('密度')}
-              value={density}
-              onChange={selectDensity}
-              options={[
-                {
-                  value: 'comfortable',
-                  label: t('舒适'),
-                  testId: 'account-density-comfortable',
-                },
-                { value: 'compact', label: t('紧凑'), testId: 'account-density-compact' },
-              ]}
-            />
           </SettingsRow>
           <SettingsRow
             label={t('推送通知')}
