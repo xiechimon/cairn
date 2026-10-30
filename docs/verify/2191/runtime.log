@@ -1,0 +1,37 @@
+
+ RUN  v5.0.1 <worktree>
+
+stdout | test/push-outcomes.test.ts > provider acceptance counts devices and correlates wire id with persistent row
+Push wire/database artifact {"payload":{"id":"s_gWjjfAMpDsNn7-2Ftwm","receiptUrl":"/api/teams/aVrRBNJNCazCTGgyb0MQ_/push/receipts","requireReceipt":false,"notification":{"title":"test: batch paused","body":"Paused","navigate":"https://cairn.local/app","tag":"test"}},"outcome":{"status":"delivered","count":2,"failedCount":0,"id":"s_gWjjfAMpDsNn7-2Ftwm"},"row":{"id":"s_gWjjfAMpDsNn7-2Ftwm","userId":"XRdYR7tb38SbnYp7cluEI","teamId":"aVrRBNJNCazCTGgyb0MQ_","createdAt":1793340143404,"receivedAt":null,"alertStatus":null}}
+
+stdout | test/push-outcomes.test.ts > receipt route authenticates, validates ownership and stores id idempotently
+Receipt database artifact {"id":"fFDzH8rOP4FEPhoq8P6bM","userId":"kpTc2XZvqQ7TeOLyLS_-C","teamId":"lWp87NC7H7kGf2ectP2eh","createdAt":1793340143458,"receivedAt":1793340143481,"alertStatus":null}
+
+ ↓ |@xiechimon/cairn| test/push-outcomes.test.ts > empty subscriptions return no-subscription
+ ↓ |@xiechimon/cairn| test/push-outcomes.test.ts > all 404 subscriptions are removed and return all-expired
+ ↓ |@xiechimon/cairn| test/push-outcomes.test.ts > all 410 subscriptions are removed and return all-expired
+ ✓ |@xiechimon/cairn| test/push-outcomes.test.ts > provider acceptance counts devices and correlates wire id with persistent row 69ms
+ ↓ |@xiechimon/cairn| test/push-outcomes.test.ts > every non-expired delivery failing returns failed: network
+ ↓ |@xiechimon/cairn| test/push-outcomes.test.ts > every non-expired delivery failing returns failed: mixed
+ ↓ |@xiechimon/cairn| test/push-outcomes.test.ts > one accepted device wins over failures
+ ✓ |@xiechimon/cairn| test/push-outcomes.test.ts > receipt route authenticates, validates ownership and stores id idempotently 130ms
+ ↓ |@xiechimon/cairn| test/push-outcomes.test.ts > must-reach alert receipt timing: timeout
+ ↓ |@xiechimon/cairn| test/push-outcomes.test.ts > must-reach alert receipt timing: receipt
+ ↓ |@xiechimon/cairn| test/push-outcomes.test.ts > must-reach alert receipt timing: early
+ ↓ |@xiechimon/cairn| test/push-outcomes.test.ts > unavailable fallback is persistently undelivered: missing
+ ↓ |@xiechimon/cairn| test/push-outcomes.test.ts > unavailable fallback is persistently undelivered: rejected
+ ↓ |@xiechimon/cairn| test/push-outcomes.test.ts > unavailable fallback is persistently undelivered: disabled
+ ↓ |@xiechimon/cairn| test/push-outcomes.test.ts > test route accepts only the owner and waits for its actual receipt
+ ↓ |@xiechimon/cairn| test/push-outcomes.test.ts > must-reach failure invokes fallback immediately: empty
+ ↓ |@xiechimon/cairn| test/push-outcomes.test.ts > must-reach failure invokes fallback immediately: expired
+ ↓ |@xiechimon/cairn| test/push-outcomes.test.ts > must-reach failure invokes fallback immediately: network
+ ↓ |@xiechimon/cairn| test/push-outcomes.test.ts > must-reach failure invokes fallback immediately: misconfigured
+ ↓ |@xiechimon/cairn| test/push-outcomes.test.ts > digest retains queued items when accepted and failed subscriptions are mixed
+ ↓ |@xiechimon/cairn| test/push-outcomes.test.ts > receipt arriving after the deadline cannot suppress fallback when the event loop resumes late
+ ↓ |@xiechimon/cairn| test/push-outcomes.test.ts > a provider promise that never settles cannot prevent fallback
+
+ Test Files  1 passed (1)
+      Tests  2 passed | 20 skipped (22)
+   Start at  14:02:21
+   Duration  2.24s (transform 56%, import 35%, tests 9%)
+

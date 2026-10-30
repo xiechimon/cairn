@@ -404,6 +404,19 @@ export const pushSubscription = sqliteTable(
   (t) => [uniqueIndex('push_subscription_endpoint_unique').on(t.endpoint)],
 );
 
+export const pushDelivery = sqliteTable('push_delivery', {
+  message: json<{ title: string; body: string; href: string; tag: string }>('message'),
+  pushStatus: text('pushStatus').notNull().default('unknown'),
+  id: text('id').primaryKey(),
+  userId: text('userId').notNull(),
+  teamId: text('teamId').notNull(),
+  createdAt: epochMs('createdAt').notNull(),
+  receivedAt: epochMs('receivedAt'),
+  alertStatus: text('alertStatus').$type<
+    'pending' | 'received' | 'fallback-accepted' | 'undelivered'
+  >(),
+});
+
 export const pushDigestItem = sqliteTable('push_digest_item', {
   id: text('id').primaryKey(),
   userId: text('userId').notNull(),

@@ -117,6 +117,9 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
     method: 'DELETE',
     path: '/api/teams/{id}/push/subscriptions',
   },
+  { method: 'POST', path: '/api/teams/{id}/push/receipts' },
+  { method: 'POST', path: '/api/teams/{id}/push/test' },
+  { method: 'GET', path: '/api/teams/{id}/push/test/{deliveryId}' },
   {
     method: 'POST',
     path: '/api/skills',

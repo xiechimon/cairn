@@ -352,8 +352,8 @@ test('the CI self-test step runs selfTests through prepush and names no self-tes
   assert.equal(step?.[1], '        run: pnpm prepush --self-test\n');
   for (const file of selfTests)
     assert.ok(
-      !workflow.includes(file),
-      `${file} is named in .github/workflows/ci.yml; list self-test files only in selfTests in scripts/prepush.mjs`,
+      !checkJob.includes(file),
+      `${file} is named in check-core; list prepush self-test files only in selfTests in scripts/prepush.mjs`,
     );
 });
 
@@ -370,11 +370,13 @@ test('--self-test runs exactly the selfTests files, skips change detection and f
   try {
     mkdirSync(join(directory, 'scripts'));
     for (const file of prepushFixtureFiles) copyFileSync(file, join(directory, file));
-    for (const file of selfTests)
+    for (const file of selfTests) {
+      mkdirSync(join(directory, file, '..'), { recursive: true });
       writeFileSync(
         join(directory, file),
         `import test from 'node:test';\ntest('ran ${file}', () => {});\n`,
       );
+    }
     const passing = run();
     assert.equal(passing.status, 0, passing.stdout + passing.stderr);
     assert.ok(

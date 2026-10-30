@@ -13,7 +13,7 @@ import { dirname, resolve } from 'node:path';
 import { and, eq } from 'drizzle-orm';
 import webpush from 'web-push';
 import type { Db } from '../db/client.js';
-import { pushDigestItem, pushSubscription } from '../db/schema.js';
+import { pushDelivery, pushDigestItem, pushSubscription } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 
 export interface VapidKeys {
@@ -22,6 +22,10 @@ export interface VapidKeys {
   subject: string;
   webOrigin: string;
 }
+
+export type PushOutcome =
+  | { status: 'delivered'; count: number; failedCount: number; id: string }
+  | { status: 'no-subscription' | 'all-expired' | 'failed' | 'unknown'; id: string };
 
 export interface PushMessage {
   title: string;
@@ -95,9 +99,21 @@ export function loadOrCreateVapidKeys(
   }
 }
 
-export function buildPushPayload(origin: string, msg: PushMessage): string {
+export function buildPushPayload(
+  origin: string,
+  msg: PushMessage,
+  receipt?: { id: string; teamId: string; required: boolean },
+): string {
   return JSON.stringify({
     web_push: 8030,
+    ...(receipt === undefined
+      ? {}
+      : {
+          mutable: true,
+          id: receipt.id,
+          receiptUrl: `/api/teams/${encodeURIComponent(receipt.teamId)}/push/receipts`,
+          requireReceipt: receipt.required,
+        }),
     notification: {
       title: msg.title.slice(0, 200),
       body: msg.body,
@@ -113,25 +129,53 @@ export async function sendPushToUser(
   userId: string,
   teamId: string,
   msg: PushMessage,
-): Promise<boolean> {
+  delivery = { id: newRecordId(), required: false },
+): Promise<PushOutcome> {
+  const id = delivery.id;
+  if (delivery.required)
+    db.insert(pushDelivery)
+      .values({
+        id,
+        userId,
+        teamId,
+        createdAt: nowMs(),
+        alertStatus: 'pending',
+        message: msg,
+      })
+      .run();
   const rows = db
     .select()
     .from(pushSubscription)
     .where(and(eq(pushSubscription.userId, userId), eq(pushSubscription.teamId, teamId)))
     .all();
+  if (rows.length === 0) return { status: 'no-subscription', id };
   const results = await Promise.allSettled(
     rows.map(async (row) => {
+      let providerDeadline: ReturnType<typeof setTimeout> | undefined;
+      let timedOut = false;
       try {
-        await webpush.sendNotification(
-          {
-            endpoint: row.endpoint,
-            keys: { p256dh: row.p256dh, auth: row.auth },
-            expirationTime: null,
-          },
-          buildPushPayload(vapid.webOrigin, msg),
-          { timeout: 10_000, TTL, vapidDetails: vapid },
-        );
-        return true;
+        await Promise.race([
+          webpush.sendNotification(
+            {
+              endpoint: row.endpoint,
+              keys: { p256dh: row.p256dh, auth: row.auth },
+              expirationTime: null,
+            },
+            buildPushPayload(
+              vapid.webOrigin,
+              msg,
+              delivery.required ? { id, teamId, required: true } : undefined,
+            ),
+            { timeout: 10_000, TTL, vapidDetails: vapid },
+          ),
+          new Promise<never>((_resolve, reject) => {
+            providerDeadline = setTimeout(() => {
+              timedOut = true;
+              reject(new Error('web push provider deadline exceeded'));
+            }, 10_000);
+          }),
+        ]);
+        return 'accepted';
       } catch (err) {
         if (err instanceof webpush.WebPushError && GONE_STATUSES.has(err.statusCode)) {
           db.delete(pushSubscription)
@@ -143,14 +187,33 @@ export async function sendPushToUser(
               ),
             )
             .run();
-          return true;
+          return 'expired';
         }
         process.stderr.write('web push delivery failed\n');
-        return false;
+        return timedOut || (delivery.required && !(err instanceof webpush.WebPushError))
+          ? 'unknown'
+          : 'failed';
+      } finally {
+        if (providerDeadline !== undefined) clearTimeout(providerDeadline);
       }
     }),
   );
-  return results.every((result) => result.status === 'fulfilled' && result.value);
+  const count = results.filter(
+    (result) => result.status === 'fulfilled' && result.value === 'accepted',
+  ).length;
+  const failedCount = results.filter(
+    (result) =>
+      result.status === 'rejected' || result.value === 'failed' || result.value === 'unknown',
+  ).length;
+  if (
+    delivery.required &&
+    results.some((result) => result.status === 'fulfilled' && result.value === 'unknown')
+  )
+    return { status: 'unknown', id };
+  if (count > 0) return { status: 'delivered', count, failedCount, id };
+  if (results.every((result) => result.status === 'fulfilled' && result.value === 'expired'))
+    return { status: 'all-expired', id };
+  return { status: 'failed', id };
 }
 
 export function pushToUserSafely(
@@ -224,7 +287,11 @@ export async function sweepPushDigest(db: Db, vapid: VapidKeys | null): Promise<
       href: '/app',
       tag: `${group.userId}:digest`,
     });
-    if (delivered) {
+    if (
+      delivered.status !== 'failed' &&
+      delivered.status !== 'unknown' &&
+      (delivered.status !== 'delivered' || delivered.failedCount === 0)
+    ) {
       for (const item of items) {
         db.delete(pushDigestItem).where(eq(pushDigestItem.id, item.id)).run();
       }
