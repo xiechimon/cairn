@@ -1,0 +1,70 @@
+[prepush] git init -q
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 0 intercepts
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 1 intercepts
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 1 intercepts
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 1 intercepts
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 1 intercepts
+✔ scrubGateEnv drops every gate base SHA and the force-full switch (1.768416ms)
+✔ hasCode classifies documents (0.442666ms)
+✔ hasCode classifies server markdown fixtures (0.098708ms)
+✔ hasCode classifies shared markdown fixtures (0.180542ms)
+✔ hasCode classifies integration markdown fixtures (0.231ms)
+✔ hasCode classifies executable evidence (0.365ms)
+✔ hasCode classifies non-markdown evidence (0.223417ms)
+✔ hasCode classifies unknown or executable-like files under docs (0.216542ms)
+✔ hasCode classifies data beside an executable check (1.47825ms)
+✔ hasCode classifies the #2188 lessons and evidence change (3.60325ms)
+✔ hasCode classifies epic data (0.081208ms)
+✔ hasCode classifies code (0.060584ms)
+✔ hasCode classifies unknown paths (0.0505ms)
+✔ hasCode classifies mixed changes (0.04825ms)
+✔ hasCode classifies empty changes (0.043292ms)
+✔ --has-code prints only a boolean, uses the supplied base and fails closed (1768.559375ms)
+✔ CI classifies before heavy work and always runs push coverage (1.527834ms)
+✔ required aggregates only accept skipped work after a successful docs-only classification (1349.718666ms)
+✔ folded gates stay visibly red, continue after failures and retain full history (1.036208ms)
+✔ documentation skips code checks, unknown paths fail closed (2.298291ms)
+✔ changes to prepush scripts run the CI self-test files locally (13.616ms)
+✔ the CI self-test step runs selfTests through prepush and names no self-test file itself (0.466583ms)
+✔ --self-test runs exactly the selfTests files, skips change detection and fails with them (887.941708ms)
+✔ escape-trace tests stay mandatory for every code prepush plan (4.145417ms)
+✔ the recording gate runs in local prepush, in CI prepush and in the CI self-test step (1.140625ms)
+✔ a ledger entry change runs the ledger gate even when only documents changed (0.270459ms)
+✔ local code checks retain fast checks and advisory dead-class (0.754041ms)
+✔ every CI node scripts step also runs in local prepush or is listed as CI-only (1.470958ms)
+✔ code changes keep suites in CI and out of local plans (6.029792ms)
+✔ local gates default their base to the merge-base, not the moving origin/main tip (14.027875ms)
+✔ executable evidence keeps code checks and data evidence keeps document readers (0.995417ms)
+✔ a docs-only data change still runs every test that reads the changed file (120.329125ms)
+✔ every node --test step in any workflow runs locally when its tests, sources or workflow change (29.247209ms)
+✔ e2e coverage check passes on the real suite and names an unmapped spec (378.328542ms)
+✔ a board card source change selects the spec that reads its title (233.072375ms)
+✔ CI shares the plan but keeps advisory and full e2e in separate jobs (1.923958ms)
+✔ CLI skips real document changes and rejects a missing base (12217.483708ms)
+✔ a stale local origin/main is refreshed by fetch before computing changes (6276.999917ms)
+✔ fetch failure falls back to the local origin/main and prints a stale notice (7014.197459ms)
+✔ prepush vitest only forgives files listed as known local red (7.270167ms)
+✔ plan children do not inherit the git hook repository binding (2142.339834ms)
+✔ only gate scripts are mapped to a ledger category when a step goes red (37.299292ms)
+✔ a gate that blocks a push records one intercept for every entry whose safeguard names it (1433.935458ms)
+✔ a red gate step leaves the repository untouched and still exits non-zero (1341.320625ms)
+✔ retrying the same gate on the same branch after another commit records nothing new (3409.867584ms)
+✔ CAIRN_GATE_LOG appends the gate-red events for a CI job to collect (1368.561583ms)
+✔ a checkout without docs/lessons, or CAIRN_LESSONS_LEDGER=0, leaves the tree untouched (7.986959ms)
+✔ logging is opt-in and never projects counters into the checkout (216.126542ms)
+✔ CI doc-reader checks select the real codeowners reader for identity documentation (260.654334ms)
+✔ workflow preserves comments about external behavior (55.573542ms)
+✔ forced push coverage preserves the English gate range across multiple commits (8839.683417ms)
+ℹ tests 51
+ℹ suites 0
+ℹ pass 51
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 51915.486625

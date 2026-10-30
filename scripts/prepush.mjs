@@ -2,7 +2,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { acquireSlot, leaseEnv, slotPortReport } from './heavy-slots.mjs';
+import { acquireSlot, leaseEnv } from './heavy-slots.mjs';
 import { interceptEventsForGate, loadLedger } from './lessons-ledger-gate.mjs';
 import { scrubGitEnv } from './scrub-git-env.mjs';
 
@@ -158,12 +158,7 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
           .filter(({ tests }) => !tests.some((test) => test in ciOnlyTestSteps))
           .map(({ tests }) => ['node', '--test', ...tests])
           .filter((step) => !required.some((args) => args.join(' ') === step.join(' '))),
-        ['node', 'scripts/prepush-vitest.mjs'],
-        ...(paths.some((path) => path.startsWith('apps/web/'))
-          ? [['pnpm', '--filter', '@cairn/web', 'test']]
-          : []),
         ...advisory,
-        ['pnpm', '--filter', '@cairn/web', 'e2e:affected', '--', ...codePaths],
       ];
 }
 
@@ -291,14 +286,7 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
             args[0]?.slice(2) ?? 'local',
             process.env.PREPUSH_FORCE_FULL === 'true',
           );
-  const lease = plan.length > 0 ? await acquireSlot() : null;
-  if (lease !== null && plan.some((step) => step.includes('e2e:affected'))) {
-    const conflict = slotPortReport({ slot: lease.slot });
-    if (conflict !== null) {
-      console.error(conflict);
-      process.exit(1);
-    }
-  }
+  const lease = plan.some((step) => step.includes('e2e')) ? await acquireSlot() : null;
   runPlan(plan, { cwd: root, env: leaseEnv(lease) });
   console.log(`[prepush] PASS (${plan.length} checks)`);
 }
