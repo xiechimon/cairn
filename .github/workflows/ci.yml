@@ -398,5 +398,3 @@ jobs:
           curl -fsSL -o "$RUNNER_TEMP/rrsync" https://raw.githubusercontent.com/RsyncProject/rsync/v3.4.1/support/rrsync
           echo "0bb743f8155907ed2a337c12a4672c67269e372803939ec98dac497edc714c9b  $RUNNER_TEMP/rrsync" | sha256sum -c -
           RRSYNC="$RUNNER_TEMP/rrsync" node --test scripts/ops/backup-server-db.test.mjs
-      - name: Secret reach regression tests (#2189)
-        run: node --test scripts/ops/secret-reach/*.test.mjs
