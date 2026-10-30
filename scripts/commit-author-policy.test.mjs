@@ -5,23 +5,22 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-for (const file of [
-  'AGENTS.md',
-  '.claude/skills/pr-cairn/SKILL.md',
-  'docs/ops/agent-bot-identity.md',
-]) {
+test('AGENTS.md delegates merge identity rules to the identity documentation', () => {
+  const guidance = readFileSync('AGENTS.md', 'utf8');
+  assert.match(guidance, /docs\/ops\/agent-bot-identity\.md/);
+  assert.doesNotMatch(guidance, /After removal, re-arm auto-merge with/);
+});
+
+for (const file of ['.claude/skills/pr-cairn/SKILL.md', 'docs/ops/agent-bot-identity.md']) {
   test(`${file} separates bot rebase from human squash`, () => {
     const guidance = readFileSync(file, 'utf8');
     assert.match(guidance, /Bot-opened PRs[^\n]*one commit authored by `Cairnwright`[^\n]*rebase/);
     assert.match(guidance, /Human-opened PRs[^\n]*`gh pr merge <n> --squash --auto`/);
     assert.doesNotMatch(guidance, /Arm auto-merge \(`gh pr merge <n> --squash --auto`\)/);
     assert.match(guidance, /~\/.cairn\/tools\/merge-pr\.sh/);
-    if (file === 'AGENTS.md') {
-      assert.doesNotMatch(guidance, /After removal, re-arm auto-merge with/);
-      assert.match(guidance, /gh pr view <n> --json author,commits/);
-      assert.match(guidance, /helper is unavailable[^\n]*dispatcher/);
-      assert.match(guidance, /neither its author name nor email contains `cairnwright\[bot\]`/);
-    }
+    assert.match(guidance, /gh pr view <n> --json author,commits/);
+    assert.match(guidance, /helper is unavailable[^\n]*dispatcher/);
+    assert.match(guidance, /neither[^\n]*author name nor email[^\n]*`cairnwright\[bot\]`/);
   });
 }
 

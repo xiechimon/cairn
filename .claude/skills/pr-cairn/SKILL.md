@@ -23,13 +23,17 @@ who did not watch the work. Use this order:
    line naming the test that fails on main, quoting its failure text, and
    stating that it passes here. End with one `Not verified:` line naming
    checks not run or unrelated failures on main.
-2. `## What`: one line explaining the change, why, the ticket and overlap result.
+2. `## What`: one line explaining the change, why, and any existing ticket or known overlap.
 3. `<details><summary>Review and risk</summary>` containing `## Review` and
    `## Risk`, separated from the HTML tags by blank lines and closed with
    `</details>`. Keep this block collapsed.
 
-Review records the vendor, model, fresh context, reviewed head SHA, rounds,
-verdict and unfixed findings with reasons. Risk states one-way or two-way
+For code changes, use one review round. A fresh, other-vendor independent
+review is required only for protected or security paths; docs-only changes
+need no code review. After three rounds, rethink or hand the PR to ian.
+Review records the review performed, its verdict and unfixed findings with
+reasons; when independent review is required, include vendor, model, fresh
+context and reviewed head SHA. Risk states one-way or two-way
 door, blast radius and whether the owner must merge. Put longer overlap
 results and optional Upstream analysis inside the details block. Include
 Upstream only when adding a mechanism; name an existing equivalent or the
@@ -83,7 +87,7 @@ so the images remain reachable. Images belong outside code fences.
 
 ## Mechanics
 
-- Before opening a PR, follow `docs/agent-overlap.md`: search open issues, open PRs, and PRs merged in the last seven days, including PRs touching the changed files. Put a one-line overlap result under What and longer numbered dispositions inside details. Extend an existing PR for the same ask. Explain intentional removal of recently merged work and name its PR for `silent-revert-gate`.
+- Small changes need no issue or overlap lookup. Reuse an existing issue or PR for the same ask; record known overlaps under What or inside details.
 
 - Write the body to a temp file; never inline multi-line markdown as
   `--body`.
@@ -112,8 +116,8 @@ so the images remain reachable. Images belong outside code fences.
   or file path in backticks. The pr-evidence check runs
   `node scripts/english-only-gate.mjs --text <body>` and reds otherwise;
   run it locally on `/tmp/pr.md` before opening.
-- Never add the `needs-decision` label to a PR. When a PR needs a decision, decide by your own recommendation, say in the chat what you chose and why, and keep going; only payments, the owner's own credentials and the steps `AGENTS.md` routes to a person go to the owner. Before asking a person about a PR whose auto-merge is armed, disarm it with `gh pr merge <n> --disable-auto`. A label that is already on keeps pr-evidence red and disarms auto-merge until it is removed.
-- Before enabling any merge, require a pr-gate verdict of go with `mergedBy: 'auto-merge'` (`AGENTS.md`, "Current merge state"; every other PR goes to ian), no unchecked tasks anywhere in the body and no `needs-decision` label; an unchecked item keeps pr-evidence red until it is checked.
+- Never add the `needs-decision` label to a PR. Agents decide by their own recommendation, say what they chose and why in chat, and continue; decisions routed to ian follow `AGENTS.md`, "Merge routes". Before asking ian about a PR whose auto-merge is armed, disarm it with `gh pr merge <n> --disable-auto`.
+- Before an agent enables merge, require passing CI checks and a pr-gate verdict of go with `mergedBy: 'auto-merge'` (`AGENTS.md`, "Merge routes"; protected-path PRs and every other route go to ian), with no unchecked tasks anywhere in the body. ian may admin-merge; agents may not use that authority.
 - Read the PR opener and every commit author: `gh pr view <n> --json author,commits`. Follow `docs/ops/agent-bot-identity.md` for the identity checks.
 - Bot-opened PRs require exactly one commit authored by `Cairnwright` before a rebase merge. Use the dispatcher's `~/.cairn/tools/merge-pr.sh`; inspect its source and usage on the dispatch host before invoking it. If the helper is unavailable or the commit identity is wrong, stop and return the PR to the dispatcher.
 - Human-opened PRs use `gh pr merge <n> --squash --auto` after verifying their commits contain no `cairnwright[bot]` author. After a merge, read the main commit author and the `commit-author` Actions result.
@@ -128,5 +132,4 @@ so the images remain reachable. Images belong outside code fences.
 | at most 600 visible prose characters outside tables, images, code, comments and details; complete legacy six-section bodies exempt | pr-evidence (required check) |
 | image links embedded + HTTP 200 | pr-evidence (required check) |
 | no unchecked tasks anywhere outside fenced code and HTML comments; no tasks required | pr-evidence (required check, pr-tasks step) |
-| no `needs-decision` label on the PR (a person's decision is pending) | pr-evidence (required check); while the label is on, each run also disarms auto-merge |
 | body is English (Chinese only inside backticks or fences) | pr-evidence (required check, language step) |

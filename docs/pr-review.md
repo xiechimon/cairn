@@ -49,7 +49,7 @@ Open questions:
 Three hard rules:
 
 - **If Bad / Ugly find nothing after checking, say so explicitly in that section** — "no issues found (checked X / Y surfaces)" — that is a conclusion, not filler; the forbidden form is a bare heading with a perfunctory "none".
-- **If there are no Open questions, omit the whole section**, heading included — it only takes "things that block the merge decision and need the user to decide"; general problems found in review belong in Bad / Ugly. When you do write Open questions, disarm the PR's auto-merge (`gh pr merge <PR> --disable-auto`) and ask them in the chat; never add the `needs-decision` label (AGENTS.md, #2051). A question left only in the review text is a question never asked.
+- **If there are no Open questions, omit the whole section**, heading included. General problems found in review belong in Bad / Ugly. Follow `AGENTS.md`, "Merge routes": decide by recommendation and explain it in chat; never add the `needs-decision` label. For a decision routed to ian, disarm the PR's auto-merge (`gh pr merge <PR> --disable-auto`) and ask in chat.
 - All six sections carry real entries; a section you cannot fill with a real entry is not written.
 
 The review verdict lands as a **PR comment** (`gh pr comment`; write long content to a one-off file and use `--body-file`), not by editing the PR body — the body is the author's evidence surface, and the review does not change it.
@@ -62,4 +62,4 @@ lint / typecheck / spec:parse / vitest / e2e are covered by the CI `check` job a
 - **Seam discipline**: whether dependencies locked by `biome.json`'s `noRestrictedImports` are being reached around the thin bridge modules (`apps/daemon/src/backend/` is the GitOps / MCP / LLM provider seam).
 - **Snapshot surfaces**: when the wire schema in `packages/shared` changes, whether `snapshot.test.ts` was updated in sync (a changed JSON projection with no snapshot update = guaranteed CI red).
 - **Closing-tag discipline**: whether `closes #N` is in the commit message (a squash merge carries only the commit message; the PR body never enters main); whether a staged PR **mistakenly carries** the whole ticket's closing tag.
-- **Review provenance and evidence quality**: check the Review section's vendor, model, fresh context, head SHA, rounds, verdict and reasons for unfixed findings against the actual review. Check that Proof demonstrates the ticket's behavior and that any checked tasks have evidence; a checked box alone is not proof.
+- **Review provenance and evidence quality**: check the Review section against the actual review and reasons for unfixed findings. `AGENTS.md`, "How to work", requires one review round for code changes, with fresh, other-vendor independent review only for protected or security paths; check its vendor, model, context and head SHA when required. Check that Proof demonstrates the requested behavior and that any checked tasks have evidence; a checked box alone is not proof.
