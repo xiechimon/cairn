@@ -10,10 +10,6 @@
     }
   },
   "permissions": {
-    "deny": [
-      "Read(~/.cairn/cairnwright.private-key.pem)",
-      "Read(~/.cairn/server/secretbox.key)",
-      "Read(~/.tds/server/secretbox.key)"
-    ]
+    "deny": ["Read(~/.cairn/**)", "Read(~/.tds/**)"]
   }
 }

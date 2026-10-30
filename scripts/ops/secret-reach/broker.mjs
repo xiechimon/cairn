@@ -1,7 +1,7 @@
 import { createSign } from 'node:crypto';
-import { chmodSync, chownSync, existsSync, readFileSync } from 'node:fs';
+import { chmodSync, chownSync, existsSync, readFileSync, unlinkSync } from 'node:fs';
 import { createServer } from 'node:net';
-import { resolve } from 'node:path';
+import { isAbsolute, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const permissions = { contents: 'write', pull_requests: 'write', issues: 'write' };
@@ -50,6 +50,8 @@ export async function mintToken(request, config) {
 }
 
 export async function createBroker(config) {
+  if (typeof config.socketPath !== 'string' || !isAbsolute(config.socketPath))
+    throw new Error('Invalid absolute socket path');
   if (existsSync(config.socketPath)) throw new Error('Socket path already exists');
   if (!Number.isInteger(config.groupId) || config.groupId < 0)
     throw new Error('Invalid socket group');
@@ -89,10 +91,22 @@ export async function createBroker(config) {
       }
     });
   });
+  const terminate = () => {
+    server.close();
+    if (existsSync(config.socketPath)) unlinkSync(config.socketPath);
+    process.exit(0);
+  };
+  process.once('SIGTERM', terminate);
+  process.once('SIGINT', terminate);
+  server.once('close', () => {
+    process.removeListener('SIGTERM', terminate);
+    process.removeListener('SIGINT', terminate);
+  });
   return server;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  if (!/^\d+$/.test(process.env.CAIRN_BROKER_GID ?? '')) throw new Error('Invalid socket group');
   process.umask(0o117);
   await createBroker({
     appId: process.env.CAIRN_GITHUB_APP_ID,

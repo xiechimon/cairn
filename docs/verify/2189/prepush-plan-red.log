@@ -1,0 +1,121 @@
+[prepush] git init -q
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 0 intercepts
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 1 intercepts
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 1 intercepts
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 1 intercepts
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 1 intercepts
+✔ scrubGateEnv drops every gate base SHA and the force-full switch (0.953208ms)
+✔ hasCode classifies documents (0.248334ms)
+✔ hasCode classifies server markdown fixtures (0.172334ms)
+✔ hasCode classifies shared markdown fixtures (0.103917ms)
+✔ hasCode classifies integration markdown fixtures (0.09275ms)
+✔ hasCode classifies executable evidence (0.092208ms)
+✔ hasCode classifies non-markdown evidence (0.078917ms)
+✔ hasCode classifies epic data (0.039209ms)
+✔ hasCode classifies code (0.0845ms)
+✔ hasCode classifies unknown paths (0.110875ms)
+✔ hasCode classifies mixed changes (0.084583ms)
+✔ hasCode classifies empty changes (0.038041ms)
+✔ --has-code prints only a boolean, uses the supplied base and fails closed (1358.347292ms)
+✔ CI classifies before heavy work and always runs push coverage (1.342333ms)
+✔ required aggregates only accept skipped work after a successful docs-only classification (679.54275ms)
+✔ folded gates stay visibly red, continue after failures and retain full history (0.538458ms)
+✔ documentation skips code checks, unknown paths fail closed (0.366417ms)
+✔ changes to prepush scripts run the CI self-test files locally (1.01525ms)
+✔ the CI self-test step runs selfTests through prepush and names no self-test file itself (0.331292ms)
+✔ --self-test runs exactly the selfTests files, skips change detection and fails with them (484.25775ms)
+✔ escape-trace tests stay mandatory for every code prepush plan (1.471791ms)
+✔ the recording gate runs in local prepush, in CI prepush and in the CI self-test step (0.368208ms)
+✔ a ledger entry change runs the ledger gate even when only documents changed (0.235709ms)
+✔ local code checks include both UI gates and affected e2e (0.252666ms)
+✔ every CI node scripts step also runs in local prepush or is listed as CI-only (0.625583ms)
+✔ a web change runs the whole web unit suite, which catches tests that read sources instead of importing them (0.921417ms)
+✔ local gates default their base to the merge-base, not the moving origin/main tip (9.694ms)
+✔ affected e2e receives non-markdown evidence paths as code (0.60775ms)
+✔ e2e coverage check passes on the real suite and names an unmapped spec (171.5655ms)
+✔ a board card source change selects the spec that reads its title (38.181125ms)
+✔ CI shares the plan but keeps advisory and full e2e in separate jobs (0.487042ms)
+✖ CLI skips real document changes and rejects a missing base (403.554625ms)
+✔ a stale local origin/main is refreshed by fetch before computing changes (510.235333ms)
+✔ fetch failure falls back to the local origin/main and prints a stale notice (283.336417ms)
+✔ prepush vitest only forgives files listed as known local red (1.020625ms)
+✔ plan children do not inherit the git hook repository binding (48.381708ms)
+✔ only gate scripts are mapped to a ledger category when a step goes red (0.136458ms)
+✔ a gate that blocks a push records one intercept for every entry whose safeguard names it (34.429917ms)
+✔ a red gate step leaves the repository untouched and still exits non-zero (30.105208ms)
+✔ retrying the same gate on the same branch after another commit records nothing new (74.385083ms)
+✔ CAIRN_GATE_LOG appends the gate-red events for a CI job to collect (73.803875ms)
+✔ a checkout without docs/lessons, or CAIRN_LESSONS_LEDGER=0, leaves the tree untouched (2.545542ms)
+✔ logging is opt-in and never projects counters into the checkout (9.37125ms)
+✔ CI doc-reader checks select the real codeowners reader for identity documentation (28.691958ms)
+✔ workflow preserves comments about external behavior (0.343583ms)
+✖ forced push coverage preserves the English gate range across multiple commits (190.065167ms)
+ℹ tests 46
+ℹ suites 0
+ℹ pass 44
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4497.85225
+
+✖ failing tests:
+
+test at scripts/prepush.test.mjs:615:1
+✖ CLI skips real document changes and rejects a missing base (403.554625ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /english-only-gate: 0 line\(s\)/. Input:
+
+  ''
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/prepush.test.mjs:649:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '',
+    expected: /english-only-gate: 0 line\(s\)/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/prepush.test.mjs:998:1
+✖ forced push coverage preserves the English gate range across multiple commits (190.065167ms)
+  AssertionError [ERR_ASSERTION]: node:fs:1954
+    const result = binding.readdir(
+                           ^
+
+  Error: ENOENT: no such file or directory, scandir '/private/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/cairn-push-english-uZXm81/scripts/ops/secret-reach'
+      at readdirSync (node:fs:1954:26)
+      at prepushPlan (file:///private/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/cairn-push-english-uZXm81/scripts/prepush.mjs:96:10)
+      at file:///private/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/cairn-push-english-uZXm81/scripts/prepush.mjs:254:11 {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'scandir',
+    path: '/private/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/cairn-push-english-uZXm81/scripts/ops/secret-reach'
+  }
+
+  Node.js v26.8.1
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/prepush.test.mjs:1025:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

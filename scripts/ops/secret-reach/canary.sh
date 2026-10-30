@@ -3,14 +3,18 @@ set -uo pipefail
 umask 077
 paths=()
 pid=''
+server_url=''
+tailscale_users=''
 while [ $# -gt 0 ]; do
   case "$1" in
     --paths) shift; while [ $# -gt 0 ] && [[ "$1" != --* ]]; do paths+=("$1"); shift; done ;;
+    --server-url) [ $# -ge 2 ] || exit 2; server_url="$2"; shift 2 ;;
+    --tailscale-users) [ $# -ge 2 ] || exit 2; tailscale_users="$2"; shift 2 ;;
     --pid) [ $# -ge 2 ] && [[ "$2" =~ ^[1-9][0-9]*$ ]] || exit 2; pid="$2"; shift 2 ;;
     *) exit 2 ;;
   esac
 done
-[ ${#paths[@]} -gt 0 ] || [ -n "$pid" ] || exit 2
+[ ${#paths[@]} -gt 0 ] || [ -n "$pid" ] || [ -n "$server_url" ] || exit 2
 tmp=$(mktemp -d) || exit 2
 trap 'rm -rf "$tmp"' EXIT
 result=0
@@ -28,6 +32,13 @@ probe() {
 }
 for path in "${paths[@]}"; do
   [[ "$path" = /* ]] || path="$PWD/$path"
+  parent=$(dirname "$path")
+  while [ ! -e "$parent" ] && [ "$parent" != / ]; do parent=$(dirname "$parent"); done
+  if [ ! -e "$path" ] && [ -x "$parent" ]; then
+    for channel in cat symlink python node subprocess dd cp; do printf 'MISSING %s %s\n' "$channel" "$path"; done
+    result=1
+    continue
+  fi
   probe cat "$path" cat cat "$path"
   ln -s "$path" "$tmp/link" || exit 2
   probe symlink "$path" cat cat "$tmp/link"
@@ -42,9 +53,42 @@ if [ -n "$pid" ]; then
   for channel in environ mem; do
     path="/proc/$pid/$channel"
     if [ "$(uname -s)" = Linux ]; then
-      probe "$channel" "$path" dd dd "if=$path" bs=1 count=1
+      if [ "$channel" = mem ]; then
+        if ! command -v node >/dev/null || ! node "$(dirname "$0")/process-memory.mjs" "$pid" > "$tmp/mem-status" 2>/dev/null; then
+          printf 'SKIPPED mem %s\n' "$path"
+        else
+          status=$(cat "$tmp/mem-status")
+          printf '%s mem %s\n' "$status" "$path"
+          [ "$status" != READ ] || result=1
+        fi
+      else
+        probe "$channel" "$path" dd dd "if=$path" bs=1 count=1
+      fi
     else
       printf 'SKIPPED %s %s\n' "$channel" "$path"
+    fi
+  done
+fi
+if [ -n "$server_url" ]; then
+  [[ "$server_url" =~ ^http://(127\.0\.0\.1|localhost|\[::1\])(:[0-9]+)?/?$ ]] || exit 2
+  identities=(anonymous)
+  IFS=',' read -r -a logins <<< "$tailscale_users"
+  identities+=("${logins[@]}")
+  for login in "${identities[@]}"; do
+    [ -n "$login" ] || continue
+    headers=()
+    [ "$login" = anonymous ] || headers=(-H "tailscale-user-login: $login")
+    if ! command -v curl >/dev/null; then
+      printf 'SKIPPED http %s\n' "$login"
+    elif status=$(curl --noproxy '*' --max-time 10 -s -o /dev/null -w '%{http_code}' "${headers[@]}" "${server_url%/}/api/teams"); then
+      if [[ "$status" = 2[0-9][0-9] ]]; then
+        printf 'READ http %s %s\n' "$login" "$status"
+        result=1
+      else
+        printf 'BLOCKED http %s %s\n' "$login" "$status"
+      fi
+    else
+      printf 'BLOCKED http %s transport\n' "$login"
     fi
   done
 fi

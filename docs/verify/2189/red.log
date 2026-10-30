@@ -42,10 +42,10 @@ test at scripts/ops/secret-reach/broker.test.mjs:1:1
 test at scripts/ops/secret-reach/secret-reach.test.mjs:10:3
 ✖ canary readable reports all channels without content (18.214666ms)
   AssertionError [ERR_ASSERTION]: bash: /Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/canary.sh: No such file or directory
-  
-  
+
+
   127 !== 1
-  
+
       at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/secret-reach.test.mjs:17:12)
       at Test.runInAsyncScope (node:async_hooks:226:14)
       at Test.run (node:internal/test_runner/test:1402:25)
@@ -62,10 +62,10 @@ test at scripts/ops/secret-reach/secret-reach.test.mjs:10:3
 test at scripts/ops/secret-reach/secret-reach.test.mjs:10:3
 ✖ canary unreadable reports all channels without content (8.298083ms)
   AssertionError [ERR_ASSERTION]: bash: /Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/canary.sh: No such file or directory
-  
-  
+
+
   127 !== 0
-  
+
       at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/secret-reach.test.mjs:17:12)
       at Test.runInAsyncScope (node:async_hooks:226:14)
       at Test.run (node:internal/test_runner/test:1402:25)
@@ -84,10 +84,10 @@ test at scripts/ops/secret-reach/secret-reach.test.mjs:10:3
 test at scripts/ops/secret-reach/secret-reach.test.mjs:10:3
 ✖ canary missing reports all channels without content (6.663291ms)
   AssertionError [ERR_ASSERTION]: bash: /Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/canary.sh: No such file or directory
-  
-  
+
+
   127 !== 0
-  
+
       at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/secret-reach.test.mjs:17:12)
       at Test.runInAsyncScope (node:async_hooks:226:14)
       at Test.run (node:internal/test_runner/test:1402:25)
@@ -106,9 +106,9 @@ test at scripts/ops/secret-reach/secret-reach.test.mjs:10:3
 test at scripts/ops/secret-reach/secret-reach.test.mjs:25:1
 ✖ canary validates arguments and reports process channels (6.431209ms)
   AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
-  
+
   127 !== 2
-  
+
       at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/secret-reach.test.mjs:26:10)
       at Test.runInAsyncScope (node:async_hooks:226:14)
       at Test.run (node:internal/test_runner/test:1402:25)
@@ -127,10 +127,10 @@ test at scripts/ops/secret-reach/secret-reach.test.mjs:25:1
 test at scripts/ops/secret-reach/secret-reach.test.mjs:31:1
 ✖ setup dry run describes operations and leaves scratch unchanged (7.122083ms)
   AssertionError [ERR_ASSERTION]: bash: /Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/setup-runner-linux.sh: No such file or directory
-  
-  
+
+
   127 !== 0
-  
+
       at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/secret-reach.test.mjs:36:10)
       at Test.runInAsyncScope (node:async_hooks:226:14)
       at Test.run (node:internal/test_runner/test:1402:25)
@@ -161,10 +161,10 @@ test at scripts/ops/secret-reach/setup-runner-linux.test.mjs:8:1
 ✖ setup removes an existing privileged primary group and preserves quarantine on rerun (9337.745833ms)
   AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
   + actual - expected
-  
+
   + 'docker'
   - 'cairn-runner'
-  
+
       at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/setup-runner-linux.test.mjs:56:10)
       at Test.runInAsyncScope (node:async_hooks:226:14)
       at Test.run (node:internal/test_runner/test:1402:25)
@@ -175,5 +175,428 @@ test at scripts/ops/secret-reach/setup-runner-linux.test.mjs:8:1
     actual: 'docker',
     expected: 'cairn-runner',
     operator: 'strictEqual',
+    diff: 'simple'
+  }
+(node:37889) [DEP0187] DeprecationWarning: Passing invalid argument types to fs.existsSync is deprecated
+(Use `node --trace-deprecation ...` to show where the warning was created)
+✔ broker rejects other repositories, permissions and malformed requests before HTTP (2.432625ms)
+✔ broker signs JWT and sends only fixed repository permissions (11.883833ms)
+﹣ socket enforces framing, mode and preserves existing paths (6.7805ms) # Sandbox denies Unix socket binding
+✖ broker rejects unsafe listener configuration before binding (4.686459ms)
+node:internal/modules/esm/resolve:272
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/process-memory.mjs' imported from /Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/review.test.mjs
+    at finalizeResolution (node:internal/modules/esm/resolve:272:11)
+    at moduleResolve (node:internal/modules/esm/resolve:879:10)
+    at defaultResolve (node:internal/modules/esm/resolve:1006:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:708:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:728:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:766:56)
+    at #resolve (node:internal/modules/esm/loader:690:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:610:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)
+    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/process-memory.mjs'
+}
+
+Node.js v26.8.1
+✖ scripts/ops/secret-reach/review.test.mjs (128.17225ms)
+✔ canary readable reports all channels without content (416.6535ms)
+✔ canary unreadable reports all channels without content (434.662ms)
+✖ canary missing reports all channels without content (529.300167ms)
+✔ canary validates arguments and reports process channels (104.744541ms)
+✔ setup dry run describes operations and leaves scratch unchanged (79.04525ms)
+✖ Mac settings deny both secret trees and preserve network configuration (2.37125ms)
+✖ HTTP channel tests anonymous and each supplied identity without leaking responses (38.951333ms)
+✖ setup removes an existing privileged primary group and preserves quarantine on rerun (4108.906125ms)
+✖ writes are absent-resource deletes, an absent PR merge, or current-main no-op (15.742666ms)
+✖ main update requires a valid current SHA (0.384708ms)
+✖ authorized main updates and merges fail and requests serialize safe bodies (0.936ms)
+✔ branch protection refusal and absent merge are accepted (0.534916ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 7
+ℹ fail 9
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 4256.492875
+
+✖ failing tests:
+
+test at scripts/ops/secret-reach/broker.test.mjs:92:1
+✖ broker rejects unsafe listener configuration before binding (4.686459ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /socket path/i. Input:
+
+  'Error: listen EPERM: operation not permitted 0.0.0.0'
+
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/broker.test.mjs:94:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: listen EPERM: operation not permitted 0.0.0.0
+        at Server.setupListenHandle [as _listen2] (node:net:2306:21)
+        at listenInCluster (node:net:2437:12)
+        at Server.listen (node:net:2562:7)
+        at file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/broker.mjs:81:12
+        at new Promise (<anonymous>)
+        at createBroker (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/broker.mjs:79:9)
+        at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/broker.test.mjs:94:26)
+        at Test.runInAsyncScope (node:async_hooks:226:14)
+        at Test.run (node:internal/test_runner/test:1402:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:974:18),
+    expected: /socket path/i,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at scripts/ops/secret-reach/review.test.mjs:1:1
+✖ scripts/ops/secret-reach/review.test.mjs (128.17225ms)
+  'test failed'
+
+test at scripts/ops/secret-reach/secret-reach.test.mjs:10:3
+✖ canary missing reports all channels without content (529.300167ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  0 !== 1
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/secret-reach.test.mjs:21:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/secret-reach/secret-reach.test.mjs:56:1
+✖ Mac settings deny both secret trees and preserve network configuration (2.37125ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+
+    [
+  +   'Read(~/.cairn/cairnwright.private-key.pem)',
+  +   'Read(~/.cairn/server/secretbox.key)',
+  +   'Read(~/.tds/server/secretbox.key)'
+  -   'Read(~/.cairn/**)',
+  -   'Read(~/.tds/**)'
+    ]
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/secret-reach.test.mjs:58:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 'Read(~/.cairn/cairnwright.private-key.pem)', 'Read(~/.cairn/server/secretbox.key)', 'Read(~/.tds/server/secretbox.key)' ],
+    expected: [ 'Read(~/.cairn/**)', 'Read(~/.tds/**)' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/secret-reach/secret-reach.test.mjs:62:1
+✖ HTTP channel tests anonymous and each supplied identity without leaking responses (38.951333ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  2 !== 1
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/secret-reach.test.mjs:69:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/secret-reach/setup-runner-linux.test.mjs:18:1
+✖ setup removes an existing privileged primary group and preserves quarantine on rerun (4108.906125ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+
+  + [
+  +   'cairn-broker',
+  +   'cairn-runner'
+  + ]
+  - []
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/setup-runner-linux.test.mjs:91:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 'cairn-broker', 'cairn-runner' ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/secret-reach/token-scope-probe.test.mjs:8:1
+✖ writes are absent-resource deletes, an absent PR merge, or current-main no-op (15.742666ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+    assert.ok(probes.some((p) => p.method === 'PATCH'))
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/token-scope-probe.test.mjs:21:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scripts/ops/secret-reach/token-scope-probe.test.mjs:24:1
+✖ main update requires a valid current SHA (0.384708ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/token-scope-probe.test.mjs:25:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /SHA/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at scripts/ops/secret-reach/token-scope-probe.test.mjs:27:1
+✖ authorized main updates and merges fail and requests serialize safe bodies (0.936ms)
+  TypeError: Cannot read properties of undefined (reading 'ok')
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/token-scope-probe.test.mjs:33:57)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+✖ setup nft removes an existing privileged primary group and preserves quarantine on rerun (3866.583542ms)
+✖ setup iptables removes an existing privileged primary group and preserves quarantine on rerun (3055.608208ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7090.544
+
+✖ failing tests:
+
+test at scripts/ops/secret-reach/setup-runner-linux.test.mjs:18:44
+✖ setup nft removes an existing privileged primary group and preserves quarantine on rerun (3866.583542ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+
+  + [
+  +   'cairn-broker',
+  +   'cairn-runner'
+  + ]
+  - []
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/setup-runner-linux.test.mjs:94:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 'cairn-broker', 'cairn-runner' ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/secret-reach/setup-runner-linux.test.mjs:18:44
+✖ setup iptables removes an existing privileged primary group and preserves quarantine on rerun (3055.608208ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+
+  + [
+  +   'cairn-broker',
+  +   'cairn-runner'
+  + ]
+  - []
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/setup-runner-linux.test.mjs:94:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 'cairn-broker', 'cairn-runner' ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+✔ canary readable reports all channels without content (106.563458ms)
+✔ canary unreadable reports all channels without content (244.466542ms)
+✔ canary missing reports all channels without content (20.545542ms)
+✖ canary missing-parent reports all channels without content (117.323084ms)
+✔ canary validates arguments and reports process channels (28.47675ms)
+✔ setup dry run describes operations and leaves scratch unchanged (16.534333ms)
+✔ Mac settings deny both secret trees and preserve network configuration (0.767833ms)
+✔ HTTP channel tests anonymous and each supplied identity without leaking responses (391.942417ms)
+✔ HTTP denial and missing curl do not report readable (572.150833ms)
+✔ writes are absent-resource deletes, an absent PR merge, or current-main no-op (0.993333ms)
+✔ main update requires a valid current SHA (0.207625ms)
+✔ authorized main updates and merges fail and requests serialize safe bodies (0.287625ms)
+✔ branch protection refusal and absent merge are accepted (0.162292ms)
+✖ generic validation failure does not establish branch protection (0.487125ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 12
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1547.492083
+
+✖ failing tests:
+
+test at scripts/ops/secret-reach/secret-reach.test.mjs:10:3
+✖ canary missing-parent reports all channels without content (117.323084ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  0 !== 1
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/secret-reach.test.mjs:21:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/secret-reach/token-scope-probe.test.mjs:45:1
+✖ generic validation failure does not establish branch protection (0.487125ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  true !== false
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/token-scope-probe.test.mjs:47:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+✖ writes are absent-resource deletes, an absent PR merge, or current-main no-op (3.157042ms)
+✔ main update requires a valid current SHA (0.269333ms)
+✔ authorized main updates and merges fail and requests serialize safe bodies (0.349166ms)
+✔ branch protection refusal and absent merge are accepted (0.729459ms)
+✔ generic validation failure does not establish branch protection (0.147583ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 4
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 53.8585
+
+✖ failing tests:
+
+test at scripts/ops/secret-reach/token-scope-probe.test.mjs:8:1
+✖ writes are absent-resource deletes, an absent PR merge, or current-main no-op (3.157042ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+    assert.ok(
+
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/token-scope-probe.test.mjs:17:14)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+✖ setup nft removes an existing privileged primary group and preserves quarantine on rerun (4736.418875ms)
+✖ setup iptables removes an existing privileged primary group and preserves quarantine on rerun (5704.112333ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 10487.113
+
+✖ failing tests:
+
+test at scripts/ops/secret-reach/setup-runner-linux.test.mjs:21:3
+✖ setup nft removes an existing privileged primary group and preserves quarantine on rerun (4736.418875ms)
+  AssertionError [ERR_ASSERTION]: Expected "actual" to be strictly unequal to: 0
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/setup-runner-linux.test.mjs:107:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 0,
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/secret-reach/setup-runner-linux.test.mjs:21:3
+✖ setup iptables removes an existing privileged primary group and preserves quarantine on rerun (5704.112333ms)
+  AssertionError [ERR_ASSERTION]: Expected "actual" to be strictly unequal to: 0
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2189-secret-reach/scripts/ops/secret-reach/setup-runner-linux.test.mjs:107:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 0,
+    operator: 'notStrictEqual',
     diff: 'simple'
   }

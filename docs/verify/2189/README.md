@@ -1,56 +1,55 @@
 # Ticket 2189 evidence
 
-## Failure modes defined before implementation
+Review round 1 fixes are uncommitted, as requested. Historical dispatcher evidence is already on the branch. No push, PR, build, full e2e, remote action, live UI, daemon or LLM run occurred in this round. GitHub overlap lookup is unavailable by task constraint; no absence claim is made. No third-party package API was added.
 
-| Failure mode | Test or limit |
+## Review round 1 failure modes (before implementation)
+
+| Failure mode | Regression or explicit limit |
 | --- | --- |
-| Readable secrets missed through cat, symlink, Python, Node, subprocess, dd or copy; contents leaked | Canary readable fixture asserts every channel and no marker |
-| Unreadable or absent files reported readable | chmod-000 fixture (skip as root), missing-path fixture |
-| Bad arguments or missing tools mistaken for isolation | Argument test; missing-tool branches unverified, missing tools must SKIP |
-| Process environment or memory reachable | PID output test; real Linux cross-user controls unverified |
-| Arbitrary repo, extra permission, malformed or oversized broker requests | Broker rejection tests |
-| JWT or GitHub scope wrong; upstream failure leaks credentials | Stub HTTP scope/JWT and error tests; real GitHub unverified |
-| Socket permissions, framing, timeout or existing-path overwrite unsafe | Socket runtime tests; actual Linux group access unverified |
-| Setup mutates during dry run | Scratch fixture snapshot test |
-| Existing runner privileges, file modes, quarantine collision, repeat setup unsafe | Scratch Linux command stubs cover modes, primary/supplementary groups and repeat quarantine; real sudo/ownership unverified |
-| Claude settings ignored or Read denies bypassed | Configuration only; local documentation unavailable, real Claude run unverified |
+| Forged loopback identity bypasses authentication | HTTP canary fixture: anonymous and every supplied login, 2xx fails; firewall command fixture for nft/iptables; real host enforcement pending |
+| Missing required file passes as blocked | Missing fixture must emit MISSING and fail; owner preflight required before user switch because EACCES and ENOENT cannot always be distinguished by runner |
+| Impossible offset-zero memory read counted as blocked | Mapped-memory helper fixture selects readable nonzero mapping; unavailable maps reports SKIPPED |
+| Mac secret directory additions remain readable | Settings regression asserts whole-directory denies and unchanged network keys; real revised Claude run pending |
+| Token probe bypasses broker or authorized writes appear safe | Socket client fixture; HTTP request fixtures assert current-SHA no-op PATCH and absent PR merge with 2xx rejected |
+| Missing/relative socket or empty/nonnumeric GID opens unsafe listener | Startup validation regression before listen; signal cleanup socket runtime test (sandbox bind may skip) |
+| Setup partially mutates before discovering unsafe path or retains DB group | Scratch setup preflight regression and explicit primary group chown assertions |
+| Firewall absent, duplicates, or not persisted/removable | Both firewall backend command fixtures, repeat install and remove; real kernel, boot persistence and owner traffic pending |
+| Secret reach tests omitted from CI/local plan | CI and prepush plan regression; exact new CI run line executed locally |
+| Evidence overstates revised settings or historical probes | Documentation correction; historic runtime evidence scoped to original file |
+| Unrelated ledger baselines changed | Compare non-ticket keys with origin/main |
 
-## Context and evidence limits
+All new results below apply to HEAD 05dbbf982328f077565f8f5c540eefc880b5c214 plus the uncommitted review-round diff, not a delivery commit. GitHub/omarchy overlap checks are unavailable by explicit task constraint.
 
-GitHub issue/comments and open/recently merged overlap lookup unavailable by task constraint; no absence claim. Proceed only in assigned worktree. No UI, fixture screenshot, real app, daemon or LLM exercised. All provider tests stub GitHub HTTP. No third-party package API used. Helper search: `rg --hidden -n 'access_tokens|RS256|createSign' scripts apps .claude` found no existing helper. Claude field names and filesystem propagation remain unverified against documentation: repository/node_modules searches found no authoritative definition.
+## Review round 1 acceptance record
 
-Red and green commands: `node --test scripts/ops/secret-reach/*.test.mjs`; artifacts `red.log` and `green.log`. Tested revision: delivery commit containing these artifacts (tests executed on its pre-commit working tree). Results establish local scratch behavior only. Automated checks are separate from review; no independent vendor or security review is claimed. No PR or published evidence URL exists in this local-only run. Dispatcher must publish SHA-pinned raw links after delivery.
+All commands test base commit `05dbbf982328f077565f8f5c540eefc880b5c214` plus the uncommitted diff identified by `review-tested-source.sha256`. These local artifacts are not published delivery evidence. The dispatcher must commit them and use commit-SHA-pinned raw links in any later PR. Automated results below are separate from independent review; no new independent or security review is claimed. No screenshot or fixture result establishes live application or real provider behavior.
 
-## Results and acceptance claims
-
-| Claim | Command | Surface / provider | Artifact | Result and limit |
+| Supported claim | Command | Surface / provider mode | Artifact | Result and limit |
 | --- | --- | --- | --- | --- |
-| Tests failed before scripts existed | `node --test scripts/ops/secret-reach/*.test.mjs` | Scratch / not exercised | red.log | Exit 1; missing implementation |
-| Seven file channels detect readable marker without printing it; unreadable and absent paths block | Same Node command | Scratch / not exercised | green.log | Three canary fixtures pass, including chmod 000 as non-root; no real host secrets tested |
-| Process channels are emitted | Same Node command | Local process / not exercised | green.log | Pass; Linux environ/mem permission boundary unverified |
-| Wrong repo and extra permission rejected before HTTP; JWT verifies and exact scoped payload sent | Same Node command | In-process / GitHub fetch stub | green.log | Pass; real GitHub installation and returned token authority unverified |
-| Socket mode, framing and existing-path preservation | Same Node command | Local socket / stub | green.log | SKIPPED: sandbox returns EPERM on bind; not accepted |
-| Setup dry run describes changes without touching scratch | Same Node command | Scratch cwd / not exercised | green.log | Pass; real mutation and idempotency unverified |
-| Repository checks pass | `pnpm lint`, `pnpm typecheck`, `pnpm exec vitest run --changed`, `pnpm spec:parse` | Static/collection / not exercised | lint.log, typecheck.log, vitest.log, spec-parse.log | Exit 0 each; changed Vitest selects no tests, Node suite is separate; lint reports one existing informational diagnostic |
-| Claude isolation | No real Claude command | Not exercised | Settings source only | Unverified; source configuration is not runtime evidence |
+| Review regressions fail on the old implementation | `node --test scripts/ops/secret-reach/*.test.mjs` and focused Node reruns | Scratch fixtures / stubs | red.log | Nonzero runs; original evidence retained and new failures appended |
+| Required missing paths fail; readable markers are detected without contents; HTTP anonymous/forged identities detect 2xx | `node --test scripts/ops/secret-reach/*.test.mjs` | Shell on scratch files, curl executable stub / no provider | green.log | Pass; real host HTTP and cross-user access pending |
+| Memory address selection excludes zero and unreadable mappings | Same Node command | Maps string fixture / no provider | green.log | Pass; real Linux mapped-memory read pending; inaccessible maps are SKIPPED |
+| Listener config rejects unsafe socket paths and group values before listen | Same Node command | In-process / no provider | green.log | Pass; CLI rejects empty/nonnumeric GID; signal cleanup and real socket lifecycle pending |
+| Token writes use current-main SHA with force false and nonexistent PR merge; generic validation failures do not prove protection | Same Node command | GitHub fetch stub / stub provider | green.log | Pass; real broker token and branch protection response pending |
+| Setup validates paths before account changes, changes DB owner and group, generates both firewall backends and repeats safely | Same Node command | Scratch shell, identity/chown/firewall/systemd stubs / no provider | green.log | Pass; generated files and actual scratch modes inspected; no kernel enforcement or boot acceptance |
+| Mac directory denies and network configuration are pinned | Same Node command | Settings JSON / no provider | green.log | Pass as configuration check only; real revised settings run pending |
+| CI ops job and local prepush plan include secret tests | Same Node command | Source/plan regression / no provider | green.log | Pass; exact new CI run line is the Node command above, run locally; GitHub CI pending |
+| Socket framing, mode and client token exchange | Same Node command | Unix socket / stub provider | green.log | Socket-dependent tests SKIPPED because sandbox denies binding; no acceptance |
+| Required repository checks | `pnpm lint`, `pnpm typecheck`, `pnpm exec vitest run --changed`, `pnpm spec:parse` | Static / collection / no provider | lint.log, typecheck.log, vitest.log, spec-parse.log | Exit 0 for all four; changed Vitest selected no tests and does not replace Node suite |
 
-The tested source manifest is `tested-source.sha256`; base revision is recorded there, with uncommitted new files tested before the delivery commit. No build, full e2e, push, PR or remote host action ran. No CI success or deployed acceptance is claimed. This archive becomes delivery evidence only with its local commit; external availability remains unverified until the dispatcher publishes it.
+Additional checks: `node --test scripts/prepush.test.mjs` passes 46/46 (`prepush-plan.log`); its initial filesystem-discovery regression is preserved in `prepush-plan-red.log`. The final secret suite reports 27 tests: 23 pass, 4 socket-dependent skips, 0 failures. Shell syntax (`bash -n scripts/ops/secret-reach/canary.sh scripts/ops/secret-reach/setup-runner-linux.sh`) passes. The English gate reports zero Chinese lines (`language.log`).
 
-## Host actions still required
+`node scripts/lessons-ledger-gate.mjs` remains nonzero (`ledger.log`): restoring the unrelated baseline keys exposes a stale `docs-only-predicate-too-narrow` baseline and mismatched counters in tickets 1689 and 1703. Those other-ticket entries are untouched as requested. The only baseline differences against origin/main belong to ticket 2189. No global ledger rewrite ran.
 
-Run the setup with sudo on Linux, inspect identities, primary and supplementary groups, sudoers, ACLs, directory traversal, database family modes and quarantine ownership, then repeat setup to establish idempotency. The dedicated primary group is now enforced; audit its existing membership and the home ownership on the host. Run owner-positive and runner-negative canaries on all supplied host secrets and plaintext transcripts, with server and daemon PIDs. Check Linux ptrace/mapped-memory access independently: offset-zero mem failure alone is insufficient. Run the socket test outside this sandbox, test actual group access and timeout behavior, then validate a real scoped installation token without archiving credentials. Verify Claude settings syntax with installed-version documentation and exercise real Mac direct/subprocess negative controls. See ../../ops/secret-reach.md for the runbook.
+The backup test is in the separate `ops-backup-test` CI job, but was not in `scripts/prepush.mjs` at this base. The secret suite was added to that job as its own exact run line and to the required local/CI plan alongside the other Node checks. The unchanged backup step was not rerun; it requires network/rrsync/Linux tooling unavailable here.
+
+## Host acceptance still pending
+
+Use `docs/ops/secret-reach.md`. Before switching users, verify every supplied path exists as the owner, including every database member; omit the old key path after quarantine and use its real destination. Run owner-positive then runner-negative file, mapped-memory and HTTP canaries with all allowed logins passed explicitly, never sourced from server.env. Runner-side canary remains pending. Inspect root and owner connectivity, both IP families, nft/iptables runtime rules, rerun stability, service boot persistence and removal. Verify identities, sudoers, ACLs and DB ownership. Start broker outside the private home; run socket/client tests and SIGTERM/SIGINT cleanup on Linux, then the token probe as runner. Record exact branch-protection response and absent-PR refusal. Rerun real Claude with the revised directory deny file while checking network access. Missing executables, inaccessible maps and socket skips do not establish isolation.
 
 ## Retro
 
-Applied retro-cairn: fixed one identity-normalization mistake. Supplementary group replacement left an existing privileged primary group intact. The scratch setup regression reproduced docker as the retained primary group before the fix; the script now ensures and selects its dedicated primary group. See docs/lessons/2189-runner-primary-group.md. Socket EPERM remains an environment limit.
-
-## Delivery blocker
-
-The sandbox denied `git add` and `git commit` when Git attempted to create this worktree's `index.lock` (`Operation not permitted`). No commit was created and the evidence remains local and uncommitted. The dispatcher must stage the explicit task paths and commit with the requested subject; it must not treat this archive as published or committed evidence yet. The same sandbox also denied process-list inspection while investigating delayed Git commands; no process-state conclusion was drawn.
-
-The appended setup negative control in red.log reproduces the primary-group bug after initial implementation. The complete green run also covers scratch setup twice, file modes and quarantine preservation with identity/ownership commands stubbed. This is not real Linux account or sudo evidence.
-
-Final Node result: 9 tests, 8 passed, 1 skipped, 0 failed. The additional setup command fixture uses the real shell script with host path literals replaced by scratch paths; Linux identity, ownership and install commands are stubs. Real chmod, move and quarantine creation execute only within scratch. The primary-group failure is captured in the appended red.log run before the fix. Lessons ledger validation passed with `node scripts/lessons-ledger-gate.mjs`. Shell syntax passed with `bash -n scripts/ops/secret-reach/canary.sh scripts/ops/secret-reach/setup-runner-linux.sh`.
+Applied retro-cairn. The review exposed false-negative probe evidence and missing boundary checks; regressions now cover the corrected classes. During this round the scratch fixture used macOS's symlinked temporary root, which the new ancestor validator correctly rejected; the fixture now canonicalizes its own root and still tests deliberate unsafe symlinks. Lint also caught an import-order error, corrected through Biome. See `docs/lessons/2189-scratch-path-canonicalization.md` and `docs/lessons/2189-plan-filesystem-dependency.md`. The prepush plan now uses explicit test paths after its own isolated CLI tests caught a directory-discovery crash. A further test-first check caught regular-file ancestors bypassing preflight; ancestor-directory validation and `docs/lessons/2189-preflight-ancestor-type.md` now cover that case. The existing destructive-probe lesson was updated for harmless no-op/absent-resource writes.
 
 ## Mac sandbox negative control (dispatcher, real `claude -p` runs)
 
@@ -61,12 +60,12 @@ Claude Code 2.1.312, model claude-haiku-5-5, `--permission-mode bypassPermission
 | Scratch canary, cat / python / node | `settings-on.json` | all `Operation not permitted` | `mac/on.txt` |
 | Scratch canary, forced `dangerouslyDisableSandbox: true` | `settings-on.json` | refused, read blocked | `mac/on-unsandboxed.txt` |
 | Scratch canary, symlink / cp / dd, no sandbox | `settings-off.json` | READ on all three (red control) | `mac/off-probe.txt` |
-| Real secret paths, symlink / cp / dd / node / git diff --no-index | `settings-mac2.json` (same as the committed file plus a path that does not exist) | BLOCKED on all five | `mac/mac-probe2-on.txt` |
+| Real secret paths, symlink / cp / dd / node / git diff --no-index | `settings-mac2.json` (the previous three-path deny list plus `~/.cairn/token`; narrower than the revised whole-directory file) | BLOCKED on all five | `mac/mac-probe2-on.txt` |
 | Same probe run directly in a shell, no sandbox | none | READ on all five (red control) | `mac/mac-probe2-off.txt` |
 | gh api, git ls-remote, npm registry inside the sandbox | `settings-on.json` without the network keys | gh TLS failure, git cannot reach the proxy | `mac/mac-net.txt` |
 | Same with `httpProxyPort`, `allowLocalBinding`, `enableWeakerNetworkIsolation` | `settings-mac2.json` | gh, git, npm OK; key reads blocked | `mac/mac-net2.txt` |
 
-Limits: the deny list covers only the listed paths; the Mac server DB and other files stay readable to the session. The settings apply only to sessions started with `--settings`; sessions started without it are unprotected.
+Measured scope: the archived run proves denial only for the tested paths under the historical settings. The revised file denies the entire `~/.cairn/**` and `~/.tds/**` trees; its real Claude rerun remains pending. The settings apply only to sessions started with `--settings`; sessions started without it are unprotected.
 
 ## omarchy negative controls (dispatcher, 2026-10-30)
 
@@ -77,4 +76,4 @@ Limits: the deny list covers only the listed paths; the Mac server DB and other 
 | Broker token: repositories, branch protection, repo settings, Actions variables, other repo | only `xiechimon/cairn` visible; protection, settings and variables 403; other repo 404; broker refuses another repo and `administration` | `omarchy/token-scope-probe.txt` |
 | Same probe with the unscoped `as-bot.sh` token | same statuses: the App installation itself has no administration permission today; the broker pins the scope if the App gains permissions | `omarchy/token-scope-probe-unscoped.txt` |
 
-Every write in the probe is a bodyless DELETE of a resource that does not exist (see `docs/lessons/2189-destructive-negative-probe.md`).
+The historical token scope run predates the socket client, current-main no-op PATCH and absent-PR merge probes. It does not accept those revised mechanisms. The offset-zero memory result is an invalid negative control and supports no memory-isolation claim.

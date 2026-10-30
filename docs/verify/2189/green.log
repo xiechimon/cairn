@@ -1,17 +1,35 @@
-✔ broker rejects other repositories, permissions and malformed requests before HTTP (9.757708ms)
-✔ broker signs JWT and sends only fixed repository permissions (266.747125ms)
-﹣ socket enforces framing, mode and preserves existing paths (22.240792ms) # Sandbox denies Unix socket binding
-✔ canary readable reports all channels without content (833.087ms)
-✔ canary unreadable reports all channels without content (1674.934292ms)
-✔ canary missing reports all channels without content (1203.146667ms)
-✔ canary validates arguments and reports process channels (95.1095ms)
-✔ setup dry run describes operations and leaves scratch unchanged (29.771792ms)
-✔ setup removes an existing privileged primary group and preserves quarantine on rerun (10743.785875ms)
-ℹ tests 9
+✔ broker rejects other repositories, permissions and malformed requests before HTTP (1.041667ms)
+✔ broker signs JWT and sends only fixed repository permissions (2.758333ms)
+﹣ socket enforces framing, mode and preserves existing paths (2.40175ms) # Sandbox denies Unix socket binding
+✔ broker rejects unsafe listener configuration before binding (1.149917ms)
+﹣ runner client obtains token through socket without reading owner configuration (1.295958ms) # Sandbox denies Unix socket binding
+✔ CLI rejects empty and nonnumeric GID before reading owner key (105.104416ms)
+﹣ broker removes socket on SIGTERM (37.92075ms) # Sandbox denies Unix socket binding
+﹣ broker removes socket on SIGINT (38.138583ms) # Sandbox denies Unix socket binding
+✔ memory probe selects a readable mapped address and never zero (0.650584ms)
+✔ client rejects relative sockets before connecting (0.632417ms)
+✔ secret tests run in the ops CI job and local prepush plan (1.211209ms)
+✔ canary readable reports all channels without content (133.866ms)
+✔ canary unreadable reports all channels without content (113.332541ms)
+✔ canary missing reports all channels without content (14.455333ms)
+✔ canary missing-parent reports all channels without content (15.000959ms)
+✔ canary validates arguments and reports process channels (21.179875ms)
+✔ setup dry run describes operations and leaves scratch unchanged (7.874542ms)
+✔ Mac settings deny both secret trees and preserve network configuration (0.373ms)
+✔ HTTP channel tests anonymous and each supplied identity without leaking responses (565.748041ms)
+✔ HTTP denial does not report readable (362.257584ms)
+✔ setup nft removes an existing privileged primary group and preserves quarantine on rerun (6668.935ms)
+✔ setup iptables removes an existing privileged primary group and preserves quarantine on rerun (8269.742625ms)
+✔ writes are absent-resource deletes, an absent PR merge, or current-main no-op (1.499208ms)
+✔ main update requires a valid current SHA (0.25075ms)
+✔ authorized main updates and merges fail and requests serialize safe bodies (0.40825ms)
+✔ branch protection refusal and absent merge are accepted (0.42425ms)
+✔ generic validation failure does not establish branch protection (0.235625ms)
+ℹ tests 27
 ℹ suites 0
-ℹ pass 8
+ℹ pass 23
 ℹ fail 0
 ℹ cancelled 0
-ℹ skipped 1
+ℹ skipped 4
 ℹ todo 0
-ℹ duration_ms 11680.751625
+ℹ duration_ms 14999.696834

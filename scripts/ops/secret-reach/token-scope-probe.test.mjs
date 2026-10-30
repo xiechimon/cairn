@@ -2,48 +2,63 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { ABSENT, runProbes, scopeProbes } from './token-scope-probe.mjs';
 
-const probes = scopeProbes('xiechimon/cairn', 'xiechimon/agents-config');
+const sha = 'a'.repeat(40);
+const probes = scopeProbes('xiechimon/cairn', 'xiechimon/agents-config', sha);
 
-test('every write probe targets a resource that does not exist and carries no body', () => {
-  const writes = probes.filter((p) => p.method !== 'GET');
-  assert.ok(writes.length >= 3);
-  for (const probe of writes) {
-    assert.equal(probe.method, 'DELETE', probe.label);
-    assert.ok(
-      probe.path.includes(ABSENT) ||
-        probe.path.toLowerCase().includes(ABSENT.replaceAll('-', '_')) ||
-        /\/hooks\/1$/.test(probe.path),
-      probe.label,
-    );
-    assert.equal(probe.body, undefined, probe.label);
+test('writes are absent-resource deletes, an absent PR merge, or current-main no-op', () => {
+  for (const probe of probes.filter((p) => p.method !== 'GET')) {
+    if (probe.method === 'PATCH') {
+      assert.equal(probe.path, '/repos/xiechimon/cairn/git/refs/heads/main');
+      assert.deepEqual(probe.body, { sha, force: false });
+    } else if (probe.method === 'PUT') {
+      assert.equal(probe.path, '/repos/xiechimon/cairn/pulls/999999999/merge');
+    } else {
+      assert.equal(probe.method, 'DELETE');
+      assert.ok(
+        probe.path.includes(ABSENT) ||
+          probe.path.includes(ABSENT.replaceAll('-', '_').toUpperCase()) ||
+          probe.path.endsWith('/hooks/999999999'),
+      );
+      assert.equal(probe.body, undefined);
+    }
   }
+  assert.ok(probes.some((p) => p.method === 'PATCH'));
+  assert.ok(probes.some((p) => p.method === 'PUT'));
 });
-
-test('the destructive branch protection PUT from the 2026-10-30 probe is not in the list', () => {
-  assert.ok(
-    !probes.some((p) => p.method === 'PUT' && p.path.endsWith('/branches/main/protection')),
-  );
+test('main update requires a valid current SHA', () => {
+  assert.throws(() => scopeProbes('xiechimon/cairn', 'other/repo', ''), /SHA/);
 });
-
-test('a token with admin rights fails the run: 404 on an absent branch means the write was authorized', async () => {
-  const results = await runProbes('t', probes, async (url) => ({
-    status: url.includes(`/branches/${ABSENT}/protection`)
-      ? 404
-      : url.includes('/installation/') || url.includes('/pulls')
-        ? 200
-        : url.includes('agents-config')
-          ? 404
-          : 403,
-  }));
-  assert.equal(
-    results.find((r) => r.path.includes(ABSENT) && r.path.includes('branches')).ok,
-    false,
-  );
-});
-
-test('requests never send a body', async () => {
-  await runProbes('t', probes, async (_url, options) => {
-    assert.equal(options.body, undefined);
-    return { status: 0 };
+test('authorized main updates and merges fail and requests serialize safe bodies', async () => {
+  const seen = [];
+  const results = await runProbes('fixture-token', probes, async (url, options) => {
+    seen.push({ url, ...options });
+    return { status: 200 };
   });
+  assert.equal(results.find((r) => r.method === 'PATCH').ok, false);
+  assert.equal(results.find((r) => r.method === 'PUT').ok, false);
+  assert.deepEqual(JSON.parse(seen.find((r) => r.method === 'PATCH').body), { sha, force: false });
+});
+test('branch protection refusal and absent merge are accepted', async () => {
+  const results = await runProbes('fixture-token', probes, async (url, options) => ({
+    json: async () => ({ message: 'Protected branch update failed' }),
+    status:
+      options.method === 'PATCH'
+        ? 422
+        : options.method === 'PUT'
+          ? 404
+          : url.includes('agents-config')
+            ? 404
+            : options.method === 'GET' && !url.includes('protection')
+              ? 200
+              : 403,
+  }));
+  assert.ok(results.every((r) => r.ok));
+});
+
+test('generic validation failure does not establish branch protection', async () => {
+  const results = await runProbes('t', probes, async () => ({
+    status: 422,
+    json: async () => ({ message: 'Invalid SHA' }),
+  }));
+  assert.equal(results.find((r) => r.method === 'PATCH').ok, false);
 });

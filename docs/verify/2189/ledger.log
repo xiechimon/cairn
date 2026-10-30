@@ -1,0 +1,3 @@
+docs/lessons/baselines.json: freezes "docs-only-predicate-too-narrow", which no ledger entry carries any more; delete the stale baseline
+docs/lessons/1689-prepush-selftest-not-run.md: Intercepts/Recurrences are written from the recorded events, do not edit them by hand (the file says Intercepts 0, Recurrences 1; the events give Intercepts 0, Recurrences 3); run `node scripts/lessons-ledger-gate.mjs write`
+docs/lessons/1703-direct-vitest-skipped-slot.md: Intercepts/Recurrences are written from the recorded events, do not edit them by hand (the file says Intercepts 1, Recurrences 0; the events give Intercepts 1, Recurrences 1); run `node scripts/lessons-ledger-gate.mjs write`

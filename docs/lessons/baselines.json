@@ -799,6 +799,10 @@
     "Intercepts": 1,
     "Recurrences": 1
   },
+  "plan-filesystem-dependency": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "platform-coupled-subprocess-tests": {
     "Intercepts": 0,
     "Recurrences": 0
@@ -813,6 +817,10 @@
   },
   "pr-head-not-refreshed-before-verification": {
     "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "preflight-ancestor-type": {
+    "Intercepts": 0,
     "Recurrences": 0
   },
   "prepush-selftest-not-run": {
@@ -974,6 +982,10 @@
   "runtime-probe-grading": {
     "Intercepts": 2,
     "Recurrences": 2
+  },
+  "scratch-path-canonicalization": {
+    "Intercepts": 0,
+    "Recurrences": 0
   },
   "screenshot-pixels-as-css-px": {
     "Intercepts": 0,
