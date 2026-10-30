@@ -2,7 +2,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from 'cn';
 import type * as React from 'react';
 
-const panelVariants = cva('rounded-[12px]', {
+const panelVariants = cva('rounded-(--radius-card)', {
   variants: {
     variant: {
       quiet: 'bg-secondary',
@@ -36,7 +36,10 @@ function PanelRow({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="panel-row"
-      className={cn('flex items-center justify-between border-t border-border', className)}
+      className={cn(
+        'flex items-center justify-between border-t border-border first:border-t-0',
+        className,
+      )}
       {...props}
     />
   );

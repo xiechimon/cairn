@@ -238,21 +238,23 @@ export function StreamSection() {
       title="Live stream"
       lede="What a running agent looks like: a live row with a ticking timer, and the conversation scroller that follows new messages and offers a jump back to the latest."
     >
-      <Specimen title="Live row" note="detail and chief variants; the second one expands">
-        <div className="flex w-full flex-col gap-4">
+      <Specimen title="Live row" note="a ticking timer while an agent works">
+        <Cell label="detail: compact, in the task transcript">
           <LiveRow variant="detail" label="Running tests" startedAt={started} />
+        </Cell>
+        <Cell label="chief: under a reply, click to expand">
           <LiveRow
             variant="chief"
             label="Planning the next step"
             startedAt={started}
             disclosure={{ expand: 'Show details', collapse: 'Hide details' }}
           >
-            <p className="m-0 mt-2 max-w-140 text-meta text-content-tertiary">
+            <p className="m-0 mt-2 max-w-100 text-meta text-content-tertiary">
               Reading the failing log, then deciding between regenerating the lockfile and pinning
               the dependency.
             </p>
           </LiveRow>
-        </div>
+        </Cell>
       </Specimen>
       <Specimen
         title="Message scroller"

@@ -130,8 +130,9 @@ import { bindGateVerdict } from './merge-gate/verdict.js';
 import { githubGatePort } from './merge-gate-github.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { assertPhaseTransition, canTransitionPhase } from './phase.js';
+import { planHasOpenDecisions } from './plan-decisions.js';
 import { projectMergeConfigOf } from './projects.js';
-import { queuePushDigest, type VapidKeys } from './push.js';
+import type { VapidKeys } from './push.js';
 import { publishStepRow, toQuotaWait } from './quota-wait.js';
 import { retryLessonsOf } from './retry-lessons.js';
 import { assertSplitProposalExecutable } from './split-proposal.js';
@@ -406,7 +407,9 @@ function landReservedPhase(
       .where(eq(todo.id, todoRow.id))
       .run();
     const record = getTodo(deps, todoRow.id);
-    if (record) deps.hub.publishTodoDoc(record.teamId, record);
+    if (record) {
+      deps.hub.publishTodoDoc(record.teamId, record);
+    }
   }
   if (desired === 'done') {
     settleSplitOnDone(deps, todoRow.id);
@@ -804,6 +807,7 @@ export function startBuilds(
     assignment: Assignment;
     withPlan: boolean;
     triggerSource?: TriggerSource;
+    scheduledBy?: string;
   },
 ): BuildRecord[] {
   const triggerSource = input.triggerSource ?? 'user';
@@ -842,6 +846,7 @@ export function startBuilds(
         withPlan: input.withPlan,
         prevPhase: todoRecord.phase,
         triggerSource,
+        scheduledBy: input.scheduledBy ?? null,
         planDocId: null,
         errorMessage: null,
         prUrl: null,
@@ -2332,8 +2337,6 @@ function planContractOfStep(
   return checkPlanContract(latest.content);
 }
 
-const OPEN_DECISION_HEADING = /^(open questions|decisions needed|decision points)$/i;
-
 export const PLAN_AUTO_CONFIRM_GRACE_MS = 10 * 60_000;
 
 export function sweepPlanAutoConfirm(deps: BuildDeps, now: number = nowMs()): void {
@@ -2362,31 +2365,7 @@ export function sweepPlanAutoConfirm(deps: BuildDeps, now: number = nowMs()): vo
     if (liveStep !== undefined) continue;
     const latestPlan = latestPlanRow(deps, buildId);
     if (latestPlan === undefined || !checkPlanContract(latestPlan.content).ok) continue;
-    const planLines = latestPlan.content
-      .replace(/\r\n?/g, '\n')
-      .split('\n')
-      .map((l) => l.trim());
-    let openDecisions = false;
-    for (let i = 0; i < planLines.length && !openDecisions; i++) {
-      const name = (planLines[i] ?? '')
-        .replace(/^#{1,6}\s+/, '')
-        .replace(/\s+#+$/, '')
-        .replace(/\*\*|__/g, '')
-        .replace(/\s*[:：]$/, '')
-        .trim();
-      if (!OPEN_DECISION_HEADING.test(name)) continue;
-      const own = /^(#{1,6})\s/.exec(planLines[i] ?? '')?.[1]?.length;
-      const sectionLevel = own ?? (/^=+$/.test(planLines[i + 1] ?? '') ? 1 : 2);
-      for (const next of planLines.slice(i + 1)) {
-        if (next === '' || /^(=+|-+)$/.test(next)) continue;
-        const nextLevel = /^(#{1,6})\s/.exec(next)?.[1]?.length;
-        if (nextLevel !== undefined && nextLevel <= sectionLevel) break;
-        if (/^([-*]\s*)?(none|n\/a|nothing)\.?$/i.test(next)) break;
-        openDecisions = true;
-        break;
-      }
-    }
-    if (openDecisions) continue;
+    if (planHasOpenDecisions(latestPlan.content)) continue;
     const mergePolicy = projectMergeConfigSchema.parse({
       mergePolicy: projectOfTodo(deps.db, todoRow)?.autonomy?.mergePolicy,
     }).mergePolicy;
@@ -2742,19 +2721,6 @@ export function finishTodoDone(deps: BuildDeps, todoId: string, buildId: string)
   });
   advanceSplitWaves(deps, todoId);
   emitRuntimeBuildSpan(deps.db, buildId, 'done');
-  const todoRow = deps.db.select().from(todo).where(eq(todo.id, todoId)).get();
-  if (todoRow !== undefined) {
-    const buildRow = deps.db.select().from(build).where(eq(build.id, buildId)).get();
-    queuePushDigest(deps.db, deps.user.id, todoRow.teamId, {
-      title: 'PR 已合并',
-      body:
-        buildRow?.prNumber != null
-          ? `PR #${buildRow.prNumber} 已合并：#${todoRow.seqNum} ${todoRow.title}`
-          : `#${todoRow.seqNum} ${todoRow.title}`,
-      href: `/app/todo/${todoId}`,
-      tag: `${deps.user.id}:${todoId}`,
-    });
-  }
   markFirstPrPromptDue(deps.db, buildId);
 }
 

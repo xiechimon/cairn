@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "de967271-1856-4254-b2fb-8c1b6c6cd3fe",
+  "id": "34b5642c-4931-4c52-9a12-e60943533142",
   "prevId": "388c8f82-77ae-48b0-88df-8f283cb3bbe6",
   "tables": {
     "agent": {
@@ -397,20 +397,6 @@
     "attachment": {
       "name": "attachment",
       "columns": {
-        "todoId": {
-          "name": "todoId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "sha256": {
-          "name": "sha256",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "id": {
           "name": "id",
           "type": "text",
@@ -826,6 +812,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "scheduledBy": {
+          "name": "scheduledBy",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "planDocId": {

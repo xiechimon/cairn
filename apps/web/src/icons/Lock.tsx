@@ -14,8 +14,8 @@ export function Lock({ width = 11, height = 11, ...props }: SVGProps<SVGSVGEleme
       strokeLinejoin="round"
       {...props}
     >
-      <path d="M7 17V13C3.5 13 3 10 5 8 5 5 8 3 12 3s7 2 7 5c2 2 1.5 5-2 5v4" />
-      <rect x="7" y="17" width="10" height="3" rx=".75" />
+      <rect x="4" y="11" width="16" height="10" rx="2" />
+      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
     </svg>
   );
 }

@@ -1,6 +1,6 @@
 ---
 name: retro-cairn
-description: Use when wrapping up a task or after fixing an error: list the mistakes that appeared and got fixed along the way (including ones a user corrected), attribute them, turn them into recurrence-preventing safeguards, and record them as an entry file under docs/lessons/.
+description: Use when wrapping up a task or after fixing an error: list the mistakes that appeared and got fixed along the way (including ones a user corrected), attribute them, turn them into recurrence-preventing safeguards, and land each safeguard in the code it concerns.
 ---
 
 # retro-cairn: process error -> safeguard
@@ -19,8 +19,8 @@ Principle: a mistake that appeared during the process, even if fixed by the end,
 1. List the errors: list every "appeared and got fixed" point, one sentence describing the symptom. Ones a user corrected always count.
 2. Attribute: ask "why was it not stopped at the time", find the root cause (missing check, unclear rule, missing context, tool misuse).
 3. Choose a safeguard: prefer architecture or types, then lint or tests, then instructions or skills. Use the real mistake as a negative control for a new machine check.
-4. Record: create or update `docs/lessons/<ticket>-<short-name>.md`, one file per kind of mistake. Write freely about the cause and safeguard; follow `docs/lessons/README.md`.
-5. Recurrence: update the existing document and strengthen the safeguard when the same kind of mistake appears again.
+4. Record: the safeguard itself is the record. Name the mistake it stops in the PR that adds it. Do not write files under `docs/lessons/`; that directory is a frozen archive.
+5. Recurrence: when the same kind of mistake appears again, strengthen the existing safeguard instead of adding prose.
 6. Report: when wrapping up, summarize in one or two sentences how many process errors were caught and what safeguard each became.
 
 ## Boundaries

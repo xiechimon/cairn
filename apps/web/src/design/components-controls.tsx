@@ -127,7 +127,7 @@ export function ButtonSection() {
       </Specimen>
       <Specimen
         title="States"
-        note="Dialog and form buttons narrow to 8px corners"
+        note="Disabled buttons fade to half strength; a busy button says what it is doing"
         code={`<Button className={DIALOG_PRIMARY_BUTTON} disabled>Create</Button>`}
       >
         <Cell label="trailing icon">

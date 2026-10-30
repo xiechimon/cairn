@@ -13,8 +13,9 @@ import { dirname, resolve } from 'node:path';
 import { and, eq } from 'drizzle-orm';
 import webpush from 'web-push';
 import type { Db } from '../db/client.js';
-import { pushDelivery, pushDigestItem, pushSubscription } from '../db/schema.js';
+import { pushDelivery, pushDigestItem, pushSubscription, todo } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { isViewingThread } from './thread-presence.js';
 
 export interface VapidKeys {
   publicKey: string;
@@ -216,6 +217,17 @@ export async function sendPushToUser(
   return { status: 'failed', id };
 }
 
+export function isArchivedTodoPush(db: Db, teamId: string, href: string): boolean {
+  const match = /^\/app\/todo\/([^/?#]+)$/.exec(href);
+  if (match?.[1] === undefined) return false;
+  const row = db
+    .select({ archivedAt: todo.archivedAt })
+    .from(todo)
+    .where(and(eq(todo.id, match[1]), eq(todo.teamId, teamId)))
+    .get();
+  return row?.archivedAt != null;
+}
+
 export function pushToUserSafely(
   db: Db,
   vapid: VapidKeys | null,
@@ -223,13 +235,19 @@ export function pushToUserSafely(
   teamId: string,
   msg: PushMessage,
 ): void {
-  if (vapid === null) return;
+  if (
+    vapid === null ||
+    isArchivedTodoPush(db, teamId, msg.href) ||
+    isViewingThread(db, userId, teamId, msg.href)
+  )
+    return;
   void sendPushToUser(db, vapid, userId, teamId, msg).catch(() => {
     process.stderr.write('web push delivery failed\n');
   });
 }
 
 export function queuePushDigest(db: Db, userId: string, teamId: string, msg: PushMessage): void {
+  if (isArchivedTodoPush(db, teamId, msg.href)) return;
   db.insert(pushDigestItem)
     .values({
       id: newRecordId(),
@@ -275,11 +293,16 @@ export async function sweepPushDigest(db: Db, vapid: VapidKeys | null): Promise<
     .groupBy(pushDigestItem.userId, pushDigestItem.teamId)
     .all();
   for (const group of groups) {
-    const items = db
+    const queued = db
       .select()
       .from(pushDigestItem)
       .where(and(eq(pushDigestItem.userId, group.userId), eq(pushDigestItem.teamId, group.teamId)))
       .all();
+    const items = queued.filter((item) => {
+      if (!isArchivedTodoPush(db, group.teamId, item.href)) return true;
+      db.delete(pushDigestItem).where(eq(pushDigestItem.id, item.id)).run();
+      return false;
+    });
     if (items.length === 0) continue;
     const delivered = await sendPushToUser(db, vapid, group.userId, group.teamId, {
       title: '每日简报',
