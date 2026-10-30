@@ -1,0 +1,175 @@
+{
+  "epic": "B2",
+  "items": [
+    {
+      "id": "orb-host",
+      "issue": 2273,
+      "dependsOn": [],
+      "humanHeld": true
+    },
+    {
+      "id": "orb-provider",
+      "issue": 2274,
+      "dependsOn": []
+    },
+    {
+      "id": "orb-runner",
+      "issue": 2275,
+      "dependsOn": [
+        "orb-provider"
+      ]
+    },
+    {
+      "id": "agents-setup",
+      "issue": 2276,
+      "dependsOn": []
+    },
+    {
+      "id": "orb-canary",
+      "issue": 2277,
+      "dependsOn": [
+        "orb-host",
+        "orb-runner"
+      ]
+    },
+    {
+      "id": "trial-one",
+      "issue": 2278,
+      "dependsOn": [
+        "orb-host",
+        "orb-runner",
+        "agents-setup",
+        "orb-canary"
+      ]
+    },
+    {
+      "id": "orb-snapshot",
+      "issue": 2279,
+      "dependsOn": [
+        "trial-one"
+      ]
+    },
+    {
+      "id": "orb-services",
+      "issue": 2280,
+      "dependsOn": [
+        "trial-one"
+      ]
+    },
+    {
+      "id": "trial-widen",
+      "issue": 2281,
+      "dependsOn": [
+        "trial-one",
+        "orb-snapshot"
+      ]
+    },
+    {
+      "id": "rules-probe",
+      "issue": 2282,
+      "dependsOn": [
+        "orb-snapshot"
+      ]
+    },
+    {
+      "id": "fakes",
+      "issue": 2283,
+      "dependsOn": []
+    },
+    {
+      "id": "key-isolation",
+      "issue": 2189,
+      "dependsOn": [],
+      "humanHeld": true
+    },
+    {
+      "id": "otel-redaction",
+      "issue": 2269,
+      "dependsOn": []
+    },
+    {
+      "id": "chatgpt-login",
+      "issue": 2284,
+      "dependsOn": [
+        "key-isolation"
+      ],
+      "humanHeld": true
+    },
+    {
+      "id": "codex-probe",
+      "issue": 2285,
+      "dependsOn": [
+        "trial-one",
+        "chatgpt-login"
+      ]
+    },
+    {
+      "id": "routing-api",
+      "issue": 2286,
+      "dependsOn": []
+    },
+    {
+      "id": "loop-feedback",
+      "issue": 2287,
+      "dependsOn": []
+    },
+    {
+      "id": "self-deploy",
+      "issue": 2288,
+      "dependsOn": [
+        "trial-one"
+      ]
+    },
+    {
+      "id": "identity",
+      "issue": 2289,
+      "dependsOn": [
+        "trial-widen"
+      ],
+      "humanHeld": true
+    },
+    {
+      "id": "acp-spike",
+      "issue": 2290,
+      "dependsOn": []
+    },
+    {
+      "id": "mcp-entry",
+      "issue": 2291,
+      "dependsOn": []
+    }
+  ],
+  "requiredChecks": [
+    "check",
+    "pack-smoke",
+    "e2e-gate"
+  ],
+  "checks": [
+    {
+      "name": "checker tests pass",
+      "run": [
+        "node",
+        "--test",
+        "scripts/epic-done.test.mjs"
+      ]
+    },
+    {
+      "name": "orb host check parser",
+      "run": [
+        "node",
+        "--test",
+        "scripts/ops/orb/orb-host-check.test.mjs"
+      ]
+    },
+    {
+      "name": "trial-one evidence",
+      "run": [
+        "node",
+        "scripts/ops/orb/trial-evidence-check.mjs",
+        "docs/verify/b2-trial-one/trial-one.json"
+      ],
+      "expectStdoutIncludes": "trial-one: ok"
+    }
+  ],
+  "maxHours": 120
+}
