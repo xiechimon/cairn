@@ -18,13 +18,13 @@ Principle: a mistake that appeared during the process, even if fixed by the end,
 
 1. List the errors: list every "appeared and got fixed" point, one sentence describing the symptom. Ones a user corrected always count.
 2. Attribute: ask "why was it not stopped at the time", find the root cause (missing check, unclear rule, missing context, tool misuse).
-3. Choose a safeguard, working from level 1 downward asking "can this be done"; the ledger's five-rung ladder is the canonical source (`docs/lessons/README.md`): architecture or types > lint, script gates, tests, CI > rules > skills > memory. Levels 4 and 5 must note in the remark why a higher level cannot be done; if it cannot be done now, open a ticket and put the ticket number in the remark, do not write just "pending upgrade" (`node scripts/lessons-ledger-gate.mjs` checks this). A new machine check must use this real mistake as the negative control: the old error turning red under the new gate is what counts as landing it.
-4. Record: create an entry file `docs/lessons/<ticket>-<short-name>.md` in the format of `docs/lessons/README.md`. One error kind per file, merge the same kind, do not open duplicate files; on recurrence update the original file's "Recurrences" count.
-5. Recurrence escalation: when the same kind appears again, increment "Recurrences" and push the safeguard to a harder level, not add another line of text.
+3. Choose a safeguard: prefer architecture or types, then lint or tests, then instructions or skills. Use the real mistake as a negative control for a new machine check.
+4. Record: create or update `docs/lessons/<ticket>-<short-name>.md`, one file per kind of mistake. Write freely about the cause and safeguard; follow `docs/lessons/README.md`.
+5. Recurrence: update the existing document and strengthen the safeguard when the same kind of mistake appears again.
 6. Report: when wrapping up, summarize in one or two sentences how many process errors were caught and what safeguard each became.
 
 ## Boundaries
 
 - Ask the user first before a safeguard that touches ADRs, protected paths, or changes intended behavior.
 - Safeguards go through the normal PR flow (open PR; arm its merge only when pr-gate returns go with `mergedBy: 'auto-merge'`, otherwise it goes to ian; wrap up), not around review.
-- Do not aim for "never again"; aim for "every mistake has a home, is countable, and escalates".
+- Do not aim for "never again"; aim for "every mistake has a home and a useful safeguard".

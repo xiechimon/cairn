@@ -100,7 +100,7 @@ Consequences already absorbed by other tickets: #1515's weekly summary is replac
 | E0-4 | #1514 | `pnpm traj:export` read-only + redaction | merged (PR #1641) |
 | E1 | #1605 | Adoption judge: validity / trigger / paired-z gates + read-once sealed set | merged (PR #1636) |
 | E1 | #1606 | Pack failure-attribution fields | merged (PR #1660) |
-| E1-1 | #1515 | 7-day outcome backfill | closed; the weekly summary it carried is replaced by Langfuse score dashboards (§3), and the lessons ledger feeds its facts in from the repository side (§4a) |
+| E1-1 | #1515 | 7-day outcome backfill | closed; the weekly summary it carried is replaced by Langfuse score dashboards (§3) |
 | E1-2 | #1516 | Failure-replay candidate generation from rejections/rollbacks | landed (`pnpm traj:failure-replay`); confirmation via Langfuse annotation queue; bank at `integration/eval/failure-replay/` |
 | E2-1 | #1517 | pacman-bench v0: 30 tasks from merged PRs (Harbor format since 2026-10-25) | open |
 | E2-2 | #1518 | Isolated runner (Harbor since 2026-10-25) | open |
@@ -110,12 +110,6 @@ Consequences already absorbed by other tickets: #1515's weekly summary is replac
 | E3 | — | Self-optimization loop (#1579, #1614, #1576 as candidates) | not ticketed |
 | E4 | — | Standing loop with human sampling | not ticketed |
 
-## 4a · Lessons ledger as the process-error input
+## 4a · Process-error notes
 
-Failure categories are a second signal alongside the trajectory features above: an error kind that reappears after a safeguard landed means the safeguard was too weak, independent of how the model scored on a task.
-
-- Source of truth: `docs/lessons/events.jsonl` (append-only intercept and recurrence events, one per gate-red). `scripts/lessons-ledger-gate.mjs` reduces it into the `Intercepts`/`Recurrences` columns of `docs/lessons/<ticket>-<short-name>.md`; the counters are written, never hand-edited.
-- Recurrence handling: the same kind reappearing after its safeguard opens an escalation ticket that names the next ladder rung; nothing is auto-deleted.
-- Weekly facts: `node scripts/lessons-ledger-gate.mjs summary` prints new categories, intercepts, recurrences, safeguards awaiting evaluation (#1407 gardener sweep) and escalations awaiting an issue. `scripts/gardener-weekly.mjs` embeds that block in its weekly report.
-- Where the facts go: the same numbers are the repository-side input to the evaluation loop's weekly summary. Because #1515's summary now renders as Langfuse score dashboards (§3), the ledger does not write into Langfuse itself; a dashboard reads `docs/lessons/events.jsonl` from main. Wiring a ledger score into Langfuse is not part of #1534 and stays open — track it under the Observability row.
-- Contract for consumers: `kind` (`intercept` | `recurrence`), `repo`, `pr`, `at`, `category` (ledger key), `episode`; `gate` on intercepts, `issue` on recurrences once the escalation ticket is filed. Ids are `kind:repo+pr:episode:category[:gate]`, so a consumer must deduplicate by `id`, not by line.
+`docs/lessons/` holds free-form documents, one per kind of mistake. Read them for causes and safeguards alongside trajectory results. They have no automated counters, event stream, or weekly collector.

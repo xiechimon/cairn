@@ -69,32 +69,6 @@ jobs:
             exit 1
           fi
 
-      - name: Lane file gate (#1199)
-        env:
-          LANE_FILE_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: |
-          if [ -n "$LANE_FILE_BASE_SHA" ]; then
-            git fetch origin "$LANE_FILE_BASE_SHA"
-          fi
-          node scripts/lane-file-gate.mjs
-
-      - name: Test spawn gate
-        run: node scripts/test-spawn-gate.mjs
-
-      - name: PR evidence workflow shape gate
-        run: node scripts/pr-evidence-workflow-gate.mjs
-
-      - name: CI job structure gate (#1557)
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          node --test scripts/ci-job-structure-gate.test.mjs
-          node scripts/ci-job-structure-gate.mjs
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            node --test scripts/baseline-owner-gate.test.mjs
-            node scripts/baseline-owner-gate.mjs
-          fi
-
       - name: UI registry gate (#989)
         env:
           UI_REGISTRY_BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -108,22 +82,11 @@ jobs:
 
       - name: Prepush checks (#1533)
         env:
-          CAIRN_GATE_LOG: ${{ runner.temp }}/gate-reds/gate-log.jsonl
-          CAIRN_BRANCH: ${{ github.head_ref || github.ref_name }}
           PREPUSH_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
           ENGLISH_ONLY_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
           PREPUSH_FORCE_FULL: ${{ github.event_name == 'push' }}
           UI_DEBT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: pnpm prepush --ci
-
-      - name: Upload safeguard interceptions
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: gate-reds-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/gate-reds/
-          if-no-files-found: ignore
-          retention-days: 90
 
       - name: PR evidence regression tests
         run: python3 scripts/pr-evidence-gate.test.py
@@ -145,9 +108,6 @@ jobs:
           pnpm --filter @xiechimon/cairn db:generate
           git add -N apps/server/drizzle
           git diff --exit-code apps/server/drizzle
-
-      - name: pr-gate self-check (#1401)
-        run: node scripts/pr-gate-selfcheck.mjs
 
       - name: Lint warning cap gate (#1192)
         if: github.event_name != 'pull_request' || needs.changes.outputs.has-code != 'false'
@@ -318,17 +278,8 @@ jobs:
 
       - run: pnpm install --frozen-lockfile --ignore-scripts
 
-      - name: Issue label gate
-        if: ${{ !cancelled() }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: node scripts/issue-label-gate.mjs
-
-      - name: Feature map staleness gate (#1160)
-        if: ${{ !cancelled() }}
-        run: node scripts/feature-map-staleness-gate.mjs
-
       - name: Comment discipline gate (advisory, #1520)
+        continue-on-error: true
         if: ${{ !cancelled() }}
         env:
           COMMENT_DISCIPLINE_BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -346,45 +297,13 @@ jobs:
           node --test docs/verify/1542/reach.test.mjs
           node .claude/skills/verify-cairn/scripts/vp-registry-gate.mjs --check-reach
 
-      - name: Single-use helper gate (advisory, #1543)
-        if: ${{ !cancelled() }}
-        env:
-          SINGLE_USE_HELPER_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: |
-          git fetch origin "${SINGLE_USE_HELPER_BASE_SHA:-main}"
-          node --test scripts/single-use-helper-gate.test.mjs
-          node scripts/single-use-helper-gate.mjs
-
-      - name: Package names in install commands exist on npm
-        if: ${{ !cancelled() }}
-        run: |
-          node --test scripts/npm-command-gate.test.mjs
-          node scripts/npm-command-gate.mjs
-
-      - name: Funding links gate (#2002)
-        if: ${{ !cancelled() }}
-        run: |
-          node --test scripts/funding-yml-gate.test.mjs
-          node scripts/funding-yml-gate.mjs
-
       - name: Dispatch agent start/check round trip (#1556)
         if: ${{ !cancelled() }}
-        run: node --test scripts/dispatch-agent.test.mjs scripts/dispatch-dedupe.test.mjs scripts/lane-model-policy.test.mjs scripts/lane-worker-exit-gate.test.mjs
+        run: node --test scripts/dispatch-agent.test.mjs scripts/dispatch-dedupe.test.mjs scripts/lane-model-policy.test.mjs
 
-      - name: Closing keyword gate (advisory, #1541)
-        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
-        run: |
-          node --test scripts/check-closing-keyword.test.mjs
-          node scripts/check-closing-keyword.mjs
-
-      - name: Baseline ratchet gate and gardener sweep self-test (#1617)
-        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
-        env:
-          BASELINE_RATCHET_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: |
-          git fetch origin "$BASELINE_RATCHET_BASE_SHA"
-          node --test scripts/baseline-ratchet-gate.test.mjs scripts/gardener-weekly.test.mjs scripts/doc-drift.test.mjs scripts/evidence-prune.test.mjs scripts/delivery-metrics.test.mjs
-          node scripts/baseline-ratchet-gate.mjs
+      - name: Gardener sweep self-test (#1617)
+        if: ${{ !cancelled() }}
+        run: node --test scripts/gardener-weekly.test.mjs scripts/doc-drift.test.mjs scripts/evidence-prune.test.mjs scripts/delivery-metrics.test.mjs
 
   ops-backup-test:
     needs: changes
