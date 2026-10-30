@@ -45,7 +45,7 @@ test.each([
         installed: true,
         hostname: 'test',
         models,
-        auth: { state: 'logged-in', method: 'oauth' },
+        auth: { state: 'logged-in', method: 'claude.ai', provider: 'firstParty' },
       },
     });
     const unknownQuota = (await (await req(s.app, 'GET', path)).json()) as {
@@ -231,7 +231,11 @@ test.each([
               installed: true,
               hostname: 'test',
               models: [{ id: 'claude-sonnet-5-5', name: 'Sonnet' }],
-              auth: { state: 'logged-in', method: mode === 'takeover' ? 'oauth' : 'api_key' },
+              auth: {
+                state: 'logged-in',
+                method: mode === 'takeover' ? 'claude.ai' : 'api_key',
+                provider: 'firstParty',
+              },
             },
           }
         : {},
@@ -378,11 +382,17 @@ test.each([
     expect(s.db.select().from(step).where(eq(step.id, 'pending')).get()).toMatchObject({
       status: 'waiting_quota',
       machineId: null,
-      quotaBlock: { reason: 'subscription-only' },
+      quotaBlock:
+        mode === 'takeover'
+          ? { source: 'claude_rate_limit', reason: 'Claude subscription five_hour rejected' }
+          : { source: 'subscription_policy', reason: 'subscription-only' },
     });
     expect(s.db.select().from(step).where(eq(step.id, 'coordinator-step')).get()).toMatchObject({
       status: 'waiting_quota',
-      quotaBlock: { reason: 'subscription-only' },
+      quotaBlock:
+        mode === 'takeover'
+          ? { source: 'claude_rate_limit', reason: 'Claude subscription five_hour rejected' }
+          : { source: 'subscription_policy', reason: 'subscription-only' },
     });
     expect(s.db.select().from(step).where(eq(step.id, 'running')).get()).toMatchObject({
       status: 'claimed',
@@ -391,7 +401,7 @@ test.each([
     });
     sweepQuotaWaitSteps(s.svc, Date.now() + 30 * 24 * 60 * 60 * 1000);
     expect(s.db.select().from(step).where(eq(step.id, 'pending')).get()?.status).toBe(
-      'waiting_quota',
+      mode === 'takeover' ? 'pending' : 'waiting_quota',
     );
     await req(s.app, 'PATCH', `/api/teams/${s.team.id}`, { claudeUsage: 'allow-paid' });
     expect(await claimStep(deps, claimant, s.team.id, 0, 'http://localhost')).toMatchObject({

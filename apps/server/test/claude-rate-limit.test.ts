@@ -60,7 +60,16 @@ async function enroll(s: ReturnType<typeof bootServer>, key: string, name: strin
   if (!row) throw new Error(`enroll did not create ${name}`);
   s.db
     .update(machineTable)
-    .set({ online: true, enabledRuntimes: ['pi', 'claude-code'] })
+    .set({
+      online: true,
+      enabledRuntimes: ['pi', 'claude-code'],
+      claudeCodeReport: {
+        installed: true,
+        hostname: name,
+        models: [],
+        auth: { state: 'logged-in', method: 'claude.ai', provider: 'firstParty' },
+      },
+    })
     .where(eq(machineTable.id, row.id))
     .run();
   return { token, machineId: row.id };
@@ -343,8 +352,8 @@ describe('claude rate limit (#1852)', () => {
       const oauth = await enroll(s, await issueKey(s, 'oauth-key'), 'oauth-spare');
       const paid = await enroll(s, await issueKey(s, 'paid-key'), 'paid-spare');
       for (const [machineId, method] of [
-        [owner.machineId, 'oauth'],
-        [oauth.machineId, 'oauth'],
+        [owner.machineId, 'claude.ai'],
+        [oauth.machineId, 'oauth_token'],
         [paid.machineId, 'api_key'],
       ] as const) {
         s.db
@@ -354,7 +363,7 @@ describe('claude rate limit (#1852)', () => {
               installed: true,
               hostname: machineId,
               models: [{ id: 'claude-sonnet', name: 'Sonnet' }],
-              auth: { state: 'logged-in', method },
+              auth: { state: 'logged-in', method, provider: 'firstParty' },
             },
           })
           .where(eq(machineTable.id, machineId))
@@ -390,7 +399,7 @@ describe('claude rate limit (#1852)', () => {
     }
   });
 
-  test.each(['oauth', 'api_key'] as const)(
+  test.each(['oauth_token', 'api_key'] as const)(
     'allow-paid lets a %s spare take over in a mixed pool',
     async (method) => {
       const s = bootServer({ claimHoldMs: 50 });
@@ -404,8 +413,8 @@ describe('claude rate limit (#1852)', () => {
         const oauth = await enroll(s, await issueKey(s, 'oauth-key'), 'oauth-spare');
         const paid = await enroll(s, await issueKey(s, 'paid-key'), 'paid-spare');
         for (const [machineId, authMethod] of [
-          [owner.machineId, 'oauth'],
-          [oauth.machineId, 'oauth'],
+          [owner.machineId, 'claude.ai'],
+          [oauth.machineId, 'oauth_token'],
           [paid.machineId, 'api_key'],
         ] as const) {
           s.db
@@ -415,7 +424,7 @@ describe('claude rate limit (#1852)', () => {
                 installed: true,
                 hostname: machineId,
                 models: [{ id: 'claude-sonnet', name: 'Sonnet' }],
-                auth: { state: 'logged-in', method: authMethod },
+                auth: { state: 'logged-in', method: authMethod, provider: 'firstParty' },
               },
             })
             .where(eq(machineTable.id, machineId))
@@ -433,7 +442,7 @@ describe('claude rate limit (#1852)', () => {
             })
           ).status,
         ).toBe(200);
-        const claimant = method === 'oauth' ? oauth : paid;
+        const claimant = method === 'oauth_token' ? oauth : paid;
         expect(await claim(s, claimant.token)).toMatchObject({
           step: { buildId, machineId: claimant.machineId },
         });

@@ -50,9 +50,12 @@ export function claudeUsageGatePasses(
   const settings = deps.db.select().from(team).where(eq(team.id, machineRow.teamId)).get();
   if (settings?.claudeUsage === 'allow-paid') return true;
   if (stepRuntimeFor(model.provider) !== 'claude-code') return false;
+  const auth = machineRow.claudeCodeReport?.auth;
   return (
     hasActiveClaudeSubscription(deps, machineRow.teamId) ||
-    !/api[-_ ]?key/i.test(machineRow.claudeCodeReport?.auth?.method ?? '')
+    (auth?.state === 'logged-in' &&
+      auth.provider === 'firstParty' &&
+      (auth.method === 'claude.ai' || auth.method === 'oauth_token'))
   );
 }
 
@@ -152,7 +155,16 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
       stepRuntimeFor(model.provider) !== 'claude-code' ||
       (owner !== undefined && !claudeUsageGatePasses(deps, owner, model)) ||
       claimants.some((row) => !claudeUsageGatePasses(deps, row, model));
-    if (!localMerge && subscriptionOnly && claude && paid && !subscriptionClaimant) {
+    const rateLimitedSubscriptionOwner =
+      ownerBlock !== null && owner !== undefined && claudeUsageGatePasses(deps, owner, model);
+    if (
+      !localMerge &&
+      subscriptionOnly &&
+      claude &&
+      paid &&
+      !subscriptionClaimant &&
+      !rateLimitedSubscriptionOwner
+    ) {
       if (stepRow.status !== 'pending' && stepRow.status !== 'waiting_quota') return;
       if (
         stepRow.quotaBlock?.source === 'subscription_policy' &&
