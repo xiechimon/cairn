@@ -7,11 +7,13 @@ import type {
   ClaimedStep,
   MachineDoneBody,
   MachineStreamEvent,
+  SessionOpts,
   StepEvent,
   ToolCallRecord,
   TranscriptUpload,
   WorktreeOps,
 } from '@cairn/shared';
+import { WORKER_REMOTE_TOOLS } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { createClaudeCodeBackend } from '../src/backend/claude-code.js';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
@@ -72,6 +74,7 @@ class FakeClient implements MachineApi {
   calls: string[] = [];
   doneBodies: { stepId: string; body: MachineDoneBody }[] = [];
   uploads: { url: string; body: TranscriptUpload | string }[] = [];
+  relayCalls: { stepId: string; name: string; params: Record<string, unknown> }[] = [];
   async enroll(): Promise<never> {
     throw new Error('unused');
   }
@@ -88,7 +91,8 @@ class FakeClient implements MachineApi {
   async heartbeat() {}
   async tool(_stepId: string, _call: ToolCallRecord) {}
   async transcriptDelta() {}
-  async relayTool() {
+  async relayTool(stepId: string, name: string, params: Record<string, unknown>) {
+    this.relayCalls.push({ stepId, name, params });
     return '{}';
   }
   async token() {
@@ -147,7 +151,7 @@ class FakeClient implements MachineApi {
 function stubBackend(opts: {
   events?: StepEvent[];
   briefBackendId?: 'pi' | null;
-  onSessionStart?: (cwd: string) => void;
+  onSessionStart?: (cwd: string, session: SessionOpts) => void | Promise<void>;
   throwOnOpen?: boolean;
 }): { backend: AgentBackend; seen: { cwd: string; systemPrompt: string | undefined }[] } {
   const seen: { cwd: string; systemPrompt: string | undefined }[] = [];
@@ -165,12 +169,12 @@ function stubBackend(opts: {
     async createSession(o) {
       if (opts.throwOnOpen === true) throw new Error('session open blew up');
       seen.push({ cwd: o.cwd, systemPrompt: o.systemPrompt });
-      opts.onSessionStart?.(o.cwd);
+      await opts.onSessionStart?.(o.cwd, o);
       return handle(events);
     },
     async continueSession(_id, o) {
       seen.push({ cwd: o.cwd, systemPrompt: o.systemPrompt });
-      opts.onSessionStart?.(o.cwd);
+      await opts.onSessionStart?.(o.cwd, o);
       return handle(events);
     },
   };
@@ -474,4 +478,50 @@ describe('brief wiring: failure gate', () => {
     expect(client.doneBodies[0]?.body.status).toBe('failed');
     expect(existsSync(join(cwd, 'AGENTS.md'))).toBe(true);
   });
+});
+
+test('generated worker brief requests light and dark screenshots through attach_file', async () => {
+  let brief = '';
+  const { backend } = stubBackend({
+    onSessionStart: (cwd) => {
+      brief = readFileSync(join(cwd, 'AGENTS.md'), 'utf8');
+    },
+  });
+  await run({ claimed: claimedStep({ repoBound: false }), backend });
+  expect(brief).toContain('UI tasks');
+  expect(brief).toContain('light and dark screenshots');
+  expect(brief).toContain('attach_file');
+});
+
+test('runner prepares attach_file locally and relays only workspace bytes', async () => {
+  const claimed = claimedStep({ repoBound: false });
+  claimed.remoteTools = [...WORKER_REMOTE_TOOLS];
+  const { backend } = stubBackend({
+    onSessionStart: async (cwd, session) => {
+      writeFileSync(join(cwd, 'report.txt'), 'runner attachment');
+      expect(() =>
+        session.executeRemoteTool?.('attach_file', { path: '../outside.txt' }),
+      ).toThrow();
+      await session.executeRemoteTool?.('attach_file', {
+        path: 'report.txt',
+        caption: 'Report',
+        contentBase64: 'forged',
+        teamId: 'foreign',
+        mimeType: 'image/png',
+      });
+    },
+  });
+  const { client } = await run({ claimed, backend });
+  expect(client.doneBodies[0]?.body.status).toBe('success');
+  expect(client.relayCalls).toEqual([
+    {
+      stepId: 's1',
+      name: 'attach_file',
+      params: {
+        fileName: 'report.txt',
+        caption: 'Report',
+        contentBase64: Buffer.from('runner attachment').toString('base64'),
+      },
+    },
+  ]);
 });
