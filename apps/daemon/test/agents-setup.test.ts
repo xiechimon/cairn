@@ -10,8 +10,9 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
+import { runWorkspaceHook } from '../src/workspace-hooks.js';
 
 const repo = fileURLToPath(new URL('../../../', import.meta.url));
 const husky = join(repo, 'node_modules/husky/bin.js');
@@ -75,6 +76,11 @@ appendFileSync(process.env.CAIRN_TEST_LOG, JSON.stringify({
   command, args, cwd: process.cwd(), browsers: process.env.PLAYWRIGHT_BROWSERS_PATH,
 }) + '\n');
 if (command === 'git') {
+  if (process.env.CAIRN_TEST_FETCH_GRANDCHILD) {
+    spawnSync('sh', ['-c', 'sleep 30 &'], { stdio: 'inherit' });
+    if (process.env.CAIRN_TEST_FETCH_GRANDCHILD === 'hang') Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0);
+    process.exit(0);
+  }
   if (process.env.CAIRN_TEST_FETCH_HANG === '1') Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0);
   process.exit(Number(process.env.CAIRN_TEST_FETCH_EXIT || 0));
 }
@@ -93,13 +99,14 @@ process.exit(1);
       { mode: 0o755 },
     );
   }
-  const runEnv = {
+  const runEnv: NodeJS.ProcessEnv = {
     ...env,
     PATH: stubs.includes('corepack') ? `${bin}:${process.env.PATH}` : `${bin}:/usr/bin:/bin`,
   };
   return {
     clone,
     home,
+    runEnv,
     run(name: string) {
       return spawnSync(join(clone, '.agents', name), [], {
         cwd: home,
@@ -219,3 +226,25 @@ test('resume stops a stalled fetch within the shared ten-second budget and exits
   expect(performance.now() - start).toBeLessThan(10_000);
   expect(f.commands().map(({ command }) => command)).toEqual(['git']);
 }, 15_000);
+
+test.each(['exit', 'hang'])(
+  'resume through the real hook runner finishes in budget when fetch leaves a grandchild holding the output pipe (%s)',
+  async (mode) => {
+    const f = fixture({ CAIRN_TEST_FETCH_GRANDCHILD: mode });
+    for (const [key, value] of Object.entries(f.runEnv)) vi.stubEnv(key, value);
+    try {
+      const note = await runWorkspaceHook({
+        cwd: f.clone,
+        name: 'resume',
+        credentials: null,
+        timeoutMs: 30_000,
+        log: () => {},
+      });
+      expect(note?.status).toBe('ok');
+      expect(note?.ms).toBeLessThan(10_000);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  },
+  35_000,
+);
