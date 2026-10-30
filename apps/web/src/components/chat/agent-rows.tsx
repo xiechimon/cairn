@@ -1,10 +1,19 @@
 import { useState } from 'react';
 import { useI18n } from '../../i18n/provider.js';
-import { ChevronDown, ChevronRight } from '../../icons/index.js';
-import { Button } from '../ui/button.js';
+import {
+  Trace,
+  TraceCollapsible,
+  TraceCollapsibleContent,
+  TraceCollapsibleTrigger,
+  TraceDescription,
+  TraceLine,
+  TraceTitle,
+} from '../ui/trace.js';
 import { useLiveSeconds } from './live-row.js';
 
 const PREVIEW_CHARS = 150;
+
+const AGENT_LINE_CLS = 'text-[12px] leading-4 text-(--text-dim)';
 
 export function ThinkingRow({ text }: { text: string }) {
   const { t } = useI18n();
@@ -17,23 +26,23 @@ export function ThinkingRow({ text }: { text: string }) {
   const preview =
     firstLine.length > PREVIEW_CHARS ? `${firstLine.slice(0, PREVIEW_CHARS)}…` : firstLine;
   return (
-    <div className="flex flex-col gap-1">
-      <Button
-        variant="ghost"
-        className="h-auto w-fit min-w-0 max-w-full shrink justify-start gap-1.5 rounded-none px-0 font-medium text-[12px] leading-4 text-[var(--text-dim)] active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto"
-        aria-label={t(open ? '收起思考' : '展开思考')}
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-      >
-        {open ? <ChevronDown width={10} height={10} /> : <ChevronRight width={10} height={10} />}
-        <span className="min-w-0 flex-auto truncate italic">{open ? t('思考') : preview}</span>
-      </Button>
-      {open && (
-        <pre className="m-0 whitespace-pre-wrap break-words font-[inherit] text-[12px] leading-4 text-[var(--text-secondary)]">
-          {text}
-        </pre>
-      )}
-    </div>
+    <Trace>
+      <TraceCollapsible open={open} onOpenChange={setOpen}>
+        <TraceCollapsibleTrigger
+          className={`${AGENT_LINE_CLS} font-medium`}
+          aria-label={t(open ? '收起思考' : '展开思考')}
+        >
+          <TraceLine className={AGENT_LINE_CLS}>
+            <TraceTitle className="italic">{open ? t('思考') : preview}</TraceTitle>
+          </TraceLine>
+        </TraceCollapsibleTrigger>
+        <TraceCollapsibleContent>
+          <pre className="m-0 whitespace-pre-wrap break-words font-[inherit] text-[12px] leading-4 text-(--text-secondary)">
+            {text}
+          </pre>
+        </TraceCollapsibleContent>
+      </TraceCollapsible>
+    </Trace>
   );
 }
 
@@ -53,13 +62,16 @@ export function ToolActivityRow({
   const { t } = useI18n();
   const tick = useLiveSeconds(running === true ? (startedAt ?? null) : null);
   const shown = tick ?? seconds ?? null;
+  const status = error === true ? 'error' : running === true ? 'running' : undefined;
   return (
-    <span className="flex items-center gap-2 text-[12px] leading-4 text-[var(--text-dim)]">
-      <span className="font-[var(--font-mono)]">
-        {running === true ? t('正在调用 {n}', { n: name }) : name}
-      </span>
-      {shown != null && <span className="tabular-nums">{shown}s</span>}
-      {error === true && <span className="text-[var(--destructive)]">{t('失败')}</span>}
-    </span>
+    <Trace>
+      <TraceLine status={status} className={AGENT_LINE_CLS}>
+        <TraceTitle className="font-mono">
+          {running === true ? t('正在调用 {n}', { n: name }) : name}
+        </TraceTitle>
+        {shown != null && <TraceDescription>{shown}s</TraceDescription>}
+        {error === true && <span>{t('失败')}</span>}
+      </TraceLine>
+    </Trace>
   );
 }

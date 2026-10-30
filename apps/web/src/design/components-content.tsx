@@ -27,7 +27,17 @@ import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { Select, SelectContent, SelectItem, SelectValue } from '../components/ui/select.js';
 import { Skeleton } from '../components/ui/skeleton.js';
 import { Switch } from '../components/ui/switch.js';
-import { FileText, Key, Lock, Paperclip, X } from '../icons/index.js';
+import {
+  Trace,
+  TraceCollapsible,
+  TraceCollapsibleContent,
+  TraceCollapsibleTrigger,
+  TraceDescription,
+  TraceIcon,
+  TraceLine,
+  TraceTitle,
+} from '../components/ui/trace.js';
+import { FileText, Key, Lock, Paperclip, Search, Sparkle, Terminal, X } from '../icons/index.js';
 import { Cell, Section, Specimen } from './specimen.js';
 
 const LANGS = [
@@ -296,6 +306,98 @@ export function ConversationSection() {
         {files.length === 0 && (
           <span className="text-meta text-content-tertiary">All removed.</span>
         )}
+      </Specimen>
+    </Section>
+  );
+}
+
+export function TraceSection() {
+  return (
+    <Section
+      id="trace"
+      title="Trace"
+      lede="One line per agent action: tool calls, thinking and waiting. Status carries running, error and pending; a collapsible line holds the detail. Do not hand-write tool rows."
+    >
+      <Specimen
+        title="Lines"
+        note="done, running, error and pending"
+        code={`<Trace>\n  <TraceLine><TraceTitle>read_file</TraceTitle><TraceDescription>2s</TraceDescription></TraceLine>\n  <TraceLine status="running"><TraceTitle>Calling Bash</TraceTitle></TraceLine>\n  <TraceLine status="error">…</TraceLine>\n  <TraceLine status="pending">…</TraceLine>\n</Trace>`}
+      >
+        <Trace className="max-w-120">
+          <TraceLine>
+            <TraceIcon>
+              <Search />
+            </TraceIcon>
+            <TraceTitle>Searched the board for open tasks</TraceTitle>
+            <TraceDescription>2s</TraceDescription>
+          </TraceLine>
+          <TraceLine status="running">
+            <TraceIcon>
+              <Terminal />
+            </TraceIcon>
+            <TraceTitle className="font-mono">
+              Calling Bash pnpm install --frozen-lockfile
+            </TraceTitle>
+          </TraceLine>
+          <TraceLine status="error">
+            <TraceIcon>
+              <Terminal />
+            </TraceIcon>
+            <TraceTitle className="font-mono">machines</TraceTitle>
+            <TraceDescription>4s</TraceDescription>
+            <span>Failed</span>
+          </TraceLine>
+          <TraceLine status="pending">
+            <TraceTitle>Waiting for the agent…</TraceTitle>
+          </TraceLine>
+        </Trace>
+      </Specimen>
+      <Specimen
+        title="Collapsible detail"
+        note="thinking and tool output fold under their line"
+        code={`<TraceCollapsible>\n  <TraceCollapsibleTrigger>\n    <TraceLine><TraceTitle>Thinking</TraceTitle></TraceLine>\n  </TraceCollapsibleTrigger>\n  <TraceCollapsibleContent>…</TraceCollapsibleContent>\n</TraceCollapsible>`}
+      >
+        <Trace className="max-w-120">
+          <TraceCollapsible defaultOpen>
+            <TraceCollapsibleTrigger>
+              <TraceLine>
+                <TraceIcon>
+                  <Sparkle />
+                </TraceIcon>
+                <TraceTitle className="italic">Thinking</TraceTitle>
+              </TraceLine>
+            </TraceCollapsibleTrigger>
+            <TraceCollapsibleContent>
+              The lockfile and package.json disagree after the last version bump, so the frozen
+              install fails before any test runs.
+            </TraceCollapsibleContent>
+          </TraceCollapsible>
+          <TraceCollapsible>
+            <TraceCollapsibleTrigger>
+              <TraceLine>
+                <TraceIcon>
+                  <FileText />
+                </TraceIcon>
+                <TraceTitle>Read package.json</TraceTitle>
+                <TraceDescription>1s</TraceDescription>
+              </TraceLine>
+            </TraceCollapsibleTrigger>
+            <TraceCollapsibleContent className="font-mono text-caption">
+              "packageManager": "pnpm@10.4.1"
+            </TraceCollapsibleContent>
+          </TraceCollapsible>
+        </Trace>
+      </Specimen>
+      <Specimen title="Chief turn tools" note="the compact panel under a chief reply">
+        <Trace className="max-w-120 gap-1 rounded-(--radius-popover) bg-(--secondary) px-2 py-1.5">
+          <TraceLine status="running" className="font-mono text-caption text-(--text-tertiary)">
+            <TraceTitle>Calling create_todo</TraceTitle>
+          </TraceLine>
+          <TraceLine className="font-mono text-caption text-(--text-tertiary)">
+            <TraceTitle>list_machines</TraceTitle>
+            <TraceDescription>1s</TraceDescription>
+          </TraceLine>
+        </Trace>
       </Specimen>
     </Section>
   );

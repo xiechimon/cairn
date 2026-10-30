@@ -10,9 +10,15 @@ import { Marker, MarkerContent } from '../components/ui/marker.js';
 import { Message, MessageContent } from '../components/ui/message.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
+import { Trace, TraceDescription, TraceLine, TraceTitle } from '../components/ui/trace.js';
 import { ChatMarkdown } from '../detail/chat-markdown.js';
 import { TodoGlanceContext, TodoStatus } from '../detail/segments.js';
-import type { ChiefContent, ChiefSegment, ChiefStreamItem } from '../fixtures/records.js';
+import type {
+  ChiefContent,
+  ChiefSegment,
+  ChiefStreamItem,
+  ChiefToolRow,
+} from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { Check, ChevronDown, ChevronRight, Copy, FileText, Restore } from '../icons/index.js';
 import { spiralAvatarUrl } from '../lib/spiral-avatar.js';
@@ -27,10 +33,8 @@ import { AVATAR_IMG_CLS, AVATAR_SLOT_CLS } from './recipes.js';
 const MSG_TOOL_BTN_CLS =
   "size-6 cursor-pointer rounded-none border-none bg-transparent text-(--text-tertiary) hover:bg-(--secondary) hover:text-(--text-secondary) dark:hover:bg-(--secondary) aria-expanded:bg-muted aria-expanded:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
 
-const TURN_TOOLS_CLS =
-  'mt-1.5 flex flex-col gap-1 rounded-(--radius-popover) bg-(--secondary) px-2 py-1.5';
-const TURN_TOOL_ROW_CLS = 'flex items-center gap-2 font-mono text-caption text-(--text-tertiary)';
-const TURN_TOOL_NAME_CLS = 'min-w-0 flex-auto truncate';
+const TURN_TOOLS_CLS = 'mt-1.5 gap-1 rounded-(--radius-popover) bg-(--secondary) px-2 py-1.5';
+const TURN_TOOL_LINE_CLS = 'font-mono text-caption text-(--text-tertiary)';
 
 const MSG_COL_CLS =
   'min-w-0 flex-1 text-card-title leading-6 text-(--foreground) [&_.chat-para+.chat-para]:mt-0.5!';
@@ -110,6 +114,21 @@ function Segments({ segments }: { segments: ChiefSegment[] }) {
       })}
     </>
   );
+}
+
+function TurnToolLines({ tools }: { tools: ChiefToolRow[] | undefined }) {
+  const { t } = useI18n();
+  return tools?.map((tool, k) => (
+    <TraceLine
+      key={k}
+      status={tool.error === true ? 'error' : undefined}
+      className={TURN_TOOL_LINE_CLS}
+    >
+      <TraceTitle>{tool.label}</TraceTitle>
+      {tool.seconds !== undefined && <TraceDescription>{tool.seconds}s</TraceDescription>}
+      {tool.error === true && <span>{t('失败')}</span>}
+    </TraceLine>
+  ));
 }
 
 function HandoffRow({ todoId }: { todoId: string }) {
@@ -420,38 +439,26 @@ export function ChiefStreamRow({
               labelVars={item.labelVars}
               disclosure={{ expand: '展开实时步骤', collapse: '收起实时步骤' }}
             >
-              <div className={TURN_TOOLS_CLS} data-testid="chief-turn-tools">
+              <Trace className={TURN_TOOLS_CLS} data-testid="chief-turn-tools">
                 {runningTool != null && (
-                  <div className={TURN_TOOL_ROW_CLS}>
-                    <span className={TURN_TOOL_NAME_CLS}>
-                      {t('正在调用 {n}', { n: runningTool })}
-                    </span>
-                  </div>
+                  <TraceLine status="running" className={TURN_TOOL_LINE_CLS}>
+                    <TraceTitle>{t('正在调用 {n}', { n: runningTool })}</TraceTitle>
+                  </TraceLine>
                 )}
-                {item.tools?.map((tool, k) => (
-                  <div key={k} className={TURN_TOOL_ROW_CLS}>
-                    <span className={TURN_TOOL_NAME_CLS}>{tool.label}</span>
-                    {tool.seconds !== undefined && (
-                      <span className="flex-none">{tool.seconds}s</span>
-                    )}
-                    {tool.error === true && (
-                      <span className="flex-none text-(--destructive)">{t('失败')}</span>
-                    )}
-                  </div>
-                ))}
+                <TurnToolLines tools={item.tools} />
                 {runningTool == null &&
                   (item.tools?.length ?? 0) === 0 &&
                   item.signalAt == null && (
-                    <div className={TURN_TOOL_ROW_CLS}>
-                      <span className={TURN_TOOL_NAME_CLS}>{t('等待 Agent 响应…')}</span>
-                    </div>
+                    <TraceLine status="pending" className={TURN_TOOL_LINE_CLS}>
+                      <TraceTitle>{t('等待 Agent 响应…')}</TraceTitle>
+                    </TraceLine>
                   )}
                 {item.signalAt != null && (
-                  <div className={TURN_TOOL_ROW_CLS}>
-                    <LiveSignal at={item.signalAt} className={TURN_TOOL_NAME_CLS} />
-                  </div>
+                  <TraceLine className={TURN_TOOL_LINE_CLS}>
+                    <LiveSignal at={item.signalAt} className="min-w-0 truncate" />
+                  </TraceLine>
                 )}
-              </div>
+              </Trace>
             </LiveRow>
           </MessageContent>
         </Message>
@@ -540,17 +547,9 @@ export function ChiefStreamRow({
             </div>
           )}
           {(item.tools?.length ?? 0) > 0 && toolsOpen.has(i) && (
-            <div className={TURN_TOOLS_CLS} data-testid="chief-turn-tools">
-              {item.tools?.map((tool, k) => (
-                <div key={k} className={TURN_TOOL_ROW_CLS}>
-                  <span className={TURN_TOOL_NAME_CLS}>{tool.label}</span>
-                  {tool.seconds !== undefined && <span className="flex-none">{tool.seconds}s</span>}
-                  {tool.error === true && (
-                    <span className="flex-none text-(--destructive)">{t('失败')}</span>
-                  )}
-                </div>
-              ))}
-            </div>
+            <Trace className={TURN_TOOLS_CLS} data-testid="chief-turn-tools">
+              <TurnToolLines tools={item.tools} />
+            </Trace>
           )}
         </MessageContent>
       </Message>

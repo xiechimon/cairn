@@ -109,7 +109,7 @@ for (const theme of ['light', 'dark'] as const) {
     const foot = win.getByTestId('chief-msg-foot').first();
     await expect(foot, 'W5').toHaveCSS('font-size', '12px');
     await win.getByRole('button', { name: '展开过程' }).click();
-    const toolRow = win.getByTestId('chief-turn-tools').locator('> div').first();
+    const toolRow = win.getByTestId('chief-turn-tools').locator('[data-slot="trace-line"]').first();
     await expect(toolRow, 'W5').toHaveCSS('font-size', '11.5px');
   });
 

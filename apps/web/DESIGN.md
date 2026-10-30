@@ -187,6 +187,12 @@ See "Page patterns · Settings list" below.
 - The plan preview fades out at the bottom with a mask instead of a hard cut.
 - The composer is a white card (`--card`) with the warm `--shadow-composer` ladder and a `--border-soft` ring; it is the one white surface in the conversation because it is where you act. The idle send button has no fill; only the stop button gets the `seg-active` square.
 
+### Trace
+- Agent activity (tool calls, thinking, waiting) renders as Trace lines (`components/ui/trace.tsx`), never as hand-written rows. One line per action: optional icon, title, then a tabular-number description such as the duration.
+- Status lives on the line: `running` sweeps the title with the `shimmer` utility (`app.css`, still under reduced motion), `error` turns the line `--destructive` and keeps a visible "failed" word, `pending` dims it to 60%.
+- Detail such as full thinking or tool output folds under its line with `TraceCollapsible`; the chevron sits after the title and the content hangs on a hairline left rule.
+- The chief turn panel is a Trace on `--secondary` with mono `text-caption` lines in `--text-tertiary`; agent rows in the task transcript use 12px `--text-dim` lines.
+
 ## Page patterns
 
 Pages like settings, resources, team, and project share the pieces below. A new page composes these pieces first and does not build its own cards, empty states, or forms inside the page. All pieces live in `src/components/`; all values go through tokens and the six font sizes.
