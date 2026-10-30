@@ -114,12 +114,25 @@ def compare(restored, live, stamp, report):
         raise RuntimeError('; '.join(errors))
 
 
-def attachments(db, backup, live, report):
+def attachments(db, backup, live, report, manifest=None):
+    expected = {}
+    if manifest is not None:
+        try:
+            for line in manifest.read_text().splitlines():
+                digest, separator, key = line.partition('\t')
+                if not separator or not re.fullmatch('[0-9a-f]{64}', digest) or key in expected:
+                    raise RuntimeError('attachment manifest invalid')
+                expected[key] = digest
+        except FileNotFoundError:
+            pass
     count = 0
     for key, size in db.execute("select storageKey,sizeBytes from attachment where status='ready'"):
-        paths = [(base / key).resolve() for base in (backup, live)]
-        if Path(key).is_absolute() or '..' in Path(key).parts or any(not inside(p, base) for p, base in zip(paths, (backup, live))):
+        bases = (backup,) if manifest is not None else (backup, live)
+        paths = [(base / key).resolve() for base in bases]
+        if Path(key).is_absolute() or '..' in Path(key).parts or any(not inside(p, base) for p, base in zip(paths, bases)):
             raise RuntimeError(f'attachment unsafe key: {key}')
+        if manifest is not None and key not in expected:
+            raise RuntimeError(f'attachment {key}: missing manifest entry')
         try:
             if any(p.stat().st_size != size or not p.is_file() for p in paths):
                 raise ValueError()
@@ -127,7 +140,7 @@ def attachments(db, backup, live, report):
             for path in paths:
                 with path.open('rb') as stream:
                     digests.append(hashlib.file_digest(stream, 'sha256').hexdigest())
-            if digests[0] != digests[1]:
+            if digests[0] != (expected[key] if manifest is not None else digests[1]):
                 raise ValueError()
         except (OSError, ValueError):
             raise RuntimeError(f'attachment {key}: missing, size or sha256 mismatch') from None
@@ -354,7 +367,7 @@ def main():
             if args.mode != 'hourly':
                 compare(db, snapshot, stamp, report)
             item = 'attachments'
-            attachments(db, attachment_copy, attachment_copy if args.mode == 'hourly' else attachment_live, report)
+            attachments(db, attachment_copy, attachment_live, report, Path(str(backup) + '.attachments.sha256') if args.mode == 'hourly' else None)
             item = 'node resolution'
             node = resolve_node()
             env = {k: v for k, v in os.environ.items() if k in ['PATH', 'TMPDIR', 'SYSTEMROOT']}

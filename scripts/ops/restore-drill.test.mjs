@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   chmodSync,
   copyFileSync,
   existsSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
+  rmSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
@@ -57,7 +60,13 @@ function fixture() {
   const backupDb = join(dir, 'backup.db');
   sql(db, `.backup '${backupDb}'`);
   const backup = join(dir, 'server-db-20261030T000000Z.db.gz');
-  const pack = () => writeFileSync(backup, gzipSync(readFileSync(backupDb)));
+  const pack = () => {
+    writeFileSync(backup, gzipSync(readFileSync(backupDb)));
+    writeFileSync(
+      `${backup}.attachments.sha256`,
+      `${createHash('sha256').update('abc').digest('hex')}\tfile.txt\n`,
+    );
+  };
   pack();
   const scratch = join(dir, 'scratch');
   const report = join(dir, 'report.json');
@@ -103,6 +112,8 @@ function fixture() {
                       .replace(/\.\d{3}Z$/, 'Z')}.db.gz`,
                   );
                   copyFileSync(backup, recent);
+                  if (existsSync(`${backup}.attachments.sha256`))
+                    copyFileSync(`${backup}.attachments.sha256`, `${recent}.attachments.sha256`);
                   return recent;
                 })(),
               ]
@@ -694,4 +705,47 @@ test('round2 fresh backup failure preserves safe step and withholds secrets', ()
   assert.notEqual(r.status, 0);
   assert.match(r.stderr, /fresh backup.*copy attachments/);
   assert.doesNotMatch(readFileSync(f.report, 'utf8') + r.stderr, /fixture plaintext secret/);
+});
+
+for (const damage of ['same-size corruption', 'missing entry', 'missing manifest'])
+  test(`hourly retained attachment rejects ${damage} and names the key`, () => {
+    const f = fixture();
+    if (damage === 'same-size corruption') {
+      const content = readFileSync(join(f.attachments, 'file.txt'));
+      content[0] ^= 1;
+      writeFileSync(join(f.attachments, 'file.txt'), content);
+    } else if (damage === 'missing entry') {
+      writeFileSync(`${f.backup}.attachments.sha256`, '');
+    } else {
+      rmSync(`${f.backup}.attachments.sha256`);
+    }
+    fails(f, /attachment file.txt:.*(?:manifest|sha256)/, ['--mode', 'hourly']);
+  });
+
+test('backup writes a sha256 manifest beside its archive for hourly recovery', () => {
+  const f = fixture();
+  const out = join(f.dir, 'generated');
+  const result = spawnSync(
+    'bash',
+    [
+      join(root, 'scripts/ops/backup-server-db.sh'),
+      '--db',
+      f.db,
+      '--out',
+      out,
+      '--attachments',
+      f.liveAttachments,
+      '--attachments-out',
+      f.attachments,
+    ],
+    { encoding: 'utf8' },
+  );
+  assert.equal(result.status, 0, result.stderr);
+  const [archive] = readdirSync(out).filter((name) => name.endsWith('.db.gz'));
+  assert.equal(
+    readFileSync(join(out, `${archive}.attachments.sha256`), 'utf8'),
+    `${createHash('sha256').update('abc').digest('hex')}\tfile.txt\n`,
+  );
+  const r = f.run(['--mode', 'hourly', '--backup', join(out, archive)]);
+  assert.equal(r.status, 0, r.stderr);
 });
