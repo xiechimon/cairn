@@ -630,6 +630,8 @@ export const chiefMessage = sqliteTable('chief_message', {
 });
 
 export const attachment = sqliteTable('attachment', {
+  todoId: text('todoId'),
+  sha256: text('sha256'),
   id: text('id').primaryKey(),
   teamId: text('teamId')
     .notNull()

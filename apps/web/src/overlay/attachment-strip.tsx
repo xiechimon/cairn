@@ -1,41 +1,13 @@
 import { useMemo, useState } from 'react';
-import { DialogShell } from '../components/ui/dialog-shell.js';
 import { attachmentIdFromKey } from '../detail/chat-markdown.js';
 import { useI18n } from '../i18n/provider.js';
 import { AttachmentCard } from './attachment-card.js';
 import { type PendingAttachment, parseAttachmentTokens } from './attachment-paste.js';
+import { AttachmentPreview } from './attachment-preview.js';
 
 interface PreviewTarget {
   name: string;
   src: string;
-}
-
-export function AttachmentPreview({
-  name,
-  src,
-  onClose,
-}: {
-  name: string;
-  src: string;
-  onClose: () => void;
-}) {
-  const [broken, setBroken] = useState(false);
-  return (
-    <DialogShell title={name} onClose={onClose} size="l">
-      <div className="flex items-center justify-center p-3">
-        {broken ? (
-          <div className="px-4 py-8 text-ui text-content-secondary">{name}</div>
-        ) : (
-          <img
-            src={src}
-            alt={name}
-            className="max-h-[60vh] max-w-full rounded-(--radius-control) object-contain"
-            onError={() => setBroken(true)}
-          />
-        )}
-      </div>
-    </DialogShell>
-  );
 }
 
 export function AttachmentStrip({

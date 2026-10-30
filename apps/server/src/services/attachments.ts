@@ -8,6 +8,7 @@ import {
   writeSync,
 } from 'node:fs';
 import { dirname, join, resolve, sep } from 'node:path';
+import { ATTACHMENT_MAX_BYTES } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { attachment } from '../db/schema.js';
@@ -23,7 +24,7 @@ import { newRecordId, nowMs } from '../lib/ids.js';
 import type { KeySecretBox } from '../lib/secret-box.js';
 import { TEAM_ATTACHMENTS_QUOTA_BYTES, teamAttachmentBytes } from './attachment-gc.js';
 
-const MAX_BYTES = 10 * 1024 * 1024;
+const MAX_BYTES = ATTACHMENT_MAX_BYTES;
 
 const ALLOWED_MIME_PREFIXES = ['text/', 'image/'];
 const ALLOWED_MIME_EXACT = new Set(['application/json', 'application/pdf', 'application/xml']);
@@ -132,7 +133,10 @@ export interface AttachmentDeps {
   teamId: string;
 }
 
-export function grantUpload(deps: AttachmentDeps, input: GrantInput): GrantOutput {
+export function validateAttachmentUpload(
+  deps: Pick<AttachmentDeps, 'db' | 'teamId'>,
+  input: GrantInput,
+): void {
   if (!isValidFileName(input.fileName)) {
     throw new HttpError(400, `invalid fileName: ${JSON.stringify(input.fileName)}`);
   }
@@ -153,6 +157,11 @@ export function grantUpload(deps: AttachmentDeps, input: GrantInput): GrantOutpu
       `team attachment quota exceeded: ${usedBytes} + ${input.size} > ${TEAM_ATTACHMENTS_QUOTA_BYTES}`,
     );
   }
+}
+
+export function grantUpload(deps: AttachmentDeps, input: GrantInput): GrantOutput {
+  validateAttachmentUpload(deps, input);
+  const ext = extOf(input.fileName);
   const id = newRecordId();
   const storageKey = `${deps.teamId}/${id}.${ext}`;
   const now = nowMs();
@@ -273,36 +282,7 @@ export function uploadFile(deps: AttachmentDeps, input: UploadInput): UploadOutp
       `team attachment quota exceeded: ${usedBytes - row.sizeBytes} + ${payload.sizeBytes} > ${TEAM_ATTACHMENTS_QUOTA_BYTES}`,
     );
   }
-  const attachmentsRoot = resolve(deps.attachmentsDir);
-  const fullPath = resolve(deps.attachmentsDir, payload.key);
-  const rootPrefix = attachmentsRoot.endsWith(sep) ? attachmentsRoot : attachmentsRoot + sep;
-  if (fullPath !== attachmentsRoot && !fullPath.startsWith(rootPrefix)) {
-    throw new HttpError(400, 'attachment key escapes attachments directory');
-  }
-  const parentDir = dirname(fullPath);
-  mkdirSync(parentDir, { recursive: true });
-  const realRoot = realpathSync(deps.attachmentsDir);
-  const realParent = realpathSync(parentDir);
-  const realPrefix = realRoot.endsWith(sep) ? realRoot : realRoot + sep;
-  if (realParent !== realRoot && !realParent.startsWith(realPrefix)) {
-    throw new HttpError(400, 'attachment key escapes attachments directory');
-  }
-  const openFlags =
-    constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | constants.O_NOFOLLOW;
-  let fd: number;
-  try {
-    fd = openSync(fullPath, openFlags, 0o600);
-  } catch (err) {
-    if (err && typeof err === 'object' && 'code' in err && err.code === 'ELOOP') {
-      throw new HttpError(400, 'attachment key escapes attachments directory');
-    }
-    throw err;
-  }
-  try {
-    writeSync(fd, Buffer.from(input.fileBytes));
-  } finally {
-    closeSync(fd);
-  }
+  writeAttachmentFile(deps.attachmentsDir, payload.key, input.fileBytes);
   const updated = deps.db
     .update(attachment)
     .set({ status: 'ready' })
@@ -322,6 +302,43 @@ export function uploadFile(deps: AttachmentDeps, input: UploadInput): UploadOutp
     key: payload.key,
     sizeBytes: input.fileBytes.byteLength,
   };
+}
+
+export function writeAttachmentFile(
+  attachmentsDir: string,
+  key: string,
+  fileBytes: Uint8Array,
+): void {
+  const attachmentsRoot = resolve(attachmentsDir);
+  const fullPath = resolve(attachmentsDir, key);
+  const rootPrefix = attachmentsRoot.endsWith(sep) ? attachmentsRoot : attachmentsRoot + sep;
+  if (fullPath !== attachmentsRoot && !fullPath.startsWith(rootPrefix)) {
+    throw new HttpError(400, 'attachment key escapes attachments directory');
+  }
+  const parentDir = dirname(fullPath);
+  mkdirSync(parentDir, { recursive: true });
+  const realRoot = realpathSync(attachmentsDir);
+  const realParent = realpathSync(parentDir);
+  const realPrefix = realRoot.endsWith(sep) ? realRoot : realRoot + sep;
+  if (realParent !== realRoot && !realParent.startsWith(realPrefix)) {
+    throw new HttpError(400, 'attachment key escapes attachments directory');
+  }
+  const openFlags =
+    constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | constants.O_NOFOLLOW;
+  let fd: number;
+  try {
+    fd = openSync(fullPath, openFlags, 0o600);
+  } catch (err) {
+    if (err && typeof err === 'object' && 'code' in err && err.code === 'ELOOP') {
+      throw new HttpError(400, 'attachment key escapes attachments directory');
+    }
+    throw err;
+  }
+  try {
+    writeSync(fd, Buffer.from(fileBytes));
+  } finally {
+    closeSync(fd);
+  }
 }
 
 export interface AttachmentRow {

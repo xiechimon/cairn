@@ -10,6 +10,14 @@ import {
   uploadFile as uploadAttachmentFile,
 } from './services/attachments.js';
 
+const INLINE_ATTACHMENT_MIME_TYPES = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp',
+  'application/pdf',
+]);
+
 export function registerUploadRoutes(app: Hono, ctx: AppContext): void {
   const grantBodySchema = z.object({
     kind: z.literal('attachment'),
@@ -87,6 +95,11 @@ export function registerUploadRoutes(app: Hono, ctx: AppContext): void {
         'content-type': row.mimeType,
         'content-length': String(row.sizeBytes),
         'cache-control': 'private, max-age=300',
+        'x-content-type-options': 'nosniff',
+        'content-security-policy': "sandbox; default-src 'none'",
+        'content-disposition': INLINE_ATTACHMENT_MIME_TYPES.has(row.mimeType)
+          ? 'inline'
+          : 'attachment',
       },
     });
   });

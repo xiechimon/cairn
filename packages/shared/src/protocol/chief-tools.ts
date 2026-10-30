@@ -774,6 +774,21 @@ const WORKER_ATTACHMENT_TOOL: RemoteToolDef = {
   replaySafe: true,
 };
 
+const WORKER_ATTACH_FILE_TOOL: RemoteToolDef = {
+  name: 'attach_file',
+  description:
+    'Attach a file from the step worktree to your reply (10 MiB maximum). ' +
+    'Relative paths resolve inside the worktree; paths and symlinks outside it are rejected. ' +
+    'The file is uploaded and its attachment token is appended to your assistant output automatically.',
+  parameters: obj(
+    {
+      path: str('Path to a file inside the step worktree.'),
+      caption: str('Optional attachment caption.'),
+    },
+    ['path'],
+  ),
+};
+
 const SET_TASK_META_TOOL: RemoteToolDef = {
   name: 'set_task_meta',
   description:
@@ -847,6 +862,7 @@ export const WORKER_SKILL_TOOLS: readonly RemoteToolDef[] = [
 export const WORKER_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   ...WORKER_MEMORY_REMOTE_TOOLS,
   WORKER_ATTACHMENT_TOOL,
+  WORKER_ATTACH_FILE_TOOL,
   SET_TASK_META_TOOL,
   ...WORKER_SKILL_TOOLS,
 ];
@@ -854,6 +870,7 @@ export const WORKER_REMOTE_TOOLS: readonly RemoteToolDef[] = [
 export const WORKER_REMOTE_TOOLS_GITHUB: readonly RemoteToolDef[] = [
   ...WORKER_MEMORY_REMOTE_TOOLS,
   WORKER_ATTACHMENT_TOOL,
+  WORKER_ATTACH_FILE_TOOL,
   SET_TASK_META_TOOL_MULTI_TAG,
   ...WORKER_SKILL_TOOLS,
 ];
