@@ -22,10 +22,10 @@ export { decideEpic, validateManifest } from '../.claude/epics/checker-policy.mj
 
 const query = `query($owner: String!, $name: String!, $number: Int!) { repository(owner: $owner, name: $name) { issue(number: $number) {
   number state stateReason labels(first: 100) { nodes { name } pageInfo { hasNextPage } }
-  timelineItems(last: 1, itemTypes: [CLOSED_EVENT]) { nodes { ... on ClosedEvent { closer {
-    __typename ... on PullRequest { number merged mergeCommit { oid } } ... on Commit { oid }
+  timelineItems(last: 1, itemTypes: [CLOSED_EVENT]) { nodes { ... on ClosedEvent { createdAt closer {
+    __typename ... on PullRequest { number merged mergedAt mergeCommit { oid } } ... on Commit { oid }
   } } } }
-  closedByPullRequestsReferences(first: 100, includeClosedPrs: true) { nodes { number state merged mergeCommit { oid } labels(first: 100) { nodes { name } pageInfo { hasNextPage } } } pageInfo { hasNextPage } }
+  closedByPullRequestsReferences(first: 100, includeClosedPrs: true) { nodes { number state isDraft merged mergeCommit { oid } labels(first: 100) { nodes { name } pageInfo { hasNextPage } } } pageInfo { hasNextPage } }
 } } }`;
 export async function main(argv, deps = {}) {
   const run = deps.run ?? execFileSync;
@@ -91,7 +91,11 @@ export async function main(argv, deps = {}) {
           !Array.isArray(persisted.failureHistory),
         'Invalid persisted state',
       );
-    const originalStart = persisted?.startedAt ?? startedAt ?? timestamp;
+    requireFact(
+      persisted !== undefined || startedAt !== undefined,
+      'Missing state requires --started-at',
+    );
+    const originalStart = persisted?.startedAt ?? startedAt;
     const activeHours =
       (persisted?.activeHours ?? 0) +
       (!persisted || ['incomplete', 'unknown'].includes(persisted.phase)
@@ -168,10 +172,13 @@ export async function main(argv, deps = {}) {
       } catch (error) {
         throw new Error(`Untrusted ref "${values.ref}": ${errorMessage(error)}`);
       }
-    const manifest = validateManifest(
-      JSON.parse(git(['show', `${manifestRef}:.claude/epics/${epic}.json`])),
-      epic,
-    );
+    const manifestSource = git(['show', `${mainSha}:.claude/epics/${epic}.json`]);
+    if (values.ref !== undefined)
+      requireFact(
+        git(['show', `${manifestRef}:.claude/epics/${epic}.json`]) === manifestSource,
+        'Selected ref manifest differs from main',
+      );
+    const manifest = validateManifest(JSON.parse(manifestSource), epic);
     const [owner, name] = values.repo.split('/');
     const issues = (manifest.issues ?? manifest.items.map((item) => item.issue)).map((number) => {
       const payload = api(
@@ -198,13 +205,7 @@ export async function main(argv, deps = {}) {
         }
       }
       const linkedPulls = nodes(issue.closedByPullRequestsReferences, 'linked PRs');
-      const mergedPull =
-        closer?.__typename === 'PullRequest' && closer.merged
-          ? closer
-          : linkedPulls.find(
-              (pull) => pull.merged === true && shaPattern.test(pull.mergeCommit?.oid),
-            );
-      if (manifest.items && mergedPull) closingSha = mergedPull.mergeCommit.oid;
+      const mergedPull = closer?.__typename === 'PullRequest' && closer.merged ? closer : null;
       return {
         mergedPr: positiveInteger(mergedPull?.number),
         pr: mergedPull?.number ?? linkedPulls.find((pull) => pull.state === 'OPEN')?.number ?? null,
@@ -213,9 +214,15 @@ export async function main(argv, deps = {}) {
         stateReason: issue.stateReason,
         labels: labels(issue.labels),
         closingSha,
+        closingAt: mergedPull ? mergedPull.mergedAt : events[0]?.createdAt,
         linkedPulls: linkedPulls.map((pull) => {
           requireFact(positiveInteger(pull?.number), `Malformed linked PR for #${number}`);
-          return { number: pull.number, state: pull.state, labels: labels(pull.labels) };
+          return {
+            number: pull.number,
+            state: pull.state,
+            isDraft: pull.isDraft,
+            labels: labels(pull.labels),
+          };
         }),
       };
     });
@@ -241,7 +248,7 @@ export async function main(argv, deps = {}) {
       const pages = api([
         '--paginate',
         '--slurp',
-        `repos/${values.repo}/commits/${sha}/check-runs?per_page=100&filter=latest`,
+        `repos/${values.repo}/commits/${sha}/check-runs?per_page=100&filter=all`,
       ]);
       requireFact(Array.isArray(pages) && pages.length > 0, `Missing check pages for ${sha}`);
       const total = pages[0]?.total_count;
@@ -322,6 +329,7 @@ export async function main(argv, deps = {}) {
       checks: [],
       items: [],
       humanHeld: [],
+      needsOwner: [],
       blocked: [],
       ready: [],
       mainSha: null,

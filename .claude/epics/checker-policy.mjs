@@ -111,7 +111,7 @@ function issueBlocker({ number, state, stateReason, closingSha }, history) {
 }
 function requiredCheckFailures({ sha, runs }, requiredChecks) {
   return requiredChecks.flatMap((name) => {
-    const matching = runs.filter((run) => run.name === name);
+    const matching = runs.filter((run) => run.name === name && run.app?.slug === 'github-actions');
     if (!matching.length) return [`required check "${name}" has no run on ${sha}`];
     const latest = matching.reduce((left, right) => (right.id > left.id ? right : left));
     return latest.status === 'completed' && latest.conclusion === 'success'
@@ -151,11 +151,21 @@ export function decideEpic(facts) {
         definition.humanHeld ||
         issue.labels.some((label) => humanLabels.has(label)) ||
         issue.linkedPulls.some(
-          (pull) => pull.state === 'OPEN' && pull.labels.some((label) => humanLabels.has(label)),
+          (pull) =>
+            pull.state === 'OPEN' &&
+            (pull.isDraft === true || pull.labels.some((label) => humanLabels.has(label))),
         );
+      const needsOwner = manifest.items && issue.state === 'CLOSED' && (blocker || missingPull);
       return {
         id: definition.id,
-        status: !blocker && !missingPull ? 'done' : held ? 'humanHeld' : 'ready',
+        status:
+          !blocker && !missingPull
+            ? 'done'
+            : needsOwner
+              ? 'needsOwner'
+              : held
+                ? 'humanHeld'
+                : 'ready',
         pr: issue.pr ?? null,
       };
     });
@@ -174,6 +184,7 @@ export function decideEpic(facts) {
     };
     for (const definition of definitions) classify(definition);
     const humanHeld = items.filter((item) => item.status === 'humanHeld').map((item) => item.id);
+    const needsOwner = items.filter((item) => item.status === 'needsOwner').map((item) => item.id);
     const blocked = items.filter((item) => item.status === 'blocked').map((item) => item.id);
     const ready = items.filter((item) => item.status === 'ready').map((item) => item.id);
     const mainSha = facts.mainSha;
@@ -189,7 +200,40 @@ export function decideEpic(facts) {
         reasons.push(`Check "${check.name}" ${check.status}: ${check.reason}`);
     const activeHours =
       facts.activeHours ?? (startedAt ? (Date.parse(now) - Date.parse(startedAt)) / 3600000 : 0);
-    const elapsed = activeHours >= manifest.maxHours;
+    const complete =
+      items.every((item) => item.status === 'done') &&
+      mainGreen &&
+      checks.every((check) => check.status === 'passed');
+    let completedAt = null;
+    if (complete && !fail && !pause) {
+      const completionTimes = issues.map((issue) => issue.closingAt);
+      for (const name of manifest.requiredChecks) {
+        const runs = commits[0].runs.filter(
+          (run) => run.name === name && run.app?.slug === 'github-actions',
+        );
+        const greenRuns = runs.filter(
+          (run) => run.status === 'completed' && run.conclusion === 'success',
+        );
+        for (const run of greenRuns)
+          requireFact(
+            isoPattern.test(run.completed_at) && Number.isFinite(Date.parse(run.completed_at)),
+            'Missing or malformed check completion time',
+          );
+        completionTimes.push(
+          new Date(Math.min(...greenRuns.map((run) => Date.parse(run.completed_at)))).toISOString(),
+        );
+      }
+      requireFact(
+        completionTimes.every(
+          (time) => isoPattern.test(time) && Number.isFinite(Date.parse(time)),
+        ),
+        'Missing or malformed completion time',
+      );
+      completedAt = new Date(Math.max(...completionTimes.map((time) => Date.parse(time)))).toISOString();
+    }
+    const elapsed = complete
+      ? Date.parse(completedAt) > Date.parse(startedAt) + manifest.maxHours * 3600000
+      : activeHours >= manifest.maxHours;
     let state = 'incomplete';
     if (fail) {
       state = 'failed';
@@ -200,14 +244,10 @@ export function decideEpic(facts) {
     } else if (elapsed) {
       state = 'failed';
       reasons.push(`Time cap of ${manifest.maxHours} hours elapsed since ${startedAt}.`);
-    } else if (!ready.length && humanHeld.length) {
+    } else if (!ready.length && (humanHeld.length || needsOwner.length)) {
       state = 'paused';
-      reasons.push(`Waiting on owner: ${humanHeld.join(', ')}.`);
-    } else if (
-      items.every((item) => item.status === 'done') &&
-      mainGreen &&
-      checks.every((check) => check.status === 'passed')
-    ) {
+      reasons.push(`Waiting on owner: ${[...humanHeld, ...needsOwner].join(', ')}.`);
+    } else if (complete) {
       state = 'complete';
       reasons.push(`Every issue is completed on main; required checks passed at ${mainSha}.`);
     }
@@ -217,10 +257,12 @@ export function decideEpic(facts) {
       exitCode: exitCodes[state],
       items,
       humanHeld,
+      needsOwner,
       blocked,
       ready,
       mainSha,
       mainGreen,
+      completedAt,
       reasons,
       greenSha: mainGreen ? mainSha : null,
       lastClosingSha: facts.history.find((sha) => closingShas.has(sha)) ?? null,
