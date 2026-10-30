@@ -1,5 +1,6 @@
 import fcntl
 import gzip
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -129,31 +130,71 @@ def scratch_server(release, home, label):
                     process.wait()
 
 
-def restart():
-    for unit in UNITS:
-        run(['systemctl', '--user', 'restart', unit])
+def install_barriers(connection):
+    with connection:
+        connection.execute('drop trigger if exists deploy_claim_barrier')
+        connection.execute('drop trigger if exists deploy_claim_insert_barrier')
+        active = "exists(select 1 from deploy_pause_state where deadline>cast(strftime('%s','now') as integer))"
+        connection.execute(f"create trigger deploy_claim_barrier before update of status on step when NEW.status='claimed' and OLD.status!='claimed' and {active} begin select raise(ignore); end")
+        connection.execute(f"create trigger deploy_claim_insert_barrier before insert on step when NEW.status='claimed' and {active} begin select raise(ignore); end")
+
+
+def restart(connection=None):
+    run(['systemctl', '--user', 'stop', UNITS[1]])
+    run(['systemctl', '--user', 'restart', UNITS[0]])
+    if connection is not None:
+        def ready():
+            user = read_api(URL, '/api/user/me')
+            teams = read_api(URL, '/api/teams')
+            return isinstance(user.get('id'), str) and isinstance(teams, list)
+        wait_for(ready, 'server migration readiness')
+        install_barriers(connection)
+    run(['systemctl', '--user', 'restart', UNITS[1]])
 
 
 def drain(connection):
     with connection:
         connection.execute('begin immediate')
-        connection.execute('create table deploy_pause_state(id text primary key, paused integer not null)')
-        connection.execute('insert into deploy_pause_state select id, autonomyPaused from team')
+        connection.execute('create table deploy_pause_state(id text primary key, paused integer not null, deadline real not null)')
+        connection.execute('insert into deploy_pause_state select id, autonomyPaused, ? from team', (time.time() + max(TIMEOUT * 4, 600),))
         connection.execute('update team set autonomyPaused=1')
-        connection.execute("create trigger deploy_claim_barrier before update of status on step when NEW.status='claimed' and OLD.status!='claimed' begin select raise(ignore); end")
-        connection.execute("create trigger deploy_claim_insert_barrier before insert on step when NEW.status='claimed' begin select raise(ignore); end")
+        active = "exists(select 1 from deploy_pause_state where deadline>cast(strftime('%s','now') as integer))"
+        connection.execute(f"create trigger deploy_claim_barrier before update of status on step when NEW.status='claimed' and OLD.status!='claimed' and {active} begin select raise(ignore); end")
+        connection.execute(f"create trigger deploy_claim_insert_barrier before insert on step when NEW.status='claimed' and {active} begin select raise(ignore); end")
 
 
 def resume(connection):
     with connection:
-        restored = connection.execute('select id, paused from deploy_pause_state order by id').fetchall()
-        connection.execute('update team set autonomyPaused=(select paused from deploy_pause_state where id=team.id) where id in (select id from deploy_pause_state)')
-        connection.execute('drop trigger deploy_claim_barrier')
-        connection.execute('drop trigger deploy_claim_insert_barrier')
+        restored = connection.execute('select team.id, paused, autonomyPaused from deploy_pause_state join team using(id) order by id').fetchall()
+        connection.execute('update team set autonomyPaused=(select paused from deploy_pause_state where id=team.id) where autonomyPaused=1 and id in (select id from deploy_pause_state)')
+    for team_id, paused, current in restored:
+        if current == 1:
+            print(json.dumps({'id': team_id, 'autonomyPaused': paused}), flush=True)
+        else:
+            print(json.dumps({'id': team_id, 'autonomyPaused': current, 'result': 'left unchanged'}), flush=True)
+    with connection:
+        connection.execute('drop trigger if exists deploy_claim_barrier')
+        connection.execute('drop trigger if exists deploy_claim_insert_barrier')
         connection.execute('drop table deploy_pause_state')
-    for team_id, paused in restored:
-        print(json.dumps({'id': team_id, 'autonomyPaused': paused}), flush=True)
     print('Restored saved team pause values; claim barriers removed', flush=True)
+
+
+def discard_report(live):
+    discarded = []
+    for (table,) in live.execute("select name from main.sqlite_master where type='table' and name not like 'sqlite_%' order by name").fetchall():
+        quoted = '"' + table.replace('"', '""') + '"'
+        try:
+            rows = live.execute(f'select * from main.{quoted} except select * from snapshot.{quoted}').fetchall()
+        except sqlite3.Error:
+            rows = live.execute(f'select * from main.{quoted}').fetchall()
+        for row in rows:
+            discarded.append(json.dumps({'table': table, 'discardedCurrentRow': row}, default=str, sort_keys=True))
+    discarded.sort()
+    for row in discarded:
+        print(row, flush=True)
+    digest = hashlib.sha256('\n'.join(discarded).encode()).hexdigest()
+    print(f'DISCARD_DIGEST {digest}', flush=True)
+    return digest
 
 
 def restore(snapshot, confirm):
@@ -167,31 +208,36 @@ def restore(snapshot, confirm):
         saved = sqlite3.connect(source)
         if saved.execute('pragma integrity_check').fetchone()[0] != 'ok':
             raise RuntimeError('snapshot integrity failed')
-        if confirm:
-            for unit in [*reversed(UNITS), BACKUP_TIMER]:
-                run(['systemctl', '--user', 'stop', unit])
-        live = sqlite3.connect(f'file:{DB}?mode=rw', uri=True)
-        live.execute('attach database ? as snapshot', (str(source),))
-        for (table,) in live.execute("select name from main.sqlite_master where type='table' and name not like 'sqlite_%'").fetchall():
-            quoted = '"' + table.replace('"', '""') + '"'
+        try:
+            if confirm:
+                for unit in [*reversed(UNITS), BACKUP_TIMER]:
+                    run(['systemctl', '--user', 'stop', unit])
+            with sqlite3.connect(f'file:{DB}?mode=rw', uri=True) as live:
+                live.execute('attach database ? as snapshot', (str(source),))
+                digest = discard_report(live)
+            if not confirm:
+                raise RuntimeError('restore requires --confirm-discard <digest>; rows above would be discarded')
+            if confirm != digest:
+                raise RuntimeError('discard set changed; preview again before confirming')
+            destination = sqlite3.connect(DB)
             try:
-                rows = live.execute(f'select * from main.{quoted} except select * from snapshot.{quoted}').fetchall()
-            except sqlite3.Error:
-                rows = live.execute(f'select * from main.{quoted}').fetchall()
-            for row in rows:
-                print(json.dumps({'table': table, 'discardedCurrentRow': row}, default=str), flush=True)
-        live.close()
-        if not confirm:
-            raise RuntimeError('restore requires --confirm-discard; rows above would be discarded')
-        destination = sqlite3.connect(DB)
-        saved.backup(destination)
-        if destination.execute("select count(*) from sqlite_master where type='table' and name='deploy_pause_state'").fetchone()[0]:
-            resume(destination)
-        destination.close()
-        saved.close()
-        log('restore', '', 'confirmed-discard')
-        restart()
-        run(['systemctl', '--user', 'start', BACKUP_TIMER])
+                saved.backup(destination)
+                if destination.execute("select count(*) from sqlite_master where type='table' and name='deploy_pause_state'").fetchone()[0]:
+                    resume(destination)
+            finally:
+                destination.close()
+            log('restore', '', 'confirmed-discard')
+        finally:
+            saved.close()
+            if confirm:
+                failures = []
+                for unit in [*UNITS, BACKUP_TIMER]:
+                    try:
+                        run(['systemctl', '--user', 'start', unit])
+                    except BaseException as error:
+                        failures.append(f'{unit}: {error}')
+                if failures:
+                    raise RuntimeError('service recovery failed: ' + '; '.join(failures))
 
 
 def deploy(sha):
@@ -232,15 +278,15 @@ def deploy(sha):
         scratch.close()
         scratch_server(release, home, 'new-scratch')
         scratch_server(old, home, 'old-scratch')
-    drain(connection)
     switched = False
     try:
+        drain(connection)
         wait_for(lambda: connection.execute("select count(*) from step where status='claimed'").fetchone()[0] == 0, 'drain')
         run(['bash', Path(__file__).with_name('backup-server-db.sh'), '--db', DB, '--out', BACKUP_OUT])
-        heartbeat = connection.execute('select coalesce(lastSeenAt,0) from machine where id=?', (MACHINE,)).fetchone()[0]
         select_release(sha)
         switched = True
-        restart()
+        restart(connection)
+        heartbeat = connection.execute('select coalesce(lastSeenAt,0) from machine where id=?', (MACHINE,)).fetchone()[0]
         def healthy():
             user = read_api(URL, '/api/user/me')
             teams = read_api(URL, '/api/teams')
@@ -254,15 +300,18 @@ def deploy(sha):
             select_release(previous)
             atomic(ROOT / 'last-good', previous + '\n')
             try:
-                restart()
+                restart(connection)
                 log('rollback', previous, 'restarted-without-db-restore')
             except BaseException:
                 log('rollback', previous, 'restart-failed')
                 raise
         raise
     finally:
-        resume(connection)
-        connection.close()
+        try:
+            if connection.execute("select 1 from sqlite_master where name='deploy_pause_state'").fetchone():
+                resume(connection)
+        finally:
+            connection.close()
 
 
 def refuse_paused():
@@ -272,7 +321,9 @@ def refuse_paused():
     try:
         connection.execute('pragma locking_mode=exclusive')
         if connection.execute("select 1 from sqlite_master where type='table' and name='deploy_pause_state'").fetchone():
-            raise RuntimeError('leftover deploy_pause_state; inspect release and unit state, then run deploy-self.sh resume')
+            columns = [row[1] for row in connection.execute('pragma table_info(deploy_pause_state)')]
+            deadline = connection.execute('select max(deadline) from deploy_pause_state').fetchone()[0] if 'deadline' in columns else 'legacy state without expiry'
+            raise RuntimeError(f'leftover deploy_pause_state; deadline={deadline}; inspect release and unit state, then run deploy-self.sh resume')
     finally:
         connection.close()
 
@@ -283,7 +334,7 @@ def main():
         raise KeyboardInterrupt(f'signal {signum}')
     signal.signal(signal.SIGTERM, interrupted)
     if len(sys.argv) < 2 or TIMEOUT <= 0:
-        raise RuntimeError('usage: deploy-self.sh <sha> | check <sha> | restore <snapshot.db[.gz]> [--confirm-discard] | resume')
+        raise RuntimeError('usage: deploy-self.sh <sha> | check <sha> | restore <snapshot.db[.gz]> [--confirm-discard <digest>] | resume')
     if sys.argv[1] != 'resume':
         refuse_paused()
     if sys.argv[1] == 'check':
@@ -300,10 +351,10 @@ def main():
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         if sys.argv[1] != 'resume':
             refuse_paused()
-        if sys.argv[1] == 'restore' and len(sys.argv) in (3, 4):
-            if len(sys.argv) == 4 and sys.argv[3] != '--confirm-discard':
+        if sys.argv[1] == 'restore' and len(sys.argv) in (3, 5):
+            if len(sys.argv) == 5 and (sys.argv[3] != '--confirm-discard' or not re.fullmatch('[0-9a-f]{64}', sys.argv[4])):
                 raise RuntimeError('unknown restore argument')
-            restore(Path(sys.argv[2]), len(sys.argv) == 4)
+            restore(Path(sys.argv[2]), sys.argv[4] if len(sys.argv) == 5 else None)
         elif sys.argv[1:] == ['resume']:
             with sqlite3.connect(f'file:{DB}?mode=rw', uri=True) as connection:
                 resume(connection)

@@ -1,5 +1,5 @@
 $ biome ci .
-apps/server/test/feishu-config.test.ts:144:7 ]8;;https://biomejs.dev/linter/rules/use-flat-map\lint/complexity/useFlatMap]8;;\  FIXABLE  ━━━━━━━━━━━━━━━━━━
+apps/server/test/feishu-config.test.ts:144:7 lint/complexity/useFlatMap  FIXABLE  ━━━━━━━━━━━━━━━━━━
 
   ℹ The call chain .map().flat() can be replaced with a single .flatMap() call.
 
@@ -29,89 +29,109 @@ apps/server/test/feishu-config.test.ts:144:7 ]8;;https://biomejs.dev/linter/rul
     151 150 │     ).toEqual({});
 
 
-scripts/ops/deploy-self.test.mjs:304:44 ]8;;https://biomejs.dev/linter/rules/use-template\lint/style/useTemplate]8;;\  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━
+scripts/ops/deploy-self.test.mjs:318:44 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   ℹ Template literals are preferred over string concatenation.
 
-    302 │   assert.equal(result.status, 0, result.stderr);
-    303 │   for (const name of ['main', 'check', 'pack-smoke', 'e2e-gate', 'pr-evidence'])
-  > 304 │     assert.match(result.stdout, new RegExp('PASS ' + name + ' '));
+    316 │   assert.equal(result.status, 0, result.stderr);
+    317 │   for (const name of ['main', 'check', 'pack-smoke', 'e2e-gate', 'pr-evidence'])
+  > 318 │     assert.match(result.stdout, new RegExp('PASS ' + name + ' '));
         │                                            ^^^^^^^^^^^^^^^^^^^^
-    305 │   assert.equal(existsSync(f.state), false);
-    306 │   assert.equal(existsSync(f.db), false);
+    319 │   assert.equal(existsSync(f.state), false);
+    320 │   assert.equal(existsSync(f.db), false);
 
   ℹ Unsafe fix: Use a template literal.
 
-    302 302 │     assert.equal(result.status, 0, result.stderr);
-    303 303 │     for (const name of ['main', 'check', 'pack-smoke', 'e2e-gate', 'pr-evidence'])
-    304     │ - ····assert.match(result.stdout,·new·RegExp('PASS·'·+·name·+·'·'));
-        304 │ + ····assert.match(result.stdout,·new·RegExp(`PASS·${name}·`));
-    305 305 │     assert.equal(existsSync(f.state), false);
-    306 306 │     assert.equal(existsSync(f.db), false);
+    316 316 │     assert.equal(result.status, 0, result.stderr);
+    317 317 │     for (const name of ['main', 'check', 'pack-smoke', 'e2e-gate', 'pr-evidence'])
+    318     │ - ····assert.match(result.stdout,·new·RegExp('PASS·'·+·name·+·'·'));
+        318 │ + ····assert.match(result.stdout,·new·RegExp(`PASS·${name}·`));
+    319 319 │     assert.equal(existsSync(f.state), false);
+    320 320 │     assert.equal(existsSync(f.db), false);
 
 
-scripts/ops/deploy-self.test.mjs:318:8 ]8;;https://biomejs.dev/linter/rules/use-template\lint/style/useTemplate]8;;\  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+scripts/ops/deploy-self.test.mjs:332:8 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   ℹ Template literals are preferred over string concatenation.
 
-    316 │   'superseded',
-    317 │ ]) {
-  > 318 │   test('check refuses ' + mode + ' without writes', () => {
+    330 │   'superseded',
+    331 │ ]) {
+  > 332 │   test('check refuses ' + mode + ' without writes', () => {
         │        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    319 │     const f = fixture(mode);
-    320 │     const before = readFileSync(f.db);
+    333 │     const f = fixture(mode);
+    334 │     const before = readFileSync(f.db);
 
   ℹ Unsafe fix: Use a template literal.
 
-    316 316 │     'superseded',
-    317 317 │   ]) {
-    318     │ - ··test('check·refuses·'·+·mode·+·'·without·writes',·()·=>·{
-        318 │ + ··test(`check·refuses·${mode}·without·writes`,·()·=>·{
-    319 319 │       const f = fixture(mode);
-    320 320 │       const before = readFileSync(f.db);
+    330 330 │     'superseded',
+    331 331 │   ]) {
+    332     │ - ··test('check·refuses·'·+·mode·+·'·without·writes',·()·=>·{
+        332 │ + ··test(`check·refuses·${mode}·without·writes`,·()·=>·{
+    333 333 │       const f = fixture(mode);
+    334 334 │       const before = readFileSync(f.db);
 
 
-scripts/ops/deploy-self.test.mjs:339:8 ]8;;https://biomejs.dev/linter/rules/use-template\lint/style/useTemplate]8;;\  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+scripts/ops/deploy-self.test.mjs:353:8 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   ℹ Template literals are preferred over string concatenation.
 
-    337 │ }
-    338 │ for (const action of ['deploy', 'check', 'restore']) {
-  > 339 │   test(action + ' refuses leftover drain state and names explicit recovery', () => {
+    351 │ }
+    352 │ for (const action of ['deploy', 'check', 'restore']) {
+  > 353 │   test(action + ' refuses leftover drain state and names explicit recovery', () => {
         │        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    340 │     const f = fixture();
-    341 │     command('python3', [
+    354 │     const f = fixture();
+    355 │     command('python3', [
 
   ℹ Unsafe fix: Use a template literal.
 
-    337 337 │   }
-    338 338 │   for (const action of ['deploy', 'check', 'restore']) {
-    339     │ - ··test(action·+·'·refuses·leftover·drain·state·and·names·explicit·recovery',·()·=>·{
-        339 │ + ··test(`${action}·refuses·leftover·drain·state·and·names·explicit·recovery`,·()·=>·{
-    340 340 │       const f = fixture();
-    341 341 │       command('python3', [
+    351 351 │   }
+    352 352 │   for (const action of ['deploy', 'check', 'restore']) {
+    353     │ - ··test(action·+·'·refuses·leftover·drain·state·and·names·explicit·recovery',·()·=>·{
+        353 │ + ··test(`${action}·refuses·leftover·drain·state·and·names·explicit·recovery`,·()·=>·{
+    354 354 │       const f = fixture();
+    355 355 │       command('python3', [
 
 
-scripts/ops/deploy-self.test.mjs:387:8 ]8;;https://biomejs.dev/linter/rules/use-template\lint/style/useTemplate]8;;\  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+scripts/ops/deploy-self.test.mjs:402:8 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   ℹ Template literals are preferred over string concatenation.
 
-    385 │ });
-    386 │ for (const units of ['', 'one.service', 'one.service two.service three.service']) {
-  > 387 │   test('invalid unit inventory refuses ' + JSON.stringify(units), () => {
+    400 │ });
+    401 │ for (const units of ['', 'one.service', 'one.service two.service three.service']) {
+  > 402 │   test('invalid unit inventory refuses ' + JSON.stringify(units), () => {
         │        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    388 │     const f = fixture('good', { CAIRN_DEPLOY_UNITS: units });
-    389 │     assert.notEqual(f.run().status, 0);
+    403 │     const f = fixture('good', { CAIRN_DEPLOY_UNITS: units });
+    404 │     assert.notEqual(f.run().status, 0);
 
   ℹ Unsafe fix: Use a template literal.
 
-    385 385 │   });
-    386 386 │   for (const units of ['', 'one.service', 'one.service two.service three.service']) {
-    387     │ - ··test('invalid·unit·inventory·refuses·'·+·JSON.stringify(units),·()·=>·{
-        387 │ + ··test(`invalid·unit·inventory·refuses·${JSON.stringify(units)}`,·()·=>·{
-    388 388 │       const f = fixture('good', { CAIRN_DEPLOY_UNITS: units });
-    389 389 │       assert.notEqual(f.run().status, 0);
+    400 400 │   });
+    401 401 │   for (const units of ['', 'one.service', 'one.service two.service three.service']) {
+    402     │ - ··test('invalid·unit·inventory·refuses·'·+·JSON.stringify(units),·()·=>·{
+        402 │ + ··test(`invalid·unit·inventory·refuses·${JSON.stringify(units)}`,·()·=>·{
+    403 403 │       const f = fixture('good', { CAIRN_DEPLOY_UNITS: units });
+    404 404 │       assert.notEqual(f.run().status, 0);
 
 
-Checked 1257 files in 16s. No fixes applied.
-Found 5 infos.
+scripts/ops/deploy-self.test.mjs:452:8 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ℹ Template literals are preferred over string concatenation.
+
+    451 │ for (const mode of ['rebuild', 'old-heartbeat']) {
+  > 452 │   test(mode + ' migration and heartbeat regression', () => {
+        │        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    453 │     const f = fixture(mode);
+    454 │     const result = f.run();
+
+  ℹ Unsafe fix: Use a template literal.
+
+    450 450 │
+    451 451 │   for (const mode of ['rebuild', 'old-heartbeat']) {
+    452     │ - ··test(mode·+·'·migration·and·heartbeat·regression',·()·=>·{
+        452 │ + ··test(`${mode}·migration·and·heartbeat·regression`,·()·=>·{
+    453 453 │       const f = fixture(mode);
+    454 454 │       const result = f.run();
+
+
+Checked 1257 files in 3s. No fixes applied.
+Found 6 infos.

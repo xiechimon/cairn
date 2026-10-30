@@ -1,0 +1,43 @@
+✖ barriers are reinstalled after asynchronous server migration readiness (226.26025ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 280.257375
+
+✖ failing tests:
+
+test at scripts/ops/deploy-self.test.mjs:566:1
+✖ barriers are reinstalled after asynchronous server migration readiness (226.26025ms)
+  AssertionError [ERR_ASSERTION]: Traceback (most recent call last):
+    File "<string>", line 19, in <module>
+      m['restart'](db)
+      ~~~~~~~~~~~~^^^^
+    File "<worktree>/scripts/ops/deploy-self.py", line 147, in restart
+      run(['systemctl', '--user', 'restart', UNITS[1]])
+      ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    File "<string>", line 8, in fake_run
+      assert state['migrated'],'daemon restarted before migration readiness'
+             ~~~~~^^^^^^^^^^^^
+  AssertionError: daemon restarted before migration readiness
+
+
+  1 !== 0
+
+      at command (file://<worktree>/scripts/ops/deploy-self.test.mjs:23:10)
+      at pythonFixture (file://<worktree>/scripts/ops/deploy-self.test.mjs:462:3)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:567:3)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

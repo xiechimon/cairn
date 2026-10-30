@@ -14,7 +14,10 @@ import { join, resolve } from 'node:path';
 import test from 'node:test';
 import { makeTestTempDir } from '../test-tmpdir.mjs';
 
-const script = resolve(import.meta.dirname, 'deploy-self.sh');
+const script =
+  process.env.CAIRN_TEST_DEPLOY_SCRIPT || resolve(import.meta.dirname, 'deploy-self.sh');
+const pythonScript =
+  process.env.CAIRN_TEST_DEPLOY_PYTHON || resolve(import.meta.dirname, 'deploy-self.py');
 function command(tool, args, options = {}) {
   const result = spawnSync(tool, args, { encoding: 'utf8', ...options });
   assert.equal(result.status, 0, result.stderr);
@@ -105,7 +108,9 @@ while True: time.sleep(1)`,
   );
   fake(
     'curl',
-    `import os,sys,json
+    `import os,sys,json,sqlite3
+if ':18787/' not in sys.argv[-1] and ':28888/' not in sys.argv[-1] and os.environ['MODE'] not in ('heartbeat','old-heartbeat'):
+ db=sqlite3.connect(os.environ['DB']); db.execute('update machine set lastSeenAt=lastSeenAt+1'); db.commit()
 with open(os.environ['EVENTS'],'a') as f: f.write('curl '+sys.argv[-1]+'\\n')
 if os.environ['MODE']=='health' and (':'+os.environ.get('CAIRN_DEPLOY_SCRATCH_PORT','18787')+'/') not in sys.argv[-1]: sys.exit(22)
 print(json.dumps([{'id':'a'}] if sys.argv[-1].endswith('/api/teams') else {'id':'user'}))`,
@@ -118,6 +123,10 @@ if 'show' in sys.argv:
 if 'stop' in sys.argv and os.environ['MODE']=='restore-late':
  db=sqlite3.connect(os.environ['DB']); db.execute("insert into todo values('late-write')"); db.commit()
 with open(os.environ['EVENTS'],'a') as f: f.write(' '.join(sys.argv[1:])+'\\n')
+if 'restart' in sys.argv and os.environ['MODE']=='rebuild' and 'server' in sys.argv[-1]:
+ db=sqlite3.connect(os.environ['DB']); db.executescript('create table new_step as select * from step; drop table step; alter table new_step rename to step;'); db.close()
+if 'restart' in sys.argv and os.environ['MODE']=='rebuild' and 'daemon' in sys.argv[-1]:
+ db=sqlite3.connect(os.environ['DB']); db.execute("insert into step values('migration-claim','claimed')"); db.commit(); assert not db.execute("select 1 from step where id='migration-claim'").fetchone(); db.close()
 if 'restart' in sys.argv:
  db=sqlite3.connect(os.environ['DB']); db.execute("insert into todo values('after')"); db.execute("update machine set lastSeenAt=lastSeenAt+1" if os.environ['MODE']!='heartbeat' else 'select 1'); db.commit()`,
   );
@@ -187,7 +196,7 @@ test('good deploy points current and last-good to the exact new SHA', () => {
   assert.equal(f.sql('select autonomyPaused from team order by id'), '0\n1');
   assert.match(
     readFileSync(f.events, 'utf8'),
-    /restart cairn-server.service\n--user restart cairn-daemon.service/,
+    /stop cairn-daemon.service[\s\S]*restart cairn-server.service[\s\S]*restart cairn-daemon.service/,
   );
 });
 test('failed health rolls code back and keeps rows written after the backup', () => {
@@ -217,10 +226,13 @@ test('confirmed restore includes writes made while stopping units in its discard
   const f = fixture('restore-late');
   const snapshot = join(f.root, 'snapshot.db');
   copyFileSync(f.db, snapshot);
-  const result = f.run('restore', snapshot, '--confirm-discard');
-  assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /late-write/);
-  assert.doesNotMatch(f.sql('select id from todo'), /late-write/);
+  const preview = f.run('restore', snapshot);
+  const digest = preview.stdout.match(/DISCARD_DIGEST ([a-f0-9]{64})/)[1];
+  const result = f.run('restore', snapshot, '--confirm-discard', digest);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /discard set changed/);
+  assert.match(f.sql('select id from todo'), /late-write/);
+  assert.match(readFileSync(f.events, 'utf8'), /start cairn-db-backup.timer/);
 });
 test('a stale daemon heartbeat causes code rollback', () => {
   const f = fixture('heartbeat');
@@ -245,7 +257,7 @@ m['resume'](db)
 assert db.execute('select autonomyPaused from team order by id').fetchall()==[(0,),(1,)]
 db.execute("update step set status='claimed' where id='pending'"); db.commit()
 assert db.execute("select count(*) from step where status='claimed'").fetchone()[0]==1`;
-  command('python3', ['-c', program, resolve(import.meta.dirname, 'deploy-self.py'), f.db]);
+  command('python3', ['-c', program, pythonScript, f.db]);
 });
 test('a drain setup error leaves neither a partial pause record nor changed pause values', () => {
   const f = fixture();
@@ -257,7 +269,7 @@ except sqlite3.Error: pass
 else: raise AssertionError('drain unexpectedly succeeded')
 assert db.execute("select count(*) from sqlite_master where name='deploy_pause_state'").fetchone()[0]==0
 assert db.execute('select autonomyPaused from team order by id').fetchall()==[(0,),(1,)]`;
-  command('python3', ['-c', program, resolve(import.meta.dirname, 'deploy-self.py'), f.db]);
+  command('python3', ['-c', program, pythonScript, f.db]);
 });
 test('restoring a drained snapshot removes its saved deployment barrier before restart', () => {
   const f = fixture();
@@ -266,10 +278,12 @@ test('restoring a drained snapshot removes its saved deployment barrier before r
   command('python3', [
     '-c',
     "import runpy,sqlite3,sys; m=runpy.run_path(sys.argv[1]); db=sqlite3.connect(sys.argv[2]); m['drain'](db)",
-    resolve(import.meta.dirname, 'deploy-self.py'),
+    pythonScript,
     snapshot,
   ]);
-  const result = f.run('restore', snapshot, '--confirm-discard');
+  const preview = f.run('restore', snapshot);
+  const digest = preview.stdout.match(/DISCARD_DIGEST ([a-f0-9]{64})/)[1];
+  const result = f.run('restore', snapshot, '--confirm-discard', digest);
   assert.equal(result.status, 0, result.stderr);
   assert.equal(f.sql("select count(*) from sqlite_master where name like 'deploy_%'"), '0');
   assert.equal(f.sql('select autonomyPaused from team order by id'), '0\n1');
@@ -341,7 +355,7 @@ for (const action of ['deploy', 'check', 'restore']) {
     command('python3', [
       '-c',
       "import runpy,sqlite3,sys; runpy.run_path(sys.argv[1])['drain'](sqlite3.connect(sys.argv[2]))",
-      resolve(import.meta.dirname, 'deploy-self.py'),
+      pythonScript,
       f.db,
     ]);
     const before = readFileSync(f.db);
@@ -377,7 +391,8 @@ test('custom instance uses only its units, URL, scratch port and backup director
   assert.ok(existsSync(join(f.root, 'private-backups')));
   const snapshot = join(f.root, 'snapshot.db');
   copyFileSync(f.db, snapshot);
-  assert.equal(f.run('restore', snapshot, '--confirm-discard').status, 0);
+  const digest = f.run('restore', snapshot).stdout.match(/DISCARD_DIGEST ([a-f0-9]{64})/)[1];
+  assert.equal(f.run('restore', snapshot, '--confirm-discard', digest).status, 0);
   const restored = readFileSync(f.events, 'utf8');
   assert.match(restored, /stop scratch-backup.timer/);
   assert.match(restored, /start scratch-backup.timer/);
@@ -425,10 +440,145 @@ result=subprocess.run(['bash',sys.argv[3],'check',os.environ['SHA']],capture_out
 assert result.returncode != 0 and 'deploy-self.sh resume' in result.stderr, result.stderr
 assert [path.read_bytes() for path in paths] == before, 'read-only check changed WAL sidecars'
 connection.close()`,
-      resolve(import.meta.dirname, 'deploy-self.py'),
+      pythonScript,
       f.db,
       script,
     ],
     { env: f.env },
   );
+});
+
+for (const mode of ['rebuild', 'old-heartbeat']) {
+  test(mode + ' migration and heartbeat regression', () => {
+    const f = fixture(mode);
+    const result = f.run();
+    assert.equal(result.status, mode === 'rebuild' ? 0 : 1, result.stderr);
+    assert.equal(f.sql('select autonomyPaused from team order by id'), '0\n1');
+    assert.equal(f.sql("select count(*) from sqlite_master where name like 'deploy_%'"), '0');
+  });
+}
+function pythonFixture(program) {
+  const f = fixture();
+  command(
+    'python3',
+    [
+      '-c',
+      `import runpy,sqlite3,sys,time,contextlib,io
+m=runpy.run_path(sys.argv[1]); db=sqlite3.connect(sys.argv[2])
+assert str(m['DB'])==sys.argv[2]
+${program}`,
+      pythonScript,
+      f.db,
+    ],
+    { env: f.env },
+  );
+}
+test('expired drain permits claims after an unclean exit and refusal names its deadline', () => {
+  pythonFixture(`m['drain'](db)
+assert db.execute('select deadline from deploy_pause_state').fetchone()[0] > time.time()
+db.execute('update deploy_pause_state set deadline=0'); db.commit()
+db.execute("insert into step values('expired','claimed')"); db.commit()
+assert db.execute("select count(*) from step where status='claimed'").fetchone()[0]==1
+try: m['refuse_paused']()
+except RuntimeError as error: assert 'deadline' in str(error)
+else: raise AssertionError('leftover drain accepted')`);
+});
+test('resume preserves changed pause values and survives missing migration triggers', () => {
+  pythonFixture(`m['drain'](db)
+db.execute('drop trigger deploy_claim_barrier'); db.execute('drop trigger deploy_claim_insert_barrier')
+db.execute("update team set autonomyPaused=0 where id='b'"); db.commit()
+output=io.StringIO()
+with contextlib.redirect_stdout(output): m['resume'](db)
+assert db.execute('select autonomyPaused from team order by id').fetchall()==[(0,),(0,)]
+assert 'left unchanged' in output.getvalue()`);
+});
+test('in-flight step completes while new claims remain blocked', () => {
+  pythonFixture(`db.execute("insert into step values('flight','claimed')"); db.commit()
+m['drain'](db)
+if __import__('os').environ.get('CAIRN_INFLIGHT_NEGATIVE_CONTROL'): db.execute("delete from step where id='flight'"); db.commit()
+assert db.execute("select status from step where id='flight'").fetchone()[0]=='claimed'
+db.execute("update step set status='done' where id='flight'")
+db.execute("insert into step values('blocked','claimed')"); db.commit()
+assert db.execute('select id,status from step').fetchall()==[('flight','done')]
+m['resume'](db)`);
+});
+test('confirmed restore failure restarts every configured service and timer', () => {
+  pythonFixture(`from pathlib import Path
+snapshot=Path(sys.argv[2]+'.snapshot'); destination=sqlite3.connect(snapshot); db.backup(destination); destination.close()
+events=[]
+def fake_run(args, **kwargs):
+ events.append(args)
+ if args==['systemctl','--user','start',m['UNITS'][0]]: raise RuntimeError('injected start failure')
+ return ''
+class BrokenBackup:
+ def __getattr__(self,key): return getattr(db,key)
+ def backup(self,destination): raise RuntimeError('injected backup failure')
+original=m['restore'].__globals__
+original['run']=fake_run
+original['sqlite3']=type('Sqlite',(),{'connect':staticmethod(lambda path,**kwargs: BrokenBackup() if str(path).endswith('restore.db') else sqlite3.connect(path,**kwargs)), 'Error':sqlite3.Error})
+db.execute('attach database ? as snapshot',(str(snapshot),))
+digest=m['discard_report'](db) if 'discard_report' in m else '0'*64
+try: m['restore'](snapshot, digest)
+except RuntimeError: pass
+else: raise AssertionError('restore succeeded')
+for unit in [*m['UNITS'],m['BACKUP_TIMER']]: assert ['systemctl','--user','start',unit] in events,events`);
+});
+test('interrupt immediately after drain still restores pause state', () => {
+  const f = fixture();
+  command(
+    'python3',
+    [
+      '-c',
+      `import runpy,sqlite3,sys
+m=runpy.run_path(sys.argv[1]); original=m['drain']
+def interrupted(db):
+ original(db)
+ raise KeyboardInterrupt('injected SIGTERM')
+m['deploy'].__globals__['drain']=interrupted
+try: m['deploy'](sys.argv[3])
+except KeyboardInterrupt: pass
+else: raise AssertionError('deploy succeeded')
+db=sqlite3.connect(sys.argv[2])
+assert db.execute('select autonomyPaused from team order by id').fetchall()==[(0,),(1,)]
+assert not db.execute("select 1 from sqlite_master where name='deploy_pause_state'").fetchone()`,
+      pythonScript,
+      f.db,
+      f.sha,
+    ],
+    { env: f.env },
+  );
+});
+
+test('trigger cleanup failure cannot roll back committed pause restoration', () => {
+  pythonFixture(`m['drain'](db)
+class CleanupFailure:
+ def __enter__(self): db.__enter__(); return self
+ def __exit__(self,*args): return db.__exit__(*args)
+ def execute(self,sql,*args):
+  if sql.startswith('drop trigger'): raise sqlite3.OperationalError('injected cleanup failure')
+  return db.execute(sql,*args)
+try: m['resume'](CleanupFailure())
+except sqlite3.Error: pass
+else: raise AssertionError('cleanup succeeded')
+assert db.execute('select autonomyPaused from team order by id').fetchall()==[(0,),(1,)]`);
+});
+
+test('barriers are reinstalled after asynchronous server migration readiness', () => {
+  pythonFixture(`m['drain'](db)
+state={'migrated':False}
+def fake_run(args,**kwargs):
+ if args==['systemctl','--user','restart',m['UNITS'][1]]:
+  assert state['migrated'],'daemon restarted before migration readiness'
+  db.execute("insert into step values('blocked','claimed')"); db.commit()
+  assert not db.execute("select 1 from step where id='blocked'").fetchone()
+ return ''
+def ready(url,path):
+ if not state['migrated']:
+  db.executescript('create table new_step as select * from step; drop table step; alter table new_step rename to step;')
+  state['migrated']=True
+ return [] if path.endswith('/teams') else {'id':'user'}
+m['restart'].__globals__['run']=fake_run
+m['restart'].__globals__['read_api']=ready
+m['restart'](db)
+m['resume'](db)`);
 });

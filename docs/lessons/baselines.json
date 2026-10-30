@@ -147,8 +147,16 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
+  "canonical-fixture-paths": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "changing-what-a-shared-route-shows-by-default-app-from": {
     "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "check-bootstrap-coupling": {
+    "Intercepts": 0,
     "Recurrences": 0
   },
   "check-reach-fed-probe-scripts": {
@@ -283,6 +291,10 @@
     "Intercepts": 0,
     "Recurrences": 0
   },
+  "deploy-fetch-boundary": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "detached-new-branch-ref": {
     "Intercepts": 1,
     "Recurrences": 0
@@ -316,6 +328,10 @@
     "Recurrences": 0
   },
   "double-url-rewrite": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "drain-lifecycle": {
     "Intercepts": 0,
     "Recurrences": 0
   },
@@ -395,6 +411,10 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
+  "evidence-source-snapshot": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "export-verdicts-did-not-map-one-to-one-to-persisted": {
     "Intercepts": 2,
     "Recurrences": 1
@@ -449,6 +469,10 @@
   },
   "gate-constant-freeze": {
     "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "gate-fixture-response-shape": {
+    "Intercepts": 0,
     "Recurrences": 0
   },
   "gate-retry-metadata-changed-the-established-wake-prefix": {
@@ -555,6 +579,10 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
+  "instance-isolation": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "intake-branch-skipped-server-chain": {
     "Intercepts": 1,
     "Recurrences": 0
@@ -568,6 +596,10 @@
     "Recurrences": 0
   },
   "lane-worker-banned-model-and-noop-exit": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "leftover-drain-guard": {
     "Intercepts": 0,
     "Recurrences": 0
   },
@@ -669,6 +701,10 @@
   },
   "native-diagnostic-loader": {
     "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "native-release-probe": {
+    "Intercepts": 0,
     "Recurrences": 0
   },
   "nested-node-test-context": {
@@ -775,6 +811,10 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
+  "postrestart-heartbeat": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "pr-head-not-refreshed-before-verification": {
     "Intercepts": 1,
     "Recurrences": 0
@@ -835,6 +875,10 @@
     "Intercepts": 0,
     "Recurrences": 0
   },
+  "python-fixture-environment": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "ran-pnpm-in-parallel-while-reusing-dependencies-the-automatic-dependency": {
     "Intercepts": 1,
     "Recurrences": 0
@@ -845,6 +889,10 @@
   },
   "react-children-in-create-element": {
     "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "readonly-wal-sidecars": {
+    "Intercepts": 0,
     "Recurrences": 0
   },
   "rebase-resurrected-lessons-table": {
@@ -896,6 +944,18 @@
     "Recurrences": 0
   },
   "restoration-fixture-parent": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "restore-drain-state": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "restore-preview-race": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "restore-service-recovery": {
     "Intercepts": 0,
     "Recurrences": 0
   },
@@ -996,6 +1056,10 @@
     "Recurrences": 0
   },
   "split-spec-path-extraction": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "sqlite-ddl-transaction": {
     "Intercepts": 0,
     "Recurrences": 0
   },

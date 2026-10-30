@@ -43,13 +43,13 @@ Before the first deploy, create a detached release worktree for the currently ru
 
 Run `scripts/ops/deploy-self.sh <full-sha>` on the host. It checks main ancestry through GitHub's compare API, requires the newest GitHub Actions check run for each named check on the exact SHA, and requires one merged main PR whose merge commit equals the requested SHA and whose final head passed pr-evidence. Missing, pending and failing runs block. The release checkout is never reused after a failed attempt without operator inspection. Scratch startup uses the new release's actual entry point (which runs its migrations), followed by the previous release's actual entry point against the same scratch DB. Scratch has its own home, token and generated encryption key; no live key or attachments are copied. The two read probes cover startup and user/team reads, not all encrypted data or all prior-release queries. Scratch logs stay private under the deploy root. Port 18787 must be free; port isolation and external side effects from scratch scheduler startup remain host acceptance limits.
 
-The claim barrier is necessary because source inspection of machine-claim.ts found no autonomyPaused check. The script transactionally saves pause values, pauses teams and installs SQLite triggers that ignore new transitions/inserts into claimed. It waits for existing claimed steps to finish without stopping either unit. Backup happens only after drain. The code symlink switches atomically, then server and daemon restart in order. Health requires both authenticated JSON reads plus the configured machine's lastSeenAt increasing after the pre-restart baseline. No dedicated health route exists in this checkout. Failed health swaps code back and restarts without copying any DB bytes back. No general forward-compatibility proof is claimed: only the scratch startup and read probes are enforced.
+The claim barrier is necessary because source inspection of machine-claim.ts found no autonomyPaused check. The script transactionally saves pause values, pauses teams and installs SQLite triggers that ignore new transitions/inserts into claimed. It waits for existing claimed steps to finish without stopping either unit. Backup happens only after drain. The code symlink switches atomically, then the daemon stops, the server restarts and passes authenticated reads, the claim barriers are reinstalled, and the daemon restarts. Health requires both authenticated JSON reads plus the configured machine's lastSeenAt increasing after the post-daemon-restart baseline. No dedicated health route exists in this checkout. Failed health swaps code back and restarts without copying any DB bytes back. No general forward-compatibility proof is claimed: only the scratch startup and read probes are enforced.
 
 On the host, verify a genuinely green SHA, missing evidence rejection, migration failure, drain timeout with units still running, both actual scratch entry points, heartbeat advancement, authenticated reads and a deliberately failed health rollback retaining a post-backup row. Confirm the effective unit source paths and native modules. Live execution, live providers, GitHub status provenance and independent review are unverified here. No PR is opened and no CI result on a pushed head is claimed.
 
-`deploy-self.sh restore <snapshot.db[.gz]>` prints current rows absent or different in the snapshot and refuses to modify anything. `--confirm-discard` explicitly authorizes stopping daemon/server/backup timer, recomputing the report after stop, replacing DB content through SQLite's backup API and restarting. The report includes changed current rows as well as new rows; schema mismatches conservatively print all current rows in that table. It can contain sensitive data: keep it private. Other external writers must be stopped separately; they are outside the supplied service inventory. Restore is not part of rollback. A failed restore leaves services stopped for inspection.
+`deploy-self.sh restore <snapshot.db[.gz]>` prints current rows absent or different in the snapshot and refuses to modify anything. `--confirm-discard <digest>` binds confirmation to the DISCARD_DIGEST printed by preview and explicitly authorizes stopping daemon/server/backup timer, recomputing the report after stop, refusing a changed digest, replacing DB content through SQLite's backup API and restarting. The report includes changed current rows as well as new rows; schema mismatches conservatively print all current rows in that table. It can contain sensitive data: keep it private. Other external writers must be stopped separately; they are outside the supplied service inventory. Restore is not part of rollback. A confirmed restore always attempts to start both services and the backup timer in finally, including on failure.
 
-SIGTERM/SIGINT clean up a normal deploy drain. SIGKILL/power loss can retain the durable claim barrier and pause state. Inspect current, last-good, deploy.jsonl and unit state before running `deploy-self.sh resume` to restore saved pause values and remove the barrier. A fresh deploy refuses a preexisting drain table rather than clearing another run's state. Do not run resume until deciding which release should run. Rollback restart failure, crash recovery, disk-full behavior, concurrent deployment refusal, malformed arguments, missing/dirty release records and arbitrary external writers are not covered by the original acceptance fixture set unless explicitly named in green.log.
+SIGTERM/SIGINT clean up a normal deploy drain. SIGKILL/power loss can retain the durable pause state. New barriers expire after max(600, 4 * TIMEOUT) seconds; expiry permits claims but does not restore saved pause values. Legacy drain state has no expiry and still requires explicit resume. Inspect current, last-good, deploy.jsonl and unit state before running `deploy-self.sh resume` to restore saved pause values and remove the barrier. A fresh deploy refuses a preexisting drain table rather than clearing another run's state. Do not run resume until deciding which release should run. Rollback restart failure, crash recovery, disk-full behavior, concurrent deployment refusal, malformed arguments, missing/dirty release records and arbitrary external writers are not covered by the original acceptance fixture set unless explicitly named in green.log.
 
 ## Original runtime evidence
 
@@ -119,7 +119,7 @@ The defaults preserve the production layout. ROOT, REPO, TOKEN, MACHINE and TIME
 
 Run `deploy-self.sh check <full-sha>` before bootstrap or cutover. It needs only authenticated gh and optional read access to the configured DB for the mandatory leftover-drain guard. It does not fetch Git refs, create the deployment root or lock, install dependencies, start services or mutate DB data. If the DB does not exist, the drain guard skips it without creating it. Each passed SHA check prints one PASS line with its checked SHA; final-head pr-evidence prints the head SHA rather than the merge SHA. Failure exits nonzero, prints the failing reason, and stops the remaining checks. Real GitHub provenance and concurrent host WAL activity still require host acceptance.
 
-Deploy, check and restore refuse a persisted deploy_pause_state before performing deployment work and name `deploy-self.sh resume`. Deploy and restore repeat that guard while holding the deployment lock. Inspect current, last-good and units first, then run resume with the same instance environment. Resume prints restored team IDs and pause values only after the transaction commits, then confirms removal of the two claim barriers. A concurrent check is advisory; a later deploy repeats every gate.
+Deploy, check and restore refuse a persisted deploy_pause_state before performing deployment work and name `deploy-self.sh resume`. Deploy and restore repeat that guard while holding the deployment lock. Inspect current, last-good and units first, then run resume with the same instance environment. Resume commits pause restoration separately before removing triggers with IF EXISTS. It restores only teams still paused at 1, prints changed teams as left unchanged, and then confirms barrier removal. A concurrent check is advisory; a later deploy repeats every gate.
 
 Host drill (not run here):
 
@@ -176,3 +176,81 @@ For rollback, use the second bootstrapped drill instance, change its health URL 
 Final follow-up result (measured): 41 node tests passed, including 20 added tests. red.log contains the 39-test pre-implementation run; fetch-red.log and wal-red.log preserve the two later failure modes before their fixes. Final lint, typecheck, changed Vitest, spec parsing, lessons, English-only and comment-discipline gates exited 0. Vitest selected no tests. The local native probe exited 0; npm ls identified better-sqlite3 13.0.3 but exited 1 because installed Drizzle packages declare incompatible dependency ranges. No dependencies or lockfile were changed to address that pre-existing environment limitation.
 
 Final logs remove terminal colors, trim trailing whitespace and redact absolute workspace/cache paths. Assertions and command results are preserved. No commit, push, PR, full e2e, pnpm build, omarchy or real GitHub command was performed. No installed lifecycle build was run locally. The host drill, clean native install, real checks and service behavior remain unverified.
+
+## Review round 1 failure modes (before implementation)
+
+- A migration rebuilds step and removes triggers: rebuild deploy fixture; daemon stopped during migration and barrier reinstalled before daemon restart.
+- Old daemon heartbeat arrives during server restart: old-heartbeat fixture must roll back; baseline follows completed daemon restart.
+- SIGKILL leaves an immortal barrier: real SQLite expiry test; pause state still requires explicit resume, deadline printed on refusal.
+- SIGTERM between drain and try: drain moves inside cleanup scope; signal injection test planned.
+- Resume overwrites concurrent pause changes or missing triggers roll back restoration: real SQLite conditional restore and missing-trigger fixture.
+- Confirmed restore fails with stopped units: injected backup failure fixture checks all start attempts.
+- Stop-time writes change the reviewed discard set: digest-bound restore-late fixture refuses and retains rows.
+- In-flight step is lost or cannot finish: real SQLite claimed-to-done test with blocked new claims.
+- Existing check read-only behavior regresses: retain absent DB, byte and WAL sidecar tests unchanged.
+- Host systemd timing, real migration/application/provider behavior, abrupt process death and external writers: unverified on host; scratch fixture evidence only.
+
+
+## Review round 1 evidence and limits
+
+This section supersedes earlier run results. Tested commit: `cb34216cc83c1fc6133973e17ad3fa95bbad782a` plus the current uncommitted diff. No commit, push, PR, CI verdict or delivered verification is claimed. Network access and overlap lookup remain unavailable by instruction. The assigned continuation stays on the existing branch; open/recently merged overlaps are unverified.
+
+The barrier remains a SQLite trigger because the claim path does not honor team pauses. During cutover the daemon is stopped before server migration; barriers are recreated after server restart before the daemon starts. The rebuild fixture executes CREATE new_step, DROP step and RENAME against the real fixture DB during server restart, then attempts a forbidden claim at daemon restart. The script now waits for authenticated user/team reads before reinstalling barriers and starting the daemon. readiness-red.log fails when the daemon starts before a deferred migration; the final suite exercises the corrected order. Source inspection of index.ts and db/client.ts shows synchronous migrations before listen, but actual host readiness, wrong URL/proxy routing and future background migrations remain unverified host limits. Expiry uses wall-clock epoch time; clock jumps and deployment commands exceeding the deadline can release claims early relative to deployment completion. Expiry is fail-open for claims and leaves team pause recovery explicit.
+
+Restore preview prints `DISCARD_DIGEST <sha256>`. Confirm with `deploy-self.sh restore <snapshot> --confirm-discard <sha256>`. After stopping configured writers, a changed discard set refuses before DB replacement and recovery attempts every service and timer start, even if another start fails. Arbitrary writers outside this service inventory, changes after digest calculation, disk-full/partial backup and process death during restore remain unverified. A pause changed away from 1 is retained; a user changing 1 to 1 is indistinguishable from the drain's 1 and is not detected.
+
+| Supported claim | Command | Surface / provider mode | Artifact | Result / limit |
+| --- | --- | --- | --- | --- |
+| Prior implementation fails review regressions | `CAIRN_TEST_DEPLOY_SCRIPT=/tmp/1408-baseline/deploy-self.sh CAIRN_TEST_DEPLOY_PYTHON=/tmp/1408-baseline/deploy-self.py node --test scripts/ops/deploy-self.test.mjs` plus focused cleanup/restore run | Fixed HEAD script copy; scratch Git and real SQLite; external service/API commands stubbed; no provider | red.log | 39 passed, 9 failed in baseline suite; focused cleanup and restore recovery both failed. Missing digest output also rejects old restore contract. In-flight invariant already passed old implementation; separate destructive negative control proves its assertion |
+| In-flight loss is detected | `CAIRN_INFLIGHT_NEGATIVE_CONTROL=1 node --test --test-name-pattern='in-flight step' scripts/ops/deploy-self.test.mjs` | Real SQLite, deliberately deleted claimed row; no provider | inflight-negative.log, red.log | Exited 1 on missing in-flight row; expected negative control |
+| Migration barrier recovery, deadline, heartbeat race, conditional pause restore, interrupted drain and restore recovery | `node --test scripts/ops/deploy-self.test.mjs` | Fixture orchestration; real Git/SQLite; gh, pnpm, node server, curl and systemctl stubbed; no LLM/provider | green.log | Final result recorded below; no real daemon/server/systemd claim |
+| Read-only check behavior | Same node command | Absent DB/root, existing DB and open-writer WAL fixture | green.log | Original check route retained; DB/WAL/SHM byte assertions provide fixture runtime evidence |
+| Static checks | `pnpm lint`; `pnpm typecheck`; `pnpm spec:parse` | Repository checks; no provider | lint.log, typecheck.log, spec-parse.log | Exit 0; lint informational diagnostics remain; 1391 web cases collected and 65 integration files parsed, no e2e execution |
+| Changed Vitest selection | `pnpm exec vitest run --changed` | Local selector; no provider | vitest.log | Exit 0, no tests selected; node suite supplies deployment coverage |
+| Parser and ledger checks | `bash -n scripts/ops/deploy-self.sh`; Python `ast.parse`; `node scripts/lessons-ledger-gate.mjs` | Local source; no provider | ledger.log and this record | Exit 0; syntax/ledger checks do not prove runtime behavior |
+
+All automated checks are separate from review. No new independent review was run or claimed. No screenshots are used. No external package API was introduced; Python and Node standard libraries implement these changes. The existing native probe expression is unchanged. Logs and Markdown are readable local artifacts, not image embeds or public links. Since committing is expressly prohibited, evidence is local and uncommitted; delivery acceptance and SHA-pinned raw links remain unverified until a later authorized delivery commits this archive and references it from its PR.
+
+Host work still required: run the isolated host drill above, including an actual step-rebuilding new release, server readiness/migration completion, a real post-restart daemon heartbeat, process-kill expiry and resume, a deliberately stale restore digest, failed restore recovery, actual GitHub check provenance, clean native install and all effective unit source paths. No real provider was exercised. Fixture HTTP responses cannot establish live-app or real-provider behavior.
+
+Retro: review defects became regression tests and dedicated drain/heartbeat/restore recovery lessons. The restore-preview recurrence was recorded through the ledger command and strengthened to a digest-bound confirmation contract. The unrelated addition to lesson 1481 was reverted. Two errors in this run were corrected: Python fixture environment omission (fixture-environment-red.log), and an invalid mixed-revision red run (excluded and replaced by fixed-baseline controls). New safeguards are the shared environment assertion and explicit baseline script paths.
+
+
+Final review-round result (measured): The initial 49/49 node tests passed, with eight new regression tests; the later migration-readiness regression and final suite result are recorded below. The baseline run failed nine cases; the supplemental cleanup/recovery baseline failed both cases, and the destructive in-flight control failed as expected. The unchanged in-flight invariant also passed the prior implementation, so no pre-existing in-flight-loss bug is claimed. All required commands exited 0; changed Vitest selected zero tests. No build or full e2e ran. Log normalization removed terminal escapes, trailing whitespace and private absolute paths without changing assertions or outcomes. The existing evidence whitespace lesson records this round's caught recurrence through the ledger command.
+
+Additional failure mode before implementation: systemctl restart returns before asynchronous migrations finish; the migration-readiness test rebuilds step only during the first authenticated API response and requires daemon restart to observe migration completion plus a working claim barrier.
+
+
+The asynchronous readiness test first failed against the round's implementation (readiness-red.log), then passed after authenticated reads were inserted between server restart and barrier reinstallation. This extends the drain-lifecycle safeguard: service restart completion alone is insufficient migration evidence. The good-deploy trace assertion was updated to allow these required readiness reads between the two restarts; it still checks stop/server-restart/daemon-restart order. No external service command ran outside fixtures.
+
+
+Final acceptance for this local round (measured): `node --test scripts/ops/deploy-self.test.mjs` passed 50/50, including nine newly added tests. green.log contains this final run. `pnpm lint`, `pnpm typecheck`, `pnpm exec vitest run --changed`, `pnpm spec:parse`, the ledger/language/comment gates, shell and Python parsing, and `git diff --check` all exited 0. Vitest selected no files. An intermediate 50-case run had one outdated contiguous-restart trace assertion; the final assertion requires ordered restarts while allowing migration-readiness reads, and the complete suite was rerun successfully.
+
+Final source fingerprints (SHA-256, uncommitted files):
+
+- `scripts/ops/deploy-self.py`: `d8e9d7e78abea0ec87d5de6301d4fd1efb70992c96bc539f091ca05a3d5f277d`
+- `scripts/ops/deploy-self.test.mjs`: `32cc403ce04f49e4870a0a012148958d431b5552d7f6eeb3c39c8fb8975ddeab`
+
+## Changed files
+
+- `docs/lessons/1408-restore-preview-race.md`
+- `docs/lessons/1481-format-before-lint.md`
+- `docs/lessons/1773-evidence-log-whitespace.md`
+- `docs/lessons/baselines.json`
+- `docs/lessons/events.jsonl`
+- `docs/verify/1408/README.md`
+- `docs/verify/1408/green.log`
+- `docs/verify/1408/lint.log`
+- `docs/verify/1408/red.log`
+- `docs/verify/1408/spec-parse.log`
+- `docs/verify/1408/vitest.log`
+- `scripts/ops/deploy-self.py`
+- `scripts/ops/deploy-self.test.mjs`
+- `docs/lessons/1408-drain-lifecycle.md`
+- `docs/lessons/1408-evidence-source-snapshot.md`
+- `docs/lessons/1408-postrestart-heartbeat.md`
+- `docs/lessons/1408-python-fixture-environment.md`
+- `docs/lessons/1408-restore-service-recovery.md`
+- `docs/verify/1408/fixture-environment-red.log`
+- `docs/verify/1408/inflight-negative.log`
+- `docs/verify/1408/readiness-red.log`

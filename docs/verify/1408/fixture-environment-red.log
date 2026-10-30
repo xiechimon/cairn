@@ -1,0 +1,123 @@
+✔ red refuses before restarting units (1670.825458ms)
+✔ evidence refuses before restarting units (1795.183167ms)
+✔ off-main refuses before restarting units (1646.747709ms)
+✔ install refuses before restarting units (2195.237042ms)
+✔ migration refuses before restarting units (3716.654084ms)
+✔ incompatible refuses before restarting units (5603.432833ms)
+✔ drain refuses before restarting units (4698.42ms)
+✔ missing-check refuses before restarting units (1843.080083ms)
+✔ pending-check refuses before restarting units (1877.596959ms)
+✔ wrong-sha refuses before restarting units (1626.912167ms)
+✔ superseded refuses before restarting units (1488.827792ms)
+✔ backup refuses before restarting units (2947.006459ms)
+✔ unit-path refuses before restarting units (1108.905125ms)
+✔ good deploy points current and last-good to the exact new SHA (3304.362083ms)
+✔ failed health rolls code back and keeps rows written after the backup (4422.977375ms)
+✔ restore previews discarded rows and refuses without explicit confirmation (632.618583ms)
+✔ confirmed restore includes writes made while stopping units in its discard report (2469.89025ms)
+✔ a stale daemon heartbeat causes code rollback (4933.2195ms)
+✔ drain blocks both claim insertion and transition, then restores prior pause values (331.826125ms)
+✔ a drain setup error leaves neither a partial pause record nor changed pause values (329.268833ms)
+✔ restoring a drained snapshot removes its saved deployment barrier before restart (1208.240208ms)
+✔ install honors allowBuilds and probes native SQLite before scratch startup (5215.900709ms)
+✔ native probe failure refuses before scratch, drain or restart (5446.489083ms)
+✔ check needs no bootstrap and leaves no deployment files or database (1815.633667ms)
+✔ check refuses red without writes (1388.479625ms)
+✔ check refuses evidence without writes (1712.877292ms)
+✔ check refuses off-main without writes (1376.648709ms)
+✔ check refuses missing-check without writes (1544.895125ms)
+✔ check refuses pending-check without writes (1803.298833ms)
+✔ check refuses wrong-sha without writes (1287.551ms)
+✔ check refuses superseded without writes (1008.70025ms)
+✔ deploy refuses leftover drain state and names explicit recovery (801.38325ms)
+✔ check refuses leftover drain state and names explicit recovery (769.04125ms)
+✔ restore refuses leftover drain state and names explicit recovery (678.57ms)
+✔ custom instance uses only its units, URL, scratch port and backup directory (3909.92725ms)
+✔ invalid unit inventory refuses "" (309.166792ms)
+✔ invalid unit inventory refuses "one.service" (299.129459ms)
+✔ invalid unit inventory refuses "one.service two.service three.service" (299.486833ms)
+✔ custom instance health failure rolls back only its units (4248.937833ms)
+✔ deploy fetches the gated release before creating its checkout (3159.78375ms)
+✔ check refuses an uncheckpointed drain without changing WAL sidecars (277.955375ms)
+✔ rebuild migration and heartbeat regression (3151.565417ms)
+✔ old-heartbeat migration and heartbeat regression (4097.621542ms)
+✖ expired drain permits claims after an unclean exit and refusal names its deadline (211.869708ms)
+✔ resume preserves changed pause values and survives missing migration triggers (211.80725ms)
+✔ in-flight step completes while new claims remain blocked (227.1725ms)
+✖ confirmed restore failure restarts every configured service and timer (231.934ms)
+✔ interrupt immediately after drain still restores pause state (3244.527959ms)
+ℹ tests 48
+ℹ suites 0
+ℹ pass 46
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 99127.873209
+
+✖ failing tests:
+
+test at scripts/ops/deploy-self.test.mjs:461:1
+✖ expired drain permits claims after an unclean exit and refusal names its deadline (211.869708ms)
+  AssertionError [ERR_ASSERTION]: Traceback (most recent call last):
+    File "<string>", line 10, in <module>
+      else: raise AssertionError('leftover drain accepted')
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  AssertionError: leftover drain accepted
+
+
+  1 !== 0
+
+      at command (file://<worktree>/scripts/ops/deploy-self.test.mjs:20:10)
+      at pythonFixture (file://<worktree>/scripts/ops/deploy-self.test.mjs:457:3)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:462:3)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/deploy-self.test.mjs:489:1
+✖ confirmed restore failure restarts every configured service and timer (231.934ms)
+  AssertionError [ERR_ASSERTION]: Traceback (most recent call last):
+    File "<string>", line 13, in <module>
+      try: m['restore'](snapshot, m['discard_report'](db))
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    File "<worktree>/scripts/ops/deploy-self.py", line 196, in restore
+      with tempfile.TemporaryDirectory(dir=ROOT) as folder:
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+    File "/opt/homebrew/Cellar/python@3.15/3.15.2/Frameworks/Python.framework/Versions/3.15/lib/python3.15/tempfile.py", line 961, in __init__
+      self.name = mkdtemp(suffix, prefix, dir)
+                  ~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+    File "/opt/homebrew/Cellar/python@3.15/3.15.2/Frameworks/Python.framework/Versions/3.15/lib/python3.15/tempfile.py", line 435, in mkdtemp
+      _os.mkdir(file, 0o700)
+      ~~~~~~~~~^^^^^^^^^^^^^
+  FileNotFoundError: [Errno 2] No such file or directory: '/Users/xmon/.local/share/cairn-deploy/tmpt19l9sxi'
+
+
+  1 !== 0
+
+      at command (file://<worktree>/scripts/ops/deploy-self.test.mjs:20:10)
+      at pythonFixture (file://<worktree>/scripts/ops/deploy-self.test.mjs:457:3)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:490:3)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
