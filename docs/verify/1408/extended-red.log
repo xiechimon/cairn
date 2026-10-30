@@ -1,0 +1,65 @@
+✔ red refuses before restarting units (793.699417ms)
+✔ evidence refuses before restarting units (781.280833ms)
+✖ off-main refuses before restarting units (529.998167ms)
+✔ install refuses before restarting units (1038.668833ms)
+✔ migration refuses before restarting units (2122.833042ms)
+✔ incompatible refuses before restarting units (2517.064916ms)
+✔ drain refuses before restarting units (2691.934875ms)
+✔ missing-check refuses before restarting units (764.298417ms)
+✔ pending-check refuses before restarting units (732.72125ms)
+✔ wrong-sha refuses before restarting units (800.599375ms)
+✔ superseded refuses before restarting units (802.217417ms)
+✔ backup refuses before restarting units (1481.806375ms)
+✖ unit-path refuses before restarting units (1949.204041ms)
+✔ good deploy points current and last-good to the exact new SHA (1811.024792ms)
+✔ failed health rolls code back and keeps rows written after the backup (2850.510209ms)
+✔ restore previews discarded rows and refuses without explicit confirmation (234.175458ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 14
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 22103.027292
+
+✖ failing tests:
+
+test at scripts/ops/deploy-self.test.mjs:76:3
+✖ off-main refuses before restarting units (529.998167ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /main/. Input:
+  
+  'FAIL git -C failed (1)\n'
+  
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:79:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL git -C failed (1)\n',
+    expected: /main/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/deploy-self.test.mjs:76:3
+✖ unit-path refuses before restarting units (1949.204041ms)
+  AssertionError [ERR_ASSERTION]: Expected "actual" to be strictly unequal to: 0
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:78:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 0,
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }

@@ -1,0 +1,36 @@
+✖ drain blocks both claim insertion and transition, then restores prior pause values (2020.908875ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2523.963333
+
+✖ failing tests:
+
+test at scripts/ops/deploy-self.test.mjs:217:1
+✖ drain blocks both claim insertion and transition, then restores prior pause values (2020.908875ms)
+  AssertionError [ERR_ASSERTION]: Traceback (most recent call last):
+    File "<string>", line 9, in <module>
+      assert db.execute("select count(*) from step where status='claimed'").fetchone()[0]==0
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  AssertionError
+  
+  
+  1 !== 0
+  
+      at command (file://<worktree>/scripts/ops/deploy-self.test.mjs:18:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:232:3)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

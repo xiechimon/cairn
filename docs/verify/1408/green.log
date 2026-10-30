@@ -1,0 +1,29 @@
+✔ red refuses before restarting units (6404.42075ms)
+✔ evidence refuses before restarting units (4281.013583ms)
+✔ off-main refuses before restarting units (2980.622125ms)
+✔ install refuses before restarting units (6349.399ms)
+✔ migration refuses before restarting units (5885.550916ms)
+✔ incompatible refuses before restarting units (5739.730958ms)
+✔ drain refuses before restarting units (7591.339958ms)
+✔ missing-check refuses before restarting units (6370.504292ms)
+✔ pending-check refuses before restarting units (5100.560334ms)
+✔ wrong-sha refuses before restarting units (5203.136291ms)
+✔ superseded refuses before restarting units (3058.172375ms)
+✔ backup refuses before restarting units (4304.247708ms)
+✔ unit-path refuses before restarting units (1901.018958ms)
+✔ good deploy points current and last-good to the exact new SHA (5554.507208ms)
+✔ failed health rolls code back and keeps rows written after the backup (5813.141667ms)
+✔ restore previews discarded rows and refuses without explicit confirmation (1623.583042ms)
+✔ confirmed restore includes writes made while stopping units in its discard report (1668.559875ms)
+✔ a stale daemon heartbeat causes code rollback (5487.972709ms)
+✔ drain blocks both claim insertion and transition, then restores prior pause values (951.831958ms)
+✔ a drain setup error leaves neither a partial pause record nor changed pause values (1327.609917ms)
+✔ restoring a drained snapshot removes its saved deployment barrier before restart (1932.8885ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 90792.115625

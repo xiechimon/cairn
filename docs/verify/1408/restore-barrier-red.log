@@ -1,0 +1,30 @@
+✖ restoring a drained snapshot removes its saved deployment barrier before restart (4447.110917ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4993.8515
+
+✖ failing tests:
+
+test at scripts/ops/deploy-self.test.mjs:246:1
+✖ restoring a drained snapshot removes its saved deployment barrier before restart (4447.110917ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  '3' !== '0'
+  
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:253:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '3',
+    expected: '0',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

@@ -1,0 +1,223 @@
+✖ red refuses before restarting units (936.601125ms)
+✖ evidence refuses before restarting units (846.296334ms)
+✖ off-main refuses before restarting units (606.248958ms)
+✖ install refuses before restarting units (1192.686042ms)
+✖ migration refuses before restarting units (2087.000291ms)
+✖ incompatible refuses before restarting units (2417.060834ms)
+✖ drain refuses before restarting units (3808.820625ms)
+✖ good deploy points current and last-good to the exact new SHA (2868.30375ms)
+✖ failed health rolls code back and keeps rows written after the backup (3557.380709ms)
+✔ restore previews discarded rows and refuses without explicit confirmation (454.321333ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 1
+ℹ fail 9
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 18959.801666
+
+✖ failing tests:
+
+test at scripts/ops/deploy-self.test.mjs:70:3
+✖ red refuses before restarting units (936.601125ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + '<canonical-fixture>/deploy/releases/1202e8a4fd4deee5414d59a627242a339bb735ac'
+  - '<alias-fixture>/deploy/releases/1202e8a4fd4deee5414d59a627242a339bb735ac'
+  
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:75:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '<canonical-fixture>/deploy/releases/1202e8a4fd4deee5414d59a627242a339bb735ac',
+    expected: '<alias-fixture>/deploy/releases/1202e8a4fd4deee5414d59a627242a339bb735ac',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/deploy-self.test.mjs:70:3
+✖ evidence refuses before restarting units (846.296334ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + '<canonical-fixture>/deploy/releases/e6ac244295e4611fc46736d59677b21c22b7ebad'
+  - '<alias-fixture>/deploy/releases/e6ac244295e4611fc46736d59677b21c22b7ebad'
+  
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:75:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '<canonical-fixture>/deploy/releases/e6ac244295e4611fc46736d59677b21c22b7ebad',
+    expected: '<alias-fixture>/deploy/releases/e6ac244295e4611fc46736d59677b21c22b7ebad',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/deploy-self.test.mjs:70:3
+✖ off-main refuses before restarting units (606.248958ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /main/. Input:
+  
+  'FAIL git -C failed (1)\n'
+  
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:73:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL git -C failed (1)\n',
+    expected: /main/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/deploy-self.test.mjs:70:3
+✖ install refuses before restarting units (1192.686042ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + '<canonical-fixture>/deploy/releases/d2f08f92dabfa5c1e4168876fea55f244859a615'
+  - '<alias-fixture>/deploy/releases/d2f08f92dabfa5c1e4168876fea55f244859a615'
+  
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:75:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '<canonical-fixture>/deploy/releases/d2f08f92dabfa5c1e4168876fea55f244859a615',
+    expected: '<alias-fixture>/deploy/releases/d2f08f92dabfa5c1e4168876fea55f244859a615',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/deploy-self.test.mjs:70:3
+✖ migration refuses before restarting units (2087.000291ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + '<canonical-fixture>/deploy/releases/48d435d04e6ac18d2ecb3267531677e9db4b1e26'
+  - '<alias-fixture>/deploy/releases/48d435d04e6ac18d2ecb3267531677e9db4b1e26'
+  
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:75:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '<canonical-fixture>/deploy/releases/48d435d04e6ac18d2ecb3267531677e9db4b1e26',
+    expected: '<alias-fixture>/deploy/releases/48d435d04e6ac18d2ecb3267531677e9db4b1e26',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/deploy-self.test.mjs:70:3
+✖ incompatible refuses before restarting units (2417.060834ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + '<canonical-fixture>/deploy/releases/0e2b5901866b9e0c9bf029c1e53787303bb48f91'
+  - '<alias-fixture>/deploy/releases/0e2b5901866b9e0c9bf029c1e53787303bb48f91'
+  
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:75:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '<canonical-fixture>/deploy/releases/0e2b5901866b9e0c9bf029c1e53787303bb48f91',
+    expected: '<alias-fixture>/deploy/releases/0e2b5901866b9e0c9bf029c1e53787303bb48f91',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/deploy-self.test.mjs:70:3
+✖ drain refuses before restarting units (3808.820625ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + '<canonical-fixture>/deploy/releases/8007b90c0d6671ee4f15a30823efe1c89e446948'
+  - '<alias-fixture>/deploy/releases/8007b90c0d6671ee4f15a30823efe1c89e446948'
+  
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:75:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '<canonical-fixture>/deploy/releases/8007b90c0d6671ee4f15a30823efe1c89e446948',
+    expected: '<alias-fixture>/deploy/releases/8007b90c0d6671ee4f15a30823efe1c89e446948',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/deploy-self.test.mjs:79:1
+✖ good deploy points current and last-good to the exact new SHA (2868.30375ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + '<canonical-fixture>/deploy/releases/8975237fb7212f6984fbfc7637b4cf6f1a986985'
+  - '<alias-fixture>/deploy/releases/8975237fb7212f6984fbfc7637b4cf6f1a986985'
+  
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:82:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '<canonical-fixture>/deploy/releases/8975237fb7212f6984fbfc7637b4cf6f1a986985',
+    expected: '<alias-fixture>/deploy/releases/8975237fb7212f6984fbfc7637b4cf6f1a986985',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/deploy-self.test.mjs:87:1
+✖ failed health rolls code back and keeps rows written after the backup (3557.380709ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + '<canonical-fixture>/deploy/releases/675a1adb007656f277781b58e0656a3a4802af6f'
+  - '<alias-fixture>/deploy/releases/675a1adb007656f277781b58e0656a3a4802af6f'
+  
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/deploy-self.test.mjs:90:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '<canonical-fixture>/deploy/releases/675a1adb007656f277781b58e0656a3a4802af6f',
+    expected: '<alias-fixture>/deploy/releases/675a1adb007656f277781b58e0656a3a4802af6f',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
