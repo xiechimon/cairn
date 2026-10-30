@@ -1,6 +1,6 @@
 # PR review scorecard (#1080)
 
-> The form is borrowed from pi's `.pi/prompts/pr.md` (a version-controlled fixed six-section scorecard + five-step process). The author-side standard already lives in `.github/PULL_REQUEST_TEMPLATE.md` (the template's five sections) and `scripts/pr-evidence-gate.py` (the form gate) — what this file adds is **the written standard for reviewers**: what to read in what order when reviewing a PR in this repo, and what shape the output takes. It is a basis for judgment, not a mechanically decidable gate; mechanical checks belong to CI, see "Mechanical checks are not the reviewer's job" below.
+> The form is borrowed from pi's `.pi/prompts/pr.md` (a version-controlled fixed six-section scorecard + five-step process). The author-side standard already lives in `.github/PULL_REQUEST_TEMPLATE.md` (the template's four required sections: What / Proof / Review / Risk, with optional Upstream) and `scripts/pr-evidence-gate.py` (the form gate) — what this file adds is **the written standard for reviewers**: what to read in what order when reviewing a PR in this repo, and what shape the output takes. It is a basis for judgment, not a mechanically decidable gate; mechanical checks belong to CI, see "Mechanical checks are not the reviewer's job" below.
 
 ## Five-step process (execute in order; skipping a step means reviewing blind)
 
@@ -56,10 +56,10 @@ The review verdict lands as a **PR comment** (`gh pr comment`; write long conten
 
 ## Mechanical checks are not the reviewer's job (do not be a CI parrot)
 
-lint / typecheck / spec:parse / vitest / e2e are covered by the CI `check` job and the `pack-smoke` / `e2e-gate` required checks; the "has answers" property of the Upstream / Failure-path sections is pinned by `pr-evidence-gate.py`; the Acceptance-section tasks existing and being fully checked is pinned by `pr-tasks-gate.py` (the pr-tasks step of the pr-evidence job). The reviewer spends judgment where machines cannot see:
+lint / typecheck / spec:parse / vitest / e2e are covered by the CI `check` job and the `pack-smoke` / `e2e-gate` required checks; the "has answers" property of the What / Proof / Review / Risk sections (legacy Verified aliases Proof; Upstream is optional) is pinned by `pr-evidence-gate.py`; the absence of unchecked tasks anywhere in the body outside fenced code and HTML comments (no tasks are required) is pinned by `pr-tasks-gate.py` (the pr-tasks step of the pr-evidence job). The reviewer spends judgment where machines cannot see:
 
 - **Semantic conflicts**: two parallel PRs each change the same thing and each runs green (git merges cleanly, typecheck exposes it late or not at all) — compare against open PRs in flight and check `gh pr diff --name-only` for file collisions.
 - **Seam discipline**: whether dependencies locked by `biome.json`'s `noRestrictedImports` are being reached around the thin bridge modules (`apps/daemon/src/backend/` is the GitOps / MCP / LLM provider seam).
 - **Snapshot surfaces**: when the wire schema in `packages/shared` changes, whether `snapshot.test.ts` was updated in sync (a changed JSON projection with no snapshot update = guaranteed CI red).
 - **Closing-tag discipline**: whether `closes #N` is in the commit message (a squash merge carries only the commit message; the PR body never enters main); whether a staged PR **mistakenly carries** the whole ticket's closing tag.
-- **Exemption authenticity** (what the pr-tasks gate cannot police): the PR writes `- [x] no task surface: <reason>` while clearly having a task surface → the machine only verifies the checkbox is ticked; the truth is the reviewer's job, record it as Bad.
+- **Review provenance and evidence quality**: check the Review section's vendor, model, fresh context, head SHA, rounds, verdict and reasons for unfixed findings against the actual review. Check that Proof demonstrates the ticket's behavior and that any checked tasks have evidence; a checked box alone is not proof.

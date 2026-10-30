@@ -1,6 +1,6 @@
 ---
 name: pr-cairn
-description: Use when writing a PR body for this repo. Carries the cairn PR body contract (six sections from .github/PULL_REQUEST_TEMPLATE.md, checked by the pr-evidence CI gate) and replaces the global show-me template (Summary/Evidence/Merge Danger), which fails the gate here.
+description: Use when writing a PR body for this repo. Carries the cairn PR body contract (four required sections from .github/PULL_REQUEST_TEMPLATE.md, checked by the pr-evidence CI gate) and replaces the global show-me template (Summary/Evidence/Merge Danger), which fails the gate here.
 ---
 
 # pr-cairn — writing a PR body in cairn
@@ -37,57 +37,76 @@ rules to it, and write like a person reporting what they did.
 The same rules apply to ticket bodies, commit messages, code comments and
 lane briefs.
 
-## The six sections (exact headings)
+## The four required sections (exact headings)
 
 ### `## What`
 
-What this PR does and why, plus the ticket it answers. Prose. Say what
-changed and what it replaces or fixes; name files and symbols instead of
+In two to four sentences, explain what changed and why, the ticket it
+answers, and the overlap lookup result. Name files and symbols instead of
 describing them.
 
-Screenshots belong here when the change is visible in the running app. Embed
-reachable image URLs with `![label](url)`. Committing evidence under
-`docs/verify/<ticket>/` is optional.
+### `## Proof`
 
-### `## Verified`
+For code, paste both halves verbatim: the command run on the old code with
+its actual failing output, then the same command on this change with its
+passing output. Include lint, typecheck and relevant e2e results. A claim
+that "without this change X would fail" is not evidence.
 
-Both halves pasted verbatim, not narrated: the command run on the old code
-(its actual failing output) and the same command on this change (its passing
-output — `pnpm lint` / `pnpm typecheck` / affected e2e results go here). A
-claim that "without this change X would fail" is not evidence. HTML comments
-do not count as an answer (the gate strips them).
+For UI changes, use a before / after / unchanged screenshot table. Embed
+reachable image URLs with `![label](url)`; committing screenshots under
+`docs/verify/<ticket>/` is optional, and a committed file needs a SHA-pinned
+raw link pushed before the body is written.
 
-### `## Upstream`
+Pick the proof by what the change touches. This table follows 56 merged
+backend PRs in eight agent-heavy repositories (t3code, background-agents,
+opencode, pi, inbox-zero, rakazo, optio, codex; sampled 2026-10-30); a test
+that fails on main and passes here was the proof in 24 of them, and no PR
+used a standalone curl transcript.
 
-Does an equivalent exist in the current dependencies (pi / claude-agent-sdk /
-code already in this repo)? If an equivalent was rejected, give the checkable
-reason (security boundary, different data source, different interaction
-semantics); "more controllable" or "fits our model better" do not qualify. If
-the PR adds no mechanism, say so in one line. HTML comments do not count.
+| Change | Proof |
+|---|---|
+| Logic, data or protocol bug | Name the test, quote its one-line failure on main, show it passing here |
+| Concurrency, leases, retries, crash recovery | A test on a real database, or one that kills the process mid-flight, with the symptom on main |
+| Database write, migration, query | A real-database test over every migration; the wrong row on main or the fixed row; a plan assertion for query changes |
+| Performance | A before / after table with data size, runs and warmup, and whether results are identical |
+| Process, daemon, CLI, deploy | A short real-run transcript: the reproduction command with output before and after |
+| External provider or model behavior | A live call matrix with numbers before and after, and the targets not covered |
+| HTTP endpoint | An integration test asserting status and body; a curl transcript is optional |
+| Visible UI | The before / after / unchanged screenshot table above |
+
+End Proof with one `Not verified:` line: what was not run, and tests that
+already fail on main for unrelated reasons. "Tests pass", a test count, a CI
+link or a bot summary is not proof. Paste the failure text itself; do not
+paraphrase it. HTML comments do not count as an answer. A legacy
+`## Verified` heading satisfies Proof. A complete legacy six-section body
+may omit Review; a body using Proof must include Review.
+
+### `## Review`
+
+Record the reviewer vendor and model, whether the context was fresh, the
+reviewed head SHA, number of rounds, verdict, and unfixed findings with
+reasons. Review findings still open must be visible here.
 
 ### `## Risk`
 
-One-way or two-way door? Blast radius: what else this change can touch, and
-which runs ruled that out (name the runs).
+State whether this is a one-way or two-way door, the blast radius and the
+runs that checked it, and whether the owner must merge under pr-gate's
+protected-path routing.
 
-### `## Acceptance`
+### Optional `## Upstream`
 
-A task-list checklist: at least one item, none unchecked at merge (the
-pr-tasks step of the pr-evidence CI gate checks both). Reconcile the
-ticket's acceptance checklist item by item, each task pointing at its
-evidence. Merge-time reconciliation items belong in the ticket, not in
-the body. If the ticket has no task surface (docs-only rename and the
-like), write exactly `- [x] no task surface: <one-line reason>`; an
-exemption line on a PR that clearly has a task surface is a reviewer
-Bad, not a gate matter.
+Include this only when the PR adds a mechanism. Does an equivalent exist
+in the current dependencies (pi / claude-agent-sdk / code already in this
+repo)? If an equivalent was rejected, give the checkable reason (security
+boundary, different data source, different interaction semantics);
+"more controllable" or "fits our model better" do not qualify.
 
-### `## Issues`
+Closing keywords belong only in commit messages. For a multi-segment ticket,
+state under What which segment closes it; only that segment's commit message
+carries the parent ticket's closing keyword.
 
-`Closes #N`. The squash commit body is what actually closes the ticket —
-carry the closing keyword in the branch commit message too (PR bodies do not
-enter the squashed commit). If this PR is one segment of a multi-segment
-ticket, state which segment closes the ticket and that the squash body must
-not carry the closing keyword for the parent ticket.
+No checklist is required. Any unchecked task anywhere in the body outside
+fenced code and HTML comments keeps pr-evidence red.
 
 ## Mechanics
 
@@ -101,8 +120,8 @@ not carry the closing keyword for the parent ticket.
   `python3 scripts/pr-evidence-gate.py /tmp/pr.md` — exit 1 names each
   problem (`missing-section` / `empty-section` / `not-embedded` /
   `unreachable`); then `python3 scripts/pr-tasks-gate.py /tmp/pr.md` —
-  exit 1 names `no-tasks` (Acceptance carries no task-list item) or
-  `unchecked-task` (a `- [ ]` still open, with its line number).
+  exit 1 names `unchecked-task` (a task still open anywhere in the body,
+  with its line number). A body with no tasks passes.
   A section whose only content is a fenced block counts as empty: put at
   least one prose line above the fence (#1785).
 - Editing an open PR: `gh pr edit` breaks on Projects-classic GraphQL
@@ -121,7 +140,7 @@ not carry the closing keyword for the parent ticket.
   `node scripts/english-only-gate.mjs --text <body>` and reds otherwise;
   run it locally on `/tmp/pr.md` before opening.
 - Never add the `needs-decision` label to a PR. When a PR needs a decision, decide by your own recommendation, say in the chat what you chose and why, and keep going; only payments, the owner's own credentials and the steps `AGENTS.md` routes to a person go to the owner. Before asking a person about a PR whose auto-merge is armed, disarm it with `gh pr merge <n> --disable-auto`. A label that is already on keeps pr-evidence red and disarms auto-merge until it is removed.
-- Before enabling any merge, require a pr-gate verdict of go with `mergedBy: 'auto-merge'` (`AGENTS.md`, "Current merge state"; every other PR goes to ian), fully checked Acceptance and no `needs-decision` label; an unchecked item keeps pr-evidence red until it is checked.
+- Before enabling any merge, require a pr-gate verdict of go with `mergedBy: 'auto-merge'` (`AGENTS.md`, "Current merge state"; every other PR goes to ian), no unchecked tasks anywhere in the body and no `needs-decision` label; an unchecked item keeps pr-evidence red until it is checked.
 - Read the PR opener and every commit author: `gh pr view <n> --json author,commits`. Follow `docs/ops/agent-bot-identity.md` for the identity checks.
 - Bot-opened PRs require exactly one commit authored by `Cairnwright` before a rebase merge. Use the dispatcher's `~/.cairn/tools/merge-pr.sh`; inspect its source and usage on the dispatch host before invoking it. If the helper is unavailable or the commit identity is wrong, stop and return the PR to the dispatcher.
 - Human-opened PRs use `gh pr merge <n> --squash --auto` after verifying their commits contain no `cairnwright[bot]` author. After a merge, read the main commit author and the `commit-author` Actions result.
@@ -132,8 +151,8 @@ not carry the closing keyword for the parent ticket.
 
 | requirement | enforced by |
 |---|---|
-| `## Verified`, `## Upstream` answered (non-empty after stripping comments) | pr-evidence (required check) |
+| `## What`, `## Proof`, `## Review`, `## Risk` answered (legacy `## Verified` aliases Proof; Upstream is optional) | pr-evidence (required check) |
 | image links embedded + HTTP 200 | pr-evidence (required check) |
-| Acceptance carries >=1 task-list item, all checked | pr-evidence (required check, pr-tasks step) |
+| no unchecked tasks anywhere outside fenced code and HTML comments; no tasks required | pr-evidence (required check, pr-tasks step) |
 | no `needs-decision` label on the PR (a person's decision is pending) | pr-evidence (required check); while the label is on, each run also disarms auto-merge |
 | body is English (Chinese only inside backticks or fences) | pr-evidence (required check, language step) |

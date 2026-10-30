@@ -1,8 +1,11 @@
 import contextlib
 import importlib.util
 import io
+import os
 from pathlib import Path
+import subprocess
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -14,7 +17,7 @@ spec.loader.exec_module(gate)
 class EvidenceGateTests(unittest.TestCase):
     def verdict(self, body, status='200'):
         output = io.StringIO()
-        with patch.object(sys, 'argv', ['pr-evidence-gate.py']), patch.dict(gate.os.environ, {'PR_BODY': '## Upstream\nIndependent.\n## Verified\nRegression checks.\n' + body}), patch.object(gate, 'http_code', return_value=status) as probe, contextlib.redirect_stdout(output):
+        with patch.object(sys, 'argv', ['pr-evidence-gate.py']), patch.dict(gate.os.environ, {'PR_BODY': '## What\nUpdate evidence checks.\n## Review\nFresh review passed.\n## Risk\nReversible gate change.\n## Proof\nRegression checks.\n' + body}), patch.object(gate, 'http_code', return_value=status) as probe, contextlib.redirect_stdout(output):
             result = gate.main()
         return result, output.getvalue(), probe
 
@@ -62,7 +65,7 @@ class EvidenceGateTests(unittest.TestCase):
                 expected = url + '?theme=dark&size=2' if suffix.startswith('?') else url
                 result, output, probe = self.verdict(f'see {url}{suffix}')
                 self.assertEqual(result, 1, output)
-                self.assertIn(f'FAIL not-embedded: {expected} (bare URL, line 5)', output)
+                self.assertIn(f'FAIL not-embedded: {expected} (bare URL, line 9)', output)
                 self.assertNotIn('FAIL fixture:', output)
                 self.assertNotIn('FAIL unreachable', output)
                 probe.assert_called_once_with(expected)
@@ -87,6 +90,151 @@ class EvidenceGateTests(unittest.TestCase):
             self.assertEqual(result, 1, output)
             self.assertIn('FAIL unreachable (HTTP 404):', output)
             probe.assert_called_once_with(url)
+
+
+class SectionContractTests(unittest.TestCase):
+    body = '## What\nUpdate the contract.\n## Proof\nOld run failed; new run passed.\n## Review\nFresh review passed.\n## Risk\nReversible gate change.\n'
+
+    def verdict(self, body):
+        output = io.StringIO()
+        with patch.object(sys, 'argv', ['pr-evidence-gate.py']), patch.dict(gate.os.environ, {'PR_BODY': body}), contextlib.redirect_stdout(output):
+            result = gate.main()
+        return result, output.getvalue()
+
+    def test_untouched_new_template_fails_all_four_sections(self):
+        body = '\n'.join(f'## {name}\n<!-- Guidance. -->\n' for name in ('What', 'Proof', 'Review', 'Risk'))
+        result, output = self.verdict(body)
+        self.assertEqual(result, 1, output)
+        for name in ('What', 'Proof', 'Review', 'Risk'):
+            self.assertIn(f'FAIL empty-section: {name}', output)
+        self.assertIn('What / Proof / Review / Risk', output)
+
+    def test_repository_template_is_unanswered(self):
+        body = Path('.github/PULL_REQUEST_TEMPLATE.md').read_text()
+        result, output = self.verdict(body)
+        self.assertEqual(result, 1, output)
+        self.assertEqual(gate.section_verdicts(body), dict.fromkeys(('What', 'Proof', 'Review', 'Risk'), 'empty'))
+
+    def test_filled_four_section_body_passes_without_upstream_or_tasks(self):
+        result, output = self.verdict(self.body)
+        self.assertEqual(result, 0, output)
+        self.assertIn('4/4 answered', output)
+
+    def test_each_missing_section_fails_and_names_it(self):
+        for name in ('What', 'Proof', 'Review', 'Risk'):
+            with self.subTest(name=name):
+                body = ''.join('## ' + section for section in self.body.split('## ') if section and not section.startswith(name + '\n'))
+                result, output = self.verdict(body)
+                self.assertEqual(result, 1, output)
+                self.assertIn(f'FAIL missing-section: {name}', output)
+
+    def test_verified_is_a_case_insensitive_proof_alias(self):
+        result, output = self.verdict(self.body.replace('## Proof', '## vErIfIeD'))
+        self.assertEqual(result, 0, output)
+        self.assertIn('4/4 answered', output)
+
+    def test_fenced_or_commented_answers_do_not_satisfy_sections(self):
+        for content in ('<!-- Not an answer. -->', '```text\nAn example.\n```'):
+            result, output = self.verdict(self.body.replace('Fresh review passed.', content))
+            self.assertEqual(result, 1, output)
+            self.assertIn('FAIL empty-section: Review', output)
+
+    def test_complete_legacy_six_section_body_passes_without_review(self):
+        body = '## What\nUpdate the gate.\n## Verified\nOld run failed; new run passed.\n## Upstream\nNo new mechanism.\n## Risk\nReversible change.\n## Acceptance\n- [x] Checks passed.\n## Issues\nRelated to #2196.\n'
+        result, output = self.verdict(body)
+        self.assertEqual(result, 0, output)
+        self.assertEqual(gate.section_verdicts(body)['Proof'], 'answered')
+        self.assertIn('legacy', output)
+        for name in ('What', 'Verified', 'Upstream', 'Risk', 'Acceptance', 'Issues'):
+            with self.subTest(missing=name):
+                incomplete = ''.join('## ' + section for section in body.split('## ') if section and not section.startswith(name + '\n'))
+                result, output = self.verdict(incomplete)
+                self.assertEqual(result, 1, output)
+                self.assertIn('FAIL missing-section: Review', output)
+        result, output = self.verdict(body + '## Review\n<!-- Pending. -->')
+        self.assertEqual(result, 1, output)
+        self.assertIn('FAIL empty-section: Review', output)
+        result, output = self.verdict(body.replace('## Verified', '## Proof'))
+        self.assertEqual(result, 1, output)
+        self.assertIn('FAIL missing-section: Review', output)
+
+    def test_commented_legacy_headings_cannot_waive_review(self):
+        body = self.body.replace('## Review\nFresh review passed.\n', '').replace('## Proof', '## Verified')
+        body += '<!--\n## Upstream\nExample.\n## Acceptance\nExample.\n## Issues\nExample.\n-->'
+        result, output = self.verdict(body)
+        self.assertEqual(result, 1, output)
+        self.assertIn('FAIL missing-section: Review', output)
+
+    def test_optional_upstream_does_not_need_an_answer(self):
+        result, output = self.verdict(self.body + '## Upstream\n<!-- Optional. -->\n')
+        self.assertEqual(result, 0, output)
+
+    def test_empty_legacy_sections_cannot_waive_review(self):
+        body = '## What\nx\n## Verified\ny\n## Upstream\n\n## Risk\nz\n## Acceptance\n\n## Issues\n'
+        result, output = self.verdict(body)
+        self.assertEqual(result, 1, output)
+        self.assertIn('FAIL missing-section: Review', output)
+        for upstream, acceptance in [
+            ('', '- [x] Done.'),
+            ('<!-- Guidance. -->', '- [x] Done.'),
+            ('```\nExample.\n```', '- [x] Done.'),
+            ('No mechanism.', ''),
+            ('No mechanism.', 'Prose only.'),
+            ('No mechanism.', '<!--\n- [x] Hidden.\n-->'),
+            ('No mechanism.', '```\n- [x] Example.\n```'),
+        ]:
+            with self.subTest(upstream=upstream, acceptance=acceptance):
+                body = f'## What\nx\n## Verified\ny\n## Upstream\n{upstream}\n## Risk\nz\n## Acceptance\n{acceptance}\n## Issues\n'
+                result, output = self.verdict(body)
+                self.assertEqual(result, 1, output)
+                self.assertIn('FAIL missing-section: Review', output)
+
+    def test_inline_code_comment_opener_does_not_hide_sections(self):
+        body = '## What\nThe gate skips `<!--` comments.\n## Proof\ny\n## Review\nr\n## Risk\n<!-- note --> z\n'
+        result, output = self.verdict(body)
+        self.assertEqual(result, 0, output)
+        self.assertIn('4/4 answered', output)
+
+    def test_fenced_comment_opener_does_not_hide_sections(self):
+        body = self.body.replace('Update the contract.', 'Update the contract.\n```html\n<!--\n```')
+        result, output = self.verdict(body)
+        self.assertEqual(result, 0, output)
+
+    def test_only_real_comments_hide_section_answers(self):
+        for content in ('`<!-- note -->`', '``<!-- note -->``', 'Prose <!-- without a close'):
+            with self.subTest(content=content):
+                result, output = self.verdict(self.body.replace('Update the contract.', content))
+                self.assertEqual(result, 0, output)
+        result, output = self.verdict(self.body.replace('Fresh review passed.', '<!-- Unclosed.'))
+        self.assertEqual(result, 1, output)
+        self.assertIn('FAIL empty-section: Review', output)
+        self.assertIn('FAIL missing-section: Risk', output)
+
+    def test_weekly_workflow_body_with_real_rendered_summary_passes(self):
+        rendered = subprocess.run([
+            'node', '--input-type=module', '-e',
+            "import { loadLedger, readEvents, weeklySummary, renderWeeklySummary } from './scripts/lessons-ledger-gate.mjs'; process.stdout.write(renderWeeklySummary(weeklySummary(loadLedger(process.cwd()), readEvents(process.cwd()), { now: new Date('2026-10-30T00:00:00Z') })));",
+        ], text=True, capture_output=True, check=True).stdout
+        self.assertTrue(rendered.startswith('## Lessons ledger weekly summary\n'))
+        workflow = Path('.github/workflows/gardener-weekly.yml').read_text()
+        script = workflow[workflow.index("            printf '%s\\n' '## What'"):workflow.index('            gh pr create')]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            root.joinpath('gardener-summary').mkdir()
+            root.joinpath('gardener-summary/lessons-weekly-test.md').write_text(rendered)
+            script = script.replace('gardener-summary/', '"$RUNNER_TEMP"/gardener-summary/')
+            subprocess.run(['bash', '-e', '-c', script], env={**os.environ, 'RUNNER_TEMP': directory}, text=True, capture_output=True, check=True)
+            result = subprocess.run([sys.executable, 'scripts/pr-evidence-gate.py', str(root / 'lessons-pr.md')], text=True, capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn('4/4 answered', result.stdout)
+
+
+def load_tests(loader, tests, pattern):
+    task_spec = importlib.util.spec_from_file_location('task_tests', Path(__file__).with_name('pr-tasks-gate.test.py'))
+    task_tests = importlib.util.module_from_spec(task_spec)
+    task_spec.loader.exec_module(task_tests)
+    tests.addTests(loader.loadTestsFromModule(task_tests))
+    return tests
 
 
 if __name__ == '__main__':

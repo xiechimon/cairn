@@ -21,7 +21,7 @@ class ArchiveTests(unittest.TestCase):
     def run_gate(self, content, messages=('Closes #1983',), repository='xiechimon/cairn'):
         with tempfile.TemporaryDirectory() as directory:
             body = Path(directory, 'body.md')
-            body.write_text('## Upstream\nIndependent.\n## Verified\n' + content)
+            body.write_text('## What\nArchive evidence.\n## Review\nFresh review passed.\n## Risk\nReversible change.\n## Proof\n' + content)
             context = Path(directory, 'context.json')
             context.write_text(json.dumps({'repository': repository, 'commits': [
                 {'commit': {'message': message}} for message in messages]}))
@@ -101,7 +101,7 @@ class ArchiveTests(unittest.TestCase):
 
     def test_screenshots_do_not_require_a_context_argument(self):
         with patch.object(sys, 'argv', ['gate']), patch.dict(os.environ, {
-            'PR_BODY': f'## Upstream\nIndependent.\n## Verified\n![proof](https://raw.githubusercontent.com/xiechimon/cairn/{SHA}/docs/verify/1983/proof.png)'
+            'PR_BODY': f'## What\nArchive evidence.\n## Review\nFresh review passed.\n## Risk\nReversible change.\n## Proof\n![proof](https://raw.githubusercontent.com/xiechimon/cairn/{SHA}/docs/verify/1983/proof.png)'
         }, clear=True), patch.object(gate, 'http_code', return_value='200'), contextlib.redirect_stdout(io.StringIO()) as output:
             self.assertEqual(gate.main(), 0)
 

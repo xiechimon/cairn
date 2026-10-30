@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""PR evidence gate (#750; widened by #939/#940; sections collapsed by #1079).
+"""PR evidence gate (#750; widened by #939/#940; body contract updated by #2196).
 
-Section checks (#939; section names collapsed by #1079): the PR body
-must answer two template sections, "Upstream" and "Verified". The gate
-checks that
-an answer exists, not that the answer is good: a missing heading, or a
-heading whose text is empty after stripping HTML comments, fails and
-names the section. Headings inside fenced code blocks do not count (a
-quoted template is not an answer), and the template ships its guidance
-as HTML comments so an untouched template fails. What the Verified
-answer must contain (the red-then-green output pair) is a reviewer
-judgment, not a gate judgment.
+Section checks (#2196): the PR body must answer What, Proof, Review and Risk.
+A legacy Verified heading is an alias for Proof. A complete legacy body with
+What, Verified, Upstream, Risk, Acceptance and Issues may omit Review; this
+exception does not apply to bodies using Proof. Upstream is optional.
+The gate checks that an answer exists, not that it is good: a missing
+heading, or a heading whose text is empty after stripping HTML comments,
+fails and names the section. Headings inside fenced code blocks do not
+count, and the template ships its guidance as HTML comments so an untouched
+template fails. Proof quality, including the old-code failing output and
+new-code passing output, is a reviewer judgment.
 
 Link checks (#750): image links in the PR body must be embedded
 (`![label](url)`) and must answer HTTP 200 (catches bad SHAs).
@@ -76,6 +76,7 @@ import re
 import subprocess
 import sys
 import concurrent.futures as cf
+from pr_body import TASK, visible_markdown
 
 MD_LINK = re.compile(r'(?P<bang>!?)\[(?P<label>[^\]]*)\]\((?P<url>[^)\s]+)\)')
 IMG_EXT = re.compile(r'\.(?:png|gif|jpe?g|webp|svg)$', re.IGNORECASE)
@@ -95,67 +96,43 @@ def is_media_host_image(url):
     return media_host and bool(last) and not TAIL_EXT.search(last)
 
 
-REQUIRED_SECTIONS = ('Upstream', 'Verified')
-# The full body contract a lane must satisfy (#1110). The gate only
-# *requires* the two sections above; the rest are named here so a failing
-# lane is pointed at the canonical template instead of guessing a shape --
-# the global show-me /pr skill ships a different three-section template and
-# fails this gate (four lanes in one day hand-rewrote the body).
+REQUIRED_SECTIONS = ('What', 'Proof', 'Review', 'Risk')
 TEMPLATE_PATH = '.github/PULL_REQUEST_TEMPLATE.md'
-TEMPLATE_SECTIONS = ('What', 'Verified', 'Upstream', 'Risk', 'Acceptance',
-                     'Issues')
+TEMPLATE_SECTIONS = REQUIRED_SECTIONS
 H2 = re.compile(r'^##[ \t]+(.+?)[ \t]*$', re.M)
-HTML_COMMENT = re.compile(r'<!--.*?-->', re.S)
-FENCE = re.compile(r'^ {0,3}(?:```|~~~)')
-
-
-def without_fences(body):
-    """Blank out fenced code blocks, keeping the line count."""
-    out = []
-    inside = False
-    for line in body.split('\n'):
-        if FENCE.match(line):
-            inside = not inside
-            out.append('')
-            continue
-        out.append('' if inside else line)
-    return '\n'.join(out)
-
-
-def without_html_comments(body):
-    """Blank out `<!-- ... -->` spans with same-length whitespace.
-
-    Newlines are preserved so the line numbers reported by the gate
-    still match the source body. URLs inside HTML comments are not
-    rendered by GitHub, so they are not links (#1335). Section checks
-    `section_verdicts` already strip comments from section content and
-    are unaffected -- this helper runs only on the link path.
-    """
-    return HTML_COMMENT.sub(
-        lambda m: re.sub(r'[^\n]', ' ', m.group(0)),
-        body)
 
 
 def section_verdicts(body):
-    """Per required section: 'answered', 'empty', or 'missing'.
+    """Per section: 'answered', 'empty', 'missing', or 'legacy' for Review.
 
     HTML comments never count as an answer, so the template's own
     guidance (shipped as comments) cannot pass the gate untouched.
     """
-    text = without_fences(body)
+    text = visible_markdown(body)
     headers = [(m.start(), m.end(), m.group(1).strip())
                for m in H2.finditer(text)]
+    heading_names = {heading.lower() for _, _, heading in headers}
+    contents = {}
+    for i, (_, hend, heading) in enumerate(headers):
+        nxt = headers[i + 1][0] if i + 1 < len(headers) else len(text)
+        contents.setdefault(heading.lower(), text[hend:nxt])
+    legacy = (
+        {'what', 'verified', 'upstream', 'risk', 'acceptance', 'issues'} <= heading_names
+        and 'proof' not in heading_names
+        and bool(contents['upstream'].strip())
+        and TASK.search(contents['acceptance']) is not None
+    )
     verdicts = {}
     for name in REQUIRED_SECTIONS:
         content = None
         for i, (_, hend, heading) in enumerate(headers):
-            if heading.lower() == name.lower():
+            if heading.lower() == name.lower() or (name == 'Proof' and heading.lower() == 'verified'):
                 nxt = headers[i + 1][0] if i + 1 < len(headers) else len(text)
                 content = text[hend:nxt]
                 break
         if content is None:
-            verdicts[name] = 'missing'
-        elif HTML_COMMENT.sub('', content).strip():
+            verdicts[name] = 'legacy' if name == 'Review' and legacy else 'missing'
+        elif content.strip():
             verdicts[name] = 'answered'
         else:
             verdicts[name] = 'empty'
@@ -183,7 +160,7 @@ def find_links(body):
     before matching, so line numbers in `FAIL not-embedded` still
     point at the source line.
     """
-    clean = without_html_comments(body)
+    clean = visible_markdown(body, blank_fences=False)
 
     links = []
     occupied = []
@@ -247,6 +224,8 @@ def main():
     verdicts = section_verdicts(body)
     answered = sum(1 for v in verdicts.values() if v == 'answered')
     print(f"pr-evidence: sections: {answered}/{len(REQUIRED_SECTIONS)} answered")
+    if verdicts.get('Review') == 'legacy':
+        print("pr-evidence: legacy six-section body: Review not required")
     section_failed = False
     for name in REQUIRED_SECTIONS:
         if verdicts[name] == 'missing':
