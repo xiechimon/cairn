@@ -1028,3 +1028,16 @@ test('forced push coverage preserves the English gate range across multiple comm
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test('prepush runs the eval coverage test that reds a hillclimb flow without a capability row', () => {
+  const steps = prepushPlan(['scripts/eval-capabilities.json'], 'local');
+  assert.ok(
+    steps.some(
+      (step) =>
+        step[0] === 'node' &&
+        step[1] === '--test' &&
+        step.includes('scripts/eval-coverage.test.mjs'),
+    ),
+    'a new flow needs its capability row checked before the push, not only in CI',
+  );
+});

@@ -74,22 +74,22 @@ Judgment = title keyword match, first rule in the table wins, and no match = Gen
 
 | Item | Count |
 |---|---|
-| Map rows (issues) | 730 |
+| Map rows (issues) | 732 |
 | of which Differentiation surface | 118 |
-| of which Runtime axis | 154 |
-| of which General surface | 458 |
-| status Done | 595 |
+| of which Runtime axis | 155 |
+| of which General surface | 459 |
+| status Done | 597 |
 | status In progress | 12 |
 | status Not started | 11 |
 | status Unverified | 112 |
 | anchors = evidence directory + test reference | 255 |
-| anchors = evidence directory only | 234 |
+| anchors = evidence directory only | 236 |
 | anchors = test reference only | 118 |
 | no anchor (`[unverified]`) | 123 |
 | referenced PRs (no rows, §3.2) | 114 |
 | unresolvable ticket numbers (§3.3) | 0 |
 | evidence directories that are not GitHub ticket numbers (§3.4) | 98 |
-| scan surface: spec volumes / test files | 31 / 695 |
+| scan surface: spec volumes / test files | 31 / 697 |
 
 ## 2. Feature map
 
@@ -369,6 +369,7 @@ Ordering: by tier (Differentiation surface → Runtime axis → General surface)
 | [#2054](https://github.com/xiechimon/cairn/issues/2054) `security: prevent restricted API keys from enrolling or taking over local machines` | Runtime axis | Done | `docs/verify/2054/`<br>`apps/server/test/machine-enroll-authority.test.ts` |
 | [#2056](https://github.com/xiechimon/cairn/issues/2056) `security: restrict daemon machine token files and state directory permissions` | Runtime axis | Done | `docs/verify/2056/`<br>`apps/daemon/test/journal.test.ts` |
 | [#2109](https://github.com/xiechimon/cairn/issues/2109) `main red: deploy on b9c5c55a` | Runtime axis | Done | `docs/verify/2109/` |
+| [#2179](https://github.com/xiechimon/cairn/issues/2179) `ci(release): pin the publish job's commands and permissions as exact sets in the release test` | Runtime axis | Done | `docs/verify/2179/` |
 | [#10](https://github.com/xiechimon/cairn/issues/10) `Kernel: MCP agent channel` | General surface | Done | `apps/web/e2e/overlay-focus.spec.ts` |
 | [#11](https://github.com/xiechimon/cairn/issues/11) `Kernel: HTTP API surface` | General surface | Done | `apps/server/test/scheduling-plan.test.ts`<br>`packages/shared/test/records.test.ts` |
 | [#12](https://github.com/xiechimon/cairn/issues/12) `Kernel: SPA three screens` | General surface | Done | `apps/daemon/test/local-merge.test.ts`<br>`apps/daemon/test/runner-issue-fence.test.ts`<br>`apps/server/test/chief-digest.test.ts`<br>`apps/server/test/pr-merge-api.test.ts`<br>`apps/server/test/scheduling-plan.test.ts`<br>`apps/web/e2e/agent-detail.spec.ts`<br>`apps/web/e2e/board-queued-drop.spec.ts`<br>`apps/web/e2e/chief-home-chat.spec.ts`<br>`apps/web/e2e/chief-stream-markdown.spec.ts`<br>`apps/web/test/chief-markdown.test.ts`<br>`apps/web/test/mention-token.test.ts`<br>`packages/shared/test/issue-fence.test.ts` |
@@ -827,6 +828,7 @@ Ordering: by tier (Differentiation surface → Runtime axis → General surface)
 | [#2159](https://github.com/xiechimon/cairn/issues/2159) `scripts: one owner for the prepush self-test list in CI and local prepush` | General surface | Done | `docs/verify/2159/` |
 | [#2162](https://github.com/xiechimon/cairn/issues/2162) `ops: warn on home when the server DB backup fails or goes stale` | General surface | Done | `docs/verify/2162/` |
 | [#2163](https://github.com/xiechimon/cairn/issues/2163) `ops: back up attachments and push off-site to an rrsync-restricted receiver` | General surface | Done | `docs/verify/2163/` |
+| [#2177](https://github.com/xiechimon/cairn/issues/2177) `ci(release): publish through npm trusted publishing, version bumps in normal PRs` | General surface | Done | `docs/verify/2177/` |
 
 ## 3. Rows without anchors and rows that cannot be resolved (follow-up work)
 
@@ -1215,6 +1217,7 @@ before today.
 | review |  |  |  |  |  | none ([#1779](https://github.com/xiechimon/cairn/issues/1779)) |
 | planning | `plan` | 2 |  |  |  | built-not-run |
 | prior-art planning | `plan-prior-art` | 2 |  |  |  | built-not-run |
+| plan revision | `plan-revision` | 1 |  |  |  | built-not-run |
 | coding |  |  |  |  |  | none |
 | machine claim |  |  |  |  |  | tests only, no eval needed |
 | intake |  |  |  |  |  | tests only, no eval needed |
