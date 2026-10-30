@@ -187,7 +187,11 @@ function publishBuild(deps: BuildDeps, row: BuildRow): BuildRecord {
   return record;
 }
 
-function continuationTodo(deps: BuildDeps, buildRow: BuildRow): TodoRow {
+function continuationTodo(
+  deps: BuildDeps,
+  buildRow: BuildRow,
+  allowReviewContinuation: boolean,
+): TodoRow {
   const row = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
   const active = deps.db
     .select({ id: step.id })
@@ -199,7 +203,12 @@ function continuationTodo(deps: BuildDeps, buildRow: BuildRow): TodoRow {
       ),
     )
     .get();
-  if (row?.phase !== 'done' || row.latestBuildId !== buildRow.id || active) {
+  if (
+    !row ||
+    (row.phase !== 'done' && !(allowReviewContinuation && row.phase === 'review')) ||
+    row.latestBuildId !== buildRow.id ||
+    active
+  ) {
     throw new HttpError(
       409,
       'conversation must have an active step or be the completed task thread',
@@ -212,9 +221,11 @@ export async function sendBuildSteer(
   deps: BuildDeps,
   conversationId: string,
   body: { content: string },
+  options: { allowReviewContinuation?: boolean } = {},
 ): Promise<{
   conversationId: string;
   message: { id: string; role: 'user'; content: string; createdAt: number };
+  delivered: 'steer' | 'new-turn';
 }> {
   const { db } = deps;
   const buildRow = db.select().from(build).where(eq(build.id, conversationId)).get();
@@ -229,7 +240,7 @@ export async function sendBuildSteer(
   let targetBuildId = conversationId;
   let prClosed: 'closed' | null = null;
   if (!running) {
-    todoRow = continuationTodo(deps, buildRow);
+    todoRow = continuationTodo(deps, buildRow, options.allowReviewContinuation === true);
     if (projectOfTodo(db, todoRow)?.repoKind === 'local') {
       const admission = db
         .select()
@@ -252,7 +263,7 @@ export async function sendBuildSteer(
     }
     if (githubPrOf(deps, todoRow, buildRow.prNumber) !== null) {
       const outcome = await probeReworkTargetPr(deps, buildRow, todoRow, true);
-      todoRow = continuationTodo(deps, buildRow);
+      todoRow = continuationTodo(deps, buildRow, options.allowReviewContinuation === true);
       if (outcome === 'merged') {
         throw new HttpError(
           409,
@@ -312,7 +323,7 @@ export async function sendBuildSteer(
       deps.machineHub?.steerSignal(todoRow.teamId, running.id);
     } else {
       db.update(build)
-        .set({ errorMessage: null, prevPhase: 'done' })
+        .set({ errorMessage: null, prevPhase: todoRow.phase })
         .where(eq(build.id, targetBuildId))
         .run();
       setTodoPhase(deps, todoRow.id, 'queued', { lastRunAt: now, latestBuildId: targetBuildId });
@@ -321,7 +332,45 @@ export async function sendBuildSteer(
       if (continued) publishBuild(deps, continued);
     }
   }
-  return { conversationId: targetBuildId, message: messageRow };
+  return {
+    conversationId: targetBuildId,
+    message: messageRow,
+    delivered: running ? 'steer' : 'new-turn',
+  };
+}
+
+export async function messageTodo(
+  deps: BuildDeps,
+  teamId: string,
+  todoId: string,
+  content: string,
+) {
+  const row = deps.db
+    .select()
+    .from(todo)
+    .where(and(eq(todo.id, todoId), eq(todo.teamId, teamId)))
+    .get();
+  if (!row) throw new HttpError(404, `todo ${todoId}`);
+  if (row.latestBuildId === null) {
+    return {
+      todoId,
+      conversationId: null,
+      posted: false,
+      error: 'This todo has no build. Start a build before messaging its worker.',
+    };
+  }
+  const result = await sendBuildSteer(
+    deps,
+    row.latestBuildId,
+    { content },
+    { allowReviewContinuation: true },
+  );
+  return {
+    todoId,
+    conversationId: result.conversationId,
+    posted: true,
+    delivered: result.delivered,
+  };
 }
 
 export function readSteerPending(db: Db, conversationId: string): string[] {

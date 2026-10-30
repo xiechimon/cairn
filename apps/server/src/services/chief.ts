@@ -8,6 +8,7 @@ import type {
   MachineDoneBody,
   PatchChiefBody,
   Phase,
+  ThreadReportContent,
   TodoRecord,
   UserRecord,
 } from '@cairn/shared';
@@ -641,13 +642,40 @@ export function triggerChiefWakes(deps: ChiefDeps, todoRecord: TodoRecord, to: P
         removeChiefWatches(deps, todoRecord.teamId, [todoRecord.id]);
         continue;
       }
+      const wakeStepId = newRecordId();
+      if (to !== 'confirm') {
+        const content = {
+          kind: 'thread-report',
+          todoId: todoRecord.id,
+          phase: to,
+          seqNum: todoRecord.seqNum,
+          title: todoRecord.title,
+          wakeStepId,
+        } satisfies ThreadReportContent;
+        const report = {
+          id: newRecordId(),
+          threadId: watch.threadId,
+          role: 'system' as const,
+          content: JSON.stringify(content),
+          createdAt: nowMs(),
+        };
+        upsertChiefMessage(deps.db, report);
+        deps.convHub?.publishMessage(watch.threadId, report);
+      }
       if (kind === 'gate') {
-        enqueueGateWake(deps, watch.threadId, { ...todoRecord, phase: to }, isSplitParent, false);
+        enqueueGateWake(
+          deps,
+          watch.threadId,
+          { ...todoRecord, phase: to },
+          isSplitParent,
+          false,
+          wakeStepId,
+        );
       } else {
         const facts = wakeFacts(kind, todoRecord, buildRow?.errorMessage ?? null, {
           isSplitParent,
         });
-        enqueueChiefStep(deps, watch.threadId, { prompt: facts, trigger: kind });
+        enqueueChiefStep(deps, watch.threadId, { id: wakeStepId, prompt: facts, trigger: kind });
       }
     }
     if (kind === 'settle' || kind === 'failed') {
@@ -662,6 +690,7 @@ function enqueueGateWake(
   record: TodoRecord,
   isSplitParent: boolean,
   retry: boolean,
+  id = newRecordId(),
 ): void {
   const latestPlan =
     record.latestBuildId && record.phase === 'confirm'
@@ -675,7 +704,7 @@ function enqueueGateWake(
       : undefined;
   const facts = wakeFacts('gate', record, null, { isSplitParent, planText: latestPlan?.content });
   const metadata = `Gate todo=${encodeURIComponent(record.id)} build=${encodeURIComponent(record.latestBuildId ?? '')} phase=${record.phase} attempt=${retry ? 1 : 0}`;
-  const id = enqueueChiefStep(deps, threadId, { prompt: `${facts}\n${metadata}`, trigger: 'gate' });
+  enqueueChiefStep(deps, threadId, { id, prompt: `${facts}\n${metadata}`, trigger: 'gate' });
   if (retry) deps.db.update(step).set({ freshSession: true }).where(eq(step.id, id)).run();
 }
 
@@ -1094,6 +1123,6 @@ export function chiefThreadMessages(db: Db, threadId: string) {
     .select()
     .from(chiefMessage)
     .where(eq(chiefMessage.threadId, threadId))
-    .orderBy(asc(chiefMessage.createdAt))
+    .orderBy(asc(chiefMessage.createdAt), sql`rowid`)
     .all();
 }

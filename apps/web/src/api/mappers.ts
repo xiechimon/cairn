@@ -41,6 +41,8 @@ import {
   stripAnsiEscapes,
   stripSkillRouteSection,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
+  threadReportContentSchema,
+  transcriptPromptRowId,
   VERIFY_VERDICT_KIND,
   verifyVerdictSchema,
 } from '@cairn/shared';
@@ -1240,6 +1242,20 @@ function collectChiefStream(
       .filter((m) => m.role === 'user' && !m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX))
       .map((m) => chiefUserText(textOfContent(m.content).trim())),
   );
+  const reportedWakePromptIds = new Set<string>();
+  for (const message of messages) {
+    if (message.role !== 'system' || typeof message.content !== 'string') continue;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(message.content);
+    } catch {
+      parsed = null;
+    }
+    const report = threadReportContentSchema.safeParse(parsed);
+    if (report.success && report.data.wakeStepId !== undefined) {
+      reportedWakePromptIds.add(transcriptPromptRowId(report.data.wakeStepId));
+    }
+  }
   let pendingTools: ChiefToolRow[] = [];
   for (const m of messages) {
     while (itemsAt.length < items.length) itemsAt.push(lastAt);
@@ -1249,6 +1265,10 @@ function collectChiefStream(
         ? m.id.slice(TRANSCRIPT_PROMPT_ROW_ID_PREFIX.length)
         : m.id;
       if (stepOfRow !== fallback.stepId) fallback = null;
+    }
+    if (m.role === 'user' && reportedWakePromptIds.has(m.id)) {
+      pendingTools = [];
+      continue;
     }
     const pendingState = m.role === 'user' ? pendingIds.get(m.id) : undefined;
     if (pendingState !== undefined) {
@@ -1274,6 +1294,11 @@ function collectChiefStream(
         parsed = typeof m.content === 'string' ? JSON.parse(m.content) : null;
       } catch {
         parsed = null;
+      }
+      const report = threadReportContentSchema.safeParse(parsed);
+      if (report.success) {
+        items.push({ ...report.data, id: m.id });
+        continue;
       }
       const stopped = chiefTurnStoppedContentSchema.safeParse(parsed);
       if (stopped.success) {
