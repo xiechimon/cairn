@@ -25,6 +25,9 @@ test.describe('home is one continuous chief chat (T1)', () => {
       expect(sections.height).toBeGreaterThan(100);
       expect(sections.y).toBeLessThan(composer.y);
     }
+    const input = home.getByTestId('chief-composer-input');
+    await input.focus();
+    await expect(input).not.toHaveCSS('box-shadow', /0px 0px 0px 3px/);
     await evidenceShot(page, 'home-hero.png');
   });
 

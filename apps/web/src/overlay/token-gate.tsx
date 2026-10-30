@@ -78,7 +78,7 @@ export function TokenGate() {
           </label>
           <Input
             id="cairn-token-input"
-            className="token-gate-input h-9 border-(--border) bg-(--card) px-3 py-0 text-sm text-foreground transition-[color,background-color,border-color] focus-visible:border-(--border) focus-visible:ring-0 focus-visible:[outline:2px_solid_var(--focus-ring)] focus-visible:outline-offset-2 dark:bg-(--card)"
+            className="token-gate-input h-9 border-(--border) bg-(--card) px-3 py-0 text-sm text-foreground transition-[color,background-color,border-color] dark:bg-(--card)"
             type="password"
             value={value}
             autoComplete="off"

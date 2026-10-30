@@ -20,6 +20,7 @@ interface FocusInfo {
   boxShadow: string;
   borderTopColor: string;
   focusRing: string;
+  focusHalo: string;
   inputColor: string;
   primaryColor: string;
   ringColor: string;
@@ -45,6 +46,14 @@ async function readFocus(locator: Locator): Promise<FocusInfo> {
       boxShadow: cs.boxShadow,
       borderTopColor: cs.borderTopColor,
       focusRing: root.getPropertyValue('--focus-ring').trim(),
+      focusHalo: (() => {
+        const probe = document.createElement('div');
+        probe.style.color = 'var(--focus-halo)';
+        document.body.append(probe);
+        const color = getComputedStyle(probe).color;
+        probe.remove();
+        return color;
+      })(),
       inputColor: root.getPropertyValue('--input').trim(),
       primaryColor: root.getPropertyValue('--primary').trim(),
       ringColor: root.getPropertyValue('--ring').trim(),
@@ -84,7 +93,7 @@ function expectFieldRing(info: FocusInfo) {
   expect(info.focusVisible).toBe(true);
   expect(info.outlineStyle).toBe('none');
   expect(info.borderTopColor).toBe(hexToRgb(info.focusRing));
-  expect(info.boxShadow).toContain('0px 0px 0px 3px');
+  expect(info.boxShadow).toBe(`${info.focusHalo} 0px 0px 0px 3px`);
 }
 
 async function themed(page: Page, theme: 'dark' | 'light', url: string) {
