@@ -83,9 +83,16 @@ const RULE_LABEL: Record<SkillRouteRuleId, string> = {
   'explicit-mention': '显式点名已装技能',
 };
 
+const SKILL_ROUTE_HEADING = '## 技能路由提示（发送后自动检测，仅建议——先核对再用）';
+
+export function stripSkillRouteSection(text: string): string {
+  const at = text.indexOf(`\n\n${SKILL_ROUTE_HEADING}`);
+  return at === -1 ? text : text.slice(0, at);
+}
+
 export function formatSkillRouteSection(hint: SkillRouteHint): string {
   const lines = [
-    '## 技能路由提示（发送后自动检测，仅建议——先核对再用）',
+    SKILL_ROUTE_HEADING,
     `用户消息命中「${RULE_LABEL[hint.ruleId]}」。以下候选仅供参考：`,
   ];
   for (const s of hint.skills) {

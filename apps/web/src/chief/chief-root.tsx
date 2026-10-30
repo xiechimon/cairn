@@ -108,7 +108,7 @@ export function ChiefRoot() {
                       <span className="fab-badge">
                         {surface.chiefUnread > 99 ? '99+' : surface.chiefUnread}
                       </span>{' '}
-                      {t('条新消息')}
+                      {t('个会话未读')}
                     </span>
                   ) : (
                     surface.chiefBusy && (
