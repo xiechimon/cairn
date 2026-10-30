@@ -6,11 +6,15 @@ on:
     branches: [main]
   schedule:
     - cron: '*/15 * * * *'
+  issues:
+    types: [opened, closed, reopened, labeled, unlabeled]
   workflow_dispatch:
 permissions:
   contents: write
   pull-requests: write
   issues: write
+  statuses: write
+  actions: write
 concurrency:
   group: autonomy-brake
   cancel-in-progress: false
@@ -20,6 +24,8 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       EVENT_NAME: ${{ github.event_name }}
+      RUN_EVENT: ${{ github.event.workflow_run.event }}
+      HEAD_REPOSITORY: ${{ github.event.workflow_run.head_repository.full_name }}
       CONCLUSION: ${{ github.event.workflow_run.conclusion }}
       HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
       FAILED_SHA: ${{ github.event.workflow_run.head_sha }}
@@ -28,18 +34,14 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           ref: main
+          fetch-depth: 0
       - name: Apply the brake
         run: |
           if [ "$EVENT_NAME" = workflow_run ]; then
-            if [ "$CONCLUSION" != failure ] || [ "$HEAD_BRANCH" != main ]; then
+            if [ "$RUN_EVENT" != push ] || [ "$HEAD_REPOSITORY" != "$GITHUB_REPOSITORY" ] || [ "$CONCLUSION" = success ] || [ "$HEAD_BRANCH" != main ]; then
               exit 0
             fi
             node scripts/autonomy-brake.mjs pause --reason "Main CI failed at $FAILED_SHA: $RUN_URL"
-            node scripts/autonomy-brake.mjs sweep
-          elif node scripts/autonomy-brake.mjs status > brake-status.json; then
-            if jq -e '.paused == true' brake-status.json > /dev/null; then
-              node scripts/autonomy-brake.mjs sweep
-            fi
           else
-            exit 1
+            node scripts/autonomy-brake.mjs sweep
           fi

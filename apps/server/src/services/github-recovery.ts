@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { and, desc, eq } from 'drizzle-orm';
-import { autonomousMergeAdmission, build, project, todo } from '../db/schema.js';
+import { autonomousMergeAdmission, build, project, team, todo } from '../db/schema.js';
 import { runGit } from '../lib/git.js';
 import { type FetchLike, githubPull, isFullSha } from '../lib/github.js';
 import type { BuildDeps } from './builds.js';
@@ -144,6 +144,11 @@ export async function recoverRedAutonomousMain(
       .filter((check) => check.name === 'check' && check.app?.slug === 'github-actions')
       .sort((a, b) => b.id - a.id)[0];
     if (latest?.status !== 'completed' || latest.conclusion !== 'failure') continue;
+    deps.db
+      .update(team)
+      .set({ autonomyPaused: true })
+      .where(eq(team.id, row.admission.teamId))
+      .run();
     await pauseGithubRepo(fetchImpl, token, repo, `Main check failed at ${main}.`);
     const pull = await githubPull(fetchImpl, token, target.owner, target.repo, row.build.prNumber);
     const reverted = pull?.pull?.mergeCommitSha;

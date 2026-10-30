@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { project } from '../db/schema.js';
+import { project, team } from '../db/schema.js';
 import type { FetchLike } from '../lib/github.js';
 import { githubRepoOfProject } from './git.js';
 import { type GithubTokenDeps, teamGithubToken } from './github-connection.js';
@@ -75,6 +75,7 @@ export async function pauseTeamGithubRepos(
   deps: GithubTokenDeps & { db: Db },
   teamId: string,
 ): Promise<void> {
+  deps.db.update(team).set({ autonomyPaused: true }).where(eq(team.id, teamId)).run();
   const repos = new Set(
     deps.db
       .select()
@@ -110,10 +111,10 @@ export async function readGithubAutonomyPause(
   fetchImpl: FetchLike,
   token: string,
   repo: string,
-  cache: GateReadCache,
-  now: number,
+  cache?: GateReadCache,
+  now = Date.now(),
 ): Promise<boolean> {
-  const cached = cache.autonomyPause.get(repo);
+  const cached = cache?.autonomyPause.get(repo);
   if (cached !== undefined && now >= cached.at && now - cached.at < 60_000) return cached.paused;
   let paused = true;
   try {
@@ -121,6 +122,6 @@ export async function readGithubAutonomyPause(
   } catch {
     return true;
   }
-  cache.autonomyPause.set(repo, { at: now, paused });
+  cache?.autonomyPause.set(repo, { at: now, paused });
   return paused;
 }

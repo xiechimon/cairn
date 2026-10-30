@@ -21,6 +21,7 @@ import {
   gateVerdict,
   message,
   step,
+  team,
   todo,
 } from '../db/schema.js';
 import { githubCreateIssue } from '../lib/github.js';
@@ -130,6 +131,8 @@ export async function evaluateMergeGate(
           opts.now ?? nowMs(),
         )
       : false;
+  if (githubPaused && cache.autonomyPause.get(`${repo.owner}/${repo.repo}`)?.paused === true)
+    deps.db.update(team).set({ autonomyPaused: true }).where(eq(team.id, todoRow.teamId)).run();
   const harness = deps.harnessEval ?? productionHarnessEvalConfig();
   const facts = await readGateGithubFacts(
     port,

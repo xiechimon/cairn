@@ -5,13 +5,17 @@ import { join } from 'node:path';
 
 const repo = process.env.GITHUB_REPOSITORY;
 if (!/^[\w.-]+\/[\w.-]+$/.test(repo ?? '')) throw new Error('GITHUB_REPOSITORY is required');
-const api = (path, payload) =>
-  JSON.parse(
-    execFileSync('gh', ['api', path, ...(payload ? ['--method', 'POST', '--input', '-'] : [])], {
+const api = (path, payload) => {
+  const output = execFileSync(
+    'gh',
+    ['api', path, ...(payload ? ['--method', 'POST', '--input', '-'] : [])],
+    {
       encoding: 'utf8',
       ...(payload ? { input: JSON.stringify(payload) } : {}),
-    }),
+    },
   );
+  return output.trim() ? JSON.parse(output) : null;
+};
 const pages = (path) =>
   JSON.parse(execFileSync('gh', ['api', path, '--paginate', '--slurp'], { encoding: 'utf8' }));
 const markers = () =>
@@ -82,6 +86,66 @@ export function verifyRecovery(number) {
   }
 }
 
+function checkPull(pr, paused) {
+  let allowed = !paused;
+  if (paused && pr.labels.some((label) => label.name === 'cairn-recovery')) {
+    try {
+      verifyRecovery(String(pr.number));
+      allowed = true;
+    } catch {}
+  }
+  if (!shaPattern.test(pr.head.sha)) throw new Error('Invalid PR head SHA');
+  api(`repos/${repo}/statuses/${pr.head.sha}`, {
+    context: 'autonomy-brake',
+    state: allowed ? 'success' : 'failure',
+    description: allowed ? 'Autonomy brake permits this head' : 'Autonomous merging is paused',
+  });
+  return allowed;
+}
+
+function sweep(paused) {
+  let failed = false;
+  for (const pr of pages(`repos/${repo}/pulls?state=open&per_page=100`).flat()) {
+    try {
+      const allowed = checkPull(pr, paused);
+      const runs = pages(
+        `repos/${repo}/actions/workflows/pr-evidence.yml/runs?event=pull_request&head_sha=${pr.head.sha}&per_page=100`,
+      ).flatMap((page) => page.workflow_runs);
+      const latest = runs
+        .filter(
+          (run) =>
+            run.head_sha === pr.head.sha &&
+            run.pull_requests.some((pull) => pull.number === pr.number),
+        )
+        .sort((a, b) => b.id - a.id)[0];
+      if (latest) api(`repos/${repo}/actions/runs/${latest.id}/rerun`, {});
+      if (allowed || !pr.auto_merge) continue;
+      const result = JSON.parse(
+        execFileSync(
+          'gh',
+          [
+            'api',
+            'graphql',
+            '-f',
+            'query=mutation($pullRequestId:ID!){disablePullRequestAutoMerge(input:{pullRequestId:$pullRequestId}){pullRequest{number}}}',
+            '-f',
+            `pullRequestId=${pr.node_id}`,
+          ],
+          { encoding: 'utf8' },
+        ),
+      );
+      if (result.errors || !result.data?.disablePullRequestAutoMerge)
+        throw new Error('Disarm mutation failed');
+      console.log(`#${pr.number}: disarmed`);
+    } catch (error) {
+      failed = true;
+      console.error(error.message);
+      console.log(`#${pr.number}: failed`);
+    }
+  }
+  if (failed) process.exitCode = 1;
+}
+
 try {
   const [command, ...args] = process.argv.slice(2);
   if (command === 'status') console.log(JSON.stringify({ paused: markers().length > 0 }));
@@ -98,37 +162,16 @@ try {
         labels: ['autonomy-paused'],
       });
     }
+    sweep(true);
     console.log('autonomy: paused');
-  } else if (command === 'sweep') {
-    let failed = false;
-    for (const pr of pages(`repos/${repo}/pulls?state=open&per_page=100`).flat()) {
-      if (!pr.auto_merge) continue;
-      try {
-        const result = JSON.parse(
-          execFileSync(
-            'gh',
-            [
-              'api',
-              'graphql',
-              '-f',
-              'query=mutation($pullRequestId:ID!){disablePullRequestAutoMerge(input:{pullRequestId:$pullRequestId}){pullRequest{number}}}',
-              '-f',
-              `pullRequestId=${pr.node_id}`,
-            ],
-            { encoding: 'utf8' },
-          ),
-        );
-        if (result.errors || !result.data?.disablePullRequestAutoMerge)
-          throw new Error('Disarm mutation failed');
-        console.log(`#${pr.number}: disarmed`);
-      } catch {
-        failed = true;
-        console.log(`#${pr.number}: failed`);
-      }
-    }
-    if (failed) process.exitCode = 1;
+  } else if (command === 'sweep') sweep(markers().length > 0);
+  else if (command === 'check-pr') {
+    if (!/^[1-9]\d*$/.test(args[0] ?? '')) throw new Error('A PR number is required');
+    const pr = api(`repos/${repo}/pulls/${args[0]}`);
+    if (!checkPull({ ...pr, number: Number(args[0]) }, markers().length > 0))
+      throw new Error('autonomy-paused: autonomous merging is paused');
   } else if (command === 'verify-recovery') verifyRecovery(args[0]);
-  else throw new Error('Expected status, pause, sweep, or verify-recovery');
+  else throw new Error('Expected status, pause, sweep, check-pr, or verify-recovery');
 } catch (error) {
   console.error(error.message);
   process.exitCode = 1;

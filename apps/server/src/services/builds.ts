@@ -82,6 +82,7 @@ import {
   steerPending,
   step,
   stopPending,
+  team,
   todo,
 } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
@@ -109,6 +110,7 @@ import { stepActivityAt } from './dispatch-timeouts.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { markFirstPrPromptDue } from './first-pr-report.js';
 import { githubRepoOfProject, hasRepoBinding, projectOfTodo, readBuildChanges } from './git.js';
+import { readGithubAutonomyPause } from './github-autonomy-brake.js';
 import { githubTokenOrNull, teamGithubToken } from './github-connection.js';
 import { githubText } from './github-text.js';
 import type { HarnessEvalDispatchPort } from './harness-eval-coordinator.js';
@@ -1741,6 +1743,15 @@ async function mergeThroughGithub(
       );
     }
     const titled = `${pull.title} (#${prNumber})`;
+    if (await readGithubAutonomyPause(fetchImpl, token, `${repoRef.owner}/${repoRef.repo}`)) {
+      deps.db
+        .update(team)
+        .set({ autonomyPaused: true })
+        .where(eq(team.id, before.todoRow.teamId))
+        .run();
+      throw new HttpError(409, 'autonomy-paused: GitHub autonomy marker is open or unreadable');
+    }
+    apiMergeGate(deps, row);
     claimAutonomousMerge(deps.db, row.id);
     const result = await githubMergePull(fetchImpl, token, repoRef.owner, repoRef.repo, prNumber, {
       sha: checkpoint,

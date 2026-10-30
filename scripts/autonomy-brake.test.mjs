@@ -18,11 +18,13 @@ const fs = require('node:fs');
 const args = process.argv.slice(2);
 fs.appendFileSync(process.env.CALLS, JSON.stringify(args)+'\\n');
 const d = JSON.parse(fs.readFileSync(process.env.DATA));
+if(args.includes('--input')) fs.appendFileSync(process.env.CALLS, fs.readFileSync(0,'utf8')+'\\n');
 const path = args[1];
 if (path === 'graphql') {
  if(args.includes('pullRequestId=bad')) process.exit(1);
  console.log(JSON.stringify({data:{disablePullRequestAutoMerge:{pullRequest:{number:1}}}}));
 } else if (path.includes('/issues?')) console.log(JSON.stringify([d.issues ?? []]));
+else if (path.includes('/actions/workflows/')) console.log(JSON.stringify([{workflow_runs:d.runs ?? []}]));
 else if (path.includes('/labels?')) console.log(JSON.stringify([d.labels ?? []]));
 else if (path.includes('/pulls?')) console.log(JSON.stringify([d.pulls ?? []]));
 else if (path.includes('/check-runs')) console.log(JSON.stringify([{check_runs:d.latestFailure && path.includes(d.main) ? [{id:1,name:'check',conclusion:'success',status:'completed',app:{slug:'github-actions'}},{id:2,name:'check',conclusion:'failure',status:'completed',app:{slug:'github-actions'}}] : [{id:1,name:'check', conclusion: path.includes(d.green) ? 'success':'failure',status:'completed',app:{slug:'github-actions'}}]}]));
@@ -59,10 +61,11 @@ test('status reports an open marker without writes', (t) => {
 });
 test('sweep tries every armed PR and fails after a failed disarm', (t) => {
   const f = fixture(t, {
+    issues: [{ number: 5 }],
     pulls: [
-      { number: 1, node_id: 'bad', auto_merge: {} },
-      { number: 2, node_id: 'good', auto_merge: {} },
-      { number: 3, auto_merge: null },
+      { number: 1, node_id: 'bad', auto_merge: {}, head: { sha: 'a'.repeat(40) }, labels: [] },
+      { number: 2, node_id: 'good', auto_merge: {}, head: { sha: 'b'.repeat(40) }, labels: [] },
+      { number: 3, auto_merge: null, head: { sha: 'c'.repeat(40) }, labels: [] },
     ],
   });
   const r = f.run(['sweep']);
@@ -131,6 +134,15 @@ for (const mode of [
           head: { sha: head },
           commits: 1,
         },
+        issues: [{ number: 5 }],
+        pulls: [
+          {
+            number: 7,
+            head: { sha: head },
+            labels: [{ name: 'cairn-recovery' }],
+            auto_merge: null,
+          },
+        ],
         commits: [{ sha: head, commit: { message } }],
       }),
     );
@@ -142,6 +154,13 @@ for (const mode of [
     );
     if (mode === 'extra file' || mode === 'one byte')
       assert.match(r.stderr, /Recovery tree differs/);
+    if (mode === 'valid') {
+      const check = f.run(['check-pr', '7'], f.dir);
+      assert.equal(check.status, 0, check.stderr);
+      assert.match(f.calls(), /"state":"success"/);
+      const sweep = f.run(['sweep'], f.dir);
+      assert.equal(sweep.status, 0, sweep.stderr);
+    }
   });
 
 for (const paused of [false, true])
@@ -156,3 +175,27 @@ for (const paused of [false, true])
       assert.match(calls, /\/issues/);
     }
   });
+
+for (const paused of [true, false])
+  test(`sweep publishes required head status and refreshes green checks: paused=${paused}`, (t) => {
+    const f = fixture(t, {
+      issues: paused ? [{ number: 5 }] : [],
+      pulls: [{ number: 7, head: { sha: 'a'.repeat(40) }, auto_merge: null, labels: [] }],
+      runs: [{ id: 90, head_sha: 'a'.repeat(40), pull_requests: [{ number: 7 }] }],
+    });
+    const r = f.run(['sweep']);
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(f.calls(), /statuses\/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/);
+    assert.match(f.calls(), /actions\/runs\/90\/rerun/);
+    assert.match(f.calls(), /POST/);
+    assert.match(f.calls(), new RegExp(`"state":"${paused ? 'failure' : 'success'}"`));
+  });
+test('a new paused head fails the PR check and publishes a failure status', (t) => {
+  const f = fixture(t, {
+    issues: [{ number: 5 }],
+    pr: { head: { sha: 'a'.repeat(40) }, labels: [] },
+  });
+  const r = f.run(['check-pr', '7']);
+  assert.equal(r.status, 1);
+  assert.match(f.calls(), /statuses\/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/);
+});

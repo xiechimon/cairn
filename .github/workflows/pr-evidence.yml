@@ -44,6 +44,7 @@ permissions:
   contents: write
   pull-requests: write
   issues: read
+  statuses: write
 
 # One run per PR at a time, newest wins: a label added seconds after a body
 # edit must not be outlived by the edit's run finishing green. A cancelled
@@ -96,9 +97,11 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           touch autonomy-paused.flag
-          node scripts/autonomy-brake.mjs status > brake-status.json
-          if jq -e '.paused == true' brake-status.json > /dev/null; then
-            node scripts/autonomy-brake.mjs verify-recovery "$PR_NUMBER"
+          if git cat-file -e origin/main:scripts/autonomy-brake.mjs; then
+            git show origin/main:scripts/autonomy-brake.mjs > "$RUNNER_TEMP/autonomy-brake.mjs"
+            node "$RUNNER_TEMP/autonomy-brake.mjs" check-pr "$PR_NUMBER"
+          else
+            echo "autonomy-brake: main has no brake script yet; nothing can be paused"
           fi
           rm autonomy-paused.flag
 

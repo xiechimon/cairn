@@ -17,9 +17,10 @@ function runStep(t, file, name, env) {
   writeFileSync(calls, '');
   writeFileSync(
     join(dir, 'node'),
-    `#!/bin/sh\necho "$*" >> "$CALLS"\ncase "$*" in\n *status) echo '{"paused":'"$PAUSED"'}';;\n *verify-recovery*) exit "$RECOVERY_EXIT";;\nesac\n`,
+    `#!/bin/sh\necho "$*" >> "$CALLS"\ncase "$*" in\n *status) echo '{"paused":'"$PAUSED"'}';;\n *check-pr*) if [ "$PAUSED" = true ]; then exit "$RECOVERY_EXIT"; fi;;\n *verify-recovery*) exit "$RECOVERY_EXIT";;\nesac\n`,
     { mode: 0o755 },
   );
+  writeFileSync(join(dir, 'git'), '#!/bin/sh\necho base-brake\n', { mode: 0o755 });
   writeFileSync(join(dir, 'gh'), '#!/bin/sh\necho "$*" >> "$CALLS"\n', { mode: 0o755 });
   const result = spawnSync('bash', ['-e', '-c', body], {
     cwd: dir,
@@ -28,6 +29,10 @@ function runStep(t, file, name, env) {
       ...process.env,
       PATH: `${dir}:${process.env.PATH}`,
       CALLS: calls,
+      RUNNER_TEMP: dir,
+      GITHUB_REPOSITORY: 'owner/repo',
+      RUN_EVENT: 'push',
+      HEAD_REPOSITORY: 'owner/repo',
       PAUSED: 'false',
       RECOVERY_EXIT: '1',
       ...env,
@@ -44,14 +49,15 @@ test('workflow_run success does not pause or sweep', (t) => {
   assert.equal(f.result.status, 0, f.result.stderr);
   assert.equal(f.calls(), '');
 });
-test('schedule without a marker performs no writes', (t) => {
+test('schedule without a marker restores head signals without opening a marker', (t) => {
   const f = runStep(t, '.github/workflows/autonomy-brake.yml', 'Apply the brake', {
     EVENT_NAME: 'schedule',
   });
   assert.equal(f.result.status, 0, f.result.stderr);
-  assert.doesNotMatch(f.calls(), /pause --reason|sweep/);
+  assert.doesNotMatch(f.calls(), /pause --reason/);
+  assert.match(f.calls(), /sweep/);
 });
-test('failed main workflow pauses then sweeps', (t) => {
+test('failed main workflow pauses and synchronizes the brake', (t) => {
   const f = runStep(t, '.github/workflows/autonomy-brake.yml', 'Apply the brake', {
     EVENT_NAME: 'workflow_run',
     CONCLUSION: 'failure',
@@ -60,10 +66,7 @@ test('failed main workflow pauses then sweeps', (t) => {
     RUN_URL: 'https://example.com/run',
   });
   assert.equal(f.result.status, 0, f.result.stderr);
-  assert.match(
-    f.calls(),
-    /pause --reason.*abc.*https:\/\/example.com\/run\nscripts\/autonomy-brake.mjs sweep/,
-  );
+  assert.match(f.calls(), /pause --reason.*abc.*https:\/\/example.com\/run/);
 });
 for (const valid of [false, true])
   test(`paused PR recovery=${valid} gates and disarms correctly`, (t) => {
@@ -123,4 +126,41 @@ test('paused schedule sweeps and workflow permissions and triggers retain the ou
   ])
     assert.ok(text.includes(line), line);
   assert.match(text, /actions\/checkout@[a-f0-9]{40}/);
+  assert.match(text, /ref: main\n\s+fetch-depth: 0/);
 });
+
+test('PR evidence executes only the trusted base brake', (t) => {
+  const f = runStep(t, '.github/workflows/pr-evidence.yml', 'Check the autonomy brake', {
+    PR_NUMBER: '7',
+  });
+  assert.equal(f.result.status, 0, f.result.stderr);
+  assert.doesNotMatch(f.calls(), /(?:^|\n)scripts\/autonomy-brake\.mjs/);
+  assert.match(f.calls(), /autonomy-brake\.mjs check-pr 7/);
+  const text = readFileSync('.github/workflows/pr-evidence.yml', 'utf8');
+  assert.match(
+    text,
+    /git show origin\/main:scripts\/autonomy-brake\.mjs > "\$RUNNER_TEMP\/autonomy-brake\.mjs"/,
+  );
+});
+for (const conclusion of ['cancelled', 'timed_out'])
+  test(`main push conclusion ${conclusion} applies the brake`, (t) => {
+    const f = runStep(t, '.github/workflows/autonomy-brake.yml', 'Apply the brake', {
+      EVENT_NAME: 'workflow_run',
+      CONCLUSION: conclusion,
+      HEAD_BRANCH: 'main',
+    });
+    assert.equal(f.result.status, 0, f.result.stderr);
+    assert.match(f.calls(), /pause --reason/);
+  });
+for (const event of ['pull_request', 'push'])
+  test(`fork main ${event} cannot apply the brake`, (t) => {
+    const f = runStep(t, '.github/workflows/autonomy-brake.yml', 'Apply the brake', {
+      EVENT_NAME: 'workflow_run',
+      RUN_EVENT: event,
+      HEAD_REPOSITORY: 'fork/repo',
+      CONCLUSION: 'failure',
+      HEAD_BRANCH: 'main',
+    });
+    assert.equal(f.result.status, 0, f.result.stderr);
+    assert.equal(f.calls(), '');
+  });

@@ -90,6 +90,8 @@ class GithubFake {
   getAnswer: Answer | null = null;
   onGet: (() => Promise<void> | void) | null = null;
   onPut: (() => Promise<void> | void) | null = null;
+  onMarker: (() => Promise<void> | void) | null = null;
+  markerAnswer: Answer = { status: 200, body: [] };
   compareStatus = 'identical';
   constructor(
     readonly pulls: Record<number, PullFake>,
@@ -117,6 +119,12 @@ class GithubFake {
         pull.mergedBy = 'octo';
       }
       return reply(a.status, a.raw ?? JSON.stringify(a.body ?? {}), a.headers);
+    }
+    if (url.includes('/issues?')) {
+      await this.onMarker?.();
+      const a = this.markerAnswer;
+      throwIfFault(a);
+      return reply(a.status, a.raw ?? JSON.stringify(a.body ?? {}));
     }
     if (url.includes('/compare/')) {
       return reply(200, JSON.stringify({ status: this.compareStatus }));
@@ -401,6 +409,7 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     expect(result).toEqual({ delegated: true });
     expect(w.fake.requests.map((r) => `${r.method} ${r.url}`)).toEqual([
       'GET https://api.github.com/repos/octo/demo/pulls/201',
+      'GET https://api.github.com/repos/octo/demo/issues?state=open&labels=autonomy-paused&per_page=100&page=1',
       'PUT https://api.github.com/repos/octo/demo/pulls/201/merge',
     ]);
     const put = w.fake.puts()[0] as Recorded;
@@ -1711,4 +1720,38 @@ test('#1405 nine landed merges and an open poll during the tenth PUT cannot admi
   }
   expect(w.phase()).toBe('done');
   expect(w.fake.puts()).toHaveLength(1);
+});
+
+test.each(['open', 'network', 'malformed'] as const)(
+  '#1405 GitHub marker %s blocks a merge with a false team flag and no PUT',
+  async (mode) => {
+    const w = makeWorld();
+    w.fake.markerAnswer =
+      mode === 'open'
+        ? { status: 200, body: [{ number: 7 }] }
+        : mode === 'network'
+          ? 'network'
+          : { status: 200, body: {} };
+    expect(
+      w.s.db.select().from(teamTable).where(eq(teamTable.id, w.s.team.id)).get()?.autonomyPaused,
+    ).toBe(false);
+    const err = await refusal(requestMerge(w.deps, w.buildId));
+    expect(err.message).toContain('autonomy-paused');
+    expect(w.fake.puts()).toHaveLength(0);
+    expect(
+      w.s.db.select().from(teamTable).where(eq(teamTable.id, w.s.team.id)).get()?.autonomyPaused,
+    ).toBe(true);
+    expectUntouched(w);
+  },
+);
+
+test('#1405 a card closed during the uncached marker read cannot merge', async () => {
+  const w = makeWorld();
+  w.fake.onMarker = () => {
+    w.s.db.update(todoTable).set({ phase: 'closed' }).where(eq(todoTable.id, w.todoId)).run();
+  };
+  await expect(requestMerge(w.deps, w.buildId)).rejects.toThrow(
+    'illegal phase transition: closed -> done',
+  );
+  expect(w.fake.puts()).toHaveLength(0);
 });
