@@ -1,0 +1,13 @@
+[Unit]
+Description=Cairn weekly database restore drill
+
+[Service]
+Type=oneshot
+UMask=0077
+Nice=10
+RuntimeDirectory=cairn-restore-drill
+EnvironmentFile=%h/.config/cairn/restore-drill.env
+Environment=RESTORE_DRILL_SCRATCH=%t/cairn-restore-drill/run
+Environment=RESTORE_DRILL_REPORT=%h/.local/state/cairn/restore-drill.json
+ExecStart=/bin/bash -c 'exec /bin/bash "$${CAIRN_CHECKOUT}/scripts/ops/restore-drill-service.sh"'
+TimeoutStartSec=30min

@@ -41,6 +41,7 @@ export const DB_TABLES = [
   'memory_candidate',
   'push_subscription',
   'push_digest_item',
+  'push_delivery',
   'harness_eval_attempts',
   'autonomous_merge_admission',
 ] as const;
@@ -70,6 +71,7 @@ export const INTERNAL_ONLY_TABLES = [
   'memory_candidate',
   'push_subscription',
   'push_digest_item',
+  'push_delivery',
   'harness_eval_attempts',
   'autonomous_merge_admission',
 ] as const;

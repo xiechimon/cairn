@@ -712,7 +712,7 @@ describe('delivery: only decisions push immediately', () => {
     const s = bootServer({ pushEndpointHosts: TEST_PUSH_HOSTS });
     const vapid = s.vapidKeys;
     if (vapid === null) throw new Error('test VAPID keys missing');
-    let delivery: Promise<boolean> | undefined;
+    let delivery: ReturnType<typeof sendPushToUser> | undefined;
     try {
       await subscribe(s.app, s.team.id, fake.endpoint('/stalled'));
       await subscribe(s.app, s.team.id, fake.endpoint('/live'));

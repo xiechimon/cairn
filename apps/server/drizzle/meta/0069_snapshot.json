@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "45de184e-2b99-495e-8a3b-5b4a2f6a2ebb",
+  "id": "0f612c48-8ae2-4dc3-8250-ee59c77464b0",
   "prevId": "f62a291e-774c-49e6-aa1f-3427c87ec3ed",
   "tables": {
     "agent": {
@@ -2262,15 +2262,7 @@
           "autoincrement": false
         }
       },
-      "indexes": {
-        "message_createdAt_idx": {
-          "name": "message_createdAt_idx",
-          "columns": [
-            "createdAt"
-          ],
-          "isUnique": false
-        }
-      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
@@ -2664,6 +2656,80 @@
           "onUpdate": "no action"
         }
       },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "push_delivery": {
+      "name": "push_delivery",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "userId": {
+          "name": "userId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "teamId": {
+          "name": "teamId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "receivedAt": {
+          "name": "receivedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "alertStatus": {
+          "name": "alertStatus",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "message": {
+          "name": "message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "pushStatus": {
+          "name": "pushStatus",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'unknown'"
+        },
+        "fallbackClaimedAt": {
+          "name": "fallbackClaimedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
@@ -3318,15 +3384,6 @@
             "kind"
           ],
           "isUnique": false
-        },
-        "step_merge_finished_idx": {
-          "name": "step_merge_finished_idx",
-          "columns": [
-            "kind",
-            "status",
-            "finishedAt"
-          ],
-          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -3516,14 +3573,6 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
-        },
-        "maxAutonomousMergesPerDay": {
-          "name": "maxAutonomousMergesPerDay",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 10
         }
       },
       "indexes": {},
@@ -3945,69 +3994,6 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "autonomous_merge_admission": {
-      "name": "autonomous_merge_admission",
-      "columns": {
-        "buildId": {
-          "name": "buildId",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "teamId": {
-          "name": "teamId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "state": {
-          "name": "state",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "createdAt": {
-          "name": "createdAt",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "landedAt": {
-          "name": "landedAt",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "autonomous_merge_team_state_landed_idx": {
-          "name": "autonomous_merge_team_state_landed_idx",
-          "columns": [
-            "teamId",
-            "state",
-            "landedAt"
-          ],
-          "isUnique": false
-        },
-        "autonomous_merge_pending_age_idx": {
-          "name": "autonomous_merge_pending_age_idx",
-          "columns": [
-            "state",
-            "createdAt"
-          ],
-          "isUnique": false
-        }
-      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},

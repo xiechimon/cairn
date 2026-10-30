@@ -12,12 +12,12 @@ import { MIGRATIONS_FOLDER, openMemoryDb } from '../src/db/client.js';
 import * as schema from '../src/db/schema.js';
 import { seed } from '../src/db/seed.js';
 
-describe('the 37-table migration (the 01 §6 list)', () => {
+describe('the schema and migration journal (the 01 §6 list)', () => {
   test('the drizzle schema table-name set = DB_TABLES', () => {
     const tables = Object.values(schema).filter((v) => is(v, SQLiteTable));
     const names = tables.map((t) => getTableConfig(t as SQLiteTable).name).sort();
     expect(names).toEqual([...DB_TABLES].sort());
-    expect(names).toHaveLength(44);
+    expect(names).toHaveLength(DB_TABLES.length);
     expect(names).toContain('autonomous_merge_admission');
     expect(names).toContain('chief');
     expect(names).toContain('attachment');
@@ -42,7 +42,7 @@ describe('the 37-table migration (the 01 §6 list)', () => {
     }
   });
 
-  test.each(['0067_schedule_report', '0068_odd_cloak'])(
+  test.each(['0067_schedule_report', '0068_odd_cloak', '0069_push_delivery'])(
     'upgrades a database migrated through %s without rewriting its migration history',
     (previousTag) => {
       const previous = mkdtempSync(join(tmpdir(), 'cairn-1405-migrations-'));
@@ -79,6 +79,44 @@ describe('the 37-table migration (the 01 §6 list)', () => {
       }
     },
   );
+
+  test('upgrades a database already migrated through the previous main migration', () => {
+    const journal = JSON.parse(
+      readFileSync(resolve(MIGRATIONS_FOLDER, 'meta/_journal.json'), 'utf8'),
+    ) as { entries: { tag: string; when: number }[] };
+    const previous = journal.entries.slice(0, -1);
+    const directory = mkdtempSync(resolve(tmpdir(), 'cairn-migration-prefix-'));
+    const sqlite = new Database(':memory:');
+    try {
+      mkdirSync(resolve(directory, 'meta'));
+      writeFileSync(
+        resolve(directory, 'meta/_journal.json'),
+        JSON.stringify({ ...journal, entries: previous }),
+      );
+      for (const entry of previous)
+        copyFileSync(
+          resolve(MIGRATIONS_FOLDER, `${entry.tag}.sql`),
+          resolve(directory, `${entry.tag}.sql`),
+        );
+      const db = drizzle(sqlite, { schema });
+      migrate(db, { migrationsFolder: directory });
+      db.run(sql`INSERT INTO team (id, name, createdAt) VALUES ('legacy', 'Legacy', 0)`);
+      migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
+      seed(db);
+      expect(
+        db
+          .select()
+          .from(schema.team)
+          .all()
+          .find((row) => row.id === 'legacy')?.maxAutonomousMergesPerDay,
+      ).toBe(10);
+      expect(db.select().from(schema.pushDelivery).all()).toEqual([]);
+      expect(db.select().from(schema.harnessEvalAttempt).all()).toEqual([]);
+    } finally {
+      sqlite.close();
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
 
   test('the migrations apply cleanly to an in-memory db', () => {
     expect(() => openMemoryDb()).not.toThrow();

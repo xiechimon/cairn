@@ -4,18 +4,10 @@
 self.addEventListener('install', () => self.skipWaiting())
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()))
 
-// Web Push fall-through for browsers WITHOUT Declarative Web Push (Chrome/Firefox). The payload is
-// declarative-shaped ({ web_push: 8030, notification: { title, body, navigate, tag } }); Safari
-// 18.4+ consumes it natively (shows the notification AND navigates on tap) and never runs this
-// handler or notificationclick — deliberate, because iOS intermittently drops notificationclick
-// when the PWA is already running. Foreground suppression (in-app toast covers that case) therefore
-// only applies on the fall-through path; declarative browsers always show the OS notification.
 self.addEventListener('push', (event) => {
   const data = event.data ? event.data.json() : {}
   const n = data.notification || {}
   event.waitUntil((async () => {
-    const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
-    if (wins.some((w) => w.visibilityState === 'visible' && w.focused)) return
     // navigate is absolute; the page routes client-side, so keep only path+query+hash.
     let href = '/app'
     try {
@@ -29,6 +21,17 @@ self.addEventListener('push', (event) => {
       tag: n.tag,
       data: { href },
     })
+    if (typeof data.id === 'string' && typeof data.receiptUrl === 'string' && /^\/api\/teams\/[^/]+\/push\/receipts$/.test(data.receiptUrl)) {
+      const cache = await caches.open('push-auth')
+      const stored = await cache.match('/__push-auth')
+      const auth = stored ? await stored.json() : {}
+      const response = await fetch(data.receiptUrl, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...(typeof auth.token === 'string' && auth.token ? { authorization: `Bearer ${auth.token}` } : {}) },
+        body: JSON.stringify({ id: data.id }),
+      })
+      if (!response.ok) throw new Error('Push receipt rejected')
+    }
   })())
 })
 

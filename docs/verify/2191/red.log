@@ -1,0 +1,1235 @@
+
+ RUN  v5.0.1 <worktree>
+
+ ❯ |@xiechimon/cairn| test/push-outcomes.test.ts (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/push-outcomes.test.ts [ apps/server/test/push-outcomes.test.ts ]
+Error: Cannot find module '../src/services/push-alerts.js' imported from <worktree>/apps/server/test/push-outcomes.test.ts
+ ❯ test/push-outcomes.test.ts:5:1
+      3| import webpush from 'web-push';
+      4| import { pushDelivery, pushSubscription } from '../src/db/schema.js';
+      5| import { sendMustReachAlert } from '../src/services/push-alerts.js';
+       | ^
+      6| import { sendPushToUser } from '../src/services/push.js';
+      7| import { bootServer, req } from './helpers.js';
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  13:26:56
+   Duration  460ms (worker 97%, environment 3%)
+
+node:internal/modules/esm/resolve:272
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '<worktree>/scripts/ops/push-test.mjs' imported from <worktree>/scripts/ops/push-test.test.mjs
+    at finalizeResolution (node:internal/modules/esm/resolve:272:11)
+    at moduleResolve (node:internal/modules/esm/resolve:879:10)
+    at defaultResolve (node:internal/modules/esm/resolve:1006:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:708:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:728:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:766:56)
+    at #resolve (node:internal/modules/esm/loader:690:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:610:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)
+    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file://<worktree>/scripts/ops/push-test.mjs'
+}
+
+Node.js v26.8.1
+✖ scripts/ops/push-test.test.mjs (56.19075ms)
+✖ required alert displays before posting its authenticated id even with a focused page (13.389292ms)
+✔ failed display never posts a receipt (0.546125ms)
+✔ legacy foreground suppression remains and sends no false receipt (0.359708ms)
+✖ receipt works without a stored token and refuses external receipt URLs (0.450292ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 2
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 69.454084
+
+✖ failing tests:
+
+test at scripts/ops/push-test.test.mjs:1:1
+✖ scripts/ops/push-test.test.mjs (56.19075ms)
+  'test failed'
+
+test at scripts/ops/push-worker.test.mjs:30:1
+✖ required alert displays before posting its authenticated id even with a focused page (13.389292ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/push-worker.test.mjs:33:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/push-worker.test.mjs:49:1
+✖ receipt works without a stored token and refuses external receipt URLs (0.450292ms)
+  TypeError: Cannot read properties of undefined (reading '1')
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/push-worker.test.mjs:52:29)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+ RUN  v5.0.1 <worktree>
+
+
+ RUN  v5.0.1 <worktree>
+
+ ❯ |@xiechimon/cairn| test/push-smtp.test.ts (2 tests | 1 failed) 1321ms
+   × SMTP transport passes secure configuration and encoded mail to a scratch curl executable 1227ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/push-smtp.test.ts > SMTP transport passes secure configuration and encoded mail to a scratch curl executable
+Error: SMTP delivery failed
+ ❯ ChildProcess.<anonymous> src/services/push-alerts.ts:38:71
+     36|         const child = spawn('curl', ['--disable', '--silent', '--show-…
+     37|         child.once('error', () => reject(new Error('SMTP transport una…
+     38|         child.once('close', (code) => code === 0 ? resolve() : reject(…
+       |                                                                       ^
+     39|         child.stdin.on('error', () => {});
+     40|         child.stdin.end(mail);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+   Start at  13:30:01
+   Duration  26.60s (import 69%, transform 25%, tests 7%)
+
+ ❯ |@xiechimon/cairn| test/push-smtp.test.ts (2 tests | 1 failed) 937ms
+   × SMTP transport passes secure configuration and encoded mail to a scratch curl executable 873ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/push-smtp.test.ts > SMTP transport passes secure configuration and encoded mail to a scratch curl executable
+Error: SMTP delivery failed
+ ❯ ChildProcess.<anonymous> src/services/push-alerts.ts:38:71
+     36|         const child = spawn('curl', ['--disable', '--silent', '--show-…
+     37|         child.once('error', () => reject(new Error('SMTP transport una…
+     38|         child.once('close', (code) => code === 0 ? resolve() : reject(…
+       |                                                                       ^
+     39|         child.stdin.on('error', () => {});
+     40|         child.stdin.end(mail);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+   Start at  13:30:20
+   Duration  15.74s (import 75%, transform 16%, tests 7%, worker 1%)
+
+
+ RUN  v5.0.1 <worktree>
+
+ ❯ |@cairn/web| test/push-auth.test.ts (2 tests | 1 failed) 161ms
+   × worker credentials are written, rotated and removed in request order 153ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cairn/web| test/push-auth.test.ts > worker credentials are written, rotated and removed in request order
+AssertionError: expected [ 'removed', 'old', 'new' ] to deeply equal [ 'old', 'new', 'removed' ]
+
+- Expected
++ Received
+
+  [
++   "removed",
+    "old",
+    "new",
+-   "removed",
+  ]
+
+ ❯ test/push-auth.test.ts:24:22
+     22|   release?.();
+     23|   await Promise.all([old, rotated, removed]);
+     24|   expect(operations).toEqual(['old', 'new', 'removed']);
+       |                      ^
+     25| });
+     26|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+   Start at  13:31:09
+   Duration  1.10s (transform 67%, tests 22%, import 8%, worker 2%)
+
+
+ RUN  v5.0.1 <worktree>
+
+web push delivery failed
+ ❯ |@xiechimon/cairn| test/push-outcomes.test.ts (20 tests | 1 failed | 19 skipped) 3742ms
+   × digest retains queued items when accepted and failed subscriptions are mixed 3737ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/push-outcomes.test.ts > digest retains queued items when accepted and failed subscriptions are mixed
+AssertionError: expected [] to have a length of 1 but got +0
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ test/push-outcomes.test.ts:148:52
+    149|       fallback,
+    150|     );
+    151|     expect(result.alertStatus).toBe('undelivered');
+       |              ^
+    152|     expect(s.db.select().from(pushDelivery).get()?.alertStatus).toBe('…
+    153|     expect(loud).toHaveBeenCalledWith(expect.stringContaining('UNDELIV…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 19 skipped (20)
+   Start at  13:31:39
+   Duration  31.16s (transform 68%, import 19%, tests 12%)
+
+  Transform  |@xiechimon/cairn| transforming modules took 20.68s · 68% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+
+
+ RUN  v5.0.1 <worktree>
+
+ ❯ |@xiechimon/cairn| test/push-outcomes.test.ts (21 tests | 1 failed | 20 skipped) 6876ms
+   × receipt arriving after the deadline cannot suppress fallback when the event loop resumes late 6868ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/push-outcomes.test.ts > receipt arriving after the deadline cannot suppress fallback when the event loop resumes late
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/push-outcomes.test.ts:219:1
+    217| });
+    218|
+    219| test('receipt arriving after the deadline cannot suppress fallback whe…
+       | ^
+    220|   const s = setup();
+    221|   vi.useFakeTimers();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 20 skipped (21)
+   Start at  13:34:16
+   Duration  94.77s (transform 69%, import 23%, tests 7%)
+
+  Transform  |@xiechimon/cairn| transforming modules took 64.48s · 69% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+
+
+ RUN  v5.0.1 <worktree>
+
+ ❯ |@xiechimon/cairn| test/push-outcomes.test.ts (21 tests | 1 failed | 20 skipped) 984ms
+   × receipt arriving after the deadline cannot suppress fallback when the event loop resumes late 982ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/push-outcomes.test.ts > receipt arriving after the deadline cannot suppress fallback when the event loop resumes late
+AssertionError: expected "vi.fn()" to be called 1 times, but got 0 times
+ ❯ test/push-outcomes.test.ts:231:25
+    229|   await vi.advanceTimersByTimeAsync(1_000);
+    230|   await pending;
+    231|   expect(fallback.send).toHaveBeenCalledTimes(1);
+       |                         ^
+    232| });
+    233|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 20 skipped (21)
+   Start at  13:36:39
+   Duration  14.83s (transform 63%, import 30%, tests 7%)
+
+  Transform  |@xiechimon/cairn| transforming modules took 8.54s · 63% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+
+
+Negative control: original sendPushToUser on base 54195adb0806fd11632109cb74e3af423b98c0b8
+
+ RUN  v5.0.1 <worktree>
+
+web push delivery failed
+web push delivery failed
+web push delivery failed
+web push delivery failed
+ ❯ |@xiechimon/cairn| test/push-outcomes.test.ts (21 tests | 7 failed | 14 skipped) 3999ms
+   × empty subscriptions return no-subscription 560ms
+   × all 404 subscriptions are removed and return all-expired 330ms
+   × all 410 subscriptions are removed and return all-expired 567ms
+   × provider acceptance counts devices and correlates wire id with persistent row 633ms
+   × every non-expired delivery failing returns failed: network 558ms
+   × every non-expired delivery failing returns failed: mixed 774ms
+   × one accepted device wins over failures 577ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/push-outcomes.test.ts > empty subscriptions return no-subscription
+AssertionError: expected true to match object { status: 'no-subscription' }
+
+- Expected:
+{
+  "status": "no-subscription",
+}
+
++ Received:
+true
+
+ ❯ test/push-outcomes.test.ts:37:77
+     35| test('empty subscriptions return no-subscription', async () => {
+     36|   const s = setup(0);
+     37|   expect(await sendPushToUser(s.db, s.keys, s.user.id, s.team.id, mess…
+       |                                                                             ^
+     38|     status: 'no-subscription',
+     39|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/7]⎯
+
+ FAIL  |@xiechimon/cairn| test/push-outcomes.test.ts > all 404 subscriptions are removed and return all-expired
+ FAIL  |@xiechimon/cairn| test/push-outcomes.test.ts > all 410 subscriptions are removed and return all-expired
+AssertionError: expected true to match object { status: 'all-expired' }
+
+- Expected:
+{
+  "status": "all-expired",
+}
+
++ Received:
+true
+
+ ❯ test/push-outcomes.test.ts:47:77
+     45|     new webpush.WebPushError('gone', status, {}, '', ''),
+     46|   );
+     47|   expect(await sendPushToUser(s.db, s.keys, s.user.id, s.team.id, mess…
+       |                                                                             ^
+     48|     status: 'all-expired',
+     49|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/7]⎯
+
+ FAIL  |@xiechimon/cairn| test/push-outcomes.test.ts > provider acceptance counts devices and correlates wire id with persistent row
+AssertionError: expected true to match object { status: 'delivered', count: 2 }
+
+- Expected:
+{
+  "count": 2,
+  "status": "delivered",
+}
+
++ Received:
+true
+
+ ❯ test/push-outcomes.test.ts:57:18
+     55|   const send = vi.spyOn(webpush, 'sendNotification').mockResolvedValue…
+     56|   const result = await sendPushToUser(s.db, s.keys, s.user.id, s.team.…
+     57|   expect(result).toMatchObject({ status: 'delivered', count: 2 });
+       |                  ^
+     58|   const payload = JSON.parse(String(send.mock.calls[0]?.[1]));
+     59|   expect(payload.id).toEqual(expect.any(String));
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/7]⎯
+
+ FAIL  |@xiechimon/cairn| test/push-outcomes.test.ts > every non-expired delivery failing returns failed: network
+ FAIL  |@xiechimon/cairn| test/push-outcomes.test.ts > every non-expired delivery failing returns failed: mixed
+AssertionError: expected false to match object { status: 'failed' }
+
+- Expected:
+{
+  "status": "failed",
+}
+
++ Received:
+false
+
+ ❯ test/push-outcomes.test.ts:70:79
+     68|     if (mode === 'mixed')
+     69|       send.mockRejectedValueOnce(new webpush.WebPushError('gone', 410,…
+     70|     expect(await sendPushToUser(s.db, s.keys, s.user.id, s.team.id, me…
+       |                                                                               ^
+     71|       status: 'failed',
+     72|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/7]⎯
+
+ FAIL  |@xiechimon/cairn| test/push-outcomes.test.ts > one accepted device wins over failures
+AssertionError: expected false to match object { status: 'delivered', count: 1 }
+
+- Expected:
+{
+  "count": 1,
+  "status": "delivered",
+}
+
++ Received:
+false
+
+ ❯ test/push-outcomes.test.ts:81:77
+     79|     .mockRejectedValueOnce(new Error('network'))
+     80|     .mockResolvedValueOnce(accepted);
+     81|   expect(await sendPushToUser(s.db, s.keys, s.user.id, s.team.id, mess…
+       |                                                                             ^
+     82|     status: 'delivered',
+     83|     count: 1,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/7]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  7 failed | 14 skipped (21)
+   Start at  13:37:36
+   Duration  13.33s (transform 44%, tests 33%, import 21%, worker 1%, environment 1%)
+
+  Transform  |@xiechimon/cairn| transforming modules took 5.43s · 44% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+
+
+ RUN  v5.0.1 <worktree>
+
+ ❯ |@xiechimon/cairn| test/wire.test.ts (26 tests | 1 failed | 25 skipped) 22ms
+   ❯ the route surface = the 02 §6.1 vocabulary (4)
+     × no invented paths outside the vocabulary ([inferred] surfaces explicitly registered) 19ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/wire.test.ts > the route surface = the 02 §6.1 vocabulary > no invented paths outside the vocabulary ([inferred] surfaces explicitly registered)
+AssertionError: invented route POST /api/teams/{id}/push/receipts: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/wire.test.ts:218:59
+    216|   test('no invented paths outside the vocabulary ([inferred] surfaces …
+    217|     for (const route of have) {
+    218|       expect(canon.has(route), `invented route ${route}`).toBe(true);
+       |                                                           ^
+    219|     }
+    220|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 25 skipped (26)
+   Start at  13:42:13
+   Duration  10.49s (transform 59%, import 40%)
+
+  Transform  |@xiechimon/cairn| transforming modules took 5.95s · 59% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+
+
+ RUN  v5.0.1 <worktree>
+
+ ❯ |@cairn/shared| test/snapshot.test.ts (79 tests | 1 failed | 78 skipped) 21ms
+   ❯ protocol vocabulary snapshot (02 §5/§6 canonical) (16)
+     × web REST endpoint vocabulary (02 §6.1) 19ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cairn/shared| test/snapshot.test.ts > protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint vocabulary (02 §6.1)
+Error: Snapshot `protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint vocabulary (02 §6.1) 1` mismatched
+
+- Expected
++ Received
+
+@@ -261,10 +261,18 @@
+      "method": "DELETE",
+      "path": "/api/teams/{id}/push/subscriptions",
+    },
+    {
+      "method": "POST",
++     "path": "/api/teams/{id}/push/receipts",
++   },
++   {
++     "method": "POST",
++     "path": "/api/teams/{id}/push/test",
++   },
++   {
++     "method": "POST",
+      "note": "XMON-109（spec 13 回摆）：写路径——建技能目录（body {name,description,files[]}，frontmatter 是唯一真值）；→ 201 record",
+      "path": "/api/skills",
+      "query": [
+        "teamId",
+      ],
+
+ ❯ test/snapshot.test.ts:165:32
+    163| describe('protocol vocabulary snapshot (02 §5/§6 canonical)', () => {
+    164|   it('web REST endpoint vocabulary (02 §6.1)', () => {
+    165|     expect(WEB_REST_ENDPOINTS).toMatchSnapshot();
+       |                                ^
+    166|   });
+    167|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+  Snapshots  1 failed
+ Test Files  1 failed (1)
+      Tests  1 failed | 78 skipped (79)
+   Start at  13:42:46
+   Duration  2.70s (transform 82%, import 15%, worker 2%, tests 1%)
+
+
+ RUN  v5.0.1 <worktree>
+
+ ❯ |@xiechimon/cairn| test/schema.test.ts (5 tests | 2 failed) 238ms
+   ❯ the 37-table migration (the 01 §6 list) (4)
+     × the drizzle schema table-name set = DB_TABLES 12ms
+     × upgrades a database already migrated through the previous main migration 85ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/schema.test.ts > the 37-table migration (the 01 §6 list) > the drizzle schema table-name set = DB_TABLES
+AssertionError: expected [ 'agent', 'agent_memory', …(42) ] to deeply equal [ 'agent', 'agent_memory', …(41) ]
+
+- Expected
++ Received
+
+@@ -25,10 +25,11 @@
+    "message",
+    "notification",
+    "plan",
+    "project",
+    "provider",
++   "push_delivery",
+    "push_digest_item",
+    "push_subscription",
+    "schedule",
+    "schedule_report",
+    "secret",
+
+ ❯ test/schema.test.ts:16:19
+     14|     const tables = Object.values(schema).filter((v) => is(v, SQLiteTab…
+     15|     const names = tables.map((t) => getTableConfig(t as SQLiteTable).n…
+     16|     expect(names).toEqual([...DB_TABLES].sort());
+       |                   ^
+     17|     expect(names).toHaveLength(43);
+     18|     expect(names).toContain('chief');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  |@xiechimon/cairn| test/schema.test.ts > the 37-table migration (the 01 §6 list) > upgrades a database already migrated through the previous main migration
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/schema.test.ts:52:71
+     50|     migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
+     51|     const columns = db.all(sql`PRAGMA table_info(api_key)`) as { name:…
+     52|     expect(columns.some((column) => column.name === 'machineAccess')).…
+       |                                                                       ^
+     53|     expect(db.select().from(schema.harnessEvalAttempt).all()).toEqual(…
+     54|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 3 passed (5)
+   Start at  13:49:13
+   Duration  2.02s (import 47%, transform 39%, tests 14%)
+
+
+ RUN  v5.0.1 <worktree>
+
+ ❯ |@cairn/shared| test/snapshot.test.ts (79 tests | 1 failed | 78 skipped) 8ms
+   ❯ protocol vocabulary snapshot (02 §5/§6 canonical) (16)
+     × storage table list (01 §6) 7ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cairn/shared| test/snapshot.test.ts > protocol vocabulary snapshot (02 §5/§6 canonical) > storage table list (01 §6)
+Error: Snapshot `protocol vocabulary snapshot (02 §5/§6 canonical) > storage table list (01 §6) 1` mismatched
+
+- Expected
++ Received
+
+@@ -39,7 +39,8 @@
+    "build_outcome_backfill",
+    "memory_save_conflict",
+    "memory_candidate",
+    "push_subscription",
+    "push_digest_item",
++   "push_delivery",
+    "harness_eval_attempts",
+  ]
+
+ ❯ test/snapshot.test.ts:235:23
+    233|
+    234|   it('storage table list (01 §6)', () => {
+    235|     expect(DB_TABLES).toMatchSnapshot();
+       |                       ^
+    236|   });
+    237|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+  Snapshots  1 failed
+ Test Files  1 failed (1)
+      Tests  1 failed | 78 skipped (79)
+   Start at  13:50:03
+   Duration  516ms (transform 68%, import 29%, tests 2%, worker 1%)
+
+
+ RUN  v5.0.1 <worktree>
+
+ ❯ |@xiechimon/cairn| test/push-outcomes.test.ts (22 tests | 1 failed | 21 skipped) 129ms
+   × a provider promise that never settles cannot prevent fallback 127ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/push-outcomes.test.ts > a provider promise that never settles cannot prevent fallback
+AssertionError: expected "vi.fn()" to be called 1 times, but got 0 times
+ ❯ test/push-outcomes.test.ts:246:25
+    244|   const pending = sendMustReachAlert(s.db, s.keys, s.user.id, s.team.i…
+    245|   await vi.advanceTimersByTimeAsync(10_000);
+    246|   expect(fallback.send).toHaveBeenCalledTimes(1);
+       |                         ^
+    247|   expect(await pending).toMatchObject({ push: { status: 'failed' }, al…
+    248| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 21 skipped (22)
+   Start at  13:59:39
+   Duration  3.55s (transform 57%, import 39%, tests 4%)
+
+
+ RUN  v5.0.1 <worktree>
+
+web push delivery failed
+web push delivery failed
+web push delivery failed
+web push delivery failed
+web push delivery failed
+ALERT FALLBACK FAILED BgCJGbIzRlrLZK2LThzvR
+ALERT UNDELIVERED BgCJGbIzRlrLZK2LThzvR
+web push delivery failed
+web push delivery failed
+ ❯ |@xiechimon/cairn| test/push-outcomes.test.ts (25 tests | 5 failed) 5854ms
+   × test route returns an id before provider settlement and status is owner scoped 5013ms
+   × a provider promise that never settles cannot prevent fallback 28ms
+   × ordinary pushes preserve declarative display without allocating receipt rows 27ms
+   × overdue pending rows recover without an active sender, fallback configured: true 27ms
+   × overdue pending rows recover without an active sender, fallback configured: false 24ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/push-outcomes.test.ts > test route returns an id before provider settlement and status is owner scoped
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/push-outcomes.test.ts:162:1
+    160| );
+    161|
+    162| test('test route returns an id before provider settlement and status i…
+       | ^
+    163|   const s = setup();
+    164|   vi.useFakeTimers();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  |@xiechimon/cairn| test/push-outcomes.test.ts > a provider promise that never settles cannot prevent fallback
+AssertionError: expected { …(2) } to match object { push: { status: 'unknown' }, …(1) }
+(1 matching property omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "alertStatus": "fallback-accepted",
+    "push": {
+-     "status": "unknown",
++     "status": "failed",
+    },
+  }
+
+ ❯ test/push-outcomes.test.ts:244:25
+    242|   await vi.advanceTimersByTimeAsync(10_000);
+    243|   expect(fallback.send).toHaveBeenCalledTimes(1);
+    244|   expect(await pending).toMatchObject({
+       |                         ^
+    245|     push: { status: 'unknown' },
+    246|     alertStatus: 'fallback-accepted',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  |@xiechimon/cairn| test/push-outcomes.test.ts > ordinary pushes preserve declarative display without allocating receipt rows
+AssertionError: expected { id: 'L0mP15raXKZl1DNX481CP', …(3) } to match object { web_push: 8030 }
+(8 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "web_push": 8030,
++   "id": "L0mP15raXKZl1DNX481CP",
++   "notification": {
++     "body": "Paused",
++     "navigate": "https://cairn.local/app",
++     "tag": "test",
++     "title": "test: batch paused",
++   },
++   "receiptUrl": "/api/teams/Thh_nNCjkEg4DhzQPLEvo/push/receipts",
++   "requireReceipt": false,
+  }
+
+ ❯ test/push-outcomes.test.ts:254:55
+    252|   const send = vi.spyOn(webpush, 'sendNotification').mockResolvedValue…
+    253|   await sendPushToUser(s.db, s.keys, s.user.id, s.team.id, message);
+    254|   expect(JSON.parse(String(send.mock.calls[0]?.[1]))).toMatchObject({ …
+       |                                                       ^
+    255|   expect(s.db.select().from(pushDelivery).all()).toEqual([]);
+    256|   expect((await req(s.app, 'POST', `/api/teams/${s.team.id}/push/recei…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  |@xiechimon/cairn| test/push-outcomes.test.ts > overdue pending rows recover without an active sender, fallback configured: true
+ FAIL  |@xiechimon/cairn| test/push-outcomes.test.ts > overdue pending rows recover without an active sender, fallback configured: false
+TypeError: sweepPendingPushAlerts is not a function
+ ❯ test/push-outcomes.test.ts:264:9
+    262|   s.db.insert(pushDelivery).values({ id: 'orphan', userId: s.user.id, …
+    263|   const fallback = { send: vi.fn().mockResolvedValue(undefined) };
+    264|   await sweepPendingPushAlerts(s.db, configured ? fallback : null);
+       |         ^
+    265|   expect(s.db.select().from(pushDelivery).get()?.alertStatus).toBe(con…
+    266|   expect(fallback.send).toHaveBeenCalledTimes(configured ? 1 : 0);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  5 failed | 20 passed (25)
+   Start at  14:53:43
+   Duration  7.15s (tests 83%, transform 10%, import 7%)
+
+✖ sends one authenticated alert for the given user and prints receipt outcome (12.548083ms)
+✔ rejects unauthorized instances and never reports fallback as a phone receipt (0.479625ms)
+✖ pending status is polled until receipt and deadline bounds unsettled requests (0.2205ms)
+✔ required alert displays before posting its authenticated id even with a focused page (13.141208ms)
+✔ failed display never posts a receipt (0.542042ms)
+✖ ordinary foreground pushes still display (0.756458ms)
+✔ receipt works without a stored token and refuses external receipt URLs (0.517917ms)
+✖ ops tests run in prepush and the backup CI job and journal ends with a newline (6.910958ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 4
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 64.6435
+
+✖ failing tests:
+
+test at scripts/ops/push-test.test.mjs:5:1
+✖ sends one authenticated alert for the given user and prints receipt outcome (12.548083ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/push-test.test.mjs:20:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/push-test.test.mjs:62:1
+✖ pending status is polled until receipt and deadline bounds unsettled requests (0.2205ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/push-test.test.mjs:67:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/push-worker.test.mjs:72:1
+✖ ordinary foreground pushes still display (0.756458ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/push-worker.test.mjs:75:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/push-worker.test.mjs:86:1
+✖ ops tests run in prepush and the backup CI job and journal ends with a newline (6.910958ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(selfTests.includes(path))
+  
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/push-worker.test.mjs:90:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+Review round 1: Supplemental mutable and scheduler negative controls
+
+ RUN  v5.0.1 <worktree>
+
+ ❯ |@xiechimon/cairn| test/push-outcomes.test.ts (27 tests | 2 failed | 25 skipped) 109ms
+   × provider acceptance counts devices and correlates wire id with persistent row 69ms
+   × scheduler recovers overdue alerts at startup and on periodic ticks 39ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/push-outcomes.test.ts > provider acceptance counts devices and correlates wire id with persistent row
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/push-outcomes.test.ts:66:27
+     64|   expect(payload.id).toEqual(expect.any(String));
+     65|   expect(payload.web_push).toBe(8030);
+     66|   expect(payload.mutable).toBe(true);
+       |                           ^
+     67|   expect(payload.requireReceipt).toBe(true);
+     68|   expect(s.db.select().from(pushDelivery).get()?.id).toBe(payload.id);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  |@xiechimon/cairn| test/push-outcomes.test.ts > scheduler recovers overdue alerts at startup and on periodic ticks
+AssertionError: expected 'pending' to be 'undelivered' // Object.is equality
+
+Expected: "undelivered"
+Received: "pending"
+
+ ❯ test/push-outcomes.test.ts:304:103
+    302|     scheduler.start();
+    303|     await vi.advanceTimersByTimeAsync(0);
+    304|     expect(s.db.select().from(pushDelivery).where(eq(pushDelivery.id, …
+       |                                                                                                       ^
+    305|     insert('periodic');
+    306|     await vi.advanceTimersByTimeAsync(100);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 25 skipped (27)
+   Start at  14:56:19
+   Duration  1.57s (transform 57%, import 36%, tests 7%)
+
+
+Review round 1: Initial prepush fixture failures
+$ node scripts/prepush.mjs --self-test
+[prepush] node --test scripts/ops/push-test.test.mjs scripts/ops/push-worker.test.mjs scripts/prepush.test.mjs scripts/heavy-slots.test.mjs scripts/english-only-gate.test.mjs scripts/doc-reader-tests.test.mjs scripts/lessons-ledger-gate.test.mjs scripts/recording-gate.test.mjs scripts/lessons-weekly.test.mjs scripts/epic-done.test.mjs scripts/agent-rules.test.mjs
+✔ merge instructions require the pr-gate auto-merge verdict (21.195125ms)
+✔ AGENTS.md and pr-cairn agree that agents never add needs-decision (8.050166ms)
+✔ active docs never tell agents to add needs-decision (5.32275ms)
+✔ a doc change selects the tests that name it, split by runner (5.838166ms)
+✔ root-level doc names, integration suites and known-red files are not selected (6.94825ms)
+✔ prose flags Chinese outside code spans, fences and HTML comments (52.970375ms)
+✔ code checks comments only; UI strings and exempt paths pass (1.161ms)
+✔ diff mode reds added Chinese lines and Chinese commit messages only (8839.1445ms)
+✔ --text checks a PR body file (825.522084ms)
+✔ caller-only required-artifact.json cannot satisfy frozen checks (2317.716625ms)
+✔ caller-only ignored-artifact.json cannot satisfy frozen checks (2408.053625ms)
+✔ tracked caller edits do not affect checks in the detached main tree (1899.047625ms)
+✔ temporary main worktree is removed after success (2932.83075ms)
+✔ temporary main worktree is removed after failure (1833.400542ms)
+✔ temporary main worktree is removed after timeout (1694.480875ms)
+✔ temporary main worktree is removed after midway error (2522.129083ms)
+✔ temporary main worktree is removed after wrong HEAD (2107.839375ms)
+✔ temporary main worktree is removed after add error (1743.327958ms)
+✔ complete: closed issues, isolated remote-main checks and one green commit (3.681667ms)
+✔ failure mode 1: API errors and rate limits are unknown, even with pause or fail (0.912541ms)
+✔ failure mode 1: malformed or partial GitHub data never completes (2.622708ms)
+✔ failure mode 2: not-planned, manual and unmerged closures name the issue (3.730375ms)
+✔ failure mode 3: a merged linked PR does not substitute for an open issue (1.341459ms)
+✔ failure mode 4: no green main commit since the last closing SHA is incomplete (1.654666ms)
+✔ failure mode 5: green at the closing commit still completes after later red merges (35.091375ms)
+✔ required checks must succeed together on one eligible commit (40.257583ms)
+✔ missing, pending, skipped and neutral required checks do not count as success (27.155666ms)
+✔ caller edits and feature HEAD do not prevent checks at remote main (5.90675ms)
+✔ failure mode 7: frozen manifest comes only from git show at the selected ref (1.373416ms)
+✔ failure mode 8: invalid manifests fail closed before commands run (3.5415ms)
+✔ missing or malformed manifests and git runner failures are unknown (0.714167ms)
+✔ failure mode 9: missing commands, nonzero exits and missing expected stdout fail checks (19.44325ms)
+✔ unexpected command errors and malformed command output are unknown (7.961084ms)
+✔ failure mode 10: no started-at means no cap even when checks fail (11.031375ms)
+✔ paused: every human-wait label on issues or open linked PRs takes priority over failure (7.379584ms)
+✔ closed linked PR labels do not pause, while explicit pause does (1.550042ms)
+✔ failed: explicit failure and elapsed maxHours apply only when not complete or paused (7.494959ms)
+✔ commit closers must belong to main; the latest of multiple closing changes sets the boundary (1.889875ms)
+✔ all REST pages are consumed and incomplete check pages cannot masquerade as green (5.412708ms)
+✔ invalid CLI arguments fail before any runner executes (5.921416ms)
+✔ JSON output contains the same decision and the pure decision does not mutate facts (63.562916ms)
+✔ import has no CLI effects and the actual CLI guard emits unknown without network (786.769583ms)
+✔ CI includes this test and ownership covers the checker and frozen manifests (1.034584ms)
+✔ green side-branch commits cannot establish a green main after closure (3.762833ms)
+✔ parallel closing changes require a green main descendant of both changes (4.795375ms)
+✔ non-Error runner throws still produce unknown (0.597625ms)
+✔ check-run requests stop at the first green commit, newest first (11.038125ms)
+✔ at most 30 eligible commits are examined, including a green thirtieth commit (6.961708ms)
+✔ 31 eligible commits with green index 30 yield unknown (2.789125ms)
+✔ 30 eligible commits with green index -1 yield incomplete (1.994625ms)
+✔ 40 eligible commits with green index 0 yield complete (2.177084ms)
+✔ no green commit reports missing and unsuccessful required checks on the newest commit (1.780416ms)
+✔ remote main movement after the first read does not invalidate local checks (1.272625ms)
+✔ each command receives a 900 second timeout and a timeout fails that check (1.885375ms)
+✔ a remote main SHA missing locally stays unknown and requests an explicit fetch (0.320416ms)
+✔ only completed success is green, regardless of future GitHub status values (3.280083ms)
+✔ partial or reordered examined commits cannot establish completion (1.230459ms)
+✔ empty required checks cannot establish completion without CI evidence (0.324542ms)
+✔ untracked files before and during checks preserve every check result (1.443916ms)
+✔ default manifest is pinned to the GitHub main SHA before it is read (1.097917ms)
+✔ explicit manifest refs must resolve to ancestors of remote main (1.797834ms)
+✔ history and descendant membership do not perform repeated array scans (1.031208ms)
+✔ finding the latest closure reads issue SHAs independently of history length (2.917166ms)
+✔ last closing events need nodes and bounded length without forward pageInfo (3.815375ms)
+✔ git and gh capture stderr and include it in unknown reasons (0.535625ms)
+✔ manifest check failures capture stderr tails including timeouts (2.673167ms)
+✔ the checker stays within 400 lines (0.288375ms)
+✔ slot count defaults to 2 and falls back to 1 with a warning for bad values (6.746792ms)
+✔ CI environments skip the queue (25.548541ms)
+✔ each slot owns its own e2e port and build directory (15.634792ms)
+✖ slotPortHolder names the pid, cwd and command of whatever listens on the port (15023.907084ms)
+✔ a bad slot count gets a warning and a single slot (912.55825ms)
+✔ waiters see their queue position and are served first-come first-served (1376.657917ms)
+✔ kill -9 on the holder frees the slot for the queued process within 5 seconds (916.542125ms)
+✔ a clean exit releases the slot too (961.140042ms)
+✔ simultaneous grabs for the last slot: exactly one wins, every round (16342.376084ms)
+✔ simultaneous reclaim of one dead holder: exactly one process inherits the slot (21401.007708ms)
+✔ two killed holders and several waiters: stale entries are reclaimed without double grants (2981.661209ms)
+✔ run wrapper: with 2 slots and 4 jobs at most 2 run at once and all pass (4142.776209ms)
+✔ a run wrapper inside a holder reuses its slot instead of queueing behind itself (1307.930709ms)
+✔ an inherited slot variable that no live process holds is ignored (624.168209ms)
+✔ an inherited slot whose lock belongs to someone else is not reused (448.033292ms)
+✔ CI skips the queue even when every slot is taken (766.298583ms)
+✔ run wrapper passes the exit code through and frees the slot (845.426167ms)
+✔ e2e:affected queues for a slot, but a dry run never waits (781.961875ms)
+✔ e2e:affected outside prepush uses only the port of the slot it acquired and releases it on exit (1744.065625ms)
+✖ a squatted slot port fails e2e:affected before playwright and names the holding process (15159.13525ms)
+✔ prepush-vitest run directly queues for a slot and only starts vitest once the holder exits (1567.431708ms)
+✔ prepush-vitest reuses the lease inherited from pnpm prepush without queueing (864.209584ms)
+✔ prepush queues for a slot in local mode and starts once the holder is killed (4104.403333ms)
+✖ prepush reports a squatted slot port before running any check (15287.882708ms)
+✔ every migrated entry passes and the old table is gone (1236.069792ms)
+✔ level 5 entry without a reason is rejected (31.107ms)
+✔ level outside 1 to 5 is rejected (9.374208ms)
+✔ pending upgrade without a ticket is rejected, with a ticket passes (2.696542ms)
+✔ the real bad note that sat on main without a ticket is rejected (3.939667ms)
+✔ file name without a ticket number is rejected (6.431625ms)
+✔ missing, reordered or malformed fields are rejected (16.542709ms)
+✔ a resurrected docs/lessons.md table is rejected (10.23025ms)
+✔ two parallel branches each adding an entry merge without conflict (2508.636792ms)
+✔ the old single table does conflict when two branches append a row (1330.121417ms)
+✔ both upgrade-pending word orders and the original Chinese marker require a ticket (0.771375ms)
+✔ table generation rejects malformed entries with the ledger diagnostic (0.813125ms)
+✔ generated table keeps existing escaped pipes inside their cell (0.947708ms)
+✔ the CLI can validate and render entries from a checkout path containing spaces (656.887167ms)
+✔ replaying one gate failure twice for the same pull request counts one intercept (13.310541ms)
+✔ a new commit on the same branch does not count the interception again, a new branch does (8.964459ms)
+✔ a red gate on a pull request and on its merge counts once, and the merge a recurrence (8.187667ms)
+✔ an event from before the safeguard activated stays out of the counters (10.256583ms)
+✔ a hand-written counter drifts from the projection and the gate says so (9.195875ms)
+✔ the counters an entry already carried are frozen as its baseline, never recounted (32.086709ms)
+✔ a baseline frozen below what the entry already records is reported, never applied (21.212ms)
+✔ a baseline left behind by a deleted entry is reported, not ignored (7.293792ms)
+✔ categories are matched by file-derived key, never by symptom prose (10.360666ms)
+✔ an ambiguous or malformed event is rejected before it reaches the log (12.279833ms)
+✔ a recurrence counts once, opens one escalation and records the issue that came back (8.26125ms)
+✔ the escalation ticket asks for the stronger rung and flags level 1, which has none (33.927875ms)
+✔ the event log rejects duplicate ids and events for categories with no entry (83.791ms)
+✔ the window is the seven days before now, so Monday 01:23 UTC reports the week that ended (0.60825ms)
+✔ the weekly summary runs on an empty ledger and on a normal week (0.634292ms)
+✔ the idle threshold counts whole weeks since the last activity, not since a fixed date (2.231292ms)
+✔ the CLI records an event once, writes the counters and prints one escalation request (2054.930166ms)
+✔ a gate failure names every entry whose safeguard points at that gate (0.418708ms)
+✔ the gate-failed command records a batch and prints one escalation per new recurrence (624.179334ms)
+✔ intercept deduplication resets at Monday UTC and ignores commits within the week (0.497959ms)
+✔ weekly deduplication also recognizes previously stored intercept ids (0.181833ms)
+lessons-weekly: could not file recurrence:xiechimon/cairn+2043:xiechimon/cairn#2043:comment-discipline: gh: HTTP 502
+✔ an empty ledger writes a report that says so and files nothing (157.119625ms)
+✔ a normal week reports its counts and leaves a filed recurrence alone (11.948959ms)
+✔ a pending escalation is filed once, and a rerun finds the issue instead of filing again (28.822042ms)
+✔ a failed issue creation leaves the recurrence pending for the next run (47.837416ms)
+✔ the CLI writes the report where --out points and prints it (440.902167ms)
+✔ weekly collection deduplicates external logs and persists projected counters (21.166167ms)
+✔ merged recurrence increases file one issue and replay does not duplicate it (5421.489334ms)
+✔ sends one authenticated alert for the given user and prints receipt outcome (326.83675ms)
+✔ rejects unauthorized instances and never reports fallback as a phone receipt (6.444166ms)
+✔ pending status is polled until receipt and the deadline bounds polling (116.010125ms)
+✔ required alert displays before posting its authenticated id even with a focused page (234.6505ms)
+✔ failed display never posts a receipt (4.583458ms)
+✔ ordinary foreground pushes still display (3.684542ms)
+✔ receipt works without a stored token and refuses external receipt URLs (3.270458ms)
+✔ ops tests run in prepush and the backup CI job and journal ends with a newline (2.821167ms)
+[prepush] git init -q
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 0 intercepts
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 1 intercepts
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 1 intercepts
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 1 intercepts
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 1 intercepts
+✔ scrubGateEnv drops every gate base SHA and the force-full switch (3.969666ms)
+✔ hasCode classifies documents (0.726167ms)
+✔ hasCode classifies server markdown fixtures (0.163208ms)
+✔ hasCode classifies shared markdown fixtures (0.12975ms)
+✔ hasCode classifies integration markdown fixtures (0.162416ms)
+✔ hasCode classifies executable evidence (0.154958ms)
+✔ hasCode classifies non-markdown evidence (0.163167ms)
+✔ hasCode classifies epic data (0.411458ms)
+✔ hasCode classifies code (0.367125ms)
+✔ hasCode classifies unknown paths (2.944375ms)
+✔ hasCode classifies mixed changes (0.378791ms)
+✔ hasCode classifies empty changes (0.215833ms)
+✔ --has-code prints only a boolean, uses the supplied base and fails closed (11247.114375ms)
+✔ CI classifies before heavy work and always runs push coverage (10.707042ms)
+✔ required aggregates only accept skipped work after a successful docs-only classification (6606.933125ms)
+✔ folded gates stay visibly red, continue after failures and retain full history (31.841083ms)
+✔ documentation skips code checks, unknown paths fail closed (1.964292ms)
+✔ changes to prepush scripts run the CI self-test files locally (3.298834ms)
+✖ the CI self-test step runs selfTests through prepush and names no self-test file itself (8.95375ms)
+✖ --self-test runs exactly the selfTests files, skips change detection and fails with them (27.704084ms)
+✔ escape-trace tests stay mandatory for every code prepush plan (0.405958ms)
+✔ the recording gate runs in local prepush, in CI prepush and in the CI self-test step (0.292625ms)
+✔ a ledger entry change runs the ledger gate even when only documents changed (0.240375ms)
+✔ local code checks include both UI gates and affected e2e (0.189625ms)
+✔ every CI node scripts step also runs in local prepush or is listed as CI-only (0.634958ms)
+✔ a web change runs the whole web unit suite, which catches tests that read sources instead of importing them (0.144833ms)
+✔ local gates default their base to the merge-base, not the moving origin/main tip (21.775333ms)
+✔ affected e2e receives non-markdown evidence paths as code (0.48675ms)
+✔ e2e coverage check passes on the real suite and names an unmapped spec (942.727042ms)
+✔ a board card source change selects the spec that reads its title (312.255125ms)
+✔ CI shares the plan but keeps advisory and full e2e in separate jobs (0.890459ms)
+✔ CLI skips real document changes and rejects a missing base (16077.497709ms)
+✔ a stale local origin/main is refreshed by fetch before computing changes (3888.8995ms)
+✔ fetch failure falls back to the local origin/main and prints a stale notice (2641.430208ms)
+✔ prepush vitest only forgives files listed as known local red (5.973ms)
+✔ plan children do not inherit the git hook repository binding (1808.108042ms)
+✔ only gate scripts are mapped to a ledger category when a step goes red (0.488292ms)
+✔ a gate that blocks a push records one intercept for every entry whose safeguard names it (1575.067042ms)
+✔ a red gate step leaves the repository untouched and still exits non-zero (1099.246416ms)
+✔ retrying the same gate on the same branch after another commit records nothing new (2344.334542ms)
+✔ CAIRN_GATE_LOG appends the gate-red events for a CI job to collect (1888.430625ms)
+✔ a checkout without docs/lessons, or CAIRN_LESSONS_LEDGER=0, leaves the tree untouched (42.962541ms)
+✔ logging is opt-in and never projects counters into the checkout (461.991583ms)
+✔ CI doc-reader checks select the real codeowners reader for identity documentation (538.890625ms)
+✔ workflow preserves comments about external behavior (13.391958ms)
+✔ forced push coverage preserves the English gate range across multiple commits (5029.16725ms)
+✔ a copy-only web change exits 0 without a recording (2833.546167ms)
+✔ a copy-only web change with two ticket evidence directories exits 0 (2141.838542ms)
+✔ the issue example (transition: transform 200ms) with only PNGs exits 1 (2759.763375ms)
+✔ the same change plus a WebM under docs/verify/1783 exits 0 (1809.3575ms)
+✔ a 6 MB recording exits 1 with a size reason (2650.950834ms)
+✔ a recording parked outside the ticket evidence directory does not satisfy the gate (2729.0275ms)
+✔ a motion token file change with no recording exits 1 (2166.645709ms)
+✔ two ticket evidence directories in one branch exit 2 instead of picking one (2477.554875ms)
+✔ a merged PR that shipped motion with only PNGs is red on replay (real history #1972) (4497.070958ms)
+ℹ tests 196
+ℹ suites 0
+ℹ pass 191
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 108267.730667
+
+✖ failing tests:
+
+test at scripts/heavy-slots.test.mjs:197:1
+✖ slotPortHolder names the pid, cwd and command of whatever listens on the port (15023.907084ms)
+  AssertionError [ERR_ASSERTION]: /SQUATTER-READY/ never appeared on out: SQUATTER-ERROR EPERM
+  
+      at until (file://<worktree>/scripts/heavy-slots.test.mjs:73:14)
+      at async TestContext.<anonymous> (file://<worktree>/scripts/heavy-slots.test.mjs:203:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at scripts/heavy-slots.test.mjs:549:1
+✖ a squatted slot port fails e2e:affected before playwright and names the holding process (15159.13525ms)
+  AssertionError [ERR_ASSERTION]: /SQUATTER-READY/ never appeared on out: SQUATTER-ERROR EPERM
+  
+      at until (file://<worktree>/scripts/heavy-slots.test.mjs:73:14)
+      at async TestContext.<anonymous> (file://<worktree>/scripts/heavy-slots.test.mjs:558:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at scripts/heavy-slots.test.mjs:670:1
+✖ prepush reports a squatted slot port before running any check (15287.882708ms)
+  AssertionError [ERR_ASSERTION]: /SQUATTER-READY/ never appeared on out: SQUATTER-ERROR EPERM
+  
+      at until (file://<worktree>/scripts/heavy-slots.test.mjs:73:14)
+      at async TestContext.<anonymous> (file://<worktree>/scripts/heavy-slots.test.mjs:691:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at scripts/prepush.test.mjs:346:1
+✖ the CI self-test step runs selfTests through prepush and names no self-test file itself (8.95375ms)
+  AssertionError [ERR_ASSERTION]: scripts/ops/push-test.test.mjs is named in .github/workflows/ci.yml; list self-test files only in selfTests in scripts/prepush.mjs
+      at TestContext.<anonymous> (file://<worktree>/scripts/prepush.test.mjs:354:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scripts/prepush.test.mjs:360:1
+✖ --self-test runs exactly the selfTests files, skips change detection and fails with them (27.704084ms)
+  Error: ENOENT: no such file or directory, open '/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/cairn-prepush-self-test-WPixjY/scripts/ops/push-test.test.mjs'
+      at writeFileSync (node:fs:2997:20)
+      at TestContext.<anonymous> (file://<worktree>/scripts/prepush.test.mjs:374:7)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'open',
+    path: '/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/cairn-prepush-self-test-WPixjY/scripts/ops/push-test.test.mjs'
+  }
+[ELIFECYCLE] Command failed with exit code 1.
+
+Review round 1: Library socket timeout negative control
+
+ RUN  v5.0.1 <worktree>
+
+web push delivery failed
+ ❯ |@xiechimon/cairn| test/push-outcomes.test.ts (28 tests | 1 failed | 27 skipped) 512ms
+   × library socket timeout is unknown and still sends fallback 510ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/push-outcomes.test.ts > library socket timeout is unknown and still sends fallback
+AssertionError: expected { …(2) } to match object { push: { status: 'unknown' }, …(1) }
+(1 matching property omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "alertStatus": "fallback-accepted",
+    "push": {
+-     "status": "unknown",
++     "status": "failed",
+    },
+  }
+
+ ❯ test/push-outcomes.test.ts:372:18
+    370|   const fallback = { send: vi.fn().mockResolvedValue(undefined) };
+    371|   const result = await sendMustReachAlert(s.db, s.keys, s.user.id, s.t…
+    372|   expect(result).toMatchObject({ push: { status: 'unknown' }, alertSta…
+       |                  ^
+    373|   expect(s.db.select().from(pushDelivery).get()?.pushStatus).toBe('unk…
+    374|   expect(fallback.send).toHaveBeenCalledTimes(1);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 27 skipped (28)
+   Start at  15:03:37
+   Duration  16.94s (transform 58%, import 38%, tests 3%)
+
+  Transform  |@xiechimon/cairn| transforming modules took 9.55s · 58% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+

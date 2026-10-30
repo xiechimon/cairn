@@ -1,0 +1,504 @@
+{
+  "ok": false,
+  "at": "2026-10-30T08:49:57.562213+00:00",
+  "tables": {
+    "__drizzle_migrations": {
+      "identical": 62,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "agent": {
+      "identical": 8,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "agent_memory": {
+      "identical": 17,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "api_key": {
+      "identical": 6,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "attachment": {
+      "identical": 9,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "autonomy_state": {
+      "identical": 2,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "branch_sync": {
+      "identical": 1,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "build": {
+      "identical": 120,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "build_feedback": {
+      "identical": 16,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "build_outcome_backfill": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "chief": {
+      "identical": 1,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "chief_message": {
+      "identical": 7058,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "chief_thread": {
+      "identical": 142,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "feishu_binding": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "gate_digest": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "gate_round": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "gate_state": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "gate_verdict": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "github_connection": {
+      "identical": 1,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "machine": {
+      "identical": 5,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "member_activity": {
+      "identical": 1,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "memory_candidate": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "memory_save_conflict": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "message": {
+      "identical": 16748,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "notification": {
+      "identical": 188,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "plan": {
+      "identical": 54,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "project": {
+      "identical": 4,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "provider": {
+      "identical": 5,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "schedule": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "secret": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "skill_audit": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "steer_pending": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "step": {
+      "identical": 539,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "stop_pending": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "tag": {
+      "identical": 90,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "team": {
+      "identical": 1,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "todo": {
+      "identical": 83,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "todo_tag": {
+      "identical": 67,
+      "changedAfterBackup": 0,
+      "missing": 1,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "token_usage": {
+      "identical": 449,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "user": {
+      "identical": 1,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    }
+  },
+  "mode": "compare",
+  "allowlist": {
+    "machine": {
+      "columns": {
+        "lastSeenAt": "Daemon heartbeat refreshes the last-seen timestamp.",
+        "capabilities": "Daemon heartbeat refreshes the reported capabilities snapshot."
+      }
+    },
+    "autonomy_state": {
+      "columns": {
+        "lastEvaluatedAt": "Scheduler evaluation heartbeat refreshes this timestamp even when the verdict is unchanged."
+      }
+    }
+  },
+  "backupTimestamp": "20261030T084946Z",
+  "integrity": "ok",
+  "relationships": {
+    "todo": "w2t0Xy9rI67EsALD6Fyy7",
+    "build": "01a17fec-d0e5-7514-ad96-86ad89296596",
+    "steps": [
+      "A1WuTAPlP6FoZ68Cepx3L",
+      "J6s3UnU7dMPjYrripKqu3"
+    ],
+    "messages": [
+      "7WWX1kF_D8MmkuUJttyev",
+      "LfjfRUqxg6UsQx2EiJwzB",
+      "b-RltGsgOfP2PG8VSKHsL",
+      "chatcmpl-tool-82c430558de2ee4b",
+      "chatcmpl-tool-83dc9b5a48e779ed",
+      "chatcmpl-tool-846cf5d6fafaa131",
+      "chatcmpl-tool-85b69b78407911c7",
+      "chatcmpl-tool-8a74012af1f85471",
+      "chatcmpl-tool-8b1f650a617c0c06",
+      "chatcmpl-tool-8b3effde798e7bc2",
+      "chatcmpl-tool-8c2ba0f606e4f4d5",
+      "chatcmpl-tool-8c906ac22563e9b2",
+      "chatcmpl-tool-8f8dbe29fea24eaf",
+      "chatcmpl-tool-90400a163ca7227c",
+      "chatcmpl-tool-90faf2e86de14156",
+      "chatcmpl-tool-91860e15c309e290",
+      "chatcmpl-tool-9575a00ec6ed616a",
+      "chatcmpl-tool-95b875e5f8a8e3bc",
+      "chatcmpl-tool-9881d977d7b0aec3",
+      "chatcmpl-tool-9af1933531f34574",
+      "chatcmpl-tool-9b645ea72c4bdad0",
+      "chatcmpl-tool-9b9f07deca067067",
+      "chatcmpl-tool-9dfcfe1c8bd48351",
+      "chatcmpl-tool-9ec467d9c1ab34e5",
+      "chatcmpl-tool-a26075ff51c32676",
+      "chatcmpl-tool-a2b513e7245b5ce4",
+      "chatcmpl-tool-a310d69dbedf8c10",
+      "chatcmpl-tool-a3c7f4cf3fa3151f",
+      "chatcmpl-tool-a4e87de8236ac6ed",
+      "chatcmpl-tool-a54c3c1bd29e28da",
+      "chatcmpl-tool-a6ed731ca78a6d0e",
+      "chatcmpl-tool-a70515ff93e6da27",
+      "chatcmpl-tool-a97326d88e40a700",
+      "chatcmpl-tool-a9ed974a06cd3bb2",
+      "chatcmpl-tool-aa1489007089b7bb",
+      "chatcmpl-tool-aaede141d89095be",
+      "chatcmpl-tool-ab68bc4528e6861f",
+      "chatcmpl-tool-abf3613d638abbd7",
+      "chatcmpl-tool-ac995b092df1d19a",
+      "chatcmpl-tool-af51b4f86ad7dcb7",
+      "chatcmpl-tool-afb345165d6fd60e",
+      "chatcmpl-tool-afd91815a2e466c1",
+      "chatcmpl-tool-b06418a26b09fb61",
+      "chatcmpl-tool-b0e54b92ab509f0d",
+      "chatcmpl-tool-b1963b47b729c097",
+      "chatcmpl-tool-b3e41b7d6dec8baf",
+      "chatcmpl-tool-b4c9daba879f86f6",
+      "chatcmpl-tool-b642f925e59a70a9",
+      "chatcmpl-tool-ba98aef1c6b061ca",
+      "chatcmpl-tool-bcdd94f1b5765724",
+      "chatcmpl-tool-be8e1602c28e6885",
+      "git-credential-A1WuTAPlP6FoZ68Cepx3L",
+      "git-credential-J6s3UnU7dMPjYrripKqu3",
+      "merged-pr-guard-01a17fec-d0e5-7514-ad96-86ad89296596",
+      "msg-A1WuTAPlP6FoZ68Cepx3L-1",
+      "msg-A1WuTAPlP6FoZ68Cepx3L-2",
+      "msg-A1WuTAPlP6FoZ68Cepx3L-3",
+      "msg-A1WuTAPlP6FoZ68Cepx3L-4",
+      "msg-A1WuTAPlP6FoZ68Cepx3L-5",
+      "msg-A1WuTAPlP6FoZ68Cepx3L-6",
+      "msg-J6s3UnU7dMPjYrripKqu3-1",
+      "msg-J6s3UnU7dMPjYrripKqu3-10",
+      "msg-J6s3UnU7dMPjYrripKqu3-11",
+      "msg-J6s3UnU7dMPjYrripKqu3-12",
+      "msg-J6s3UnU7dMPjYrripKqu3-13",
+      "msg-J6s3UnU7dMPjYrripKqu3-14",
+      "msg-J6s3UnU7dMPjYrripKqu3-15",
+      "msg-J6s3UnU7dMPjYrripKqu3-16",
+      "msg-J6s3UnU7dMPjYrripKqu3-17",
+      "msg-J6s3UnU7dMPjYrripKqu3-18",
+      "msg-J6s3UnU7dMPjYrripKqu3-19",
+      "msg-J6s3UnU7dMPjYrripKqu3-2",
+      "msg-J6s3UnU7dMPjYrripKqu3-20",
+      "msg-J6s3UnU7dMPjYrripKqu3-21",
+      "msg-J6s3UnU7dMPjYrripKqu3-22",
+      "msg-J6s3UnU7dMPjYrripKqu3-23",
+      "msg-J6s3UnU7dMPjYrripKqu3-24",
+      "msg-J6s3UnU7dMPjYrripKqu3-25",
+      "msg-J6s3UnU7dMPjYrripKqu3-26",
+      "msg-J6s3UnU7dMPjYrripKqu3-27",
+      "msg-J6s3UnU7dMPjYrripKqu3-28",
+      "msg-J6s3UnU7dMPjYrripKqu3-29",
+      "msg-J6s3UnU7dMPjYrripKqu3-3",
+      "msg-J6s3UnU7dMPjYrripKqu3-30",
+      "msg-J6s3UnU7dMPjYrripKqu3-31",
+      "msg-J6s3UnU7dMPjYrripKqu3-32",
+      "msg-J6s3UnU7dMPjYrripKqu3-33",
+      "msg-J6s3UnU7dMPjYrripKqu3-34",
+      "msg-J6s3UnU7dMPjYrripKqu3-35",
+      "msg-J6s3UnU7dMPjYrripKqu3-36",
+      "msg-J6s3UnU7dMPjYrripKqu3-37",
+      "msg-J6s3UnU7dMPjYrripKqu3-38",
+      "msg-J6s3UnU7dMPjYrripKqu3-39",
+      "msg-J6s3UnU7dMPjYrripKqu3-4",
+      "msg-J6s3UnU7dMPjYrripKqu3-40",
+      "msg-J6s3UnU7dMPjYrripKqu3-41",
+      "msg-J6s3UnU7dMPjYrripKqu3-42",
+      "msg-J6s3UnU7dMPjYrripKqu3-43",
+      "msg-J6s3UnU7dMPjYrripKqu3-44",
+      "msg-J6s3UnU7dMPjYrripKqu3-45",
+      "msg-J6s3UnU7dMPjYrripKqu3-46",
+      "msg-J6s3UnU7dMPjYrripKqu3-47",
+      "msg-J6s3UnU7dMPjYrripKqu3-48",
+      "msg-J6s3UnU7dMPjYrripKqu3-49",
+      "msg-J6s3UnU7dMPjYrripKqu3-5",
+      "msg-J6s3UnU7dMPjYrripKqu3-50",
+      "msg-J6s3UnU7dMPjYrripKqu3-51",
+      "msg-J6s3UnU7dMPjYrripKqu3-52",
+      "msg-J6s3UnU7dMPjYrripKqu3-53",
+      "msg-J6s3UnU7dMPjYrripKqu3-54",
+      "msg-J6s3UnU7dMPjYrripKqu3-55",
+      "msg-J6s3UnU7dMPjYrripKqu3-56",
+      "msg-J6s3UnU7dMPjYrripKqu3-57",
+      "msg-J6s3UnU7dMPjYrripKqu3-58",
+      "msg-J6s3UnU7dMPjYrripKqu3-59",
+      "msg-J6s3UnU7dMPjYrripKqu3-6",
+      "msg-J6s3UnU7dMPjYrripKqu3-60",
+      "msg-J6s3UnU7dMPjYrripKqu3-61",
+      "msg-J6s3UnU7dMPjYrripKqu3-62",
+      "msg-J6s3UnU7dMPjYrripKqu3-63",
+      "msg-J6s3UnU7dMPjYrripKqu3-64",
+      "msg-J6s3UnU7dMPjYrripKqu3-65",
+      "msg-J6s3UnU7dMPjYrripKqu3-66",
+      "msg-J6s3UnU7dMPjYrripKqu3-67",
+      "msg-J6s3UnU7dMPjYrripKqu3-68",
+      "msg-J6s3UnU7dMPjYrripKqu3-69",
+      "msg-J6s3UnU7dMPjYrripKqu3-7",
+      "msg-J6s3UnU7dMPjYrripKqu3-70",
+      "msg-J6s3UnU7dMPjYrripKqu3-71",
+      "msg-J6s3UnU7dMPjYrripKqu3-72",
+      "msg-J6s3UnU7dMPjYrripKqu3-73",
+      "msg-J6s3UnU7dMPjYrripKqu3-74",
+      "msg-J6s3UnU7dMPjYrripKqu3-75",
+      "msg-J6s3UnU7dMPjYrripKqu3-8",
+      "msg-J6s3UnU7dMPjYrripKqu3-9",
+      "skill-injection-A1WuTAPlP6FoZ68Cepx3L",
+      "skill-injection-J6s3UnU7dMPjYrripKqu3",
+      "user-A1WuTAPlP6FoZ68Cepx3L",
+      "user-J6s3UnU7dMPjYrripKqu3"
+    ],
+    "chiefThread": "chief-01a1882e-4f38-7a56-a984-d7528be636de",
+    "chiefMessages": [
+      "chief-err-kAHTl5tvbNmMWu82kmvCH",
+      "chief-fallback-kAHTl5tvbNmMWu82kmvCH-2",
+      "kAHTl5tvbNmMWu82kmvCH",
+      "msg-kAHTl5tvbNmMWu82kmvCH-1",
+      "skill-injection-kAHTl5tvbNmMWu82kmvCH",
+      "user-kAHTl5tvbNmMWu82kmvCH"
+    ],
+    "cutoff": 1793350186000.0
+  },
+  "foreignKeys": "ok",
+  "migrationIdentity": "SQLite rowid: Drizzle serial ids are nullable and not populated.",
+  "error": "content: content todo_tag fwlEU1RdgVX7K2748AORd/H2jakuIKPM5YZRTgxPzv0: missing row"
+}

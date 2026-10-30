@@ -1,0 +1,24 @@
+
+ RUN  v5.0.1 <worktree>
+
+
+  Snapshots  1 updated 
+ Test Files  1 passed (1)
+      Tests  1 passed | 78 skipped (79)
+   Start at  13:43:21
+   Duration  3.59s (transform 75%, import 24%, worker 1%)
+
+  Transform  |@cairn/shared| transforming modules took 2.12s · 75% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+
+
+ RUN  v5.0.1 <worktree>
+
+
+  Snapshots  1 updated 
+ Test Files  1 passed (1)
+      Tests  1 passed | 78 skipped (79)
+   Start at  13:50:26
+   Duration  431ms (transform 70%, import 28%, tests 1%, worker 1%)
+

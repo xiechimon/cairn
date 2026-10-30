@@ -10,7 +10,22 @@ export function readStoredToken(): string | null {
   }
 }
 
+let pushAuthWrites: Promise<void> = Promise.resolve();
+
+export function syncPushAuthToken(token: string | null): Promise<void> {
+  pushAuthWrites = pushAuthWrites.then(async () => {
+    if (typeof caches === 'undefined') return;
+    try {
+      const cache = await caches.open('push-auth');
+      if (token === null) await cache.delete('/__push-auth');
+      else await cache.put('/__push-auth', new Response(JSON.stringify({ token })));
+    } catch {}
+  });
+  return pushAuthWrites;
+}
+
 function writeToken(token: string | null): void {
+  void syncPushAuthToken(token);
   try {
     if (token === null) localStorage.removeItem(TOKEN_STORAGE_KEY);
     else localStorage.setItem(TOKEN_STORAGE_KEY, token);

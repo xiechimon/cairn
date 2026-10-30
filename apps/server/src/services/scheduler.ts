@@ -49,6 +49,7 @@ import { sweepFailedRetries } from './needs-you.js';
 import { sweepIdleChiefUnread } from './notifications.js';
 import { PhaseTransitionError } from './phase.js';
 import { digestSlotDueAt, digestSlotsDue, sweepPushDigest } from './push.js';
+import { sweepPendingPushAlerts } from './push-alerts.js';
 import { sweepQuotaWaitSteps } from './quota-wait.js';
 import { computeNextRunAt, dueSchedules, isRecurring, updateNextRunAt } from './schedules.js';
 import { createScheduling, SCHEDULE_INTERVAL_MS, type SchedulingRun } from './scheduling/sweep.js';
@@ -194,6 +195,7 @@ export function createScheduler(
   let timer: NodeJS.Timeout | null = null;
   const lastDigestRun = new Map<string, number>();
   let digestSweeping = false;
+  let alertsSweeping = false;
   const ciPoller =
     ci !== undefined && ci !== null
       ? createCiPoller(deps, { githubFetch: ci.githubFetch, logger: ci.logger })
@@ -254,6 +256,16 @@ export function createScheduler(
   }
 
   function tick(now = nowMs()): void {
+    if (!alertsSweeping) {
+      alertsSweeping = true;
+      void sweepPendingPushAlerts(deps.db, undefined, now)
+        .catch(() => {
+          process.stderr.write('Push alert recovery failed\n');
+        })
+        .finally(() => {
+          alertsSweeping = false;
+        });
+    }
     const due = dueSchedules(deps, now);
     for (const row of due) {
       const todoRow = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();

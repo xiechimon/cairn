@@ -1,0 +1,16 @@
+✔ sends one authenticated alert for the given user and prints receipt outcome (55.665708ms)
+✔ rejects unauthorized instances and never reports fallback as a phone receipt (1.847917ms)
+✔ pending status is polled until receipt and the deadline bounds polling (18.005167ms)
+✔ required alert displays before posting its authenticated id even with a focused page (72.199041ms)
+✔ failed display never posts a receipt (1.564375ms)
+✔ ordinary foreground pushes still display (3.876792ms)
+✔ receipt works without a stored token and refuses external receipt URLs (1.470292ms)
+✔ ops tests run in prepush and the backup CI job and journal ends with a newline (1.160625ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 382.918542

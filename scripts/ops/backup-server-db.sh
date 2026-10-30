@@ -92,7 +92,7 @@ echo "[$ts] wrote $OUT/$name ($(wc -c < "$OUT/$name" | tr -d ' ') bytes)"
 (
   cd "$OUT" &&
     { ls -1 server-db-*.db.gz 2>/dev/null || true; } | sort -r | tail -n +$((KEEP + 1)) |
-    while IFS= read -r f; do rm -f -- "$f" || exit 1; done
+    while IFS= read -r f; do rm -f -- "$f" "$f.attachments.sha256" || exit 1; done
 ) || fail "rotate $OUT"
 
 if [ -n "$ATTACHMENTS" ]; then
@@ -106,6 +106,9 @@ if [ -n "$ATTACHMENTS" ]; then
     esac
     actual="$( [ -f "$ATTACHMENTS/$key" ] && wc -c < "$ATTACHMENTS/$key" | tr -d ' ' || echo missing)"
     if [ "$actual" = "$size" ]; then
+      case "$key" in
+        secretbox.key | */secretbox.key | *.pem) continue ;;
+      esac
       printf '%s\0' "$key" >> "$tmp/settled"
     else
       echo "[$ts] skipped $key: $actual bytes on disk, $size in the db" >&2
@@ -134,6 +137,16 @@ if [ -n "$ATTACHMENTS" ]; then
       fi
     done
   fi
+  find "$ATTACHMENTS_OUT" -type f ! -name secretbox.key ! -name '*.pem' ! -name '*.partial' -print0 > "$tmp/copied" ||
+    fail "list copied attachments"
+  : > "$tmp/attachments.sha256"
+  while IFS= read -r -d '' copied; do
+    key="${copied#"$ATTACHMENTS_OUT/"}"
+    digest="$("${SHA256[@]}" < "$copied" | cut -c1-64)" || fail "hash copied attachment $key"
+    printf '%s\t%s\n' "$digest" "$key" >> "$tmp/attachments.sha256"
+  done < "$tmp/copied"
+  LC_ALL=C sort -k2 "$tmp/attachments.sha256" > "$tmp/attachments.sorted.sha256" || fail "sort attachment manifest"
+  mv -f "$tmp/attachments.sorted.sha256" "$OUT/$name.attachments.sha256" || fail "write attachment manifest"
   echo "[$ts] attachments copied: $(find "$ATTACHMENTS_OUT" -type f | wc -l | tr -d ' ') files"
 fi
 
@@ -144,7 +157,7 @@ if [ -n "$REMOTE" ]; then
     *) dest="$REMOTE/" ;;
   esac
   push=(rsync -a --timeout=300 --ignore-existing)
-  "${push[@]}" --include='server-db-*.db.gz' --exclude='*' "$OUT/" "${dest}db/" || fail "push db to ${dest}db/"
+  "${push[@]}" --include='server-db-*.db.gz' --include='server-db-*.db.gz.attachments.sha256' --exclude='*' "$OUT/" "${dest}db/" || fail "push db to ${dest}db/"
   if [ -n "$ATTACHMENTS" ]; then
     "${push[@]}" "${SECRETS[@]}" --exclude='*.partial' "$ATTACHMENTS_OUT/" "${dest}attachments/" || fail "push attachments to ${dest}attachments/"
   fi
