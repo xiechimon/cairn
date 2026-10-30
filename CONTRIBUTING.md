@@ -57,7 +57,15 @@ A maintainer reviews every pull request, and an AI reviewer may also comment. A 
 
 ## Releases
 
-Releases are automated with [changesets](https://changesets.dev). Add a changeset for any pull request that changes a publishable package (`pnpm changeset`), and the `release` workflow opens a `Version Packages` pull request when it merges to main. Merging that pull request publishes `@xiechimon/cairn` and `@xiechimon/cairn-cli` to npm and tags each release. Publishing runs under the repository's `NPM_TOKEN` secret, which only the owner can set.
+Releases use [changesets](https://changesets.dev). Add a changeset with `pnpm changeset` for any pull request that changes a publishable package. When the pull request should ship, run `pnpm release:version` in it to bump package versions and write changelogs, then include those changes in the pull request for normal review and merge.
+
+After merge to main, the `release` workflow publishes unpublished versions of `@xiechimon/cairn` and `@xiechimon/cairn-cli` to npm through npm Trusted Publishing (OIDC) with provenance and attempts to push the release tags after publishing, including after a partial publish failure. Versions already on npm are skipped. Pending changesets on main leave a warning naming them and wait for a pull request that runs `pnpm release:version`. Unpublished package versions still publish when changesets are pending.
+
+The release workflow builds and packs the tarballs in a job without npm publishing rights, and a separate job that runs no package scripts publishes them.
+
+Publish only through the `release` workflow: both manifests set `publishConfig.provenance`, and provenance needs the CI's OIDC identity, so a publish from a laptop fails. If a tag push fails after a successful publish, run `pnpm exec changeset git-tag` and `git push origin --tags` from an up-to-date main to recreate the tags.
+
+Publishing requires a Trusted Publisher on npmjs.com for each package, with provider GitHub Actions, repository `xiechimon/cairn`, and workflow file `release.yml`. Renaming the workflow file breaks publishing until the Trusted Publishers are updated. Publishing needs no token or repository secret.
 
 ## License
 
