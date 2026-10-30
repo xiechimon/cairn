@@ -20,6 +20,7 @@ import {
   todo,
 } from '../src/db/schema.js';
 import { completeStep } from '../src/services/builds.js';
+import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { compareFilesFromResponse, computePatchDigest } from '../src/services/merge-gate/digest.js';
 import type { GateGithubPort, GateRaw } from '../src/services/merge-gate/github-port.js';
 import {
@@ -571,3 +572,17 @@ test.each(['autonomy-paused', 'daily-cap'] as const)(
     expect(readiness?.blockers.map((b) => b.code)).toContain(code);
   },
 );
+
+test('an open GitHub marker blocks server readiness with autonomy-paused', async () => {
+  const { s, buildId } = await world();
+  upsertGithubConnection(
+    { db: s.db, box: s.secretBox },
+    { teamId: s.team.id, login: 'owner', accessToken: 'token', scope: 'repo' },
+  );
+  const readiness = await evaluateMergeGate(
+    { ...s.svc, box: s.secretBox, githubFetch: async () => Response.json([{ number: 7 }]) },
+    buildId,
+    { port: scriptedPort([]) },
+  );
+  expect(readiness?.blockers.map((blocker) => blocker.code)).toContain('autonomy-paused');
+});

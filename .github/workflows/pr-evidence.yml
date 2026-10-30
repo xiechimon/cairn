@@ -20,6 +20,9 @@ name: pr-evidence
 # and clears itself when the lane fixes it, and nobody re-arms auto-merge on
 # a lane's behalf.
 #
+# The autonomy brake rejects paused repositories before body checks unless the
+# PR is an exact recovery revert. Brake failures also disarm auto-merge.
+#
 # The job has no `if:` and the trigger no `paths:`: a skipped run counts as
 # a passing required check and would supersede a red one.
 #
@@ -47,6 +50,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  issues: read
 
 # One run per PR at a time, newest wins: a label added seconds after a body
 # edit must not be outlived by the edit's run finishing green. A cancelled
@@ -64,6 +68,8 @@ jobs:
       PR_NUMBER: ${{ github.event.pull_request.number }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
 
       # The PR is read from the API as it is now, never from the event
       # payload: a rerun replays the payload the run was created with, so a
@@ -93,6 +99,16 @@ jobs:
           esac
           echo "pr-decision: GREEN (no needs-decision label)"
 
+      - name: Check the autonomy brake
+        if: ${{ !cancelled() }}
+        run: |
+          touch autonomy-paused.flag
+          node scripts/autonomy-brake.mjs status > brake-status.json
+          if jq -e '.paused == true' brake-status.json > /dev/null; then
+            node scripts/autonomy-brake.mjs verify-recovery "$PR_NUMBER"
+          fi
+          rm autonomy-paused.flag
+
       # !cancelled() so every gate's findings show in one run even when an
       # earlier step reds (#1240): a lane fixing a link problem should not
       # have to push again to discover a tasks problem.
@@ -121,7 +137,7 @@ jobs:
       - name: Mark the decision pending and disarm auto-merge
         if: ${{ failure() }}
         run: |
-          if [ ! -f needs-decision.flag ]; then
+          if [ ! -f needs-decision.flag ] && [ ! -f autonomy-paused.flag ]; then
             echo "pr-decision: red without a pending decision; auto-merge left as it is"
             exit 0
           fi
