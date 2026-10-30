@@ -1,4 +1,4 @@
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type {
@@ -18,7 +18,7 @@ import type { ClaudeCodeAuthProbe } from '../src/claude-code-auth.js';
 import { StepJournal } from '../src/journal.js';
 import type { DaemonLogger } from '../src/log.js';
 import type { MachineApi } from '../src/machine-client.js';
-import { runStep } from '../src/runner.js';
+import { resumePendingUpload, runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
 
 function captureLogger(): { logger: DaemonLogger; lines: string[] } {
@@ -62,7 +62,12 @@ function claimedStep(opts: { provider: string | null; modelId: string | null }):
 
 class FakeClient implements MachineApi {
   doneBodies: { stepId: string; body: MachineDoneBody }[] = [];
-  constructor(private readonly tokenProvider: ProviderConfig | null) {}
+  uploads: (TranscriptUpload | string)[] = [];
+  failDone = false;
+  constructor(
+    private readonly tokenProvider: ProviderConfig | null,
+    private readonly subscriptionToken?: string,
+  ) {}
 
   async enroll(): Promise<never> {
     throw new Error('unused');
@@ -84,7 +89,12 @@ class FakeClient implements MachineApi {
     return '{}';
   }
   async token() {
-    return { provider: this.tokenProvider, secrets: {}, git: null };
+    return {
+      provider: this.tokenProvider,
+      secrets: {},
+      git: null,
+      claudeSubscriptionToken: this.subscriptionToken,
+    };
   }
   async skillsManifest() {
     return { selection: 'whitelist' as const, skills: [] };
@@ -105,12 +115,11 @@ class FakeClient implements MachineApi {
       })),
     };
   }
-  async putUpload(
-    _url: string,
-    _headers: Record<string, string>,
-    _body: TranscriptUpload | string,
-  ) {}
+  async putUpload(_url: string, _headers: Record<string, string>, body: TranscriptUpload | string) {
+    this.uploads.push(body);
+  }
   async done(stepId: string, body: MachineDoneBody) {
+    if (this.failDone) throw new Error('done endpoint unavailable');
     this.doneBodies.push({ stepId, body });
   }
   async steer() {
@@ -127,7 +136,10 @@ class FakeClient implements MachineApi {
   async stream(_signal: AbortSignal, _onEvent: (ev: MachineStreamEvent) => void) {}
 }
 
-function recordingBackend(): {
+function recordingBackend(
+  echo?: string,
+  sessionFile?: string,
+): {
   backend: AgentBackend;
   sessions: SessionOpts[];
   resumed: string[];
@@ -140,8 +152,10 @@ function recordingBackend(): {
       sessions.push(opts);
       return {
         sessionId: 'stub-sess-1',
+        ...(sessionFile !== undefined ? { sessionFile } : {}),
         events: (async function* () {
-          yield { type: 'text_delta', text: 'ok' } as never;
+          yield { type: 'text_delta', text: echo ?? 'ok' } as never;
+          if (echo) yield { type: 'error', error: { message: echo, retryable: false } } as never;
           yield { type: 'done', usage: [] } as never;
         })(),
         async steer() {},
@@ -176,6 +190,10 @@ async function setup(
   claimed: ClaimedStep,
   opts: {
     tokenProvider?: ProviderConfig | null;
+    subscriptionToken?: string;
+    echoToken?: boolean;
+    sessionFile?: string;
+    failDone?: boolean;
     probe?: () => Promise<ClaudeCodeAuthProbe>;
     machineName?: string;
   } = {},
@@ -183,9 +201,13 @@ async function setup(
   const home = mkdtempSync(join(tmpdir(), 'cairn-runner-runtime-'));
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
-  const client = new FakeClient(opts.tokenProvider ?? null);
+  const client = new FakeClient(opts.tokenProvider ?? null, opts.subscriptionToken);
+  client.failDone = opts.failDone ?? false;
   const journal = new StepJournal(paths.outboxDir);
-  const { backend, sessions, resumed } = recordingBackend();
+  const { backend, sessions, resumed } = recordingBackend(
+    opts.echoToken ? opts.subscriptionToken : undefined,
+    opts.sessionFile,
+  );
   const resolved: (string | null | undefined)[] = [];
   const probeCalls: number[] = [];
   const probe = opts.probe ?? LOGGED_IN_PROBE;
@@ -208,7 +230,7 @@ async function setup(
     },
   };
   await runStep(deps, claimed);
-  return { client, lines, sessions, resumed, resolved, paths, probeCalls };
+  return { client, lines, sessions, resumed, resolved, paths, probeCalls, journal, deps };
 }
 
 describe('runner runtime identity branch (spec 17 A3/A4)', () => {
@@ -428,4 +450,57 @@ describe('runner runtime-step tool surface (spec 17 A10 / after #647 T4 wiring)'
     expect((sessions[0]?.localTools ?? []).length).toBeGreaterThanOrEqual(2);
     expect(lines.some((l) => l.includes('T4'))).toBe(false);
   });
+});
+
+describe('subscription credential isolation', () => {
+  const token = 'private-subscription-token-for-step';
+  test('Claude Code receives per-step token and bypasses machine login; pi does not receive it', async () => {
+    const claude = await setup(claimedStep({ provider: 'claude-code', modelId: 'sonnet' }), {
+      subscriptionToken: token,
+      probe: async () => ({ state: 'not-logged-in', provider: 'firstParty' }),
+    });
+    expect(claude.sessions[0]?.env?.CLAUDE_CODE_OAUTH_TOKEN).toBe(token);
+    expect(claude.sessions[0]?.env?.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB).toBe('1');
+    expect(claude.probeCalls).toHaveLength(0);
+    const pi = await setup(claimedStep({ provider: 'stub-gw', modelId: 'stub-model' }), {
+      subscriptionToken: token,
+    });
+    expect(pi.sessions[0]?.env?.CLAUDE_CODE_OAUTH_TOKEN).toBeUndefined();
+    expect(pi.sessions[0]?.env?.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB).toBeUndefined();
+    expect(process.env.CLAUDE_CODE_OAUTH_TOKEN).not.toBe(token);
+    expect([...claude.lines, ...pi.lines].join('')).not.toContain(token);
+  });
+  test('backend output and failures cannot put the token into step logs or uploaded results', async () => {
+    const result = await setup(claimedStep({ provider: 'claude-code', modelId: 'sonnet' }), {
+      subscriptionToken: token,
+      echoToken: true,
+    });
+    expect(result.lines.join('')).not.toContain(token);
+    expect(JSON.stringify(result.client.doneBodies)).not.toContain(token);
+    for (const entry of readdirSync(result.paths.outboxDir, {
+      recursive: true,
+      withFileTypes: true,
+    })) {
+      if (entry.isFile())
+        expect(readFileSync(join(entry.parentPath, entry.name), 'utf8')).not.toContain(token);
+    }
+  });
+});
+
+test('subscription session uploads stay redacted when a failed final report is replayed after restart', async () => {
+  const token = 'private-recovery-subscription-token';
+  const directory = mkdtempSync(join(tmpdir(), 'cairn-subscription-session-'));
+  const sessionFile = join(directory, 'session.jsonl');
+  writeFileSync(sessionFile, `${JSON.stringify({ text: token })}\n`);
+  const result = await setup(claimedStep({ provider: 'claude-code', modelId: 'sonnet' }), {
+    subscriptionToken: token,
+    sessionFile,
+    failDone: true,
+  });
+  const entry = result.journal.get('s1');
+  expect(entry?.state).toBe('awaiting-upload');
+  result.client.failDone = false;
+  if (!entry) throw new Error('Expected a pending upload');
+  await resumePendingUpload(result.deps, entry);
+  expect(JSON.stringify(result.client.uploads)).not.toContain(token);
 });

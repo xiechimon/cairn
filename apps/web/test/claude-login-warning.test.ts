@@ -1,6 +1,6 @@
 import { claudeLoginNotice } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
-import { formatClaudeLoginWarning } from '../src/claude-login-warning.js';
+import { subscriptionLoginWarning, formatClaudeLoginWarning } from '../src/claude-login-warning.js';
 
 const DAY = 24 * 60 * 60 * 1000;
 const NOW = 1_700_000_000_000;
@@ -38,5 +38,19 @@ describe('formatClaudeLoginWarning', () => {
     expect(formatClaudeLoginWarning(soon!, 'soon-box', t)).toBe(
       'soon-box 上的 Claude Code 登录将在不到 1 天内过期。在该机器上运行 `claude auth login` 重新登录。',
     );
+  });
+});
+
+const subscription = { id: 'subscription-1', kind: 'claude-subscription' as const, label: 'Personal', expiresAt: NOW + 30 * DAY, createdAt: NOW };
+
+describe('subscription brief warning', () => {
+  test('warns within 30 days, including the boundary, with setup-token instructions', () => {
+    expect(subscriptionLoginWarning(subscription, NOW, t)).toContain('30');
+    expect(subscriptionLoginWarning({ ...subscription, expiresAt: NOW + DAY }, NOW, t)).toContain('claude setup-token');
+    expect(subscriptionLoginWarning({ ...subscription, expiresAt: NOW - DAY }, NOW, t)).toContain('expired');
+  });
+  test('does not warn beyond 30 days or without a known expiry', () => {
+    expect(subscriptionLoginWarning({ ...subscription, expiresAt: NOW + 30 * DAY + 1 }, NOW, t)).toBeNull();
+    expect(subscriptionLoginWarning({ ...subscription, expiresAt: null }, NOW, t)).toBeNull();
   });
 });

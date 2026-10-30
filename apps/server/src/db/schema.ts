@@ -833,3 +833,14 @@ export const scheduleReport = sqliteTable(
   },
   (t) => [index('schedule_report_project_idx').on(t.projectId, t.generatedAt)],
 );
+
+export const claudeSubscription = sqliteTable('claude_subscription', {
+  id: text('id').primaryKey(),
+  teamId: text('teamId')
+    .notNull()
+    .references(() => team.id, { onDelete: 'cascade' }),
+  label: text('label').notNull(),
+  tokenCipher: text('tokenCipher').notNull(),
+  expiresAt: epochMs('expiresAt'),
+  createdAt: epochMs('createdAt').notNull(),
+});

@@ -10,6 +10,8 @@ import type { Db } from '../db/client.js';
 import { agent, apiKey, build, chief, chiefThread, step, todo } from '../db/schema.js';
 import { notFound } from '../lib/errors.js';
 import { createApiKey } from './api-keys.js';
+import { openClaudeSubscription } from './claude-subscriptions.js';
+import { agentForStep } from './dispatch-eligibility.js';
 import { openProviderKey, type ProviderDeps } from './providers.js';
 import { openSecretValues, type SecretDeps } from './secrets.js';
 
@@ -46,6 +48,7 @@ function stepGitKeyName(stepId: string): string {
 }
 
 export interface StepCredentialBundle {
+  claudeSubscriptionToken?: string;
   provider: {
     providerId: string;
     label: string;
@@ -101,12 +104,23 @@ export function resolveStepCredentials(
       ? openSecretValues(boxDeps, todoRow.teamId, agentRow.secrets)
       : {};
 
-  return { provider, secrets, git: null };
+  return {
+    provider,
+    secrets,
+    git: null,
+    claudeSubscriptionToken: openClaudeSubscription(
+      deps,
+      todoRow.teamId,
+      stepRow.fallback?.model?.provider ??
+        agentForStep(deps.db, todoRow, stepRow.kind, stepRow.prompt)?.provider,
+    ),
+  };
 }
 
 export function resolveChiefStepCredentials(
   deps: CredentialsDeps,
   threadId: string,
+  providerId?: string | null,
 ): StepCredentialBundle {
   const threadRow = deps.db.select().from(chiefThread).where(eq(chiefThread.id, threadId)).get();
   if (!threadRow) throw notFound(`chief thread ${threadId}`);
@@ -133,5 +147,14 @@ export function resolveChiefStepCredentials(
       };
     }
   }
-  return { provider, secrets: {}, git: null };
+  return {
+    provider,
+    secrets: {},
+    git: null,
+    claudeSubscriptionToken: openClaudeSubscription(
+      deps,
+      threadRow.teamId,
+      providerId === undefined ? agentRow.provider : providerId,
+    ),
+  };
 }

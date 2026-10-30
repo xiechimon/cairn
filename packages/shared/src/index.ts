@@ -7,6 +7,7 @@ export * from './blocker-handoff.js';
 export * from './blocker-handoff-record.js';
 export * from './brand.js';
 export * from './brief-file.js';
+export * from './claude-subscription.js';
 export * from './experience-candidate.js';
 export * from './failure-attribution.js';
 export * from './failure-replay-candidate.js';

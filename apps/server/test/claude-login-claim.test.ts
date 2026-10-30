@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { ClaudeCodeReport } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
@@ -10,6 +11,7 @@ import {
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
+import { hasActiveClaudeSubscription } from '../src/services/claude-subscriptions.js';
 import { claimStep, markPresence } from '../src/services/machines.js';
 import {
   bootServer,
@@ -146,7 +148,7 @@ function insertChief(s: TestServer, machineId: string, provider: string): string
       createdAt: 1,
     })
     .run();
-  const threadId = `thread-login-${machineId}`;
+  const threadId = `chief-thread-login-${machineId}`;
   s.db
     .insert(chiefThreadTable)
     .values({
@@ -330,4 +332,152 @@ describe('presence stores Claude Code login and the machine record exposes it', 
       expiresAt,
     });
   });
+});
+
+describe('subscription login takes precedence over expired machine login', () => {
+  test.each(['build', 'chief'] as const)(
+    '%s claims with a subscription and delivers it only over the owned credential endpoint',
+    async (kind) => {
+      const { s, projectId } = await world();
+      const machineId = insertMachine(s, {
+        name: `subscription-${kind}`,
+        claudeCodeReport: report({ state: 'expired', expiresAt: 1 }),
+      });
+      const stepId =
+        kind === 'chief'
+          ? insertChief(s, machineId, 'claude-code')
+          : (() => {
+              insertAgent(s, { id: 'subscription-builder', machineId, provider: 'claude-code' });
+              return insertBuildStep(s, projectId, 'subscription-builder');
+            })();
+      const token =
+        'sk-ant-oat01-private-subscription-claim-token-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz';
+      const created = await req(s.app, 'POST', `/api/teams/${s.team.id}/claude-subscriptions`, {
+        label: 'Personal',
+        token,
+        expiresAt: Date.now() + 86400000,
+      });
+      expect(created.status).toBe(201);
+      const events: object[] = [];
+      s.hub.subscribe(s.team.id, {
+        nextSeq: () => 1,
+        send: async (event: object) => {
+          events.push(event);
+        },
+      });
+      const claimed = await claimAs(s, machineId);
+      expect(claimed?.step.id).toBe(stepId);
+      expect(JSON.stringify({ claimed, events })).not.toContain(token);
+      const machineToken = 'machine-subscription-auth';
+      s.db
+        .update(machineTable)
+        .set({ tokenHash: createHash('sha256').update(machineToken).digest('hex') })
+        .where(eq(machineTable.id, machineId))
+        .run();
+      const credentialResponse = await s.app.request(`/api/machine/token/${stepId}`, {
+        headers: { authorization: `Bearer ${machineToken}` },
+      });
+      expect(credentialResponse.status).toBe(200);
+      expect(await credentialResponse.json()).toMatchObject({ claudeSubscriptionToken: token });
+      for (const status of ['done', 'failed', 'stopped', 'waiting_quota', 'pending'] as const) {
+        s.db.update(stepTable).set({ status }).where(eq(stepTable.id, stepId)).run();
+        const finished = await s.app.request(`/api/machine/token/${stepId}`, {
+          headers: { authorization: `Bearer ${machineToken}` },
+        });
+        expect(finished.status).toBe(200);
+        const body = await finished.text();
+        expect(body).not.toContain(token);
+        expect(JSON.parse(body)).not.toHaveProperty('claudeSubscriptionToken');
+      }
+      s.db.update(stepTable).set({ status: 'claimed' }).where(eq(stepTable.id, stepId)).run();
+      const otherMachineId = insertMachine(s, { name: 'other-machine' });
+      const otherToken = 'other-machine-auth';
+      s.db
+        .update(machineTable)
+        .set({ tokenHash: createHash('sha256').update(otherToken).digest('hex') })
+        .where(eq(machineTable.id, otherMachineId))
+        .run();
+      const denied = await s.app.request(`/api/machine/token/${stepId}`, {
+        headers: { authorization: `Bearer ${otherToken}` },
+      });
+      expect(denied.status).toBe(404);
+      expect(await denied.text()).not.toContain(token);
+      s.db
+        .update(stepTable)
+        .set({
+          fallback: {
+            model: { provider: 'stub-gw', modelId: 'stub-model' },
+            tried: [],
+            zeroUsageRetried: false,
+          },
+        })
+        .where(eq(stepTable.id, stepId))
+        .run();
+      const piCredentials = await s.app.request(`/api/machine/token/${stepId}`, {
+        headers: { authorization: `Bearer ${machineToken}` },
+      });
+      expect(piCredentials.status).toBe(200);
+      expect(await piCredentials.text()).not.toContain(token);
+    },
+  );
+  test('an expired subscription does not bypass expired machine login', async () => {
+    const { s, projectId } = await world();
+    const machineId = insertMachine(s, {
+      name: 'expired-both',
+      claudeCodeReport: report({ state: 'expired', expiresAt: 1 }),
+    });
+    insertAgent(s, { id: 'expired-subscription-builder', machineId, provider: 'claude-code' });
+    insertBuildStep(s, projectId, 'expired-subscription-builder');
+    await req(s.app, 'POST', `/api/teams/${s.team.id}/claude-subscriptions`, {
+      label: 'Expired',
+      token:
+        'sk-ant-oat01-expired-subscription-token-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz',
+      expiresAt: 1,
+    });
+    expect(await claimAs(s, machineId)).toBeNull();
+  });
+});
+
+test('team-scoped revocation removes future credentials and restores the machine login gate', async () => {
+  const { s, projectId } = await world();
+  const machineId = insertMachine(s, {
+    name: 'revoked-subscription',
+    claudeCodeReport: report({ state: 'expired', expiresAt: 1 }),
+  });
+  insertAgent(s, { id: 'revocation-builder', machineId, provider: 'claude-code' });
+  const token = `sk-ant-oat01-${'r'.repeat(64)}`;
+  const path = `/api/teams/${s.team.id}/claude-subscriptions`;
+  const response = await req(s.app, 'POST', path, { label: 'Revocable', token });
+  expect(response.status).toBe(201);
+  const { id } = (await response.json()) as { id: string };
+  const firstStep = insertBuildStep(s, projectId, 'revocation-builder');
+  expect((await claimAs(s, machineId))?.step.id).toBe(firstStep);
+  const machineToken = 'revocation-machine-auth';
+  s.db
+    .update(machineTable)
+    .set({ tokenHash: createHash('sha256').update(machineToken).digest('hex') })
+    .where(eq(machineTable.id, machineId))
+    .run();
+  const headers = { authorization: `Bearer ${machineToken}` };
+  expect(
+    await (await s.app.request(`/api/machine/token/${firstStep}`, { headers })).json(),
+  ).toMatchObject({ claudeSubscriptionToken: token });
+  expect((await req(s.app, 'DELETE', `/api/teams/other/claude-subscriptions/${id}`)).status).toBe(
+    404,
+  );
+  expect((await req(s.app, 'DELETE', `${path}/missing`)).status).toBe(404);
+  expect(hasActiveClaudeSubscription({ db: s.db }, s.team.id)).toBe(true);
+  expect((await req(s.app, 'DELETE', `${path}/${id}`)).status).toBe(204);
+  expect((await req(s.app, 'DELETE', `${path}/${id}`)).status).toBe(404);
+  expect(hasActiveClaudeSubscription({ db: s.db }, s.team.id)).toBe(false);
+  const nextStep = insertBuildStep(s, projectId, 'revocation-builder');
+  expect(await claimAs(s, machineId)).toBeNull();
+  s.db
+    .update(stepTable)
+    .set({ machineId, status: 'claimed' })
+    .where(eq(stepTable.id, nextStep))
+    .run();
+  const nextCredentials = await s.app.request(`/api/machine/token/${nextStep}`, { headers });
+  expect(nextCredentials.status).toBe(200);
+  expect(await nextCredentials.text()).not.toContain(token);
 });

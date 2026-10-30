@@ -26,6 +26,10 @@ import { setTodoPhase } from '../src/services/todos.js';
 import { bootServer, postProject, req } from './helpers.js';
 
 const INFERRED_ROUTES = [
+  'GET /api/teams/{id}/claude-subscriptions',
+  'DELETE /api/teams/{id}/claude-subscriptions/{cid}',
+  'POST /api/teams/{id}/claude-subscriptions',
+  'POST /api/teams/{id}/claude-subscriptions/{cid}/verify',
   'POST /api/projects',
   'PATCH /api/projects/{id}',
   'PATCH /api/user/me',

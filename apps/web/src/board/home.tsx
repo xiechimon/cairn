@@ -14,10 +14,11 @@ import {
 } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { Link, useLocation } from 'react-router';
+import { useClaudeSubscriptions } from '../api/claude-subscriptions.js';
 import { useLiveData } from '../api/provider.js';
 import { SpiralMark } from '../chief/chief-fab-icon.js';
 import type { CardOrchestration } from '../chief/orchestration-inflight.js';
-import { formatClaudeLoginWarning } from '../claude-login-warning.js';
+import { formatClaudeLoginWarning, subscriptionLoginWarning } from '../claude-login-warning.js';
 import { Button } from '../components/ui/button.js';
 import { Skeleton } from '../components/ui/skeleton.js';
 import { PROJECT_NAME } from '../fixtures/fixtures.js';
@@ -493,6 +494,23 @@ export function DailyBrief({
     if (waitingSet.has(todo)) line.waiting += 1;
     byProject.set(name, line);
   }
+  const { live, teamId } = useLiveData();
+  const subscriptions = useClaudeSubscriptions(teamId, live);
+  const subscriptionWarnings = (subscriptions.data ?? []).flatMap((connection) => {
+    const text = subscriptionLoginWarning(connection, ctx.now, t);
+    return text === null
+      ? []
+      : [
+          {
+            key: connection.id,
+            kind:
+              connection.expiresAt !== null && connection.expiresAt <= ctx.now
+                ? ('expired' as const)
+                : ('expiring' as const),
+            text,
+          },
+        ];
+  });
   const lines = [...byProject].sort(([a], [b]) => a.localeCompare(b));
   const loginWarnings = machines.flatMap((machine) => {
     const notice = claudeLoginNotice(machine.claudeLogin, ctx.now);
@@ -505,6 +523,7 @@ export function DailyBrief({
       },
     ];
   });
+  loginWarnings.push(...subscriptionWarnings);
   return (
     <div data-testid="chief-brief" className="flex flex-col gap-3 text-ui text-content-secondary">
       {lines.length > 0 ? (

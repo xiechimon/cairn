@@ -81,6 +81,12 @@ import {
   claudeCodeAuthFailureMessage,
   probeClaudeCodeAuth,
 } from './claude-code-auth.js';
+import {
+  credentialRedactor,
+  credentialSafeEvents,
+  guardCredentialOutputs,
+  prepareCredentialSessionUpload,
+} from './credential-output.js';
 import { clearCredentials, pushCredential } from './credentials.js';
 import { GitPushHookError, withGitCredentialFallback } from './git.js';
 import { githubRepoRefOf, probeGithubPr } from './github-probe.js';
@@ -363,7 +369,7 @@ async function runClaimedStep(
   stop: RunStop,
   provenance: MachineHeartbeatBody,
 ): Promise<void> {
-  const { client, journal, logger } = deps;
+  let { client, journal, logger } = deps;
   const now = deps.now ?? (() => Date.now());
   const stepId = claimed.step.id;
   const convId = claimed.conversationId;
@@ -518,6 +524,11 @@ async function runClaimedStep(
 
   const tokenRes = await client.token(stepId);
   const creds = pushCredential(tokenRes, claimed.project?.repo?.cloneUrl ?? null);
+  const redact = credentialRedactor(creds.claudeSubscriptionToken);
+  client = guardCredentialOutputs(client, redact);
+  journal = guardCredentialOutputs(journal, redact);
+  logger = guardCredentialOutputs(logger, redact);
+  deps = { ...deps, client, journal, logger };
   const agent = claimed.agent;
   const runtimeId = isBackendRuntimeId(agent?.provider) ? agent.provider : null;
   let provider: ProviderConfig | null =
@@ -560,7 +571,7 @@ async function runClaimedStep(
       return;
     }
   }
-  if (runtimeId === 'claude-code') {
+  if (runtimeId === 'claude-code' && creds.claudeSubscriptionToken === undefined) {
     const auth = await (deps.claudeCodeAuthProbe ?? probeClaudeCodeAuth)();
     if (auth.state === 'not-logged-in') {
       clearCredentials(creds);
@@ -811,6 +822,12 @@ async function runClaimedStep(
     }
   };
   const skillInjection: { facts: SkillInjectionFacts | null } = { facts: null };
+  const stepEnv = { ...opts.env, ...(readonlyWorkspace ? READONLY_GIT_ENV : {}) };
+  delete stepEnv.CLAUDE_CODE_OAUTH_TOKEN;
+  if (runtimeId === 'claude-code' && creds.claudeSubscriptionToken !== undefined) {
+    stepEnv.CLAUDE_CODE_OAUTH_TOKEN = creds.claudeSubscriptionToken;
+    stepEnv.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB = '1';
+  }
   const sessionOpts: SessionOpts = {
     provider,
     modelId: agent.modelId,
@@ -842,9 +859,7 @@ async function runClaimedStep(
     ...(isReview ? { readOnly: true } : {}),
     ...(claimed.remoteToolsOnly === true ? { remoteToolsOnly: true } : {}),
     ...(telemetry !== undefined ? { telemetry } : {}),
-    ...(opts.env !== undefined || readonlyWorkspace
-      ? { env: { ...opts.env, ...(readonlyWorkspace ? READONLY_GIT_ENV : {}) } }
-      : {}),
+    ...(Object.keys(stepEnv).length > 0 ? { env: stepEnv } : {}),
   };
 
   let continueId =
@@ -852,7 +867,10 @@ async function runClaimedStep(
       ? (opts.resume?.sessionId ?? claimed.session.sessionId)
       : null;
 
-  const transcript = new TranscriptBuffer(deps.paths.outboxDir, stepId);
+  const transcript = guardCredentialOutputs(
+    new TranscriptBuffer(deps.paths.outboxDir, stepId),
+    redact,
+  );
   deps.stepTranscripts?.set(stepId, transcript);
   if (skippedNoVisionCount > 0) {
     transcript.upsert({
@@ -1387,7 +1405,7 @@ async function runClaimedStep(
     armBodyTimeout();
     if (pass === 0) armDurationCap();
     try {
-      for await (const ev of handle.events) {
+      for await (const ev of credentialSafeEvents(handle.events, creds.claudeSubscriptionToken)) {
         if (ev.type === 'toolcall_end') {
           if (ev.call.result === undefined) runningToolCalls.add(ev.call.id);
           else runningToolCalls.delete(ev.call.id);
@@ -2001,14 +2019,21 @@ async function runClaimedStep(
       ? { noOutput: true as const }
       : {}),
   };
+  const redactedSessionFile = join(deps.paths.outboxDir, `step-${stepId}.session.jsonl`);
+  const sessionFileForUpload = prepareCredentialSessionUpload(
+    handle?.sessionFile,
+    creds.claudeSubscriptionToken,
+    redactedSessionFile,
+    (message) => logger.step(message),
+  );
   journal.update(stepId, {
     state: 'awaiting-upload',
     doneBody,
     planContent,
-    sessionFile: handle?.sessionFile ?? null,
+    sessionFile: sessionFileForUpload ?? null,
   });
   try {
-    await putFinalArtifacts(client, logger, stepId, messages, planContent, handle?.sessionFile);
+    await putFinalArtifacts(client, logger, stepId, messages, planContent, sessionFileForUpload);
   } catch (err) {
     logger.step(`transcript upload failed: ${err instanceof Error ? err.message : String(err)}`);
     clearCredentials(creds);
@@ -2024,6 +2049,7 @@ async function runClaimedStep(
   }
   clearCredentials(creds);
   journal.remove(stepId);
+  rmSync(join(deps.paths.outboxDir, `step-${stepId}.session.jsonl`), { force: true });
   logger.raw(`finished (${running - 1} running)`);
 }
 
@@ -2127,6 +2153,7 @@ export async function resumePendingUpload(
     return;
   }
   journal.remove(stepId);
+  rmSync(join(deps.paths.outboxDir, `step-${stepId}.session.jsonl`), { force: true });
   deps.sessionHandles?.delete(stepId);
   logger.raw(`finished (${running - 1} running)`);
 }
