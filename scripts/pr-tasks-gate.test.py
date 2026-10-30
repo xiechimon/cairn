@@ -81,6 +81,13 @@ class TasksGateTests(unittest.TestCase):
         self.assertEqual(result, 1, output)
         self.assertIn('still pending', output)
 
+    def test_empty_line_start_comment_closes_on_its_own_line(self):
+        for comment in ('<!-->', '<!--->', '  <!--->'):
+            with self.subTest(comment=comment):
+                result, output = self.verdict(comment + '\n- [ ] pending\n')
+                self.assertEqual(result, 1, output)
+                self.assertIn('FAIL unchecked-task: line 2: pending', output)
+
     def test_blockquoted_tasks_fail_with_source_lines(self):
         for prefix in ('> ', '>', '> > ', '>>', '  >\t> '):
             with self.subTest(prefix=prefix):

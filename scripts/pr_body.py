@@ -41,14 +41,19 @@ def visible_markdown(body, blank_fences=True):
                     visible.append(line[cursor:])
                     break
                 start, end = token.span()
+                close = line.find('-->', start + 2)
                 if (token.group('ticks') is not None
                         or not (re.fullmatch(r' {0,3}', line[:start])
-                                or line.find('-->', end) != -1)):
+                                or close != -1)):
                     visible.append(line[cursor:end])
                     cursor = end
                     continue
-                visible.append(line[cursor:start] + ' ' * 4)
-                cursor = end
+                if close != -1:
+                    visible.append(line[cursor:start] + ' ' * (close + 3 - start))
+                    cursor = close + 3
+                    continue
+                visible.append(line[cursor:start] + ' ' * (len(line) - start))
                 inside_comment = True
+                break
         out.append(''.join(visible))
     return '\n'.join(out)

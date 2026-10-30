@@ -790,3 +790,40 @@ index 5e6416914..607d8090a 100644
          ...(paths.some((path) => path.startsWith('apps/web/'))
            ? [['pnpm', '--filter', '@cairn/web', 'test']]
 Exit status: 1
+
+# round 3: empty line-start comments (<!-->, <!--->) hid later tasks; new test before the fix
+...FFF.........
+======================================================================
+FAIL: test_empty_line_start_comment_closes_on_its_own_line (__main__.TasksGateTests.test_empty_line_start_comment_closes_on_its_own_line) (comment='<!-->')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 88, in test_empty_line_start_comment_closes_on_its_own_line
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-tasks: GREEN
+
+
+======================================================================
+FAIL: test_empty_line_start_comment_closes_on_its_own_line (__main__.TasksGateTests.test_empty_line_start_comment_closes_on_its_own_line) (comment='<!--->')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 88, in test_empty_line_start_comment_closes_on_its_own_line
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-tasks: GREEN
+
+
+======================================================================
+FAIL: test_empty_line_start_comment_closes_on_its_own_line (__main__.TasksGateTests.test_empty_line_start_comment_closes_on_its_own_line) (comment='  <!--->')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 88, in test_empty_line_start_comment_closes_on_its_own_line
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-tasks: GREEN
+
+
+----------------------------------------------------------------------
+Ran 13 tests in 7.460s
+
+FAILED (failures=3)
