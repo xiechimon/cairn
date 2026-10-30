@@ -13,6 +13,7 @@ function eligibility(number, expectedHead, dailyCap) {
   const reasons = [];
   if (pr.state !== 'open') reasons.push('not-open');
   if (!batchHead.test(pr.head.ref)) reasons.push('not-batch');
+  if (pr.head.repo?.full_name !== repo) reasons.push('head-repo-mismatch');
   if (!/^[a-f0-9]{40}$/.test(pr.head.sha) || pr.head.sha !== expectedHead)
     reasons.push('head-changed-or-invalid');
   if (!pr.labels.some((label) => label.name === 'review-gate')) reasons.push('no-review-label');
@@ -43,20 +44,24 @@ function eligibility(number, expectedHead, dailyCap) {
     .sort((a, b) => b.id - a.id)[0];
   if (
     !verdict ||
-    !/^\*\*Independent review gate: PASS\*\*(?: \(carried over\))? for /m.test(verdict.body)
+    !new RegExp(
+      `^<!-- review-gate:${pr.head.sha} -->\\n\\*\\*Independent review gate: PASS\\*\\*(?: \\(carried over\\))? for `,
+    ).test(verdict.body)
   )
     reasons.push('review-not-pass');
   const today = new Date().toISOString().slice(0, 10);
-  const search = pages(
-    `search/issues?q=${encodeURIComponent(`repo:${repo} is:pr is:merged merged:${today}`)}&per_page=100`,
-  );
-  const items = search.flatMap((page) => page.items);
-  if (search.some((page) => page.incomplete_results || page.total_count !== items.length))
-    throw new Error('Incomplete daily merge search');
-  const merged = items
-    .map((item) => api(`repos/${repo}/pulls/${item.number}`))
-    .filter((pull) => batchHead.test(pull.head.ref) && pull.merged_at?.slice(0, 10) === today);
-  if (merged.length >= dailyCap) reasons.push('daily-cap');
+  let merged = 0;
+  for (let page = 1; ; page++) {
+    const closed = api(
+      `repos/${repo}/pulls?state=closed&sort=updated&direction=desc&per_page=100&page=${page}`,
+    );
+    for (const pull of closed) {
+      if (pull.updated_at.slice(0, 10) < today) break;
+      if (batchHead.test(pull.head.ref) && pull.merged_at?.slice(0, 10) === today) merged++;
+    }
+    if (closed.length < 100 || closed.some((pull) => pull.updated_at.slice(0, 10) < today)) break;
+  }
+  if (merged >= dailyCap) reasons.push('daily-cap');
   if (markers().length) reasons.push('autonomy-paused');
   return { pr, reasons };
 }
@@ -74,7 +79,7 @@ try {
   }
   const pulls = pages(`repos/${repo}/pulls?state=open&per_page=100`)
     .flat()
-    .filter((pr) => batchHead.test(pr.head.ref));
+    .filter((pr) => batchHead.test(pr.head.ref) && pr.head.repo?.full_name === repo);
   const blocked = new Set();
   for (const pr of pulls) {
     if (!pr.auto_merge) continue;
