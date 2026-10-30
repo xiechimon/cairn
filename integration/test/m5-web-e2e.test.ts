@@ -68,7 +68,7 @@ beforeAll(async () => {
         arguments: { command: `cat > plan.md <<'EOF'\n${PLAN_MD('reject-v1')}\nEOF` },
       },
     },
-    { content: '方案 v1 已就绪。' },
+    { content: '方案 v1 已就绪。', delayMs: 500 },
     {
       toolCall: {
         name: 'bash',
@@ -388,15 +388,79 @@ describe('M5 web E2E: main sequence full chain (01 §7.4 spine, zero UI reload)'
     const rejectBuildId = target!.latestBuildId!;
     probeConvId = rejectBuildId;
 
+    const stepsUrl = `**/api/builds/${rejectBuildId}/steps`;
+    let markPendingRoute = () => {};
+    let releasePendingRoute = () => {};
+    const pendingRoute = new Promise<void>((resolve) => {
+      markPendingRoute = resolve;
+    });
+    const resumeRoute = new Promise<void>((resolve) => {
+      releasePendingRoute = resolve;
+    });
+    let rewriteSteps = true;
+    let pendingResponses = 0;
+    await page.route(stepsUrl, async (route) => {
+      if (!rewriteSteps || route.request().method() !== 'GET') {
+        await route.continue();
+        return;
+      }
+      pendingResponses++;
+      try {
+        const response = await route.fetch();
+        const steps = (await response.json()) as { kind: string; status: string }[];
+        if (route.request().headers()['x-cairn-route-drain'] === 'true') {
+          markPendingRoute();
+          await resumeRoute;
+        }
+        await route.fulfill({
+          response,
+          json: steps.map((step) => (step.kind === 'plan' ? { ...step, status: 'claimed' } : step)),
+        });
+      } finally {
+        pendingResponses--;
+      }
+    });
     await openDetail('M5 驳回探针');
     await waitChip(/确认/);
+    await pexpect(
+      page.getByTestId('composer-card').getByRole('button', { name: '停止', exact: true }),
+    ).toBeVisible();
 
-    await page.locator('.composer-input').fill('标题去掉项目名后缀');
-    await page.locator('.composer-send').click();
-
-    await pexpect(page.locator('.chat-bubble', { hasText: '标题去掉项目名后缀' })).toBeVisible({
-      timeout: 30_000,
+    await withDiagnostics('confirm feedback requests a plan revision', async () => {
+      await page.locator('.composer-input').fill('Drop the project suffix from the title');
+      const [revision] = await Promise.all([
+        page.waitForResponse(
+          (response) =>
+            response.url().endsWith(`/api/builds/${rejectBuildId}/steps`) &&
+            response.request().method() === 'POST',
+          { timeout: 10_000 },
+        ),
+        page.locator('.composer-send').click(),
+      ]);
+      expect(revision.ok()).toBe(true);
+      expect(revision.request().postDataJSON()).toMatchObject({
+        action: 'revision',
+        side: 'plan',
+        feedback: 'Drop the project suffix from the title',
+      });
     });
+    const pendingSteps = page.evaluate<{ kind: string; status: string }[]>(
+      `fetch('/api/builds/${rejectBuildId}/steps', { headers: { 'x-cairn-route-drain': 'true' } }).then(response => response.json())`,
+    );
+    await pendingRoute;
+    rewriteSteps = false;
+    releasePendingRoute();
+    const drainedSteps = await pendingSteps;
+    await waitFor(() => pendingResponses === 0, 10_000);
+    await page.unrouteAll({ behavior: 'wait' });
+    expect(drainedSteps.filter((step) => step.kind === 'plan')).toEqual(
+      expect.arrayContaining([expect.objectContaining({ status: 'claimed' })]),
+    );
+    await withDiagnostics('accepted feedback appears in the transcript', () =>
+      pexpect(
+        page.locator('.chat-bubble', { hasText: 'Drop the project suffix from the title' }),
+      ).toBeVisible({ timeout: 30_000 }),
+    );
     await withDiagnostics('plan card v2 on screen', () =>
       pexpect(page.locator('.chat-plan-title').last()).toHaveText('方案 · v2', {
         timeout: 30_000,
