@@ -1,0 +1,466 @@
+✖ blocks hook bypass in the shared clone: git -c core.hooksPath=/dev/null commit -q -m "ci(2182): probe that a non-main ref cannot deploy to the npm environment" (28.344958ms)
+✖ blocks hook bypass in the shared clone: git -c core.hooksPath=/dev/null push -q origin probe/2182-env-deny (25.7235ms)
+✖ blocks hook bypass in the shared clone: git add .github/workflows/env-probe-2182.yml && git -c core.hooksPath=/dev/null commit -q -m "x" && git -c core.hooksPath=/dev/null push -q origin probe/2182-env-deny (25.414792ms)
+✖ blocks hook bypass in the shared clone: git -c core.hookspath=/dev/null commit -m x (25.739167ms)
+✖ blocks hook bypass in the shared clone: git -c core.hooksPath= commit -m x (25.222292ms)
+✖ blocks hook bypass in the shared clone: git -c core.hooksPath=/tmp/empty push origin x (25.683083ms)
+✖ blocks hook bypass in the shared clone: git --config-env=core.hooksPath=EMPTY commit -m x (29.259375ms)
+✖ blocks hook bypass in the shared clone: git --config-env core.hooksPath=EMPTY commit -m x (27.811375ms)
+✖ blocks hook bypass in the shared clone: git config core.hooksPath /dev/null (28.533167ms)
+✖ blocks hook bypass in the shared clone: git config --local core.hooksPath /dev/null (28.231625ms)
+✖ blocks hook bypass in the shared clone: git config --unset core.hooksPath (29.522292ms)
+✖ blocks hook bypass in the shared clone: GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=/dev/null git push origin x (26.7925ms)
+✖ blocks hook bypass in the shared clone: HUSKY=0 git push origin x (29.818292ms)
+✖ blocks hook bypass in the shared clone: git commit --no-verify -m x (29.175792ms)
+✖ blocks hook bypass in the shared clone: git commit -n -m x (26.528333ms)
+✖ blocks hook bypass in the shared clone: git push --no-verify origin x (25.613459ms)
+✖ blocks hook bypass in the shared clone: git merge --no-verify feature (25.285417ms)
+✖ blocks hook bypass in the shared clone: git -c core.hooksPath=/dev/null checkout --detach HEAD (25.169416ms)
+✖ blocks hook bypass in the shared clone: git -c core.hooksPath=/dev/null switch --detach HEAD (25.536208ms)
+✖ blocks hook bypass in the shared clone: HUSKY=0 git commit -m x (25.614041ms)
+✖ blocks hook bypass in the shared clone: GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=/dev/null git commit -m x (25.072833ms)
+✖ blocks hook bypass in the shared clone: git -c core.hooksPath=/dev/null cherry-pick abc (25.25125ms)
+✔ allows: git commit -m "mentions core.hooksPath=/dev/null and --no-verify in the message" (25.708708ms)
+✔ allows: git push origin x (25.606541ms)
+✔ allows: git push -n origin x (25.391583ms)
+✔ allows: git config --get core.hooksPath (25.18125ms)
+✔ allows: git config core.hooksPath (25.529ms)
+✔ allows: GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.https://github.com/.extraheader GIT_CONFIG_VALUE_0=x git push origin x (25.408708ms)
+✔ allows: git -c user.name=t commit -m x (25.448042ms)
+✔ allows: git checkout --detach HEAD (25.292792ms)
+✔ allows: git -c core.hooksPath=/dev/null fetch origin +refs/heads/main:refs/pr-gate/base +refs/pull/1/head:refs/pr-gate/head (25.660541ms)
+✔ allows: git -c core.hooksPath=/dev/null update-ref -d refs/pr-gate/base (26.831375ms)
+✔ allows: HUSKY=0 pnpm install --frozen-lockfile (26.597875ms)
+✔ allows: python3 - <<'EOF'
+print('GIT_CONFIG_KEY_0=core.hooksPath HUSKY=0 git -c core.hooksPath=/dev/null commit')
+EOF (25.880333ms)
+✔ allows: cat > notes.md <<'EOF'
+HUSKY=0 git push
+EOF (25.169ms)
+✔ allows the pr-gate evidence checkout with hooks off in its own linked worktree (51.233083ms)
+✖ the linked-worktree exception covers only a detached checkout (25.7805ms)
+ℹ tests 37
+ℹ suites 0
+ℹ pass 14
+ℹ fail 23
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1107.71325
+
+✖ failing tests:
+
+test at dangerous-cmd-block.local.test.cjs:71:3
+✖ blocks hook bypass in the shared clone: git -c core.hooksPath=/dev/null commit -q -m "ci(2182): probe that a non-main ref cannot deploy to the npm environment" (28.344958ms)
+  AssertionError [ERR_ASSERTION]: expected a block for: git -c core.hooksPath=/dev/null commit -q -m "ci(2182): probe that a non-main ref cannot deploy to the npm environment"
+      at TestContext.<anonymous> (/private<old-hook-copy>/dangerous-cmd-block.local.test.cjs:73:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.start (node:internal/test_runner/test:1015:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at dangerous-cmd-block.local.test.cjs:71:3
+✖ blocks hook bypass in the shared clone: git -c core.hooksPath=/dev/null push -q origin probe/2182-env-deny (25.7235ms)
+  AssertionError [ERR_ASSERTION]: expected a block for: git -c core.hooksPath=/dev/null push -q origin probe/2182-env-deny
+      at TestContext.<anonymous> (/private<old-hook-copy>/dangerous-cmd-block.local.test.cjs:73:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at dangerous-cmd-block.local.test.cjs:71:3
+✖ blocks hook bypass in the shared clone: git add .github/workflows/env-probe-2182.yml && git -c core.hooksPath=/dev/null commit -q -m "x" && git -c core.hooksPath=/dev/null push -q origin probe/2182-env-deny (25.414792ms)
+  AssertionError [ERR_ASSERTION]: expected a block for: git add .github/workflows/env-probe-2182.yml && git -c core.hooksPath=/dev/null commit -q -m "x" && git -c core.hooksPath=/dev/null push -q origin probe/2182-env-deny
+      at TestContext.<anonymous> (/private<old-hook-copy>/dangerous-cmd-block.local.test.cjs:73:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at dangerous-cmd-block.local.test.cjs:71:3
+✖ blocks hook bypass in the shared clone: git -c core.hookspath=/dev/null commit -m x (25.739167ms)
+  AssertionError [ERR_ASSERTION]: expected a block for: git -c core.hookspath=/dev/null commit -m x
+      at TestContext.<anonymous> (/private<old-hook-copy>/dangerous-cmd-block.local.test.cjs:73:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at dangerous-cmd-block.local.test.cjs:71:3
+✖ blocks hook bypass in the shared clone: git -c core.hooksPath= commit -m x (25.222292ms)
+  AssertionError [ERR_ASSERTION]: expected a block for: git -c core.hooksPath= commit -m x
+      at TestContext.<anonymous> (/private<old-hook-copy>/dangerous-cmd-block.local.test.cjs:73:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at dangerous-cmd-block.local.test.cjs:71:3
+✖ blocks hook bypass in the shared clone: git -c core.hooksPath=/tmp/empty push origin x (25.683083ms)
+  AssertionError [ERR_ASSERTION]: expected a block for: git -c core.hooksPath=/tmp/empty push origin x
+      at TestContext.<anonymous> (/private<old-hook-copy>/dangerous-cmd-block.local.test.cjs:73:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at dangerous-cmd-block.local.test.cjs:71:3
+✖ blocks hook bypass in the shared clone: git --config-env=core.hooksPath=EMPTY commit -m x (29.259375ms)
+  AssertionError [ERR_ASSERTION]: expected a block for: git --config-env=core.hooksPath=EMPTY commit -m x
+      at TestContext.<anonymous> (/private<old-hook-copy>/dangerous-cmd-block.local.test.cjs:73:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at dangerous-cmd-block.local.test.cjs:71:3
+✖ blocks hook bypass in the shared clone: git --config-env core.hooksPath=EMPTY commit -m x (27.811375ms)
+  AssertionError [ERR_ASSERTION]: expected a block for: git --config-env core.hooksPath=EMPTY commit -m x
+      at TestContext.<anonymous> (/private<old-hook-copy>/dangerous-cmd-block.local.test.cjs:73:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at dangerous-cmd-block.local.test.cjs:71:3
+✖ blocks hook bypass in the shared clone: git config core.hooksPath /dev/null (28.533167ms)
+  AssertionError [ERR_ASSERTION]: expected a block for: git config core.hooksPath /dev/null
+      at TestContext.<anonymous> (/private<old-hook-copy>/dangerous-cmd-block.local.test.cjs:73:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at dangerous-cmd-block.local.test.cjs:71:3
+✖ blocks hook bypass in the shared clone: git config --local core.hooksPath /dev/null (28.231625ms)
+  AssertionError [ERR_ASSERTION]: expected a block for: git config --local core.hooksPath /dev/null
+      at TestContext.<anonymous> (/private<old-hook-copy>/dangerous-cmd-block.local.test.cjs:73:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at dangerous-cmd-block.local.test.cjs:71:3
+✖ blocks hook bypass in the shared clone: git config --unset core.hooksPath (29.522292ms)
+  AssertionError [ERR_ASSERTION]: expected a block for: git config --unset core.hooksPath
+      at TestContext.<anonymous> (/private<old-hook-copy>/dangerous-cmd-block.local.test.cjs:73:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at dangerous-cmd-block.local.test.cjs:71:3
+✖ blocks hook bypass in the shared clone: GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=/dev/null git push origin x (26.7925ms)
+  AssertionError [ERR_ASSERTION]: expected a block for: GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=/dev/null git push origin x
+      at TestContext.<anonymous> (/private<old-hook-copy>/dangerous-cmd-block.local.test.cjs:73:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at dangerous-cmd-block.local.test.cjs:71:3
+✖ blocks hook bypass in the shared clone: HUSKY=0 git push origin x (29.818292ms)
+  AssertionError [ERR_ASSERTION]: expected a block for: HUSKY=0 git push origin x
+      at TestContext.<anonymous> (/private<old-hook-copy>/dangerous-cmd-block.local.test.cjs:73:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at dangerous-cmd-block.local.test.cjs:71:3
+✖ blocks hook bypass in the shared clone: git commit --no-verify -m x (29.175792ms)
+  AssertionError [ERR_ASSERTION]: expected a block for: git commit --no-verify -m x
+      at TestContext.<anonymous> (/private<old-hook-copy>/dangerous-cmd-block.local.test.cjs:73:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at dangerous-cmd-block.local.test.cjs:71:3
+✖ blocks hook bypass in the shared clone: git commit -n -m x (26.528333ms)
+  AssertionError [ERR_ASSERTION]: expected a block for: git commit -n -m x
+      at TestContext.<anonymous> (/private<old-hook-copy>/dangerous-cmd-block.local.test.cjs:73:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at dangerous-cmd-block.local.test.cjs:71:3
+✖ blocks hook bypass in the shared clone: git push --no-verify origin x (25.613459ms)
+  AssertionError [ERR_ASSERTION]: expected a block for: git push --no-verify origin x
+      at TestContext.<anonymous> (/private<old-hook-copy>/dangerous-cmd-block.local.test.cjs:73:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at dangerous-cmd-block.local.test.cjs:71:3
+✖ blocks hook bypass in the shared clone: git merge --no-verify feature (25.285417ms)
+  AssertionError [ERR_ASSERTION]: expected a block for: git merge --no-verify feature
+      at TestContext.<anonymous> (/private<old-hook-copy>/dangerous-cmd-block.local.test.cjs:73:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at dangerous-cmd-block.local.test.cjs:71:3
+✖ blocks hook bypass in the shared clone: git -c core.hooksPath=/dev/null checkout --detach HEAD (25.169416ms)
+  AssertionError [ERR_ASSERTION]: expected a block for: git -c core.hooksPath=/dev/null checkout --detach HEAD
+      at TestContext.<anonymous> (/private<old-hook-copy>/dangerous-cmd-block.local.test.cjs:73:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at dangerous-cmd-block.local.test.cjs:71:3
+✖ blocks hook bypass in the shared clone: git -c core.hooksPath=/dev/null switch --detach HEAD (25.536208ms)
+  AssertionError [ERR_ASSERTION]: expected a block for: git -c core.hooksPath=/dev/null switch --detach HEAD
+      at TestContext.<anonymous> (/private<old-hook-copy>/dangerous-cmd-block.local.test.cjs:73:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at dangerous-cmd-block.local.test.cjs:71:3
+✖ blocks hook bypass in the shared clone: HUSKY=0 git commit -m x (25.614041ms)
+  AssertionError [ERR_ASSERTION]: expected a block for: HUSKY=0 git commit -m x
+      at TestContext.<anonymous> (/private<old-hook-copy>/dangerous-cmd-block.local.test.cjs:73:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at dangerous-cmd-block.local.test.cjs:71:3
+✖ blocks hook bypass in the shared clone: GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=/dev/null git commit -m x (25.072833ms)
+  AssertionError [ERR_ASSERTION]: expected a block for: GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=/dev/null git commit -m x
+      at TestContext.<anonymous> (/private<old-hook-copy>/dangerous-cmd-block.local.test.cjs:73:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at dangerous-cmd-block.local.test.cjs:71:3
+✖ blocks hook bypass in the shared clone: git -c core.hooksPath=/dev/null cherry-pick abc (25.25125ms)
+  AssertionError [ERR_ASSERTION]: expected a block for: git -c core.hooksPath=/dev/null cherry-pick abc
+      at TestContext.<anonymous> (/private<old-hook-copy>/dangerous-cmd-block.local.test.cjs:73:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at dangerous-cmd-block.local.test.cjs:89:1
+✖ the linked-worktree exception covers only a detached checkout (25.7805ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (/private<old-hook-copy>/dangerous-cmd-block.local.test.cjs:90:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
