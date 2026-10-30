@@ -4,6 +4,8 @@ import { Toaster } from '../components/ui/toaster.js';
 import { TooltipProvider } from '../components/ui/tooltip.js';
 import { I18nProvider } from '../i18n/provider.js';
 import { trackPointerFocus } from '../pointer-focus.js';
+import { safeLocalStorage } from '../safe-storage.js';
+import { readStoredTheme } from '../theme.js';
 import '../styles/fonts.css';
 import '../styles/tokens.css';
 import '../styles/motion.css';
@@ -11,6 +13,7 @@ import '../styles/app.css';
 import { Gallery } from './gallery.js';
 
 trackPointerFocus();
+document.documentElement.classList.toggle('light', readStoredTheme(safeLocalStorage()) === 'light');
 
 const container = document.getElementById('root');
 if (container == null) {

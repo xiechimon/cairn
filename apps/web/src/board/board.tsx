@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router';
+import { useLiveData } from '../api/provider.js';
 import type { CardOrchestration } from '../chief/orchestration-inflight.js';
 import { Button } from '../components/ui/button.js';
 import { Kbd } from '../components/ui/kbd.js';
@@ -177,6 +178,7 @@ export function BoardSurface({
 }: BoardProps) {
   const { t } = useI18n();
   const { search } = useLocation();
+  const { live } = useLiveData();
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropColumnId, setDropColumnId] = useState<string | null>(null);
   const sensors = useSensors(
@@ -220,7 +222,7 @@ export function BoardSurface({
     };
   }, []);
   useEffect(() => {
-    if (!boardView || onlyColumn != null) return;
+    if (!live || !boardView || onlyColumn != null) return;
     const cols = COLUMNS.map(
       (column) => sortColumnTodos(column, visibleTodos.filter(column.accepts)).length,
     );
@@ -228,7 +230,7 @@ export function BoardSurface({
     try {
       localStorage.setItem('cairn-boot-shape', JSON.stringify({ cols }));
     } catch {}
-  }, [visibleTodos, onlyColumn, boardView]);
+  }, [live, visibleTodos, onlyColumn, boardView]);
 
   const home = !boardView && onlyColumn == null;
   const showFilterEmpty =

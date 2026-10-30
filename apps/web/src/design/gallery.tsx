@@ -15,6 +15,7 @@ import {
   InputSection,
   TooltipSection,
 } from './components-controls.js';
+import { IdentitySection, StreamSection, StructureSection } from './components-more.js';
 import { DialogSection, MenuSection, ToastSection } from './components-overlays.js';
 import type { GalleryTheme } from './design-doc.js';
 import {
@@ -27,6 +28,7 @@ import {
   TypeSection,
 } from './foundations.js';
 import { BoardPattern, ProvidersPattern } from './patterns.js';
+import { ScreensSection } from './screens.js';
 import { GroupTitle } from './specimen.js';
 
 const NAV = [
@@ -59,6 +61,9 @@ const NAV = [
       ['panel', 'Panel and avatar'],
       ['conversation', 'Conversation'],
       ['trace', 'Trace'],
+      ['structure', 'Structure primitives'],
+      ['identity', 'Agents and models'],
+      ['stream', 'Live stream'],
     ],
   },
   {
@@ -67,6 +72,7 @@ const NAV = [
     items: [
       ['board', 'Board'],
       ['providers', 'Empty to filled'],
+      ['screens', 'Screens'],
     ],
   },
 ] as const;
@@ -206,6 +212,9 @@ export function Gallery() {
           <PanelSection />
           <ConversationSection />
           <TraceSection />
+          <StructureSection />
+          <IdentitySection />
+          <StreamSection />
           <GroupTitle
             id="patterns"
             title="Patterns"
@@ -213,6 +222,7 @@ export function Gallery() {
           />
           <BoardPattern />
           <ProvidersPattern />
+          <ScreensSection theme={theme} />
         </div>
       </main>
     </div>
