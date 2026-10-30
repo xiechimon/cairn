@@ -25,7 +25,7 @@ Also true and unchanged: the merge policy default is autonomous (ADR 0026 R1); l
 ## Consequences
 
 - Measured 2026-10-29: the omarchy review-gate timer reviews every non-draft PR that touches a protected path and, on a passing review, arms auto-merge with `~/.cairn/tools/merge-pr.sh <n> --auto`. Until that timer skips route B and C PRs, such a PR merges without ian once its checks are green. This ADR holds only after the timer changes; meanwhile a route B or C PR that must wait for ian stays a draft.
-- No change to `.claude/workflows/pr-gate.js` or `packages/shared/src/records/merge-gate.ts`: pr-gate already routes every protected-path PR to the user, and merge-gate.ts keeps the protected globs; `node scripts/pr-gate-selfcheck.mjs` stays green. The in-product readiness check (`apps/server/src/services/merge-gate/readiness.ts`) already implements the ADR 0026 R2 target state; where it runs on this repository, it must not merge route B or C PRs in phase 1.
+- No change to `.claude/workflows/pr-gate.js` or `packages/shared/src/records/merge-gate.ts`: pr-gate already routes every protected-path PR to the user, and merge-gate.ts keeps the protected globs. The in-product readiness check (`apps/server/src/services/merge-gate/readiness.ts`) already implements the ADR 0026 R2 target state; where it runs on this repository, it must not merge route B or C PRs in phase 1.
 - Route B moves to ADR 0026 R2 only through a later ADR that lands together with the pr-gate change; until then pr-gate keeps returning `mergedBy: 'user'` for it.
 - ADR 0026 R4 says ADRs merge through R2 without a click; in phase 1 they take route C.
 

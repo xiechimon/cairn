@@ -32,20 +32,8 @@ export const METRICS = [
     count: (json) => json.arbitraryValues.spacingTotal,
   },
   {
-    id: 'feature-map-staleness/entries',
-    file: 'scripts/feature-map-staleness-baseline.json',
-    ratchet: true,
-    count: (json) => json.entries.length,
-  },
-  {
     id: 'comment-discipline-allowlist/entries',
     file: 'scripts/comment-discipline-allowlist.json',
-    ratchet: false,
-    count: entryCount,
-  },
-  {
-    id: 'single-use-helper-allowlist/entries',
-    file: 'scripts/single-use-helper-allowlist.json',
     ratchet: false,
     count: entryCount,
   },

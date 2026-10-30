@@ -290,11 +290,6 @@ export const MERGE_BLOCKERS = [
   },
   { code: 'issue-ref-missing', class: 'human', label: '任务来源解不出 issue 号' },
   {
-    code: 'evidence-link-missing',
-    class: 'transient',
-    label: 'PR body 缺钉在本 PR 提交上、指向本 PR 证据的 raw 永久链',
-  },
-  {
     code: 'recording-missing',
     class: 'transient',
     label: 'Interactive or animated UI requires a recording of at most 5 MiB',

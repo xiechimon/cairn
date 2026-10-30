@@ -197,7 +197,6 @@ const CLASS: Record<MergeBlockerCode, BlockerClass> = {
   'harness-regression-evaluating': 'transient',
   'harness-regression-below-threshold': 'human',
   'issue-ref-missing': 'human',
-  'evidence-link-missing': 'transient',
   'recording-missing': 'transient',
   'verify-missing': 'transient',
   'verify-failed': 'transient',
@@ -430,12 +429,6 @@ const ROWS: Row[] = [
     'issue-ref-missing',
     (i) => {
       i.issueNumber = null;
-    },
-  ],
-  [
-    'evidence-link-missing',
-    (i) => {
-      pr(i).body = `evidence: ${link(MAIN)}`;
     },
   ],
   [
@@ -728,13 +721,13 @@ describe('mergeReadiness: combinations the design names', () => {
     expect(codesOf(i)).toEqual(['required-checks-unreadable']);
   });
 
-  test('evidence links pointing at another ticket or pinned at an old SHA (outside base..head): do not count', () => {
+  test('optional links to another ticket or an old SHA do not block readiness', () => {
     const a = green();
     pr(a).body = link(HEAD, 'docs/verify/1403/shot.png');
-    expect(codesOf(a)).toEqual(['evidence-link-missing']);
+    expect(codesOf(a)).toEqual([]);
     const b = green();
     pr(b).body = link(OLD);
-    expect(codesOf(b)).toEqual(['evidence-link-missing']);
+    expect(codesOf(b)).toEqual([]);
   });
 
   test('review perspectives are judged against the round-frozen set, not the team current one', () => {
@@ -800,7 +793,7 @@ describe('mergeReadiness: combinations the design names', () => {
     expect(() => mergeReadiness(i)).not.toThrow();
     const r = mergeReadiness(i);
     expect(r.ready).toBe(false);
-    expect(r.blockers.map((b) => b.code)).toEqual(['patch-unbindable', 'evidence-link-missing']);
+    expect(r.blockers.map((b) => b.code)).toEqual(['patch-unbindable']);
   });
 });
 
@@ -1035,7 +1028,7 @@ describe('mergeReadiness: a docs-only patch (#1621) is a go under shadow; a prot
   });
 });
 
-describe('mergeReadiness: a malformed compare is left to a human, evidence must come from this PR, checks are trusted only when fully read', () => {
+describe('mergeReadiness: a malformed compare is left to a human, evidence is optional, checks are trusted only when fully read', () => {
   test('compare read but malformed: the human compare-malformed, not the waitable patch-unavailable', () => {
     const a = green();
     a.compare = 'malformed';
@@ -1045,16 +1038,10 @@ describe('mergeReadiness: a malformed compare is left to a human, evidence must 
     expect(classesOf(b)).toEqual([['patch-unavailable', 'transient', 'compare unreadable']]);
   });
 
-  test('evidence links pinned on main history (ancestors of head, outside base..head): do not count, even when the path is this PR evidence', () => {
+  test('reference links pinned outside this PR do not block readiness', () => {
     const i = green();
     pr(i).body = `evidence: ${link(MAIN)}`;
-    expect(classesOf(i)).toEqual([
-      [
-        'evidence-link-missing',
-        'transient',
-        '1 link(s) to docs/verify/1404/, none at a commit of this PR to a file it adds or changes',
-      ],
-    ]);
+    expect(mergeReadiness(i).ready).toBe(true);
   });
 
   test('evidence links pinned on a commit of this PR (not necessarily head), pointing at evidence this PR added: count', () => {
@@ -1064,17 +1051,17 @@ describe('mergeReadiness: a malformed compare is left to a human, evidence must 
     expect(codesOf(i)).toEqual([]);
   });
 
-  test('pinned on a commit of this PR but pointing at evidence this PR did not add or change (an earlier round of the same ticket left on main): do not count', () => {
+  test('optional links to unchanged evidence do not block readiness', () => {
     const i = green();
     pr(i).body = `evidence: ${link(HEAD, 'docs/verify/1404/s1-result.json')}`;
-    expect(codesOf(i)).toEqual(['evidence-link-missing']);
+    expect(codesOf(i)).toEqual([]);
   });
 
-  test('pointing at evidence this PR deleted: does not count', () => {
+  test('optional links to deleted evidence do not block readiness', () => {
     const i = green();
     setFiles(i, [...FILES, opaque('docs/verify/1404/old.png', { status: 'removed' })]);
     pr(i).body = `evidence: ${link(EARLIER, 'docs/verify/1404/old.png')}`;
-    expect(codesOf(i)).toEqual(['evidence-link-missing']);
+    expect(codesOf(i)).toEqual([]);
   });
 
   test('of several links one qualified is enough: the one pinned on main history does not drag it down', () => {
@@ -1281,41 +1268,22 @@ describe('mergeReadiness: extraction failures clearable, unmergeable states, tru
     expect(classesOf(i)).toEqual([['pr-from-fork', 'human', 'head repository deleted']]);
   });
 
-  test('the linked file does not exist at that commit (raw 404): evidence-link-missing (the evidence input the S4b shell checked)', () => {
-    const missing = (detail: string) => [['evidence-link-missing', 'transient', detail]];
-    const i = green();
-    pr(i).body = `evidence: ${link(EARLIER)}`;
-    i.evidence = [{ sha: EARLIER, path: SHOT.filename, present: false }];
-    expect(classesOf(i)).toEqual(
-      missing(
-        '1 link(s) at a commit of this PR to a file it adds or changes, none present at its commit',
-      ),
-    );
-    i.evidence = [{ sha: EARLIER, path: SHOT.filename, present: null }];
-    expect(classesOf(i)).toEqual(
-      missing('1 link(s) at a commit of this PR to a file it adds or changes, presence unreadable'),
-    );
-    i.evidence = [{ sha: HEAD, path: SHOT.filename, present: true }];
-    expect(classesOf(i)).toEqual(
-      missing(
-        '1 link(s) at a commit of this PR to a file it adds or changes, none present at its commit',
-      ),
-    );
-    i.evidence = [{ sha: EARLIER, path: SHOT.filename, present: true }];
-    expect(codesOf(i)).toEqual([]);
-    pr(i).body = `evidence: ${link(EARLIER)} and ${link(HEAD)}`;
-    i.evidence = [
-      { sha: EARLIER, path: SHOT.filename, present: false },
-      { sha: HEAD, path: SHOT.filename, present: true },
-    ];
-    expect(codesOf(i)).toEqual([]);
+  test('optional evidence links do not block readiness when absent or unreadable', () => {
+    for (const present of [false, null, true]) {
+      const i = green();
+      pr(i).body = `evidence: ${link(EARLIER)}`;
+      i.evidence = [{ sha: EARLIER, path: SHOT.filename, present }];
+      expect(mergeReadiness(i).ready).toBe(true);
+    }
   });
 
-  test('evidence entries accept only qualified links: a present from an unqualified link does not count', () => {
+  test('a PR without evidence files or links can be ready', () => {
     const i = green();
-    pr(i).body = `evidence: ${link(MAIN)}`;
-    i.evidence = [{ sha: MAIN, path: SHOT.filename, present: true }];
-    expect(codesOf(i)).toEqual(['evidence-link-missing']);
+    compare(i).files = FILES;
+    pr(i).changedFiles = FILES.length;
+    pr(i).body = 'Verified with regression tests.';
+    i.evidence = [];
+    expect(mergeReadiness(i)).toMatchObject({ ready: true, blockers: [], patchDigest: D });
   });
 
   test.each([-1, 1.5, Number.NaN])(

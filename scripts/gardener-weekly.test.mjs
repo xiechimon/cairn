@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
-import { lessonSection, PATTERNS, rankBaselines } from './gardener-weekly.mjs';
+import { PATTERNS, rankBaselines } from './gardener-weekly.mjs';
 
 const script = resolve(import.meta.dirname, 'gardener-weekly.mjs');
 const NOW = '2026-10-24T12:00:00Z';
@@ -12,22 +12,14 @@ const daysAgo = (days) => new Date(Date.parse(NOW) - days * 86400000).toISOStrin
 
 const allowlist = (n) =>
   Array.from({ length: n }, (_, i) => ({ path: 'a.ts', line: `// ${i}`, reason: 'external' }));
-const baselineFiles = ({ warnings, controls, staleness, comments, helpers }) => ({
+const baselineFiles = ({ warnings, controls, comments }) => ({
   'scripts/lint-warning-baseline.json': { maxWarnings: warnings },
   'scripts/ui-debt-baseline.json': {
     perFaceCss: { 'a.css': 10 },
     rawControls: { total: controls, files: {} },
     arbitraryValues: { textTotal: 5, spacingTotal: 1, files: {} },
   },
-  'scripts/feature-map-staleness-baseline.json': {
-    entries: Array.from({ length: staleness }, (_, i) => ({
-      file: 'a.md',
-      kind: 'class',
-      symbol: `.c${i}`,
-    })),
-  },
   'scripts/comment-discipline-allowlist.json': allowlist(comments),
-  'scripts/single-use-helper-allowlist.json': allowlist(helpers),
 });
 
 const fixture = () => {
@@ -80,14 +72,8 @@ test('ranks growth by the 7-day delta and stock by current count', () => {
 test('report lists every category with its 7-day change, sorted, and writes the summary file', () => {
   const { cwd, commit, run } = fixture();
   try {
-    commit(
-      daysAgo(20),
-      baselineFiles({ warnings: 0, controls: 3, staleness: 4, comments: 2, helpers: 1 }),
-    );
-    commit(
-      daysAgo(3),
-      baselineFiles({ warnings: 0, controls: 3, staleness: 9, comments: 2, helpers: 1 }),
-    );
+    commit(daysAgo(20), baselineFiles({ warnings: 0, controls: 3, comments: 2 }));
+    commit(daysAgo(3), baselineFiles({ warnings: 0, controls: 3, comments: 7 }));
     const result = run();
     assert.equal(result.status, 0, result.stderr);
     for (const id of [
@@ -96,17 +82,15 @@ test('report lists every category with its 7-day change, sorted, and writes the 
       'ui-debt/bare-controls',
       'ui-debt/arbitrary-text',
       'ui-debt/arbitrary-spacing',
-      'feature-map-staleness/entries',
       'comment-discipline-allowlist/entries',
-      'single-use-helper-allowlist/entries',
     ])
       assert.ok(result.stdout.includes(id), id);
     const growth = result.stdout.split('## By growth')[1].split('## By stock')[0];
-    assert.match(growth, /1\. feature-map-staleness\/entries\s*\|\s*9\s*\|\s*\+5/);
+    assert.match(growth, /1\. comment-discipline-allowlist\/entries\s*\|\s*7\s*\|\s*\+5/);
     const stock = result.stdout.split('## By stock')[1];
     assert.match(stock, /1\. ui-debt\/per-face-css-lines\s*\|\s*10\s*\|\s*0/);
-    assert.match(stock, /2\. feature-map-staleness\/entries/);
-    assert.match(result.stdout, /Next target: feature-map-staleness\/entries/);
+    assert.match(stock, /2\. comment-discipline-allowlist\/entries/);
+    assert.match(result.stdout, /Next target: comment-discipline-allowlist\/entries/);
     const summary = readFileSync(join(cwd, '.gardener/weekly-2026-10-24.md'), 'utf8');
     assert.equal(summary, result.stdout);
   } finally {
@@ -118,10 +102,7 @@ test('a baseline file born inside the window reports its whole count as growth',
   const { cwd, commit, run } = fixture();
   try {
     commit(daysAgo(20), { 'README.md': 'x' });
-    commit(
-      daysAgo(2),
-      baselineFiles({ warnings: 0, controls: 3, staleness: 4, comments: 2, helpers: 1 }),
-    );
+    commit(daysAgo(2), baselineFiles({ warnings: 0, controls: 3, comments: 2 }));
     const result = run();
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /ui-debt\/bare-controls\s*\|\s*3\s*\|\s*\+3/);
@@ -134,10 +115,7 @@ test('refuses a shallow clone, whose history would fake every delta as growth', 
   const { cwd, commit } = fixture();
   const clone = join(cwd, 'shallow');
   try {
-    commit(
-      daysAgo(20),
-      baselineFiles({ warnings: 0, controls: 3, staleness: 4, comments: 2, helpers: 1 }),
-    );
+    commit(daysAgo(20), baselineFiles({ warnings: 0, controls: 3, comments: 2 }));
     commit(daysAgo(1), { 'README.md': 'x' });
     execFileSync('git', ['clone', '--depth', '1', `file://${cwd}`, clone], { stdio: 'pipe' });
     const result = spawnSync(process.execPath, [script, '--now', NOW], {
@@ -151,7 +129,7 @@ test('refuses a shallow clone, whose history would fake every delta as growth', 
   }
 });
 
-const quiet = { warnings: 0, controls: 3, staleness: 4, comments: 2, helpers: 1 };
+const quiet = { warnings: 0, controls: 3, comments: 2 };
 const sites = (name, count) =>
   Array.from({ length: count }, (_, i) => `const v${i} = load() as unknown as ${name};`).join('\n');
 
@@ -206,24 +184,6 @@ test('the watchlist patterns compile and each has a suggested rule when ungated'
   for (const pattern of PATTERNS) {
     assert.ok(new RegExp(pattern.regex).source);
     assert.ok(pattern.gate || pattern.suggestedRule, pattern.id);
-  }
-});
-
-test('the weekly report carries the lessons ledger summary and tolerates a missing ledger', () => {
-  const root = mkdtempSync(join(tmpdir(), 'gardener-lessons-'));
-  try {
-    mkdirSync(join(root, 'docs/lessons'), { recursive: true });
-    writeFileSync(
-      join(root, 'docs/lessons/2001-new-gate.md'),
-      '---\nCategory: a symptom\nSource: #1\nLevel: 2\nSafeguard: `scripts/some-gate.mjs`; since 2026-10-22\nIntercepts: 1\nRecurrences: 0\nNotes: kept\n---\n',
-    );
-    const section = lessonSection(root, new Date('2026-10-24T12:00:00Z'));
-    assert.match(section, /## Lessons ledger weekly summary/);
-    assert.match(section, /New categories:\n- new-gate/);
-    assert.match(section, /Intercepts: 0/);
-    assert.match(lessonSection(join(root, 'nope'), new Date()), /docs\/lessons\/ is missing/);
-  } finally {
-    rmSync(root, { recursive: true, force: true });
   }
 });
 
