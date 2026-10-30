@@ -63,18 +63,18 @@ function headerName(page: Page, scope: string) {
   return page.locator(`${scope} .settings-header h2`);
 }
 
-test('account: three equal 52px rows, dividers between rows only, name above the card', async ({
+test('account: two equal 52px rows, dividers between rows only, name above the card', async ({
   page,
 }) => {
   await page.goto('/app/account?scenario=13');
   const card = page.locator('.account-card');
   await expect(card).toBeVisible();
   const p = await probe(card);
-  expect(p.rows.map((r) => r.label)).toEqual(['语言', '密度', '推送通知']);
+  expect(p.rows.map((r) => r.label)).toEqual(['语言', '推送通知']);
   expect(
     p.rows.map((r) => r.h),
     'F1: equal row heights',
-  ).toEqual([52, 52, 52]);
+  ).toEqual([52, 52]);
   expectOneCardShape(p);
   await expect(headerName(page, '[data-route="account"]')).toHaveText('Xmon Dai');
 
@@ -91,34 +91,8 @@ test('account: editing the name keeps the card untouched (no row appears)', asyn
   await page.getByRole('button', { name: '编辑名称' }).click();
   await expect(page.locator('.account-header').getByRole('textbox')).toBeFocused();
   const p = await probe(page.locator('.account-card'));
-  expect(p.rows).toHaveLength(3);
+  expect(p.rows).toHaveLength(2);
   expectOneCardShape(p);
-});
-
-test('account: the selected density segment is a white tab with a 1px ring (F8)', async ({
-  page,
-}) => {
-  await page.goto('/app/account?scenario=13');
-  const on = page.getByTestId('account-density-comfortable');
-  const off = page.getByTestId('account-density-compact');
-  await expect(on).toHaveAttribute('aria-checked', 'true');
-  await expect(off).toHaveAttribute('aria-checked', 'false');
-  const face = (l: Locator) =>
-    l.evaluate((el) => {
-      const cs = getComputedStyle(el);
-      return { bg: cs.backgroundColor, shadow: cs.boxShadow };
-    });
-  const selected = await face(on);
-  expect(selected.bg).toBe('rgb(255, 253, 246)');
-  expect(selected.shadow).toContain('0px 0px 0px 1px');
-  expect((await face(off)).bg).toBe('rgba(0, 0, 0, 0)');
-  // Language trigger and segmented track share the 32px control height.
-  const heights = await Promise.all(
-    [page.getByRole('combobox', { name: '语言' }), page.getByRole('radiogroup', { name: '密度' })].map(
-      (l) => l.evaluate((el) => el.getBoundingClientRect().height),
-    ),
-  );
-  expect(heights).toEqual([32, 32]);
 });
 
 test('agent overview: same card shape; one-line rows are 52px, two-line rows grow', async ({

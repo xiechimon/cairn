@@ -11,11 +11,6 @@ interface Control {
 
 const CONTROLS: Control[] = [
   {
-    name: 'account density',
-    url: '/app/account?scenario=13',
-    track: (page) => page.getByRole('radiogroup', { name: '密度' }),
-  },
-  {
     name: 'agent tabs',
     url: '/app/resources/agents/r3-builder?scenario=agent-detail',
     track: (page) => page.getByRole('tablist', { name: 'Agent' }),
@@ -45,12 +40,6 @@ const CONTROLS: Control[] = [
     url: '/app?scenario=01',
     open: (page) => page.click('.sidebar-user'),
     track: (page) => page.getByRole('radiogroup', { name: '外观' }),
-  },
-  {
-    name: 'user menu density',
-    url: '/app?scenario=01',
-    open: (page) => page.click('.sidebar-user'),
-    track: (page) => page.getByRole('radiogroup', { name: '密度' }),
   },
 ];
 

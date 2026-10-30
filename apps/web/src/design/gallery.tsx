@@ -1,5 +1,5 @@
 import { cn } from 'cn';
-import { useEffect, useState } from 'react';
+import { type RefObject, useEffect, useRef, useState } from 'react';
 import { SegmentedRadio } from '../components/segmented.js';
 import {
   ConversationSection,
@@ -27,8 +27,6 @@ import {
 } from './foundations.js';
 import { BoardPattern, ProvidersPattern } from './patterns.js';
 import { GroupTitle } from './specimen.js';
-
-type Density = 'comfortable' | 'compact';
 
 const NAV = [
   {
@@ -71,14 +69,16 @@ const NAV = [
   },
 ] as const;
 
-function useActiveSection(): string {
+function useActiveSection(scroller: RefObject<HTMLElement | null>): string {
   const [active, setActive] = useState('color');
   useEffect(() => {
+    const el = scroller.current;
+    if (el == null) return;
     let frame = 0;
     const update = () => {
       frame = 0;
-      const sections = [...document.querySelectorAll<HTMLElement>('[data-gallery-section]')];
-      const line = window.innerHeight * 0.25;
+      const sections = [...el.querySelectorAll<HTMLElement>('[data-gallery-section]')];
+      const line = el.getBoundingClientRect().top + el.clientHeight * 0.25;
       const current = sections.filter((s) => s.getBoundingClientRect().top <= line).at(-1);
       setActive(current?.id ?? sections[0]?.id ?? '');
     };
@@ -86,12 +86,12 @@ function useActiveSection(): string {
       if (frame === 0) frame = requestAnimationFrame(update);
     };
     update();
-    window.addEventListener('scroll', onScroll, { passive: true });
+    el.addEventListener('scroll', onScroll, { passive: true });
     return () => {
-      window.removeEventListener('scroll', onScroll);
+      el.removeEventListener('scroll', onScroll);
       cancelAnimationFrame(frame);
     };
-  }, []);
+  }, [scroller]);
   return active;
 }
 
@@ -99,47 +99,30 @@ export function Gallery() {
   const [theme, setTheme] = useState<GalleryTheme>(() =>
     document.documentElement.classList.contains('light') ? 'light' : 'dark',
   );
-  const [density, setDensity] = useState<Density>('comfortable');
-  const active = useActiveSection();
+  const scroller = useRef<HTMLElement>(null);
+  const active = useActiveSection(scroller);
 
   const changeTheme = (next: GalleryTheme) => {
     document.documentElement.classList.toggle('light', next === 'light');
     document.documentElement.dataset.theme = next;
     setTheme(next);
   };
-  const changeDensity = (next: Density) => {
-    if (next === 'compact') document.documentElement.dataset.density = 'compact';
-    else delete document.documentElement.dataset.density;
-    setDensity(next);
-  };
   const controls = (
-    <>
-      <SegmentedRadio
-        label="Theme"
-        value={theme}
-        onChange={changeTheme}
-        className="w-full"
-        options={[
-          { value: 'dark', label: 'Dark' },
-          { value: 'light', label: 'Light' },
-        ]}
-      />
-      <SegmentedRadio
-        label="Density"
-        value={density}
-        onChange={changeDensity}
-        className="w-full"
-        options={[
-          { value: 'comfortable', label: 'Comfortable' },
-          { value: 'compact', label: 'Compact' },
-        ]}
-      />
-    </>
+    <SegmentedRadio
+      label="Theme"
+      value={theme}
+      onChange={changeTheme}
+      className="w-full"
+      options={[
+        { value: 'dark', label: 'Dark' },
+        { value: 'light', label: 'Light' },
+      ]}
+    />
   );
 
   return (
-    <div className="flex min-h-screen bg-canvas text-foreground">
-      <aside className="sticky top-0 hidden h-screen w-62 flex-none flex-col overflow-y-auto px-3 py-5 md:flex">
+    <div className="flex h-full bg-canvas text-foreground">
+      <aside className="hidden h-full w-62 flex-none flex-col overflow-y-auto px-3 py-5 md:flex">
         <a href="#top" className="flex items-center gap-2 px-2.5 pb-1 text-foreground no-underline">
           <span
             aria-hidden
@@ -180,12 +163,16 @@ export function Gallery() {
         </nav>
         <div className="mt-auto flex flex-col gap-3 px-1 pt-6">{controls}</div>
       </aside>
-      <main id="top" className="min-w-0 flex-auto bg-background md:border-l md:border-border">
+      <main
+        id="top"
+        ref={scroller}
+        className="h-full min-w-0 flex-auto overflow-y-auto scroll-smooth bg-background motion-reduce:scroll-auto md:border-l md:border-border"
+      >
         <div className="sticky top-0 z-(--z-docked) flex flex-wrap items-center gap-2 border-b border-border bg-background px-4 py-2.5 md:hidden">
           {controls}
         </div>
         <div className="mx-auto max-w-250 px-6 pb-40 md:px-12">
-          <div key={`${theme}-${density}`}>
+          <div key={theme}>
             <GroupTitle
               id="foundations"
               title="Cairn"

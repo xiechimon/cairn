@@ -1,25 +1,16 @@
 import { cn } from 'cn';
 import { KeyRound, Plug, User } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import { useLiveData } from '../api/provider.js';
 import { SegmentedRadio } from '../components/segmented.js';
 import { MENU_ITEM_CLS, MENU_SEPARATOR_CLS, MENU_SURFACE_CLS } from '../components/ui/menu.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
-import {
-  applyDensity,
-  DENSITY_EVENT,
-  type Density,
-  readDomDensity,
-  readStoredDensity,
-} from '../density.js';
 import { useI18n } from '../i18n/provider.js';
-import { safeLocalStorage } from '../safe-storage.js';
 import { applyTheme, type Theme } from '../theme.js';
 
 interface UserMenuProps {
   theme: Theme;
-  density?: Density;
   floating?: boolean;
   className?: string;
 }
@@ -46,12 +37,7 @@ const NAV_ROW_CLS = cn(
   'user-menu-row cursor-pointer no-underline hover:bg-menu-hover focus-visible:bg-menu-hover',
 );
 
-export function UserMenu({
-  theme: initialTheme,
-  density: initialDensity,
-  floating = false,
-  className,
-}: UserMenuProps) {
+export function UserMenu({ theme: initialTheme, floating = false, className }: UserMenuProps) {
   const { t } = useI18n();
   const { user } = useLiveData();
   const { search } = useLocation();
@@ -60,22 +46,6 @@ export function UserMenu({
     applyTheme(next);
     setTheme(next);
   };
-  const [density, setDensity] = useState<Density>(
-    () => initialDensity ?? readStoredDensity(safeLocalStorage()),
-  );
-  const selectDensity = (next: Density) => {
-    applyDensity(next);
-    setDensity(next);
-  };
-  useEffect(() => {
-    const onDensity = (e: Event) => {
-      const detail = (e as CustomEvent<Density>).detail;
-      if (detail === 'comfortable' || detail === 'compact') setDensity(detail);
-    };
-    window.addEventListener(DENSITY_EVENT, onDensity);
-    setDensity(readDomDensity());
-    return () => window.removeEventListener(DENSITY_EVENT, onDensity);
-  }, []);
   return (
     <div
       className={`${PANEL}${floating ? ` ${PANEL_FLOATING}` : ''}${
@@ -104,20 +74,6 @@ export function UserMenu({
           options={[
             { value: 'light', label: t('浅色') },
             { value: 'dark', label: t('深色') },
-          ]}
-        />
-      </div>
-      <div className={SEG_ROW_CLS} data-testid="density-row">
-        <span className={SEG_LABEL_CLS}>{t('密度')}</span>
-        <SegmentedRadio
-          className={SEG_TRACK_CLS}
-          optionHandle={SEG_OPTION_CLS}
-          label={t('密度')}
-          value={density}
-          onChange={selectDensity}
-          options={[
-            { value: 'comfortable', label: t('舒适'), testId: 'density-comfortable' },
-            { value: 'compact', label: t('紧凑'), testId: 'density-compact' },
           ]}
         />
       </div>

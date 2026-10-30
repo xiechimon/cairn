@@ -167,29 +167,6 @@
   }
 }
 
-[data-density="compact"] {
-  --rem-scale: 0.9375;
-  --pad-card: 8px;
-  --font-size-caption: calc(0.6875rem * var(--rem-scale));
-  --font-size-code: calc(0.75rem * var(--rem-scale));
-  --font-size-body: calc(0.8125rem * var(--rem-scale));
-  --font-size-heading: calc(0.875rem * var(--rem-scale));
-  --font-size-title: calc(1.25rem * var(--rem-scale));
-  --type-scale: calc(var(--rem-scale) * 17 / 16);
-  --type-page: calc(1.125rem * var(--type-scale));
-  --type-heading: calc(1rem * var(--type-scale));
-  --type-card-title: calc(0.875rem * var(--type-scale));
-  --type-ui: calc(0.84375rem * var(--type-scale));
-  --type-meta: calc(0.75rem * var(--type-scale));
-  --type-caption: calc(0.71875rem * var(--type-scale));
-}
-[data-density="compact"] [data-slot="card"] {
-  --card-spacing: 0.5rem;
-}
-[data-density="compact"] .todo-card {
-  padding: 8px 10px;
-}
-
 .light {
   --radius-popover: 18px;
   --radius-window: 20px;
