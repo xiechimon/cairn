@@ -523,8 +523,22 @@
     {
       "idx": 74,
       "version": "6",
-      "when": 1793384510265,
-      "tag": "0074_claude_subscription",
+      "when": 1793383884169,
+      "tag": "0074_build_schedule_creator",
+      "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "6",
+      "when": 1793385661835,
+      "tag": "0075_agent_attachments",
+      "breakpoints": true
+    },
+    {
+      "idx": 76,
+      "version": "6",
+      "when": 1793386640593,
+      "tag": "0076_claude_subscription",
       "breakpoints": true
     }
   ]

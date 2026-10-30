@@ -65,6 +65,7 @@ import {
 } from '@cairn/shared';
 import { createActivityTracker } from './activity.js';
 import { parseAgentTodoText } from './agent-todo.js';
+import { prepareFileAttachment } from './attach-file.js';
 import { SessionNotResumableError } from './backend/errors.js';
 import { notInConfigLine, resolveMcpEndpoints } from './backend/mcp-config.js';
 import type { DaemonOtel } from './backend/otel.js';
@@ -282,9 +283,14 @@ function taskMetaOpts(
 export function composeWorkerSystemPrompt(
   description: string | null | undefined,
   memories: readonly { title: string; content: string }[] | undefined,
-  opts?: { taskMeta?: { currentTitle: string; meta?: TaskMetaForm } },
+  opts?: { taskMeta?: { currentTitle: string; meta?: TaskMetaForm }; attachments?: boolean },
 ): string | undefined {
   const parts: string[] = [];
+  if (opts?.attachments) {
+    parts.push(
+      'For UI tasks, attach light and dark screenshots with `attach_file {path, caption?}` before your final reply. Attach other deliverable files the same way. Attachment tokens are appended to your assistant output automatically.',
+    );
+  }
   if (description) parts.push(description);
   if (memories && memories.length > 0) {
     parts.push(`## 记忆\n${memories.map((m) => `- ${m.title}：${m.content}`).join('\n')}`);
@@ -690,7 +696,10 @@ async function runClaimedStep(
   const systemPrompt =
     isChief && claimed.chief
       ? claimed.chief.systemPrompt
-      : composeWorkerSystemPrompt(agent.description, agent.memories, taskMetaOpts(claimed.todo));
+      : composeWorkerSystemPrompt(agent.description, agent.memories, {
+          ...taskMetaOpts(claimed.todo),
+          attachments: true,
+        });
   const remoteTools = claimed.remoteTools;
   const claimedMcp = claimed.mcpServers;
   const mcpSlugs = claimedMcp ?? [];
@@ -842,6 +851,9 @@ async function runClaimedStep(
           remoteTools,
           executeRemoteTool: (name, params) => {
             if (name === 'ask_user' && client.askUser) return runAskChannel(params);
+            if (name === 'attach_file' && !isChief) {
+              return client.relayTool(stepId, name, prepareFileAttachment(cwd, params));
+            }
             const def = remoteTools.find((t) => t.name === name);
             return client.relayTool(stepId, name, params, {
               ...(def?.replaySafe ? { replaySafe: true } : {}),

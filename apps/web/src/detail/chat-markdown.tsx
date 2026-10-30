@@ -1,10 +1,11 @@
 import { AGENT_TODO_LINE_RE, AGENT_TODO_MARKER_STATES, type AgentTodoState } from '@cairn/shared';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { inlineSegments } from '../api/mappers.js';
 import { Button } from '../components/ui/button.js';
 import type { DocSegment } from '../fixtures/records.js';
 import { Check } from '../icons/index.js';
 import { ATTACHMENT_LINE } from '../overlay/attachment-paste.js';
+import { AttachmentPreview } from '../overlay/attachment-preview.js';
 import { Segments } from './segments.js';
 
 export type ChatBlock =
@@ -195,7 +196,12 @@ export function AttachmentChip({
         variant="ghost"
         className={`spec-chip spec-chip--image ${SPEC_CHIP} ${SPEC_CHIP_IMAGE} h-auto cursor-pointer rounded-(--cds-radius-md) whitespace-normal font-normal active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto`}
         title={name}
-        onClick={() => onPreview(name, href)}
+        nativeButton={false}
+        render={<a href={href} />}
+        onClick={(event) => {
+          event.preventDefault();
+          onPreview(name, href);
+        }}
       >
         <img src={href} alt={name} className={`spec-chip-img ${SPEC_CHIP_IMG}`} />
       </Button>
@@ -278,6 +284,7 @@ export function TaskCard({ items }: { items: TaskItem[] }) {
 
 export function ChatMarkdown({ text }: { text: string }) {
   const blocks = useMemo(() => parseChatMarkdown(text), [text]);
+  const [preview, setPreview] = useState<{ name: string; src: string } | null>(null);
   return (
     <>
       {blocks.map((block, i) => {
@@ -341,7 +348,11 @@ export function ChatMarkdown({ text }: { text: string }) {
           case 'attachment':
             return (
               <div key={i} className="chat-md-attachment my-2">
-                <AttachmentChip name={block.name} attachmentKey={block.key} />
+                <AttachmentChip
+                  name={block.name}
+                  attachmentKey={block.key}
+                  onPreview={(name, src) => setPreview({ name, src })}
+                />
               </div>
             );
           case 'para':
@@ -353,6 +364,9 @@ export function ChatMarkdown({ text }: { text: string }) {
         }
         return null;
       })}
+      {preview !== null && (
+        <AttachmentPreview name={preview.name} src={preview.src} onClose={() => setPreview(null)} />
+      )}
     </>
   );
 }

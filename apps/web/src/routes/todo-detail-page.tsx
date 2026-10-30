@@ -60,6 +60,7 @@ import { useChiefRoot } from '../chief/chief-root.js';
 import { inflightOrchestrationFor } from '../chief/orchestration-inflight.js';
 import { useOrchestrateStart } from '../chief/use-orchestrate-start.js';
 import { Button } from '../components/ui/button.js';
+import { Spinner } from '../components/ui/spinner.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { blockDemoWrite, DEMO_MODE } from '../demo/demo-gate.js';
 import { AcceptDialog } from '../detail/accept-dialog.js';
@@ -103,6 +104,7 @@ import { MoreMenu } from '../overlay/more-menu.js';
 import { SearchPanel, useSearchState } from '../overlay/search-panel.js';
 import { SHEET_PANEL } from '../pages/shell.js';
 import { PHASE_UI } from '../phase.js';
+import { useThreadPresence } from '../pwa/thread-presence.js';
 import { safeLocalStorage } from '../safe-storage.js';
 import { readStoredTheme } from '../theme.js';
 
@@ -167,6 +169,7 @@ export function TodoDetailPage() {
   const todoQ = useTodo(live ? id : undefined, live);
   const todosQ = useTodos(teamId, live);
   const wireTodo = todoQ.data ?? null;
+  useThreadPresence(teamId, wireTodo?.id, live);
   const buildId = wireTodo?.latestBuildId ?? null;
   const buildQ = useBuild(buildId, live);
   const gateQ = useBuildGate(buildId, live);
@@ -784,6 +787,7 @@ export function TodoDetailPage() {
                   onClick={unarchiveTask}
                   disabled={mutations.setTodoArchived.isPending}
                 >
+                  {mutations.setTodoArchived.isPending && <Spinner data-icon="inline-start" />}
                   {t('Unarchive to continue')}
                 </Button>
               </div>

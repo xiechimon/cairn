@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../components/ui/select.js';
+import { Spinner } from '../components/ui/spinner.js';
 import { StatusChip, type StatusTone } from '../components/ui/status-chip.js';
 import { Switch } from '../components/ui/switch.js';
 import { TagChip } from '../components/ui/tag-chip.js';
@@ -127,7 +128,7 @@ export function ButtonSection() {
       </Specimen>
       <Specimen
         title="States"
-        note="Dialog and form buttons narrow to 8px corners"
+        note="Disabled buttons fade to half strength; a busy button says what it is doing"
         code={`<Button className={DIALOG_PRIMARY_BUTTON} disabled>Create</Button>`}
       >
         <Cell label="trailing icon">
@@ -145,7 +146,7 @@ export function ButtonSection() {
             Create
           </Button>
         </Cell>
-        <Cell label="click to load">
+        <Cell label="click: spinner while busy">
           <Button
             disabled={busy}
             onClick={() => {
@@ -153,6 +154,7 @@ export function ButtonSection() {
               window.setTimeout(() => setBusy(false), 1400);
             }}
           >
+            {busy && <Spinner data-icon="inline-start" />}
             {busy ? 'Starting…' : 'Start task'}
           </Button>
         </Cell>

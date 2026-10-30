@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "d3b48815-0f3b-4b06-a206-04622b178385",
+  "id": "34b5642c-4931-4c52-9a12-e60943533142",
   "prevId": "388c8f82-77ae-48b0-88df-8f283cb3bbe6",
   "tables": {
     "agent": {
@@ -814,6 +814,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "scheduledBy": {
+          "name": "scheduledBy",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "planDocId": {
           "name": "planDocId",
           "type": "text",
@@ -1329,72 +1336,6 @@
       },
       "indexes": {},
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "claude_subscription": {
-      "name": "claude_subscription",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "teamId": {
-          "name": "teamId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "label": {
-          "name": "label",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "tokenCipher": {
-          "name": "tokenCipher",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "expiresAt": {
-          "name": "expiresAt",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "createdAt": {
-          "name": "createdAt",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "claude_subscription_teamId_team_id_fk": {
-          "name": "claude_subscription_teamId_team_id_fk",
-          "tableFrom": "claude_subscription",
-          "tableTo": "team",
-          "columnsFrom": [
-            "teamId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}

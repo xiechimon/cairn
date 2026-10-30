@@ -297,6 +297,7 @@ export function createScheduler(
           assignment: todoRow.assignment ?? { plan: null, build: null },
           withPlan: false,
           triggerSource: 'schedule',
+          scheduledBy: row.createdBy,
         });
       } catch (err) {
         if (err instanceof PhaseTransitionError) {

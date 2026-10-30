@@ -152,6 +152,7 @@ export const build = sqliteTable('build', {
   withPlan: bool('withPlan').notNull(),
   prevPhase: text('prevPhase').$type<Phase | null>(),
   triggerSource: text('triggerSource').$type<TriggerSource>().notNull(),
+  scheduledBy: text('scheduledBy'),
   planDocId: text('planDocId'),
   errorMessage: text('errorMessage'),
   prUrl: text('prUrl'),
@@ -630,6 +631,8 @@ export const chiefMessage = sqliteTable('chief_message', {
 });
 
 export const attachment = sqliteTable('attachment', {
+  todoId: text('todoId'),
+  sha256: text('sha256'),
   id: text('id').primaryKey(),
   teamId: text('teamId')
     .notNull()

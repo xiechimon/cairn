@@ -10,6 +10,7 @@ import {
 import { eq } from 'drizzle-orm';
 import { agent, build, chief, chiefThread, type step, todo } from '../db/schema.js';
 import { HttpError, parseWith } from '../lib/errors.js';
+import { attachWorkerFile } from './agent-attachments.js';
 import { NotFoundError } from './builds.js';
 import { assertChiefDigestTool } from './chief-digest.js';
 import {
@@ -124,6 +125,7 @@ async function executeWorkerMemoryToolCall(
   if (!buildRow) throw new NotFoundError(`build ${row.buildId}`);
   const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
   if (!todoRow) throw new NotFoundError(`todo ${buildRow.todoId}`);
+  if (name === 'attach_file') return attachWorkerFile(deps, row, todoRow, params);
   if (name === 'set_task_meta') return setTaskMeta(deps, todoRow, params);
   const slot = row.kind === 'plan' ? todoRow.assignment?.plan : todoRow.assignment?.build;
   const agentId = slot?.agentId;
