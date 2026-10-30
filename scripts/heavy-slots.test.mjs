@@ -18,6 +18,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 import { skipsQueue, slotCount, slotPortHolder, slotResources } from './heavy-slots.mjs';
 import { prepushModules } from './prepush.mjs';
+import { scrubGateEnv } from './scrub-git-env.mjs';
 
 const moduleUrl = pathToFileURL(resolve('scripts/heavy-slots.mjs')).href;
 const cli = resolve('scripts/heavy-slots.mjs');
@@ -34,7 +35,7 @@ const SANDBOX_PORT_BASE = 20000 + (process.pid % 1000) * 20;
 function sandbox(slots) {
   const dir = mkdtempSync(join(tmpdir(), 'heavy-slots-test-'));
   const env = {
-    ...process.env,
+    ...scrubGateEnv(),
     CAIRN_HEAVY_SLOTS: String(slots),
     CAIRN_HEAVY_SLOTS_DIR: join(dir, 'locks'),
     TMPDIR: join(dir, 'tmp'),

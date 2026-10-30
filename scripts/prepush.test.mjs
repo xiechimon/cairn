@@ -26,12 +26,26 @@ import {
   runPlan,
   selfTests,
 } from './prepush.mjs';
+import { scrubGateEnv } from './scrub-git-env.mjs';
 
 const prepushFixtureFiles = [
   ...prepushModules,
   'scripts/doc-reader-tests.mjs',
   'scripts/prepush-known-red.json',
 ];
+
+test('scrubGateEnv drops every gate base SHA and the force-full switch', () => {
+  const env = {
+    PATH: 'p',
+    LANE_FILE_BASE_SHA: 'a',
+    ENGLISH_ONLY_BASE_SHA: 'b',
+    PREPUSH_BASE_SHA: 'c',
+    PREPUSH_FORCE_FULL: 'true',
+    GIT_DIR: 'g',
+  };
+  assert.deepEqual(scrubGateEnv(env), { PATH: 'p', GIT_DIR: 'g' });
+  assert.equal(env.LANE_FILE_BASE_SHA, 'a');
+});
 
 for (const [name, paths, expected] of [
   ['documents', ['README.md', 'AGENTS.md', 'docs/ops/agent-bot-identity.md', 'LICENSE'], false],
@@ -64,7 +78,7 @@ test('--has-code prints only a boolean, uses the supplied base and fails closed'
     const result = spawnSync(process.execPath, ['scripts/prepush.mjs', '--has-code'], {
       cwd: directory,
       encoding: 'utf8',
-      env: { ...process.env, PREPUSH_BASE_SHA: base, CAIRN_HEAVY_SLOTS_DIR: slots, ...extraEnv },
+      env: prepushEnv({ PREPUSH_BASE_SHA: base, CAIRN_HEAVY_SLOTS_DIR: slots, ...extraEnv }),
     });
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /^(true|false)\n$/);
@@ -345,7 +359,7 @@ test('the CI self-test step runs selfTests through prepush and names no self-tes
 
 test('--self-test runs exactly the selfTests files, skips change detection and fails with them', () => {
   const directory = mkdtempSync(join(tmpdir(), 'cairn-prepush-self-test-'));
-  const env = { ...process.env, CAIRN_HEAVY_SLOTS_DIR: join(directory, 'heavy-slots') };
+  const env = prepushEnv({ CAIRN_HEAVY_SLOTS_DIR: join(directory, 'heavy-slots') });
   delete env.NODE_TEST_CONTEXT;
   const run = () =>
     spawnSync(process.execPath, ['scripts/prepush.mjs', '--self-test'], {
@@ -596,6 +610,8 @@ test('CI shares the plan but keeps advisory and full e2e in separate jobs', () =
   }
 });
 
+const prepushEnv = (overrides = {}) => ({ ...scrubGateEnv(), ...overrides });
+
 test('CLI skips real document changes and rejects a missing base', () => {
   const directory = mkdtempSync(join(tmpdir(), 'cairn-prepush-'));
   process.env.CAIRN_HEAVY_SLOTS_DIR = join(directory, 'heavy-slots');
@@ -620,14 +636,14 @@ test('CLI skips real document changes and rejects a missing base', () => {
     const result = spawnSync(process.execPath, ['scripts/prepush.mjs', '--ci'], {
       cwd: directory,
       encoding: 'utf8',
-      env: { ...process.env, PREPUSH_BASE_SHA: 'origin/main' },
+      env: prepushEnv({ PREPUSH_BASE_SHA: 'origin/main' }),
     });
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /PASS \(2 checks\)/);
     const forced = spawnSync(process.execPath, ['scripts/prepush.mjs', '--ci'], {
       cwd: directory,
       encoding: 'utf8',
-      env: { ...process.env, PREPUSH_BASE_SHA: 'origin/main', PREPUSH_FORCE_FULL: 'true' },
+      env: prepushEnv({ PREPUSH_BASE_SHA: 'origin/main', PREPUSH_FORCE_FULL: 'true' }),
     });
     assert.notEqual(forced.status, 0);
     assert.match(forced.stdout, /english-only-gate: 0 line\(s\)/);
@@ -638,7 +654,7 @@ test('CLI skips real document changes and rejects a missing base', () => {
       const code = spawnSync(process.execPath, ['scripts/prepush.mjs', '--ci'], {
         cwd: directory,
         encoding: 'utf8',
-        env: { ...process.env, PREPUSH_BASE_SHA: 'origin/main' },
+        env: prepushEnv({ PREPUSH_BASE_SHA: 'origin/main' }),
       });
       assert.notEqual(code.status, 0);
       assert.match(code.stdout, /prepush.*node scripts\/ui-debt-gate.mjs/);
@@ -646,13 +662,13 @@ test('CLI skips real document changes and rejects a missing base', () => {
     const firstPush = spawnSync(process.execPath, ['scripts/prepush.mjs', '--ci'], {
       cwd: directory,
       encoding: 'utf8',
-      env: { ...process.env, PREPUSH_BASE_SHA: '0'.repeat(40) },
+      env: prepushEnv({ PREPUSH_BASE_SHA: '0'.repeat(40) }),
     });
     assert.match(firstPush.stdout, /prepush.*node scripts\/ui-debt-gate.mjs/);
     const missing = spawnSync(process.execPath, ['scripts/prepush.mjs', '--ci'], {
       cwd: directory,
       encoding: 'utf8',
-      env: { ...process.env, PREPUSH_BASE_SHA: 'missing-ref' },
+      env: prepushEnv({ PREPUSH_BASE_SHA: 'missing-ref' }),
     });
     assert.notEqual(missing.status, 0);
   } finally {
@@ -667,15 +683,12 @@ const gitIn = (cwd, args) =>
     { cwd, encoding: 'utf8', stdio: 'pipe' },
   );
 
-const runPrepushCi = (cwd) => {
-  const env = { ...process.env };
-  delete env.PREPUSH_BASE_SHA;
-  return spawnSync(process.execPath, ['scripts/prepush.mjs', '--ci'], {
+const runPrepushCi = (cwd) =>
+  spawnSync(process.execPath, ['scripts/prepush.mjs', '--ci'], {
     cwd,
     encoding: 'utf8',
-    env,
+    env: prepushEnv(),
   });
-};
 
 test('a stale local origin/main is refreshed by fetch before computing changes', () => {
   const directory = mkdtempSync(join(tmpdir(), 'cairn-prepush-stale-'));
@@ -1001,13 +1014,12 @@ test('forced push coverage preserves the English gate range across multiple comm
     const result = spawnSync(process.execPath, ['scripts/prepush.mjs', '--ci'], {
       cwd: directory,
       encoding: 'utf8',
-      env: {
-        ...process.env,
+      env: prepushEnv({
         PREPUSH_BASE_SHA: before,
         ENGLISH_ONLY_BASE_SHA: before,
         PREPUSH_FORCE_FULL: 'true',
         CAIRN_HEAVY_SLOTS_DIR: join(directory, 'heavy-slots'),
-      },
+      }),
     });
     assert.equal(result.status, 1, result.stdout + result.stderr);
     assert.ok(result.stderr.includes(`commit ${offending}:1: Chinese text`), result.stderr);

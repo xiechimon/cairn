@@ -26,5 +26,5 @@ Principle: a mistake that appeared during the process, even if fixed by the end,
 ## Boundaries
 
 - Ask the user first before a safeguard that touches ADRs, protected paths, or changes intended behavior.
-- Safeguards go through the normal PR flow (open PR, open auto-merge, wrap up), not around review.
+- Safeguards go through the normal PR flow (open PR; arm its merge only when pr-gate returns go with `mergedBy: 'auto-merge'`, otherwise it goes to ian; wrap up), not around review.
 - Do not aim for "never again"; aim for "every mistake has a home, is countable, and escalates".

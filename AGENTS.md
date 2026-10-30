@@ -2,7 +2,20 @@
 
 > Repository rules shared by agents and humans. A rule **can be overridden**, but only with explicit user confirmation (see "User Override" at the end).
 > Project background and past decisions live in `~/.claude/projects/-Users-xmon-Code-AgentProjects-cairn/memory/MEMORY.md`; this file lists rules only and does not repeat facts.
-> Working style, division of labor, model rules and the current progress summary are in `.claude/workflow.md`; the wrap-up retro uses `.claude/skills/retro-cairn`.
+> The wrap-up retro uses `.claude/skills/retro-cairn`.
+
+## Model roles
+
+| Role | Model |
+|---|---|
+| Orchestration | `claude-opus-5-5` |
+| Implementation | Codex CLI with `gpt-6.1-sol`, or `claude-sonnet-5-5` |
+| Mechanical work | `claude-haiku-5-5` |
+| Review | Always by the other vendor than the implementer (ADR 0027), from a fresh context |
+
+- A run never switches models on quota exhaustion: it saves its progress and pauses until the quota window resets.
+- **Do not use**: extra models, gpt-6-astra (Codex too; keep its original model), the GPT 5.6 series, older-generation models, MiniMax M3, DeepSeek V4 Flash. The machine-checked ids are `deepseek-v4-flash`, `minimax-m3`, `gpt-6-astra` and `gpt-5.6*`: `BANNED_MODEL_IDS` in `scripts/lane-model-policy.mjs` holds them, and `scripts/lane-model-policy.test.mjs` fails when this list and `BANNED_MODEL_IDS` differ or when a role in the table names one of them.
+- The table binds the runs an orchestrator dispatches. Overnight lanes on omarchy dispatch through `ai-route` (`docs/ops/lane-workers.md`), which picks among pi, Codex and Grok routes, including glm-5.3, glm-5.3-flash and deepseek-v4.1-flash. `ai-route` still picks a route by remaining quota, so the quota rule above does not yet hold for those lanes.
 
 ## Language
 
@@ -114,7 +127,7 @@ Before planning, creating an issue, starting a build, or opening a PR, follow [t
 
 **Run `/code-review` on your own branch before opening a PR** (Skill `code-review`, reviewing this branch's diff against `origin/main`): fix confirmed findings before opening the PR; for findings you decide not to fix, write a one-line reason in the PR body's Risk section. Run it again after pushing code fixes during the PR and before merging. When adding or rewriting a lot of code (new files, refactors, large new logic), follow up with `/simplify`. Skip both for docs-only changes. Green gates and green e2e do not mean the change is fine: on #1412 (2026-10-20) the gates and the full e2e suite passed, and `code-review` still found three things to fix: a new spec missing from the `e2e-affected` family table, the `drive-stop` "start" selector (`开始`) falsely matching the new chip word `待开始`, and wrong queued-chip semantics.
 
-**Get one independent review before opening a PR**: `/code-review` run in the author's own context is anchored on the author's brief. Before opening a PR, also have the branch diff against `origin/main` reviewed in a fresh context, by a different vendor than the implementer where one is available: a fresh Claude subagent running `/code-review` for a Codex-built branch, `codex exec -s read-only` given the diff for a Claude-built branch. Fix confirmed findings before opening the PR, so the independent review gate on the PR confirms instead of discovering. Origin: on #2158 (2026-10-29) the author's in-context review passed, and the PR's review gate then blocked two findings that earlier in-context fixes had introduced.
+**Get one independent review before opening a PR**: `/code-review` run in the author's own context is anchored on the author's brief. Before opening a PR, also have the branch diff against `origin/main` reviewed in a fresh context, by a different vendor than the implementer (ADR 0027; when that vendor is out of quota, the run pauses): a fresh Claude subagent running `/code-review` for a Codex-built branch, `codex exec -s read-only` given the diff for a Claude-built branch. Fix confirmed findings before opening the PR, so the independent review gate on the PR confirms instead of discovering. Origin: on #2158 (2026-10-29) the author's in-context review passed, and the PR's review gate then blocked two findings that earlier in-context fixes had introduced.
 
 **Cap review rounds**: a review round is one review pass (in-context, independent, the PR gate or a human) followed by a fix push. Fix the bug class a finding names, every instance, not only the flagged line. After three rounds on one PR, stop fixing findings one at a time: re-evaluate the approach, then either fix the class or hand the PR to the user. An unattended fix loop (Autofix, an overnight goal run) stops when the independent review gate blocks a second head in a row, and reports to the user instead of pushing again. Origin: #2158 took four rounds of single-line fixes, and two of its later blockers came from earlier fixes. #1909 turns the cap into a gate rule.
 
@@ -124,11 +137,13 @@ Before planning, creating an issue, starting a build, or opening a PR, follow [t
 - MCP auth and external entry points: `apps/server/src/services/{mcp-face,mcp-servers}.ts`
 - The list above is also ADR 0021 D4 class ⑤: `.claude/workflows/pr-gate.js` and `packages/shared/src/records/merge-gate.ts` embed it as protected paths that always route to a human, and `scripts/pr-gate-selfcheck.mjs` fails when an entry here is missing from the gate list. Change all of them together.
 
-**Human decisions before a merge are expressed with a label, not in chat**: before asking the user anything about a PR (acceptance wording, conflict trade-offs, whether to merge), do these in order: `gh pr merge <n> --disable-auto` (takes effect synchronously; disarm first) → `gh pr edit <n> --add-label needs-decision`. `pr-evidence` is a required check on main (pinned to the GitHub Actions app): it goes red when it sees this label, and while the label is on, every run disarms the PR's auto-merge (including when someone re-arms it); it also adds the label itself when Acceptance has unchecked items. Removing the label is a human action: on GitHub, or by an agent with the prefix `CAIRN_DECIDED=1` after the user gave the decision in chat (otherwise the local PreToolUse hook blocks it; `gh pr merge --admin` is no way out). After removal, read the PR opener and every commit author with `gh pr view <n> --json author,commits` and choose the merge path below. Editing the body to turn the gate green is not the decision landing: while the label is on, the check stays red. Origin: on 2026-10-21 #1435 was auto-merged before the user's decision landed; the orchestrator had checked the Acceptance boxes itself while asking the user, and pr-evidence was only advisory then.
+**Current merge state (phase 1)**: the merge policy default is autonomous (ADR 0026 R1), and local-form projects merge themselves (ADR 0023, #2050). On this repository a PR merges itself only when `.claude/workflows/pr-gate.js` returns go with `mergedBy: 'auto-merge'`. A PR for which pr-gate returns `mergedBy: 'user'`, which includes every PR that touches a protected path, goes to ian: agents do not merge it or arm its auto-merge. [ADR 0028](docs/adr/0028-phase-1-merge-routes.md) defines the three routes and when route B moves to ADR 0026 R2. The omarchy review-gate timer still arms auto-merge on every protected-path PR it passes, so until it changes, a PR that must wait for ian stays a draft (ADR 0028).
+
+**Agents never add the `needs-decision` label to a PR**: when a PR needs a decision, decide by your own recommendation, say in the chat what you chose and why, and keep going; only payments, the owner's own credentials and the steps this file routes to a person go to the owner. Those steps are the merges pr-gate routes to ian, the design trade-offs under Working style, an unfixed `/security-review` finding, and the review-round cap. Before asking a person about a PR whose auto-merge is armed, disarm it with `gh pr merge <n> --disable-auto`. `pr-evidence` is a required check on main (pinned to the GitHub Actions app). A label that is already on keeps pr-evidence red and disarms auto-merge until it is removed: every run disarms the PR's auto-merge while the label is on, including when someone re-arms it. Editing the body does not turn the check green while the label is on. An unchecked Acceptance item keeps pr-evidence red until it is checked. Removing the label is a human action: on GitHub, or by an agent with the prefix `CAIRN_DECIDED=1` after the user gave the decision in chat (otherwise the local PreToolUse hook blocks it; `gh pr merge --admin` is no way out). Before merging, read the PR opener and every commit author with `gh pr view <n> --json author,commits` and choose the merge path below. Origin: on 2026-10-21 #1435 was auto-merged before the user's decision landed; the orchestrator had checked the Acceptance boxes itself while asking the user, and pr-evidence was only advisory then. On 2026-10-28 #2051 moved the decision from the label to the agent's own recommendation.
 
 - Bot-opened PRs require exactly one commit authored by `Cairnwright` before a rebase merge. Check that neither its author name nor email contains `cairnwright[bot]`. Use the dispatcher's `~/.cairn/tools/merge-pr.sh` after inspecting its source and usage on the dispatch host. If the helper is unavailable or authorship is wrong, return the PR to the dispatcher for preparation.
 - Human-opened PRs use `gh pr merge <n> --squash --auto` after checking that none of their commit authors contains `cairnwright[bot]`.
-- Both paths require fully checked Acceptance and no `needs-decision` label. After merging, verify the resulting main commit's author and its `commit-author` Actions result.
+- Both paths require a pr-gate go with `mergedBy: 'auto-merge'` (every other PR goes to ian), fully checked Acceptance and no `needs-decision` label. After merging, verify the resulting main commit's author and its `commit-author` Actions result.
 
 **Review PRs with `docs/pr-review.md`** (#1080): a five-step process plus a fixed six-section scorecard (What it does / Good / Bad / Ugly / Tests / Open questions). "**Read the diff without switching branches**" is a hard requirement: use `gh pr view` / `gh pr diff` / `gh api` / `git show <ref>:<path>`, never `gh pr checkout`. Many lanes run in parallel here, each in its own worktree, and a reviewer's checkout collides with another lane's state. The only exception is the evidence dimension of the `pr-gate` workflow and its refuter: only in their own separate worktrees (never in the shared clone), with hooks off via `git -c core.hooksPath=/dev/null checkout --detach <headSha>`, and never checking out a head from a fork; see the `pr-gate` exception section in `docs/pr-review.md`.
 
@@ -146,6 +161,24 @@ A bare `--head <branch>` once failed with `Head sha can't be blank` in the two-r
 PR bodies and long issue comments: **write a temporary file and use `--body-file`**; do not inline multi-line markdown in `--body`.
 - **Read back after editing**: `gh pr edit <n> --body-file ...` can be interrupted by gh's Projects-classic GraphQL error and **not apply** (measured on #550: the command errored and the body stayed old). Use `gh api -X PATCH repos/xiechimon/cairn/pulls/<n> --input -` instead (JSON generated by a script to avoid shell escaping), then pull it back with `gh pr view <n> --json body` and compare byte for byte.
 - **Screenshots and evidence for a PR must be committed to the branch**: Multica attachment URLs are not readable anonymously (`static.multica.ai/...` → `403 MissingKey`, `/api/attachments/<id>/download` → `401`), so embedding them in a PR body renders broken images; and a PR body can only embed URLs, which local files do not have. By convention, commit them to the task branch under `docs/verify/<ticket>/` and reference `https://raw.githubusercontent.com/xiechimon/cairn/<sha>/<path>` in the body (the repo is public; raw is anonymously readable). A local copy is only a backup, not a channel.
+
+## Working style
+
+- This repository is public: commit no secrets, internal addresses, personal information or quota details.
+- Reply to the user in plain words with little jargon, in the user's language (see Language).
+- Fix same-kind bugs or leftovers found during a fix directly.
+- Leave the human no manual steps other than the decisions and merges this file routes to them.
+- Ask the human before design trade-offs: changing intended behavior, touching an ADR or a protected path.
+- After opening a PR that may merge itself (see "Current merge state"), arm its merge and stop; do not sit watching CI.
+- Run a retro before closing every thread (see `.claude/skills/retro-cairn/SKILL.md`) without being reminded. The lessons ledger is `docs/lessons/` (one file per entry).
+- One local thread per topic: a new topic gets a new thread instead of piling onto the existing "dispatch local agents" thread; finish existing items in their own thread.
+- Do not stop to wait for the human to set priorities when dispatching; pick the order and go. Attach images directly in the reply, not only in the file library.
+
+## Takeover checklist
+
+1. Read `AGENTS.md` and `docs/lessons/README.md`.
+2. Look at `.claude/skills/`: `pr-cairn` (PR bodies), `retro-cairn` (wrap-up retro), `verify-cairn`, `verify-step-claim`, `verify-merge-gate`.
+3. Run `gh issue list -R xiechimon/cairn` for tickets in flight and pick the next one without waiting for someone to prioritize.
 
 ## User Override
 

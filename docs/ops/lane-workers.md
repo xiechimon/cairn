@@ -6,7 +6,7 @@ Issue #2021. Overnight lane workers on omarchy exit early when `ai-route` select
 
 | Script | Role |
 |---|---|
-| `scripts/lane-model-policy.mjs` | Banned model ids aligned with `.claude/workflow.md` (`deepseek-v4-flash`, `minimax-m3`, `gpt-6-astra`, any `gpt-5.6*`). `deepseek-v4.1-flash` is not banned. |
+| `scripts/lane-model-policy.mjs` | Banned model ids aligned with the "Do not use" line in `AGENTS.md` (`deepseek-v4-flash`, `minimax-m3`, `gpt-6-astra`, any `gpt-5.6*`). `deepseek-v4.1-flash` is not banned. |
 | `scripts/lane-worker-exit-gate.mjs` | Classifies a finished lane from `--log`, `--rc`, and `--duration-s`. Reds banned-model routes, short rc-0 no-op wrap-ups, and route-only exits. |
 | `scripts/dispatch-agent.mjs wait` | Polls a started job, then runs the exit gate on its log. |
 
