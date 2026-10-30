@@ -185,7 +185,7 @@ async function setup(
   const { logger, lines } = captureLogger();
   const client = new FakeClient(opts.tokenProvider ?? null);
   const journal = new StepJournal(paths.outboxDir);
-  const { backend, sessions } = recordingBackend();
+  const { backend, sessions, resumed } = recordingBackend();
   const resolved: (string | null | undefined)[] = [];
   const probeCalls: number[] = [];
   const probe = opts.probe ?? LOGGED_IN_PROBE;
@@ -208,7 +208,7 @@ async function setup(
     },
   };
   await runStep(deps, claimed);
-  return { client, lines, sessions, resolved, paths, probeCalls };
+  return { client, lines, sessions, resumed, resolved, paths, probeCalls };
 }
 
 describe('runner runtime identity branch (spec 17 A3/A4)', () => {
@@ -321,6 +321,29 @@ describe('runner runtime-step credential preflight (#867 T6 cross-machine creden
 });
 
 describe('runner runtime-step session continuation (spec 17 A7)', () => {
+  test('a follow-up build step resumes the completed claude-code session with the new instruction', async () => {
+    const initial = claimedStep({ provider: 'claude-code', modelId: 'claude-sonnet-4-5' });
+    const first = await setup(initial);
+    const sessionId = first.client.doneBodies[0]?.body.sessionId;
+    expect(first.client.doneBodies[0]?.body.status).toBe('success');
+    expect(sessionId).toBe('stub-sess-1');
+    const next: ClaimedStep = {
+      ...initial,
+      step: { ...initial.step, id: 's2', createdAt: 2 },
+      session: { action: 'continue', sessionId: sessionId ?? null },
+      instruction: 'Add coverage for the completed task',
+    };
+    const continued = await setup(next);
+    expect(continued.resolved).toEqual(['claude-code']);
+    expect(continued.resumed).toEqual([sessionId]);
+    expect(continued.sessions).toHaveLength(1);
+    expect(continued.sessions[0]?.prompt).toContain(next.instruction);
+    expect(continued.client.doneBodies[0]).toMatchObject({
+      stepId: 's2',
+      body: { status: 'success', sessionId },
+    });
+  });
+
   test('session.action=continue → continueSession after backendFor resolution', async () => {
     const claimed = {
       ...claimedStep({ provider: 'claude-code', modelId: 'claude-sonnet-4-5' }),

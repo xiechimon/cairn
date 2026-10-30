@@ -154,6 +154,7 @@ export const EN: Record<string, string> = {
   重开: 'Reopen',
   '向 Agent 补充说明，执行过程中即可送达':
     'Add details for the Agent — delivered while the run is in progress',
+  '发送消息以继续这个任务…': 'Send a message to continue this task…',
   '请求修改…': 'Request changes…',
   // #701 审核关口人肉打回（更多菜单入口 + reject 弹层）
   请求修改: 'Request changes',
