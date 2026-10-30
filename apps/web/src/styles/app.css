@@ -14,7 +14,7 @@
   --color-surface-tertiary: var(--surface-tertiary);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
-  --font-heading: var(--font-sans);
+  --font-heading: var(--font-display);
   --text-page: var(--type-page);
   --text-page--line-height: calc(24 / 18);
   --text-heading: var(--type-heading);

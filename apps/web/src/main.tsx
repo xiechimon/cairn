@@ -7,7 +7,6 @@ import { trackPointerFocus } from './pointer-focus.js';
 import { safeLocalStorage } from './safe-storage.js';
 import { applyTheme, readStoredTheme } from './theme.js';
 import './styles/fonts.css';
-import './styles/tokens.css';
 import './styles/motion.css';
 import './styles/app.css';
 
