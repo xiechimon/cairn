@@ -1,0 +1,30 @@
+✔ clean backup passes fixture in-process checkout API and never reports key or plaintext (32779.352583ms)
+✔ one attachment byte changed names its storage key (29514.896917ms)
+✔ message content edited names table and id (23572.164417ms)
+✔ deleted row in backupDb fails (19679.371667ms)
+✔ deleted row in db fails (12046.437041ms)
+✔ scratch inside live directory is refused (41870.200209ms)
+✔ scratch through symlink is refused (53493.228208ms)
+✔ existing scratch is refused without overwriting it (19534.359209ms)
+✔ report cannot overwrite live DB or key (7709.054875ms)
+✔ invalid gzip fails and publishes failure status (8988.981875ms)
+✔ foreign key violation fails (7839.61725ms)
+✔ wrong key fails without leaking bytes (7631.661708ms)
+✔ no encrypted sample fails (4561.122833ms)
+✔ missing relationship sample fails (3686.433792ms)
+✔ post-backup timestamped updates and inserts are allowed (9701.6425ms)
+✔ missing attachment and unsafe attachment key fail (4156.541875ms)
+✔ default backup directory selects the newest timestamp (8642.96925ms)
+✔ migration ledger rows with null declared ids are compared rather than skipped (3742.671417ms)
+✔ machine heartbeat allowlist is reported while machine name remains strict (14210.084417ms)
+✔ missing ready attachment names its storage key (12128.987292ms)
+✔ weekly units isolate scratch and do not install themselves (2.003583ms)
+✔ production shell requires a real HTTP listener and reports sandbox refusal (26606.509583ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 22
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 353184.29575

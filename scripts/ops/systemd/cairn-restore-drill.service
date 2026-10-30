@@ -1,0 +1,15 @@
+[Unit]
+Description=Cairn weekly database restore drill
+
+[Service]
+Type=oneshot
+UMask=0077
+Nice=10
+RuntimeDirectory=cairn-restore-drill
+EnvironmentFile=%h/.config/cairn/restore-drill.env
+WorkingDirectory=%h/Code/AgentProjects/cairn
+ExecStart=%h/Code/AgentProjects/cairn/scripts/ops/restore-drill.sh --backup ${BACKUP_DIR} --live-db ${LIVE_DB} --attachments ${BACKUP_ATTACHMENTS} --live-attachments ${LIVE_ATTACHMENTS} --secretbox-key ${SECRETBOX_KEY} --scratch %t/cairn-restore-drill/run --report %h/.local/state/cairn/restore-drill.json
+TimeoutStartSec=30min
+
+[Install]
+WantedBy=default.target

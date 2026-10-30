@@ -1,0 +1,383 @@
+✖ clean backup passes real checkout API and never reports key or plaintext (641.802375ms)
+✖ one attachment byte changed names its storage key (539.250375ms)
+✖ message content edited names table and id (565.065666ms)
+✖ deleted row in backupDb fails (689.938667ms)
+✖ deleted row in db fails (578.722834ms)
+✔ scratch inside live directory is refused (738.767917ms)
+✔ scratch through symlink is refused (537.270042ms)
+✔ existing scratch is refused without overwriting it (493.293459ms)
+✔ report cannot overwrite live DB or key (498.988167ms)
+✔ invalid gzip fails and publishes failure status (527.568209ms)
+✔ foreign key violation fails (544.140917ms)
+✖ wrong key fails without leaking bytes (557.002959ms)
+✖ no encrypted sample fails (555.854666ms)
+✖ missing relationship sample fails (541.583125ms)
+✖ post-backup timestamped updates and inserts are allowed (538.457542ms)
+✖ missing attachment and unsafe attachment key fail (579.93475ms)
+✖ default backup directory selects the newest timestamp (585.238583ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 6
+ℹ fail 11
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9798.351375
+
+✖ failing tests:
+
+test at scripts/ops/restore-drill.test.mjs:52:1
+✖ clean backup passes real checkout API and never reports key or plaintext (641.802375ms)
+  AssertionError [ERR_ASSERTION]: FAIL content: content __drizzle_migrations: duplicate primary key
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:55:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:66:1
+✖ one attachment byte changed names its storage key (539.250375ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /attachment.*file.txt/. Input:
+  
+  'FAIL content: content __drizzle_migrations: duplicate primary key\n'
+  
+      at fails (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:50:10)
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:66:143)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL content: content __drizzle_migrations: duplicate primary key\n',
+    expected: /attachment.*file.txt/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:67:1
+✖ message content edited names table and id (565.065666ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /message.*m/. Input:
+  
+  'FAIL content: content __drizzle_migrations: duplicate primary key\n'
+  
+      at fails (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:50:10)
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:67:161)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL content: content __drizzle_migrations: duplicate primary key\n',
+    expected: /message.*m/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:68:40
+✖ deleted row in backupDb fails (689.938667ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /message.*m/. Input:
+  
+  'FAIL content: content __drizzle_migrations: duplicate primary key\n'
+  
+      at fails (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:50:10)
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:68:166)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL content: content __drizzle_migrations: duplicate primary key\n',
+    expected: /message.*m/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:68:40
+✖ deleted row in db fails (578.722834ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /message.*m/. Input:
+  
+  'FAIL content: content __drizzle_migrations: duplicate primary key\n'
+  
+      at fails (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:50:10)
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:68:166)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL content: content __drizzle_migrations: duplicate primary key\n',
+    expected: /message.*m/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:75:1
+✖ wrong key fails without leaking bytes (557.002959ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /decrypt/. Input:
+  
+  'FAIL content: content __drizzle_migrations: duplicate primary key\n'
+  
+      at fails (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:50:10)
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:75:145)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL content: content __drizzle_migrations: duplicate primary key\n',
+    expected: /decrypt/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:76:1
+✖ no encrypted sample fails (555.854666ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /decrypt.*sample/. Input:
+  
+  'FAIL content: content __drizzle_migrations: duplicate primary key\n'
+  
+      at fails (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:50:10)
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:76:158)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL content: content __drizzle_migrations: duplicate primary key\n',
+    expected: /decrypt.*sample/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:77:1
+✖ missing relationship sample fails (541.583125ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /relationship/. Input:
+  
+  'FAIL content: content __drizzle_migrations: duplicate primary key\n'
+  
+      at fails (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:50:10)
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:77:151)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL content: content __drizzle_migrations: duplicate primary key\n',
+    expected: /relationship/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:78:1
+✖ post-backup timestamped updates and inserts are allowed (538.457542ms)
+  AssertionError [ERR_ASSERTION]: FAIL content: content __drizzle_migrations: duplicate primary key
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:78:306)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:79:1
+✖ missing attachment and unsafe attachment key fail (579.93475ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /attachment.*unsafe/. Input:
+  
+  'FAIL content: content __drizzle_migrations: duplicate primary key\n'
+  
+      at fails (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:50:10)
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:79:199)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'FAIL content: content __drizzle_migrations: duplicate primary key\n',
+    expected: /attachment.*unsafe/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:80:1
+✖ default backup directory selects the newest timestamp (585.238583ms)
+  AssertionError [ERR_ASSERTION]: FAIL content: content __drizzle_migrations: duplicate primary key
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:80:137)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+✖ clean backup passes real checkout API and never reports key or plaintext (106829.158666ms)
+✔ one attachment byte changed names its storage key (10606.686792ms)
+✔ message content edited names table and id (4154.560083ms)
+✔ deleted row in backupDb fails (3441.926458ms)
+✔ deleted row in db fails (2113.496625ms)
+✔ scratch inside live directory is refused (4979.026875ms)
+✔ scratch through symlink is refused (3041.458375ms)
+✔ existing scratch is refused without overwriting it (1387.318541ms)
+✔ report cannot overwrite live DB or key (1321.315667ms)
+✔ invalid gzip fails and publishes failure status (1444.472667ms)
+✔ foreign key violation fails (1071.603708ms)
+✔ wrong key fails without leaking bytes (1323.143708ms)
+✔ no encrypted sample fails (1125.969791ms)
+✔ missing relationship sample fails (1197.352958ms)
+✖ post-backup timestamped updates and inserts are allowed (4449.268792ms)
+✔ missing attachment and unsafe attachment key fail (2038.407583ms)
+✖ default backup directory selects the newest timestamp (12424.703542ms)
+✔ migration ledger rows with null declared ids are compared rather than skipped (7254.941625ms)
+✖ machine heartbeat allowlist is reported while machine name remains strict (47751.493ms)
+✔ missing ready attachment names its storage key (9932.396333ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 16
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 229259.107541
+
+✖ failing tests:
+
+test at scripts/ops/restore-drill.test.mjs:52:1
+✖ clean backup passes real checkout API and never reports key or plaintext (106829.158666ms)
+  AssertionError [ERR_ASSERTION]: FAIL api: api startup failed or timed out
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:55:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:78:1
+✖ post-backup timestamped updates and inserts are allowed (4449.268792ms)
+  AssertionError [ERR_ASSERTION]: FAIL api: api startup failed or timed out
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:78:306)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:80:1
+✖ default backup directory selects the newest timestamp (12424.703542ms)
+  AssertionError [ERR_ASSERTION]: FAIL api: api startup failed or timed out
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:80:137)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:82:1
+✖ machine heartbeat allowlist is reported while machine name remains strict (47751.493ms)
+  AssertionError [ERR_ASSERTION]: FAIL api: api startup failed or timed out
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:82:386)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

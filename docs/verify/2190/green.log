@@ -1,0 +1,35 @@
+✔ clean backup passes fixture in-process checkout API and never reports key or plaintext (33062.672667ms)
+✔ one attachment byte changed names its storage key (1401.588ms)
+✔ message content edited names table and id (1121.933292ms)
+✔ deleted row in backupDb fails (1539.741958ms)
+✔ deleted row in db fails (1263.630209ms)
+✔ scratch inside live directory is refused (1071.542625ms)
+✔ scratch through symlink is refused (926.280583ms)
+✔ existing scratch is refused without overwriting it (932.443334ms)
+✔ report cannot overwrite live DB or key (1027.919416ms)
+✔ invalid gzip fails and publishes failure status (1341.233291ms)
+✔ foreign key violation fails (1392.377333ms)
+✔ wrong key fails without leaking bytes (2813.649541ms)
+✔ no encrypted sample fails (962.734458ms)
+✔ missing relationship sample fails (1336.487916ms)
+✔ post-backup timestamped updates and inserts are allowed (9979.096209ms)
+✔ missing attachment and unsafe attachment key fail (803.391792ms)
+✔ default backup directory selects the newest timestamp (10657.897125ms)
+✔ migration ledger rows with null declared ids are compared rather than skipped (701.870542ms)
+✔ machine heartbeat allowlist is reported while machine name remains strict (6649.903083ms)
+✔ missing ready attachment names its storage key (1154.860125ms)
+✔ weekly units isolate scratch and do not install themselves (1.130875ms)
+✔ production shell requires a real HTTP listener and reports sandbox refusal (13340.396209ms)
+✔ invalid SQLite fails integrity checking (1112.51325ms)
+✔ ready attachment size mismatch fails (1061.753833ms)
+✔ scratch equal to live DB is refused (843.483666ms)
+✔ missing key fails without creating a replacement (735.482541ms)
+✔ non-allowlisted machine field changes fail (1528.904917ms)
+ℹ tests 27
+ℹ suites 0
+ℹ pass 27
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 99621.3735

@@ -1,0 +1,394 @@
+✖ clean backup passes real checkout API and never reports key or plaintext (1292.255167ms)
+✖ one attachment byte changed names its storage key (486.279334ms)
+✖ message content edited names table and id (568.691292ms)
+✖ deleted row in backupDb fails (496.466375ms)
+✖ deleted row in db fails (456.776917ms)
+✖ scratch inside live directory is refused (445.714875ms)
+✖ scratch through symlink is refused (460.846417ms)
+✖ existing scratch is refused without overwriting it (450.790208ms)
+✖ report cannot overwrite live DB or key (440.980917ms)
+✖ invalid gzip fails and publishes failure status (458.333042ms)
+✖ foreign key violation fails (459.908959ms)
+✖ wrong key fails without leaking bytes (446.681417ms)
+✖ no encrypted sample fails (483.439625ms)
+✖ missing relationship sample fails (531.773916ms)
+✖ post-backup timestamped updates and inserts are allowed (596.0235ms)
+✖ missing attachment and unsafe attachment key fail (611.914917ms)
+✖ default backup directory selects the newest timestamp (550.406209ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 0
+ℹ fail 17
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9321.074
+
+✖ failing tests:
+
+test at scripts/ops/restore-drill.test.mjs:52:1
+✖ clean backup passes real checkout API and never reports key or plaintext (1292.255167ms)
+  AssertionError [ERR_ASSERTION]: bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory
+  
+  
+  127 !== 0
+  
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:55:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 127,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:66:1
+✖ one attachment byte changed names its storage key (486.279334ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /attachment.*file.txt/. Input:
+  
+  'bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory\n'
+  
+      at fails (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:50:10)
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:66:143)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory\n',
+    expected: /attachment.*file.txt/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:67:1
+✖ message content edited names table and id (568.691292ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /message.*m/. Input:
+  
+  'bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory\n'
+  
+      at fails (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:50:10)
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:67:161)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory\n',
+    expected: /message.*m/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:68:40
+✖ deleted row in backupDb fails (496.466375ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /message.*m/. Input:
+  
+  'bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory\n'
+  
+      at fails (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:50:10)
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:68:166)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory\n',
+    expected: /message.*m/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:68:40
+✖ deleted row in db fails (456.776917ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /message.*m/. Input:
+  
+  'bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory\n'
+  
+      at fails (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:50:10)
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:68:166)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory\n',
+    expected: /message.*m/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:69:1
+✖ scratch inside live directory is refused (445.714875ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /scratch.*live/. Input:
+  
+  'bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory\n'
+  
+      at fails (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:50:10)
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:69:79)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory\n',
+    expected: /scratch.*live/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:70:1
+✖ scratch through symlink is refused (460.846417ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /scratch.*live/. Input:
+  
+  'bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory\n'
+  
+      at fails (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:50:10)
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:70:126)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory\n',
+    expected: /scratch.*live/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:71:1
+✖ existing scratch is refused without overwriting it (450.790208ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /scratch.*exist/. Input:
+  
+  'bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory\n'
+  
+      at fails (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:50:10)
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:71:111)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory\n',
+    expected: /scratch.*exist/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:72:1
+✖ report cannot overwrite live DB or key (440.980917ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /report.*unsafe/. Input:
+  
+  'bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory\n'
+  
+      at fails (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:50:10)
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:72:113)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory\n',
+    expected: /report.*unsafe/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:73:1
+✖ invalid gzip fails and publishes failure status (458.333042ms)
+  Error: ENOENT: no such file or directory, open '/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/cairn-test-690aa89f-0819-427a-8fbb-24bca5ba49a5-restore-drill-klL9Ow/report.json.status'
+      at readFileSync (node:fs:621:20)
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:73:156)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'open',
+    path: '/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/cairn-test-690aa89f-0819-427a-8fbb-24bca5ba49a5-restore-drill-klL9Ow/report.json.status'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:74:1
+✖ foreign key violation fails (459.908959ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /foreign_key_check/. Input:
+  
+  'bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory\n'
+  
+      at fails (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:50:10)
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:74:139)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory\n',
+    expected: /foreign_key_check/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:75:1
+✖ wrong key fails without leaking bytes (446.681417ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /decrypt/. Input:
+  
+  'bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory\n'
+  
+      at fails (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:50:10)
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:75:145)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory\n',
+    expected: /decrypt/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:76:1
+✖ no encrypted sample fails (483.439625ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /decrypt.*sample/. Input:
+  
+  'bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory\n'
+  
+      at fails (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:50:10)
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:76:158)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory\n',
+    expected: /decrypt.*sample/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:77:1
+✖ missing relationship sample fails (531.773916ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /relationship/. Input:
+  
+  'bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory\n'
+  
+      at fails (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:50:10)
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:77:151)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory\n',
+    expected: /relationship/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:78:1
+✖ post-backup timestamped updates and inserts are allowed (596.0235ms)
+  AssertionError [ERR_ASSERTION]: bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory
+  
+  
+  127 !== 0
+  
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:78:306)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 127,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:79:1
+✖ missing attachment and unsafe attachment key fail (611.914917ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /attachment.*unsafe/. Input:
+  
+  'bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory\n'
+  
+      at fails (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:50:10)
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:79:199)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory\n',
+    expected: /attachment.*unsafe/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:80:1
+✖ default backup directory selects the newest timestamp (550.406209ms)
+  AssertionError [ERR_ASSERTION]: bash: <WORKTREE>/scripts/ops/restore-drill.sh: No such file or directory
+  
+  
+  127 !== 0
+  
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:80:137)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 127,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

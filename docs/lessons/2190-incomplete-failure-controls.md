@@ -1,0 +1,9 @@
+---
+Category: Supplemental restore edge assertions were added after implementation rather than in the initial red test set
+Source: Ticket 2190 (2026-10-30)
+Level: 2
+Safeguard: Explicit fixture regressions for invalid SQLite, attachment size, missing key, live DB scratch equality and strict machine fields
+Intercepts: 0
+Recurrences: 0
+Notes: Initial 17 cases ran red before implementation; supplemental passing cases cannot establish test-first ordering. They make these edge behaviors executable, while the acceptance record explicitly limits the process claim.
+---
