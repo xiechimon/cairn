@@ -1,0 +1,496 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cairn design system</title>
+<link rel="stylesheet" href="../src/styles/tokens.css">
+<link rel="stylesheet" href="../src/styles/shadcn.css">
+<style>
+@font-face { font-family: "inter"; src: url("../public/fonts/inter-var.woff2") format("woff2"); font-weight: 100 900; }
+@font-face { font-family: "sourceSerif4"; src: url("../public/fonts/source-serif-4-latin-wght.woff2") format("woff2-variations"); font-weight: 200 900; }
+:root {
+  --font-inter: "inter", "PingFang SC", sans-serif;
+  --font-source-serif: "sourceSerif4", Georgia, "Songti SC", serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: var(--type-ui);
+  line-height: var(--leading-body);
+  -webkit-font-smoothing: antialiased;
+}
+code { font-family: var(--font-mono); font-size: 0.92em; color: var(--text-secondary); }
+:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+.bar {
+  position: sticky; top: 0; z-index: 5;
+  display: flex; align-items: center; gap: 16px;
+  height: 56px; padding: 0 32px;
+  background: color-mix(in srgb, var(--background) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.bar .brand { font-family: var(--font-serif); font-weight: 600; font-size: var(--type-heading); }
+.bar nav { display: flex; gap: 2px; margin-left: 12px; overflow-x: auto; }
+.bar nav a { color: var(--text-secondary); text-decoration: none; padding: 4px 10px; border-radius: var(--radius-control); white-space: nowrap; }
+.bar nav a:hover { background: var(--hover-1); color: var(--foreground); }
+.bar .tools { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+
+.seg { display: inline-flex; gap: 2px; padding: 2px; height: 32px; border-radius: calc(var(--radius) * 0.8); background: var(--canvas); }
+.seg button { height: 28px; padding: 0 12px; border: 0; border-radius: var(--cds-radius-md); background: transparent; color: var(--text-secondary); font: inherit; cursor: pointer; transition: color var(--dur-fast) var(--ease-standard); }
+.seg button:hover { color: var(--foreground); }
+.seg button[aria-checked="true"] { background: var(--card); color: var(--foreground); font-weight: 500; box-shadow: 0 0 0 1px var(--border), 0 1px 2px rgb(0 0 0 / 0.06); }
+.seg button:focus-visible { outline-offset: -2px; }
+
+main { max-width: 1040px; margin: 0 auto; padding: 0 32px 120px; }
+.block { padding: 72px 0 0; }
+.block > h2 { font-size: var(--type-page); font-weight: 500; margin: 0; letter-spacing: -0.01em; }
+.block > .lede { color: var(--text-secondary); margin: 6px 0 28px; max-width: 62ch; }
+
+.hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 56px; align-items: end; padding-top: 72px; }
+.hero h1 { font-family: var(--font-serif); font-weight: 600; font-size: 64px; line-height: 1; letter-spacing: -0.02em; margin: 0 0 20px; }
+.hero p { color: var(--text-secondary); font-size: var(--type-card-title); max-width: 40ch; margin: 0 0 24px; }
+.status { display: inline-flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: var(--radius-card); background: var(--card); box-shadow: var(--e1); }
+.status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--running); box-shadow: 0 0 0 3px color-mix(in srgb, var(--running) 22%, transparent); }
+.status.off .dot { background: var(--badge-attention); box-shadow: 0 0 0 3px color-mix(in srgb, var(--badge-attention) 22%, transparent); }
+.status a { color: var(--card-button); font-weight: 500; text-decoration: none; }
+
+.cairn { display: flex; flex-direction: column-reverse; align-items: center; gap: 0; padding: 24px 0 0; }
+.stone { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 20px; height: 62px; margin-top: -6px; box-shadow: 0 0 0 1px var(--border); }
+.stone b { font-weight: 500; }
+.stone span { color: var(--text-tertiary); font-size: var(--type-meta); }
+.stone.s0 { width: 100%; background: var(--canvas); border-radius: var(--edge-radius); height: 72px; }
+.stone.s1 { width: 84%; background: var(--background); border-radius: var(--edge-radius); box-shadow: var(--e1); }
+.stone.s2 { width: 66%; background: var(--card); border-radius: var(--radius-card); box-shadow: var(--e1); }
+.stone.s3 { width: 48%; background: var(--popover); border-radius: var(--radius-popover); box-shadow: var(--e2); }
+.marker { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+.marker i { width: 44px; height: 26px; border-radius: 9999px; background: var(--card-button); box-shadow: var(--e2); }
+.marker span { color: var(--text-tertiary); font-size: var(--type-meta); }
+
+.paper { background: var(--card); border-radius: var(--radius-card); box-shadow: var(--e1); }
+.ink { display: grid; grid-template-columns: 1fr auto; }
+.ink-line { display: contents; }
+.ink-line > div { padding: 14px 20px; border-top: 1px solid var(--border); }
+.ink-line:first-child > div { border-top: 0; }
+.ink-line .sample { font-size: var(--type-card-title); }
+.ink-line .sample small { display: block; font-size: var(--type-meta); color: var(--text-tertiary); margin-top: 2px; }
+.ink-line .ratio { text-align: right; font-variant-numeric: tabular-nums; color: var(--text-secondary); white-space: nowrap; }
+.ink-line .ratio em { font-style: normal; display: block; font-size: var(--type-meta); color: var(--text-tertiary); }
+.ink-line .ratio.fail { color: var(--fail-fg); }
+
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+.use { padding: 20px; display: grid; gap: 14px; align-content: start; }
+.use h3 { margin: 0; font-size: var(--type-card-title); font-weight: 500; display: flex; align-items: center; gap: 10px; }
+.use h3 i { width: 18px; height: 18px; border-radius: 6px; }
+.use p { margin: 0; color: var(--text-secondary); }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.badge { min-width: 20px; height: 20px; border-radius: 9999px; padding: 0 6px; background: var(--card-button); color: var(--text-on-accent); font-size: var(--type-caption); font-weight: 600; display: inline-grid; place-items: center; }
+.alink { color: var(--card-button); font-weight: 500; padding: 3px 8px; border-radius: var(--radius-control); cursor: pointer; }
+.alink:hover { background: var(--accent-hover); }
+.ring-demo { height: 32px; padding: 0 12px; border-radius: var(--radius-control); display: inline-flex; align-items: center; outline: 2px solid var(--focus-ring); outline-offset: 2px; color: var(--text-secondary); }
+.progress { height: 3px; flex: 1; min-width: 120px; background: var(--running-track); border-radius: 2px; overflow: hidden; }
+.progress > i { display: block; height: 100%; width: 43%; background: var(--running-bar); }
+.chip { display: inline-flex; align-items: center; height: 22px; border-radius: 9999px; padding: 0 10px; font-size: var(--type-caption); font-weight: 500; }
+.tiles { display: flex; gap: 8px; }
+.tile { width: 28px; height: 28px; border-radius: var(--radius-control); display: grid; place-items: center; color: var(--text-on-accent); font-size: var(--type-caption); font-weight: 600; }
+
+.type { padding: 8px 24px; }
+.type-line { display: grid; grid-template-columns: 120px 1fr; gap: 24px; align-items: baseline; padding: 14px 0; border-top: 1px solid var(--border); }
+.type-line:first-child { border-top: 0; }
+.type-line .k { color: var(--text-tertiary); font-size: var(--type-meta); }
+.type-line .k b { display: block; color: var(--text-secondary); font-weight: 500; }
+.type-line .v { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.shapes { display: grid; grid-template-columns: 1.2fr 1fr; gap: 16px; }
+.shape-stage { background: var(--canvas); border-radius: var(--radius-card); padding: 28px; display: grid; gap: 16px; align-content: start; position: relative; }
+.menu { width: 240px; background: var(--popover); border-radius: var(--radius-popover); padding: var(--menu-pad); box-shadow: var(--e2); }
+.menu .it { height: 32px; display: flex; align-items: center; padding: 0 10px; border-radius: var(--radius-menu-item); }
+.menu .it.on { background: var(--menu-hover); }
+.menu .it kbd { margin-left: auto; font: inherit; font-size: var(--type-caption); color: var(--text-tertiary); }
+.menu .sep { height: 1px; background: var(--border); margin: 4px 6px; }
+.note { color: var(--text-tertiary); font-size: var(--type-meta); }
+.note b { color: var(--text-secondary); font-weight: 500; }
+.radii { display: grid; gap: 0; padding: 4px 20px; }
+.radius-line { display: grid; grid-template-columns: 48px 1fr auto; gap: 16px; align-items: center; padding: 10px 0; border-top: 1px solid var(--border); }
+.radius-line:first-child { border-top: 0; }
+.radius-line .corner { width: 40px; height: 40px; border-top: 2px solid var(--foreground); border-left: 2px solid var(--foreground); opacity: 0.85; }
+.radius-line .px { font-variant-numeric: tabular-nums; color: var(--text-secondary); }
+.field { height: 32px; border-radius: calc(var(--radius) * 0.8); background: var(--card); box-shadow: 0 0 0 1px var(--border); display: flex; align-items: center; padding: 0 10px; color: var(--text-tertiary); width: 240px; }
+.btn { height: 32px; border: 0; border-radius: var(--radius-control); padding: 0 14px; font: inherit; font-weight: 500; cursor: pointer; }
+.btn-primary { background: var(--primary); color: var(--primary-foreground); }
+.btn-text { background: transparent; color: var(--text-secondary); }
+.btn-text:hover { background: var(--hover-1); color: var(--foreground); }
+
+.elev { position: relative; height: 300px; background: var(--canvas); border-radius: var(--radius-card); overflow: hidden; }
+.elev > div { position: absolute; padding: 16px 18px; }
+.elev b { font-weight: 500; display: block; }
+.elev .e1 { left: 6%; top: 18%; width: 40%; height: 54%; background: var(--card); border-radius: var(--radius-card); box-shadow: var(--e1); }
+.elev .e2 { left: 34%; top: 34%; width: 30%; height: 42%; background: var(--popover); border-radius: var(--radius-popover); box-shadow: var(--e2); }
+.elev .e3 { left: 54%; top: 12%; width: 40%; height: 62%; background: var(--dialog-surface); border-radius: var(--edge-radius); box-shadow: var(--e3); }
+
+.board { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; background: var(--background); }
+.col h4 { margin: 0 0 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border); font-size: var(--type-heading); font-weight: 500; display: flex; align-items: center; gap: 8px; }
+.col h4 span { color: var(--text-tertiary); font-size: var(--type-ui); font-weight: 400; }
+.col h4 svg { color: var(--icon); }
+.task { background: var(--card); border-radius: var(--radius-card); box-shadow: var(--e1); padding: 12px 14px; margin-bottom: 8px; transition: box-shadow 200ms var(--ease-out-expo), translate 200ms var(--ease-out-expo); }
+.task:hover { box-shadow: var(--card-lift); translate: 0 -1px; }
+.task .t { font-size: var(--type-card-title); font-weight: 500; }
+.task .m { font-size: var(--type-meta); color: var(--text-tertiary); margin-top: 4px; display: flex; gap: 6px; align-items: center; }
+.task .m .tile { width: 16px; height: 16px; font-size: 10px; }
+.task .f { margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--border); display: flex; gap: 6px; align-items: center; font-size: var(--type-meta); }
+
+.motion { padding: 8px 24px 16px; }
+.mline { display: grid; grid-template-columns: 200px 1fr 64px; gap: 20px; align-items: center; padding: 12px 0; border-top: 1px solid var(--border); }
+.mline:first-child { border-top: 0; }
+.mline .k b { display: block; font-weight: 500; }
+.mline .k { color: var(--text-tertiary); font-size: var(--type-meta); }
+.lane { position: relative; height: 4px; background: var(--running-track); border-radius: 2px; }
+.lane i { position: absolute; top: -6px; left: 0; width: 16px; height: 16px; border-radius: 50%; background: var(--card-button); box-shadow: var(--e1); }
+.motion.go .lane i { left: calc(100% - 16px); }
+.mline .ms { text-align: right; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+
+.drift { padding: 4px 20px; }
+.dline { display: grid; grid-template-columns: 160px 1fr 1fr; gap: 16px; align-items: center; padding: 10px 0; border-top: 1px solid var(--border); font-size: var(--type-meta); }
+.dline:first-child { border-top: 0; color: var(--text-tertiary); }
+.sw { display: inline-block; width: 14px; height: 14px; border-radius: 4px; box-shadow: inset 0 0 0 1px var(--border-soft); vertical-align: -3px; margin-right: 8px; }
+.agree { padding: 18px 20px; display: flex; gap: 10px; align-items: center; }
+
+@media (max-width: 760px) {
+  .bar { padding: 0 16px; }
+  .bar nav { display: none; }
+  main { padding: 0 16px 80px; }
+  .hero, .pair, .shapes, .board { grid-template-columns: 1fr; }
+  .hero h1 { font-size: 48px; }
+  .type-line, .mline, .dline { grid-template-columns: 1fr; gap: 6px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lane i, .task { transition: none !important; }
+}
+</style>
+</head>
+<body>
+<header class="bar">
+  <span class="brand">Cairn</span>
+  <nav aria-label="Sections">
+    <a href="#color">Color</a>
+    <a href="#type">Type</a>
+    <a href="#shape">Shape</a>
+    <a href="#depth">Depth</a>
+    <a href="#motion">Motion</a>
+    <a href="#board">In use</a>
+    <a href="#drift">Doc check</a>
+  </nav>
+  <div class="tools">
+    <div class="seg" role="radiogroup" aria-label="Theme" id="theme">
+      <button role="radio" aria-checked="true" data-theme="dark">Dark</button>
+      <button role="radio" aria-checked="false" data-theme="light">Light</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div>
+      <h1>Cairn</h1>
+      <p>Warm paper, dense rows, one accent. Surfaces stack like stones: each layer up is a step lighter in dark and a step whiter in light, and the accent sits on top as the marker.</p>
+      <div class="status" id="status"><span class="dot"></span><span>Reading DESIGN.md…</span></div>
+    </div>
+    <div class="cairn" id="cairn">
+      <div class="stone s0"><b>canvas</b><span data-hex="--canvas"></span></div>
+      <div class="stone s1"><b>sheet</b><span data-hex="--background"></span></div>
+      <div class="stone s2"><b>card</b><span data-hex="--card"></span></div>
+      <div class="stone s3"><b>popover</b><span data-hex="--popover"></span></div>
+      <div class="marker"><i></i><span>accent <span data-hex="--card-button"></span></span></div>
+    </div>
+  </section>
+
+  <section class="block" id="color">
+    <h2>Ink on paper</h2>
+    <p class="lede">Four steps of ink do all the talking. Ratios are measured live against the card color; text needs 4.5, labeled icons 3.</p>
+    <div class="paper ink" id="ink"></div>
+
+    <div class="pair">
+      <div class="paper use">
+        <h3><i style="background:var(--card-button)"></i>Accent means it needs you</h3>
+        <p>Count badges, action links on cards, the active nav icon and the focus ring. Never decoration, never a large fill.</p>
+        <div class="row"><span>Needs me</span><span class="badge">3</span><span class="alink">Confirm plan</span><span class="alink">Retry</span></div>
+        <div class="row"><span class="ring-demo">Keyboard focus</span></div>
+      </div>
+      <div class="paper use">
+        <h3><i style="background:var(--running)"></i>Green means it is running</h3>
+        <p>Running agents and online machines, nothing else. Status always pairs color with an icon and a label.</p>
+        <div class="row" style="color:var(--running-text)"><span>● codex is running tests</span><span style="margin-left:auto;color:var(--text-tertiary)">3/7</span></div>
+        <div class="row"><div class="progress"><i></i></div></div>
+        <div class="row">
+          <span class="chip" style="background:var(--chip-idle-bg);color:var(--chip-idle-fg)">Idle</span>
+          <span class="chip" style="background:var(--chip-confirm-bg);color:var(--chip-confirm-fg)">Awaiting confirmation</span>
+          <span class="chip" style="background:var(--chip-done-bg);color:var(--chip-done-fg)">Done</span>
+          <span class="chip" style="background:var(--chip-failed-bg);color:var(--chip-failed-fg)">Failed</span>
+        </div>
+      </div>
+    </div>
+    <div class="paper use" style="margin-top:16px">
+      <h3>Project tiles</h3>
+      <div class="row"><div class="tiles" id="tiles"></div><span class="note" id="tile-note"></span></div>
+    </div>
+  </section>
+
+  <section class="block" id="type">
+    <h2>Six sizes, three weights</h2>
+    <p class="lede">Inter for everything you read; Source Serif only for the brand and the chief greeting. Nothing outside these six sizes.</p>
+    <div class="paper type" id="type-list"></div>
+  </section>
+
+  <section class="block" id="shape">
+    <h2>Corners nest</h2>
+    <p class="lede">Bigger surfaces get rounder corners, and an inner row's radius is its container's radius minus the padding between them.</p>
+    <div class="shapes">
+      <div class="shape-stage">
+        <div class="menu" role="presentation">
+          <div class="it on">Rename<kbd>R</kbd></div>
+          <div class="it">Duplicate<kbd>⌘D</kbd></div>
+          <div class="sep"></div>
+          <div class="it" style="color:var(--destructive)">Delete</div>
+        </div>
+        <div class="note" id="concentric"></div>
+        <div class="field">Name this task</div>
+        <div class="row"><button class="btn btn-primary">Create task</button><button class="btn btn-text">Cancel</button></div>
+      </div>
+      <div class="paper radii" id="radii"></div>
+    </div>
+  </section>
+
+  <section class="block" id="depth">
+    <h2>Three heights</h2>
+    <p class="lede">Elevation is three tokens with the hairline ring built in. Cards sit, menus float, dialogs lift.</p>
+    <div class="elev">
+      <div class="e1"><b>Card</b><span class="note"><code>--e1</code></span></div>
+      <div class="e2"><b>Menu</b><span class="note"><code>--e2</code></span></div>
+      <div class="e3"><b>Dialog</b><span class="note"><code>--e3</code></span></div>
+    </div>
+  </section>
+
+  <section class="block" id="motion">
+    <h2>Quiet motion</h2>
+    <p class="lede">Every transition takes one of these durations and curves. Press play to send them all at once and compare.</p>
+    <div class="row" style="margin-bottom:12px"><button class="btn btn-primary" id="play">Play</button></div>
+    <div class="paper motion" id="motion-list"></div>
+  </section>
+
+  <section class="block" id="board">
+    <h2>On the board</h2>
+    <p class="lede">The same tokens, composed the way the workbench uses them.</p>
+    <div class="board">
+      <div class="col">
+        <h4><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>执行中 <span>2</span></h4>
+        <div class="task">
+          <div class="t">Wire weekly review packs into eval-weekly.sh</div>
+          <div class="m"><span class="tile" style="background:var(--project-tile-1)">C</span>cairn · #2097 · 2h</div>
+          <div class="f" style="color:var(--running-text)">● codex · running tests<span style="margin-left:auto;color:var(--text-tertiary)">3/7</span></div>
+          <div class="progress" style="margin-top:8px"><i></i></div>
+        </div>
+        <div class="task">
+          <div class="t">Keep brake disarming independent of evidence reruns</div>
+          <div class="m"><span class="tile" style="background:var(--project-tile-2)">S</span>scripts · #2214 · 20m</div>
+          <div class="f" style="color:var(--running-text)">● claude · reading pr-gate.js<span style="margin-left:auto;color:var(--text-tertiary)">1/4</span></div>
+        </div>
+      </div>
+      <div class="col">
+        <h4><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>待处理 <span>1</span></h4>
+        <div class="task">
+          <div class="t">Map data-orientation variants</div>
+          <div class="m"><span class="tile" style="background:var(--project-tile-3)">W</span>web · #2218 · 5m</div>
+          <div class="f"><span style="color:var(--card-button)">☰ Awaiting confirmation</span><span class="alink" style="margin-left:auto">Confirm plan</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="drift">
+    <h2>Doc check</h2>
+    <p class="lede">The values below come from the frontmatter of <code>apps/web/DESIGN.md</code>, compared with what the current theme renders. Switch themes to check the other side.</p>
+    <div class="paper" id="drift-list"></div>
+  </section>
+</main>
+
+<script>
+const VAR_OF = {
+  canvas: "--canvas", sheet: "--background", card: "--card", popover: "--popover", hover: "--sidebar-hover",
+  line: "--border", rule: "--border", divider: "--border", ink: "--foreground", "ink-2": "--text-secondary",
+  "ink-3": "--text-tertiary", "ink-4": "--text-dim", icon: "--icon", accent: "--card-button", primary: "--primary",
+  "on-primary": "--primary-foreground", "on-accent": "--text-on-accent", "accent-hover": "--accent-hover",
+  "menu-hover": "--menu-hover", backdrop: "--dialog-backdrop", running: "--running", "running-text": "--running-text",
+  "running-bar": "--running-bar", "running-track": "--running-track",
+};
+const RADIUS_OF = {
+  field: "calc(var(--radius) * 0.8)", control: "var(--radius-control)", "menu-item": "var(--radius-menu-item)",
+  sheet: "var(--edge-radius)", menu: "var(--radius-popover)", bubble: "var(--radius-bubble)",
+  card: "var(--radius-card)", composer: "var(--radius-composer)", window: "var(--radius-window)",
+};
+const RADIUS_USE = {
+  field: "inputs, selects, dialog buttons", control: "buttons, icon buttons", "menu-item": "menu rows",
+  sheet: "dialogs, ⌘K", menu: "menus, popovers", bubble: "chat bubble", card: "cards", composer: "composer", window: "chief window",
+};
+const INK = [
+  ["ink", "--foreground", "Headings and body text", 4.5],
+  ["ink-2", "--text-secondary", "Navigation, buttons, descriptions", 4.5],
+  ["ink-3", "--text-tertiary", "Meta: project, time, counts", 4.5],
+  ["icon", "--icon", "Icons that sit next to a label", 3],
+  ["ink-4", "--text-dim", "Decorative icons only, never text", 0],
+];
+const TYPE = [
+  ["Page", "--type-page", 500, "", "需要你处理的事"],
+  ["Heading", "--type-heading", 500, "", "执行中 · column heading"],
+  ["Brand", "--type-heading", 600, "serif", "Cairn"],
+  ["Card title", "--type-card-title", 500, "", "Wire weekly review packs into eval-weekly.sh"],
+  ["UI", "--type-ui", 400, "", "Buttons, menu rows, and everything you click"],
+  ["Meta", "--type-meta", 400, "", "cairn · #2097 · 2 hours ago"],
+  ["Caption", "--type-caption", 500, "", "Badges and group labels"],
+];
+const MOTION = [
+  ["Hover and press", "--dur-fast", "--ease-standard"],
+  ["Card arrives", "--dur-fast", "--ease-pop"],
+  ["Dialog opens", "--dur-overlay", "--ease-standard"],
+  ["Card lifts", "200ms", "--ease-out-expo"],
+  ["Chief window grows", "--dur-window", "--ease-drawer"],
+  ["Message enters", "--spring-snappy-dur", "--spring-snappy"],
+];
+
+const root = document.documentElement;
+const probe = document.createElement("div");
+probe.style.cssText = "position:absolute;visibility:hidden;pointer-events:none";
+document.body.append(probe);
+const cv = document.createElement("canvas"); cv.width = cv.height = 1;
+const cx = cv.getContext("2d", { willReadFrequently: true });
+
+function color(value) {
+  probe.style.color = "";
+  probe.style.color = value.startsWith("--") ? `var(${value})` : value;
+  return getComputedStyle(probe).color;
+}
+function rgb(value) {
+  cx.clearRect(0, 0, 1, 1); cx.fillStyle = "#000"; cx.fillStyle = color(value); cx.fillRect(0, 0, 1, 1);
+  const [r, g, b, a] = cx.getImageData(0, 0, 1, 1).data;
+  return { r, g, b, a: a / 255 };
+}
+const hex = ({ r, g, b }) => "#" + [r, g, b].map((x) => x.toString(16).padStart(2, "0")).join("");
+const lum = ({ r, g, b }) => { const f = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+function length(expr) { probe.style.width = expr; return getComputedStyle(probe).width; }
+const raw = (v) => getComputedStyle(root).getPropertyValue(v).trim();
+const isLight = () => root.classList.contains("light");
+
+let doc = null;
+function parseFrontmatter(text) {
+  const fm = text.split(/^---$/m)[1] ?? "";
+  const out = {};
+  let section = null;
+  for (const line of fm.split("\n")) {
+    const top = line.match(/^([\w-]+):\s*$/);
+    if (top) { section = top[1]; out[section] = {}; continue; }
+    const kv = line.match(/^\s{2}([\w-]+):\s*(\[[^\]]*\]|'[^']*'|[^#\s][^#]*?)\s*(#.*)?$/);
+    if (!kv || !section) continue;
+    const v = kv[2];
+    out[section][kv[1]] = v.startsWith("[") ? [...v.matchAll(/'([^']+)'/g)].map((m) => m[1]) : v.replace(/^'(.*)'$/, "$1");
+  }
+  return out;
+}
+
+function renderHexes() {
+  for (const el of document.querySelectorAll("[data-hex]")) el.textContent = hex(rgb(el.dataset.hex));
+}
+function renderInk() {
+  const card = rgb("--card");
+  document.getElementById("ink").innerHTML = INK.map(([name, v, use, need]) => {
+    const k = ratio(rgb(v), card);
+    const verdict = need === 0 ? "decorative" : k >= need ? `passes ${need}` : `below ${need}`;
+    return `<div class="ink-line"><div class="sample" style="color:var(${v})">${use}<small><code>${name}</code> ${hex(rgb(v))}</small></div><div class="ratio${need && k < need ? " fail" : ""}">${k.toFixed(2)}<em>${verdict}</em></div></div>`;
+  }).join("");
+  const onAccent = rgb("--text-on-accent");
+  const ks = [1, 2, 3, 4, 5, 6].map((i) => ratio(onAccent, rgb(`--project-tile-${i}`)));
+  document.getElementById("tiles").innerHTML = [1, 2, 3, 4, 5, 6].map((i) => `<span class="tile" style="background:var(--project-tile-${i})">${"CSWDAM"[i - 1]}</span>`).join("");
+  const low = Math.min(...ks), high = Math.max(...ks);
+  document.getElementById("tile-note").innerHTML = `Letters on tiles measure ${low.toFixed(2)}–${high.toFixed(2)}${low < 4.5 ? ' <span style="color:var(--fail-fg)">(some below 4.5)</span>' : ""}`;
+}
+function renderType() {
+  document.getElementById("type-list").innerHTML = TYPE.map(([name, v, w, fam, s]) => `<div class="type-line"><div class="k"><b>${name}</b>${length(`var(${v})`).replace(/(\.\d)\d+/, "$1")} / ${w}</div><div class="v" style="font-size:var(${v});font-weight:${w};${fam === "serif" ? "font-family:var(--font-serif)" : ""}">${s}</div></div>`).join("");
+}
+function renderRadii() {
+  const pad = parseFloat(length("var(--menu-pad)")), menu = parseFloat(length("var(--radius-popover)"));
+  document.getElementById("concentric").innerHTML = `<b>${menu}px</b> menu minus <b>${pad}px</b> padding gives <b>${menu - pad}px</b> rows.`;
+  const keys = doc?.rounded ? Object.keys(doc.rounded).filter((k) => RADIUS_OF[k]) : Object.keys(RADIUS_OF);
+  const rows = keys.map((k) => [k, parseFloat(length(RADIUS_OF[k]))]).sort((a, b) => a[1] - b[1]);
+  document.getElementById("radii").innerHTML = rows.map(([k, px]) => `<div class="radius-line"><div class="corner" style="border-top-left-radius:${px}px"></div><div>${RADIUS_USE[k]}<div class="note"><code>${RADIUS_OF[k].replace(/^var\((.+)\)$/, "$1")}</code></div></div><div class="px">${px}px</div></div>`).join("");
+}
+function renderMotion() {
+  document.getElementById("motion-list").innerHTML = MOTION.map(([name, d, e]) => {
+    const dur = d.startsWith("--") ? raw(d) : d;
+    return `<div class="mline"><div class="k"><b>${name}</b><code>${e}</code></div><div class="lane"><i style="transition:left ${dur} var(${e})"></i></div><div class="ms">${dur}</div></div>`;
+  }).join("");
+}
+function compare() {
+  if (!doc) return null;
+  const light = isLight();
+  const colors = light ? doc.colors : doc["colors-dark"];
+  const rows = [], unmapped = [];
+  let checked = 0;
+  for (const [k, v] of Object.entries(colors ?? {})) {
+    if (k === "project-tiles") {
+      v.forEach((want, i) => { checked++; const name = `--project-tile-${i + 1}`; if (color(want) !== color(name)) rows.push([`project-tile-${i + 1}`, name, want, hex(rgb(name)), true]); });
+      continue;
+    }
+    const name = VAR_OF[k];
+    if (!name) { unmapped.push(k); continue; }
+    checked++;
+    if (color(v) !== color(name)) rows.push([k, name, v, rgb(name).a < 1 ? color(name) : hex(rgb(name)), true]);
+  }
+  for (const [k, v] of Object.entries(doc.rounded ?? {})) {
+    if (!RADIUS_OF[k]) continue;
+    checked++;
+    const got = length(RADIUS_OF[k]);
+    if (got !== v) rows.push([`rounded.${k}`, RADIUS_OF[k], v, got, false]);
+  }
+  return { rows, unmapped, checked };
+}
+function renderDrift() {
+  const res = compare();
+  const list = document.getElementById("drift-list");
+  const status = document.getElementById("status");
+  if (!res) {
+    list.innerHTML = `<div class="agree note">DESIGN.md could not be loaded. Serve <code>apps/web</code> over HTTP to run the check.</div>`;
+    status.className = "status off"; status.innerHTML = `<span class="dot"></span><span>DESIGN.md not loaded</span>`;
+    return;
+  }
+  const theme = isLight() ? "light" : "dark";
+  const extra = res.unmapped.length ? ` <span class="note">Not a token in code: ${res.unmapped.join(", ")}.</span>` : "";
+  if (res.rows.length === 0) {
+    list.innerHTML = `<div class="agree"><span class="badge" style="background:var(--running)">✓</span><span>All ${res.checked} ${theme} values in DESIGN.md match the code.${extra}</span></div>`;
+    status.className = "status"; status.innerHTML = `<span class="dot"></span><span>DESIGN.md matches the ${theme} theme on ${res.checked} values</span>`;
+  } else {
+    const sw = (c, isColor) => isColor ? `<span class="sw" style="background:${c}"></span>` : "";
+    list.innerHTML = `<div class="drift"><div class="dline"><div>Key</div><div>DESIGN.md says</div><div>Code renders</div></div>${res.rows.map(([k, , want, got, isColor]) => `<div class="dline"><div><code>${k}</code></div><div>${sw(want, isColor)}${want}</div><div>${sw(got, isColor)}${got}</div></div>`).join("")}</div>${extra ? `<div class="agree">${extra}</div>` : ""}`;
+    status.className = "status off"; status.innerHTML = `<span class="dot"></span><span>${res.rows.length} of ${res.checked} ${theme} values differ from DESIGN.md</span> <a href="#drift">See</a>`;
+  }
+}
+function renderAll() { renderHexes(); renderInk(); renderType(); renderRadii(); renderMotion(); renderDrift(); }
+
+document.getElementById("theme").addEventListener("click", (ev) => {
+  const b = ev.target.closest("button"); if (!b) return;
+  root.classList.toggle("light", b.dataset.theme === "light");
+  for (const x of ev.currentTarget.children) x.setAttribute("aria-checked", String(x === b));
+  renderAll();
+});
+document.getElementById("play").addEventListener("click", () => {
+  const m = document.getElementById("motion-list");
+  m.classList.toggle("go");
+});
+fetch("../DESIGN.md").then((r) => (r.ok ? r.text() : Promise.reject())).then((t) => { doc = parseFrontmatter(t); }).catch(() => {}).finally(renderAll);
+document.fonts.ready.then(renderAll);
+renderAll();
+</script>
+</body>
+</html>
