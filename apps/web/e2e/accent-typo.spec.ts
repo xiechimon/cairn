@@ -184,8 +184,7 @@ for (const theme of ['light', 'dark'] as const) {
     });
     expect(ring.style).toBe('solid');
     expect(ring.w).toBe('2px');
-    // the codebase ring recipe rides --focus-ring (Paper dark #f0926d / light #173a2f)
-    expect(ring.color).toBe(theme === 'dark' ? 'rgb(240, 146, 109)' : 'rgb(23, 58, 47)');
+    expect(ring.color).toBe(theme === 'dark' ? 'rgb(228, 182, 92)' : 'rgb(32, 89, 67)');
   });
 }
 
@@ -241,8 +240,8 @@ for (const theme of ['light', 'dark'] as const) {
     const destructive = await resolveToken(page, '--destructive');
     const card = await resolveToken(page, '--card');
 
-    expect(destructive).toBe(theme === 'dark' ? 'rgb(255, 171, 183)' : 'rgb(158, 44, 73)');
-    expect(card).toBe(theme === 'dark' ? 'rgb(47, 42, 38)' : 'rgb(255, 253, 246)');
+    expect(destructive).toBe(theme === 'dark' ? 'rgb(242, 136, 129)' : 'rgb(182, 50, 45)');
+    expect(card).toBe(theme === 'dark' ? 'rgb(24, 32, 28)' : 'rgb(254, 254, 251)');
     expect(await contrastOf(page, destructive, card)).toBeGreaterThanOrEqual(4.5);
   });
 
@@ -251,8 +250,8 @@ for (const theme of ['light', 'dark'] as const) {
     await page.goto('/app?scenario=01&view=board');
     const bg = await resolveToken(page, '--card-button');
     const fg = await resolveToken(page, '--text-on-accent');
-    expect(bg).toBe(theme === 'dark' ? 'rgb(240, 146, 109)' : 'rgb(23, 58, 47)');
-    expect(fg).toBe(theme === 'dark' ? 'rgb(26, 22, 18)' : 'rgb(255, 255, 255)');
+    expect(bg).toBe(theme === 'dark' ? 'rgb(228, 182, 92)' : 'rgb(146, 99, 0)');
+    expect(fg).toBe(theme === 'dark' ? 'rgb(7, 26, 19)' : 'rgb(255, 255, 255)');
     expect(await contrastOf(page, fg, bg)).toBeGreaterThanOrEqual(4.5);
   });
 

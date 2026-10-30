@@ -187,9 +187,9 @@ export function FoundationsHero({ theme }: { theme: GalleryTheme }) {
     <div className="grid grid-cols-1 items-end gap-12 pt-6 lg:grid-cols-2">
       <div>
         <p className="m-0 max-w-100 text-card-title text-content-secondary">
-          Warm paper, dense rows, one accent. Surfaces stack like stones, each layer a step
-          {theme === 'dark' ? ' lighter' : ' whiter'} than the one below, and the accent sits on top
-          as the marker.
+          Pine & Brass: stone paper, pine ink, one brass accent. Surfaces stack like stones, each
+          layer a step {theme === 'dark' ? 'lighter' : 'whiter'} than the one below, and the brass
+          sits on top as the marker.
         </p>
         <a
           href="#doc-check"

@@ -74,7 +74,7 @@ test('org chart: nodes are Paper cards, `创建 Agent` only in the top bar', asy
       };
     });
   expect(shape.radius).toBe('20px');
-  expect(shape.bg).toBe('rgb(255, 253, 246)');
+  expect(shape.bg).toBe('rgb(254, 254, 251)');
   expect(shape.shadow).toContain('0px 0px 0px 1px');
   expect(shape.height).toBe(NODE_H);
   expect(shape.width).toBe(220);
