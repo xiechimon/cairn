@@ -34,10 +34,12 @@ import {
   GATE_ANNOUNCEMENTS,
   infoReportMessageSchema,
   MODEL_SOURCE_RUNTIME_LABELS,
+  orchestratePromptHeadOf,
   PLAN_SECTIONS,
   REVIEW_VERDICT_KIND,
   reviewVerdictSchema,
   stripAnsiEscapes,
+  stripSkillRouteSection,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
   VERIFY_VERDICT_KIND,
   verifyVerdictSchema,
@@ -1202,8 +1204,8 @@ const CHIEF_HERO_EXAMPLES = [
 
 const WAKE_MARKER_PREFIX_RE = /^\[wake:\w+\]\s*/;
 
-function stripWakeMarker(text: string): string {
-  return text.replace(WAKE_MARKER_PREFIX_RE, '');
+function chiefUserText(raw: string): string {
+  return stripSkillRouteSection(raw.replace(WAKE_MARKER_PREFIX_RE, '')).trim();
 }
 
 function handoffTodoOf(call: ToolCallRecord): string | null {
@@ -1235,7 +1237,7 @@ function collectChiefStream(
   const postedTexts = new Set(
     messages
       .filter((m) => m.role === 'user' && !m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX))
-      .map((m) => stripWakeMarker(textOfContent(m.content).trim())),
+      .map((m) => chiefUserText(textOfContent(m.content).trim())),
   );
   let pendingTools: ChiefToolRow[] = [];
   for (const m of messages) {
@@ -1344,11 +1346,16 @@ function collectChiefStream(
       continue;
     }
     if (m.role === 'user') {
-      const text = stripWakeMarker(rawText);
+      const text = chiefUserText(rawText);
       if (text === '') continue;
       if (m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX) && postedTexts.has(text)) continue;
       pendingTools = [];
-      items.push({ kind: 'user', text, id: m.id, markdown: text });
+      const head = orchestratePromptHeadOf(text);
+      items.push(
+        head === null
+          ? { kind: 'user', text, id: m.id, markdown: text }
+          : { kind: 'user', text: head, id: m.id },
+      );
       continue;
     }
     if (m.role === 'system') continue;
