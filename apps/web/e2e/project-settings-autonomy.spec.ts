@@ -99,6 +99,7 @@ test('autonomy card: github project shows thresholds and the last verdict per ki
   await expect(card.getByRole('spinbutton', { name: '同类任务冷却（分钟）' })).toHaveValue('15');
   await expect(card.getByRole('spinbutton', { name: '每日预算（USD）' })).toHaveValue('10');
   await expect(card.getByText('$3.50')).toBeVisible();
+  await expect(card.getByText('$3.50').locator('../..').getByRole('button')).toHaveCount(0);
   await expect(card.getByTestId('autonomy-state-issue-intake')).toHaveText(
     '最近一次被拦：有人正在用，让路',
   );
@@ -153,4 +154,13 @@ test('autonomy card: save failure is visible', async ({ page }) => {
   await card.getByRole('spinbutton', { name: '同类任务冷却（分钟）' }).fill('30');
   await card.getByRole('button', { name: '保存后台自动任务设置' }).click();
   await expect(page.getByText('保存失败，请重试。')).toBeVisible();
+});
+
+test('project page: a github-backed project opens on the tasks tab, not the placeholder files tab', async ({
+  page,
+}) => {
+  await stubWorld(page);
+  await page.goto(`/app/project/${GITHUB_PROJECT_ID}`);
+  await expect(page.getByText('GitHub 仓库项目的文件在 GitHub 上查看')).toHaveCount(0);
+  await expect(page.getByRole('tab', { name: '任务' })).toHaveAttribute('aria-selected', 'true');
 });

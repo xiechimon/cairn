@@ -688,8 +688,8 @@ export function ProjectPage() {
   const { search } = useLocation();
   const [searchParams] = useSearchParams();
   const fixture = resolveScenario(searchParams);
-  const [tab, setTab] = useState<'tasks' | 'files'>(
-    searchParams.get('tab') === 'tasks' ? 'tasks' : (fixture.projectTab ?? 'files'),
+  const [chosenTab, setTab] = useState<'tasks' | 'files' | null>(
+    searchParams.get('tab') === 'tasks' ? 'tasks' : (fixture.projectTab ?? null),
   );
   const [seg, setSeg] = useState<'files' | 'history'>('files');
   const { live, teamId } = useLiveData();
@@ -699,6 +699,8 @@ export function ProjectPage() {
   const wireProject = live ? (projectsQ.data ?? []).find((p) => p.id === id) : undefined;
   const hostedRepo = live && wireProject?.repoKind === 'hosted';
   const localRepo = live && wireProject?.repoKind === 'local';
+  const isGithubRepoEntry = live && wireProject?.repoKind === 'github';
+  const tab = chosenTab ?? (isGithubRepoEntry ? 'tasks' : 'files');
   const [dirSel, setDirSel] = useState<{ projectId: string; path: string }>({
     projectId: '',
     path: '',
@@ -789,7 +791,6 @@ export function ProjectPage() {
   );
   const newTaskApiRef = useRef<NewTaskSurfaceApi | null>(null);
   const openNewTask = useCallback(() => newTaskApiRef.current?.openDialog(), []);
-  const isGithubRepoEntry = live && wireProject?.repoKind === 'github';
   const githubFilesUrl =
     isGithubRepoEntry && wireProject?.githubRepo != null
       ? `https://github.com/${wireProject.githubRepo}`

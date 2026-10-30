@@ -4,10 +4,16 @@ import type {
   AutonomyRecord,
   AutonomySettings,
 } from '@cairn/shared';
+import { cn } from 'cn';
 import { useState } from 'react';
 import { useApiMutations, useProjectAutonomy } from '../api/hooks.js';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
-import { SETTINGS_HINT_CLS, SettingsCard, SettingsRow } from '../components/settings-list.js';
+import {
+  SETTINGS_HINT_CLS,
+  SETTINGS_ROW_CLS,
+  SettingsCard,
+  SettingsRow,
+} from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
@@ -103,10 +109,7 @@ export function ProjectAutonomyCard({ projectId, teamId }: { projectId: string; 
             />
           </SettingsRow>
         ))}
-        <SettingsRow label={t('今日已花（UTC）')}>
-          <span className="font-mono">
-            {data.spentTodayUsd === null ? t('读不到') : `$${data.spentTodayUsd.toFixed(2)}`}
-          </span>
+        <div className={cn(SETTINGS_ROW_CLS, 'justify-end')}>
           <Button
             className={DIALOG_PRIMARY_BUTTON}
             aria-label={t('保存后台自动任务设置')}
@@ -115,6 +118,11 @@ export function ProjectAutonomyCard({ projectId, teamId }: { projectId: string; 
           >
             {t('保存')}
           </Button>
+        </div>
+        <SettingsRow label={t('今日已花（UTC）')}>
+          <span className="font-mono">
+            {data.spentTodayUsd === null ? t('读不到') : `$${data.spentTodayUsd.toFixed(2)}`}
+          </span>
         </SettingsRow>
         {data.kinds
           .filter((k) => k.kind === 'issue-intake' || k.lastEvaluatedAt !== null)
