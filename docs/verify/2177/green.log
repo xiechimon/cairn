@@ -1,0 +1,20 @@
+✔ the changeset config ignores exactly the private workspace packages and keeps the rest publishable (1.401ms)
+✔ the release workflow publishes through OIDC without a token or a bot pull request (0.134625ms)
+✔ packing inherits read permissions and publishing alone can request an OIDC token (0.341292ms)
+✔ the publish job installs without scripts and never builds or publishes unpacked packages (0.2615ms)
+✔ the pack job packs tarballs before uploading the release artifact (0.235958ms)
+✔ the publish job downloads the packed artifact before publishing (0.151083ms)
+✔ pending changesets warn without controlling release steps (0.166417ms)
+✔ the publish job configures a tagger before publishing (0.09975ms)
+✔ the publish step always publishes packed tarballs with explicit pnpm provenance (0.1265ms)
+✔ the publish job pushes tags after an attempted publish even if publishing fails (0.159041ms)
+✔ pull requests validate release configuration for every workspace manifest (0.1055ms)
+✔ every publishable package names this repository for provenance (0.31175ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 46.352042

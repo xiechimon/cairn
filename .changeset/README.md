@@ -14,4 +14,6 @@ When the pull request should ship, run `pnpm release:version` in it to bump vers
 
 After merge to main, the `release` workflow publishes unpublished versions through npm Trusted Publishing (OIDC) with provenance and pushes the release tags, including tags created before a partial publish failure. Versions already on npm are skipped. Pending changesets on main leave a warning naming them and wait for a pull request that runs `pnpm release:version`. Unpublished package versions still publish when changesets are pending. `pnpm exec changeset status` shows what is pending.
 
+The release workflow builds and packs the tarballs in a job without npm publishing rights, and a separate job that runs no package scripts publishes them.
+
 Publishing requires a Trusted Publisher on npmjs.com for each package, with provider GitHub Actions, repository `xiechimon/cairn`, and workflow file `release.yml`. Renaming the workflow file breaks publishing until the Trusted Publishers are updated. Publishing needs no token or repository secret.
