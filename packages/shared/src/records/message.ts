@@ -104,6 +104,15 @@ export const chiefModelFallbackContentSchema = z.object({
 });
 export type ChiefModelFallbackContent = z.infer<typeof chiefModelFallbackContentSchema>;
 
+export const threadReportContentSchema = z.object({
+  kind: z.literal('thread-report'),
+  todoId: recordId,
+  phase: z.enum(['done', 'failed', 'review']),
+  seqNum: z.number().int().positive(),
+  title: z.string(),
+});
+export type ThreadReportContent = z.infer<typeof threadReportContentSchema>;
+
 export const ASK_USER_QUESTION_KIND = 'ask_user_question';
 
 export const askUserQuestionSchema = z.object({

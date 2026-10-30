@@ -165,6 +165,7 @@ export function chiefStreamRowKey(item: ChiefStreamItem, index: number): string 
     case 'handoff':
     case 'digest':
     case 'stopped':
+    case 'thread-report':
       return item.id ?? index;
     default:
       return index;
@@ -236,6 +237,18 @@ export function ChiefStreamRow({
 }: ChiefStreamRowProps) {
   const { t } = useI18n();
   if (item.kind === 'stopped') return <StoppedRow todos={item.todos} />;
+  if (item.kind === 'thread-report')
+    return (
+      <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
+        <Marker className={MARKER_NOTE_CLS} data-testid="thread-report-marker">
+          <MarkerContent>
+            <Link to={`/app/todo/${item.todoId}`} className="hover:underline">
+              {t('来自任务 #{n} {title} 的消息', { n: item.seqNum, title: item.title })}
+            </Link>
+          </MarkerContent>
+        </Marker>
+      </MessageScrollerItem>
+    );
   if (item.kind === 'error')
     return (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>

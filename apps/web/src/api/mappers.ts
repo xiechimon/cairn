@@ -41,6 +41,7 @@ import {
   stripAnsiEscapes,
   stripSkillRouteSection,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
+  threadReportContentSchema,
   VERIFY_VERDICT_KIND,
   verifyVerdictSchema,
 } from '@cairn/shared';
@@ -1240,7 +1241,10 @@ function collectChiefStream(
       .map((m) => chiefUserText(textOfContent(m.content).trim())),
   );
   let pendingTools: ChiefToolRow[] = [];
+  let reportWakePrefix: string | null = null;
   for (const m of messages) {
+    const precedingReportWakePrefix = reportWakePrefix;
+    reportWakePrefix = null;
     while (itemsAt.length < items.length) itemsAt.push(lastAt);
     lastAt = m.createdAt;
     if (m.role === 'user' && fallback !== null) {
@@ -1248,6 +1252,15 @@ function collectChiefStream(
         ? m.id.slice(TRANSCRIPT_PROMPT_ROW_ID_PREFIX.length)
         : m.id;
       if (stepOfRow !== fallback.stepId) fallback = null;
+    }
+    if (
+      m.role === 'user' &&
+      m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX) &&
+      precedingReportWakePrefix !== null &&
+      textOfContent(m.content).trim().startsWith(precedingReportWakePrefix)
+    ) {
+      pendingTools = [];
+      continue;
     }
     const pendingState = m.role === 'user' ? pendingIds.get(m.id) : undefined;
     if (pendingState !== undefined) {
@@ -1273,6 +1286,12 @@ function collectChiefStream(
         parsed = typeof m.content === 'string' ? JSON.parse(m.content) : null;
       } catch {
         parsed = null;
+      }
+      const report = threadReportContentSchema.safeParse(parsed);
+      if (report.success) {
+        reportWakePrefix = `[wake:${report.data.phase === 'done' ? 'settle' : report.data.phase === 'failed' ? 'failed' : 'gate'}]`;
+        items.push({ ...report.data, id: m.id });
+        continue;
       }
       const stopped = chiefTurnStoppedContentSchema.safeParse(parsed);
       if (stopped.success) {

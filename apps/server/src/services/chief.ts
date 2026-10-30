@@ -8,6 +8,7 @@ import type {
   MachineDoneBody,
   PatchChiefBody,
   Phase,
+  ThreadReportContent,
   TodoRecord,
   UserRecord,
 } from '@cairn/shared';
@@ -641,6 +642,24 @@ export function triggerChiefWakes(deps: ChiefDeps, todoRecord: TodoRecord, to: P
         removeChiefWatches(deps, todoRecord.teamId, [todoRecord.id]);
         continue;
       }
+      if (to !== 'confirm') {
+        const content = {
+          kind: 'thread-report',
+          todoId: todoRecord.id,
+          phase: to,
+          seqNum: todoRecord.seqNum,
+          title: todoRecord.title,
+        } satisfies ThreadReportContent;
+        const report = {
+          id: newRecordId(),
+          threadId: watch.threadId,
+          role: 'system' as const,
+          content: JSON.stringify(content),
+          createdAt: nowMs(),
+        };
+        upsertChiefMessage(deps.db, report);
+        deps.convHub?.publishMessage(watch.threadId, report);
+      }
       if (kind === 'gate') {
         enqueueGateWake(deps, watch.threadId, { ...todoRecord, phase: to }, isSplitParent, false);
       } else {
@@ -1094,6 +1113,6 @@ export function chiefThreadMessages(db: Db, threadId: string) {
     .select()
     .from(chiefMessage)
     .where(eq(chiefMessage.threadId, threadId))
-    .orderBy(asc(chiefMessage.createdAt))
+    .orderBy(asc(chiefMessage.createdAt), sql`rowid`)
     .all();
 }
