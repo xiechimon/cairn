@@ -1,29 +1,41 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
-const repo = process.env.GITHUB_REPOSITORY;
+export const repo = process.env.GITHUB_REPOSITORY;
 if (!/^[\w.-]+\/[\w.-]+$/.test(repo ?? '')) throw new Error('GITHUB_REPOSITORY is required');
-const api = (path, payload) => {
+export const api = (path, payload) => {
   const output = execFileSync(
     'gh',
     ['api', path, ...(payload ? ['--method', 'POST', '--input', '-'] : [])],
     {
       encoding: 'utf8',
+      maxBuffer: 512 * 1024 * 1024,
       ...(payload ? { input: JSON.stringify(payload) } : {}),
     },
   );
   return output.trim() ? JSON.parse(output) : null;
 };
-const pages = (path) =>
-  JSON.parse(execFileSync('gh', ['api', path, '--paginate', '--slurp'], { encoding: 'utf8' }));
-const markers = () =>
+export const pages = (path) =>
+  JSON.parse(
+    execFileSync('gh', ['api', path, '--paginate', '--slurp'], {
+      encoding: 'utf8',
+      maxBuffer: 512 * 1024 * 1024,
+    }),
+  );
+export const markers = () =>
   pages(`repos/${repo}/issues?state=open&labels=autonomy-paused&per_page=100`)
     .flat()
     .filter((issue) => !issue.pull_request);
 const git = (cwd, ...args) =>
-  execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  execFileSync('git', args, {
+    cwd,
+    encoding: 'utf8',
+    maxBuffer: 512 * 1024 * 1024,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  }).trim();
 const shaPattern = /^[a-f0-9]{40}$/;
 
 export function verifyRecovery(number) {
@@ -103,6 +115,25 @@ function checkPull(pr, paused) {
   return allowed;
 }
 
+export function disarmAutoMerge(pr) {
+  const result = JSON.parse(
+    execFileSync(
+      'gh',
+      [
+        'api',
+        'graphql',
+        '-f',
+        'query=mutation($pullRequestId:ID!){disablePullRequestAutoMerge(input:{pullRequestId:$pullRequestId}){pullRequest{number}}}',
+        '-f',
+        `pullRequestId=${pr.node_id}`,
+      ],
+      { encoding: 'utf8', maxBuffer: 512 * 1024 * 1024 },
+    ),
+  );
+  if (result.errors || !result.data?.disablePullRequestAutoMerge)
+    throw new Error('Disarm mutation failed');
+}
+
 function sweep(paused) {
   let failed = false;
   for (const pr of pages(`repos/${repo}/pulls?state=open&per_page=100`).flat()) {
@@ -127,22 +158,7 @@ function sweep(paused) {
         }
       }
       if (allowed || !pr.auto_merge) continue;
-      const result = JSON.parse(
-        execFileSync(
-          'gh',
-          [
-            'api',
-            'graphql',
-            '-f',
-            'query=mutation($pullRequestId:ID!){disablePullRequestAutoMerge(input:{pullRequestId:$pullRequestId}){pullRequest{number}}}',
-            '-f',
-            `pullRequestId=${pr.node_id}`,
-          ],
-          { encoding: 'utf8' },
-        ),
-      );
-      if (result.errors || !result.data?.disablePullRequestAutoMerge)
-        throw new Error('Disarm mutation failed');
+      disarmAutoMerge(pr);
       console.log(`#${pr.number}: disarmed`);
     } catch (error) {
       failed = true;
@@ -153,33 +169,38 @@ function sweep(paused) {
   if (failed) process.exitCode = 1;
 }
 
-try {
-  const [command, ...args] = process.argv.slice(2);
-  if (command === 'status') console.log(JSON.stringify({ paused: markers().length > 0 }));
-  else if (command === 'pause') {
-    const reason = args[0] === '--reason' ? args[1]?.trim() : '';
-    if (!reason) throw new Error('pause --reason <text> is required');
-    if (!markers().length) {
-      const labels = pages(`repos/${repo}/labels?per_page=100`).flat();
-      if (!labels.some((label) => label.name === 'autonomy-paused'))
-        api(`repos/${repo}/labels`, { name: 'autonomy-paused', color: 'b60205' });
-      api(`repos/${repo}/issues`, {
-        title: 'Autonomous merging paused',
-        body: `${reason}\n\nClose this issue to resume autonomous merging.`,
-        labels: ['autonomy-paused'],
-      });
-    }
-    sweep(true);
-    console.log('autonomy: paused');
-  } else if (command === 'sweep') sweep(markers().length > 0);
-  else if (command === 'check-pr') {
-    if (!/^[1-9]\d*$/.test(args[0] ?? '')) throw new Error('A PR number is required');
-    const pr = api(`repos/${repo}/pulls/${args[0]}`);
-    if (!checkPull({ ...pr, number: Number(args[0]) }, markers().length > 0))
-      throw new Error('autonomy-paused: autonomous merging is paused');
-  } else if (command === 'verify-recovery') verifyRecovery(args[0]);
-  else throw new Error('Expected status, pause, sweep, check-pr, or verify-recovery');
-} catch (error) {
-  console.error(error.message);
-  process.exitCode = 1;
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(realpathSync(resolve(process.argv[1]))).href
+) {
+  try {
+    const [command, ...args] = process.argv.slice(2);
+    if (command === 'status') console.log(JSON.stringify({ paused: markers().length > 0 }));
+    else if (command === 'pause') {
+      const reason = args[0] === '--reason' ? args[1]?.trim() : '';
+      if (!reason) throw new Error('pause --reason <text> is required');
+      if (!markers().length) {
+        const labels = pages(`repos/${repo}/labels?per_page=100`).flat();
+        if (!labels.some((label) => label.name === 'autonomy-paused'))
+          api(`repos/${repo}/labels`, { name: 'autonomy-paused', color: 'b60205' });
+        api(`repos/${repo}/issues`, {
+          title: 'Autonomous merging paused',
+          body: `${reason}\n\nClose this issue to resume autonomous merging.`,
+          labels: ['autonomy-paused'],
+        });
+      }
+      sweep(true);
+      console.log('autonomy: paused');
+    } else if (command === 'sweep') sweep(markers().length > 0);
+    else if (command === 'check-pr') {
+      if (!/^[1-9]\d*$/.test(args[0] ?? '')) throw new Error('A PR number is required');
+      const pr = api(`repos/${repo}/pulls/${args[0]}`);
+      if (!checkPull({ ...pr, number: Number(args[0]) }, markers().length > 0))
+        throw new Error('autonomy-paused: autonomous merging is paused');
+    } else if (command === 'verify-recovery') verifyRecovery(args[0]);
+    else throw new Error('Expected status, pause, sweep, check-pr, or verify-recovery');
+  } catch (error) {
+    console.error(error.message);
+    process.exitCode = 1;
+  }
 }

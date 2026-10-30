@@ -122,7 +122,9 @@ try {
       comments.find(
         (c) =>
           c.body.includes(`<!-- review-gate-patch:${patch} -->`) &&
-          /Independent review gate: PASS/.test(c.body),
+          /^<!-- review-gate:[0-9a-f]{40} -->\n\*\*Independent review gate: PASS\*\*(?: \(carried over\))? for /.test(
+            c.body,
+          ),
       );
     if (prior) {
       const from = prior.body.match(/review-gate:([0-9a-f]{40})/)?.[1] ?? '?';

@@ -49,4 +49,20 @@ console.log(
   dup.review.split('a.ts:1').length === 2 && !dup.review.includes('pnpm') ? 'ok' : 'BAD',
 );
 bad += !(dup.review.split('a.ts:1').length === 2);
+
+const priorBody = src.slice(src.indexOf('    const prior ='), src.indexOf('    if (prior)'));
+const findPrior = new Function('comments', 'patch', `${priorBody}; return prior;`);
+const marker = `<!-- review-gate:${'a'.repeat(40)} -->`;
+for (const carried of ['', ' (carried over)']) {
+  const pass = `${marker}\n**Independent review gate: PASS**${carried} for head.\n<!-- review-gate-patch:patch -->`;
+  for (const [body, want] of [
+    [pass, true],
+    [`${marker}\n**Independent review gate: BLOCK** for head.\n${pass} `, false],
+    [`quoted\n${pass}`, false],
+  ]) {
+    const got = Boolean(findPrior([{ body }], 'patch'));
+    bad += got !== want;
+    console.log(got === want ? 'ok' : 'BAD', 'carried PASS source', carried, want);
+  }
+}
 process.exit(bad);

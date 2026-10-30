@@ -1,0 +1,10 @@
+[Unit]
+Description=Run the Cairn batch merger every five minutes
+
+[Timer]
+OnCalendar=*:0/5
+Persistent=true
+Unit=cairn-batch-merger.service
+
+[Install]
+WantedBy=timers.target
