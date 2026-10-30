@@ -2,8 +2,8 @@
 
 ## Invariant test, red on main and green on the branch
 
-- `red.log`: `node --test scripts/release-config.test.mjs` from this branch, run against the `release.yml`, package manifests and workspace files of `origin/main` at `000945c2e`. Result: 1 pass, 11 fail. The one pass is the existing changeset ignore-list test.
-- `green.log`: the same command on the branch. Result: 12 pass, 0 fail.
+- `red.log`: `node --test scripts/release-config.test.mjs` from this branch, run against the `release.yml`, package manifests and workspace files of `origin/main` at `000945c2e`. Result: 2 pass, 12 fail. The passes are the existing changeset ignore-list test and the action pin test, which main already satisfies.
+- `green.log`: the same command on the branch. Result: 14 pass, 0 fail.
 
 ## Pack on real tarballs
 

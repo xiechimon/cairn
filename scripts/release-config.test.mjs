@@ -62,7 +62,7 @@ function jobConfig(name) {
 
 function jobSteps(name) {
   return jobConfig(name)
-    .split(/^ {6}- (?=(?:name|uses|run):)/m)
+    .split(/^ {6}- (?=[a-z][a-z-]*:)/m)
     .slice(1);
 }
 
@@ -71,6 +71,12 @@ test('the release workflow publishes through OIDC without a token or a bot pull 
     assert.ok(!workflow.includes(forbidden), `the release workflow must not contain ${forbidden}`);
   }
   assert.doesNotMatch(workflow, /\bNPM_CONFIG_PROVENANCE\b/);
+});
+
+test('every release action pins a full commit SHA with a version note', () => {
+  for (const [line] of workflow.matchAll(/^.*\buses:.*$/gm)) {
+    assert.match(line, /^ +(?:- )?uses: [^@\s]+@[a-f0-9]{40} # v\d+\.\d+\.\d+$/);
+  }
 });
 
 test('packing inherits read permissions and publishing alone can request an OIDC token', () => {
@@ -86,11 +92,18 @@ test('packing inherits read permissions and publishing alone can request an OIDC
   assert.match(publish, /^ {4}if: needs\.pack\.outputs\.count != '0'$/m);
 });
 
-test('the publish job installs without scripts and never builds or publishes unpacked packages', () => {
+test('the publish job sets up Node without restoring a shared dependency cache', () => {
+  const setupNode = jobSteps('publish').find((step) => step.includes('uses: actions/setup-node@'));
+  assert.ok(setupNode, 'the publish job must set up Node');
+  assert.doesNotMatch(setupNode, /^\s*cache:/m);
+});
+
+test('the publish job installs only root dependencies without scripts and never builds or publishes unpacked packages', () => {
   const steps = jobSteps('publish');
   const install = steps.find((step) => /\bpnpm install\b/.test(step));
   assert.ok(install, 'the publish job must install dependencies');
   assert.match(install, /\bpnpm install --frozen-lockfile --ignore-scripts\b/);
+  assert.match(install, /--filter \.(?=\s|$)/);
   for (const step of steps) {
     assert.doesNotMatch(step, /\bpnpm (?:run )?release:publish\b/);
     assert.doesNotMatch(step, /\bpnpm (?:run )?build\b/);
@@ -170,6 +183,7 @@ test('the publish step always publishes packed tarballs with explicit pnpm prove
   assert.match(publish, /^ {8}id: publish$/m);
   assert.doesNotMatch(publish, /^ {8}if:/m);
   assert.match(publish, /^ {8}env:\n(?: {10}.+\n)*? {10}PNPM_CONFIG_PROVENANCE: 'true'$/m);
+  assert.match(publish, /^ {8}env:\n(?: {10}.+\n)*? {10}PNPM_CONFIG_IGNORE_SCRIPTS: 'true'$/m);
 });
 
 test('the publish job pushes tags after an attempted publish even if publishing fails', () => {
