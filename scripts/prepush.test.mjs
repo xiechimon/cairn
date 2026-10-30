@@ -17,6 +17,7 @@ import { docReaderTests } from './doc-reader-tests.mjs';
 import { readEvents, recordAll } from './lessons-ledger-gate.mjs';
 import {
   ciOnlyScripts,
+  ciOnlyTestSteps,
   gateOf,
   hasCode,
   localOnly,
@@ -25,6 +26,7 @@ import {
   recordInterception,
   runPlan,
   selfTests,
+  workflowTestSteps,
 } from './prepush.mjs';
 import { scrubGateEnv } from './scrub-git-env.mjs';
 
@@ -52,8 +54,34 @@ for (const [name, paths, expected] of [
   ['server markdown fixtures', ['apps/server/test/fixtures/x.md'], true],
   ['shared markdown fixtures', ['packages/shared/test/fixtures/plan1606-verification.md'], true],
   ['integration markdown fixtures', ['integration/test/fixtures/x.md'], true],
-  ['executable evidence', ['docs/verify/2136/review-check.test.mjs'], true],
-  ['non-markdown evidence', ['docs/verify/1/result.json', 'docs/verify/1/shot.png'], true],
+  [
+    'executable evidence',
+    [
+      'docs/verify/2136/review-check.test.mjs',
+      'docs/verify/1/probe.mts',
+      'docs/verify/1/run.sh',
+      'docs/verify/1/check.py',
+    ],
+    true,
+  ],
+  ['non-markdown evidence', ['docs/verify/1/result.json', 'docs/verify/1/shot.png'], false],
+  [
+    'unknown or executable-like files under docs',
+    ['docs/verify/1/drive.tsx', 'docs/verify/1/run', 'docs/verify/1/notes.yaml'],
+    true,
+  ],
+  ['data beside an executable check', ['docs/verify/2136/fixture.json'], true],
+  [
+    'the #2188 lessons and evidence change',
+    [
+      'docs/lessons/1678-no-verify-fixup-commit.md',
+      'docs/lessons/events.jsonl',
+      'docs/verify/2182/README.md',
+      'docs/verify/2182/hookspath-green.log',
+      'docs/verify/2182/hookspath-red.log',
+    ],
+    false,
+  ],
   ['epic data', ['.claude/epics/E1.0a.json'], false],
   ['code', ['apps/server/src/app.ts', 'scripts/prepush.mjs'], true],
   ['unknown paths', ['new-config', 'package.json', '.claude/epics-other/data.json'], true],
@@ -453,7 +481,7 @@ test('a ledger entry change runs the ledger gate even when only documents change
   );
 });
 
-test('local code checks include both UI gates and affected e2e', () => {
+test('local code checks retain fast checks and advisory dead-class', () => {
   const commands = prepushPlan(['apps/web/src/main.tsx']).map((args) => args.join(' '));
   for (const command of [
     'node scripts/ci-job-structure-gate.mjs',
@@ -471,8 +499,6 @@ test('local code checks include both UI gates and affected e2e', () => {
     'pnpm spec:parse',
     'node scripts/e2e-affected.mjs --check-coverage',
     'node --test docs/verify/1542/reach.test.mjs',
-    'node scripts/prepush-vitest.mjs',
-    'pnpm --filter @cairn/web e2e:affected -- apps/web/src/main.tsx',
   ])
     assert.ok(commands.includes(command), command);
 });
@@ -491,18 +517,44 @@ test('every CI node scripts step also runs in local prepush or is listed as CI-o
   for (const script of Object.keys(ciOnlyScripts)) assert.ok(ciScripts.includes(script), script);
 });
 
-test('a web change runs the whole web unit suite, which catches tests that read sources instead of importing them', () => {
-  const webSuite = 'pnpm --filter @cairn/web test';
+test('code changes keep suites in CI and out of local plans', () => {
+  for (const paths of [
+    ['apps/server/src/app.ts'],
+    ['apps/web/src/components/ui/skeleton.tsx'],
+    ['scripts/prepush.mjs'],
+  ]) {
+    for (const forceFull of [false, true]) {
+      const plan = prepushPlan(paths, 'local', forceFull);
+      assert.ok(!plan.some((step) => step[1] === 'scripts/prepush-vitest.mjs'));
+      assert.ok(!plan.some((step) => step.join(' ') === 'pnpm --filter @cairn/web test'));
+      assert.ok(!plan.some((step) => step.includes('e2e:affected')));
+      assert.deepEqual(prepushPlan(paths, 'ci', forceFull), [
+        ['node', 'scripts/english-only-gate.mjs'],
+        ['node', 'scripts/ui-debt-gate.mjs'],
+        ['node', 'scripts/ui-drift-gate.mjs'],
+        ['python3', 'scripts/pr-evidence-archive.test.py'],
+        ['pnpm', 'lint'],
+        ['pnpm', 'typecheck'],
+        ['pnpm', 'spec:parse'],
+        ['node', 'scripts/recording-gate.mjs'],
+        ['node', 'scripts/e2e-affected.mjs', '--check-coverage'],
+        ['node', '--test', 'docs/verify/1542/reach.test.mjs'],
+        ['node', '--test', 'scripts/escape-trace.test.mjs'],
+        ['node', 'scripts/escape-trace.mjs', 'validate-cases', 'integration/eval/review/cases'],
+        ['node', '--test', 'scripts/review-escapes.test.mjs'],
+        ['node', '--test', 'scripts/escape-eval-loop.test.mjs'],
+        ['node', 'scripts/lessons-ledger-gate.mjs'],
+        ['python3', 'scripts/pr-evidence-gate.test.py'],
+      ]);
+    }
+  }
+  const jobs = workflowJobs();
+  assert.ok(readFileSync('vitest.config.ts', 'utf8').includes("'apps/web'"));
+  assert.ok(jobs.get('vitest-light').includes('run: VITEST_PROJECT_SET=light pnpm test'));
   assert.ok(
-    prepushPlan(['apps/web/src/components/ui/skeleton.tsx'])
-      .map((args) => args.join(' '))
-      .includes(webSuite),
+    jobs.get('vitest-integration').includes('run: VITEST_PROJECT_SET=integration pnpm test'),
   );
-  assert.ok(
-    !prepushPlan(['apps/server/src/index.ts'])
-      .map((args) => args.join(' '))
-      .includes(webSuite),
-  );
+  assert.ok(jobs.get('e2e').includes('run: pnpm prepush --e2e-shard'));
 });
 
 test('local gates default their base to the merge-base, not the moving origin/main tip', () => {
@@ -514,21 +566,71 @@ test('local gates default their base to the merge-base, not the moving origin/ma
     );
 });
 
-test('affected e2e receives non-markdown evidence paths as code', () => {
-  const evidence = ['docs/verify/1/shot.png', 'docs/verify/2136/review-check.test.mjs'];
-  const paths = [...evidence, 'README.md', '.claude/epics/E1.json', 'scripts/evidence-prune.mjs'];
+test('executable evidence keeps code checks and data evidence keeps document readers', () => {
+  const paths = [
+    'docs/verify/1/shot.png',
+    'docs/verify/2136/review-check.test.mjs',
+    'README.md',
+    '.claude/epics/E1.json',
+    'scripts/evidence-prune.mjs',
+  ];
+  const plan = prepushPlan(paths);
+  assert.ok(plan.some((step) => step.join(' ') === 'pnpm lint'));
+  assert.ok(!plan.some((step) => step.includes('e2e:affected')));
   assert.deepEqual(
-    prepushPlan(paths).find((args) => args.includes('e2e:affected')),
-    [
-      'pnpm',
-      '--filter',
-      '@cairn/web',
-      'e2e:affected',
-      '--',
-      ...evidence,
-      'scripts/evidence-prune.mjs',
-    ],
+    plan.find((args) => args[1] === 'scripts/doc-reader-tests.mjs'),
+    ['node', 'scripts/doc-reader-tests.mjs', 'docs/verify/1/shot.png', 'README.md'],
   );
+});
+
+test('a docs-only data change still runs every test that reads the changed file', () => {
+  const data = 'docs/verify/920/wire-new/manifest-new.json';
+  assert.deepEqual(prepushPlan(['docs/lessons/events.jsonl', data], 'ci'), [
+    ['node', 'scripts/english-only-gate.mjs'],
+    ['node', 'scripts/lessons-ledger-gate.mjs'],
+    ['node', 'scripts/doc-reader-tests.mjs', 'docs/lessons/events.jsonl', data],
+  ]);
+  assert.ok(
+    docReaderTests(
+      [data],
+      (doc) => {
+        const result = spawnSync(
+          'git',
+          ['-c', 'color.ui=never', 'grep', '-l', '-F', '-e', doc, '--', '*.test.ts', '*.test.mjs'],
+          { encoding: 'utf8' },
+        );
+        return result.status === 0 ? result.stdout.split('\n').filter(Boolean) : [];
+      },
+      [],
+    ).vitest.includes('apps/daemon/test/skills-version-skew.test.ts'),
+  );
+});
+
+test('every node --test step in any workflow runs locally when its tests, sources or workflow change', () => {
+  const steps = workflowTestSteps();
+  const written = readdirSync('.github/workflows')
+    .filter((name) => name.endsWith('.yml'))
+    .flatMap(
+      (name) => readFileSync(join('.github/workflows', name), 'utf8').match(/node --test\b/g) ?? [],
+    );
+  assert.equal(steps.length, written.length, 'every node --test step is parsed');
+  assert.ok(steps.some(({ workflow }) => workflow === '.github/workflows/silent-revert-gate.yml'));
+  assert.ok(steps.some(({ tests }) => tests.includes('scripts/lane-model-policy.test.mjs')));
+  assert.ok(steps.some(({ tests }) => tests.some((test) => test in ciOnlyTestSteps)));
+  for (const { workflow, tests } of steps) {
+    const step = ['node', '--test', ...tests].join(' ');
+    if (tests.some((test) => test in ciOnlyTestSteps)) {
+      assert.ok(!prepushPlan([workflow]).some((args) => args.join(' ') === step), step);
+      continue;
+    }
+    for (const path of [workflow, tests[0], tests[0].replace(/\.test\.mjs$/, '.mjs')]) {
+      assert.equal(
+        prepushPlan([path]).filter((args) => args.join(' ') === step).length,
+        1,
+        `${path} should run ${step} exactly once`,
+      );
+    }
+  }
 });
 
 test('e2e coverage check passes on the real suite and names an unmapped spec', () => {
@@ -572,10 +674,6 @@ test('CI shares the plan but keeps advisory and full e2e in separate jobs', () =
     prepushPlan(paths).filter(
       (args) =>
         !localOnly.some((local) => local.join(' ') === args.join(' ')) &&
-        !['node scripts/prepush-vitest.mjs', 'pnpm --filter @cairn/web test'].includes(
-          args.join(' '),
-        ) &&
-        !args.includes('e2e:affected') &&
         !args.includes('--compile'),
     ),
   );
