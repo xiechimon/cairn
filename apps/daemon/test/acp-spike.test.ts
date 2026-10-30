@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { once } from 'node:events';
 import { fileURLToPath } from 'node:url';
 import { type SessionOpts, type StepEvent, toolCallRecordSchema } from '@cairn/shared';
 import { afterEach, describe, expect, test, vi } from 'vitest';
@@ -269,6 +270,56 @@ describe('ACP spike with a real scripted stdio child', () => {
       }).createSession(opts),
     ).rejects.toThrow('ENOENT');
   });
+
+  test.skipIf(process.platform === 'win32').each(['exit', 'stop-exit'])(
+    '%s mid-prompt reaps the adapter and its descendant within two seconds',
+    async (mode) => {
+      const child = spawn(
+        process.execPath,
+        [
+          '--import',
+          import.meta.resolve('tsx'),
+          fileURLToPath(new URL('./fixtures/acp-exit.mjs', import.meta.url)),
+          mode,
+        ],
+        { stdio: ['ignore', 'pipe', 'pipe', 'ipc'] },
+      );
+      let adapterPid: number | undefined;
+      let descendantPid: number | undefined;
+      const alive = (pid: number) => {
+        try {
+          process.kill(pid, 0);
+          return true;
+        } catch {
+          return false;
+        }
+      };
+      const exited = once(child, 'exit');
+      try {
+        const [message] = await once(child, 'message', { signal: AbortSignal.timeout(3_000) });
+        const pids = message as {
+          adapterPid: number;
+          descendantPid: number;
+        };
+        ({ adapterPid, descendantPid } = pids);
+        expect(alive(adapterPid)).toBe(true);
+        expect(alive(descendantPid)).toBe(true);
+        child.send('exit');
+        expect(await exited).toEqual([0, null]);
+        await expect
+          .poll(() => [alive(pids.adapterPid), alive(pids.descendantPid)], { timeout: 2_000 })
+          .toEqual([false, false]);
+      } finally {
+        if (child.exitCode === null && child.signalCode === null) {
+          child.kill('SIGKILL');
+          await exited;
+        }
+        if (adapterPid !== undefined && alive(adapterPid)) process.kill(-adapterPid, 'SIGKILL');
+        if (descendantPid !== undefined && alive(descendantPid))
+          process.kill(descendantPid, 'SIGKILL');
+      }
+    },
+  );
 
   test('allows a single permission only under the explicit per-agent policy', async () => {
     const session = await createAcpBackend({

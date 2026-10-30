@@ -76,7 +76,7 @@ export async function runForeground(opts: StartOptions): Promise<void> {
     hookTimeoutMs: config.hookTimeoutMs,
   });
   const onSignal = (signal: string) => {
-    void handle.stop(signal);
+    void handle.stop(signal).finally(() => process.exit());
   };
   process.on('SIGTERM', () => onSignal('SIGTERM'));
   process.on('SIGINT', () => onSignal('SIGINT'));

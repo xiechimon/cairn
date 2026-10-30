@@ -33,6 +33,25 @@ import { DAEMON_VERSION } from '../version.js';
 import { openAcpTools } from './acp-tools.js';
 import { isLearnedNoVision, rememberNoVision } from './image-support.js';
 
+const adapterProcessGroups = new Set<number>();
+
+function terminateAdapterProcessGroup(pid: number, signal: NodeJS.Signals): void {
+  try {
+    process.kill(-pid, signal);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error;
+  }
+  if (signal === 'SIGKILL') adapterProcessGroups.delete(pid);
+}
+
+process.once('exit', () => {
+  for (const pid of adapterProcessGroups) {
+    try {
+      terminateAdapterProcessGroup(pid, 'SIGKILL');
+    } catch {}
+  }
+});
+
 export const GEMINI_CAPABILITIES: AgentBackendCapabilities = {
   name: 'gemini',
   thinkingLevels: [],
@@ -379,6 +398,8 @@ class AcpBackend implements AgentBackend {
       hostTools?.close();
       throw error;
     }
+    const groupPid = adapter && process.platform !== 'win32' ? child.pid : undefined;
+    if (groupPid !== undefined) adapterProcessGroups.add(groupPid);
     let stderr = '';
     child.stderr.on('data', (chunk: Buffer) => {
       stderr = (stderr + chunk.toString()).slice(-8192);
@@ -414,7 +435,6 @@ class AcpBackend implements AgentBackend {
         new Error(`${adapter?.harness ?? 'Gemini'} ACP exited (${code}): ${stderr}`),
       ),
     );
-    const groupPid = adapter && process.platform !== 'win32' ? child.pid : undefined;
     let exited = false;
     let cleanedUp = false;
     let killTimer: ReturnType<typeof setTimeout> | undefined;
@@ -425,9 +445,9 @@ class AcpBackend implements AgentBackend {
     const terminate = (signal: NodeJS.Signals) => {
       if (groupPid !== undefined) {
         try {
-          process.kill(-groupPid, signal);
-        } catch (error) {
-          if ((error as NodeJS.ErrnoException).code !== 'ESRCH') child.kill(signal);
+          terminateAdapterProcessGroup(groupPid, signal);
+        } catch {
+          child.kill(signal);
         }
       } else if (!exited) child.kill(signal);
     };
