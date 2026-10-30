@@ -233,7 +233,11 @@ function degradedFreshPrompt(claimed: ClaimedStep, plansDir: string, convId: str
       claimed.step.kind === 'verify') &&
     (claimed.project?.repo ?? null) !== null
   ) {
-    text = appendWorkBranchNote(text, conversationBranch(convId));
+    text = appendWorkBranchNote(
+      text,
+      conversationBranch(convId),
+      claimed.project?.repo?.baseBranch,
+    );
   }
   return text;
 }
@@ -438,7 +442,11 @@ async function runClaimedStep(
       claimed.step.kind === 'merge' ||
       claimed.step.kind === 'verify') &&
     (claimed.project?.repo ?? null) !== null
-      ? appendWorkBranchNote(promptWithPlanNote, conversationBranch(convId))
+      ? appendWorkBranchNote(
+          promptWithPlanNote,
+          conversationBranch(convId),
+          claimed.project?.repo?.baseBranch,
+        )
       : promptWithPlanNote;
   if (claimed.step.kind === 'plan') {
     mkdirSync(join(deps.paths.plansDir, convId), { recursive: true });
@@ -633,6 +641,7 @@ async function runClaimedStep(
         conversationId: convId,
         cloneUrl: repo.cloneUrl,
         repoKind: repo.kind,
+        baseBranch: repo.baseBranch,
         workspacesRoot: deps.workspacesDir,
         credentials: creds.git,
         localPath: repo.kind === 'github' ? (repo.localPath ?? null) : null,
@@ -752,8 +761,7 @@ async function runClaimedStep(
       const matched: string[] = [];
       let m = slashPattern.exec(deliveryPrompt);
       while (m !== null) {
-        // biome-ignore lint/style/noNonNullAssertion: regex /\/([a-z][a-z0-9-]*)/ guarantees capture group 1 when exec returned non-null
-        const name = m[1]!;
+        const name = m[1] ?? '';
         if (visibleNames.has(name)) {
           matched.push(name);
         } else {
@@ -1919,6 +1927,7 @@ async function runClaimedStep(
           owner: ghRef.owner,
           repo: ghRef.repo,
           branch: head,
+          baseBranch: ws.defaultBranch,
           token: creds.git?.password ?? null,
         }).catch((err: unknown) => {
           logger.step(

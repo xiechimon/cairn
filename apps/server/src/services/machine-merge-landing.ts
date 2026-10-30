@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import { build, type step, todo } from '../db/schema.js';
 import { systemGitOps } from '../lib/git.js';
 import { projectOfTodo, repoDirFor } from './git.js';
+import { parseHostedMergeInstruction } from './hosted-merge-instruction.js';
 import type { MachineDeps } from './machine-deps.js';
 
 export const MERGE_LANDING_SKIPPED = Symbol('merge-landing-skipped');
@@ -33,15 +34,32 @@ export async function applyMergeLanding(
   if (commit === null) return 'merge step reported no commit';
   const dir = repoDirFor(deps.reposDir, todoRow.teamId, projectRow.repoName);
   const { defaultBranch } = await systemGitOps.listBranches(dir);
-  const branch = defaultBranch ?? 'main';
+  const target = parseHostedMergeInstruction(stepRow.prompt);
+  if (target === null) return 'merge landing refused: pinned base missing — rerun the task';
+  const branch = target.baseBranch;
+  if (
+    target.projectId !== projectRow.id ||
+    target.repoName !== projectRow.repoName ||
+    target.configuredBaseBranch !== projectRow.baseBranch ||
+    branch !== (projectRow.baseBranch ?? defaultBranch ?? 'main')
+  )
+    return 'merge landing refused: project base changed — rerun the task';
   const tip = await systemGitOps.resolveCommit(dir, `refs/heads/${branch}`);
-  if (tip !== null && tip !== commit) {
+  if (tip === null) return `merge landing refused: ${branch} missing — rerun the task`;
+  if (tip !== commit) {
     const ancestor = await systemGitOps.isAncestor(dir, tip, commit);
     if (!ancestor) {
       return `merge landing refused: ${branch} moved (non-fast-forward) — rerun the task`;
     }
   }
   if (mergeCardLeftReview(deps, stepRow)) return MERGE_LANDING_SKIPPED;
+  const current = projectOfTodo(deps.db, todoRow);
+  if (
+    current?.id !== target.projectId ||
+    current.repoName !== target.repoName ||
+    current.baseBranch !== target.configuredBaseBranch
+  )
+    return 'merge landing refused: project base changed — rerun the task';
   await systemGitOps.updateBranchRef(dir, branch, commit);
   return null;
 }

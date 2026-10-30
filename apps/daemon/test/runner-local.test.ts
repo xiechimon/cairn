@@ -172,7 +172,7 @@ function fakeWorkspace(opts: { prepareError?: Error } = {}) {
         cwd: join(input.workspacesRoot, input.conversationId),
         baseRepoDir: join(input.workspacesRoot, input.projectId, 'repo'),
         branch: `cairn/conv-${input.conversationId}`,
-        defaultBranch: 'main',
+        defaultBranch: input.baseBranch ?? 'main',
         reused: false,
       };
     },
@@ -706,4 +706,92 @@ test('a structured local merge lands without starting an agent or the branch del
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+for (const baseBranch of ['dev', 'nope']) {
+  test(`a build uses the configured origin/${baseBranch} or fails with that ref`, async () => {
+    const home = mkdtempSync(join(tmpdir(), 'cairn-base-branch-'));
+    try {
+      const userRepo = join(home, 'origin');
+      mkdirSync(userRepo);
+      seedUserRepo(userRepo);
+      const git = (...args: string[]) =>
+        execFileSync('git', ['-C', userRepo, ...args], { encoding: 'utf8' }).trim();
+      const main = git('rev-parse', 'main');
+      git('checkout', '-b', 'dev');
+      writeFileSync(join(userRepo, 'dev.txt'), 'dev only\n');
+      git('add', 'dev.txt');
+      git('-c', 'user.name=test', '-c', 'user.email=test@localhost', 'commit', '-m', 'dev');
+      const dev = git('rev-parse', 'dev');
+      git('checkout', 'main');
+      const paths = statePaths(home, join(home, 'workspaces'));
+      const { logger } = captureLogger();
+      const workspace = new WorkspaceManager({ logger });
+      const client = new FakeClient();
+      const claimed = claimedStep('build', { kind: 'local', cloneUrl: userRepo, baseBranch });
+      await runStep(
+        {
+          client,
+          journal: new StepJournal(paths.outboxDir),
+          backendFor: () => probeWritingBackend(),
+          logger,
+          paths,
+          workspace,
+          workspacesDir: paths.workspacesDir,
+          mcpConfigPath: join(home, 'claude.json'),
+          heartbeatIntervalMs: 60_000,
+        },
+        claimed,
+      );
+      const report = client.doneBodies[0]?.body;
+      if (baseBranch === 'nope') {
+        expect(report?.status).toBe('failed');
+        expect(report?.errorMessage).toContain('origin/nope');
+        expect(git('rev-parse', 'main')).toBe(main);
+        expect(git('rev-parse', 'dev')).toBe(dev);
+        return;
+      }
+      expect(report?.status).toBe('success');
+      const cwd = join(paths.workspacesDir, claimed.conversationId);
+      const workGit = (...args: string[]) =>
+        execFileSync('git', ['-C', cwd, ...args], { encoding: 'utf8' }).trim();
+      expect(workGit('merge-base', 'HEAD', 'origin/dev')).toBe(workGit('rev-parse', 'origin/dev'));
+      const head = workGit('rev-parse', 'HEAD');
+      const merge = claimedStep('merge', { kind: 'local', cloneUrl: userRepo, baseBranch });
+      merge.localMerge = {
+        projectId: 'p1',
+        buildId: 'conv-1',
+        defaultBranch: baseBranch,
+        workBranch: 'cairn/conv-conv-1',
+        judgedBase: dev,
+        judgedHead: head,
+        judgedPatchDigest: (await inspectLocalPatch(userRepo, dev, head)).patchDigest,
+        localChecks: ['test -f probe.txt'],
+        message: 'Land on dev',
+        identity: { name: 'test', email: 'test@localhost' },
+      };
+      const merged = await setup(merge);
+      expect(merged.client.doneBodies[0]?.body.localMerge?.result.outcome).toBe('merged');
+      workGit('fetch', 'origin');
+      expect(workGit('rev-parse', 'origin/dev')).not.toBe(dev);
+      expect(workGit('rev-parse', 'origin/dev^')).toBe(dev);
+      expect(workGit('rev-parse', 'origin/main')).toBe(main);
+      expect(git('rev-parse', 'HEAD')).toBe(main);
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  }, 30_000);
+}
+
+test('a configured GitHub base reaches the agent prompt and PR probe', async () => {
+  const { paths } = await setup(
+    claimedStep('build', {
+      kind: 'github',
+      cloneUrl: 'https://github.com/o/r.git',
+      baseBranch: 'dev',
+    }),
+  );
+  const transcript = readFileSync(join(paths.outboxDir, 'step-s1.transcript.json'), 'utf8');
+  expect(transcript).toContain("--base 'dev'");
+  expect(probeMock).toHaveBeenCalledWith(expect.objectContaining({ baseBranch: 'dev' }));
 });

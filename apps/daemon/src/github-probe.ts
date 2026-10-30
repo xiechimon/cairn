@@ -33,6 +33,7 @@ interface ProbeOpts {
   owner: string;
   repo: string;
   branch: string;
+  baseBranch?: string;
   token?: string | null;
   fetchImpl?: ProbeFetch;
   ghPath?: string;
@@ -49,10 +50,11 @@ async function probeViaGh(opts: ProbeOpts, ghPath: string): Promise<GithubPrProb
         `${opts.owner}/${opts.repo}`,
         '--head',
         opts.branch,
+        ...(opts.baseBranch !== undefined ? ['--base', opts.baseBranch] : []),
         '--state',
         'all',
         '--json',
-        'number,url,state',
+        'number,url,state,baseRefName',
         '--limit',
         '5',
       ],
@@ -67,19 +69,26 @@ async function probeViaGh(opts: ProbeOpts, ghPath: string): Promise<GithubPrProb
     });
   });
   if (r === null) return null;
-  let rows: { number: number; url: string; state?: string }[];
+  let rows: { number: number; url: string; state?: string; baseRefName?: string }[];
   try {
-    rows = JSON.parse(r.stdout) as { number: number; url: string; state?: string }[];
+    rows = JSON.parse(r.stdout) as {
+      number: number;
+      url: string;
+      state?: string;
+      baseRefName?: string;
+    }[];
   } catch {
     return null;
   }
-  return pickPr(rows);
+  return pickPr(
+    rows.filter((row) => opts.baseBranch === undefined || row.baseRefName === opts.baseBranch),
+  );
 }
 
 async function probeViaApi(opts: ProbeOpts, fetchImpl: ProbeFetch): Promise<GithubPrProbe | null> {
   const url = `https://api.github.com/repos/${opts.owner}/${opts.repo}/pulls?head=${encodeURIComponent(
     `${opts.owner}:${opts.branch}`,
-  )}&state=all`;
+  )}&state=all${opts.baseBranch === undefined ? '' : `&base=${encodeURIComponent(opts.baseBranch)}`}`;
   let data: unknown;
   try {
     const res = await fetchImpl(url, {
@@ -99,6 +108,11 @@ async function probeViaApi(opts: ProbeOpts, fetchImpl: ProbeFetch): Promise<Gith
   const rows = data
     .filter((r): r is { number: number; html_url: string; state?: string } => {
       if (r === null || typeof r !== 'object') return false;
+      if (
+        opts.baseBranch !== undefined &&
+        (r as { base?: { ref?: unknown } }).base?.ref !== opts.baseBranch
+      )
+        return false;
       const { number, html_url } = r as { number?: unknown; html_url?: unknown };
       return typeof number === 'number' && typeof html_url === 'string';
     })
@@ -106,7 +120,9 @@ async function probeViaApi(opts: ProbeOpts, fetchImpl: ProbeFetch): Promise<Gith
   return pickPr(rows);
 }
 
-function pickPr(rows: { number: number; url: string; state?: string }[]): GithubPrProbe | null {
+function pickPr(
+  rows: { number: number; url: string; state?: string; baseRefName?: string }[],
+): GithubPrProbe | null {
   if (rows.length === 0) return null;
   const open = rows.filter((r) => r.state === 'open');
   const pool = open.length > 0 ? open : rows;

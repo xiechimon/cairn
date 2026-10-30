@@ -176,8 +176,7 @@ export class WorkspaceManager implements WorktreeOps {
         }
         await runNet('fetch', (cred) => withGitNetRetries(() => gitPrim.fetch(baseRepoDir, cred)));
       }
-      const defaultBranch = await gitPrim.remoteDefaultBranch(baseRepoDir);
-
+      const defaultBranch = input.baseBranch ?? (await gitPrim.remoteDefaultBranch(baseRepoDir));
       if (input.readonly === true) {
         const reused = await this.materializeReadonlyExport(
           baseRepoDir,
@@ -216,6 +215,12 @@ export class WorkspaceManager implements WorktreeOps {
         };
       }
 
+      if (
+        input.baseBranch != null &&
+        !(await gitPrim.hasRemoteBranch(baseRepoDir, defaultBranch))
+      ) {
+        throw new Error(`remote has no base branch (origin/${defaultBranch} missing)`);
+      }
       if (existsSync(convDir)) rmSync(convDir, { recursive: true, force: true });
       await gitPrim.worktreePrune(baseRepoDir);
       const remoteHas = await gitPrim.hasRemoteBranch(baseRepoDir, branch);

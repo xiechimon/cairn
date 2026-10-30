@@ -120,20 +120,6 @@ export function isOwnPull(pull: GithubPull, branch: string): boolean {
   return pull.headRepoId !== null && pull.headRepoId === pull.baseRepoId && pull.headRef === branch;
 }
 
-export function isOwnOpenDefaultPull(
-  p: GithubPull,
-  branch: string,
-): p is GithubPull & {
-  headRef: string;
-  baseRef: string;
-  defaultBranch: string;
-  baseRepoId: number;
-} {
-  return (
-    hasPullFields(p) && isOwnPull(p, branch) && p.baseRef === p.defaultBranch && p.state === 'open'
-  );
-}
-
 export interface GithubPullPage {
   notModified: boolean;
   etag: string | null;

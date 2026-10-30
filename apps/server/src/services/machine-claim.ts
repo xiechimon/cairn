@@ -43,6 +43,7 @@ import {
   unassignedStepReason,
 } from './dispatch-eligibility.js';
 import { projectOfTodo, projectRepoRef } from './git.js';
+import { parseHostedMergeInstruction } from './hosted-merge-instruction.js';
 import {
   agentForStep,
   type MachineDeps,
@@ -473,7 +474,13 @@ async function tryClaim(
             ...(priorMachineId !== null && sessionOnOtherMachine ? { priorMachineId } : {}),
           };
     const projectRow = projectOfTodo(db, cand.todoRow);
-    const repo = projectRepoRef(projectRow, origin);
+    const repoRef = projectRepoRef(projectRow, origin);
+    const mergeTarget =
+      cand.stepRow.kind === 'merge' ? parseHostedMergeInstruction(cand.stepRow.prompt) : null;
+    const repo =
+      repoRef?.kind === 'hosted' && mergeTarget !== null
+        ? { ...repoRef, baseBranch: mergeTarget.baseBranch }
+        : repoRef;
     const workerMcp = claimMcpSlugs(machineRow.latestCliVersion, agentRow.mcpServers);
     const isGithubProject = projectRow?.repoKind === 'github';
     const taskMeta =
