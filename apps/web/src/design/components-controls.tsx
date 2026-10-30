@@ -73,20 +73,20 @@ function ChoiceRow({
   disabled = false,
 }: {
   label: string;
-  control: ReactNode;
+  control: (id: string) => ReactNode;
   disabled?: boolean;
 }) {
+  const id = useId();
   return (
-    // biome-ignore lint/a11y/noLabelWithoutControl: Base UI Checkbox.Root and Switch.Root render their hidden native input inside this label at runtime; the static check cannot see through the component.
-    <label
-      className={cn(
-        'flex items-center gap-2.5 text-ui',
-        disabled ? 'text-content-tertiary' : 'cursor-pointer',
-      )}
-    >
-      {control}
-      {label}
-    </label>
+    <div className="flex items-center gap-2.5">
+      {control(id)}
+      <label
+        htmlFor={id}
+        className={cn('text-ui', disabled ? 'text-content-tertiary' : 'cursor-pointer')}
+      >
+        {label}
+      </label>
+    </div>
   );
 }
 
@@ -370,43 +370,53 @@ export function ChoiceSection() {
         <div className="flex flex-col gap-3">
           <ChoiceRow
             label="Run all checks"
-            control={
+            control={(id) => (
               <Checkbox
+                id={id}
                 checked={all}
                 indeterminate={some && !all}
                 onCheckedChange={(on) => setChecks({ tests: on, lint: on })}
               />
-            }
+            )}
           />
           <div className="flex flex-col gap-3 pl-6">
             <ChoiceRow
               label="Tests"
-              control={
+              control={(id) => (
                 <Checkbox
+                  id={id}
                   checked={checks.tests}
                   onCheckedChange={(on) => setChecks((c) => ({ ...c, tests: on }))}
                 />
-              }
+              )}
             />
             <ChoiceRow
               label="Lint"
-              control={
+              control={(id) => (
                 <Checkbox
+                  id={id}
                   checked={checks.lint}
                   onCheckedChange={(on) => setChecks((c) => ({ ...c, lint: on }))}
                 />
-              }
+              )}
             />
           </div>
-          <ChoiceRow label="Deploy (needs a machine)" disabled control={<Checkbox disabled />} />
+          <ChoiceRow
+            label="Deploy (needs a machine)"
+            disabled
+            control={(id) => <Checkbox id={id} disabled />}
+          />
         </div>
         <div className="flex flex-col gap-4">
           <ChoiceRow
             label="Notify me when a task needs me"
-            control={<Switch checked={notify} onCheckedChange={setNotify} />}
+            control={(id) => <Switch id={id} checked={notify} onCheckedChange={setNotify} />}
           />
-          <ChoiceRow label="Small switch" control={<Switch size="sm" defaultChecked />} />
-          <ChoiceRow label="Disabled" disabled control={<Switch disabled />} />
+          <ChoiceRow
+            label="Small switch"
+            control={(id) => <Switch id={id} size="sm" defaultChecked />}
+          />
+          <ChoiceRow label="Disabled" disabled control={(id) => <Switch id={id} disabled />} />
         </div>
       </Specimen>
       <Specimen
