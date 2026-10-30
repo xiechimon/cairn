@@ -49,6 +49,7 @@ import { type GateVerdictView, isFullSha, mergeReadiness } from './merge-gate/re
 import { type FinalVerdictLine, parseFinalVerdictLine } from './merge-gate/verdict-line.js';
 import { githubGatePort } from './merge-gate-github.js';
 import { projectMergeConfigOf } from './projects.js';
+import { notifyEvaluatedReview, pendingReviewPushEntry } from './thread-push.js';
 import { insertMessageRow } from './transcript.js';
 
 export const MERGE_GATE_RUN_KIND = 'merge_gate_run';
@@ -104,6 +105,7 @@ export async function evaluateMergeGate(
   if (buildRow?.prNumber == null) return null;
   const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
   if (todoRow === undefined) return null;
+  const reviewPushEntry = pendingReviewPushEntry(deps, buildId);
   const projectRow = projectOfTodo(deps.db, todoRow);
   const repo = githubRepoOfProject(projectRow);
   if (repo === null || projectRow === undefined) return null;
@@ -392,6 +394,7 @@ export async function evaluateMergeGate(
       },
     })
     .run();
+  notifyEvaluatedReview(deps, buildId, readiness, reviewPushEntry);
   const plan = planGateStatusWrite({
     policy: readiness.policy,
     readiness,

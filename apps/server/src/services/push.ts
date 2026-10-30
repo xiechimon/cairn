@@ -15,6 +15,7 @@ import webpush from 'web-push';
 import type { Db } from '../db/client.js';
 import { pushDelivery, pushDigestItem, pushSubscription } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { isViewingThread } from './thread-presence.js';
 
 export interface VapidKeys {
   publicKey: string;
@@ -223,7 +224,7 @@ export function pushToUserSafely(
   teamId: string,
   msg: PushMessage,
 ): void {
-  if (vapid === null) return;
+  if (vapid === null || isViewingThread(db, userId, teamId, msg.href)) return;
   void sendPushToUser(db, vapid, userId, teamId, msg).catch(() => {
     process.stderr.write('web push delivery failed\n');
   });

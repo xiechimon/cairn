@@ -6,11 +6,16 @@ import { and, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { z } from 'zod';
 import type { AppContext } from './context.js';
-import { pushDelivery, pushSubscription } from './db/schema.js';
+import { pushDelivery, pushSubscription, todo } from './db/schema.js';
 import { parseWith } from './lib/errors.js';
 import { newRecordId, nowMs } from './lib/ids.js';
 import { jsonBody, requireTeam } from './routes-helpers.js';
 import { sendMustReachAlert } from './services/push-alerts.js';
+import { clearThreadPresence, recordThreadPresence } from './services/thread-presence.js';
+
+const threadPresenceBodySchema = z
+  .object({ todoId: z.string().min(1).max(128), tabId: z.string().min(1).max(128) })
+  .strict();
 
 const requestWindows = new WeakMap<AppContext, Map<string, number[]>>();
 
@@ -26,6 +31,26 @@ function allowRequest(ctx: AppContext, key: string): boolean {
 }
 
 export function registerPushRoutes(app: Hono, ctx: AppContext): void {
+  app.post('/api/teams/:id/presence', async (c) => {
+    requireTeam(ctx, c.req.param('id'));
+    const body = parseWith(threadPresenceBodySchema, await jsonBody(c), 'body');
+    const row = ctx.db
+      .select({ id: todo.id })
+      .from(todo)
+      .where(and(eq(todo.id, body.todoId), eq(todo.teamId, ctx.team.id)))
+      .get();
+    if (row === undefined) return c.json({ error: 'thread not found' }, 404);
+    recordThreadPresence(ctx.db, ctx.user.id, ctx.team.id, row.id, body.tabId);
+    return c.json({ ok: true });
+  });
+
+  app.delete('/api/teams/:id/presence', async (c) => {
+    requireTeam(ctx, c.req.param('id'));
+    const body = parseWith(threadPresenceBodySchema, await jsonBody(c), 'body');
+    clearThreadPresence(ctx.db, ctx.user.id, ctx.team.id, body.todoId, body.tabId);
+    return c.json({ ok: true });
+  });
+
   app.post('/api/teams/:id/push/receipts', async (c) => {
     requireTeam(ctx, c.req.param('id'));
     const body = parseWith(

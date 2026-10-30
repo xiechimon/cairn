@@ -53,7 +53,8 @@ import type { MachineWakeHub } from './machine-wake-hub.js';
 import { notifyTodoPhase } from './notifications.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { assertPhaseTransition, canManualMovePhase } from './phase.js';
-import { queuePushDigest, type VapidKeys } from './push.js';
+import type { VapidKeys } from './push.js';
+import { notifyThreadPhase } from './thread-push.js';
 import { insertGateAnnouncement } from './transcript.js';
 
 type TodoRow = typeof todo.$inferSelect;
@@ -74,26 +75,7 @@ function notifyPhaseEntry(deps: TodoDeps, record: TodoRecord, from: Phase, to: P
   if (from === to) return;
   if (to === 'confirm' || to === 'review') notifyTodoPhase(deps, record, to);
   triggerChiefWakes(deps, record, to);
-  queueDigestEntry(deps, record, to);
-}
-
-export function queueDigestEntry(deps: TodoDeps, record: TodoRecord, to: Phase): void {
-  const copy =
-    to === 'confirm'
-      ? { title: '方案已就绪', body: `#${record.seqNum} ${record.title}` }
-      : to === 'review'
-        ? { title: '构建待审核', body: `#${record.seqNum} ${record.title}` }
-        : to === 'failed'
-          ? { title: '任务失败', body: `#${record.seqNum} ${record.title}` }
-          : to === 'done'
-            ? { title: 'Task completed', body: `#${record.seqNum} ${record.title}` }
-            : null;
-  if (copy === null) return;
-  queuePushDigest(deps.db, deps.user.id, record.teamId, {
-    ...copy,
-    href: `/app/todo/${record.id}`,
-    tag: `${deps.user.id}:${record.id}`,
-  });
+  notifyThreadPhase(deps, record, to);
 }
 
 export function toTodoRecord(deps: TodoDeps, row: TodoRow): TodoRecord {

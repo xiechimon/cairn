@@ -4,7 +4,8 @@ import {
   REVIEW_VERDICT_KIND,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
+import webpush from 'web-push';
 import {
   agent as agentTable,
   build,
@@ -15,6 +16,9 @@ import {
   gateVerdict,
   message,
   project,
+  pushDelivery,
+  pushDigestItem,
+  pushSubscription,
   step,
   team,
   todo,
@@ -28,6 +32,7 @@ import {
   gateRunMismatch,
   MERGE_GATE_RUN_KIND,
 } from '../src/services/merge-gate-run.js';
+import { setTodoPhase } from '../src/services/todos.js';
 import { bootServer, postProject, type TestServer } from './helpers.js';
 
 const HEAD = 'a'.repeat(40);
@@ -39,6 +44,7 @@ const servers: TestServer[] = [];
 afterEach(() => {
   for (const s of servers) s.dispose();
   servers.length = 0;
+  vi.restoreAllMocks();
 });
 
 function ok(body: unknown): GateRaw {
@@ -47,6 +53,7 @@ function ok(body: unknown): GateRaw {
 
 function scriptedPort(
   statuses: { sha: string; state: string; description: string }[],
+  options: { checksPending?: boolean; forked?: boolean } = {},
 ): GateGithubPort {
   const shot = 'docs/verify/1794/shot.png';
   const pull = {
@@ -57,7 +64,11 @@ function scriptedPort(
     changed_files: 2,
     mergeable_state: 'clean',
     body: `evidence: https://raw.githubusercontent.com/${OWNER}/${REPO}/${HEAD}/${shot}`,
-    head: { sha: HEAD, ref: 'lane/1794', repo: { full_name: `${OWNER}/${REPO}` } },
+    head: {
+      sha: HEAD,
+      ref: 'lane/1794',
+      repo: { full_name: options.forked ? 'another/fork' : `${OWNER}/${REPO}` },
+    },
     base: {
       ref: 'main',
       repo: { full_name: `${OWNER}/${REPO}`, default_branch: 'main' },
@@ -89,7 +100,7 @@ function scriptedPort(
     {
       id: 1,
       name: 'check',
-      status: 'completed',
+      status: options.checksPending ? 'in_progress' : 'completed',
       conclusion: 'success',
       head_sha: HEAD,
       app: { id: 1 },
@@ -585,4 +596,203 @@ test('an open GitHub marker blocks server readiness with autonomy-paused', async
     { port: scriptedPort([]) },
   );
   expect(readiness?.blockers.map((blocker) => blocker.code)).toContain('autonomy-paused');
+});
+
+async function reviewPushWorld(policy: 'human' | 'autonomous') {
+  const w = await world();
+  const { s, buildId, stepId } = w;
+  s.db
+    .update(project)
+    .set({ autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, mergePolicy: policy } })
+    .run();
+  completeStep(s.svc, stepId, { hasChanges: true });
+  const review = s.db
+    .select()
+    .from(step)
+    .where(eq(step.buildId, buildId))
+    .all()
+    .find((row) => row.kind === 'review');
+  if (!review) throw new Error('Missing review step');
+  s.db.update(step).set({ status: 'done', finishedAt: 2 }).where(eq(step.id, review.id)).run();
+  const port = scriptedPort([]);
+  const raw = await port.compare(BASE, HEAD, { page: 1, perPage: 100 });
+  if (raw.kind !== 'ok') throw new Error('Missing comparison fixture');
+  const digest = computePatchDigest(compareFilesFromResponse(raw.body) ?? [], {
+    expectedFileCount: 2,
+  }).patchDigest;
+  for (const kind of ['review', 'verify', 'decision'] as const) {
+    s.db
+      .insert(gateVerdict)
+      .values({
+        stepId: kind === 'review' ? review.id : `verdict-${kind}`,
+        buildId,
+        kind,
+        perspective: kind === 'review' ? 'code_reviewer' : null,
+        outcome: 'pass',
+        patchDigest: digest,
+        headSha: HEAD,
+        expectedHeadSha: HEAD,
+        createdAt: 3,
+      })
+      .run();
+  }
+  s.db
+    .insert(message)
+    .values({
+      id: 'push-review-verdict',
+      conversationId: buildId,
+      role: 'system',
+      content: JSON.stringify({
+        kind: REVIEW_VERDICT_KIND,
+        stepId: review.id,
+        verdict: { conclusion: 'Safe', gateLoosening: false, evalRulerChange: false, findings: [] },
+      }),
+      createdAt: 3,
+    })
+    .run();
+  s.db
+    .insert(pushSubscription)
+    .values({
+      id: 'push-review-sub',
+      userId: s.user.id,
+      teamId: s.team.id,
+      endpoint: 'https://push.example/sub',
+      p256dh: 'key',
+      auth: 'auth',
+      createdAt: 1,
+    })
+    .run();
+  s.db
+    .insert(gateState)
+    .values({
+      buildId,
+      ready: false,
+      policy,
+      headSha: HEAD,
+      patchDigest: digest,
+      evaluatedAt: 1,
+      blockers: [
+        { code: 'phase-not-review', class: 'transient', label: 'Building', detail: [] },
+        { code: 'required-check-pending', class: 'transient', label: 'Checks pending', detail: [] },
+      ],
+    })
+    .run();
+  return w;
+}
+
+test('review push follows fresh gate evaluation once per persisted review entry', async () => {
+  const { s, buildId } = await reviewPushWorld('human');
+  vi.spyOn(Date, 'now').mockReturnValue(Date.now());
+  const send = vi
+    .spyOn(webpush, 'sendNotification')
+    .mockResolvedValue({ statusCode: 201, body: '', headers: {} });
+  setTodoPhase(s.svc, 'todo-1794', 'review');
+  expect(send).not.toHaveBeenCalled();
+  const readiness = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
+  expect(readiness?.blockers.map((blocker) => blocker.code)).toEqual(['policy-human']);
+  expect(send).toHaveBeenCalledTimes(1);
+  expect(s.db.select().from(pushDigestItem).all()).toHaveLength(0);
+  expect(s.db.select().from(pushDelivery).all()).toEqual([
+    expect.objectContaining({
+      pushStatus: 'review-notified',
+      userId: s.user.id,
+      teamId: s.team.id,
+    }),
+  ]);
+  await Promise.all([
+    evaluateMergeGate({ ...s.svc }, buildId, { port: scriptedPort([]) }),
+    evaluateMergeGate({ ...s.svc }, buildId, { port: scriptedPort([]) }),
+  ]);
+  expect(send).toHaveBeenCalledTimes(1);
+  setTodoPhase(s.svc, 'todo-1794', 'planning');
+  setTodoPhase(s.svc, 'todo-1794', 'confirm');
+  setTodoPhase(s.svc, 'todo-1794', 'building');
+  send.mockClear();
+  setTodoPhase(s.svc, 'todo-1794', 'review');
+  expect(send).not.toHaveBeenCalled();
+  await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
+  await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
+  expect(send).toHaveBeenCalledTimes(1);
+});
+
+test('fresh machine blockers suppress review push until the gate becomes human-only', async () => {
+  const { s, buildId } = await reviewPushWorld('human');
+  const send = vi
+    .spyOn(webpush, 'sendNotification')
+    .mockResolvedValue({ statusCode: 201, body: '', headers: {} });
+  setTodoPhase(s.svc, 'todo-1794', 'review');
+  const pending = await evaluateMergeGate(s.svc, buildId, {
+    port: scriptedPort([], { checksPending: true }),
+  });
+  expect(pending?.blockers.map((blocker) => blocker.code)).toContain('required-check-pending');
+  expect(send).not.toHaveBeenCalled();
+  await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
+  expect(send).toHaveBeenCalledTimes(1);
+});
+
+test('an autonomous review pushes once when a human blocker first appears during later evaluation', async () => {
+  const { s, buildId } = await reviewPushWorld('autonomous');
+  const send = vi
+    .spyOn(webpush, 'sendNotification')
+    .mockResolvedValue({ statusCode: 201, body: '', headers: {} });
+  setTodoPhase(s.svc, 'todo-1794', 'review');
+  const ready = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
+  expect(ready?.ready).toBe(true);
+  expect(send).not.toHaveBeenCalled();
+  const blocked = await evaluateMergeGate(s.svc, buildId, {
+    port: scriptedPort([], { forked: true }),
+  });
+  expect(blocked?.blockers.some((blocker) => blocker.class === 'human')).toBe(true);
+  expect(send).toHaveBeenCalledTimes(1);
+  await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([], { forked: true }) });
+  expect(send).toHaveBeenCalledTimes(1);
+});
+
+test('a human blocker waits for pending machine checks before the review push', async () => {
+  const { s, buildId } = await reviewPushWorld('autonomous');
+  const send = vi
+    .spyOn(webpush, 'sendNotification')
+    .mockResolvedValue({ statusCode: 201, body: '', headers: {} });
+  setTodoPhase(s.svc, 'todo-1794', 'review');
+  const mixed = await evaluateMergeGate(s.svc, buildId, {
+    port: scriptedPort([], { forked: true, checksPending: true }),
+  });
+  expect(mixed?.blockers.some((blocker) => blocker.class === 'human')).toBe(true);
+  expect(mixed?.blockers.some((blocker) => blocker.class === 'transient')).toBe(true);
+  expect(send).not.toHaveBeenCalled();
+  await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([], { forked: true }) });
+  expect(send).toHaveBeenCalledTimes(1);
+});
+
+test('an evaluation started for a previous review entry cannot notify its replacement', async () => {
+  const { s, buildId } = await reviewPushWorld('human');
+  vi.spyOn(Date, 'now').mockReturnValue(Date.now());
+  const send = vi
+    .spyOn(webpush, 'sendNotification')
+    .mockResolvedValue({ statusCode: 201, body: '', headers: {} });
+  setTodoPhase(s.svc, 'todo-1794', 'review');
+  const port = scriptedPort([]);
+  let release: (() => void) | undefined;
+  const previous = evaluateMergeGate(s.svc, buildId, {
+    port: {
+      ...port,
+      pull: async (...args) => {
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        return port.pull(...args);
+      },
+    },
+  });
+  await vi.waitFor(() => expect(release).toBeDefined());
+  setTodoPhase(s.svc, 'todo-1794', 'planning');
+  setTodoPhase(s.svc, 'todo-1794', 'confirm');
+  setTodoPhase(s.svc, 'todo-1794', 'building');
+  send.mockClear();
+  setTodoPhase(s.svc, 'todo-1794', 'review');
+  release?.();
+  await previous;
+  expect(send).not.toHaveBeenCalled();
+  await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
+  expect(send).toHaveBeenCalledTimes(1);
 });
