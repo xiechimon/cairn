@@ -224,18 +224,6 @@ test('migration ledger rows with null declared ids are compared rather than skip
   f.pack();
   fails(f, /__drizzle_migrations.*1.*differing/);
 });
-test('undated machine heartbeat differences fail conservatively', () => {
-  const f = fixture();
-  const team = sql(f.db, 'select id from team limit 1');
-  for (const db of [f.db, f.backupDb])
-    sql(
-      db,
-      `insert into machine(id,teamId,name,lastSeenAt) values('machine','${team}','Original',1)`,
-    );
-  f.pack();
-  sql(f.db, 'update machine set lastSeenAt=2');
-  fails(f, /machine.*machine.*differing/);
-});
 test('missing ready attachment names its storage key', () => {
   const f = fixture();
   sql(f.backupDb, "update attachment set storageKey='missing.txt'");
@@ -550,3 +538,96 @@ for (const [table, field, value] of [
     f.pack();
     fails(f, new RegExp(`content ${table}.*differing`));
   });
+
+for (const mode of ['compare', 'fresh', 'hourly'])
+  for (const renamed of [false, true])
+    test(`${mode} heartbeat drift ${renamed ? (mode === 'hourly' ? 'does not compare live name' : 'keeps machine name strict') : 'is reported and accepted'}`, () => {
+      const f = fixture();
+      const team = sql(f.db, 'select id from team limit 1');
+      for (const db of [f.db, f.backupDb])
+        sql(
+          db,
+          `insert into machine(id,teamId,name,lastSeenAt,capabilities) values('machine','${team}','Original',1,'{}')`,
+        );
+      f.pack();
+      const mutation = `update machine set lastSeenAt=2,capabilities='{"heartbeat":2}'${renamed ? ",name='Changed'" : ''}`;
+      let env = process.env;
+      if (mode === 'fresh') {
+        const sqlite = spawnSync('which', ['sqlite3'], { encoding: 'utf8' }).stdout.trim();
+        const bin = join(f.dir, 'snapshot-bin');
+        mkdirSync(bin);
+        const shim = join(bin, 'sqlite3');
+        writeFileSync(
+          shim,
+          `#!/bin/bash
+case "$*" in
+  *".backup live-snapshot.db"*) ${sqlite} '${f.db}' '${mutation.replaceAll("'", "'\"'\"'")}' ;;
+esac
+exec ${sqlite} "$@"
+`,
+        );
+        chmodSync(shim, 0o700);
+        env = { ...process.env, PATH: `${bin}:${process.env.PATH}` };
+      } else sql(f.db, mutation);
+      const r = f.run(['--mode', mode], false, env);
+      const report = JSON.parse(readFileSync(f.report));
+      if (renamed && mode !== 'hourly') {
+        assert.notEqual(r.status, 0);
+        assert.match(r.stderr, /content machine machine: differing row/);
+      } else {
+        assert.equal(r.status, 0, r.stderr);
+        if (mode !== 'hourly') assert.equal(report.tables.machine.allowedMutable, 1);
+      }
+      assert.deepEqual(Object.keys(report.allowlist.machine.columns), [
+        'lastSeenAt',
+        'capabilities',
+      ]);
+      for (const reason of Object.values(report.allowlist.machine.columns))
+        assert.match(reason, /heartbeat/i);
+      assert.deepEqual(Object.keys(report.allowlist.autonomy_state.columns), ['lastEvaluatedAt']);
+      if (process.env.CAIRN_RESTORE_DRILL_EVIDENCE && !renamed)
+        copyFileSync(
+          f.report,
+          join(process.env.CAIRN_RESTORE_DRILL_EVIDENCE, `heartbeat-${mode}-report.json`),
+        );
+    });
+
+test('heartbeat comparator accepts only named columns and keeps all other machine and autonomy fields strict', () => {
+  const r = spawnSync(
+    'python3',
+    [
+      '-c',
+      `
+import importlib.util
+import sqlite3
+spec = importlib.util.spec_from_file_location('drill', 'scripts/ops/restore-drill.py')
+drill = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(drill)
+for table, allowed, strict in [
+    ('machine', ['lastSeenAt', 'capabilities'], ['id', 'teamId', 'name', 'online', 'tokenHash', 'apiKeyId', 'latestCliVersion', 'kind', 'enabledRuntimes', 'claudeCodeReport', 'claudeRateLimits', 'maxConcurrent', 'maxConcurrentOverridden']),
+    ('autonomy_state', ['lastEvaluatedAt'], ['projectId', 'kind', 'lastStartedAt', 'baselineSha', 'lastBlockedReason']),
+]:
+    fields = allowed + strict
+    for field in fields:
+        copies = [sqlite3.connect(':memory:') for _ in range(2)]
+        for db in copies:
+            db.execute('create table ' + table + '(' + ','.join(name + ' text' + (' primary key' if name == strict[0] else '') for name in fields) + ')')
+            db.execute('insert into ' + table + ' values(' + ','.join('?' for _ in fields) + ')', ['old'] * len(fields))
+        copies[1].execute('update ' + table + ' set ' + field + "='new'")
+        report = {'tables': {}}
+        try:
+            drill.compare(*copies, 0, report)
+        except RuntimeError:
+            assert field in strict, (table, field, report)
+        else:
+            assert field in allowed, (table, field, report)
+            assert report['tables'][table]['allowedMutable'] == 1
+        print(table + '.' + field + ': ' + ('accepted heartbeat' if field in allowed else 'rejected corruption'))
+        for db in copies:
+            db.close()
+`,
+    ],
+    { cwd: root, encoding: 'utf8' },
+  );
+  assert.equal(r.status, 0, r.stderr + r.stdout);
+});

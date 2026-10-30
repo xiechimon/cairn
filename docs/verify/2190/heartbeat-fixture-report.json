@@ -1,0 +1,401 @@
+{
+  "ok": true,
+  "at": "2026-10-30T08:12:53.525979+00:00",
+  "tables": {
+    "__drizzle_migrations": {
+      "identical": 69,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "agent": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "agent_memory": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "api_key": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "attachment": {
+      "identical": 1,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "autonomy_state": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "branch_sync": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "build": {
+      "identical": 1,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "build_feedback": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "build_outcome_backfill": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "chief": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "chief_message": {
+      "identical": 1,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "chief_thread": {
+      "identical": 1,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "feishu_binding": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "gate_digest": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "gate_round": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "gate_state": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "gate_verdict": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "github_connection": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "harness_eval_attempts": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "machine": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "member_activity": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "memory_candidate": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "memory_save_conflict": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "message": {
+      "identical": 1,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "notification": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "plan": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "project": {
+      "identical": 1,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "provider": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "push_digest_item": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "push_subscription": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "schedule": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "schedule_report": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "secret": {
+      "identical": 1,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "skill_audit": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "steer_pending": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "step": {
+      "identical": 1,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "stop_pending": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "tag": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "team": {
+      "identical": 1,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "todo": {
+      "identical": 1,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "todo_tag": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "token_usage": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "user": {
+      "identical": 1,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    }
+  },
+  "mode": "compare",
+  "allowlist": {
+    "machine": {
+      "columns": {
+        "lastSeenAt": "Daemon heartbeat refreshes the last-seen timestamp.",
+        "capabilities": "Daemon heartbeat refreshes the reported capabilities snapshot."
+      }
+    },
+    "autonomy_state": {
+      "columns": {
+        "lastEvaluatedAt": "Scheduler evaluation heartbeat refreshes this timestamp even when the verdict is unchanged."
+      }
+    }
+  },
+  "backupTimestamp": "20261030T000000Z",
+  "integrity": "ok",
+  "relationships": {
+    "todo": "t",
+    "build": "b",
+    "steps": [
+      "s"
+    ],
+    "messages": [
+      "m"
+    ],
+    "chiefThread": "ct",
+    "chiefMessages": [
+      "cm"
+    ],
+    "cutoff": 1793318400000.0
+  },
+  "foreignKeys": "ok",
+  "migrationIdentity": "SQLite rowid: Drizzle serial ids are nullable and not populated.",
+  "attachments": {
+    "checked": 1
+  },
+  "decryption": "decrypt ok",
+  "api": {
+    "count": 1,
+    "surface": "fixture real Hono route, in-process transport",
+    "provider": "not exercised"
+  },
+  "fixtureOnly": true
+}

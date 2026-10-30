@@ -36,7 +36,7 @@ scripts/ops/restore-drill.sh --mode fresh \
 
 `hourly` restores the newest `server-db-<UTC timestamp>.db.gz` in `--backup` (or the exact file supplied). Supply `--attachments` with the corresponding archived attachment directory. It checks integrity, declared foreign keys, ready attachment presence/size, restored relationships, one encrypted sample and the API wrapper. It never compares current live rows or files: ordinary deletions, todo creation without createdAt, message upserts, gate-round/secret edits, chief message timestamp changes, expired keys/subscriptions and attachment GC since the backup therefore cannot cause live-content false failures. The live-path arguments remain required for path safety but their files need not exist. Relationship checks in this mode use the restored DB as their reference; they cannot detect missing rows that leave an internally consistent archive. Without a separately trusted attachment digest, same-size corruption in the hourly archive is unverified.
 
-`compare` is an explicit diagnostic mode for a supplied backup and live snapshot. It retains content-loss negative controls and should be used only with a deliberately paired snapshot or when strict drift diagnosis is wanted. It is unsuitable for routine hourly recovery checks. A differing row is accepted only with a dating signal: live updatedAt after the backup timestamp, live todo/tag v greater than restored v, or live todo phaseAt after the backup timestamp. Project, agent, machine and other undated content stay strict. No undated mutable-column allowlist remains. Dating signals establish that a row advanced, not that every individual cell is correct. Live-only rows require createdAt after the cutoff; missing rows otherwise fail. UTC filename cutoff precision is one second. The Drizzle migration ledger uses SQLite rowid because declared serial IDs are nullable.
+`compare` is an explicit diagnostic mode for a supplied backup and live snapshot. It retains content-loss negative controls and should be used only with a deliberately paired snapshot or when strict drift diagnosis is wanted. It is unsuitable for routine hourly recovery checks. A differing row is accepted only with a dating signal: live updatedAt after the backup timestamp, live todo/tag v greater than restored v, or live todo phaseAt after the backup timestamp. Project, agent and other undated content stay strict, except the explicitly reported heartbeat columns documented in the follow-up below. All other machine columns remain strict. Dating signals establish that a row advanced, not that every individual cell is correct. Live-only rows require createdAt after the cutoff; missing rows otherwise fail. UTC filename cutoff precision is one second. The Drizzle migration ledger uses SQLite rowid because declared serial IDs are nullable.
 
 All modes require a previously absent scratch path and refuse overlap with protected inputs or live directories, including resolved symlink aliases. Success removes scratch, which contains a full DB copy. Manual failures retain private scratch for diagnosis; remove it after inspection. The service RuntimeDirectory is also cleaned by systemd after service exit. Reports are published outside scratch. No live data is restored or updated.
 
@@ -121,3 +121,66 @@ No commit, push, PR, remote host action, full e2e suite, build or lockfile chang
 Final measured result: the sequential Node 24.14.0 run exited 0, with 64 passed and 0 failed in 124.96 seconds. No implementation or assertion changed between the timeout run and this rerun. The runtime result covers synthetic fixtures and the createApp wrapper only; successful host HTTP, production recovery, installed timer execution and provider behavior remain unverified for this revision.
 
 Changed files for this round are listed in [review-files.txt](review-files.txt). Implementation, tests and unit byte identities are recorded in [review-tested-files.sha256](review-tested-files.sha256). The final whitespace and byte-identity check is [review-final.log](review-final.log).
+
+## Heartbeat follow-up: failure modes recorded before implementation
+
+Base: `60ab20d8b50dbce7a63d0bb392a760e205a5e5a2`, with uncommitted follow-up changes. GitHub overlap and host access are unavailable by the run contract; this extends the assigned #2190 branch only.
+
+| Failure mode | Test or limit |
+| --- | --- |
+| Fresh capture rejects machine heartbeat drift between backup and snapshot | Snapshot-boundary SQLite CLI shim changes lastSeenAt and capabilities; fresh must pass |
+| Compare rejects the same heartbeat drift | Compare heartbeat acceptance test |
+| Hourly report omits heartbeat policy | Hourly report allowlist assertion; hourly still performs no live comparison |
+| Heartbeat exception hides machine name or other machine corruption | Fresh name mutation negative control and comparator matrix over every other machine column |
+| Timer evaluation timestamp causes false failure | autonomy_state lastEvaluatedAt acceptance test |
+| Evaluation exception hides verdict, start, baseline or identity corruption | autonomy_state strict-field negative controls |
+| Allowlist missing reasons, broadens to a whole row or absent on failure | Report assertions and strict-field negative controls |
+| Other timer-driven business state races with capture | Source audit below; remains strict, concurrent business writes remain an unverified host timing limit |
+| Real host fresh/hourly recovery, systemd timer, production HTTP and provider | Unverified here; rerun fresh and hourly on omarchy with existing real paths/key and inspect JSON/status and scratch cleanup |
+
+
+## Heartbeat policy and timer audit
+
+Measured source: `apps/server/src/services/machines.ts` heartbeat updates lastSeenAt and reported capabilities; `apps/server/src/services/autonomy-gates.ts` recordAutonomyVerdict writes lastEvaluatedAt on every evaluation, called by issue-intake and scheduling sweeps. The allowlist is column-specific and present in every mode's report, including failed content comparisons. Only rows whose non-allowlisted cells are identical count as allowedMutable. Missing rows and schema changes remain errors. Hourly mode reports the same policy but continues to skip live-content comparisons entirely.
+
+| Table.column | Reason | Strict neighbors |
+| --- | --- | --- |
+| machine.lastSeenAt | Daemon heartbeat timestamp | Every other machine column except capabilities |
+| machine.capabilities | Daemon heartbeat capability snapshot | Name, online, credentials, runtime settings, CLI/report/rate-limit fields and concurrency remain strict |
+| autonomy_state.lastEvaluatedAt | Evaluation heartbeat timestamp when the verdict remains identical | lastBlockedReason, lastStartedAt, baselineSha, projectId and kind remain strict |
+
+Measured audit commands: `rg -n 'setInterval|setTimeout' apps/server/src --glob '*.ts' --glob '!**/test/**'`, then scheduler sweep call sites and their database writers. The route timers emit SSE/WebSocket keepalive traffic; fs-pick and machine-wake timers manage timeouts. Scheduler sweeps update build/step/todo status, chief wakes/messages, notification readAt, schedules, push subscriptions/digest items, attachments/session retention, CI results and trajectory outcomes/curation. These represent business state, cleanup or derived results rather than pure heartbeats and receive no exemptions. Machine stale-offline changes online, which also stays strict as explicitly requested. Autonomy verdict reason/start/baseline changes affect gates and are not pure heartbeat metadata. Inference from this source audit: lastEvaluatedAt is the additional pure heartbeat column; this is not a live trace or proof of all possible timer races.
+
+## Heartbeat follow-up evidence limits
+
+All follow-up commands test base `60ab20d8b50dbce7a63d0bb392a760e205a5e5a2` plus the uncommitted files identified in heartbeat-tested-files.sha256. Surface is synthetic SQLite and scratch attachment files; provider mode is **not exercised**. The fresh boundary shim delegates to the real SQLite CLI and injects a deterministic write after the real backup script finishes but before the live snapshot. API transport in these tests is the existing in-process createApp fixture, except the separate production-shell listener probe. No screenshots or live-app claims apply.
+
+| Claim | Command | Artifact | Result / limit |
+| --- | --- | --- | --- |
+| Existing comparator rejects heartbeat drift and lacks policy reporting | `node --test --test-name-pattern='heartbeat' scripts/ops/restore-drill.test.mjs` | red.log, final follow-up segment | 7 failed before implementation; strict-name cases already reject corruption but fail the new report assertion |
+| Fresh and compare heartbeat-only drift passes; machine name drift still produces a failing drill | `node --test --test-concurrency=1 scripts/ops/restore-drill.test.mjs scripts/ops/restore-drill-service.test.mjs` | green.log, final follow-up segment; heartbeat-fresh-report.json, heartbeat-compare-report.json | Runtime SQLite evidence; final totals below |
+| Every other machine field and autonomy identity/verdict/start/baseline remains strict | Same command, heartbeat comparator matrix | green.log | Python runtime comparator on minimal SQLite tables; does not exercise live scheduler writes |
+| Hourly mode publishes reasons without introducing live comparison | Same command | heartbeat-hourly-report.json | Synthetic archive recovery only |
+
+Automated regressions and static checks are separate from review. No independent review, PR evidence gate, CI or host command was run for this follow-up. No external package API was added or changed. No commit/push/PR is authorized, so these artifacts are local working-tree evidence, not delivered verification or SHA-pinned remote evidence. The PR evidence gate would not establish live origin, provider behavior or evidence sufficiency even if green.
+
+Host acceptance remains unverified: rerun `scripts/ops/restore-drill.sh --mode fresh` and `--mode hourly` with the existing host paths/key and new scratch paths; inspect allowlist reasons, JSON/status, fresh allowedMutable counts and successful scratch cleanup. This sandbox cannot validate real heartbeat timing, production recovery, host HTTP transport, Linux units, installed timer execution, production load or providers. Concurrent non-heartbeat business writes can still conservatively fail fresh/compare.
+
+Retro: applied `.claude/skills/retro-cairn/SKILL.md`. The user-corrected heartbeat classification is recorded in `docs/lessons/2190-heartbeat-restore-comparison.md`, protected by a failing-before-fix boundary test and strict-column negative controls.
+
+### Follow-up command results
+
+| Command | Measured result | Artifact / remaining limit |
+| --- | --- | --- |
+| Ops node:test suites listed above | Exit 0; 70 passed, 0 failed | green.log; synthetic scratch databases, no host/provider |
+| `pnpm lint` | Exit 0; one pre-existing informational useFlatMap diagnostic | heartbeat-lint.log |
+| `pnpm typecheck` | Exit 0 | heartbeat-typecheck.log |
+| `pnpm exec vitest run --changed` | Exit 0; no tests selected | heartbeat-vitest.log; ops regressions use node:test |
+| `pnpm spec:parse` | Exit 0; 1391 web cases collected and 65 integration files parsed | heartbeat-spec-parse.log; no e2e executed |
+| `node scripts/lessons-ledger-gate.mjs` | Exit 0 | heartbeat-lessons.log |
+| `node scripts/english-only-gate.mjs` | Exit 0 | heartbeat-english.log |
+| `node scripts/comment-discipline-gate.mjs` | Exit 0; no added comment lines | heartbeat-comments.log |
+
+The production shell probe returned the expected explicit `EPERM` listener refusal, recorded in heartbeat-http-report.json/status. This is not HTTP success. Follow-up fixture and HTTP reports are prefixed `heartbeat-`; older reports are preserved unchanged. Red and green logs append the follow-up after historical runs. The final focused rerun after formatting/test-title clarification is also in green.log. Repository check logs contain no application surface or provider execution. No workflow step was changed, so no additional changed-CI-step command applies.
+
+Changed files are enumerated in heartbeat-files.txt. No commit, push, PR, lockfile change, other-worktree modification, full e2e suite or pnpm build was performed.

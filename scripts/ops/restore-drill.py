@@ -19,6 +19,15 @@ import urllib.request
 
 
 ROOT = Path(__file__).resolve().parents[2]
+HEARTBEAT_ALLOWLIST = {
+    'machine': {'columns': {
+        'lastSeenAt': 'Daemon heartbeat refreshes the last-seen timestamp.',
+        'capabilities': 'Daemon heartbeat refreshes the reported capabilities snapshot.',
+    }},
+    'autonomy_state': {'columns': {
+        'lastEvaluatedAt': 'Scheduler evaluation heartbeat refreshes this timestamp even when the verdict is unchanged.',
+    }},
+}
 
 
 def inside(path, parent):
@@ -91,6 +100,8 @@ def compare(restored, live, stamp, report):
                 continue
             if all(cell(x) == cell(y) for x, y in zip(a, b)):
                 counts['identical'] += 1
+            elif all(cell(x) == cell(y) for field, x, y in zip(fields, a, b) if field not in HEARTBEAT_ALLOWLIST.get(table, {}).get('columns', {})):
+                counts['allowedMutable'] += 1
             elif 'updatedAt' in fields and b[fields.index('updatedAt')] is not None and b[fields.index('updatedAt')] > stamp:
                 counts['changedAfterBackup'] += 1
             elif table in {'todo', 'tag'} and (('v' in fields and b[fields.index('v')] > a[fields.index('v')]) or (table == 'todo' and b[fields.index('phaseAt')] > stamp)):
@@ -282,7 +293,7 @@ def main():
     if unsafe_report or inside(report_path, scratch) or inside(Path(str(report_path) + '.status'), scratch):
         print('FAIL report unsafe location', file=sys.stderr)
         return 1
-    report = {'ok': False, 'at': datetime.datetime.now(datetime.timezone.utc).isoformat(), 'tables': {}, 'mode': args.mode}
+    report = {'ok': False, 'at': datetime.datetime.now(datetime.timezone.utc).isoformat(), 'tables': {}, 'mode': args.mode, 'allowlist': HEARTBEAT_ALLOWLIST}
     item = 'inputs'
     try:
         if inside(scratch, live.parent) or scratch == live or any(inside(p, scratch) for p in [live, key, backup, attachment_copy, attachment_live]):

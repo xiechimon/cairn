@@ -600,3 +600,96 @@ test at scripts/ops/restore-drill.test.mjs:523:1
 ℹ skipped 0
 ℹ todo 0
 ℹ duration_ms 124964.405625
+✔ configured service launcher rejects missing node (7.43ms)
+✔ configured service launcher rejects missing python3 (12.862292ms)
+✔ configured service launcher rejects missing sqlite3 (12.746875ms)
+✔ configured service launcher rejects missing tsx (980.238917ms)
+✔ configured service launcher uses the configured checkout and fresh mode (371.324792ms)
+✔ clean backup passes fixture in-process checkout API and never reports key or plaintext (1828.2415ms)
+✔ one attachment byte changed names its storage key (132.478875ms)
+✔ message content edited names table and id (152.655166ms)
+✔ deleted row in backupDb fails (148.532916ms)
+✔ deleted row in db fails (143.185167ms)
+✔ scratch inside live directory is refused (96.6235ms)
+✔ scratch through symlink is refused (94.304959ms)
+✔ existing scratch is refused without overwriting it (97.470584ms)
+✔ report cannot overwrite live DB or key (96.847ms)
+✔ invalid gzip fails and publishes failure status (127.888458ms)
+✔ orphaned chief message fails the selected relationship (145.008083ms)
+✔ wrong key fails without leaking bytes (351.185042ms)
+✔ no encrypted sample fails (198.215083ms)
+✔ missing relationship sample fails (154.739792ms)
+✔ post-backup timestamped updates and inserts are allowed (1008.9215ms)
+✔ missing attachment and unsafe attachment key fail (158.128208ms)
+✔ default backup directory selects the newest timestamp (965.356833ms)
+✔ migration ledger rows with null declared ids are compared rather than skipped (143.503208ms)
+✔ missing ready attachment names its storage key (155.347917ms)
+✔ weekly units isolate scratch and do not install themselves (1.053834ms)
+✔ production shell requires a real HTTP listener and reports sandbox refusal (1024.209333ms)
+✔ invalid SQLite fails integrity checking (130.567ms)
+✔ ready attachment size mismatch fails (126.333916ms)
+✔ scratch equal to live DB is refused (89.462792ms)
+✔ missing key fails without creating a replacement (89.92675ms)
+✔ non-allowlisted machine field changes fail (177.4375ms)
+✔ missing selected todo names the relationship sample (136.430791ms)
+✔ missing selected build names the relationship sample (138.514166ms)
+✔ missing selected step names the relationship sample (138.371125ms)
+✔ missing selected message names the relationship sample (144.302291ms)
+✔ missing selected chief_thread names the relationship sample (140.693ms)
+✔ missing selected chief_message names the relationship sample (140.355042ms)
+✔ newest eligible build wins over todo activity and step-less builds (1047.118709ms)
+✔ partial step loss names selected sample (149.045708ms)
+✔ partial message loss names selected sample (151.786958ms)
+✔ partial chief_message loss names selected sample (149.3135ms)
+✔ post-backup relationships are excluded while boundary rows are required (1308.718792ms)
+✔ HOME-dependent node shim is resolved before isolated helpers (1777.031917ms)
+✔ decrypt helper startup failure reports exit and safe first stderr line (754.779125ms)
+✔ api helper startup failure reports exit and safe first stderr line (882.456125ms)
+✔ unknown helper stderr is withheld from all published diagnostics (739.50825ms)
+✔ node resolution failure is classified before isolated helpers (939.736209ms)
+✔ undated todo.spec corruption is rejected (174.205459ms)
+✔ undated todo.title corruption is rejected (155.787125ms)
+✔ undated project.localPath corruption is rejected (148.315333ms)
+✔ undated project.githubRepo corruption is rejected (185.152084ms)
+✔ undated team.name corruption is rejected (146.261ms)
+✔ todo differences require a later version or phase timestamp (1334.219583ms)
+✔ hourly mode tolerates ordinary changes before the drill and removes successful scratch (946.428875ms)
+✔ fresh mode tolerates ordinary changes before the drill and removes successful scratch (1252.657084ms)
+✔ API wrapper never creates a missing key (4311.086542ms)
+✔ weekly launcher configures checkout and preflights runtime dependencies (2.3995ms)
+✔ hourly recovery does not require current live rows or attachment files (2869.262375ms)
+✔ undated agent.persona corruption is rejected (280.917083ms)
+✔ undated agent.tools corruption is rejected (350.008458ms)
+✔ undated agent.secrets corruption is rejected (350.218292ms)
+✔ undated tag.name corruption is rejected (309.928708ms)
+✔ undated tag.color corruption is rejected (194.681417ms)
+✔ compare heartbeat drift is reported and accepted (1058.381166ms)
+✔ compare heartbeat drift keeps machine name strict (190.336459ms)
+✔ fresh heartbeat drift is reported and accepted (1635.150833ms)
+✔ fresh heartbeat drift keeps machine name strict (829.462792ms)
+✔ hourly heartbeat drift is reported and accepted (960.340833ms)
+✔ hourly heartbeat drift keeps machine name strict (938.829791ms)
+✔ heartbeat comparator accepts only named columns and keeps all other machine and autonomy fields strict (63.972041ms)
+ℹ tests 70
+ℹ suites 0
+ℹ pass 70
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 36907.125916
+✔ compare heartbeat drift is reported and accepted (1935.168042ms)
+✔ compare heartbeat drift keeps machine name strict (227.600167ms)
+✔ fresh heartbeat drift is reported and accepted (1309.3405ms)
+✔ fresh heartbeat drift keeps machine name strict (295.065167ms)
+✔ hourly heartbeat drift is reported and accepted (1179.266292ms)
+✔ hourly heartbeat drift does not compare live name (1358.062916ms)
+✔ heartbeat comparator accepts only named columns and keeps all other machine and autonomy fields strict (228.443541ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6610.84775

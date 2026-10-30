@@ -2382,3 +2382,142 @@ test at scripts/ops/restore-drill.test.mjs:505:1
     operator: 'strictEqual',
     diff: 'simple'
   }
+✖ compare heartbeat drift is reported and accepted (980.991333ms)
+✖ compare heartbeat drift keeps machine name strict (167.930708ms)
+✖ fresh heartbeat drift is reported and accepted (1193.398834ms)
+✖ fresh heartbeat drift keeps machine name strict (857.478417ms)
+✖ hourly heartbeat drift is reported and accepted (1097.6965ms)
+✖ hourly heartbeat drift keeps machine name strict (936.647209ms)
+✖ heartbeat comparator accepts only named columns and keeps all other machine and autonomy fields strict (86.053708ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 0
+ℹ fail 7
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5397.910834
+
+✖ failing tests:
+
+test at scripts/ops/restore-drill.test.mjs:544:5
+✖ compare heartbeat drift is reported and accepted (980.991333ms)
+  AssertionError [ERR_ASSERTION]: FAIL content: content machine machine: differing row
+
+
+  1 !== 0
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:572:16)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:544:5
+✖ compare heartbeat drift keeps machine name strict (167.930708ms)
+  TypeError: Cannot read properties of undefined (reading 'machine')
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:575:53)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+
+test at scripts/ops/restore-drill.test.mjs:544:5
+✖ fresh heartbeat drift is reported and accepted (1193.398834ms)
+  AssertionError [ERR_ASSERTION]: FAIL content: content machine machine: differing row
+
+
+  1 !== 0
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:572:16)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:544:5
+✖ fresh heartbeat drift keeps machine name strict (857.478417ms)
+  TypeError: Cannot read properties of undefined (reading 'machine')
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:575:53)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at scripts/ops/restore-drill.test.mjs:544:5
+✖ hourly heartbeat drift is reported and accepted (1097.6965ms)
+  TypeError: Cannot read properties of undefined (reading 'machine')
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:575:53)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at scripts/ops/restore-drill.test.mjs:544:5
+✖ hourly heartbeat drift keeps machine name strict (936.647209ms)
+  TypeError: Cannot read properties of undefined (reading 'machine')
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:575:53)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at scripts/ops/restore-drill.test.mjs:582:1
+✖ heartbeat comparator accepts only named columns and keeps all other machine and autonomy fields strict (86.053708ms)
+  AssertionError [ERR_ASSERTION]: Traceback (most recent call last):
+    File "<string>", line 20, in <module>
+      drill.compare(*copies, 0, report)
+      ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+    File "<worktree>/scripts/ops/restore-drill.py", line 103, in compare
+      raise RuntimeError('; '.join(errors))
+  RuntimeError: content machine old: differing row
+
+  During handling of the above exception, another exception occurred:
+
+  Traceback (most recent call last):
+    File "<string>", line 22, in <module>
+      assert field in strict, (table, field, report)
+             ^^^^^^^^^^^^^^^
+  AssertionError: ('machine', 'lastSeenAt', {'tables': {'machine': {'identical': 0, 'changedAfterBackup': 0, 'missing': 0, 'differing': 1, 'allowedMutable': 0, 'addedAfterBackup': 0}}})
+
+
+  1 !== 0
+
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:612:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

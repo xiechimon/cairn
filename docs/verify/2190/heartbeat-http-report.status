@@ -1,0 +1,1 @@
+2026-10-30T08:12:59.003059+00:00 FAIL restore-drill api: api listen failed: EPERM; api failed; exit=1; stderr empty
