@@ -226,6 +226,67 @@ test('parallel tools hold queued steers in order, including images, until every 
   }
 });
 
+test.each([false, true])(
+  'a tool result without content releases queued and later steers (is_error=%s)',
+  async (isError) => {
+    const otherTool = defer();
+    const emptyTool = defer();
+    const end = defer();
+    const completion: SDKUserMessage = {
+      type: 'user',
+      message: {
+        role: 'user',
+        content: [
+          { type: 'tool_result', tool_use_id: 'empty', ...(isError ? { is_error: true } : {}) },
+        ],
+      },
+      parent_tool_use_id: null,
+    };
+    const { handle, received, events, collected, interrupt } = await controlledSession(
+      (async function* () {
+        yield toolStart(['other', 'empty']);
+        await otherTool.promise;
+        yield toolResult('other');
+        await emptyTool.promise;
+        yield completion;
+        await end.promise;
+      })(),
+    );
+    try {
+      await waitFor(() => events.filter((event) => event.type === 'toolcall_end').length === 2);
+      const steering = handle.steer('Queued instruction').then(
+        () => 'delivered',
+        () => 'rejected',
+      );
+      otherTool.resolve();
+      await waitFor(() => events.filter((event) => event.type === 'toolcall_end').length === 3);
+      expect(received).toHaveLength(1);
+      expect(events.some((event) => event.type === 'steer')).toBe(false);
+      emptyTool.resolve();
+      await waitFor(() => events.some((event) => event.type === 'steer'));
+      expect(await steering).toBe('delivered');
+      expect(events.slice(-2).map((event) => event.type)).toEqual(['toolcall_end', 'steer']);
+      expect(events.at(-2)).toMatchObject({
+        type: 'toolcall_end',
+        call: { id: 'empty', result: undefined, isError },
+      });
+      await handle.steer('Later instruction');
+      await waitFor(() => received.length === 3);
+      expect(received.slice(1).map((message) => message.message.content)).toEqual([
+        'Queued instruction',
+        'Later instruction',
+      ]);
+      expect(interrupt).not.toHaveBeenCalled();
+    } finally {
+      otherTool.resolve();
+      emptyTool.resolve();
+      end.resolve();
+      await handle.stop();
+      await collected;
+    }
+  },
+);
+
 test.each(['stop', 'error', 'end'] as const)(
   'a queued steer is rejected when the session closes via %s',
   async (closure) => {

@@ -87,6 +87,7 @@ export function todoFromTodoWrite(name: unknown, input: unknown): AgentTodoItem[
 
 export interface ClaudeMapState {
   calls: Map<string, ToolCallRecord>;
+  runningTools: Set<string>;
   interrupted: boolean;
   usage: AgentTokenUsage;
   sessionId: string | null;
@@ -102,6 +103,7 @@ export function createClaudeMapState(opts?: {
 }): ClaudeMapState {
   return {
     calls: new Map(),
+    runningTools: new Set(),
     interrupted: false,
     usage: [],
     sessionId: null,
@@ -229,6 +231,7 @@ export function mapClaudeMessage(msg: SDKMessage, state: ClaudeMapState): StepEv
             ...(todo !== null ? { todo } : {}),
           };
           state.calls.set(call.id, call);
+          state.runningTools.add(call.id);
           out.push({ type: 'toolcall_end', call });
         }
       }
@@ -254,6 +257,7 @@ export function mapClaudeMessage(msg: SDKMessage, state: ClaudeMapState): StepEv
           is_error?: boolean;
         };
         if (b.type !== 'tool_result' || typeof b.tool_use_id !== 'string') continue;
+        state.runningTools.delete(b.tool_use_id);
         const pending = state.calls.get(b.tool_use_id);
         if (!pending) continue;
         const final: ToolCallRecord = {
@@ -408,7 +412,6 @@ class ClaudeSessionHandle implements AgentSessionHandle {
   private readonly q: Query;
   private readonly abort: AbortController;
   private readonly onClaudeRateLimit: ((notice: ClaudeRateLimitNotice) => void) | undefined;
-  private readonly runningTools = new Set<string>();
   private readonly pendingSteers: {
     message: SDKUserMessage;
     text: string;
@@ -449,10 +452,6 @@ class ClaudeSessionHandle implements AgentSessionHandle {
           this.onClaudeRateLimit?.(notice);
         }
         for (const ev of events) {
-          if (ev.type === 'toolcall_end') {
-            if (ev.call.result === undefined) this.runningTools.add(ev.call.id);
-            else this.runningTools.delete(ev.call.id);
-          }
           this.queue.push(ev);
           if (TERMINAL_EVENT_TYPES.includes(ev.type)) {
             this.finish();
@@ -493,7 +492,7 @@ class ClaudeSessionHandle implements AgentSessionHandle {
   }
 
   private flushSteers(): void {
-    if (this.closed || this.runningTools.size > 0) return;
+    if (this.closed || this.state.runningTools.size > 0) return;
     for (const pending of this.pendingSteers.splice(0)) {
       this.input.push(pending.message);
       this.queue.push({ type: 'steer', text: pending.text });
