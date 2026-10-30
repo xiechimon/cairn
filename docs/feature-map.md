@@ -59,7 +59,7 @@ Judgment = title keyword match, first rule in the table wins, and no match = Gen
 | `pack-smoke` | `Install dependencies` / `Pack smoke (main package tarball, bare node)` |
 | `dead-class-gate` | `Install dependencies` / `Dead class gate (#1036)` |
 | `gates` | `Issue label gate` / `Feature map staleness gate (#1160)` / `Comment discipline gate (advisory, #1520)` / `Probe reach gate (advisory, #1542)` / `Single-use helper gate (advisory, #1543)` / `Package names in install commands exist on npm` / `Funding links gate (#2002)` / `Dispatch agent start/check round trip (#1556)` / `Closing keyword gate (advisory, #1541)` / `Baseline ratchet gate and gardener sweep self-test (#1617)` |
-| `ops-backup-test` | `Server backup script against an rrsync receiver (#2163)` |
+| `ops-backup-test` | `Server backup script against an rrsync receiver (#2163)`, `Secret reach regression tests (#2189)` |
 
 ### 0.6 Known limitations (recorded as-is in the first version)
 
