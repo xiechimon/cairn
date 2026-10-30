@@ -177,9 +177,14 @@ the shared `redactSecrets` patterns before posting. Trace and parent span ids
 remain tied to the build and step.
 
 Direct Claude CLI telemetry is disabled in both the subprocess environment and
-the SDK flag settings. Inherited and per-session `OTEL_*` and `CAIRN_OTEL_*`
-configuration is removed from the subprocess environment, except for
-`OTEL_SDK_DISABLED=true`. Exporter credentials stay in the daemon. CLI-native
+the SDK flag settings. Inherited and per-session `OTEL_*`, `CAIRN_OTEL_*`,
+`ANT_OTEL_*` and beta tracing (`ENABLE_BETA_TRACING_DETAILED`,
+`BETA_TRACING_ENDPOINT`) configuration is removed from the subprocess
+environment. The CLI's beta tracing exporter ignores
+`CLAUDE_CODE_ENABLE_TELEMETRY`, so the flag settings also pin
+`BETA_TRACING_ENDPOINT` to an empty value; flag settings outrank user and project
+settings. Managed policy settings still outrank flag settings, so a machine
+administrator can re-enable CLI export. Exporter credentials stay in the daemon. CLI-native
 chat spans, metrics, logs and enhanced telemetry are disabled; only streamed
 tool spans use this replacement path. Export is best effort and does not delay
 session completion.
@@ -188,7 +193,8 @@ The regression in `apps/daemon/test/claude-otel-export.test.ts` runs the real SD
 against a fake CLI process and an ephemeral HTTP collector. The fake executes a
 child tool that prints a synthetic secret. The test checks the actual exported
 body, including completion, CLI failure, abrupt exit, credential patterns,
-settings overrides and collector failure. With the unchanged main backend, the
+settings overrides (including beta tracing set in user settings) and collector
+failure. With the unchanged main backend, the
 same fixture exports the synthetic secret in clear text. This verifies the SDK,
 daemon mapping and HTTP boundary; it does not exercise a real model or Langfuse.
 

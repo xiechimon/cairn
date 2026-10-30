@@ -41,10 +41,12 @@ export function claudeTelemetryEnv(ctx: StepOtelContext): Record<string, string>
   };
 }
 
+const CLI_EXPORT_KEY = /^(OTEL_|CAIRN_OTEL_|ANT_OTEL_|BETA_TRACING_|ENABLE_BETA_TRACING_)/;
+
 export function claudeCliEnv(env: NodeJS.ProcessEnv): Record<string, string> {
   const filtered: Record<string, string> = {};
   for (const [key, value] of Object.entries(env)) {
-    if (value === undefined || key.startsWith('OTEL_') || key.startsWith('CAIRN_OTEL_')) continue;
+    if (value === undefined || CLI_EXPORT_KEY.test(key)) continue;
     filtered[key] = value;
   }
   return {
@@ -52,6 +54,8 @@ export function claudeCliEnv(env: NodeJS.ProcessEnv): Record<string, string> {
     CLAUDE_CODE_ENABLE_TELEMETRY: '0',
     CLAUDE_CODE_ENHANCED_TELEMETRY_BETA: '0',
     OTEL_SDK_DISABLED: 'true',
+    ENABLE_BETA_TRACING_DETAILED: '0',
+    BETA_TRACING_ENDPOINT: '',
   };
 }
 

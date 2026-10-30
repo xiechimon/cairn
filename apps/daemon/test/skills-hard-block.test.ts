@@ -264,6 +264,8 @@ describe('buildClaudeSdkOptions (spec 14 §post-ruling scope 1/2: settingSources
         CLAUDE_CODE_ENABLE_TELEMETRY: '0',
         CLAUDE_CODE_ENHANCED_TELEMETRY_BETA: '0',
         OTEL_SDK_DISABLED: 'true',
+        ENABLE_BETA_TRACING_DETAILED: '0',
+        BETA_TRACING_ENDPOINT: '',
       },
     });
   });

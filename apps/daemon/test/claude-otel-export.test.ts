@@ -12,9 +12,11 @@ import { createClaudeCodeBackend } from '../src/backend/claude-code.js';
 const secret = `sk-ant-oat01-${'synthetic'.repeat(8)}`;
 const cli = `
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 const send = (value) => process.stdout.write(JSON.stringify(value) + '\\n');
+const userSettings = process.env.CLAUDE_CONFIG_DIR + '/settings.json';
+if (existsSync(userSettings)) Object.assign(process.env, JSON.parse(readFileSync(userSettings, 'utf8')).env);
 Object.assign(process.env, JSON.parse(readFileSync('.claude/settings.json', 'utf8')).env);
 const settings = process.argv.indexOf('--settings');
 if (settings >= 0) Object.assign(process.env, JSON.parse(process.argv[settings + 1]).env);
@@ -36,6 +38,11 @@ for await (const line of input) {
     const endpoint = process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT ??
       process.env.OTEL_EXPORTER_OTLP_ENDPOINT + '/v1/traces';
     await fetch(endpoint, { method: 'POST', body: JSON.stringify({ tool_output: result }) });
+  }
+  if (process.env.ENABLE_BETA_TRACING_DETAILED && process.env.BETA_TRACING_ENDPOINT) {
+    await fetch(process.env.BETA_TRACING_ENDPOINT + '/beta/v1/traces', {
+      method: 'POST', body: JSON.stringify({ tool_output: result }),
+    });
   }
   send({ type: 'assistant', message: { role: 'assistant', content: [
     { type: 'tool_use', id: 'tool-1', name: 'Bash', input: { command: process.env.TEST_TOOL_OUTPUT } }
@@ -81,6 +88,13 @@ async function runCli(completion: string, configured = true, status = 200, token
   if (address === null || typeof address === 'string') throw new Error('No collector port');
   const endpoint = `http://127.0.0.1:${address.port}`;
   mkdirSync(join(directory, '.claude'));
+  mkdirSync(join(directory, 'config'));
+  writeFileSync(
+    join(directory, 'config', 'settings.json'),
+    JSON.stringify({
+      env: { ENABLE_BETA_TRACING_DETAILED: '1', BETA_TRACING_ENDPOINT: endpoint },
+    }),
+  );
   writeFileSync(
     join(directory, '.claude', 'settings.json'),
     JSON.stringify({
@@ -93,6 +107,8 @@ async function runCli(completion: string, configured = true, status = 200, token
   );
   vi.stubEnv('OTEL_EXPORTER_OTLP_ENDPOINT', endpoint);
   vi.stubEnv('CLAUDE_CODE_ENABLE_TELEMETRY', '1');
+  vi.stubEnv('ENABLE_BETA_TRACING_DETAILED', '1');
+  vi.stubEnv('BETA_TRACING_ENDPOINT', endpoint);
   const telemetry = stepOtelContext(
     'synthetic-build',
     'synthetic-step',
@@ -173,6 +189,8 @@ test.each(['success', 'error', 'eof', 'crash'])(
     expect(childEnv.OTEL_SDK_DISABLED).toBe('true');
     expect(childEnv.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT).toBeUndefined();
     expect(childEnv.OTEL_EXPORTER_OTLP_HEADERS).toBeUndefined();
+    expect(childEnv.BETA_TRACING_ENDPOINT).toBe('');
+    expect(childEnv.ENABLE_BETA_TRACING_DETAILED).toBe('0');
     expect(childEnv.CLAUDE_CODE_OAUTH_TOKEN).toBe(secret);
     expect(childEnv.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB).toBe('1');
   },
