@@ -22,7 +22,7 @@ afterEach(() => {
   for (const root of roots.splice(0)) releaseTestTempDir(root);
 });
 
-function fixture(overrides: NodeJS.ProcessEnv = {}) {
+function fixture(overrides: NodeJS.ProcessEnv = {}, stubs = ['corepack', 'pnpm', 'git']) {
   const allocated = makeTestTempDir('agents-setup-');
   roots.push(allocated);
   const root = realpathSync(allocated);
@@ -59,7 +59,7 @@ function fixture(overrides: NodeJS.ProcessEnv = {}) {
     env,
   });
   writeFileSync(log, '');
-  for (const name of ['corepack', 'pnpm', 'git']) {
+  for (const name of stubs) {
     writeFileSync(
       join(bin, name),
       String.raw`#!${process.execPath}
@@ -93,7 +93,10 @@ process.exit(1);
       { mode: 0o755 },
     );
   }
-  const runEnv = { ...env, PATH: `${bin}:${process.env.PATH}` };
+  const runEnv = {
+    ...env,
+    PATH: stubs.includes('corepack') ? `${bin}:${process.env.PATH}` : `${bin}:/usr/bin:/bin`,
+  };
   return {
     clone,
     home,
@@ -153,6 +156,17 @@ test('setup is executable, installs real hooks twice in a fresh clone and leaves
   expect(
     commands.filter(({ args }) => args.includes('playwright')).map(({ browsers }) => browsers),
   ).toEqual(Array(2).fill(join(f.home, '.cache/ms-playwright')));
+});
+
+test('setup skips corepack when the Node runtime no longer ships it', () => {
+  const f = fixture({ PLAYWRIGHT_BROWSERS_PATH: '/unused-cache' }, ['pnpm', 'git']);
+  const result = f.run('setup');
+  expect(result.status, result.stderr).toBe(0);
+  expect(f.commands().map(({ command, args }) => [command, ...args])).toEqual([
+    ['pnpm', 'install', '--frozen-lockfile'],
+    ['pnpm', 'exec', 'husky'],
+    ['pnpm', 'exec', 'playwright', 'install', 'chromium'],
+  ]);
 });
 
 test('setup contains no backgrounding or server launch commands', () => {

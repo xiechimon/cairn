@@ -2,7 +2,7 @@
 set -eu
 
 cd "$(dirname "$0")/.."
-corepack enable
+if command -v corepack >/dev/null 2>/dev/null; then corepack enable; fi
 pnpm install --frozen-lockfile
 pnpm exec husky
 if ! test -x .husky/_/pre-push; then
