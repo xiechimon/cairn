@@ -133,6 +133,20 @@ describe('/api/mcp 24-tool whitelist shape-preserving (02/A10; r3 section 6 matr
     s.dispose();
   });
 
+  test('a grant only counts in the column of its tool kind: write tools in the read list and read tools in the write list register nothing', async () => {
+    const s = bootServer();
+    const key = await issueMcpKey(s, { read: ['Merge Builds', 'Create Todo'], write: ['Todos'] });
+    const list = (await rpc(s.app, key, 'tools/list', {})).body as JsonRpcResponse;
+    expect(list.result?.tools ?? []).toEqual([]);
+    const denied = (await rpc(s.app, key, 'tools/call', {
+      name: 'create_todo',
+      arguments: { title: 'should not exist' },
+    })) as { body: JsonRpcResponse };
+    expect(denied.body.error !== undefined || denied.body.result?.isError === true).toBe(true);
+    expect(s.db.select().from(todoTable).all()).toEqual([]);
+    s.dispose();
+  });
+
   test('zero grant = MCP disabled for this key (tools/list empty; "Removing every MCP tool disables MCP" canon)', async () => {
     const s = bootServer();
     const key = await issueMcpKey(s, { read: [], write: [] });
