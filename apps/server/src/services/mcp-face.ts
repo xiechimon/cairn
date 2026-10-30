@@ -11,20 +11,10 @@ import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/
 import { and, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Db } from '../db/client.js';
-import {
-  agent,
-  build,
-  chiefThread,
-  machine,
-  message,
-  project,
-  schedule,
-  todo,
-} from '../db/schema.js';
+import { agent, build, chiefThread, machine, project, schedule, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
-import { newRecordId, nowMs } from '../lib/ids.js';
 import { verifyApiKey } from './api-keys.js';
-import { cancelBuild, startBuilds } from './builds.js';
+import { cancelBuild, messageTodo, startBuilds } from './builds.js';
 import type { ChiefToolDeps, TransitionActor } from './chief-tools.js';
 import { confirmBuild, transitionTodos } from './chief-tools.js';
 import { readConversationPage } from './conversation-page.js';
@@ -272,21 +262,7 @@ export async function executeMcpTool(
       return json(record);
     }
     case 'message_todo': {
-      const todoId = str(args, 'todoId');
-      const row = requireTeamTodo(db, todoId, ctx.teamId);
-      const conversationId = row.latestBuildId;
-      if (conversationId) {
-        db.insert(message)
-          .values({
-            id: newRecordId(),
-            conversationId,
-            role: 'user',
-            content: str(args, 'content'),
-            createdAt: nowMs(),
-          })
-          .run();
-      }
-      return json({ todoId, conversationId, posted: conversationId !== null });
+      return json(await messageTodo(deps, ctx.teamId, str(args, 'todoId'), str(args, 'content')));
     }
     case 'run_builds': {
       const todoIds = strArrOf(args, 'todoIds');

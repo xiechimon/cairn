@@ -17,7 +17,6 @@ import {
   chief,
   chiefThread,
   machine,
-  message,
   project,
   schedule,
   todo,
@@ -25,13 +24,14 @@ import {
 } from '../db/schema.js';
 import { HttpError, parseWith } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
-import { newRecordId, nowMs } from '../lib/ids.js';
+import { newRecordId } from '../lib/ids.js';
 import { todoAuthorizesAttachment } from './attachment-authorization.js';
 import {
   advanceSplitWaves,
   applyBuildStepAction,
   cancelBuild,
   dispatchSplitChildren,
+  messageTodo,
   startBuilds,
   stopActiveStepsAfterExit,
 } from './builds.js';
@@ -521,21 +521,9 @@ export async function executeChiefTool(
     case 'complete_todos':
       return json(transitionTodos(deps, ctx.teamId, strArr(params, 'todoIds'), 'done', chiefActor));
     case 'message_todo': {
-      const todoId = str(params, 'todoId');
-      const row = requireTeamTodo(db, todoId, ctx.teamId);
-      const conversationId = row.latestBuildId;
-      if (conversationId) {
-        db.insert(message)
-          .values({
-            id: newRecordId(),
-            conversationId,
-            role: 'user',
-            content: str(params, 'content'),
-            createdAt: nowMs(),
-          })
-          .run();
-      }
-      return json({ todoId, conversationId, posted: conversationId !== null });
+      return json(
+        await messageTodo(deps, ctx.teamId, str(params, 'todoId'), str(params, 'content')),
+      );
     }
     case 'create_project': {
       const name = str(params, 'name');
