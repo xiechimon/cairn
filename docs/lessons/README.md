@@ -1,6 +1,6 @@
 # Lessons
 
-Keep one file per kind of mistake under `docs/lessons/`, named `<ticket>-<short-name>.md`.
-Write freely about what happened, why it happened, and what prevents it from happening again.
-Update the existing document when the same kind of mistake recurs. There are no counters or fixed fields.
-Existing entries remain as plain documents, and their safeguard tests stay with the code they protect.
+This directory is a frozen archive; do not add entries.
+A mistake that recurs becomes a safeguard in the code it concerns: a type, a lint rule, a test or a CI check, using the real mistake as the negative control.
+The PR that adds the safeguard says which mistake it stops; that PR is the record.
+Existing entries stay as plain documents, and their safeguard tests stay with the code they protect.
