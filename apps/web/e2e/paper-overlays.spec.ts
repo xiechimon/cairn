@@ -155,7 +155,7 @@ test('footer stays on screen on a short viewport; only the body scrolls', async 
   expect(overflow).toBe(true);
 });
 
-test('Paper menu: 32px rows, 14px text, 15px icons, 18px panel corners, 4px padding', async ({
+test('Paper menu: 32px rows, 14px text, 15px icons, 12px panel corners, 4px padding', async ({
   page,
 }) => {
   await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
@@ -164,8 +164,8 @@ test('Paper menu: 32px rows, 14px text, 15px icons, 18px panel corners, 4px padd
   const menu = page.locator('.more-menu');
   await expect(menu).toBeVisible();
   await settle(menu);
-  await expect(menu).toHaveCSS('border-top-left-radius', '18px');
-  await expect(menu).toHaveCSS('padding-top', '6px');
+  await expect(menu).toHaveCSS('border-top-left-radius', '12px');
+  await expect(menu).toHaveCSS('padding-top', '4px');
   await expect(menu).toHaveCSS('background-color', 'rgb(253, 253, 251)');
 
   const rows = menu.getByRole('menuitem');
@@ -192,8 +192,8 @@ test('user menu rides the same Paper menu face', async ({ page }) => {
   const menu = page.locator('.user-menu');
   await expect(menu).toBeVisible();
   await settle(menu.locator('..'));
-  await expect(menu).toHaveCSS('border-top-left-radius', '18px');
-  await expect(menu).toHaveCSS('padding-top', '6px');
+  await expect(menu).toHaveCSS('border-top-left-radius', '12px');
+  await expect(menu).toHaveCSS('padding-top', '4px');
   for (const label of ['账号', 'API 密钥', 'MCP']) {
     const row = menu.locator('a.user-menu-row', { hasText: label });
     expect((await row.boundingBox())?.height).toBe(32);

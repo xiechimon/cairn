@@ -56,14 +56,14 @@ const POOLS = {
     'cds-shadow-sm':
       'rgba(29, 35, 31, 0.04) 0px 1px 0px 0px, rgba(29, 35, 31, 0.06) 0px 1px 2px 0px',
     'cds-shadow-md':
-      'rgba(29, 35, 31, 0.12) 0px 12px 32px 0px, rgba(29, 35, 31, 0.06) 0px 2px 6px 0px',
+      'rgba(29, 35, 31, 0.04) 0px 1px 1px 0px, rgba(29, 35, 31, 0.05) 0px 3px 9px 0px, rgba(29, 35, 31, 0.06) 0px 8px 20px 0px',
     'cds-shadow-lg':
-      'rgba(29, 35, 31, 0.16) 0px 18px 44px 0px, rgba(29, 35, 31, 0.07) 0px 3px 8px 0px',
+      'rgba(29, 35, 31, 0.04) 0px 1px 1px 0px, rgba(29, 35, 31, 0.08) 0px 6px 24px 0px, rgba(29, 35, 31, 0.08) 0px 12px 48px 0px',
   },
   dark: {
     'cds-shadow-sm': 'rgba(0, 0, 0, 0.25) 0px 1px 0px 0px, rgba(0, 0, 0, 0.3) 0px 1px 3px 0px',
-    'cds-shadow-md': 'rgba(0, 0, 0, 0.5) 0px 10px 30px 0px, rgba(0, 0, 0, 0.3) 0px 2px 8px 0px',
-    'cds-shadow-lg': 'rgba(0, 0, 0, 0.5) 0px 18px 44px 0px, rgba(0, 0, 0, 0.3) 0px 3px 8px 0px',
+    'cds-shadow-md': 'rgba(0, 0, 0, 0.3) 0px 1px 2px 0px, rgba(0, 0, 0, 0.32) 0px 8px 24px 0px',
+    'cds-shadow-lg': 'rgba(0, 0, 0, 0.3) 0px 2px 4px 0px, rgba(0, 0, 0, 0.4) 0px 16px 40px 0px',
   },
 } as const;
 
@@ -101,7 +101,7 @@ for (const theme of ['light', 'dark'] as const) {
       }
     });
 
-    test('pools hold the pre-ladder darkness; --top only in dark e2/e3', async ({ page }) => {
+    test('pools hold the faint layered shadows; --top only in dark e2/e3', async ({ page }) => {
       await page.goto('/app?scenario=01&view=board');
       await page.waitForSelector('.board-sidebar');
       const top = await slot(page, 'top');
@@ -172,11 +172,10 @@ for (const theme of ['light', 'dark'] as const) {
       expect(rings(card)).toBe(1);
       expect(card).not.toContain('inset');
 
-      // pool + own --edge-ring: exactly one ring, and it is the inset one
       await page.goto('/app?scenario=notify-banner&view=board');
       const banner = await surfaceShadow(page, '.board-notify-banner');
       expect(rings(banner)).toBe(1);
-      expect(banner.startsWith(edgeRing)).toBe(true);
+      expect(banner.endsWith(await slot(page, 'e1'))).toBe(true);
 
       await page.goto('/app?scenario=111&view=board');
       const drawer = await surfaceShadow(page, '.chief-drawer');

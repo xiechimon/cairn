@@ -93,9 +93,8 @@ for (const theme of ['light', 'dark'] as const) {
     const banner = await edgeContract(page, '.board-notify-banner');
 
     expect(banner.border).toBe('0px');
-    expect(banner.radius).toBe('18px');
-    expect(banner.shadow.startsWith(banner.ring)).toBe(true);
-    expect(banner.ring.startsWith(`${banner.borderColor} `)).toBe(true);
+    expect(banner.radius).toBe('14px');
+    expect(banner.shadow.endsWith(`${banner.borderColor} 0px 0px 0px 1px`)).toBe(true);
     expect(banner.shadow).toContain(banner.cardShadow);
   });
 
@@ -107,7 +106,7 @@ for (const theme of ['light', 'dark'] as const) {
 
     const menu = await edgeContract(page, '.user-menu');
     expect(menu.border).toBe('0px');
-    expect(menu.radius).toBe('18px');
+    expect(menu.radius).toBe('12px');
     expect(menu.shadow).not.toBe('none');
     expect(menu.shadow).toContain('0px 0px 0px');
   });

@@ -25,7 +25,7 @@ export const R7_BUILD_ID = '01a0c26e-23ea-734f-9847-cf9cdbce7802';
 export const R7_BUILD_BRANCH = conversationBranch(R7_BUILD_ID);
 export const R7_TARGET_COMMIT = '2cceb9dbf7a8';
 
-export const AGENT_MODEL_LINE = 'claude-sonnet-5 · 默认';
+export const AGENT_MODEL = { modelId: 'claude-sonnet-5', thinkingLevel: null };
 
 export const PROBE_TOKEN_USAGE: TokenUsageContent = {
   total: '82.9k',

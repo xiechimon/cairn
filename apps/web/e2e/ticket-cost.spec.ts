@@ -156,7 +156,7 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(card(page, PRICED.id).getByTestId('card-cost')).toHaveText('$0.92');
       await expect(card(page, SUB_CENT.id).getByTestId('card-cost')).toHaveText('<$0.01');
       const unpriced = card(page, UNPRICED.id).getByTestId('card-cost');
-      await expect(unpriced).toHaveText('—');
+      await expect(unpriced).toHaveText('$—');
       await expect(unpriced).toHaveAttribute('title', NO_PRICE_REASON);
       const free = card(page, FREE.id).getByTestId('card-cost');
       await expect(free).toHaveText('$0.00');

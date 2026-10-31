@@ -8,13 +8,10 @@ const AGENT_SRC = spiralAvatarUrl('r3-builder');
 const SVG_BODY =
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><circle cx="12" cy="12" r="12"/></svg>';
 
-test('sidebar avatar chips (expanded + rail) and user-menu head share one seeded src', async ({
+test('sidebar avatar chip (rail) and user-menu head share one seeded src', async ({
   page,
 }) => {
   await page.goto('/app?scenario=01');
-  const expanded = page.locator('.sidebar-user img');
-  await expect(expanded).toHaveAttribute('src', USER_SRC);
-
   await page.locator('.sidebar-user').click();
   await expect(page.locator('.user-menu-head img')).toHaveAttribute('src', USER_SRC);
   await expect(page.locator('.user-menu-mail')).toHaveCount(0);
@@ -81,7 +78,7 @@ test('detail chip popover: user row + `执行对话` agent row both seeded', asy
   const popover = page.getByRole('dialog', { name: '任务分配' });
   await expect(popover).toBeVisible();
   await expect(popover.locator('[data-row-kind="owner"] img')).toHaveAttribute('src', USER_SRC);
-  await expect(popover.locator('[data-selected] [data-row-kind="agent"] img')).toHaveAttribute(
+  await expect(popover.locator('[data-row-kind="agent"][data-selected] img')).toHaveAttribute(
     'src',
     AGENT_SRC,
   );
@@ -144,7 +141,7 @@ test('no avatar surface reaches a third-party avatar host', async ({ page }) => 
     if (request.url().includes('api.dicebear.com')) hits.push(request.url());
   });
   await page.goto('/app?scenario=01');
-  await expect(page.locator('.sidebar-user img')).toHaveAttribute('src', USER_SRC);
+  await expect(page.locator('.sidebar-user')).toBeVisible();
   await page.goto('/app/team?scenario=12');
   await expect(page.getByTestId('team-agent-card').first().locator('img')).toBeVisible();
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=36');
@@ -156,7 +153,7 @@ test('search agent rows + project task rows are seeded (`Agent 列表` / task-ro
   page,
 }) => {
   await page.goto('/app?scenario=01');
-  await expect(page.locator('.sidebar-row').first()).toBeVisible();
+  await expect(page.locator('[data-slot="sidebar-nav-row"]').first()).toBeVisible();
   const searchPanel = page.getByRole('dialog', { name: '搜索' });
   await pressAndExpect(page, 'Meta+k', searchPanel);
   await page.keyboard.type('r3-builder');

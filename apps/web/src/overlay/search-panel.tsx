@@ -13,7 +13,6 @@ import {
 } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
-import { StatusChip } from '../components/ui/status-chip.js';
 import { PROJECT_ID, PROJECT_INITIAL, PROJECT_NAME } from '../fixtures/fixtures.js';
 import type { AgentRef, FixtureSet, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
@@ -29,7 +28,7 @@ import {
   Server,
   Users,
 } from '../icons/index.js';
-import { PHASE_UI } from '../phase.js';
+import { PHASE_STATUS, PHASE_UI } from '../phase.js';
 
 const NAV_ROWS = [
   { label: '任务', Icon: FileCheck, href: '/app' },
@@ -104,6 +103,7 @@ function TodoRow({
 }) {
   const { t } = useI18n();
   const ui = PHASE_UI[todo.phase];
+  const { icon: PhaseIcon, ink } = PHASE_STATUS[todo.phase];
   return (
     <Button
       variant="ghost"
@@ -114,22 +114,22 @@ function TodoRow({
       className={`${ROW_BASE} ${ROW_RESULT} ${rowLitClasses(selected, kbd)}`}
     >
       <span className={ROW_ICON}>
-        <FileCheck width={16} height={16} />
+        <PhaseIcon aria-hidden="true" className={`size-4 ${ink}`} />
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="truncate leading-5 text-foreground">
-          #{todo.seqNum} {todo.title}
+          <span className="text-content-tertiary tabular-nums">#{todo.seqNum}</span> {todo.title}
         </span>
-        {projectName !== undefined && (
-          <span className="truncate text-meta text-content-tertiary">{projectName}</span>
-        )}
+        <span className="truncate text-meta text-content-tertiary">
+          <span className={ink} data-tone={ui.tone}>
+            {t(ui.chip)}
+          </span>
+          {projectName !== undefined && ` · ${projectName}`}
+        </span>
       </span>
-      <span className="flex-none text-meta text-content-tertiary">
+      <span className="ml-auto flex-none text-meta text-content-tertiary tabular-nums">
         {relativeTime(todo.phaseAt, now, t)}
       </span>
-      <StatusChip tone={ui.tone} className="ml-auto flex-none">
-        {t(ui.chip)}
-      </StatusChip>
     </Button>
   );
 }

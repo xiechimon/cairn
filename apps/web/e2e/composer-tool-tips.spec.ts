@@ -13,16 +13,14 @@ async function expectTip(page: Page, button: Locator, label: string) {
 test('detail composer tools name themselves on hover', async ({ page }) => {
   await page.goto(DETAIL);
   const toolbar = page.getByTestId('composer-toolbar');
-  for (const label of ['添加附件', '提及']) {
-    await expectTip(page, toolbar.getByRole('button', { name: label }), label);
-  }
+  await expectTip(page, toolbar.getByRole('button', { name: '添加附件' }), '添加附件');
 });
 
 test('chief composer tools name themselves on hover', async ({ page }) => {
   await page.goto(CHIEF);
   const chief = page.locator('.chief-drawer');
   await expect(chief).toBeVisible();
-  await expectTip(page, chief.getByRole('button', { name: '提及' }), '提及');
+  await expectTip(page, chief.getByRole('button', { name: '添加附件' }), '添加附件');
 });
 
 test('light: chief composer is the same white field as the workbench new-task bar', async ({

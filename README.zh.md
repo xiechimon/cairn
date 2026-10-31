@@ -217,7 +217,7 @@ pnpm test         # vitest
 ## 第三方署名
 
 - 头像字体 [Lorelei](https://www.figma.com/community/file/1198749693280469639) — © Lisa Wischofsky, CC0 1.0
-- 字体 Instrument Sans / Bricolage Grotesque / JetBrains Mono — SIL Open Font License 1.1
+- 字体 Instrument Sans / Bricolage Grotesque / Source Serif 4 / JetBrains Mono — SIL Open Font License 1.1
 - 图标 [lucide](https://lucide.dev) — ISC License
 - emoji 策展数据 [gitmoji](https://gitmoji.dev) — MIT License
 - 执行引擎 [pi SDK](https://github.com/badlogic/pi-mono) — MIT License

@@ -13,7 +13,6 @@
 //     F3 subsequence is NOT a match (`/sl` must not hit `spell-check`)
 //     F4 empty query = caller order, capped at 15
 //   registry + sections (D1: no placeholders):
-//     R1 six builtins, all execute kind, each with descKey + aliases
 //     R2 skill rows are insert kind; builtins execute kind
 //     R3 availability gating: review/stop vanish when unavailable
 //     R4 name collision: builtin wins, same-named skill hidden
@@ -95,7 +94,7 @@ describe('SLASH_COMPLETION_SPEC trigger (S1-S4)', () => {
 });
 
 describe('slashFilter word-prefix matcher (F1-F4)', () => {
-  const names = ['clear', 'attach', 'mention', 'review', 'stop', 'help'];
+  const names = ['clear', 'attach', 'review', 'stop', 'help'];
 
   test('prefix + separator-stripped word prefix + alias (F1)', () => {
     expect(slashFilter('cl', names, String)).toEqual(['clear']);
@@ -123,11 +122,10 @@ describe('slashFilter word-prefix matcher (F1-F4)', () => {
 });
 
 describe('registry + sections (R1-R4)', () => {
-  test('six builtins, all execute, each with descKey (R1)', () => {
+  test('five builtins, all execute, each with descKey (R1)', () => {
     expect(BUILTIN_SLASH_COMMANDS.map((c) => c.name)).toEqual([
       'clear',
       'attach',
-      'mention',
       'review',
       'stop',
       'help',
@@ -149,7 +147,6 @@ describe('registry + sections (R1-R4)', () => {
     expect(sections[0]?.rows.map((r) => r.name)).toEqual([
       'clear',
       'attach',
-      'mention',
       'review',
       'stop',
       'help',
@@ -165,7 +162,7 @@ describe('registry + sections (R1-R4)', () => {
       available: { review: false, stop: false },
       skills: [],
     });
-    expect(sections[0]?.rows.map((r) => r.name)).toEqual(['clear', 'attach', 'mention', 'help']);
+    expect(sections[0]?.rows.map((r) => r.name)).toEqual(['clear', 'attach', 'help']);
   });
 
   test('builtin wins a name collision; same-named skill hidden (R4)', () => {

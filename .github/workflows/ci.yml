@@ -312,6 +312,9 @@ jobs:
       - name: Orb host provisioning fixtures (#2273)
         if: ${{ !cancelled() }}
         run: node --test scripts/ops/orb/egress-relay.test.mjs scripts/ops/orb/orb-host-check.test.mjs scripts/ops/orb/provision.test.mjs scripts/ops/orb/shell.test.mjs
+      - name: Runner secret isolation fixtures (#2189)
+        if: ${{ !cancelled() }}
+        run: node --test scripts/ops/secret-reach/canary.test.mjs scripts/ops/secret-reach/broker.test.mjs scripts/ops/secret-reach/setup-runner-user.test.mjs
 
   ops-backup-test:
     needs: changes

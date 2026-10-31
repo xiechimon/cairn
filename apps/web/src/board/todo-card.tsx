@@ -101,7 +101,7 @@ export function TodoCard({
   const face = cardFace(todo);
   const project = live ? projectName : (projectName ?? PROJECT_NAME);
   const suspended = suspension(todo);
-  const queued = todo.phase === 'queued';
+  const queued = todo.phase === 'queued' || suspended != null;
   const retryTitle =
     todo.waitingOn?.on === 'quota' && todo.waitingOn.retryAt != null
       ? t('下次尝试 {time}', {
@@ -163,7 +163,7 @@ export function TodoCard({
         </Link>
       </h3>
 
-      <div className="todo-card-meta mt-1.5 flex h-5 items-center gap-2 bg-inherit text-meta whitespace-nowrap text-content-tertiary">
+      <div className="todo-card-meta pointer-events-none relative mt-1.5 flex h-5 items-center gap-2 bg-inherit text-meta whitespace-nowrap text-content-tertiary [&_:is(a,button)]:pointer-events-auto">
         <div className="pointer-events-none relative flex min-w-0 flex-1 bg-inherit [&_:is(a,button)]:pointer-events-auto">
           <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
             {project !== undefined && (
@@ -199,7 +199,7 @@ export function TodoCard({
                 title={usageCostKnown(todo.usageCost) ? undefined : t(NO_PRICE_REASON)}
                 className={`${META_ITEM} tabular-nums`}
               >
-                {usageCostKnown(todo.usageCost) ? formatUsd(todo.usageCost.total) : '—'}
+                {usageCostKnown(todo.usageCost) ? formatUsd(todo.usageCost.total) : '$—'}
               </span>
             )}
             {face.kind === 'done' && face.canceled && (
@@ -219,7 +219,7 @@ export function TodoCard({
               'absolute inset-y-0 right-0 my-auto bg-inherit opacity-0 transition-opacity duration-150 ease-out group-hover/card:opacity-100 group-focus-within/card:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100',
             )}
         </div>
-        <div className="flex flex-none items-center gap-1 text-content-dim opacity-0 transition-opacity duration-150 ease-out empty:hidden group-hover/card:opacity-100 group-focus-within/card:opacity-100 pointer-coarse:opacity-100">
+        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center gap-1 bg-inherit pl-2 text-content-dim opacity-0 transition-opacity duration-150 ease-out empty:hidden group-hover/card:pointer-events-auto group-hover/card:opacity-100 group-focus-within/card:pointer-events-auto group-focus-within/card:opacity-100 pointer-coarse:pointer-events-auto pointer-coarse:opacity-100">
           {todo.chiefCreated === true && (
             <span role="img" aria-label={t('由总管创建')} title={t('由总管创建')} className="flex">
               <Glyph icon={Sparkles} className="size-3" />
@@ -298,29 +298,33 @@ export function TodoCard({
           data-orchestration-failed="true"
           className="mt-2.5 border-t border-dashed border-border pt-2 text-meta"
         >
-          <div className="flex items-center gap-1.5">
-            <Glyph icon={CircleX} className="size-3.25 flex-none" />
-            <span>{t('编排失败')}</span>
-            {actionLink('重试', RotateCcw, 'ml-auto')}
-            <Link
-              className="relative z-10 text-content-secondary"
-              to={{ search: chiefSearch(orchestration?.threadId ?? '') }}
-            >
-              {t('查看会话')}
-            </Link>
+          <div className="flex items-center gap-1.5 whitespace-nowrap">
+            <span className="flex min-w-0 items-center gap-1 font-medium text-destructive">
+              <Glyph icon={CircleX} className="size-3.25 flex-none" />
+              <span className="truncate">{t('编排失败')}</span>
+            </span>
+            {actionLink('重试', RotateCcw, '-mr-1.5 ml-auto')}
           </div>
           <p
             className="mt-1 line-clamp-2 wrap-break-word text-content-secondary"
             title={orchestrationError}
           >
-            {t(orchestrationErrorSummary(orchestrationError))}
+            {t(orchestrationErrorSummary(orchestrationError))}{' '}
+            <Link
+              className="relative z-10 text-content-secondary underline decoration-border underline-offset-2 hover:decoration-current"
+              to={{ search: chiefSearch(orchestration?.threadId ?? '') }}
+            >
+              {t('查看会话')}
+            </Link>
           </p>
         </div>
       )}
 
       {face.kind === 'attention' && !orchestrationError && (
         <div className="mt-2.5 flex items-center gap-1.5 border-t border-dashed border-border pt-2 text-meta whitespace-nowrap">
-          <span className={`flex min-w-0 items-center gap-1 font-medium ${ACCENT_INK}`}>
+          <span
+            className={`flex min-w-0 items-center gap-1 font-medium ${face.need === 'failed' ? 'text-destructive' : ACCENT_INK}`}
+          >
             <Glyph icon={ATTENTION[face.need].icon} className="size-3.25 flex-none" />
             <span className="truncate">{t(ATTENTION[face.need].label)}</span>
           </span>

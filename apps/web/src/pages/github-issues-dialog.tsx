@@ -1,8 +1,9 @@
 import type { GithubIssueState, TodoRecord } from '@cairn/shared';
 import { useEffect, useState } from 'react';
 import { useApiMutations, useGithubIssues } from '../api/hooks.js';
+import { SegmentedRadio } from '../components/segmented.js';
 import { Button } from '../components/ui/button.js';
-import { DIALOG_TEXT_BUTTON, DialogShell } from '../components/ui/dialog-shell.js';
+import { DialogShell } from '../components/ui/dialog-shell.js';
 import { TagChip } from '../components/ui/tag-chip.js';
 import { useI18n } from '../i18n/provider.js';
 
@@ -58,16 +59,18 @@ export function GithubIssuesDialog({
       footer={
         <>
           <Button
-            variant="ghost"
-            className={DIALOG_TEXT_BUTTON}
+            variant="outline"
+            size="sm"
+            className="px-3"
             disabled={page <= 1 || pending}
             onClick={() => setPage((p) => p - 1)}
           >
             {t('上一页')}
           </Button>
           <Button
-            variant="ghost"
-            className={DIALOG_TEXT_BUTTON}
+            variant="outline"
+            size="sm"
+            className="px-3"
             disabled={data?.hasMore !== true || pending}
             onClick={() => setPage((p) => p + 1)}
           >
@@ -76,21 +79,15 @@ export function GithubIssuesDialog({
         </>
       }
     >
-      <div className="flex gap-2">
-        {STATE_FILTERS.map((filter) => (
-          <Button
-            key={filter.id}
-            variant={state === filter.id ? 'secondary' : 'outline'}
-            aria-pressed={state === filter.id}
-            onClick={() => {
-              setState(filter.id);
-              setPage(1);
-            }}
-          >
-            {t(filter.label)}
-          </Button>
-        ))}
-      </div>
+      <SegmentedRadio
+        label={t('issue 状态')}
+        value={state}
+        options={STATE_FILTERS.map((filter) => ({ value: filter.id, label: t(filter.label) }))}
+        onChange={(next) => {
+          setState(next);
+          setPage(1);
+        }}
+      />
       {issuesQ.isError ? (
         <div className="py-6 text-center text-ui text-content-tertiary">
           {t('issue 列表加载失败')}
@@ -107,18 +104,18 @@ export function GithubIssuesDialog({
             <Button
               key={issue.number}
               variant="ghost"
-              className="h-auto w-full cursor-pointer items-baseline justify-start gap-1.5 rounded-lg p-2 text-left font-normal whitespace-normal"
+              className="h-auto w-full cursor-pointer flex-wrap items-baseline justify-start gap-x-2 gap-y-1 rounded-(--radius-menu-item) px-2.5 py-2 text-left font-normal whitespace-normal hover:bg-(--menu-hover)"
               disabled={pending}
               onClick={() => importIssue(issue.number)}
             >
               <span className="flex-none text-meta text-content-tertiary tabular-nums">
                 #{issue.number}
               </span>
-              <span className="min-w-0 text-ui text-foreground [overflow-wrap:anywhere]">
+              <span className="min-w-0 flex-1 text-ui text-foreground [overflow-wrap:anywhere]">
                 {issue.title}
               </span>
               {issue.labels.length > 0 && (
-                <span className="flex w-full flex-wrap gap-1">
+                <span className="flex flex-none flex-wrap gap-1">
                   {issue.labels.map((label) => (
                     <TagChip
                       key={label.name}

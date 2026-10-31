@@ -8,12 +8,7 @@ import { cn } from 'cn';
 import { useState } from 'react';
 import { useApiMutations, useProjectAutonomy } from '../api/hooks.js';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
-import {
-  SETTINGS_HINT_CLS,
-  SETTINGS_ROW_CLS,
-  SettingsCard,
-  SettingsRow,
-} from '../components/settings-list.js';
+import { SETTINGS_ROW_CLS, SettingsCard, SettingsRow } from '../components/settings-list.js';
 import { ToggleSwitch } from '../components/toggle-switch.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON } from '../components/ui/dialog-shell.js';
@@ -131,9 +126,14 @@ export function ProjectAutonomyCard({ projectId, teamId }: { projectId: string; 
           .map((k) => (
             <SettingsRow key={k.kind} label={t(KIND_LABELS[k.kind])}>
               <span
-                className={
-                  k.lastBlockedReason === null ? SETTINGS_HINT_CLS : 'text-ui text-foreground'
-                }
+                className={cn(
+                  'text-meta',
+                  k.lastEvaluatedAt === null
+                    ? 'text-content-tertiary'
+                    : k.lastBlockedReason === null
+                      ? 'text-running-text'
+                      : 'text-content-secondary',
+                )}
                 data-testid={`autonomy-state-${k.kind}`}
               >
                 {k.lastEvaluatedAt === null

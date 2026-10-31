@@ -1,6 +1,6 @@
 {
   "frozenFrom": {
-    "sha": "3539dba55e4ad1a88585649e2b91d9633a86086d",
+    "sha": "ac9fc7c8ed14a1b32ee49c9287e31b57bbddbf80",
     "date": "2026-10-31"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
@@ -8,7 +8,7 @@
     "alert-dialog-shell.tsx": {
       "kind": "adapter",
       "reason": "#425 B1: shared confirm-surface base over Base UI AlertDialog; restores the repo three-path close contract (X/Esc/backdrop) that the stock blocking AlertDialog semantics do not provide. Paper face shared with DialogShell (S width by default, same head/body/split footer).",
-      "hash": "b01730a88d4682386eff68128290fb076d57a7d6d8a8bb9d52fcc6dcdfdecf28"
+      "hash": "f03f25b0488dfd888b2bc4dc44e89327c741e2afb75057b8763c20881b47b747"
     },
     "alert-dialog.tsx": {
       "kind": "registry",
@@ -46,7 +46,7 @@
       "upstreamItem": "button",
       "status": "deviated",
       "reason": "#411/#425 semantic mapping, zero skin: type=button default (implicit-submit guard, repo-wide ui/button law) + data-variant/data-size pass-through (the observable contract e2e material pins assert). Focus-ring, transition-list and brand-variant deviations retired per #982/#991: official ring form restored, brand semantics live in the token layer.",
-      "hash": "7523d9a493b68ef31b72f056a64891802c24e6a899a14165851227f4e38f2e2e"
+      "hash": "0af5025d00123562d10d93c086363ff61968a948a1a66ba09f33b191b6425112"
     },
     "card.tsx": {
       "kind": "registry",
@@ -183,7 +183,7 @@
     "status-chip.tsx": {
       "kind": "adapter",
       "reason": "#942 canon table §5.2 / #983 verdict (kept as zero-skin adapter): five-state task chip = registry Badge skeleton + data-tone state carrier + five --chip-* token utility pairs (spec/22 §1.7/1.8 1:1 values; plan/confirm have no registry variant semantics). The sm geometry tier is retired per #983 — all faces converge on the registry Badge h-5 default (#1006).",
-      "hash": "02a9ea807a008af5a33701580d1ff3a0f6c27dc6ad20d96303dbb9d3def9fe14"
+      "hash": "6ca04a9311f473be2072a4de9154114a0690555cd3c771ed705351a6558ea00e"
     },
     "switch.tsx": {
       "kind": "registry",
@@ -201,7 +201,7 @@
     "tag-chip.tsx": {
       "kind": "adapter",
       "reason": "XMON-14 / #983 verdict (rewritten as zero-skin adapter): tag pill = registry Badge default geometry with the runtime data color kept as an inline background (TagRecord.color is a record field, not a design token — board-filter.spec pins the contract) + max-w-40 truncate layout + --text-on-accent foreground. The 11px font-rewrite tier (text-[11px]/leading-5/py-0) is retired per #983 — font size/line height/padding converge on Badge defaults (#1006); the todo-card row-flush consumer override is folded into the same default per the R5 prototype-review ruling.",
-      "hash": "f98365f1ac5d44732dbb52028419e8aee245b8f0f94d268682fe9613d4ddae42"
+      "hash": "52f7384a45318ee09d0efc5ddbeb5e63adbba281bd8de10c3e53e995d154a01f"
     },
     "textarea.tsx": {
       "kind": "registry",
@@ -212,7 +212,7 @@
     "toaster.tsx": {
       "kind": "adapter",
       "reason": "#631: sonner official recipe adapted to the repo theme inversion (MutationObserver on the root class; dark is the :root default) + popover-family token skin, zero new color values. #1236: toastSuccess helper next to toastError (delegated-action receipts). The official recipe's lucide status icons, tinted with the status tokens, and the popover radius.",
-      "hash": "382101350d55b854b87e0cb626f80f88904ea25ea0063f78e52b740d4bdc5955"
+      "hash": "eb42e006acc6021856db208481d4b103eede1ddf80c080af07cf8488441bb98f"
     },
     "tooltip.tsx": {
       "kind": "registry",

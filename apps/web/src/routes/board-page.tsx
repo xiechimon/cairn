@@ -684,11 +684,7 @@ export function BoardPage() {
         onClose={() => search.setOpen(false)}
         server={live ? searchResults.data : undefined}
       />
-      <NewTaskSurfaceRoot
-        fixture={fixture}
-        opts={{ fixtureTodos, eager: true, onFixtureSave }}
-        apiRef={newTaskApiRef}
-      />
+      <NewTaskSurfaceRoot fixture={fixture} opts={{ onFixtureSave }} apiRef={newTaskApiRef} />
       <AcceptDialog
         open={overlay?.kind === 'accept'}
         onClose={closeOverlay}

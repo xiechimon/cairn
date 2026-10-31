@@ -30,3 +30,13 @@ export function markScheduleCreated(record: Omit<ScheduleRecord, 'id'>): void {
 export function withCreatedSchedules(schedules: ScheduleRecord[]): ScheduleRecord[] {
   return createdSchedules.length === 0 ? schedules : [...schedules, ...createdSchedules];
 }
+
+const archived = new Set<string>();
+
+export function markArchived(id: string): void {
+  archived.add(id);
+}
+
+export function isArchived(id: string): boolean {
+  return archived.has(id);
+}

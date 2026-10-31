@@ -305,7 +305,7 @@ export function BoardSurface({
   return (
     <div className="board-main relative flex min-w-0 flex-1 flex-col">
       <header className="board-topbar flex h-14 flex-none items-center gap-3 px-6 whitespace-nowrap">
-        <h1 className="board-topbar-title flex-none font-heading text-page font-title text-foreground">
+        <h1 className="board-topbar-title flex-none font-serif text-page font-semibold text-foreground">
           {t(boardView ? '看板' : '工作台')}
         </h1>
         {!home && <NeedsYouSummary count={pendingSplit.fresh.length} />}

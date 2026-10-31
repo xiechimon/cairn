@@ -20,7 +20,7 @@ colors:
   accent: '#9a6500'        # ochre (--card-button): waiting on you, action links, count badges
   primary: '#233127'       # primary button: deep lichen ink
   on-primary: '#f4f6f1'
-  on-accent: '#ffffff'     # text on count badges and project tiles
+  on-accent: '#ffffff'     # text on count badges
   accent-hover: '#f7ecd2'  # action link hover background
   menu-hover: '#eff1eb'    # menu row hover background
   backdrop: 'rgb(29 35 31 / 0.28)'  # dialog backdrop (ink dim, no blur)
@@ -69,8 +69,8 @@ colors-dark:
   danger-line: '#8c4a3e'
   project-tiles: ['#6f9c5f', '#b98a57', '#6f93bb', '#9a7cad', '#5fa3a0', '#b77f8a']
 typography:
-  greeting:     { fontFamily: display, fontSize: 26px, fontWeight: '650' }
-  page-title:   { fontFamily: display, fontSize: 20px, fontWeight: '650' }
+  greeting:     { fontFamily: serif, fontSize: 26px, fontWeight: '600' }
+  page-title:   { fontFamily: serif, fontSize: 20px, fontWeight: '600' }
   heading:      { fontFamily: display, fontSize: 17px, fontWeight: '650' }
   brand:        { fontFamily: display, fontSize: 20px, fontWeight: '650' }
   card-title:   { fontFamily: sans, fontSize: 14px, fontWeight: '600', lineHeight: '1.5' }
@@ -79,6 +79,7 @@ typography:
   caption:      { fontFamily: sans, fontSize: 12px, fontWeight: '500' }
   code:         { fontFamily: mono, fontSize: 12px, fontWeight: '400' }
 fonts:
+  serif: var(--font-source-serif) # Source Serif 4 → Songti SC: greeting and page titles
   display: var(--font-display)   # Bricolage Grotesque → sans
   sans: var(--font-sans)         # Instrument Sans → PingFang SC
   mono: var(--font-mono)         # JetBrains Mono
@@ -88,7 +89,7 @@ rounded:
   menu-item: 12px    # --radius-menu-item = menu radius minus the 6px menu padding
   card: 14px         # --radius-card = rounded-xl: one corner for every card-like surface
   sheet: 18px        # --edge-radius: dialogs, ⌘K
-  menu: 18px         # --radius-popover: menus, floating surfaces, dropdowns
+  menu: 12px         # --radius-popover: menus, floating surfaces, dropdowns
   bubble: 14px       # --radius-bubble: user chat bubble
   composer: 14px     # --radius-composer
   window: 18px       # --radius-window: chief window
@@ -120,9 +121,9 @@ Direction A, **Cairn**: a cairn is a pile of stones that marks a trail for the n
 - **Three stone layers**: `canvas` (app background; the sidebar sits directly on it) → `sheet` (main surface) → `card` (near-white cards, rows and the composer, `#fdfdfb` in light).
 - **One theme file**: every token lives in `src/styles/shadcn.css` (the file `components.json` points the shadcn CLI at). Its first `:root` block holds theme-independent tokens (motion, z-index, type, radii, sizes, formulas over color slots) followed by the dark colors; `.light` overrides the colors only. A palette change touches one file.
 - **Borders are always 1 CSS pixel**: the main panel, task cards, the active nav item, and the new-task button stay 1px on high-density screens too (they do not follow `--hairline` down to 0.5px); borders must be visible.
-- **Three-tier shadow ladder** (#1428): `--e1` cards and rows, `--e2` menus and floating surfaces, `--e3` dialogs and floating windows. Each tier carries its own 1px ring at the end (`--e1` uses `line`; `--e2`/`--e3` use `--elevated-ring`, which is `line` in light and `--ring-inset-highlight` in dark, where `line` is invisible on the surface base). Light shadows are tinted ink (`rgb(29 35 31 / a)`) rather than neutral black so they sit in the paper, and no extra border is drawn on the surface; surfaces that draw their own `--edge-ring` (the notification strip, the chief window, the FAB) take the pool of the same tier: `--cds-shadow-sm` / `-md` / `-lg` — one ring per edge. Old slot names like `--panel-shadow` / `--shadow-popover` / `--dialog-shadow` are aliases; the hover / focus slots are states, not tiers.
+- **Three-tier shadow ladder** (#1428): `--e1` cards and rows, `--e2` menus and floating surfaces, `--e3` dialogs and floating windows. Each tier carries its own 1px ring at the end (`--e1` uses `line`; `--e2`/`--e3` use `--elevated-ring`, which is `line` in light and `--ring-inset-highlight` in dark, where `line` is invisible on the surface base). Light shadows are tinted ink (`rgb(29 35 31 / a)`) rather than neutral black so they sit in the paper, and stay faint and layered (`--e2` is 1/1/.04, 3/9/.05, 8/20/.06; `--e3` 1/1/.04, 6/24/.08, 12/48/.08, measured against Linear's menus and ⌘K); dark `--e2` stops at .32 alpha, and no extra border is drawn on the surface; surfaces that draw their own `--edge-ring` (the notification strip, the chief window, the FAB) take the pool of the same tier: `--cds-shadow-sm` / `-md` / `-lg` — one ring per edge. Old slot names like `--panel-shadow` / `--shadow-popover` / `--dialog-shadow` are aliases; the hover / focus slots are states, not tiers.
 - **Four ink steps**: `ink` headings and body text; `ink-2` nav, buttons, descriptions; `ink-3` meta information; `ink-4` decorative icons only. The lightest text ever uses is `ink-3`.
-- **Contrast (light, measured, WCAG 2.x)**: on the card, `ink` is 15.71, `ink-2` 7.80, `ink-3` 5.80, `accent` 4.87, `running-text` 6.05, `destructive` 6.45; `icon` is 5.80, the same step as `ink-3`, so labelled icons read as solid as their text; `ink-3` on canvas is 4.75 and on `--secondary` (`#eceee8`) 5.06, `ink-2` there 6.79. White text on the `accent` background is 4.96; `on-primary` on `primary` is 12.53. White text on the six light project tiles measures 4.55–6.16. The running bar on its track is 3.45. Action links swap to `spot-text-on-tint` on the `accent-hover` background (6.84), because `accent` on it drops to 4.22. `ink-4` is decorative only.
+- **Contrast (light, measured, WCAG 2.x)**: on the card, `ink` is 15.71, `ink-2` 7.80, `ink-3` 5.80, `accent` 4.87, `running-text` 6.05, `destructive` 6.45; `icon` is 5.80, the same step as `ink-3`, so labelled icons read as solid as their text; `ink-3` on canvas is 4.75 and on `--secondary` (`#eceee8`) 5.06, `ink-2` there 6.79. White text on the `accent` background is 4.96; `on-primary` on `primary` is 12.53. Project tiles draw their letter in `--project-ink-N` on an 18% tint of the same hue, 5.8 and up in both themes (measured live in the gallery). The running bar on its track is 3.45. Action links swap to `spot-text-on-tint` on the `accent-hover` background (6.84), because `accent` on it drops to 4.22. `ink-4` is decorative only.
 - **Focus ring**: `--focus-ring` is lichen `#3f6c35` in light (6.05 on the card) and `#9cc78b` in dark, so keyboard focus never reads as "waiting on you". Buttons, checkboxes, switches and badges draw it as a 2px outline 2px outside the box. Text fields (`Input`, `Textarea`, `SelectTrigger`, the `InputGroup` shell) turn their own border `--focus-ring` and add a 3px `--focus-halo` (the ring at 22%) instead, so the field reads as one shape, not a box inside a box. An invalid field (`aria-invalid`) shows one `destructive` 1px border at rest and, when focused, that border plus a 3px `--danger-halo` (destructive at 20%); it never stacks the green focus ring on top of the red border.
 - **Brand marks**: the spiral launcher disc uses `--fab-surface` `#2f5a2a` with the `--fab-mark` `#f4f6f1` spiral in both themes, the nearest stone-green to the Cairn app icon.
 - **Status chips use five distinct hues**: idle neutral, plan slate blue, confirm ochre, done lichen green, failed rust (`--chip-*-bg` / `--chip-*-fg`, every pair 5.5+ in light and 7.0+ in dark). Plan is deliberately not ochre: only "waiting on you" may look like the accent.
@@ -133,7 +134,7 @@ Direction A, **Cairn**: a cairn is a pile of stones that marks a trail for the n
 
 ## Typography
 
-- **Display face for titles**: Bricolage Grotesque (`--font-display`, the `font-heading` utility) for the brand name, page and pane titles, dialog titles and the Coordinator greeting, at 650 with -0.015em tracking. Chinese falls back to PingFang SC.
+- **Two title faces**: Source Serif 4 (`font-serif`, 600, -0.01em) for the Coordinator greeting and page titles (the board top bar, page shells, the task detail header, settings headers), so the top of every page has one quiet serif voice. Bricolage Grotesque (`font-heading` with `font-title`, 650) for the brand name, section and column headings, pane and dialog titles. Chinese falls back to Songti SC under the serif and PingFang SC under the sans.
 - **Everything else is Instrument Sans** (`--font-sans`): thread titles, rows, navigation, buttons, meta. Chinese falls back to PingFang SC. Code, times, ids and counters use JetBrains Mono (`--font-mono`) with tabular numbers.
 - Fonts are self-hosted latin subsets in `public/fonts` (SIL OFL 1.1, licenses next to the files), loaded with `font-display: swap` and preloaded in `index.html` and `design.html`; the metric-matched fallbacks keep the swap from shifting layout.
 - **Six font sizes, no seventh allowed**: 26 Coordinator greeting / 20 page title and brand / 17 column and section headings / 14 card titles and UI text / 12.5 meta / 12 badges and group labels. In code, use the corresponding Tailwind theme keys `text-greeting` / `text-page` / `text-heading` / `text-card-title` and `text-ui` / `text-meta` / `text-caption` (heading font `font-heading`), never arbitrary values like `text-[13px]`; `scripts/ui-debt-gate.mjs` D5 only allows the total count of arbitrary values to decrease.
@@ -162,7 +163,7 @@ From top to bottom:
 1. **Workspace row**: spiral mark (`public/logo-mark.svg` as a mask, 22px, taking the row ink `ink`) + display brand name at 20px + dropdown arrow; two icon buttons on the right: search (⌘K) and collapse sidebar.
 2. **New-task button**: see "Current shell and board surface" below. It is an action, not a nav item.
 3. **Work nav**: workbench, needs my attention (`accent` count badge on the right), schedules. Active item = `accent` icon.
-4. **Projects**: group label "Projects" + plus on the right; each project is one row = colored first-letter tile (colors taken in order from `project-tiles`) + name + unfinished count.
+4. **Projects**: group label "Projects" + plus on the right; each project is one row = tinted first-letter tile (`ProjectAvatar`: hue taken in order from `project-tiles`, letter in `--project-ink-N`, 1px ring of the hue) + name + unfinished count.
 5. **Footer**: one "Resources" row (skills / MCP / keys / machines / providers collapsed inside, expanding into an indented sub-list on click); user row = avatar + name + second line "● 2 machines online · N running".
 
 ### Board columns
@@ -174,7 +175,7 @@ From top to bottom:
 - `card` surface, 14px corner (`--radius-card`), a `line` 1px hairline ring plus one very light ink shadow (`0 1px 2px`, 5% in light; together they are `--e1`), so the edge is crisp, never soft. On hover the ring deepens and the shadow rises to `0 6px 16px -2px` at 9% (150ms ease-out). No second large blur shadow.
 - In-flight orchestration (start was pressed, the chief has not dispatched yet): a todo card swaps `开始` for a footer `编排中 · reason` (waiting for X to come online / missing capability / queued) plus `查看会话` on the right; a failed card swaps `重试` for an inert `编排中`. Nothing is layered over the meta line.
 - A failed orchestration shows a short plain summary (`orchestrationErrorSummary`: connection dropped, timed out, out of quota, context too long, bad key, provider unavailable); the raw provider error stays in the `title` tooltip and never wraps character by character on the card.
-- Structure: title (at most two lines), then one meta line (project, #number, tag, time; never wraps; when space runs out the tag truncates first and the project keeps at least five characters), then a footer by status. The tag icon uses the user's tag color; the tag name uses the meta ink. A standalone tag (`TagChip`) is a neutral outline pill (`card` background, `line` ring, `ink` text) with an 8px dot in the tag color; the tag color never fills the pill.
+- Structure: title (at most two lines), then one meta line (project, #number, tag, time; never wraps; when space runs out the tag truncates first and the project keeps at least five characters), then a footer by status. The tag icon uses the user's tag color; the tag name uses the meta ink. A standalone tag (`TagChip`) is a tinted label: the tag color mixed into `card` behind text that mixes the tag color into `ink` (`--tag-tint` / `--tag-ink`: 12% / 35% light, 22% / 40% dark, chosen so every label color, white and black included, keeps at least 4.5:1; `test/tag-chip-contrast.test.ts` measures it), 4px corners, no border and no dot, like a GitHub label. Inside the card meta line the tag stays a colored tag glyph plus the name.
 - The right-side meta icons (plan, changes, chief-created, branch) stay hidden until the card is hovered or focused, and are always visible on touch screens (`pointer-coarse`).
 - Footer:
   - Three pending states: dashed divider + status icon and name (ochre) + reason (truncated) + an ochre action link on the right (retry / confirm plan / review).
@@ -198,7 +199,7 @@ See "Page patterns · Settings list" below.
 - User turns sit on the right with no avatar: a `--secondary` bubble, at most `min(80%, 56ch)` wide, 32px tall for one line, with a tighter bottom-right corner. Their action row aligns right. Agent and chief turns keep the avatar on the left.
 - Copy icons under a message stay hidden until its row is hovered or focused (`.chat-copy` in `app.css`); touch screens always show them.
 - The plan preview fades out at the bottom with a mask instead of a hard cut.
-- The composer is a white card (`--card`) with a 1px `--input` ring that turns lichen with a soft halo on focus (`--shadow-composer*`); it is the one white surface in the conversation because it is where you act. The idle send button has no fill; only the stop button gets the `seg-active` square.
+- The composer is a white card (`--card`) with a 1px `--input` ring that turns lichen with a soft halo on focus (`--shadow-composer*`); it is the one white surface in the conversation because it is where you act. The empty send button has no fill; once there is a draft it fills with `primary` (ink, never the ochre accent, which means waiting on you). The stop button is a `secondary` square with an ink stop glyph.
 
 ### Trace
 - Agent activity (tool calls, thinking, waiting) renders as Trace lines (`components/ui/trace.tsx`), never as hand-written rows. One line per action: optional icon, title, then a tabular-number description such as the duration. Every line is sans `text-meta` (12.5px) in `ink-2`; a command or tool name goes in an inline `font-mono text-caption` code span, never a mono line. Errors keep the line in `ink-2` and add a 500 `destructive` "Failed" label (and a `destructive` icon); the whole line never turns red. Pending lines use `ink-3`, not opacity. The live spinner is `running` green, because it means working, not waiting on you. The chief turn-tool panel uses a 1px `border` rule, the same weight as collapsible detail.
@@ -223,7 +224,7 @@ All live in `src/components/` and are shown in the gallery under "Stone language
 - **PrBar** (`thread/pr-bar.tsx`): PR number, branch, CI chip that opens a Checks popover (Auto-fix, Auto-merge with dynamic help, one locked row that states why), Merge; merged variant.
 - **ScheduledTaskRow** (`thread/scheduled-task-row.tsx`): still clock mark, name, trigger and next run, Active, Paused or Auto-disabled tag.
 - **Shell parts** (`shell/`): `SidebarNavRow`, `SidebarProjectRow` with waiting count, `SidebarThreadList` and `SidebarThreadRow` (pebble, truncation, hover menu, open and snoozed), `SidebarUser`, `WaitPill`, `HeaderIconButton` with attention dot, `ProjectCard`, `PhoneTabBar` with badge.
-- **Stream parts** (`stream/`): `GoalLine`, `Greeting`, `SuggestionChip`, `ArchivedBanner`; the day divider is `Marker variant="separator"`.
+- **Stream parts** (`stream/`): `GoalLine`, `Greeting`, `SuggestionChip`; the archived banner is `NoticeBanner` with the waiting tone; the day divider is `Marker variant="separator"`.
 - **ListCard / ListRow** (`list-card.tsx`): divided card list used by library, activity and settings rows.
 - **RoutingNode / QuotaBar** (`settings/`): model-routing node with optional quota bar that turns ochre at 80% and above; unavailable nodes are dashed with a failed tag.
 
@@ -234,7 +235,7 @@ Pages like settings, resources, team, and project share the pieces below. A new 
 ### Card radius: one corner
 - **Token**: `--radius-card` = 14px (`rounded.card`), the class `rounded-(--radius-card)`, or `CARD_RADIUS_CLS` exported by `settings-list.tsx`.
 - **Used on**: every card-like surface — task cards, cards being dragged, settings cards, team / agent cards, grouped resource-row cards, one-off notice cards.
-- **Not in this list**: dialogs and the ⌘K panel are the sheet tier at 18px (`--edge-radius`); menus and floating surfaces use `--radius-popover` (18px, see "Dialogs and menus" below); buttons, icon buttons, rows, inputs and selects are 8px (`--radius-control`, `rounded-md`).
+- **Not in this list**: dialogs and the ⌘K panel are the sheet tier at 18px (`--edge-radius`); menus and floating surfaces use `--radius-popover` (12px, see "Dialogs and menus" below); buttons, icon buttons, rows, inputs and selects are 8px (`--radius-control`, `rounded-md`).
 - The registry `Card` ships with `rounded-xl`, which equals `--radius-card` (14px).
 - Do: one corner for all cards on a page. Do not: write 10px / 18px cards into a page, or mix two card corners on one page.
 
@@ -288,7 +289,7 @@ Pieces: `src/components/ui/dialog-shell.tsx` (`DialogShell` + the exported `DIAL
 - **Body**: the single scrolling box (`min-h-0`), with 20px left/right padding that also serves as room for the focus ring. The panel is capped at `100vh - 64px`; in short viewports the body scrolls and the foot stays on screen.
 - **Foot (split)**: a 12px `ink-3` hint or status on the left (`hint`: doc links, shortcuts, waiting states, page numbers), the action group on the right. The primary action is the shadcn Button default (`primary` background, 32px, 8px corner, `DIALOG_PRIMARY_BUTTON`), the secondary action is a ghost text button (`DIALOG_TEXT_BUTTON`), and danger confirmations switch to `destructive`. With no hint the actions still align right. No background band, no divider line.
 - **Grouped selector** (providers): a search box on top, then groups under small headings (`text-caption` 500 `ink-3`); each row is 40px = a 22px first-letter tile (white background + `line` ring) + name + an `ink-3` tag on the right (OAuth / not yet enabled). Hover and keyboard focus = the selector's selected row (white card + hairline ring). Disabled rows drop the text to `ink-3` and show no hover. Search filters across groups and whole empty groups hide; "Other · custom endpoint" is always there.
-- **Menus** (one menu surface — `DropdownMenu` / `Popover` / the Select popup are the same surface, #1767): `popover` background, 18px radius (`--radius-popover`), 6px padding (`--menu-pad`), `--shadow-popover` (= `--e2`: soft shadow + 1px ring). Rows are 32px tall with a concentric 12px radius (`--radius-menu-item` = popover radius minus padding), 14px text, 15px `ink-3` icons, hover `menu-hover`; shortcut hints right-aligned in `text-caption` `ink-3`; dividers 1px, inset 6px left and right; group labels `text-caption` 500 `ink-3`. Danger rows use `destructive` for text and icon, hover `danger-soft`. Segmented controls inside menus use `SegmentedRadio` / `SegmentedTabs`; do not hand-roll them.
+- **Menus** (one menu surface — `DropdownMenu` / `Popover` / the Select popup are the same surface, #1767): `popover` background, 12px radius (`--radius-popover`), 4px padding (`--menu-pad`), `--shadow-popover` (= `--e2`: soft shadow + 1px ring). Rows are 32px tall with a concentric 8px radius (`--radius-menu-item` = popover radius minus padding, the same 12/8 pair Linear and Amp use), 14px text, 15px `ink-3` icons, hover `menu-hover`; shortcut hints right-aligned in `text-caption` `ink-3`; dividers 1px, inset 6px left and right; group labels `text-caption` 500 `ink-3`. Danger rows use `destructive` for text and icon, hover `danger-soft`. Segmented controls inside menus use `SegmentedRadio` / `SegmentedTabs`; do not hand-roll them.
 - Do: one width tier per dialog, hints left and actions right, equal-height menu rows. Do not: a dark or blurred backdrop, full-width submit bars, a gray-background foot band, outline secondary buttons, or small gray 12px menus.
 - `e2e/paper-overlays.spec.ts` pins the backdrop color, the three widths, the split foot, the menu row height, and the grouped selector; `e2e/color-freeze.spec.ts` pins `dialog-backdrop` / `menu-hover`.
 
@@ -326,7 +327,7 @@ Dark is the `:root` default (`.light` is the light theme). Values live in the `c
 - **Hairline rings stay drawn**: `line` #353b36 is 1.32 on the card and 1.45 on the sheet.
 - **The ink ladder inverts**: `ink` #e6e8e2, `ink-2` #b4bab3, `ink-3` #959c96, `icon` #959c96; `ink-4` #5d655f is decorative only.
 - **Contrast (measured, WCAG 2.x)**: on the card, `ink` 12.30, `ink-2` 7.68, `ink-3` 5.41, `icon` 5.41, `accent` 8.14, `running-text` 7.92, `destructive` 7.00; `ink-3` on canvas 6.43 and on a hovered menu row 4.53.
-- **Text on ochre is dark ochre**: `--text-on-accent` #1a1404 on the bright `accent` measures 9.83; dark project tiles carry #121513 text at 5.13 and up. Light mode uses white on the darker ochre and on the tiles.
+- **Text on ochre is dark ochre**: `--text-on-accent` #1a1404 on the bright `accent` measures 9.83; dark project letters mix the tile hue with 40% white. Light mode uses white on the darker ochre.
 - **Accent hover backgrounds are deep-dyed**: `accent-hover` #33290f, links on it 7.69; `spot-text-on-tint` #f2cf86 there 9.59.
 - **The running green brightens**: icon #82b46f (6.30 on the card), text #9cc78b (7.92), bar #6fa35c on its track 4.28.
 - **Dialog backdrop**: black at 50%, no blur; the dialog surface is `sheet`.

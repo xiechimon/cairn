@@ -4,13 +4,14 @@ import { Link } from 'react-router';
 import type { CurrentUser } from '../api/provider.js';
 import { ThinkingRow, ToolActivityRow } from '../components/chat/agent-rows.js';
 import { LiveRow, LiveSignal } from '../components/chat/live-row.js';
+import { TraceStepLine } from '../components/chat/trace-steps.js';
 import { Bubble, BubbleContent } from '../components/ui/bubble.js';
 import { Button } from '../components/ui/button.js';
 import { Marker, MarkerContent } from '../components/ui/marker.js';
 import { Message, MessageContent } from '../components/ui/message.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
-import { Trace, TraceDescription, TraceLine, TraceTitle } from '../components/ui/trace.js';
+import { Trace, TraceLine, TraceTitle } from '../components/ui/trace.js';
 import { ChatMarkdown } from '../detail/chat-markdown.js';
 import { TodoGlanceContext, TodoStatus } from '../detail/segments.js';
 import type {
@@ -49,7 +50,7 @@ const MSG_COL_MID_CLS = `${MSG_COL_CLS} gap-0`;
 const MSG_COL_LIVE_CLS = 'min-w-0 flex-1 gap-0';
 
 const BUBBLE_WRAP_CLS = 'w-full max-w-full';
-const BUBBLE_USER_CLS = 'w-full rounded-(--radius-popover) border-0 px-3 py-2.5 leading-6';
+const BUBBLE_USER_CLS = 'w-full rounded-(--radius-bubble) border-0 px-3 py-2.5 leading-6';
 const BUBBLE_ROBOT_CLS = 'w-full border-0 leading-6';
 const MARKER_NOTE_CLS = 'my-2.5 justify-center text-center text-meta text-(--text-tertiary)';
 const MARKER_ERROR_CLS =
@@ -120,15 +121,17 @@ function Segments({ segments }: { segments: ChiefSegment[] }) {
 function TurnToolLines({ tools }: { tools: ChiefToolRow[] | undefined }) {
   const { t } = useI18n();
   return tools?.map((tool, k) => (
-    <TraceLine
+    <TraceStepLine
       key={k}
-      status={tool.error === true ? 'error' : undefined}
-      className={TURN_TOOL_LINE_CLS}
-    >
-      <TraceTitle>{tool.label}</TraceTitle>
-      {tool.seconds !== undefined && <TraceDescription>{tool.seconds}s</TraceDescription>}
-      {tool.error === true && <span className="font-medium text-destructive">{t('失败')}</span>}
-    </TraceLine>
+      density="compact"
+      failedLabel={t('失败')}
+      step={{
+        kind: 'tool',
+        name: tool.label,
+        status: tool.error === true ? 'failed' : 'done',
+        ...(tool.seconds !== undefined ? { secs: tool.seconds } : {}),
+      }}
+    />
   ));
 }
 
@@ -455,9 +458,15 @@ export function ChiefStreamRow({
             >
               <Trace className={TURN_TOOLS_CLS} data-testid="chief-turn-tools">
                 {runningTool != null && (
-                  <TraceLine status="running" className={TURN_TOOL_LINE_CLS}>
-                    <TraceTitle>{t('正在调用 {n}', { n: runningTool })}</TraceTitle>
-                  </TraceLine>
+                  <TraceStepLine
+                    density="compact"
+                    step={{
+                      kind: 'tool',
+                      verb: t('正在调用'),
+                      name: runningTool,
+                      status: 'running',
+                    }}
+                  />
                 )}
                 <TurnToolLines tools={item.tools} />
                 {runningTool == null &&

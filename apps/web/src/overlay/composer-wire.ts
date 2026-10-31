@@ -24,13 +24,19 @@ import {
   detectCompletionToken,
   MENTION_COMPLETION_SPEC,
 } from './completion.js';
-import type { MentionGroups } from './mention-picker.js';
+import {
+  createMentionRegistry,
+  insertMentionDisplay,
+  type MentionRegistry,
+  toDisplay,
+  toWire,
+} from './mention-display.js';
 import {
   buildInlineRows,
   type FileMentionEntry,
   type InlineCompletionRow,
   insertFileText,
-  insertMentionText,
+  type MentionGroups,
   type MentionToken,
 } from './mention-token.js';
 import { applyOrderedListEnter } from './ordered-list.js';
@@ -82,9 +88,6 @@ export interface ComposerWire {
   pendingAttachments: PendingAttachment[];
   onPickFiles: (event: ChangeEvent<HTMLInputElement>) => void;
   handlePaste: (event: ClipboardEvent<HTMLTextAreaElement>) => void;
-  pickerOpen: boolean;
-  togglePicker: () => void;
-  closePicker: () => void;
   inlineOpen: boolean;
   inlineCaret: number | null;
   inlineQuery: string;
@@ -110,17 +113,8 @@ export interface ComposerWire {
   closeHelp: () => void;
   helpRows: SlashRow[];
   helpSkillCount: number;
-  insertTokens: (tokens: MentionToken[]) => void;
-  groups: MentionGroups;
+  mentionRegistry: MentionRegistry;
 }
-
-const EMPTY_GROUPS: MentionGroups = {
-  todo: [],
-  skill: [],
-  agent: [],
-  project: [],
-  machine: [],
-};
 
 function sameRange(a: CompletionRange, b: CompletionRange): boolean {
   return a.start === b.start && a.end === b.end && a.query === b.query;
@@ -146,19 +140,26 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
   const [internalDraft, setInternalDraft] = useState('');
   const controlled = draftProp !== undefined && onDraftChange !== undefined;
   const staticFace = draftProp !== undefined && onDraftChange === undefined;
-  const draft = controlled || staticFace ? (draftProp as string) : internalDraft;
-  const setDraft: Dispatch<SetStateAction<string>> = controlled
-    ? (next) =>
-        (onDraftChange as (value: string) => void)(typeof next === 'function' ? next(draft) : next)
-    : staticFace
-      ? () => {}
-      : setInternalDraft;
+  const wireDraft = controlled || staticFace ? (draftProp as string) : internalDraft;
+  const registryRef = useRef<MentionRegistry | null>(null);
+  if (registryRef.current === null) registryRef.current = createMentionRegistry();
+  const registry = registryRef.current;
+  const draft = useMemo(() => toDisplay(wireDraft, registry), [wireDraft, registry]);
+  const setDraft: Dispatch<SetStateAction<string>> = staticFace
+    ? () => {}
+    : (next) => {
+        const display = typeof next === 'function' ? next(draftRef.current) : next;
+        const wire = toWire(display, registry);
+        if (controlled) (onDraftChange as (value: string) => void)(wire);
+        else setInternalDraft(wire);
+      };
 
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const inlineListboxRef = useRef<HTMLDivElement | null>(null);
   const [attaching, setAttaching] = useState(false);
-  const [pickerOpen, setPickerOpen] = useState(false);
   const {
     pending: pendingAttachments,
     track: trackPending,
@@ -188,8 +189,6 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
   const slashListboxRef = useRef<HTMLDivElement | null>(null);
   const slashEnabled = editable && slashOptions !== undefined;
 
-  const draftRef = useRef(draft);
-  draftRef.current = draft;
   const pastedNameCounterRef = useRef<PastedNameCounter | null>(null);
   if (pastedNameCounterRef.current === null)
     pastedNameCounterRef.current = createPastedNameCounter();
@@ -309,7 +308,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
   const sending = useRef(false);
   const submit = (callback: typeof onSend) => {
     if (attachInFlightRef.current > 0 || sending.current) return;
-    const text = draft.trim();
+    const text = toWire(draft, registry).trim();
     if (text === '' && !editable) {
       callback?.(text);
       return;
@@ -444,7 +443,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
       let caret = at;
       let rest = end;
       for (const token of tokens) {
-        const result = insertMentionText(value, token, caret, rest);
+        const result = insertMentionDisplay(value, token, registry, caret, rest);
         value = result.value;
         caret = result.caret;
         rest = undefined;
@@ -499,9 +498,6 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
         break;
       case 'attach':
         openFilePicker();
-        break;
-      case 'mention':
-        setPickerOpen(true);
         break;
       case 'review':
         slashOptions?.onReview?.();
@@ -676,8 +672,6 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     return () => document.removeEventListener('pointerdown', onPointerDown, true);
   }, [inlineOpen, slashOpen, closeInline, closeSlash]);
 
-  const groups = mentionGroups ?? EMPTY_GROUPS;
-
   return {
     draft,
     setDraft,
@@ -697,9 +691,6 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     pendingAttachments,
     onPickFiles,
     handlePaste,
-    pickerOpen,
-    togglePicker: () => setPickerOpen((value) => !value),
-    closePicker: () => setPickerOpen(false),
     inlineOpen,
     inlineCaret: inlineRange?.start ?? null,
     inlineQuery: inlineRange?.query ?? '',
@@ -710,8 +701,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     inlineListboxRef,
     closeInline,
     acceptInlineRow,
-    insertTokens,
-    groups,
+    mentionRegistry: registry,
     slashOpen,
     slashQuery,
     slashCaret: slashRange?.start ?? null,

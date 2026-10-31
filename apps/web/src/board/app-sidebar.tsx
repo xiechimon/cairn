@@ -1,17 +1,6 @@
-// Shared app sidebar (issue #129): the single BoardSidebar call site every
-// route family renders, so the rail keeps identical geometry and behavior
-// across /app ↔ /app/team ↔ resources ↔ detail hops — the collapse state
-// online dot, the attention badge and the ⌘K search row all derive the
-// same way everywhere. Routes that mount their own SearchPanel (board and
-// detail: their fixture ui.searchOpen open states drive the fixture rows)
-// pass searchPanel={false} + their own onSearch opener; every other shell
-// rides the internal panel, which renders nothing while closed.
-// with their own dialog (board / project) pass onNewTask and keep their
-// page-anchored save semantics; every other route rides the internal
-// global dialog (useNewTaskSurface, live save path shared with the board).
-
 import { PanelLeft } from 'lucide-react';
-import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useLocation } from 'react-router';
 import { useMachines, useProjects, useSearchResults, useTodos } from '../api/hooks.js';
 import { toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
@@ -23,7 +12,7 @@ import { useNewTaskHotkey } from '../overlay/hotkeys.js';
 import { type NewTaskSurfaceApi, NewTaskSurfaceRoot } from '../overlay/new-task-surface-root.js';
 import { SearchPanel, useSearchState } from '../overlay/search-panel.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
-import { attentionCount, countInColumn, openCountByProject } from './columns.js';
+import { attentionCount } from './columns.js';
 import { BoardSidebar, type SidebarProject, type SidebarSelected } from './sidebar.js';
 
 export const SIDEBAR_STORAGE_KEY = 'cairn.sidebar-collapsed';
@@ -78,6 +67,10 @@ export function AppSidebar({
   );
   const [drawerOpen, setDrawerOpen] = useState(false);
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
+  const { key: locationKey } = useLocation();
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [locationKey]);
   const toggle = useCallback(() => {
     setCollapsed((prev) => {
       const next = !prev;
@@ -89,7 +82,6 @@ export function AppSidebar({
     () => todos ?? (live ? (todosQ.data ?? []).map(toDisplayTodo) : fixture.todos),
     [todos, live, todosQ.data, fixture.todos],
   );
-  const projectCounts = useMemo(() => openCountByProject(resolvedTodos), [resolvedTodos]);
   const fixtureMachines = fixture.resources?.machines;
   const machinesOnline = live
     ? (machinesQ.data ?? []).filter((m) => m.online).length
@@ -104,9 +96,8 @@ export function AppSidebar({
   useNewTaskHotkey(openNewTask);
   const sidebarProps = {
     attention: attentionCount(resolvedTodos, live ? Date.now() : fixture.now),
-    running: countInColumn(resolvedTodos, 'building'),
     machinesOnline,
-    projectCounts,
+    todos: resolvedTodos,
     onSearch: onSearch ?? (() => search.setOpen(true)),
     onNewTask: openNewTask,
     usageNav: fixture.usageNav === true,

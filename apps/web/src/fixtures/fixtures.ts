@@ -30,6 +30,8 @@ export {
   boardTagFilter,
   boardTagFilterEmpty,
   boardWithProbe,
+  sidebarThreadStatuses,
+  sidebarThreads,
 } from './board.js';
 export {
   chiefDefault,
@@ -45,7 +47,7 @@ export {
   chiefThreadsOpen,
 } from './chief.js';
 export {
-  AGENT_MODEL_LINE,
+  AGENT_MODEL,
   at,
   localTodo,
   MACHINE_ID,

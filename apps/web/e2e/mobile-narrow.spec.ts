@@ -21,12 +21,17 @@ for (const width of [360, 390]) {
       expect(menuBox.height).toBeGreaterThanOrEqual(44);
       await menu.click();
       const drawer = page.getByRole('dialog', { name: '侧边栏' });
-      await expect(drawer.getByRole('link', { name: '定时' })).toBeVisible();
+      await expect(drawer.getByRole('button', { name: 'Scheduled' })).toBeVisible();
       await page.keyboard.press('Escape');
       await expect(drawer).toBeHidden();
       await menu.click();
-      await drawer.getByRole('link', { name: '定时' }).click();
+      await drawer.getByRole('button', { name: 'Scheduled' }).click();
       await expect(page).toHaveURL(/\/app\/schedules/);
+      await expect(drawer).toBeHidden();
+      await page.goto('/app?view=board');
+      await menu.click();
+      await drawer.locator('[data-slot="sidebar-nav-row"]', { hasText: 'Projects' }).click();
+      await expect(page).not.toHaveURL(/view=board/);
       await expect(drawer).toBeHidden();
       await page.goto('/app?view=board');
       for (const name of ['筛选', '新任务']) {

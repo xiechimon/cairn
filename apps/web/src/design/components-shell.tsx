@@ -1,5 +1,6 @@
 import {
   Activity,
+  Archive,
   Clock,
   FolderGit2,
   Inbox,
@@ -12,6 +13,7 @@ import {
 import { useState } from 'react';
 import { SpiralMark } from '../chief/chief-fab-icon.js';
 import { ListCard, ListRow } from '../components/list-card.js';
+import { NoticeBanner } from '../components/notice-banner.js';
 import { SegmentedRadio } from '../components/segmented.js';
 import { QuotaBar } from '../components/settings/quota-bar.js';
 import { RoutingNode } from '../components/settings/routing-node.js';
@@ -25,7 +27,6 @@ import {
   SidebarThreadRow,
 } from '../components/shell/sidebar-project.js';
 import { SidebarUser } from '../components/shell/sidebar-user.js';
-import { ArchivedBanner } from '../components/stream/archived-banner.js';
 import { GoalLine } from '../components/stream/goal-line.js';
 import { Greeting } from '../components/stream/greeting.js';
 import { SuggestionChip } from '../components/stream/suggestion-chip.js';
@@ -268,13 +269,19 @@ export function CoordinatorStreamSection() {
       </Specimen>
       <Specimen
         title="Archived banner"
-        code={`<ArchivedBanner message="This project is archived." actionLabel="Unarchive" />`}
+        code={`<NoticeBanner tone="waiting" icon={Archive} title="This project is archived." actions={<Button size="sm">Unarchive</Button>} />`}
       >
         <div className="w-full max-w-170">
-          <ArchivedBanner
-            message="This project is archived. Threads are read-only and scheduled tasks are paused."
-            actionLabel="Unarchive"
-            onAction={() => toastSuccess('Unarchived')}
+          <NoticeBanner
+            tone="waiting"
+            icon={Archive}
+            title="This project is archived."
+            body="Threads are read-only and scheduled tasks are paused."
+            actions={
+              <Button size="sm" onClick={() => toastSuccess('Unarchived')}>
+                Unarchive
+              </Button>
+            }
           />
         </div>
       </Specimen>

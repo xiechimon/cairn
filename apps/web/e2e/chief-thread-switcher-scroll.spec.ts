@@ -90,7 +90,7 @@ test.describe('chief thread switcher long-list scroll (#1094)', () => {
       // that would swallow real width regressions.
       offsetWidth: el.offsetWidth,
     }));
-    expect(geom.clientHeight).toBe(76);
+    expect(geom.clientHeight).toBe(72);
     expect(geom.scrollHeight).toBeLessThanOrEqual(geom.clientHeight);
     // width on the 4px grid (w-66, #1398; was 262)
     expect(geom.offsetWidth).toBe(264);

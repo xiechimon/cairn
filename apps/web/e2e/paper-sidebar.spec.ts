@@ -25,7 +25,6 @@ test('five parts stack top to bottom in a 248px sidebar', async ({ page }) => {
     }),
   ).toContain('/logo-mark.svg');
   await expect(team.getByRole('link', { name: 'Cairn' })).toBeVisible();
-  await expect(team.getByRole('button', { name: '搜索' })).toBeVisible();
   await expect(team.getByRole('button', { name: '收起侧边栏' })).toBeVisible();
   const nameFont = await team
     .getByText('Cairn', { exact: true })
@@ -35,9 +34,9 @@ test('five parts stack top to bottom in a 248px sidebar', async ({ page }) => {
   const order = [
     await top(page, '[data-testid="team-row"]'),
     await top(page, '.sidebar-new-task'),
-    await aside.getByRole('link', { name: '工作台' }).evaluate((el) => el.getBoundingClientRect().top),
-    await aside.getByRole('link', { name: '看板' }).evaluate((el) => el.getBoundingClientRect().top),
-    await aside.getByRole('link', { name: '定时' }).evaluate((el) => el.getBoundingClientRect().top),
+    await aside.getByRole('button', { name: /搜索/ }).evaluate((el) => el.getBoundingClientRect().top),
+    await aside.locator('[data-slot="sidebar-nav-row"]', { hasText: 'Projects' }).evaluate((el) => el.getBoundingClientRect().top),
+    await aside.locator('[data-slot="sidebar-nav-row"]', { hasText: 'Scheduled' }).evaluate((el) => el.getBoundingClientRect().top),
     await top(page, '[data-testid="project-group"]'),
     await aside.getByRole('button', { name: '资源' }).evaluate((el) => el.getBoundingClientRect().top),
     await top(page, '.sidebar-user'),
@@ -59,18 +58,14 @@ test('`新任务` row opens the new-task dialog without a sidebar key badge', as
   await expect(page.getByRole('dialog')).toBeVisible();
 });
 
-test('`工作台` badge counts the `待处理` column; `看板` opens the four-column board and back', async ({
-  page,
-}) => {
+test('`Projects` badge counts the `待处理` column and opens the home view', async ({ page }) => {
   await page.goto('/app?scenario=01&view=board');
   const pendingCount = await page
     .locator('[data-column="pending"] [data-testid="column-count"]')
     .textContent();
-  const home = sidebar(page).getByRole('link', { name: /工作台/ });
-  const kanban = sidebar(page).getByRole('link', { name: '看板' });
-  await expect(home.getByTestId('attention-badge')).toHaveText(pendingCount ?? '');
+  const home = sidebar(page).locator('[data-slot="sidebar-nav-row"]', { hasText: 'Projects' });
+  await expect(sidebar(page).getByTestId('attention-badge')).toHaveText(pendingCount ?? '');
   await expect(columns(page)).toHaveCount(4);
-  await expect(kanban).toHaveAttribute('aria-current', 'page');
 
   await home.click();
   await expect(page).not.toHaveURL(/view=/);
@@ -78,26 +73,20 @@ test('`工作台` badge counts the `待处理` column; `看板` opens the four-c
   await expect(columns(page)).toHaveCount(0);
   await expect(page.getByTestId('home-sections')).toBeVisible();
   await expect(home).toHaveAttribute('aria-current', 'page');
-  await expect(kanban).not.toHaveAttribute('aria-current', 'page');
 
   await page.reload();
   await expect(page.getByTestId('home-sections')).toBeVisible();
-
-  await kanban.click();
-  await expect(page).toHaveURL(/[?&]view=board/);
-  await expect(columns(page)).toHaveCount(4);
-  await expect(kanban).toHaveAttribute('aria-current', 'page');
 });
 
-test('active row = sheet fill + hairline ring + accent icon', async ({ page }) => {
+test('active row = sidebar-active fill, no ring', async ({ page }) => {
   await page.goto('/app?scenario=01&view=board');
   const m = await page.evaluate(() => {
-    const row = document.querySelector('aside a[aria-current="page"]');
+    const row = document.querySelector('aside [data-slot="sidebar-nav-row"][aria-current="page"]');
     const main = document.querySelector('.board-sheet');
     if (!row || !main) throw new Error('active row missing');
     const cs = getComputedStyle(row);
     const tokenProbe = document.createElement('span');
-    tokenProbe.style.backgroundColor = 'var(--hover-1)';
+    tokenProbe.style.backgroundColor = 'var(--sidebar-active)';
     document.body.append(tokenProbe);
     const hover = getComputedStyle(tokenProbe).backgroundColor;
     tokenProbe.remove();
@@ -106,14 +95,10 @@ test('active row = sheet fill + hairline ring + accent icon', async ({ page }) =
       hover,
       sheet: getComputedStyle(main).backgroundColor,
       ring: cs.boxShadow,
-      icon: getComputedStyle(row.querySelector('svg')!).color,
-      accent: getComputedStyle(document.documentElement).getPropertyValue('--card-button').trim(),
     };
   });
   expect(m.bg).toBe(m.hover);
   expect(m.ring).toBe('none');
-  expect(m.accent).toBe('#9a6500');
-  expect(m.icon).toBe('rgb(154, 101, 0)');
 });
 
 test('`资源` folds by default, opens to an indented sub-list, survives reload', async ({ page }) => {
@@ -131,8 +116,8 @@ test('`资源` folds by default, opens to an indented sub-list, survives reload'
   const indent = await page.evaluate(() => {
     const links = [...document.querySelectorAll('aside a')];
     const skill = links.find((a) => a.textContent?.trim() === '技能');
-    const board = links.find((a) => a.textContent?.trim() === '工作台');
-    return (skill?.getBoundingClientRect().left ?? 0) - (board?.getBoundingClientRect().left ?? 0);
+    const team = document.querySelector('.sidebar-team-name');
+    return (skill?.getBoundingClientRect().left ?? 0) - (team?.getBoundingClientRect().left ?? 0);
   });
   expect(indent).toBeGreaterThan(8);
 
@@ -155,46 +140,46 @@ test('a resource route lights the folded `资源` row', async ({ page }) => {
   );
 });
 
-test('project rows: tile colors follow --project-tile-N in order, open-task counts', async ({
+test('project rows: tile letters follow --project-ink-N in order, open-task counts', async ({
   page,
 }) => {
   await page.goto('/app?scenario=board-repos&view=board');
-  const rows = page.locator('[data-testid="project-row"]');
+  const rows = page.locator('[data-slot="sidebar-project-row"]');
   await expect(rows).toHaveCount(3);
   const probe = await rows.evaluateAll((els) => {
     const root = getComputedStyle(document.documentElement);
     return els.map((el, i) => {
       const tile = el.querySelector('.project-avatar')!;
       const probeEl = document.createElement('span');
-      probeEl.style.backgroundColor = root.getPropertyValue(`--project-tile-${(i % 6) + 1}`);
+      probeEl.style.color = root.getPropertyValue(`--project-ink-${(i % 6) + 1}`);
       document.body.append(probeEl);
-      const want = getComputedStyle(probeEl).backgroundColor;
+      const want = getComputedStyle(probeEl).color;
       probeEl.remove();
       return {
-        tile: getComputedStyle(tile).backgroundColor,
+        tile: getComputedStyle(tile).color,
         want,
         initial: tile.textContent,
-        count: el.querySelector('[data-testid="project-count"]')?.textContent ?? null,
+        count: el.querySelector('.rounded-full')?.textContent ?? null,
       };
     });
   });
   for (const row of probe) expect(row.tile).toBe(row.want);
   expect(probe.map((r) => r.initial)).toEqual(['R', 'R', 'R']);
-  expect(probe.map((r) => r.count)).toEqual(['2', '1', null]);
+  expect(probe.map((r) => r.count)).toEqual(['1', null, null]);
 
   await page.getByTestId('project-group').getByRole('link', { name: '新建项目' }).click();
   await expect(page).toHaveURL(/\/app\/project\/new\?scenario=board-repos/);
 });
 
-test('long project names truncate and keep the count visible', async ({ page }) => {
+test('long project names truncate and keep the waiting pill visible', async ({ page }) => {
   await page.goto('/app?scenario=board-repos&view=board');
   const m = await page
-    .locator('[data-testid="project-row"]')
+    .locator('[data-slot="sidebar-project-row"]')
     .first()
     .evaluate((row) => {
-      const label = row.querySelector('[data-testid="project-name"]') as HTMLElement;
+      const label = row.querySelector('span.truncate') as HTMLElement;
       label.textContent = '一个非常非常非常长的项目名字用来压测侧栏截断行为-with-latin-tail';
-      const count = row.querySelector('[data-testid="project-count"]')!;
+      const count = row.querySelector('.rounded-full')!;
       const r = row.getBoundingClientRect();
       const c = count.getBoundingClientRect();
       return {
@@ -207,25 +192,20 @@ test('long project names truncate and keep the count visible', async ({ page }) 
   expect(m.overflow).toBe(true);
   expect(m.ellipsis).toBe('ellipsis');
   expect(m.countInside).toBe(true);
-  expect(m.rowHeight).toBe(36);
+  expect(m.rowHeight).toBe(32);
 });
 
-test('user row second line reads machines online and running count', async ({ page }) => {
+test('user row second line reads machines online', async ({ page }) => {
   await page.goto('/app?scenario=01&view=board');
-  const running = await page
-    .locator('[data-column="building"] [data-testid="column-count"]')
-    .textContent();
-  await expect(page.getByTestId('machine-status')).toHaveText(
-    new RegExp(`^\\d+ 台机器在线 · 执行中 ${running}$`),
-  );
+  await expect(page.locator('[data-slot="sidebar-user"]')).toContainText(/\d+ machines? online/);
 });
 
-test('collapsed rail keeps `工作台` with its badge dot and the expand toggle', async ({ page }) => {
+test('collapsed rail keeps `Projects` with its badge dot and the expand toggle', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
   await page.goto('/app?scenario=01&view=board');
   const aside = sidebar(page);
   expect(await aside.evaluate((el) => el.getBoundingClientRect().width)).toBe(40);
-  const home = aside.getByRole('link', { name: /工作台/ });
+  const home = aside.getByRole('link', { name: /Projects/ });
   await expect(home).toBeVisible();
   await home.click();
   await expect(page.getByTestId('home-sections')).toBeVisible();

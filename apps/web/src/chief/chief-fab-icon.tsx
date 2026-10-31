@@ -1,6 +1,6 @@
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import type { ChiefContent } from '../fixtures/records.js';
-import { BUSY_SPIN_CLS } from './chief-spiral-face.js';
+import { SPIRAL_PATH } from './chief-spiral-face.js';
 
 export function SpiralMark({
   busy,
@@ -10,18 +10,27 @@ export function SpiralMark({
   className?: string;
 }) {
   return (
-    <svg
-      aria-hidden="true"
-      viewBox="-142 -254 452 452"
-      className={`${className} ${busy ? BUSY_SPIN_CLS : ''}`}
-    >
+    <svg aria-hidden="true" viewBox="-142 -254 452 452" className={className}>
       <path
-        d="M0 0 A84 84 0 0 1 168 0 A140 140 0 0 1 -112 0 A196 196 0 0 1 280 0"
+        d={SPIRAL_PATH}
+        pathLength={1}
         fill="none"
         stroke="currentColor"
         strokeWidth="58"
         strokeLinecap="round"
+        opacity={busy ? 0.28 : 1}
       />
+      {busy && (
+        <path
+          className="spiral-trace"
+          d={SPIRAL_PATH}
+          pathLength={1}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="58"
+          strokeLinecap="round"
+        />
+      )}
     </svg>
   );
 }

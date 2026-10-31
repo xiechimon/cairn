@@ -336,6 +336,8 @@ test('changes to prepush scripts run the CI self-test files locally', () => {
   for (const path of [
     'scripts/heavy-slots.mjs',
     '.github/workflows/ci.yml',
+    'apps/web/playwright.config.ts',
+    'apps/web/e2e/port-holder-guard.ts',
     'scripts/epic-done.mjs',
     ...selfTests,
     ...selfTests.map((path) => path.replace(/\.test\.mjs$/, '.mjs')),

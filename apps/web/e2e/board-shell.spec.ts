@@ -33,7 +33,7 @@ test('a project filter keeps home; a filter that matches nothing shows the filte
   await page.goto('/app?scenario=board-repos&projects=r2-inventory');
   await expect(page.getByTestId('home-sections')).toBeVisible();
   await expect(page.locator('[data-column]')).toHaveCount(0);
-  await expect(page.getByRole('complementary').getByRole('link', { name: /工作台/ })).toHaveAttribute(
+  await expect(page.getByRole('complementary').locator('[data-slot="sidebar-nav-row"]', { hasText: 'Projects' })).toHaveAttribute(
     'aria-current',
     'page',
   );

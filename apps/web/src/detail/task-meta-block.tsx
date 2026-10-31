@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { relativeTime } from '../board/rel-time.js';
+import { CODE_PILL_CLS } from '../components/code-pill.js';
 import { useI18n } from '../i18n/provider.js';
 
 export interface TaskMetaFields {
@@ -14,8 +15,10 @@ export interface TaskMetaFields {
 
 function Row({ label, first, children }: { label: string; first?: boolean; children: ReactNode }) {
   return (
-    <div className={`flex items-baseline text-meta leading-5${first === true ? '' : ' mt-4'}`}>
-      <span className="w-17 flex-none text-(--text-tertiary)">{label}</span>
+    <div
+      className={`flex items-baseline gap-3 text-meta leading-5${first === true ? '' : ' mt-2.5'}`}
+    >
+      <span className="w-24 flex-none text-(--text-tertiary)">{label}</span>
       <span className="min-w-0 flex-1 text-(--text-secondary) [overflow-wrap:anywhere]">
         {children}
       </span>
@@ -45,13 +48,15 @@ export function TaskMetaBlock({ meta, now }: { meta: TaskMetaFields; now: number
     rows.push({
       label: t('分支 / PR'),
       content: (
-        <>
-          {meta.branch != null && <code className="font-mono text-caption">{meta.branch}</code>}
+        <span className="flex min-w-0 items-center gap-2">
+          {meta.branch != null && (
+            <code className={`${CODE_PILL_CLS} min-w-0 truncate`} title={meta.branch}>
+              {meta.branch}
+            </code>
+          )}
           {meta.pr != null && (
             <a
-              className={`text-(--chip-plan-fg) no-underline hover:underline${
-                meta.branch != null ? ' ml-2' : ''
-              }`}
+              className="flex-none text-(--chip-plan-fg) no-underline hover:underline"
               href={meta.pr.url}
               target="_blank"
               rel="noopener noreferrer"
@@ -59,7 +64,7 @@ export function TaskMetaBlock({ meta, now }: { meta: TaskMetaFields; now: number
               #{meta.pr.number}
             </a>
           )}
-        </>
+        </span>
       ),
     });
   }
@@ -70,7 +75,7 @@ export function TaskMetaBlock({ meta, now }: { meta: TaskMetaFields; now: number
         <>
           {meta.machine}
           {meta.machineWaiting && (
-            <span className="text-(--text-tertiary)">{t('（等待机器上线）')}</span>
+            <span className="ml-1 text-(--text-tertiary)">{t('（等待机器上线）')}</span>
           )}
         </>
       ),
@@ -79,7 +84,7 @@ export function TaskMetaBlock({ meta, now }: { meta: TaskMetaFields; now: number
   if (meta.model != null) {
     rows.push({
       label: t('模型'),
-      content: <code className="font-mono text-caption">{meta.model}</code>,
+      content: <code className={CODE_PILL_CLS}>{meta.model}</code>,
     });
   }
   if (meta.createdAt != null) {

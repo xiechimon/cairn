@@ -61,7 +61,9 @@ import { AttachmentStrip } from '../overlay/attachment-strip.js';
 import { useComposerWire } from '../overlay/composer-wire.js';
 import { dropEscLayer, pushEscLayer } from '../overlay/gesture-machine.js';
 import { useChiefNewThreadHotkey } from '../overlay/hotkeys.js';
-import { type MentionGroups, MentionInline, MentionPicker } from '../overlay/mention-picker.js';
+import { MENTION_TEXTAREA_CLS, MentionHighlight } from '../overlay/mention-highlight.js';
+import { MentionInline } from '../overlay/mention-inline.js';
+import type { MentionGroups } from '../overlay/mention-token.js';
 import { SlashHelp, SlashMenu } from '../overlay/slash-menu.js';
 import { ChiefStreamRow, chiefStreamRowKey } from './chief-message-rows.js';
 import { ChiefFallbackBanner, ChiefOutageBanner } from './chief-outage-banner.js';
@@ -79,7 +81,7 @@ const PROJECT_CHIP_CLS =
 const SEND_BTN_CLS =
   'ml-auto size-7 cursor-pointer rounded-(--radius-control) border-0 bg-(--menu-hover) text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-(--text-secondary) dark:hover:bg-(--menu-hover) aria-expanded:bg-transparent active:not-aria-[haspopup]:translate-y-0';
 const SEND_ON_CLS =
-  'bg-(--card-button) text-(--text-on-accent) hover:bg-(--card-button) hover:text-(--text-on-accent) dark:hover:bg-(--card-button)';
+  'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground dark:hover:bg-primary/90';
 const STOP_ON_CLS =
   'bg-(--foreground) text-(--background) hover:bg-(--foreground) hover:text-(--background) dark:hover:bg-(--foreground)';
 
@@ -291,9 +293,6 @@ export function ChiefConversation({
     attaching,
     pendingAttachments,
     onPickFiles,
-    pickerOpen,
-    togglePicker,
-    closePicker,
     closeInline,
     inlineOpen,
     inlineCaret,
@@ -304,8 +303,6 @@ export function ChiefConversation({
     inlineListboxId,
     inlineListboxRef,
     acceptInlineRow,
-    insertTokens,
-    groups,
     slashOpen,
     slashQuery,
     slashCaret,
@@ -325,11 +322,10 @@ export function ChiefConversation({
     if (open) return;
     setThreadsOpen(false);
     setRewindConfirm(null);
-    closePicker();
     closeInline();
     closeSlash();
     closeHelp();
-  }, [open, closePicker, closeInline, closeSlash, closeHelp]);
+  }, [open, closeInline, closeSlash, closeHelp]);
   const { textareaRef } = wire;
   const prevOpenRef = useRef(open);
   useEffect(() => {
@@ -657,7 +653,7 @@ export function ChiefConversation({
           <Textarea
             ref={attachComposer}
             data-testid="chief-composer-input"
-            className="h-10 max-h-30 min-h-0 resize-none overflow-y-auto rounded-none border-none bg-transparent p-0 font-sans text-ui leading-5 text-(--foreground) md:text-ui tabular-nums shadow-none field-sizing-fixed placeholder:text-(--text-secondary) focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none dark:bg-transparent"
+            className={`h-10 max-h-30 min-h-0 resize-none overflow-y-auto rounded-none border-none bg-transparent p-0 font-sans text-ui leading-5 md:text-ui tabular-nums shadow-none field-sizing-fixed focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none dark:bg-transparent ${MENTION_TEXTAREA_CLS} placeholder:text-(--text-secondary)`}
             readOnly={onSend == null}
             value={wire.draft}
             onChange={wire.handleChange}
@@ -695,6 +691,11 @@ export function ChiefConversation({
               : slashOpen && slashHighlight != null
                 ? { 'aria-activedescendant': `${slashListboxId}-opt-${slashHighlight}` }
                 : {})}
+          />
+          <MentionHighlight
+            text={wire.draft}
+            registry={wire.mentionRegistry}
+            textareaRef={wire.textareaRef}
           />
           <MentionInline
             open={inlineOpen}
@@ -746,14 +747,6 @@ export function ChiefConversation({
             }
           >
             <Paperclip width={16} height={16} />
-          </IconTooltip>
-          <IconTooltip
-            label={t('提及')}
-            trigger={
-              <Button variant="ghost" size="icon" className={TOOL_BTN_CLS} onClick={togglePicker} />
-            }
-          >
-            <Grid2x2 width={16} height={16} />
           </IconTooltip>
           {chipVisible && (
             <ProjectMenu
@@ -809,15 +802,6 @@ export function ChiefConversation({
             </Button>
           )}
         </div>
-        <MentionPicker
-          open={pickerOpen}
-          onClose={closePicker}
-          groups={groups}
-          onInsert={(tokens) => {
-            insertTokens(tokens);
-            closePicker();
-          }}
-        />
         <SlashHelp
           open={helpOpen}
           onClose={closeHelp}

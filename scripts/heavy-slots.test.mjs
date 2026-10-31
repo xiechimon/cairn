@@ -239,6 +239,48 @@ test('slotPortHolder names the pid, cwd and command of whatever listens on the p
   }
 });
 
+test('Playwright loads the generated slot config from outside the web package', () => {
+  const { dir, env, cleanup } = sandbox(1);
+  try {
+    mkdirSync(env.TMPDIR, { recursive: true });
+    const webDir = resolve('apps/web');
+    const written = spawnSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        `import { writeSlotPlaywrightConfig } from ${JSON.stringify(moduleUrl)};
+console.log(writeSlotPlaywrightConfig({ slot: 1, env: process.env, webDir: ${JSON.stringify(webDir)} }).path);`,
+      ],
+      { env, encoding: 'utf8' },
+    );
+    assert.equal(written.status, 0, written.stderr);
+    const configPath = written.stdout.trim();
+    assert.ok(configPath.startsWith(realpathSync(dir)) || configPath.startsWith(dir), configPath);
+    const reportPath = join(dir, 'list.json');
+    const listed = spawnSync(
+      'pnpm',
+      [
+        'exec',
+        'playwright',
+        'test',
+        '--list',
+        '--config',
+        configPath,
+        '--reporter=json',
+        'fixture-mode-chip.spec.ts',
+      ],
+      { cwd: webDir, env: { ...env, PLAYWRIGHT_JSON_OUTPUT_NAME: reportPath }, encoding: 'utf8' },
+    );
+    assert.equal(listed.status, 0, `${listed.stdout}${listed.stderr}`);
+    const { config } = JSON.parse(readFileSync(reportPath, 'utf8'));
+    assert.equal(config.globalSetup, join(webDir, 'e2e/port-holder-guard.ts'));
+    assert.ok(existsSync(config.globalSetup));
+  } finally {
+    cleanup();
+  }
+});
+
 test('foreignPortHolderReport accepts a free port and a holder from the same checkout', () => {
   const toplevel = '/repo/.claude/worktrees/mine';
   assert.equal(foreignPortHolderReport({ port: 8399, toplevel, holderOf: () => null }), null);

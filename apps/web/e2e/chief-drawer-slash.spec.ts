@@ -108,14 +108,11 @@ test('trigger: `/` opens builtins plus skills, review/stop hidden (F2)', async (
 
   await input.fill('/');
   await expect(menu).toBeVisible();
-  // clear / attach / mention / help, then the one stubbed team skill —
-  // review and stop have no drawer handles, so they are omitted (F2).
-  await expect(rows).toHaveCount(5);
+  await expect(rows).toHaveCount(4);
   await expect(rows.nth(0)).toContainText('/clear');
   await expect(rows.nth(1)).toContainText('/attach');
-  await expect(rows.nth(2)).toContainText('/mention');
-  await expect(rows.nth(3)).toContainText('/help');
-  await expect(rows.nth(4)).toContainText('/verify-cairn');
+  await expect(rows.nth(2)).toContainText('/help');
+  await expect(rows.nth(3)).toContainText('/verify-cairn');
   await expect(menu).not.toContainText('/review');
   await expect(menu).not.toContainText('/stop');
 
@@ -175,15 +172,14 @@ test('/help opens the command panel with the drawer builtins', async ({ page }) 
   const { input, rows } = await openDrawer(page);
 
   await input.fill('/');
-  await expect(rows).toHaveCount(5);
-  await input.press('ArrowDown');
+  await expect(rows).toHaveCount(4);
   await input.press('ArrowDown');
   await input.press('ArrowDown');
   await input.press('ArrowDown');
   await input.press('Enter');
   const panel = page.locator('.slash-help');
   await expect(panel).toBeVisible();
-  await expect(panel.locator('.slash-help-row')).toHaveCount(4);
+  await expect(panel.locator('.slash-help-row')).toHaveCount(3);
   await expect(panel).toContainText('/clear');
   await expect(panel).not.toContainText('/review');
   const box = await panel.boundingBox();
