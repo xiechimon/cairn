@@ -1,122 +1,180 @@
-# Orb runner verification (#2275)
+# Orb transport verification (#2275)
 
-## What
+## Status and plan
 
-Worker steps execute through a per-step Unix socket relay. The host retains the machine credential and creates backends lazily. Coordinator steps (`kind === 'chief'`) execute on the host. The container receives the socket, the matching daemon build read-only, and a read-only bare Git seed snapshot. The seed contains only the source's default HEAD branch, without tags, other branches, their unreachable commit objects, untracked files, host Git configuration or Git hooks. `--no-local` forces Git transport rather than copying the local object database. Workspace preparation defaults to `/work`, fetches with step credentials, and disables host credential fallback.
+This flow supersedes the earlier per-step bind and guest-execution transport. The daemon now dispatches one step through an authenticated Unix socket to a worker started by the image. The host publishes build and seed contents before starting a machine, then waits for its root-created runtime directory before listening. Local socket, Git delivery, watchdog and compiled-worker checks are repeatable offline. Native nspawn acceptance remains a separate check after the image and installer PR is installed.
 
-Set `CAIRN_EXECUTOR=orb` to select the existing nspawn provider. Set `CAIRN_ORB_PROXY_URL` to the egress relay provisioned by orb-host; HTTP and HTTPS proxy variables are passed explicitly to the worker.
+The revised dist contract, decided on 2026-10-31, supersedes the image-installed daemon package contract. The host publishes its own checkout build and offline production dependencies as one release. The provider and checkout-specific fakes are implemented, and 236 related regressions pass locally; native acceptance follows the separate image and installer installation. No owner action is needed for this local delivery.
 
-After exec returns or throws, the host closes the relay and waits for an in-flight finish report. If upstream accepted that report, no second report is sent. If the orb attempted `done` but upstream rejected it, the host replays the awaiting-upload journal through `resumePendingUpload`, including checkpoint artifacts. If the orb never sent `done`, a checkpoint alone cannot claim completion: the host journals and reports `done(failed)` with `orb exited with code N`, including exit code 0. Signal termination uses 128 plus the signal number. An unreachable host report remains journaled for restart recovery. The run's stop registration remains available during host reporting.
+The implementation sequence was: list failure modes, reproduce them with failing tests, replace guest execution with lifecycle commands, migrate the guest fakes, and run the repository gates. The existing host journal, backend seam and dependency set remain the verification boundaries. No dependency change, lockfile change, push or PR is part of this delivery.
 
-This deliberately replaces the issue's original “host reports nothing” requirement: **approved by ian 2026-10-31**. Measured source in `apps/server/src/services/builds.ts` retains abandoned steps that already heartbeated while their machine remains online. Relying on that sweep would leave a crashed orb's step claimed indefinitely. The host therefore keeps the token and reports the failure. Server sweep code is unchanged.
+## Alignment failure modes and acceptance
 
-The host starts a heartbeat watchdog when dispatching orb exec. Every validated orb heartbeat refreshes it before upstream forwarding, even if upstream is slow or unreachable. The host timeout is defined once as `ORB_HEARTBEAT_TIMEOUT_MS = 120_000`, matching the server-only `BUILD_ABANDONED_STEP_MS`; `orbHeartbeatTimeoutMs` injects a shorter deadline for tests. On timeout, the host closes the relay, aborts exec, stops the container through the provider and reports `done(failed)` with `orb heartbeat timeout`. A completion already in flight is awaited; an accepted completion suppresses host reporting. A later completion cannot overtake the timeout. Accepted completion and exec termination clear the watchdog.
+- The daemon creates or repairs a runtime mount source before the root start hook, allowing its inode to be swapped. Acceptance: preparation leaves the path absent, machine start sees no socket or token, and dispatch waits for the hook's directory.
+- A missing runtime directory waits forever, or a symlink, regular file, foreign owner or mode other than 0700 receives a secret. Acceptance: bounded waiting (30 seconds by default, configurable), lstat validation, a specific failure reason and machine shutdown, including reuse of a running machine.
+- Cancellation while waiting leaves a machine running. Acceptance: abort interrupts the wait and shutdown completes before the start operation rejects.
+- Missing, non-directory or foreign-owned installer publication roots are silently created or repaired. Acceptance: both roots are required before publication; valid roots retain their modes and immutable publishing behavior.
+- A previous fake worker consumes the next step listener during late cleanup. Acceptance: cleanup is bound to its original token, and a delayed previous worker cannot disconnect a new listener.
+- The guest runs an older registry daemon or dependencies from another checkout. Acceptance: derive the checkout from the running daemon location, publish its built dist with offline production dependencies, and verify the release SHA and dependency resolution through the stable entry.
+- Identical keys trigger another deploy, or dirty content reuses a stale release. Acceptance: reuse an immutable key without deploy; staged, unstaged, untracked and deleted contents determine dirty keys.
+- Failed or timed-out deploy exposes partial content or silently uses a registry install. Acceptance: retain the previous release and metadata, remove staging files, and report a clear pnpm deploy failure through the host step.
+- Release storage grows without bound or pruning removes current. Acceptance: retain the newest three releases and always protect current, including reuse of an older release.
 
-The relay accepts exactly one connection during a step socket's lifetime. It uses a fixed 16 MiB input buffer, disconnects oversized or invalid worker frames, and limits queued output to 16 MiB. Transcript JSON and session content each have a 4 MiB UTF-8 checkpoint limit before any host write. Rate-limit reports use `claudeRateLimitReportSchema`, replace the supplied machine identity with the host claim's machine identity, normalize seconds/milliseconds, cap reset times at eight days, and allow at most one report per 30 seconds per step, including rejected upstream attempts. A stop sends the worker a frame and aborts exec after a five-second grace period if it has not returned.
+Measured from the current provider and dispatch source: the filesystem and lifecycle boundaries are injectable and covered by offline socket tests. The alignment needs no new dependencies, external services or owner action. Native nspawn acceptance still depends on the separate installed image and Linux host.
+
+## Host flow
+
+1. `ensure` clones `cairn-orb-base` into a bounded `cairn-orb-*` name once per Thread; it does not start the machine.
+2. `prepare` requires `/var/lib/cairn-orb/{dist,seed}` to already be real directories owned by the daemon user. It never creates or changes their modes. It derives the checkout from its own `<checkout>/apps/daemon/dist/cli.mjs` location, reads `apps/daemon/package.json` and `git rev-parse --short HEAD`, and computes `<version>-<sha>-dist-<build hash>[-dirty-<content hash>]`. Dirty hashing streams tracked and untracked file contents, including deletions and symlink targets. It deploys production dependencies from that checkout's lockfile with `--prefer-offline` (pure `--offline` fails on omarchy for missing registry metadata; measured 2026-10-31: `--prefer-offline` reused all 231 packages from the store and downloaded none, 438 MB) into a temporary directory, copies the running built `dist/`, and renames the complete directory to `releases/<key>`. Identical keys reuse the existing release without deploy. It atomically replaces relative symlinks `current` -> `releases/<key>` and `cli.mjs` -> `current/dist/cli.mjs`, then atomically writes `current.json` as `{key, version, sha}`. Releases beyond the newest three are pruned unless current or pinned by a running machine. Each machine retains its previous loaded release and its pending published release until a worker authenticates with that published release; reuse alone does not advance the loaded pin. Pins persist across daemon restart. A newly started machine conservatively pins its boot release before authentication; a recovered machine with no known release or legacy metadata-only pins disables pruning until its worker authenticates or the machine stops. Failed deployment leaves the last complete release and metadata available.
+3. A Project seed is a bare, single-branch, tag-free snapshot made with `--no-local`. Host configuration, hooks, untracked files and unrelated branch objects are excluded. It is prepared in a temporary directory and published atomically at `/var/lib/cairn-orb/seed/<projectId>/repo` through relative symlinks. Failed preparation keeps the last complete publication. Published versions remain available to readers until operator maintenance removes obsolete versions while machines are stopped.
+4. The host calls `machinectl start`, or confirms an already-running machine with `machinectl list`. A root `ExecStartPre` hook creates `/run/cairn-orb/<machine>` on every container start, owned by the daemon UID with mode 0700. The daemon never creates that directory. It waits up to 30 seconds by default (`runtimeDirectoryTimeoutMs` is configurable), using `lstat` to reject symlinks, non-directories, foreign ownership and modes other than 0700. These metadata checks validate the startup contract; ownership under this directory is guest-controlled and does not establish trust. A missing directory times out; failed validation or cancellation powers the machine off before dispatch fails. Only after validation does the host create and listen on `relay.sock` and exclusively create a fresh `relay.sock.token`, both mode 0600. Existing paths, including stale sockets and dangling symlinks, are refused. Local Project steps also get an empty 0700 `outbox` through an exclusive, non-recursive mkdir; any existing entry is refused and retained.
+5. The image's worker connects, authenticates, receives its bound step, and reports heartbeat/tool/checkpoint/done traffic. The host waits for worker finish or disconnect, rather than a guest process launched by the host. Coordinator steps continue to run on the host.
+6. The host closes the relay, awaits in-flight delivery/completion, removes the socket, token and step outbox, and releases capacity. It retains the per-machine directory because the running container binds its inode. A later step revalidates the directory and creates a fresh listener and secret at the same paths. The root lifecycle hook removes the directory on machine stop. An accepted `done` releases the host run without waiting for service exit; the compiled worker process is separately required to exit 0.
+
+`NspawnOrbProvider` accepts `runtimeRoot`, `distRoot`, `seedRoot`, `distSource`, `stateFile`, `runtimeDirectoryTimeoutMs` and `shutdownTimeoutMs` overrides for isolated tests. Production roots are the paths above. The provider uses checkout-local Git reads, bounded `--prefer-offline` pnpm deploy pinned to the checkout's lockfile, and only these machine lifecycle commands: `machinectl clone`, `start`, `poweroff`, `terminate`, `remove` and `list`. `terminate` is reserved for a poweroff deadline. It never invokes guest execution, runtime binds, a privileged helper or a polkit change.
+
+## Exact image and installer contract
+
+The separate image/installer PR must provide these fixed mounts at machine start, without replacing their host directory inodes:
+
+| Host source | Guest destination | Access |
+| --- | --- | --- |
+| `/run/cairn-orb/%i` | `/run/cairn` | Read/write; only that machine's directory |
+| `/var/lib/cairn-orb/dist` | `/opt/cairn/daemon` | Read-only |
+| `/var/lib/cairn-orb/seed` | `/seed` | Read-only |
+
+`%i` must expand to the full machine name, including `cairn-orb-`. The installer creates `/run/cairn-orb` as root-owned mode 0755 and recreates that parent after reboot. Root lifecycle hooks create the per-machine directory at each start and remove it on stop; the daemon user cannot replace its mount-source inode in the root-owned parent. The installer also creates `/var/lib/cairn-orb/{dist,seed}` as daemon-owned directories inside a root-owned parent; the daemon requires them to exist. Dist and seed directories must be traversable/readable by `agent` through their read-only mounts. The runtime bind must map the host daemon UID to the guest `agent` UID, including ownership of newly created files, so that 0700 directories and 0600 sockets/token files remain accessible. An idmapped bind is suitable; widening the modes or granting the dedicated host runner user access is not.
+
+The image ships and enables `cairn-orb-worker.service` with `User=agent`, `Restart=always`, `RestartSec=1s`, `After=local-fs.target`, and `Environment=CAIRN_ORB=1`. Its exact command is:
+
+```text
+/usr/bin/node /opt/cairn/daemon/cli.mjs orb-step --socket /run/cairn/relay.sock
+```
+
+The image includes neither npm nor a daemon package. It provides `/usr/bin/node` with the same major version as the host daemon's `process.versions.node`, plus the required CLIs. The host runs from a Git checkout (`WorkingDirectory=<checkout>/apps/daemon`, `ExecStart=<node> dist/cli.mjs start -f`). Registry package versions through `0.2.2` predate the relay protocol and cannot supply the guest daemon.
+
+The host uses its existing command runner with a 120-second timeout and install scripts disabled to execute:
+
+```sh
+pnpm --dir <checkout> deploy --filter @xiechimon/cairn-cli --prod --prefer-offline <temporary-release>
+```
+
+A failed or unavailable offline deploy fails the orb step with its reason; there is no registry fallback. The deploy must use that checkout's lockfile and locally available pnpm store. The host then replaces the temporary release's `dist/` with the host's actual built files before publication. Each release contains `dist/`, production `node_modules/` and the deployed package manifest. The stable entry resolves to `/opt/cairn/daemon/releases/<key>/dist/cli.mjs`, so Node resolves imports from `/opt/cairn/daemon/releases/<key>/node_modules`. The guest image supplies no separate dependency tree.
+
+The host-readable `/var/lib/cairn-orb/dist/current.json` exposes `{key, version, sha}` for host checks and humans; the same record is visible through the read-only guest mount. Image preparation and native acceptance must check the Node major and this publication contract before enabling dispatch. No guest execution is needed to inspect the published build identity.
+
+Worker state defaults to `/home/agent/.cairn`, workspaces to `/work`, seeds to `/seed/<projectId>/repo`, and bundle output to `/run/cairn/outbox`. State and workspaces must be writable by `agent` and persist across worker process restarts. The image must supply Git, backend executables and the egress relay required by those backends. `CAIRN_ORB_PROXY_URL` on the host is carried in relay initialization as HTTP/HTTPS proxy settings for both worker HTTP traffic and agent commands.
+
+`orb-step` waits for both socket and token to appear before dialing. Each invocation handles exactly one connection and one step, closes its connection, and returns normally (exit 0) after a reported success, failure or stop. The service restarts it for the next connection. A stale socket, rejected authentication or pre-step connection failure can exit nonzero; systemd retries with its restart delay. A connected worker never reconnects to reclaim or replay a step. If its host connection disappears it stops the active backend; the host owns recovery. The host does not depend on the worker service exit code.
+
+The image also owns `cairn-orb-check.service`: host probes must use a request/result file or socket under the same per-machine `/run/cairn` bind. The host checker must never enter guest namespaces. Its probe details belong to the image/installer PR.
+
+## Relay authentication and isolation
+
+The host generates 32 random bytes per step and writes their 64 lowercase hexadecimal characters, without a newline, to `/run/cairn-orb/<machine>/relay.sock.token`. The intended guest reads `/run/cairn/relay.sock.token`. Every wire frame is newline-delimited JSON prefixed by `cairn-orb-rpc:`. The mandatory first frame is:
+
+```text
+cairn-orb-rpc:{"type":"auth","token":"<64 lowercase hexadecimal characters>","release":"<release key>"}
+```
+
+The worker resolves its own loaded entry before waiting for the socket. Its realpath must end in `releases/<key>/dist/cli.mjs`; the key must match the published `<version>-<sha>-dist-<16 hex>[-dirty-<16 hex>]` format. The host compares the token in constant time and checks the release against the one published for this step. A valid token with a different release receives `{"type":"refused","reason":"stale-release"}` and the connection closes without consuming the authenticated slot or refreshing the startup watchdog. The worker exits 75; `Restart=always` with `RestartSec=1s` loads the next worker through `current`. Matching authentication sends `{"type":"authenticated"}` with the same prefix, and only then sends `init` or accepts calls. Missing, malformed, stale or foreign secrets close the connection before any claim or credential is disclosed or upstream method is called. Unauthenticated connections have a 1 KiB frame budget and a five-second deadline; they do not reserve the single worker slot or refresh the heartbeat watchdog. Exactly one authenticated connection is permitted for each step listener's lifetime. A continuing mismatch fails the step with the expected and received release keys at the existing startup deadline and powers off the machine.
+
+Isolation requires both the filesystem contract and authentication. Everything under `/run/cairn-orb/<machine>` is guest-controlled: the idmapped guest `agent` maps to the daemon UID, so ownership is not a trust signal. A compromised guest can chmod its own runtime directory and let other host users reach the socket. The fresh per-step token is the authentication boundary against those users; directory permissions alone cannot provide that boundary. The token starts at mode 0600 and remains scoped to one step, but the intended guest can disclose it or change its permissions, so authentication cannot protect that step from its own compromised guest. Other containers only see their own runtime bind and secret. The root-owned host runtime parent must never be mounted into a guest. A foreign connection with another machine's valid-format secret is rejected even if it obtains a socket descriptor. Root and the daemon user remain trusted. The machine credential stays on the host; credentials returned by step RPC retain their existing server-side scope.
+
+The existing method allowlist, step binding, upload URL binding, checkpoint bounds, rate-limit controls, 16 MiB frame/output limits and one-completion guard remain enforced after authentication.
+
+## Failure and cancellation behavior
+
+An authenticated worker disconnecting without an accepted or attempted `done` causes one host `done(failed)` with `Orb worker disconnected without done`. There is no fabricated guest exit code. A checkpoint alone cannot establish completion. An attempted but rejected completion remains journaled and is replayed with its artifacts. An accepted or in-flight completion is awaited without a duplicate host failure. Unreachable host reporting remains journaled for restart recovery.
+
+The host's 120-second watchdog starts before machine start. Validated relay API activity refreshes it before upstream forwarding, including heartbeats and finish-up uploads. Silence, including a worker that never connects, closes the relay and reports `orb heartbeat timeout`. Stop first sends the existing stop frame; after five seconds without completion the host closes the relay and reports `Orb worker did not finish after stop`. Both paths power off the machine, poll `machinectl list`, and use `machinectl terminate` after the shutdown deadline. Capacity is not released before shutdown settles. Cancellation during a pending start also powers the machine off once start returns.
+
+Local Project delivery retains the bundle outbox protocol: the worker writes a bundle into `/run/cairn/outbox` and sends only its bounded filename. Host runtime-file reads use `lstat`, `O_NOFOLLOW`, descriptor identity checks, a single-link regular-file requirement and bounded reads; FIFOs are refused without blocking. On Linux, reads resolve relative to an opened directory through `/proc/self/fd`, pinning the directory against guest replacement. The macOS test path checks parent identity before reading; it does not establish Linux namespace or concurrent-replacement behavior. The host copies bundle bytes into a private temporary directory before verifying Git validity and the single claimed Thread ref. The host awaits delivery before removing the outbox. GitHub Project delivery continues to use the existing push path.
 
 ## Proof
 
-Tests use real Unix sockets, fake upstream MachineApi implementations, fake backends, and local Git repositories. The compiled-worker process test runs pi against a stub LLM, exercises a shell tool and setup/resume hooks, and completes two steps with session reuse. It simulates container mounts; it does not launch nspawn.
+The alignment regressions first failed 13 cases against HEAD `3f192d7e7`, covering startup ordering, runtime validation/waiting and installer roots; three further cases rejected invalid timeout configuration before implementation. A deterministic fake-worker cleanup regression also failed before token binding fixed cross-step listener reuse. The initial transport regressions failed three cases against the old implementation: eager start, missing authentication, and foreign authentication. Additional regressions reproduced incomplete-build publication, duplicate release storage and cancellation during machine start before their fixes. The proxy regression failed before explicitly applying relayed proxy configuration to the worker HTTP dispatcher. Further failing regressions cover accepted completion without service exit, an externally powered-off cached machine, and two pending starts exceeding the configured machine cap. The lifecycle counts pending starts as capacity reservations.
 
-Round-two failure modes and regression names:
+Alignment acceptance is covered by these named tests in `apps/daemon/test/orb-transport.test.ts` and `orb-runner.test.ts`:
 
-| Finding | Tests |
+| Test | Acceptance |
 | --- | --- |
-| 1. Crash leaves a claim stuck; rejected completion cannot retry | `OOM after a worker heartbeat is failed by the online host`; `retries a rejected finish report over the same connection`; `worker exit replays a rejected journaled finish with its checkpoint artifacts`; `a stop after worker crash still reaches the run while host completion is pending`; `worker exit waits for an in-flight finish report without replacing or duplicating it`; `an unreachable host failure report remains journaled for replay`; six preparation/exec failure cases |
-| 2. Machine-wide rate-limit poisoning | `validates rate-limit reports before forwarding`; `binds rate-limit machine identity and caps reset timestamps` (seconds and milliseconds); `throttles rate-limit reports per step even after upstream rejection` |
-| 3. Unbounded input, checkpoints and extra connections | `disconnects an oversized complete frame` (ASCII and multibyte); `destroys a socket when an unterminated frame exceeds the byte limit`; `accepts exactly one connection for the lifetime of a step socket`; `disconnects a non-reading worker when queued output exceeds the frame budget`; `disconnects invalid worker frame` (eight cases); `rejects oversized checkpoint transcript before writing host files`; `rejects oversized checkpoint sessionContent before writing host files` |
-| 4. Stop is advisory | `a worker ignoring stop is aborted after the grace period`; existing stop-during-preparation coverage |
-| 5. Agent-code credential boundary | Documented below; this is a boundary clarification, not an isolation claim |
-| 6. Unrelated seed branches | `mounts a private bare snapshot with committed objects and no host working files or config` now creates another Thread branch and a tag, then asserts that the seed has only `refs/heads/main` and cannot resolve the other branch's private commit object |
-| 7. Missing seed bind assertion | `exec exposes only the socket, read-only build and read-only project seed` now supplies a real local repository and asserts the exact `/seed/project/repo` read-only mount |
+| `publishes releases without creating the runtime directory and reuses a running machine` | No daemon-created runtime source; valid running-machine reuse |
+| `machine start precedes the relay socket and token publication` | Lifecycle order through real step dispatch |
+| `waits for the root start hook before accepting the runtime directory` | Delayed hook directory creation |
+| `refuses a runtime directory with invalid %s and powers off its machine` | Symlink, file, foreign UID and mode refusal; UID comparison uses a mocked daemon UID with real lstat results |
+| `a missing runtime directory times out cleanly and powers off the machine` | Configured deadline and shutdown |
+| `the default runtime directory deadline is thirty seconds` | Default deadline with a controlled clock |
+| `cancelling the runtime directory wait powers off the machine` | Abort and awaited shutdown |
+| `revalidates the runtime directory of an already running machine` | Running-machine validation failure |
+| `requires the installer %s root without creating or repairing it` | Missing, file, symlink and foreign-owned dist/seed roots; preserve valid root modes |
+| `relay never creates a missing runtime directory` | Listener cannot create its mount source |
+| `runtime directory %s failure reports the reason through the host step and powers off` | Missing/mode failure reaches host completion and powers off |
+| `a previous fake worker cannot disconnect the next step listener` | Delayed fake cleanup cannot claim a later token |
+| `rejects an unbounded or negative runtime directory timeout %s` | Invalid configuration cannot remove the deadline |
 
-Before implementation, the four focused files produced 31 failures and 75 passes. The two additional checkpoint-size cases also failed before implementation. A further regression proved that a local single-branch clone still copied the private branch's commit object; it failed before adding `--no-local`. The seed-mount assertion passed immediately against the existing exec path: it closes a test gap rather than changing that path. The round-two checks below supersede the initial implementation's check results. Follow-up results are recorded separately below.
+Runtime evidence uses real Unix sockets, real local Git repositories, deterministic fake upstream APIs/backends and a fake lifecycle runner that rejects `systemd-run -M`, `--machine`, and `machinectl bind/shell/login`. The compiled-worker process probe runs pi against a local stub LLM, executes a shell tool and setup/resume hooks, and completes two steps. It validates daemon/worker protocol behavior without launching nspawn.
+
+Measured local checks use Node 24.14.0 on the branch based on `origin/main`; no native container is launched.
 
 | Command | Result |
 | --- | --- |
-| `pnpm lint` | PASS; 1,346 files, one pre-existing informational suggestion |
+| `pnpm lint` | PASS; 1,422 files, one pre-existing informational suggestion |
 | `pnpm typecheck` | PASS; five workspace packages |
-| `pnpm spec:parse` | PASS; 1,418 web tests in 207 files and 67 integration files |
-| `pnpm exec vitest run apps/daemon/test/orb-{relay,step,seed,runner,provider,workspace,worker-process}.test.ts --maxWorkers=1` | PASS; 133 tests in seven files, including the compiled-worker process probe |
-| `pnpm exec vitest run --changed --project @xiechimon/cairn-cli --project @xiechimon/cairn --maxWorkers=1` | PASS; 212 tests in 21 files |
-| `pnpm --filter @cairn/web e2e:affected` | PASS; no web surface selected |
-| `.claude/skills/verify-step-claim/scripts/run.sh` | PASS; four properties, 685,236 distinct states each |
-| `pnpm prepush` | PASS; 20 checks |
+| `pnpm spec:parse` | PASS; 1,421 web tests in 207 files and 67 integration test files parse |
+| `pnpm exec vitest run apps/daemon/test/orb-{transport,provider,relay,step,runner,delivery,watchdog,worker-process,seed,workspace}.test.ts apps/daemon/test/proxy.test.ts --maxWorkers=1` | PASS; 210 tests in 11 files, including compiled-worker exit status 0 |
+| `pnpm exec vitest run --changed --project @xiechimon/cairn-cli --maxWorkers=1` | PASS; 330 tests in 24 files |
+| `pnpm --filter @cairn/web e2e:affected` | PASS; no web e2e surface selected |
+| `pnpm prepush` | PASS; all 20 checks |
 
-Final test verification uses one worker. An earlier run concurrent with lint/typecheck hit two five-second test timeouts and the compiled probe's sixty-second second-turn wait; all seven orb files subsequently passed with one worker, without increasing those deadlines.
+## Guest-controlled runtime hardening
 
-The existing bounded TLC safety model is unchanged. Orb crash fallback uses the same claimed-step failure and journal replay operations already represented by `FinishSession`, `FinishStepOwnedCheck` and `FinishStepApply`. It creates no new executor or claim, and preserves a journaled result when replaying. The new real-socket tests exercise orb exit, retry and stop timing that the model does not distinguish. TLC does not establish liveness, cancellation deadlines or native container behavior.
+The hardening tests first reproduced unsafe outbox replacement, reading through a replaced outbox, dangling socket symlink handling, token symlink handling and cleanup, unsafe token reads, FIFO blocking and stale-socket replacement against `9d6842fce`. Bundle symlink, FIFO and hardlink cases retain the existing refusal behavior and now check that the outside target's contents and metadata remain unchanged. A further failing test caught token mode 0000 under a restrictive process umask before descriptor-based permission setting restored mode 0600.
 
-## Follow-up verification (2026-10-31)
+Measured on macOS with Node 24.14.0: the related Vitest command above passes 224 tests across 11 files, including the compiled-worker process probe. The daemon `--changed` command above passes 344 tests across 24 files. The added publication race test plants a token symlink after path preflight and confirms `O_EXCL` refuses it without overwriting the target or removing the planted link during cleanup. Tests also cover pre-existing outbox files/directories, dangling symlinks and restrictive umask restoration. `pnpm lint` passes across 1,423 files with one pre-existing informational suggestion; `pnpm typecheck` passes across five packages; `pnpm spec:parse` collects 1,421 web tests in 207 files and parses 67 integration files. The affected-e2e command selects no web tests.
 
-Measured failure modes and regression names in `apps/daemon/test/orb-watchdog.test.ts`:
+Runtime evidence is recorded in `/tmp/b2-orb-hardening-{related,changed,lint,typecheck,spec,e2e}.log`. The filesystem, Git and Unix socket operations are real; lifecycle commands, upstream APIs and model responses remain fake. Linux `/proc/self/fd` pinning, nspawn idmapping and actual cross-user denial remain unverified locally: this host runs macOS and its Docker daemon is unavailable. Native acceptance still requires the installed Linux image and host contract.
 
-| Failure mode | Test |
-| --- | --- |
-| Exit without completion | `orb exits mid-step with code %i and reports exactly one failed done` (0, 1, 137) |
-| Signal exit loses its status | `signal termination reports 128 plus the signal number exactly once` (a real child exits on SIGTERM, yielding 143) |
-| Live orb stops heartbeating or never connects | `silent orb is killed and reports exactly one heartbeat timeout, connected=%s` (false, true) |
-| Slow upstream hides a healthy orb | `every received heartbeat refreshes the watchdog before upstream responds` |
-| Normal completion gains a host duplicate or a stale timer | `normal orb done suppresses the host fallback and clears the watchdog` |
-| Completion and timeout race | `orb done racing the watchdog is awaited without a second report`; `a done sent after the watchdog cannot replace its failure report` |
-| Checkpoint incorrectly substitutes for completion | `an awaiting-upload checkpoint without done still fails on %s` (exit, timeout) |
+## Checkout dist publication
 
-The first focused run produced seven failures and two passes before implementation. Two subsequent checkpoint-only regressions failed because the host reported success without receiving `done`; they preceded the completion-attempt guard. Socket traffic, host completion payloads, abort signals and provider stop calls are exercised at runtime with fake timers and a fake nspawn command runner. Native Linux container termination remains unverified on macOS.
+The revised contract tests first failed all eight cases against the previous provider. They cover host-checkout identity, dependency resolution from the symlinked release, reuse, dirty contents, publication ordering, pruning, deploy exit/timeout and propagation to the host step. A compiled provider probe starts from a different working directory and verifies that its own module location determines the checkout. The checkout fake rejects registry installs, foreign checkout paths, missing offline flags, unbounded commands and enabled install scripts. Further failing tests reproduced lost stdout-only pnpm diagnostics and confirmed that pnpm 12 ignores the legacy `npm_config_ignore_scripts` variable. Publication now uses `PNPM_CONFIG_IGNORE_SCRIPTS=true`, verified through the installed pnpm configuration reader, and retains stdout-only errors. The FIFO probe is compiled before its three-second subprocess deadline, so that deadline measures token reads without TypeScript loader startup; it passes with the same blocking guard.
 
-Measured follow-up checks (working tree based on `aea85afb2`):
+Measured on macOS with Node 26.8.1 and pnpm 12.5.1: the real offline deploy command reached dependency deployment but failed with `ERR_PNPM_NO_OFFLINE_META` for `@agentclientprotocol/sdk`. The local store lacks the required metadata, so a complete deployment using real production dependencies is not verified here. No online installation or registry fallback was attempted. Release filesystem operations, Git reads and Node execution are real in the tests; dependency deployment and container lifecycle remain fake. Native Linux image acceptance remains outstanding.
 
-| Command | Result |
-| --- | --- |
-| `pnpm lint` | PASS; 1,347 files, one existing informational suggestion |
-| `pnpm typecheck` | PASS; five workspace packages |
-| `pnpm spec:parse` | PASS; 1,418 web tests in 207 files and 67 integration files |
-| `pnpm exec vitest run apps/daemon/test/orb-{relay,step,seed,runner,provider,workspace,worker-process,watchdog}.test.ts --maxWorkers=1` | PASS; 145 tests in eight files, including 12 new watchdog cases |
-| `pnpm --filter @cairn/web e2e:affected` | PASS; no web surface selected |
-| `pnpm exec vitest run --changed --project @xiechimon/cairn-cli --maxWorkers=1` | PASS; 229 tests in 21 files on Node 24.14.0 |
-| `pnpm prepush` | PASS; 20 checks on Node 24.14.0 |
+The final related command, `pnpm exec vitest run apps/daemon/test/orb-{dist,transport,provider,relay,step,runner,delivery,watchdog,worker-process,seed,workspace}.test.ts apps/daemon/test/proxy.test.ts --maxWorkers=1`, passes 236 tests in 12 files, including 12 dist tests and the compiled worker. `pnpm lint` passes across 1,426 files with one pre-existing informational suggestion; `pnpm typecheck` passes across five workspace packages; `pnpm spec:parse` collects 1,421 web tests in 207 files and parses 67 integration files. `pnpm --filter @cairn/web e2e:affected` selects no web tests. `pnpm exec vitest run --changed --project @xiechimon/cairn-cli --maxWorkers=1` passes 278 tests across 24 files. `pnpm prepush` passes all 20 checks.
 
-The eight-file run used the shell's initial Node 26.8.1. Lint, typecheck, spec parsing and affected e2e were also run through `fnm exec --using 24.14.0`, matching `.nvmrc`.
+Evidence logs: `/tmp/b2-orb-dist-{red,stdout-red,scripts-red,unit,related,changed-final,fifo,lint,typecheck,spec,e2e,deploy,prepush}.log`.
 
 ## Review
 
-The initial implementation had two Claude Sonnet 5.5 security reviews. The subsequent independent behavior review returned BLOCK, identifying the seven findings tracked above. This fix round adds regressions before implementing the behavior corrections. No fresh other-vendor review of this fix round has been performed, and no PR was opened or pushed.
+The earlier transport pass attempted a fresh Claude Sonnet 5.5 security/behavior review using `/security-review` in a read-only CLI session. The CLI reported `unrecognized_model` for the required `claude-sonnet-5-5` and produced no review verdict. The session was stopped without changing models. Independent review remains incomplete and must precede a PR. No PR or push is requested. Native permissions and image installation are outside the local fake boundary.
 
 ## Risk
 
-Agent code inside an orb runs as the same UID as the worker. It can call `token(stepId)` on the relay or inspect worker memory. Credentials returned by the token endpoint are step-scoped and issued by the live server; their authorization remains live server-side. The machine credential remains on the host, but this design is not credential isolation from agent code. Keeping credentials out of worker files does not prevent same-UID access to them in memory or through the relay.
+transport decided by ian 2026-10-31 (option 1)
 
-Native `machinectl bind`, release unmounts, base-image dependencies, egress routing, cancellation of a real systemd-run workload, and agent UID mapping were not exercised on macOS. Git ownership checks on `/seed` still require native-host verification. A failed host report remains recoverable in the journal, but no guarantee of progress during a continuing upstream outage is made. The current TLC properties cover bounded safety rather than eventual post-crash completion.
+Native nspawn UID mapping, actual host-user denial, image packages, service restart behavior, real machine poweroff/terminate and Linux Git ownership behavior remain unverified by the macOS tests. They require the separate image/installer PR and an installed host. The native acceptance must run as the unprivileged owner, complete two steps in one machine, deliver a local commit, reject the dedicated host runner user and a foreign container, and exercise worker death and watchdog shutdown. No host installation or polkit widening is included here. Dist releases beyond the newest three are pruned except current and running-machine release pins; seed snapshots still require operator maintenance while machines are stopped; no eventual-progress claim is made during a continuing upstream outage.
 
-## Local Project delivery fix (2026-10-31)
+## Loaded release identity fix
 
-Measured failure: local workspaces inside an orb have the read-only seed as their origin, so normal finalization cannot deliver commits to the original host repository. Local worker finalization now creates a bundle of exactly `refs/heads/<conversationBranch(conversationId)>` and calls `deliverBundle(stepId, filename)` over the real step relay. GitHub Projects continue through `WorkspaceManager.push` with the existing credential path.
+The release regressions cover stale refusal without slot consumption, release-key validation, foreign-token silence, a distinct client refusal error, the unchanged startup deadline and shutdown on repeated mismatch, and loaded/pending pin persistence. The compiled process regression `a compiled waiting worker retains release A until refusal and release B authentication` starts A through the stable entry before publishing B, ages A beyond the retention window, verifies exit 75 without any step completion or model request, then starts B through the same entry and verifies completion, exit 0, persisted B identity and subsequent A pruning. B also contains distinct compiled bytes and emits a build marker checked by the probe.
 
-For each local step, the host creates a unique 0700 directory and mounts it writable at `/run/cairn/outbox`, with release after exec. The directory is removed after relay shutdown on success and failure. The worker removes its bundle after the delivery attempt. Only a filename matching the bounded bundle-name schema crosses the relay; the repository path and Thread identity come from the host claim. The new method retains the existing allowlist, step binding and 16 MiB frame limit, rejects extra arguments and cancellation flags, and is unavailable without a host local-delivery configuration.
+The process checks use real compiled worker processes, Unix sockets, filesystem publication and Git reads. Container lifecycle, production dependency deployment and model responses are fake. Native systemd restart timing and nspawn remain unverified on this macOS host; the image must provide `Restart=always` and a short `RestartSec=1s` without suppressing exit 75.
 
-The host opens the outbox file without following symlinks, requires a regular file with one link, and enforces a 64 MiB cap. It copies the bounded contents into a private host temporary directory before running Git, preventing subsequent worker edits from replacing the verified input. `git bundle verify` must succeed and `git bundle list-heads` must return exactly the claimed Thread branch. Fetch uses one explicit branch refspec without force, tags, ref mapping or a FETCH_HEAD write. Divergence fails; a host branch already containing the delivered commit succeeds without changing its ref. Git refuses delivery into a checked-out host branch. Delivery errors become ordinary failed-step reports with the Git rejection reason. Relay shutdown waits for in-flight delivery before removing the outbox.
 
-Measured runtime regressions in `apps/daemon/test/orb-delivery.test.ts` use real temporary Git repositories, a real Unix relay socket, the actual worker and runner finalization, and a fake backend that creates a real commit:
+The corrected process harness fails against an isolated source copy of `a6a15d200`: A executes the step and reports success after B is published. The handshake regressions first failed seven of eight cases against that HEAD, and the pin regression reproduced metadata advancing without authentication. The legacy migration regression also failed before clearing unverified pins from pre-handshake state.
 
-| Test | Coverage |
+| Test | Failure covered |
 | --- | --- |
-| `local orb step delivers a new commit and releases its per-step outbox` | Host branch hash and file contents match the worker commit; no push to seed; 0700 writable outbox mount and cleanup |
-| `github orb step delivers a new commit and releases its per-step outbox` | Existing real push path delivers the commit |
-| `local-rejected orb step delivers a new commit and releases its per-step outbox` | Checked-out host branch rejects delivery, normal failed step reports the reason, outbox is removed |
-| `relay rejects %s delivery without changing host refs` | Nine cases: extra ref, another Thread branch, oversized file, traversal, absolute path, symlink, invalid bundle, wrong step, extra argument; complete host ref list remains unchanged |
-| `host bundle delivery preserves %s push semantics` | Three cases: fast-forward, divergence and already-contained commit |
+| `stale release refusal preserves the authenticated slot and discloses no step` | A cannot consume B's listener or obtain its input |
+| `invalid release identity %j cannot authenticate or reserve the slot` | Missing, empty, malformed, escaping and oversized identities |
+| `a foreign token with a stale release receives no release refusal` | Release handling cannot bypass token authentication |
+| `relay client exposes stale release refusal as a distinct error` | Refusal remains distinct from an ordinary disconnect |
+| `repeated stale releases do not extend the startup bound and power off the machine` | Retrying an old build cannot keep a step or machine alive indefinitely |
+| `a running machine retains its loaded release until the new release authenticates` | Reuse preserves loaded and pending pins across daemon restart |
+| `legacy metadata-only pins remain untrusted until a worker authenticates` | Upgrading from the old re-pin implementation cannot prune an unknown loaded build |
+| `a compiled waiting worker retains release A until refusal and release B authentication` | Real process upgrade, exit 75, subsequent B completion and safe A pruning |
 
-The initial focused run failed ten cases and passed the GitHub control before implementation. The final focused orb run passes 178 tests in nine files, including these 15 delivery cases and the compiled-worker process probe. The mount assertion in `orb-runner.test.ts` now includes the ephemeral outbox.
+Measured with Node 24.14.0: `pnpm exec vitest run apps/daemon/test/orb-{dist,transport,provider,relay,release,step,runner,delivery,watchdog,worker-process,seed,workspace,hardening}.test.ts apps/daemon/test/proxy.test.ts --maxWorkers=1` passes 263 tests across 14 files. `pnpm lint` passes across 1,432 files with one pre-existing informational suggestion; `pnpm typecheck` passes across five workspace packages; `pnpm spec:parse` collects 1,432 web tests in 209 files and parses 67 integration files. `pnpm --filter @cairn/web e2e:affected` selects no web tests. `pnpm exec vitest run --changed --project @xiechimon/cairn-cli --maxWorkers=1` passes 383 tests across 27 files, including the distinct compiled B marker. The final handshake-only rerun passes all eight tests with a real initialization payload configured. `pnpm prepush` passes all 20 checks.
 
-Checks run with `fnm exec --using 24.14.0`:
-
-| Command | Result |
-| --- | --- |
-| `pnpm lint` | PASS; 1,369 files, one existing informational suggestion |
-| `pnpm typecheck` | PASS; five workspace packages |
-| `pnpm spec:parse` | PASS; 1,418 web tests in 207 files and 67 integration files |
-| `pnpm exec vitest run apps/daemon/test/orb-{delivery,relay,step,seed,runner,provider,workspace,worker-process,watchdog}.test.ts --maxWorkers=1` | PASS; 178 tests in nine files |
-| `pnpm --filter @cairn/web e2e:affected` | PASS; no web surface selected |
-| `pnpm exec vitest run --changed --project @xiechimon/cairn-cli --maxWorkers=1` | PASS; 286 tests in 22 files |
-| `pnpm prepush` | PASS; 20 checks |
-
-Native Linux nspawn mounts and UID mapping remain unverified on macOS; the tests simulate mount placement while exercising real Git delivery and socket traffic. No push or PR was performed for this fix.
+Evidence logs: `/tmp/b2-orb-release-{process-baseline-clean,auth-red,legacy-red,related,changed,lint,typecheck-final,spec,e2e,prepush}.log`.

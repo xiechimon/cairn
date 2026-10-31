@@ -50,7 +50,11 @@ export class OrbLifecycle {
           const idle = handles
             .filter((orb) => orb.running && !this.running.has(orb.conversationId))
             .sort((a, b) => a.lastUsedAt - b.lastUsedAt);
-          let running = handles.filter((orb) => orb.running).length;
+          let running = handles.filter(
+            (orb) =>
+              orb.running ||
+              (orb.conversationId !== input.conversationId && this.running.has(orb.conversationId)),
+          ).length;
           while (running >= this.max && idle.length > 0) {
             const oldest = idle.shift();
             if (oldest) await this.stop(oldest);

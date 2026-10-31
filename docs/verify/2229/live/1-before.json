@@ -1,0 +1,19 @@
+{
+  "todos": [
+    {
+      "id": "fgx4axwJfV2akDokFfNOw",
+      "title": "Timed snooze thread",
+      "phase": "todo",
+      "snoozeMode": null,
+      "snoozedUntil": null
+    },
+    {
+      "id": "1sfElaZRpHeVN3_sdprnt",
+      "title": "Needed snooze thread",
+      "phase": "todo",
+      "snoozeMode": null,
+      "snoozedUntil": null
+    }
+  ],
+  "unreadThreadIds": []
+}

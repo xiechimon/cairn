@@ -1,6 +1,15 @@
-import { chmodSync, existsSync, lstatSync, mkdirSync, rmSync } from 'node:fs';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
+import {
+  closeSync,
+  constants,
+  fchmodSync,
+  lstatSync,
+  openSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { createConnection, createServer, type Server, type Socket } from 'node:net';
-import { dirname } from 'node:path';
+import { basename, dirname } from 'node:path';
 import { createInterface } from 'node:readline';
 import {
   claudeRateLimitReportSchema,
@@ -21,8 +30,12 @@ import {
   type OrbStepInput,
   type OrbStepMethod,
   orbBundleArgsSchema,
+  orbReleaseKeySchema,
   orbWorkerFrameSchema,
 } from './protocol.js';
+import { readOrbFile } from './runtime-fs.js';
+
+const listeningPaths = new Set<string>();
 
 const callSchema = z
   .object({
@@ -41,6 +54,15 @@ export class RelayMachineError extends MachineApiError {
   }
 }
 
+export class OrbStaleReleaseError extends Error {
+  constructor() {
+    super('Orb worker refused: stale-release');
+    this.name = 'OrbStaleReleaseError';
+  }
+}
+
+export class RelayPathError extends RelayMachineError {}
+
 export class RelayMachineServer {
   private readonly server: Server;
   private readonly sockets = new Set<Socket>();
@@ -51,13 +73,19 @@ export class RelayMachineServer {
   private completed = false;
   private delivery: Promise<void> | undefined;
   private ownsSocket = false;
+  private ownsToken = false;
   private connected = false;
+  private readonly authenticated = new Set<Socket>();
+  private readonly token = randomBytes(32).toString('hex');
   private lastRateLimitAt: number | undefined;
 
   constructor(
     private readonly options: {
       socketPath: string;
       stepId: string;
+      release: string;
+      onAuthenticated?: (release: string) => void;
+      onStaleRelease?: (release: string) => void;
       machineId?: string;
       upstream: MachineApi;
       localDelivery?: OrbLocalDelivery;
@@ -66,27 +94,32 @@ export class RelayMachineServer {
       onActivity?: () => void;
       onReporting?: (body: MachineDoneBody) => void;
       onDone?: () => void;
+      onDisconnect?: () => void;
     },
   ) {
+    orbReleaseKeySchema.parse(options.release);
     this.server = createServer((socket) => {
       socket.on('error', () => {});
-      if (this.connected) {
+      if (this.connected || this.sockets.size >= 4) {
         socket.destroy();
         return;
       }
-      this.connected = true;
       this.sockets.add(socket);
       const requests = new Map<number, AbortController>();
       this.requests.set(socket, requests);
-      let buffer = Buffer.allocUnsafe(ORB_MAX_FRAME_BYTES);
+      let buffer = Buffer.allocUnsafe(1024);
       let size = 0;
+      let refused = false;
+      const authTimeout = setTimeout(() => socket.destroy(), 5_000);
+      authTimeout.unref();
       socket.on('data', (chunk: Buffer) => {
+        if (refused) return;
         let start = 0;
         while (start < chunk.length && !socket.destroyed) {
           const end = chunk.indexOf(10, start);
           const part = chunk.subarray(start, end < 0 ? chunk.length : end);
           size += part.length;
-          if (size > ORB_MAX_FRAME_BYTES) {
+          if (size > buffer.length) {
             socket.destroy();
             return;
           }
@@ -95,6 +128,46 @@ export class RelayMachineServer {
           const frame = decodeOrbFrame(buffer.toString('utf8', 0, size));
           size = 0;
           start = end + 1;
+          if (!this.authenticated.has(socket)) {
+            const auth = z
+              .object({
+                type: z.literal('auth'),
+                token: z.string().regex(/^[a-f0-9]{64}$/),
+                release: orbReleaseKeySchema,
+              })
+              .strict()
+              .safeParse(frame);
+            if (
+              !auth.success ||
+              this.connected ||
+              !timingSafeEqual(Buffer.from(auth.data.token), Buffer.from(this.token))
+            ) {
+              socket.destroy();
+              return;
+            }
+            clearTimeout(authTimeout);
+            if (auth.data.release !== options.release) {
+              refused = true;
+              options.onStaleRelease?.(auth.data.release);
+              socket.end(encodeOrbFrame({ type: 'refused', reason: 'stale-release' }));
+              socket.setTimeout(1_000, () => socket.destroy());
+              return;
+            }
+            options.onAuthenticated?.(auth.data.release);
+            this.connected = true;
+            this.authenticated.add(socket);
+            buffer = Buffer.allocUnsafe(ORB_MAX_FRAME_BYTES);
+            this.write(socket, encodeOrbFrame({ type: 'authenticated' }));
+            if (options.input)
+              this.write(
+                socket,
+                encodeOrbFrame({
+                  type: 'init',
+                  input: typeof options.input === 'function' ? options.input() : options.input,
+                }),
+              );
+            continue;
+          }
           if (frame?.type === 'call') {
             void this.receive(socket, frame);
             continue;
@@ -109,54 +182,68 @@ export class RelayMachineServer {
         }
       });
       socket.on('close', () => {
+        clearTimeout(authTimeout);
+        if (this.authenticated.delete(socket)) this.options.onDisconnect?.();
         for (const request of requests.values()) request.abort();
         this.requests.delete(socket);
         this.sockets.delete(socket);
         buffer = Buffer.alloc(0);
       });
-      if (options.input)
-        this.write(
-          socket,
-          encodeOrbFrame({
-            type: 'init',
-            input: typeof options.input === 'function' ? options.input() : options.input,
-          }),
-        );
     });
   }
 
   async listen(): Promise<void> {
-    mkdirSync(dirname(this.options.socketPath), { recursive: true, mode: 0o700 });
-    chmodSync(dirname(this.options.socketPath), 0o700);
-    if (existsSync(this.options.socketPath)) {
-      if (!lstatSync(this.options.socketPath).isSocket())
-        throw new RelayMachineError('Relay path is not a socket');
-      await new Promise<void>((resolve, reject) => {
-        const probe = createConnection(this.options.socketPath);
-        probe.once('connect', () => {
-          probe.destroy();
-          reject(new RelayMachineError('Relay socket already has a live listener'));
-        });
-        probe.once('error', (error: NodeJS.ErrnoException) => {
-          if (error.code === 'ECONNREFUSED') resolve();
-          else reject(error);
-        });
-      });
-      rmSync(this.options.socketPath);
+    const directory = lstatSync(dirname(this.options.socketPath));
+    if (!directory.isDirectory())
+      throw new RelayMachineError('Relay parent must be a real directory');
+    if (directory.uid !== process.getuid?.() || (directory.mode & 0o7777) !== 0o700)
+      throw new RelayMachineError('Relay directory must be owned by daemon uid with mode 0700');
+    if (listeningPaths.has(this.options.socketPath))
+      throw new RelayMachineError('Relay path already has a listener');
+    const paths = [this.options.socketPath, `${this.options.socketPath}.token`];
+    for (const path of paths) {
+      const metadata = lstatSync(path, { throwIfNoEntry: false });
+      if (metadata && !metadata.isFile() && !metadata.isSocket())
+        throw new RelayPathError('Relay path must be a regular file or socket');
+    }
+    for (const path of paths) {
+      const metadata = lstatSync(path, { throwIfNoEntry: false });
+      if (metadata) {
+        if (!metadata.isFile() && !metadata.isSocket())
+          throw new RelayPathError('Relay path must be a regular file or socket');
+        unlinkSync(path);
+      }
     }
     await new Promise<void>((resolve, reject) => {
       this.server.once('error', reject);
-      this.server.listen(this.options.socketPath, () => {
-        this.server.removeListener('error', reject);
-        this.ownsSocket = true;
-        resolve();
-      });
+      const mask = process.umask(0o177);
+      try {
+        this.server.listen(this.options.socketPath, () => {
+          this.server.removeListener('error', reject);
+          this.ownsSocket = true;
+          listeningPaths.add(this.options.socketPath);
+          resolve();
+        });
+      } finally {
+        process.umask(mask);
+      }
     });
-    chmodSync(this.options.socketPath, 0o666);
+    const descriptor = openSync(
+      `${this.options.socketPath}.token`,
+      constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
+      0o600,
+    );
+    this.ownsToken = true;
+    try {
+      fchmodSync(descriptor, 0o600);
+      writeFileSync(descriptor, this.token);
+    } finally {
+      closeSync(descriptor);
+    }
   }
 
   send(frame: OrbFrame): void {
-    for (const socket of this.sockets) this.write(socket, encodeOrbFrame(frame));
+    for (const socket of this.authenticated) this.write(socket, encodeOrbFrame(frame));
   }
 
   get isComplete(): boolean {
@@ -178,8 +265,21 @@ export class RelayMachineServer {
       await new Promise<void>((resolve) => this.server.close(() => resolve()));
       if (this.reporting) await this.reporting.catch(() => {});
       if (this.delivery) await this.delivery.catch(() => {});
-      if (this.ownsSocket) rmSync(this.options.socketPath, { force: true });
-    })();
+      for (const [owned, path] of [
+        [this.ownsSocket, this.options.socketPath],
+        [this.ownsToken, `${this.options.socketPath}.token`],
+      ] as const) {
+        if (!owned) continue;
+        try {
+          const metadata = lstatSync(path, { throwIfNoEntry: false });
+          if (metadata?.isFile() || metadata?.isSocket()) unlinkSync(path);
+        } catch {}
+      }
+    })()
+      .catch(() => {})
+      .finally(() => {
+        if (this.ownsSocket) listeningPaths.delete(this.options.socketPath);
+      });
     return this.closing;
   }
 
@@ -289,6 +389,7 @@ export class RelayMachineServer {
 export class RelayMachineApi {
   readonly api: MachineApi;
   readonly input: Promise<OrbStepInput>;
+  private readonly authentication: Promise<void>;
   private nextId = 0;
   private available: readonly string[] = ORB_STEP_METHODS;
   private disconnected = false;
@@ -299,10 +400,20 @@ export class RelayMachineApi {
   private readonly socket: Socket;
   private constructor(
     socketPath: string,
+    token: string,
+    release: string,
     onFrame?: (frame: OrbFrame) => void,
     onClose?: () => void,
   ) {
     this.socket = createConnection(socketPath);
+    this.socket.once('connect', () => this.send({ type: 'auth', token, release }));
+    let authenticated: () => void = () => {};
+    let rejectAuthentication: (error: Error) => void = () => {};
+    this.authentication = new Promise((resolve, reject) => {
+      authenticated = resolve;
+      rejectAuthentication = reject;
+    });
+    void this.authentication.catch(() => {});
     let resolveInput: (value: OrbStepInput) => void = () => {};
     let rejectInput: (error: Error) => void = () => {};
     this.input = new Promise((resolve, reject) => {
@@ -314,7 +425,14 @@ export class RelayMachineApi {
     lines.on('line', (line) => {
       const frame = decodeOrbFrame(line);
       if (!frame) return;
-      if (frame.type === 'init') {
+      if (frame.type === 'authenticated') {
+        authenticated();
+      } else if (frame.type === 'refused' && frame.reason === 'stale-release') {
+        const error = new OrbStaleReleaseError();
+        rejectAuthentication(error);
+        rejectInput(error);
+        this.socket.end();
+      } else if (frame.type === 'init') {
         this.available = frame.input.methods;
         resolveInput(frame.input);
       } else if (frame.type === 'reply') {
@@ -336,6 +454,7 @@ export class RelayMachineApi {
       this.disconnected = true;
       const error = new MachineApiError(410, 'Orb relay connection closed');
       rejectInput(error);
+      rejectAuthentication(error);
       for (const pending of this.pending.values()) pending.reject(error);
       this.pending.clear();
       lines.close();
@@ -357,14 +476,17 @@ export class RelayMachineApi {
 
   static async connect(
     socketPath: string,
+    release: string,
     onFrame?: (frame: OrbFrame) => void,
     onClose?: () => void,
   ): Promise<RelayMachineApi> {
-    const client = new RelayMachineApi(socketPath, onFrame, onClose);
-    await new Promise<void>((resolve, reject) => {
-      client.socket.once('connect', resolve);
-      client.socket.once('error', reject);
-    });
+    const token = readOrbFile(dirname(socketPath), `${basename(socketPath)}.token`, 64).toString(
+      'utf8',
+    );
+    if (!/^[a-f0-9]{64}$/.test(token)) throw new RelayMachineError('Invalid relay token');
+    orbReleaseKeySchema.parse(release);
+    const client = new RelayMachineApi(socketPath, token, release, onFrame, onClose);
+    await client.authentication;
     return client;
   }
 

@@ -40,6 +40,12 @@ export function setupProxy(
   const proxy = detectProxyEnv(env);
   if (!proxy) return;
   const noProxy = loopbackNoProxy(env, serverUrl);
-  setGlobalDispatcher(new EnvHttpProxyAgent(noProxy === undefined ? undefined : { noProxy }));
+  setGlobalDispatcher(
+    new EnvHttpProxyAgent({
+      httpProxy: env.http_proxy ?? env.HTTP_PROXY,
+      httpsProxy: env.https_proxy ?? env.HTTPS_PROXY,
+      noProxy: noProxy ?? env.no_proxy ?? env.NO_PROXY,
+    }),
+  );
   logger.raw(`[${BRAND.cliCommandName}] Proxy: ${proxy}`);
 }

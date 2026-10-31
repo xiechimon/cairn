@@ -62,6 +62,12 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
   },
   { method: 'GET', path: '/api/todos', query: ['teamId'] },
   { method: 'GET', path: '/api/todos/{id}' },
+  {
+    method: 'POST',
+    path: '/api/todos/{id}/snooze',
+    note: 'body {until: needed|tomorrow|tomorrow-09:00|next-monday|epoch ms|ISO, tz?}',
+  },
+  { method: 'POST', path: '/api/todos/{id}/unsnooze', note: 'clears the snooze' },
   { method: 'GET', path: '/api/builds/{id}' },
   { method: 'GET', path: '/api/builds/{id}/steps' },
   { method: 'GET', path: '/api/conversations/{id}/messages', note: 'chief 会话同族（r5 §3.6）' },

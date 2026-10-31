@@ -3,22 +3,7 @@ import { Button } from '../components/ui/button.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { useI18n } from '../i18n/provider.js';
 import { FileCheck, FileText, Layers, Puzzle, Server } from '../icons/index.js';
-import type { InlineCompletionRow, MentionKind } from './mention-token.js';
-
-function labelFor(t: ReturnType<typeof useI18n>['t'], kind: MentionKind): string {
-  switch (kind) {
-    case 'todo':
-      return t('任务');
-    case 'skill':
-      return t('技能');
-    case 'agent':
-      return 'Agents';
-    case 'project':
-      return t('项目');
-    case 'machine':
-      return t('机器');
-  }
-}
+import type { InlineCompletionRow } from './mention-token.js';
 
 export interface MentionInlineProps {
   open: boolean;
@@ -50,10 +35,10 @@ function InlineKindIcon({ kind }: { kind: InlineCompletionRow['kind'] }) {
 }
 
 const INLINE_PANEL_CLS =
-  'mention-inline absolute left-0 w-88 max-w-full bottom-[calc(100%+8px)] z-40 max-h-55 overflow-auto rounded-(--radius-popover) bg-popover p-(--menu-pad) shadow-(--shadow-popover)';
+  'mention-inline absolute left-0 w-120 max-w-full bottom-[calc(100%+8px)] z-40 max-h-62 overflow-auto rounded-(--radius-popover) bg-popover p-(--menu-pad) shadow-(--shadow-popover)';
 
 const INLINE_ROW_CLS =
-  'mention-inline-row flex h-8 w-full cursor-pointer items-center justify-start gap-2 rounded-(--radius-menu-item) border-0 bg-transparent px-2.5 text-left text-ui font-normal text-foreground hover:bg-transparent hover:text-foreground focus:bg-transparent dark:hover:bg-transparent aria-expanded:bg-transparent active:not-aria-[haspopup]:translate-y-0';
+  'mention-inline-row flex h-7 w-full cursor-pointer items-center justify-start gap-2 rounded-(--radius-menu-item) border-0 bg-transparent px-2.5 text-left text-ui font-normal text-foreground hover:bg-transparent hover:text-foreground focus:bg-transparent dark:hover:bg-transparent aria-expanded:bg-transparent active:not-aria-[haspopup]:translate-y-0';
 
 export function MentionInline({
   open,
@@ -88,16 +73,7 @@ export function MentionInline({
             : t('没有与"{query}"匹配的结果', { query: `@${query}` })}
         </div>
       ) : (
-        rows.map((row, index) => [
-          rows[index - 1]?.kind !== row.kind && (
-            <div
-              key={`group:${row.kind}`}
-              aria-hidden="true"
-              className="px-2.5 pt-2 pb-1 text-caption font-medium text-content-tertiary first:pt-1"
-            >
-              {row.kind === 'file' ? t('文件') : labelFor(t, row.kind)}
-            </div>
-          ),
+        rows.map((row, index) => (
           <Button
             key={`${row.kind}:${row.id}`}
             id={`${listboxId}-opt-${index}`}
@@ -114,21 +90,25 @@ export function MentionInline({
               <SeededAvatar
                 name={row.label}
                 fallback="/avatar-robot-1.svg"
-                className="size-5 flex-none"
+                className="size-4 flex-none"
               />
             ) : (
-              <span className="inline-flex size-5 flex-none items-center justify-center text-icon">
+              <span className="inline-flex size-4 flex-none items-center justify-center text-icon">
                 <InlineKindIcon kind={row.kind} />
               </span>
             )}
-            <span className="min-w-0 truncate">{row.label}</span>
+            <span
+              className={`min-w-0 truncate ${row.subtitle != null ? 'max-w-2/3 flex-none' : ''}`}
+            >
+              {row.label}
+            </span>
             {row.subtitle != null && (
-              <span className="ml-auto flex-none truncate pl-3 text-meta text-content-tertiary">
+              <span className="min-w-0 truncate text-meta text-content-tertiary">
                 {row.subtitle}
               </span>
             )}
-          </Button>,
-        ])
+          </Button>
+        ))
       )}
     </div>
   );

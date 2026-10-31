@@ -18,7 +18,7 @@ export function StoneSection() {
   return (
     <Section
       id="stone"
-      title="Stone marks and trail"
+      title="Inbox groups"
       lede="Five groups carry the inbox in a fixed order: waiting on you, ready for review, working, idle, resolved. A state is drawn once per context: the group header carries the glyph and its rows carry none; a row outside a group carries its own. The reason is written, not iconised."
     >
       <Specimen

@@ -1,8 +1,13 @@
+import { execFileSync } from 'node:child_process';
 import {
   cpSync,
   existsSync,
+  linkSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
+  renameSync,
   rmSync,
   statSync,
   symlinkSync,
@@ -14,10 +19,11 @@ import { join } from 'node:path';
 import { type AgentBackend, conversationBranch } from '@cairn/shared';
 import { afterEach, expect, test, vi } from 'vitest';
 import { gitPrim, runGitOk } from '../src/git.js';
-import { NspawnOrbProvider } from '../src/orb/provider.js';
 import { RelayMachineApi, RelayMachineServer } from '../src/orb/relay.js';
 import { runOrbWorker } from '../src/orb/worker.js';
 import { boot, CLAIMED, FakeMachineApi, fakeBackend, waitFor } from './machine-loop-harness.js';
+import { FakeOrbProvider } from './orb-fake.js';
+import { orbTestEntry, orbTestRelease } from './orb-release-fixture.js';
 
 const roots: string[] = [];
 afterEach(() => {
@@ -79,23 +85,21 @@ test.each(['local', 'github', 'local-rejected'] as const)(
         repo: { kind: kind === 'github' ? 'github' : 'local', cloneUrl: repo },
       },
     });
-    const provider = new NspawnOrbProvider({
+    const provider = new FakeOrbProvider({
       runner: async (argv, options) => {
-        if (!argv.includes('--uid=agent')) return { code: 0, stdout: '', stderr: '' };
-        const binds = options!.binds!;
-        const seed = binds.find((bind) => bind.target.startsWith('/seed/'));
-        outbox = binds.find((bind) => bind.target === '/run/cairn/outbox')?.source ?? '';
+        if (argv[0] !== 'orb-worker') return { code: 0, stdout: '', stderr: '' };
+        const seed = join(options!.seedRoot, CLAIMED.project!.id, 'repo');
+        outbox = options!.outboxRoot;
         if (kind !== 'github') {
           expect(outbox).not.toBe('');
           expect(statSync(outbox).mode & 0o777).toBe(0o700);
-          expect(binds.find((bind) => bind.source === outbox)).toMatchObject({
-            releaseAfterExec: true,
-          });
+          expect(outbox).toBe(join(provider.runtimeRoot, 'cairn-orb-conv-1', 'outbox'));
         }
-        if (seed)
-          cpSync(seed.source, join(root, 'seed', CLAIMED.project!.id, 'repo'), { recursive: true });
+        if (existsSync(seed))
+          cpSync(seed, join(root, 'seed', CLAIMED.project!.id, 'repo'), { recursive: true });
         await runOrbWorker({
-          socketPath: binds.find((bind) => bind.target.endsWith('relay.sock'))!.source,
+          socketPath: options!.socketPath,
+          entryPath: orbTestEntry(options!.socketPath),
           backendFor: () => backend,
           home: join(root, 'worker'),
           workspacesRoot: join(root, 'work'),
@@ -143,6 +147,9 @@ test.each([
   'escape',
   'absolute',
   'symlink',
+  'fifo',
+  'hardlink',
+  'outbox-symlink',
   'invalid',
   'wrong-step',
   'extra-argument',
@@ -164,19 +171,34 @@ test.each([
     { cwd: repo },
   );
   if (attack === 'oversized') truncateSync(bundle, 64 * 1024 * 1024 + 1);
-  if (attack === 'symlink') {
-    rmSync(bundle);
-    symlinkSync(join(root, 'outside.bundle'), bundle);
+  const outside = join(root, 'outside.bundle');
+  if (attack === 'symlink' || attack === 'hardlink' || attack === 'fifo') {
+    renameSync(bundle, outside);
+    if (attack === 'symlink') symlinkSync(outside, bundle);
+    else if (attack === 'hardlink') linkSync(outside, bundle);
+    else execFileSync('mkfifo', [bundle]);
   }
+  const outsideDir = join(root, 'outside');
+  if (attack === 'outbox-symlink') {
+    renameSync(outboxDir, outsideDir);
+    symlinkSync(outsideDir, outboxDir, 'dir');
+  }
+  const target = attack === 'outbox-symlink' ? join(outsideDir, 'step.bundle') : outside;
+  const original = existsSync(target) ? readFileSync(target) : undefined;
+  const metadata = existsSync(target) ? lstatSync(target) : undefined;
   if (attack === 'invalid') writeFileSync(bundle, 'not a bundle');
   const server = new RelayMachineServer({
     socketPath: join(root, 'relay.sock'),
+    release: orbTestRelease(join(root, 'relay.sock')),
     stepId: 's1',
     upstream: new FakeMachineApi(),
     localDelivery: { outboxDir, repoPath: repo, conversationId: CLAIMED.conversationId },
   });
   await server.listen();
-  const relay = await RelayMachineApi.connect(join(root, 'relay.sock'));
+  const relay = await RelayMachineApi.connect(
+    join(root, 'relay.sock'),
+    orbTestRelease(join(root, 'relay.sock')),
+  );
   try {
     const name =
       attack === 'escape' ? '../step.bundle' : attack === 'absolute' ? bundle : 'step.bundle';
@@ -188,6 +210,13 @@ test.each([
       ]),
     ).rejects.toThrow(attack === 'wrong-step' ? /step does not match/ : /bundle/i);
     expect(await runGitOk(['show-ref'], { cwd: repo })).toBe(before);
+    if (original && metadata) {
+      const current = lstatSync(target);
+      expect(current.atimeMs).toBe(metadata.atimeMs);
+      expect(current.mtimeMs).toBe(metadata.mtimeMs);
+      expect(current.mode).toBe(metadata.mode);
+      expect(readFileSync(target)).toEqual(original);
+    }
   } finally {
     relay.close();
     await server.close();
@@ -241,12 +270,16 @@ test.each(['fast-forward', 'divergent', 'already-contained'] as const)(
     const before = await runGitOk(['show-ref'], { cwd: repo });
     const server = new RelayMachineServer({
       socketPath: join(root, 'relay.sock'),
+      release: orbTestRelease(join(root, 'relay.sock')),
       stepId: 's1',
       upstream: new FakeMachineApi(),
       localDelivery: { outboxDir, repoPath: repo, conversationId: CLAIMED.conversationId },
     });
     await server.listen();
-    const relay = await RelayMachineApi.connect(join(root, 'relay.sock'));
+    const relay = await RelayMachineApi.connect(
+      join(root, 'relay.sock'),
+      orbTestRelease(join(root, 'relay.sock')),
+    );
     try {
       const delivery = relay.call('deliverBundle', ['s1', 'step.bundle']);
       if (mode === 'divergent') await expect(delivery).rejects.toThrow(/non-fast-forward/);

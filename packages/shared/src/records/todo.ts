@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { CHIEF_THREAD_ID_PREFIX } from './chief.js';
 import { epochMs, phaseSchema, recordId } from './common.js';
 import { parseGithubRepoRef } from './project.js';
+import { snoozeModeSchema } from './snooze.js';
 import { quotaWaitSchema } from './step.js';
 
 export const assignmentSlotSchema = z.object({ agentId: recordId });
@@ -77,6 +78,8 @@ export const todoRecordSchema = z.object({
   phase: phaseSchema,
   phaseAt: epochMs,
   archivedAt: epochMs.nullish(),
+  snoozedUntil: epochMs.nullish(),
+  snoozeMode: snoozeModeSchema.nullish(),
   seqNum: z.number().int(),
   orderIndex: z.number(),
   tagIds: z.array(recordId),
