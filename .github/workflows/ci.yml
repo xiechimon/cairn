@@ -305,6 +305,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: node --test scripts/gardener-ratchet.test.mjs scripts/gardener-weekly.test.mjs scripts/doc-drift.test.mjs scripts/evidence-prune.test.mjs scripts/delivery-metrics.test.mjs
 
+      - name: Merge routing size caps (#2371)
+        if: ${{ !cancelled() }}
+        run: node --test scripts/pr-gate-routing.test.mjs scripts/batch-merger.test.mjs
+
       - name: Real smoke runner and checker fixtures (#2283)
         if: ${{ !cancelled() }}
         run: node --test scripts/ops/real-smoke.test.mjs
