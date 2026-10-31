@@ -1,7 +1,10 @@
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { userInfo } from 'node:os';
-import { resolve } from 'node:path';
+import { join, resolve } from 'node:path';
+
+import { readMetadata, validatePorts } from './guest-check.mjs';
 
 export function parseHostCheck(input, { blockedPorts = [22, 5231] } = {}) {
   const statuses = [...input.headers.matchAll(/^HTTP\/\S+\s+(\d{3})([^\r\n]*)/gm)].filter(
@@ -63,19 +66,13 @@ export function checkHost({
   wait = () => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1000),
   user = userInfo().username,
   name = `cairn-orb-check-${randomUUID().slice(0, 8)}`,
+  runtimeRoot = '/run/cairn-orb',
+  removeRuntime = rmSync,
   blockedPorts = (process.env.CAIRN_ORB_CHECK_BLOCKED_PORTS ?? '22,5231').split(',').map(Number),
 } = {}) {
   if (user !== 'ian') throw new Error('Run the host check as ian without sudo');
   if (!/^cairn-orb-check-[a-zA-Z0-9-]+$/.test(name)) throw new Error('Invalid check machine name');
-  if (
-    !Array.isArray(blockedPorts) ||
-    blockedPorts.length < 2 ||
-    new Set(blockedPorts).size !== blockedPorts.length ||
-    blockedPorts.some(
-      (port) => !Number.isInteger(port) || port < 1 || port > 65535 || port === 7890,
-    )
-  )
-    throw new Error('Invalid firewall check ports');
+  validatePorts(blockedPorts);
   const errors = [];
   const input = {
     images: '',
@@ -118,90 +115,112 @@ export function checkHost({
   input.negativeError = negative.stderr || '';
   const clone = call('machinectl', ['--no-ask-password', 'clone', 'cairn-orb-base', name]);
   if (clone.status !== 0) return { ...parseHostCheck(input, { blockedPorts }), errors };
+  const directory = join(runtimeRoot, name);
+  const requestId = randomUUID();
+  let ownedDirectory = false;
   let lifecycle = true;
   try {
+    mkdirSync(directory, { mode: 0o700 });
+    ownedDirectory = true;
+    writeFileSync(
+      join(directory, 'check-request'),
+      JSON.stringify({ version: 1, requestId, blockedPorts }),
+      { mode: 0o600, flag: 'wx' },
+    );
     if (call('machinectl', ['--no-ask-password', 'start', name]).status !== 0)
       throw new Error('start failed');
-    const guest = ['-M', name, '--no-ask-password', '--wait', '--pipe', '--collect', '--quiet'];
-    let ready = false;
-    for (let attempt = 0; attempt < 30; attempt++) {
-      const result = run('systemd-run', [...guest, 'true']);
-      if (result.status === 0) {
-        ready = true;
+    let result;
+    for (let attempt = 0; attempt < 150; attempt++) {
+      try {
+        result = readMetadata(join(directory, 'check-result.json'));
         break;
+      } catch (error) {
+        if (error.code !== 'ENOENT') throw new Error('Invalid guest check result');
       }
-      if (attempt < 29) wait();
+      if (attempt < 149) wait();
     }
-    if (!ready) throw new Error('guest execution failed');
-    for (const port of [7890, ...blockedPorts]) {
-      const probe = run('systemd-run', [
-        ...guest,
-        '--uid=agent',
-        'timeout',
-        '3',
-        'bash',
-        '-c',
-        `exec 3<>/dev/tcp/10.203.0.1/${port}`,
-      ]);
-      input.firewallProbes.push({ port, status: probe.status });
-    }
-    const egress = call('systemd-run', [
-      ...guest,
-      '--uid=agent',
-      'curl',
-      '--silent',
-      '--show-error',
-      '--head',
-      '--max-time',
-      '10',
-      '--retry',
-      '10',
-      '--retry-all-errors',
-      '--retry-delay',
-      '1',
-      '--retry-max-time',
-      '30',
-      '--proxy',
-      'http://10.203.0.1:7890',
-      'https://github.com',
-    ]);
-    if (egress.status === 0) input.headers = egress.stdout || '';
-    for (const target of ['http://127.0.0.1:80/', 'http://10.203.0.1:22/']) {
-      const denied = run('systemd-run', [
-        ...guest,
-        '--uid=agent',
-        'curl',
-        '--silent',
-        '--show-error',
-        '--fail',
-        '--max-time',
-        '10',
-        '--noproxy',
-        '',
-        '--proxy',
-        'http://10.203.0.1:7890',
-        '--output',
-        '/dev/null',
-        '--write-out',
-        '%{http_code}',
-        target,
-      ]);
-      input.privateEgress.push({ status: denied.status, code: denied.stdout?.trim() });
-    }
+    if (!result) throw new Error('Timed out waiting for guest check result');
+    const keys = [
+      'version',
+      'requestId',
+      'egressCode',
+      'egressExit',
+      'privateEgress',
+      'firewallProbes',
+      'homeExit',
+    ];
+    if (
+      result.version !== 1 ||
+      result.requestId !== requestId ||
+      Object.keys(result).length !== keys.length ||
+      Object.keys(result).some((key) => !keys.includes(key)) ||
+      typeof result.egressCode !== 'string' ||
+      !/^[0-9]{3}$/.test(result.egressCode) ||
+      !Array.isArray(result.privateEgress) ||
+      !Array.isArray(result.firewallProbes) ||
+      !result.privateEgress.every(
+        (probe) =>
+          probe &&
+          typeof probe === 'object' &&
+          Object.keys(probe).sort().join(',') === 'code,status' &&
+          typeof probe.code === 'string',
+      ) ||
+      !result.firewallProbes.every(
+        (probe) =>
+          probe &&
+          typeof probe === 'object' &&
+          Object.keys(probe).sort().join(',') === 'port,status',
+      )
+    )
+      throw new Error('Invalid guest check metadata');
+    input.headers = result.egressExit === 0 ? `HTTP/2 ${result.egressCode}` : '';
+    input.privateEgress = result.privateEgress;
+    input.firewallProbes = result.firewallProbes;
+    input.homeExit = result.homeExit;
     input.memory =
       call('systemctl', ['show', `systemd-nspawn@${name}.service`, '-p', 'MemoryMax']).stdout || '';
-    input.homeExit = call('systemd-run', [...guest, 'test', '!', '-e', '/home/ian']).status;
   } catch (error) {
     lifecycle = false;
     errors.push(error.message);
   } finally {
     if (call('machinectl', ['--no-ask-password', 'poweroff', name]).status !== 0) lifecycle = false;
-    if (
-      call('systemctl', ['--no-ask-password', 'stop', `systemd-nspawn@${name}.service`]).status !==
-      0
-    )
+    let stopped = false;
+    for (let attempt = 0; attempt < 30; attempt++) {
+      const machines = call('machinectl', [
+        '--no-ask-password',
+        'list',
+        '--no-legend',
+        '--no-pager',
+      ]);
+      if (machines.status !== 0) break;
+      if (
+        !(machines.stdout || '').split('\n').some((line) => line.trim().split(/\s+/)[0] === name)
+      ) {
+        stopped = true;
+        break;
+      }
+      if (
+        attempt === 14 &&
+        call('machinectl', ['--no-ask-password', 'terminate', name]).status !== 0
+      )
+        lifecycle = false;
+      if (attempt < 29) wait();
+    }
+    if (!stopped) {
       lifecycle = false;
-    if (call('machinectl', ['--no-ask-password', 'remove', name]).status !== 0) lifecycle = false;
+      errors.push('Timed out waiting for check machine to stop; runtime directory preserved');
+    } else {
+      const removed = call('machinectl', ['--no-ask-password', 'remove', name]).status === 0;
+      if (!removed) lifecycle = false;
+      if (removed && ownedDirectory) {
+        try {
+          removeRuntime(directory, { recursive: true });
+        } catch (error) {
+          lifecycle = false;
+          errors.push(`Cannot remove private runtime directory: ${error.code || 'unknown error'}`);
+        }
+      }
+    }
   }
   input.cloneStartStop = lifecycle ? 'ok' : 'failed';
   const result = parseHostCheck(input, { blockedPorts });

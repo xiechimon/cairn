@@ -58,7 +58,7 @@ test('polkit grants no unrelated units, names, actions or users', () => {
   ]) {
     assert.notEqual(evaluate(unit, { unit: name, verb: 'start' }), 'yes');
   }
-  for (const verb of ['set-property', 'enable', undefined]) {
+  for (const verb of ['stop', 'restart', 'set-property', 'enable', undefined]) {
     assert.notEqual(
       evaluate(unit, { unit: 'systemd-nspawn@cairn-orb-task-a.service', verb }),
       'yes',
@@ -92,16 +92,29 @@ function fixture() {
   const calls = [];
   const logs = [];
   const run = (cmd, args) => {
+    assert.notEqual(cmd, 'systemd-run');
+    assert.ok(!args.some((arg) => arg === '-M' || arg.startsWith('--machine')));
+    if (cmd === 'machinectl')
+      assert.ok(
+        !args.some((arg) => ['bind', 'shell', 'login', 'copy-to', 'copy-from'].includes(arg)),
+      );
     const key = [cmd, ...args].join(' ');
     calls.push(key);
     if (cmd === 'pacman' && args[0] === '-Q')
       return { status: state.has('package') ? 0 : 1, stdout: '' };
     if (cmd === 'pacman') state.add('package');
-    const ctl = args[0] === '--user' ? args.slice(2) : args;
-    const scope = args[0] === '--user' ? 'user ' : '';
-    if (cmd === 'systemctl' && ['is-active', 'is-enabled'].includes(ctl[0]))
+    const userCommand = cmd === 'runuser';
+    const ctl = userCommand ? args.slice(7) : args;
+    const scope = userCommand ? 'user ' : '';
+    if (cmd === 'stat')
+      return {
+        status: state.has('directories') ? 0 : 1,
+        stdout: state.has('directories') ? 'ian:700' : '',
+      };
+    if (cmd === 'systemd-tmpfiles') state.add('directories');
+    if ((cmd === 'systemctl' || userCommand) && ['is-active', 'is-enabled'].includes(ctl[0]))
       return { status: state.has(scope + ctl.join(' ')) ? 0 : 1, stdout: '' };
-    if (cmd === 'systemctl' && ['start', 'enable'].includes(ctl[0]))
+    if ((cmd === 'systemctl' || userCommand) && ['start', 'enable'].includes(ctl[0]))
       state.add(`${scope}is-${ctl[0] === 'start' ? 'active' : 'enabled'} ${ctl[1]}`);
     if (cmd === 'networkctl' && args.includes('list'))
       return {
@@ -141,7 +154,7 @@ test('dry-run prints all privileged steps and leaves the fixture untouched', () 
     assert.ok(f.logs.some((line) => line.includes('build-image')));
     assert.ok(
       f.calls.every((line) =>
-        /node --version|nft --version|nft list table inet cairn_orb|ip -Version|nmcli --version|networkctl .*list|pacman -Q|systemctl .*is-|systemctl is-|loginctl show-user|id -u|bash .*build-image.sh --dry-run/.test(
+        /stat -c|runuser .*is-|node --version|nft --version|nft list table inet cairn_orb|ip -Version|nmcli --version|networkctl .*list|pacman -Q|systemctl .*is-|systemctl is-|loginctl show-user|id -u|bash .*build-image.sh --dry-run/.test(
           line,
         ),
       ),
@@ -401,13 +414,13 @@ test('inactive networkd cannot activate an earlier host network configuration', 
 
 test('polkit denies root-directory access and dead power verbs while retaining scoped lifecycle', () => {
   const evaluate = policy();
-  for (const verb of ['open_root_directory', 'poweroff', 'reboot']) {
+  for (const verb of ['open_root_directory', 'poweroff', 'reboot', 'unregister']) {
     assert.equal(
       evaluate('org.freedesktop.machine1.manage-machines', { machine: 'cairn-orb-task-a', verb }),
       'no',
     );
   }
-  for (const verb of ['kill', 'terminate', 'unregister']) {
+  for (const verb of ['kill', 'terminate']) {
     assert.equal(
       evaluate('org.freedesktop.machine1.manage-machines', { machine: 'cairn-orb-task-a', verb }),
       'yes',
@@ -565,6 +578,53 @@ test('relay runtime remains executable with ProtectHome and binary installs conv
     f.logs.length = 0;
     installHost(f);
     assert.equal(f.logs.at(-1), '0 changes');
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+test('polkit denies guest execution while keeping only required lifecycle grants', () => {
+  const evaluate = policy();
+  for (const action of ['shell', 'login', 'open-pty', 'inspect-machines']) {
+    assert.equal(
+      evaluate(`org.freedesktop.machine1.${action}`, { machine: 'cairn-orb-task-a' }),
+      'no',
+    );
+  }
+});
+
+test('installer provisions private owner directories and reboot tmpfiles without machine transport', () => {
+  const f = fixture();
+  try {
+    installHost(f);
+    const config = readFileSync(join(f.root, 'etc/tmpfiles.d/cairn-orb.conf'), 'utf8');
+    for (const path of ['/run/cairn-orb', '/var/lib/cairn-orb/dist', '/var/lib/cairn-orb/seed']) {
+      assert.ok(config.includes(`d ${path} 0700 ian`));
+    }
+    assert.ok(f.calls.some((call) => call.startsWith('systemd-tmpfiles --create')));
+    assert.ok(!f.calls.some((call) => call.includes('--machine')));
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+test('template launches fixed specifier binds and never exposes the runtime parent', () => {
+  const f = fixture();
+  try {
+    installHost(f);
+    const template = readFileSync(
+      join(f.root, 'etc/systemd/system/systemd-nspawn@.service.d/20-cairn-orb.conf'),
+      'utf8',
+    );
+    assert.match(template, /--bind=\/run\/cairn-orb\/%i:\/run\/cairn:idmap,norbind/);
+    assert.match(
+      template,
+      /--bind-ro=\/var\/lib\/cairn-orb\/dist:\/opt\/cairn\/daemon:idmap,norbind/,
+    );
+    assert.match(template, /--bind-ro=\/var\/lib\/cairn-orb\/seed:\/seed:idmap,norbind/);
+    assert.doesNotMatch(template, /--bind=\/run\/cairn-orb:/);
+    assert.match(template, /EnvironmentFile=-\/run\/systemd\/nspawn\/%i.binds/);
+    assert.match(template, /ExecStart=systemd-nspawn .*--machine=%i \$CAIRN_ORB_BINDS/);
   } finally {
     rmSync(f.root, { recursive: true, force: true });
   }

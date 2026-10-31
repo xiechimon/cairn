@@ -7,9 +7,12 @@ if [[ $# == 1 && $1 == --dry-run ]]; then dry_run=true; elif [[ $# != 0 ]]; then
 if ! $dry_run && [[ $(id -u) != 0 ]]; then printf 'Run build-image.sh as root\n' >&2; exit 1; fi
 host_root=${CAIRN_ORB_ROOT:-}
 [[ -z $host_root || $host_root == /* ]] || { printf 'CAIRN_ORB_ROOT must be absolute\n' >&2; exit 2; }
+daemon_entry=/opt/cairn/daemon/dist/cli.mjs
+agent_uid=$(id -u ian)
+[[ $agent_uid =~ ^[0-9]+$ && $agent_uid -gt 0 && $agent_uid -lt 65534 ]] || { printf 'Cannot map ian to guest agent UID\n' >&2; exit 1; }
 image=$host_root/var/lib/machines/cairn-orb-base
 if ! $dry_run; then
-  lock_dir=$host_root/run/cairn-orb
+  lock_dir=$host_root/run/lock/cairn-orb
   if [[ ! -d $lock_dir ]]; then printf 'create %s mode 700\n' "$lock_dir"; install -d -m 700 "$lock_dir"; fi
   if [[ ! -e $lock_dir/build.lock ]]; then printf 'create %s/build.lock\n' "$lock_dir"; fi
   exec 9>>"$lock_dir/build.lock"
@@ -27,8 +30,8 @@ codex_version=$(host_version codex | awk 'NR == 1 {print $NF}')
 [[ $claude_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ && $codex_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { printf 'Cannot pin host Claude Code and Codex versions\n' >&2; exit 1; }
 pnpm_version=$(sed -n 's/.*"packageManager": "pnpm@\([0-9.]*\)".*/\1/p' "$script_dir/../../../package.json")
 [[ $pnpm_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { printf 'Cannot pin pnpm version\n' >&2; exit 1; }
-recipe=$(sha256sum "$script_dir/build-image.sh" | awk '{print $1}')
-expected=$(printf 'recipe=%s\nclaude=%s\ncodex=%s\npnpm=%s' "$recipe" "$claude_version" "$codex_version" "$pnpm_version")
+recipe=$(cat "$script_dir/build-image.sh" "$script_dir/guest-check.mjs" | sha256sum | awk '{print $1}')
+expected=$(printf 'recipe=%s\nclaude=%s\ncodex=%s\npnpm=%s\nagent_uid=%s' "$recipe" "$claude_version" "$codex_version" "$pnpm_version" "$agent_uid")
 previous_marker=
 if [[ -d $image ]]; then
   if [[ -f $image/etc/cairn-orb-image && $(cat "$image/etc/cairn-orb-image") == "$expected" ]]; then
@@ -36,7 +39,7 @@ if [[ -d $image ]]; then
     printf '0 changes\n'
     exit 0
   fi
-  if [[ ! -f $image/etc/cairn-orb-image ]] || ! [[ $(cat "$image/etc/cairn-orb-image") =~ ^recipe=[a-zA-Z0-9-]+$'\n'claude=[0-9]+\.[0-9]+\.[0-9]+$'\n'codex=[0-9]+\.[0-9]+\.[0-9]+$'\n'pnpm=[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  if [[ ! -f $image/etc/cairn-orb-image ]] || ! [[ $(cat "$image/etc/cairn-orb-image") =~ ^recipe=[a-zA-Z0-9-]+$'\n'claude=[0-9]+\.[0-9]+\.[0-9]+$'\n'codex=[0-9]+\.[0-9]+\.[0-9]+$'\n'pnpm=[0-9]+\.[0-9]+\.[0-9]+($'\n'agent_uid=[0-9]+)?$ ]]; then
     printf 'Unrecognized existing base image; preserve it and resolve explicitly\n' >&2
     exit 1
   fi
@@ -52,6 +55,8 @@ printf '%s\n' \
   'create unprivileged agent user and validate its CLI versions' \
   'lock root login and mask SSH server units' \
   'enable guest systemd-networkd' \
+  'install and enable cairn-orb-worker.service, cairn-orb-check.service and cairn-orb-check.path' \
+  'map host ian UID to guest agent for private fixed idmapped binds' \
   'write /etc/systemd/system.conf.d/20-cairn-orb-proxy.conf' \
   'write /etc/environment and /etc/profile.d/cairn-orb-proxy.sh' \
   'remove guest package caches and SSH host keys; clear /etc/machine-id' \
@@ -86,14 +91,14 @@ cleanup() {
 trap cleanup EXIT
 pacstrap -K -M "$stage" base git nodejs npm corepack openssh ca-certificates curl
 printf 'configure image and pinned tools\n'
-arch-chroot "$stage" /usr/bin/env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/bin HOME=/root HTTP_PROXY="$HTTP_PROXY" HTTPS_PROXY="$HTTPS_PROXY" http_proxy="$http_proxy" https_proxy="$https_proxy" bash -s -- "$claude_version" "$codex_version" "$pnpm_version" <<'GUEST'
+arch-chroot "$stage" /usr/bin/env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/bin HOME=/root HTTP_PROXY="$HTTP_PROXY" HTTPS_PROXY="$HTTPS_PROXY" http_proxy="$http_proxy" https_proxy="$https_proxy" bash -s -- "$claude_version" "$codex_version" "$pnpm_version" "$agent_uid" "$daemon_entry" <<'GUEST'
 set -euo pipefail
 node -e 'const [major, minor] = process.versions.node.split(".").map(Number); if (major < 22 || (major === 22 && minor < 19)) process.exit(1)'
 export COREPACK_HOME=/usr/local/lib/corepack
 corepack enable
 corepack install --global "pnpm@$3"
 npm install --global --ignore-scripts --no-audit --no-fund "@anthropic-ai/claude-code@$1" "@openai/codex@$2"
-useradd --create-home --shell /bin/bash agent
+useradd --uid "$4" --create-home --shell /bin/bash agent
 [[ $(runuser -u agent -- claude --version | awk 'NR == 1 {print $1}') == "$1" ]]
 [[ $(runuser -u agent -- codex --version | awk 'NR == 1 {print $NF}') == "$2" ]]
 [[ $(pnpm --version) == "$3" ]]
@@ -107,9 +112,56 @@ install -d /etc/systemd/system.conf.d
 printf '[Manager]\nDefaultEnvironment="COREPACK_HOME=/usr/local/lib/corepack" "HTTP_PROXY=http://10.203.0.1:7890" "HTTPS_PROXY=http://10.203.0.1:7890" "http_proxy=http://10.203.0.1:7890" "https_proxy=http://10.203.0.1:7890" "NO_PROXY=localhost,127.0.0.1,::1" "no_proxy=localhost,127.0.0.1,::1"\n' > /etc/systemd/system.conf.d/20-cairn-orb-proxy.conf
 printf 'COREPACK_HOME=/usr/local/lib/corepack\nHTTP_PROXY=http://10.203.0.1:7890\nHTTPS_PROXY=http://10.203.0.1:7890\nhttp_proxy=http://10.203.0.1:7890\nhttps_proxy=http://10.203.0.1:7890\nNO_PROXY=localhost,127.0.0.1,::1\nno_proxy=localhost,127.0.0.1,::1\n' > /etc/environment
 printf 'export COREPACK_HOME=/usr/local/lib/corepack HTTP_PROXY=http://10.203.0.1:7890 HTTPS_PROXY=http://10.203.0.1:7890 http_proxy=http://10.203.0.1:7890 https_proxy=http://10.203.0.1:7890 NO_PROXY=localhost,127.0.0.1,::1 no_proxy=localhost,127.0.0.1,::1\n' > /etc/profile.d/cairn-orb-proxy.sh
+install -d /usr/local/lib/cairn-orb /etc/systemd/system
+cat > /etc/systemd/system/cairn-orb-worker.service <<WORKER
+[Unit]
+Description=Cairn Orb worker
+After=local-fs.target
+StartLimitIntervalSec=0
+
+[Service]
+User=agent
+Environment=CAIRN_ORB=1
+Restart=always
+RestartSec=1
+ExecStartPre=/bin/sh -c 'while [ ! -S /run/cairn/relay.sock ]; do sleep 1; done'
+TimeoutStartSec=infinity
+ExecStart=/usr/bin/node $5 orb-step --socket /run/cairn/relay.sock
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
+WORKER
+cat > /etc/systemd/system/cairn-orb-check.service <<'CHECK'
+[Unit]
+Description=Cairn Orb metadata probes
+After=local-fs.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=agent
+ExecStart=/usr/bin/node /usr/local/lib/cairn-orb/guest-check.mjs
+TimeoutStartSec=120
+UMask=0077
+CHECK
+cat > /etc/systemd/system/cairn-orb-check.path <<'CHECKPATH'
+[Unit]
+Description=Cairn Orb check trigger
+After=local-fs.target
+
+[Path]
+PathExists=/run/cairn/check-request
+Unit=cairn-orb-check.service
+
+[Install]
+WantedBy=multi-user.target
+CHECKPATH
+systemctl enable cairn-orb-worker.service cairn-orb-check.path
 rm -rf /root/.npm /root/.cache /etc/ssh/ssh_host_*
 : > /etc/machine-id
 GUEST
+install -D -m 644 "$script_dir/guest-check.mjs" "$stage/usr/local/lib/cairn-orb/guest-check.mjs"
 printf '%s\n' "$expected" > "$stage/etc/cairn-orb-image"
 unmounted
 backup=

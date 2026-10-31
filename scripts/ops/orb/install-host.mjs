@@ -63,7 +63,10 @@ export function installHost(options = {}) {
   if (change.probe('pacman', ['-Q', 'arch-install-scripts']).status !== 0) {
     change.exec('pacman', ['-S', '--needed', '--noconfirm', 'arch-install-scripts']);
   }
+  const directoryPaths = ['/run/cairn-orb', '/var/lib/cairn-orb/dist', '/var/lib/cairn-orb/seed'];
+  const tmpfiles = `${directoryPaths.map((path) => `d ${path} 0700 ian - -`).join('\n')}\n`;
   const files = [
+    ['/etc/tmpfiles.d/cairn-orb.conf', tmpfiles],
     ['/usr/local/lib/cairn-orb/node', nodeBinary, 0o755],
     ...assets.map(([source, target, mode]) => [
       target,
@@ -72,7 +75,7 @@ export function installHost(options = {}) {
     ]),
     [
       '/etc/systemd/system/systemd-nspawn@.service.d/20-cairn-orb.conf',
-      '[Unit]\nRequires=cairn-orb-firewall.service\nAfter=cairn-orb-firewall.service\n\n[Service]\nExecStartPre=+/usr/local/lib/cairn-orb/prepare-machine.sh %i\n',
+      '[Unit]\nRequires=cairn-orb-firewall.service\nAfter=cairn-orb-firewall.service\n\n[Service]\nExecStartPre=+/usr/local/lib/cairn-orb/prepare-machine.sh %i\nEnvironment=CAIRN_ORB_BINDS=\nEnvironment="CAIRN_ORB_FIXED_BINDS=--bind=/run/cairn-orb/%i:/run/cairn:idmap,norbind --bind-ro=/var/lib/cairn-orb/dist:/opt/cairn/daemon:idmap,norbind --bind-ro=/var/lib/cairn-orb/seed:/seed:idmap,norbind"\nEnvironmentFile=-/run/systemd/nspawn/%i.binds\nExecStart=\nExecStart=systemd-nspawn --quiet --keep-unit --boot --link-journal=try-guest --network-veth -U --settings=override --machine=%i $CAIRN_ORB_BINDS\n',
     ],
     [
       '/etc/systemd/system/systemd-networkd.service.d/20-cairn-orb.conf',
@@ -102,6 +105,13 @@ export function installHost(options = {}) {
   const needsReload = previousPending || files.some((file) => !change.matches(...file));
   if (needsReload) change.file('/var/lib/cairn-orb/install-pending', 'pending\n');
   for (const file of files) change.file(...file);
+  const directoriesMissing = directoryPaths.some(
+    (path) => change.probe('stat', ['-c', '%U:%a', join(root, path)]).stdout?.trim() !== 'ian:700',
+  );
+  if (directoriesMissing) {
+    log(tmpfiles.trim());
+    change.exec('systemd-tmpfiles', ['--create', '/etc/tmpfiles.d/cairn-orb.conf']);
+  }
   if (needsReload) {
     change.exec('systemctl', ['daemon-reload']);
   }
@@ -145,18 +155,26 @@ export function installHost(options = {}) {
   if (change.probe('systemctl', ['is-active', userManager]).status !== 0) {
     change.exec('systemctl', ['start', userManager]);
   }
-  const userctl = ['--user', '--machine=ian@.host'];
+  const userctl = [
+    '-u',
+    'ian',
+    '--',
+    'env',
+    `XDG_RUNTIME_DIR=/run/user/${uid || '<ian-uid>'}`,
+    'systemctl',
+    '--user',
+  ];
   if (needsReload) {
-    change.exec('systemctl', [...userctl, 'daemon-reload']);
-    if (change.probe('systemctl', [...userctl, 'is-active', 'egress-relay.service']).status === 0)
-      change.exec('systemctl', [...userctl, 'restart', 'egress-relay.service']);
+    change.exec('runuser', [...userctl, 'daemon-reload']);
+    if (change.probe('runuser', [...userctl, 'is-active', 'egress-relay.service']).status === 0)
+      change.exec('runuser', [...userctl, 'restart', 'egress-relay.service']);
   }
   for (const [probe, action] of [
     ['is-enabled', 'enable'],
     ['is-active', 'start'],
   ]) {
-    if (change.probe('systemctl', [...userctl, probe, 'egress-relay.service']).status !== 0)
-      change.exec('systemctl', [...userctl, action, 'egress-relay.service']);
+    if (change.probe('runuser', [...userctl, probe, 'egress-relay.service']).status !== 0)
+      change.exec('runuser', [...userctl, action, 'egress-relay.service']);
   }
   if (dryRun) log('plan: bash build-image.sh --dry-run');
   const image = change.probe('bash', [
