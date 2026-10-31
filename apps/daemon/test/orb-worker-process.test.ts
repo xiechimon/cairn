@@ -13,8 +13,9 @@ import { join, resolve } from 'node:path';
 import { build } from 'esbuild';
 import { expect, test } from 'vitest';
 import { startStubLlm } from '../../../integration/test/stub-llm.js';
-import { NspawnOrbProvider, runOrbCommand } from '../src/orb/provider.js';
+import { runOrbCommand } from '../src/orb/provider.js';
 import { boot, CLAIMED, FakeMachineApi, waitFor } from './machine-loop-harness.js';
+import { FakeOrbProvider } from './orb-fake.js';
 
 test('compiled worker runs an agent command with CAIRN_ORB through the real Unix socket relay', async () => {
   const scratch = mkdtempSync(join(tmpdir(), 'cairn-orb-worker-'));
@@ -23,7 +24,7 @@ test('compiled worker runs an agent command with CAIRN_ORB through the real Unix
   const entry = join(scratch, 'dist', 'cli.mjs');
   await build({
     stdin: {
-      contents: `import { runOrbWorker } from ${JSON.stringify(resolve('apps/daemon/src/orb/worker.ts'))}; await runOrbWorker({ socketPath: process.argv[2], home: ${JSON.stringify(join(scratch, 'state'))}, workspacesRoot: ${JSON.stringify(join(scratch, 'work'))}, seedRoot: ${JSON.stringify(join(scratch, 'seed'))} });`,
+      contents: `import { runOrbWorker } from ${JSON.stringify(resolve('apps/daemon/src/orb/worker.ts'))}; await runOrbWorker({ socketPath: process.argv[2], home: ${JSON.stringify(join(scratch, 'state'))}, workspacesRoot: ${JSON.stringify(join(scratch, 'work'))}, seedRoot: process.argv[3], outboxRoot: process.argv[4] });`,
       resolveDir: resolve('.'),
     },
     outfile: entry,
@@ -72,29 +73,28 @@ test('compiled worker runs an agent command with CAIRN_ORB through the real Unix
     agent: { ...CLAIMED.agent!, skillsAllowlist: [], injectedSkills: [] },
   };
   api.claimQueue.push(claimed);
-  const provider = new NspawnOrbProvider({
+  const provider = new FakeOrbProvider({
     runner: async (argv, options) => {
-      if (argv[0] !== 'systemd-run' || !argv.includes('--uid=agent'))
-        return { code: 0, stdout: '', stderr: '' };
-      const socketPath = options?.binds?.find(
-        (bind) => bind.target === '/run/cairn/relay.sock',
-      )?.source;
+      if (argv[0] !== 'orb-worker') return { code: 0, stdout: '', stderr: '' };
+      const socketPath = options?.socketPath;
       if (!socketPath) throw new Error('Missing relay socket');
       const seed = join(scratch, 'seed', 'P');
       mkdirSync(seed, { recursive: true });
-      const seedSource = options?.binds?.find((bind) => bind.target === '/seed/P/repo')?.source;
+      const seedSource = join(options!.seedRoot, 'P', 'repo');
       if (!seedSource) throw new Error('Missing seed snapshot');
       rmSync(join(seed, 'repo'), { force: true });
       symlinkSync(seedSource, join(seed, 'repo'), 'dir');
       const home = join(scratch, 'user');
       mkdirSync(home, { recursive: true });
-      return runOrbCommand(
+      const result = await runOrbCommand(
         [
           process.execPath,
           '--import',
           resolve('apps/daemon/node_modules/tsx/dist/loader.mjs'),
           entry,
           socketPath,
+          options!.seedRoot,
+          options!.outboxRoot,
         ],
         {
           ...options,
@@ -108,6 +108,8 @@ test('compiled worker runs an agent command with CAIRN_ORB through the real Unix
           },
         },
       );
+      expect(result.code, result.stderr).toBe(0);
+      return result;
     },
   });
   const { handle, lines } = await boot({

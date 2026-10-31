@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, statSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { createConnection } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -100,7 +100,7 @@ test('refuses arbitrary uploads and returns binary skills intact', async () => {
   ).rejects.toBeInstanceOf(RelayMachineError);
   expect(forwarded).not.toHaveBeenCalled();
   expect(await client.api.skillFile('step', 'skill', 'SKILL.md')).toEqual(Buffer.from('skill'));
-  expect(statSync(socketPath).mode & 0o777).toBe(0o666);
+  expect(statSync(socketPath).mode & 0o777).toBe(0o600);
   expect(statSync(join(socketPath, '..')).mode & 0o777).toBe(0o700);
 });
 
@@ -352,6 +352,9 @@ test('disconnects a non-reading worker when queued output exceeds the frame budg
   socket.on('error', () => {});
   try {
     await new Promise<void>((resolve) => socket.once('connect', resolve));
+    socket.write(
+      `cairn-orb-rpc:${JSON.stringify({ type: 'auth', token: readFileSync(`${socketPath}.token`, 'utf8') })}\n`,
+    );
     socket.write('cairn-orb-rpc:{"type":"call","id":0,"method":"heartbeat","args":["step"]}\n');
     await vi.waitFor(() => expect(heartbeat).toHaveBeenCalledTimes(1));
     const message = 'x'.repeat(1024 * 1024);

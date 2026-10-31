@@ -1,4 +1,5 @@
-import { chmodSync, existsSync, lstatSync, mkdirSync, rmSync } from 'node:fs';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { createConnection, createServer, type Server, type Socket } from 'node:net';
 import { dirname } from 'node:path';
 import { createInterface } from 'node:readline';
@@ -10,6 +11,7 @@ import {
 } from '@cairn/shared';
 import { z } from 'zod';
 import { type MachineApi, MachineApiError } from '../machine-client.js';
+import { writePrivateFile } from '../private-fs.js';
 import { deliverOrbBundle, type OrbLocalDelivery } from './delivery.js';
 import {
   decodeOrbFrame,
@@ -52,6 +54,8 @@ export class RelayMachineServer {
   private delivery: Promise<void> | undefined;
   private ownsSocket = false;
   private connected = false;
+  private readonly authenticated = new Set<Socket>();
+  private readonly token = randomBytes(32).toString('hex');
   private lastRateLimitAt: number | undefined;
 
   constructor(
@@ -66,6 +70,7 @@ export class RelayMachineServer {
       onActivity?: () => void;
       onReporting?: (body: MachineDoneBody) => void;
       onDone?: () => void;
+      onDisconnect?: () => void;
     },
   ) {
     this.server = createServer((socket) => {
@@ -74,19 +79,20 @@ export class RelayMachineServer {
         socket.destroy();
         return;
       }
-      this.connected = true;
       this.sockets.add(socket);
       const requests = new Map<number, AbortController>();
       this.requests.set(socket, requests);
-      let buffer = Buffer.allocUnsafe(ORB_MAX_FRAME_BYTES);
+      let buffer = Buffer.allocUnsafe(1024);
       let size = 0;
+      const authTimeout = setTimeout(() => socket.destroy(), 5_000);
+      authTimeout.unref();
       socket.on('data', (chunk: Buffer) => {
         let start = 0;
         while (start < chunk.length && !socket.destroyed) {
           const end = chunk.indexOf(10, start);
           const part = chunk.subarray(start, end < 0 ? chunk.length : end);
           size += part.length;
-          if (size > ORB_MAX_FRAME_BYTES) {
+          if (size > buffer.length) {
             socket.destroy();
             return;
           }
@@ -95,6 +101,34 @@ export class RelayMachineServer {
           const frame = decodeOrbFrame(buffer.toString('utf8', 0, size));
           size = 0;
           start = end + 1;
+          if (!this.authenticated.has(socket)) {
+            const auth = z
+              .object({ type: z.literal('auth'), token: z.string().regex(/^[a-f0-9]{64}$/) })
+              .strict()
+              .safeParse(frame);
+            if (
+              !auth.success ||
+              this.connected ||
+              !timingSafeEqual(Buffer.from(auth.data.token), Buffer.from(this.token))
+            ) {
+              socket.destroy();
+              return;
+            }
+            clearTimeout(authTimeout);
+            this.connected = true;
+            this.authenticated.add(socket);
+            buffer = Buffer.allocUnsafe(ORB_MAX_FRAME_BYTES);
+            this.write(socket, encodeOrbFrame({ type: 'authenticated' }));
+            if (options.input)
+              this.write(
+                socket,
+                encodeOrbFrame({
+                  type: 'init',
+                  input: typeof options.input === 'function' ? options.input() : options.input,
+                }),
+              );
+            continue;
+          }
           if (frame?.type === 'call') {
             void this.receive(socket, frame);
             continue;
@@ -109,19 +143,13 @@ export class RelayMachineServer {
         }
       });
       socket.on('close', () => {
+        clearTimeout(authTimeout);
+        if (this.authenticated.delete(socket)) this.options.onDisconnect?.();
         for (const request of requests.values()) request.abort();
         this.requests.delete(socket);
         this.sockets.delete(socket);
         buffer = Buffer.alloc(0);
       });
-      if (options.input)
-        this.write(
-          socket,
-          encodeOrbFrame({
-            type: 'init',
-            input: typeof options.input === 'function' ? options.input() : options.input,
-          }),
-        );
     });
   }
 
@@ -152,11 +180,12 @@ export class RelayMachineServer {
         resolve();
       });
     });
-    chmodSync(this.options.socketPath, 0o666);
+    chmodSync(this.options.socketPath, 0o600);
+    writePrivateFile(`${this.options.socketPath}.token`, this.token);
   }
 
   send(frame: OrbFrame): void {
-    for (const socket of this.sockets) this.write(socket, encodeOrbFrame(frame));
+    for (const socket of this.authenticated) this.write(socket, encodeOrbFrame(frame));
   }
 
   get isComplete(): boolean {
@@ -178,7 +207,10 @@ export class RelayMachineServer {
       await new Promise<void>((resolve) => this.server.close(() => resolve()));
       if (this.reporting) await this.reporting.catch(() => {});
       if (this.delivery) await this.delivery.catch(() => {});
-      if (this.ownsSocket) rmSync(this.options.socketPath, { force: true });
+      if (this.ownsSocket) {
+        rmSync(this.options.socketPath, { force: true });
+        rmSync(`${this.options.socketPath}.token`, { force: true });
+      }
     })();
     return this.closing;
   }
@@ -289,6 +321,7 @@ export class RelayMachineServer {
 export class RelayMachineApi {
   readonly api: MachineApi;
   readonly input: Promise<OrbStepInput>;
+  private readonly authentication: Promise<void>;
   private nextId = 0;
   private available: readonly string[] = ORB_STEP_METHODS;
   private disconnected = false;
@@ -299,10 +332,19 @@ export class RelayMachineApi {
   private readonly socket: Socket;
   private constructor(
     socketPath: string,
+    token: string,
     onFrame?: (frame: OrbFrame) => void,
     onClose?: () => void,
   ) {
     this.socket = createConnection(socketPath);
+    this.socket.once('connect', () => this.send({ type: 'auth', token }));
+    let authenticated: () => void = () => {};
+    let rejectAuthentication: (error: Error) => void = () => {};
+    this.authentication = new Promise((resolve, reject) => {
+      authenticated = resolve;
+      rejectAuthentication = reject;
+    });
+    void this.authentication.catch(() => {});
     let resolveInput: (value: OrbStepInput) => void = () => {};
     let rejectInput: (error: Error) => void = () => {};
     this.input = new Promise((resolve, reject) => {
@@ -314,7 +356,9 @@ export class RelayMachineApi {
     lines.on('line', (line) => {
       const frame = decodeOrbFrame(line);
       if (!frame) return;
-      if (frame.type === 'init') {
+      if (frame.type === 'authenticated') {
+        authenticated();
+      } else if (frame.type === 'init') {
         this.available = frame.input.methods;
         resolveInput(frame.input);
       } else if (frame.type === 'reply') {
@@ -336,6 +380,7 @@ export class RelayMachineApi {
       this.disconnected = true;
       const error = new MachineApiError(410, 'Orb relay connection closed');
       rejectInput(error);
+      rejectAuthentication(error);
       for (const pending of this.pending.values()) pending.reject(error);
       this.pending.clear();
       lines.close();
@@ -360,11 +405,9 @@ export class RelayMachineApi {
     onFrame?: (frame: OrbFrame) => void,
     onClose?: () => void,
   ): Promise<RelayMachineApi> {
-    const client = new RelayMachineApi(socketPath, onFrame, onClose);
-    await new Promise<void>((resolve, reject) => {
-      client.socket.once('connect', resolve);
-      client.socket.once('error', reject);
-    });
+    const token = readFileSync(`${socketPath}.token`, 'utf8');
+    const client = new RelayMachineApi(socketPath, token, onFrame, onClose);
+    await client.authentication;
     return client;
   }
 

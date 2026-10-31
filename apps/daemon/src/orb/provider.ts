@@ -1,10 +1,25 @@
 import { spawn } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
+import { createHash, randomUUID } from 'node:crypto';
+import {
+  chmodSync,
+  cpSync,
+  createReadStream,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+} from 'node:fs';
 import { constants } from 'node:os';
-import { dirname } from 'node:path';
+import { basename, dirname, join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { WorkspaceHookNoteData } from '@cairn/shared';
 import { ensurePrivateDir, writePrivateFile } from '../private-fs.js';
+import { prepareOrbSeed } from './seed.js';
 
 export interface OrbHandle {
   id: string;
@@ -18,12 +33,6 @@ export interface OrbHandle {
 
 export interface OrbExecOptions {
   env?: NodeJS.ProcessEnv;
-  binds?: readonly {
-    source: string;
-    target: string;
-    readonly?: boolean;
-    releaseAfterExec?: boolean;
-  }[];
   cwd?: string;
   signal?: AbortSignal;
   input?: string;
@@ -46,7 +55,8 @@ export type OrbCommandRunner = (
 export interface OrbProvider {
   readonly kind: 'host' | 'orb';
   ensure(input: { conversationId: string; projectId: string }): Promise<OrbHandle>;
-  exec(handle: OrbHandle, argv: readonly string[], options: OrbExecOptions): Promise<OrbExecResult>;
+  prepare(handle: OrbHandle, seed?: string): Promise<string>;
+  start(handle: OrbHandle, options?: { signal?: AbortSignal }): Promise<void>;
   stop(handle: OrbHandle): Promise<void>;
   destroy(handle: OrbHandle): Promise<void>;
   list(): Promise<OrbHandle[]>;
@@ -113,6 +123,14 @@ export class HostOrbProvider implements OrbProvider {
     return handle;
   }
 
+  async prepare(): Promise<string> {
+    throw new Error('Host steps do not use orb transport');
+  }
+
+  async start(handle: OrbHandle): Promise<void> {
+    handle.running = true;
+  }
+
   exec(
     _handle: OrbHandle,
     argv: readonly string[],
@@ -144,14 +162,41 @@ export class NspawnOrbProvider implements OrbProvider {
   private readonly runner: OrbCommandRunner;
   private readonly stateFile: string | undefined;
   private reconciled = false;
-  private readonly bound = new Map<string, Set<string>>();
+  readonly runtimeRoot: string;
+  readonly distRoot: string;
+  readonly seedRoot: string;
+  private readonly distSource: string;
+  private readonly shutdownTimeoutMs: number;
+  private publishing: Promise<void> = Promise.resolve();
 
-  constructor(options: { runner?: OrbCommandRunner; stateFile?: string } = {}) {
+  constructor(
+    options: {
+      runner?: OrbCommandRunner;
+      stateFile?: string;
+      runtimeRoot?: string;
+      distRoot?: string;
+      seedRoot?: string;
+      distSource?: string;
+      shutdownTimeoutMs?: number;
+    } = {},
+  ) {
     this.runner = options.runner ?? runOrbCommand;
+    this.runtimeRoot = options.runtimeRoot ?? '/run/cairn-orb';
+    this.distRoot = options.distRoot ?? '/var/lib/cairn-orb/dist';
+    this.seedRoot = options.seedRoot ?? '/var/lib/cairn-orb/seed';
+    this.distSource =
+      options.distSource ??
+      (import.meta.url.endsWith('.ts')
+        ? join(dirname(fileURLToPath(import.meta.url)), '../../dist')
+        : dirname(fileURLToPath(import.meta.url)));
+    this.shutdownTimeoutMs = options.shutdownTimeoutMs ?? 5_000;
     this.stateFile = options.stateFile;
     if (this.stateFile && existsSync(this.stateFile)) {
       const handles = JSON.parse(readFileSync(this.stateFile, 'utf8')) as OrbHandle[];
-      for (const handle of handles) this.handles.set(handle.conversationId, handle);
+      for (const handle of handles) {
+        this.validate(handle);
+        this.handles.set(handle.conversationId, handle);
+      }
     }
   }
 
@@ -173,9 +218,11 @@ export class NspawnOrbProvider implements OrbProvider {
     const startedAt = Date.now();
     let handle = this.handles.get(input.conversationId);
     if (!handle) {
-      const suffix = /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,44}[a-zA-Z0-9])?$/.test(input.conversationId)
-        ? input.conversationId
-        : createHash('sha256').update(input.conversationId).digest('hex').slice(0, 54);
+      const suffix =
+        input.conversationId !== 'base' &&
+        /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,44}[a-zA-Z0-9])?$/.test(input.conversationId)
+          ? input.conversationId
+          : createHash('sha256').update(input.conversationId).digest('hex').slice(0, 54);
       handle = {
         ...input,
         id: `cairn-orb-${suffix}`,
@@ -188,96 +235,78 @@ export class NspawnOrbProvider implements OrbProvider {
       this.handles.set(input.conversationId, handle);
       this.save();
     }
-    if (!handle.running) {
-      await this.command(['machinectl', 'start', handle.id]);
-      handle.running = true;
-      this.bound.set(handle.id, new Set());
-      handle.notes.push(orbNote('orb: setup'));
-      handle.notes.push(
-        orbNote(`orb: started in ${Date.now() - startedAt}ms`, Date.now() - startedAt),
-      );
-      this.save();
-    }
     return handle;
   }
 
-  async exec(
-    handle: OrbHandle,
-    argv: readonly string[],
-    options: OrbExecOptions,
-  ): Promise<OrbExecResult> {
-    if (handle.running && !this.bound.has(handle.id)) {
-      await this.stop(handle);
-      await this.ensure(handle);
-    }
-    let bound = this.bound.get(handle.id);
-    if (!bound) {
-      bound = new Set();
-      this.bound.set(handle.id, bound);
-    }
-    const execute = async () => {
-      for (const bind of options.binds ?? []) {
-        const key = JSON.stringify(bind);
-        if (bound.has(key)) continue;
-        await this.command([
-          'machinectl',
-          'bind',
-          '--mkdir',
-          ...(bind.readonly ? ['--read-only'] : []),
-          handle.id,
-          bind.source,
-          bind.target,
-        ]);
-        bound.add(key);
-      }
-      const env = { ...options.env, CAIRN_ORB: '1' };
-      const flags = Object.entries(env).flatMap(([key, value]) =>
-        value === undefined ? [] : [`--setenv=${key}=${value}`],
-      );
-      return this.runner(
-        [
-          'systemd-run',
-          '-M',
-          handle.id,
-          '--uid=agent',
-          '--wait',
-          '--pipe',
-          '--quiet',
-          ...(options.cwd ? [`--working-directory=${options.cwd}`] : []),
-          ...flags,
-          '--',
-          ...argv,
-        ],
-        { ...options, env: undefined },
-      );
-    };
-    return execute().finally(async () => {
-      const released = (options.binds ?? []).filter(
-        (bind) => bind.releaseAfterExec && bound.has(JSON.stringify(bind)),
-      );
-      if (released.length > 0) {
+  async prepare(handle: OrbHandle, seed?: string): Promise<string> {
+    this.validate(handle);
+    const directory = join(this.runtimeRoot, handle.id);
+    ensurePrivateDir(directory);
+    const publish = this.publishing.then(async () => {
+      mkdirSync(this.distRoot, { recursive: true, mode: 0o755 });
+      chmodSync(this.distRoot, 0o755);
+      const release = mkdtempSync(join(this.distRoot, '.release-'));
+      try {
+        cpSync(this.distSource, release, { recursive: true, dereference: true });
+        if (!existsSync(join(release, 'cli.mjs')))
+          throw new Error('Orb daemon build is missing cli.mjs');
+        const entry = join(this.distRoot, `.entry-${randomUUID()}`);
         try {
-          await this.command([
-            'systemd-run',
-            '-M',
-            handle.id,
-            '--wait',
-            '--quiet',
-            '--',
-            'umount',
-            '--',
-            ...released.map((bind) => bind.target),
-          ]);
-          for (const bind of released) bound.delete(JSON.stringify(bind));
+          symlinkSync('current/cli.mjs', entry);
+          renameSync(entry, join(this.distRoot, 'cli.mjs'));
+        } finally {
+          rmSync(entry, { force: true });
+        }
+        await this.publish(release, join(this.distRoot, 'current'));
+      } catch (error) {
+        rmSync(release, { recursive: true, force: true });
+        throw error;
+      }
+      if (seed) {
+        if (!/^[a-zA-Z0-9-]+$/.test(handle.projectId)) throw new Error('Invalid orb project id');
+        mkdirSync(this.seedRoot, { recursive: true, mode: 0o755 });
+        chmodSync(this.seedRoot, 0o755);
+        const project = join(this.seedRoot, handle.projectId);
+        mkdirSync(project, { recursive: true, mode: 0o755 });
+        const snapshot = mkdtempSync(join(project, '.snapshot-'));
+        try {
+          await prepareOrbSeed({ source: seed, directory: snapshot, projectId: handle.projectId });
+          await this.publish(snapshot, join(project, 'current'));
+          const link = join(project, `.repo-${randomUUID()}`);
+          try {
+            symlinkSync('current/repo', link);
+            renameSync(link, join(project, 'repo'));
+          } finally {
+            rmSync(link, { force: true });
+          }
         } catch (error) {
-          await this.stop(handle);
+          rmSync(snapshot, { recursive: true, force: true });
           throw error;
         }
       }
     });
+    this.publishing = publish.catch(() => {});
+    await publish;
+    return directory;
+  }
+
+  async start(handle: OrbHandle, options: { signal?: AbortSignal } = {}): Promise<void> {
+    this.validate(handle);
+    options.signal?.throwIfAborted();
+    if (handle.running && (await this.runningMachines()).has(handle.id)) return;
+    handle.running = false;
+    handle.notes.push(orbNote('orb: setup'));
+    await this.command(['machinectl', 'start', handle.id]);
+    handle.running = true;
+    this.save();
+    if (options.signal?.aborted) {
+      await this.stop(handle);
+      options.signal.throwIfAborted();
+    }
   }
 
   async stop(handle: OrbHandle): Promise<void> {
+    this.validate(handle);
     if (!handle.running) return;
     try {
       await this.command(['machinectl', 'poweroff', handle.id]);
@@ -287,10 +316,19 @@ export class NspawnOrbProvider implements OrbProvider {
       if (machines.has(handle.id)) throw error;
       handle.running = false;
     }
-    if (handle.running)
-      await this.command(['systemctl', 'stop', `systemd-nspawn@${handle.id}.service`]);
+    if (handle.running) {
+      const deadline = Date.now() + this.shutdownTimeoutMs;
+      while ((await this.runningMachines()).has(handle.id)) {
+        if (Date.now() >= deadline) {
+          await this.command(['machinectl', 'terminate', handle.id]);
+          if ((await this.runningMachines()).has(handle.id))
+            throw new Error('Orb machine is still running after terminate');
+          break;
+        }
+        await new Promise<void>((resolve) => setTimeout(resolve, 100));
+      }
+    }
     handle.running = false;
-    this.bound.delete(handle.id);
     handle.notes.push(orbNote('orb: stopped'));
     this.save();
   }
@@ -333,6 +371,38 @@ export class NspawnOrbProvider implements OrbProvider {
     const result = await this.runner(argv);
     if (result.code !== 0)
       throw new Error(`${argv[0]} ${argv[1]} failed (${result.code}): ${result.stderr}`);
+  }
+
+  private async publish(directory: string, target: string): Promise<void> {
+    chmodSync(directory, 0o755);
+    const hash = createHash('sha256');
+    const files = readdirSync(directory, { recursive: true, withFileTypes: true })
+      .filter((entry) => entry.isFile())
+      .map((entry) => relative(directory, join(entry.parentPath, entry.name)))
+      .sort();
+    for (const file of files) {
+      const path = join(directory, file);
+      hash.update(JSON.stringify([file, statSync(path).size]));
+      for await (const chunk of createReadStream(path)) hash.update(chunk);
+    }
+    const version = join(dirname(target), `.data-${hash.digest('hex')}`);
+    if (existsSync(version)) rmSync(directory, { recursive: true, force: true });
+    else renameSync(directory, version);
+    const link = `${target}-${randomUUID()}`;
+    try {
+      symlinkSync(basename(version), link);
+      renameSync(link, target);
+    } finally {
+      rmSync(link, { force: true });
+    }
+  }
+
+  private validate(handle: OrbHandle): void {
+    if (
+      !/^cairn-orb-[a-zA-Z0-9][a-zA-Z0-9-]{0,53}$/.test(handle.id) ||
+      handle.id === 'cairn-orb-base'
+    )
+      throw new Error('Invalid orb machine name');
   }
 
   private save(): void {

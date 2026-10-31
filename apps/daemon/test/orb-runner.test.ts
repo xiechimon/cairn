@@ -7,7 +7,6 @@ import { expect, test, vi } from 'vitest';
 import { createPiBackend } from '../src/backend/pi.js';
 import type { MachineApi } from '../src/machine-client.js';
 import { ORB_STEP_METHODS } from '../src/orb/protocol.js';
-import { NspawnOrbProvider } from '../src/orb/provider.js';
 import { RelayMachineServer } from '../src/orb/relay.js';
 import { runOrbWorker } from '../src/orb/worker.js';
 import {
@@ -18,6 +17,7 @@ import {
   fakeBackend,
   waitFor,
 } from './machine-loop-harness.js';
+import { FakeOrbProvider } from './orb-fake.js';
 
 vi.mock('../src/backend/pi.js', async (importOriginal) => {
   const original = await importOriginal<typeof import('../src/backend/pi.js')>();
@@ -26,12 +26,10 @@ vi.mock('../src/backend/pi.js', async (importOriginal) => {
 
 function socketWorker(backend: AgentBackend) {
   const scratch = mkdtempSync(join(tmpdir(), 'orb-runtime-'));
-  return new NspawnOrbProvider({
+  return new FakeOrbProvider({
     runner: async (argv, options) => {
-      if (!argv.includes('--uid=agent')) return { code: 0, stdout: '', stderr: '' };
-      const socketPath = options?.binds?.find(
-        (bind) => bind.target === '/run/cairn/relay.sock',
-      )?.source;
+      if (argv[0] !== 'orb-worker') return { code: 0, stdout: '', stderr: '' };
+      const socketPath = options?.socketPath;
       if (!socketPath) throw new Error('Missing relay socket mount');
       await runOrbWorker({
         socketPath,
@@ -51,10 +49,10 @@ test('orb workers use a socket and never construct or run a host backend', async
   const hostContinue = vi.spyOn(host.backend, 'continueSession');
   const worker = fakeBackend([{ type: 'done', usage: [] }]);
   const provider = socketWorker(worker.backend);
-  const exec = vi.spyOn(provider, 'exec');
+  const exec = vi.spyOn(provider, 'launchWorker');
   const api = new FakeMachineApi();
   api.claimQueue.push(CLAIMED);
-  const { handle, paths } = await boot({
+  const { handle } = await boot({
     api,
     backend: host.backend,
     useDefaultBackend: true,
@@ -68,22 +66,17 @@ test('orb workers use a socket and never construct or run a host backend', async
     expect(createPiBackend).not.toHaveBeenCalled();
     expect(worker.created).toHaveLength(1);
     expect(api.doneBodies).toHaveLength(1);
-    expect(exec.mock.calls[0]?.[1]).toEqual([
-      'node',
-      '/opt/cairn/daemon/cli.mjs',
-      'orb-step',
-      '--socket',
-      '/run/cairn/relay.sock',
-    ]);
-    await waitFor(() => !existsSync(join(paths.home, 'orb', 's1.sock')));
-    expect(existsSync(join(paths.home, 'orb', 's1.sock'))).toBe(false);
+    const socketPath = exec.mock.calls[0]![1].socketPath;
+    expect(socketPath).toBe(join(provider.runtimeRoot, 'cairn-orb-conv-1', 'relay.sock'));
+    await waitFor(() => !existsSync(socketPath));
+    expect(existsSync(socketPath)).toBe(false);
   } finally {
     await handle.stop();
     await handle.done;
   }
 });
 
-test('exec exposes the socket, read-only build and seed, and a per-step delivery outbox', async () => {
+test('fixed roots expose the socket, complete build and seed, and a per-step delivery outbox', async () => {
   const repo = mkdtempSync(join(tmpdir(), 'orb-exec-seed-'));
   execFileSync('git', ['init', '-b', 'main', repo]);
   execFileSync('git', [
@@ -110,7 +103,7 @@ test('exec exposes the socket, read-only build and seed, and a per-step delivery
     project: { ...CLAIMED.project!, id: 'project', repo: { kind: 'local', cloneUrl: repo } },
   });
   const provider = socketWorker(fakeBackend([{ type: 'done', usage: [] }]).backend);
-  const exec = vi.spyOn(provider, 'exec');
+  const exec = vi.spyOn(provider, 'launchWorker');
   const { handle, paths } = await boot({
     api,
     orbProvider: provider,
@@ -119,36 +112,13 @@ test('exec exposes the socket, read-only build and seed, and a per-step delivery
   try {
     await waitFor(() => api.doneBodies.length === 1);
     const call = exec.mock.calls[0]!;
-    const options = call[2];
+    const options = call[1];
     expect(JSON.stringify(call)).not.toContain(sentinel);
-    expect(JSON.stringify([call[1], options.env])).not.toContain(paths.home);
-    expect(options.env).toMatchObject({
-      HTTP_PROXY: 'http://egress.test:3128',
-      HTTPS_PROXY: 'http://egress.test:3128',
-    });
-    expect(options.binds).toEqual([
-      {
-        source: join(paths.home, 'orb', 's1.sock'),
-        target: '/run/cairn/relay.sock',
-        releaseAfterExec: true,
-      },
-      {
-        source: expect.stringMatching(/\/daemon\/dist$/),
-        target: '/opt/cairn/daemon',
-        readonly: true,
-      },
-      {
-        source: join(paths.home, 'orb', 's1-seed', 'repo'),
-        target: '/seed/project/repo',
-        readonly: true,
-        releaseAfterExec: true,
-      },
-      {
-        source: expect.stringMatching(/orb\/s1-outbox-[a-zA-Z0-9]+$/),
-        target: '/run/cairn/outbox',
-        releaseAfterExec: true,
-      },
-    ]);
+    expect(JSON.stringify(options)).not.toContain(paths.home);
+    expect(options.socketPath).toBe(join(provider.runtimeRoot, 'cairn-orb-conv-1', 'relay.sock'));
+    expect(options.outboxRoot).toBe(join(provider.runtimeRoot, 'cairn-orb-conv-1', 'outbox'));
+    expect(readFileSync(join(options.distRoot, 'current', 'cli.mjs'), 'utf8')).toBe('');
+    expect(existsSync(join(options.seedRoot, 'project', 'repo', 'HEAD'))).toBe(true);
     expect(readFileSync(paths.machineJson, 'utf8')).toContain(sentinel);
   } finally {
     await handle.stop();
@@ -159,7 +129,7 @@ test('exec exposes the socket, read-only build and seed, and a per-step delivery
 test('Coordinator steps stay on the host when orb mode is enabled', async () => {
   const host = fakeBackend([{ type: 'done', usage: [] }]);
   const provider = socketWorker(fakeBackend([]).backend);
-  const exec = vi.spyOn(provider, 'exec');
+  const exec = vi.spyOn(provider, 'launchWorker');
   const ensure = vi.spyOn(provider, 'ensure');
   const api = new FakeMachineApi();
   api.claimQueue.push({ ...CLAIMED, step: { ...CLAIMED.step, kind: 'chief' } });
@@ -181,16 +151,16 @@ test('Coordinator steps stay on the host when orb mode is enabled', async () => 
 });
 
 test('a dead container receives a host failure report', async () => {
-  const provider = new NspawnOrbProvider({
+  const provider = new FakeOrbProvider({
     runner: async (argv) => ({
-      code: argv.includes('--uid=agent') ? 137 : 0,
+      code: argv[0] === 'orb-worker' ? 137 : 0,
       stdout: '',
       stderr: '',
     }),
   });
   const api = new FakeMachineApi();
   api.claimQueue.push(CLAIMED);
-  const { handle, paths, lines } = await boot({
+  const { handle, lines } = await boot({
     api,
     orbProvider: provider,
     capEnv: { CAIRN_EXECUTOR: 'orb' },
@@ -199,10 +169,13 @@ test('a dead container receives a host failure report', async () => {
     await waitFor(() => api.doneBodies.length === 1);
     expect(lines.some((line) => line.includes('Orb step exited'))).toBe(true);
     expect(api.doneBodies).toEqual([
-      { stepId: 's1', body: { status: 'failed', errorMessage: expect.stringContaining('137') } },
+      {
+        stepId: 's1',
+        body: { status: 'failed', errorMessage: 'Orb worker disconnected without done' },
+      },
     ]);
     expect(api.uploads).toEqual([]);
-    expect(readdirSync(join(paths.home, 'orb'))).toEqual([]);
+    expect(readdirSync(join(provider.runtimeRoot, 'cairn-orb-conv-1'))).toEqual([]);
   } finally {
     await handle.stop();
     await handle.done;

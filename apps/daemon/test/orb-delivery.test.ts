@@ -14,10 +14,10 @@ import { join } from 'node:path';
 import { type AgentBackend, conversationBranch } from '@cairn/shared';
 import { afterEach, expect, test, vi } from 'vitest';
 import { gitPrim, runGitOk } from '../src/git.js';
-import { NspawnOrbProvider } from '../src/orb/provider.js';
 import { RelayMachineApi, RelayMachineServer } from '../src/orb/relay.js';
 import { runOrbWorker } from '../src/orb/worker.js';
 import { boot, CLAIMED, FakeMachineApi, fakeBackend, waitFor } from './machine-loop-harness.js';
+import { FakeOrbProvider } from './orb-fake.js';
 
 const roots: string[] = [];
 afterEach(() => {
@@ -79,23 +79,20 @@ test.each(['local', 'github', 'local-rejected'] as const)(
         repo: { kind: kind === 'github' ? 'github' : 'local', cloneUrl: repo },
       },
     });
-    const provider = new NspawnOrbProvider({
+    const provider = new FakeOrbProvider({
       runner: async (argv, options) => {
-        if (!argv.includes('--uid=agent')) return { code: 0, stdout: '', stderr: '' };
-        const binds = options!.binds!;
-        const seed = binds.find((bind) => bind.target.startsWith('/seed/'));
-        outbox = binds.find((bind) => bind.target === '/run/cairn/outbox')?.source ?? '';
+        if (argv[0] !== 'orb-worker') return { code: 0, stdout: '', stderr: '' };
+        const seed = join(options!.seedRoot, CLAIMED.project!.id, 'repo');
+        outbox = options!.outboxRoot;
         if (kind !== 'github') {
           expect(outbox).not.toBe('');
           expect(statSync(outbox).mode & 0o777).toBe(0o700);
-          expect(binds.find((bind) => bind.source === outbox)).toMatchObject({
-            releaseAfterExec: true,
-          });
+          expect(outbox).toBe(join(provider.runtimeRoot, 'cairn-orb-conv-1', 'outbox'));
         }
-        if (seed)
-          cpSync(seed.source, join(root, 'seed', CLAIMED.project!.id, 'repo'), { recursive: true });
+        if (existsSync(seed))
+          cpSync(seed, join(root, 'seed', CLAIMED.project!.id, 'repo'), { recursive: true });
         await runOrbWorker({
-          socketPath: binds.find((bind) => bind.target.endsWith('relay.sock'))!.source,
+          socketPath: options!.socketPath,
           backendFor: () => backend,
           home: join(root, 'worker'),
           workspacesRoot: join(root, 'work'),

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { rmSync } from 'node:fs';
+import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { type AgentBackend, type AgentSessionHandle, conversationBranch } from '@cairn/shared';
 import { createGeminiBackend } from '../backend/acp.js';
@@ -42,6 +42,8 @@ export async function runOrbWorker(options: {
   const stops = new StepStops();
   let activeStep: string | null = null;
   let stopRequest: StopRequest | undefined;
+  while (!existsSync(options.socketPath) || !existsSync(`${options.socketPath}.token`))
+    await new Promise<void>((resolve) => setTimeout(resolve, 100));
   relay = await RelayMachineApi.connect(
     options.socketPath,
     (frame) => {
@@ -83,7 +85,7 @@ export async function runOrbWorker(options: {
         (...args: string[]) =>
           send({ type: 'log', message: args.at(-1) ?? '' }),
     });
-    setupProxy(logger);
+    setupProxy(logger, { ...process.env, ...input.options.env });
     const workspacesDir = options.workspacesRoot ?? '/work';
     const paths = statePaths(options.home ?? '/home/agent/.cairn', workspacesDir);
     ensureStateDirs(paths);

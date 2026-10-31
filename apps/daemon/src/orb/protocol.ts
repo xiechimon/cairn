@@ -87,6 +87,8 @@ export const orbWorkerFrameSchema = z.discriminatedUnion('type', [
 ]);
 
 export type OrbFrame =
+  | { type: 'auth'; token: string }
+  | { type: 'authenticated' }
   | { type: 'init'; input: OrbStepInput }
   | { type: 'call'; id: number; method: OrbStepMethod; args: unknown[]; cancellable?: boolean }
   | { type: 'cancel'; id: number }
