@@ -30,7 +30,7 @@ test('five parts stack top to bottom in a 248px sidebar', async ({ page }) => {
   const nameFont = await team
     .getByText('Cairn', { exact: true })
     .evaluate((el) => getComputedStyle(el).fontFamily);
-  expect(nameFont).toContain('sourceSerif4');
+  expect(nameFont).toContain('bricolageGrotesque');
 
   const order = [
     await top(page, '[data-testid="team-row"]'),
@@ -112,8 +112,8 @@ test('active row = sheet fill + hairline ring + accent icon', async ({ page }) =
   });
   expect(m.bg).toBe(m.hover);
   expect(m.ring).toBe('none');
-  expect(m.accent).toBe('#926300');
-  expect(m.icon).toBe('rgb(146, 99, 0)');
+  expect(m.accent).toBe('#9a6500');
+  expect(m.icon).toBe('rgb(154, 101, 0)');
 });
 
 test('`资源` folds by default, opens to an indented sub-list, survives reload', async ({ page }) => {

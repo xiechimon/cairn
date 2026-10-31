@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "39165a36-f708-4b85-843a-759526ebb318",
+  "id": "c6edd36e-e5b2-4b0b-9ba0-e0e011c23446",
   "prevId": "9beed6d9-2ba6-4a4c-a5f7-30cdbcc47622",
   "tables": {
     "agent": {
@@ -3197,6 +3197,20 @@
           "notNull": false,
           "autoincrement": false
         },
+        "lastRunError": {
+          "name": "lastRunError",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "lastRunStepId": {
+          "name": "lastRunStepId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "pausedReason": {
           "name": "pausedReason",
           "type": "text",
@@ -3573,6 +3587,20 @@
           "notNull": false,
           "autoincrement": false
         },
+        "scheduleId": {
+          "name": "scheduleId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "scheduledBy": {
+          "name": "scheduledBy",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "checkpointCommit": {
           "name": "checkpointCommit",
           "type": "text",
@@ -3837,14 +3865,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'free'"
-        },
-        "claudeUsage": {
-          "name": "claudeUsage",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'subscription-only'"
         },
         "avatarStyle": {
           "name": "avatarStyle",

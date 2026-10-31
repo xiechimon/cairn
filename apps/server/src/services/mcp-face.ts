@@ -14,12 +14,18 @@ import type { Db } from '../db/client.js';
 import { agent, build, chiefThread, machine, project, schedule, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { verifyApiKey } from './api-keys.js';
+import { readAttachmentMeta } from './attachments.js';
 import { cancelBuild, messageTodo, startBuilds } from './builds.js';
 import type { ChiefToolDeps, TransitionActor } from './chief-tools.js';
 import { confirmBuild, transitionTodos } from './chief-tools.js';
 import { readConversationPage } from './conversation-page.js';
 import { executeGithubReadTool } from './github-reads.js';
 import { isChiefConversation } from './machines.js';
+import {
+  executeThreadMcpTool,
+  THREAD_TOOL_DESCRIPTIONS,
+  THREAD_TOOL_SCHEMAS,
+} from './mcp-threads.js';
 import { createSchedule, deleteSchedule, listSchedules } from './schedules.js';
 import { scanLocalSkills } from './skills.js';
 import { createTodo, listTodos, updateTodo } from './todos.js';
@@ -34,6 +40,7 @@ const s = z.string();
 const sArr = z.array(z.string());
 
 const TOOL_SCHEMAS: Record<string, z.ZodRawShape> = {
+  ...THREAD_TOOL_SCHEMAS,
   todos: { projectId: s.optional(), phase: s.optional() },
   projects: {},
   conversation: { conversationId: s, before: s.optional() },
@@ -156,6 +163,12 @@ export async function executeMcpTool(
   };
   const mcpActor: TransitionActor = { kind: 'user', name: deps.user.displayName };
   switch (name) {
+    case 'start_thread':
+    case 'threads_waiting_on_me':
+    case 'read_thread':
+    case 'reply_thread':
+    case 'thread_pull_requests':
+      return json(await executeThreadMcpTool(deps, ctx.teamId, name, args));
     case 'todos': {
       const projectId = optStr(args, 'projectId');
       const phase = optStr(args, 'phase');
@@ -207,7 +220,6 @@ export async function executeMcpTool(
       return json(listSchedules({ db, hub: deps.hub }, ctx.teamId));
     case 'attachment': {
       const attachmentId = str(args, 'attachmentId');
-      const { readAttachmentMeta } = await import('./attachments.js');
       return json(
         readAttachmentMeta(
           { db: deps.db, attachmentsDir: deps.attachmentsDir },
@@ -371,7 +383,10 @@ export function buildMcpFaceServer(deps: ChiefToolDeps, ctx: McpCallerCtx): McpS
       entry.name,
       {
         title: entry.grant,
-        description: CHIEF_DESCRIPTIONS.get(entry.name) ?? entry.grant,
+        description:
+          THREAD_TOOL_DESCRIPTIONS[entry.name as keyof typeof THREAD_TOOL_DESCRIPTIONS] ??
+          CHIEF_DESCRIPTIONS.get(entry.name) ??
+          entry.grant,
         inputSchema: TOOL_SCHEMAS[entry.name] ?? {},
       },
       async (rawArgs) => {
@@ -406,7 +421,7 @@ export async function handleMcpRequest(
   const ctx: McpCallerCtx = {
     teamId: key.teamId,
     user: deps.user,
-    grants: new Set([...key.toolGrants.read, ...key.toolGrants.write]),
+    grants: grantsByKind(key.toolGrants),
   };
   const server = buildMcpFaceServer(deps, ctx);
   const transport = new WebStandardStreamableHTTPServerTransport({
@@ -420,6 +435,14 @@ export async function handleMcpRequest(
     await transport.close().catch(() => {});
     await server.close().catch(() => {});
   }
+}
+
+function grantsByKind(toolGrants: { read: string[]; write: string[] }): Set<string> {
+  return new Set(
+    MCP_TOOL_REGISTRY.filter((tool) => toolGrants[tool.kind].includes(tool.grant)).map(
+      (tool) => tool.grant,
+    ),
+  );
 }
 
 export function grantedToolNames(grants: ReadonlySet<string>): string[] {

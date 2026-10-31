@@ -56,6 +56,7 @@ import { effectiveModel } from './model-fallback.js';
 import { projectMergeConfigOf } from './projects.js';
 import { scanLocalSkills } from './skills.js';
 import { listProjectTagVocab } from './tags.js';
+import { isThreadScheduleTool } from './thread-schedule-tools.js';
 import { setTodoPhase } from './todos.js';
 
 function workerSkillInjection(
@@ -545,7 +546,12 @@ async function tryClaim(
         injectedSkills: skillInjection.hits.map((h) => h.id),
         tools: [...agentRow.tools],
       },
-      remoteTools: [...(isGithubProject ? WORKER_REMOTE_TOOLS_GITHUB : WORKER_REMOTE_TOOLS)],
+      remoteTools: (isGithubProject ? WORKER_REMOTE_TOOLS_GITHUB : WORKER_REMOTE_TOOLS).filter(
+        (tool) =>
+          cand.stepRow.kind === 'plan' ||
+          cand.stepRow.kind === 'build' ||
+          !isThreadScheduleTool(tool.name),
+      ),
       localTools: claimLocalTools(agentRow.tools),
       ...(workerMcp !== undefined ? { mcpServers: workerMcp } : {}),
     };

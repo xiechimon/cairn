@@ -50,6 +50,7 @@ export const scheduleRecordSchema = z.object({
   nextRunAt: epochMs.nullable(),
   lastRunAt: epochMs.nullable(),
   lastRunStatus: z.string().nullable(),
+  lastRunError: z.string().nullable().optional(),
   pausedReason: z.string().nullable(),
   createdBy: recordId,
   todo: scheduleTodoEmbedSchema,

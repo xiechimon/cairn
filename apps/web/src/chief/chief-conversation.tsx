@@ -443,7 +443,7 @@ export function ChiefConversation({
       {chief.examples && (
         <div className="flex-none">
           <h2
-            className={`text-center font-serif text-heading font-medium text-(--foreground) ${
+            className={`text-center font-heading text-heading font-medium text-(--foreground) ${
               chief.bound ? 'mt-14' : 'mt-16'
             }`}
           >

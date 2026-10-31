@@ -121,14 +121,15 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
     const conversationId = c.req.param('id');
     if (!isChiefConversation(conversationId)) {
       const body = parseWith(buildSteerBodySchema, await jsonBody(c), 'body');
+      const humanSvc = { ...svc, steerOptions: { human: true } };
       const result =
         body.queuedMessageId !== undefined
           ? body.cancelQueued
             ? cancelQueuedMessage(svc, conversationId, body.queuedMessageId)
-            : await deliverQueuedMessage(svc, conversationId, body.queuedMessageId, true)
+            : await deliverQueuedMessage(humanSvc, conversationId, body.queuedMessageId, true)
           : body.mode === 'queue'
-            ? await queueTaskMessage(svc, conversationId, body.content, body.deliverAfterStop)
-            : await sendBuildSteer(svc, conversationId, body);
+            ? await queueTaskMessage(humanSvc, conversationId, body.content, body.deliverAfterStop)
+            : await sendBuildSteer(svc, conversationId, body, { human: true });
       return c.json(result, 201);
     }
     const raw = (await jsonBody(c)) as { content?: unknown; projectId?: unknown };

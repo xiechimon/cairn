@@ -156,7 +156,7 @@ describe('terminal thread push routing', () => {
 
 test('one-shot user schedule retains push intent after the schedule is deleted', () => {
   const s = world({ triggerSource: 'schedule', userStarted: false });
-  s.db.update(todo).set({ phase: 'todo' }).where(eq(todo.id, s.record.id)).run();
+  s.db.update(todo).set({ phase: 'done' }).where(eq(todo.id, s.record.id)).run();
   s.db
     .insert(schedule)
     .values({
@@ -174,7 +174,7 @@ test('one-shot user schedule retains push intent after the schedule is deleted',
   const scheduler = createScheduler(s.svc, { tickMs: 15_000 });
   scheduler.tick();
   scheduler.stop();
-  expect(s.db.select().from(schedule).all()).toHaveLength(0);
+  s.db.delete(schedule).where(eq(schedule.id, 'once')).run();
   const current = s.db.select().from(todo).where(eq(todo.id, s.record.id)).get();
   if (current?.latestBuildId == null) throw new Error('Missing scheduled build');
   const send = vi

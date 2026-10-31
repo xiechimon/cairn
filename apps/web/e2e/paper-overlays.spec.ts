@@ -52,7 +52,7 @@ for (const theme of ['light', 'dark'] as const) {
       await page.goto(SECRETS);
       return resolveColor(page, 'var(--dialog-backdrop)');
     })();
-    if (theme === 'light') expect(want).toBe('rgba(16, 32, 26, 0.18)');
+    if (theme === 'light') expect(want).toBe('rgba(29, 35, 31, 0.28)');
 
     await openFromTopbar(page, SECRETS, '添加密钥');
     const overlay = page.locator('[data-slot="dialog-overlay"]');
@@ -92,11 +92,11 @@ test('dialog widths are S 400 / M 480 / L 640', async ({ page }) => {
   await evidenceShot(page, 'delete-confirm-s.png');
 });
 
-test('dialog face: sheet surface, 12px corners, 16px sans title, 28px close', async ({ page }) => {
+test('dialog face: sheet surface, 18px corners, 16px sans title, 28px close', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
   const dialog = await openFromTopbar(page, SECRETS, '添加密钥');
-  await expect(dialog).toHaveCSS('background-color', await resolveColor(page, '#f9f8f4'));
-  await expect(dialog).toHaveCSS('border-top-left-radius', '12px');
+  await expect(dialog).toHaveCSS('background-color', await resolveColor(page, '#f6f6f2'));
+  await expect(dialog).toHaveCSS('border-top-left-radius', '18px');
   const title = dialog.getByTestId('dialog-head').getByText('添加密钥');
   await expect(title).toHaveCSS('font-size', '16px');
   const close = dialog.getByRole('button', { name: '关闭' });
@@ -155,7 +155,7 @@ test('footer stays on screen on a short viewport; only the body scrolls', async 
   expect(overflow).toBe(true);
 });
 
-test('Paper menu: 32px rows, 13.5px text, 15px icons, 12px panel corners, 4px padding', async ({
+test('Paper menu: 32px rows, 13.5px text, 15px icons, 18px panel corners, 4px padding', async ({
   page,
 }) => {
   await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
@@ -164,9 +164,9 @@ test('Paper menu: 32px rows, 13.5px text, 15px icons, 12px panel corners, 4px pa
   const menu = page.locator('.more-menu');
   await expect(menu).toBeVisible();
   await settle(menu);
-  await expect(menu).toHaveCSS('border-top-left-radius', '12px');
+  await expect(menu).toHaveCSS('border-top-left-radius', '18px');
   await expect(menu).toHaveCSS('padding-top', '6px');
-  await expect(menu).toHaveCSS('background-color', 'rgb(254, 254, 251)');
+  await expect(menu).toHaveCSS('background-color', 'rgb(253, 253, 251)');
 
   const rows = menu.getByRole('menuitem');
   const count = await rows.count();
@@ -180,7 +180,7 @@ test('Paper menu: 32px rows, 13.5px text, 15px icons, 12px panel corners, 4px pa
   }
   const copy = menu.locator('.more-menu-item', { hasText: '复制链接' });
   await copy.hover();
-  await expect(copy).toHaveCSS('background-color', await resolveColor(page, '#f1f0eb'));
+  await expect(copy).toHaveCSS('background-color', await resolveColor(page, '#eff1eb'));
   await expect(menu.getByRole('separator')).toHaveCount(1);
   await evidenceShot(page, 'more-menu.png');
 });
@@ -192,7 +192,7 @@ test('user menu rides the same Paper menu face', async ({ page }) => {
   const menu = page.locator('.user-menu');
   await expect(menu).toBeVisible();
   await settle(menu.locator('..'));
-  await expect(menu).toHaveCSS('border-top-left-radius', '12px');
+  await expect(menu).toHaveCSS('border-top-left-radius', '18px');
   await expect(menu).toHaveCSS('padding-top', '6px');
   for (const label of ['账号', 'API 密钥', 'MCP']) {
     const row = menu.locator('a.user-menu-row', { hasText: label });
@@ -214,7 +214,7 @@ test('provider picker: grouped rows, search hides empty groups', async ({ page }
   await expect(dialog.getByRole('group', { name: '订阅登录' }).locator('[data-preset-id]')).toHaveCount(2);
   const codex = dialog.locator('[data-preset-id="openai-codex"]');
   await expect(codex).toBeDisabled();
-  await expect(codex).toHaveCSS('color', await resolveColor(page, '#666b62'));
+  await expect(codex).toHaveCSS('color', await resolveColor(page, '#5f665f'));
   await evidenceShot(page, 'provider-picker.png');
 
   await dialog.getByLabel('搜索服务商...').fill('cloudflare');

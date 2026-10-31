@@ -3,7 +3,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { ChevronRight } from '../icons/index.js';
 
 export const DISPLAY_STYLE: CSSProperties = {
-  fontFamily: 'var(--font-serif)',
+  fontFamily: 'var(--font-display)',
   fontSize: 44,
   lineHeight: 1.05,
   letterSpacing: '-0.02em',
