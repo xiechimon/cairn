@@ -4,7 +4,14 @@ set -euo pipefail
 base=$(git merge-base origin/main HEAD)
 n=$(git rev-list --count "$base"..HEAD)
 [ "$n" -gt 0 ] || exit 0
-if [ "$n" = 1 ] && [ "$(git log -1 --format=%ae)" = "348051526+cairnwright@users.noreply.github.com" ] && git log -1 --format=%B | grep -q '^Co-authored-by: xiechimon'; then exit 0; fi
+if [ "$n" = 1 ]; then
+  author_email=$(git log -1 --format=%ae)
+  message=$(git log -1 --format=%B)
+  case "$author_email" in
+    348051526+cairnwright@users.noreply.github.com) grep -q '^Co-authored-by: xiechimon' <<<"$message" && exit 0;;
+    347615582+cairnwright\[bot\]@users.noreply.github.com) grep -q '^Cairn-Thread: ' <<<"$message" && grep -q '^Co-authored-by: xiechimon' <<<"$message" && exit 0;;
+  esac
+fi
 subject=$(git log --reverse --format=%s "$base"..HEAD | head -1)
 bodies=$(git log --reverse --format=%b "$base"..HEAD | { grep -v '^Co-authored-by:' || true; } | { grep -v '^[Cc]loses #' || true; } | sed '/^$/N;/^\n$/D')
 others=$(git log --reverse --format=%s "$base"..HEAD | tail -n +2 | sed 's/^/- /')

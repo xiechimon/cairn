@@ -311,7 +311,7 @@ jobs:
 
       - name: Host control script fixtures (#2380)
         if: ${{ !cancelled() }}
-        run: node --test scripts/ops/host/aged-prs.test.mjs scripts/ops/host/dispatch-issue.test.mjs scripts/ops/host/lanes-retry.test.mjs
+        run: node --test scripts/ops/host/aged-prs.test.mjs scripts/ops/host/dispatch-issue.test.mjs scripts/ops/host/lanes-retry.test.mjs scripts/ops/host/identity-compat.test.mjs
 
       - name: Runner secret isolation fixtures (#2189)
         if: ${{ !cancelled() }}
