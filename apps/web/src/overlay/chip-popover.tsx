@@ -16,8 +16,7 @@ export function ChipPopover({ todo, projectName, agentModel, onEditAssign }: Chi
   const { user, live } = useLiveData();
   const project = live ? projectName : PROJECT_NAME;
   const model = live ? agentModel : AGENT_MODEL;
-  const modelLine =
-    model && (model.thinkingLevel ? `${model.modelId} · ${model.thinkingLevel}` : model.modelId);
+  const modelLine = model && `${model.modelId} · ${model.thinkingLevel ?? t('默认')}`;
   const agentAvatarUrl = useAgentAvatarUrlById();
   return (
     <div className="chip-popover flex w-72 flex-col gap-1 text-left">
