@@ -79,7 +79,7 @@ const PROJECT_CHIP_CLS =
 const SEND_BTN_CLS =
   'ml-auto size-7 cursor-pointer rounded-(--radius-control) border-0 bg-(--menu-hover) text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-(--text-secondary) dark:hover:bg-(--menu-hover) aria-expanded:bg-transparent active:not-aria-[haspopup]:translate-y-0';
 const SEND_ON_CLS =
-  'bg-(--card-button) text-(--text-on-accent) hover:bg-(--card-button) hover:text-(--text-on-accent) dark:hover:bg-(--card-button)';
+  'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground dark:hover:bg-primary/90';
 const STOP_ON_CLS =
   'bg-(--foreground) text-(--background) hover:bg-(--foreground) hover:text-(--background) dark:hover:bg-(--foreground)';
 
