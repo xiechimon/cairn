@@ -1,0 +1,16 @@
+[Unit]
+Description=Cairn Orb proxy relay
+StartLimitIntervalSec=0
+
+[Service]
+ExecStart=/usr/local/lib/cairn-orb/egress-relay.sh
+Restart=on-failure
+RestartSec=2
+TasksMax=256
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=default.target

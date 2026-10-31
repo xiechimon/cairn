@@ -1,0 +1,9 @@
+{
+  "images": "No images.\n",
+  "cloneStartStop": "failed",
+  "headers": "",
+  "memory": "",
+  "homeExit": null,
+  "negativeExit": 1,
+  "negativeError": "No image 'cairn-orb-base' known"
+}

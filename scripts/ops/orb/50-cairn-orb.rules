@@ -1,0 +1,37 @@
+polkit.addRule(function(action, subject) {
+    if (subject.user !== 'ian') return polkit.Result.NOT_HANDLED;
+    function orb(name) {
+        return typeof name === 'string' && /^cairn-orb-[a-zA-Z0-9][a-zA-Z0-9-]*$/.test(name);
+    }
+    if (action.id === 'org.freedesktop.machine1.manage-images') {
+        var image = action.lookup('image');
+        var verb = action.lookup('verb');
+        if (typeof image !== 'string') return polkit.Result.NO;
+        if (!orb(image)) return polkit.Result.NOT_HANDLED;
+        if (verb === 'clone') {
+            var destination = action.lookup('new_name');
+            return orb(destination) && destination !== 'cairn-orb-base' ? polkit.Result.YES : polkit.Result.NO;
+        }
+        return verb === 'remove' && image !== 'cairn-orb-base' ? polkit.Result.YES : polkit.Result.NO;
+    }
+    if (action.id.indexOf('org.freedesktop.machine1.') === 0) {
+        var machine = action.lookup('machine');
+        if (typeof machine !== 'string' || machine === 'cairn-orb-base') return polkit.Result.NO;
+        if (!orb(machine)) return polkit.Result.NOT_HANDLED;
+        if (action.id === 'org.freedesktop.machine1.manage-machines') {
+            var operation = action.lookup('verb');
+            return ['kill', 'terminate', 'unregister', 'open_root_directory', 'poweroff', 'reboot'].indexOf(operation) >= 0 ? polkit.Result.YES : polkit.Result.NO;
+        }
+        return ['org.freedesktop.machine1.shell', 'org.freedesktop.machine1.login', 'org.freedesktop.machine1.open-pty', 'org.freedesktop.machine1.inspect-machines'].indexOf(action.id) >= 0 ? polkit.Result.YES : polkit.Result.NO;
+    }
+    if (action.id === 'org.freedesktop.systemd1.manage-units') {
+        var unit = action.lookup('unit');
+        var unitOperation = action.lookup('verb');
+        if (typeof unit !== 'string') return polkit.Result.NO;
+        if (unit.indexOf('systemd-nspawn@cairn-orb-') !== 0) return polkit.Result.NOT_HANDLED;
+        return typeof unit === 'string' && /^systemd-nspawn@cairn-orb-[a-zA-Z0-9][a-zA-Z0-9-]*\.service$/.test(unit) &&
+            unit !== 'systemd-nspawn@cairn-orb-base.service' &&
+            (unitOperation === 'start' || unitOperation === 'stop' || unitOperation === 'restart') ? polkit.Result.YES : polkit.Result.NO;
+    }
+    return polkit.Result.NOT_HANDLED;
+});
