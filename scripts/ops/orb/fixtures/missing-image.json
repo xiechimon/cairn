@@ -1,0 +1,34 @@
+{
+  "images": "No images.\n",
+  "cloneStartStop": "failed",
+  "headers": "",
+  "memory": "",
+  "homeExit": null,
+  "negativeExit": 1,
+  "negativeError": "No image 'cairn-orb-base' known",
+  "privateEgress": [
+    {
+      "status": 22,
+      "code": "403"
+    },
+    {
+      "status": 22,
+      "code": "403"
+    }
+  ],
+  "firewallService": "active",
+  "firewallProbes": [
+    {
+      "port": 7890,
+      "status": 0
+    },
+    {
+      "port": 22,
+      "status": 124
+    },
+    {
+      "port": 5231,
+      "status": 124
+    }
+  ]
+}
