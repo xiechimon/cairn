@@ -75,14 +75,14 @@ test('settings: github project shows local-path field; save writes path; clear w
   );
   await page.getByRole('button', { name: '保存', exact: true }).click();
   await refetched;
-  await expect(stub.patches.length).toBeGreaterThanOrEqual(1);
+  await expect.poll(() => stub.patches.length).toBeGreaterThanOrEqual(1);
   expect(stub.patches[0]?.body).toEqual({ localPath: '/Users/who/code/cairn' });
 
   await expect(input).toHaveValue('/Users/who/code/cairn');
 
   await input.fill('');
   await page.getByRole('button', { name: '保存', exact: true }).click();
-  await expect(stub.patches.length).toBeGreaterThanOrEqual(2);
+  await expect.poll(() => stub.patches.length).toBeGreaterThanOrEqual(2);
   const clearBody = stub.patches[1]?.body;
   expect(Object.hasOwn(clearBody ?? {}, 'localPath')).toBe(true);
   expect(clearBody?.localPath).toBeNull();
