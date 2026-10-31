@@ -438,7 +438,6 @@ export function ArchivedThreadGroup({
           <SidebarThreadRow
             title={todo.title === '' ? `#${todo.seqNum}` : todo.title}
             tone="idle"
-            snoozed
             open={todo.id === activeThreadId}
             onClick={() => onOpenThread(todo)}
             menu={
