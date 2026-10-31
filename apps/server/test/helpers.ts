@@ -298,6 +298,13 @@ async function openSse(app: Hono, path: string) {
   };
 }
 
+export const subscriptionClaudeReport = {
+  installed: true,
+  hostname: 'test',
+  models: [],
+  auth: { state: 'logged-in', method: 'claude.ai', provider: 'firstParty' },
+} satisfies import('@cairn/shared').ClaudeCodeReport;
+
 export function insertMachine(
   s: TestServer,
   opts: {
