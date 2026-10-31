@@ -281,9 +281,12 @@ function TaskStatus({ phase }: { phase: Phase }) {
   return (
     <span
       data-testid="task-status"
-      className={cn('flex flex-none items-center gap-1 text-meta whitespace-nowrap', ink)}
+      className={cn(
+        'flex flex-none items-center gap-1 text-meta whitespace-nowrap',
+        PHASE_UI[phase].tone === 'confirm' ? ink : 'text-content-tertiary',
+      )}
     >
-      <StatusGlyph kind={glyph} className="size-3.25" />
+      <StatusGlyph kind={glyph} className={cn('size-3.25', ink)} />
       {t(PHASE_UI[phase].chip)}
     </span>
   );
