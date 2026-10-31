@@ -99,6 +99,16 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
     path: '/api/projects/{id}/builds',
     note: '开始/重跑；body {todoIds[],assignment,withPlan}（r5 §3.4）',
   },
+  {
+    method: 'POST',
+    path: '/api/teams/{id}/notifications/{entityId}/read',
+    note: 'flips readAt; 404 without a row',
+  },
+  {
+    method: 'POST',
+    path: '/api/teams/{id}/notifications/{entityId}/unread',
+    note: 'clears readAt; creates the row for an existing todo',
+  },
   { method: 'POST', path: '/api/builds/{id}/merge', note: '→ 202 {delegated:true}（r3 §3.6）' },
   { method: 'POST', path: '/api/builds/{id}/steps', note: '确认/驳回回路（02 §4.2/r5 §4）' },
   { method: 'POST', path: '/api/teams/{id}/providers' },

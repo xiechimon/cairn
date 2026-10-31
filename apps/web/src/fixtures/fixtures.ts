@@ -32,6 +32,7 @@ export {
   boardWithProbe,
   sidebarThreadStatuses,
   sidebarThreads,
+  sidebarUnread,
 } from './board.js';
 export {
   chiefDefault,

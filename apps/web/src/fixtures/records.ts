@@ -202,6 +202,7 @@ export interface FixtureSet {
   details?: Record<string, DetailContent>;
   overlay?: OverlayState;
   chiefUnread?: number;
+  unreadThreadIds?: string[];
   chiefBusy?: boolean;
   ui?: OverlayUi;
   usageNav?: boolean;

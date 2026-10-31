@@ -1,4 +1,4 @@
-import type { CreateScheduleBody, ScheduleKind, ScheduleRecord } from '@cairn/shared';
+import type { CreateScheduleBody, ScheduleKind, ScheduleRecord, UserRecord } from '@cairn/shared';
 import { classifyStepFailure, isProviderOutage, SCHEDULE_MINUTE_STEPS } from '@cairn/shared';
 import { CronExpressionParser } from 'cron-parser';
 import { and, desc, eq, isNotNull, isNull, like, lte, max, or } from 'drizzle-orm';
@@ -8,6 +8,7 @@ import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import type { TeamStreamHub } from './events.js';
 import { projectOfTodo } from './git.js';
+import { notifyScheduleRun } from './notifications.js';
 
 export interface ScheduleDeps {
   db: Db;
@@ -399,7 +400,7 @@ export function recordScheduleFailure(
 }
 
 export function finishScheduledStep(
-  deps: ScheduleDeps,
+  deps: ScheduleDeps & { user: UserRecord },
   stepRow: typeof step.$inferSelect,
   outcome: { status: 'completed' | 'stopped' } | { status: 'failed'; error: string } = {
     status: 'completed',
@@ -412,6 +413,16 @@ export function finishScheduledStep(
     .where(and(eq(schedule.id, stepRow.scheduleId), eq(schedule.lastRunStepId, stepRow.id)))
     .get();
   if (!row) return;
+  if (outcome.status !== 'stopped') {
+    const todoRow = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
+    if (todoRow) {
+      notifyScheduleRun(
+        deps,
+        todoRow,
+        outcome.status === 'failed' ? `Scheduled run failed: ${outcome.error}` : null,
+      );
+    }
+  }
   if (outcome.status === 'failed') {
     recordScheduleFailure(deps, row.id, outcome.error);
     return;

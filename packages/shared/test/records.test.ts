@@ -438,7 +438,7 @@ describe('notification (02 §9.1, r5 §7.2 measured override)', () => {
     ).toBe(true);
   });
 
-  it('rejects types outside the three-event matrix (done/failed have no in-app events)', () => {
+  it('rejects types outside the notification vocabulary', () => {
     expect(notificationRecordSchema.safeParse({ ...sample, type: 'build_done' }).success).toBe(
       false,
     );

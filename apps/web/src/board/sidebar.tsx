@@ -20,6 +20,7 @@ import {
 import {
   type ReactElement,
   useCallback,
+  useEffect,
   useId,
   useMemo,
   useReducer,
@@ -27,7 +28,7 @@ import {
   useState,
 } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import { useApiMutations } from '../api/hooks.js';
+import { useApiMutations, useNotifications } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { SidebarNavRow } from '../components/shell/sidebar-nav-row.js';
 import { SidebarUser } from '../components/shell/sidebar-user.js';
@@ -42,6 +43,7 @@ import { UserMenu } from '../detail/user-menu.js';
 import { isArchived, isDeleted, markArchived, markDeleted } from '../fixtures/deletions.js';
 import { PROJECT_ID, PROJECT_NAME } from '../fixtures/fixtures.js';
 import type { TodoRecord } from '../fixtures/records.js';
+import { isFixtureUnread, setFixtureUnread } from '../fixtures/unread.js';
 import { scrollFadeClassName, useScrollFade } from '../hooks/use-scroll-fade.js';
 import { useI18n } from '../i18n/provider.js';
 import { FOCUS_RING_INSET } from '../lib/focus-ring.js';
@@ -83,6 +85,7 @@ interface BoardSidebarProps {
   selected?: SidebarSelected;
   projects?: SidebarProject[];
   todos?: TodoRecord[];
+  fixtureUnreadIds?: string[];
 }
 
 interface ResourceRow {
@@ -211,6 +214,7 @@ export function BoardSidebar({
   selected = 'board',
   projects,
   todos,
+  fixtureUnreadIds,
 }: BoardSidebarProps) {
   const { t } = useI18n();
   const { user, live, teamId } = useLiveData();
@@ -235,6 +239,41 @@ export function BoardSidebar({
   const activeThreadId = pathname.startsWith('/app/todo/')
     ? (pathname.split('/')[3] ?? null)
     : null;
+  const notificationsQ = useNotifications(teamId, live);
+  const unreadIds = new Set(
+    live
+      ? (notificationsQ.data?.unreadThreadIds ?? [])
+      : liveThreads
+          .filter((todo) => isFixtureUnread(todo.id, fixtureUnreadIds))
+          .map((todo) => todo.id),
+  );
+  const keepUnreadFor = useRef<string | null>(null);
+  const autoReadFor = useRef<string | null>(null);
+  const setThreadRead = (id: string, read: boolean) => {
+    if (live) {
+      mutations.setThreadRead.mutate({ id, read });
+      return;
+    }
+    setFixtureUnread(id, !read);
+    refresh();
+  };
+  const activeUnread = activeThreadId !== null && unreadIds.has(activeThreadId);
+  useEffect(() => {
+    if (keepUnreadFor.current !== activeThreadId) keepUnreadFor.current = null;
+    if (!activeUnread) {
+      autoReadFor.current = null;
+      return;
+    }
+    if (activeThreadId === null || keepUnreadFor.current !== null) return;
+    if (autoReadFor.current === activeThreadId) return;
+    autoReadFor.current = activeThreadId;
+    setThreadRead(activeThreadId, true);
+  });
+  const markThreadUnread = (todo: TodoRecord) => {
+    if (!live && blockDemoWrite()) return;
+    if (todo.id === activeThreadId) keepUnreadFor.current = todo.id;
+    setThreadRead(todo.id, false);
+  };
   const resourceRows = usageNav
     ? [...RESOURCE_ROWS.slice(0, 4), USAGE_ROW, ...RESOURCE_ROWS.slice(4)]
     : RESOURCE_ROWS;
@@ -565,8 +604,10 @@ export function BoardSidebar({
                 active={pathname === href}
                 activeThreadId={activeThreadId}
                 threads={projectThreads(liveThreads, row.id)}
+                unreadIds={unreadIds}
                 onOpenProject={() => goTo(href)}
                 onOpenThread={(todo) => goTo(threadHref(todo.id))}
+                onMarkUnread={markThreadUnread}
                 onArchive={archiveThread}
                 onDelete={setPendingDelete}
               />
