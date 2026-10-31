@@ -43,7 +43,7 @@ import { UserMenu } from '../detail/user-menu.js';
 import { isArchived, isDeleted, markArchived, markDeleted } from '../fixtures/deletions.js';
 import { PROJECT_ID, PROJECT_NAME } from '../fixtures/fixtures.js';
 import type { TodoRecord } from '../fixtures/records.js';
-import { isFixtureUnread, setFixtureUnread } from '../fixtures/unread.js';
+import { isFixtureUnread, setFixtureUnread, subscribeFixtureUnread } from '../fixtures/unread.js';
 import { scrollFadeClassName, useScrollFade } from '../hooks/use-scroll-fade.js';
 import { useI18n } from '../i18n/provider.js';
 import { FOCUS_RING_INSET } from '../lib/focus-ring.js';
@@ -54,6 +54,7 @@ import { withColumnParam } from './columns.js';
 import { withoutBoardView } from './home.js';
 import { ProjectAvatar } from './project-avatar.js';
 import { ProjectGroup, projectThreads, threadHref } from './sidebar-threads.js';
+import { keepThreadUnread } from './thread-read-keep.js';
 
 export type SidebarSelected =
   | 'board'
@@ -221,6 +222,7 @@ export function BoardSidebar({
   const navigate = useNavigate();
   const mutations = useApiMutations(teamId);
   const [, refresh] = useReducer((n: number) => n + 1, 0);
+  useEffect(() => subscribeFixtureUnread(refresh), []);
   const [pendingDelete, setPendingDelete] = useState<TodoRecord | null>(null);
   const { search, pathname } = useLocation();
   const stripped = withoutBoardView(withColumnParam(search, null));
@@ -247,31 +249,16 @@ export function BoardSidebar({
           .filter((todo) => isFixtureUnread(todo.id, fixtureUnreadIds))
           .map((todo) => todo.id),
   );
-  const keepUnreadFor = useRef<string | null>(null);
-  const autoReadFor = useRef<string | null>(null);
   const setThreadRead = (id: string, read: boolean) => {
     if (live) {
       mutations.setThreadRead.mutate({ id, read });
       return;
     }
     setFixtureUnread(id, !read);
-    refresh();
   };
-  const activeUnread = activeThreadId !== null && unreadIds.has(activeThreadId);
-  useEffect(() => {
-    if (keepUnreadFor.current !== activeThreadId) keepUnreadFor.current = null;
-    if (!activeUnread) {
-      autoReadFor.current = null;
-      return;
-    }
-    if (activeThreadId === null || keepUnreadFor.current !== null) return;
-    if (autoReadFor.current === activeThreadId) return;
-    autoReadFor.current = activeThreadId;
-    setThreadRead(activeThreadId, true);
-  });
   const markThreadUnread = (todo: TodoRecord) => {
     if (!live && blockDemoWrite()) return;
-    if (todo.id === activeThreadId) keepUnreadFor.current = todo.id;
+    if (todo.id === activeThreadId) keepThreadUnread(todo.id);
     setThreadRead(todo.id, false);
   };
   const resourceRows = usageNav

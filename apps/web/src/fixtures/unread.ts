@@ -11,6 +11,15 @@ function readOverrides(): Record<string, boolean> {
   }
 }
 
+const listeners = new Set<() => void>();
+
+export function subscribeFixtureUnread(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
 export function setFixtureUnread(id: string, unread: boolean): void {
   try {
     safeSessionStorage()?.setItem(
@@ -18,6 +27,7 @@ export function setFixtureUnread(id: string, unread: boolean): void {
       JSON.stringify({ ...readOverrides(), [id]: unread }),
     );
   } catch {}
+  for (const listener of listeners) listener();
 }
 
 export function isFixtureUnread(id: string, initial: readonly string[] | undefined): boolean {
