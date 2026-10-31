@@ -131,7 +131,7 @@ export function foreignPortHolderReport({
   const holder = holderOf(port);
   if (holder === null) return null;
   const holderToplevel = holder.cwd === undefined ? undefined : toplevelOf(holder.cwd);
-  if (holderToplevel === toplevel) return null;
+  if (holderToplevel !== undefined && holderToplevel === toplevel) return null;
   const details = [`pid ${holder.pid}`, `cwd ${holder.cwd ?? 'unknown'}`];
   if (holder.command !== undefined) details.push(`command ${holder.command}`);
   return `[e2e] port ${port} is served by another checkout (${holderToplevel ?? 'not a git checkout'}), not ${toplevel}: ${details.join(', ')}. Playwright reused that server, so these specs would test its build. Stop your own stale preview, or pick a free port with E2E_PORT=<port>; leave other lanes' processes running.`;

@@ -284,6 +284,13 @@ test('foreignPortHolderReport rejects a holder whose checkout cannot be resolved
     toplevelOf: () => undefined,
   });
   assert.match(outsideGit, /not a git checkout/);
+  const neitherInGit = foreignPortHolderReport({
+    port: 8399,
+    toplevel: undefined,
+    holderOf: () => ({ pid: 9, cwd: '/tmp', command: 'python3 -m http.server' }),
+    toplevelOf: () => undefined,
+  });
+  assert.match(neitherInGit, /not a git checkout/);
 });
 
 test('a bad slot count gets a warning and a single slot', async () => {
