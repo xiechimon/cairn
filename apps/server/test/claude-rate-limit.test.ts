@@ -5,8 +5,10 @@ import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
 import {
   agent as agentTable,
+  claudeSubscription,
   machine as machineTable,
   step as stepTable,
+  team as teamTable,
 } from '../src/db/schema.js';
 import { bootServer, postProject } from './helpers.js';
 
@@ -58,7 +60,16 @@ async function enroll(s: ReturnType<typeof bootServer>, key: string, name: strin
   if (!row) throw new Error(`enroll did not create ${name}`);
   s.db
     .update(machineTable)
-    .set({ online: true, enabledRuntimes: ['pi', 'claude-code'] })
+    .set({
+      online: true,
+      enabledRuntimes: ['pi', 'claude-code'],
+      claudeCodeReport: {
+        installed: true,
+        hostname: name,
+        models: [],
+        auth: { state: 'logged-in', method: 'claude.ai', provider: 'firstParty' },
+      },
+    })
     .where(eq(machineTable.id, row.id))
     .run();
   return { token, machineId: row.id };
@@ -243,6 +254,50 @@ describe('claude rate limit (#1852)', () => {
     s.dispose();
   });
 
+  test('a local merge already parked by the rate limiter resumes after an allowed report', async () => {
+    const s = bootServer({ claimHoldMs: 50 });
+    const machine = await enroll(s, await issueKey(s, 'owner-key'), 'owner');
+    insertAgent(s, 'agent-cc', machine.machineId, 'claude-code');
+    const buildId = await startBuild(s, 'agent-cc');
+    await report(s, machine.token, machine.machineId, {
+      status: 'rejected',
+      rateLimitType: 'five_hour',
+      resetsAt: Date.now() + 2 * HOUR,
+    });
+    expect(stepOfBuild(s, buildId)).toMatchObject({
+      status: 'waiting_quota',
+      quotaBlock: { source: 'claude_rate_limit' },
+    });
+    s.db
+      .update(stepTable)
+      .set({
+        kind: 'merge',
+        prompt: JSON.stringify({
+          kind: 'local-merge',
+          command: {
+            projectId: 'project',
+            buildId,
+            defaultBranch: 'main',
+            workBranch: 'work',
+            judgedBase: 'a'.repeat(40),
+            judgedHead: 'b'.repeat(40),
+            judgedPatchDigest: `pd2:${'c'.repeat(64)}`,
+            localChecks: ['pnpm test'],
+            message: 'Merge work',
+            identity: { name: 'Test', email: 'test@example.com' },
+          },
+        }),
+      })
+      .where(eq(stepTable.buildId, buildId))
+      .run();
+    await report(s, machine.token, machine.machineId, {
+      status: 'allowed',
+      rateLimitType: 'five_hour',
+    });
+    expect(stepOfBuild(s, buildId)).toMatchObject({ status: 'pending', quotaBlock: null });
+    s.dispose();
+  });
+
   test('a later allowed report clears the same window and a different window stays rejected', async () => {
     const s = bootServer({ claimHoldMs: 50 });
     const machine = await enroll(s, await issueKey(s, 'omarchy-key'), 'omarchy');
@@ -288,6 +343,148 @@ describe('claude rate limit (#1852)', () => {
     ).toBe(owner.machineId);
     expect(await claim(s, owner.token)).toBeNull();
     s.dispose();
+  });
+
+  test('subscription-only lets an OAuth spare take over while an API-key spare cannot', async () => {
+    const s = bootServer({ claimHoldMs: 50 });
+    try {
+      const owner = await enroll(s, await issueKey(s, 'owner-key'), 'owner');
+      const oauth = await enroll(s, await issueKey(s, 'oauth-key'), 'oauth-spare');
+      const paid = await enroll(s, await issueKey(s, 'paid-key'), 'paid-spare');
+      for (const [machineId, method] of [
+        [owner.machineId, 'claude.ai'],
+        [oauth.machineId, 'oauth_token'],
+        [paid.machineId, 'api_key'],
+      ] as const) {
+        s.db
+          .update(machineTable)
+          .set({
+            claudeCodeReport: {
+              installed: true,
+              hostname: machineId,
+              models: [{ id: 'claude-sonnet', name: 'Sonnet' }],
+              auth: { state: 'logged-in', method, provider: 'firstParty' },
+            },
+          })
+          .where(eq(machineTable.id, machineId))
+          .run();
+      }
+      expect(s.db.select().from(teamTable).where(eq(teamTable.id, s.team.id)).get()).toMatchObject({
+        claudeUsage: 'subscription-only',
+      });
+      expect(s.db.select().from(claudeSubscription).all()).toEqual([]);
+      insertAgent(s, 'agent-cc', owner.machineId, 'claude-code');
+      const buildId = await startBuild(s, 'agent-cc');
+      expect(
+        (
+          await report(s, owner.token, owner.machineId, {
+            status: 'rejected',
+            rateLimitType: 'five_hour',
+            resetsAt: Date.now() + 2 * HOUR,
+          })
+        ).status,
+      ).toBe(200);
+      expect(stepOfBuild(s, buildId)).toMatchObject({ status: 'pending', quotaBlock: null });
+      expect(await claim(s, paid.token)).toBeNull();
+      expect(stepOfBuild(s, buildId)).toMatchObject({ status: 'pending', quotaBlock: null });
+      const claimed = await claim(s, oauth.token);
+      expect(claimed?.step.buildId).toBe(buildId);
+      expect(claimed?.step.machineId).toBe(oauth.machineId);
+      expect(stepOfBuild(s, buildId).status).toBe('claimed');
+      expect(
+        s.db.select().from(agentTable).where(eq(agentTable.id, 'agent-cc')).get()?.machineId,
+      ).toBe(owner.machineId);
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test.each(['oauth_token', 'api_key'] as const)(
+    'allow-paid lets a %s spare take over in a mixed pool',
+    async (method) => {
+      const s = bootServer({ claimHoldMs: 50 });
+      try {
+        s.db
+          .update(teamTable)
+          .set({ claudeUsage: 'allow-paid' })
+          .where(eq(teamTable.id, s.team.id))
+          .run();
+        const owner = await enroll(s, await issueKey(s, 'owner-key'), 'owner');
+        const oauth = await enroll(s, await issueKey(s, 'oauth-key'), 'oauth-spare');
+        const paid = await enroll(s, await issueKey(s, 'paid-key'), 'paid-spare');
+        for (const [machineId, authMethod] of [
+          [owner.machineId, 'claude.ai'],
+          [oauth.machineId, 'oauth_token'],
+          [paid.machineId, 'api_key'],
+        ] as const) {
+          s.db
+            .update(machineTable)
+            .set({
+              claudeCodeReport: {
+                installed: true,
+                hostname: machineId,
+                models: [{ id: 'claude-sonnet', name: 'Sonnet' }],
+                auth: { state: 'logged-in', method: authMethod, provider: 'firstParty' },
+              },
+            })
+            .where(eq(machineTable.id, machineId))
+            .run();
+        }
+        expect(s.db.select().from(claudeSubscription).all()).toEqual([]);
+        insertAgent(s, 'agent-cc', owner.machineId, 'claude-code');
+        const buildId = await startBuild(s, 'agent-cc');
+        expect(
+          (
+            await report(s, owner.token, owner.machineId, {
+              status: 'rejected',
+              rateLimitType: 'five_hour',
+              resetsAt: Date.now() + 2 * HOUR,
+            })
+          ).status,
+        ).toBe(200);
+        const claimant = method === 'oauth_token' ? oauth : paid;
+        expect(await claim(s, claimant.token)).toMatchObject({
+          step: { buildId, machineId: claimant.machineId },
+        });
+        expect(
+          s.db.select().from(agentTable).where(eq(agentTable.id, 'agent-cc')).get()?.machineId,
+        ).toBe(owner.machineId);
+      } finally {
+        s.dispose();
+      }
+    },
+  );
+
+  test('subscription-only leaves non-Claude work on an API-key machine unaffected', async () => {
+    const s = bootServer({ claimHoldMs: 50 });
+    try {
+      const machine = await enroll(s, await issueKey(s, 'paid-key'), 'paid');
+      s.db
+        .update(machineTable)
+        .set({
+          claudeCodeReport: {
+            installed: true,
+            hostname: 'paid',
+            models: [{ id: 'claude-sonnet', name: 'Sonnet' }],
+            auth: { state: 'logged-in', method: 'api_key' },
+          },
+        })
+        .where(eq(machineTable.id, machine.machineId))
+        .run();
+      insertAgent(s, 'agent-pi', machine.machineId, 'stub-gw');
+      const buildId = await startBuild(s, 'agent-pi');
+      await report(s, machine.token, machine.machineId, {
+        status: 'rejected',
+        rateLimitType: 'five_hour',
+        resetsAt: Date.now() + 2 * HOUR,
+      });
+      expect(await claim(s, machine.token)).toMatchObject({
+        step: { buildId, machineId: machine.machineId },
+        agent: { provider: 'stub-gw' },
+      });
+    } finally {
+      s.dispose();
+    }
   });
 
   test('the only rejected machine parks the step and a failed done does not fail it', async () => {

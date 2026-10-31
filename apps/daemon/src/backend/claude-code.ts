@@ -862,6 +862,14 @@ export interface ClaudeSdkOptionParts {
   abortController: AbortController;
 }
 
+const METERED_CLAUDE_AUTH_BLANK = {
+  ANTHROPIC_API_KEY: '',
+  ANTHROPIC_AUTH_TOKEN: '',
+  CLAUDE_CODE_USE_BEDROCK: '',
+  CLAUDE_CODE_USE_VERTEX: '',
+  CLAUDE_CODE_USE_FOUNDRY: '',
+};
+
 export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
   const managedMcp = parts.strictMcpConfig === true;
   const mcpSection: Pick<Options, 'mcpServers' | 'strictMcpConfig'> = managedMcp
@@ -898,7 +906,11 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
     ...(parts.executablePath !== undefined
       ? { pathToClaudeCodeExecutable: parts.executablePath }
       : {}),
-    env: claudeCliEnv({ ...process.env, ...parts.env }),
+    env: claudeCliEnv({
+      ...process.env,
+      ...parts.env,
+      ...(parts.env?.CLAUDE_CODE_OAUTH_TOKEN !== undefined ? METERED_CLAUDE_AUTH_BLANK : {}),
+    }),
     ...(parts.plugins !== undefined && parts.plugins.length > 0 ? { plugins: parts.plugins } : {}),
     abortController: parts.abortController,
   };

@@ -14,7 +14,7 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import { providerHealth } from '../src/services/provider-health.js';
-import { bootServer, issueApiKey, type TestServer } from './helpers.js';
+import { bootServer, issueApiKey, subscriptionClaudeReport, type TestServer } from './helpers.js';
 
 const AGENT_ID = 'agent-chief-queue';
 const QUOTA_ERROR = '402: {"message":"insufficient quota: usage limit reached","type":..}';
@@ -576,7 +576,10 @@ describe('chief unavailable (T4)', () => {
       .run();
     w.s.db
       .update(machineTable)
-      .set({ enabledRuntimes: ['pi', 'claude-code', 'gemini'] })
+      .set({
+        enabledRuntimes: ['pi', 'claude-code', 'gemini'],
+        claudeCodeReport: subscriptionClaudeReport,
+      })
       .run();
     await w.send('第一句');
     const running = await w.claim();

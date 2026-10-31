@@ -9,6 +9,7 @@ import type {
   ChiefWatch,
   ClaudeCodeReport,
   ClaudeRateLimitWindow,
+  ClaudeUsage,
   DocumentDiffFile,
   MachineCapabilities,
   MemoryCandidateStatus,
@@ -56,6 +57,7 @@ export const team = sqliteTable('team', {
   name: text('name').notNull(),
   createdAt: epochMs('createdAt').notNull(),
   plan: text('plan').notNull().default('free'),
+  claudeUsage: text('claudeUsage').$type<ClaudeUsage>().notNull().default('subscription-only'),
   avatarStyle: text('avatarStyle'),
   autonomyPaused: bool('autonomyPaused').notNull().default(false),
   maxAutonomousMergesPerDay: integer('maxAutonomousMergesPerDay').notNull().default(10),
@@ -175,7 +177,7 @@ export interface QuotaWaitRow {
   lastAt: number;
   attempts: number;
   probeAt: number;
-  source?: 'claude_rate_limit';
+  source?: 'claude_rate_limit' | 'subscription_policy';
 }
 
 export interface StepFallbackRow {
