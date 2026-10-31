@@ -74,6 +74,7 @@ function fakeHost(t, { resultChange = {}, missing = false, malformed = false, fa
   const root = mkdtempSync(join(tmpdir(), 'cairn-orb-check-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const calls = [];
+  let prepared = false;
   const run = (cmd, args) => {
     calls.push([cmd, ...args]);
     assert.ok(!args.some((arg) => arg === '-M' || arg.startsWith('--machine')));
@@ -90,32 +91,40 @@ function fakeHost(t, { resultChange = {}, missing = false, malformed = false, fa
     if (args.includes('is-active')) stdout = 'active\n';
     if (args.includes('start')) {
       const directory = join(root, args.at(-1));
-      assert.equal(statSync(directory).mode & 0o777, 0o700);
-      const request = JSON.parse(readFileSync(join(directory, 'check-request'), 'utf8'));
-      if (!missing)
-        writeFileSync(
-          join(directory, 'check-result.json'),
-          malformed
-            ? '{'
-            : JSON.stringify({
-                version: 1,
-                requestId: request.requestId,
-                egressCode: '200',
-                egressExit: 0,
-                privateEgress: [
-                  { status: 22, code: '403' },
-                  { status: 22, code: '403' },
-                ],
-                firewallProbes: [7890, ...request.blockedPorts].map((port) => ({
-                  port,
-                  status: port === 7890 ? 0 : 124,
-                })),
-                homeExit: 0,
-                ...resultChange,
-              }),
-        );
+      assert.equal(existsSync(directory), false);
+      mkdirSync(directory, { mode: 0o700 });
+      prepared = true;
     }
+    if (args.includes('remove') && prepared)
+      rmSync(join(root, args.at(-1)), { recursive: true, force: true });
     return { status: 0, stdout, stderr: '' };
+  };
+  const wait = () => {
+    const directory = join(root, 'cairn-orb-check-fixture');
+    if (!existsSync(join(directory, 'check-request'))) return;
+    const request = JSON.parse(readFileSync(join(directory, 'check-request'), 'utf8'));
+    if (!missing)
+      writeFileSync(
+        join(directory, 'check-result.json'),
+        malformed
+          ? '{'
+          : JSON.stringify({
+              version: 1,
+              requestId: request.requestId,
+              egressCode: '200',
+              egressExit: 0,
+              privateEgress: [
+                { status: 22, code: '403' },
+                { status: 22, code: '403' },
+              ],
+              firewallProbes: [7890, ...request.blockedPorts].map((port) => ({
+                port,
+                status: port === 7890 ? 0 : 124,
+              })),
+              homeExit: 0,
+              ...resultChange,
+            }),
+      );
   };
   return {
     calls,
@@ -123,7 +132,7 @@ function fakeHost(t, { resultChange = {}, missing = false, malformed = false, fa
     runtimeRoot: root,
     user: 'ian',
     name: 'cairn-orb-check-fixture',
-    wait: () => {},
+    wait,
   };
 }
 
@@ -160,7 +169,13 @@ for (const [name, options] of [
   test(`${name} fails closed with bounded polling and cleanup`, (t) => {
     const f = fakeHost(t, options);
     let waits = 0;
-    const result = checkHost({ ...f, wait: () => waits++ });
+    const result = checkHost({
+      ...f,
+      wait: () => {
+        waits++;
+        f.wait();
+      },
+    });
     assert.equal(result.ok, false);
     assert.ok(waits <= 149);
     assert.ok(f.calls.some((call) => call.includes('remove')));
@@ -179,14 +194,11 @@ test('check refuses root, unsafe names, existing directories and symlinked resul
   rmSync(join(f.runtimeRoot, f.name), { recursive: true });
   const result = checkHost({
     ...f,
-    run: (cmd, args) => {
-      const value = f.run(cmd, args);
-      if (args.includes('start')) {
-        const path = join(f.runtimeRoot, f.name, 'check-result.json');
-        renameSync(path, `${path}.real`);
-        symlinkSync(`${path}.real`, path);
-      }
-      return value;
+    wait: () => {
+      f.wait();
+      const path = join(f.runtimeRoot, f.name, 'check-result.json');
+      renameSync(path, `${path}.real`);
+      symlinkSync(`${path}.real`, path);
     },
   });
   assert.equal(result.ok, false);
@@ -373,45 +385,71 @@ if (cmd === 'timeout') process.exit(args.at(-1).endsWith('/7890') ? 0 : 124);
   }
   const result = checkHost({
     ...f,
-    run: (cmd, args) => {
-      const response = f.run(cmd, args);
-      if (args.includes('start')) {
-        const processResult = spawnSync(
-          process.execPath,
-          [
-            '--input-type=module',
-            '-e',
-            `import { runGuestCheck } from ${JSON.stringify(new URL('./guest-check.mjs', import.meta.url).href)}; runGuestCheck({ directory: ${JSON.stringify(join(f.runtimeRoot, f.name))} });`,
-          ],
-          { encoding: 'utf8', env: { ...process.env, PATH: `${bin}:${process.env.PATH}` } },
-        );
-        assert.equal(processResult.status, 0, processResult.stderr);
-        const metadata = readFileSync(join(f.runtimeRoot, f.name, 'check-result.json'), 'utf8');
-        assert.ok(!metadata.includes('diagnostics'));
-        assert.ok(!existsSync(join(f.runtimeRoot, f.name, 'check-request')));
-        assert.equal(
-          statSync(join(f.runtimeRoot, f.name, 'check-result.json')).mode & 0o777,
-          0o600,
-        );
-      }
-      return response;
+    wait: () => {
+      const processResult = spawnSync(
+        process.execPath,
+        [
+          '--input-type=module',
+          '-e',
+          `import { runGuestCheck } from ${JSON.stringify(new URL('./guest-check.mjs', import.meta.url).href)}; runGuestCheck({ directory: ${JSON.stringify(join(f.runtimeRoot, f.name))} });`,
+        ],
+        { encoding: 'utf8', env: { ...process.env, PATH: `${bin}:${process.env.PATH}` } },
+      );
+      assert.equal(processResult.status, 0, processResult.stderr);
+      const metadata = readFileSync(join(f.runtimeRoot, f.name, 'check-result.json'), 'utf8');
+      assert.ok(!metadata.includes('diagnostics'));
+      assert.ok(!existsSync(join(f.runtimeRoot, f.name, 'check-request')));
+      assert.equal(statSync(join(f.runtimeRoot, f.name, 'check-result.json')).mode & 0o777, 0o600);
     },
   });
   assert.equal(result.ok, true, JSON.stringify(result));
 });
 
-test('runtime cleanup errors preserve structured failure metadata and the directory', (t) => {
+test('missing root stop cleanup fails with bounded polling and preserves the directory', (t) => {
   const f = fakeHost(t);
   const result = checkHost({
     ...f,
-    removeRuntime: () => {
-      throw Object.assign(new Error('denied'), { code: 'EACCES' });
-    },
+    run: (cmd, args) => (args.includes('remove') ? { status: 0 } : f.run(cmd, args)),
   });
   assert.equal(result.ok, false);
   assert.equal(result.egress, 'ok');
-  assert.ok(
-    result.errors.some((error) => error.includes('runtime directory') && error.includes('EACCES')),
-  );
+  assert.ok(result.errors.some((error) => error.includes('runtime directory')));
   assert.ok(existsSync(join(f.runtimeRoot, f.name)));
+});
+
+test('host waits for root preparation and never creates its bind source', (t) => {
+  const f = fakeHost(t);
+  const directory = join(f.runtimeRoot, f.name);
+  let waits = 0;
+  const result = checkHost({
+    ...f,
+    run: (cmd, args) => {
+      const value = f.run(cmd, args);
+      if (args.includes('start')) rmSync(directory, { recursive: true });
+      return value;
+    },
+    wait: () => {
+      if (++waits === 2) mkdirSync(directory, { mode: 0o700 });
+      f.wait();
+    },
+  });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.ok(waits >= 2);
+});
+
+test('missing root preparation times out without writing a trigger', (t) => {
+  const f = fakeHost(t);
+  let waits = 0;
+  const result = checkHost({
+    ...f,
+    run: (cmd, args) => {
+      const value = f.run(cmd, args);
+      if (args.includes('start')) rmSync(join(f.runtimeRoot, f.name), { recursive: true });
+      return value;
+    },
+    wait: () => waits++,
+  });
+  assert.equal(result.ok, false);
+  assert.ok(result.errors.some((error) => /runtime directory/.test(error)));
+  assert.equal(waits, 29);
 });

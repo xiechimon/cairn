@@ -54,6 +54,7 @@ export function installHost(options = {}) {
       '/etc/systemd/system/systemd-nspawn@cairn-orb-.service.d/limits.conf',
     ],
     ['prepare-machine.sh', '/usr/local/lib/cairn-orb/prepare-machine.sh', 0o755],
+    ['runtime-directory.mjs', '/usr/local/lib/cairn-orb/runtime-directory.mjs'],
     ['egress-relay.mjs', '/usr/local/lib/cairn-orb/egress-relay.mjs'],
     ['firewall.nft', '/etc/cairn-orb/firewall.nft'],
     ['cairn-orb-firewall.service', '/etc/systemd/system/cairn-orb-firewall.service'],
@@ -63,8 +64,13 @@ export function installHost(options = {}) {
   if (change.probe('pacman', ['-Q', 'arch-install-scripts']).status !== 0) {
     change.exec('pacman', ['-S', '--needed', '--noconfirm', 'arch-install-scripts']);
   }
-  const directoryPaths = ['/run/cairn-orb', '/var/lib/cairn-orb/dist', '/var/lib/cairn-orb/seed'];
-  const tmpfiles = `${directoryPaths.map((path) => `d ${path} 0700 ian - -`).join('\n')}\n`;
+  const directories = [
+    ['/run/cairn-orb', 'root', 'root'],
+    ['/var/lib/cairn-orb', 'root', 'root'],
+    ['/var/lib/cairn-orb/dist', 'ian', '-'],
+    ['/var/lib/cairn-orb/seed', 'ian', '-'],
+  ];
+  const tmpfiles = `${directories.map(([path, owner, group]) => `d ${path} 0755 ${owner} ${group} -`).join('\n')}\n`;
   const files = [
     ['/etc/tmpfiles.d/cairn-orb.conf', tmpfiles],
     ['/usr/local/lib/cairn-orb/node', nodeBinary, 0o755],
@@ -75,7 +81,7 @@ export function installHost(options = {}) {
     ]),
     [
       '/etc/systemd/system/systemd-nspawn@.service.d/20-cairn-orb.conf',
-      '[Unit]\nRequires=cairn-orb-firewall.service\nAfter=cairn-orb-firewall.service\n\n[Service]\nExecStartPre=+/usr/local/lib/cairn-orb/prepare-machine.sh %i\nEnvironment=CAIRN_ORB_BINDS=\nEnvironment="CAIRN_ORB_FIXED_BINDS=--bind=/run/cairn-orb/%i:/run/cairn:idmap,norbind --bind-ro=/var/lib/cairn-orb/dist:/opt/cairn/daemon:idmap,norbind --bind-ro=/var/lib/cairn-orb/seed:/seed:idmap,norbind"\nEnvironmentFile=-/run/systemd/nspawn/%i.binds\nExecStart=\nExecStart=systemd-nspawn --quiet --keep-unit --boot --link-journal=try-guest --network-veth -U --settings=override --machine=%i $CAIRN_ORB_BINDS\n',
+      '[Unit]\nRequires=cairn-orb-firewall.service\nAfter=cairn-orb-firewall.service\n\n[Service]\nExecStartPre=+/usr/local/lib/cairn-orb/prepare-machine.sh %i\nExecStopPost=+/usr/local/lib/cairn-orb/prepare-machine.sh --stop %i\nEnvironment=CAIRN_ORB_BINDS=\nEnvironment="CAIRN_ORB_FIXED_BINDS=--bind=/run/cairn-orb/%i:/run/cairn:idmap,norbind --bind-ro=/var/lib/cairn-orb/dist:/opt/cairn/daemon:idmap,norbind --bind-ro=/var/lib/cairn-orb/seed:/seed:idmap,norbind"\nEnvironmentFile=-/run/systemd/nspawn/%i.binds\nExecStart=\nExecStart=systemd-nspawn --quiet --keep-unit --boot --link-journal=try-guest --network-veth -U --settings=override --machine=%i $CAIRN_ORB_BINDS\n',
     ],
     [
       '/etc/systemd/system/systemd-networkd.service.d/20-cairn-orb.conf',
@@ -103,15 +109,27 @@ export function installHost(options = {}) {
     if (error.code !== 'ENOENT') throw error;
   }
   const needsReload = previousPending || files.some((file) => !change.matches(...file));
-  if (needsReload) change.file('/var/lib/cairn-orb/install-pending', 'pending\n');
-  for (const file of files) change.file(...file);
-  const directoriesMissing = directoryPaths.some(
-    (path) => change.probe('stat', ['-c', '%U:%a', join(root, path)]).stdout?.trim() !== 'ian:700',
-  );
-  if (directoriesMissing) {
+  change.file(...files[0]);
+  const inspectDirectories = () =>
+    directories.map(([path, owner, group]) => {
+      const result = change.probe('stat', [
+        '-c',
+        group === '-' ? '%F:%U:%a' : '%F:%U:%G:%a',
+        join(root, path),
+      ]);
+      if (result.status === 0 && !result.stdout?.startsWith('directory:'))
+        throw new Error(`Expected a bind directory without symlinks: ${path}`);
+      const expected = group === '-' ? `directory:${owner}:755` : `directory:${owner}:${group}:755`;
+      return result.status === 0 && result.stdout?.trim() === expected;
+    });
+  if (inspectDirectories().some((matches) => !matches)) {
     log(tmpfiles.trim());
     change.exec('systemd-tmpfiles', ['--create', '/etc/tmpfiles.d/cairn-orb.conf']);
+    if (!dryRun && inspectDirectories().some((matches) => !matches))
+      throw new Error('Bind directory ownership or mode did not converge');
   }
+  if (needsReload) change.file('/var/lib/cairn-orb/install-pending', 'pending\n');
+  for (const file of files) change.file(...file);
   if (needsReload) {
     change.exec('systemctl', ['daemon-reload']);
   }

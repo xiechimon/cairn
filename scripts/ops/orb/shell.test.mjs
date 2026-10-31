@@ -32,7 +32,8 @@ const args = process.argv.slice(2);
 const root = process.env.CAIRN_ORB_ROOT;
 appendFileSync(join(root, 'calls'), JSON.stringify([cmd, ...args]) + '\\n');
 if (process.env.FAIL_COMMAND === cmd) process.exit(1);
-if (cmd === 'node') console.log(JSON.stringify({ http: process.env.http_proxy, https: process.env.https_proxy }));
+if (cmd === 'node') console.log(args[0].endsWith('/runtime-directory.mjs') ? '0 changes' : JSON.stringify({ http: process.env.http_proxy, https: process.env.https_proxy }));
+if (cmd === 'sysctl') console.log(process.env.PROTECTED_HARDLINKS ?? '1');
 if (cmd === 'id') console.log(args[0] === '-un' ? (process.env.FAKE_USER || 'root') : args.includes('ian') ? (process.env.AGENT_UID || '1000') : '0');
 if (cmd === 'runuser' || cmd === 'bash') console.log(args.at(-1).includes('claude') ? (process.env.BAD_VERSION || '2.1.0 (Claude Code)') : 'codex-cli 0.100.0');
 if (cmd !== 'systemd-nspawn' && cmd !== 'pacstrap' && args.some((arg) => arg === '-M' || arg.startsWith('--machine'))) process.exit(91);
@@ -80,6 +81,7 @@ if (cmd === 'ip') console.log('7: vz-cairn inet ' + (process.env.BRIDGE_IP || '1
   chmodSync(fake, 0o755);
   for (const cmd of [
     'node',
+    'sysctl',
     'bash',
     'id',
     'runuser',
@@ -104,6 +106,7 @@ if (cmd === 'ip') console.log('7: vz-cairn inet ' + (process.env.BRIDGE_IP || '1
     spawnSync('/bin/bash', [join(source, file), ...args], {
       env: {
         ...env,
+        CAIRN_ORB_NODE: join(bin, 'node'),
         CAIRN_ORB_FIXED_BINDS: `--bind=/run/cairn-orb/${args.at(-1)}:/run/cairn:idmap,norbind --bind-ro=/var/lib/cairn-orb/dist:/opt/cairn/daemon:idmap,norbind --bind-ro=/var/lib/cairn-orb/seed:/seed:idmap,norbind`,
         ...extra,
       },
@@ -430,20 +433,46 @@ test('image ships enabled guest worker and trigger units with one daemon entry',
   assert.match(script, /useradd --uid "\$4"/);
 });
 
-test('preparation rejects unsafe runtime ownership, modes and symlinked machine directories', () => {
+test('preparation delegates source creation and stop to the root fd helper', () => {
   const f = fixture();
   try {
     const name = 'cairn-orb-test-a';
-    const directory = join(f.root, 'run/cairn-orb', name);
-    mkdirSync(directory, { recursive: true });
-    for (const owner of ['ian:755', 'cairn-runner:700', 'root:700']) {
-      assert.notEqual(f.run('prepare-machine.sh', [name], { DIR_OWNER: owner }).status, 0);
-    }
-    rmSync(directory, { recursive: true });
-    symlinkSync(f.root, directory);
-    assert.notEqual(f.run('prepare-machine.sh', [name]).status, 0);
-    rmSync(directory);
-    assert.notEqual(f.run('prepare-machine.sh', [name]).status, 0);
+    mkdirSync(join(f.root, 'run/cairn-orb'), { recursive: true });
+    writeFileSync(
+      join(f.root, 'properties'),
+      'MemoryMax=4294967296\nCPUQuotaPerSecUSec=4s\nTasksMax=4096',
+    );
+    const dry = f.run('prepare-machine.sh', ['--dry-run', name]);
+    assert.equal(dry.status, 0, dry.stderr);
+    assert.ok(
+      f
+        .calls()
+        .some(
+          ([cmd, path, flag, machine]) =>
+            cmd === 'node' &&
+            path.endsWith('/runtime-directory.mjs') &&
+            flag === '--dry-run' &&
+            machine === name,
+        ),
+    );
+    const stopped = f.run('prepare-machine.sh', ['--stop', name]);
+    assert.equal(stopped.status, 0, stopped.stderr);
+    assert.ok(
+      f
+        .calls()
+        .some(
+          ([cmd, path, flag, machine]) =>
+            cmd === 'node' &&
+            path.endsWith('/runtime-directory.mjs') &&
+            flag === '--stop' &&
+            machine === name,
+        ),
+    );
+    assert.equal(f.run('prepare-machine.sh', ['--stop', 'unrelated']).status, 0);
+    assert.notEqual(
+      f.run('prepare-machine.sh', ['--dry-run', name], { PROTECTED_HARDLINKS: '0' }).status,
+      0,
+    );
     assert.notEqual(f.run('prepare-machine.sh', ['cairn-orb-base']).status, 0);
   } finally {
     rmSync(f.root, { recursive: true, force: true });

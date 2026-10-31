@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {
+import fs, {
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -13,6 +13,7 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import { installHost } from './install-host.mjs';
+import { runtimeDirectory } from './runtime-directory.mjs';
 
 function policy() {
   let rule;
@@ -109,7 +110,11 @@ function fixture() {
     if (cmd === 'stat')
       return {
         status: state.has('directories') ? 0 : 1,
-        stdout: state.has('directories') ? 'ian:700' : '',
+        stdout: state.has('directories')
+          ? args.at(-1).endsWith('/dist') || args.at(-1).endsWith('/seed')
+            ? 'directory:ian:755'
+            : 'directory:root:root:755'
+          : '',
       };
     if (cmd === 'systemd-tmpfiles') state.add('directories');
     if ((cmd === 'systemctl' || userCommand) && ['is-active', 'is-enabled'].includes(ctl[0]))
@@ -593,14 +598,19 @@ test('polkit denies guest execution while keeping only required lifecycle grants
   }
 });
 
-test('installer provisions private owner directories and reboot tmpfiles without machine transport', () => {
+test('installer provisions root-owned bind parents and owner content directories', () => {
   const f = fixture();
   try {
     installHost(f);
     const config = readFileSync(join(f.root, 'etc/tmpfiles.d/cairn-orb.conf'), 'utf8');
-    for (const path of ['/run/cairn-orb', '/var/lib/cairn-orb/dist', '/var/lib/cairn-orb/seed']) {
-      assert.ok(config.includes(`d ${path} 0700 ian`));
-    }
+    for (const path of ['/run/cairn-orb', '/var/lib/cairn-orb'])
+      assert.ok(config.includes(`d ${path} 0755 root root -`));
+    for (const path of ['/var/lib/cairn-orb/dist', '/var/lib/cairn-orb/seed'])
+      assert.ok(config.includes(`d ${path} 0755 ian - -`));
+    assert.equal(
+      readFileSync(join(f.root, 'usr/local/lib/cairn-orb/runtime-directory.mjs'), 'utf8'),
+      readFileSync(new URL('./runtime-directory.mjs', import.meta.url), 'utf8'),
+    );
     assert.ok(f.calls.some((call) => call.startsWith('systemd-tmpfiles --create')));
     assert.ok(!f.calls.some((call) => call.includes('--machine')));
   } finally {
@@ -623,9 +633,224 @@ test('template launches fixed specifier binds and never exposes the runtime pare
     );
     assert.match(template, /--bind-ro=\/var\/lib\/cairn-orb\/seed:\/seed:idmap,norbind/);
     assert.doesNotMatch(template, /--bind=\/run\/cairn-orb:/);
+    assert.match(
+      template,
+      /ExecStopPost=\+\/usr\/local\/lib\/cairn-orb\/prepare-machine.sh --stop %i/,
+    );
     assert.match(template, /EnvironmentFile=-\/run\/systemd\/nspawn\/%i.binds/);
     assert.match(template, /ExecStart=systemd-nspawn .*--machine=%i \$CAIRN_ORB_BINDS/);
   } finally {
     rmSync(f.root, { recursive: true, force: true });
   }
+});
+
+test('installer refuses symlinked bind paths before tmpfiles or image mutations', () => {
+  for (const path of [
+    '/run/cairn-orb',
+    '/var/lib/cairn-orb',
+    '/var/lib/cairn-orb/dist',
+    '/var/lib/cairn-orb/seed',
+  ]) {
+    const f = fixture();
+    try {
+      assert.throws(
+        () =>
+          installHost({
+            ...f,
+            run: (cmd, args) =>
+              cmd === 'stat' && args.at(-1) === join(f.root, path)
+                ? { status: 0, stdout: 'symbolic link:ian:755' }
+                : f.run(cmd, args),
+          }),
+        /directory/i,
+      );
+      assert.ok(!f.calls.some((call) => call.startsWith('systemd-tmpfiles')));
+      assert.ok(!f.calls.some((call) => call.startsWith('bash ')));
+    } finally {
+      rmSync(f.root, { recursive: true, force: true });
+    }
+  }
+});
+
+function runtimeFixture(t) {
+  const root = fs.mkdtempSync(join(tmpdir(), 'cairn-orb-runtime-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const parent = join(root, 'run/cairn-orb');
+  const state = join(root, 'run/systemd/nspawn');
+  fs.mkdirSync(parent, { recursive: true, mode: 0o755 });
+  fs.mkdirSync(state, { recursive: true, mode: 0o755 });
+  const name = 'cairn-orb-test-a';
+  const directory = join(parent, name);
+  const calls = [];
+  const io = {
+    ...fs,
+    lstatSync(path, ...args) {
+      const stat = fs.lstatSync(path, ...args);
+      if (path === parent || path === state) return Object.assign(stat, { uid: 0, gid: 0 });
+      return stat;
+    },
+    openSync(path, flags, ...args) {
+      const fd = fs.openSync(path, flags, ...args);
+      calls.push(['open', path, flags, fd]);
+      return fd;
+    },
+    fchownSync(fd, uid, gid) {
+      calls.push(['fchown', fd, uid, gid]);
+      fs.fchownSync(fd, uid, gid);
+    },
+    fchmodSync(fd, mode) {
+      calls.push(['fchmod', fd, mode]);
+      fs.fchmodSync(fd, mode);
+    },
+  };
+  const run = (cmd, args) => {
+    assert.equal(cmd, '/usr/bin/rm');
+    assert.deepEqual(args, ['--recursive', '--force', '--one-file-system', '--', directory]);
+    fs.rmSync(directory, { recursive: true });
+    return { status: 0 };
+  };
+  const options = { root, name, uid: process.getuid(), gid: process.getgid(), io, run };
+  return { options, parent, state, directory, calls };
+}
+
+test('root preparation creates and opens a private directory before fd ownership changes', (t) => {
+  const f = runtimeFixture(t);
+  assert.equal(runtimeDirectory(f.options), 1);
+  const stat = fs.lstatSync(f.directory);
+  assert.ok(stat.isDirectory());
+  assert.equal(stat.uid, f.options.uid);
+  assert.equal(stat.gid, f.options.gid);
+  assert.equal(stat.mode & 0o777, 0o700);
+  const opened = f.calls.find(([op, path]) => op === 'open' && path === f.directory);
+  assert.equal(
+    opened[2],
+    fs.constants.O_RDONLY | fs.constants.O_DIRECTORY | fs.constants.O_NOFOLLOW,
+  );
+  assert.deepEqual(
+    f.calls.filter(([op]) => op.startsWith('f')),
+    [
+      ['fchown', opened[3], f.options.uid, f.options.gid],
+      ['fchmod', opened[3], 0o700],
+    ],
+  );
+  assert.equal(runtimeDirectory(f.options), 0);
+  fs.writeFileSync(join(f.directory, 'relay.sock'), 'relay');
+  const outside = join(f.parent, 'keep');
+  fs.writeFileSync(outside, 'host data');
+  fs.symlinkSync(outside, join(f.directory, 'link'));
+  assert.equal(runtimeDirectory({ ...f.options, stop: true }), 1);
+  assert.equal(fs.existsSync(f.directory), false);
+  assert.equal(fs.readFileSync(outside, 'utf8'), 'host data');
+  assert.equal(runtimeDirectory({ ...f.options, stop: true }), 0);
+  assert.equal(runtimeDirectory(f.options), 1);
+});
+
+for (const kind of ['symlink', 'file', 'directory']) {
+  test(`preparation and stop refuse a pre-planted ${kind}`, (t) => {
+    const f = runtimeFixture(t);
+    const victim = join(f.parent, 'victim');
+    fs.mkdirSync(victim);
+    fs.writeFileSync(join(victim, 'keep'), 'host data');
+    if (kind === 'symlink') fs.symlinkSync(victim, f.directory);
+    if (kind === 'file') fs.writeFileSync(f.directory, 'untrusted');
+    if (kind === 'directory') fs.mkdirSync(f.directory);
+    for (const stop of [false, true])
+      assert.throws(() => runtimeDirectory({ ...f.options, stop }), /unrecognized runtime/i);
+    assert.equal(fs.readFileSync(join(victim, 'keep'), 'utf8'), 'host data');
+    assert.equal(f.calls.length, 0);
+  });
+}
+
+test('stop refuses a replacement symlink even with a preparation record', (t) => {
+  const f = runtimeFixture(t);
+  runtimeDirectory(f.options);
+  fs.renameSync(f.directory, `${f.directory}.original`);
+  const victim = join(f.parent, 'victim');
+  fs.mkdirSync(victim);
+  fs.writeFileSync(join(victim, 'keep'), 'host data');
+  fs.symlinkSync(victim, f.directory);
+  assert.throws(() => runtimeDirectory({ ...f.options, stop: true }), /unrecognized runtime/i);
+  assert.equal(fs.readFileSync(join(victim, 'keep'), 'utf8'), 'host data');
+});
+
+test('dry-run plans creation and removal without touching the filesystem', (t) => {
+  const f = runtimeFixture(t);
+  assert.equal(runtimeDirectory({ ...f.options, dryRun: true }), 1);
+  assert.equal(fs.existsSync(f.directory), false);
+  assert.deepEqual(fs.readdirSync(f.state), []);
+  runtimeDirectory(f.options);
+  assert.equal(runtimeDirectory({ ...f.options, dryRun: true, stop: true }), 1);
+  assert.ok(fs.existsSync(f.directory));
+});
+
+test('unsafe parents, invalid machines and unmappable owners fail before creation', (t) => {
+  const f = runtimeFixture(t);
+  for (const parent of [f.parent, f.state]) {
+    fs.chmodSync(parent, 0o777);
+    assert.throws(() => runtimeDirectory(f.options), /root-owned parent/i);
+    fs.chmodSync(parent, 0o755);
+  }
+  for (const uid of [0, 65534, -1, NaN])
+    assert.throws(() => runtimeDirectory({ ...f.options, uid }), /owner/i);
+  for (const name of ['cairn-orb-base', 'cairn-orb-../../evil', 'unrelated'])
+    assert.throws(() => runtimeDirectory({ ...f.options, name }), /machine/i);
+  assert.equal(fs.existsSync(f.directory), false);
+});
+
+test('a symlink appearing before open cannot receive ownership or mode changes', (t) => {
+  const f = runtimeFixture(t);
+  const victim = join(f.parent, 'victim');
+  fs.mkdirSync(victim, { mode: 0o755 });
+  const io = {
+    ...f.options.io,
+    openSync(path, flags) {
+      if (path === f.directory) {
+        fs.renameSync(path, `${path}.original`);
+        fs.symlinkSync(victim, path);
+      }
+      return f.options.io.openSync(path, flags);
+    },
+  };
+  assert.throws(() => runtimeDirectory({ ...f.options, io }), /ELOOP|ENOTDIR/);
+  assert.equal(fs.statSync(victim).mode & 0o777, 0o755);
+  assert.ok(!f.calls.some(([op]) => op === 'fchown' || op === 'fchmod'));
+});
+
+test('failed fd ownership changes close the fd and never certify the directory', (t) => {
+  const f = runtimeFixture(t);
+  let closed = false;
+  const io = {
+    ...f.options.io,
+    fchownSync() {
+      throw new Error('ownership failed');
+    },
+    closeSync(fd) {
+      closed = true;
+      fs.closeSync(fd);
+    },
+  };
+  assert.throws(() => runtimeDirectory({ ...f.options, io }), /ownership failed/);
+  assert.equal(closed, true);
+  assert.deepEqual(fs.readdirSync(f.state), []);
+  assert.throws(() => runtimeDirectory(f.options), /unrecognized runtime/i);
+});
+
+test('failed stop cleanup preserves the root identity record for retry', (t) => {
+  const f = runtimeFixture(t);
+  runtimeDirectory(f.options);
+  assert.throws(
+    () => runtimeDirectory({ ...f.options, stop: true, run: () => ({ status: 1 }) }),
+    /remove/,
+  );
+  assert.ok(fs.existsSync(f.directory));
+  assert.equal(fs.readdirSync(f.state).length, 1);
+  assert.equal(runtimeDirectory({ ...f.options, stop: true }), 1);
+});
+
+test('first-start dry-run does not require or create the systemd runtime state directory', (t) => {
+  const f = runtimeFixture(t);
+  fs.rmdirSync(f.state);
+  assert.equal(runtimeDirectory({ ...f.options, dryRun: true }), 1);
+  assert.equal(fs.existsSync(f.state), false);
+  assert.equal(fs.existsSync(f.directory), false);
 });

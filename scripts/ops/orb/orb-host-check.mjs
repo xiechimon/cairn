@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { lstatSync, writeFileSync } from 'node:fs';
 import { userInfo } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -67,7 +67,6 @@ export function checkHost({
   user = userInfo().username,
   name = `cairn-orb-check-${randomUUID().slice(0, 8)}`,
   runtimeRoot = '/run/cairn-orb',
-  removeRuntime = rmSync,
   blockedPorts = (process.env.CAIRN_ORB_CHECK_BLOCKED_PORTS ?? '22,5231').split(',').map(Number),
 } = {}) {
   if (user !== 'ian') throw new Error('Run the host check as ian without sudo');
@@ -117,18 +116,30 @@ export function checkHost({
   if (clone.status !== 0) return { ...parseHostCheck(input, { blockedPorts }), errors };
   const directory = join(runtimeRoot, name);
   const requestId = randomUUID();
-  let ownedDirectory = false;
+  let preparedDirectory = false;
   let lifecycle = true;
   try {
-    mkdirSync(directory, { mode: 0o700 });
-    ownedDirectory = true;
+    if (lstatSync(directory, { throwIfNoEntry: false }))
+      throw new Error('Runtime directory already exists');
+    if (call('machinectl', ['--no-ask-password', 'start', name]).status !== 0)
+      throw new Error('start failed');
+    for (let attempt = 0; attempt < 30; attempt++) {
+      const stat = lstatSync(directory, { throwIfNoEntry: false });
+      if (stat) {
+        if (!stat.isDirectory() || stat.uid !== process.getuid() || (stat.mode & 0o7777) !== 0o700)
+          throw new Error('Invalid private runtime directory');
+        preparedDirectory = true;
+        break;
+      }
+      if (attempt < 29) wait();
+    }
+    if (!preparedDirectory)
+      throw new Error('Timed out waiting for root-prepared runtime directory');
     writeFileSync(
       join(directory, 'check-request'),
       JSON.stringify({ version: 1, requestId, blockedPorts }),
       { mode: 0o600, flag: 'wx' },
     );
-    if (call('machinectl', ['--no-ask-password', 'start', name]).status !== 0)
-      throw new Error('start failed');
     let result;
     for (let attempt = 0; attempt < 150; attempt++) {
       try {
@@ -212,12 +223,13 @@ export function checkHost({
     } else {
       const removed = call('machinectl', ['--no-ask-password', 'remove', name]).status === 0;
       if (!removed) lifecycle = false;
-      if (removed && ownedDirectory) {
-        try {
-          removeRuntime(directory, { recursive: true });
-        } catch (error) {
-          lifecycle = false;
-          errors.push(`Cannot remove private runtime directory: ${error.code || 'unknown error'}`);
+      if (removed && preparedDirectory) {
+        for (let attempt = 0; attempt < 30; attempt++) {
+          if (!lstatSync(directory, { throwIfNoEntry: false })) break;
+          if (attempt === 29) {
+            lifecycle = false;
+            errors.push('Timed out waiting for root stop cleanup of runtime directory');
+          } else wait();
         }
       }
     }

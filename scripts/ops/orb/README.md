@@ -39,6 +39,9 @@ The guest dials the host; the host never executes commands in a guest.
   must survive cloning and starting any `cairn-orb-*` instance.
 - NetworkManager keeps physical interfaces; networkd only manages container
   links. The relay binds the container bridge only. No direct routing is enabled.
+- Pre-planted runtime files, symlinks and unrecognized directories are refused.
+  Only root creates or removes bind sources; fd operations set runtime ownership
+  and mode. Parent ownership, modes and hardlink protection fail closed.
 - Dry runs perform no mutations. Completed installs converge to zero changes;
   failed steps are never recorded as completed.
 - Missing images, authorization denial, missing or malformed guest metadata, failed cleanup, broken
@@ -90,20 +93,51 @@ machines receive no Orb binds:
 | `/var/lib/cairn-orb/seed` | `/seed` | read-only, `idmap,norbind` |
 
 The installer prints and installs `/etc/tmpfiles.d/cairn-orb.conf`, which
-recreates `/run/cairn-orb` at boot. All three source directories are owned by
-`ian`, mode `0700`. The host creates each machine's runtime directory with
-mode `0700` before start; the preparation hook rejects symlinks, other owners and other
-modes. It also requires the runtime filesystem to have `nosuid,nodev`.
-`norbind` prevents nested mounts from propagating. `PrivateUsers=pick`
-is retained, and the image pins `agent` to host `ian`'s numeric UID. Per
+recreates `/run/cairn-orb` at boot. Both `/run/cairn-orb` and
+`/var/lib/cairn-orb` are `root:root`, mode `0755`. The installer creates `dist`
+and `seed` inside the latter, owned by `ian`, mode `0755`. Nspawn binds those
+directories themselves, read-only. Their parent cannot be modified by `ian`,
+so changing their contents cannot replace a bind source. Symlinks inside the
+exported directories resolve in the guest namespace and cannot redirect a bind
+to another host path.
+
+At every start, the root `ExecStartPre` preparation hook creates the exact
+`/run/cairn-orb/<machine>` directory. It uses `lstat` to refuse pre-planted files,
+symlinks and directories without its root-owned device/inode record in
+`/run/systemd/nspawn/<machine>.runtime`. It creates a missing directory with
+`mkdir`, opens it with `O_DIRECTORY|O_NOFOLLOW`, then uses `fchown` and `fchmod`
+on that fd to set `ian` ownership and mode `0700`. Repeated preparation recognizes
+the recorded inode. An old runtime directory from the previous owner-writable
+parent design requires administrator inspection and removal before starting;
+it is never adopted automatically. `ExecStopPost` checks the same identity and
+removes only that directory, without following symlinks. GNU `rm` handles nested
+symlinks without traversal and refuses to cross filesystem boundaries. The daemon
+never creates or removes the bind source: after `machinectl start`, it waits for
+the prepared directory, then creates `relay.sock` and `outbox/` inside it.
+
+`norbind` prevents nested mounts from propagating. `PrivateUsers=pick` is retained,
+and the image pins `agent` to host `ian`'s numeric UID. Per
 [systemd's idmap contract](https://www.freedesktop.org/software/systemd/man/latest/systemd-nspawn.html#--bind=),
-that guest UID maps to the host UID only on these mounts. `cairn-runner` cannot
-traverse the host directories. Another container has its own user namespace
-and only its exact runtime directory mounted; the runtime parent and other
-machines' sockets are absent. No network listener exposes the relay socket.
-Actual filesystem idmap support and cross-user/container isolation must still
-be checked on the Linux host after the owner's install; local fakes validate
-the template arguments, ownership gates and directory modes, not kernel mounts.
+identity `idmap` maps guest root to host UID 0 and guest `agent` to host `ian`'s
+UID on these mounts only; it is not a root-to-ian mapping. Outside these binds,
+the private user namespace retains its allocated UID range. Host root-owned
+parents are never mounted, `dist` and `seed` are read-only, and the only writable
+export is the newly prepared disposable runtime directory. Guest-created UID-0
+files may exist there, but unrelated host root-owned files are not exposed.
+The preparation hook requires `fs.protected_hardlinks=1`, preventing `ian` from
+introducing hardlinks to files it neither owns nor can already read and write
+([kernel contract](https://docs.kernel.org/admin-guide/sysctl/fs.html#protected-hardlinks)).
+The runtime filesystem must have `nosuid,nodev`; unsupported protection fails
+startup. Together these controls close source swaps, external symlink traversal
+and hardlink import of host root files that `ian` cannot already modify.
+
+`cairn-runner` cannot traverse a private runtime child. Another container has its
+own user namespace and only its exact runtime directory mounted; the runtime
+parent and other machines' sockets are absent. No network listener exposes the
+relay socket. Actual filesystem idmap support, root/agent UID observations and
+cross-user/container isolation must still be checked on the Linux host after
+installation; local tests validate the installed arguments and exercise directory
+lifecycle operations, with root ownership and GNU cleanup commands simulated.
 
 Fill `dist` with the daemon package and its runtime dependencies, and put
 Project seeds at `/var/lib/cairn-orb/seed/<projectId>/repo`, as `ian`. The image
@@ -156,8 +190,9 @@ require HTTP 403 for both `127.0.0.1:80` and `10.203.0.1:22` (allowed ports, so 
 errors cannot count as successful proxy filtering. Public egress has three
 retries bounded by a 20-second retry window and a 30-second subprocess timeout.
 
-Before start, the checker writes a request ID and blocked-port list to
-`check-request` inside the new private runtime directory. The image's enabled
+After start, the checker waits at most 30 polls for the root-prepared private
+runtime directory and writes a request ID and blocked-port list to `check-request`.
+The image's enabled
 `cairn-orb-check.path` detects that file. The guest writes only exit statuses,
 HTTP status codes, port numbers and request ID to an atomically published
 `check-result.json`, then removes the trigger. No response bodies, headers,
@@ -165,7 +200,9 @@ stderr, credentials or tool output are returned. The host waits at most 150
 polls, rejects symlinks, oversized/nonregular files, stale IDs and unexpected
 fields, then powers off the clone. It polls machine listing for at most 30
 attempts, requests terminate after 15, and removes the clone only once it is
-absent. Failed shutdown/removal preserves the runtime directory for diagnosis.
+absent. Root `ExecStopPost` owns runtime cleanup; the checker waits at most 30
+polls for it and reports missing cleanup as a failure. A still-running machine
+keeps its runtime directory.
 No `systemd-run -M`, `--machine` guest transport, or `machinectl bind/shell/login`
 is used. The template's `systemd-nspawn --machine=<name>` only names a new
 container; the installer addresses the host user manager through `runuser`.
@@ -201,16 +238,13 @@ fail startup instead of falling back to permissive modes. Image UID changes
 require rebuilding the base and recreating existing clones. The build lock is
 root-owned under `/run/lock/cairn-orb`, separate from private relay directories.
 
-transport decided by ian 2026-10-31 (option 1). The independent Claude Opus 5.5
-security review BLOCKed on a mount-source swap race: `ian` owns the runtime
-parent and can replace a checked child with a symlink before nspawn resolves
-it. Guest root also maps to host root within an `idmap` bind, so a malicious
-owner process plus guest root could use that race for host privilege escalation.
-The preparation hook's path checks do not eliminate this race. Changing the
-parent to root ownership and creating children in the existing preparation
-hook would prevent replacement, but differs from the decided owner-writable
-parent contract and awaits ian's decision. Do not treat this rework as approved
-for installation or merge while that finding remains unresolved.
+transport decided by ian 2026-10-31 (option 1). The mount-source swap finding
+is addressed by root-owned bind-source parents, root preparation and stop hooks,
+and fd-based runtime ownership changes. `ian` retains ownership of the source
+contents without permission to rename or replace a source inode. Identity idmap
+is retained with the read-only exports, private runtime and hardlink gate above.
+This records the fix within option 1; it does not claim a new independent review
+verdict or Linux host acceptance.
 
 Every guest can read all Project seeds under the explicitly decided shared
 read-only `/seed` mount; this is not a boundary between Projects. The worker
@@ -219,8 +253,8 @@ unit sets `CAIRN_ORB=1`, but needs the separate daemon change that accepts
 main's stdin/stdout worker cannot satisfy that interface.
 
 Live Linux acceptance and an independent review of the resolved final patch
-remain required before delivery of PR #2341. This local worktree run has no
-sudo or host access.
+remain required before delivery of PR #2341. This macOS worktree run does not
+exercise Linux nspawn mounts, polkit or root host provisioning.
 
 Per-machine runtime settings remain
 under `/run` until reboot. Unrelated administrative actions retain their
