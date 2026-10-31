@@ -325,7 +325,7 @@ export function ProductDetailSection() {
       <Specimen
         title="Fresh task"
         note="FreshBlock before the first run"
-        stage="canvas"
+        stage="sheet"
         className="flex-col"
       >
         <Labeled label="With tags and the start action">
@@ -341,7 +341,7 @@ export function ProductDetailSection() {
           <FreshBlock todo={FRESH} action="开始" onAction={() => {}} actionInFlight />
         </Labeled>
       </Specimen>
-      <Specimen title="Spec and meta" note="SpecBlock, TaskMetaBlock" stage="canvas">
+      <Specimen title="Spec and meta" note="SpecBlock, TaskMetaBlock" stage="sheet">
         <Cell label="SpecBlock">
           <div className="w-120">
             <SpecBlock
@@ -365,7 +365,7 @@ export function ProductDetailSection() {
       <Specimen
         title="Source line"
         note="SourceIssueLine for each source kind"
-        stage="canvas"
+        stage="sheet"
         className="flex-col"
       >
         <Cell label="From a chief orchestration">
@@ -415,7 +415,7 @@ export function ProductDetailSection() {
       <Specimen
         title="Work trace"
         note="WorkTrace collapsed and expanded, InjectedSkills"
-        stage="canvas"
+        stage="sheet"
         className="flex-col"
       >
         <Cell label="Collapsed summary">

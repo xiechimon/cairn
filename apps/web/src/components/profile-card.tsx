@@ -71,7 +71,7 @@ export function ProfileHeader({
               id={inputId}
               ref={inputRef}
               aria-label={t('名称')}
-              className="h-8 w-48 bg-card text-ui md:text-ui"
+              className="h-8 min-w-0 flex-auto bg-card text-ui md:text-ui"
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={(event) => {

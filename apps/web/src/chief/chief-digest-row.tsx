@@ -15,10 +15,10 @@ import { AGENTS_HREF } from '../routes/agent-detail-page.js';
 const DIVIDER_CLS =
   "my-3 flex items-center gap-3 text-meta text-content-tertiary before:h-px before:flex-1 before:bg-border before:content-[''] after:h-px after:flex-1 after:bg-border after:content-['']";
 const TOGGLE_CLS =
-  'h-7 max-w-[calc(100%-3rem)] gap-1.5 rounded-full px-2.5 text-meta font-normal whitespace-normal text-content-secondary [&_svg]:transition-transform [&_svg]:duration-200 aria-expanded:[&_svg]:rotate-180';
+  'h-7 max-w-[calc(100%-3rem)] gap-1.5 rounded-(--radius-control) px-2 text-meta font-normal whitespace-normal text-content-tertiary hover:text-foreground aria-expanded:bg-transparent aria-expanded:text-foreground [&_svg]:transition-transform [&_svg]:duration-200 aria-expanded:[&_svg]:rotate-180';
 const CARD_CLS =
   'mb-3 flex flex-col gap-3 rounded-(--radius-card) border border-border bg-card px-3.5 py-3 text-ui leading-6 text-content-secondary';
-const GROUP_CLS = 'grid grid-cols-[3.25rem_minmax(0,1fr)] gap-x-2.5 gap-y-1.5';
+const GROUP_CLS = 'grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-3 gap-y-1.5';
 const ITEM_CLS = 'flex min-w-0 items-start gap-2 data-gone:opacity-60';
 const ITEM_TEXT_CLS =
   'min-w-0 flex-1 text-foreground [&>:first-child]:mt-0! [&>:last-child]:mb-0! [[data-gone]_&]:line-through';
@@ -50,7 +50,7 @@ export function ChiefDigestRow({
     <MessageScrollerItem style={{ contentVisibility: 'visible' }}>
       <div className={DIVIDER_CLS} data-testid="chief-digest">
         <Button
-          variant="outline"
+          variant="ghost"
           className={TOGGLE_CLS}
           aria-expanded={open}
           aria-controls={cardId}
@@ -77,7 +77,7 @@ export function ChiefDigestRow({
           if (groupItems.length === 0) return null;
           return (
             <div key={group} data-testid="chief-digest-group" className={GROUP_CLS}>
-              <span className="pt-px text-meta text-content-tertiary">
+              <span className="truncate pt-px text-meta text-content-tertiary">
                 {t(CHIEF_DIGEST_GROUP_LABELS[group])}
               </span>
               <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
