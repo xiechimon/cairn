@@ -73,6 +73,9 @@ test.each(['fresh', 'upgrade'])(
           enabled: 1,
           lastRunAt: null,
           lastRunStatus: null,
+          lastRunError: null,
+          lastRunStepId: null,
+          retryNotBefore: null,
           pausedReason: null,
         },
       ]);

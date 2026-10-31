@@ -8873,6 +8873,12 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > sch
         },
       ],
     },
+    "lastRunError": {
+      "type": [
+        "string",
+        "null",
+      ],
+    },
     "lastRunStatus": {
       "type": [
         "string",

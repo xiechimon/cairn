@@ -16,6 +16,7 @@ import {
   pushDelivery,
   pushDigestItem,
   schedule,
+  step,
   todo,
 } from '../db/schema.js';
 import { planHasOpenDecisions } from './plan-decisions.js';
@@ -174,16 +175,24 @@ export function notifyThreadPhase(deps: ThreadPushDeps, record: TodoRecord, to: 
   let immediate = false;
   if (latest !== undefined) {
     if (to === 'done' || to === 'failed') {
+      const wakeStep = deps.db
+        .select({ scheduledBy: step.scheduledBy })
+        .from(step)
+        .where(eq(step.buildId, latest.id))
+        .orderBy(desc(step.createdAt))
+        .get();
       const scheduled =
         latest.triggerSource === 'schedule'
           ? deps.db.select().from(schedule).where(eq(schedule.todoId, record.id)).get()
           : undefined;
       immediate =
         record.sourceKind !== 'github-issue' &&
-        (latest.triggerSource === 'user' ||
-          latest.triggerSource === 'chief' ||
-          (latest.triggerSource === 'schedule' &&
-            (latest.scheduledBy ?? scheduled?.createdBy) === deps.user.id));
+        (wakeStep?.scheduledBy != null
+          ? wakeStep.scheduledBy === deps.user.id
+          : latest.triggerSource === 'user' ||
+            latest.triggerSource === 'chief' ||
+            (latest.triggerSource === 'schedule' &&
+              (latest.scheduledBy ?? scheduled?.createdBy) === deps.user.id));
     } else {
       const projectRow = deps.db
         .select()

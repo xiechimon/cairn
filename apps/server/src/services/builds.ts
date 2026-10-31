@@ -81,6 +81,7 @@ import {
   plan as planTable,
   project,
   queuedMessage,
+  schedule,
   steerPending,
   step,
   stopPending,
@@ -136,6 +137,7 @@ import { projectMergeConfigOf } from './projects.js';
 import type { VapidKeys } from './push.js';
 import { publishStepRow, toQuotaWait } from './quota-wait.js';
 import { retryLessonsOf } from './retry-lessons.js';
+import { finishScheduledStep } from './schedules.js';
 import { assertSplitProposalExecutable } from './split-proposal.js';
 import { stepQueueProjector } from './step-queue.js';
 import {
@@ -196,10 +198,17 @@ function publishBuild(deps: BuildDeps, row: BuildRow): BuildRecord {
   return record;
 }
 
+export class BuildContinuationPhaseError extends HttpError {
+  constructor() {
+    super(409, 'Conversation phase cannot accept a continuation');
+  }
+}
+
 interface BuildSteerOptions {
   allowReviewContinuation?: boolean;
   afterTurn?: boolean;
   human?: boolean;
+  schedule?: { id: string; createdBy: string; at: number };
 }
 
 function continuationTodo(
@@ -231,6 +240,8 @@ function continuationTodo(
       row !== undefined &&
       (['planning', 'building', 'confirm', 'review', 'failed'].includes(row.phase) ||
         (row.phase === 'todo' && stopped)));
+  if (row && row.archivedAt === null && row.latestBuildId === buildRow.id && (!resumable || active))
+    throw new BuildContinuationPhaseError();
   if (
     !row ||
     row.archivedAt !== null ||
@@ -267,15 +278,15 @@ export async function sendBuildSteer(
     .all()
     .at(-1);
   let todoRow = db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
-  if (
-    !todoRow ||
-    todoRow.archivedAt !== null ||
-    todoRow.latestBuildId !== conversationId ||
-    todoRow.phase === 'closed'
-  )
+  if (todoRow?.phase === 'closed' && todoRow.archivedAt === null)
+    throw new BuildContinuationPhaseError();
+  if (!todoRow || todoRow.archivedAt !== null || todoRow.latestBuildId !== conversationId)
     throw new HttpError(409, 'Task cannot accept a message');
   let targetBuildId = conversationId;
   let prClosed: 'closed' | null = null;
+  if (running && continuationOptions.schedule) {
+    throw new HttpError(409, 'Scheduled continuation requires an idle thread');
+  }
   if (!running) {
     todoRow = continuationTodo(deps, buildRow, continuationOptions);
     if (projectOfTodo(db, todoRow)?.repoKind === 'local') {
@@ -311,7 +322,26 @@ export async function sendBuildSteer(
       if (prClosed === 'closed') targetBuildId = newUuidv7();
     }
   }
+  if (continuationOptions.schedule && targetBuildId !== conversationId) {
+    throw new HttpError(
+      409,
+      'Scheduled continuation would require a new build after the previous delivery. Create a new task.',
+    );
+  }
   return db.transaction(() => {
+    if (continuationOptions.schedule) {
+      const wake = continuationOptions.schedule;
+      const current = db.select().from(schedule).where(eq(schedule.id, wake.id)).get();
+      if (!current?.enabled || current.nextRunAt === null || current.nextRunAt > wake.at) {
+        throw new HttpError(409, 'Scheduled wake is no longer enabled or due');
+      }
+      if (
+        wake.createdBy.startsWith('worker:') &&
+        ['confirm', 'review'].includes(todoRow?.phase ?? '')
+      ) {
+        throw new HttpError(409, 'Worker schedule is waiting at a confirmation or review gate');
+      }
+    }
     if (
       body.queuedMessageId !== undefined &&
       !db
@@ -362,7 +392,7 @@ export async function sendBuildSteer(
         createdAt: now,
       });
     }
-    insertMessageRow(deps, targetBuildId, messageRow);
+    if (!continuationOptions.schedule) insertMessageRow(deps, targetBuildId, messageRow);
     if (running) {
       db.insert(steerPending)
         .values({ conversationId, stepId: running.id, content: body.content, createdAt: now })
@@ -373,7 +403,8 @@ export async function sendBuildSteer(
         .run();
     }
     if (todoRow) {
-      addUserMessageAttachmentGrants(db, todoRow.id, todoRow.teamId, body.content);
+      if (!continuationOptions.schedule)
+        addUserMessageAttachmentGrants(db, todoRow.id, todoRow.teamId, body.content);
       if (running) {
         deps.machineHub?.steerSignal(todoRow.teamId, running.id);
       } else {
@@ -390,13 +421,26 @@ export async function sendBuildSteer(
           .where(and(eq(step.buildId, conversationId), inArray(step.kind, ['plan', 'build'])))
           .orderBy(desc(step.createdAt))
           .get();
-        enqueueStep(
+        const continuedStep = enqueueStep(
           deps,
           targetBuildId,
           continuationOptions.afterTurn && previousWork?.kind === 'plan' ? 'plan' : 'build',
           todoRow.teamId,
           body.content,
         );
+        if (continuationOptions.schedule) {
+          const wake = continuationOptions.schedule;
+          db.update(step)
+            .set({ scheduleId: wake.id, scheduledBy: wake.createdBy })
+            .where(eq(step.id, continuedStep.id))
+            .run();
+          insertMessageRow(deps, targetBuildId, {
+            id: `schedule-wake-${continuedStep.id}`,
+            role: 'system',
+            content: JSON.stringify({ kind: 'schedule-wake', stepId: continuedStep.id }),
+            createdAt: wake.at,
+          });
+        }
         const continued = db.select().from(build).where(eq(build.id, targetBuildId)).get();
         if (continued) publishBuild(deps, continued);
       }
@@ -552,6 +596,7 @@ export function applyStoppedStep(deps: BuildDeps, stepId: string): void {
     .set({ status: 'stopped', finishedAt: nowMs(), archiveStop: null })
     .where(eq(step.id, stepId))
     .run();
+  finishScheduledStep(deps, stepRow, { status: 'stopped' });
   db.delete(stopPending).where(eq(stopPending.stepId, stepId)).run();
   const stoppedRow = db.select().from(step).where(eq(step.id, stepId)).get();
   if (stoppedRow) publishStepRow(deps, stoppedRow);
@@ -656,6 +701,7 @@ function stopStepKeepPhase(deps: BuildDeps, stepId: string): void {
     .set({ status: 'stopped', finishedAt: nowMs(), archiveStop: null })
     .where(eq(step.id, stepId))
     .run();
+  finishScheduledStep(deps, stepRow, { status: 'stopped' });
   db.delete(stopPending).where(eq(stopPending.stepId, stepId)).run();
   const stoppedRow = db.select().from(step).where(eq(step.id, stepId)).get();
   if (stoppedRow) publishStepRow(deps, stoppedRow);
@@ -684,6 +730,7 @@ export function stopUnclaimedGateSteps(
   for (const row of rows) {
     const finishedAt = nowMs();
     deps.db.update(step).set({ status: 'stopped', finishedAt }).where(eq(step.id, row.id)).run();
+    finishScheduledStep(deps, row, { status: 'stopped' });
     publishStepRow(deps, { ...row, status: 'stopped', finishedAt });
   }
   return rows.map((r) => r.kind);
@@ -2157,6 +2204,7 @@ export function noteDeliveredPlanResidual(
       actor: null,
     });
   }
+  finishScheduledStep(deps, stepRow, { status: 'failed', error: reason });
   return true;
 }
 
@@ -2194,6 +2242,7 @@ export function applyStepFailure(
   ) {
     return;
   }
+  finishScheduledStep(deps, stepRow, { status: 'failed', error: errorMessage });
   db.update(build).set({ errorMessage }).where(eq(build.id, buildRow.id)).run();
   if (stepRow.kind === 'build') {
     const changes = buildRow.changes;
@@ -2503,6 +2552,7 @@ export function completeStep(
       .set({ status: 'done', finishedAt: nowMs() })
       .where(eq(step.id, stepId))
       .run();
+    finishScheduledStep(deps, stepRow);
     return;
   }
   const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
@@ -2512,6 +2562,7 @@ export function completeStep(
       .set({ status: 'done', finishedAt: nowMs() })
       .where(eq(step.id, stepId))
       .run();
+    finishScheduledStep(deps, stepRow);
     return;
   }
   const reserved = afterStopPhaseByBuild.get(buildRow.id);
@@ -2528,6 +2579,7 @@ export function completeStep(
       .set({ status: 'done', finishedAt: nowMs() })
       .where(eq(step.id, stepId))
       .run();
+    finishScheduledStep(deps, stepRow);
     if (reserved !== undefined && reserved !== 'keep') landReservedPhase(deps, todoRow, reserved);
     return;
   }
@@ -2562,6 +2614,8 @@ export function completeStep(
     .set({ status: 'done', finishedAt: nowMs() })
     .where(eq(step.id, stepId))
     .run();
+
+  finishScheduledStep(deps, stepRow);
 
   if (stepRow.kind === 'plan') {
     const planDoc = deps.db

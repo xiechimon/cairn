@@ -90,6 +90,7 @@ import {
 import { markModelDead } from './model-liveness.js';
 import { notifyModelFallback } from './notifications.js';
 import { applyQuotaWaitStep } from './quota-wait.js';
+import { finishScheduledStep } from './schedules.js';
 import { drainTaskMessageQueue } from './task-message-queue.js';
 import { costFromRates, ratesForModel } from './token-usage-cost.js';
 
@@ -580,6 +581,7 @@ async function finishStepReport(
       applyStepFailure(deps, stepRow, deadLoopMessage(rounds), verdictReport);
     } else {
       db.update(step).set({ status: 'done', finishedAt: nowMs() }).where(eq(step.id, stepId)).run();
+      finishScheduledStep(deps, stepRow);
       const buildRow = db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
       const prompt =
         buildRow?.prNumber != null

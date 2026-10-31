@@ -192,9 +192,9 @@ describe('cron cadence in Asia/Shanghai', () => {
     const record = scheduleRecordSchema.parse(await response.json());
     const firstRun = record.nextRunAt as number;
     const scheduler = createScheduler(s.svc, { tickMs: 60_000 });
-    scheduler.tick(firstRun);
+    await scheduler.tick(firstRun);
     expect(s.db.select().from(schedule).get()?.nextRunAt).toBe(firstRun + 600_000);
-    scheduler.tick(firstRun + 600_000);
+    await scheduler.tick(firstRun + 600_000);
     expect(s.db.select().from(schedule).get()?.nextRunAt).toBe(firstRun + 1_200_000);
     const builds = await (await req(s.app, 'GET', `/api/projects/${s.projectId}/builds`)).json();
     expect(builds).toHaveLength(1);
@@ -211,7 +211,7 @@ describe('cron cadence in Asia/Shanghai', () => {
     });
     expect(response.status).toBe(201);
     const record = scheduleRecordSchema.parse(await response.json());
-    createScheduler(s.svc, { tickMs: 60_000 }).tick(record.nextRunAt as number);
+    await createScheduler(s.svc, { tickMs: 60_000 }).tick(record.nextRunAt as number);
     expect(await (await req(s.app, 'GET', `/api/projects/${s.projectId}/builds`)).json()).toEqual(
       [],
     );
@@ -229,8 +229,8 @@ describe('cron cadence in Asia/Shanghai', () => {
     const record = scheduleRecordSchema.parse(await response.json());
     s.db.update(schedule).set({ cron: 'not a cron' }).where(eq(schedule.id, record.id)).run();
     const scheduler = createScheduler(s.svc, { tickMs: 60_000 });
-    expect(() => scheduler.tick(record.nextRunAt as number)).not.toThrow();
-    expect(() => scheduler.tick((record.nextRunAt as number) + 600_000)).not.toThrow();
+    await expect(scheduler.tick(record.nextRunAt as number)).resolves.toBeUndefined();
+    await expect(scheduler.tick((record.nextRunAt as number) + 600_000)).resolves.toBeUndefined();
     expect(await (await req(s.app, 'GET', `/api/projects/${s.projectId}/builds`)).json()).toEqual(
       [],
     );
