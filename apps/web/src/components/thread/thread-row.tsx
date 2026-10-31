@@ -87,7 +87,8 @@ export function ThreadRow({
         className={cn(
           'flex-none pt-0.5 font-mono text-caption text-content-tertiary',
           tone === 'working' && 'text-running-text',
-          (selected || menu != null) && 'group-hover/row:invisible',
+          (selected || menu != null) &&
+            'group-focus-within/row:invisible group-hover/row:invisible',
           selected && 'invisible',
         )}
       >
