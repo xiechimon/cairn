@@ -1,6 +1,6 @@
 {
   "frozenFrom": {
-    "sha": "a0b4a1a39affa6f0f2b6f093d2f98a4a4acbee9c",
+    "sha": "4d455d74c98098905bc2a0e804dff0704149ef13",
     "date": "2026-10-31"
   },
   "scope": "apps/web/src; per-face css = *.css minus the ui-debt-gate.mjs WHITELIST (carrier layer); bare controls = <button|<input|<select|<textarea occurrences in *.tsx minus components/ui/; arbitrary values = text-[<len>] and SPACING_UTILITIES-[<len>] (px|rem|em, or interpolated) in *.ts/*.tsx minus components/ui/ and test files",
