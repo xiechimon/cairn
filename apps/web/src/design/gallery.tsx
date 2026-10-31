@@ -97,10 +97,10 @@ const NAV = [
     ],
   },
   {
-    id: 'stone-language',
-    title: 'Stone language',
+    id: 'inbox-threads',
+    title: 'Inbox and threads',
     items: [
-      ['stone', 'Stone marks and trail'],
+      ['stone', 'Inbox groups'],
       ['thread-card', 'Thread card'],
       ['thread-row', 'Thread row and bulk bar'],
       ['permission', 'Permission and proposal'],
@@ -277,9 +277,9 @@ export function Gallery() {
             <ProductPagesSection theme={theme} />
           </ProductProviders>
           <GroupTitle
-            id="stone-language"
-            title="Stone language"
-            lede="The status marks, cards and bars prototype A is built from, as reusable components in src/components. Pages compose only these."
+            id="inbox-threads"
+            title="Inbox and threads"
+            lede="The inbox groups, thread cards and rows, and the bars prototype A is built from, as reusable components in src/components. Pages compose only these."
           />
           <StoneSection />
           <ThreadCardSection />

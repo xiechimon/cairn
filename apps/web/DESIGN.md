@@ -22,7 +22,7 @@ colors:
   on-primary: '#f4f6f1'
   on-accent: '#ffffff'     # text on count badges
   accent-hover: '#f7ecd2'  # action link hover background
-  menu-hover: '#eff1eb'    # menu row hover background
+  menu-hover: 'rgb(29 35 31 / 0.1)'  # menu row hover: 10% ink over any surface (Claude.ai's value)
   backdrop: 'rgb(29 35 31 / 0.28)'  # dialog backdrop (ink dim, no blur)
   running: '#5f8f4f'       # working: running icon, online dot
   running-text: '#3f6c35'  # working text
@@ -55,7 +55,7 @@ colors-dark:
   on-primary: '#161a17'
   on-accent: '#1a1404'
   accent-hover: '#33290f'
-  menu-hover: '#2e3430'
+  menu-hover: 'rgb(230 232 226 / 0.1)'
   backdrop: 'rgba(0, 0, 0, 0.5)'
   running: '#82b46f'
   running-text: '#9cc78b'
@@ -86,7 +86,7 @@ fonts:
 rounded:
   field: 8px         # rounded-md: inputs, selects, segmented tracks, dialog and form primary buttons
   control: 8px       # --radius-control = rounded-lg: default Button, icon buttons, rows
-  menu-item: 12px    # --radius-menu-item = menu radius minus the 6px menu padding
+  menu-item: 8px     # --radius-menu-item = menu radius minus the 4px menu padding
   card: 14px         # --radius-card = rounded-xl: one corner for every card-like surface
   sheet: 18px        # --edge-radius: dialogs, ⌘K
   menu: 12px         # --radius-popover: menus, floating surfaces, dropdowns
@@ -193,6 +193,10 @@ From top to bottom:
 - The selected row in pickers that are not menus: white card (`card`) + `line` hairline ring + at most one extremely light shadow (0 1px 2px). No hover tint, no accent.
 - ⌘K is a menu-style palette (Linear): 640px, rows 32px with the `menu-hover` fill and 8px corners. On a task page the task rides along as a chip above the input and its commands come first under "This task"; typing filters commands and results together; Backspace on an empty input drops the chip. A footer row shows the keys (move, open, drop context, close).
 - Folder picker (`DirBrowser`, Amp's project picker): a search / paste-a-path input, then Recent (picked folders and project folders) and the git repositories in the last browsed folder; each row is name, grey path on the right and a `git` tag. "Browse folders…" at the bottom opens the old breadcrumb tree.
+
+### Slash and @ lists (Claude Code)
+- The slash list is 240px of 28px rows: the command name in sans `text-ui`, no `/` prefix and no monospace, the typed part in bold; no group headings, a thin rule between commands and skills. The description shows only as a dark bubble beside the highlighted row.
+- The @ list is one mixed list (agents, tasks, projects, files) with no headings or rules: a 16px avatar or outlined kind icon, the name, then its secondary text inline in `ink-3`, truncated.
 
 ### Task header and status
 - The task detail header is one 44px line (Amp): back, project tile + project name + `#seq` in `ink-3`, the title in sans 15px/600, the status as a ghost pill (bg only on hover, full radius, glyph in its tone, label in `ink`), then on the right the agent, ⋯ and the primary action when there is one.

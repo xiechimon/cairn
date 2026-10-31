@@ -19,11 +19,18 @@ import {
   step,
   todo,
 } from '../db/schema.js';
+import type { TeamStreamHub } from './events.js';
 import { planHasOpenDecisions } from './plan-decisions.js';
 import { projectMergeConfigOf } from './projects.js';
-import { isArchivedTodoPush, pushToUserSafely, queuePushDigest, type VapidKeys } from './push.js';
+import { isSilencedTodoPush, pushToUserSafely, queuePushDigest, type VapidKeys } from './push.js';
+import { endSnoozeOn } from './snooze.js';
 
-type ThreadPushDeps = { db: Db; user: UserRecord; vapidKeys?: VapidKeys | null };
+type ThreadPushDeps = {
+  db: Db;
+  hub?: TeamStreamHub;
+  user: UserRecord;
+  vapidKeys?: VapidKeys | null;
+};
 
 export function pendingWorkerQuestion(content: unknown): string | null {
   let value = content;
@@ -62,6 +69,7 @@ export function pushWorkerQuestion(
     row.phase === 'closed'
   )
     return;
+  if (deps.hub) endSnoozeOn({ ...deps, hub: deps.hub }, row.id, 'needs-you');
   pushToUserSafely(deps.db, deps.vapidKeys ?? null, deps.user.id, row.teamId, {
     title: '需要你决定',
     body,
@@ -102,7 +110,13 @@ export function notifyEvaluatedReview(
     .innerJoin(todo, eq(todo.id, build.todoId))
     .where(eq(build.id, buildId))
     .get()?.todo;
-  if (row?.phase !== 'review' || row.latestBuildId !== buildId || row.archivedAt !== null) return;
+  if (
+    row?.phase !== 'review' ||
+    row.latestBuildId !== buildId ||
+    row.archivedAt !== null ||
+    row.snoozeMode !== null
+  )
+    return;
   const marker = deps.db
     .select()
     .from(pushDelivery)
@@ -143,7 +157,7 @@ export function notifyEvaluatedReview(
 
 export function notifyThreadPhase(deps: ThreadPushDeps, record: TodoRecord, to: Phase): void {
   if (to !== 'confirm' && to !== 'review' && to !== 'done' && to !== 'failed') return;
-  if (isArchivedTodoPush(deps.db, record.teamId, `/app/todo/${record.id}`)) return;
+  if (isSilencedTodoPush(deps.db, record.teamId, `/app/todo/${record.id}`)) return;
   const latest = deps.db
     .select()
     .from(build)

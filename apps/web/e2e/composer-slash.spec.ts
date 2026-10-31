@@ -161,10 +161,10 @@ test('trigger: `/` opens builtins then skills, paths and mid-word stay literal (
   await input.fill('/');
   await expect(menu).toBeVisible();
   await expect(rows).toHaveCount(5);
-  await expect(rows.nth(0)).toContainText('/clear');
-  await expect(rows.nth(2)).toContainText('/help');
-  await expect(rows.nth(3)).toContainText('/code-review');
-  await expect(rows.nth(4)).toContainText('/spell-check');
+  await expect(rows.nth(0)).toHaveText('clear');
+  await expect(rows.nth(2)).toHaveText('help');
+  await expect(rows.nth(3)).toHaveText('code-review');
+  await expect(rows.nth(4)).toHaveText('spell-check');
 
   await input.fill('好的。/');
   await expect(menu).toBeVisible();
@@ -176,12 +176,12 @@ test('filter: word-prefix only, alias, empty state (F3/F7)', async ({ page }) =>
 
   await input.fill('/cl');
   await expect(rows).toHaveCount(1);
-  await expect(rows.first()).toContainText('/clear');
+  await expect(rows.first()).toHaveText('clear');
 
   // Alias: `/new` highlights `/clear` (canon rule 48).
   await input.fill('/new');
   await expect(rows).toHaveCount(1);
-  await expect(rows.first()).toContainText('/clear');
+  await expect(rows.first()).toHaveText('clear');
 
   // Subsequence is not a match: `/sl` hits no word boundary (F3).
   await input.fill('/sl');
@@ -211,7 +211,7 @@ test('Enter on a highlighted execute row runs it without sending (F1)', async ({
 
   await input.fill('some draft');
   await input.fill('/clear');
-  await expect(rows.first()).toContainText('/clear');
+  await expect(rows.first()).toHaveText('clear');
   await input.press('ArrowDown');
   await input.press('Enter');
   await expect(menu).toBeHidden();
@@ -238,7 +238,7 @@ test('mid-prompt accept inserts literal text, never runs (F5)', async ({ page })
   const { input, menu, rows, sent } = await openDetail(page);
 
   await input.fill('hi /clear');
-  await expect(rows.first()).toContainText('/clear');
+  await expect(rows.first()).toHaveText('clear');
   await input.press('ArrowDown');
   await input.press('Enter');
   await expect(menu).toBeHidden();
@@ -284,7 +284,7 @@ test('skill row inserts the display token with trailing space', async ({ page })
 
   await input.fill('/code');
   await expect(rows).toHaveCount(1);
-  await expect(rows.first()).toContainText('/code-review');
+  await expect(rows.first()).toHaveText('code-review');
   await input.press('ArrowDown');
   await input.press('Enter');
   await expect(input).toHaveValue('@code-review ');

@@ -180,7 +180,7 @@ test('Paper menu: 32px rows, 14px text, 15px icons, 12px panel corners, 4px padd
   }
   const copy = menu.locator('.more-menu-item', { hasText: '复制链接' });
   await copy.hover();
-  await expect(copy).toHaveCSS('background-color', await resolveColor(page, '#eff1eb'));
+  await expect(copy).toHaveCSS('background-color', await resolveColor(page, 'var(--menu-hover)'));
   await expect(menu.getByRole('separator')).toHaveCount(1);
   await evidenceShot(page, 'more-menu.png');
 });

@@ -1,10 +1,10 @@
 import { cn } from 'cn';
 import { Check, ChevronDown, GitPullRequest, LoaderCircle, X } from 'lucide-react';
 import { useId } from 'react';
+import { StatusGlyph } from '../status-glyph.js';
 import { ToggleSwitch } from '../toggle-switch.js';
 import { Button } from '../ui/button.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover.js';
-import { StatusChip } from '../ui/status-chip.js';
 
 export type CiState = 'passed' | 'running' | 'failed';
 
@@ -87,14 +87,14 @@ export function PrBar({
       )}
     >
       <GitPullRequest className="size-3.5 flex-none text-content-secondary" />
-      <span className="font-mono text-content-secondary">#{number}</span>
+      <span className="text-content-secondary tabular-nums">#{number}</span>
       <span className="min-w-0 truncate font-mono text-content-secondary">{branch}</span>
       <span className="ml-auto flex flex-none items-center gap-2">
         {merged ? (
-          <StatusChip tone="plan" className="h-6.5 gap-1.5 rounded-lg px-2.25 text-meta">
-            <Check className="size-3" />
+          <span className="inline-flex h-6.5 items-center gap-1.5 px-1 text-meta font-medium text-content-secondary">
+            <StatusGlyph kind="done" className="size-3.5 text-running" />
             Merged
-          </StatusChip>
+          </span>
         ) : (
           <>
             <Popover>
@@ -103,7 +103,7 @@ export function PrBar({
                 className={cn(
                   'inline-flex h-6.5 items-center gap-1.5 rounded-lg px-2.25 text-meta font-medium whitespace-nowrap outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
                   ci.state === 'passed' && 'bg-(--chip-done-bg) text-(--chip-done-fg)',
-                  ci.state === 'running' && 'bg-(--chip-confirm-bg) text-(--chip-confirm-fg)',
+                  ci.state === 'running' && 'bg-secondary text-content-secondary',
                   ci.state === 'failed' && 'bg-(--chip-failed-bg) text-(--chip-failed-fg)',
                 )}
               >

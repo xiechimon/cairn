@@ -66,7 +66,8 @@ test('hover reveals the menu; archive sits inside it and drops the row', async (
   await expect(page.getByTestId('thread-row-copy-link')).toBeVisible();
   await expect(page.getByTestId('thread-row-delete')).toBeVisible();
   await expect(page.getByTestId('thread-row-mark-unread')).toBeVisible();
-  await expect(page.getByRole('menuitem')).toHaveCount(4);
+  await expect(page.getByTestId('thread-row-snooze')).toBeVisible();
+  await expect(page.getByRole('menuitem')).toHaveCount(5);
 
   await page.getByTestId('thread-row-archive').click();
   await expect(group(page, 'P1').getByTestId('sidebar-thread-row')).toHaveCount(0);
