@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, realpathSync, rmSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { type AgentBackend, type AgentSessionHandle, conversationBranch } from '@cairn/shared';
 import { createGeminiBackend } from '../backend/acp.js';
 import { createClaudeCodeBackend } from '../backend/claude-code.js';
@@ -14,17 +15,28 @@ import { readSessionJsonlForUpload } from '../session-jsonl.js';
 import { ensureStateDirs, recordSession, resolveSessionFile, statePaths } from '../state.js';
 import { StepStops, type StopRequest } from '../step-stops.js';
 import { WorkspaceManager } from '../workspace.js';
-import type { OrbFrame } from './protocol.js';
-import { RelayMachineApi } from './relay.js';
+import { type OrbFrame, orbReleaseKeySchema } from './protocol.js';
+import { OrbStaleReleaseError, RelayMachineApi } from './relay.js';
 
 export async function runOrbWorker(options: {
   socketPath: string;
+  entryPath?: string;
   backendFor?: (provider: string | null | undefined) => AgentBackend;
   home?: string;
   workspacesRoot?: string;
   seedRoot?: string;
   outboxRoot?: string;
 }): Promise<void> {
+  const entry = realpathSync(options.entryPath ?? fileURLToPath(import.meta.url));
+  const directory = dirname(entry);
+  const releaseRoot = dirname(directory);
+  if (
+    basename(entry) !== 'cli.mjs' ||
+    basename(directory) !== 'dist' ||
+    basename(dirname(releaseRoot)) !== 'releases'
+  )
+    throw new Error('Orb worker entry must resolve to releases/<key>/dist/cli.mjs');
+  const release = orbReleaseKeySchema.parse(basename(releaseRoot));
   let relay: RelayMachineApi | undefined;
   const send = (frame: OrbFrame) => relay?.send(frame);
   const sessions = new (class extends Map<string, AgentSessionHandle> {
@@ -42,36 +54,46 @@ export async function runOrbWorker(options: {
   const stops = new StepStops();
   let activeStep: string | null = null;
   let stopRequest: StopRequest | undefined;
-  relay = await RelayMachineApi.connect(
-    options.socketPath,
-    (frame) => {
-      if (frame.type === 'stop') {
-        stopRequest = { discard: frame.discard };
+  while (!existsSync(options.socketPath) || !existsSync(`${options.socketPath}.token`))
+    await new Promise<void>((resolve) => setTimeout(resolve, 100));
+  try {
+    relay = await RelayMachineApi.connect(
+      options.socketPath,
+      release,
+      (frame) => {
+        if (frame.type === 'stop') {
+          stopRequest = { discard: frame.discard };
+          if (activeStep)
+            void stops
+              .get(activeStep)
+              ?.deliver(stopRequest)
+              .catch((error: unknown) => send({ type: 'log', message: String(error) }));
+        } else if (frame.type === 'steer' && activeStep) {
+          const session = sessions.get(activeStep);
+          void (
+            session
+              ? session.steer(frame.text, frame.images)
+              : Promise.reject(new Error('No live orb session'))
+          ).then(
+            () => send({ type: 'steered', id: frame.id }),
+            (error: unknown) => send({ type: 'steered', id: frame.id, error: String(error) }),
+          );
+        }
+      },
+      () => {
         if (activeStep)
           void stops
             .get(activeStep)
-            ?.deliver(stopRequest)
-            .catch((error: unknown) => send({ type: 'log', message: String(error) }));
-      } else if (frame.type === 'steer' && activeStep) {
-        const session = sessions.get(activeStep);
-        void (
-          session
-            ? session.steer(frame.text, frame.images)
-            : Promise.reject(new Error('No live orb session'))
-        ).then(
-          () => send({ type: 'steered', id: frame.id }),
-          (error: unknown) => send({ type: 'steered', id: frame.id, error: String(error) }),
-        );
-      }
-    },
-    () => {
-      if (activeStep)
-        void stops
-          .get(activeStep)
-          ?.deliver({ discard: false })
-          .catch(() => {});
-    },
-  );
+            ?.deliver({ discard: false })
+            .catch(() => {});
+      },
+    );
+  } catch (error) {
+    if (!(error instanceof OrbStaleReleaseError)) throw error;
+    process.stderr.write(`${error.message}\n`);
+    process.exitCode = 75;
+    return;
+  }
   try {
     const input = await relay.input;
     const connection = relay;
@@ -83,7 +105,7 @@ export async function runOrbWorker(options: {
         (...args: string[]) =>
           send({ type: 'log', message: args.at(-1) ?? '' }),
     });
-    setupProxy(logger);
+    setupProxy(logger, { ...process.env, ...input.options.env });
     const workspacesDir = options.workspacesRoot ?? '/work';
     const paths = statePaths(options.home ?? '/home/agent/.cairn', workspacesDir);
     ensureStateDirs(paths);

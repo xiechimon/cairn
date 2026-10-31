@@ -1,428 +1,263 @@
-import { mkdtempSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, test, vi } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { OrbLifecycle, resolveOrbCap } from '../src/orb/lifecycle.js';
 import { HostOrbProvider, NspawnOrbProvider, type OrbCommandRunner } from '../src/orb/provider.js';
+import { rejectGuestExec } from './orb-fake.js';
 
 function fixture() {
-  const commands: { argv: readonly string[]; env?: NodeJS.ProcessEnv }[] = [];
-  const runner: OrbCommandRunner = async (argv, options) => {
-    commands.push({ argv, env: options?.env });
-    return { code: 0, stdout: '', stderr: '' };
+  const runtimeRoot = mkdtempSync(join(tmpdir(), 'orb-provider-run-'));
+  const commands: string[][] = [];
+  const machines = new Set<string>();
+  const runner: OrbCommandRunner = async (argv) => {
+    rejectGuestExec(argv);
+    commands.push([...argv]);
+    if (argv[1] === 'start') {
+      mkdirSync(join(runtimeRoot, argv[2]!), { recursive: true, mode: 0o700 });
+      machines.add(argv[2]!);
+    }
+    if (argv[1] === 'poweroff' || argv[1] === 'terminate') machines.delete(argv[2]!);
+    return { code: 0, stdout: argv[1] === 'list' ? [...machines].join('\n') : '', stderr: '' };
   };
   const stateFile = join(mkdtempSync(join(tmpdir(), 'cairn-orbs-')), 'state.json');
-  const provider = new NspawnOrbProvider({ runner, stateFile });
-  return { commands, runner, provider, stateFile };
+  const provider = new NspawnOrbProvider({ runner, stateFile, runtimeRoot });
+  return { commands, machines, runner, provider, stateFile, runtimeRoot };
 }
 
-afterEach(() => vi.useRealTimers());
+test.each([
+  ['systemd-run', '-M', 'cairn-orb-A'],
+  ['systemd-run', '--machine', 'cairn-orb-A'],
+  ['systemd-run', '--machine=cairn-orb-A'],
+  ['machinectl', 'bind', 'cairn-orb-A', '/host', '/guest'],
+  ['machinectl', 'shell', 'cairn-orb-A'],
+  ['machinectl', 'login', 'cairn-orb-A'],
+])('fake rejects forbidden transport %j', (...argv) => {
+  expect(() => rejectGuestExec(argv)).toThrow('Forbidden guest transport');
+});
 
-describe('OrbProvider', () => {
-  test('clones once per conversation, serializes concurrent ensure and bounds unique names', async () => {
+describe('Orb provider', () => {
+  test('clones once, serializes ensure and bounds unique machine names', async () => {
     const { provider, commands } = fixture();
     const [first, again] = await Promise.all([
       provider.ensure({ conversationId: 'C', projectId: 'P' }),
       provider.ensure({ conversationId: 'C', projectId: 'P' }),
     ]);
-    expect(commands.map((c) => c.argv)).toEqual([
-      ['machinectl', 'clone', 'cairn-orb-base', 'cairn-orb-C'],
-      ['machinectl', 'start', 'cairn-orb-C'],
-    ]);
-    expect(again.id).toBe(first.id);
-    const other = await provider.ensure({ conversationId: 'D', projectId: 'P' });
-    expect(other.id).not.toBe(first.id);
+    expect(commands).toEqual([['machinectl', 'clone', 'cairn-orb-base', 'cairn-orb-C']]);
+    expect(again).toBe(first);
     const long = await provider.ensure({ conversationId: 'a'.repeat(150), projectId: 'P' });
-    const collision = await provider.ensure({
-      conversationId: `${'a'.repeat(149)}b`,
-      projectId: 'P',
-    });
+    const other = await provider.ensure({ conversationId: `${'a'.repeat(149)}b`, projectId: 'P' });
     expect(long.id.length).toBeLessThanOrEqual(64);
-    expect(collision.id).not.toBe(long.id);
+    expect(other.id).not.toBe(long.id);
   });
 
-  test('recovers state across provider restart and restarts a stopped container without cloning', async () => {
-    const { provider, commands, runner, stateFile } = fixture();
+  test('recovers running machines and restarts stopped machines without cloning again', async () => {
+    const { provider, runner, stateFile, commands, machines, runtimeRoot } = fixture();
     const handle = await provider.ensure({ conversationId: 'C', projectId: 'P' });
-    await provider.stop(handle);
-    const restarted = new NspawnOrbProvider({ runner, stateFile });
-    await restarted.ensure({ conversationId: 'C', projectId: 'P' });
-    expect(commands.map((c) => c.argv[1])).toEqual([
-      'clone',
-      'start',
-      'poweroff',
-      'stop',
-      'list',
-      'start',
-    ]);
-    expect(await restarted.list()).toHaveLength(1);
+    await provider.start(handle);
+    const recovered = new NspawnOrbProvider({ runner, stateFile, runtimeRoot });
+    const running = await recovered.ensure({ conversationId: 'C', projectId: 'P' });
+    await recovered.start(running);
+    expect(commands.filter((argv) => argv[1] === 'start')).toHaveLength(1);
+    machines.clear();
+    const rebooted = new NspawnOrbProvider({ runner, stateFile, runtimeRoot });
+    await rebooted.start(await rebooted.ensure({ conversationId: 'C', projectId: 'P' }));
+    expect(commands.filter((argv) => argv[1] === 'start')).toHaveLength(2);
+    expect(commands.filter((argv) => argv[1] === 'clone')).toHaveLength(1);
   });
 
-  test('exec binds paths and runs as agent with CAIRN_ORB, host exec strips the marker', async () => {
-    const { provider, commands, runner } = fixture();
-    const handle = await provider.ensure({ conversationId: 'C', projectId: 'P' });
-    await provider.exec(handle, ['printenv', 'CAIRN_ORB'], {
-      env: { SAMPLE: 'value' },
-      binds: [{ source: '/work', target: '/work' }],
+  test('failed start retries without cloning twice', async () => {
+    const { runner, commands, runtimeRoot } = fixture();
+    let fail = true;
+    const provider = new NspawnOrbProvider({
+      runtimeRoot,
+      runner: async (argv, options) => {
+        if (argv[1] === 'start' && fail) {
+          fail = false;
+          throw new Error('start failed');
+        }
+        return runner(argv, options);
+      },
     });
-    expect(commands.at(-2)?.argv).toEqual([
-      'machinectl',
-      'bind',
-      '--mkdir',
-      'cairn-orb-C',
-      '/work',
-      '/work',
-    ]);
-    expect(commands.at(-1)?.argv).toEqual([
-      'systemd-run',
-      '-M',
-      handle.id,
-      '--uid=agent',
-      '--wait',
-      '--pipe',
-      '--quiet',
-      '--setenv=SAMPLE=value',
-      '--setenv=CAIRN_ORB=1',
-      '--',
-      'printenv',
-      'CAIRN_ORB',
-    ]);
+    const handle = await provider.ensure({ conversationId: 'C', projectId: 'P' });
+    await expect(provider.start(handle)).rejects.toThrow('start failed');
+    await provider.start(handle);
+    expect(commands.filter((argv) => argv[1] === 'clone')).toHaveLength(1);
+  });
+
+  test('host exec strips the orb marker', async () => {
+    const runner = vi.fn<OrbCommandRunner>(async () => ({ code: 0, stdout: '', stderr: '' }));
     const host = new HostOrbProvider(runner);
     await host.exec(await host.ensure({ conversationId: 'C', projectId: 'P' }), ['env'], {
       env: { CAIRN_ORB: '1', SAMPLE: 'host' },
     });
-    expect(commands.at(-1)?.env?.CAIRN_ORB).toBeUndefined();
-    expect(commands.at(-1)?.env?.SAMPLE).toBe('host');
+    expect(runner.mock.calls[0]![1]!.env?.CAIRN_ORB).toBeUndefined();
+    expect(runner.mock.calls[0]![1]!.env?.SAMPLE).toBe('host');
   });
 
-  test('a failed start retries without cloning the image twice', async () => {
-    const { runner, stateFile, commands } = fixture();
-    let fail = true;
-    const provider = new NspawnOrbProvider({
-      stateFile,
-      runner: async (argv, opts) => {
-        const result = await runner(argv, opts);
-        if (argv[1] === 'start' && fail) {
-          fail = false;
-          return { ...result, code: 1 };
-        }
-        return result;
-      },
-    });
-    await expect(provider.ensure({ conversationId: 'C', projectId: 'P' })).rejects.toThrow();
-    await provider.ensure({ conversationId: 'C', projectId: 'P' });
-    expect(commands.filter((c) => c.argv[1] === 'clone')).toHaveLength(1);
-  });
-});
-
-describe('Orb lifecycle', () => {
-  test('three claimed steps wait for two slots, then start without a capacity error', async () => {
-    const { provider } = fixture();
-    const ensure = vi.spyOn(provider, 'ensure');
-    const lifecycle = new OrbLifecycle(provider, { max: resolveOrbCap({ CAIRN_ORB_MAX: '2' }, 4) });
-    const releases: (() => void)[] = [];
-    const runs = ['A', 'B', 'C'].map((conversationId) =>
-      lifecycle.run(
-        { conversationId, projectId: 'P' },
-        async () => new Promise<void>((resolve) => releases.push(resolve)),
-      ),
-    );
-    await vi.waitFor(() => expect(releases).toHaveLength(2));
-    expect(ensure).toHaveBeenCalledTimes(2);
-    releases[0]?.();
-    await vi.waitFor(() => expect(releases).toHaveLength(3));
-    expect(ensure).toHaveBeenCalledTimes(3);
-    releases[1]?.();
-    releases[2]?.();
-    await expect(Promise.all(runs)).resolves.toEqual([undefined, undefined, undefined]);
-    expect(resolveOrbCap({ CAIRN_ORB_MAX: '4' }, 1)).toBe(1);
-    expect(resolveOrbCap({}, 4)).toBe(2);
-  });
-
-  test('idle threshold, active protection, pending journal protection and closed builds', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(0);
+  test('destroy waits for poweroff and list before removing the image', async () => {
     const { provider, commands } = fixture();
-    const lifecycle = new OrbLifecycle(provider, { max: 2 });
-    await lifecycle.run({ conversationId: 'A', projectId: 'P' }, async () => {});
-    vi.setSystemTime(19 * 60_000 + 59_000);
-    await lifecycle.sweep({ activeConversationIds: [] });
-    expect(commands.some((c) => c.argv[1] === 'poweroff')).toBe(false);
-    vi.setSystemTime(20 * 60_000 + 1_000);
-    await lifecycle.sweep({ activeConversationIds: [] });
-    expect(commands.at(-2)?.argv).toEqual(['machinectl', 'poweroff', 'cairn-orb-A']);
-    vi.setSystemTime(73 * 60 * 60_000);
-    await lifecycle.sweep({ activeConversationIds: ['A'], closedConversationIds: ['A'] });
-    expect(await provider.list()).toHaveLength(1);
-    await lifecycle.sweep({ activeConversationIds: [], closedConversationIds: ['A'] });
-    expect(commands.at(-1)?.argv).toEqual(['machinectl', 'remove', 'cairn-orb-A']);
+    const handle = await provider.ensure({ conversationId: 'A', projectId: 'P' });
+    await provider.start(handle);
+    await provider.destroy(handle);
+    expect(commands.slice(-3).map((argv) => argv[1])).toEqual(['poweroff', 'list', 'remove']);
     expect(await provider.list()).toEqual([]);
   });
 
-  test('sweep cannot stop an executing step and releases capacity after a failure', async () => {
-    const { provider, commands } = fixture();
-    const lifecycle = new OrbLifecycle(provider, { max: 1, idleStopMs: 1 });
-    let release: () => void = () => {};
-    const running = lifecycle.run(
-      { conversationId: 'A', projectId: 'P' },
-      async () =>
-        new Promise<void>((r) => {
-          release = r;
-        }),
-    );
-    await vi.waitFor(() => expect(provider.list()).resolves.toHaveLength(1));
-    await lifecycle.sweep({
-      activeConversationIds: [],
-      closedConversationIds: ['A'],
-      now: Date.now() + 80 * 60 * 60_000,
+  test('poweroff timeout terminates only its machine and verifies shutdown', async () => {
+    const { runner, stateFile, commands, machines, runtimeRoot } = fixture();
+    const provider = new NspawnOrbProvider({
+      runtimeRoot,
+      stateFile,
+      shutdownTimeoutMs: 0,
+      runner: async (argv, options) => {
+        if (argv[1] === 'poweroff') {
+          commands.push([...argv]);
+          return { code: 0, stdout: '', stderr: '' };
+        }
+        return runner(argv, options);
+      },
     });
-    expect(commands.some((c) => c.argv[1] === 'poweroff')).toBe(false);
-    release();
-    await running;
-    await expect(
-      lifecycle.run({ conversationId: 'B', projectId: 'P' }, async () => {
-        throw new Error('failure');
-      }),
-    ).rejects.toThrow('failure');
-    await expect(
-      lifecycle.run({ conversationId: 'C', projectId: 'P' }, async () => 'ok'),
-    ).resolves.toBe('ok');
+    const handle = await provider.ensure({ conversationId: 'A', projectId: 'P' });
+    await provider.start(handle);
+    machines.add('unrelated');
+    await provider.stop(handle);
+    expect(commands.slice(-4).map((argv) => argv[1])).toEqual([
+      'poweroff',
+      'list',
+      'terminate',
+      'list',
+    ]);
+    expect(machines).toEqual(new Set(['unrelated']));
+    expect(handle.running).toBe(false);
+  });
+
+  test('rejects persisted machine names outside its namespace before running commands', () => {
+    const { runner, stateFile, commands, runtimeRoot } = fixture();
+    writeFileSync(stateFile, JSON.stringify([{ id: 'unrelated', conversationId: 'A' }]));
+    expect(() => new NspawnOrbProvider({ runner, stateFile, runtimeRoot })).toThrow(
+      'Invalid orb machine name',
+    );
+    expect(commands).toEqual([]);
   });
 });
 
-test('a free step slot stops an idle orb before starting a third container', async () => {
+test('lifecycle caps, serializes Threads, evicts idle machines and protects pending recovery', async () => {
   const { provider, commands } = fixture();
   const lifecycle = new OrbLifecycle(provider, { max: 2 });
-  await lifecycle.run({ conversationId: 'A', projectId: 'P' }, async () => {});
-  await lifecycle.run({ conversationId: 'B', projectId: 'P' }, async () => {});
-  await lifecycle.run({ conversationId: 'C', projectId: 'P' }, async () => {});
-  expect((await provider.list()).filter((handle) => handle.running)).toHaveLength(2);
-  expect(commands.findIndex((command) => command.argv[1] === 'poweroff')).toBeLessThan(
-    commands.findIndex(
-      (command) => command.argv[1] === 'clone' && command.argv[3] === 'cairn-orb-C',
-    ),
+  const releases: (() => void)[] = [];
+  const runs = ['A', 'B', 'C'].map((conversationId) =>
+    lifecycle.run({ conversationId, projectId: 'P' }, async (handle) => {
+      await provider.start(handle);
+      await new Promise<void>((resolve) => releases.push(resolve));
+    }),
   );
+  await vi.waitFor(() => expect(releases).toHaveLength(2));
+  releases[0]!();
+  await vi.waitFor(() => expect(releases).toHaveLength(3));
+  releases[1]!();
+  releases[2]!();
+  await Promise.all(runs);
+  expect((await provider.list()).filter((handle) => handle.running)).toHaveLength(2);
+  expect(commands.some((argv) => argv[1] === 'poweroff')).toBe(true);
+  await lifecycle.sweep({ activeConversationIds: ['A'], now: Date.now() + 73 * 60 * 60_000 });
+  expect((await provider.list()).map((handle) => handle.conversationId)).toEqual(['A']);
+  expect(resolveOrbCap({ CAIRN_ORB_MAX: '4' }, 1)).toBe(1);
+  expect(resolveOrbCap({}, 4)).toBe(2);
 });
 
-test('steps for the same conversation serialize even when two slots are available', async () => {
-  const { provider } = fixture();
+test('same-Thread lifecycle runs serialize and active steps cannot be swept', async () => {
+  const { provider, commands } = fixture();
   const lifecycle = new OrbLifecycle(provider, { max: 2 });
   let release: () => void = () => {};
   let starts = 0;
-  const first = lifecycle.run({ conversationId: 'A', projectId: 'P' }, async () => {
-    starts += 1;
+  const first = lifecycle.run({ conversationId: 'A', projectId: 'P' }, async (handle) => {
+    await provider.start(handle);
+    starts++;
     await new Promise<void>((resolve) => {
       release = resolve;
     });
   });
   const second = lifecycle.run({ conversationId: 'A', projectId: 'P' }, async () => {
-    starts += 1;
+    starts++;
   });
-  await vi.waitFor(() => expect(starts).toBeGreaterThan(0));
+  await vi.waitFor(() => expect(starts).toBe(1));
+  await lifecycle.sweep({
+    activeConversationIds: [],
+    closedConversationIds: ['A'],
+    now: Date.now() + 80 * 60 * 60_000,
+  });
   expect(starts).toBe(1);
+  expect(commands.some((argv) => argv[1] === 'poweroff')).toBe(false);
   release();
   await Promise.all([first, second]);
   expect(starts).toBe(2);
 });
 
-test('idle removal uses 72 hours and a pending journal protects the container across restart', async () => {
-  vi.useFakeTimers();
-  vi.setSystemTime(0);
-  const { provider, stateFile, runner } = fixture();
-  const lifecycle = new OrbLifecycle(provider, { max: 2 });
-  await lifecycle.run({ conversationId: 'A', projectId: 'P' }, async () => {});
-  vi.setSystemTime(72 * 60 * 60_000 - 1);
-  await lifecycle.sweep({ activeConversationIds: [] });
-  expect(await provider.list()).toHaveLength(1);
-  vi.setSystemTime(72 * 60 * 60_000 + 1);
-  const restarted = new NspawnOrbProvider({ stateFile, runner });
-  const recovered = new OrbLifecycle(restarted, { max: 2 });
-  await recovered.sweep({ activeConversationIds: ['A'] });
-  expect(await restarted.list()).toHaveLength(1);
-  await recovered.sweep({ activeConversationIds: [] });
-  expect(await restarted.list()).toHaveLength(0);
-});
-
-test('destroy waits for the container service to stop before removing its image', async () => {
-  const { provider, commands } = fixture();
-  const handle = await provider.ensure({ conversationId: 'A', projectId: 'P' });
-  await provider.destroy(handle);
-  expect(commands.slice(-3).map((command) => command.argv)).toEqual([
-    ['machinectl', 'poweroff', handle.id],
-    ['systemctl', 'stop', `systemd-nspawn@${handle.id}.service`],
-    ['machinectl', 'remove', handle.id],
-  ]);
-});
-
-test('persisted running handles restart after a host reboot without another clone', async () => {
-  const { provider, runner, stateFile, commands } = fixture();
-  await provider.ensure({ conversationId: 'A', projectId: 'P' });
-  const rebooted = new NspawnOrbProvider({ runner, stateFile });
-  await rebooted.ensure({ conversationId: 'A', projectId: 'P' });
-  expect(commands.filter((c) => c.argv[1] === 'start')).toHaveLength(2);
-  expect(commands.filter((c) => c.argv[1] === 'clone')).toHaveLength(1);
-});
-
-test('a missing machine and image do not abort cleanup', async () => {
-  const { provider, stateFile } = fixture();
-  await provider.ensure({ conversationId: 'A', projectId: 'P' });
-  const missing = new NspawnOrbProvider({
-    stateFile,
-    runner: async (argv) => ({
-      code: argv[1] === 'list' ? 0 : 1,
-      stdout: '',
-      stderr: 'No machine or image known',
-    }),
-  });
-  const [handle] = await missing.list();
-  handle!.running = true;
-  await expect(missing.stop(handle!)).resolves.toBeUndefined();
-  expect(handle!.running).toBe(false);
-  await expect(missing.destroy(handle!)).resolves.toBeUndefined();
-  expect(await missing.list()).toEqual([]);
-});
-
-test.each(['sweep', 'eviction'])('onStopped relay failures do not abort %s', async (source) => {
+test('idle poweroff and image removal retain their twenty-minute and seventy-two-hour thresholds', async () => {
   const { provider } = fixture();
-  const onStopped = vi.fn(async () => {
-    throw new Error('relay unavailable');
-  });
-  const log = vi.fn();
-  const lifecycle = new OrbLifecycle(provider, { max: source === 'sweep' ? 2 : 1, onStopped, log });
-  await lifecycle.run({ conversationId: 'A', projectId: 'P' }, async () => {});
-  if (source === 'sweep') {
-    await lifecycle.run({ conversationId: 'B', projectId: 'P' }, async () => {});
-    await expect(
-      lifecycle.sweep({ activeConversationIds: [], closedConversationIds: ['A', 'B'] }),
-    ).resolves.toBeUndefined();
-    expect(await provider.list()).toEqual([]);
-  } else {
-    await expect(
-      lifecycle.run({ conversationId: 'B', projectId: 'P' }, async () => 'ok'),
-    ).resolves.toBe('ok');
-  }
-  expect(onStopped).toHaveBeenCalled();
-  expect(log).toHaveBeenCalledWith(expect.stringContaining('relay unavailable'));
-});
-
-test('binds are applied once per running container and restored after restart', async () => {
-  const { provider, commands } = fixture();
+  const lifecycle = new OrbLifecycle(provider, { max: 2 });
   const handle = await provider.ensure({ conversationId: 'A', projectId: 'P' });
-  const options = { binds: [{ source: '/work/A', target: '/work/A' }] };
-  await provider.exec(handle, ['true'], options);
-  await provider.exec(handle, ['true'], options);
-  expect(commands.filter((c) => c.argv[1] === 'bind')).toHaveLength(1);
-  await provider.stop(handle);
-  await provider.ensure({ conversationId: 'A', projectId: 'P' });
-  await provider.exec(handle, ['true'], options);
-  expect(commands.filter((c) => c.argv[1] === 'bind')).toHaveLength(2);
-});
-
-test('provider restart preserves a machine that is actually running', async () => {
-  const { provider, stateFile, commands, runner } = fixture();
-  await provider.ensure({ conversationId: 'A', projectId: 'P' });
-  const restarted = new NspawnOrbProvider({
-    stateFile,
-    runner: async (argv, options) => {
-      const result = await runner(argv, options);
-      return argv[1] === 'list'
-        ? { ...result, stdout: 'cairn-orb-A container systemd-nspawn linux\n' }
-        : result;
-    },
-  });
-  await restarted.ensure({ conversationId: 'A', projectId: 'P' });
-  expect(commands.filter((c) => c.argv[1] === 'start')).toHaveLength(1);
-  expect((await restarted.list())[0]?.running).toBe(true);
-});
-
-test('step outbox binds are released after both successful and failed execution', async () => {
-  for (const fail of [false, true]) {
-    const { commands, runner, stateFile } = fixture();
-    const scoped = new NspawnOrbProvider({
-      stateFile,
-      runner: async (argv, options) => {
-        if (fail && argv[0] === 'systemd-run' && argv.includes('--uid=agent'))
-          throw new Error('worker failed');
-        return runner(argv, options);
-      },
-    });
-    const handle = await scoped.ensure({ conversationId: 'A', projectId: 'P' });
-    const execution = scoped.exec(handle, ['cairn', 'orb-step'], {
-      binds: [{ source: '/outbox/s1', target: '/outbox/s1', releaseAfterExec: true }],
-    });
-    if (fail) await expect(execution).rejects.toThrow('worker failed');
-    else await execution;
-    expect(commands.at(-1)?.argv).toEqual([
-      'systemd-run',
-      '-M',
-      handle.id,
-      '--wait',
-      '--quiet',
-      '--',
-      'umount',
-      '--',
-      '/outbox/s1',
-    ]);
-  }
-});
-
-test('a recovered running container drops stale mounts before executing another step', async () => {
-  const { provider, commands, runner, stateFile } = fixture();
-  const handle = await provider.ensure({ conversationId: 'A', projectId: 'P' });
-  const recovered = new NspawnOrbProvider({
-    stateFile,
-    runner: async (argv, options) => {
-      const result = await runner(argv, options);
-      return argv[1] === 'list' ? { ...result, stdout: `${handle.id} container linux` } : result;
-    },
-  });
-  const recoveredHandle = await recovered.ensure({ conversationId: 'A', projectId: 'P' });
-  const before = commands.length;
-  await recovered.exec(recoveredHandle, ['true'], {});
-  expect(commands.slice(before).map((command) => command.argv[1])).toEqual([
-    'poweroff',
-    'stop',
-    'start',
-    '-M',
-  ]);
-});
-
-test('partial bind failure releases the already mounted step outbox', async () => {
-  const { runner, stateFile, commands } = fixture();
-  const provider = new NspawnOrbProvider({
-    stateFile,
-    runner: async (argv, options) => {
-      if (argv[1] === 'bind' && argv.includes('/work')) throw new Error('bind failed');
-      return runner(argv, options);
-    },
-  });
-  const handle = await provider.ensure({ conversationId: 'A', projectId: 'P' });
-  await expect(
-    provider.exec(handle, ['true'], {
-      binds: [
-        { source: '/outbox/s1', target: '/outbox/s1', releaseAfterExec: true },
-        { source: '/work', target: '/work' },
-      ],
-    }),
-  ).rejects.toThrow('bind failed');
-  expect(commands.at(-1)?.argv).toContain('umount');
-});
-
-test('failed outbox unmount stops the container before it can be reused', async () => {
-  const { runner, stateFile, commands } = fixture();
-  const provider = new NspawnOrbProvider({
-    stateFile,
-    runner: async (argv, options) => {
-      if (argv.includes('umount')) throw new Error('unmount failed');
-      return runner(argv, options);
-    },
-  });
-  const handle = await provider.ensure({ conversationId: 'A', projectId: 'P' });
-  await expect(
-    provider.exec(handle, ['true'], {
-      binds: [{ source: '/outbox/s1', target: '/outbox/s1', releaseAfterExec: true }],
-    }),
-  ).rejects.toThrow('unmount failed');
+  await provider.start(handle);
+  const used = handle.lastUsedAt;
+  await lifecycle.sweep({ activeConversationIds: [], now: used + 20 * 60_000 - 1 });
+  expect(handle.running).toBe(true);
+  await lifecycle.sweep({ activeConversationIds: [], now: used + 20 * 60_000 });
   expect(handle.running).toBe(false);
-  expect(commands.slice(-2).map((command) => command.argv[1])).toEqual(['poweroff', 'stop']);
+  await lifecycle.sweep({ activeConversationIds: [], now: used + 72 * 60 * 60_000 - 1 });
+  expect(await provider.list()).toHaveLength(1);
+  await lifecycle.sweep({ activeConversationIds: [], now: used + 72 * 60 * 60_000 });
+  expect(await provider.list()).toEqual([]);
+});
+
+test('a Thread named base never aliases the base image', async () => {
+  const { provider, commands } = fixture();
+  const handle = await provider.ensure({ conversationId: 'base', projectId: 'P' });
+  expect(handle.id).not.toBe('cairn-orb-base');
+  expect(commands[0]![3]).toBe(handle.id);
+});
+
+test('a cached running handle is restarted when the machine has powered off externally', async () => {
+  const { provider, machines, commands } = fixture();
+  const handle = await provider.ensure({ conversationId: 'A', projectId: 'P' });
+  await provider.start(handle);
+  machines.clear();
+  await provider.start(handle);
+  expect(commands.filter((argv) => argv[1] === 'start')).toHaveLength(2);
+  expect(commands.filter((argv) => argv[1] === 'clone')).toHaveLength(1);
+});
+
+test('a pending machine start reserves capacity before another Thread evicts idle machines', async () => {
+  const { runner, runtimeRoot } = fixture();
+  let release: () => void = () => {};
+  let starting = false;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const provider = new NspawnOrbProvider({
+    runtimeRoot,
+    runner: async (argv, options) => {
+      if (argv[1] === 'start' && argv[2] === 'cairn-orb-A') {
+        starting = true;
+        await gate;
+      }
+      return runner(argv, options);
+    },
+  });
+  const lifecycle = new OrbLifecycle(provider, { max: 2 });
+  for (const conversationId of ['idle-I', 'idle-J'])
+    await lifecycle.run({ conversationId, projectId: 'P' }, (handle) => provider.start(handle));
+  const first = lifecycle.run({ conversationId: 'A', projectId: 'P' }, (handle) =>
+    provider.start(handle),
+  );
+  try {
+    await vi.waitFor(() => expect(starting).toBe(true));
+    await lifecycle.run({ conversationId: 'B', projectId: 'P' }, (handle) =>
+      provider.start(handle),
+    );
+  } finally {
+    release();
+    await first;
+  }
+  expect((await provider.list()).filter((handle) => handle.running)).toHaveLength(2);
 });

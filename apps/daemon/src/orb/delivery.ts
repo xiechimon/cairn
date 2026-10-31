@@ -1,17 +1,9 @@
-import {
-  closeSync,
-  constants,
-  fstatSync,
-  mkdtempSync,
-  openSync,
-  readSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { conversationBranch } from '@cairn/shared';
 import { runGit, runGitOk } from '../git.js';
+import { readOrbFile } from './runtime-fs.js';
 
 export const ORB_MAX_BUNDLE_BYTES = 64 * 1024 * 1024;
 
@@ -24,28 +16,7 @@ export interface OrbLocalDelivery {
 export async function deliverOrbBundle(input: OrbLocalDelivery, filename: string): Promise<void> {
   const directory = mkdtempSync(join(tmpdir(), 'cairn-orb-delivery-'));
   try {
-    const descriptor = openSync(
-      join(input.outboxDir, filename),
-      constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
-    );
-    let content: Buffer;
-    try {
-      const stat = fstatSync(descriptor);
-      if (!stat.isFile() || stat.nlink !== 1)
-        throw new Error('Bundle must be a regular file with one link');
-      if (stat.size > ORB_MAX_BUNDLE_BYTES) throw new Error('Bundle exceeds 64 MiB size cap');
-      content = Buffer.alloc(stat.size + 1);
-      let offset = 0;
-      while (offset < content.length) {
-        const size = readSync(descriptor, content, offset, content.length - offset, offset);
-        if (size === 0) break;
-        offset += size;
-      }
-      if (offset !== stat.size) throw new Error('Bundle changed while reading');
-      content = content.subarray(0, offset);
-    } finally {
-      closeSync(descriptor);
-    }
+    const content = readOrbFile(input.outboxDir, filename, ORB_MAX_BUNDLE_BYTES);
     const bundle = join(directory, 'verified.bundle');
     writeFileSync(bundle, content, { mode: 0o600 });
     const opts = { cwd: input.repoPath, timeoutMs: 120_000 };
