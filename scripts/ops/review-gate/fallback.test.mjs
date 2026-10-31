@@ -31,7 +31,7 @@ const script = (path, body) => {
   chmodSync(path, 0o755);
 };
 
-function host({ author, claude, priorNoVerdictMs, stallNoted, labelled, failLabel }) {
+function host({ author, claude, priorNoVerdictMs, stallNoted, labelled, failLabel, bigDiff }) {
   const home = mkdtempSync(join(tmpdir(), 'review-gate-host-'));
   const bin = join(home, 'bin');
   const log = join(home, 'calls.log');
@@ -58,7 +58,12 @@ function host({ author, claude, priorNoVerdictMs, stallNoted, labelled, failLabe
   git(work, 'remote', 'add', 'origin', origin);
   git(work, 'push', '-q', 'origin', 'main');
   writeFileSync(join(work, 'feature.txt'), 'change\n');
-  git(work, 'add', 'feature.txt');
+  if (bigDiff) {
+    writeFileSync(join(work, 'benign.txt'), `${'benign line\n'.repeat(12_000)}`);
+    mkdirSync(join(work, 'scripts'), { recursive: true });
+    writeFileSync(join(work, 'scripts/zz-gate.mjs'), 'export const gate = false;\n');
+  }
+  git(work, 'add', '.');
   git(work, 'commit', '-q', '-m', 'change');
   const sha = git(work, 'rev-parse', 'HEAD').trim();
   git(work, 'push', '-q', 'origin', 'HEAD:refs/pull/2306/head');
@@ -206,4 +211,10 @@ test('a failed label add is retried on the next round without a second comment',
   const retry = host({ author: anthropic, priorNoVerdictMs: 2 * 3600_000, stallNoted: true });
   assert.match(retry.calls, /bot gh pr edit 2306 -R xiechimon\/cairn --add-label review-stalled/);
   assert.doesNotMatch(retry.calls, /review-gate-stalled/);
+});
+
+test('a diff over the cap never reaches Claude, so a hidden change cannot PASS', () => {
+  const { calls } = host({ author: openai, claude: 'VERDICT: pass', bigDiff: true });
+  assert.doesNotMatch(calls, /^claude /m);
+  assert.doesNotMatch(calls, /Independent review gate: PASS/);
 });

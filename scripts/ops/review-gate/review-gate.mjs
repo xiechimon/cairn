@@ -4,6 +4,7 @@ import {
   claudeFallback,
   claudeReviewArgs,
   claudeReviewPrompt,
+  DIFF_LIMIT,
   parseRuns,
   stallAlert,
   stalled,
@@ -335,6 +336,11 @@ ${
             gh(['pr', 'view', String(pr.number), '--json', 'title,body']),
           );
           input = claudeReviewPrompt(prompt, { diff, title, body });
+          if (input === null)
+            return resolve({
+              ...routed,
+              stderr: `${routed.stderr}\nclaude fallback: diff of ${diff.length} characters exceeds ${DIFF_LIMIT}; no partial review`,
+            });
         } catch (e) {
           return resolve({ ...routed, stderr: `${routed.stderr}\nclaude fallback: ${e.message}` });
         }

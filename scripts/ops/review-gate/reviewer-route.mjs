@@ -39,10 +39,7 @@ export function claudeReviewArgs() {
 }
 
 export function claudeReviewPrompt(prompt, { diff, title, body }) {
-  const shown =
-    diff.length > DIFF_LIMIT
-      ? `${diff.slice(0, DIFF_LIMIT)}\n[diff truncated at ${DIFF_LIMIT} of ${diff.length} characters]`
-      : diff;
+  if (diff.length > DIFF_LIMIT) return null;
   return `${prompt}
 
 You cannot run commands. The PR description and the full diff against origin/main are below; the checkout is origin/main, so Read/Grep/Glob show the base side only.
@@ -54,7 +51,7 @@ ${body}
 
 Diff:
 \`\`\`diff
-${shown}
+${diff}
 \`\`\``;
 }
 

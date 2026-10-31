@@ -45,15 +45,17 @@ test('the Claude review has no shell and no write tools', () => {
   assert.ok(args.includes('--strict-mcp-config'));
 });
 
-test('the Claude prompt carries the description and a bounded diff', () => {
+test('the Claude prompt carries the description and the whole diff, or nothing', () => {
   const small = claudeReviewPrompt('PROMPT', { diff: '+x\n', title: 'T', body: 'B' });
   assert.match(small, /^PROMPT\n/);
   assert.match(small, /PR title: T/);
   assert.match(small, /PR description:\nB/);
   assert.match(small, /```diff\n\+x\n/);
-  const big = claudeReviewPrompt('P', { diff: 'y'.repeat(DIFF_LIMIT + 5), title: '', body: '' });
-  assert.match(big, new RegExp(`diff truncated at ${DIFF_LIMIT} of ${DIFF_LIMIT + 5} characters`));
-  assert.ok(big.length < DIFF_LIMIT + 1000);
+  assert.equal(
+    claudeReviewPrompt('P', { diff: 'y'.repeat(DIFF_LIMIT + 1), title: '', body: '' }),
+    null,
+  );
+  assert.ok(claudeReviewPrompt('P', { diff: 'y'.repeat(DIFF_LIMIT), title: '', body: '' }));
 });
 
 const sha = 'a'.repeat(40);
