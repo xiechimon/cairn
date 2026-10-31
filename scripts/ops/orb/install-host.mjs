@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { changes } from './host-files.mjs';
+import { missingUfwRules } from './ufw-rules.mjs';
 
 export function installHost(options = {}) {
   const {
@@ -150,6 +151,10 @@ export function installHost(options = {}) {
   }
   if (change.probe('systemctl', ['is-enabled', 'cairn-orb-firewall.service']).status !== 0)
     change.exec('systemctl', ['enable', 'cairn-orb-firewall.service']);
+  if (change.probe('systemctl', ['is-active', 'ufw']).status === 0) {
+    const rules = readFileSync(join(root, 'etc/ufw/user.rules'), 'utf8');
+    for (const { args } of missingUfwRules(rules)) change.exec('ufw', args);
+  }
   if (needsReload) {
     change.exec('nmcli', ['general', 'reload', 'conf']);
     if (change.probe('systemctl', ['is-active', 'systemd-networkd.service']).status === 0)

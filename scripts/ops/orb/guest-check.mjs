@@ -9,6 +9,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
+import { isIPv4 } from 'node:net';
 import { join, resolve } from 'node:path';
 
 export function validatePorts(ports) {
@@ -36,9 +37,36 @@ export function readMetadata(path) {
   }
 }
 
+export function waitForNetwork({
+  readAddresses,
+  timeoutMs = 120_000,
+  pollMs = 1000,
+  now = () => performance.now(),
+  wait = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms),
+}) {
+  if (!Number.isFinite(timeoutMs) || timeoutMs < 0 || !Number.isFinite(pollMs) || pollMs <= 0)
+    throw new Error('Invalid network wait bounds');
+  const start = now();
+  for (;;) {
+    const ipv4 = [...readAddresses().matchAll(/\binet (\S+)\/\d+\b/g)]
+      .map((match) => match[1])
+      .find((address) => isIPv4(address) && !address.startsWith('169.254.'));
+    const networkWaitMs = Math.max(0, Math.round(now() - start));
+    if (ipv4) return { networkReady: true, networkWaitMs, ipv4 };
+    if (networkWaitMs >= timeoutMs) return { networkReady: false, networkWaitMs, ipv4: null };
+    wait(Math.min(pollMs, timeoutMs - networkWaitMs));
+  }
+}
+
 export function runGuestCheck({
   directory = '/run/cairn',
-  run = (cmd, args) => spawnSync(cmd, args, { encoding: 'utf8', timeout: 30000, maxBuffer: 16384 }),
+  run = (cmd, args) =>
+    spawnSync(cmd, args, {
+      encoding: 'utf8',
+      timeout: cmd === 'ip' ? 1000 : 30000,
+      maxBuffer: 16384,
+    }),
+  network = {},
 } = {}) {
   const request = readMetadata(join(directory, 'check-request'));
   if (
@@ -48,6 +76,13 @@ export function runGuestCheck({
   )
     throw new Error('Invalid check request');
   validatePorts(request.blockedPorts);
+  const networkResult = waitForNetwork({
+    readAddresses: () => {
+      const result = run('ip', ['-4', '-o', 'addr', 'show', 'dev', 'host0']);
+      return result.status === 0 ? result.stdout || '' : '';
+    },
+    ...network,
+  });
   const curl = [
     '--silent',
     '--show-error',
@@ -77,6 +112,7 @@ export function runGuestCheck({
   const result = {
     version: 1,
     requestId: request.requestId,
+    ...networkResult,
     egressCode: /^\d{3}$/.test(egress.stdout?.trim() ?? '') ? egress.stdout.trim() : '',
     egressExit: egress.status,
     privateEgress: ['http://127.0.0.1:80/', 'http://10.203.0.1:22/'].map((target) => {

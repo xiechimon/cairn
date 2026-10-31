@@ -15,6 +15,7 @@ import { runInNewContext } from 'node:vm';
 import { daemonNodeMajor } from './daemon-package.mjs';
 import { installHost } from './install-host.mjs';
 import { runtimeDirectory } from './runtime-directory.mjs';
+import { missingUfwRules } from './ufw-rules.mjs';
 
 function policy() {
   let rule;
@@ -102,6 +103,13 @@ function fixture() {
       );
     const key = [cmd, ...args].join(' ');
     calls.push(key);
+    if (cmd === 'ufw') {
+      const path = join(root, 'etc/ufw/user.rules');
+      const rule = readFileSync(new URL('./fixtures/ufw-user.rules', import.meta.url), 'utf8')
+        .split('\n')
+        .find((line) => line.startsWith('-A') && line.includes(`-p ${args[5]}`));
+      writeFileSync(path, `${readFileSync(path, 'utf8')}${rule}\n`);
+    }
     if (cmd === 'pacman' && args[0] === '-Q')
       return { status: state.has('package') ? 0 : 1, stdout: '' };
     if (cmd === 'pacman') state.add('package');
@@ -1097,4 +1105,161 @@ test('a failed image build after host changes resumes, builds the image, then co
   } finally {
     rmSync(f.root, { recursive: true, force: true });
   }
+});
+
+for (const present of [false, true]) {
+  test(`active ufw installs only missing scoped input rules and converges: ${present}`, (t) => {
+    const f = fixture();
+    t.after(() => rmSync(f.root, { recursive: true, force: true }));
+    installHost(f);
+    const directory = join(f.root, 'etc/ufw');
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(
+      join(directory, 'user.rules'),
+      present ? readFileSync(new URL('./fixtures/ufw-user.rules', import.meta.url)) : '',
+    );
+    f.state.add('is-active ufw');
+    f.calls.length = 0;
+    f.logs.length = 0;
+    installHost(f);
+    const commands = [
+      'ufw allow in on vz-cairn proto udp from any port 68 to any port 67 comment cairn-orb-dhcp',
+      'ufw allow in on vz-cairn proto tcp from 10.203.0.0/24 to 10.203.0.1 port 7890 comment cairn-orb-relay',
+    ];
+    assert.deepEqual(
+      f.calls.filter((call) => call.startsWith('ufw ')),
+      present ? [] : commands,
+    );
+    for (const command of present ? [] : commands) assert.ok(f.logs.includes(command));
+    assert.equal(f.logs.at(-1), present ? '0 changes' : '2 changes');
+    f.logs.length = 0;
+    f.calls.length = 0;
+    installHost(f);
+    assert.equal(f.logs.at(-1), '0 changes');
+    assert.ok(!f.calls.some((call) => call.startsWith('ufw ')));
+  });
+}
+
+test('active ufw dry-run prints both rules without invoking ufw or changing files', (t) => {
+  const f = fixture();
+  t.after(() => rmSync(f.root, { recursive: true, force: true }));
+  installHost(f);
+  mkdirSync(join(f.root, 'etc/ufw'), { recursive: true });
+  const path = join(f.root, 'etc/ufw/user.rules');
+  writeFileSync(path, '');
+  f.state.add('is-active ufw');
+  f.calls.length = 0;
+  f.logs.length = 0;
+  installHost({ ...f, dryRun: true });
+  assert.equal(
+    f.logs.filter((line) => line.startsWith('plan: ufw allow in on vz-cairn')).length,
+    2,
+  );
+  assert.equal(f.logs.at(-1), '2 planned changes');
+  assert.ok(!f.calls.some((call) => call.startsWith('ufw ')));
+  assert.equal(readFileSync(path, 'utf8'), '');
+});
+
+for (const status of [3, 4]) {
+  test(`inactive or absent ufw is untouched: ${status}`, (t) => {
+    const f = fixture();
+    t.after(() => rmSync(f.root, { recursive: true, force: true }));
+    installHost(f);
+    f.logs.length = 0;
+    f.calls.length = 0;
+    installHost({
+      ...f,
+      run: (cmd, args) =>
+        cmd === 'systemctl' && args[1] === 'ufw'
+          ? { status, stdout: 'inactive' }
+          : f.run(cmd, args),
+    });
+    assert.equal(f.logs.at(-1), '0 changes');
+    assert.ok(!f.calls.some((call) => call.startsWith('ufw ')));
+  });
+}
+
+const rules = readFileSync(new URL('./fixtures/ufw-user.rules', import.meta.url), 'utf8');
+
+test('ufw rule matching requires actual scoped input accepts, not comments or tuple metadata', () => {
+  assert.equal(missingUfwRules(rules).length, 0);
+  assert.equal(
+    missingUfwRules(
+      rules
+        .split('\n')
+        .map((line) => `# ${line}`)
+        .join('\n'),
+    ).length,
+    2,
+  );
+  for (const [from, to] of [
+    ['-i vz-cairn', '-i eth0'],
+    ['ufw-user-input', 'ufw-user-forward'],
+    ['-j ACCEPT', '-j DROP'],
+    ['-p udp', '-p tcp'],
+    ['--sport 68', '--sport 69'],
+    ['--dport 67', '--dport 68'],
+    ['-p tcp', '-p udp'],
+    ['10.203.0.0/24', '10.204.0.0/24'],
+    ['10.203.0.1/32', '10.203.0.2/32'],
+    ['--dport 7890', '--dport 7891'],
+    ['--dport 7890', '--dport 7890 -m conntrack --ctstate ESTABLISHED'],
+    ['-i vz-cairn', '! -i vz-cairn'],
+  ])
+    assert.ok(missingUfwRules(rules.replaceAll(from, to)).length > 0, `${from} -> ${to}`);
+});
+
+test('ufw rule matching accepts reordered fields, protocol modules and host address normalization', () => {
+  const normalized = rules
+    .replace('-i vz-cairn -p udp', '-p udp -m udp -i vz-cairn')
+    .replace('10.203.0.1/32', '10.203.0.1')
+    .replace('--dport 7890 -j ACCEPT', '-j ACCEPT -m tcp --dport 7890');
+  assert.equal(missingUfwRules(normalized).length, 0);
+});
+
+for (const protocol of ['udp', 'tcp']) {
+  test(`active ufw repairs only the missing ${protocol} rule`, (t) => {
+    const f = fixture();
+    t.after(() => rmSync(f.root, { recursive: true, force: true }));
+    installHost(f);
+    mkdirSync(join(f.root, 'etc/ufw'), { recursive: true });
+    const path = join(f.root, 'etc/ufw/user.rules');
+    writeFileSync(
+      path,
+      rules
+        .split('\n')
+        .filter((line) => !line.includes(`-p ${protocol}`))
+        .join('\n'),
+    );
+    f.state.add('is-active ufw');
+    f.calls.length = 0;
+    f.logs.length = 0;
+    installHost(f);
+    const commands = f.calls.filter((call) => call.startsWith('ufw '));
+    assert.equal(commands.length, 1);
+    assert.ok(commands[0].includes(`proto ${protocol} `));
+    assert.equal(f.logs.at(-1), '1 changes');
+    assert.equal(missingUfwRules(readFileSync(path, 'utf8')).length, 0);
+  });
+}
+
+test('failed ufw commands stop installation and are retried on rerun', (t) => {
+  const f = fixture();
+  t.after(() => rmSync(f.root, { recursive: true, force: true }));
+  installHost(f);
+  mkdirSync(join(f.root, 'etc/ufw'), { recursive: true });
+  writeFileSync(join(f.root, 'etc/ufw/user.rules'), '');
+  f.state.add('is-active ufw');
+  assert.throws(
+    () =>
+      installHost({
+        ...f,
+        run: (cmd, args) =>
+          cmd === 'ufw' ? { status: 1, stderr: 'fixture ufw failure' } : f.run(cmd, args),
+      }),
+    /ufw failure/,
+  );
+  f.logs.length = 0;
+  installHost(f);
+  assert.equal(f.logs.at(-1), '2 changes');
 });

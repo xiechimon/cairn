@@ -155,7 +155,7 @@ Wants=network-online.target
 Type=oneshot
 User=agent
 ExecStart=/usr/bin/node /usr/local/lib/cairn-orb/guest-check.mjs
-TimeoutStartSec=120
+TimeoutStartSec=240
 UMask=0077
 CHECK
 cat > /etc/systemd/system/cairn-orb-check.path <<'CHECKPATH'

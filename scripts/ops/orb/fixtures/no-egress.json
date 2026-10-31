@@ -30,5 +30,10 @@
       "port": 5231,
       "status": 124
     }
-  ]
+  ],
+  "ufwService": "inactive",
+  "ufwRules": "",
+  "networkReady": true,
+  "networkWaitMs": 50000,
+  "ipv4": "10.203.0.2"
 }

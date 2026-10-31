@@ -626,3 +626,24 @@ test('guest Node mismatch aborts staging before image registration', () => {
     rmSync(f.root, { recursive: true, force: true });
   }
 });
+
+test('generated guest check unit permits the network wait and subsequent probes', () => {
+  const f = fixture();
+  try {
+    const result = f.run('build-image.sh');
+    assert.equal(result.status, 0, result.stderr);
+    const recipe = readFileSync(join(f.root, 'guest-recipe'), 'utf8');
+    const unit =
+      /cat > \/etc\/systemd\/system\/cairn-orb-check.service <<'CHECK'\n([\s\S]+?)\nCHECK/.exec(
+        recipe,
+      )?.[1];
+    assert.ok(unit);
+    assert.match(unit, /^TimeoutStartSec=240$/m);
+    assert.match(
+      unit,
+      /^ExecStart=\/usr\/bin\/node \/usr\/local\/lib\/cairn-orb\/guest-check.mjs$/m,
+    );
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});

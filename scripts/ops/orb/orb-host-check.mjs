@@ -1,10 +1,12 @@
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { lstatSync, writeFileSync } from 'node:fs';
+import { lstatSync, readFileSync, writeFileSync } from 'node:fs';
+import { isIPv4 } from 'node:net';
 import { userInfo } from 'node:os';
 import { join, resolve } from 'node:path';
 
 import { readMetadata, validatePorts } from './guest-check.mjs';
+import { missingUfwRules } from './ufw-rules.mjs';
 
 export function parseHostCheck(input, { blockedPorts = [22, 5231] } = {}) {
   const statuses = [...input.headers.matchAll(/^HTTP\/\S+\s+(\d{3})([^\r\n]*)/gm)].filter(
@@ -13,6 +15,17 @@ export function parseHostCheck(input, { blockedPorts = [22, 5231] } = {}) {
   const memory = /^MemoryMax=(\d+)\s*$/m.exec(input.memory);
   const record = {
     daemonRelease: input.daemonRelease ?? null,
+    ufw:
+      input.ufwService === 'active'
+        ? missingUfwRules(input.ufwRules ?? '').length === 0
+          ? 'ok'
+          : 'missing-rules'
+        : input.ufwService === 'inactive'
+          ? 'inactive'
+          : 'missing-rules',
+    networkReady: input.networkReady ?? false,
+    networkWaitMs: input.networkWaitMs ?? null,
+    ipv4: input.ipv4 ?? null,
     image: input.images.split('\n').some((line) => line.trim().split(/\s+/)[0] === 'cairn-orb-base')
       ? 'cairn-orb-base'
       : null,
@@ -51,6 +64,8 @@ export function parseHostCheck(input, { blockedPorts = [22, 5231] } = {}) {
       record.egress === 'ok' &&
       record.privateEgress === 'denied' &&
       record.firewall === 'ok' &&
+      ['ok', 'inactive'].includes(record.ufw) &&
+      record.networkReady === true &&
       record.memoryMax === 4294967296 &&
       record.homeVisible === false &&
       record.negativeControl === 'denied',
@@ -69,6 +84,7 @@ export function checkHost({
   name = `cairn-orb-check-${randomUUID().slice(0, 8)}`,
   runtimeRoot = '/run/cairn-orb',
   releaseFile = '/var/lib/cairn-orb/dist/current.json',
+  ufwRulesFile = '/etc/ufw/user.rules',
   blockedPorts = (process.env.CAIRN_ORB_CHECK_BLOCKED_PORTS ?? '22,5231').split(',').map(Number),
 } = {}) {
   if (user !== 'ian') throw new Error('Run the host check as ian without sudo');
@@ -105,6 +121,19 @@ export function checkHost({
       );
     return result;
   };
+  const ufw = run('systemctl', ['is-active', 'ufw']);
+  input.ufwService = ufw.status === 0 ? 'active' : 'inactive';
+  if (input.ufwService === 'active') {
+    try {
+      input.ufwRules = readFileSync(ufwRulesFile, 'utf8');
+    } catch {
+      input.ufwRules = '';
+    }
+    if (missingUfwRules(input.ufwRules).length > 0)
+      errors.push(
+        'ufw is active without the cairn-orb DHCP and relay rules; rerun install-host.sh',
+      );
+  }
   const firewall = call('systemctl', ['is-active', 'cairn-orb-firewall.service']);
   input.firewallService = firewall.status === 0 ? firewall.stdout?.trim() : '';
   input.images =
@@ -153,14 +182,14 @@ export function checkHost({
       { mode: 0o600, flag: 'wx' },
     );
     let result;
-    for (let attempt = 0; attempt < 150; attempt++) {
+    for (let attempt = 0; attempt < 240; attempt++) {
       try {
         result = readMetadata(join(directory, 'check-result.json'));
         break;
       } catch (error) {
         if (error.code !== 'ENOENT') throw new Error('Invalid guest check result');
       }
-      if (attempt < 149) wait();
+      if (attempt < 239) wait();
     }
     if (!result) throw new Error('Timed out waiting for guest check result');
     const keys = [
@@ -171,12 +200,21 @@ export function checkHost({
       'privateEgress',
       'firewallProbes',
       'homeExit',
+      'networkReady',
+      'networkWaitMs',
+      'ipv4',
     ];
     if (
       result.version !== 1 ||
       result.requestId !== requestId ||
       Object.keys(result).length !== keys.length ||
       Object.keys(result).some((key) => !keys.includes(key)) ||
+      typeof result.networkReady !== 'boolean' ||
+      !Number.isInteger(result.networkWaitMs) ||
+      result.networkWaitMs < 0 ||
+      (result.networkReady
+        ? !isIPv4(result.ipv4) || result.ipv4.startsWith('169.254.')
+        : result.ipv4 !== null) ||
       typeof result.egressCode !== 'string' ||
       !/^[0-9]{3}$/.test(result.egressCode) ||
       !Array.isArray(result.privateEgress) ||
@@ -197,6 +235,11 @@ export function checkHost({
     )
       throw new Error('Invalid guest check metadata');
     input.headers = result.egressExit === 0 ? `HTTP/2 ${result.egressCode}` : '';
+    input.networkReady = result.networkReady;
+    input.networkWaitMs = result.networkWaitMs;
+    input.ipv4 = result.ipv4;
+    if (!result.networkReady)
+      errors.push('Guest host0 has no non-link-local IPv4 address after network wait');
     input.privateEgress = result.privateEgress;
     input.firewallProbes = result.firewallProbes;
     input.homeExit = result.homeExit;

@@ -1,0 +1,39 @@
+{
+  "images": "cairn-orb-base directory no 123456789\n",
+  "cloneStartStop": "ok",
+  "headers": "HTTP/1.1 200 Connection established\r\n\r\nHTTP/2 301\r\nlocation: https://github.com/\r\n",
+  "memory": "MemoryMax=4294967296\n",
+  "homeExit": 0,
+  "negativeExit": 1,
+  "negativeError": "Failed to clone image: Access denied\n",
+  "privateEgress": [
+    {
+      "status": 22,
+      "code": "403"
+    },
+    {
+      "status": 22,
+      "code": "403"
+    }
+  ],
+  "firewallService": "active",
+  "firewallProbes": [
+    {
+      "port": 7890,
+      "status": 0
+    },
+    {
+      "port": 22,
+      "status": 124
+    },
+    {
+      "port": 5231,
+      "status": 124
+    }
+  ],
+  "ufwService": "active",
+  "ufwRules": "*filter\n:ufw-user-input - [0:0]\n-A ufw-user-input -i vz-cairn -p udp --sport 68 --dport 67 -j ACCEPT\n-A ufw-user-input -i vz-cairn -s 10.203.0.0/24 -d 10.203.0.1/32 -p tcp --dport 7890 -j ACCEPT\nCOMMIT\n",
+  "networkReady": true,
+  "networkWaitMs": 50000,
+  "ipv4": "10.203.0.2"
+}

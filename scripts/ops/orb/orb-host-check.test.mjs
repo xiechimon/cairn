@@ -15,7 +15,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { readMetadata, runGuestCheck } from './guest-check.mjs';
+import { readMetadata, runGuestCheck, waitForNetwork } from './guest-check.mjs';
 import { checkHost, parseHostCheck } from './orb-host-check.mjs';
 
 for (const name of [
@@ -25,11 +25,16 @@ for (const name of [
   'no-egress',
   'private-egress',
   'firewall-open',
+  'ufw-ok',
+  'ufw-inactive',
+  'ufw-missing-rules',
 ]) {
   test(`recorded ${name} command outputs`, () => {
     const input = JSON.parse(readFileSync(new URL(`./fixtures/${name}.json`, import.meta.url)));
     const result = parseHostCheck(input);
-    assert.equal(result.ok, name === 'pass');
+    assert.equal(result.ok, ['pass', 'ufw-ok', 'ufw-inactive'].includes(name));
+    if (name.startsWith('ufw-'))
+      assert.equal(result.ufw, name.slice(4) === 'inactive' ? 'inactive' : name.slice(4));
     if (name === 'pass') {
       assert.equal(result.image, 'cairn-orb-base');
       assert.equal(result.cloneStartStop, 'ok');
@@ -70,7 +75,10 @@ test('ambiguous or unsafe outputs never pass', () => {
     assert.equal(parseHostCheck({ ...input, ...change }).ok, false);
 });
 
-function fakeHost(t, { resultChange = {}, missing = false, malformed = false, failAt } = {}) {
+function fakeHost(
+  t,
+  { resultChange = {}, missing = false, malformed = false, failAt, ufw = 'inactive' } = {},
+) {
   const root = mkdtempSync(join(tmpdir(), 'cairn-orb-check-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const calls = [];
@@ -83,6 +91,8 @@ function fakeHost(t, { resultChange = {}, missing = false, malformed = false, fa
       cmd !== 'machinectl' ||
         !args.some((arg) => ['bind', 'shell', 'login', 'copy-to', 'copy-from'].includes(arg)),
     );
+    if (cmd === 'systemctl' && args[1] === 'ufw')
+      return { status: ufw === 'active' ? 0 : 3, stdout: `${ufw}\n` };
     if (args.includes('not-cairn-x')) return { status: 1, stderr: 'Access denied' };
     if (failAt && args.includes(failAt)) return { status: 1, stderr: 'fixture failure' };
     let stdout = '';
@@ -123,6 +133,9 @@ function fakeHost(t, { resultChange = {}, missing = false, malformed = false, fa
                 status: port === 7890 ? 0 : 124,
               })),
               homeExit: 0,
+              networkReady: true,
+              networkWaitMs: 50000,
+              ipv4: '10.203.0.2',
               ...resultChange,
             }),
       );
@@ -131,6 +144,7 @@ function fakeHost(t, { resultChange = {}, missing = false, malformed = false, fa
     calls,
     run,
     runtimeRoot: root,
+    ufwRulesFile: join(root, 'user.rules'),
     user: 'ian',
     name: 'cairn-orb-check-fixture',
     wait,
@@ -178,7 +192,7 @@ for (const [name, options] of [
       },
     });
     assert.equal(result.ok, false);
-    assert.ok(waits <= 149);
+    assert.ok(waits <= 239);
     assert.ok(f.calls.some((call) => call.includes('remove')));
     assert.ok(!JSON.stringify(result).includes('must not be exposed'));
   });
@@ -258,6 +272,7 @@ for (const failure of ['', 'curl', 'timeout', 'test']) {
     const calls = [];
     runGuestCheck({
       directory: root,
+      network: { readAddresses: () => '2: host0 inet 10.203.0.2/24 scope global host0' },
       run: (cmd, args) => {
         calls.push([cmd, ...args]);
         if (cmd === failure)
@@ -370,7 +385,7 @@ test('real guest Node process publishes metadata consumed by the unprivileged ho
   const f = fakeHost(t, { missing: true });
   const bin = join(f.runtimeRoot, 'bin');
   mkdirSync(bin);
-  for (const cmd of ['curl', 'timeout', 'test']) {
+  for (const cmd of ['curl', 'timeout', 'test', 'ip']) {
     const path = join(bin, cmd);
     writeFileSync(
       path,
@@ -378,6 +393,7 @@ test('real guest Node process publishes metadata consumed by the unprivileged ho
 const cmd = ${JSON.stringify(cmd)};
 const args = process.argv.slice(2);
 process.stderr.write('probe diagnostics must stay in guest');
+if (cmd === 'ip') process.stdout.write('2: host0 inet 10.203.0.2/24 scope global host0');
 if (cmd === 'curl') { process.stdout.write(args.includes('--fail') ? '403' : '200'); process.exit(args.includes('--fail') ? 22 : 0); }
 if (cmd === 'timeout') process.exit(args.at(-1).endsWith('/7890') ? 0 : 124);
 `,
@@ -498,3 +514,168 @@ test('the image is removed only after the container unit finished its stop hooks
   assert.deepEqual(order.slice(-4), ['unit:1', 'unit:2', 'unit:3', 'remove']);
   assert.ok(!result.errors.some((error) => error.includes('is-active')));
 });
+
+for (const present of [false, true]) {
+  test(`unprivileged host check diagnoses active ufw from user.rules: ${present}`, (t) => {
+    const f = fakeHost(t, { ufw: 'active' });
+    if (present)
+      writeFileSync(
+        f.ufwRulesFile,
+        readFileSync(new URL('./fixtures/ufw-user.rules', import.meta.url)),
+      );
+    const result = checkHost(f);
+    assert.equal(result.ufw, present ? 'ok' : 'missing-rules');
+    assert.equal(result.ok, present);
+    assert.deepEqual(
+      result.errors,
+      present
+        ? []
+        : ['ufw is active without the cairn-orb DHCP and relay rules; rerun install-host.sh'],
+    );
+    assert.ok(!f.calls.some(([cmd]) => cmd === 'ufw' || cmd === 'sudo'));
+  });
+}
+
+test('host check permits a slow guest result within a bounded 240 second wait', (t) => {
+  const f = fakeHost(t);
+  let waits = 0;
+  const result = checkHost({
+    ...f,
+    wait: () => {
+      if (++waits === 200) f.wait();
+    },
+  });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(waits, 200);
+  assert.equal(result.networkWaitMs, 50000);
+  assert.equal(result.ipv4, '10.203.0.2');
+  assert.equal(result.networkReady, true);
+});
+
+test('invalid or timed-out guest network metadata cannot pass', (t) => {
+  for (const resultChange of [
+    { networkReady: false, ipv4: null },
+    { networkReady: true, ipv4: '169.254.1.2' },
+    { ipv4: '10.203.0.2/24' },
+    { networkWaitMs: -1 },
+    { networkWaitMs: '50000' },
+  ]) {
+    const f = fakeHost(t, { resultChange });
+    assert.equal(checkHost(f).ok, false, JSON.stringify(resultChange));
+  }
+});
+
+for (const [name, addresses, expectedWait] of [
+  ['ready immediately', ['2: host0 inet 10.203.0.2/24 scope global host0'], 0],
+  [
+    'delayed DHCP after link-local',
+    [
+      '',
+      '2: host0 inet 169.254.1.2/16 scope link host0',
+      '2: host0 inet 10.203.0.3/24 scope global host0',
+    ],
+    2000,
+  ],
+  [
+    'multiple addresses',
+    [
+      '2: host0 inet 169.254.1.2/16 scope link host0\n2: host0 inet 10.203.0.4/24 scope global host0',
+    ],
+    0,
+  ],
+]) {
+  test(`network wait: ${name}`, () => {
+    let elapsed = 0;
+    let reads = 0;
+    const result = waitForNetwork({
+      readAddresses: () => addresses[Math.min(reads++, addresses.length - 1)],
+      now: () => elapsed,
+      wait: (ms) => {
+        elapsed += ms;
+      },
+    });
+    assert.equal(result.networkReady, true);
+    assert.equal(result.networkWaitMs, expectedWait);
+    assert.match(result.ipv4, /^10\.203\.0\.[234]$/);
+    assert.equal(reads, expectedWait / 1000 + 1);
+  });
+}
+
+for (const addresses of [
+  '',
+  '2: host0 inet 169.254.1.2/16 scope link host0',
+  '2: host0 inet 999.1.2.3/24 scope global host0',
+]) {
+  test(`network wait bounds missing, link-local and invalid addresses: ${addresses}`, () => {
+    let elapsed = 0;
+    let reads = 0;
+    const result = waitForNetwork({
+      readAddresses: () => {
+        reads++;
+        return addresses;
+      },
+      now: () => elapsed,
+      wait: (ms) => {
+        elapsed += ms;
+      },
+    });
+    assert.deepEqual(result, { networkReady: false, networkWaitMs: 120000, ipv4: null });
+    assert.equal(reads, 121);
+  });
+}
+
+test('network wait caps its last poll at the configured deadline', () => {
+  let elapsed = 0;
+  const result = waitForNetwork({
+    timeoutMs: 2500,
+    readAddresses: () => '',
+    now: () => elapsed,
+    wait: (ms) => {
+      elapsed += ms;
+    },
+  });
+  assert.equal(elapsed, 2500);
+  assert.equal(result.networkReady, false);
+});
+
+for (const ready of [false, true]) {
+  test(`guest waits before every probe and publishes network metadata even on timeout: ${ready}`, (t) => {
+    const root = mkdtempSync(join(tmpdir(), 'cairn-orb-network-'));
+    t.after(() => rmSync(root, { recursive: true, force: true }));
+    writeFileSync(
+      join(root, 'check-request'),
+      JSON.stringify({ version: 1, requestId: 'network-test', blockedPorts: [22, 5231] }),
+    );
+    let elapsed = 0;
+    const calls = [];
+    runGuestCheck({
+      directory: root,
+      network: {
+        timeoutMs: 2000,
+        now: () => elapsed,
+        wait: (ms) => {
+          elapsed += ms;
+        },
+      },
+      run: (cmd, args) => {
+        calls.push(cmd);
+        if (cmd === 'ip') {
+          assert.deepEqual(args, ['-4', '-o', 'addr', 'show', 'dev', 'host0']);
+          return {
+            status: 0,
+            stdout:
+              elapsed === 2000 && ready ? '2: host0 inet 10.203.0.2/24 scope global host0' : '',
+          };
+        }
+        assert.equal(elapsed, 2000);
+        return { status: 7, stdout: '000' };
+      },
+    });
+    const result = JSON.parse(readFileSync(join(root, 'check-result.json'), 'utf8'));
+    assert.equal(result.networkReady, ready);
+    assert.equal(result.networkWaitMs, 2000);
+    assert.equal(result.ipv4, ready ? '10.203.0.2' : null);
+    assert.deepEqual(calls.slice(0, 3), ['ip', 'ip', 'ip']);
+    assert.equal(calls.filter((cmd) => cmd !== 'ip').length, 7);
+  });
+}

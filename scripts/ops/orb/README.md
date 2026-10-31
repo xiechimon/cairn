@@ -57,8 +57,8 @@ host check, but guests need a published release to run a Thread.
 A passing result exits zero and contains `image: "cairn-orb-base"`,
 `cloneStartStop: "ok"`, `egress: "ok"`, `memoryMax: 4294967296`,
 `homeVisible: false`, `negativeControl: "denied"`, `privateEgress: "denied"`,
-and `firewall: "ok"`, with `ok: true` and an empty `errors` array. Save the actual
-host output to `docs/verify/2273/host-check.json` after installation. Local fixtures
+`firewall: "ok"`, `ufw: "ok"` (or `"inactive"`), and `networkReady: true`,
+with `ok: true` and an empty `errors` array. Save the actual host output to `docs/verify/2273/host-check.json` after installation. Local fixtures
 are not host acceptance evidence. The check creates and cleans up a unique
 `cairn-orb-check-*` container and refuses password prompts.
 
@@ -249,6 +249,24 @@ The enabled `cairn-orb-firewall.service` restores it before networkd at reboot;
 networkd and nspawn require that service to succeed before starting. Guests
 on the shared bridge can still communicate at layer 2.
 
+When `systemctl is-active ufw` succeeds, the installer reads
+`/etc/ufw/user.rules` and adds only missing scoped input rules with the root ufw CLI:
+
+```sh
+ufw allow in on vz-cairn proto udp from any port 68 to any port 67 comment cairn-orb-dhcp
+ufw allow in on vz-cairn proto tcp from 10.203.0.0/24 to 10.203.0.1 port 7890 comment cairn-orb-relay
+```
+
+Each addition is printed and counted; reruns print `0 changes`. Inactive or
+absent ufw is untouched, and `--dry-run` prints planned commands without running
+ufw. No route or forwarding rules are added; forwarding stays off. An accept in
+`inet cairn_orb` cannot override a drop in ufw's separate iptables-nft tables.
+The unprivileged host check reads the same rules file when ufw is active and
+requires both scoped accepts. Missing or unreadable rules produce
+`ufw: "missing-rules"`, `ok: false`, and
+`ufw is active without the cairn-orb DHCP and relay rules; rerun install-host.sh`.
+Otherwise it reports `ufw: "ok"`, or `ufw: "inactive"` when ufw is inactive or absent.
+
 The host check needs no sudo or nftables read access. It requires
 `systemctl is-active cairn-orb-firewall.service` to report `active`. Inside the
 throwaway container as `agent`, the baked `cairn-orb-check.service` uses `timeout 3 bash -c` with `/dev/tcp` to
@@ -266,12 +284,18 @@ retries bounded by a 20-second retry window and a 30-second subprocess timeout.
 After start, the checker waits at most 30 polls for the root-prepared private
 runtime directory and writes a request ID and blocked-port list to `check-request`.
 The image's enabled
-`cairn-orb-check.path` detects that file. The guest writes only exit statuses,
-HTTP status codes, port numbers and request ID to an atomically published
-`check-result.json`, then removes the trigger. No response bodies, headers,
-stderr, credentials or tool output are returned. The host waits at most 150
-polls, rejects symlinks, oversized/nonregular files, stale IDs and unexpected
-fields, then powers off the clone. It polls machine listing for at most 30
+`cairn-orb-check.path` detects that file. Before any connectivity probe, the guest
+polls `ip -4 -o addr show dev host0` every second for up to 120 seconds, waiting
+for a non-link-local IPv4 address. Under load, networkd may start late. A guest
+with only a link-local (`169.254.*`) address means DHCP was dropped; inspect
+ufw's scoped DHCP rule. A timeout records `networkReady: false` and still runs
+all probes. The guest check service has a 240-second start timeout to cover both
+the wait and probes. The guest writes network readiness, `networkWaitMs`, `ipv4` (address
+only, or null on timeout), exit statuses, HTTP status codes, port numbers and
+request ID to an atomically published `check-result.json`, then removes the trigger. No response bodies, headers,
+stderr, credentials or tool output are returned. The host waits at most 240
+one-second polls for the result, covering the network wait and probes. It rejects
+symlinks, oversized/nonregular files, stale IDs and unexpected fields, then powers off the clone. It polls machine listing for at most 30
 attempts, requests terminate after 15, and removes the clone only once it is
 absent. Root `ExecStopPost` owns runtime cleanup; the checker waits at most 30
 polls for it and reports missing cleanup as a failure. A still-running machine
@@ -282,7 +306,9 @@ container; the installer addresses the host user manager through `runuser`.
 
 The `--json` result has `image` (base-image name or null), `cloneStartStop`
 (`ok` or `failed`), `egress` (`ok` or `failed`), `privateEgress` (`denied` or
-`failed`), `firewall` (`ok` or `failed`), `memoryMax` (bytes or null),
+`failed`), `firewall` (`ok` or `failed`), `ufw` (`ok`, `inactive` or
+`missing-rules`), `networkReady` (boolean), `networkWaitMs` (milliseconds or null),
+`ipv4` (address only or null), `memoryMax` (bytes or null),
 `homeVisible` (boolean or null), `negativeControl` (`denied` or `failed`),
 `daemonRelease` (`{key, version, sha}` from `/var/lib/cairn-orb/dist/current.json`,
 or null when absent or unreadable), `ok` (boolean), and `errors` (string array).
