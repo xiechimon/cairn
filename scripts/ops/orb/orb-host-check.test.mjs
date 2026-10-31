@@ -485,7 +485,9 @@ test('the image is removed only after the container unit finished its stop hooks
       if (cmd === 'systemctl' && args.some((arg) => arg.startsWith('systemd-nspawn@'))) {
         polls += 1;
         order.push(`unit:${polls}`);
-        return { status: 0, stdout: polls < 3 ? 'deactivating\n' : 'inactive\n', stderr: '' };
+        return polls < 3
+          ? { status: 3, stdout: 'deactivating\n', stderr: '' }
+          : { status: 3, stdout: 'inactive\n', stderr: '' };
       }
       if (cmd === 'machinectl' && args.includes('remove') && args.includes(f.name))
         order.push('remove');
@@ -494,4 +496,5 @@ test('the image is removed only after the container unit finished its stop hooks
   });
   assert.equal(result.cloneStartStop, 'ok');
   assert.deepEqual(order.slice(-4), ['unit:1', 'unit:2', 'unit:3', 'remove']);
+  assert.ok(!result.errors.some((error) => error.includes('is-active')));
 });

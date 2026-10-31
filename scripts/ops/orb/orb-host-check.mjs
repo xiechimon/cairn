@@ -233,7 +233,7 @@ export function checkHost({
       stopped = false;
       for (let attempt = 0; attempt < 30; attempt++) {
         const state = (
-          call('systemctl', ['is-active', `systemd-nspawn@${name}.service`]).stdout || ''
+          run('systemctl', ['is-active', `systemd-nspawn@${name}.service`]).stdout || ''
         ).trim();
         if (state === 'inactive' || state === 'failed') {
           stopped = true;
