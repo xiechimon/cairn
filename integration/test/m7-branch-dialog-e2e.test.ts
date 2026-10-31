@@ -56,16 +56,18 @@ afterAll(async () => {
 });
 
 describe('branch-sync buildId wiring (#346 regression pin)', () => {
-  test('detail right pane switches to the Branch & PR section → renders the live face (machine picker + editable dir), not the fixture placeholder', async () => {
+  test('detail right pane shows the Branch & PR section → renders the live face (machine picker + editable dir), not the fixture placeholder', async () => {
     const todoFace = (await api(server.url, 'GET', `/api/todos/${todoId}`)).body as {
       latestBuildId: string | null;
     };
     expect(todoFace.latestBuildId).toBeTruthy();
 
     await page.goto(`${server.url}/app/todo/${todoId}`);
-    const branchTab = page.locator('.detail-right').getByTestId('pane-tab-branch');
-    await pexpect(branchTab).toBeVisible({ timeout: 30_000 });
-    await branchTab.click();
+    const planView = page.locator('.detail-right').getByTestId('pane-view-plan');
+    await pexpect(planView).toBeVisible({ timeout: 30_000 });
+    await planView.click();
+    const branchSection = page.locator('.detail-right').getByTestId('pane-section-branch');
+    await pexpect(branchSection).toBeVisible({ timeout: 30_000 });
 
     const right = page.locator('.detail-right');
     const picker = right.getByRole('button', { name: '选择机器' });

@@ -76,7 +76,7 @@ import { MergeGateVerdict } from '../detail/merge-gate-verdict.js';
 import { RerunDialog, ReusePanel } from '../detail/overlays.js';
 import { RejectDialog } from '../detail/reject-dialog.js';
 import { ReviewDialog } from '../detail/review-dialog.js';
-import { RightPane } from '../detail/right-pane.js';
+import { PaneSections, RightPane } from '../detail/right-pane.js';
 import { SourceIssueLine } from '../detail/source-issue.js';
 import { SpecBlock } from '../detail/spec-block.js';
 import { StopConfirmDialog } from '../detail/stop-confirm-dialog.js';
@@ -92,7 +92,6 @@ import { overlayContent } from '../fixtures/fixtures.js';
 import type {
   DetailContent,
   OverlayState,
-  PaneView,
   Phase,
   PlanDiffContent,
   TranscriptItem,
@@ -103,6 +102,7 @@ import { EllipsisVertical, Settings } from '../icons/index.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import type { FileMentionEntry, MentionGroups } from '../overlay/mention-token.js';
 import { MoreMenu } from '../overlay/more-menu.js';
+import type { DocView } from '../overlay/plan-dropdown.js';
 import { type SearchContext, SearchPanel, useSearchState } from '../overlay/search-panel.js';
 import { SHEET_PANEL } from '../pages/shell.js';
 import { PHASE_UI } from '../phase.js';
@@ -159,7 +159,6 @@ export function TodoDetailPage() {
   const { openChiefThread } = useChiefRoot();
   const orchestrateStart = useOrchestrateStart();
   const chiefThreadsQ = useChiefThreads(teamId, live);
-  const [paneView, setPaneView] = useState<PaneView>(fixture.ui?.paneView ?? 'doc');
   const [moreOpen, setMoreOpen] = useState(false);
   const moreAnchorRef = useRef<HTMLButtonElement | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -223,9 +222,10 @@ export function TodoDetailPage() {
   const [chain, setChain] = useState<ChainState>('idle');
   const [changesExpanded, setChangesExpanded] = useState(true);
   const [compareOpen, setCompareOpen] = useState(false);
-  const [planView, setPlanView] = useState(false);
+  const frozenSection = fixture.ui?.paneView != null && fixture.ui.paneView !== 'doc';
+  const [docChoice, setDocChoice] = useState<DocView | null>(frozenSection ? 'plan' : null);
   useEffect(() => {
-    setPlanView(false);
+    setDocChoice(frozenSection ? 'plan' : null);
   }, [id, buildId]);
   const [assignOpen, setAssignOpen] = useState(false);
   const [stopOpen, setStopOpen] = useState(false);
@@ -687,13 +687,15 @@ export function TodoDetailPage() {
   const detail = live ? liveDetail : fixtureDetail;
   const streaming = live ? running : view.transcript.some((item) => item.kind === 'streaming');
   const docMode =
-    view.planDiff != null
-      ? 'diff'
-      : planView
-        ? 'plan'
-        : stoppedBuild || phase === 'review' || phase === 'done' || phase === 'failed'
-          ? 'changes'
-          : 'plan';
+    docChoice === 'changes'
+      ? 'changes'
+      : view.planDiff != null
+        ? 'diff'
+        : docChoice === 'plan'
+          ? 'plan'
+          : stoppedBuild || phase === 'review' || phase === 'done' || phase === 'failed'
+            ? 'changes'
+            : 'plan';
 
   const stepActionFailed =
     mutations.stepAction.isError &&
@@ -856,8 +858,7 @@ export function TodoDetailPage() {
                     : null
                 }
                 onOpenPlan={() => {
-                  setPaneView('doc');
-                  setPlanView(true);
+                  setDocChoice('plan');
                 }}
                 spec={live && todo.spec.trim() !== '' ? todo.spec : undefined}
                 queuedMessages={live ? messagesQ.data?.queuedMessages : undefined}
@@ -928,20 +929,22 @@ export function TodoDetailPage() {
             )}
           </div>
           {detail != null && (
-            <RightPane
-              view={paneView}
-              onView={setPaneView}
-              docLabel={docMode === 'changes' ? '变更' : '方案'}
-              content={content}
-              buildId={live ? buildId : null}
-            >
+            <RightPane>
               <DocPane
                 mode={docMode}
                 doc={view.doc}
                 changes={live ? liveDetail?.changes : detail.changes}
                 now={live ? Date.now() : fixture.now}
-                onPaneView={setPaneView}
-                hasSections={content != null}
+                onDocView={setDocChoice}
+                sections={
+                  content != null ? (
+                    <PaneSections
+                      content={content}
+                      buildId={live ? buildId : null}
+                      initialView={fixture.ui?.paneView}
+                    />
+                  ) : undefined
+                }
                 planVersions={view.planVersions}
                 versionMenu={menu}
                 onVersionMenu={setMenu}
@@ -1153,7 +1156,7 @@ export function TodoDetailPage() {
           onClose={closeOverlay}
           onBack={() => setOverlay({ kind: 'rerun' })}
           onView={() => {
-            setPlanView(true);
+            setDocChoice('plan');
             closeOverlay();
           }}
           onDirect={

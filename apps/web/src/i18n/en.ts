@@ -434,6 +434,7 @@ export const EN: Record<string, string> = {
   // —— project routes (r2 07/24/24b/24c) ——
   文件: 'Files',
   历史: 'History',
+  '{n} 次运行': '{n} runs',
   '尚无提交历史。': 'No commits yet.',
   // #1097 files-pane folder drill-down
   目录导航: 'Directory navigation',
