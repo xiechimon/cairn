@@ -32,13 +32,13 @@ export function runtimeDirectory({
   const directory = join(parent, name);
   const record = join(state, `${name}.runtime`);
   let stat;
+  let identity;
   try {
     stat = io.lstatSync(directory);
   } catch (error) {
     if (error.code !== 'ENOENT') throw error;
   }
   if (stat) {
-    let identity;
     try {
       identity = JSON.parse(io.readFileSync(record, 'utf8'));
     } catch (error) {
@@ -47,9 +47,39 @@ export function runtimeDirectory({
     if (!stat.isDirectory() || identity?.dev !== stat.dev || identity?.ino !== stat.ino)
       throw new Error('Unrecognized runtime directory; refusing to follow or replace it');
   }
-  if (stop) {
-    if (!stat) return 0;
-    if (!dryRun) {
+  if (stop && !stat) return 0;
+  if (!stat && dryRun) return 1;
+  if (!stat) io.mkdirSync(directory, { mode: 0o700 });
+  let fd = io.openSync(
+    directory,
+    fs.constants.O_RDONLY | fs.constants.O_DIRECTORY | fs.constants.O_NOFOLLOW,
+  );
+  const execute = (command, args) =>
+    run(command, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe', fd] });
+  try {
+    let opened = io.fstatSync(fd);
+    if (stat && (stat.dev !== opened.dev || stat.ino !== opened.ino))
+      throw new Error('Runtime directory identity changed');
+    if (stop) {
+      if (dryRun) return 1;
+      if (identity.base) {
+        if (
+          execute('/usr/bin/umount', ['--no-canonicalize', '--', '/proc/self/fd/3']).status !== 0 &&
+          execute('/usr/bin/umount', ['--no-canonicalize', '--lazy', '--', '/proc/self/fd/3'])
+            .status !== 0
+        )
+          throw new Error('Cannot unmount runtime tmpfs');
+        io.closeSync(fd);
+        fd = undefined;
+        fd = io.openSync(
+          directory,
+          fs.constants.O_RDONLY | fs.constants.O_DIRECTORY | fs.constants.O_NOFOLLOW,
+        );
+        opened = io.fstatSync(fd);
+        if (opened.dev !== identity.base.dev || opened.ino !== identity.base.ino)
+          throw new Error('Underlying runtime directory identity changed');
+        io.writeFileSync(record, JSON.stringify(identity.base), { mode: 0o600 });
+      }
       const result = run('/usr/bin/rm', [
         '--recursive',
         '--force',
@@ -59,31 +89,47 @@ export function runtimeDirectory({
       ]);
       if (result.status !== 0) throw new Error('Cannot remove runtime directory');
       io.unlinkSync(record);
+      return 1;
     }
-    return 1;
-  }
-  if (!stat && dryRun) return 1;
-  if (!stat) io.mkdirSync(directory, { mode: 0o700 });
-  const fd = io.openSync(
-    directory,
-    fs.constants.O_RDONLY | fs.constants.O_DIRECTORY | fs.constants.O_NOFOLLOW,
-  );
-  try {
-    const opened = io.fstatSync(fd);
-    if (stat && (stat.dev !== opened.dev || stat.ino !== opened.ino))
-      throw new Error('Runtime directory identity changed');
     const changed =
-      !stat || opened.uid !== uid || opened.gid !== gid || (opened.mode & 0o7777) !== 0o700;
-    if (!dryRun && changed) {
+      !identity?.base ||
+      opened.uid !== uid ||
+      opened.gid !== gid ||
+      (opened.mode & 0o7777) !== 0o700;
+    if (dryRun) return changed ? 1 : 0;
+    if (!identity?.base) {
+      const base = { dev: opened.dev, ino: opened.ino };
+      if (
+        execute('/usr/bin/mount', [
+          '--no-canonicalize',
+          '-t',
+          'tmpfs',
+          '-o',
+          `size=64M,nr_inodes=4096,mode=0700,uid=${uid},gid=${gid},nosuid,nodev,noexec`,
+          'cairn-orb',
+          '/proc/self/fd/3',
+        ]).status !== 0
+      )
+        throw new Error('Cannot mount runtime tmpfs');
+      io.closeSync(fd);
+      fd = undefined;
+      fd = io.openSync(
+        directory,
+        fs.constants.O_RDONLY | fs.constants.O_DIRECTORY | fs.constants.O_NOFOLLOW,
+      );
+      opened = io.fstatSync(fd);
+      if (opened.dev === base.dev && opened.ino === base.ino)
+        throw new Error('Runtime tmpfs did not replace the directory');
+      identity = { dev: opened.dev, ino: opened.ino, base };
+    }
+    if (changed) {
       io.fchownSync(fd, uid, gid);
       io.fchmodSync(fd, 0o700);
-      io.writeFileSync(record, JSON.stringify({ dev: opened.dev, ino: opened.ino }), {
-        mode: 0o600,
-      });
+      io.writeFileSync(record, JSON.stringify(identity), { mode: 0o600 });
     }
     return changed ? 1 : 0;
   } finally {
-    io.closeSync(fd);
+    if (fd !== undefined) io.closeSync(fd);
   }
 }
 

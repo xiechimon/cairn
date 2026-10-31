@@ -7,7 +7,7 @@ if [[ $# == 1 && $1 == --dry-run ]]; then dry_run=true; elif [[ $# != 0 ]]; then
 if ! $dry_run && [[ $(id -u) != 0 ]]; then printf 'Run build-image.sh as root\n' >&2; exit 1; fi
 host_root=${CAIRN_ORB_ROOT:-}
 [[ -z $host_root || $host_root == /* ]] || { printf 'CAIRN_ORB_ROOT must be absolute\n' >&2; exit 2; }
-daemon_entry=/opt/cairn/daemon/dist/cli.mjs
+daemon_entry=/opt/cairn/daemon/cli.mjs
 agent_uid=$(id -u ian)
 [[ $agent_uid =~ ^[0-9]+$ && $agent_uid -gt 0 && $agent_uid -lt 65534 ]] || { printf 'Cannot map ian to guest agent UID\n' >&2; exit 1; }
 image=$host_root/var/lib/machines/cairn-orb-base
@@ -30,8 +30,16 @@ codex_version=$(host_version codex | awk 'NR == 1 {print $NF}')
 [[ $claude_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ && $codex_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { printf 'Cannot pin host Claude Code and Codex versions\n' >&2; exit 1; }
 pnpm_version=$(sed -n 's/.*"packageManager": "pnpm@\([0-9.]*\)".*/\1/p' "$script_dir/../../../package.json")
 [[ $pnpm_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { printf 'Cannot pin pnpm version\n' >&2; exit 1; }
-recipe=$(cat "$script_dir/build-image.sh" "$script_dir/guest-check.mjs" | sha256sum | awk '{print $1}')
-expected=$(printf 'recipe=%s\nclaude=%s\ncodex=%s\npnpm=%s\nagent_uid=%s' "$recipe" "$claude_version" "$codex_version" "$pnpm_version" "$agent_uid")
+daemon_args=(bash -lc 'node "$1" "$(command -v cairn || true)" "$2" "$3"' cairn-orb "$script_dir/daemon-package.mjs" "${CAIRN_ORB_DAEMON_PACKAGE:-}" "${CAIRN_ORB_DAEMON_VERSION:-}")
+if [[ $(id -un) == ian ]]; then
+  daemon_pin=$("${daemon_args[@]}")
+else
+  daemon_pin=$(runuser -u ian -- "${daemon_args[@]}")
+fi
+read -r daemon_package daemon_version <<< "$daemon_pin"
+[[ $daemon_package =~ ^(@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*$ && $daemon_version =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]] || { printf 'Cannot pin host daemon package and version\n' >&2; exit 1; }
+recipe=$(cat "$script_dir/build-image.sh" "$script_dir/guest-check.mjs" "$script_dir/daemon-package.mjs" | sha256sum | awk '{print $1}')
+expected=$(printf 'recipe=%s\nclaude=%s\ncodex=%s\npnpm=%s\nagent_uid=%s\ndaemon_package=%s\ndaemon=%s' "$recipe" "$claude_version" "$codex_version" "$pnpm_version" "$agent_uid" "$daemon_package" "$daemon_version")
 previous_marker=
 if [[ -d $image ]]; then
   if [[ -f $image/etc/cairn-orb-image && $(cat "$image/etc/cairn-orb-image") == "$expected" ]]; then
@@ -39,15 +47,16 @@ if [[ -d $image ]]; then
     printf '0 changes\n'
     exit 0
   fi
-  if [[ ! -f $image/etc/cairn-orb-image ]] || ! [[ $(cat "$image/etc/cairn-orb-image") =~ ^recipe=[a-zA-Z0-9-]+$'\n'claude=[0-9]+\.[0-9]+\.[0-9]+$'\n'codex=[0-9]+\.[0-9]+\.[0-9]+$'\n'pnpm=[0-9]+\.[0-9]+\.[0-9]+($'\n'agent_uid=[0-9]+)?$ ]]; then
+  if [[ ! -f $image/etc/cairn-orb-image ]] || ! [[ $(cat "$image/etc/cairn-orb-image") =~ ^recipe=[a-zA-Z0-9-]+$'\n'claude=[0-9]+\.[0-9]+\.[0-9]+$'\n'codex=[0-9]+\.[0-9]+\.[0-9]+$'\n'pnpm=[0-9]+\.[0-9]+\.[0-9]+($'\n'agent_uid=[0-9]+)?($'\n'daemon_package=(@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*$'\n'daemon=[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?)?$ ]]; then
     printf 'Unrecognized existing base image; preserve it and resolve explicitly\n' >&2
     exit 1
   fi
   previous_marker=$(cat "$image/etc/cairn-orb-image")
-  printf 'rebuild cairn-orb-base: recipe or pinned CLI versions changed\n'
+  printf 'rebuild cairn-orb-base: recipe or pinned CLI/daemon versions changed\n'
 fi
 printf 'build cairn-orb-base with pacstrap: base git nodejs npm corepack openssh ca-certificates curl\n'
 printf 'pin @anthropic-ai/claude-code@%s @openai/codex@%s pnpm@%s; create agent; install proxy settings; register image\n' "$claude_version" "$codex_version" "$pnpm_version"
+printf 'pin daemon %s@%s into /opt/cairn/node_modules with npm lifecycle scripts disabled\n' "$daemon_package" "$daemon_version"
 printf '%s\n' \
   'create a locked staging image under /var/lib/machines' \
   'enable Corepack shims and install pinned pnpm in /usr/local/lib/corepack' \
@@ -91,13 +100,14 @@ cleanup() {
 trap cleanup EXIT
 pacstrap -K -M "$stage" base git nodejs npm corepack openssh ca-certificates curl
 printf 'configure image and pinned tools\n'
-arch-chroot "$stage" /usr/bin/env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/bin HOME=/root HTTP_PROXY="$HTTP_PROXY" HTTPS_PROXY="$HTTPS_PROXY" http_proxy="$http_proxy" https_proxy="$https_proxy" bash -s -- "$claude_version" "$codex_version" "$pnpm_version" "$agent_uid" "$daemon_entry" <<'GUEST'
+arch-chroot "$stage" /usr/bin/env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/bin HOME=/root HTTP_PROXY="$HTTP_PROXY" HTTPS_PROXY="$HTTPS_PROXY" http_proxy="$http_proxy" https_proxy="$https_proxy" bash -s -- "$claude_version" "$codex_version" "$pnpm_version" "$agent_uid" "$daemon_entry" "$daemon_package" "$daemon_version" <<'GUEST'
 set -euo pipefail
 node -e 'const [major, minor] = process.versions.node.split(".").map(Number); if (major < 22 || (major === 22 && minor < 19)) process.exit(1)'
 export COREPACK_HOME=/usr/local/lib/corepack
 corepack enable
 corepack install --global "pnpm@$3"
 npm install --global --ignore-scripts --no-audit --no-fund "@anthropic-ai/claude-code@$1" "@openai/codex@$2"
+npm install --prefix /opt/cairn --omit=dev --ignore-scripts "$6@$7"
 useradd --uid "$4" --create-home --shell /bin/bash agent
 [[ $(runuser -u agent -- claude --version | awk 'NR == 1 {print $1}') == "$1" ]]
 [[ $(runuser -u agent -- codex --version | awk 'NR == 1 {print $NF}') == "$2" ]]

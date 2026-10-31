@@ -35,7 +35,7 @@ if (process.env.FAIL_COMMAND === cmd) process.exit(1);
 if (cmd === 'node') console.log(args[0].endsWith('/runtime-directory.mjs') ? '0 changes' : JSON.stringify({ http: process.env.http_proxy, https: process.env.https_proxy }));
 if (cmd === 'sysctl') console.log(process.env.PROTECTED_HARDLINKS ?? '1');
 if (cmd === 'id') console.log(args[0] === '-un' ? (process.env.FAKE_USER || 'root') : args.includes('ian') ? (process.env.AGENT_UID || '1000') : '0');
-if (cmd === 'runuser' || cmd === 'bash') console.log(args.at(-1).includes('claude') ? (process.env.BAD_VERSION || '2.1.0 (Claude Code)') : 'codex-cli 0.100.0');
+if (cmd === 'runuser' || cmd === 'bash') console.log(args.some((arg) => arg.includes('daemon-package.mjs')) ? (process.env.CAIRN_ORB_DAEMON_PACKAGE || '@xiechimon/cairn-cli') + ' ' + (process.env.CAIRN_ORB_DAEMON_VERSION || '0.2.2') : args.at(-1).includes('claude') ? (process.env.BAD_VERSION || '2.1.0 (Claude Code)') : 'codex-cli 0.100.0');
 if (cmd !== 'systemd-nspawn' && cmd !== 'pacstrap' && args.some((arg) => arg === '-M' || arg.startsWith('--machine'))) process.exit(91);
 if (cmd === 'machinectl' && args.some((arg) => ['bind', 'shell', 'login', 'copy-to', 'copy-from'].includes(arg))) process.exit(92);
 if (cmd === 'stat') console.log(process.env.DIR_OWNER || 'ian:700');
@@ -61,6 +61,8 @@ if (cmd === 'mv') {
 }
 if (cmd === 'arch-chroot') {
   const input = readFileSync(0, 'utf8');
+  writeFileSync(join(root, 'guest-recipe'), input);
+  writeFileSync(join(root, 'guest-args'), JSON.stringify(args));
   if (!input.includes('major < 22') || !input.includes('passwd --lock root') || !input.includes('systemctl mask sshd')) process.exit(3);
 }
 if (cmd === 'machinectl') console.log('cairn-orb-base directory no');
@@ -81,6 +83,7 @@ if (cmd === 'ip') console.log('7: vz-cairn inet ' + (process.env.BRIDGE_IP || '1
   chmodSync(fake, 0o755);
   for (const cmd of [
     'node',
+    'npm',
     'sysctl',
     'bash',
     'id',
@@ -116,7 +119,7 @@ if (cmd === 'ip') console.log('7: vz-cairn inet ' + (process.env.BRIDGE_IP || '1
     existsSync(join(root, 'calls'))
       ? readFileSync(join(root, 'calls'), 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse)
       : [];
-  return { root, run, calls };
+  return { root, run, calls, env };
 }
 
 for (const file of [
@@ -423,7 +426,7 @@ test('failed image publication restores the previous base', () => {
 
 test('image ships enabled guest worker and trigger units with one daemon entry', () => {
   const script = readFileSync(join(source, 'build-image.sh'), 'utf8');
-  assert.match(script, /daemon_entry=\/opt\/cairn\/daemon\/dist\/cli.mjs/);
+  assert.match(script, /daemon_entry=\/opt\/cairn\/daemon\/cli.mjs/);
   assert.match(script, /User=agent/);
   assert.match(script, /Restart=always/);
   assert.match(script, /After=local-fs.target/);
@@ -490,6 +493,83 @@ test('agent UID drift rebuilds the image and invalid mappings fail closed', () =
     );
     for (const uid of ['0', '65534', 'invalid'])
       assert.notEqual(f.run('build-image.sh', ['--dry-run'], { AGENT_UID: uid }).status, 0);
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+for (const override of [
+  { CAIRN_ORB_DAEMON_VERSION: '0.3.0' },
+  { CAIRN_ORB_DAEMON_PACKAGE: '@example/daemon' },
+]) {
+  test(`daemon pin drift rebuilds and converges: ${JSON.stringify(override)}`, () => {
+    const f = fixture();
+    try {
+      assert.equal(f.run('build-image.sh').status, 0);
+      const changed = f.run('build-image.sh', [], override);
+      assert.equal(changed.status, 0, changed.stderr);
+      assert.match(changed.stdout, /rebuild cairn-orb-base/);
+      assert.match(changed.stdout, /1 changes/);
+      const marker = readFileSync(
+        join(f.root, 'var/lib/machines/cairn-orb-base/etc/cairn-orb-image'),
+        'utf8',
+      );
+      assert.ok(marker.includes(`daemon=${override.CAIRN_ORB_DAEMON_VERSION || '0.2.2'}`));
+      assert.ok(
+        marker.includes(
+          `daemon_package=${override.CAIRN_ORB_DAEMON_PACKAGE || '@xiechimon/cairn-cli'}`,
+        ),
+      );
+      const args = JSON.parse(readFileSync(join(f.root, 'guest-args'), 'utf8'));
+      assert.equal(args.at(-3), '/opt/cairn/daemon/cli.mjs');
+      assert.equal(args.at(-2), override.CAIRN_ORB_DAEMON_PACKAGE || '@xiechimon/cairn-cli');
+      assert.equal(args.at(-1), override.CAIRN_ORB_DAEMON_VERSION || '0.2.2');
+      const recipe = readFileSync(join(f.root, 'guest-recipe'), 'utf8');
+      const install = /^npm install --prefix .*$/m.exec(recipe)[0];
+      const worker =
+        /cat > \/etc\/systemd\/system\/cairn-orb-worker.service <<WORKER\n([\s\S]+?)\nWORKER/.exec(
+          recipe,
+        )[1];
+      const guest = spawnSync('/bin/bash', ['-s', '--', ...args.slice(args.indexOf('--') + 1)], {
+        input: `${install}\ncat <<WORKER\n${worker}\nWORKER\n`,
+        env: f.env,
+        encoding: 'utf8',
+      });
+      assert.equal(guest.status, 0, guest.stderr);
+      assert.match(
+        guest.stdout,
+        /^ExecStart=\/usr\/bin\/node \/opt\/cairn\/daemon\/cli.mjs orb-step --socket \/run\/cairn\/relay.sock$/m,
+      );
+      assert.deepEqual(
+        f.calls().find(([cmd]) => cmd === 'npm'),
+        [
+          'npm',
+          'install',
+          '--prefix',
+          '/opt/cairn',
+          '--omit=dev',
+          '--ignore-scripts',
+          `${args.at(-2)}@${args.at(-1)}`,
+        ],
+      );
+      assert.equal(f.run('build-image.sh', [], override).stdout.trim(), '0 changes');
+      assert.equal(f.calls().filter(([cmd]) => cmd === 'pacstrap').length, 2);
+    } finally {
+      rmSync(f.root, { recursive: true, force: true });
+    }
+  });
+}
+
+test('legacy image markers rebuild with daemon pins instead of being rejected', () => {
+  const f = fixture();
+  try {
+    const marker = join(f.root, 'var/lib/machines/cairn-orb-base/etc/cairn-orb-image');
+    mkdirSync(join(marker, '..'), { recursive: true });
+    writeFileSync(marker, 'recipe=old\nclaude=2.1.0\ncodex=0.100.0\npnpm=12.5.1\nagent_uid=1000\n');
+    const changed = f.run('build-image.sh');
+    assert.equal(changed.status, 0, changed.stderr);
+    assert.match(changed.stdout, /rebuild cairn-orb-base/);
+    assert.match(readFileSync(marker, 'utf8'), /daemon=0.2.2/);
   } finally {
     rmSync(f.root, { recursive: true, force: true });
   }

@@ -32,7 +32,8 @@ The guest dials the host; the host never executes commands in a guest.
 
 ## Failure modes and local verification
 
-- Missing or partial images, invalid CLI pins, and Node below 22.19 fail closed.
+- Missing or partial images, invalid CLI or daemon pins, and Node below 22.19 fail closed.
+  Daemon package/version drift rebuilds the image with matching runtime dependencies.
 - Polkit evaluates both clone source and destination; other users, unnamed
   actions, unrelated units, and nonmatching names receive no grant.
 - Resource limits, private users, proxy configuration, and host-path isolation
@@ -41,7 +42,9 @@ The guest dials the host; the host never executes commands in a guest.
   links. The relay binds the container bridge only. No direct routing is enabled.
 - Pre-planted runtime files, symlinks and unrecognized directories are refused.
   Only root creates or removes bind sources; fd operations set runtime ownership
-  and mode. Parent ownership, modes and hardlink protection fail closed.
+  and mode. A dedicated 64 MiB tmpfs with at most 4096 inodes bounds each guest's
+  runtime writes. Mount and unmount failures stop preparation or cleanup. Parent
+  ownership, modes and hardlink protection fail closed.
 - Dry runs perform no mutations. Completed installs converge to zero changes;
   failed steps are never recorded as completed.
 - Missing images, authorization denial, missing or malformed guest metadata, failed cleanup, broken
@@ -59,9 +62,18 @@ on reruns. Host CLI pins come from `claude
 --version` and `codex --version` in that login shell. Corepack installs the
 repository's exact pnpm version. Existing networkd-managed host links or earlier network configuration files
 stop the installer before changes.
-A completed base image is rebuilt when the recipe or pinned host CLI versions
-change. The previous base survives failed builds and is replaced only after
-the staging image is complete and unmounted. Unrecognized images are preserved
+The daemon pin is read from the installed package behind `cairn` in `ian`'s
+login shell, following the executable symlink to its `package.json`. The package
+name defaults to `apps/daemon/package.json`. Set `CAIRN_ORB_DAEMON_VERSION` to an
+exact published version to bypass discovery, and optionally set
+`CAIRN_ORB_DAEMON_PACKAGE` to override the package name. Use these overrides when
+the host service uses a different executable or installation than the login shell.
+The chroot runs `npm install --prefix /opt/cairn --omit=dev --ignore-scripts <name>@<version>`,
+placing the daemon's runtime dependencies in `/opt/cairn/node_modules`.
+`/etc/cairn-orb-image` records both `daemon_package` and `daemon` (the version).
+A completed base image is rebuilt when the recipe, pinned host CLI versions,
+daemon package or daemon version change. The previous base survives failed builds
+and is replaced only after the staging image is complete and unmounted. Unrecognized images are preserved
 and stop installation. The rebuild is printed and counted; the next run prints
 `0 changes`. Existing clones keep their original tools.
 
@@ -105,14 +117,20 @@ At every start, the root `ExecStartPre` preparation hook creates the exact
 `/run/cairn-orb/<machine>` directory. It uses `lstat` to refuse pre-planted files,
 symlinks and directories without its root-owned device/inode record in
 `/run/systemd/nspawn/<machine>.runtime`. It creates a missing directory with
-`mkdir`, opens it with `O_DIRECTORY|O_NOFOLLOW`, then uses `fchown` and `fchmod`
-on that fd to set `ian` ownership and mode `0700`. Repeated preparation recognizes
-the recorded inode. An old runtime directory from the previous owner-writable
-parent design requires administrator inspection and removal before starting;
-it is never adopted automatically. `ExecStopPost` checks the same identity and
-removes only that directory, without following symlinks. GNU `rm` handles nested
-symlinks without traversal and refuses to cross filesystem boundaries. The daemon
-never creates or removes the bind source: after `machinectl start`, it waits for
+`mkdir`, opens it with `O_DIRECTORY|O_NOFOLLOW`, and immediately mounts a dedicated
+tmpfs through the inherited fd before nspawn binds it. The mount uses
+`size=64M,nr_inodes=4096,mode=0700,uid=<ian>,gid=<ian>,nosuid,nodev,noexec`.
+The helper reopens the mounted directory without following symlinks, sets its
+ownership and mode through that fd, and records both the tmpfs and underlying
+directory identities. Repeated preparation recognizes the recorded mount.
+An old runtime directory from the previous owner-writable parent design requires
+administrator inspection and removal before starting; it is never adopted
+automatically. `ExecStopPost` checks the mounted identity, unmounts through its fd
+(lazily if a normal unmount fails), checks the underlying identity, then removes
+the directory and record. Failed unmounts preserve the directory and record;
+failed removal after unmount can retry without unmounting the host filesystem.
+GNU `rm` handles nested symlinks without traversal and refuses to cross filesystem
+boundaries. The daemon never creates or removes the bind source: after `machinectl start`, it waits for
 the prepared directory, then creates `relay.sock` and `outbox/` inside it.
 
 `norbind` prevents nested mounts from propagating. `PrivateUsers=pick` is retained,
@@ -131,20 +149,26 @@ The runtime filesystem must have `nosuid,nodev`; unsupported protection fails
 startup. Together these controls close source swaps, external symlink traversal
 and hardlink import of host root files that `ian` cannot already modify.
 
-`cairn-runner` cannot traverse a private runtime child. Another container has its
-own user namespace and only its exact runtime directory mounted; the runtime
-parent and other machines' sockets are absent. No network listener exposes the
-relay socket. Actual filesystem idmap support, root/agent UID observations and
-cross-user/container isolation must still be checked on the Linux host after
+Mode `0700` initially prevents other host users, including `cairn-runner`, from
+traversing the runtime directory. Compromised guest code running as `agent` has
+the same UID as `ian` on the idmapped mount and can chmod its own runtime
+directory and socket. Filesystem modes alone therefore do not keep other host
+users out after guest compromise: the per-step relay token is the authentication
+boundary. Another container has its own user namespace and only its exact runtime
+directory mounted; the runtime parent and other machines' sockets are absent.
+No network listener exposes the relay socket. Actual filesystem idmap support,
+root/agent UID observations and cross-user/container isolation must still be checked on the Linux host after
 installation; local tests validate the installed arguments and exercise directory
-lifecycle operations, with root ownership and GNU cleanup commands simulated.
+lifecycle operations, with root ownership, tmpfs mount/unmount and GNU cleanup
+commands simulated.
 
-Fill `dist` with the daemon package and its runtime dependencies, and put
-Project seeds at `/var/lib/cairn-orb/seed/<projectId>/repo`, as `ian`. The image
-uses one `daemon_entry` variable, `/opt/cairn/daemon/dist/cli.mjs`, matching
-`apps/daemon/build.mjs` and the package binary entry. The enabled
+The daemon publishes its stable `cli.mjs` symlink at the root of
+`/var/lib/cairn-orb/dist`; the image supplies runtime dependencies separately.
+Put Project seeds at `/var/lib/cairn-orb/seed/<projectId>/repo`, as `ian`.
+The image uses one `daemon_entry` variable, `/opt/cairn/daemon/cli.mjs`. The enabled
 `cairn-orb-worker.service` runs as `agent`, waits for `/run/cairn/relay.sock`,
-and runs `orb-step --socket /run/cairn/relay.sock` with `Restart=always`.
+and runs exactly `/usr/bin/node /opt/cairn/daemon/cli.mjs orb-step --socket /run/cairn/relay.sock`
+with `Restart=always`.
 The daemon relay protocol owns authentication, step binding, heartbeat, tool
 and done messages; host crash fallback and the 120-second watchdog remain
 on the host. This host/image change requires the daemon transport rework.
@@ -231,7 +255,9 @@ managed by NetworkManager and is unaffected.
 The polkit transient-unit protection relies on the installed
 `systemd-nspawn@.service` template existing: systemd must load that template
 instead of allowing a caller to supply an arbitrary transient unit definition.
-Residual privileges are scoped clone/remove, start, kill and terminate only.
+The Orb rule grants only scoped clone/remove, start, kill and terminate actions.
+As reported by the owner for this host, `ian` is also in `docker` and `wheel`;
+polkit scoping is not a real boundary against a compromised `ian` process today.
 Clones may use the base as a source; they cannot replace, remove or start it.
 The fixed idmapped binds require kernel/filesystem support; unsupported mounts
 fail startup instead of falling back to permissive modes. Image UID changes
@@ -247,14 +273,15 @@ This records the fix within option 1; it does not claim a new independent review
 verdict or Linux host acceptance.
 
 Every guest can read all Project seeds under the explicitly decided shared
-read-only `/seed` mount; this is not a boundary between Projects. The worker
-unit sets `CAIRN_ORB=1`, but needs the separate daemon change that accepts
+read-only `/seed` mount; this is not a boundary between Projects. Multi-user
+hosting in phase 2/3 requires per-Project seed binds instead of the shared `/seed`.
+The worker unit sets `CAIRN_ORB=1`, but needs the separate daemon change that accepts
 `orb-step --socket` and implements the authenticated relay client. Current
 main's stdin/stdout worker cannot satisfy that interface.
 
-Live Linux acceptance and an independent review of the resolved final patch
-remain required before delivery of PR #2341. This macOS worktree run does not
-exercise Linux nspawn mounts, polkit or root host provisioning.
+The independent security review passed before this alignment and hardening round;
+that verdict does not cover this new patch. Live Linux acceptance remains required
+before delivery of PR #2341. This macOS worktree run does not exercise Linux nspawn mounts, polkit or root host provisioning.
 
 Per-machine runtime settings remain
 under `/run` until reboot. Unrelated administrative actions retain their

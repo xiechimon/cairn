@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
+import { daemonPackage } from './daemon-package.mjs';
 import { installHost } from './install-host.mjs';
 import { runtimeDirectory } from './runtime-directory.mjs';
 
@@ -682,16 +683,27 @@ function runtimeFixture(t) {
   const name = 'cairn-orb-test-a';
   const directory = join(parent, name);
   const calls = [];
+  const descriptors = new Map();
+  let mounted = false;
   const io = {
     ...fs,
     lstatSync(path, ...args) {
       const stat = fs.lstatSync(path, ...args);
       if (path === parent || path === state) return Object.assign(stat, { uid: 0, gid: 0 });
+      if (path === directory && mounted)
+        return Object.assign(stat, { dev: stat.dev + 1, ino: stat.ino + 1 });
       return stat;
+    },
+    fstatSync(fd) {
+      const stat = fs.fstatSync(fd);
+      return descriptors.get(fd)
+        ? Object.assign(stat, { dev: stat.dev + 1, ino: stat.ino + 1 })
+        : stat;
     },
     openSync(path, flags, ...args) {
       const fd = fs.openSync(path, flags, ...args);
       calls.push(['open', path, flags, fd]);
+      descriptors.set(fd, mounted);
       return fd;
     },
     fchownSync(fd, uid, gid) {
@@ -703,14 +715,23 @@ function runtimeFixture(t) {
       fs.fchmodSync(fd, mode);
     },
   };
-  const run = (cmd, args) => {
+  const run = (cmd, args, options) => {
+    calls.push([cmd, args, options]);
+    if (cmd === '/usr/bin/mount') {
+      mounted = true;
+      return { status: 0 };
+    }
+    if (cmd === '/usr/bin/umount') {
+      mounted = false;
+      return { status: 0 };
+    }
     assert.equal(cmd, '/usr/bin/rm');
     assert.deepEqual(args, ['--recursive', '--force', '--one-file-system', '--', directory]);
     fs.rmSync(directory, { recursive: true });
     return { status: 0 };
   };
   const options = { root, name, uid: process.getuid(), gid: process.getgid(), io, run };
-  return { options, parent, state, directory, calls };
+  return { options, parent, state, directory, calls, run };
 }
 
 test('root preparation creates and opens a private directory before fd ownership changes', (t) => {
@@ -840,7 +861,7 @@ test('failed stop cleanup preserves the root identity record for retry', (t) => 
   runtimeDirectory(f.options);
   assert.throws(
     () => runtimeDirectory({ ...f.options, stop: true, run: () => ({ status: 1 }) }),
-    /remove/,
+    /unmount/,
   );
   assert.ok(fs.existsSync(f.directory));
   assert.equal(fs.readdirSync(f.state).length, 1);
@@ -853,4 +874,129 @@ test('first-start dry-run does not require or create the systemd runtime state d
   assert.equal(runtimeDirectory({ ...f.options, dryRun: true }), 1);
   assert.equal(fs.existsSync(f.state), false);
   assert.equal(fs.existsSync(f.directory), false);
+});
+
+test('runtime tmpfs is bounded, hardened and mounted through the no-follow fd', (t) => {
+  const f = runtimeFixture(t);
+  runtimeDirectory(f.options);
+  const mount = f.calls.find(([op]) => op === '/usr/bin/mount');
+  assert.ok(mount);
+  assert.deepEqual(mount[1], [
+    '--no-canonicalize',
+    '-t',
+    'tmpfs',
+    '-o',
+    `size=64M,nr_inodes=4096,mode=0700,uid=${f.options.uid},gid=${f.options.gid},nosuid,nodev,noexec`,
+    'cairn-orb',
+    '/proc/self/fd/3',
+  ]);
+  const opened = f.calls.find(([op]) => op === 'open');
+  assert.equal(mount[2].stdio[3], opened[3]);
+  assert.equal(mount[2].encoding, 'utf8');
+  assert.equal(runtimeDirectory(f.options), 0);
+  assert.equal(f.calls.filter(([op]) => op === '/usr/bin/mount').length, 1);
+});
+
+test('stop unmounts before removal and retries a busy mount lazily using its fd', (t) => {
+  const f = runtimeFixture(t);
+  runtimeDirectory(f.options);
+  f.calls.length = 0;
+  const run = (cmd, args, options) => {
+    if (cmd === '/usr/bin/umount' && !args.includes('--lazy')) {
+      f.calls.push([cmd, args, options]);
+      return { status: 1 };
+    }
+    return f.run(cmd, args, options);
+  };
+  assert.equal(runtimeDirectory({ ...f.options, stop: true, run }), 1);
+  const commands = f.calls.filter(([op]) => op.startsWith('/usr/bin/'));
+  assert.deepEqual(
+    commands.map(([op, args]) => [op, args]),
+    [
+      ['/usr/bin/umount', ['--no-canonicalize', '--', '/proc/self/fd/3']],
+      ['/usr/bin/umount', ['--no-canonicalize', '--lazy', '--', '/proc/self/fd/3']],
+      ['/usr/bin/rm', ['--recursive', '--force', '--one-file-system', '--', f.directory]],
+    ],
+  );
+  assert.ok(commands.slice(0, 2).every(([, , options]) => Number.isInteger(options.stdio[3])));
+  assert.equal(fs.existsSync(f.directory), false);
+  assert.deepEqual(fs.readdirSync(f.state), []);
+});
+
+test('failed tmpfs mount cannot certify an unbounded runtime directory', (t) => {
+  const f = runtimeFixture(t);
+  assert.throws(() => runtimeDirectory({ ...f.options, run: () => ({ status: 1 }) }), /mount/i);
+  assert.deepEqual(fs.readdirSync(f.state), []);
+  assert.ok(!f.calls.some(([op]) => op === 'fchown'));
+});
+
+test('failed removal after unmount can retry without unmounting the host filesystem', (t) => {
+  const f = runtimeFixture(t);
+  runtimeDirectory(f.options);
+  assert.throws(
+    () =>
+      runtimeDirectory({
+        ...f.options,
+        stop: true,
+        run: (cmd, args, options) =>
+          cmd === '/usr/bin/rm' ? { status: 1 } : f.run(cmd, args, options),
+      }),
+    /remove/,
+  );
+  f.calls.length = 0;
+  assert.equal(runtimeDirectory({ ...f.options, stop: true }), 1);
+  assert.ok(!f.calls.some(([op]) => op === '/usr/bin/umount'));
+});
+
+const daemonPackageName = '@xiechimon/cairn-cli';
+
+function packageFixture(t) {
+  const root = fs.mkdtempSync(join(tmpdir(), 'cairn-orb-package-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const installed = join(root, 'node_modules', daemonPackageName);
+  mkdirSync(join(installed, 'dist'), { recursive: true });
+  writeFileSync(
+    join(installed, 'package.json'),
+    JSON.stringify({ name: daemonPackageName, version: '0.2.2' }),
+  );
+  writeFileSync(join(installed, 'dist/cli.mjs'), '');
+  const entry = join(root, 'cairn');
+  fs.symlinkSync(join(installed, 'dist/cli.mjs'), entry);
+  return { installed, entry };
+}
+
+test('daemon pin comes from the installed package behind the host CLI symlink', (t) => {
+  const f = packageFixture(t);
+  assert.deepEqual(daemonPackage({ entry: f.entry }), {
+    name: daemonPackageName,
+    version: '0.2.2',
+  });
+});
+
+test('exact version and package overrides work without a host CLI', () => {
+  assert.deepEqual(daemonPackage({ version: '0.3.0-rc.1', packageName: '@example/daemon' }), {
+    name: '@example/daemon',
+    version: '0.3.0-rc.1',
+  });
+  assert.deepEqual(daemonPackage({ version: '0.2.2' }), {
+    name: daemonPackageName,
+    version: '0.2.2',
+  });
+});
+
+test('missing metadata and nonexact package specs fail closed', (t) => {
+  const f = packageFixture(t);
+  for (const version of ['', 'latest', '^0.2.2', '0.2', '0.2.2;echo bad'])
+    assert.throws(
+      () => daemonPackage({ version, packageName: daemonPackageName }),
+      /version|entry/i,
+    );
+  for (const name of ['--global', 'https://example.com/pkg', '../daemon', 'pkg@latest'])
+    assert.throws(() => daemonPackage({ packageName: name, version: '0.2.2' }), /package/i);
+  assert.throws(() => daemonPackage({ entry: join(f.installed, 'missing') }), /ENOENT/);
+  writeFileSync(
+    join(f.installed, 'package.json'),
+    JSON.stringify({ name: 'other', version: '0.2.2' }),
+  );
+  assert.throws(() => daemonPackage({ entry: f.entry }), /package/i);
 });
