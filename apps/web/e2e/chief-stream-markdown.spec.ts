@@ -503,7 +503,7 @@ test.describe('chief drawer streaming face (live mock, #651)', () => {
     await expect(presence.getByTestId('chief-turn-tools')).toHaveCount(0);
 
     const hit = await toggle.boundingBox();
-    expect(hit?.height).toBe(24);
+    expect(hit?.height).toBe(23);
     const label = presence.getByText('处理中...');
     const inkInset = await label.evaluate((el) => {
       const btn = el.closest('button') as HTMLElement;

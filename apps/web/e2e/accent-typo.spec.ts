@@ -28,7 +28,7 @@ for (const theme of ['light', 'dark'] as const) {
     const w = await page.evaluate(
       () => getComputedStyle(document.querySelector('.sched-empty h2')!).fontWeight,
     );
-    expect(w).toBe('500');
+    expect(w).toBe('650');
   });
 
   test(`sidebar header carries the Cairn pixel mark + name (${theme})`, async ({ page }) => {

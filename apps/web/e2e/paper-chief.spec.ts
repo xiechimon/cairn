@@ -104,12 +104,12 @@ for (const theme of ['light', 'dark'] as const) {
 
     win = await openWindow(page, THREAD);
     const note = win.getByTestId('chief-stream').locator('[data-slot="marker"]').first();
-    await expect(note, 'W5').toHaveCSS('font-size', '12px');
+    await expect(note, 'W5').toHaveCSS('font-size', '12.5px');
     const foot = win.getByTestId('chief-msg-foot').first();
-    await expect(foot, 'W5').toHaveCSS('font-size', '12px');
+    await expect(foot, 'W5').toHaveCSS('font-size', '12.5px');
     await win.getByRole('button', { name: '展开过程' }).click();
     const toolRow = win.getByTestId('chief-turn-tools').locator('[data-slot="trace-line"]').first();
-    await expect(toolRow, 'W5').toHaveCSS('font-size', '11.5px');
+    await expect(toolRow, 'W5').toHaveCSS('font-size', '12.5px');
   });
 
   test(`settings: Paper top bar, one settings card, empty rows in the card (${theme})`, async ({

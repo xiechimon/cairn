@@ -164,7 +164,7 @@ export function TodoCard({
       </h3>
 
       <div className="todo-card-meta mt-1.5 flex h-5 items-center gap-2 bg-inherit text-meta whitespace-nowrap text-content-tertiary">
-        <div className="relative flex min-w-0 flex-1 bg-inherit">
+        <div className="pointer-events-none relative flex min-w-0 flex-1 bg-inherit [&_:is(a,button)]:pointer-events-auto">
           <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
             {project !== undefined && (
               <span className="flex items-center gap-1">
