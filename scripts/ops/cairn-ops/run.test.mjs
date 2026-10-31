@@ -45,7 +45,7 @@ function git(cwd, ...args) {
 }
 
 function taskScript(out) {
-  return `printf '%s\\n' "$@" > '${out}/args'\nenv > '${out}/env'\nfind . | sort > '${out}/files'\nls -ld . | cut -c1-10 > '${out}/mode'\nexit "\${DEMO_EXIT:-0}"\n`;
+  return `printf '%s\\n' "$@" > '${out}/args'\nenv > '${out}/env'\nfind . | sort > '${out}/files'\nfind . -exec ls -ld {} \\; | awk '{ print substr($1, 1, 10), $NF }' | sort -k2 > '${out}/modes'\nls -ld . | cut -c1-10 > '${out}/mode'\nexit "\${DEMO_EXIT:-0}"\n`;
 }
 
 function fixture({ trustedUid = process.getuid(), tasks } = {}) {
@@ -190,6 +190,33 @@ test('materializes the whole task directory and nothing outside it', () => {
     './scripts/ops/demo/lib',
     './scripts/ops/demo/lib/data.txt',
     './scripts/ops/demo/task.sh',
+  ]);
+});
+
+test('under umask 077 every materialized directory and file stays readable by other users', () => {
+  const { out, layout, upstream } = fixture();
+  writeFileSync(join(upstream, 'scripts/ops/demo/lib/tool.sh'), 'exit 0\n', { mode: 0o755 });
+  chmodSync(join(upstream, 'scripts/ops/demo/lib/tool.sh'), 0o755);
+  git(upstream, 'add', '.');
+  git(upstream, 'commit', '-q', '-m', 'tool');
+  const sha = git(upstream, 'rev-parse', 'HEAD');
+  const previous = process.umask(0o077);
+  let result;
+  try {
+    result = run(layout, ['demo', sha]);
+  } finally {
+    process.umask(previous);
+  }
+  assert.equal(result.code, 0, result.messages);
+  assert.deepEqual(readFileSync(join(out, 'modes'), 'utf8').trim().split('\n'), [
+    'drwxr-xr-x .',
+    'drwxr-xr-x ./scripts',
+    'drwxr-xr-x ./scripts/ops',
+    'drwxr-xr-x ./scripts/ops/demo',
+    'drwxr-xr-x ./scripts/ops/demo/lib',
+    '-rw-r--r-- ./scripts/ops/demo/lib/data.txt',
+    '-rwxr-xr-x ./scripts/ops/demo/lib/tool.sh',
+    '-rw-r--r-- ./scripts/ops/demo/task.sh',
   ]);
 });
 

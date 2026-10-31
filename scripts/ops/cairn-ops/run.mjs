@@ -4,6 +4,7 @@ import {
   closeSync,
   constants,
   existsSync,
+  fchmodSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
@@ -240,19 +241,29 @@ function listTree(git, commit, directory) {
     });
 }
 
+function ensureReadableDirectories(workdir, relativeDirectory) {
+  let current = workdir;
+  for (const segment of relativeDirectory.split('/')) {
+    current = join(current, segment);
+    if (!existsSync(current)) mkdirSync(current, { mode: 0o755 });
+    chmodSync(current, 0o755);
+  }
+}
+
 function materialize(git, entries, workdir) {
   for (const item of entries) {
     const blob = git(['cat-file', 'blob', item.oid]);
     if (blob.status !== 0) refuse(`cannot read blob ${item.oid}`);
-    const target = join(workdir, item.path);
-    mkdirSync(dirname(target), { recursive: true, mode: 0o755 });
+    ensureReadableDirectories(workdir, dirname(item.path));
+    const mode = item.mode === '100755' ? 0o755 : 0o644;
     const descriptor = openSync(
-      target,
+      join(workdir, item.path),
       constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
-      item.mode === '100755' ? 0o755 : 0o644,
+      mode,
     );
     try {
       writeSync(descriptor, blob.stdout);
+      fchmodSync(descriptor, mode);
     } finally {
       closeSync(descriptor);
     }
