@@ -192,7 +192,7 @@ export function FoundationsHero({ theme }: { theme: GalleryTheme }) {
         <p className="m-0 max-w-100 text-card-title text-content-secondary">
           Cairn: limestone paper, lichen ink, ochre for what waits on you. Surfaces stack like
           stones, each layer a step {theme === 'dark' ? 'lighter' : 'whiter'} than the one below,
-          and status marks are the pebbles on the trail.
+          and each group on the trail carries one status mark.
         </p>
         <a
           href="#doc-check"

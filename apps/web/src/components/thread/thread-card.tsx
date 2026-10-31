@@ -1,14 +1,12 @@
 import { cn } from 'cn';
 import type { ReactNode } from 'react';
-import { type StoneKind, StoneMark } from '../stone/stone-mark.js';
 import type { StoneTone } from '../stone/tone.js';
+import { ToneGlyph } from '../stone/tone-glyph.js';
 import { Button } from '../ui/button.js';
-import { ThreadStateTag } from './thread-state-tag.js';
 
 export interface ThreadCardProps {
   title: string;
   tone: StoneTone;
-  kind: StoneKind;
   stateLabel: string;
   reason: ReactNode;
   primaryLabel?: string;
@@ -21,7 +19,6 @@ export interface ThreadCardProps {
 export function ThreadCard({
   title,
   tone,
-  kind,
   stateLabel,
   reason,
   primaryLabel,
@@ -39,15 +36,13 @@ export function ThreadCard({
         className,
       )}
     >
-      <StoneMark tone={tone} kind={kind} />
+      <ToneGlyph tone={tone} className="mt-0.75" />
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2.5">
           <h3 className="m-0 min-w-0 truncate text-ui font-semibold text-foreground">{title}</h3>
-          <span className="ml-auto flex-none">
-            <ThreadStateTag tone={tone}>{stateLabel}</ThreadStateTag>
-          </span>
+          <span className="sr-only">{stateLabel}</span>
         </div>
-        <p className="mt-0.5 mb-0 text-ui text-content-secondary">{reason}</p>
+        <p className="mt-0.5 mb-0 text-meta text-content-secondary">{reason}</p>
         <div className="mt-3 flex flex-wrap gap-2">
           {primaryLabel != null && (
             <Button size="sm" onClick={onPrimary} className="h-6.5 px-2.25 text-meta">

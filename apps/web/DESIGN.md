@@ -28,7 +28,7 @@ colors:
   running-text: '#3f6c35'  # working text
   running-bar: '#55833f'
   running-track: '#e1e3dc'
-  pebble-waiting: '#d49a1c'   # stone mark and pebble: waiting on you
+  pebble-waiting: '#d49a1c'   # palette: waiting on you
   pebble-review: '#5379a0'    # ready for review
   pebble-working: '#5f8f4f'   # working
   pebble-idle: '#a8aea6'      # idle or snoozed
@@ -218,11 +218,10 @@ See "Page patterns · Settings list" below.
 
 All live in `src/components/` and are shown in the gallery under "Stone language". Pages compose only these.
 
-- **Pebble** (`stone/pebble.tsx`): 8 by 7 status dot, five tones (`waiting`, `review`, `working`, `idle`, `resolved`) on the `pebble-*` tokens.
-- **StoneMark** (`stone/stone-mark.tsx`): 22px pebble with a kind icon (question, plan, permission, pr, running, idle, snoozed, done). Working spins 1.6s unless `still`; stops under reduced motion.
-- **StoneGroup / StoneTrail** (`stone/stone-group.tsx`): the inbox group header (pebble, label, mono count, collapse chevron) on a dashed trail line; idle and resolved use an outlined pebble; an empty group shows a dashed hint.
-- **ThreadCard** (`thread/thread-card.tsx`): the Coordinator stream card. Mark, title, `ThreadStateTag`, one-line reason, primary action (Answer, Review plan, Review PR) and a quiet View thread. One card changes tone, kind and actions in place.
-- **ThreadRow** (`thread/thread-row.tsx`): inbox row with PR tag, age (mono, green while working), snoozed icon, hover checkbox and menu slot, selected state; waiting rows are raised.
+- **ToneGlyph** (`stone/tone-glyph.tsx`): the inbox tone drawn with the status glyph family (`StatusGlyph`): waiting = half pie and review = three-quarter pie in accent, working = the spiral trace in `running` (`still` holds it, reduced motion stops it), idle = plain ring in `ink-3`, resolved = filled check in `ink-4`. The `pebble-*` tokens remain only as palette entries.
+- **StoneGroup / StoneTrail** (`stone/stone-group.tsx`): the inbox group header (glyph, label, count in `tabular-nums`, collapse chevron), no trail line. A state is drawn once per context: inside a group the header carries the glyph and its rows carry none; an empty group says so in one line of `ink-3`.
+- **ThreadCard** (`thread/thread-card.tsx`): the Coordinator stream card. Glyph, title, one-line reason, primary action (Answer, Review plan, Review PR) and a quiet View thread. The glyph is the state; there is no second state tag (the label stays for screen readers).
+- **ThreadRow** (`thread/thread-row.tsx`): the inbox row inside a group: no glyph, title aligned under the group label, PR number, the reason in words ("Question · …", "Permission · …"), age in `tabular-nums`, a snoozed clock when it differs from its group. Hover is `menu-hover`; the checkbox appears in the left gutter on hover or when selected.
 - **BulkBar** (`thread/bulk-bar.tsx`): floating primary-ink bar, "N selected" plus Resolve, Snooze, Archive and clear.
 - **PermissionCard** (`thread/permission-card.tsx`): ochre-outlined card with lock head, command `<pre>`, help line, Deny (primary), Allow once, Always allow; resolves to a one-line Allowed once, Denied or Always allowed.
 - **ProposalCard** (`thread/proposal-card.tsx`): dashed card with Update setup (primary), Edit, Dismiss; applied state is solid with an open action.
@@ -230,7 +229,7 @@ All live in `src/components/` and are shown in the gallery under "Stone language
 - **UsageStrip, NextSteps** (`thread/`): three-cell cost, tokens and time strip (`StatStrip`); quiet next-step buttons.
 - **PrBar** (`thread/pr-bar.tsx`): PR number, branch, CI chip that opens a Checks popover (Auto-fix, Auto-merge with dynamic help, one locked row that states why), Merge; merged variant.
 - **ScheduledTaskRow** (`thread/scheduled-task-row.tsx`): still clock mark, name, trigger and next run, Active, Paused or Auto-disabled tag.
-- **Shell parts** (`shell/`): `SidebarNavRow`, `SidebarProjectRow` with waiting count, `SidebarThreadList` and `SidebarThreadRow` (pebble, truncation, hover menu, open and snoozed), `SidebarUser`, `WaitPill`, `HeaderIconButton` with attention dot, `ProjectCard`, `PhoneTabBar` with badge.
+- **Shell parts** (`shell/`): `SidebarNavRow`, `SidebarProjectRow` with waiting count, `SidebarThreadList` and `SidebarThreadRow` (tone glyph, truncation, hover menu, open and snoozed), `SidebarUser`, `WaitPill`, `HeaderIconButton` with attention dot, `ProjectCard`, `PhoneTabBar` with badge.
 - **Stream parts** (`stream/`): `GoalLine`, `Greeting`, `SuggestionChip`; the archived banner is `NoticeBanner` with the waiting tone; the day divider is `Marker variant="separator"`.
 - **ListCard / ListRow** (`list-card.tsx`): divided card list used by library, activity and settings rows.
 - **RoutingNode / QuotaBar** (`settings/`): model-routing node with optional quota bar that turns ochre at 80% and above; unavailable nodes are dashed with a failed tag.
