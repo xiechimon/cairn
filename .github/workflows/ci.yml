@@ -309,6 +309,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: node --test scripts/ops/real-smoke.test.mjs
 
+      - name: Runner secret isolation fixtures (#2189)
+        if: ${{ !cancelled() }}
+        run: node --test scripts/ops/secret-reach/canary.test.mjs scripts/ops/secret-reach/broker.test.mjs scripts/ops/secret-reach/setup-runner-user.test.mjs
+
   ops-backup-test:
     needs: changes
     if: github.event_name != 'pull_request' || needs.changes.outputs.has-code != 'false'
