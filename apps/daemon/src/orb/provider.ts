@@ -2,7 +2,6 @@ import { spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import {
   chmodSync,
-  cpSync,
   createReadStream,
   existsSync,
   lstatSync,
@@ -21,6 +20,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import type { WorkspaceHookNoteData } from '@cairn/shared';
 import { ensurePrivateDir, writePrivateFile } from '../private-fs.js';
+import { publishOrbDist } from './dist.js';
 import { prepareOrbSeed } from './seed.js';
 
 export interface OrbHandle {
@@ -256,23 +256,7 @@ export class NspawnOrbProvider implements OrbProvider {
         if (!this.checkDirectory(root, `Orb ${name} root`))
           throw new Error(`Orb ${name} root must exist: ${root}; run the installer`);
       }
-      const release = mkdtempSync(join(this.distRoot, '.release-'));
-      try {
-        cpSync(this.distSource, release, { recursive: true, dereference: true });
-        if (!existsSync(join(release, 'cli.mjs')))
-          throw new Error('Orb daemon build is missing cli.mjs');
-        const entry = join(this.distRoot, `.entry-${randomUUID()}`);
-        try {
-          symlinkSync('current/cli.mjs', entry);
-          renameSync(entry, join(this.distRoot, 'cli.mjs'));
-        } finally {
-          rmSync(entry, { force: true });
-        }
-        await this.publish(release, join(this.distRoot, 'current'));
-      } catch (error) {
-        rmSync(release, { recursive: true, force: true });
-        throw error;
-      }
+      await publishOrbDist(this.distSource, this.distRoot, this.runner);
       if (seed) {
         if (!/^[a-zA-Z0-9-]+$/.test(handle.projectId)) throw new Error('Invalid orb project id');
         const project = join(this.seedRoot, handle.projectId);

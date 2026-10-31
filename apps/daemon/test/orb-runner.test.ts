@@ -117,7 +117,9 @@ test('fixed roots expose the socket, complete build and seed, and a per-step del
     expect(JSON.stringify(options)).not.toContain(paths.home);
     expect(options.socketPath).toBe(join(provider.runtimeRoot, 'cairn-orb-conv-1', 'relay.sock'));
     expect(options.outboxRoot).toBe(join(provider.runtimeRoot, 'cairn-orb-conv-1', 'outbox'));
-    expect(readFileSync(join(options.distRoot, 'current', 'cli.mjs'), 'utf8')).toBe('');
+    expect(readFileSync(join(options.distRoot, 'current', 'dist', 'cli.mjs'), 'utf8')).toBe(
+      'first',
+    );
     expect(existsSync(join(options.seedRoot, 'project', 'repo', 'HEAD'))).toBe(true);
     expect(readFileSync(paths.machineJson, 'utf8')).toContain(sentinel);
   } finally {

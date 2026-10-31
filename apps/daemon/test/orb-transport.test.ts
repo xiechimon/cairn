@@ -16,7 +16,8 @@ import {
 } from 'node:fs';
 import { createConnection } from 'node:net';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { build } from 'esbuild';
 import { expect, test, vi } from 'vitest';
 import { runGitOk } from '../src/git.js';
 import { encodeOrbFrame, ORB_STEP_METHODS } from '../src/orb/protocol.js';
@@ -31,6 +32,7 @@ import {
   fakeBackend,
   waitFor,
 } from './machine-loop-harness.js';
+import { createOrbCheckout } from './orb-dist-fixture.js';
 
 test.each(['symlink', 'directory', 'file'] as const)(
   'refuses a pre-planted outbox %s without replacing it or touching its target',
@@ -170,17 +172,21 @@ test('refuses a FIFO relay token without blocking', async () => {
   const socketPath = join(root, 'relay.sock');
   execFileSync('mkfifo', [`${socketPath}.token`]);
   try {
-    const result = execFileSync(
-      process.execPath,
-      [
-        '--import',
-        'tsx',
-        '--input-type=module',
-        '-e',
-        `import { RelayMachineApi } from './src/orb/relay.ts'; try { await RelayMachineApi.connect(${JSON.stringify(socketPath)}); process.exitCode = 1; } catch {}`,
-      ],
-      { cwd: join(process.cwd(), 'apps/daemon'), timeout: 3_000 },
-    );
+    const entry = join(root, 'fifo-probe.mjs');
+    await build({
+      stdin: {
+        contents: `import { RelayMachineApi } from ${JSON.stringify(resolve('apps/daemon/src/orb/relay.ts'))}; try { await RelayMachineApi.connect(${JSON.stringify(socketPath)}); process.exitCode = 1; } catch {}`,
+        resolveDir: resolve('.'),
+      },
+      outfile: entry,
+      bundle: true,
+      platform: 'node',
+      format: 'esm',
+      banner: {
+        js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);",
+      },
+    });
+    const result = execFileSync(process.execPath, [entry], { timeout: 3_000 });
     expect(result.length).toBe(0);
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -242,9 +248,7 @@ function fixture(
   } = {},
 ) {
   const root = mkdtempSync(join(tmpdir(), 'orb-transport-'));
-  const distSource = join(root, 'build');
-  mkdirSync(distSource);
-  writeFileSync(join(distSource, 'cli.mjs'), 'first');
+  const { checkout, distSource, runner: distRunner } = createOrbCheckout(root);
   for (const name of ['run', 'dist', 'seed']) mkdirSync(join(root, name));
   const commands: string[][] = [];
   const running = new Set<string>();
@@ -254,7 +258,8 @@ function fixture(
     seedRoot: join(root, 'seed'),
     distSource,
     runtimeDirectoryTimeoutMs: options.runtimeDirectoryTimeoutMs,
-    runner: async (argv) => {
+    runner: async (argv, execOptions) => {
+      if (argv[0] !== 'machinectl') return distRunner(argv, execOptions);
       commands.push([...argv]);
       if (argv[1] === 'start') {
         const directory = join(root, 'run', argv[2]!);
@@ -266,23 +271,24 @@ function fixture(
       return { code: 0, stdout: argv[1] === 'list' ? [...running].join('\n') : '', stderr: '' };
     },
   });
-  return { root, provider, commands, distSource, running };
+  return { root, provider, commands, distSource, checkout, running };
 }
 
 test('publishes releases without creating the runtime directory and reuses a running machine', async () => {
-  const { provider, commands, distSource, root } = fixture();
+  const { provider, commands, distSource, checkout, root } = fixture();
   const handle = await provider.ensure({ conversationId: 'thread', projectId: 'project' });
   expect(commands.map((argv) => argv[1])).toEqual(['clone']);
   const directory = await provider.prepare(handle);
   expect(directory).toBe(join(root, 'run', handle.id));
   expect(existsSync(directory)).toBe(false);
-  expect(readFileSync(join(root, 'dist', 'current', 'cli.mjs'), 'utf8')).toBe('first');
+  expect(readFileSync(join(root, 'dist', 'current', 'dist', 'cli.mjs'), 'utf8')).toBe('first');
   const published = readdirSync(join(root, 'dist'));
   await provider.prepare(handle);
   expect(readdirSync(join(root, 'dist'))).toEqual(published);
+  writeFileSync(join(checkout, 'source.txt'), 'second');
   writeFileSync(join(distSource, 'cli.mjs'), 'second');
   await provider.prepare(handle);
-  expect(readFileSync(join(root, 'dist', 'current', 'cli.mjs'), 'utf8')).toBe('second');
+  expect(readFileSync(join(root, 'dist', 'current', 'dist', 'cli.mjs'), 'utf8')).toBe('second');
   await provider.start(handle);
   expect(statSync(directory).mode & 0o777).toBe(0o700);
   await provider.start(handle);
@@ -329,9 +335,10 @@ test.each(['missing', 'foreign'] as const)(
 );
 
 test('failed daemon publication retains the previous complete release', async () => {
-  const { root, provider, distSource } = fixture();
+  const { root, provider, distSource, checkout } = fixture();
   const handle = await provider.ensure({ conversationId: 'thread', projectId: 'project' });
   await provider.prepare(handle);
+  writeFileSync(join(checkout, 'source.txt'), 'new build');
   rmSync(distSource, { recursive: true });
   await expect(provider.prepare(handle)).rejects.toThrow();
   expect(readFileSync(join(root, 'dist', 'cli.mjs'), 'utf8')).toBe('first');

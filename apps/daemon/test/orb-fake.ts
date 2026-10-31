@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -10,6 +10,7 @@ import {
   type OrbHandle,
 } from '../src/orb/provider.js';
 import { RelayMachineApi } from '../src/orb/relay.js';
+import { createOrbCheckout } from './orb-dist-fixture.js';
 
 const assertions: unknown[] = [];
 const workers = new Set<Promise<void>>();
@@ -43,9 +44,7 @@ export class FakeOrbProvider extends NspawnOrbProvider {
   private readonly worker: FakeOrbRunner;
   constructor(options: { runner: FakeOrbRunner }) {
     const root = mkdtempSync(join(tmpdir(), 'orb-fake-'));
-    const distSource = join(root, 'build');
-    mkdirSync(distSource);
-    writeFileSync(join(distSource, 'cli.mjs'), '');
+    const { distSource, runner: distRunner } = createOrbCheckout(root);
     for (const name of ['run', 'dist', 'seed']) mkdirSync(join(root, name));
     const running = new Set<string>();
     super({
@@ -53,8 +52,9 @@ export class FakeOrbProvider extends NspawnOrbProvider {
       distRoot: join(root, 'dist'),
       seedRoot: join(root, 'seed'),
       distSource,
-      runner: async (argv) => {
+      runner: async (argv, execOptions) => {
         rejectGuestExec(argv);
+        if (argv[0] !== 'machinectl') return distRunner(argv, execOptions);
         const result = await options.runner(argv);
         if (result.code !== 0) return result;
         const machine = argv[2] ?? '';
