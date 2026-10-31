@@ -274,6 +274,15 @@ export const EN: Record<string, string> = {
 
   // —— ⌘K search panel (r7 05/05b, r2 §8.4) ——
   '搜索任务、项目、成员…': 'Search todos, projects, members…',
+  最近: 'Recent',
+  '{dir} 里的仓库': 'Repositories in {dir}',
+  查找文件夹或粘贴路径: 'Find a folder or paste a path',
+  '查找文件夹或粘贴路径…': 'Find a folder or paste a path…',
+  '使用 {path}': 'Use {path}',
+  还没有用过的文件夹: 'No folders used yet',
+  没有匹配的文件夹: 'No matching folders',
+  '浏览文件夹…': 'Browse folders…',
+  返回列表: 'Back to the list',
   这个任务: 'This task',
   '输入命令或搜索…': 'Type a command or search…',
   移动: 'Move',

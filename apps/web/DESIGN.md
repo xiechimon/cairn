@@ -134,7 +134,7 @@ Direction A, **Cairn**: a cairn is a pile of stones that marks a trail for the n
 
 ## Typography
 
-- **Two title faces**: Source Serif 4 (`font-serif`, 600, -0.01em) for the Coordinator greeting and page titles (the board top bar, page shells, the task detail header, settings headers), so the top of every page has one quiet serif voice. Bricolage Grotesque (`font-heading` with `font-title`, 650) for the brand name, section and column headings, pane and dialog titles. Chinese falls back to Songti SC under the serif and PingFang SC under the sans.
+- **Two title faces**: Source Serif 4 (`font-serif`, 600, -0.01em) for the Coordinator greeting and page titles (the board top bar, page shells, settings headers; the task detail header is a one-line sans bar, see below), so the top of every page has one quiet serif voice. Bricolage Grotesque (`font-heading` with `font-title`, 650) for the brand name, section and column headings, pane and dialog titles. Chinese falls back to Songti SC under the serif and PingFang SC under the sans.
 - **Everything else is Instrument Sans** (`--font-sans`): thread titles, rows, navigation, buttons, meta. Chinese falls back to PingFang SC. Code, times, ids and counters use JetBrains Mono (`--font-mono`) with tabular numbers.
 - Fonts are self-hosted latin subsets in `public/fonts` (SIL OFL 1.1, licenses next to the files), loaded with `font-display: swap` and preloaded in `index.html` and `design.html`; the metric-matched fallbacks keep the swap from shifting layout.
 - **Six font sizes, no seventh allowed**: 26 Coordinator greeting / 20 page title and brand / 17 column and section headings / 14 card titles and UI text / 12.5 meta / 12 badges and group labels. In code, use the corresponding Tailwind theme keys `text-greeting` / `text-page` / `text-heading` / `text-card-title` and `text-ui` / `text-meta` / `text-caption` (heading font `font-heading`), never arbitrary values like `text-[13px]`; `scripts/ui-debt-gate.mjs` D5 only allows the total count of arbitrary values to decrease.
@@ -190,7 +190,14 @@ From top to bottom:
 - Card actions: `accent` text links + icon, with the `accent-hover` background on hover.
 
 ### Selector and ⌘K
-- The selected row (keyboard cursor or hovered row): white card (`card`) + `line` hairline ring + at most one extremely light shadow (0 1px 2px). No hover tint, no accent.
+- The selected row in pickers that are not menus: white card (`card`) + `line` hairline ring + at most one extremely light shadow (0 1px 2px). No hover tint, no accent.
+- ⌘K is a menu-style palette (Linear): 640px, rows 32px with the `menu-hover` fill and 8px corners. On a task page the task rides along as a chip above the input and its commands come first under "This task"; typing filters commands and results together; Backspace on an empty input drops the chip. A footer row shows the keys (move, open, drop context, close).
+- Folder picker (`DirBrowser`, Amp's project picker): a search / paste-a-path input, then Recent (picked folders and project folders) and the git repositories in the last browsed folder; each row is name, grey path on the right and a `git` tag. "Browse folders…" at the bottom opens the old breadcrumb tree.
+
+### Task header and status
+- The task detail header is one 44px line (Amp): back, project tile + project name + `#seq` in `ink-3`, the title in sans 15px/600, the status as a ghost pill (bg only on hover, full radius, glyph in its tone, label in `ink`), then on the right the agent, ⋯ and the primary action when there is one.
+- Status glyphs are one circular family (`StatusGlyph`, Linear's model) used in the header, search rows, mentions and home rows: dashed ring = to start, ring + clock = queued, a pie that fills with progress (quarter = planning in `chip-plan-fg`, half = confirm in accent, three quarters = building in `running` or review in accent), filled check = done, filled cross = failed, filled slash = closed. Ochre still means it waits on you.
+- The right pane switches views with visible segmented tabs (plan or changes, branch, usage, history); the plan version is a small ghost select on the right; the change summary and expand-all sit on a thin row under the header.
 
 ### Settings lists (account page, agent overview)
 See "Page patterns · Settings list" below.

@@ -93,6 +93,7 @@ async function openLocalFace(page: Page) {
 async function openBrowser(page: Page) {
   await page.getByRole('button', { name: '浏览' }).click();
   await expect(page.getByRole('dialog', DIALOG)).toBeVisible();
+  await page.getByRole('dialog', DIALOG).getByRole('button', { name: '浏览文件夹…' }).click();
 }
 
 function row(page: Page, name: string) {
@@ -307,4 +308,28 @@ test('pick misclassified error (500 with no reason) → overlay does not open, r
   await page.getByRole('button', { name: '浏览' }).click();
   await expect(page.getByRole('status')).toContainText('pick exploded');
   await expect(page.getByRole('dialog', DIALOG)).toHaveCount(0);
+});
+
+test('list view first: repos in the last folder, a pasted path, then the pick shows under Recent', async ({
+  page,
+}) => {
+  await stubBoot(page);
+  await stubPick(page);
+  await stubFsList(page);
+  const input = await openLocalFace(page);
+  await page.getByRole('button', { name: '浏览' }).click();
+  const dialog = page.getByRole('dialog', DIALOG);
+  const list = dialog.getByTestId('dir-folder-list');
+  await expect(list.getByText(`${HOME} 里的仓库`)).toBeVisible();
+  await expect(list.getByRole('button', { name: /demo/ })).toBeVisible();
+  await expect(list.getByRole('button', { name: /plain/ })).toHaveCount(0);
+
+  await dialog.getByRole('textbox', { name: '查找文件夹或粘贴路径' }).fill('/srv/elsewhere');
+  await page.keyboard.press('Enter');
+  await expect(dialog).not.toBeVisible();
+  await expect(input).toHaveValue('/srv/elsewhere');
+
+  await page.getByRole('button', { name: '浏览' }).click();
+  await expect(list.getByText('最近')).toBeVisible();
+  await expect(list.getByRole('button', { name: /elsewhere/ })).toBeVisible();
 });
