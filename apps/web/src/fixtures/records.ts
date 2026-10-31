@@ -117,7 +117,6 @@ export interface OverlayUi {
   searchOpen?: boolean;
   searchQuery?: string;
   chipPopoverOpen?: boolean;
-  planDropdownOpen?: boolean;
   paneView?: PaneView;
   langDropdownOpen?: boolean;
   notificationBanner?: boolean;

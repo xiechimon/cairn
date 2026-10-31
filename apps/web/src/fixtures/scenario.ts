@@ -203,7 +203,7 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
         ui: { searchOpen: true, searchQuery: 'r3 lifecycle probe' },
       },
       '19': { ...detailConfirm(false), ui: { chipPopoverOpen: true } },
-      '20': { ...detailConfirm(false), ui: { planDropdownOpen: true } },
+      '20': detailConfirm(false),
       '29': { ...detailReview({ userMenuOpen: false }), ui: { chipPopoverOpen: true } },
       '11': schedulesEmpty,
       'r3-93': schedulesList,

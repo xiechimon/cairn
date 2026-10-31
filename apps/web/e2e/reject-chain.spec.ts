@@ -5,7 +5,7 @@ test('reject loop: request changes → v2 → diff → confirm', async ({ page }
 
   // confirm v1 surface
   await expect(page.getByTestId('phase-chip')).toHaveText(/确认/);
-  await expect(page.locator('.doc-pane-select').nth(1)).toHaveText(/v1/);
+  await expect(page.locator('.doc-range-wrap .doc-pane-select')).toHaveText(/v1/);
 
   await page.locator('.composer-send').click();
   await expect(page.getByTestId('phase-chip')).toHaveText(/规划中/);

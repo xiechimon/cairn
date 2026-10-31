@@ -14,7 +14,7 @@ import { DeleteProjectConfirm } from '../overlay/delete-project-confirm.js';
 import { MentionInline } from '../overlay/mention-inline.js';
 import { MoreMenu } from '../overlay/more-menu.js';
 import { NewTaskDialog } from '../overlay/new-task-dialog.js';
-import { PaneTypeSelect } from '../overlay/plan-dropdown.js';
+import { PaneTabs } from '../overlay/plan-dropdown.js';
 import { SearchPanel, useSearchState } from '../overlay/search-panel.js';
 import { BUILTIN_SLASH_COMMANDS, type SlashRow } from '../overlay/slash-commands.js';
 import { SlashMenu } from '../overlay/slash-menu.js';
@@ -257,7 +257,7 @@ function MenusSpecimen() {
   return (
     <Specimen
       title="Menus and popovers"
-      note={last ?? 'MoreMenu, PaneTypeSelect and the ChipPopover body'}
+      note={last ?? 'MoreMenu, PaneTabs and the ChipPopover body'}
       stage="canvas"
     >
       <Cell label="MoreMenu">
@@ -283,11 +283,11 @@ function MenusSpecimen() {
           onDiscard={() => setLast('Discard changes')}
         />
       </Cell>
-      <Cell label={`PaneTypeSelect: ${view}`}>
-        <PaneTypeSelect view={view} docLabel="方案" sections onView={setView} />
+      <Cell label={`PaneTabs: ${view}`}>
+        <PaneTabs view={view} docLabel="方案" sections onView={setView} />
       </Cell>
-      <Cell label="PaneTypeSelect, changes only">
-        <PaneTypeSelect view="doc" docLabel="变更" onView={() => {}} />
+      <Cell label="PaneTabs, changes only">
+        <PaneTabs view="doc" docLabel="变更" onView={() => {}} />
       </Cell>
       {chipTodo != null && (
         <Cell label="ChipPopover body">

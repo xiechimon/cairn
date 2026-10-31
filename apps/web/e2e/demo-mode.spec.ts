@@ -126,7 +126,7 @@ test('the selling points browse end to end with no backend traffic', async ({ pa
 
   await page.goto(`${demo.base}/app/todo/${DEMO.cartMerge}`);
   await expect(page.getByTestId('phase-chip')).toHaveText(/确认/);
-  await expect(page.locator('.doc-pane-select').nth(1)).toHaveText(/v3/);
+  await expect(page.locator('.doc-range-wrap .doc-pane-select')).toHaveText(/v3/);
   await expect(page.getByText('AI 审核', { exact: false }).first()).toBeVisible();
   await expect(page.getByText('blocking').first()).toBeVisible();
   await page.locator('.doc-range-wrap .doc-pane-select').click();

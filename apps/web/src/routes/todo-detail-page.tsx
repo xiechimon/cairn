@@ -905,7 +905,6 @@ export function TodoDetailPage() {
                 doc={view.doc}
                 changes={live ? liveDetail?.changes : detail.changes}
                 now={live ? Date.now() : fixture.now}
-                planDropdownOpen={fixture.ui?.planDropdownOpen === true}
                 onPaneView={setPaneView}
                 hasSections={content != null}
                 planVersions={view.planVersions}

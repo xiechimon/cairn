@@ -25,12 +25,11 @@ import {
   ChevronDown,
   ChevronRight,
   Eye,
-  FileTab,
   FileText,
   Restore,
   UnfoldVertical,
 } from '../icons/index.js';
-import { type DocTypeLabel, PaneTypeSelect } from '../overlay/plan-dropdown.js';
+import { type DocTypeLabel, PaneTabs } from '../overlay/plan-dropdown.js';
 import { Segments } from './segments.js';
 import { computeHunkWordDiff } from './word-diff.js';
 
@@ -39,7 +38,6 @@ interface DocPaneProps {
   doc: DocBlock[] | undefined;
   changes: ChangesContent | undefined;
   now: number;
-  planDropdownOpen?: boolean;
   onPaneView: (view: PaneView) => void;
   hasSections?: boolean;
   planVersions?: PlanVersion[];
@@ -54,7 +52,7 @@ interface DocPaneProps {
 }
 
 export const PANE_HEAD =
-  'flex h-9 flex-none items-center border-b border-(--border) pl-4 text-meta text-(--text-secondary) [&>svg]:text-(--text-tertiary)';
+  'flex h-10 flex-none items-center gap-2 border-b border-(--border) px-2 text-meta text-(--text-secondary)';
 const PANE_SELECT = 'doc-pane-select ml-0';
 const DIFF_LINE = 'flex items-center font-mono text-caption leading-4 text-(--text-secondary)';
 const DIFF_NO = 'flex-none pr-1 text-right text-(--text-tertiary)';
@@ -316,7 +314,7 @@ function VersionControl({
   onBase?: () => void;
 }) {
   return (
-    <span className="doc-range-wrap relative ml-4 inline-flex">
+    <span className="doc-range-wrap relative ml-auto inline-flex">
       <DropdownMenu
         open={versionMenu != null}
         onOpenChange={(next: boolean) => onVersionMenu?.(next ? 'versions' : undefined)}
@@ -365,7 +363,6 @@ export function DocPane({
   doc,
   changes,
   now,
-  planDropdownOpen,
   onPaneView,
   hasSections,
   planVersions,
@@ -380,13 +377,7 @@ export function DocPane({
 }: DocPaneProps) {
   const { t } = useI18n();
   const typeSelect = (docLabel: DocTypeLabel) => (
-    <PaneTypeSelect
-      view="doc"
-      docLabel={docLabel}
-      sections={hasSections}
-      onView={onPaneView}
-      initiallyOpen={planDropdownOpen}
-    />
+    <PaneTabs view="doc" docLabel={docLabel} sections={hasSections} onView={onPaneView} />
   );
   if (mode === 'changes' || mode === 'diff') {
     const hasData = mode === 'diff' ? planDiff != null : changes != null;
@@ -398,7 +389,6 @@ export function DocPane({
     return (
       <section className="doc-pane flex min-h-0 flex-1 flex-col" data-testid="doc-pane">
         <header className={PANE_HEAD}>
-          <FileTab width={14} height={14} />
           {typeSelect(mode === 'diff' ? '方案' : '变更')}
           {hasData &&
             (mode === 'diff' && planDiff != null ? (
@@ -422,24 +412,24 @@ export function DocPane({
                 onBase={onBase}
               />
             ))}
-          {hasData && (
-            <>
-              <span className="ml-4 text-(--text-tertiary)">
-                {t('· {n} 个文件改动', { n: fileCount })}{' '}
-                <span className="text-(--diff-add-fg)">+{added}</span>
-                {removed > 0 && <span className="text-(--destructive)"> −{removed}</span>}
-              </span>
-              <Button
-                variant="ghost"
-                size="xs"
-                className="ml-auto mr-4 text-(--text-tertiary)"
-                onClick={onToggleExpand}
-              >
-                {expanded ? t('全部收起') : t('全部展开')}
-              </Button>
-            </>
-          )}
         </header>
+        {hasData && (
+          <div className="flex h-8 flex-none items-center border-b border-(--border) pr-2 pl-4 text-meta text-(--text-tertiary)">
+            <span>
+              {t('{n} 个文件改动', { n: fileCount })}{' '}
+              <span className="text-(--diff-add-fg)">+{added}</span>
+              {removed > 0 && <span className="text-(--destructive)"> −{removed}</span>}
+            </span>
+            <Button
+              variant="ghost"
+              size="xs"
+              className="ml-auto text-(--text-tertiary)"
+              onClick={onToggleExpand}
+            >
+              {expanded ? t('全部收起') : t('全部展开')}
+            </Button>
+          </div>
+        )}
         {hasData ? (
           <div className="min-h-0 flex-1 overflow-y-auto">
             <div className="w-max min-w-full">
@@ -465,7 +455,6 @@ export function DocPane({
   return (
     <section className="doc-pane flex min-h-0 flex-1 flex-col" data-testid="doc-pane">
       <header className={PANE_HEAD}>
-        <FileTab width={14} height={14} />
         {typeSelect('方案')}
         {doc != null && (
           <VersionControl

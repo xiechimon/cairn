@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router';
 import { useProjects } from '../api/hooks.js';
 import { useAgentAvatarUrlById, useLiveData } from '../api/provider.js';
 import { relativeTime } from '../board/rel-time.js';
+import { StatusGlyph } from '../components/status-glyph.js';
 import { Button } from '../components/ui/button.js';
 import {
   DIALOG_FACE,
@@ -103,7 +104,7 @@ function TodoRow({
 }) {
   const { t } = useI18n();
   const ui = PHASE_UI[todo.phase];
-  const { icon: PhaseIcon, ink } = PHASE_STATUS[todo.phase];
+  const { glyph, ink } = PHASE_STATUS[todo.phase];
   return (
     <Button
       variant="ghost"
@@ -114,7 +115,7 @@ function TodoRow({
       className={`${ROW_BASE} ${ROW_RESULT} ${rowLitClasses(selected, kbd)}`}
     >
       <span className={ROW_ICON}>
-        <PhaseIcon aria-hidden="true" className={`size-4 ${ink}`} />
+        <StatusGlyph kind={glyph} className={`size-4 ${ink}`} />
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="truncate leading-5 text-foreground">

@@ -184,23 +184,16 @@ test('right pane type select switches between the doc surface and the three sect
   await expect(right.getByTestId('doc-pane')).toBeVisible();
   await expect(page.getByRole('dialog')).toHaveCount(0);
 
-  const select = page.locator('.doc-select-wrap .doc-pane-select');
-  await select.click();
+  const tabs = right.getByRole('tablist', { name: '面板视图' });
+  await expect(tabs.getByRole('tab')).toHaveCount(4);
+  await expect(tabs.getByRole('tab').first()).toHaveText('变更');
 
-  const dropdown = page.getByRole('menu');
-  await expect(dropdown).toBeVisible();
-  await expect(dropdown.getByRole('menuitemradio')).toHaveCount(4);
-  await expect(dropdown.getByRole('menuitemradio').first()).toContainText('变更');
-
-  await dropdown.getByRole('menuitemradio', { name: 'Token 用量' }).click();
-  await expect(dropdown).toBeHidden();
+  await tabs.getByRole('tab', { name: '用量' }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(right.getByTestId('doc-pane')).toHaveCount(0);
   await expect(right.getByText('tokens', { exact: true })).toBeVisible();
 
-  // the section head carries the same select — switch back to the doc view
-  await page.locator('.doc-select-wrap .doc-pane-select').click();
-  await page.getByRole('menuitemradio', { name: '变更' }).click();
+  await right.getByRole('tab', { name: '变更' }).click();
   await expect(right.getByTestId('doc-pane')).toBeVisible();
   await expect(right.getByText('tokens', { exact: true })).toHaveCount(0);
 });
@@ -225,11 +218,9 @@ test('plan card activation in the thread opens the plan doc in the right pane', 
 }) => {
   await page.goto(`${DETAIL_ROUTE}?scenario=plan-open`);
 
-  await expect(page.locator('.doc-select-wrap .doc-pane-select')).toContainText('变更');
-  // the build-open round carries its own plan card; the frozen row is first
+  await expect(page.getByTestId('pane-tab-doc')).toHaveText('变更');
   await page.getByRole('button', { name: '打开方案' }).first().click();
-  // activation flips the pane to the doc view's plan surface
-  await expect(page.locator('.doc-select-wrap .doc-pane-select')).toContainText('方案');
+  await expect(page.getByTestId('pane-tab-doc')).toHaveText('方案');
   await expect(page.getByTestId('doc-body').locator('p').first()).toBeVisible();
 });
 

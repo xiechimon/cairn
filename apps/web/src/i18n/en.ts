@@ -137,6 +137,7 @@ export const EN: Record<string, string> = {
   回复: 'Reply',
   '分支与 PR': 'Branch & PR',
   方案: 'Plan',
+  分支: 'Branch',
   变更: 'Changes',
   // 看板顶部通知引导条 (issue #114): components consume the shared
   // NOTIFICATION_BANNER_COPY canon — these keys match its zh values
@@ -171,7 +172,6 @@ export const EN: Record<string, string> = {
   '{n} 天前': '{n}d ago',
 
   // —— todo detail (r7 §3.3–§3.6) ——
-  'Token 用量': 'Token usage',
   运行历史: 'Run history',
   打开方案: 'Open plan',
   添加附件: 'Add attachment',
@@ -236,7 +236,7 @@ export const EN: Record<string, string> = {
   '任务状态已变化，消息未送出': 'The task state changed — the message was not delivered',
   暂无方案: 'No plan yet',
   暂无可显示的变更: 'No changes to show',
-  '· {n} 个文件改动': 'Files changed: {n}',
+  '{n} 个文件改动': 'Files changed: {n}',
   全部展开: 'Expand all',
   全部收起: 'Collapse all',
   显示完整文件: 'Show full file',
