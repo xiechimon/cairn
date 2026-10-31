@@ -1024,3 +1024,38 @@ test('installer leaves release publication to the owner daemon', () => {
     rmSync(f.root, { recursive: true, force: true });
   }
 });
+
+test('a failed image build after host changes resumes, builds the image, then converges to zero changes', () => {
+  const f = fixture();
+  try {
+    assert.throws(
+      () =>
+        installHost({
+          ...f,
+          run: (cmd, args) =>
+            cmd === 'bash' && !args.includes('--dry-run')
+              ? { status: 1, stdout: '', stderr: 'Error: claude native binary not installed.' }
+              : f.run(cmd, args),
+        }),
+      /build-image failed/,
+    );
+    assert.ok(!f.state.has('image'));
+    assert.equal(
+      readFileSync(join(f.root, 'var/lib/cairn-orb/install-pending'), 'utf8'),
+      'pending\n',
+    );
+    f.logs.length = 0;
+    installHost(f);
+    assert.ok(f.state.has('image'));
+    assert.notEqual(f.logs.at(-1), '0 changes');
+    assert.equal(
+      readFileSync(join(f.root, 'var/lib/cairn-orb/install-pending'), 'utf8'),
+      'complete\n',
+    );
+    f.logs.length = 0;
+    installHost(f);
+    assert.equal(f.logs.at(-1), '0 changes');
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});

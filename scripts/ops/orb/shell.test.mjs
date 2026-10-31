@@ -272,6 +272,20 @@ test('guest image provides Node and CLIs without package-manager bootstrapping',
   assert.match(script, /npm install --global --ignore-scripts/);
 });
 
+test("guest image runs only Claude Code's own native installer and verifies both CLIs as agent", () => {
+  const script = readFileSync(join(source, 'build-image.sh'), 'utf8');
+  const install = script.indexOf('npm install --global --ignore-scripts');
+  const native = script.indexOf('node install.cjs');
+  const claudeCheck = script.indexOf('runuser -u agent -- claude --version');
+  const codexCheck = script.indexOf('runuser -u agent -- codex --version');
+  assert.ok(install >= 0, 'global CLI install keeps --ignore-scripts');
+  assert.ok(native > install, "Claude Code's install.cjs runs after the scripted-off install");
+  assert.ok(claudeCheck > native, 'the agent verifies the Claude Code binary after placement');
+  assert.ok(codexCheck > native, 'the agent verifies the codex binary');
+  assert.doesNotMatch(script, /--omit[= ]optional/);
+  assert.match(script.slice(install, native), /@anthropic-ai\/claude-code/);
+});
+
 test('ian can preview image creation without runuser or privilege', () => {
   const f = fixture();
   try {

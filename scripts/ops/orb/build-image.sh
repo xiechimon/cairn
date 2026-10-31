@@ -111,9 +111,12 @@ arch-chroot "$stage" /usr/bin/env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/bi
 set -euo pipefail
 node -e 'const [major, minor] = process.versions.node.split(".").map(Number); const expected = Number(process.argv[1]); if (major !== expected || major < 22 || (major === 22 && minor < 19)) { console.error(`Guest Node ${process.versions.node} must match host daemon Node major ${expected} and be >=22.19; install a compatible guest nodejs package before retrying`); process.exit(1); }' "$5"
 npm install --global --ignore-scripts --no-audit --no-fund "@anthropic-ai/claude-code@$1" "@openai/codex@$2"
+claude_package="$(npm root --global)/@anthropic-ai/claude-code"
+[[ -f $claude_package/install.cjs ]] || { printf 'Claude Code package has no install.cjs; cannot place its native binary\n' >&2; exit 1; }
+(cd "$claude_package" && node install.cjs)
 useradd --uid "$3" --create-home --shell /bin/bash agent
-[[ $(runuser -u agent -- claude --version | awk 'NR == 1 {print $1}') == "$1" ]]
-[[ $(runuser -u agent -- codex --version | awk 'NR == 1 {print $NF}') == "$2" ]]
+[[ $(runuser -u agent -- claude --version | awk 'NR == 1 {print $1}') == "$1" ]] || { printf 'Claude Code %s is not runnable by agent\n' "$1" >&2; exit 1; }
+[[ $(runuser -u agent -- codex --version | awk 'NR == 1 {print $NF}') == "$2" ]] || { printf 'codex %s is not runnable by agent\n' "$2" >&2; exit 1; }
 passwd --lock root
 systemctl disable sshd.service sshd.socket || true
 systemctl mask sshd.service sshd.socket
