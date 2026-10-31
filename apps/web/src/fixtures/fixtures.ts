@@ -45,7 +45,7 @@ export {
   chiefThreadsOpen,
 } from './chief.js';
 export {
-  AGENT_MODEL_LINE,
+  AGENT_MODEL,
   at,
   localTodo,
   MACHINE_ID,

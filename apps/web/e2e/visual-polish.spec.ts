@@ -106,7 +106,7 @@ for (const theme of ['light', 'dark'] as const) {
 
     const menu = await edgeContract(page, '.user-menu');
     expect(menu.border).toBe('0px');
-    expect(menu.radius).toBe('18px');
+    expect(menu.radius).toBe('12px');
     expect(menu.shadow).not.toBe('none');
     expect(menu.shadow).toContain('0px 0px 0px');
   });

@@ -1,6 +1,7 @@
 import { cn } from 'cn';
 import { useEffect, useState } from 'react';
 import designDoc from '../../DESIGN.md?raw';
+import { ProjectAvatar } from '../board/project-avatar.js';
 import { Button } from '../components/ui/button.js';
 import { docChecks, type GalleryTheme, parseFrontmatter } from './design-doc.js';
 import {
@@ -237,7 +238,6 @@ export function FoundationsHero({ theme }: { theme: GalleryTheme }) {
 
 export function ColorSection() {
   const card = rgba('var(--card)');
-  const onAccent = rgba('var(--text-on-accent)');
   return (
     <Section
       id="color"
@@ -288,18 +288,18 @@ export function ColorSection() {
           ))}
         </div>
       </Specimen>
-      <Specimen title="Project tiles" note="Letters use --text-on-accent">
+      <Specimen title="Project tiles" note="Ink letter on an 18% tint of the same hue">
         <div className="flex flex-wrap gap-4">
           {TILES.map((i) => {
-            const k = contrast(onAccent, rgba(`var(--project-tile-${i})`));
+            const tint = rgba(`var(--project-tile-${i})`);
+            const k = contrast(rgba(`var(--project-ink-${i})`), over({ ...tint, a: 0.18 }, card));
             return (
               <div key={i} className="flex items-center gap-2.5">
-                <span
-                  className="grid size-8 place-items-center rounded-(--radius-control) text-ui font-semibold text-(--text-on-accent)"
-                  style={{ background: `var(--project-tile-${i})` }}
-                >
-                  {'CSWDAM'[i - 1]}
-                </span>
+                <ProjectAvatar
+                  name={'CSWDAM'[i - 1] ?? ''}
+                  tone={i - 1}
+                  className="size-8 text-ui"
+                />
                 <span
                   className={cn(
                     'text-meta tabular-nums',
