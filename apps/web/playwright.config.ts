@@ -1,11 +1,10 @@
-import { resolve } from 'node:path';
 import { defineConfig } from '@playwright/test';
 
 const PORT = Number(process.env.E2E_PORT ?? 8399);
 
 export default defineConfig({
   testDir: './e2e',
-  globalSetup: resolve(import.meta.dirname, 'e2e/port-holder-guard.ts'),
+  globalSetup: './e2e/port-holder-guard.ts',
   fullyParallel: false,
   retries: 0,
   use: {

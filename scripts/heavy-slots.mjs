@@ -49,7 +49,8 @@ export function writeSlotPlaywrightConfig({ slot, env, webDir }) {
   const buildFlags = `--outDir ${distDir}`;
   writeFileSync(
     path,
-    `import base from ${JSON.stringify(join(webDir, 'playwright.config.ts'))};
+    `import { resolve } from 'node:path';
+import base from ${JSON.stringify(join(webDir, 'playwright.config.ts'))};
 
 const webServer = base.webServer;
 const command = webServer.command
@@ -62,6 +63,7 @@ if (!command.includes('${buildFlags} --emptyOutDir') || !command.includes('previ
 export default {
   ...base,
   testDir: ${JSON.stringify(join(webDir, 'e2e'))},
+  globalSetup: base.globalSetup && resolve(${JSON.stringify(webDir)}, base.globalSetup),
   outputDir: ${JSON.stringify(join(slotDir, 'test-results'))},
   use: { ...base.use, baseURL: 'http://127.0.0.1:${port}' },
   webServer: { ...webServer, command, cwd: ${JSON.stringify(webDir)}, url: 'http://127.0.0.1:${port}/app', reuseExistingServer: false },
