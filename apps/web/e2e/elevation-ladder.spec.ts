@@ -175,7 +175,7 @@ for (const theme of ['light', 'dark'] as const) {
       await page.goto('/app?scenario=notify-banner&view=board');
       const banner = await surfaceShadow(page, '.board-notify-banner');
       expect(rings(banner)).toBe(1);
-      expect(banner).toBe(card);
+      expect(banner.endsWith(await slot(page, 'e1'))).toBe(true);
 
       await page.goto('/app?scenario=111&view=board');
       const drawer = await surfaceShadow(page, '.chief-drawer');

@@ -69,11 +69,17 @@ export function findLowContrast(page: Page): Promise<LowContrast[]> {
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
       const text = node.textContent?.trim();
       const el = node.parentElement;
-      if (!text || !el || el.closest('script, style, svg')) continue;
+      if (!text || !el || el.closest('script, style, svg, textarea')) continue;
       const inKbd = el.closest('kbd') !== null;
       if (!inKbd && el.closest('[aria-hidden="true"]')) continue;
       const kind = inKbd ? 'kbd' : el.closest(':disabled, [aria-disabled="true"]') ? 'disabled' : 'text';
       check(el, getComputedStyle(el).color, kind, text);
+    }
+    for (const mirror of document.querySelectorAll('[data-testid="mention-highlight"]')) {
+      for (const span of mirror.querySelectorAll('span')) {
+        const text = span.textContent?.replace(/\u200b/g, '').trim();
+        if (text) check(span, getComputedStyle(span).color, 'text', text);
+      }
     }
     for (const el of document.querySelectorAll('input[placeholder], textarea[placeholder]')) {
       const placeholder = el.getAttribute('placeholder');

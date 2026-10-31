@@ -21,9 +21,9 @@ test('bar geometry: 56px, display page title, summary N = the `待处理` column
     const cs = getComputedStyle(el);
     return { family: cs.fontFamily, weight: cs.fontWeight };
   });
-  expect(titleStyle.family).toContain('bricolageGrotesque');
-  expect(titleStyle.family).not.toContain('sourceSerif4');
-  expect(titleStyle.weight).toBe('650');
+  expect(titleStyle.family).toContain('sourceSerif4');
+  expect(titleStyle.family).not.toContain('bricolageGrotesque');
+  expect(titleStyle.weight).toBe('600');
 
   const n = Number(await pendingCount(page).textContent());
   expect(n).toBeGreaterThan(0);

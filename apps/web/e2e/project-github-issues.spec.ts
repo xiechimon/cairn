@@ -182,6 +182,29 @@ test('1. connected github project: entry → sheet → pick to import → detail
   expect(importBodies).toEqual([{ number: 7 }]);
 });
 
+test('tag chip lands on the registry Badge: tinted label, 20px tall, 4px corners, no dot', async ({
+  page,
+}) => {
+  await stubWorld(page);
+  const dialog = await openDialog(page);
+  const chip = dialog.locator('.tag-chip').first();
+  await expect(chip).toHaveText('bug');
+  await expect(chip).toHaveAttribute('data-slot', 'badge');
+  const style = await chip.evaluate((el) => {
+    const cs = getComputedStyle(el);
+    return {
+      height: (el as HTMLElement).offsetHeight,
+      radius: cs.borderTopLeftRadius,
+      background: cs.backgroundColor,
+      children: el.children.length,
+    };
+  });
+  expect(style.height).toBe(20);
+  expect(style.radius).toBe('4px');
+  expect(style.background).not.toBe('rgba(0, 0, 0, 0)');
+  expect(style.children).toBe(1);
+});
+
 test('2. local project: entry not rendered', async ({ page }) => {
   await stubWorld(page);
   await page.goto('/app/project/proj-local?tab=tasks');

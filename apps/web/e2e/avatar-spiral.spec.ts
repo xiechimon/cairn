@@ -81,7 +81,7 @@ test('detail chip popover: user row + `执行对话` agent row both seeded', asy
   const popover = page.getByRole('dialog', { name: '任务分配' });
   await expect(popover).toBeVisible();
   await expect(popover.locator('[data-row-kind="owner"] img')).toHaveAttribute('src', USER_SRC);
-  await expect(popover.locator('[data-selected] [data-row-kind="agent"] img')).toHaveAttribute(
+  await expect(popover.locator('[data-row-kind="agent"][data-selected] img')).toHaveAttribute(
     'src',
     AGENT_SRC,
   );
