@@ -17,6 +17,24 @@ import {
 } from './components-controls.js';
 import { IdentitySection, StreamSection, StructureSection } from './components-more.js';
 import { DialogSection, MenuSection, ToastSection } from './components-overlays.js';
+import {
+  CommandPaletteSection,
+  CoordinatorStreamSection,
+  ProjectsSection,
+  RoutingSection,
+  ShortcutMenuSection,
+  SidebarSection,
+} from './components-shell.js';
+import { StoneSection, ThreadCardSection, ThreadRowSection } from './components-stone.js';
+import {
+  ChangesSection,
+  ComposerSection,
+  PermissionSection,
+  PlanSection,
+  PrBarSection,
+  ScheduledSection,
+  UndoToastSection,
+} from './components-threads.js';
 import type { GalleryTheme } from './design-doc.js';
 import {
   ColorSection,
@@ -64,6 +82,28 @@ const NAV = [
       ['structure', 'Structure primitives'],
       ['identity', 'Agents and models'],
       ['stream', 'Live stream'],
+    ],
+  },
+  {
+    id: 'stone-language',
+    title: 'Stone language',
+    items: [
+      ['stone', 'Stone marks and trail'],
+      ['thread-card', 'Thread card'],
+      ['thread-row', 'Thread row and bulk bar'],
+      ['permission', 'Permission and proposal'],
+      ['plan', 'Plan, activity, usage'],
+      ['composer', 'Composer'],
+      ['pr-bar', 'Pull request bar'],
+      ['undo-toast', 'Undo toast'],
+      ['changes', 'Diff and commits'],
+      ['scheduled', 'Scheduled task row'],
+      ['sidebar', 'Sidebar parts'],
+      ['projects-lists', 'Projects, lists, phone'],
+      ['coordinator', 'Coordinator stream'],
+      ['shortcut-menu', 'Shortcut menus'],
+      ['palette', 'Command palette'],
+      ['routing', 'Model routing'],
     ],
   },
   {
@@ -217,6 +257,27 @@ export function Gallery() {
           <StructureSection />
           <IdentitySection />
           <StreamSection />
+          <GroupTitle
+            id="stone-language"
+            title="Stone language"
+            lede="The status marks, cards and bars prototype A is built from, as reusable components in src/components. Pages compose only these."
+          />
+          <StoneSection />
+          <ThreadCardSection />
+          <ThreadRowSection />
+          <PermissionSection />
+          <PlanSection />
+          <ComposerSection />
+          <PrBarSection />
+          <UndoToastSection />
+          <ChangesSection />
+          <ScheduledSection />
+          <SidebarSection />
+          <ProjectsSection />
+          <CoordinatorStreamSection />
+          <ShortcutMenuSection />
+          <CommandPaletteSection />
+          <RoutingSection />
           <GroupTitle
             id="patterns"
             title="Patterns"
