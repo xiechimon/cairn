@@ -175,6 +175,19 @@ try {
         `${marker}\n**Independent review gate: PASS** (carried over) for \`${pr.headRefOid.slice(0, 8)}\`: same patch as the reviewed head \`${from.slice(0, 8)}\`; only the base moved.\n<!-- review-gate-patch:${patch} -->`,
       );
       record(pr, { verdict: 'pass', action: 'carried-over', from });
+      if (pr.labels.some((l) => l.name === 'review-stalled'))
+        try {
+          asBot([
+            'gh',
+            'pr',
+            'edit',
+            String(pr.number),
+            '-R',
+            REPO,
+            '--remove-label',
+            'review-stalled',
+          ]);
+        } catch {}
       rearm(pr);
       console.log(`#${pr.number}: PASS carried over from ${from.slice(0, 8)} (patch unchanged)`);
       continue;
@@ -363,7 +376,9 @@ ${
       ...(run.reviewer ? { reviewer: run.reviewer } : {}),
     });
     if (!verdict) {
-      console.log(`no verdict for #${pr.number}; rc=${run.status}\n${run.stderr.slice(-800)}`);
+      console.log(
+        `no verdict for #${pr.number}${run.reviewer ? ` (${run.reviewer})` : ''}; rc=${run.status}\n${(run.stderr || run.stdout).slice(-800)}`,
+      );
       if (pr.autoMergeRequest && !pr.pendingNoted) {
         try {
           asBot(

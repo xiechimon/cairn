@@ -10,6 +10,23 @@ export const CLAUDE_REVIEW_TOOLS = [
   'Bash(gh issue view:*)',
 ];
 
+export const CLAUDE_DENIED_TOOLS = [
+  'Edit',
+  'Write',
+  'NotebookEdit',
+  'WebFetch',
+  'WebSearch',
+  'Bash(git commit:*)',
+  'Bash(git push:*)',
+  'Bash(git checkout:*)',
+  'Bash(git reset:*)',
+  'Bash(gh pr edit:*)',
+  'Bash(gh pr create:*)',
+  'Bash(gh pr merge:*)',
+  'Bash(gh pr comment:*)',
+  'Bash(gh api:*)',
+];
+
 export function claudeFallback(authorVendor, run) {
   return (
     Boolean(authorVendor) &&
@@ -27,8 +44,15 @@ export function claudeReviewArgs(prompt) {
     'opus',
     '--permission-mode',
     'default',
+    '--setting-sources',
+    'project',
+    '--strict-mcp-config',
+    '--tools',
+    'Read,Grep,Glob,Bash',
     '--allowedTools',
-    CLAUDE_REVIEW_TOOLS.join(' '),
+    ...CLAUDE_REVIEW_TOOLS,
+    '--disallowedTools',
+    ...CLAUDE_DENIED_TOOLS,
   ];
 }
 

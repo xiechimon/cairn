@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  CLAUDE_DENIED_TOOLS,
   CLAUDE_REVIEW_TOOLS,
   claudeFallback,
   claudeReviewArgs,
@@ -31,9 +32,24 @@ test('no fallback without an excluded author or on other failures', () => {
 test('the Claude review is read-only', () => {
   const args = claudeReviewArgs('review this');
   assert.deepEqual(args.slice(0, 2), ['-p', 'review this']);
-  const tools = args[args.indexOf('--allowedTools') + 1];
-  assert.equal(tools, CLAUDE_REVIEW_TOOLS.join(' '));
-  assert.doesNotMatch(tools, /Edit|Write|git push|git commit|gh pr merge|gh pr comment/);
+  const allowedAt = args.indexOf('--allowedTools');
+  const deniedAt = args.indexOf('--disallowedTools');
+  const tools = args.slice(allowedAt + 1, deniedAt);
+  assert.deepEqual(tools, CLAUDE_REVIEW_TOOLS);
+  assert.doesNotMatch(tools.join(' '), /Edit|Write|git push|git commit|gh pr merge|gh pr comment/);
+  assert.equal(args[args.indexOf('--setting-sources') + 1], 'project');
+  assert.equal(args[args.indexOf('--tools') + 1], 'Read,Grep,Glob,Bash');
+  assert.ok(args.includes('--strict-mcp-config'));
+  const denied = args.slice(deniedAt + 1);
+  assert.equal(deniedAt, args.length - CLAUDE_DENIED_TOOLS.length - 1);
+  for (const write of [
+    'Edit',
+    'Write',
+    'Bash(git commit:*)',
+    'Bash(gh pr edit:*)',
+    'Bash(gh pr create:*)',
+  ])
+    assert.ok(denied.includes(write), write);
 });
 
 const sha = 'a'.repeat(40);
