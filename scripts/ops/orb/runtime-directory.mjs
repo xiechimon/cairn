@@ -44,6 +44,19 @@ export function runtimeDirectory({
     } catch (error) {
       if (error.code !== 'ENOENT') throw error;
     }
+    const parentStat = io.lstatSync(parent);
+    const orphan =
+      stop &&
+      identity === undefined &&
+      stat.isDirectory() &&
+      stat.uid === 0 &&
+      (stat.mode & 0o7777) === 0o700 &&
+      stat.dev === parentStat.dev &&
+      io.readdirSync(directory).length === 0;
+    if (orphan) {
+      if (!dryRun) io.rmdirSync(directory);
+      return 1;
+    }
     if (!stat.isDirectory() || identity?.dev !== stat.dev || identity?.ino !== stat.ino)
       throw new Error('Unrecognized runtime directory; refusing to follow or replace it');
   }
@@ -54,8 +67,7 @@ export function runtimeDirectory({
     directory,
     fs.constants.O_RDONLY | fs.constants.O_DIRECTORY | fs.constants.O_NOFOLLOW,
   );
-  const execute = (command, args) =>
-    run(command, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe', fd] });
+  const execute = (command, args) => run(command, args, { encoding: 'utf8' });
   try {
     let opened = io.fstatSync(fd);
     if (stat && (stat.dev !== opened.dev || stat.ino !== opened.ino))
@@ -64,9 +76,8 @@ export function runtimeDirectory({
       if (dryRun) return 1;
       if (identity.base) {
         if (
-          execute('/usr/bin/umount', ['--no-canonicalize', '--', '/proc/self/fd/3']).status !== 0 &&
-          execute('/usr/bin/umount', ['--no-canonicalize', '--lazy', '--', '/proc/self/fd/3'])
-            .status !== 0
+          execute('/usr/bin/umount', ['--no-canonicalize', '--', directory]).status !== 0 &&
+          execute('/usr/bin/umount', ['--no-canonicalize', '--lazy', '--', directory]).status !== 0
         )
           throw new Error('Cannot unmount runtime tmpfs');
         io.closeSync(fd);
@@ -99,6 +110,10 @@ export function runtimeDirectory({
     if (dryRun) return changed ? 1 : 0;
     if (!identity?.base) {
       const base = { dev: opened.dev, ino: opened.ino };
+      if (!identity) {
+        identity = base;
+        io.writeFileSync(record, JSON.stringify(identity), { mode: 0o600 });
+      }
       if (
         execute('/usr/bin/mount', [
           '--no-canonicalize',
@@ -107,7 +122,7 @@ export function runtimeDirectory({
           '-o',
           `size=64M,nr_inodes=4096,mode=0700,uid=${uid},gid=${gid},nosuid,nodev,noexec`,
           'cairn-orb',
-          '/proc/self/fd/3',
+          directory,
         ]).status !== 0
       )
         throw new Error('Cannot mount runtime tmpfs');
@@ -121,6 +136,7 @@ export function runtimeDirectory({
       if (opened.dev === base.dev && opened.ino === base.ino)
         throw new Error('Runtime tmpfs did not replace the directory');
       identity = { dev: opened.dev, ino: opened.ino, base };
+      io.writeFileSync(record, JSON.stringify(identity), { mode: 0o600 });
     }
     if (changed) {
       io.fchownSync(fd, uid, gid);

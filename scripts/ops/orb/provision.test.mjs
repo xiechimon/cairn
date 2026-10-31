@@ -837,7 +837,7 @@ test('a symlink appearing before open cannot receive ownership or mode changes',
   assert.ok(!f.calls.some(([op]) => op === 'fchown' || op === 'fchmod'));
 });
 
-test('failed fd ownership changes close the fd and never certify the directory', (t) => {
+test('failed fd ownership changes close the fd, record the mount, and recover on rerun', (t) => {
   const f = runtimeFixture(t);
   let closed = false;
   const io = {
@@ -852,8 +852,12 @@ test('failed fd ownership changes close the fd and never certify the directory',
   };
   assert.throws(() => runtimeDirectory({ ...f.options, io }), /ownership failed/);
   assert.equal(closed, true);
-  assert.deepEqual(fs.readdirSync(f.state), []);
-  assert.throws(() => runtimeDirectory(f.options), /unrecognized runtime/i);
+  const record = JSON.parse(fs.readFileSync(join(f.state, 'cairn-orb-test-a.runtime'), 'utf8'));
+  assert.ok(record.base, 'the mounted tmpfs is recorded so stop can unmount it');
+  assert.doesNotThrow(() => runtimeDirectory(f.options));
+  assert.equal(runtimeDirectory({ ...f.options, stop: true }), 1);
+  assert.ok(f.calls.some(([op]) => op === '/usr/bin/umount'));
+  assert.ok(!fs.existsSync(f.directory));
 });
 
 test('failed stop cleanup preserves the root identity record for retry', (t) => {
@@ -876,7 +880,7 @@ test('first-start dry-run does not require or create the systemd runtime state d
   assert.equal(fs.existsSync(f.directory), false);
 });
 
-test('runtime tmpfs is bounded, hardened and mounted through the no-follow fd', (t) => {
+test('runtime tmpfs is bounded, hardened and mounted by path inside the root-owned parent', (t) => {
   const f = runtimeFixture(t);
   runtimeDirectory(f.options);
   const mount = f.calls.find(([op]) => op === '/usr/bin/mount');
@@ -888,16 +892,15 @@ test('runtime tmpfs is bounded, hardened and mounted through the no-follow fd', 
     '-o',
     `size=64M,nr_inodes=4096,mode=0700,uid=${f.options.uid},gid=${f.options.gid},nosuid,nodev,noexec`,
     'cairn-orb',
-    '/proc/self/fd/3',
+    f.directory,
   ]);
-  const opened = f.calls.find(([op]) => op === 'open');
-  assert.equal(mount[2].stdio[3], opened[3]);
   assert.equal(mount[2].encoding, 'utf8');
+  assert.equal(mount[2].stdio, undefined);
   assert.equal(runtimeDirectory(f.options), 0);
   assert.equal(f.calls.filter(([op]) => op === '/usr/bin/mount').length, 1);
 });
 
-test('stop unmounts before removal and retries a busy mount lazily using its fd', (t) => {
+test('stop unmounts by path before removal and retries a busy mount lazily', (t) => {
   const f = runtimeFixture(t);
   runtimeDirectory(f.options);
   f.calls.length = 0;
@@ -913,21 +916,57 @@ test('stop unmounts before removal and retries a busy mount lazily using its fd'
   assert.deepEqual(
     commands.map(([op, args]) => [op, args]),
     [
-      ['/usr/bin/umount', ['--no-canonicalize', '--', '/proc/self/fd/3']],
-      ['/usr/bin/umount', ['--no-canonicalize', '--lazy', '--', '/proc/self/fd/3']],
+      ['/usr/bin/umount', ['--no-canonicalize', '--', f.directory]],
+      ['/usr/bin/umount', ['--no-canonicalize', '--lazy', '--', f.directory]],
       ['/usr/bin/rm', ['--recursive', '--force', '--one-file-system', '--', f.directory]],
     ],
   );
-  assert.ok(commands.slice(0, 2).every(([, , options]) => Number.isInteger(options.stdio[3])));
   assert.equal(fs.existsSync(f.directory), false);
   assert.deepEqual(fs.readdirSync(f.state), []);
 });
 
-test('failed tmpfs mount cannot certify an unbounded runtime directory', (t) => {
+test('failed tmpfs mount cannot certify an unbounded directory and the stop hook removes it', (t) => {
   const f = runtimeFixture(t);
   assert.throws(() => runtimeDirectory({ ...f.options, run: () => ({ status: 1 }) }), /mount/i);
-  assert.deepEqual(fs.readdirSync(f.state), []);
   assert.ok(!f.calls.some(([op]) => op === 'fchown'));
+  const base = JSON.parse(fs.readFileSync(join(f.state, 'cairn-orb-test-a.runtime'), 'utf8'));
+  assert.equal(base.base, undefined);
+  assert.equal(runtimeDirectory({ ...f.options, stop: true }), 1);
+  assert.ok(!fs.existsSync(f.directory));
+  assert.deepEqual(fs.readdirSync(f.state), []);
+  assert.ok(!f.calls.some(([op]) => op === '/usr/bin/umount'));
+});
+
+test('stop removes only an empty unmounted root-owned orphan without a record', (t) => {
+  const f = runtimeFixture(t);
+  const lstatSync = (path) => {
+    const stat = f.options.io.lstatSync(path);
+    return path === f.directory ? Object.assign(stat, { uid: 0 }) : stat;
+  };
+  fs.mkdirSync(f.directory, { mode: 0o700 });
+  assert.equal(
+    runtimeDirectory({
+      ...f.options,
+      stop: true,
+      dryRun: true,
+      io: { ...f.options.io, lstatSync },
+    }),
+    1,
+  );
+  assert.ok(fs.existsSync(f.directory));
+  assert.equal(
+    runtimeDirectory({ ...f.options, stop: true, io: { ...f.options.io, lstatSync } }),
+    1,
+  );
+  assert.ok(!fs.existsSync(f.directory));
+  fs.mkdirSync(f.directory, { mode: 0o700 });
+  fs.writeFileSync(join(f.directory, 'planted'), 'x');
+  assert.throws(
+    () => runtimeDirectory({ ...f.options, stop: true, io: { ...f.options.io, lstatSync } }),
+    /Unrecognized/,
+  );
+  fs.rmSync(join(f.directory, 'planted'));
+  assert.throws(() => runtimeDirectory({ ...f.options, stop: true }), /Unrecognized/);
 });
 
 test('failed removal after unmount can retry without unmounting the host filesystem', (t) => {
