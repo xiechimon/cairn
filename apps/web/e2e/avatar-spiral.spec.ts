@@ -145,7 +145,7 @@ test('no avatar surface reaches a third-party avatar host', async ({ page }) => 
   await page.goto('/app/team?scenario=12');
   await expect(page.getByTestId('team-agent-card').first().locator('img')).toBeVisible();
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=36');
-  await expect(page.locator('.chat-row--agent .chat-avatar img').first()).toBeVisible();
+  await expect(page.locator('.chat-row--agent').first()).toBeVisible();
   expect(hits).toEqual([]);
 });
 
@@ -168,18 +168,15 @@ test('search agent rows + project task rows are seeded (`Agent 列表` / task-ro
   await expect(page.locator('.prj-task-avatar img').first()).toHaveAttribute('src', USER_SRC);
 });
 
-test('conversation transcript: agent rows carry the assigned agent avatar, user rows carry none', async ({
+test('conversation transcript: replies carry no avatar column, user rows are gradient bubbles', async ({
   page,
 }) => {
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=36');
-  await expect(page.locator('.chat-row--agent .chat-avatar img').first()).toHaveAttribute(
-    'src',
-    AGENT_SRC,
-  );
+  await expect(page.locator('.chat-row--agent').first()).toBeVisible();
   await expect(page.locator('.chat-row--user').first()).toBeVisible();
-  await expect(
-    page.locator('.chat-row:not(.chat-row--agent):not(.chat-row--chief) .chat-avatar'),
-  ).toHaveCount(0);
+  await expect(page.locator('.chat-avatar')).toHaveCount(0);
+  await expect(page.getByTestId('msg-avatar')).toHaveCount(0);
+  await expect(page.getByTestId('user-bubble').first()).toHaveCSS('border-top-left-radius', '12px');
 });
 
 test('account head shares the seeded user src (same identity as the sidebar chip)', async ({
@@ -189,38 +186,30 @@ test('account head shares the seeded user src (same identity as the sidebar chip
   await expect(page.locator('.account-avatar img')).toHaveAttribute('src', USER_SRC);
 });
 
-test('a working agent traces its spiral; idle rows stay still', async ({ page }) => {
+test('a working agent shows a pulse under the last line; finished rows stay still', async ({
+  page,
+}) => {
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=26');
-  const rows = page.locator('.chat-row--agent');
-  await expect(rows.last().getByTestId('msg-avatar').locator('img')).toHaveAttribute(
-    'src',
-    /class%3D%22trace%22/,
-  );
-  await expect(rows.first().getByTestId('msg-avatar').locator('img')).not.toHaveAttribute(
-    'src',
-    /trace/,
-  );
+  await expect(page.getByTestId('live-pulse')).toHaveCount(1);
+  await expect(page.getByTestId('live-pulse')).toHaveCSS('animation-name', 'live-pulse');
+  await expect(page.locator('.chat-row--agent').first().getByTestId('live-pulse')).toHaveCount(0);
 });
 
-test('the unbound chief wears the spiral face instead of the dashed one', async ({ page }) => {
+test('the unbound chief reply carries no face and no avatar column', async ({ page }) => {
   await page.goto('/app?view=board&scenario=114');
-  const face = page.getByTestId('chief-stream').getByTestId('chief-msg').locator('> svg');
-  await expect(face).toHaveCount(1);
-  await expect(face.locator('circle')).toHaveAttribute('fill', 'var(--fab-surface)');
-  await expect(face.locator('path')).toHaveAttribute('stroke', 'var(--fab-mark)');
+  const reply = page.getByTestId('chief-stream').getByTestId('chief-msg');
+  await expect(reply.first()).toBeVisible();
+  await expect(reply.locator('> svg')).toHaveCount(0);
+  await expect(reply.locator('> img, > span > img')).toHaveCount(0);
 });
 
-test('the chief spiral traces on the reply it is still typing, rests on finished ones', async ({
+test('the chief pulses under the reply it is still typing, finished ones carry none', async ({
   page,
 }) => {
   await page.goto('/app?view=board&scenario=chief-md');
-  const spirals = page
-    .getByTestId('chief-stream')
-    .getByTestId('chief-msg')
-    .locator('> svg > g');
-  await expect(spirals).toHaveCount(2);
-  await expect(spirals.first().locator('.spiral-trace')).toHaveCount(0);
-  await expect(spirals.last().locator('.spiral-trace')).toHaveCSS('animation-name', 'spiral-trace');
+  const replies = page.getByTestId('chief-stream').getByTestId('chief-msg');
+  await expect(replies.last().getByTestId('live-pulse')).toHaveCSS('animation-name', 'live-pulse');
+  await expect(replies.first().getByTestId('live-pulse')).toHaveCount(0);
 });
 
 test('every spiral sits on the disc centre, so it turns in place', async ({ page }) => {

@@ -136,14 +136,15 @@ test('schedules fixture face: topbar `新建` opens the dialog, freq tabs respon
   await expect(page.locator('.sched-card')).toContainText('每周运行');
 });
 
-test('doc pane tabs: the doc tab reads `变更` and re-selecting it keeps the pane (#306)', async ({
+test('doc pane title reads `变更` and re-selecting it keeps the pane (#306)', async ({
   page,
 }) => {
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=27');
-  const docTab = page.getByTestId('pane-tab-doc');
-  await expect(docTab).toHaveText('变更');
-  await expect(docTab).toHaveAttribute('aria-selected', 'true');
-  await docTab.click();
+  const title = page.getByTestId('pane-title');
+  await expect(title).toHaveText('变更');
+  await expect(page.getByTestId('pane-view-changes')).toHaveAttribute('aria-pressed', 'true');
+  await title.click();
+  await page.getByRole('menuitem', { name: '变更' }).click();
   await expect(page.getByTestId('doc-pane')).toBeVisible();
   await expect(page.locator('.overlay-actions button', { hasText: '复用方案' })).toHaveCount(0);
 });
@@ -441,7 +442,7 @@ test('reuse panel `查看方案` flips the doc pane to the plan face (#318)', as
   await page.goto('/app/todo/r8-15?scenario=75');
   await expect(page.locator('.overlay-title')).toHaveText('复用方案');
 
-  await expect(page.getByTestId('pane-tab-doc')).toHaveText('变更');
+  await expect(page.getByTestId('pane-title')).toHaveText('变更');
 
   await page.locator('.overlay-actions button', { hasText: '查看方案' }).click();
 

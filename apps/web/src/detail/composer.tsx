@@ -1,4 +1,5 @@
 import { useLayoutEffect, useState } from 'react';
+import { formatClock, useLiveSeconds } from '../components/chat/live-row.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
 import { Input } from '../components/ui/input.js';
@@ -37,6 +38,7 @@ interface ComposerProps {
   mentionFiles?: FileMentionEntry[];
   onStop?: () => void;
   onReview?: () => void;
+  workingFor?: { startedAt?: number | undefined; seconds?: number | undefined } | undefined;
 }
 
 export function Composer({
@@ -54,8 +56,11 @@ export function Composer({
   mentionFiles,
   onStop,
   onReview,
+  workingFor,
 }: ComposerProps) {
   const { t } = useI18n();
+  const tick = useLiveSeconds(streaming ? workingFor?.startedAt : null);
+  const elapsed = tick ?? workingFor?.seconds ?? null;
   const {
     draft,
     send,
@@ -252,6 +257,14 @@ export function Composer({
           </IconTooltip>
         )}
       </div>
+      {streaming && elapsed != null && (
+        <span
+          className="absolute right-24 bottom-3 flex h-8 items-center text-meta tabular-nums text-(--text-tertiary)"
+          data-testid="composer-working"
+        >
+          {t('工作中 · {time}', { time: formatClock(elapsed) })}
+        </span>
+      )}
       {streaming && (
         <Button
           variant="ghost"

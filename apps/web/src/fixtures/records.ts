@@ -11,6 +11,8 @@ import {
   type ModelSource,
   PHASE_VALUES,
   type Phase,
+  type ProjectColor,
+  type ProjectIcon,
   type ProjectRepoKind,
   type ProviderRecord,
   type QuotaWait,
@@ -162,6 +164,8 @@ export interface ProjectContent {
   repoKind?: ProjectRepoKind;
   defaultBranch: string;
   description: string | null;
+  icon?: ProjectIcon;
+  color?: ProjectColor;
   commits?: ProjectCommitRow[];
   fileContents?: Record<string, string>;
 }
@@ -216,6 +220,7 @@ export interface FixtureSet {
   apiKeys?: ApiKeysContent;
   resources?: ResourcesContent;
   projectNames?: Record<string, string>;
+  projectAvatars?: Record<string, { icon?: ProjectIcon; color?: ProjectColor }>;
   chief?: ChiefContent;
   github?: GithubFixture;
   tags?: Array<Pick<TagRecord, 'id' | 'name' | 'color'>>;
@@ -312,6 +317,7 @@ export type TranscriptItem =
       title?: string;
       markdown?: string;
       id?: string;
+      at?: string;
     }
   | {
       kind: 'robot';
@@ -480,7 +486,14 @@ export type ChiefStreamItem =
       }[];
       answers: { header: string; choices?: string[]; text?: string }[] | null;
     }
-  | { kind: 'user'; text: string; id?: string; markdown?: string; pending?: 'queued' | 'held' }
+  | {
+      kind: 'user';
+      text: string;
+      id?: string;
+      markdown?: string;
+      pending?: 'queued' | 'held';
+      at?: string;
+    }
   | { kind: 'stopped'; todos: { id: string; seq: number; title: string }[]; id?: string }
   | {
       kind: 'robot';
