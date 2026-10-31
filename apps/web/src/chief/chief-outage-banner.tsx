@@ -1,3 +1,4 @@
+import { CircleAlert, Info } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '../components/ui/button.js';
 import type { ChiefContent } from '../fixtures/records.js';
@@ -19,11 +20,13 @@ export function ChiefOutageBanner({
 }) {
   const { t, locale } = useI18n();
   const [open, setOpen] = useState(false);
-  const model = outage.model ?? t('总管的模型');
+  const model = outage.model;
   const why =
-    outage.reason === 'quota'
-      ? t('总管用的模型 {model} 额度已用完', { model })
-      : t('总管用的模型 {model} 暂时过载', { model });
+    model == null
+      ? t(outage.reason === 'quota' ? '总管用的模型额度已用完' : '总管用的模型暂时过载')
+      : outage.reason === 'quota'
+        ? t('总管用的模型 {model} 额度已用完', { model })
+        : t('总管用的模型 {model} 暂时过载', { model });
   const retryAt = outage.retryAt != null ? new Date(outage.retryAt) : null;
   const when =
     retryAt !== null
@@ -42,16 +45,11 @@ export function ChiefOutageBanner({
     <div
       role="status"
       data-testid="chief-outage"
-      className={`${BANNER_CLS} shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--badge-attention)_45%,transparent)] ${open ? 'max-sm:flex-wrap' : 'max-sm:items-center'}`}
+      className={`${BANNER_CLS} shadow-(--e1) ${open ? 'max-sm:flex-wrap' : 'max-sm:items-center'}`}
     >
+      <CircleAlert aria-hidden="true" className="mt-0.5 size-4.5 flex-none text-(--card-button)" />
       <span className={`min-w-0 flex-1 ${open ? 'max-sm:basis-full' : ''}`}>
-        <b className="flex items-center gap-2 text-ui font-medium text-(--foreground)">
-          <span
-            aria-hidden="true"
-            className="size-2 flex-none rounded-full bg-(--badge-attention)"
-          />
-          {t('总管暂时不可用')}
-        </b>
+        <b className="block text-ui font-semibold text-(--foreground)">{t('总管暂时不可用')}</b>
         <span className={`block ${open ? '' : 'max-sm:hidden'}`}>
           {t('{why}，{when}。任务照常在跑；你说的话先存下，恢复后按顺序处理。', { why, when })}
         </span>
@@ -96,15 +94,16 @@ export function ChiefFallbackBanner({
     <div
       role="status"
       data-testid="chief-fallback-banner"
-      className={`${BANNER_CLS} items-center shadow-[inset_0_0_0_1px_var(--border)]`}
+      className={`${BANNER_CLS} items-center shadow-(--e1)`}
     >
+      <Info aria-hidden="true" className="size-4.5 flex-none text-icon" />
       <span className="min-w-0 flex-1">
         {t('总管的主模型暂时用不了，这次改用备用模型 {model} 回复，判断可能没那么准。', {
           model,
         })}
       </span>
       {onSettings != null && (
-        <Button variant="ghost" className={`${LINK_BTN_CLS} flex-none`} onClick={onSettings}>
+        <Button variant="outline" size="sm" className="flex-none px-3" onClick={onSettings}>
           {t('换模型')}
         </Button>
       )}
