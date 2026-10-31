@@ -11,7 +11,7 @@ import { Marker, MarkerContent } from '../components/ui/marker.js';
 import { Message, MessageContent } from '../components/ui/message.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
-import { Trace, TraceDescription, TraceLine, TraceTitle } from '../components/ui/trace.js';
+import { Trace, TraceLine, TraceTitle } from '../components/ui/trace.js';
 import { ChatMarkdown } from '../detail/chat-markdown.js';
 import { TodoGlanceContext, TodoStatus } from '../detail/segments.js';
 import type {

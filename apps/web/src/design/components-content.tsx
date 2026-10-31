@@ -27,28 +27,7 @@ import { Message, MessageContent } from '../components/ui/message.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { Select, SelectContent, SelectItem, SelectValue } from '../components/ui/select.js';
 import { Skeleton } from '../components/ui/skeleton.js';
-import {
-  Trace,
-  TraceCollapsible,
-  TraceCollapsibleContent,
-  TraceCollapsibleTrigger,
-  TraceDescription,
-  TraceIcon,
-  TraceLine,
-  TraceTitle,
-} from '../components/ui/trace.js';
-import {
-  FileText,
-  Key,
-  Lock,
-  Paperclip,
-  Search,
-  Server,
-  Sparkle,
-  SquarePen,
-  Terminal,
-  X,
-} from '../icons/index.js';
+import { FileText, Key, Lock, Paperclip, Server, SquarePen, X } from '../icons/index.js';
 import { SEED_TRANSCRIPT } from './agent-transcript.js';
 import { Cell, Section, Specimen } from './specimen.js';
 

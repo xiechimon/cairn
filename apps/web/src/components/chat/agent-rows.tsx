@@ -5,7 +5,6 @@ import {
   TraceCollapsible,
   TraceCollapsibleContent,
   TraceCollapsibleTrigger,
-  TraceDescription,
   TraceLine,
   TraceTitle,
 } from '../ui/trace.js';
