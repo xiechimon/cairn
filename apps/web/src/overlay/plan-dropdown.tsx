@@ -1,4 +1,5 @@
 import { cn } from 'cn';
+import { Button } from '../components/ui/button.js';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -59,16 +60,17 @@ export function PaneViewButtons({
       className="m-0 flex min-w-0 items-center gap-0.5 border-0 p-0"
     >
       {VIEWS.map(({ view, label }) => (
-        <button
+        <Button
           key={view}
-          type="button"
+          variant="ghost"
+          size="icon-xs"
           data-testid={`pane-view-${view}`}
           aria-label={t(label)}
           aria-pressed={active === view}
           title={t(label)}
           onClick={() => onDocView(view)}
           className={cn(
-            'inline-grid size-6.5 place-items-center rounded-[7px] text-(--text-tertiary) outline-none hover:bg-(--menu-hover) hover:text-(--foreground) focus-visible:ring-2 focus-visible:ring-(--ring)',
+            'size-6.5 rounded-md text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-(--foreground)',
             active === view && 'bg-(--menu-hover) text-(--foreground)',
           )}
         >
@@ -77,7 +79,7 @@ export function PaneViewButtons({
           ) : (
             <DiffSquare width={15} height={15} />
           )}
-        </button>
+        </Button>
       ))}
     </fieldset>
   );

@@ -3,6 +3,7 @@ import { type ReactNode, useState } from 'react';
 import { useBuild } from '../api/hooks.js';
 import { NO_PRICE_REASON } from '../api/mappers.js';
 import { Badge } from '../components/ui/badge.js';
+import { Button } from '../components/ui/button.js';
 import { Label } from '../components/ui/label.js';
 import type { BuildOverlayContent, PaneView, RunHistoryRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
@@ -41,12 +42,12 @@ function SectionShell({
   const bodyId = `pane-section-${testId}`;
   return (
     <section data-testid={`pane-section-${testId}`} className="mx-3.5 border-t border-(--border)">
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         aria-expanded={open}
         aria-controls={bodyId}
         onClick={onToggle}
-        className="flex h-8 w-full items-center gap-1 rounded-md text-meta font-medium text-(--text-tertiary) outline-none hover:text-(--foreground) focus-visible:ring-2 focus-visible:ring-(--ring)"
+        className="h-8 w-full justify-start gap-1 px-0 text-meta font-medium text-(--text-tertiary) hover:bg-transparent hover:text-(--foreground) aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) aria-expanded:hover:text-(--foreground)"
       >
         {open ? <TriangleDown width={10} height={10} /> : <TriangleRight width={10} height={10} />}
         {title}
@@ -55,7 +56,7 @@ function SectionShell({
             {summary}
           </span>
         )}
-      </button>
+      </Button>
       {open && (
         <div id={bodyId} className="pb-3.5">
           {children}
