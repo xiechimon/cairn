@@ -14,8 +14,10 @@ export interface TaskMetaFields {
 
 function Row({ label, first, children }: { label: string; first?: boolean; children: ReactNode }) {
   return (
-    <div className={`flex items-baseline text-meta leading-5${first === true ? '' : ' mt-4'}`}>
-      <span className="w-17 flex-none text-(--text-tertiary)">{label}</span>
+    <div
+      className={`flex items-baseline gap-3 text-meta leading-5${first === true ? '' : ' mt-2.5'}`}
+    >
+      <span className="w-24 flex-none text-(--text-tertiary)">{label}</span>
       <span className="min-w-0 flex-1 text-(--text-secondary) [overflow-wrap:anywhere]">
         {children}
       </span>
@@ -46,7 +48,11 @@ export function TaskMetaBlock({ meta, now }: { meta: TaskMetaFields; now: number
       label: t('分支 / PR'),
       content: (
         <>
-          {meta.branch != null && <code className="font-mono text-caption">{meta.branch}</code>}
+          {meta.branch != null && (
+            <code className="box-decoration-clone rounded-(--cds-radius-sm) bg-secondary px-1.5 py-px font-mono text-caption text-foreground">
+              {meta.branch}
+            </code>
+          )}
           {meta.pr != null && (
             <a
               className={`text-(--chip-plan-fg) no-underline hover:underline${
@@ -70,7 +76,7 @@ export function TaskMetaBlock({ meta, now }: { meta: TaskMetaFields; now: number
         <>
           {meta.machine}
           {meta.machineWaiting && (
-            <span className="text-(--text-tertiary)">{t('（等待机器上线）')}</span>
+            <span className="ml-1 text-(--text-tertiary)">{t('（等待机器上线）')}</span>
           )}
         </>
       ),
@@ -79,7 +85,11 @@ export function TaskMetaBlock({ meta, now }: { meta: TaskMetaFields; now: number
   if (meta.model != null) {
     rows.push({
       label: t('模型'),
-      content: <code className="font-mono text-caption">{meta.model}</code>,
+      content: (
+        <code className="box-decoration-clone rounded-(--cds-radius-sm) bg-secondary px-1.5 py-px font-mono text-caption text-foreground">
+          {meta.model}
+        </code>
+      ),
     });
   }
   if (meta.createdAt != null) {
