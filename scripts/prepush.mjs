@@ -112,6 +112,8 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
         ...(paths.some(
           (path) =>
             path === '.github/workflows/ci.yml' ||
+            path === 'apps/web/playwright.config.ts' ||
+            path === 'apps/web/e2e/port-holder-guard.ts' ||
             selfTests.some(
               (selfTest) => path === selfTest || path === selfTest.replace(/\.test\.mjs$/, '.mjs'),
             ) ||

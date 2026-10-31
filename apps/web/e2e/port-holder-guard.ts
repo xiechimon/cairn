@@ -6,7 +6,7 @@ export default function portHolderGuard(config: FullConfig) {
   if (url === undefined) return;
   const report = foreignPortHolderReport({
     port: Number(new URL(url).port),
-    toplevel: gitToplevel(import.meta.dirname),
+    toplevel: gitToplevel(config.rootDir),
   });
   if (report !== null) throw new Error(report);
 }
