@@ -40,6 +40,12 @@
   --color-project-tile-4: var(--project-tile-4);
   --color-project-tile-5: var(--project-tile-5);
   --color-project-tile-6: var(--project-tile-6);
+  --color-pebble-waiting: var(--pebble-waiting);
+  --color-pebble-review: var(--pebble-review);
+  --color-pebble-working: var(--pebble-working);
+  --color-pebble-idle: var(--pebble-idle);
+  --color-pebble-resolved: var(--pebble-resolved);
+  --color-danger-line: var(--danger-line);
   --radius-sm: 6px;
   --radius-md: var(--radius);
   --radius-lg: var(--radius);
@@ -309,6 +315,12 @@
   --project-tile-4: #9a7cad;
   --project-tile-5: #5fa3a0;
   --project-tile-6: #b77f8a;
+  --pebble-waiting: #e0a838;
+  --pebble-review: #7fa3cc;
+  --pebble-working: #82b46f;
+  --pebble-idle: #5d655f;
+  --pebble-resolved: #444b46;
+  --danger-line: #8c4a3e;
 }
 
 @media (min-resolution: 2dppx) {
@@ -430,6 +442,12 @@
   --project-tile-4: #7a5b8e;
   --project-tile-5: #3d7c7a;
   --project-tile-6: #8a5560;
+  --pebble-waiting: #d49a1c;
+  --pebble-review: #5379a0;
+  --pebble-working: #5f8f4f;
+  --pebble-idle: #a8aea6;
+  --pebble-resolved: #c3c7bf;
+  --danger-line: #d98c7d;
   --fab-surface: #2f5a2a;
   --fab-mark: #f4f6f1;
 }
