@@ -174,9 +174,11 @@ export async function evaluateMergeGate(
         typeof facts.compare === 'object' &&
         facts.compare.headSha === head
         ? correctionDoneCheck(
-            facts.compare.files
-              .filter((file) => file.status !== 'removed')
-              .map((file) => ({ path: file.filename, additions: file.additions })),
+            facts.compare.files.map((file) => ({
+              path: file.filename,
+              additions: file.additions,
+              status: file.status,
+            })),
           )
         : null,
     );

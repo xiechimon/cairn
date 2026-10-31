@@ -326,9 +326,11 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
     i.correction &&
     compare !== null &&
     !correctionDoneCheck(
-      compare.files
-        .filter((file) => file.status !== 'removed')
-        .map((file) => ({ path: file.filename, additions: file.additions })),
+      compare.files.map((file) => ({
+        path: file.filename,
+        additions: file.additions,
+        status: file.status,
+      })),
     )
   ) {
     block('verify-missing', CORRECTION_GUARD_MISSING);

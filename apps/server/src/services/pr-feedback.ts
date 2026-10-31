@@ -1,8 +1,17 @@
 import { neutralizeIssueAttachmentTokens } from '@cairn/shared';
 import { and, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
-import { build, message, project, steerPending, step, todo } from '../db/schema.js';
-import { type FetchLike, githubCollaboratorPermission, githubPullState } from '../lib/github.js';
-import { githubPrFeedback } from '../lib/github-feedback.js';
+import {
+  build,
+  githubConnection,
+  message,
+  project,
+  steerPending,
+  step,
+  todo,
+} from '../db/schema.js';
+import { type FetchLike, githubCollaboratorPermission, githubPull } from '../lib/github.js';
+import { feedbackHighWaterSchema, githubPrFeedback } from '../lib/github-feedback.js';
+import { conditionalFeedbackFetch } from '../lib/github-feedback-cache.js';
 import { nowMs } from '../lib/ids.js';
 import { type BuildDeps, enqueueStep } from './builds.js';
 import { githubRepoOfProject } from './git.js';
@@ -18,6 +27,8 @@ export function createPrFeedbackPoller(
   run: { githubFetch: FetchLike; logger?: { info(obj: object, msg: string): void } },
 ) {
   let sweeping = false;
+  const cachedFetch = conditionalFeedbackFetch(run.githubFetch);
+  const permissions = new Map<string, { allowed: boolean; expiresAt: number }>();
   return {
     async sweep(): Promise<number> {
       if (sweeping) return 0;
@@ -52,23 +63,53 @@ export function createPrFeedbackPoller(
             if (ref === null || target.build.prNumber === null) continue;
             const access = await teamGithubToken(deps, target.todo.teamId);
             if (!('token' in access)) continue;
-            const pull = await githubPullState(
-              run.githubFetch,
+            const page = await githubPull(
+              cachedFetch,
               access.token,
               ref.owner,
               ref.repo,
               target.build.prNumber,
             );
+            const pull = page?.pull;
             if (pull?.state !== 'open' || pull.merged) continue;
-            const comments = await githubPrFeedback(
-              run.githubFetch,
+            const snapshot = await githubPrFeedback(
+              cachedFetch,
               access.token,
               ref.owner,
               ref.repo,
               target.build.prNumber,
             );
-            const permissions = new Map<string, boolean>();
-            for (const comment of comments) {
+            const cursorId =
+              `github-feedback-baseline:${target.todo.teamId}:${ref.owner}/${ref.repo}:${target.build.prNumber}`.toLowerCase();
+            const cursor = deps.db.select().from(message).where(eq(message.id, cursorId)).get();
+            if (cursor === undefined) {
+              deps.db
+                .insert(message)
+                .values({
+                  id: cursorId,
+                  conversationId: target.build.id,
+                  role: 'system',
+                  content: { kind: 'github_feedback_baseline', ...snapshot.highWater },
+                  createdAt: nowMs(),
+                })
+                .onConflictDoNothing()
+                .run();
+              continue;
+            }
+            const highWater = feedbackHighWaterSchema.parse(cursor.content);
+            const login = deps.db
+              .select({ login: githubConnection.login })
+              .from(githubConnection)
+              .where(eq(githubConnection.teamId, target.todo.teamId))
+              .get()
+              ?.login.toLowerCase();
+            for (const comment of snapshot.comments) {
+              if (comment.id <= highWater[comment.kind]) continue;
+              if (
+                comment.author.toLowerCase() === login &&
+                pull.openerLogin?.toLowerCase() === login
+              )
+                continue;
               const id =
                 `github-feedback:${target.todo.teamId}:${ref.owner}/${ref.repo}:${comment.key}`.toLowerCase();
               const dispatchedId = `dispatched:${id}`;
@@ -80,7 +121,9 @@ export function createPrFeedbackPoller(
                   .get()
               )
                 continue;
-              let allowed = permissions.get(comment.author.toLowerCase());
+              const permissionKey = `${access.token}:${`${ref.owner}/${ref.repo}:${comment.author}`.toLowerCase()}`;
+              const cached = permissions.get(permissionKey);
+              let allowed = cached && cached.expiresAt > nowMs() ? cached.allowed : undefined;
               if (allowed === undefined) {
                 const permission = await githubCollaboratorPermission(
                   run.githubFetch,
@@ -93,7 +136,7 @@ export function createPrFeedbackPoller(
                   permission !== null &&
                   (['write', 'admin', 'maintain'].includes(permission.permission) ||
                     ['write', 'admin', 'maintain'].includes(permission.roleName ?? ''));
-                permissions.set(comment.author.toLowerCase(), allowed);
+                permissions.set(permissionKey, { allowed, expiresAt: nowMs() + 5 * 60_000 });
               }
               if (!allowed) continue;
               const content = `PR #${target.build.prNumber} feedback from ${comment.author}. Continue this Thread with the requested changes.\n\nGitHub feedback data:\n${neutralizeIssueAttachmentTokens(JSON.stringify(comment.body))}`;

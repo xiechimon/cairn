@@ -3,25 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { ratchetLintBaseline, tightenBaseline } from './gardener-ratchet.mjs';
-
-test('lowers the baseline by exactly one step with measured headroom', () => {
-  assert.equal(tightenBaseline(12, 3), 11);
-  assert.equal(tightenBaseline(1, 0), 0);
-});
-
-test('does nothing at or above the baseline or at zero', () => {
-  assert.equal(tightenBaseline(12, 12), 12);
-  assert.equal(tightenBaseline(12, 13), 12);
-  assert.equal(tightenBaseline(0, 0), 0);
-});
-
-test('rejects invalid measurements instead of lowering a baseline', () => {
-  for (const value of [-1, 0.5, NaN, Infinity, undefined]) {
-    assert.throws(() => tightenBaseline(12, value));
-    assert.throws(() => tightenBaseline(value, 0));
-  }
-});
+import { ratchetLintBaseline } from './gardener-ratchet.mjs';
 
 test('the weekly timer runs the measured ratchet in the configured repository', () => {
   const unit = readFileSync(
@@ -39,7 +21,7 @@ test('the weekly timer runs the measured ratchet in the configured repository', 
   assert.match(timer, /Persistent=true/);
 });
 
-test('the job persists one step and preserves the file on no-op or failed measurement', () => {
+test('the weekly job reports measurements without editing the configured checkout', () => {
   const repo = mkdtempSync(join(tmpdir(), 'gardener-ratchet-'));
   try {
     mkdirSync(join(repo, 'scripts'));
@@ -54,10 +36,10 @@ test('the job persists one step and preserves the file on no-op or failed measur
     };
     assert.deepEqual(ratchetLintBaseline(repo, run(0, 'Checked 42 files. Found 3 warnings.')), {
       before: 12,
-      after: 11,
+      after: 12,
       measured: 3,
     });
-    assert.deepEqual(JSON.parse(readFileSync(path, 'utf8')), { maxWarnings: 11, scope: 'lint' });
+    assert.equal(readFileSync(path, 'utf8'), original);
     writeFileSync(path, original);
     assert.equal(
       ratchetLintBaseline(repo, run(0, 'Checked 42 files. Found 12 warnings.')).after,
@@ -74,6 +56,18 @@ test('the job persists one step and preserves the file on no-op or failed measur
     assert.throws(() =>
       ratchetLintBaseline(repo, run(0, 'Checked 42 files. Found unknown warnings.')),
     );
+    writeFileSync(path, JSON.stringify({ maxWarnings: 0 }));
+    assert.deepEqual(ratchetLintBaseline(repo, run(0, 'Checked 42 files.')), {
+      before: 0,
+      after: 0,
+      measured: 0,
+    });
+    assert.deepEqual(JSON.parse(readFileSync(path, 'utf8')), { maxWarnings: 0 });
+    for (const value of [-1, 0.5, null]) {
+      writeFileSync(path, JSON.stringify({ maxWarnings: value }));
+      assert.throws(() => ratchetLintBaseline(repo, run(0, 'Checked 42 files.')));
+    }
+    writeFileSync(path, original);
     const ansiEscape = String.fromCharCode(27);
     assert.equal(
       ratchetLintBaseline(

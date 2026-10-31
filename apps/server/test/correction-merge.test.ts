@@ -91,3 +91,23 @@ test('an unreadable correction diff stays a transient read failure', () => {
     expect.objectContaining({ code: 'patch-unavailable', class: 'transient' }),
   ]);
 });
+
+test.each(['modified', 'renamed', 'removed'] as const)(
+  'a %s test or workflow is not a newly added correction guard',
+  (status) => {
+    for (const path of [
+      'apps/server/test/fix.test.ts',
+      '.github/workflows/guard.yml',
+      'scripts/check-gate.mjs',
+    ]) {
+      const i = input(path);
+      if (typeof i.compare !== 'object') throw new Error('Missing compare fixture');
+      i.compare.files[0]!.status = status;
+      expect(mergeReadiness(i).blockers).toContainEqual(
+        expect.objectContaining({
+          detail: expect.arrayContaining([expect.stringMatching(/Correction/)]),
+        }),
+      );
+    }
+  },
+);

@@ -437,7 +437,7 @@ export function updateTodo(
     if (row.phase === 'done' && patch.phase === 'review' && !row.hasChanges) {
       throw new HttpError(409, '无变更产物的已完成任务不能拖回待处理（没有可重开验收的东西）');
     }
-    if (patch.phase === 'done' || patch.phase === 'closed') assertCorrectionDone(db, row);
+    if (patch.phase === 'done') assertCorrectionDone(db, row);
     sets.phase = patch.phase;
     sets.phaseAt = nowMs();
   }
@@ -582,7 +582,6 @@ export function setTodoPhase(
     return record;
   }
   assertPhaseTransition(row.phase, to);
-  if (to === 'done' || to === 'closed') assertCorrectionDone(db, row);
   db.update(todo)
     .set({ ...extra, phase: to, phaseAt: nowMs(), v: row.v + 1 })
     .where(eq(todo.id, id))

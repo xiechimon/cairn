@@ -1,5 +1,5 @@
 [Unit]
-Description=Tighten the Cairn lint debt baseline by one measured step
+Description=Report the Cairn lint warning measurement
 
 [Service]
 Type=oneshot

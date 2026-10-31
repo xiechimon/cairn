@@ -1,13 +1,7 @@
 import { spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-
-export function tightenBaseline(baseline, measured) {
-  if (![baseline, measured].every((n) => Number.isSafeInteger(n) && n >= 0))
-    throw new Error('Baseline and measurement must be non-negative integers');
-  return measured < baseline ? baseline - 1 : baseline;
-}
 
 export function ratchetLintBaseline(repo, run = spawnSync) {
   const result = run('pnpm', ['exec', 'biome', 'ci', '.'], { cwd: repo, encoding: 'utf8' });
@@ -21,11 +15,9 @@ export function ratchetLintBaseline(repo, run = spawnSync) {
   const measured = count ? Number(count[1]) : 0;
   const path = join(repo, 'scripts/lint-warning-baseline.json');
   const baseline = JSON.parse(readFileSync(path, 'utf8'));
-  const next = tightenBaseline(baseline.maxWarnings, measured);
-  if (next !== baseline.maxWarnings) {
-    writeFileSync(path, `${JSON.stringify({ ...baseline, maxWarnings: next }, null, 2)}\n`);
-  }
-  return { before: baseline.maxWarnings, after: next, measured };
+  if (![baseline.maxWarnings, measured].every((n) => Number.isSafeInteger(n) && n >= 0))
+    throw new Error('Baseline and measurement must be non-negative integers');
+  return { before: baseline.maxWarnings, after: baseline.maxWarnings, measured };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

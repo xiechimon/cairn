@@ -96,9 +96,11 @@ export async function localGateFacts(
       headSha,
       compareFiles !== 'malformed'
         ? correctionDoneCheck(
-            compareFiles
-              .filter((file) => file.status !== 'removed')
-              .map((file) => ({ path: file.filename, additions: file.additions })),
+            compareFiles.map((file) => ({
+              path: file.filename,
+              additions: file.additions,
+              status: file.status,
+            })),
           )
         : null,
     );

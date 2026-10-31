@@ -1,3 +1,4 @@
+import { conversationBranch } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test, vi } from 'vitest';
 import {
@@ -12,14 +13,17 @@ import {
   step,
   todo,
 } from '../src/db/schema.js';
+import { finishTodoDone, requestMerge } from '../src/services/builds.js';
+import { createCiPoller } from '../src/services/ci-loop.js';
 import { recordCorrectionGuard } from '../src/services/correction.js';
+import { DONE_ROW } from '../src/services/delivery-rows.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { createIssueIntake } from '../src/services/issue-intake.js';
 import { correctionDoneCheck } from '../src/services/merge-gate/correction.js';
 import { createPrFeedbackPoller, PR_FEEDBACK_INTERVAL_MS } from '../src/services/pr-feedback.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import { createTodo, setTodoPhase, updateTodo } from '../src/services/todos.js';
-import { githubFake } from './fakes/github.js';
+import { githubFake, mergeGithubFake } from './fakes/github.js';
 import { bootServer, req } from './helpers.js';
 
 const REPO = 'octo/demo';
@@ -30,7 +34,7 @@ const feedback = (id: number, login = 'reviewer', body = `Fix case ${id}`) => ({
   created_at: '2026-10-31T00:00:00Z',
 });
 
-async function world() {
+async function world(prime = true) {
   const gh = githubFake(REPO);
   gh.state.permissions.set('reviewer', { body: { permission: 'write', role_name: 'write' } });
   const s = bootServer({ githubFetch: gh.impl });
@@ -84,6 +88,7 @@ async function world() {
     .run();
   gh.state.pulls.set(42, { state: 'open', merged: false });
   const deps = { ...s.svc, box: s.secretBox, githubFetch: gh.impl };
+  if (prime) await createPrFeedbackPoller(deps, { githubFetch: gh.impl }).sweep();
   return { s, gh, deps, projectId, task };
 }
 
@@ -92,6 +97,90 @@ function userMessages(s: ReturnType<typeof bootServer>) {
 }
 
 describe('PR feedback backflow', () => {
+  test('first sight persists historical high-water marks across restart and only dispatches newer feedback once', async () => {
+    const { s, gh, deps } = await world(false);
+    gh.state.comments.set(42, [feedback(50)]);
+    gh.state.reviewComments.set(42, [feedback(70)]);
+    gh.state.reviews.set(42, [{ ...feedback(90), state: 'CHANGES_REQUESTED' }]);
+    await createPrFeedbackPoller(deps, { githubFetch: gh.impl }).sweep();
+    expect(userMessages(s)).toHaveLength(0);
+    expect(s.db.select().from(step).all()).toHaveLength(0);
+    const restarted = createPrFeedbackPoller(deps, { githubFetch: gh.impl });
+    await restarted.sweep();
+    gh.state.comments.set(42, [feedback(50), feedback(51)]);
+    await restarted.sweep();
+    await createPrFeedbackPoller(deps, { githubFetch: gh.impl }).sweep();
+    expect(userMessages(s)).toHaveLength(1);
+    expect(userMessages(s)[0]?.content).toContain('Fix case 51');
+  });
+
+  test('unchanged sweeps use four conditional reads and cache collaborator permission until its TTL expires', async () => {
+    const { s, gh, deps } = await world();
+    const poller = createPrFeedbackPoller(deps, { githubFetch: gh.impl });
+    const now = vi.spyOn(Date, 'now').mockReturnValue(Date.now());
+    try {
+      gh.state.reviewComments.set(42, [feedback(1, 'reader')]);
+      await poller.sweep();
+      const before = gh.calls.length;
+      await poller.sweep();
+      expect(gh.calls.slice(before).map((call) => call.status)).toEqual([304, 304, 304, 304]);
+      expect(gh.permissionReads('reader')).toHaveLength(1);
+      now.mockReturnValue(now() + 60 * 60_000);
+      await poller.sweep();
+      expect(gh.permissionReads('reader')).toHaveLength(2);
+      expect(userMessages(s)).toHaveLength(0);
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  test('generated markers and token-owner self-comments never feed back, while another author can comment', async () => {
+    const { s, gh, deps } = await world();
+    gh.state.pulls.set(42, { state: 'open', merged: false, user: { login: 'owner' } });
+    gh.state.permissions.set('owner', { body: { permission: 'admin' } });
+    gh.state.reviewComments.set(42, [
+      feedback(1, 'owner'),
+      feedback(2, 'reviewer', '<!-- review-gate:abc --> PASS'),
+      feedback(3, 'reviewer', '<!-- review-gate-pending:abc --> Pending'),
+      feedback(4, 'reviewer', '<!-- cairn-dedupe: test --> Generated'),
+      feedback(5),
+    ]);
+    await createPrFeedbackPoller(deps, { githubFetch: gh.impl }).sweep();
+    expect(userMessages(s)).toHaveLength(1);
+    expect(userMessages(s)[0]?.content).toContain('Fix case 5');
+    expect(gh.permissionReads('owner')).toHaveLength(0);
+  });
+
+  test('issue comments, inline comments and reviews are spliced in creation order', async () => {
+    const { s, gh, deps } = await world();
+    s.db
+      .insert(step)
+      .values({
+        id: 'ordered',
+        buildId: 'build-feedback',
+        kind: 'build',
+        status: 'claimed',
+        createdAt: 1,
+      })
+      .run();
+    gh.state.comments.set(42, [{ ...feedback(3), created_at: '2026-10-31T00:03:00Z' }]);
+    gh.state.reviewComments.set(42, [{ ...feedback(1), created_at: '2026-10-31T00:01:00Z' }]);
+    gh.state.reviews.set(42, [
+      {
+        id: 2,
+        user: { login: 'reviewer' },
+        body: 'Fix case 2',
+        submitted_at: '2026-10-31T00:02:00Z',
+        state: 'CHANGES_REQUESTED',
+      },
+      { id: 4, user: { login: 'reviewer' }, body: null, submitted_at: null, state: 'PENDING' },
+    ]);
+    await createPrFeedbackPoller(deps, { githubFetch: gh.impl }).sweep();
+    const content = s.db.select().from(steerPending).get()!.content;
+    expect(content.indexOf('Fix case 1')).toBeLessThan(content.indexOf('Fix case 2'));
+    expect(content.indexOf('Fix case 2')).toBeLessThan(content.indexOf('Fix case 3'));
+  });
+
   test('one poll delivers one user message, wakes the same Thread and leaves merge-gate state unchanged across restarts', async () => {
     const { s, gh, deps } = await world();
     gh.state.reviewComments.set(42, [feedback(1)]);
@@ -328,6 +417,120 @@ describe('PR feedback backflow', () => {
 });
 
 describe('correction loop', () => {
+  test.each(['internal', 'manual'] as const)(
+    'a correction can be abandoned through the %s phase path without a guard',
+    async (path) => {
+      const { s, deps, task, projectId } = await world();
+      const res = await req(s.app, 'POST', `/api/projects/${projectId}/tags`, {
+        name: 'correction',
+        color: '#000000',
+      });
+      const label = (await res.json()) as { id: string };
+      updateTodo(deps, task.id, { tagIds: [label.id] });
+      const closed =
+        path === 'manual'
+          ? updateTodo(deps, task.id, { phase: 'closed' }, { manualPhase: true })
+          : setTodoPhase(deps, task.id, 'closed');
+      expect(closed?.phase).toBe('closed');
+    },
+  );
+
+  test('merged correction reconciliation settles once with one merge row and one completion row without a guard', async () => {
+    const { s, deps, task, projectId } = await world();
+    const res = await req(s.app, 'POST', `/api/projects/${projectId}/tags`, {
+      name: 'correction',
+      color: '#000000',
+    });
+    updateTodo(deps, task.id, { tagIds: [((await res.json()) as { id: string }).id] });
+    const gh = mergeGithubFake({ 42: { state: 'closed', merged: true } }, () =>
+      conversationBranch('build-feedback'),
+    );
+    const poller = createCiPoller({ ...deps, githubFetch: gh.fetch }, { githubFetch: gh.fetch });
+    await poller.sweep();
+    expect(s.db.select().from(todo).where(eq(todo.id, task.id)).get()?.phase).toBe('done');
+    const rows = s.db.select().from(message).all();
+    expect(rows.filter((row) => String(row.content).startsWith('PR #42'))).toHaveLength(1);
+    expect(rows.filter((row) => row.content === DONE_ROW)).toHaveLength(1);
+    await poller.sweep(Date.now() + 60_000);
+    await createCiPoller({ ...deps, githubFetch: gh.fetch }, { githubFetch: gh.fetch }).sweep();
+    expect(s.db.select().from(message).all()).toEqual(rows);
+  });
+
+  test('the API merge gate rejects an unguarded correction before any GitHub merge request', async () => {
+    const { s, deps, task, projectId } = await world();
+    const res = await req(s.app, 'POST', `/api/projects/${projectId}/tags`, {
+      name: 'correction',
+      color: '#000000',
+    });
+    updateTodo(deps, task.id, { tagIds: [((await res.json()) as { id: string }).id] });
+    const gh = mergeGithubFake({ 42: { state: 'open', merged: false } }, () =>
+      conversationBranch('build-feedback'),
+    );
+    s.db
+      .insert(step)
+      .values({
+        id: 'pushed',
+        buildId: 'build-feedback',
+        kind: 'build',
+        status: 'done',
+        checkpointCommit: '1a2b3c4d'.repeat(5),
+        createdAt: 1,
+      })
+      .run();
+    await expect(
+      requestMerge({ ...deps, githubFetch: gh.fetch }, 'build-feedback'),
+    ).rejects.toThrow(/Correction.*test or gate/);
+    expect(gh.puts()).toHaveLength(0);
+    expect(s.db.select().from(todo).where(eq(todo.id, task.id)).get()?.phase).toBe('review');
+  });
+
+  test('the API correction merge completes after GitHub merges even if guard proof disappears during settlement', async () => {
+    const { s, deps, task, projectId } = await world();
+    const res = await req(s.app, 'POST', `/api/projects/${projectId}/tags`, {
+      name: 'correction',
+      color: '#000000',
+    });
+    updateTodo(deps, task.id, { tagIds: [((await res.json()) as { id: string }).id] });
+    const checkpoint = '1a2b3c4d'.repeat(5);
+    s.db
+      .insert(step)
+      .values({
+        id: 'pushed',
+        buildId: 'build-feedback',
+        kind: 'build',
+        status: 'done',
+        checkpointCommit: checkpoint,
+        createdAt: 1,
+      })
+      .run();
+    recordCorrectionGuard(s.db, 'build-feedback', checkpoint, true);
+    const gh = mergeGithubFake({ 42: { state: 'open', merged: false } }, () =>
+      conversationBranch('build-feedback'),
+    );
+    gh.onPut = () => {
+      s.db
+        .delete(message)
+        .where(eq(message.id, `correction-guard:build-feedback:${checkpoint}`))
+        .run();
+    };
+    await expect(
+      requestMerge({ ...deps, githubFetch: gh.fetch }, 'build-feedback'),
+    ).resolves.toEqual({ delegated: true });
+    expect(gh.puts()).toHaveLength(1);
+    expect(s.db.select().from(todo).where(eq(todo.id, task.id)).get()?.phase).toBe('done');
+  });
+
+  test('post-merge completion does not reapply the correction guard', async () => {
+    const { s, deps, task, projectId } = await world();
+    const res = await req(s.app, 'POST', `/api/projects/${projectId}/tags`, {
+      name: 'correction',
+      color: '#000000',
+    });
+    updateTodo(deps, task.id, { tagIds: [((await res.json()) as { id: string }).id] });
+    expect(() => finishTodoDone(deps, task.id, 'build-feedback')).not.toThrow();
+    expect(s.db.select().from(todo).where(eq(todo.id, task.id)).get()?.phase).toBe('done');
+  });
+
   test('a correction issue creates exactly one todo and a Coordinator prompt requiring the highest feasible guard and negative control', async () => {
     const { s, gh, deps } = await world();
     gh.state.open.push({
@@ -388,7 +591,7 @@ describe('correction loop', () => {
     expect(prompts).toContain('negative control');
     expect(prompts).toContain('highest feasible guard');
     expect(prompts).toContain('lint');
-    expect(() => setTodoPhase(deps, tasks[0]!.id, 'closed')).toThrow(/test or gate/);
+    expect(setTodoPhase(deps, tasks[0]!.id, 'closed')?.phase).toBe('closed');
   });
 
   test.each(['checkpoint', 'ahead'] as const)(
@@ -426,19 +629,27 @@ describe('correction loop', () => {
           evaluatedAt: 1,
         })
         .run();
-      expect(() => setTodoPhase(deps, task.id, 'done')).toThrow(/test or gate/);
+      expect(() => updateTodo(deps, task.id, { phase: 'done' }, { manualPhase: true })).toThrow(
+        /test or gate/,
+      );
       recordCorrectionGuard(s.db, 'build-feedback', 'c'.repeat(40), true);
-      expect(() => setTodoPhase(deps, task.id, 'done')).toThrow(/test or gate/);
+      expect(() => updateTodo(deps, task.id, { phase: 'done' }, { manualPhase: true })).toThrow(
+        /test or gate/,
+      );
       recordCorrectionGuard(s.db, 'build-feedback', checkpoint, false);
       recordCorrectionGuard(s.db, 'build-feedback', head, false);
-      expect(() => setTodoPhase(deps, task.id, 'done')).toThrow(/test or gate/);
+      expect(() => updateTodo(deps, task.id, { phase: 'done' }, { manualPhase: true })).toThrow(
+        /test or gate/,
+      );
       recordCorrectionGuard(s.db, 'build-feedback', head, true);
       recordCorrectionGuard(s.db, 'build-feedback', head, null);
-      expect(setTodoPhase(deps, task.id, 'done')?.phase).toBe('done');
+      expect(updateTodo(deps, task.id, { phase: 'done' }, { manualPhase: true })?.phase).toBe(
+        'done',
+      );
     },
   );
 
-  test('done and manual close fail without a test or gate in the delivered diff; an added guard permits completion', async () => {
+  test('manual done fails without a test or gate in the delivered diff; an added guard permits completion', async () => {
     const { s, deps, task, projectId } = await world();
     const imported = await req(s.app, 'POST', `/api/projects/${projectId}/tags`, {
       name: 'correction',
@@ -447,41 +658,56 @@ describe('correction loop', () => {
     expect(imported.status).toBe(201);
     const correctionTag = (await imported.json()) as { id: string };
     updateTodo(deps, task.id, { tagIds: [correctionTag.id] });
-    expect(() => setTodoPhase(deps, task.id, 'done')).toThrow(/test or gate/);
     expect(() => updateTodo(deps, task.id, { phase: 'done' }, { manualPhase: true })).toThrow(
       /test or gate/,
     );
-    const file = { path: 'apps/server/src/fix.ts', additions: 2, deletions: 0, hunks: [] };
+    expect(() => updateTodo(deps, task.id, { phase: 'done' }, { manualPhase: true })).toThrow(
+      /test or gate/,
+    );
+    const file = {
+      status: 'added' as const,
+      path: 'apps/server/src/fix.ts',
+      additions: 2,
+      deletions: 0,
+      hunks: [],
+    };
     s.db
       .update(build)
       .set({ changes: [file] })
       .run();
-    expect(() => setTodoPhase(deps, task.id, 'done')).toThrow(/test or gate/);
+    expect(() => updateTodo(deps, task.id, { phase: 'done' }, { manualPhase: true })).toThrow(
+      /test or gate/,
+    );
     s.db
       .update(build)
       .set({
         changes: [{ ...file, path: 'apps/server/test/fix.test.ts', additions: 0, deletions: 3 }],
       })
       .run();
-    expect(() => setTodoPhase(deps, task.id, 'done')).toThrow(/test or gate/);
+    expect(() => updateTodo(deps, task.id, { phase: 'done' }, { manualPhase: true })).toThrow(
+      /test or gate/,
+    );
     s.db
       .update(build)
       .set({ changes: [{ ...file, path: 'apps/server/test/fix.test.ts' }] })
       .run();
-    expect(setTodoPhase(deps, task.id, 'done')?.phase).toBe('done');
+    expect(updateTodo(deps, task.id, { phase: 'done' }, { manualPhase: true })?.phase).toBe('done');
   });
 });
 
 test.each([
+  [[{ path: 'apps/server/test/fix.test.ts', additions: 1, status: 'modified' }], false],
+  [[{ path: '.github/workflows/guard.yml', additions: 1, status: 'modified' }], false],
+  [[{ path: 'scripts/new-gate.mjs', additions: 1, status: 'modified' }], false],
   [null, false],
   [[], false],
   [[{ path: 'docs/new-gate.md', additions: 10 }], false],
   [[{ path: 'apps/server/test/fix.test.ts', additions: 0 }], false],
-  [[{ path: 'apps/server/test/fix.test.ts', additions: 1 }], true],
-  [[{ path: 'scripts/new-gate.mjs', additions: 1 }], true],
-  [[{ path: 'scripts/new-gate.py', additions: 1 }], true],
-  [[{ path: 'scripts/new-gate.test.py', additions: 1 }], true],
-  [[{ path: '.github/workflows/guard.yml', additions: 1 }], true],
+  [[{ path: 'apps/server/test/fix.test.ts', additions: 1, status: 'added' }], true],
+  [[{ path: 'scripts/new-gate.mjs', additions: 1, status: 'added' }], true],
+  [[{ path: 'scripts/new-gate.py', additions: 1, status: 'added' }], true],
+  [[{ path: 'scripts/new-gate.test.py', additions: 1, status: 'added' }], true],
+  [[{ path: '.github/workflows/guard.yml', additions: 1, status: 'added' }], true],
 ] as const)('correction done check %j returns %s', (files, allowed) => {
   expect(correctionDoneCheck(files)).toBe(allowed);
 });
