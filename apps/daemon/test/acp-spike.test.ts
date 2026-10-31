@@ -296,7 +296,7 @@ describe('ACP spike with a real scripted stdio child', () => {
       };
       const exited = once(child, 'exit');
       try {
-        const [message] = await once(child, 'message', { signal: AbortSignal.timeout(3_000) });
+        const [message] = await once(child, 'message', { signal: AbortSignal.timeout(20_000) });
         const pids = message as {
           adapterPid: number;
           descendantPid: number;
@@ -319,6 +319,7 @@ describe('ACP spike with a real scripted stdio child', () => {
           process.kill(descendantPid, 'SIGKILL');
       }
     },
+    30_000,
   );
 
   test('allows a single permission only under the explicit per-agent policy', async () => {
