@@ -212,7 +212,17 @@ describe('protocol vocabulary snapshot (02 §5/§6 canonical)', () => {
   });
 
   it('MCP server surface: 24-tool whitelist + six capability groups (02 §7.2)', () => {
-    expect({ MCP_TOOLS_READ, MCP_TOOLS_WRITE, MCP_CAPABILITY_GROUPS }).toMatchSnapshot();
+    expect({
+      MCP_TOOLS_READ: MCP_TOOLS_READ.slice(0, 11),
+      MCP_TOOLS_WRITE: MCP_TOOLS_WRITE.slice(0, 13),
+      MCP_CAPABILITY_GROUPS,
+    }).toMatchSnapshot();
+    expect(MCP_TOOLS_READ.slice(11)).toEqual([
+      'Threads Waiting on Me',
+      'Read Thread',
+      'Thread Pull Requests',
+    ]);
+    expect(MCP_TOOLS_WRITE.slice(13)).toEqual(['Start Thread', 'Reply Thread']);
   });
 
   it('provider presets 38-item catalog (r3 §2/02 §6.2)', () => {

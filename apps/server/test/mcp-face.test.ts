@@ -88,7 +88,7 @@ describe('/api/mcp auth surface (02 section 7.2: Bearer <apiKey>; mcpAccess gate
   });
 });
 
-describe('/api/mcp 24-tool whitelist shape-preserving (02/A10; r3 section 6 matrix 1:1)', () => {
+describe('/api/mcp tool whitelist preserves legacy tools and adds Thread entry', () => {
   test('initialize → serverInfo + capabilities.tools', async () => {
     const s = bootServer();
     const key = await issueMcpKey(s, { read: ALL_READ, write: ALL_WRITE });
@@ -104,14 +104,14 @@ describe('/api/mcp 24-tool whitelist shape-preserving (02/A10; r3 section 6 matr
     s.dispose();
   });
 
-  test('full grant -> tools/list exactly 24 items = registry list (11 read + 13 write)', async () => {
+  test('full grant -> tools/list exactly 29 items = registry list (14 read + 15 write)', async () => {
     const s = bootServer();
     const key = await issueMcpKey(s, { read: ALL_READ, write: ALL_WRITE });
     const res = await rpc(s.app, key, 'tools/list', {});
     const body = res.body as JsonRpcResponse;
     const names = (body.result?.tools ?? []).map((t) => t.name).sort();
     expect(names).toEqual(MCP_TOOL_REGISTRY.map((t) => t.name).sort());
-    expect(names).toHaveLength(24);
+    expect(names).toHaveLength(29);
     s.dispose();
   });
 
@@ -130,6 +130,20 @@ describe('/api/mcp 24-tool whitelist shape-preserving (02/A10; r3 section 6 matr
     })) as { body: JsonRpcResponse };
     const b = denied.body;
     expect(b.error !== undefined || b.result?.isError === true).toBe(true);
+    s.dispose();
+  });
+
+  test('a grant only counts in the column of its tool kind: write tools in the read list and read tools in the write list register nothing', async () => {
+    const s = bootServer();
+    const key = await issueMcpKey(s, { read: ['Merge Builds', 'Create Todo'], write: ['Todos'] });
+    const list = (await rpc(s.app, key, 'tools/list', {})).body as JsonRpcResponse;
+    expect(list.result?.tools ?? []).toEqual([]);
+    const denied = (await rpc(s.app, key, 'tools/call', {
+      name: 'create_todo',
+      arguments: { title: 'should not exist' },
+    })) as { body: JsonRpcResponse };
+    expect(denied.body.error !== undefined || denied.body.result?.isError === true).toBe(true);
+    expect(s.db.select().from(todoTable).all()).toEqual([]);
     s.dispose();
   });
 

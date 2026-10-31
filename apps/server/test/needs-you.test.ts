@@ -211,6 +211,25 @@ describe('needs you (#1800)', () => {
     ).toEqual(['confirm']);
   });
 
+  test('a transient failure of a scheduled continuation is not retried and enters the current group', async () => {
+    const w = openWorld();
+    w.s.db
+      .update(stepTable)
+      .set({ scheduleId: 'once', scheduledBy: w.s.user.id })
+      .where(eq(stepTable.id, w.stepId))
+      .run();
+    w.s.db.update(buildTable).set({ prevPhase: 'done' }).where(eq(buildTable.id, w.buildId)).run();
+    const step = w.s.db.select().from(stepTable).where(eq(stepTable.id, w.stepId)).get();
+    if (step === undefined) throw new Error('missing step');
+    applyStepFailure(w.deps, step, 'connection reset by peer');
+    const builds = buildCount(w);
+    await sweepFailedRetries(w.deps);
+
+    expect(phaseOf(w)).toBe('failed');
+    expect(buildCount(w)).toBe(builds);
+    expect(groups(w).current.map((entry) => entry.reason)).toEqual(['failed']);
+  });
+
   test('the scheduler tick retries a transient failure', async () => {
     const w = openWorld();
     const step = w.s.db.select().from(stepTable).where(eq(stepTable.id, w.stepId)).get();

@@ -542,7 +542,11 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     agentTodo = null,
   } = input;
   const head: TranscriptItem[] = [];
-  if (build?.triggerSource === 'schedule') head.push({ kind: 'scheduled' });
+  if (
+    build?.triggerSource === 'schedule' &&
+    !messages.some((m) => m.role === 'system' && systemKindOf(m.content) === 'schedule-wake')
+  )
+    head.push({ kind: 'scheduled' });
   if (build?.triggerSource === 'chief') head.push({ kind: 'chief' });
   if (build) {
     const cancelled = steps.some((s) => s.status === 'stopped');
@@ -575,6 +579,13 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       toolNameByResult.set(pairedText, paired.name);
   }
 
+  const scheduledStepIds = new Set(
+    messages.flatMap((m) => {
+      if (m.role !== 'system' || systemKindOf(m.content) !== 'schedule-wake') return [];
+      const wake = JSON.parse(m.content as string) as { stepId?: unknown };
+      return typeof wake.stepId === 'string' ? [wake.stepId] : [];
+    }),
+  );
   const claimedSince = steps.find((s) => s.status === 'claimed')?.createdAt ?? null;
   const entries: TimelineEntry[] = [];
   let previousAt: number | null = null;
@@ -604,6 +615,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     }
     const text = textOfContent(m.content).trim();
     if (m.role === 'user') {
+      if ([...scheduledStepIds].some((id) => m.id === transcriptPromptRowId(id))) continue;
       if (GATE_ANNOUNCEMENTS.includes(text)) {
         entries.push({
           at: m.createdAt,
@@ -617,6 +629,15 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     }
     if (m.role === 'system') {
       if (systemKindOf(m.content) !== null) {
+        if (systemKindOf(m.content) === 'schedule-wake') {
+          const wake = JSON.parse(m.content as string) as { stepId?: unknown };
+          if (typeof wake.stepId === 'string')
+            entries.push({
+              at: m.createdAt,
+              item: { kind: 'scheduled', id: m.id, stepId: wake.stepId },
+            });
+          continue;
+        }
         const verdict = reviewVerdictOfContent(m.content);
         if (verdict !== null) {
           entries.push({ at: m.createdAt, item: { kind: 'review', ...verdict, id: m.id } });
@@ -682,7 +703,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
   });
   if (build?.withPlan === true) {
     for (const s of steps) {
-      if (s.kind === 'build') {
+      if (s.kind === 'build' && !scheduledStepIds.has(s.id)) {
         entries.push({ at: s.createdAt, item: { kind: 'user', text: '确认' } });
       }
     }
@@ -786,7 +807,28 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       body: failGuidanceBody(classifyStepFailure(build.errorMessage)),
     });
   }
-  return items;
+  const folded: TranscriptItem[] = [];
+  for (let index = 0; index < items.length; index++) {
+    const item = items[index];
+    if (!item) continue;
+    folded.push(item);
+    if (
+      item.kind !== 'scheduled' ||
+      !item.stepId ||
+      steps.find((s) => s.id === item.stepId)?.status !== 'done'
+    )
+      continue;
+    const turn: TranscriptItem[] = [];
+    while (index + 1 < items.length) {
+      const next = items[index + 1];
+      if (!next || ['user', 'scheduled', 'streaming', 'fail'].includes(next.kind)) break;
+      turn.push(next);
+      index++;
+    }
+    folded.push({ kind: 'scheduled-turn', id: `turn-${item.stepId}`, items: turn });
+    folded.push({ kind: 'automation-completed', id: `completed-${item.stepId}` });
+  }
+  return folded;
 }
 
 function failGuidanceBody(kind: ReturnType<typeof classifyStepFailure>): string {

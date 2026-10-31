@@ -5,6 +5,7 @@ import {
   machineAgentTodoBodySchema,
   machineAskBodySchema,
   machineClaimBodySchema,
+  machineClosedOrbsBodySchema,
   machineDoneBodySchema,
   machineEnrollBodySchema,
   machineEnrollConfirmBodySchema,
@@ -23,10 +24,12 @@ import {
   SESSION_FILE_NAME,
   transcriptUploadSchema,
 } from '@cairn/shared';
+import { and, eq, inArray, isNotNull, or } from 'drizzle-orm';
 import type { Context, Hono } from 'hono';
+import { bodyLimit } from 'hono/body-limit';
 import { streamSSE } from 'hono/streaming';
 import type { AppContext } from './context.js';
-import type { machine as machineTable } from './db/schema.js';
+import { build, type machine as machineTable, step, todo } from './db/schema.js';
 import { HttpError, parseWith } from './lib/errors.js';
 import { newRecordId } from './lib/ids.js';
 import { matchesAllowlistedTailscaleIdentity, matchesAuthToken } from './lib/token-auth.js';
@@ -131,6 +134,8 @@ function bearer(c: Context): string | null {
 function unauthorized(): HttpError {
   return new HttpError(401, 'unauthorized');
 }
+
+const CLOSED_ORBS_MAX_BODY_BYTES = 64 * 1024;
 
 async function jsonBody(c: Context): Promise<unknown> {
   return c.req.json().catch(() => null);
@@ -257,6 +262,34 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
     const row = me(c);
     return c.json(toMachineRecord(row, machineRunningCount(deps.db, row.id)));
   });
+
+  app.post(
+    '/api/machine/orbs/closed',
+    bodyLimit({
+      maxSize: CLOSED_ORBS_MAX_BODY_BYTES,
+      onError: (c) => c.json({ error: 'orb cleanup body too large' }, 413),
+    }),
+    async (c) => {
+      const row = me(c);
+      const body = parseWith(machineClosedOrbsBodySchema, await jsonBody(c), 'body');
+      if (body.conversationIds.length === 0) return c.json([]);
+      const closed = ctx.db
+        .selectDistinct({ id: build.id })
+        .from(build)
+        .innerJoin(todo, eq(todo.id, build.todoId))
+        .innerJoin(step, eq(step.buildId, build.id))
+        .where(
+          and(
+            inArray(build.id, body.conversationIds),
+            eq(step.machineId, row.id),
+            eq(todo.teamId, row.teamId),
+            or(inArray(todo.phase, ['closed', 'done']), isNotNull(todo.archivedAt)),
+          ),
+        )
+        .all();
+      return c.json(closed.map((conversation) => conversation.id));
+    },
+  );
 
   app.post('/api/machine/presence', async (c) => {
     const row = me(c);

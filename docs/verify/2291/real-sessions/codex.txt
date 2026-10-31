@@ -1,0 +1,44 @@
+===== attempt 1 (without per-run approval override) =====
+thread.started codex_session=01a18eaa-d64b-7333-aae8-3f1392840451
+
+[agent_message] I’ll find the project, start the thread, then read its status before and after sending the follow-up.
+
+>>> mcp_tool_call cairn.projects {} status=failed
+<<< error {"message":"MCP tool call requires approval, but approval policy is never"}
+
+[agent_message] The `projects` call was blocked: “MCP tool call requires approval, but approval policy is never.”
+
+No thread was created, so there are no thread statuses or reply message ID to report.
+
+turn.completed
+
+===== attempt 2 (passing run) =====
+thread.started codex_session=01a18eab-4515-7a93-9be7-074e575ff701
+
+[agent_message] I’ll use the Cairn tools to find the project, start the thread, read its status, send the follow-up, and read it again.
+
+>>> mcp_tool_call cairn.projects {} status=completed
+<<< result [{"id":"B0fy8CIOd9Toiqeklrqny","name":"mcp-entry-2291","repoKind":"local","todoCount":0}]
+
+>>> mcp_tool_call cairn.start_thread {"projectId":"B0fy8CIOd9Toiqeklrqny","content":"Codex real-session check for #2291: please list the files in the repository."} status=completed
+<<< result {"thread":{"id":"chief-01a18eab-702f-7d4a-ae49-0b6c40e11712","projectId":"B0fy8CIOd9Toiqeklrqny","status":"working"},"message":{"id":"DJw1tNi6RIZw7uYxSRHUf","role":"user","content":"Codex real-session check for #2291: please list the files in the repository.","createdAt":1793394962479}}
+
+>>> mcp_tool_call cairn.read_thread {"threadId":"chief-01a18eab-702f-7d4a-ae49-0b6c40e11712"} status=completed
+<<< result {"thread":{"id":"chief-01a18eab-702f-7d4a-ae49-0b6c40e11712","coordinatorId":"chief-Hk2zAqGo6UcIM-fEMwCHR-L1LyVgehLrW8EaGvCXECd","projectId":"B0fy8CIOd9Toiqeklrqny","title":"Codex real-s…","status":"working","updatedAt":1793394962483},"questions":[],"conversation":{"messages":[{"id":"DJw1tNi6RIZw7uYxSRHUf","role":"user","content":"Codex real-session check for #2291: please list the files in the repository.","createdAt":1793394962479}],"truncated":false,"nextBefore":null}}
+
+[agent_message] The first read shows the thread is `working`. I’ll send the follow-up and read it again.
+
+>>> mcp_tool_call cairn.reply_thread {"threadId":"chief-01a18eab-702f-7d4a-ae49-0b6c40e11712","content":"Follow-up from Codex: no code changes needed, just a summary."} status=completed
+<<< result {"threadId":"chief-01a18eab-702f-7d4a-ae49-0b6c40e11712","message":{"id":"CTJz3fR7CJGfEBu-_N3vG","role":"user","content":"Follow-up from Codex: no code changes needed, just a summary.","createdAt":1793394966570},"steered":false}
+
+>>> mcp_tool_call cairn.read_thread {"threadId":"chief-01a18eab-702f-7d4a-ae49-0b6c40e11712"} status=completed
+<<< result {"thread":{"id":"chief-01a18eab-702f-7d4a-ae49-0b6c40e11712","coordinatorId":"chief-Hk2zAqGo6UcIM-fEMwCHR-L1LyVgehLrW8EaGvCXECd","projectId":"B0fy8CIOd9Toiqeklrqny","title":"Codex real-s…","status":"working","updatedAt":1793394966572},"questions":[],"conversation":{"messages":[{"id":"CTJz3fR7CJGfEBu-_N3vG","role":"user","content":"Follow-up from Codex: no code changes needed, just a summary.","createdAt":1793394966570},{"id":"DJw1tNi6RIZw7uYxSRHUf","role":"user","content":"Codex real-session check for #2291: please list the files in the repository.","createdAt":1793394962479}],"truncated":false,"nextBefore":null}}
+
+[agent_message] - Thread id: `chief-01a18eab-702f-7d4a-ae49-0b6c40e11712`
+- Status at creation: `working`
+- First read status: `working`
+- Second read status: `working`
+- Reply message id: `CTJz3fR7CJGfEBu-_N3vG`
+
+turn.completed
+

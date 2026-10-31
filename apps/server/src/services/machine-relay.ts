@@ -24,6 +24,7 @@ import { projectOfTodo } from './git.js';
 import { isChiefConversation, type MachineDeps, ownedStep } from './machines.js';
 import { createLocalSkill, updateLocalSkill } from './skills.js';
 import { resolveFixedTagId, resolveProjectTagIds } from './tags.js';
+import { executeThreadScheduleTool, isThreadScheduleTool } from './thread-schedule-tools.js';
 import { updateTodo, writebackSelfIssueTitle } from './todos.js';
 
 export async function machineAsk(
@@ -75,6 +76,14 @@ export async function executeRelayToolCall(
   params: Record<string, unknown>,
 ): Promise<string> {
   const row = ownedStep(deps, machineId, stepId);
+  if (isThreadScheduleTool(name)) {
+    if (row.kind !== 'plan' && row.kind !== 'build') {
+      throw new HttpError(400, 'schedule tools require a plan or build step');
+    }
+    if (row.status !== 'claimed') {
+      throw new HttpError(409, 'schedule tools require a currently claimed step');
+    }
+  }
   if (row.kind !== 'chief') {
     return executeWorkerMemoryToolCall(deps, row, name, params);
   }
@@ -125,6 +134,9 @@ async function executeWorkerMemoryToolCall(
   if (!buildRow) throw new NotFoundError(`build ${row.buildId}`);
   const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
   if (!todoRow) throw new NotFoundError(`todo ${buildRow.todoId}`);
+  if (isThreadScheduleTool(name)) {
+    return executeThreadScheduleTool(deps, todoRow, `worker:${row.id}`, name, params);
+  }
   if (name === 'attach_file') return attachWorkerFile(deps, row, todoRow, params);
   if (name === 'set_task_meta') return setTaskMeta(deps, todoRow, params);
   const slot = row.kind === 'plan' ? todoRow.assignment?.plan : todoRow.assignment?.build;
