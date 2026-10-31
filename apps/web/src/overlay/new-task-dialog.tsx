@@ -1,5 +1,5 @@
 import type { ClipboardEvent } from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -24,7 +24,7 @@ import { Textarea } from '../components/ui/textarea.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { PROJECT_ID, PROJECT_NAME } from '../fixtures/fixtures.js';
 import { useI18n } from '../i18n/provider.js';
-import { Check, ChevronDown, Grid2x2, Paperclip, X } from '../icons/index.js';
+import { Check, ChevronDown, Paperclip, X } from '../icons/index.js';
 import { isEditableTarget, useChordHotkey, useProjectCycleHotkey } from '../overlay/hotkeys.js';
 import { safeLocalStorage } from '../safe-storage.js';
 import {
@@ -35,8 +35,13 @@ import {
   preparePastedFiles,
 } from './attachment-paste.js';
 import { AttachmentStrip } from './attachment-strip.js';
-import { type MentionGroups, MentionPicker } from './mention-picker.js';
-import { insertMentionText, type MentionToken } from './mention-token.js';
+import {
+  createMentionRegistry,
+  type MentionRegistry,
+  toDisplay,
+  toWire,
+} from './mention-display.js';
+import { MENTION_TEXTAREA_CLS, MentionHighlight } from './mention-highlight.js';
 import { applyOrderedListEnter } from './ordered-list.js';
 import { usePendingAttachments } from './pending-attachments.js';
 
@@ -97,8 +102,6 @@ export interface NewTaskDialogProps {
   onSpecChange?: (next: string) => void;
   onAttachment?: (files: File[]) => string[] | Promise<string[]>;
 
-  mentionGroups?: MentionGroups;
-
   rememberProject?: boolean;
 }
 
@@ -111,19 +114,22 @@ export function NewTaskDialog({
   spec: specProp,
   onSpecChange,
   onAttachment,
-
-  mentionGroups,
   rememberProject = false,
 }: NewTaskDialogProps) {
   const { t } = useI18n();
   const [internalSpec, setInternalSpec] = useState('');
   const specControlled = specProp !== undefined && onSpecChange !== undefined;
-  const spec = specControlled ? (specProp as string) : internalSpec;
-  const setSpec: React.Dispatch<React.SetStateAction<string>> = specControlled
-    ? (next) =>
-        (onSpecChange as (s: string) => void)(typeof next === 'function' ? next(spec) : next)
-    : setInternalSpec;
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const wireSpec = specControlled ? (specProp as string) : internalSpec;
+  const registryRef = useRef<MentionRegistry | null>(null);
+  if (registryRef.current === null) registryRef.current = createMentionRegistry();
+  const mentionRegistry = registryRef.current;
+  const spec = useMemo(() => toDisplay(wireSpec, mentionRegistry), [wireSpec, mentionRegistry]);
+  const setSpec: React.Dispatch<React.SetStateAction<string>> = (next) => {
+    const display = typeof next === 'function' ? next(spec) : next;
+    const wire = toWire(display, mentionRegistry);
+    if (specControlled) (onSpecChange as (s: string) => void)(wire);
+    else setInternalSpec(wire);
+  };
   const [discardOpen, setDiscardOpen] = useState(false);
   const [projectOpen, setProjectOpen] = useState(false);
   const [projectId, setProjectId] = useState<string | null>(() =>
@@ -168,22 +174,16 @@ export function NewTaskDialog({
   };
   const gateRef = useRef({
     discardOpen: false,
-    pickerOpen: false,
     projectOpen: false,
     dirty: false,
   });
-  gateRef.current = { discardOpen, pickerOpen, projectOpen, dirty };
+  gateRef.current = { discardOpen, projectOpen, dirty };
   const requestClose = () => {
     if (gestureConsumedRef.current) return;
     const gate = gateRef.current;
     if (gate.discardOpen) {
       markGestureConsumed();
       closeDiscard();
-      return;
-    }
-    if (gate.pickerOpen) {
-      markGestureConsumed();
-      setPickerOpen(false);
       return;
     }
     if (gate.projectOpen) {
@@ -203,7 +203,6 @@ export function NewTaskDialog({
     if (!open) {
       setProjectOpen(false);
       setDiscardOpen(false);
-      setPickerOpen(false);
       setSpec('');
     }
   }, [open]);
@@ -308,13 +307,13 @@ export function NewTaskDialog({
 
   const save = () => {
     if (attachInFlightRef.current > 0) return;
-    onSave(spec, selected?.id);
+    onSave(wireSpec, selected?.id);
   };
 
   const saveAndStart = () => {
     if (attachInFlightRef.current > 0) return;
     if (spec.trim() === '') return;
-    if (onSaveAndStart) onSaveAndStart(spec, selected?.id);
+    if (onSaveAndStart) onSaveAndStart(wireSpec, selected?.id);
     else save();
   };
   useChordHotkey('enter', isEditableOutsideDialog, saveAndStart, open && !discardOpen);
@@ -323,44 +322,6 @@ export function NewTaskDialog({
     setDiscardOpen(false);
     setSpec('');
     onClose();
-  };
-
-  const insertTokens = (tokens: MentionToken[]) => {
-    if (tokens.length === 0) return;
-    const ta = specRef.current;
-    if (ta == null) {
-      setSpec((current) => {
-        let value = current;
-        for (const token of tokens) value = insertMentionText(value, token, null).value;
-        return value;
-      });
-      return;
-    }
-    const start = ta.selectionStart ?? spec.length;
-    const pending = { caret: start };
-    setSpec((current) => {
-      let value = current;
-      let at = start;
-      for (const token of tokens) {
-        const result = insertMentionText(value, token, at);
-        value = result.value;
-        pending.caret = result.caret;
-        at = result.caret;
-      }
-      return value;
-    });
-    requestAnimationFrame(() => {
-      ta.focus();
-      ta.setSelectionRange(pending.caret, pending.caret);
-    });
-  };
-
-  const groups = mentionGroups ?? {
-    todo: [],
-    skill: [],
-    agent: [],
-    project: [],
-    machine: [],
   };
 
   return (
@@ -467,17 +428,18 @@ export function NewTaskDialog({
             <X />
           </Button>
         </div>
-        <div className="flex min-h-0 flex-1 flex-col px-4 pt-4 [&>.attachment-strip]:flex-none [&>.attachment-strip]:pb-2 [&_[data-slot=attachment]]:bg-transparent">
+        <div className="relative flex min-h-0 flex-1 flex-col px-4 pt-4 [&>.attachment-strip]:flex-none [&>.attachment-strip]:pb-2 [&_[data-slot=attachment]]:bg-transparent">
           <Textarea
             ref={focusSpecRef}
             data-testid="new-task-spec"
-            className="new-task-spec min-h-0 flex-1 resize-none border-0 bg-transparent p-0 text-ui leading-5 tabular-nums text-foreground field-sizing-fixed placeholder:text-content-tertiary focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none dark:bg-transparent md:text-ui"
+            className={`new-task-spec min-h-0 flex-1 resize-none border-0 bg-transparent p-0 text-ui leading-5 tabular-nums field-sizing-fixed focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none dark:bg-transparent md:text-ui ${MENTION_TEXTAREA_CLS}`}
             placeholder={SPEC_TEMPLATE_LINES.map((line) => t(line)).join('\n')}
             value={spec}
             onChange={(e) => setSpec(e.target.value)}
             onKeyDown={handleSpecKeyDown}
             onPaste={handleSpecPaste}
           />
+          <MentionHighlight text={spec} registry={mentionRegistry} textareaRef={specRef} />
           {/* deliberate-native: hidden file picker trigger (display:none, opened programmatically); the visible skin is the attachment Button */}
           <input
             ref={fileInputRef}
@@ -501,15 +463,6 @@ export function NewTaskDialog({
                 onClick={() => fileInputRef.current?.click()}
               >
                 <Paperclip />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-7 text-content-tertiary"
-                aria-label={t('提及')}
-                onClick={() => setPickerOpen((value) => !value)}
-              >
-                <Grid2x2 />
               </Button>
             </div>
             <div className="ml-auto flex items-center gap-2">
@@ -583,18 +536,6 @@ export function NewTaskDialog({
           </DialogFootRow>
         </AlertDialogContent>
       </AlertDialog>
-      <MentionPicker
-        open={pickerOpen}
-        onClose={() => {
-          markGestureConsumed();
-          setPickerOpen(false);
-        }}
-        groups={groups}
-        onInsert={(tokens) => {
-          insertTokens(tokens);
-          setPickerOpen(false);
-        }}
-      />
     </>
   );
 }

@@ -5,15 +5,15 @@ import { useFsList } from '../api/hooks.js';
 import { Button } from '../components/ui/button.js';
 import { PopoverContent } from '../components/ui/popover.js';
 import { useI18n } from '../i18n/provider.js';
-import { ChevronRight, GitCommit } from '../icons/index.js';
+import { ChevronRight, Folder, GitCommit } from '../icons/index.js';
 
 const LAST_DIR_KEY = 'cairn.dirBrowser.lastDir';
 
 const CRUMB_CLS =
-  'h-auto max-w-40 shrink cursor-pointer truncate p-1 font-normal text-muted-foreground hover:text-foreground aria-[current=location]:font-medium aria-[current=location]:text-foreground';
+  'h-auto max-w-40 cursor-pointer truncate px-1 py-0.5 text-meta font-normal text-muted-foreground hover:text-foreground aria-[current=location]:font-medium aria-[current=location]:text-foreground';
 
 const ROW_NAME_CLS =
-  'h-auto min-w-0 flex-1 cursor-pointer justify-start truncate px-1.5 py-1 font-normal hover:bg-transparent dark:hover:bg-transparent';
+  'h-auto min-w-0 flex-1 cursor-pointer justify-start gap-0 px-0 py-1 text-ui font-normal hover:bg-transparent dark:hover:bg-transparent';
 
 const PICK_CLS =
   'flex-none cursor-pointer opacity-0 group-hover:opacity-100 focus-visible:opacity-100';
@@ -75,9 +75,15 @@ export function DirBrowser({ onPick }: { onPick: (path: string) => void }) {
   const crumbs = currentPath !== null ? breadcrumb(currentPath) : [];
 
   return (
-    <PopoverContent side="bottom" align="end" sideOffset={8} aria-label={t('浏览本地文件夹')}>
+    <PopoverContent
+      side="bottom"
+      align="start"
+      sideOffset={8}
+      className="w-88"
+      aria-label={t('浏览本地文件夹')}
+    >
       <div className="flex items-center gap-2 px-1">
-        <nav className="flex min-w-0 flex-1 flex-wrap items-center gap-0.5">
+        <nav className="flex min-w-0 flex-1 flex-wrap items-center gap-0.5 border-b border-border pb-1.5">
           {crumbs.map((seg, i) => (
             <span key={seg.path} className="inline-flex min-w-0 items-center gap-0.5">
               {i > 0 && (
@@ -96,15 +102,6 @@ export function DirBrowser({ onPick }: { onPick: (path: string) => void }) {
             </span>
           ))}
         </nav>
-        <Button
-          variant={showDotfiles ? 'secondary' : 'outline'}
-          size="xs"
-          className="flex-none whitespace-nowrap"
-          aria-pressed={showDotfiles}
-          onClick={() => setShowDotfiles((v) => !v)}
-        >
-          {t('显示隐藏文件')}
-        </Button>
       </div>
       <ul className="flex max-h-72 flex-col overflow-y-auto">
         {listQ.isError ? (
@@ -117,21 +114,28 @@ export function DirBrowser({ onPick }: { onPick: (path: string) => void }) {
             const child = base === '/' ? `/${entry.name}` : `${base}/${entry.name}`;
             return (
               <li
-                className="group flex h-8 items-center gap-1.5 rounded-md px-1 hover:bg-accent"
+                className="group flex h-8 items-center gap-2 rounded-(--radius-menu-item) px-1.5 hover:bg-(--menu-hover)"
                 key={entry.name}
               >
-                <Button variant="ghost" className={ROW_NAME_CLS} onClick={() => setDir(child)}>
-                  {entry.name}
+                <Folder aria-hidden="true" className="size-4 flex-none text-icon" />
+                <Button
+                  variant="ghost"
+                  aria-label={entry.name}
+                  className={ROW_NAME_CLS}
+                  onClick={() => setDir(child)}
+                >
+                  <span className="truncate">{entry.name}</span>
+                  {entry.git && (
+                    <span
+                      className="ml-1 inline-flex flex-none items-center gap-1 text-caption text-content-tertiary"
+                      role="img"
+                      aria-label={t('git 仓库')}
+                    >
+                      <GitCommit width={12} height={12} />
+                      git
+                    </span>
+                  )}
                 </Button>
-                {entry.git && (
-                  <span
-                    className="inline-flex flex-none text-primary"
-                    role="img"
-                    aria-label={t('git 仓库')}
-                  >
-                    <GitCommit width={13} height={13} />
-                  </span>
-                )}
                 <Button
                   variant="outline"
                   size="xs"
@@ -158,6 +162,17 @@ export function DirBrowser({ onPick }: { onPick: (path: string) => void }) {
           {t('目录条目过多，只列出前 {n} 条', { n: FS_LIST_MAX_ENTRIES })}
         </div>
       )}
+      <div className="border-t border-border pt-1">
+        <Button
+          variant="ghost"
+          size="xs"
+          className="h-7 justify-start px-1.5 text-meta font-normal text-content-tertiary aria-pressed:text-foreground"
+          aria-pressed={showDotfiles}
+          onClick={() => setShowDotfiles((v) => !v)}
+        >
+          {t('显示隐藏文件')}
+        </Button>
+      </div>
     </PopoverContent>
   );
 }

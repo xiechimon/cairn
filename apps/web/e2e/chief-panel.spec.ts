@@ -56,7 +56,7 @@ test.describe('chief panel floating form (ADR 0013)', () => {
   test('chief header and composer tools retain 24px targets after conversation extraction', async ({ page }, testInfo) => {
     await page.goto('/app?scenario=111&view=board');
     await settled(page);
-    for (const name of ['新主题', '总管设置', '最小化', '添加附件', '提及']) {
+    for (const name of ['新主题', '总管设置', '最小化', '添加附件']) {
       const control = drawer(page).getByRole('button', { name, exact: true });
       await expect(control).toBeVisible();
       const box = await control.boundingBox();
@@ -67,15 +67,14 @@ test.describe('chief panel floating form (ADR 0013)', () => {
     await page.screenshot({ path: testInfo.outputPath('chief-button-tiers.png') });
   });
 
-  test('composer bar carries the attach + mention tools and the send button', async ({ page }) => {
+  test('composer bar carries the attach tool and the send button', async ({ page }) => {
     await page.goto('/app?scenario=111&view=board');
 
     const bar = page.locator('.chief-composer');
 
     await expect(bar.locator('button[aria-label="语音输入"]')).toHaveCount(0);
     await expect(bar.locator('button[aria-label="添加附件"]')).toBeVisible();
-    await expect(bar.locator('button[aria-label="提及"]')).toBeVisible();
-    await expect(bar.locator('button')).toHaveCount(3);
+    await expect(bar.locator('button')).toHaveCount(2);
     await expect(bar.locator('button[aria-label="发送"]')).toBeVisible();
   });
 

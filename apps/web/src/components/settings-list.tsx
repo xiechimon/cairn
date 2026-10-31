@@ -61,7 +61,7 @@ export function SettingsHeader({
           <div className="flex min-w-0 flex-auto flex-col gap-0.5">
             <h2
               className={cn(
-                'm-0 truncate font-heading text-page font-title text-foreground',
+                'm-0 truncate font-serif text-page font-semibold text-foreground',
                 titleClassName,
               )}
             >

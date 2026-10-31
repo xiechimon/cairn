@@ -172,11 +172,10 @@ for (const theme of ['light', 'dark'] as const) {
       expect(rings(card)).toBe(1);
       expect(card).not.toContain('inset');
 
-      // pool + own --edge-ring: exactly one ring, and it is the inset one
       await page.goto('/app?scenario=notify-banner&view=board');
       const banner = await surfaceShadow(page, '.board-notify-banner');
       expect(rings(banner)).toBe(1);
-      expect(banner.startsWith(edgeRing)).toBe(true);
+      expect(banner.endsWith(await slot(page, 'e1'))).toBe(true);
 
       await page.goto('/app?scenario=111&view=board');
       const drawer = await surfaceShadow(page, '.chief-drawer');

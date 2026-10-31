@@ -25,7 +25,7 @@ createRoot(container).render(
       <TooltipProvider>
         <Gallery />
       </TooltipProvider>
-      <Toaster />
+      <Toaster expand visibleToasts={4} />
     </I18nProvider>
   </StrictMode>,
 );

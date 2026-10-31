@@ -91,7 +91,7 @@ export function PageShell({
                 <ChevronLeft width={16} height={16} />
               </Link>
             )}
-            <h1 className="min-w-0 truncate font-heading text-page font-title text-foreground">
+            <h1 className="min-w-0 truncate font-serif text-page font-semibold text-foreground">
               {title}
             </h1>
             {tabs != null && tab != null && <TabGroup tabs={tabs} tab={tab} onTab={onTab} />}

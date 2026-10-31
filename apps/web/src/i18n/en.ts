@@ -192,7 +192,6 @@ export const EN: Record<string, string> = {
   '没有匹配"/{query}"的命令': 'No commands match "/{query}"',
   清空输入: 'Clear the input',
   已清空: 'Cleared',
-  打开提及面板: 'Open the mention picker',
   '发起 AI 审核': 'Start an AI review',
   停止当前运行: 'Stop the current run',
   查看命令说明: 'Show command help',
@@ -237,7 +236,7 @@ export const EN: Record<string, string> = {
   '任务状态已变化，消息未送出': 'The task state changed — the message was not delivered',
   暂无方案: 'No plan yet',
   暂无可显示的变更: 'No changes to show',
-  '· {n} 个文件改动': '· {n} files changed',
+  '· {n} 个文件改动': 'Files changed: {n}',
   全部展开: 'Expand all',
   全部收起: 'Collapse all',
   显示完整文件: 'Show full file',
@@ -656,7 +655,7 @@ export const EN: Record<string, string> = {
   // #822 在飞存在行展开面：行开关 aria + 正在调用的工具 + 空面 fallback。
   展开实时步骤: 'Show live steps',
   收起实时步骤: 'Hide live steps',
-  '正在调用 {n}': 'Calling {n}',
+  正在调用: 'Calling',
   '等待 Agent 响应…': 'Waiting for the agent…',
   // #1257 板面挂起态：等机器 / 等额度 chip + 等额度 tooltip（下次尝试时刻）。
   // 等额度 chip 词复用 #1261 的同名键（上面等额度族）。
@@ -801,7 +800,14 @@ export const EN: Record<string, string> = {
   '将「{name}」移出团队？该 Agent 进行中的任务将被停止。':
     'Remove "{name}" from this team? Active tasks for this agent will be stopped.',
   复制链接: 'Copy link',
-  完成任务: 'Complete todo',
+  完成任务: 'Complete task',
+  负责人: 'Owner',
+  'issue 状态': 'Issue state',
+  总管用的模型额度已用完: "The chief's model is out of quota",
+  总管用的模型暂时过载: "The chief's model is overloaded",
+  '例如：测试在远端机器上失败，请先修复':
+    'For example: tests fail on the remote machine, fix them first',
+  '例如：并发、错误处理、测试覆盖': 'For example: concurrency, error handling, test coverage',
   将改动合并到默认分支: 'Merge the changes into the default branch',
   // #1313：已上报且文件集为空时完成弹层不提供合并勾选。
   '本轮没有文件改动，完成不会合并分支。':
@@ -1034,15 +1040,8 @@ export const EN: Record<string, string> = {
   继续编辑: 'Keep editing',
   放弃并关闭: 'Discard and close',
 
-  // —— mention picker (issue #311, r9 §2.2/§3.2) ——
-  // Top layer 5 category rows + drill-in search + footer Insert (N) count.
-  // 与侧边栏/搜索面板的「任务/技能/Agents/项目/机器」键一致,只追加弹层
-  // 本地需要的 5 个键(搜索/空集/返回/插入 (n)/空态 query 分支；#848 起内联
-  // 空态复用「没有可引用的对象」，「没有可用的 Agent」退役)。
-  '搜索…': 'Search…',
   没有可引用的对象: 'Nothing to mention',
   '没有与"{query}"匹配的结果': 'No results matching “{query}”',
-  '插入 ({count})': 'Insert ({count})',
 
   // —— local 项目 Files tab 读面（#1030 开闸；不可达降级文案）——
   '本地仓库当前无法读取。': 'The local repository cannot be read right now.',
@@ -1117,6 +1116,9 @@ export const EN: Record<string, string> = {
   '{name} 上的 Claude Code 登录已过期。在该机器上运行 `claude auth login` 重新登录。':
     'Claude Code login on {name} has expired. On that machine run `claude auth login`.',
   服务器数据库备份: 'Server database backup',
+  数据库备份已停止: 'Database backup stopped',
+  数据库备份失败: 'Database backup failed',
+  无法确认数据库备份状态: 'Backup status unknown',
   '服务器数据库备份状态文件无法读取，无法确认备份是否在运行。':
     'The server database backup status file cannot be read, so the backup cannot be confirmed as running.',
   '{host} 上的服务器数据库备份已有 {hours} 小时没有成功，备份可能已停止。在该机器上运行 `systemctl --user list-timers cairn-db-backup.timer` 检查定时器。':
@@ -1198,7 +1200,6 @@ export const EN: Record<string, string> = {
   现在插话: 'Steer now',
   撤回: 'Withdraw',
   '由备用模型 {model} 回答': 'Answered by backup model {model}',
-  总管的模型: "the chief's model",
   '总管用的模型 {model} 额度已用完': "The chief's model {model} is out of quota",
   '总管用的模型 {model} 暂时过载': "The chief's model {model} is overloaded",
   '{time} 会自动再试': 'it retries automatically at {time}',

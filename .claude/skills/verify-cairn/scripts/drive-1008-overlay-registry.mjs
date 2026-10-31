@@ -136,31 +136,6 @@ try {
   await discard.waitFor({ state: 'hidden', timeout: 5_000 });
   check((await specBox().inputValue()) === '1008 未保存探针', 'A12 继续编辑收闸留草稿');
 
-  await dialog().getByRole('button', { name: '提及' }).click();
-  const picker = page.getByRole('dialog', { name: '提及' });
-  await picker.waitFor({ state: 'visible', timeout: 5_000 });
-
-  await picker.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
-  const pickerRect = await picker.evaluate((el) => {
-    const r = el.getBoundingClientRect();
-    return { x: r.x, width: r.width };
-  });
-  check(
-    Math.abs(pickerRect.width - 400) <= 1 && Math.abs(pickerRect.x - (1440 - pickerRect.width) / 2) <= 1,
-    `A13 提及 picker = 400 宽视口居中（实测 w=${pickerRect.width.toFixed(1)} x=${pickerRect.x.toFixed(1)}；registry translate 居中，#448「transform 不承载位移」字面照旧成立）`,
-  );
-  const noBuiltinX = await picker.evaluate(
-    (el) => el.querySelector(':scope > [data-slot="dialog-close"]') == null,
-  );
-  check(noBuiltinX, 'A14 picker 无 registry 自带 X（自带 head 关闭钮，双 X 防重）');
-
-  const overlayVisible = await page.locator('[data-slot="dialog-overlay"]').last().isVisible();
-  check(overlayVisible, 'A15 picker 自带 registry 可见背板在场（实审裁决 3 接受的形态）');
-  await shot(page, '06-mention-picker-dark.png');
-  await page.keyboard.press('Escape');
-  await picker.waitFor({ state: 'hidden', timeout: 5_000 });
-  check(await dialog().isVisible(), 'A16 Esc 分层：只收 picker，dialog 存留');
-
   await dialog().getByRole('button', { name: '保存', exact: true }).click();
   await dialog().waitFor({ state: 'hidden', timeout: 10_000 });
   await page

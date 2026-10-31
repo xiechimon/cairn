@@ -122,16 +122,16 @@ test.describe('chief FAB brand states', () => {
     expect(look).toEqual({ bgIsCard: true, inkIsForeground: true, width: 40, spin: 'none' });
   });
 
-  test('busy: the pill says `思考中…` and the spiral spins', async ({ page }) => {
+  test('busy: the pill says `思考中…` and the spiral traces itself', async ({ page }) => {
     await page.goto('/app?view=board&scenario=chief-busy');
     const fab = page.getByRole('button', { name: '总管', exact: true });
     await expect(fab).toHaveAttribute('data-expanded', 'true');
     await expect(fab).toHaveText('思考中…');
     const look = await fab.evaluate((el) => ({
       wide: el.getBoundingClientRect().width > 40,
-      spin: getComputedStyle(el.querySelector('svg') as Element).animationName,
+      spin: getComputedStyle(el.querySelector('svg .spiral-trace') as Element).animationName,
     }));
-    expect(look).toEqual({ wide: true, spin: 'spin' });
+    expect(look).toEqual({ wide: true, spin: 'spiral-trace' });
   });
 
   test('unread: the pill counts unread threads, matching the tooltip', async ({ page }) => {
@@ -139,12 +139,14 @@ test.describe('chief FAB brand states', () => {
     await expect(page.getByRole('button', { name: '总管', exact: true })).toHaveText('99 个会话未读');
   });
 
-  test('reduced motion: busy keeps the label but stops the spin', async ({ page }) => {
+  test('reduced motion: busy keeps the label but stops the trace', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/app?view=board&scenario=chief-busy');
     const fab = page.getByRole('button', { name: '总管', exact: true });
     await expect(fab).toHaveText('思考中…');
-    const spin = await fab.evaluate((el) => getComputedStyle(el.querySelector('svg') as Element).animationName);
+    const spin = await fab.evaluate(
+      (el) => getComputedStyle(el.querySelector('svg .spiral-trace') as Element).animationName,
+    );
     expect(spin).toBe('none');
   });
 });

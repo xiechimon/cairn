@@ -1,3 +1,4 @@
+import { CircleX, Hourglass } from 'lucide-react';
 import { useState } from 'react';
 import { Badge } from '../components/ui/badge.js';
 import { Bubble, BubbleContent } from '../components/ui/bubble.js';
@@ -28,19 +29,26 @@ export function QueuedMessages({
               <ChatMarkdown text={message.content} />
             </BubbleContent>
           </Bubble>
-          {message.error && (
-            <p data-testid="queued-message-error" className="text-meta text-destructive">
-              {message.error}
-            </p>
-          )}
-          <MessageFooter className="gap-2">
-            <Badge variant="secondary" data-testid="queued-badge">
-              {t('排队中')}
-            </Badge>
+          <MessageFooter className="justify-end gap-1">
+            {message.error ? (
+              <span
+                data-testid="queued-message-error"
+                className="mr-1 inline-flex items-center gap-1 text-meta font-medium text-destructive"
+              >
+                <CircleX aria-hidden="true" className="size-3.5" />
+                {message.error}
+              </span>
+            ) : (
+              <Badge variant="secondary" data-testid="queued-badge" className="mr-1 gap-1 pl-1.5">
+                <Hourglass aria-hidden="true" />
+                {t('排队中')}
+              </Badge>
+            )}
             {onCancel && (
               <Button
                 variant="ghost"
                 size="sm"
+                className="text-content-secondary"
                 disabled={sending !== null}
                 data-testid="cancel-queued-message"
                 onClick={() => {
@@ -55,7 +63,7 @@ export function QueuedMessages({
             )}
             {onSteer && (
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
                 disabled={sending !== null}
                 data-testid="steer-queued-message"

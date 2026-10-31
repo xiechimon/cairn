@@ -6,6 +6,7 @@ import {
   CircleDashed,
   CircleX,
   GitPullRequest,
+  Hourglass,
   ListChecks,
 } from 'lucide-react';
 import type { Phase } from './fixtures/records.js';
@@ -59,12 +60,12 @@ const QUIET_INK = 'text-content-tertiary';
 
 export const PHASE_STATUS: Record<Phase, { icon: LucideIcon; ink: string }> = {
   todo: { icon: CircleDashed, ink: QUIET_INK },
-  queued: { icon: CircleDashed, ink: QUIET_INK },
+  queued: { icon: Hourglass, ink: QUIET_INK },
   planning: { icon: Activity, ink: RUNNING_INK },
   building: { icon: Activity, ink: RUNNING_INK },
   confirm: { icon: ListChecks, ink: ACCENT_INK },
   review: { icon: GitPullRequest, ink: ACCENT_INK },
-  failed: { icon: CircleX, ink: ACCENT_INK },
+  failed: { icon: CircleX, ink: 'text-destructive' },
   done: { icon: CircleCheck, ink: QUIET_INK },
   closed: { icon: Ban, ink: QUIET_INK },
 };

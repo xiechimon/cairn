@@ -1,31 +1,19 @@
-import type { TodoRecord as WireTodo } from '@cairn/shared';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { attachFile } from '../api/attachments.js';
-import {
-  useApiMutations,
-  useMachines,
-  useMembers,
-  useProjects,
-  useSkills,
-  useTodos,
-} from '../api/hooks.js';
+import { useApiMutations, useProjects } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { useOrchestrateStart } from '../chief/use-orchestrate-start.js';
 import { toastError } from '../components/ui/toaster.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
-import type { FixtureSet, TodoRecord } from '../fixtures/records.js';
+import type { FixtureSet } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { attachmentFailureTitle } from './attachment-paste.js';
-import type { MentionGroups } from './mention-picker.js';
 import type { NewTaskDialogProps } from './new-task-dialog.js';
 
 export interface NewTaskSurfaceOpts {
-  fixtureTodos?: TodoRecord[];
-  eager?: boolean;
   onFixtureSave?: (spec: string) => void;
   anchorProjectId?: string;
-  mentions?: boolean;
 }
 
 export interface NewTaskSurface {
@@ -34,24 +22,13 @@ export interface NewTaskSurface {
 }
 
 export function useNewTaskSurface(fixture: FixtureSet, opts: NewTaskSurfaceOpts = {}) {
-  const {
-    fixtureTodos: fixtureTodosOpt,
-    eager = false,
-    onFixtureSave,
-    anchorProjectId,
-    mentions = true,
-  } = opts;
+  const { onFixtureSave, anchorProjectId } = opts;
   const { live, teamId } = useLiveData();
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const openDialog = useCallback(() => setOpen(true), []);
   const closeDialog = useCallback(() => setOpen(false), []);
-  const todosQ = useTodos(teamId, live);
   const projectsQ = useProjects(teamId, live);
-  const dataOn = live && (eager || open);
-  const membersQ = useMembers(teamId, dataOn);
-  const machinesQ = useMachines(teamId, dataOn);
-  const skillsQ = useSkills(teamId, dataOn && mentions);
   const mutations = useApiMutations(teamId);
 
   const [liveSpec, setLiveSpec] = useState('');
@@ -183,59 +160,6 @@ export function useNewTaskSurface(fixture: FixtureSet, opts: NewTaskSurfaceOpts 
     return rows;
   }, [live, projectsQ.data, fixture.projectNames, anchorProjectId]);
 
-  const liveTodoSet: WireTodo[] = todosQ.data ?? [];
-  const fixtureTodos = fixtureTodosOpt ?? fixture.todos;
-  const mentionGroups: MentionGroups = live
-    ? {
-        todo: liveTodoSet.map((t) => ({
-          id: t.id,
-          label: `#${t.seqNum} ${t.title}`,
-          seq: t.seqNum,
-          subtitle: t.phase,
-        })),
-        agent: (membersQ.data ?? [])
-          .filter((m) => m.memberType === 'agent')
-          .map((m) => ({
-            id: m.actorId,
-            label: (m.actor as { displayName?: string } | undefined)?.displayName ?? m.actorId,
-            subtitle:
-              (m.actor as { description?: string | null } | undefined)?.description ?? undefined,
-          })),
-        project: (projectsQ.data ?? []).map((p) => ({ id: p.id, label: p.name })),
-        skill: (skillsQ.data ?? []).map((s) => ({
-          id: s.id,
-          label: s.name,
-          subtitle: s.description ?? undefined,
-        })),
-        machine: (machinesQ.data ?? []).map((m) => ({ id: m.id, label: m.name })),
-      }
-    : {
-        todo: fixtureTodos.map((t) => ({
-          id: t.id,
-          label: `#${t.seqNum} ${t.title}`,
-          seq: t.seqNum,
-          subtitle: t.phase,
-        })),
-        agent: (fixture.team?.agents ?? []).map((a) => ({
-          id: a.id,
-          label: a.displayName,
-          subtitle: a.role ?? a.model,
-        })),
-        project: Object.entries(fixture.projectNames ?? {}).map(([id, name]) => ({
-          id,
-          label: name,
-        })),
-        skill: (fixture.resources?.skills ?? []).map((s) => ({
-          id: s.name,
-          label: s.name,
-          subtitle: s.description,
-        })),
-        machine: (fixture.resources?.machines ?? []).map((m) => ({
-          id: m.name,
-          label: m.name,
-        })),
-      };
-
   const dialogProps: NewTaskDialogProps = {
     open,
     onClose: closeDialog,
@@ -244,7 +168,6 @@ export function useNewTaskSurface(fixture: FixtureSet, opts: NewTaskSurfaceOpts 
     projects: projectRows,
     ...(anchorProjectId === undefined ? { rememberProject: true } : {}),
     ...(live ? { spec: liveSpec, onSpecChange: setLiveSpec, onAttachment } : {}),
-    ...(mentions ? { mentionGroups } : {}),
   };
   return { openDialog, dialogProps };
 }

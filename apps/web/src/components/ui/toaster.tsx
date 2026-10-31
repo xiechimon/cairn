@@ -52,6 +52,14 @@ function Toaster({ ...props }: ToasterProps) {
           '--border-radius': 'var(--radius-popover)',
         } as CSSProperties
       }
+      toastOptions={{
+        classNames: {
+          title: 'text-ui font-medium',
+          description: 'text-meta text-content-secondary',
+          actionButton:
+            'bg-transparent! px-2! text-ui! font-medium! text-(--card-button)! hover:bg-accent-hover!',
+        },
+      }}
       {...props}
     />
   );

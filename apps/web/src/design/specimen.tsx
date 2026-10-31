@@ -56,7 +56,7 @@ export function Specimen({
   children: ReactNode;
 }) {
   return (
-    <figure className="m-0 overflow-hidden rounded-(--radius-card) bg-card shadow-(--e1)">
+    <figure className="isolate m-0 overflow-hidden rounded-(--radius-card) bg-card shadow-(--e1)">
       <figcaption className="flex items-baseline gap-3 border-b border-border px-5 py-3">
         <span className="text-ui font-semibold text-foreground">{title}</span>
         {note != null && <span className="text-meta text-content-tertiary">{note}</span>}
@@ -93,6 +93,15 @@ export function Cell({ label, children }: { label: string; children: ReactNode }
   return (
     <div className="flex flex-col items-start gap-2.5">
       <div className="flex min-h-8 flex-1 flex-wrap items-center gap-2">{children}</div>
+      <span className="text-caption text-content-tertiary">{label}</span>
+    </div>
+  );
+}
+
+export function Labeled({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex w-full min-w-0 flex-col gap-2">
+      {children}
       <span className="text-caption text-content-tertiary">{label}</span>
     </div>
   );

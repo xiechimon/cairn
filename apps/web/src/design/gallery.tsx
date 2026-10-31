@@ -41,6 +41,12 @@ import {
   TypeSection,
 } from './foundations.js';
 import { ProvidersPattern } from './patterns.js';
+import { ProductBoardSection } from './product-board.js';
+import { ProductChiefSection } from './product-chief.js';
+import { ProductDetailSection } from './product-detail.js';
+import { ProductOverlaysSection } from './product-overlays.js';
+import { ProductPagesSection } from './product-pages.js';
+import { ProductProviders } from './product-providers.js';
 import { ScreensSection } from './screens.js';
 import { GroupTitle } from './specimen.js';
 
@@ -77,6 +83,17 @@ const NAV = [
       ['structure', 'Structure primitives'],
       ['identity', 'Agents and models'],
       ['stream', 'Live stream'],
+    ],
+  },
+  {
+    id: 'product',
+    title: 'Product',
+    items: [
+      ['product-board', 'Board'],
+      ['product-detail', 'Task detail'],
+      ['product-chief', 'Coordinator'],
+      ['product-overlays', 'Overlays and pickers'],
+      ['product-pages', 'Page parts'],
     ],
   },
   {
@@ -247,6 +264,18 @@ export function Gallery() {
           <StructureSection />
           <IdentitySection />
           <StreamSection />
+          <GroupTitle
+            id="product"
+            title="Product"
+            lede="The app's own components from board, detail, chief, overlay and pages, rendered with sample data in every state they ship."
+          />
+          <ProductProviders>
+            <ProductBoardSection />
+            <ProductDetailSection />
+            <ProductChiefSection />
+            <ProductOverlaysSection />
+            <ProductPagesSection theme={theme} />
+          </ProductProviders>
           <GroupTitle
             id="stone-language"
             title="Stone language"

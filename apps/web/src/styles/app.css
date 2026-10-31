@@ -15,6 +15,7 @@
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
   --font-heading: var(--font-display);
+  --font-serif: var(--font-source-serif);
   --text-page: var(--type-page);
   --text-page--line-height: calc(26 / 20);
   --text-greeting: var(--type-greeting);

@@ -52,7 +52,7 @@ export function RejectDialog({ open, onClose, onConfirm, rejectReason }: RejectD
           onChange={(event) => setFeedback(event.target.value)}
           rows={3}
           className="text-ui md:text-ui"
-          placeholder={label}
+          placeholder={t('例如：测试在远端机器上失败，请先修复')}
         />
       </div>
       {rejectReason != null && (

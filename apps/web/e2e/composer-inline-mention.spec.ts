@@ -17,7 +17,6 @@ import { evidenceShot } from './evidence';
 //   F7  backspace boundary off-by-one;
 //   F8  IME composition firing insert/send;
 //   F10 second mention with a stale range;
-//   F11 popover multi-select insertion (last-one-wins before the fix);
 //   plus the close set (rules 32-34 + web adaptations) and cap 15.
 //
 // Data face = live face stubbed (composer-wire-reject.spec discipline):
@@ -179,6 +178,8 @@ async function openDetail(
 // Serialized wire forms (mention-token.ts serializeMention).
 const T_BUILDER = '[builder](agent:agent-1)';
 const T_REVIEWER = '[reviewer](agent:agent-2)';
+const D_BUILDER = '@builder';
+const D_REVIEWER = '@reviewer';
 
 test('trigger: line start / after whitespace / after CJK punctuation — never mid-word or in an email (F2)', async ({
   page,
@@ -272,7 +273,7 @@ test('Enter with a highlight inserts WITHOUT sending; the second Enter sends (r9
   // The whole @query is consumed (no residue) and one trailing space lands
   // (rule 26 + r9 §3.2); the caret sits after the space — proven by the
   // follow-up typing test below.
-  await expect(input).toHaveValue(`${T_BUILDER} `);
+  await expect(input).toHaveValue(`${D_BUILDER} `);
   await expect(listbox).toBeHidden();
   // The value/hidden assertions above already spanned multiple render
   // round-trips — an accidental send (synchronous in the same handler)
@@ -305,7 +306,7 @@ test('Tab inserts the top match without sending and keeps focus (rule 22/56)', a
   const { input, listbox, sent } = await openDetail(page);
   await input.fill('@bu');
   await input.press('Tab');
-  await expect(input).toHaveValue(`${T_BUILDER} `);
+  await expect(input).toHaveValue(`${D_BUILDER} `);
   await expect(listbox).toBeHidden();
   await expect(input).toBeFocused(); // Tab did not move focus away
   expect(sent).toHaveLength(0);
@@ -336,7 +337,7 @@ test('mouse: hover highlights, click inserts, the textarea never loses focus (F4
 
   // Click inserts — and focus stays on the textarea (mousedown prevented).
   await rows.first().click();
-  await expect(input).toHaveValue(`${T_BUILDER} `);
+  await expect(input).toHaveValue(`${D_BUILDER} `);
   await expect(listbox).toBeHidden();
   await expect(input).toBeFocused();
   expect(sent).toHaveLength(0);
@@ -349,15 +350,15 @@ test('insert lands a trailing space and the caret after it — typing continues 
   await input.fill('hi @bu');
   await input.press('ArrowDown');
   await input.press('Enter');
-  await expect(input).toHaveValue(`hi ${T_BUILDER} `);
+  await expect(input).toHaveValue(`hi ${D_BUILDER} `);
 
   // The caret must sit AFTER the trailing space: the next keystroke may
   // not land inside `[label](agent:id)` (markdown corruption).
   await input.press('x');
-  await expect(input).toHaveValue(`hi ${T_BUILDER} x`);
+  await expect(input).toHaveValue(`hi ${D_BUILDER} x`);
   // The inserted token still round-trips to a mention chip shape.
   const caret = await input.evaluate((el) => el.selectionStart);
-  expect(caret).toBe(`hi ${T_BUILDER} x`.length);
+  expect(caret).toBe(`hi ${D_BUILDER} x`.length);
 });
 
 test('close set: Esc closes the listbox and stays on the detail (#634 layering)', async ({
@@ -455,7 +456,7 @@ test('multiple mentions: a second @ after an insert opens fresh and lands in ord
   await input.fill('@bu');
   await input.press('ArrowDown');
   await input.press('Enter');
-  await expect(input).toHaveValue(`${T_BUILDER} `);
+  await expect(input).toHaveValue(`${D_BUILDER} `);
 
   // The caret landed after the trailing space; typing @ again must open
   // with an empty stale-range slate.
@@ -465,24 +466,8 @@ test('multiple mentions: a second @ after an insert opens fresh and lands in ord
   await expect(rows.first()).toContainText('reviewer');
   await input.press('ArrowDown');
   await input.press('Enter');
-  await expect(input).toHaveValue(`${T_BUILDER} ${T_REVIEWER} `);
+  await expect(input).toHaveValue(`${D_BUILDER} ${D_REVIEWER} `);
   await evidenceShot(page, 'multiple-mentions.png');
-});
-
-test('popover multi-select inserts every token with trailing spaces (F11)', async ({ page }) => {
-  const { input } = await openDetail(page);
-  await page.getByTestId('composer-toolbar').getByRole('button', { name: '提及' }).click();
-  const picker = page.locator('.mention-picker');
-  await expect(picker).toBeVisible();
-  await page.locator('.mention-row--top[aria-label="Agents (3)"]').click();
-  await page.locator('.mention-row--entry', { hasText: 'builder' }).click();
-  await page.locator('.mention-row--entry', { hasText: 'reviewer' }).click();
-  await page.locator('.mention-picker-insert').click();
-
-  // Before the batched insertTokens fix only the LAST token of a
-  // multi-select survived (each insertToken read the same stale closure).
-  await expect(input).toHaveValue(`${T_BUILDER} ${T_REVIEWER} `);
-  await evidenceShot(page, 'popover-multi-insert.png');
 });
 
 test('IME: a composing Enter neither inserts nor sends (F8)', async ({ page }) => {
@@ -511,7 +496,7 @@ test('IME: a composing Enter neither inserts nor sends (F8)', async ({ page }) =
   // The very next real Enter inserts normally — the guard skips composing
   // keys only.
   await input.press('Enter');
-  await expect(input).toHaveValue(`${T_BUILDER} `);
+  await expect(input).toHaveValue(`${D_BUILDER} `);
   expect(sent).toHaveLength(0);
 });
 
@@ -521,8 +506,6 @@ test('geometry: the listbox stays anchored above the composer (#688 ladder untou
   const { input, listbox } = await openDetail(page);
   await input.fill('@');
   await expect(listbox).toBeVisible();
-  // Past the 100ms zoom-in-95 enter animation — a mid-animation
-  // boundingBox is scaled (mention-picker-center.spec precedent).
   await page.waitForTimeout(300);
   const listBox = await listbox.boundingBox();
   const composerBox = await page.getByTestId('composer-card').boundingBox();
@@ -620,91 +603,70 @@ test('files: directory row inserts with a trailing slash', async ({ page }) => {
   await expect(input).toHaveValue('apps/web/src/ui/ ');
 });
 
-test('chips: Enter-select renders the file chip with a fresh pop', async ({ page }) => {
+function mentionSpan(page: Page, kind: string) {
+  return page.getByTestId('composer-card').getByTestId('mention-highlight').locator(`[data-mention-kind="${kind}"]`);
+}
+
+test('highlight: Enter-select paints the file mention inline', async ({ page }) => {
   const { input, rows } = await openDetailWithFiles(page);
   await input.fill('@butt');
   await expect(rows).toHaveCount(1);
   await input.press('ArrowDown');
   await input.press('Enter');
-  const strip = page.getByTestId('composer-card').getByRole('status', { name: '提及' });
-  await expect(strip).toBeVisible();
-  await expect(strip.locator('.mention-chip')).toHaveCount(1);
-  await expect(strip.locator('.mention-chip')).toContainText('apps/web/src/ui/button.tsx');
-
-  await expect(strip.locator('[data-fresh]')).toHaveCount(1);
-
-  const animationName = await strip
-    .locator('[data-fresh]')
-    .evaluate((el) => getComputedStyle(el).animationName);
-  expect(animationName).not.toBe('none');
-  await evidenceShot(page, 'chips-file-fresh.png');
+  await expect(input).toHaveValue('apps/web/src/ui/button.tsx ');
+  await expect(page.locator('.composer-chips')).toHaveCount(0);
+  await evidenceShot(page, 'highlight-file.png');
 });
 
-test('chips: agent select renders the agent chip', async ({ page }) => {
+test('highlight: agent select paints the agent mention', async ({ page }) => {
   const { input, rows } = await openDetailWithFiles(page);
   await input.fill('@bld');
   await expect(rows).toHaveCount(1);
   await input.press('ArrowDown');
   await input.press('Enter');
-  const strip = page.getByTestId('composer-card').getByRole('status', { name: '提及' });
-  await expect(strip.locator('.mention-chip--agent')).toHaveCount(1);
-  await expect(strip.locator('.mention-chip--agent')).toContainText('builder');
+  await expect(mentionSpan(page, 'agent')).toHaveCount(1);
+  await expect(mentionSpan(page, 'agent')).toHaveText('@builder');
 });
 
-test('chips: Tab and click render the identical chip (identical accept path)', async ({
+test('highlight: Enter, Tab and click paint the identical mention (identical accept path)', async ({
   page,
 }) => {
   const { input, rows } = await openDetailWithFiles(page);
-  await input.fill('@butt');
+  await input.fill('@bld');
   await expect(rows).toHaveCount(1);
   await input.press('Tab');
-  const strip = page.getByTestId('composer-card').getByRole('status', { name: '提及' });
-  await expect(strip.locator('.mention-chip')).toContainText('apps/web/src/ui/button.tsx');
+  await expect(input).toHaveValue('@builder ');
+  await expect(mentionSpan(page, 'agent')).toHaveText('@builder');
+
+  await input.fill('@bld');
+  await expect(rows).toHaveCount(1);
+  await input.press('ArrowDown');
+  await input.press('Enter');
+  await expect(input).toHaveValue('@builder ');
+  await expect(mentionSpan(page, 'agent')).toHaveText('@builder');
 
   await input.fill('');
-  await expect(strip).toBeHidden();
-  await input.fill('@butt');
+  await expect(mentionSpan(page, 'agent')).toHaveCount(0);
+  await input.fill('@bld');
   await expect(rows).toHaveCount(1);
   await rows.first().click();
-  await expect(strip.locator('.mention-chip')).toContainText('apps/web/src/ui/button.tsx');
-  await expect(strip.locator('[data-fresh]')).toHaveCount(1);
+  await expect(input).toHaveValue('@builder ');
+  await expect(mentionSpan(page, 'agent')).toHaveText('@builder');
 });
 
-test('chips: editing the path retires the chip; the pop plays only once (C8)', async ({
-  page,
-}) => {
+test('highlight: deleting a letter inside the label retires the highlight', async ({ page }) => {
   const { input, rows } = await openDetailWithFiles(page);
-  await input.fill('@butt');
+  await input.fill('@bld');
   await expect(rows).toHaveCount(1);
   await input.press('ArrowDown');
   await input.press('Enter');
-  const strip = page.getByTestId('composer-card').getByRole('status', { name: '提及' });
-  await expect(strip.locator('[data-fresh]')).toHaveCount(1);
+  await expect(mentionSpan(page, 'agent')).toHaveCount(1);
 
-  await input.press('x');
-  await expect(strip.locator('.mention-chip')).toHaveCount(1);
-  await expect(strip.locator('[data-fresh]')).toHaveCount(0);
-
-  await input.fill('');
-  await expect(strip).toHaveCount(0);
-});
-
-test('chips: the strip yields while the listbox is open (C6)', async ({ page }) => {
-  const { input, listbox, rows } = await openDetailWithFiles(page);
-  await input.fill('@butt');
-  await expect(rows).toHaveCount(1);
-  await input.press('ArrowDown');
-  await input.press('Enter');
-  const strip = page.getByTestId('composer-card').getByRole('status', { name: '提及' });
-  await expect(strip).toBeVisible();
-
-  await input.pressSequentially('@');
-  await expect(listbox).toBeVisible();
-  await expect(strip).toHaveCount(0);
-
-  await input.press('Escape');
-  await expect(listbox).toBeHidden();
-  await expect(strip).toBeVisible();
+  await input.press('ArrowLeft');
+  await input.press('ArrowLeft');
+  await input.press('Backspace');
+  await expect(input).toHaveValue('@buildr ');
+  await expect(mentionSpan(page, 'agent')).toHaveCount(0);
 });
 
 const FIVE_KIND = {
@@ -725,7 +687,7 @@ test('five-kind: bare @ lists all five kinds in roster order', async ({ page }) 
   await evidenceShot(page, 'five-kind-list.png');
 });
 
-test('five-kind: skill Tab-inserts the scheme token and the chip confirms', async ({
+test('five-kind: skill Tab-inserts the display form and the highlight confirms', async ({
   page,
 }) => {
   const { input, rows } = await openDetail(page, AGENTS, FIVE_KIND);
@@ -733,10 +695,8 @@ test('five-kind: skill Tab-inserts the scheme token and the chip confirms', asyn
   await expect(rows).toHaveCount(1);
   await expect(rows.first()).toContainText('code-review');
   await input.press('Tab');
-  await expect(input).toHaveValue('[code-review](skill:skill-1) ');
-  const strip = page.getByTestId('composer-card').getByRole('status', { name: '提及' });
-  await expect(strip.locator('.mention-chip--skill')).toHaveCount(1);
-  await expect(strip.locator('.mention-chip--skill')).toContainText('code-review');
+  await expect(input).toHaveValue('@code-review ');
+  await expect(mentionSpan(page, 'skill')).toHaveText('@code-review');
   await evidenceShot(page, 'five-kind-skill-insert.png');
 });
 
@@ -756,16 +716,15 @@ test('five-kind: todo Enter-inserts the plain #seq token without sending', async
   await expect.poll(() => sent.length).toBe(1);
 });
 
-test('five-kind: project click inserts the scheme token and the chip confirms', async ({
+test('five-kind: project click inserts the display form and the highlight confirms', async ({
   page,
 }) => {
   const { input, rows } = await openDetail(page, AGENTS, FIVE_KIND);
   await input.fill('@cair');
   await expect(rows).toHaveCount(1);
   await rows.first().click();
-  await expect(input).toHaveValue('[cairn](project:proj-1) ');
-  const strip = page.getByTestId('composer-card').getByRole('status', { name: '提及' });
-  await expect(strip.locator('.mention-chip--project')).toHaveCount(1);
+  await expect(input).toHaveValue('@cairn ');
+  await expect(mentionSpan(page, 'project')).toHaveText('@cairn');
 });
 
 test('five-kind: machine Enter-inserts without sending; second Enter sends', async ({
@@ -776,7 +735,7 @@ test('five-kind: machine Enter-inserts without sending; second Enter sends', asy
   await expect(rows).toHaveCount(1);
   await input.press('ArrowDown');
   await input.press('Enter');
-  await expect(input).toHaveValue('[mea](machine:machine-1) ');
+  await expect(input).toHaveValue('@mea ');
   await expect(listbox).toBeHidden();
   expect(sent).toHaveLength(0);
   await input.press('Enter');

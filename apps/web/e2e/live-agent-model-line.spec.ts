@@ -1,4 +1,4 @@
-import { expect, type Page, type Route, test } from '@playwright/test';
+import { expect, type Locator, type Page, type Route, test } from '@playwright/test';
 import { evidencePanelShot } from './evidence';
 
 const TEAM = { id: 'team-1', name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null };
@@ -93,7 +93,14 @@ async function openRow(page: Page, todoId: string) {
   await page.getByTestId('phase-chip').click();
   const popover = page.locator('.chip-popover');
   await expect(popover).toBeVisible();
-  return { popover, row: popover.locator('[data-selected] [data-row-kind="agent"]') };
+  return { popover, row: popover.locator('[data-row-kind="agent"][data-selected]') };
+}
+
+async function expectAgentLine(row: Locator, name: string, model?: string) {
+  const lines = row.locator('.truncate');
+  await expect(lines.first()).toHaveText(name);
+  if (model === undefined) await expect(lines).toHaveCount(1);
+  else await expect(lines.nth(1)).toHaveText(model);
 }
 
 /** evidencePanelShot after the popover's enter fade; regression runs skip both. */
@@ -109,7 +116,7 @@ test('unassigned todo: `未指派` alone, no model segment', async ({ page }) =>
   const { popover, row } = await openRow(page, 'todo-0');
   await expect(popover).toContainText('model line probe 0');
   await shot(page, 'unassigned.png');
-  await expect(row).toHaveText('未指派');
+  await expectAgentLine(row, '未指派');
 });
 
 test('assigned agent: its own model and thinking level, not another member’s', async ({
@@ -120,12 +127,12 @@ test('assigned agent: its own model and thinking level, not another member’s',
   const beta = await openRow(page, 'todo-1');
   await expect(beta.popover).toContainText('model line probe 1');
   await shot(page, 'assigned-thinking-level.png');
-  await expect(beta.row).toHaveText('Beta · qwen3.8-max · high');
+  await expectAgentLine(beta.row, 'Beta', 'qwen3.8-max · high');
 
   const alpha = await openRow(page, 'todo-2');
   await expect(alpha.popover).toContainText('model line probe 2');
   await shot(page, 'assigned-default-level.png');
-  await expect(alpha.row).toHaveText('Alpha · gpt-5.5 · 默认');
+  await expectAgentLine(alpha.row, 'Alpha', 'gpt-5.5 · 默认');
 });
 
 test('agent without a model configured: the name alone', async ({ page }) => {
@@ -134,7 +141,7 @@ test('agent without a model configured: the name alone', async ({ page }) => {
   const { popover, row } = await openRow(page, 'todo-3');
   await expect(popover).toContainText('model line probe 3');
   await expect(popover).toContainText('Gamma');
-  await expect(row).toHaveText('Gamma');
+  await expectAgentLine(row, 'Gamma');
   await expect(popover).not.toContainText(FIXTURE_MODEL);
 });
 
@@ -145,10 +152,10 @@ test('members pending: the name alone, then the model fills in', async ({ page }
   await expect.poll(members.count).toBeGreaterThan(0);
   await expect(popover).toContainText('model line probe 1');
   await shot(page, 'members-pending.png');
-  await expect(row).toHaveText('Beta');
+  await expectAgentLine(row, 'Beta');
 
   await members.release();
-  await expect(row).toHaveText('Beta · qwen3.8-max · high');
+  await expectAgentLine(row, 'Beta', 'qwen3.8-max · high');
 });
 
 test('members read failed: the name alone', async ({ page }) => {
@@ -165,7 +172,7 @@ test('members read failed: the name alone', async ({ page }) => {
   await page.evaluate(
     () => new Promise<void>((res) => requestAnimationFrame(() => requestAnimationFrame(() => res()))),
   );
-  await expect(row).toHaveText('Beta');
+  await expectAgentLine(row, 'Beta');
 });
 
 test('en locale: the null thinking level reads Default', async ({ page }) => {
@@ -174,5 +181,5 @@ test('en locale: the null thinking level reads Default', async ({ page }) => {
   await serveMembers(page);
   const { popover, row } = await openRow(page, 'todo-2');
   await expect(popover).toContainText('model line probe 2');
-  await expect(row).toHaveText('Alpha · gpt-5.5 · Default');
+  await expectAgentLine(row, 'Alpha', 'gpt-5.5 · Default');
 });
