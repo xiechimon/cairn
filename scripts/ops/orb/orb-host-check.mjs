@@ -25,8 +25,7 @@ export function parseHostCheck(input, { blockedPorts = [22, 5231] } = {}) {
       [7890, ...blockedPorts].every((port) => {
         const probes = input.firewallProbes.filter((probe) => probe.port === port);
         return (
-          probes.length === 1 &&
-          (port === 7890 ? probes[0].status === 0 : [1, 124].includes(probes[0].status))
+          probes.length === 1 && (port === 7890 ? probes[0].status === 0 : probes[0].status === 124)
         );
       })
         ? 'ok'
@@ -167,7 +166,7 @@ export function checkHost({
       'https://github.com',
     ]);
     if (egress.status === 0) input.headers = egress.stdout || '';
-    for (const target of ['http://127.0.0.1:8787/', 'http://10.203.0.1:8787/']) {
+    for (const target of ['http://127.0.0.1:80/', 'http://10.203.0.1:22/']) {
       const denied = run('systemd-run', [
         ...guest,
         '--uid=agent',

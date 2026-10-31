@@ -111,7 +111,7 @@ probes, an inactive service, reachable blocked ports, or an unreachable proxy
 produce `firewall: "failed"` and `ok: false`. A refused connection also counts
 as blocked, so the probes sample reachability rather than proving every
 firewall rule. The guest proxy negative checks explicitly bypass NO_PROXY and
-require HTTP 403 for both `127.0.0.1:8787` and `10.203.0.1:8787`; connectivity
+require HTTP 403 for both `127.0.0.1:80` and `10.203.0.1:22` (allowed ports, so the address filter refuses them); connectivity
 errors cannot count as successful proxy filtering.
 
 The `--json` result has `image` (base-image name or null), `cloneStartStop`

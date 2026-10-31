@@ -67,7 +67,7 @@ function fakeHost(failAt) {
     if (args.includes('list-images')) stdout = 'cairn-orb-base directory no\n';
     if (args.includes('show')) stdout = 'MemoryMax=4294967296\n';
     if (args.includes('curl')) {
-      if (args.some((arg) => /http:\/\/(127\.0\.0\.1|10\.203\.0\.1):8787/.test(arg)))
+      if (args.some((arg) => /http:\/\/(127\.0\.0\.1:80|10\.203\.0\.1:22)\//.test(arg)))
         return { status: 22, stdout: '403', stderr: 'HTTP 403' };
       stdout = 'HTTP/2 200\r\n';
     }
@@ -143,7 +143,7 @@ test('host check rejects loopback and bridge proxy egress without privileged ins
   });
   assert.equal(result.privateEgress, 'denied');
   assert.equal(result.firewall, 'ok');
-  for (const target of ['http://127.0.0.1:8787/', 'http://10.203.0.1:8787/']) {
+  for (const target of ['http://127.0.0.1:80/', 'http://10.203.0.1:22/']) {
     assert.ok(
       f.calls.some(
         (call) => call.includes(target) && call.includes('--noproxy') && call.includes('--proxy'),
@@ -219,7 +219,7 @@ for (const failure of ['inactive-service', 'open-port', 'proxy-unreachable', 'pr
   });
 }
 
-test('firewall blocked ports are configurable and connection refusals count as blocked', () => {
+test('firewall blocked ports are configurable and only dropped connections count as blocked', () => {
   const f = fakeHost();
   const result = checkHost({
     user: 'ian',
@@ -228,13 +228,24 @@ test('firewall blocked ports are configurable and connection refusals count as b
     run: (cmd, args) => {
       if (args.includes('timeout') && !args.at(-1).endsWith('/7890')) {
         f.calls.push([cmd, ...args]);
-        return { status: 1, stdout: '', stderr: 'Connection refused' };
+        return { status: 124, stdout: '', stderr: '' };
       }
       return f.run(cmd, args);
     },
   });
   assert.equal(result.firewall, 'ok');
   assert.equal(result.ok, true);
+  const refused = checkHost({
+    user: 'ian',
+    name: 'cairn-orb-check-fixture',
+    blockedPorts: [2222, 8080],
+    run: (cmd, args) =>
+      args.includes('timeout') && !args.at(-1).endsWith('/7890')
+        ? { status: 1, stdout: '', stderr: 'Connection refused' }
+        : fakeHost().run(cmd, args),
+  });
+  assert.notEqual(refused.firewall, 'ok');
+  assert.equal(refused.ok, false);
   assert.ok(f.calls.some((call) => call.at(-1).endsWith('/2222')));
   assert.ok(f.calls.some((call) => call.at(-1).endsWith('/8080')));
 });
