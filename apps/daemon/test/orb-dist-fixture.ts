@@ -59,7 +59,7 @@ export function createOrbCheckout(root: string) {
         '--filter',
         '@xiechimon/cairn-cli',
         '--prod',
-        '--offline',
+        '--prefer-offline',
       ])
     )
       throw new Error('Deploy must use the host checkout and its offline lockfile');

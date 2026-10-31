@@ -92,7 +92,7 @@ export async function publishOrbDist(distSource: string, root: string, runner: O
             '--filter',
             '@xiechimon/cairn-cli',
             '--prod',
-            '--offline',
+            '--prefer-offline',
             temporary,
           ],
           {

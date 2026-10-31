@@ -222,7 +222,7 @@ const provider = new NspawnOrbProvider({
   runner: async (argv, options) => {
     if (argv[0] === 'git') return runOrbCommand(argv, options);
     if (argv[0] === 'pnpm') {
-      if (argv[2] !== ${JSON.stringify(realpathSync(f.checkout))} || argv[3] !== 'deploy' || !argv.includes('--offline')) throw new Error('Wrong checkout or registry install');
+      if (argv[2] !== ${JSON.stringify(realpathSync(f.checkout))} || argv[3] !== 'deploy' || !argv.includes('--prefer-offline')) throw new Error('Wrong checkout or registry install');
       mkdirSync(join(argv.at(-1), 'node_modules'));
     } else if (argv[0] !== 'machinectl') throw new Error('Registry install');
     return { code: 0, stdout: '', stderr: '' };
@@ -259,7 +259,7 @@ test('checkout fake rejects registry installs and commands targeting another che
       '--filter',
       '@xiechimon/cairn-cli',
       '--prod',
-      '--offline',
+      '--prefer-offline',
       join(f.root, 'wrong'),
     ]),
   ).rejects.toThrow('Deploy must use the host checkout');
