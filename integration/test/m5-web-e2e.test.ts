@@ -434,7 +434,7 @@ describe('M5 web E2E: main sequence full chain (01 §7.4 spine, zero UI reload)'
     expect(server.todoPhase(target!.id)).toBe('review');
   }, 300_000);
 
-  test('scheduled run parks at review: create once schedule in UI → tick trigger → direct build → parks at review + started-by-schedule marker (r3 §9)', async () => {
+  test('scheduled run parks at review: create once schedule in UI → tick trigger → continues the latest build → parks at review + started-by-schedule marker (r3 §9)', async () => {
     await page.goto(`${server.url}/app/schedules`);
     await page.getByRole('button', { name: '新建定时', exact: true }).click();
     await pexpect(page.getByRole('dialog', { name: '新建定时' })).toBeVisible();
@@ -479,11 +479,14 @@ describe('M5 web E2E: main sequence full chain (01 §7.4 spine, zero UI reload)'
     const after = (await api(server.url, 'GET', `/api/todos/${spine!.id}`)).body as {
       latestBuildId: string | null;
     };
-    expect(after.latestBuildId).not.toBe(spineBefore!.latestBuildId);
-    const schedBuild = (await api(server.url, 'GET', `/api/builds/${after.latestBuildId}`))
-      .body as { triggerSource: string; withPlan: boolean };
-    expect(schedBuild.triggerSource).toBe('schedule');
-    expect(schedBuild.withPlan).toBe(false);
+    expect(after.latestBuildId).toBe(spineBefore!.latestBuildId);
+    const scheduledSteps = server.db
+      .select()
+      .from(stepTable)
+      .where(eq(stepTable.buildId, after.latestBuildId!))
+      .all()
+      .filter((s) => s.scheduleId === schedules[0]!.id);
+    expect(scheduledSteps.map((s) => s.kind)).toEqual(['build']);
     expect((await api(server.url, 'GET', '/api/schedules')).body as unknown[]).toHaveLength(0);
 
     await openBoard();
