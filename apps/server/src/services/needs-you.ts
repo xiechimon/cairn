@@ -1,6 +1,6 @@
 import type { NeedsYouQuery, NeedsYouReason } from '@cairn/shared';
 import { isProviderAuthFailure } from '@cairn/shared';
-import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { build, project, step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
@@ -41,10 +41,28 @@ export function failureNeedsHuman(errorMessage: string): boolean {
   return MISSING_CREDENTIALS.some((mark) => lower.includes(mark.toLowerCase()));
 }
 
+function lastStepScheduledBuildIds(deps: BuildDeps, buildIds: string[]): Set<string> {
+  if (buildIds.length === 0) return new Set();
+  const latestByBuild = new Map<string, { scheduleId: string | null; createdAt: number }>();
+  for (const row of deps.db
+    .select({ buildId: step.buildId, scheduleId: step.scheduleId, createdAt: step.createdAt })
+    .from(step)
+    .where(inArray(step.buildId, buildIds))
+    .all()) {
+    const seen = latestByBuild.get(row.buildId);
+    if (seen === undefined || row.createdAt >= seen.createdAt) latestByBuild.set(row.buildId, row);
+  }
+  return new Set(
+    [...latestByBuild].flatMap(([buildId, row]) => (row.scheduleId === null ? [] : [buildId])),
+  );
+}
+
 function owedAutomaticRetry(
-  buildRow: { errorMessage: string | null; prevPhase: string | null } | undefined,
+  buildRow: { id: string; errorMessage: string | null; prevPhase: string | null } | undefined,
+  scheduledBuildIds: Set<string>,
 ): boolean {
   if (buildRow === undefined) return false;
+  if (scheduledBuildIds.has(buildRow.id)) return false;
   if (failureNeedsHuman(buildRow.errorMessage ?? '')) return false;
   return buildRow.prevPhase !== 'failed';
 }
@@ -68,6 +86,12 @@ export function listNeedsYou(deps: BuildDeps, teamId: string, now = nowMs()): Ne
       : deps.db.select().from(build).where(inArray(build.id, buildIds)).all()
     ).map((row) => [row.id, row]),
   );
+  const scheduledBuildIds = lastStepScheduledBuildIds(
+    deps,
+    rows.flatMap((row) =>
+      row.phase === 'failed' && row.latestBuildId !== null ? [row.latestBuildId] : [],
+    ),
+  );
   const projectIds = [...new Set(rows.map((row) => row.projectId))];
   const projectById = new Map(
     (projectIds.length === 0
@@ -86,7 +110,7 @@ export function listNeedsYou(deps: BuildDeps, teamId: string, now = nowMs()): Ne
       if (policy === 'human') reason = 'review';
     } else if (row.phase === 'failed') {
       const latest = row.latestBuildId === null ? undefined : buildById.get(row.latestBuildId);
-      if (!owedAutomaticRetry(latest)) reason = 'failed';
+      if (!owedAutomaticRetry(latest, scheduledBuildIds)) reason = 'failed';
     }
     if (reason !== null) entries.push({ todoId: row.id, reason, phaseAt: row.phaseAt });
   }
@@ -111,15 +135,13 @@ export async function sweepFailedRetries(deps: BuildDeps): Promise<void> {
     .all();
   for (const row of rows) {
     if (row.latestBuildId === null) continue;
-    const latest = deps.db
-      .select({ scheduleId: step.scheduleId })
-      .from(step)
-      .where(eq(step.buildId, row.latestBuildId))
-      .orderBy(desc(step.createdAt))
-      .get();
-    if (latest?.scheduleId != null) continue;
     const buildRow = deps.db.select().from(build).where(eq(build.id, row.latestBuildId)).get();
-    if (buildRow === undefined || !owedAutomaticRetry(buildRow)) continue;
+    if (
+      buildRow === undefined ||
+      !owedAutomaticRetry(buildRow, lastStepScheduledBuildIds(deps, [row.latestBuildId]))
+    ) {
+      continue;
+    }
     try {
       await applyBuildStepAction(
         deps,
