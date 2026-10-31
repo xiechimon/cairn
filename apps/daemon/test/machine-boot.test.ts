@@ -6,13 +6,12 @@ describe('online sequence canon (02 §5.4/r3 §1.5)', () => {
   test('unregistered → enroll → full sequence line order', async () => {
     const { handle, api, lines, paths } = await boot({});
     await waitFor(() => lines.some((l) => l.includes('[wake] push channel connected')));
-    expect(lines[0]).toBe('Loading pi runtime…');
+    expect(lines).not.toContain('Loading pi runtime…');
     expect(lines).toContain('Enrolled in team team-1 (machine m1)');
     expect(lines.some((l) => l === 'Online (machineId=m1); polling http://server')).toBe(true);
     expect(lines).toContain('[recover] no pending steps found');
     expect(lines).toContain('[wake] push channel connected');
     const idx = (s: string) => lines.findIndex((l) => l.includes(s));
-    expect(idx('Loading pi runtime')).toBeLessThan(idx('Online (machineId'));
     expect(idx('Online (machineId')).toBeLessThan(idx('[recover]'));
     expect(idx('[recover]')).toBeLessThan(idx('[wake] push channel connected'));
     expect(existsSync(paths.machineJson)).toBe(true);

@@ -1,15 +1,15 @@
-import { mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { PassThrough } from 'node:stream';
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { AgentBackend, MachineDoneBody, SessionOpts } from '@cairn/shared';
 import { describe, expect, test, vi } from 'vitest';
 import { StepJournal, TranscriptBuffer } from '../src/journal.js';
-import { decodeOrbFrame, encodeOrbFrame } from '../src/orb/protocol.js';
 import {
   NspawnOrbProvider,
   type OrbCommandRunner,
   type OrbExecOptions,
 } from '../src/orb/provider.js';
+import { RelayMachineApi } from '../src/orb/relay.js';
 import { runOrbWorker } from '../src/orb/worker.js';
 import {
   boot,
@@ -22,21 +22,24 @@ import {
 
 function workerRunner(
   backend: AgentBackend,
-  observe?: (options: OrbExecOptions) => void,
+  observe?: (options: OrbExecOptions, runtimeHome: string) => void,
 ): OrbCommandRunner {
+  const root = mkdtempSync(join(tmpdir(), 'orb-worker-'));
   return async (argv, options) => {
     if (argv[0] !== 'systemd-run' || !argv.includes('--uid=agent'))
       return { code: 0, stdout: '', stderr: '' };
-    if (options) observe?.(options);
-    const input = new PassThrough();
-    const output = new PassThrough();
-    output.on('data', (chunk: Buffer) => options?.onStdout?.(chunk.toString()));
-    options?.onInput?.((data) => input.write(data));
-    const worker = runOrbWorker({ input, output, backendFor: () => backend });
-    input.write(options?.input ?? '');
-    await worker;
-    input.end();
-    output.end();
+    const runtimeHome = join(root, argv[2] ?? 'agent');
+    if (options) observe?.(options, runtimeHome);
+    const socketPath = options?.binds?.find(
+      (bind) => bind.target === '/run/cairn/relay.sock',
+    )?.source;
+    if (!socketPath) throw new Error('Missing relay socket');
+    await runOrbWorker({
+      socketPath,
+      backendFor: () => backend,
+      home: runtimeHome,
+      workspacesRoot: join(runtimeHome, 'work'),
+    });
     return { code: 0, stdout: '', stderr: '' };
   };
 }
@@ -189,18 +192,14 @@ test('idle stop notes reach the completed step transcript', async () => {
   }
 });
 
-test.each(['clone', 'start', 'worker', 'worker-exit', 'worker-frame', 'eviction'] as const)(
-  '%s failure reports a failed step with an error transcript and clears its host journal',
+test.each(['clone', 'start', 'worker', 'worker-exit', 'bind', 'eviction'] as const)(
+  '%s failure receives a host failure report',
   async (source) => {
     const runner = workerRunner(fakeBackend([{ type: 'done', usage: [] }]).backend);
     const provider = new NspawnOrbProvider({
       runner: async (argv, options) => {
         if (argv.includes('--uid=agent') && source === 'worker-exit')
           return { code: 137, stdout: '', stderr: `${source} unavailable` };
-        if (argv.includes('--uid=agent') && source === 'worker-frame') {
-          options?.onStdout?.(encodeOrbFrame({ type: 'failed', error: `${source} unavailable` }));
-          return { code: 0, stdout: '', stderr: '' };
-        }
         if (
           argv[1] === source ||
           (source === 'worker' && argv.includes('--uid=agent')) ||
@@ -213,22 +212,20 @@ test.each(['clone', 'start', 'worker', 'worker-exit', 'worker-frame', 'eviction'
     if (source === 'eviction') await provider.ensure({ conversationId: 'old', projectId: 'P' });
     const api = new FakeMachineApi();
     api.claimQueue.push(CLAIMED);
-    const { handle, paths } = await boot({
+    const { handle, paths, lines } = await boot({
       api,
       orbProvider: provider,
       capEnv: { CAIRN_EXECUTOR: 'orb', CAIRN_ORB_MAX: '1' },
     });
     try {
+      await waitFor(() => lines.some((line) => line.includes('Orb step exited')));
       await waitFor(() => api.doneBodies.length === 1);
       expect(api.doneBodies[0]?.body).toMatchObject({
         status: 'failed',
         errorMessage:
-          source === 'worker-exit'
-            ? `Orb step exited (137): ${source} unavailable`
-            : `${source} unavailable`,
+          source === 'worker-exit' ? 'orb exited with code 137' : expect.stringContaining(source),
       });
-      expect(JSON.stringify(api.uploads)).toContain(`${source} unavailable`);
-      expect(new StepJournal(paths.outboxDir).pending()).toEqual([]);
+      expect(new StepJournal(paths.outboxDir).get('s1')).toBeNull();
     } finally {
       await handle.stop();
       await handle.done;
@@ -296,7 +293,7 @@ test.each(['clone', 'bind', 'session'] as const)(
   },
 );
 
-test('chief and worker claims share the two-orb cap even when the server gates workers', async () => {
+test('Coordinator and worker claims share the executor cap even when the server gates workers', async () => {
   const release = defer();
   let started = 0;
   const backend: AgentBackend = {
@@ -322,6 +319,7 @@ test('chief and worker claims share the two-orb cap even when the server gates w
     });
   const { handle } = await boot({
     api,
+    backend,
     orbProvider: new NspawnOrbProvider({ runner: workerRunner(backend) }),
     capEnv: { CAIRN_EXECUTOR: 'orb', CAIRN_ORB_MAX: '2' },
   });
@@ -363,14 +361,17 @@ test('orb mounts conversation workspaces and artifacts without sharing host runt
     ])
       expect(sources).not.toContain(root);
     expect(sources).not.toContain(paths.outboxDir);
-    expect(sources).toContain(join(paths.home, 'orb-outbox', CLAIMED.step.id));
+    expect(sources).toEqual([
+      join(paths.home, 'orb', `${CLAIMED.step.id}.sock`),
+      expect.stringMatching(/\/daemon\/dist$/),
+    ]);
   } finally {
     await handle.stop();
     await handle.done;
   }
 });
 
-test('an unreachable failure report keeps the failed result in the host journal for recovery', async () => {
+test('an unreachable host failure report remains journaled for replay', async () => {
   class Api extends FakeMachineApi {
     override async done() {
       throw new Error('report unreachable');
@@ -389,12 +390,12 @@ test('an unreachable failure report keeps the failed result in the host journal 
     capEnv: { CAIRN_EXECUTOR: 'orb' },
   });
   try {
-    await waitFor(() => lines.some((line) => line.includes('done report failed')));
+    await waitFor(() => lines.some((line) => line.includes('Orb step exited')));
     expect(new StepJournal(paths.outboxDir).pending()[0]).toMatchObject({
       state: 'awaiting-upload',
-      doneBody: { status: 'failed', errorMessage: 'clone unavailable' },
+      doneBody: { status: 'failed', errorMessage: expect.stringContaining('clone unavailable') },
     });
-    expect(api.uploads).toHaveLength(1);
+    expect(api.uploads).toHaveLength(0);
   } finally {
     await handle.stop();
     await handle.done;
@@ -415,15 +416,14 @@ test('worker exit waits for an in-flight finish report without replacing or dupl
   api.claimQueue.push(CLAIMED);
   const provider = new NspawnOrbProvider({
     runner: async (argv, options) => {
-      if (argv[0] === 'systemd-run') {
-        options?.onStdout?.(
-          encodeOrbFrame({
-            type: 'call',
-            id: 1,
-            method: 'done',
-            args: ['s1', { status: 'success' }],
-          }),
-        );
+      if (argv.includes('--uid=agent')) {
+        const socketPath = options?.binds?.find(
+          (bind) => bind.target === '/run/cairn/relay.sock',
+        )?.source;
+        if (!socketPath) throw new Error('Missing relay socket');
+        const relay = await RelayMachineApi.connect(socketPath);
+        void relay.api.done('s1', { status: 'success' }).catch(() => {});
+        await waitFor(() => reporting);
         return { code: 1, stdout: '', stderr: 'worker crashed after finish' };
       }
       return { code: 0, stdout: '', stderr: '' };
@@ -451,7 +451,7 @@ test('worker exit waits for an in-flight finish report without replacing or dupl
   }
 });
 
-test('an orb cannot mount another step outbox or forge its host recovery journal', async () => {
+test('an orb cannot complete another step or mount its host recovery journal', async () => {
   const executions: OrbExecOptions[] = [];
   const api = new FakeMachineApi();
   api.mePatch = { maxConcurrent: 2 };
@@ -463,26 +463,20 @@ test('an orb cannot mount another step outbox or forge its host recovery journal
     });
   const provider = new NspawnOrbProvider({
     runner: async (argv, options) => {
-      if (argv[0] !== 'systemd-run' || !options) return { code: 0, stdout: '', stderr: '' };
+      if (!argv.includes('--uid=agent') || !options) return { code: 0, stdout: '', stderr: '' };
       executions.push(options);
-      const init = decodeOrbFrame(options.input?.trim() ?? '');
-      if (init?.type !== 'init') throw new Error('Missing init frame');
-      const outbox = init.input.paths.outboxDir;
-      const forged = new StepJournal(outbox);
-      forged.claim({
-        stepId: 'victim',
-        buildId: 'victim-build',
-        kind: 'plan',
-        conversationId: 'victim-build',
-        sessionAction: 'new',
-        prompt: 'forged',
-      });
-      forged.update('victim', {
-        state: 'awaiting-upload',
-        doneBody: { status: 'success' },
-        stopRequest: { discard: true },
-      });
-      options.onStdout?.(encodeOrbFrame({ type: 'finished' }));
+      const socketPath = options.binds?.find(
+        (bind) => bind.target === '/run/cairn/relay.sock',
+      )?.source;
+      if (!socketPath) throw new Error('Missing relay socket');
+      const relay = await RelayMachineApi.connect(socketPath);
+      try {
+        await expect(relay.api.done('victim', { status: 'success' })).rejects.toThrow(
+          'Relay step does not match claim',
+        );
+      } finally {
+        relay.close();
+      }
       return { code: 0, stdout: '', stderr: '' };
     },
   });
@@ -493,22 +487,19 @@ test('an orb cannot mount another step outbox or forge its host recovery journal
   });
   try {
     await waitFor(() => executions.length === 2);
-    const outboxes = ['s1', 's2'].map((id) => join(paths.home, 'orb-outbox', id));
-    for (const [index, execution] of executions.entries()) {
-      const sources = execution.binds?.map((bind) => bind.source) ?? [];
-      expect(sources).toContain(outboxes[index]);
-      expect(sources).not.toContain(outboxes[1 - index]);
-      expect(sources).not.toContain(paths.outboxDir);
-      expect(sources).not.toContain(dirname(outboxes[index]!));
+    for (const execution of executions) {
+      expect(execution.binds).toHaveLength(2);
+      expect(execution.binds?.filter((bind) => bind.source.startsWith(paths.home))).toEqual([
+        {
+          source: expect.stringMatching(/orb\/s[12]\.sock$/),
+          target: '/run/cairn/relay.sock',
+          releaseAfterExec: true,
+        },
+      ]);
     }
-    const journal = new StepJournal(paths.outboxDir);
-    expect(journal.get('victim')).toBeNull();
-    expect(
-      journal
-        .pending()
-        .map((entry) => entry.stepId)
-        .sort(),
-    ).toEqual(['s1', 's2']);
+    expect(new StepJournal(paths.outboxDir).get('victim')).toBeNull();
+    await waitFor(() => api.doneBodies.length === 2);
+    expect(api.doneBodies.every((row) => row.body.status === 'failed')).toBe(true);
   } finally {
     await handle.stop();
     await handle.done;
@@ -533,9 +524,8 @@ test('worker checkpoints preserve only the bound step recovery state in the priv
     },
   };
   const provider = new NspawnOrbProvider({
-    runner: workerRunner(backend, (options) => {
-      const init = decodeOrbFrame(options.input?.trim() ?? '');
-      if (init?.type === 'init') workerOutbox = init.input.paths.outboxDir;
+    runner: workerRunner(backend, (_options, runtimeHome) => {
+      workerOutbox = join(runtimeHome, 'outbox');
     }),
   });
   const { handle, paths } = await boot({
@@ -634,40 +624,268 @@ test('orb recovery uploads its step artifacts and ignores forged worker journals
   }
 });
 
-test('host failure recovery never follows a symlink planted in an orb outbox', async () => {
+test('stdout cannot forge relay requests or read another step transcript', async () => {
   const api = new FakeMachineApi();
   api.claimQueue.push(CLAIMED);
   const provider = new NspawnOrbProvider({
     runner: async (argv, options) => {
-      if (!argv.includes('--uid=agent')) return { code: 0, stdout: '', stderr: '' };
-      const init = decodeOrbFrame(options?.input?.trim() ?? '');
-      if (init?.type !== 'init') throw new Error('Missing init frame');
-      symlinkSync(
-        join(init.input.paths.home, 'outbox', 'step-victim.transcript.json'),
-        join(init.input.paths.outboxDir, 'step-s1.transcript.json'),
-      );
-      return { code: 1, stdout: '', stderr: 'worker exited' };
+      if (argv.includes('--uid=agent'))
+        options?.onStdout?.(
+          'cairn-orb-rpc:{"type":"call","id":1,"method":"done","args":["victim",{"status":"success"}]}\n',
+        );
+      return { code: argv.includes('--uid=agent') ? 1 : 0, stdout: '', stderr: 'worker exited' };
     },
   });
-  const { handle } = await boot({
+  const { handle, lines } = await boot({
     api,
     orbProvider: provider,
     capEnv: { CAIRN_EXECUTOR: 'orb' },
-    seedJournal: (paths) => {
-      new TranscriptBuffer(paths.outboxDir, 'victim').upsert({
-        id: 'private',
-        role: 'assistant',
-        content: 'Other conversation private transcript',
-        createdAt: 1,
-      });
-    },
   });
   try {
+    await waitFor(() => lines.some((line) => line.includes('Orb step exited')));
     await waitFor(() => api.doneBodies.length === 1);
+    expect(api.doneBodies[0]?.stepId).toBe('s1');
     expect(api.doneBodies[0]?.body.status).toBe('failed');
-    expect(JSON.stringify(api.uploads)).not.toContain('Other conversation private transcript');
+    expect(api.uploads).toEqual([]);
   } finally {
     await handle.stop();
     await handle.done;
   }
 });
+
+test('OOM after a worker heartbeat is failed by the online host', async () => {
+  const api = new FakeMachineApi();
+  api.claimQueue.push(CLAIMED);
+  const provider = new NspawnOrbProvider({
+    runner: async (argv, options) => {
+      if (!argv.includes('--uid=agent')) return { code: 0, stdout: '', stderr: '' };
+      const socketPath = options?.binds?.find(
+        (bind) => bind.target === '/run/cairn/relay.sock',
+      )?.source;
+      if (!socketPath) throw new Error('Missing relay socket');
+      const relay = await RelayMachineApi.connect(socketPath);
+      await relay.api.heartbeat('s1');
+      relay.send({ type: 'session', live: true });
+      relay.close();
+      return { code: 137, stdout: '', stderr: 'OOM killed' };
+    },
+  });
+  const { handle, paths } = await boot({
+    api,
+    orbProvider: provider,
+    capEnv: { CAIRN_EXECUTOR: 'orb' },
+  });
+  try {
+    await waitFor(() => api.doneBodies.length === 1);
+    expect(api.calls).toContain('heartbeat:s1');
+    expect(api.doneBodies[0]?.body).toMatchObject({
+      status: 'failed',
+      errorMessage: 'orb exited with code 137',
+    });
+    expect(new StepJournal(paths.outboxDir).pending()).toEqual([]);
+  } finally {
+    await handle.stop();
+    await handle.done;
+  }
+});
+
+test('worker exit replays a rejected journaled finish with its checkpoint artifacts', async () => {
+  class Api extends FakeMachineApi {
+    attempts = 0;
+    override async done(stepId: string, body: MachineDoneBody) {
+      if (++this.attempts === 1) throw new Error('finish temporarily rejected');
+      await super.done(stepId, body);
+    }
+  }
+  const api = new Api();
+  api.claimQueue.push(CLAIMED);
+  const provider = new NspawnOrbProvider({
+    runner: async (argv, options) => {
+      if (!argv.includes('--uid=agent')) return { code: 0, stdout: '', stderr: '' };
+      const socketPath = options?.binds?.find(
+        (bind) => bind.target === '/run/cairn/relay.sock',
+      )?.source;
+      if (!socketPath) throw new Error('Missing relay socket');
+      const relay = await RelayMachineApi.connect(socketPath);
+      relay.send({
+        type: 'checkpoint',
+        checkpoint: {
+          state: 'awaiting-upload',
+          sessionId: 'session',
+          sessionAction: 'new',
+          prompt: null,
+          doneBody: { status: 'success' },
+          sessionContent: 'session artifact',
+          transcript: [
+            { id: 'row', role: 'assistant', content: 'checkpoint artifact', createdAt: 1 },
+          ],
+        },
+      });
+      await expect(relay.api.done('s1', { status: 'success' })).rejects.toThrow(
+        'temporarily rejected',
+      );
+      relay.close();
+      return { code: 137, stdout: '', stderr: 'crashed after rejected finish' };
+    },
+  });
+  const { handle, paths } = await boot({
+    api,
+    orbProvider: provider,
+    capEnv: { CAIRN_EXECUTOR: 'orb' },
+  });
+  try {
+    await waitFor(() => api.doneBodies.length === 1);
+    expect(api.attempts).toBe(2);
+    expect(api.doneBodies[0]?.body.status).toBe('success');
+    expect(JSON.stringify(api.uploads)).toContain('checkpoint artifact');
+    expect(new StepJournal(paths.outboxDir).pending()).toEqual([]);
+  } finally {
+    await handle.stop();
+    await handle.done;
+  }
+});
+
+test('a stop after worker crash still reaches the run while host completion is pending', async () => {
+  const finish = defer();
+  let reporting = false;
+  class Api extends FakeMachineApi {
+    override async done(stepId: string, body: MachineDoneBody) {
+      reporting = true;
+      await finish.promise;
+      await super.done(stepId, body);
+    }
+  }
+  const api = new Api();
+  api.claimQueue.push(CLAIMED);
+  api.stopResponse = true;
+  const { handle, lines, paths } = await boot({
+    api,
+    orbProvider: new NspawnOrbProvider({
+      runner: async (argv) => ({
+        code: argv.includes('--uid=agent') ? 137 : 0,
+        stdout: '',
+        stderr: 'crash',
+      }),
+    }),
+    capEnv: { CAIRN_EXECUTOR: 'orb' },
+  });
+  try {
+    await waitFor(() => reporting);
+    api.onStreamEvent?.({ type: 'stop', stepId: 's1' });
+    await waitFor(() => api.calls.includes('stop:s1'));
+    await waitFor(() => new StepJournal(paths.outboxDir).get('s1')?.stopRequest != null);
+    expect(lines.some((line) => line.includes('stop dropped'))).toBe(false);
+    finish.resolve();
+    await waitFor(() => api.doneBodies.length === 1);
+    expect(api.doneBodies[0]?.body.status).toBe('failed');
+  } finally {
+    finish.resolve();
+    await handle.stop();
+    await handle.done;
+  }
+});
+
+test('a worker ignoring stop is aborted after the grace period', async () => {
+  let signal: AbortSignal | undefined;
+  let started = false;
+  let receivedStop = false;
+  const release = defer();
+  const api = new FakeMachineApi();
+  api.claimQueue.push(CLAIMED);
+  api.stopResponse = true;
+  const provider = new NspawnOrbProvider({
+    runner: async (argv, options) => {
+      if (!argv.includes('--uid=agent')) return { code: 0, stdout: '', stderr: '' };
+      const socketPath = options?.binds?.find(
+        (bind) => bind.target === '/run/cairn/relay.sock',
+      )?.source;
+      if (!socketPath) throw new Error('Missing relay socket');
+      const relay = await RelayMachineApi.connect(socketPath, (frame) => {
+        if (frame.type === 'stop') receivedStop = true;
+      });
+      await relay.api.heartbeat('s1');
+      relay.send({ type: 'session', live: true });
+      signal = options?.signal;
+      signal?.addEventListener('abort', () => release.resolve(), { once: true });
+      started = true;
+      await release.promise;
+      relay.close();
+      return { code: 137, stdout: '', stderr: 'aborted unresponsive worker' };
+    },
+  });
+  const { handle } = await boot({ api, orbProvider: provider, capEnv: { CAIRN_EXECUTOR: 'orb' } });
+  try {
+    await waitFor(() => started);
+    expect(signal).toBeDefined();
+    api.onStreamEvent?.({ type: 'stop', stepId: 's1' });
+    await waitFor(() => receivedStop);
+    expect(signal?.aborted).toBe(false);
+    await waitFor(() => signal?.aborted === true, 8000);
+    await waitFor(() => api.doneBodies.length === 1);
+    expect(api.doneBodies[0]?.body.status).toBe('failed');
+  } finally {
+    release.resolve();
+    await handle.stop();
+    await handle.done;
+  }
+}, 15000);
+
+test.each(['transcript', 'sessionContent'] as const)(
+  'rejects oversized checkpoint %s before writing host files',
+  async (field) => {
+    const api = new FakeMachineApi();
+    api.claimQueue.push(CLAIMED);
+    let rejected = false;
+    const provider = new NspawnOrbProvider({
+      runner: async (argv, options) => {
+        if (!argv.includes('--uid=agent')) return { code: 0, stdout: '', stderr: '' };
+        const socketPath = options?.binds?.find(
+          (bind) => bind.target === '/run/cairn/relay.sock',
+        )?.source;
+        if (!socketPath) throw new Error('Missing relay socket');
+        const relay = await RelayMachineApi.connect(socketPath);
+        const content = 'é'.repeat(3 * 1024 * 1024);
+        relay.send({
+          type: 'checkpoint',
+          checkpoint: {
+            state: 'running',
+            sessionId: 'oversized',
+            sessionAction: 'new',
+            prompt: null,
+            ...(field === 'transcript'
+              ? { transcript: [{ id: 'row', role: 'assistant' as const, content, createdAt: 1 }] }
+              : { sessionContent: content }),
+          },
+        });
+        try {
+          await relay.api.heartbeat('s1');
+        } catch {
+          rejected = true;
+        }
+        relay.close();
+        return { code: 1, stdout: '', stderr: 'worker rejected' };
+      },
+    });
+    const { handle, paths } = await boot({
+      api,
+      orbProvider: provider,
+      capEnv: { CAIRN_EXECUTOR: 'orb' },
+    });
+    try {
+      await waitFor(() => api.doneBodies.length === 1 || api.calls.includes('heartbeat:s1'));
+      expect(rejected).toBe(true);
+      expect(new StepJournal(paths.outboxDir).get('s1')?.sessionId).not.toBe('oversized');
+      expect(
+        existsSync(
+          join(
+            paths.outboxDir,
+            `step-s1.${field === 'transcript' ? 'transcript.json' : 'session.jsonl'}`,
+          ),
+        ),
+      ).toBe(false);
+    } finally {
+      await handle.stop();
+      await handle.done;
+    }
+  },
+);

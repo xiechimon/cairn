@@ -16,13 +16,16 @@ import { startStubLlm } from '../../../integration/test/stub-llm.js';
 import { NspawnOrbProvider, runOrbCommand } from '../src/orb/provider.js';
 import { boot, CLAIMED, FakeMachineApi, waitFor } from './machine-loop-harness.js';
 
-test('compiled worker runs an agent command with CAIRN_ORB through the real stdio bridge', async () => {
+test('compiled worker runs an agent command with CAIRN_ORB through the real Unix socket relay', async () => {
   const scratch = mkdtempSync(join(tmpdir(), 'cairn-orb-worker-'));
   symlinkSync(resolve('apps/daemon/node_modules'), join(scratch, 'node_modules'), 'dir');
   copyFileSync(resolve('apps/daemon/package.json'), join(scratch, 'package.json'));
   const entry = join(scratch, 'dist', 'cli.mjs');
   await build({
-    entryPoints: [resolve('apps/daemon/src/cli.ts')],
+    stdin: {
+      contents: `import { runOrbWorker } from ${JSON.stringify(resolve('apps/daemon/src/orb/worker.ts'))}; await runOrbWorker({ socketPath: process.argv[2], home: ${JSON.stringify(join(scratch, 'state'))}, workspacesRoot: ${JSON.stringify(join(scratch, 'work'))}, seedRoot: ${JSON.stringify(join(scratch, 'seed'))} });`,
+      resolveDir: resolve('.'),
+    },
     outfile: entry,
     bundle: true,
     platform: 'node',
@@ -73,6 +76,16 @@ test('compiled worker runs an agent command with CAIRN_ORB through the real stdi
     runner: async (argv, options) => {
       if (argv[0] !== 'systemd-run' || !argv.includes('--uid=agent'))
         return { code: 0, stdout: '', stderr: '' };
+      const socketPath = options?.binds?.find(
+        (bind) => bind.target === '/run/cairn/relay.sock',
+      )?.source;
+      if (!socketPath) throw new Error('Missing relay socket');
+      const seed = join(scratch, 'seed', 'P');
+      mkdirSync(seed, { recursive: true });
+      const seedSource = options?.binds?.find((bind) => bind.target === '/seed/P/repo')?.source;
+      if (!seedSource) throw new Error('Missing seed snapshot');
+      rmSync(join(seed, 'repo'), { force: true });
+      symlinkSync(seedSource, join(seed, 'repo'), 'dir');
       const home = join(scratch, 'user');
       mkdirSync(home, { recursive: true });
       return runOrbCommand(
@@ -81,7 +94,7 @@ test('compiled worker runs an agent command with CAIRN_ORB through the real stdi
           '--import',
           resolve('apps/daemon/node_modules/tsx/dist/loader.mjs'),
           entry,
-          'orb-step',
+          socketPath,
         ],
         {
           ...options,
@@ -104,15 +117,20 @@ test('compiled worker runs an agent command with CAIRN_ORB through the real stdi
   });
   try {
     await waitFor(
-      () => api.doneBodies.length === 1 || lines.some((line) => line.includes('runStep crashed')),
-      30_000,
+      () => api.doneBodies.length === 1 || lines.some((line) => line.includes('Orb step exited')),
+      60_000,
     ).catch((error: unknown) => {
       throw new Error(lines.join('\n'), { cause: error });
     });
     expect(api.doneBodies[0]?.body.status, lines.join('\n')).toBe('success');
-    await waitFor(() => api.parked !== null);
+    await waitFor(() => api.parked !== null, 30_000);
     api.parked?.({ ...claimed, step: { ...claimed.step, id: 's2' } });
-    await waitFor(() => api.doneBodies.length === 2, 30_000);
+    await waitFor(
+      () => api.doneBodies.length === 2 || lines.some((line) => line.includes('Orb step exited')),
+      60_000,
+    ).catch((error: unknown) => {
+      throw new Error(lines.join('\n'), { cause: error });
+    });
     expect(api.doneBodies[1]?.body.status, lines.join('\n')).toBe('success');
     expect(stub.requests).toHaveLength(3);
     expect(JSON.stringify(api.toolCalls)).toContain('orb-command=1');
@@ -126,4 +144,4 @@ test('compiled worker runs an agent command with CAIRN_ORB through the real stdi
     await stub.close();
     rmSync(scratch, { recursive: true, force: true });
   }
-}, 60_000);
+}, 180_000);

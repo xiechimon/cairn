@@ -361,9 +361,10 @@ describe('#1195 branchesWithNewCommits (step-window branch scan primitive)', () 
     const prepared = await ws.prepare(prepareInput(CONV_A));
     const base = (await gitPrim.head(prepared.cwd)) as string;
     const sibling = conversationBranch(CONV_B);
+    const sinceMs = Date.now();
     await commitOn(prepared.cwd, sibling, 'sib.md', 'sibling work\n');
     await runGit(['checkout', prepared.branch], { cwd: prepared.cwd });
-    const found = await gitPrim.branchesWithNewCommits(prepared.cwd, base, Date.now());
+    const found = await gitPrim.branchesWithNewCommits(prepared.cwd, base, sinceMs);
     expect(found).toContain(sibling);
   }, 30_000);
 
@@ -380,9 +381,10 @@ describe('#1195 branchesWithNewCommits (step-window branch scan primitive)', () 
   test('WorkspaceManager passes through the same semantics (WorktreeOps seam consumer surface)', async () => {
     const prepared = await ws.prepare(prepareInput(CONV_A));
     const base = (await gitPrim.head(prepared.cwd)) as string;
+    const sinceMs = Date.now();
     await commitOn(prepared.cwd, 'dogfood/passthrough', 'p.md', 'x\n');
     await runGit(['checkout', prepared.branch], { cwd: prepared.cwd });
-    const found = await ws.branchesWithNewCommits(prepared.cwd, base, Date.now());
+    const found = await ws.branchesWithNewCommits(prepared.cwd, base, sinceMs);
     expect(found).toContain('dogfood/passthrough');
     expect(await ws.currentBranch(prepared.cwd)).toBe(prepared.branch);
   }, 30_000);
@@ -455,8 +457,7 @@ describe('#1149 environment lifecycle hooks (two prepare mount points)', () => {
   }, 30_000);
 
   test('hooks consume step-level credentials: credentials non-null → GIT_CONFIG_COUNT=2 enters the hook env', async () => {
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: shell-script content embedded in a JS string; ${GIT_CONFIG_COUNT} is sh parameter expansion, not JS template
-    seedHook('setup', '#!/bin/sh\necho "cred=${GIT_CONFIG_COUNT:-unset}"\n');
+    seedHook('setup', '#!/bin/sh\necho "cred=$GIT_CONFIG_COUNT"\n');
     await runGit(['add', '-A'], { cwd: seedDir });
     await runGit(['commit', '-m', 'hooks'], { cwd: seedDir, env: commitEnv(IDENTITY) });
     await runGit(['push', 'origin', 'main'], { cwd: seedDir });
