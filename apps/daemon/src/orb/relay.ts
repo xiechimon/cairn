@@ -51,6 +51,7 @@ export class RelayMachineServer {
       upstream: MachineApi;
       input?: OrbStepInput | (() => OrbStepInput);
       onFrame?: (frame: OrbFrame) => void;
+      onHeartbeat?: () => void;
       onReporting?: (body: unknown) => void;
       onDone?: () => void;
     },
@@ -208,6 +209,7 @@ export class RelayMachineServer {
       const operation = this.options.upstream[method as OrbStepMethod];
       if (typeof operation !== 'function')
         throw new RelayMachineError('Relay method is unavailable');
+      if (method === 'heartbeat') this.options.onHeartbeat?.();
       if (cancellable && (method === 'relayTool' || method === 'askUser')) {
         const index = method === 'relayTool' ? 3 : 2;
         args[index] = { ...(args[index] as object), signal: controller.signal };

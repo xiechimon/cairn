@@ -222,7 +222,8 @@ test.each(['clone', 'start', 'worker', 'worker-exit', 'bind', 'eviction'] as con
       await waitFor(() => api.doneBodies.length === 1);
       expect(api.doneBodies[0]?.body).toMatchObject({
         status: 'failed',
-        errorMessage: expect.stringContaining(source),
+        errorMessage:
+          source === 'worker-exit' ? 'orb exited with code 137' : expect.stringContaining(source),
       });
       expect(new StepJournal(paths.outboxDir).get('s1')).toBeNull();
     } finally {
@@ -679,7 +680,7 @@ test('OOM after a worker heartbeat is failed by the online host', async () => {
     expect(api.calls).toContain('heartbeat:s1');
     expect(api.doneBodies[0]?.body).toMatchObject({
       status: 'failed',
-      errorMessage: expect.stringContaining('OOM killed'),
+      errorMessage: 'orb exited with code 137',
     });
     expect(new StepJournal(paths.outboxDir).pending()).toEqual([]);
   } finally {

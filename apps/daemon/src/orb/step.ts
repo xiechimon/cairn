@@ -18,9 +18,11 @@ import { type OrbExecOptions, type OrbHandle, orbNote } from './provider.js';
 import { RelayMachineServer } from './relay.js';
 import { prepareOrbSeed } from './seed.js';
 
+export const ORB_HEARTBEAT_TIMEOUT_MS = 120_000;
+
 export async function runOrbStep(
   lifecycle: OrbLifecycle,
-  deps: RunStepDeps & { orbProxyUrl?: string },
+  deps: RunStepDeps & { orbProxyUrl?: string; orbHeartbeatTimeoutMs?: number },
   claimed: ClaimedStep,
   options: RunStepOptions = {},
 ): Promise<void> {
@@ -55,9 +57,13 @@ export async function runOrbStep(
   heartbeat.unref?.();
   const orbStartedAt = Date.now();
   let relay: RelayMachineServer | undefined;
+  let workerReported = false;
   let exitError = 'Orb worker exited without completing the step';
   const execController = new AbortController();
   let stopTimer: ReturnType<typeof setTimeout> | undefined;
+  let watchdog: ReturnType<typeof setTimeout> | undefined;
+  let watchdogStop: Promise<void> | undefined;
+  let timedOut = false;
   const seedDirectory = join(deps.paths.home, 'orb', `${stepId}-seed`);
   let ready = false;
   let ended = false;
@@ -184,13 +190,16 @@ export async function runOrbStep(
             options: { ...input.options, stopRequest: stop.request ?? undefined },
           }),
           onFrame: receive,
+          onHeartbeat: () => watchdog?.refresh(),
           onReporting: (body) => {
+            workerReported = true;
             deps.journal.update(stepId, {
               state: 'awaiting-upload',
               doneBody: body as MachineDoneBody,
             });
           },
           onDone: () => {
+            clearTimeout(watchdog);
             deps.journal.remove(stepId);
             rmSync(join(deps.paths.outboxDir, `step-${stepId}.session.jsonl`), { force: true });
           },
@@ -199,27 +208,44 @@ export async function runOrbStep(
         void stop.attach(session).catch((error: unknown) => deps.logger.step(String(error)));
         input.options.stopRequest = stop.request ?? undefined;
         const proxyUrl = deps.orbProxyUrl;
-        const result = await lifecycle.provider.exec(
-          handle,
-          ['node', '/opt/cairn/daemon/cli.mjs', 'orb-step', '--socket', '/run/cairn/relay.sock'],
-          {
-            binds,
-            signal: execController.signal,
-            env: {
-              ...options.env,
-              CAIRN_ORB: '1',
-              ...(proxyUrl ? { HTTP_PROXY: proxyUrl, HTTPS_PROXY: proxyUrl } : {}),
+        watchdog = setTimeout(() => {
+          timedOut = true;
+          exitError = 'orb heartbeat timeout';
+          void relay?.close();
+          execController.abort();
+          watchdogStop = lifecycle.provider.stop(handle).catch((error: unknown) => {
+            deps.logger.step(`Orb watchdog stop failed: ${String(error)}`);
+          });
+        }, deps.orbHeartbeatTimeoutMs ?? ORB_HEARTBEAT_TIMEOUT_MS);
+        watchdog.unref?.();
+        try {
+          const result = await lifecycle.provider.exec(
+            handle,
+            ['node', '/opt/cairn/daemon/cli.mjs', 'orb-step', '--socket', '/run/cairn/relay.sock'],
+            {
+              binds,
+              signal: execController.signal,
+              env: {
+                ...options.env,
+                CAIRN_ORB: '1',
+                ...(proxyUrl ? { HTTP_PROXY: proxyUrl, HTTPS_PROXY: proxyUrl } : {}),
+              },
+              onStderr: (chunk) => deps.logger.step(chunk.trimEnd()),
             },
-            onStderr: (chunk) => deps.logger.step(chunk.trimEnd()),
-          },
-        );
-        if (result.code !== 0 || failure)
-          throw new Error(failure ?? `Orb step exited (${result.code}): ${result.stderr}`);
+          );
+          if (!timedOut) exitError = `orb exited with code ${result.code}`;
+          if (result.code !== 0 || failure) {
+            deps.logger.step(`Orb step exited (${result.code}): ${failure ?? result.stderr}`);
+          }
+        } finally {
+          clearTimeout(watchdog);
+          await watchdogStop;
+        }
       },
     );
   } catch (error) {
-    exitError = `Orb step exited: ${error instanceof Error ? error.message : String(error)}`;
-    deps.logger.step(exitError);
+    if (!timedOut) exitError = error instanceof Error ? error.message : String(error);
+    deps.logger.step(`Orb step exited: ${exitError}`);
   } finally {
     ended = true;
     const error = new Error('Orb worker ended before steer delivery');
@@ -227,11 +253,12 @@ export async function runOrbStep(
     deps.sessionHandles?.delete(stepId);
     clearInterval(heartbeat);
     clearTimeout(stopTimer);
+    clearTimeout(watchdog);
     stop.detach();
     await relay?.close();
     if (!relay?.isComplete) {
       const pending = deps.journal.get(stepId);
-      if (pending?.state === 'awaiting-upload' && pending.doneBody) {
+      if (workerReported && pending?.state === 'awaiting-upload' && pending.doneBody) {
         await resumePendingUpload(deps, pending, options);
       } else {
         const doneBody: MachineDoneBody = { status: 'failed', errorMessage: exitError };

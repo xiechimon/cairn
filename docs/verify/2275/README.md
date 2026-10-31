@@ -6,9 +6,11 @@ Worker steps execute through a per-step Unix socket relay. The host retains the 
 
 Set `CAIRN_EXECUTOR=orb` to select the existing nspawn provider. Set `CAIRN_ORB_PROXY_URL` to the egress relay provisioned by orb-host; HTTP and HTTPS proxy variables are passed explicitly to the worker.
 
-After exec returns or throws, the host closes the relay and waits for an in-flight finish report. If upstream accepted that report, no second report is sent. Otherwise, the host replays an awaiting-upload journal through `resumePendingUpload`, including checkpoint artifacts. Without a pending upload, it journals and reports `done(failed)` with the exit error. An unreachable host report remains journaled for restart recovery. The run's stop registration remains available during host reporting.
+After exec returns or throws, the host closes the relay and waits for an in-flight finish report. If upstream accepted that report, no second report is sent. If the orb attempted `done` but upstream rejected it, the host replays the awaiting-upload journal through `resumePendingUpload`, including checkpoint artifacts. If the orb never sent `done`, a checkpoint alone cannot claim completion: the host journals and reports `done(failed)` with `orb exited with code N`, including exit code 0. Signal termination uses 128 plus the signal number. An unreachable host report remains journaled for restart recovery. The run's stop registration remains available during host reporting.
 
-This deliberately replaces the issue's original “host reports nothing” requirement. Measured source in `apps/server/src/services/builds.ts` retains abandoned steps that already heartbeated while their machine remains online. Relying on that sweep would leave a crashed orb's step claimed indefinitely. The host therefore keeps the token and reports the failure. Server sweep code is unchanged.
+This deliberately replaces the issue's original “host reports nothing” requirement: **approved by ian 2026-10-31**. Measured source in `apps/server/src/services/builds.ts` retains abandoned steps that already heartbeated while their machine remains online. Relying on that sweep would leave a crashed orb's step claimed indefinitely. The host therefore keeps the token and reports the failure. Server sweep code is unchanged.
+
+The host starts a heartbeat watchdog when dispatching orb exec. Every validated orb heartbeat refreshes it before upstream forwarding, even if upstream is slow or unreachable. The host timeout is defined once as `ORB_HEARTBEAT_TIMEOUT_MS = 120_000`, matching the server-only `BUILD_ABANDONED_STEP_MS`; `orbHeartbeatTimeoutMs` injects a shorter deadline for tests. On timeout, the host closes the relay, aborts exec, stops the container through the provider and reports `done(failed)` with `orb heartbeat timeout`. A completion already in flight is awaited; an accepted completion suppresses host reporting. A later completion cannot overtake the timeout. Accepted completion and exec termination clear the watchdog.
 
 The relay accepts exactly one connection during a step socket's lifetime. It uses a fixed 16 MiB input buffer, disconnects oversized or invalid worker frames, and limits queued output to 16 MiB. Transcript JSON and session content each have a 4 MiB UTF-8 checkpoint limit before any host write. Rate-limit reports use `claudeRateLimitReportSchema`, replace the supplied machine identity with the host claim's machine identity, normalize seconds/milliseconds, cap reset times at eight days, and allow at most one report per 30 seconds per step, including rejected upstream attempts. A stop sends the worker a frame and aborts exec after a five-second grace period if it has not returned.
 
@@ -28,7 +30,7 @@ Round-two failure modes and regression names:
 | 6. Unrelated seed branches | `mounts a private bare snapshot with committed objects and no host working files or config` now creates another Thread branch and a tag, then asserts that the seed has only `refs/heads/main` and cannot resolve the other branch's private commit object |
 | 7. Missing seed bind assertion | `exec exposes only the socket, read-only build and read-only project seed` now supplies a real local repository and asserts the exact `/seed/project/repo` read-only mount |
 
-Before implementation, the four focused files produced 31 failures and 75 passes. The two additional checkpoint-size cases also failed before implementation. A further regression proved that a local single-branch clone still copied the private branch's commit object; it failed before adding `--no-local`. The seed-mount assertion passed immediately against the existing exec path: it closes a test gap rather than changing that path. The final checks below supersede the initial implementation's check results.
+Before implementation, the four focused files produced 31 failures and 75 passes. The two additional checkpoint-size cases also failed before implementation. A further regression proved that a local single-branch clone still copied the private branch's commit object; it failed before adding `--no-local`. The seed-mount assertion passed immediately against the existing exec path: it closes a test gap rather than changing that path. The round-two checks below supersede the initial implementation's check results. Follow-up results are recorded separately below.
 
 | Command | Result |
 | --- | --- |
@@ -44,6 +46,36 @@ Before implementation, the four focused files produced 31 failures and 75 passes
 Final test verification uses one worker. An earlier run concurrent with lint/typecheck hit two five-second test timeouts and the compiled probe's sixty-second second-turn wait; all seven orb files subsequently passed with one worker, without increasing those deadlines.
 
 The existing bounded TLC safety model is unchanged. Orb crash fallback uses the same claimed-step failure and journal replay operations already represented by `FinishSession`, `FinishStepOwnedCheck` and `FinishStepApply`. It creates no new executor or claim, and preserves a journaled result when replaying. The new real-socket tests exercise orb exit, retry and stop timing that the model does not distinguish. TLC does not establish liveness, cancellation deadlines or native container behavior.
+
+## Follow-up verification (2026-10-31)
+
+Measured failure modes and regression names in `apps/daemon/test/orb-watchdog.test.ts`:
+
+| Failure mode | Test |
+| --- | --- |
+| Exit without completion | `orb exits mid-step with code %i and reports exactly one failed done` (0, 1, 137) |
+| Signal exit loses its status | `signal termination reports 128 plus the signal number exactly once` (a real child exits on SIGTERM, yielding 143) |
+| Live orb stops heartbeating or never connects | `silent orb is killed and reports exactly one heartbeat timeout, connected=%s` (false, true) |
+| Slow upstream hides a healthy orb | `every received heartbeat refreshes the watchdog before upstream responds` |
+| Normal completion gains a host duplicate or a stale timer | `normal orb done suppresses the host fallback and clears the watchdog` |
+| Completion and timeout race | `orb done racing the watchdog is awaited without a second report`; `a done sent after the watchdog cannot replace its failure report` |
+| Checkpoint incorrectly substitutes for completion | `an awaiting-upload checkpoint without done still fails on %s` (exit, timeout) |
+
+The first focused run produced seven failures and two passes before implementation. Two subsequent checkpoint-only regressions failed because the host reported success without receiving `done`; they preceded the completion-attempt guard. Socket traffic, host completion payloads, abort signals and provider stop calls are exercised at runtime with fake timers and a fake nspawn command runner. Native Linux container termination remains unverified on macOS.
+
+Measured follow-up checks (working tree based on `aea85afb2`):
+
+| Command | Result |
+| --- | --- |
+| `pnpm lint` | PASS; 1,347 files, one existing informational suggestion |
+| `pnpm typecheck` | PASS; five workspace packages |
+| `pnpm spec:parse` | PASS; 1,418 web tests in 207 files and 67 integration files |
+| `pnpm exec vitest run apps/daemon/test/orb-{relay,step,seed,runner,provider,workspace,worker-process,watchdog}.test.ts --maxWorkers=1` | PASS; 145 tests in eight files, including 12 new watchdog cases |
+| `pnpm --filter @cairn/web e2e:affected` | PASS; no web surface selected |
+| `pnpm exec vitest run --changed --project @xiechimon/cairn-cli --maxWorkers=1` | PASS; 229 tests in 21 files on Node 24.14.0 |
+| `pnpm prepush` | PASS; 20 checks on Node 24.14.0 |
+
+The eight-file run used the shell's initial Node 26.8.1. Lint, typecheck, spec parsing and affected e2e were also run through `fnm exec --using 24.14.0`, matching `.nvmrc`.
 
 ## Review
 
