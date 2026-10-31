@@ -1,10 +1,10 @@
 import { cn } from 'cn';
 import { AlarmClockOff, Ellipsis } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { ProjectAvatar } from '../../board/project-avatar.js';
 import { Pebble } from '../stone/pebble.js';
 import type { StoneTone } from '../stone/tone.js';
 import { Button } from '../ui/button.js';
-import { ProjectTile } from './project-tile.js';
 
 export interface SidebarProjectRowProps {
   name: string;
@@ -34,7 +34,7 @@ export function SidebarProjectRow({
           : 'text-content-secondary hover:bg-sidebar-hover hover:text-foreground dark:hover:bg-sidebar-hover',
       )}
     >
-      <ProjectTile name={name} tone={tone} />
+      <ProjectAvatar name={name} tone={tone} />
       <span className="min-w-0 truncate">{name}</span>
       {waiting > 0 && (
         <span className="ml-auto flex-none rounded-full bg-(--chip-confirm-bg) px-1.5 text-caption leading-4.5 font-semibold text-(--chip-confirm-fg)">

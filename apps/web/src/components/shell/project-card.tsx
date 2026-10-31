@@ -1,10 +1,10 @@
 import { cn } from 'cn';
 import { Ellipsis } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { ProjectAvatar } from '../../board/project-avatar.js';
 import { Pebble } from '../stone/pebble.js';
 import { Button } from '../ui/button.js';
 import { StatusChip } from '../ui/status-chip.js';
-import { ProjectTile } from './project-tile.js';
 
 export interface ProjectCardProps {
   name: string;
@@ -38,7 +38,11 @@ export function ProjectCard({
       data-slot="project-card"
       className="group/pcard relative flex items-start gap-3.5 rounded-(--radius-card) bg-card p-4 shadow-(--e1) hover:shadow-(--card-lift)"
     >
-      <ProjectTile name={name} tone={tone} size="lg" />
+      <ProjectAvatar
+        name={name}
+        tone={tone}
+        className="size-9 rounded-(--cds-radius-xl) text-heading"
+      />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <Button
@@ -98,7 +102,11 @@ export function ArchivedProjectCard({
         className,
       )}
     >
-      <ProjectTile name={name} tone={tone} size="lg" />
+      <ProjectAvatar
+        name={name}
+        tone={tone}
+        className="size-9 rounded-(--cds-radius-xl) text-heading"
+      />
       <div className="min-w-0 flex-1">
         <b className="block truncate text-card-title font-semibold text-foreground">{name}</b>
         <p className="mt-0.5 mb-0 text-meta text-content-tertiary">{note}</p>

@@ -15,10 +15,8 @@ import { SegmentedRadio } from '../components/segmented.js';
 import { QuotaBar } from '../components/settings/quota-bar.js';
 import { RoutingNode } from '../components/settings/routing-node.js';
 import { SettingsDangerZone } from '../components/settings-list.js';
-import { CommandPalette, PaletteRow, PaletteSection } from '../components/shell/command-palette.js';
 import { PhoneTabBar } from '../components/shell/phone-tab-bar.js';
 import { ArchivedProjectCard, ProjectCard } from '../components/shell/project-card.js';
-import { ProjectTile } from '../components/shell/project-tile.js';
 import { SidebarNavRow } from '../components/shell/sidebar-nav-row.js';
 import {
   SidebarProjectRow,
@@ -26,18 +24,14 @@ import {
   SidebarThreadRow,
 } from '../components/shell/sidebar-project.js';
 import { SidebarUser } from '../components/shell/sidebar-user.js';
-import { ShortcutMenuContent } from '../components/shortcut-menu.js';
 import { ArchivedBanner } from '../components/stream/archived-banner.js';
 import { GoalLine } from '../components/stream/goal-line.js';
 import { Greeting } from '../components/stream/greeting.js';
 import { SuggestionChip } from '../components/stream/suggestion-chip.js';
-import { PROJECT_MENU, THREAD_MENU, ThreadMenu } from '../components/thread/thread-menu.js';
 import { Button } from '../components/ui/button.js';
-import { DropdownMenu, DropdownMenuTrigger } from '../components/ui/dropdown-menu.js';
-import { Kbd } from '../components/ui/kbd.js';
 import { Marker, MarkerContent } from '../components/ui/marker.js';
 import { toastSuccess } from '../components/ui/toaster.js';
-import { Cell, Section, Specimen } from './specimen.js';
+import { Section, Specimen } from './specimen.js';
 
 export function SidebarSection() {
   const [active, setActive] = useState('cairn');
@@ -49,7 +43,7 @@ export function SidebarSection() {
     >
       <Specimen
         title="Sidebar"
-        note="Click a project; hover a thread row for its menu"
+        note="Click a project"
         stage="canvas"
         code={`<SidebarNavRow icon={<Plus />} label="New" shortcut="C" />\n<SidebarProjectRow name="cairn" tone={0} waiting={2} active />\n<SidebarThreadList><SidebarThreadRow title="Snooze until needed" tone="waiting" open /></SidebarThreadList>\n<SidebarUser name="ian" machinesOnline={2} />`}
       >
@@ -80,7 +74,6 @@ export function SidebarSection() {
                 title="Connect a Claude subscription"
                 tone="waiting"
                 onClick={() => undefined}
-                menu={<ThreadMenu onSelect={(id) => toastSuccess(`Menu: ${id}`)} />}
               />
               <SidebarThreadRow
                 title="Snooze until needed and an unreasonably long title that truncates"
@@ -119,18 +112,6 @@ export function SidebarSection() {
             }
           />
         </div>
-      </Specimen>
-      <Specimen
-        title="Project tile"
-        note="First letter on one of six project colors"
-        code={`<ProjectTile name="cairn" tone={0} />\n<ProjectTile name="cairn" tone={0} size="lg" />`}
-      >
-        {[0, 1, 2, 3, 4, 5].map((tone) => (
-          <Cell key={tone} label={`tone ${tone + 1}`}>
-            <ProjectTile name="cairn" tone={tone} />
-            <ProjectTile name="cairn" tone={tone} size="lg" />
-          </Cell>
-        ))}
       </Specimen>
     </Section>
   );
@@ -283,143 +264,6 @@ export function CoordinatorStreamSection() {
             actionLabel="Unarchive"
             onAction={() => toastSuccess('Unarchived')}
           />
-        </div>
-      </Specimen>
-    </Section>
-  );
-}
-
-export function ShortcutMenuSection() {
-  const [last, setLast] = useState<string | null>(null);
-  return (
-    <Section
-      id="shortcut-menu"
-      title="Shortcut menus"
-      lede="Thread and project menus show a single-key hint on every row. With the menu open, pressing the key runs the row. Snooze opens a submenu of times."
-    >
-      <Specimen
-        title="Thread and project menus"
-        note={last == null ? 'Open a menu, then press a letter' : `Last: ${last}`}
-        stage="canvas"
-        code={`<DropdownMenu>\n  <DropdownMenuTrigger render={<Button variant="outline" />}>Thread</DropdownMenuTrigger>\n  <ShortcutMenuContent entries={THREAD_MENU} onSelect={(id) => …} />\n</DropdownMenu>`}
-      >
-        <DropdownMenu>
-          <DropdownMenuTrigger render={<Button variant="outline" />}>
-            Thread menu
-          </DropdownMenuTrigger>
-          <ShortcutMenuContent entries={THREAD_MENU} onSelect={setLast} className="w-56" />
-        </DropdownMenu>
-        <DropdownMenu>
-          <DropdownMenuTrigger render={<Button variant="outline" />}>
-            Project menu
-          </DropdownMenuTrigger>
-          <ShortcutMenuContent entries={PROJECT_MENU} onSelect={setLast} className="w-56" />
-        </DropdownMenu>
-      </Specimen>
-    </Section>
-  );
-}
-
-const PALETTE_THREADS = [
-  { id: 'snooze-until', title: 'Snooze until needed', hint: 'cairn · waiting on you' },
-  { id: 'automation', title: 'Automation badge and popover', hint: 'cairn · snoozed' },
-] as const;
-
-const PALETTE_ACTIONS = [
-  { id: 'snooze', title: 'Snooze this thread…', shortcut: 'S', icon: <Clock /> },
-  { id: 'new-thread', title: 'New thread in cairn', shortcut: 'N', icon: <Plus /> },
-  { id: 'new-project', title: 'New project', shortcut: 'C', icon: <LayoutGrid /> },
-  { id: 'theme', title: 'Toggle dark mode', shortcut: '⇧D', icon: <Moon /> },
-] as const;
-
-export function CommandPaletteSection() {
-  const [query, setQuery] = useState('snoo');
-  const [index, setIndex] = useState(0);
-  const needle = query.trim().toLowerCase();
-  const threads = PALETTE_THREADS.filter((t) => t.title.toLowerCase().includes(needle));
-  const actions = PALETTE_ACTIONS.filter((a) => a.title.toLowerCase().includes(needle));
-  const rows = [...threads.map((t) => t.id), ...actions.map((a) => a.id)];
-  const activeId = rows[Math.min(index, Math.max(rows.length - 1, 0))];
-  return (
-    <Section
-      id="palette"
-      title="Command palette"
-      lede="Cmd+K opens one search over threads, actions and projects. Rows are 36px, the cursor row is highlighted, and the footer teaches the filters."
-    >
-      <Specimen
-        title="Palette"
-        note="Type to filter; arrow keys move the cursor"
-        stage="canvas"
-        code={`<CommandPalette query={q} onQueryChange={setQ} footer={<span><Kbd>↑↓</Kbd> move</span>}>\n  <PaletteSection title="Threads"><PaletteRow icon={<Lock />} active>Snooze until needed</PaletteRow></PaletteSection>\n</CommandPalette>`}
-      >
-        <div className="w-full max-w-160">
-          <CommandPalette
-            query={query}
-            onMoveCursor={(delta) =>
-              setIndex(Math.min(Math.max(index + delta, 0), rows.length - 1))
-            }
-            onQueryChange={(next) => {
-              setQuery(next);
-              setIndex(0);
-            }}
-            footer={
-              <>
-                <span>
-                  <Kbd>↑↓</Kbd> move
-                </span>
-                <span>
-                  <Kbd>↵</Kbd> open
-                </span>
-                <span>
-                  <Kbd>is:</Kbd> <Kbd>project:</Kbd> <Kbd>pr:</Kbd> filter
-                </span>
-              </>
-            }
-          >
-            {threads.length > 0 && (
-              <PaletteSection title="Threads">
-                {threads.map((t) => (
-                  <PaletteRow
-                    key={t.id}
-                    icon={<Inbox />}
-                    hint={t.hint}
-                    active={activeId === t.id}
-                    onSelect={() => toastSuccess(`Open ${t.title}`)}
-                  >
-                    {t.title}
-                  </PaletteRow>
-                ))}
-              </PaletteSection>
-            )}
-            {actions.length > 0 && (
-              <PaletteSection title="Actions">
-                {actions.map((a) => (
-                  <PaletteRow
-                    key={a.id}
-                    icon={a.icon}
-                    shortcut={a.shortcut}
-                    active={activeId === a.id}
-                    onSelect={() => toastSuccess(a.title)}
-                  >
-                    {a.title}
-                  </PaletteRow>
-                ))}
-              </PaletteSection>
-            )}
-            {rows.length === 0 && (
-              <p className="m-0 px-3 py-6 text-center text-ui text-content-tertiary">
-                Nothing matches “{query}”.
-              </p>
-            )}
-            {rows.length > 0 && (
-              <PaletteSection title="Projects">
-                <PaletteRow icon={<ProjectTile name="cairn" tone={0} />}>cairn</PaletteRow>
-                <PaletteRow icon={<ProjectTile name="api-latency" tone={2} />}>
-                  api-latency
-                </PaletteRow>
-              </PaletteSection>
-            )}
-          </CommandPalette>
         </div>
       </Specimen>
     </Section>

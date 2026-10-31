@@ -18,22 +18,17 @@ import {
 import { IdentitySection, StreamSection, StructureSection } from './components-more.js';
 import { DialogSection, MenuSection, ToastSection } from './components-overlays.js';
 import {
-  CommandPaletteSection,
   CoordinatorStreamSection,
   ProjectsSection,
   RoutingSection,
-  ShortcutMenuSection,
   SidebarSection,
 } from './components-shell.js';
 import { StoneSection, ThreadCardSection, ThreadRowSection } from './components-stone.js';
 import {
-  ChangesSection,
-  ComposerSection,
   PermissionSection,
   PlanSection,
   PrBarSection,
   ScheduledSection,
-  UndoToastSection,
 } from './components-threads.js';
 import type { GalleryTheme } from './design-doc.js';
 import {
@@ -92,17 +87,12 @@ const NAV = [
       ['thread-card', 'Thread card'],
       ['thread-row', 'Thread row and bulk bar'],
       ['permission', 'Permission and proposal'],
-      ['plan', 'Plan, activity, usage'],
-      ['composer', 'Composer'],
+      ['plan', 'Plan approval, usage'],
       ['pr-bar', 'Pull request bar'],
-      ['undo-toast', 'Undo toast'],
-      ['changes', 'Diff and commits'],
       ['scheduled', 'Scheduled task row'],
       ['sidebar', 'Sidebar parts'],
       ['projects-lists', 'Projects, lists, phone'],
       ['coordinator', 'Coordinator stream'],
-      ['shortcut-menu', 'Shortcut menus'],
-      ['palette', 'Command palette'],
       ['routing', 'Model routing'],
     ],
   },
@@ -267,16 +257,11 @@ export function Gallery() {
           <ThreadRowSection />
           <PermissionSection />
           <PlanSection />
-          <ComposerSection />
           <PrBarSection />
-          <UndoToastSection />
-          <ChangesSection />
           <ScheduledSection />
           <SidebarSection />
           <ProjectsSection />
           <CoordinatorStreamSection />
-          <ShortcutMenuSection />
-          <CommandPaletteSection />
           <RoutingSection />
           <GroupTitle
             id="patterns"

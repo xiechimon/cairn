@@ -218,16 +218,12 @@ All live in `src/components/` and are shown in the gallery under "Stone language
 - **BulkBar** (`thread/bulk-bar.tsx`): floating primary-ink bar, "N selected" plus Resolve, Snooze, Archive and clear.
 - **PermissionCard** (`thread/permission-card.tsx`): ochre-outlined card with lock head, command `<pre>`, help line, Deny (primary), Allow once, Always allow; resolves to a one-line Allowed once, Denied or Always allowed.
 - **ProposalCard** (`thread/proposal-card.tsx`): dashed card with Update setup (primary), Edit, Dismiss; applied state is solid with an open action.
-- **PlanBlock / PlanApproval** (`thread/plan-block.tsx`, `thread/plan-approval.tsx`): plan items pending (dashed ring), now (spinning ring), done (filled); Approve plan and Edit plan, then an approved line.
-- **ActivityFold, UsageStrip, NextSteps** (`thread/`): one-line activity summary that expands to the command list; three-cell cost, tokens and time strip (`StatStrip`); quiet next-step buttons.
-- **ComposerCard / QueuedChip** (`composer/`): presentational composer with queued chips, `Enter steer, Cmd+Enter queue` hint, Stop state and an error ring (`danger-line`). The app's `detail/composer.tsx` keeps the behavior; page work moves it onto this shell.
+- **PlanApproval** (`thread/plan-approval.tsx`): Approve plan and Edit plan, then an approved line.
+- **UsageStrip, NextSteps** (`thread/`): three-cell cost, tokens and time strip (`StatStrip`); quiet next-step buttons.
 - **PrBar** (`thread/pr-bar.tsx`): PR number, branch, CI chip that opens a Checks popover (Auto-fix, Auto-merge with dynamic help, one locked row that states why), Merge; merged variant.
-- **UndoToast / toastUndo** (`undo-toast.tsx`): primary-ink toast with check, text, Undo and the Cmd+Z hint; `toastUndo(text, onUndo)` fires it through sonner and binds Cmd+Z while it is open.
-- **DiffFile, CommitRow** (`thread/`): mono diff block with add and delete rows from the diff tokens; commit row with the sha in the review color.
 - **ScheduledTaskRow** (`thread/scheduled-task-row.tsx`): still clock mark, name, trigger and next run, Active, Paused or Auto-disabled tag.
-- **Shell parts** (`shell/`): `ProjectTile` (sm 18px, lg 36px), `SidebarNavRow`, `SidebarProjectRow` with waiting count, `SidebarThreadList` and `SidebarThreadRow` (pebble, truncation, hover menu, open and snoozed), `SidebarUser`, `WaitPill`, `HeaderIconButton` with attention dot, `ProjectCard`, `PhoneTabBar` with badge, `CommandPalette` rows, sections and footer.
+- **Shell parts** (`shell/`): `SidebarNavRow`, `SidebarProjectRow` with waiting count, `SidebarThreadList` and `SidebarThreadRow` (pebble, truncation, hover menu, open and snoozed), `SidebarUser`, `WaitPill`, `HeaderIconButton` with attention dot, `ProjectCard`, `PhoneTabBar` with badge.
 - **Stream parts** (`stream/`): `GoalLine`, `Greeting`, `SuggestionChip`, `ArchivedBanner`; the day divider is `Marker variant="separator"`.
-- **ShortcutMenuContent** (`shortcut-menu.tsx`, entries in `thread/thread-menu.tsx`): menu rows with single-key hints that run the row while the menu is open, danger rows, and a Snooze until submenu.
 - **ListCard / ListRow** (`list-card.tsx`): divided card list used by library, activity and settings rows.
 - **RoutingNode / QuotaBar** (`settings/`): model-routing node with optional quota bar that turns ochre at 80% and above; unavailable nodes are dashed with a failed tag.
 

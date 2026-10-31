@@ -9,7 +9,6 @@ import { STONE_KINDS, StoneMark } from '../components/stone/stone-mark.js';
 import { STONE_TONES, type StoneTone } from '../components/stone/tone.js';
 import { BulkBar } from '../components/thread/bulk-bar.js';
 import { ThreadCard } from '../components/thread/thread-card.js';
-import { ThreadMenu } from '../components/thread/thread-menu.js';
 import { ThreadRow } from '../components/thread/thread-row.js';
 import { Button } from '../components/ui/button.js';
 import { toastSuccess } from '../components/ui/toaster.js';
@@ -305,18 +304,17 @@ export function ThreadRowSection() {
         snoozed={t.snoozed}
         selected={selected.has(t.id)}
         onSelectedChange={(on) => toggle(t.id, on)}
-        menu={<ThreadMenu onSelect={(id) => toastSuccess(`Menu: ${id}`)} />}
       />
     ));
   return (
     <Section
       id="thread-row"
       title="Thread row and bulk bar"
-      lede="The inbox row: mark, title, PR tag, reason and age. Hover reveals a checkbox and the menu; waiting rows are raised. Selecting rows floats the bulk bar."
+      lede="The inbox row: mark, title, PR tag, reason and age. Hover reveals a checkbox; waiting rows are raised. Selecting rows floats the bulk bar."
     >
       <Specimen
         title="Inbox trail"
-        note="Hover a row, tick the checkbox, open the menu and press a letter key"
+        note="Hover a row, tick the checkbox"
         stage="canvas"
         code={`<ThreadRow title="Fold finished turns" reason="PR is ready" tone="review" kind="pr" pr={2271} age="32m" />\n<BulkBar count={2} onResolve={...} onSnooze={...} onArchive={...} onClear={...} />`}
       >
