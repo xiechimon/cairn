@@ -21,7 +21,9 @@ import { installedLayout, validateConfig, wrapperScript } from './run.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repository = join(here, '../../..');
-const gitPath = execFileSync('/bin/sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
+const gitPath = existsSync('/usr/bin/git')
+  ? '/usr/bin/git'
+  : execFileSync('/bin/sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
 const scratch = [];
 
 after(() => {

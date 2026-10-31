@@ -18,7 +18,9 @@ import { fileURLToPath } from 'node:url';
 import { runTask, validateConfig, validateTree, wrapperScript } from './run.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const gitPath = execFileSync('/bin/sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
+const gitPath = existsSync('/usr/bin/git')
+  ? '/usr/bin/git'
+  : execFileSync('/bin/sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
 const flockPath = ['/usr/bin/flock', '/bin/flock'].find((path) => existsSync(path));
 const bases = [];
 
