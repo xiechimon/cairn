@@ -9,7 +9,14 @@ const GH_ALLOWED = {
 };
 
 const GH_PR_EDIT_FLAGS = new Set(['--add-label', '--remove-label', '-R', '--repo']);
-const GH_PR_DISARM_FLAGS = new Set(['--disable-auto', '-R', '--repo']);
+const GH_PR_MERGE_FLAGS = new Map([
+  ['--rebase', 'rebase'],
+  ['-r', 'rebase'],
+  ['--squash', 'squash'],
+  ['-s', 'squash'],
+  ['--auto', 'auto'],
+  ['--disable-auto', 'disable-auto'],
+]);
 const GH_BODYFUL_API_FLAGS = new Set(['-f', '-F', '--field', '--raw-field', '--input']);
 
 const GIT_PUSH_LONG_FLAGS = new Set([
@@ -58,12 +65,43 @@ function checkGhApi(args) {
   return allow;
 }
 
+function parsePrMerge(args) {
+  const parsed = { flags: new Set(), head: undefined, positional: [], unknown: undefined };
+  for (let i = 0; i < args.length; i++) {
+    const [name, inline] = args[i].split(/=(.*)/s);
+    if (name === '-R' || name === '--repo') {
+      if (inline === undefined) i++;
+    } else if (name === '--match-head-commit') {
+      parsed.head = inline ?? args[++i];
+    } else if (GH_PR_MERGE_FLAGS.has(name) && inline === undefined) {
+      parsed.flags.add(GH_PR_MERGE_FLAGS.get(name));
+    } else if (args[i].startsWith('-')) {
+      parsed.unknown ??= args[i];
+    } else parsed.positional.push(args[i]);
+  }
+  return parsed;
+}
+
 function checkPrMerge(args) {
-  const bad = args.find((arg) => arg.startsWith('-') && !GH_PR_DISARM_FLAGS.has(arg.split('=')[0]));
-  if (args.includes('--disable-auto') && !bad) return allow;
-  return deny(
-    'gh pr merge is refused: merging and arming auto-merge are not delegated to the bot (only --disable-auto is allowed)',
-  );
+  const { flags, head, positional, unknown } = parsePrMerge(args);
+  const refuse = (why) => deny(`gh pr merge is refused: ${why}`);
+  if (unknown)
+    return refuse(
+      `${unknown} is not allowed (admin, branch deletion and message overrides are refused)`,
+    );
+  if (positional.length !== 1) return refuse('name exactly one pull request');
+  if (flags.has('disable-auto')) {
+    return flags.size === 1 && head === undefined
+      ? allow
+      : refuse('--disable-auto cannot be combined with other merge flags');
+  }
+  if (!/^[0-9a-f]{40}$/.test(head ?? ''))
+    return refuse(
+      '--match-head-commit <40-hex sha> is required so the merge is pinned to the reviewed head',
+    );
+  const methods = ['rebase', 'squash'].filter((method) => flags.has(method));
+  if (methods.length !== 1) return refuse('use exactly one of --rebase or --squash');
+  return allow;
 }
 
 function checkPrEdit(args) {

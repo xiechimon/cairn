@@ -67,6 +67,8 @@ function setup(t) {
   };
 }
 
+const HEAD = 'a'.repeat(40);
+
 const allowed = [
   ['gh', 'pr', 'view', '12', '-R', 'xiechimon/cairn', '--json', 'state'],
   ['gh', 'pr', 'list', '-R', 'xiechimon/cairn', '--head', 'lane/1'],
@@ -88,6 +90,16 @@ const allowed = [
   ['gh', 'pr', 'close', '12', '-c', 'closed'],
   ['gh', 'pr', 'update-branch', '12', '--rebase'],
   ['gh', 'pr', 'merge', '12', '-R', 'xiechimon/cairn', '--disable-auto'],
+  ['gh', 'pr', 'merge', '12', '-R', 'xiechimon/cairn', '--rebase', '--match-head-commit', HEAD],
+  ['gh', 'pr', 'merge', '12', '--squash', '--auto', '--match-head-commit', HEAD],
+  [
+    'gh',
+    'pr',
+    'merge',
+    'https://github.com/xiechimon/cairn/pull/12',
+    '--squash',
+    `--match-head-commit=${HEAD}`,
+  ],
   ['gh', 'issue', 'view', '5'],
   ['gh', 'issue', 'list', '-l', 'batch:C1'],
   ['gh', 'issue', 'comment', '5', '-b', 'x'],
@@ -119,11 +131,45 @@ for (const argv of allowed) {
 }
 
 const denied = [
-  [['gh', 'pr', 'merge', '12', '--rebase'], /gh pr merge is refused/],
-  [['gh', 'pr', 'merge', '12', '--squash', '--auto'], /gh pr merge is refused/],
-  [['gh', 'pr', 'merge', '12', '--admin'], /gh pr merge is refused/],
-  [['gh', 'pr', 'merge', '12', '--disable-auto', '--auto'], /gh pr merge is refused/],
-  [['gh', '-R', 'xiechimon/cairn', 'pr', 'merge', '12', '--auto'], /gh pr merge is refused/],
+  [['gh', 'pr', 'merge', '12', '--rebase'], /--match-head-commit <40-hex sha> is required/],
+  [
+    ['gh', 'pr', 'merge', '12', '--squash', '--auto'],
+    /--match-head-commit <40-hex sha> is required/,
+  ],
+  [['gh', 'pr', 'merge', '12', '--rebase', '--match-head-commit', 'abc123'], /40-hex sha/],
+  [['gh', 'pr', 'merge', '12', '--rebase', '--match-head-commit', 'A'.repeat(40)], /40-hex sha/],
+  [
+    ['gh', 'pr', 'merge', '12', '--rebase', '--admin', '--match-head-commit', HEAD],
+    /--admin is not allowed/,
+  ],
+  [
+    ['gh', 'pr', 'merge', '12', '--squash', '--delete-branch', '--match-head-commit', HEAD],
+    /--delete-branch is not allowed/,
+  ],
+  [
+    ['gh', 'pr', 'merge', '12', '--squash', '--auto', '--body', 'x', '--match-head-commit', HEAD],
+    /--body is not allowed/,
+  ],
+  [
+    ['gh', 'pr', 'merge', '12', '--squash', '--subject', 'x', '--match-head-commit', HEAD],
+    /--subject is not allowed/,
+  ],
+  [['gh', 'pr', 'merge', '12', '--merge', '--match-head-commit', HEAD], /--merge is not allowed/],
+  [['gh', 'pr', 'merge', '12', '--match-head-commit', HEAD], /exactly one of --rebase or --squash/],
+  [
+    ['gh', 'pr', 'merge', '12', '--rebase', '--squash', '--match-head-commit', HEAD],
+    /exactly one of --rebase or --squash/,
+  ],
+  [['gh', 'pr', 'merge', '--rebase', '--match-head-commit', HEAD], /exactly one pull request/],
+  [['gh', 'pr', 'merge', '12', '--disable-auto', '--auto'], /cannot be combined/],
+  [
+    ['gh', 'pr', 'merge', '12', '--disable-auto', '--rebase', '--match-head-commit', HEAD],
+    /cannot be combined/,
+  ],
+  [
+    ['gh', '-R', 'xiechimon/cairn', 'pr', 'merge', '12', '--auto'],
+    /--match-head-commit <40-hex sha> is required/,
+  ],
   [['gh', 'pr', 'edit', '12', '--base', 'other'], /only change labels/],
   [['gh', 'pr', 'edit', '12', '--title', 'x'], /only change labels/],
   [['gh', 'pr', 'ready', '12'], /not on the as-bot allowlist/],
@@ -192,7 +238,7 @@ for (const [argv, message] of denied) {
 }
 
 test('as-bot.sh refuses before any token is minted and exits 126', (t) => {
-  const result = setup(t).run('gh', 'pr', 'merge', '1', '--rebase');
+  const result = setup(t).run('gh', 'pr', 'merge', '1', '--admin');
   assert.equal(result.status, 126);
   assert.equal(result.minted, false);
 });
