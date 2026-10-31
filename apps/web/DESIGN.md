@@ -57,8 +57,8 @@ colors-dark:
   running-track: '#2e3430'
   project-tiles: ['#6f9c5f', '#b98a57', '#6f93bb', '#9a7cad', '#5fa3a0', '#b77f8a']
 typography:
-  greeting:     { fontFamily: display, fontSize: 26px, fontWeight: '650' }
-  page-title:   { fontFamily: display, fontSize: 20px, fontWeight: '650' }
+  greeting:     { fontFamily: serif, fontSize: 26px, fontWeight: '600' }
+  page-title:   { fontFamily: serif, fontSize: 20px, fontWeight: '600' }
   heading:      { fontFamily: display, fontSize: 17px, fontWeight: '650' }
   brand:        { fontFamily: display, fontSize: 20px, fontWeight: '650' }
   card-title:   { fontFamily: sans, fontSize: 14px, fontWeight: '600', lineHeight: '1.5' }
@@ -67,6 +67,7 @@ typography:
   caption:      { fontFamily: sans, fontSize: 12px, fontWeight: '500' }
   code:         { fontFamily: mono, fontSize: 12px, fontWeight: '400' }
 fonts:
+  serif: var(--font-source-serif) # Source Serif 4 → Songti SC: greeting and page titles
   display: var(--font-display)   # Bricolage Grotesque → sans
   sans: var(--font-sans)         # Instrument Sans → PingFang SC
   mono: var(--font-mono)         # JetBrains Mono
@@ -121,7 +122,7 @@ Direction A, **Cairn**: a cairn is a pile of stones that marks a trail for the n
 
 ## Typography
 
-- **Display face for titles**: Bricolage Grotesque (`--font-display`, the `font-heading` utility) for the brand name, page and pane titles, dialog titles and the Coordinator greeting, at 650 with -0.015em tracking. Chinese falls back to PingFang SC.
+- **Two title faces**: Source Serif 4 (`font-serif`, 600, -0.01em) for the Coordinator greeting and page titles (the board top bar, page shells, the task detail header, settings headers), so the top of every page has one quiet serif voice. Bricolage Grotesque (`font-heading` with `font-title`, 650) for the brand name, section and column headings, pane and dialog titles. Chinese falls back to Songti SC under the serif and PingFang SC under the sans.
 - **Everything else is Instrument Sans** (`--font-sans`): thread titles, rows, navigation, buttons, meta. Chinese falls back to PingFang SC. Code, times, ids and counters use JetBrains Mono (`--font-mono`) with tabular numbers.
 - Fonts are self-hosted latin subsets in `public/fonts` (SIL OFL 1.1, licenses next to the files), loaded with `font-display: swap` and preloaded in `index.html` and `design.html`; the metric-matched fallbacks keep the swap from shifting layout.
 - **Six font sizes, no seventh allowed**: 26 Coordinator greeting / 20 page title and brand / 17 column and section headings / 14 card titles and UI text / 12.5 meta / 12 badges and group labels. In code, use the corresponding Tailwind theme keys `text-greeting` / `text-page` / `text-heading` / `text-card-title` and `text-ui` / `text-meta` / `text-caption` (heading font `font-heading`), never arbitrary values like `text-[13px]`; `scripts/ui-debt-gate.mjs` D5 only allows the total count of arbitrary values to decrease.

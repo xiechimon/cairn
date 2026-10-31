@@ -81,17 +81,17 @@ const SEMANTIC = [
 const TYPE = [
   {
     name: 'Greeting',
-    cls: 'font-heading text-greeting font-title tracking-[-0.015em]',
+    cls: 'font-serif text-greeting font-semibold tracking-[-0.01em]',
     sample: 'Good afternoon, ian',
     token: '--type-greeting',
-    weight: 650,
+    weight: 600,
   },
   {
     name: 'Page',
-    cls: 'font-heading text-page font-title tracking-[-0.015em]',
+    cls: 'font-serif text-page font-semibold',
     sample: 'Waiting on you',
     token: '--type-page',
-    weight: 650,
+    weight: 600,
   },
   {
     name: 'Brand',
