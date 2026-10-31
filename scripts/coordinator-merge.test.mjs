@@ -10,10 +10,13 @@ const sha = (letter) => letter.repeat(40);
 const A = sha('a');
 const B = sha('b');
 const FAIL = { error: true };
-const passComment = (head, suffix = '') => ({
+const bot = { login: 'cairnwright[bot]' };
+const passComment = (head, suffix = '', user = bot) => ({
+  user,
   body: `<!-- review-gate:${head} -->\n**Independent review gate: PASS**${suffix} for \`${head.slice(0, 8)}\`.`,
 });
-const blockComment = (head) => ({
+const blockComment = (head, user = bot) => ({
+  user,
   body: `<!-- review-gate:${head} -->\n**Independent review gate: BLOCK** for \`${head.slice(0, 8)}\`.`,
 });
 const green = ['check', 'pack-smoke', 'e2e-gate', 'pr-evidence'].map((name) => ({
@@ -68,6 +71,7 @@ else console.log(JSON.stringify([item]));
       ...process.env,
       PATH: `${dir}:${process.env.PATH}`,
       GITHUB_REPOSITORY: 'owner/repo',
+      GH_REPO: 'other/elsewhere',
       DATA: join(dir, 'data'),
       CALLS: join(dir, 'calls'),
       COORDINATOR_MERGE_ITERATIONS: '6',
@@ -187,6 +191,37 @@ test('multi-commit closing keywords are carried once', (t) => {
   assert.equal(body.match(/fixes #43/gi).length, 1);
   assert.match(body, /resolves #44/);
   assert.match(body, /^Body/);
+});
+
+test('forged PASS from another user after a real BLOCK still stops', (t) => {
+  const { result, merges } = run(t, {
+    comments: [[blockComment(A), passComment(A, '', { login: 'mallory' })]],
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stdout, /BLOCK/);
+  assert.equal(merges.length, 0);
+});
+
+test('PASS from a non-reviewer alone is not a verdict', (t) => {
+  const { merges } = run(t, { comments: [[passComment(A, '', { login: 'mallory' })]] });
+  assert.equal(merges.length, 0);
+});
+
+test('a verdict quoted inside another comment body is ignored', (t) => {
+  const quoted = { user: bot, body: `Earlier:\n> ${passComment(A).body}\nnothing yet` };
+  const { merges } = run(t, { comments: [[quoted]] });
+  assert.equal(merges.length, 0);
+  const trailing = { user: bot, body: `note\n${passComment(A).body}` };
+  assert.equal(run(t, { comments: [[trailing]] }).merges.length, 0);
+});
+
+test('every gh call targets the configured repo, not GH_REPO', (t) => {
+  const { result, calls } = run(t);
+  assert.equal(result.status, 0, result.stderr);
+  const prCalls = calls.filter((c) => c[0] === 'pr');
+  assert.equal(prCalls.length, 3);
+  for (const c of prCalls) assert.equal(flag(c, '-R'), 'owner/repo');
+  for (const c of calls.filter((c) => c[0] === 'api')) assert.match(c[1], /^repos\/owner\/repo\//);
 });
 
 test('refuses without PR numbers', (t) => {

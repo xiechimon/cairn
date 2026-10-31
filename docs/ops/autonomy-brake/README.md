@@ -62,7 +62,8 @@ GITHUB_REPOSITORY=owner/repository node scripts/coordinator-merge.mjs 123 124
 
 For each PR it polls up to 90 times, 60 seconds apart (`COORDINATOR_MERGE_ITERATIONS`, `COORDINATOR_MERGE_INTERVAL_MS`). Each iteration reads the current head; a `gh` or network error, or an empty head, retries on the next iteration and never changes state. It merges only when all of these hold on the current head:
 
-- The newest comment containing `<!-- review-gate:<head> -->` is a PASS, ordinary or carried over. A BLOCK stops the helper with a nonzero exit.
+- The newest comment by `cairnwright[bot]` that starts with `<!-- review-gate:<head> -->` and an anchored `**Independent review gate: PASS**` (ordinary or carried over) or `BLOCK` line is a PASS. Comments by other users and verdicts quoted mid-comment are ignored. A BLOCK stops the helper with a nonzero exit.
+- Every `gh` call targets the repository named by `GITHUB_REPOSITORY` (`-R`), whatever `GH_REPO` or the checkout says.
 - At least 4 required checks are present and every one is success or skipped.
 - No `autonomy-paused` issue is open. A failed marker lookup counts as paused.
 

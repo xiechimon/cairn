@@ -6,7 +6,7 @@ import { api, markers, pages, repo } from './autonomy-brake.mjs';
 
 const minimumChecks = 4;
 const closingLine = /^(?:closes|fixes|resolves) #\d+$/i;
-const verdictPattern = /\*\*Independent review gate: (PASS|BLOCK)\*\*/;
+const reviewer = 'cairnwright[bot]';
 
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 const gh = (...args) =>
@@ -22,9 +22,14 @@ function readHead(number) {
 }
 
 export function verdictFor(comments, head) {
-  const marker = `<!-- review-gate:${head} -->`;
-  const newest = comments.filter((comment) => comment.body?.includes(marker)).at(-1);
-  return verdictPattern.exec(newest?.body ?? '')?.[1] ?? null;
+  const pattern = new RegExp(
+    `^<!-- review-gate:${head} -->\\n\\*\\*Independent review gate: (PASS|BLOCK)\\*\\*(?: \\(carried over\\))? for `,
+  );
+  const verdicts = comments
+    .filter((comment) => comment.user?.login === reviewer)
+    .map((comment) => pattern.exec(comment.body ?? '')?.[1])
+    .filter(Boolean);
+  return verdicts.at(-1) ?? null;
 }
 
 export function mergeMessage(number, messages) {
@@ -44,7 +49,7 @@ export function mergeMessage(number, messages) {
 
 function checksGreen(number) {
   const checks = JSON.parse(
-    gh('pr', 'checks', String(number), '--required', '--json', 'name,bucket'),
+    gh('pr', 'checks', String(number), '-R', repo, '--required', '--json', 'name,bucket'),
   );
   return (
     checks.length >= minimumChecks &&
@@ -70,6 +75,8 @@ function merge(number, head) {
     'pr',
     'merge',
     String(number),
+    '-R',
+    repo,
     '--squash',
     '--subject',
     subject,
@@ -78,7 +85,9 @@ function merge(number, head) {
     '--match-head-commit',
     head,
   );
-  const state = JSON.parse(gh('pr', 'view', String(number), '--json', 'state,mergeCommit'));
+  const state = JSON.parse(
+    gh('pr', 'view', String(number), '-R', repo, '--json', 'state,mergeCommit'),
+  );
   console.log(`${number} ${state.state} ${state.mergeCommit?.oid ?? ''}`);
 }
 
