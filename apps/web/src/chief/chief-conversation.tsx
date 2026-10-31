@@ -62,7 +62,8 @@ import { useComposerWire } from '../overlay/composer-wire.js';
 import { dropEscLayer, pushEscLayer } from '../overlay/gesture-machine.js';
 import { useChiefNewThreadHotkey } from '../overlay/hotkeys.js';
 import { MENTION_TEXTAREA_CLS, MentionHighlight } from '../overlay/mention-highlight.js';
-import { type MentionGroups, MentionInline, MentionPicker } from '../overlay/mention-picker.js';
+import { MentionInline } from '../overlay/mention-inline.js';
+import type { MentionGroups } from '../overlay/mention-token.js';
 import { SlashHelp, SlashMenu } from '../overlay/slash-menu.js';
 import { ChiefStreamRow, chiefStreamRowKey } from './chief-message-rows.js';
 import { ChiefFallbackBanner, ChiefOutageBanner } from './chief-outage-banner.js';
@@ -292,9 +293,6 @@ export function ChiefConversation({
     attaching,
     pendingAttachments,
     onPickFiles,
-    pickerOpen,
-    togglePicker,
-    closePicker,
     closeInline,
     inlineOpen,
     inlineCaret,
@@ -305,8 +303,6 @@ export function ChiefConversation({
     inlineListboxId,
     inlineListboxRef,
     acceptInlineRow,
-    insertTokens,
-    groups,
     slashOpen,
     slashQuery,
     slashCaret,
@@ -326,11 +322,10 @@ export function ChiefConversation({
     if (open) return;
     setThreadsOpen(false);
     setRewindConfirm(null);
-    closePicker();
     closeInline();
     closeSlash();
     closeHelp();
-  }, [open, closePicker, closeInline, closeSlash, closeHelp]);
+  }, [open, closeInline, closeSlash, closeHelp]);
   const { textareaRef } = wire;
   const prevOpenRef = useRef(open);
   useEffect(() => {
@@ -753,14 +748,6 @@ export function ChiefConversation({
           >
             <Paperclip width={16} height={16} />
           </IconTooltip>
-          <IconTooltip
-            label={t('提及')}
-            trigger={
-              <Button variant="ghost" size="icon" className={TOOL_BTN_CLS} onClick={togglePicker} />
-            }
-          >
-            <Grid2x2 width={16} height={16} />
-          </IconTooltip>
           {chipVisible && (
             <ProjectMenu
               title="发给哪个项目"
@@ -815,15 +802,6 @@ export function ChiefConversation({
             </Button>
           )}
         </div>
-        <MentionPicker
-          open={pickerOpen}
-          onClose={closePicker}
-          groups={groups}
-          onInsert={(tokens) => {
-            insertTokens(tokens);
-            closePicker();
-          }}
-        />
         <SlashHelp
           open={helpOpen}
           onClose={closeHelp}

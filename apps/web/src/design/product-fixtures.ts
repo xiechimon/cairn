@@ -21,7 +21,7 @@ import type {
   TodoRecord,
   TranscriptItem,
 } from '../fixtures/records.js';
-import type { MentionGroups } from '../overlay/mention-picker.js';
+import type { MentionGroups } from '../overlay/mention-token.js';
 
 export const NOW = Date.parse('2026-10-31T14:00:00+08:00');
 const MIN = 60_000;

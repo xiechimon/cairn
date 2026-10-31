@@ -17,7 +17,6 @@ import { evidenceShot } from './evidence';
 //   F7  backspace boundary off-by-one;
 //   F8  IME composition firing insert/send;
 //   F10 second mention with a stale range;
-//   F11 popover multi-select insertion (last-one-wins before the fix);
 //   plus the close set (rules 32-34 + web adaptations) and cap 15.
 //
 // Data face = live face stubbed (composer-wire-reject.spec discipline):
@@ -471,22 +470,6 @@ test('multiple mentions: a second @ after an insert opens fresh and lands in ord
   await evidenceShot(page, 'multiple-mentions.png');
 });
 
-test('popover multi-select inserts every token with trailing spaces (F11)', async ({ page }) => {
-  const { input } = await openDetail(page);
-  await page.getByTestId('composer-toolbar').getByRole('button', { name: '提及' }).click();
-  const picker = page.locator('.mention-picker');
-  await expect(picker).toBeVisible();
-  await page.locator('.mention-row--top[aria-label="Agents (3)"]').click();
-  await page.locator('.mention-row--entry', { hasText: 'builder' }).click();
-  await page.locator('.mention-row--entry', { hasText: 'reviewer' }).click();
-  await page.locator('.mention-picker-insert').click();
-
-  // Before the batched insertTokens fix only the LAST token of a
-  // multi-select survived (each insertToken read the same stale closure).
-  await expect(input).toHaveValue(`${D_BUILDER} ${D_REVIEWER} `);
-  await evidenceShot(page, 'popover-multi-insert.png');
-});
-
 test('IME: a composing Enter neither inserts nor sends (F8)', async ({ page }) => {
   const { input, listbox, rows, sent } = await openDetail(page);
   await input.fill('@bu');
@@ -523,8 +506,6 @@ test('geometry: the listbox stays anchored above the composer (#688 ladder untou
   const { input, listbox } = await openDetail(page);
   await input.fill('@');
   await expect(listbox).toBeVisible();
-  // Past the 100ms zoom-in-95 enter animation — a mid-animation
-  // boundingBox is scaled (mention-picker-center.spec precedent).
   await page.waitForTimeout(300);
   const listBox = await listbox.boundingBox();
   const composerBox = await page.getByTestId('composer-card').boundingBox();

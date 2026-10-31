@@ -2,6 +2,15 @@ import { fuzzyFilter } from './completion.js';
 
 export type MentionKind = 'todo' | 'skill' | 'agent' | 'project' | 'machine';
 
+export interface MentionGroupEntry {
+  id: string;
+  label: string;
+  subtitle?: string;
+  seq?: number;
+}
+
+export type MentionGroups = Record<MentionKind, MentionGroupEntry[]>;
+
 export interface FileMentionEntry {
   path: string;
   type: 'blob' | 'tree';

@@ -921,15 +921,15 @@
     "mentions": {
       "recipe": "features/mentions.md",
       "cases": {
-        "mention-picker": {
+        "mention-inline": {
           "script": ".claude/skills/verify-cairn/scripts/drive-mentions.mjs",
           "args": [],
           "needs": [
             "stack"
           ],
           "status": "current",
-          "purpose": "Mention picker inserts agent token into new-task spec and optionally detail composer draft.",
-          "usage": "[todoId] (optional; the todoId path needs a todo from setup-review-seed.mjs, which answers 400 without machineId since ADR 0019); env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR"
+          "purpose": "Typing @ in the detail composer opens the inline completion and a picked row lands as @label in the draft.",
+          "usage": "<todoId> (required; needs a todo from setup-review-seed.mjs, which answers 400 without machineId since ADR 0019); env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR"
         }
       }
     },

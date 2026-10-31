@@ -192,7 +192,6 @@ export const EN: Record<string, string> = {
   '没有匹配"/{query}"的命令': 'No commands match "/{query}"',
   清空输入: 'Clear the input',
   已清空: 'Cleared',
-  打开提及面板: 'Open the mention picker',
   '发起 AI 审核': 'Start an AI review',
   停止当前运行: 'Stop the current run',
   查看命令说明: 'Show command help',
@@ -1041,15 +1040,8 @@ export const EN: Record<string, string> = {
   继续编辑: 'Keep editing',
   放弃并关闭: 'Discard and close',
 
-  // —— mention picker (issue #311, r9 §2.2/§3.2) ——
-  // Top layer 5 category rows + drill-in search + footer Insert (N) count.
-  // 与侧边栏/搜索面板的「任务/技能/Agents/项目/机器」键一致,只追加弹层
-  // 本地需要的 5 个键(搜索/空集/返回/插入 (n)/空态 query 分支；#848 起内联
-  // 空态复用「没有可引用的对象」，「没有可用的 Agent」退役)。
-  '搜索…': 'Search…',
   没有可引用的对象: 'Nothing to mention',
   '没有与"{query}"匹配的结果': 'No results matching “{query}”',
-  '插入 ({count})': 'Insert ({count})',
 
   // —— local 项目 Files tab 读面（#1030 开闸；不可达降级文案）——
   '本地仓库当前无法读取。': 'The local repository cannot be read right now.',

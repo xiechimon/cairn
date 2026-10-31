@@ -11,8 +11,7 @@ import { AttachmentPreview } from '../overlay/attachment-preview.js';
 import { ChipPopover } from '../overlay/chip-popover.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { DeleteProjectConfirm } from '../overlay/delete-project-confirm.js';
-import { MentionInline, MentionPicker } from '../overlay/mention-picker.js';
-import type { MentionToken } from '../overlay/mention-token.js';
+import { MentionInline } from '../overlay/mention-inline.js';
 import { MoreMenu } from '../overlay/more-menu.js';
 import { NewTaskDialog } from '../overlay/new-task-dialog.js';
 import { PaneTypeSelect } from '../overlay/plan-dropdown.js';
@@ -71,7 +70,7 @@ function NewTaskSpecimen() {
   return (
     <Specimen
       title="New task"
-      note={saved ?? 'NewTaskDialog with the project picker, attachments and mentions'}
+      note={saved ?? 'NewTaskDialog with the project picker and attachments'}
       stage="canvas"
     >
       <Button onClick={() => setOpen(true)}>New task</Button>
@@ -90,7 +89,6 @@ function NewTaskSpecimen() {
           { id: PROJECT, name: PROJECT_TITLE },
           { id: 'docs-site', name: 'docs-site' },
         ]}
-        mentionGroups={MENTION_GROUPS}
         onAttachment={(files) => files.map((f) => f.name)}
       />
     </Specimen>
@@ -132,8 +130,6 @@ function SearchSpecimen() {
 
 function PickersSpecimen() {
   const { t } = useI18n();
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [inserted, setInserted] = useState<MentionToken[]>([]);
   const [slashHi, setSlashHi] = useState<number | null>(0);
   const [inlineHi, setInlineHi] = useState<number | null>(0);
   const [picked, setPicked] = useState<string | null>(null);
@@ -144,12 +140,7 @@ function PickersSpecimen() {
   return (
     <Specimen
       title="Slash menu and mentions"
-      note={
-        picked ??
-        (inserted.length > 0
-          ? `Inserted: ${inserted.map((t) => t.label).join(', ')}`
-          : 'SlashMenu and MentionInline as they float over the composer; MentionPicker as a dialog')
-      }
+      note={picked ?? 'SlashMenu and MentionInline as they float over the composer'}
       stage="canvas"
     >
       <Cell label="SlashMenu">
@@ -199,20 +190,6 @@ function PickersSpecimen() {
             listboxId={inlineId}
           />
         </div>
-      </Cell>
-      <Cell label="MentionPicker">
-        <Button variant="outline" onClick={() => setPickerOpen(true)}>
-          Open mention picker
-        </Button>
-        <MentionPicker
-          open={pickerOpen}
-          onClose={() => setPickerOpen(false)}
-          groups={MENTION_GROUPS}
-          onInsert={(tokens) => {
-            setInserted(tokens);
-            setPickerOpen(false);
-          }}
-        />
       </Cell>
     </Specimen>
   );

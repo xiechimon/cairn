@@ -915,7 +915,7 @@ export function ProjectPage() {
       )}
       <NewTaskSurfaceRoot
         fixture={fixture}
-        opts={{ onFixtureSave, anchorProjectId: id, mentions: false, eager: true }}
+        opts={{ onFixtureSave, anchorProjectId: id }}
         apiRef={newTaskApiRef}
       />
       {ghIssuesAvailable && id !== undefined && (

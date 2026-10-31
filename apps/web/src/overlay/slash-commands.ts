@@ -24,7 +24,7 @@ export function slashFilter<T>(
 
 export type SlashRowKind = 'insert' | 'execute';
 
-export type BuiltinSlashName = 'clear' | 'attach' | 'mention' | 'review' | 'stop' | 'help';
+export type BuiltinSlashName = 'clear' | 'attach' | 'review' | 'stop' | 'help';
 
 export interface BuiltinSlashDef {
   name: BuiltinSlashName;
@@ -36,7 +36,6 @@ export interface BuiltinSlashDef {
 export const BUILTIN_SLASH_COMMANDS: BuiltinSlashDef[] = [
   { name: 'clear', aliases: ['new'], descKey: '清空输入', kind: 'execute' },
   { name: 'attach', aliases: [], descKey: '添加附件', kind: 'execute' },
-  { name: 'mention', aliases: ['at'], descKey: '打开提及面板', kind: 'execute' },
   { name: 'review', aliases: [], descKey: '发起 AI 审核', kind: 'execute' },
   { name: 'stop', aliases: ['cancel'], descKey: '停止当前运行', kind: 'execute' },
   { name: 'help', aliases: [], descKey: '查看命令说明', kind: 'execute' },
