@@ -337,7 +337,9 @@ export type TranscriptItem =
       text: string;
       id?: string;
     }
-  | { kind: 'scheduled' }
+  | { kind: 'scheduled'; id?: string; stepId?: string }
+  | { kind: 'scheduled-turn'; id: string; items: TranscriptItem[] }
+  | { kind: 'automation-completed'; id: string }
   | { kind: 'chief' }
   | { kind: 'fail'; title: string; body: string }
   | {

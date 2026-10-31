@@ -111,7 +111,7 @@ export function upsertMessage(
     .values(row)
     .onConflictDoUpdate({
       target: message.id,
-      set: { role: row.role, content: row.content, createdAt: row.createdAt },
+      set: { role: row.role, content: row.content, createdAt: row.createdAt, actor: null },
     })
     .run();
   deps.convHub?.publishMessage(row.conversationId, row);

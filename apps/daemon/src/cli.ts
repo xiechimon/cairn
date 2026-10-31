@@ -19,6 +19,7 @@ import {
 } from './config.js';
 import { createDaemonLogger } from './log.js';
 import { runMachine } from './machine-loop.js';
+import { runOrbWorker } from './orb/worker.js';
 import { forgetMachine, loadDaemonJson, loadMachineJson, statePaths } from './state.js';
 import { isAlive, runSupervisor, spawnSupervisor, stopSupervisor } from './supervisor.js';
 import { runTokenCommand } from './token-command.js';
@@ -245,6 +246,11 @@ export function buildProgram(): Command {
     .action(() => {
       process.stdout.write(`${PROVIDER_COMMAND_NOTICE}\n`);
     });
+
+  program.command('orb-step', { hidden: true }).action(async () => {
+    if (process.env.CAIRN_ORB !== '1') throw new Error('Orb worker requires CAIRN_ORB=1');
+    await runOrbWorker({ input: process.stdin, output: process.stdout });
+  });
 
   return program;
 }

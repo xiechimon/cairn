@@ -305,9 +305,9 @@ describe('SSE channels (02 §1.2, all SSE, no WS)', () => {
 });
 
 describe('MCP vocabulary (02 §7.2, r3 §6 matrix 1:1)', () => {
-  it('server-face whitelist = 11 read groups + 13 write tools = 24', () => {
-    expect(MCP_TOOLS_READ).toHaveLength(11);
-    expect(MCP_TOOLS_WRITE).toHaveLength(13);
+  it('server-face whitelist = 14 read groups + 15 write tools = 29', () => {
+    expect(MCP_TOOLS_READ).toHaveLength(14);
+    expect(MCP_TOOLS_WRITE).toHaveLength(15);
     expect(MCP_TOOLS_READ).toEqual([
       'Todos',
       'Projects',
@@ -320,6 +320,9 @@ describe('MCP vocabulary (02 §7.2, r3 §6 matrix 1:1)', () => {
       'Issues',
       'Pull Requests',
       'Workflow Runs',
+      'Threads Waiting on Me',
+      'Read Thread',
+      'Thread Pull Requests',
     ]);
     expect(MCP_TOOLS_WRITE).toEqual([
       'Create Todo',
@@ -335,6 +338,8 @@ describe('MCP vocabulary (02 §7.2, r3 §6 matrix 1:1)', () => {
       'Reopen Todos',
       'Schedule Todo',
       'Unschedule Todo',
+      'Start Thread',
+      'Reply Thread',
     ]);
   });
 
@@ -349,16 +354,16 @@ describe('MCP vocabulary (02 §7.2, r3 §6 matrix 1:1)', () => {
     ]);
   });
 
-  it('tool registry = 24 grant<->name single source, whitelist labels 1:1 (02/A10 shape-preserving)', () => {
+  it('tool registry = 29 grant-to-name pairs, whitelist labels remain one-to-one', () => {
     const read = MCP_TOOL_REGISTRY.filter((t) => t.kind === 'read');
     const write = MCP_TOOL_REGISTRY.filter((t) => t.kind === 'write');
     expect(read.map((t) => t.grant)).toEqual([...MCP_TOOLS_READ]);
     expect(write.map((t) => t.grant)).toEqual([...MCP_TOOLS_WRITE]);
-    expect(MCP_TOOL_REGISTRY).toHaveLength(24);
+    expect(MCP_TOOL_REGISTRY).toHaveLength(29);
     const names = MCP_TOOL_REGISTRY.map((t) => t.name);
-    expect(new Set(names).size).toBe(24);
+    expect(new Set(names).size).toBe(29);
     for (const name of names) expect(name).toMatch(/^[a-z][a-z0-9_]*$/);
-    expect(MCP_REGISTRY_BY_NAME.size).toBe(24);
+    expect(MCP_REGISTRY_BY_NAME.size).toBe(29);
   });
 
   it('executor minimum-version gate shape (02 §7.1: value self-determined per replica version line [design])', () => {

@@ -8,6 +8,7 @@ import {
   type MachineAttachmentResponse,
   type MachineCapabilities,
   type MachineClaimBody,
+  type MachineClosedOrbsBody,
   type MachineDoneBody,
   type MachineEnrollResponse,
   type MachineHeartbeatBody,
@@ -22,6 +23,7 @@ import {
   machineAskResponseSchema,
   machineAttachmentResponseSchema,
   machineClaimResponseSchema,
+  machineClosedOrbsResponseSchema,
   machineEnrollPollResponseSchema,
   machineEnrollResponseSchema,
   machineEnrollStartResponseSchema,
@@ -81,6 +83,9 @@ export interface MachineApi {
     capabilities?: MachineCapabilities;
   }): Promise<void>;
   recover(): Promise<MachineRecoverResponse>;
+  closedOrbConversations?(
+    conversationIds: MachineClosedOrbsBody['conversationIds'],
+  ): Promise<string[]>;
   claim(signal?: AbortSignal, body?: MachineClaimBody): Promise<ClaimedStep | null>;
   heartbeat(stepId: string, body?: MachineHeartbeatBody): Promise<void>;
   tool(stepId: string, call: ToolCallRecord): Promise<void>;
@@ -233,6 +238,16 @@ export class MachineClient implements MachineApi {
     return this.request('POST', '/api/machine/recover', {
       body: {},
       parse: (raw) => machineRecoverResponseSchema.parse(raw),
+    });
+  }
+
+  async closedOrbConversations(
+    conversationIds: MachineClosedOrbsBody['conversationIds'],
+  ): Promise<string[]> {
+    return this.request('POST', '/api/machine/orbs/closed', {
+      body: { conversationIds },
+      signal: AbortSignal.timeout(10_000),
+      parse: (raw) => machineClosedOrbsResponseSchema.parse(raw),
     });
   }
 
