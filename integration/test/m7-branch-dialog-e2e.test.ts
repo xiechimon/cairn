@@ -67,6 +67,7 @@ describe('branch-sync buildId wiring (#346 regression pin)', () => {
     await pexpect(planView).toBeVisible({ timeout: 30_000 });
     await planView.click();
     const branchSection = page.locator('.detail-right').getByTestId('pane-section-branch');
+    await branchSection.getByRole('button', { name: '分支' }).click();
     await pexpect(branchSection).toBeVisible({ timeout: 30_000 });
 
     const right = page.locator('.detail-right');

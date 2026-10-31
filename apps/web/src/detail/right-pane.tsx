@@ -289,7 +289,7 @@ export function PaneSections({
 }) {
   const { t } = useI18n();
   const [open, setOpen] = useState<Record<SectionKey, boolean>>({
-    branch: true,
+    branch: initialView === 'branch',
     token: true,
     history: initialView === 'history',
   });

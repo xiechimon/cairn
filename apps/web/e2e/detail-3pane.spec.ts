@@ -196,8 +196,10 @@ test('right pane title switches plan and changes; usage, branch and history are 
   const history = right.getByTestId('pane-section-history');
   await expect(branch.getByRole('button', { name: '分支' })).toHaveAttribute(
     'aria-expanded',
-    'true',
+    'false',
   );
+  await branch.getByRole('button', { name: '分支' }).click();
+  await expect(branch.getByText('构建分支')).toBeVisible();
   await expect(usage).toContainText('tokens');
   await expect(history.getByRole('button', { name: '历史' })).toHaveAttribute(
     'aria-expanded',
