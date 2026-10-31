@@ -180,7 +180,7 @@ function FolderList({
                     {folder.path}
                   </span>
                   {folder.git && (
-                    <span className="flex-none rounded-(--cds-radius-sm) bg-secondary px-1.5 text-caption text-content-secondary">
+                    <span className="inline-flex h-4.5 flex-none items-center rounded-(--cds-radius-sm) px-1.5 text-caption text-content-tertiary ring-1 ring-border ring-inset">
                       git
                     </span>
                   )}
