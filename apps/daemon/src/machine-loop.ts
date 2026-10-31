@@ -438,7 +438,10 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       const entry = journal.get(stepRecord.id);
       if (entry?.claimed) {
         if (entry.state === 'awaiting-upload' && entry.doneBody != null) {
-          await resumePendingUpload(stepDeps(), entry, { running: 1 });
+          await resumePendingUpload(stepDeps(), entry, {
+            running: 1,
+            failOnRejectedDone: orbProvider.kind === 'orb' && entry.kind !== 'chief',
+          });
           continue;
         }
         const priorMachineId = entry.claimed.session.priorMachineId;

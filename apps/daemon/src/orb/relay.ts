@@ -2,7 +2,12 @@ import { chmodSync, existsSync, lstatSync, mkdirSync, rmSync } from 'node:fs';
 import { createConnection, createServer, type Server, type Socket } from 'node:net';
 import { dirname } from 'node:path';
 import { createInterface } from 'node:readline';
-import { claudeRateLimitReportSchema, normalizeClaudeResetsAt } from '@cairn/shared';
+import {
+  claudeRateLimitReportSchema,
+  type MachineDoneBody,
+  machineDoneBodySchema,
+  normalizeClaudeResetsAt,
+} from '@cairn/shared';
 import { z } from 'zod';
 import { type MachineApi, MachineApiError } from '../machine-client.js';
 import {
@@ -51,8 +56,8 @@ export class RelayMachineServer {
       upstream: MachineApi;
       input?: OrbStepInput | (() => OrbStepInput);
       onFrame?: (frame: OrbFrame) => void;
-      onHeartbeat?: () => void;
-      onReporting?: (body: unknown) => void;
+      onActivity?: () => void;
+      onReporting?: (body: MachineDoneBody) => void;
       onDone?: () => void;
     },
   ) {
@@ -209,15 +214,18 @@ export class RelayMachineServer {
       const operation = this.options.upstream[method as OrbStepMethod];
       if (typeof operation !== 'function')
         throw new RelayMachineError('Relay method is unavailable');
-      if (method === 'heartbeat') this.options.onHeartbeat?.();
       if (cancellable && (method === 'relayTool' || method === 'askUser')) {
         const index = method === 'relayTool' ? 3 : 2;
         args[index] = { ...(args[index] as object), signal: controller.signal };
       }
       if (method === 'done') {
         if (this.reporting) throw new RelayMachineError('Relay completion is already in flight');
-        this.options.onReporting?.(args[1]);
+        const body = machineDoneBodySchema.safeParse(args[1]);
+        if (!body.success) throw new RelayMachineError('Invalid relay done body');
+        args[1] = body.data;
+        this.options.onReporting?.(body.data);
       }
+      this.options.onActivity?.();
       const result = Promise.resolve(Reflect.apply(operation, this.options.upstream, args));
       if (method === 'done') {
         report = result;

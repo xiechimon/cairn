@@ -297,3 +297,62 @@ test('a lost host relay interrupts the container session', async () => {
     await server.close();
   }
 });
+
+test.each(['success', 'failed'] as const)(
+  'orb worker heartbeats through finish-up until %s done settles',
+  async (status) => {
+    vi.useFakeTimers();
+    const root = mkdtempSync(join(tmpdir(), 'orb-finish-heartbeat-'));
+    const socketPath = join(root, 'step.sock');
+    const api = new FakeMachineApi();
+    const upload = defer();
+    const finish = defer();
+    const heartbeat = vi.spyOn(api, 'heartbeat');
+    const putUpload = vi.spyOn(api, 'putUpload').mockImplementation(async () => upload.promise);
+    const done = vi.spyOn(api, 'done').mockImplementation(async (stepId, body) => {
+      await finish.promise;
+      api.doneBodies.push({ stepId, body });
+    });
+    const server = new RelayMachineServer({
+      socketPath,
+      stepId: 's1',
+      upstream: api,
+      input: {
+        claimed: {
+          ...CLAIMED,
+          agent: { ...CLAIMED.agent!, modelId: status === 'success' ? 'stub-model' : null },
+        },
+        options: {},
+        methods: [...ORB_STEP_METHODS],
+      },
+    });
+    await server.listen();
+    const running = runOrbWorker({
+      socketPath,
+      backendFor: () => fakeBackend([{ type: 'done', usage: [] }]).backend,
+      home: join(root, 'state'),
+      workspacesRoot: join(root, 'work'),
+    });
+    try {
+      if (status === 'success') {
+        await vi.waitFor(() => expect(putUpload).toHaveBeenCalledTimes(1), { interval: 1 });
+        heartbeat.mockClear();
+        await vi.advanceTimersByTimeAsync(150_000);
+        await vi.waitFor(() => expect(heartbeat).toHaveBeenCalledTimes(5), { interval: 1 });
+        upload.resolve();
+      }
+      await vi.waitFor(() => expect(done).toHaveBeenCalledTimes(1), { interval: 1 });
+      heartbeat.mockClear();
+      await vi.advanceTimersByTimeAsync(150_000);
+      await vi.waitFor(() => expect(heartbeat).toHaveBeenCalledTimes(5), { interval: 1 });
+      expect(server.isComplete).toBe(false);
+    } finally {
+      upload.resolve();
+      finish.resolve();
+      await running;
+      await server.close();
+      vi.useRealTimers();
+    }
+    expect(api.doneBodies[0]?.body.status).toBe(status);
+  },
+);

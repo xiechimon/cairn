@@ -62,7 +62,8 @@ export async function runOrbStep(
   const execController = new AbortController();
   let stopTimer: ReturnType<typeof setTimeout> | undefined;
   let watchdog: ReturnType<typeof setTimeout> | undefined;
-  let watchdogStop: Promise<void> | undefined;
+  let providerStop: Promise<void> | undefined;
+  let activeHandle: OrbHandle | undefined;
   let timedOut = false;
   const seedDirectory = join(deps.paths.home, 'orb', `${stepId}-seed`);
   let ready = false;
@@ -85,7 +86,13 @@ export async function runOrbStep(
     },
     async stop() {
       send({ type: 'stop', discard: stop.request?.discard ?? false });
-      stopTimer ??= setTimeout(() => execController.abort(), 5_000);
+      stopTimer ??= setTimeout(() => {
+        execController.abort();
+        if (activeHandle)
+          providerStop ??= lifecycle.provider.stop(activeHandle).catch((error: unknown) => {
+            deps.logger.step(`Orb stop failed: ${String(error)}`);
+          });
+      }, 5_000);
       stopTimer.unref?.();
     },
     usage: () => [],
@@ -98,6 +105,7 @@ export async function runOrbStep(
         projectId: claimed.project?.id ?? claimed.conversationId,
       },
       async (handle) => {
+        activeHandle = handle;
         handle.lastStepId = stepId;
         lifecycle.provider.touch(handle, Date.now());
         const methods = ORB_STEP_METHODS.filter((method) => deps.client[method] !== undefined);
@@ -190,12 +198,12 @@ export async function runOrbStep(
             options: { ...input.options, stopRequest: stop.request ?? undefined },
           }),
           onFrame: receive,
-          onHeartbeat: () => watchdog?.refresh(),
+          onActivity: () => watchdog?.refresh(),
           onReporting: (body) => {
             workerReported = true;
             deps.journal.update(stepId, {
               state: 'awaiting-upload',
-              doneBody: body as MachineDoneBody,
+              doneBody: body,
             });
           },
           onDone: () => {
@@ -213,8 +221,8 @@ export async function runOrbStep(
           exitError = 'orb heartbeat timeout';
           void relay?.close();
           execController.abort();
-          watchdogStop = lifecycle.provider.stop(handle).catch((error: unknown) => {
-            deps.logger.step(`Orb watchdog stop failed: ${String(error)}`);
+          providerStop ??= lifecycle.provider.stop(handle).catch((error: unknown) => {
+            deps.logger.step(`Orb stop failed: ${String(error)}`);
           });
         }, deps.orbHeartbeatTimeoutMs ?? ORB_HEARTBEAT_TIMEOUT_MS);
         watchdog.unref?.();
@@ -239,7 +247,7 @@ export async function runOrbStep(
           }
         } finally {
           clearTimeout(watchdog);
-          await watchdogStop;
+          await providerStop;
         }
       },
     );
@@ -259,7 +267,7 @@ export async function runOrbStep(
     if (!relay?.isComplete) {
       const pending = deps.journal.get(stepId);
       if (workerReported && pending?.state === 'awaiting-upload' && pending.doneBody) {
-        await resumePendingUpload(deps, pending, options);
+        await resumePendingUpload(deps, pending, { ...options, failOnRejectedDone: true });
       } else {
         const doneBody: MachineDoneBody = { status: 'failed', errorMessage: exitError };
         deps.journal.update(stepId, { state: 'awaiting-upload', doneBody });

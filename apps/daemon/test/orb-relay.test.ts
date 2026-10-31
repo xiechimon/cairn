@@ -57,7 +57,9 @@ test.each(ORB_STEP_METHODS)(
         ? ['https://upload.test/step', { 'x-upload': 'value' }, 'payload', 'text/plain']
         : method === 'reportClaudeRateLimit'
           ? [{ machineId: 'host', status: 'rejected', resetsAt: Date.now() + 1000 }]
-          : ['step', { nested: ['unchanged', 42, false], text: 'body' }];
+          : method === 'done'
+            ? ['step', { status: 'success', hasChanges: true, sessionId: 'session' }]
+            : ['step', { nested: ['unchanged', 42, false], text: 'body' }];
     await client.call(method, args);
     expect(forwarded).toHaveBeenLastCalledWith(method, args);
   },
@@ -215,6 +217,19 @@ test('retries a rejected finish report over the same connection', async () => {
   await expect(client.api.done('step', { status: 'failed' })).resolves.toBeDefined();
   expect(forwarded).toHaveBeenCalledTimes(2);
 });
+
+test.each([null, {}, { status: 'invalid' }, { status: 'success', hasChanges: 'yes' }])(
+  'rejects invalid done body %j before forwarding and permits a valid completion',
+  async (body) => {
+    const { client, forwarded, server } = await fixture();
+    await expect(client.call('done', ['step', body])).rejects.toThrow('Invalid relay done body');
+    expect(forwarded).not.toHaveBeenCalled();
+    expect(server.isComplete).toBe(false);
+    await client.api.done('step', { status: 'failed', errorMessage: 'Invalid completion' });
+    expect(forwarded).toHaveBeenCalledTimes(1);
+    expect(server.isComplete).toBe(true);
+  },
+);
 
 test('validates rate-limit reports before forwarding', async () => {
   const { client, forwarded } = await fixture();

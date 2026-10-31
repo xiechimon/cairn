@@ -1691,7 +1691,7 @@ async function runClaimedStep(
   await sealSegment();
   flushDeltas();
   flushThinking();
-  clearInterval(heartbeat);
+  if (opts.env?.CAIRN_ORB !== '1') clearInterval(heartbeat);
   if (watchdog) clearTimeout(watchdog);
   if (bodyTimeout) clearTimeout(bodyTimeout);
   if (durationCap) clearTimeout(durationCap);
@@ -2145,7 +2145,7 @@ async function putFinalArtifacts(
 export async function resumePendingUpload(
   deps: Pick<RunStepDeps, 'client' | 'journal' | 'logger' | 'paths' | 'sessionHandles'>,
   entry: StepJournalEntry,
-  opts: { running?: number } = {},
+  opts: { running?: number; failOnRejectedDone?: boolean } = {},
 ): Promise<void> {
   const { client, journal, logger } = deps;
   const stepId = entry.stepId;
@@ -2173,7 +2173,26 @@ export async function resumePendingUpload(
     await client.done(stepId, doneBody);
   } catch (err) {
     logger.step(`done report failed: ${err instanceof Error ? err.message : String(err)}`);
-    return;
+    if (
+      !opts.failOnRejectedDone ||
+      !(err instanceof MachineApiError) ||
+      err.status < 400 ||
+      err.status >= 500
+    )
+      return;
+    const failedBody: MachineDoneBody = {
+      status: 'failed',
+      errorMessage: `Orb completion rejected with HTTP ${err.status}: ${err.body}`,
+    };
+    journal.update(stepId, { doneBody: failedBody });
+    try {
+      await client.done(stepId, failedBody);
+    } catch (error) {
+      logger.step(
+        `done(failed) report unreachable: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return;
+    }
   }
   journal.remove(stepId);
   rmSync(join(deps.paths.outboxDir, `step-${stepId}.session.jsonl`), { force: true });
@@ -2187,7 +2206,6 @@ async function failStep(
   stepId: string,
   message: string,
 ): Promise<void> {
-  clearInterval(heartbeat);
   deps.sessionHandles?.delete(stepId);
   deps.logger.step(`failed: ${message}`);
   try {
@@ -2197,5 +2215,7 @@ async function failStep(
     deps.logger.step(
       `done(failed) report unreachable: ${err instanceof Error ? err.message : String(err)}`,
     );
+  } finally {
+    clearInterval(heartbeat);
   }
 }
