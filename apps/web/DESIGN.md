@@ -234,9 +234,9 @@ All live in `src/components/` and are shown in the gallery under "Stone language
 - **PrBar** (`thread/pr-bar.tsx`): PR number, branch, CI chip that opens a Checks popover (Auto-fix, Auto-merge with dynamic help, one locked row that states why), Merge; merged variant.
 - **ScheduledTaskRow** (`thread/scheduled-task-row.tsx`): still clock mark, name, trigger and next run, Active, Paused or Auto-disabled tag.
 - **Shell parts** (`shell/`): `SidebarNavRow`, `SidebarProjectRow` with waiting count, `SidebarThreadList` and `SidebarThreadRow` (tone glyph, truncation, hover menu, open and snoozed), `SidebarUser`, `WaitPill`, `HeaderIconButton` with attention dot, `ProjectCard`, `PhoneTabBar` with badge.
-- **Stream parts** (`stream/`): `GoalLine`, `Greeting`, `SuggestionChip`; the archived banner is `NoticeBanner` with the waiting tone; the day divider is `Marker variant="separator"`.
+- **Stream parts** (`stream/`): `GoalLine` is one meta line (tertiary "Goal", secondary text, optional 22px pencil when an edit action exists); `Greeting` is a short single line with an optional tertiary "Since" line and never wraps; `StreamDigest` lists up to three 34px rows (tone glyph, bold tabular count, label, chevron when clickable) and hides rows with count 0; `SuggestionChip` is a quiet text button; the archived banner is `NoticeBanner` with the waiting tone.
 - **ListCard / ListRow** (`list-card.tsx`): divided card list used by library, activity and settings rows.
-- **RoutingNode / QuotaBar** (`settings/`): model-routing node with optional quota bar that turns ochre at 80% and above; unavailable nodes are dashed with a failed tag.
+- **RoutingGraph / QuotaRow** (`settings/`): two-column model-routing graph. Job nodes are two rows (name in the job's project ink, then "Model" and the mono model id) with a 1px border in the job's project tile at 55%; each connects by a 1.5px curve in the job's ink to its connection node, which shows name, plan tier and `QuotaRow` bars (5h, week) that turn ochre at 80% and above. Unavailable nodes are dashed in destructive at 45% with a small Unavailable tag and no curve.
 
 ## Page patterns
 
