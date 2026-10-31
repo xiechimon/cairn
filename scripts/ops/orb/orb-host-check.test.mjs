@@ -453,3 +453,23 @@ test('missing root preparation times out without writing a trigger', (t) => {
   assert.ok(result.errors.some((error) => /runtime directory/.test(error)));
   assert.equal(waits, 29);
 });
+
+for (const metadata of [
+  undefined,
+  '{',
+  '{}',
+  JSON.stringify({ key: '0.3.0-abc1234', version: '0.3.0', sha: 'abc1234' }),
+]) {
+  test(`daemon release metadata is informational: ${metadata ?? 'missing'}`, (t) => {
+    const f = fakeHost(t);
+    const releaseFile = join(f.runtimeRoot, 'current.json');
+    if (metadata !== undefined) writeFileSync(releaseFile, metadata);
+    const result = checkHost({ ...f, releaseFile });
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.deepEqual(result.errors, []);
+    assert.deepEqual(
+      result.daemonRelease,
+      metadata?.includes('abc1234') ? JSON.parse(metadata) : null,
+    );
+  });
+}

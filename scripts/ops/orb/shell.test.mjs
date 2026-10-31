@@ -27,6 +27,7 @@ function fixture() {
     `#!${process.execPath}
 import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, realpathSync, renameSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
+import { runInNewContext } from 'node:vm';
 const cmd = basename(process.argv[1]);
 const args = process.argv.slice(2);
 const root = process.env.CAIRN_ORB_ROOT;
@@ -35,7 +36,7 @@ if (process.env.FAIL_COMMAND === cmd) process.exit(1);
 if (cmd === 'node') console.log(args[0].endsWith('/runtime-directory.mjs') ? '0 changes' : JSON.stringify({ http: process.env.http_proxy, https: process.env.https_proxy }));
 if (cmd === 'sysctl') console.log(process.env.PROTECTED_HARDLINKS ?? '1');
 if (cmd === 'id') console.log(args[0] === '-un' ? (process.env.FAKE_USER || 'root') : args.includes('ian') ? (process.env.AGENT_UID || '1000') : '0');
-if (cmd === 'runuser' || cmd === 'bash') console.log(args.some((arg) => arg.includes('daemon-package.mjs')) ? (process.env.CAIRN_ORB_DAEMON_PACKAGE || '@xiechimon/cairn-cli') + ' ' + (process.env.CAIRN_ORB_DAEMON_VERSION || '0.2.2') : args.at(-1).includes('claude') ? (process.env.BAD_VERSION || '2.1.0 (Claude Code)') : 'codex-cli 0.100.0');
+if (cmd === 'runuser' || cmd === 'bash') console.log(args.some((arg) => arg.includes('daemon-package.mjs')) ? (process.env.CAIRN_ORB_NODE_MAJOR || process.env.HOST_NODE_MAJOR || '26') : args.at(-1).includes('claude') ? (process.env.BAD_VERSION || '2.1.302 (Claude Code)') : 'codex-cli 0.163.0');
 if (cmd !== 'systemd-nspawn' && cmd !== 'pacstrap' && args.some((arg) => arg === '-M' || arg.startsWith('--machine'))) process.exit(91);
 if (cmd === 'machinectl' && args.some((arg) => ['bind', 'shell', 'login', 'copy-to', 'copy-from'].includes(arg))) process.exit(92);
 if (cmd === 'stat') console.log(process.env.DIR_OWNER || 'ian:700');
@@ -63,6 +64,11 @@ if (cmd === 'arch-chroot') {
   const input = readFileSync(0, 'utf8');
   writeFileSync(join(root, 'guest-recipe'), input);
   writeFileSync(join(root, 'guest-args'), JSON.stringify(args));
+  const gate = /^node -e '(.+)'/m.exec(input)?.[1];
+  if (gate) runInNewContext(gate, {
+    console,
+    process: { argv: ['node', args.at(-1)], versions: { node: (process.env.GUEST_NODE_MAJOR || args.at(-1)) + '.1.0' }, exit: (code) => process.exit(code) },
+  });
   if (!input.includes('major < 22') || !input.includes('passwd --lock root') || !input.includes('systemctl mask sshd')) process.exit(3);
 }
 if (cmd === 'machinectl') console.log('cairn-orb-base directory no');
@@ -140,8 +146,8 @@ test('image dry-run prints pins and never invokes privileged mutations', () => {
   try {
     const result = f.run('build-image.sh', ['--dry-run']);
     assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stdout, /@anthropic-ai\/claude-code@2.1.0/);
-    assert.match(result.stdout, /@openai\/codex@0.100.0/);
+    assert.match(result.stdout, /@anthropic-ai\/claude-code@2.1.302/);
+    assert.match(result.stdout, /@openai\/codex@0.163.0/);
     assert.match(result.stdout, /write \/etc\/environment/);
     assert.match(result.stdout, /mask SSH server/);
     assert.ok(f.calls().every(([cmd]) => ['id', 'runuser', 'sha256sum'].includes(cmd)));
@@ -260,11 +266,10 @@ test('relay binds only its expected bridge and forwards only to loopback', () =>
   }
 });
 
-test('guest runtime enforces Node minimum and keeps pnpm readable by agent', () => {
+test('guest image provides Node and CLIs without package-manager bootstrapping', () => {
   const script = readFileSync(join(source, 'build-image.sh'), 'utf8');
-  assert.match(script, /COREPACK_HOME=\/usr\/local\/lib\/corepack/);
-  assert.match(script, /runuser -u agent -- env COREPACK_HOME=.* pnpm --version/);
-  assert.match(script, /DefaultEnvironment=.*COREPACK_HOME=/);
+  assert.doesNotMatch(script, /corepack install|pnpm --version/);
+  assert.match(script, /npm install --global --ignore-scripts/);
 });
 
 test('ian can preview image creation without runuser or privilege', () => {
@@ -281,13 +286,19 @@ test('ian can preview image creation without runuser or privilege', () => {
   }
 });
 
-test('the actual image Node gate rejects versions below 22.19', () => {
-  const gate = /^node -e '(.+)'$/m.exec(readFileSync(join(source, 'build-image.sh'), 'utf8'))[1];
-  for (const node of ['20.19.0', '22.18.0']) {
+test('the actual image Node gate rejects a different major with an actionable error', () => {
+  const gate = /^node -e '(.+)' "\$5"$/m.exec(
+    readFileSync(join(source, 'build-image.sh'), 'utf8'),
+  )?.[1];
+  assert.ok(gate);
+  for (const node of ['20.19.0', '22.18.0', '24.14.0', '28.0.0']) {
+    const messages = [];
     assert.throws(
       () =>
         runInNewContext(gate, {
+          console: { error: (message) => messages.push(message) },
           process: {
+            argv: ['node', '26'],
             versions: { node },
             exit: () => {
               throw new Error('unsupported');
@@ -296,19 +307,18 @@ test('the actual image Node gate rejects versions below 22.19', () => {
         }),
       /unsupported/,
     );
+    assert.match(messages.join(' '), /guest Node.*host daemon.*26/i);
   }
-  for (const node of ['22.19.0', '24.14.0', '26.0.0']) {
-    assert.doesNotThrow(() =>
-      runInNewContext(gate, {
-        process: {
-          versions: { node },
-          exit: () => {
-            throw new Error('unsupported');
-          },
-        },
-      }),
-    );
-  }
+  assert.doesNotThrow(() =>
+    runInNewContext(gate, {
+      console,
+      process: {
+        argv: ['node', '26'],
+        versions: { node: '26.1.0' },
+        exit: () => assert.fail('matching major rejected'),
+      },
+    }),
+  );
 });
 
 test('failed image cleanup preserves a tree with active mounts', () => {
@@ -433,7 +443,7 @@ test('image ships enabled guest worker and trigger units with one daemon entry',
   assert.match(script, /orb-step --socket \/run\/cairn\/relay.sock/);
   assert.match(script, /PathExists=\/run\/cairn\/check-request/);
   assert.match(script, /systemctl enable cairn-orb-worker.service cairn-orb-check.path/);
-  assert.match(script, /useradd --uid "\$4"/);
+  assert.match(script, /useradd --uid "\$3"/);
 });
 
 test('preparation delegates source creation and stop to the root fd helper', () => {
@@ -498,78 +508,106 @@ test('agent UID drift rebuilds the image and invalid mappings fail closed', () =
   }
 });
 
-for (const override of [
-  { CAIRN_ORB_DAEMON_VERSION: '0.3.0' },
-  { CAIRN_ORB_DAEMON_PACKAGE: '@example/daemon' },
-]) {
-  test(`daemon pin drift rebuilds and converges: ${JSON.stringify(override)}`, () => {
-    const f = fixture();
-    try {
-      assert.equal(f.run('build-image.sh').status, 0);
-      const changed = f.run('build-image.sh', [], override);
-      assert.equal(changed.status, 0, changed.stderr);
-      assert.match(changed.stdout, /rebuild cairn-orb-base/);
-      assert.match(changed.stdout, /1 changes/);
-      const marker = readFileSync(
-        join(f.root, 'var/lib/machines/cairn-orb-base/etc/cairn-orb-image'),
-        'utf8',
-      );
-      assert.ok(marker.includes(`daemon=${override.CAIRN_ORB_DAEMON_VERSION || '0.2.2'}`));
-      assert.ok(
-        marker.includes(
-          `daemon_package=${override.CAIRN_ORB_DAEMON_PACKAGE || '@xiechimon/cairn-cli'}`,
-        ),
-      );
-      const args = JSON.parse(readFileSync(join(f.root, 'guest-args'), 'utf8'));
-      assert.equal(args.at(-3), '/opt/cairn/daemon/cli.mjs');
-      assert.equal(args.at(-2), override.CAIRN_ORB_DAEMON_PACKAGE || '@xiechimon/cairn-cli');
-      assert.equal(args.at(-1), override.CAIRN_ORB_DAEMON_VERSION || '0.2.2');
-      const recipe = readFileSync(join(f.root, 'guest-recipe'), 'utf8');
-      const install = /^npm install --prefix .*$/m.exec(recipe)[0];
-      const worker =
-        /cat > \/etc\/systemd\/system\/cairn-orb-worker.service <<WORKER\n([\s\S]+?)\nWORKER/.exec(
-          recipe,
-        )[1];
-      const guest = spawnSync('/bin/bash', ['-s', '--', ...args.slice(args.indexOf('--') + 1)], {
-        input: `${install}\ncat <<WORKER\n${worker}\nWORKER\n`,
-        env: f.env,
-        encoding: 'utf8',
-      });
-      assert.equal(guest.status, 0, guest.stderr);
-      assert.match(
-        guest.stdout,
-        /^ExecStart=\/usr\/bin\/node \/opt\/cairn\/daemon\/cli.mjs orb-step --socket \/run\/cairn\/relay.sock$/m,
-      );
-      assert.deepEqual(
-        f.calls().find(([cmd]) => cmd === 'npm'),
+test('image recipe only installs CLI packages and retains the mounted release entry', () => {
+  const f = fixture();
+  try {
+    assert.equal(f.run('build-image.sh').status, 0);
+    const args = JSON.parse(readFileSync(join(f.root, 'guest-args'), 'utf8'));
+    const recipe = readFileSync(join(f.root, 'guest-recipe'), 'utf8');
+    const installs = recipe.split('\n').filter((line) => /^npm install /.test(line));
+    assert.equal(installs.length, 1);
+    const worker =
+      /cat > \/etc\/systemd\/system\/cairn-orb-worker.service <<WORKER\n([\s\S]+?)\nWORKER/.exec(
+        recipe,
+      )[1];
+    const guest = spawnSync('/bin/bash', ['-s', '--', ...args.slice(args.indexOf('--') + 1)], {
+      input: `${installs.join('\n')}\ncat <<WORKER\n${worker}\nWORKER\n`,
+      env: f.env,
+      encoding: 'utf8',
+    });
+    assert.equal(guest.status, 0, guest.stderr);
+    assert.match(
+      guest.stdout,
+      /^ExecStart=\/usr\/bin\/node \/opt\/cairn\/daemon\/cli.mjs orb-step --socket \/run\/cairn\/relay.sock$/m,
+    );
+    assert.deepEqual(
+      f.calls().filter(([cmd]) => cmd === 'npm'),
+      [
         [
           'npm',
           'install',
-          '--prefix',
-          '/opt/cairn',
-          '--omit=dev',
+          '--global',
           '--ignore-scripts',
-          `${args.at(-2)}@${args.at(-1)}`,
+          '--no-audit',
+          '--no-fund',
+          '@anthropic-ai/claude-code@2.1.302',
+          '@openai/codex@0.163.0',
         ],
-      );
-      assert.equal(f.run('build-image.sh', [], override).stdout.trim(), '0 changes');
-      assert.equal(f.calls().filter(([cmd]) => cmd === 'pacstrap').length, 2);
-    } finally {
-      rmSync(f.root, { recursive: true, force: true });
-    }
-  });
-}
+      ],
+    );
+    assert.doesNotMatch(recipe, /@xiechimon\/cairn-cli|npm install --prefix/);
+    const marker = readFileSync(
+      join(f.root, 'var/lib/machines/cairn-orb-base/etc/cairn-orb-image'),
+      'utf8',
+    );
+    assert.match(marker, /node_major=26/);
+    assert.doesNotMatch(marker, /daemon=|daemon_package=|pnpm=/);
+    assert.equal(
+      f.run('build-image.sh', [], { CAIRN_ORB_DAEMON_VERSION: '999.0.0' }).stdout.trim(),
+      '0 changes',
+    );
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
 
-test('legacy image markers rebuild with daemon pins instead of being rejected', () => {
+test('Node major drift rebuilds and converges', () => {
+  const f = fixture();
+  try {
+    assert.equal(f.run('build-image.sh').status, 0);
+    const changed = f.run('build-image.sh', [], { HOST_NODE_MAJOR: '28' });
+    assert.equal(changed.status, 0, changed.stderr);
+    assert.match(changed.stdout, /rebuild cairn-orb-base/);
+    const marker = readFileSync(
+      join(f.root, 'var/lib/machines/cairn-orb-base/etc/cairn-orb-image'),
+      'utf8',
+    );
+    assert.match(marker, /node_major=28/);
+    assert.equal(f.run('build-image.sh', [], { HOST_NODE_MAJOR: '28' }).stdout.trim(), '0 changes');
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+test('legacy image markers rebuild without retaining npm daemon pins', () => {
   const f = fixture();
   try {
     const marker = join(f.root, 'var/lib/machines/cairn-orb-base/etc/cairn-orb-image');
     mkdirSync(join(marker, '..'), { recursive: true });
-    writeFileSync(marker, 'recipe=old\nclaude=2.1.0\ncodex=0.100.0\npnpm=12.5.1\nagent_uid=1000\n');
-    const changed = f.run('build-image.sh');
-    assert.equal(changed.status, 0, changed.stderr);
-    assert.match(changed.stdout, /rebuild cairn-orb-base/);
-    assert.match(readFileSync(marker, 'utf8'), /daemon=0.2.2/);
+    for (const daemon of ['', '\ndaemon_package=@xiechimon/cairn-cli\ndaemon=0.2.2']) {
+      writeFileSync(
+        marker,
+        `recipe=old\nclaude=2.1.0\ncodex=0.100.0\npnpm=12.5.1\nagent_uid=1000${daemon}\n`,
+      );
+      const changed = f.run('build-image.sh');
+      assert.equal(changed.status, 0, changed.stderr);
+      assert.match(changed.stdout, /rebuild cairn-orb-base/);
+      assert.match(readFileSync(marker, 'utf8'), /node_major=26/);
+      assert.doesNotMatch(readFileSync(marker, 'utf8'), /daemon=/);
+    }
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+test('guest Node mismatch aborts staging before image registration', () => {
+  const f = fixture();
+  try {
+    const result = f.run('build-image.sh', [], { GUEST_NODE_MAJOR: '24' });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Guest Node 24.1.0 must match host daemon Node major 26/);
+    assert.equal(existsSync(join(f.root, 'var/lib/machines/cairn-orb-base')), false);
+    assert.ok(!f.calls().some(([cmd]) => cmd === 'machinectl'));
   } finally {
     rmSync(f.root, { recursive: true, force: true });
   }

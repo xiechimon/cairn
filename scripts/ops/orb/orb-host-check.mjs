@@ -12,6 +12,7 @@ export function parseHostCheck(input, { blockedPorts = [22, 5231] } = {}) {
   );
   const memory = /^MemoryMax=(\d+)\s*$/m.exec(input.memory);
   const record = {
+    daemonRelease: input.daemonRelease ?? null,
     image: input.images.split('\n').some((line) => line.trim().split(/\s+/)[0] === 'cairn-orb-base')
       ? 'cairn-orb-base'
       : null,
@@ -67,6 +68,7 @@ export function checkHost({
   user = userInfo().username,
   name = `cairn-orb-check-${randomUUID().slice(0, 8)}`,
   runtimeRoot = '/run/cairn-orb',
+  releaseFile = '/var/lib/cairn-orb/dist/current.json',
   blockedPorts = (process.env.CAIRN_ORB_CHECK_BLOCKED_PORTS ?? '22,5231').split(',').map(Number),
 } = {}) {
   if (user !== 'ian') throw new Error('Run the host check as ian without sudo');
@@ -85,6 +87,16 @@ export function checkHost({
     firewallService: '',
     firewallProbes: [],
   };
+  try {
+    const release = readMetadata(releaseFile);
+    if (
+      release &&
+      ['key', 'version', 'sha'].every(
+        (key) => typeof release[key] === 'string' && release[key].length > 0,
+      )
+    )
+      input.daemonRelease = { key: release.key, version: release.version, sha: release.sha };
+  } catch {}
   const call = (cmd, args) => {
     const result = run(cmd, args);
     if (result.status !== 0)

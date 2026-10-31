@@ -28,18 +28,15 @@ host_version() {
 claude_version=$(host_version claude | awk 'NR == 1 {print $1}')
 codex_version=$(host_version codex | awk 'NR == 1 {print $NF}')
 [[ $claude_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ && $codex_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { printf 'Cannot pin host Claude Code and Codex versions\n' >&2; exit 1; }
-pnpm_version=$(sed -n 's/.*"packageManager": "pnpm@\([0-9.]*\)".*/\1/p' "$script_dir/../../../package.json")
-[[ $pnpm_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { printf 'Cannot pin pnpm version\n' >&2; exit 1; }
-daemon_args=(bash -lc 'node "$1" "$(command -v cairn || true)" "$2" "$3"' cairn-orb "$script_dir/daemon-package.mjs" "${CAIRN_ORB_DAEMON_PACKAGE:-}" "${CAIRN_ORB_DAEMON_VERSION:-}")
+daemon_args=(bash -lc 'export XDG_RUNTIME_DIR=/run/user/$(id -u); node "$1" "$2"' cairn-orb "$script_dir/daemon-package.mjs" "${CAIRN_ORB_NODE_MAJOR:-}")
 if [[ $(id -un) == ian ]]; then
-  daemon_pin=$("${daemon_args[@]}")
+  node_major=$("${daemon_args[@]}")
 else
-  daemon_pin=$(runuser -u ian -- "${daemon_args[@]}")
+  node_major=$(runuser -u ian -- "${daemon_args[@]}")
 fi
-read -r daemon_package daemon_version <<< "$daemon_pin"
-[[ $daemon_package =~ ^(@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*$ && $daemon_version =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]] || { printf 'Cannot pin host daemon package and version\n' >&2; exit 1; }
+[[ $node_major =~ ^[1-9][0-9]*$ && $node_major -ge 22 ]] || { printf 'Cannot pin host daemon Node major; set CAIRN_ORB_NODE_MAJOR\n' >&2; exit 1; }
 recipe=$(cat "$script_dir/build-image.sh" "$script_dir/guest-check.mjs" "$script_dir/daemon-package.mjs" | sha256sum | awk '{print $1}')
-expected=$(printf 'recipe=%s\nclaude=%s\ncodex=%s\npnpm=%s\nagent_uid=%s\ndaemon_package=%s\ndaemon=%s' "$recipe" "$claude_version" "$codex_version" "$pnpm_version" "$agent_uid" "$daemon_package" "$daemon_version")
+expected=$(printf 'recipe=%s\nclaude=%s\ncodex=%s\nnode_major=%s\nagent_uid=%s' "$recipe" "$claude_version" "$codex_version" "$node_major" "$agent_uid")
 previous_marker=
 if [[ -d $image ]]; then
   if [[ -f $image/etc/cairn-orb-image && $(cat "$image/etc/cairn-orb-image") == "$expected" ]]; then
@@ -47,19 +44,29 @@ if [[ -d $image ]]; then
     printf '0 changes\n'
     exit 0
   fi
-  if [[ ! -f $image/etc/cairn-orb-image ]] || ! [[ $(cat "$image/etc/cairn-orb-image") =~ ^recipe=[a-zA-Z0-9-]+$'\n'claude=[0-9]+\.[0-9]+\.[0-9]+$'\n'codex=[0-9]+\.[0-9]+\.[0-9]+$'\n'pnpm=[0-9]+\.[0-9]+\.[0-9]+($'\n'agent_uid=[0-9]+)?($'\n'daemon_package=(@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*$'\n'daemon=[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?)?$ ]]; then
+  current_marker_pattern='^recipe=[a-zA-Z0-9-]+
+claude=[0-9]+\.[0-9]+\.[0-9]+
+codex=[0-9]+\.[0-9]+\.[0-9]+
+node_major=[1-9][0-9]*
+agent_uid=[0-9]+$'
+  legacy_marker_pattern='^recipe=[a-zA-Z0-9-]+
+claude=[0-9]+\.[0-9]+\.[0-9]+
+codex=[0-9]+\.[0-9]+\.[0-9]+
+pnpm=[0-9]+\.[0-9]+\.[0-9]+(
+agent_uid=[0-9]+)?(
+daemon_package=(@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*
+daemon=[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?)?$'
+  if [[ ! -f $image/etc/cairn-orb-image ]] || ! { [[ $(cat "$image/etc/cairn-orb-image") =~ $current_marker_pattern ]] || [[ $(cat "$image/etc/cairn-orb-image") =~ $legacy_marker_pattern ]]; }; then
     printf 'Unrecognized existing base image; preserve it and resolve explicitly\n' >&2
     exit 1
   fi
   previous_marker=$(cat "$image/etc/cairn-orb-image")
-  printf 'rebuild cairn-orb-base: recipe or pinned CLI/daemon versions changed\n'
+  printf 'rebuild cairn-orb-base: recipe or pinned Node/CLI versions changed\n'
 fi
-printf 'build cairn-orb-base with pacstrap: base git nodejs npm corepack openssh ca-certificates curl\n'
-printf 'pin @anthropic-ai/claude-code@%s @openai/codex@%s pnpm@%s; create agent; install proxy settings; register image\n' "$claude_version" "$codex_version" "$pnpm_version"
-printf 'pin daemon %s@%s into /opt/cairn/node_modules with npm lifecycle scripts disabled\n' "$daemon_package" "$daemon_version"
+printf 'build cairn-orb-base with pacstrap: base git nodejs npm openssh ca-certificates curl\n'
+printf 'pin Node major %s @anthropic-ai/claude-code@%s @openai/codex@%s; create agent; install proxy settings; register image\n' "$node_major" "$claude_version" "$codex_version"
 printf '%s\n' \
   'create a locked staging image under /var/lib/machines' \
-  'enable Corepack shims and install pinned pnpm in /usr/local/lib/corepack' \
   'install pinned CLI packages with npm lifecycle scripts disabled' \
   'create unprivileged agent user and validate its CLI versions' \
   'lock root login and mask SSH server units' \
@@ -98,30 +105,23 @@ cleanup() {
     printf 'remove incomplete image %s\n' "$stage"; rm -rf -- "$stage"; fi
 }
 trap cleanup EXIT
-pacstrap -K -M "$stage" base git nodejs npm corepack openssh ca-certificates curl
+pacstrap -K -M "$stage" base git nodejs npm openssh ca-certificates curl
 printf 'configure image and pinned tools\n'
-arch-chroot "$stage" /usr/bin/env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/bin HOME=/root HTTP_PROXY="$HTTP_PROXY" HTTPS_PROXY="$HTTPS_PROXY" http_proxy="$http_proxy" https_proxy="$https_proxy" bash -s -- "$claude_version" "$codex_version" "$pnpm_version" "$agent_uid" "$daemon_entry" "$daemon_package" "$daemon_version" <<'GUEST'
+arch-chroot "$stage" /usr/bin/env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/bin HOME=/root HTTP_PROXY="$HTTP_PROXY" HTTPS_PROXY="$HTTPS_PROXY" http_proxy="$http_proxy" https_proxy="$https_proxy" bash -s -- "$claude_version" "$codex_version" "$agent_uid" "$daemon_entry" "$node_major" <<'GUEST'
 set -euo pipefail
-node -e 'const [major, minor] = process.versions.node.split(".").map(Number); if (major < 22 || (major === 22 && minor < 19)) process.exit(1)'
-export COREPACK_HOME=/usr/local/lib/corepack
-corepack enable
-corepack install --global "pnpm@$3"
+node -e 'const [major, minor] = process.versions.node.split(".").map(Number); const expected = Number(process.argv[1]); if (major !== expected || major < 22 || (major === 22 && minor < 19)) { console.error(`Guest Node ${process.versions.node} must match host daemon Node major ${expected} and be >=22.19; install a compatible guest nodejs package before retrying`); process.exit(1); }' "$5"
 npm install --global --ignore-scripts --no-audit --no-fund "@anthropic-ai/claude-code@$1" "@openai/codex@$2"
-npm install --prefix /opt/cairn --omit=dev --ignore-scripts "$6@$7"
-useradd --uid "$4" --create-home --shell /bin/bash agent
+useradd --uid "$3" --create-home --shell /bin/bash agent
 [[ $(runuser -u agent -- claude --version | awk 'NR == 1 {print $1}') == "$1" ]]
 [[ $(runuser -u agent -- codex --version | awk 'NR == 1 {print $NF}') == "$2" ]]
-[[ $(pnpm --version) == "$3" ]]
-chmod -R a+rX "$COREPACK_HOME"
-[[ $(runuser -u agent -- env COREPACK_HOME=/usr/local/lib/corepack pnpm --version) == "$3" ]]
 passwd --lock root
 systemctl disable sshd.service sshd.socket || true
 systemctl mask sshd.service sshd.socket
 systemctl enable systemd-networkd.service
 install -d /etc/systemd/system.conf.d
-printf '[Manager]\nDefaultEnvironment="COREPACK_HOME=/usr/local/lib/corepack" "HTTP_PROXY=http://10.203.0.1:7890" "HTTPS_PROXY=http://10.203.0.1:7890" "http_proxy=http://10.203.0.1:7890" "https_proxy=http://10.203.0.1:7890" "NO_PROXY=localhost,127.0.0.1,::1" "no_proxy=localhost,127.0.0.1,::1"\n' > /etc/systemd/system.conf.d/20-cairn-orb-proxy.conf
-printf 'COREPACK_HOME=/usr/local/lib/corepack\nHTTP_PROXY=http://10.203.0.1:7890\nHTTPS_PROXY=http://10.203.0.1:7890\nhttp_proxy=http://10.203.0.1:7890\nhttps_proxy=http://10.203.0.1:7890\nNO_PROXY=localhost,127.0.0.1,::1\nno_proxy=localhost,127.0.0.1,::1\n' > /etc/environment
-printf 'export COREPACK_HOME=/usr/local/lib/corepack HTTP_PROXY=http://10.203.0.1:7890 HTTPS_PROXY=http://10.203.0.1:7890 http_proxy=http://10.203.0.1:7890 https_proxy=http://10.203.0.1:7890 NO_PROXY=localhost,127.0.0.1,::1 no_proxy=localhost,127.0.0.1,::1\n' > /etc/profile.d/cairn-orb-proxy.sh
+printf '[Manager]\nDefaultEnvironment="HTTP_PROXY=http://10.203.0.1:7890" "HTTPS_PROXY=http://10.203.0.1:7890" "http_proxy=http://10.203.0.1:7890" "https_proxy=http://10.203.0.1:7890" "NO_PROXY=localhost,127.0.0.1,::1" "no_proxy=localhost,127.0.0.1,::1"\n' > /etc/systemd/system.conf.d/20-cairn-orb-proxy.conf
+printf 'HTTP_PROXY=http://10.203.0.1:7890\nHTTPS_PROXY=http://10.203.0.1:7890\nhttp_proxy=http://10.203.0.1:7890\nhttps_proxy=http://10.203.0.1:7890\nNO_PROXY=localhost,127.0.0.1,::1\nno_proxy=localhost,127.0.0.1,::1\n' > /etc/environment
+printf 'export HTTP_PROXY=http://10.203.0.1:7890 HTTPS_PROXY=http://10.203.0.1:7890 http_proxy=http://10.203.0.1:7890 https_proxy=http://10.203.0.1:7890 NO_PROXY=localhost,127.0.0.1,::1 no_proxy=localhost,127.0.0.1,::1\n' > /etc/profile.d/cairn-orb-proxy.sh
 install -d /usr/local/lib/cairn-orb /etc/systemd/system
 cat > /etc/systemd/system/cairn-orb-worker.service <<WORKER
 [Unit]
@@ -136,7 +136,7 @@ Restart=always
 RestartSec=1
 ExecStartPre=/bin/sh -c 'while [ ! -S /run/cairn/relay.sock ]; do sleep 1; done'
 TimeoutStartSec=infinity
-ExecStart=/usr/bin/node $5 orb-step --socket /run/cairn/relay.sock
+ExecStart=/usr/bin/node $4 orb-step --socket /run/cairn/relay.sock
 UMask=0077
 
 [Install]

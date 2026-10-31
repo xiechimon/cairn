@@ -1,23 +1,58 @@
 # Orb host provisioning
 
-Owner install command, from the repository checkout on the Linux host:
+Run these steps as `ian` from the same Linux checkout used by
+`cairn-daemon.service`. Inspect its working directory and exact Node executable:
 
 ```sh
-sudo bash scripts/ops/orb/install-host.sh
+systemctl --user show cairn-daemon.service -p WorkingDirectory -p ExecStart
 ```
 
-Preview every privileged step without changing the host:
+Run `<ExecStart-node-path> --version` using the absolute `path=` value above.
+The host currently uses mise Node 26.x; the login shell's Node is not the source
+of truth. Preview installation, then install twice with the owner's privileges:
 
 ```sh
 bash scripts/ops/orb/install-host.sh --dry-run
+sudo bash scripts/ops/orb/install-host.sh
+sudo bash scripts/ops/orb/install-host.sh
 ```
 
-Run the installer twice; the second successful run must print `0 changes`.
-As `ian`, run the exact post-install check command:
+The second successful install must print `0 changes`. The image builder reads
+`claude --version` and `codex --version` from `ian`'s login shell (currently
+Claude Code 2.1.302 and codex-cli 0.163.0). It reads the Node major by running
+`--version` on the daemon service's ExecStart binary. If service discovery is
+unavailable, supply the major verified above explicitly to each command:
 
 ```sh
+CAIRN_ORB_NODE_MAJOR=26 bash scripts/ops/orb/install-host.sh --dry-run
+sudo env CAIRN_ORB_NODE_MAJOR=26 bash scripts/ops/orb/install-host.sh
+sudo env CAIRN_ORB_NODE_MAJOR=26 bash scripts/ops/orb/install-host.sh
+```
+
+The guest's Arch `nodejs` package must have that same major and satisfy Node
+>=22.19. A mismatch aborts before image publication with the expected major;
+provide a compatible guest package before retrying. There is no daemon npm
+package/version override or fallback.
+
+The installer only creates the `ian`-owned `dist` directory inside its root-owned
+parent; the host daemon owns release publication. After the matching checkout
+has been built by the normal daemon deployment, restart its service as `ian`
+to use the daemon-side release publisher, then inspect the published contract:
+
+```sh
+systemctl --user restart cairn-daemon.service
+cat /var/lib/cairn-orb/dist/current.json
+readlink /var/lib/cairn-orb/dist/current
+readlink /var/lib/cairn-orb/dist/cli.mjs
+test -f /var/lib/cairn-orb/dist/current/dist/cli.mjs
+test -d /var/lib/cairn-orb/dist/current/node_modules
 scripts/ops/orb/orb-host-check.sh --json
 ```
+
+Do not copy a standalone `cli.mjs` or install the daemon from npm. Release
+publication requires the matching daemon-side publisher; the host installer does
+not implement or substitute for it. A missing release does not fail the network
+host check, but guests need a published release to run a Thread.
 
 A passing result exits zero and contains `image: "cairn-orb-base"`,
 `cloneStartStop: "ok"`, `egress: "ok"`, `memoryMax: 4294967296`,
@@ -32,8 +67,9 @@ The guest dials the host; the host never executes commands in a guest.
 
 ## Failure modes and local verification
 
-- Missing or partial images, invalid CLI or daemon pins, and Node below 22.19 fail closed.
-  Daemon package/version drift rebuilds the image with matching runtime dependencies.
+- Missing or partial images, invalid CLI pins, failed daemon Node discovery, Node
+  below 22.19, and a guest/host Node-major mismatch fail closed. Node-major or CLI
+  drift rebuilds the image; daemon release changes do not.
 - Polkit evaluates both clone source and destination; other users, unnamed
   actions, unrelated units, and nonmatching names receive no grant.
 - Resource limits, private users, proxy configuration, and host-path isolation
@@ -58,24 +94,17 @@ The host needs `nft`, `ip`, `nmcli`, systemd, and a Node executable available
 through root's PATH or `ian`'s login shell. The installer copies that executable
 to `/usr/local/lib/cairn-orb/node` for the relay, so a home-based Node install
 works with the user unit's `ProtectHome=yes`. Binary content and mode converge
-on reruns. Host CLI pins come from `claude
---version` and `codex --version` in that login shell. Corepack installs the
-repository's exact pnpm version. Existing networkd-managed host links or earlier network configuration files
-stop the installer before changes.
-The daemon pin is read from the installed package behind `cairn` in `ian`'s
-login shell, following the executable symlink to its `package.json`. The package
-name defaults to `apps/daemon/package.json`. Set `CAIRN_ORB_DAEMON_VERSION` to an
-exact published version to bypass discovery, and optionally set
-`CAIRN_ORB_DAEMON_PACKAGE` to override the package name. Use these overrides when
-the host service uses a different executable or installation than the login shell.
-The chroot runs `npm install --prefix /opt/cairn --omit=dev --ignore-scripts <name>@<version>`,
-placing the daemon's runtime dependencies in `/opt/cairn/node_modules`.
-`/etc/cairn-orb-image` records both `daemon_package` and `daemon` (the version).
-A completed base image is rebuilt when the recipe, pinned host CLI versions,
-daemon package or daemon version change. The previous base survives failed builds
-and is replaced only after the staging image is complete and unmounted. Unrecognized images are preserved
-and stop installation. The rebuild is printed and counted; the next run prints
-`0 changes`. Existing clones keep their original tools.
+on reruns. Existing networkd-managed host links or earlier network configuration
+files stop the installer before changes.
+The image contains Node and pinned Claude Code/Codex CLIs, with npm lifecycle
+scripts disabled. It installs no daemon package or production dependencies.
+`/etc/cairn-orb-image` records `node_major`, `claude`, `codex`, `agent_uid`, and
+the recipe hash. A completed base image is rebuilt when those values change.
+Legacy markers containing pnpm or daemon package/version pins are recognized
+and rebuilt once into this contract. The previous base survives failed builds
+and is replaced only after the staging image is complete and unmounted.
+Unrecognized images are preserved and stop installation. The rebuild is printed
+and counted; the next run prints `0 changes`. Existing clones keep their tools.
 
 The proxy subnet is `10.203.0.0/24`, with the relay at `10.203.0.1:7890` on
 `vz-cairn`. The subnet must be unused on the host. The container DHCP server
@@ -162,8 +191,28 @@ installation; local tests validate the installed arguments and exercise director
 lifecycle operations, with root ownership, tmpfs mount/unmount and GNU cleanup
 commands simulated.
 
-The daemon publishes its stable `cli.mjs` symlink at the root of
-`/var/lib/cairn-orb/dist`; the image supplies runtime dependencies separately.
+The revised dist contract was decided on 2026-10-31: guests run the same daemon
+build as the host's git checkout. npm's `@xiechimon/cairn-cli` through 0.2.2
+predates the relay protocol and cannot supply this build.
+The daemon-side publisher produces a self-contained
+`/var/lib/cairn-orb/dist/releases/<key>/` containing the built `dist/` files and
+production `node_modules`. Dependencies must come from the checkout's lockfile:
+
+```sh
+pnpm --dir <checkout> deploy --filter @xiechimon/cairn-cli --prod --offline <tmp>
+```
+
+An offline deploy failure must produce a clear error, never an npm fallback.
+The key is `<package version>-<git short SHA of the checkout>`, with
+`-dirty-<content hash>` appended for a dirty build. Publication uses a temporary
+directory followed by atomic rename; identical keys are reused. Relative
+symlinks `current -> releases/<key>` and `cli.mjs -> current/dist/cli.mjs`
+keep the entry stable. `current.json` contains `{key, version, sha}`. Releases
+beyond the newest three are pruned only when they are not `current`.
+The guest resolves imports through the entry's real path inside the release,
+so its dependencies resolve from
+`/opt/cairn/daemon/releases/<key>/node_modules`. No image-provided daemon
+dependencies are needed.
 Put Project seeds at `/var/lib/cairn-orb/seed/<projectId>/repo`, as `ian`.
 The image uses one `daemon_entry` variable, `/opt/cairn/daemon/cli.mjs`. The enabled
 `cairn-orb-worker.service` runs as `agent`, waits for `/run/cairn/relay.sock`,
@@ -235,7 +284,9 @@ The `--json` result has `image` (base-image name or null), `cloneStartStop`
 (`ok` or `failed`), `egress` (`ok` or `failed`), `privateEgress` (`denied` or
 `failed`), `firewall` (`ok` or `failed`), `memoryMax` (bytes or null),
 `homeVisible` (boolean or null), `negativeControl` (`denied` or `failed`),
-`ok` (boolean), and `errors` (string array). Exit status is zero only when
+`daemonRelease` (`{key, version, sha}` from `/var/lib/cairn-orb/dist/current.json`,
+or null when absent or unreadable), `ok` (boolean), and `errors` (string array).
+`daemonRelease` is informational and never affects `ok`. Exit status is zero only when
 `ok` is true. Configuration or user-validation errors return `ok: false` and
 `errors` without the probe fields.
 

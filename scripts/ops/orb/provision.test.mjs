@@ -12,7 +12,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
-import { daemonPackage } from './daemon-package.mjs';
+import { daemonNodeMajor } from './daemon-package.mjs';
 import { installHost } from './install-host.mjs';
 import { runtimeDirectory } from './runtime-directory.mjs';
 
@@ -948,55 +948,79 @@ test('failed removal after unmount can retry without unmounting the host filesys
   assert.ok(!f.calls.some(([op]) => op === '/usr/bin/umount'));
 });
 
-const daemonPackageName = '@xiechimon/cairn-cli';
-
-function packageFixture(t) {
-  const root = fs.mkdtempSync(join(tmpdir(), 'cairn-orb-package-'));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
-  const installed = join(root, 'node_modules', daemonPackageName);
-  mkdirSync(join(installed, 'dist'), { recursive: true });
-  writeFileSync(
-    join(installed, 'package.json'),
-    JSON.stringify({ name: daemonPackageName, version: '0.2.2' }),
-  );
-  writeFileSync(join(installed, 'dist/cli.mjs'), '');
-  const entry = join(root, 'cairn');
-  fs.symlinkSync(join(installed, 'dist/cli.mjs'), entry);
-  return { installed, entry };
-}
-
-test('daemon pin comes from the installed package behind the host CLI symlink', (t) => {
-  const f = packageFixture(t);
-  assert.deepEqual(daemonPackage({ entry: f.entry }), {
-    name: daemonPackageName,
-    version: '0.2.2',
-  });
+test('daemon Node major comes from the service ExecStart binary, not the login Node', () => {
+  const calls = [];
+  const run = (cmd, args) => {
+    calls.push([cmd, ...args]);
+    if (cmd === 'systemctl')
+      return {
+        status: 0,
+        stdout:
+          '{ path=/home/ian/.local/share/mise/installs/node/26.1.0/bin/node ; argv[]=/home/ian/.local/share/mise/installs/node/26.1.0/bin/node dist/cli.mjs start -f ; }',
+      };
+    assert.equal(cmd, '/home/ian/.local/share/mise/installs/node/26.1.0/bin/node');
+    assert.deepEqual(args, ['--version']);
+    return { status: 0, stdout: 'v26.1.0\n' };
+  };
+  assert.equal(daemonNodeMajor({ run }), 26);
+  assert.deepEqual(calls[0], [
+    'systemctl',
+    '--user',
+    'show',
+    'cairn-daemon.service',
+    '-p',
+    'ExecStart',
+    '--value',
+  ]);
 });
 
-test('exact version and package overrides work without a host CLI', () => {
-  assert.deepEqual(daemonPackage({ version: '0.3.0-rc.1', packageName: '@example/daemon' }), {
-    name: '@example/daemon',
-    version: '0.3.0-rc.1',
-  });
-  assert.deepEqual(daemonPackage({ version: '0.2.2' }), {
-    name: daemonPackageName,
-    version: '0.2.2',
-  });
+test('explicit daemon Node major avoids service access and invalid majors fail closed', () => {
+  const run = () => assert.fail('unexpected discovery');
+  assert.equal(daemonNodeMajor({ major: '26', run }), 26);
+  for (const major of ['0', '20', '026', '26.1', 'v26', 'latest', '26;echo bad'])
+    assert.throws(() => daemonNodeMajor({ major, run }), /CAIRN_ORB_NODE_MAJOR/);
 });
 
-test('missing metadata and nonexact package specs fail closed', (t) => {
-  const f = packageFixture(t);
-  for (const version of ['', 'latest', '^0.2.2', '0.2', '0.2.2;echo bad'])
+test('missing service, invalid ExecStart and failed Node probes require an explicit major', () => {
+  for (const result of [
+    { status: 1 },
+    { status: 0, stdout: '' },
+    { status: 0, stdout: '{ path=relative/node ; }' },
+  ])
+    assert.throws(() => daemonNodeMajor({ run: () => result }), /CAIRN_ORB_NODE_MAJOR/);
+  for (const result of [
+    { status: 1 },
+    { status: 0, stdout: 'v20.19.0' },
+    { status: 0, stdout: 'not-node' },
+  ])
     assert.throws(
-      () => daemonPackage({ version, packageName: daemonPackageName }),
-      /version|entry/i,
+      () =>
+        daemonNodeMajor({
+          run: (cmd) =>
+            cmd === 'systemctl' ? { status: 0, stdout: '{ path=/mise/node ; }' } : result,
+        }),
+      /CAIRN_ORB_NODE_MAJOR/,
     );
-  for (const name of ['--global', 'https://example.com/pkg', '../daemon', 'pkg@latest'])
-    assert.throws(() => daemonPackage({ packageName: name, version: '0.2.2' }), /package/i);
-  assert.throws(() => daemonPackage({ entry: join(f.installed, 'missing') }), /ENOENT/);
-  writeFileSync(
-    join(f.installed, 'package.json'),
-    JSON.stringify({ name: 'other', version: '0.2.2' }),
-  );
-  assert.throws(() => daemonPackage({ entry: f.entry }), /package/i);
+});
+
+test('installer leaves release publication to the owner daemon', () => {
+  const f = fixture();
+  try {
+    const dist = join(f.root, 'var/lib/cairn-orb/dist');
+    mkdirSync(dist, { recursive: true });
+    writeFileSync(join(dist, 'current.json'), 'owner release');
+    fs.symlinkSync('current/dist/cli.mjs', join(dist, 'cli.mjs'));
+    installHost(f);
+    assert.equal(
+      readFileSync(join(f.root, 'var/lib/cairn-orb/dist/current.json'), 'utf8'),
+      'owner release',
+    );
+    assert.equal(
+      fs.readlinkSync(join(f.root, 'var/lib/cairn-orb/dist/cli.mjs')),
+      'current/dist/cli.mjs',
+    );
+    assert.ok(!f.calls.some((call) => /deploy|npm install|chown.*releases/.test(call)));
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
 });
