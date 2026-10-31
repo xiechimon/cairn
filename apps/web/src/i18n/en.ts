@@ -801,7 +801,10 @@ export const EN: Record<string, string> = {
   '将「{name}」移出团队？该 Agent 进行中的任务将被停止。':
     'Remove "{name}" from this team? Active tasks for this agent will be stopped.',
   复制链接: 'Copy link',
-  完成任务: 'Complete todo',
+  完成任务: 'Complete task',
+  '例如：测试在远端机器上失败，请先修复':
+    'For example: tests fail on the remote machine, fix them first',
+  '例如：并发、错误处理、测试覆盖': 'For example: concurrency, error handling, test coverage',
   将改动合并到默认分支: 'Merge the changes into the default branch',
   // #1313：已上报且文件集为空时完成弹层不提供合并勾选。
   '本轮没有文件改动，完成不会合并分支。':
