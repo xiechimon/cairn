@@ -64,7 +64,7 @@ export const PANE_HEAD =
 const PANE_SELECT = 'doc-pane-select ml-0';
 const DIFF_LINE =
   'flex items-center font-mono text-caption leading-5 text-(--foreground) [font-variant-ligatures:none]';
-const DIFF_NO = 'w-8 flex-none pr-2 text-right text-(--text-dim) select-none';
+const DIFF_NO = 'w-8 flex-none pr-2 text-right text-(--text-tertiary) select-none';
 const DIFF_KIND_SKIN: Record<string, string> = {
   add: 'bg-(--diff-add-bg) shadow-[inset_2px_0_0_var(--diff-add-fg)]',
   del: 'bg-(--diff-del-bg) shadow-[inset_2px_0_0_var(--destructive)]',

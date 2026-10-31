@@ -1,7 +1,6 @@
 import { cn } from 'cn';
 import type { ReactNode } from 'react';
 import { Button } from '../ui/button.js';
-import { Kbd } from '../ui/kbd.js';
 
 export interface SidebarNavRowProps {
   icon: ReactNode;
@@ -34,9 +33,9 @@ export function SidebarNavRow({
       <span className="flex-none text-icon">{icon}</span>
       <span className="min-w-0 truncate">{label}</span>
       {shortcut != null && (
-        <Kbd className="ml-auto h-4.5 min-w-4.5 rounded-(--cds-radius-sm) bg-transparent px-1 font-normal text-content-tertiary opacity-0 ring-1 ring-border ring-inset group-hover/nav:opacity-100 group-focus-visible/nav:opacity-100">
+        <span className="ml-auto text-caption text-content-tertiary opacity-0 group-hover/nav:opacity-100 group-focus-visible/nav:opacity-100">
           {shortcut}
-        </Kbd>
+        </span>
       )}
     </Button>
   );
