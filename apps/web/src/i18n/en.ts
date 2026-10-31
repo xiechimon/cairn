@@ -1208,7 +1208,6 @@ export const EN: Record<string, string> = {
   现在插话: 'Steer now',
   撤回: 'Withdraw',
   '由备用模型 {model} 回答': 'Answered by backup model {model}',
-  总管的模型: "the chief's model",
   '总管用的模型 {model} 额度已用完': "The chief's model {model} is out of quota",
   '总管用的模型 {model} 暂时过载': "The chief's model {model} is overloaded",
   '{time} 会自动再试': 'it retries automatically at {time}',
