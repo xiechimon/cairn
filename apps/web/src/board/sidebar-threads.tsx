@@ -78,7 +78,9 @@ function ThreadMenu({ todo, onArchive, onDelete }: ThreadMenuProps) {
             variant="ghost"
             size="icon-xs"
             data-testid="thread-row-menu"
-            aria-label={t('更多')}
+            aria-label={t('线程操作：{title}', {
+              title: todo.title === '' ? `#${todo.seqNum}` : todo.title,
+            })}
             className="size-5.5"
           >
             <Ellipsis />
@@ -90,7 +92,9 @@ function ThreadMenu({ todo, onArchive, onDelete }: ThreadMenuProps) {
         side="bottom"
         sideOffset={4}
         anchor={() => triggerRef.current?.closest('[data-slot="sidebar-thread-row"]') ?? null}
-        aria-label={t('更多')}
+        aria-label={t('线程操作：{title}', {
+          title: todo.title === '' ? `#${todo.seqNum}` : todo.title,
+        })}
         className="w-48"
       >
         <DropdownMenuItem data-testid="thread-row-copy-link" onClick={copyLink}>

@@ -801,6 +801,7 @@ export const EN: Record<string, string> = {
   '将「{name}」移出团队？该 Agent 进行中的任务将被停止。':
     'Remove "{name}" from this team? Active tasks for this agent will be stopped.',
   复制链接: 'Copy link',
+  '线程操作：{title}': 'Thread actions: {title}',
   完成任务: 'Complete task',
   负责人: 'Owner',
   'issue 状态': 'Issue state',
