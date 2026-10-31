@@ -31,7 +31,7 @@ const script = (path, body) => {
   chmodSync(path, 0o755);
 };
 
-function host({ author, claude, priorNoVerdictMs, stallNoted }) {
+function host({ author, claude, priorNoVerdictMs, stallNoted, labelled, failLabel }) {
   const home = mkdtempSync(join(tmpdir(), 'review-gate-host-'));
   const bin = join(home, 'bin');
   const log = join(home, 'calls.log');
@@ -71,7 +71,7 @@ function host({ author, claude, priorNoVerdictMs, stallNoted }) {
     headRefName: 'lane/2303',
     files: [{ path: 'feature.txt' }],
     title: 'web(2303): example',
-    labels: [],
+    labels: labelled ? [{ name: 'review-stalled' }] : [],
     autoMergeRequest: null,
   };
   writeFileSync(join(home, 'prs.json'), JSON.stringify([pr]));
@@ -105,7 +105,10 @@ esac
   script(
     join(home, '.cairn/tools/app-token/as-bot.sh'),
     `#!/bin/sh
-if [ "$1" = gh ]; then shift; echo "bot gh $*" >> "${log}"; cat >> "${log}"; echo >> "${log}"; exit 0; fi
+if [ "$1" = gh ]; then shift; echo "bot gh $*" >> "${log}"; cat >> "${log}"; echo >> "${log}"
+  case "$*" in *--add-label*) [ -n "${failLabel ? 'fail' : ''}" ] && exit 1 ;; esac
+  exit 0
+fi
 exec "$@"
 `,
   );
@@ -185,6 +188,22 @@ test('no verdict for over an hour alerts once with the review-stalled label', ()
   assert.match(first.calls, /bot gh pr edit 2306 -R xiechimon\/cairn --add-label review-stalled/);
   const fresh = host({ author: anthropic, priorNoVerdictMs: 10 * 60_000 });
   assert.doesNotMatch(fresh.calls, /review-gate-stalled/);
-  const again = host({ author: anthropic, priorNoVerdictMs: 3 * 3600_000, stallNoted: true });
+  const again = host({
+    author: anthropic,
+    priorNoVerdictMs: 3 * 3600_000,
+    stallNoted: true,
+    labelled: true,
+  });
   assert.doesNotMatch(again.calls, /review-gate-stalled|add-label/);
+});
+
+test('a failed label add is retried on the next round without a second comment', () => {
+  const failed = host({ author: anthropic, priorNoVerdictMs: 2 * 3600_000, failLabel: true });
+  assert.equal(failed.run.status, 0, failed.run.stderr);
+  assert.match(failed.calls, new RegExp(`<!-- review-gate-stalled:${failed.sha} -->`));
+  assert.match(failed.calls, /--add-label review-stalled/);
+  assert.match(failed.run.stdout, /review-stalled label failed; retrying next round/);
+  const retry = host({ author: anthropic, priorNoVerdictMs: 2 * 3600_000, stallNoted: true });
+  assert.match(retry.calls, /bot gh pr edit 2306 -R xiechimon\/cairn --add-label review-stalled/);
+  assert.doesNotMatch(retry.calls, /review-gate-stalled/);
 });

@@ -347,7 +347,8 @@ ${
       });
     });
   const alertIfStalled = (pr) => {
-    if (pr.stallNoted) return;
+    const labelled = pr.labels.some((l) => l.name === 'review-stalled');
+    if (pr.stallNoted && labelled) return;
     let records;
     try {
       records = parseRuns(readFileSync(`${STATE}/runs.jsonl`, 'utf8'));
@@ -356,16 +357,25 @@ ${
     }
     const since = stalled(records, pr.number, pr.headRefOid, Date.now());
     if (!since) return;
-    try {
-      asBot(
-        ['gh', 'pr', 'comment', String(pr.number), '-R', REPO, '--body-file', '-'],
-        stallAlert(pr, since),
-      );
-      asBot(['gh', 'pr', 'edit', String(pr.number), '-R', REPO, '--add-label', 'review-stalled']);
-      record(pr, { action: 'stall-alert', since });
-    } catch (e) {
-      console.log(`#${pr.number}: stall alert failed; retrying next round\n${e.message}`);
-    }
+    if (!pr.stallNoted)
+      try {
+        asBot(
+          ['gh', 'pr', 'comment', String(pr.number), '-R', REPO, '--body-file', '-'],
+          stallAlert(pr, since),
+        );
+        record(pr, { action: 'stall-alert', since });
+      } catch (e) {
+        console.log(`#${pr.number}: stall comment failed; retrying next round\n${e.message}`);
+      }
+    if (!labelled)
+      try {
+        asBot(['gh', 'pr', 'edit', String(pr.number), '-R', REPO, '--add-label', 'review-stalled']);
+        record(pr, { action: 'stall-label', since });
+      } catch (e) {
+        console.log(
+          `#${pr.number}: review-stalled label failed; retrying next round\n${e.message}`,
+        );
+      }
   };
   const clearStall = (pr) => {
     if (!pr.labels.some((l) => l.name === 'review-stalled')) return;
