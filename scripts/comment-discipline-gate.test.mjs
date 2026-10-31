@@ -62,3 +62,85 @@ test('checks only added source comment lines and exact allowlist entries', () =>
     rmSync(cwd, { recursive: true, force: true });
   }
 });
+
+function revertFixture(t) {
+  const cwd = mkdtempSync(resolve(tmpdir(), 'comment-gate-revert-'));
+  t.after(() => rmSync(cwd, { recursive: true, force: true }));
+  const git = (...args) =>
+    execFileSync('git', args, { cwd, encoding: 'utf8', stdio: 'pipe' }).trim();
+  const run = (base = '') =>
+    spawnSync(process.execPath, [script], {
+      cwd,
+      encoding: 'utf8',
+      env: { ...process.env, COMMENT_DISCIPLINE_BASE_SHA: base },
+    });
+  const file = resolve(cwd, 'apps/demo/code.ts');
+  const other = resolve(cwd, 'apps/demo/other.ts');
+  git('init', '-b', 'main');
+  git('config', 'user.email', 'test@example.com');
+  git('config', 'user.name', 'Test');
+  mkdirSync(resolve(cwd, 'apps/demo'), { recursive: true });
+  mkdirSync(resolve(cwd, 'scripts'));
+  writeFileSync(resolve(cwd, 'scripts/comment-discipline-allowlist.json'), '[]');
+  writeFileSync(file, '// legacy note\nconst x = 1;\n');
+  writeFileSync(other, '// other note\nconst y = 1;\n');
+  git('add', '.');
+  git('commit', '-m', 'legacy comments');
+  writeFileSync(file, 'const x = 1;\n');
+  git('commit', '-am', 'strip comments');
+  const strip = git('rev-parse', 'HEAD');
+  git('update-ref', 'refs/remotes/origin/main', 'HEAD');
+  return { cwd, git, run, file, other, strip };
+}
+
+test('an exact revert of a main commit that re-adds comments passes', (t) => {
+  const f = revertFixture(t);
+  f.git('checkout', '-b', 'feature');
+  f.git('revert', '--no-edit', f.strip);
+  const result = f.run();
+  assert.equal(result.status, 0, result.stderr);
+});
+
+test('a revert with one extra changed line still fails', (t) => {
+  const f = revertFixture(t);
+  f.git('checkout', '-b', 'feature');
+  f.git('revert', '--no-edit', '--no-commit', f.strip);
+  writeFileSync(f.file, '// legacy note\nconst x = 2;\n');
+  f.git('commit', '-am', `Revert "strip comments"\n\nThis reverts commit ${f.strip}.`);
+  assert.equal(f.run().status, 1);
+});
+
+test('a revert followed by a commit adding a comment still fails', (t) => {
+  const f = revertFixture(t);
+  f.git('checkout', '-b', 'feature');
+  f.git('revert', '--no-edit', f.strip);
+  writeFileSync(f.file, '// legacy note\n// fresh\nconst x = 1;\n');
+  f.git('commit', '-am', 'add comment');
+  assert.equal(f.run().status, 1);
+});
+
+test('an uncommitted comment on top of an exact revert still fails', (t) => {
+  const f = revertFixture(t);
+  f.git('checkout', '-b', 'feature');
+  f.git('revert', '--no-edit', f.strip);
+  writeFileSync(f.file, '// legacy note\n// fresh\nconst x = 1;\n');
+  assert.equal(f.run().status, 1);
+});
+
+test('an ordinary change adding a comment still fails', (t) => {
+  const f = revertFixture(t);
+  f.git('checkout', '-b', 'feature');
+  writeFileSync(f.file, '// fresh\nconst x = 1;\n');
+  f.git('commit', '-am', 'ordinary');
+  assert.equal(f.run().status, 1);
+});
+
+test('a revert of a commit that is not on main fails', (t) => {
+  const f = revertFixture(t);
+  f.git('checkout', '-b', 'side');
+  writeFileSync(f.other, 'const y = 1;\n');
+  f.git('commit', '-am', 'side strip');
+  const side = f.git('rev-parse', 'HEAD');
+  f.git('revert', '--no-edit', side);
+  assert.equal(f.run(side).status, 1);
+});
