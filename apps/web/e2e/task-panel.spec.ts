@@ -281,6 +281,7 @@ test.describe('axe with the panel open', () => {
     test(name, async ({ page }) => {
       await page.goto(url);
       await expect(panel(page)).toBeVisible();
+      await expect(panel(page)).toHaveCSS('opacity', '1');
       const result = await new AxeBuilder({ page })
         .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
         .analyze();
