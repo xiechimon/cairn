@@ -106,8 +106,8 @@ function readGroupCollapsed(storage: Storage | null): Record<GroupId, boolean> {
   }
 }
 
-const ICON = 'size-4 flex-none';
-const STROKE = 1.5;
+const ICON = 'size-4.5 flex-none';
+const STROKE = 1.75;
 
 export function BrandMark({ className = 'size-4' }: { className?: string }) {
   return (
@@ -130,12 +130,12 @@ const FOCUS =
 const SEARCH_OPEN_DIM =
   '[html[data-search-open]_&]:bg-transparent [html[data-search-open]_&]:shadow-none [html[data-search-open]_&]:ring-0 [html[data-search-open]_&]:text-content-secondary';
 
-const ROW = `flex h-9 w-full flex-none items-center gap-2.5 rounded-(--cds-radius-lg) px-2.5 text-left text-ui text-content-secondary no-underline transition-[background-color,color] duration-150 ease-out ${FOCUS_RING_INSET}`;
-const ROW_IDLE = 'hover:bg-sidebar-hover hover:text-foreground [&>svg:first-child]:text-icon';
-const ROW_ACTIVE = `bg-(--hover-1) font-medium text-foreground [&>svg:first-child]:text-(--card-button) ${SEARCH_OPEN_DIM}`;
+const ROW = `flex h-9 w-full flex-none items-center gap-2.5 rounded-(--cds-radius-lg) px-2.5 text-left text-ui font-medium text-foreground no-underline transition-[background-color,color] duration-150 ease-out ${FOCUS_RING_INSET}`;
+const ROW_IDLE = 'hover:bg-sidebar-hover hover:text-foreground';
+const ROW_ACTIVE = `bg-(--hover-1) font-semibold text-foreground [&>svg:first-child]:text-(--card-button) ${SEARCH_OPEN_DIM}`;
 
 const ROW_BTN =
-  'justify-start border-none font-normal dark:hover:bg-sidebar-hover active:not-aria-[haspopup]:translate-y-0';
+  'justify-start border-none dark:hover:bg-sidebar-hover active:not-aria-[haspopup]:translate-y-0';
 
 const ICON_BTN = `size-7 flex-none cursor-pointer rounded-(--radius-control) border-none bg-transparent p-0 text-content-tertiary hover:bg-sidebar-hover hover:text-foreground dark:hover:bg-sidebar-hover active:not-aria-[haspopup]:translate-y-0 ${FOCUS}`;
 
@@ -399,10 +399,10 @@ export function BoardSidebar({
     <aside className="board-sidebar relative z-(--z-docked) flex w-(--sidebar-w) flex-none flex-col overflow-hidden border-r border-border bg-(--surface-1) px-3 pt-3 pb-2.5">
       <div
         data-testid="team-row"
-        className="sidebar-team-row flex h-10 flex-none items-center gap-0.5 text-foreground"
+        className="sidebar-team-row flex h-11 flex-none items-center gap-0.5 text-foreground"
       >
         <Link
-          className={`sidebar-team-name flex h-10 min-w-0 flex-1 items-center gap-2 rounded-(--cds-radius-lg) px-2 text-foreground no-underline transition-[background-color,box-shadow] duration-150 ease-out ${FOCUS} ${
+          className={`sidebar-team-name flex h-11 min-w-0 flex-1 items-center gap-2 rounded-(--cds-radius-lg) px-2 text-foreground no-underline transition-[background-color,box-shadow] duration-150 ease-out ${FOCUS} ${
             selected === 'team'
               ? `sidebar-team-row--active bg-background shadow-xs ring-1 ring-border ${SEARCH_OPEN_DIM}`
               : 'hover:bg-sidebar-hover'
@@ -410,10 +410,8 @@ export function BoardSidebar({
           to={{ pathname: '/app/team', search: plain }}
           aria-current={selected === 'team' ? 'page' : undefined}
         >
-          <BrandMark />
-          <span className="truncate font-heading text-heading font-semibold">
-            {BRAND.manifestName}
-          </span>
+          <BrandMark className="size-5.5" />
+          <span className="truncate font-heading text-page font-title">{BRAND.manifestName}</span>
           <ChevronDown
             aria-hidden
             className="size-3.5 flex-none text-content-tertiary"
@@ -429,7 +427,7 @@ export function BoardSidebar({
                 aria-label={t('搜索')}
                 onClick={onSearch}
               >
-                <Search className="size-3.5" strokeWidth={STROKE} />
+                <Search className="size-4" strokeWidth={STROKE} />
               </Button>
             }
           />
@@ -443,7 +441,7 @@ export function BoardSidebar({
           aria-label={t('收起侧边栏')}
           onClick={onToggle}
         >
-          <PanelLeft className="size-3.5" strokeWidth={STROKE} />
+          <PanelLeft className="size-4" strokeWidth={STROKE} />
         </Button>
       </div>
 
@@ -453,7 +451,7 @@ export function BoardSidebar({
         onClick={onNewTask}
       >
         <span className="flex size-5 flex-none items-center justify-center rounded-full bg-(--card-button) text-(--text-on-accent)">
-          <Plus className="size-3.5" strokeWidth={1.5} />
+          <Plus className="size-3.5" strokeWidth={2} />
         </span>
         <span className="truncate">{t('新任务')}</span>
       </Button>
@@ -595,13 +593,15 @@ export function BoardSidebar({
                 <span
                   id={machineStatusId}
                   data-testid="machine-status"
-                  className="flex max-w-full items-center gap-1.5 truncate text-caption font-normal text-content-tertiary"
+                  className="flex max-w-full items-center gap-1.5 text-caption font-normal text-content-tertiary"
                 >
                   <span
                     aria-hidden
                     className={`size-1.5 flex-none rounded-full ${machinesOnline > 0 ? 'bg-running' : 'bg-content-dim'}`}
                   />
-                  {t('{n} 台机器在线', { n: machinesOnline })} · {t('执行中 {n}', { n: running })}
+                  <span className="min-w-0 truncate">
+                    {t('{n} 台机器在线', { n: machinesOnline })} · {t('执行中 {n}', { n: running })}
+                  </span>
                 </span>
               </span>
               <EllipsisVertical

@@ -33,7 +33,7 @@ import {
   isChiefDigestStep,
 } from './chief-digest.js';
 import { hasEarlierLiveChiefStep } from './chief-turns.js';
-import { refreshClaudeRateParks } from './claude-rate-limit.js';
+import { claudeUsageGatePasses, refreshClaudeRateParks } from './claude-rate-limit.js';
 import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import {
   agentRunningCount,
@@ -175,6 +175,7 @@ function buildChiefClaim(
   if (!agentRow.modelId) return null;
   const model = effectiveModel(agentRow, stepRow);
   if (!machineRow || !runtimeGatePasses(machineRow, model.provider)) return null;
+  if (!claudeUsageGatePasses(deps, machineRow, model)) return null;
   if (claudeCodeLoginBlocks(deps, machineRow, model.provider)) return null;
   if (!capabilityGatePasses(machineRow, agentRow)) return null;
   const claimedAt = nowMs();
@@ -357,6 +358,7 @@ async function tryClaim(
       if (runtime !== 'claude-code' || !claudeBlocked(agentRow.machineId)) continue;
     }
     if (!runtimeGatePasses(machineRow, model.provider)) continue;
+    if (localMerge === null && !claudeUsageGatePasses(deps, machineRow, model)) continue;
     if (claudeCodeLoginBlocks(deps, machineRow, model.provider)) continue;
     if (!capabilityGatePasses(machineRow, agentRow)) continue;
     if (

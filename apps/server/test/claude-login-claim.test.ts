@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { ClaudeCodeReport } from '@cairn/shared';
+import type { ClaudeAuthStateWire, ClaudeCodeReport } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
@@ -9,6 +9,7 @@ import {
   chiefThread as chiefThreadTable,
   machine as machineTable,
   step as stepTable,
+  team as teamTable,
   todo as todoTable,
 } from '../src/db/schema.js';
 import { hasActiveClaudeSubscription } from '../src/services/claude-subscriptions.js';
@@ -53,6 +54,7 @@ function report(login?: {
     installed: true,
     hostname: 'omarchy',
     models: [],
+    auth: { state: 'logged-in', method: 'claude.ai', provider: 'firstParty' },
     ...(login !== undefined ? { login } : {}),
   } as ClaudeCodeReport;
 }
@@ -170,6 +172,129 @@ function insertChief(s: TestServer, machineId: string, provider: string): string
     .run();
   return stepId;
 }
+
+const subscriptionAuthCases: {
+  name: string;
+  auth?: ClaudeAuthStateWire;
+  noReport?: boolean;
+  subscription: boolean;
+}[] = [
+  { name: 'no report', noReport: true, subscription: false },
+  { name: 'no auth', subscription: false },
+  { name: 'failed probe', auth: { state: 'unknown', reason: 'probe failed' }, subscription: false },
+  {
+    name: 'not logged in',
+    auth: { state: 'not-logged-in', method: 'claude.ai', provider: 'firstParty' },
+    subscription: false,
+  },
+  {
+    name: 'unknown method',
+    auth: { state: 'logged-in', method: 'unknown', provider: 'firstParty' },
+    subscription: false,
+  },
+  {
+    name: 'missing method',
+    auth: { state: 'logged-in', provider: 'firstParty' },
+    subscription: false,
+  },
+  {
+    name: 'missing provider',
+    auth: { state: 'logged-in', method: 'claude.ai' },
+    subscription: false,
+  },
+  {
+    name: 'bedrock',
+    auth: { state: 'logged-in', method: 'claude.ai', provider: 'bedrock' },
+    subscription: false,
+  },
+  {
+    name: 'vertex',
+    auth: { state: 'logged-in', method: 'oauth_token', provider: 'vertex' },
+    subscription: false,
+  },
+  {
+    name: 'API key',
+    auth: { state: 'logged-in', method: 'api_key', provider: 'firstParty' },
+    subscription: false,
+  },
+  {
+    name: 'native subscription',
+    auth: { state: 'logged-in', method: 'claude.ai', provider: 'firstParty' },
+    subscription: true,
+  },
+  {
+    name: 'OAuth token subscription',
+    auth: { state: 'logged-in', method: 'oauth_token', provider: 'firstParty' },
+    subscription: true,
+  },
+];
+
+describe.each(['subscription-only', 'allow-paid'] as const)('%s machine auth', (claudeUsage) => {
+  describe.each(['build', 'chief'] as const)('%s claim', (kind) => {
+    describe.each(['owner', 'spare'] as const)('%s', (role) => {
+      test.each(subscriptionAuthCases)('$name', async ({ auth, noReport, subscription }) => {
+        const { s, projectId } = await world();
+        s.db.update(teamTable).set({ claudeUsage }).where(eq(teamTable.id, s.team.id)).run();
+        const ownerId = insertMachine(s, {
+          name: 'auth-owner',
+          claudeCodeReport: {
+            ...report(),
+            auth: { state: 'logged-in', method: 'claude.ai', provider: 'firstParty' },
+          },
+        });
+        const claimantId = role === 'owner' ? ownerId : insertMachine(s, { name: 'auth-spare' });
+        s.db
+          .update(machineTable)
+          .set({ claudeCodeReport: noReport ? null : { ...report(), auth } })
+          .where(eq(machineTable.id, claimantId))
+          .run();
+        if (role === 'spare') {
+          s.db
+            .update(machineTable)
+            .set({
+              claudeRateLimits: [
+                {
+                  subscription: 'five_hour',
+                  status: 'rejected',
+                  utilization: 1,
+                  resetsAt: Date.now() + 3_600_000,
+                  reportedAt: Date.now(),
+                },
+              ],
+            })
+            .where(eq(machineTable.id, ownerId))
+            .run();
+        }
+        const stepId =
+          kind === 'chief'
+            ? insertChief(s, ownerId, 'claude-code')
+            : (() => {
+                insertAgent(s, { id: 'auth-builder', machineId: ownerId, provider: 'claude-code' });
+                return insertBuildStep(s, projectId, 'auth-builder');
+              })();
+        const claimed = await claimAs(s, claimantId);
+        if (claudeUsage === 'allow-paid' || subscription) {
+          expect(claimed?.step).toMatchObject({ id: stepId, machineId: claimantId });
+        } else {
+          expect(claimed).toBeNull();
+          expect(s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()).toMatchObject(
+            {
+              status: 'waiting_quota',
+              machineId: null,
+              quotaBlock:
+                role === 'spare'
+                  ? {
+                      source: 'claude_rate_limit',
+                      reason: 'Claude subscription five_hour rejected',
+                    }
+                  : { source: 'subscription_policy', reason: 'subscription-only' },
+            },
+          );
+        }
+      });
+    });
+  });
+});
 
 describe('claimStep and Claude Code login expiry', () => {
   test('an expired login is not given its pinned claude-code step; the step stays pending', async () => {

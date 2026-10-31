@@ -12,6 +12,7 @@ import { readBackupHealth } from './services/backup-status.js';
 import { createSerialConnection } from './services/events.js';
 import { readFirstPrReportPrompt, setFirstPrReportPrompt } from './services/first-pr-report.js';
 import { pauseTeamGithubRepos } from './services/github-autonomy-brake.js';
+import { getModelRouting } from './services/model-routing.js';
 
 export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
   app.use('/api/*', async (c, next) => {
@@ -48,10 +49,19 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     );
   });
 
+  app.get('/api/teams/:id/model-routing', (c) => {
+    const id = c.req.param('id');
+    requireTeam(ctx, id);
+    return c.json(getModelRouting(ctx.db, id));
+  });
+
   app.patch('/api/teams/:id', async (c) => {
     const id = c.req.param('id');
     requireTeam(ctx, id);
     const body = parseWith(patchTeamBodySchema, await jsonBody(c), 'body');
+    if (body.claudeUsage !== undefined) {
+      ctx.db.update(team).set({ claudeUsage: body.claudeUsage }).where(eq(team.id, id)).run();
+    }
     if (body.autonomyPaused !== undefined) {
       ctx.db.update(team).set({ autonomyPaused: body.autonomyPaused }).where(eq(team.id, id)).run();
     }

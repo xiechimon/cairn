@@ -29,7 +29,7 @@ export const DIALOG_PANEL_CLS = `grid max-h-[calc(100vh-64px)] max-w-none gap-0 
 export const DIALOG_HEAD_CLS = 'flex items-start gap-3 pt-4.5 pr-13 pb-1 pl-5';
 
 export const DIALOG_TITLE_CLS =
-  'font-heading text-heading leading-[1.4] font-medium text-foreground';
+  'font-heading text-heading leading-[1.4] font-title text-foreground';
 
 export const DIALOG_SUBTITLE_CLS = 'mt-0.5 text-meta text-content-tertiary';
 

@@ -42,7 +42,7 @@ test('CDS settings: reading col 768, cards at --radius-card 14px no shadow, inpu
   if (m.inputHeight != null) expect(m.inputHeight).toBe('32px');
 });
 
-test('resources empty: Paper EmptyState card-title tier, medium, balanced', async ({ page }) => {
+test('resources empty: Paper EmptyState heading tier, title weight, balanced', async ({ page }) => {
   await page.goto('/app/resources/skills?scenario=01');
   const empty = page.getByTestId('resource-empty');
   // may or may not be empty depending on fixture — skip soft if absent
@@ -60,6 +60,6 @@ test('resources empty: Paper EmptyState card-title tier, medium, balanced', asyn
       balance: cs.textWrap || (cs as CSSStyleDeclaration & { textWrap: string }).textWrap,
     };
   });
-  expect(m.size).toBe('14px');
-  expect(m.weight).toBe('500');
+  expect(m.size).toBe('17px');
+  expect(m.weight).toBe('650');
 });

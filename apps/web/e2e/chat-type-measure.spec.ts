@@ -101,7 +101,7 @@ test('68ch measure cap binds the body text and the centered note', async ({ page
   expect(overflow.scroll).toBeLessThanOrEqual(overflow.client + 1);
 });
 
-test('composer placeholder sits at 13.5px (text-ui) — one notch under the 14px body', async ({ page }) => {
+test('composer placeholder sits at 14px (text-ui) — the same size as the 14px body', async ({ page }) => {
   await page.goto(CONFIRM);
   const sizes = await page.evaluate(() => {
     const ph = document.querySelector('[data-testid="composer-placeholder"]')!;
@@ -111,7 +111,7 @@ test('composer placeholder sits at 13.5px (text-ui) — one notch under the 14px
       body: getComputedStyle(text).fontSize,
     };
   });
-  expect(sizes.placeholder).toBe('13.5px');
+  expect(sizes.placeholder).toBe('14px');
   expect(sizes.body).toBe('14px');
 });
 

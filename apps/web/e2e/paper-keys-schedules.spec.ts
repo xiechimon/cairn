@@ -22,7 +22,7 @@ for (const [name, url] of [
       };
     });
     expect(face.mediaBg).toBe('rgba(0, 0, 0, 0)');
-    expect(face.iconSize).toBe(24);
+    expect(face.iconSize).toBe(32);
   });
 }
 

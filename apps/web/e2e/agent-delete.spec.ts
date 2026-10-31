@@ -25,7 +25,7 @@ test('overview footer has the delete entry, opens a second confirm (canon wordin
   await expect(dialog.locator('.delete-confirm-summary')).toHaveText(CANON_BODY);
   await expect(dialog.locator('.delete-confirm-cancel')).toHaveText('取消');
 
-  await expect(dialog.locator('.delete-confirm-cancel')).toHaveCSS('font-size', '13.5px');
+  await expect(dialog.locator('.delete-confirm-cancel')).toHaveCSS('font-size', '14px');
   await expect(dialog.locator('.delete-confirm-cancel')).toHaveCSS('line-height', '20px');
   await expect(dialog.locator('.delete-confirm-delete')).toHaveText('删除');
 });

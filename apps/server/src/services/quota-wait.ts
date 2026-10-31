@@ -103,6 +103,7 @@ export function sweepQuotaWaitSteps(deps: QuotaWaitDeps, now: number = nowMs()):
   const rows = deps.db.select().from(step).where(eq(step.status, 'waiting_quota')).all();
   let released = 0;
   for (const row of rows) {
+    if (row.quotaBlock?.source === 'subscription_policy') continue;
     if ((row.quotaBlock?.probeAt ?? 0) > now) continue;
     deps.db
       .update(step)

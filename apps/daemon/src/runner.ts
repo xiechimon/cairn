@@ -119,7 +119,7 @@ function gitCredentialSourceRowContent(source: GitCredentialSource): string {
 export interface RunStepDeps {
   client: MachineApi;
   journal: StepJournal;
-  backendFor: (agentProviderId: string | null | undefined) => AgentBackend;
+  backendFor: (agentProviderId: string | null | undefined, agentId?: string) => AgentBackend;
   logger: DaemonLogger;
   paths: StatePaths;
   workspacesDir: string;
@@ -127,6 +127,7 @@ export interface RunStepDeps {
   workspace?: WorktreeOps;
   sessionHandles?: Map<string, AgentSessionHandle>;
   stepImageSupport?: Map<string, boolean | null>;
+  stepSteeringSupport?: Map<string, boolean>;
   stepTranscripts?: Map<string, TranscriptBuffer>;
   stops?: StepStops;
   heartbeatIntervalMs?: number;
@@ -365,6 +366,7 @@ export async function runStep(
   } finally {
     clearInterval(heartbeat);
     deps.stepImageSupport?.delete(stepId);
+    deps.stepSteeringSupport?.delete(stepId);
     deps.stepTranscripts?.delete(stepId);
     stop.settle();
   }
@@ -596,7 +598,8 @@ async function runClaimedStep(
       logger.step(`claude-code auth probe inconclusive: ${auth.reason} (continuing)`);
     }
   }
-  const backend = deps.backendFor(agent?.provider);
+  const backend = deps.backendFor(agent?.provider, agent.id);
+  deps.stepSteeringSupport?.set(stepId, backend.capabilities.steering !== false);
   const modelKey = `${provider?.providerId ?? agent.provider}/${agent.modelId}`;
   logger.raw(`using model ${modelKey}`);
 

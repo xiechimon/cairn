@@ -39,6 +39,7 @@ import {
   githubIssueTimeline,
   githubOpenIssuesWithLabel,
 } from '../lib/github.js';
+import { isCairnIdentity } from '../lib/github-feedback.js';
 import { nowMs } from '../lib/ids.js';
 import {
   type AutonomyGateResult,
@@ -224,14 +225,19 @@ function newestOf(
   return newest;
 }
 
-function newestLabeler(data: IssueHistory): { labeler: string } | AppLabel | { reason: string } {
+function newestLabeler(
+  data: IssueHistory,
+  intakeLabel: string,
+): { labeler: string } | AppLabel | { reason: string } {
   if (!data.complete) return { reason: 'events-incomplete' };
   const forLabel = (kind: 'labeled' | 'unlabeled') => (e: GithubIssueEvent) =>
-    e.event === kind && e.label?.toLowerCase() === ISSUE_INTAKE_LABEL;
+    e.event === kind && e.label?.toLowerCase() === intakeLabel;
   const labeled = newestOf(data.events, forLabel('labeled'));
   const unlabeled = newestOf(data.events, forLabel('unlabeled'));
   if (labeled === null) return { reason: 'no-labeled-event' };
   if (unlabeled !== null && later(unlabeled, labeled)) return { reason: 'label-removed' };
+  if (intakeLabel === 'correction' && labeled.actor !== null && isCairnIdentity(labeled.actor))
+    return { labeler: labeled.actor };
   if (
     labeled.viaApp !== null &&
     !(
@@ -303,8 +309,13 @@ export async function hasRepoTriage(
 
 export function createIssueIntake(
   deps: BuildDeps,
-  run: { githubFetch: FetchLike; logger?: IssueIntakeLogger },
+  run: {
+    githubFetch: FetchLike;
+    logger?: IssueIntakeLogger;
+    label?: 'ready-for-agent' | 'correction';
+  },
 ): IssueIntake {
+  const intakeLabel = run.label ?? ISSUE_INTAKE_LABEL;
   const log = (obj: object, msg: string) => run.logger?.info(obj, msg);
   const listCache: EtagCache<GithubLabeledIssuesPage> = new Map();
   const eventsCache: EtagCache<GithubIssueEventsPage> = new Map();
@@ -385,8 +396,9 @@ export function createIssueIntake(
     const key = `${teamId}\u0000${owner}/${repo}#${issueNumber}`.toLowerCase();
     const history = await readHistory(eventsCache, key, token, { owner, repo, issueNumber });
     if (history === null) return { notTaken: 'unverifiable', reason: 'events-unreadable' };
-    const found = newestLabeler(history);
+    const found = newestLabeler(history, intakeLabel);
     if ('reason' in found) return { notTaken: 'not-eligible', ...found };
+    if (intakeLabel === 'correction' && isCairnIdentity(found.labeler)) return found;
     const trusted = await hasRepoTriage(
       run.githubFetch,
       teamId,
@@ -738,7 +750,7 @@ export function createIssueIntake(
         access.token,
         owner,
         repo,
-        ISSUE_INTAKE_LABEL,
+        intakeLabel,
         { url, etag: etagFor(listCache, pageKey) },
       );
       const data: GithubLabeledIssuesPage | null = settle(listCache, pageKey, page);
@@ -766,7 +778,13 @@ export function createIssueIntake(
           tally.otherLane += 1;
           continue;
         }
-        if (labelNames.some((n) => ISSUE_INTAKE_HOLD_LABELS.includes(n))) {
+        if (
+          labelNames.some(
+            (n) =>
+              ISSUE_INTAKE_HOLD_LABELS.includes(n) &&
+              !(intakeLabel === 'correction' && n === 'needs-triage'),
+          )
+        ) {
           tally.held += 1;
           continue;
         }
@@ -1023,7 +1041,7 @@ export function createIssueIntake(
     } finally {
       sweeping = false;
     }
-    log(tally, 'issue intake sweep');
+    log(tally, intakeLabel === 'correction' ? 'correction intake sweep' : 'issue intake sweep');
     return tally;
   }
 

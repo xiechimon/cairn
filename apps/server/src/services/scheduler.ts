@@ -48,6 +48,7 @@ import { sweepStaleMachines } from './machines.js';
 import { sweepFailedRetries } from './needs-you.js';
 import { sweepIdleChiefUnread } from './notifications.js';
 import { PhaseTransitionError } from './phase.js';
+import { createPrFeedbackPoller, PR_FEEDBACK_INTERVAL_MS } from './pr-feedback.js';
 import { digestSlotDueAt, digestSlotsDue, sweepPushDigest } from './push.js';
 import { sweepPendingPushAlerts } from './push-alerts.js';
 import { sweepQuotaWaitSteps } from './quota-wait.js';
@@ -215,6 +216,11 @@ export function createScheduler(
       ? createCiPoller(deps, { githubFetch: ci.githubFetch, logger: ci.logger })
       : null;
   let ciTimer: NodeJS.Timeout | null = null;
+  const feedbackPoller = ci ? createPrFeedbackPoller(deps, ci) : null;
+  let feedbackTimer: NodeJS.Timeout | null = null;
+  const correctionIntake = intake
+    ? createIssueIntake(deps, { ...intake, label: 'correction' })
+    : null;
   const issueIntake =
     intake !== undefined && intake !== null
       ? createIssueIntake(deps, { githubFetch: intake.githubFetch, logger: intake.logger })
@@ -549,10 +555,23 @@ export function createScheduler(
         }, CI_POLL_INTERVAL_MS);
         ciTimer.unref?.();
       }
+      if (feedbackPoller !== null) {
+        void feedbackPoller.sweep().catch(() => {});
+        feedbackTimer = setInterval(() => {
+          void feedbackPoller.sweep().catch(() => {});
+        }, PR_FEEDBACK_INTERVAL_MS);
+        feedbackTimer.unref?.();
+      }
       if (issueIntake !== null) {
-        void issueIntake.sweep().catch(() => {});
+        void issueIntake
+          .sweep()
+          .then(() => correctionIntake?.sweep())
+          .catch(() => {});
         intakeTimer = setInterval(() => {
-          void issueIntake.sweep().catch(() => {});
+          void issueIntake
+            .sweep()
+            .then(() => correctionIntake?.sweep())
+            .catch(() => {});
         }, ISSUE_INTAKE_INTERVAL_MS);
         intakeTimer.unref?.();
       }
@@ -646,6 +665,10 @@ export function createScheduler(
       }
     },
     stop() {
+      if (feedbackTimer !== null) {
+        clearInterval(feedbackTimer);
+        feedbackTimer = null;
+      }
       if (reflectCurateTimer !== null) {
         clearInterval(reflectCurateTimer);
         reflectCurateTimer = null;

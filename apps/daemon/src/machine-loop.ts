@@ -17,7 +17,7 @@ import {
   MACHINE_ORB_CONVERSATIONS_LIMIT,
   ORPHAN_WORKTREE_TTL_MS,
 } from '@cairn/shared';
-import { createGeminiBackend } from './backend/acp.js';
+import { configuredAcpBackends, createGeminiBackend } from './backend/acp.js';
 import { createClaudeCodeBackend } from './backend/claude-code.js';
 import { type DaemonOtel, daemonOtelFromEnv } from './backend/otel.js';
 import { createPiBackend, piSessionPolicyLine } from './backend/pi.js';
@@ -115,6 +115,7 @@ export function portBaseForSlot(slot: number): number {
 
 export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> {
   const { config, paths, logger } = opts;
+  const acpBackends = configuredAcpBackends(process.env.CAIRN_ACP_AGENTS);
   ensureStateDirs(paths);
   loadOrCreateDeviceJson(paths);
   setupProxy(logger, opts.proxyEnv ?? process.env, config.serverUrl);
@@ -180,7 +181,15 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   let geminiBackend: AgentBackend | null = opts.geminiBackend ?? null;
   let claudeAnnounced = false;
   let geminiAnnounced = false;
-  const backendFor = (agentProviderId: string | null | undefined): AgentBackend => {
+  const backendFor = (
+    agentProviderId: string | null | undefined,
+    agentId?: string,
+  ): AgentBackend => {
+    const acp = agentId !== undefined ? acpBackends.get(agentId) : undefined;
+    if (acp) {
+      logger.machine(`ACP adapter ${acp.capabilities.name} selected for agent ${agentId}`);
+      return acp;
+    }
     if (agentProviderId === 'gemini') {
       if (!geminiAnnounced) {
         logger.raw('Loading gemini runtime…');
@@ -326,6 +335,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   });
   const sessionHandles = new Map<string, AgentSessionHandle>();
   const stepImageSupport = new Map<string, boolean | null>();
+  const stepSteeringSupport = new Map<string, boolean>();
   const stepTranscripts = new Map<string, TranscriptBuffer>();
   const stops = new StepStops();
   const inFlightChief = new Set<string>();
@@ -475,14 +485,18 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
 
   const streamCtrl = new AbortController();
   const deliverSteer = async (stepId: string): Promise<void> => {
+    if (stepSteeringSupport.get(stepId) === false) {
+      logger.step(`steer left queued (backend does not support steering) step=${stepId}`);
+      return;
+    }
     try {
-      const content = await client.steer(stepId);
-      if (content === null) return;
       const live = sessionHandles.get(stepId);
       if (live === undefined) {
         logger.step(`steer dropped (no live session) step=${stepId}`);
         return;
       }
+      const content = await client.steer(stepId);
+      if (content === null) return;
       let deliveryText = content;
       let images: DeliveredImage[] | undefined;
       try {
@@ -608,6 +622,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       skillsDir: config.skillsDir,
       sessionHandles,
       stepImageSupport,
+      stepSteeringSupport,
       stepTranscripts,
       stops,
       machineName: config.name,

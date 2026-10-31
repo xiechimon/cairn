@@ -10,6 +10,7 @@ import {
   SettingsCard,
   SettingsRow,
 } from '../components/settings-list.js';
+import { ToggleSwitch } from '../components/toggle-switch.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import {
   Select,
@@ -18,7 +19,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../components/ui/select.js';
-import { Switch } from '../components/ui/switch.js';
 import { toastError } from '../components/ui/toaster.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
 import { USER_NAME } from '../fixtures/fixtures.js';
@@ -127,7 +127,7 @@ export function AccountPage() {
             }
             hintClassName={notifyBlocked ? 'account-notify-blocked' : undefined}
           >
-            <Switch
+            <ToggleSwitch
               aria-label={t('推送通知')}
               checked={notifyOn}
               onCheckedChange={(checked) => {
@@ -148,7 +148,7 @@ export function AccountPage() {
               }
               hintClassName={devicePushFailed ? 'account-notify-blocked' : undefined}
             >
-              <Switch
+              <ToggleSwitch
                 aria-label={t('在这台设备上接收推送')}
                 checked={deviceSubscribed === true}
                 disabled={deviceSubscribed === null}
@@ -186,7 +186,7 @@ export function AccountPage() {
                 '团队设置，默认关闭。首个 PR 完成后显示分享链接，由你决定是否在 GitHub 发布。',
               )}
             >
-              <Switch
+              <ToggleSwitch
                 aria-label={t('首个 PR 社区提示')}
                 checked={team.firstPrReportPrompt?.enabled ?? false}
                 disabled={mutations.patchTeam.isPending}

@@ -28,6 +28,7 @@ import { githubCreateIssue } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { autonomousMergePolicy } from './autonomous-merge.js';
 import type { BuildDeps } from './builds.js';
+import { isCorrectionTask, recordCorrectionGuard } from './correction.js';
 import { agentForStep } from './dispatch-eligibility.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { readGithubAutonomyPause } from './github-autonomy-brake.js';
@@ -37,6 +38,7 @@ import {
   DEFAULT_HARNESS_EVAL_ATTEMPT_TIMEOUT_MS,
   productionHarnessEvalConfig,
 } from './harness-eval-production.js';
+import { correctionDoneCheck } from './merge-gate/correction.js';
 import { computePatchDigest } from './merge-gate/digest.js';
 import { planGateStatusWrite, writeGateStatus } from './merge-gate/gate-status.js';
 import {
@@ -163,6 +165,24 @@ export async function evaluateMergeGate(
           expectedFileCount: facts.pr?.changedFiles ?? null,
         })
       : null;
+  if (isCorrectionTask(deps.db, todoRow.id) && head !== null) {
+    recordCorrectionGuard(
+      deps.db,
+      buildId,
+      head,
+      digest?.patchDigest != null &&
+        typeof facts.compare === 'object' &&
+        facts.compare.headSha === head
+        ? correctionDoneCheck(
+            facts.compare.files.map((file) => ({
+              path: file.filename,
+              additions: file.additions,
+              status: file.status,
+            })),
+          )
+        : null,
+    );
+  }
   const steps = deps.db.select().from(step).where(eq(step.buildId, buildId)).all();
   const agents = new Map(
     deps.db
@@ -264,6 +284,7 @@ export async function evaluateMergeGate(
     opts.now ?? nowMs(),
   );
   const readiness = mergeReadiness({
+    correction: isCorrectionTask(deps.db, todoRow.id),
     author: authorAgent !== null ? { id: authorAgent.id, model: authorAgent.modelId ?? '' } : null,
     policy: {
       mergePolicy: projectMergeConfigOf(projectRow).mergePolicy,

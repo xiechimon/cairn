@@ -113,7 +113,7 @@ test('type multi-select = OR union; URL order = vocab canonical order; picking k
 
   await expect(typeOption(page, 'bug')).toHaveAttribute('aria-selected', 'true');
   await expect(typeOption(page, 'bug').locator(CHIP)).toBeVisible();
-  await expect(typeOption(page, 'bug').locator(CHIP)).toHaveText('bug');
+  await expect(typeOption(page, 'bug').locator('.tag-chip')).toHaveText('bug');
   await expect(typeOption(page, 'chore')).toHaveAttribute('aria-selected', 'false');
   await expect(typeOption(page, 'chore').locator(CHIP)).toHaveCount(0);
 

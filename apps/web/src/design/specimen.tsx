@@ -22,7 +22,7 @@ export function Section({
 }) {
   return (
     <section id={id} data-gallery-section="" className="scroll-mt-4 pt-16">
-      <h2 className="m-0 text-page font-medium text-foreground">{title}</h2>
+      <h2 className="m-0 font-heading text-page font-title text-foreground">{title}</h2>
       <p className="mt-1.5 mb-6 max-w-160 text-ui text-content-secondary">{lede}</p>
       <div className="flex flex-col gap-5">{children}</div>
     </section>
@@ -58,7 +58,7 @@ export function Specimen({
   return (
     <figure className="m-0 overflow-hidden rounded-(--radius-card) bg-card shadow-(--e1)">
       <figcaption className="flex items-baseline gap-3 border-b border-border px-5 py-3">
-        <span className="text-ui font-medium text-foreground">{title}</span>
+        <span className="text-ui font-semibold text-foreground">{title}</span>
         {note != null && <span className="text-meta text-content-tertiary">{note}</span>}
       </figcaption>
       <div

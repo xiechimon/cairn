@@ -29,12 +29,14 @@ export function EmptyState({
   return (
     <Empty data-testid={testId} className={cn('empty-state', className)}>
       <EmptyHeader className="gap-1">
-        <EmptyMedia className="mb-3 text-content-tertiary">
-          <Icon className="size-6" strokeWidth={1.75} />
+        <EmptyMedia className="mb-3 text-icon">
+          <Icon className="size-8" strokeWidth={1.5} />
         </EmptyMedia>
-        <h2 className="m-0 text-card-title font-medium text-balance text-foreground">{title}</h2>
+        <h2 className="m-0 font-heading text-heading font-title text-balance text-foreground">
+          {title}
+        </h2>
         {description != null && (
-          <p className="m-0 max-w-80 text-meta text-balance text-content-tertiary">{description}</p>
+          <p className="m-0 max-w-80 text-ui text-balance text-content-secondary">{description}</p>
         )}
       </EmptyHeader>
       {(action != null || hint != null) && (

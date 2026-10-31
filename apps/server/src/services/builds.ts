@@ -107,6 +107,7 @@ import { addUserMessageAttachmentGrants } from './attachment-authorization.js';
 import { claimAutonomousMerge, settleAutonomousMerge } from './autonomous-merge.js';
 import { recordBuildFeedback } from './build-provenance.js';
 import { askQuestionContentOf } from './chief-questions.js';
+import { assertCorrectionDone } from './correction.js';
 import { DONE_ROW } from './delivery-rows.js';
 import { agentForStep } from './dispatch-eligibility.js';
 import { stepActivityAt } from './dispatch-timeouts.js';
@@ -1934,6 +1935,7 @@ function apiMergeGate(deps: BuildDeps, row: BuildRow): { todoRow: TodoRow; faile
         : `本任务还有一个${STEP_KIND_TEXT[busy]}步在排队或在跑，它收尾时还会推送提交：等它跑完再合并。`,
     );
   }
+  assertCorrectionDone(deps.db, todoRow);
   return { todoRow, failed };
 }
 
@@ -2837,7 +2839,7 @@ export function finishTodoDone(deps: BuildDeps, todoId: string, buildId: string)
     .get()?.phase;
   if (current !== undefined) assertPhaseTransition(current, 'done');
   stopUnclaimedGateSteps(deps, buildId);
-  setTodoPhase(deps, todoId, 'done');
+  setTodoPhase(deps, todoId, 'done', {}, { landedMerge: true });
   insertMessageRow(deps, buildId, {
     id: newRecordId(),
     role: 'system',

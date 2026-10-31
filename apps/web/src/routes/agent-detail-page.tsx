@@ -40,6 +40,7 @@ import {
   SettingsRow,
   SettingsSelectTrigger,
 } from '../components/settings-list.js';
+import { ToggleSwitch } from '../components/toggle-switch.js';
 import { Button } from '../components/ui/button.js';
 import { Card } from '../components/ui/card.js';
 import {
@@ -53,7 +54,6 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from '../components/ui/i
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { Select, SelectContent, SelectItem, SelectValue } from '../components/ui/select.js';
 import { StatusChip } from '../components/ui/status-chip.js';
-import { Switch } from '../components/ui/switch.js';
 import { Textarea } from '../components/ui/textarea.js';
 import { toastError } from '../components/ui/toaster.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
@@ -602,7 +602,7 @@ export function AgentDetailPage() {
                     hint={t(AGENT_TOOL_COPY[label])}
                     hintClassName="agent-perm-hint"
                   >
-                    <Switch
+                    <ToggleSwitch
                       className="agent-tool-switch"
                       aria-label={t(label)}
                       checked={agent.tools.includes(label)}
@@ -618,7 +618,7 @@ export function AgentDetailPage() {
               <p className={SETTINGS_HINT_CLS}>{t(AGENT_PERMISSION_COPY.skillsAllowlist)}</p>
               <SettingsCard>
                 <SettingsRow label={t('不限制')}>
-                  <Switch
+                  <ToggleSwitch
                     className="agent-allowlist-switch"
                     aria-label={t('不限制')}
                     checked={agent.skillsAllowlist === null}
@@ -630,7 +630,7 @@ export function AgentDetailPage() {
                   if (allowlist === null) return null;
                   return skillOptions.map((skill) => (
                     <SettingsRow key={skill.id} className="agent-allowlist-row" label={skill.name}>
-                      <Switch
+                      <ToggleSwitch
                         className="agent-allowlist-skill-switch"
                         aria-label={skill.name}
                         checked={allowlist.includes(skill.id)}
@@ -667,7 +667,7 @@ export function AgentDetailPage() {
                     labelClassName="agent-secret-name"
                     hintClassName="agent-perm-hint agent-secret-hint"
                   >
-                    <Switch
+                    <ToggleSwitch
                       className="agent-secret-switch"
                       aria-label={t('团队密钥')}
                       checked={agent.secrets.length > 0}
@@ -693,7 +693,7 @@ export function AgentDetailPage() {
                 <SettingsCard>
                   {mcpOptions.map((server) => (
                     <SettingsRow key={server.id} className="agent-mcp-row" label={server.name}>
-                      <Switch
+                      <ToggleSwitch
                         aria-label={server.name}
                         checked={agent.mcpServers.includes(server.id)}
                         onCheckedChange={(checked) => toggleMcp(server.id, checked)}
@@ -728,7 +728,7 @@ export function AgentDetailPage() {
                       hint={t('要求执行机已安装该 MCP 服务器')}
                       hintClassName="agent-perm-hint"
                     >
-                      <Switch
+                      <ToggleSwitch
                         aria-label={t('要求安装 {name}', { name: server.name })}
                         checked={(agent.requiredCapabilities?.mcpServers ?? []).includes(server.id)}
                         onCheckedChange={(checked) => toggleRequiredMcp(server.id, checked)}
