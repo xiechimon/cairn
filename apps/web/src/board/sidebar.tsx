@@ -593,13 +593,15 @@ export function BoardSidebar({
                 <span
                   id={machineStatusId}
                   data-testid="machine-status"
-                  className="flex max-w-full items-center gap-1.5 truncate text-caption font-normal text-content-tertiary"
+                  className="flex max-w-full items-center gap-1.5 text-caption font-normal text-content-tertiary"
                 >
                   <span
                     aria-hidden
                     className={`size-1.5 flex-none rounded-full ${machinesOnline > 0 ? 'bg-running' : 'bg-content-dim'}`}
                   />
-                  {t('{n} 台机器在线', { n: machinesOnline })} · {t('执行中 {n}', { n: running })}
+                  <span className="min-w-0 truncate">
+                    {t('{n} 台机器在线', { n: machinesOnline })} · {t('执行中 {n}', { n: running })}
+                  </span>
                 </span>
               </span>
               <EllipsisVertical
