@@ -142,7 +142,7 @@ import type { VapidKeys } from './push.js';
 import { publishStepRow, toQuotaWait } from './quota-wait.js';
 import { retryLessonsOf } from './retry-lessons.js';
 import { finishScheduledStep } from './schedules.js';
-import { appendShipGateInstruction, judgeShip } from './ship-gate.js';
+import { appendShipGateInstruction, CUSTOM_NEEDS_PR, hasGithubPr, judgeShip } from './ship-gate.js';
 import { endSnoozeOn } from './snooze.js';
 import { assertSplitProposalExecutable } from './split-proposal.js';
 import { stepQueueProjector } from './step-queue.js';
@@ -1597,6 +1597,8 @@ export async function requestMerge(
   if (shipRoute === 'local-merge' && projectRow?.repoKind !== 'local') {
     throw new HttpError(409, 'local-merge requires a local repository project');
   }
+  if (shipRoute === 'custom' && !hasGithubPr(deps, buildId))
+    throw new HttpError(409, CUSTOM_NEEDS_PR);
   const judged = shipRoute === 'merge-gate' ? null : await judgeShip(deps, buildId);
   const pr = shipRoute === 'custom' ? null : githubPrOf(deps, todoRow, row.prNumber);
   if (pr !== null) {

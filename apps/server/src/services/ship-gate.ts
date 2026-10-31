@@ -22,6 +22,9 @@ const instructionSchema = z
   .strict();
 export type ShipGateInstruction = z.infer<typeof instructionSchema>;
 
+export const CUSTOM_NEEDS_PR =
+  'the custom ship route needs a GitHub pull request so the landing can be verified; local projects use local-merge';
+
 const USER_APPROVAL_BLOCKERS: readonly MergeBlockerCode[] = ['policy-human'];
 const OWN_STEP_BLOCKERS: readonly MergeBlockerCode[] = [
   ...USER_APPROVAL_BLOCKERS,
@@ -45,6 +48,15 @@ export function parseShipGateInstruction(prompt: string | null): ShipGateInstruc
   } catch {
     return null;
   }
+}
+
+export function hasGithubPr(deps: BuildDeps, buildId: string): boolean {
+  const buildRow = deps.db.select().from(build).where(eq(build.id, buildId)).get();
+  const todoRow = buildRow && deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
+  if (!buildRow || !todoRow) return false;
+  return (
+    githubRepoOfProject(projectOfTodo(deps.db, todoRow)) !== null && buildRow.prNumber !== null
+  );
 }
 
 async function readinessOf(deps: BuildDeps, buildId: string): Promise<MergeReadiness | null> {
@@ -107,6 +119,7 @@ export async function reverifyShip(
   const instruction = parseShipGateInstruction(stepRow.prompt);
   if (instruction === null) return null;
   if (instruction.buildId !== stepRow.buildId) return 'ship gate verdict belongs to another build';
+  if (!hasGithubPr(deps, stepRow.buildId)) return CUSTOM_NEEDS_PR;
   const outcome = await refusalOf(deps, stepRow.buildId, OWN_STEP_BLOCKERS).catch(
     (err: unknown) => ({ reason: `merge gate could not be evaluated: ${String(err)}` }),
   );

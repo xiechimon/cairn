@@ -2,6 +2,7 @@ import { CONTINUE_PROMPTS, type MergeBlocker, type MergeReadiness } from '@cairn
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
+  build as buildTable,
   project as projectTable,
   step as stepTable,
   team,
@@ -39,12 +40,19 @@ function depsWith(verdict: () => MergeReadiness): BuildDeps {
   return { ...s.svc, mergeVerdict: async () => verdict() };
 }
 
-async function reviewBuild(route: 'custom' | 'local-merge'): Promise<string> {
+async function reviewBuild(route: 'custom' | 'local-merge', withPr = true): Promise<string> {
   const projectId = await postProject(s.app);
   if (route === 'local-merge') {
     s.db
       .update(projectTable)
       .set({ repoKind: 'local' })
+      .where(eq(projectTable.id, projectId))
+      .run();
+  }
+  if (route === 'custom' && withPr) {
+    s.db
+      .update(projectTable)
+      .set({ repoKind: 'github', githubRepo: 'octo/demo' })
       .where(eq(projectTable.id, projectId))
       .run();
   }
@@ -65,9 +73,12 @@ async function reviewBuild(route: 'custom' | 'local-merge'): Promise<string> {
     .set({ phase: 'review', hasChanges: true })
     .where(eq(todoTable.id, created.id))
     .run();
-  return (
-    s.db.select().from(todoTable).where(eq(todoTable.id, created.id)).get()?.latestBuildId ?? ''
-  );
+  const buildId =
+    s.db.select().from(todoTable).where(eq(todoTable.id, created.id)).get()?.latestBuildId ?? '';
+  if (withPr) {
+    s.db.update(buildTable).set({ prNumber: 7 }).where(eq(buildTable.id, buildId)).run();
+  }
+  return buildId;
 }
 
 function mergeSteps(buildId: string) {
@@ -89,6 +100,42 @@ describe('every ship route needs a mergeable gate verdict for the current head',
     await expect(
       requestMerge(
         depsWith(() => readiness(HEAD, [BLOCKER])),
+        buildId,
+      ),
+    ).rejects.toMatchObject({ status: 409 });
+    expect(mergeSteps(buildId)).toHaveLength(0);
+  });
+
+  test('custom route on a local or PR-less build is refused and enqueues no step', async () => {
+    const localBuild = await reviewBuild('custom', false);
+    await expect(
+      requestMerge(
+        depsWith(() => readiness(HEAD)),
+        localBuild,
+      ),
+    ).rejects.toMatchObject({
+      status: 409,
+      message: expect.stringContaining('GitHub pull request'),
+    });
+    expect(mergeSteps(localBuild)).toHaveLength(0);
+  });
+
+  test('custom route on a local project is refused and enqueues no step', async () => {
+    const buildId = await reviewBuild('custom');
+    const projectId = s.db
+      .select({ projectId: todoTable.projectId })
+      .from(todoTable)
+      .innerJoin(buildTable, eq(buildTable.todoId, todoTable.id))
+      .where(eq(buildTable.id, buildId))
+      .get()?.projectId;
+    s.db
+      .update(projectTable)
+      .set({ repoKind: 'local', githubRepo: null })
+      .where(eq(projectTable.id, projectId ?? ''))
+      .run();
+    await expect(
+      requestMerge(
+        depsWith(() => readiness(HEAD)),
         buildId,
       ),
     ).rejects.toMatchObject({ status: 409 });
@@ -236,6 +283,17 @@ describe('the merge step re-checks the verdict for the head it lands', () => {
     } finally {
       setPaused(false);
     }
+  });
+
+  test('a build without a GitHub PR is refused at claim time', async () => {
+    const row = await enqueued();
+    s.db.update(buildTable).set({ prNumber: null }).where(eq(buildTable.id, row.buildId)).run();
+    expect(
+      await reverifyShip(
+        depsWith(() => readiness(HEAD)),
+        row,
+      ),
+    ).toMatch(/GitHub pull request/);
   });
 
   test('steps without a ship instruction are not touched', async () => {
