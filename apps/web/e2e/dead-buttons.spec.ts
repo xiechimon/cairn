@@ -136,29 +136,16 @@ test('schedules fixture face: topbar `新建` opens the dialog, freq tabs respon
   await expect(page.locator('.sched-card')).toContainText('每周运行');
 });
 
-test('doc pane `变更▾` opens the document-type listbox and closes on Escape', async ({ page }) => {
+test('doc pane tabs: the doc tab reads `变更` and re-selecting it keeps the pane (#306)', async ({
+  page,
+}) => {
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=27');
-  const select = page.locator('.doc-select-wrap .doc-pane-select');
-  await expect(select).toContainText('变更');
-  await select.click();
-
-  const dropdown = page.getByRole('menu');
-  await expect(dropdown).toBeVisible();
-
-  await expect(dropdown.getByRole('menuitemradio').first()).toContainText('变更');
-  await page.keyboard.press('Escape');
-  await expect(dropdown).toBeHidden();
-});
-
-test('doc pane type-row click re-selects the current type and closes (#306)', async ({ page }) => {
-  await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=27');
-  await page.locator('.doc-select-wrap .doc-pane-select').click();
-  const dropdown = page.getByRole('menu');
-  await expect(dropdown).toBeVisible();
-
-  await dropdown.getByRole('menuitemradio').first().click();
-  await expect(dropdown).toBeHidden();
-  await expect(page.locator('.detail-right .doc-pane')).toBeVisible();
+  const docTab = page.getByTestId('pane-tab-doc');
+  await expect(docTab).toHaveText('变更');
+  await expect(docTab).toHaveAttribute('aria-selected', 'true');
+  await docTab.click();
+  await expect(page.getByTestId('doc-pane')).toBeVisible();
+  await expect(page.locator('.overlay-actions button', { hasText: '复用方案' })).toHaveCount(0);
 });
 
 test('machines rows carry only live controls, no dead inline buttons (#222 shipped + #1108 narrowed)', async ({
@@ -454,7 +441,7 @@ test('reuse panel `查看方案` flips the doc pane to the plan face (#318)', as
   await page.goto('/app/todo/r8-15?scenario=75');
   await expect(page.locator('.overlay-title')).toHaveText('复用方案');
 
-  await expect(page.locator('.doc-select-wrap .doc-pane-select')).toContainText('变更');
+  await expect(page.getByTestId('pane-tab-doc')).toHaveText('变更');
 
   await page.locator('.overlay-actions button', { hasText: '查看方案' }).click();
 

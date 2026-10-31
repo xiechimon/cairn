@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('CDS transcript: tokens, fade, follow 40 / jump 120, header 56 (Paper top bar)', async ({ page }) => {
+test('CDS transcript: tokens, fade, follow 40 / jump 120, one-line 44px header', async ({ page }) => {
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=16');
   await page.waitForSelector('[data-testid="transcript-col"]');
 
@@ -32,7 +32,7 @@ test('CDS transcript: tokens, fade, follow 40 / jump 120, header 56 (Paper top b
   expect(m.radiusBubble).toBe('14px');
   expect(m.cdsRadiusXl).toBe('12px');
   expect(m.hasScrollFade).toBe(true);
-  expect(m.headH).toBe('56px');
+  expect(m.headH).toBe('44px');
   expect(m.contentMaxW).toBe('768px');
   // 35vh bottom buffer — numeric px depends on viewport; just ensure >> 16
   expect(Number.parseFloat(m.colPadBottom)).toBeGreaterThanOrEqual(16);

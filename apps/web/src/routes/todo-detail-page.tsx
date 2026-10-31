@@ -1,5 +1,6 @@
 import { canOrchestrate, STOP_MESSAGE } from '@cairn/shared';
 import { useQueryClient } from '@tanstack/react-query';
+import { Play } from 'lucide-react';
 import {
   useCallback,
   useEffect,
@@ -98,10 +99,11 @@ import type {
 } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
+import { EllipsisVertical, Settings } from '../icons/index.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import type { FileMentionEntry, MentionGroups } from '../overlay/mention-token.js';
 import { MoreMenu } from '../overlay/more-menu.js';
-import { SearchPanel, useSearchState } from '../overlay/search-panel.js';
+import { type SearchContext, SearchPanel, useSearchState } from '../overlay/search-panel.js';
 import { SHEET_PANEL } from '../pages/shell.js';
 import { PHASE_UI } from '../phase.js';
 import { useThreadPresence } from '../pwa/thread-presence.js';
@@ -707,6 +709,37 @@ export function TodoDetailPage() {
         ? t('任务状态已变化，消息未送出')
         : null;
 
+  const shownPhase = live ? phase : (view.phaseOverride ?? todo.phase);
+  const primaryLabel = archived || actionInFlight ? null : PHASE_UI[shownPhase].action;
+  const searchContext: SearchContext = {
+    seqNum: todo.seqNum,
+    title: todo.title,
+    commands: [
+      ...(primaryLabel == null
+        ? []
+        : [
+            {
+              id: 'primary',
+              label: t(primaryLabel),
+              icon: <Play width={15} height={15} />,
+              run: () => handlePrimaryAction(),
+            },
+          ]),
+      {
+        id: 'assign',
+        label: t('编辑分配…'),
+        icon: <Settings width={15} height={15} />,
+        run: () => setAssignOpen(true),
+      },
+      {
+        id: 'more',
+        label: t('更多操作…'),
+        icon: <EllipsisVertical width={15} height={15} />,
+        run: () => setMoreOpen(true),
+      },
+    ],
+  };
+
   const handlePrimaryAction = () => {
     if (archived) return;
     if (live) {
@@ -772,7 +805,7 @@ export function TodoDetailPage() {
           todo={todo}
           projectName={projectsQ.data?.find((p) => p.id === todo.projectId)?.name}
           agentModel={chipAgentModel}
-          phase={live ? phase : (view.phaseOverride ?? todo.phase)}
+          phase={shownPhase}
           onMore={() => setMoreOpen(true)}
           reviewActive={reviewActive}
           verifyActive={verifyActive}
@@ -907,7 +940,6 @@ export function TodoDetailPage() {
                 doc={view.doc}
                 changes={live ? liveDetail?.changes : detail.changes}
                 now={live ? Date.now() : fixture.now}
-                planDropdownOpen={fixture.ui?.planDropdownOpen === true}
                 onPaneView={setPaneView}
                 hasSections={content != null}
                 planVersions={view.planVersions}
@@ -1169,6 +1201,7 @@ export function TodoDetailPage() {
       />
       <SearchPanel
         open={search.open}
+        context={searchContext}
         fixture={live ? { ...fixture, todos, now: Date.now() } : fixture}
         server={live ? searchResults.data : undefined}
         query={search.query}

@@ -2,12 +2,10 @@ import { canOrchestrate, claudeLoginNotice } from '@cairn/shared';
 import { cn } from 'cn';
 import {
   Activity,
-  Ban,
   ChevronRight,
   CircleAlert,
   CircleCheck,
   CircleDashed,
-  CircleX,
   type LucideIcon,
   Play,
   RotateCcw,
@@ -19,12 +17,13 @@ import { useLiveData } from '../api/provider.js';
 import { SpiralMark } from '../chief/chief-fab-icon.js';
 import type { CardOrchestration } from '../chief/orchestration-inflight.js';
 import { formatClaudeLoginWarning, subscriptionLoginWarning } from '../claude-login-warning.js';
+import { StatusGlyph as PhaseGlyph } from '../components/status-glyph.js';
 import { Button } from '../components/ui/button.js';
 import { Skeleton } from '../components/ui/skeleton.js';
 import { PROJECT_NAME } from '../fixtures/fixtures.js';
 import type { MachineRow, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { PHASE_UI } from '../phase.js';
+import { PHASE_STATUS, PHASE_UI } from '../phase.js';
 import { useOpenTaskInPlace } from '../task-panel/task-panel-root.js';
 import { COLUMNS, cardFace, STALE_PENDING_MS, sortColumnTodos, splitStale } from './columns.js';
 import { relativeTime } from './rel-time.js';
@@ -200,9 +199,9 @@ function NeedsYouRows({ todos, ...ctx }: RowContext & { todos: TodoRecord[] }) {
             todo={todo}
             testId="needs-you-row"
             status={
-              <StatusGlyph
-                icon={orchestrationFailed ? CircleX : attention.icon}
-                className="text-(--card-button)"
+              <PhaseGlyph
+                kind={orchestrationFailed ? 'failed' : PHASE_STATUS[todo.phase].glyph}
+                className={orchestrationFailed ? 'text-destructive' : PHASE_STATUS[todo.phase].ink}
               />
             }
             meta={[
@@ -373,7 +372,7 @@ export function HomeSections({
                   testId="home-running-row"
                   status={
                     todo.phase === 'queued' ? (
-                      <StatusGlyph icon={CircleDashed} className="text-content-tertiary" />
+                      <PhaseGlyph kind="queued" className="size-3.75 text-content-tertiary" />
                     ) : (
                       <SpiralMark busy className="size-3.75 text-running" />
                     )
@@ -440,9 +439,9 @@ export function HomeSections({
                   testId="home-done-row"
                   muted={todo.phase === 'closed'}
                   status={
-                    <StatusGlyph
-                      icon={todo.phase === 'closed' ? Ban : CircleCheck}
-                      className="text-content-tertiary"
+                    <PhaseGlyph
+                      kind={PHASE_STATUS[todo.phase].glyph}
+                      className={`size-3.75 ${PHASE_STATUS[todo.phase].ink}`}
                     />
                   }
                   meta={[
