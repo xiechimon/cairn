@@ -115,7 +115,7 @@ connection to the checked IP under the measured upstream configuration. HTTP
 absolute URIs use that same tunnel with an origin-form request and the destination
 Host header; HTTPS retains the client TLS handshake and SNI.
 NetworkManager ignores `ve-*`, `vz-*`, and nspawn's bridged `vb-*` slave links.
-Networkd manages only `ve-*` and `vz-*`; nspawn attaches and raises its slaves.
+Networkd manages only `ve-*`, `vz-*` and the `vb-*` zone ports (stock `80-container-vb.network`); every other link is unmanaged.
 
 Systemd does not expand instance-name prefixes when looking up drop-ins. A
 shared start-preparation hook clears fixed binds for unrelated machines and

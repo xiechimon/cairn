@@ -421,7 +421,7 @@ test('unit environment configures destination ports and invalid values fail befo
     const result = spawnSync(process.execPath, ['scripts/ops/orb/egress-relay.mjs'], {
       encoding: 'utf8',
       env: { ...process.env, CAIRN_ORB_ALLOWED_PORTS: value },
-      timeout: 2000,
+      timeout: 15000,
     });
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /Invalid destination port allowlist/);

@@ -42,7 +42,7 @@ export function installHost(options = {}) {
       if (fields.length !== 5 || !/^\d+$/.test(fields[0]))
         throw new Error('Cannot parse existing networkd links');
       const name = fields[1];
-      if (name !== 'lo' && !/^(ve-|vz-)/.test(name) && fields[4] !== 'unmanaged')
+      if (name !== 'lo' && !/^(ve-|vz-|vb-)/.test(name) && fields[4] !== 'unmanaged')
         throw new Error(`Preserve existing networkd-managed link: ${name}`);
     }
   }
@@ -93,7 +93,7 @@ export function installHost(options = {}) {
     ],
     [
       '/etc/systemd/network/00-cairn-unmanaged.network',
-      '[Match]\nName=!ve-* vz-*\n\n[Link]\nUnmanaged=yes\n',
+      '[Match]\nName=!ve-* vz-* vb-*\n\n[Link]\nUnmanaged=yes\n',
     ],
     ['/etc/systemd/network/10-cairn.netdev', '[NetDev]\nName=vz-cairn\nKind=bridge\n'],
     [

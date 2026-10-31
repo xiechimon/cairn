@@ -254,7 +254,7 @@ test('network configuration isolates physical links and allows proxy-only guest 
       join(f.root, 'etc/systemd/network/00-cairn-unmanaged.network'),
       'utf8',
     );
-    assert.match(unmanaged, /Name=!ve-\* vz-\*/);
+    assert.match(unmanaged, /^Name=!ve-\* vz-\* vb-\*$/m);
     const bridge = readFileSync(join(f.root, 'etc/systemd/network/10-cairn.network'), 'utf8');
     assert.match(bridge, /ConfigureWithoutCarrier=yes/);
     for (const property of [
