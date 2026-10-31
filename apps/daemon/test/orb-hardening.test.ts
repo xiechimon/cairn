@@ -13,7 +13,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { afterEach, expect, test, vi } from 'vitest';
 import { StepJournal } from '../src/journal.js';
 import { NspawnOrbProvider, type OrbCommandRunner } from '../src/orb/provider.js';
@@ -345,4 +345,31 @@ test('seed pruning keeps current and running versions across restart then remove
   expect(readdirSync(project).filter((name) => name.startsWith('.data-'))).toEqual([
     readlinkSync(join(project, 'current')),
   ]);
+}, 30_000);
+
+test('a running machine re-pins the release and seed it uses for each new step', async () => {
+  const f = fixture();
+  const machine = await f.provider.ensure({ conversationId: 'reused', projectId: 'p1' });
+  await f.provider.prepare(machine, f.checkout);
+  await f.provider.start(machine);
+  const firstRelease = readlinkSync(join(f.distRoot, 'current'));
+  writeFileSync(join(f.checkout, 'source.txt'), 'second step');
+  execFileSync('git', ['-C', f.checkout, 'add', 'source.txt']);
+  execFileSync('git', [
+    '-C',
+    f.checkout,
+    '-c',
+    'user.name=Test',
+    '-c',
+    'user.email=test@example.test',
+    'commit',
+    '-m',
+    'Second step',
+  ]);
+  await f.provider.prepare(machine, f.checkout);
+  await f.provider.start(machine);
+  const handle = (await f.provider.list()).find((entry) => entry.id === machine.id)!;
+  expect(handle.releaseKey).toBe(basename(readlinkSync(join(f.distRoot, 'current'))));
+  expect(handle.releaseKey).not.toBe(basename(firstRelease));
+  expect(handle.seedKey).toBe(readlinkSync(join(f.seedRoot, 'p1', 'current')));
 }, 30_000);

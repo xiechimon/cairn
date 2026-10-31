@@ -311,17 +311,17 @@ export class NspawnOrbProvider implements OrbProvider {
   ): Promise<void> {
     this.validate(handle);
     options.signal?.throwIfAborted();
+    const release = join(this.distRoot, 'current');
+    const seed = join(this.seedRoot, handle.projectId, 'current');
+    handle.releaseKey = existsSync(release) ? basename(readlinkSync(release)) : undefined;
+    handle.seedKey = existsSync(seed) ? readlinkSync(seed) : null;
     if (!handle.running || !(await this.runningMachines()).has(handle.id)) {
       handle.running = false;
       handle.notes.push(orbNote('orb: setup'));
-      const release = join(this.distRoot, 'current');
-      const seed = join(this.seedRoot, handle.projectId, 'current');
-      handle.releaseKey = existsSync(release) ? basename(readlinkSync(release)) : undefined;
-      handle.seedKey = existsSync(seed) ? readlinkSync(seed) : null;
       await this.command(['machinectl', 'start', handle.id]);
       handle.running = true;
-      this.save();
     }
+    this.save();
     try {
       const directory = join(this.runtimeRoot, handle.id);
       const deadline = Date.now() + this.runtimeDirectoryTimeoutMs;
