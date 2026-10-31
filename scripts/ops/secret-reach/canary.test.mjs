@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -209,4 +217,43 @@ test('CLI red and green controls exercise actual OS read permissions with metada
     .map((line) => JSON.parse(line));
   assert.equal(greenRows.length, 8);
   assert.ok(greenRows.every((row) => row.readable === 'no' && row.bytes === 0));
+});
+
+test('unexpected filesystem errors report error states in every ordinary read channel and exit two', (t) => {
+  const f = fixture(t);
+  const loop = join(f.dir, 'loop');
+  symlinkSync(loop, loop);
+  const result = spawnSync(process.execPath, [cli, '--profile', 'mac', '--path', loop], {
+    encoding: 'utf8',
+    env: { HOME: f.dir, PATH: process.env.PATH, GIT_CONFIG_NOSYSTEM: '1' },
+  });
+  assert.equal(result.status, 2);
+  const rows = result.stdout
+    .trim()
+    .split('\n')
+    .map((line) => JSON.parse(line));
+  for (const channel of ['direct', 'symlink', 'python', 'node', 'sh', 'subprocess-file']) {
+    const row = rows.find((entry) => entry.channel === channel);
+    assert.equal(row.readable, 'error', channel);
+    assert.equal(row.bytes, 0, channel);
+  }
+  assert.equal(result.stderr, '');
+});
+
+test('a failed shell copy is unavailable rather than a zero-byte success', async (t) => {
+  const f = fixture(t);
+  const dd = join(f.dir, 'dd');
+  writeFileSync(dd, '#!/bin/sh\nexit 1\n', { mode: 0o755 });
+  const rows = [];
+  assert.equal(
+    await runCanary({
+      paths: [f.path],
+      procPaths: [],
+      scratchParent: f.dir,
+      emit: (row) => rows.push(row),
+      env: { HOME: f.dir, PATH: `${f.dir}:${process.env.PATH}`, GIT_CONFIG_NOSYSTEM: '1' },
+    }),
+    2,
+  );
+  assert.equal(rows.find((row) => row.channel === 'sh').readable, 'error');
 });

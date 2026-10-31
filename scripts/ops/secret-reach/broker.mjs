@@ -20,19 +20,20 @@ function samePermissions(value, metadata = false) {
   );
 }
 
-export function createTokenMinter({ appId, installationId, privateKey, fetchImpl = fetch }) {
+export function createTokenMinter({
+  appId,
+  installationId,
+  privateKey,
+  fetchImpl = fetch,
+  clock = Date.now,
+}) {
   if (!/^[1-9]\d*$/.test(appId) || !/^[1-9]\d*$/.test(installationId))
     throw new Error('Invalid broker identity');
-  return async (request) => {
-    if (
-      !request ||
-      Object.keys(request).length !== 3 ||
-      request.operation !== 'token' ||
-      request.repository !== 'xiechimon/cairn' ||
-      !samePermissions(request.permissions)
-    )
-      throw new Error('Scope refused');
-    const now = Math.floor(Date.now() / 1000);
+  let cached;
+  let pending;
+  let lastAttempt = -Infinity;
+  const mint = async () => {
+    const now = Math.floor(clock() / 1000);
     const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
     const claims = Buffer.from(
       JSON.stringify({ iat: now - 60, exp: now + 540, iss: appId }),
@@ -73,12 +74,33 @@ export function createTokenMinter({ appId, installationId, privateKey, fetchImpl
             token.repositories.length !== 1 ||
             token.repositories[0]?.full_name !== 'xiechimon/cairn')) ||
         !Number.isFinite(Date.parse(token.expires_at)) ||
-        Date.parse(token.expires_at) <= Date.now()
+        Date.parse(token.expires_at) <= clock()
       )
         throw new Error('Token scope refused');
       return { token: token.token, expires_at: token.expires_at };
     } catch {
       throw new Error('Token request refused');
+    }
+  };
+  return async (request) => {
+    if (
+      !request ||
+      Object.keys(request).length !== 3 ||
+      request.operation !== 'token' ||
+      request.repository !== 'xiechimon/cairn' ||
+      !samePermissions(request.permissions)
+    )
+      throw new Error('Scope refused');
+    if (cached && Date.parse(cached.expires_at) - clock() > 300000) return { ...cached };
+    if (pending) return { ...(await pending) };
+    if (clock() - lastAttempt < 60000) throw new Error('Token request refused');
+    lastAttempt = clock();
+    pending = mint();
+    try {
+      cached = await pending;
+      return { ...cached };
+    } finally {
+      pending = undefined;
     }
   };
 }

@@ -1,7 +1,18 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import {
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
-import { setupRunner } from './setup-runner-user.mjs';
+import { protectAsOwner, setupRunner, tightenOwnerPath } from './setup-runner-user.mjs';
 
 function fixture() {
   const state = {
@@ -9,6 +20,8 @@ function fixture() {
     yama: 0,
     paths: new Map([
       ['/home/ian', { uid: 1000, gid: 1000, mode: 0o755, kind: 'directory' }],
+      ['/mnt/fast/cairn', { uid: 1000, gid: 1000, mode: 0o755, kind: 'directory' }],
+      ['/mnt/fast/cairn/workspaces', { uid: 1000, gid: 1000, mode: 0o755, kind: 'directory' }],
       ['/mnt/fast/cairn/server', { uid: 1000, gid: 1000, mode: 0o755, kind: 'directory' }],
       ['/mnt/fast/cairn/server/server.db', { uid: 1000, gid: 1000, mode: 0o644, kind: 'file' }],
     ]),
@@ -182,4 +195,104 @@ test('shell entry refuses unknown arguments without running setup', () => {
   );
   assert.equal(result.status, 2);
   assert.match(result.stderr, /Usage:/);
+});
+
+test('foreign-owned protected paths are refused before mutation even in dry-run', () => {
+  for (const dryRun of [false, true]) {
+    const f = fixture();
+    f.state.paths.get('/mnt/fast/cairn/server/server.db').uid = 0;
+    assert.throws(() => setupRunner({ host: f.host, dryRun, log: () => {} }), /owner/i);
+    assert.deepEqual(f.changes, []);
+  }
+});
+
+test('the Cairn parent permits traversal only and workspaces deny runner access', () => {
+  const f = fixture();
+  setupRunner({ host: f.host, log: () => {} });
+  assert.equal(f.state.paths.get('/mnt/fast/cairn').mode, 0o711);
+  assert.equal(f.state.paths.get('/mnt/fast/cairn/workspaces').mode, 0o700);
+});
+
+test('configured protected locations replace the default data and workspace locations', () => {
+  const f = fixture();
+  for (const path of ['/fixture/cairn', '/fixture/data', '/fixture/workspaces', '/fixture/stale'])
+    f.state.paths.set(path, { uid: 1000, gid: 1000, mode: 0o755, kind: 'directory' });
+  setupRunner({
+    host: f.host,
+    locations: {
+      parent: '/fixture/cairn',
+      server: '/fixture/data',
+      workspaces: '/fixture/workspaces',
+      stale: '/fixture/stale',
+    },
+    log: () => {},
+  });
+  assert.equal(f.state.paths.get('/fixture/cairn').mode, 0o711);
+  for (const path of ['/fixture/data', '/fixture/workspaces', '/fixture/stale'])
+    assert.equal(f.state.paths.get(path).mode, 0o700);
+  assert.equal(f.state.paths.get('/mnt/fast/cairn/server').mode, 0o755);
+});
+
+test('protection executes in a child with the owner uid and gid', () => {
+  const action = { path: '/fixture', uid: 1000, gid: 1000, mode: 0o700 };
+  let invocation;
+  protectAsOwner(action, (command, args, options) => {
+    invocation = { command, args, options };
+  });
+  assert.equal(invocation.command, process.execPath);
+  assert.equal(invocation.options.uid, action.uid);
+  assert.equal(invocation.options.gid, action.gid);
+  assert.equal(invocation.options.stdio, 'ignore');
+});
+
+test('owner protection refuses a planted or swapped symlink without changing the outside target', (t) => {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), 'owner-protection-')));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const tree = join(dir, 'tree');
+  mkdirSync(tree);
+  const outside = join(dir, 'outside');
+  writeFileSync(outside, 'fixture', { mode: 0o644 });
+  const original = lstatSync(outside);
+  const target = join(tree, 'target');
+  writeFileSync(target, 'fixture');
+  const info = lstatSync(target);
+  const action = {
+    path: target,
+    uid: info.uid,
+    gid: info.gid,
+    dev: info.dev,
+    ino: info.ino,
+    mode: 0o600,
+    kind: 'file',
+  };
+  rmSync(target);
+  symlinkSync(outside, target);
+  assert.throws(() => tightenOwnerPath(action));
+  assert.throws(() => tightenOwnerPath({ ...action, ...lstatSync(target) }));
+  const after = lstatSync(outside);
+  assert.equal(after.mode, original.mode);
+  assert.equal(after.uid, original.uid);
+  assert.equal(after.gid, original.gid);
+});
+
+test('owner protection pins the inode and refuses replacement or foreign ownership', (t) => {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), 'owner-protection-')));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const path = join(dir, 'target');
+  writeFileSync(path, 'fixture', { mode: 0o644 });
+  const info = lstatSync(path);
+  const action = {
+    path,
+    uid: info.uid,
+    gid: info.gid,
+    dev: info.dev,
+    ino: info.ino,
+    mode: 0o600,
+    kind: 'file',
+  };
+  assert.throws(() => tightenOwnerPath({ ...action, ino: info.ino + 1 }));
+  assert.throws(() => tightenOwnerPath({ ...action, uid: info.uid + 1 }));
+  assert.equal(lstatSync(path).mode & 0o777, 0o644);
+  protectAsOwner(action);
+  assert.equal(lstatSync(path).mode & 0o777, 0o600);
 });

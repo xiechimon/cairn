@@ -18,6 +18,7 @@ const request = {
 
 async function fixture(t, overrides = {}) {
   const calls = [];
+  const clock = overrides.clock ?? Date.now;
   const api = createServer(async (req, res) => {
     let body = '';
     for await (const chunk of req) body += chunk;
@@ -35,7 +36,7 @@ async function fixture(t, overrides = {}) {
         JSON.stringify(
           overrides.response ?? {
             token: 'fixture-token',
-            expires_at: new Date(Date.now() + 3600000).toISOString(),
+            expires_at: new Date(clock() + (overrides.lifetime ?? 3600000)).toISOString(),
             permissions: { ...request.permissions, metadata: 'read' },
           },
         ),
@@ -47,6 +48,7 @@ async function fixture(t, overrides = {}) {
     appId: '123',
     installationId: '456',
     privateKey,
+    clock,
     fetchImpl: (url, options) =>
       fetch(`http://127.0.0.1:${api.address().port}${new URL(url).pathname}`, options),
   });
@@ -193,4 +195,45 @@ test('unsafe directories and existing socket paths are never replaced', async (t
     startBroker({ socketPath: path, runnerGid: statSync(dir).gid, mint: async () => ({}) }),
   );
   assert.equal(statSync(path).size, 4);
+});
+
+test('concurrent and repeated requests share one mint until five minutes before expiry', async (t) => {
+  let now = Date.now();
+  const f = await fixture(t, { clock: () => now });
+  const tokens = await Promise.all(Array.from({ length: 20 }, () => f.mint(request)));
+  assert.equal(f.calls.filter((call) => call.method === 'POST').length, 1);
+  assert.ok(tokens.every((token) => token.token === tokens[0].token));
+  now += 3300000 - 1;
+  await f.mint(request);
+  assert.equal(f.calls.length, 2);
+  await assert.rejects(f.mint({ ...request, repository: 'xiechimon/other' }));
+  now += 1;
+  await Promise.all(Array.from({ length: 20 }, () => f.mint(request)));
+  assert.equal(f.calls.filter((call) => call.method === 'POST').length, 2);
+});
+
+test('short-lived tokens cannot cause more than one mint per sixty seconds', async (t) => {
+  let now = Date.now();
+  const f = await fixture(t, { clock: () => now, lifetime: 30000 });
+  await f.mint(request);
+  now += 59999;
+  await assert.rejects(f.mint(request));
+  assert.equal(f.calls.filter((call) => call.method === 'POST').length, 1);
+  now += 1;
+  await Promise.all(Array.from({ length: 10 }, () => f.mint(request)));
+  assert.equal(f.calls.filter((call) => call.method === 'POST').length, 2);
+});
+
+test('failed upstream mint attempts are single-flight and rate limited without caching errors', async (t) => {
+  let now = Date.now();
+  const f = await fixture(t, { clock: () => now, response: { token: 'invalid-fixture' } });
+  const results = await Promise.allSettled(Array.from({ length: 10 }, () => f.mint(request)));
+  assert.ok(results.every((result) => result.status === 'rejected'));
+  assert.equal(f.calls.length, 2);
+  now += 59999;
+  await assert.rejects(f.mint(request));
+  assert.equal(f.calls.length, 2);
+  now += 1;
+  await assert.rejects(f.mint(request));
+  assert.equal(f.calls.length, 4);
 });

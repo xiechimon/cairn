@@ -1,15 +1,20 @@
 import { execFileSync } from 'node:child_process';
 import {
-  chmodSync,
-  chownSync,
+  closeSync,
+  constants,
+  fchmodSync,
+  fchownSync,
+  fstatSync,
+  ftruncateSync,
   lstatSync,
   mkdirSync,
+  openSync,
   readdirSync,
   readFileSync,
   realpathSync,
   writeFileSync,
 } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { isAbsolute, join, resolve } from 'node:path';
 
 const runnerName = 'cairn-runner';
 const configPath = '/etc/sysctl.d/90-cairn-runner.conf';
@@ -37,7 +42,110 @@ function checkRunner(runner, owner) {
     throw new Error('Existing runner identity is unsafe');
 }
 
-export function setupRunner({ host = systemHost(), dryRun = false, log = console.log } = {}) {
+export function tightenOwnerPath(action) {
+  if (realpathSync(action.path) !== action.path) throw new Error('Unsafe owner path');
+  const fd = openSync(action.path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    const info = fstatSync(fd);
+    if (
+      info.uid !== action.uid ||
+      info.dev !== action.dev ||
+      info.ino !== action.ino ||
+      (action.kind === 'directory' ? !info.isDirectory() : !info.isFile())
+    )
+      throw new Error('Owner path changed or has a different owner');
+    fchmodSync(fd, action.mode);
+  } finally {
+    closeSync(fd);
+  }
+}
+
+export function protectAsOwner(action, execute = execFileSync) {
+  execute(
+    process.execPath,
+    [
+      '--input-type=module',
+      '-e',
+      `import { tightenOwnerPath } from ${JSON.stringify(import.meta.url)};tightenOwnerPath(JSON.parse(process.argv[1]));`,
+      JSON.stringify(action),
+    ],
+    { uid: action.uid, gid: action.gid, stdio: 'ignore', env: {} },
+  );
+}
+
+function changeSystemPath(action, content) {
+  const parts = action.path.split('/').filter(Boolean);
+  let parent = openSync('/', constants.O_RDONLY | constants.O_DIRECTORY);
+  let target;
+  try {
+    for (const part of parts.slice(0, -1)) {
+      const info = fstatSync(parent);
+      if (info.uid !== 0 || (info.mode & 0o022) !== 0) throw new Error('Unsafe system ancestor');
+      const next = openSync(
+        `/proc/self/fd/${parent}/${part}`,
+        constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW,
+      );
+      closeSync(parent);
+      parent = next;
+    }
+    const parentInfo = fstatSync(parent);
+    if (parentInfo.uid !== 0 || (parentInfo.mode & 0o022) !== 0)
+      throw new Error('Unsafe system parent');
+    const path = `/proc/self/fd/${parent}/${parts.at(-1)}`;
+    let previous;
+    try {
+      previous = lstatSync(path);
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+    if (action.type === 'directory') {
+      if (!previous) mkdirSync(path, { mode: 0o700 });
+      target = openSync(path, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
+    } else {
+      target = openSync(
+        path,
+        constants.O_WRONLY |
+          constants.O_NOFOLLOW |
+          (previous ? 0 : constants.O_CREAT | constants.O_EXCL),
+        0o600,
+      );
+    }
+    const info = fstatSync(target);
+    if (previous && (info.dev !== previous.dev || info.ino !== previous.ino))
+      throw new Error('System path changed');
+    if (action.type !== 'directory') {
+      if (!info.isFile() || info.uid !== 0 || info.nlink !== 1 || (info.mode & 0o022) !== 0)
+        throw new Error('Unsafe system file');
+      writeFileSync(target, content);
+      ftruncateSync(target, Buffer.byteLength(content));
+    }
+    fchownSync(target, action.uid, action.gid);
+    fchmodSync(target, action.mode);
+  } finally {
+    if (target !== undefined) closeSync(target);
+    closeSync(parent);
+  }
+}
+
+export function setupRunner({
+  host = systemHost(),
+  dryRun = false,
+  log = console.log,
+  locations = {},
+} = {}) {
+  const protectedLocations = {
+    parent: '/mnt/fast/cairn',
+    server: '/mnt/fast/cairn/server',
+    workspaces: '/mnt/fast/cairn/workspaces',
+    stale: '/home/ian/.cairn/server.hdd-old',
+    ...locations,
+  };
+  if (
+    Object.values(protectedLocations).some(
+      (path) => typeof path !== 'string' || !isAbsolute(path) || resolve(path) !== path,
+    )
+  )
+    throw new Error('Invalid protected location');
   if (host.platform !== 'linux' || host.euid !== 0) throw new Error('Linux root required');
   const owner = host.owner;
   if (
@@ -62,20 +170,31 @@ export function setupRunner({ host = systemHost(), dryRun = false, log = console
       return;
     }
     if (!['file', 'directory'].includes(info.kind)) throw new Error(`Unsafe path: ${path}`);
+    if (info.uid !== owner.uid) throw new Error(`Protected path has a different owner: ${path}`);
     paths.set(path, { ...info, path, mode: info.kind === 'directory' ? 0o700 : 0o600 });
     if (recursive && info.kind === 'directory')
       for (const child of host.children(path)) add(child, true);
   };
   for (const path of ['/home/ian', '/home/ian/.cairn', '/home/ian/.config/cairn']) add(path);
-  for (const path of ['/mnt/fast/cairn/server', '/home/ian/.cairn/server.hdd-old']) add(path, true);
+  add(protectedLocations.parent);
+  if (paths.has(protectedLocations.parent)) paths.get(protectedLocations.parent).mode = 0o711;
+  add(protectedLocations.workspaces);
+  for (const path of [protectedLocations.server, protectedLocations.stale]) add(path, true);
   for (const path of [
     '/home/ian/.cairn/cairnwright.private-key.pem',
     '/home/ian/.cairn/token',
     '/home/ian/.config/cairn/server.env',
   ])
     add(path);
-  if (!paths.has('/home/ian') || !paths.has('/mnt/fast/cairn/server'))
-    throw new Error('Owner home and server data directory are required');
+  if (
+    !paths.has('/home/ian') ||
+    !paths.has(protectedLocations.server) ||
+    !paths.has(protectedLocations.parent) ||
+    !paths.has(protectedLocations.workspaces)
+  )
+    throw new Error(
+      'Owner home, Cairn parent, server data and workspaces directories are required',
+    );
   const socketDir = host.inspect('/run/cairn-token-broker');
   if (socketDir && socketDir.kind !== 'directory') throw new Error('Unsafe broker directory');
   const runnerHome = host.inspect('/var/lib/cairn-runner');
@@ -108,7 +227,15 @@ export function setupRunner({ host = systemHost(), dryRun = false, log = console
   if (!dryRun) checkRunner(identity, owner);
   for (const entry of paths.values()) {
     const previous = host.inspect(entry.path);
-    if (previous.uid !== owner.uid || previous.gid !== owner.gid || previous.mode !== entry.mode)
+    if (
+      !previous ||
+      previous.kind !== entry.kind ||
+      previous.uid !== owner.uid ||
+      previous.dev !== entry.dev ||
+      previous.ino !== entry.ino
+    )
+      throw new Error(`Protected owner path changed: ${entry.path}`);
+    if (previous.mode !== entry.mode)
       apply({
         type: 'protect',
         path: entry.path,
@@ -116,6 +243,8 @@ export function setupRunner({ host = systemHost(), dryRun = false, log = console
         gid: owner.gid,
         mode: entry.mode,
         kind: entry.kind,
+        dev: entry.dev,
+        ino: entry.ino,
       });
   }
   for (const [path, previous, uid, gid, mode] of [
@@ -165,7 +294,14 @@ function systemHost() {
             : info.isFile()
               ? 'file'
               : 'special';
-      return { uid: info.uid, gid: info.gid, mode: info.mode & 0o7777, kind };
+      return {
+        uid: info.uid,
+        gid: info.gid,
+        mode: info.mode & 0o7777,
+        kind,
+        dev: info.dev,
+        ino: info.ino,
+      };
     } catch (error) {
       if (error.code === 'ENOENT') return undefined;
       throw error;
@@ -252,28 +388,22 @@ function systemHost() {
           runnerName,
         ]);
         run('usermod', ['--lock', runnerName]);
-      } else if (action.type === 'protect' || action.type === 'directory') {
-        if (action.type === 'directory') mkdirSync(action.path, { mode: 0o700, recursive: true });
-        chownSync(action.path, action.uid, action.gid);
-        chmodSync(action.path, action.mode);
-      } else if (action.type === 'tool') {
-        writeFileSync(toolPath, readFileSync(new URL('./canary.mjs', import.meta.url)), {
-          mode: 0o600,
-        });
-        chownSync(toolPath, 0, 0);
-        chmodSync(toolPath, 0o644);
+      } else if (action.type === 'protect') protectAsOwner(action);
+      else if (action.type === 'directory') changeSystemPath(action);
+      else if (action.type === 'tool') {
+        changeSystemPath(
+          { ...action, uid: 0, gid: 0, mode: 0o644 },
+          readFileSync(new URL('./canary.mjs', import.meta.url)),
+        );
       } else if (action.type === 'yama')
         run('sysctl', ['-w', `kernel.yama.ptrace_scope=${action.value}`]);
       else if (action.type === 'config' || action.type === 'tmpfiles') {
-        writeFileSync(
-          action.path,
+        changeSystemPath(
+          { ...action, uid: 0, gid: 0, mode: 0o644 },
           action.type === 'config'
             ? `kernel.yama.ptrace_scope = ${action.value}\n`
             : action.content,
-          { mode: 0o600 },
         );
-        chownSync(action.path, 0, 0);
-        chmodSync(action.path, 0o644);
       }
     },
   };
@@ -284,7 +414,12 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
     const args = process.argv.slice(2);
     if (args.length > 1 || (args.length === 1 && args[0] !== '--dry-run'))
       throw new Error('Usage: setup-runner-user.sh [--dry-run]');
-    setupRunner({ dryRun: args[0] === '--dry-run' });
+    setupRunner({
+      dryRun: args[0] === '--dry-run',
+      locations: process.env.SECRET_REACH_SETUP_LOCATIONS
+        ? JSON.parse(process.env.SECRET_REACH_SETUP_LOCATIONS)
+        : {},
+    });
   } catch (error) {
     process.stderr.write(`Setup refused: ${error.message}\n`);
     process.exitCode = 1;

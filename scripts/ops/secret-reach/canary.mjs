@@ -85,7 +85,7 @@ function readCount(path) {
 }
 
 const nodeRead =
-  "const fs=require('node:fs');let n=0;try{const f=fs.openSync(process.argv[1],'r');try{n=fs.readSync(f,Buffer.alloc(4096),0,4096,0)}finally{fs.closeSync(f)}}catch{};";
+  "const fs=require('node:fs');let n=0;try{const f=fs.openSync(process.argv[1],'r');try{n=fs.readSync(f,Buffer.alloc(4096),0,4096,0)}finally{fs.closeSync(f)}}catch(e){if(!['ENOENT','EACCES','EPERM','ENOTDIR','EISDIR'].includes(e.code))process.exit(2)};";
 
 function subprocess(channel, path, scratch, env) {
   let command = process.execPath;
@@ -94,12 +94,15 @@ function subprocess(channel, path, scratch, env) {
     command = 'python3';
     args = [
       '-c',
-      'import sys\ntry:\n with open(sys.argv[1], "rb") as f: n=len(f.read(4096))\nexcept OSError: n=0\nprint(n)',
+      'import errno,sys\ntry:\n with open(sys.argv[1], "rb") as f: n=len(f.read(4096))\nexcept OSError as e:\n if e.errno not in (errno.ENOENT,errno.EACCES,errno.EPERM,errno.ENOTDIR,errno.EISDIR): sys.exit(2)\n n=0\nprint(n)',
       path,
     ];
   } else if (channel === 'sh') {
-    command = 'sh';
-    args = ['-c', 'dd if="$1" bs=4096 count=1 2>/dev/null | wc -c', 'secret-reach', path];
+    args = [
+      '-e',
+      "const fs=require('node:fs');const {spawnSync}=require('node:child_process');let n=0;try{const f=fs.openSync(process.argv[1],'r');try{const r=spawnSync('sh',['-c','dd bs=4096 count=1'],{stdio:[f,'pipe','ignore'],maxBuffer:4096,timeout:5000});if(r.error||r.status!==0)process.exit(2);n=r.stdout.length}finally{fs.closeSync(f)}}catch(e){if(!['ENOENT','EACCES','EPERM','ENOTDIR','EISDIR'].includes(e.code))process.exit(2)}process.stdout.write(String(n))",
+      path,
+    ];
   } else if (channel === 'node') {
     args = ['-e', `${nodeRead}process.stdout.write(String(n))`, path];
   } else if (channel === 'subprocess-file') {
@@ -172,6 +175,7 @@ export async function runCanary({
     for (const path of paths) {
       for (const channel of channels) {
         let bytes = 0;
+        let failed = false;
         try {
           if (channel === 'direct') bytes = readCount(path);
           else if (channel === 'symlink') {
@@ -185,26 +189,29 @@ export async function runCanary({
           } else bytes = subprocess(channel, path, scratch, probeEnv);
         } catch {
           unavailable = true;
+          failed = true;
         }
         leaked ||= bytes > 0;
-        emit({ channel, path, readable: bytes > 0 ? 'yes' : 'no', bytes });
+        emit({ channel, path, readable: failed ? 'error' : bytes > 0 ? 'yes' : 'no', bytes });
         rmSync(join(scratch, 'count'), { force: true });
       }
     }
     for (const path of procPaths) {
       let bytes = 0;
+      let failed = false;
       try {
         if (/^\/proc\/\d+\/(?:environ|mem)$/.test(path) && !lstatSync(dirname(path)).isDirectory())
           throw new Error('Invalid process directory');
         bytes = readCount(path);
       } catch {
         unavailable = true;
+        failed = true;
       }
       leaked ||= bytes > 0;
       emit({
         channel: path.endsWith('/mem') ? 'proc-mem' : 'proc-environ',
         path,
-        readable: bytes > 0 ? 'yes' : 'no',
+        readable: failed ? 'error' : bytes > 0 ? 'yes' : 'no',
         bytes,
       });
     }
