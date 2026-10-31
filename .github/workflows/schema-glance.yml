@@ -16,6 +16,7 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 24
@@ -25,7 +26,8 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          node scripts/schema-glance.mjs --base "$BASE_SHA" --head "$HEAD_SHA" > "$RUNNER_TEMP/schema-glance.md"
+          git show "$BASE_SHA:scripts/schema-glance.mjs" > "$RUNNER_TEMP/schema-glance.mjs" 2>/dev/null || cp scripts/schema-glance.mjs "$RUNNER_TEMP/schema-glance.mjs"
+          node "$RUNNER_TEMP/schema-glance.mjs" --base "$BASE_SHA" --head "$HEAD_SHA" > "$RUNNER_TEMP/schema-glance.md"
           cat "$RUNNER_TEMP/schema-glance.md" >> "$GITHUB_STEP_SUMMARY"
       - name: Upsert sticky comment
         env:
