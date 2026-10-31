@@ -4,6 +4,7 @@ import {
   Check,
   FileText,
   GitBranch,
+  Puzzle,
   Search,
   Sparkle,
   SquarePen,
@@ -47,6 +48,9 @@ const LINE: Record<TraceDensity, string> = {
   comfortable: 'text-ui text-content-secondary',
   compact: 'text-meta leading-5 text-content-secondary',
 };
+
+const RUNNING_VERB =
+  'data-running:[&_[data-trace-verb]]:shimmer motion-reduce:data-running:[&_[data-trace-verb]]:shimmer-none';
 
 export function TraceCode({ children }: { children: ReactNode }) {
   return (
@@ -97,7 +101,7 @@ function ToolLine({
   trailing?: ReactNode;
 }) {
   return (
-    <TraceLine status={running ? 'running' : undefined} className={LINE[density]}>
+    <TraceLine data-running={running ? '' : undefined} className={cn(LINE[density], RUNNING_VERB)}>
       {Glyph != null && (
         <TraceIcon className={failed ? 'text-destructive' : undefined}>
           <Glyph />
@@ -199,13 +203,14 @@ export function TraceStepLine({
     case 'tool':
       return (
         <ToolLine
+          icon={Puzzle}
           density={density}
           running={step.status === 'running'}
           failed={step.status === 'failed'}
           secs={step.secs}
           trailing={step.status === 'failed' ? <TraceFailed label={failedLabel} /> : undefined}
         >
-          {step.verb != null && <>{step.verb} </>}
+          {step.verb != null && <span data-trace-verb="">{step.verb} </span>}
           <TraceCode>{step.name}</TraceCode>
         </ToolLine>
       );
@@ -219,7 +224,8 @@ export function TraceStepLine({
           secs={step.secs}
           trailing={step.exit == null ? undefined : <ExitBadge exit={step.exit} />}
         >
-          {step.exit == null ? 'Running' : 'Ran'} <TraceCode>{step.command}</TraceCode>
+          <span data-trace-verb="">{step.exit == null ? 'Running' : 'Ran'} </span>
+          <TraceCode>{step.command}</TraceCode>
         </ToolLine>
       );
       if (step.output.length === 0) return head;
