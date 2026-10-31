@@ -1,9 +1,10 @@
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, statSync } from 'node:fs';
+import { createConnection } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, test, vi } from 'vitest';
-import { type MachineApi, MachineApiError } from '../src/machine-client.js';
+import { type MachineApi, MachineApiError, MachineClient } from '../src/machine-client.js';
 import { ORB_STEP_METHODS } from '../src/orb/protocol.js';
 import { RelayMachineApi, RelayMachineError, RelayMachineServer } from '../src/orb/relay.js';
 
@@ -30,7 +31,12 @@ async function fixture() {
           forwarded(method, args),
     },
   ) as MachineApi;
-  const server = new RelayMachineServer({ socketPath, stepId: 'step', upstream });
+  const server = new RelayMachineServer({
+    socketPath,
+    stepId: 'step',
+    machineId: 'host',
+    upstream,
+  });
   await server.listen();
   const client = await RelayMachineApi.connect(socketPath);
   cleanup.push(async () => {
@@ -50,7 +56,7 @@ test.each(ORB_STEP_METHODS)(
       method === 'putUpload'
         ? ['https://upload.test/step', { 'x-upload': 'value' }, 'payload', 'text/plain']
         : method === 'reportClaudeRateLimit'
-          ? [{ providerId: 'claude-code', retryAfterMs: 1000 }]
+          ? [{ machineId: 'host', status: 'rejected', resetsAt: Date.now() + 1000 }]
           : ['step', { nested: ['unchanged', 42, false], text: 'body' }];
     await client.call(method, args);
     expect(forwarded).toHaveBeenLastCalledWith(method, args);
@@ -171,7 +177,12 @@ test('reclaims a socket left by a dead process', async () => {
   ]);
   expect(statSync(socketPath).isSocket()).toBe(true);
   const upstream = new Proxy({}, { get: () => vi.fn(async () => undefined) }) as MachineApi;
-  const server = new RelayMachineServer({ socketPath, stepId: 'step', upstream });
+  const server = new RelayMachineServer({
+    socketPath,
+    stepId: 'step',
+    machineId: 'host',
+    upstream,
+  });
   try {
     await server.listen();
     const client = await RelayMachineApi.connect(socketPath);
@@ -195,4 +206,146 @@ test('does not remove a live listener when another server tries to use its path'
   await client.api.heartbeat('step');
   expect(forwarded).toHaveBeenCalledWith('heartbeat', ['step']);
   expect(statSync(socketPath).isSocket()).toBe(true);
+});
+
+test('retries a rejected finish report over the same connection', async () => {
+  const { client, forwarded } = await fixture();
+  forwarded.mockRejectedValueOnce(new MachineApiError(503, 'retry finish'));
+  await expect(client.api.done('step', { status: 'success' })).rejects.toThrow('retry finish');
+  await expect(client.api.done('step', { status: 'failed' })).resolves.toBeDefined();
+  expect(forwarded).toHaveBeenCalledTimes(2);
+});
+
+test('validates rate-limit reports before forwarding', async () => {
+  const { client, forwarded } = await fixture();
+  await expect(
+    client.call('reportClaudeRateLimit', [{ machineId: 'host', status: 'forged' }]),
+  ).rejects.toBeInstanceOf(RelayMachineError);
+  expect(forwarded).not.toHaveBeenCalled();
+});
+
+test.each([Date.now() + 100 * 86400000, Math.floor((Date.now() + 100 * 86400000) / 1000)])(
+  'binds rate-limit machine identity and caps reset timestamps %s',
+  async (resetsAt) => {
+    const { client, forwarded } = await fixture();
+    const before = Date.now();
+    await client.call('reportClaudeRateLimit', [
+      { machineId: 'victim', status: 'rejected', resetsAt },
+    ]);
+    const report = forwarded.mock.calls[0]?.[1][0] as { machineId: string; resetsAt: number };
+    expect(report.machineId).toBe('host');
+    expect(report.resetsAt).toBeGreaterThanOrEqual(before + 8 * 86400000);
+    expect(report.resetsAt).toBeLessThanOrEqual(Date.now() + 8 * 86400000);
+  },
+);
+
+test('throttles rate-limit reports per step even after upstream rejection', async () => {
+  const { client, forwarded } = await fixture();
+  const now = vi.spyOn(Date, 'now').mockReturnValue(1800000000000);
+  try {
+    const report = { machineId: 'host', status: 'rejected' };
+    forwarded.mockRejectedValueOnce(new MachineApiError(503, 'unavailable'));
+    await expect(client.call('reportClaudeRateLimit', [report])).rejects.toThrow('unavailable');
+    await expect(client.call('reportClaudeRateLimit', [report])).rejects.toThrow('throttled');
+    now.mockReturnValue(1800000030000);
+    await client.call('reportClaudeRateLimit', [report]);
+    expect(forwarded).toHaveBeenCalledTimes(2);
+  } finally {
+    now.mockRestore();
+  }
+});
+
+test('accepts exactly one connection for the lifetime of a step socket', async () => {
+  const { client, socketPath, forwarded } = await fixture();
+  const second = createConnection(socketPath);
+  second.on('error', () => {});
+  cleanup.push(async () => {
+    second.destroy();
+  });
+  await vi.waitFor(() => expect(second.destroyed).toBe(true));
+  await client.api.heartbeat('step');
+  expect(forwarded).toHaveBeenCalledTimes(1);
+  client.close();
+  const third = createConnection(socketPath);
+  third.on('error', () => {});
+  cleanup.push(async () => {
+    third.destroy();
+  });
+  await vi.waitFor(() => expect(third.destroyed).toBe(true));
+});
+
+test.each(['x', 'é'])(
+  'disconnects an oversized complete frame with %s content',
+  async (character) => {
+    const { client, forwarded } = await fixture();
+    client.send({
+      type: 'log',
+      message: character.repeat((character === 'x' ? 17 : 9) * 1024 * 1024),
+    });
+    await vi.waitFor(() => expect(client.call('heartbeat', ['step'])).rejects.toThrow('closed'));
+    expect(forwarded).not.toHaveBeenCalled();
+  },
+);
+
+test.each([
+  { type: 'session', live: 'yes' },
+  { type: 'cancel', id: 'bad' },
+  { type: 'steered', id: -1 },
+  { type: 'log', message: {} },
+  { type: 'failed', error: [] },
+  { type: 'finished', extra: true },
+  { type: 'stop', discard: true },
+  { type: 'checkpoint', checkpoint: { state: 'forged' } },
+])('disconnects invalid worker frame %j', async (frame) => {
+  const { client, forwarded } = await fixture();
+  client.send(frame as Parameters<typeof client.send>[0]);
+  await vi.waitFor(() => expect(client.api.heartbeat('step')).rejects.toThrow('closed'));
+  expect(forwarded).not.toHaveBeenCalled();
+});
+
+test('destroys a socket when an unterminated frame exceeds the byte limit', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'relay-limit-'));
+  const socketPath = join(home, 'step.sock');
+  const server = new RelayMachineServer({ socketPath, stepId: 'step', upstream: {} as MachineApi });
+  await server.listen();
+  const socket = createConnection(socketPath);
+  socket.on('error', () => {});
+  try {
+    await new Promise<void>((resolve) => socket.once('connect', resolve));
+    socket.resume();
+    for (let index = 0; index < 17; index++) socket.write(Buffer.alloc(1024 * 1024, 120));
+    await vi.waitFor(() => expect(socket.destroyed).toBe(true), { timeout: 5000 });
+  } finally {
+    socket.destroy();
+    await server.close();
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('disconnects a non-reading worker when queued output exceeds the frame budget', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'relay-output-limit-'));
+  const socketPath = join(home, 'step.sock');
+  const upstream = new MachineClient({ serverUrl: 'http://unused.test' });
+  const heartbeat = vi.spyOn(upstream, 'heartbeat').mockResolvedValue(undefined);
+  const server = new RelayMachineServer({
+    socketPath,
+    stepId: 'step',
+    upstream,
+  });
+  await server.listen();
+  const socket = createConnection(socketPath);
+  socket.on('error', () => {});
+  try {
+    await new Promise<void>((resolve) => socket.once('connect', resolve));
+    socket.write('cairn-orb-rpc:{"type":"call","id":0,"method":"heartbeat","args":["step"]}\n');
+    await vi.waitFor(() => expect(heartbeat).toHaveBeenCalledTimes(1));
+    const message = 'x'.repeat(1024 * 1024);
+    for (let index = 0; index < 20; index++) server.send({ type: 'log', message });
+    socket.resume();
+    await vi.waitFor(() => expect(socket.destroyed).toBe(true));
+  } finally {
+    socket.destroy();
+    await server.close();
+    rmSync(home, { recursive: true, force: true });
+  }
 });

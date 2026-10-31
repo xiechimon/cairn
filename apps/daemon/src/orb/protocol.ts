@@ -3,6 +3,9 @@ import { z } from 'zod';
 import type { MachineApi } from '../machine-client.js';
 import type { RunStepOptions } from '../runner.js';
 
+export const ORB_MAX_FRAME_BYTES = 16 * 1024 * 1024;
+export const ORB_MAX_CHECKPOINT_CONTENT_BYTES = 4 * 1024 * 1024;
+
 export const ORB_RPC_PREFIX = 'cairn-orb-rpc:';
 export const ORB_STEP_METHODS = [
   'heartbeat',
@@ -44,10 +47,35 @@ export const orbCheckpointSchema = z
     prompt: z.string().nullable(),
     doneBody: machineDoneBodySchema.nullable().optional(),
     planContent: z.string().nullable().optional(),
-    transcript: transcriptUploadSchema.shape.messages.optional(),
-    sessionContent: z.string().nullable().optional(),
+    transcript: transcriptUploadSchema.shape.messages
+      .refine(
+        (messages) =>
+          Buffer.byteLength(JSON.stringify(messages)) <= ORB_MAX_CHECKPOINT_CONTENT_BYTES,
+      )
+      .optional(),
+    sessionContent: z
+      .string()
+      .refine((content) => Buffer.byteLength(content) <= ORB_MAX_CHECKPOINT_CONTENT_BYTES)
+      .nullable()
+      .optional(),
   })
   .strict();
+
+export const orbWorkerFrameSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('cancel'), id: z.number().int().nonnegative() }).strict(),
+  z.object({ type: z.literal('session'), live: z.boolean() }).strict(),
+  z.object({ type: z.literal('checkpoint'), checkpoint: orbCheckpointSchema }).strict(),
+  z
+    .object({
+      type: z.literal('steered'),
+      id: z.number().int().nonnegative(),
+      error: z.string().optional(),
+    })
+    .strict(),
+  z.object({ type: z.literal('log'), message: z.string() }).strict(),
+  z.object({ type: z.literal('finished') }).strict(),
+  z.object({ type: z.literal('failed'), error: z.string() }).strict(),
+]);
 
 export type OrbFrame =
   | { type: 'init'; input: OrbStepInput }

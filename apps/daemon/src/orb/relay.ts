@@ -2,15 +2,18 @@ import { chmodSync, existsSync, lstatSync, mkdirSync, rmSync } from 'node:fs';
 import { createConnection, createServer, type Server, type Socket } from 'node:net';
 import { dirname } from 'node:path';
 import { createInterface } from 'node:readline';
+import { claudeRateLimitReportSchema, normalizeClaudeResetsAt } from '@cairn/shared';
 import { z } from 'zod';
 import { type MachineApi, MachineApiError } from '../machine-client.js';
 import {
   decodeOrbFrame,
   encodeOrbFrame,
+  ORB_MAX_FRAME_BYTES,
   ORB_STEP_METHODS,
   type OrbFrame,
   type OrbStepInput,
   type OrbStepMethod,
+  orbWorkerFrameSchema,
 } from './protocol.js';
 
 const callSchema = z.object({
@@ -37,11 +40,14 @@ export class RelayMachineServer {
   private reporting: Promise<unknown> | undefined;
   private completed = false;
   private ownsSocket = false;
+  private connected = false;
+  private lastRateLimitAt: number | undefined;
 
   constructor(
     private readonly options: {
       socketPath: string;
       stepId: string;
+      machineId?: string;
       upstream: MachineApi;
       input?: OrbStepInput | (() => OrbStepInput);
       onFrame?: (frame: OrbFrame) => void;
@@ -50,30 +56,54 @@ export class RelayMachineServer {
     },
   ) {
     this.server = createServer((socket) => {
+      socket.on('error', () => {});
+      if (this.connected) {
+        socket.destroy();
+        return;
+      }
+      this.connected = true;
       this.sockets.add(socket);
       const requests = new Map<number, AbortController>();
       this.requests.set(socket, requests);
-      socket.on('error', () => {});
-      const lines = createInterface({ input: socket });
-      lines.on('line', (line) => {
-        const frame = decodeOrbFrame(line);
-        if (!frame) return;
-        if (frame.type === 'call') {
-          void this.receive(socket, frame);
-        } else if (frame.type === 'cancel') {
-          requests.get(frame.id)?.abort();
-        } else {
-          this.options.onFrame?.(frame);
+      let buffer = Buffer.allocUnsafe(ORB_MAX_FRAME_BYTES);
+      let size = 0;
+      socket.on('data', (chunk: Buffer) => {
+        let start = 0;
+        while (start < chunk.length && !socket.destroyed) {
+          const end = chunk.indexOf(10, start);
+          const part = chunk.subarray(start, end < 0 ? chunk.length : end);
+          size += part.length;
+          if (size > ORB_MAX_FRAME_BYTES) {
+            socket.destroy();
+            return;
+          }
+          part.copy(buffer, size - part.length);
+          if (end < 0) return;
+          const frame = decodeOrbFrame(buffer.toString('utf8', 0, size));
+          size = 0;
+          start = end + 1;
+          if (frame?.type === 'call') {
+            void this.receive(socket, frame);
+            continue;
+          }
+          const parsed = orbWorkerFrameSchema.safeParse(frame);
+          if (!parsed.success) {
+            socket.destroy();
+            return;
+          }
+          if (parsed.data.type === 'cancel') requests.get(parsed.data.id)?.abort();
+          else this.options.onFrame?.(parsed.data);
         }
       });
       socket.on('close', () => {
         for (const request of requests.values()) request.abort();
         this.requests.delete(socket);
         this.sockets.delete(socket);
-        lines.close();
+        buffer = Buffer.alloc(0);
       });
       if (options.input)
-        socket.write(
+        this.write(
+          socket,
           encodeOrbFrame({
             type: 'init',
             input: typeof options.input === 'function' ? options.input() : options.input,
@@ -113,7 +143,20 @@ export class RelayMachineServer {
   }
 
   send(frame: OrbFrame): void {
-    for (const socket of this.sockets) socket.write(encodeOrbFrame(frame));
+    for (const socket of this.sockets) this.write(socket, encodeOrbFrame(frame));
+  }
+
+  get isComplete(): boolean {
+    return this.completed;
+  }
+
+  private write(socket: Socket, data: string): void {
+    if (socket.destroyed) return;
+    if (socket.writableLength + Buffer.byteLength(data) > ORB_MAX_FRAME_BYTES) {
+      socket.destroy();
+      return;
+    }
+    socket.write(data);
   }
 
   close(): Promise<void> {
@@ -135,6 +178,7 @@ export class RelayMachineServer {
     const { id, method, args, cancellable } = parsed.data;
     const controller = new AbortController();
     this.requests.get(socket)?.set(id, controller);
+    let report: Promise<unknown> | undefined;
     try {
       if (!(ORB_STEP_METHODS as readonly string[]).includes(method))
         throw new RelayMachineError('Relay method is forbidden');
@@ -145,6 +189,21 @@ export class RelayMachineServer {
         throw new RelayMachineError('Relay step does not match claim');
       if (method === 'putUpload' && !this.uploads.has(String(args[0])))
         throw new RelayMachineError('Relay upload URL was not issued for this step');
+      if (method === 'reportClaudeRateLimit') {
+        const parsed = claudeRateLimitReportSchema.safeParse(args[0]);
+        if (!parsed.success || !this.options.machineId)
+          throw new RelayMachineError('Invalid relay rate-limit report');
+        const now = Date.now();
+        if (this.lastRateLimitAt !== undefined && now - this.lastRateLimitAt < 30_000)
+          throw new RelayMachineError('Relay rate-limit report throttled');
+        this.lastRateLimitAt = now;
+        const resetsAt = normalizeClaudeResetsAt(parsed.data.resetsAt);
+        args[0] = {
+          ...parsed.data,
+          machineId: this.options.machineId,
+          ...(resetsAt !== null ? { resetsAt: Math.min(resetsAt, now + 8 * 86_400_000) } : {}),
+        };
+      }
       if (this.completed) throw new RelayMachineError('Relay step is complete');
       const operation = this.options.upstream[method as OrbStepMethod];
       if (typeof operation !== 'function')
@@ -158,7 +217,10 @@ export class RelayMachineServer {
         this.options.onReporting?.(args[1]);
       }
       const result = Promise.resolve(Reflect.apply(operation, this.options.upstream, args));
-      if (method === 'done') this.reporting = result;
+      if (method === 'done') {
+        report = result;
+        this.reporting = result;
+      }
       const value: unknown = await result;
       if (method === 'done') {
         this.completed = true;
@@ -168,10 +230,12 @@ export class RelayMachineServer {
         for (const upload of (value as Awaited<ReturnType<MachineApi['uploadUrls']>>).uploads)
           this.uploads.add(upload.url);
       }
-      if (!socket.destroyed) socket.write(encodeOrbFrame({ type: 'reply', id, value }));
+      this.write(socket, encodeOrbFrame({ type: 'reply', id, value }));
     } catch (error) {
+      if (report && this.reporting === report) this.reporting = undefined;
       if (!socket.destroyed)
-        socket.write(
+        this.write(
+          socket,
           encodeOrbFrame({
             type: 'reply',
             id,
@@ -241,6 +305,7 @@ export class RelayMachineApi {
       lines.close();
       onClose?.();
     };
+    lines.on('error', closed);
     this.socket.on('error', closed);
     this.socket.on('close', closed);
     this.api = new Proxy(

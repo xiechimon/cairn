@@ -5,7 +5,7 @@ import type { AgentSessionHandle, ClaimedStep, MachineDoneBody } from '@cairn/sh
 import { TranscriptBuffer } from '../journal.js';
 import { MachineApiError } from '../machine-client.js';
 import { writePrivateFile } from '../private-fs.js';
-import { type RunStepDeps, type RunStepOptions, runStep } from '../runner.js';
+import { type RunStepDeps, type RunStepOptions, resumePendingUpload, runStep } from '../runner.js';
 import { StepStops } from '../step-stops.js';
 import type { OrbLifecycle } from './lifecycle.js';
 import {
@@ -55,6 +55,9 @@ export async function runOrbStep(
   heartbeat.unref?.();
   const orbStartedAt = Date.now();
   let relay: RelayMachineServer | undefined;
+  let exitError = 'Orb worker exited without completing the step';
+  const execController = new AbortController();
+  let stopTimer: ReturnType<typeof setTimeout> | undefined;
   const seedDirectory = join(deps.paths.home, 'orb', `${stepId}-seed`);
   let ready = false;
   let ended = false;
@@ -76,6 +79,8 @@ export async function runOrbStep(
     },
     async stop() {
       send({ type: 'stop', discard: stop.request?.discard ?? false });
+      stopTimer ??= setTimeout(() => execController.abort(), 5_000);
+      stopTimer.unref?.();
     },
     usage: () => [],
   };
@@ -172,6 +177,7 @@ export async function runOrbStep(
         relay = new RelayMachineServer({
           socketPath,
           stepId,
+          machineId: claimed.step.machineId ?? undefined,
           upstream: deps.client,
           input: () => ({
             ...input,
@@ -198,6 +204,7 @@ export async function runOrbStep(
           ['node', '/opt/cairn/daemon/cli.mjs', 'orb-step', '--socket', '/run/cairn/relay.sock'],
           {
             binds,
+            signal: execController.signal,
             env: {
               ...options.env,
               CAIRN_ORB: '1',
@@ -211,14 +218,32 @@ export async function runOrbStep(
       },
     );
   } catch (error) {
-    deps.logger.step(`Orb step exited: ${error instanceof Error ? error.message : String(error)}`);
+    exitError = `Orb step exited: ${error instanceof Error ? error.message : String(error)}`;
+    deps.logger.step(exitError);
   } finally {
     ended = true;
     const error = new Error('Orb worker ended before steer delivery');
     for (const pending of [...waiting, ...steering.values()]) pending.reject(error);
     deps.sessionHandles?.delete(stepId);
     clearInterval(heartbeat);
+    clearTimeout(stopTimer);
+    stop.detach();
     await relay?.close();
+    if (!relay?.isComplete) {
+      const pending = deps.journal.get(stepId);
+      if (pending?.state === 'awaiting-upload' && pending.doneBody) {
+        await resumePendingUpload(deps, pending, options);
+      } else {
+        const doneBody: MachineDoneBody = { status: 'failed', errorMessage: exitError };
+        deps.journal.update(stepId, { state: 'awaiting-upload', doneBody });
+        try {
+          await deps.client.done(stepId, doneBody);
+          deps.journal.remove(stepId);
+        } catch (error) {
+          deps.logger.step(`Host orb failure report unreachable: ${String(error)}`);
+        }
+      }
+    }
     rmSync(seedDirectory, { recursive: true, force: true });
     stop.settle();
   }

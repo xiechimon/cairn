@@ -22,6 +22,25 @@ test('mounts a private bare snapshot with committed objects and no host working 
     '-m',
     'Seed',
   ]);
+  execFileSync('git', ['-C', repo, 'switch', '-c', 'other-thread']);
+  writeFileSync(join(repo, 'private-thread.txt'), 'Other Thread content');
+  execFileSync('git', ['-C', repo, 'add', 'private-thread.txt']);
+  execFileSync('git', [
+    '-C',
+    repo,
+    '-c',
+    'user.name=Test',
+    '-c',
+    'user.email=test@example.test',
+    'commit',
+    '-m',
+    'Private Thread',
+  ]);
+  const privateCommit = execFileSync('git', ['-C', repo, 'rev-parse', 'HEAD'], {
+    encoding: 'utf8',
+  }).trim();
+  execFileSync('git', ['-C', repo, 'tag', 'private-tag']);
+  execFileSync('git', ['-C', repo, 'switch', 'main']);
   writeFileSync(join(repo, '.env'), 'host-secret-sentinel');
   execFileSync('git', ['-C', repo, 'config', 'private.token', 'host-secret-sentinel']);
   const seed = await prepareOrbSeed({
@@ -29,6 +48,14 @@ test('mounts a private bare snapshot with committed objects and no host working 
     directory: join(root, 'snapshot'),
     projectId: 'project',
   });
+  expect(
+    execFileSync('git', ['-C', seed.source, 'for-each-ref', '--format=%(refname)'], {
+      encoding: 'utf8',
+    }).trim(),
+  ).toBe('refs/heads/main');
+  expect(() =>
+    execFileSync('git', ['-C', seed.source, 'cat-file', '-e', privateCommit], { stdio: 'pipe' }),
+  ).toThrow();
   expect(seed).toEqual({
     source: join(root, 'snapshot', 'repo'),
     target: '/seed/project/repo',

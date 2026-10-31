@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -83,6 +84,20 @@ test('orb workers use a socket and never construct or run a host backend', async
 });
 
 test('exec exposes only the socket, read-only build and read-only project seed', async () => {
+  const repo = mkdtempSync(join(tmpdir(), 'orb-exec-seed-'));
+  execFileSync('git', ['init', '-b', 'main', repo]);
+  execFileSync('git', [
+    '-C',
+    repo,
+    '-c',
+    'user.name=Test',
+    '-c',
+    'user.email=test@example.test',
+    'commit',
+    '--allow-empty',
+    '-m',
+    'Seed',
+  ]);
   const sentinel = 'deadbeef'.repeat(8);
   class Api extends FakeMachineApi {
     override async enroll(body: Parameters<FakeMachineApi['enroll']>[0]) {
@@ -90,7 +105,10 @@ test('exec exposes only the socket, read-only build and read-only project seed',
     }
   }
   const api = new Api();
-  api.claimQueue.push(CLAIMED);
+  api.claimQueue.push({
+    ...CLAIMED,
+    project: { ...CLAIMED.project!, id: 'project', repo: { kind: 'local', cloneUrl: repo } },
+  });
   const provider = socketWorker(fakeBackend([{ type: 'done', usage: [] }]).backend);
   const exec = vi.spyOn(provider, 'exec');
   const { handle, paths } = await boot({
@@ -118,6 +136,12 @@ test('exec exposes only the socket, read-only build and read-only project seed',
         source: expect.stringMatching(/\/daemon\/dist$/),
         target: '/opt/cairn/daemon',
         readonly: true,
+      },
+      {
+        source: join(paths.home, 'orb', 's1-seed', 'repo'),
+        target: '/seed/project/repo',
+        readonly: true,
+        releaseAfterExec: true,
       },
     ]);
     expect(readFileSync(paths.machineJson, 'utf8')).toContain(sentinel);
@@ -151,7 +175,7 @@ test('Coordinator steps stay on the host when orb mode is enabled', async () => 
   }
 });
 
-test('a dead container leaves completion and uploads to the worker', async () => {
+test('a dead container receives a host failure report', async () => {
   const provider = new NspawnOrbProvider({
     runner: async (argv) => ({
       code: argv.includes('--uid=agent') ? 137 : 0,
@@ -167,8 +191,11 @@ test('a dead container leaves completion and uploads to the worker', async () =>
     capEnv: { CAIRN_EXECUTOR: 'orb' },
   });
   try {
-    await waitFor(() => lines.some((line) => line.includes('Orb step exited')));
-    expect(api.doneBodies).toEqual([]);
+    await waitFor(() => api.doneBodies.length === 1);
+    expect(lines.some((line) => line.includes('Orb step exited'))).toBe(true);
+    expect(api.doneBodies).toEqual([
+      { stepId: 's1', body: { status: 'failed', errorMessage: expect.stringContaining('137') } },
+    ]);
     expect(api.uploads).toEqual([]);
     expect(readdirSync(join(paths.home, 'orb'))).toEqual([]);
   } finally {
