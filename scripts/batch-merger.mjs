@@ -5,6 +5,7 @@ import { api, disarmAutoMerge, markers, pages, repo } from './autonomy-brake.mjs
 const batchHead = /^B\d+\//;
 const mergerTrailer = 'Merged-by: cairn-batch-merger';
 const requiredChecks = ['check', 'pack-smoke', 'e2e-gate', 'pr-evidence'];
+const sandboxOptions = { timeout: 1000, contextCodeGeneration: { strings: false, wasm: false } };
 const log = (pr, action, reasons) =>
   console.log(
     JSON.stringify({ pr: pr?.number ?? null, head: pr?.head?.sha ?? null, action, reasons }),
@@ -23,6 +24,11 @@ function ownerRouting(headSha) {
   };
   const constants = extract('const AUTO_MERGE =', 'const FILES_CMD =');
   const routing = extract('const safety = reviewed.find', 'const checked =');
+  const isEvidence = runInNewContext(
+    `${constants}\n;(path) => EVIDENCE_RE.test(path)`,
+    {},
+    sandboxOptions,
+  );
   const range = `origin/main...${headSha}`;
   const numstat = git([
     '-c',
@@ -43,7 +49,7 @@ function ownerRouting(headSha) {
     const [, added, removed, path] = match;
     changedFiles.push(path);
     if (added === '-') binaryFiles.push(path);
-    else linesChanged += Number(added) + Number(removed);
+    else if (!isEvidence(path)) linesChanged += Number(added) + Number(removed);
   }
   const deleted = git([
     '-c',
@@ -64,7 +70,7 @@ const reviewed = [];
 ${routing}
 humanReasons`,
     { changedFiles, deletedFiles, binaryFiles, linesChanged },
-    { timeout: 1000, contextCodeGeneration: { strings: false, wasm: false } },
+    sandboxOptions,
   );
   if (!Array.isArray(reasons) || !reasons.every((reason) => typeof reason === 'string'))
     throw new Error('Invalid owner routing result');

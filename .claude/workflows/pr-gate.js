@@ -150,6 +150,7 @@ const FILES_CMD = 'git -c core.quotePath=false diff --no-renames --name-only'
 // turn text into "- -" rows and zero the line count (run 6); core.quotePath=false
 // keeps the binary rows' paths in the form FILES_CMD prints (run 7).
 const LINES_CMD = 'git -c core.quotePath=false --attr-source=4b825dc642cb6eb9a060e54bf8d69288fbee4904 diff --no-renames --numstat'
+const LINES_PATHSPEC = "-- . ':(exclude)docs/verify'"
 // The shared clone's core.hooksPath can be husky's relative .husky/_, which git
 // resolves inside the tree a worktree has checked out, so a head that tracks
 // .husky/_/post-checkout or reference-transaction would run with this
@@ -157,7 +158,7 @@ const LINES_CMD = 'git -c core.quotePath=false --attr-source=4b825dc642cb6eb9a06
 // without hooks.
 const NO_HOOKS = 'git -c core.hooksPath=/dev/null'
 const LINES_GIT = 'the command needs git 2.40 or later for --attr-source; never drop the option on an older git'
-const ARGS_HELP = `pr-gate args: {pr: number, ticket: number, headSha: 40-hex sha, changedFiles: non-empty string[] from \`${FILES_CMD} origin/main...<headSha>\`, deletedFiles: string[] from the same command with --diff-filter=D, linesChanged: non-negative integer, the sum of both columns of \`${LINES_CMD} origin/main...<headSha>\` (${LINES_GIT}) with binary rows (- -) counted as 0, binaryFiles: string[], the paths of those binary rows}`
+const ARGS_HELP = `pr-gate args: {pr: number, ticket: number, headSha: 40-hex sha, changedFiles: non-empty string[] from \`${FILES_CMD} origin/main...<headSha>\`, deletedFiles: string[] from the same command with --diff-filter=D, linesChanged: non-negative integer, the sum of both columns of \`${LINES_CMD} origin/main...<headSha> ${LINES_PATHSPEC}\` (docs/verify evidence is not counted; ${LINES_GIT}) with binary rows (- -) counted as 0, binaryFiles: string[], the paths of those binary rows}`
 const isPathList = (xs) => Array.isArray(xs) && xs.every((f) => typeof f === 'string' && f.length > 0)
 // File names reach agents that build git commands from them, so only letters,
 // digits, combining marks and ._/@+%- pass (every tracked path fits).
@@ -234,7 +235,7 @@ const DIMENSIONS = [
   },
   {
     key: 'safety',
-    prompt: `Dimension: safety and protected paths. First run \`${FILES_CMD} <your base ref>...${headSha}\` and put its output lines, unchanged, in changedFiles; run it again with --diff-filter=D for deletedFiles; put the sum of both columns of \`${LINES_CMD} <your base ref>...${headSha}\` in linesChanged (binary rows count 0; ${LINES_GIT}, so if git rejects it, report a blocking finding) and the paths of its binary rows (- -) in binaryFiles. The script compares these with the caller's values and matches ADR 0021 D4 on them itself. Read D4 in docs/adr/0021-*.md at the head and add to protectedPaths any changed path that steers agents, gates a check or is a one-way door; a protected path is not a finding by itself. Then look for secrets or tokens in code or evidence, credentials handed to agents, issue or PR text reaching a prompt system layer or a shell, one-way doors (migrations, dependency changes, data deletion), and changes outside the ticket's scope.`,
+    prompt: `Dimension: safety and protected paths. First run \`${FILES_CMD} <your base ref>...${headSha}\` and put its output lines, unchanged, in changedFiles; run it again with --diff-filter=D for deletedFiles; put the sum of both columns of \`${LINES_CMD} <your base ref>...${headSha} ${LINES_PATHSPEC}\` (docs/verify evidence is not counted) in linesChanged (binary rows count 0; ${LINES_GIT}, so if git rejects it, report a blocking finding) and the paths of its binary rows (- -) in binaryFiles. The script compares these with the caller's values and matches ADR 0021 D4 on them itself. Read D4 in docs/adr/0021-*.md at the head and add to protectedPaths any changed path that steers agents, gates a check or is a one-way door; a protected path is not a finding by itself. Then look for secrets or tokens in code or evidence, credentials handed to agents, issue or PR text reaching a prompt system layer or a shell, one-way doors (migrations, dependency changes, data deletion), and changes outside the ticket's scope.`,
   },
   {
     key: 'evidence',
@@ -413,6 +414,7 @@ const opaque = [...new Set([...binaryFiles, ...safetyBinary])].filter(
 )
 const lines = Math.max(linesChanged, Number.isInteger(safety?.linesChanged) ? safety.linesChanged : 0)
 const allFiles = [...new Set([...changedFiles, ...unlistedFiles])]
+const sizedFiles = allFiles.filter((f) => !EVIDENCE_RE.test(f))
 const outside = allFiles.filter(
   (f) => !protectedPaths.includes(f) && !isProtected(f) && !AUTO_MERGE_RE.some((re) => re.test(f)),
 )
@@ -422,7 +424,7 @@ const humanReasons = [
   ...(deletedTests.length > 0 ? [`deleted test files: ${deletedTests.join(', ')}`] : []),
   ...(opaque.length > 0 ? [`binary files outside docs/verify (no line count, no readable diff): ${opaque.join(', ')}`] : []),
   ...(lines > MAX_LINES ? [`${lines} lines changed (over ${MAX_LINES})`] : []),
-  ...(allFiles.length > MAX_FILES ? [`${allFiles.length} files changed (over ${MAX_FILES})`] : []),
+  ...(sizedFiles.length > MAX_FILES ? [`${sizedFiles.length} files changed (over ${MAX_FILES})`] : []),
 ]
 const checked = Object.fromEntries(reviewed.map((r) => [r.key, r.review.checked]))
 
