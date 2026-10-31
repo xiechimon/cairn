@@ -65,6 +65,7 @@ const SIDEBAR = [
   'shadcn-primitives',
   'storage-unavailable',
   'mobile-narrow',
+  'thread-snooze',
 ];
 const DETAIL = [
   'composer-tool-tips',

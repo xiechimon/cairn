@@ -331,3 +331,43 @@ describe('/api/mcp tool execution = key owner identity (02 section 7.2)', () => 
     s.dispose();
   });
 });
+
+describe('/api/mcp unschedule_todo ends a snooze (#2242, #2354)', () => {
+  test('the thread comes back unsnoozed and unread for the key owner', async () => {
+    const s = bootServer();
+    const projectId = await postProject(s.app);
+    const key = await issueMcpKey(s, {
+      read: [],
+      write: ['Create Todo', 'Schedule Todo', 'Unschedule Todo'],
+    });
+    const call = async (name: string, args: Record<string, unknown>) => {
+      const res = (await rpc(s.app, key, 'tools/call', { name, arguments: args }))
+        .body as JsonRpcResponse;
+      expect(res.error).toBeUndefined();
+      expect(res.result?.isError ?? false).toBe(false);
+      return JSON.parse(res.result?.content?.[0]?.text ?? '{}') as { id?: string };
+    };
+    const unreadIds = async () => {
+      const res = await s.app.request(`/api/teams/${s.team.id}/notifications`);
+      return ((await res.json()) as { unreadThreadIds: string[] }).unreadThreadIds;
+    };
+    const created = await call('create_todo', { projectId, title: 'snoozed via mcp', spec: 's' });
+    const todoId = created.id ?? '';
+    await call('schedule_todo', { todoId, kind: 'daily', at: Date.now() + 3_600_000 });
+    const snoozed = await s.app.request(`/api/todos/${todoId}/snooze`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ until: 'needed' }),
+    });
+    expect(snoozed.status).toBe(200);
+    expect(await unreadIds()).not.toContain(todoId);
+
+    await call('unschedule_todo', { todoId });
+
+    const row = s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get();
+    expect(row?.snoozeMode ?? null).toBeNull();
+    expect(row?.snoozedUntil ?? null).toBeNull();
+    expect(await unreadIds()).toContain(todoId);
+    s.dispose();
+  });
+});

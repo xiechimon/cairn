@@ -364,7 +364,7 @@ export async function executeMcpTool(
       const todoId = str(args, 'todoId');
       requireTeamTodo(db, todoId, ctx.teamId);
       const rows = db.select().from(schedule).where(eq(schedule.todoId, todoId)).all();
-      for (const r of rows) deleteSchedule({ db, hub: deps.hub }, r.id);
+      for (const r of rows) deleteSchedule({ db, hub: deps.hub, user: deps.user }, r.id);
       return json({ todoId, removed: rows.length });
     }
     default:

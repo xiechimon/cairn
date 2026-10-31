@@ -56,6 +56,7 @@ import type { OAuthClientConfig } from './oauth.js';
 import { assertPhaseTransition, canManualMovePhase } from './phase.js';
 import type { VapidKeys } from './push.js';
 import { ARCHIVED_SCHEDULE_PAUSE_REASON, pauseTodoSchedule } from './schedules.js';
+import { endSnoozeOn } from './snooze.js';
 import { notifyThreadPhase } from './thread-push.js';
 import { insertGateAnnouncement } from './transcript.js';
 
@@ -75,12 +76,14 @@ export interface TodoDeps {
 
 function notifyPhaseEntry(deps: TodoDeps, record: TodoRecord, from: Phase, to: Phase): void {
   if (from === to) return;
+  if (to === 'confirm' || to === 'review' || to === 'failed')
+    endSnoozeOn(deps, record.id, 'needs-you');
   if (isNotifiedPhase(to)) notifyTodoPhase(deps, record, to);
   triggerChiefWakes(deps, record, to);
   notifyThreadPhase(deps, record, to);
 }
 
-export function toTodoRecord(deps: TodoDeps, row: TodoRow): TodoRecord {
+export function toTodoRecord(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoRecord {
   const { db } = deps;
   const tagIds = db
     .select({ tagId: todoTag.tagId })
@@ -141,6 +144,8 @@ export function toTodoRecord(deps: TodoDeps, row: TodoRow): TodoRecord {
     phase: row.phase,
     phaseAt: row.phaseAt,
     archivedAt: row.archivedAt,
+    snoozedUntil: row.snoozedUntil,
+    snoozeMode: row.snoozeMode,
     seqNum: row.seqNum,
     orderIndex: row.orderIndex,
     tagIds,
@@ -178,7 +183,7 @@ export function toTodoRecord(deps: TodoDeps, row: TodoRow): TodoRecord {
 }
 
 function waitingOnOf(
-  deps: TodoDeps,
+  deps: Pick<TodoDeps, 'db'>,
   row: TodoRow,
 ): { on: 'machine' | 'quota'; retryAt: number | null } | undefined {
   if (!(IN_PROGRESS_PHASES as readonly string[]).includes(row.phase) || row.latestBuildId === null)
@@ -221,7 +226,7 @@ function waitingOnOf(
   return undefined;
 }
 
-function getRow(deps: TodoDeps, id: string): TodoRow | undefined {
+function getRow(deps: Pick<TodoDeps, 'db'>, id: string): TodoRow | undefined {
   return deps.db.select().from(todo).where(eq(todo.id, id)).get();
 }
 
@@ -258,7 +263,7 @@ export function listTodos(
   return rows.map((row) => toTodoRecord(deps, row));
 }
 
-export function getTodo(deps: TodoDeps, id: string): TodoRecord | null {
+export function getTodo<D extends Pick<TodoDeps, 'db'>>(deps: D, id: string): TodoRecord | null {
   const row = getRow(deps, id);
   return row ? toTodoRecord(deps, row) : null;
 }

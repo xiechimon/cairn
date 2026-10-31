@@ -6,6 +6,7 @@ import {
   IN_PROGRESS_PHASES,
   MERGE_HUMAN_ONLY_COPY,
   MODEL_SOURCE_RUNTIME_LABELS,
+  snoozeTodoBodySchema,
   todoOutputSchema,
   updateSkillToolParamsSchema,
 } from '@cairn/shared';
@@ -56,6 +57,7 @@ import type { VapidKeys } from './push.js';
 import { createSchedule, deleteSchedule, listSchedules } from './schedules.js';
 import { createSecret, deleteSecret, listSecrets, updateSecret } from './secrets.js';
 import { createLocalSkill, scanLocalSkills, updateLocalSkill } from './skills.js';
+import { snoozeTodo } from './snooze.js';
 import { seedFixedTags } from './tags.js';
 import { createSplitTodo, type SplitSubtodoInput } from './todo-split.js';
 import { createTodo, deleteTodo, getTodo, listTodos, setTodoPhase, updateTodo } from './todos.js';
@@ -693,8 +695,43 @@ export async function executeChiefTool(
       const todoId = str(params, 'todoId');
       requireTeamTodo(db, todoId, ctx.teamId);
       const rows = db.select().from(schedule).where(eq(schedule.todoId, todoId)).all();
-      for (const r of rows) deleteSchedule({ db, hub: deps.hub }, r.id);
+      for (const r of rows) deleteSchedule({ db, hub: deps.hub, user: deps.user }, r.id);
       return json({ todoId, removed: rows.length });
+    }
+
+    case 'snooze_todos': {
+      const todoIds = strArr(params, 'todoIds');
+      const body = parseWith(
+        snoozeTodoBodySchema,
+        {
+          until:
+            typeof params.until === 'string' && /^\d+$/.test(params.until)
+              ? Number(params.until)
+              : params.until,
+          ...(optStr(params, 'tz') ? { tz: optStr(params, 'tz') } : {}),
+        },
+        'params',
+      );
+      const snoozed: { id: string; snoozeMode: string | null; snoozedUntil: number | null }[] = [];
+      const skipped: string[] = [];
+      for (const id of todoIds) {
+        const owned = db
+          .select({ id: todo.id })
+          .from(todo)
+          .where(and(eq(todo.id, id), eq(todo.teamId, ctx.teamId)))
+          .get();
+        const record = owned ? snoozeTodo(svc, id, body) : null;
+        if (!record) {
+          skipped.push(id);
+          continue;
+        }
+        snoozed.push({
+          id,
+          snoozeMode: record.snoozeMode ?? null,
+          snoozedUntil: record.snoozedUntil ?? null,
+        });
+      }
+      return json({ snoozed, skipped });
     }
 
     case 'run_builds': {
