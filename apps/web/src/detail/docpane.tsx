@@ -16,20 +16,17 @@ import type {
   ChangesContent,
   DiffFile,
   DocBlock,
-  PaneView,
   PlanDiffContent,
   PlanVersion,
 } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
+import { ChevronDown, ChevronRight, Restore, UnfoldVertical } from '../icons/index.js';
 import {
-  ChevronDown,
-  ChevronRight,
-  Eye,
-  FileText,
-  Restore,
-  UnfoldVertical,
-} from '../icons/index.js';
-import { type DocTypeLabel, PaneTabs } from '../overlay/plan-dropdown.js';
+  type DocTypeLabel,
+  type DocView,
+  PaneTitle,
+  PaneViewButtons,
+} from '../overlay/plan-dropdown.js';
 import { Segments } from './segments.js';
 import { computeHunkWordDiff } from './word-diff.js';
 
@@ -38,8 +35,8 @@ interface DocPaneProps {
   doc: DocBlock[] | undefined;
   changes: ChangesContent | undefined;
   now: number;
-  onPaneView: (view: PaneView) => void;
-  hasSections?: boolean;
+  onDocView: (view: DocView) => void;
+  sections?: ReactNode;
   planVersions?: PlanVersion[];
   versionMenu?: 'versions' | 'compare';
   onVersionMenu?: (menu: 'versions' | 'compare' | undefined) => void;
@@ -59,9 +56,8 @@ function dirName(path: string): string {
   return path.slice(0, Math.max(0, path.lastIndexOf('/')));
 }
 
-export const PANE_HEAD =
-  'flex h-10 flex-none items-center gap-2 border-b border-(--border) px-2 text-meta text-(--text-secondary)';
-const PANE_SELECT = 'doc-pane-select ml-0';
+const PANE_HEAD = 'flex h-10 flex-none items-center gap-1 px-2.5 text-meta text-(--text-secondary)';
+const PANE_SELECT = 'doc-pane-select ml-0 font-normal text-(--text-tertiary)';
 const DIFF_LINE =
   'flex items-center font-mono text-caption leading-5 text-(--foreground) [font-variant-ligatures:none]';
 const DIFF_NO = 'w-8 flex-none pr-2 text-right text-(--text-tertiary) select-none';
@@ -123,19 +119,15 @@ export function DiffFileBlock({
   );
   return (
     <div>
-      <div className="doc-file-row flex h-9 flex-none items-center gap-1.5 border-b border-(--border) pl-3 text-ui text-(--text-tertiary) [&_svg]:text-(--text-tertiary)">
+      <div className="doc-file-row flex h-8.5 flex-none items-center gap-1.5 border-b border-(--border) pl-3 text-ui text-(--text-tertiary) [&_svg]:text-(--text-tertiary)">
         {expanded ? (
           <ChevronDown width={10} height={10} />
         ) : (
           <ChevronRight width={10} height={10} />
         )}
-        <FileText width={14} height={14} />
         <span className="min-w-0 truncate">
           <span className="font-medium text-(--foreground)">{baseName(file.path)}</span>
           {dirName(file.path) !== '' && <span className="ml-1.5">{dirName(file.path)}</span>}
-        </span>
-        <span className="flex text-(--text-tertiary)">
-          <Eye width={14} height={14} />
         </span>
         <span className="ml-auto pr-4 font-mono text-meta text-(--diff-add-fg)">
           +{file.added}
@@ -325,7 +317,7 @@ function VersionControl({
   onBase?: () => void;
 }) {
   return (
-    <span className="doc-range-wrap relative ml-auto inline-flex">
+    <span className="doc-range-wrap relative inline-flex">
       <DropdownMenu
         open={versionMenu != null}
         onOpenChange={(next: boolean) => onVersionMenu?.(next ? 'versions' : undefined)}
@@ -374,8 +366,8 @@ export function DocPane({
   doc,
   changes,
   now,
-  onPaneView,
-  hasSections,
+  onDocView,
+  sections,
   planVersions,
   versionMenu,
   onVersionMenu,
@@ -387,8 +379,17 @@ export function DocPane({
   emptyMeta,
 }: DocPaneProps) {
   const { t } = useI18n();
-  const typeSelect = (docLabel: DocTypeLabel) => (
-    <PaneTabs view="doc" docLabel={docLabel} sections={hasSections} onView={onPaneView} />
+  const versionLabel = (): string => {
+    const latest = planVersions?.[0];
+    return latest == null ? 'v1' : `${latest.v} · ${relativeTime(latest.at, now, t)}`;
+  };
+  const headStart = (docLabel: DocTypeLabel) => (
+    <PaneTitle docLabel={docLabel} onDocView={onDocView} />
+  );
+  const headEnd = (docLabel: DocTypeLabel) => (
+    <div className="ml-auto">
+      <PaneViewButtons docLabel={docLabel} onDocView={onDocView} />
+    </div>
   );
   if (mode === 'changes' || mode === 'diff') {
     const hasData = mode === 'diff' ? planDiff != null : changes != null;
@@ -400,7 +401,7 @@ export function DocPane({
     return (
       <section className="doc-pane flex min-h-0 flex-1 flex-col" data-testid="doc-pane">
         <header className={PANE_HEAD}>
-          {typeSelect(mode === 'diff' ? '方案' : '变更')}
+          {headStart(mode === 'diff' ? '方案' : '变更')}
           {hasData &&
             (mode === 'diff' && planDiff != null ? (
               <VersionControl
@@ -414,7 +415,7 @@ export function DocPane({
               />
             ) : (
               <VersionControl
-                label={planVersions?.[0]?.v ?? 'v1'}
+                label={versionLabel()}
                 planVersions={planVersions}
                 versionMenu={versionMenu}
                 now={now}
@@ -423,6 +424,7 @@ export function DocPane({
                 onBase={onBase}
               />
             ))}
+          {headEnd(mode === 'diff' ? '方案' : '变更')}
         </header>
         {hasData && (
           <div className="flex h-8 flex-none items-center border-b border-(--border) pr-2 pl-4 text-meta text-(--text-tertiary)">
@@ -466,10 +468,10 @@ export function DocPane({
   return (
     <section className="doc-pane flex min-h-0 flex-1 flex-col" data-testid="doc-pane">
       <header className={PANE_HEAD}>
-        {typeSelect('方案')}
+        {headStart('方案')}
         {doc != null && (
           <VersionControl
-            label={planVersions?.[0]?.v ?? 'v1'}
+            label={versionLabel()}
             planVersions={planVersions}
             versionMenu={versionMenu}
             now={now}
@@ -478,31 +480,32 @@ export function DocPane({
             onBase={onBase}
           />
         )}
+        {headEnd('方案')}
       </header>
-      <div
-        className="relative min-h-0 flex-1 overflow-y-auto px-4 pt-4 pb-6"
-        data-testid="doc-body"
-      >
-        {doc == null
-          ? (emptyMeta ?? (
-              <div className="doc-empty absolute inset-0 flex items-center justify-center text-meta text-(--text-tertiary)">
-                {t('暂无方案')}
-              </div>
-            ))
-          : doc.map((block, i) => (
-              <p
-                key={i}
-                className={cn(`doc-block--${block.kind}`, docBlockClass(block.kind, i === 0))}
-              >
-                {block.kind === 'bullet' && (
-                  <span
-                    aria-hidden="true"
-                    className="absolute top-2.5 left-1 size-1 rounded-full bg-(--text-tertiary)"
-                  />
-                )}
-                <Segments segments={block.segments} codeClassName="doc-code" />
-              </p>
-            ))}
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="px-3.5 pt-2 pb-4" data-testid="doc-body">
+          {doc == null
+            ? (emptyMeta ?? (
+                <div className="doc-empty flex h-24 items-center justify-center text-meta text-(--text-tertiary)">
+                  {t('暂无方案')}
+                </div>
+              ))
+            : doc.map((block, i) => (
+                <p
+                  key={i}
+                  className={cn(`doc-block--${block.kind}`, docBlockClass(block.kind, i === 0))}
+                >
+                  {block.kind === 'bullet' && (
+                    <span
+                      aria-hidden="true"
+                      className="absolute top-2.5 left-1 size-1 rounded-full bg-(--text-tertiary)"
+                    />
+                  )}
+                  <Segments segments={block.segments} codeClassName="doc-code" />
+                </p>
+              ))}
+        </div>
+        {sections}
       </div>
     </section>
   );

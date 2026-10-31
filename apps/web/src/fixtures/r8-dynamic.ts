@@ -751,6 +751,11 @@ export const versionMenuV2: FixtureSet = withDetail(detailV2(r8(23, 54)), {
   compareTarget: planDiff('v1', 'v2', LINES_V1, LINES_V2, false),
 });
 
+export const versionCompareWithChanges: FixtureSet = withDetail(detailV2(r8(23, 54)), {
+  changes: probeChanges(true),
+  compareTarget: planDiff('v1', 'v2', LINES_V1, LINES_V2, false),
+});
+
 export const compareMenuV2: FixtureSet = withDetail(detailV2(r8(23, 54)), {
   versionMenu: 'compare',
   compareTarget: planDiff('v1', 'v2', LINES_V1, LINES_V2, false),

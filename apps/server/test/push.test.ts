@@ -2,9 +2,11 @@ import { execFileSync } from 'node:child_process';
 import { createECDH, randomBytes } from 'node:crypto';
 import {
   chmodSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   statSync,
   symlinkSync,
@@ -552,6 +554,41 @@ describe('VAPID configuration', () => {
         webOrigin: 'https://cairn.local',
       });
     } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('creates the key pair when the configured data directory is a symlink', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-vapid-home-'));
+    const realData = join(dir, 'fast-disk', 'server');
+    const home = join(dir, 'home');
+    mkdirSync(realData, { recursive: true });
+    mkdirSync(home);
+    symlinkSync(realData, join(home, 'server'));
+    const previous = process.env.CAIRN_HOME;
+    try {
+      process.env.CAIRN_HOME = home;
+      const config = loadConfig();
+      expect(config.dataDir).toBe(realpathSync(realData));
+      expect(config.dbPath).toBe(join(realpathSync(realData), 'server.db'));
+      expect(() => loadOrCreateVapidKeys(config.vapidKeysPath)).not.toThrow();
+      expect(existsSync(join(realData, 'vapid.json'))).toBe(true);
+    } finally {
+      if (previous === undefined) delete process.env.CAIRN_HOME;
+      else process.env.CAIRN_HOME = previous;
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('keeps the joined data directory when it does not exist yet', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-vapid-fresh-'));
+    const previous = process.env.CAIRN_HOME;
+    try {
+      process.env.CAIRN_HOME = dir;
+      expect(loadConfig().dataDir).toBe(join(dir, 'server'));
+    } finally {
+      if (previous === undefined) delete process.env.CAIRN_HOME;
+      else process.env.CAIRN_HOME = previous;
       rmSync(dir, { recursive: true, force: true });
     }
   });
