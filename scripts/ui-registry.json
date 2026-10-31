@@ -1,7 +1,7 @@
 {
   "frozenFrom": {
-    "sha": "69d73f08e67620fcdb55beb73c28ab2d24003318",
-    "date": "2026-10-30"
+    "sha": "ee665b66bf001cb61e54e15f36769f2b9583aa53",
+    "date": "2026-10-31"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
   "files": {
@@ -70,7 +70,7 @@
     "dialog-shell.tsx": {
       "kind": "adapter",
       "reason": "Paper dialog adapter (apps/web/DESIGN.md 弹窗与菜单) over the registry dialog item: regular faces compose DialogContent/DialogTitle/DialogDescription/DialogClose and own the Paper skin here so dialog.tsx stays pristine (sheet surface, 16px corners, --dialog-shadow, S/M/L widths via --dialog-w-*, 16px title + 12px sub-line + 28px ghost close, body as the only scroll box, split footer with a left hint). Repo behavior contracts kept as semantic mapping (#193 three-segment cap + dialog-head/body/foot testids, #389 finalFocus, #73 retained-mount open flag, #318 layered dismiss, #68 family close law). viewportRoot and bare modes keep the legacy direct-primitive mechanism (search-panel / new-task-dialog own their geometry); zIndex/onBackdropClick/backdropClassName serve only those two modes. Exports the shared Paper pieces (DIALOG_* classes, DialogFootRow, dialogWidth) for AlertDialogShell and direct registry Dialog consumers.",
-      "hash": "4a228cb26ed1301fb36c4af62ce78c11de191f6cf4b7082891e74b41ebdf5e4e"
+      "hash": "283a278f8ef0b33a81fd05dc5acd4a277fd39e301de0bae42c19ee7eef7ffd59"
     },
     "dialog.tsx": {
       "kind": "registry",

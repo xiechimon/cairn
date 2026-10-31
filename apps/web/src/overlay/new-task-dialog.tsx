@@ -454,7 +454,7 @@ export function NewTaskDialog({
               </Popover>
             )}
           </span>
-          <div className="pointer-events-none absolute inset-x-0 text-center font-heading text-heading font-medium text-foreground">
+          <div className="pointer-events-none absolute inset-x-0 text-center font-heading text-heading font-title text-foreground">
             {t('新建任务')}
           </div>
           <Button

@@ -443,7 +443,7 @@ export function ChiefConversation({
       {chief.examples && (
         <div className="flex-none">
           <h2
-            className={`text-center font-heading text-heading font-medium text-(--foreground) ${
+            className={`text-center font-heading text-heading font-title text-(--foreground) ${
               chief.bound ? 'mt-14' : 'mt-16'
             }`}
           >
@@ -462,10 +462,10 @@ export function ChiefConversation({
                   key={ex.text}
                   onClick={onSend != null ? () => void onSend(ex.text, chipProjectId) : undefined}
                 >
-                  <span className="flex size-6 flex-none items-center justify-center text-(--text-tertiary)">
-                    <Icon width={16} height={16} />
+                  <span className="flex size-6 flex-none items-center justify-center text-(--text-secondary)">
+                    <Icon width={18} height={18} />
                   </span>
-                  <span className="text-meta leading-5 text-(--text-secondary)">{t(ex.text)}</span>
+                  <span className="text-ui leading-5 text-(--foreground)">{t(ex.text)}</span>
                 </Button>
               );
             })}
@@ -491,7 +491,7 @@ export function ChiefConversation({
             onClick={() => setThreadsOpen((v) => !v)}
           >
             <ChiefHash />
-            <span className="max-w-52 truncate font-heading text-heading font-medium text-(--foreground)">
+            <span className="max-w-52 truncate font-heading text-heading font-title text-(--foreground)">
               {t(chief.threadTitle)}
             </span>
             <ChevronDown width={12} height={12} />

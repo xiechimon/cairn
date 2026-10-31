@@ -8,6 +8,7 @@ import {
   SettingsRow,
   SettingsSelectTrigger,
 } from '../components/settings-list.js';
+import { ToggleSwitch } from '../components/toggle-switch.js';
 import {
   Attachment,
   AttachmentAction,
@@ -24,7 +25,6 @@ import { Message, MessageAvatar, MessageContent } from '../components/ui/message
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { Select, SelectContent, SelectItem, SelectValue } from '../components/ui/select.js';
 import { Skeleton } from '../components/ui/skeleton.js';
-import { Switch } from '../components/ui/switch.js';
 import {
   Trace,
   TraceCollapsible,
@@ -162,7 +162,7 @@ export function SettingsSection() {
               </Select>
             </SettingsRow>
             <SettingsRow label="Sound" hint="Play a chime when a task needs you.">
-              <Switch checked={sound} onCheckedChange={setSound} aria-label="Sound" />
+              <ToggleSwitch checked={sound} onCheckedChange={setSound} aria-label="Sound" />
             </SettingsRow>
           </SettingsCard>
           <SettingsDangerZone

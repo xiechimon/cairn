@@ -66,7 +66,7 @@ export function DetailHead({
         <ChevronLeft width={16} height={16} />
       </Link>
       <h1
-        className="min-w-0 truncate font-heading text-page font-medium text-foreground"
+        className="min-w-0 truncate font-heading text-page font-title text-foreground"
         title={todo.title}
         data-testid="detail-title"
       >

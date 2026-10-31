@@ -2,6 +2,7 @@ import { cn } from 'cn';
 import { type ReactNode, useId, useState } from 'react';
 import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
 import { SegmentedRadio, SegmentedTabs } from '../components/segmented.js';
+import { ToggleSwitch } from '../components/toggle-switch.js';
 import { Badge } from '../components/ui/badge.js';
 import { Button } from '../components/ui/button.js';
 import { Checkbox } from '../components/ui/checkbox.js';
@@ -24,7 +25,6 @@ import {
 } from '../components/ui/select.js';
 import { Spinner } from '../components/ui/spinner.js';
 import { StatusChip, type StatusTone } from '../components/ui/status-chip.js';
-import { Switch } from '../components/ui/switch.js';
 import { TagChip } from '../components/ui/tag-chip.js';
 import { Textarea } from '../components/ui/textarea.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
@@ -417,13 +417,17 @@ export function ChoiceSection() {
         <div className="flex flex-col gap-4">
           <ChoiceRow
             label="Notify me when a task needs me"
-            control={(id) => <Switch id={id} checked={notify} onCheckedChange={setNotify} />}
+            control={(id) => <ToggleSwitch id={id} checked={notify} onCheckedChange={setNotify} />}
           />
           <ChoiceRow
-            label="Small switch"
-            control={(id) => <Switch id={id} size="sm" defaultChecked />}
+            label="Auto-merge when checks pass"
+            control={(id) => <ToggleSwitch id={id} defaultChecked />}
           />
-          <ChoiceRow label="Disabled" disabled control={(id) => <Switch id={id} disabled />} />
+          <ChoiceRow
+            label="Disabled"
+            disabled
+            control={(id) => <ToggleSwitch id={id} disabled />}
+          />
         </div>
       </Specimen>
       <Specimen

@@ -104,7 +104,7 @@
     },
     {
       "file": "apps/web/src/board/sidebar.tsx",
-      "anchor": "bg-(--hover-1) font-medium text-foreground [&>svg:first-child]:text-(--card-button)",
+      "anchor": "bg-(--hover-1) font-semibold text-foreground [&>svg:first-child]:text-(--card-button)",
       "role": "indicator",
       "reason": "Active sidebar row icon. DESIGN.md shell: active row = flat --hover-1 fill + accent icon.",
       "contrast": "measured 2026-10-25 in the fixture build (light / dark): 9.14 / 6.90 on the composited --hover-1 row; non-text glyph, 3:1 gate"
