@@ -350,6 +350,36 @@ for (const data of [{ gitError: true }, { policy: 'invalid policy' }, { numstat:
     assert.equal(f.merges.length, 0);
     assert.match(f.result.stdout, /owner-routing-unavailable/);
   });
+test('a patch whose only overflow is docs/verify evidence stays eligible', (t) => {
+  const evidence = Array.from(
+    { length: 41 },
+    (_, i) => `900\t0\tdocs/verify/2371/run-${i}.txt\n`,
+  ).join('');
+  assert.equal(
+    fixture(t, { numstat: `800\t0\tapps/web/src/page.ts\n${evidence}` }).merges.length,
+    1,
+  );
+});
+test('an evidence binary stays eligible', (t) => {
+  assert.equal(
+    fixture(t, { numstat: '1\t0\tapps/web/src/page.ts\n-\t-\tdocs/verify/2371/shot.png\n' }).merges
+      .length,
+    1,
+  );
+});
+test('product lines beside evidence still hit the line limit', (t) => {
+  const f = fixture(t, {
+    numstat: '401\t400\tapps/web/src/page.ts\n900\t0\tdocs/verify/2371/run.txt\n',
+  });
+  assert.equal(f.merges.length, 0);
+  assert.ok(f.result.stdout.includes('801 lines changed'), f.result.stdout);
+});
+test('product files beside evidence still hit the file limit', (t) => {
+  const code = Array.from({ length: 41 }, (_, i) => `1\t0\tapps/web/src/page${i}.ts\n`).join('');
+  const f = fixture(t, { numstat: `${code}1\t0\tdocs/verify/2371/run.txt\n` });
+  assert.equal(f.merges.length, 0);
+  assert.ok(f.result.stdout.includes('41 files changed'), f.result.stdout);
+});
 test('clean product source remains eligible', (t) => {
   assert.equal(fixture(t).merges.length, 1);
 });
