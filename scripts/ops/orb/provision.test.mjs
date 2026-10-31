@@ -636,7 +636,7 @@ test('template launches fixed specifier binds and never exposes the runtime pare
     assert.doesNotMatch(template, /--bind=\/run\/cairn-orb:/);
     assert.match(
       template,
-      /ExecStopPost=\+\/usr\/local\/lib\/cairn-orb\/prepare-machine.sh --stop %i/,
+      /ExecStopPost=\nExecStopPost=\+\/usr\/local\/lib\/cairn-orb\/prepare-machine.sh --stop %i\nExecStopPost=-systemd-nspawn --cleanup --machine=%i\n/,
     );
     assert.match(template, /EnvironmentFile=-\/run\/systemd\/nspawn\/%i.binds/);
     assert.match(template, /ExecStart=systemd-nspawn .*--machine=%i \$CAIRN_ORB_BINDS/);

@@ -88,7 +88,8 @@ function fakeHost(t, { resultChange = {}, missing = false, malformed = false, fa
     let stdout = '';
     if (args.includes('list-images')) stdout = 'cairn-orb-base directory no\n';
     if (args.includes('show')) stdout = 'MemoryMax=4294967296\n';
-    if (args.includes('is-active')) stdout = 'active\n';
+    if (args.includes('is-active'))
+      stdout = args.some((arg) => arg.startsWith('systemd-nspawn@')) ? 'inactive\n' : 'active\n';
     if (args.includes('start')) {
       const directory = join(root, args.at(-1));
       assert.equal(existsSync(directory), false);
@@ -473,3 +474,24 @@ for (const metadata of [
     );
   });
 }
+
+test('the image is removed only after the container unit finished its stop hooks', (t) => {
+  const f = fakeHost(t);
+  let polls = 0;
+  const order = [];
+  const result = checkHost({
+    ...f,
+    run: (cmd, args) => {
+      if (cmd === 'systemctl' && args.some((arg) => arg.startsWith('systemd-nspawn@'))) {
+        polls += 1;
+        order.push(`unit:${polls}`);
+        return { status: 0, stdout: polls < 3 ? 'deactivating\n' : 'inactive\n', stderr: '' };
+      }
+      if (cmd === 'machinectl' && args.includes('remove') && args.includes(f.name))
+        order.push('remove');
+      return f.run(cmd, args);
+    },
+  });
+  assert.equal(result.cloneStartStop, 'ok');
+  assert.deepEqual(order.slice(-4), ['unit:1', 'unit:2', 'unit:3', 'remove']);
+});

@@ -81,7 +81,7 @@ export function installHost(options = {}) {
     ]),
     [
       '/etc/systemd/system/systemd-nspawn@.service.d/20-cairn-orb.conf',
-      '[Unit]\nRequires=cairn-orb-firewall.service\nAfter=cairn-orb-firewall.service\n\n[Service]\nExecStartPre=+/usr/local/lib/cairn-orb/prepare-machine.sh %i\nExecStopPost=+/usr/local/lib/cairn-orb/prepare-machine.sh --stop %i\nEnvironment=CAIRN_ORB_BINDS=\nEnvironment="CAIRN_ORB_FIXED_BINDS=--bind=/run/cairn-orb/%i:/run/cairn:idmap,norbind --bind-ro=/var/lib/cairn-orb/dist:/opt/cairn/daemon:idmap,norbind --bind-ro=/var/lib/cairn-orb/seed:/seed:idmap,norbind"\nEnvironmentFile=-/run/systemd/nspawn/%i.binds\nExecStart=\nExecStart=systemd-nspawn --quiet --keep-unit --boot --link-journal=try-guest --network-veth -U --settings=override --machine=%i $CAIRN_ORB_BINDS\n',
+      '[Unit]\nRequires=cairn-orb-firewall.service\nAfter=cairn-orb-firewall.service\n\n[Service]\nExecStartPre=+/usr/local/lib/cairn-orb/prepare-machine.sh %i\nExecStopPost=\nExecStopPost=+/usr/local/lib/cairn-orb/prepare-machine.sh --stop %i\nExecStopPost=-systemd-nspawn --cleanup --machine=%i\nEnvironment=CAIRN_ORB_BINDS=\nEnvironment="CAIRN_ORB_FIXED_BINDS=--bind=/run/cairn-orb/%i:/run/cairn:idmap,norbind --bind-ro=/var/lib/cairn-orb/dist:/opt/cairn/daemon:idmap,norbind --bind-ro=/var/lib/cairn-orb/seed:/seed:idmap,norbind"\nEnvironmentFile=-/run/systemd/nspawn/%i.binds\nExecStart=\nExecStart=systemd-nspawn --quiet --keep-unit --boot --link-journal=try-guest --network-veth -U --settings=override --machine=%i $CAIRN_ORB_BINDS\n',
     ],
     [
       '/etc/systemd/system/systemd-networkd.service.d/20-cairn-orb.conf',

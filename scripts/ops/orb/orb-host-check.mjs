@@ -229,6 +229,19 @@ export function checkHost({
         lifecycle = false;
       if (attempt < 29) wait();
     }
+    if (stopped) {
+      stopped = false;
+      for (let attempt = 0; attempt < 30; attempt++) {
+        const state = (
+          call('systemctl', ['is-active', `systemd-nspawn@${name}.service`]).stdout || ''
+        ).trim();
+        if (state === 'inactive' || state === 'failed') {
+          stopped = true;
+          break;
+        }
+        if (attempt < 29) wait();
+      }
+    }
     if (!stopped) {
       lifecycle = false;
       errors.push('Timed out waiting for check machine to stop; runtime directory preserved');
