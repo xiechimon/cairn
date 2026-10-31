@@ -17,6 +17,19 @@ import {
 } from './components-controls.js';
 import { IdentitySection, StreamSection, StructureSection } from './components-more.js';
 import { DialogSection, MenuSection, ToastSection } from './components-overlays.js';
+import {
+  CoordinatorStreamSection,
+  ProjectsSection,
+  RoutingSection,
+  SidebarSection,
+} from './components-shell.js';
+import { StoneSection, ThreadCardSection, ThreadRowSection } from './components-stone.js';
+import {
+  PermissionSection,
+  PlanSection,
+  PrBarSection,
+  ScheduledSection,
+} from './components-threads.js';
 import type { GalleryTheme } from './design-doc.js';
 import {
   ColorSection,
@@ -81,6 +94,23 @@ const NAV = [
       ['product-chief', 'Coordinator'],
       ['product-overlays', 'Overlays and pickers'],
       ['product-pages', 'Page parts'],
+    ],
+  },
+  {
+    id: 'stone-language',
+    title: 'Stone language',
+    items: [
+      ['stone', 'Stone marks and trail'],
+      ['thread-card', 'Thread card'],
+      ['thread-row', 'Thread row and bulk bar'],
+      ['permission', 'Permission and proposal'],
+      ['plan', 'Plan approval, usage'],
+      ['pr-bar', 'Pull request bar'],
+      ['scheduled', 'Scheduled task row'],
+      ['sidebar', 'Sidebar parts'],
+      ['projects-lists', 'Projects, lists, phone'],
+      ['coordinator', 'Coordinator stream'],
+      ['routing', 'Model routing'],
     ],
   },
   {
@@ -246,6 +276,22 @@ export function Gallery() {
             <ProductOverlaysSection />
             <ProductPagesSection theme={theme} />
           </ProductProviders>
+          <GroupTitle
+            id="stone-language"
+            title="Stone language"
+            lede="The status marks, cards and bars prototype A is built from, as reusable components in src/components. Pages compose only these."
+          />
+          <StoneSection />
+          <ThreadCardSection />
+          <ThreadRowSection />
+          <PermissionSection />
+          <PlanSection />
+          <PrBarSection />
+          <ScheduledSection />
+          <SidebarSection />
+          <ProjectsSection />
+          <CoordinatorStreamSection />
+          <RoutingSection />
           <GroupTitle
             id="patterns"
             title="Patterns"

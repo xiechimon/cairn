@@ -17,6 +17,7 @@ import test from 'node:test';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 import {
+  foreignPortHolderReport,
   skipsQueue,
   slotCount,
   slotLockDir,
@@ -236,6 +237,60 @@ test('slotPortHolder names the pid, cwd and command of whatever listens on the p
   } finally {
     cleanup();
   }
+});
+
+test('foreignPortHolderReport accepts a free port and a holder from the same checkout', () => {
+  const toplevel = '/repo/.claude/worktrees/mine';
+  assert.equal(foreignPortHolderReport({ port: 8399, toplevel, holderOf: () => null }), null);
+  assert.equal(
+    foreignPortHolderReport({
+      port: 8399,
+      toplevel,
+      holderOf: () => ({ pid: 7, cwd: `${toplevel}/apps/web`, command: 'node vite preview' }),
+      toplevelOf: () => toplevel,
+    }),
+    null,
+  );
+});
+
+test('foreignPortHolderReport names the pid, cwd and command of a holder from another checkout', () => {
+  const report = foreignPortHolderReport({
+    port: 8398,
+    toplevel: '/repo/.claude/worktrees/mine',
+    holderOf: () => ({
+      pid: 4242,
+      cwd: '/repo/.claude/worktrees/nice-faraday-984028/apps/web',
+      command: 'node vite preview --port 8398',
+    }),
+    toplevelOf: () => '/repo/.claude/worktrees/nice-faraday-984028',
+  });
+  assert.match(report, /port 8398/);
+  assert.match(report, /pid 4242/);
+  assert.match(report, /cwd \/repo\/\.claude\/worktrees\/nice-faraday-984028\/apps\/web/);
+  assert.match(report, /command node vite preview --port 8398/);
+});
+
+test('foreignPortHolderReport rejects a holder whose checkout cannot be resolved', () => {
+  const unknownCwd = foreignPortHolderReport({
+    port: 8399,
+    toplevel: '/repo',
+    holderOf: () => ({ pid: 9, cwd: undefined, command: undefined }),
+  });
+  assert.match(unknownCwd, /pid 9, cwd unknown/);
+  const outsideGit = foreignPortHolderReport({
+    port: 8399,
+    toplevel: '/repo',
+    holderOf: () => ({ pid: 9, cwd: '/tmp', command: 'python3 -m http.server' }),
+    toplevelOf: () => undefined,
+  });
+  assert.match(outsideGit, /not a git checkout/);
+  const neitherInGit = foreignPortHolderReport({
+    port: 8399,
+    toplevel: undefined,
+    holderOf: () => ({ pid: 9, cwd: '/tmp', command: 'python3 -m http.server' }),
+    toplevelOf: () => undefined,
+  });
+  assert.match(neitherInGit, /not a git checkout/);
 });
 
 test('a bad slot count gets a warning and a single slot', async () => {
