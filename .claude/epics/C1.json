@@ -110,6 +110,40 @@
       "issue": 2383,
       "dependsOn": [],
       "humanHeld": true
+    },
+    {
+      "id": "brake-self-clear",
+      "issue": 2317,
+      "dependsOn": [
+        "review-fallback"
+      ]
+    },
+    {
+      "id": "step-claim-archive",
+      "issue": 2260,
+      "dependsOn": []
+    },
+    {
+      "id": "routing-cli-linux",
+      "issue": 2202,
+      "dependsOn": []
+    },
+    {
+      "id": "gate-log-leak",
+      "issue": 2187,
+      "dependsOn": []
+    },
+    {
+      "id": "publish-environment",
+      "issue": 2182,
+      "dependsOn": [
+        "publish-main-health"
+      ]
+    },
+    {
+      "id": "review-converge",
+      "issue": 1909,
+      "dependsOn": []
     }
   ],
   "requiredChecks": [

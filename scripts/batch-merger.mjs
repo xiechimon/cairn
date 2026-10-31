@@ -6,6 +6,7 @@ const batchHead = /^B\d+\//;
 const mergerTrailer = 'Merged-by: cairn-batch-merger';
 const requiredChecks = ['check', 'pack-smoke', 'e2e-gate', 'pr-evidence'];
 const sandboxOptions = { timeout: 1000, contextCodeGeneration: { strings: false, wasm: false } };
+const ownerRouteLabel = 'owner-route';
 const log = (pr, action, reasons) =>
   console.log(
     JSON.stringify({ pr: pr?.number ?? null, head: pr?.head?.sha ?? null, action, reasons }),
@@ -75,6 +76,39 @@ humanReasons`,
   if (!Array.isArray(reasons) || !reasons.every((reason) => typeof reason === 'string'))
     throw new Error('Invalid owner routing result');
   return reasons;
+}
+
+function markOwnerRoute(pr, reasons, dryRun) {
+  const marker = `<!-- batch-merger-owner-route:${pr.head.sha} -->`;
+  const commented = pages(`repos/${repo}/issues/${pr.number}/comments?per_page=100`)
+    .flat()
+    .some((comment) => comment.body.startsWith(marker));
+  const labelled = pr.labels.some((label) => label.name === ownerRouteLabel);
+  if (commented && labelled) return;
+  if (dryRun) {
+    log(pr, 'would-mark-owner-route', reasons);
+    return;
+  }
+  if (!commented)
+    api(`repos/${repo}/issues/${pr.number}/comments`, {
+      body: `${marker}\n**Batch merger: owner route** for \`${pr.head.sha.slice(0, 8)}\`. This PR needs the owner:\n\n${reasons.map((reason) => `- ${reason}`).join('\n')}`,
+    });
+  if (!labelled) api(`repos/${repo}/issues/${pr.number}/labels`, { labels: [ownerRouteLabel] });
+  log(pr, 'marked-owner-route', reasons);
+}
+
+function clearOwnerRoute(pr, dryRun) {
+  if (!pr.labels.some((label) => label.name === ownerRouteLabel)) return;
+  if (dryRun) {
+    log(pr, 'would-unmark-owner-route', []);
+    return;
+  }
+  execFileSync(
+    'gh',
+    ['api', '--method', 'DELETE', `repos/${repo}/issues/${pr.number}/labels/${ownerRouteLabel}`],
+    { encoding: 'utf8', maxBuffer: 512 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] },
+  );
+  log(pr, 'unmarked-owner-route', []);
 }
 
 function eligibility(number, expectedHead, dailyCap) {
@@ -193,8 +227,10 @@ try {
       }
       if (ownerReasons.length) {
         log(result.pr, 'owner-route', ownerReasons);
+        markOwnerRoute(result.pr, ownerReasons, dryRun);
         continue;
       }
+      clearOwnerRoute(result.pr, dryRun);
       attempted = true;
       if (!dryRun)
         execFileSync(
