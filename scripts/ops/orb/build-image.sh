@@ -29,14 +29,19 @@ pnpm_version=$(sed -n 's/.*"packageManager": "pnpm@\([0-9.]*\)".*/\1/p' "$script
 [[ $pnpm_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { printf 'Cannot pin pnpm version\n' >&2; exit 1; }
 recipe=$(sha256sum "$script_dir/build-image.sh" | awk '{print $1}')
 expected=$(printf 'recipe=%s\nclaude=%s\ncodex=%s\npnpm=%s' "$recipe" "$claude_version" "$codex_version" "$pnpm_version")
+previous_marker=
 if [[ -d $image ]]; then
   if [[ -f $image/etc/cairn-orb-image && $(cat "$image/etc/cairn-orb-image") == "$expected" ]]; then
     machinectl list-images --no-legend --no-pager | awk '$1 == "cairn-orb-base" {found=1} END {exit !found}'
     printf '0 changes\n'
     exit 0
   fi
-  printf 'Existing base image does not match the recipe; preserve it and resolve explicitly\n' >&2
-  exit 1
+  if [[ ! -f $image/etc/cairn-orb-image ]] || ! [[ $(cat "$image/etc/cairn-orb-image") =~ ^recipe=[a-zA-Z0-9-]+$'\n'claude=[0-9]+\.[0-9]+\.[0-9]+$'\n'codex=[0-9]+\.[0-9]+\.[0-9]+$'\n'pnpm=[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    printf 'Unrecognized existing base image; preserve it and resolve explicitly\n' >&2
+    exit 1
+  fi
+  previous_marker=$(cat "$image/etc/cairn-orb-image")
+  printf 'rebuild cairn-orb-base: recipe or pinned CLI versions changed\n'
 fi
 printf 'build cairn-orb-base with pacstrap: base git nodejs npm corepack openssh ca-certificates curl\n'
 printf 'pin @anthropic-ai/claude-code@%s @openai/codex@%s pnpm@%s; create agent; install proxy settings; register image\n' "$claude_version" "$codex_version" "$pnpm_version"
@@ -62,14 +67,14 @@ stage=$(mktemp -d "$host_root/var/lib/machines/.cairn-orb-build.XXXXXX")
 stage=$(cd -- "$stage" && pwd -P)
 [[ $stage =~ ^/[a-zA-Z0-9/._-]+$ ]] || { printf 'Preserve image at unsupported path: %s\n' "$stage" >&2; exit 1; }
 unmounted() {
-  local targets target
+  local targets target tree=${1:-$stage}
   if ! targets=$(findmnt --raw --noheadings --output TARGET); then
     printf 'Cannot inspect mounts; preserve image %s\n' "$stage" >&2
     return 1
   fi
   while IFS= read -r target; do
     case "$target" in
-      "$stage"|"$stage"/*) printf 'Preserve mounted image %s; unmount it before removal\n' "$stage" >&2; return 1;;
+      "$tree"|"$tree"/*) printf 'Preserve mounted image %s; unmount it before removal\n' "$tree" >&2; return 1;;
     esac
   done <<< "$targets"
 }
@@ -107,9 +112,28 @@ rm -rf /root/.npm /root/.cache /etc/ssh/ssh_host_*
 GUEST
 printf '%s\n' "$expected" > "$stage/etc/cairn-orb-image"
 unmounted
-[[ ! -e $image ]] || { printf 'Another image appeared; preserve the existing base\n' >&2; exit 1; }
+backup=
+if [[ -e $image ]]; then
+  if [[ -z $previous_marker || ! -f $image/etc/cairn-orb-image || $(cat "$image/etc/cairn-orb-image") != "$previous_marker" ]]; then
+    printf 'Another image appeared or changed; preserve the existing base\n' >&2
+    exit 1
+  fi
+  unmounted "$image"
+  backup=$(mktemp -d "$host_root/var/lib/machines/.cairn-orb-previous.XXXXXX")
+  rmdir -- "$backup"
+  printf 'preserve previous base at %s until replacement is registered\n' "$backup"
+  mv -T -- "$image" "$backup"
+fi
 printf 'register %s\n' "$image"
-mv -T -- "$stage" "$image"
+if ! mv -T -- "$stage" "$image"; then
+  if [[ -n $backup ]]; then printf 'restore previous base\n'; mv -T -- "$backup" "$image"; fi
+  exit 1
+fi
 stage=
+if [[ -n $backup ]]; then
+  unmounted "$backup"
+  printf 'remove previous base %s\n' "$backup"
+  rm -rf -- "$backup"
+fi
 machinectl list-images --no-legend --no-pager | awk '$1 == "cairn-orb-base" {found=1} END {exit !found}'
 printf '1 changes\n'

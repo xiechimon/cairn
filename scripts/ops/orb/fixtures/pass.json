@@ -5,5 +5,16 @@
   "memory": "MemoryMax=4294967296\n",
   "homeExit": 0,
   "negativeExit": 1,
-  "negativeError": "Failed to clone image: Access denied\n"
+  "negativeError": "Failed to clone image: Access denied\n",
+  "privateEgress": [
+    {
+      "status": 22,
+      "code": "403"
+    },
+    {
+      "status": 22,
+      "code": "403"
+    }
+  ],
+  "firewall": "present"
 }

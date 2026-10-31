@@ -26,7 +26,7 @@ export function changes({ root = '/', dryRun = false, run = command, log = conso
     const target = join(root, path);
     return (
       existsSync(target) &&
-      readFileSync(target, 'utf8') === content &&
+      readFileSync(target).equals(Buffer.isBuffer(content) ? content : Buffer.from(content)) &&
       (statSync(target).mode & 0o777) === mode
     );
   };
@@ -41,6 +41,7 @@ export function changes({ root = '/', dryRun = false, run = command, log = conso
       if (!dryRun) {
         const result = run(cmd, args);
         if (result.stdout?.trim()) log(result.stdout.trim());
+        if (result.stderr?.trim()) log(result.stderr.trim());
         if (result.status !== 0)
           throw new Error(`${cmd} failed: ${result.stderr || result.error || result.status}`);
       }

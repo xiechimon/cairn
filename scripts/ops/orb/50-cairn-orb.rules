@@ -20,7 +20,7 @@ polkit.addRule(function(action, subject) {
         if (!orb(machine)) return polkit.Result.NOT_HANDLED;
         if (action.id === 'org.freedesktop.machine1.manage-machines') {
             var operation = action.lookup('verb');
-            return ['kill', 'terminate', 'unregister', 'open_root_directory', 'poweroff', 'reboot'].indexOf(operation) >= 0 ? polkit.Result.YES : polkit.Result.NO;
+            return ['kill', 'terminate', 'unregister'].indexOf(operation) >= 0 ? polkit.Result.YES : polkit.Result.NO;
         }
         return ['org.freedesktop.machine1.shell', 'org.freedesktop.machine1.login', 'org.freedesktop.machine1.open-pty', 'org.freedesktop.machine1.inspect-machines'].indexOf(action.id) >= 0 ? polkit.Result.YES : polkit.Result.NO;
     }

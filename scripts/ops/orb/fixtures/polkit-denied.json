@@ -5,5 +5,16 @@
   "memory": "",
   "homeExit": null,
   "negativeExit": 1,
-  "negativeError": "Access denied"
+  "negativeError": "Access denied",
+  "privateEgress": [
+    {
+      "status": 22,
+      "code": "403"
+    },
+    {
+      "status": 22,
+      "code": "403"
+    }
+  ],
+  "firewall": "present"
 }

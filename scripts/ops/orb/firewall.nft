@@ -1,0 +1,14 @@
+table inet cairn_orb
+flush table inet cairn_orb
+table inet cairn_orb {
+  chain input {
+    type filter hook input priority -10; policy accept;
+    iifname "vz-cairn" ip saddr 10.203.0.0/24 ip daddr 10.203.0.1 tcp dport 7890 accept
+    iifname "vz-cairn" udp sport 68 udp dport 67 accept
+    iifname "vz-cairn" drop
+  }
+  chain forward {
+    type filter hook forward priority -10; policy accept;
+    iifname "vz-cairn" drop
+  }
+}

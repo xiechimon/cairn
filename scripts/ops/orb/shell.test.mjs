@@ -37,6 +37,11 @@ if (cmd === 'id') console.log(args[0] === '-un' ? (process.env.FAKE_USER || 'roo
 if (cmd === 'runuser' || cmd === 'bash') console.log(args.at(-1).includes('claude') ? (process.env.BAD_VERSION || '2.1.0 (Claude Code)') : 'codex-cli 0.100.0');
 if (cmd === 'sha256sum') console.log('fake-recipe  ' + args[0]);
 if (cmd === 'pacstrap') {
+  if (process.env.APPEARED_IMAGE) {
+    const appeared = join(root, 'var/lib/machines/cairn-orb-base/etc');
+    mkdirSync(appeared, { recursive: true });
+    writeFileSync(join(appeared, 'cairn-orb-image'), 'owner-created-image');
+  }
   mkdirSync(join(args[2], 'etc'), { recursive: true });
   if (process.env.MOUNTED_STAGE) writeFileSync(join(root, 'active-mount'), args[2] + '/dev');
 }
@@ -45,6 +50,7 @@ if (cmd === 'findmnt' && existsSync(join(root, 'active-mount'))) {
   console.log(join(realpathSync(dirname(active)), basename(active)));
 }
 if (cmd === 'mv') {
+  if (process.env.FAIL_PUBLISH && args.at(-2).includes('.cairn-orb-build.')) process.exit(1);
   if (existsSync(args.at(-1))) process.exit(1);
   renameSync(args.at(-2), args.at(-1));
 }
@@ -216,11 +222,9 @@ test('relay binds only its expected bridge and forwards only to loopback', () =>
     assert.equal(dry.status, 0, dry.stderr);
     assert.ok(!f.calls().some(([cmd]) => cmd === 'socat'));
     assert.equal(f.run('egress-relay.sh').status, 0);
-    const relay = f.calls().find(([cmd]) => cmd === 'socat');
-    assert.deepEqual(relay.slice(1), [
-      'TCP4-LISTEN:7890,bind=10.203.0.1,reuseaddr,fork,max-children=128,range=10.203.0.0/24',
-      'TCP4:127.0.0.1:7890',
-    ]);
+    const relay = f.calls().find(([cmd]) => cmd === 'node');
+    assert.ok(relay[1].endsWith('/egress-relay.mjs'));
+    assert.ok(!f.calls().some(([cmd]) => cmd === 'socat'));
     assert.notEqual(f.run('egress-relay.sh', [], { BRIDGE_IP: '192.0.2.1' }).status, 0);
   } finally {
     rmSync(f.root, { recursive: true, force: true });
@@ -319,6 +323,73 @@ test('installer supplies the loopback proxy to provisioning commands', () => {
       http: 'http://127.0.0.1:7890',
       https: 'http://127.0.0.1:7890',
     });
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+test('CLI version drift rebuilds the base image and the next run prints zero changes', () => {
+  const f = fixture();
+  try {
+    assert.equal(f.run('build-image.sh').status, 0);
+    const changed = f.run('build-image.sh', [], { BAD_VERSION: '2.2.0' });
+    assert.equal(changed.status, 0, changed.stderr);
+    assert.match(changed.stdout, /rebuild cairn-orb-base/);
+    assert.match(changed.stdout, /1 changes/);
+    assert.match(
+      readFileSync(join(f.root, 'var/lib/machines/cairn-orb-base/etc/cairn-orb-image'), 'utf8'),
+      /claude=2.2.0/,
+    );
+    const next = f.run('build-image.sh', [], { BAD_VERSION: '2.2.0' });
+    assert.equal(next.status, 0, next.stderr);
+    assert.equal(next.stdout.trim(), '0 changes');
+    assert.equal(f.calls().filter(([cmd]) => cmd === 'pacstrap').length, 2);
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+test('failed replacement build preserves the completed base image', () => {
+  const f = fixture();
+  try {
+    assert.equal(f.run('build-image.sh').status, 0);
+    const marker = join(f.root, 'var/lib/machines/cairn-orb-base/etc/cairn-orb-image');
+    const original = readFileSync(marker, 'utf8');
+    assert.notEqual(
+      f.run('build-image.sh', [], { BAD_VERSION: '2.2.0', FAIL_COMMAND: 'pacstrap' }).status,
+      0,
+    );
+    assert.equal(readFileSync(marker, 'utf8'), original);
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+test('an image appearing during a build is preserved instead of being replaced', () => {
+  const f = fixture();
+  try {
+    const result = f.run('build-image.sh', [], { APPEARED_IMAGE: '1' });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /preserve/);
+    assert.equal(
+      readFileSync(join(f.root, 'var/lib/machines/cairn-orb-base/etc/cairn-orb-image'), 'utf8'),
+      'owner-created-image',
+    );
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+test('failed image publication restores the previous base', () => {
+  const f = fixture();
+  try {
+    assert.equal(f.run('build-image.sh').status, 0);
+    const marker = join(f.root, 'var/lib/machines/cairn-orb-base/etc/cairn-orb-image');
+    const original = readFileSync(marker, 'utf8');
+    const result = f.run('build-image.sh', [], { BAD_VERSION: '2.2.0', FAIL_PUBLISH: '1' });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stdout, /restore previous base/);
+    assert.equal(readFileSync(marker, 'utf8'), original);
   } finally {
     rmSync(f.root, { recursive: true, force: true });
   }

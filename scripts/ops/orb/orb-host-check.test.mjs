@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { checkHost, parseHostCheck } from './orb-host-check.mjs';
 
-for (const name of ['pass', 'missing-image', 'polkit-denied', 'no-egress']) {
+for (const name of ['pass', 'missing-image', 'polkit-denied', 'no-egress', 'private-egress']) {
   test(`recorded ${name} command outputs`, () => {
     const input = JSON.parse(readFileSync(new URL(`./fixtures/${name}.json`, import.meta.url)));
     const result = parseHostCheck(input);
@@ -30,6 +30,19 @@ test('ambiguous or unsafe outputs never pass', () => {
     { negativeError: 'Connection timed out' },
     { headers: 'HTTP/1.1 200 Connection established\r\n\r\nHTTP/2 403' },
     { cloneStartStop: 'failed' },
+    { privateEgress: [] },
+    {
+      privateEgress: [
+        { status: 0, code: '200' },
+        { status: 22, code: '403' },
+      ],
+    },
+    {
+      privateEgress: [
+        { status: 7, code: '000' },
+        { status: 22, code: '403' },
+      ],
+    },
   ])
     assert.equal(parseHostCheck({ ...input, ...change }).ok, false);
 });
@@ -45,7 +58,12 @@ function fakeHost(failAt) {
     let stdout = '';
     if (args.includes('list-images')) stdout = 'cairn-orb-base directory no\n';
     if (args.includes('show')) stdout = 'MemoryMax=4294967296\n';
-    if (args.includes('curl')) stdout = 'HTTP/2 200\r\n';
+    if (args.includes('curl')) {
+      if (args.some((arg) => /http:\/\/(127\.0\.0\.1|10\.203\.0\.1):8787/.test(arg)))
+        return { status: 22, stdout: '403', stderr: 'HTTP 403' };
+      stdout = 'HTTP/2 200\r\n';
+    }
+    if (cmd === 'nft') stdout = 'table inet cairn_orb { }';
     return { status: 0, stdout, stderr: '' };
   };
   return { calls, run };
@@ -102,4 +120,32 @@ test('unexpected negative-control success is cleaned up and cannot pass', () => 
   });
   assert.equal(result.ok, false);
   assert.ok(f.calls.some((call) => call.includes('remove') && call.includes('not-cairn-x')));
+});
+
+test('host check rejects loopback and bridge egress and reports owner firewall inspection', () => {
+  const f = fakeHost();
+  const result = checkHost({
+    run: f.run,
+    wait: () => {},
+    user: 'ian',
+    name: 'cairn-orb-check-fixture',
+  });
+  assert.equal(result.privateEgress, 'denied');
+  assert.equal(result.firewall, 'present');
+  for (const target of ['http://127.0.0.1:8787/', 'http://10.203.0.1:8787/']) {
+    assert.ok(
+      f.calls.some(
+        (call) => call.includes(target) && call.includes('--noproxy') && call.includes('--proxy'),
+      ),
+    );
+  }
+  const owner = checkHost({
+    run: (cmd, args) =>
+      cmd === 'nft' ? { status: 1, stderr: 'Operation not permitted' } : f.run(cmd, args),
+    wait: () => {},
+    user: 'ian',
+    name: 'cairn-orb-check-fixture',
+  });
+  assert.equal(owner.firewall, 'owner-check-required');
+  assert.equal(owner.ok, false);
 });

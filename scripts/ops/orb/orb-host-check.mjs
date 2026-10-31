@@ -14,6 +14,12 @@ export function parseHostCheck(input) {
       : null,
     cloneStartStop: input.cloneStartStop === 'ok' ? 'ok' : 'failed',
     egress: ['200', '301'].includes(statuses.at(-1)?.[1]) ? 'ok' : 'failed',
+    privateEgress:
+      input.privateEgress?.length === 2 &&
+      input.privateEgress.every((probe) => probe.status === 22 && probe.code === '403')
+        ? 'denied'
+        : 'failed',
+    firewall: input.firewall || 'owner-check-required',
     memoryMax: memory ? Number(memory[1]) : null,
     homeVisible: input.homeExit === 0 ? false : input.homeExit === 1 ? true : null,
     negativeControl:
@@ -29,6 +35,8 @@ export function parseHostCheck(input) {
       record.image !== null &&
       record.cloneStartStop === 'ok' &&
       record.egress === 'ok' &&
+      record.privateEgress === 'denied' &&
+      record.firewall === 'present' &&
       record.memoryMax === 4294967296 &&
       record.homeVisible === false &&
       record.negativeControl === 'denied',
@@ -57,6 +65,8 @@ export function checkHost({
     homeExit: null,
     negativeExit: null,
     negativeError: '',
+    privateEgress: [],
+    firewall: 'owner-check-required',
   };
   const call = (cmd, args) => {
     const result = run(cmd, args);
@@ -66,6 +76,13 @@ export function checkHost({
       );
     return result;
   };
+  const firewall = run('nft', ['list', 'table', 'inet', 'cairn_orb']);
+  input.firewall =
+    firewall.status === 0 && /table inet cairn_orb\b/.test(firewall.stdout || '')
+      ? 'present'
+      : 'owner-check-required';
+  if (input.firewall !== 'present')
+    errors.push('Owner must inspect: nft list table inet cairn_orb');
   input.images =
     call('machinectl', ['--no-ask-password', 'list-images', '--no-legend', '--no-pager']).stdout ||
     '';
@@ -121,6 +138,28 @@ export function checkHost({
       'https://github.com',
     ]);
     if (egress.status === 0) input.headers = egress.stdout || '';
+    for (const target of ['http://127.0.0.1:8787/', 'http://10.203.0.1:8787/']) {
+      const denied = run('systemd-run', [
+        ...guest,
+        '--uid=agent',
+        'curl',
+        '--silent',
+        '--show-error',
+        '--fail',
+        '--max-time',
+        '10',
+        '--noproxy',
+        '',
+        '--proxy',
+        'http://10.203.0.1:7890',
+        '--output',
+        '/dev/null',
+        '--write-out',
+        '%{http_code}',
+        target,
+      ]);
+      input.privateEgress.push({ status: denied.status, code: denied.stdout?.trim() });
+    }
     input.memory =
       call('systemctl', ['show', `systemd-nspawn@${name}.service`, '-p', 'MemoryMax']).stdout || '';
     input.homeExit = call('systemd-run', [...guest, 'test', '!', '-e', '/home/ian']).status;

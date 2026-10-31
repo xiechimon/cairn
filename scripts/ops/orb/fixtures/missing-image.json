@@ -5,5 +5,16 @@
   "memory": "",
   "homeExit": null,
   "negativeExit": 1,
-  "negativeError": "No image 'cairn-orb-base' known"
+  "negativeError": "No image 'cairn-orb-base' known",
+  "privateEgress": [
+    {
+      "status": 22,
+      "code": "403"
+    },
+    {
+      "status": 22,
+      "code": "403"
+    }
+  ],
+  "firewall": "present"
 }

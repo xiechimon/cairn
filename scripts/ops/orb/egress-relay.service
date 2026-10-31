@@ -3,6 +3,7 @@ Description=Cairn Orb proxy relay
 StartLimitIntervalSec=0
 
 [Service]
+Environment=CAIRN_ORB_NODE=/usr/local/lib/cairn-orb/node
 ExecStart=/usr/local/lib/cairn-orb/egress-relay.sh
 Restart=on-failure
 RestartSec=2

@@ -3,10 +3,16 @@ import { join, resolve } from 'node:path';
 import { changes } from './host-files.mjs';
 
 export function installHost(options = {}) {
-  const { root = '/', dryRun = false, log = console.log } = options;
+  const {
+    root = '/',
+    dryRun = false,
+    log = console.log,
+    nodeBinary = readFileSync(process.execPath),
+  } = options;
   const change = changes(options);
   for (const [cmd, args] of [
-    ['socat', ['-V']],
+    [process.execPath, ['--version']],
+    ['nft', ['--version']],
     ['ip', ['-Version']],
     ['nmcli', ['--version']],
   ]) {
@@ -48,6 +54,9 @@ export function installHost(options = {}) {
       '/etc/systemd/system/systemd-nspawn@cairn-orb-.service.d/limits.conf',
     ],
     ['prepare-machine.sh', '/usr/local/lib/cairn-orb/prepare-machine.sh', 0o755],
+    ['egress-relay.mjs', '/usr/local/lib/cairn-orb/egress-relay.mjs'],
+    ['firewall.nft', '/etc/cairn-orb/firewall.nft'],
+    ['cairn-orb-firewall.service', '/etc/systemd/system/cairn-orb-firewall.service'],
     ['egress-relay.sh', '/usr/local/lib/cairn-orb/egress-relay.sh', 0o755],
     ['egress-relay.service', '/etc/systemd/user/egress-relay.service'],
   ];
@@ -55,6 +64,7 @@ export function installHost(options = {}) {
     change.exec('pacman', ['-S', '--needed', '--noconfirm', 'arch-install-scripts']);
   }
   const files = [
+    ['/usr/local/lib/cairn-orb/node', nodeBinary, 0o755],
     ...assets.map(([source, target, mode]) => [
       target,
       readFileSync(new URL(source, import.meta.url), 'utf8'),
@@ -62,7 +72,11 @@ export function installHost(options = {}) {
     ]),
     [
       '/etc/systemd/system/systemd-nspawn@.service.d/20-cairn-orb.conf',
-      '[Service]\nExecStartPre=+/usr/local/lib/cairn-orb/prepare-machine.sh %i\n',
+      '[Unit]\nRequires=cairn-orb-firewall.service\nAfter=cairn-orb-firewall.service\n\n[Service]\nExecStartPre=+/usr/local/lib/cairn-orb/prepare-machine.sh %i\n',
+    ],
+    [
+      '/etc/systemd/system/systemd-networkd.service.d/20-cairn-orb.conf',
+      '[Unit]\nRequires=cairn-orb-firewall.service\nAfter=cairn-orb-firewall.service\n',
     ],
     [
       '/etc/NetworkManager/conf.d/90-cairn-orb.conf',
@@ -90,6 +104,25 @@ export function installHost(options = {}) {
   for (const file of files) change.file(...file);
   if (needsReload) {
     change.exec('systemctl', ['daemon-reload']);
+  }
+  const firewall = readFileSync(new URL('firewall.nft', import.meta.url), 'utf8');
+  const firewallPresent = change.probe('nft', ['list', 'table', 'inet', 'cairn_orb']).status === 0;
+  if (
+    needsReload ||
+    !firewallPresent ||
+    change.probe('systemctl', ['is-active', 'cairn-orb-firewall.service']).status !== 0
+  ) {
+    log(firewall.trim());
+    change.exec('systemctl', [
+      change.probe('systemctl', ['is-active', 'cairn-orb-firewall.service']).status === 0
+        ? 'reload'
+        : 'start',
+      'cairn-orb-firewall.service',
+    ]);
+  }
+  if (change.probe('systemctl', ['is-enabled', 'cairn-orb-firewall.service']).status !== 0)
+    change.exec('systemctl', ['enable', 'cairn-orb-firewall.service']);
+  if (needsReload) {
     change.exec('nmcli', ['general', 'reload', 'conf']);
     if (change.probe('systemctl', ['is-active', 'systemd-networkd.service']).status === 0)
       change.exec('networkctl', ['reload']);
@@ -130,6 +163,7 @@ export function installHost(options = {}) {
     resolve(import.meta.dirname, 'build-image.sh'),
     ...(dryRun ? ['--dry-run'] : []),
   ]);
+  if (image.stderr?.trim()) log(image.stderr.trim());
   if (image.status !== 0) {
     if (image.stdout?.trim()) log(image.stdout.trim());
     throw new Error(`build-image failed: ${image.stderr || image.stdout}`);
