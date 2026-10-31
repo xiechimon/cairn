@@ -26,6 +26,7 @@ The notes and captures from the early study of todos.dev (the r1 to r9 series an
 | [herdr-multica-parity.md](herdr-multica-parity.md) | none | Whether herdr itself can produce the Multica experience (method research) |
 | [r16-model-catalog-liveness.md](r16-model-catalog-liveness.md) | none | Model catalog liveness: withdrawn upstream models still listed, live models rejected |
 | [1607-acp-execution-surface.md](1607-acp-execution-surface.md) | none | ACP as an execution surface |
+| [2330-claude-entrypoint-and-setup-token-quota.md](2330-claude-entrypoint-and-setup-token-quota.md) | none | `claude -p` (sdk-cli) and interactive mode cost the same allowance; setup-token rate-limit events not yet measurable on omarchy (D50 spike) |
 
 ### Design system and front-end craft (from 2026-09-23)
 
