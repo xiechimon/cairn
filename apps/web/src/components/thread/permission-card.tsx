@@ -35,7 +35,7 @@ export function PermissionCard({
 }: PermissionCardProps) {
   if (resolution != null) {
     const Icon = resolution === 'deny' ? X : Check;
-    const firstLine = command.split('\n')[0] ?? command;
+    const [firstLine] = command.split('\n');
     return (
       <div
         data-slot="permission-card"

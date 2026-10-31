@@ -6,6 +6,14 @@ import type { StoneTone } from '../stone/tone.js';
 import { Button } from '../ui/button.js';
 import { Checkbox } from '../ui/checkbox.js';
 
+const TONE_LABEL: Record<StoneTone, string> = {
+  waiting: 'Waiting on you',
+  review: 'Ready for review',
+  working: 'Working',
+  idle: 'Idle',
+  resolved: 'Resolved',
+};
+
 export interface ThreadRowProps {
   title: string;
   reason: ReactNode;
@@ -46,12 +54,8 @@ export function ThreadRow({
       )}
     >
       {selected ? (
-        <span className="grid size-5.5 flex-none place-items-center">
-          <Checkbox
-            checked
-            aria-label={`Deselect ${title}`}
-            onCheckedChange={() => onSelectedChange?.(false)}
-          />
+        <span aria-hidden="true" className="grid size-5.5 flex-none place-items-center">
+          <Checkbox checked tabIndex={-1} onCheckedChange={() => onSelectedChange?.(false)} />
         </span>
       ) : (
         <StoneMark tone={tone} kind={kind} />
@@ -77,6 +81,7 @@ export function ThreadRow({
           )}
         </span>
         <span className="truncate text-meta text-content-secondary">{reason}</span>
+        <span className="sr-only">{TONE_LABEL[tone]}</span>
       </Button>
       <span
         className={cn(
@@ -90,7 +95,7 @@ export function ThreadRow({
       </span>
       <span
         className={cn(
-          'absolute top-1.5 right-1.5 hidden items-center gap-1 group-hover/row:flex',
+          'absolute top-1.5 right-1.5 hidden items-center gap-1 group-focus-within/row:flex group-hover/row:flex',
           selected && 'flex',
         )}
       >

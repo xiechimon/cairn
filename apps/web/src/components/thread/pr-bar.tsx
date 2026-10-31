@@ -42,6 +42,7 @@ function ToggleRow({
   onCheckedChange?: (next: boolean) => void;
 }) {
   const id = useId();
+  const helpId = useId();
   return (
     <div className="flex items-start gap-2.5 px-1 py-1.5 text-ui text-foreground">
       <ToggleSwitch
@@ -49,12 +50,15 @@ function ToggleRow({
         checked={checked}
         disabled={disabled}
         onCheckedChange={onCheckedChange}
+        aria-describedby={helpId}
         className="mt-0.5"
       />
-      <label htmlFor={id} className={cn('min-w-0 flex-1', disabled && 'text-content-tertiary')}>
-        {label}
-        <small className="block text-caption text-content-tertiary">{help}</small>
-      </label>
+      <span className={cn('min-w-0 flex-1', disabled && 'text-content-tertiary')}>
+        <label htmlFor={id}>{label}</label>
+        <small id={helpId} className="block text-caption text-content-tertiary">
+          {help}
+        </small>
+      </span>
     </div>
   );
 }

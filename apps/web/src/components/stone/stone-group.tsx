@@ -2,12 +2,10 @@ import { cn } from 'cn';
 import { ChevronDown } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Button } from '../ui/button.js';
-import type { StoneTone } from './tone.js';
+import { PEBBLE_BG, type StoneTone } from './tone.js';
 
 const BIG_PEBBLE: Record<StoneTone, string> = {
-  waiting: 'bg-pebble-waiting',
-  review: 'bg-pebble-review',
-  working: 'bg-pebble-working',
+  ...PEBBLE_BG,
   idle: 'bg-canvas shadow-[inset_0_0_0_1.5px_var(--text-tertiary)]',
   resolved: 'bg-canvas shadow-[inset_0_0_0_1.5px_var(--text-tertiary)]',
 };
