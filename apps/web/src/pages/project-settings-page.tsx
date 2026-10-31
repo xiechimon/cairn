@@ -1,9 +1,11 @@
 import { isGithubRepoRef } from '@cairn/shared';
+import { cn } from 'cn';
 import { useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { useApiMutations, useProjects } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { ProjectAvatar } from '../board/project-avatar.js';
+import { ProjectIconPicker } from '../board/project-icon-picker.js';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
 import {
   SETTINGS_HINT_CLS,
@@ -67,6 +69,8 @@ export function ProjectSettingsPage() {
           hosted: wireProject.repoKind === 'hosted',
           defaultBranch: wireProject.baseBranch ?? '',
           description: wireProject.description ?? null,
+          ...(wireProject.icon != null ? { icon: wireProject.icon } : {}),
+          ...(wireProject.color != null ? { color: wireProject.color } : {}),
         }
       : undefined
     : fixture.project;
@@ -93,12 +97,35 @@ export function ProjectSettingsPage() {
     >
       <div className="flex flex-col gap-4">
         <SettingsHeader
-          avatarClassName="prj-set-avatar"
+          avatarClassName={cn('prj-set-avatar', project?.icon != null && 'rounded-xl')}
           avatar={
-            <ProjectAvatar
-              name={project?.name ?? ''}
-              tone={tone}
-              className="size-14 rounded-none text-page"
+            <ProjectIconPicker
+              icon={project?.icon}
+              color={project?.color}
+              disabled={id === undefined}
+              onChange={(patch) => {
+                if (id === undefined) return;
+                if (!live) {
+                  blockDemoWrite();
+                  return;
+                }
+                mutations.patchProject.mutate(
+                  { id, body: patch },
+                  { onError: (error) => toastError(t('保存失败，请重试。'), error) },
+                );
+              }}
+              trigger={
+                <ProjectAvatar
+                  name={project?.name ?? ''}
+                  tone={tone}
+                  icon={project?.icon}
+                  color={project?.color}
+                  className={cn(
+                    'size-14',
+                    project?.icon != null ? 'rounded-none' : 'rounded-none text-page',
+                  )}
+                />
+              }
             />
           }
           title={project?.name ?? ''}

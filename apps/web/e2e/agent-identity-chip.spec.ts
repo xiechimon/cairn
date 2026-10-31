@@ -120,7 +120,7 @@ test.describe('agent mention chip (fixture, #741 gap 2)', () => {
 });
 
 test.describe('lazy face zero change (#741 negative case)', () => {
-  test('F-E8: robot rows without an agent projection keep the dashed glyph, zero anchors (frozen capture face r5 114)', async ({
+  test('F-E8: robot rows without an agent projection carry no face and zero anchors (frozen capture face r5 114)', async ({
     page,
   }) => {
     await stubDicebear(page);
@@ -128,7 +128,7 @@ test.describe('lazy face zero change (#741 negative case)', () => {
     await expect(page.locator('.chief-drawer')).toBeVisible();
     const stream = page.getByTestId('chief-stream');
 
-    await expect(stream.getByTestId('chief-msg').locator('> svg')).toHaveCount(1);
+    await expect(stream.getByTestId('chief-msg').locator('> svg')).toHaveCount(0);
 
     await expect(stream.getByRole('link')).toHaveCount(0);
     await expect(

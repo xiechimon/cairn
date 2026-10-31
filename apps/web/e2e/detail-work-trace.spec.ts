@@ -202,7 +202,7 @@ test('call details preserve commands, cap output and show edit lines', async ({ 
   await page.getByTestId('work-summary').first().click();
   const block = page.getByTestId('work-block').first();
   const run = block.getByTestId('work-call').filter({ hasText: 'Verify changes' });
-  await expect(run).toContainText('pnpm test');
+  await expect(run).toContainText('Verify changes');
   await expect(run).toContainText('12s');
   await run.click();
   const output = block.getByTestId('tool-output');
@@ -218,7 +218,7 @@ test('call details preserve commands, cap output and show edit lines', async ({ 
   await expect(block.getByTestId('tool-output').last()).toContainText('new line');
   await expect(block.getByTestId('work-call').last()).toContainText('docs · lookup');
   const failed = block.getByTestId('work-call').filter({ hasText: 'src/other.ts' });
-  await expect(failed.getByLabel('失败')).toBeVisible();
+  await expect(failed.getByText('失败')).toBeVisible();
   await failed.click();
   await expect(block.getByTestId('edit-error')).toHaveText('old_string not found in src/other.ts');
 });

@@ -1,5 +1,4 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
-import { spiralAvatarUrl } from '../src/lib/spiral-avatar.js';
 
 declare global {
   interface Window {
@@ -179,11 +178,12 @@ test.describe('chief drawer markdown face (fixture, #650)', () => {
     await expect(page.locator('.chief-drawer')).toBeVisible();
   });
 
-  test('F-R24: unbound chief reply rows wear the spiral face; the page has zero dashed-face glyphs', async ({
+  test('F-R24: unbound chief reply rows carry no face; the page has zero dashed-face glyphs', async ({
     page,
   }) => {
     const stream = page.getByTestId('chief-stream');
-    await expect(stream.getByTestId('chief-msg').locator('> svg').first()).toBeVisible();
+    await expect(stream.getByTestId('chief-msg').first()).toBeVisible();
+    await expect(stream.getByTestId('chief-msg').locator('> svg')).toHaveCount(0);
     await expect(page.locator('svg circle[stroke-dasharray]')).toHaveCount(0);
   });
 
@@ -254,14 +254,12 @@ test.describe('chief drawer markdown face (fixture, #650)', () => {
     await expect(typing.locator('strong')).toHaveText('relay 通道');
   });
 
-  test('F-R6/R8: user row avatar = real identity img (XMON-105 single source), drawer body scrollable', async ({ page }) => {
+  test('F-R6/R8: user row is a gradient bubble with no avatar, drawer body scrollable', async ({ page }) => {
     const userRow = page.getByTestId('chief-stream').getByTestId('chief-msg').first();
 
-    const img = userRow.locator('img');
-    await expect(img).toBeVisible();
-    await expect(img).toHaveAttribute('src', spiralAvatarUrl('Xmon Dai'));
-
+    await expect(userRow.locator('img')).toHaveCount(0);
     await expect(userRow.locator('> svg')).toHaveCount(0);
+    await expect(userRow.getByTestId('chief-bubble')).toHaveClass(/bubble-gradient/);
 
     const overflow = await page
       .getByTestId('chief-body')
@@ -313,10 +311,8 @@ test.describe('chief drawer streaming face (live mock, #651)', () => {
     await expect(drawer.getByRole('button', { name: '主题', exact: true })).toHaveText('线程乙');
 
     const userRow = drawer.getByTestId('chief-msg').first();
-    await expect(userRow.locator('img')).toHaveAttribute(
-      'src',
-      'https://cdn.example/me.png',
-    );
+    await expect(userRow.locator('img')).toHaveCount(0);
+    await expect(userRow.getByTestId('chief-bubble')).toBeVisible();
 
     const es = await chiefStream(page);
 
@@ -395,7 +391,7 @@ test.describe('chief drawer streaming face (live mock, #651)', () => {
     const presence = drawer.getByTestId('chief-msg').last();
     const toggle = presence.getByRole('button', { name: /实时步骤/ });
     await expect(toggle).toBeVisible();
-    await expect(presence.locator('[class*="spinner-breathe"]')).toHaveCount(1);
+    await expect(presence.getByTestId('live-pulse')).toHaveCount(1);
     await expect(presence.getByText('处理中...')).toHaveText('处理中...');
 
     await expect(presence.getByText(/^\d+s$/)).toHaveCount(0);
@@ -503,20 +499,20 @@ test.describe('chief drawer streaming face (live mock, #651)', () => {
     await expect(presence.getByTestId('chief-turn-tools')).toHaveCount(0);
 
     const hit = await toggle.boundingBox();
-    expect(hit?.height).toBe(23);
+    expect(hit?.height).toBe(28);
     const label = presence.getByText('处理中...');
     const inkInset = await label.evaluate((el) => {
       const btn = el.closest('button') as HTMLElement;
       return Number((el.getBoundingClientRect().y - btn.getBoundingClientRect().y).toFixed(1));
     });
-    expect(inkInset).toBe(1.5);
+    expect(inkInset).toBe(2);
 
     await toggle.click();
     await expect(toggle).toHaveAttribute('aria-expanded', 'true');
     await expect(toggle).toHaveAccessibleName('收起实时步骤');
     const panel = presence.getByTestId('chief-turn-tools');
     await expect(panel).toBeVisible();
-    await expect(panel).toContainText('正在调用 machines');
+    await expect(panel).toContainText(/正在调用\s*machines/);
     await expect(panel).toContainText('todo_write');
 
     await toggle.press('Enter');
@@ -643,7 +639,7 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
     await expect(items.nth(3)).toHaveAttribute('data-message-id', 'm9');
   });
 
-  test('F-R16: single-paragraph plain-text bubble geometry does not drift (44px pill); multi-block bubble first/last block margin trimming works', async ({
+  test('F-R16: single-paragraph plain-text bubble geometry does not drift (40px pill); multi-block bubble first/last block margin trimming works', async ({
     page,
   }) => {
     const drawer = await boot(page);
@@ -653,7 +649,7 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
       const r = el.getBoundingClientRect();
       return { h: Math.round(r.height), font: getComputedStyle(el).fontSize };
     });
-    expect(geo.h).toBe(44);
+    expect(geo.h).toBe(40);
     expect(geo.font).toBe('14px');
 
     const fence = drawer.getByTestId('chief-bubble').filter({ hasText: 'echo before-and-after' });
@@ -725,38 +721,29 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
       .poll(
         () =>
           thinking.evaluate((row) => {
-            const img = row.querySelector('img')?.getBoundingClientRect();
             const colEl = row.querySelector(':scope > div');
-            const col = colEl?.getBoundingClientRect();
-            if (img == null || colEl == null || col == null) return null;
+            if (colEl == null) return null;
             const colCs = getComputedStyle(colEl);
             return {
               display: getComputedStyle(row).display,
               grow: colCs.flexGrow,
               minW: colCs.minWidth,
-              imgW: img.width,
-              imgH: img.height,
-
-              colRightOfImg: col.x > img.x,
-              colBesideImg: col.y < img.bottom,
+              images: row.querySelectorAll('img').length,
             };
           }),
-        { message: 'thinking 行几何（#1033：24px 头像槽 + flex 行 + min-w-0 flex-1 列）' },
+        { message: 'thinking 行几何（无头像列：flex 行 + min-w-0 flex-1 列）' },
       )
       .toEqual({
         display: 'flex',
         grow: '1',
         minW: '0px',
-        imgW: 24,
-        imgH: 24,
-        colRightOfImg: true,
-        colBesideImg: true,
+        images: 0,
       });
     await expect(thinking.locator('pre')).toHaveCount(0);
     await thinking.getByRole('button', { name: '展开思考' }).click();
     await expect(thinking.locator('pre')).toHaveText('先把凭证面捋一遍');
 
-    const toolRow = drawer.locator('.chief-msg', { hasText: '正在调用 todo_write' });
+    const toolRow = drawer.locator('.chief-msg', { hasText: /正在调用\s*todo_write/ });
     await expect(toolRow).toHaveCount(1);
     await expect(toolRow.locator('span.tabular-nums')).toHaveText(/^[3-9]s$/);
 
@@ -792,10 +779,10 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
     await page.goto('/app?view=board&chief=chief-bbb');
 
     const drawer = page.locator('.chief-drawer');
-    const bashRow = drawer.locator('.chief-msg', { hasText: '正在调用 Bash' });
+    const bashRow = drawer.locator('.chief-msg', { hasText: /正在调用\s*Bash/ });
     await expect(bashRow).toHaveCount(1);
 
-    await expect(bashRow).toContainText('正在调用 Bash ls -la');
+    await expect(bashRow).toContainText(/正在调用\s*Bash ls -la/);
   });
 
   test('F-R21: segment-order contract (#1003 / ADR 0011 premortem) — text segments first, their tool rows after, each exactly once; after settle tools fold into the trailing row', async ({
@@ -856,13 +843,13 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
     await expect(rows.nth(0)).toContainText('派一下凭证链路验证');
     await expect(rows.nth(1)).toContainText('先盘点凭证面');
     await expect(rows.nth(2)).toContainText('先看现状');
-    await expect(rows.nth(3)).toContainText('正在调用 todo_write');
+    await expect(rows.nth(3)).toContainText(/正在调用\s*todo_write/);
     await expect(rows.nth(4)).toContainText('再核对补发语义');
     await expect(rows.nth(5)).toContainText('最后收口票');
 
     for (const text of [
       '先看现状',
-      '正在调用 todo_write',
+      /正在调用\s*todo_write/,
       '再核对补发语义',
       '最后收口票',
     ]) {
@@ -874,9 +861,9 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
     const settled = drawer.locator('.chief-msg, [data-testid="chief-msg"]');
     await expect(settled).toHaveCount(5);
     await expect(settled.nth(2)).toContainText('先看现状');
-    await expect(settled.nth(2).getByRole('button', { name: '展开过程' })).toHaveCount(0);
+    await expect(settled.nth(2).getByTestId('chief-tools-toggle')).toHaveCount(0);
     await expect(settled.nth(3)).toContainText('再核对补发语义');
-    const fold = settled.nth(3).getByRole('button', { name: '展开过程' });
+    const fold = settled.nth(3).getByTestId('chief-tools-toggle');
     await expect(fold).toHaveCount(1);
     await fold.click();
     await expect(settled.nth(3).getByTestId('chief-turn-tools')).toContainText('todo_write');

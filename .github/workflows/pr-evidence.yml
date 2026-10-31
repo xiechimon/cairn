@@ -99,6 +99,9 @@ jobs:
           touch autonomy-paused.flag
           if git cat-file -e origin/main:scripts/autonomy-brake.mjs; then
             git show origin/main:scripts/autonomy-brake.mjs > "$RUNNER_TEMP/autonomy-brake.mjs"
+            if git cat-file -e origin/main:scripts/exact-revert.mjs; then
+              git show origin/main:scripts/exact-revert.mjs > "$RUNNER_TEMP/exact-revert.mjs"
+            fi
             node "$RUNNER_TEMP/autonomy-brake.mjs" check-pr "$PR_NUMBER"
           else
             echo "autonomy-brake: main has no brake script yet; nothing can be paused"
