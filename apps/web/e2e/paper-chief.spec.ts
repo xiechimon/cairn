@@ -117,10 +117,10 @@ for (const theme of ['light', 'dark'] as const) {
   }) => {
     await setTheme(page, theme);
     await page.goto(SETTINGS('101'));
-    const display = await probe(page, 'fontFamily', 'var(--font-display)');
+    const serif = await probe(page, 'fontFamily', 'var(--font-source-serif)');
 
     const heading = page.getByRole('heading', { name: '总管设置' });
-    await expect(heading, 'S1').toHaveCSS('font-family', display);
+    await expect(heading, 'S1').toHaveCSS('font-family', serif);
     await expect(heading, 'S1').toHaveCSS('font-size', '20px');
     const bar = page.getByTestId('chief-settings-topbar');
     expect((await bar.boundingBox())?.height, 'S1').toBe(56);
