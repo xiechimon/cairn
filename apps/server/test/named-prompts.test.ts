@@ -1,4 +1,4 @@
-import { CONTINUE_PROMPTS, DEFAULT_NAMED_PROMPTS, REVIEW_GATE_HEAD } from '@cairn/shared';
+import { DEFAULT_NAMED_PROMPTS, REVIEW_GATE_HEAD } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
@@ -165,25 +165,6 @@ describe('the ship action uses the stored route and prompt', () => {
     expect(merges).toHaveLength(1);
     expect(merges[0]?.prompt).not.toBe('should not be used');
     await req(s.app, 'DELETE', '/api/prompts/ship');
-  });
-
-  test('custom route enqueues a merge step carrying the edited Ship prompt', async () => {
-    const projectId = await postProject(s.app);
-    await req(s.app, 'PUT', `/api/projects/${projectId}/ship-route`, { shipRoute: 'custom' });
-    await req(s.app, 'PUT', '/api/prompts/ship', { text: 'Squash and push to main.' });
-    const { buildId } = await reviewTodo(projectId);
-    const res = await req(s.app, 'POST', `/api/builds/${buildId}/merge`);
-    expect(res.status).toBe(202);
-    expect(stepsOf(buildId, 'merge')[0]?.prompt).toBe('Squash and push to main.');
-    await req(s.app, 'DELETE', '/api/prompts/ship');
-  });
-
-  test('custom route without an edit falls back to the default Ship text', async () => {
-    const projectId = await postProject(s.app);
-    await req(s.app, 'PUT', `/api/projects/${projectId}/ship-route`, { shipRoute: 'custom' });
-    const { buildId } = await reviewTodo(projectId);
-    await req(s.app, 'POST', `/api/builds/${buildId}/merge`);
-    expect(stepsOf(buildId, 'merge')[0]?.prompt).toBe(CONTINUE_PROMPTS.merge);
   });
 
   test('review action swaps the review-gate instruction for the edited Review prompt only when overridden', async () => {

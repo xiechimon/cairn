@@ -2,6 +2,7 @@ import type {
   Assignment,
   BuildRecord,
   GithubRepoRef,
+  MergeReadiness,
   Phase,
   ReviewGate,
   ReviewVerdict,
@@ -141,6 +142,7 @@ import type { VapidKeys } from './push.js';
 import { publishStepRow, toQuotaWait } from './quota-wait.js';
 import { retryLessonsOf } from './retry-lessons.js';
 import { finishScheduledStep } from './schedules.js';
+import { appendShipGateInstruction, judgeShip } from './ship-gate.js';
 import { endSnoozeOn } from './snooze.js';
 import { assertSplitProposalExecutable } from './split-proposal.js';
 import { stepQueueProjector } from './step-queue.js';
@@ -167,6 +169,7 @@ export interface BuildDeps {
   oauthClient?: OAuthClientConfig | null;
   attachmentsDir?: string;
   gitOps?: typeof systemGitOps;
+  mergeVerdict?: (buildId: string) => Promise<MergeReadiness | null>;
   harnessEval?: {
     dispatch: HarnessEvalDispatchPort;
     attemptTimeoutMs?: number;
@@ -1591,6 +1594,10 @@ export async function requestMerge(
   if (inFlight) throw new HttpError(409, '这个构建已有一个合并步在排队或在跑，等它结束再发起');
   const projectRow = projectOfTodo(deps.db, todoRow);
   const shipRoute = projectRow === undefined ? DEFAULT_SHIP_ROUTE : projectShipRouteOf(projectRow);
+  if (shipRoute === 'local-merge' && projectRow?.repoKind !== 'local') {
+    throw new HttpError(409, 'local-merge requires a local repository project');
+  }
+  const judged = shipRoute === 'merge-gate' ? null : await judgeShip(deps, buildId);
   const pr = shipRoute === 'custom' ? null : githubPrOf(deps, todoRow, row.prNumber);
   if (pr !== null) {
     return mergeThroughGithub(deps, row, pr.prNumber, pr.repoRef, actor ?? deps.user.displayName);
@@ -1642,8 +1649,11 @@ export async function requestMerge(
   assertMergeTools(deps, todoRow);
   insertGateAnnouncement(deps, buildId, MERGE_ANNOUNCEMENT, actor ?? deps.user.displayName);
   let prompt: string | undefined;
-  if (shipRoute === 'custom') {
-    prompt = resolveNamedPrompt(deps.db, todoRow.teamId, 'ship').text;
+  if (shipRoute === 'custom' && judged !== null) {
+    prompt = appendShipGateInstruction(resolveNamedPrompt(deps.db, todoRow.teamId, 'ship').text, {
+      buildId,
+      judgedHead: judged.headSha,
+    });
   } else if (projectRow?.repoKind === 'hosted' && projectRow.repoName !== null) {
     if (deps.reposDir === undefined) throw new HttpError(409, 'Hosted repository unavailable');
     const dir = repoDirFor(deps.reposDir, todoRow.teamId, projectRow.repoName);
