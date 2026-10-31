@@ -30,10 +30,10 @@ import {
 } from '../components/ui/message-scroller.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { Separator } from '../components/ui/separator.js';
-import { Trace, TraceDescription, TraceLine, TraceTitle } from '../components/ui/trace.js';
 import type { ModelOption } from '../fixtures/records.js';
 import { ArrowDown, Copy, Download, Settings, Trash2 } from '../icons/index.js';
 import { AgentModelSelect, AgentRuntimeSelect } from '../routes/agent-model-select.js';
+import { SEED_TRANSCRIPT, TranscriptSteps } from './agent-transcript.js';
 import { Cell, Section, Specimen } from './specimen.js';
 
 const MODEL_OPTIONS: ModelOption[] = [
@@ -51,16 +51,6 @@ const MODEL_OPTIONS: ModelOption[] = [
   },
   { provider: 'codex', providerLabel: 'Codex', modelId: 'gpt-6.1-sol', modelName: 'GPT-6.1 Sol' },
 ];
-
-const SEED_STEPS = [
-  { title: 'Read the failing CI log', code: '', secs: 2 },
-  { title: 'Found the cause: package.json moved without the lockfile', code: '', secs: 0 },
-  { title: 'Ran', code: 'pnpm install', secs: 14 },
-  { title: 'Edited', code: 'pnpm-lock.yaml', secs: 1 },
-  { title: 'Ran', code: 'git push origin fix/lockfile', secs: 3 },
-  { title: 'CI is green on the new head', code: '', secs: 0 },
-];
-const SEED_STEPS_FALLBACK = { title: 'Waiting', code: '', secs: 0 };
 
 export function StructureSection() {
   const nameId = useId();
@@ -227,12 +217,7 @@ export function IdentitySection() {
 }
 
 export function StreamSection() {
-  const [steps, setSteps] = useState(() =>
-    Array.from({ length: 14 }, (_, i) => ({
-      id: i + 1,
-      ...(SEED_STEPS[i % SEED_STEPS.length] ?? SEED_STEPS_FALLBACK),
-    })),
-  );
+  const [steps, setSteps] = useState(() => SEED_TRANSCRIPT.map((step, i) => ({ id: i + 1, step })));
   const [started] = useState(() => Date.now() - 12_000);
   return (
     <Section
@@ -260,20 +245,17 @@ export function StreamSection() {
       </Specimen>
       <Specimen
         title="Agent transcript"
-        note="Scroll up to reveal the jump button; Add step follows the bottom"
+        note="Thoughts fold, runs show the exit code, edits show the diff size"
         className="block"
       >
         <div className="mb-3 flex gap-2">
           <Button
             variant="outline"
             onClick={() =>
-              setSteps((all) => [
-                ...all,
-                {
-                  id: all.length + 1,
-                  ...(SEED_STEPS[all.length % SEED_STEPS.length] ?? SEED_STEPS_FALLBACK),
-                },
-              ])
+              setSteps((all) => {
+                const step = SEED_TRANSCRIPT[all.length % SEED_TRANSCRIPT.length];
+                return step == null ? all : [...all, { id: all.length + 1, step }];
+              })
             }
           >
             Add step
@@ -284,24 +266,9 @@ export function StreamSection() {
             <MessageScroller className="h-auto min-h-0 flex-1">
               <FadeScrollerViewport>
                 <MessageScrollerContent className="block gap-0 px-5 pt-4 pb-5">
-                  <Trace className="gap-2.5">
-                    {steps.map((step) => (
-                      <TraceLine key={step.id} className="text-ui text-content-secondary">
-                        <TraceTitle>
-                          {step.title}
-                          {step.code !== '' && (
-                            <>
-                              {' '}
-                              <code className="font-mono text-caption">{step.code}</code>
-                            </>
-                          )}
-                        </TraceTitle>
-                        {step.secs > 0 && <TraceDescription>{step.secs}s</TraceDescription>}
-                      </TraceLine>
-                    ))}
-                  </Trace>
+                  <TranscriptSteps steps={steps} />
                   <div className="mt-4">
-                    <LiveRow variant="chief" label="Waiting for CI" startedAt={started} />
+                    <LiveRow variant="chief" label="Opening the pull request" startedAt={started} />
                   </div>
                 </MessageScrollerContent>
               </FadeScrollerViewport>
