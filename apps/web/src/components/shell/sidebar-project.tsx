@@ -2,8 +2,8 @@ import { cn } from 'cn';
 import { AlarmClockOff, Ellipsis } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { ProjectAvatar } from '../../board/project-avatar.js';
-import { Pebble } from '../stone/pebble.js';
 import type { StoneTone } from '../stone/tone.js';
+import { ToneGlyph } from '../stone/tone-glyph.js';
 import { Button } from '../ui/button.js';
 
 export interface SidebarProjectRowProps {
@@ -88,7 +88,7 @@ export function SidebarThreadRow({
           open && 'text-foreground',
         )}
       >
-        <Pebble tone={tone} />
+        <ToneGlyph tone={tone} />
         <span className="min-w-0 truncate">{title}</span>
         {snoozed && <AlarmClockOff className="size-3 flex-none text-content-tertiary" />}
       </Button>

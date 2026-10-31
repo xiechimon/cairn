@@ -2,7 +2,7 @@ import { cn } from 'cn';
 import { Ellipsis } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { ProjectAvatar } from '../../board/project-avatar.js';
-import { Pebble } from '../stone/pebble.js';
+import { ToneGlyph } from '../stone/tone-glyph.js';
 import { Button } from '../ui/button.js';
 import { StatusChip } from '../ui/status-chip.js';
 
@@ -64,7 +64,7 @@ export function ProjectCard({
         <p className="mt-2 mb-0 line-clamp-2 text-ui text-content-secondary">{goal}</p>
         <p className="mt-2.5 mb-0 flex gap-3 text-meta text-content-tertiary">
           <span className="inline-flex items-center gap-1.25">
-            <Pebble tone="working" />
+            <ToneGlyph tone="working" still className="size-3" />
             {running} running
           </span>
           <span>{threads} threads</span>

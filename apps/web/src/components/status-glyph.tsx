@@ -4,6 +4,7 @@ import { useId } from 'react';
 export type GlyphKind =
   | 'todo'
   | 'queued'
+  | 'ring'
   | 'quarter'
   | 'half'
   | 'three-quarter'

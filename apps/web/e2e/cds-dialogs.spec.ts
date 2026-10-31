@@ -62,5 +62,5 @@ test('Paper user-menu: 12px + shadow-popover, no solid border', async ({ page })
   expect(m.border).toBe('0px');
   expect(m.shadow).not.toBe('none');
   expect(m.shadow).toContain('0px 0px 0px 1px');
-  expect(m.shadow.includes('8px 24px') || m.shadow.includes('8px 20px')).toBeTruthy();
+  expect(m.shadow.includes('10px 28px') || m.shadow.includes('8px 24px')).toBeTruthy();
 });
