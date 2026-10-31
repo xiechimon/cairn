@@ -256,6 +256,7 @@ function handle(sessionId: string, events: StepEvent[]): AgentSessionHandle {
 export async function boot(opts: {
   api?: FakeMachineApi;
   backend?: AgentBackend;
+  useDefaultBackend?: boolean;
   claudeCodeBackend?: AgentBackend;
   claudeCodeAuthProbe?: () => Promise<ClaudeCodeAuthProbe>;
   readClaudeOauthExpiresAt?: () => number | null;
@@ -297,7 +298,7 @@ export async function boot(opts: {
     paths,
     logger,
     client: api,
-    backend: opts.backend ?? fakeBackend([]).backend,
+    ...(opts.useDefaultBackend ? {} : { backend: opts.backend ?? fakeBackend([]).backend }),
     claudeCodeBackend: opts.claudeCodeBackend,
     claudeCodeAuthProbe:
       opts.claudeCodeAuthProbe ??

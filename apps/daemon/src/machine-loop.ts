@@ -131,29 +131,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     }
   }
 
-  logger.raw('Loading pi runtime…');
-  const backend =
-    opts.backend ??
-    createPiBackend({
-      agentDir: paths.agentRuntimeDir,
-      sessionDir: paths.chatSessionsDir,
-      skills: { skillsDir: config.skillsDir, cwd: config.home },
-      resolveSessionFile: (sid) => resolveSessionFile(paths, sid),
-      onSession: (sid, file) => {
-        if (file) recordSession(paths, sid, file);
-      },
-      onMcpLog: (msg) => logger.mcp(msg),
-      onSkillsLog: (msg) => logger.skills(msg),
-      onGateLog: (msg) => logger.gate(msg),
-      onTrustLog: (msg) => logger.trust(msg),
-      onOtelLog: (msg) => logger.prefixed('otel', msg),
-      onCompactionLog: (msg) => logger.step(msg),
-      machineName: config.name,
-    });
-  if (opts.backend === undefined) {
-    logger.machine(piSessionPolicyLine(process.env));
-  }
-
+  let backend: AgentBackend | undefined = opts.backend;
   const claudeBin: ClaudeBinInfo | null = await probeClaudeBin();
   logger.machine(
     claudeBin
@@ -211,7 +189,29 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       if (geminiBackend === null) geminiBackend = createGeminiBackend();
       return geminiBackend;
     }
-    if (!isBackendRuntimeId(agentProviderId)) return backend;
+    if (!isBackendRuntimeId(agentProviderId)) {
+      if (backend === undefined) {
+        logger.raw('Loading pi runtime…');
+        backend = createPiBackend({
+          agentDir: paths.agentRuntimeDir,
+          sessionDir: paths.chatSessionsDir,
+          skills: { skillsDir: config.skillsDir, cwd: config.home },
+          resolveSessionFile: (sid) => resolveSessionFile(paths, sid),
+          onSession: (sid, file) => {
+            if (file) recordSession(paths, sid, file);
+          },
+          onMcpLog: (msg) => logger.mcp(msg),
+          onSkillsLog: (msg) => logger.skills(msg),
+          onGateLog: (msg) => logger.gate(msg),
+          onTrustLog: (msg) => logger.trust(msg),
+          onOtelLog: (msg) => logger.prefixed('otel', msg),
+          onCompactionLog: (msg) => logger.step(msg),
+          machineName: config.name,
+        });
+        logger.machine(piSessionPolicyLine(process.env));
+      }
+      return backend;
+    }
     if (!claudeAnnounced) {
       logger.raw('Loading claude-code runtime…');
       claudeAnnounced = true;
@@ -596,6 +596,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       client,
       journal,
       backendFor,
+      orbProxyUrl: capEnv.CAIRN_ORB_PROXY_URL,
       logger,
       paths,
       workspace,

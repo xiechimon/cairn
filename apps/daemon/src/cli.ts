@@ -247,10 +247,13 @@ export function buildProgram(): Command {
       process.stdout.write(`${PROVIDER_COMMAND_NOTICE}\n`);
     });
 
-  program.command('orb-step', { hidden: true }).action(async () => {
-    if (process.env.CAIRN_ORB !== '1') throw new Error('Orb worker requires CAIRN_ORB=1');
-    await runOrbWorker({ input: process.stdin, output: process.stdout });
-  });
+  program
+    .command('orb-step', { hidden: true })
+    .requiredOption('--socket <path>', 'Per-step relay socket')
+    .action(async (opts: { socket: string }) => {
+      if (process.env.CAIRN_ORB !== '1') throw new Error('Orb worker requires CAIRN_ORB=1');
+      await runOrbWorker({ socketPath: opts.socket });
+    });
 
   return program;
 }

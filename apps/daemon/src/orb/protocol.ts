@@ -2,7 +2,6 @@ import { type ClaimedStep, machineDoneBodySchema, transcriptUploadSchema } from 
 import { z } from 'zod';
 import type { MachineApi } from '../machine-client.js';
 import type { RunStepOptions } from '../runner.js';
-import type { StatePaths } from '../state.js';
 
 export const ORB_RPC_PREFIX = 'cairn-orb-rpc:';
 export const ORB_STEP_METHODS = [
@@ -23,16 +22,15 @@ export const ORB_STEP_METHODS = [
   'putUpload',
   'done',
   'reportClaudeRateLimit',
+  'steer',
+  'steerAck',
+  'stop',
 ] as const satisfies readonly (keyof MachineApi)[];
 export type OrbStepMethod = (typeof ORB_STEP_METHODS)[number];
 
 export interface OrbStepInput {
   claimed: ClaimedStep;
   options: RunStepOptions;
-  paths: StatePaths;
-  workspacesDir: string;
-  mcpConfigPath: string;
-  skillsDir?: string;
   machineName?: string;
   hookTimeoutMs?: number;
   methods: OrbStepMethod[];
@@ -53,9 +51,17 @@ export const orbCheckpointSchema = z
 
 export type OrbFrame =
   | { type: 'init'; input: OrbStepInput }
-  | { type: 'call'; id: number; method: OrbStepMethod; args: unknown[] }
+  | { type: 'call'; id: number; method: OrbStepMethod; args: unknown[]; cancellable?: boolean }
   | { type: 'cancel'; id: number }
-  | { type: 'reply'; id: number; value?: unknown; error?: string; status?: number; body?: string }
+  | {
+      type: 'reply';
+      id: number;
+      value?: unknown;
+      error?: string;
+      status?: number;
+      body?: string;
+      forbidden?: boolean;
+    }
   | { type: 'stop'; discard: boolean }
   | { type: 'session'; live: boolean }
   | { type: 'checkpoint'; checkpoint: z.infer<typeof orbCheckpointSchema> }

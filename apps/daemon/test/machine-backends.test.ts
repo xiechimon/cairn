@@ -18,7 +18,7 @@ describe('per-step backend resolution (spec 17 A3: backendFor is the only branch
     expect(api.doneBodies[0]?.body.status).toBe('success');
     expect(claudeCreated).toHaveLength(1);
     expect(piCreated).toHaveLength(0);
-    expect(lines[0]).toBe('Loading pi runtime…');
+    expect(lines).not.toContain('Loading pi runtime…');
     const claudeLines = lines.filter((l) => l === 'Loading claude-code runtime…');
     expect(claudeLines).toHaveLength(1);
     expect(lines).toContain('using model claude-code/stub-model');
