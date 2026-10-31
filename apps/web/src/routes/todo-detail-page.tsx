@@ -98,8 +98,7 @@ import type {
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
-import type { MentionGroups } from '../overlay/mention-picker.js';
-import type { FileMentionEntry } from '../overlay/mention-token.js';
+import type { FileMentionEntry, MentionGroups } from '../overlay/mention-token.js';
 import { MoreMenu } from '../overlay/more-menu.js';
 import { SearchPanel, useSearchState } from '../overlay/search-panel.js';
 import { SHEET_PANEL } from '../pages/shell.js';

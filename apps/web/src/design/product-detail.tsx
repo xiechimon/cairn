@@ -136,11 +136,7 @@ function ComposerSpecimen() {
   return (
     <Specimen
       title="Composer"
-      note={
-        sent.length === 0
-          ? 'Type / for commands or @ for mentions; the grid button opens the mention picker'
-          : `Sent: ${sent.at(-1)}`
-      }
+      note={sent.length === 0 ? 'Type / for commands or @ for mentions' : `Sent: ${sent.at(-1)}`}
       stage="canvas"
       className="flex-col gap-y-10"
     >

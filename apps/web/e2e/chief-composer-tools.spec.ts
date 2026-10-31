@@ -9,14 +9,6 @@ import { evidenceShot } from './evidence';
 // grant/upload/read chain and the mention wire are the landed ones.
 //
 // Failure modes pinned here (ticket list, extended by recon):
-//  FM1 data source: chief's mentionGroups come from the same REST hooks the
-//      detail face projects (members filtered to agents feeds the inline
-//      list; the five groups feed the popover). A mis-wired or missing
-//      source leaves the inline listbox permanently closed (it needs a
-//      non-empty agent group) or the popover at zero counts.
-//  FM2 popup layer: the drawer is a docked dialog — the inline listbox
-//      anchors above the composer wrap inside it (mention-picker.css z 40 is
-//      local to the drawer), the popover rides FloatingShell's ladder.
 //  FM3 read-only face: with onSend absent (fixture capture) the completion
 //      must not fire (editable gate inside useComposerWire) and the attach
 //      button stays inert.
@@ -26,9 +18,6 @@ import { evidenceShot } from './evidence';
 //      the draft verbatim, zero wire change.
 //  FM7 transcript: the live user row renders through ChatMarkdown (#742), so
 //      mention and attachment tokens must come out as chips, never literal.
-//  FM9 Esc ladder: with the inline listbox open Esc closes the listbox and
-//      the drawer survives (#146 ladder law); the popover's Esc is the
-//      FloatingShell layer's.
 //  FM10 send path: Enter with a highlighted row inserts instead of sending;
 //      Enter during an in-flight upload never sends (the shared wire gate).
 //
@@ -347,43 +336,6 @@ test('Esc closes the listbox and the drawer survives (#146 ladder, FM9)', async 
   await expect(input).toHaveValue('@bu');
 });
 
-test('the mention button opens the popover with live group counts and inserts a token (FM1)', async ({
-  page,
-}) => {
-  const { drawer, input } = await openChief(page);
-
-  await drawer.getByRole('button', { name: '提及' }).click();
-  const picker = page.locator('.mention-picker');
-  await expect(picker).toBeVisible();
-  // Counts come from the live hooks (one todo / one skill / three agents /
-  // one project / one machine) — a zero row means the group source is not
-  // wired on the chief face.
-  await expect(picker.locator('.mention-row--top[aria-label="Agents (3)"]')).toBeVisible();
-  await expect(picker.locator('.mention-row--top[aria-label="任务 (1)"]')).toBeVisible();
-  await expect(picker.locator('.mention-row--top[aria-label="技能 (1)"]')).toBeVisible();
-  await expect(picker.locator('.mention-row--top[aria-label="项目 (1)"]')).toBeVisible();
-  await expect(picker.locator('.mention-row--top[aria-label="机器 (1)"]')).toBeVisible();
-  await evidenceShot(page, 'chief-mention-popover-counts.png');
-
-  await picker.locator('.mention-row--top[aria-label="Agents (3)"]').click();
-  await picker.locator('.mention-row--entry', { hasText: 'builder' }).click();
-  await picker.locator('.mention-picker-insert').click();
-
-  await expect(picker).toBeHidden();
-  await expect(input).toHaveValue('@builder ');
-});
-
-test('Esc with the popover open closes the popover, not the drawer (FM9)', async ({ page }) => {
-  const { drawer } = await openChief(page);
-
-  await drawer.getByRole('button', { name: '提及' }).click();
-  const picker = page.locator('.mention-picker');
-  await expect(picker).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(picker).toBeHidden();
-  await expect(drawer).toBeVisible();
-});
-
 // —— clipboard paste face (FM6/FM10) ——
 
 test('a mid-line image paste lands the token whole-line at the caret (FM6)', async ({ page }) => {
@@ -552,7 +504,7 @@ test('transcript: mention and attachment tokens in a user row render as chips, n
 // —— fixture capture face (FM3) ——
 
 test.describe('fixture face stays inert (#732 FM3)', () => {
-  test('the composer is read-only: no listbox, attach inert, picker at zero counts', async ({
+  test('the composer is read-only: no listbox, attach inert', async ({
     page,
   }) => {
     await page.goto('/app?view=board&scenario=111');
@@ -567,11 +519,5 @@ test.describe('fixture face stays inert (#732 FM3)', () => {
     await expect(drawer.locator('.mention-inline')).toHaveCount(0);
 
     await expect(drawer.getByRole('button', { name: '添加附件' })).toBeDisabled();
-
-    // The popover opens on the capture face with zero counts (no live hooks).
-    await drawer.getByRole('button', { name: '提及' }).click();
-    const picker = page.locator('.mention-picker');
-    await expect(picker).toBeVisible();
-    await expect(picker.locator('.mention-row--top[aria-label="Agents (0)"]')).toBeVisible();
   });
 });

@@ -31,12 +31,12 @@ import {
   toDisplay,
   toWire,
 } from './mention-display.js';
-import type { MentionGroups } from './mention-picker.js';
 import {
   buildInlineRows,
   type FileMentionEntry,
   type InlineCompletionRow,
   insertFileText,
+  type MentionGroups,
   type MentionToken,
 } from './mention-token.js';
 import { applyOrderedListEnter } from './ordered-list.js';
@@ -88,9 +88,6 @@ export interface ComposerWire {
   pendingAttachments: PendingAttachment[];
   onPickFiles: (event: ChangeEvent<HTMLInputElement>) => void;
   handlePaste: (event: ClipboardEvent<HTMLTextAreaElement>) => void;
-  pickerOpen: boolean;
-  togglePicker: () => void;
-  closePicker: () => void;
   inlineOpen: boolean;
   inlineCaret: number | null;
   inlineQuery: string;
@@ -116,18 +113,8 @@ export interface ComposerWire {
   closeHelp: () => void;
   helpRows: SlashRow[];
   helpSkillCount: number;
-  insertTokens: (tokens: MentionToken[]) => void;
-  groups: MentionGroups;
   mentionRegistry: MentionRegistry;
 }
-
-const EMPTY_GROUPS: MentionGroups = {
-  todo: [],
-  skill: [],
-  agent: [],
-  project: [],
-  machine: [],
-};
 
 function sameRange(a: CompletionRange, b: CompletionRange): boolean {
   return a.start === b.start && a.end === b.end && a.query === b.query;
@@ -173,7 +160,6 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const inlineListboxRef = useRef<HTMLDivElement | null>(null);
   const [attaching, setAttaching] = useState(false);
-  const [pickerOpen, setPickerOpen] = useState(false);
   const {
     pending: pendingAttachments,
     track: trackPending,
@@ -513,9 +499,6 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
       case 'attach':
         openFilePicker();
         break;
-      case 'mention':
-        setPickerOpen(true);
-        break;
       case 'review':
         slashOptions?.onReview?.();
         break;
@@ -689,8 +672,6 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     return () => document.removeEventListener('pointerdown', onPointerDown, true);
   }, [inlineOpen, slashOpen, closeInline, closeSlash]);
 
-  const groups = mentionGroups ?? EMPTY_GROUPS;
-
   return {
     draft,
     setDraft,
@@ -710,9 +691,6 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     pendingAttachments,
     onPickFiles,
     handlePaste,
-    pickerOpen,
-    togglePicker: () => setPickerOpen((value) => !value),
-    closePicker: () => setPickerOpen(false),
     inlineOpen,
     inlineCaret: inlineRange?.start ?? null,
     inlineQuery: inlineRange?.query ?? '',
@@ -723,8 +701,6 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     inlineListboxRef,
     closeInline,
     acceptInlineRow,
-    insertTokens,
-    groups,
     mentionRegistry: registry,
     slashOpen,
     slashQuery,

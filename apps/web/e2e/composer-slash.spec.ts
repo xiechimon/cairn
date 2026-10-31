@@ -158,15 +158,13 @@ test('trigger: `/` opens builtins then skills, paths and mid-word stay literal (
   await input.fill('/tmp/notes.md');
   await expect(menu).toBeHidden();
 
-  // Building phase: review/stop unavailable, so four builtins (F6),
-  // then the two stubbed team skills in roster order.
   await input.fill('/');
   await expect(menu).toBeVisible();
-  await expect(rows).toHaveCount(6);
+  await expect(rows).toHaveCount(5);
   await expect(rows.nth(0)).toContainText('/clear');
-  await expect(rows.nth(3)).toContainText('/help');
-  await expect(rows.nth(4)).toContainText('/code-review');
-  await expect(rows.nth(5)).toContainText('/spell-check');
+  await expect(rows.nth(2)).toContainText('/help');
+  await expect(rows.nth(3)).toContainText('/code-review');
+  await expect(rows.nth(4)).toContainText('/spell-check');
 
   await input.fill('好的。/');
   await expect(menu).toBeVisible();
@@ -315,15 +313,14 @@ test('/help opens the command panel', async ({ page }) => {
   const { input, rows } = await openDetail(page);
 
   await input.fill('/');
-  await expect(rows).toHaveCount(6);
-  await input.press('ArrowDown');
+  await expect(rows).toHaveCount(5);
   await input.press('ArrowDown');
   await input.press('ArrowDown');
   await input.press('ArrowDown');
   await input.press('Enter');
   const panel = page.locator('.slash-help');
   await expect(panel).toBeVisible();
-  await expect(panel.locator('.slash-help-row')).toHaveCount(4);
+  await expect(panel.locator('.slash-help-row')).toHaveCount(3);
   await expect(panel).toContainText('/clear');
   // Geometry: the panel must land inside the viewport (an unpositioned
   // panel renders below the fold and screenshots empty).

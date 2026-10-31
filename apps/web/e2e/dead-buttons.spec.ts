@@ -172,7 +172,7 @@ test('machines rows carry only live controls, no dead inline buttons (#222 shipp
   await expect(page.locator('div[data-kind] button[aria-label^="并发上限"]')).toHaveCount(2);
 });
 
-test('composer toolbar drops the `语音输入` button, keeps attachment + mention', async ({ page }) => {
+test('composer toolbar drops the `语音输入` button, keeps attachment', async ({ page }) => {
 
   await page.goto('/app/todo/r8-15?scenario=chain');
   const toolbar = page.locator('.composer-toolbar');
@@ -180,10 +180,9 @@ test('composer toolbar drops the `语音输入` button, keeps attachment + menti
 
   await expect(toolbar.locator('button[aria-label="语音输入"]')).toHaveCount(0);
   await expect(toolbar.locator('button[aria-label="添加附件"]')).toBeVisible();
-  await expect(toolbar.locator('button[aria-label="提及"]')).toBeVisible();
 });
 
-test('new-task dialog tools drop the `语音输入` button, keep two live tools', async ({ page }) => {
+test('new-task dialog tools drop the `语音输入` button, keep the attachment tool', async ({ page }) => {
   await page.goto('/app?scenario=01&view=board');
   await page.locator('.sidebar-new-task').click();
 
@@ -191,9 +190,8 @@ test('new-task dialog tools drop the `语音输入` button, keep two live tools'
   await expect(tools).toBeVisible();
 
   await expect(tools.getByRole('button', { name: '语音输入' })).toHaveCount(0);
-  await expect(tools.getByRole('button')).toHaveCount(2);
+  await expect(tools.getByRole('button')).toHaveCount(1);
   await expect(tools.getByRole('button', { name: '添加附件' })).toBeVisible();
-  await expect(tools.getByRole('button', { name: '提及' })).toBeVisible();
 });
 
 test('api-keys empty state drops the `查看文档` button, keeps `新建密钥` (#307)', async ({ page }) => {

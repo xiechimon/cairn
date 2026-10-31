@@ -4,12 +4,12 @@ import { Button } from '../components/ui/button.js';
 import { Input } from '../components/ui/input.js';
 import { Textarea } from '../components/ui/textarea.js';
 import { useI18n } from '../i18n/provider.js';
-import { ArrowUp, Grid2x2, Paperclip, SearchPlus } from '../icons/index.js';
+import { ArrowUp, Paperclip, SearchPlus } from '../icons/index.js';
 import { AttachmentStrip } from '../overlay/attachment-strip.js';
 import { useComposerWire } from '../overlay/composer-wire.js';
 import { MENTION_TEXTAREA_CLS, MentionHighlight } from '../overlay/mention-highlight.js';
-import { type MentionGroups, MentionInline, MentionPicker } from '../overlay/mention-picker.js';
-import type { FileMentionEntry } from '../overlay/mention-token.js';
+import { MentionInline } from '../overlay/mention-inline.js';
+import type { FileMentionEntry, MentionGroups } from '../overlay/mention-token.js';
 import { SlashHelp, SlashMenu } from '../overlay/slash-menu.js';
 
 const COMPOSER_CARD =
@@ -71,9 +71,6 @@ export function Composer({
     pendingAttachments,
     onPickFiles,
     handlePaste,
-    pickerOpen,
-    togglePicker,
-    closePicker,
     inlineOpen,
     inlineCaret,
     inlineQuery,
@@ -83,9 +80,7 @@ export function Composer({
     inlineListboxId,
     inlineListboxRef,
     acceptInlineRow,
-    insertTokens,
     mentionRegistry,
-    groups,
     slashOpen,
     slashQuery,
     slashCaret,
@@ -256,18 +251,6 @@ export function Composer({
             <SearchPlus width={16} height={16} />
           </IconTooltip>
         )}
-        <IconTooltip
-          label={t('提及')}
-          trigger={
-            <Button
-              variant="ghost"
-              className={`composer-tool ${COMPOSER_TOOL} mr-1.5 font-normal [&_svg:not([class*='size-'])]:size-auto`}
-              onClick={togglePicker}
-            />
-          }
-        >
-          <Grid2x2 width={16} height={16} />
-        </IconTooltip>
       </div>
       {streaming && (
         <Button
@@ -291,15 +274,6 @@ export function Composer({
       >
         <ArrowUp width={14} height={14} />
       </Button>
-      <MentionPicker
-        open={pickerOpen}
-        onClose={closePicker}
-        groups={groups}
-        onInsert={(tokens) => {
-          insertTokens(tokens);
-          closePicker();
-        }}
-      />
       <SlashHelp
         open={helpOpen}
         onClose={closeHelp}

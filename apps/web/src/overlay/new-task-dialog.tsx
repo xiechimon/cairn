@@ -24,7 +24,7 @@ import { Textarea } from '../components/ui/textarea.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { PROJECT_ID, PROJECT_NAME } from '../fixtures/fixtures.js';
 import { useI18n } from '../i18n/provider.js';
-import { Check, ChevronDown, Grid2x2, Paperclip, X } from '../icons/index.js';
+import { Check, ChevronDown, Paperclip, X } from '../icons/index.js';
 import { isEditableTarget, useChordHotkey, useProjectCycleHotkey } from '../overlay/hotkeys.js';
 import { safeLocalStorage } from '../safe-storage.js';
 import {
@@ -37,14 +37,11 @@ import {
 import { AttachmentStrip } from './attachment-strip.js';
 import {
   createMentionRegistry,
-  insertMentionDisplay,
   type MentionRegistry,
   toDisplay,
   toWire,
 } from './mention-display.js';
 import { MENTION_TEXTAREA_CLS, MentionHighlight } from './mention-highlight.js';
-import { type MentionGroups, MentionPicker } from './mention-picker.js';
-import type { MentionToken } from './mention-token.js';
 import { applyOrderedListEnter } from './ordered-list.js';
 import { usePendingAttachments } from './pending-attachments.js';
 
@@ -105,8 +102,6 @@ export interface NewTaskDialogProps {
   onSpecChange?: (next: string) => void;
   onAttachment?: (files: File[]) => string[] | Promise<string[]>;
 
-  mentionGroups?: MentionGroups;
-
   rememberProject?: boolean;
 }
 
@@ -119,8 +114,6 @@ export function NewTaskDialog({
   spec: specProp,
   onSpecChange,
   onAttachment,
-
-  mentionGroups,
   rememberProject = false,
 }: NewTaskDialogProps) {
   const { t } = useI18n();
@@ -137,7 +130,6 @@ export function NewTaskDialog({
     if (specControlled) (onSpecChange as (s: string) => void)(wire);
     else setInternalSpec(wire);
   };
-  const [pickerOpen, setPickerOpen] = useState(false);
   const [discardOpen, setDiscardOpen] = useState(false);
   const [projectOpen, setProjectOpen] = useState(false);
   const [projectId, setProjectId] = useState<string | null>(() =>
@@ -182,22 +174,16 @@ export function NewTaskDialog({
   };
   const gateRef = useRef({
     discardOpen: false,
-    pickerOpen: false,
     projectOpen: false,
     dirty: false,
   });
-  gateRef.current = { discardOpen, pickerOpen, projectOpen, dirty };
+  gateRef.current = { discardOpen, projectOpen, dirty };
   const requestClose = () => {
     if (gestureConsumedRef.current) return;
     const gate = gateRef.current;
     if (gate.discardOpen) {
       markGestureConsumed();
       closeDiscard();
-      return;
-    }
-    if (gate.pickerOpen) {
-      markGestureConsumed();
-      setPickerOpen(false);
       return;
     }
     if (gate.projectOpen) {
@@ -217,7 +203,6 @@ export function NewTaskDialog({
     if (!open) {
       setProjectOpen(false);
       setDiscardOpen(false);
-      setPickerOpen(false);
       setSpec('');
     }
   }, [open]);
@@ -337,45 +322,6 @@ export function NewTaskDialog({
     setDiscardOpen(false);
     setSpec('');
     onClose();
-  };
-
-  const insertTokens = (tokens: MentionToken[]) => {
-    if (tokens.length === 0) return;
-    const ta = specRef.current;
-    if (ta == null) {
-      setSpec((current) => {
-        let value = current;
-        for (const token of tokens)
-          value = insertMentionDisplay(value, token, mentionRegistry, null).value;
-        return value;
-      });
-      return;
-    }
-    const start = ta.selectionStart ?? spec.length;
-    const pending = { caret: start };
-    setSpec((current) => {
-      let value = current;
-      let at = start;
-      for (const token of tokens) {
-        const result = insertMentionDisplay(value, token, mentionRegistry, at);
-        value = result.value;
-        pending.caret = result.caret;
-        at = result.caret;
-      }
-      return value;
-    });
-    requestAnimationFrame(() => {
-      ta.focus();
-      ta.setSelectionRange(pending.caret, pending.caret);
-    });
-  };
-
-  const groups = mentionGroups ?? {
-    todo: [],
-    skill: [],
-    agent: [],
-    project: [],
-    machine: [],
   };
 
   return (
@@ -518,15 +464,6 @@ export function NewTaskDialog({
               >
                 <Paperclip />
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-7 text-content-tertiary"
-                aria-label={t('提及')}
-                onClick={() => setPickerOpen((value) => !value)}
-              >
-                <Grid2x2 />
-              </Button>
             </div>
             <div className="ml-auto flex items-center gap-2">
               <Button
@@ -599,18 +536,6 @@ export function NewTaskDialog({
           </DialogFootRow>
         </AlertDialogContent>
       </AlertDialog>
-      <MentionPicker
-        open={pickerOpen}
-        onClose={() => {
-          markGestureConsumed();
-          setPickerOpen(false);
-        }}
-        groups={groups}
-        onInsert={(tokens) => {
-          insertTokens(tokens);
-          setPickerOpen(false);
-        }}
-      />
     </>
   );
 }

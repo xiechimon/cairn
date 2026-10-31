@@ -484,7 +484,7 @@ test('the chip cycles on Tab while the list is open; Shift+Tab keeps native move
   await pressAndExpect(page, 'Escape', dialog(page), 'hidden');
 });
 
-test('Tab off the driving seats stays native (mention button keeps its own walk)', async ({
+test('Tab off the driving seats stays native (close button keeps its own walk)', async ({
   page,
 }) => {
   await page.goto(PROJECTS);
@@ -493,15 +493,13 @@ test('Tab off the driving seats stays native (mention button keeps its own walk)
   const chipName = page.locator('.new-task-project-name');
   await expect(chipName).toHaveText('r3-lifecycle');
 
-  const mention = page.locator('.new-task-dialog button[aria-label="提及"]');
-  await mention.focus();
+  const close = page.locator('.new-task-dialog .new-task-close');
+  await close.focus();
   await page.keyboard.press('Tab');
 
   await expect(chipName).toHaveText('r3-lifecycle');
-  await expect(mention).not.toBeFocused();
+  await expect(close).not.toBeFocused();
 
-  const hint = page.locator('[data-slot="tooltip-content"]');
-  await pressAndExpect(page, 'Escape', hint, 'hidden');
   await pressAndExpect(page, 'Escape', dialog(page), 'hidden');
 });
 
