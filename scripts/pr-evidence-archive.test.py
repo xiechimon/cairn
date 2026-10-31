@@ -24,7 +24,7 @@ class ArchiveTests(unittest.TestCase):
             body.write_text('## What\nArchive evidence.\n## Review\nFresh review passed.\n## Risk\nReversible change.\n## Proof\n' + content)
             context = Path(directory, 'context.json')
             context.write_text(json.dumps({'repository': repository, 'commits': [
-                {'commit': {'message': message}} for message in messages]}))
+                {'commit': {'message': message}} for message in messages], 'files': []}))
             output = io.StringIO()
             with patch.object(sys, 'argv', ['gate', str(body), str(context)]), patch.object(
                 gate, 'http_code', return_value='200'
@@ -143,6 +143,7 @@ class WorkflowTests(unittest.TestCase):
             context = json.loads(Path(directory, 'pr-evidence-context.json').read_text())
             self.assertEqual(context['repository'], 'xiechimon/cairn')
             self.assertEqual(context['commits'][1]['commit']['message'], 'Closes #1983')
+            self.assertEqual(len(context['files']), 2)
         self.assertIn('scripts/pr-evidence-gate.py "$RUNNER_TEMP/pr-body.md" "$RUNNER_TEMP/pr-evidence-context.json"', workflow)
 
     def test_regressions_run_in_both_prepush_plans(self):

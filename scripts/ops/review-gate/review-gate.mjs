@@ -9,6 +9,7 @@ import {
   stallAlert,
   stalled,
 } from './reviewer-route.mjs';
+import { sizeFacts, sizeFactsLine } from './size-facts.mjs';
 
 const HOME = process.env.HOME;
 const REPO = 'xiechimon/cairn';
@@ -270,6 +271,24 @@ try {
       .at(-1);
     return last ? vendorOf(last.kind, last.model) : null;
   };
+  const sizeLine = (pr) =>
+    sizeFactsLine(
+      sizeFacts(
+        execFileSync(
+          'git',
+          [
+            'diff',
+            '--no-renames',
+            '--numstat',
+            `origin/main...review-gate-${pr.number}`,
+            '--',
+            '.',
+            ':(exclude)docs/verify',
+          ],
+          { cwd: MAIN, encoding: 'utf8', maxBuffer: 64 << 20 },
+        ),
+      ),
+    );
   const runReview = (pr, slot) =>
     new Promise((resolve) => {
       const prompt = `${readFileSync(new URL('./prompt.txt', import.meta.url), 'utf8')}
@@ -286,6 +305,7 @@ ${
 `
     : ''
 }
+  ${sizeLine(pr)}
   Protected paths touched: ${pr.touched.join(', ')}`;
       const tierEnv = pr.lane
         ? Object.fromEntries(

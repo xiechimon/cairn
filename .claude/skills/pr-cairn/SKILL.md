@@ -46,6 +46,12 @@ within lines, and decoded HTML entities; formatting and whitespace between
 lines do not count. Over the limit, it reports
 `too-long: <n> characters of prose outside tables, images, code and details (limit 600)`.
 Keep Proof and What short; put supporting output in tables or code blocks.
+
+A patch over 800 non-evidence lines or 40 non-evidence files (`docs/verify/**`
+left out, a rename counts two files) also needs `## Size` inside the collapsed
+details block: say why the change cannot be split. Oversize no longer routes
+to ian; the gate reds as `missing-section: Size` until the section is answered,
+and the review must answer why the change is this big.
 A section containing only fenced code or HTML comments is unanswered.
 
 A legacy `## Verified` aliases Proof. The complete legacy six-section shape
@@ -130,6 +136,7 @@ so the images remain reachable. Images belong outside code fences.
 |---|---|
 | `## Proof`, `## What`, `## Review`, `## Risk` answered, including headings inside details (legacy `## Verified` aliases Proof; Upstream is optional) | pr-evidence (required check) |
 | at most 600 visible prose characters outside tables, images, code, comments and details; complete legacy six-section bodies exempt | pr-evidence (required check) |
+| over 800 non-evidence lines or 40 non-evidence files: `## Size` answered inside the details block | pr-evidence (required check, file list from the PR files API) |
 | image links embedded + HTTP 200 | pr-evidence (required check) |
 | no unchecked tasks anywhere outside fenced code and HTML comments; no tasks required | pr-evidence (required check, pr-tasks step) |
 | body is English (Chinese only inside backticks or fences) | pr-evidence (required check, language step) |

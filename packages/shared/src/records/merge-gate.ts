@@ -254,7 +254,12 @@ export const MERGE_BLOCKERS = [
     class: 'human',
     label: '补丁无法取摘要（证据之外没有文件，或有文件缺 blob sha）',
   },
-  { code: 'size-cap', class: 'human', label: '补丁超过 800 行或 40 个文件' },
+  { code: 'size-cap', class: 'human', label: '本地补丁超过 800 行或 40 个文件' },
+  {
+    code: 'size-review',
+    class: 'transient',
+    label: '补丁超过 800 行或 40 个文件：PR 正文要有 ## Size 小节，且当前补丁要有评审通过',
+  },
   {
     code: 'independent-review-missing',
     class: 'transient',

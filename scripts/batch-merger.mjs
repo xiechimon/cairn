@@ -64,18 +64,22 @@ function ownerRouting(headSha) {
   const deletedFiles = deleted ? deleted.split('\n') : [];
   if (!Number.isSafeInteger(linesChanged) || !deletedFiles.every((f) => changedFiles.includes(f)))
     throw new Error('Invalid owner routing diff');
-  const reasons = runInNewContext(
+  const { humanReasons, sizeReview } = runInNewContext(
     `${constants}
 const matchedProtected = changedFiles.filter(isProtected);
 const reviewed = [];
 ${routing}
-humanReasons`,
+;({ humanReasons, sizeReview })`,
     { changedFiles, deletedFiles, binaryFiles, linesChanged },
     sandboxOptions,
   );
-  if (!Array.isArray(reasons) || !reasons.every((reason) => typeof reason === 'string'))
+  if (
+    !Array.isArray(humanReasons) ||
+    !humanReasons.every((reason) => typeof reason === 'string') ||
+    typeof sizeReview !== 'boolean'
+  )
     throw new Error('Invalid owner routing result');
-  return reasons;
+  return { reasons: Array.from(humanReasons), sizeReview };
 }
 
 function markOwnerRoute(pr, reasons, dryRun) {
@@ -219,8 +223,9 @@ try {
         continue;
       }
       let ownerReasons;
+      let sizeReview;
       try {
-        ownerReasons = ownerRouting(result.pr.head.sha);
+        ({ reasons: ownerReasons, sizeReview } = ownerRouting(result.pr.head.sha));
       } catch (error) {
         log(result.pr, 'owner-routing-unavailable', [error.message]);
         continue;
@@ -251,7 +256,7 @@ try {
           ],
           { encoding: 'utf8', maxBuffer: 512 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] },
         );
-      log(result.pr, dryRun ? 'would-merge' : 'merged', []);
+      log(result.pr, dryRun ? 'would-merge' : 'merged', sizeReview ? ['size-review'] : []);
     } catch (error) {
       log(candidate, 'error', [error.message]);
       process.exitCode = 1;
