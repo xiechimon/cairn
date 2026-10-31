@@ -4,11 +4,10 @@ import { useBuild } from '../api/hooks.js';
 import { NO_PRICE_REASON } from '../api/mappers.js';
 import { Badge } from '../components/ui/badge.js';
 import { Button } from '../components/ui/button.js';
-import { Label } from '../components/ui/label.js';
 import type { BuildOverlayContent, PaneView, RunHistoryRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { Check, TriangleDown, TriangleRight, X } from '../icons/index.js';
-import { BranchSyncFields, READONLY_BOX, SyncButton, useBranchSyncState } from './branch-dialog.js';
+import { BranchSyncFields, CopyButton, SyncButton, useBranchSyncState } from './branch-dialog.js';
 
 function RunGlyph({ status }: { status: RunHistoryRow['status'] }) {
   if (status === 'current')
@@ -112,14 +111,14 @@ function UsageBody({ content }: { content: BuildOverlayContent }) {
             <span className="text-right tabular-nums text-(--foreground)">{row.value}</span>
           </div>
         ))}
-      </div>
-      <div className="mt-2.5 flex items-center justify-between">
+        <span aria-hidden="true" />
         <span className="text-(--text-tertiary)">{t('缓存命中率')}</span>
-        <span className="tabular-nums text-(--foreground)">{stats.cacheHitRate}</span>
-      </div>
-      <div className="mt-1.5 flex items-center justify-between font-mono">
-        <span className="text-(--text-secondary)">{stats.model}</span>
-        <span className="text-(--text-tertiary)">{stats.modelTotal} tokens</span>
+        <span className="text-right tabular-nums text-(--foreground)">{stats.cacheHitRate}</span>
+        <span aria-hidden="true" />
+        <span className="truncate font-mono text-xs text-(--text-secondary)">{stats.model}</span>
+        <span className="text-right tabular-nums text-(--text-tertiary)">
+          {stats.modelTotal} tokens
+        </span>
       </div>
       {stats.cost !== undefined && (
         <fieldset
@@ -177,6 +176,38 @@ function HistoryBody({ content }: { content: BuildOverlayContent }) {
   );
 }
 
+function KvRow({
+  label,
+  mono,
+  copy,
+  children,
+}: {
+  label: string;
+  mono?: boolean;
+  copy?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="group relative flex min-h-6 items-center gap-2 text-meta">
+      <span className="flex-none text-(--text-tertiary)">{label}</span>
+      <span
+        className={cn(
+          'min-w-0 flex-1 truncate text-right text-(--foreground)',
+          mono && 'font-mono text-xs [font-variant-ligatures:none]',
+        )}
+      >
+        {children}
+      </span>
+      {copy !== undefined && (
+        <CopyButton
+          value={copy}
+          className="absolute right-0 size-5 bg-(--background) opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100"
+        />
+      )}
+    </div>
+  );
+}
+
 function BranchBody({
   content,
   buildId,
@@ -192,34 +223,44 @@ function BranchBody({
   const prNumber = buildQ.data?.prNumber ?? null;
   return (
     <div>
-      <BranchSyncFields
-        info={info}
-        canSync={sync.canSync}
-        machines={sync.machines}
-        selectedMachineId={sync.selectedMachineId}
-        onMachineId={sync.onMachineId}
-        directory={sync.directory}
-        onDirectory={sync.onDirectory}
-        force={sync.force}
-        onForce={sync.onForce}
-        buildId={buildId}
-      />
-      <div className="mt-4 flex flex-col gap-2">
-        <Label>Pull Request</Label>
-        {pr !== null && prNumber != null ? (
-          <a
-            className={cn(READONLY_BOX, 'text-(--accent) underline')}
-            href={pr}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            #{prNumber}
-          </a>
-        ) : (
-          <div className={READONLY_BOX}>{t('未创建')}</div>
-        )}
+      <div className="flex flex-col">
+        <KvRow label={t('构建分支')} mono copy={info.branch}>
+          {info.branch}
+        </KvRow>
+        <KvRow label={t('目标提交')} mono copy={info.commit}>
+          {info.commit}
+        </KvRow>
+        <KvRow label="Pull Request">
+          {pr !== null && prNumber != null ? (
+            <a
+              className="text-(--accent) underline"
+              href={pr}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              #{prNumber}
+            </a>
+          ) : (
+            <span className="text-(--text-tertiary)">{t('未创建')}</span>
+          )}
+        </KvRow>
       </div>
-      <div className="mt-4">
+      <div className="mt-3">
+        <BranchSyncFields
+          compact
+          info={info}
+          canSync={sync.canSync}
+          machines={sync.machines}
+          selectedMachineId={sync.selectedMachineId}
+          onMachineId={sync.onMachineId}
+          directory={sync.directory}
+          onDirectory={sync.onDirectory}
+          force={sync.force}
+          onForce={sync.onForce}
+          buildId={buildId}
+        />
+      </div>
+      <div className="mt-3">
         <SyncButton
           buildId={buildId}
           canSync={sync.canSync}
@@ -278,7 +319,9 @@ export function PaneSections({
       <SectionShell
         testId="history"
         title={t('历史')}
-        summary={t('{n} 次运行', { n: content.runs.length })}
+        summary={
+          content.runs.length === 1 ? t('1 次运行') : t('{n} 次运行', { n: content.runs.length })
+        }
         open={open.history}
         onToggle={() => toggle('history')}
       >

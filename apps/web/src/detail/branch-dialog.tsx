@@ -30,7 +30,7 @@ interface BranchDialogProps {
   onClose: () => void;
 }
 
-function CopyButton({ value }: { value: string }) {
+export function CopyButton({ value, className }: { value: string; className?: string }) {
   const { t } = useI18n();
   const copy = () => {
     void navigator.clipboard?.writeText(value).catch(() => {});
@@ -39,7 +39,7 @@ function CopyButton({ value }: { value: string }) {
     <Button
       variant="ghost"
       size="icon-xs"
-      className="flex-none"
+      className={cn('flex-none', className)}
       aria-label={t('复制')}
       onClick={copy}
     >
@@ -80,6 +80,7 @@ export function BranchSyncFields({
   force,
   onForce,
   buildId,
+  compact = false,
 }: {
   info: BranchInfoContent;
   canSync: boolean;
@@ -91,13 +92,15 @@ export function BranchSyncFields({
   force: boolean;
   onForce: (force: boolean) => void;
   buildId: string | null;
+  compact?: boolean;
 }) {
   const { t } = useI18n();
+  const fieldLabel = compact ? 'text-meta font-medium text-(--text-tertiary)' : 'leading-tight';
   return (
-    <div className="flex flex-col gap-4">
-      <BranchBox info={info} />
-      <div className="flex flex-col gap-2">
-        <Label className="leading-tight">{t('目标机器')}</Label>
+    <div className={cn('flex flex-col', compact ? 'gap-3' : 'gap-4')}>
+      {!compact && <BranchBox info={info} />}
+      <div className={cn('flex flex-col', compact ? 'gap-1.5' : 'gap-2')}>
+        <Label className={fieldLabel}>{t('目标机器')}</Label>
         {canSync ? (
           <MachinePicker
             machines={machines}
@@ -113,8 +116,8 @@ export function BranchSyncFields({
           </Button>
         )}
       </div>
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="branch-sync-directory" className="leading-tight">
+      <div className={cn('flex flex-col', compact ? 'gap-1.5' : 'gap-2')}>
+        <Label htmlFor="branch-sync-directory" className={fieldLabel}>
           {t('同步目录')}
         </Label>
         {canSync ? (
@@ -127,14 +130,16 @@ export function BranchSyncFields({
             onChange={(event) => onDirectory(event.target.value)}
             spellCheck={false}
           />
+        ) : compact ? (
+          <div className="font-mono text-xs text-(--text-tertiary)">{info.directory}</div>
         ) : (
           <div className={READONLY_BOX}>{info.directory}</div>
         )}
       </div>
       <div className="flex items-start gap-3">
         <div className="flex flex-1 flex-col gap-1">
-          <Label className="text-sm leading-tight">{t('强制同步')}</Label>
-          <div className="text-meta text-(--text-tertiary)">
+          <Label className={compact ? fieldLabel : 'text-sm leading-tight'}>{t('强制同步')}</Label>
+          <div className={cn('text-(--text-tertiary)', compact ? 'text-caption' : 'text-meta')}>
             {t('丢弃代码修改并删除非忽略的未跟踪文件；保留忽略内容。仅本次生效。')}
           </div>
         </div>
