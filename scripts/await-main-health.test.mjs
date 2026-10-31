@@ -2,7 +2,13 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { awaitMainHealth, decideMainHealth } from './await-main-health.mjs';
 
-const run = (id, name, status, conclusion = null) => ({ id, name, status, conclusion });
+const run = (id, name, status, conclusion = null, slug = 'github-actions') => ({
+  id,
+  name,
+  status,
+  conclusion,
+  app: { slug },
+});
 const green = [run(1, 'check', 'completed', 'success'), run(2, 'e2e-gate', 'completed', 'success')];
 
 function harness(snapshots, timeoutMs = 1000) {
@@ -121,14 +127,49 @@ test('pending then red refuses', async () => {
   assert.equal(result.verdict, 'red');
 });
 
-test('a fetch error propagates so the caller fails closed', async () => {
-  await assert.rejects(
-    awaitMainHealth({
-      fetchCheckRuns: async () => {
-        throw new Error('boom');
-      },
-      sleep: async () => {},
-    }),
-    /boom/,
-  );
+test('a non-Actions success cannot satisfy a red Actions check', () => {
+  const runs = [
+    run(1, 'check', 'completed', 'failure'),
+    run(9, 'check', 'completed', 'success', 'cairnwright'),
+    green[1],
+  ];
+  assert.deepEqual(decideMainHealth(runs), { verdict: 'red', detail: 'check=failure' });
+});
+
+test('only a non-Actions run of a required name -> missing', () => {
+  const runs = [run(1, 'check', 'completed', 'success', 'cairnwright'), green[1]];
+  assert.deepEqual(decideMainHealth(runs), { verdict: 'missing', detail: 'check' });
+});
+
+test('a transient fetch error is retried and a later success proceeds', async () => {
+  let calls = 0;
+  const result = await awaitMainHealth({
+    fetchCheckRuns: async () => {
+      if (calls++ === 0) throw new Error('503');
+      return green;
+    },
+    sleep: async () => {},
+    now: () => 0,
+    timeoutMs: 1000,
+    intervalMs: 100,
+  });
+  assert.equal(result.ok, true);
+});
+
+test('a persistent fetch error fails closed at the deadline', async () => {
+  let clock = 0;
+  const result = await awaitMainHealth({
+    fetchCheckRuns: async () => {
+      throw new Error('boom');
+    },
+    sleep: async (ms) => {
+      clock += ms;
+    },
+    now: () => clock,
+    timeoutMs: 300,
+    intervalMs: 100,
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.verdict, 'timeout-error');
+  assert.equal(result.detail, 'boom');
 });

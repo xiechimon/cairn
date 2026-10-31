@@ -1,11 +1,14 @@
 import { pathToFileURL } from 'node:url';
 
 export const REQUIRED_CHECKS = ['check', 'e2e-gate'];
+const ACTIONS_APP_SLUG = 'github-actions';
 export const DEFAULT_TIMEOUT_MS = 60 * 60 * 1000;
 export const DEFAULT_INTERVAL_MS = 30 * 1000;
 
 export function latestRunByName(checkRuns, name) {
-  const matching = checkRuns.filter((run) => run.name === name);
+  const matching = checkRuns.filter(
+    (run) => run.name === name && run.app?.slug === ACTIONS_APP_SLUG,
+  );
   if (matching.length === 0) return null;
   return matching.reduce((latest, run) => (run.id > latest.id ? run : latest));
 }
@@ -37,7 +40,12 @@ export async function awaitMainHealth({
 }) {
   const deadline = now() + timeoutMs;
   for (;;) {
-    const decision = decideMainHealth(await fetchCheckRuns(), required);
+    let decision;
+    try {
+      decision = decideMainHealth(await fetchCheckRuns(), required);
+    } catch (error) {
+      decision = { verdict: 'error', detail: error.message };
+    }
     log(`${decision.verdict}: ${decision.detail}`);
     if (decision.verdict === 'success') return { ok: true, ...decision };
     if (decision.verdict === 'red') return { ok: false, ...decision };
