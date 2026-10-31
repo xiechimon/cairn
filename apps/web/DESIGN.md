@@ -22,7 +22,7 @@ colors:
   on-primary: '#f4f6f1'
   on-accent: '#ffffff'     # text on count badges
   accent-hover: '#f7ecd2'  # action link hover background
-  menu-hover: '#eff1eb'    # menu row hover background
+  menu-hover: 'rgb(29 35 31 / 0.1)'  # menu row hover: 10% ink over any surface (Claude.ai's value)
   backdrop: 'rgb(29 35 31 / 0.28)'  # dialog backdrop (ink dim, no blur)
   running: '#5f8f4f'       # working: running icon, online dot
   running-text: '#3f6c35'  # working text
@@ -55,7 +55,7 @@ colors-dark:
   on-primary: '#161a17'
   on-accent: '#1a1404'
   accent-hover: '#33290f'
-  menu-hover: '#2e3430'
+  menu-hover: 'rgb(230 232 226 / 0.1)'
   backdrop: 'rgba(0, 0, 0, 0.5)'
   running: '#82b46f'
   running-text: '#9cc78b'
@@ -86,7 +86,7 @@ fonts:
 rounded:
   field: 8px         # rounded-md: inputs, selects, segmented tracks, dialog and form primary buttons
   control: 8px       # --radius-control = rounded-lg: default Button, icon buttons, rows
-  menu-item: 12px    # --radius-menu-item = menu radius minus the 6px menu padding
+  menu-item: 8px     # --radius-menu-item = menu radius minus the 4px menu padding
   card: 14px         # --radius-card = rounded-xl: one corner for every card-like surface
   sheet: 18px        # --edge-radius: dialogs, ⌘K
   menu: 12px         # --radius-popover: menus, floating surfaces, dropdowns

@@ -324,7 +324,7 @@
   --accent-hover: #33290f;
   --dialog-surface: var(--background);
   --dialog-backdrop: rgb(0 0 0 / 0.5);
-  --menu-hover: #2e3430;
+  --menu-hover: rgb(230 232 226 / 0.1);
   --project-tile-1: #6f9c5f;
   --project-tile-2: #b98a57;
   --project-tile-3: #6f93bb;
@@ -458,7 +458,7 @@
   --accent-hover: #f7ecd2;
   --dialog-surface: var(--background);
   --dialog-backdrop: rgb(29 35 31 / 0.28);
-  --menu-hover: #eff1eb;
+  --menu-hover: rgb(29 35 31 / 0.1);
   --project-tile-1: #3f6c35;
   --project-tile-2: #9a6b3a;
   --project-tile-3: #5379a0;
