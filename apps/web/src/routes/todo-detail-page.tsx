@@ -55,6 +55,7 @@ import {
 import { useAgentAvatarUrlById, useLiveData } from '../api/provider.js';
 import { useConversationStream } from '../api/sse.js';
 import { AppSidebar } from '../board/app-sidebar.js';
+import { useMarkThreadRead } from '../board/use-mark-thread-read.js';
 import { ChiefAgentDialog } from '../chief/chief-agent-dialog.js';
 import { useChiefRoot } from '../chief/chief-root.js';
 import { inflightOrchestrationFor } from '../chief/orchestration-inflight.js';
@@ -169,6 +170,7 @@ export function TodoDetailPage() {
   const todosQ = useTodos(teamId, live);
   const wireTodo = todoQ.data ?? null;
   useThreadPresence(teamId, wireTodo?.id, live);
+  useMarkThreadRead(id);
   const buildId = wireTodo?.latestBuildId ?? null;
   const buildQ = useBuild(buildId, live);
   const gateQ = useBuildGate(buildId, live);

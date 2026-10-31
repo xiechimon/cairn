@@ -20,6 +20,7 @@ import {
 import {
   type ReactElement,
   useCallback,
+  useEffect,
   useId,
   useMemo,
   useReducer,
@@ -27,7 +28,7 @@ import {
   useState,
 } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import { useApiMutations } from '../api/hooks.js';
+import { useApiMutations, useNotifications } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { SidebarNavRow } from '../components/shell/sidebar-nav-row.js';
 import { SidebarUser } from '../components/shell/sidebar-user.js';
@@ -42,6 +43,7 @@ import { UserMenu } from '../detail/user-menu.js';
 import { isArchived, isDeleted, markArchived, markDeleted } from '../fixtures/deletions.js';
 import { PROJECT_ID, PROJECT_NAME } from '../fixtures/fixtures.js';
 import type { TodoRecord } from '../fixtures/records.js';
+import { isFixtureUnread, setFixtureUnread, subscribeFixtureUnread } from '../fixtures/unread.js';
 import { scrollFadeClassName, useScrollFade } from '../hooks/use-scroll-fade.js';
 import { useI18n } from '../i18n/provider.js';
 import { FOCUS_RING_INSET } from '../lib/focus-ring.js';
@@ -52,6 +54,7 @@ import { withColumnParam } from './columns.js';
 import { withoutBoardView } from './home.js';
 import { ProjectAvatar } from './project-avatar.js';
 import { ProjectGroup, projectThreads, threadHref } from './sidebar-threads.js';
+import { keepThreadUnread } from './thread-read-keep.js';
 
 export type SidebarSelected =
   | 'board'
@@ -83,6 +86,7 @@ interface BoardSidebarProps {
   selected?: SidebarSelected;
   projects?: SidebarProject[];
   todos?: TodoRecord[];
+  fixtureUnreadIds?: string[];
 }
 
 interface ResourceRow {
@@ -211,12 +215,14 @@ export function BoardSidebar({
   selected = 'board',
   projects,
   todos,
+  fixtureUnreadIds,
 }: BoardSidebarProps) {
   const { t } = useI18n();
   const { user, live, teamId } = useLiveData();
   const navigate = useNavigate();
   const mutations = useApiMutations(teamId);
   const [, refresh] = useReducer((n: number) => n + 1, 0);
+  useEffect(() => subscribeFixtureUnread(refresh), []);
   const [pendingDelete, setPendingDelete] = useState<TodoRecord | null>(null);
   const { search, pathname } = useLocation();
   const stripped = withoutBoardView(withColumnParam(search, null));
@@ -235,6 +241,26 @@ export function BoardSidebar({
   const activeThreadId = pathname.startsWith('/app/todo/')
     ? (pathname.split('/')[3] ?? null)
     : null;
+  const notificationsQ = useNotifications(teamId, live);
+  const unreadIds = new Set(
+    live
+      ? (notificationsQ.data?.unreadThreadIds ?? [])
+      : liveThreads
+          .filter((todo) => isFixtureUnread(todo.id, fixtureUnreadIds))
+          .map((todo) => todo.id),
+  );
+  const setThreadRead = (id: string, read: boolean) => {
+    if (live) {
+      mutations.setThreadRead.mutate({ id, read });
+      return;
+    }
+    setFixtureUnread(id, !read);
+  };
+  const markThreadUnread = (todo: TodoRecord) => {
+    if (!live && blockDemoWrite()) return;
+    if (todo.id === activeThreadId) keepThreadUnread(todo.id);
+    setThreadRead(todo.id, false);
+  };
   const resourceRows = usageNav
     ? [...RESOURCE_ROWS.slice(0, 4), USAGE_ROW, ...RESOURCE_ROWS.slice(4)]
     : RESOURCE_ROWS;
@@ -565,8 +591,10 @@ export function BoardSidebar({
                 active={pathname === href}
                 activeThreadId={activeThreadId}
                 threads={projectThreads(liveThreads, row.id)}
+                unreadIds={unreadIds}
                 onOpenProject={() => goTo(href)}
                 onOpenThread={(todo) => goTo(threadHref(todo.id))}
+                onMarkUnread={markThreadUnread}
                 onArchive={archiveThread}
                 onDelete={setPendingDelete}
               />

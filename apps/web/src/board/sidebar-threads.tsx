@@ -1,4 +1,4 @@
-import { Archive, Copy, Ellipsis, Trash2 } from 'lucide-react';
+import { Archive, Copy, Ellipsis, MailOpen, Trash2 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import {
   SidebarProjectRow,
@@ -59,11 +59,12 @@ export function projectThreads(todos: readonly TodoRecord[], projectId: string):
 
 interface ThreadMenuProps {
   todo: TodoRecord;
+  onMarkUnread: (todo: TodoRecord) => void;
   onArchive: (todo: TodoRecord) => void;
   onDelete: (todo: TodoRecord) => void;
 }
 
-function ThreadMenu({ todo, onArchive, onDelete }: ThreadMenuProps) {
+function ThreadMenu({ todo, onMarkUnread, onArchive, onDelete }: ThreadMenuProps) {
   const { t } = useI18n();
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const copyLink = () => {
@@ -97,6 +98,10 @@ function ThreadMenu({ todo, onArchive, onDelete }: ThreadMenuProps) {
         })}
         className="w-48"
       >
+        <DropdownMenuItem data-testid="thread-row-mark-unread" onClick={() => onMarkUnread(todo)}>
+          <MailOpen />
+          {t('标记为未读')}
+        </DropdownMenuItem>
         <DropdownMenuItem data-testid="thread-row-copy-link" onClick={copyLink}>
           <Copy />
           {t('复制链接')}
@@ -125,8 +130,10 @@ interface ProjectGroupProps {
   active: boolean;
   activeThreadId: string | null;
   threads: TodoRecord[];
+  unreadIds: ReadonlySet<string>;
   onOpenProject: () => void;
   onOpenThread: (todo: TodoRecord) => void;
+  onMarkUnread: (todo: TodoRecord) => void;
   onArchive: (todo: TodoRecord) => void;
   onDelete: (todo: TodoRecord) => void;
 }
@@ -137,8 +144,10 @@ export function ProjectGroup({
   active,
   activeThreadId,
   threads,
+  unreadIds,
   onOpenProject,
   onOpenThread,
+  onMarkUnread,
   onArchive,
   onDelete,
 }: ProjectGroupProps) {
@@ -164,13 +173,33 @@ export function ProjectGroup({
           {shown.map((todo) => {
             const status = threadStatus(todo);
             return (
-              <div key={todo.id} data-testid="sidebar-thread-row" data-status={status}>
+              <div
+                key={todo.id}
+                data-testid="sidebar-thread-row"
+                data-status={status}
+                className="group/unread relative"
+              >
+                {unreadIds.has(todo.id) && (
+                  <span
+                    data-testid="unread-dot"
+                    role="img"
+                    aria-label={t('未读')}
+                    className="pointer-events-none absolute top-1/2 right-2.5 size-1.5 -translate-y-1/2 rounded-full bg-(--card-button) group-focus-within/unread:hidden group-hover/unread:hidden"
+                  />
+                )}
                 <SidebarThreadRow
                   title={todo.title === '' ? `#${todo.seqNum}` : todo.title}
                   tone={THREAD_TONE[status]}
                   open={todo.id === activeThreadId}
                   onClick={() => onOpenThread(todo)}
-                  menu={<ThreadMenu todo={todo} onArchive={onArchive} onDelete={onDelete} />}
+                  menu={
+                    <ThreadMenu
+                      todo={todo}
+                      onMarkUnread={onMarkUnread}
+                      onArchive={onArchive}
+                      onDelete={onDelete}
+                    />
+                  }
                 />
               </div>
             );

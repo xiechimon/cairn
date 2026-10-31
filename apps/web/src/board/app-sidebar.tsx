@@ -98,6 +98,7 @@ export function AppSidebar({
     attention: attentionCount(resolvedTodos, live ? Date.now() : fixture.now),
     machinesOnline,
     todos: resolvedTodos,
+    fixtureUnreadIds: fixture.unreadThreadIds,
     onSearch: onSearch ?? (() => search.setOpen(true)),
     onNewTask: openNewTask,
     usageNav: fixture.usageNav === true,

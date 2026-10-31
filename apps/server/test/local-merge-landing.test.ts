@@ -283,9 +283,10 @@ for (const outcome of ['merged', 'held', 'recheck', 'checks-failed'] as const) {
         .all()
         .find((r) => r.kind === 'merge')?.status,
     ).toBe('done');
-    expect(f.s.db.select().from(notification).all()).toHaveLength(outcome === 'merged' ? 0 : 1);
-    if (outcome !== 'merged')
-      expect(f.s.db.select().from(notification).get()?.snippet).toContain('worktree-dirty');
+    const notices = f.s.db.select().from(notification).all();
+    expect(notices).toHaveLength(1);
+    if (outcome === 'merged') expect(notices[0]?.type).toBe('todo_done');
+    else expect(notices[0]?.snippet).toContain('worktree-dirty');
   });
 }
 

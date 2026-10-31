@@ -1,10 +1,10 @@
 import { patchTeamBodySchema, patchUserBodySchema, type TeamMember } from '@cairn/shared';
-import { eq, isNull } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { getCookie, setCookie } from 'hono/cookie';
 import { streamSSE } from 'hono/streaming';
 import type { AppContext } from './context.js';
-import { agent, notification, team, user } from './db/schema.js';
+import { agent, team, user } from './db/schema.js';
 import { toTeamRecord } from './db/seed.js';
 import { parseWith } from './lib/errors.js';
 import { agentRecordOf, jsonBody, requireTeam, SESSION_COOKIE } from './routes-helpers.js';
@@ -13,6 +13,11 @@ import { createSerialConnection } from './services/events.js';
 import { readFirstPrReportPrompt, setFirstPrReportPrompt } from './services/first-pr-report.js';
 import { pauseTeamGithubRepos } from './services/github-autonomy-brake.js';
 import { getModelRouting } from './services/model-routing.js';
+import {
+  listUnreadEntityIds,
+  markNotificationRead,
+  markNotificationUnread,
+} from './services/notifications.js';
 
 export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
   app.use('/api/*', async (c, next) => {
@@ -116,16 +121,24 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     return c.json(rows);
   });
 
+  const notificationDeps = { db: ctx.db, hub: ctx.hub, user: ctx.user };
+
   app.get('/api/teams/:id/notifications', (c) => {
     const id = c.req.param('id');
     requireTeam(ctx, id);
-    const unread = ctx.db
-      .selectDistinct({ entityId: notification.entityId })
-      .from(notification)
-      .where(isNull(notification.readAt))
-      .all()
-      .map((r) => r.entityId);
-    return c.json({ unreadThreadIds: unread });
+    return c.json({ unreadThreadIds: listUnreadEntityIds(notificationDeps, id) });
+  });
+
+  app.post('/api/teams/:id/notifications/:entityId/read', (c) => {
+    const id = c.req.param('id');
+    requireTeam(ctx, id);
+    return c.json(markNotificationRead(notificationDeps, id, c.req.param('entityId')));
+  });
+
+  app.post('/api/teams/:id/notifications/:entityId/unread', (c) => {
+    const id = c.req.param('id');
+    requireTeam(ctx, id);
+    return c.json(markNotificationUnread(notificationDeps, id, c.req.param('entityId')));
   });
 
   app.get('/api/teams/:id/stream', (c) => {
