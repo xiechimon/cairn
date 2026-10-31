@@ -104,6 +104,7 @@ import {
   teamOrgChartPair,
   teamOrgChartSingle,
   teamRoster,
+  versionCompareWithChanges,
   versionMenuV2,
   versionMenuV3,
 } from './fixtures.js';
@@ -219,6 +220,7 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       '57': history12,
       '63': versionMenuV2,
       '64': compareMenuV2,
+      '64c': versionCompareWithChanges,
       '65': diffV1V2(false),
       '66': diffV1V2(true),
       '67': revisionStreaming,

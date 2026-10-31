@@ -4,7 +4,6 @@ import { DoneConfirmDialog } from '../board/done-confirm-dialog.js';
 import { ResetConfirmDialog } from '../board/reset-confirm-dialog.js';
 import { Button } from '../components/ui/button.js';
 import { Kbd } from '../components/ui/kbd.js';
-import type { PaneView } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { EllipsisVertical, Search, Settings } from '../icons/index.js';
 import { AttachmentCard } from '../overlay/attachment-card.js';
@@ -15,7 +14,7 @@ import { DeleteProjectConfirm } from '../overlay/delete-project-confirm.js';
 import { MentionInline } from '../overlay/mention-inline.js';
 import { MoreMenu } from '../overlay/more-menu.js';
 import { NewTaskDialog } from '../overlay/new-task-dialog.js';
-import { PaneTabs } from '../overlay/plan-dropdown.js';
+import { type DocView, PaneTitle, PaneViewButtons } from '../overlay/plan-dropdown.js';
 import { type SearchContext, SearchPanel, useSearchState } from '../overlay/search-panel.js';
 import { BUILTIN_SLASH_COMMANDS, type SlashRow } from '../overlay/slash-commands.js';
 import { SlashMenu } from '../overlay/slash-menu.js';
@@ -285,14 +284,14 @@ function AttachmentsSpecimen() {
 
 function MenusSpecimen() {
   const [moreOpen, setMoreOpen] = useState(false);
-  const [view, setView] = useState<PaneView>('doc');
+  const [view, setView] = useState<DocView>('plan');
   const [last, setLast] = useState<string | null>(null);
   const moreRef = useRef<HTMLButtonElement>(null);
   const chipTodo = CARD_FACES[11]?.todo ?? CARD_FACES[0]?.todo;
   return (
     <Specimen
       title="Menus and popovers"
-      note={last ?? 'MoreMenu, PaneTabs and the ChipPopover body'}
+      note={last ?? 'MoreMenu, PaneTitle, PaneViewButtons and the ChipPopover body'}
       stage="canvas"
     >
       <Cell label="MoreMenu">
@@ -318,11 +317,11 @@ function MenusSpecimen() {
           onDiscard={() => setLast('Discard changes')}
         />
       </Cell>
-      <Cell label={`PaneTabs: ${view}`}>
-        <PaneTabs view={view} docLabel="方案" sections onView={setView} />
+      <Cell label={`PaneTitle: ${view}`}>
+        <PaneTitle docLabel={view === 'plan' ? '方案' : '变更'} onDocView={setView} />
       </Cell>
-      <Cell label="PaneTabs, changes only">
-        <PaneTabs view="doc" docLabel="变更" onView={() => {}} />
+      <Cell label="PaneViewButtons">
+        <PaneViewButtons docLabel={view === 'plan' ? '方案' : '变更'} onDocView={setView} />
       </Cell>
       {chipTodo != null && (
         <Cell label="ChipPopover body">
