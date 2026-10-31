@@ -22,6 +22,7 @@ import { fileURLToPath } from 'node:url';
 import type { WorkspaceHookNoteData } from '@cairn/shared';
 import { ensurePrivateDir, writePrivateFile } from '../private-fs.js';
 import { publishOrbDist } from './dist.js';
+import { orbReleaseKeySchema } from './protocol.js';
 import { prepareOrbSeed } from './seed.js';
 
 export interface OrbHandle {
@@ -33,6 +34,7 @@ export interface OrbHandle {
   notes: WorkspaceHookNoteData[];
   lastStepId?: string;
   releaseKey?: string;
+  expectedReleaseKey?: string;
   seedKey?: string | null;
 }
 
@@ -66,6 +68,7 @@ export interface OrbProvider {
   destroy(handle: OrbHandle): Promise<void>;
   list(): Promise<OrbHandle[]>;
   touch(handle: OrbHandle, now: number): void;
+  authenticateRelease(handle: OrbHandle, release: string): void;
 }
 
 export const runOrbCommand: OrbCommandRunner = (argv, options = {}) =>
@@ -146,6 +149,8 @@ export class HostOrbProvider implements OrbProvider {
     return this.runner(argv, { ...options, env });
   }
 
+  authenticateRelease(): void {}
+
   async stop(handle: OrbHandle): Promise<void> {
     handle.running = false;
   }
@@ -206,6 +211,7 @@ export class NspawnOrbProvider implements OrbProvider {
       const handles = JSON.parse(readFileSync(this.stateFile, 'utf8')) as OrbHandle[];
       for (const handle of handles) {
         this.validate(handle);
+        if (!handle.expectedReleaseKey) handle.releaseKey = undefined;
         this.handles.set(handle.conversationId, handle);
       }
     }
@@ -262,13 +268,23 @@ export class NspawnOrbProvider implements OrbProvider {
         if (!this.checkDirectory(root, `Orb ${name} root`))
           throw new Error(`Orb ${name} root must exist: ${root}; run the installer`);
       }
-      await publishOrbDist(this.distSource, this.distRoot, this.runner, () => {
-        const running = [...this.handles.values()].filter((machine) => machine.running);
-        if (running.some((machine) => !machine.releaseKey)) return undefined;
-        return new Set(
-          running.flatMap((machine) => (machine.releaseKey ? [machine.releaseKey] : [])),
-        );
-      });
+      handle.expectedReleaseKey = await publishOrbDist(
+        this.distSource,
+        this.distRoot,
+        this.runner,
+        () => {
+          const running = [...this.handles.values()].filter((machine) => machine.running);
+          if (running.some((machine) => !machine.releaseKey)) return undefined;
+          return new Set(
+            running.flatMap((machine) =>
+              [machine.releaseKey, machine.expectedReleaseKey].filter(
+                (key): key is string => key !== undefined,
+              ),
+            ),
+          );
+        },
+      );
+      this.save();
       if (seed) {
         if (!/^[a-zA-Z0-9-]+$/.test(handle.projectId)) throw new Error('Invalid orb project id');
         const project = join(this.seedRoot, handle.projectId);
@@ -313,10 +329,10 @@ export class NspawnOrbProvider implements OrbProvider {
     options.signal?.throwIfAborted();
     const release = join(this.distRoot, 'current');
     const seed = join(this.seedRoot, handle.projectId, 'current');
-    handle.releaseKey = existsSync(release) ? basename(readlinkSync(release)) : undefined;
     handle.seedKey = existsSync(seed) ? readlinkSync(seed) : null;
     if (!handle.running || !(await this.runningMachines()).has(handle.id)) {
       handle.running = false;
+      handle.releaseKey = existsSync(release) ? basename(readlinkSync(release)) : undefined;
       handle.notes.push(orbNote('orb: setup'));
       await this.command(['machinectl', 'start', handle.id]);
       handle.running = true;
@@ -338,6 +354,15 @@ export class NspawnOrbProvider implements OrbProvider {
       options.signal?.throwIfAborted();
       throw error;
     }
+  }
+
+  authenticateRelease(handle: OrbHandle, release: string): void {
+    this.validate(handle);
+    orbReleaseKeySchema.parse(release);
+    if (release !== handle.expectedReleaseKey)
+      throw new Error('Orb authenticated release does not match published release');
+    handle.releaseKey = release;
+    this.save();
   }
 
   private checkDirectory(directory: string, label: string, mode?: number): boolean {

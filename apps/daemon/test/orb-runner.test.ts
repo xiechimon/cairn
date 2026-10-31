@@ -18,6 +18,7 @@ import {
   waitFor,
 } from './machine-loop-harness.js';
 import { FakeOrbProvider } from './orb-fake.js';
+import { orbTestEntry, orbTestRelease } from './orb-release-fixture.js';
 
 vi.mock('../src/backend/pi.js', async (importOriginal) => {
   const original = await importOriginal<typeof import('../src/backend/pi.js')>();
@@ -33,6 +34,7 @@ function socketWorker(backend: AgentBackend) {
       if (!socketPath) throw new Error('Missing relay socket mount');
       await runOrbWorker({
         socketPath,
+        entryPath: orbTestEntry(socketPath),
         backendFor: () => backend,
         home: join(scratch, 'state'),
         workspacesRoot: join(scratch, 'work'),
@@ -202,6 +204,7 @@ test('a scripted relay completes one fake-backend step and keeps credentials out
   const worker = fakeBackend([{ type: 'done', usage: [] }]);
   const server = new RelayMachineServer({
     socketPath,
+    release: orbTestRelease(socketPath),
     stepId: 's1',
     upstream: api,
     input: {
@@ -214,6 +217,7 @@ test('a scripted relay completes one fake-backend step and keeps credentials out
   try {
     await runOrbWorker({
       socketPath,
+      entryPath: orbTestEntry(socketPath),
       backendFor: () => worker.backend,
       home: join(root, 'state'),
       workspacesRoot: join(root, 'work'),
@@ -254,6 +258,7 @@ test('a lost host relay interrupts the container session', async () => {
   };
   const server = new RelayMachineServer({
     socketPath,
+    release: orbTestRelease(socketPath),
     stepId: 's1',
     upstream: api,
     input: { claimed: CLAIMED, options: {}, methods: [...ORB_STEP_METHODS] },
@@ -261,6 +266,7 @@ test('a lost host relay interrupts the container session', async () => {
   await server.listen();
   const running = runOrbWorker({
     socketPath,
+    entryPath: orbTestEntry(socketPath),
     backendFor: () => backend,
     home: join(root, 'state'),
     workspacesRoot: join(root, 'work'),
@@ -295,6 +301,7 @@ test.each(['success', 'failed'] as const)(
     });
     const server = new RelayMachineServer({
       socketPath,
+      release: orbTestRelease(socketPath),
       stepId: 's1',
       upstream: api,
       input: {
@@ -309,6 +316,7 @@ test.each(['success', 'failed'] as const)(
     await server.listen();
     const running = runOrbWorker({
       socketPath,
+      entryPath: orbTestEntry(socketPath),
       backendFor: () => fakeBackend([{ type: 'done', usage: [] }]).backend,
       home: join(root, 'state'),
       workspacesRoot: join(root, 'work'),
@@ -375,8 +383,18 @@ test('a previous fake worker cannot disconnect the next step listener', async ()
   });
   const handle = await provider.ensure({ conversationId: 'thread', projectId: 'project' });
   const api = new FakeMachineApi();
-  const first = new RelayMachineServer({ socketPath, stepId: 's1', upstream: api });
-  const second = new RelayMachineServer({ socketPath, stepId: 's2', upstream: api });
+  const first = new RelayMachineServer({
+    socketPath,
+    release: orbTestRelease(socketPath),
+    stepId: 's1',
+    upstream: api,
+  });
+  const second = new RelayMachineServer({
+    socketPath,
+    release: orbTestRelease(socketPath),
+    stepId: 's2',
+    upstream: api,
+  });
   await first.listen();
   const previous = provider.launchWorker(handle, {
     socketPath,
@@ -389,7 +407,7 @@ test('a previous fake worker cannot disconnect the next step listener', async ()
     await second.listen();
     exit.resolve();
     await previous;
-    const worker = await RelayMachineApi.connect(socketPath);
+    const worker = await RelayMachineApi.connect(socketPath, orbTestRelease(socketPath));
     try {
       await worker.api.heartbeat('s2');
       expect(api.calls).toContain('heartbeat:s2');

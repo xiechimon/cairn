@@ -11,6 +11,7 @@ import {
 } from '../src/orb/provider.js';
 import { RelayMachineApi } from '../src/orb/relay.js';
 import { createOrbCheckout } from './orb-dist-fixture.js';
+import { orbTestRelease } from './orb-release-fixture.js';
 
 const assertions: unknown[] = [];
 const workers = new Set<Promise<void>>();
@@ -102,7 +103,10 @@ export class FakeOrbProvider extends NspawnOrbProvider {
     }
     if (!existsSync(tokenPath) || readFileSync(tokenPath, 'utf8') !== token) return;
     try {
-      const connection = await RelayMachineApi.connect(options.socketPath);
+      const connection = await RelayMachineApi.connect(
+        options.socketPath,
+        orbTestRelease(options.socketPath),
+      );
       connection.close();
     } catch {}
   }

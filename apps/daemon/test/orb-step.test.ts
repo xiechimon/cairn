@@ -15,6 +15,7 @@ import {
   waitFor,
 } from './machine-loop-harness.js';
 import { FakeOrbProvider, type FakeOrbRunner, type FakeWorkerOptions } from './orb-fake.js';
+import { orbTestEntry, orbTestRelease } from './orb-release-fixture.js';
 
 function workerRunner(
   backend: AgentBackend,
@@ -29,6 +30,7 @@ function workerRunner(
     if (!socketPath) throw new Error('Missing relay socket');
     await runOrbWorker({
       socketPath,
+      entryPath: orbTestEntry(socketPath),
       backendFor: () => backend,
       home: runtimeHome,
       workspacesRoot: join(runtimeHome, 'work'),
@@ -418,7 +420,7 @@ test('worker exit waits for an in-flight finish report without replacing or dupl
       if (argv[0] === 'orb-worker') {
         const socketPath = options?.socketPath;
         if (!socketPath) throw new Error('Missing relay socket');
-        const relay = await RelayMachineApi.connect(socketPath);
+        const relay = await RelayMachineApi.connect(socketPath, orbTestRelease(socketPath));
         void relay.api.done('s1', { status: 'success' }).catch(() => {});
         await waitFor(() => reporting);
         relay.close();
@@ -465,7 +467,7 @@ test('an orb cannot complete another step or mount its host recovery journal', a
       executions.push(options);
       const socketPath = options.socketPath;
       if (!socketPath) throw new Error('Missing relay socket');
-      const relay = await RelayMachineApi.connect(socketPath);
+      const relay = await RelayMachineApi.connect(socketPath, orbTestRelease(socketPath));
       try {
         await expect(relay.api.done('victim', { status: 'success' })).rejects.toThrow(
           'Relay step does not match claim',
@@ -651,7 +653,7 @@ test('OOM after a worker heartbeat is failed by the online host', async () => {
       if (argv[0] !== 'orb-worker') return { code: 0, stdout: '', stderr: '' };
       const socketPath = options?.socketPath;
       if (!socketPath) throw new Error('Missing relay socket');
-      const relay = await RelayMachineApi.connect(socketPath);
+      const relay = await RelayMachineApi.connect(socketPath, orbTestRelease(socketPath));
       await relay.api.heartbeat('s1');
       relay.send({ type: 'session', live: true });
       relay.close();
@@ -692,7 +694,7 @@ test('worker exit replays a rejected journaled finish with its checkpoint artifa
       if (argv[0] !== 'orb-worker') return { code: 0, stdout: '', stderr: '' };
       const socketPath = options?.socketPath;
       if (!socketPath) throw new Error('Missing relay socket');
-      const relay = await RelayMachineApi.connect(socketPath);
+      const relay = await RelayMachineApi.connect(socketPath, orbTestRelease(socketPath));
       relay.send({
         type: 'checkpoint',
         checkpoint: {
@@ -784,9 +786,13 @@ test('a worker ignoring stop is aborted after the grace period', async () => {
       if (argv[0] !== 'orb-worker') return { code: 0, stdout: '', stderr: '' };
       const socketPath = options?.socketPath;
       if (!socketPath) throw new Error('Missing relay socket');
-      const relay = await RelayMachineApi.connect(socketPath, (frame) => {
-        if (frame.type === 'stop') receivedStop = true;
-      });
+      const relay = await RelayMachineApi.connect(
+        socketPath,
+        orbTestRelease(socketPath),
+        (frame) => {
+          if (frame.type === 'stop') receivedStop = true;
+        },
+      );
       await relay.api.heartbeat('s1');
       relay.send({ type: 'session', live: true });
       signal = options?.signal;
@@ -825,7 +831,7 @@ test.each(['transcript', 'sessionContent'] as const)(
         if (argv[0] !== 'orb-worker') return { code: 0, stdout: '', stderr: '' };
         const socketPath = options?.socketPath;
         if (!socketPath) throw new Error('Missing relay socket');
-        const relay = await RelayMachineApi.connect(socketPath);
+        const relay = await RelayMachineApi.connect(socketPath, orbTestRelease(socketPath));
         const content = 'é'.repeat(3 * 1024 * 1024);
         relay.send({
           type: 'checkpoint',

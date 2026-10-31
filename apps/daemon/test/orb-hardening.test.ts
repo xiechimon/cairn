@@ -21,6 +21,7 @@ import { RelayMachineApi, RelayMachineServer } from '../src/orb/relay.js';
 import { RunStop } from '../src/step-stops.js';
 import { boot, CLAIMED, FakeMachineApi, waitFor } from './machine-loop-harness.js';
 import { createOrbCheckout } from './orb-dist-fixture.js';
+import { orbTestRelease } from './orb-release-fixture.js';
 
 const roots: string[] = [];
 afterEach(() => {
@@ -90,7 +91,7 @@ test('daemon restart recovers a running machine with stale relay files and resum
     .spyOn(RelayMachineServer.prototype, 'listen')
     .mockImplementation(async function (this: RelayMachineServer) {
       await listen.call(this);
-      const relay = await RelayMachineApi.connect(socketPath);
+      const relay = await RelayMachineApi.connect(socketPath, orbTestRelease(socketPath));
       await relay.api.done('s1', { status: 'success' });
       relay.close();
     });
@@ -143,7 +144,10 @@ test.each(['relay.sock', 'relay.sock.token', 'outbox'])(
     ) {
       await listen.call(this);
       expect(statSync(join(directory, 'outbox')).isDirectory()).toBe(true);
-      const relay = await RelayMachineApi.connect(join(directory, 'relay.sock'));
+      const relay = await RelayMachineApi.connect(
+        join(directory, 'relay.sock'),
+        orbTestRelease(join(directory, 'relay.sock')),
+      );
       await relay.api.done('s1', { status: 'success' });
       relay.close();
     });
@@ -206,7 +210,7 @@ test.each(['directory', 'close-rejection'])(
       this: RelayMachineServer,
     ) {
       await listen.call(this);
-      const relay = await RelayMachineApi.connect(socketPath);
+      const relay = await RelayMachineApi.connect(socketPath, orbTestRelease(socketPath));
       if (failure === 'directory') {
         rmSync(socketPath);
         mkdirSync(socketPath);
@@ -262,7 +266,7 @@ test('outbox cleanup removes direct files and symlinks but leaves nested directo
     writeFileSync(join(outbox, 'nested/sentinel'), 'guest nested');
     writeFileSync(join(outbox, 'direct.bundle'), 'direct');
     symlinkSync(outside, join(outbox, 'outside'));
-    const relay = await RelayMachineApi.connect(socketPath);
+    const relay = await RelayMachineApi.connect(socketPath, orbTestRelease(socketPath));
     relay.close();
   });
   const settle = vi.spyOn(RunStop.prototype, 'settle');
@@ -347,7 +351,7 @@ test('seed pruning keeps current and running versions across restart then remove
   ]);
 }, 30_000);
 
-test('a running machine re-pins the release and seed it uses for each new step', async () => {
+test('a running machine retains its loaded release until the new release authenticates', async () => {
   const f = fixture();
   const machine = await f.provider.ensure({ conversationId: 'reused', projectId: 'p1' });
   await f.provider.prepare(machine, f.checkout);
@@ -369,7 +373,37 @@ test('a running machine re-pins the release and seed it uses for each new step',
   await f.provider.prepare(machine, f.checkout);
   await f.provider.start(machine);
   const handle = (await f.provider.list()).find((entry) => entry.id === machine.id)!;
-  expect(handle.releaseKey).toBe(basename(readlinkSync(join(f.distRoot, 'current'))));
-  expect(handle.releaseKey).not.toBe(basename(firstRelease));
+  expect(handle.releaseKey).toBe(basename(firstRelease));
+  expect(handle.expectedReleaseKey).toBe(basename(readlinkSync(join(f.distRoot, 'current'))));
+  const recovered = new NspawnOrbProvider(f.options);
+  const restored = (await recovered.list()).find((entry) => entry.id === machine.id)!;
+  expect(restored.releaseKey).toBe(basename(firstRelease));
+  expect(restored.expectedReleaseKey).toBe(handle.expectedReleaseKey);
   expect(handle.seedKey).toBe(readlinkSync(join(f.seedRoot, 'p1', 'current')));
+}, 30_000);
+
+test('legacy metadata-only pins remain untrusted until a worker authenticates', async () => {
+  const f = fixture();
+  const machine = await f.provider.ensure({ conversationId: 'legacy', projectId: 'p1' });
+  await f.provider.prepare(machine);
+  await f.provider.start(machine);
+  const loaded = readlinkSync(join(f.distRoot, 'current'));
+  utimesSync(join(f.distRoot, loaded), 1, 1);
+  writeFileSync(join(f.checkout, 'source.txt'), 'legacy re-pin');
+  await f.provider.prepare(machine);
+  const persisted = JSON.parse(readFileSync(f.stateFile, 'utf8'));
+  persisted[0].releaseKey = basename(readlinkSync(join(f.distRoot, 'current')));
+  delete persisted[0].expectedReleaseKey;
+  writeFileSync(f.stateFile, JSON.stringify(persisted));
+  const recovered = new NspawnOrbProvider(f.options);
+  const restored = (await recovered.list())[0]!;
+  for (let index = 0; index < 4; index++) {
+    writeFileSync(join(f.checkout, 'source.txt'), `legacy-upgrade-${index}`);
+    await recovered.prepare(restored);
+  }
+  expect(restored.releaseKey).toBeUndefined();
+  expect(existsSync(join(f.distRoot, loaded))).toBe(true);
+  recovered.authenticateRelease(restored, restored.expectedReleaseKey!);
+  await recovered.prepare(restored);
+  expect(existsSync(join(f.distRoot, loaded))).toBe(false);
 }, 30_000);

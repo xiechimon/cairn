@@ -12,6 +12,7 @@ import {
   type OrbFrame,
   type OrbStepInput,
   orbCheckpointSchema,
+  orbReleaseKeySchema,
 } from './protocol.js';
 import { type OrbHandle, orbNote } from './provider.js';
 import { RelayMachineServer, RelayPathError } from './relay.js';
@@ -138,10 +139,14 @@ export async function runOrbStep(
           handle,
           seed && existsSync(seed) ? seed : undefined,
         );
+        const release = orbReleaseKeySchema.parse(handle.expectedReleaseKey);
+        let staleRelease: string | undefined;
         void stop.attach(session).catch((error: unknown) => deps.logger.step(String(error)));
         watchdog = setTimeout(() => {
           timedOut = true;
-          exitError = 'orb heartbeat timeout';
+          exitError = staleRelease
+            ? `Orb worker release mismatch: expected ${release}, received ${staleRelease}; startup timed out`
+            : 'orb heartbeat timeout';
           void relay?.close();
           execController.abort();
           finishTransport();
@@ -212,6 +217,14 @@ export async function runOrbStep(
           relay = new RelayMachineServer({
             socketPath,
             stepId,
+            release,
+            onStaleRelease: (loaded) => {
+              staleRelease = loaded;
+            },
+            onAuthenticated: (loaded) => {
+              lifecycle.provider.authenticateRelease(handle, loaded);
+              staleRelease = undefined;
+            },
             machineId: claimed.step.machineId ?? undefined,
             upstream: deps.client,
             ...(outboxDirectory && claimed.project?.repo?.kind === 'local'

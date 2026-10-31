@@ -155,9 +155,10 @@ export async function publishOrbDist(
     .map((entry) => ({ name: entry.name, mtime: lstatSync(join(releases, entry.name)).mtimeMs }))
     .sort((left, right) => right.mtime - left.mtime || left.name.localeCompare(right.name));
   const retained = retainedKeys();
-  if (!retained) return;
+  if (!retained) return key;
   for (const entry of entries.slice(3)) {
     if (entry.name !== key && !retained.has(entry.name))
       rmSync(join(releases, entry.name), { recursive: true, force: true });
   }
+  return key;
 }

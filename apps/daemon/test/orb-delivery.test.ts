@@ -23,6 +23,7 @@ import { RelayMachineApi, RelayMachineServer } from '../src/orb/relay.js';
 import { runOrbWorker } from '../src/orb/worker.js';
 import { boot, CLAIMED, FakeMachineApi, fakeBackend, waitFor } from './machine-loop-harness.js';
 import { FakeOrbProvider } from './orb-fake.js';
+import { orbTestEntry, orbTestRelease } from './orb-release-fixture.js';
 
 const roots: string[] = [];
 afterEach(() => {
@@ -98,6 +99,7 @@ test.each(['local', 'github', 'local-rejected'] as const)(
           cpSync(seed, join(root, 'seed', CLAIMED.project!.id, 'repo'), { recursive: true });
         await runOrbWorker({
           socketPath: options!.socketPath,
+          entryPath: orbTestEntry(options!.socketPath),
           backendFor: () => backend,
           home: join(root, 'worker'),
           workspacesRoot: join(root, 'work'),
@@ -187,12 +189,16 @@ test.each([
   if (attack === 'invalid') writeFileSync(bundle, 'not a bundle');
   const server = new RelayMachineServer({
     socketPath: join(root, 'relay.sock'),
+    release: orbTestRelease(join(root, 'relay.sock')),
     stepId: 's1',
     upstream: new FakeMachineApi(),
     localDelivery: { outboxDir, repoPath: repo, conversationId: CLAIMED.conversationId },
   });
   await server.listen();
-  const relay = await RelayMachineApi.connect(join(root, 'relay.sock'));
+  const relay = await RelayMachineApi.connect(
+    join(root, 'relay.sock'),
+    orbTestRelease(join(root, 'relay.sock')),
+  );
   try {
     const name =
       attack === 'escape' ? '../step.bundle' : attack === 'absolute' ? bundle : 'step.bundle';
@@ -264,12 +270,16 @@ test.each(['fast-forward', 'divergent', 'already-contained'] as const)(
     const before = await runGitOk(['show-ref'], { cwd: repo });
     const server = new RelayMachineServer({
       socketPath: join(root, 'relay.sock'),
+      release: orbTestRelease(join(root, 'relay.sock')),
       stepId: 's1',
       upstream: new FakeMachineApi(),
       localDelivery: { outboxDir, repoPath: repo, conversationId: CLAIMED.conversationId },
     });
     await server.listen();
-    const relay = await RelayMachineApi.connect(join(root, 'relay.sock'));
+    const relay = await RelayMachineApi.connect(
+      join(root, 'relay.sock'),
+      orbTestRelease(join(root, 'relay.sock')),
+    );
     try {
       const delivery = relay.call('deliverBundle', ['s1', 'step.bundle']);
       if (mode === 'divergent') await expect(delivery).rejects.toThrow(/non-fast-forward/);

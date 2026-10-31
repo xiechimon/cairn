@@ -33,6 +33,7 @@ import {
   waitFor,
 } from './machine-loop-harness.js';
 import { createOrbCheckout } from './orb-dist-fixture.js';
+import { orbTestEntry, orbTestRelease } from './orb-release-fixture.js';
 
 test.each(['symlink', 'directory', 'file'] as const)(
   'refuses a pre-planted outbox %s without replacing it or touching its target',
@@ -113,6 +114,7 @@ test.each(['relay.sock', 'relay.sock.token'] as const)(
       const metadata = present ? lstatSync(target) : undefined;
       const relay = new RelayMachineServer({
         socketPath: join(root, 'relay.sock'),
+        release: orbTestRelease(join(root, 'relay.sock')),
         stepId: 's1',
         upstream: new FakeMachineApi(),
       });
@@ -140,6 +142,7 @@ test.each(['symlink', 'hardlink', 'oversized'] as const)(
     const socketPath = join(root, 'relay.sock');
     const relay = new RelayMachineServer({
       socketPath,
+      release: orbTestRelease(socketPath),
       stepId: 's1',
       upstream: new FakeMachineApi(),
     });
@@ -153,7 +156,7 @@ test.each(['symlink', 'hardlink', 'oversized'] as const)(
     else writeFileSync(tokenPath, 'f'.repeat(65));
     const metadata = lstatSync(target);
     try {
-      const connection = RelayMachineApi.connect(socketPath);
+      const connection = RelayMachineApi.connect(socketPath, orbTestRelease(socketPath));
       void connection.then(
         (client) => client.close(),
         () => {},
@@ -175,7 +178,7 @@ test('refuses a FIFO relay token without blocking', async () => {
     const entry = join(root, 'fifo-probe.mjs');
     await build({
       stdin: {
-        contents: `import { RelayMachineApi } from ${JSON.stringify(resolve('apps/daemon/src/orb/relay.ts'))}; try { await RelayMachineApi.connect(${JSON.stringify(socketPath)}); process.exitCode = 1; } catch {}`,
+        contents: `import { RelayMachineApi } from ${JSON.stringify(resolve('apps/daemon/src/orb/relay.ts'))}; try { await RelayMachineApi.connect(${JSON.stringify(socketPath)}, ${JSON.stringify(orbTestRelease(socketPath))}); process.exitCode = 1; } catch {}`,
         resolveDir: resolve('.'),
       },
       outfile: entry,
@@ -202,6 +205,7 @@ test('exclusive token publication refuses a symlink planted after relay prefligh
   const metadata = lstatSync(target);
   const relay = new RelayMachineServer({
     socketPath,
+    release: orbTestRelease(socketPath),
     stepId: 's1',
     upstream: new FakeMachineApi(),
   });
@@ -225,6 +229,7 @@ test('relay publishes mode 0600 paths and restores a restrictive process umask',
   const socketPath = join(root, 'relay.sock');
   const relay = new RelayMachineServer({
     socketPath,
+    release: orbTestRelease(socketPath),
     stepId: 's1',
     upstream: new FakeMachineApi(),
   });
@@ -303,7 +308,12 @@ test.each(['missing', 'foreign'] as const)(
     const socketPath = join(root, 'relay.sock');
     const api = new FakeMachineApi();
     const token = vi.spyOn(api, 'token');
-    const server = new RelayMachineServer({ socketPath, stepId: 's1', upstream: api });
+    const server = new RelayMachineServer({
+      socketPath,
+      release: orbTestRelease(socketPath),
+      stepId: 's1',
+      upstream: api,
+    });
     await server.listen();
     const attacker = createConnection(socketPath);
     attacker.on('error', () => {});
@@ -316,13 +326,13 @@ test.each(['missing', 'foreign'] as const)(
       attacker.write(
         kind === 'missing'
           ? encodeOrbFrame({ type: 'call', id: 0, method: 'token', args: ['s1'] })
-          : `${'cairn-orb-rpc:'}${JSON.stringify({ type: 'auth', token: 'f'.repeat(64) })}\n`,
+          : `${'cairn-orb-rpc:'}${JSON.stringify({ type: 'auth', token: 'f'.repeat(64), release: orbTestRelease(socketPath) })}\n`,
       );
       await vi.waitFor(() => expect(attacker.destroyed).toBe(true));
       expect(received).toBe('');
       expect(token).not.toHaveBeenCalled();
       expect(statSync(`${socketPath}.token`).mode & 0o777).toBe(0o600);
-      const worker = await RelayMachineApi.connect(socketPath);
+      const worker = await RelayMachineApi.connect(socketPath, orbTestRelease(socketPath));
       await worker.api.token('s1');
       worker.close();
       expect(token).toHaveBeenCalledTimes(1);
@@ -415,6 +425,7 @@ test('worker waits for the bound socket, runs one step and can restart for the n
   const api = new FakeMachineApi();
   const backend = fakeBackend([{ type: 'done', usage: [] }]);
   const options = {
+    entryPath: orbTestEntry(socketPath),
     socketPath,
     home: join(root, 'worker'),
     workspacesRoot: join(root, 'work'),
@@ -426,6 +437,7 @@ test('worker waits for the bound socket, runs one step and can restart for the n
   mkdirSync(join(root, 'delayed'), { mode: 0o700 });
   const first = new RelayMachineServer({
     socketPath,
+    release: orbTestRelease(socketPath),
     stepId: 's1',
     upstream: api,
     input: { claimed: CLAIMED, options: {}, methods: [...ORB_STEP_METHODS] },
@@ -436,6 +448,7 @@ test('worker waits for the bound socket, runs one step and can restart for the n
   await first.close();
   const second = new RelayMachineServer({
     socketPath,
+    release: orbTestRelease(socketPath),
     stepId: 's2',
     upstream: api,
     input: {
@@ -568,6 +581,7 @@ test('relay never creates a missing runtime directory', async () => {
   const directory = join(root, 'absent');
   const relay = new RelayMachineServer({
     socketPath: join(directory, 'relay.sock'),
+    release: orbTestRelease(join(directory, 'relay.sock')),
     stepId: 's1',
     upstream: new FakeMachineApi(),
   });

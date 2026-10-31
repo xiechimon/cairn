@@ -14,6 +14,7 @@ import { ensureStateDirs, statePaths } from '../src/state.js';
 import { StepStops } from '../src/step-stops.js';
 import { boot, CLAIMED, defer, FakeMachineApi, fakeBackend } from './machine-loop-harness.js';
 import { FakeOrbProvider, type FakeOrbRunner } from './orb-fake.js';
+import { orbTestRelease } from './orb-release-fixture.js';
 
 function fixture(runner: FakeOrbRunner, api = new FakeMachineApi(), timeoutMs = 1_000) {
   const paths = statePaths(mkdtempSync(join(tmpdir(), 'orb-watchdog-')));
@@ -93,7 +94,10 @@ test.each([false, true])(
       signal = options?.signal;
       signal?.addEventListener('abort', () => release.resolve(), { once: true });
       const socketPath = options?.socketPath;
-      const relay = connect && socketPath ? await RelayMachineApi.connect(socketPath) : undefined;
+      const relay =
+        connect && socketPath
+          ? await RelayMachineApi.connect(socketPath, orbTestRelease(socketPath))
+          : undefined;
       if (relay) await relay.api.heartbeat('s1');
       started = true;
       await release.promise;
@@ -131,7 +135,7 @@ test('every received heartbeat refreshes the watchdog before upstream responds',
     if (argv[0] !== 'orb-worker') return { code: 0, stdout: '', stderr: '' };
     signal = options?.signal;
     signal?.addEventListener('abort', () => release.resolve(), { once: true });
-    relay = await RelayMachineApi.connect(options!.socketPath);
+    relay = await RelayMachineApi.connect(options!.socketPath, orbTestRelease(options!.socketPath));
     await release.promise;
     relay.close();
     return { code: 137, stdout: '', stderr: '' };
@@ -169,7 +173,7 @@ test('uploads without heartbeats keep the orb alive beyond the watchdog timeout'
     if (argv[0] !== 'orb-worker') return { code: 0, stdout: '', stderr: '' };
     signal = options?.signal;
     signal?.addEventListener('abort', () => release.resolve(), { once: true });
-    relay = await RelayMachineApi.connect(options!.socketPath);
+    relay = await RelayMachineApi.connect(options!.socketPath, orbTestRelease(options!.socketPath));
     await release.promise;
     relay.close();
     return { code: 0, stdout: '', stderr: '' };
@@ -243,7 +247,10 @@ test('invalid worker done is rejected and the host reports failure', async () =>
   const done = vi.spyOn(api, 'done');
   const { running, journal } = fixture(async (argv, options) => {
     if (argv[0] !== 'orb-worker') return { code: 0, stdout: '', stderr: '' };
-    const relay = await RelayMachineApi.connect(options!.socketPath);
+    const relay = await RelayMachineApi.connect(
+      options!.socketPath,
+      orbTestRelease(options!.socketPath),
+    );
     try {
       await relay.call('done', ['s1', { status: 'forged' }]);
     } catch (error) {
@@ -274,7 +281,10 @@ test.each([400, 403, 409, 422, 499])(
     done.mockRejectedValueOnce(new MachineApiError(status, 'completion rejected'));
     const { running, journal } = fixture(async (argv, options) => {
       if (argv[0] !== 'orb-worker') return { code: 0, stdout: '', stderr: '' };
-      const relay = await RelayMachineApi.connect(options!.socketPath);
+      const relay = await RelayMachineApi.connect(
+        options!.socketPath,
+        orbTestRelease(options!.socketPath),
+      );
       await expect(relay.api.done('s1', { status: 'success' })).rejects.toThrow('retry completion');
       relay.close();
       return { code: 137, stdout: '', stderr: '' };
@@ -301,7 +311,10 @@ test.each([new MachineApiError(503, 'server unavailable'), new Error('network un
     const done = vi.spyOn(api, 'done').mockRejectedValue(error);
     const { running, journal } = fixture(async (argv, options) => {
       if (argv[0] !== 'orb-worker') return { code: 0, stdout: '', stderr: '' };
-      const relay = await RelayMachineApi.connect(options!.socketPath);
+      const relay = await RelayMachineApi.connect(
+        options!.socketPath,
+        orbTestRelease(options!.socketPath),
+      );
       await expect(relay.api.done('s1', { status: 'success' })).rejects.toThrow(error.message);
       relay.close();
       return { code: 137, stdout: '', stderr: '' };
@@ -321,7 +334,10 @@ test('a rejected replay preserves the failed fallback when reporting is unreacha
   done.mockRejectedValueOnce(new MachineApiError(503, 'server unavailable'));
   const { running, journal } = fixture(async (argv, options) => {
     if (argv[0] !== 'orb-worker') return { code: 0, stdout: '', stderr: '' };
-    const relay = await RelayMachineApi.connect(options!.socketPath);
+    const relay = await RelayMachineApi.connect(
+      options!.socketPath,
+      orbTestRelease(options!.socketPath),
+    );
     await expect(relay.api.done('s1', { status: 'success' })).rejects.toThrow('retry completion');
     relay.close();
     return { code: 137, stdout: '', stderr: '' };
@@ -384,7 +400,10 @@ test('normal orb done suppresses the host fallback and clears the watchdog', asy
   const completed = defer();
   const { api, running, stop } = fixture(async (argv, options) => {
     if (argv[0] !== 'orb-worker') return { code: 0, stdout: '', stderr: '' };
-    const relay = await RelayMachineApi.connect(options!.socketPath);
+    const relay = await RelayMachineApi.connect(
+      options!.socketPath,
+      orbTestRelease(options!.socketPath),
+    );
     await relay.api.done('s1', { status: 'success' });
     completed.resolve();
     await release.promise;
@@ -424,7 +443,10 @@ test('orb done racing the watchdog is awaited without a second report', async ()
   const done = vi.spyOn(api, 'done');
   const { running } = fixture(async (argv, options) => {
     if (argv[0] !== 'orb-worker') return { code: 0, stdout: '', stderr: '' };
-    const relay = await RelayMachineApi.connect(options!.socketPath);
+    const relay = await RelayMachineApi.connect(
+      options!.socketPath,
+      orbTestRelease(options!.socketPath),
+    );
     options?.signal?.addEventListener('abort', () => release.resolve(), { once: true });
     void relay.api.done('s1', { status: 'success' }).catch(() => {});
     await release.promise;
@@ -450,7 +472,7 @@ test('a done sent after the watchdog cannot replace its failure report', async (
   let lateDone: Promise<void> | undefined;
   const { api, running } = fixture(async (argv, options) => {
     if (argv[0] !== 'orb-worker') return { code: 0, stdout: '', stderr: '' };
-    relay = await RelayMachineApi.connect(options!.socketPath);
+    relay = await RelayMachineApi.connect(options!.socketPath, orbTestRelease(options!.socketPath));
     options?.signal?.addEventListener(
       'abort',
       () => {
@@ -484,7 +506,10 @@ test.each(['exit', 'timeout'] as const)(
     let checkpointed = false;
     const { api, running } = fixture(async (argv, options) => {
       if (argv[0] !== 'orb-worker') return { code: 0, stdout: '', stderr: '' };
-      const relay = await RelayMachineApi.connect(options!.socketPath);
+      const relay = await RelayMachineApi.connect(
+        options!.socketPath,
+        orbTestRelease(options!.socketPath),
+      );
       options?.signal?.addEventListener('abort', () => release.resolve(), { once: true });
       relay.send({
         type: 'checkpoint',
@@ -521,3 +546,49 @@ test.each(['exit', 'timeout'] as const)(
     ]);
   },
 );
+
+test('repeated stale releases do not extend the startup bound and power off the machine', async () => {
+  vi.useFakeTimers();
+  const release = defer();
+  let refused = 0;
+  let signal: AbortSignal | undefined;
+  const { api, stop, journal, running } = fixture(async (argv, options) => {
+    if (argv[0] !== 'orb-worker') return { code: 0, stdout: '', stderr: '' };
+    signal = options?.signal;
+    signal?.addEventListener('abort', () => release.resolve(), { once: true });
+    for (let index = 0; index < 3; index++) {
+      await expect(
+        RelayMachineApi.connect(options!.socketPath, '0.2.2-abcd-dist-aaaaaaaaaaaaaaaa'),
+      ).rejects.toThrow('stale-release');
+      refused += 1;
+      await new Promise<void>((resolve) => setTimeout(resolve, 200));
+    }
+    await release.promise;
+    return { code: 75, stdout: '', stderr: '' };
+  });
+  try {
+    await vi.waitFor(() => expect(refused).toBe(1), { interval: 1 });
+    await vi.advanceTimersByTimeAsync(200);
+    await vi.waitFor(() => expect(refused).toBe(2), { interval: 1 });
+    await vi.advanceTimersByTimeAsync(200);
+    await vi.waitFor(() => expect(refused).toBe(3), { interval: 1 });
+    expect(signal?.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(600);
+    expect(signal?.aborted).toBe(true);
+  } finally {
+    release.resolve();
+    await running;
+  }
+  expect(stop).toHaveBeenCalledTimes(1);
+  expect(api.doneBodies).toEqual([
+    {
+      stepId: 's1',
+      body: {
+        status: 'failed',
+        errorMessage: expect.stringContaining('Orb worker release mismatch'),
+      },
+    },
+  ]);
+  expect(journal.pending()).toEqual([]);
+  expect(vi.getTimerCount()).toBe(0);
+});

@@ -30,6 +30,7 @@ import {
   type OrbStepInput,
   type OrbStepMethod,
   orbBundleArgsSchema,
+  orbReleaseKeySchema,
   orbWorkerFrameSchema,
 } from './protocol.js';
 import { readOrbFile } from './runtime-fs.js';
@@ -50,6 +51,13 @@ export class RelayMachineError extends MachineApiError {
   constructor(message: string) {
     super(403, message);
     this.name = 'RelayMachineError';
+  }
+}
+
+export class OrbStaleReleaseError extends Error {
+  constructor() {
+    super('Orb worker refused: stale-release');
+    this.name = 'OrbStaleReleaseError';
   }
 }
 
@@ -75,6 +83,9 @@ export class RelayMachineServer {
     private readonly options: {
       socketPath: string;
       stepId: string;
+      release: string;
+      onAuthenticated?: (release: string) => void;
+      onStaleRelease?: (release: string) => void;
       machineId?: string;
       upstream: MachineApi;
       localDelivery?: OrbLocalDelivery;
@@ -86,6 +97,7 @@ export class RelayMachineServer {
       onDisconnect?: () => void;
     },
   ) {
+    orbReleaseKeySchema.parse(options.release);
     this.server = createServer((socket) => {
       socket.on('error', () => {});
       if (this.connected || this.sockets.size >= 4) {
@@ -97,9 +109,11 @@ export class RelayMachineServer {
       this.requests.set(socket, requests);
       let buffer = Buffer.allocUnsafe(1024);
       let size = 0;
+      let refused = false;
       const authTimeout = setTimeout(() => socket.destroy(), 5_000);
       authTimeout.unref();
       socket.on('data', (chunk: Buffer) => {
+        if (refused) return;
         let start = 0;
         while (start < chunk.length && !socket.destroyed) {
           const end = chunk.indexOf(10, start);
@@ -116,7 +130,11 @@ export class RelayMachineServer {
           start = end + 1;
           if (!this.authenticated.has(socket)) {
             const auth = z
-              .object({ type: z.literal('auth'), token: z.string().regex(/^[a-f0-9]{64}$/) })
+              .object({
+                type: z.literal('auth'),
+                token: z.string().regex(/^[a-f0-9]{64}$/),
+                release: orbReleaseKeySchema,
+              })
               .strict()
               .safeParse(frame);
             if (
@@ -128,6 +146,14 @@ export class RelayMachineServer {
               return;
             }
             clearTimeout(authTimeout);
+            if (auth.data.release !== options.release) {
+              refused = true;
+              options.onStaleRelease?.(auth.data.release);
+              socket.end(encodeOrbFrame({ type: 'refused', reason: 'stale-release' }));
+              socket.setTimeout(1_000, () => socket.destroy());
+              return;
+            }
+            options.onAuthenticated?.(auth.data.release);
             this.connected = true;
             this.authenticated.add(socket);
             buffer = Buffer.allocUnsafe(ORB_MAX_FRAME_BYTES);
@@ -375,11 +401,12 @@ export class RelayMachineApi {
   private constructor(
     socketPath: string,
     token: string,
+    release: string,
     onFrame?: (frame: OrbFrame) => void,
     onClose?: () => void,
   ) {
     this.socket = createConnection(socketPath);
-    this.socket.once('connect', () => this.send({ type: 'auth', token }));
+    this.socket.once('connect', () => this.send({ type: 'auth', token, release }));
     let authenticated: () => void = () => {};
     let rejectAuthentication: (error: Error) => void = () => {};
     this.authentication = new Promise((resolve, reject) => {
@@ -400,6 +427,11 @@ export class RelayMachineApi {
       if (!frame) return;
       if (frame.type === 'authenticated') {
         authenticated();
+      } else if (frame.type === 'refused' && frame.reason === 'stale-release') {
+        const error = new OrbStaleReleaseError();
+        rejectAuthentication(error);
+        rejectInput(error);
+        this.socket.end();
       } else if (frame.type === 'init') {
         this.available = frame.input.methods;
         resolveInput(frame.input);
@@ -444,6 +476,7 @@ export class RelayMachineApi {
 
   static async connect(
     socketPath: string,
+    release: string,
     onFrame?: (frame: OrbFrame) => void,
     onClose?: () => void,
   ): Promise<RelayMachineApi> {
@@ -451,7 +484,8 @@ export class RelayMachineApi {
       'utf8',
     );
     if (!/^[a-f0-9]{64}$/.test(token)) throw new RelayMachineError('Invalid relay token');
-    const client = new RelayMachineApi(socketPath, token, onFrame, onClose);
+    orbReleaseKeySchema.parse(release);
+    const client = new RelayMachineApi(socketPath, token, release, onFrame, onClose);
     await client.authentication;
     return client;
   }
