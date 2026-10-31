@@ -133,6 +133,7 @@
   --menu-pad: 6px;
   --focus-field-border: var(--focus-ring);
   --focus-halo: color-mix(in srgb, var(--focus-ring) 22%, transparent);
+  --danger-halo: color-mix(in srgb, var(--destructive) 20%, transparent);
   --radius-menu-item: calc(var(--radius-popover) - var(--menu-pad));
   --dialog-w-s: 400px;
   --dialog-w-m: 480px;

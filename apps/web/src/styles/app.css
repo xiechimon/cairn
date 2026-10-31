@@ -248,6 +248,29 @@
     border-color: var(--focus-field-border);
     box-shadow: 0 0 0 3px var(--focus-halo);
   }
+
+  :root
+    :is(
+      [data-slot="input"],
+      [data-slot="textarea"],
+      [data-slot="select-trigger"]
+    )[aria-invalid="true"],
+  :root [data-slot="input-group"]:has([aria-invalid="true"]) {
+    border-color: var(--destructive);
+    box-shadow: none;
+  }
+
+  :root
+    :is(
+      [data-slot="input"],
+      [data-slot="textarea"],
+      [data-slot="select-trigger"]
+    )[aria-invalid="true"]:focus-visible,
+  :root [data-slot="input-group"]:has([aria-invalid="true"]:focus-visible) {
+    outline: none;
+    border-color: var(--destructive);
+    box-shadow: 0 0 0 3px var(--danger-halo);
+  }
 }
 
 [data-slot="kbd"]:not([data-slot="tooltip-content"] *) {
