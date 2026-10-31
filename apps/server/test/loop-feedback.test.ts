@@ -14,6 +14,7 @@ import {
   todo,
 } from '../src/db/schema.js';
 import { finishTodoDone, requestMerge } from '../src/services/builds.js';
+import { transitionTodos } from '../src/services/chief-tools.js';
 import { createCiPoller } from '../src/services/ci-loop.js';
 import { recordCorrectionGuard } from '../src/services/correction.js';
 import { DONE_ROW } from '../src/services/delivery-rows.js';
@@ -114,6 +115,40 @@ describe('PR feedback backflow', () => {
     expect(userMessages(s)[0]?.content).toContain('Fix case 51');
   });
 
+  test.each(['before', 'after'] as const)(
+    'a PR created %s team polling starts preserves the correct first-poll feedback policy across restart',
+    async (position) => {
+      const { s, gh, deps } = await world(false);
+      const startedAt = Date.parse('2026-10-31T01:00:00Z');
+      const now = vi.spyOn(Date, 'now').mockReturnValue(startedAt);
+      try {
+        s.db.update(build).set({ prNumber: null }).run();
+        await createPrFeedbackPoller(deps, { githubFetch: gh.impl }).sweep();
+        now.mockReturnValue(startedAt + 120_000);
+        s.db.update(build).set({ prNumber: 42 }).run();
+        gh.overrides.set(`/repos/${REPO}/pulls/42`, () => ({
+          body: {
+            state: 'open',
+            merged: false,
+            created_at: new Date(
+              startedAt + (position === 'after' ? 60_000 : -60_000),
+            ).toISOString(),
+          },
+        }));
+        gh.state.comments.set(42, [feedback(1)]);
+        gh.state.reviewComments.set(42, [feedback(2)]);
+        gh.state.reviews.set(42, [{ ...feedback(3), state: 'CHANGES_REQUESTED' }]);
+        await createPrFeedbackPoller(deps, { githubFetch: gh.impl }).sweep();
+        expect(userMessages(s)).toHaveLength(position === 'after' ? 3 : 0);
+        gh.state.comments.set(42, [feedback(1), feedback(4)]);
+        await createPrFeedbackPoller(deps, { githubFetch: gh.impl }).sweep();
+        expect(userMessages(s)).toHaveLength(position === 'after' ? 4 : 1);
+      } finally {
+        now.mockRestore();
+      }
+    },
+  );
+
   test('unchanged sweeps use four conditional reads and cache collaborator permission until its TTL expires', async () => {
     const { s, gh, deps } = await world();
     const poller = createPrFeedbackPoller(deps, { githubFetch: gh.impl });
@@ -134,7 +169,7 @@ describe('PR feedback backflow', () => {
     }
   });
 
-  test('generated markers and token-owner self-comments never feed back, while another author can comment', async () => {
+  test('the connection owner can comment and request changes on their own PR while generated markers are ignored', async () => {
     const { s, gh, deps } = await world();
     gh.state.pulls.set(42, { state: 'open', merged: false, user: { login: 'owner' } });
     gh.state.permissions.set('owner', { body: { permission: 'admin' } });
@@ -145,10 +180,39 @@ describe('PR feedback backflow', () => {
       feedback(4, 'reviewer', '<!-- cairn-dedupe: test --> Generated'),
       feedback(5),
     ]);
+    gh.state.reviews.set(42, [
+      { ...feedback(1, 'owner', 'Owner requests changes'), state: 'CHANGES_REQUESTED' },
+    ]);
+    await createPrFeedbackPoller(deps, { githubFetch: gh.impl }).sweep();
+    expect(userMessages(s)).toHaveLength(3);
+    expect(
+      userMessages(s)
+        .map((row) => row.content)
+        .join('\n'),
+    ).toContain('Owner requests changes');
+    expect(
+      userMessages(s)
+        .map((row) => row.content)
+        .join('\n'),
+    ).toContain('Fix case 1');
+    expect(
+      userMessages(s)
+        .map((row) => row.content)
+        .join('\n'),
+    ).toContain('Fix case 5');
+    expect(gh.permissionReads('owner')).toHaveLength(1);
+  });
+
+  test('a human collaborator named cairn is filtered by generated markers rather than their login', async () => {
+    const { s, gh, deps } = await world();
+    gh.state.permissions.set('cairn', { body: { permission: 'write' } });
+    gh.state.comments.set(42, [
+      feedback(1, 'cairn'),
+      feedback(2, 'cairn', '<!-- cairn-dedupe: test --> Generated'),
+    ]);
     await createPrFeedbackPoller(deps, { githubFetch: gh.impl }).sweep();
     expect(userMessages(s)).toHaveLength(1);
-    expect(userMessages(s)[0]?.content).toContain('Fix case 5');
-    expect(gh.permissionReads('owner')).toHaveLength(0);
+    expect(userMessages(s)[0]?.content).toContain('Fix case 1');
   });
 
   test('issue comments, inline comments and reviews are spliced in creation order', async () => {
@@ -417,6 +481,33 @@ describe('PR feedback backflow', () => {
 });
 
 describe('correction loop', () => {
+  test.each(['building', 'queued'] as const)(
+    'Coordinator cannot complete an unguarded correction from %s',
+    async (phase) => {
+      const { s, deps, task, projectId } = await world();
+      const res = await req(s.app, 'POST', `/api/projects/${projectId}/tags`, {
+        name: 'correction',
+        color: '#000000',
+      });
+      updateTodo(deps, task.id, { tagIds: [((await res.json()) as { id: string }).id] });
+      s.db.update(todo).set({ phase }).where(eq(todo.id, task.id)).run();
+      const result = transitionTodos(deps, s.team.id, [task.id], 'done', {
+        kind: 'agent',
+        name: 'Coordinator',
+      });
+      expect(result.transitioned).toEqual([]);
+      expect(result.skipped).toEqual([task.id]);
+      expect(s.db.select().from(todo).where(eq(todo.id, task.id)).get()?.phase).toBe(phase);
+      expect(
+        s.db
+          .select()
+          .from(message)
+          .all()
+          .filter((row) => row.content === DONE_ROW),
+      ).toHaveLength(0);
+    },
+  );
+
   test.each(['internal', 'manual'] as const)(
     'a correction can be abandoned through the %s phase path without a guard',
     async (path) => {
@@ -649,7 +740,7 @@ describe('correction loop', () => {
     },
   );
 
-  test('manual done fails without a test or gate in the delivered diff; an added guard permits completion', async () => {
+  test('manual done requires gate proof even when a delivered diff contains a test or legacy added status', async () => {
     const { s, deps, task, projectId } = await world();
     const imported = await req(s.app, 'POST', `/api/projects/${projectId}/tags`, {
       name: 'correction',
@@ -691,7 +782,18 @@ describe('correction loop', () => {
       .update(build)
       .set({ changes: [{ ...file, path: 'apps/server/test/fix.test.ts' }] })
       .run();
-    expect(updateTodo(deps, task.id, { phase: 'done' }, { manualPhase: true })?.phase).toBe('done');
+    expect(() => updateTodo(deps, task.id, { phase: 'done' }, { manualPhase: true })).toThrow(
+      /test or gate/,
+    );
+    s.db
+      .update(build)
+      .set({
+        changes: [{ path: 'apps/server/test/fix.test.ts', additions: 2, deletions: 0, hunks: [] }],
+      })
+      .run();
+    expect(() => updateTodo(deps, task.id, { phase: 'done' }, { manualPhase: true })).toThrow(
+      /test or gate/,
+    );
   });
 });
 

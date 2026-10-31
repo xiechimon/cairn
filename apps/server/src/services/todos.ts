@@ -563,6 +563,7 @@ export function setTodoPhase(
   extra: Partial<
     Pick<TodoRow, 'hasChanges' | 'hasPlan' | 'latestBuildId' | 'lastRunAt' | 'assignment'>
   > = {},
+  options: { landedMerge?: true } = {},
 ): TodoRecord | null {
   const { db } = deps;
   const row = getRow(deps, id);
@@ -582,6 +583,7 @@ export function setTodoPhase(
     return record;
   }
   assertPhaseTransition(row.phase, to);
+  if (to === 'done' && !options.landedMerge) assertCorrectionDone(db, row);
   db.update(todo)
     .set({ ...extra, phase: to, phaseAt: nowMs(), v: row.v + 1 })
     .where(eq(todo.id, id))

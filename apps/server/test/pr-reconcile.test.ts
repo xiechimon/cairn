@@ -2276,6 +2276,7 @@ describe('#1403 [66] live GitHub response shapes (captured over REST, see docs/v
       title: 'server(1403): reconcile review-phase PRs merged or closed on GitHub',
       authorAssociation: 'OWNER',
       mergeableState: 'blocked',
+      createdAt: '2026-10-20T21:01:14Z',
       openerLogin: 'xiechimon',
       openerType: 'User',
     });
@@ -2300,6 +2301,7 @@ describe('#1403 [66] live GitHub response shapes (captured over REST, see docs/v
       title: 'server(1453): a step that finishes before its stop lands leaves an exited card alone',
       authorAssociation: 'OWNER',
       mergeableState: 'unknown',
+      createdAt: '2026-10-21T07:45:01Z',
       openerLogin: 'xiechimon',
       openerType: 'User',
     });

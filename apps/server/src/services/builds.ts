@@ -2839,7 +2839,7 @@ export function finishTodoDone(deps: BuildDeps, todoId: string, buildId: string)
     .get()?.phase;
   if (current !== undefined) assertPhaseTransition(current, 'done');
   stopUnclaimedGateSteps(deps, buildId);
-  setTodoPhase(deps, todoId, 'done');
+  setTodoPhase(deps, todoId, 'done', {}, { landedMerge: true });
   insertMessageRow(deps, buildId, {
     id: newRecordId(),
     role: 'system',

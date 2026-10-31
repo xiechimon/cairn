@@ -60,7 +60,7 @@ export async function githubPrFeedback(
       const rows = z.array(feedbackSchema).parse(await response.json());
       for (const row of rows) {
         highWater[kind] = Math.max(highWater[kind], row.id);
-        if (row.user === null || isCairnIdentity(row.user.login)) continue;
+        if (row.user === null) continue;
         if (kind === 'review' && row.state !== 'CHANGES_REQUESTED') continue;
         const body = row.body?.trim() ?? '';
         if (body === '' && kind !== 'review') continue;

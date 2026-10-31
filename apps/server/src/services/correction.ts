@@ -3,7 +3,7 @@ import type { Db } from '../db/client.js';
 import { build, gateState, message, step, tag, type todo, todoTag } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
-import { CORRECTION_GUARD_MISSING, correctionDoneCheck } from './merge-gate/correction.js';
+import { CORRECTION_GUARD_MISSING } from './merge-gate/correction.js';
 
 export function isCorrectionTask(db: Db, todoId: string): boolean {
   return (
@@ -50,9 +50,7 @@ export function assertCorrectionDone(
           .from(build)
           .where(and(eq(build.id, row.latestBuildId), eq(build.todoId, row.id)))
           .get();
-  const changes = latest?.changes ?? null;
-  const files = changes === null ? null : Array.isArray(changes) ? changes : changes.files;
-  let approved = correctionDoneCheck(files);
+  let approved = false;
   if (latest !== undefined) {
     const delivered = db
       .select()

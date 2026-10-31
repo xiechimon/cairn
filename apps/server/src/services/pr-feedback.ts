@@ -1,14 +1,6 @@
 import { neutralizeIssueAttachmentTokens } from '@cairn/shared';
 import { and, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
-import {
-  build,
-  githubConnection,
-  message,
-  project,
-  steerPending,
-  step,
-  todo,
-} from '../db/schema.js';
+import { build, message, project, steerPending, step, team, todo } from '../db/schema.js';
 import { type FetchLike, githubCollaboratorPermission, githubPull } from '../lib/github.js';
 import { feedbackHighWaterSchema, githubPrFeedback } from '../lib/github-feedback.js';
 import { conditionalFeedbackFetch } from '../lib/github-feedback-cache.js';
@@ -35,6 +27,20 @@ export function createPrFeedbackPoller(
       sweeping = true;
       let delivered = 0;
       try {
+        for (const row of deps.db.select({ id: team.id }).from(team).all()) {
+          const id = `github-feedback-start:${row.id}`;
+          deps.db
+            .insert(message)
+            .values({
+              id,
+              conversationId: id,
+              role: 'system',
+              content: { kind: 'github_feedback_start' },
+              createdAt: nowMs(),
+            })
+            .onConflictDoNothing()
+            .run();
+        }
         const targets = deps.db
           .select({ build, todo, project })
           .from(build)
@@ -82,6 +88,16 @@ export function createPrFeedbackPoller(
             const cursorId =
               `github-feedback-baseline:${target.todo.teamId}:${ref.owner}/${ref.repo}:${target.build.prNumber}`.toLowerCase();
             const cursor = deps.db.select().from(message).where(eq(message.id, cursorId)).get();
+            const startedAt = deps.db
+              .select({ at: message.createdAt })
+              .from(message)
+              .where(eq(message.id, `github-feedback-start:${target.todo.teamId}`))
+              .get()?.at;
+            if (startedAt === undefined) continue;
+            const baseline =
+              Date.parse(pull.createdAt ?? '') > startedAt
+                ? { comment: 0, 'review-comment': 0, review: 0 }
+                : snapshot.highWater;
             if (cursor === undefined) {
               deps.db
                 .insert(message)
@@ -89,27 +105,15 @@ export function createPrFeedbackPoller(
                   id: cursorId,
                   conversationId: target.build.id,
                   role: 'system',
-                  content: { kind: 'github_feedback_baseline', ...snapshot.highWater },
+                  content: { kind: 'github_feedback_baseline', ...baseline },
                   createdAt: nowMs(),
                 })
                 .onConflictDoNothing()
                 .run();
-              continue;
             }
-            const highWater = feedbackHighWaterSchema.parse(cursor.content);
-            const login = deps.db
-              .select({ login: githubConnection.login })
-              .from(githubConnection)
-              .where(eq(githubConnection.teamId, target.todo.teamId))
-              .get()
-              ?.login.toLowerCase();
+            const highWater = feedbackHighWaterSchema.parse(cursor?.content ?? baseline);
             for (const comment of snapshot.comments) {
               if (comment.id <= highWater[comment.kind]) continue;
-              if (
-                comment.author.toLowerCase() === login &&
-                pull.openerLogin?.toLowerCase() === login
-              )
-                continue;
               const id =
                 `github-feedback:${target.todo.teamId}:${ref.owner}/${ref.repo}:${comment.key}`.toLowerCase();
               const dispatchedId = `dispatched:${id}`;
