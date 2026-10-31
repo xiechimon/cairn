@@ -177,7 +177,7 @@ export function TraceStepLine({
           density={density}
           secs={step.secs}
           trailing={
-            <span className="font-mono text-caption font-medium tabular-nums">
+            <span className="font-mono text-code font-medium tabular-nums">
               <span className="text-running-text">+{step.added}</span>{' '}
               <span className="text-destructive">−{step.removed}</span>
             </span>
@@ -192,7 +192,7 @@ export function TraceStepLine({
           icon={GitBranch}
           density={density}
           secs={step.secs}
-          trailing={<Meta className="font-mono text-caption">{step.commit}</Meta>}
+          trailing={<Meta className="font-mono text-code">{step.commit}</Meta>}
         >
           Pushed <TraceCode>{step.branch}</TraceCode>
         </ToolLine>
@@ -229,7 +229,7 @@ export function TraceStepLine({
       return (
         <TraceCollapsible defaultOpen={step.exit != null && step.exit !== 0}>
           <TraceCollapsibleTrigger className={line}>{head}</TraceCollapsibleTrigger>
-          <TraceCollapsibleContent className="font-mono text-caption leading-5 not-italic">
+          <TraceCollapsibleContent className="font-mono text-code leading-5 not-italic">
             {step.output.map((out) => (
               <div key={out} className={step.exit === 0 ? '' : 'text-destructive'}>
                 {out}

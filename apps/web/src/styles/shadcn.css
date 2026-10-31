@@ -207,9 +207,10 @@
   --type-page: calc(1.25rem * var(--type-scale));
   --type-heading: calc(1.0625rem * var(--type-scale));
   --type-greeting: calc(1.625rem * var(--type-scale));
-  --type-card-title: calc(0.875rem * var(--type-scale));
+  --type-card-title: calc(0.9375rem * var(--type-scale));
   --type-ui: calc(0.875rem * var(--type-scale));
-  --type-meta: calc(0.78125rem * var(--type-scale));
+  --type-meta: calc(0.8125rem * var(--type-scale));
+  --type-code: calc(0.8125rem * var(--type-scale));
   --type-caption: calc(0.75rem * var(--type-scale));
   --leading-body: 1.428;
   --surface-0: var(--background);

@@ -92,7 +92,7 @@ function WorkStepRow({ step, enter, t }: { step: WorkStep; enter: boolean; t: TF
             )}
             <span className="flex-1" />
             {step.diff !== undefined && (
-              <span className="flex flex-none gap-1 font-mono text-caption">
+              <span className="flex flex-none gap-1 font-mono text-code">
                 <span className="text-(--diff-add-fg)">+{step.diff.added}</span>
                 <span className="text-destructive">−{step.diff.removed}</span>
               </span>
@@ -133,7 +133,7 @@ function WorkStepRow({ step, enter, t }: { step: WorkStep; enter: boolean; t: TF
               {step.command !== undefined ? `$ ${step.command}` : (step.target ?? step.label)}
             </div>
             <pre
-              className="m-0 max-h-60 overflow-auto px-2.5 py-2 text-left font-mono text-caption leading-5 whitespace-pre-wrap text-(--foreground) [overflow-wrap:anywhere]"
+              className="m-0 max-h-60 overflow-auto px-2.5 py-2 text-left font-mono text-code leading-5 whitespace-pre-wrap text-(--foreground) [overflow-wrap:anywhere]"
               data-testid="tool-output"
             >
               {step.kind === 'call' &&

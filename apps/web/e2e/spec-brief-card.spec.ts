@@ -136,7 +136,7 @@ test('4. brief-card recipe = framed content box (1px border / rounded-lg / surfa
 
   expect(cs.bg).toBe('rgb(42, 48, 43)');
   expect(cs.borderColor).toBe('rgb(53, 59, 54)');
-  expect(cs.fontSize).toBe('14px');
+  expect(cs.fontSize).toBe('15px');
 });
 
 test('4b. wide screens line length takes the 68ch cap (same law as the 60–75 character band in #470)', async ({ page }) => {

@@ -215,7 +215,7 @@ test('5. a one-line message keeps the 32px bubble height (no geometry drift)', a
     return { h: Math.round(r.height), font: getComputedStyle(el).fontSize };
   });
   expect(box.h).toBe(32);
-  expect(box.font).toBe('14px');
+  expect(box.font).toBe('15px');
 });
 
 test('6. taskline does not mis-attach: after the task text row retires no #seq row residue remains', async ({ page }) => {
