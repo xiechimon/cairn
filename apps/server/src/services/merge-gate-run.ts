@@ -288,6 +288,7 @@ export async function evaluateMergeGate(
     author: authorAgent !== null ? { id: authorAgent.id, model: authorAgent.modelId ?? '' } : null,
     policy: {
       mergePolicy: projectMergeConfigOf(projectRow).mergePolicy,
+      requireUpToDate: projectMergeConfigOf(projectRow).requireUpToDate,
       ...policy,
       autonomyPaused: policy.autonomyPaused || githubPaused,
     },

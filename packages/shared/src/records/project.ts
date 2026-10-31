@@ -23,6 +23,7 @@ export const projectRecordSchema = z.object({
   baseBranch: z.string().nullable().optional(),
   mergePolicy: mergePolicySchema.optional(),
   localChecks: z.array(z.string().min(1)).optional(),
+  requireUpToDate: z.boolean().optional(),
   cloneUrl: z.string().optional(),
 });
 export type ProjectRecord = z.infer<typeof projectRecordSchema>;
@@ -30,12 +31,14 @@ export type ProjectRecord = z.infer<typeof projectRecordSchema>;
 export const projectMergeConfigSchema = z.object({
   mergePolicy: mergePolicySchema.default('autonomous'),
   localChecks: z.array(z.string().min(1)).default([]),
+  requireUpToDate: z.boolean().default(false),
 });
 export type ProjectMergeConfig = z.infer<typeof projectMergeConfigSchema>;
 export const patchProjectMergeConfigSchema = z
   .object({
     mergePolicy: projectMergeConfigSchema.shape.mergePolicy.unwrap().optional(),
     localChecks: projectMergeConfigSchema.shape.localChecks.unwrap().optional(),
+    requireUpToDate: projectMergeConfigSchema.shape.requireUpToDate.unwrap().optional(),
   })
   .strict();
 export type PatchProjectMergeConfig = z.infer<typeof patchProjectMergeConfigSchema>;
