@@ -513,40 +513,211 @@ function runDocCheck(theme: GalleryTheme) {
   return { checks, unmapped, failed };
 }
 
+const DOC_GROUPS: [string, (key: string) => boolean][] = [
+  ['Corners', (k) => k.startsWith('rounded.')],
+  ['Tiles', (k) => k.startsWith('project-tiles')],
+  ['Running', (k) => k.startsWith('running')],
+  ['Ink', (k) => k.startsWith('ink') || k === 'icon'],
+  ['Overlay', (k) => k === 'backdrop'],
+  [
+    'Surfaces',
+    (k) => ['canvas', 'sheet', 'card', 'popover', 'hover', 'line', 'rule', 'divider'].includes(k),
+  ],
+  ['Actions', () => true],
+];
+
+function docGroup(key: string): string {
+  return DOC_GROUPS.find(([, match]) => match(key))?.[0] ?? 'Actions';
+}
+
+function DocRing({ done, total }: { done: number; total: number }) {
+  const r = 46;
+  const c = 2 * Math.PI * r;
+  const ok = done === total;
+  return (
+    <div className="relative size-28 flex-none">
+      <svg viewBox="0 0 112 112" className="size-28" aria-hidden="true">
+        <circle cx="56" cy="56" r={r} fill="none" stroke="var(--running-track)" strokeWidth="10" />
+        <circle
+          cx="56"
+          cy="56"
+          r={r}
+          fill="none"
+          stroke={ok ? 'var(--running-bar)' : 'var(--destructive)'}
+          strokeWidth="10"
+          strokeLinecap="round"
+          strokeDasharray={c}
+          strokeDashoffset={c * (1 - done / Math.max(total, 1))}
+          transform="rotate(-90 56 56)"
+        />
+      </svg>
+      <span className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="font-heading text-page font-title tabular-nums">
+          {done}/{total}
+        </span>
+        <span className="text-caption text-content-tertiary">in sync</span>
+      </span>
+    </div>
+  );
+}
+
+function DocSwatch({ value, kind }: { value: string; kind: 'color' | 'length' }) {
+  if (kind === 'length')
+    return (
+      <span
+        className="size-4 flex-none border-t-[1.5px] border-l-[1.5px] border-content-tertiary"
+        style={{ borderTopLeftRadius: `min(${value}, 12px)` }}
+      />
+    );
+  return (
+    <span
+      className="size-4 flex-none rounded-(--cds-radius-xs) ring-1 ring-foreground/10"
+      style={{ background: value }}
+    />
+  );
+}
+
 export function DocCheckSection({ theme }: { theme: GalleryTheme }) {
   const { checks, unmapped, failed } = runDocCheck(theme);
+  const [showAll, setShowAll] = useState(false);
+  const failedKeys = new Set(failed.map((f) => f.key));
+  const groups = DOC_GROUPS.map(([name]) => {
+    const members = checks.filter((c) => docGroup(c.key) === name);
+    return {
+      name,
+      total: members.length,
+      ok: members.filter((c) => !failedKeys.has(c.key)).length,
+    };
+  }).filter((g) => g.total > 0);
+  const colorChecks = checks.filter((c) => c.kind === 'color');
+  const cornerChecks = checks.filter((c) => c.kind === 'length');
+  const okCount = checks.length - failed.length;
+  const summary = [
+    ['Theme', theme === 'dark' ? 'Dark' : 'Light'],
+    [
+      'Colors',
+      `${colorChecks.filter((c) => !failedKeys.has(c.key)).length} of ${colorChecks.length}`,
+    ],
+    [
+      'Corners',
+      `${cornerChecks.filter((c) => !failedKeys.has(c.key)).length} of ${cornerChecks.length}`,
+    ],
+  ];
   return (
     <Section
       id="doc-check"
       title="Doc check"
       lede="Every value in the DESIGN.md frontmatter, compared with what the current theme renders. Switch themes to check the other side."
     >
-      <Specimen
-        title={`${theme === 'dark' ? 'Dark' : 'Light'} theme`}
-        note={`${checks.length} values checked`}
-      >
-        {failed.length === 0 ? (
-          <p className="m-0 flex items-center gap-2.5 text-ui text-foreground">
-            <span className="size-2 rounded-full bg-running" />
-            DESIGN.md and the code agree on all {checks.length} values.
-          </p>
-        ) : (
-          <div className="-my-3 w-full divide-y divide-border">
-            {failed.map((f) => (
-              <div key={f.key} className="grid grid-cols-3 gap-4 py-2.5 text-meta">
-                <span className="font-mono text-content-secondary">{f.key}</span>
-                <span className="text-content-tertiary">DESIGN.md: {f.expected}</span>
-                <span className="text-foreground">Code: {f.got}</span>
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[18rem_1fr]">
+        <div className="flex flex-col gap-4 rounded-(--radius-card) bg-card p-5 shadow-(--e1)">
+          <DocRing done={okCount} total={checks.length} />
+          <div>
+            <h3 className="m-0 font-heading text-heading font-title">
+              {failed.length === 0 ? 'In sync' : `${failed.length} drifted`}
+            </h3>
+            <p className="m-0 mt-1 text-ui text-content-secondary">
+              {failed.length === 0
+                ? 'DESIGN.md and the code agree on every value.'
+                : 'These tokens no longer match DESIGN.md.'}
+            </p>
+          </div>
+          <dl className="m-0 grid gap-2 text-ui">
+            {summary.map(([k, v]) => (
+              <div key={k} className="flex justify-between">
+                <dt className="text-content-tertiary">{k}</dt>
+                <dd className="m-0 tabular-nums">{v}</dd>
               </div>
             ))}
+          </dl>
+        </div>
+        <div className="rounded-(--radius-card) bg-card shadow-(--e1)">
+          <h3 className="m-0 px-5 pt-4 pb-2 text-ui font-semibold">Needs attention</h3>
+          <div className="px-2 pb-2">
+            {failed.length === 0 ? (
+              <p className="m-0 px-3 py-2 text-ui text-content-tertiary">Nothing drifted.</p>
+            ) : (
+              failed.map((f) => (
+                <div
+                  key={f.key}
+                  className="grid grid-cols-[1.2fr_1fr_1fr] items-center gap-3 rounded-(--radius-menu-item) bg-danger-soft px-3 py-2.5"
+                >
+                  <span className="font-mono text-caption font-medium">{f.key}</span>
+                  <span className="flex items-center gap-2">
+                    <DocSwatch value={f.expected} kind={f.kind} />
+                    <span className="flex flex-col">
+                      <span className="text-caption text-content-tertiary">DESIGN.md</span>
+                      <span className="font-mono text-caption">{f.expected}</span>
+                    </span>
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <DocSwatch value={f.got} kind={f.kind} />
+                    <span className="flex flex-col">
+                      <span className="text-caption text-content-tertiary">Rendered</span>
+                      <span className="font-mono text-caption text-destructive">{f.got}</span>
+                    </span>
+                  </span>
+                </div>
+              ))
+            )}
           </div>
-        )}
-        {unmapped.length > 0 && (
-          <p className="m-0 w-full text-meta text-content-tertiary">
-            In DESIGN.md but not a token in code: {unmapped.join(', ')}.
-          </p>
-        )}
-      </Specimen>
+          <h3 className="m-0 px-5 pt-3 pb-2 text-ui font-semibold">In sync</h3>
+          <div className="flex flex-wrap gap-1.5 px-5 pb-4">
+            {groups.map((g) => (
+              <span
+                key={g.name}
+                className={cn(
+                  'rounded-full px-2.5 py-0.5 text-meta font-medium',
+                  g.ok === g.total
+                    ? 'bg-(--chip-done-bg) text-(--chip-done-fg)'
+                    : 'bg-danger-soft text-destructive',
+                )}
+              >
+                {g.name} {g.ok}/{g.total}
+              </span>
+            ))}
+          </div>
+          {unmapped.length > 0 && (
+            <p className="m-0 px-5 pb-4 text-meta text-content-tertiary">
+              In DESIGN.md but not a token in code: {unmapped.join(', ')}.
+            </p>
+          )}
+          <Button
+            variant="ghost"
+            aria-expanded={showAll}
+            onClick={() => setShowAll((v) => !v)}
+            className="h-auto w-full justify-start rounded-none border-0 border-t border-border px-5 py-3 text-ui text-content-secondary hover:bg-transparent hover:text-foreground aria-expanded:bg-transparent"
+          >
+            {showAll ? 'Hide values' : `Show all ${checks.length} values`}
+          </Button>
+          {showAll && (
+            <div className="divide-y divide-border border-t border-border">
+              {checks.map((c) => (
+                <div
+                  key={c.key}
+                  className="grid grid-cols-[1.2fr_1fr_auto] items-center gap-3 px-5 py-2"
+                >
+                  <span className="flex items-center gap-2.5 text-ui">
+                    <DocSwatch value={c.expected} kind={c.kind} />
+                    {c.key}
+                  </span>
+                  <span className="font-mono text-caption text-content-secondary">
+                    {c.expected}
+                  </span>
+                  <span
+                    className={cn(
+                      'text-meta font-medium',
+                      failedKeys.has(c.key) ? 'text-destructive' : 'text-running-text',
+                    )}
+                  >
+                    {failedKeys.has(c.key) ? 'Drifted' : 'Match'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </Section>
   );
 }
