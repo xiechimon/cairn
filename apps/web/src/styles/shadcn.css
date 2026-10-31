@@ -296,6 +296,8 @@
   --running-text: #9cc78b;
   --running-bar: #6fa35c;
   --switch-on: #6fa35c;
+  --tag-tint: 26%;
+  --tag-ink: 55%;
   --switch-off: #434a44;
   --switch-thumb: #ffffff;
   --running-track: #2e3430;
@@ -417,6 +419,8 @@
   --running-text: #3f6c35;
   --running-bar: #55833f;
   --switch-on: #55833f;
+  --tag-tint: 14%;
+  --tag-ink: 78%;
   --switch-off: #ccd0c7;
   --switch-thumb: #ffffff;
   --running-track: #e1e3dc;

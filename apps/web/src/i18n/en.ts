@@ -656,7 +656,7 @@ export const EN: Record<string, string> = {
   // #822 在飞存在行展开面：行开关 aria + 正在调用的工具 + 空面 fallback。
   展开实时步骤: 'Show live steps',
   收起实时步骤: 'Hide live steps',
-  '正在调用 {n}': 'Calling {n}',
+  正在调用: 'Calling',
   '等待 Agent 响应…': 'Waiting for the agent…',
   // #1257 板面挂起态：等机器 / 等额度 chip + 等额度 tooltip（下次尝试时刻）。
   // 等额度 chip 词复用 #1261 的同名键（上面等额度族）。

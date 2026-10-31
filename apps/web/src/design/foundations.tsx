@@ -167,19 +167,19 @@ const ELEVATIONS = [
     name: 'Card',
     token: '--e1',
     cls: 'rounded-(--radius-card) bg-card shadow-(--e1)',
-    box: { top: '18%', left: '6%', height: '54%', width: '40%' },
+    box: { top: '30%', left: '5%', height: '46%', width: '27%' },
   },
   {
     name: 'Menu',
     token: '--e2',
     cls: 'rounded-(--radius-popover) bg-popover shadow-(--e2)',
-    box: { top: '36%', left: '34%', height: '42%', width: '28%' },
+    box: { top: '20%', left: '37%', height: '46%', width: '26%' },
   },
   {
     name: 'Dialog',
     token: '--e3',
     cls: 'rounded-(--edge-radius) bg-dialog-surface shadow-(--e3)',
-    box: { top: '12%', left: '56%', height: '62%', width: '38%' },
+    box: { top: '10%', left: '68%', height: '56%', width: '27%' },
   },
 ];
 
@@ -483,7 +483,7 @@ export function MotionSection() {
                 </div>
                 <div className="relative h-1 flex-auto rounded-full bg-(--running-track)">
                   <span
-                    className="absolute -top-1.5 size-4 rounded-full bg-(--card-button) shadow-(--e1)"
+                    className="absolute -top-1.5 size-4 rounded-full bg-primary shadow-(--e1)"
                     style={{
                       left: played ? 'calc(100% - 1rem)' : 0,
                       transition: reduceMotion ? 'none' : `left ${duration} var(${m.ease})`,
@@ -682,14 +682,16 @@ export function DocCheckSection({ theme }: { theme: GalleryTheme }) {
               In DESIGN.md but not a token in code: {unmapped.join(', ')}.
             </p>
           )}
-          <Button
-            variant="ghost"
-            aria-expanded={showAll}
-            onClick={() => setShowAll((v) => !v)}
-            className="h-auto w-full justify-start rounded-none border-0 border-t border-border px-5 py-3 text-ui text-content-secondary hover:bg-transparent hover:text-foreground aria-expanded:bg-transparent"
-          >
-            {showAll ? 'Hide values' : `Show all ${checks.length} values`}
-          </Button>
+          <div className="border-t border-border p-2">
+            <Button
+              variant="ghost"
+              aria-expanded={showAll}
+              onClick={() => setShowAll((v) => !v)}
+              className="w-full justify-start px-3 text-ui text-content-secondary aria-expanded:bg-transparent"
+            >
+              {showAll ? 'Hide values' : `Show all ${checks.length} values`}
+            </Button>
+          </div>
           {showAll && (
             <div className="divide-y divide-border border-t border-border">
               {checks.map((c) => (

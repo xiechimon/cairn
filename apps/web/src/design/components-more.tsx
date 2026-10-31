@@ -3,6 +3,7 @@ import { ClaudeMark, GeminiMark, PiMark } from '../components/brand-marks.js';
 import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.js';
 import { JumpToLatestButton } from '../components/chat/jump-to-latest.js';
 import { LiveRow } from '../components/chat/live-row.js';
+import { TraceSteps } from '../components/chat/trace-steps.js';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { ProfileHeader } from '../components/profile-card.js';
@@ -33,7 +34,7 @@ import { Separator } from '../components/ui/separator.js';
 import type { ModelOption } from '../fixtures/records.js';
 import { ArrowDown, Copy, Download, Settings, Trash2 } from '../icons/index.js';
 import { AgentModelSelect, AgentRuntimeSelect } from '../routes/agent-model-select.js';
-import { SEED_TRANSCRIPT, TranscriptSteps } from './agent-transcript.js';
+import { SEED_TRANSCRIPT } from './agent-transcript.js';
 import { Cell, Section, Specimen } from './specimen.js';
 
 const MODEL_OPTIONS: ModelOption[] = [
@@ -266,7 +267,7 @@ export function StreamSection() {
             <MessageScroller className="h-auto min-h-0 flex-1">
               <FadeScrollerViewport>
                 <MessageScrollerContent className="block gap-0 px-5 pt-4 pb-5">
-                  <TranscriptSteps steps={steps} />
+                  <TraceSteps steps={steps} />
                   <div className="mt-4">
                     <LiveRow variant="chief" label="Opening the pull request" startedAt={started} />
                   </div>

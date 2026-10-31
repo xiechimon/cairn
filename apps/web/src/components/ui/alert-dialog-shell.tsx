@@ -132,7 +132,7 @@ export function AlertDialogActions({
       <Button
         variant="destructive"
         size="default"
-        className={`${confirmClassName ?? 'delete-confirm-delete'} ${DIALOG_PRIMARY_BUTTON}`}
+        className={`${confirmClassName ?? 'delete-confirm-delete'} ${DIALOG_PRIMARY_BUTTON} bg-destructive text-(--text-on-veil) hover:bg-destructive/90 dark:bg-destructive dark:text-(--text-on-accent) dark:hover:bg-destructive/90`}
         disabled={confirmDisabled}
         onClick={onConfirm}
       >

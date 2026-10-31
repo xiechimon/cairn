@@ -12,18 +12,16 @@ interface TagChipProps {
 export function TagChip({ tag, className }: TagChipProps) {
   return (
     <Badge
-      variant="outline"
       className={cn(
-        'tag-chip max-w-40 justify-start gap-1.5 bg-card text-foreground transition-none',
+        'tag-chip max-w-40 justify-start gap-0 rounded-(--cds-radius-sm) px-1.5 transition-none',
         className,
       )}
+      style={{
+        backgroundColor: `color-mix(in srgb, ${tag.color} var(--tag-tint), var(--card))`,
+        color: `color-mix(in srgb, ${tag.color} var(--tag-ink), var(--foreground))`,
+      }}
       title={tag.name}
     >
-      <span
-        aria-hidden="true"
-        className="size-2 flex-none rounded-full"
-        style={{ backgroundColor: tag.color }}
-      />
       <span className="min-w-0 truncate">{tag.name}</span>
     </Badge>
   );
