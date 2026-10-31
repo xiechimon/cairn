@@ -12,7 +12,7 @@ import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { pauseTeamGithubRepos } from './github-autonomy-brake.js';
 import { teamGithubToken } from './github-connection.js';
 import { localGateFacts } from './local-merge-facts.js';
-import { type MachineDeps, upsertMessage } from './machine-deps.js';
+import { upsertMessage } from './machine-deps.js';
 import { evaluateMergeGate } from './merge-gate-run.js';
 import { sendMustReachAlert } from './push-alerts.js';
 
@@ -130,7 +130,7 @@ export async function reverifyShip(
 }
 
 async function raiseUnjudgedLanding(
-  deps: MachineDeps,
+  deps: BuildDeps,
   stepRow: typeof step.$inferSelect,
   teamId: string,
   reason: string,
@@ -151,19 +151,28 @@ async function raiseUnjudgedLanding(
   }).catch(() => undefined);
 }
 
-export async function verifyShipLanding(
-  deps: MachineDeps,
+type LandingInspection =
+  | { kind: 'ok' }
+  | { kind: 'unverifiable' | 'head-moved'; reason: string }
+  | { kind: 'unjudged'; reason: string; teamId: string };
+
+async function inspectShipLanding(
+  deps: BuildDeps,
   stepRow: typeof step.$inferSelect,
-): Promise<string | null> {
+): Promise<LandingInspection> {
   const instruction = parseShipGateInstruction(stepRow.prompt);
-  if (instruction === null) return null;
+  if (instruction === null) return { kind: 'ok' };
   const buildRow = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
   const todoRow = buildRow && deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
-  if (!buildRow || !todoRow) return 'cannot verify the landing: build or task missing';
+  if (!buildRow || !todoRow) {
+    return { kind: 'unverifiable', reason: 'cannot verify the landing: build or task missing' };
+  }
   const repo = githubRepoOfProject(projectOfTodo(deps.db, todoRow));
-  if (repo === null || buildRow.prNumber === null) return null;
+  if (repo === null || buildRow.prNumber === null) return { kind: 'ok' };
   const access = await teamGithubToken(deps, todoRow.teamId);
-  if (!('token' in access)) return 'cannot verify the landing: no GitHub connection';
+  if (!('token' in access)) {
+    return { kind: 'unverifiable', reason: 'cannot verify the landing: no GitHub connection' };
+  }
   const page = await githubPull(
     deps.githubFetch ?? fetch,
     access.token,
@@ -173,12 +182,36 @@ export async function verifyShipLanding(
   );
   const pull = page?.pull ?? null;
   if (pull === null || pull.headSha === null) {
-    return 'cannot verify the landing: the pull request could not be read';
+    return {
+      kind: 'unverifiable',
+      reason: 'cannot verify the landing: the pull request could not be read',
+    };
   }
-  if (pull.headSha === instruction.judgedHead) return null;
+  if (pull.headSha === instruction.judgedHead) return { kind: 'ok' };
   const moved = `pull request head ${pull.headSha.slice(0, 7)} differs from the judged head ${instruction.judgedHead.slice(0, 7)}`;
-  if (!pull.merged) return `head-moved: ${moved}`;
-  const reason = `unjudged code was merged: ${moved}`;
-  await raiseUnjudgedLanding(deps, stepRow, todoRow.teamId, reason);
-  return reason;
+  if (!pull.merged) return { kind: 'head-moved', reason: `head-moved: ${moved}` };
+  return { kind: 'unjudged', reason: `unjudged code was merged: ${moved}`, teamId: todoRow.teamId };
+}
+
+export async function verifyShipLanding(
+  deps: BuildDeps,
+  stepRow: typeof step.$inferSelect,
+): Promise<string | null> {
+  const found = await inspectShipLanding(deps, stepRow);
+  if (found.kind === 'ok') return null;
+  if (found.kind === 'unjudged')
+    await raiseUnjudgedLanding(deps, stepRow, found.teamId, found.reason);
+  return found.reason;
+}
+
+export async function settleAbandonedShip(
+  deps: BuildDeps,
+  stepRow: typeof step.$inferSelect,
+): Promise<string | null> {
+  const found = await inspectShipLanding(deps, stepRow).catch(
+    (): LandingInspection => ({ kind: 'ok' }),
+  );
+  if (found.kind !== 'unjudged') return null;
+  await raiseUnjudgedLanding(deps, stepRow, found.teamId, found.reason);
+  return found.reason;
 }

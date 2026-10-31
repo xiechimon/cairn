@@ -142,7 +142,14 @@ import type { VapidKeys } from './push.js';
 import { publishStepRow, toQuotaWait } from './quota-wait.js';
 import { retryLessonsOf } from './retry-lessons.js';
 import { finishScheduledStep } from './schedules.js';
-import { appendShipGateInstruction, CUSTOM_NEEDS_PR, hasGithubPr, judgeShip } from './ship-gate.js';
+import {
+  appendShipGateInstruction,
+  CUSTOM_NEEDS_PR,
+  hasGithubPr,
+  judgeShip,
+  parseShipGateInstruction,
+  settleAbandonedShip,
+} from './ship-gate.js';
 import { endSnoozeOn } from './snooze.js';
 import { assertSplitProposalExecutable } from './split-proposal.js';
 import { stepQueueProjector } from './step-queue.js';
@@ -2371,25 +2378,79 @@ export function sweepAbandonedBuildSteps(deps: BuildDeps, now: number = nowMs())
     if (!buildRow) continue;
     const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
     if (!todoRow) continue;
-    const effectiveBeat = stepActivityAt(row);
-    if (now - effectiveBeat > BUILD_ABANDONED_STEP_MS) {
-      const machineRow = row.machineId
-        ? deps.db.select().from(machine).where(eq(machine.id, row.machineId)).get()
-        : undefined;
-      const progressed =
-        row.lastHeartbeatAt !== null && row.lastHeartbeatAt > (row.claimedAt ?? row.createdAt);
-      if (machineRow === undefined || !machineRow.online || !progressed) {
-        if (
-          row.archiveStop !== null ||
-          todoRow.archivedAt !== null ||
-          todoRow.phase === 'closed' ||
-          todoRow.phase === 'done'
-        )
-          stopStepKeepPhase(deps, row.id);
-        else releaseClaimedStep(deps, row, todoRow);
-      }
-    }
+    const ending = abandonedEnding(deps, row, todoRow, now);
+    if (ending === null || parseShipGateInstruction(row.prompt) !== null) continue;
+    applyAbandonedEnding(deps, row, todoRow, ending);
   }
+}
+
+type AbandonedEnding = 'stop' | 'release';
+
+function abandonedEnding(
+  deps: BuildDeps,
+  row: typeof step.$inferSelect,
+  todoRow: typeof todo.$inferSelect,
+  now: number,
+): AbandonedEnding | null {
+  if (now - stepActivityAt(row) <= BUILD_ABANDONED_STEP_MS) return null;
+  const machineRow = row.machineId
+    ? deps.db.select().from(machine).where(eq(machine.id, row.machineId)).get()
+    : undefined;
+  const progressed =
+    row.lastHeartbeatAt !== null && row.lastHeartbeatAt > (row.claimedAt ?? row.createdAt);
+  if (machineRow !== undefined && machineRow.online && progressed) return null;
+  return row.archiveStop !== null ||
+    todoRow.archivedAt !== null ||
+    todoRow.phase === 'closed' ||
+    todoRow.phase === 'done'
+    ? 'stop'
+    : 'release';
+}
+
+function applyAbandonedEnding(
+  deps: BuildDeps,
+  row: typeof step.$inferSelect,
+  todoRow: typeof todo.$inferSelect,
+  ending: AbandonedEnding,
+): void {
+  if (ending === 'stop') stopStepKeepPhase(deps, row.id);
+  else releaseClaimedStep(deps, row, todoRow);
+}
+
+export async function sweepAbandonedShipSteps(
+  deps: BuildDeps,
+  now: number = nowMs(),
+): Promise<void> {
+  const candidates = deps.db
+    .select()
+    .from(step)
+    .where(and(eq(step.kind, 'merge'), eq(step.status, 'claimed')))
+    .all()
+    .filter((row) => parseShipGateInstruction(row.prompt) !== null);
+  for (const row of candidates) {
+    const todoRow = todoOfBuild(deps, row.buildId);
+    if (todoRow === undefined || abandonedEnding(deps, row, todoRow, now) === null) continue;
+    const violation = await settleAbandonedShip(deps, row);
+    const current = deps.db.select().from(step).where(eq(step.id, row.id)).get();
+    const currentTodo = todoOfBuild(deps, row.buildId);
+    if (
+      current?.status !== 'claimed' ||
+      current.claimedAt !== row.claimedAt ||
+      currentTodo === undefined
+    )
+      continue;
+    if (violation !== null) {
+      applyStepFailure(deps, current, violation);
+      continue;
+    }
+    const ending = abandonedEnding(deps, current, currentTodo, now);
+    if (ending !== null) applyAbandonedEnding(deps, current, currentTodo, ending);
+  }
+}
+
+function todoOfBuild(deps: BuildDeps, buildId: string): typeof todo.$inferSelect | undefined {
+  const buildRow = deps.db.select().from(build).where(eq(build.id, buildId)).get();
+  return buildRow && deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
 }
 
 function releaseClaimedStep(

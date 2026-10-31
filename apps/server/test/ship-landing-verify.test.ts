@@ -1,7 +1,17 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
-import { agent, build, project, pushDelivery, step, team, todo } from '../src/db/schema.js';
+import {
+  agent,
+  build,
+  machine,
+  project,
+  pushDelivery,
+  step,
+  team,
+  todo,
+} from '../src/db/schema.js';
 import type { FetchLike } from '../src/lib/github.js';
+import { sweepAbandonedBuildSteps, sweepAbandonedShipSteps } from '../src/services/builds.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { finishStep } from '../src/services/machines.js';
 import { appendShipGateInstruction } from '../src/services/ship-gate.js';
@@ -159,5 +169,59 @@ describe('the custom merge step is verified when it finishes', () => {
     await finishStep({ ...deps, githubFetch: broken }, machineId, 'm1', { status: 'success' });
     expect(stepRow(s)?.status).toBe('failed');
     expect(failure(s)).toMatch(/cannot verify/);
+  });
+});
+
+describe('an abandoned custom merge step is verified without a finish report', () => {
+  function abandon(s: ReturnType<typeof world>['s']) {
+    s.db
+      .update(step)
+      .set({ lastHeartbeatAt: 1_000, claimedAt: 1_000, createdAt: 1_000 })
+      .where(eq(step.id, 'm1'))
+      .run();
+    s.db.update(machine).set({ online: false }).run();
+  }
+
+  test('the sync sweep leaves a custom step to the verified sweep', () => {
+    const { s, deps } = world({ merged: true, head: PUSHED });
+    abandon(s);
+    sweepAbandonedBuildSteps(deps, Date.now());
+    expect(stepRow(s)?.status).toBe('claimed');
+  });
+
+  test('merged unjudged head and no finish report: step failed, alert raised, brake opened', async () => {
+    const { s, deps } = world({ merged: true, head: PUSHED });
+    abandon(s);
+    await sweepAbandonedShipSteps(deps, Date.now());
+    expect(stepRow(s)?.status).toBe('failed');
+    expect(failure(s)).toMatch(/unjudged/);
+    expect(s.db.select().from(team).where(eq(team.id, s.team.id)).get()?.autonomyPaused).toBe(true);
+    expect(s.db.select().from(pushDelivery).all().length).toBeGreaterThan(0);
+  });
+
+  test('unmerged and head equal to the judged head: ordinary abandon handling, no pause', async () => {
+    const { s, deps } = world({ merged: false, head: JUDGED });
+    abandon(s);
+    await sweepAbandonedShipSteps(deps, Date.now());
+    expect(stepRow(s)?.status).toBe('pending');
+    expect(s.db.select().from(team).where(eq(team.id, s.team.id)).get()?.autonomyPaused).toBe(
+      false,
+    );
+    expect(s.db.select().from(pushDelivery).all()).toHaveLength(0);
+  });
+
+  test('a closed card stops the abandoned step after verification, and an unjudged merge still fails it', async () => {
+    const { s, deps } = world({ merged: true, head: PUSHED });
+    abandon(s);
+    s.db.update(todo).set({ phase: 'closed' }).where(eq(todo.id, 't1')).run();
+    await sweepAbandonedShipSteps(deps, Date.now());
+    expect(stepRow(s)?.status).toBe('failed');
+    expect(s.db.select().from(team).where(eq(team.id, s.team.id)).get()?.autonomyPaused).toBe(true);
+  });
+
+  test('a fresh claimed step is not touched', async () => {
+    const { s, deps } = world({ merged: true, head: PUSHED });
+    await sweepAbandonedShipSteps(deps, Date.now());
+    expect(stepRow(s)?.status).toBe('claimed');
   });
 });
