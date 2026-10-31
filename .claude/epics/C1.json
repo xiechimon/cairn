@@ -129,11 +129,6 @@
       "dependsOn": []
     },
     {
-      "id": "gate-log-leak",
-      "issue": 2187,
-      "dependsOn": []
-    },
-    {
       "id": "publish-environment",
       "issue": 2182,
       "dependsOn": [
