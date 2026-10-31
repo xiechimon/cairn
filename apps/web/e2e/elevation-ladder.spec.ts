@@ -54,16 +54,16 @@ function rings(shadow: string): number {
 const POOLS = {
   light: {
     'cds-shadow-sm':
-      'rgba(29, 35, 31, 0.04) 0px 1px 0px 0px, rgba(29, 35, 31, 0.06) 0px 1px 2px 0px',
+      'rgba(29, 35, 31, 0.06) 0px 1px 2px 0px, rgba(29, 35, 31, 0.06) 0px 2px 8px 0px',
     'cds-shadow-md':
-      'rgba(29, 35, 31, 0.04) 0px 1px 1px 0px, rgba(29, 35, 31, 0.05) 0px 3px 9px 0px, rgba(29, 35, 31, 0.06) 0px 8px 20px 0px',
+      'rgba(29, 35, 31, 0.08) 0px 2px 6px 0px, rgba(29, 35, 31, 0.12) 0px 8px 24px 0px',
     'cds-shadow-lg':
-      'rgba(29, 35, 31, 0.04) 0px 1px 1px 0px, rgba(29, 35, 31, 0.08) 0px 6px 24px 0px, rgba(29, 35, 31, 0.08) 0px 12px 48px 0px',
+      'rgba(29, 35, 31, 0.08) 0px 4px 12px 0px, rgba(29, 35, 31, 0.25) 0px 24px 48px -12px',
   },
   dark: {
-    'cds-shadow-sm': 'rgba(0, 0, 0, 0.25) 0px 1px 0px 0px, rgba(0, 0, 0, 0.3) 0px 1px 3px 0px',
-    'cds-shadow-md': 'rgba(0, 0, 0, 0.3) 0px 1px 2px 0px, rgba(0, 0, 0, 0.32) 0px 8px 24px 0px',
-    'cds-shadow-lg': 'rgba(0, 0, 0, 0.3) 0px 2px 4px 0px, rgba(0, 0, 0, 0.4) 0px 16px 40px 0px',
+    'cds-shadow-sm': 'rgba(0, 0, 0, 0.35) 0px 1px 2px 0px, rgba(0, 0, 0, 0.3) 0px 2px 8px 0px',
+    'cds-shadow-md': 'rgba(0, 0, 0, 0.4) 0px 2px 6px 0px, rgba(0, 0, 0, 0.45) 0px 10px 28px 0px',
+    'cds-shadow-lg': 'rgba(0, 0, 0, 0.4) 0px 4px 12px 0px, rgba(0, 0, 0, 0.6) 0px 24px 48px -12px',
   },
 } as const;
 

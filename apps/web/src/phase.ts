@@ -44,7 +44,7 @@ export const PHASE_UI: Record<Phase, PhaseUi> = {
   closed: { chip: '已取消', tone: 'idle', action: null, placeholder: null },
 };
 
-const ACCENT_INK = 'text-(--card-button)';
+export const ACCENT_INK = 'text-(--card-button)';
 export const RUNNING_INK = 'text-running-text';
 const QUIET_INK = 'text-content-tertiary';
 
