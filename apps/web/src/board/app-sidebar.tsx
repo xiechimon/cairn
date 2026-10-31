@@ -11,7 +11,8 @@
 // global dialog (useNewTaskSurface, live save path shared with the board).
 
 import { PanelLeft } from 'lucide-react';
-import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useLocation } from 'react-router';
 import { useMachines, useProjects, useSearchResults, useTodos } from '../api/hooks.js';
 import { toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
@@ -23,7 +24,7 @@ import { useNewTaskHotkey } from '../overlay/hotkeys.js';
 import { type NewTaskSurfaceApi, NewTaskSurfaceRoot } from '../overlay/new-task-surface-root.js';
 import { SearchPanel, useSearchState } from '../overlay/search-panel.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
-import { attentionCount, countInColumn, openCountByProject } from './columns.js';
+import { attentionCount } from './columns.js';
 import { BoardSidebar, type SidebarProject, type SidebarSelected } from './sidebar.js';
 
 export const SIDEBAR_STORAGE_KEY = 'cairn.sidebar-collapsed';
@@ -78,6 +79,10 @@ export function AppSidebar({
   );
   const [drawerOpen, setDrawerOpen] = useState(false);
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
+  const { pathname } = useLocation();
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [pathname]);
   const toggle = useCallback(() => {
     setCollapsed((prev) => {
       const next = !prev;
@@ -89,7 +94,6 @@ export function AppSidebar({
     () => todos ?? (live ? (todosQ.data ?? []).map(toDisplayTodo) : fixture.todos),
     [todos, live, todosQ.data, fixture.todos],
   );
-  const projectCounts = useMemo(() => openCountByProject(resolvedTodos), [resolvedTodos]);
   const fixtureMachines = fixture.resources?.machines;
   const machinesOnline = live
     ? (machinesQ.data ?? []).filter((m) => m.online).length
@@ -104,9 +108,8 @@ export function AppSidebar({
   useNewTaskHotkey(openNewTask);
   const sidebarProps = {
     attention: attentionCount(resolvedTodos, live ? Date.now() : fixture.now),
-    running: countInColumn(resolvedTodos, 'building'),
     machinesOnline,
-    projectCounts,
+    todos: resolvedTodos,
     onSearch: onSearch ?? (() => search.setOpen(true)),
     onNewTask: openNewTask,
     usageNav: fixture.usageNav === true,

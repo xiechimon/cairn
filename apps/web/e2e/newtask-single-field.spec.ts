@@ -60,5 +60,5 @@ test('Esc close returns focus to the invoking button (#388 family law; #445 trig
   const dialog = await openDialog(page);
   await page.keyboard.press('Escape');
   await expect(dialog).not.toBeVisible();
-  await expect(page.locator('.sidebar-new-task')).toBeFocused();
+  await expect(page.locator('.sidebar-new-task button')).toBeFocused();
 });

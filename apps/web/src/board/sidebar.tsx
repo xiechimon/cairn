@@ -5,7 +5,6 @@ import {
   ChevronDown,
   ChevronRight,
   Clock,
-  Columns3,
   EllipsisVertical,
   Inbox,
   KeyRound,
@@ -18,26 +17,41 @@ import {
   Search,
   Server,
 } from 'lucide-react';
-import { type ReactElement, useCallback, useId, useMemo, useRef, useState } from 'react';
-import { Link, useLocation } from 'react-router';
+import {
+  type ReactElement,
+  useCallback,
+  useId,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from 'react';
+import { Link, useLocation, useNavigate } from 'react-router';
+import { useApiMutations } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { SidebarNavRow } from '../components/shell/sidebar-nav-row.js';
+import { SidebarUser } from '../components/shell/sidebar-user.js';
 import { Button } from '../components/ui/button.js';
 import { Kbd } from '../components/ui/kbd.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
+import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
-import { DEMO_MODE } from '../demo/demo-gate.js';
+import { blockDemoWrite, DEMO_MODE } from '../demo/demo-gate.js';
 import { UserMenu } from '../detail/user-menu.js';
-import { isDeleted } from '../fixtures/deletions.js';
+import { isArchived, isDeleted, markArchived, markDeleted } from '../fixtures/deletions.js';
 import { PROJECT_ID, PROJECT_NAME } from '../fixtures/fixtures.js';
+import type { TodoRecord } from '../fixtures/records.js';
 import { scrollFadeClassName, useScrollFade } from '../hooks/use-scroll-fade.js';
 import { useI18n } from '../i18n/provider.js';
 import { FOCUS_RING_INSET } from '../lib/focus-ring.js';
+import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { readStoredTheme } from '../theme.js';
 import { withColumnParam } from './columns.js';
 import { withoutBoardView } from './home.js';
 import { ProjectAvatar } from './project-avatar.js';
+import { ProjectGroup, projectThreads, threadHref } from './sidebar-threads.js';
 
 export type SidebarSelected =
   | 'board'
@@ -62,14 +76,13 @@ interface BoardSidebarProps {
   collapsed?: boolean;
   onToggle?: () => void;
   attention?: number;
-  running?: number;
   machinesOnline?: number;
   onSearch?: () => void;
   onNewTask: () => void;
   usageNav?: boolean;
   selected?: SidebarSelected;
   projects?: SidebarProject[];
-  projectCounts?: ReadonlyMap<string, number>;
+  todos?: TodoRecord[];
 }
 
 interface ResourceRow {
@@ -188,31 +201,37 @@ export function BoardSidebar({
   collapsed = false,
   onToggle,
   attention = 0,
-  running = 0,
   machinesOnline = 0,
   onSearch,
   onNewTask,
   usageNav = false,
   selected = 'board',
   projects,
-  projectCounts,
+  todos,
 }: BoardSidebarProps) {
   const { t } = useI18n();
-  const { user } = useLiveData();
+  const { user, live, teamId } = useLiveData();
+  const navigate = useNavigate();
+  const mutations = useApiMutations(teamId);
+  const [, refresh] = useReducer((n: number) => n + 1, 0);
+  const [pendingDelete, setPendingDelete] = useState<TodoRecord | null>(null);
   const { search, pathname } = useLocation();
   const stripped = withoutBoardView(withColumnParam(search, null));
   const baseParams = new URLSearchParams(stripped.startsWith('?') ? stripped.slice(1) : stripped);
   const homeParams = new URLSearchParams(baseParams);
-  const kanbanParams = new URLSearchParams(baseParams);
   if (DEMO_MODE) homeParams.set('view', 'home');
-  else kanbanParams.set('view', 'board');
   const plain = `?${baseParams}`;
   const homeSearch = `?${homeParams}`;
-  const kanbanSearch = `?${kanbanParams}`;
   const projectRows = useMemo(
     () => (projects ?? [CANON_PROJECT]).filter((row) => !isDeleted(row.id)),
     [projects],
   );
+  const liveThreads = (todos ?? []).filter(
+    (todo) => todo.archivedAt == null && !isDeleted(todo.id) && !isArchived(todo.id),
+  );
+  const activeThreadId = pathname.startsWith('/app/todo/')
+    ? (pathname.split('/')[3] ?? null)
+    : null;
   const resourceRows = usageNav
     ? [...RESOURCE_ROWS.slice(0, 4), USAGE_ROW, ...RESOURCE_ROWS.slice(4)]
     : RESOURCE_ROWS;
@@ -231,8 +250,54 @@ export function BoardSidebar({
   const navRef = useRef<HTMLElement | null>(null);
   useScrollFade(navRef, { enabled: !collapsed });
   const resourceListId = useId();
-  const machineStatusId = useId();
-  const homeLabel = attention > 0 ? `${t('工作台')} ${attention}` : t('工作台');
+  const homeLabel = attention > 0 ? `${t('Projects')} ${attention}` : t('Projects');
+
+  const goTo = (target: string) => navigate({ pathname: target, search: plain });
+  const unarchiveThread = (todo: TodoRecord) => {
+    if (!live) return;
+    mutations.setTodoArchived.mutate(
+      { id: todo.id, archived: false },
+      { onError: (error) => toastError(t('Could not unarchive task.'), error) },
+    );
+  };
+  const archiveThread = (todo: TodoRecord) => {
+    if (!live) {
+      if (blockDemoWrite()) return;
+      markArchived(todo.id);
+      refresh();
+      return;
+    }
+    mutations.setTodoArchived.mutate(
+      { id: todo.id, archived: true },
+      {
+        onSuccess: () =>
+          toastSuccess(t('Task archived'), {
+            label: t('Undo'),
+            onClick: () => unarchiveThread(todo),
+          }),
+        onError: (error) => toastError(t('Could not archive task.'), error),
+      },
+    );
+  };
+  const confirmDeleteThread = () => {
+    const todo = pendingDelete;
+    setPendingDelete(null);
+    if (todo == null) return;
+    const leave = () => {
+      if (activeThreadId === todo.id) goTo('/app');
+    };
+    if (live) {
+      mutations.deleteTodo.mutate(todo.id, {
+        onSuccess: leave,
+        onError: (error) => toastError(t('删除任务失败，请重试。'), error),
+      });
+      return;
+    }
+    if (blockDemoWrite()) return;
+    markDeleted(todo.id);
+    refresh();
+    leave();
+  };
 
   const userAvatar = (
     <SeededAvatar
@@ -300,7 +365,11 @@ export function BoardSidebar({
         </Tooltip>
         <nav className="mt-2 flex min-h-0 flex-1 flex-col items-center gap-px overflow-y-auto">
           <Link
-            {...railLink({ pathname: '/app', search: homeSearch }, selected === 'board', homeLabel)}
+            {...railLink(
+              { pathname: '/app', search: homeSearch },
+              selected === 'board' || selected === 'kanban',
+              homeLabel,
+            )}
           >
             <Inbox className={ICON} strokeWidth={STROKE} />
             {attention > 0 && (
@@ -309,18 +378,9 @@ export function BoardSidebar({
           </Link>
           <Link
             {...railLink(
-              { pathname: '/app', search: kanbanSearch },
-              selected === 'kanban',
-              t('看板'),
-            )}
-          >
-            <Columns3 className={ICON} strokeWidth={STROKE} />
-          </Link>
-          <Link
-            {...railLink(
               { pathname: '/app/schedules', search: plain },
               selected === 'schedules',
-              t('定时'),
+              t('Scheduled'),
             )}
           >
             <Clock className={ICON} strokeWidth={STROKE} />
@@ -329,7 +389,7 @@ export function BoardSidebar({
             variant="ghost"
             className={`rail-group group mt-2 ${RAIL_ROW} ${RAIL_BTN} ${groupCollapsed.project ? 'rail-group--collapsed' : ''}`}
             aria-label={t(groupCollapsed.project ? '展开{label}' : '收起{label}', {
-              label: t('项目'),
+              label: t('Projects'),
             })}
             aria-expanded={!groupCollapsed.project}
             onClick={() => toggleGroup('project')}
@@ -389,12 +449,6 @@ export function BoardSidebar({
     );
   }
 
-  const navLink = (to: { pathname: string; search: string }, active: boolean) => ({
-    className: `sidebar-row ${ROW} ${active ? ROW_ACTIVE : ROW_IDLE}`,
-    to,
-    'aria-current': active ? ('page' as const) : undefined,
-  });
-
   return (
     <aside className="board-sidebar relative z-(--z-docked) flex w-(--sidebar-w) flex-none flex-col overflow-hidden border-r border-border bg-(--surface-1) px-3 pt-3 pb-2.5">
       <div
@@ -418,23 +472,6 @@ export function BoardSidebar({
             strokeWidth={STROKE}
           />
         </Link>
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                variant="ghost"
-                className={ICON_BTN}
-                aria-label={t('搜索')}
-                onClick={onSearch}
-              >
-                <Search className="size-4" strokeWidth={STROKE} />
-              </Button>
-            }
-          />
-          <TooltipContent side="bottom" sideOffset={6}>
-            {t('搜索')} <Kbd>⌘K</Kbd>
-          </TooltipContent>
-        </Tooltip>
         <Button
           variant="ghost"
           className={`sidebar-team-collapse ${ICON_BTN}`}
@@ -445,38 +482,49 @@ export function BoardSidebar({
         </Button>
       </div>
 
-      <Button
-        variant="ghost"
-        className={`sidebar-new-task mt-2 mb-3 h-9 flex-none cursor-pointer justify-start gap-2 rounded-(--cds-radius-lg) border-none bg-transparent px-3 text-ui font-medium text-foreground transition-colors duration-150 ease-out hover:bg-(--hover-1) hover:text-foreground dark:hover:bg-(--hover-1) ${FOCUS}`}
-        onClick={onNewTask}
-      >
-        <span className="flex size-5 flex-none items-center justify-center rounded-full bg-(--card-button) text-(--text-on-accent)">
-          <Plus className="size-3.5" strokeWidth={2} />
-        </span>
-        <span className="truncate">{t('新任务')}</span>
-      </Button>
+      <div className="mt-2 flex flex-none flex-col gap-px">
+        <div className="sidebar-new-task">
+          <SidebarNavRow
+            icon={<Plus className="size-4" strokeWidth={STROKE} />}
+            label={t('新任务')}
+            shortcut="C"
+            onClick={onNewTask}
+          />
+        </div>
+        <SidebarNavRow
+          icon={<Search className="size-4" strokeWidth={STROKE} />}
+          label={t('搜索')}
+          shortcut="⌘K"
+          onClick={onSearch}
+        />
+        <div className="relative">
+          <SidebarNavRow
+            icon={<Inbox className="size-4" strokeWidth={STROKE} />}
+            label={t('Projects')}
+            active={selected === 'board' || selected === 'kanban'}
+            onClick={() => navigate({ pathname: '/app', search: homeSearch })}
+          />
+          {attention > 0 && (
+            <span className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2">
+              <AttentionBadge count={attention} />
+            </span>
+          )}
+        </div>
+        <SidebarNavRow
+          icon={<Clock className="size-4" strokeWidth={STROKE} />}
+          label={t('Scheduled')}
+          active={selected === 'schedules'}
+          onClick={() => goTo('/app/schedules')}
+        />
+      </div>
 
       <nav
         ref={navRef}
-        className={`flex min-h-0 flex-1 flex-col gap-px overflow-y-auto ${scrollFadeClassName()}`}
+        className={`mt-3 flex min-h-0 flex-1 flex-col gap-px overflow-y-auto ${scrollFadeClassName()}`}
       >
-        <Link {...navLink({ pathname: '/app', search: homeSearch }, selected === 'board')}>
-          <Inbox className={ICON} strokeWidth={STROKE} />
-          <span className="truncate">{t('工作台')}</span>
-          {attention > 0 && <AttentionBadge count={attention} />}
-        </Link>
-        <Link {...navLink({ pathname: '/app', search: kanbanSearch }, selected === 'kanban')}>
-          <Columns3 className={ICON} strokeWidth={STROKE} />
-          <span className="truncate">{t('看板')}</span>
-        </Link>
-        <Link {...navLink({ pathname: '/app/schedules', search: plain }, selected === 'schedules')}>
-          <Clock className={ICON} strokeWidth={STROKE} />
-          <span className="truncate">{t('定时')}</span>
-        </Link>
-
         <div
           data-testid="project-group"
-          className="mt-4 mb-0.5 flex h-6 flex-none items-center pr-1 pl-2.5 text-caption font-medium text-content-tertiary"
+          className="mb-0.5 flex h-6 flex-none items-center pr-1 pl-2.5 text-caption font-medium text-content-tertiary"
         >
           <Button
             variant="ghost"
@@ -486,7 +534,7 @@ export function BoardSidebar({
             aria-expanded={!groupCollapsed.project}
             onClick={() => toggleGroup('project')}
           >
-            {t('项目')}
+            {t('Projects')}
             <ChevronDown
               aria-hidden
               className="sidebar-group-chevron size-3 text-content-dim transition-transform duration-150 group-[.sidebar-group--collapsed]:-rotate-90"
@@ -504,29 +552,19 @@ export function BoardSidebar({
         {!groupCollapsed.project &&
           projectRows.map((row, i) => {
             const href = `/app/project/${row.id}`;
-            const active = pathname === href;
-            const count = projectCounts?.get(row.id) ?? 0;
             return (
-              <Link
+              <ProjectGroup
                 key={row.id}
-                data-testid="project-row"
-                className={`sidebar-subrow group/row ${ROW} ${active ? ROW_ACTIVE : ROW_IDLE}`}
-                to={{ pathname: href, search: plain }}
-                aria-current={active ? 'page' : undefined}
-              >
-                <ProjectAvatar name={row.name} tone={i} />
-                <span data-testid="project-name" className="min-w-0 flex-1 truncate">
-                  {row.name}
-                </span>
-                {count > 0 && (
-                  <span
-                    data-testid="project-count"
-                    className={`flex-none text-caption tabular-nums ${active ? 'text-content-secondary' : 'text-content-tertiary group-hover/row:text-content-secondary'}`}
-                  >
-                    {count}
-                  </span>
-                )}
-              </Link>
+                name={row.name}
+                tone={i}
+                active={pathname === href}
+                activeThreadId={activeThreadId}
+                threads={projectThreads(liveThreads, row.id)}
+                onOpenProject={() => goTo(href)}
+                onOpenThread={(todo) => goTo(threadHref(todo.id))}
+                onArchive={archiveThread}
+                onDelete={setPendingDelete}
+              />
             );
           })}
       </nav>
@@ -581,37 +619,36 @@ export function BoardSidebar({
           trigger={
             <Button
               variant="ghost"
-              className={`sidebar-user mt-1 h-auto flex-none cursor-pointer justify-start gap-2.5 rounded-(--cds-radius-lg) border-none bg-transparent px-2.5 py-2 font-normal hover:bg-sidebar-hover dark:hover:bg-sidebar-hover aria-expanded:bg-sidebar-hover [&_img]:block [&_img]:size-6 [&_img]:rounded-full`}
+              className="sidebar-user mt-1 h-auto w-full flex-none cursor-pointer justify-start rounded-(--cds-radius-lg) border-none bg-transparent p-0 font-normal hover:bg-sidebar-hover dark:hover:bg-sidebar-hover aria-expanded:bg-sidebar-hover [&>div]:w-full"
               aria-label={user.displayName}
-              aria-describedby={machineStatusId}
             >
-              {userAvatar}
-              <span className="flex min-w-0 flex-1 flex-col items-start">
-                <span className="max-w-full truncate text-ui text-foreground">
-                  {user.displayName}
-                </span>
-                <span
-                  id={machineStatusId}
-                  data-testid="machine-status"
-                  className="flex max-w-full items-center gap-1.5 text-caption font-normal text-content-tertiary"
-                >
-                  <span
-                    aria-hidden
-                    className={`size-1.5 flex-none rounded-full ${machinesOnline > 0 ? 'bg-running' : 'bg-content-dim'}`}
+              <SidebarUser
+                name={user.displayName}
+                machinesOnline={machinesOnline}
+                action={
+                  <EllipsisVertical
+                    className="size-3.5 text-content-tertiary"
+                    strokeWidth={STROKE}
                   />
-                  <span className="min-w-0 truncate">
-                    {t('{n} 台机器在线', { n: machinesOnline })} · {t('执行中 {n}', { n: running })}
-                  </span>
-                </span>
-              </span>
-              <EllipsisVertical
-                className="size-3.5 flex-none text-content-tertiary"
-                strokeWidth={STROKE}
+                }
               />
             </Button>
           }
         />
       </div>
+      <DeleteConfirm
+        open={pendingDelete != null}
+        title={t('确定删除该任务？此操作不可撤销。')}
+        summary={
+          <>
+            <span className="text-(--text-tertiary)">#{pendingDelete?.seqNum}</span>
+            {pendingDelete?.title}
+          </>
+        }
+        ariaLabel={t('删除任务')}
+        onClose={() => setPendingDelete(null)}
+        onConfirm={confirmDeleteThread}
+      />
     </aside>
   );
 }

@@ -74,7 +74,7 @@ export const EN: Record<string, string> = {
   已转给任务: 'Passed to task',
   '来自任务 #{n} {title} 的消息': 'Message from task #{n} {title}',
   定时: 'Schedules',
-  '{n} 台机器在线': '{n} machines online',
+  '显示另外 {n} 个': 'Show {n} more',
   '执行中 {n}': '{n} running',
   项目: 'Project', // sidebar group / search group / schedule-form field — one fit
   资源: 'Resources',

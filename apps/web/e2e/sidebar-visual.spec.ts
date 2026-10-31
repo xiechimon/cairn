@@ -31,12 +31,11 @@ const resolve = (page: Page, token: string) =>
   }, token);
 
 for (const theme of ['light', 'dark'] as const) {
-  test(`⌘K hint rides the search button tooltip (${theme})`, async ({ page }) => {
+  test(`⌘K hint shows on the search row (${theme})`, async ({ page }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     await page.goto('/app?scenario=01');
-    const button = page.getByTestId('team-row').getByRole('button', { name: '搜索' });
-    await button.hover();
-    await expect(page.locator('kbd', { hasText: '⌘K' })).toBeVisible();
+    const button = page.getByRole('complementary').getByRole('button', { name: /搜索/ });
+    await expect(button).toContainText('⌘K');
   });
 
   test(`hover and selected rows share one geometry (${theme})`, async ({ page }) => {
@@ -48,9 +47,11 @@ for (const theme of ['light', 'dark'] as const) {
         const r = el.getBoundingClientRect();
         return { x: r.x, w: r.width, h: r.height, radius: getComputedStyle(el).borderRadius };
       };
-      const selected = document.querySelector('aside nav a[aria-current="page"]');
-      const plain = [...document.querySelectorAll('aside nav a')].find(
-        (el) => el.getAttribute('aria-current') !== 'page' && el.textContent?.includes('定时'),
+      const selected = document.querySelector(
+        'aside [data-slot="sidebar-nav-row"][aria-current="page"]',
+      );
+      const plain = [...document.querySelectorAll('aside [data-slot="sidebar-nav-row"]')].find(
+        (el) => el.getAttribute('aria-current') !== 'page' && el.textContent?.includes('Scheduled'),
       );
       if (!selected || !plain) throw new Error('sidebar rows missing');
       return { selected: box(selected), plain: box(plain) };
@@ -58,7 +59,7 @@ for (const theme of ['light', 'dark'] as const) {
     // one face geometry for both states — selected is a fill, not a shape
     expect(geo.plain).toEqual(geo.selected);
     // DESIGN.md: nav row 32px, control radius 8px, inside the 12px padding
-    expect(geo.selected).toEqual({ x: 12, w: 223, h: 36, radius: '8px' });
+    expect(geo.selected).toEqual({ x: 12, w: 223, h: 32, radius: '8px' });
   });
 
   test(`selected row = sheet fill + hairline, distinct from hover (${theme})`, async ({
@@ -70,19 +71,21 @@ for (const theme of ['light', 'dark'] as const) {
     const sidebarBg = await page.evaluate(
       () => getComputedStyle(document.querySelector('aside')!).backgroundColor,
     );
-    const schedules = page.getByRole('complementary').getByRole('link', { name: '定时' });
+    const schedules = page.getByRole('complementary').getByRole('button', { name: 'Scheduled' });
     await schedules.hover();
     await page.waitForTimeout(300); // the 150ms color step settles
     const hoverBg = await schedules.evaluate((el) => getComputedStyle(el).backgroundColor);
     const selected = await page.evaluate(() => {
-      const cs = getComputedStyle(document.querySelector('aside nav a[aria-current="page"]')!);
+      const cs = getComputedStyle(
+        document.querySelector('aside [data-slot="sidebar-nav-row"][aria-current="page"]')!,
+      );
       return { bg: cs.backgroundColor, ring: cs.boxShadow };
     });
 
     expect(hoverBg).toBe(await resolve(page, '--sidebar-hover'));
     const bg = parse(sidebarBg);
     expect(dist(over(hoverBg, sidebarBg), bg)).toBeGreaterThan(3);
-    expect(selected.bg).toBe(await resolve(page, '--hover-1'));
+    expect(selected.bg).toBe(await resolve(page, '--sidebar-active'));
     expect(selected.ring).toBe('none');
     expect(selected.bg).not.toBe(hoverBg);
   });

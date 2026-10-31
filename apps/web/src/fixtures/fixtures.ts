@@ -30,6 +30,8 @@ export {
   boardTagFilter,
   boardTagFilterEmpty,
   boardWithProbe,
+  sidebarThreadStatuses,
+  sidebarThreads,
 } from './board.js';
 export {
   chiefDefault,
