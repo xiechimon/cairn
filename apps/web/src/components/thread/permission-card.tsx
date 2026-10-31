@@ -63,10 +63,7 @@ export function PermissionCard({
     <div
       data-slot="permission-card"
       data-resolution="pending"
-      className={cn(
-        'rounded-(--radius-card) border border-pebble-waiting bg-card px-4 py-3.5',
-        className,
-      )}
+      className={cn('rounded-(--radius-card) bg-card px-4 py-3.5 shadow-(--e1)', className)}
     >
       <div className="flex items-center gap-2 text-ui font-semibold text-foreground">
         <Lock className="size-4 flex-none text-(--chip-confirm-fg)" />

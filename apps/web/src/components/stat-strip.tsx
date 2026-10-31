@@ -22,7 +22,7 @@ export function StatStrip({
     >
       {items.map((item) => (
         <div key={item.label} className="min-w-0 bg-card px-3 py-2.5">
-          <dd className="m-0 truncate font-mono text-card-title font-medium text-foreground">
+          <dd className="m-0 truncate text-card-title font-medium text-foreground tabular-nums">
             {item.value}
           </dd>
           <dt className="truncate text-caption font-normal text-content-tertiary">{item.label}</dt>

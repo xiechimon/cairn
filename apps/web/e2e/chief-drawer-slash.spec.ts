@@ -109,12 +109,12 @@ test('trigger: `/` opens builtins plus skills, review/stop hidden (F2)', async (
   await input.fill('/');
   await expect(menu).toBeVisible();
   await expect(rows).toHaveCount(4);
-  await expect(rows.nth(0)).toContainText('/clear');
-  await expect(rows.nth(1)).toContainText('/attach');
-  await expect(rows.nth(2)).toContainText('/help');
-  await expect(rows.nth(3)).toContainText('/verify-cairn');
-  await expect(menu).not.toContainText('/review');
-  await expect(menu).not.toContainText('/stop');
+  await expect(rows.nth(0)).toHaveText('clear');
+  await expect(rows.nth(1)).toHaveText('attach');
+  await expect(rows.nth(2)).toHaveText('help');
+  await expect(rows.nth(3)).toHaveText('verify-cairn');
+  await expect(menu.getByRole('option', { name: 'review', exact: true })).toHaveCount(0);
+  await expect(menu.getByRole('option', { name: 'stop', exact: true })).toHaveCount(0);
 
   await input.fill('/zzz');
   await expect(rows).toHaveCount(0);
@@ -127,7 +127,7 @@ test('`/clear` runs without sending and toasts confirmation (F1)', async ({ page
 
   await input.fill('some draft');
   await input.fill('/clear');
-  await expect(rows.first()).toContainText('/clear');
+  await expect(rows.first()).toHaveText('clear');
   await input.press('ArrowDown');
   await input.press('Enter');
   await expect(menu).toBeHidden();
@@ -160,7 +160,7 @@ test('mid-prompt accept inserts literal text, never runs (F3)', async ({ page })
   const { input, menu, rows, posts } = await openDrawer(page);
 
   await input.fill('hi /clear');
-  await expect(rows.first()).toContainText('/clear');
+  await expect(rows.first()).toHaveText('clear');
   await input.press('ArrowDown');
   await input.press('Enter');
   await expect(menu).toBeHidden();

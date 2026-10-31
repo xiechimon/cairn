@@ -35,18 +35,14 @@ export function ProposalCard({
     <div
       data-slot="proposal-card"
       data-status={status}
-      className={cn(
-        'rounded-(--radius-card) border px-4 py-3.5',
-        applied ? 'border-border bg-card' : 'border-dashed border-content-tertiary',
-        className,
-      )}
+      className={cn('rounded-(--radius-card) bg-card px-4 py-3.5 shadow-(--e1)', className)}
     >
       <div className="flex items-center gap-2 text-ui font-semibold text-foreground">
         <Icon className="size-4 flex-none text-(--chip-plan-fg)" />
         {applied ? appliedTitle : title}
       </div>
       {!applied && <p className="mt-1.5 mb-0 text-ui text-content-secondary">{description}</p>}
-      <p className="mt-1.5 mb-0 font-mono text-caption text-content-tertiary">{meta}</p>
+      <p className="mt-1.5 mb-0 text-meta text-content-tertiary">{meta}</p>
       <div className="mt-3 flex flex-wrap gap-2">
         {applied ? (
           <Button
