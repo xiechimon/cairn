@@ -24,9 +24,10 @@ const SKIN = {
       "h-6 -my-0.5 cursor-pointer rounded-none justify-start border-none bg-transparent py-0.5 text-left text-[length:inherit] leading-[inherit] font-normal hover:bg-transparent hover:text-(--text-tertiary) dark:hover:bg-transparent dark:hover:text-(--text-tertiary) aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto",
     spinner:
       'flex-none text-running animate-[spinner-breathe_3600ms_var(--ease-standard)_infinite] motion-reduce:animate-none',
-    secs: 'tabular-nums',
+    secs: 'tabular-nums text-(--text-tertiary)',
     rowTestid: 'live-row',
-    label: 'chat-streaming-label truncate text-(--text-tertiary)',
+    label:
+      'chat-streaming-label truncate text-(--text-secondary) shimmer motion-reduce:shimmer-none',
   },
   chief: {
     rowTestid: undefined,
@@ -35,8 +36,8 @@ const SKIN = {
       "-my-[1.5px] h-auto cursor-pointer rounded-none justify-start border-none bg-transparent py-[1.5px] text-left text-meta leading-5 font-normal hover:bg-transparent hover:text-(--text-tertiary) dark:hover:bg-transparent dark:hover:text-(--text-tertiary) aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto",
     spinner:
       'flex-none animate-[spinner-breathe_3600ms_var(--ease-standard)_infinite] text-running motion-reduce:animate-none',
-    secs: 'tabular-nums',
-    label: 'truncate text-(--text-tertiary)',
+    secs: 'tabular-nums text-(--text-tertiary)',
+    label: 'truncate text-(--text-secondary) shimmer motion-reduce:shimmer-none',
   },
 } as const;
 
@@ -74,6 +75,7 @@ export function LiveRow({
   const body = (
     <>
       <Atom size={16} duration={1800} className={skin.spinner} />
+      <span className={skin.label}>{t(label, labelVars)}</span>
       {shown != null && <span className={skin.secs}>{shown}s</span>}
       {disclosure != null &&
         (expanded ? (
@@ -81,7 +83,6 @@ export function LiveRow({
         ) : (
           <ChevronRight width={12} height={12} />
         ))}
-      <span className={skin.label}>{t(label, labelVars)}</span>
     </>
   );
   return (

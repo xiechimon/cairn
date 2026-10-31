@@ -49,7 +49,7 @@ export function SettingsHeader({
       {avatar != null && (
         <span
           className={cn(
-            'settings-avatar flex size-14 flex-none overflow-hidden rounded-full bg-card ring-1 ring-border [&_img]:block [&_img]:size-14',
+            'settings-avatar flex size-14 flex-none overflow-hidden rounded-full bg-card ring-1 ring-foreground/8 [&_img]:block [&_img]:size-14',
             avatarClassName,
           )}
         >
@@ -67,7 +67,7 @@ export function SettingsHeader({
             >
               {title}
             </h2>
-            {sub != null && <p className="m-0 text-meta text-content-tertiary">{sub}</p>}
+            {sub != null && <p className="m-0 text-ui text-content-secondary">{sub}</p>}
           </div>
           {action}
         </>

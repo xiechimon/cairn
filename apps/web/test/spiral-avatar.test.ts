@@ -26,13 +26,15 @@ describe('spiralAvatarSvg', () => {
 });
 
 describe('busy spiral', () => {
-  it('spins only the spiral, keeps the same face, and rests under reduced motion', () => {
+  it('traces the spiral over a faint copy of the same face, and rests under reduced motion', () => {
     const idle = spiralAvatarSvg('r3-builder');
     const busy = spiralAvatarSvg('r3-builder', true);
-    expect(busy).toContain('<g class="spin">');
-    expect(busy).toContain('@media (prefers-reduced-motion:reduce){.spin{animation:none}}');
-    expect(busy.replace(/<style>.*<\/style>/, '').replace('<g class="spin">', '').replace('</g></g>', '</g>')).toBe(idle);
-    expect(idle).not.toContain('spin');
+    const idlePath = idle.match(/<path [^>]*\/>/)?.[0] ?? '';
+    expect(busy).toContain('<path class="trace"');
+    expect(busy).toContain('pathLength="1"');
+    expect(busy).toContain('@media (prefers-reduced-motion:reduce){.trace{stroke-dasharray:none;animation:none}}');
+    expect(busy).toContain(idlePath.replace('/>', ' opacity=".28"/>'));
+    expect(idle).not.toContain('trace');
   });
 });
 

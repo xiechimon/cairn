@@ -44,6 +44,7 @@ import {
   Search,
   Server,
   Sparkle,
+  SquarePen,
   Terminal,
   X,
 } from '../icons/index.js';
@@ -140,7 +141,12 @@ export function SettingsSection() {
             avatar={<SeededAvatar name="ian" fallback="/avatar-user.png" className="size-14" />}
             title="ian"
             sub="Owner · signed in with GitHub"
-            action={<Button variant="ghost">Edit name</Button>}
+            action={
+              <Button variant="outline" className="h-8 gap-1.5 px-3 text-ui">
+                <SquarePen className="size-4" />
+                Edit name
+              </Button>
+            }
           />
           <SettingsCard>
             <SettingsRow label="Language">
@@ -182,7 +188,7 @@ export function AvatarSection() {
     <Section
       id="avatar"
       title="Avatar"
-      lede="Avatars are seeded from the name, so the same person always looks the same. A busy agent's avatar spins."
+      lede="Avatars are seeded from the name, so the same person always looks the same. A busy agent's avatar draws its spiral over a faint copy, so the face never changes."
     >
       <Specimen title="Seeded avatar">
         {[

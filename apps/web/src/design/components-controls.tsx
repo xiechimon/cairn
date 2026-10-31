@@ -128,7 +128,7 @@ export function ButtonSection() {
       </Specimen>
       <Specimen
         title="States"
-        note="Disabled buttons fade to half strength; a busy button says what it is doing"
+        note="A disabled primary turns stone with secondary ink; other tiers fade to half strength. A busy button says what it is doing"
         code={`<Button className={DIALOG_PRIMARY_BUTTON} disabled>Create</Button>`}
       >
         <Cell label="trailing icon">

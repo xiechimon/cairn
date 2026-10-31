@@ -230,7 +230,7 @@ Piece: `src/components/form-layout.tsx` (the base is the registry `Field` family
 - **Stack** (`FormStack`): fields stacked vertically, 16px between fields, at most 520px wide, left-aligned.
 - **Field** (`FormField`): label on top (`text-ui` 500 `ink`, `htmlFor` pointing at the control), the control, and an optional help line (`text-meta` `ink-3`) below.
 - **Controls**: Input / SelectTrigger with `FORM_CONTROL_CLS`: 32px tall, white background, `line` 1px ring, 8px radius, `text-ui`.
-- **Action row** (`FormActions`): the last row of the form, right-aligned; an optional text button (such as `取消`) on the left, the shadcn Button default primary on the right. When the form cannot submit, the button's own `disabled` state paints it `secondary` with secondary ink at full opacity (`DIALOG_PRIMARY_BUTTON`); no separate gray bar.
+- **Action row** (`FormActions`): the last row of the form, right-aligned; an optional text button (such as `取消`) on the left, the shadcn Button default primary on the right. When the form cannot submit, the button's own `disabled` state paints it `secondary` with secondary ink at full opacity; every default (primary) Button disables this way, not only `DIALOG_PRIMARY_BUTTON`, so there is one disabled-primary look. Other tiers fade to half strength. No separate gray bar.
 - Do: a narrow column, labels on top, the primary button on the right. Do not: inputs spanning the whole column, full-width gray submit bars, or two-column forms with labels beside inputs.
 
 ### Segmented control

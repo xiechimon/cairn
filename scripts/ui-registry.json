@@ -1,6 +1,6 @@
 {
   "frozenFrom": {
-    "sha": "85c586c18ba86eb1cf4b4e9c4328c8849502c837",
+    "sha": "3539dba55e4ad1a88585649e2b91d9633a86086d",
     "date": "2026-10-31"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
@@ -46,7 +46,7 @@
       "upstreamItem": "button",
       "status": "deviated",
       "reason": "#411/#425 semantic mapping, zero skin: type=button default (implicit-submit guard, repo-wide ui/button law) + data-variant/data-size pass-through (the observable contract e2e material pins assert). Focus-ring, transition-list and brand-variant deviations retired per #982/#991: official ring form restored, brand semantics live in the token layer.",
-      "hash": "79c1b43dd28b188b8a3deb91b87d8789e8e147143a6aa75edaef9879ad7307e1"
+      "hash": "7523d9a493b68ef31b72f056a64891802c24e6a899a14165851227f4e38f2e2e"
     },
     "card.tsx": {
       "kind": "registry",

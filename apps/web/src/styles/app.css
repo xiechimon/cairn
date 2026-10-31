@@ -344,6 +344,27 @@
   bottom: calc(var(--chief-launcher-clearance) + var(--chief-launcher-inset));
 }
 
+@keyframes spiral-trace {
+  from {
+    stroke-dashoffset: 1;
+  }
+  50% {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -1;
+  }
+}
+
+@utility spiral-trace {
+  stroke-dasharray: 1 1;
+  animation: spiral-trace 2.8s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+  @media (prefers-reduced-motion: reduce) {
+    stroke-dasharray: none;
+    animation: none;
+  }
+}
+
 @keyframes shimmer-sweep {
   from {
     background-position: 100% 0;

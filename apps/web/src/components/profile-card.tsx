@@ -1,6 +1,7 @@
 import { cn } from 'cn';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useI18n } from '../i18n/provider.js';
+import { SquarePen } from '../icons/index.js';
 import { SettingsHeader } from './settings-list.js';
 import { Button } from './ui/button.js';
 import { DIALOG_PRIMARY_BUTTON, DIALOG_TEXT_BUTTON } from './ui/dialog-shell.js';
@@ -55,10 +56,11 @@ export function ProfileHeader({
       sub={sub}
       action={
         <Button
-          variant="ghost"
-          className={cn('h-8', DIALOG_TEXT_BUTTON, editClassName)}
+          variant="outline"
+          className={cn('h-8 flex-none gap-1.5 px-3 text-ui', editClassName)}
           onClick={() => setDraft(name)}
         >
+          <SquarePen className="size-4" />
           {t('编辑名称')}
         </Button>
       }
