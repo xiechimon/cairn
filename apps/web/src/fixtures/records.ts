@@ -11,6 +11,8 @@ import {
   type ModelSource,
   PHASE_VALUES,
   type Phase,
+  type ProjectColor,
+  type ProjectIcon,
   type ProjectRepoKind,
   type ProviderRecord,
   type QuotaWait,
@@ -162,6 +164,8 @@ export interface ProjectContent {
   repoKind?: ProjectRepoKind;
   defaultBranch: string;
   description: string | null;
+  icon?: ProjectIcon;
+  color?: ProjectColor;
   commits?: ProjectCommitRow[];
   fileContents?: Record<string, string>;
 }
@@ -216,6 +220,7 @@ export interface FixtureSet {
   apiKeys?: ApiKeysContent;
   resources?: ResourcesContent;
   projectNames?: Record<string, string>;
+  projectAvatars?: Record<string, { icon?: ProjectIcon; color?: ProjectColor }>;
   chief?: ChiefContent;
   github?: GithubFixture;
   tags?: Array<Pick<TagRecord, 'id' | 'name' | 'color'>>;

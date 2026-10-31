@@ -138,11 +138,13 @@ export async function updateProject(
     body.repoKind !== undefined ||
     body.githubRepo !== undefined ||
     body.localPath !== undefined ||
-    body.baseBranch !== undefined;
+    body.baseBranch !== undefined ||
+    body.icon !== undefined ||
+    body.color !== undefined;
   if (!carriesKey) {
     throw new HttpError(
       400,
-      'invalid body: nothing to update (at least one of name/description/repoKind/githubRepo/localPath/baseBranch)',
+      'invalid body: nothing to update (at least one of name/description/repoKind/githubRepo/localPath/baseBranch/icon/color)',
     );
   }
 
@@ -260,6 +262,8 @@ export async function updateProject(
       localPath: nextLocalPath,
       description: nextDescription,
       baseBranch: body.baseBranch !== undefined ? body.baseBranch : row.baseBranch,
+      icon: body.icon !== undefined ? body.icon : row.icon,
+      color: body.color !== undefined ? body.color : row.color,
     })
     .where(eq(project.id, id))
     .run();

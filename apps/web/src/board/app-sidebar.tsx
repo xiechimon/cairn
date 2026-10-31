@@ -50,10 +50,21 @@ export function AppSidebar({
   const machinesQ = useMachines(teamId, live);
   const projectsQ = useProjects(teamId, live);
   const projects: SidebarProject[] | undefined = useMemo(() => {
-    if (live) return (projectsQ.data ?? []).map((p) => ({ id: p.id, name: p.name }));
+    if (live) {
+      return (projectsQ.data ?? []).map((p) => ({
+        id: p.id,
+        name: p.name,
+        icon: p.icon,
+        color: p.color,
+      }));
+    }
     if (fixture.projectNames == null) return undefined;
-    return Object.entries(fixture.projectNames).map(([id, name]) => ({ id, name }));
-  }, [live, projectsQ.data, fixture.projectNames]);
+    return Object.entries(fixture.projectNames).map(([id, name]) => ({
+      id,
+      name,
+      ...fixture.projectAvatars?.[id],
+    }));
+  }, [live, projectsQ.data, fixture.projectNames, fixture.projectAvatars]);
   const search = useSearchState(false, '');
   const searchResults = useSearchResults(search.query, live && search.open);
   const [collapsed, setCollapsed] = useState(() => readCollapsed(safeLocalStorage()));

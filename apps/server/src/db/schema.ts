@@ -17,6 +17,8 @@ import type {
   NotificationType,
   PersonaRole,
   Phase,
+  ProjectColor,
+  ProjectIcon,
   ProjectMergeConfig,
   ProjectRepoKind,
   ProviderApi,
@@ -82,6 +84,8 @@ export const project = sqliteTable('project', {
   githubRepo: text('githubRepo'),
   localPath: text('localPath'),
   baseBranch: text('baseBranch'),
+  icon: text('icon').$type<ProjectIcon>(),
+  color: text('color').$type<ProjectColor>(),
   autonomy: json<(AutonomySettings & Partial<ProjectMergeConfig>) | null>('autonomy'),
 });
 

@@ -10,6 +10,47 @@ export type SplitPolicy = z.infer<typeof splitPolicySchema>;
 export const projectRepoKindSchema = z.enum(PROJECT_REPO_KINDS);
 export type ProjectRepoKind = z.infer<typeof projectRepoKindSchema>;
 
+export const PROJECT_ICONS = [
+  'folder',
+  'code',
+  'terminal',
+  'database',
+  'flask-conical',
+  'box',
+  'globe',
+  'book-open',
+  'leaf',
+  'mountain',
+  'rocket',
+  'zap',
+  'chart-column',
+  'heart',
+  'star',
+  'layers',
+  'cpu',
+  'cloud',
+  'server',
+  'smartphone',
+  'palette',
+  'pen-tool',
+  'bug',
+  'shield',
+  'key',
+  'wrench',
+  'git-branch',
+  'package',
+  'music',
+  'camera',
+  'map',
+  'graduation-cap',
+] as const;
+export const projectIconSchema = z.enum(PROJECT_ICONS);
+export type ProjectIcon = z.infer<typeof projectIconSchema>;
+
+export const PROJECT_COLORS = ['moss', 'amber', 'slate', 'plum', 'teal', 'rose', 'gray'] as const;
+export const projectColorSchema = z.enum(PROJECT_COLORS);
+export type ProjectColor = z.infer<typeof projectColorSchema>;
+
 export const projectRecordSchema = z.object({
   id: recordId,
   name: z.string(),
@@ -21,6 +62,8 @@ export const projectRecordSchema = z.object({
   githubRepo: z.string().optional(),
   localPath: z.string().optional(),
   baseBranch: z.string().nullable().optional(),
+  icon: projectIconSchema.nullable().optional(),
+  color: projectColorSchema.nullable().optional(),
   mergePolicy: mergePolicySchema.optional(),
   localChecks: z.array(z.string().min(1)).optional(),
   cloneUrl: z.string().optional(),
@@ -76,6 +119,8 @@ export const patchProjectBodySchema = z
     repoKind: projectRepoKindSchema.optional(),
     githubRepo: z.string().optional(),
     localPath: z.string().nullish(),
+    icon: projectIconSchema.nullable().optional(),
+    color: projectColorSchema.nullable().optional(),
     baseBranch: z
       .string()
       .trim()
