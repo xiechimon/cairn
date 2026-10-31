@@ -1,13 +1,22 @@
 import { FS_LIST_MAX_ENTRIES } from '@cairn/shared';
 import { useEffect, useRef, useState } from 'react';
 import { ApiError } from '../api/client.js';
-import { useFsList } from '../api/hooks.js';
+import { useFsList, useProjects } from '../api/hooks.js';
+import { useLiveData } from '../api/provider.js';
 import { Button } from '../components/ui/button.js';
+import { Input } from '../components/ui/input.js';
 import { PopoverContent } from '../components/ui/popover.js';
 import { useI18n } from '../i18n/provider.js';
-import { ChevronRight, Folder, GitCommit } from '../icons/index.js';
+import { ChevronLeft, ChevronRight, Folder, GitCommit, Search } from '../icons/index.js';
 
 const LAST_DIR_KEY = 'cairn.dirBrowser.lastDir';
+const RECENT_KEY = 'cairn.dirBrowser.recent';
+const RECENT_MAX = 6;
+
+const LIST_ROW_CLS =
+  'flex h-8 w-full cursor-pointer items-center justify-start gap-2.5 rounded-(--radius-menu-item) border-none bg-transparent px-2.5 text-left text-ui font-normal text-foreground hover:bg-(--menu-hover) hover:text-foreground data-selected:bg-(--menu-hover) dark:hover:bg-(--menu-hover) active:not-aria-[haspopup]:translate-y-0';
+
+const LIST_GROUP_CLS = 'px-2.5 pt-2 pb-1 text-caption font-medium text-content-tertiary';
 
 const CRUMB_CLS =
   'h-auto max-w-40 cursor-pointer truncate px-1 py-0.5 text-meta font-normal text-muted-foreground hover:text-foreground aria-[current=location]:font-medium aria-[current=location]:text-foreground';
@@ -32,6 +41,175 @@ function writeLastDir(path: string): void {
   } catch {}
 }
 
+function readRecent(): string[] {
+  try {
+    const raw = window.localStorage.getItem(RECENT_KEY);
+    const list: unknown = raw == null ? [] : JSON.parse(raw);
+    return Array.isArray(list) ? list.filter((p): p is string => typeof p === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function rememberPick(path: string): void {
+  try {
+    const next = [path, ...readRecent().filter((p) => p !== path)].slice(0, RECENT_MAX);
+    window.localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+  } catch {}
+}
+
+function baseName(path: string): string {
+  return path.split('/').filter(Boolean).at(-1) ?? path;
+}
+
+function joinPath(dir: string, name: string): string {
+  return dir === '/' ? `/${name}` : `${dir}/${name}`;
+}
+
+interface KnownFolder {
+  path: string;
+  git: boolean;
+}
+
+function FolderList({
+  onPick,
+  onBrowse,
+}: {
+  onPick: (path: string) => void;
+  onBrowse: () => void;
+}) {
+  const { t } = useI18n();
+  const { live, teamId } = useLiveData();
+  const projectsQ = useProjects(teamId, live);
+  const listQ = useFsList(readLastDir(), true);
+  const [query, setQuery] = useState('');
+  const [cursor, setCursor] = useState(0);
+
+  const projectPaths = new Set(
+    (projectsQ.data ?? []).flatMap((project) =>
+      project.localPath != null && project.localPath !== '' ? [project.localPath] : [],
+    ),
+  );
+  const recent: KnownFolder[] = [...new Set([...readRecent(), ...projectPaths])].map((path) => ({
+    path,
+    git: projectPaths.has(path),
+  }));
+  const listedDir = listQ.data && !listQ.isPlaceholderData ? listQ.data.path : null;
+  const nearby: KnownFolder[] =
+    listedDir === null
+      ? []
+      : (listQ.data?.entries ?? [])
+          .filter((entry) => entry.git && !entry.name.startsWith('.'))
+          .map((entry) => ({ path: joinPath(listedDir, entry.name), git: true }))
+          .filter((folder) => !recent.some((r) => r.path === folder.path));
+
+  const q = query.trim();
+  const match = (folder: KnownFolder) =>
+    q === '' || folder.path.toLowerCase().includes(q.toLowerCase());
+  const typedPath = q.startsWith('/') ? q : null;
+  const groups: { label: string; folders: KnownFolder[] }[] = [
+    { label: t('最近'), folders: recent.filter(match) },
+    {
+      label: listedDir === null ? '' : t('{dir} 里的仓库', { dir: listedDir }),
+      folders: nearby.filter(match),
+    },
+  ].filter((group) => group.folders.length > 0);
+  const actions: Array<() => void> = [
+    ...(typedPath === null ? [] : [() => onPick(typedPath)]),
+    ...groups.flatMap((group) => group.folders.map((folder) => () => onPick(folder.path))),
+    onBrowse,
+  ];
+  const at = Math.min(cursor, actions.length - 1);
+  let index = typedPath === null ? 0 : 1;
+
+  return (
+    <>
+      <div className="-mx-2.5 -mt-2.5 mb-1 flex h-10 items-center gap-2 border-b border-border px-3 text-content-tertiary">
+        <Search width={15} height={15} />
+        <Input
+          autoFocus
+          aria-label={t('查找文件夹或粘贴路径')}
+          placeholder={t('查找文件夹或粘贴路径…')}
+          className="h-auto flex-1 rounded-none border-none bg-transparent p-0 text-ui text-foreground shadow-none ring-0 placeholder:text-content-tertiary focus-visible:border-transparent focus-visible:ring-0! focus-visible:outline-none md:text-ui dark:bg-transparent"
+          value={query}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setCursor(0);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+              event.preventDefault();
+              const step = event.key === 'ArrowDown' ? 1 : -1;
+              setCursor((at + step + actions.length) % actions.length);
+            } else if (event.key === 'Enter') {
+              event.preventDefault();
+              actions[at]?.();
+            }
+          }}
+        />
+      </div>
+      <div className="flex max-h-80 flex-col overflow-y-auto" data-testid="dir-folder-list">
+        {typedPath !== null && (
+          <Button
+            variant="ghost"
+            className={LIST_ROW_CLS}
+            data-selected={at === 0 ? '' : undefined}
+            onClick={() => onPick(typedPath)}
+          >
+            <Folder aria-hidden="true" className="size-4 flex-none text-icon" />
+            <span className="truncate">{t('使用 {path}', { path: typedPath })}</span>
+          </Button>
+        )}
+        {groups.map((group) => (
+          <div key={group.label} className="flex flex-col">
+            <div className={LIST_GROUP_CLS}>{group.label}</div>
+            {group.folders.map((folder) => {
+              const rowIndex = index++;
+              return (
+                <Button
+                  key={folder.path}
+                  variant="ghost"
+                  className={LIST_ROW_CLS}
+                  data-selected={at === rowIndex ? '' : undefined}
+                  title={folder.path}
+                  onClick={() => onPick(folder.path)}
+                >
+                  <Folder aria-hidden="true" className="size-4 flex-none text-icon" />
+                  <span className="flex-none">{baseName(folder.path)}</span>
+                  <span className="ml-auto min-w-0 truncate pl-3 text-meta text-content-tertiary">
+                    {folder.path}
+                  </span>
+                  {folder.git && (
+                    <span className="inline-flex h-4.5 flex-none items-center rounded-(--cds-radius-sm) px-1.5 text-caption text-content-tertiary ring-1 ring-border ring-inset">
+                      git
+                    </span>
+                  )}
+                </Button>
+              );
+            })}
+          </div>
+        ))}
+        {groups.length === 0 && typedPath === null && (
+          <div className="px-2.5 py-2 text-meta text-content-tertiary">
+            {q === '' ? t('还没有用过的文件夹') : t('没有匹配的文件夹')}
+          </div>
+        )}
+      </div>
+      <div className="-mx-2.5 mt-1 border-t border-border px-1 pt-1">
+        <Button
+          variant="ghost"
+          className={LIST_ROW_CLS}
+          data-selected={at === actions.length - 1 ? '' : undefined}
+          onClick={onBrowse}
+        >
+          <ChevronRight aria-hidden="true" className="size-4 flex-none text-icon" />
+          {t('浏览文件夹…')}
+        </Button>
+      </div>
+    </>
+  );
+}
+
 function breadcrumb(path: string): { label: string; path: string }[] {
   const segs = [{ label: '/', path: '/' }];
   let acc = '';
@@ -44,6 +222,30 @@ function breadcrumb(path: string): { label: string; path: string }[] {
 }
 
 export function DirBrowser({ onPick }: { onPick: (path: string) => void }) {
+  const { t } = useI18n();
+  const [browsing, setBrowsing] = useState(false);
+  const pick = (path: string) => {
+    rememberPick(path);
+    onPick(path);
+  };
+  return (
+    <PopoverContent
+      side="bottom"
+      align="start"
+      sideOffset={8}
+      className="w-115"
+      aria-label={t('浏览本地文件夹')}
+    >
+      {browsing ? (
+        <FolderTree onPick={pick} onBack={() => setBrowsing(false)} />
+      ) : (
+        <FolderList onPick={pick} onBrowse={() => setBrowsing(true)} />
+      )}
+    </PopoverContent>
+  );
+}
+
+function FolderTree({ onPick, onBack }: { onPick: (path: string) => void; onBack: () => void }) {
   const { t } = useI18n();
   const [dir, setDir] = useState<string | null>(() => readLastDir());
   const [showDotfiles, setShowDotfiles] = useState(false);
@@ -75,14 +277,17 @@ export function DirBrowser({ onPick }: { onPick: (path: string) => void }) {
   const crumbs = currentPath !== null ? breadcrumb(currentPath) : [];
 
   return (
-    <PopoverContent
-      side="bottom"
-      align="start"
-      sideOffset={8}
-      className="w-88"
-      aria-label={t('浏览本地文件夹')}
-    >
-      <div className="flex items-center gap-2 px-1">
+    <>
+      <div className="flex items-center gap-1 px-1">
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          aria-label={t('返回列表')}
+          className="flex-none self-start text-content-tertiary"
+          onClick={onBack}
+        >
+          <ChevronLeft width={14} height={14} />
+        </Button>
         <nav className="flex min-w-0 flex-1 flex-wrap items-center gap-0.5 border-b border-border pb-1.5">
           {crumbs.map((seg, i) => (
             <span key={seg.path} className="inline-flex min-w-0 items-center gap-0.5">
@@ -173,6 +378,6 @@ export function DirBrowser({ onPick }: { onPick: (path: string) => void }) {
           {t('显示隐藏文件')}
         </Button>
       </div>
-    </PopoverContent>
+    </>
   );
 }

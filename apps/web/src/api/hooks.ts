@@ -33,6 +33,8 @@ import type {
   MemoryRecord,
   MergeReadiness,
   ModelSourcesEnvelope,
+  NotificationRecord,
+  NotificationsResponse,
   OAuthAuthorizeResponse,
   PatchAgentBody,
   PatchAutonomyBody,
@@ -511,7 +513,7 @@ export const useChiefThreads = (teamId: string | undefined, enabled: boolean) =>
 export const useNotifications = (teamId: string | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['notifications', teamId],
-    queryFn: () => api.get<{ unreadThreadIds: string[] }>(`/api/teams/${teamId}/notifications`),
+    queryFn: () => api.get<NotificationsResponse>(`/api/teams/${teamId}/notifications`),
     enabled: enabled && teamId !== undefined,
   });
 
@@ -681,6 +683,22 @@ export function useApiMutations(teamId: string | undefined) {
     deleteTodo: useMutation({
       mutationFn: (id: string) => api.del<void>(`/api/todos/${id}`),
       onSuccess: invalidateAll,
+    }),
+    setThreadRead: useMutation({
+      mutationFn: (input: { id: string; read: boolean }) =>
+        api.post<NotificationRecord>(
+          `/api/teams/${encodeURIComponent(teamId ?? '')}/notifications/${encodeURIComponent(input.id)}/${input.read ? 'read' : 'unread'}`,
+        ),
+      onMutate: async (input) => {
+        await qc.cancelQueries({ queryKey: ['notifications', teamId] });
+        qc.setQueryData<NotificationsResponse>(['notifications', teamId], (data) => {
+          const ids = (data?.unreadThreadIds ?? []).filter((id) => id !== input.id);
+          return { unreadThreadIds: input.read ? ids : [...ids, input.id] };
+        });
+      },
+      onSettled: () => {
+        void qc.invalidateQueries({ queryKey: ['notifications', teamId] });
+      },
     }),
     startBuilds: useMutation({
       mutationFn: (input: {

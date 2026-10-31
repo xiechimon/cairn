@@ -166,7 +166,7 @@ describe('three-event matrix (r5 section 7.2 field by field)', () => {
     }
   });
 
-  test('entering done / entering failed has no in-app notification event (copied verbatim from the r5 section 7.2 observation window)', async () => {
+  test('entering done / entering failed emits todo_done / todo_failed unread events', async () => {
     const s = await withRunningTodo({ withPlan: false, pingIntervalMs: 50 });
     const stream = await openStream(s.app, s.team.id);
     try {
@@ -181,7 +181,8 @@ describe('three-event matrix (r5 section 7.2 field by field)', () => {
       const steps = await stepsOf();
       completeStep(s.svc, steps[steps.length - 1]?.id ?? '');
 
-      await expect(notificationFrames(stream)()).rejects.toThrow();
+      const doneFrame = notificationEventSchema.parse(await notificationFrames(stream)(3000));
+      expect(doneFrame.notification).toMatchObject({ type: 'todo_done', readAt: null });
 
       const second = (await (
         await req(s.app, 'POST', `/api/projects/${s.projectId}/todos`, {
@@ -197,7 +198,12 @@ describe('three-event matrix (r5 section 7.2 field by field)', () => {
       });
       setTodoPhase(s.svc, second.id, 'building');
       setTodoPhase(s.svc, second.id, 'failed');
-      await expect(notificationFrames(stream)()).rejects.toThrow();
+      const failedFrame = notificationEventSchema.parse(await notificationFrames(stream)(3000));
+      expect(failedFrame.notification).toMatchObject({
+        type: 'todo_failed',
+        entityId: second.id,
+        readAt: null,
+      });
     } finally {
       stream.close();
     }

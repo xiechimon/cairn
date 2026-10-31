@@ -1,14 +1,4 @@
-import type { LucideIcon } from 'lucide-react';
-import {
-  Activity,
-  Ban,
-  CircleCheck,
-  CircleDashed,
-  CircleX,
-  GitPullRequest,
-  Hourglass,
-  ListChecks,
-} from 'lucide-react';
+import type { GlyphKind } from './components/status-glyph.js';
 import type { Phase } from './fixtures/records.js';
 
 export interface PhaseUi {
@@ -54,18 +44,20 @@ export const PHASE_UI: Record<Phase, PhaseUi> = {
   closed: { chip: '已取消', tone: 'idle', action: null, placeholder: null },
 };
 
-const ACCENT_INK = 'text-(--card-button)';
+export const ACCENT_INK = 'text-(--card-button)';
 export const RUNNING_INK = 'text-running-text';
 const QUIET_INK = 'text-content-tertiary';
 
-export const PHASE_STATUS: Record<Phase, { icon: LucideIcon; ink: string }> = {
-  todo: { icon: CircleDashed, ink: QUIET_INK },
-  queued: { icon: Hourglass, ink: QUIET_INK },
-  planning: { icon: Activity, ink: RUNNING_INK },
-  building: { icon: Activity, ink: RUNNING_INK },
-  confirm: { icon: ListChecks, ink: ACCENT_INK },
-  review: { icon: GitPullRequest, ink: ACCENT_INK },
-  failed: { icon: CircleX, ink: 'text-destructive' },
-  done: { icon: CircleCheck, ink: QUIET_INK },
-  closed: { icon: Ban, ink: QUIET_INK },
+const PLAN_INK = 'text-(--chip-plan-fg)';
+
+export const PHASE_STATUS: Record<Phase, { glyph: GlyphKind; ink: string }> = {
+  todo: { glyph: 'todo', ink: QUIET_INK },
+  queued: { glyph: 'queued', ink: QUIET_INK },
+  planning: { glyph: 'quarter', ink: PLAN_INK },
+  confirm: { glyph: 'half', ink: ACCENT_INK },
+  building: { glyph: 'three-quarter', ink: RUNNING_INK },
+  review: { glyph: 'three-quarter', ink: ACCENT_INK },
+  failed: { glyph: 'failed', ink: 'text-destructive' },
+  done: { glyph: 'done', ink: RUNNING_INK },
+  closed: { glyph: 'closed', ink: 'text-content-dim' },
 };

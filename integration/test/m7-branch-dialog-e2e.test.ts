@@ -63,10 +63,9 @@ describe('branch-sync buildId wiring (#346 regression pin)', () => {
     expect(todoFace.latestBuildId).toBeTruthy();
 
     await page.goto(`${server.url}/app/todo/${todoId}`);
-    const select = page.locator('.detail-right .doc-select-wrap .doc-pane-select');
-    await pexpect(select).toBeVisible({ timeout: 30_000 });
-    await select.click();
-    await page.getByRole('menuitemradio', { name: '分支与 PR' }).click();
+    const branchTab = page.locator('.detail-right').getByTestId('pane-tab-branch');
+    await pexpect(branchTab).toBeVisible({ timeout: 30_000 });
+    await branchTab.click();
 
     const right = page.locator('.detail-right');
     const picker = right.getByRole('button', { name: '选择机器' });

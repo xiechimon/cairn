@@ -1,7 +1,7 @@
 import type { NotificationRecord, TodoRecord, UserRecord } from '@cairn/shared';
 import { and, eq, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { agent, chiefThread, notification } from '../db/schema.js';
+import { agent, chiefThread, notification, todo as todoTable } from '../db/schema.js';
 import { notFound } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import type { TeamStreamHub } from './events.js';
@@ -79,29 +79,143 @@ function upsertAndPublish(deps: NotificationDeps, input: NotificationInput): Not
   return record;
 }
 
-export function notifyTodoPhase(
+const PHASE_NOTIFICATION_TYPE = {
+  confirm: 'plan_ready',
+  review: 'build_review',
+  done: 'todo_done',
+  failed: 'todo_failed',
+} as const;
+
+export type NotifiedPhase = keyof typeof PHASE_NOTIFICATION_TYPE;
+
+export function isNotifiedPhase(phase: string): phase is NotifiedPhase {
+  return phase in PHASE_NOTIFICATION_TYPE;
+}
+
+interface TodoNoticeSource {
+  id: string;
+  teamId: string;
+  title: string;
+  projectId: string | null;
+  seqNum: number | null;
+  assignment?: { plan?: { agentId?: string } | null; build?: { agentId?: string } | null } | null;
+}
+
+function todoNoticeAgent(
   deps: NotificationDeps,
-  todo: TodoRecord,
-  to: 'confirm' | 'review',
-  snippet: string | null = null,
-): NotificationRecord {
-  const agentId =
-    to === 'confirm'
-      ? (todo.assignment?.plan?.agentId ?? todo.assignment?.build?.agentId)
-      : (todo.assignment?.build?.agentId ?? todo.assignment?.plan?.agentId);
+  todo: TodoNoticeSource,
+  planFirst: boolean,
+): { name: string; avatarUrl: string | null } {
+  const plan = todo.assignment?.plan?.agentId;
+  const build = todo.assignment?.build?.agentId;
+  const agentId = planFirst ? (plan ?? build) : (build ?? plan);
   const agentRow = agentId
     ? deps.db.select().from(agent).where(eq(agent.id, agentId)).get()
     : undefined;
+  return agentRow
+    ? { name: agentRow.displayName, avatarUrl: agentRow.avatarUrl }
+    : { name: deps.user.displayName, avatarUrl: deps.user.avatarUrl };
+}
+
+export function notifyTodoPhase(
+  deps: NotificationDeps,
+  todo: TodoRecord,
+  to: NotifiedPhase,
+  snippet: string | null = null,
+): NotificationRecord {
   return upsertAndPublish(deps, {
     teamId: todo.teamId,
-    type: to === 'confirm' ? 'plan_ready' : 'build_review',
+    type: PHASE_NOTIFICATION_TYPE[to],
     entityId: todo.id,
     entityRef: { title: todo.title, projectId: todo.projectId, seqNum: todo.seqNum },
-    agent: agentRow
-      ? { name: agentRow.displayName, avatarUrl: agentRow.avatarUrl }
-      : { name: deps.user.displayName, avatarUrl: deps.user.avatarUrl },
+    agent: todoNoticeAgent(deps, todo, to === 'confirm'),
     snippet,
   });
+}
+
+export function notifyScheduleRun(
+  deps: NotificationDeps,
+  todoRow: TodoNoticeSource,
+  snippet: string | null,
+): NotificationRecord {
+  return upsertAndPublish(deps, {
+    teamId: todoRow.teamId,
+    type: 'schedule_run',
+    entityId: todoRow.id,
+    entityRef: { title: todoRow.title, projectId: todoRow.projectId, seqNum: todoRow.seqNum },
+    agent: todoNoticeAgent(deps, todoRow, false),
+    snippet,
+  });
+}
+
+export function listUnreadEntityIds(deps: NotificationDeps, teamId: string): string[] {
+  return deps.db
+    .selectDistinct({ entityId: notification.entityId })
+    .from(notification)
+    .where(
+      and(
+        eq(notification.teamId, teamId),
+        eq(notification.userId, deps.user.id),
+        isNull(notification.readAt),
+      ),
+    )
+    .all()
+    .map((r) => r.entityId);
+}
+
+export function markNotificationRead(
+  deps: NotificationDeps,
+  teamId: string,
+  entityId: string,
+): NotificationRecord {
+  const row = deps.db
+    .select()
+    .from(notification)
+    .where(and(eq(notification.id, `${deps.user.id}:${entityId}`), eq(notification.teamId, teamId)))
+    .get();
+  if (!row) throw notFound(`notification ${entityId}`);
+  if (row.readAt !== null) return toNotificationRecord(row);
+  deps.db.update(notification).set({ readAt: nowMs() }).where(eq(notification.id, row.id)).run();
+  return republish(deps, row.id);
+}
+
+export function markNotificationUnread(
+  deps: NotificationDeps,
+  teamId: string,
+  entityId: string,
+): NotificationRecord {
+  const row = deps.db
+    .select()
+    .from(notification)
+    .where(and(eq(notification.id, `${deps.user.id}:${entityId}`), eq(notification.teamId, teamId)))
+    .get();
+  if (row) {
+    if (row.readAt === null) return toNotificationRecord(row);
+    deps.db.update(notification).set({ readAt: null }).where(eq(notification.id, row.id)).run();
+    return republish(deps, row.id);
+  }
+  const todoRow = deps.db
+    .select()
+    .from(todoTable)
+    .where(and(eq(todoTable.id, entityId), eq(todoTable.teamId, teamId)))
+    .get();
+  if (!todoRow) throw notFound(`notification ${entityId}`);
+  return upsertAndPublish(deps, {
+    teamId,
+    type: 'marked_unread',
+    entityId,
+    entityRef: { title: todoRow.title, projectId: todoRow.projectId, seqNum: todoRow.seqNum },
+    agent: todoNoticeAgent(deps, todoRow, false),
+    snippet: null,
+  });
+}
+
+function republish(deps: NotificationDeps, id: string): NotificationRecord {
+  const row = deps.db.select().from(notification).where(eq(notification.id, id)).get();
+  if (!row) throw new Error(`notification ${id} missing after update`);
+  const record = toNotificationRecord(row);
+  deps.hub.publishNotification(record.teamId, record);
+  return record;
 }
 
 export function notifyChiefMessage(

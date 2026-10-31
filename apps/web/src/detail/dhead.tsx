@@ -1,10 +1,14 @@
-import { Activity, Hourglass } from 'lucide-react';
 import { type Ref, useState } from 'react';
 import { Link, useLocation } from 'react-router';
+import { useAgentAvatarUrlById, useLiveData } from '../api/provider.js';
 import { TOPBAR_PRIMARY_BUTTON } from '../board/filter-panel.js';
+import { ProjectAvatar } from '../board/project-avatar.js';
+import { type GlyphKind, StatusGlyph } from '../components/status-glyph.js';
 import { Badge } from '../components/ui/badge.js';
 import { Button } from '../components/ui/button.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
+import { SeededAvatar } from '../components/ui/seeded-avatar.js';
+import { PROJECT_NAME } from '../fixtures/fixtures.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronDown, ChevronLeft, EllipsisVertical } from '../icons/index.js';
@@ -42,37 +46,50 @@ export function DetailHead({
 }: DetailHeadProps) {
   const { t } = useI18n();
   const shown = phase ?? todo.phase;
-  const status = verifyActive
-    ? { chip: '验证中', icon: Activity, ink: RUNNING_INK }
+  const status: { chip: string; glyph: GlyphKind; ink: string } = verifyActive
+    ? { chip: '验证中', glyph: 'three-quarter', ink: RUNNING_INK }
     : reviewActive
-      ? { chip: '审核中', icon: Activity, ink: RUNNING_INK }
+      ? { chip: '审核中', glyph: 'three-quarter', ink: RUNNING_INK }
       : todo.quotaWait != null
-        ? { chip: '等额度', icon: Hourglass, ink: 'text-content-secondary' }
+        ? { chip: '等额度', glyph: 'queued', ink: 'text-content-secondary' }
         : { chip: PHASE_UI[shown].chip, ...PHASE_STATUS[shown] };
+  const { live } = useLiveData();
+  const project = live ? projectName : PROJECT_NAME;
+  const agentAvatarUrl = useAgentAvatarUrlById();
   const action = PHASE_UI[shown].action;
   const { search } = useLocation();
   const [popover, setPopover] = useState(chipPopoverOpen === true);
-  const StatusIcon = status.icon;
   return (
     <header
-      className="detail-head flex h-14 flex-none items-center gap-3 border-b border-border px-6 whitespace-nowrap"
+      className="detail-head flex h-11 flex-none items-center gap-2.5 border-b border-border pr-3 pl-4 whitespace-nowrap"
       data-testid="detail-head"
     >
       <Link
-        className="-mr-1 -ml-2 flex size-7 flex-none items-center justify-center rounded-md text-content-tertiary hover:bg-muted"
+        className="-ml-1 flex size-7 flex-none items-center justify-center rounded-md text-content-tertiary hover:bg-muted"
         to={{ pathname: '/app', search }}
         aria-label={t('返回')}
       >
         <ChevronLeft width={16} height={16} />
       </Link>
+      <span className="flex flex-none items-center gap-1.5 text-meta text-content-tertiary">
+        {project !== undefined && (
+          <>
+            <ProjectAvatar name={project} tone={0} />
+            <span className="max-w-40 truncate max-md:hidden">{project}</span>
+            <span aria-hidden="true" className="max-md:hidden">
+              /
+            </span>
+          </>
+        )}
+        <span className="tabular-nums">#{todo.seqNum}</span>
+      </span>
       <h1
-        className="min-w-0 truncate font-serif text-page font-semibold text-foreground"
+        className="min-w-0 truncate text-card-title font-semibold text-foreground"
         title={todo.title}
         data-testid="detail-title"
       >
         {todo.title}
       </h1>
-      <span className="flex-none text-meta tabular-nums text-content-tertiary">#{todo.seqNum}</span>
       {todo.archivedAt != null && (
         <Badge variant="secondary" data-testid="archived-badge">
           {t('Archived')}
@@ -86,11 +103,11 @@ export function DetailHead({
               size="sm"
               data-testid="phase-chip"
               data-tone={PHASE_UI[shown].tone}
-              className={`detail-chip -ml-1.5 h-7 flex-none gap-1.5 px-1.5 text-ui font-normal ${status.ink}`}
+              className="detail-chip h-7 flex-none gap-1.5 rounded-full pr-2 pl-1.5 text-ui font-medium text-foreground"
             />
           }
         >
-          <StatusIcon aria-hidden strokeWidth={1.75} className="size-3.5" />
+          <StatusGlyph kind={status.glyph} className={status.ink} />
           {t(status.chip)}
           <span className="flex flex-none text-content-tertiary" data-testid="chip-chevron">
             <ChevronDown width={12} height={12} />
@@ -121,10 +138,18 @@ export function DetailHead({
         </PopoverContent>
       </Popover>
 
-      <div
-        className="ml-auto flex flex-none items-center gap-0.5"
-        data-testid="detail-head-actions"
-      >
+      <div className="ml-auto flex flex-none items-center gap-1" data-testid="detail-head-actions">
+        {todo.agent != null && (
+          <span className="mr-1 flex items-center gap-1.5 text-meta text-content-tertiary max-md:hidden">
+            <SeededAvatar
+              className="size-4.5"
+              name={todo.agent.displayName}
+              src={agentAvatarUrl.get(todo.agent.id) ?? null}
+              fallback="/avatar-robot-1.svg"
+            />
+            {todo.agent.displayName}
+          </span>
+        )}
         <Button
           variant="ghost"
           ref={moreButtonRef}

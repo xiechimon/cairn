@@ -117,7 +117,6 @@ export interface OverlayUi {
   searchOpen?: boolean;
   searchQuery?: string;
   chipPopoverOpen?: boolean;
-  planDropdownOpen?: boolean;
   paneView?: PaneView;
   langDropdownOpen?: boolean;
   notificationBanner?: boolean;
@@ -202,6 +201,7 @@ export interface FixtureSet {
   details?: Record<string, DetailContent>;
   overlay?: OverlayState;
   chiefUnread?: number;
+  unreadThreadIds?: string[];
   chiefBusy?: boolean;
   ui?: OverlayUi;
   usageNav?: boolean;

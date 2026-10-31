@@ -145,13 +145,6 @@
     },
     {
       "file": "apps/web/src/board/home.tsx",
-      "anchor": "className=\"text-(--card-button)\"",
-      "role": "indicator",
-      "reason": "Needs-me inbox row status glyph (failed / plan / review / reply). DESIGN.md 图标: needs-you icons take the accent; non-text glyph, 3:1 gate.",
-      "contrast": "apps/web/DESIGN.md 颜色 (accent on card 4.99, measured in PR #1369)"
-    },
-    {
-      "file": "apps/web/src/board/home.tsx",
       "anchor": "tone=\"text-(--card-button)\"",
       "role": "indicator",
       "reason": "Home `需要你` section header alert-circle glyph. DESIGN.md 图标: needs-you icons take the accent; non-text glyph, 3:1 gate.",

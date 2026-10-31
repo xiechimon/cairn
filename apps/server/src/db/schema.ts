@@ -14,6 +14,7 @@ import type {
   MachineCapabilities,
   MemoryCandidateStatus,
   ModelRef,
+  NotificationType,
   PersonaRole,
   Phase,
   ProjectMergeConfig,
@@ -353,9 +354,7 @@ export const notification = sqliteTable(
     id: text('id').primaryKey(),
     teamId: text('teamId').notNull(),
     userId: text('userId').notNull(),
-    type: text('type')
-      .$type<'plan_ready' | 'build_review' | 'chief_message' | 'quota_wait' | 'model_fallback'>()
-      .notNull(),
+    type: text('type').$type<NotificationType>().notNull(),
     entityId: text('entityId').notNull(),
     entityRef: json<{ title: string; projectId: string | null; seqNum: number | null }>(
       'entityRef',

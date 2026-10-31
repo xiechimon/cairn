@@ -71,7 +71,7 @@ test('settings: github project can retarget its repo; save writes githubRepo and
   );
   await page.getByRole('button', { name: '保存仓库' }).click();
   await refetched;
-  await expect(stub.patches.length).toBeGreaterThanOrEqual(1);
+  await expect.poll(() => stub.patches.length).toBeGreaterThanOrEqual(1);
   expect(stub.patches[0]?.body).toEqual({ githubRepo: 'octo/cairn' });
 
   await expect(input).toHaveValue('octo/cairn');
