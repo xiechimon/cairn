@@ -14,7 +14,6 @@ import { type ReactNode, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import { useClaudeSubscriptions } from '../api/claude-subscriptions.js';
 import { useLiveData } from '../api/provider.js';
-import { SpiralMark } from '../chief/chief-fab-icon.js';
 import type { CardOrchestration } from '../chief/orchestration-inflight.js';
 import { formatClaudeLoginWarning, subscriptionLoginWarning } from '../claude-login-warning.js';
 import { StatusGlyph as PhaseGlyph } from '../components/status-glyph.js';
@@ -374,7 +373,7 @@ export function HomeSections({
                     todo.phase === 'queued' ? (
                       <PhaseGlyph kind="queued" className="size-3.75 text-content-tertiary" />
                     ) : (
-                      <SpiralMark busy className="size-3.75 text-running" />
+                      <PhaseGlyph kind="working" className="size-3.75 text-running" />
                     )
                   }
                   meta={[
