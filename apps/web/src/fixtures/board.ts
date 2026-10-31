@@ -229,6 +229,28 @@ export const sidebarSnooze: FixtureSet = {
   now: r7(13, 55),
 };
 
+export const sidebarGroups: FixtureSet = {
+  ...boardDefault,
+  projectNames: { [PROJECT_ID]: 'P1' },
+  todos: [
+    repoFilterProbe('sidebar-groups-a', 101, 'active thread A', 'building', PROJECT_ID, []),
+    repoFilterProbe('sidebar-groups-b', 102, 'active thread B', 'done', PROJECT_ID, []),
+    {
+      ...repoFilterProbe('sidebar-groups-s', 103, 'sleeping thread S', 'done', PROJECT_ID, []),
+      snoozeMode: 'needed',
+    },
+    {
+      ...repoFilterProbe('sidebar-groups-c', 104, 'archived thread C', 'done', PROJECT_ID, []),
+      archivedAt: r7(13, 0),
+    },
+    {
+      ...repoFilterProbe('sidebar-groups-d', 105, 'archived thread D', 'done', PROJECT_ID, []),
+      archivedAt: r7(13, 10),
+    },
+  ],
+  now: r7(13, 55),
+};
+
 export const sidebarThreadStatuses: FixtureSet = {
   ...boardDefault,
   projectNames: { [PROJECT_ID]: 'P1' },

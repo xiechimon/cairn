@@ -30,6 +30,7 @@ export {
   boardTagFilter,
   boardTagFilterEmpty,
   boardWithProbe,
+  sidebarGroups,
   sidebarSnooze,
   sidebarThreadStatuses,
   sidebarThreads,
