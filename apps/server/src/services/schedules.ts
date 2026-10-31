@@ -199,7 +199,7 @@ export function createSchedule(
   return record;
 }
 
-export function deleteSchedule(deps: ScheduleDeps & { user?: UserRecord }, id: string): boolean {
+export function deleteSchedule(deps: ScheduleDeps & { user: UserRecord }, id: string): boolean {
   const row = deps.db.select().from(schedule).where(eq(schedule.id, id)).get();
   if (!row) return false;
   deps.db.delete(schedule).where(eq(schedule.id, id)).run();

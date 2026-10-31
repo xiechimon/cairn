@@ -18,7 +18,7 @@ import { getTodo } from './todos.js';
 export interface SnoozeDeps {
   db: Db;
   hub: TeamStreamHub;
-  user?: UserRecord;
+  user: UserRecord;
 }
 
 type TodoRow = typeof todo.$inferSelect;
@@ -65,7 +65,7 @@ function clearSnooze(deps: SnoozeDeps, row: TodoRow): void {
 
 function returnThread(deps: SnoozeDeps, row: TodoRow): void {
   clearSnooze(deps, row);
-  if (deps.user) markNotificationUnread({ ...deps, user: deps.user }, row.teamId, row.id);
+  markNotificationUnread(deps, row.teamId, row.id);
   publish(deps, row.id);
 }
 
