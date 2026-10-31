@@ -1,4 +1,5 @@
 # Runner identity checks on omarchy, 2026-10-31 (run by the owner).
 cairn-runner: dedicated uid/gid 959, no supplementary groups, locked password.
 sudo -l -U cairn-runner: no sudo grant. The only matching entry is the distribution's stock negation-only rule for a display utility, which applies to all users and grants nothing.
-runner canary: 58 rows, every channel readable=no with 0 bytes (direct, symlink, python, node, sh, subprocess-file, git-config, git-credential, proc-environ, proc-mem). Exit status was not captured; exit 0 is inferred from the rows (no error rows), not observed.
+runner canary: 58 rows, every channel readable=no with 0 bytes (direct, symlink, python, node, sh, subprocess-file, git-config, git-credential, proc-environ, proc-mem). Rerun by the owner: runner exit=0.
+runner broker connect: `runner broker connect ok` (the runner user reaches /run/cairn-token-broker/broker.sock).
