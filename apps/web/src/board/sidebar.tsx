@@ -143,6 +143,9 @@ const FOCUS =
 const SEARCH_OPEN_DIM =
   '[html[data-search-open]_&]:bg-transparent [html[data-search-open]_&]:shadow-none [html[data-search-open]_&]:ring-0 [html[data-search-open]_&]:text-content-secondary';
 
+const SEARCH_OPEN_DIM_CURRENT =
+  '[html[data-search-open]_&_[aria-current=page]]:bg-transparent [html[data-search-open]_&_[aria-current=page]]:text-content-secondary';
+
 const ROW = `flex h-9 w-full flex-none items-center gap-2.5 rounded-(--cds-radius-lg) px-2.5 text-left text-ui font-medium text-foreground no-underline transition-[background-color,color] duration-150 ease-out ${FOCUS_RING_INSET}`;
 const ROW_IDLE = 'hover:bg-sidebar-hover hover:text-foreground';
 const ROW_ACTIVE = `bg-(--hover-1) font-semibold text-foreground [&>svg:first-child]:text-(--card-button) ${SEARCH_OPEN_DIM}`;
@@ -450,7 +453,9 @@ export function BoardSidebar({
   }
 
   return (
-    <aside className="board-sidebar relative z-(--z-docked) flex w-(--sidebar-w) flex-none flex-col overflow-hidden border-r border-border bg-(--surface-1) px-3 pt-3 pb-2.5">
+    <aside
+      className={`board-sidebar relative z-(--z-docked) flex w-(--sidebar-w) flex-none flex-col overflow-hidden border-r border-border bg-(--surface-1) px-3 pt-3 pb-2.5 ${SEARCH_OPEN_DIM_CURRENT}`}
+    >
       <div
         data-testid="team-row"
         className="sidebar-team-row flex h-11 flex-none items-center gap-0.5 text-foreground"

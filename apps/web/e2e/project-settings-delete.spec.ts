@@ -4,7 +4,7 @@ const SETTINGS = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/settings?scenario=r2-24c';
 const PROJECT_PAGE = '/app/project/ZAQczKCu0MOAzC1ZqcFlX?scenario=r2-24c';
 const PROJECT_NAME = 'r3-lifecycle';
 
-const PROJECT_ROW = 'aside a[href*="/app/project/ZAQczKCu0MOAzC1ZqcFlX"]';
+const PROJECT_ROW = `aside [data-testid="sidebar-project-group"]:has-text("${PROJECT_NAME}")`;
 
 async function openConfirm(page: Page) {
   await page.goto(SETTINGS);
