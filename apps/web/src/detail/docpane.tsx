@@ -51,14 +51,23 @@ interface DocPaneProps {
   emptyMeta?: ReactNode;
 }
 
+function baseName(path: string): string {
+  return path.slice(path.lastIndexOf('/') + 1);
+}
+
+function dirName(path: string): string {
+  return path.slice(0, Math.max(0, path.lastIndexOf('/')));
+}
+
 export const PANE_HEAD =
   'flex h-10 flex-none items-center gap-2 border-b border-(--border) px-2 text-meta text-(--text-secondary)';
 const PANE_SELECT = 'doc-pane-select ml-0';
-const DIFF_LINE = 'flex items-center font-mono text-caption leading-4 text-(--text-secondary)';
-const DIFF_NO = 'flex-none pr-1 text-right text-(--text-tertiary)';
+const DIFF_LINE =
+  'flex items-center font-mono text-caption leading-5 text-(--foreground) [font-variant-ligatures:none]';
+const DIFF_NO = 'w-8 flex-none pr-2 text-right text-(--text-tertiary) select-none';
 const DIFF_KIND_SKIN: Record<string, string> = {
-  add: 'bg-(--diff-add-bg)',
-  del: 'bg-(--diff-del-bg)',
+  add: 'bg-(--diff-add-bg) shadow-[inset_2px_0_0_var(--diff-add-fg)]',
+  del: 'bg-(--diff-del-bg) shadow-[inset_2px_0_0_var(--destructive)]',
   marker: 'bg-transparent text-(--text-tertiary)',
   context: '',
 };
@@ -114,14 +123,17 @@ export function DiffFileBlock({
   );
   return (
     <div>
-      <div className="doc-file-row flex h-8 flex-none items-center gap-1.5 bg-(--secondary) pl-3 text-ui text-(--text-secondary) [&_svg]:text-(--text-tertiary)">
+      <div className="doc-file-row flex h-9 flex-none items-center gap-1.5 border-b border-(--border) pl-3 text-ui text-(--text-tertiary) [&_svg]:text-(--text-tertiary)">
         {expanded ? (
           <ChevronDown width={10} height={10} />
         ) : (
           <ChevronRight width={10} height={10} />
         )}
         <FileText width={14} height={14} />
-        {file.path}
+        <span className="min-w-0 truncate">
+          <span className="font-medium text-(--foreground)">{baseName(file.path)}</span>
+          {dirName(file.path) !== '' && <span className="ml-1.5">{dirName(file.path)}</span>}
+        </span>
         <span className="flex text-(--text-tertiary)">
           <Eye width={14} height={14} />
         </span>
@@ -139,7 +151,7 @@ export function DiffFileBlock({
               const wordDiff = wordDiffs[hi];
               return (
                 <div key={hunk.header}>
-                  <div className="diff-hunk-head border-y border-(--border) bg-(--secondary) pl-14 font-mono text-caption leading-5 text-(--text-secondary)">
+                  <div className="diff-hunk-head bg-(--secondary) pl-18 font-mono text-caption leading-6 text-(--text-tertiary) [font-variant-ligatures:none]">
                     {hunk.header}
                   </div>
                   {hunk.lines.map((line, i) => {
@@ -161,7 +173,7 @@ export function DiffFileBlock({
                         <span data-no="new" className={`${DIFF_NO} w-5`}>
                           {line.newNo ?? ''}
                         </span>
-                        <span className="w-3 flex-none text-center text-(--diff-add-fg)">
+                        <span className="sr-only">
                           {line.kind === 'add' ? '+' : line.kind === 'del' ? '-' : ''}
                         </span>
                         <span className="pl-2 whitespace-pre">
@@ -198,14 +210,13 @@ export function DiffFileBlock({
                     <span data-no="new" className={`${DIFF_NO} w-5`}>
                       {i + 1}
                     </span>
-                    <span className="w-3 flex-none text-center text-(--diff-add-fg)" />
                     <span className="pl-2 whitespace-pre">{text}</span>
                   </div>
                 ))}
             </div>
           )}
           {(full.kind === 'loading' || full.kind === 'error' || full.kind === 'binary') && (
-            <div className="py-2 pr-3 pl-14 font-mono text-caption leading-4 text-(--text-tertiary)">
+            <div className="py-2 pr-3 pl-18 font-mono text-caption leading-4 text-(--text-tertiary)">
               {full.kind === 'loading'
                 ? t('加载中…')
                 : full.kind === 'error'
@@ -354,7 +365,7 @@ function VersionControl({
 function docBlockClass(kind: string, first: boolean): string {
   const base = 'text-card-title leading-6 break-words text-(--foreground)';
   if (kind === 'para') return `${base}${first ? '' : ' mt-2'}`;
-  if (kind === 'bullet') return `${base} pl-4 [text-indent:-12px]`;
+  if (kind === 'bullet') return `${base} relative mt-1 pl-4`;
   return `${base} ${first ? 'mt-0' : 'mt-6'} mb-1.5 text-meta font-medium tracking-[0.02em] text-(--text-tertiary)`;
 }
 
@@ -483,7 +494,12 @@ export function DocPane({
                 key={i}
                 className={cn(`doc-block--${block.kind}`, docBlockClass(block.kind, i === 0))}
               >
-                {block.kind === 'bullet' ? '• ' : ''}
+                {block.kind === 'bullet' && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute top-2.5 left-1 size-1 rounded-full bg-(--text-tertiary)"
+                  />
+                )}
                 <Segments segments={block.segments} codeClassName="doc-code" />
               </p>
             ))}

@@ -215,7 +215,7 @@ test('Stop preserves changes without a dialog and cancelled tools show cancelled
   await expect(page.getByTestId('work-cancelled')).toBeVisible();
   await expect(page.getByTestId('work-cancelled')).toHaveText('已取消');
   await expect(page.getByTestId('work-spinner')).toHaveCount(0);
-  await expect(page.getByTestId('doc-pane').getByText('src/kept.ts')).toBeVisible();
+  await expect(page.getByTestId('doc-pane').getByText('kept.ts', { exact: true })).toBeVisible();
 });
 
 test('Escape stops and a second Escape queues the draft after cancellation', async ({ page }) => {
@@ -255,7 +255,7 @@ test('kept changes after Stop do not expose discard', async ({ page }) => {
   await expect.poll(() => task.stops).toEqual([{ discard: false }]);
   task.finish('stopped');
   await page.reload();
-  await expect(page.getByTestId('doc-pane').getByText('src/kept.ts')).toBeVisible();
+  await expect(page.getByTestId('doc-pane').getByText('kept.ts', { exact: true })).toBeVisible();
   await page.getByTestId('detail-head').getByRole('button', { name: '更多' }).click();
   await expect(page.getByTestId('discard-changes')).toHaveCount(0);
   await expect(page.getByRole('dialog')).toHaveCount(0);

@@ -857,7 +857,7 @@ export const EN: Record<string, string> = {
   // 上）。#1236：完成弹层的勾选分流反馈四串（合并委派回执 / 不合并完成回
   // 执 / 目标缺位报错 / 不合并腿兜底句）＋ failed 卡勾选锁定行。
   '缺少「{tools}」授权，无法合并。请在该 Agent 的权限里开启。':
-    'Missing the "{tools}" permission, so this merge cannot go through. Turn it on in the agent’s permissions.',
+    'Missing the “{tools}” permission, so this merge cannot go through. Turn it on in the agent’s permissions.',
   '合并请求未送出，请重试。': 'The merge request was not sent. Try again.',
   '完成请求未送出，请重试。': 'The completion request was not sent. Try again.',
   '任务数据未就绪，完成请求未送出。请刷新页面后重试。':
@@ -1182,6 +1182,7 @@ export const EN: Record<string, string> = {
   // shared canon（packages/shared/src/records/agent.ts、memory.ts），经 t()
   // 消费、不作字面量出现——i18n-coverage COMPUTED_KEYS 登记。
   合并分支: 'Merge branches',
+  '、': ', ',
   创建标签: 'Create tags',
   推送分支: 'Push branches',
   创建技能: 'Create skills',
