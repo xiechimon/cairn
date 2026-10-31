@@ -1,15 +1,3 @@
-// Shared app sidebar (issue #129): the single BoardSidebar call site every
-// route family renders, so the rail keeps identical geometry and behavior
-// across /app ↔ /app/team ↔ resources ↔ detail hops — the collapse state
-// online dot, the attention badge and the ⌘K search row all derive the
-// same way everywhere. Routes that mount their own SearchPanel (board and
-// detail: their fixture ui.searchOpen open states drive the fixture rows)
-// pass searchPanel={false} + their own onSearch opener; every other shell
-// rides the internal panel, which renders nothing while closed.
-// with their own dialog (board / project) pass onNewTask and keep their
-// page-anchored save semantics; every other route rides the internal
-// global dialog (useNewTaskSurface, live save path shared with the board).
-
 import { PanelLeft } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useLocation } from 'react-router';
