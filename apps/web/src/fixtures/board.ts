@@ -251,9 +251,9 @@ export const sidebarProjectIcons: FixtureSet = {
     'sidebar-project-d': 'P4',
   },
   projectAvatars: {
-    [PROJECT_ID]: { icon: 'flask-conical', color: 'plum' },
+    [PROJECT_ID]: { icon: 'flask-conical', color: 'moss' },
     [SIDEBAR_PROJECT_B]: { icon: 'rocket', color: 'amber' },
-    'sidebar-project-c': { icon: 'database', color: 'gray' },
+    'sidebar-project-c': { icon: 'database', color: 'slate' },
   },
 };
 
