@@ -93,3 +93,16 @@ describe('translate', () => {
     expect(translate('en', DICT, '工作台', { n: 1 })).toBe('Workbench');
   });
 });
+
+describe('translate plural form', () => {
+  const PLURAL = { '跑了 {n} 条命令': 'Ran {n#1 command|# commands}' };
+
+  it('picks the singular for 1 and the plural otherwise, with # standing for the value', () => {
+    expect(translate('en', PLURAL, '跑了 {n} 条命令', { n: 1 })).toBe('Ran 1 command');
+    expect(translate('en', PLURAL, '跑了 {n} 条命令', { n: 3 })).toBe('Ran 3 commands');
+  });
+
+  it('leaves zh renders on the plain placeholder', () => {
+    expect(translate('zh', PLURAL, '跑了 {n} 条命令', { n: 3 })).toBe('跑了 3 条命令');
+  });
+});

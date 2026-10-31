@@ -1,27 +1,18 @@
 import { cn } from 'cn';
-import type { ComponentType, ReactNode, SVGProps } from 'react';
+import { type ReactNode, useState } from 'react';
+import { useI18n } from '../../i18n/provider.js';
+import { Check, X } from '../../icons/index.js';
 import {
-  Check,
-  FileText,
-  GitBranch,
-  Puzzle,
-  Search,
-  Sparkle,
-  SquarePen,
-  Terminal,
-  X,
-} from '../../icons/index.js';
-import { CODE_PILL_CLS } from '../code-pill.js';
-import {
-  Trace,
-  TraceCollapsible,
-  TraceCollapsibleContent,
-  TraceCollapsibleTrigger,
-  TraceDescription,
-  TraceIcon,
-  TraceLine,
-  TraceTitle,
-} from '../ui/trace.js';
+  EMPTY_TRACE_COUNTS,
+  TraceCard,
+  TraceCommandBox,
+  type TraceCounts,
+  TraceFailTag,
+  TraceGroupSummary,
+  TraceOutput,
+  TraceRowButton,
+  traceSummary,
+} from './trace-parts.js';
 
 export type TraceStep =
   | { kind: 'think'; text: string; secs: number }
@@ -43,240 +34,323 @@ export type TraceStep =
 
 export type TraceDensity = 'comfortable' | 'compact';
 
-type Icon = ComponentType<SVGProps<SVGSVGElement>>;
+type ActionStep = Exclude<TraceStep, { kind: 'say' | 'wait' | 'check' }>;
 
-const LINE: Record<TraceDensity, string> = {
-  comfortable: 'text-ui text-content-secondary',
-  compact: 'text-meta leading-5 text-content-secondary',
-};
+export interface TraceStepItem {
+  id: number | string;
+  step: TraceStep;
+}
 
-const RUNNING_VERB =
-  'data-running:[&_[data-trace-verb]]:shimmer motion-reduce:data-running:[&_[data-trace-verb]]:shimmer-none';
+function isAction(step: TraceStep): step is ActionStep {
+  return step.kind !== 'say' && step.kind !== 'wait' && step.kind !== 'check';
+}
+
+function isRunning(step: ActionStep): boolean {
+  if (step.kind === 'run') return step.exit == null;
+  if (step.kind === 'tool') return step.status === 'running';
+  return false;
+}
+
+function isFailed(step: ActionStep): boolean {
+  if (step.kind === 'run') return step.exit != null && step.exit !== 0;
+  if (step.kind === 'tool') return step.status === 'failed';
+  return false;
+}
+
+export function traceCounts(steps: TraceStep[]): TraceCounts {
+  const counts = { ...EMPTY_TRACE_COUNTS };
+  for (const step of steps) {
+    if (!isAction(step)) continue;
+    counts[step.kind] += 1;
+    if (isFailed(step)) counts.failed += 1;
+  }
+  return counts;
+}
 
 export function TraceCode({ children }: { children: ReactNode }) {
-  return <code className={CODE_PILL_CLS}>{children}</code>;
+  return <span className="font-medium text-(--foreground)">{children}</span>;
 }
 
-function Meta({ children, className }: { children: ReactNode; className?: string }) {
-  return <span className={cn('text-meta text-content-tertiary', className)}>{children}</span>;
+function Secs({ secs }: { secs: number | undefined }) {
+  if (secs == null || secs <= 0) return null;
+  return <span className="text-caption text-(--text-tertiary)">{secs}s</span>;
 }
 
-export function TraceFailed({ label }: { label: string }) {
+function Diff({ added, removed }: { added: number; removed: number }) {
   return (
-    <span className="inline-flex items-center gap-1 text-meta font-medium text-destructive">
-      <X className="size-3.5" />
-      {label}
+    <span className="font-mono text-caption font-medium">
+      <span className="text-running-text">+{added}</span>{' '}
+      <span className="text-destructive">−{removed}</span>
     </span>
   );
 }
 
-function ExitBadge({ exit }: { exit: number }) {
-  if (exit !== 0) return <TraceFailed label={`exit ${exit}`} />;
-  return (
-    <span className="inline-flex items-center gap-1 text-meta font-medium text-running-text">
-      <Check className="size-3.5" />
-      exit 0
-    </span>
-  );
+function RowDetail({ children }: { children: ReactNode }) {
+  return <div className="px-3 pb-3">{children}</div>;
 }
 
-function ToolLine({
-  icon: Glyph,
-  density,
-  failed = false,
-  running = false,
-  children,
-  secs,
-  trailing,
-}: {
-  icon?: Icon;
-  density: TraceDensity;
-  failed?: boolean;
-  running?: boolean;
-  children: ReactNode;
-  secs?: number | undefined;
-  trailing?: ReactNode;
-}) {
-  return (
-    <TraceLine data-running={running ? '' : undefined} className={cn(LINE[density], RUNNING_VERB)}>
-      {Glyph != null && (
-        <TraceIcon className={failed ? 'text-destructive' : undefined}>
-          <Glyph />
-        </TraceIcon>
-      )}
-      <TraceTitle>{children}</TraceTitle>
-      {trailing}
-      {secs != null && secs > 0 && <TraceDescription>{secs}s</TraceDescription>}
-    </TraceLine>
-  );
-}
-
-export function TraceStepLine({
-  step,
-  density = 'comfortable',
-  failedLabel = 'Failed',
-}: {
-  step: TraceStep;
-  density?: TraceDensity;
-  failedLabel?: string;
-}) {
-  const line = LINE[density];
+function ActionRow({ step, compact }: { step: ActionStep; compact: boolean }) {
+  const { t } = useI18n();
+  const [open, setOpen] = useState(isFailed(step));
+  const running = isRunning(step);
+  const common = { compact, running } as const;
   switch (step.kind) {
-    case 'say':
-      return <p className="m-0 py-1 text-card-title leading-6 text-foreground">{step.text}</p>;
-    case 'wait':
-      return (
-        <TraceLine className={cn(line, 'text-content-tertiary')}>
-          <TraceTitle>{step.text}</TraceTitle>
-        </TraceLine>
-      );
     case 'think':
       return (
-        <TraceCollapsible>
-          <TraceCollapsibleTrigger className={line}>
-            <TraceLine className={line}>
-              <TraceIcon className="text-content-tertiary">
-                <Sparkle />
-              </TraceIcon>
-              <TraceTitle className="text-content-tertiary italic">
-                Thought for {step.secs}s
-              </TraceTitle>
-            </TraceLine>
-          </TraceCollapsibleTrigger>
-          <TraceCollapsibleContent className="text-meta italic">
-            {step.text}
-          </TraceCollapsibleContent>
-        </TraceCollapsible>
-      );
-    case 'search':
-      return (
-        <ToolLine
-          icon={Search}
-          density={density}
-          secs={step.secs}
-          trailing={<Meta>{step.hits} results</Meta>}
-        >
-          Searched <TraceCode>{step.query}</TraceCode>
-        </ToolLine>
+        <div>
+          <TraceRowButton
+            {...common}
+            verb={t('思考了')}
+            target={`${step.secs}s`}
+            expandable
+            open={open}
+            onClick={() => setOpen((v) => !v)}
+          />
+          {open && (
+            <RowDetail>
+              <p className="m-0 text-meta leading-5 text-(--text-secondary) italic">{step.text}</p>
+            </RowDetail>
+          )}
+        </div>
       );
     case 'read':
       return (
-        <ToolLine
-          icon={FileText}
-          density={density}
-          secs={step.secs}
-          trailing={<Meta>{step.lines} lines</Meta>}
-        >
-          Read <TraceCode>{step.path}</TraceCode>
-        </ToolLine>
+        <TraceRowButton
+          {...common}
+          verb={t('读取了')}
+          target={step.path}
+          trailing={<Secs secs={step.secs} />}
+        />
+      );
+    case 'search':
+      return (
+        <TraceRowButton
+          {...common}
+          verb={t('搜索了')}
+          target={step.query}
+          trailing={<Secs secs={step.secs} />}
+        />
       );
     case 'edit':
       return (
-        <ToolLine
-          icon={SquarePen}
-          density={density}
-          secs={step.secs}
+        <TraceRowButton
+          {...common}
+          verb={t('修改了')}
+          target={step.path}
           trailing={
-            <span className="font-mono text-caption font-medium tabular-nums">
-              <span className="text-running-text">+{step.added}</span>{' '}
-              <span className="text-destructive">−{step.removed}</span>
-            </span>
+            <>
+              <Diff added={step.added} removed={step.removed} />
+              <Secs secs={step.secs} />
+            </>
           }
-        >
-          Edited <TraceCode>{step.path}</TraceCode>
-        </ToolLine>
+        />
       );
     case 'push':
       return (
-        <ToolLine
-          icon={GitBranch}
-          density={density}
-          secs={step.secs}
-          trailing={<Meta className="font-mono text-caption">{step.commit}</Meta>}
-        >
-          Pushed <TraceCode>{step.branch}</TraceCode>
-        </ToolLine>
+        <TraceRowButton
+          {...common}
+          verb={t('推送了')}
+          target={step.branch}
+          trailing={
+            <>
+              <span className="font-mono text-caption">{step.commit}</span>
+              <Secs secs={step.secs} />
+            </>
+          }
+        />
       );
     case 'tool':
       return (
-        <ToolLine
-          icon={Puzzle}
-          density={density}
-          running={step.status === 'running'}
-          failed={step.status === 'failed'}
-          secs={step.secs}
-          trailing={step.status === 'failed' ? <TraceFailed label={failedLabel} /> : undefined}
-        >
-          {step.verb != null && <span data-trace-verb="">{step.verb} </span>}
-          <TraceCode>{step.name}</TraceCode>
-        </ToolLine>
+        <TraceRowButton
+          {...common}
+          verb={step.verb ?? t(running ? '正在调用' : '调用了')}
+          target={step.name}
+          trailing={
+            <>
+              {step.status === 'failed' && <TraceFailTag>{t('失败')}</TraceFailTag>}
+              <Secs secs={step.secs} />
+            </>
+          }
+        />
       );
-    case 'run': {
-      const head = (
-        <ToolLine
-          icon={Terminal}
-          density={density}
-          running={step.exit == null}
-          failed={step.exit != null && step.exit !== 0}
-          secs={step.secs}
-          trailing={step.exit == null ? undefined : <ExitBadge exit={step.exit} />}
-        >
-          <span data-trace-verb="">{step.exit == null ? 'Running' : 'Ran'} </span>
-          <TraceCode>{step.command}</TraceCode>
-        </ToolLine>
-      );
-      if (step.output.length === 0) return head;
+    case 'run':
       return (
-        <TraceCollapsible defaultOpen={step.exit != null && step.exit !== 0}>
-          <TraceCollapsibleTrigger className={line}>{head}</TraceCollapsibleTrigger>
-          <TraceCollapsibleContent className="font-mono text-caption leading-5 not-italic">
-            {step.output.map((out) => (
-              <div key={out} className={step.exit === 0 ? '' : 'text-destructive'}>
-                {out}
-              </div>
-            ))}
-          </TraceCollapsibleContent>
-        </TraceCollapsible>
-      );
-    }
-    case 'check':
-      return (
-        <div
-          className={cn(
-            'flex w-fit items-center gap-1.5 rounded-full py-0.5 pr-2.5 pl-1 text-meta font-medium',
-            step.ok
-              ? 'bg-(--chip-done-bg) text-(--chip-done-fg)'
-              : 'bg-danger-soft text-destructive',
+        <div>
+          <TraceRowButton
+            {...common}
+            verb={t(running ? '正在运行' : '运行了')}
+            target={step.command}
+            mono
+            expandable
+            open={open}
+            onClick={() => setOpen((v) => !v)}
+            trailing={
+              <>
+                {isFailed(step) && <TraceFailTag>{`exit ${step.exit}`}</TraceFailTag>}
+                <Secs secs={step.secs} />
+              </>
+            }
+          />
+          {open && (
+            <RowDetail>
+              <TraceCommandBox command={step.command} />
+              {step.output.length > 0 && (
+                <TraceOutput className={isFailed(step) ? 'text-destructive' : undefined}>
+                  {step.output.join('\n')}
+                </TraceOutput>
+              )}
+            </RowDetail>
           )}
-        >
-          <span
-            className={cn(
-              'flex size-4 items-center justify-center rounded-full text-(--switch-thumb)',
-              step.ok ? 'bg-running-bar' : 'bg-destructive',
-            )}
-          >
-            {step.ok ? <Check className="size-3" /> : <X className="size-3" />}
-          </span>
-          {step.label}
         </div>
       );
   }
 }
 
-export function TraceSteps({
+export function TraceRows({
   steps,
   density = 'comfortable',
   className,
+  ...props
 }: {
-  steps: { id: number | string; step: TraceStep }[];
+  steps: TraceStepItem[];
   density?: TraceDensity;
+  className?: string;
+  'data-testid'?: string;
+}) {
+  return (
+    <TraceCard className={className} {...props}>
+      {steps.map(({ id, step }) =>
+        isAction(step) ? <ActionRow key={id} step={step} compact={density === 'compact'} /> : null,
+      )}
+    </TraceCard>
+  );
+}
+
+export function TraceGroup({
+  steps,
+  density = 'comfortable',
+  defaultOpen = false,
+  open: controlledOpen,
+  onOpenChange,
+  summaryTestId,
+  cardTestId,
+  className,
+}: {
+  steps: TraceStepItem[];
+  density?: TraceDensity;
+  defaultOpen?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  summaryTestId?: string;
+  cardTestId?: string;
+  className?: string;
+}) {
+  const { t } = useI18n();
+  const [innerOpen, setInnerOpen] = useState(defaultOpen);
+  const open = controlledOpen ?? innerOpen;
+  const actions = steps.filter((s): s is TraceStepItem & { step: ActionStep } => isAction(s.step));
+  const counts = traceCounts(actions.map((s) => s.step));
+  const running = actions.some((s) => isRunning(s.step));
+  const { text, failed } = traceSummary(t, counts, running);
+  return (
+    <div className={cn('mb-3 min-w-0', className)}>
+      <TraceGroupSummary
+        summary={text}
+        failed={failed}
+        open={open}
+        running={running}
+        compact={density === 'compact'}
+        data-testid={summaryTestId}
+        onClick={() => {
+          const next = !open;
+          setInnerOpen(next);
+          onOpenChange?.(next);
+        }}
+      />
+      {open && <TraceRows steps={actions} density={density} data-testid={cardTestId} />}
+    </div>
+  );
+}
+
+function CheckChip({ label, ok }: { label: string; ok: boolean }) {
+  return (
+    <div
+      className={cn(
+        'flex w-fit items-center gap-1.5 rounded-full py-0.5 pr-2.5 pl-1 text-meta font-medium',
+        ok ? 'bg-(--chip-done-bg) text-(--chip-done-fg)' : 'bg-danger-soft text-destructive',
+      )}
+    >
+      <span
+        className={cn(
+          'flex size-4 items-center justify-center rounded-full text-(--switch-thumb)',
+          ok ? 'bg-running-bar' : 'bg-destructive',
+        )}
+      >
+        {ok ? <Check className="size-3" /> : <X className="size-3" />}
+      </span>
+      {label}
+    </div>
+  );
+}
+
+type Block =
+  | { type: 'group'; key: number | string; steps: TraceStepItem[] }
+  | { type: 'line'; key: number | string; step: Exclude<TraceStep, ActionStep> };
+
+function toBlocks(steps: TraceStepItem[]): Block[] {
+  const blocks: Block[] = [];
+  for (const item of steps) {
+    if (isAction(item.step)) {
+      const last = blocks.at(-1);
+      if (last?.type === 'group') last.steps.push(item);
+      else blocks.push({ type: 'group', key: item.id, steps: [item] });
+    } else blocks.push({ type: 'line', key: item.id, step: item.step });
+  }
+  return blocks;
+}
+
+export function TraceSteps({
+  steps,
+  density = 'comfortable',
+  defaultOpen = false,
+  className,
+}: {
+  steps: TraceStepItem[];
+  density?: TraceDensity;
+  defaultOpen?: boolean;
   className?: string;
 }) {
   return (
-    <Trace className={cn(density === 'compact' ? 'gap-1.5' : 'gap-2.5', className)}>
-      {steps.map(({ id, step }) => (
-        <TraceStepLine key={id} step={step} density={density} />
-      ))}
-    </Trace>
+    <div className={cn('flex min-w-0 flex-col', className)}>
+      {toBlocks(steps).map((block) => {
+        if (block.type === 'group')
+          return (
+            <TraceGroup
+              key={block.key}
+              steps={block.steps}
+              density={density}
+              defaultOpen={defaultOpen}
+            />
+          );
+        const { step } = block;
+        if (step.kind === 'say')
+          return (
+            <p key={block.key} className="m-0 mb-3 text-card-title leading-6 text-foreground">
+              {step.text}
+            </p>
+          );
+        if (step.kind === 'wait')
+          return (
+            <p key={block.key} className="m-0 mb-3 text-ui leading-6 text-(--text-tertiary)">
+              {step.text}
+            </p>
+          );
+        return (
+          <div key={block.key} className="mb-3">
+            <CheckChip label={step.label} ok={step.ok} />
+          </div>
+        );
+      })}
+    </div>
   );
 }

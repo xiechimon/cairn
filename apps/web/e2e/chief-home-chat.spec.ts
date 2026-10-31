@@ -86,7 +86,7 @@ test.describe('home is one continuous chief chat (T1)', () => {
     const handoff = stream.getByTestId('chief-handoff');
     await expect(handoff).toContainText('已转给任务');
     await expect(handoff).toContainText('#9');
-    const expand = stream.getByRole('button', { name: '展开过程' }).first();
+    const expand = stream.getByTestId('chief-tools-toggle').first();
     await expand.click();
     await expect(stream.getByTestId('chief-turn-tools').first()).toBeVisible();
     await evidenceShot(page, 'home-chat.png');

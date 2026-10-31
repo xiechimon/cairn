@@ -149,13 +149,12 @@ function thinkingRow(page: Page) {
   return page.getByTestId('work-think');
 }
 
-test('T1: thinking shares a work block with a compact row and no avatar overlap', async ({ page }) => {
+test('T1: thinking shares a work block with the other rows at the 36px row height', async ({ page }) => {
   await stubWorld(page);
   const row = thinkingRow(page);
   await expect(row).toHaveCount(1);
   const height = await row.evaluate((el) => el.getBoundingClientRect().height);
-  expect(height).toBeGreaterThanOrEqual(26);
-  expect(height).toBeLessThanOrEqual(28);
+  expect(height).toBe(36);
   await expect(page.getByTestId('work-summary')).toContainText('思考 1 次');
 });
 
@@ -173,7 +172,7 @@ test('T3: the long preview stays on one line and hides while full thinking is op
   const row = thinkingRow(page);
   await expect(page.getByTestId('thinking-body')).toHaveCount(0);
   const collapsedHeight = await row.evaluate((el) => el.getBoundingClientRect().height);
-  expect(collapsedHeight).toBeLessThanOrEqual(28);
+  expect(collapsedHeight).toBe(36);
   await row.click();
   await expect(page.getByTestId('thinking-body')).toHaveText(LONG_THINKING);
   await expect(row.locator('.work-preview')).toBeHidden();
