@@ -333,7 +333,7 @@ describe('M5 web E2E: main sequence full chain (01 §7.4 spine, zero UI reload)'
         timeout: 30_000,
       }),
     );
-    await pexpect(page.locator('.doc-pane-select').nth(1)).toHaveText(/v1/, {
+    await pexpect(page.locator('.doc-range-wrap .doc-pane-select')).toHaveText(/v1/, {
       timeout: 30_000,
     });
 
@@ -402,7 +402,7 @@ describe('M5 web E2E: main sequence full chain (01 §7.4 spine, zero UI reload)'
         timeout: 30_000,
       }),
     );
-    await pexpect(page.locator('.doc-pane-select').nth(1)).toHaveText(/v2/, {
+    await pexpect(page.locator('.doc-range-wrap .doc-pane-select')).toHaveText(/v2/, {
       timeout: 30_000,
     });
 

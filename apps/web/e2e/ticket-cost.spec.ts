@@ -136,8 +136,7 @@ const card = (page: Page, todoId: string) => page.locator(`[data-todo-id="${todo
 
 async function openTokenSection(page: Page, todoId: string) {
   await page.goto(`/app/todo/${todoId}`);
-  await page.locator('.doc-select-wrap .doc-pane-select').click();
-  await page.getByRole('menuitemradio', { name: 'Token 用量' }).click();
+  await page.getByTestId('pane-tab-token').click();
   return page.getByTestId('detail-right').getByRole('group', { name: '花费' });
 }
 

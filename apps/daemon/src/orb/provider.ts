@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
+import { constants } from 'node:os';
 import { dirname } from 'node:path';
 import type { WorkspaceHookNoteData } from '@cairn/shared';
 import { ensurePrivateDir, writePrivateFile } from '../private-fs.js';
@@ -82,7 +83,9 @@ export const runOrbCommand: OrbCommandRunner = (argv, options = {}) =>
     options.onInput?.((data) => child.stdin.write(data));
     if (options.input !== undefined) child.stdin.write(options.input);
     if (!options.onInput) child.stdin.end();
-    child.on('close', (code) => resolve({ code: code ?? 1, stdout, stderr }));
+    child.on('close', (code, signal) =>
+      resolve({ code: code ?? (signal ? 128 + constants.signals[signal] : 1), stdout, stderr }),
+    );
   });
 
 export function orbNote(output: string, ms = 0): WorkspaceHookNoteData {

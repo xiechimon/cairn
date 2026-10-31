@@ -112,12 +112,12 @@ test('settings: name and description edits reach PATCH; description clear writes
   await page.getByRole('button', { name: '保存描述' }).click();
   await descRefetched;
   await expect(descInput).toHaveValue('迁移期的主项目');
-  await expect(stub.patches.length).toBe(2);
+  await expect.poll(() => stub.patches.length).toBe(2);
   expect(stub.patches[1]?.body).toEqual({ description: '迁移期的主项目' });
 
   await descInput.fill('');
   await page.getByRole('button', { name: '保存描述' }).click();
-  await expect(stub.patches.length).toBe(3);
+  await expect.poll(() => stub.patches.length).toBe(3);
   expect(stub.patches[2]?.raw).toContain('"description":null');
 });
 

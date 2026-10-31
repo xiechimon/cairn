@@ -7,7 +7,17 @@ export const NOTIFICATION_TYPES = [
   'chief_message',
   'quota_wait',
   'model_fallback',
+  'todo_done',
+  'todo_failed',
+  'schedule_run',
+  'marked_unread',
 ] as const;
+export const SILENT_NOTIFICATION_TYPES: readonly NotificationType[] = [
+  'todo_done',
+  'todo_failed',
+  'schedule_run',
+  'marked_unread',
+];
 export const notificationTypeSchema = z.enum(NOTIFICATION_TYPES);
 export type NotificationType = z.infer<typeof notificationTypeSchema>;
 

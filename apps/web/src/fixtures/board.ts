@@ -204,6 +204,17 @@ export const sidebarThreads: FixtureSet = {
   now: r7(13, 55),
 };
 
+export const sidebarUnread: FixtureSet = {
+  ...boardDefault,
+  projectNames: { [PROJECT_ID]: 'P1' },
+  todos: [
+    repoFilterProbe('sidebar-unread-a', 81, 'unread thread A', 'done', PROJECT_ID, []),
+    repoFilterProbe('sidebar-unread-b', 82, 'read thread B', 'done', PROJECT_ID, []),
+  ],
+  unreadThreadIds: ['sidebar-unread-a'],
+  now: r7(13, 55),
+};
+
 export const sidebarThreadStatuses: FixtureSet = {
   ...boardDefault,
   projectNames: { [PROJECT_ID]: 'P1' },

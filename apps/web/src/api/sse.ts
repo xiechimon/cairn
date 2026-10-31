@@ -5,7 +5,7 @@ import type {
   NotificationRecord,
   TranscriptRow,
 } from '@cairn/shared';
-import { isChiefConversationId } from '@cairn/shared';
+import { isChiefConversationId, SILENT_NOTIFICATION_TYPES } from '@cairn/shared';
 import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { readNotifyPref } from '../board/notify-pref.js';
@@ -81,6 +81,7 @@ async function showViaServiceWorker(
 
 function fireDesktopNotification(record: NotificationRecord): void {
   if (!document.hidden) return;
+  if (record.readAt !== null || SILENT_NOTIFICATION_TYPES.includes(record.type)) return;
   if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
   if (readNotifyPref(safeLocalStorage()) === 'off') return;
   const t = (source: string) => translate(readStoredLocale(safeLocalStorage()), EN, source);

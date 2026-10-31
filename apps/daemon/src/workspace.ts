@@ -65,6 +65,7 @@ export interface WorkspaceManagerOpts {
   logger: DaemonLogger;
   orphanTtlMs?: number;
   hookTimeoutMs?: number;
+  seedRoot?: string;
 }
 
 export class WorkspaceManager implements WorktreeOps {
@@ -72,9 +73,11 @@ export class WorkspaceManager implements WorktreeOps {
   private readonly logger: DaemonLogger;
   private readonly orphanTtlMs: number;
   private readonly hookTimeoutMs: number;
+  private readonly seedRoot: string | undefined;
 
   constructor(opts: WorkspaceManagerOpts) {
     this.logger = opts.logger;
+    this.seedRoot = opts.seedRoot;
     this.orphanTtlMs = opts.orphanTtlMs ?? ORPHAN_WORKTREE_TTL_MS;
     this.hookTimeoutMs = opts.hookTimeoutMs ?? WORKSPACE_HOOK_TIMEOUT_MS;
   }
@@ -96,20 +99,22 @@ export class WorkspaceManager implements WorktreeOps {
 
   async prepare(input: WorktreePrepareInput): Promise<PreparedWorkspace> {
     return this.withProjectLock(input.projectId, async () => {
+      const seed = this.seedRoot ? join(this.seedRoot, input.projectId, 'repo') : null;
+      const cloneUrl = seed && input.repoKind === 'local' ? seed : input.cloneUrl;
       const branch = conversationBranch(input.conversationId);
       const baseRepoDir = join(input.workspacesRoot, input.projectId, 'repo');
       const convDir = join(input.workspacesRoot, input.conversationId);
 
       if (input.repoKind === 'local') {
-        if (!existsSync(input.cloneUrl)) {
-          throw new LocalRepoUnreachableError(input.cloneUrl, 'not_found');
+        if (!existsSync(cloneUrl)) {
+          throw new LocalRepoUnreachableError(cloneUrl, 'not_found');
         }
-        if (!(await gitPrim.isGitDir(input.cloneUrl))) {
-          throw new LocalRepoUnreachableError(input.cloneUrl, 'not_git');
+        if (!(await gitPrim.isGitDir(cloneUrl))) {
+          throw new LocalRepoUnreachableError(cloneUrl, 'not_git');
         }
       }
 
-      const credFallback = input.machineCredentialFallback === true;
+      const credFallback = !this.seedRoot && input.machineCredentialFallback === true;
       let credentialSource: GitCredentialSource = 'integration';
       const runNet = async (
         what: string,
@@ -131,12 +136,22 @@ export class WorkspaceManager implements WorktreeOps {
       };
       if (!existsSync(join(baseRepoDir, '.git')) && !isBareish(baseRepoDir)) {
         let fromLocal = false;
-        if (input.localPath != null && input.localPath !== '') {
-          const verdict = await localSourceUsable(input.localPath, input.cloneUrl);
+        if (seed && existsSync(seed)) {
+          await gitPrim.clone(seed, baseRepoDir, null);
+          await gitPrim.setRemoteUrl(baseRepoDir, cloneUrl);
+          await runNet('fetch', (cred) =>
+            withGitNetRetries(() => gitPrim.fetch(baseRepoDir, cred)),
+          );
+          await gitPrim.remoteSetHeadAuto(baseRepoDir, input.credentials);
+          this.logger.workspace('Repo source: orb seed');
+          fromLocal = true;
+        }
+        if (!fromLocal && !this.seedRoot && input.localPath != null && input.localPath !== '') {
+          const verdict = await localSourceUsable(input.localPath, cloneUrl);
           if (verdict.ok) {
             try {
               await gitPrim.clone(input.localPath, baseRepoDir, null);
-              await gitPrim.setRemoteUrl(baseRepoDir, input.cloneUrl);
+              await gitPrim.setRemoteUrl(baseRepoDir, cloneUrl);
               const fetchSource = await runNet('fetch', (cred) =>
                 withGitNetRetries(() => gitPrim.fetch(baseRepoDir, cred)),
               );
@@ -159,19 +174,19 @@ export class WorkspaceManager implements WorktreeOps {
           }
         }
         if (!fromLocal) {
-          const label = repoLabel(input.cloneUrl);
+          const label = repoLabel(cloneUrl);
           const defaultBranchGuess = 'main';
           this.logger.workspace(`Cloning ${label} (branch: ${defaultBranchGuess})`);
           await runNet(
             'clone',
-            (cred) => withGitNetRetries(() => gitPrim.clone(input.cloneUrl, baseRepoDir, cred)),
+            (cred) => withGitNetRetries(() => gitPrim.clone(cloneUrl, baseRepoDir, cred)),
             () => rmSync(baseRepoDir, { recursive: true, force: true }),
           );
         }
       } else {
         const origin = await gitPrim.originConfigUrl(baseRepoDir);
-        if (origin !== null && origin !== input.cloneUrl) {
-          await gitPrim.setRemoteUrl(baseRepoDir, input.cloneUrl);
+        if (origin !== null && origin !== cloneUrl) {
+          await gitPrim.setRemoteUrl(baseRepoDir, cloneUrl);
           this.logger.workspace('Repo origin re-pointed to the project clone URL');
         }
         await runNet('fetch', (cred) => withGitNetRetries(() => gitPrim.fetch(baseRepoDir, cred)));

@@ -6,8 +6,8 @@ import { Badge } from '../components/ui/badge.js';
 import { Label } from '../components/ui/label.js';
 import type { BuildOverlayContent, PaneView, RunHistoryRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { BarChart3, Check, Download, History, X } from '../icons/index.js';
-import { type DocTypeLabel, PaneTypeSelect } from '../overlay/plan-dropdown.js';
+import { Check, X } from '../icons/index.js';
+import { type DocTypeLabel, PaneTabs } from '../overlay/plan-dropdown.js';
 import { BranchSyncFields, READONLY_BOX, SyncButton, useBranchSyncState } from './branch-dialog.js';
 import { PANE_HEAD } from './docpane.js';
 
@@ -18,11 +18,10 @@ interface PaneSelectProps {
   onView: (view: PaneView) => void;
 }
 
-function SectionHead({ icon, select }: { icon: ReactNode; select: PaneSelectProps }) {
+function SectionHead({ select }: { select: PaneSelectProps }) {
   return (
     <header className={PANE_HEAD}>
-      {icon}
-      <PaneTypeSelect
+      <PaneTabs
         view={select.view}
         docLabel={select.docLabel}
         sections={select.sections}
@@ -65,7 +64,7 @@ function TokenSection({
     : [];
   return (
     <section className="flex min-h-0 flex-1 flex-col">
-      <SectionHead icon={<BarChart3 width={14} height={14} />} select={select} />
+      <SectionHead select={select} />
       <div className="pane-section-body min-h-0 flex-1 overflow-y-auto">
         <div className="flex h-15 items-baseline justify-between border-b border-b-(--border) px-4">
           <span className="text-page font-semibold tabular-nums text-(--foreground)">
@@ -128,7 +127,7 @@ function HistorySection({
   const { t } = useI18n();
   return (
     <section className="flex min-h-0 flex-1 flex-col">
-      <SectionHead icon={<History width={14} height={14} />} select={select} />
+      <SectionHead select={select} />
       <div className="pane-section-body min-h-0 flex-1 overflow-y-auto">
         <div className="px-4 pt-6 pb-6">
           {content.runs.map((run, index) => (
@@ -177,7 +176,7 @@ function BranchSection({
   const prNumber = buildQ.data?.prNumber ?? null;
   return (
     <section className="flex min-h-0 flex-1 flex-col">
-      <SectionHead icon={<Download width={14} height={14} />} select={select} />
+      <SectionHead select={select} />
       <div className="pane-section-body min-h-0 flex-1 overflow-y-auto">
         <div className="p-4">
           <BranchSyncFields

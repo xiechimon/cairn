@@ -1,7 +1,7 @@
 import { cn } from 'cn';
 import { createContext, useContext } from 'react';
 import { Link } from 'react-router';
-
+import { StatusGlyph } from '../components/status-glyph.js';
 import type { DocSegment, Phase } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { mentionChipClass } from '../overlay/mention-chip.js';
@@ -38,15 +38,8 @@ export const TodoGlanceContext = createContext<ReadonlyMap<string, TodoGlance> |
 
 export function TodoStatus({ phase }: { phase: Phase }) {
   const { t } = useI18n();
-  const { icon: Icon, ink } = PHASE_STATUS[phase];
-  return (
-    <Icon
-      role="img"
-      aria-label={t(PHASE_UI[phase].chip)}
-      strokeWidth={2}
-      className={cn('size-3 flex-none', ink)}
-    />
-  );
+  const { glyph, ink } = PHASE_STATUS[phase];
+  return <StatusGlyph kind={glyph} label={t(PHASE_UI[phase].chip)} className={cn('size-3', ink)} />;
 }
 
 function MentionChip({ seg }: { seg: DocSegment }) {

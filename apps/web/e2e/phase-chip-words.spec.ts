@@ -31,10 +31,10 @@ test('search rows: fresh reads `待开始`, review `审核`, done `已完成`', 
   await page.keyboard.type('probe');
   const rows = panel(page).locator('[data-row-kind="todo"]');
   await expect(rows).toHaveCount(3);
-  const chip = (title: string) => rows.filter({ hasText: title }).locator('[data-tone]');
-  await expect(chip(FRESH_TITLE)).toHaveText('待开始');
-  await expect(chip('r3 lifecycle probe」')).toHaveText('审核');
-  await expect(chip('r3 lifecycle probe2')).toHaveText('已完成');
+  const glyph = (title: string) => rows.filter({ hasText: title }).locator('[data-glyph]');
+  await expect(glyph(FRESH_TITLE)).toHaveAttribute('aria-label', '待开始');
+  await expect(glyph('r3 lifecycle probe」')).toHaveAttribute('aria-label', '审核');
+  await expect(glyph('r3 lifecycle probe2')).toHaveAttribute('aria-label', '已完成');
   await expect(panel(page).getByText('待处理', { exact: true })).toHaveCount(0);
 });
 

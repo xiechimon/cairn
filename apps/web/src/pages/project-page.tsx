@@ -25,6 +25,7 @@ import { relativeTime } from '../board/rel-time.js';
 import { EmptyState } from '../components/empty-state.js';
 import { SegmentedTabs } from '../components/segmented.js';
 import { CARD_RADIUS_CLS, SETTINGS_ROW_CLS, SettingsCard } from '../components/settings-list.js';
+import { StatusGlyph } from '../components/status-glyph.js';
 import { Badge } from '../components/ui/badge.js';
 import { Button } from '../components/ui/button.js';
 import { Card } from '../components/ui/card.js';
@@ -276,13 +277,16 @@ function isSettled(phase: Phase): boolean {
 
 function TaskStatus({ phase }: { phase: Phase }) {
   const { t } = useI18n();
-  const { icon: Icon, ink } = PHASE_STATUS[phase];
+  const { glyph, ink } = PHASE_STATUS[phase];
   return (
     <span
       data-testid="task-status"
-      className={cn('flex flex-none items-center gap-1 text-meta whitespace-nowrap', ink)}
+      className={cn(
+        'flex flex-none items-center gap-1 text-meta whitespace-nowrap',
+        PHASE_UI[phase].tone === 'confirm' ? ink : 'text-content-tertiary',
+      )}
     >
-      <Icon aria-hidden strokeWidth={1.75} className="size-3.25" />
+      <StatusGlyph kind={glyph} className={cn('size-3.25', ink)} />
       {t(PHASE_UI[phase].chip)}
     </span>
   );

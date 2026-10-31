@@ -51,7 +51,7 @@ import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { hasGithubConnection, teamGithubToken } from './github-connection.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
-import { notifyTodoPhase } from './notifications.js';
+import { isNotifiedPhase, notifyTodoPhase } from './notifications.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { assertPhaseTransition, canManualMovePhase } from './phase.js';
 import type { VapidKeys } from './push.js';
@@ -75,7 +75,7 @@ export interface TodoDeps {
 
 function notifyPhaseEntry(deps: TodoDeps, record: TodoRecord, from: Phase, to: Phase): void {
   if (from === to) return;
-  if (to === 'confirm' || to === 'review') notifyTodoPhase(deps, record, to);
+  if (isNotifiedPhase(to)) notifyTodoPhase(deps, record, to);
   triggerChiefWakes(deps, record, to);
   notifyThreadPhase(deps, record, to);
 }

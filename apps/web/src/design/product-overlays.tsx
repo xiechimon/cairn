@@ -1,3 +1,4 @@
+import { Play } from 'lucide-react';
 import { useId, useRef, useState } from 'react';
 import { DoneConfirmDialog } from '../board/done-confirm-dialog.js';
 import { ResetConfirmDialog } from '../board/reset-confirm-dialog.js';
@@ -5,7 +6,7 @@ import { Button } from '../components/ui/button.js';
 import { Kbd } from '../components/ui/kbd.js';
 import type { PaneView } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { EllipsisVertical, Search } from '../icons/index.js';
+import { EllipsisVertical, Search, Settings } from '../icons/index.js';
 import { AttachmentCard } from '../overlay/attachment-card.js';
 import { AttachmentPreview } from '../overlay/attachment-preview.js';
 import { ChipPopover } from '../overlay/chip-popover.js';
@@ -14,8 +15,8 @@ import { DeleteProjectConfirm } from '../overlay/delete-project-confirm.js';
 import { MentionInline } from '../overlay/mention-inline.js';
 import { MoreMenu } from '../overlay/more-menu.js';
 import { NewTaskDialog } from '../overlay/new-task-dialog.js';
-import { PaneTypeSelect } from '../overlay/plan-dropdown.js';
-import { SearchPanel, useSearchState } from '../overlay/search-panel.js';
+import { PaneTabs } from '../overlay/plan-dropdown.js';
+import { type SearchContext, SearchPanel, useSearchState } from '../overlay/search-panel.js';
 import { BUILTIN_SLASH_COMMANDS, type SlashRow } from '../overlay/slash-commands.js';
 import { SlashMenu } from '../overlay/slash-menu.js';
 import {
@@ -95,14 +96,44 @@ function NewTaskSpecimen() {
   );
 }
 
+const SEARCH_CONTEXT: SearchContext = {
+  seqNum: 71,
+  title: 'Cache the project file tree',
+  commands: [
+    { id: 'primary', label: 'Confirm', icon: <Play width={15} height={15} />, run: () => {} },
+    {
+      id: 'assign',
+      label: 'Edit assignment…',
+      icon: <Settings width={15} height={15} />,
+      run: () => {},
+    },
+    {
+      id: 'more',
+      label: 'More actions…',
+      icon: <EllipsisVertical width={15} height={15} />,
+      run: () => {},
+    },
+  ],
+};
+
 function SearchSpecimen() {
   const { open, setOpen, query, setQuery } = useSearchState(false, '');
+  const [withContext, setWithContext] = useState(false);
   return (
     <Specimen
       title="Search"
-      note="SearchPanel: navigation rows when empty, task and agent results as you type"
+      note="SearchPanel: on a task page the task rides along as a chip and its commands come first"
       stage="canvas"
     >
+      <Button
+        variant="outline"
+        onClick={() => {
+          setWithContext(true);
+          setOpen(true);
+        }}
+      >
+        On a task page
+      </Button>
       <Button variant="outline" onClick={() => setOpen(true)}>
         <Search data-icon="inline-start" />
         Search
@@ -119,10 +150,14 @@ function SearchSpecimen() {
       </Button>
       <SearchPanel
         fixture={SEARCH_FIXTURE}
+        context={withContext ? SEARCH_CONTEXT : undefined}
         query={query}
         onQuery={setQuery}
         open={open}
-        onClose={() => setOpen(false)}
+        onClose={() => {
+          setOpen(false);
+          setWithContext(false);
+        }}
       />
     </Specimen>
   );
@@ -257,7 +292,7 @@ function MenusSpecimen() {
   return (
     <Specimen
       title="Menus and popovers"
-      note={last ?? 'MoreMenu, PaneTypeSelect and the ChipPopover body'}
+      note={last ?? 'MoreMenu, PaneTabs and the ChipPopover body'}
       stage="canvas"
     >
       <Cell label="MoreMenu">
@@ -283,11 +318,11 @@ function MenusSpecimen() {
           onDiscard={() => setLast('Discard changes')}
         />
       </Cell>
-      <Cell label={`PaneTypeSelect: ${view}`}>
-        <PaneTypeSelect view={view} docLabel="方案" sections onView={setView} />
+      <Cell label={`PaneTabs: ${view}`}>
+        <PaneTabs view={view} docLabel="方案" sections onView={setView} />
       </Cell>
-      <Cell label="PaneTypeSelect, changes only">
-        <PaneTypeSelect view="doc" docLabel="变更" onView={() => {}} />
+      <Cell label="PaneTabs, changes only">
+        <PaneTabs view="doc" docLabel="变更" onView={() => {}} />
       </Cell>
       {chipTodo != null && (
         <Cell label="ChipPopover body">

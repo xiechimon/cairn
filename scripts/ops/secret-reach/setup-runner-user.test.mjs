@@ -197,6 +197,20 @@ test('shell entry refuses unknown arguments without running setup', () => {
   assert.match(result.stderr, /Usage:/);
 });
 
+test('shell entry runs only the system Node and names /usr/bin/node when it is missing', () => {
+  const result = spawnSync(
+    'sh',
+    [new URL('./setup-runner-user.sh', import.meta.url).pathname, '--dry-run'],
+    {
+      encoding: 'utf8',
+      env: { PATH: '/usr/bin:/bin', SECRET_REACH_SYSTEM_NODE: '/nonexistent/node' },
+    },
+  );
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /\/nonexistent\/node/);
+  assert.match(result.stderr, /system Node/);
+});
+
 test('foreign-owned protected paths are refused before mutation even in dry-run', () => {
   for (const dryRun of [false, true]) {
     const f = fixture();
