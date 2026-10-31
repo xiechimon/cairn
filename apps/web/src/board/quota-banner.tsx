@@ -1,3 +1,5 @@
+import { Hourglass } from 'lucide-react';
+import { NoticeBanner } from '../components/notice-banner.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 
@@ -36,30 +38,25 @@ export function QuotaBanner({ infos }: { infos: QuotaBannerInfo[] }) {
   const { t } = useI18n();
   const single = infos.length === 1 ? infos[0] : null;
   return (
-    <section
+    <NoticeBanner
       data-quota-banner="true"
-      className="board-notify-banner flex h-16 items-center rounded-2xl border-0 bg-(--secondary) px-4 [box-shadow:var(--edge-ring),var(--card-shadow)]"
       aria-label={t('等额度')}
-    >
-      <span className="flex size-7 flex-none items-center justify-center rounded-full bg-(--badge-attention) text-[10px] leading-none font-bold text-(--badge-attention-fg)">
-        …
-      </span>
-      <div className="ml-3.5 min-w-0">
-        <div className="text-sm leading-5 font-medium text-foreground">
-          {single != null
-            ? t('{lane} {kind}，{count} 个任务挂起等额度', {
-                lane: single.lane,
-                kind: single.kindText,
-                count: single.count,
-              })
-            : t('{count} 个任务因额度/限流挂起', { count: infos.length })}
-        </div>
-        <div className="text-xs leading-4 text-muted-foreground">
-          {single != null
-            ? t('额度恢复后自动续跑；{probe} 自动探测', { probe: single.probe })
-            : t('额度恢复后自动续跑，无需人工操作')}
-        </div>
-      </div>
-    </section>
+      tone="waiting"
+      icon={Hourglass}
+      title={
+        single != null
+          ? t('{lane} {kind}，{count} 个任务挂起等额度', {
+              lane: single.lane,
+              kind: t(single.kindText),
+              count: single.count,
+            })
+          : t('{count} 个任务因额度/限流挂起', { count: infos.length })
+      }
+      body={
+        single != null
+          ? t('额度恢复后自动续跑；{probe} 自动探测', { probe: single.probe })
+          : t('额度恢复后自动续跑，无需人工操作')
+      }
+    />
   );
 }

@@ -1117,6 +1117,9 @@ export const EN: Record<string, string> = {
   '{name} 上的 Claude Code 登录已过期。在该机器上运行 `claude auth login` 重新登录。':
     'Claude Code login on {name} has expired. On that machine run `claude auth login`.',
   服务器数据库备份: 'Server database backup',
+  数据库备份已停止: 'Database backup stopped',
+  数据库备份失败: 'Database backup failed',
+  无法确认数据库备份状态: 'Backup status unknown',
   '服务器数据库备份状态文件无法读取，无法确认备份是否在运行。':
     'The server database backup status file cannot be read, so the backup cannot be confirmed as running.',
   '{host} 上的服务器数据库备份已有 {hours} 小时没有成功，备份可能已停止。在该机器上运行 `systemctl --user list-timers cairn-db-backup.timer` 检查定时器。':
