@@ -314,7 +314,7 @@ function MenusSpecimen() {
       </Cell>
       {chipTodo != null && (
         <Cell label="ChipPopover body">
-          <div className="w-74.5 rounded-(--radius-popover) bg-popover p-(--menu-pad) shadow-(--shadow-popover)">
+          <div className="rounded-(--radius-popover) bg-popover p-(--menu-pad) shadow-(--shadow-popover)">
             <ChipPopover
               todo={chipTodo}
               projectName={PROJECT_TITLE}

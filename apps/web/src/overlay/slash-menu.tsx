@@ -1,6 +1,6 @@
 import { Fragment, type Ref, useEffect } from 'react';
 import { Button } from '../components/ui/button.js';
-import { DialogShell, PICKER_ROW_SELECTED } from '../components/ui/dialog-shell.js';
+import { DialogShell } from '../components/ui/dialog-shell.js';
 import { useI18n } from '../i18n/provider.js';
 import type { SlashRow } from './slash-commands.js';
 
@@ -25,9 +25,9 @@ const MENU_CLS =
   'slash-menu absolute inset-x-0 bottom-[calc(100%+8px)] z-40 max-h-55 overflow-auto rounded-(--radius-popover) bg-popover p-(--menu-pad) shadow-(--shadow-popover)';
 
 const ROW_CLS =
-  'slash-menu-row flex h-auto w-full cursor-pointer items-baseline justify-start gap-2 rounded-(--radius-menu-item) border-0 px-2.5 py-2 text-left text-ui font-normal text-foreground hover:bg-transparent hover:text-foreground dark:hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-foreground active:not-aria-[haspopup]:translate-y-0';
+  'slash-menu-row flex h-8 w-full cursor-pointer items-center justify-start gap-2.5 rounded-(--radius-menu-item) border-0 px-2.5 text-left text-ui font-normal text-foreground hover:bg-transparent hover:text-foreground dark:hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-foreground active:not-aria-[haspopup]:translate-y-0';
 
-const NAME_CLS = 'flex-none font-mono text-meta';
+const NAME_CLS = 'flex-none font-mono text-caption text-foreground';
 const DESC_CLS = 'truncate text-meta text-content-tertiary';
 
 export function SlashMenu({
@@ -68,7 +68,10 @@ export function SlashMenu({
           offset += section.rows.length;
           return (
             <Fragment key={section.title}>
-              <div className="px-2 pt-2 pb-1 text-caption text-content-tertiary" aria-hidden="true">
+              <div
+                className="px-2.5 pt-2 pb-1 text-caption font-medium text-content-tertiary"
+                aria-hidden="true"
+              >
                 {section.title}
               </div>
               {section.rows.map((row, i) => {
@@ -81,7 +84,7 @@ export function SlashMenu({
                     tabIndex={-1}
                     role="option"
                     aria-selected={index === highlight}
-                    className={`${ROW_CLS}${index === highlight ? ` ${PICKER_ROW_SELECTED}` : ''}`}
+                    className={`${ROW_CLS}${index === highlight ? ' bg-(--menu-hover) hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)' : ''}`}
                     onMouseDown={(event) => event.preventDefault()}
                     onMouseEnter={() => onHover(index)}
                     onClick={() => onPick(row)}

@@ -1,15 +1,15 @@
 import { useAgentAvatarUrlById, useLiveData } from '../api/provider.js';
+import { ProjectAvatar } from '../board/project-avatar.js';
 import { Button } from '../components/ui/button.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { AGENT_MODEL_LINE, PROJECT_NAME } from '../fixtures/fixtures.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { Check, Settings } from '../icons/index.js';
+import { Settings } from '../icons/index.js';
 
-const POPOVER_ROW =
-  'flex min-h-8 items-center gap-2.5 rounded-md px-1.5 text-sm leading-5 text-(--text-tertiary) transition-[background-color] duration-150 hover:bg-(--accent-soft) [&_img]:size-3 [&_img]:flex-none [&_img]:rounded-full';
-
-const SECTION_LABEL = 'px-1.5 text-xs leading-4 font-medium text-muted-foreground';
+const ROW = 'grid grid-cols-[5.5rem_1fr] items-center gap-2 px-1.5 py-1';
+const ROW_LABEL = 'text-meta text-content-tertiary';
+const ROW_VALUE = 'flex min-w-0 items-center gap-2 text-ui text-foreground';
 
 export function ChipPopover({ todo, projectName, agentModel, onEditAssign }: ChipPopoverProps) {
   const { t } = useI18n();
@@ -20,59 +20,61 @@ export function ChipPopover({ todo, projectName, agentModel, onEditAssign }: Chi
     : AGENT_MODEL_LINE;
   const agentAvatarUrl = useAgentAvatarUrlById();
   return (
-    <div className="chip-popover flex flex-col gap-1.5 text-left">
-      <div className="flex items-center gap-2 px-1.5">
-        {project !== undefined && (
-          <>
-            <span className="flex size-3 flex-none items-center justify-center rounded-(--cds-radius-sm) bg-(--project-avatar-bg) text-[8px] font-medium text-(--project-avatar-fg)">
-              {project.charAt(0).toLowerCase()}
-            </span>
-            <span className="text-xs leading-4 text-(--text-tertiary)">{project}</span>
-          </>
-        )}
-        <span className="text-xs leading-4 text-(--text-tertiary)">#{todo.seqNum}</span>
+    <div className="chip-popover flex w-72 flex-col gap-1 text-left">
+      <div className="flex flex-col gap-1 px-1.5 pt-0.5 pb-1.5">
+        <div className="flex items-center gap-1.5 text-meta text-content-tertiary">
+          {project !== undefined && (
+            <>
+              <ProjectAvatar name={project} tone={0} />
+              <span className="truncate">{project}</span>
+              <span aria-hidden="true">·</span>
+            </>
+          )}
+          <span className="tabular-nums">#{todo.seqNum}</span>
+        </div>
+        <div className="text-ui leading-5 font-medium text-foreground">{todo.title}</div>
       </div>
-      <div className="px-1.5 text-sm leading-5 text-(--foreground)">{todo.title}</div>
       <div className="h-px flex-none bg-(--border)" />
-      <div className="flex flex-none flex-col gap-0.5">
-        <div className={SECTION_LABEL}>{t('任务')}</div>
-        <div className={POPOVER_ROW} data-row-kind="owner">
+      <div className={ROW} data-row-kind="owner">
+        <span className={ROW_LABEL}>{t('负责人')}</span>
+        <span className={ROW_VALUE}>
           <SeededAvatar
-            className="size-3"
+            className="size-4.5 flex-none"
             name={user.displayName}
             src={user.avatarUrl}
             fallback="/avatar-user.png"
           />
-          {user.displayName}
-        </div>
+          <span className="truncate">{user.displayName}</span>
+        </span>
       </div>
-      <div
-        className="flex flex-none flex-col gap-0.5 rounded-md bg-(--spot-soft) px-1 py-1"
-        data-selected=""
-      >
-        <div className={SECTION_LABEL}>{t('执行对话')}</div>
-        <div className={POPOVER_ROW} data-row-kind="agent">
+      <div className={ROW} data-row-kind="agent" data-selected="">
+        <span className={`${ROW_LABEL} self-start pt-0.5`}>{t('执行对话')}</span>
+        <span className="flex min-w-0 items-start gap-2">
           <SeededAvatar
-            className="size-3"
+            className="mt-0.5 size-4.5 flex-none"
             name={todo.agent?.displayName}
             src={todo.agent ? (agentAvatarUrl.get(todo.agent.id) ?? null) : null}
             fallback="/avatar-robot-1.svg"
           />
-          {todo.agent?.displayName ?? t('未指派')}
-          {modelLine !== undefined && ` · ${modelLine}`}
-          <span className="ml-auto flex text-(--card-button)">
-            <Check width={14} height={14} />
+          <span className="flex min-w-0 flex-col">
+            <span className="truncate text-ui text-foreground">
+              {todo.agent?.displayName ?? t('未指派')}
+            </span>
+            {modelLine !== undefined && (
+              <span className="truncate font-mono text-caption text-content-tertiary">
+                {modelLine}
+              </span>
+            )}
           </span>
-        </div>
+        </span>
       </div>
       <div className="h-px flex-none bg-(--border)" />
       <Button
         variant="ghost"
-        size="default"
-        className="min-h-8 flex-none cursor-pointer justify-start gap-2 rounded-md border-none bg-transparent px-1.5 text-left text-sm leading-5 font-normal whitespace-normal text-(--text-tertiary) hover:bg-transparent hover:text-(--text-tertiary) dark:hover:bg-transparent dark:hover:text-(--text-tertiary) aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto"
+        className="h-8 flex-none cursor-pointer justify-start gap-2 rounded-(--radius-menu-item) border-none px-1.5 text-ui font-normal text-content-secondary hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover) [&_svg:not([class*='size-'])]:size-auto"
         onClick={onEditAssign}
       >
-        <Settings width={14} height={14} />
+        <Settings width={15} height={15} className="text-content-tertiary" />
         {t('编辑分配')}
       </Button>
     </div>

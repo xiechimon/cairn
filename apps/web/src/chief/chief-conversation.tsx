@@ -61,6 +61,7 @@ import { AttachmentStrip } from '../overlay/attachment-strip.js';
 import { useComposerWire } from '../overlay/composer-wire.js';
 import { dropEscLayer, pushEscLayer } from '../overlay/gesture-machine.js';
 import { useChiefNewThreadHotkey } from '../overlay/hotkeys.js';
+import { MENTION_TEXTAREA_CLS, MentionHighlight } from '../overlay/mention-highlight.js';
 import { type MentionGroups, MentionInline, MentionPicker } from '../overlay/mention-picker.js';
 import { SlashHelp, SlashMenu } from '../overlay/slash-menu.js';
 import { ChiefStreamRow, chiefStreamRowKey } from './chief-message-rows.js';
@@ -657,7 +658,7 @@ export function ChiefConversation({
           <Textarea
             ref={attachComposer}
             data-testid="chief-composer-input"
-            className="h-10 max-h-30 min-h-0 resize-none overflow-y-auto rounded-none border-none bg-transparent p-0 font-sans text-ui leading-5 text-(--foreground) md:text-ui tabular-nums shadow-none field-sizing-fixed placeholder:text-(--text-secondary) focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none dark:bg-transparent"
+            className={`h-10 max-h-30 min-h-0 resize-none overflow-y-auto rounded-none border-none bg-transparent p-0 font-sans text-ui leading-5 md:text-ui tabular-nums shadow-none field-sizing-fixed focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none dark:bg-transparent ${MENTION_TEXTAREA_CLS} placeholder:text-(--text-secondary)`}
             readOnly={onSend == null}
             value={wire.draft}
             onChange={wire.handleChange}
@@ -695,6 +696,11 @@ export function ChiefConversation({
               : slashOpen && slashHighlight != null
                 ? { 'aria-activedescendant': `${slashListboxId}-opt-${slashHighlight}` }
                 : {})}
+          />
+          <MentionHighlight
+            text={wire.draft}
+            registry={wire.mentionRegistry}
+            textareaRef={wire.textareaRef}
           />
           <MentionInline
             open={inlineOpen}

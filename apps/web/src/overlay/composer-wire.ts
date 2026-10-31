@@ -24,13 +24,19 @@ import {
   detectCompletionToken,
   MENTION_COMPLETION_SPEC,
 } from './completion.js';
+import {
+  createMentionRegistry,
+  insertMentionDisplay,
+  type MentionRegistry,
+  toDisplay,
+  toWire,
+} from './mention-display.js';
 import type { MentionGroups } from './mention-picker.js';
 import {
   buildInlineRows,
   type FileMentionEntry,
   type InlineCompletionRow,
   insertFileText,
-  insertMentionText,
   type MentionToken,
 } from './mention-token.js';
 import { applyOrderedListEnter } from './ordered-list.js';
@@ -112,6 +118,7 @@ export interface ComposerWire {
   helpSkillCount: number;
   insertTokens: (tokens: MentionToken[]) => void;
   groups: MentionGroups;
+  mentionRegistry: MentionRegistry;
 }
 
 const EMPTY_GROUPS: MentionGroups = {
@@ -146,14 +153,22 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
   const [internalDraft, setInternalDraft] = useState('');
   const controlled = draftProp !== undefined && onDraftChange !== undefined;
   const staticFace = draftProp !== undefined && onDraftChange === undefined;
-  const draft = controlled || staticFace ? (draftProp as string) : internalDraft;
-  const setDraft: Dispatch<SetStateAction<string>> = controlled
-    ? (next) =>
-        (onDraftChange as (value: string) => void)(typeof next === 'function' ? next(draft) : next)
-    : staticFace
-      ? () => {}
-      : setInternalDraft;
+  const wireDraft = controlled || staticFace ? (draftProp as string) : internalDraft;
+  const registryRef = useRef<MentionRegistry | null>(null);
+  if (registryRef.current === null) registryRef.current = createMentionRegistry();
+  const registry = registryRef.current;
+  const draft = useMemo(() => toDisplay(wireDraft, registry), [wireDraft, registry]);
+  const setDraft: Dispatch<SetStateAction<string>> = staticFace
+    ? () => {}
+    : (next) => {
+        const display = typeof next === 'function' ? next(draftRef.current) : next;
+        const wire = toWire(display, registry);
+        if (controlled) (onDraftChange as (value: string) => void)(wire);
+        else setInternalDraft(wire);
+      };
 
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const inlineListboxRef = useRef<HTMLDivElement | null>(null);
@@ -188,8 +203,6 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
   const slashListboxRef = useRef<HTMLDivElement | null>(null);
   const slashEnabled = editable && slashOptions !== undefined;
 
-  const draftRef = useRef(draft);
-  draftRef.current = draft;
   const pastedNameCounterRef = useRef<PastedNameCounter | null>(null);
   if (pastedNameCounterRef.current === null)
     pastedNameCounterRef.current = createPastedNameCounter();
@@ -309,7 +322,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
   const sending = useRef(false);
   const submit = (callback: typeof onSend) => {
     if (attachInFlightRef.current > 0 || sending.current) return;
-    const text = draft.trim();
+    const text = toWire(draft, registry).trim();
     if (text === '' && !editable) {
       callback?.(text);
       return;
@@ -444,7 +457,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
       let caret = at;
       let rest = end;
       for (const token of tokens) {
-        const result = insertMentionText(value, token, caret, rest);
+        const result = insertMentionDisplay(value, token, registry, caret, rest);
         value = result.value;
         caret = result.caret;
         rest = undefined;
@@ -712,6 +725,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     acceptInlineRow,
     insertTokens,
     groups,
+    mentionRegistry: registry,
     slashOpen,
     slashQuery,
     slashCaret: slashRange?.start ?? null,
