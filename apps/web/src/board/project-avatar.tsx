@@ -22,7 +22,7 @@ export function ProjectAvatar({
     <span
       aria-hidden="true"
       className={cn(
-        'project-avatar grid size-4.5 flex-none place-items-center rounded-(--radius-control) text-caption leading-none font-semibold text-(--text-on-accent)',
+        'project-avatar grid size-4.5 flex-none place-items-center rounded-(--cds-radius-sm) text-caption leading-none font-semibold text-(--text-on-accent)',
         TILE_BG[tone % TILE_BG.length],
         className,
       )}
