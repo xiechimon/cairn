@@ -1,4 +1,5 @@
 import { PHASE_VALUES } from '@cairn/shared';
+import { cn } from 'cn';
 import { useRef, useState } from 'react';
 import { Button } from '../components/ui/button.js';
 import { MessageScrollerProvider } from '../components/ui/message-scroller.js';
@@ -11,17 +12,18 @@ import { MergeGateVerdict } from '../detail/merge-gate-verdict.js';
 import { QueuedMessages } from '../detail/queued-messages.js';
 import { RejectDialog } from '../detail/reject-dialog.js';
 import { ReviewDialog } from '../detail/review-dialog.js';
-import { RightPane } from '../detail/right-pane.js';
+import { PaneSections, RightPane } from '../detail/right-pane.js';
 import { Segments, TodoStatus } from '../detail/segments.js';
 import { SourceIssueLine } from '../detail/source-issue.js';
 import { SpecBlock } from '../detail/spec-block.js';
 import { StopConfirmDialog } from '../detail/stop-confirm-dialog.js';
 import { TaskMetaBlock } from '../detail/task-meta-block.js';
 import { InjectedSkills, WorkTrace } from '../detail/work-trace.js';
-import type { PaneView, TodoRecord } from '../fixtures/records.js';
+import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { serializeMention } from '../overlay/mention-token.js';
 import { MoreMenu } from '../overlay/more-menu.js';
+import type { DocView } from '../overlay/plan-dropdown.js';
 import { PHASE_UI } from '../phase.js';
 import {
   BUILD_CONTENT,
@@ -193,26 +195,25 @@ function ComposerSpecimen() {
 }
 
 function PaneSpecimen({ mode }: { mode: 'plan' | 'changes' }) {
-  const [view, setView] = useState<PaneView>('doc');
+  const [view, setView] = useState<DocView>(mode === 'plan' ? 'plan' : 'changes');
   return (
-    <div className="flex h-110 w-full overflow-hidden rounded-(--radius-card) bg-background ring-1 ring-border">
+    <div
+      className={cn(
+        'flex w-full overflow-hidden rounded-(--radius-card) bg-background ring-1 ring-border',
+        mode === 'plan' ? 'h-240' : 'h-110',
+      )}
+    >
       <div className="flex min-w-0 flex-1 flex-col items-center justify-center text-meta text-content-tertiary">
         Conversation column
       </div>
-      <RightPane
-        view={view}
-        docLabel={mode === 'plan' ? '方案' : '变更'}
-        onView={setView}
-        content={BUILD_CONTENT}
-        buildId={null}
-      >
+      <RightPane>
         <DocPane
-          mode={mode}
+          mode={view}
           doc={PLAN_DOC}
           changes={CHANGES}
           now={NOW}
-          onPaneView={setView}
-          hasSections
+          onDocView={setView}
+          sections={<PaneSections content={BUILD_CONTENT} buildId={null} />}
           planVersions={[
             { v: 'v2', at: NOW - 600_000 },
             { v: 'v1', at: NOW - 3_600_000 },
@@ -495,7 +496,7 @@ export function ProductDetailSection() {
       </Specimen>
       <Specimen
         title="Right pane"
-        note="RightPane hosting DocPane. Switch views from the pane title: plan or changes, branch, tokens, run history."
+        note="RightPane hosting DocPane. Switch plan and changes from the pane title or header buttons; branch, usage and history are collapsible sections under the plan."
         stage="canvas"
         className="flex-col"
       >

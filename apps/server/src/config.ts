@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -107,7 +107,8 @@ function expandHome(path: string): string {
 
 export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig {
   const home = process.env[ENV_VARS.home] ?? join(homedir(), BRAND.homeDirName);
-  const dataDir = join(home, 'server');
+  const joinedDataDir = join(home, 'server');
+  const dataDir = existsSync(joinedDataDir) ? realpathSync(joinedDataDir) : joinedDataDir;
   const skillsDirEnv = envStr(ENV_VARS.skillsDir);
   const skillsDir = resolve(expandHome(skillsDirEnv ?? SKILLS_DIR_DEFAULT));
   const webDirEnv = process.env[ENV_VARS.webDir];

@@ -181,6 +181,8 @@ export function toProjectRecord(row: ProjectRow, origin?: string): ProjectRecord
     teamId: row.teamId,
     splitPolicy: row.splitPolicy,
     baseBranch: row.baseBranch,
+    ...(row.icon !== null ? { icon: row.icon } : {}),
+    ...(row.color !== null ? { color: row.color } : {}),
     ...(row.description !== null ? { description: row.description } : {}),
     ...(row.repoKind !== null ? { repoKind: row.repoKind } : {}),
     ...(row.repoName !== null ? { repoName: row.repoName } : {}),

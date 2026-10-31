@@ -78,6 +78,8 @@ export function SidebarSection() {
           <SidebarProjectRow
             name="cairn"
             tone={0}
+            icon="mountain"
+            color="moss"
             waiting={2}
             active={active === 'cairn'}
             onClick={() => setActive('cairn')}
@@ -101,6 +103,8 @@ export function SidebarSection() {
           <SidebarProjectRow
             name="api-latency"
             tone={2}
+            icon="server"
+            color="slate"
             active={active === 'api'}
             onClick={() => setActive('api')}
           />
@@ -148,6 +152,8 @@ export function ProjectsSection() {
           <ProjectCard
             name="cairn"
             tone={0}
+            icon="mountain"
+            color="moss"
             repo="xiechimon/cairn"
             created="Oct 2"
             goal="Make Cairn a self-hostable agent team that works through a backlog while you sleep and brings back only what needs you."
@@ -160,6 +166,8 @@ export function ProjectsSection() {
           <ProjectCard
             name="api-latency"
             tone={2}
+            icon="server"
+            color="slate"
             repo="xiechimon/api"
             created="Oct 19"
             goal="Bring p95 latency under 200 ms across the whole API."
