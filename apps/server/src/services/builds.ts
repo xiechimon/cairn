@@ -29,6 +29,7 @@ import {
   CONFIRM_ANNOUNCEMENT,
   checkPlanContract,
   conversationBranch,
+  DEFAULT_SHIP_ROUTE,
   EVIDENCE_PREFIX,
   GATE_LIMITS,
   hasBlockingFinding,
@@ -131,10 +132,11 @@ import type { MachineWakeHub } from './machine-wake-hub.js';
 import { readCompareAt } from './merge-gate/github-facts.js';
 import { bindGateVerdict } from './merge-gate/verdict.js';
 import { githubGatePort } from './merge-gate-github.js';
+import { resolveNamedPrompt } from './named-prompts.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { assertPhaseTransition, canTransitionPhase } from './phase.js';
 import { planHasOpenDecisions } from './plan-decisions.js';
-import { projectMergeConfigOf } from './projects.js';
+import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
 import type { VapidKeys } from './push.js';
 import { publishStepRow, toQuotaWait } from './quota-wait.js';
 import { retryLessonsOf } from './retry-lessons.js';
@@ -1087,6 +1089,7 @@ export function maybeEnqueueIndependentReview(
   const reviewer = deps.db.select().from(agent).where(eq(agent.id, agentId)).get();
   const focus = reviewer?.persona != null ? personaByRole(reviewer.persona).reviewFocus : undefined;
   const plan = latestPlanRow(deps, buildId);
+  const reviewInstruction = reviewInstructionOf(deps, todoRow.teamId, 'review');
   const prompt = buildReviewStepPrompt({
     agentId,
     gate: 'review',
@@ -1095,6 +1098,7 @@ export function maybeEnqueueIndependentReview(
     checkout: hasRepoBinding(projectOfTodo(deps.db, todoRow)),
     expectedHeadSha: head,
     ...(focus !== undefined && focus !== '' ? { focus } : {}),
+    ...(reviewInstruction !== undefined ? { instruction: reviewInstruction } : {}),
   });
   insertGateAnnouncement(deps, buildId, REVIEW_ANNOUNCEMENT, deps.user.displayName);
   enqueueStep(deps, buildId, 'review', todoRow.teamId, prompt);
@@ -1446,9 +1450,11 @@ export async function applyBuildStepAction(
     }
     insertGateAnnouncement(deps, buildId, REVIEW_ANNOUNCEMENT, actorName);
     const expectedHeadSha = gate === 'review' ? dispatchHeadSha(deps, buildId) : null;
+    const reviewInstruction = reviewInstructionOf(deps, todoRecord.teamId, gate);
     const promptArgs = {
       gate,
       planText,
+      ...(reviewInstruction !== undefined ? { instruction: reviewInstruction } : {}),
       ...(changes !== undefined ? { changes } : {}),
       checkout,
       ...(expectedHeadSha !== null ? { expectedHeadSha } : {}),
@@ -1550,6 +1556,16 @@ function assertDeliveredBuild(deps: BuildDeps, row: BuildRow): void {
   }
 }
 
+function reviewInstructionOf(
+  deps: BuildDeps,
+  teamId: string,
+  gate: ReviewGate,
+): string | undefined {
+  if (gate !== 'review') return undefined;
+  const prompt = resolveNamedPrompt(deps.db, teamId, 'review');
+  return prompt.overridden ? prompt.text : undefined;
+}
+
 export async function requestMerge(
   deps: BuildDeps,
   buildId: string,
@@ -1573,14 +1589,16 @@ export async function requestMerge(
     )
     .get();
   if (inFlight) throw new HttpError(409, '这个构建已有一个合并步在排队或在跑，等它结束再发起');
-  const pr = githubPrOf(deps, todoRow, row.prNumber);
+  const projectRow = projectOfTodo(deps.db, todoRow);
+  const shipRoute = projectRow === undefined ? DEFAULT_SHIP_ROUTE : projectShipRouteOf(projectRow);
+  const pr = shipRoute === 'custom' ? null : githubPrOf(deps, todoRow, row.prNumber);
   if (pr !== null) {
     return mergeThroughGithub(deps, row, pr.prNumber, pr.repoRef, actor ?? deps.user.displayName);
   }
-  const projectRow = projectOfTodo(deps.db, todoRow);
   if (
     projectRow?.repoKind === 'local' &&
-    projectMergeConfigOf(projectRow).mergePolicy === 'autonomous'
+    shipRoute !== 'custom' &&
+    (shipRoute === 'local-merge' || projectMergeConfigOf(projectRow).mergePolicy === 'autonomous')
   ) {
     if (todoRow.phase === 'failed') assertDeliveredBuild(deps, row);
     else assertPhaseTransition(todoRow.phase, 'done');
@@ -1598,7 +1616,7 @@ export async function requestMerge(
       deps,
       buildId,
       projectRow.baseBranch ?? listing.defaultBranch,
-      false,
+      shipRoute === 'local-merge',
       todoRow.phase === 'failed',
     );
     if (local.enqueued) {
@@ -1624,7 +1642,9 @@ export async function requestMerge(
   assertMergeTools(deps, todoRow);
   insertGateAnnouncement(deps, buildId, MERGE_ANNOUNCEMENT, actor ?? deps.user.displayName);
   let prompt: string | undefined;
-  if (projectRow?.repoKind === 'hosted' && projectRow.repoName !== null) {
+  if (shipRoute === 'custom') {
+    prompt = resolveNamedPrompt(deps.db, todoRow.teamId, 'ship').text;
+  } else if (projectRow?.repoKind === 'hosted' && projectRow.repoName !== null) {
     if (deps.reposDir === undefined) throw new HttpError(409, 'Hosted repository unavailable');
     const dir = repoDirFor(deps.reposDir, todoRow.teamId, projectRow.repoName);
     const { defaultBranch } = await systemGitOps.listBranches(dir);

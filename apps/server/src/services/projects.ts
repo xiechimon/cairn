@@ -1,5 +1,6 @@
 import {
   DEFAULT_AUTONOMY_SETTINGS,
+  DEFAULT_SHIP_ROUTE,
   type PatchProjectBody,
   type ProjectMergeConfig,
   patchProjectMergeConfigSchema,
@@ -8,6 +9,8 @@ import {
   projectMergeConfigSchema,
   projectRenamedNote,
   type SecretBox,
+  type ShipRoute,
+  shipRouteSchema,
 } from '@cairn/shared';
 import { and, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -53,6 +56,19 @@ export function updateProjectMergeConfig(
   const autonomy = { ...DEFAULT_AUTONOMY_SETTINGS, ...(row.autonomy ?? {}), ...next };
   db.update(project).set({ autonomy }).where(eq(project.id, row.id)).run();
   return next;
+}
+
+export function projectShipRouteOf(row: ProjectRow): ShipRoute {
+  return shipRouteSchema.catch(DEFAULT_SHIP_ROUTE).parse(row.autonomy?.shipRoute);
+}
+
+export function updateProjectShipRoute(db: Db, row: ProjectRow, shipRoute: ShipRoute): ShipRoute {
+  if (shipRoute === 'local-merge' && row.repoKind !== 'local') {
+    throw new HttpError(409, 'local-merge requires a local repository project');
+  }
+  const autonomy = { ...DEFAULT_AUTONOMY_SETTINGS, ...(row.autonomy ?? {}), shipRoute };
+  db.update(project).set({ autonomy }).where(eq(project.id, row.id)).run();
+  return shipRoute;
 }
 
 export interface ProjectDeps {
