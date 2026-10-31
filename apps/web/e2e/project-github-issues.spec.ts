@@ -205,13 +205,13 @@ test('4. status filter and pagination params reach the request face; hasMore=fal
   expect(issueQueries).toEqual(['state=open&page=1']);
   await expect(next).toBeEnabled();
 
-  await dialog.getByRole('button', { name: '已关闭' }).click();
+  await dialog.getByRole('radio', { name: '已关闭' }).click();
   await expect(rows).toHaveCount(1);
   await expect(rows).toContainText('closed issue');
   expect(issueQueries).toEqual(['state=open&page=1', 'state=closed&page=1']);
   await expect(next).toBeDisabled();
 
-  await dialog.getByRole('button', { name: '打开' }).click();
+  await dialog.getByRole('radio', { name: '打开' }).click();
   await next.click();
   await expect(rows).toHaveCount(1);
   await expect(rows).toContainText('third issue');

@@ -802,6 +802,7 @@ export const EN: Record<string, string> = {
     'Remove "{name}" from this team? Active tasks for this agent will be stopped.',
   复制链接: 'Copy link',
   完成任务: 'Complete task',
+  'issue 状态': 'Issue state',
   总管用的模型额度已用完: "The chief's model is out of quota",
   总管用的模型暂时过载: "The chief's model is overloaded",
   '例如：测试在远端机器上失败，请先修复':
