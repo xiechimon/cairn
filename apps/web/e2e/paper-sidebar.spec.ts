@@ -159,7 +159,7 @@ test('project rows: tile letters follow --project-ink-N in order, open-task coun
         tile: getComputedStyle(tile).color,
         want,
         initial: tile.textContent,
-        count: el.querySelector('.rounded-full')?.textContent ?? null,
+        count: el.querySelector('[data-slot="sidebar-project-count"]')?.textContent ?? null,
       };
     });
   });
@@ -171,7 +171,7 @@ test('project rows: tile letters follow --project-ink-N in order, open-task coun
   await expect(page).toHaveURL(/\/app\/project\/new\?scenario=board-repos/);
 });
 
-test('long project names truncate and keep the waiting pill visible', async ({ page }) => {
+test('long project names truncate and keep the waiting count visible', async ({ page }) => {
   await page.goto('/app?scenario=board-repos&view=board');
   const m = await page
     .locator('[data-slot="sidebar-project-row"]')
@@ -179,7 +179,7 @@ test('long project names truncate and keep the waiting pill visible', async ({ p
     .evaluate((row) => {
       const label = row.querySelector('span.truncate') as HTMLElement;
       label.textContent = '一个非常非常非常长的项目名字用来压测侧栏截断行为-with-latin-tail';
-      const count = row.querySelector('.rounded-full')!;
+      const count = row.querySelector('[data-slot="sidebar-project-count"]')!;
       const r = row.getBoundingClientRect();
       const c = count.getBoundingClientRect();
       return {

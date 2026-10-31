@@ -17,8 +17,7 @@ export function SidebarUser({ name, machinesOnline, action }: SidebarUserProps) 
       </span>
       <span className="flex min-w-0 flex-col leading-tight">
         <b className="text-ui font-semibold text-foreground">{name}</b>
-        <small className="flex items-center gap-1.25 text-caption text-content-tertiary">
-          <span className="size-1.5 rounded-full bg-pebble-working" />
+        <small className="text-caption text-content-tertiary">
           {machinesOnline} {machinesOnline === 1 ? 'machine' : 'machines'} online
         </small>
       </span>

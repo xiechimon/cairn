@@ -262,7 +262,7 @@ function DialogsSpecimen() {
         onClose={close}
         onConfirm={() => done('accept')}
         mergeLocked
-        missingTools={['gh']}
+        missingTools={['推送分支']}
         rejectReason="The PR still has a failing check."
       />
       <AcceptDialog
