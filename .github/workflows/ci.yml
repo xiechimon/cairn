@@ -313,6 +313,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: node --test scripts/ops/secret-reach/canary.test.mjs scripts/ops/secret-reach/broker.test.mjs scripts/ops/secret-reach/setup-runner-user.test.mjs
 
+      - name: Scoped root runner for ops scripts (#2362)
+        if: ${{ !cancelled() }}
+        run: node --test scripts/ops/cairn-ops/run.test.mjs scripts/ops/cairn-ops/install.test.mjs
+
   ops-backup-test:
     needs: changes
     if: github.event_name != 'pull_request' || needs.changes.outputs.has-code != 'false'
