@@ -155,7 +155,7 @@ test('a resource route lights the folded `资源` row', async ({ page }) => {
   );
 });
 
-test('project rows: tile colors follow --project-tile-N in order, open-task counts', async ({
+test('project rows: tile letters follow --project-ink-N in order, open-task counts', async ({
   page,
 }) => {
   await page.goto('/app?scenario=board-repos&view=board');
@@ -166,12 +166,12 @@ test('project rows: tile colors follow --project-tile-N in order, open-task coun
     return els.map((el, i) => {
       const tile = el.querySelector('.project-avatar')!;
       const probeEl = document.createElement('span');
-      probeEl.style.backgroundColor = root.getPropertyValue(`--project-tile-${(i % 6) + 1}`);
+      probeEl.style.color = root.getPropertyValue(`--project-ink-${(i % 6) + 1}`);
       document.body.append(probeEl);
-      const want = getComputedStyle(probeEl).backgroundColor;
+      const want = getComputedStyle(probeEl).color;
       probeEl.remove();
       return {
-        tile: getComputedStyle(tile).backgroundColor,
+        tile: getComputedStyle(tile).color,
         want,
         initial: tile.textContent,
         count: el.querySelector('[data-testid="project-count"]')?.textContent ?? null,

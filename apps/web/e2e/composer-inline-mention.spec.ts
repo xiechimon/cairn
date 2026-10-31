@@ -500,7 +500,7 @@ test('IME: a composing Enter neither inserts nor sends (F8)', async ({ page }) =
   expect(sent).toHaveLength(0);
 });
 
-test('geometry: the listbox stays anchored above the composer (#688 ladder untouched)', async ({
+test('geometry: the listbox sits above the composer, left-anchored and list-width', async ({
   page,
 }) => {
   const { input, listbox } = await openDetail(page);
@@ -513,11 +513,8 @@ test('geometry: the listbox stays anchored above the composer (#688 ladder untou
   expect(composerBox).toBeTruthy();
   const lb = listBox as { x: number; y: number; width: number; height: number };
   const cb = composerBox as { x: number; y: number; width: number; height: number };
-  // Anchored above the composer card (bottom: calc(100% + 6px) — the
-  // containing block is .composer, position: relative; unchanged).
   expect(lb.y + lb.height).toBeLessThanOrEqual(cb.y);
-  // Spanning the composer width (left/right 0 anchoring, unchanged).
-  expect(Math.abs(lb.width - cb.width)).toBeLessThanOrEqual(8);
+  expect(lb.width).toBeLessThanOrEqual(Math.min(352, cb.width) + 1);
   expect(Math.abs(lb.x - cb.x)).toBeLessThanOrEqual(8);
 });
 
