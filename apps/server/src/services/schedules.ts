@@ -1,9 +1,9 @@
 import type { CreateScheduleBody, ScheduleKind, ScheduleRecord } from '@cairn/shared';
-import { SCHEDULE_MINUTE_STEPS } from '@cairn/shared';
+import { classifyStepFailure, isProviderOutage, SCHEDULE_MINUTE_STEPS } from '@cairn/shared';
 import { CronExpressionParser } from 'cron-parser';
-import { and, desc, eq, isNotNull, like, lte, max } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, isNull, like, lte, max, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { build, message, schedule, todo } from '../db/schema.js';
+import { build, message, schedule, step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import type { TeamStreamHub } from './events.js';
@@ -118,6 +118,7 @@ export function toScheduleRecord(deps: ScheduleDeps, row: ScheduleRow): Schedule
     nextRunAt: row.nextRunAt,
     lastRunAt: row.lastRunAt,
     lastRunStatus: row.lastRunStatus,
+    lastRunError: row.lastRunError,
     pausedReason: row.pausedReason,
     createdBy: row.createdBy,
     todo: {
@@ -179,6 +180,9 @@ export function createSchedule(
     nextRunAt,
     lastRunAt: null,
     lastRunStatus: null,
+    lastRunError: null,
+    lastRunStepId: null,
+    retryNotBefore: null,
     pausedReason: null,
     createdBy: input.createdBy,
   };
@@ -209,6 +213,7 @@ export function dueSchedules(deps: ScheduleDeps, nowMsValue: number): ScheduleRo
         eq(schedule.enabled, true),
         isNotNull(schedule.nextRunAt),
         lte(schedule.nextRunAt, nowMsValue),
+        or(isNull(schedule.retryNotBefore), lte(schedule.retryNotBefore, nowMsValue)),
       ),
     )
     .all();
@@ -340,13 +345,22 @@ export function workerScheduleRunHistory(
         ),
       )
       .get()?.at ?? null;
-  const recent = deps.db
+  const legacy = deps.db
     .select()
     .from(build)
     .where(and(eq(build.todoId, todoId), eq(build.triggerSource, 'schedule')))
     .orderBy(desc(build.createdAt), desc(build.id))
     .limit(WORKER_SCHEDULE_RUN_LIMIT)
     .all();
+  const continued = deps.db
+    .select({ createdAt: step.createdAt })
+    .from(step)
+    .innerJoin(build, eq(step.buildId, build.id))
+    .where(and(eq(build.todoId, todoId), isNotNull(step.scheduledBy)))
+    .orderBy(desc(step.createdAt), desc(step.id))
+    .limit(WORKER_SCHEDULE_RUN_LIMIT)
+    .all();
+  const recent = [...legacy, ...continued].sort((a, b) => b.createdAt - a.createdAt);
   let consecutive = 0;
   for (const row of recent) {
     if (lastHuman !== null && row.createdAt <= lastHuman) break;
@@ -356,4 +370,59 @@ export function workerScheduleRunHistory(
     consecutive,
     lastRunAt: recent[0]?.createdAt ?? null,
   };
+}
+
+export function scheduleFailureIsTransient(reason: string): boolean {
+  return (
+    ['network', 'capacity', 'quota'].includes(classifyStepFailure(reason)) ||
+    isProviderOutage(reason) ||
+    /^Could not read PR #/.test(reason)
+  );
+}
+
+export function recordScheduleFailure(
+  deps: ScheduleDeps,
+  id: string,
+  reason: string,
+  at = nowMs(),
+): void {
+  deps.db
+    .update(schedule)
+    .set({
+      lastRunStatus: 'failed',
+      lastRunError: reason,
+      retryNotBefore: scheduleFailureIsTransient(reason) ? at + 5 * 60_000 : null,
+    })
+    .where(eq(schedule.id, id))
+    .run();
+  if (!scheduleFailureIsTransient(reason)) pauseSchedule(deps, id, reason);
+}
+
+export function finishScheduledStep(
+  deps: ScheduleDeps,
+  stepRow: typeof step.$inferSelect,
+  outcome: { status: 'completed' | 'stopped' } | { status: 'failed'; error: string } = {
+    status: 'completed',
+  },
+): void {
+  if (stepRow.scheduleId === null) return;
+  const row = deps.db
+    .select()
+    .from(schedule)
+    .where(and(eq(schedule.id, stepRow.scheduleId), eq(schedule.lastRunStepId, stepRow.id)))
+    .get();
+  if (!row) return;
+  if (outcome.status === 'failed') {
+    recordScheduleFailure(deps, row.id, outcome.error);
+    return;
+  }
+  if (outcome.status === 'completed' && row.kind === 'once' && row.enabled) {
+    deps.db.delete(schedule).where(eq(schedule.id, row.id)).run();
+    return;
+  }
+  deps.db
+    .update(schedule)
+    .set({ lastRunStatus: outcome.status, lastRunError: null, retryNotBefore: null })
+    .where(eq(schedule.id, row.id))
+    .run();
 }

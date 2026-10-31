@@ -1,0 +1,44 @@
+#!/usr/bin/env node
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+
+const deadline = performance.now() + 9_000;
+const cwd = fileURLToPath(new URL('../', import.meta.url));
+
+function killGroup(pid) {
+  try {
+    process.kill(-pid, 'SIGKILL');
+  } catch {}
+}
+
+function run(command, args, remaining) {
+  return new Promise((resolve) => {
+    const child = spawn(command, args, {
+      cwd,
+      env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+      stdio: 'inherit',
+      detached: true,
+    });
+    const timer = setTimeout(() => killGroup(child.pid), remaining);
+    child.on('error', () => {
+      clearTimeout(timer);
+      resolve(false);
+    });
+    child.on('exit', (code) => {
+      clearTimeout(timer);
+      killGroup(child.pid);
+      resolve(code === 0);
+    });
+  });
+}
+
+for (const [command, args] of [
+  ['git', ['fetch']],
+  ['pnpm', ['install', '--frozen-lockfile', '--offline']],
+]) {
+  const remaining = Math.floor(deadline - performance.now());
+  if (remaining <= 0) break;
+  if (!(await run(command, args, remaining))) {
+    console.error(`Resume: ${command} did not complete; continuing the session.`);
+  }
+}

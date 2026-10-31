@@ -269,8 +269,8 @@ describe('periodic-slot nextRunAt (cron tz-aware; the hourly/daily/weekly enum w
   });
 });
 
-describe('the trigger loop E2E (04 §4 M2: trigger -> a fresh rerun in a new build, r3 §9)', () => {
-  test('a once schedule due at tick -> a new build triggerSource:"schedule" + the todo queued + auto dequeue', async () => {
+describe('scheduled thread continuation', () => {
+  test('a once schedule starts an unbuilt task and is removed after its step completes', async () => {
     const s = await withTodo();
     const at = new Date('2026-09-23T00:00:00+08:00').getTime();
     await req(s.app, 'POST', '/api/schedules', {
@@ -279,7 +279,7 @@ describe('the trigger loop E2E (04 §4 M2: trigger -> a fresh rerun in a new bui
       at,
       tz: TZ,
     });
-    s.scheduler.tick();
+    await s.scheduler.tick();
     const builds = await buildsOf(s, s.projectId);
     expect(builds).toHaveLength(1);
     expect(builds[0]).toMatchObject({
@@ -292,13 +292,16 @@ describe('the trigger loop E2E (04 §4 M2: trigger -> a fresh rerun in a new bui
     expect(t.phase).toBe('queued');
     expect(t.latestBuildId).toBe(builds[0]?.id);
     const list = (await (await req(s.app, 'GET', '/api/schedules')).json()) as unknown[];
-    expect(list).toEqual([]);
+    expect(list).toHaveLength(1);
     const steps = listSteps(s.svc, builds[0]?.id as string);
     expect(steps).toHaveLength(1);
     expect(steps[0]?.kind).toBe('build');
+    setTodoPhase(s.svc, s.todoDoc.id, 'building');
+    completeStep(s.svc, steps[0]!.id);
+    expect(await (await req(s.app, 'GET', '/api/schedules')).json()).toEqual([]);
   });
 
-  test('a done rerun (the r3 §9 measurement: finished -> a fresh rerun at the due time, back to the executing -> awaiting-review semantics)', async () => {
+  test('a done task continues its existing build and history', async () => {
     const s = await withTodo();
     await runToDone(s, s.projectId, s.todoDoc.id);
     expect((await todoOf(s, s.todoDoc.id)).phase).toBe('done');
@@ -308,16 +311,15 @@ describe('the trigger loop E2E (04 §4 M2: trigger -> a fresh rerun in a new bui
       at: new Date('2026-09-23T00:00:00+08:00').getTime(),
       tz: TZ,
     });
-    s.scheduler.tick();
+    await s.scheduler.tick();
     const builds = await buildsOf(s, s.projectId);
-    expect(builds).toHaveLength(2);
-    const rerun = builds.find((b) => b.triggerSource === 'schedule');
-    expect(rerun?.prevPhase).toBe('done');
+    expect(builds).toHaveLength(1);
+    expect(builds[0]?.prevPhase).toBe('done');
     expect((await todoOf(s, s.todoDoc.id)).phase).toBe('queued');
-    expect((await todoOf(s, s.todoDoc.id)).buildHistory).toHaveLength(2);
+    expect((await todoOf(s, s.todoDoc.id)).buildHistory).toHaveLength(1);
   });
 
-  test('a review-sojourn round displaced: the old build errorMessage:"Cancelled" (the r5 §8 measurement)', async () => {
+  test('an owner schedule continues a review thread without cancelling its build', async () => {
     const s = await withTodo();
     const oldBuildId = await runToReview(s, s.projectId, s.todoDoc.id);
     expect((await todoOf(s, s.todoDoc.id)).phase).toBe('review');
@@ -327,15 +329,16 @@ describe('the trigger loop E2E (04 §4 M2: trigger -> a fresh rerun in a new bui
       at: new Date('2026-09-23T00:00:00+08:00').getTime(),
       tz: TZ,
     });
-    s.scheduler.tick();
+    await s.scheduler.tick();
     const oldBuild = (await (await req(s.app, 'GET', `/api/builds/${oldBuildId}`)).json()) as
       | BuildRecord
       | { error: string };
-    expect(oldBuild).toMatchObject({ id: oldBuildId, errorMessage: 'Cancelled' });
+    expect(oldBuild).toMatchObject({ id: oldBuildId, errorMessage: null });
     const t = await todoOf(s, s.todoDoc.id);
     expect(t.phase).toBe('queued');
     const builds = await buildsOf(s, s.projectId);
-    expect(builds.find((b) => b.triggerSource === 'schedule')?.prevPhase).toBe('review');
+    expect(builds).toHaveLength(1);
+    expect(builds[0]).toMatchObject({ id: oldBuildId, prevPhase: 'review' });
   });
 
   test('a periodic slot rolls nextRunAt after firing (the row kept, with a once-dequeued control group)', async () => {
@@ -352,7 +355,7 @@ describe('the trigger loop E2E (04 §4 M2: trigger -> a fresh rerun in a new bui
       ).json(),
     );
     const firstNext = created.nextRunAt as number;
-    s.scheduler.tick(firstNext + 1_000);
+    await s.scheduler.tick(firstNext + 1_000);
     const after = scheduleRecordSchema.parse(
       ((await (await req(s.app, 'GET', '/api/schedules')).json()) as ScheduleRecord[])[0],
     );
@@ -389,7 +392,7 @@ describe('the trigger loop E2E (04 §4 M2: trigger -> a fresh rerun in a new bui
         })
       ).json(),
     );
-    s.scheduler.tick((created.nextRunAt as number) + 1_000);
+    await s.scheduler.tick((created.nextRunAt as number) + 1_000);
     expect(await buildsOf(s, s.projectId)).toHaveLength(1);
     expect((await todoOf(s, s.todoDoc.id)).phase).toBe('queued');
     const after = scheduleRecordSchema.parse(
@@ -407,7 +410,7 @@ describe('the trigger loop E2E (04 §4 M2: trigger -> a fresh rerun in a new bui
       tz: TZ,
     });
     s.db.delete(todoTable).where(eq(todoTable.id, s.todoDoc.id)).run();
-    s.scheduler.tick();
+    await s.scheduler.tick();
     const list = (await (await req(s.app, 'GET', '/api/schedules')).json()) as unknown[];
     expect(list).toEqual([]);
     expect(await buildsOf(s, s.projectId)).toHaveLength(0);
