@@ -949,6 +949,7 @@ export function TodoDetailPage() {
                 versionMenu={menu}
                 onVersionMenu={setMenu}
                 onCompare={() => {
+                  setDocChoice('plan');
                   if (live) {
                     setCompareOpen(true);
                     setMenu(undefined);

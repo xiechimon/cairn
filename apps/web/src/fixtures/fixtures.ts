@@ -116,6 +116,7 @@ export {
   skillInject,
   skillInjectZero,
   skillsRouting,
+  versionCompareWithChanges,
   versionMenuV2,
   versionMenuV3,
 } from './r8-dynamic.js';
