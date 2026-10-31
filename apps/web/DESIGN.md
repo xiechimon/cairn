@@ -194,6 +194,10 @@ From top to bottom:
 - ⌘K is a menu-style palette (Linear): 640px, rows 32px with the `menu-hover` fill and 8px corners. On a task page the task rides along as a chip above the input and its commands come first under "This task"; typing filters commands and results together; Backspace on an empty input drops the chip. A footer row shows the keys (move, open, drop context, close).
 - Folder picker (`DirBrowser`, Amp's project picker): a search / paste-a-path input, then Recent (picked folders and project folders) and the git repositories in the last browsed folder; each row is name, grey path on the right and a `git` tag. "Browse folders…" at the bottom opens the old breadcrumb tree.
 
+### Slash and @ lists (Claude Code)
+- The slash list is 240px of 28px rows: the command name in sans `text-ui`, no `/` prefix and no monospace, the typed part in bold; no group headings, a thin rule between commands and skills. The description shows only as a dark bubble beside the highlighted row.
+- The @ list is one mixed list (agents, tasks, projects, files) with no headings or rules: a 16px avatar or outlined kind icon, the name, then its secondary text inline in `ink-3`, truncated.
+
 ### Task header and status
 - The task detail header is one 44px line (Amp): back, project tile + project name + `#seq` in `ink-3`, the title in sans 15px/600, the status as a ghost pill (bg only on hover, full radius, glyph in its tone, label in `ink`), then on the right the agent, ⋯ and the primary action when there is one.
 - Status glyphs are one circular family (`StatusGlyph`, Linear's model) used in the header, search rows, mentions and home rows: dashed ring = to start, ring + clock = queued, a pie that fills with progress (quarter = planning in `chip-plan-fg`, half = confirm in accent, three quarters = building in `running` or review in accent), filled check = done, filled cross = failed, filled slash = closed. Ochre still means it waits on you.
