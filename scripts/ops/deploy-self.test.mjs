@@ -135,7 +135,10 @@ sqlite3 "$db" "insert into __drizzle_migrations(hash) values ('m1')"`,
 if [ "$2 $3" = "start cairn-server.service" ]; then
   head=$(git -C "${checkout}" rev-parse HEAD)
   [ "$head" = "${previous}" ] || sqlite3 "${db}" "insert or ignore into __drizzle_migrations(id, hash) values (2, 'm1')"
-  if [ "$head" = "$(cat "${fake}/broken-sha" 2>/dev/null)" ]; then rm -f "${fake}/up"; else touch "${fake}/up"; fi
+  if [ "$head" = "$(cat "${fake}/broken-sha" 2>/dev/null)" ]; then
+    rm -f "${fake}/up"
+    [ ! -f "${fake}/write-on-broken-start" ] || sqlite3 "${db}" "insert or ignore into step values ('written-after', 'done')"
+  else touch "${fake}/up"; fi
 fi
 [ "$2 $3" = "stop cairn-server.service" ] && rm -f "${fake}/up"
 if [ "$2 $3" = "start cairn-daemon.service" ]; then
@@ -318,6 +321,22 @@ test('rolls code and database back when the new server fails its health check', 
   assert.ok(existsSync(join(f.state, 'failed', target)));
   assert.match(f.log('pnpm.log'), new RegExp(`install --frozen-lockfile .*@ ${f.previous}`));
   assert.ok(readdirSync(f.backups).some((name) => name.startsWith('failed-')));
+});
+
+test('keeps the DB and rolls back only code when data changed after the snapshot', () => {
+  const f = fixture();
+  const target = pushTarget(f);
+  writeFileSync(join(f.fake, 'broken-sha'), target);
+  writeFileSync(join(f.fake, 'write-on-broken-start'), '');
+  const result = f.run(DEPLOY, [target]);
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /kept the DB/);
+  assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), f.previous);
+  assert.equal(sqlite(f.db, "select count(*) from step where id = 'written-after'"), '1');
+  assert.equal(sqlite(f.db, 'select count(*) from __drizzle_migrations'), '2');
+  const record = JSON.parse(readFileSync(join(f.state, 'deployed.json'), 'utf8'));
+  assert.equal(record.result, 'rolled-back-code');
+  assert.ok(!readdirSync(f.backups).some((name) => name.startsWith('failed-')));
 });
 
 test('watch deploys the newest green main commit and skips a SHA that already failed', () => {

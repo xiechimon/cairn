@@ -221,14 +221,50 @@ prune_snapshots() {
   find "$BACKUPS" -maxdepth 1 -name 'stopped-*.db' -print | sort -r | tail -n +"$((KEEP_SNAPSHOTS + 1))" | xargs -r rm -f
 }
 
+UNTRACKED_TABLES=" __drizzle_migrations machine autonomy_state "
+
+user_tables() {
+  sqlite3 -readonly "$1" "select name from sqlite_master where type = 'table' and name not like 'sqlite_%'" |
+    while read -r table; do [[ "$UNTRACKED_TABLES" == *" $table "* ]] || echo "$table"; done
+}
+
+writes_after_snapshot() {
+  local snapshot="$1" table columns differing
+  while read -r table; do
+    columns="$(sqlite3 -readonly "$snapshot" "select group_concat('\"' || replace(name, '\"', '\"\"') || '\"', ',') from pragma_table_info('$table')")"
+    differing="$(sqlite3 -readonly "$DB" "attach '$snapshot' as snap;
+      select (select count(*) from (select $columns from main.\"$table\" except select $columns from snap.\"$table\"))
+           + (select count(*) from (select $columns from snap.\"$table\" except select $columns from main.\"$table\"));")" || return 0
+    [ "$differing" = 0 ] || return 0
+  done < <(user_tables "$snapshot")
+  while read -r table; do
+    user_tables "$snapshot" | grep -qxF "$table" && continue
+    [ "$(sqlite3 -readonly "$DB" "select count(*) from \"$table\"")" = 0 ] || return 0
+  done < <(user_tables "$DB")
+  return 1
+}
+
+stop_or_give_up() {
+  stop_services && return 0
+  write_record "$TARGET" "$PREVIOUS" rollback-unhealthy "$TARGET" "$1"
+  echo "CRITICAL: could not stop services to roll back $TARGET; DB left in place, snapshot $1" >&2
+  exit "$EXIT_ROLLBACK_UNHEALTHY"
+}
+
 roll_back() {
   local snapshot="$1" reason="$2" failed_dir
   log "rolling back to $PREVIOUS: $reason"
-  if ! stop_services; then
-    mark_failed "$TARGET" "$reason"
-    write_record "$TARGET" "$PREVIOUS" rollback-unhealthy "$TARGET" "$snapshot"
-    echo "CRITICAL: could not stop services to roll back $TARGET; DB left in place, snapshot $snapshot" >&2
-    exit "$EXIT_ROLLBACK_UNHEALTHY"
+  mark_failed "$TARGET" "$reason"
+  stop_or_give_up "$snapshot"
+  if writes_after_snapshot "$snapshot"; then
+    log "data changed after the snapshot; keeping the DB and rolling back code only"
+    if switch_code "$PREVIOUS" && start_and_check; then
+      write_record "$PREVIOUS" "$PREVIOUS" rolled-back-code "$TARGET" "$snapshot"
+      echo "deploy of $TARGET failed ($reason); rolled code back to $PREVIOUS and kept the DB, which changed after the snapshot" >&2
+      exit 1
+    fi
+    log "$PREVIOUS is unhealthy on the kept DB; restoring the snapshot"
+    stop_or_give_up "$snapshot"
   fi
   failed_dir="$BACKUPS/failed-$(date -u +%Y%m%dT%H%M%SZ)-${TARGET:0:12}"
   mkdir -p "$failed_dir"
@@ -236,8 +272,7 @@ roll_back() {
     [ ! -e "$DATA_DIR/$file" ] || mv "$DATA_DIR/$file" "$failed_dir/$file"
   done
   cp "$snapshot" "$DB"
-  mark_failed "$TARGET" "$reason"
-  if switch_code "$PREVIOUS" && start_and_check; then
+  if { [ "$(git -C "$CHECKOUT" rev-parse HEAD)" = "$PREVIOUS" ] || switch_code "$PREVIOUS"; } && start_and_check; then
     write_record "$PREVIOUS" "$PREVIOUS" rolled-back "$TARGET" "$snapshot"
     echo "deploy of $TARGET failed ($reason); rolled back to $PREVIOUS, failed DB kept in $failed_dir" >&2
     exit 1
