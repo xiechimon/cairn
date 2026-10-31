@@ -69,8 +69,8 @@ colors-dark:
   danger-line: '#8c4a3e'
   project-tiles: ['#6f9c5f', '#b98a57', '#6f93bb', '#9a7cad', '#5fa3a0', '#b77f8a']
 typography:
-  greeting:     { fontFamily: display, fontSize: 26px, fontWeight: '650' }
-  page-title:   { fontFamily: display, fontSize: 20px, fontWeight: '650' }
+  greeting:     { fontFamily: serif, fontSize: 26px, fontWeight: '600' }
+  page-title:   { fontFamily: serif, fontSize: 20px, fontWeight: '600' }
   heading:      { fontFamily: display, fontSize: 17px, fontWeight: '650' }
   brand:        { fontFamily: display, fontSize: 20px, fontWeight: '650' }
   card-title:   { fontFamily: sans, fontSize: 14px, fontWeight: '600', lineHeight: '1.5' }
@@ -79,6 +79,7 @@ typography:
   caption:      { fontFamily: sans, fontSize: 12px, fontWeight: '500' }
   code:         { fontFamily: mono, fontSize: 12px, fontWeight: '400' }
 fonts:
+  serif: var(--font-source-serif) # Source Serif 4 → Songti SC: greeting and page titles
   display: var(--font-display)   # Bricolage Grotesque → sans
   sans: var(--font-sans)         # Instrument Sans → PingFang SC
   mono: var(--font-mono)         # JetBrains Mono
@@ -133,7 +134,7 @@ Direction A, **Cairn**: a cairn is a pile of stones that marks a trail for the n
 
 ## Typography
 
-- **Display face for titles**: Bricolage Grotesque (`--font-display`, the `font-heading` utility) for the brand name, page and pane titles, dialog titles and the Coordinator greeting, at 650 with -0.015em tracking. Chinese falls back to PingFang SC.
+- **Two title faces**: Source Serif 4 (`font-serif`, 600, -0.01em) for the Coordinator greeting and page titles (the board top bar, page shells, the task detail header, settings headers), so the top of every page has one quiet serif voice. Bricolage Grotesque (`font-heading` with `font-title`, 650) for the brand name, section and column headings, pane and dialog titles. Chinese falls back to Songti SC under the serif and PingFang SC under the sans.
 - **Everything else is Instrument Sans** (`--font-sans`): thread titles, rows, navigation, buttons, meta. Chinese falls back to PingFang SC. Code, times, ids and counters use JetBrains Mono (`--font-mono`) with tabular numbers.
 - Fonts are self-hosted latin subsets in `public/fonts` (SIL OFL 1.1, licenses next to the files), loaded with `font-display: swap` and preloaded in `index.html` and `design.html`; the metric-matched fallbacks keep the swap from shifting layout.
 - **Six font sizes, no seventh allowed**: 26 Coordinator greeting / 20 page title and brand / 17 column and section headings / 14 card titles and UI text / 12.5 meta / 12 badges and group labels. In code, use the corresponding Tailwind theme keys `text-greeting` / `text-page` / `text-heading` / `text-card-title` and `text-ui` / `text-meta` / `text-caption` (heading font `font-heading`), never arbitrary values like `text-[13px]`; `scripts/ui-debt-gate.mjs` D5 only allows the total count of arbitrary values to decrease.
@@ -174,7 +175,7 @@ From top to bottom:
 - `card` surface, 14px corner (`--radius-card`), a `line` 1px hairline ring plus one very light ink shadow (`0 1px 2px`, 5% in light; together they are `--e1`), so the edge is crisp, never soft. On hover the ring deepens and the shadow rises to `0 6px 16px -2px` at 9% (150ms ease-out). No second large blur shadow.
 - In-flight orchestration (start was pressed, the chief has not dispatched yet): a todo card swaps `开始` for a footer `编排中 · reason` (waiting for X to come online / missing capability / queued) plus `查看会话` on the right; a failed card swaps `重试` for an inert `编排中`. Nothing is layered over the meta line.
 - A failed orchestration shows a short plain summary (`orchestrationErrorSummary`: connection dropped, timed out, out of quota, context too long, bad key, provider unavailable); the raw provider error stays in the `title` tooltip and never wraps character by character on the card.
-- Structure: title (at most two lines), then one meta line (project, #number, tag, time; never wraps; when space runs out the tag truncates first and the project keeps at least five characters), then a footer by status. The tag icon uses the user's tag color; the tag name uses the meta ink. A standalone tag (`TagChip`) is a neutral outline pill (`card` background, `line` ring, `ink` text) with an 8px dot in the tag color; the tag color never fills the pill.
+- Structure: title (at most two lines), then one meta line (project, #number, tag, time; never wraps; when space runs out the tag truncates first and the project keeps at least five characters), then a footer by status. The tag icon uses the user's tag color; the tag name uses the meta ink. A standalone tag (`TagChip`) is a tinted label: the tag color mixed into `card` behind text that mixes the tag color into `ink` (`--tag-tint` / `--tag-ink`: 12% / 35% light, 22% / 40% dark, chosen so every label color, white and black included, keeps at least 4.5:1; `test/tag-chip-contrast.test.ts` measures it), 4px corners, no border and no dot, like a GitHub label. Inside the card meta line the tag stays a colored tag glyph plus the name.
 - The right-side meta icons (plan, changes, chief-created, branch) stay hidden until the card is hovered or focused, and are always visible on touch screens (`pointer-coarse`).
 - Footer:
   - Three pending states: dashed divider + status icon and name (ochre) + reason (truncated) + an ochre action link on the right (retry / confirm plan / review).
@@ -198,7 +199,7 @@ See "Page patterns · Settings list" below.
 - User turns sit on the right with no avatar: a `--secondary` bubble, at most `min(80%, 56ch)` wide, 32px tall for one line, with a tighter bottom-right corner. Their action row aligns right. Agent and chief turns keep the avatar on the left.
 - Copy icons under a message stay hidden until its row is hovered or focused (`.chat-copy` in `app.css`); touch screens always show them.
 - The plan preview fades out at the bottom with a mask instead of a hard cut.
-- The composer is a white card (`--card`) with a 1px `--input` ring that turns lichen with a soft halo on focus (`--shadow-composer*`); it is the one white surface in the conversation because it is where you act. The idle send button has no fill; only the stop button gets the `seg-active` square.
+- The composer is a white card (`--card`) with a 1px `--input` ring that turns lichen with a soft halo on focus (`--shadow-composer*`); it is the one white surface in the conversation because it is where you act. The empty send button has no fill; once there is a draft it fills with `primary` (ink, never the ochre accent, which means waiting on you). The stop button is a `secondary` square with an ink stop glyph.
 
 ### Trace
 - Agent activity (tool calls, thinking, waiting) renders as Trace lines (`components/ui/trace.tsx`), never as hand-written rows. One line per action: optional icon, title, then a tabular-number description such as the duration. Every line is sans `text-meta` (12.5px) in `ink-2`; a command or tool name goes in an inline `font-mono text-caption` code span, never a mono line. Errors keep the line in `ink-2` and add a 500 `destructive` "Failed" label (and a `destructive` icon); the whole line never turns red. Pending lines use `ink-3`, not opacity. The live spinner is `running` green, because it means working, not waiting on you. The chief turn-tool panel uses a 1px `border` rule, the same weight as collapsible detail.

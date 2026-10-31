@@ -25,7 +25,7 @@ test('home warns when the server backup went stale', async ({ page }) => {
   const warning = page.getByTestId('backup-warning');
   await expect(warning).toHaveAttribute('data-backup', 'stale');
   await expect(warning).toContainText(
-    'omarchy 上的服务器数据库备份已有 5 小时没有成功，备份可能已停止。在该机器上运行 `systemctl --user list-timers cairn-db-backup.timer` 检查定时器。',
+    'omarchy 上的服务器数据库备份已有 5 小时没有成功，备份可能已停止。在该机器上运行 systemctl --user list-timers cairn-db-backup.timer 检查定时器。',
   );
 });
 
@@ -48,7 +48,7 @@ test('home warns when the latest server backup run failed, even before any chat'
   const warning = page.getByTestId('backup-warning');
   await expect(warning).toHaveAttribute('data-backup', 'failing');
   await expect(warning).toContainText(
-    'omarchy 上的服务器数据库备份最近一次运行失败（exit-code 255），上次成功备份在 1 小时前。在该机器上运行 `systemctl --user status cairn-db-backup.service` 查看原因。',
+    'omarchy 上的服务器数据库备份最近一次运行失败（exit-code 255），上次成功备份在 1 小时前。在该机器上运行 systemctl --user status cairn-db-backup.service 查看原因。',
   );
 });
 

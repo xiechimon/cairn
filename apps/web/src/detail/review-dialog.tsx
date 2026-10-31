@@ -8,6 +8,7 @@ import {
 } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
 import { Label } from '../components/ui/label.js';
+import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { Textarea } from '../components/ui/textarea.js';
 import { useI18n } from '../i18n/provider.js';
 import { classifyReviewChoice } from './review-default.js';
@@ -143,21 +144,20 @@ export function ReviewDialog({
                     <Button
                       variant="ghost"
                       key={row.id}
-                      className="h-auto w-full justify-start gap-3 p-2 text-left font-normal data-[on=true]:bg-(--spot-soft)"
+                      className="h-auto w-full justify-start gap-3 p-2 text-left font-normal data-[on=true]:bg-(--menu-hover) data-[on=true]:ring-1 data-[on=true]:ring-border"
                       data-on={isSelected}
                       role="option"
                       aria-selected={isSelected}
                       onClick={() => setSelected(row.id)}
                     >
-                      <span
-                        className="grid size-9 flex-none place-items-center rounded-full bg-(--secondary) text-sm text-(--text-secondary)"
-                        aria-hidden="true"
-                      >
-                        {row.name.charAt(0).toUpperCase()}
-                      </span>
+                      <SeededAvatar
+                        name={row.name}
+                        fallback="/avatar-robot-1.svg"
+                        className="size-8 flex-none"
+                      />
                       <span className="flex min-w-0 flex-col gap-0.5">
-                        <span className="text-sm text-(--foreground)">{row.name}</span>
-                        <span className="text-xs text-(--text-tertiary)">
+                        <span className="text-ui font-medium text-(--foreground)">{row.name}</span>
+                        <span className="text-meta text-(--text-tertiary)">
                           {row.provider === null ? row.model : `${row.provider} · ${row.model}`}
                         </span>
                       </span>
@@ -191,7 +191,7 @@ export function ReviewDialog({
             value={focus}
             onChange={(event) => setFocus(event.target.value)}
             rows={3}
-            placeholder={t('希望 Agent 审核时重点关注什么？（可选）')}
+            placeholder={t('例如：并发、错误处理、测试覆盖')}
           />
         </div>
       </div>

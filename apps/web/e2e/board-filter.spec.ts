@@ -112,10 +112,10 @@ test('type multi-select = OR union; URL order = vocab canonical order; picking k
   await expect(page.getByTestId('filter-count')).toHaveText('2');
 
   await expect(typeOption(page, 'bug')).toHaveAttribute('aria-selected', 'true');
-  await expect(typeOption(page, 'bug').locator(CHIP)).toBeVisible();
-  await expect(typeOption(page, 'bug').locator('.tag-chip')).toHaveText('bug');
+  await expect(typeOption(page, 'bug')).toHaveText(/bug/);
+  await expect(typeOption(page, 'bug').locator('svg.lucide-tag')).toBeVisible();
   await expect(typeOption(page, 'chore')).toHaveAttribute('aria-selected', 'false');
-  await expect(typeOption(page, 'chore').locator(CHIP)).toHaveCount(0);
+  await expect(typeOption(page, 'chore').locator('svg.lucide-tag')).toBeVisible();
 
   await expect(card(page, 'tagfilter-bug')).toBeVisible();
   await expect(card(page, 'tagfilter-docs')).toBeVisible();

@@ -1,5 +1,5 @@
 import type { ClipboardEvent } from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -35,8 +35,16 @@ import {
   preparePastedFiles,
 } from './attachment-paste.js';
 import { AttachmentStrip } from './attachment-strip.js';
+import {
+  createMentionRegistry,
+  insertMentionDisplay,
+  type MentionRegistry,
+  toDisplay,
+  toWire,
+} from './mention-display.js';
+import { MENTION_TEXTAREA_CLS, MentionHighlight } from './mention-highlight.js';
 import { type MentionGroups, MentionPicker } from './mention-picker.js';
-import { insertMentionText, type MentionToken } from './mention-token.js';
+import type { MentionToken } from './mention-token.js';
 import { applyOrderedListEnter } from './ordered-list.js';
 import { usePendingAttachments } from './pending-attachments.js';
 
@@ -118,11 +126,17 @@ export function NewTaskDialog({
   const { t } = useI18n();
   const [internalSpec, setInternalSpec] = useState('');
   const specControlled = specProp !== undefined && onSpecChange !== undefined;
-  const spec = specControlled ? (specProp as string) : internalSpec;
-  const setSpec: React.Dispatch<React.SetStateAction<string>> = specControlled
-    ? (next) =>
-        (onSpecChange as (s: string) => void)(typeof next === 'function' ? next(spec) : next)
-    : setInternalSpec;
+  const wireSpec = specControlled ? (specProp as string) : internalSpec;
+  const registryRef = useRef<MentionRegistry | null>(null);
+  if (registryRef.current === null) registryRef.current = createMentionRegistry();
+  const mentionRegistry = registryRef.current;
+  const spec = useMemo(() => toDisplay(wireSpec, mentionRegistry), [wireSpec, mentionRegistry]);
+  const setSpec: React.Dispatch<React.SetStateAction<string>> = (next) => {
+    const display = typeof next === 'function' ? next(spec) : next;
+    const wire = toWire(display, mentionRegistry);
+    if (specControlled) (onSpecChange as (s: string) => void)(wire);
+    else setInternalSpec(wire);
+  };
   const [pickerOpen, setPickerOpen] = useState(false);
   const [discardOpen, setDiscardOpen] = useState(false);
   const [projectOpen, setProjectOpen] = useState(false);
@@ -308,13 +322,13 @@ export function NewTaskDialog({
 
   const save = () => {
     if (attachInFlightRef.current > 0) return;
-    onSave(spec, selected?.id);
+    onSave(wireSpec, selected?.id);
   };
 
   const saveAndStart = () => {
     if (attachInFlightRef.current > 0) return;
     if (spec.trim() === '') return;
-    if (onSaveAndStart) onSaveAndStart(spec, selected?.id);
+    if (onSaveAndStart) onSaveAndStart(wireSpec, selected?.id);
     else save();
   };
   useChordHotkey('enter', isEditableOutsideDialog, saveAndStart, open && !discardOpen);
@@ -331,7 +345,8 @@ export function NewTaskDialog({
     if (ta == null) {
       setSpec((current) => {
         let value = current;
-        for (const token of tokens) value = insertMentionText(value, token, null).value;
+        for (const token of tokens)
+          value = insertMentionDisplay(value, token, mentionRegistry, null).value;
         return value;
       });
       return;
@@ -342,7 +357,7 @@ export function NewTaskDialog({
       let value = current;
       let at = start;
       for (const token of tokens) {
-        const result = insertMentionText(value, token, at);
+        const result = insertMentionDisplay(value, token, mentionRegistry, at);
         value = result.value;
         pending.caret = result.caret;
         at = result.caret;
@@ -467,17 +482,18 @@ export function NewTaskDialog({
             <X />
           </Button>
         </div>
-        <div className="flex min-h-0 flex-1 flex-col px-4 pt-4 [&>.attachment-strip]:flex-none [&>.attachment-strip]:pb-2 [&_[data-slot=attachment]]:bg-transparent">
+        <div className="relative flex min-h-0 flex-1 flex-col px-4 pt-4 [&>.attachment-strip]:flex-none [&>.attachment-strip]:pb-2 [&_[data-slot=attachment]]:bg-transparent">
           <Textarea
             ref={focusSpecRef}
             data-testid="new-task-spec"
-            className="new-task-spec min-h-0 flex-1 resize-none border-0 bg-transparent p-0 text-ui leading-5 tabular-nums text-foreground field-sizing-fixed placeholder:text-content-tertiary focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none dark:bg-transparent md:text-ui"
+            className={`new-task-spec min-h-0 flex-1 resize-none border-0 bg-transparent p-0 text-ui leading-5 tabular-nums field-sizing-fixed focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none dark:bg-transparent md:text-ui ${MENTION_TEXTAREA_CLS}`}
             placeholder={SPEC_TEMPLATE_LINES.map((line) => t(line)).join('\n')}
             value={spec}
             onChange={(e) => setSpec(e.target.value)}
             onKeyDown={handleSpecKeyDown}
             onPaste={handleSpecPaste}
           />
+          <MentionHighlight text={spec} registry={mentionRegistry} textareaRef={specRef} />
           {/* deliberate-native: hidden file picker trigger (display:none, opened programmatically); the visible skin is the attachment Button */}
           <input
             ref={fileInputRef}

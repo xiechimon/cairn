@@ -7,6 +7,7 @@ import {
   PICKER_ROW_SELECTED,
 } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
+import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { useI18n } from '../i18n/provider.js';
 import {
   ChevronLeft,
@@ -330,7 +331,7 @@ const INLINE_PANEL_CLS =
   'mention-inline absolute inset-x-0 bottom-[calc(100%+8px)] z-40 max-h-55 overflow-auto rounded-(--radius-popover) bg-popover p-(--menu-pad) shadow-(--shadow-popover)';
 
 const INLINE_ROW_CLS =
-  'mention-inline-row flex h-10 w-full cursor-pointer items-center justify-start gap-2 rounded-(--radius-menu-item) border-0 bg-transparent px-2.5 text-left text-ui font-normal text-foreground hover:bg-transparent hover:text-foreground focus:bg-transparent dark:hover:bg-transparent aria-expanded:bg-transparent active:not-aria-[haspopup]:translate-y-0';
+  'mention-inline-row flex h-8 w-full cursor-pointer items-center justify-start gap-2 rounded-(--radius-menu-item) border-0 bg-transparent px-2.5 text-left text-ui font-normal text-foreground hover:bg-transparent hover:text-foreground focus:bg-transparent dark:hover:bg-transparent aria-expanded:bg-transparent active:not-aria-[haspopup]:translate-y-0';
 
 export function MentionInline({
   open,
@@ -365,7 +366,16 @@ export function MentionInline({
             : t('没有与"{query}"匹配的结果', { query: `@${query}` })}
         </div>
       ) : (
-        rows.map((row, index) => (
+        rows.map((row, index) => [
+          rows[index - 1]?.kind !== row.kind && (
+            <div
+              key={`group:${row.kind}`}
+              aria-hidden="true"
+              className="px-2.5 pt-2 pb-1 text-caption font-medium text-content-tertiary first:pt-1"
+            >
+              {row.kind === 'file' ? t('文件') : labelFor(t, row.kind)}
+            </div>
+          ),
           <Button
             key={`${row.kind}:${row.id}`}
             id={`${listboxId}-opt-${index}`}
@@ -373,28 +383,30 @@ export function MentionInline({
             tabIndex={-1}
             role="option"
             aria-selected={index === highlight}
-            className={`${INLINE_ROW_CLS}${index === highlight ? ` mention-inline-row--active ${PICKER_ROW_SELECTED}` : ''}`}
+            className={`${INLINE_ROW_CLS}${index === highlight ? ' mention-inline-row--active bg-(--menu-hover) hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)' : ''}`}
             onMouseDown={(event) => event.preventDefault()}
             onMouseEnter={() => onHover(index)}
             onClick={() => onPick(row)}
           >
             {row.kind === 'agent' ? (
-              <span className="inline-flex size-6 flex-none items-center justify-center rounded-full bg-(--surface-tertiary) text-caption font-semibold text-foreground">
-                {row.label.charAt(0).toLowerCase()}
-              </span>
+              <SeededAvatar
+                name={row.label}
+                fallback="/avatar-robot-1.svg"
+                className="size-5 flex-none"
+              />
             ) : (
-              <span className="inline-flex size-6 flex-none items-center justify-center rounded-full bg-(--surface-tertiary) text-caption font-semibold text-foreground">
+              <span className="inline-flex size-5 flex-none items-center justify-center text-icon">
                 <InlineKindIcon kind={row.kind} />
               </span>
             )}
-            <span className="flex min-w-0 flex-col gap-px">
-              <span className="truncate font-medium">{row.label}</span>
-              {row.subtitle != null && (
-                <span className="truncate text-meta text-content-tertiary">{row.subtitle}</span>
-              )}
-            </span>
-          </Button>
-        ))
+            <span className="min-w-0 truncate">{row.label}</span>
+            {row.subtitle != null && (
+              <span className="ml-auto flex-none truncate pl-3 text-meta text-content-tertiary">
+                {row.subtitle}
+              </span>
+            )}
+          </Button>,
+        ])
       )}
     </div>
   );

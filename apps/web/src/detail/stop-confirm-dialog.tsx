@@ -28,7 +28,7 @@ export function StopConfirmDialog({ open, onClose, onConfirm, queued }: StopConf
           </Button>
           <Button
             variant="destructive"
-            className={DIALOG_PRIMARY_BUTTON}
+            className={`${DIALOG_PRIMARY_BUTTON} bg-destructive text-(--text-on-veil) hover:bg-destructive/90 dark:bg-destructive dark:text-(--text-on-accent) dark:hover:bg-destructive/90`}
             onClick={() => onConfirm(!queued)}
           >
             {queued ? t('停止') : t('丢弃修改')}

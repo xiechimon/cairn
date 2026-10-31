@@ -88,12 +88,12 @@ test('meta row never wraps at the 200px column floor', async ({ page }) => {
   }
 });
 
-test('running footer spiral spins, and stops under reduced motion', async ({ page }) => {
+test('running footer spiral traces itself, and rests under reduced motion', async ({ page }) => {
   await page.goto(MATRIX);
   const running = card(page, 'dm-building');
   await expect(running).toContainText('执行中');
-  const spinner = running.locator('[data-card-footer="running"] svg');
-  await expect(spinner).toHaveCSS('animation-name', 'spin');
+  const spinner = running.locator('[data-card-footer="running"] svg .spiral-trace');
+  await expect(spinner).toHaveCSS('animation-name', 'spiral-trace');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await expect(spinner).toHaveCSS('animation-name', 'none');
 });

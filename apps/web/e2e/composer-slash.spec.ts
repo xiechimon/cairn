@@ -281,7 +281,7 @@ test('close set: Esc, space, backspace-past-slash, outside click', async ({ page
   await expect(menu).toBeHidden();
 });
 
-test('skill row inserts the wire token with trailing space', async ({ page }) => {
+test('skill row inserts the display token with trailing space', async ({ page }) => {
   const { input, rows, sent } = await openDetail(page);
 
   await input.fill('/code');
@@ -289,7 +289,7 @@ test('skill row inserts the wire token with trailing space', async ({ page }) =>
   await expect(rows.first()).toContainText('/code-review');
   await input.press('ArrowDown');
   await input.press('Enter');
-  await expect(input).toHaveValue('[code-review](skill:code-review) ');
+  await expect(input).toHaveValue('@code-review ');
   expect(sent).toHaveLength(0);
   await evidenceShot(page, 'slash-skill-insert.png');
 });
@@ -300,15 +300,15 @@ test('mixed: slash skill token plus @ mention coexist', async ({ page }) => {
   await input.fill('/code');
   await input.press('ArrowDown');
   await input.press('Enter');
-  await expect(input).toHaveValue('[code-review](skill:code-review) ');
+  await expect(input).toHaveValue('@code-review ');
 
   await input.pressSequentially(' @bu');
   await expect(page.locator('.mention-inline')).toBeVisible();
   await input.press('ArrowDown');
   await input.press('Enter');
   const value = await input.inputValue();
-  expect(value).toContain('[code-review](skill:code-review)');
-  expect(value).toContain('[builder](agent:agent-1)');
+  expect(value).toContain('@code-review');
+  expect(value).toContain('@builder');
 });
 
 test('/help opens the command panel', async ({ page }) => {

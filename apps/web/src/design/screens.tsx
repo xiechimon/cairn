@@ -69,7 +69,7 @@ const SCREENS = [
   },
 ] as const;
 
-function applyFrameTheme(frame: HTMLIFrameElement | null, theme: GalleryTheme) {
+export function applyFrameTheme(frame: HTMLIFrameElement | null, theme: GalleryTheme) {
   const root = frame?.contentDocument?.documentElement;
   if (root == null) return;
   root.classList.toggle('light', theme === 'light');

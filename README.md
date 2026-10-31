@@ -223,7 +223,7 @@ After your team's first pull request merges, Cairn can show a dismissible card l
 ## Third-party credits
 
 - Avatar font [Lorelei](https://www.figma.com/community/file/1198749693280469639) — © Lisa Wischofsky, CC0 1.0
-- Fonts Instrument Sans / Bricolage Grotesque / JetBrains Mono — SIL Open Font License 1.1
+- Fonts Instrument Sans / Bricolage Grotesque / Source Serif 4 / JetBrains Mono — SIL Open Font License 1.1
 - Icons [lucide](https://lucide.dev) — ISC License
 - Emoji curation data [gitmoji](https://gitmoji.dev) — MIT License
 - Execution engine [pi SDK](https://github.com/badlogic/pi-mono) — MIT License

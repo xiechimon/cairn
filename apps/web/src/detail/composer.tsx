@@ -7,10 +7,10 @@ import { useI18n } from '../i18n/provider.js';
 import { ArrowUp, Grid2x2, Paperclip, SearchPlus } from '../icons/index.js';
 import { AttachmentStrip } from '../overlay/attachment-strip.js';
 import { useComposerWire } from '../overlay/composer-wire.js';
+import { MENTION_TEXTAREA_CLS, MentionHighlight } from '../overlay/mention-highlight.js';
 import { type MentionGroups, MentionInline, MentionPicker } from '../overlay/mention-picker.js';
 import type { FileMentionEntry } from '../overlay/mention-token.js';
 import { SlashHelp, SlashMenu } from '../overlay/slash-menu.js';
-import { ComposerChips } from './composer-chips.js';
 
 const COMPOSER_CARD =
   'composer relative mx-auto mb-4 w-[calc(100%-2rem)] max-w-(--chat-max-w) flex-none rounded-(--radius-composer) border-0 bg-(--card) shadow-(--shadow-composer) transition-[box-shadow] duration-[220ms] ease-(--ease-out-expo) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)';
@@ -84,6 +84,7 @@ export function Composer({
     inlineListboxRef,
     acceptInlineRow,
     insertTokens,
+    mentionRegistry,
     groups,
     slashOpen,
     slashQuery,
@@ -149,10 +150,10 @@ export function Composer({
       data-testid="composer-card"
     >
       {editable ? (
-        <div>
+        <div className="relative">
           <Textarea
             ref={textareaRef}
-            className={`composer-placeholder composer-input ${COMPOSER_INPUT}`}
+            className={`composer-placeholder composer-input ${COMPOSER_INPUT} ${MENTION_TEXTAREA_CLS}`}
             placeholder={t(placeholder)}
             value={draft}
             onChange={handleChange}
@@ -175,6 +176,7 @@ export function Composer({
               ? { 'aria-activedescendant': `${inlineListboxId}-opt-${inlineHighlight}` }
               : {})}
           />
+          <MentionHighlight text={draft} registry={mentionRegistry} textareaRef={textareaRef} />
           <MentionInline
             open={inlineOpen}
             rows={inlineRows}
@@ -211,9 +213,8 @@ export function Composer({
       )}
       <div
         data-testid="composer-float"
-        className="pointer-events-none absolute inset-x-0 bottom-[calc(100%+6px)] z-30 flex flex-col gap-1.5 [&>.attachment-strip]:pointer-events-auto [&>.composer-chips]:static!"
+        className="pointer-events-none absolute inset-x-0 bottom-[calc(100%+6px)] z-30 flex flex-col gap-1.5 [&>.attachment-strip]:pointer-events-auto"
       >
-        <ComposerChips draft={draft} files={mentionFiles} suspended={inlineOpen || slashOpen} />
         <AttachmentStrip draft={draft} pending={pendingAttachments} />
       </div>
       <Input
@@ -271,7 +272,7 @@ export function Composer({
       {streaming && (
         <Button
           variant="ghost"
-          className={`composer-stop ${COMPOSER_SQUARE} right-13 bg-(--seg-active) text-(--destructive) hover:bg-(--seg-active) hover:text-(--destructive) dark:hover:bg-(--seg-active) dark:hover:text-(--destructive) [&_svg:not([class*='size-'])]:size-auto`}
+          className={`composer-stop ${COMPOSER_SQUARE} right-13 bg-secondary text-foreground hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover) dark:hover:text-foreground [&_svg:not([class*='size-'])]:size-auto`}
           aria-label={t('停止')}
           onClick={onStop}
         >
@@ -283,7 +284,7 @@ export function Composer({
         className={`composer-send ${COMPOSER_SQUARE} right-3 transition-[background-color,color] duration-(--dur-fast) ease-[cubic-bezier(0.2,0,0,1)] ${
           draft.trim() === ''
             ? 'bg-transparent text-(--text-tertiary) hover:bg-transparent hover:text-(--text-tertiary) dark:hover:bg-transparent dark:hover:text-(--text-tertiary)'
-            : 'bg-(--card-button) text-(--text-on-accent) hover:bg-(--card-button) hover:text-(--text-on-accent) dark:hover:bg-(--card-button) dark:hover:text-(--text-on-accent)'
+            : 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground dark:hover:bg-primary/90 dark:hover:text-primary-foreground'
         } [&_svg:not([class*='size-'])]:size-auto`}
         aria-label={t('发送')}
         onClick={send}

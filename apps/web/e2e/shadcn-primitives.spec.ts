@@ -56,16 +56,3 @@ test('kbd landing: floating hint = registry Tooltip+Kbd combo, not mounted at re
   await expect(hint).toHaveAttribute('data-slot', 'kbd');
   await expect(hint).toHaveText('⌘J');
 });
-
-test('tag-chip landing: lands on the registry Badge, single 20px tier canon', async ({ page }) => {
-  await page.goto('/app?scenario=board-tags&view=board');
-  await expect(page.locator('.todo-card-tag')).toHaveCount(0);
-  await page.locator('.board-type-filter').click();
-  const option = page.locator('.type-filter-option[data-tag="bug"]');
-  await option.click();
-  const picked = option.locator('.tag-chip');
-  await expect(picked).toBeVisible();
-  await expect(picked).toHaveAttribute('data-slot', 'badge');
-  const ph = await picked.evaluate((el) => el.getBoundingClientRect().height);
-  expect(ph).toBeCloseTo(20, 2);
-});

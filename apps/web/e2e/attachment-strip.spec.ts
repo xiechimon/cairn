@@ -265,7 +265,7 @@ test('detail face: paste paints a placeholder, landing swaps it for a chip with 
   await expect(placeholder).toHaveCount(0);
   const chip = strip.getByRole('button', { name: 'pasted-image-1.png' });
   await expect(chip).toBeVisible();
-  const chipImg = chip.getByRole('img', { name: 'pasted-image-1.png' });
+  const chipImg = strip.getByRole('img', { name: 'pasted-image-1.png' });
   await expect
     .poll(() => chipImg.evaluate((el) => (el as HTMLImageElement).naturalWidth))
     .toBe(CARD_W);

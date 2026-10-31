@@ -1,4 +1,4 @@
-import { Archive, CircleStop } from 'lucide-react';
+import { Archive, CircleStop, Undo2 } from 'lucide-react';
 import type { ComponentProps } from 'react';
 import {
   DropdownMenu,
@@ -46,18 +46,6 @@ export function MoreMenu({
     onClose();
   };
   const rows = [
-    ...(onDiscard
-      ? [
-          {
-            key: 'discard-changes',
-            label: t('丢弃修改'),
-            Icon: Trash2,
-            disabled: false,
-            danger: true,
-            onClick: onDiscard,
-          },
-        ]
-      : []),
     {
       key: 'complete',
       label: t('完成'),
@@ -115,6 +103,18 @@ export function MoreMenu({
       disabled: !canClose,
       onClick: onCloseTask,
     },
+    ...(onDiscard
+      ? [
+          {
+            key: 'discard-changes',
+            label: t('丢弃修改'),
+            Icon: Undo2,
+            disabled: false,
+            danger: true,
+            onClick: onDiscard,
+          },
+        ]
+      : []),
     {
       key: 'delete',
       label: t('删除'),
@@ -140,8 +140,10 @@ export function MoreMenu({
         aria-label={t('更多')}
         className={PANEL_CLS}
       >
-        {rows.map((row) => [
-          row.danger === true && <DropdownMenuSeparator key={`${row.key}-sep`} />,
+        {rows.map((row, index) => [
+          row.danger === true && rows[index - 1]?.danger !== true && (
+            <DropdownMenuSeparator key={`${row.key}-sep`} />
+          ),
           <DropdownMenuItem
             key={row.key}
             variant={row.danger === true ? 'destructive' : 'default'}

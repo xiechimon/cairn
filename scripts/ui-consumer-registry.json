@@ -32,20 +32,6 @@
   ],
   "brandInkText": [
     {
-      "file": "apps/web/src/board/notify-banner.tsx",
-      "anchor": "bg-(--notify-icon-bg) text-(--card-button)",
-      "role": "badge-glyph",
-      "reason": "Bell glyph on the --notify-icon-bg disc = spot emphasis, the slot's canon role ('其上字形走 spot（--card-button，非文本 3:1 门实测见 docs/verify/988/）', shadcn.css token comment). Non-text 3:1 gate, not a text-ink role.",
-      "contrast": "docs/verify/988/ (sealed) re-attested in docs/verify/1055/colors/incremental.md"
-    },
-    {
-      "file": "apps/web/src/overlay/chip-popover.tsx",
-      "anchor": "ml-auto flex text-(--card-button)",
-      "role": "selection-mark",
-      "reason": "Check mark on the assigned-agent row = selection indicator (#987: brand ink is for 选中标记/小徽标 only). Wave-1 0bfbdefa kept the spot-emphasis usages on a user-approved ruling.",
-      "contrast": "docs/verify/1055/colors/incremental.md"
-    },
-    {
       "file": "apps/web/src/routes/team-chart.tsx",
       "anchor": "bg-spot-soft text-(--card-button)",
       "role": "badge-glyph",
@@ -184,6 +170,20 @@
       "role": "indicator",
       "reason": "Task panel needs-you marks (#1937): the row status glyph and reason label, the waiting and failed stage glyphs, and the ask box label. DESIGN.md: accent only for needs-you; each carries an icon or a text label, so the state does not rely on color.",
       "contrast": "apps/web/DESIGN.md 颜色 (accent on sheet 4.99, AA for 12px text)"
+    },
+    {
+      "file": "apps/web/src/components/notice-banner.tsx",
+      "anchor": "warning: 'text-(--card-button)'",
+      "role": "indicator",
+      "reason": "Notice banner tone icon for warnings: a non-text 18px glyph that marks waiting-on-you notices (backup stale, unreadable); spot role per #987.",
+      "contrast": "docs/verify/988/ (sealed) re-attested in docs/verify/1055/colors/incremental.md"
+    },
+    {
+      "file": "apps/web/src/chief/chief-outage-banner.tsx",
+      "anchor": "size-4.5 flex-none text-(--card-button)",
+      "role": "indicator",
+      "reason": "Chief outage banner alert glyph: non-text 18px icon, same warning tone as NoticeBanner.",
+      "contrast": "docs/verify/988/ (sealed) re-attested in docs/verify/1055/colors/incremental.md"
     }
   ]
 }

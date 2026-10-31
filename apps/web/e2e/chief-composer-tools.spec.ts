@@ -281,7 +281,7 @@ test('trigger: @ opens the inline listbox inside the drawer; arrows + Enter inse
   await input.press('Enter');
 
   // Whole @query consumed, trailing space landed, nothing sent (FM10).
-  await expect(input).toHaveValue(`${T_BUILDER} `);
+  await expect(input).toHaveValue('@builder ');
   await expect(listbox).toBeHidden();
   expect(sent).toHaveLength(0);
   await expect(input).toBeFocused();
@@ -301,7 +301,7 @@ test('mouse: hover highlights and the row click inserts without stealing focus (
   await expect(input).toHaveAttribute('aria-activedescendant', rowId as string);
 
   await rows.first().click();
-  await expect(input).toHaveValue(`${T_BUILDER} `);
+  await expect(input).toHaveValue('@builder ');
   await expect(listbox).toBeHidden();
   await expect(input).toBeFocused();
 });
@@ -370,7 +370,7 @@ test('the mention button opens the popover with live group counts and inserts a 
   await picker.locator('.mention-picker-insert').click();
 
   await expect(picker).toBeHidden();
-  await expect(input).toHaveValue(`${T_BUILDER} `);
+  await expect(input).toHaveValue('@builder ');
 });
 
 test('Esc with the popover open closes the popover, not the drawer (FM9)', async ({ page }) => {

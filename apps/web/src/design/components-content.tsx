@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ChiefSpiralFace } from '../chief/chief-spiral-face.js';
+import { type TraceStep, TraceSteps } from '../components/chat/trace-steps.js';
 import { EmptyState } from '../components/empty-state.js';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
 import {
@@ -26,28 +27,8 @@ import { Message, MessageContent } from '../components/ui/message.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { Select, SelectContent, SelectItem, SelectValue } from '../components/ui/select.js';
 import { Skeleton } from '../components/ui/skeleton.js';
-import {
-  Trace,
-  TraceCollapsible,
-  TraceCollapsibleContent,
-  TraceCollapsibleTrigger,
-  TraceDescription,
-  TraceIcon,
-  TraceLine,
-  TraceTitle,
-} from '../components/ui/trace.js';
-import {
-  FileText,
-  Key,
-  Lock,
-  Paperclip,
-  Search,
-  Server,
-  Sparkle,
-  SquarePen,
-  Terminal,
-  X,
-} from '../icons/index.js';
+import { FileText, Key, Lock, Paperclip, Server, SquarePen, X } from '../icons/index.js';
+import { SEED_TRANSCRIPT } from './agent-transcript.js';
 import { Cell, Section, Specimen } from './specimen.js';
 
 const LANGS = [
@@ -297,104 +278,57 @@ export function ConversationSection() {
   );
 }
 
+const TRACE_STATES: { id: string; step: TraceStep }[] = [
+  { id: 'done', step: { kind: 'search', query: 'open tasks', hits: 4, secs: 2 } },
+  {
+    id: 'running',
+    step: { kind: 'run', command: 'pnpm install', exit: null, output: [], secs: 0 },
+  },
+  {
+    id: 'failed',
+    step: { kind: 'tool', verb: 'Called', name: 'list_machines', status: 'failed', secs: 4 },
+  },
+  { id: 'pending', step: { kind: 'wait', text: 'Waiting for the agent…' } },
+];
+
+const TRACE_TOOLS: { id: string; step: TraceStep }[] = [
+  { id: 'a', step: { kind: 'tool', verb: 'Calling', name: 'create_todo', status: 'running' } },
+  { id: 'b', step: { kind: 'tool', name: 'list_machines', status: 'done', secs: 1 } },
+  { id: 'c', step: { kind: 'tool', name: 'open_pr', status: 'failed', secs: 3 } },
+];
+
 export function TraceSection() {
   return (
     <Section
       id="trace"
       title="Trace"
-      lede="One line per agent action: tool calls, thinking and waiting. Status carries running, error and pending; a collapsible line holds the detail. Do not hand-write tool rows."
+      lede="One line per agent action. Every line comes from TraceStepLine: an icon for the kind, a verb, the target in a code pill, then the result and the time. Never hand-write tool rows."
     >
       <Specimen
-        title="Lines"
-        note="done, running, error and pending"
-        code={`<Trace>\n  <TraceLine><TraceTitle>read_file</TraceTitle><TraceDescription>2s</TraceDescription></TraceLine>\n  <TraceLine status="running"><TraceTitle>Calling Bash</TraceTitle></TraceLine>\n  <TraceLine status="error">…</TraceLine>\n  <TraceLine status="pending">…</TraceLine>\n</Trace>`}
+        title="States"
+        note="done, running (shimmer), failed (red mark only), pending"
+        code={`<TraceSteps steps={[{ id, step: { kind: 'run', command: 'pnpm install', exit: null, output: [], secs: 0 } }]} />`}
       >
-        <Trace className="max-w-120">
-          <TraceLine>
-            <TraceIcon>
-              <Search />
-            </TraceIcon>
-            <TraceTitle>Searched the board for open tasks</TraceTitle>
-            <TraceDescription>2s</TraceDescription>
-          </TraceLine>
-          <TraceLine status="running">
-            <TraceIcon>
-              <Terminal />
-            </TraceIcon>
-            <TraceTitle>
-              Running <code className="font-mono text-caption">pnpm install --frozen-lockfile</code>
-            </TraceTitle>
-          </TraceLine>
-          <TraceLine status="error" className="data-[status=error]:text-muted-foreground">
-            <TraceIcon className="text-destructive">
-              <Server />
-            </TraceIcon>
-            <TraceTitle>Listed machines</TraceTitle>
-            <TraceDescription>4s</TraceDescription>
-            <span className="text-meta font-medium text-destructive">Failed</span>
-          </TraceLine>
-          <TraceLine
-            status="pending"
-            className="data-[status=pending]:text-content-tertiary data-[status=pending]:opacity-100"
-          >
-            <TraceTitle>Waiting for the agent…</TraceTitle>
-          </TraceLine>
-        </Trace>
+        <TraceSteps steps={TRACE_STATES} className="max-w-120" />
       </Specimen>
       <Specimen
-        title="Collapsible detail"
-        note="thinking and tool output fold under their line"
-        code={`<TraceCollapsible>\n  <TraceCollapsibleTrigger>\n    <TraceLine><TraceTitle>Thinking</TraceTitle></TraceLine>\n  </TraceCollapsibleTrigger>\n  <TraceCollapsibleContent>…</TraceCollapsibleContent>\n</TraceCollapsible>`}
+        title="Step kinds"
+        note="think, search, read, say, run (folds its output), edit, push, check"
       >
-        <Trace className="max-w-120">
-          <TraceCollapsible defaultOpen>
-            <TraceCollapsibleTrigger>
-              <TraceLine>
-                <TraceIcon>
-                  <Sparkle />
-                </TraceIcon>
-                <TraceTitle className="italic">Thinking</TraceTitle>
-              </TraceLine>
-            </TraceCollapsibleTrigger>
-            <TraceCollapsibleContent>
-              The lockfile and package.json disagree after the last version bump, so the frozen
-              install fails before any test runs.
-            </TraceCollapsibleContent>
-          </TraceCollapsible>
-          <TraceCollapsible>
-            <TraceCollapsibleTrigger>
-              <TraceLine>
-                <TraceIcon>
-                  <FileText />
-                </TraceIcon>
-                <TraceTitle>Read package.json</TraceTitle>
-                <TraceDescription>1s</TraceDescription>
-              </TraceLine>
-            </TraceCollapsibleTrigger>
-            <TraceCollapsibleContent className="font-mono text-caption">
-              "packageManager": "pnpm@10.4.1"
-            </TraceCollapsibleContent>
-          </TraceCollapsible>
-        </Trace>
+        <TraceSteps
+          steps={SEED_TRANSCRIPT.map((step, i) => ({ id: i, step }))}
+          className="max-w-160"
+        />
       </Specimen>
-      <Specimen title="Chief turn tools" note="the compact panel under a chief reply">
-        <Trace className="max-w-120 gap-1.5 border-l border-border py-0.5 pl-3">
-          <TraceLine status="running" className="text-meta leading-5 text-content-secondary">
-            <TraceTitle>Calling create_todo</TraceTitle>
-          </TraceLine>
-          <TraceLine className="text-meta leading-5 text-content-secondary">
-            <TraceTitle>list_machines</TraceTitle>
-            <TraceDescription>1s</TraceDescription>
-          </TraceLine>
-          <TraceLine
-            status="error"
-            className="text-meta leading-5 text-content-secondary data-[status=error]:text-content-secondary"
-          >
-            <TraceTitle>open_pr</TraceTitle>
-            <TraceDescription>3s</TraceDescription>
-            <span className="font-medium text-destructive">Failed</span>
-          </TraceLine>
-        </Trace>
+      <Specimen
+        title="Chief turn tools"
+        note="the same lines at compact density under a chief reply"
+      >
+        <TraceSteps
+          steps={TRACE_TOOLS}
+          density="compact"
+          className="max-w-120 border-l border-border py-0.5 pl-3"
+        />
       </Specimen>
     </Section>
   );

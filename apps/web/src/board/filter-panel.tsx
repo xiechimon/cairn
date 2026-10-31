@@ -1,4 +1,4 @@
-import { Funnel } from 'lucide-react';
+import { Funnel, Tag } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Button } from '../components/ui/button.js';
 import { Checkbox } from '../components/ui/checkbox.js';
@@ -6,7 +6,6 @@ import { EmptyDescription } from '../components/ui/empty.js';
 import { Input } from '../components/ui/input.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
 import { Separator } from '../components/ui/separator.js';
-import { TagChip } from '../components/ui/tag-chip.js';
 import { useI18n } from '../i18n/provider.js';
 import { Check, X } from '../icons/index.js';
 
@@ -74,18 +73,19 @@ export function FilterChips({
         <Button
           key={chip.key}
           data-dimension={chip.key}
-          className="h-5 flex-none gap-1 rounded-full border border-transparent bg-foreground px-2 text-[11px] leading-none font-medium text-background hover:bg-foreground active:not-aria-[haspopup]:translate-y-0"
+          variant="secondary"
+          className="h-6 flex-none gap-1 rounded-(--cds-radius-sm) border-none px-1.5 text-meta font-medium hover:brightness-95 active:not-aria-[haspopup]:translate-y-0"
           aria-label={t('清除{name}筛选', { name: chip.label })}
           onClick={chip.onClear}
         >
           <span className="max-w-40 truncate">{chip.label}</span>
-          <X className="size-2.5" />
+          <X className="size-3 opacity-70" />
         </Button>
       ))}
       {chips.length > 1 && (
         <Button
           variant="ghost"
-          className="h-5 flex-none rounded-full border-none px-2 text-[11px] leading-none font-medium text-muted-foreground hover:bg-transparent hover:text-foreground dark:hover:bg-transparent active:not-aria-[haspopup]:translate-y-0"
+          className="h-6 flex-none rounded-(--cds-radius-sm) border-none px-2 text-meta font-medium text-content-tertiary hover:bg-transparent hover:text-foreground dark:hover:bg-transparent active:not-aria-[haspopup]:translate-y-0"
           onClick={onClearAll}
         >
           {t('清除全部')}
@@ -145,7 +145,7 @@ function DimensionSection({
           )}
           <div className="flex items-center">
             {/* biome-ignore lint/a11y/noLabelWithoutControl: Base UI Checkbox.Root renders its hidden native input inside this label at runtime; the static check cannot see through the component. */}
-            <label className="inline-flex h-7 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-(--radius-menu-item) px-2 text-xs text-foreground transition-colors hover:bg-accent-soft">
+            <label className="inline-flex h-8 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-(--radius-menu-item) px-2 text-ui text-foreground transition-colors hover:bg-(--menu-hover)">
               <Checkbox
                 checked={allSelected}
                 indeterminate={someSelected && !allSelected}
@@ -182,23 +182,23 @@ function DimensionSection({
                       : { 'data-tag': choice.value })}
                     role="option"
                     aria-selected={active}
-                    className={`${alias} h-7 min-w-0 flex-1 justify-start gap-2 rounded-(--radius-menu-item) border-none px-2 text-xs font-normal text-foreground hover:bg-accent-soft dark:hover:bg-accent-soft active:not-aria-[haspopup]:translate-y-0 ${
-                      active ? 'bg-accent' : ''
-                    }`}
+                    className={`${alias} h-8 min-w-0 flex-1 justify-start gap-2 rounded-(--radius-menu-item) border-none px-2 text-ui font-normal text-foreground hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover) active:not-aria-[haspopup]:translate-y-0 `}
                     onClick={() => dimension.onToggle(choice.value)}
                   >
                     <CheckBox state={active ? 'on' : 'off'} />
-                    {active && choice.color != null ? (
-                      <TagChip
-                        tag={{ id: choice.value, name: choice.label, color: choice.color }}
+                    {choice.color != null && (
+                      <Tag
+                        aria-hidden="true"
+                        className="size-3.5 flex-none"
+                        strokeWidth={1.75}
+                        style={{ color: choice.color }}
                       />
-                    ) : (
-                      <span className="min-w-0 flex-1 truncate text-left">{choice.label}</span>
                     )}
+                    <span className="min-w-0 flex-1 truncate text-left">{choice.label}</span>
                     {choice.count > 0 && (
                       <span
                         data-testid="option-count"
-                        className="ml-auto text-[11px] text-muted-foreground tabular-nums transition-opacity group-hover:opacity-0"
+                        className="ml-auto text-caption text-content-tertiary tabular-nums transition-opacity group-hover:opacity-0"
                       >
                         {choice.count}
                       </span>
@@ -285,7 +285,7 @@ export function FilterPanel({ dimensions, totalSelected, onClearAll }: FilterPan
         {totalSelected > 0 && (
           <Button
             variant="ghost"
-            className="mt-0.5 h-7 w-full rounded-(--cds-radius-sm) border-none text-xs font-normal text-muted-foreground hover:bg-accent-soft hover:text-foreground dark:hover:bg-accent-soft active:not-aria-[haspopup]:translate-y-0"
+            className="mt-0.5 h-7 w-full rounded-(--cds-radius-sm) border-none text-xs font-normal text-muted-foreground hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover) active:not-aria-[haspopup]:translate-y-0"
             onClick={onClearAll}
           >
             {t('清除全部')}

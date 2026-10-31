@@ -100,7 +100,7 @@ export function MenuSection() {
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
               <DropdownMenuItem onClick={() => setLast('Open in GitHub')}>
-                <ExternalLink />
+                <ExternalLink className="size-4.5" />
                 Open in GitHub
               </DropdownMenuItem>
             </DropdownMenuGroup>
@@ -145,15 +145,23 @@ export function MenuSection() {
       <Specimen title="Popover" note="For a small panel anchored to its trigger" stage="canvas">
         <Popover>
           <PopoverTrigger render={<Button variant="outline" />}>Machine status</PopoverTrigger>
-          <PopoverContent className="w-72">
-            <PopoverHeader>
-              <PopoverTitle>omarchy</PopoverTitle>
-              <PopoverDescription>Online · 2 tasks running · last seen just now</PopoverDescription>
+          <PopoverContent align="start" className="w-72 gap-3">
+            <PopoverHeader className="gap-1">
+              <PopoverTitle className="flex items-center gap-2 text-ui font-semibold">
+                <span className="size-2 flex-none rounded-full bg-running" />
+                omarchy
+                <span className="ml-auto text-meta font-medium text-running-text">Online</span>
+              </PopoverTitle>
+              <PopoverDescription className="text-meta text-content-tertiary">
+                Linux · last seen just now
+              </PopoverDescription>
             </PopoverHeader>
-            <div className="mt-3 flex items-center gap-2 text-meta text-content-tertiary">
-              <span className="size-2 rounded-full bg-running" />
-              Heartbeat every 15s
-            </div>
+            <dl className="m-0 grid grid-cols-2 gap-x-3 gap-y-1.5 border-t border-border pt-3 text-meta">
+              <dt className="text-content-tertiary">Running</dt>
+              <dd className="m-0 text-right tabular-nums">2 tasks</dd>
+              <dt className="text-content-tertiary">Heartbeat</dt>
+              <dd className="m-0 text-right tabular-nums">every 15s</dd>
+            </dl>
           </PopoverContent>
         </Popover>
       </Specimen>
