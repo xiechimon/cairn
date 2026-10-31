@@ -117,6 +117,26 @@ export function slotPortReport({ slot, env = process.env }) {
   return `[heavy-slots] slot ${slot}'s port ${port} is held by ${details.join(', ')}; anything on a leased slot's port is an orphan — kill the pid or free the port, then rerun`;
 }
 
+export function gitToplevel(dir) {
+  const res = spawnSync('git', ['-C', dir, 'rev-parse', '--show-toplevel'], { encoding: 'utf8' });
+  return res.error || res.status !== 0 ? undefined : res.stdout.trim();
+}
+
+export function foreignPortHolderReport({
+  port,
+  toplevel,
+  holderOf = slotPortHolder,
+  toplevelOf = gitToplevel,
+}) {
+  const holder = holderOf(port);
+  if (holder === null) return null;
+  const holderToplevel = holder.cwd === undefined ? undefined : toplevelOf(holder.cwd);
+  if (holderToplevel === toplevel) return null;
+  const details = [`pid ${holder.pid}`, `cwd ${holder.cwd ?? 'unknown'}`];
+  if (holder.command !== undefined) details.push(`command ${holder.command}`);
+  return `[e2e] port ${port} is served by another checkout (${holderToplevel ?? 'not a git checkout'}), not ${toplevel}: ${details.join(', ')}. Playwright reused that server, so these specs would test its build. Stop your own stale preview, or pick a free port with E2E_PORT=<port>; leave other lanes' processes running.`;
+}
+
 function isAlive(pid) {
   try {
     process.kill(pid, 0);
