@@ -1,4 +1,4 @@
-import { StoneMark } from '../stone/stone-mark.js';
+import { ToneGlyph } from '../stone/tone-glyph.js';
 import { Button } from '../ui/button.js';
 import { StatusChip } from '../ui/status-chip.js';
 
@@ -29,7 +29,11 @@ export function ScheduledTaskRow({ name, trigger, next, state, onOpen }: Schedul
       data-state={state}
       className="h-auto w-full justify-start gap-3 rounded-none border-0 px-3.5 py-3 text-left text-ui font-normal not-last:border-b not-last:border-border hover:bg-sidebar-hover"
     >
-      <StoneMark tone={state === 'active' ? 'working' : 'idle'} kind="idle" still />
+      <ToneGlyph
+        tone={state === 'active' ? 'working' : 'idle'}
+        still
+        className="mt-0.75 self-start"
+      />
       <span className="min-w-0 flex-1">
         <b className="block truncate font-semibold text-foreground">{name}</b>
         <small className="block truncate text-meta text-content-tertiary">{detail}</small>

@@ -2,11 +2,9 @@ import { Inbox, Library, Settings2 } from 'lucide-react';
 import { useState } from 'react';
 import { HeaderIconButton } from '../components/shell/header-icon-button.js';
 import { WaitPill } from '../components/shell/wait-pill.js';
-import { Pebble } from '../components/stone/pebble.js';
 import { StoneGroup, StoneTrail } from '../components/stone/stone-group.js';
-import type { StoneKind } from '../components/stone/stone-mark.js';
-import { STONE_KINDS, StoneMark } from '../components/stone/stone-mark.js';
 import { STONE_TONES, type StoneTone } from '../components/stone/tone.js';
+import { ToneGlyph } from '../components/stone/tone-glyph.js';
 import { BulkBar } from '../components/thread/bulk-bar.js';
 import { ThreadCard } from '../components/thread/thread-card.js';
 import { ThreadRow } from '../components/thread/thread-row.js';
@@ -21,48 +19,25 @@ export function StoneSection() {
     <Section
       id="stone"
       title="Stone marks and trail"
-      lede="Status is a pebble. Five tones carry the whole inbox: waiting (ochre), review (slate), working (lichen), idle and resolved (stone). Marks add a kind icon; the working mark spins unless still, and holds still under reduced motion."
+      lede="Five groups carry the inbox in a fixed order: waiting on you, ready for review, working, idle, resolved. A state is drawn once per context: the group header carries the glyph and its rows carry none; a row outside a group carries its own. The reason is written, not iconised."
     >
-      <Specimen title="Pebble" note="8 by 7, one per tone" code={`<Pebble tone="waiting" />`}>
+      <Specimen
+        title="Tone glyph"
+        note="The status glyph family, one per tone; working is the spiral trace"
+        code={`<ToneGlyph tone="waiting" />\n<ToneGlyph tone="working" still />`}
+      >
         {STONE_TONES.map((tone) => (
           <Cell key={tone} label={tone}>
-            <Pebble tone={tone} />
-          </Cell>
-        ))}
-      </Specimen>
-      <Specimen
-        title="Stone mark"
-        note="22px pebble with the kind icon, every tone and kind"
-        code={`<StoneMark tone="working" kind="running" />\n<StoneMark tone="working" kind="idle" still />`}
-      >
-        {(
-          [
-            ['waiting', 'question'],
-            ['waiting', 'plan'],
-            ['waiting', 'permission'],
-            ['review', 'pr'],
-            ['working', 'running'],
-            ['idle', 'idle'],
-            ['idle', 'snoozed'],
-            ['resolved', 'done'],
-          ] as const satisfies readonly (readonly [StoneTone, StoneKind])[]
-        ).map(([tone, kind]) => (
-          <Cell key={kind} label={`${tone} / ${kind}`}>
-            <StoneMark tone={tone} kind={kind} />
+            <ToneGlyph tone={tone} />
           </Cell>
         ))}
         <Cell label="working, still">
-          <StoneMark tone="working" kind="idle" still />
-        </Cell>
-        <Cell label={`${STONE_KINDS.length} kinds in all`}>
-          {STONE_KINDS.map((kind) => (
-            <StoneMark key={kind} tone="idle" kind={kind} />
-          ))}
+          <ToneGlyph tone="working" still />
         </Cell>
       </Specimen>
       <Specimen
         title="Stone trail"
-        note="Group header: pebble, label, count, collapse chevron; the dashed line is the trail"
+        note="Group header: glyph, label, count, collapse chevron; an empty group says so in one line"
         stage="canvas"
         code={`<StoneTrail>\n  <StoneGroup tone="waiting" label="Waiting on you" count={2}>{rows}</StoneGroup>\n</StoneTrail>`}
       >
@@ -131,7 +106,6 @@ export function StoneSection() {
 
 type CardState = {
   tone: StoneTone;
-  kind: StoneKind;
   stateLabel: string;
   reason: string;
   primary?: string;
@@ -140,34 +114,29 @@ type CardState = {
 const CARD_STATES: readonly CardState[] = [
   {
     tone: 'waiting',
-    kind: 'question',
     stateLabel: 'Waiting on you',
-    reason: 'Asks whether to store the token once on the server or per machine.',
+    reason: 'Question · whether to store the token once on the server or per machine.',
     primary: 'Answer',
   },
   {
     tone: 'waiting',
-    kind: 'plan',
     stateLabel: 'Waiting on you',
-    reason: 'Plan ready: 4 steps, nothing changes until you approve it.',
+    reason: 'Plan · 4 steps, nothing changes until you approve it.',
     primary: 'Review plan',
   },
   {
     tone: 'working',
-    kind: 'running',
     stateLabel: 'Working',
     reason: 'Writing the receipt test · 6 of 9 files read.',
   },
   {
     tone: 'review',
-    kind: 'pr',
     stateLabel: 'Ready for review',
     reason: 'PR #2271 opened, CI passed.',
     primary: 'Review PR',
   },
   {
     tone: 'resolved',
-    kind: 'done',
     stateLabel: 'Merged',
     reason: 'PR #2271 merged into main.',
   },
@@ -181,19 +150,18 @@ export function ThreadCardSection() {
     <Section
       id="thread-card"
       title="Thread card"
-      lede="The Coordinator stream shows each thread as one card that updates in place: mark, title, state tag, one-line reason, and the next action. Step the state to see it change."
+      lede="The Coordinator stream shows each thread as one card that updates in place: glyph, title, one-line reason, and the next action. The glyph is the state; there is no second state tag. Step the state to see it change."
     >
       <Specimen
         title="One card, five states"
         note={`State ${index + 1} of ${CARD_STATES.length}`}
         stage="canvas"
-        code={`<ThreadCard\n  title="Connect a Claude subscription"\n  tone="waiting"\n  kind="question"\n  stateLabel="Waiting on you"\n  reason="Asks whether to store the token once or per machine."\n  primaryLabel="Answer"\n/>`}
+        code={`<ThreadCard\n  title="Connect a Claude subscription"\n  tone="waiting"\n  stateLabel="Waiting on you"\n  reason="Asks whether to store the token once or per machine."\n  primaryLabel="Answer"\n/>`}
       >
         <div className="flex w-full max-w-170 flex-col gap-4">
           <ThreadCard
             title="Connect a Claude subscription"
             tone={state.tone}
-            kind={state.kind}
             stateLabel={state.stateLabel}
             reason={state.reason}
             primaryLabel={state.primary}
@@ -210,11 +178,10 @@ export function ThreadCardSection() {
       <Specimen title="All states" stage="canvas" className="flex-col">
         {CARD_STATES.map((s) => (
           <ThreadCard
-            key={`${s.tone}${s.kind}`}
+            key={s.reason}
             className="max-w-170"
             title="Connect a Claude subscription"
             tone={s.tone}
-            kind={s.kind}
             stateLabel={s.stateLabel}
             reason={s.reason}
             primaryLabel={s.primary}
@@ -230,7 +197,6 @@ interface DemoThread {
   title: string;
   reason: string;
   tone: StoneTone;
-  kind: StoneKind;
   age: string;
   pr?: number;
   snoozed?: boolean;
@@ -240,25 +206,22 @@ const DEMO_THREADS: readonly DemoThread[] = [
   {
     id: 'a',
     title: 'Connect a Claude subscription',
-    reason: 'Asks where to store the token',
+    reason: 'Question · where to store the token',
     tone: 'waiting',
-    kind: 'question',
     age: '4m',
   },
   {
     id: 'b',
-    title: 'Snooze until needed',
-    reason: 'Wants to run pnpm db:migrate',
+    title: 'Run the schedules migration',
+    reason: 'Permission · wants to run pnpm db:migrate',
     tone: 'waiting',
-    kind: 'permission',
     age: '11m',
   },
   {
     id: 'c',
     title: 'Fold finished turns',
-    reason: 'PR is ready, CI passed',
+    reason: 'CI passed',
     tone: 'review',
-    kind: 'pr',
     age: '32m',
     pr: 2271,
   },
@@ -267,7 +230,6 @@ const DEMO_THREADS: readonly DemoThread[] = [
     title: 'Device receipts',
     reason: 'Writing the receipt test',
     tone: 'working',
-    kind: 'running',
     age: '0:42',
   },
   {
@@ -275,7 +237,6 @@ const DEMO_THREADS: readonly DemoThread[] = [
     title: 'Automation badge and popover',
     reason: 'Snoozed until needed',
     tone: 'idle',
-    kind: 'snoozed',
     age: '',
     snoozed: true,
   },
@@ -298,7 +259,6 @@ export function ThreadRowSection() {
         title={t.title}
         reason={t.reason}
         tone={t.tone}
-        kind={t.kind}
         age={t.age}
         pr={t.pr}
         snoozed={t.snoozed}
@@ -310,13 +270,13 @@ export function ThreadRowSection() {
     <Section
       id="thread-row"
       title="Thread row and bulk bar"
-      lede="The inbox row: mark, title, PR tag, reason and age. Hover reveals a checkbox; waiting rows are raised. Selecting rows floats the bulk bar."
+      lede="The inbox row inside a group: title, PR number, reason and age, no glyph of its own. Hover reveals a checkbox in the left gutter; selecting rows floats the bulk bar."
     >
       <Specimen
         title="Inbox trail"
         note="Hover a row, tick the checkbox"
         stage="canvas"
-        code={`<ThreadRow title="Fold finished turns" reason="PR is ready" tone="review" kind="pr" pr={2271} age="32m" />\n<BulkBar count={2} onResolve={...} onSnooze={...} onArchive={...} onClear={...} />`}
+        code={`<ThreadRow title="Fold finished turns" reason="PR is ready" tone="review" pr={2271} age="32m" />\n<BulkBar count={2} onResolve={...} onSnooze={...} onArchive={...} onClear={...} />`}
       >
         <div className="relative w-full max-w-130 overflow-hidden rounded-(--radius-card) bg-background pb-14">
           <StoneTrail>
