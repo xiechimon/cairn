@@ -1,7 +1,15 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
-import { chmodSync, existsSync, lstatSync, readFileSync, rmSync } from 'node:fs';
+import {
+  closeSync,
+  constants,
+  fchmodSync,
+  lstatSync,
+  openSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { createConnection, createServer, type Server, type Socket } from 'node:net';
-import { dirname } from 'node:path';
+import { basename, dirname } from 'node:path';
 import { createInterface } from 'node:readline';
 import {
   claudeRateLimitReportSchema,
@@ -11,7 +19,6 @@ import {
 } from '@cairn/shared';
 import { z } from 'zod';
 import { type MachineApi, MachineApiError } from '../machine-client.js';
-import { writePrivateFile } from '../private-fs.js';
 import { deliverOrbBundle, type OrbLocalDelivery } from './delivery.js';
 import {
   decodeOrbFrame,
@@ -25,6 +32,7 @@ import {
   orbBundleArgsSchema,
   orbWorkerFrameSchema,
 } from './protocol.js';
+import { readOrbFile } from './runtime-fs.js';
 
 const callSchema = z
   .object({
@@ -53,6 +61,7 @@ export class RelayMachineServer {
   private completed = false;
   private delivery: Promise<void> | undefined;
   private ownsSocket = false;
+  private ownsToken = false;
   private connected = false;
   private readonly authenticated = new Set<Socket>();
   private readonly token = randomBytes(32).toString('hex');
@@ -159,32 +168,34 @@ export class RelayMachineServer {
       throw new RelayMachineError('Relay parent must be a real directory');
     if (directory.uid !== process.getuid?.() || (directory.mode & 0o7777) !== 0o700)
       throw new RelayMachineError('Relay directory must be owned by daemon uid with mode 0700');
-    if (existsSync(this.options.socketPath)) {
-      if (!lstatSync(this.options.socketPath).isSocket())
-        throw new RelayMachineError('Relay path is not a socket');
-      await new Promise<void>((resolve, reject) => {
-        const probe = createConnection(this.options.socketPath);
-        probe.once('connect', () => {
-          probe.destroy();
-          reject(new RelayMachineError('Relay socket already has a live listener'));
-        });
-        probe.once('error', (error: NodeJS.ErrnoException) => {
-          if (error.code === 'ECONNREFUSED') resolve();
-          else reject(error);
-        });
-      });
-      rmSync(this.options.socketPath);
-    }
+    for (const path of [this.options.socketPath, `${this.options.socketPath}.token`])
+      if (lstatSync(path, { throwIfNoEntry: false }))
+        throw new RelayMachineError('Relay path already exists');
     await new Promise<void>((resolve, reject) => {
       this.server.once('error', reject);
-      this.server.listen(this.options.socketPath, () => {
-        this.server.removeListener('error', reject);
-        this.ownsSocket = true;
-        resolve();
-      });
+      const mask = process.umask(0o177);
+      try {
+        this.server.listen(this.options.socketPath, () => {
+          this.server.removeListener('error', reject);
+          this.ownsSocket = true;
+          resolve();
+        });
+      } finally {
+        process.umask(mask);
+      }
     });
-    chmodSync(this.options.socketPath, 0o600);
-    writePrivateFile(`${this.options.socketPath}.token`, this.token);
+    const descriptor = openSync(
+      `${this.options.socketPath}.token`,
+      constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
+      0o600,
+    );
+    this.ownsToken = true;
+    try {
+      fchmodSync(descriptor, 0o600);
+      writeFileSync(descriptor, this.token);
+    } finally {
+      closeSync(descriptor);
+    }
   }
 
   send(frame: OrbFrame): void {
@@ -210,10 +221,8 @@ export class RelayMachineServer {
       await new Promise<void>((resolve) => this.server.close(() => resolve()));
       if (this.reporting) await this.reporting.catch(() => {});
       if (this.delivery) await this.delivery.catch(() => {});
-      if (this.ownsSocket) {
-        rmSync(this.options.socketPath, { force: true });
-        rmSync(`${this.options.socketPath}.token`, { force: true });
-      }
+      if (this.ownsSocket) rmSync(this.options.socketPath, { force: true });
+      if (this.ownsToken) rmSync(`${this.options.socketPath}.token`, { force: true });
     })();
     return this.closing;
   }
@@ -408,7 +417,10 @@ export class RelayMachineApi {
     onFrame?: (frame: OrbFrame) => void,
     onClose?: () => void,
   ): Promise<RelayMachineApi> {
-    const token = readFileSync(`${socketPath}.token`, 'utf8');
+    const token = readOrbFile(dirname(socketPath), `${basename(socketPath)}.token`, 64).toString(
+      'utf8',
+    );
+    if (!/^[a-f0-9]{64}$/.test(token)) throw new RelayMachineError('Invalid relay token');
     const client = new RelayMachineApi(socketPath, token, onFrame, onClose);
     await client.authentication;
     return client;

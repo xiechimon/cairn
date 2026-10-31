@@ -1,8 +1,13 @@
+import { execFileSync } from 'node:child_process';
 import {
   cpSync,
   existsSync,
+  linkSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
+  renameSync,
   rmSync,
   statSync,
   symlinkSync,
@@ -140,6 +145,9 @@ test.each([
   'escape',
   'absolute',
   'symlink',
+  'fifo',
+  'hardlink',
+  'outbox-symlink',
   'invalid',
   'wrong-step',
   'extra-argument',
@@ -161,10 +169,21 @@ test.each([
     { cwd: repo },
   );
   if (attack === 'oversized') truncateSync(bundle, 64 * 1024 * 1024 + 1);
-  if (attack === 'symlink') {
-    rmSync(bundle);
-    symlinkSync(join(root, 'outside.bundle'), bundle);
+  const outside = join(root, 'outside.bundle');
+  if (attack === 'symlink' || attack === 'hardlink' || attack === 'fifo') {
+    renameSync(bundle, outside);
+    if (attack === 'symlink') symlinkSync(outside, bundle);
+    else if (attack === 'hardlink') linkSync(outside, bundle);
+    else execFileSync('mkfifo', [bundle]);
   }
+  const outsideDir = join(root, 'outside');
+  if (attack === 'outbox-symlink') {
+    renameSync(outboxDir, outsideDir);
+    symlinkSync(outsideDir, outboxDir, 'dir');
+  }
+  const target = attack === 'outbox-symlink' ? join(outsideDir, 'step.bundle') : outside;
+  const original = existsSync(target) ? readFileSync(target) : undefined;
+  const metadata = existsSync(target) ? lstatSync(target) : undefined;
   if (attack === 'invalid') writeFileSync(bundle, 'not a bundle');
   const server = new RelayMachineServer({
     socketPath: join(root, 'relay.sock'),
@@ -185,6 +204,13 @@ test.each([
       ]),
     ).rejects.toThrow(attack === 'wrong-step' ? /step does not match/ : /bundle/i);
     expect(await runGitOk(['show-ref'], { cwd: repo })).toBe(before);
+    if (original && metadata) {
+      const current = lstatSync(target);
+      expect(current.atimeMs).toBe(metadata.atimeMs);
+      expect(current.mtimeMs).toBe(metadata.mtimeMs);
+      expect(current.mode).toBe(metadata.mode);
+      expect(readFileSync(target)).toEqual(original);
+    }
   } finally {
     relay.close();
     await server.close();

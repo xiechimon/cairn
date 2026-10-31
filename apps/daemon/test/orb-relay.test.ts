@@ -169,7 +169,7 @@ test('refuses a second completion while the first is in flight and after it sett
   expect(forwarded).toHaveBeenCalledTimes(1);
 });
 
-test('reclaims a socket left by a dead process', async () => {
+test('refuses a socket left by a dead process without replacing it', async () => {
   const root = mkdtempSync(join(tmpdir(), 'orb-stale-relay-'));
   const socketPath = join(root, 'step.sock');
   execFileSync(process.execPath, [
@@ -178,6 +178,7 @@ test('reclaims a socket left by a dead process', async () => {
     socketPath,
   ]);
   expect(statSync(socketPath).isSocket()).toBe(true);
+  const inode = statSync(socketPath).ino;
   const upstream = new Proxy({}, { get: () => vi.fn(async () => undefined) }) as MachineApi;
   const server = new RelayMachineServer({
     socketPath,
@@ -186,10 +187,9 @@ test('reclaims a socket left by a dead process', async () => {
     upstream,
   });
   try {
-    await server.listen();
-    const client = await RelayMachineApi.connect(socketPath);
-    await expect(client.api.heartbeat('step')).resolves.toBeUndefined();
-    client.close();
+    await expect(server.listen()).rejects.toThrow('already exists');
+    await server.close();
+    expect(statSync(socketPath).ino).toBe(inode);
   } finally {
     await server.close();
     rmSync(root, { recursive: true, force: true });

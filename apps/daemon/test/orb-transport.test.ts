@@ -1,10 +1,14 @@
+import { execFileSync } from 'node:child_process';
 import {
   chmodSync,
   existsSync,
+  linkSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
+  readlinkSync,
   rmSync,
   statSync,
   symlinkSync,
@@ -27,6 +31,209 @@ import {
   fakeBackend,
   waitFor,
 } from './machine-loop-harness.js';
+
+test.each(['symlink', 'directory', 'file'] as const)(
+  'refuses a pre-planted outbox %s without replacing it or touching its target',
+  async (kind) => {
+    let outbox = '';
+    const { provider, root } = fixture({
+      onStart: (directory) => {
+        mkdirSync(directory, { mode: 0o700 });
+        outbox = join(directory, 'outbox');
+        if (kind === 'symlink') symlinkSync(join(root, 'outside'), outbox, 'dir');
+        else if (kind === 'directory') mkdirSync(outbox);
+        else writeFileSync(outbox, 'pre-planted');
+      },
+    });
+    const outside = join(root, 'outside');
+    mkdirSync(outside, { mode: 0o750 });
+    writeFileSync(join(outside, 'sentinel'), 'unchanged');
+    const metadata = lstatSync(outside);
+    await runGitOk(['init', '-b', 'main', root]);
+    await runGitOk(
+      [
+        '-c',
+        'user.name=Test',
+        '-c',
+        'user.email=test@example.test',
+        'commit',
+        '--allow-empty',
+        '-m',
+        'Initial',
+      ],
+      { cwd: root },
+    );
+    const listen = vi
+      .spyOn(RelayMachineServer.prototype, 'listen')
+      .mockRejectedValue(new Error('Unexpected relay publication'));
+    const api = new FakeMachineApi();
+    api.claimQueue.push({
+      ...CLAIMED,
+      project: { ...CLAIMED.project!, repo: { kind: 'local', cloneUrl: root } },
+    });
+    const { handle } = await boot({
+      api,
+      orbProvider: provider,
+      capEnv: { CAIRN_EXECUTOR: 'orb' },
+    });
+    try {
+      await waitFor(() => api.doneBodies.length === 1);
+      expect(api.doneBodies[0]?.body).toMatchObject({
+        status: 'failed',
+        errorMessage: expect.stringContaining('EEXIST'),
+      });
+      expect(listen).not.toHaveBeenCalled();
+      expect(lstatSync(outbox).ino).toBeGreaterThan(0);
+      if (kind === 'symlink') expect(readlinkSync(outbox)).toBe(outside);
+      else if (kind === 'directory') expect(lstatSync(outbox).isDirectory()).toBe(true);
+      else expect(readFileSync(outbox, 'utf8')).toBe('pre-planted');
+      expect(lstatSync(outside).mode).toBe(metadata.mode);
+      expect(lstatSync(outside).mtimeMs).toBe(metadata.mtimeMs);
+      expect(readFileSync(join(outside, 'sentinel'), 'utf8')).toBe('unchanged');
+    } finally {
+      await handle.stop();
+      await handle.done;
+      listen.mockRestore();
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
+
+test.each(['relay.sock', 'relay.sock.token'] as const)(
+  'refuses existing and dangling symlinks at %s without touching their targets',
+  async (name) => {
+    for (const present of [true, false]) {
+      const { root } = fixture();
+      const target = join(root, 'outside');
+      if (present) writeFileSync(target, 'unchanged', { mode: 0o640 });
+      const planted = join(root, name);
+      symlinkSync(target, planted);
+      const metadata = present ? lstatSync(target) : undefined;
+      const relay = new RelayMachineServer({
+        socketPath: join(root, 'relay.sock'),
+        stepId: 's1',
+        upstream: new FakeMachineApi(),
+      });
+      try {
+        await expect(relay.listen()).rejects.toThrow();
+        await relay.close();
+        expect(readlinkSync(planted)).toBe(target);
+        if (metadata) {
+          expect(lstatSync(target).mode).toBe(metadata.mode);
+          expect(lstatSync(target).mtimeMs).toBe(metadata.mtimeMs);
+          expect(readFileSync(target, 'utf8')).toBe('unchanged');
+        } else expect(existsSync(target)).toBe(false);
+      } finally {
+        await relay.close();
+        rmSync(root, { recursive: true, force: true });
+      }
+    }
+  },
+);
+
+test.each(['symlink', 'hardlink', 'oversized'] as const)(
+  'refuses a %s relay token before connecting',
+  async (kind) => {
+    const { root } = fixture();
+    const socketPath = join(root, 'relay.sock');
+    const relay = new RelayMachineServer({
+      socketPath,
+      stepId: 's1',
+      upstream: new FakeMachineApi(),
+    });
+    await relay.listen();
+    const tokenPath = `${socketPath}.token`;
+    const target = join(root, 'outside');
+    writeFileSync(target, readFileSync(tokenPath));
+    rmSync(tokenPath);
+    if (kind === 'symlink') symlinkSync(target, tokenPath);
+    else if (kind === 'hardlink') linkSync(target, tokenPath);
+    else writeFileSync(tokenPath, 'f'.repeat(65));
+    const metadata = lstatSync(target);
+    try {
+      const connection = RelayMachineApi.connect(socketPath);
+      void connection.then(
+        (client) => client.close(),
+        () => {},
+      );
+      await expect(connection).rejects.toThrow(/regular file|size cap/);
+      expect(lstatSync(target).atimeMs).toBe(metadata.atimeMs);
+    } finally {
+      await relay.close();
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
+
+test('refuses a FIFO relay token without blocking', async () => {
+  const { root } = fixture();
+  const socketPath = join(root, 'relay.sock');
+  execFileSync('mkfifo', [`${socketPath}.token`]);
+  try {
+    const result = execFileSync(
+      process.execPath,
+      [
+        '--import',
+        'tsx',
+        '--input-type=module',
+        '-e',
+        `import { RelayMachineApi } from './src/orb/relay.ts'; try { await RelayMachineApi.connect(${JSON.stringify(socketPath)}); process.exitCode = 1; } catch {}`,
+      ],
+      { cwd: join(process.cwd(), 'apps/daemon'), timeout: 3_000 },
+    );
+    expect(result.length).toBe(0);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('exclusive token publication refuses a symlink planted after relay preflight', async () => {
+  const { root } = fixture();
+  const socketPath = join(root, 'relay.sock');
+  const tokenPath = `${socketPath}.token`;
+  const target = join(root, 'outside');
+  writeFileSync(target, 'unchanged', { mode: 0o640 });
+  const metadata = lstatSync(target);
+  const relay = new RelayMachineServer({
+    socketPath,
+    stepId: 's1',
+    upstream: new FakeMachineApi(),
+  });
+  const listening = relay.listen();
+  symlinkSync(target, tokenPath);
+  try {
+    await expect(listening).rejects.toThrow('EEXIST');
+    await relay.close();
+    expect(readlinkSync(tokenPath)).toBe(target);
+    expect(lstatSync(target).mode).toBe(metadata.mode);
+    expect(lstatSync(target).mtimeMs).toBe(metadata.mtimeMs);
+    expect(readFileSync(target, 'utf8')).toBe('unchanged');
+  } finally {
+    await relay.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('relay publishes mode 0600 paths and restores a restrictive process umask', async () => {
+  const { root } = fixture();
+  const socketPath = join(root, 'relay.sock');
+  const relay = new RelayMachineServer({
+    socketPath,
+    stepId: 's1',
+    upstream: new FakeMachineApi(),
+  });
+  const mask = process.umask(0o777);
+  try {
+    await relay.listen();
+    expect(process.umask()).toBe(0o777);
+    expect(lstatSync(socketPath).mode & 0o777).toBe(0o600);
+    expect(lstatSync(`${socketPath}.token`).mode & 0o777).toBe(0o600);
+  } finally {
+    process.umask(mask);
+    await relay.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
 
 function fixture(
   options: {

@@ -1,9 +1,9 @@
-import { existsSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import type { AgentSessionHandle, ClaimedStep, MachineDoneBody } from '@cairn/shared';
 import { TranscriptBuffer } from '../journal.js';
 import { MachineApiError } from '../machine-client.js';
-import { ensurePrivateDir, writePrivateFile } from '../private-fs.js';
+import { writePrivateFile } from '../private-fs.js';
 import { type RunStepDeps, type RunStepOptions, resumePendingUpload, runStep } from '../runner.js';
 import { StepStops } from '../step-stops.js';
 import type { OrbLifecycle } from './lifecycle.js';
@@ -152,9 +152,9 @@ export async function runOrbStep(
           await lifecycle.provider.start(handle, { signal: execController.signal });
           const socketPath = join(directory, 'relay.sock');
           if (claimed.project?.repo?.kind === 'local') {
-            outboxDirectory = join(directory, 'outbox');
-            rmSync(outboxDirectory, { recursive: true, force: true });
-            ensurePrivateDir(outboxDirectory);
+            const outbox = join(directory, 'outbox');
+            mkdirSync(outbox, { mode: 0o700 });
+            outboxDirectory = outbox;
           }
           let failure: string | null = null;
           const receive = (frame: OrbFrame): void => {
