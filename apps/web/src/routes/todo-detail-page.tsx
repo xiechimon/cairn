@@ -686,6 +686,11 @@ export function TodoDetailPage() {
     : PHASE_UI[phase];
   const detail = live ? liveDetail : fixtureDetail;
   const streaming = live ? running : view.transcript.some((item) => item.kind === 'streaming');
+  const streamingItem = view.transcript.findLast((item) => item.kind === 'streaming');
+  const workingFor =
+    streamingItem?.kind === 'streaming'
+      ? { startedAt: streamingItem.startedAt, seconds: streamingItem.seconds }
+      : undefined;
   const docMode =
     view.planDiff != null
       ? 'diff'
@@ -902,6 +907,7 @@ export function TodoDetailPage() {
                   placeholder={reviewActive ? t('AI 审核进行中…') : ui.placeholder}
                   aiReview={(phase === 'confirm' || phase === 'review') && !todo.awaitingReply}
                   streaming={streaming}
+                  workingFor={workingFor}
                   editable={live || DEMO_MODE}
                   draft={live ? liveDraft : undefined}
                   onDraftChange={live ? setLiveDraft : undefined}

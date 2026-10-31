@@ -101,7 +101,7 @@ test.describe('chief drawer model row (#615)', () => {
     await expect(page.getByTestId('chief-msg-foot').locator('> svg')).toHaveCount(0);
   });
 
-  test('restore button opens the rewind confirm; the foot chevron discloses tool rows', async ({
+  test('restore button opens the rewind confirm; the grey summary line discloses tool rows', async ({
     page,
   }) => {
     await page.goto('/app?view=board&scenario=114');
@@ -121,17 +121,16 @@ test.describe('chief drawer model row (#615)', () => {
     await expect(confirm).toHaveCount(0);
     await expect(page.getByTestId('chief-msg')).toHaveCount(2);
 
-    const foot = page.getByTestId('chief-msg-foot');
-    const fold = foot.getByRole('button', { name: '展开过程' });
+    const fold = page.getByTestId('chief-tools-toggle');
     await expect(fold).toBeVisible();
     await expect(page.getByTestId('chief-turn-tools')).toHaveCount(0);
     await fold.click();
     const tools = page.getByTestId('chief-turn-tools');
     await expect(tools).toBeVisible();
-    await expect(tools.locator('[data-slot="trace-line"]')).toHaveCount(2);
+    await expect(tools.locator('[data-trace-verb]')).toHaveCount(2);
     await expect(tools).toContainText('create_todo');
 
-    await foot.getByRole('button', { name: '收起过程' }).click();
+    await fold.click();
     await expect(tools).toHaveCount(0);
   });
 

@@ -171,7 +171,7 @@ export function ChiefConversation({
   day,
 }: ChiefConversationProps) {
   const { t } = useI18n();
-  const { live, teamId, user } = useLiveData();
+  const { live, teamId } = useLiveData();
   const todosQ = useTodos(teamId, live);
   const membersQ = useMembers(teamId, live);
   const projectsQ = useProjects(teamId, live);
@@ -408,7 +408,6 @@ export function ChiefConversation({
       bound={chief.bound}
       agent={chief.agent}
       runningTool={chief.runningTool}
-      user={user}
       copiedKey={copiedKey}
       onCopy={copyText}
       toolsOpen={toolsOpen}

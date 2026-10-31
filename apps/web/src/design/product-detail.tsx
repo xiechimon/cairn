@@ -160,6 +160,7 @@ function ComposerSpecimen() {
             placeholder={PHASE_UI.building.placeholder ?? ''}
             aiReview={false}
             streaming
+            workingFor={{ seconds: 72 }}
             editable
             mentionGroups={MENTION_GROUPS}
             onQueue={(text) => setSent((all) => [...all, `queued: ${text}`])}
