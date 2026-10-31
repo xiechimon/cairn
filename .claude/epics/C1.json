@@ -1,0 +1,155 @@
+{
+  "epic": "C1",
+  "items": [
+    {
+      "id": "review-fallback",
+      "issue": 2364,
+      "dependsOn": []
+    },
+    {
+      "id": "owner-route-alert",
+      "issue": 2365,
+      "dependsOn": []
+    },
+    {
+      "id": "glance-schema",
+      "issue": 2366,
+      "dependsOn": []
+    },
+    {
+      "id": "glance-evidence",
+      "issue": 2367,
+      "dependsOn": [
+        "glance-schema"
+      ]
+    },
+    {
+      "id": "integration-required",
+      "issue": 2368,
+      "dependsOn": []
+    },
+    {
+      "id": "revert-comment-exempt",
+      "issue": 2369,
+      "dependsOn": []
+    },
+    {
+      "id": "coordinator-brake",
+      "issue": 2370,
+      "dependsOn": []
+    },
+    {
+      "id": "digest-kept",
+      "issue": 2371,
+      "dependsOn": []
+    },
+    {
+      "id": "size-review",
+      "issue": 2372,
+      "dependsOn": [
+        "digest-kept"
+      ]
+    },
+    {
+      "id": "gate-paths-json",
+      "issue": 2373,
+      "dependsOn": []
+    },
+    {
+      "id": "human-queue",
+      "issue": 2374,
+      "dependsOn": [
+        "gate-paths-json"
+      ]
+    },
+    {
+      "id": "pr-evidence-ext",
+      "issue": 2375,
+      "dependsOn": [
+        "gate-paths-json",
+        "size-review"
+      ]
+    },
+    {
+      "id": "readiness-strict",
+      "issue": 2376,
+      "dependsOn": []
+    },
+    {
+      "id": "publish-main-health",
+      "issue": 2377,
+      "dependsOn": []
+    },
+    {
+      "id": "identity-compat",
+      "issue": 2378,
+      "dependsOn": []
+    },
+    {
+      "id": "as-bot-allowlist",
+      "issue": 2379,
+      "dependsOn": []
+    },
+    {
+      "id": "ops-scripts-in-repo",
+      "issue": 2380,
+      "dependsOn": []
+    },
+    {
+      "id": "named-prompts",
+      "issue": 2381,
+      "dependsOn": []
+    },
+    {
+      "id": "deploy-self",
+      "issue": 2382,
+      "dependsOn": []
+    },
+    {
+      "id": "adr-0029",
+      "issue": 2383,
+      "dependsOn": [],
+      "humanHeld": true
+    }
+  ],
+  "requiredChecks": [
+    "check",
+    "pack-smoke",
+    "e2e-gate"
+  ],
+  "checks": [
+    {
+      "name": "checker tests pass",
+      "run": [
+        "node",
+        "--test",
+        "scripts/epic-done.test.mjs"
+      ]
+    },
+    {
+      "name": "review gate fallback routing",
+      "run": [
+        "node",
+        "--test",
+        "scripts/ops/review-gate/reviewer-route.test.mjs"
+      ]
+    },
+    {
+      "name": "schema glance diff",
+      "run": [
+        "node",
+        "--test",
+        "scripts/schema-glance.test.mjs"
+      ]
+    },
+    {
+      "name": "batch merger tests pass",
+      "run": [
+        "node",
+        "--test",
+        "scripts/batch-merger.test.mjs"
+      ]
+    }
+  ],
+  "maxHours": 96
+}
