@@ -1,4 +1,5 @@
 import {
+  type ClaudeCodeReport,
   ROUTING_USES,
   type RoutingConnection,
   type RoutingQuota,
@@ -58,7 +59,7 @@ export function getModelRouting(db: Db, teamId: string) {
     const report = row.claudeCodeReport;
     if (!report?.installed && (row.claudeRateLimits?.length ?? 0) === 0) continue;
     const id = `machine:${row.id}`;
-    const paid = /api[-_ ]?key/i.test(report?.auth?.method ?? '');
+    const paid = !machineUsesClaudeSubscription(report);
     connections.push({
       id,
       vendor: 'anthropic',
@@ -101,4 +102,15 @@ export function getModelRouting(db: Db, teamId: string) {
     quota,
     settings: routingSettings,
   };
+}
+
+export function machineUsesClaudeSubscription(
+  report: ClaudeCodeReport | null | undefined,
+): boolean {
+  const auth = report?.auth;
+  return (
+    auth?.state === 'logged-in' &&
+    auth.provider === 'firstParty' &&
+    (auth.method === 'claude.ai' || auth.method === 'oauth_token')
+  );
 }

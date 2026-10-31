@@ -441,3 +441,37 @@ test('known quota stays visible while a machine model report is missing', async 
   ]);
   expect(body.edges.every((edge) => edge.unavailable === true)).toBe(true);
 });
+
+test.each([
+  {
+    auth: { state: 'logged-in' as const, method: 'claude.ai', provider: 'firstParty' },
+    kind: 'subscription',
+  },
+  {
+    auth: { state: 'logged-in' as const, method: 'oauth_token', provider: 'firstParty' },
+    kind: 'subscription',
+  },
+  {
+    auth: { state: 'logged-in' as const, method: 'claude.ai', provider: 'bedrock' },
+    kind: 'api-key',
+  },
+  {
+    auth: { state: 'logged-in' as const, method: 'unknown', provider: 'firstParty' },
+    kind: 'api-key',
+  },
+  { auth: { state: 'unknown' as const, reason: 'probe failed' }, kind: 'api-key' },
+])(
+  'the routing view labels machine $auth.method/$auth.provider auth as $kind like the claim gate',
+  async ({ auth, kind }) => {
+    const s = bootServer();
+    const id = insertMachine(s, {
+      claudeCodeReport: { installed: true, hostname: 'test', models: [], auth },
+    });
+    const body = (await (
+      await req(s.app, 'GET', `/api/teams/${s.team.id}/model-routing`)
+    ).json()) as {
+      connections: RoutingConnection[];
+    };
+    expect(body.connections.find((entry) => entry.id === `machine:${id}`)?.kind).toBe(kind);
+  },
+);

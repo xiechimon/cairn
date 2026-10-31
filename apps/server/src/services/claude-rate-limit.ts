@@ -33,7 +33,7 @@ import {
 } from './dispatch-eligibility.js';
 import { isChiefConversation, type MachineDeps, stepTeamId } from './machine-deps.js';
 import { effectiveModel } from './model-fallback.js';
-import { isClaudeModel } from './model-routing.js';
+import { isClaudeModel, machineUsesClaudeSubscription } from './model-routing.js';
 import { notifyQuotaWait } from './notifications.js';
 import { publishStepRow } from './quota-wait.js';
 import { getTodo } from './todos.js';
@@ -50,12 +50,9 @@ export function claudeUsageGatePasses(
   const settings = deps.db.select().from(team).where(eq(team.id, machineRow.teamId)).get();
   if (settings?.claudeUsage === 'allow-paid') return true;
   if (stepRuntimeFor(model.provider) !== 'claude-code') return false;
-  const auth = machineRow.claudeCodeReport?.auth;
   return (
     hasActiveClaudeSubscription(deps, machineRow.teamId) ||
-    (auth?.state === 'logged-in' &&
-      auth.provider === 'firstParty' &&
-      (auth.method === 'claude.ai' || auth.method === 'oauth_token'))
+    machineUsesClaudeSubscription(machineRow.claudeCodeReport)
   );
 }
 

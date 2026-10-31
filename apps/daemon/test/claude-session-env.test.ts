@@ -105,3 +105,38 @@ test('subscription authentication reaches the CLI through env with subprocess sc
   expect(env.CLAUDE_CODE_OAUTH_TOKEN).toBe(token);
   expect(process.env.CLAUDE_CODE_OAUTH_TOKEN).not.toBe(token);
 });
+
+test('a team subscription token blanks inherited metered Claude auth so the CLI cannot fall back to paid use', () => {
+  vi.stubEnv('ANTHROPIC_API_KEY', 'sk-ant-api03-inherited');
+  vi.stubEnv('ANTHROPIC_AUTH_TOKEN', 'inherited-bearer');
+  vi.stubEnv('CLAUDE_CODE_USE_BEDROCK', '1');
+  vi.stubEnv('CLAUDE_CODE_USE_VERTEX', '1');
+  vi.stubEnv('CLAUDE_CODE_USE_FOUNDRY', '1');
+  const token = `sk-ant-oat01-${'t'.repeat(64)}`;
+  const base = {
+    cwd: '/tmp/ws',
+    modelId: 'sonnet',
+    resumeId: null,
+    sessionId: 'metered-env-test',
+    disallowedTools: [],
+    mcpServers: {},
+    abortController: new AbortController(),
+  };
+  const team = buildClaudeSdkOptions({
+    ...base,
+    env: { CLAUDE_CODE_OAUTH_TOKEN: token, ANTHROPIC_API_KEY: 'sk-ant-api03-step' },
+  });
+  expect(team.env?.CLAUDE_CODE_OAUTH_TOKEN).toBe(token);
+  for (const key of [
+    'ANTHROPIC_API_KEY',
+    'ANTHROPIC_AUTH_TOKEN',
+    'CLAUDE_CODE_USE_BEDROCK',
+    'CLAUDE_CODE_USE_VERTEX',
+    'CLAUDE_CODE_USE_FOUNDRY',
+  ]) {
+    expect(team.env?.[key]).toBe('');
+  }
+  const local = buildClaudeSdkOptions({ ...base, env: { FOO: '1' } });
+  expect(local.env?.ANTHROPIC_API_KEY).toBe('sk-ant-api03-inherited');
+  expect(local.env?.CLAUDE_CODE_USE_BEDROCK).toBe('1');
+});
