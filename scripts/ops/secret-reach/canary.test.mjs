@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
+  existsSync,
+  mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
@@ -257,3 +259,40 @@ test('a failed shell copy is unavailable rather than a zero-byte success', async
   );
   assert.equal(rows.find((row) => row.channel === 'sh').readable, 'error');
 });
+
+for (const shell of ['/bin/dash', '/bin/sh', '/bin/bash'].filter((path) => existsSync(path))) {
+  test(`the sh channel opens the target itself and reports a blocked or missing file as unreadable under ${shell}`, {
+    skip: process.getuid() === 0,
+  }, (t) => {
+    const f = fixture(t);
+    const bin = join(f.dir, 'bin');
+    mkdirSync(bin);
+    symlinkSync(shell, join(bin, 'sh'));
+    const run = (path) =>
+      spawnSync(process.execPath, [cli, '--profile', 'mac', '--path', path], {
+        encoding: 'utf8',
+        env: { HOME: f.dir, PATH: `${bin}:${process.env.PATH}`, GIT_CONFIG_NOSYSTEM: '1' },
+      });
+    const shRow = (result) =>
+      result.stdout
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line))
+        .find((row) => row.channel === 'sh');
+    const readable = run(f.path);
+    assert.equal(readable.status, 1);
+    assert.deepEqual(
+      { readable: shRow(readable).readable, bytes: shRow(readable).bytes },
+      { readable: 'yes', bytes: Buffer.byteLength(marker) },
+    );
+    chmodSync(f.path, 0o000);
+    for (const path of [f.path, join(f.dir, 'missing')]) {
+      const blocked = run(path);
+      assert.equal(blocked.status, 0, path);
+      assert.deepEqual(
+        { readable: shRow(blocked).readable, bytes: shRow(blocked).bytes },
+        { readable: 'no', bytes: 0 },
+      );
+    }
+  });
+}

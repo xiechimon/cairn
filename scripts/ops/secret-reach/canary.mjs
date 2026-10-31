@@ -100,7 +100,7 @@ function subprocess(channel, path, scratch, env) {
   } else if (channel === 'sh') {
     args = [
       '-e',
-      "const {spawnSync}=require('node:child_process');const r=spawnSync('sh',['-c','exec 3<\"$1\" 2>/dev/null || exit 13; dd bs=4096 count=1 <&3 2>/dev/null','secret-reach',process.argv[1]],{stdio:['ignore','pipe','ignore'],maxBuffer:4096,timeout:5000});if(r.error||(r.status!==0&&r.status!==13))process.exit(2);if(r.status===13){try{require('node:fs').closeSync(require('node:fs').openSync(process.argv[1],'r'));process.exit(2)}catch(e){if(!['ENOENT','EACCES','EPERM','ENOTDIR','EISDIR'].includes(e.code))process.exit(2)}}process.stdout.write(String(r.status===13?0:r.stdout.length))",
+      "const {spawnSync}=require('node:child_process');const r=spawnSync('sh',['-c','{ :; } 2>/dev/null <\"$1\" || exit 13; dd bs=4096 count=1 <\"$1\" 2>/dev/null','secret-reach',process.argv[1]],{stdio:['ignore','pipe','ignore'],maxBuffer:4096,timeout:5000});if(r.error||(r.status!==0&&r.status!==13))process.exit(2);if(r.status===13){try{require('node:fs').closeSync(require('node:fs').openSync(process.argv[1],'r'));process.exit(2)}catch(e){if(!['ENOENT','EACCES','EPERM','ENOTDIR','EISDIR'].includes(e.code))process.exit(2)}}process.stdout.write(String(r.status===13?0:r.stdout.length))",
       path,
     ];
   } else if (channel === 'node') {
