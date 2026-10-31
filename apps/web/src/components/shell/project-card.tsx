@@ -1,3 +1,4 @@
+import type { ProjectColor, ProjectIcon } from '@cairn/shared';
 import { cn } from 'cn';
 import { Ellipsis } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -9,6 +10,8 @@ import { StatusChip } from '../ui/status-chip.js';
 export interface ProjectCardProps {
   name: string;
   tone: number;
+  icon?: ProjectIcon | null | undefined;
+  color?: ProjectColor | null | undefined;
   repo: string;
   created: string;
   goal: string;
@@ -23,6 +26,8 @@ export interface ProjectCardProps {
 export function ProjectCard({
   name,
   tone,
+  icon,
+  color,
   repo,
   created,
   goal,
@@ -41,7 +46,9 @@ export function ProjectCard({
       <ProjectAvatar
         name={name}
         tone={tone}
-        className="size-9 rounded-(--cds-radius-xl) text-heading"
+        icon={icon}
+        color={color}
+        className={icon == null ? 'size-9 rounded-(--cds-radius-xl) text-heading' : undefined}
       />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
