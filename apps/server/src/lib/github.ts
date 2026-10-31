@@ -101,6 +101,7 @@ export interface GithubPull extends GithubPullState {
   title: string | null;
   authorAssociation: string | null;
   mergeableState: string | null;
+  createdAt?: string | null;
   openerLogin?: string | null;
   openerType?: string | null;
 }
@@ -194,6 +195,7 @@ export async function githubPull(
     merge_commit_sha?: unknown;
     merged_by?: { login?: unknown } | null;
     merged_at?: unknown;
+    created_at?: unknown;
     head?: { sha?: unknown; ref?: unknown; repo?: { id?: unknown } | null } | null;
     base?: {
       ref?: unknown;
@@ -225,6 +227,7 @@ export async function githubPull(
       title: optString(raw.title),
       authorAssociation: optString(raw.author_association),
       mergeableState: optString(raw.mergeable_state),
+      createdAt: optString(raw.created_at),
       openerLogin: optString(raw.user?.login),
       openerType: optString(raw.user?.type),
     },

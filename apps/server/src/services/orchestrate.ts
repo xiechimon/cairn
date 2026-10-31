@@ -3,7 +3,9 @@ import { inArray } from 'drizzle-orm';
 import { tag } from '../db/schema.js';
 import { conflict, notFound } from '../lib/errors.js';
 import { sendChiefMessage } from './chief.js';
+import { isCorrectionTask } from './correction.js';
 import type { ConversationStreamHub } from './events.js';
+import { CORRECTION_PROMPT } from './merge-gate/correction.js';
 import { getTodo, type TodoDeps } from './todos.js';
 
 export interface OrchestrateDeps extends TodoDeps {
@@ -37,7 +39,7 @@ export function orchestrateTodo(deps: OrchestrateDeps, todoId: string) {
   });
   const result = sendChiefMessage(deps, record.teamId, {
     threadId: null,
-    content,
+    content: isCorrectionTask(deps.db, todoId) ? `${CORRECTION_PROMPT}\n\n${content}` : content,
   });
   deps.convHub?.publishMessage(result.thread.id, { ...result.message });
   return result;

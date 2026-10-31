@@ -17,6 +17,15 @@ export interface RawIssue {
   pull_request?: unknown;
 }
 
+export interface RawFeedback {
+  id: number;
+  user: { login: string; type?: string } | null;
+  body: string | null;
+  state?: string;
+  created_at?: string;
+  submitted_at?: string | null;
+}
+
 export interface RawEvent {
   id: number;
   actor: { login: string; id: number; type: string } | null;
@@ -111,6 +120,13 @@ const MISSING_GATE_ANSWER: GateRaw = {
 
 export function githubFake(repo: string, options: GithubFakeOptions = {}) {
   const state = {
+    pulls: new Map<
+      number,
+      { state: 'open' | 'closed'; merged: boolean; user?: { login: string } }
+    >(),
+    reviewComments: new Map<number, RawFeedback[]>(),
+    reviews: new Map<number, RawFeedback[]>(),
+    comments: new Map<number, RawFeedback[]>(),
     open: structuredClone(options.issues ?? []) as RawIssue[],
     issues: new Map<number, RawIssue>(),
     events: new Map<number, RawEvent[]>(),
@@ -158,6 +174,24 @@ export function githubFake(repo: string, options: GithubFakeOptions = {}) {
       next.searchParams.set('page', String(pageNo + 1));
       return conditional(headers, slice, { link: `<${next.toString()}>; rel="next"` });
     }
+    const feedbackMatch = new RegExp(`^${base}/(pulls|issues)/(\\d+)/(comments|reviews)$`).exec(
+      path,
+    );
+    if (feedbackMatch) {
+      const n = Number(feedbackMatch[2]);
+      const source =
+        feedbackMatch[1] === 'issues'
+          ? state.comments
+          : feedbackMatch[3] === 'reviews'
+            ? state.reviews
+            : state.reviewComments;
+      const rows = source.get(n) ?? [];
+      const perPage = Number(url.searchParams.get('per_page') ?? '30');
+      const page = Number(url.searchParams.get('page') ?? '1');
+      return conditional(headers, rows.slice((page - 1) * perPage, page * perPage));
+    }
+    const pullMatch = new RegExp(`^${base}/pulls/(\\d+)$`).exec(path);
+    if (pullMatch) return conditional(headers, state.pulls.get(Number(pullMatch[1])) ?? null);
     const eventsMatch = new RegExp(`^${base}/issues/(\\d+)/events$`).exec(path);
     if (eventsMatch) {
       const n = Number(eventsMatch[1]);

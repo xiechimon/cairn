@@ -41,6 +41,7 @@ import type { FetchLike } from '../lib/github.js';
 import { githubCloseIssue, githubCreateIssue, githubUpdateIssueTitle } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { triggerChiefWakes } from './chief.js';
+import { assertCorrectionDone } from './correction.js';
 import {
   agentForStep as agentForStepEligibility,
   capabilityGatePasses,
@@ -436,6 +437,7 @@ export function updateTodo(
     if (row.phase === 'done' && patch.phase === 'review' && !row.hasChanges) {
       throw new HttpError(409, '无变更产物的已完成任务不能拖回待处理（没有可重开验收的东西）');
     }
+    if (patch.phase === 'done') assertCorrectionDone(db, row);
     sets.phase = patch.phase;
     sets.phaseAt = nowMs();
   }
@@ -561,6 +563,7 @@ export function setTodoPhase(
   extra: Partial<
     Pick<TodoRow, 'hasChanges' | 'hasPlan' | 'latestBuildId' | 'lastRunAt' | 'assignment'>
   > = {},
+  options: { landedMerge?: true } = {},
 ): TodoRecord | null {
   const { db } = deps;
   const row = getRow(deps, id);
@@ -580,6 +583,7 @@ export function setTodoPhase(
     return record;
   }
   assertPhaseTransition(row.phase, to);
+  if (to === 'done' && !options.landedMerge) assertCorrectionDone(db, row);
   db.update(todo)
     .set({ ...extra, phase: to, phaseAt: nowMs(), v: row.v + 1 })
     .where(eq(todo.id, id))
