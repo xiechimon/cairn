@@ -28,8 +28,29 @@ import type {
   StepEvent,
   ToolCallRecord,
 } from '@cairn/shared';
+import { z } from 'zod';
 import { DAEMON_VERSION } from '../version.js';
+import { openAcpTools } from './acp-tools.js';
 import { isLearnedNoVision, rememberNoVision } from './image-support.js';
+
+const adapterProcessGroups = new Set<number>();
+
+function terminateAdapterProcessGroup(pid: number, signal: NodeJS.Signals): void {
+  try {
+    process.kill(-pid, signal);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error;
+  }
+  if (signal === 'SIGKILL') adapterProcessGroups.delete(pid);
+}
+
+process.once('exit', () => {
+  for (const pid of adapterProcessGroups) {
+    try {
+      terminateAdapterProcessGroup(pid, 'SIGKILL');
+    } catch {}
+  }
+});
 
 export const GEMINI_CAPABILITIES: AgentBackendCapabilities = {
   name: 'gemini',
@@ -98,7 +119,7 @@ export function mapAcpUpdate(update: SessionUpdate | { kind: 'cancelled' }): Ste
   return null;
 }
 
-class GeminiSession implements AgentSessionHandle {
+class AcpSession implements AgentSessionHandle {
   readonly sessionId: string;
   readonly events: AsyncIterable<StepEvent>;
   private readonly queue: StepEvent[] = [];
@@ -109,6 +130,8 @@ class GeminiSession implements AgentSessionHandle {
   private cancelled = false;
   private text = '';
   private readonly calls = new Map<string, ToolCallRecord>();
+  private readonly toolOutputs = new Map<string, unknown>();
+  private cancelTimer: ReturnType<typeof setTimeout> | undefined;
 
   constructor(
     sessionId: string,
@@ -117,6 +140,7 @@ class GeminiSession implements AgentSessionHandle {
     private readonly images: readonly ContentBlock[],
     private readonly imageCapability: boolean,
     private readonly cleanup: () => void,
+    private readonly adapter?: AcpBackendOptions,
   ) {
     this.sessionId = sessionId;
     this.events = { [Symbol.asyncIterator]: () => this };
@@ -127,7 +151,7 @@ class GeminiSession implements AgentSessionHandle {
   }
 
   async next(): Promise<IteratorResult<StepEvent>> {
-    if (!this.promptStarted) {
+    if (!this.promptStarted && !this.stopped) {
       this.promptStarted = true;
       void this.runPrompt();
     }
@@ -155,19 +179,32 @@ class GeminiSession implements AgentSessionHandle {
       });
       if (this.text)
         this.push({ type: 'message_end', message: { role: 'assistant', content: this.text } });
+      if (this.adapter && result.stopReason === 'cancelled' && !this.cancelled) {
+        throw new Error('ACP agent cancelled the prompt without a stop request');
+      }
       if (this.cancelled || result.stopReason === 'cancelled') {
         this.push({ type: 'message_stop', message: { role: 'assistant', content: this.text } });
-      } else if (result.stopReason === 'end_turn') this.push({ type: 'done', usage: [] });
-      else
+      } else if (result.stopReason === 'end_turn') {
+        if (this.adapter && [...this.calls.values()].some((call) => call.result === undefined)) {
+          throw new Error('ACP prompt completed with unfinished tool calls');
+        }
+        this.push({ type: 'done', usage: [] });
+      } else
         this.push({
           type: 'error',
-          error: { message: `Gemini ACP stopped: ${result.stopReason}`, retryable: false },
+          error: {
+            message: `${this.adapter?.harness ?? 'Gemini'} ACP stopped: ${result.stopReason}`,
+            retryable: false,
+          },
         });
     } catch (error) {
-      const message = acpErrorMessage(error);
+      const message = this.adapter
+        ? error instanceof Error
+          ? error.message
+          : String(error)
+        : acpErrorMessage(error);
       if (this.cancelled) {
-        const stopped = mapAcpUpdate({ kind: 'cancelled' });
-        if (stopped !== null) this.push(stopped);
+        this.push({ type: 'message_stop', message: { role: 'assistant', content: this.text } });
       } else this.push({ type: 'error', error: { message, retryable: false } });
     } finally {
       this.finish();
@@ -175,12 +212,15 @@ class GeminiSession implements AgentSessionHandle {
   }
 
   private finish(): void {
+    if (this.stopped) return;
+    clearTimeout(this.cancelTimer);
     this.stopped = true;
     this.cleanup();
     for (const waiter of this.waiters.splice(0)) waiter({ done: true, value: undefined });
   }
 
   onAcpUpdate(update: SessionUpdate): void {
+    if (this.stopped || (this.adapter && !this.promptStarted)) return;
     if (update.sessionUpdate === 'agent_message_chunk' && update.content.type === 'text')
       this.text += update.content.text;
     if (update.sessionUpdate === 'agent_thought_chunk' && update.content.type === 'text') {
@@ -200,15 +240,46 @@ class GeminiSession implements AgentSessionHandle {
           ? { isError: update.status === 'failed' }
           : {}),
       };
-      this.calls.set(call.id, call);
-      this.push({ type: 'toolcall_end', call });
+      if (this.adapter) {
+        if (update.rawOutput != null) this.toolOutputs.set(call.id, update.rawOutput);
+        else if (update.content != null) this.toolOutputs.set(call.id, update.content);
+        const terminal =
+          update.status === 'completed' ||
+          update.status === 'failed' ||
+          previous?.isError !== undefined;
+        if (terminal) {
+          call.result = this.toolOutputs.get(call.id) ?? previous?.result ?? '';
+          call.isError =
+            update.status === 'failed' ||
+            (update.status !== 'completed' && previous?.isError === true);
+        } else delete call.result;
+        this.calls.set(call.id, call);
+        if (
+          JSON.stringify(call) !== JSON.stringify(previous) &&
+          (!previous ||
+            terminal ||
+            update.rawInput != null ||
+            update.name != null ||
+            update.title != null)
+        ) {
+          this.push({ type: 'toolcall_end', call });
+        }
+      } else {
+        this.calls.set(call.id, call);
+        this.push({ type: 'toolcall_end', call });
+      }
     } else {
       const event = mapAcpUpdate(update);
       if (event) this.push(event);
     }
   }
 
+  get acceptingPermissions(): boolean {
+    return this.promptStarted && !this.stopped && !this.cancelled;
+  }
+
   async steer(text: string, images: readonly DeliveredImage[] = []): Promise<void> {
+    if (this.adapter) throw new Error('ACP steer is unsupported during a step');
     if (images.length > 0 && !this.imageCapability) {
       throw new Error('gemini ACP backend: image capability is not advertised');
     }
@@ -224,6 +295,18 @@ class GeminiSession implements AgentSessionHandle {
   async stop(): Promise<void> {
     if (this.stopped) return;
     this.cancelled = true;
+    if (this.adapter) {
+      if (!this.promptStarted) {
+        this.push({ type: 'message_stop', message: { role: 'assistant', content: this.text } });
+        this.finish();
+        return;
+      }
+      this.cancelTimer ??= setTimeout(
+        () => this.connection.close(new Error('ACP cancellation timed out')),
+        this.adapter.cancelTimeoutMs ?? 2_000,
+      );
+      this.cancelTimer.unref();
+    }
     await this.connection.agent.notify(methods.agent.session.cancel, { sessionId: this.sessionId });
   }
 
@@ -239,18 +322,24 @@ export interface GeminiBackendOptions {
     args: string[],
     options: SpawnOptionsWithoutStdio,
   ) => Pick<ChildProcessWithoutNullStreams, 'stdin' | 'stdout' | 'stderr'> &
-    Pick<ChildProcess, 'once' | 'kill'>;
+    Pick<ChildProcess, 'once' | 'kill' | 'pid'>;
 }
 
-export class GeminiBackend implements AgentBackend {
+class AcpBackend implements AgentBackend {
   private readonly imageSupport = new Map<string, boolean>();
-  readonly capabilities = GEMINI_CAPABILITIES;
-  readonly brief: BriefChannel = {
-    backendId: 'gemini',
-    composeBody: (_opts, base) => base ?? '',
-  };
+  readonly capabilities: AgentBackendCapabilities;
+  readonly brief?: BriefChannel;
 
-  constructor(private readonly options: GeminiBackendOptions = {}) {}
+  constructor(
+    private readonly options: GeminiBackendOptions & { adapter?: AcpBackendOptions } = {},
+  ) {
+    this.capabilities = options.adapter
+      ? { ...GEMINI_CAPABILITIES, name: `${options.adapter.harness}-acp`, steering: false }
+      : GEMINI_CAPABILITIES;
+    if (!options.adapter) {
+      this.brief = { backendId: 'gemini', composeBody: (_opts, base) => base ?? '' };
+    }
+  }
 
   async modelSupportsImages(provider: ProviderConfig, modelId: string): Promise<boolean | null> {
     if (isLearnedNoVision(provider.providerId, modelId)) return false;
@@ -270,38 +359,74 @@ export class GeminiBackend implements AgentBackend {
   }
 
   private async open(opts: SessionOpts, resumeId: string | undefined): Promise<AgentSessionHandle> {
+    const adapter = this.options.adapter;
+    if (adapter && opts.mcpServers !== undefined)
+      throw new Error(
+        'ACP mcpServers policy is unsupported: adapter host MCP configuration is not isolated',
+      );
+    if (
+      adapter &&
+      (opts.readOnly ||
+        opts.remoteToolsOnly ||
+        opts.skillsAllowlist !== undefined ||
+        (opts.injectedSkills?.length ?? 0) > 0 ||
+        (opts.tools?.length ?? 0) > 0 ||
+        (opts.thinkingLevel !== undefined && opts.thinkingLevel !== 'off'))
+    )
+      throw new Error('ACP session policy or host tools are unsupported (fail-closed)');
     const validated = validateGeminiSession({
       cwd: opts.cwd,
       modelId: opts.modelId,
       ...(resumeId !== undefined ? { resumeId } : {}),
       ...(opts.prompt !== undefined ? { prompt: opts.prompt } : {}),
 
-      ...(opts.remoteTools !== undefined ? { remoteTools: opts.remoteTools } : {}),
-      ...(opts.localTools !== undefined ? { localTools: opts.localTools } : {}),
+      ...(!adapter && opts.remoteTools !== undefined ? { remoteTools: opts.remoteTools } : {}),
+      ...(!adapter && opts.localTools !== undefined ? { localTools: opts.localTools } : {}),
     });
+    const hostTools = adapter ? await openAcpTools(opts) : null;
     const spawnProcess = this.options.spawnProcess ?? spawn;
-    const child = spawnProcess(this.options.executablePath ?? 'gemini', ['--acp'], {
-      cwd: opts.cwd,
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env, ...opts.env },
-    });
+    let child: ReturnType<NonNullable<GeminiBackendOptions['spawnProcess']>>;
+    try {
+      child = spawnProcess(
+        adapter?.command ?? this.options.executablePath ?? 'gemini',
+        adapter ? (adapter.args ?? []) : ['--acp'],
+        {
+          cwd: opts.cwd,
+          stdio: ['pipe', 'pipe', 'pipe'],
+          ...(adapter && process.platform !== 'win32' ? { detached: true } : {}),
+          env: { ...process.env, ...opts.env },
+        },
+      );
+    } catch (error) {
+      hostTools?.close();
+      throw error;
+    }
+    const groupPid = adapter && process.platform !== 'win32' ? child.pid : undefined;
+    if (groupPid !== undefined) adapterProcessGroups.add(groupPid);
     let stderr = '';
     child.stderr.on('data', (chunk: Buffer) => {
       stderr = (stderr + chunk.toString()).slice(-8192);
     });
     const app = client({ name: 'cairn' });
     app.onRequest(methods.client.session.requestPermission, ({ params }) => {
-      const option = params.options.find((value) => value.kind === 'reject_once');
+      const allow =
+        adapter?.permissions === 'allow-once' &&
+        session?.acceptingPermissions &&
+        params.sessionId === session.sessionId;
+      const option = params.options.find(
+        (value) => value.kind === (allow ? 'allow_once' : 'reject_once'),
+      );
       return {
         outcome: option
           ? { outcome: 'selected', optionId: option.optionId }
           : { outcome: 'cancelled' },
       };
     });
-    let session: GeminiSession | null = null;
-    app.onNotification(methods.client.session.update, ({ params }) =>
-      session?.onAcpUpdate(params.update),
-    );
+    let session: AcpSession | null = null;
+    app.onNotification(methods.client.session.update, ({ params }) => {
+      if (session && (!adapter || params.sessionId === session.sessionId))
+        session.onAcpUpdate(params.update);
+    });
     const stream = ndJsonStream(
       Writable.toWeb(child.stdin),
       Readable.toWeb(child.stdout) as ReadableStream<Uint8Array>,
@@ -309,8 +434,43 @@ export class GeminiBackend implements AgentBackend {
     const connection = app.connect(stream);
     child.once('error', (error) => connection.close(error));
     child.once('exit', (code) =>
-      connection.close(new Error(`Gemini ACP exited (${code}): ${stderr}`)),
+      connection.close(
+        new Error(`${adapter?.harness ?? 'Gemini'} ACP exited (${code}): ${stderr}`),
+      ),
     );
+    let exited = false;
+    let cleanedUp = false;
+    let killTimer: ReturnType<typeof setTimeout> | undefined;
+    child.once('close', () => {
+      exited = true;
+      if (groupPid === undefined) clearTimeout(killTimer);
+    });
+    const terminate = (signal: NodeJS.Signals) => {
+      if (groupPid !== undefined) {
+        try {
+          terminateAdapterProcessGroup(groupPid, signal);
+        } catch {
+          child.kill(signal);
+        }
+      } else if (!exited) child.kill(signal);
+    };
+    const cleanup = () => {
+      if (cleanedUp) return;
+      cleanedUp = true;
+      hostTools?.close();
+      connection.close();
+      terminate('SIGTERM');
+      if (adapter && (groupPid !== undefined || !exited)) {
+        killTimer = setTimeout(() => terminate('SIGKILL'), 1_000);
+      }
+    };
+    const initializeTimer = adapter
+      ? setTimeout(
+          () => connection.close(new Error('ACP initialization timed out')),
+          adapter.initializeTimeoutMs ?? 30_000,
+        )
+      : undefined;
+    initializeTimer?.unref();
     let agentVersion: number | string = 'unavailable';
     try {
       const initialized = await connection.agent.request(methods.agent.initialize, {
@@ -325,8 +485,21 @@ export class GeminiBackend implements AgentBackend {
         `${opts.provider.providerId}/${opts.modelId}`,
         caps?.promptCapabilities?.image === true,
       );
-      validateGeminiSession({ ...opts, imageCapability: caps?.promptCapabilities?.image === true });
-      const request = { cwd: opts.cwd, mcpServers: [] };
+      if (adapter) {
+        if ((opts.promptImages?.length ?? 0) > 0 && !caps?.promptCapabilities?.image) {
+          throw new Error(`${adapter.harness} ACP backend: image capability is not advertised`);
+        }
+      } else
+        validateGeminiSession({
+          ...opts,
+          imageCapability: caps?.promptCapabilities?.image === true,
+        });
+      if (hostTools && !caps?.mcpCapabilities?.http)
+        throw new Error('ACP adapter does not support HTTP host tools');
+      if (adapter && resumeId && !caps?.sessionCapabilities?.resume && !caps?.loadSession) {
+        throw new Error('ACP resume is unsupported by this adapter');
+      }
+      const request = { cwd: opts.cwd, mcpServers: hostTools ? [hostTools.declaration] : [] };
       const response = resumeId
         ? caps?.sessionCapabilities?.resume
           ? await connection.agent.request<ResumeSessionResponse>(methods.agent.session.resume, {
@@ -344,7 +517,7 @@ export class GeminiBackend implements AgentBackend {
         'sessionId' in response && typeof response.sessionId === 'string'
           ? response.sessionId
           : resumeId;
-      if (!sessionId) throw new Error('Gemini ACP returned no sessionId');
+      if (!sessionId) throw new Error(`${adapter?.harness ?? 'Gemini'} ACP returned no sessionId`);
       const modelOption = response.configOptions?.find((option) => option.category === 'model');
       if (modelOption) {
         await connection.agent.request(methods.agent.session.setConfigOption, {
@@ -352,37 +525,79 @@ export class GeminiBackend implements AgentBackend {
           configId: modelOption.id,
           value: opts.modelId,
         });
+      } else if (adapter) {
+        throw new Error('ACP adapter did not advertise model configuration');
       } else {
         process.stderr.write(
           `Gemini ACP: no model configuration advertised; using the CLI default instead of ${opts.modelId}\n`,
         );
       }
-      session = new GeminiSession(
+      session = new AcpSession(
         sessionId,
         connection,
-        validated.prompt,
+        adapter && opts.systemPrompt && validated.prompt !== undefined
+          ? `${opts.systemPrompt}\n\n${validated.prompt}`
+          : validated.prompt,
         (opts.promptImages ?? []).map((image) => ({ type: 'image', ...image })),
         caps?.promptCapabilities?.image === true,
-        () => {
-          connection.close();
-          child.kill();
-        },
+        cleanup,
+        adapter,
       );
       return session;
     } catch (error) {
-      connection.close();
-      child.kill();
+      cleanup();
       const message = error instanceof Error ? error.message : String(error);
-      const mapped = acpErrorMessage(error);
+      const mapped = adapter ? message : acpErrorMessage(error);
       throw new Error(
         mapped !== message
           ? mapped
           : `ACP initialize failed (protocolVersion client=${PROTOCOL_VERSION}, agent=${agentVersion}): ${message}`,
       );
+    } finally {
+      clearTimeout(initializeTimer);
     }
   }
 }
 
+export class GeminiBackend extends AcpBackend {}
+
 export function createGeminiBackend(options?: GeminiBackendOptions): AgentBackend {
   return new GeminiBackend(options);
+}
+
+export interface AcpBackendOptions {
+  harness: 'claude-code' | 'codex';
+  command: string;
+  args?: string[];
+  permissions?: 'deny' | 'allow-once';
+  initializeTimeoutMs?: number;
+  cancelTimeoutMs?: number;
+  spawnProcess?: GeminiBackendOptions['spawnProcess'];
+}
+
+export function createAcpBackend(options: AcpBackendOptions): AgentBackend {
+  return new AcpBackend({
+    adapter: options,
+    ...(options.spawnProcess ? { spawnProcess: options.spawnProcess } : {}),
+  });
+}
+
+export function configuredAcpBackends(raw: string | undefined): Map<string, AgentBackend> {
+  if (!raw) return new Map();
+  const configuration = z
+    .record(
+      z.string().min(1),
+      z
+        .object({
+          harness: z.enum(['claude-code', 'codex']),
+          command: z.string().min(1),
+          args: z.array(z.string()).optional(),
+          permissions: z.enum(['deny', 'allow-once']).optional(),
+        })
+        .strict(),
+    )
+    .parse(JSON.parse(raw));
+  return new Map(
+    Object.entries(configuration).map(([id, options]) => [id, createAcpBackend(options)]),
+  );
 }
