@@ -53,11 +53,16 @@ import { sweepPendingPushAlerts } from './push-alerts.js';
 import { sweepQuotaWaitSteps } from './quota-wait.js';
 import {
   ARCHIVED_SCHEDULE_PAUSE_REASON,
+  assertWorkerScheduleInterval,
   computeNextRunAt,
   dueSchedules,
   isRecurring,
+  isWorkerSchedule,
   pauseSchedule,
   updateNextRunAt,
+  WORKER_SCHEDULE_MIN_INTERVAL_MS,
+  WORKER_SCHEDULE_RUN_LIMIT,
+  workerScheduleRunHistory,
 } from './schedules.js';
 import { createScheduling, SCHEDULE_INTERVAL_MS, type SchedulingRun } from './scheduling/sweep.js';
 
@@ -273,6 +278,39 @@ export function createScheduler(
       pauseSchedule(deps, row.id, ARCHIVED_SCHEDULE_PAUSE_REASON);
       return;
     }
+    const workerCreated = isWorkerSchedule(row.createdBy);
+    if (workerCreated) {
+      const history = workerScheduleRunHistory(deps, row.todoId);
+      if (history.consecutive >= WORKER_SCHEDULE_RUN_LIMIT) {
+        pauseSchedule(
+          deps,
+          row.id,
+          'Paused after 10 consecutive scheduled runs without a human message',
+        );
+        return;
+      }
+      if (CANCEL_GATE_PHASES.has(todoRow.phase)) {
+        try {
+          const next = isRecurring(row.kind)
+            ? computeNextRunAt(row.kind, row.at, row.tz, now, row.cron)
+            : now + WORKER_SCHEDULE_MIN_INTERVAL_MS;
+          updateNextRunAt(deps, row.id, next);
+        } catch (err) {
+          pauseSchedule(deps, row.id, err instanceof Error ? err.message : String(err));
+        }
+        return;
+      }
+      try {
+        assertWorkerScheduleInterval(row, now, false);
+      } catch (err) {
+        pauseSchedule(deps, row.id, err instanceof Error ? err.message : String(err));
+        return;
+      }
+      if (history.lastRunAt !== null && now - history.lastRunAt < WORKER_SCHEDULE_MIN_INTERVAL_MS) {
+        updateNextRunAt(deps, row.id, history.lastRunAt + WORKER_SCHEDULE_MIN_INTERVAL_MS);
+        return;
+      }
+    }
     let nextRunAt: number | null = null;
     if (isRecurring(row.kind)) {
       try {
@@ -291,6 +329,9 @@ export function createScheduler(
         withPlan: false,
         triggerSource: 'schedule',
         scheduledBy: row.createdBy,
+        prompt: workerCreated
+          ? `Scheduled follow-up you set earlier:\n\n${row.prompt}`
+          : row.prompt || undefined,
       });
     } catch (err) {
       if (err instanceof PhaseTransitionError) {
@@ -299,6 +340,11 @@ export function createScheduler(
       }
       throw err;
     }
+    deps.db
+      .update(schedule)
+      .set({ lastRunAt: now, lastRunStatus: 'started' })
+      .where(eq(schedule.id, row.id))
+      .run();
     if (!isRecurring(row.kind)) {
       deps.db.delete(schedule).where(eq(schedule.id, row.id)).run();
     } else {

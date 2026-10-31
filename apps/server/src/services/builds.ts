@@ -148,6 +148,7 @@ import {
 import { insertGateAnnouncement, insertMessageRow } from './transcript.js';
 
 export interface BuildDeps {
+  steerOptions?: Pick<BuildSteerOptions, 'human'>;
   db: Db;
   hub: TeamStreamHub;
   machineHub?: MachineWakeHub;
@@ -198,6 +199,7 @@ function publishBuild(deps: BuildDeps, row: BuildRow): BuildRecord {
 interface BuildSteerOptions {
   allowReviewContinuation?: boolean;
   afterTurn?: boolean;
+  human?: boolean;
 }
 
 function continuationTodo(
@@ -325,8 +327,11 @@ export async function sendBuildSteer(
     )
       throw new HttpError(409, 'Queued message was already delivered');
     const now = nowMs();
+    const human =
+      continuationOptions.human ?? deps.steerOptions?.human ?? body.queuedMessageId !== undefined;
     const messageRow = {
-      id: newRecordId(),
+      id: human ? `human-${newRecordId()}` : newRecordId(),
+      actor: human ? deps.user.displayName : null,
       role: 'user' as const,
       content: body.content,
       createdAt: now,
@@ -873,6 +878,7 @@ export function startBuilds(
     withPlan: boolean;
     triggerSource?: TriggerSource;
     scheduledBy?: string;
+    prompt?: string;
   },
 ): BuildRecord[] {
   const triggerSource = input.triggerSource ?? 'user';
@@ -931,7 +937,7 @@ export function startBuilds(
       id,
       firstKind,
       todoRecord.teamId,
-      withRetryLessons(undefined, firstKind, lessons),
+      withRetryLessons(input.prompt, firstKind, lessons),
     );
     setTodoPhase(deps, todoId, 'queued', {
       assignment: input.assignment,

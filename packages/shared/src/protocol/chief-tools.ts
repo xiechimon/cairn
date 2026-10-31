@@ -859,12 +859,64 @@ export const WORKER_SKILL_TOOLS: readonly RemoteToolDef[] = [
   },
 ];
 
+const WORKER_SCHEDULE_TOOLS: readonly RemoteToolDef[] = [
+  {
+    name: 'schedule_create',
+    description:
+      'Create or replace the single schedule of your current thread. Never supply a todoId or teamId.',
+    parameters: obj(
+      {
+        cadence: str(
+          'A positive whole-number delay such as "in 15 minutes" (seconds/minutes/hours/days), "at <ISO timestamp>", or a five-field cron expression. Minimum interval 15 minutes; maximum 256 characters. Uses the server timezone.',
+        ),
+        prompt: str(
+          'Instructions for the scheduled run, preserved verbatim; 1 to 16000 characters, not blank.',
+        ),
+      },
+      ['cadence', 'prompt'],
+    ),
+  },
+  {
+    name: 'get_schedule',
+    description:
+      'Read your current thread schedule as {prompt, cadence, nextRunAt, lastRunAt, enabled}, or null. A one-shot cadence is returned as "at <ISO timestamp>"; a fired one-shot schedule is removed.',
+    parameters: obj({}),
+    replaySafe: true,
+  },
+  {
+    name: 'schedule_update',
+    description:
+      'Update your current thread schedule. Supply prompt, cadence, or both. Changing cadence resumes a paused schedule; prompt alone preserves its state.',
+    parameters: obj({
+      cadence: str('Optional replacement cadence, using the same format as schedule_create.'),
+      prompt: str(
+        'Optional replacement instructions, preserved verbatim; 1 to 16000 characters, not blank.',
+      ),
+    }),
+  },
+  {
+    name: 'schedule_pause',
+    description: 'Pause your current thread schedule and clear its next run time.',
+    parameters: obj({ reason: str('Optional pause reason, 1 to 1000 characters, not blank.') }),
+  },
+  {
+    name: 'schedule_clear',
+    description:
+      'Clear your current thread schedule: disable it and clear its next run time. The row is retained with the reason.',
+    parameters: obj(
+      { reason: str('Why this schedule is no longer needed, 1 to 1000 characters, not blank.') },
+      ['reason'],
+    ),
+  },
+];
+
 export const WORKER_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   ...WORKER_MEMORY_REMOTE_TOOLS,
   WORKER_ATTACHMENT_TOOL,
   WORKER_ATTACH_FILE_TOOL,
   SET_TASK_META_TOOL,
   ...WORKER_SKILL_TOOLS,
+  ...WORKER_SCHEDULE_TOOLS,
 ];
 
 export const WORKER_REMOTE_TOOLS_GITHUB: readonly RemoteToolDef[] = [
@@ -873,4 +925,5 @@ export const WORKER_REMOTE_TOOLS_GITHUB: readonly RemoteToolDef[] = [
   WORKER_ATTACH_FILE_TOOL,
   SET_TASK_META_TOOL_MULTI_TAG,
   ...WORKER_SKILL_TOOLS,
+  ...WORKER_SCHEDULE_TOOLS,
 ];
