@@ -13,7 +13,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import { build } from 'esbuild';
 import { afterEach, expect, test } from 'vitest';
 import { NspawnOrbProvider, type OrbCommandRunner } from '../src/orb/provider.js';
@@ -52,7 +52,8 @@ test('publishes the running checkout build and resolves production dependencies 
   const f = fixture();
   writeFileSync(join(f.distSource, 'cli.mjs'), "import sha from 'host-build'; console.log(sha);");
   await f.prepare();
-  const key = `0.2.2-${f.sha}`;
+  const key = basename(readlinkSync(join(f.distRoot, 'current')));
+  expect(key).toMatch(new RegExp(`^0\\.2\\.2-${f.sha}-dist-[a-f0-9]{16}$`));
   expect(readlinkSync(join(f.distRoot, 'current'))).toBe(`releases/${key}`);
   expect(readlinkSync(join(f.distRoot, 'cli.mjs'))).toBe('current/dist/cli.mjs');
   expect(JSON.parse(readFileSync(join(f.distRoot, 'current.json'), 'utf8'))).toEqual({
@@ -74,7 +75,9 @@ test('reuses an identical release key without another deploy or replacing immuta
   await f.prepare();
   expect(f.deployments).toHaveLength(1);
   expect(statSync(entry).ino).toBe(inode);
-  expect(readdirSync(join(f.distRoot, 'releases'))).toEqual([`0.2.2-${f.sha}`]);
+  expect(readdirSync(join(f.distRoot, 'releases'))).toEqual([
+    basename(readlinkSync(join(f.distRoot, 'current'))),
+  ]);
 });
 
 test('dirty keys reflect staged, unstaged, deleted and untracked content and are reusable', async () => {
@@ -85,7 +88,9 @@ test('dirty keys reflect staged, unstaged, deleted and untracked content and are
     writeFileSync(join(f.checkout, 'source.txt'), content);
     await f.prepare();
     const key = readlinkSync(join(f.distRoot, 'current'));
-    expect(key).toMatch(new RegExp(`^releases/0\\.2\\.2-${f.sha}-dirty-[a-f0-9]+$`));
+    expect(key).toMatch(
+      new RegExp(`^releases/0\\.2\\.2-${f.sha}-dist-[a-f0-9]{16}-dirty-[a-f0-9]+$`),
+    );
     keys.add(key);
   }
   const unstaged = readlinkSync(join(f.distRoot, 'current'));
@@ -118,7 +123,9 @@ test('keeps current and metadata intact while a new release is being deployed', 
     expect(readlinkSync(join(f.distRoot, 'current'))).toBe(previous);
     expect(readFileSync(join(f.distRoot, 'cli.mjs'), 'utf8')).toBe('first');
     expect(readFileSync(join(f.distRoot, 'current.json'), 'utf8')).toBe(metadata);
-    expect(readdirSync(join(f.distRoot, 'releases'))).toEqual([`0.2.2-${f.sha}`]);
+    expect(readdirSync(join(f.distRoot, 'releases'))).toEqual([
+      basename(readlinkSync(join(f.distRoot, 'current'))),
+    ]);
   };
   writeFileSync(join(f.checkout, 'source.txt'), 'second');
   writeFileSync(join(f.distSource, 'cli.mjs'), 'second');
@@ -130,6 +137,7 @@ test('keeps current and metadata intact while a new release is being deployed', 
 test('prunes releases beyond the newest three while preserving an older current release', async () => {
   const f = fixture();
   await f.prepare();
+  const current = basename(readlinkSync(join(f.distRoot, 'current')));
   for (let index = 0; index < 5; index++) {
     const directory = join(f.distRoot, 'releases', `old-${index}`);
     mkdirSync(directory);
@@ -137,7 +145,7 @@ test('prunes releases beyond the newest three while preserving an older current 
   }
   await f.prepare();
   expect(readdirSync(join(f.distRoot, 'releases')).sort()).toEqual(
-    [`0.2.2-${f.sha}`, 'old-2', 'old-3', 'old-4'].sort(),
+    [current, 'old-2', 'old-3', 'old-4'].sort(),
   );
   expect(readFileSync(join(f.distRoot, 'cli.mjs'), 'utf8')).toBe('first');
 });
@@ -233,7 +241,7 @@ await provider.prepare(await provider.ensure({ conversationId: 'thread', project
   );
   execFileSync(process.execPath, [probe], { cwd: f.root, timeout: 10_000 });
   expect(JSON.parse(readFileSync(join(f.distRoot, 'current.json'), 'utf8'))).toEqual({
-    key: `0.2.2-${f.sha}`,
+    key: expect.stringMatching(new RegExp(`^0\\.2\\.2-${f.sha}-dist-[a-f0-9]{16}$`)),
     version: '0.2.2',
     sha: f.sha,
   });
@@ -277,4 +285,44 @@ test('deployment disables lifecycle scripts in the installed pnpm configuration'
     return runner(argv, options);
   });
   await f.prepare();
+});
+
+test('a pull without rebuilding followed by a rebuild publishes distinct built content', async () => {
+  const f = fixture();
+  await f.prepare();
+  writeFileSync(join(f.checkout, 'source.txt'), 'new source');
+  execFileSync('git', ['-C', f.checkout, 'add', 'source.txt']);
+  execFileSync('git', [
+    '-C',
+    f.checkout,
+    '-c',
+    'user.name=Test',
+    '-c',
+    'user.email=test@example.test',
+    'commit',
+    '-m',
+    'New source',
+  ]);
+  await f.prepare();
+  const pulled = readlinkSync(join(f.distRoot, 'current'));
+  expect(readFileSync(join(f.distRoot, 'cli.mjs'), 'utf8')).toBe('first');
+  writeFileSync(join(f.distSource, 'cli.mjs'), 'rebuilt');
+  await f.prepare();
+  expect(readlinkSync(join(f.distRoot, 'current'))).not.toBe(pulled);
+  expect(readFileSync(join(f.distRoot, 'cli.mjs'), 'utf8')).toBe('rebuilt');
+  expect(readFileSync(join(f.distRoot, pulled, 'dist/cli.mjs'), 'utf8')).toBe('first');
+  expect(f.deployments).toHaveLength(3);
+});
+
+test('a rebuild at the same HEAD hashes nested dist files without git-visible changes', async () => {
+  const f = fixture();
+  mkdirSync(join(f.distSource, 'assets'));
+  writeFileSync(join(f.distSource, 'assets/worker.mjs'), 'first');
+  await f.prepare();
+  const previous = readlinkSync(join(f.distRoot, 'current'));
+  writeFileSync(join(f.distSource, 'assets/worker.mjs'), 'other');
+  await f.prepare();
+  expect(readlinkSync(join(f.distRoot, 'current'))).not.toBe(previous);
+  expect(readFileSync(join(f.distRoot, 'current/dist/assets/worker.mjs'), 'utf8')).toBe('other');
+  expect(f.deployments).toHaveLength(2);
 });

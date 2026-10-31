@@ -14,7 +14,8 @@ import {
   orbCheckpointSchema,
 } from './protocol.js';
 import { type OrbHandle, orbNote } from './provider.js';
-import { RelayMachineServer } from './relay.js';
+import { RelayMachineServer, RelayPathError } from './relay.js';
+import { cleanOrbOutbox } from './runtime-fs.js';
 
 export const ORB_HEARTBEAT_TIMEOUT_MS = 120_000;
 
@@ -68,6 +69,7 @@ export async function runOrbStep(
   let activeHandle: OrbHandle | undefined;
   let timedOut = false;
   let outboxDirectory: string | undefined;
+  let ownsOutbox = false;
   let ready = false;
   let ended = false;
   let nextSteer = 0;
@@ -152,9 +154,7 @@ export async function runOrbStep(
           await lifecycle.provider.start(handle, { signal: execController.signal });
           const socketPath = join(directory, 'relay.sock');
           if (claimed.project?.repo?.kind === 'local') {
-            const outbox = join(directory, 'outbox');
-            mkdirSync(outbox, { mode: 0o700 });
-            outboxDirectory = outbox;
+            outboxDirectory = join(directory, 'outbox');
           }
           let failure: string | null = null;
           const receive = (frame: OrbFrame): void => {
@@ -261,7 +261,27 @@ export async function runOrbStep(
               rmSync(join(deps.paths.outboxDir, `step-${stepId}.session.jsonl`), { force: true });
             },
           });
-          await relay.listen();
+          for (let attempt = 0; ; attempt++) {
+            try {
+              if (outboxDirectory) {
+                try {
+                  mkdirSync(outboxDirectory, { mode: 0o700 });
+                  ownsOutbox = true;
+                } catch (error) {
+                  throw new RelayPathError(
+                    `Orb outbox must be recreated by root: ${String(error)}`,
+                  );
+                }
+              }
+              await relay.listen();
+              break;
+            } catch (error) {
+              if (handle.running) await lifecycle.provider.stop(handle);
+              ownsOutbox = false;
+              if (!(error instanceof RelayPathError) || attempt > 0) throw error;
+              await lifecycle.provider.start(handle, { signal: execController.signal });
+            }
+          }
           input.options.stopRequest = stop.request ?? undefined;
           await transportEnded;
           if (stop.request)
@@ -287,7 +307,11 @@ export async function runOrbStep(
     clearTimeout(stopTimer);
     clearTimeout(watchdog);
     stop.detach();
-    await relay?.close();
+    try {
+      await relay?.close();
+    } catch (error) {
+      deps.logger.step(`Orb relay close failed: ${String(error)}`);
+    }
     if (!relay?.isComplete) {
       const pending = deps.journal.get(stepId);
       if (workerReported && pending?.state === 'awaiting-upload' && pending.doneBody) {
@@ -304,7 +328,7 @@ export async function runOrbStep(
         }
       }
     }
-    if (outboxDirectory) rmSync(outboxDirectory, { recursive: true, force: true });
+    if (outboxDirectory && ownsOutbox) cleanOrbOutbox(outboxDirectory);
     stop.settle();
   }
 }

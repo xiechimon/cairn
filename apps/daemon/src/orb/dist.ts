@@ -12,6 +12,7 @@ import {
   readlinkSync,
   renameSync,
   rmSync,
+  statSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
@@ -37,7 +38,12 @@ function publishLink(root: string, target: string, name: string) {
   }
 }
 
-export async function publishOrbDist(distSource: string, root: string, runner: OrbCommandRunner) {
+export async function publishOrbDist(
+  distSource: string,
+  root: string,
+  runner: OrbCommandRunner,
+  retainedKeys: () => ReadonlySet<string> | undefined = () => new Set(),
+) {
   const checkout = resolve(distSource, '../../..');
   const { version } = JSON.parse(
     readFileSync(join(checkout, 'apps/daemon/package.json'), 'utf8'),
@@ -49,7 +55,21 @@ export async function publishOrbDist(distSource: string, root: string, runner: O
     throw new Error('Orb daemon checkout has an invalid package version');
   const sha = (await checkoutCommand(runner, checkout, ['rev-parse', '--short', 'HEAD'])).trim();
   if (!/^[a-f0-9]{4,40}$/.test(sha)) throw new Error('Orb daemon checkout has an invalid git SHA');
-  let key = `${version}-${sha}`;
+  const builtHash = createHash('sha256');
+  const hashDirectory = async (directory: string, prefix: string): Promise<void> => {
+    for (const name of readdirSync(directory).sort()) {
+      const path = join(directory, name);
+      const metadata = statSync(path);
+      const relative = `${prefix}${name}`;
+      builtHash.update(JSON.stringify([relative, metadata.mode, metadata.size]));
+      if (metadata.isDirectory()) await hashDirectory(path, `${relative}/`);
+      else if (metadata.isFile())
+        for await (const chunk of createReadStream(path)) builtHash.update(chunk);
+      else throw new Error('Orb daemon build must contain only files and directories');
+    }
+  };
+  await hashDirectory(distSource, '');
+  let key = `${version}-${sha}-dist-${builtHash.digest('hex').slice(0, 16)}`;
   const status = await checkoutCommand(runner, checkout, [
     'status',
     '--porcelain=v1',
@@ -134,7 +154,10 @@ export async function publishOrbDist(distSource: string, root: string, runner: O
     .filter((entry) => entry.isDirectory())
     .map((entry) => ({ name: entry.name, mtime: lstatSync(join(releases, entry.name)).mtimeMs }))
     .sort((left, right) => right.mtime - left.mtime || left.name.localeCompare(right.name));
+  const retained = retainedKeys();
+  if (!retained) return;
   for (const entry of entries.slice(3)) {
-    if (entry.name !== key) rmSync(join(releases, entry.name), { recursive: true, force: true });
+    if (entry.name !== key && !retained.has(entry.name))
+      rmSync(join(releases, entry.name), { recursive: true, force: true });
   }
 }

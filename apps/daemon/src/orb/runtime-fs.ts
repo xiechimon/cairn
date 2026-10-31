@@ -1,4 +1,14 @@
-import { closeSync, constants, fstatSync, lstatSync, openSync, readSync } from 'node:fs';
+import {
+  closeSync,
+  constants,
+  fstatSync,
+  lstatSync,
+  openSync,
+  readdirSync,
+  readSync,
+  rmdirSync,
+  unlinkSync,
+} from 'node:fs';
 import { basename, join } from 'node:path';
 
 export function readOrbFile(directory: string, filename: string, maxBytes: number): Buffer {
@@ -62,5 +72,33 @@ export function readOrbFile(directory: string, filename: string, maxBytes: numbe
     }
   } finally {
     closeSync(parentDescriptor);
+  }
+}
+
+export function cleanOrbOutbox(directory: string): void {
+  let descriptor: number | undefined;
+  try {
+    descriptor = openSync(
+      directory,
+      constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW,
+    );
+    const opened = fstatSync(descriptor);
+    const current = () => {
+      const metadata = lstatSync(directory, { throwIfNoEntry: false });
+      return metadata?.isDirectory() && metadata.dev === opened.dev && metadata.ino === opened.ino;
+    };
+    const path = process.platform === 'linux' ? `/proc/self/fd/${descriptor}` : directory;
+    for (const name of readdirSync(path)) {
+      try {
+        if (!current()) return;
+        const entry = join(path, name);
+        const metadata = lstatSync(entry, { throwIfNoEntry: false });
+        if (metadata && !metadata.isDirectory()) unlinkSync(entry);
+      } catch {}
+    }
+    if (current()) rmdirSync(directory);
+  } catch {
+  } finally {
+    if (descriptor !== undefined) closeSync(descriptor);
   }
 }

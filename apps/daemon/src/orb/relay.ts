@@ -5,7 +5,7 @@ import {
   fchmodSync,
   lstatSync,
   openSync,
-  rmSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { createConnection, createServer, type Server, type Socket } from 'node:net';
@@ -34,6 +34,8 @@ import {
 } from './protocol.js';
 import { readOrbFile } from './runtime-fs.js';
 
+const listeningPaths = new Set<string>();
+
 const callSchema = z
   .object({
     type: z.literal('call'),
@@ -50,6 +52,8 @@ export class RelayMachineError extends MachineApiError {
     this.name = 'RelayMachineError';
   }
 }
+
+export class RelayPathError extends RelayMachineError {}
 
 export class RelayMachineServer {
   private readonly server: Server;
@@ -84,7 +88,7 @@ export class RelayMachineServer {
   ) {
     this.server = createServer((socket) => {
       socket.on('error', () => {});
-      if (this.connected) {
+      if (this.connected || this.sockets.size >= 4) {
         socket.destroy();
         return;
       }
@@ -168,9 +172,22 @@ export class RelayMachineServer {
       throw new RelayMachineError('Relay parent must be a real directory');
     if (directory.uid !== process.getuid?.() || (directory.mode & 0o7777) !== 0o700)
       throw new RelayMachineError('Relay directory must be owned by daemon uid with mode 0700');
-    for (const path of [this.options.socketPath, `${this.options.socketPath}.token`])
-      if (lstatSync(path, { throwIfNoEntry: false }))
-        throw new RelayMachineError('Relay path already exists');
+    if (listeningPaths.has(this.options.socketPath))
+      throw new RelayMachineError('Relay path already has a listener');
+    const paths = [this.options.socketPath, `${this.options.socketPath}.token`];
+    for (const path of paths) {
+      const metadata = lstatSync(path, { throwIfNoEntry: false });
+      if (metadata && !metadata.isFile() && !metadata.isSocket())
+        throw new RelayPathError('Relay path must be a regular file or socket');
+    }
+    for (const path of paths) {
+      const metadata = lstatSync(path, { throwIfNoEntry: false });
+      if (metadata) {
+        if (!metadata.isFile() && !metadata.isSocket())
+          throw new RelayPathError('Relay path must be a regular file or socket');
+        unlinkSync(path);
+      }
+    }
     await new Promise<void>((resolve, reject) => {
       this.server.once('error', reject);
       const mask = process.umask(0o177);
@@ -178,6 +195,7 @@ export class RelayMachineServer {
         this.server.listen(this.options.socketPath, () => {
           this.server.removeListener('error', reject);
           this.ownsSocket = true;
+          listeningPaths.add(this.options.socketPath);
           resolve();
         });
       } finally {
@@ -221,9 +239,21 @@ export class RelayMachineServer {
       await new Promise<void>((resolve) => this.server.close(() => resolve()));
       if (this.reporting) await this.reporting.catch(() => {});
       if (this.delivery) await this.delivery.catch(() => {});
-      if (this.ownsSocket) rmSync(this.options.socketPath, { force: true });
-      if (this.ownsToken) rmSync(`${this.options.socketPath}.token`, { force: true });
-    })();
+      for (const [owned, path] of [
+        [this.ownsSocket, this.options.socketPath],
+        [this.ownsToken, `${this.options.socketPath}.token`],
+      ] as const) {
+        if (!owned) continue;
+        try {
+          const metadata = lstatSync(path, { throwIfNoEntry: false });
+          if (metadata?.isFile() || metadata?.isSocket()) unlinkSync(path);
+        } catch {}
+      }
+    })()
+      .catch(() => {})
+      .finally(() => {
+        if (this.ownsSocket) listeningPaths.delete(this.options.socketPath);
+      });
     return this.closing;
   }
 

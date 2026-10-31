@@ -9,6 +9,7 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  readlinkSync,
   renameSync,
   rmSync,
   statSync,
@@ -31,6 +32,8 @@ export interface OrbHandle {
   lastUsedAt: number;
   notes: WorkspaceHookNoteData[];
   lastStepId?: string;
+  releaseKey?: string;
+  seedKey?: string | null;
 }
 
 export interface OrbExecOptions {
@@ -171,6 +174,7 @@ export class NspawnOrbProvider implements OrbProvider {
   private readonly shutdownTimeoutMs: number;
   private readonly runtimeDirectoryTimeoutMs: number;
   private publishing: Promise<void> = Promise.resolve();
+  private readonly starting = new Set<Promise<void>>();
 
   constructor(
     options: {
@@ -248,7 +252,9 @@ export class NspawnOrbProvider implements OrbProvider {
   async prepare(handle: OrbHandle, seed?: string): Promise<string> {
     this.validate(handle);
     const directory = join(this.runtimeRoot, handle.id);
+    const starting = [...this.starting];
     const publish = this.publishing.then(async () => {
+      await Promise.allSettled(starting);
       for (const [name, root] of [
         ['dist', this.distRoot],
         ['seed', this.seedRoot],
@@ -256,7 +262,13 @@ export class NspawnOrbProvider implements OrbProvider {
         if (!this.checkDirectory(root, `Orb ${name} root`))
           throw new Error(`Orb ${name} root must exist: ${root}; run the installer`);
       }
-      await publishOrbDist(this.distSource, this.distRoot, this.runner);
+      await publishOrbDist(this.distSource, this.distRoot, this.runner, () => {
+        const running = [...this.handles.values()].filter((machine) => machine.running);
+        if (running.some((machine) => !machine.releaseKey)) return undefined;
+        return new Set(
+          running.flatMap((machine) => (machine.releaseKey ? [machine.releaseKey] : [])),
+        );
+      });
       if (seed) {
         if (!/^[a-zA-Z0-9-]+$/.test(handle.projectId)) throw new Error('Invalid orb project id');
         const project = join(this.seedRoot, handle.projectId);
@@ -264,7 +276,7 @@ export class NspawnOrbProvider implements OrbProvider {
         const snapshot = mkdtempSync(join(project, '.snapshot-'));
         try {
           await prepareOrbSeed({ source: seed, directory: snapshot, projectId: handle.projectId });
-          await this.publish(snapshot, join(project, 'current'));
+          await this.publish(snapshot, join(project, 'current'), handle.projectId);
           const link = join(project, `.repo-${randomUUID()}`);
           try {
             symlinkSync('current/repo', link);
@@ -284,11 +296,28 @@ export class NspawnOrbProvider implements OrbProvider {
   }
 
   async start(handle: OrbHandle, options: { signal?: AbortSignal } = {}): Promise<void> {
+    const starting = this.publishing.then(() => this.startContainer(handle, options));
+    this.starting.add(starting);
+    try {
+      await starting;
+    } finally {
+      this.starting.delete(starting);
+    }
+  }
+
+  private async startContainer(
+    handle: OrbHandle,
+    options: { signal?: AbortSignal },
+  ): Promise<void> {
     this.validate(handle);
     options.signal?.throwIfAborted();
     if (!handle.running || !(await this.runningMachines()).has(handle.id)) {
       handle.running = false;
       handle.notes.push(orbNote('orb: setup'));
+      const release = join(this.distRoot, 'current');
+      const seed = join(this.seedRoot, handle.projectId, 'current');
+      handle.releaseKey = existsSync(release) ? basename(readlinkSync(release)) : undefined;
+      handle.seedKey = existsSync(seed) ? readlinkSync(seed) : null;
       await this.command(['machinectl', 'start', handle.id]);
       handle.running = true;
       this.save();
@@ -391,7 +420,7 @@ export class NspawnOrbProvider implements OrbProvider {
       throw new Error(`${argv[0]} ${argv[1]} failed (${result.code}): ${result.stderr}`);
   }
 
-  private async publish(directory: string, target: string): Promise<void> {
+  private async publish(directory: string, target: string, projectId: string): Promise<void> {
     chmodSync(directory, 0o755);
     const hash = createHash('sha256');
     const files = readdirSync(directory, { recursive: true, withFileTypes: true })
@@ -412,6 +441,20 @@ export class NspawnOrbProvider implements OrbProvider {
       renameSync(link, target);
     } finally {
       rmSync(link, { force: true });
+    }
+    const running = [...this.handles.values()].filter(
+      (handle) => handle.running && handle.projectId === projectId,
+    );
+    if (running.some((handle) => handle.seedKey === undefined)) return;
+    const retained = new Set(running.map((handle) => handle.seedKey));
+    retained.add(basename(version));
+    for (const entry of readdirSync(dirname(target), { withFileTypes: true })) {
+      if (
+        entry.isDirectory() &&
+        /^\.data-[a-f0-9]{64}$/.test(entry.name) &&
+        !retained.has(entry.name)
+      )
+        rmSync(join(dirname(target), entry.name), { recursive: true, force: true });
     }
   }
 

@@ -401,6 +401,7 @@ test('cancellation during machine start powers off the machine after it starts',
   });
   const handle = await provider.ensure({ conversationId: 'thread', projectId: 'project' });
   const starting = provider.start(handle, { signal: controller.signal });
+  await vi.waitFor(() => expect(commands.some((argv) => argv[1] === 'start')).toBe(true));
   controller.abort();
   start.resolve();
   await expect(starting).rejects.toThrow();
