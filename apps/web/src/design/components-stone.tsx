@@ -23,7 +23,7 @@ export function StoneSection() {
     >
       <Specimen
         title="Tone glyph"
-        note="The status glyph family, one per tone; working is the spiral trace"
+        note="The status glyph family, one per tone; working is a turning arc, the spiral stays for agents"
         code={`<ToneGlyph tone="waiting" />\n<ToneGlyph tone="working" still />`}
       >
         {STONE_TONES.map((tone) => (
