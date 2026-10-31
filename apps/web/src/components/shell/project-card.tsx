@@ -73,7 +73,12 @@ export function ProjectCard({
       </div>
       <span className="relative z-10 flex-none">
         {menu ?? (
-          <Button variant="ghost" size="icon-sm" aria-label="Project menu">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Project menu"
+            className="text-content-tertiary"
+          >
             <Ellipsis />
           </Button>
         )}

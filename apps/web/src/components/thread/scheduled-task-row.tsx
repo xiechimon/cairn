@@ -27,7 +27,7 @@ export function ScheduledTaskRow({ name, trigger, next, state, onOpen }: Schedul
       onClick={onOpen}
       data-slot="scheduled-task-row"
       data-state={state}
-      className="h-auto w-full justify-start gap-3 rounded-none px-3.5 py-3 text-left text-ui font-normal hover:bg-sidebar-hover"
+      className="h-auto w-full justify-start gap-3 rounded-none border-0 px-3.5 py-3 text-left text-ui font-normal not-last:border-b not-last:border-border hover:bg-sidebar-hover"
     >
       <StoneMark tone={state === 'active' ? 'working' : 'idle'} kind="idle" still />
       <span className="min-w-0 flex-1">

@@ -10,6 +10,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useState } from 'react';
+import { SpiralMark } from '../chief/chief-fab-icon.js';
 import { ListCard, ListRow } from '../components/list-card.js';
 import { SegmentedRadio } from '../components/segmented.js';
 import { QuotaBar } from '../components/settings/quota-bar.js';
@@ -58,8 +59,17 @@ export function SidebarSection() {
             onClick={() => setActive('scheduled')}
           />
           <SidebarNavRow icon={<Activity className="size-4" />} label="Activity" />
-          <div className="px-2 pt-4.5 pb-1.5 text-meta font-medium text-content-tertiary">
+          <div className="flex items-center px-2 pt-4.5 pb-1.5 text-meta font-medium text-content-tertiary">
             Projects
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              aria-label="New project"
+              className="ml-auto text-content-tertiary"
+              onClick={() => toastSuccess('New project')}
+            >
+              <Plus />
+            </Button>
           </div>
           <SidebarProjectRow
             name="cairn"
@@ -118,7 +128,7 @@ export function SidebarSection() {
 }
 
 export function ProjectsSection() {
-  const [tab, setTab] = useState('inbox');
+  const [tab, setTab] = useState('coordinator');
   return (
     <Section
       id="projects-lists"
@@ -195,7 +205,11 @@ export function ProjectsSection() {
             onChange={setTab}
             tabs={[
               { id: 'inbox', label: 'Inbox', icon: <Inbox className="size-5" />, badge: 2 },
-              { id: 'coordinator', label: 'Coordinator', icon: <Sparkles className="size-5" /> },
+              {
+                id: 'coordinator',
+                label: 'Coordinator',
+                icon: <SpiralMark busy={false} className="size-5" />,
+              },
               { id: 'projects', label: 'Projects', icon: <LayoutGrid className="size-5" /> },
             ]}
           />
@@ -231,7 +245,6 @@ export function CoordinatorStreamSection() {
       <Specimen
         title="Stream header"
         note={chip == null ? 'Click a suggestion' : `Picked: ${chip}`}
-        stage="canvas"
         code={`<Marker variant="separator"><MarkerContent>Today</MarkerContent></Marker>\n<GoalLine>Bring p95 latency under 200 ms.</GoalLine>\n<Greeting>Morning, ian.</Greeting>\n<SuggestionChip>Make a plan</SuggestionChip>`}
       >
         <div className="flex w-full max-w-170 flex-col gap-4">
@@ -255,7 +268,6 @@ export function CoordinatorStreamSection() {
       </Specimen>
       <Specimen
         title="Archived banner"
-        stage="canvas"
         code={`<ArchivedBanner message="This project is archived." actionLabel="Unarchive" />`}
       >
         <div className="w-full max-w-170">

@@ -1,10 +1,10 @@
 import { cn } from 'cn';
 import { Check, ChevronDown, GitPullRequest, LoaderCircle, X } from 'lucide-react';
 import { useId } from 'react';
+import { ToggleSwitch } from '../toggle-switch.js';
 import { Button } from '../ui/button.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover.js';
 import { StatusChip } from '../ui/status-chip.js';
-import { Switch } from '../ui/switch.js';
 
 export type CiState = 'passed' | 'running' | 'failed';
 
@@ -44,16 +44,16 @@ function ToggleRow({
   const id = useId();
   return (
     <div className="flex items-start gap-2.5 px-1 py-1.5 text-ui text-foreground">
-      <Switch
+      <ToggleSwitch
         id={id}
         checked={checked}
         disabled={disabled}
         onCheckedChange={onCheckedChange}
         className="mt-0.5"
       />
-      <label htmlFor={id} className={cn('min-w-0 flex-1', disabled && 'text-content-secondary')}>
+      <label htmlFor={id} className={cn('min-w-0 flex-1', disabled && 'text-content-tertiary')}>
         {label}
-        <small className="block text-meta text-content-tertiary">{help}</small>
+        <small className="block text-caption text-content-tertiary">{help}</small>
       </label>
     </div>
   );
@@ -84,7 +84,7 @@ export function PrBar({
     >
       <GitPullRequest className="size-3.5 flex-none text-content-secondary" />
       <span className="font-mono text-content-secondary">#{number}</span>
-      <span className="min-w-0 truncate font-mono text-content-tertiary">{branch}</span>
+      <span className="min-w-0 truncate font-mono text-content-secondary">{branch}</span>
       <span className="ml-auto flex flex-none items-center gap-2">
         {merged ? (
           <StatusChip tone="plan" className="h-6.5 gap-1.5 rounded-lg px-2.25 text-meta">

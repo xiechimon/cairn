@@ -48,23 +48,21 @@ export function ThreadCard({
           </span>
         </div>
         <p className="mt-0.5 mb-0 text-ui text-content-secondary">{reason}</p>
-        {(primaryLabel != null || onView != null) && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {primaryLabel != null && (
-              <Button size="sm" onClick={onPrimary} className="h-6.5 px-2.25 text-meta">
-                {primaryLabel}
-              </Button>
-            )}
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={onView}
-              className="h-6.5 px-2.25 text-meta text-content-secondary"
-            >
-              {viewLabel}
+        <div className="mt-3 flex flex-wrap gap-2">
+          {primaryLabel != null && (
+            <Button size="sm" onClick={onPrimary} className="h-6.5 px-2.25 text-meta">
+              {primaryLabel}
             </Button>
-          </div>
-        )}
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onView}
+            className="h-6.5 px-2.25 text-meta text-content-secondary"
+          >
+            {viewLabel}
+          </Button>
+        </div>
       </div>
     </article>
   );
