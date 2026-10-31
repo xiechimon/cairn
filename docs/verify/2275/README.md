@@ -86,3 +86,37 @@ The initial implementation had two Claude Sonnet 5.5 security reviews. The subse
 Agent code inside an orb runs as the same UID as the worker. It can call `token(stepId)` on the relay or inspect worker memory. Credentials returned by the token endpoint are step-scoped and issued by the live server; their authorization remains live server-side. The machine credential remains on the host, but this design is not credential isolation from agent code. Keeping credentials out of worker files does not prevent same-UID access to them in memory or through the relay.
 
 Native `machinectl bind`, release unmounts, base-image dependencies, egress routing, cancellation of a real systemd-run workload, and agent UID mapping were not exercised on macOS. Git ownership checks on `/seed` still require native-host verification. A failed host report remains recoverable in the journal, but no guarantee of progress during a continuing upstream outage is made. The current TLC properties cover bounded safety rather than eventual post-crash completion.
+
+## Local Project delivery fix (2026-10-31)
+
+Measured failure: local workspaces inside an orb have the read-only seed as their origin, so normal finalization cannot deliver commits to the original host repository. Local worker finalization now creates a bundle of exactly `refs/heads/<conversationBranch(conversationId)>` and calls `deliverBundle(stepId, filename)` over the real step relay. GitHub Projects continue through `WorkspaceManager.push` with the existing credential path.
+
+For each local step, the host creates a unique 0700 directory and mounts it writable at `/run/cairn/outbox`, with release after exec. The directory is removed after relay shutdown on success and failure. The worker removes its bundle after the delivery attempt. Only a filename matching the bounded bundle-name schema crosses the relay; the repository path and Thread identity come from the host claim. The new method retains the existing allowlist, step binding and 16 MiB frame limit, rejects extra arguments and cancellation flags, and is unavailable without a host local-delivery configuration.
+
+The host opens the outbox file without following symlinks, requires a regular file with one link, and enforces a 64 MiB cap. It copies the bounded contents into a private host temporary directory before running Git, preventing subsequent worker edits from replacing the verified input. `git bundle verify` must succeed and `git bundle list-heads` must return exactly the claimed Thread branch. Fetch uses one explicit branch refspec without force, tags, ref mapping or a FETCH_HEAD write. Divergence fails; a host branch already containing the delivered commit succeeds without changing its ref. Git refuses delivery into a checked-out host branch. Delivery errors become ordinary failed-step reports with the Git rejection reason. Relay shutdown waits for in-flight delivery before removing the outbox.
+
+Measured runtime regressions in `apps/daemon/test/orb-delivery.test.ts` use real temporary Git repositories, a real Unix relay socket, the actual worker and runner finalization, and a fake backend that creates a real commit:
+
+| Test | Coverage |
+| --- | --- |
+| `local orb step delivers a new commit and releases its per-step outbox` | Host branch hash and file contents match the worker commit; no push to seed; 0700 writable outbox mount and cleanup |
+| `github orb step delivers a new commit and releases its per-step outbox` | Existing real push path delivers the commit |
+| `local-rejected orb step delivers a new commit and releases its per-step outbox` | Checked-out host branch rejects delivery, normal failed step reports the reason, outbox is removed |
+| `relay rejects %s delivery without changing host refs` | Nine cases: extra ref, another Thread branch, oversized file, traversal, absolute path, symlink, invalid bundle, wrong step, extra argument; complete host ref list remains unchanged |
+| `host bundle delivery preserves %s push semantics` | Three cases: fast-forward, divergence and already-contained commit |
+
+The initial focused run failed ten cases and passed the GitHub control before implementation. The final focused orb run passes 178 tests in nine files, including these 15 delivery cases and the compiled-worker process probe. The mount assertion in `orb-runner.test.ts` now includes the ephemeral outbox.
+
+Checks run with `fnm exec --using 24.14.0`:
+
+| Command | Result |
+| --- | --- |
+| `pnpm lint` | PASS; 1,369 files, one existing informational suggestion |
+| `pnpm typecheck` | PASS; five workspace packages |
+| `pnpm spec:parse` | PASS; 1,418 web tests in 207 files and 67 integration files |
+| `pnpm exec vitest run apps/daemon/test/orb-{delivery,relay,step,seed,runner,provider,workspace,worker-process,watchdog}.test.ts --maxWorkers=1` | PASS; 178 tests in nine files |
+| `pnpm --filter @cairn/web e2e:affected` | PASS; no web surface selected |
+| `pnpm exec vitest run --changed --project @xiechimon/cairn-cli --maxWorkers=1` | PASS; 286 tests in 22 files |
+| `pnpm prepush` | PASS; 20 checks |
+
+Native Linux nspawn mounts and UID mapping remain unverified on macOS; the tests simulate mount placement while exercising real Git delivery and socket traffic. No push or PR was performed for this fix.

@@ -83,7 +83,7 @@ test('orb workers use a socket and never construct or run a host backend', async
   }
 });
 
-test('exec exposes only the socket, read-only build and read-only project seed', async () => {
+test('exec exposes the socket, read-only build and seed, and a per-step delivery outbox', async () => {
   const repo = mkdtempSync(join(tmpdir(), 'orb-exec-seed-'));
   execFileSync('git', ['init', '-b', 'main', repo]);
   execFileSync('git', [
@@ -141,6 +141,11 @@ test('exec exposes only the socket, read-only build and read-only project seed',
         source: join(paths.home, 'orb', 's1-seed', 'repo'),
         target: '/seed/project/repo',
         readonly: true,
+        releaseAfterExec: true,
+      },
+      {
+        source: expect.stringMatching(/orb\/s1-outbox-[a-zA-Z0-9]+$/),
+        target: '/run/cairn/outbox',
         releaseAfterExec: true,
       },
     ]);

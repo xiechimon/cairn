@@ -29,7 +29,16 @@ export const ORB_STEP_METHODS = [
   'steerAck',
   'stop',
 ] as const satisfies readonly (keyof MachineApi)[];
-export type OrbStepMethod = (typeof ORB_STEP_METHODS)[number];
+export const ORB_RELAY_METHODS = [...ORB_STEP_METHODS, 'deliverBundle'] as const;
+export type OrbStepMethod = (typeof ORB_RELAY_METHODS)[number];
+
+export const orbBundleArgsSchema = z.tuple([
+  z.string(),
+  z
+    .string()
+    .max(128)
+    .regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]*\.bundle$/),
+]);
 
 export interface OrbStepInput {
   claimed: ClaimedStep;

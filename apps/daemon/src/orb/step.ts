@@ -1,10 +1,10 @@
-import { existsSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AgentSessionHandle, ClaimedStep, MachineDoneBody } from '@cairn/shared';
 import { TranscriptBuffer } from '../journal.js';
 import { MachineApiError } from '../machine-client.js';
-import { writePrivateFile } from '../private-fs.js';
+import { ensurePrivateDir, writePrivateFile } from '../private-fs.js';
 import { type RunStepDeps, type RunStepOptions, resumePendingUpload, runStep } from '../runner.js';
 import { StepStops } from '../step-stops.js';
 import type { OrbLifecycle } from './lifecycle.js';
@@ -65,6 +65,7 @@ export async function runOrbStep(
   let providerStop: Promise<void> | undefined;
   let activeHandle: OrbHandle | undefined;
   let timedOut = false;
+  let outboxDirectory: string | undefined;
   const seedDirectory = join(deps.paths.home, 'orb', `${stepId}-seed`);
   let ready = false;
   let ended = false;
@@ -108,7 +109,10 @@ export async function runOrbStep(
         activeHandle = handle;
         handle.lastStepId = stepId;
         lifecycle.provider.touch(handle, Date.now());
-        const methods = ORB_STEP_METHODS.filter((method) => deps.client[method] !== undefined);
+        const methods: OrbStepInput['methods'] = ORB_STEP_METHODS.filter(
+          (method) => deps.client[method] !== undefined,
+        );
+        if (claimed.project?.repo?.kind === 'local') methods.push('deliverBundle');
         const input: OrbStepInput = {
           claimed,
           options: { ...options, hookNotes: handle.notes.splice(0), orbStartedAt },
@@ -138,6 +142,15 @@ export async function runOrbStep(
         if (seed && projectId && existsSync(seed)) {
           rmSync(seedDirectory, { recursive: true, force: true });
           binds.push(await prepareOrbSeed({ source: seed, directory: seedDirectory, projectId }));
+        }
+        if (claimed.project?.repo?.kind === 'local') {
+          ensurePrivateDir(join(deps.paths.home, 'orb'));
+          outboxDirectory = mkdtempSync(join(deps.paths.home, 'orb', `${stepId}-outbox-`));
+          binds.push({
+            source: outboxDirectory,
+            target: '/run/cairn/outbox',
+            releaseAfterExec: true,
+          });
         }
         let failure: string | null = null;
         const receive = (frame: OrbFrame): void => {
@@ -193,6 +206,15 @@ export async function runOrbStep(
           stepId,
           machineId: claimed.step.machineId ?? undefined,
           upstream: deps.client,
+          ...(outboxDirectory && claimed.project?.repo?.kind === 'local'
+            ? {
+                localDelivery: {
+                  outboxDir: outboxDirectory,
+                  repoPath: claimed.project.repo.cloneUrl,
+                  conversationId: claimed.conversationId,
+                },
+              }
+            : {}),
           input: () => ({
             ...input,
             options: { ...input.options, stopRequest: stop.request ?? undefined },
@@ -280,6 +302,7 @@ export async function runOrbStep(
       }
     }
     rmSync(seedDirectory, { recursive: true, force: true });
+    if (outboxDirectory) rmSync(outboxDirectory, { recursive: true, force: true });
     stop.settle();
   }
 }

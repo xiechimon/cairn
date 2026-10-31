@@ -10,24 +10,29 @@ import {
 } from '@cairn/shared';
 import { z } from 'zod';
 import { type MachineApi, MachineApiError } from '../machine-client.js';
+import { deliverOrbBundle, type OrbLocalDelivery } from './delivery.js';
 import {
   decodeOrbFrame,
   encodeOrbFrame,
   ORB_MAX_FRAME_BYTES,
+  ORB_RELAY_METHODS,
   ORB_STEP_METHODS,
   type OrbFrame,
   type OrbStepInput,
   type OrbStepMethod,
+  orbBundleArgsSchema,
   orbWorkerFrameSchema,
 } from './protocol.js';
 
-const callSchema = z.object({
-  type: z.literal('call'),
-  id: z.number().int().nonnegative(),
-  method: z.string(),
-  args: z.array(z.unknown()),
-  cancellable: z.boolean().optional(),
-});
+const callSchema = z
+  .object({
+    type: z.literal('call'),
+    id: z.number().int().nonnegative(),
+    method: z.string(),
+    args: z.array(z.unknown()),
+    cancellable: z.boolean().optional(),
+  })
+  .strict();
 
 export class RelayMachineError extends MachineApiError {
   constructor(message: string) {
@@ -44,6 +49,7 @@ export class RelayMachineServer {
   private closing: Promise<void> | undefined;
   private reporting: Promise<unknown> | undefined;
   private completed = false;
+  private delivery: Promise<void> | undefined;
   private ownsSocket = false;
   private connected = false;
   private lastRateLimitAt: number | undefined;
@@ -54,6 +60,7 @@ export class RelayMachineServer {
       stepId: string;
       machineId?: string;
       upstream: MachineApi;
+      localDelivery?: OrbLocalDelivery;
       input?: OrbStepInput | (() => OrbStepInput);
       onFrame?: (frame: OrbFrame) => void;
       onActivity?: () => void;
@@ -170,6 +177,7 @@ export class RelayMachineServer {
       for (const socket of this.sockets) socket.destroy();
       await new Promise<void>((resolve) => this.server.close(() => resolve()));
       if (this.reporting) await this.reporting.catch(() => {});
+      if (this.delivery) await this.delivery.catch(() => {});
       if (this.ownsSocket) rmSync(this.options.socketPath, { force: true });
     })();
     return this.closing;
@@ -186,7 +194,7 @@ export class RelayMachineServer {
     this.requests.get(socket)?.set(id, controller);
     let report: Promise<unknown> | undefined;
     try {
-      if (!(ORB_STEP_METHODS as readonly string[]).includes(method))
+      if (!(ORB_RELAY_METHODS as readonly string[]).includes(method))
         throw new RelayMachineError('Relay method is forbidden');
       if (
         !['putUpload', 'reportClaudeRateLimit'].includes(method) &&
@@ -211,7 +219,25 @@ export class RelayMachineServer {
         };
       }
       if (this.completed) throw new RelayMachineError('Relay step is complete');
-      const operation = this.options.upstream[method as OrbStepMethod];
+      if (method === 'deliverBundle') {
+        const bundleArgs = orbBundleArgsSchema.safeParse(args);
+        if (!bundleArgs.success || cancellable !== undefined || !this.options.localDelivery)
+          throw new RelayMachineError('Invalid local bundle delivery call');
+        if (this.delivery || this.reporting)
+          throw new RelayMachineError('Bundle delivery or completion is already in flight');
+        this.options.onActivity?.();
+        const delivery = deliverOrbBundle(this.options.localDelivery, bundleArgs.data[1]);
+        this.delivery = delivery;
+        try {
+          await delivery;
+          this.write(socket, encodeOrbFrame({ type: 'reply', id }));
+        } finally {
+          this.delivery = undefined;
+        }
+        return;
+      }
+      if (method === 'done' && this.delivery) await this.delivery;
+      const operation = this.options.upstream[method as (typeof ORB_STEP_METHODS)[number]];
       if (typeof operation !== 'function')
         throw new RelayMachineError('Relay method is unavailable');
       if (cancellable && (method === 'relayTool' || method === 'askUser')) {

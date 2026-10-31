@@ -1,7 +1,11 @@
-import type { AgentBackend, AgentSessionHandle } from '@cairn/shared';
+import { randomUUID } from 'node:crypto';
+import { rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { type AgentBackend, type AgentSessionHandle, conversationBranch } from '@cairn/shared';
 import { createGeminiBackend } from '../backend/acp.js';
 import { createClaudeCodeBackend } from '../backend/claude-code.js';
 import { createPiBackend } from '../backend/pi.js';
+import { runGitOk } from '../git.js';
 import { StepJournal, TranscriptBuffer } from '../journal.js';
 import { createDaemonLogger } from '../log.js';
 import { setupProxy } from '../proxy.js';
@@ -19,6 +23,7 @@ export async function runOrbWorker(options: {
   home?: string;
   workspacesRoot?: string;
   seedRoot?: string;
+  outboxRoot?: string;
 }): Promise<void> {
   let relay: RelayMachineApi | undefined;
   const send = (frame: OrbFrame) => relay?.send(frame);
@@ -69,6 +74,7 @@ export async function runOrbWorker(options: {
   );
   try {
     const input = await relay.input;
+    const connection = relay;
     const client = relay.api;
     activeStep = input.claimed.step.id;
     const logger = new Proxy(createDaemonLogger({}), {
@@ -148,7 +154,25 @@ export async function runOrbWorker(options: {
         workspacesDir,
         mcpConfigPath: '/home/agent/.cairn/mcp.json',
         machineName: input.machineName,
-        workspace: new WorkspaceManager({
+        workspace: new (class extends WorkspaceManager {
+          override async push(...args: Parameters<WorkspaceManager['push']>): Promise<void> {
+            if (input.claimed.project?.repo?.kind !== 'local') return super.push(...args);
+            const [cwd, branch] = args;
+            if (branch !== conversationBranch(input.claimed.conversationId))
+              throw new Error('Local bundle branch does not match claimed Thread');
+            const filename = `${randomUUID()}.bundle`;
+            const bundle = join(options.outboxRoot ?? '/run/cairn/outbox', filename);
+            try {
+              await runGitOk(['bundle', 'create', bundle, `refs/heads/${branch}`], {
+                cwd,
+                timeoutMs: 120_000,
+              });
+              await connection.call('deliverBundle', [input.claimed.step.id, filename]);
+            } finally {
+              rmSync(bundle, { force: true });
+            }
+          }
+        })({
           logger,
           hookTimeoutMs: input.hookTimeoutMs,
           seedRoot: options.seedRoot ?? '/seed',
