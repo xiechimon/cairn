@@ -13,9 +13,11 @@ LAG_TITLE="deploy lag: omarchy is behind main"
 
 mkdir -p "$STATE/alarms"
 if [ "${CAIRN_DEPLOY_WATCH_RUNNING_COPY:-}" != 1 ]; then
-  cp "$0" "$STATE/deploy-watch.running.sh"
-  CAIRN_DEPLOY_WATCH_RUNNING_COPY=1 exec bash "$STATE/deploy-watch.running.sh" "$@"
+  running_copy="$(mktemp "$STATE/deploy-watch.running.XXXXXX")"
+  cp "$0" "$running_copy"
+  CAIRN_DEPLOY_WATCH_RUNNING_COPY=1 exec bash "$running_copy" "$@"
 fi
+trap 'rm -f "$0"' EXIT
 
 log() { echo "$(date -u +%FT%TZ) $*"; }
 
@@ -30,7 +32,9 @@ green() {
 newest_green_after() {
   local deployed="$1" sha
   for sha in $(git -C "$CHECKOUT" rev-list --first-parent --max-count="$SCAN_DEPTH" "$deployed..origin/main"); do
-    if green "$sha"; then
+    if [ -e "$STATE/failed/$sha" ]; then
+      log "skip $sha: already failed ($(head -n1 "$STATE/failed/$sha"))" >&2
+    elif green "$sha"; then
       echo "$sha"
       return 0
     fi
@@ -42,10 +46,6 @@ deploy_newest_green() {
   deployed="$(git -C "$CHECKOUT" rev-parse HEAD)"
   target="$(newest_green_after "$deployed")"
   [ -n "$target" ] || return 0
-  if [ -e "$STATE/failed/$target" ]; then
-    log "skip $target: already failed ($(head -n1 "$STATE/failed/$target"))"
-    return 0
-  fi
   log "deploying $target"
   local status=0
   CAIRN_DEPLOY_RUNNING_COPY= bash "$DEPLOY_SCRIPT" "$target" >>"$STATE/last-attempt.log" 2>&1 || status=$?
@@ -67,7 +67,7 @@ check_lag() {
   local deployed head oldest committed age open_issue
   deployed="$(git -C "$CHECKOUT" rev-parse HEAD)"
   head="$(git -C "$CHECKOUT" rev-parse origin/main)"
-  open_issue="$(gh issue list -R "$REPO" --state open --search "\"$LAG_TITLE\" in:title" --json number --jq '.[0].number // empty')"
+  open_issue="$(gh issue list -R "$REPO" --state open --author "@me" --search "\"$LAG_TITLE\" in:title" --json number --jq '.[0].number // empty')"
   if [ "$deployed" = "$head" ]; then
     if [ -n "$open_issue" ]; then
       gh issue close "$open_issue" -R "$REPO" -c "Caught up: omarchy runs $head." >/dev/null && log "closed lag issue #$open_issue"
@@ -83,9 +83,11 @@ check_lag() {
   body="$(printf 'omarchy runs `%s`; origin/main is `%s`. The oldest undeployed main commit `%s` landed %s minutes ago (limit %s).\n\nReason: %s\n\nOpened by deploy-watch on omarchy; closed automatically once the deployed SHA equals main.' \
     "$deployed" "$head" "$oldest" "$((age / 60))" "$((LAG_LIMIT_SECONDS / 60)) minutes" "$(lag_reason)")"
   if [ -n "$open_issue" ]; then
-    gh issue comment "$open_issue" -R "$REPO" -b "$body" >/dev/null && log "commented lag issue #$open_issue"
+    gh issue comment "$open_issue" -R "$REPO" -b "$body" >/dev/null || return 0
+    log "commented lag issue #$open_issue"
   else
-    gh issue create -R "$REPO" -t "$LAG_TITLE" -b "$body" -a xiechimon >/dev/null && log "opened lag issue"
+    gh issue create -R "$REPO" -t "$LAG_TITLE" -b "$body" -a xiechimon >/dev/null || return 0
+    log "opened lag issue"
   fi
   touch "$STATE/alarms/$head"
 }
