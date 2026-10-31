@@ -29,6 +29,11 @@ for (const width of [360, 390]) {
       await expect(page).toHaveURL(/\/app\/schedules/);
       await expect(drawer).toBeHidden();
       await page.goto('/app?view=board');
+      await menu.click();
+      await drawer.locator('[data-slot="sidebar-nav-row"]', { hasText: 'Projects' }).click();
+      await expect(page).not.toHaveURL(/view=board/);
+      await expect(drawer).toBeHidden();
+      await page.goto('/app?view=board');
       for (const name of ['筛选', '新任务']) {
         const box = (await page
           .getByRole('button', { name: new RegExp(name) })

@@ -67,10 +67,10 @@ export function AppSidebar({
   );
   const [drawerOpen, setDrawerOpen] = useState(false);
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
-  const { pathname } = useLocation();
+  const { key: locationKey } = useLocation();
   useEffect(() => {
     setDrawerOpen(false);
-  }, [pathname]);
+  }, [locationKey]);
   const toggle = useCallback(() => {
     setCollapsed((prev) => {
       const next = !prev;
