@@ -1,6 +1,4 @@
-const SPIRAL_PATH = 'M0 0 A84 84 0 0 1 168 0 A140 140 0 0 1 -112 0 A196 196 0 0 1 280 0';
-
-export const BUSY_SPIN_CLS = 'motion-safe:animate-[spin_2.4s_linear_infinite]';
+export const SPIRAL_PATH = 'M0 0 A84 84 0 0 1 168 0 A140 140 0 0 1 -112 0 A196 196 0 0 1 280 0';
 
 export function ChiefSpiralFace({
   size,
