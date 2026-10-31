@@ -16,5 +16,19 @@
       "code": "403"
     }
   ],
-  "firewall": "present"
+  "firewallService": "active",
+  "firewallProbes": [
+    {
+      "port": 7890,
+      "status": 0
+    },
+    {
+      "port": 22,
+      "status": 124
+    },
+    {
+      "port": 5231,
+      "status": 1
+    }
+  ]
 }

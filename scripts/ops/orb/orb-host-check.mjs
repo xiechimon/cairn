@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { userInfo } from 'node:os';
 import { resolve } from 'node:path';
 
-export function parseHostCheck(input) {
+export function parseHostCheck(input, { blockedPorts = [22, 5231] } = {}) {
   const statuses = [...input.headers.matchAll(/^HTTP\/\S+\s+(\d{3})([^\r\n]*)/gm)].filter(
     (match) => !/connection established/i.test(match[2]),
   );
@@ -19,7 +19,18 @@ export function parseHostCheck(input) {
       input.privateEgress.every((probe) => probe.status === 22 && probe.code === '403')
         ? 'denied'
         : 'failed',
-    firewall: input.firewall || 'owner-check-required',
+    firewall:
+      input.firewallService === 'active' &&
+      input.firewallProbes?.length === blockedPorts.length + 1 &&
+      [7890, ...blockedPorts].every((port) => {
+        const probes = input.firewallProbes.filter((probe) => probe.port === port);
+        return (
+          probes.length === 1 &&
+          (port === 7890 ? probes[0].status === 0 : [1, 124].includes(probes[0].status))
+        );
+      })
+        ? 'ok'
+        : 'failed',
     memoryMax: memory ? Number(memory[1]) : null,
     homeVisible: input.homeExit === 0 ? false : input.homeExit === 1 ? true : null,
     negativeControl:
@@ -36,7 +47,7 @@ export function parseHostCheck(input) {
       record.cloneStartStop === 'ok' &&
       record.egress === 'ok' &&
       record.privateEgress === 'denied' &&
-      record.firewall === 'present' &&
+      record.firewall === 'ok' &&
       record.memoryMax === 4294967296 &&
       record.homeVisible === false &&
       record.negativeControl === 'denied',
@@ -53,9 +64,19 @@ export function checkHost({
   wait = () => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1000),
   user = userInfo().username,
   name = `cairn-orb-check-${randomUUID().slice(0, 8)}`,
+  blockedPorts = (process.env.CAIRN_ORB_CHECK_BLOCKED_PORTS ?? '22,5231').split(',').map(Number),
 } = {}) {
   if (user !== 'ian') throw new Error('Run the host check as ian without sudo');
   if (!/^cairn-orb-check-[a-zA-Z0-9-]+$/.test(name)) throw new Error('Invalid check machine name');
+  if (
+    !Array.isArray(blockedPorts) ||
+    blockedPorts.length < 2 ||
+    new Set(blockedPorts).size !== blockedPorts.length ||
+    blockedPorts.some(
+      (port) => !Number.isInteger(port) || port < 1 || port > 65535 || port === 7890,
+    )
+  )
+    throw new Error('Invalid firewall check ports');
   const errors = [];
   const input = {
     images: '',
@@ -66,7 +87,8 @@ export function checkHost({
     negativeExit: null,
     negativeError: '',
     privateEgress: [],
-    firewall: 'owner-check-required',
+    firewallService: '',
+    firewallProbes: [],
   };
   const call = (cmd, args) => {
     const result = run(cmd, args);
@@ -76,18 +98,13 @@ export function checkHost({
       );
     return result;
   };
-  const firewall = run('nft', ['list', 'table', 'inet', 'cairn_orb']);
-  input.firewall =
-    firewall.status === 0 && /table inet cairn_orb\b/.test(firewall.stdout || '')
-      ? 'present'
-      : 'owner-check-required';
-  if (input.firewall !== 'present')
-    errors.push('Owner must inspect: nft list table inet cairn_orb');
+  const firewall = call('systemctl', ['is-active', 'cairn-orb-firewall.service']);
+  input.firewallService = firewall.status === 0 ? firewall.stdout?.trim() : '';
   input.images =
     call('machinectl', ['--no-ask-password', 'list-images', '--no-legend', '--no-pager']).stdout ||
     '';
   if (!input.images.split('\n').some((line) => line.trim().split(/\s+/)[0] === 'cairn-orb-base'))
-    return { ...parseHostCheck(input), errors };
+    return { ...parseHostCheck(input, { blockedPorts }), errors };
   const negative = run('machinectl', [
     '--no-ask-password',
     'clone',
@@ -101,7 +118,7 @@ export function checkHost({
   input.negativeExit = negative.status;
   input.negativeError = negative.stderr || '';
   const clone = call('machinectl', ['--no-ask-password', 'clone', 'cairn-orb-base', name]);
-  if (clone.status !== 0) return { ...parseHostCheck(input), errors };
+  if (clone.status !== 0) return { ...parseHostCheck(input, { blockedPorts }), errors };
   let lifecycle = true;
   try {
     if (call('machinectl', ['--no-ask-password', 'start', name]).status !== 0)
@@ -117,6 +134,18 @@ export function checkHost({
       if (attempt < 29) wait();
     }
     if (!ready) throw new Error('guest execution failed');
+    for (const port of [7890, ...blockedPorts]) {
+      const probe = run('systemd-run', [
+        ...guest,
+        '--uid=agent',
+        'timeout',
+        '3',
+        'bash',
+        '-c',
+        `exec 3<>/dev/tcp/10.203.0.1/${port}`,
+      ]);
+      input.firewallProbes.push({ port, status: probe.status });
+    }
     const egress = call('systemd-run', [
       ...guest,
       '--uid=agent',
@@ -176,7 +205,9 @@ export function checkHost({
     if (call('machinectl', ['--no-ask-password', 'remove', name]).status !== 0) lifecycle = false;
   }
   input.cloneStartStop = lifecycle ? 'ok' : 'failed';
-  const result = parseHostCheck(input);
+  const result = parseHostCheck(input, { blockedPorts });
+  if (result.firewall !== 'ok')
+    errors.push('Firewall requires an active service, reachable TCP/7890 and blocked check ports');
   return { ...result, ok: result.ok && errors.length === 0, errors };
 }
 

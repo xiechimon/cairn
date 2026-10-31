@@ -9,6 +9,7 @@ export const relayDefaults = {
   subnet: '10.203.0.0/24',
   upstreamHost: '127.0.0.1',
   upstreamPort: 7890,
+  allowedPorts: [80, 443, 22],
   maxHeaderSize: 16 * 1024,
   idleTimeout: 30_000,
   maxConnections: 128,
@@ -78,6 +79,13 @@ export function createRelay(options = {}) {
     resolve: (host) => lookup(host, { all: true, verbatim: true }),
     ...options,
   };
+  if (
+    !Array.isArray(config.allowedPorts) ||
+    !config.allowedPorts.length ||
+    config.allowedPorts.some((port) => !Number.isInteger(port) || port < 1 || port > 65535)
+  )
+    throw new Error('Invalid destination port allowlist');
+  const allowedPorts = new Set(config.allowedPorts);
   const allowed = new BlockList();
   const [subnet, prefix] = config.subnet.split('/');
   allowed.addSubnet(subnet, Number(prefix), 'ipv4');
@@ -170,6 +178,10 @@ export function createRelay(options = {}) {
       fail(400);
       return;
     }
+    if (!allowedPorts.has(target.port)) {
+      fail(403);
+      return;
+    }
     let addresses;
     try {
       addresses = isIP(target.hostname)
@@ -247,7 +259,11 @@ export function createRelay(options = {}) {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
-  const server = createRelay();
+  const server = createRelay({
+    allowedPorts: (process.env.CAIRN_ORB_ALLOWED_PORTS ?? relayDefaults.allowedPorts.join(','))
+      .split(',')
+      .map(Number),
+  });
   server.listen(relayDefaults.port, relayDefaults.host);
   server.on('listening', () =>
     console.log(`Filtering relay listening on ${relayDefaults.host}:${relayDefaults.port}`),

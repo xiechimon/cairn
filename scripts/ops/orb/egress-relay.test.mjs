@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { once } from 'node:events';
+import { readFileSync } from 'node:fs';
 import { createServer as createHttpServer, request } from 'node:http';
 import { connect, createServer } from 'node:net';
 import { test } from 'node:test';
@@ -145,6 +147,7 @@ for (const address of [
 
 test('every DNS answer is checked and literal private targets bypass no checks', async (t) => {
   const f = await fixture(t, {
+    allowedPorts: [80, 443, 22, 8787],
     resolve: async () => [
       { address: '93.184.216.34', family: 4 },
       { address: '10.1.2.3', family: 4 },
@@ -178,6 +181,7 @@ test('DNS rebinding never performs a second resolution or connects to private se
   const privatePort = await listen(privateServer);
   t.after(() => privateServer.close());
   const f = await fixture(t, {
+    allowedPorts: [privatePort],
     resolve: async () => [
       { address: ++resolutions === 1 ? '93.184.216.34' : '127.0.0.1', family: 4 },
     ],
@@ -280,7 +284,7 @@ test('public IPv6 tunnels use bracketed IP authorities without resolving literal
 });
 
 test('alternate numeric loopback spellings and invalid targets cannot bypass filtering', async (t) => {
-  const f = await fixture(t);
+  const f = await fixture(t, { allowedPorts: [8787] });
   for (const target of ['2130706433:8787', '0x7f000001:8787', '127.1:8787']) {
     assert.match(
       await f.exchange(`CONNECT ${target} HTTP/1.1\r\nHost: ignored\r\n\r\n`),
@@ -346,4 +350,80 @@ test('a late DNS result cannot open upstream after client idle expiry', async (t
   finish([{ address: '93.184.216.34', family: 4 }]);
   await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(f.targets, []);
+});
+
+for (const port of [80, 443, 22]) {
+  for (const method of ['CONNECT', 'GET']) {
+    test(`default destination port ${port} allows ${method}`, async (t) => {
+      const f = await fixture(t);
+      const target =
+        method === 'CONNECT' ? `public.example:${port}` : `http://public.example:${port}/`;
+      assert.match(
+        await f.exchange(
+          `${method} ${target} HTTP/1.1\r\nHost: ignored\r\n\r\n${method === 'CONNECT' ? 'ping' : ''}`,
+        ),
+        /^HTTP\/1.1 200/,
+      );
+      assert.equal(f.targets[0], `93.184.216.34:${port}`);
+    });
+  }
+}
+
+for (const method of ['CONNECT', 'GET']) {
+  test(`unlisted destination ports refuse ${method} before DNS or upstream contact`, async (t) => {
+    let resolutions = 0;
+    const f = await fixture(t, {
+      resolve: async () => {
+        resolutions++;
+        return [{ address: '93.184.216.34', family: 4 }];
+      },
+    });
+    for (const port of [1, 25, 5231, 7890, 8080, 65535]) {
+      for (const host of ['public.example', '93.184.216.34']) {
+        const target = method === 'CONNECT' ? `${host}:${port}` : `http://${host}:${port}/`;
+        assert.match(
+          await f.exchange(`${method} ${target} HTTP/1.1\r\nHost: ignored\r\n\r\n`),
+          /^HTTP\/1.1 403/,
+        );
+      }
+    }
+    assert.equal(resolutions, 0);
+    assert.deepEqual(f.targets, []);
+  });
+
+  test(`configured destination ports replace defaults for ${method}`, async (t) => {
+    const f = await fixture(t, { allowedPorts: [8080] });
+    for (const port of [80, 443, 22, 8080]) {
+      const target =
+        method === 'CONNECT' ? `public.example:${port}` : `http://public.example:${port}/`;
+      assert.match(
+        await f.exchange(
+          `${method} ${target} HTTP/1.1\r\nHost: ignored\r\n\r\n${method === 'CONNECT' && port === 8080 ? 'ping' : ''}`,
+        ),
+        port === 8080 ? /^HTTP\/1.1 200/ : /^HTTP\/1.1 403/,
+      );
+    }
+    assert.equal(f.targets[0], '93.184.216.34:8080');
+    assert.equal(f.targets.length, method === 'CONNECT' ? 1 : 2);
+  });
+}
+
+test('invalid destination port allowlists fail closed', () => {
+  for (const allowedPorts of [[], [0], [-1], [65536], [1.5], [NaN], ['443']]) {
+    assert.throws(() => createRelay({ allowedPorts }), /destination port/i);
+  }
+});
+
+test('unit environment configures destination ports and invalid values fail before listening', () => {
+  const unit = readFileSync(new URL('./egress-relay.service', import.meta.url), 'utf8');
+  assert.match(unit, /Environment=CAIRN_ORB_ALLOWED_PORTS=80,443,22/);
+  for (const value of ['', '443,', '0', '65536', '443,nope']) {
+    const result = spawnSync(process.execPath, ['scripts/ops/orb/egress-relay.mjs'], {
+      encoding: 'utf8',
+      env: { ...process.env, CAIRN_ORB_ALLOWED_PORTS: value },
+      timeout: 2000,
+    });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Invalid destination port allowlist/);
+  }
 });

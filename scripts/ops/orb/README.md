@@ -22,8 +22,8 @@ scripts/ops/orb/orb-host-check.sh --json
 A passing result exits zero and contains `image: "cairn-orb-base"`,
 `cloneStartStop: "ok"`, `egress: "ok"`, `memoryMax: 4294967296`,
 `homeVisible: false`, `negativeControl: "denied"`, `privateEgress: "denied"`,
-and `firewall: "present"`. Save the actual host
-output to `docs/verify/2273/host-check.json` after installation. Local fixtures
+and `firewall: "ok"`, with `ok: true` and an empty `errors` array. Save the actual
+host output to `docs/verify/2273/host-check.json` after installation. Local fixtures
 are not host acceptance evidence. The check creates and cleans up a unique
 `cairn-orb-check-*` container and refuses password prompts.
 
@@ -64,7 +64,7 @@ The proxy subnet is `10.203.0.0/24`, with the relay at `10.203.0.1:7890` on
 advertises no router or DNS server. The relay resolves names locally, checks
 every returned address, then sends `CONNECT <checked-ip>:<port>` to the upstream
 proxy at `127.0.0.1:7890`. IPv6 authorities use brackets. This pins the actual
-connection without allowing the upstream to repeat DNS resolution. HTTP
+connection to the checked IP under the measured upstream configuration. HTTP
 absolute URIs use that same tunnel with an origin-form request and the destination
 Host header; HTTPS retains the client TLS handshake and SNI.
 NetworkManager ignores `ve-*`, `vz-*`, and nspawn's bridged `vb-*` slave links.
@@ -83,8 +83,13 @@ The filtering relay uses Node built-ins and runs as the user unit, bound only
 to the bridge IP and accepting only `10.203.0.0/24`. It refuses loopback, RFC1918,
 link-local, CGNAT (including the tailnet), multicast, unspecified addresses,
 IPv6 ULA and IPv4-mapped equivalents, including mixed public/private DNS
-answers. It caps request and upstream response headers at 16 KiB, idle time
-at 30 seconds, concurrent clients at 128 and unit tasks at 256.
+answers. Destination ports default to 80, 443 and 22 for both CONNECT and
+absolute-URI HTTP. Other ports receive HTTP 403 before DNS resolution or upstream
+contact. Override the comma-separated `CAIRN_ORB_ALLOWED_PORTS` through an
+`egress-relay.service` environment drop-in; it replaces the defaults. Empty or
+invalid port lists prevent startup. After changing the drop-in, reload the user
+manager and restart the relay. It caps request and upstream response headers
+at 16 KiB, idle time at 30 seconds, concurrent clients at 128 and unit tasks at 256.
 
 The installer prints and installs its own `inet cairn_orb` nftables table.
 Only container-subnet TCP/7890 to the bridge and DHCP client UDP/68 to server
@@ -95,13 +100,40 @@ The enabled `cairn-orb-firewall.service` restores it before networkd at reboot;
 networkd and nspawn require that service to succeed before starting. Guests
 on the shared bridge can still communicate at layer 2.
 
-The host check runs read-only `nft list table inet cairn_orb`. If the host
-requires root for that read, it reports `firewall: "owner-check-required"` and
-`ok: false`; the owner must separately run `sudo nft list table inet cairn_orb`
-and verify the input and forward rules above. This is an owner-run acceptance
-check, not permission for the agent to use sudo. The guest negative checks
-explicitly bypass NO_PROXY and require HTTP 403 for both `127.0.0.1:8787` and
-`10.203.0.1:8787`; connectivity errors cannot count as successful filtering.
+The host check needs no sudo or nftables read access. It requires
+`systemctl is-active cairn-orb-firewall.service` to report `active`. Inside the
+throwaway container as `agent`, it uses `timeout 3 bash -c` with `/dev/tcp` to
+connect directly to `10.203.0.1`, bypassing all proxy settings. TCP/7890 must
+connect; TCP/22 and TCP/5231 must fail or time out. Set the comma-separated
+`CAIRN_ORB_CHECK_BLOCKED_PORTS` environment variable to replace the blocked ports
+with at least two distinct ports, excluding 7890. Missing tools, incomplete
+probes, an inactive service, reachable blocked ports, or an unreachable proxy
+produce `firewall: "failed"` and `ok: false`. A refused connection also counts
+as blocked, so the probes sample reachability rather than proving every
+firewall rule. The guest proxy negative checks explicitly bypass NO_PROXY and
+require HTTP 403 for both `127.0.0.1:8787` and `10.203.0.1:8787`; connectivity
+errors cannot count as successful proxy filtering.
+
+The `--json` result has `image` (base-image name or null), `cloneStartStop`
+(`ok` or `failed`), `egress` (`ok` or `failed`), `privateEgress` (`denied` or
+`failed`), `firewall` (`ok` or `failed`), `memoryMax` (bytes or null),
+`homeVisible` (boolean or null), `negativeControl` (`denied` or `failed`),
+`ok` (boolean), and `errors` (string array). Exit status is zero only when
+`ok` is true. Configuration or user-validation errors return `ok: false` and
+`errors` without the probe fields.
+
+## Risk notes
+
+The proxy path relies on sing-box not re-resolving checked IP destinations or
+using fake-IP DNS, as measured on 2026-10-31. A later sing-box configuration
+change, including sniff override or fake-IP, could reopen loopback access
+through the upstream; the bridge firewall does not cover that proxy path.
+The relay does not block the host's own public IPv4 address, so hairpin NAT to
+router port forwards remains reachable on allowed destination ports.
+
+Networkd has `Requires=cairn-orb-firewall.service` and starts after it. A failed
+firewall unit keeps the container bridge down. Physical host networking remains
+managed by NetworkManager and is unaffected.
 
 The polkit transient-unit protection relies on the installed
 `systemd-nspawn@.service` template existing: systemd must load that template
