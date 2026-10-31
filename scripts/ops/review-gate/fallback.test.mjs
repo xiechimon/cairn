@@ -53,12 +53,12 @@ function host({
     join(home, '.cairn/tools/governor'),
     join(home, '.local/state/ai-route'),
     join(home, '.local/state/review-gate'),
-    join(work, 'packages/shared/src/records'),
+    join(work, 'packages/shared'),
   ])
     mkdirSync(dir, { recursive: true });
   writeFileSync(
-    join(work, 'packages/shared/src/records/merge-gate.ts'),
-    "export const PROTECTED_PATH_GLOBS = [\n  'scripts/**',\n];\n",
+    join(work, 'packages/shared/merge-gate-paths.json'),
+    `${JSON.stringify({ protected: ['scripts/**'] })}\n`,
   );
   git(home, 'init', '-q', '--bare', origin);
   git(work, 'init', '-q', '-b', 'main');

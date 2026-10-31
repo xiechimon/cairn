@@ -28,14 +28,13 @@ const globToRe = (g) =>
       .replace(/\uE001/g, '.*')}$`,
   );
 const repoProtected = () => {
-  const src = execFileSync(
-    'git',
-    ['show', 'origin/main:packages/shared/src/records/merge-gate.ts'],
-    { cwd: MAIN, encoding: 'utf8' },
+  const paths = JSON.parse(
+    execFileSync('git', ['show', 'origin/main:packages/shared/merge-gate-paths.json'], {
+      cwd: MAIN,
+      encoding: 'utf8',
+    }),
   );
-  const block = src.slice(src.indexOf('export const PROTECTED_PATH_GLOBS'));
-  const list = block.slice(block.indexOf('['), block.indexOf('];'));
-  return [...list.matchAll(/'([^']+)'/g)].map((m) => globToRe(m[1]));
+  return paths.protected.map(globToRe);
 };
 
 mkdirSync(`${STATE}/runs`, { recursive: true });

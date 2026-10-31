@@ -1,0 +1,8 @@
+base commit                                         41c622134fde38bd4329528f6ce7a12f67c1930f
+merged PRs compared                                 100
+files compared                                      1867
+PRs touching a protected path (new)                 70
+PRs whose routing changed (isProtected or auto)     0
+files whose classification changed                  0
+old merge-gate.ts lists identical to JSON           true
+limits identical (800 lines, 40 files)              true

@@ -7,6 +7,7 @@ import { test } from 'node:test';
 
 const script = resolve('scripts/batch-merger.mjs');
 const policy = readFileSync('.claude/workflows/pr-gate.js', 'utf8');
+const gatePaths = readFileSync('packages/shared/merge-gate-paths.json', 'utf8');
 const head = 'a'.repeat(40);
 const required = ['check', 'pack-smoke', 'e2e-gate', 'pr-evidence'];
 const trailer = 'Merged-by: cairn-batch-merger';
@@ -34,6 +35,7 @@ function fixture(t, overrides = {}) {
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const data = {
     policy,
+    gatePaths,
     numstat: '1\t0\tapps/web/src/page.ts\n',
     deleted: '',
     pulls: [pull()],
@@ -88,7 +90,7 @@ const fs = require('node:fs');
 const d = JSON.parse(fs.readFileSync(process.env.DATA));
 const args = process.argv.slice(2);
 if (d.gitError) process.exit(1);
-if (args[0] === 'show') process.stdout.write(d.policy);
+if (args[0] === 'show') process.stdout.write(args[1].endsWith('merge-gate-paths.json') ? d.gatePaths : d.policy);
 else if (args.includes('--numstat')) process.stdout.write(d.numstat);
 else if (args.includes('--diff-filter=D')) process.stdout.write(d.deleted);
 else process.exit(2);

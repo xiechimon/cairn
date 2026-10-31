@@ -16,6 +16,7 @@ function ownerRouting(headSha) {
   const git = (args) =>
     execFileSync('git', args, { encoding: 'utf8', maxBuffer: 512 * 1024 * 1024 });
   const source = git(['show', 'origin/main:.claude/workflows/pr-gate.js']);
+  const gatePaths = JSON.parse(git(['show', 'origin/main:packages/shared/merge-gate-paths.json']));
   const extract = (start, end) => {
     const from = source.indexOf(start);
     const to = source.indexOf(end, from + start.length);
@@ -27,7 +28,7 @@ function ownerRouting(headSha) {
   const routing = extract('const safety = reviewed.find', 'const checked =');
   const isEvidence = runInNewContext(
     `${constants}\n;(path) => EVIDENCE_RE.test(path)`,
-    {},
+    { args: { gatePaths } },
     sandboxOptions,
   );
   const range = `origin/main...${headSha}`;
@@ -70,7 +71,7 @@ const matchedProtected = changedFiles.filter(isProtected);
 const reviewed = [];
 ${routing}
 ;({ humanReasons, sizeReview })`,
-    { changedFiles, deletedFiles, binaryFiles, linesChanged },
+    { args: { gatePaths }, changedFiles, deletedFiles, binaryFiles, linesChanged },
     sandboxOptions,
   );
   if (

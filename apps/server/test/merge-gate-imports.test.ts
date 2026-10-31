@@ -274,9 +274,10 @@ describe('merge-gate sources import only from the gate own sources', () => {
     expect(escaping.map((f) => relative(GATE_DIR, f))).toEqual([]);
   });
 
-  test("records/merge-gate.ts imports only from 'zod' and its own recording trigger table", () => {
+  test("records/merge-gate.ts imports only from 'zod', the path policy JSON and its own recording trigger table", () => {
     expect(specifiers(toJs(readFileSync(RECORDS, 'utf8')))).toEqual([
       'zod',
+      '../../merge-gate-paths.json',
       './recording-trigger.js',
     ]);
     expect(specifiers(toJs(readFileSync(RECORDING_TRIGGER, 'utf8')))).toEqual([]);
