@@ -13,7 +13,8 @@ import { useLiveSeconds } from './live-row.js';
 
 const PREVIEW_CHARS = 150;
 
-const AGENT_LINE_CLS = 'text-[12px] leading-4 text-(--text-dim)';
+const AGENT_LINE_CLS =
+  'text-meta leading-5 text-content-tertiary data-[status=error]:text-content-tertiary';
 
 export function ThinkingRow({ text }: { text: string }) {
   const { t } = useI18n();
@@ -37,7 +38,7 @@ export function ThinkingRow({ text }: { text: string }) {
           </TraceLine>
         </TraceCollapsibleTrigger>
         <TraceCollapsibleContent>
-          <pre className="m-0 whitespace-pre-wrap break-words font-[inherit] text-[12px] leading-4 text-(--text-secondary)">
+          <pre className="m-0 whitespace-pre-wrap break-words font-[inherit] text-meta leading-5 text-(--text-secondary)">
             {text}
           </pre>
         </TraceCollapsibleContent>
@@ -66,11 +67,15 @@ export function ToolActivityRow({
   return (
     <Trace>
       <TraceLine status={status} className={AGENT_LINE_CLS}>
-        <TraceTitle className="font-mono">
-          {running === true ? t('正在调用 {n}', { n: name }) : name}
+        <TraceTitle>
+          {running === true ? (
+            t('正在调用 {n}', { n: name })
+          ) : (
+            <code className="font-mono text-caption">{name}</code>
+          )}
         </TraceTitle>
         {shown != null && <TraceDescription>{shown}s</TraceDescription>}
-        {error === true && <span>{t('失败')}</span>}
+        {error === true && <span className="font-medium text-destructive">{t('失败')}</span>}
       </TraceLine>
     </Trace>
   );

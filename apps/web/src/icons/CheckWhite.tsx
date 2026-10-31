@@ -9,7 +9,7 @@ export function CheckWhite({ width = 9, height = 9, ...props }: SVGProps<SVGSVGE
       viewBox="0 0 24 24"
       fill="none"
       stroke="#ffffff"
-      strokeWidth="2.3"
+      strokeWidth="1.75"
       strokeLinecap="round"
       strokeLinejoin="round"
       {...props}

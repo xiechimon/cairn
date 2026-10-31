@@ -192,16 +192,16 @@ test('account head shares the seeded user src (same identity as the sidebar chip
   await expect(page.locator('.account-avatar img')).toHaveAttribute('src', USER_SRC);
 });
 
-test('a working agent spins its spiral; idle rows stay still', async ({ page }) => {
+test('a working agent traces its spiral; idle rows stay still', async ({ page }) => {
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=26');
   const rows = page.locator('.chat-row--agent');
   await expect(rows.last().getByTestId('msg-avatar').locator('img')).toHaveAttribute(
     'src',
-    /%3Cg%20class%3D%22spin%22%3E/,
+    /class%3D%22trace%22/,
   );
   await expect(rows.first().getByTestId('msg-avatar').locator('img')).not.toHaveAttribute(
     'src',
-    /spin/,
+    /trace/,
   );
 });
 
@@ -213,7 +213,7 @@ test('the unbound chief wears the spiral face instead of the dashed one', async 
   await expect(face.locator('path')).toHaveAttribute('stroke', 'var(--fab-mark)');
 });
 
-test('the chief spiral spins on the reply it is still typing, rests on finished ones', async ({
+test('the chief spiral traces on the reply it is still typing, rests on finished ones', async ({
   page,
 }) => {
   await page.goto('/app?view=board&scenario=chief-md');
@@ -222,8 +222,8 @@ test('the chief spiral spins on the reply it is still typing, rests on finished 
     .getByTestId('chief-msg')
     .locator('> svg > g');
   await expect(spirals).toHaveCount(2);
-  await expect(spirals.first()).toHaveCSS('animation-name', 'none');
-  await expect(spirals.last()).toHaveCSS('animation-name', 'spin');
+  await expect(spirals.first().locator('.spiral-trace')).toHaveCount(0);
+  await expect(spirals.last().locator('.spiral-trace')).toHaveCSS('animation-name', 'spiral-trace');
 });
 
 test('every spiral sits on the disc centre, so it turns in place', async ({ page }) => {

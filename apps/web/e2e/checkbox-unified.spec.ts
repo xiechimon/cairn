@@ -60,7 +60,7 @@ test('accept: whole row clickable (text is also a click target)', async ({ page 
   await expect(input).toBeChecked();
 });
 
-test('accept: box geometry = 16×16 / radius 4px / gap to text 8 / text 13.5px', async ({
+test('accept: box geometry = 16×16 / radius 4px / gap to text 8 / text 14px', async ({
   page,
 }) => {
   const dialog = await openAccept(page);
@@ -74,7 +74,7 @@ test('accept: box geometry = 16×16 / radius 4px / gap to text 8 / text 13.5px',
   expect(box.height).toBeLessThan(16.5);
   await expect(tile).toHaveCSS('border-radius', '4px');
   const label = dialog.getByText('将改动合并到默认分支');
-  await expect(label).toHaveCSS('font-size', '13.5px');
+  await expect(label).toHaveCSS('font-size', '14px');
   const lb = await label.boundingBox();
   expect(lb).not.toBeNull();
   if (lb == null) return;

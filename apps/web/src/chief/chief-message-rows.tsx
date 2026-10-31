@@ -33,8 +33,9 @@ import { AVATAR_IMG_CLS, AVATAR_SLOT_CLS } from './recipes.js';
 const MSG_TOOL_BTN_CLS =
   "size-6 cursor-pointer rounded-none border-none bg-transparent text-(--text-tertiary) hover:bg-(--secondary) hover:text-(--text-secondary) dark:hover:bg-(--secondary) aria-expanded:bg-muted aria-expanded:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
 
-const TURN_TOOLS_CLS = 'mt-1.5 gap-1 border-l-2 border-border py-0.5 pl-3';
-const TURN_TOOL_LINE_CLS = 'font-mono text-caption leading-4 text-content-tertiary';
+const TURN_TOOLS_CLS = 'mt-2 gap-1.5 border-l border-border py-0.5 pl-3';
+const TURN_TOOL_LINE_CLS =
+  'text-meta leading-5 text-content-secondary data-[status=error]:text-content-secondary data-[status=pending]:text-content-tertiary data-[status=pending]:opacity-100';
 
 const MSG_COL_CLS =
   'min-w-0 flex-1 text-card-title leading-6 text-(--foreground) [&_.chat-para+.chat-para]:mt-0.5!';
@@ -52,7 +53,7 @@ const BUBBLE_USER_CLS = 'w-full rounded-(--radius-popover) border-0 px-3 py-2.5 
 const BUBBLE_ROBOT_CLS = 'w-full border-0 leading-6';
 const MARKER_NOTE_CLS = 'my-2.5 justify-center text-center text-meta text-(--text-tertiary)';
 const MARKER_ERROR_CLS =
-  'my-2.5 flex-col justify-center text-center text-meta text-(--destructive)';
+  'my-2.5 flex-col items-start gap-0.5 rounded-(--radius-card) bg-danger-soft px-3 py-2.5 text-left text-meta text-(--destructive)';
 
 const PENDING_BTN_CLS =
   'h-7 cursor-pointer rounded-(--radius-menu-item) px-2.5 text-meta font-normal text-(--text-secondary)';
@@ -126,7 +127,7 @@ function TurnToolLines({ tools }: { tools: ChiefToolRow[] | undefined }) {
     >
       <TraceTitle>{tool.label}</TraceTitle>
       {tool.seconds !== undefined && <TraceDescription>{tool.seconds}s</TraceDescription>}
-      {tool.error === true && <span>{t('失败')}</span>}
+      {tool.error === true && <span className="font-medium text-destructive">{t('失败')}</span>}
     </TraceLine>
   ));
 }

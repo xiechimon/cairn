@@ -23,7 +23,7 @@ test('bar geometry: 56px, display page title, summary N = the `待处理` column
   });
   expect(titleStyle.family).toContain('bricolageGrotesque');
   expect(titleStyle.family).not.toContain('sourceSerif4');
-  expect(titleStyle.weight).toBe('500');
+  expect(titleStyle.weight).toBe('650');
 
   const n = Number(await pendingCount(page).textContent());
   expect(n).toBeGreaterThan(0);

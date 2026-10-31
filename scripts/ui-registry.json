@@ -1,7 +1,7 @@
 {
   "frozenFrom": {
-    "sha": "69d73f08e67620fcdb55beb73c28ab2d24003318",
-    "date": "2026-10-30"
+    "sha": "3539dba55e4ad1a88585649e2b91d9633a86086d",
+    "date": "2026-10-31"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
   "files": {
@@ -46,7 +46,7 @@
       "upstreamItem": "button",
       "status": "deviated",
       "reason": "#411/#425 semantic mapping, zero skin: type=button default (implicit-submit guard, repo-wide ui/button law) + data-variant/data-size pass-through (the observable contract e2e material pins assert). Focus-ring, transition-list and brand-variant deviations retired per #982/#991: official ring form restored, brand semantics live in the token layer.",
-      "hash": "1df2d8037bd82fe26d910b9d83c1f477fed6926f8138938614c5b5ba8204ef4a"
+      "hash": "7523d9a493b68ef31b72f056a64891802c24e6a899a14165851227f4e38f2e2e"
     },
     "card.tsx": {
       "kind": "registry",
@@ -70,7 +70,7 @@
     "dialog-shell.tsx": {
       "kind": "adapter",
       "reason": "Paper dialog adapter (apps/web/DESIGN.md 弹窗与菜单) over the registry dialog item: regular faces compose DialogContent/DialogTitle/DialogDescription/DialogClose and own the Paper skin here so dialog.tsx stays pristine (sheet surface, 16px corners, --dialog-shadow, S/M/L widths via --dialog-w-*, 16px title + 12px sub-line + 28px ghost close, body as the only scroll box, split footer with a left hint). Repo behavior contracts kept as semantic mapping (#193 three-segment cap + dialog-head/body/foot testids, #389 finalFocus, #73 retained-mount open flag, #318 layered dismiss, #68 family close law). viewportRoot and bare modes keep the legacy direct-primitive mechanism (search-panel / new-task-dialog own their geometry); zIndex/onBackdropClick/backdropClassName serve only those two modes. Exports the shared Paper pieces (DIALOG_* classes, DialogFootRow, dialogWidth) for AlertDialogShell and direct registry Dialog consumers.",
-      "hash": "4a228cb26ed1301fb36c4af62ce78c11de191f6cf4b7082891e74b41ebdf5e4e"
+      "hash": "283a278f8ef0b33a81fd05dc5acd4a277fd39e301de0bae42c19ee7eef7ffd59"
     },
     "dialog.tsx": {
       "kind": "registry",
@@ -201,7 +201,7 @@
     "tag-chip.tsx": {
       "kind": "adapter",
       "reason": "XMON-14 / #983 verdict (rewritten as zero-skin adapter): tag pill = registry Badge default geometry with the runtime data color kept as an inline background (TagRecord.color is a record field, not a design token — board-filter.spec pins the contract) + max-w-40 truncate layout + --text-on-accent foreground. The 11px font-rewrite tier (text-[11px]/leading-5/py-0) is retired per #983 — font size/line height/padding converge on Badge defaults (#1006); the todo-card row-flush consumer override is folded into the same default per the R5 prototype-review ruling.",
-      "hash": "f7509d2423bb52b3e40df5d8f4c2a1b68b97a27c48dea735e73bac0a13189fef"
+      "hash": "f98365f1ac5d44732dbb52028419e8aee245b8f0f94d268682fe9613d4ddae42"
     },
     "textarea.tsx": {
       "kind": "registry",

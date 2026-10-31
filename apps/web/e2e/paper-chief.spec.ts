@@ -62,8 +62,8 @@ for (const theme of ['light', 'dark'] as const) {
     const chip = win.getByRole('button', { name: '主题', exact: true });
     const title = chip.locator('span').first();
     await expect(title, 'W1').toHaveCSS('font-family', display);
-    await expect(title, 'W1').toHaveCSS('font-size', '16px');
-    await expect(title, 'W1').toHaveCSS('font-weight', '500');
+    await expect(title, 'W1').toHaveCSS('font-size', '17px');
+    await expect(title, 'W1').toHaveCSS('font-weight', '650');
     const winBox = await win.boundingBox();
     const chipBox = await chip.boundingBox();
     expect((chipBox?.x ?? 0) - (winBox?.x ?? 0), 'W1').toBeCloseTo(16, 0);
@@ -78,7 +78,7 @@ for (const theme of ['light', 'dark'] as const) {
 
     const hero = win.getByRole('heading', { name: '选择一个主题开始' });
     await expect(hero, 'W3').toHaveCSS('font-family', display);
-    await expect(hero, 'W3').toHaveCSS('font-size', '16px');
+    await expect(hero, 'W3').toHaveCSS('font-size', '17px');
     const example = win.getByTestId('chief-examples').getByRole('button').first();
     await expect(example, 'W3').toHaveCSS('border-top-left-radius', await token(page, '--radius-card'));
     await expect(example, 'W3').toHaveCSS('background-color', card);
@@ -90,7 +90,7 @@ for (const theme of ['light', 'dark'] as const) {
     await setTheme(page, theme);
     let win = await openWindow(page, READY);
     await expect(win.getByTestId('chief-gate'), 'W2: bound has no gate').toHaveCount(0);
-    await expect(win.getByTestId('chief-composer-input'), 'W5').toHaveCSS('font-size', '13.5px');
+    await expect(win.getByTestId('chief-composer-input'), 'W5').toHaveCSS('font-size', '14px');
 
     win = await openWindow(page, SWITCHER);
     const menu = win.getByRole('menu');
@@ -100,16 +100,16 @@ for (const theme of ['light', 'dark'] as const) {
     );
     const row = menu.getByRole('menuitem').first();
     expect((await row.boundingBox())?.height, 'W4').toBe(32);
-    await expect(row, 'W4').toHaveCSS('font-size', '13.5px');
+    await expect(row, 'W4').toHaveCSS('font-size', '14px');
 
     win = await openWindow(page, THREAD);
     const note = win.getByTestId('chief-stream').locator('[data-slot="marker"]').first();
-    await expect(note, 'W5').toHaveCSS('font-size', '12px');
+    await expect(note, 'W5').toHaveCSS('font-size', '12.5px');
     const foot = win.getByTestId('chief-msg-foot').first();
-    await expect(foot, 'W5').toHaveCSS('font-size', '12px');
+    await expect(foot, 'W5').toHaveCSS('font-size', '12.5px');
     await win.getByRole('button', { name: '展开过程' }).click();
     const toolRow = win.getByTestId('chief-turn-tools').locator('[data-slot="trace-line"]').first();
-    await expect(toolRow, 'W5').toHaveCSS('font-size', '11.5px');
+    await expect(toolRow, 'W5').toHaveCSS('font-size', '12.5px');
   });
 
   test(`settings: Paper top bar, one settings card, empty rows in the card (${theme})`, async ({
@@ -121,7 +121,7 @@ for (const theme of ['light', 'dark'] as const) {
 
     const heading = page.getByRole('heading', { name: '总管设置' });
     await expect(heading, 'S1').toHaveCSS('font-family', display);
-    await expect(heading, 'S1').toHaveCSS('font-size', '18px');
+    await expect(heading, 'S1').toHaveCSS('font-size', '20px');
     const bar = page.getByTestId('chief-settings-topbar');
     expect((await bar.boundingBox())?.height, 'S1').toBe(56);
     await expect(bar, 'S1').toHaveCSS('border-bottom-width', '1px');
@@ -203,11 +203,11 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(pending.getByTestId('chief-question-text'), 'Q2').toHaveCSS('font-weight', '500');
     await expect(pending.getByTestId('chief-question-step'), 'Q2').toHaveCSS(
       'font-size',
-      '11.5px',
+      '12px',
     );
     await expect(pending.getByTestId('chief-question-option-0-0'), 'Q2').toHaveCSS(
       'font-size',
-      '13.5px',
+      '14px',
     );
   });
 }
