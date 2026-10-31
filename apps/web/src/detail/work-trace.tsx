@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import { useState } from 'react';
+import { CODE_PILL_CLS } from '../components/code-pill.js';
 import { Button } from '../components/ui/button.js';
 import type { TranscriptItem, WorkStep } from '../fixtures/records.js';
 import type { TFunc } from '../i18n/translate.js';
@@ -85,7 +86,7 @@ function WorkStepRow({ step, enter, t }: { step: WorkStep; enter: boolean; t: TF
             )}
             {(step.command ?? (step.description === undefined ? step.target : undefined)) !==
               undefined && (
-              <code className="min-w-0 flex-[0_1_auto] truncate rounded-(--cds-radius-sm) bg-secondary px-1.5 py-px font-mono text-caption text-foreground">
+              <code className={`min-w-0 flex-[0_1_auto] truncate ${CODE_PILL_CLS}`}>
                 {(step.command ?? step.target ?? '').split('\n')[0]}
               </code>
             )}

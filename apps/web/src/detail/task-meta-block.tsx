@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { relativeTime } from '../board/rel-time.js';
+import { CODE_PILL_CLS } from '../components/code-pill.js';
 import { useI18n } from '../i18n/provider.js';
 
 export interface TaskMetaFields {
@@ -48,11 +49,7 @@ export function TaskMetaBlock({ meta, now }: { meta: TaskMetaFields; now: number
       label: t('分支 / PR'),
       content: (
         <>
-          {meta.branch != null && (
-            <code className="box-decoration-clone rounded-(--cds-radius-sm) bg-secondary px-1.5 py-px font-mono text-caption text-foreground">
-              {meta.branch}
-            </code>
-          )}
+          {meta.branch != null && <code className={CODE_PILL_CLS}>{meta.branch}</code>}
           {meta.pr != null && (
             <a
               className={`text-(--chip-plan-fg) no-underline hover:underline${
@@ -85,11 +82,7 @@ export function TaskMetaBlock({ meta, now }: { meta: TaskMetaFields; now: number
   if (meta.model != null) {
     rows.push({
       label: t('模型'),
-      content: (
-        <code className="box-decoration-clone rounded-(--cds-radius-sm) bg-secondary px-1.5 py-px font-mono text-caption text-foreground">
-          {meta.model}
-        </code>
-      ),
+      content: <code className={CODE_PILL_CLS}>{meta.model}</code>,
     });
   }
   if (meta.createdAt != null) {

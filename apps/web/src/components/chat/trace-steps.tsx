@@ -11,6 +11,7 @@ import {
   Terminal,
   X,
 } from '../../icons/index.js';
+import { CODE_PILL_CLS } from '../code-pill.js';
 import {
   Trace,
   TraceCollapsible,
@@ -53,11 +54,7 @@ const RUNNING_VERB =
   'data-running:[&_[data-trace-verb]]:shimmer motion-reduce:data-running:[&_[data-trace-verb]]:shimmer-none';
 
 export function TraceCode({ children }: { children: ReactNode }) {
-  return (
-    <code className="rounded-(--cds-radius-sm) bg-secondary px-1.5 py-px font-mono text-caption text-foreground">
-      {children}
-    </code>
-  );
+  return <code className={CODE_PILL_CLS}>{children}</code>;
 }
 
 function Meta({ children, className }: { children: ReactNode; className?: string }) {

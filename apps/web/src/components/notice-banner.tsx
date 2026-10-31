@@ -1,5 +1,6 @@
 import { cn } from 'cn';
 import type { ComponentProps, ComponentType, ReactNode, SVGProps } from 'react';
+import { CODE_PILL_CLS } from './code-pill.js';
 
 export type NoticeTone = 'info' | 'waiting' | 'warning' | 'danger';
 
@@ -13,10 +14,7 @@ const TONE_INK: Record<NoticeTone, string> = {
 export function withCodeSpans(text: string): ReactNode[] {
   return text.split(/`([^`]+)`/).map((part, i) =>
     i % 2 === 1 ? (
-      <code
-        key={part}
-        className="box-decoration-clone rounded-(--cds-radius-sm) bg-secondary px-1 py-px font-mono text-caption text-foreground"
-      >
+      <code key={part} className={CODE_PILL_CLS}>
         {part}
       </code>
     ) : (

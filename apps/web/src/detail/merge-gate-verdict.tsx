@@ -1,5 +1,6 @@
 import type { MergeReadiness } from '@cairn/shared';
 import { CircleCheck, CircleX, Minus } from 'lucide-react';
+import { CODE_PILL_CLS } from '../components/code-pill.js';
 import { useI18n } from '../i18n/provider.js';
 
 export function MergeGateVerdict({ state }: { state: MergeReadiness }) {
@@ -34,7 +35,7 @@ export function MergeGateVerdict({ state }: { state: MergeReadiness }) {
                   <span className="text-content-tertiary">{` · ${blocker.detail.join(' ')}`}</span>
                 )}
               </span>
-              <code className="ml-auto flex-none rounded-(--cds-radius-sm) bg-secondary px-1.5 py-px font-mono text-caption text-content-tertiary">
+              <code className={`ml-auto flex-none ${CODE_PILL_CLS} text-content-tertiary`}>
                 {blocker.code}
               </code>
             </li>
