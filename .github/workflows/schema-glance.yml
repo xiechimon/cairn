@@ -30,6 +30,8 @@ jobs:
           node "$RUNNER_TEMP/schema-glance.mjs" --base "$BASE_SHA" --head "$HEAD_SHA" > "$RUNNER_TEMP/schema-glance.md"
           cat "$RUNNER_TEMP/schema-glance.md" >> "$GITHUB_STEP_SUMMARY"
       - name: Upsert sticky comment
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
@@ -38,7 +40,7 @@ jobs:
           marker='<!-- schema-glance -->'
           { printf '%s\n' "$marker"; cat "$RUNNER_TEMP/schema-glance.md"; } > "$RUNNER_TEMP/schema-glance-comment.md"
           comment_id=$(gh api --paginate "repos/$REPO/issues/$PR_NUMBER/comments" \
-            --jq ".[] | select(.body | startswith(\"$marker\")) | .id" | head -n 1)
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"$marker\"))) | .id" | head -n 1)
           if [ -n "$comment_id" ]; then
             gh api --method PATCH "repos/$REPO/issues/comments/$comment_id" -F "body=@$RUNNER_TEMP/schema-glance-comment.md"
           else
