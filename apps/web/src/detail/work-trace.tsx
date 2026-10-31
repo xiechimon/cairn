@@ -59,13 +59,16 @@ function WorkStepRow({ step, enter, t }: { step: WorkStep; enter: boolean; t: TF
     >
       <Button
         variant="ghost"
-        className="flex h-7 min-h-7 w-full min-w-0 cursor-pointer justify-start gap-2 rounded-md border-0 bg-transparent px-1.5 text-left text-ui leading-5 font-normal text-(--text-secondary) hover:bg-(--secondary) hover:text-(--text-secondary) aria-expanded:bg-transparent aria-expanded:text-(--text-secondary) dark:hover:bg-(--secondary) [&_svg]:size-3.5 [&_svg]:flex-none [&_svg]:text-(--text-tertiary) [&_strong]:flex-none [&_strong]:font-semibold [&_strong]:text-(--foreground)"
+        className="flex h-7 min-h-7 w-full min-w-0 cursor-pointer justify-start gap-2 rounded-md border-0 bg-transparent px-1.5 text-left text-ui leading-5 font-normal text-(--text-secondary) hover:bg-(--secondary) hover:text-(--text-secondary) aria-expanded:bg-transparent aria-expanded:text-(--text-secondary) dark:hover:bg-(--secondary) [&_svg]:size-3.5 [&_svg]:flex-none [&_svg]:text-(--text-tertiary) [&_strong]:flex-none [&_strong]:font-normal [&_strong]:text-(--text-secondary)"
         data-testid={step.kind === 'think' ? 'work-think' : 'work-call'}
         aria-expanded={open}
         aria-label={step.kind === 'think' ? t(open ? '收起思考' : '展开思考') : undefined}
         onClick={() => setOpen((value) => !value)}
       >
-        <Icon aria-hidden="true" />
+        <Icon
+          aria-hidden="true"
+          className={step.kind === 'call' && step.error ? '!text-destructive' : undefined}
+        />
         <strong>{t(step.kind === 'think' ? '思考' : ACTION_LABELS[step.action])}</strong>
         {step.kind === 'think' ? (
           <span
@@ -75,20 +78,18 @@ function WorkStepRow({ step, enter, t }: { step: WorkStep; enter: boolean; t: TF
           </span>
         ) : (
           <>
-            <span
-              className={
-                step.description !== undefined
-                  ? 'min-w-0 flex-1 truncate'
-                  : 'min-w-0 flex-1 truncate font-mono text-meta'
-              }
-            >
-              {step.description ?? step.target}
-            </span>
-            {step.command !== undefined && (
-              <span className="max-w-[45%] flex-[0_1_auto] truncate font-mono text-caption text-(--text-tertiary)">
-                {step.command.split('\n')[0]}
+            {step.description !== undefined && (
+              <span className="min-w-0 flex-[0_1_auto] truncate text-(--foreground)">
+                {step.description}
               </span>
             )}
+            {(step.command ?? (step.description === undefined ? step.target : undefined)) !==
+              undefined && (
+              <code className="min-w-0 flex-[0_1_auto] truncate rounded-(--cds-radius-sm) bg-secondary px-1.5 py-px font-mono text-caption text-foreground">
+                {(step.command ?? step.target ?? '').split('\n')[0]}
+              </code>
+            )}
+            <span className="flex-1" />
             {step.diff !== undefined && (
               <span className="flex flex-none gap-1 font-mono text-caption">
                 <span className="text-(--diff-add-fg)">+{step.diff.added}</span>
