@@ -301,15 +301,19 @@ describe('PR feedback backflow', () => {
   test('bot identities, deleted authors and read-only reviewers produce no messages', async () => {
     const { s, gh, deps } = await world();
     gh.state.permissions.set('reader', { body: { permission: 'read', role_name: 'read' } });
+    const bots = [
+      'cairn',
+      'cairn[bot]',
+      'cairnwright',
+      'cairnwright[bot]',
+      'CAIRNWRIGHT[bot]',
+      'dependabot[bot]',
+    ];
+    for (const login of [...bots.filter((login) => login.endsWith('[bot]')), 'app-account'])
+      gh.state.permissions.set(login, { body: { permission: 'write', role_name: 'write' } });
     gh.state.reviewComments.set(42, [
-      ...[
-        'cairn',
-        'cairn[bot]',
-        'cairnwright',
-        'cairnwright[bot]',
-        'CAIRNWRIGHT[bot]',
-        'reader',
-      ].map((login, i) => feedback(i + 1, login)),
+      ...[...bots, 'reader'].map((login, i) => feedback(i + 1, login)),
+      { ...feedback(9, 'app-account'), user: { login: 'app-account', type: 'Bot' } },
       { ...feedback(10), user: null },
     ]);
     await createPrFeedbackPoller(deps, { githubFetch: gh.impl }).sweep();

@@ -4,7 +4,7 @@ import type { FetchLike } from './github.js';
 
 const feedbackSchema = z.object({
   id: z.number().int().positive(),
-  user: z.object({ login: z.string().min(1) }).nullable(),
+  user: z.object({ login: z.string().min(1), type: z.string().optional() }).nullable(),
   body: z.string().nullable(),
   state: z.string().optional(),
   created_at: z.string().optional(),
@@ -60,7 +60,12 @@ export async function githubPrFeedback(
       const rows = z.array(feedbackSchema).parse(await response.json());
       for (const row of rows) {
         highWater[kind] = Math.max(highWater[kind], row.id);
-        if (row.user === null) continue;
+        if (
+          row.user === null ||
+          row.user.type === 'Bot' ||
+          row.user.login.toLowerCase().endsWith('[bot]')
+        )
+          continue;
         if (kind === 'review' && row.state !== 'CHANGES_REQUESTED') continue;
         const body = row.body?.trim() ?? '';
         if (body === '' && kind !== 'review') continue;
