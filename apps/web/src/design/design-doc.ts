@@ -34,6 +34,12 @@ export const COLOR_VARS: Record<string, string> = {
   'running-text': '--running-text',
   'running-bar': '--running-bar',
   'running-track': '--running-track',
+  'pebble-waiting': '--pebble-waiting',
+  'pebble-review': '--pebble-review',
+  'pebble-working': '--pebble-working',
+  'pebble-idle': '--pebble-idle',
+  'pebble-resolved': '--pebble-resolved',
+  'danger-line': '--danger-line',
 };
 
 export const RADIUS_EXPRS: Record<string, string> = {
