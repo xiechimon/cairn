@@ -15,8 +15,11 @@ import { SpiralMark } from '../chief/chief-fab-icon.js';
 import { ListCard, ListRow } from '../components/list-card.js';
 import { NoticeBanner } from '../components/notice-banner.js';
 import { SegmentedRadio } from '../components/segmented.js';
-import { QuotaBar } from '../components/settings/quota-bar.js';
-import { RoutingNode } from '../components/settings/routing-node.js';
+import {
+  type RoutingConnection,
+  RoutingGraph,
+  type RoutingJob,
+} from '../components/settings/routing-graph.js';
 import { SettingsDangerZone } from '../components/settings-list.js';
 import { PhoneTabBar } from '../components/shell/phone-tab-bar.js';
 import { ArchivedProjectCard, ProjectCard } from '../components/shell/project-card.js';
@@ -29,9 +32,9 @@ import {
 import { SidebarUser } from '../components/shell/sidebar-user.js';
 import { GoalLine } from '../components/stream/goal-line.js';
 import { Greeting } from '../components/stream/greeting.js';
+import { StreamDigest } from '../components/stream/stream-digest.js';
 import { SuggestionChip } from '../components/stream/suggestion-chip.js';
 import { Button } from '../components/ui/button.js';
-import { Marker, MarkerContent } from '../components/ui/marker.js';
 import { toastSuccess } from '../components/ui/toaster.js';
 import { Section, Specimen } from './specimen.js';
 
@@ -241,24 +244,27 @@ export function CoordinatorStreamSection() {
     <Section
       id="coordinator"
       title="Coordinator stream parts"
-      lede="The pieces around the thread cards: a day divider, the goal line, the greeting, suggestion chips, and the archived banner that replaces the composer."
+      lede="The pieces around the thread cards: the goal line, the greeting, clickable status rows, quiet suggestions, and the archived banner that replaces the composer."
     >
       <Specimen
         title="Stream header"
-        note={chip == null ? 'Click a suggestion' : `Picked: ${chip}`}
-        code={`<Marker variant="separator"><MarkerContent>Today</MarkerContent></Marker>\n<GoalLine>Bring p95 latency under 200 ms.</GoalLine>\n<Greeting>Morning, ian.</Greeting>\n<SuggestionChip>Make a plan</SuggestionChip>`}
+        note={chip == null ? 'Click a row or a suggestion' : `Picked: ${chip}`}
+        code={`<GoalLine onEdit={edit}>Bring p95 latency under 200 ms.</GoalLine>\n<Greeting since="Since last night">Morning, ian.</Greeting>\n<StreamDigest rows={[{ tone: 'waiting', count: 2, label: 'need you', onSelect }]} />\n<SuggestionChip>Make a plan</SuggestionChip>`}
       >
-        <div className="flex w-full max-w-170 flex-col gap-4">
-          <Marker variant="separator" className="text-meta text-content-tertiary">
-            <MarkerContent>Today</MarkerContent>
-          </Marker>
-          <GoalLine>
+        <div className="flex w-full max-w-170 flex-col gap-3.5">
+          <GoalLine onEdit={() => toastSuccess('Edit goal')}>
             Make Cairn a self-hostable agent team that brings back only what needs you.
           </GoalLine>
-          <Greeting>
-            Morning, ian. Since last night: 3 threads merged, 2 need you, 2 are running.
-          </Greeting>
-          <div className="flex flex-wrap gap-2">
+          <Greeting since="Since last night">Morning, ian.</Greeting>
+          <StreamDigest
+            className="max-w-90"
+            rows={[
+              { tone: 'waiting', count: 2, label: 'need you', onSelect: () => setChip('need you') },
+              { tone: 'working', count: 2, label: 'running', onSelect: () => setChip('running') },
+              { tone: 'resolved', count: 3, label: 'merged', onSelect: () => setChip('merged') },
+            ]}
+          />
+          <div className="-mx-2.5 flex flex-wrap gap-1">
             {['Make a plan', 'Add a repo', 'Pick up recent work', 'Use my tools'].map((label) => (
               <SuggestionChip key={label} onClick={() => setChip(label)}>
                 {label}
@@ -289,18 +295,49 @@ export function CoordinatorStreamSection() {
   );
 }
 
+const ROUTING_JOBS: RoutingJob[] = [
+  {
+    id: 'coordinator',
+    name: 'Coordinator',
+    model: 'claude-opus-5-5',
+    tone: 1,
+    connectionId: 'claude',
+  },
+  {
+    id: 'implementation',
+    name: 'Implementation',
+    model: 'gpt-6.1-sol',
+    tone: 3,
+    connectionId: 'codex',
+  },
+  { id: 'review', name: 'Review', model: 'claude-sonnet-5-5', tone: 4, connectionId: 'claude' },
+  {
+    id: 'mechanical',
+    name: 'Mechanical work',
+    model: 'claude-haiku-5-5',
+    tone: 2,
+    unavailable: true,
+  },
+];
+
+const ROUTING_CONNECTIONS: RoutingConnection[] = [
+  { id: 'claude', name: 'Claude subscription', tier: 'Max 20x', quota: { fiveHour: 38, week: 22 } },
+  { id: 'codex', name: 'Codex', tier: 'Pro', quota: { fiveHour: 86, week: 61 } },
+  { id: 'openrouter', name: 'OpenRouter key', unavailable: true },
+];
+
 export function RoutingSection() {
   const [mode, setMode] = useState<'subscriptions' | 'payg'>('subscriptions');
   return (
     <Section
       id="routing"
       title="Model routing parts"
-      lede="Routing nodes name a job and its model, or a connection and its quota. The bar shows the 5-hour window and turns ochre when a window runs hot."
+      lede="Jobs on the left name their model; a curve runs to the connection that serves them, which shows its 5-hour and weekly quota. A bar turns ochre from 80%."
     >
       <Specimen
         title="Routing nodes and quota bar"
         stage="canvas"
-        code={`<RoutingNode name="Claude subscription" detail="max 20x" quota={{ fiveHour: 38, week: 22 }} />\n<QuotaBar percent={86} hot label="Codex five-hour quota" />`}
+        code={`<RoutingGraph jobs={[{ id: 'coordinator', name: 'Coordinator', model: 'claude-opus-5-5', tone: 1, connectionId: 'claude' }]} connections={[{ id: 'claude', name: 'Claude subscription', tier: 'Max 20x', quota: { fiveHour: 38, week: 22 } }]} />`}
       >
         <div className="flex w-full max-w-170 flex-col gap-4">
           <SegmentedRadio
@@ -312,30 +349,7 @@ export function RoutingSection() {
               { value: 'payg', label: 'Allow pay as you go' },
             ]}
           />
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <div className="flex flex-col gap-2.5">
-              <RoutingNode name="Coordinator" detail="claude-opus-5-5" />
-              <RoutingNode
-                name="Implementation"
-                detail="gpt-6.1-sol"
-                note="falls back after quota"
-              />
-              <RoutingNode name="Mechanical work" detail="claude-haiku-5-5" unavailable />
-            </div>
-            <div className="flex flex-col gap-2.5">
-              <RoutingNode
-                name="Claude subscription"
-                detail="max 20x"
-                quota={{ fiveHour: 38, week: 22 }}
-              />
-              <RoutingNode name="Codex" detail="pro" quota={{ fiveHour: 86, week: 61 }} />
-              <RoutingNode name="OpenRouter key" detail="pay as you go" unavailable />
-            </div>
-          </div>
-          <div className="w-60">
-            <QuotaBar percent={54} label="Example quota" />
-            <QuotaBar percent={91} hot label="Hot quota" />
-          </div>
+          <RoutingGraph jobs={ROUTING_JOBS} connections={ROUTING_CONNECTIONS} />
         </div>
       </Specimen>
     </Section>

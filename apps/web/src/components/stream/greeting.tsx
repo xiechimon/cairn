@@ -1,12 +1,12 @@
 import type { ReactNode } from 'react';
 
-export function Greeting({ children }: { children: ReactNode }) {
+export function Greeting({ children, since }: { children: ReactNode; since?: ReactNode }) {
   return (
-    <p
-      data-slot="greeting"
-      className="m-0 max-w-[30ch] font-heading text-xl leading-snug font-medium tracking-tight text-foreground"
-    >
-      {children}
-    </p>
+    <div data-slot="greeting" className="flex flex-col gap-0.5">
+      <p className="m-0 font-heading text-xl leading-snug font-medium tracking-tight whitespace-nowrap text-foreground">
+        {children}
+      </p>
+      {since != null && <p className="m-0 text-meta text-content-tertiary">{since}</p>}
+    </div>
   );
 }
