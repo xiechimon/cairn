@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, test, vi } from 'vitest';
@@ -7,18 +7,22 @@ import { HostOrbProvider, NspawnOrbProvider, type OrbCommandRunner } from '../sr
 import { rejectGuestExec } from './orb-fake.js';
 
 function fixture() {
+  const runtimeRoot = mkdtempSync(join(tmpdir(), 'orb-provider-run-'));
   const commands: string[][] = [];
   const machines = new Set<string>();
   const runner: OrbCommandRunner = async (argv) => {
     rejectGuestExec(argv);
     commands.push([...argv]);
-    if (argv[1] === 'start') machines.add(argv[2]!);
+    if (argv[1] === 'start') {
+      mkdirSync(join(runtimeRoot, argv[2]!), { recursive: true, mode: 0o700 });
+      machines.add(argv[2]!);
+    }
     if (argv[1] === 'poweroff' || argv[1] === 'terminate') machines.delete(argv[2]!);
     return { code: 0, stdout: argv[1] === 'list' ? [...machines].join('\n') : '', stderr: '' };
   };
   const stateFile = join(mkdtempSync(join(tmpdir(), 'cairn-orbs-')), 'state.json');
-  const provider = new NspawnOrbProvider({ runner, stateFile });
-  return { commands, machines, runner, provider, stateFile };
+  const provider = new NspawnOrbProvider({ runner, stateFile, runtimeRoot });
+  return { commands, machines, runner, provider, stateFile, runtimeRoot };
 }
 
 test.each([
@@ -48,24 +52,25 @@ describe('Orb provider', () => {
   });
 
   test('recovers running machines and restarts stopped machines without cloning again', async () => {
-    const { provider, runner, stateFile, commands, machines } = fixture();
+    const { provider, runner, stateFile, commands, machines, runtimeRoot } = fixture();
     const handle = await provider.ensure({ conversationId: 'C', projectId: 'P' });
     await provider.start(handle);
-    const recovered = new NspawnOrbProvider({ runner, stateFile });
+    const recovered = new NspawnOrbProvider({ runner, stateFile, runtimeRoot });
     const running = await recovered.ensure({ conversationId: 'C', projectId: 'P' });
     await recovered.start(running);
     expect(commands.filter((argv) => argv[1] === 'start')).toHaveLength(1);
     machines.clear();
-    const rebooted = new NspawnOrbProvider({ runner, stateFile });
+    const rebooted = new NspawnOrbProvider({ runner, stateFile, runtimeRoot });
     await rebooted.start(await rebooted.ensure({ conversationId: 'C', projectId: 'P' }));
     expect(commands.filter((argv) => argv[1] === 'start')).toHaveLength(2);
     expect(commands.filter((argv) => argv[1] === 'clone')).toHaveLength(1);
   });
 
   test('failed start retries without cloning twice', async () => {
-    const { runner, commands } = fixture();
+    const { runner, commands, runtimeRoot } = fixture();
     let fail = true;
     const provider = new NspawnOrbProvider({
+      runtimeRoot,
       runner: async (argv, options) => {
         if (argv[1] === 'start' && fail) {
           fail = false;
@@ -100,8 +105,9 @@ describe('Orb provider', () => {
   });
 
   test('poweroff timeout terminates only its machine and verifies shutdown', async () => {
-    const { runner, stateFile, commands, machines } = fixture();
+    const { runner, stateFile, commands, machines, runtimeRoot } = fixture();
     const provider = new NspawnOrbProvider({
+      runtimeRoot,
       stateFile,
       shutdownTimeoutMs: 0,
       runner: async (argv, options) => {
@@ -127,9 +133,11 @@ describe('Orb provider', () => {
   });
 
   test('rejects persisted machine names outside its namespace before running commands', () => {
-    const { runner, stateFile, commands } = fixture();
+    const { runner, stateFile, commands, runtimeRoot } = fixture();
     writeFileSync(stateFile, JSON.stringify([{ id: 'unrelated', conversationId: 'A' }]));
-    expect(() => new NspawnOrbProvider({ runner, stateFile })).toThrow('Invalid orb machine name');
+    expect(() => new NspawnOrbProvider({ runner, stateFile, runtimeRoot })).toThrow(
+      'Invalid orb machine name',
+    );
     expect(commands).toEqual([]);
   });
 });
@@ -220,13 +228,14 @@ test('a cached running handle is restarted when the machine has powered off exte
 });
 
 test('a pending machine start reserves capacity before another Thread evicts idle machines', async () => {
-  const { runner } = fixture();
+  const { runner, runtimeRoot } = fixture();
   let release: () => void = () => {};
   let starting = false;
   const gate = new Promise<void>((resolve) => {
     release = resolve;
   });
   const provider = new NspawnOrbProvider({
+    runtimeRoot,
     runner: async (argv, options) => {
       if (argv[1] === 'start' && argv[2] === 'cairn-orb-A') {
         starting = true;

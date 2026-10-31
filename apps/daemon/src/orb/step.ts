@@ -136,120 +136,7 @@ export async function runOrbStep(
           handle,
           seed && existsSync(seed) ? seed : undefined,
         );
-        const socketPath = join(directory, 'relay.sock');
-        if (claimed.project?.repo?.kind === 'local') {
-          outboxDirectory = join(directory, 'outbox');
-          rmSync(outboxDirectory, { recursive: true, force: true });
-          ensurePrivateDir(outboxDirectory);
-        }
-        let failure: string | null = null;
-        const receive = (frame: OrbFrame): void => {
-          if (frame.type === 'checkpoint') {
-            const parsed = orbCheckpointSchema.safeParse(frame.checkpoint);
-            if (parsed.success) {
-              const { transcript, sessionContent, ...checkpoint } = parsed.data;
-              if (transcript) {
-                writePrivateFile(
-                  join(deps.paths.outboxDir, `step-${stepId}.transcript.json`),
-                  JSON.stringify(transcript),
-                );
-              }
-              const sessionFile = join(deps.paths.outboxDir, `step-${stepId}.session.jsonl`);
-              if (sessionContent != null) writePrivateFile(sessionFile, sessionContent);
-              deps.journal.update(stepId, {
-                ...checkpoint,
-                ...(sessionContent !== undefined
-                  ? { sessionFile: sessionContent === null ? null : sessionFile }
-                  : {}),
-              });
-            }
-            return;
-          }
-          if (frame.type === 'session') {
-            if (stop.request) send({ type: 'stop', discard: stop.request.discard });
-            clearInterval(heartbeat);
-            ready = frame.live;
-            if (ready) {
-              for (const waiter of waiting) waiter.resolve();
-              waiting.clear();
-            }
-            return;
-          }
-          if (frame.type === 'steered') {
-            const pending = steering.get(frame.id);
-            steering.delete(frame.id);
-            if (frame.error) pending?.reject(new Error(frame.error));
-            else pending?.resolve();
-            return;
-          }
-          if (frame.type === 'failed') {
-            failure = frame.error;
-            return;
-          }
-          if (frame.type === 'finished') {
-            finishTransport();
-            return;
-          }
-          if (frame.type === 'log') {
-            deps.logger.step(frame.message);
-            return;
-          }
-        };
-        relay = new RelayMachineServer({
-          socketPath,
-          stepId,
-          machineId: claimed.step.machineId ?? undefined,
-          upstream: deps.client,
-          ...(outboxDirectory && claimed.project?.repo?.kind === 'local'
-            ? {
-                localDelivery: {
-                  outboxDir: outboxDirectory,
-                  repoPath: claimed.project.repo.cloneUrl,
-                  conversationId: claimed.conversationId,
-                },
-              }
-            : {}),
-          input: () => ({
-            ...input,
-            options: {
-              ...input.options,
-              hookNotes: [
-                ...(input.options.hookNotes ?? []),
-                ...handle.notes.splice(0),
-                orbNote(
-                  `orb: started in ${Date.now() - orbStartedAt}ms`,
-                  Date.now() - orbStartedAt,
-                ),
-              ],
-              stopRequest: stop.request ?? undefined,
-              env: {
-                ...input.options.env,
-                ...(deps.orbProxyUrl
-                  ? { HTTP_PROXY: deps.orbProxyUrl, HTTPS_PROXY: deps.orbProxyUrl }
-                  : {}),
-              },
-            },
-          }),
-          onFrame: receive,
-          onDisconnect: finishTransport,
-          onActivity: () => watchdog?.refresh(),
-          onReporting: (body) => {
-            workerReported = true;
-            deps.journal.update(stepId, {
-              state: 'awaiting-upload',
-              doneBody: body,
-            });
-          },
-          onDone: () => {
-            finishTransport();
-            clearTimeout(watchdog);
-            deps.journal.remove(stepId);
-            rmSync(join(deps.paths.outboxDir, `step-${stepId}.session.jsonl`), { force: true });
-          },
-        });
-        await relay.listen();
         void stop.attach(session).catch((error: unknown) => deps.logger.step(String(error)));
-        input.options.stopRequest = stop.request ?? undefined;
         watchdog = setTimeout(() => {
           timedOut = true;
           exitError = 'orb heartbeat timeout';
@@ -263,6 +150,119 @@ export async function runOrbStep(
         watchdog.unref?.();
         try {
           await lifecycle.provider.start(handle, { signal: execController.signal });
+          const socketPath = join(directory, 'relay.sock');
+          if (claimed.project?.repo?.kind === 'local') {
+            outboxDirectory = join(directory, 'outbox');
+            rmSync(outboxDirectory, { recursive: true, force: true });
+            ensurePrivateDir(outboxDirectory);
+          }
+          let failure: string | null = null;
+          const receive = (frame: OrbFrame): void => {
+            if (frame.type === 'checkpoint') {
+              const parsed = orbCheckpointSchema.safeParse(frame.checkpoint);
+              if (parsed.success) {
+                const { transcript, sessionContent, ...checkpoint } = parsed.data;
+                if (transcript) {
+                  writePrivateFile(
+                    join(deps.paths.outboxDir, `step-${stepId}.transcript.json`),
+                    JSON.stringify(transcript),
+                  );
+                }
+                const sessionFile = join(deps.paths.outboxDir, `step-${stepId}.session.jsonl`);
+                if (sessionContent != null) writePrivateFile(sessionFile, sessionContent);
+                deps.journal.update(stepId, {
+                  ...checkpoint,
+                  ...(sessionContent !== undefined
+                    ? { sessionFile: sessionContent === null ? null : sessionFile }
+                    : {}),
+                });
+              }
+              return;
+            }
+            if (frame.type === 'session') {
+              if (stop.request) send({ type: 'stop', discard: stop.request.discard });
+              clearInterval(heartbeat);
+              ready = frame.live;
+              if (ready) {
+                for (const waiter of waiting) waiter.resolve();
+                waiting.clear();
+              }
+              return;
+            }
+            if (frame.type === 'steered') {
+              const pending = steering.get(frame.id);
+              steering.delete(frame.id);
+              if (frame.error) pending?.reject(new Error(frame.error));
+              else pending?.resolve();
+              return;
+            }
+            if (frame.type === 'failed') {
+              failure = frame.error;
+              return;
+            }
+            if (frame.type === 'finished') {
+              finishTransport();
+              return;
+            }
+            if (frame.type === 'log') {
+              deps.logger.step(frame.message);
+              return;
+            }
+          };
+          relay = new RelayMachineServer({
+            socketPath,
+            stepId,
+            machineId: claimed.step.machineId ?? undefined,
+            upstream: deps.client,
+            ...(outboxDirectory && claimed.project?.repo?.kind === 'local'
+              ? {
+                  localDelivery: {
+                    outboxDir: outboxDirectory,
+                    repoPath: claimed.project.repo.cloneUrl,
+                    conversationId: claimed.conversationId,
+                  },
+                }
+              : {}),
+            input: () => ({
+              ...input,
+              options: {
+                ...input.options,
+                hookNotes: [
+                  ...(input.options.hookNotes ?? []),
+                  ...handle.notes.splice(0),
+                  orbNote(
+                    `orb: started in ${Date.now() - orbStartedAt}ms`,
+                    Date.now() - orbStartedAt,
+                  ),
+                ],
+                stopRequest: stop.request ?? undefined,
+                env: {
+                  ...input.options.env,
+                  ...(deps.orbProxyUrl
+                    ? { HTTP_PROXY: deps.orbProxyUrl, HTTPS_PROXY: deps.orbProxyUrl }
+                    : {}),
+                },
+              },
+            }),
+            onFrame: receive,
+            onDisconnect: finishTransport,
+            onActivity: () => watchdog?.refresh(),
+            onReporting: (body) => {
+              workerReported = true;
+              deps.journal.update(stepId, {
+                state: 'awaiting-upload',
+                doneBody: body,
+              });
+            },
+            onDone: () => {
+              finishTransport();
+              clearTimeout(watchdog);
+              deps.journal.remove(stepId);
+              rmSync(join(deps.paths.outboxDir, `step-${stepId}.session.jsonl`), { force: true });
+            },
+          });
+          await relay.listen();
+          input.options.stopRequest = stop.request ?? undefined;
           await transportEnded;
           if (stop.request)
             providerStop ??= lifecycle.provider.stop(handle).catch((error: unknown) => {

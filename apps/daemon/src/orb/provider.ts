@@ -5,6 +5,7 @@ import {
   cpSync,
   createReadStream,
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -16,6 +17,7 @@ import {
 } from 'node:fs';
 import { constants } from 'node:os';
 import { basename, dirname, join, relative } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import type { WorkspaceHookNoteData } from '@cairn/shared';
 import { ensurePrivateDir, writePrivateFile } from '../private-fs.js';
@@ -167,6 +169,7 @@ export class NspawnOrbProvider implements OrbProvider {
   readonly seedRoot: string;
   private readonly distSource: string;
   private readonly shutdownTimeoutMs: number;
+  private readonly runtimeDirectoryTimeoutMs: number;
   private publishing: Promise<void> = Promise.resolve();
 
   constructor(
@@ -178,6 +181,7 @@ export class NspawnOrbProvider implements OrbProvider {
       seedRoot?: string;
       distSource?: string;
       shutdownTimeoutMs?: number;
+      runtimeDirectoryTimeoutMs?: number;
     } = {},
   ) {
     this.runner = options.runner ?? runOrbCommand;
@@ -190,6 +194,9 @@ export class NspawnOrbProvider implements OrbProvider {
         ? join(dirname(fileURLToPath(import.meta.url)), '../../dist')
         : dirname(fileURLToPath(import.meta.url)));
     this.shutdownTimeoutMs = options.shutdownTimeoutMs ?? 5_000;
+    this.runtimeDirectoryTimeoutMs = options.runtimeDirectoryTimeoutMs ?? 30_000;
+    if (!Number.isFinite(this.runtimeDirectoryTimeoutMs) || this.runtimeDirectoryTimeoutMs < 0)
+      throw new Error('Orb runtime directory timeout must be finite and nonnegative');
     this.stateFile = options.stateFile;
     if (this.stateFile && existsSync(this.stateFile)) {
       const handles = JSON.parse(readFileSync(this.stateFile, 'utf8')) as OrbHandle[];
@@ -241,10 +248,14 @@ export class NspawnOrbProvider implements OrbProvider {
   async prepare(handle: OrbHandle, seed?: string): Promise<string> {
     this.validate(handle);
     const directory = join(this.runtimeRoot, handle.id);
-    ensurePrivateDir(directory);
     const publish = this.publishing.then(async () => {
-      mkdirSync(this.distRoot, { recursive: true, mode: 0o755 });
-      chmodSync(this.distRoot, 0o755);
+      for (const [name, root] of [
+        ['dist', this.distRoot],
+        ['seed', this.seedRoot],
+      ] as const) {
+        if (!this.checkDirectory(root, `Orb ${name} root`))
+          throw new Error(`Orb ${name} root must exist: ${root}; run the installer`);
+      }
       const release = mkdtempSync(join(this.distRoot, '.release-'));
       try {
         cpSync(this.distSource, release, { recursive: true, dereference: true });
@@ -264,8 +275,6 @@ export class NspawnOrbProvider implements OrbProvider {
       }
       if (seed) {
         if (!/^[a-zA-Z0-9-]+$/.test(handle.projectId)) throw new Error('Invalid orb project id');
-        mkdirSync(this.seedRoot, { recursive: true, mode: 0o755 });
-        chmodSync(this.seedRoot, 0o755);
         const project = join(this.seedRoot, handle.projectId);
         mkdirSync(project, { recursive: true, mode: 0o755 });
         const snapshot = mkdtempSync(join(project, '.snapshot-'));
@@ -293,16 +302,41 @@ export class NspawnOrbProvider implements OrbProvider {
   async start(handle: OrbHandle, options: { signal?: AbortSignal } = {}): Promise<void> {
     this.validate(handle);
     options.signal?.throwIfAborted();
-    if (handle.running && (await this.runningMachines()).has(handle.id)) return;
-    handle.running = false;
-    handle.notes.push(orbNote('orb: setup'));
-    await this.command(['machinectl', 'start', handle.id]);
-    handle.running = true;
-    this.save();
-    if (options.signal?.aborted) {
-      await this.stop(handle);
-      options.signal.throwIfAborted();
+    if (!handle.running || !(await this.runningMachines()).has(handle.id)) {
+      handle.running = false;
+      handle.notes.push(orbNote('orb: setup'));
+      await this.command(['machinectl', 'start', handle.id]);
+      handle.running = true;
+      this.save();
     }
+    try {
+      const directory = join(this.runtimeRoot, handle.id);
+      const deadline = Date.now() + this.runtimeDirectoryTimeoutMs;
+      while (true) {
+        options.signal?.throwIfAborted();
+        if (this.checkDirectory(directory, 'Orb runtime directory', 0o700)) return;
+        const remaining = deadline - Date.now();
+        if (remaining <= 0)
+          throw new Error(`Timed out waiting for orb runtime directory: ${directory}`);
+        await delay(Math.min(100, remaining), undefined, { signal: options.signal });
+      }
+    } catch (error) {
+      await this.stop(handle);
+      options.signal?.throwIfAborted();
+      throw error;
+    }
+  }
+
+  private checkDirectory(directory: string, label: string, mode?: number): boolean {
+    const stats = lstatSync(directory, { throwIfNoEntry: false });
+    if (!stats) return false;
+    if (!stats.isDirectory()) throw new Error(`${label} must be a real directory: ${directory}`);
+    const uid = process.getuid?.();
+    if (uid === undefined || stats.uid !== uid)
+      throw new Error(`${label} must be owned by daemon uid ${uid}: ${directory}`);
+    if (mode !== undefined && (stats.mode & 0o7777) !== mode)
+      throw new Error(`${label} must have mode 0700: ${directory}`);
+    return true;
   }
 
   async stop(handle: OrbHandle): Promise<void> {

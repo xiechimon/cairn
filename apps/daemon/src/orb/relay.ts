@@ -1,5 +1,5 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
-import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { chmodSync, existsSync, lstatSync, readFileSync, rmSync } from 'node:fs';
 import { createConnection, createServer, type Server, type Socket } from 'node:net';
 import { dirname } from 'node:path';
 import { createInterface } from 'node:readline';
@@ -154,8 +154,11 @@ export class RelayMachineServer {
   }
 
   async listen(): Promise<void> {
-    mkdirSync(dirname(this.options.socketPath), { recursive: true, mode: 0o700 });
-    chmodSync(dirname(this.options.socketPath), 0o700);
+    const directory = lstatSync(dirname(this.options.socketPath));
+    if (!directory.isDirectory())
+      throw new RelayMachineError('Relay parent must be a real directory');
+    if (directory.uid !== process.getuid?.() || (directory.mode & 0o7777) !== 0o700)
+      throw new RelayMachineError('Relay directory must be owned by daemon uid with mode 0700');
     if (existsSync(this.options.socketPath)) {
       if (!lstatSync(this.options.socketPath).isSocket())
         throw new RelayMachineError('Relay path is not a socket');

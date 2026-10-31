@@ -1,6 +1,7 @@
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 import { afterEach, expect } from 'vitest';
 import {
   NspawnOrbProvider,
@@ -45,6 +46,7 @@ export class FakeOrbProvider extends NspawnOrbProvider {
     const distSource = join(root, 'build');
     mkdirSync(distSource);
     writeFileSync(join(distSource, 'cli.mjs'), '');
+    for (const name of ['run', 'dist', 'seed']) mkdirSync(join(root, name));
     const running = new Set<string>();
     super({
       runtimeRoot: join(root, 'run'),
@@ -56,7 +58,10 @@ export class FakeOrbProvider extends NspawnOrbProvider {
         const result = await options.runner(argv);
         if (result.code !== 0) return result;
         const machine = argv[2] ?? '';
-        if (argv[1] === 'start') running.add(machine);
+        if (argv[1] === 'start') {
+          mkdirSync(join(root, 'run', machine), { recursive: true, mode: 0o700 });
+          running.add(machine);
+        }
         if (argv[1] === 'poweroff' || argv[1] === 'terminate') running.delete(machine);
         return argv[1] === 'list' ? { ...result, stdout: [...running].join('\n') } : result;
       },
@@ -66,24 +71,36 @@ export class FakeOrbProvider extends NspawnOrbProvider {
 
   override async start(handle: OrbHandle, options: { signal?: AbortSignal } = {}): Promise<void> {
     await super.start(handle, options);
-    if (!existsSync(join(this.runtimeRoot, handle.id, 'relay.sock'))) return;
-    const running = this.launchWorker(handle, {
-      ...options,
-      socketPath: join(this.runtimeRoot, handle.id, 'relay.sock'),
-      distRoot: this.distRoot,
-      seedRoot: this.seedRoot,
-      outboxRoot: join(this.runtimeRoot, handle.id, 'outbox'),
-    });
+    const directory = join(this.runtimeRoot, handle.id);
+    const socketPath = join(directory, 'relay.sock');
+    if (!options.signal && !existsSync(socketPath)) return;
+    const running = (async () => {
+      while (!existsSync(socketPath) || !existsSync(`${socketPath}.token`)) {
+        if (options.signal?.aborted) return;
+        await delay(1);
+      }
+      if (options.signal?.aborted) return;
+      await this.launchWorker(handle, {
+        ...options,
+        socketPath: join(this.runtimeRoot, handle.id, 'relay.sock'),
+        distRoot: this.distRoot,
+        seedRoot: this.seedRoot,
+        outboxRoot: join(this.runtimeRoot, handle.id, 'outbox'),
+      });
+    })();
     workers.add(running);
     void running.finally(() => workers.delete(running));
   }
 
   async launchWorker(handle: OrbHandle, options: FakeWorkerOptions): Promise<void> {
+    const tokenPath = `${options.socketPath}.token`;
+    const token = readFileSync(tokenPath, 'utf8');
     try {
       await this.worker(['orb-worker', '--', handle.id], options);
     } catch (error) {
       if (error instanceof Error && error.name === 'AssertionError') assertions.push(error);
     }
+    if (!existsSync(tokenPath) || readFileSync(tokenPath, 'utf8') !== token) return;
     try {
       const connection = await RelayMachineApi.connect(options.socketPath);
       connection.close();

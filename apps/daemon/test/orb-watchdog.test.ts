@@ -58,10 +58,13 @@ test.each([0, 1, 137])(
 );
 
 test('signal termination reports one disconnect failure without a fabricated exit code', async () => {
-  const { api, running } = fixture(async (argv) =>
-    argv[0] === 'orb-worker'
-      ? runOrbCommand([process.execPath, '-e', 'process.kill(process.pid, "SIGTERM")'])
-      : { code: 0, stdout: '', stderr: '' },
+  const { api, running } = fixture(
+    async (argv) =>
+      argv[0] === 'orb-worker'
+        ? runOrbCommand([process.execPath, '-e', 'process.kill(process.pid, "SIGTERM")'])
+        : { code: 0, stdout: '', stderr: '' },
+    new FakeMachineApi(),
+    10_000,
   );
   await running;
   expect(api.doneBodies).toEqual([
@@ -85,9 +88,9 @@ test.each([false, true])(
       deadline = Date.now() + 1_000;
     });
     const { api, stop, running, journal } = fixture(async (argv, options) => {
+      if (argv[1] === 'start') deadline = Date.now() + 1_000;
       if (argv[0] !== 'orb-worker') return { code: 0, stdout: '', stderr: '' };
       signal = options?.signal;
-      deadline = Date.now() + 1_000;
       signal?.addEventListener('abort', () => release.resolve(), { once: true });
       const socketPath = options?.socketPath;
       const relay = connect && socketPath ? await RelayMachineApi.connect(socketPath) : undefined;

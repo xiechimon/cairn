@@ -7,7 +7,7 @@ import { expect, test, vi } from 'vitest';
 import { createPiBackend } from '../src/backend/pi.js';
 import type { MachineApi } from '../src/machine-client.js';
 import { ORB_STEP_METHODS } from '../src/orb/protocol.js';
-import { RelayMachineServer } from '../src/orb/relay.js';
+import { RelayMachineApi, RelayMachineServer } from '../src/orb/relay.js';
 import { runOrbWorker } from '../src/orb/worker.js';
 import {
   boot,
@@ -334,3 +334,70 @@ test.each(['success', 'failed'] as const)(
     expect(api.doneBodies[0]?.body.status).toBe(status);
   },
 );
+
+test('machine start precedes the relay socket and token publication', async () => {
+  const starts: boolean[] = [];
+  const provider = new FakeOrbProvider({
+    runner: async (argv) => {
+      if (argv[1] === 'start') {
+        const directory = join(provider.runtimeRoot, argv[2]!);
+        starts.push(
+          existsSync(join(directory, 'relay.sock')) ||
+            existsSync(join(directory, 'relay.sock.token')),
+        );
+      }
+      return { code: 0, stdout: '', stderr: '' };
+    },
+  });
+  const api = new FakeMachineApi();
+  api.claimQueue.push(CLAIMED);
+  const { handle } = await boot({ api, orbProvider: provider, capEnv: { CAIRN_EXECUTOR: 'orb' } });
+  try {
+    await waitFor(() => api.doneBodies.length === 1);
+    expect(starts).toEqual([false]);
+  } finally {
+    await handle.stop();
+    await handle.done;
+  }
+});
+
+test('a previous fake worker cannot disconnect the next step listener', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'orb-worker-reuse-'));
+  const socketPath = join(root, 'relay.sock');
+  const exit = defer();
+  const provider = new FakeOrbProvider({
+    runner: async (argv) => {
+      if (argv[0] === 'orb-worker') await exit.promise;
+      return { code: 0, stdout: '', stderr: '' };
+    },
+  });
+  const handle = await provider.ensure({ conversationId: 'thread', projectId: 'project' });
+  const api = new FakeMachineApi();
+  const first = new RelayMachineServer({ socketPath, stepId: 's1', upstream: api });
+  const second = new RelayMachineServer({ socketPath, stepId: 's2', upstream: api });
+  await first.listen();
+  const previous = provider.launchWorker(handle, {
+    socketPath,
+    distRoot: provider.distRoot,
+    seedRoot: provider.seedRoot,
+    outboxRoot: join(root, 'outbox'),
+  });
+  try {
+    await first.close();
+    await second.listen();
+    exit.resolve();
+    await previous;
+    const worker = await RelayMachineApi.connect(socketPath);
+    try {
+      await worker.api.heartbeat('s2');
+      expect(api.calls).toContain('heartbeat:s2');
+    } finally {
+      worker.close();
+    }
+  } finally {
+    exit.resolve();
+    await previous;
+    await first.close();
+    await second.close();
+  }
+});
