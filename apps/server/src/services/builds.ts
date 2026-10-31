@@ -139,6 +139,7 @@ import type { VapidKeys } from './push.js';
 import { publishStepRow, toQuotaWait } from './quota-wait.js';
 import { retryLessonsOf } from './retry-lessons.js';
 import { finishScheduledStep } from './schedules.js';
+import { endSnoozeOn } from './snooze.js';
 import { assertSplitProposalExecutable } from './split-proposal.js';
 import { stepQueueProjector } from './step-queue.js';
 import {
@@ -329,7 +330,7 @@ export async function sendBuildSteer(
       'Scheduled continuation would require a new build after the previous delivery. Create a new task.',
     );
   }
-  return db.transaction(() => {
+  const sent = db.transaction(() => {
     if (continuationOptions.schedule) {
       const wake = continuationOptions.schedule;
       const current = db.select().from(schedule).where(eq(schedule.id, wake.id)).get();
@@ -459,6 +460,10 @@ export async function sendBuildSteer(
       delivered: running ? ('steer' as const) : ('new-turn' as const),
     };
   });
+  const fromUser =
+    continuationOptions.human ?? deps.steerOptions?.human ?? body.queuedMessageId !== undefined;
+  if (fromUser && !continuationOptions.schedule) endSnoozeOn(deps, buildRow.todoId, 'user-message');
+  return sent;
 }
 
 export async function messageTodo(

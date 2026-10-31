@@ -43,6 +43,7 @@ import { UserMenu } from '../detail/user-menu.js';
 import { isArchived, isDeleted, markArchived, markDeleted } from '../fixtures/deletions.js';
 import { PROJECT_ID, PROJECT_NAME } from '../fixtures/fixtures.js';
 import type { TodoRecord } from '../fixtures/records.js';
+import { setFixtureSnooze, subscribeFixtureSnooze, withFixtureSnooze } from '../fixtures/snooze.js';
 import { isFixtureUnread, setFixtureUnread, subscribeFixtureUnread } from '../fixtures/unread.js';
 import { scrollFadeClassName, useScrollFade } from '../hooks/use-scroll-fade.js';
 import { useI18n } from '../i18n/provider.js';
@@ -53,7 +54,9 @@ import { readStoredTheme } from '../theme.js';
 import { withColumnParam } from './columns.js';
 import { withoutBoardView } from './home.js';
 import { ProjectAvatar } from './project-avatar.js';
-import { ProjectGroup, projectThreads, threadHref } from './sidebar-threads.js';
+import { ProjectGroup, projectThreads, SnoozedThreadGroup, threadHref } from './sidebar-threads.js';
+import { SnoozeConfirmDialog, SnoozePickDialog } from './snooze-dialogs.js';
+import { presetInstant, type SnoozeChoice, type SnoozeRequest } from './snooze-presets.js';
 import { keepThreadUnread } from './thread-read-keep.js';
 
 export type SidebarSelected =
@@ -223,7 +226,10 @@ export function BoardSidebar({
   const mutations = useApiMutations(teamId);
   const [, refresh] = useReducer((n: number) => n + 1, 0);
   useEffect(() => subscribeFixtureUnread(refresh), []);
+  useEffect(() => subscribeFixtureSnooze(refresh), []);
   const [pendingDelete, setPendingDelete] = useState<TodoRecord | null>(null);
+  const [pendingSnooze, setPendingSnooze] = useState<TodoRecord | null>(null);
+  const [pendingPick, setPendingPick] = useState<TodoRecord | null>(null);
   const { search, pathname } = useLocation();
   const stripped = withoutBoardView(withColumnParam(search, null));
   const baseParams = new URLSearchParams(stripped.startsWith('?') ? stripped.slice(1) : stripped);
@@ -235,9 +241,11 @@ export function BoardSidebar({
     () => (projects ?? [CANON_PROJECT]).filter((row) => !isDeleted(row.id)),
     [projects],
   );
-  const liveThreads = (todos ?? []).filter(
+  const openThreads = (live ? (todos ?? []) : withFixtureSnooze(todos ?? [])).filter(
     (todo) => todo.archivedAt == null && !isDeleted(todo.id) && !isArchived(todo.id),
   );
+  const liveThreads = openThreads.filter((todo) => todo.snoozeMode == null);
+  const snoozedThreads = openThreads.filter((todo) => todo.snoozeMode != null);
   const activeThreadId = pathname.startsWith('/app/todo/')
     ? (pathname.split('/')[3] ?? null)
     : null;
@@ -288,6 +296,43 @@ export function BoardSidebar({
       { id: todo.id, archived: false },
       { onError: (error) => toastError(t('Could not unarchive task.'), error) },
     );
+  };
+  const unsnoozeThread = (todo: TodoRecord) => {
+    if (!live) {
+      setFixtureSnooze(todo.id, { snoozeMode: null, snoozedUntil: null });
+      return;
+    }
+    mutations.unsnoozeTodo.mutate(todo.id, {
+      onError: (error) => toastError(t('无法取消暂停。'), error),
+    });
+  };
+  const applySnooze = (todo: TodoRecord, request: SnoozeRequest) => {
+    const announce = () =>
+      toastSuccess(t('线程已暂停'), { label: t('撤销'), onClick: () => unsnoozeThread(todo) });
+    if (!live) {
+      if (blockDemoWrite()) return;
+      const until =
+        request === 'needed'
+          ? null
+          : typeof request === 'number'
+            ? request
+            : presetInstant(request, Date.now());
+      setFixtureSnooze(todo.id, {
+        snoozeMode: request === 'needed' ? 'needed' : 'until',
+        snoozedUntil: until,
+      });
+      announce();
+      return;
+    }
+    mutations.snoozeTodo.mutate(
+      { id: todo.id, until: request },
+      { onSuccess: announce, onError: (error) => toastError(t('无法暂停线程。'), error) },
+    );
+  };
+  const chooseSnooze = (todo: TodoRecord, choice: SnoozeChoice) => {
+    if (choice === 'needed') setPendingSnooze(todo);
+    else if (choice === 'pick') setPendingPick(todo);
+    else applySnooze(todo, choice);
   };
   const archiveThread = (todo: TodoRecord) => {
     if (!live) {
@@ -595,11 +640,20 @@ export function BoardSidebar({
                 onOpenProject={() => goTo(href)}
                 onOpenThread={(todo) => goTo(threadHref(todo.id))}
                 onMarkUnread={markThreadUnread}
+                onSnooze={chooseSnooze}
                 onArchive={archiveThread}
                 onDelete={setPendingDelete}
               />
             );
           })}
+        {!groupCollapsed.project && (
+          <SnoozedThreadGroup
+            threads={snoozedThreads}
+            activeThreadId={activeThreadId}
+            onOpenThread={(todo) => goTo(threadHref(todo.id))}
+            onUnsnooze={unsnoozeThread}
+          />
+        )}
       </nav>
 
       <div className="flex flex-none flex-col gap-px pt-2">
@@ -669,6 +723,26 @@ export function BoardSidebar({
           }
         />
       </div>
+      <SnoozeConfirmDialog
+        open={pendingSnooze != null}
+        onClose={() => setPendingSnooze(null)}
+        onConfirm={() => {
+          const todo = pendingSnooze;
+          setPendingSnooze(null);
+          if (todo != null) applySnooze(todo, 'needed');
+        }}
+      />
+      {pendingPick != null && (
+        <SnoozePickDialog
+          open
+          onClose={() => setPendingPick(null)}
+          onConfirm={(at) => {
+            const todo = pendingPick;
+            setPendingPick(null);
+            applySnooze(todo, at);
+          }}
+        />
+      )}
       <DeleteConfirm
         open={pendingDelete != null}
         title={t('确定删除该任务？此操作不可撤销。')}

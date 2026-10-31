@@ -217,15 +217,15 @@ export async function sendPushToUser(
   return { status: 'failed', id };
 }
 
-export function isArchivedTodoPush(db: Db, teamId: string, href: string): boolean {
+export function isSilencedTodoPush(db: Db, teamId: string, href: string): boolean {
   const match = /^\/app\/todo\/([^/?#]+)$/.exec(href);
   if (match?.[1] === undefined) return false;
   const row = db
-    .select({ archivedAt: todo.archivedAt })
+    .select({ archivedAt: todo.archivedAt, snoozeMode: todo.snoozeMode })
     .from(todo)
     .where(and(eq(todo.id, match[1]), eq(todo.teamId, teamId)))
     .get();
-  return row?.archivedAt != null;
+  return row !== undefined && (row.archivedAt !== null || row.snoozeMode !== null);
 }
 
 export function pushToUserSafely(
@@ -237,7 +237,7 @@ export function pushToUserSafely(
 ): void {
   if (
     vapid === null ||
-    isArchivedTodoPush(db, teamId, msg.href) ||
+    isSilencedTodoPush(db, teamId, msg.href) ||
     isViewingThread(db, userId, teamId, msg.href)
   )
     return;
@@ -247,7 +247,7 @@ export function pushToUserSafely(
 }
 
 export function queuePushDigest(db: Db, userId: string, teamId: string, msg: PushMessage): void {
-  if (isArchivedTodoPush(db, teamId, msg.href)) return;
+  if (isSilencedTodoPush(db, teamId, msg.href)) return;
   db.insert(pushDigestItem)
     .values({
       id: newRecordId(),
@@ -299,7 +299,7 @@ export async function sweepPushDigest(db: Db, vapid: VapidKeys | null): Promise<
       .where(and(eq(pushDigestItem.userId, group.userId), eq(pushDigestItem.teamId, group.teamId)))
       .all();
     const items = queued.filter((item) => {
-      if (!isArchivedTodoPush(db, group.teamId, item.href)) return true;
+      if (!isSilencedTodoPush(db, group.teamId, item.href)) return true;
       db.delete(pushDigestItem).where(eq(pushDigestItem.id, item.id)).run();
       return false;
     });

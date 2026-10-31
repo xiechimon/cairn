@@ -9,6 +9,7 @@ import { newRecordId, nowMs } from '../lib/ids.js';
 import type { TeamStreamHub } from './events.js';
 import { projectOfTodo } from './git.js';
 import { notifyScheduleRun } from './notifications.js';
+import { endSnoozeOn } from './snooze.js';
 
 export interface ScheduleDeps {
   db: Db;
@@ -198,10 +199,11 @@ export function createSchedule(
   return record;
 }
 
-export function deleteSchedule(deps: ScheduleDeps, id: string): boolean {
+export function deleteSchedule(deps: ScheduleDeps & { user?: UserRecord }, id: string): boolean {
   const row = deps.db.select().from(schedule).where(eq(schedule.id, id)).get();
   if (!row) return false;
   deps.db.delete(schedule).where(eq(schedule.id, id)).run();
+  endSnoozeOn(deps, row.todoId, 'schedule-cleared');
   return true;
 }
 
@@ -421,6 +423,7 @@ export function finishScheduledStep(
         todoRow,
         outcome.status === 'failed' ? `Scheduled run failed: ${outcome.error}` : null,
       );
+      endSnoozeOn(deps, todoRow.id, 'scheduled-run-finished');
     }
   }
   if (outcome.status === 'failed') {

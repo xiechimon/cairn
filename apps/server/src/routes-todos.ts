@@ -5,6 +5,7 @@ import {
   isStartedTodo,
   needsYouQuerySchema,
   phaseSchema,
+  snoozeTodoBodySchema,
   type TodoRecord,
 } from '@cairn/shared';
 import type { Hono } from 'hono';
@@ -29,6 +30,7 @@ import { readSourceIssueEcho } from './services/github-issues.js';
 import { listNeedsYou } from './services/needs-you.js';
 import { orchestrateTodo } from './services/orchestrate.js';
 import { PhaseTransitionError } from './services/phase.js';
+import { snoozeTodo, unsnoozeTodo } from './services/snooze.js';
 import {
   createTodo,
   deleteTodo,
@@ -141,6 +143,21 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
   app.post('/api/todos/:id/unarchive', (c) => {
     const id = c.req.param('id');
     const record = setTodoArchived(svc, id, false);
+    if (!record) throw notFound(`todo ${id}`);
+    return c.json(record);
+  });
+
+  app.post('/api/todos/:id/snooze', async (c) => {
+    const id = c.req.param('id');
+    const body = parseWith(snoozeTodoBodySchema, await jsonBody(c), 'body');
+    const record = snoozeTodo(svc, id, body);
+    if (!record) throw notFound(`todo ${id}`);
+    return c.json(record);
+  });
+
+  app.post('/api/todos/:id/unsnooze', (c) => {
+    const id = c.req.param('id');
+    const record = unsnoozeTodo(svc, id);
     if (!record) throw notFound(`todo ${id}`);
     return c.json(record);
   });

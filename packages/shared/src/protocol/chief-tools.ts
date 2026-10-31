@@ -28,6 +28,7 @@ export const CHIEF_TOOLS_ADDED = [
   'models',
   'split_todo',
   'update_memory',
+  'snooze_todos',
 ] as const;
 
 export const CHIEF_TOOL_CATEGORIES = {
@@ -70,6 +71,7 @@ export const CHIEF_TOOL_CATEGORIES = {
     'delete_secrets',
     'schedule_todo',
     'unschedule_todo',
+    'snooze_todos',
   ],
   execute: ['run_builds', 'run_review', 'confirm_builds', 'cancel_builds', 'merge_builds'],
   private: [
@@ -533,6 +535,21 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
     parameters: obj({ todoId: str('Todo id.') }, ['todoId']),
   },
   {
+    name: 'snooze_todos',
+    description:
+      'Snooze todo threads so they leave the active list and stop pushing. until is "needed" (back when the agent needs the user), "tomorrow" (next 08:00), "tomorrow-09:00", "next-monday" (09:00), epoch ms as a digit string or an ISO timestamp with offset. A user message, a finished scheduled run, a cleared schedule or a needs-you event ends the snooze early and marks the thread unread.',
+    parameters: obj(
+      {
+        todoIds: idArr('Todo ids to snooze.'),
+        until: str(
+          'needed | tomorrow | tomorrow-09:00 | next-monday | epoch ms as digits | ISO timestamp with offset.',
+        ),
+        tz: str('Optional IANA time zone for the presets; defaults to the server time zone.'),
+      },
+      ['todoIds', 'until'],
+    ),
+  },
+  {
     name: 'run_builds',
     description:
       'Start builds for todos: assignment picks the executing agent per responsibility fit; withPlan is your per-dispatch judgment (omit = plan first) — state the reason via dispatchReason; the review gate applies either way. Assignment must set at least one slot (plan and/or build agentId) — an empty assignment is rejected.',
@@ -712,7 +729,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   },
 ];
 
-export const CHIEF_TOOL_COUNT = 52;
+export const CHIEF_TOOL_COUNT = 53;
 
 export const WORKER_MEMORY_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {

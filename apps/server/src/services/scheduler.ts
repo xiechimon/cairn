@@ -67,6 +67,7 @@ import {
   workerScheduleRunHistory,
 } from './schedules.js';
 import { createScheduling, SCHEDULE_INTERVAL_MS, type SchedulingRun } from './scheduling/sweep.js';
+import { sweepSnoozeExpiry } from './snooze.js';
 import { insertMessageRow } from './transcript.js';
 
 export interface SchedulerOptions {
@@ -478,6 +479,7 @@ export function createScheduler(
       );
     }
     sweepIdleChiefUnread(deps, now);
+    sweepSnoozeExpiry(deps, now);
     fireDueChiefWakes(deps, now);
     planChiefDigests(deps, now);
     sweepStaleMachines(deps);
