@@ -74,7 +74,10 @@ test.describe('task panel list view', () => {
     await page.goto(HOME);
     await page.getByTestId('needs-you-row').filter({ hasText: '#102' }).getByRole('link').click();
     await expect.poll(() => params(page).get('task')).toBe('inbox-confirm');
-    await page.getByRole('link', { name: '看板' }).first().click();
+    await page.evaluate((url) => {
+      history.pushState(null, '', url);
+      dispatchEvent(new PopStateEvent('popstate'));
+    }, `${HOME}&view=board`);
     await expect(page.locator('[data-column]')).toHaveCount(4);
     await page.locator('[data-todo-id="inbox-running"] .todo-card-link').click();
     await expect(panel(page).getByTestId('task-panel-title')).toContainText('verify-cairn');
@@ -278,6 +281,7 @@ test.describe('axe with the panel open', () => {
     test(name, async ({ page }) => {
       await page.goto(url);
       await expect(panel(page)).toBeVisible();
+      await expect(panel(page)).toHaveCSS('opacity', '1');
       const result = await new AxeBuilder({ page })
         .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
         .analyze();

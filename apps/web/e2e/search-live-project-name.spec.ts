@@ -109,7 +109,7 @@ test('live, projects loaded: pre-response rows carry each todo’s own project',
 
   await page.goto('/app?view=board');
   // both reads landed: sidebar project rows (projects) + a board card (todos)
-  await expect(page.getByTestId('project-name').filter({ hasText: 'atlas' })).toBeVisible();
+  await expect(page.locator('[data-slot="sidebar-project-row"]').filter({ hasText: 'atlas' })).toBeVisible();
   await expect(page.getByText('search probe beta').first()).toBeVisible();
   await openPanel(page);
 

@@ -9,7 +9,7 @@ test('CDS sidebar: 248px tier-1 surface, no seam, rounded rows, scroll-fade', as
   const m = await page.evaluate(() => {
     const sidebar = document.querySelector('.board-sidebar')!;
     const nav = document.querySelector('.board-sidebar nav')!;
-    const row = document.querySelector('.board-sidebar .sidebar-row')!;
+    const row = document.querySelector('.board-sidebar [data-slot="sidebar-nav-row"]')!;
     const ss = getComputedStyle(sidebar);
     return {
       width: Math.round(sidebar.getBoundingClientRect().width),

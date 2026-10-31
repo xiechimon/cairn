@@ -47,7 +47,7 @@ async function expectMenuOnTop(page: Page) {
 async function expectAnchoredAboveChip(page: Page, chip: Locator) {
   const box = await menu(page).boundingBox();
   const row = await chip.boundingBox();
-  const img = await chip.locator('img').boundingBox();
+  const img = await chip.locator('img, [aria-hidden="true"]').first().boundingBox();
   expect(box).not.toBeNull();
   expect(row).not.toBeNull();
   expect(img).not.toBeNull();

@@ -133,7 +133,7 @@ async function shot(page: Page, name: string, panel: Locator) {
 const column = (page: Page) =>
   page.locator('section[data-column]', { has: page.locator('[data-todo-id="todo-0"]') });
 const sidebarProject = (page: Page, name: string) =>
-  page.getByTestId('project-name').filter({ hasText: name });
+  page.locator('[data-slot="sidebar-project-row"]').filter({ hasText: name });
 
 test.describe('board card', () => {
   test('projects pending: no project item, then each card’s own project', async ({ page }) => {

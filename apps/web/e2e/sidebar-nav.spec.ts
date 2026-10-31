@@ -35,14 +35,16 @@ test('nav rows hop client-side: no reload, pill + aria-current follow', async ({
   await page.goto('/app?scenario=01');
   await plantCanary(page);
 
-  const schedules = page.getByRole('complementary').getByRole('link', { name: '定时' });
+  const schedules = page.getByRole('complementary').getByRole('button', { name: 'Scheduled' });
   await schedules.click();
 
   await expect(page).toHaveURL('/app/schedules?scenario=01');
   expect(await page.evaluate(() => window.__spaCanary)).toBe('alive');
   await expect(schedules).toHaveAttribute('aria-current', 'page');
 
-  const board = page.getByRole('link', { name: '工作台' });
+  const board = page
+    .getByRole('complementary')
+    .locator('[data-slot="sidebar-nav-row"]', { hasText: 'Projects' });
   await expect(board).not.toHaveAttribute('aria-current', 'page');
 });
 
@@ -71,7 +73,7 @@ test('rail rows hop client-side', async ({ page }) => {
   await page.goto('/app?scenario=03');
   await plantCanary(page);
 
-  await page.getByRole('complementary').getByRole('link', { name: '定时' }).click();
+  await page.getByRole('complementary').getByRole('link', { name: 'Scheduled' }).click();
   await expect(page).toHaveURL('/app/schedules?scenario=03');
   expect(await page.evaluate(() => window.__spaCanary)).toBe('alive');
 });
@@ -89,7 +91,9 @@ test('collapsed rail carries no install icon', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
   await page.goto('/app?scenario=03');
   await expect(page.getByRole('link', { name: /安装/ })).toHaveCount(0);
-  await expect(page.getByRole('complementary').getByRole('link', { name: '定时' })).toBeVisible();
+  await expect(
+    page.getByRole('complementary').getByRole('link', { name: 'Scheduled' }),
+  ).toBeVisible();
 });
 
 test('/zh/install redirects to /app (unmatched-path divergence, 01 §8)', async ({ page }) => {
@@ -100,7 +104,7 @@ test('/zh/install redirects to /app (unmatched-path divergence, 01 §8)', async 
 
 test('hover tints the row — dark default + light theme', async ({ page }) => {
   await page.goto('/app?scenario=01');
-  const row = page.getByRole('complementary').getByRole('link', { name: '定时' });
+  const row = page.getByRole('complementary').getByRole('button', { name: 'Scheduled' });
 
   expect(await pillBg(row)).toBe('rgba(0, 0, 0, 0)');
   await row.hover();
@@ -108,7 +112,7 @@ test('hover tints the row — dark default + light theme', async ({ page }) => {
 
   await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
   await page.goto('/app?scenario=01');
-  const lightRow = page.getByRole('complementary').getByRole('link', { name: '定时' });
+  const lightRow = page.getByRole('complementary').getByRole('button', { name: 'Scheduled' });
   await lightRow.hover();
   await expect.poll(() => pillBg(lightRow)).toBe('rgb(220, 222, 215)');
 });
@@ -116,7 +120,7 @@ test('hover tints the row — dark default + light theme', async ({ page }) => {
 test('rail hover tints the row', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
   await page.goto('/app?scenario=03');
-  const row = page.getByRole('complementary').getByRole('link', { name: '定时' });
+  const row = page.getByRole('complementary').getByRole('link', { name: 'Scheduled' });
 
   expect(await pillBg(row)).toBe('rgba(0, 0, 0, 0)');
   await row.hover();
@@ -125,10 +129,12 @@ test('rail hover tints the row', async ({ page }) => {
 
 test('selected row keeps its sheet fill under hover', async ({ page }) => {
   await page.goto('/app?scenario=01');
-  const board = page.getByRole('link', { name: '工作台' });
+  const board = page
+    .getByRole('complementary')
+    .locator('[data-slot="sidebar-nav-row"]', { hasText: 'Projects' });
   await expect(board).toHaveAttribute('aria-current', 'page');
 
-  const sheet = await tokenBg(page, '--hover-1');
+  const sheet = await tokenBg(page, '--sidebar-active');
   await board.hover();
 
   await page.waitForTimeout(250);

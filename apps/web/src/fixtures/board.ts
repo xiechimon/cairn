@@ -185,6 +185,38 @@ function repoFilterProbe(
   return { ...probeTodo(phase, r7(13, 40)), id, seqNum, title, spec: title, projectId, tagIds };
 }
 
+const SIDEBAR_PROJECT_B = 'sidebar-project-b';
+
+export const sidebarThreads: FixtureSet = {
+  ...boardDefault,
+  projectNames: { [PROJECT_ID]: 'P1', [SIDEBAR_PROJECT_B]: 'P2' },
+  todos: [
+    repoFilterProbe('sidebar-thread-p1', 61, 'P1 running thread', 'building', PROJECT_ID, []),
+    repoFilterProbe(
+      'sidebar-thread-p2',
+      62,
+      'P2 running thread',
+      'building',
+      SIDEBAR_PROJECT_B,
+      [],
+    ),
+  ],
+  now: r7(13, 55),
+};
+
+export const sidebarThreadStatuses: FixtureSet = {
+  ...boardDefault,
+  projectNames: { [PROJECT_ID]: 'P1' },
+  todos: [
+    repoFilterProbe('sidebar-status-running', 71, 'status running', 'building', PROJECT_ID, []),
+    repoFilterProbe('sidebar-status-review', 72, 'status review', 'review', PROJECT_ID, []),
+    repoFilterProbe('sidebar-status-failed', 73, 'status failed', 'failed', PROJECT_ID, []),
+    repoFilterProbe('sidebar-status-done', 74, 'status done', 'done', PROJECT_ID, []),
+    repoFilterProbe('sidebar-status-todo', 75, 'status todo', 'todo', PROJECT_ID, []),
+  ],
+  now: r7(13, 55),
+};
+
 export const boardRepoFilter: FixtureSet = {
   ...boardDefault,
   projectNames: {

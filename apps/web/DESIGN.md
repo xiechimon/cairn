@@ -224,7 +224,7 @@ All live in `src/components/` and are shown in the gallery under "Stone language
 - **PrBar** (`thread/pr-bar.tsx`): PR number, branch, CI chip that opens a Checks popover (Auto-fix, Auto-merge with dynamic help, one locked row that states why), Merge; merged variant.
 - **ScheduledTaskRow** (`thread/scheduled-task-row.tsx`): still clock mark, name, trigger and next run, Active, Paused or Auto-disabled tag.
 - **Shell parts** (`shell/`): `SidebarNavRow`, `SidebarProjectRow` with waiting count, `SidebarThreadList` and `SidebarThreadRow` (pebble, truncation, hover menu, open and snoozed), `SidebarUser`, `WaitPill`, `HeaderIconButton` with attention dot, `ProjectCard`, `PhoneTabBar` with badge.
-- **Stream parts** (`stream/`): `GoalLine`, `Greeting`, `SuggestionChip`, `ArchivedBanner`; the day divider is `Marker variant="separator"`.
+- **Stream parts** (`stream/`): `GoalLine`, `Greeting`, `SuggestionChip`; the archived banner is `NoticeBanner` with the waiting tone; the day divider is `Marker variant="separator"`.
 - **ListCard / ListRow** (`list-card.tsx`): divided card list used by library, activity and settings rows.
 - **RoutingNode / QuotaBar** (`settings/`): model-routing node with optional quota bar that turns ochre at 80% and above; unavailable nodes are dashed with a failed tag.
 
