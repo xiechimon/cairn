@@ -22,7 +22,9 @@ const COLOR_INK: Record<ProjectColor, string> = {
   gray: 'text-content-tertiary',
 };
 
-const ICON_TILE: Record<ProjectColor | 'none', string> = {
+const NEUTRAL_TILE = 'bg-foreground/8 text-content-secondary';
+
+const ICON_TILE: Record<ProjectColor, string> = {
   moss: 'bg-project-tile-1/16 text-project-ink-1',
   amber: 'bg-project-tile-2/16 text-project-ink-2',
   slate: 'bg-project-tile-3/16 text-project-ink-3',
@@ -30,17 +32,16 @@ const ICON_TILE: Record<ProjectColor | 'none', string> = {
   teal: 'bg-project-tile-5/16 text-project-ink-5',
   rose: 'bg-project-tile-6/16 text-project-ink-6',
   gray: 'bg-content-tertiary/16 text-content-tertiary',
-  none: 'bg-foreground/8 text-content-secondary',
 };
 
 export const PROJECT_COLOR_SWATCH: Record<ProjectColor, string> = {
-  moss: 'bg-project-ink-1',
-  amber: 'bg-project-ink-2',
-  slate: 'bg-project-ink-3',
-  plum: 'bg-project-ink-4',
-  teal: 'bg-project-ink-5',
-  rose: 'bg-project-ink-6',
-  gray: 'bg-content-tertiary',
+  moss: 'bg-project-ink-1 hover:bg-project-ink-1 dark:hover:bg-project-ink-1',
+  amber: 'bg-project-ink-2 hover:bg-project-ink-2 dark:hover:bg-project-ink-2',
+  slate: 'bg-project-ink-3 hover:bg-project-ink-3 dark:hover:bg-project-ink-3',
+  plum: 'bg-project-ink-4 hover:bg-project-ink-4 dark:hover:bg-project-ink-4',
+  teal: 'bg-project-ink-5 hover:bg-project-ink-5 dark:hover:bg-project-ink-5',
+  rose: 'bg-project-ink-6 hover:bg-project-ink-6 dark:hover:bg-project-ink-6',
+  gray: 'bg-content-tertiary hover:bg-content-tertiary dark:hover:bg-content-tertiary',
 };
 
 const COLOR_TONE: Record<ProjectColor, number | null> = {
@@ -79,7 +80,10 @@ export function ProjectAvatar({
           'project-avatar grid flex-none place-items-center',
           bare
             ? ['size-4', color != null && COLOR_INK[color]]
-            : ['size-8 rounded-lg [&>svg]:size-1/2', ICON_TILE[color ?? 'none']],
+            : [
+                'size-8 rounded-lg [&>svg]:size-1/2',
+                color != null ? ICON_TILE[color] : NEUTRAL_TILE,
+              ],
           className,
         )}
       >

@@ -83,7 +83,8 @@ export function ProjectIconPicker({
             const Icon = PROJECT_ICON_COMPONENTS[name];
             const selected = icon === name;
             return (
-              <button
+              <Button
+                variant="ghost"
                 key={name}
                 type="button"
                 aria-label={name}
@@ -91,13 +92,13 @@ export function ProjectIconPicker({
                 data-icon={name}
                 onClick={() => onChange({ icon: name })}
                 className={cn(
-                  'grid size-8 cursor-pointer place-items-center rounded-(--radius-menu-item) text-content-secondary hover:bg-(--menu-hover) hover:text-foreground',
+                  'grid size-8 h-8 min-w-0 cursor-pointer p-0 font-normal place-items-center rounded-(--radius-menu-item) text-content-secondary hover:bg-(--menu-hover) hover:text-foreground',
                   selected && 'bg-(--menu-hover) text-foreground',
                   FOCUS,
                 )}
               >
                 <Icon className="size-4" strokeWidth={1.75} />
-              </button>
+              </Button>
             );
           })}
           {shown.length === 0 && (
@@ -108,22 +109,24 @@ export function ProjectIconPicker({
         </fieldset>
         <fieldset className="m-0 flex min-w-0 items-center justify-between border-0 border-t border-border px-2.5 py-2.5">
           <legend className="sr-only">{t('颜色')}</legend>
-          <button
+          <Button
+            variant="ghost"
             type="button"
             aria-label={t('无颜色')}
             aria-pressed={color == null}
             data-color="none"
             onClick={() => onChange({ color: null })}
             className={cn(
-              'grid size-5 cursor-pointer place-items-center rounded-full text-content-tertiary ring-1 ring-border ring-inset',
+              'grid size-5 h-5 min-w-0 cursor-pointer p-0 place-items-center rounded-full text-content-tertiary ring-1 ring-border ring-inset',
               color == null && 'ring-2 ring-offset-2 ring-offset-popover ring-foreground',
               FOCUS,
             )}
           >
             <Ban className="size-3" strokeWidth={1.75} />
-          </button>
+          </Button>
           {PROJECT_COLORS.map((name) => (
-            <button
+            <Button
+              variant="ghost"
               key={name}
               type="button"
               aria-label={t(COLOR_LABEL[name])}
@@ -131,7 +134,7 @@ export function ProjectIconPicker({
               data-color={name}
               onClick={() => onChange({ color: name })}
               className={cn(
-                'size-5 cursor-pointer rounded-full',
+                'size-5 h-5 min-w-0 cursor-pointer rounded-full p-0',
                 PROJECT_COLOR_SWATCH[name],
                 color === name && 'ring-2 ring-offset-2 ring-offset-popover ring-foreground',
                 FOCUS,
