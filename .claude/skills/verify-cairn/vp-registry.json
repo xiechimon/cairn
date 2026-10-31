@@ -927,9 +927,10 @@
           "needs": [
             "stack"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "Typing @ in the detail composer opens the inline completion and a picked row lands as @label in the draft.",
-          "usage": "<todoId> (required; needs a todo from setup-review-seed.mjs, which answers 400 without machineId since ADR 0019); env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR"
+          "usage": "<todoId> (required; needs a todo from setup-review-seed.mjs, which answers 400 without machineId since ADR 0019); env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+          "note": "The new-task path that ran without a seeded todo went away with the mention picker; the remaining detail-composer path needs setup-review-seed.mjs, which creates its agent without machineId and answers 400 since ADR 0019."
         }
       }
     },
