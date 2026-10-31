@@ -44,3 +44,20 @@ test('Backspace on an empty box drops the context; a command closes the palette 
   await expect(panel(page)).toBeHidden();
   await expect(page.getByRole('menu')).toBeVisible();
 });
+
+test('dropping the context clears the keyboard cursor, and the next arrow lands on a real row', async ({
+  page,
+}) => {
+  await openPalette(page);
+  await page.keyboard.press('ArrowUp');
+  const lit = panel(page).locator('[data-selected]');
+  await expect(lit).toHaveAttribute('data-row-kind', 'nav');
+  await page.keyboard.press('Backspace');
+  await expect(panel(page).getByTestId('search-context')).toHaveCount(0);
+  await expect(lit).toHaveCount(0);
+  await page.keyboard.press('ArrowDown');
+  await expect(lit).toHaveAttribute('data-row-index', '0');
+  await page.keyboard.press('Enter');
+  await expect(panel(page)).toBeHidden();
+  await expect(page).toHaveURL(/\/app\?/);
+});

@@ -224,6 +224,10 @@ export function SearchPanel({
     if (open) setContextOn(true);
   }, [open]);
   const activeContext = contextOn ? context : undefined;
+  const dropContext = () => {
+    setContextOn(false);
+    setCursor(null);
+  };
   const commands =
     activeContext?.commands.filter(
       (command) => q === '' || command.label.toLowerCase().includes(q),
@@ -293,7 +297,7 @@ export function SearchPanel({
                 type="button"
                 aria-label={t('移除上下文')}
                 className="flex size-4.5 flex-none items-center justify-center rounded-sm text-content-tertiary hover:bg-(--menu-hover) hover:text-foreground"
-                onClick={() => setContextOn(false)}
+                onClick={dropContext}
               >
                 <X width={12} height={12} />
               </button>
@@ -311,7 +315,7 @@ export function SearchPanel({
             onKeyDown={(event) => {
               if (event.key === 'Backspace' && query === '' && activeContext != null) {
                 event.preventDefault();
-                setContextOn(false);
+                dropContext();
               } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
                 if (actions.length === 0) return;
                 event.preventDefault();
