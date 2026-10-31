@@ -52,7 +52,7 @@ export function FreshBlock({
   const { t } = useI18n();
   return (
     <div className="fresh-block mx-auto max-w-180 px-4 pt-18" data-testid="fresh-block">
-      <h2 className="fresh-title m-0 text-page font-medium break-words text-(--foreground)">
+      <h2 className="fresh-title m-0 font-serif text-page font-semibold break-words text-(--foreground)">
         {todo.title}
       </h2>
       {(tags ?? []).length > 0 && (

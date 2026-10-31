@@ -237,7 +237,7 @@ export const EN: Record<string, string> = {
   '任务状态已变化，消息未送出': 'The task state changed — the message was not delivered',
   暂无方案: 'No plan yet',
   暂无可显示的变更: 'No changes to show',
-  '· {n} 个文件改动': '· {n} files changed',
+  '· {n} 个文件改动': 'Files changed: {n}',
   全部展开: 'Expand all',
   全部收起: 'Collapse all',
   显示完整文件: 'Show full file',
