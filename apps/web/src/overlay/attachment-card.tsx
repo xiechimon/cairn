@@ -1,15 +1,14 @@
 import {
   Attachment,
   AttachmentContent,
+  AttachmentDescription,
   AttachmentMedia,
   AttachmentTitle,
   AttachmentTrigger,
 } from '../components/ui/attachment.js';
+import { Spinner } from '../components/ui/spinner.js';
 import { useI18n } from '../i18n/provider.js';
 import { FileText } from '../icons/index.js';
-
-const PENDING_BADGE_CLS =
-  'absolute bottom-1 left-1 rounded-(--radius-control) bg-[rgb(0_0_0/0.55)] px-1 text-caption whitespace-nowrap text-(--text-on-veil)';
 
 function CardBody({
   name,
@@ -41,8 +40,13 @@ function CardBody({
       </AttachmentMedia>
       <AttachmentContent>
         <AttachmentTitle>{name}</AttachmentTitle>
+        {uploading && (
+          <AttachmentDescription className="flex items-center gap-1 text-meta text-content-tertiary">
+            <Spinner className="size-3" />
+            <span>{t('上传中')}</span>
+          </AttachmentDescription>
+        )}
       </AttachmentContent>
-      {uploading && <span className={PENDING_BADGE_CLS}>{t('上传中')}</span>}
     </>
   );
 }
