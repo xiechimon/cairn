@@ -301,6 +301,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: node --test scripts/dispatch-agent.test.mjs scripts/dispatch-dedupe.test.mjs scripts/lane-model-policy.test.mjs
 
+      - name: UI debt ledger only shrinks against main
+        if: ${{ !cancelled() }}
+        run: node --test scripts/ui-debt-gate.test.mjs
+
       - name: Gardener sweep self-test (#1617)
         if: ${{ !cancelled() }}
         run: node --test scripts/gardener-ratchet.test.mjs scripts/gardener-weekly.test.mjs scripts/doc-drift.test.mjs scripts/evidence-prune.test.mjs scripts/delivery-metrics.test.mjs
