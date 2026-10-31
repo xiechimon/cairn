@@ -48,13 +48,15 @@ export function TaskMetaBlock({ meta, now }: { meta: TaskMetaFields; now: number
     rows.push({
       label: t('分支 / PR'),
       content: (
-        <>
-          {meta.branch != null && <code className={CODE_PILL_CLS}>{meta.branch}</code>}
+        <span className="flex min-w-0 items-center gap-2">
+          {meta.branch != null && (
+            <code className={`${CODE_PILL_CLS} min-w-0 truncate`} title={meta.branch}>
+              {meta.branch}
+            </code>
+          )}
           {meta.pr != null && (
             <a
-              className={`text-(--chip-plan-fg) no-underline hover:underline${
-                meta.branch != null ? ' ml-2' : ''
-              }`}
+              className="flex-none text-(--chip-plan-fg) no-underline hover:underline"
               href={meta.pr.url}
               target="_blank"
               rel="noopener noreferrer"
@@ -62,7 +64,7 @@ export function TaskMetaBlock({ meta, now }: { meta: TaskMetaFields; now: number
               #{meta.pr.number}
             </a>
           )}
-        </>
+        </span>
       ),
     });
   }

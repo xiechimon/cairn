@@ -2,7 +2,7 @@ import { useAgentAvatarUrlById, useLiveData } from '../api/provider.js';
 import { ProjectAvatar } from '../board/project-avatar.js';
 import { Button } from '../components/ui/button.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
-import { AGENT_MODEL_LINE, PROJECT_NAME } from '../fixtures/fixtures.js';
+import { AGENT_MODEL, PROJECT_NAME } from '../fixtures/fixtures.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { Settings } from '../icons/index.js';
@@ -15,9 +15,8 @@ export function ChipPopover({ todo, projectName, agentModel, onEditAssign }: Chi
   const { t } = useI18n();
   const { user, live } = useLiveData();
   const project = live ? projectName : PROJECT_NAME;
-  const modelLine = live
-    ? agentModel && `${agentModel.modelId} · ${agentModel.thinkingLevel ?? t('默认')}`
-    : AGENT_MODEL_LINE;
+  const model = live ? agentModel : AGENT_MODEL;
+  const modelLine = model && `${model.modelId} · ${model.thinkingLevel ?? t('默认')}`;
   const agentAvatarUrl = useAgentAvatarUrlById();
   return (
     <div className="chip-popover flex w-72 flex-col gap-1 text-left">

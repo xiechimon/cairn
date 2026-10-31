@@ -51,7 +51,7 @@ export function Specimen({
   title: string;
   note?: string;
   code?: string;
-  stage?: 'card' | 'canvas';
+  stage?: 'card' | 'canvas' | 'sheet';
   className?: string;
   children: ReactNode;
 }) {
@@ -65,6 +65,7 @@ export function Specimen({
         className={cn(
           'flex flex-wrap items-stretch gap-x-8 gap-y-6 px-6 py-7',
           stage === 'canvas' && 'bg-canvas',
+          stage === 'sheet' && 'bg-background',
           className,
         )}
       >

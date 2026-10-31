@@ -40,6 +40,12 @@
   --color-project-tile-4: var(--project-tile-4);
   --color-project-tile-5: var(--project-tile-5);
   --color-project-tile-6: var(--project-tile-6);
+  --color-project-ink-1: var(--project-ink-1);
+  --color-project-ink-2: var(--project-ink-2);
+  --color-project-ink-3: var(--project-ink-3);
+  --color-project-ink-4: var(--project-ink-4);
+  --color-project-ink-5: var(--project-ink-5);
+  --color-project-ink-6: var(--project-ink-6);
   --color-pebble-waiting: var(--pebble-waiting);
   --color-pebble-review: var(--pebble-review);
   --color-pebble-working: var(--pebble-working);
@@ -135,8 +141,8 @@
   --radius-card: 14px;
   --cds-radius-xl: 12px;
   --cds-radius-2xl: 16px;
-  --radius-popover: 18px;
-  --menu-pad: 6px;
+  --radius-popover: 12px;
+  --menu-pad: 4px;
   --focus-field-border: var(--focus-ring);
   --focus-halo: color-mix(in srgb, var(--focus-ring) 22%, transparent);
   --danger-halo: color-mix(in srgb, var(--destructive) 20%, transparent);
@@ -213,8 +219,8 @@
 
   --top: inset 0 1px 0 rgb(255 255 255 / 0.05);
   --cds-shadow-sm: 0 1px 0 rgb(0 0 0 / 0.25), 0 1px 3px rgb(0 0 0 / 0.3);
-  --cds-shadow-md: 0 10px 30px rgb(0 0 0 / 0.5), 0 2px 8px rgb(0 0 0 / 0.3), var(--top);
-  --cds-shadow-lg: 0 18px 44px rgb(0 0 0 / 0.5), 0 3px 8px rgb(0 0 0 / 0.3), var(--top);
+  --cds-shadow-md: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px rgb(0 0 0 / 0.32), var(--top);
+  --cds-shadow-lg: 0 2px 4px rgb(0 0 0 / 0.3), 0 16px 40px rgb(0 0 0 / 0.4), var(--top);
   --elevated-ring: var(--ring-inset-highlight);
   --panel-shadow-hover: 0 0 0 1px var(--border-soft), 0 6px 18px -2px rgb(0 0 0 / 0.35);
   --shadow-composer: 0 1px 0 rgb(0 0 0 / 0.25), inset 0 0 0 var(--hairline) var(--input);
@@ -319,6 +325,12 @@
   --project-tile-4: #9a7cad;
   --project-tile-5: #5fa3a0;
   --project-tile-6: #b77f8a;
+  --project-ink-1: color-mix(in oklab, var(--project-tile-1), white 40%);
+  --project-ink-2: color-mix(in oklab, var(--project-tile-2), white 40%);
+  --project-ink-3: color-mix(in oklab, var(--project-tile-3), white 40%);
+  --project-ink-4: color-mix(in oklab, var(--project-tile-4), white 40%);
+  --project-ink-5: color-mix(in oklab, var(--project-tile-5), white 40%);
+  --project-ink-6: color-mix(in oklab, var(--project-tile-6), white 40%);
   --pebble-waiting: #e0a838;
   --pebble-review: #7fa3cc;
   --pebble-working: #82b46f;
@@ -342,8 +354,11 @@
 .light {
   --top: inset 0 1px 0 rgb(255 255 255 / 0);
   --cds-shadow-sm: 0 1px 0 rgb(29 35 31 / 0.04), 0 1px 2px rgb(29 35 31 / 0.06);
-  --cds-shadow-md: 0 12px 32px rgb(29 35 31 / 0.12), 0 2px 6px rgb(29 35 31 / 0.06);
-  --cds-shadow-lg: 0 18px 44px rgb(29 35 31 / 0.16), 0 3px 8px rgb(29 35 31 / 0.07);
+  --cds-shadow-md:
+    0 1px 1px rgb(29 35 31 / 0.04), 0 3px 9px rgb(29 35 31 / 0.05), 0 8px 20px rgb(29 35 31 / 0.06);
+  --cds-shadow-lg:
+    0 1px 1px rgb(29 35 31 / 0.04), 0 6px 24px rgb(29 35 31 / 0.08),
+    0 12px 48px rgb(29 35 31 / 0.08);
   --elevated-ring: var(--border);
   --panel-shadow-hover: 0 0 0 1px var(--input), 0 6px 16px -2px rgb(29 35 31 / 0.1);
   --shadow-composer:
@@ -450,6 +465,12 @@
   --project-tile-4: #7a5b8e;
   --project-tile-5: #3d7c7a;
   --project-tile-6: #8a5560;
+  --project-ink-1: var(--project-tile-1);
+  --project-ink-2: var(--project-tile-2);
+  --project-ink-3: var(--project-tile-3);
+  --project-ink-4: var(--project-tile-4);
+  --project-ink-5: var(--project-tile-5);
+  --project-ink-6: var(--project-tile-6);
   --pebble-waiting: #d49a1c;
   --pebble-review: #5379a0;
   --pebble-working: #5f8f4f;
