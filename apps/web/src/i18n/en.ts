@@ -274,6 +274,12 @@ export const EN: Record<string, string> = {
 
   // —— ⌘K search panel (r7 05/05b, r2 §8.4) ——
   '搜索任务、项目、成员…': 'Search todos, projects, members…',
+  这个任务: 'This task',
+  '输入命令或搜索…': 'Type a command or search…',
+  移动: 'Move',
+  移除上下文: 'Drop context',
+  '更多操作…': 'More actions…',
+  '编辑分配…': 'Edit assignment…',
   前往: 'Go to',
   团队: 'Team',
   '没有与“{q}”匹配的结果': 'No results matching “{q}”',

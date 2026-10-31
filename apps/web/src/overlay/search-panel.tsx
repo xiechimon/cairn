@@ -1,20 +1,17 @@
 import type { SearchResponse } from '@cairn/shared';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { useProjects } from '../api/hooks.js';
 import { useAgentAvatarUrlById, useLiveData } from '../api/provider.js';
+import { ProjectAvatar } from '../board/project-avatar.js';
 import { relativeTime } from '../board/rel-time.js';
 import { StatusGlyph } from '../components/status-glyph.js';
 import { Button } from '../components/ui/button.js';
-import {
-  DIALOG_FACE,
-  DialogShell,
-  PICKER_ROW_SELECTED,
-  VIEWPORT_POP_ANIM,
-} from '../components/ui/dialog-shell.js';
+import { DIALOG_FACE, DialogShell, VIEWPORT_POP_ANIM } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
+import { Kbd } from '../components/ui/kbd.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
-import { PROJECT_ID, PROJECT_INITIAL, PROJECT_NAME } from '../fixtures/fixtures.js';
+import { PROJECT_ID, PROJECT_NAME } from '../fixtures/fixtures.js';
 import type { AgentRef, FixtureSet, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import {
@@ -28,6 +25,7 @@ import {
   Search,
   Server,
   Users,
+  X,
 } from '../icons/index.js';
 import { PHASE_STATUS, PHASE_UI } from '../phase.js';
 
@@ -44,18 +42,31 @@ const NAV_ROWS = [
 ];
 
 const ROW_BASE =
-  'flex h-10 w-full cursor-pointer items-center justify-start gap-4 whitespace-normal rounded-md border-none bg-transparent pl-4 pr-2 text-left text-ui font-normal text-content-secondary hover:text-content-secondary active:not-aria-[haspopup]:translate-y-0 [&>svg]:flex-none [&>svg]:text-content-tertiary';
+  'flex h-8 w-full cursor-pointer items-center justify-start gap-2.5 rounded-(--radius-menu-item) border-none bg-transparent px-2.5 text-left text-ui font-normal text-foreground hover:text-foreground active:not-aria-[haspopup]:translate-y-0 [&>svg]:flex-none [&>svg:not([data-glyph])]:text-content-tertiary';
 
-const ROW_RESULT = 'gap-3 pl-2';
+const ROW_LIT = 'bg-(--menu-hover) hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)';
 
 function rowLitClasses(selected: boolean, kbd: boolean): string {
-  if (selected) return PICKER_ROW_SELECTED;
+  if (selected) return ROW_LIT;
   if (kbd) return 'hover:bg-transparent dark:hover:bg-transparent';
-  return 'hover:bg-card hover:shadow-xs hover:ring-1 hover:ring-border dark:hover:bg-card';
+  return 'hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)';
 }
 
-const ROW_ICON =
-  'flex size-7 flex-none items-center justify-center rounded-md bg-(--row-icon-bg) text-content-tertiary';
+const GROUP_LABEL = 'px-2.5 pt-2 pb-1 text-caption font-medium text-content-tertiary';
+const ROW_END = 'ml-auto flex flex-none items-center gap-1.5 pl-3 text-meta text-content-tertiary';
+
+export interface SearchCommand {
+  id: string;
+  label: string;
+  icon: ReactNode;
+  run: () => void;
+}
+
+export interface SearchContext {
+  seqNum: number;
+  title: string;
+  commands: SearchCommand[];
+}
 
 interface SearchPanelProps {
   fixture: FixtureSet;
@@ -64,6 +75,7 @@ interface SearchPanelProps {
   open: boolean;
   onClose: () => void;
   server?: SearchResponse;
+  context?: SearchContext;
 }
 
 interface TodoRowItem {
@@ -87,7 +99,6 @@ interface ProjectRowItem {
 
 function TodoRow({
   todo,
-  now,
   selected,
   kbd,
   index,
@@ -95,7 +106,6 @@ function TodoRow({
   projectName,
 }: {
   todo: TodoRowItem;
-  now: number;
   selected: boolean;
   kbd: boolean;
   index: number;
@@ -103,7 +113,6 @@ function TodoRow({
   projectName?: string;
 }) {
   const { t } = useI18n();
-  const ui = PHASE_UI[todo.phase];
   const { glyph, ink } = PHASE_STATUS[todo.phase];
   return (
     <Button
@@ -112,24 +121,18 @@ function TodoRow({
       data-row-index={index}
       data-selected={selected ? '' : undefined}
       onClick={onActivate}
-      className={`${ROW_BASE} ${ROW_RESULT} ${rowLitClasses(selected, kbd)}`}
+      className={`${ROW_BASE} ${rowLitClasses(selected, kbd)}`}
     >
-      <span className={ROW_ICON}>
-        <StatusGlyph kind={glyph} className={`size-4 ${ink}`} />
-      </span>
-      <span className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate leading-5 text-foreground">
-          <span className="text-content-tertiary tabular-nums">#{todo.seqNum}</span> {todo.title}
-        </span>
-        <span className="truncate text-meta text-content-tertiary">
-          <span className={ink} data-tone={ui.tone}>
-            {t(ui.chip)}
-          </span>
-          {projectName !== undefined && ` · ${projectName}`}
-        </span>
-      </span>
-      <span className="ml-auto flex-none text-meta text-content-tertiary tabular-nums">
-        {relativeTime(todo.phaseAt, now, t)}
+      <StatusGlyph kind={glyph} label={t(PHASE_UI[todo.phase].chip)} className={ink} />
+      <span className="min-w-0 truncate">{todo.title}</span>
+      <span className={ROW_END}>
+        {projectName !== undefined && (
+          <>
+            <ProjectAvatar name={projectName} tone={0} />
+            <span className="max-w-32 truncate">{projectName}</span>
+          </>
+        )}
+        <span className="tabular-nums">#{todo.seqNum}</span>
       </span>
     </Button>
   );
@@ -148,7 +151,15 @@ function useSingleLitSurface(open: boolean) {
   }, [open]);
 }
 
-export function SearchPanel({ fixture, query, onQuery, open, onClose, server }: SearchPanelProps) {
+export function SearchPanel({
+  fixture,
+  query,
+  onQuery,
+  open,
+  onClose,
+  server,
+  context,
+}: SearchPanelProps) {
   const { t } = useI18n();
   const navigate = useNavigate();
   const { search } = useLocation();
@@ -209,21 +220,36 @@ export function SearchPanel({ fixture, query, onQuery, open, onClose, server }: 
               },
             ]
           : [];
-  const hitCount = todos.length + agents.length + projects.length;
-
-  const targets =
-    q === ''
-      ? NAV_ROWS.map((row) => row.href)
-      : [
-          ...todos.map((todo) => `/app/todo/${todo.id}`),
-          ...projects.map((project) => `/app/project/${project.id}`),
-          ...agents.map(() => '/app/team'),
-        ];
+  const [contextOn, setContextOn] = useState(true);
+  useEffect(() => {
+    if (open) setContextOn(true);
+  }, [open]);
+  const activeContext = contextOn ? context : undefined;
+  const commands =
+    activeContext?.commands.filter(
+      (command) => q === '' || command.label.toLowerCase().includes(q),
+    ) ?? [];
+  const hitCount = commands.length + todos.length + agents.length + projects.length;
 
   const go = (pathname: string) => {
     navigate({ pathname, search });
     onClose();
   };
+  const runCommand = (command: SearchCommand) => {
+    onClose();
+    command.run();
+  };
+  const actions: Array<() => void> = [
+    ...commands.map((command) => () => runCommand(command)),
+    ...(q === ''
+      ? NAV_ROWS.map((row) => () => go(row.href))
+      : [
+          ...todos.map((todo) => () => go(`/app/todo/${todo.id}`)),
+          ...projects.map((project) => () => go(`/app/project/${project.id}`)),
+          ...agents.map(() => () => go('/app/team')),
+        ]),
+  ];
+  const base = commands.length;
   const releaseCursor = () => setCursor(null);
 
   useEffect(() => {
@@ -248,7 +274,7 @@ export function SearchPanel({ fixture, query, onQuery, open, onClose, server }: 
       zIndex="var(--z-modal)"
     >
       <div
-        className={`search-panel fixed top-36.5 left-1/2 z-(--z-modal) flex h-110 w-130 max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-col overflow-hidden ${DIALOG_FACE} origin-top transition-[opacity,scale] group-data-closed/dlgvp:scale-[0.98] group-data-closed/dlgvp:opacity-0 motion-reduce:transition-none ${VIEWPORT_POP_ANIM}`}
+        className={`search-panel fixed top-36.5 left-1/2 z-(--z-modal) flex max-h-110 w-160 max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-col overflow-hidden ${DIALOG_FACE} origin-top transition-[opacity,scale] group-data-closed/dlgvp:scale-[0.98] group-data-closed/dlgvp:opacity-0 motion-reduce:transition-none ${VIEWPORT_POP_ANIM}`}
         role="dialog"
         aria-label={t('搜索')}
         onMouseEnter={releaseCursor}
@@ -259,141 +285,191 @@ export function SearchPanel({ fixture, query, onQuery, open, onClose, server }: 
             setCursor(null);
         }}
       >
-        <div className="flex h-10 flex-none items-center gap-2 border-b border-border px-4 text-content-tertiary">
-          <Search width={14} height={14} />
+        {activeContext != null && (
+          <div className="flex flex-none px-3.5 pt-3" data-testid="search-context">
+            <span className="inline-flex h-6 max-w-full items-center gap-1.5 rounded-(--cds-radius-md) bg-secondary pr-1 pl-2 text-meta text-content-secondary">
+              <span className="flex-none tabular-nums">#{activeContext.seqNum}</span>
+              <span className="truncate">{activeContext.title}</span>
+              <button
+                type="button"
+                aria-label={t('移除上下文')}
+                className="flex size-4.5 flex-none items-center justify-center rounded-sm text-content-tertiary hover:bg-(--menu-hover) hover:text-foreground"
+                onClick={() => setContextOn(false)}
+              >
+                <X width={12} height={12} />
+              </button>
+            </span>
+          </div>
+        )}
+        <div className="flex h-12 flex-none items-center gap-2.5 border-b border-border px-4 text-content-tertiary">
+          <Search width={16} height={16} />
           <Input
             ref={attachInput}
-            className="flex-1 h-auto border-none shadow-none ring-0 p-0 text-ui md:text-ui leading-4 rounded-none bg-transparent dark:bg-transparent text-foreground placeholder:text-content-tertiary focus-visible:border-transparent focus-visible:!ring-0 focus-visible:outline-none"
+            className="flex-1 h-auto border-none shadow-none ring-0 p-0 text-card-title md:text-card-title leading-5 rounded-none bg-transparent dark:bg-transparent text-foreground placeholder:text-content-tertiary focus-visible:border-transparent focus-visible:!ring-0 focus-visible:outline-none"
             value={query}
-            placeholder={t('搜索任务、项目、成员…')}
+            placeholder={t(activeContext != null ? '输入命令或搜索…' : '搜索任务、项目、成员…')}
             onChange={(event) => onQuery(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-                if (targets.length === 0) return;
+              if (event.key === 'Backspace' && query === '' && activeContext != null) {
+                event.preventDefault();
+                setContextOn(false);
+              } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                if (actions.length === 0) return;
                 event.preventDefault();
                 const step = event.key === 'ArrowDown' ? 1 : -1;
                 setCursor((prev) =>
                   prev == null
                     ? event.key === 'ArrowDown'
                       ? 0
-                      : targets.length - 1
-                    : (prev + step + targets.length) % targets.length,
+                      : actions.length - 1
+                    : (prev + step + actions.length) % actions.length,
                 );
               } else if (event.key === 'Enter' && cursor != null) {
-                const target = targets[cursor];
-                if (target == null) return;
+                const action = actions[cursor];
+                if (action == null) return;
                 event.preventDefault();
-                go(target);
+                action();
               }
             }}
           />
         </div>
-        {q === '' ? (
-          <div className="flex-1 overflow-y-auto px-2 pb-2" ref={listRef}>
-            <div className="px-2 pt-3 pb-1 text-caption text-content-tertiary">{t('前往')}</div>
-            {NAV_ROWS.map(({ label, Icon, href }, index) => (
-              <Button
-                variant="ghost"
-                key={label}
-                data-row-kind="nav"
-                data-row-index={index}
-                data-selected={cursor === index ? '' : undefined}
-                className={`${ROW_BASE} ${rowLitClasses(cursor === index, kbd)}`}
-                onClick={() => go(href)}
-              >
-                <Icon width={16} height={16} />
-                {t(label)}
-              </Button>
-            ))}
-          </div>
-        ) : hitCount === 0 ? (
+        {q !== '' && hitCount === 0 ? (
           <div className="px-4 py-6 text-ui text-content-tertiary">
             {t('没有与“{q}”匹配的结果', { q: query.trim() })}
           </div>
         ) : (
-          <div className="flex-1 overflow-y-auto px-2 pb-2" ref={listRef}>
-            {todos.length > 0 && (
+          <div className="min-h-0 flex-1 overflow-y-auto px-1.5 pt-1 pb-1.5" ref={listRef}>
+            {commands.length > 0 && (
               <>
-                <div className="px-2 pt-3 pb-1 text-caption text-content-tertiary">{t('任务')}</div>
-                {todos.map((todo, index) => (
-                  <TodoRow
-                    key={todo.id}
-                    todo={todo}
-                    now={fixture.now}
-                    selected={cursor === index}
-                    kbd={kbd}
-                    index={index}
-                    onActivate={() => go(`/app/todo/${todo.id}`)}
-                    projectName={useServer ? todo.projectName : clientProjectName(todo.projectId)}
-                  />
-                ))}
-              </>
-            )}
-            {projects.length > 0 && (
-              <>
-                <div className="px-2 pt-3 pb-1 text-caption text-content-tertiary">{t('项目')}</div>
-                {projects.map((project, index) => (
+                <div className={GROUP_LABEL}>{t('这个任务')}</div>
+                {commands.map((command, index) => (
                   <Button
                     variant="ghost"
-                    key={project.id}
-                    data-row-kind="project"
-                    data-row-index={todos.length + index}
-                    data-selected={cursor === todos.length + index ? '' : undefined}
-                    className={`${ROW_BASE} ${ROW_RESULT} ${rowLitClasses(
-                      cursor === todos.length + index,
-                      kbd,
-                    )}`}
-                    onClick={() => go(`/app/project/${project.id}`)}
+                    key={command.id}
+                    data-row-kind="command"
+                    data-row-index={index}
+                    data-selected={cursor === index ? '' : undefined}
+                    className={`${ROW_BASE} ${rowLitClasses(cursor === index, kbd)}`}
+                    onClick={() => runCommand(command)}
                   >
-                    <span
-                      className={`${ROW_ICON} bg-(--project-avatar-bg) text-caption font-medium text-(--project-avatar-fg)`}
-                    >
-                      {project.name.charAt(0).toLowerCase() || PROJECT_INITIAL}
-                    </span>
-                    <span className="flex min-w-0 flex-1 flex-col">
-                      <span className="truncate text-foreground">{project.name}</span>
-                    </span>
+                    {command.icon}
+                    {command.label}
                   </Button>
                 ))}
               </>
             )}
-            {agents.length > 0 && (
+            {q === '' ? (
               <>
-                <div className="px-2 pt-3 pb-1 text-caption text-content-tertiary uppercase">
-                  Agents
-                </div>
-                {agents.map((agent, index) => {
-                  const rowIndex = todos.length + projects.length + index;
-                  return (
-                    <Button
-                      variant="ghost"
-                      key={agent.id}
-                      data-row-kind="agent"
-                      data-row-index={rowIndex}
-                      data-selected={cursor === rowIndex ? '' : undefined}
-                      className={`${ROW_BASE} ${ROW_RESULT} ${rowLitClasses(cursor === rowIndex, kbd)}`}
-                      onClick={() => go('/app/team')}
-                    >
-                      <span
-                        className={`${ROW_ICON} bg-transparent [&_img]:size-4 [&_img]:rounded-full`}
-                      >
-                        <SeededAvatar
-                          className="size-4"
-                          name={agent.displayName}
-                          src={agent.avatarUrl}
-                          fallback="/avatar-robot-1.svg"
-                        />
-                      </span>
-                      <span className="flex min-w-0 flex-1 flex-col">
-                        <span className="truncate text-foreground">{agent.displayName}</span>
-                      </span>
-                    </Button>
-                  );
-                })}
+                <div className={GROUP_LABEL}>{t('前往')}</div>
+                {NAV_ROWS.map(({ label, Icon, href }, index) => (
+                  <Button
+                    variant="ghost"
+                    key={label}
+                    data-row-kind="nav"
+                    data-row-index={base + index}
+                    data-selected={cursor === base + index ? '' : undefined}
+                    className={`${ROW_BASE} ${rowLitClasses(cursor === base + index, kbd)}`}
+                    onClick={() => go(href)}
+                  >
+                    <Icon width={15} height={15} />
+                    {t(label)}
+                  </Button>
+                ))}
+              </>
+            ) : (
+              <>
+                {todos.length > 0 && (
+                  <>
+                    <div className={GROUP_LABEL}>{t('任务')}</div>
+                    {todos.map((todo, index) => (
+                      <TodoRow
+                        key={todo.id}
+                        todo={todo}
+                        selected={cursor === base + index}
+                        kbd={kbd}
+                        index={base + index}
+                        onActivate={() => go(`/app/todo/${todo.id}`)}
+                        projectName={
+                          useServer ? todo.projectName : clientProjectName(todo.projectId)
+                        }
+                      />
+                    ))}
+                  </>
+                )}
+                {projects.length > 0 && (
+                  <>
+                    <div className={GROUP_LABEL}>{t('项目')}</div>
+                    {projects.map((project, index) => {
+                      const rowIndex = base + todos.length + index;
+                      return (
+                        <Button
+                          variant="ghost"
+                          key={project.id}
+                          data-row-kind="project"
+                          data-row-index={rowIndex}
+                          data-selected={cursor === rowIndex ? '' : undefined}
+                          className={`${ROW_BASE} ${rowLitClasses(cursor === rowIndex, kbd)}`}
+                          onClick={() => go(`/app/project/${project.id}`)}
+                        >
+                          <ProjectAvatar name={project.name} tone={0} />
+                          <span className="truncate">{project.name}</span>
+                        </Button>
+                      );
+                    })}
+                  </>
+                )}
+                {agents.length > 0 && (
+                  <>
+                    <div className={GROUP_LABEL}>Agents</div>
+                    {agents.map((agent, index) => {
+                      const rowIndex = base + todos.length + projects.length + index;
+                      return (
+                        <Button
+                          variant="ghost"
+                          key={agent.id}
+                          data-row-kind="agent"
+                          data-row-index={rowIndex}
+                          data-selected={cursor === rowIndex ? '' : undefined}
+                          className={`${ROW_BASE} ${rowLitClasses(cursor === rowIndex, kbd)}`}
+                          onClick={() => go('/app/team')}
+                        >
+                          <SeededAvatar
+                            className="size-4.5 flex-none"
+                            name={agent.displayName}
+                            src={agent.avatarUrl}
+                            fallback="/avatar-robot-1.svg"
+                          />
+                          <span className="truncate">{agent.displayName}</span>
+                        </Button>
+                      );
+                    })}
+                  </>
+                )}
               </>
             )}
           </div>
         )}
+        <div className="flex h-9 flex-none items-center gap-4 border-t border-border px-3.5 text-caption text-content-tertiary">
+          <span className="flex items-center gap-1.5">
+            <Kbd>↑</Kbd>
+            <Kbd>↓</Kbd>
+            {t('移动')}
+          </span>
+          <span className="flex items-center gap-1.5">
+            <Kbd>↵</Kbd>
+            {t('打开')}
+          </span>
+          {activeContext != null && (
+            <span className="flex items-center gap-1.5">
+              <Kbd>⌫</Kbd>
+              {t('移除上下文')}
+            </span>
+          )}
+          <span className="ml-auto flex items-center gap-1.5">
+            <Kbd>Esc</Kbd>
+            {t('关闭')}
+          </span>
+        </div>
       </div>
     </DialogShell>
   );
