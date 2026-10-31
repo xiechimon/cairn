@@ -7,6 +7,7 @@ import {
   PICKER_ROW_SELECTED,
 } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
+import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { useI18n } from '../i18n/provider.js';
 import {
   ChevronLeft,
@@ -379,9 +380,11 @@ export function MentionInline({
             onClick={() => onPick(row)}
           >
             {row.kind === 'agent' ? (
-              <span className="inline-flex size-6 flex-none items-center justify-center rounded-full bg-(--surface-tertiary) text-caption font-semibold text-foreground">
-                {row.label.charAt(0).toLowerCase()}
-              </span>
+              <SeededAvatar
+                name={row.label}
+                fallback="/avatar-robot-1.svg"
+                className="size-6 flex-none"
+              />
             ) : (
               <span className="inline-flex size-6 flex-none items-center justify-center rounded-full bg-(--surface-tertiary) text-caption font-semibold text-foreground">
                 <InlineKindIcon kind={row.kind} />
