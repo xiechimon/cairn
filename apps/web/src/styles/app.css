@@ -16,17 +16,21 @@
   --font-mono: var(--font-mono);
   --font-heading: var(--font-display);
   --text-page: var(--type-page);
-  --text-page--line-height: calc(24 / 18);
+  --text-page--line-height: calc(26 / 20);
+  --text-greeting: var(--type-greeting);
+  --text-greeting--line-height: calc(32 / 26);
+  --font-weight-title: var(--title-weight);
+  --font-weight-normal: 450;
   --text-heading: var(--type-heading);
-  --text-heading--line-height: calc(22 / 16);
+  --text-heading--line-height: calc(24 / 17);
   --text-card-title: var(--type-card-title);
   --text-card-title--line-height: 1.5;
   --text-ui: var(--type-ui);
-  --text-ui--line-height: calc(20 / 13.5);
+  --text-ui--line-height: calc(20 / 14);
   --text-meta: var(--type-meta);
-  --text-meta--line-height: calc(16 / 12);
+  --text-meta--line-height: calc(18 / 12.5);
   --text-caption: var(--type-caption);
-  --text-caption--line-height: calc(16 / 11.5);
+  --text-caption--line-height: calc(16 / 12);
 }
 
 @layer base {
@@ -41,7 +45,7 @@
     color: var(--foreground);
     font-family: var(--font-sans);
     font-size: 14px;
-    font-weight: 400;
+    font-weight: 450;
     line-height: 1.5;
     text-autospace: normal;
     -webkit-font-smoothing: antialiased;
@@ -244,6 +248,29 @@
     border-color: var(--focus-field-border);
     box-shadow: 0 0 0 3px var(--focus-halo);
   }
+
+  :root
+    :is(
+      [data-slot="input"],
+      [data-slot="textarea"],
+      [data-slot="select-trigger"]
+    )[aria-invalid="true"],
+  :root [data-slot="input-group"]:has([aria-invalid="true"]) {
+    border-color: var(--destructive);
+    box-shadow: none;
+  }
+
+  :root
+    :is(
+      [data-slot="input"],
+      [data-slot="textarea"],
+      [data-slot="select-trigger"]
+    )[aria-invalid="true"]:focus-visible,
+  :root [data-slot="input-group"]:has([aria-invalid="true"]:focus-visible) {
+    outline: none;
+    border-color: var(--destructive);
+    box-shadow: 0 0 0 3px var(--danger-halo);
+  }
 }
 
 [data-slot="kbd"]:not([data-slot="tooltip-content"] *) {
@@ -315,6 +342,27 @@
 
 @utility above-chief-launcher {
   bottom: calc(var(--chief-launcher-clearance) + var(--chief-launcher-inset));
+}
+
+@keyframes spiral-trace {
+  from {
+    stroke-dashoffset: 1;
+  }
+  50% {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -1;
+  }
+}
+
+@utility spiral-trace {
+  stroke-dasharray: 1 1;
+  animation: spiral-trace 2.8s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+  @media (prefers-reduced-motion: reduce) {
+    stroke-dasharray: none;
+    animation: none;
+  }
 }
 
 @keyframes shimmer-sweep {

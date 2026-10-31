@@ -207,7 +207,7 @@ export function MentionPicker({ open, onClose, onInsert, groups }: MentionPicker
               <ChevronLeft width={14} height={14} />
             </Button>
           ) : null}
-          <div className="flex-1 font-heading text-heading font-medium text-foreground">
+          <div className="flex-1 font-heading text-heading font-title text-foreground">
             {layer === 'top' ? t('提及') : `${labelFor(t, layer)} · ${counts[layer]}`}
           </div>
           <Button

@@ -110,7 +110,7 @@ export function ChiefSettings({
         >
           <ChevronLeft width={16} height={16} />
         </Button>
-        <h1 className="min-w-0 truncate font-heading text-page font-medium text-foreground">
+        <h1 className="min-w-0 truncate font-heading text-page font-title text-foreground">
           {t('总管设置')}
         </h1>
       </header>

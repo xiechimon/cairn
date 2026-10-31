@@ -158,7 +158,9 @@ test.describe('#1244 registry focus: outline on buttons, field ring on text fiel
     expectFieldRing(await readFocus(input));
   });
 
-  test('aria-invalid keeps a 3px destructive shadow and the global outline', async ({ page }) => {
+  test('aria-invalid focus draws a destructive border and a 3px danger halo, no outline', async ({
+    page,
+  }) => {
     await themed(page, 'dark', AGENT);
     await page.getByRole('button', { name: '创建 Agent' }).click();
     const input = page.locator('#dlg-agent-name');
@@ -166,10 +168,20 @@ test.describe('#1244 registry focus: outline on buttons, field ring on text fiel
     await input.evaluate((el) => el.setAttribute('aria-invalid', 'true'));
     await settleTransitions(page);
     const info = await readFocus(input);
-    expect(info.outlineStyle).toBe('solid');
-    expect(info.outlineWidth).toBe('2px');
-    expect(info.outlineColor).toBe(hexToRgb(info.focusRing));
-    expect(info.boxShadow).toContain('0px 0px 0px 3px');
+    const probes = await page.evaluate(() => {
+      const read = (value: string) => {
+        const probe = document.createElement('div');
+        probe.style.color = value;
+        document.body.append(probe);
+        const out = getComputedStyle(probe).color;
+        probe.remove();
+        return out;
+      };
+      return { destructive: read('var(--destructive)'), halo: read('var(--danger-halo)') };
+    });
+    expect(info.outlineStyle).toBe('none');
+    expect(info.borderTopColor).toBe(probes.destructive);
+    expect(info.boxShadow).toBe(`${probes.halo} 0px 0px 0px 3px`);
   });
 
   test('checkbox, switch, and badge use the global outline', async ({ page }) => {

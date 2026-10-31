@@ -41,7 +41,7 @@ test.describe('drawer robot row identity chip (fixture, #741 gap 1)', () => {
     const fontSize = await chip
       .getByText('r3-builder')
       .evaluate((el) => getComputedStyle(el).fontSize);
-    expect(fontSize).toBe('12px');
+    expect(fontSize).toBe('12.5px');
   });
 
   test('F-E9: hover only changes the cursor, invents no background state (reference-site canon)', async ({ page }) => {

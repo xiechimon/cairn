@@ -14,11 +14,11 @@ import {
   SettingsCard,
   SettingsRow,
 } from '../components/settings-list.js';
+import { ToggleSwitch } from '../components/toggle-switch.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
 import { Spinner } from '../components/ui/spinner.js';
-import { Switch } from '../components/ui/switch.js';
 import { toastError } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
 
@@ -90,7 +90,7 @@ export function ProjectAutonomyCard({ projectId, teamId }: { projectId: string; 
             'issue 进料、园丁等后台任务开一轮前先过这道闸；下面的分钟数或预算填 0 = 关掉那一道。',
           )}
         >
-          <Switch
+          <ToggleSwitch
             aria-label={t('允许后台自动开跑')}
             checked={settings.enabled}
             disabled={mutations.patchAutonomy.isPending}

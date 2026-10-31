@@ -16,7 +16,7 @@ colors:
   ink-2: '#4b534d'         # secondary text (nav, buttons, descriptions)
   ink-3: '#5f665f'         # meta information (project, time, counts)
   ink-4: '#a8aea6'         # decorative icons only, never text
-  icon: '#7b827c'          # icons with a text label
+  icon: '#5f665f'          # icons with a text label
   accent: '#9a6500'        # ochre (--card-button): waiting on you, action links, count badges
   primary: '#233127'       # primary button: deep lichen ink
   on-primary: '#f4f6f1'
@@ -43,7 +43,7 @@ colors-dark:
   ink-2: '#b4bab3'
   ink-3: '#959c96'
   ink-4: '#5d655f'         # decorative icons only, never text
-  icon: '#858c86'
+  icon: '#959c96'
   accent: '#ebb550'        # ochre brightened; text on it is dark ochre, not white
   primary: '#e6e8e2'       # primary button is limestone in dark
   on-primary: '#161a17'
@@ -57,13 +57,14 @@ colors-dark:
   running-track: '#2e3430'
   project-tiles: ['#6f9c5f', '#b98a57', '#6f93bb', '#9a7cad', '#5fa3a0', '#b77f8a']
 typography:
-  page-title:   { fontFamily: display, fontSize: 18px, fontWeight: '650' }
-  heading:      { fontFamily: display, fontSize: 16px, fontWeight: '650' }
-  brand:        { fontFamily: display, fontSize: 16px, fontWeight: '650' }
+  greeting:     { fontFamily: display, fontSize: 26px, fontWeight: '650' }
+  page-title:   { fontFamily: display, fontSize: 20px, fontWeight: '650' }
+  heading:      { fontFamily: display, fontSize: 17px, fontWeight: '650' }
+  brand:        { fontFamily: display, fontSize: 20px, fontWeight: '650' }
   card-title:   { fontFamily: sans, fontSize: 14px, fontWeight: '600', lineHeight: '1.5' }
-  ui:           { fontFamily: sans, fontSize: 13.5px, fontWeight: '400' }
-  meta:         { fontFamily: sans, fontSize: 12px, fontWeight: '400' }
-  caption:      { fontFamily: sans, fontSize: 11.5px, fontWeight: '500' }
+  ui:           { fontFamily: sans, fontSize: 14px, fontWeight: '450' }
+  meta:         { fontFamily: sans, fontSize: 12.5px, fontWeight: '450' }
+  caption:      { fontFamily: sans, fontSize: 12px, fontWeight: '500' }
   code:         { fontFamily: mono, fontSize: 12px, fontWeight: '400' }
 fonts:
   display: var(--font-display)   # Bricolage Grotesque → sans
@@ -109,8 +110,8 @@ Direction A, **Cairn**: a cairn is a pile of stones that marks a trail for the n
 - **Borders are always 1 CSS pixel**: the main panel, task cards, the active nav item, and the new-task button stay 1px on high-density screens too (they do not follow `--hairline` down to 0.5px); borders must be visible.
 - **Three-tier shadow ladder** (#1428): `--e1` cards and rows, `--e2` menus and floating surfaces, `--e3` dialogs and floating windows. Each tier carries its own 1px ring at the end (`--e1` uses `line`; `--e2`/`--e3` use `--elevated-ring`, which is `line` in light and `--ring-inset-highlight` in dark, where `line` is invisible on the surface base). Light shadows are tinted ink (`rgb(29 35 31 / a)`) rather than neutral black so they sit in the paper, and no extra border is drawn on the surface; surfaces that draw their own `--edge-ring` (the notification strip, the chief window, the FAB) take the pool of the same tier: `--cds-shadow-sm` / `-md` / `-lg` — one ring per edge. Old slot names like `--panel-shadow` / `--shadow-popover` / `--dialog-shadow` are aliases; the hover / focus slots are states, not tiers.
 - **Four ink steps**: `ink` headings and body text; `ink-2` nav, buttons, descriptions; `ink-3` meta information; `ink-4` decorative icons only. The lightest text ever uses is `ink-3`.
-- **Contrast (light, measured, WCAG 2.x)**: on the card, `ink` is 15.71, `ink-2` 7.80, `ink-3` 5.80, `accent` 4.87, `running-text` 6.05, `destructive` 6.45; `icon` is 3.87 (the 3:1 non-text gate); `ink-3` on canvas is 4.75 and on `--secondary` (`#eceee8`) 5.06, `ink-2` there 6.79. White text on the `accent` background is 4.96; `on-primary` on `primary` is 12.53. White text on the six light project tiles measures 4.55–6.16. The running bar on its track is 3.45. Action links swap to `spot-text-on-tint` on the `accent-hover` background (6.84), because `accent` on it drops to 4.22. `ink-4` is decorative only.
-- **Focus ring**: `--focus-ring` is lichen `#3f6c35` in light (6.05 on the card) and `#9cc78b` in dark, so keyboard focus never reads as "waiting on you". Buttons, checkboxes, switches and badges draw it as a 2px outline 2px outside the box. Text fields (`Input`, `Textarea`, `SelectTrigger`, the `InputGroup` shell) turn their own border `--focus-ring` and add a 3px `--focus-halo` (the ring at 22%) instead, so the field reads as one shape, not a box inside a box.
+- **Contrast (light, measured, WCAG 2.x)**: on the card, `ink` is 15.71, `ink-2` 7.80, `ink-3` 5.80, `accent` 4.87, `running-text` 6.05, `destructive` 6.45; `icon` is 5.80, the same step as `ink-3`, so labelled icons read as solid as their text; `ink-3` on canvas is 4.75 and on `--secondary` (`#eceee8`) 5.06, `ink-2` there 6.79. White text on the `accent` background is 4.96; `on-primary` on `primary` is 12.53. White text on the six light project tiles measures 4.55–6.16. The running bar on its track is 3.45. Action links swap to `spot-text-on-tint` on the `accent-hover` background (6.84), because `accent` on it drops to 4.22. `ink-4` is decorative only.
+- **Focus ring**: `--focus-ring` is lichen `#3f6c35` in light (6.05 on the card) and `#9cc78b` in dark, so keyboard focus never reads as "waiting on you". Buttons, checkboxes, switches and badges draw it as a 2px outline 2px outside the box. Text fields (`Input`, `Textarea`, `SelectTrigger`, the `InputGroup` shell) turn their own border `--focus-ring` and add a 3px `--focus-halo` (the ring at 22%) instead, so the field reads as one shape, not a box inside a box. An invalid field (`aria-invalid`) shows one `destructive` 1px border at rest and, when focused, that border plus a 3px `--danger-halo` (destructive at 20%); it never stacks the green focus ring on top of the red border.
 - **Brand marks**: the spiral launcher disc uses `--fab-surface` `#2f5a2a` with the `--fab-mark` `#f4f6f1` spiral in both themes, the nearest stone-green to the Cairn app icon.
 - **Status chips use five distinct hues**: idle neutral, plan slate blue, confirm ochre, done lichen green, failed rust (`--chip-*-bg` / `--chip-*-fg`, every pair 5.5+ in light and 7.0+ in dark). Plan is deliberately not ochre: only "waiting on you" may look like the accent.
 - **Accent discipline**: `accent` is used only for: needs-your-attention states and counts, action links on cards, icons of the active nav item, and count-badge backgrounds. It is never decorative and never a large-area background.
@@ -122,9 +123,9 @@ Direction A, **Cairn**: a cairn is a pile of stones that marks a trail for the n
 
 - **Display face for titles**: Bricolage Grotesque (`--font-display`, the `font-heading` utility) for the brand name, page and pane titles, dialog titles and the Coordinator greeting, at 650 with -0.015em tracking. Chinese falls back to PingFang SC.
 - **Everything else is Instrument Sans** (`--font-sans`): thread titles, rows, navigation, buttons, meta. Chinese falls back to PingFang SC. Code, times, ids and counters use JetBrains Mono (`--font-mono`) with tabular numbers.
-- Fonts are self-hosted latin subsets in `public/fonts` (SIL OFL 1.1, licenses next to the files), loaded with `font-display: optional` and preloaded in `index.html`.
-- **Six font sizes, no seventh allowed**: 18 page title / 16 column headings and brand / 14 card title / 13.5 UI text / 12 meta / 11.5 badges and group labels. In code, use the corresponding Tailwind theme keys `text-page` / `text-heading` / `text-card-title` / `text-ui` / `text-meta` / `text-caption` (heading font `font-heading`), never arbitrary values like `text-[13px]`; `scripts/ui-debt-gate.mjs` D5 only allows the total count of arbitrary values to decrease.
-- **Four font weights**: 400 body text, 500 active items and captions, 600 card and row titles and count badges, 650 display titles. 700 is not used.
+- Fonts are self-hosted latin subsets in `public/fonts` (SIL OFL 1.1, licenses next to the files), loaded with `font-display: swap` and preloaded in `index.html` and `design.html`; the metric-matched fallbacks keep the swap from shifting layout.
+- **Six font sizes, no seventh allowed**: 26 Coordinator greeting / 20 page title and brand / 17 column and section headings / 14 card titles and UI text / 12.5 meta / 12 badges and group labels. In code, use the corresponding Tailwind theme keys `text-greeting` / `text-page` / `text-heading` / `text-card-title` and `text-ui` / `text-meta` / `text-caption` (heading font `font-heading`), never arbitrary values like `text-[13px]`; `scripts/ui-debt-gate.mjs` D5 only allows the total count of arbitrary values to decrease.
+- **Four font weights**: 450 body text (`font-normal` maps to 450, because Instrument Sans at 400 reads faint at 14px), 500 sidebar rows and captions, 600 card and row titles, the active nav row and count badges, 650 display titles (`font-title`, always paired with `font-heading`). 700 is not used.
 - The title of a completed task drops to 400 + `ink-3`, meaning "no longer needs to be read".
 
 ## Layout and spacing
@@ -138,7 +139,7 @@ Direction A, **Cairn**: a cairn is a pile of stones that marks a trail for the n
 
 - Icon library lucide (configured in `components.json`), stroke 1.75.
 - Sizes: meta 12, card actions and status 13, top-bar buttons 14, column headings 15, sidebar nav 16.
-- Colors: meta icons and collapse arrows use `ink-4` (`text-content-dim`); icons with a text label (sidebar nav, column headings) use `icon` (`text-icon`); pure-icon buttons without a text label (search, collapse sidebar, collapsed sidebar icons) use `ink-3`, preserving the 3:1 non-text contrast; icons of the active nav item and anything "needs you" use `accent`; running-related icons use `running`.
+- Colors: meta icons and collapse arrows use `ink-4` (`text-content-dim`); sidebar nav icons take their row's `ink`, 18px at stroke 1.75; other icons with a text label (column headings) use `icon` (`text-icon`); pure-icon buttons without a text label (search, collapse sidebar, collapsed sidebar icons) use `ink-3`, preserving the 3:1 non-text contrast; icons of the active nav item and anything "needs you" use `accent`; running-related icons use `running`.
 - Shapes: workbench = three columns (Columns3); collapse/expand sidebar = panel (PanelLeft, no arrow).
 - Column heading icons are fixed: `待开始` = dashed circle, `执行中` = pulse line, `待处理` = exclamation circle, `已完成` = check circle.
 
@@ -146,7 +147,7 @@ Direction A, **Cairn**: a cairn is a pile of stones that marks a trail for the n
 
 ### Sidebar (Grouped)
 From top to bottom:
-1. **Workspace row**: spiral mark (`public/logo-mark.svg` as a mask, 16px, taking the row ink `ink`) + display brand name + dropdown arrow; two icon buttons on the right: search (⌘K) and collapse sidebar.
+1. **Workspace row**: spiral mark (`public/logo-mark.svg` as a mask, 22px, taking the row ink `ink`) + display brand name at 20px + dropdown arrow; two icon buttons on the right: search (⌘K) and collapse sidebar.
 2. **New-task button**: see "Current shell and board surface" below. It is an action, not a nav item.
 3. **Work nav**: workbench, needs my attention (`accent` count badge on the right), schedules. Active item = `accent` icon.
 4. **Projects**: group label "Projects" + plus on the right; each project is one row = colored first-letter tile (colors taken in order from `project-tiles`) + name + unfinished count.
@@ -161,7 +162,7 @@ From top to bottom:
 - `card` surface, 14px corner (`--radius-card`), a `line` 1px hairline ring plus one very light ink shadow (`0 1px 2px`, 5% in light; together they are `--e1`), so the edge is crisp, never soft. On hover the ring deepens and the shadow rises to `0 6px 16px -2px` at 9% (150ms ease-out). No second large blur shadow.
 - In-flight orchestration (start was pressed, the chief has not dispatched yet): a todo card swaps `开始` for a footer `编排中 · reason` (waiting for X to come online / missing capability / queued) plus `查看会话` on the right; a failed card swaps `重试` for an inert `编排中`. Nothing is layered over the meta line.
 - A failed orchestration shows a short plain summary (`orchestrationErrorSummary`: connection dropped, timed out, out of quota, context too long, bad key, provider unavailable); the raw provider error stays in the `title` tooltip and never wraps character by character on the card.
-- Structure: title (at most two lines), then one meta line (project, #number, tag, time; never wraps; when space runs out the tag truncates first and the project keeps at least five characters), then a footer by status. The tag icon uses the user's tag color; the tag name uses the meta ink.
+- Structure: title (at most two lines), then one meta line (project, #number, tag, time; never wraps; when space runs out the tag truncates first and the project keeps at least five characters), then a footer by status. The tag icon uses the user's tag color; the tag name uses the meta ink. A standalone tag (`TagChip`) is a neutral outline pill (`card` background, `line` ring, `ink` text) with an 8px dot in the tag color; the tag color never fills the pill.
 - The right-side meta icons (plan, changes, chief-created, branch) stay hidden until the card is hovered or focused, and are always visible on touch screens (`pointer-coarse`).
 - Footer:
   - Three pending states: dashed divider + status icon and name (ochre) + reason (truncated) + an ochre action link on the right (retry / confirm plan / review).
@@ -188,7 +189,7 @@ See "Page patterns · Settings list" below.
 - The composer is a white card (`--card`) with a 1px `--input` ring that turns lichen with a soft halo on focus (`--shadow-composer*`); it is the one white surface in the conversation because it is where you act. The idle send button has no fill; only the stop button gets the `seg-active` square.
 
 ### Trace
-- Agent activity (tool calls, thinking, waiting) renders as Trace lines (`components/ui/trace.tsx`), never as hand-written rows. One line per action: optional icon, title, then a tabular-number description such as the duration.
+- Agent activity (tool calls, thinking, waiting) renders as Trace lines (`components/ui/trace.tsx`), never as hand-written rows. One line per action: optional icon, title, then a tabular-number description such as the duration. Every line is sans `text-meta` (12.5px) in `ink-2`; a command or tool name goes in an inline `font-mono text-caption` code span, never a mono line. Errors keep the line in `ink-2` and add a 500 `destructive` "Failed" label (and a `destructive` icon); the whole line never turns red. Pending lines use `ink-3`, not opacity. The live spinner is `running` green, because it means working, not waiting on you. The chief turn-tool panel uses a 1px `border` rule, the same weight as collapsible detail.
 - Status lives on the line: `running` sweeps the title with the `shimmer` utility (`app.css`, still under reduced motion), `error` turns the line `--destructive` and keeps a visible "failed" word, `pending` dims it to 60%.
 - Detail such as full thinking or tool output folds under its line with `TraceCollapsible`; the chevron sits after the title and the content hangs on a hairline left rule.
 - The chief turn panel is a Trace on `--secondary` with mono `text-caption` lines in `--text-tertiary`; agent rows in the task transcript use 12px `--text-dim` lines.
@@ -206,9 +207,9 @@ Pages like settings, resources, team, and project share the pieces below. A new 
 
 ### Empty state
 Piece: `EmptyState` in `src/components/empty-state.tsx` (the base is the registry `Empty`).
-- **Icon**: a lucide line icon, 24px, stroke 1.75, `ink-3` (`text-content-tertiary`), no background tile.
-- **Title**: `h2`, `text-card-title` 500 `ink`.
-- **Description**: `text-meta` `ink-3`, at most 320px wide (about 44ch), centered, `text-balance`.
+- **Icon**: a line icon, 32px, stroke 1.5, `icon` (`text-icon`), no background tile.
+- **Title**: `h2`, display `text-heading` 650 `ink`; the description below is `text-ui` `ink-2`.
+- **Description**: `text-ui` `ink-2`, at most 320px wide (about 44ch), centered, `text-balance`.
 - **Primary action** (optional): shadcn Button default tier, `primary` background, 32px, 8px corner (`DIALOG_PRIMARY_BUTTON`). An empty state has at most one primary action.
 - **Hint line** (optional): one `text-meta` `ink-3` line below the primary action, optionally preceded by a 12px icon (`ink-4`), explaining read-only or permission reasons.
 - **Used on**: list pages with no data (API keys, schedules, skills, MCP, keys…). The copy is translated by the caller before being passed in.
@@ -220,7 +221,7 @@ Pieces: `src/components/settings-list.tsx`. The account page's "edit name" heade
 - **One card** (`SettingsCard`): white background, `line` 1px outer ring, `--radius-card`; rows carry no background color (no two-tone cards).
 - **Row** (`SettingsRow`): minimum height 52px, 16px left and right; a `text-ui` `ink` label on the left (optionally with one `text-meta` `ink-3` description line), controls on the right. Rows with two-line content grow naturally. Custom rows that do not go through `SettingsRow` use `SETTINGS_ROW_CLS`.
 - **Dividers are drawn only between rendered rows**: `divide-y` on the card, rows rendered conditionally, never hidden with CSS. A hidden row is still a sibling node and would draw a second border at the top of the card.
-- **Controls are framed, one kind each**: dropdown = white background + `line` 1px ring + 8px radius + 32px tall (`SETTINGS_SELECT_TRIGGER_CLS`, the same string as the form's `FORM_CONTROL_CLS`); single-choice segmented = `SettingsSegmented` (i.e. `SegmentedRadio`, see "Segmented control" below); switch = shadcn Switch with ink on-state.
+- **Controls are framed, one kind each**: dropdown = white background + `line` 1px ring + 8px radius + 32px tall (`SETTINGS_SELECT_TRIGGER_CLS`, the same string as the form's `FORM_CONTROL_CLS`); single-choice segmented = `SettingsSegmented` (i.e. `SegmentedRadio`, see "Segmented control" below); switch = `ToggleSwitch` (`components/toggle-switch.tsx`, never the bare registry `Switch`): a 36×20 track, a 16px white thumb inset 2px with a soft shadow, `--switch-on` green when on (`#55833f` light, `#6fa35c` dark) and `--switch-off` stone when off.
 - **Danger zone** (`SettingsDangerZone`): a separate card at the very end of the page, one row: label + description on the left, a Button with `variant="destructive"` on the right, 32px with the standard 8px button corner. Clicking opens a confirm layer first; it never deletes directly.
 - Do: header + one card + equal-height rows. Do not: a large avatar occupying a row, rows with background tints, a rounded-pill delete button, or danger actions mixed into ordinary settings cards.
 
@@ -229,7 +230,7 @@ Piece: `src/components/form-layout.tsx` (the base is the registry `Field` family
 - **Stack** (`FormStack`): fields stacked vertically, 16px between fields, at most 520px wide, left-aligned.
 - **Field** (`FormField`): label on top (`text-ui` 500 `ink`, `htmlFor` pointing at the control), the control, and an optional help line (`text-meta` `ink-3`) below.
 - **Controls**: Input / SelectTrigger with `FORM_CONTROL_CLS`: 32px tall, white background, `line` 1px ring, 8px radius, `text-ui`.
-- **Action row** (`FormActions`): the last row of the form, right-aligned; an optional text button (such as `取消`) on the left, the shadcn Button default primary on the right. When the form cannot submit, the button's own `disabled` state paints it `secondary` with secondary ink at full opacity (`DIALOG_PRIMARY_BUTTON`); no separate gray bar.
+- **Action row** (`FormActions`): the last row of the form, right-aligned; an optional text button (such as `取消`) on the left, the shadcn Button default primary on the right. When the form cannot submit, the button's own `disabled` state paints it `secondary` with secondary ink at full opacity; every default (primary) Button disables this way, not only `DIALOG_PRIMARY_BUTTON`, so there is one disabled-primary look. Other tiers fade to half strength. No separate gray bar.
 - Do: a narrow column, labels on top, the primary button on the right. Do not: inputs spanning the whole column, full-width gray submit bars, or two-column forms with labels beside inputs.
 
 ### Segmented control
@@ -254,7 +255,7 @@ Pieces: `src/components/ui/dialog-shell.tsx` (`DialogShell` + the exported `DIAL
 - **Body**: the single scrolling box (`min-h-0`), with 20px left/right padding that also serves as room for the focus ring. The panel is capped at `100vh - 64px`; in short viewports the body scrolls and the foot stays on screen.
 - **Foot (split)**: a 12px `ink-3` hint or status on the left (`hint`: doc links, shortcuts, waiting states, page numbers), the action group on the right. The primary action is the shadcn Button default (`primary` background, 32px, 8px corner, `DIALOG_PRIMARY_BUTTON`), the secondary action is a ghost text button (`DIALOG_TEXT_BUTTON`), and danger confirmations switch to `destructive`. With no hint the actions still align right. No background band, no divider line.
 - **Grouped selector** (providers): a search box on top, then groups under small headings (`text-caption` 500 `ink-3`); each row is 40px = a 22px first-letter tile (white background + `line` ring) + name + an `ink-3` tag on the right (OAuth / not yet enabled). Hover and keyboard focus = the selector's selected row (white card + hairline ring). Disabled rows drop the text to `ink-3` and show no hover. Search filters across groups and whole empty groups hide; "Other · custom endpoint" is always there.
-- **Menus** (one menu surface — `DropdownMenu` / `Popover` / the Select popup are the same surface, #1767): `popover` background, 18px radius (`--radius-popover`), 6px padding (`--menu-pad`), `--shadow-popover` (= `--e2`: soft shadow + 1px ring). Rows are 32px tall with a concentric 12px radius (`--radius-menu-item` = popover radius minus padding), 13.5px text, 15px `ink-3` icons, hover `menu-hover`; shortcut hints right-aligned in `text-caption` `ink-3`; dividers 1px, inset 6px left and right; group labels `text-caption` 500 `ink-3`. Danger rows use `destructive` for text and icon, hover `danger-soft`. Segmented controls inside menus use `SegmentedRadio` / `SegmentedTabs`; do not hand-roll them.
+- **Menus** (one menu surface — `DropdownMenu` / `Popover` / the Select popup are the same surface, #1767): `popover` background, 18px radius (`--radius-popover`), 6px padding (`--menu-pad`), `--shadow-popover` (= `--e2`: soft shadow + 1px ring). Rows are 32px tall with a concentric 12px radius (`--radius-menu-item` = popover radius minus padding), 14px text, 15px `ink-3` icons, hover `menu-hover`; shortcut hints right-aligned in `text-caption` `ink-3`; dividers 1px, inset 6px left and right; group labels `text-caption` 500 `ink-3`. Danger rows use `destructive` for text and icon, hover `danger-soft`. Segmented controls inside menus use `SegmentedRadio` / `SegmentedTabs`; do not hand-roll them.
 - Do: one width tier per dialog, hints left and actions right, equal-height menu rows. Do not: a dark or blurred backdrop, full-width submit bars, a gray-background foot band, outline secondary buttons, or small gray 12px menus.
 - `e2e/paper-overlays.spec.ts` pins the backdrop color, the three widths, the split foot, the menu row height, and the grouped selector; `e2e/color-freeze.spec.ts` pins `dialog-backdrop` / `menu-hover`.
 
@@ -290,8 +291,8 @@ Dark is the `:root` default (`.light` is the light theme). Values live in the `c
 
 - **The same ladder, direction reversed**: in dark, higher elevation is brighter — `canvas` #141715 → `sheet` #1b1f1c → `card` #222723 → `popover` #262b27. The steps share one green-grey hue: deep stone, not a neutral gray. In light, menus share the card color (#fdfdfb); in dark shadows are weak, so menus are one brightness step above the card.
 - **Hairline rings stay drawn**: `line` #353b36 is 1.32 on the card and 1.45 on the sheet.
-- **The ink ladder inverts**: `ink` #e6e8e2, `ink-2` #b4bab3, `ink-3` #959c96, `icon` #858c86; `ink-4` #5d655f is decorative only.
-- **Contrast (measured, WCAG 2.x)**: on the card, `ink` 12.30, `ink-2` 7.68, `ink-3` 5.41, `icon` 4.41, `accent` 8.14, `running-text` 7.92, `destructive` 7.00; `ink-3` on canvas 6.43 and on a hovered menu row 4.53.
+- **The ink ladder inverts**: `ink` #e6e8e2, `ink-2` #b4bab3, `ink-3` #959c96, `icon` #959c96; `ink-4` #5d655f is decorative only.
+- **Contrast (measured, WCAG 2.x)**: on the card, `ink` 12.30, `ink-2` 7.68, `ink-3` 5.41, `icon` 5.41, `accent` 8.14, `running-text` 7.92, `destructive` 7.00; `ink-3` on canvas 6.43 and on a hovered menu row 4.53.
 - **Text on ochre is dark ochre**: `--text-on-accent` #1a1404 on the bright `accent` measures 9.83; dark project tiles carry #121513 text at 5.13 and up. Light mode uses white on the darker ochre and on the tiles.
 - **Accent hover backgrounds are deep-dyed**: `accent-hover` #33290f, links on it 7.69; `spot-text-on-tint` #f2cf86 there 9.59.
 - **The running green brightens**: icon #82b46f (6.30 on the card), text #9cc78b (7.92), bar #6fa35c on its track 4.28.
@@ -308,12 +309,12 @@ Cairn UI rules (source: apps/web/DESIGN.md):
 - Look: direction A, Cairn. Stone paper, dense, calm. Light (.light): canvas #e6e7e1 → sheet #f6f6f2 → card #fdfdfb, ink #1d231f. Hairline rings, almost no shadow. Elevation is three tokens with the ring baked in: --e1 card/row, --e2 menu/popover, --e3 dialog/floating window. Never add a second ring or a raw shadow.
 - Dark (:root default): the same ladder in deep stone, lighter with elevation: canvas #141715 → sheet #1b1f1c → card #222723 → popover #262b27. Ink #e6e8e2 / #b4bab3 / #959c96. Accent #ebb550 with dark ochre text on it. Running #82b46f. All tokens live in src/styles/shadcn.css.
 - Three meaningful hues: ochre (--card-button: light #9a6500, dark #ebb550) = waiting on you: action links, count badges; lichen green (running) = working/online; slate blue = ready for review. Status chips: idle neutral, plan slate, confirm ochre, done lichen, failed rust. Everything else is ink greys.
-- Type: Bricolage Grotesque (font-heading, 650) for brand, page, pane and dialog titles and the Coordinator greeting; Instrument Sans for everything else; JetBrains Mono for code, times, ids. Chinese falls back to PingFang SC. Sizes only 18/16/14/13.5/12/11.5.
+- Type: Bricolage Grotesque (font-heading, 650) for brand, page, pane and dialog titles and the Coordinator greeting; Instrument Sans for everything else; JetBrains Mono for code, times, ids. Chinese falls back to PingFang SC. Sizes only 26/20/17/14/12.5/12; body weight 450, titles 650.
 - Spacing on the 4px grid. No arbitrary px values (text-[13px], ml-[10.5px]).
-- Every status = icon + color + label. Lucide icons, stroke 1.75. The spiral mark is the brand and the Coordinator avatar.
+- Every status = icon + color + label. Every icon draws at stroke 1.75 (`test/icon-stroke.test.ts` pins `src/icons`). The spiral mark is the brand and the Coordinator avatar.
 - Primary button = shadcn default Button on --primary (light #233127 with #f4f6f1 text, dark #e6e8e2 with dark text), 8px corners, 32px tall. Card actions = accent text links. No solid buttons on cards except the one primary action of a thread card.
 - Radii: menu and dialog 18px, card and composer 14px, menu row 12px, button, input and row 8px.
-- Dialogs: DialogShell with size s (400) / m (480) / l (640), light dim backdrop (no blur), 16px display title + optional 12px sub-line, split footer (12px ink-3 hint left, actions right, primary button). Menus: popover color, 18px corners, 6px padding, 32px rows with 12px corners, 13.5px text, 15px ink-3 icons, --menu-hover, danger rows in destructive.
+- Dialogs: DialogShell with size s (400) / m (480) / l (640), light dim backdrop (no blur), 17px display title + optional 12.5px sub-line, split footer (12px ink-3 hint left, actions right, primary button). Menus: popover color, 18px corners, 6px padding, 32px rows with 12px corners, 14px text, 15px ink-3 icons, --menu-hover, danger rows in destructive.
 - Segmented controls only from components/segmented.tsx: SegmentedTabs for view switches, SegmentedRadio for value pickers. Canvas track, white selected option with a 1px ring, inset keyboard ring. Never hand-roll role=tab/radio or restyle TabsList.
 - One card corner: --radius-card (14px) on every card-like surface. Pages compose EmptyState / SettingsHeader+SettingsCard+SettingsRow / FormStack+FormField+FormActions; no tinted icon tiles, no full-width submit bars, no two-tone cards, no pill buttons.
 - Use components/ui primitives and tokens; no hex in components.
@@ -325,7 +326,7 @@ Direction A's tokens are in code; the page structure (project sidebar, Coordinat
 
 ## Current shell and board surface
 
-The application shell is edge-to-edge: the main surface has no sheet margin, rounded corners, ring, or shadow overlay. The sidebar keeps `--surface-1` and is separated from the main surface by one `border-border` hairline. Expanded sidebar rows are 36px tall, use 14px UI text, 1.5px icon strokes, and a flat `--hover-1` selected state. The new-task row uses a filled `--card-button` circle for its plus icon and does not display a keyboard badge; the `C` shortcut remains active.
+The application shell is edge-to-edge: the main surface has no sheet margin, rounded corners, ring, or shadow overlay. The sidebar keeps `--surface-1` and is separated from the main surface by one `border-border` hairline. Expanded sidebar rows are 36px tall, use 14px UI text at weight 500 in `ink`, 18px icons at stroke 1.75 in the row ink, and a flat `--hover-1` selected state. The new-task row uses a filled `--card-button` circle for its plus icon and does not display a keyboard badge; the `C` shortcut remains active.
 
 The board top bar has no bottom rule. Its primary action is a centered new-task bar with the spiral brand mark, the translated prompt `新任务：接下来让 agent 做什么？`, and a `C` key badge. The bar opens the existing new-task surface. When attention cards exist, the `needs-you-strip` appears below it, capped at five rows. Each row exposes the task title, project and sequence metadata, the attention label, the same primary action as the task card, and an `打开` link. A last-seen summary uses `cairn.board.lastSeenAt` and only renders when completion or failure transitions occurred since that timestamp.
 

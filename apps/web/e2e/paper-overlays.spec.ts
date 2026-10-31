@@ -92,13 +92,13 @@ test('dialog widths are S 400 / M 480 / L 640', async ({ page }) => {
   await evidenceShot(page, 'delete-confirm-s.png');
 });
 
-test('dialog face: sheet surface, 18px corners, 16px sans title, 28px close', async ({ page }) => {
+test('dialog face: sheet surface, 18px corners, 17px sans title, 28px close', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
   const dialog = await openFromTopbar(page, SECRETS, '添加密钥');
   await expect(dialog).toHaveCSS('background-color', await resolveColor(page, '#f6f6f2'));
   await expect(dialog).toHaveCSS('border-top-left-radius', '18px');
   const title = dialog.getByTestId('dialog-head').getByText('添加密钥');
-  await expect(title).toHaveCSS('font-size', '16px');
+  await expect(title).toHaveCSS('font-size', '17px');
   const close = dialog.getByRole('button', { name: '关闭' });
   const box = await close.boundingBox();
   expect(box?.width).toBe(28);
@@ -119,7 +119,7 @@ test('split footer: hint left, actions right, no band fill', async ({ page }) =>
   await expect(foot).toHaveCSS('border-top-width', '0px');
   const hint = foot.getByRole('link', { name: '浏览器授权注册 →' });
   const done = foot.getByRole('button', { name: '完成' });
-  await expect(hint).toHaveCSS('font-size', '12px');
+  await expect(hint).toHaveCSS('font-size', '12.5px');
   const dialogBox = await dialog.boundingBox();
   const footBox = await foot.boundingBox();
   const hintBox = await hint.boundingBox();
@@ -155,7 +155,7 @@ test('footer stays on screen on a short viewport; only the body scrolls', async 
   expect(overflow).toBe(true);
 });
 
-test('Paper menu: 32px rows, 13.5px text, 15px icons, 18px panel corners, 4px padding', async ({
+test('Paper menu: 32px rows, 14px text, 15px icons, 18px panel corners, 4px padding', async ({
   page,
 }) => {
   await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
@@ -174,7 +174,7 @@ test('Paper menu: 32px rows, 13.5px text, 15px icons, 18px panel corners, 4px pa
   for (let i = 0; i < count; i += 1) {
     const row = rows.nth(i);
     expect((await row.boundingBox())?.height).toBe(32);
-    await expect(row).toHaveCSS('font-size', '13.5px');
+    await expect(row).toHaveCSS('font-size', '14px');
     const icon = await row.locator('svg').first().boundingBox();
     expect(icon?.width).toBe(15);
   }
@@ -197,7 +197,7 @@ test('user menu rides the same Paper menu face', async ({ page }) => {
   for (const label of ['账号', 'API 密钥', 'MCP']) {
     const row = menu.locator('a.user-menu-row', { hasText: label });
     expect((await row.boundingBox())?.height).toBe(32);
-    await expect(row).toHaveCSS('font-size', '13.5px');
+    await expect(row).toHaveCSS('font-size', '14px');
   }
   await evidenceShot(page, 'user-menu.png');
 });

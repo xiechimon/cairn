@@ -103,11 +103,11 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(doneStatus, 'T3').toHaveCSS('color', ink3);
 
     const title = rows.nth(0).getByRole('link');
-    await expect(title, 'T4').toHaveCSS('font-size', '13.5px');
+    await expect(title, 'T4').toHaveCSS('font-size', '14px');
     await expect(title, 'T4').toHaveCSS('color', ink);
     const meta = rows.nth(0).getByTestId('task-meta');
     await expect(meta, 'T4').toHaveText(/^#1 · .+前$/);
-    await expect(meta, 'T4').toHaveCSS('font-size', '12px');
+    await expect(meta, 'T4').toHaveCSS('font-size', '12.5px');
     await expect(meta, 'T4').toHaveCSS('color', ink3);
 
     await expect(rows.nth(1).getByRole('link'), 'T5').toHaveCSS('color', ink3);
@@ -142,7 +142,7 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(page.getByTestId('page-col'), 'T1: 文件 keeps the bleed').toHaveCount(0);
 
     const placeholder = page.getByText('请选择一个文件查看');
-    await expect(placeholder, 'F3').toHaveCSS('font-size', '13.5px');
+    await expect(placeholder, 'F3').toHaveCSS('font-size', '14px');
     await expect(placeholder, 'F3').toHaveCSS('color', await resolveColor(page, 'var(--text-tertiary)'));
 
     const file = page.locator('[data-tree-entry="file"]', { hasText: 'README.md' });
@@ -154,13 +154,13 @@ for (const theme of ['light', 'dark'] as const) {
 
     await page.locator('.prj-files-seg-tab', { hasText: '历史' }).click();
     const commit = page.locator('[data-history-entry="commit"]').first();
-    await expect(commit.getByTestId('history-message'), 'F2').toHaveCSS('font-size', '13.5px');
-    await expect(commit.getByTestId('history-meta'), 'F2').toHaveCSS('font-size', '12px');
+    await expect(commit.getByTestId('history-message'), 'F2').toHaveCSS('font-size', '14px');
+    await expect(commit.getByTestId('history-meta'), 'F2').toHaveCSS('font-size', '12.5px');
     await commit.click();
     await expect(page.locator('[data-commit-detail="message"]'), 'F2').toHaveCSS(
       'font-size',
-      '13.5px',
+      '14px',
     );
-    await expect(page.locator('[data-commit-detail="meta"]'), 'F2').toHaveCSS('font-size', '12px');
+    await expect(page.locator('[data-commit-detail="meta"]'), 'F2').toHaveCSS('font-size', '12.5px');
   });
 }

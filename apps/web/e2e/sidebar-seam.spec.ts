@@ -30,8 +30,7 @@ test.describe('sidebar seam (Paper Grouped)', () => {
       expect(m.shadow).toBe('none');
       expect(m.sidebarW).toBe(248);
       expect(m.navBorderTopW).toBe('0px');
-      // workspace row: 40px tall inside the 12px sidebar padding
-      expect(await teamRowBox(page)).toEqual({ x: 12, y: 12, w: 223, h: 40 });
+      expect(await teamRowBox(page)).toEqual({ x: 12, y: 12, w: 223, h: 44 });
     });
 
     test(`team page: the active workspace row keeps the board geometry (${theme})`, async ({
@@ -43,7 +42,7 @@ test.describe('sidebar seam (Paper Grouped)', () => {
         'aria-current',
         'page',
       );
-      expect(await teamRowBox(page)).toEqual({ x: 12, y: 12, w: 223, h: 40 });
+      expect(await teamRowBox(page)).toEqual({ x: 12, y: 12, w: 223, h: 44 });
     });
 
     test(`rail: no seam either (${theme})`, async ({ page }) => {
@@ -84,7 +83,7 @@ test.describe('sidebar seam (Paper Grouped)', () => {
         });
         expect(m.borderRightW).toBe('1px');
         expect(m.shadow).toBe('none');
-        expect(await teamRowBox(page)).toEqual({ x: 12, y: 12, w: 223, h: 40 });
+        expect(await teamRowBox(page)).toEqual({ x: 12, y: 12, w: 223, h: 44 });
       });
     }
   }

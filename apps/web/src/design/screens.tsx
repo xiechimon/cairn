@@ -3,8 +3,8 @@ import { ExternalLink } from '../icons/index.js';
 import type { GalleryTheme } from './design-doc.js';
 import { Section } from './specimen.js';
 
-const FRAME_W = 1440;
-const FRAME_H = 900;
+const FRAME_W = 1200;
+const FRAME_H = 760;
 
 const SCREENS = [
   {

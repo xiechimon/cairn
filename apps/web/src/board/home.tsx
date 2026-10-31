@@ -303,7 +303,7 @@ function HomeSection({
     <section data-testid={testId} aria-label={t(title)} className="flex flex-col gap-2">
       <header className="flex h-8 items-center gap-2 px-1">
         <Icon aria-hidden strokeWidth={1.75} className={cn('size-3.75 flex-none', tone)} />
-        <h2 className="font-heading text-heading font-medium text-foreground">{t(title)}</h2>
+        <h2 className="font-heading text-heading font-title text-foreground">{t(title)}</h2>
         <span
           data-testid="home-section-count"
           className="text-meta tabular-nums text-content-tertiary"

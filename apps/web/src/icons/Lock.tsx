@@ -9,7 +9,7 @@ export function Lock({ width = 11, height = 11, ...props }: SVGProps<SVGSVGEleme
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="2.5"
+      strokeWidth="1.75"
       strokeLinecap="round"
       strokeLinejoin="round"
       {...props}

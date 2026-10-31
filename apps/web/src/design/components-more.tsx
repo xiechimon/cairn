@@ -30,6 +30,7 @@ import {
 } from '../components/ui/message-scroller.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { Separator } from '../components/ui/separator.js';
+import { Trace, TraceDescription, TraceLine, TraceTitle } from '../components/ui/trace.js';
 import type { ModelOption } from '../fixtures/records.js';
 import { ArrowDown, Copy, Download, Settings, Trash2 } from '../icons/index.js';
 import { AgentModelSelect, AgentRuntimeSelect } from '../routes/agent-model-select.js';
@@ -51,14 +52,15 @@ const MODEL_OPTIONS: ModelOption[] = [
   { provider: 'codex', providerLabel: 'Codex', modelId: 'gpt-6.1-sol', modelName: 'GPT-6.1 Sol' },
 ];
 
-const SEED_MESSAGES = [
-  'Read the failing CI log for the lockfile check.',
-  'The last commit bumped a version in package.json without the lockfile.',
-  'Running pnpm install locally to regenerate pnpm-lock.yaml.',
-  'Lockfile regenerated; 1 file changed.',
-  'Committing the lockfile and pushing the branch.',
-  'CI is green on the new head.',
+const SEED_STEPS = [
+  { title: 'Read the failing CI log', code: '', secs: 2 },
+  { title: 'Found the cause: package.json moved without the lockfile', code: '', secs: 0 },
+  { title: 'Ran', code: 'pnpm install', secs: 14 },
+  { title: 'Edited', code: 'pnpm-lock.yaml', secs: 1 },
+  { title: 'Ran', code: 'git push origin fix/lockfile', secs: 3 },
+  { title: 'CI is green on the new head', code: '', secs: 0 },
 ];
+const SEED_STEPS_FALLBACK = { title: 'Waiting', code: '', secs: 0 };
 
 export function StructureSection() {
   const nameId = useId();
@@ -125,7 +127,7 @@ export function StructureSection() {
         note="Click Edit name, type, press Enter to save or Escape to cancel"
         code={`<ProfileHeader avatar={…} name={name} sub="Avatar and name" onRename={setName} />`}
       >
-        <div className="w-full max-w-140">
+        <div className="w-full">
           <ProfileHeader
             avatar={<SeededAvatar name={name} fallback="/avatar-user.png" className="size-14" />}
             name={name}
@@ -225,10 +227,10 @@ export function IdentitySection() {
 }
 
 export function StreamSection() {
-  const [messages, setMessages] = useState(() =>
-    Array.from({ length: 18 }, (_, i) => ({
+  const [steps, setSteps] = useState(() =>
+    Array.from({ length: 14 }, (_, i) => ({
       id: i + 1,
-      text: SEED_MESSAGES[i % SEED_MESSAGES.length] ?? '',
+      ...(SEED_STEPS[i % SEED_STEPS.length] ?? SEED_STEPS_FALLBACK),
     })),
   );
   const [started] = useState(() => Date.now() - 12_000);
@@ -236,7 +238,7 @@ export function StreamSection() {
     <Section
       id="stream"
       title="Live stream"
-      lede="What a running agent looks like: a live row with a ticking timer, and the conversation scroller that follows new messages and offers a jump back to the latest."
+      lede="What a running agent looks like: finished steps as quiet trace lines, one live row with a shimmering label and a ticking timer, and a scroller that follows new steps and offers a jump back to the latest."
     >
       <Specimen title="Live row" note="a ticking timer while an agent works">
         <Cell label="detail: compact, in the task transcript">
@@ -257,39 +259,50 @@ export function StreamSection() {
         </Cell>
       </Specimen>
       <Specimen
-        title="Message scroller"
-        note="Scroll up to reveal the jump button; Add message follows the bottom"
+        title="Agent transcript"
+        note="Scroll up to reveal the jump button; Add step follows the bottom"
         className="block"
       >
         <div className="mb-3 flex gap-2">
           <Button
             variant="outline"
             onClick={() =>
-              setMessages((all) => [
+              setSteps((all) => [
                 ...all,
                 {
                   id: all.length + 1,
-                  text: SEED_MESSAGES[all.length % SEED_MESSAGES.length] ?? '',
+                  ...(SEED_STEPS[all.length % SEED_STEPS.length] ?? SEED_STEPS_FALLBACK),
                 },
               ])
             }
           >
-            Add message
+            Add step
           </Button>
         </div>
-        <div className="relative flex h-72 flex-col overflow-hidden rounded-(--radius-card) bg-background ring-1 ring-border">
+        <div className="relative flex h-80 flex-col overflow-hidden rounded-(--radius-card) bg-card ring-1 ring-border">
           <MessageScrollerProvider autoScroll scrollEdgeThreshold={40} defaultScrollPosition="end">
             <MessageScroller className="h-auto min-h-0 flex-1">
               <FadeScrollerViewport>
-                <MessageScrollerContent className="block gap-0 px-4 pt-3.5 pb-4">
-                  {messages.map((m) => (
-                    <p key={m.id} className="m-0 py-1.5 text-ui text-foreground">
-                      <span className="mr-2 text-meta text-content-tertiary tabular-nums">
-                        {String(m.id).padStart(2, '0')}
-                      </span>
-                      {m.text}
-                    </p>
-                  ))}
+                <MessageScrollerContent className="block gap-0 px-5 pt-4 pb-5">
+                  <Trace className="gap-2.5">
+                    {steps.map((step) => (
+                      <TraceLine key={step.id} className="text-ui text-content-secondary">
+                        <TraceTitle>
+                          {step.title}
+                          {step.code !== '' && (
+                            <>
+                              {' '}
+                              <code className="font-mono text-caption">{step.code}</code>
+                            </>
+                          )}
+                        </TraceTitle>
+                        {step.secs > 0 && <TraceDescription>{step.secs}s</TraceDescription>}
+                      </TraceLine>
+                    ))}
+                  </Trace>
+                  <div className="mt-4">
+                    <LiveRow variant="chief" label="Waiting for CI" startedAt={started} />
+                  </div>
                 </MessageScrollerContent>
               </FadeScrollerViewport>
               <JumpToLatestButton aria-label="Jump to latest">

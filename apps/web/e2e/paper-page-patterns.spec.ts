@@ -71,6 +71,8 @@ for (const theme of ['light', 'dark'] as const) {
       swatch.style.color = 'var(--text-tertiary)';
       document.body.append(swatch);
       const ink3 = getComputedStyle(swatch).color;
+      swatch.style.color = 'var(--text-secondary)';
+      const ink2 = getComputedStyle(swatch).color;
       swatch.remove();
       const svg = el.querySelector('svg');
       const tile = svg?.parentElement;
@@ -81,6 +83,7 @@ for (const theme of ['light', 'dark'] as const) {
       const bcs = getComputedStyle(button);
       return {
         ink3,
+        ink2,
         iconColor: getComputedStyle(svg).color,
         iconSize: svg.getBoundingClientRect().width,
         tileBg: getComputedStyle(tile).backgroundColor,
@@ -101,14 +104,14 @@ for (const theme of ['light', 'dark'] as const) {
     expect(m.tileBg, 'E1: no tinted tile behind the icon').toBe('rgba(0, 0, 0, 0)');
     expect(m.tileShadow, 'E1: no ring tile either').toBe('none');
     expect(m.iconColor, 'E2: icon in ink-3').toBe(m.ink3);
-    expect(m.iconSize).toBe(24);
+    expect(m.iconSize).toBe(32);
     expect(m.button.variant, 'E3').toBe('default');
     expect(m.button.size, 'E3').toBe('default');
     expect(m.button.h, 'E3: 32px').toBe(32);
     expect(m.button.radius, 'E3: 8px corners, not a pill').toBe('8px');
     expect(m.button.w, 'E3: not a full-width bar').toBeLessThan(m.emptyWidth / 2);
-    expect(m.title, 'E4').toEqual(['14px', '500']);
-    expect(m.desc, 'E4').toEqual(['12px', m.ink3]);
+    expect(m.title, 'E4').toEqual(['17px', '650']);
+    expect(m.desc, 'E4').toEqual(['14px', m.ink2]);
     expect(m.descWidth, 'E4: description capped near 44ch').toBeLessThanOrEqual(320);
   });
 }

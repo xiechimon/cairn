@@ -6,13 +6,13 @@ import { api } from '../api/client.js';
 import { useBuild, useMachines } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { SegmentedTabs } from '../components/segmented.js';
+import { ToggleSwitch } from '../components/toggle-switch.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON, DialogShell } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
 import { Label } from '../components/ui/label.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
 import { Spinner } from '../components/ui/spinner.js';
-import { Switch } from '../components/ui/switch.js';
 import { toastError } from '../components/ui/toaster.js';
 import type { BranchInfoContent } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
@@ -138,7 +138,7 @@ export function BranchSyncFields({
             {t('丢弃代码修改并删除非忽略的未跟踪文件；保留忽略内容。仅本次生效。')}
           </div>
         </div>
-        <Switch
+        <ToggleSwitch
           className="mt-1 flex-none"
           aria-label={t('强制同步')}
           checked={force}
