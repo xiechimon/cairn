@@ -204,9 +204,10 @@ export function install({
   ensureFile(layout.runner, wrapperScript(layout), 0o755);
   ensureDirectory(dirname(layout.config), 0o755);
   ensureFile(layout.config, tasks, 0o644);
-  ensureDirectory(layout.state, 0o700);
-  ensureDirectory(layout.work, 0o700);
+  ensureDirectory(layout.state, 0o711);
+  ensureDirectory(layout.work, 0o711);
   ensureMirror(layout.mirror);
+  if (current(target(layout.mirror)) !== null) ensureDirectory(layout.mirror, 0o700);
   ensureDirectory(dirname(layout.log), 0o755);
   ensureFile(layout.log, '', 0o644, { keepContent: true });
   ensureFile(sudoersPath, sudoers, 0o440);

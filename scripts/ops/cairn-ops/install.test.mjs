@@ -107,8 +107,9 @@ test('installs root-only layout, mirror and sudoers rule, then is idempotent', (
     readFileSync(at(installedLayout.config), 'utf8'),
     readFileSync(join(here, 'tasks.json'), 'utf8'),
   );
-  assert.equal(mode(at(installedLayout.state)), 0o700);
-  assert.equal(mode(at(installedLayout.work)), 0o700);
+  assert.equal(mode(at(installedLayout.state)), 0o711);
+  assert.equal(mode(at(installedLayout.work)), 0o711);
+  assert.equal(mode(at(installedLayout.mirror)), 0o700);
   assert.equal(
     execFileSync(
       gitPath,

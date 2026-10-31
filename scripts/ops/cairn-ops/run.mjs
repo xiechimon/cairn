@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import {
+  chmodSync,
   closeSync,
   constants,
   existsSync,
@@ -314,6 +315,7 @@ function execute(argv, layout, trusted, stdio) {
   const entries = validateTree(listTree(git, commit, task.directory), task.directory, task.entry);
 
   const workdir = mkdtempSync(join(layout.work, 'run-'));
+  chmodSync(workdir, 0o755);
   try {
     materialize(git, entries, workdir);
     const result = spawnSync(

@@ -43,7 +43,7 @@ function git(cwd, ...args) {
 }
 
 function taskScript(out) {
-  return `printf '%s\\n' "$@" > '${out}/args'\nenv > '${out}/env'\nfind . | sort > '${out}/files'\nexit "\${DEMO_EXIT:-0}"\n`;
+  return `printf '%s\\n' "$@" > '${out}/args'\nenv > '${out}/env'\nfind . | sort > '${out}/files'\nls -ld . | cut -c1-10 > '${out}/mode'\nexit "\${DEMO_EXIT:-0}"\n`;
 }
 
 function fixture({ trustedUid = process.getuid(), tasks } = {}) {
@@ -92,8 +92,8 @@ function fixture({ trustedUid = process.getuid(), tasks } = {}) {
     mode: 0o755,
   });
   mkdirSync(dirname(layout.config), { recursive: true });
-  mkdirSync(layout.state, { mode: 0o700 });
-  mkdirSync(layout.work, { mode: 0o700 });
+  mkdirSync(layout.state, { mode: 0o711 });
+  mkdirSync(layout.work, { mode: 0o711 });
   mkdirSync(dirname(layout.log), { recursive: true });
   git(base, 'init', '-q', '--bare', layout.mirror);
   const config = {
@@ -158,6 +158,7 @@ test('runs the task from a main commit with fixed argv and clean env, and logs s
   const { code, messages } = run(layout, ['demo', mainSha, '--dry-run']);
   assert.equal(code, 0, messages);
   assert.equal(readFileSync(join(out, 'args'), 'utf8'), '--fixed\n--dry-run\n');
+  assert.equal(readFileSync(join(out, 'mode'), 'utf8'), 'drwxr-xr-x\n');
   const env = readFileSync(join(out, 'env'), 'utf8');
   assert.match(env, /^PATH=\/usr\/bin:\/bin$/m);
   assert.match(env, new RegExp(`^CAIRN_OPS_COMMIT=${mainSha}$`, 'm'));

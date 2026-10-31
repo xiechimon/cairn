@@ -23,7 +23,7 @@ sudo cairn-ops-run orb-install-host "$(git rev-parse origin/main)" --env CAIRN_O
 3. Validates `tasks.json` strictly. Unknown fields, unsafe paths and reserved environment names (`PATH`, `LD_*`, `NODE_*`, `BASH_*`, `GIT_*` and similar) are refused.
 4. Fetches `main` from the configured URL into the root-owned bare mirror `/var/lib/cairn-ops/cairn.git` through the configured proxy, with system and global Git config disabled.
 5. Refuses unless the argument is a full 40-character lowercase SHA of a commit reachable from `origin/main`. Short, uppercase and symbolic names are refused.
-6. Lists only the task directory at that commit. Any symlink, submodule, `.`/`..`/`.git` segment or entry outside the directory is refused. Each blob is written with `O_EXCL | O_NOFOLLOW` into a fresh `0700` directory under `/var/lib/cairn-ops/work`. Nothing is read from a checkout, `$HOME` or the caller's environment.
+6. Lists only the task directory at that commit. Any symlink, submodule, `.`/`..`/`.git` segment or entry outside the directory is refused. Each blob is written with `O_EXCL | O_NOFOLLOW` into a fresh root-owned `0755` directory under `/var/lib/cairn-ops/work`, readable but not writable by other users so a task that drops to ian's uid (as `setup-runner-user.mjs` does) can still load its own files. Nothing is read from a checkout, `$HOME` or the caller's environment.
 7. Runs `<interpreter> <directory>/<entry> <args...> [--dry-run]` with `PATH=/usr/local/sbin:/usr/local/bin:/usr/bin`, `HOME=/root`, `LANG=C.UTF-8`, `CAIRN_OPS_TASK`, `CAIRN_OPS_COMMIT` and the accepted `--env` values. The work directory is deleted afterwards.
 8. Appends JSON lines to `/var/log/cairn-ops/run.log`: a `start` record, then an `end` record with task, commit, argv, start and end times, exit code and any refusal reason. Refusals are logged too.
 
@@ -48,7 +48,8 @@ The installer needs `/usr/bin/node`, `/usr/bin/git`, `/usr/bin/flock`, `/usr/bin
 | `/usr/local/sbin/cairn-ops-run` | `root:root 0755` |
 | `/usr/local/lib/cairn-ops/run.mjs`, `layout.json` | `root:root 0644` |
 | `/etc/cairn-ops/tasks.json` | `root:root 0644` |
-| `/var/lib/cairn-ops`, `work/`, bare mirror `cairn.git` | `root:root 0700` |
+| `/var/lib/cairn-ops`, `work/` | `root:root 0711` |
+| bare mirror `/var/lib/cairn-ops/cairn.git` | `root:root 0700` |
 | `/var/log/cairn-ops/run.log` | `root:root 0644` |
 | `/etc/sudoers.d/zz-cairn-ops` | `root:root 0440` |
 
