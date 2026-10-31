@@ -43,7 +43,7 @@ Exit `1` means at least one channel read bytes. Exit `0` means all attempted cha
 
 ## Owner setup on omarchy
 
-Before running either sudo command, verify this checkout matches the exact commit that received review. Run `git rev-parse HEAD` and compare its output with the reviewed commit ID; run `git status --porcelain` and require empty output. Stop if either check differs. Keep the checkout unchanged through setup. With a system Node executable available through sudo's PATH:
+Before running either sudo command, verify this checkout matches the exact commit that received review. Run `git rev-parse HEAD` and compare its output with the reviewed commit ID; run `git status --porcelain` and require empty output. Stop if either check differs. Keep the checkout unchanged through setup. The script runs only the root-owned system Node at `/usr/bin/node`; a per-user Node from mise or fnm is not used. Install it first if missing (on Arch: `sudo pacman -S --needed nodejs`). Then:
 
 ```sh
 sudo sh scripts/ops/secret-reach/setup-runner-user.sh --dry-run
