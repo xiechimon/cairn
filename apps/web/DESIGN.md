@@ -216,7 +216,7 @@ See "Page patterns · Settings list" below.
 
 ### Trace
 - The agent's narration stays body text. Tool activity folds into one grey summary line in `--text-tertiary` ("Ran 2 commands (1 failed)") ending in a small triangle, right when closed and down when open (`components/chat/trace-parts.tsx`, composed by `TraceGroup`, `TraceRows` and `WorkTrace`). Never hand-write tool rows.
-- Open, the group is a hairline card (1px inset `--border` ring, 10px radius) of 36px rows separated by hairlines. A row reads "verb **target**": the verb in `--text-tertiary`, the target in `--foreground` at medium weight, no kind icon and no code pill; commands are mono without a background. The duration, diff size or exit code sits at the row end in tabular numbers.
+- Open, the group is a hairline card (1px inset `--border` ring, 12px radius from `--cds-radius-xl`) of 36px rows separated by hairlines. A row reads "verb **target**": the verb in `--text-tertiary`, the target in `--foreground` at medium weight, no kind icon and no code pill; commands are mono without a background. The duration, diff size or exit code sits at the row end in tabular numbers.
 - A row with detail opens to a bordered command box (`$ command`, mono 12.5/19, 8px radius, `--background`) with the output under it in grey mono `text-caption`.
 - Failures: the summary shows a `--destructive` count and the row a `--destructive` "exit N" or "Failed" label; a failed command opens by default and prints its output in `--destructive`. Never use `--text-dim` for text.
 - Running: the summary switches to the present tense for the whole group ("Running 1 command") and sweeps with the `shimmer` utility, as does the verb of the running row. Under reduced motion the shimmer stops.

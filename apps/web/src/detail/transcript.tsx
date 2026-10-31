@@ -119,7 +119,7 @@ function ActionRow({
       data-testid="msg-actions"
     >
       {stamp != null && (
-        <span className="chat-stamp text-caption tabular-nums" data-testid="msg-stamp">
+        <span className="text-caption tabular-nums" data-testid="msg-stamp">
           {stamp}
         </span>
       )}
@@ -256,7 +256,7 @@ function Row({
       return <InjectedSkills skills={item.skills} t={t} />;
     case 'chief':
       return (
-        <div className={`${ROW_BASE} chat-row--chief ${margin}`}>
+        <div className={`${ROW_BASE} ${margin}`}>
           <TurnRule className="w-full">{t('由总管发起')}</TurnRule>
         </div>
       );

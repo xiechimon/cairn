@@ -29,7 +29,7 @@ const SUMMARY_BTN =
   "h-auto min-h-0 w-fit max-w-full cursor-pointer justify-start gap-1 rounded-md border-0 bg-transparent px-0 py-0.5 text-left font-normal text-(--text-tertiary) hover:bg-transparent hover:text-(--text-secondary) dark:hover:bg-transparent dark:hover:text-(--text-secondary) aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
 
 const ROW_BTN =
-  "flex h-9 min-h-9 w-full min-w-0 cursor-pointer justify-start gap-1.5 rounded-none border-0 bg-transparent px-3 text-left font-normal text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-(--text-tertiary) aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) dark:hover:bg-(--menu-hover) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
+  "flex h-9 min-h-9 w-full min-w-0 cursor-pointer justify-start gap-1.5 rounded-(--cds-radius-xs) border-0 bg-transparent px-3 text-left font-normal text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-(--text-tertiary) aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) dark:hover:bg-(--menu-hover) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
 
 export const RUNNING_VERB =
   'data-running:[&_[data-trace-verb]]:shimmer motion-reduce:data-running:[&_[data-trace-verb]]:shimmer-none';
@@ -138,7 +138,7 @@ export function TraceCard({ className, ...props }: ComponentProps<'div'>) {
     <div
       data-trace-card=""
       className={cn(
-        'mt-0.5 min-w-0 divide-y divide-(--border) overflow-hidden rounded-[10px] ring-1 ring-(--border) ring-inset',
+        'mt-0.5 min-w-0 divide-y divide-(--border) overflow-hidden rounded-(--cds-radius-xl) ring-1 ring-(--border) ring-inset',
         className,
       )}
       {...props}

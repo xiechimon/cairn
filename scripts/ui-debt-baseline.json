@@ -1,7 +1,7 @@
 {
   "frozenFrom": {
-    "sha": "888b6d675ad70c9cb945367524620ab4b80c5ab1",
-    "date": "2026-10-30"
+    "sha": "a0b4a1a39affa6f0f2b6f093d2f98a4a4acbee9c",
+    "date": "2026-10-31"
   },
   "scope": "apps/web/src; per-face css = *.css minus the ui-debt-gate.mjs WHITELIST (carrier layer); bare controls = <button|<input|<select|<textarea occurrences in *.tsx minus components/ui/; arbitrary values = text-[<len>] and SPACING_UTILITIES-[<len>] (px|rem|em, or interpolated) in *.ts/*.tsx minus components/ui/ and test files",
   "perFaceCss": {},
@@ -9,51 +9,35 @@
     "total": 3,
     "files": {
       "chief/chief-conversation.tsx": 1,
-      "detail/composer.tsx": 1,
-      "overlay/new-task-dialog.tsx": 1
+      "overlay/new-task-dialog.tsx": 1,
+      "overlay/search-panel.tsx": 1
     }
   },
   "arbitraryValues": {
-    "textTotal": 13,
-    "spacingTotal": 14,
+    "textTotal": 7,
+    "spacingTotal": 11,
     "files": {
       "board/board.tsx": {
         "text": 0,
         "spacing": 3
       },
       "board/filter-panel.tsx": {
-        "text": 4,
+        "text": 1,
         "spacing": 2
-      },
-      "board/notify-banner.tsx": {
-        "text": 1,
-        "spacing": 0
-      },
-      "board/quota-banner.tsx": {
-        "text": 1,
-        "spacing": 0
-      },
-      "components/chat/agent-rows.tsx": {
-        "text": 2,
-        "spacing": 0
       },
       "components/chat/live-row.tsx": {
         "text": 0,
-        "spacing": 3
+        "spacing": 1
+      },
+      "components/chat/trace-parts.tsx": {
+        "text": 2,
+        "spacing": 0
       },
       "components/model-select-core.tsx": {
         "text": 1,
         "spacing": 0
       },
-      "overlay/chip-popover.tsx": {
-        "text": 1,
-        "spacing": 0
-      },
       "overlay/more-menu.tsx": {
-        "text": 0,
-        "spacing": 1
-      },
-      "overlay/plan-dropdown.tsx": {
         "text": 0,
         "spacing": 1
       },
