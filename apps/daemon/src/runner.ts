@@ -21,6 +21,7 @@ import type {
   SessionOpts,
   SkillInjectionFacts,
   TranscriptUpload,
+  WorkspaceHookNoteData,
   WorktreeOps,
 } from '@cairn/shared';
 import {
@@ -141,6 +142,8 @@ export interface RunStepOptions {
   running?: number;
   env?: Record<string, string>;
   stopRequest?: StopRequest;
+  hookNotes?: WorkspaceHookNoteData[];
+  orbStartedAt?: number;
   retryStormMax?: number;
   streamTimeouts?: { first: number; idle: number; body: number };
   streamDurationCapMs?: number;
@@ -900,7 +903,7 @@ async function runClaimedStep(
       createdAt: now(),
     });
   }
-  for (const hook of ws?.hooks ?? []) {
+  for (const [index, hook] of [...(opts.hookNotes ?? []), ...(ws?.hooks ?? [])].entries()) {
     const head =
       hook.status === 'ok'
         ? `.agents/${hook.name} hook ok (${hook.ms}ms)`
@@ -911,9 +914,17 @@ async function runClaimedStep(
       hook.totalChars > hook.output.length
         ? `\n… output truncated (${hook.totalChars - hook.output.length} more chars)`
         : '';
-    const body = hook.output.trim() === '' ? '' : `\n${hook.output.trimEnd()}${truncated}`;
+    const output =
+      opts.hookNotes?.includes(hook) &&
+      hook.output.startsWith('orb: started in') &&
+      opts.orbStartedAt !== undefined
+        ? `orb: started in ${Math.max(0, now() - opts.orbStartedAt)}ms`
+        : hook.output;
+    const body = output.trim() === '' ? '' : `\n${output.trimEnd()}${truncated}`;
     transcript.upsert({
-      id: `hook-${hook.name}-${stepId}`,
+      id: opts.hookNotes?.includes(hook)
+        ? `orb-hook-${index}-${stepId}`
+        : `hook-${hook.name}-${stepId}`,
       role: 'system',
       content: `${head}${body}`,
       createdAt: now(),
