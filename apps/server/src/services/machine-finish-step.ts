@@ -91,6 +91,7 @@ import { markModelDead } from './model-liveness.js';
 import { notifyModelFallback } from './notifications.js';
 import { applyQuotaWaitStep } from './quota-wait.js';
 import { finishScheduledStep } from './schedules.js';
+import { verifyShipLanding } from './ship-gate.js';
 import { drainTaskMessageQueue } from './task-message-queue.js';
 import { costFromRates, ratesForModel } from './token-usage-cost.js';
 
@@ -286,9 +287,11 @@ async function finishStepReport(
   }
   if (body.status === 'success' && parseLocalMergeInstruction(stepRow.prompt) !== null)
     throw conflict('Local merge command reported no landing result');
-  const mergeSuccess = stepRow.kind === 'merge' && body.status === 'success';
+  const shipFailure = stepRow.kind === 'merge' ? await verifyShipLanding(deps, stepRow) : null;
+  const mergeSuccess =
+    stepRow.kind === 'merge' && body.status === 'success' && shipFailure === null;
   let landingSkipped = mergeSuccess && mergeCardLeftReview(deps, stepRow);
-  let landingError: string | null = null;
+  let landingError: string | null = shipFailure;
   if (mergeSuccess && !landingSkipped) {
     const landing = await applyMergeLanding(deps, stepRow, body.commit ?? null);
     if (landing === MERGE_LANDING_SKIPPED) landingSkipped = true;

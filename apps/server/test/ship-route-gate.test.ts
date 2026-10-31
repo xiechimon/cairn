@@ -160,6 +160,7 @@ describe('every ship route needs a mergeable gate verdict for the current head',
       );
       const [merge] = mergeSteps(buildId);
       expect(merge?.prompt?.startsWith('Squash and push to main.')).toBe(true);
+      expect(merge?.prompt).toContain(`--match-head-commit ${HEAD}`);
       expect(parseShipGateInstruction(merge?.prompt ?? null)).toEqual({
         buildId,
         judgedHead: HEAD,
