@@ -32,7 +32,6 @@ export function PaneTabs({
     <SegmentedTabs
       value={view}
       label={t('面板视图')}
-      className="doc-pane-tabs"
       options={tabs.map((tab) => ({
         value: tab.view,
         label: t(tab.label),
