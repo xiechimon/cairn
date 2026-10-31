@@ -91,6 +91,17 @@ function FilterSpecimen() {
   );
 }
 
+const AVATAR_ICONS = [
+  ['folder', undefined],
+  ['flask-conical', 'plum'],
+  ['rocket', 'amber'],
+  ['leaf', 'moss'],
+  ['database', 'slate'],
+  ['cloud', 'teal'],
+  ['heart', 'rose'],
+  ['server', 'gray'],
+] as const;
+
 export function ProductBoardSection() {
   const [_lastAction, setLastAction] = useState<string | null>(null);
   const [firstPrShown, setFirstPrShown] = useState(true);
@@ -135,7 +146,10 @@ export function ProductBoardSection() {
           )}
         </Labeled>
       </Specimen>
-      <Specimen title="Project avatar" note="ProjectAvatar, six tones cycling by index">
+      <Specimen
+        title="Project avatar"
+        note="ProjectAvatar: letter tile by index tone, or a chosen icon and colour"
+      >
         {['cairn', 'docs-site', 'mobile', 'infra', 'billing', 'search', 'api'].map((name, i) => (
           <Cell key={name} label={`tone ${i}`}>
             <ProjectAvatar name={name} tone={i} />
@@ -143,6 +157,16 @@ export function ProductBoardSection() {
             <span className="text-ui">{name}</span>
           </Cell>
         ))}
+        <Cell label="icon tiles">
+          {AVATAR_ICONS.map(([icon, color]) => (
+            <ProjectAvatar key={icon} name={icon} tone={0} icon={icon} color={color} />
+          ))}
+        </Cell>
+        <Cell label="icon bare">
+          {AVATAR_ICONS.map(([icon, color]) => (
+            <ProjectAvatar key={icon} name={icon} tone={0} icon={icon} color={color} bare />
+          ))}
+        </Cell>
       </Specimen>
     </Section>
   );

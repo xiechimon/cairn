@@ -242,6 +242,21 @@ export const sidebarThreadStatuses: FixtureSet = {
   now: r7(13, 55),
 };
 
+export const sidebarProjectIcons: FixtureSet = {
+  ...sidebarThreads,
+  projectNames: {
+    [PROJECT_ID]: 'P1',
+    [SIDEBAR_PROJECT_B]: 'P2',
+    'sidebar-project-c': 'P3',
+    'sidebar-project-d': 'P4',
+  },
+  projectAvatars: {
+    [PROJECT_ID]: { icon: 'flask-conical', color: 'plum' },
+    [SIDEBAR_PROJECT_B]: { icon: 'rocket', color: 'amber' },
+    'sidebar-project-c': { icon: 'database', color: 'gray' },
+  },
+};
+
 export const boardRepoFilter: FixtureSet = {
   ...boardDefault,
   projectNames: {
