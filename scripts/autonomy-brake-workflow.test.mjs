@@ -139,7 +139,7 @@ test('PR evidence executes only the trusted base brake', (t) => {
   );
   assert.match(
     text,
-    /git show origin\/main:scripts\/exact-revert\.mjs > "\$RUNNER_TEMP\/exact-revert\.mjs"/,
+    /if git cat-file -e origin\/main:scripts\/exact-revert\.mjs; then\n\s+git show origin\/main:scripts\/exact-revert\.mjs > "\$RUNNER_TEMP\/exact-revert\.mjs"\n\s+fi/,
   );
 });
 for (const conclusion of ['cancelled', 'timed_out'])
