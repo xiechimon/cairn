@@ -40,20 +40,6 @@
       "contrast": "docs/verify/1055/colors/incremental.md"
     },
     {
-      "file": "apps/web/src/components/chat/live-row.tsx",
-      "anchor": "flex-none text-(--card-button) animate-[spinner-breathe",
-      "role": "indicator",
-      "reason": "Detail-face in-flight activity spinner glyph = indicator accent, spot role per #987 (选中/指示/徽标). Non-text glyph, 3:1 gate.",
-      "contrast": "docs/verify/1055/colors/incremental.md"
-    },
-    {
-      "file": "apps/web/src/components/chat/live-row.tsx",
-      "anchor": "_infinite] text-(--card-button)",
-      "role": "indicator",
-      "reason": "Chief-face twin of the chat-spinner indicator (same recipe, chief skin).",
-      "contrast": "docs/verify/1055/colors/incremental.md"
-    },
-    {
       "file": "apps/web/src/routes/team-chart.tsx",
       "anchor": "bg-spot-soft text-(--card-button)",
       "role": "badge-glyph",

@@ -123,7 +123,7 @@ Direction A, **Cairn**: a cairn is a pile of stones that marks a trail for the n
 
 - **Display face for titles**: Bricolage Grotesque (`--font-display`, the `font-heading` utility) for the brand name, page and pane titles, dialog titles and the Coordinator greeting, at 650 with -0.015em tracking. Chinese falls back to PingFang SC.
 - **Everything else is Instrument Sans** (`--font-sans`): thread titles, rows, navigation, buttons, meta. Chinese falls back to PingFang SC. Code, times, ids and counters use JetBrains Mono (`--font-mono`) with tabular numbers.
-- Fonts are self-hosted latin subsets in `public/fonts` (SIL OFL 1.1, licenses next to the files), loaded with `font-display: optional` and preloaded in `index.html`.
+- Fonts are self-hosted latin subsets in `public/fonts` (SIL OFL 1.1, licenses next to the files), loaded with `font-display: swap` and preloaded in `index.html` and `design.html`; the metric-matched fallbacks keep the swap from shifting layout.
 - **Six font sizes, no seventh allowed**: 26 Coordinator greeting / 20 page title and brand / 17 column and section headings / 14 card titles and UI text / 12.5 meta / 12 badges and group labels. In code, use the corresponding Tailwind theme keys `text-greeting` / `text-page` / `text-heading` / `text-card-title` and `text-ui` / `text-meta` / `text-caption` (heading font `font-heading`), never arbitrary values like `text-[13px]`; `scripts/ui-debt-gate.mjs` D5 only allows the total count of arbitrary values to decrease.
 - **Four font weights**: 450 body text (`font-normal` maps to 450, because Instrument Sans at 400 reads faint at 14px), 500 sidebar rows and captions, 600 card and row titles, the active nav row and count badges, 650 display titles (`font-title`, always paired with `font-heading`). 700 is not used.
 - The title of a completed task drops to 400 + `ink-3`, meaning "no longer needs to be read".
@@ -162,7 +162,7 @@ From top to bottom:
 - `card` surface, 14px corner (`--radius-card`), a `line` 1px hairline ring plus one very light ink shadow (`0 1px 2px`, 5% in light; together they are `--e1`), so the edge is crisp, never soft. On hover the ring deepens and the shadow rises to `0 6px 16px -2px` at 9% (150ms ease-out). No second large blur shadow.
 - In-flight orchestration (start was pressed, the chief has not dispatched yet): a todo card swaps `开始` for a footer `编排中 · reason` (waiting for X to come online / missing capability / queued) plus `查看会话` on the right; a failed card swaps `重试` for an inert `编排中`. Nothing is layered over the meta line.
 - A failed orchestration shows a short plain summary (`orchestrationErrorSummary`: connection dropped, timed out, out of quota, context too long, bad key, provider unavailable); the raw provider error stays in the `title` tooltip and never wraps character by character on the card.
-- Structure: title (at most two lines), then one meta line (project, #number, tag, time; never wraps; when space runs out the tag truncates first and the project keeps at least five characters), then a footer by status. The tag icon uses the user's tag color; the tag name uses the meta ink.
+- Structure: title (at most two lines), then one meta line (project, #number, tag, time; never wraps; when space runs out the tag truncates first and the project keeps at least five characters), then a footer by status. The tag icon uses the user's tag color; the tag name uses the meta ink. A standalone tag (`TagChip`) is a neutral outline pill (`card` background, `line` ring, `ink` text) with an 8px dot in the tag color; the tag color never fills the pill.
 - The right-side meta icons (plan, changes, chief-created, branch) stay hidden until the card is hovered or focused, and are always visible on touch screens (`pointer-coarse`).
 - Footer:
   - Three pending states: dashed divider + status icon and name (ochre) + reason (truncated) + an ochre action link on the right (retry / confirm plan / review).
@@ -189,7 +189,7 @@ See "Page patterns · Settings list" below.
 - The composer is a white card (`--card`) with a 1px `--input` ring that turns lichen with a soft halo on focus (`--shadow-composer*`); it is the one white surface in the conversation because it is where you act. The idle send button has no fill; only the stop button gets the `seg-active` square.
 
 ### Trace
-- Agent activity (tool calls, thinking, waiting) renders as Trace lines (`components/ui/trace.tsx`), never as hand-written rows. One line per action: optional icon, title, then a tabular-number description such as the duration.
+- Agent activity (tool calls, thinking, waiting) renders as Trace lines (`components/ui/trace.tsx`), never as hand-written rows. One line per action: optional icon, title, then a tabular-number description such as the duration. Every line is sans `text-meta` (12.5px) in `ink-2`; a command or tool name goes in an inline `font-mono text-caption` code span, never a mono line. Errors keep the line in `ink-2` and add a 500 `destructive` "Failed" label (and a `destructive` icon); the whole line never turns red. Pending lines use `ink-3`, not opacity. The live spinner is `running` green, because it means working, not waiting on you. The chief turn-tool panel uses a 1px `border` rule, the same weight as collapsible detail.
 - Status lives on the line: `running` sweeps the title with the `shimmer` utility (`app.css`, still under reduced motion), `error` turns the line `--destructive` and keeps a visible "failed" word, `pending` dims it to 60%.
 - Detail such as full thinking or tool output folds under its line with `TraceCollapsible`; the chevron sits after the title and the content hangs on a hairline left rule.
 - The chief turn panel is a Trace on `--secondary` with mono `text-caption` lines in `--text-tertiary`; agent rows in the task transcript use 12px `--text-dim` lines.
@@ -207,9 +207,9 @@ Pages like settings, resources, team, and project share the pieces below. A new 
 
 ### Empty state
 Piece: `EmptyState` in `src/components/empty-state.tsx` (the base is the registry `Empty`).
-- **Icon**: a lucide line icon, 24px, stroke 1.75, `ink-3` (`text-content-tertiary`), no background tile.
-- **Title**: `h2`, `text-card-title` 500 `ink`.
-- **Description**: `text-meta` `ink-3`, at most 320px wide (about 44ch), centered, `text-balance`.
+- **Icon**: a line icon, 32px, stroke 1.5, `icon` (`text-icon`), no background tile.
+- **Title**: `h2`, display `text-heading` 650 `ink`; the description below is `text-ui` `ink-2`.
+- **Description**: `text-ui` `ink-2`, at most 320px wide (about 44ch), centered, `text-balance`.
 - **Primary action** (optional): shadcn Button default tier, `primary` background, 32px, 8px corner (`DIALOG_PRIMARY_BUTTON`). An empty state has at most one primary action.
 - **Hint line** (optional): one `text-meta` `ink-3` line below the primary action, optionally preceded by a 12px icon (`ink-4`), explaining read-only or permission reasons.
 - **Used on**: list pages with no data (API keys, schedules, skills, MCP, keys…). The copy is translated by the caller before being passed in.
@@ -311,7 +311,7 @@ Cairn UI rules (source: apps/web/DESIGN.md):
 - Three meaningful hues: ochre (--card-button: light #9a6500, dark #ebb550) = waiting on you: action links, count badges; lichen green (running) = working/online; slate blue = ready for review. Status chips: idle neutral, plan slate, confirm ochre, done lichen, failed rust. Everything else is ink greys.
 - Type: Bricolage Grotesque (font-heading, 650) for brand, page, pane and dialog titles and the Coordinator greeting; Instrument Sans for everything else; JetBrains Mono for code, times, ids. Chinese falls back to PingFang SC. Sizes only 26/20/17/14/12.5/12; body weight 450, titles 650.
 - Spacing on the 4px grid. No arbitrary px values (text-[13px], ml-[10.5px]).
-- Every status = icon + color + label. Lucide icons, stroke 1.75. The spiral mark is the brand and the Coordinator avatar.
+- Every status = icon + color + label. Every icon draws at stroke 1.75 (`test/icon-stroke.test.ts` pins `src/icons`). The spiral mark is the brand and the Coordinator avatar.
 - Primary button = shadcn default Button on --primary (light #233127 with #f4f6f1 text, dark #e6e8e2 with dark text), 8px corners, 32px tall. Card actions = accent text links. No solid buttons on cards except the one primary action of a thread card.
 - Radii: menu and dialog 18px, card and composer 14px, menu row 12px, button, input and row 8px.
 - Dialogs: DialogShell with size s (400) / m (480) / l (640), light dim backdrop (no blur), 17px display title + optional 12.5px sub-line, split footer (12px ink-3 hint left, actions right, primary button). Menus: popover color, 18px corners, 6px padding, 32px rows with 12px corners, 14px text, 15px ink-3 icons, --menu-hover, danger rows in destructive.

@@ -56,11 +56,11 @@ test('queued start link: hidden at rest, shown on hover and keyboard focus, take
   await expect(start).toHaveCSS('opacity', '1');
 });
 
-test('done card: title drops to 400 + ink-3, no footer', async ({ page }) => {
+test('done card: title drops to 450 + ink-3, no footer', async ({ page }) => {
   await page.goto(MATRIX);
   const done = card(page, 'dm-done-plain');
   const title = done.locator('.todo-card-title');
-  await expect(title).toHaveCSS('font-weight', '400');
+  await expect(title).toHaveCSS('font-weight', '450');
   const ink3 = await page.evaluate(() => {
     const probe = document.createElement('div');
     probe.style.color = 'var(--text-tertiary)';

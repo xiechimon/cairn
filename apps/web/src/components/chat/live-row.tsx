@@ -19,22 +19,22 @@ export function useLiveSeconds(startedAt: number | null | undefined): number | n
 
 const SKIN = {
   detail: {
-    head: 'ml-[15px] flex h-5 max-w-full items-center gap-1.5 overflow-hidden whitespace-nowrap text-xs leading-4 text-(--text-tertiary)',
+    head: 'ml-[15px] flex h-5 max-w-full items-center gap-1.5 overflow-hidden whitespace-nowrap text-meta leading-4 text-(--text-tertiary)',
     headBtn:
       "h-6 -my-0.5 cursor-pointer rounded-none justify-start border-none bg-transparent py-0.5 text-left text-[length:inherit] leading-[inherit] font-normal hover:bg-transparent hover:text-(--text-tertiary) dark:hover:bg-transparent dark:hover:text-(--text-tertiary) aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto",
     spinner:
-      'flex-none text-(--card-button) animate-[spinner-breathe_3600ms_var(--ease-standard)_infinite] motion-reduce:animate-none',
+      'flex-none text-running animate-[spinner-breathe_3600ms_var(--ease-standard)_infinite] motion-reduce:animate-none',
     secs: 'tabular-nums',
     rowTestid: 'live-row',
     label: 'chat-streaming-label truncate text-(--text-tertiary)',
   },
   chief: {
     rowTestid: undefined,
-    head: 'flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap text-xs leading-4 text-(--text-tertiary)',
+    head: 'flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap text-meta leading-5 text-(--text-tertiary)',
     headBtn:
-      "-my-[1.5px] h-auto cursor-pointer rounded-none justify-start border-none bg-transparent py-[1.5px] text-left text-sm leading-normal font-normal hover:bg-transparent hover:text-(--text-tertiary) dark:hover:bg-transparent dark:hover:text-(--text-tertiary) aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto",
+      "-my-[1.5px] h-auto cursor-pointer rounded-none justify-start border-none bg-transparent py-[1.5px] text-left text-meta leading-5 font-normal hover:bg-transparent hover:text-(--text-tertiary) dark:hover:bg-transparent dark:hover:text-(--text-tertiary) aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto",
     spinner:
-      'flex-none animate-[spinner-breathe_3600ms_var(--ease-standard)_infinite] text-(--card-button) motion-reduce:animate-none',
+      'flex-none animate-[spinner-breathe_3600ms_var(--ease-standard)_infinite] text-running motion-reduce:animate-none',
     secs: 'tabular-nums',
     label: 'truncate text-(--text-tertiary)',
   },
@@ -77,15 +77,15 @@ export function LiveRow({
       {shown != null && <span className={skin.secs}>{shown}s</span>}
       {disclosure != null &&
         (expanded ? (
-          <ChevronDown width={10} height={10} />
+          <ChevronDown width={12} height={12} />
         ) : (
-          <ChevronRight width={10} height={10} />
+          <ChevronRight width={12} height={12} />
         ))}
       <span className={skin.label}>{t(label, labelVars)}</span>
     </>
   );
   return (
-    <>
+    <div className="flex min-w-0 flex-col">
       {disclosure == null ? (
         <span className={skin.head} data-testid={skin.rowTestid}>
           {body}
@@ -103,6 +103,6 @@ export function LiveRow({
         </Button>
       )}
       {disclosure != null && expanded && children}
-    </>
+    </div>
   );
 }

@@ -9,7 +9,7 @@ export function ChiefFab({ width = 30.8, height = 30.8, ...props }: SVGProps<SVG
       viewBox="0 0 24 24"
       fill="none"
       stroke="#52525b"
-      strokeWidth="2.5"
+      strokeWidth="1.75"
       strokeLinecap="round"
       {...props}
     >

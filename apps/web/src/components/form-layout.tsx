@@ -5,7 +5,7 @@ import { DIALOG_PRIMARY_BUTTON, DIALOG_TEXT_BUTTON } from './ui/dialog-shell.js'
 import { Field, FieldDescription, FieldGroup, FieldLabel } from './ui/field.js';
 
 export const FORM_CONTROL_CLS =
-  'h-8 rounded-md border-border bg-card text-ui shadow-xs md:text-ui dark:bg-input/30';
+  'h-8 rounded-md border-input bg-card text-ui shadow-xs md:text-ui dark:bg-input/30';
 
 export function FormStack({ className, children }: { className?: string; children: ReactNode }) {
   return <FieldGroup className={cn('max-w-130 gap-4', className)}>{children}</FieldGroup>;

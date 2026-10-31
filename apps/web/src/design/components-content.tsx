@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ChiefSpiralFace } from '../chief/chief-spiral-face.js';
 import { EmptyState } from '../components/empty-state.js';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
 import {
@@ -21,7 +22,7 @@ import {
 import { Bubble, BubbleContent } from '../components/ui/bubble.js';
 import { Button } from '../components/ui/button.js';
 import { Marker, MarkerContent } from '../components/ui/marker.js';
-import { Message, MessageAvatar, MessageContent } from '../components/ui/message.js';
+import { Message, MessageContent } from '../components/ui/message.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { Select, SelectContent, SelectItem, SelectValue } from '../components/ui/select.js';
 import { Skeleton } from '../components/ui/skeleton.js';
@@ -239,9 +240,7 @@ export function ConversationSection() {
             </MessageContent>
           </Message>
           <Message className="gap-2.5">
-            <MessageAvatar className="mt-0.5 self-start">
-              <SeededAvatar name="chief" fallback="/avatar-robot-1.svg" className="size-6" />
-            </MessageAvatar>
+            <ChiefSpiralFace size={24} className="mt-0.5 flex-none self-start" />
             <MessageContent>
               <Bubble variant="ghost">
                 <BubbleContent className="text-card-title leading-6">
@@ -254,7 +253,10 @@ export function ConversationSection() {
           <Marker variant="separator" className="text-meta text-content-tertiary">
             <MarkerContent>Plan approved · 3 steps</MarkerContent>
           </Marker>
-          <Marker className="justify-center text-meta text-destructive" role="alert">
+          <Marker
+            className="rounded-(--radius-card) bg-danger-soft px-3 py-2.5 text-meta text-destructive"
+            role="alert"
+          >
             <MarkerContent>
               The machine went offline. The task will resume when it is back.
             </MarkerContent>
@@ -313,19 +315,22 @@ export function TraceSection() {
             <TraceIcon>
               <Terminal />
             </TraceIcon>
-            <TraceTitle className="font-mono">
-              Calling Bash pnpm install --frozen-lockfile
+            <TraceTitle>
+              Running <code className="font-mono text-caption">pnpm install --frozen-lockfile</code>
             </TraceTitle>
           </TraceLine>
-          <TraceLine status="error">
-            <TraceIcon>
-              <Terminal />
+          <TraceLine status="error" className="data-[status=error]:text-muted-foreground">
+            <TraceIcon className="text-destructive">
+              <Server />
             </TraceIcon>
-            <TraceTitle className="font-mono">machines</TraceTitle>
+            <TraceTitle>Listed machines</TraceTitle>
             <TraceDescription>4s</TraceDescription>
-            <span>Failed</span>
+            <span className="text-meta font-medium text-destructive">Failed</span>
           </TraceLine>
-          <TraceLine status="pending">
+          <TraceLine
+            status="pending"
+            className="data-[status=pending]:text-content-tertiary data-[status=pending]:opacity-100"
+          >
             <TraceTitle>Waiting for the agent…</TraceTitle>
           </TraceLine>
         </Trace>
@@ -367,16 +372,21 @@ export function TraceSection() {
         </Trace>
       </Specimen>
       <Specimen title="Chief turn tools" note="the compact panel under a chief reply">
-        <Trace className="max-w-120 gap-1 border-l-2 border-border py-0.5 pl-3">
-          <TraceLine
-            status="running"
-            className="font-mono text-caption leading-4 text-content-tertiary"
-          >
+        <Trace className="max-w-120 gap-1.5 border-l border-border py-0.5 pl-3">
+          <TraceLine status="running" className="text-meta leading-5 text-content-secondary">
             <TraceTitle>Calling create_todo</TraceTitle>
           </TraceLine>
-          <TraceLine className="font-mono text-caption leading-4 text-content-tertiary">
+          <TraceLine className="text-meta leading-5 text-content-secondary">
             <TraceTitle>list_machines</TraceTitle>
             <TraceDescription>1s</TraceDescription>
+          </TraceLine>
+          <TraceLine
+            status="error"
+            className="text-meta leading-5 text-content-secondary data-[status=error]:text-content-secondary"
+          >
+            <TraceTitle>open_pr</TraceTitle>
+            <TraceDescription>3s</TraceDescription>
+            <span className="font-medium text-destructive">Failed</span>
           </TraceLine>
         </Trace>
       </Specimen>

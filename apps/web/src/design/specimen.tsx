@@ -22,7 +22,7 @@ export function Section({
 }) {
   return (
     <section id={id} data-gallery-section="" className="scroll-mt-4 pt-16">
-      <h2 className="m-0 text-page font-medium text-foreground">{title}</h2>
+      <h2 className="m-0 font-heading text-page font-title text-foreground">{title}</h2>
       <p className="mt-1.5 mb-6 max-w-160 text-ui text-content-secondary">{lede}</p>
       <div className="flex flex-col gap-5">{children}</div>
     </section>

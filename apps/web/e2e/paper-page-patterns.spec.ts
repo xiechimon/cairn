@@ -108,7 +108,7 @@ for (const theme of ['light', 'dark'] as const) {
     expect(m.button.radius, 'E3: 8px corners, not a pill').toBe('8px');
     expect(m.button.w, 'E3: not a full-width bar').toBeLessThan(m.emptyWidth / 2);
     expect(m.title, 'E4').toEqual(['14px', '500']);
-    expect(m.desc, 'E4').toEqual(['12px', m.ink3]);
+    expect(m.desc, 'E4').toEqual(['12.5px', m.ink3]);
     expect(m.descWidth, 'E4: description capped near 44ch').toBeLessThanOrEqual(320);
   });
 }

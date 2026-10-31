@@ -389,7 +389,7 @@ export function ShapeSection() {
       title="Shape"
       lede="Bigger surfaces get rounder corners. An inner row's radius is its container's radius minus the padding between them."
     >
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
         <Specimen
           title="Concentric corners"
           note={`${menu}px menu − ${pad}px padding = ${menu - pad}px rows`}

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 for (const theme of ['light', 'dark'] as const) {
-  test(`font baseline: body 400, card title 500, var font really loaded (${theme})`, async ({
+  test(`font baseline: body 450, card title 500, var font really loaded (${theme})`, async ({
     page,
   }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
@@ -16,7 +16,7 @@ for (const theme of ['light', 'dark'] as const) {
       };
     });
     expect(m.bodyFontLoaded).toBe(true);
-    expect(m.bodyWeight).toBe('400');
+    expect(m.bodyWeight).toBe('450');
     expect(m.cardTitleWeight).toBe('500');
   });
 
@@ -61,7 +61,7 @@ for (const theme of ['light', 'dark'] as const) {
     expect(m.markPaint).toBe(m.rowInk);
     expect(m.markPaint).not.toBe('rgba(0, 0, 0, 0)');
     expect(m.markText).toBe('');
-    expect(m.markBox).toEqual({ w: 16, h: 16 });
+    expect(m.markBox).toEqual({ w: 22, h: 22 });
     expect(m.nameText).toContain('Cairn');
     // the head row keeps its /app/team navigation law
     expect(m.nameHref).toContain('/app/team');
