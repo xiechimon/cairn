@@ -13,7 +13,14 @@ import {
 } from '../src/db/schema.js';
 import { sweepAbandonedChiefSteps } from '../src/services/chief.js';
 import { claimStep, type MachineDeps } from '../src/services/machines.js';
-import { bootServer, insertMachine, postProject, req, type TestServer } from './helpers.js';
+import {
+  bootServer,
+  insertMachine,
+  postProject,
+  req,
+  subscriptionClaudeReport,
+  type TestServer,
+} from './helpers.js';
 
 const disposables: (() => void)[] = [];
 afterAll(() => {
@@ -232,7 +239,7 @@ describe('#1260 route re-source: chief step destination = the bound Agent home m
     const w = await setupWorld({ provider: 'claude-code' });
     w.s.db
       .update(machineTable)
-      .set({ enabledRuntimes: ['pi'] })
+      .set({ enabledRuntimes: ['pi'], claudeCodeReport: subscriptionClaudeReport })
       .where(eq(machineTable.id, w.machineAId))
       .run();
     expect(await claimOn(w, w.machineAId)).toBeNull();

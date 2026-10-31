@@ -27,6 +27,7 @@ import {
   issueApiKey,
   postProject,
   req,
+  subscriptionClaudeReport,
   type TestServer,
   withVerification,
 } from './helpers.js';
@@ -287,6 +288,11 @@ describe('#682 runtime real gate (semantics unchanged, home-machine version)', (
       enabledRuntimes: ['pi', 'claude-code'],
     });
     expect(dual.status).toBe(200);
+    w.s.db
+      .update(machineTable)
+      .set({ claudeCodeReport: { ...subscriptionClaudeReport, installed: false } })
+      .where(eq(machineTable.id, w.machineAId))
+      .run();
     const todoId = await createTodo(w.s, w.projectId);
     const res = await req(w.s.app, 'POST', `/api/projects/${w.projectId}/builds`, {
       todoIds: [todoId],
@@ -303,7 +309,7 @@ describe('#682 runtime real gate (semantics unchanged, home-machine version)', (
       .update(machineTable)
       .set({
         claudeCodeReport: {
-          installed: true,
+          ...subscriptionClaudeReport,
           hostname: 'home-other',
           models: [{ id: 'stub-model', name: 'stub-model', slot: 'default' }],
         },

@@ -7077,6 +7077,10 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
   },
   {
     "method": "GET",
+    "path": "/api/teams/{id}/model-routing",
+  },
+  {
+    "method": "GET",
     "note": "→ {unreadThreadIds}（02 §9.1）",
     "path": "/api/teams/{id}/notifications",
   },
@@ -9111,6 +9115,13 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tea
         "string",
         "null",
       ],
+    },
+    "claudeUsage": {
+      "enum": [
+        "subscription-only",
+        "allow-paid",
+      ],
+      "type": "string",
     },
     "createdAt": {
       "maximum": 9007199254740991,

@@ -137,6 +137,17 @@ function backend(env: Record<string, string> = {}) {
 }
 
 describe('Gemini stdio execution', () => {
+  test.each([
+    { mcpServers: [] },
+    { mcpServers: [{ slug: 'host', transport: 'http' as const, url: 'http://host' }] },
+  ])(
+    'preserves Gemini session behavior with external MCP configuration %j',
+    async ({ mcpServers }) => {
+      const handle = await backend().createSession({ ...opts, mcpServers });
+      expect(await collect(handle.events)).toContainEqual({ type: 'done', usage: [] });
+    },
+  );
+
   test('records complete text and merged tool results with empty usage', async () => {
     const handle = await backend().createSession(opts);
     const events = await collect(handle.events);

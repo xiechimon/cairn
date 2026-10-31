@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { claudeUsageSchema } from '../model-routing.js';
 
 export const firstPrReportPromptSchema = z.object({
   enabled: z.boolean(),
@@ -26,12 +27,14 @@ export const patchTeamBodySchema = z
   .object({
     firstPrReportPrompt: patchFirstPrReportPromptSchema.optional(),
     autonomyPaused: z.boolean().optional(),
+    claudeUsage: claudeUsageSchema.optional(),
     maxAutonomousMergesPerDay: z.number().int().nonnegative().optional(),
   })
   .refine(
     (body) =>
       body.firstPrReportPrompt !== undefined ||
       body.autonomyPaused !== undefined ||
+      body.claudeUsage !== undefined ||
       body.maxAutonomousMergesPerDay !== undefined,
     {
       message: 'At least one team setting is required',

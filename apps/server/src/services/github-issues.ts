@@ -17,6 +17,7 @@ import type { FetchLike } from '../lib/github.js';
 import { githubRepoIssue, githubRepoIssues, githubRepoLabels } from '../lib/github.js';
 import { githubRepoOfProject } from './git.js';
 import { teamGithubToken } from './github-connection.js';
+import { CORRECTION_PROMPT } from './merge-gate/correction.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { normalizeGithubLabelColor, resolveProjectTagIds, syncGithubLabels } from './tags.js';
 import { createTodo, type TodoDeps } from './todos.js';
@@ -134,7 +135,7 @@ export async function importGithubIssue(
       teamId: row.teamId,
       projectId: row.id,
       title: neutralizeIssueAttachmentTokens(detail.title),
-      spec: neutralizeIssueAttachmentTokens(detail.body ?? ''),
+      spec: `${names.some((name) => name.toLowerCase() === 'correction') ? `${CORRECTION_PROMPT}\n\n` : ''}${neutralizeIssueAttachmentTokens(detail.body ?? '')}`,
       tagIds,
       createdBy: opts.createdBy ?? deps.user.id,
       ownerId: deps.user.id,
