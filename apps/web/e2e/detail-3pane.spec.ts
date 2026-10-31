@@ -175,7 +175,7 @@ test('composer width tracks the center column; the floating window overlays with
   expect(open.comp).toBeCloseTo(pane.comp, 0);
 });
 
-test('right pane type select switches between the doc surface and the three sections', async ({
+test('right pane title switches plan and changes; usage, branch and history are sections', async ({
   page,
 }) => {
   await page.goto(`${DETAIL_ROUTE}?scenario=27`);
@@ -183,26 +183,45 @@ test('right pane type select switches between the doc surface and the three sect
   const right = page.getByTestId('detail-right');
   await expect(right.getByTestId('doc-pane')).toBeVisible();
   await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(right.getByRole('tablist')).toHaveCount(0);
+  await expect(right.getByTestId('pane-title')).toHaveText('变更');
 
-  const tabs = right.getByRole('tablist', { name: '面板视图' });
-  await expect(tabs.getByRole('tab')).toHaveCount(4);
-  await expect(tabs.getByRole('tab').first()).toHaveText('变更');
+  await right.getByTestId('pane-title').click();
+  await page.getByRole('menuitem', { name: '方案' }).click();
+  await expect(right.getByTestId('pane-title')).toHaveText('方案');
+  await expect(right.getByTestId('pane-view-plan')).toHaveAttribute('aria-pressed', 'true');
 
-  await tabs.getByRole('tab', { name: '用量' }).click();
-  await expect(page.getByRole('dialog')).toHaveCount(0);
-  await expect(right.getByTestId('doc-pane')).toHaveCount(0);
-  await expect(right.getByText('tokens', { exact: true })).toBeVisible();
+  const branch = right.getByTestId('pane-section-branch');
+  const usage = right.getByTestId('pane-section-token');
+  const history = right.getByTestId('pane-section-history');
+  await expect(branch.getByRole('button', { name: '分支' })).toHaveAttribute(
+    'aria-expanded',
+    'false',
+  );
+  await branch.getByRole('button', { name: '分支' }).click();
+  await expect(branch.getByText('构建分支')).toBeVisible();
+  await expect(usage).toContainText('tokens');
+  await expect(history.getByRole('button', { name: '历史' })).toHaveAttribute(
+    'aria-expanded',
+    'false',
+  );
+  await expect(history.getByTestId('history-row')).toHaveCount(0);
 
-  await right.getByRole('tab', { name: '变更' }).click();
-  await expect(right.getByTestId('doc-pane')).toBeVisible();
-  await expect(right.getByText('tokens', { exact: true })).toHaveCount(0);
+  await usage.getByRole('button', { name: '用量' }).click();
+  await expect(usage).not.toContainText('tokens');
+  await history.getByRole('button', { name: '历史' }).click();
+  await expect(history.getByTestId('history-row').first()).toBeVisible();
+
+  await right.getByTestId('pane-view-changes').click();
+  await expect(right.getByTestId('pane-title')).toHaveText('变更');
+  await expect(right.getByTestId('pane-sections')).toHaveCount(0);
 });
 
 test('scenarios 30/31/32 freeze the pane view instead of popping dialogs', async ({ page }) => {
   const right = page.getByTestId('detail-right');
   await page.goto(`${DETAIL_ROUTE}?scenario=30`);
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await expect(right.getByText('tokens', { exact: true })).toBeVisible();
+  await expect(right.getByTestId('pane-section-token')).toContainText('tokens');
 
   await page.goto(`${DETAIL_ROUTE}?scenario=31`);
   await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -218,9 +237,9 @@ test('plan card activation in the thread opens the plan doc in the right pane', 
 }) => {
   await page.goto(`${DETAIL_ROUTE}?scenario=plan-open`);
 
-  await expect(page.getByTestId('pane-tab-doc')).toHaveText('变更');
+  await expect(page.getByTestId('pane-title')).toHaveText('变更');
   await page.getByRole('button', { name: '打开方案' }).first().click();
-  await expect(page.getByTestId('pane-tab-doc')).toHaveText('方案');
+  await expect(page.getByTestId('pane-title')).toHaveText('方案');
   await expect(page.getByTestId('doc-body').locator('p').first()).toBeVisible();
 });
 

@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "8f17a678-5145-47d0-a848-1f1570e56cdf",
+  "id": "0b85ad61-b098-468b-88d8-c9be71c377a0",
   "prevId": "6c5ba041-016c-4c2e-84b1-bdfe91e10a98",
   "tables": {
     "agent": {
@@ -2672,6 +2672,20 @@
           "notNull": false,
           "autoincrement": false
         },
+        "icon": {
+          "name": "icon",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "color": {
+          "name": "color",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "autonomy": {
           "name": "autonomy",
           "type": "text",
@@ -3929,13 +3943,6 @@
         "firstPrReportPromptFirstPrNumber": {
           "name": "firstPrReportPromptFirstPrNumber",
           "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "namedPrompts": {
-          "name": "namedPrompts",
-          "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
