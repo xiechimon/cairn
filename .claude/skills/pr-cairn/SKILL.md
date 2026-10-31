@@ -56,6 +56,15 @@ HTML comments still makes the task gate red, including inside details.
 Closing keywords belong in commit messages. For a multi-segment ticket,
 only the closing segment's commit message carries the parent closing keyword.
 
+## Glance card by change type
+
+Put one glance card under Proof so a reviewer sees the change without reading the diff:
+
+- Migrations (`apps/server/drizzle/**`): paste the output of `node scripts/schema-glance.mjs --base origin/main --head HEAD`, heading included. The `pr-evidence` gate reds a drizzle PR whose `### Schema changes` rows differ from the script's output for the PR head.
+- API changes: before and after request and response, captured with `verify-cairn`.
+- Cross-component flows: a Mermaid `sequenceDiagram`.
+- `scripts/ops/**`: the command and its run output.
+
 ## Screenshots
 
 Store images on `pr-assets/<pr-number>`, created from main or as an orphan.

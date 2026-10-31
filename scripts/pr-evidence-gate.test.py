@@ -304,6 +304,72 @@ class ProseCapTests(unittest.TestCase):
         self.assertIn('FAIL too-long:', output)
 
 
+class SchemaGlanceTests(unittest.TestCase):
+    table = ('### Schema changes\n\n| table | change | detail |\n|---|---|---|\n'
+             '| `tasks` | + due_at | integer |\n| `tasks` | - legacy | text |\n')
+    base = '## Proof\nOld run failed; new run passed.\n## What\nAdd a column.\n## Review\nReviewed.\n## Risk\nReversible.\n'
+
+    def verdict(self, body, expected=None):
+        output = io.StringIO()
+        with tempfile.TemporaryDirectory() as directory:
+            argv = ['pr-evidence-gate.py']
+            if expected is not None:
+                path = Path(directory, 'schema-glance.md')
+                path.write_text(expected)
+                argv += ['--schema-glance', str(path)]
+            with patch.object(sys, 'argv', argv), patch.dict(gate.os.environ, {'PR_BODY': body}), contextlib.redirect_stdout(output):
+                result = gate.main()
+        return result, output.getvalue()
+
+    def test_drizzle_body_without_the_table_is_red(self):
+        result, output = self.verdict(self.base, self.table)
+        self.assertEqual(result, 1, output)
+        self.assertIn('FAIL schema-changes: missing', output)
+
+    def test_stale_table_is_red(self):
+        stale = self.table.replace('+ due_at | integer', '+ due_at | text')
+        result, output = self.verdict(self.base + stale, self.table)
+        self.assertEqual(result, 1, output)
+        self.assertIn('FAIL schema-changes: stale', output)
+
+    def test_current_table_is_green(self):
+        result, output = self.verdict(self.base + self.table, self.table)
+        self.assertEqual(result, 0, output)
+        self.assertIn('schema-changes: matches', output)
+
+    def test_table_inside_details_counts(self):
+        body = self.base + '<details><summary>Schema</summary>\n\n' + self.table + '\n</details>\n'
+        result, output = self.verdict(body, self.table)
+        self.assertEqual(result, 0, output)
+
+    def test_extra_or_reordered_rows_are_red(self):
+        rows = self.table.splitlines()
+        reordered = '\n'.join(rows[:4] + [rows[5], rows[4]]) + '\n'
+        for body_table in (reordered, self.table + '| `tasks` | + extra | text |\n'):
+            result, output = self.verdict(self.base + body_table, self.table)
+            self.assertEqual(result, 1, output)
+            self.assertIn('FAIL schema-changes: stale', output)
+
+    def test_no_schema_changes_output_requires_the_heading_and_text(self):
+        expected = '### Schema changes\n\nNo schema changes\n'
+        result, output = self.verdict(self.base + expected, expected)
+        self.assertEqual(result, 0, output)
+        result, output = self.verdict(self.base, expected)
+        self.assertEqual(result, 1, output)
+
+    def test_non_drizzle_body_is_unaffected(self):
+        result, output = self.verdict(self.base)
+        self.assertEqual(result, 0, output)
+        self.assertNotIn('schema-changes', output)
+        result, output = self.verdict(self.base + self.table)
+        self.assertEqual(result, 0, output)
+
+    def test_workflow_passes_the_base_copy_output(self):
+        workflow = Path('.github/workflows/pr-evidence.yml').read_text()
+        self.assertIn('git show "$BASE_SHA:scripts/schema-glance.mjs"', workflow)
+        self.assertIn('--schema-glance', workflow)
+
+
 def load_tests(loader, tests, pattern):
     task_spec = importlib.util.spec_from_file_location('task_tests', Path(__file__).with_name('pr-tasks-gate.test.py'))
     task_tests = importlib.util.module_from_spec(task_spec)
