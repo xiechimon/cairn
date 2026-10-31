@@ -177,7 +177,7 @@ export function TraceRowButton({
         <span
           className={cn(
             'min-w-0 truncate font-medium text-(--foreground)',
-            mono && 'font-mono text-[0.92em]',
+            mono && 'font-mono text-meta',
           )}
         >
           {target}
@@ -229,7 +229,7 @@ export function TraceCommandBox({
   return (
     <div
       className={cn(
-        'rounded-lg bg-(--background) px-3 py-2 font-mono text-[12.5px] leading-[19px] whitespace-pre-wrap text-(--foreground) ring-1 ring-(--border) ring-inset [overflow-wrap:anywhere]',
+        'rounded-lg bg-(--background) px-3 py-2 font-mono text-meta leading-5 whitespace-pre-wrap text-(--foreground) ring-1 ring-(--border) ring-inset [overflow-wrap:anywhere]',
         className,
       )}
       data-trace-command=""
