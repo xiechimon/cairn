@@ -98,6 +98,7 @@ case "$*" in
   *"pr list"*) cat "${home}/prs.json" ;;
   *"--json comments"*) cat "${home}/comments.json" ;;
   *"--json files"*) echo '{"files":[{"path":"feature.txt"}]}' ;;
+  *"--json title,body"*) echo '{"title":"web(2303): example","body":"PR BODY TEXT"}' ;;
 esac
 `,
   );
@@ -121,28 +122,40 @@ exit 1
     script(
       join(bin, 'claude'),
       `#!/bin/sh
-echo "claude $1 <prompt> $3 $4" >> "${log}"
+echo "claude $* proxy=$HTTPS_PROXY" >> "${log}"
+cat > "${home}/claude-input.txt"
 printf '%s\\n' "${claude}"
 `,
     );
   const run = spawnSync(process.execPath, [gateScript], {
     encoding: 'utf8',
-    env: { ...process.env, HOME: home, PATH: `${bin}:${process.env.PATH}` },
+    env: {
+      ...process.env,
+      HOME: home,
+      PATH: `${bin}:${process.env.PATH}`,
+      HTTPS_PROXY: 'http://127.0.0.1:7890',
+    },
   });
-  return { run, calls: existsSync(log) ? readFileSync(log, 'utf8') : '', sha };
+  return { run, calls: existsSync(log) ? readFileSync(log, 'utf8') : '', sha, home };
 }
 
 const openai = { kind: 'codex', model: 'default' };
 const anthropic = { kind: 'claude', model: 'claude-opus-5-5' };
 
 test('openai author with no usable cross-vendor model gets a Claude verdict', () => {
-  const { run, calls, sha } = host({
+  const { run, calls, sha, home } = host({
     author: openai,
     claude: '1. suggestion: none\nVERDICT: pass',
   });
   assert.equal(run.status, 0, run.stderr);
   assert.match(calls, /ai-route openai/);
-  assert.match(calls, /claude -p <prompt> --model opus/);
+  assert.match(
+    calls,
+    /^claude -p --model opus .*--tools Read,Grep,Glob .*proxy=http:\/\/127\.0\.0\.1:7890$/m,
+  );
+  const input = readFileSync(join(home, 'claude-input.txt'), 'utf8');
+  assert.match(input, /PR description:\nPR BODY TEXT/);
+  assert.match(input, /\+change/);
   assert.match(
     calls,
     new RegExp(`<!-- review-gate:${sha} -->\\n\\*\\*Independent review gate: PASS\\*\\* for `),

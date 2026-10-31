@@ -1,31 +1,14 @@
 export const STALL_MS = 3600_000;
-export const CLAUDE_REVIEW_TOOLS = [
-  'Read',
-  'Grep',
-  'Glob',
-  'Bash(git diff:*)',
-  'Bash(git log:*)',
-  'Bash(git show:*)',
-  'Bash(gh pr view:*)',
-  'Bash(gh issue view:*)',
-];
-
+export const CLAUDE_REVIEW_TOOLS = ['Read', 'Grep', 'Glob'];
 export const CLAUDE_DENIED_TOOLS = [
+  'Bash',
   'Edit',
   'Write',
   'NotebookEdit',
   'WebFetch',
   'WebSearch',
-  'Bash(git commit:*)',
-  'Bash(git push:*)',
-  'Bash(git checkout:*)',
-  'Bash(git reset:*)',
-  'Bash(gh pr edit:*)',
-  'Bash(gh pr create:*)',
-  'Bash(gh pr merge:*)',
-  'Bash(gh pr comment:*)',
-  'Bash(gh api:*)',
 ];
+export const DIFF_LIMIT = 100_000;
 
 export function claudeFallback(authorVendor, run) {
   return (
@@ -36,10 +19,9 @@ export function claudeFallback(authorVendor, run) {
   );
 }
 
-export function claudeReviewArgs(prompt) {
+export function claudeReviewArgs() {
   return [
     '-p',
-    prompt,
     '--model',
     'opus',
     '--permission-mode',
@@ -48,12 +30,32 @@ export function claudeReviewArgs(prompt) {
     'project',
     '--strict-mcp-config',
     '--tools',
-    'Read,Grep,Glob,Bash',
+    CLAUDE_REVIEW_TOOLS.join(','),
     '--allowedTools',
     ...CLAUDE_REVIEW_TOOLS,
     '--disallowedTools',
     ...CLAUDE_DENIED_TOOLS,
   ];
+}
+
+export function claudeReviewPrompt(prompt, { diff, title, body }) {
+  const shown =
+    diff.length > DIFF_LIMIT
+      ? `${diff.slice(0, DIFF_LIMIT)}\n[diff truncated at ${DIFF_LIMIT} of ${diff.length} characters]`
+      : diff;
+  return `${prompt}
+
+You cannot run commands. The PR description and the full diff against origin/main are below; the checkout is origin/main, so Read/Grep/Glob show the base side only.
+
+PR title: ${title}
+
+PR description:
+${body}
+
+Diff:
+\`\`\`diff
+${shown}
+\`\`\``;
 }
 
 export function stalledSince(records, number, sha) {

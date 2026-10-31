@@ -3,6 +3,7 @@ import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from '
 import {
   claudeFallback,
   claudeReviewArgs,
+  claudeReviewPrompt,
   parseRuns,
   stallAlert,
   stalled,
@@ -305,8 +306,10 @@ ${
       console.log(
         `reviewing #${pr.number} @ ${pr.headRefOid.slice(0, 8)} (slot ${slot}, prefer ${env.AI_ROUTE_PREFER}${av ? `, author ${av} excluded` : ''})`,
       );
-      const reviewWith = (command, args, done) => {
+      const reviewWith = (command, args, done, input) => {
         const child = spawn(command, args, { env, cwd: MAIN });
+        child.stdin.on('error', () => {});
+        child.stdin.end(input ?? '');
         let stdout = '';
         let stderr = '';
         child.stdout.on('data', (d) => (stdout += d));
@@ -321,8 +324,25 @@ ${
       reviewWith('ai-route', ['run', 'review', '--hard', '-C', MAIN, prompt], (routed) => {
         if (!claudeFallback(av, routed)) return resolve(routed);
         console.log(`#${pr.number}: no usable cross-vendor model; reviewing with Claude`);
-        reviewWith('claude', claudeReviewArgs(prompt), (fallback) =>
-          resolve({ ...fallback, reviewer: 'claude' }),
+        let input;
+        try {
+          const diff = execFileSync('git', ['diff', `origin/main...review-gate-${pr.number}`], {
+            cwd: MAIN,
+            encoding: 'utf8',
+            maxBuffer: 64 << 20,
+          });
+          const { title, body } = JSON.parse(
+            gh(['pr', 'view', String(pr.number), '--json', 'title,body']),
+          );
+          input = claudeReviewPrompt(prompt, { diff, title, body });
+        } catch (e) {
+          return resolve({ ...routed, stderr: `${routed.stderr}\nclaude fallback: ${e.message}` });
+        }
+        reviewWith(
+          'claude',
+          claudeReviewArgs(),
+          (fallback) => resolve({ ...fallback, reviewer: 'claude' }),
+          input,
         );
       });
     });

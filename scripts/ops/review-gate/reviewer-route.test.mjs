@@ -5,6 +5,8 @@ import {
   CLAUDE_REVIEW_TOOLS,
   claudeFallback,
   claudeReviewArgs,
+  claudeReviewPrompt,
+  DIFF_LIMIT,
   parseRuns,
   STALL_MS,
   stallAlert,
@@ -29,27 +31,29 @@ test('no fallback without an excluded author or on other failures', () => {
   assert.equal(claudeFallback('openai', { status: 0, stderr: 'no usable model' }), false);
 });
 
-test('the Claude review is read-only', () => {
-  const args = claudeReviewArgs('review this');
-  assert.deepEqual(args.slice(0, 2), ['-p', 'review this']);
+test('the Claude review has no shell and no write tools', () => {
+  const args = claudeReviewArgs();
+  assert.equal(args[0], '-p');
+  assert.equal(args[args.indexOf('--tools') + 1], 'Read,Grep,Glob');
   const allowedAt = args.indexOf('--allowedTools');
   const deniedAt = args.indexOf('--disallowedTools');
-  const tools = args.slice(allowedAt + 1, deniedAt);
-  assert.deepEqual(tools, CLAUDE_REVIEW_TOOLS);
-  assert.doesNotMatch(tools.join(' '), /Edit|Write|git push|git commit|gh pr merge|gh pr comment/);
+  assert.deepEqual(args.slice(allowedAt + 1, deniedAt), CLAUDE_REVIEW_TOOLS);
+  assert.deepEqual(args.slice(deniedAt + 1), CLAUDE_DENIED_TOOLS);
+  for (const tool of ['Bash', 'Edit', 'Write', 'WebFetch'])
+    assert.ok(CLAUDE_DENIED_TOOLS.includes(tool));
   assert.equal(args[args.indexOf('--setting-sources') + 1], 'project');
-  assert.equal(args[args.indexOf('--tools') + 1], 'Read,Grep,Glob,Bash');
   assert.ok(args.includes('--strict-mcp-config'));
-  const denied = args.slice(deniedAt + 1);
-  assert.equal(deniedAt, args.length - CLAUDE_DENIED_TOOLS.length - 1);
-  for (const write of [
-    'Edit',
-    'Write',
-    'Bash(git commit:*)',
-    'Bash(gh pr edit:*)',
-    'Bash(gh pr create:*)',
-  ])
-    assert.ok(denied.includes(write), write);
+});
+
+test('the Claude prompt carries the description and a bounded diff', () => {
+  const small = claudeReviewPrompt('PROMPT', { diff: '+x\n', title: 'T', body: 'B' });
+  assert.match(small, /^PROMPT\n/);
+  assert.match(small, /PR title: T/);
+  assert.match(small, /PR description:\nB/);
+  assert.match(small, /```diff\n\+x\n/);
+  const big = claudeReviewPrompt('P', { diff: 'y'.repeat(DIFF_LIMIT + 5), title: '', body: '' });
+  assert.match(big, new RegExp(`diff truncated at ${DIFF_LIMIT} of ${DIFF_LIMIT + 5} characters`));
+  assert.ok(big.length < DIFF_LIMIT + 1000);
 });
 
 const sha = 'a'.repeat(40);
