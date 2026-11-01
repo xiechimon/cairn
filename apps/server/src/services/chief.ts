@@ -296,6 +296,7 @@ export function toChiefThreadRecord(
     chiefId: row.chiefId,
     userId: row.userId,
     teamId: row.teamId,
+    projectId: row.projectId,
     title: row.title,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -412,6 +413,7 @@ export function sendChiefMessage(
   deps: ChiefDeps,
   teamId: string,
   body: { threadId: string | null; content: string; projectId?: string | null | undefined },
+  bindNewThreadToProject = false,
 ): {
   thread: ChiefThread;
   message: { id: string; role: 'user'; content: string; createdAt: number };
@@ -440,6 +442,7 @@ export function sendChiefMessage(
         chiefId: chiefRow.id,
         userId: deps.user.id,
         teamId,
+        projectId: bindNewThreadToProject ? (picked?.id ?? null) : null,
         title: chiefThreadTitle(body.content),
         createdAt: now,
         updatedAt: now,

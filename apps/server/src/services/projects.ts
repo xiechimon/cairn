@@ -18,6 +18,7 @@ import {
   agentMemory,
   build,
   chief,
+  chiefThread,
   project,
   schedule,
   step,
@@ -88,6 +89,18 @@ export interface ProjectPatchDeps {
 
 const IN_FLIGHT_STEP_STATUSES = ['pending', 'claimed', 'waiting_quota'] as const;
 
+export function setProjectArchived(
+  db: Db,
+  id: string,
+  archived: boolean,
+): typeof project.$inferSelect | undefined {
+  db.update(project)
+    .set({ archivedAt: archived ? nowMs() : null })
+    .where(eq(project.id, id))
+    .run();
+  return db.select().from(project).where(eq(project.id, id)).get();
+}
+
 export function deleteProject(deps: ProjectDeps, id: string): boolean {
   const { db } = deps;
   const row = db.select().from(project).where(eq(project.id, id)).get();
@@ -122,6 +135,7 @@ export function deleteProject(deps: ProjectDeps, id: string): boolean {
       }
     }
     tx.update(agentMemory).set({ projectId: null }).where(eq(agentMemory.projectId, id)).run();
+    tx.update(chiefThread).set({ projectId: null }).where(eq(chiefThread.projectId, id)).run();
     tx.delete(project).where(eq(project.id, id)).run();
   });
   if (row.repoKind === 'hosted' && row.repoName !== null) {

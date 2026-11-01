@@ -7227,6 +7227,26 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
   },
   {
     "method": "GET",
+    "note": "the project's Coordinator conversation, {thread} or {thread: null}",
+    "path": "/api/projects/{id}/coordinator",
+  },
+  {
+    "method": "POST",
+    "note": "body {content}; opens the conversation on the first message, 409 when archived",
+    "path": "/api/projects/{id}/coordinator/messages",
+  },
+  {
+    "method": "POST",
+    "note": "sets project.archivedAt",
+    "path": "/api/projects/{id}/archive",
+  },
+  {
+    "method": "POST",
+    "note": "clears project.archivedAt",
+    "path": "/api/projects/{id}/unarchive",
+  },
+  {
+    "method": "GET",
     "path": "/api/builds/{id}",
   },
   {
@@ -8122,6 +8142,12 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > chi
         },
       ],
     },
+    "projectId": {
+      "type": [
+        "string",
+        "null",
+      ],
+    },
     "session": {
       "additionalProperties": false,
       "properties": {
@@ -8653,6 +8679,18 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > pro
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "archivedAt": {
+      "anyOf": [
+        {
+          "maximum": 9007199254740991,
+          "minimum": -9007199254740991,
+          "type": "integer",
+        },
+        {
+          "type": "null",
+        },
+      ],
+    },
     "baseBranch": {
       "type": [
         "string",
