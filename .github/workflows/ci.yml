@@ -317,6 +317,9 @@ jobs:
         if: ${{ !cancelled() }}
         run: node --test scripts/ops/real-smoke.test.mjs
 
+      - name: Orb host provisioning fixtures (#2273)
+        if: ${{ !cancelled() }}
+        run: node --test scripts/ops/orb/egress-relay.test.mjs scripts/ops/orb/orb-host-check.test.mjs scripts/ops/orb/provision.test.mjs scripts/ops/orb/shell.test.mjs
       - name: Host control script fixtures (#2380)
         if: ${{ !cancelled() }}
         run: node --test scripts/ops/host/aged-prs.test.mjs scripts/ops/host/dispatch-issue.test.mjs scripts/ops/host/lanes-retry.test.mjs
