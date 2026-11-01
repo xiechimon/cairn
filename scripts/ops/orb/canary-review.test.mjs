@@ -1,7 +1,16 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -9,7 +18,7 @@ import { aggregateResult } from './canary.mjs';
 import * as attacker from './canary-attacker.mjs';
 import * as processes from './canary-process.mjs';
 import { poll, stopChild } from './canary-process.mjs';
-import { recoverSentinels, remainingSentinels } from './canary-sentinels.mjs';
+import { plantSentinels, recoverSentinels, remainingSentinels } from './canary-sentinels.mjs';
 import * as stack from './canary-stack.mjs';
 
 function green() {
@@ -271,7 +280,7 @@ await canaryMain(['--json'], { home: ${JSON.stringify(home)}, preflight: async (
   assert.match(JSON.parse(output.stdout).errors[0], /^~\/.cairn\/1.pem$/);
 });
 
-test('recorded process recovery refuses mismatched start time, command and cwd', async (t) => {
+test('recorded process recovery ignores reused PIDs and refuses mismatched command and cwd', async (t) => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'canary-identity-')));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const entry = join(root, 'worker.mjs');
@@ -283,12 +292,202 @@ test('recorded process recovery refuses mismatched start time, command and cwd',
     await closed;
   });
   const record = processes.childRecord(child, root, entry);
-  for (const change of [
-    { startTime: 'different' },
-    { entry: 'different.mjs' },
-    { cwd: tmpdir() },
-  ]) {
+  assert.doesNotThrow(() => processes.stopRecordedChildSync({ ...record, startTime: 'different' }));
+  assert.doesNotThrow(() => process.kill(child.pid, 0));
+  for (const change of [{ entry: 'different.mjs' }, { cwd: tmpdir() }]) {
     assert.throws(() => processes.stopRecordedChildSync({ ...record, ...change }), /different/);
     assert.doesNotThrow(() => process.kill(child.pid, 0));
   }
+});
+
+function fixture(t) {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'canary-round4-')));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  for (const name of ['.cairn', '.ssh', '.codex', '.claude']) mkdirSync(join(root, name));
+  return root;
+}
+
+test('wildcard control starts without a bridge and accepts loopback connections', async (t) => {
+  const listener = await stack.startBridgeControl(0);
+  t.after(() => new Promise((closed) => listener.close(closed)));
+  assert.equal(listener.address().address, '0.0.0.0');
+  assert.equal(
+    (await attacker.connectionProbe({ host: '127.0.0.1', port: listener.address().port })).detail,
+    'connected',
+  );
+});
+
+test('scratch API and wildcard control use distinct ports without requiring a bridge', async (t) => {
+  const root = fixture(t);
+  await processes.withCleanup(async (defer) => {
+    const running = await stack.startStack({
+      root,
+      config: { tailnetAddress: '127.0.0.1' },
+      defer,
+      requireOrbBuild: false,
+      record: () => {},
+    });
+    assert.equal(
+      (await attacker.connectionProbe({ host: '127.0.0.1', port: running.port })).detail,
+      'connected',
+    );
+  });
+});
+
+test('host negative control requires loopback and tailnet but no idle bridge address', () => {
+  const config = {
+    hostHome: '/fixture',
+    sentinels: [{ path: '/fixture/sentinel' }],
+    realPaths: [],
+    serverPort: 34567,
+  };
+  const routes = Object.fromEntries(
+    Object.entries(attacker.expectedTargets(config)).map(([name, targets]) => [
+      name,
+      targets.map((target) => ({ target, blocked: true, detail: 'ETIMEDOUT' })),
+    ]),
+  );
+  const input = {
+    config,
+    orb: { executor: 'orb', routes, githubReach: { ok: true, ms: 1 } },
+    negative: {
+      executor: 'host',
+      leaked: ['/fixture/sentinel'],
+      routes: {
+        socketAndServer: attacker
+          .networkTargets(config)
+          .filter((target) => !target.includes('10.203.0.1') && !target.endsWith(':8787'))
+          .map((target) => ({ target: `direct ${target}`, blocked: false, detail: 'connected' })),
+      },
+    },
+    pushedObjectsClean: true,
+    negativeObjectsContainMarker: true,
+  };
+  assert.equal(aggregateResult(input).ok, true);
+  for (const target of ['127.0.0.1', 'tailnet-server']) {
+    const broken = structuredClone(input);
+    broken.negative.routes.socketAndServer = broken.negative.routes.socketAndServer.filter(
+      (row) => !row.target.includes(target),
+    );
+    assert.equal(aggregateResult(broken).ok, false);
+  }
+});
+
+for (const code of ['EACCES', 'EPERM', 'root']) {
+  test(`proc1 alias is blocked when readlink reports ${code}`, () => {
+    for (const sentinel of [undefined, { hash: 'a'.repeat(64) }]) {
+      const result = attacker.fileProbe('/proc/1/root/fixture', sentinel, undefined, {
+        readlink: (path) => {
+          assert.equal(path, '/proc/1/root');
+          if (code === 'root') return '/';
+          throw Object.assign(new Error(code), { code });
+        },
+        stat: () => assert.fail('guest root alias probed'),
+        open: () => assert.fail('guest root alias opened'),
+      });
+      assert.deepEqual(result, { blocked: true, detail: 'proc1-root-not-host' });
+    }
+  });
+}
+
+test('host-root aliases and ordinary paths still require ENOENT', () => {
+  for (const path of ['/fixture', '/proc/1/root/fixture', '/proc/1/rootish/fixture']) {
+    for (const code of ['ENOENT', 'EACCES', 'EPERM', 'ENOTDIR', 'EIO']) {
+      const fail = () => {
+        throw Object.assign(new Error(code), { code });
+      };
+      const result = attacker.fileProbe(path, undefined, undefined, {
+        readlink: () => '/host',
+        stat: fail,
+      });
+      assert.equal(result.blocked, code === 'ENOENT');
+    }
+  }
+  assert.deepEqual(
+    attacker.fileProbe('/proc/1/root/fixture', undefined, undefined, {
+      readlink: () => {
+        throw Object.assign(new Error('I/O'), { code: 'EIO' });
+      },
+    }),
+    { blocked: false, detail: 'EIO' },
+  );
+});
+
+test('resource failures still remove sentinels and successful resources from recovery inventory', (t) => {
+  const home = fixture(t);
+  const planted = plantSentinels(home, 'failed-resource');
+  const failed = { kind: 'child', pid: 123, entry: 'entry.mjs', cwd: home, startTime: 'fixture' };
+  planted.record(failed);
+  planted.record({ kind: 'seed', path: '/var/lib/cairn-orb/seed/fixture' });
+  planted.record({ kind: 'machine', name: 'cairn-orb-019a3f00-0000-7000-8000-000000000001' });
+  const rows = readFileSync(planted.manifest, 'utf8').trim().split('\n').map(JSON.parse);
+  rows[0].pid = 2147483647;
+  writeFileSync(planted.manifest, `${rows.map(JSON.stringify).join('\n')}\n`);
+  const attempted = [];
+  assert.throws(
+    () =>
+      recoverSentinels(home, 'failed-resource', {
+        cleanupResource: (resource) => {
+          attempted.push(resource.kind);
+          if (resource.kind === 'child') throw new Error('child cleanup failed');
+        },
+      }),
+    /child cleanup failed/,
+  );
+  assert.deepEqual(attempted, ['child', 'machine', 'seed']);
+  assert.deepEqual(remainingSentinels(home), []);
+  const remaining = readFileSync(planted.manifest, 'utf8').trim().split('\n').map(JSON.parse);
+  assert.deepEqual(remaining.slice(1), [failed]);
+  recoverSentinels(home, 'failed-resource', {
+    cleanupResource: (resource) => assert.deepEqual(resource, failed),
+  });
+  assert.equal(existsSync(planted.manifest), false);
+});
+
+test('scratch recovery validates against the recorded prefix instead of current tmpdir', (t) => {
+  const home = fixture(t);
+  const planted = plantSentinels(home, 'prefix');
+  const prefix = join(home, 'different-temp/cairn-orb-canary-');
+  const scratch = `${prefix}owned`;
+  mkdirSync(scratch, { recursive: true });
+  const { dev, ino } = lstatSync(scratch);
+  const rows = readFileSync(planted.manifest, 'utf8').trim().split('\n').map(JSON.parse);
+  rows[0] = { ...rows[0], pid: 2147483647, scratchPrefix: prefix };
+  rows.push({ kind: 'scratch', path: scratch, dev, ino });
+  writeFileSync(planted.manifest, `${rows.map(JSON.stringify).join('\n')}\n`);
+  recoverSentinels(home, 'prefix');
+  assert.equal(existsSync(scratch), false);
+  assert.deepEqual(remainingSentinels(home), []);
+});
+
+test('scratch inventory rejects paths outside its recorded directory prefix', (t) => {
+  const home = fixture(t);
+  const planted = plantSentinels(home, 'outside');
+  t.after(planted.cleanup);
+  const header = JSON.parse(readFileSync(planted.manifest, 'utf8').split('\n')[0]);
+  assert.equal(header.scratchPrefix, join(realpathSync(tmpdir()), 'cairn-orb-canary-'));
+  for (const path of [
+    join(home, 'unowned'),
+    `${header.scratchPrefix}owned/nested`,
+    `${header.scratchPrefix}../unowned`,
+  ])
+    assert.throws(() => planted.record({ kind: 'scratch', path, dev: 1, ino: 1 }), /Invalid/);
+});
+
+test('scratch child is durably recorded synchronously before spawn returns to its caller', async (t) => {
+  const root = fixture(t);
+  const planted = plantSentinels(root, 'spawn');
+  t.after(planted.cleanup);
+  const entry = join(root, 'worker.mjs');
+  writeFileSync(entry, 'setInterval(() => {}, 1000);');
+  const child = processes.spawnRecordedChild(process.cwd(), entry, [], process.env, planted.record);
+  const closed = once(child, 'close');
+  t.after(async () => {
+    child.kill('SIGTERM');
+    await closed;
+  });
+  const rows = readFileSync(planted.manifest, 'utf8').trim().split('\n').map(JSON.parse);
+  assert.equal(rows.at(-1).pid, child.pid);
+  assert.equal(rows.at(-1).entry, entry);
+  assert.ok(rows.at(-1).startTime);
 });

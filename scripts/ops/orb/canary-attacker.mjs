@@ -8,6 +8,7 @@ import {
   openSync,
   readdirSync,
   readFileSync,
+  readlinkSync,
   readSync,
   statSync,
   symlinkSync,
@@ -41,9 +42,24 @@ export function expectedTargets(config) {
   };
 }
 
-export function fileProbe(path, sentinel, copy, { stat = statSync, open = openSync } = {}) {
+export function fileProbe(
+  path,
+  sentinel,
+  copy,
+  { stat = statSync, open = openSync, readlink = readlinkSync } = {},
+) {
   let fd;
   try {
+    if (path.startsWith('/proc/1/root/')) {
+      let guestRoot = false;
+      try {
+        guestRoot = readlink('/proc/1/root') === '/';
+      } catch (error) {
+        if (!['EACCES', 'EPERM'].includes(error.code)) throw error;
+        guestRoot = true;
+      }
+      if (guestRoot) return { blocked: true, detail: 'proc1-root-not-host' };
+    }
     if (!sentinel) {
       stat(path);
       return { blocked: false, detail: 'real path reachable (metadata only)' };

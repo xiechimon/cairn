@@ -171,7 +171,9 @@ test.each(['exit', 'stdout', 'timeout'] as const)(
     fail = true;
     writeFileSync(join(f.checkout, 'source.txt'), 'new');
     await expect(f.prepare()).rejects.toThrow(
-      kind === 'timeout' ? /pnpm deploy.*Timed out/ : /pnpm deploy.*offline store missing/,
+      kind === 'timeout'
+        ? /pnpm deploy timed out after 600 seconds/
+        : /pnpm deploy.*offline store missing/,
     );
     expect(readlinkSync(join(f.distRoot, 'current'))).toBe(previous);
     expect(readFileSync(join(f.distRoot, 'cli.mjs'), 'utf8')).toBe('first');
@@ -358,4 +360,26 @@ test('release preflight computes the publisher key without deploying or changing
   expect(JSON.parse(readFileSync(join(f.distRoot, 'current.json'), 'utf8'))).toEqual(expected);
   writeFileSync(join(f.checkout, 'source.txt'), 'dirty');
   expect((await orbDistRelease(f.distSource, f.runner)).key).not.toBe(expected.key);
+});
+
+test('deploy allows 600 seconds for cross-filesystem copies and reports signal abort duration', async () => {
+  const original = AbortSignal.timeout.bind(AbortSignal);
+  const timeout = vi.spyOn(AbortSignal, 'timeout');
+  const controller = new AbortController();
+  try {
+    const f = fixture((runner) => async (argv, options) => {
+      if (argv[0] === 'pnpm') {
+        expect(timeout).toHaveBeenLastCalledWith(600_000);
+        controller.abort(new DOMException('Deadline reached', 'TimeoutError'));
+        throw new DOMException('The operation was aborted', 'AbortError');
+      }
+      return runner(argv, options);
+    });
+    timeout.mockImplementation((milliseconds) =>
+      milliseconds === 600_000 ? controller.signal : original(milliseconds),
+    );
+    await expect(f.prepare()).rejects.toThrow('Orb pnpm deploy timed out after 600 seconds');
+  } finally {
+    timeout.mockRestore();
+  }
 });

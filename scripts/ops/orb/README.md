@@ -241,10 +241,14 @@ The daemon-side publisher produces a self-contained
 production `node_modules`. Dependencies must come from the checkout's lockfile:
 
 ```sh
-pnpm --dir <checkout> deploy --filter @xiechimon/cairn-cli --prod --offline <tmp>
+pnpm --dir <checkout> deploy --filter @xiechimon/cairn-cli --prod --prefer-offline <tmp>
 ```
 
-An offline deploy failure must produce a clear error, never an npm fallback.
+Deployment has a 600-second timeout, reported as `Orb pnpm deploy timed out after
+600 seconds` on abort. Stores and release directories on different filesystems
+require copying production dependencies instead of hardlinking them; the longer
+budget accommodates these copies under load. A deploy failure must produce a
+clear error, never an npm fallback.
 The key is `<package version>-<git short SHA of the checkout>`, with
 `-dirty-<content hash>` appended for a dirty build. Publication uses a temporary
 directory followed by atomic rename; identical keys are reused. Relative
@@ -485,14 +489,20 @@ The three routes cover:
   every random marker, including intermediate, deleted and packed objects.
 - A Node Unix-socket connect to `/var/run/docker.sock`, plus TCP connects to
   canary-owned listeners on loopback, bridge `10.203.0.1`, and the discovered
-  tailnet address, all using the scratch server port. Both control listeners
-  must bind and accept a host connection before probing. The host runner's
-  negative control must also connect to every owned endpoint; missing, refused
-  or duplicate controls fail the result. The Orb's bridge and tailnet probes
-  require timeouts rather than connection refusal. The separate
+  tailnet address, all using a separate free control port. One TCP control
+  listener binds `0.0.0.0` and accepts a loopback connection before probing; the
+  token-protected scratch API remains on its own loopback port. Wildcard binding
+  works while the host is idle: `vz-cairn` and `10.203.0.1` exist only while an
+  Orb runs, so binding that bridge address before startup fails with
+  `EADDRNOTAVAIL`. The listener accepts no application requests and closes each
+  connection. The host runner's negative control must connect through loopback
+  and the tailnet address; it does not require the bridge address after the Orb
+  stops. Missing, refused or duplicate required controls fail the result. The
+  Orb's bridge and tailnet probes require timeouts rather than connection refusal.
+  The separate
   `127.0.0.1:8787` row explicitly identifies the Orb's own loopback in `detail`;
-  it makes no claim about a host production listener. The loopback scratch
-  server detects a shared host network namespace. Each HTTP target is also
+  it makes no claim about a host production listener. The loopback control
+  detects a shared host network namespace. Each HTTP target is also
   attempted with an explicit CONNECT through `HTTP_PROXY`, bypassing `NO_PROXY`.
   Proxy attempts require HTTP 403; missing proxies and unexpected responses
   fail the canary. The host tailnet address comes from `tailscale ip -4` and
@@ -535,6 +545,11 @@ use indexed aliases such as `~/.cairn/1.pem`, including `/proc/1/root` aliases.
 Failure JSON and leftover inventories also redact the real home and PEM names.
 Only `ENOENT` counts as an absent file or directory. `EACCES` and `EPERM` report
 `blocked: false` with `detail: "present-but-denied"`; `ENOTDIR` also fails closed.
+The `/proc/1/root/...` alias has one exception: if reading `/proc/1/root` itself
+returns `EACCES` or `EPERM`, or its link target is `/`, it does not identify a host
+path. That alias records `blocked: true` with `detail: "proc1-root-not-host"`
+without opening the path. Other readlink errors and all ordinary paths retain
+the `ENOENT`-only rule.
 
 `ok` and exit zero require complete, unique probe rows, every Orb target blocked,
 clean Orb objects, a scanner-confirmed leaking host control, live host listeners
@@ -551,12 +566,18 @@ retained by this publisher rather than pruned or deleted by the canary.
 A private `~/.cairn/orb-canary-runs/<runid>.jsonl` manifest records the run PID and
 created paths with device/inode identities, flushed before marker contents are
 written. It also records each scratch server/daemon PID, entry, working directory
-and OS start time before waiting for readiness, plus the exact Orb machine names
-and Project seed paths before the daemon can create them. The scratch directory
-is recorded with its device/inode identity. It contains no raw markers. Successful
-cleanup removes the manifest; failed cleanup preserves it for retry. The shell wrapper traps exit and forwards
-SIGINT/SIGTERM/SIGHUP to Node before waiting for cleanup. After SIGKILL or a host
-restart, the next run recovers manifests whose owning process no longer exists.
+and OS start time synchronously immediately after spawn, before returning the
+child or awaiting readiness, plus the exact Orb machine names and Project seed
+paths before the daemon can create them. A recording error terminates the new
+child. SIGKILL or power loss between the OS spawn and the completed synchronous
+manifest write can still leave an unrecorded child; readiness checks do not
+eliminate this window. The scratch directory is recorded with its
+device/inode identity, and its allowed temporary-directory prefix is stored in
+the header so recovery does not depend on the current `TMPDIR`. It contains no
+raw markers. Successful cleanup removes the manifest; failed cleanup atomically
+retains only failed resources and sentinel entries for retry. The shell wrapper
+traps exit and forwards SIGINT/SIGTERM/SIGHUP to Node before waiting for cleanup.
+After SIGKILL or a host restart, the next run recovers manifests whose owning process no longer exists.
 To recover one stopped run explicitly without starting the stack:
 
 ```sh
@@ -564,12 +585,16 @@ scripts/ops/orb/canary.sh --cleanup <runid>
 ```
 
 Recovery stops recorded children only after matching their start time, command
-and working directory; an empty Linux cmdline means an already exited zombie.
+and working directory; a different start time means the recorded process is gone
+and the reused PID is left untouched. An empty Linux cmdline means an already
+exited zombie.
 It then removes only recorded machines through `machine-cleanup.mjs`, waits for
-their stop hooks, and removes recorded seeds and scratch directories. A failed
-process or machine cleanup preserves the remaining resources and manifest for
-retry. Tests simulate a parent SIGKILL with a live detached child and cover both
-explicit cleanup and the next-run sweep.
+their stop hooks, and removes recorded seeds and scratch directories. Cleanup
+collects resource errors and always attempts every recorded sentinel removal,
+even after a process or machine cleanup fails. Successful entries are removed
+from the recovery inventory; only failures remain for retry. Tests simulate a
+parent SIGKILL with a live detached child and cover both explicit cleanup and
+the next-run sweep.
 Recovery removes only recorded files whose identities still match. Active runs,
 replaced files, symlinks and malformed manifests are preserved and refused.
 Untracked sentinel names are reported by the final assertion and never removed

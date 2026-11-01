@@ -19,6 +19,8 @@ import {
 import { join, resolve } from 'node:path';
 import type { OrbCommandRunner, OrbExecResult } from './provider.js';
 
+const ORB_DEPLOY_TIMEOUT_MS = 600_000;
+
 async function checkoutCommand(runner: OrbCommandRunner, checkout: string, args: string[]) {
   const result = await runner(['git', '-C', checkout, ...args], {
     signal: AbortSignal.timeout(30_000),
@@ -108,6 +110,7 @@ export async function publishOrbDist(
     const temporary = mkdtempSync(join(root, '.release-'));
     try {
       let result: OrbExecResult;
+      const deploySignal = AbortSignal.timeout(ORB_DEPLOY_TIMEOUT_MS);
       try {
         result = await runner(
           [
@@ -123,10 +126,14 @@ export async function publishOrbDist(
           ],
           {
             env: { ...process.env, PNPM_CONFIG_IGNORE_SCRIPTS: 'true' },
-            signal: AbortSignal.timeout(120_000),
+            signal: deploySignal,
           },
         );
       } catch (error) {
+        if (deploySignal.aborted || (error instanceof Error && error.name === 'TimeoutError'))
+          throw new Error(
+            `Orb pnpm deploy timed out after ${ORB_DEPLOY_TIMEOUT_MS / 1000} seconds`,
+          );
         throw new Error(
           `Orb pnpm deploy failed: ${error instanceof Error ? error.message : String(error)}`,
         );

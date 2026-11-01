@@ -130,12 +130,28 @@ export function childRecord(child, cwd, entry) {
   };
 }
 
+export function spawnRecordedChild(cwd, entry, args, env, record) {
+  const child = spawn(process.execPath, ['--import', 'tsx', entry, ...args], {
+    cwd,
+    env,
+    stdio: ['ignore', 'ignore', 'ignore'],
+    detached: true,
+  });
+  child.on('error', () => {});
+  try {
+    record(childRecord(child, cwd, entry));
+  } catch (error) {
+    child.kill('SIGTERM');
+    throw error;
+  }
+  return child;
+}
+
 function recordedChildRunning(record) {
   try {
     const started = processStart(record.pid);
     if (!started) return false;
-    if (started !== record.startTime)
-      throw new Error('Refusing to stop a process with a different start time');
+    if (started !== record.startTime) return false;
     let command;
     let cwd;
     if (process.platform === 'linux') {

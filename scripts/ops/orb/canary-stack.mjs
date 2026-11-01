@@ -1,9 +1,8 @@
-import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { connect, createServer } from 'node:net';
 import { join, resolve } from 'node:path';
-import { childRecord, poll, runCommand, stopChild } from './canary-process.mjs';
+import { poll, runCommand, spawnRecordedChild, stopChild } from './canary-process.mjs';
 
 export function freePort() {
   return new Promise((resolvePort, reject) => {
@@ -16,7 +15,7 @@ export function freePort() {
   });
 }
 
-export async function startBridgeControl(port, host = '10.203.0.1') {
+export async function startBridgeControl(port, host = '0.0.0.0') {
   const bridge = createServer((socket) => socket.destroy());
   try {
     await new Promise((ready, reject) => {
@@ -24,7 +23,10 @@ export async function startBridgeControl(port, host = '10.203.0.1') {
       bridge.listen(port, host, ready);
     });
     await new Promise((ready, reject) => {
-      const socket = connect({ host, port: bridge.address().port });
+      const socket = connect({
+        host: host === '0.0.0.0' ? '127.0.0.1' : host,
+        port: bridge.address().port,
+      });
       socket.setTimeout(2000, () => {
         socket.destroy();
         reject(new Error('Host listener positive control timed out'));
@@ -123,15 +125,8 @@ export async function startStack({
     return response.json();
   };
   const start = (directory, entry, args, extraEnv) => {
-    const child = spawn(process.execPath, ['--import', 'tsx', entry, ...args], {
-      cwd: directory,
-      env: { ...env, ...extraEnv },
-      stdio: ['ignore', 'ignore', 'ignore'],
-      detached: true,
-    });
-    child.on('error', () => {});
+    const child = spawnRecordedChild(directory, entry, args, { ...env, ...extraEnv }, record);
     defer(() => stopChild(child, directory, entry));
-    record(childRecord(child, directory, entry));
     return child;
   };
   const server = start(join(checkout, 'apps/server'), 'src/index.ts', [], {
@@ -151,12 +146,24 @@ export async function startStack({
     },
     { signal, timeout: 60000, label: 'scratch server' },
   );
+  let controlPort = port;
   if (probeNetwork) {
-    for (const host of ['10.203.0.1', config.tailnetAddress]) {
-      if (!host) throw new Error('Missing tailnet listener address');
-      const listener = await startBridgeControl(port, host);
-      defer(() => new Promise((closed) => listener.close(closed)));
-    }
+    if (!config.tailnetAddress) throw new Error('Missing tailnet listener address');
+    const listener = await startBridgeControl(0);
+    defer(() => new Promise((closed) => listener.close(closed)));
+    controlPort = listener.address().port;
+    const socket = connect({ host: config.tailnetAddress, port: controlPort });
+    await new Promise((ready, reject) => {
+      socket.setTimeout(2000, () => {
+        socket.destroy();
+        reject(new Error('Host tailnet listener positive control timed out'));
+      });
+      socket.once('error', reject);
+      socket.once('connect', () => {
+        socket.destroy();
+        ready();
+      });
+    });
   }
   const [team] = await api('GET', '/api/teams');
   const key = await api('POST', `/api/teams/${team.id}/api-keys`, {
@@ -175,7 +182,7 @@ export async function startStack({
     models: [{ id: 'canary-model', name: 'Canary model' }],
   });
   return {
-    port,
+    port: controlPort,
     async run(executor) {
       const daemonHome = join(root, `${executor}-home`);
       const source = join(root, `${executor}-source`);
@@ -198,7 +205,7 @@ export async function startStack({
         );
       writeFileSync(
         join(source, '.agents/config.json'),
-        JSON.stringify({ ...config, serverPort: port, modelPort, probeNetwork }),
+        JSON.stringify({ ...config, serverPort: controlPort, modelPort, probeNetwork }),
         { flag: 'wx' },
       );
       writeFileSync(

@@ -267,6 +267,10 @@ test('preparation applies the shared template and actual runtime limits idempote
     const first = f.run('prepare-machine.sh', ['cairn-orb-test-a']);
     assert.equal(first.status, 0, first.stderr);
     assert.match(first.stdout, /MemoryMax=4G CPUQuota=400% TasksMax=4096/);
+    writeFileSync(
+      join(f.root, 'properties'),
+      `MemoryMax=4294967296\nCPUQuotaPerSecUSec=4s\nTasksMax=4096\nExtra=${'x'.repeat(1024 * 1024)}`,
+    );
     assert.equal(f.run('prepare-machine.sh', ['cairn-orb-test-a']).stdout.trim(), '0 changes');
     for (const flags of ['rw,nodev', 'rw,nosuid', 'rw', '']) {
       assert.notEqual(
@@ -507,6 +511,16 @@ test('image ships enabled guest worker and trigger units with one daemon entry',
 test('preparation delegates source creation and stop to the root fd helper', () => {
   const f = fixture();
   try {
+    for (const [from, to] of [
+      ['cairn-orb.nspawn', 'etc/systemd/nspawn/cairn-orb.nspawn'],
+      [
+        'systemd-nspawn@cairn-orb-.service.d/limits.conf',
+        'etc/systemd/system/systemd-nspawn@cairn-orb-.service.d/limits.conf',
+      ],
+    ]) {
+      mkdirSync(join(f.root, to, '..'), { recursive: true });
+      writeFileSync(join(f.root, to), readFileSync(join(source, from)));
+    }
     const name = 'cairn-orb-test-a';
     mkdirSync(join(f.root, 'run/cairn-orb'), { recursive: true });
     writeFileSync(

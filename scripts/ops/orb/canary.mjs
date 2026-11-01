@@ -63,7 +63,9 @@ export function aggregateResult({
     Array.isArray(leaked) &&
     leaked.length > 0 &&
     leaked.every((path) => config.sentinels.some((entry) => entry.path === path));
-  const hostTargets = networkTargets(config).filter((target) => target !== 'http://127.0.0.1:8787');
+  const hostTargets = networkTargets(config).filter(
+    (target) => target !== 'http://127.0.0.1:8787' && !target.startsWith('http://10.203.0.1:'),
+  );
   const hostConnections = negative?.routes?.socketAndServer ?? [];
   const listenersLive = hostTargets.every((target) => {
     const rows = hostConnections.filter((row) => row.target === `direct ${target}`);

@@ -11,12 +11,13 @@ import {
   readdirSync,
   readFileSync,
   realpathSync,
+  renameSync,
   rmSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { isAbsolute, join } from 'node:path';
+import { basename, isAbsolute, join, resolve } from 'node:path';
 
 import { stopRecordedChildSync } from './canary-process.mjs';
 
@@ -52,7 +53,7 @@ function manifestPath(home, id, create = false) {
   return join(parent, `${id}.jsonl`);
 }
 
-function validResource(resource) {
+function validResource(resource, scratchPrefix) {
   if (resource.kind === 'child')
     return (
       Number.isSafeInteger(resource.pid) &&
@@ -73,7 +74,12 @@ function validResource(resource) {
   if (resource.kind === 'scratch')
     return (
       typeof resource.path === 'string' &&
-      resource.path.startsWith(join(realpathSync(tmpdir()), 'cairn-orb-canary-')) &&
+      typeof scratchPrefix === 'string' &&
+      isAbsolute(scratchPrefix) &&
+      resolve(scratchPrefix) === scratchPrefix &&
+      basename(scratchPrefix) === 'cairn-orb-canary-' &&
+      resource.path.startsWith(scratchPrefix) &&
+      /^[a-zA-Z0-9]+$/.test(resource.path.slice(scratchPrefix.length)) &&
       Number.isSafeInteger(resource.dev) &&
       Number.isSafeInteger(resource.ino)
     );
@@ -120,7 +126,7 @@ function readManifest(home, id) {
     const allowed = sentinelPaths(home, id);
     if (
       !header ||
-      resources.some((resource) => !validResource(resource)) ||
+      resources.some((resource) => !validResource(resource, header.scratchPrefix)) ||
       header.id !== id ||
       !Number.isInteger(header.pid) ||
       header.pid <= 0 ||
@@ -150,17 +156,20 @@ function cleanupManifest(home, id, allowActive = false, cleanup = cleanupResourc
     }
   }
   const errors = [];
+  const failedResources = [];
+  const failedSentinels = [];
   for (const kind of ['child', 'machine', 'seed', 'scratch']) {
     for (const resource of manifest.resources.filter((row) => row.kind === kind).toReversed()) {
       try {
         cleanup(resource);
       } catch (error) {
         errors.push(error.message);
+        failedResources.push(resource);
       }
     }
-    if (errors.length) throw new Error(errors.join('; '));
   }
-  for (const { path, dev, ino } of manifest.created.toReversed()) {
+  for (const sentinel of manifest.created.toReversed()) {
+    const { path, dev, ino } = sentinel;
     try {
       checkDirectory(join(path, '..'));
       const current = lstatSync(path, { throwIfNoEntry: false });
@@ -170,9 +179,25 @@ function cleanupManifest(home, id, allowActive = false, cleanup = cleanupResourc
       unlinkSync(path);
     } catch (error) {
       errors.push(error.message);
+      failedSentinels.push(sentinel);
     }
   }
-  if (errors.length) throw new Error(errors.join('; '));
+  if (errors.length) {
+    const temporary = `${manifest.path}.${randomBytes(12).toString('hex')}`;
+    const fd = openSync(temporary, 'wx', 0o600);
+    try {
+      writeFileSync(
+        fd,
+        `${[manifest.header, ...failedSentinels, ...failedResources].map(JSON.stringify).join('\n')}\n`,
+      );
+      fsyncSync(fd);
+      renameSync(temporary, manifest.path);
+    } finally {
+      closeSync(fd);
+      rmSync(temporary, { force: true });
+    }
+    throw new Error(errors.join('; '));
+  }
   unlinkSync(manifest.path);
 }
 
@@ -221,11 +246,16 @@ export function plantSentinels(home, id = randomBytes(12).toString('hex')) {
     const paths = sentinelPaths(home, id);
     const manifest = manifestPath(home, id, true);
     const fd = openSync(manifest, 'wx', 0o600);
+    const header = {
+      id,
+      pid: process.pid,
+      scratchPrefix: join(realpathSync(tmpdir()), 'cairn-orb-canary-'),
+    };
     const sentinels = [];
     const markers = [];
     const cleanup = () => cleanupManifest(home, id, true);
     try {
-      writeFileSync(fd, `${JSON.stringify({ id, pid: process.pid })}\n`);
+      writeFileSync(fd, `${JSON.stringify(header)}\n`);
       fsyncSync(fd);
       for (const path of paths) {
         checkDirectory(join(path, '..'));
@@ -250,7 +280,8 @@ export function plantSentinels(home, id = randomBytes(12).toString('hex')) {
       closeSync(fd);
     }
     const record = (resource) => {
-      if (!validResource(resource)) throw new Error('Invalid canary resource inventory');
+      if (!validResource(resource, header.scratchPrefix))
+        throw new Error('Invalid canary resource inventory');
       const inventory = openSync(
         manifest,
         constants.O_WRONLY | constants.O_APPEND | constants.O_NOFOLLOW,
