@@ -197,6 +197,18 @@ jobs:
       - name: E2E (shard ${{ matrix.shard }}/4, #693)
         run: pnpm prepush --e2e-shard ${{ matrix.shard }}/4
 
+      - name: Upload gallery snapshot renders
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: gallery-snapshots-shard-${{ matrix.shard }}
+          path: |
+            apps/web/e2e/gallery-snapshots.spec.ts-snapshots/
+            apps/web/test-results/**/*-actual.png
+            apps/web/test-results/**/*-diff.png
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: CSS mechanism gate (#747)
         run: node scripts/css-mechanism-gate.mjs
 
@@ -304,6 +316,10 @@ jobs:
       - name: UI debt ledger only shrinks against main
         if: ${{ !cancelled() }}
         run: node --test scripts/ui-debt-gate.test.mjs
+
+      - name: Pages keep to tokens; gallery baselines map from CI renders
+        if: ${{ !cancelled() }}
+        run: node --test scripts/ui-page-style-gate.test.mjs
 
       - name: Gardener sweep self-test (#1617)
         if: ${{ !cancelled() }}
