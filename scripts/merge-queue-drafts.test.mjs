@@ -42,7 +42,20 @@ test('pr-evidence skips only the draft PRs Mergify opens for a queued batch', ()
     assert.equal(runsFor(conditions[0], pr), true, JSON.stringify(pr));
 });
 
+const SKIPS_QUEUE_DRAFTS = /mergify|merge-queue|pull_request\.draft/i;
+
 for (const job of ['gates', 'check', 'e2e-gate', 'pack-smoke'])
   test(`${job} still runs on merge-queue draft PRs`, () => {
-    assert.doesNotMatch(jobBlock('.github/workflows/ci.yml', job), /mergify/);
+    const conditions = jobBlock('.github/workflows/ci.yml', job)
+      .split('\n')
+      .filter((line) => /^ {4}if:/.test(line));
+    for (const condition of conditions) assert.doesNotMatch(condition, SKIPS_QUEUE_DRAFTS);
   });
+
+test('the guard reads job conditions, not step names', () => {
+  assert.match(
+    "    if: !(github.event.pull_request.draft && github.event.pull_request.user.login == 'mergify[bot]')",
+    SKIPS_QUEUE_DRAFTS,
+  );
+  assert.doesNotMatch("    if: needs.changes.outputs.has-code != 'false'", SKIPS_QUEUE_DRAFTS);
+});
