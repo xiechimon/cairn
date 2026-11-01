@@ -8,7 +8,7 @@ test.skip(
   'Baselines are rendered on Linux CI; pull them with scripts/gallery-snapshots-accept.mjs',
 );
 
-test.use({ viewport: { width: 1280, height: 2400 } });
+test.use({ viewport: { width: 1280, height: 2400 }, reducedMotion: 'reduce' });
 
 async function openGallery(page: Page, theme: (typeof THEMES)[number]) {
   await page.clock.install({ time: FROZEN_AT });
