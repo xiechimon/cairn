@@ -12,6 +12,9 @@ async function openRowMenu(page: Page, title: string) {
   await row(page, title).hover();
   await row(page, title).getByTestId('thread-row-menu').click();
   await expect(page.getByRole('menuitem').first()).toBeVisible();
+  await expect
+    .poll(() => page.evaluate(() => document.activeElement?.closest('[role="menu"]') != null))
+    .toBe(true);
 }
 
 test('the archived group is collapsed by default and shows the archived count', async ({
@@ -153,8 +156,10 @@ test('pressing R opens the rename dialog and D opens the delete confirmation', a
   await page.goto(`/app?scenario=${SCENARIO}`);
   await openRowMenu(page, 'active thread A');
   await page.keyboard.press('r');
-  await expect(page.getByRole('dialog', { name: '重命名线程' })).toBeVisible();
-  await page.getByRole('button', { name: '取消' }).click();
+  const rename = page.getByRole('dialog', { name: '重命名线程' });
+  await expect(rename).toBeVisible();
+  await rename.getByRole('button', { name: '取消' }).click();
+  await expect(rename).toBeHidden();
 
   await openRowMenu(page, 'active thread B');
   await page.keyboard.press('d');
