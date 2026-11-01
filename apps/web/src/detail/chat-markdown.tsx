@@ -338,7 +338,7 @@ export function ChatMarkdown({ text }: { text: string }) {
             return (
               <pre
                 key={i}
-                className="chat-md-code my-2 max-h-80 overflow-auto rounded-(--cds-radius-xl) border border-(--border) bg-(--muted) px-2.5 py-2 font-mono text-caption break-words whitespace-pre-wrap text-(--foreground) [word-break:break-word]"
+                className="chat-md-code my-2 max-h-80 overflow-auto rounded-(--cds-radius-xl) border border-(--border) bg-(--muted) px-2.5 py-2 font-mono text-code break-words whitespace-pre-wrap text-(--foreground) [word-break:break-word]"
                 data-lang={block.lang ?? ''}
                 data-testid="md-code"
               >

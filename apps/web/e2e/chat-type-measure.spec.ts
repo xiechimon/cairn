@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 const DONE = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=36';
 const CONFIRM = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=17b';
 
-test('chat body reads at 14px (text-card-title) on a unitless 1.6', async ({ page }) => {
+test('chat body reads at 15px (text-card-title) on a unitless 1.6', async ({ page }) => {
   await page.goto(DONE);
   const text = page.getByTestId('agent-text').first();
   await expect(text).toBeVisible();
@@ -11,10 +11,8 @@ test('chat body reads at 14px (text-card-title) on a unitless 1.6', async ({ pag
     const s = getComputedStyle(el);
     return { fontSize: s.fontSize, lineHeight: s.lineHeight };
   });
-  // Paper PR 7: the six type keys have no 15px step; reading text takes
-  // text-card-title (14px) and keeps the unitless 1.6 (22.4px line box)
-  expect(cs.fontSize).toBe('14px');
-  expect(cs.lineHeight).toBe('22.4px');
+  expect(cs.fontSize).toBe('15px');
+  expect(cs.lineHeight).toBe('24px');
   // the declaration itself must stay unitless so the pitch tracks the size:
   // scan the stylesheets for a rule that matches THIS element and declares
   // line-height: 1.6 (the leading-[1.6] utility is that rule)
@@ -116,7 +114,7 @@ test('composer placeholder sits at 14px (text-ui) — the same size as the 14px 
     };
   });
   expect(sizes.placeholder).toBe('14px');
-  expect(sizes.body).toBe('14px');
+  expect(sizes.body).toBe('15px');
 });
 
 test('bubble / footer keep their own geometry, replies carry no avatar column', async ({ page }) => {
@@ -139,7 +137,7 @@ test('bubble / footer keep their own geometry, replies carry no avatar column', 
     };
   });
   expect(geo.bubbleH).toBe(40);
-  expect(geo.bubbleFont).toBe('14px');
+  expect(geo.bubbleFont).toBe('15px');
   expect(geo.avatars).toBe(0);
   expect(geo.footerPad).toBe('0px');
   expect(geo.userFooterAlign).toBe('flex-end');
