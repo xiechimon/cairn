@@ -1,6 +1,6 @@
-import { ChevronDown, MessageSquareWarning } from 'lucide-react';
+import { ChevronDown, FolderOpen, MessageSquareWarning, Settings2 } from 'lucide-react';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { useLiveData } from '../api/provider.js';
 import { ChiefConversation } from '../chief/chief-conversation.js';
 import { ChiefQuestionCard, type ChiefQuestionItem } from '../chief/chief-question-card.js';
@@ -162,6 +162,33 @@ export function HomeC({
     </p>
   );
 
+  const projectLinks = projectId !== null && (
+    <nav
+      data-testid="home-c-project-links"
+      aria-label={t('项目')}
+      className="mt-2 -ml-2.5 flex gap-1"
+    >
+      <Button
+        variant="ghost"
+        size="sm"
+        className="text-meta text-content-secondary"
+        render={<Link to={`/app/project/${projectId}/files`} />}
+      >
+        <FolderOpen aria-hidden="true" className="size-3.5" />
+        {t('文件')}
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="text-meta text-content-secondary"
+        render={<Link to={`/app/project/${projectId}/settings`} />}
+      >
+        <Settings2 aria-hidden="true" className="size-3.5" />
+        {t('项目设置')}
+      </Button>
+    </nav>
+  );
+
   const needsYou = entries.length > 0 && (
     <section
       data-testid="needs-you"
@@ -219,6 +246,7 @@ export function HomeC({
     >
       {greeting}
       {since}
+      {projectLinks}
       {needsYou}
       {entries.length === 0 && (
         <div data-testid="home-c-starters" className="mt-4 -ml-2.5 flex flex-wrap gap-1">
@@ -239,6 +267,7 @@ export function HomeC({
     <section data-testid="home-c-lead" aria-label={t('首页概况')} className="pt-6 pb-8">
       {greeting}
       {since}
+      {projectLinks}
       {needsYou}
     </section>
   );

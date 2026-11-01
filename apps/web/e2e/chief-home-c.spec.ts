@@ -184,3 +184,21 @@ test('a failed conversation load shows Retry instead of the greeting, with no co
   await expect(page.getByTestId('chief-stream').getByText('Make a plan')).toBeVisible();
   await expect(composer(page)).toBeVisible();
 });
+
+test('a project-filtered home links to that project files and settings', async ({ page }) => {
+  await page.goto(home('home-c', `&project=${PROJECT_ID}`));
+  const links = page.getByTestId('home-c-project-links');
+  await links.getByRole('link', { name: 'Files' }).click();
+  await expect(page).toHaveURL(new RegExp(`/app/project/${PROJECT_ID}/files`));
+  await page.goBack();
+  await links.getByRole('link', { name: 'Project settings' }).click();
+  await expect(page).toHaveURL(new RegExp(`/app/project/${PROJECT_ID}/settings`));
+  await page.goto(home('home-c'));
+  await expect(page.getByTestId('home-c-project-links')).toHaveCount(0);
+});
+
+test('a project link with board or column params still lands on the filtered home', async ({ page }) => {
+  await page.goto(`/app/project/${PROJECT_ID}?scenario=home-c&view=board&column=pending`);
+  await expect(page.getByTestId('home-c')).toBeVisible();
+  await expect(page).not.toHaveURL(/view=board|column=/);
+});

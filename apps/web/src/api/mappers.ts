@@ -1335,6 +1335,7 @@ function collectChiefStream(
         id: m.id,
         markdown: text,
         pending: pendingState,
+        projectId: m.projectId ?? null,
       });
       continue;
     }
