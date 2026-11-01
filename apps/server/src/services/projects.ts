@@ -94,11 +94,11 @@ export function setProjectArchived(
   id: string,
   archived: boolean,
 ): typeof project.$inferSelect | undefined {
-  db.update(project)
-    .set({ archivedAt: archived ? nowMs() : null })
-    .where(eq(project.id, id))
-    .run();
-  return db.select().from(project).where(eq(project.id, id)).get();
+  const row = db.select().from(project).where(eq(project.id, id)).get();
+  if (row === undefined || (row.archivedAt !== null) === archived) return row;
+  const archivedAt = archived ? nowMs() : null;
+  db.update(project).set({ archivedAt }).where(eq(project.id, id)).run();
+  return { ...row, archivedAt };
 }
 
 export function deleteProject(deps: ProjectDeps, id: string): boolean {

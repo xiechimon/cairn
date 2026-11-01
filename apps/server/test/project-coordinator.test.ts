@@ -93,12 +93,23 @@ describe('project Coordinator conversation (D37)', () => {
     expect(b.thread.projectId).toBe(other);
   });
 
-  test('the team thread list carries the project binding', async () => {
+  test('the team thread list leaves project conversations out', async () => {
     const sent = (await (await sendToCoordinator(H.projectId, 'hi')).json()) as CoordinatorSend;
     const res = await req(H.s.app, 'GET', `/api/teams/${H.teamId}/chief/threads`);
     const threads = (await res.json()) as { id: string; projectId?: string | null }[];
-    expect(threads.find((t) => t.id === sent.thread.id)?.projectId).toBe(H.projectId);
+    expect(threads.map((t) => t.id)).not.toContain(sent.thread.id);
     expect(threads.find((t) => t.id === H.threadId)?.projectId).toBeNull();
+  });
+
+  test('a follow-up through the conversation route stays on the bound project', async () => {
+    const other = await postProject(H.s.app, 'cairn-site');
+    const sent = (await (await sendToCoordinator(H.projectId, 'hi')).json()) as CoordinatorSend;
+    const res = await req(H.s.app, 'POST', `/api/conversations/${sent.thread.id}/messages`, {
+      content: 'again',
+      projectId: other,
+    });
+    expect(res.status).toBe(201);
+    expect(chiefPrompts(sent.thread.id).at(-1)).toContain(`demo（id: ${H.projectId}）`);
   });
 
   test('a blank message is rejected and opens nothing', async () => {
@@ -139,6 +150,27 @@ describe('project archive', () => {
     const restored = await req(H.s.app, 'POST', `/api/projects/${H.projectId}/unarchive`);
     expect(restored.status).toBe(200);
     expect(((await restored.json()) as { archivedAt?: number | null }).archivedAt).toBeNull();
+  });
+
+  test('archiving twice keeps the first archivedAt', async () => {
+    const first = (await (
+      await req(H.s.app, 'POST', `/api/projects/${H.projectId}/archive`)
+    ).json()) as { archivedAt: number };
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const second = (await (
+      await req(H.s.app, 'POST', `/api/projects/${H.projectId}/archive`)
+    ).json()) as { archivedAt: number };
+    expect(second.archivedAt).toBe(first.archivedAt);
+  });
+
+  test('an archived project refuses follow-ups through the conversation route', async () => {
+    const sent = (await (await sendToCoordinator(H.projectId, 'hi')).json()) as CoordinatorSend;
+    await req(H.s.app, 'POST', `/api/projects/${H.projectId}/archive`);
+    const res = await req(H.s.app, 'POST', `/api/conversations/${sent.thread.id}/messages`, {
+      content: 'still there?',
+    });
+    expect(res.status).toBe(409);
+    expect(chiefPrompts(sent.thread.id)).toHaveLength(1);
   });
 
   test('an archived project refuses Coordinator messages until unarchived', async () => {
