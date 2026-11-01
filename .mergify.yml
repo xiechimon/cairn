@@ -6,7 +6,9 @@ queue_rules:
       - -draft
       - -label = needs-decision
       - -label = owner-route
-      - -label = queue-hold
+      - or:
+          - -head ~= ^B[0-9]+/
+          - label = queue-admit
       - check-success = commit-author
       - status-success = review-gate
       - check-success = merge-route
@@ -70,7 +72,9 @@ queue_rules:
       - -draft
       - -label = needs-decision
       - -label = owner-route
-      - -label = queue-hold
+      - or:
+          - -head ~= ^B[0-9]+/
+          - label = queue-admit
       - check-success = commit-author
       - status-success = review-gate
       - check-success = merge-route

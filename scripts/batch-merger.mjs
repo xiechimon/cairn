@@ -2,12 +2,11 @@ import { execFileSync } from 'node:child_process';
 import { api, disarmAutoMerge, markers, pages, repo } from './autonomy-brake.mjs';
 import { requiredChecks as branchProtectionChecks, mustBeGreenJobs } from './merge-checks.mjs';
 import { ownerRouting } from './merge-route.mjs';
-import { holdLabel } from './mergify-config.mjs';
+import { admitLabel } from './mergify-config.mjs';
 
 const batchHead = /^B\d+\//;
 const requiredChecks = branchProtectionChecks;
 const ownerRouteLabel = 'owner-route';
-const queuedLabel = 'queued';
 const hasLabel = (pr, name) => pr.labels.some((label) => label.name === name);
 const isBatch = (pr) => batchHead.test(pr.head.ref) && pr.head.repo?.full_name === repo;
 const log = (pr, action, reasons) =>
@@ -63,23 +62,7 @@ function admissionsToday(openBatches) {
     merged += closed.filter((pr) => isBatch(pr) && pr.merged_at && pr.merged_at >= since).length;
     if (closed.at(-1).updated_at < since) break;
   }
-  return merged + openBatches.filter((pr) => hasLabel(pr, queuedLabel)).length;
-}
-
-function admit(pr, admissions, dailyCap, dryRun) {
-  const held = hasLabel(pr, holdLabel);
-  if (admissions < dailyCap) {
-    if (held) {
-      if (!dryRun) removeLabel(pr, holdLabel);
-      log(pr, dryRun ? 'would-release' : 'released', []);
-    }
-    return true;
-  }
-  if (!held) {
-    if (!dryRun) api(`repos/${repo}/issues/${pr.number}/labels`, { labels: [holdLabel] });
-    log(pr, dryRun ? 'would-hold' : 'held', ['daily-cap']);
-  }
-  return false;
+  return merged + openBatches.filter((pr) => hasLabel(pr, admitLabel)).length;
 }
 
 function eligibility(number, expectedHead) {
@@ -194,13 +177,16 @@ try {
         continue;
       }
       clearOwnerRoute(result.pr, dryRun);
-      if (!hasLabel(result.pr, queuedLabel)) {
+      if (!hasLabel(result.pr, admitLabel)) {
         admissions ??= admissionsToday(pulls);
-        if (!admit(result.pr, admissions, dailyCap, dryRun)) {
+        if (admissions >= dailyCap) {
           log(result.pr, 'skip', ['daily-cap']);
           continue;
         }
+        if (!dryRun)
+          api(`repos/${repo}/issues/${candidate.number}/labels`, { labels: [admitLabel] });
         admissions++;
+        log(result.pr, dryRun ? 'would-admit' : 'admitted', []);
       }
       log(result.pr, 'auto-queue', []);
     } catch (error) {
