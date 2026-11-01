@@ -278,3 +278,57 @@ for (const theme of ['light', 'dark'] as const) {
   });
 
 }
+
+for (const theme of ['light', 'dark'] as const) {
+  for (const width of [1440, 390]) {
+    test(`schedules empty-state hint icon stays beside its first text line (${theme}, ${width})`, async ({
+      page,
+    }, testInfo) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.addInitScript((value) => localStorage.setItem('cairn-theme', value), theme);
+      await page.goto('/app/schedules?scenario=11');
+      const hint = page.locator('.sched-empty [data-slot="empty-content"] p');
+      await expect(hint).toBeVisible();
+      const geometry = await hint.evaluate(async (paragraph) => {
+        await document.fonts.ready;
+        const icon = paragraph.querySelector('svg')!.getBoundingClientRect();
+        const text = [...paragraph.childNodes].find(
+          (node) => node.nodeType === Node.TEXT_NODE && node.textContent!.trim().length > 0,
+        )!;
+        const start = text.textContent!.search(/\S/);
+        const range = document.createRange();
+        range.setStart(text, start);
+        range.setEnd(text, start + 1);
+        const first = range.getBoundingClientRect();
+        range.setEnd(text, text.textContent!.length);
+        const lines = [...range.getClientRects()];
+        const box = paragraph.getBoundingClientRect();
+        return {
+          gap: first.left - icon.right,
+          overlap: Math.min(first.bottom, icon.bottom) - Math.max(first.top, icon.top),
+          lines: new Set(lines.map((line) => line.top)).size,
+          width: box.width,
+          maxWidth: 34 * Number.parseFloat(getComputedStyle(paragraph).fontSize),
+          overflow: document.documentElement.scrollWidth > window.innerWidth,
+        };
+      });
+      console.log(JSON.stringify({ theme, viewportWidth: width, ...geometry }));
+      await testInfo.attach('hint-geometry', {
+        body: JSON.stringify(geometry, null, 2),
+        contentType: 'application/json',
+      });
+      if (process.env.HINT_EVIDENCE_DIR) {
+        await page.screenshot({
+          path: `${process.env.HINT_EVIDENCE_DIR}/${theme}-${width}.png`,
+          fullPage: true,
+        });
+      }
+      expect(geometry.gap).toBeGreaterThanOrEqual(0);
+      expect(geometry.gap).toBeLessThanOrEqual(8);
+      expect(geometry.overlap).toBeGreaterThan(0);
+      expect(geometry.width).toBeLessThanOrEqual(geometry.maxWidth);
+      expect(geometry.overflow).toBe(false);
+      if (width === 390) expect(geometry.lines).toBeGreaterThan(1);
+    });
+  }
+}

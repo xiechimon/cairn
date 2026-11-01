@@ -197,6 +197,18 @@ jobs:
       - name: E2E (shard ${{ matrix.shard }}/4, #693)
         run: pnpm prepush --e2e-shard ${{ matrix.shard }}/4
 
+      - name: Upload gallery snapshot renders
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: gallery-snapshots-shard-${{ matrix.shard }}
+          path: |
+            apps/web/e2e/gallery-snapshots.spec.ts-snapshots/
+            apps/web/test-results/**/*-actual.png
+            apps/web/test-results/**/*-diff.png
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: CSS mechanism gate (#747)
         run: node scripts/css-mechanism-gate.mjs
 
@@ -305,6 +317,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: node --test scripts/ui-debt-gate.test.mjs
 
+      - name: Pages keep to tokens; gallery baselines map from CI renders
+        if: ${{ !cancelled() }}
+        run: node --test scripts/ui-page-style-gate.test.mjs
+
       - name: Gardener sweep self-test (#1617)
         if: ${{ !cancelled() }}
         run: node --test scripts/gardener-ratchet.test.mjs scripts/gardener-weekly.test.mjs scripts/doc-drift.test.mjs scripts/evidence-prune.test.mjs scripts/delivery-metrics.test.mjs
@@ -344,3 +360,6 @@ jobs:
           curl -fsSL -o "$RUNNER_TEMP/rrsync" https://raw.githubusercontent.com/RsyncProject/rsync/v3.4.1/support/rrsync
           echo "0bb743f8155907ed2a337c12a4672c67269e372803939ec98dac497edc714c9b  $RUNNER_TEMP/rrsync" | sha256sum -c -
           RRSYNC="$RUNNER_TEMP/rrsync" node --test scripts/ops/backup-server-db.test.mjs scripts/ops/push-test.test.mjs scripts/ops/push-worker.test.mjs
+      - name: Self-deploy and deploy-lag watch fixtures (#2288)
+        if: ${{ !cancelled() }}
+        run: node --test scripts/ops/deploy-self.test.mjs

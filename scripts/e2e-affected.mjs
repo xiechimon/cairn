@@ -462,7 +462,7 @@ const explicit = argv.filter((a) => !a.startsWith('--'));
 
 if (argv.includes('--check-coverage')) {
   const prefixes = [...FILE_RULES.values(), ...DIR_RULES.map((rule) => rule.specs)].flat();
-  prefixes.push('a11y-axe', ...SHARED_SURFACE_ONLY);
+  prefixes.push('a11y-axe', 'gallery-snapshots', ...SHARED_SURFACE_ONLY);
   const specNames = (explicit.length > 0 ? explicit : listSpecs()).map((path) => basename(path));
   const notSpecs = specNames.filter((name) => !name.endsWith('.spec.ts'));
   const missing = specNames.filter(
@@ -490,11 +490,14 @@ for (const path of paths) {
   const { specs, why } = classify(path);
   const axe = specs !== null && path.startsWith('apps/web/src/');
   reasons.push(
-    `  ${path} → ${specs === null ? `FULL (${why})` : specs.length === 0 && !axe ? 'none' : why}${axe ? ' + a11y-axe' : ''}`,
+    `  ${path} → ${specs === null ? `FULL (${why})` : specs.length === 0 && !axe ? 'none' : why}${axe ? ' + a11y-axe + gallery-snapshots' : ''}`,
   );
   if (specs === null) full = true;
   for (const s of specs ?? []) picked.add(s);
-  if (axe) picked.add('a11y-axe');
+  if (axe) {
+    picked.add('a11y-axe');
+    picked.add('gallery-snapshots');
+  }
 }
 
 const selection = full ? allSpecs : expand([...picked], allSpecs);
