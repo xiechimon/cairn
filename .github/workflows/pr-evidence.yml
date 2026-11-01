@@ -97,7 +97,8 @@ jobs:
         run: |
           gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" > "$RUNNER_TEMP/pr.json"
           gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/commits" > "$RUNNER_TEMP/pr-commits.json"
-          jq -n --arg repository "$(jq -r '.base.repo.full_name' "$RUNNER_TEMP/pr.json")" --slurpfile pages "$RUNNER_TEMP/pr-commits.json" '{repository: $repository, commits: ($pages[0] | add)}' > "$RUNNER_TEMP/pr-evidence-context.json"
+          gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" > "$RUNNER_TEMP/pr-files.json"
+          jq -n --arg repository "$(jq -r '.base.repo.full_name' "$RUNNER_TEMP/pr.json")" --slurpfile pages "$RUNNER_TEMP/pr-commits.json" --slurpfile filePages "$RUNNER_TEMP/pr-files.json" '{repository: $repository, commits: ($pages[0] | add), files: ($filePages[0] | add)}' > "$RUNNER_TEMP/pr-evidence-context.json"
           jq -r '.body // ""' "$RUNNER_TEMP/pr.json" > "$RUNNER_TEMP/pr-body.md"
           echo "labels=$(jq -r '[.labels[].name] | join(",")' "$RUNNER_TEMP/pr.json")" >> "$GITHUB_OUTPUT"
           echo "draft=$(jq -r '.draft' "$RUNNER_TEMP/pr.json")" >> "$GITHUB_OUTPUT"

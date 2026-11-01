@@ -12,6 +12,14 @@ count, and the template ships its guidance as HTML comments so an untouched
 template fails. Proof quality, including the old-code failing output and
 new-code passing output, is a reviewer judgment.
 
+Size check (#2372): a PR over 800 non-evidence lines or 40 non-evidence files
+(counted as apps/server/src/services/merge-gate/digest.ts counts: docs/verify
+evidence is left out, a rename counts two files) must carry a `## Size`
+section inside the collapsed details block, stating why the change cannot be
+split. The file list comes from the `files` key of the context JSON given as
+the second argument (the GitHub pulls/files response, paginated or flat); a
+run without a context argument does not check size.
+
 Link checks (#750): image links in the PR body must be embedded
 (`![label](url)`) and must answer HTTP 200 (catches bad SHAs).
 
@@ -70,12 +78,14 @@ must carry a
 `### Schema changes` section whose table rows equal that file's rows.
 
 Usage:
-  PR_BODY='<pr body>' python3 scripts/pr-evidence-gate.py   # CI entry point
+  python3 scripts/pr-evidence-gate.py body.md context.json   # CI entry point
+  PR_BODY='<pr body>' python3 scripts/pr-evidence-gate.py
   python3 scripts/pr-evidence-gate.py path/to/body.md        # local testing
 
 Exit 0 when the body passes, 1 otherwise. Findings name the section or
 the URL (with its line for bare URLs).
 """
+import json
 import os
 from html import unescape
 from urllib.parse import parse_qs, urlsplit
@@ -111,6 +121,9 @@ FOLD_MARKUP = re.compile(r'</?details\b[^>]*>|<summary\b[^>]*>.*?</summary\s*>',
 INLINE_CODE = re.compile(r'(?P<ticks>`+)(?!`).*?(?<!`)(?P=ticks)(?!`)', re.S)
 DETAILS_TAG = re.compile(r'<(?P<closing>/)?details\b[^>]*>', re.I)
 PROSE_LIMIT = 600
+EVIDENCE_PREFIX = 'docs/verify/'
+MAX_LINES = 800
+MAX_FILES = 40
 SCHEMA_HEADING = re.compile(r'^### Schema changes[ \t]*$', re.M)
 ANY_HEADING = re.compile(r'^#{1,6}[ \t]+', re.M)
 NO_SCHEMA_CHANGES = 'No schema changes'
@@ -125,6 +138,39 @@ def section_contents(body):
         nxt = headers[i + 1][0] if i + 1 < len(headers) else len(text)
         contents.setdefault(heading.lower(), text[hend:nxt])
     return contents
+
+
+def is_evidence_entry(file):
+    previous = file.get('previous_filename')
+    return file['filename'].startswith(EVIDENCE_PREFIX) and (
+        not previous or previous.startswith(EVIDENCE_PREFIX))
+
+
+def patch_size(files):
+    kept = [file for file in files if not is_evidence_entry(file)]
+    lines = sum(file['additions'] + file['deletions'] for file in kept)
+    counted_files = sum(2 if file.get('previous_filename') else 1 for file in kept)
+    return lines, counted_files
+
+
+def flatten_pages(files):
+    return [file for page in files for file in (page if isinstance(page, list) else [page])]
+
+
+def size_section_state(body):
+    text = visible_markdown(body)
+    headings = [(m.start(), m.end(), m.group(1).strip().lower()) for m in H2.finditer(text)]
+    for i, (start, end, heading) in enumerate(headings):
+        if heading != 'size':
+            continue
+        stop = headings[i + 1][0] if i + 1 < len(headings) else len(text)
+        if not FOLD_MARKUP.sub('', text[end:stop]).strip():
+            return 'empty'
+        depth = 0
+        for tag in DETAILS_TAG.finditer(text[:start]):
+            depth = max(depth - 1, 0) if tag['closing'] else depth + 1
+        return 'answered' if depth else 'outside-details'
+    return 'missing'
 
 
 def is_legacy_body(contents):
@@ -263,6 +309,18 @@ def describe(link):
     return f"[{link['label']}]({link['url']})"
 
 
+def load_patch_files(path):
+    with open(path, encoding='utf-8') as f:
+        files = json.load(f).get('files')
+    if not isinstance(files, list):
+        return None
+    files = flatten_pages(files)
+    valid = all(isinstance(file, dict) and isinstance(file.get('filename'), str)
+                and isinstance(file.get('additions'), int) and isinstance(file.get('deletions'), int)
+                for file in files)
+    return files if valid else None
+
+
 def schema_rows(markdown):
     text = visible_markdown(markdown)
     heading = SCHEMA_HEADING.search(text)
@@ -335,6 +393,27 @@ def main():
         print("pr-evidence: the global show-me /pr template "
               "(Summary/Evidence/Merge Danger) does not satisfy this gate; "
               "use the repo skill .claude/skills/pr-cairn/SKILL.md.")
+
+    if len(args) > 1:
+        patch_files = load_patch_files(args[1])
+        if patch_files is None:
+            failures.append('size-unreadable')
+            print("FAIL size-unreadable: the context JSON has no usable pull request file list")
+        else:
+            lines, counted_files = patch_size(patch_files)
+            if lines > MAX_LINES or counted_files > MAX_FILES:
+                print(f"pr-evidence: oversize ({lines} lines, {counted_files} files; "
+                      f"limits {MAX_LINES} lines, {MAX_FILES} files): a ## Size section is required")
+                state = size_section_state(body)
+                if state == 'missing':
+                    failures.append('Size')
+                    print("FAIL missing-section: Size (state why this change cannot be split)")
+                elif state == 'empty':
+                    failures.append('Size')
+                    print("FAIL empty-section: Size (state why this change cannot be split)")
+                elif state == 'outside-details':
+                    failures.append('Size')
+                    print("FAIL size-outside-details: Size belongs inside the collapsed details block")
 
     characters = prose_length(body)
     if not legacy and characters > PROSE_LIMIT:
