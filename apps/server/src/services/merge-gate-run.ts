@@ -27,7 +27,7 @@ import {
 import { githubCreateIssue } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { autonomousMergePolicy } from './autonomous-merge.js';
-import type { BuildDeps } from './builds.js';
+import { type BuildDeps, maybeEnqueueIndependentReview } from './builds.js';
 import { isCorrectionTask, recordCorrectionGuard } from './correction.js';
 import { agentForStep } from './dispatch-eligibility.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
@@ -48,6 +48,7 @@ import {
 } from './merge-gate/github-facts.js';
 import type { GateGithubPort } from './merge-gate/github-port.js';
 import { type GateVerdictView, isFullSha, mergeReadiness } from './merge-gate/readiness.js';
+import { sizeSection } from './merge-gate/size-section.js';
 import { type FinalVerdictLine, parseFinalVerdictLine } from './merge-gate/verdict-line.js';
 import { githubGatePort } from './merge-gate-github.js';
 import { projectMergeConfigOf } from './projects.js';
@@ -245,10 +246,8 @@ export async function evaluateMergeGate(
   };
   const views: GateVerdictView[] = stored.map((row) => {
     const reviewStep = steps.find((item) => item.id === row.stepId);
-    const reviewerId =
-      reviewStep?.kind === 'review'
-        ? (parseReviewPromptMeta(reviewStep.prompt)?.agentId ?? null)
-        : null;
+    const meta = reviewStep?.kind === 'review' ? parseReviewPromptMeta(reviewStep.prompt) : null;
+    const reviewerId = meta?.agentId ?? null;
     const answer = answers.get(row.stepId);
     return {
       kind: row.kind,
@@ -260,6 +259,7 @@ export async function evaluateMergeGate(
       reviewerModel: reviewerId !== null ? (agents.get(reviewerId)?.modelId ?? null) : null,
       gateLoosening: answer?.gateLoosening ?? null,
       evalRulerChange: answer?.evalRulerChange ?? null,
+      sizeAssessment: meta?.sizeReview === true ? (answer?.sizeAssessment ?? null) : null,
     };
   });
   const perspectives = [
@@ -420,6 +420,21 @@ export async function evaluateMergeGate(
       },
     })
     .run();
+  const justification = sizeSection(facts.pr?.body ?? null);
+  if (
+    head !== null &&
+    digest !== null &&
+    justification !== null &&
+    todoRow.phase === 'review' &&
+    readiness.blockers.some((item) => item.code === 'size-review')
+  ) {
+    maybeEnqueueIndependentReview(deps, todoRow, buildId, {
+      headSha: head,
+      countedLines: digest.countedLines,
+      countedFiles: digest.countedFiles,
+      justification,
+    });
+  }
   notifyEvaluatedReview(deps, buildId, readiness, reviewPushEntry);
   const plan = planGateStatusWrite({
     policy: readiness.policy,

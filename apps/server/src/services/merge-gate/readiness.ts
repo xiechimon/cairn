@@ -1,4 +1,4 @@
-import type { Phase } from '@cairn/shared';
+import type { Phase, ReviewSizeAssessment } from '@cairn/shared';
 import {
   CHIEF_DISPATCH_BASELINE_DECISION_OK_CI_LOWER,
   type CompareFile,
@@ -19,6 +19,7 @@ import { qualifyingEvidenceLinks } from './evidence-link.js';
 import { isLiveHarnessAttempt } from './harness-eval-route.js';
 import { independenceVendorDetail, modelsAreIndependent } from './model-identity.js';
 import { classifyPaths, touchesHarness } from './paths.js';
+import { sizeSection } from './size-section.js';
 
 export interface GateVerdictView {
   kind: 'review' | 'verify' | 'decision';
@@ -27,6 +28,7 @@ export interface GateVerdictView {
   reviewerModel?: string | null;
   gateLoosening?: boolean | null;
   evalRulerChange?: boolean | null;
+  sizeAssessment?: ReviewSizeAssessment | null;
   perspective: string | null;
   patchDigest: string | null;
   outcome:
@@ -356,6 +358,7 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
     block('verify-missing', CORRECTION_GUARD_MISSING);
   }
   let D: string | null = null;
+  let sizeReview: string | null = null;
   if (compare !== null) {
     const digest = computePatchDigest(compare.files, {
       expectedFileCount: pr !== null && head !== null ? pr.changedFiles : null,
@@ -367,7 +370,9 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
       block('patch-unbindable', digest.unavailable);
     }
     if (digest.countedLines > GATE_LIMITS.maxLines || digest.countedFiles > GATE_LIMITS.maxFiles) {
-      block('size-cap', `${digest.countedLines} lines, ${digest.countedFiles} files`);
+      const counted = `${digest.countedLines} lines, ${digest.countedFiles} files`;
+      if (isLocal) block('size-cap', counted);
+      else sizeReview = counted;
     }
     const paths = classifyPaths(compare.files, i.ticketRef);
     const reviewRequired = [...paths.protected, ...paths.deletedTests];
@@ -518,6 +523,32 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
       if (has(decision, 'extraction_failed')) block('decision-extraction-failed');
       else block('decision-missing');
     }
+  }
+  if (sizeReview !== null) {
+    const assessed = i.verdicts.filter(
+      (x) =>
+        x.kind === 'review' &&
+        D !== null &&
+        x.patchDigest === D &&
+        head !== null &&
+        x.headSha === head &&
+        x.sizeAssessment != null,
+    );
+    const accepted = assessed.some(
+      (x) =>
+        x.outcome === 'pass' &&
+        x.sizeAssessment === 'accepted' &&
+        !!x.reviewerId?.trim() &&
+        x.reviewerId !== i.author?.id,
+    );
+    const unmet = [
+      ...(sizeSection(pr?.body ?? null) !== null ? [] : ['the PR body has no ## Size section']),
+      ...(accepted ? [] : ['no passing review on this patch accepts its size']),
+      ...(assessed.some((x) => x.sizeAssessment === 'split-needed')
+        ? ['a review on this patch asks to split it']
+        : []),
+    ];
+    if (unmet.length > 0) block('size-review', sizeReview, ...unmet);
   }
   if (i.round !== null && i.round.timedOut.length > 0)
     block('perspective-timed-out', ...i.round.timedOut);

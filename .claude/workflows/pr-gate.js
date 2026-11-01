@@ -27,8 +27,9 @@ const MAX_SKEPTICS = 4
 // reviewer remembering it. Default deny: only AUTO_MERGE paths (product source
 // and tests, docs/verify evidence, Markdown under docs/) may auto-merge, and only when no PROTECTED
 // class matches them; every other path, deleted test files, binary files
-// outside docs/verify, and patches over 800 lines or 40 files route to the
-// user. pr-gate runs 3, 4 and 5 each found another agent-steering or gate
+// outside docs/verify route to the user. A patch over 800 lines or 40 files
+// does not: it reports sizeReview, and pr-evidence, the review gate and the
+// product gate require the Size section and the review answer (#2372). pr-gate runs 3, 4 and 5 each found another agent-steering or gate
 // file that a list of names missed
 // (AGENTS.override.md, .pi/skills, nested .claude/), so the list now says what
 // may merge alone instead of what may not. Matching ignores case (APFS);
@@ -423,9 +424,11 @@ const humanReasons = [
   ...(outside.length > 0 ? [`outside the auto-merge set (product source, tests, docs/verify, Markdown under docs/): ${outside.join(', ')}`] : []),
   ...(deletedTests.length > 0 ? [`deleted test files: ${deletedTests.join(', ')}`] : []),
   ...(opaque.length > 0 ? [`binary files outside docs/verify (no line count, no readable diff): ${opaque.join(', ')}`] : []),
-  ...(lines > MAX_LINES ? [`${lines} lines changed (over ${MAX_LINES})`] : []),
-  ...(sizedFiles.length > MAX_FILES ? [`${sizedFiles.length} files changed (over ${MAX_FILES})`] : []),
 ]
+const sizeReview = lines > MAX_LINES || sizedFiles.length > MAX_FILES
+const sizeRequirement = sizeReview
+  ? `${lines} lines, ${sizedFiles.length} files (over ${MAX_LINES} lines or ${MAX_FILES} files): the PR body needs a ## Size section stating why the change cannot be split, and the review must answer why it is this big`
+  : null
 const checked = Object.fromEntries(reviewed.map((r) => [r.key, r.review.checked]))
 
 return {
@@ -448,6 +451,8 @@ return {
   protectedPaths,
   mergedBy: humanReasons.length > 0 ? 'user' : 'auto-merge',
   humanReasons,
+  sizeReview,
+  sizeRequirement,
   missing,
   shaMismatch,
   unlistedFiles,
