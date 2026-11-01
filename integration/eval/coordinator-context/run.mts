@@ -559,6 +559,7 @@ async function driveArm(spec: ArmSpec, world: World, rows: Record<string, unknow
         recalled: recalled(result.text),
       },
     );
+    if (result.error !== null) throw new Error(`${spec.name} recall: ${result.error}`);
   }
   const summary = world.db
     .select({
