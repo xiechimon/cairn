@@ -44,18 +44,39 @@ test('pr-evidence skips only the draft PRs Mergify opens for a queued batch', ()
 
 const SKIPS_QUEUE_DRAFTS = /mergify|merge-queue|pull_request\.draft/i;
 
+function jobConditions(block) {
+  const lines = block.split('\n');
+  const conditions = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    if (!/^ {4}if:/.test(lines[i])) continue;
+    const parts = [lines[i]];
+    while (i + 1 < lines.length && /^ {5,}\S/.test(lines[i + 1])) {
+      i += 1;
+      parts.push(lines[i]);
+    }
+    conditions.push(parts.join('\n'));
+  }
+  return conditions;
+}
+
 for (const job of ['gates', 'check', 'e2e-gate', 'pack-smoke'])
   test(`${job} still runs on merge-queue draft PRs`, () => {
-    const conditions = jobBlock('.github/workflows/ci.yml', job)
-      .split('\n')
-      .filter((line) => /^ {4}if:/.test(line));
-    for (const condition of conditions) assert.doesNotMatch(condition, SKIPS_QUEUE_DRAFTS);
+    for (const condition of jobConditions(jobBlock('.github/workflows/ci.yml', job)))
+      assert.doesNotMatch(condition, SKIPS_QUEUE_DRAFTS);
   });
 
-test('the guard reads job conditions, not step names', () => {
-  assert.match(
-    "    if: !(github.event.pull_request.draft && github.event.pull_request.user.login == 'mergify[bot]')",
-    SKIPS_QUEUE_DRAFTS,
-  );
+test('the guard reads whole job conditions, not step names', () => {
+  const job = [
+    '  gates:',
+    '    if: >-',
+    "      github.event.pull_request.user.login != 'mergify[bot]'",
+    '    runs-on: ubuntu-latest',
+    '    steps:',
+    '      - name: Mergify queue config follows pr-gate routing',
+    '        run: node --test scripts/mergify-config.test.mjs',
+  ].join('\n');
+  const [condition] = jobConditions(job);
+  assert.match(condition, SKIPS_QUEUE_DRAFTS);
+  assert.deepEqual(jobConditions(job.replace(/ {4}if: >-\n.*\n/, '')), []);
   assert.doesNotMatch("    if: needs.changes.outputs.has-code != 'false'", SKIPS_QUEUE_DRAFTS);
 });
