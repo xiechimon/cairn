@@ -207,6 +207,7 @@ stop_services() {
 
 start_and_check() {
   local started_ms
+  [ -s "$DB" ] || { echo "refusing to start services: $DB is missing" >&2; return 1; }
   systemctl --user start "$SERVER_UNIT"
   server_healthy || return 1
   started_ms="$(($(date +%s) * 1000))"
@@ -315,11 +316,12 @@ roll_back() {
     exit "$EXIT_ROLLBACK_UNHEALTHY"
   fi
   failed_dir="$BACKUPS/failed-$(date -u +%Y%m%dT%H%M%SZ)-${TARGET:0:12}"
-  mkdir -p "$failed_dir"
-  for file in server.db server.db-wal server.db-shm; do
-    [ ! -e "$DATA_DIR/$file" ] || mv "$DATA_DIR/$file" "$failed_dir/$file"
-  done
-  cp "$snapshot" "$DB"
+  set_in_progress restoring "$snapshot" "$failed_dir"
+  restore_snapshot "$snapshot" "$failed_dir" || {
+    write_record "$PREVIOUS" "$PREVIOUS" rollback-unhealthy "$TARGET" "$snapshot"
+    echo "CRITICAL: restoring $snapshot failed; failed DB in $failed_dir, deploy marker kept for --recover" >&2
+    exit "$EXIT_ROLLBACK_UNHEALTHY"
+  }
   build_previous || log "rebuilding $PREVIOUS failed; starting with the checkout as it is"
   if start_and_check; then
     write_record "$PREVIOUS" "$PREVIOUS" rolled-back "$TARGET" "$snapshot"
@@ -336,8 +338,23 @@ roll_back() {
 IN_PROGRESS="$STATE/in-progress"
 
 set_in_progress() {
-  printf 'phase=%s\ntarget=%s\nprevious=%s\nsnapshot=%s\n' "$1" "$TARGET" "$PREVIOUS" "${2:-}" >"$IN_PROGRESS.tmp"
+  printf 'phase=%s\ntarget=%s\nprevious=%s\nsnapshot=%s\nfailed=%s\n' "$1" "$TARGET" "$PREVIOUS" "${2:-}" "${3:-}" >"$IN_PROGRESS.tmp"
   mv "$IN_PROGRESS.tmp" "$IN_PROGRESS"
+}
+
+restore_snapshot() {
+  local snapshot="$1" failed_dir="$2" file
+  [ -s "$snapshot" ] || return 1
+  mkdir -p "$failed_dir" || return 1
+  if [ -e "$DB" ] && ! cmp -s "$DB" "$snapshot"; then
+    for file in server.db server.db-wal server.db-shm; do
+      [ ! -e "$DATA_DIR/$file" ] || mv "$DATA_DIR/$file" "$failed_dir/$file.$(date -u +%Y%m%dT%H%M%SZ).$$" || return 1
+    done
+  fi
+  rm -f "$DB-wal" "$DB-shm"
+  if [ ! -e "$DB" ]; then
+    cp "$snapshot" "$DB.restoring" && mv "$DB.restoring" "$DB" || return 1
+  fi
 }
 
 clear_in_progress() {
@@ -350,13 +367,14 @@ recorded() {
 
 recover_interrupted() {
   [ -e "$IN_PROGRESS" ] || return 0
-  local phase="" key value snapshot=""
+  local phase="" key value snapshot="" failed_dir=""
   while IFS='=' read -r key value; do
     case "$key" in
       phase) phase="$value" ;;
       target) TARGET="$value" ;;
       previous) PREVIOUS="$value" ;;
       snapshot) snapshot="$value" ;;
+      failed) failed_dir="$value" ;;
     esac
   done <"$IN_PROGRESS"
   log "recovering an interrupted deploy of $TARGET (phase $phase, previous $PREVIOUS)"
@@ -365,6 +383,31 @@ recover_interrupted() {
     clear_in_progress
     log "restored the $PREVIOUS checkout; running services were not touched"
     return 0
+  fi
+  if [ "$phase" = restoring ]; then
+    stop_or_give_up "$snapshot"
+    restore_snapshot "$snapshot" "$failed_dir" || {
+      echo "CRITICAL: could not restore $snapshot during recovery; marker kept" >&2
+      exit "$EXIT_ROLLBACK_UNHEALTHY"
+    }
+    build_previous || log "rebuilding $PREVIOUS failed; starting with the checkout as it is"
+    if start_and_check; then
+      write_record "$PREVIOUS" "$PREVIOUS" rolled-back "$TARGET" "$snapshot"
+      clear_in_progress
+      echo "finished the interrupted rollback of $TARGET to $PREVIOUS; failed DB in $failed_dir" >&2
+      exit 1
+    fi
+    write_record "$PREVIOUS" "$PREVIOUS" rollback-unhealthy "$TARGET" "$snapshot"
+    clear_in_progress
+    echo "CRITICAL: interrupted rollback to $PREVIOUS is unhealthy after restoring $snapshot" >&2
+    exit "$EXIT_ROLLBACK_UNHEALTHY"
+  fi
+  if [ ! -s "$DB" ]; then
+    stop_or_give_up "$snapshot"
+    restore_snapshot "$snapshot" "${failed_dir:-$BACKUPS/failed-recovery-${TARGET:0:12}}" || {
+      echo "CRITICAL: $DB is missing and $snapshot cannot be restored; marker kept" >&2
+      exit "$EXIT_ROLLBACK_UNHEALTHY"
+    }
   fi
   if [ -s "$snapshot" ] && [ "$(git -C "$CHECKOUT" rev-parse HEAD)" = "$TARGET" ] && start_and_check; then
     write_record "$TARGET" "$PREVIOUS" deployed "" "$snapshot"

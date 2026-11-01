@@ -6,6 +6,7 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  renameSync,
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
@@ -409,6 +410,49 @@ test('recovers an interrupted switch: finishes a healthy target, rolls back an u
     assert.equal(record.result, broken ? 'rolled-back' : 'deployed');
     assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), broken ? f.previous : target);
     assert.ok(!existsSync(join(f.state, 'in-progress')));
+  }
+});
+
+test('recovers a rollback killed while swapping the DB, before any service starts', () => {
+  for (const point of ['before-move', 'after-move', 'mid-copy']) {
+    const f = fixture();
+    sqlite(f.db, "insert into step values ('in-snapshot', 'done')");
+    const target = pushTarget(f);
+    git(f.checkout, 'fetch', '-q', 'origin', 'main');
+    git(f.checkout, 'checkout', '-q', '--detach', target);
+    mkdirSync(f.state, { recursive: true });
+    mkdirSync(f.backups, { recursive: true });
+    const snapshot = join(f.backups, 'stopped-interrupted.db');
+    sqlite(f.db, `vacuum into '${snapshot}'`);
+    sqlite(f.db, "insert into step values ('failed-only', 'done')");
+    const failedDir = join(f.backups, 'failed-interrupted');
+    mkdirSync(failedDir);
+    if (point !== 'before-move') renameSync(f.db, join(failedDir, 'server.db'));
+    if (point === 'mid-copy') writeFileSync(`${f.db}.restoring`, 'partial');
+    writeFileSync(
+      join(f.state, 'in-progress'),
+      `phase=restoring\ntarget=${target}\nprevious=${f.previous}\nsnapshot=${snapshot}\nfailed=${failedDir}\n`,
+    );
+    const result = f.run(DEPLOY, ['--recover']);
+    assert.equal(result.status, 1, `${point}: ${result.stderr}`);
+    assert.equal(sqlite(f.db, "select count(*) from step where id = 'in-snapshot'"), '1');
+    assert.equal(sqlite(f.db, "select count(*) from step where id = 'failed-only'"), '0');
+    assert.ok(
+      readdirSync(failedDir).some((name) => name.startsWith('server.db')),
+      point,
+    );
+    assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), f.previous);
+    const record = JSON.parse(readFileSync(join(f.state, 'deployed.json'), 'utf8'));
+    assert.equal(record.result, 'rolled-back');
+    assert.ok(!existsSync(join(f.state, 'in-progress')));
+    const starts = f
+      .log('systemctl.log')
+      .split('\n')
+      .filter((line) => line.includes('start'));
+    assert.deepEqual(starts, [
+      'systemctl --user start cairn-server.service',
+      'systemctl --user start cairn-daemon.service',
+    ]);
   }
 });
 
