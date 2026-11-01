@@ -91,6 +91,28 @@ test('Rename opens a dialog and saving changes the row title', async ({ page }) 
   await expect(row(page, 'active thread A')).toHaveCount(0);
 });
 
+test('Rename ignores the Enter that confirms an IME candidate and saves on a plain Enter', async ({
+  page,
+}) => {
+  await page.goto(`/app?scenario=${SCENARIO}`);
+  await openRowMenu(page, 'active thread A');
+  await page.getByTestId('thread-row-rename').click();
+  const dialog = page.getByRole('dialog', { name: '重命名线程' });
+  const input = dialog.getByTestId('thread-rename-input');
+  await input.fill('改名中');
+  await input.evaluate((el) => {
+    el.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true, isComposing: true }),
+    );
+  });
+  await expect(dialog).toBeVisible();
+  await expect(row(page, 'active thread A')).toHaveCount(1);
+  await input.fill('改名完成');
+  await input.press('Enter');
+  await expect(dialog).toBeHidden();
+  await expect(row(page, '改名完成')).toHaveCount(1);
+});
+
 test('Rename with a blank title keeps Save disabled and Cancel keeps the title', async ({
   page,
 }) => {

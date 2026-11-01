@@ -53,7 +53,7 @@ export function RenameThreadDialog({ initialTitle, onClose, onSave }: RenameThre
             autoFocus
             onChange={(event) => setValue(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === 'Enter') save();
+              if (event.key === 'Enter' && !event.nativeEvent.isComposing) save();
             }}
           />
         </FormField>
