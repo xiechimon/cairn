@@ -197,7 +197,7 @@ export function ReviewDialog({
           >
             <TriangleAlert
               aria-hidden="true"
-              className="mt-0.5 size-3.5 flex-none text-(--card-button)"
+              className="mt-0.5 size-3.5 flex-none text-(--badge-attention)"
             />
             {notice === 'same-vendor'
               ? t('审核人与产出该方案的 Agent 来自同一模型厂商，不构成独立复核。')
