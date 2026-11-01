@@ -15,7 +15,7 @@ import {
 import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { build } from 'esbuild';
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 import { NspawnOrbProvider, type OrbCommandRunner } from '../src/orb/provider.js';
 import { boot, CLAIMED, FakeMachineApi, waitFor } from './machine-loop-harness.js';
 import { createOrbCheckout } from './orb-dist-fixture.js';
@@ -325,4 +325,25 @@ test('a rebuild at the same HEAD hashes nested dist files without git-visible ch
   expect(readlinkSync(join(f.distRoot, 'current'))).not.toBe(previous);
   expect(readFileSync(join(f.distRoot, 'current/dist/assets/worker.mjs'), 'utf8')).toBe('other');
   expect(f.deployments).toHaveLength(2);
+});
+
+test('a scratch daemon can retain every shared release without adopting other machines', async () => {
+  vi.stubEnv('CAIRN_ORB_RETAIN_RELEASES', '1');
+  try {
+    const f = fixture();
+    await f.prepare();
+    const current = basename(readlinkSync(join(f.distRoot, 'current')));
+    for (let index = 0; index < 5; index++) {
+      const directory = join(f.distRoot, 'releases', `production-${index}`);
+      mkdirSync(directory);
+      utimesSync(directory, 2_000_000_000 + index, 2_000_000_000 + index);
+    }
+    await f.prepare();
+    expect(readdirSync(join(f.distRoot, 'releases')).sort()).toEqual(
+      [current, ...Array.from({ length: 5 }, (_, index) => `production-${index}`)].sort(),
+    );
+    expect(await f.provider.list()).toHaveLength(1);
+  } finally {
+    vi.unstubAllEnvs();
+  }
 });

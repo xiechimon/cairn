@@ -413,3 +413,138 @@ under `/run` until reboot. Unrelated administrative actions retain their
 existing authentication policy for named targets; unscoped machine-management
 actions receive no grant. Image builds use an exclusive lock and preserve
 staging trees with active or unreadable mounts.
+
+## Secret isolation canary (#2277)
+
+From the normally built, matching Linux checkout on omarchy, as `ian` without
+sudo, run this single command:
+
+```sh
+scripts/ops/orb/canary.sh --json --out docs/verify/2277/canary.json
+```
+
+Use Node 22.19+ with the guest's Node major, installed checkout dependencies
+(including the native SQLite binding), `git`, `tailscale`, and the existing daemon build at
+`apps/daemon/dist/cli.mjs`. The canary performs no installation or build. It first
+runs the real `orb-host-check` detection, including its disposable clone and
+cleanup in a separate terminal signal group. Repeated SIGINT/SIGTERM signals
+only request cancellation and cannot bypass cleanup. Missing prerequisites refuse the run before planting sentinels. If
+interrupted during that check, it waits for the check's own cleanup before
+honoring the interruption. The output path must be new; an existing evidence
+file is never overwritten. Omitting `--out` prints JSON without writing evidence.
+
+The script starts a token-protected scratch server on a free loopback port and
+enrolls a scratch daemon with a machine-only API key through the normal
+non-interactive CLI path. Both use fresh temporary `CAIRN_HOME` directories and
+a separate OS home, MCP configuration and skills directory. No credentials or
+application settings are inherited from the owner's environment. Each executor
+gets a separate local bare repository and Project on that same scratch server.
+The scratch setup selects Project and step IDs accepted by the current Orb
+validators; rejected pending steps are canceled before the daemon restarts.
+Production server and daemon state are never opened for writing. The scratch
+daemon sets `CAIRN_ORB_RETAIN_RELEASES=1`, which disables release pruning for
+this publisher so it cannot delete a production Thread's older release.
+
+The Project's executable `.agents/setup` runs the attacker inside the real
+runner's workspace. For an Orb, `runOrbStep` starts the real nspawn provider,
+authenticated relay and guest worker, which calls `runStep`. Hook output is
+forwarded into the server transcript with `HOOK_OUTPUT_CHAR_LIMIT = 100000`.
+The attacker also writes `canary-result.json`; the host reads it from the
+actually delivered branch and requires it to match the server's hook note.
+This detects a missing hook note, truncated result, failed model turn or missing
+push instead of treating an incomplete run as isolation evidence.
+
+After probing, the hook starts a tiny OpenAI-compatible streaming model server
+on guest loopback and waits for its readiness over IPC. It uses only Node
+built-ins. The actual Pi backend consumes one text response, and the runner's
+normal automatic commit and push deliver the hook's changes. No model tool call
+is needed to reach push. The existing `test/fakes/scripted-model.ts` is an
+in-process backend fake coupled to Vitest, so it cannot run as a guest HTTP
+server; the canary uses the SSE response shape from the integration stub instead.
+`NO_PROXY` keeps the model request on loopback. The model exits after responding,
+or when its daemon parent exits, with a ten-minute upper bound.
+
+The three routes cover:
+
+- Direct reads of every sentinel, metadata-only reachability of every real path,
+  and `/proc/1/root` aliases of both. Enumeration of the actual host home must
+  fail. `$HOME` enumeration records whether host sentinel names are visible;
+  enumerating the guest's own home is expected and is not a host leak.
+- Workspace symlinks to every target and attempted copies of the new sentinels.
+  Real secret paths are only `stat`ed through the symlinks: copying their actual
+  contents would violate the requirement to keep real keys unread. The runner
+  commits and pushes the symlinks, copied sentinels and JSON through real local
+  bundle delivery. The host streams `git log -p --binary` and
+  `git cat-file --batch-all-objects --batch` over the scratch repository, checking
+  every random marker, including intermediate, deleted and packed objects.
+- A Node Unix-socket connect to `/var/run/docker.sock`, plus TCP connects to the
+  server endpoints required by the issue and the scratch port on both loopback
+  and the bridge. A canary-owned listener on the bridge binds that same scratch
+  port and must first accept a host-side TCP connection. Its guest direct probe
+  requires a timeout; connection refusal is inconclusive and cannot pass that
+  control. Other refused endpoints record current unreachability rather than
+  proving a firewall DROP. The known loopback scratch server also detects a
+  regression that shares the host network namespace. Each HTTP target is also attempted with an explicit CONNECT
+  through `HTTP_PROXY`, bypassing `NO_PROXY`. Proxy attempts require an explicit
+  HTTP 403; missing proxies and unexpected responses fail the canary. The host
+  tailnet address is discovered with `tailscale ip -4`; the scratch attacker uses
+  that address but reports only `tailnet-server`, keeping internal addresses out
+  of the public evidence and source code.
+
+In that same Orb run, `git ls-remote https://github.com/xiechimon/cairn.git HEAD`
+must succeed through the egress proxy. `githubReach: {ok, ms}` is a positive
+control for GitHub HTTPS, independent of the denied private destinations. The
+same attacker then runs with `CAIRN_EXECUTOR=host` through the real host runner
+on the same scratch server. Its negative control must read at least one exact
+sentinel marker. Its separate repository intentionally contains synthetic leaked
+markers and is deleted during cleanup.
+
+### Sentinel safety and evidence
+
+The issue originally proposed replacing real secret paths and restoring backups.
+This implementation deliberately creates only new random-named files:
+
+```text
+~/.cairn/cairn-canary-<random>.pem
+~/.cairn/cairn-canary-<random>.key
+~/.ssh/cairn-canary-<random>
+~/.codex/cairn-canary-<random>.json
+~/.claude/cairn-canary-<random>.json
+```
+
+The directories must already exist without symlinks. Exclusive creation refuses
+existing files or symlinks, rolls back partial planting, and cleanup checks each
+created inode before unlinking it. Real files are never moved, renamed,
+overwritten or backed up, so a crash can no longer strand real keys. Only the
+new sentinel contents are read or copied. Real `~/.cairn/machine.json`, existing
+`~/.cairn/*.pem`, optional `~/.cairn/secretbox.key`, `~/.ssh`,
+`~/.codex/auth.json` and `~/.claude` are probed without reading their contents.
+Neither hook output nor public evidence contains raw markers; sentinel entries
+contain paths and SHA-256 hashes only.
+
+`ok` and exit zero require complete, unique probe rows, every Orb target blocked,
+clean pushed objects, a leaking host negative control and successful GitHub
+reachability. Any failed prerequisite, runner, push, control, probe or cleanup
+prevents success. Cleanup runs on failure and SIGINT/SIGTERM, stops only owned
+scratch processes, and removes only the newly allocated machine/image and
+Project seed. Machine shutdown reuses `orb-host-check`'s cleanup helper, waits
+for stop hooks, and refuses to remove a running machine. The production
+provider's normal shared dist publisher is used; shared daemon releases are
+retained by this publisher rather than pruned or deleted by the canary. SIGKILL and power
+loss cannot run cleanup; any remaining sentinel is synthetic and real keys
+remain in place.
+
+Offline verification:
+
+```sh
+node --test scripts/ops/orb/*.test.mjs
+```
+
+The canary unit tests use fake homes, real temporary Git objects, local fake
+proxy responses and injected network results. The scratch-stack test uses a
+real server, non-interactive enrollment, host runner and Pi backend against a
+local scripted model, with real-home and external-network probes disabled. It
+proves the detector and delivery plumbing, not Linux isolation. Only the
+coordinator's live `docs/verify/2277/canary.json` can establish nspawn, filesystem
+and egress behavior on omarchy. The macOS backend-user canary remains outside
+this item's scope.
