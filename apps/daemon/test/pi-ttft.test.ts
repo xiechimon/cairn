@@ -91,6 +91,16 @@ describe('pi sessions measure time to first token from the prompt send', () => {
     ]);
   });
 
+  test('a clock that steps backwards reports zero, never a negative ttftMs the server would reject', () => {
+    const c = clock(1000);
+    const state = newMapState({ now: c.now });
+    notePromptSent(state);
+    c.advance(-300);
+    mapPiSessionEvent(delta('text_delta'), state);
+    mapPiSessionEvent(end(), state);
+    expect(settle(state)[0]?.ttftMs).toBe(0);
+  });
+
   test('without a prompt send there is no ttftMs', () => {
     const state = newMapState({ now: () => 5 });
     mapPiSessionEvent(delta('text_delta'), state);

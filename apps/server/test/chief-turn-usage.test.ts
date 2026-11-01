@@ -1,5 +1,5 @@
 import type { MachineDoneBody } from '@cairn/shared';
-import { machineDoneBodySchema } from '@cairn/shared';
+import { chiefDigestThreadId, machineDoneBodySchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { build, chiefTurnUsage, step as stepTable, todo, tokenUsage } from '../src/db/schema.js';
@@ -160,6 +160,16 @@ describe('chief turns record their own usage per step', () => {
     await expect(
       finishStep(deps(), other, 'turn-1', { status: 'success', usage: [usage('pi/glm', 40, 0)] }),
     ).rejects.toThrow();
+    expect(turnRows()).toEqual([]);
+  });
+
+  test('a background digest step is not a Coordinator turn and writes no turn row', async () => {
+    const machineId = insertMachine(H.s);
+    claimedStep(machineId, 'digest-step', { buildId: chiefDigestThreadId(H.chiefId) });
+    await finishStep(deps(), machineId, 'digest-step', {
+      status: 'success',
+      usage: [usage('pi/glm', 9000, 0)],
+    });
     expect(turnRows()).toEqual([]);
   });
 

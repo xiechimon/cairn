@@ -414,7 +414,11 @@ async function finishStepReport(
         set: cost === null ? tokens : { ...tokens, ...cost },
       })
       .run();
-    if (stepRow.kind === 'chief' && isChiefConversation(stepRow.buildId)) {
+    if (
+      stepRow.kind === 'chief' &&
+      isChiefConversation(stepRow.buildId) &&
+      !isChiefDigestStep(stepRow)
+    ) {
       db.insert(chiefTurnUsage)
         .values({
           stepId: stepRow.id,

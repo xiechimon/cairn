@@ -452,7 +452,7 @@ export interface MapState {
   firstToken?: { model: string; ms: number };
 }
 
-const FIRST_TOKEN_EVENTS = new Set([
+export const FIRST_TOKEN_EVENTS: ReadonlySet<string> = new Set([
   'text_delta',
   'thinking_delta',
   'toolcall_delta',
@@ -472,7 +472,7 @@ function noteFirstToken(state: MapState, event: AgentSessionEventLike): void {
   if (type === undefined || !FIRST_TOKEN_EVENTS.has(type)) return;
   state.firstToken = {
     model: `${msg.provider}/${msg.model}`,
-    ms: state.now() - state.promptSentAt,
+    ms: Math.max(0, Math.round(state.now() - state.promptSentAt)),
   };
 }
 
@@ -522,7 +522,7 @@ export function newMapState(opts?: {
   return {
     usage: new Map(),
     calls: new Map(),
-    now: opts?.now ?? Date.now,
+    now: opts?.now ?? (() => performance.now()),
     ...(opts?.diagnose !== undefined ? { diagnose: opts.diagnose } : {}),
   };
 }
