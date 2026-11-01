@@ -13,10 +13,11 @@ import { useI18n } from '../i18n/provider.js';
 import {
   createPastedNameCounter,
   filesFromClipboardData,
-  insertAttachmentTokens,
+  joinDraft,
   type PastedNameCounter,
   type PendingAttachment,
   preparePastedFiles,
+  splitDraft,
 } from './attachment-paste.js';
 import {
   type CompletionRange,
@@ -75,6 +76,8 @@ export interface ComposerWireOptions {
 export interface ComposerWire {
   draft: string;
   setDraft: Dispatch<SetStateAction<string>>;
+  tokens: string[];
+  removeToken: (index: number) => void;
   send: () => void;
   handleChange: (event: ChangeEvent<HTMLTextAreaElement>) => void;
   handleKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
@@ -144,18 +147,33 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
   const registryRef = useRef<MentionRegistry | null>(null);
   if (registryRef.current === null) registryRef.current = createMentionRegistry();
   const registry = registryRef.current;
-  const draft = useMemo(() => toDisplay(wireDraft, registry), [wireDraft, registry]);
-  const setDraft: Dispatch<SetStateAction<string>> = staticFace
-    ? () => {}
-    : (next) => {
-        const display = typeof next === 'function' ? next(draftRef.current) : next;
-        const wire = toWire(display, registry);
-        if (controlled) (onDraftChange as (value: string) => void)(wire);
-        else setInternalDraft(wire);
-      };
+  const fullDraft = useMemo(() => toDisplay(wireDraft, registry), [wireDraft, registry]);
+  const { tokens, text: draft } = useMemo(() => splitDraft(fullDraft), [fullDraft]);
+  const writeFull = (display: string) => {
+    if (staticFace) return;
+    const wire = toWire(display, registry);
+    if (controlled) (onDraftChange as (value: string) => void)(wire);
+    else setInternalDraft(wire);
+  };
+  const setDraft: Dispatch<SetStateAction<string>> = (next) => {
+    const text = typeof next === 'function' ? next(draftRef.current) : next;
+    writeFull(joinDraft(tokensRef.current, text));
+  };
+  const removeToken = (index: number) => {
+    writeFull(
+      joinDraft(
+        tokensRef.current.filter((_, i) => i !== index),
+        draftRef.current,
+      ),
+    );
+  };
 
   const draftRef = useRef(draft);
   draftRef.current = draft;
+  const tokensRef = useRef(tokens);
+  tokensRef.current = tokens;
+  const fullDraftRef = useRef(fullDraft);
+  fullDraftRef.current = fullDraft;
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const inlineListboxRef = useRef<HTMLDivElement | null>(null);
@@ -193,7 +211,6 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
   if (pastedNameCounterRef.current === null)
     pastedNameCounterRef.current = createPastedNameCounter();
   const attachInFlightRef = useRef(0);
-  const pendingAttachRef = useRef<{ value: string; caret: number } | null>(null);
 
   const applyRange = useCallback((next: CompletionRange | null) => {
     const prev = inlineRangeRef.current;
@@ -308,7 +325,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
   const sending = useRef(false);
   const submit = (callback: typeof onSend) => {
     if (attachInFlightRef.current > 0 || sending.current) return;
-    const text = toWire(draft, registry).trim();
+    const text = toWire(fullDraft, registry).trim();
     if (text === '' && !editable) {
       callback?.(text);
       return;
@@ -319,14 +336,14 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
       sending.current = true;
       void result
         .then(() => {
-          if (draftRef.current === draft) setDraft('');
+          if (fullDraftRef.current === fullDraft) writeFull('');
         })
         .catch(() => {})
         .finally(() => {
           sending.current = false;
         });
     } else {
-      setDraft('');
+      writeFull('');
     }
   };
 
@@ -334,7 +351,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
 
   const openFilePicker = () => fileInputRef.current?.click();
 
-  const runAttachment = (files: File[], caret: number | null, also?: () => void) => {
+  const runAttachment = (files: File[], also?: () => void) => {
     if (!onAttachment) {
       also?.();
       return;
@@ -345,9 +362,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     void Promise.resolve(onAttachment(files))
       .then((tokens) => {
         if (tokens.length === 0) return;
-        const inserted = insertAttachmentTokens(draftRef.current, tokens, caret);
-        pendingAttachRef.current = inserted;
-        setDraft(inserted.value);
+        writeFull(joinDraft([...tokensRef.current, ...tokens], draftRef.current));
       })
       .catch((err) => {
         console.error('attachment delegate failed', err);
@@ -364,7 +379,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     const files = Array.from(event.target.files ?? []);
     event.target.value = '';
     if (files.length === 0) return;
-    runAttachment(files, null);
+    runAttachment(files);
   };
 
   const handlePaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
@@ -375,8 +390,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     closeInline();
     const counter = pastedNameCounterRef.current as PastedNameCounter;
     counter.begin(draftRef.current.trim() === '');
-    const caret = event.currentTarget.selectionStart ?? draftRef.current.length;
-    runAttachment(preparePastedFiles(files, counter), caret, () => counter.end());
+    runAttachment(preparePastedFiles(files, counter), () => counter.end());
   };
 
   const pendingInsertRef = useRef<{ value: string; caret: number } | null>(null);
@@ -389,16 +403,6 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     const ta = textareaRef.current;
     if (ta == null) return;
     ta.focus();
-    ta.setSelectionRange(pending.caret, pending.caret);
-  }, [draft]);
-
-  useLayoutEffect(() => {
-    const pending = pendingAttachRef.current;
-    if (pending == null) return;
-    pendingAttachRef.current = null;
-    if (pending.value !== draft) return;
-    const ta = textareaRef.current;
-    if (ta == null || document.activeElement !== ta) return;
     ta.setSelectionRange(pending.caret, pending.caret);
   }, [draft]);
 
@@ -504,7 +508,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     closeSlash();
     switch (name) {
       case 'clear':
-        setDraft('');
+        writeFull('');
         toast.success(t('已清空'));
         break;
       case 'attach':
@@ -686,6 +690,8 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
   return {
     draft,
     setDraft,
+    tokens,
+    removeToken,
     send,
     handleChange,
     handleKeyDown,

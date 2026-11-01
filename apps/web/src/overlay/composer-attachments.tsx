@@ -6,7 +6,6 @@ import {
   formatFileSize,
   type PendingAttachment,
   parseAttachmentTokens,
-  removeAttachmentToken,
 } from './attachment-paste.js';
 import { AttachmentPreview } from './attachment-preview.js';
 
@@ -23,16 +22,16 @@ function fileKind(name: string): string {
 }
 
 export function ComposerAttachments({
-  draft,
+  tokens,
   pending,
-  onDraftChange,
+  onRemove,
 }: {
-  draft: string;
+  tokens: string[];
   pending: PendingAttachment[];
-  onDraftChange: (next: string) => void;
+  onRemove: (index: number) => void;
 }) {
   const { t } = useI18n();
-  const settled = useMemo(() => parseAttachmentTokens(draft), [draft]);
+  const settled = useMemo(() => parseAttachmentTokens(tokens.join('\n')), [tokens]);
   const [preview, setPreview] = useState<PreviewTarget | null>(null);
   if (pending.length === 0 && settled.length === 0) return null;
   return (
@@ -67,7 +66,7 @@ export function ComposerAttachments({
             name={token.name}
             kind={fileKind(token.name)}
             state="ready"
-            onRemove={() => onDraftChange(removeAttachmentToken(draft, index))}
+            onRemove={() => onRemove(index)}
             {...(isImage
               ? {
                   imageSrc: source,

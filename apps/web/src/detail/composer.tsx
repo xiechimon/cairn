@@ -66,7 +66,8 @@ export function Composer({
   const elapsed = tick ?? workingFor?.seconds ?? null;
   const {
     draft,
-    setDraft,
+    tokens,
+    removeToken,
     send,
     handleChange,
     handleKeyDown,
@@ -122,7 +123,7 @@ export function Composer({
     growCap: 384,
   });
 
-  const hasContent = draft.trim() !== '' || pendingAttachments.length > 0;
+  const hasContent = draft.trim() !== '' || tokens.length > 0 || pendingAttachments.length > 0;
 
   return (
     <div
@@ -132,9 +133,9 @@ export function Composer({
       {editable ? (
         <>
           <ComposerAttachments
-            draft={draft}
+            tokens={tokens}
             pending={pendingAttachments}
-            onDraftChange={setDraft}
+            onRemove={removeToken}
           />
           <div className="relative">
             <Textarea

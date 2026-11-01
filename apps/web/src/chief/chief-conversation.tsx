@@ -388,7 +388,8 @@ export function ChiefConversation({
   const heroLayout = home && empty && !heroCollapsed;
   const heroScrollRef = useRef<HTMLDivElement | null>(null);
   useScrollFade(heroScrollRef, { enabled: heroLayout });
-  const stopMode = chief.running === true && wire.draft === '' && onStop != null;
+  const stopMode =
+    chief.running === true && wire.draft === '' && wire.tokens.length === 0 && onStop != null;
   const liveTurn =
     chief.running === true
       ? chief.stream?.findLast((item) => item.kind === 'streaming')
@@ -658,9 +659,9 @@ export function ChiefConversation({
         style={home ? { viewTransitionName: 'chief-composer' } : undefined}
       >
         <ComposerAttachments
-          draft={wire.draft}
+          tokens={wire.tokens}
           pending={pendingAttachments}
-          onDraftChange={wire.setDraft}
+          onRemove={wire.removeToken}
         />
         <div className="relative">
           <Textarea
@@ -820,7 +821,8 @@ export function ChiefConversation({
               aria-label={t('发送')}
               className={cn(
                 SEND_BTN_CLS,
-                (wire.draft !== '' || pendingAttachments.length > 0) && SEND_ON_CLS,
+                (wire.draft !== '' || wire.tokens.length > 0 || pendingAttachments.length > 0) &&
+                  SEND_ON_CLS,
                 turnElapsed != null && 'ml-2',
               )}
               onClick={wire.send}
