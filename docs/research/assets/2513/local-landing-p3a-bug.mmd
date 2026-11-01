@@ -1,0 +1,80 @@
+---
+title: "Local landing (LocalLanding.tla)"
+---
+stateDiagram-v2
+  state "Legend" as legend {
+    lg0: open
+    lg1: decided
+    lg2: landed
+    lg3: Breaks LocalLandingBindsJudgedPatch
+    lg4: Path to the LocalLandingBindsJudgedPatch bug
+  }
+  class lg0 blue
+  class lg1 orange
+  class lg2 teal
+  class lg3 breaks
+  class lg4 bugPath
+  s0: Not judged
+  s1: Judged
+  s2: Commit built, not judged
+  s3: Judged (base moved since judgement)
+  s4: Commit built, judged
+  s5: Judged (patch changed since judgement)
+  s6: Decided to land
+  s7: Commit built, judged (base moved since judgement)
+  s8: Judged (patch changed, base moved since judgement)
+  s9: Commit built, judged (patch changed since judgement)
+  s10: Landed the judged patch
+  s11: Decided to land (base moved since judgement)
+  s12: Decided to land (patch changed since judgement)
+  s13: Commit built, judged (patch changed, base moved since judgement)
+  s14: Landed an unjudged patch
+  s15: Decided to land (patch changed, base moved since judgement)
+  [*] --> s0
+  s0 --> s1: judge patch
+  s0 --> s2: build merge commit
+  s1 --> s3: default branch moves
+  s1 --> s4: build merge commit
+  s1 --> s5: patch changes
+  s2 --> s4: judge patch
+  s3 --> s7: build merge commit
+  s3 --> s8: patch changes
+  s4 --> s6: decideLocalMerge says land
+  s4 --> s7: default branch moves
+  s5 --> s8: default branch moves
+  s5 --> s9: build merge commit
+  s6 --> s10: applyMergeLanding updates ref
+  s6 --> s11: default branch moves
+  s7 --> s11: decideLocalMerge says land
+  s8 --> s13: build merge commit
+  s9 --> s12: decideLocalMerge says land
+  s9 --> s13: default branch moves
+  s11 --> s14: applyMergeLanding updates ref
+  s12 --> s14: applyMergeLanding updates ref
+  s12 --> s15: default branch moves
+  s13 --> s15: decideLocalMerge says land
+  s15 --> s14: applyMergeLanding updates ref
+  classDef breaks fill:#ffecee,stroke:#e72e3b,stroke-width:2.5px,color:#cd2834
+  class s0 blue
+  class s0 bugPath
+  class s1 blue
+  class s1 bugPath
+  class s2 blue
+  class s3 blue
+  class s4 blue
+  class s5 blue
+  class s5 bugPath
+  class s6 orange
+  class s7 blue
+  class s8 blue
+  class s9 blue
+  class s9 bugPath
+  class s10 teal
+  class s11 orange
+  class s12 orange
+  class s12 bugPath
+  class s13 blue
+  class s14 teal
+  class s14 breaks
+  class s14 bugPath
+  class s15 orange
