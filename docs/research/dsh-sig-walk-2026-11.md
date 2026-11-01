@@ -32,13 +32,13 @@
 | Live GitHub loop: allowed person mentions the agent on an Issue, Ticket, worker, PR, review comment fan-out | Not run. It needs a dedicated agent GitHub account (the Source drops every comment whose author is the agent login, `src/sources/github.ts:227`, `:397`, so ian's account cannot be both requester and agent) and a working model provider. Both are ian's to provide (§8) | read |
 | sig | Read only; see §3 for why it was not deployed | read |
 
-Screenshots (`docs/research/assets/dsh-sig-walk-2026-11/`):
+Screenshots are kept on the `pr-assets/2490` branch at commit `e25dceee4` (`docs/verify/2489/`), linked below:
 
-- `01-overview-setup.jpg`: Overview before setup. Only two blocks, both actionable: "Deployment check failed; dsh-superagent takes no work" and "No one may originate work: the lists on every Source are empty". Healthy parts take no space.
-- `02-settings-sources.jpg`: the GitHub Source card: repository, agent CLI wrapper, four receive-all switches (new Issues, new PRs, comments, default-branch CI), all off by default.
-- `03-settings-eval-policy.jpg`: Policy version hash, two default accept rules ("Copy fixes", "Visual fixes"), per-Source allowed list and bot list, and the admission table (receiving scope × on/off list × addressed/not).
-- `04-settings-eval-mode.jpg`: accept mode Off / Observe (default) / Auto, Eval time limit 120 s, assessor model override.
-- `05-dsh-session-provider-retry.jpg`: the plain DSH session stuck in model retries.
+- [`01-overview-setup.jpg`](https://raw.githubusercontent.com/xiechimon/cairn/e25dceee4b67e992f9fdc6dd30ca23714a5bbb5c/docs/verify/2489/01-overview-setup.jpg): Overview before setup. Only two blocks, both actionable: "Deployment check failed; dsh-superagent takes no work" and "No one may originate work: the lists on every Source are empty". Healthy parts take no space.
+- [`02-settings-sources.jpg`](https://raw.githubusercontent.com/xiechimon/cairn/e25dceee4b67e992f9fdc6dd30ca23714a5bbb5c/docs/verify/2489/02-settings-sources.jpg): the GitHub Source card: repository, agent CLI wrapper, four receive-all switches (new Issues, new PRs, comments, default-branch CI), all off by default.
+- [`03-settings-eval-policy.jpg`](https://raw.githubusercontent.com/xiechimon/cairn/e25dceee4b67e992f9fdc6dd30ca23714a5bbb5c/docs/verify/2489/03-settings-eval-policy.jpg): Policy version hash, two default accept rules ("Copy fixes", "Visual fixes"), per-Source allowed list and bot list, and the admission table (receiving scope × on/off list × addressed/not).
+- [`04-settings-eval-mode.jpg`](https://raw.githubusercontent.com/xiechimon/cairn/e25dceee4b67e992f9fdc6dd30ca23714a5bbb5c/docs/verify/2489/04-settings-eval-mode.jpg): accept mode Off / Observe (default) / Auto, Eval time limit 120 s, assessor model override.
+- [`05-dsh-session-provider-retry.jpg`](https://raw.githubusercontent.com/xiechimon/cairn/e25dceee4b67e992f9fdc6dd30ca23714a5bbb5c/docs/verify/2489/05-dsh-session-provider-retry.jpg): the plain DSH session stuck in model retries.
 
 
 ## 2. DSH super-agent
