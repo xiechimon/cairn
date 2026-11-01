@@ -1,6 +1,6 @@
 **Spike result (PR2): resume the runtime session with server-tuned compaction. Do not rebuild a fresh session per turn.**
 
-PR: PR_URL. Raw rows, commands and limits: `docs/verify/2522/` on that branch.
+PR: https://github.com/xiechimon/cairn/pull/2559. Raw rows, commands and limits: `docs/verify/2522/` on that branch.
 
 Setup:
 
