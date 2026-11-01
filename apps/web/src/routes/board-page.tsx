@@ -415,7 +415,7 @@ export function BoardPage() {
     [live, orchestrateStart.orchestrate],
   );
   const orchestrationOf = useCallback(
-    (todo: TodoRecord) => cardOrchestration(chiefThreadsQ.data, todo.seqNum),
+    (todo: TodoRecord) => cardOrchestration(chiefThreadsQ.data, todo),
     [chiefThreadsQ.data],
   );
 
