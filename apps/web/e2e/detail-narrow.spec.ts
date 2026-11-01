@@ -180,7 +180,7 @@ for (const theme of ['light', 'dark'] as const) {
       }
       await expect(header.getByTestId('phase-chip')).toHaveAccessibleName('审核');
       await header.getByTestId('phase-chip').click();
-      await expect(page.getByRole('dialog', { name: '任务分配' })).toBeVisible();
+      await expect(page.getByRole('dialog', { name: '任务状态' })).toBeVisible();
       await page.keyboard.press('Escape');
       await action.click();
       await expect(page.getByRole('dialog', { name: '完成任务' })).toBeVisible();

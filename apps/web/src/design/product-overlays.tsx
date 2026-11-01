@@ -2,13 +2,13 @@ import { Play } from 'lucide-react';
 import { useId, useRef, useState } from 'react';
 import { DoneConfirmDialog } from '../board/done-confirm-dialog.js';
 import { ResetConfirmDialog } from '../board/reset-confirm-dialog.js';
+import { AgentPickerPanel } from '../components/agent-picker.js';
 import { Button } from '../components/ui/button.js';
 import { Kbd } from '../components/ui/kbd.js';
 import { useI18n } from '../i18n/provider.js';
 import { EllipsisVertical, Search, Settings } from '../icons/index.js';
 import { AttachmentCard } from '../overlay/attachment-card.js';
 import { AttachmentPreview } from '../overlay/attachment-preview.js';
-import { ChipPopover } from '../overlay/chip-popover.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { DeleteProjectConfirm } from '../overlay/delete-project-confirm.js';
 import { MentionInline } from '../overlay/mention-inline.js';
@@ -18,9 +18,11 @@ import { type DocView, PaneTitle, PaneViewButtons } from '../overlay/plan-dropdo
 import { type SearchContext, SearchPanel, useSearchState } from '../overlay/search-panel.js';
 import { BUILTIN_SLASH_COMMANDS, type SlashRow } from '../overlay/slash-commands.js';
 import { SlashMenu } from '../overlay/slash-menu.js';
+import { StatusMenu } from '../overlay/status-menu.js';
 import {
   BOARD_FIXTURE,
   CARD_FACES,
+  GALLERY_AGENTS,
   MENTION_GROUPS,
   PROJECT,
   PROJECT_TITLE,
@@ -282,16 +284,18 @@ function AttachmentsSpecimen() {
   );
 }
 
+const MENU_STAGE =
+  'w-72 rounded-(--radius-popover) bg-popover p-(--menu-pad) shadow-(--shadow-popover)';
+
 function MenusSpecimen() {
   const [moreOpen, setMoreOpen] = useState(false);
   const [view, setView] = useState<DocView>('plan');
   const [last, setLast] = useState<string | null>(null);
   const moreRef = useRef<HTMLButtonElement>(null);
-  const chipTodo = CARD_FACES[11]?.todo ?? CARD_FACES[0]?.todo;
   return (
     <Specimen
       title="Menus and popovers"
-      note={last ?? 'MoreMenu, PaneTitle, PaneViewButtons and the ChipPopover body'}
+      note={last ?? 'MoreMenu, PaneTitle, PaneViewButtons, the status menu and the agent picker'}
       stage="canvas"
     >
       <Cell label="MoreMenu">
@@ -323,18 +327,49 @@ function MenusSpecimen() {
       <Cell label="PaneViewButtons">
         <PaneViewButtons docLabel={view === 'plan' ? '方案' : '变更'} onDocView={setView} />
       </Cell>
-      {chipTodo != null && (
-        <Cell label="ChipPopover body">
-          <div className="rounded-(--radius-popover) bg-popover p-(--menu-pad) shadow-(--shadow-popover)">
-            <ChipPopover
-              todo={chipTodo}
-              projectName={PROJECT_TITLE}
-              agentModel={{ modelId: 'claude-sonnet-5-5', thinkingLevel: 'high' }}
-              onEditAssign={() => setLast('Edit assignment')}
-            />
-          </div>
-        </Cell>
-      )}
+      <Cell label="Status menu, Planning">
+        <div className={MENU_STAGE}>
+          <StatusMenu
+            phase="planning"
+            elapsed="12 minutes ago"
+            onMoveBack={() => setLast('Move back')}
+          />
+        </div>
+      </Cell>
+      <Cell label="Status menu, Review">
+        <div className={MENU_STAGE}>
+          <StatusMenu
+            phase="review"
+            elapsed="3 hours ago"
+            onMoveBack={() => setLast('Move back')}
+            onMarkDone={() => setLast('Mark done')}
+          />
+        </div>
+      </Cell>
+      <Cell label="Agent picker">
+        <div className={MENU_STAGE}>
+          <AgentPickerPanel
+            agents={GALLERY_AGENTS}
+            selectedId="builder"
+            onSelect={(id) => setLast(`Assign ${id}`)}
+            onDone={() => {}}
+            footnote="Switching agents restarts this step."
+            rebindCopy="更换执行 Agent？后续运行将改由 <agent> 执行。"
+          />
+        </div>
+      </Cell>
+      <Cell label="Agent picker, rebind confirmation">
+        <div className={MENU_STAGE}>
+          <AgentPickerPanel
+            agents={GALLERY_AGENTS}
+            selectedId="builder"
+            onSelect={(id) => setLast(`Assign ${id}`)}
+            onDone={() => {}}
+            rebindCopy="更换执行 Agent？后续运行将改由 <agent> 执行。"
+            startConfirming="reviewer"
+          />
+        </div>
+      </Cell>
     </Specimen>
   );
 }

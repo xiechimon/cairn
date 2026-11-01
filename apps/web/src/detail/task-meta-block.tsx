@@ -7,6 +7,7 @@ export interface TaskMetaFields {
   sourceIssue: { number: number; title: string; url: string } | null;
   branch: string | null;
   pr: { number: number; url: string } | null;
+  owner?: string | null;
   machine: string | null;
   machineWaiting: boolean;
   model: string | null;
@@ -67,6 +68,9 @@ export function TaskMetaBlock({ meta, now }: { meta: TaskMetaFields; now: number
         </span>
       ),
     });
+  }
+  if (meta.owner != null) {
+    rows.push({ label: t('负责人'), content: meta.owner });
   }
   if (meta.machine != null) {
     rows.push({

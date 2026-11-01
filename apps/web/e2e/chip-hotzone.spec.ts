@@ -18,7 +18,7 @@ const chip = (page: import('@playwright/test').Page) => page.locator('.detail-ch
 
 const chevron = (page: import('@playwright/test').Page) => page.getByTestId('chip-chevron');
 const popover = (page: import('@playwright/test').Page) =>
-  page.getByRole('dialog', { name: '任务分配' });
+  page.getByRole('dialog', { name: '任务状态' });
 
 test('H1: the chevron side of the chip toggles the popover', async ({ page }) => {
   await page.goto(DETAIL);
