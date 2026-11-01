@@ -834,6 +834,7 @@ export function ProjectPage() {
             variant="ghost"
             size="icon-sm"
             render={<Link to={{ pathname: `/app/project/${id}/settings`, search }} />}
+            nativeButton={false}
             aria-label={t('设置')}
           >
             <Settings />

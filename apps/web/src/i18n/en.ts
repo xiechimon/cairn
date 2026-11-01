@@ -541,10 +541,11 @@ export const EN: Record<string, string> = {
   已换备用模型: 'Switched to fallback model',
   '等额度：{lane} {kind}，{probe} 自动探测续跑':
     'Waiting for quota: {lane} {kind}, auto-probe at {probe}',
-  '{lane} {kind}，{count} 个任务挂起等额度': '{lane} {kind}, {count} task(s) waiting for quota',
+  '{lane} {kind}，{count} 个任务挂起等额度':
+    '{lane} {kind}, {count#1 task|# tasks} waiting for quota',
   '额度恢复后自动续跑；{probe} 自动探测':
     'Runs resume automatically once quota recovers; next probe at {probe}',
-  '{count} 个任务因额度/限流挂起': '{count} task(s) suspended on quota/rate limits',
+  '{count} 个任务因额度/限流挂起': '{count#1 task|# tasks} suspended on quota/rate limits',
   '额度恢复后自动续跑，无需人工操作':
     'Runs resume automatically once quota recovers — no action needed',
   // #1261 标签 vars 值（kind 位的中英对译——vars 插值不查词典，单列键位）。

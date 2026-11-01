@@ -57,6 +57,7 @@ export function FirstPrCard({ info, onDismiss }: { info: FirstPrCardInfo; onDism
             size="sm"
             className="px-3"
             render={<a href={info.href} target="_blank" rel="noreferrer" />}
+            nativeButton={false}
           >
             {t('分享到 Discussions')}
           </Button>

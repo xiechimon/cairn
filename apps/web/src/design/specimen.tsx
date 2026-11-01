@@ -58,7 +58,9 @@ export function Specimen({
   return (
     <figure className="isolate m-0 overflow-hidden rounded-(--radius-card) bg-card shadow-(--e1)">
       <figcaption className="flex items-baseline gap-3 border-b border-border px-5 py-3">
-        <span className="text-ui font-semibold text-foreground">{title}</span>
+        <span className="flex-none text-ui font-semibold whitespace-nowrap text-foreground">
+          {title}
+        </span>
         {note != null && <span className="text-meta text-content-tertiary">{note}</span>}
       </figcaption>
       <div
