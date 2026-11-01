@@ -54,6 +54,8 @@ test('only files inside the auto-merge set may enter the queue', () => {
 test('the queue requires the review-gate status and keeps PR-only gates off the draft', () => {
   const [queue, merge] = config.split('    merge_conditions:\n');
   assert.match(queue, /- status-success = review-gate\n/);
+  assert.match(queue, /- check-success = merge-route\n/);
+  assert.doesNotMatch(queue, /check-skipped = merge-route/);
   assert.match(queue, /- -label = owner-route\n/);
   assert.match(queue, /- -author = cairnwright\[bot\]\n/);
   for (const check of ['check', 'pack-smoke', 'e2e-gate', 'pr-evidence', 'gates'])

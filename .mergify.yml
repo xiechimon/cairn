@@ -7,6 +7,7 @@ queue_rules:
       - -label = owner-route
       - -author = cairnwright[bot]
       - status-success = review-gate
+      - check-success = merge-route
       - or:
           - check-success = check
           - check-skipped = check

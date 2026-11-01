@@ -50,6 +50,7 @@ export function mergifyConfig(prGateSource) {
       - -label = owner-route
       - -author = cairnwright[bot]
       - status-success = review-gate
+      - check-success = merge-route
 ${prChecks.map(passedOrSkipped).join('\n')}
       - ${quoted(`-files ~= ${protectedRe}`)}
       - ${quoted(`-files ~= ${outsideRe}`)}

@@ -315,7 +315,7 @@ jobs:
 
       - name: Mergify queue config follows pr-gate routing
         if: ${{ !cancelled() }}
-        run: node --test scripts/mergify-config.test.mjs
+        run: node --test scripts/mergify-config.test.mjs scripts/merge-route.test.mjs
 
       - name: UI debt ledger only shrinks against main
         if: ${{ !cancelled() }}

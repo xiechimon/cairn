@@ -54,6 +54,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  merge-route:
+    if: ${{ !(github.event.pull_request.user.login == 'mergify[bot]' && startsWith(github.head_ref, 'mergify/merge-queue/')) }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+
+      - name: Route the head through main's pr-gate rules
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if ! git cat-file -e origin/main:scripts/merge-route.mjs; then
+            echo "merge-route: main has no merge-route.mjs yet; no PR may enter the merge queue"
+            exit 1
+          fi
+          git show origin/main:scripts/merge-route.mjs > "$RUNNER_TEMP/merge-route.mjs"
+          node "$RUNNER_TEMP/merge-route.mjs" "$HEAD_SHA"
+
   # Stable job name: it is in the branch-protection required checks.
   pr-evidence:
     runs-on: ubuntu-latest
