@@ -322,6 +322,7 @@ roll_back() {
     echo "CRITICAL: restoring $snapshot failed; failed DB in $failed_dir, deploy marker kept for --recover" >&2
     exit "$EXIT_ROLLBACK_UNHEALTHY"
   }
+  set_in_progress restored "$snapshot" "$failed_dir"
   build_previous || log "rebuilding $PREVIOUS failed; starting with the checkout as it is"
   if start_and_check; then
     write_record "$PREVIOUS" "$PREVIOUS" rolled-back "$TARGET" "$snapshot"
@@ -384,12 +385,15 @@ recover_interrupted() {
     log "restored the $PREVIOUS checkout; running services were not touched"
     return 0
   fi
-  if [ "$phase" = restoring ]; then
+  if [ "$phase" = restoring ] || [ "$phase" = restored ]; then
     stop_or_give_up "$snapshot"
-    restore_snapshot "$snapshot" "$failed_dir" || {
-      echo "CRITICAL: could not restore $snapshot during recovery; marker kept" >&2
-      exit "$EXIT_ROLLBACK_UNHEALTHY"
-    }
+    if [ "$phase" = restoring ]; then
+      restore_snapshot "$snapshot" "$failed_dir" || {
+        echo "CRITICAL: could not restore $snapshot during recovery; marker kept" >&2
+        exit "$EXIT_ROLLBACK_UNHEALTHY"
+      }
+      set_in_progress restored "$snapshot" "$failed_dir"
+    fi
     build_previous || log "rebuilding $PREVIOUS failed; starting with the checkout as it is"
     if start_and_check; then
       write_record "$PREVIOUS" "$PREVIOUS" rolled-back "$TARGET" "$snapshot"

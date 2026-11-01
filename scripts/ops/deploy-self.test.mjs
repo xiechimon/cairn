@@ -133,6 +133,7 @@ sqlite3 "$db" "insert into __drizzle_migrations(hash) values ('m1')"`,
     bin,
     'systemctl',
     `echo "systemctl $*" >> "${fake}/systemctl.log"
+[ ! -f "${fake}/phase-on-start" ] || [ "$2" != start ] || echo "start $3 @ $(sed -n 's/^phase=//p' "${dir}/state/in-progress" 2>/dev/null)" >> "${fake}/phases.log"
 if [ "$2 $3" = "start cairn-server.service" ]; then
   head=$(git -C "${checkout}" rev-parse HEAD)
   [ "$head" = "${previous}" ] || sqlite3 "${db}" "insert or ignore into __drizzle_migrations(id, hash) values (2, 'm1')"
@@ -454,6 +455,51 @@ test('recovers a rollback killed while swapping the DB, before any service start
       'systemctl --user start cairn-daemon.service',
     ]);
   }
+});
+
+test('recovery after the snapshot was restored and services started keeps their new writes', () => {
+  for (const checkoutAt of ['previous', 'target']) {
+    const f = fixture();
+    const target = pushTarget(f);
+    git(f.checkout, 'fetch', '-q', 'origin', 'main');
+    if (checkoutAt === 'target') git(f.checkout, 'checkout', '-q', '--detach', target);
+    mkdirSync(f.state, { recursive: true });
+    mkdirSync(f.backups, { recursive: true });
+    const snapshot = join(f.backups, 'stopped-interrupted.db');
+    sqlite(f.db, `vacuum into '${snapshot}'`);
+    sqlite(f.db, "insert into step values ('written-by-restarted-previous', 'done')");
+    const failedDir = join(f.backups, 'failed-interrupted');
+    mkdirSync(failedDir);
+    writeFileSync(
+      join(f.state, 'in-progress'),
+      `phase=restored\ntarget=${target}\nprevious=${f.previous}\nsnapshot=${snapshot}\nfailed=${failedDir}\n`,
+    );
+    const result = f.run(DEPLOY, ['--recover']);
+    assert.equal(result.status, 1, `${checkoutAt}: ${result.stderr}`);
+    assert.equal(
+      sqlite(f.db, "select count(*) from step where id = 'written-by-restarted-previous'"),
+      '1',
+    );
+    assert.deepEqual(readdirSync(failedDir), []);
+    assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), f.previous);
+    const record = JSON.parse(readFileSync(join(f.state, 'deployed.json'), 'utf8'));
+    assert.equal(record.result, 'rolled-back');
+    assert.ok(!existsSync(join(f.state, 'in-progress')));
+  }
+});
+
+test('a rollback persists the restored phase before starting the previous build', () => {
+  const f = fixture();
+  const target = pushTarget(f);
+  writeFileSync(join(f.fake, 'broken-sha'), target);
+  writeFileSync(join(f.fake, 'phase-on-start'), '');
+  const result = f.run(DEPLOY, [target]);
+  assert.equal(result.status, 1, result.stderr);
+  assert.deepEqual(f.log('phases.log').trim().split('\n'), [
+    'start cairn-server.service @ switching',
+    'start cairn-server.service @ restored',
+    'start cairn-daemon.service @ restored',
+  ]);
 });
 
 test('does not treat a checkout at the target as deployed without a record and a healthy server', () => {
