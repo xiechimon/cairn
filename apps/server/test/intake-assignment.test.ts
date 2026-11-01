@@ -51,6 +51,37 @@ for (const caller of ['Coordinator', 'MCP']) {
           .map((row) => row.kind),
       ).toEqual([withPlan ? 'plan' : 'build']);
     });
+
+    test(`${caller} refuses a mixed build batch with an empty intake preset withPlan=${withPlan}`, async () => {
+      const normal = await assignedTodo(false);
+      const preset = await assignedTodo(true);
+      const assignment = { source: 'intake-label' as const, plan: null, build: null };
+      H.s.db.update(todo).set({ assignment }).where(eq(todo.id, preset.id)).run();
+      const args = {
+        todoIds: [normal.id, preset.id],
+        withPlan,
+        assignment: { plan: { agentId: AGENT2_ID }, build: { agentId: AGENT2_ID } },
+      };
+      const call =
+        caller === 'Coordinator'
+          ? relay('run_builds', args)
+          : executeMcpTool(
+              toolDeps(),
+              { teamId: H.teamId, user: H.s.user, grants: new Set() },
+              'run_builds',
+              args,
+            );
+      await expect(call).rejects.toMatchObject({
+        status: 409,
+        message:
+          'intake-label-assignment-failed: Restore the requested intake agent preset before dispatching this task.',
+      });
+      expect(H.s.db.select().from(build).all()).toHaveLength(0);
+      expect(H.s.db.select().from(step).all()).toHaveLength(0);
+      expect(H.s.db.select().from(todo).where(eq(todo.id, preset.id)).get()?.assignment).toEqual(
+        assignment,
+      );
+    });
   }
 
   for (const status of ['inactive', 'archived']) {
@@ -170,4 +201,30 @@ test('closing missing tasks retains skipped results', async () => {
     transitioned: [],
     skipped: ['missing-task'],
   });
+});
+
+test('deleting a mixed batch refuses an unbuilt intake preset before deleting any task', async () => {
+  const normal = await assignedTodo(false);
+  const preset = await assignedTodo(true);
+  await expect(relay('delete_todos', { todoIds: [normal.id, preset.id] })).rejects.toMatchObject({
+    status: 409,
+    message: expect.stringMatching(/intake-label-split-refused.*Build .* as is/),
+  });
+  expect(
+    H.s.db
+      .select()
+      .from(todo)
+      .all()
+      .map((row) => row.id),
+  ).toEqual([normal.id, preset.id]);
+});
+
+test('deleting a batch allows ordinary tasks and intake presets that have a build', async () => {
+  const normal = await assignedTodo(false);
+  const preset = await assignedTodo(true);
+  await relay('run_builds', { todoIds: [preset.id], withPlan: false });
+  expect(await relay('delete_todos', { todoIds: [normal.id, preset.id] })).toEqual({
+    deleted: [normal.id, preset.id],
+  });
+  expect(H.s.db.select().from(todo).all()).toHaveLength(0);
 });

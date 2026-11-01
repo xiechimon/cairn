@@ -1,4 +1,4 @@
-import type { SecretBox, UserRecord } from '@cairn/shared';
+import type { Assignment, SecretBox, UserRecord } from '@cairn/shared';
 import {
   AGENT_TOOL_DEFAULTS,
   createSkillBodySchema,
@@ -170,6 +170,20 @@ function refuseIntakeSplit(row: typeof todo.$inferSelect): void {
     );
   }
 }
+
+export function requireIntakeAssignment(assignment: Assignment): void {
+  if (
+    assignment.source === 'intake-label' &&
+    assignment.plan === null &&
+    assignment.build === null
+  ) {
+    throw new HttpError(
+      409,
+      'intake-label-assignment-failed: Restore the requested intake agent preset before dispatching this task.',
+    );
+  }
+}
+
 const DOCS_MAX_PATHS = 24;
 
 export const CHIEF_TASK_LIST_MAX_OUTPUT_BYTES = 32 * 1024;
@@ -519,7 +533,10 @@ export async function executeChiefTool(
     }
     case 'delete_todos': {
       const ids = strArr(params, 'todoIds');
-      for (const id of ids) requireTeamTodo(db, id, ctx.teamId);
+      for (const id of ids) {
+        const row = requireTeamTodo(db, id, ctx.teamId);
+        if (row.latestBuildId === null) refuseIntakeSplit(row);
+      }
       const deleted = ids.filter((id) => deleteTodo(svc, id));
       return json({ deleted });
     }
@@ -788,16 +805,7 @@ export async function executeChiefTool(
         };
       });
       for (const target of targets) {
-        if (
-          target.row.assignment?.source === 'intake-label' &&
-          target.assignment.plan === null &&
-          target.assignment.build === null
-        ) {
-          throw new HttpError(
-            409,
-            'intake-label-assignment-failed: Restore the requested intake agent preset before dispatching this task.',
-          );
-        }
+        requireIntakeAssignment(target.assignment);
         if (target.assignment.plan === null && target.assignment.build === null) {
           throw new HttpError(
             400,

@@ -18,7 +18,7 @@ import { verifyApiKey } from './api-keys.js';
 import { readAttachmentMeta } from './attachments.js';
 import { cancelBuild, messageTodo, startBuilds } from './builds.js';
 import type { ChiefToolDeps, TransitionActor } from './chief-tools.js';
-import { confirmBuild, transitionTodos } from './chief-tools.js';
+import { confirmBuild, requireIntakeAssignment, transitionTodos } from './chief-tools.js';
 import { readConversationPage } from './conversation-page.js';
 import { executeGithubReadTool } from './github-reads.js';
 import { isChiefConversation } from './machines.js';
@@ -305,6 +305,7 @@ export async function executeMcpTool(
         return { row, assignment: effectiveAssignment };
       });
       for (const target of targets) {
+        requireIntakeAssignment(target.assignment);
         for (const slot of [
           target.assignment.plan,
           target.assignment.build,
