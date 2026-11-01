@@ -1,6 +1,7 @@
 import { PHASE_VALUES } from '@cairn/shared';
 import { cn } from 'cn';
 import { useRef, useState } from 'react';
+import { ComposerAttachmentTile } from '../components/composer-attachment-tile.js';
 import { Button } from '../components/ui/button.js';
 import { MessageScrollerProvider } from '../components/ui/message-scroller.js';
 import { AcceptDialog } from '../detail/accept-dialog.js';
@@ -83,6 +84,8 @@ const HEADS: { label: string; todo: TodoRecord; reviewActive?: boolean; inFlight
 
 const FRESH = todo({ title: 'Add a dark mode toggle to settings', phase: 'todo', phaseAt: NOW });
 
+const READ_ONLY_REASON = '此任务为只读，请在实时工作区中打开后继续。';
+
 const MENTION_DRAFT = `Use ${serializeMention({ kind: 'skill', id: 'frontend-design', label: 'frontend-design' })} and ask ${serializeMention({ kind: 'agent', id: 'reviewer', label: 'reviewer' })} to check ${serializeMention({ kind: 'todo', id: 'gallery-44', label: 'Fix the stale branch badge', seq: 44 })}`;
 
 function HeadSpecimen() {
@@ -133,6 +136,18 @@ function HeadSpecimen() {
   );
 }
 
+const TILE_IMAGE = `data:image/svg+xml;utf8,${encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="112" height="112"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7c5cff"/><stop offset="1" stop-color="#2fd4a7"/></linearGradient></defs><rect width="112" height="112" fill="url(#g)"/></svg>',
+)}`;
+
+const ATTACHED_DRAFT = [
+  '![error.log](attachment:team-1/error.log)',
+  '![crash-report.pdf](attachment:team-1/crash-report.pdf)',
+  'Why does this crash on start?',
+].join('\n');
+
+const noop = () => {};
+
 function ComposerSpecimen() {
   const [sent, setSent] = useState<string[]>([]);
   return (
@@ -142,7 +157,7 @@ function ComposerSpecimen() {
       stage="canvas"
       className="flex-col gap-y-10"
     >
-      <Cell label="Editable, idle">
+      <Cell label="Empty: placeholder, attach, Review; send is muted until there is something to send">
         <div className="w-160 pt-2">
           <Composer
             placeholder={PHASE_UI.review.placeholder ?? ''}
@@ -156,12 +171,74 @@ function ComposerSpecimen() {
           />
         </div>
       </Cell>
-      <Cell label="Agent running: stop button and queue on send">
+      <Cell label="Typing: send turns ink (focus only darkens the ring)">
+        <div className="w-160 pt-2">
+          <Composer
+            placeholder={PHASE_UI.review.placeholder ?? ''}
+            aiReview
+            streaming={false}
+            editable
+            draft="Why does this crash on start?"
+            onDraftChange={noop}
+            onReview={noop}
+            onAttachment={(files) => files.map((f) => f.name)}
+          />
+        </div>
+      </Cell>
+      <Cell label="With attachments: two files from the draft, tiles sit above the text">
+        <div className="w-160 pt-2">
+          <Composer
+            placeholder={PHASE_UI.review.placeholder ?? ''}
+            aiReview={false}
+            streaming={false}
+            editable
+            draft={ATTACHED_DRAFT}
+            onDraftChange={noop}
+            onAttachment={(files) => files.map((f) => f.name)}
+          />
+        </div>
+      </Cell>
+      <Cell label="Attachment tile states: file, image, uploading, over the size limit">
+        <div className="flex w-160 flex-wrap gap-2 rounded-(--radius-composer) bg-card px-3.5 pt-3.5 pb-3 shadow-(--shadow-composer)">
+          <ComposerAttachmentTile
+            name="error.log"
+            kind="LOG"
+            state="ready"
+            detail="212 lines"
+            href="#"
+            onRemove={noop}
+          />
+          <ComposerAttachmentTile
+            name="screenshot.png"
+            kind="PNG"
+            state="ready"
+            imageSrc={TILE_IMAGE}
+            onPreview={noop}
+            onRemove={noop}
+          />
+          <ComposerAttachmentTile
+            name="screen-recording.mov"
+            kind="MOV"
+            state="uploading"
+            progress={45}
+          />
+          <ComposerAttachmentTile
+            name="build.zip"
+            kind="ZIP"
+            state="error"
+            detail="80 MB"
+            errorReason="Over 50 MB"
+            onRemove={noop}
+          />
+        </div>
+      </Cell>
+      <Cell label="Agent running: timer and stop beside send; sending queues the message">
         <div className="w-160 pt-2">
           <Composer
             placeholder={PHASE_UI.building.placeholder ?? ''}
             aiReview={false}
             streaming
+            workingFor={{ seconds: 72 }}
             editable
             mentionGroups={MENTION_GROUPS}
             onQueue={(text) => setSent((all) => [...all, `queued: ${text}`])}
@@ -169,7 +246,7 @@ function ComposerSpecimen() {
           />
         </div>
       </Cell>
-      <Cell label="Draft with mention chips above it">
+      <Cell label="Draft with @mentions highlighted inline in the text">
         <div className="w-160 pt-12">
           <Composer
             placeholder={PHASE_UI.confirm.placeholder ?? ''}
@@ -181,13 +258,9 @@ function ComposerSpecimen() {
           />
         </div>
       </Cell>
-      <Cell label="Read only">
+      <Cell label="Read only: secondary background, no tools, one sentence on how to continue">
         <div className="w-160">
-          <Composer
-            placeholder={PHASE_UI.done.placeholder ?? ''}
-            aiReview={false}
-            streaming={false}
-          />
+          <Composer placeholder={READ_ONLY_REASON} aiReview={false} streaming={false} readOnly />
         </div>
       </Cell>
     </Specimen>

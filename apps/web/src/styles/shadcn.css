@@ -156,6 +156,7 @@
   --dialog-w-m: 480px;
   --dialog-w-l: 640px;
   --radius-composer: 14px;
+  --radius-tile: 10px;
   --radius-bubble: 14px;
   --radius-control: 8px;
   --radius-window: 18px;
@@ -196,6 +197,7 @@
   --sidebar-w: 248px;
   --chat-max-w: 768px;
   --composer-max-h: 384px;
+  --composer-bottom-gap: 24px;
   --scroll-fade-size: 28px;
   --chat-extra-space: 35vh;
   --font-size-caption: calc(0.6875rem * var(--rem-scale));
@@ -207,9 +209,10 @@
   --type-page: calc(1.25rem * var(--type-scale));
   --type-heading: calc(1.0625rem * var(--type-scale));
   --type-greeting: calc(1.625rem * var(--type-scale));
-  --type-card-title: calc(0.875rem * var(--type-scale));
+  --type-card-title: calc(0.9375rem * var(--type-scale));
   --type-ui: calc(0.875rem * var(--type-scale));
-  --type-meta: calc(0.78125rem * var(--type-scale));
+  --type-meta: calc(0.8125rem * var(--type-scale));
+  --type-code: calc(0.8125rem * var(--type-scale));
   --type-caption: calc(0.75rem * var(--type-scale));
   --leading-body: 1.428;
   --surface-0: var(--background);
@@ -229,11 +232,15 @@
   --cds-shadow-lg: 0 4px 12px rgb(0 0 0 / 0.4), 0 24px 48px -12px rgb(0 0 0 / 0.6), var(--top);
   --elevated-ring: var(--ring-inset-highlight);
   --panel-shadow-hover: 0 0 0 1px var(--border-soft), 0 6px 18px -2px rgb(0 0 0 / 0.35);
-  --shadow-composer: var(--cds-shadow-sm), inset 0 0 0 var(--hairline) var(--input);
-  --shadow-composer-hover: var(--cds-shadow-sm), inset 0 0 0 var(--hairline) var(--text-dim);
+  --shadow-composer:
+    0 4px 20px rgb(0 0 0 / 0.2),
+    inset 0 0 0 var(--hairline) color-mix(in srgb, var(--foreground) 22%, transparent);
+  --shadow-composer-hover:
+    0 4px 20px rgb(0 0 0 / 0.2),
+    inset 0 0 0 var(--hairline) color-mix(in srgb, var(--foreground) 28%, transparent);
   --shadow-composer-focus:
-    0 0 0 4px color-mix(in srgb, var(--running) 18%, transparent),
-    inset 0 0 0 var(--hairline) var(--running);
+    0 4px 20px rgb(0 0 0 / 0.2),
+    inset 0 0 0 var(--hairline) color-mix(in srgb, var(--foreground) 36%, transparent);
   --drag-shadow: 0 10px 28px rgb(0 0 0 / 0.4);
   --canvas: #141715;
   --background: #1b1f1c;
@@ -316,6 +323,13 @@
   --switch-on: #6fa35c;
   --tag-tint: 22%;
   --code-pill-bg: #2c322d;
+  --bubble-base: #262c27;
+  --bubble-wash-a: rgb(130 180 111 / 0.16);
+  --bubble-wash-b: rgb(111 147 187 / 0.14);
+  --bubble-wash-c: rgb(154 124 173 / 0.16);
+  --bubble-rim-a: rgb(130 180 111 / 0.55);
+  --bubble-rim-b: rgb(111 147 187 / 0.45);
+  --bubble-rim-c: rgb(154 124 173 / 0.5);
   --code-pill-ring: #3d443e;
   --tag-ink: 40%;
   --switch-off: #434a44;
@@ -365,11 +379,15 @@
   --cds-shadow-lg: 0 4px 12px rgb(29 35 31 / 0.08), 0 24px 48px -12px rgb(29 35 31 / 0.25);
   --elevated-ring: var(--border);
   --panel-shadow-hover: 0 0 0 1px var(--input), 0 8px 20px -4px rgb(29 35 31 / 0.14);
-  --shadow-composer: var(--cds-shadow-sm), inset 0 0 0 var(--hairline) var(--input);
-  --shadow-composer-hover: var(--cds-shadow-sm), inset 0 0 0 var(--hairline) var(--text-dim);
+  --shadow-composer:
+    0 4px 20px rgb(0 0 0 / 0.06),
+    inset 0 0 0 var(--hairline) color-mix(in srgb, var(--foreground) 22%, transparent);
+  --shadow-composer-hover:
+    0 4px 20px rgb(0 0 0 / 0.06),
+    inset 0 0 0 var(--hairline) color-mix(in srgb, var(--foreground) 28%, transparent);
   --shadow-composer-focus:
-    0 0 0 4px color-mix(in srgb, var(--running) 20%, transparent),
-    inset 0 0 0 var(--hairline) var(--running);
+    0 4px 20px rgb(0 0 0 / 0.06),
+    inset 0 0 0 var(--hairline) color-mix(in srgb, var(--foreground) 36%, transparent);
   --drag-shadow: 0 10px 28px rgb(29 35 31 / 0.16);
   --canvas: #e6e7e1;
   --background: #f6f6f2;
@@ -450,6 +468,13 @@
   --switch-on: #55833f;
   --tag-tint: 12%;
   --code-pill-bg: #e9ebe4;
+  --bubble-base: #edf0ec;
+  --bubble-wash-a: rgb(95 143 79 / 0.13);
+  --bubble-wash-b: rgb(83 121 160 / 0.1);
+  --bubble-wash-c: rgb(122 91 142 / 0.12);
+  --bubble-rim-a: rgb(95 143 79 / 0.45);
+  --bubble-rim-b: rgb(83 121 160 / 0.35);
+  --bubble-rim-c: rgb(122 91 142 / 0.4);
   --code-pill-ring: #d6d9d0;
   --tag-ink: 35%;
   --switch-off: #ccd0c7;
@@ -465,12 +490,12 @@
   --project-tile-4: #7a5b8e;
   --project-tile-5: #3d7c7a;
   --project-tile-6: #8a5560;
-  --project-ink-1: var(--project-tile-1);
-  --project-ink-2: var(--project-tile-2);
-  --project-ink-3: var(--project-tile-3);
-  --project-ink-4: var(--project-tile-4);
-  --project-ink-5: var(--project-tile-5);
-  --project-ink-6: var(--project-tile-6);
+  --project-ink-1: color-mix(in oklab, var(--project-tile-1), black 22%);
+  --project-ink-2: color-mix(in oklab, var(--project-tile-2), black 22%);
+  --project-ink-3: color-mix(in oklab, var(--project-tile-3), black 22%);
+  --project-ink-4: color-mix(in oklab, var(--project-tile-4), black 22%);
+  --project-ink-5: color-mix(in oklab, var(--project-tile-5), black 22%);
+  --project-ink-6: color-mix(in oklab, var(--project-tile-6), black 22%);
   --pebble-waiting: #d49a1c;
   --pebble-review: #5379a0;
   --pebble-working: #5f8f4f;

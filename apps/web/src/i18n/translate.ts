@@ -21,7 +21,13 @@ export function translate(
 ): string {
   const template = locale === 'zh' ? source : (dict[source] ?? source);
   if (vars == null) return template;
-  return template.replace(/\{(\w+)\}/g, (match, name: string) =>
-    Object.hasOwn(vars, name) ? String(vars[name]) : match,
+  return template.replace(
+    /\{(\w+)(?:#([^|}]*)\|([^}]*))?\}/g,
+    (match, name: string, one: string | undefined, many: string | undefined) => {
+      if (!Object.hasOwn(vars, name)) return match;
+      const value = vars[name];
+      if (one === undefined || many === undefined) return String(value);
+      return (value === 1 ? one : many).replaceAll('#', String(value));
+    },
   );
 }

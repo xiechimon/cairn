@@ -68,12 +68,13 @@ const COMPUTED_KEYS = new Set<string>([
 const EXCLUDED_DIRS = ['fixtures', 'api'];
 const EXCLUDED_FILES = ['i18n/en.ts'];
 
-function sourceFiles(dir: string): string[] {
+function sourceFiles(dir: string, includeExcluded = false): string[] {
   const out: string[] = [];
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry);
     if (statSync(full).isDirectory()) {
-      if (!EXCLUDED_DIRS.includes(entry)) out.push(...sourceFiles(full));
+      if (includeExcluded || !EXCLUDED_DIRS.includes(entry))
+        out.push(...sourceFiles(full, includeExcluded));
     } else if (/\.tsx?$/.test(entry)) {
       out.push(full);
     }
@@ -126,5 +127,16 @@ describe('EN dict liveness', () => {
       (key) => !COMPUTED_KEYS.has(key) && !corpus.includes(key),
     );
     expect(dead).toEqual([]);
+  });
+});
+
+describe('translation call coverage', () => {
+  it('every literal t() key contains CJK or is an own EN key', () => {
+    const missing = sourceFiles(SRC, true)
+      .flatMap((file) => scanFile(file, SRC, true))
+      .filter((item) => item.kind === 'translation')
+      .filter((item) => !/[一-鿿]/.test(item.text) && !Object.hasOwn(EN, item.text))
+      .map((item) => `${item.rel}: ${JSON.stringify(item.text)}`);
+    expect([...new Set(missing)]).toEqual([]);
   });
 });

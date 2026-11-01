@@ -21,16 +21,16 @@ for (const width of [360, 390]) {
       expect(menuBox.height).toBeGreaterThanOrEqual(44);
       await menu.click();
       const drawer = page.getByRole('dialog', { name: '侧边栏' });
-      await expect(drawer.getByRole('button', { name: 'Scheduled' })).toBeVisible();
+      await expect(drawer.getByRole('button', { name: '定时' })).toBeVisible();
       await page.keyboard.press('Escape');
       await expect(drawer).toBeHidden();
       await menu.click();
-      await drawer.getByRole('button', { name: 'Scheduled' }).click();
+      await drawer.getByRole('button', { name: '定时' }).click();
       await expect(page).toHaveURL(/\/app\/schedules/);
       await expect(drawer).toBeHidden();
       await page.goto('/app?view=board');
       await menu.click();
-      await drawer.locator('[data-slot="sidebar-nav-row"]', { hasText: 'Projects' }).click();
+      await drawer.locator('[data-slot="sidebar-nav-row"]', { hasText: '工作台' }).click();
       await expect(page).not.toHaveURL(/view=board/);
       await expect(drawer).toBeHidden();
       await page.goto('/app?view=board');
@@ -60,7 +60,7 @@ for (const width of [360, 390]) {
       expect(overflow).toBeLessThanOrEqual(0);
     });
 
-    test('M3 详情：头按钮与 composer 控件触控区 ≥44px', async ({ page }) => {
+    test('M3 detail: compact header controls and 44px composer controls', async ({ page }) => {
       await page.goto(DETAIL_REVIEW);
       const headControls: Locator[] = [
         page.getByRole('link', { name: '返回' }),
@@ -69,7 +69,7 @@ for (const width of [360, 390]) {
       ];
       for (const control of headControls) {
         const box = (await control.boundingBox()) as { height: number };
-        expect(box.height, `${control} 高度`).toBeGreaterThanOrEqual(44);
+        expect(box.height, `${control} height`).toBe(32);
       }
       for (const cls of ['.composer-tool', '.composer-send']) {
         const box = (await page.locator(cls).first().boundingBox()) as { height: number };

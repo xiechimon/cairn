@@ -686,6 +686,11 @@ export function TodoDetailPage() {
     : PHASE_UI[phase];
   const detail = live ? liveDetail : fixtureDetail;
   const streaming = live ? running : view.transcript.some((item) => item.kind === 'streaming');
+  const streamingItem = view.transcript.findLast((item) => item.kind === 'streaming');
+  const workingFor =
+    streamingItem?.kind === 'streaming'
+      ? { startedAt: streamingItem.startedAt, seconds: streamingItem.seconds }
+      : undefined;
   const docMode =
     docChoice === 'changes'
       ? 'changes'
@@ -903,6 +908,7 @@ export function TodoDetailPage() {
                   placeholder={reviewActive ? t('AI 审核进行中…') : ui.placeholder}
                   aiReview={(phase === 'confirm' || phase === 'review') && !todo.awaitingReply}
                   streaming={streaming}
+                  workingFor={workingFor}
                   editable={live || DEMO_MODE}
                   draft={live ? liveDraft : undefined}
                   onDraftChange={live ? setLiveDraft : undefined}
@@ -1181,10 +1187,12 @@ export function TodoDetailPage() {
       <ReviewDialog
         open={overlay?.kind === 'review'}
         onClose={closeOverlay}
-        agents={reviewAgents}
-        defaultAgentId={reviewDefaultId ?? undefined}
-        producerProvider={reviewProducerProvider}
-        fanoutAvailable={live ? fanoutAvailable : undefined}
+        agents={live ? reviewAgents : fixture.reviewChoice?.agents}
+        defaultAgentId={
+          live ? (reviewDefaultId ?? undefined) : fixture.reviewChoice?.defaultAgentId
+        }
+        producerProvider={live ? reviewProducerProvider : fixture.reviewChoice?.producerProvider}
+        fanoutAvailable={live ? fanoutAvailable : fixture.reviewChoice?.fanoutAvailable}
         onStart={
           live && buildId
             ? (input) => {

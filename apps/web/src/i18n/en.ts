@@ -21,20 +21,52 @@
 import { PROBE_TOOL_CALL_LABEL, PROBE_TOOL_PILLS } from '../fixtures/fixtures.js';
 
 export const EN: Record<string, string> = {
-  '思考 {n} 次': 'Thinking: {n}',
-  '读了 {n} 个文件': 'Files read: {n}',
-  '搜索 {n} 次': 'Searches: {n}',
-  '跑了 {n} 条命令': 'Commands: {n}',
-  '改了 {n} 个文件': 'Files edited: {n}',
-  '调用 {n} 个工具': 'Tool calls: {n}',
+  Archive: 'Archive',
+  'Could not unarchive task.': 'Could not unarchive task.',
+  'Task archived': 'Task archived',
+  Undo: 'Undo',
+  'Could not archive task.': 'Could not archive task.',
+  '{name}: Claude subscription token expired. Run `claude setup-token` and add a new connection.':
+    '{name}: Claude subscription token expired. Run `claude setup-token` and add a new connection.',
+  '{name}: Claude subscription token expires in {days} days. Run `claude setup-token` and add a new connection.':
+    '{name}: Claude subscription token expires in {days} days. Run `claude setup-token` and add a new connection.',
+  Archived: 'Archived',
+  Agent: 'Agent',
+  'Unarchive to continue': 'Unarchive to continue',
+
+  '思考 {n} 次': 'Thought {n#once|# times}',
+  '读了 {n} 个文件': 'Read {n#1 file|# files}',
+  '{n} 行未改动': '{n#1 unmodified line|# unmodified lines}',
+  '搜索 {n} 次': 'Searched {n#once|# times}',
+  '跑了 {n} 条命令': 'Ran {n#1 command|# commands}',
+  '改了 {n} 个文件': 'Edited {n#1 file|# files}',
+  '推送 {n} 次': 'Pushed {n#once|# times}',
+  '调用 {n} 个工具': 'Called {n#1 tool|# tools}',
+  正在思考: 'Thinking',
+  '正在读 {n} 个文件': 'Reading {n#1 file|# files}',
+  '正在搜索 {n} 次': 'Searching {n#once|# times}',
+  '正在跑 {n} 条命令': 'Running {n#1 command|# commands}',
+  '正在改 {n} 个文件': 'Editing {n#1 file|# files}',
+  正在推送: 'Pushing',
+  '正在调用 {n} 个工具': 'Calling {n#1 tool|# tools}',
+  '（{n} 个失败）': '({n} failed)',
+  '已工作 {n} 分钟': 'Worked for {n#1 minute|# minutes}',
+  '工作中 · {time}': 'Working · {time}',
+  思考了: 'Thought',
+  读取了: 'Read',
+  搜索了: 'Searched',
+  运行了: 'Ran',
+  修改了: 'Edited',
+  推送了: 'Pushed',
+  调用了: 'Called',
+  正在读取: 'Reading',
+  正在搜索: 'Searching',
+  正在运行: 'Running',
+  正在修改: 'Editing',
   '已加载 {n} 个技能': 'Skills loaded: {n}',
   '还有 {n} 行': '{n} more lines',
   无输出: 'No output',
   未完成: 'Not finished',
-  读取: 'Read',
-  运行: 'Run',
-  修改: 'Edit',
-  调用: 'Call',
 
   // —— shared chrome / sidebar (r2 §1.1) ——
   搜索: 'Search',
@@ -176,6 +208,10 @@ export const EN: Record<string, string> = {
   打开方案: 'Open plan',
   添加附件: 'Add attachment',
   'AI 审核': 'AI review',
+  移除附件: 'Remove attachment',
+  '上传中 {percent}%': 'Uploading {percent}%',
+  '此任务为只读，请在实时工作区中打开后继续。':
+    'This task is read only. Open it in the live workspace to continue.',
   审核中: 'Reviewing',
   'AI 审核进行中…': 'AI review in progress…',
   提及: 'Mention',
@@ -522,10 +558,11 @@ export const EN: Record<string, string> = {
   已换备用模型: 'Switched to fallback model',
   '等额度：{lane} {kind}，{probe} 自动探测续跑':
     'Waiting for quota: {lane} {kind}, auto-probe at {probe}',
-  '{lane} {kind}，{count} 个任务挂起等额度': '{lane} {kind}, {count} task(s) waiting for quota',
+  '{lane} {kind}，{count} 个任务挂起等额度':
+    '{lane} {kind}, {count#1 task|# tasks} waiting for quota',
   '额度恢复后自动续跑；{probe} 自动探测':
     'Runs resume automatically once quota recovers; next probe at {probe}',
-  '{count} 个任务因额度/限流挂起': '{count} task(s) suspended on quota/rate limits',
+  '{count} 个任务因额度/限流挂起': '{count#1 task|# tasks} suspended on quota/rate limits',
   '额度恢复后自动续跑，无需人工操作':
     'Runs resume automatically once quota recovers — no action needed',
   // #1261 标签 vars 值（kind 位的中英对译——vars 插值不查词典，单列键位）。
@@ -681,8 +718,6 @@ export const EN: Record<string, string> = {
   恢复到此处: 'Restore to here',
   '恢复到此处？该条之后的 {n} 条消息会移除，总管从这条重发开新回合。':
     'Restore to here? The {n} messages after it are removed and the Chief resends from this one as a fresh turn.',
-  展开过程: 'Show process',
-  收起过程: 'Hide process',
   // #822 在飞存在行展开面：行开关 aria + 正在调用的工具 + 空面 fallback。
   展开实时步骤: 'Show live steps',
   收起实时步骤: 'Hide live steps',
@@ -711,8 +746,9 @@ export const EN: Record<string, string> = {
   开始三视角审核: 'Start three-perspective review',
   // #509 审核选人独立性提示：默认值优先跨厂商；无跨厂商可选时出声。两档措辞
   // ——确证同源 vs 无法判定（未配置厂商 = 没有比对基准），都不静默。
-  本次审核与产出同源: 'This review shares a vendor with the producing step',
-  无法判定审核独立性: 'Cannot determine review independence',
+  选择谁来审这份方案: 'Pick who reviews this plan',
+  其他厂商: 'Other vendor',
+  与方案作者同厂商: 'same vendor as the plan author',
   '审核人与产出该方案的 Agent 来自同一模型厂商，不构成独立复核。':
     'The reviewer and the Agent that produced this plan use the same model vendor; this is not an independent review.',
   '产出该方案的 Agent 或所选审核人未配置模型厂商，缺少比对基准，不构成独立复核。':
@@ -859,7 +895,8 @@ export const EN: Record<string, string> = {
   总管用的模型暂时过载: "The chief's model is overloaded",
   '例如：测试在远端机器上失败，请先修复':
     'For example: tests fail on the remote machine, fix them first',
-  '例如：并发、错误处理、测试覆盖': 'For example: concurrency, error handling, test coverage',
+  '重点关注什么？例如：并发、错误处理、测试覆盖（可选）':
+    'Focus on… e.g. concurrency, error handling, test coverage (optional)',
   将改动合并到默认分支: 'Merge the changes into the default branch',
   // #1313：已上报且文件集为空时完成弹层不提供合并勾选。
   '本轮没有文件改动，完成不会合并分支。':

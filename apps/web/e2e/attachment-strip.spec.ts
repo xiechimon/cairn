@@ -80,7 +80,7 @@ interface GrantCall {
 
 /** Hold every grant/upload request until the test releases it, so the
  *  in-flight window stays open for placeholder assertions. */
-async function deferUploads(page: Page) {
+async function deferUploads(page: Page, ext = 'png') {
   const held: Route[] = [];
   await page.route('**/api/uploads/grant', (route, request) => {
     if (request.method() !== 'POST') return route.fallback();
@@ -102,7 +102,7 @@ async function deferUploads(page: Page) {
             json: {
               uploadUrl: '/api/uploads',
               grant: `grant-${n}`,
-              key: `${TEAM_ID}/att-${n}.png`,
+              key: `${TEAM_ID}/att-${n}.${ext}`,
               attachmentId: `att-${n}`,
             },
           });
@@ -230,7 +230,7 @@ async function bootDetail(page: Page, art: TestArt) {
   return input;
 }
 
-test('detail face: paste paints a placeholder, landing swaps it for a chip with zero geometry move', async ({
+test('detail face: paste paints a placeholder, landing swaps it for a chip at the same x and size', async ({
   page,
 }) => {
   const deferred = await deferUploads(page);
@@ -240,7 +240,7 @@ test('detail face: paste paints a placeholder, landing swaps it for a chip with 
 
   await pastePng(page, COMPOSER, art.b64);
 
-  const strip = page.getByTestId('composer-float').getByRole('status', { name: '附件' });
+  const strip = page.getByTestId('composer-attachments');
   await expect(strip).toBeVisible();
   const placeholder = strip.getByTestId('attachment-pending');
   await expect(placeholder).toBeVisible();
@@ -259,9 +259,9 @@ test('detail face: paste paints a placeholder, landing swaps it for a chip with 
   await deferred.releaseAll(); // grant
   await expect.poll(() => deferred.held.length).toBe(1);
   await deferred.releaseAll(); // upload
-  await expect(input).toHaveValue(`${TOKEN_1}\n`);
+  await expect(input).toHaveValue('');
+  await expect(input).not.toHaveValue(/attachment:/);
 
-  // FM2: the settled chip replaces the placeholder at the identical box.
   await expect(placeholder).toHaveCount(0);
   const chip = strip.getByRole('button', { name: 'pasted-image-1.png' });
   await expect(chip).toBeVisible();
@@ -270,8 +270,23 @@ test('detail face: paste paints a placeholder, landing swaps it for a chip with 
     .poll(() => chipImg.evaluate((el) => (el as HTMLImageElement).naturalWidth))
     .toBe(CARD_W);
   const afterBox = await chip.boundingBox();
-  expect(afterBox).toEqual(beforeBox);
+  expect(afterBox).toMatchObject({
+    x: beforeBox?.x,
+    width: beforeBox?.width,
+    height: beforeBox?.height,
+  });
+  expect(afterBox?.y).toBeLessThanOrEqual(beforeBox?.y ?? 0);
   await evidenceShot(page, 'strip-detail-settled.png');
+
+  const sentBodies: string[] = [];
+  await page.route(`**/api/conversations/${BUILD_ID}/messages`, (route, request) => {
+    if (request.method() !== 'POST') return route.fallback();
+    sentBodies.push((JSON.parse(request.postData() ?? '{}') as { content?: string }).content ?? '');
+    return route.fulfill({ status: 201, json: { message: { id: 'msg-1' } } });
+  });
+  await input.press('Enter');
+  await expect.poll(() => sentBodies).toEqual([TOKEN_1]);
+  await expect(chip).toHaveCount(0);
 });
 
 test('detail face: clicking the settled chip opens the image preview; Esc closes it', async ({
@@ -287,12 +302,11 @@ test('detail face: clicking the settled chip opens the image preview; Esc closes
   await deferred.releaseAll(); // grant
   await expect.poll(() => deferred.held.length).toBe(1);
   await deferred.releaseAll(); // upload
-  await expect(input).toHaveValue(`${TOKEN_1}\n`);
+  await expect(input).toHaveValue('');
+  await expect(input).not.toHaveValue(/attachment:/);
 
   // FM4: preview opens on the settled chip, paints the image, Esc closes.
-  const chip = page
-    .getByTestId('composer-float')
-    .getByRole('button', { name: 'pasted-image-1.png' });
+  const chip = page.getByTestId('composer-attachments').getByRole('button', { name: 'pasted-image-1.png' });
   await chip.click();
   const preview = page.getByRole('dialog', { name: 'pasted-image-1.png' });
   await expect(preview).toBeVisible();
@@ -306,7 +320,8 @@ test('detail face: clicking the settled chip opens the image preview; Esc closes
   await page.keyboard.press('Escape');
   await expect(preview).toHaveCount(0);
   // The draft survives the whole preview round trip untouched.
-  await expect(input).toHaveValue(`${TOKEN_1}\n`);
+  await expect(input).toHaveValue('');
+  await expect(input).not.toHaveValue(/attachment:/);
 });
 
 test('detail face: clicking the in-flight placeholder previews the local bytes', async ({
@@ -318,7 +333,7 @@ test('detail face: clicking the in-flight placeholder previews the local bytes',
   art.b64 = await renderTestCard(page);
 
   await pastePng(page, COMPOSER, art.b64);
-  const placeholder = page.getByTestId('composer-float').getByTestId('attachment-pending');
+  const placeholder = page.getByTestId('composer-attachments').getByTestId('attachment-pending');
   await expect(placeholder).toBeVisible();
 
   // FM5: no server round trip has completed (grant still held) — the preview
@@ -340,7 +355,7 @@ test('detail face: clicking the in-flight placeholder previews the local bytes',
   await deferred.releaseAll(); // grant
   await expect.poll(() => deferred.held.length).toBe(1);
   await deferred.releaseAll(); // upload
-  await expect(page.locator(COMPOSER)).toHaveValue(`${TOKEN_1}\n`);
+  await expect(page.locator(COMPOSER)).toHaveValue('');
 });
 
 test('detail face: a failed upload clears the placeholder, toasts, keeps the draft', async ({
@@ -364,7 +379,7 @@ test('detail face: a failed upload clears the placeholder, toasts, keeps the dra
   await pastePng(page, COMPOSER, PNG_1PX);
 
   // The placeholder paints while the grant is held…
-  const strip = page.getByTestId('composer-float').getByRole('status', { name: '附件' });
+  const strip = page.getByTestId('composer-attachments');
   await expect(strip.getByTestId('attachment-pending')).toBeVisible();
 
   // …then FM3: the grant fails — toast names it, the card leaves, draft whole.
@@ -377,6 +392,50 @@ test('detail face: a failed upload clears the placeholder, toasts, keeps the dra
   await expect(toast).toContainText('附件上传失败');
   await expect(strip).toHaveCount(0);
   await expect(input).toHaveValue('words that must survive');
+});
+
+test('detail face: a picked file shows an uploading tile, then a file tile whose remove drops its token', async ({
+  page,
+}) => {
+  const deferred = await deferUploads(page, 'log');
+  const input = await bootDetail(page, { b64: PNG_1PX });
+
+  await page.locator('input[type="file"]').first().setInputFiles({
+    name: 'error.log',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('boom\n'.repeat(212)),
+  });
+
+  const strip = page.getByTestId('composer-attachments');
+  const pending = strip.getByTestId('attachment-pending');
+  await expect(pending).toBeVisible();
+  await expect(pending).toHaveAttribute('data-state', 'uploading');
+  await expect(pending).toContainText('error.log');
+  await expect(pending).toContainText('上传中');
+  const box = await pending.boundingBox();
+  expect(box?.width).toBe(112);
+  expect(box?.height).toBe(112);
+  await evidenceShot(page, 'tile-file-uploading.png');
+
+  await expect.poll(() => deferred.held.length).toBe(1);
+  await deferred.releaseAll();
+  await expect.poll(() => deferred.held.length).toBe(1);
+  await deferred.releaseAll();
+  await expect(input).toHaveValue('');
+
+  const tile = strip.locator('[data-state="ready"]');
+  await expect(tile).toHaveCount(1);
+  await expect(tile).toContainText('error.log');
+  await expect(tile).toContainText('LOG');
+  const remove = tile.getByRole('button', { name: '移除附件' });
+  await expect(remove).toHaveCSS('opacity', '0');
+  await tile.hover();
+  await expect(remove).toHaveCSS('opacity', '1');
+  await evidenceShot(page, 'tile-file-ready.png');
+
+  await remove.click();
+  await expect(strip).toHaveCount(0);
+  await expect(input).not.toHaveValue(/attachment:/);
 });
 
 // —— new-task face ————
@@ -489,7 +548,8 @@ test('chief face: placeholder → settled chip → preview', async ({ page }) =>
   await deferred.releaseAll(); // grant
   await expect.poll(() => deferred.held.length).toBe(1);
   await deferred.releaseAll(); // upload
-  await expect(input).toHaveValue(`${TOKEN_1}\n`);
+  await expect(input).toHaveValue('');
+  await expect(input).not.toHaveValue(/attachment:/);
 
   const chip = strip.getByRole('button', { name: 'pasted-image-1.png' });
   await expect(chip).toBeVisible();
