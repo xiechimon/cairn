@@ -20,7 +20,6 @@ import {
   chiefDigestContentSchema,
   chiefDigestThreadId,
   chiefIdFormat,
-  chiefThreadTitle,
   chiefTurnErrorContentSchema,
   fenceIssueText,
   GITHUB_OVERLAP_RULE,
@@ -310,46 +309,82 @@ export function toChiefThreadRecord(
   };
 }
 
-export function listChiefThreads(deps: ChiefDeps, teamId: string): ChiefThread[] {
-  const row = ensureChief(deps, teamId);
-  const projector = stepQueueProjector(deps.db, teamId);
+export const COORDINATOR_THREAD_TITLE = 'Coordinator';
+
+function existingCoordinatorThread(deps: ChiefDeps, chiefRow: ChiefRow): ThreadRow | undefined {
   return deps.db
     .select()
     .from(chiefThread)
     .where(
       and(
-        eq(chiefThread.chiefId, row.id),
-        ne(chiefThread.id, chiefDigestThreadId(row.id)),
-        isNull(chiefThread.projectId),
+        eq(chiefThread.chiefId, chiefRow.id),
+        ne(chiefThread.id, chiefDigestThreadId(chiefRow.id)),
+        isNull(chiefThread.archivedAt),
       ),
     )
-    .orderBy(desc(chiefThread.updatedAt))
-    .all()
-    .map((r) => {
-      const pending = projector.pendingChiefOf(r.id);
-      const record = {
-        ...toChiefThreadRecord(r, pending === null ? null : projector.project(pending)),
-        pending: chiefPendingMessages(deps.db, r.id),
-        fallbackModel: chiefThreadFallbackModel(deps.db, r.id),
-      };
-      const latest = deps.db
-        .select()
-        .from(step)
-        .where(and(eq(step.buildId, r.id), eq(step.kind, 'chief')))
-        .orderBy(desc(step.createdAt), sql`rowid desc`)
-        .limit(1)
-        .get();
-      if (latest?.status !== 'failed') return { ...record, lastTurnError: null };
-      const error = deps.db
-        .select()
-        .from(chiefMessage)
-        .where(eq(chiefMessage.id, `chief-err-${latest.id}`))
-        .get();
-      const content =
-        typeof error?.content === 'string' ? JSON.parse(error.content) : error?.content;
-      const parsed = chiefTurnErrorContentSchema.safeParse(content);
-      return { ...record, lastTurnError: parsed.success ? parsed.data.message : null };
-    });
+    .get();
+}
+
+export function coordinatorThreadRow(deps: ChiefDeps, chiefRow: ChiefRow): ThreadRow {
+  const existing = existingCoordinatorThread(deps, chiefRow);
+  if (existing) return existing;
+  const now = nowMs();
+  deps.db
+    .insert(chiefThread)
+    .values({
+      id: newChiefThreadId(newUuidv7()),
+      chiefId: chiefRow.id,
+      userId: chiefRow.userId,
+      teamId: chiefRow.teamId,
+      projectId: null,
+      title: COORDINATOR_THREAD_TITLE,
+      createdAt: now,
+      updatedAt: now,
+      lastTurnAt: null,
+      sessionRuntime: 'pi',
+      sessionId: '',
+      sessionOpenedAt: now,
+      pendingSessionResumeAt: null,
+      toolDefHashes: chiefToolDefHashes(),
+      toolResultHashes: {},
+      activeRun: null,
+    })
+    .onConflictDoNothing()
+    .run();
+  const row = existingCoordinatorThread(deps, chiefRow);
+  if (!row) throw new Error('coordinator thread missing after insert');
+  return row;
+}
+
+export function chiefThreadView(deps: ChiefDeps, teamId: string, r: ThreadRow): ChiefThread {
+  const projector = stepQueueProjector(deps.db, teamId);
+  const pending = projector.pendingChiefOf(r.id);
+  const record = {
+    ...toChiefThreadRecord(r, pending === null ? null : projector.project(pending)),
+    pending: chiefPendingMessages(deps.db, r.id),
+    fallbackModel: chiefThreadFallbackModel(deps.db, r.id),
+  };
+  const latest = deps.db
+    .select()
+    .from(step)
+    .where(and(eq(step.buildId, r.id), eq(step.kind, 'chief')))
+    .orderBy(desc(step.createdAt), sql`rowid desc`)
+    .limit(1)
+    .get();
+  if (latest?.status !== 'failed') return { ...record, lastTurnError: null };
+  const error = deps.db
+    .select()
+    .from(chiefMessage)
+    .where(eq(chiefMessage.id, `chief-err-${latest.id}`))
+    .get();
+  const content = typeof error?.content === 'string' ? JSON.parse(error.content) : error?.content;
+  const parsed = chiefTurnErrorContentSchema.safeParse(content);
+  return { ...record, lastTurnError: parsed.success ? parsed.data.message : null };
+}
+
+export function listChiefThreads(deps: ChiefDeps, teamId: string): ChiefThread[] {
+  const row = existingCoordinatorThread(deps, ensureChief(deps, teamId));
+  return row === undefined ? [] : [chiefThreadView(deps, teamId, row)];
 }
 
 export function getChiefThread(deps: { db: Db }, threadId: string): ThreadRow | undefined {
@@ -415,7 +450,7 @@ function promptWithPickedProject(picked: { id: string; name: string } | null, co
     : `${PICKED_PROJECT_OPEN}${picked.name.replace(/[【】\r\n]+/g, ' ').trim()}（id: ${picked.id}）】\n${content}`;
 }
 
-function requireUnarchivedProject(db: ChiefDeps['db'], projectId: string): void {
+export function requireUnarchivedProject(db: Db, projectId: string): void {
   const row = db
     .select({ archivedAt: project.archivedAt })
     .from(project)
@@ -424,65 +459,38 @@ function requireUnarchivedProject(db: ChiefDeps['db'], projectId: string): void 
   if (row?.archivedAt != null) throw new HttpError(409, `project ${projectId} is archived`);
 }
 
+function requireWritableThread(row: ThreadRow): void {
+  if (row.archivedAt !== null) throw new HttpError(409, `chief thread ${row.id} is archived`);
+}
+
 export function sendChiefMessage(
   deps: ChiefDeps,
   teamId: string,
   body: { threadId: string | null; content: string; projectId?: string | null | undefined },
-  options: { bindNewThreadToProject?: boolean } = {},
 ): {
   thread: ChiefThread;
   message: { id: string; role: 'user'; content: string; createdAt: number };
 } {
   const chiefRow = ensureChief(deps, teamId);
   requireBoundAgent(deps, chiefRow);
-  const chosen = pickedProjectOf(deps.db, teamId, body.projectId);
-  if (body.projectId != null && chosen === null) {
+  const picked = pickedProjectOf(deps.db, teamId, body.projectId);
+  if (body.projectId != null && picked === null) {
     throw new HttpError(400, `project ${body.projectId} not in team`);
   }
+  if (picked !== null) requireUnarchivedProject(deps.db, picked.id);
 
-  let threadRow: ThreadRow | undefined;
+  let threadRow: ThreadRow;
   if (body.threadId !== null) {
-    threadRow = getChiefThread(deps, body.threadId);
-    if (!threadRow || threadRow.teamId !== teamId || isChiefDigestThreadId(threadRow.id)) {
+    const found = getChiefThread(deps, body.threadId);
+    if (!found || found.teamId !== teamId || isChiefDigestThreadId(found.id)) {
       throw new HttpError(404, `chief thread ${body.threadId}`);
     }
+    requireWritableThread(found);
+    threadRow = found;
+  } else {
+    threadRow = coordinatorThreadRow(deps, chiefRow);
   }
-  const boundProjectId =
-    threadRow !== undefined
-      ? threadRow.projectId
-      : options.bindNewThreadToProject === true
-        ? (chosen?.id ?? null)
-        : null;
-  if (boundProjectId !== null) requireUnarchivedProject(deps.db, boundProjectId);
-  const picked =
-    boundProjectId !== null ? pickedProjectOf(deps.db, teamId, boundProjectId) : chosen;
   const now = nowMs();
-  if (!threadRow) {
-    const id = newChiefThreadId(newUuidv7());
-    deps.db
-      .insert(chiefThread)
-      .values({
-        id,
-        chiefId: chiefRow.id,
-        userId: deps.user.id,
-        teamId,
-        projectId: boundProjectId,
-        title: chiefThreadTitle(body.content),
-        createdAt: now,
-        updatedAt: now,
-        lastTurnAt: null,
-        sessionRuntime: 'pi',
-        sessionId: '',
-        sessionOpenedAt: now,
-        pendingSessionResumeAt: null,
-        toolDefHashes: chiefToolDefHashes(),
-        toolResultHashes: {},
-        activeRun: null,
-      })
-      .run();
-    threadRow = getChiefThread(deps, id);
-    if (!threadRow) throw new Error('chief thread missing after insert');
-  }
 
   const message = {
     id: newRecordId(),
@@ -561,7 +569,7 @@ export function rewindChiefThread(
   if (!threadRow || threadRow.teamId !== teamId) {
     throw new HttpError(404, `chief thread ${threadId}`);
   }
-  if (threadRow.projectId !== null) requireUnarchivedProject(deps.db, threadRow.projectId);
+  requireWritableThread(threadRow);
   const anchor = deps.db
     .select()
     .from(chiefMessage)
@@ -571,6 +579,7 @@ export function rewindChiefThread(
   if (anchor.role !== 'user') {
     throw new HttpError(400, 'rewind anchor must be a user message');
   }
+  if (anchor.projectId !== null) requireUnarchivedProject(deps.db, anchor.projectId);
   if (threadRow.activeRun !== null) {
     throw new HttpError(409, 'chief thread turn in flight (回合中不 rewind)');
   }

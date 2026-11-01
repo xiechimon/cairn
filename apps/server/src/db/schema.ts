@@ -635,24 +635,33 @@ export const chief = sqliteTable('chief', {
   tz: text('tz'),
 });
 
-export const chiefThread = sqliteTable('chief_thread', {
-  id: text('id').primaryKey(),
-  chiefId: text('chiefId').notNull(),
-  userId: text('userId').notNull(),
-  teamId: text('teamId').notNull(),
-  projectId: text('projectId'),
-  title: text('title').notNull(),
-  createdAt: epochMs('createdAt').notNull(),
-  updatedAt: epochMs('updatedAt').notNull(),
-  lastTurnAt: epochMs('lastTurnAt'),
-  sessionRuntime: text('sessionRuntime').notNull().default('pi'),
-  sessionId: text('sessionId').notNull(),
-  sessionOpenedAt: epochMs('sessionOpenedAt').notNull(),
-  pendingSessionResumeAt: epochMs('pendingSessionResumeAt'),
-  toolDefHashes: json<Record<string, string>>('toolDefHashes').notNull().default(sql`'{}'`),
-  toolResultHashes: json<Record<string, string>>('toolResultHashes').notNull().default(sql`'{}'`),
-  activeRun: json<ActiveRun>('activeRun'),
-});
+export const chiefThread = sqliteTable(
+  'chief_thread',
+  {
+    id: text('id').primaryKey(),
+    chiefId: text('chiefId').notNull(),
+    userId: text('userId').notNull(),
+    teamId: text('teamId').notNull(),
+    projectId: text('projectId'),
+    title: text('title').notNull(),
+    createdAt: epochMs('createdAt').notNull(),
+    updatedAt: epochMs('updatedAt').notNull(),
+    lastTurnAt: epochMs('lastTurnAt'),
+    sessionRuntime: text('sessionRuntime').notNull().default('pi'),
+    sessionId: text('sessionId').notNull(),
+    sessionOpenedAt: epochMs('sessionOpenedAt').notNull(),
+    pendingSessionResumeAt: epochMs('pendingSessionResumeAt'),
+    toolDefHashes: json<Record<string, string>>('toolDefHashes').notNull().default(sql`'{}'`),
+    toolResultHashes: json<Record<string, string>>('toolResultHashes').notNull().default(sql`'{}'`),
+    activeRun: json<ActiveRun>('activeRun'),
+    archivedAt: epochMs('archivedAt'),
+  },
+  (t) => [
+    uniqueIndex('chief_thread_coordinator_unique')
+      .on(t.chiefId)
+      .where(sql`${t.archivedAt} is null and ${t.id} not like 'chief-digest-%'`),
+  ],
+);
 
 export const chiefMessage = sqliteTable('chief_message', {
   id: text('id').primaryKey(),

@@ -10,7 +10,7 @@ import {
   todoOutputSchema,
   updateSkillToolParamsSchema,
 } from '@cairn/shared';
-import { and, eq, inArray, or, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   agent,
@@ -161,6 +161,77 @@ function requireTeamTodo(db: Db, todoId: string, teamId: string) {
   if (!row) throw new HttpError(404, `todo ${todoId}`);
   return row;
 }
+const PROJECT_WRITE_TOOLS = new Set([
+  'create_todo',
+  'split_todo',
+  'update_todo',
+  'delete_todos',
+  'close_todos',
+  'reopen_todos',
+  'complete_todos',
+  'message_todo',
+  'update_project',
+  'connect_repo',
+  'schedule_todo',
+  'unschedule_todo',
+  'snooze_todos',
+  'run_builds',
+  'run_review',
+  'confirm_builds',
+  'cancel_builds',
+  'merge_builds',
+  'save_memory',
+]);
+
+function idsOf(params: Params, one: string, many: string): string[] {
+  const single = params[one];
+  const list = params[many];
+  return [
+    ...(typeof single === 'string' ? [single] : []),
+    ...(Array.isArray(list) ? list.filter((x): x is string => typeof x === 'string') : []),
+  ];
+}
+
+function requireUnarchivedTargets(db: Db, teamId: string, name: string, params: Params): void {
+  if (!PROJECT_WRITE_TOOLS.has(name)) return;
+  const projectIds = idsOf(params, 'projectId', 'projectIds');
+  const todoIds = idsOf(params, 'todoId', 'todoIds');
+  const buildIds = idsOf(params, 'buildId', 'buildIds');
+  const viaTodos =
+    todoIds.length === 0
+      ? []
+      : db
+          .select({ projectId: todo.projectId })
+          .from(todo)
+          .where(and(inArray(todo.id, todoIds), eq(todo.teamId, teamId)))
+          .all();
+  const viaBuilds =
+    buildIds.length === 0
+      ? []
+      : db
+          .select({ projectId: todo.projectId })
+          .from(build)
+          .innerJoin(todo, eq(todo.id, build.todoId))
+          .where(and(inArray(build.id, buildIds), eq(todo.teamId, teamId)))
+          .all();
+  const targets = [
+    ...projectIds,
+    ...viaTodos.map((r) => r.projectId),
+    ...viaBuilds.map((r) => r.projectId),
+  ];
+  if (targets.length === 0) return;
+  const archived = db
+    .select({ id: project.id })
+    .from(project)
+    .where(
+      and(inArray(project.id, targets), eq(project.teamId, teamId), isNotNull(project.archivedAt)),
+    )
+    .get();
+  if (archived) {
+    throw new HttpError(409, `project ${archived.id} is archived; unarchive it before changing it`);
+  }
+}
+
 const DOCS_MAX_PATHS = 24;
 
 export const CHIEF_TASK_LIST_MAX_OUTPUT_BYTES = 32 * 1024;
@@ -212,6 +283,7 @@ export async function executeChiefTool(
           .get()?.name
       : undefined;
   const chiefActor: TransitionActor = { kind: 'agent', name: boundChiefName ?? 'Chief' };
+  requireUnarchivedTargets(db, ctx.teamId, name, params);
   switch (name) {
     case 'projects': {
       const rows = db.select().from(project).where(eq(project.teamId, ctx.teamId)).all();

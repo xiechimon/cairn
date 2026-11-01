@@ -375,6 +375,15 @@ function chiefThreads(s: TestServer) {
   return s.db.select().from(chiefThreadTable).all();
 }
 
+function orchestrationTurns(s: TestServer) {
+  return s.db
+    .select()
+    .from(stepTable)
+    .where(eq(stepTable.kind, 'chief'))
+    .all()
+    .filter((row) => (row.prompt ?? '').includes('\n\n编排请求：'));
+}
+
 function notTakenReasons(w: World): unknown[] {
   return w.logs
     .filter((l) => l.msg === 'issue intake candidate not taken')
@@ -1884,18 +1893,19 @@ describe('16 orchestration fails after import: retried over later rounds, with a
     const ghost = await req(w.s.app, 'POST', '/api/todos/todo-ghost-1/orchestrate');
     expect(ghost.status).toBe(201);
     w.s.db
-      .update(chiefThreadTable)
+      .update(stepTable)
       .set({ createdAt: Date.now() - 3_600_000 })
       .run();
     w.s.db.delete(todoTable).where(eq(todoTable.id, 'todo-ghost-1')).run();
-    const { intake, flaky } = flakyIntake(w);
+    const { intake, flaky } = flakyIntake(w, stepTable);
     await intake.sweep();
     expect(todoOf(w.s, 1406)?.seqNum).toBe(1);
-    expect(chiefThreads(w.s)).toHaveLength(1);
+    expect(orchestrationTurns(w.s)).toHaveLength(1);
     flaky.failing = false;
     const second = await intake.sweep();
     expect(second?.orchestrated).toBe(1);
-    expect(chiefThreads(w.s)).toHaveLength(2);
+    expect(orchestrationTurns(w.s)).toHaveLength(2);
+    expect(chiefThreads(w.s)).toHaveLength(1);
   });
 
   test('its own orchestration failed midway (thread created, chief step never queued) -> does not count as picked up, retried normally', async () => {
@@ -1927,7 +1937,8 @@ describe('16 orchestration fails after import: retried over later rounds, with a
     flaky.failingRead = false;
     const third = await intake.sweep();
     expect(third?.orchestrated).toBe(1);
-    expect(chiefThreads(w.s)).toHaveLength(2);
+    expect(orchestrationTurns(w.s)).toHaveLength(2);
+    expect(chiefThreads(w.s)).toHaveLength(1);
   });
 
   test('after the orchestration failed the chief is rebound to another agent -> no more retries (the card left the close-reconcile scope), one log line', async () => {
