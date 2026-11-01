@@ -1,8 +1,17 @@
+import { useEffect, useRef, useState } from 'react';
+import { ProjectAvatar } from '../board/project-avatar.js';
+import { useProjectMark } from '../board/project-mark.js';
+import { AgentPicker, type AgentPickerOption } from '../components/agent-picker.js';
 import { Button } from '../components/ui/button.js';
+import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { TagChip, type TagChipData } from '../components/ui/tag-chip.js';
+import { Textarea } from '../components/ui/textarea.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
+import { ChevronDown, Monitor } from '../icons/index.js';
+
+const SAVE_DELAY_MS = 800;
 
 export function formatCreatedAt(ms: number, t: TFunc): string {
   const base = {
@@ -32,44 +41,146 @@ export function formatCreatedAt(ms: number, t: TFunc): string {
   });
 }
 
+const CHIP =
+  'inline-flex h-7 max-w-full items-center gap-1.5 rounded-lg bg-card px-2 text-ui text-content-secondary shadow-[inset_0_0_0_1px_var(--border)]';
+
 interface FreshBlockProps {
   todo: TodoRecord;
+  projectName?: string;
   tags?: TagChipData[];
+  machineName?: string | null;
+  agentOptions?: AgentPickerOption[];
+  agentAvatarUrl?: string | null;
+  onPickAgent?: (agentId: string) => void;
+  agentRebindCopy?: string;
+  spec: string;
+  onSaveSpec?: (spec: string) => void;
   action?: string | null;
   onAction?: () => void;
   actionInFlight?: boolean;
-  hasSpec?: boolean;
+}
+
+function DescriptionBox({ spec, onSave }: { spec: string; onSave?: (spec: string) => void }) {
+  const { t } = useI18n();
+  const [draft, setDraft] = useState(spec);
+  const [focused, setFocused] = useState(false);
+  const saved = useRef(spec);
+  const save = useRef(onSave);
+  save.current = onSave;
+
+  useEffect(() => {
+    if (!focused && spec !== saved.current) {
+      saved.current = spec;
+      setDraft(spec);
+    }
+  }, [spec, focused]);
+
+  useEffect(() => {
+    if (draft === saved.current) return;
+    const timer = setTimeout(() => {
+      saved.current = draft;
+      save.current?.(draft);
+    }, SAVE_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [draft]);
+
+  const flush = () => {
+    setFocused(false);
+    if (draft === saved.current) return;
+    saved.current = draft;
+    save.current?.(draft);
+  };
+
+  return (
+    <Textarea
+      data-testid="fresh-description"
+      className="min-h-28 rounded-lg border-none bg-card px-3 py-2.5 text-card-title leading-6 text-foreground shadow-[inset_0_0_0_1px_var(--border)] placeholder:text-content-tertiary md:text-card-title dark:bg-card"
+      value={draft}
+      readOnly={onSave == null}
+      aria-label={t('描述')}
+      placeholder={t('补充 Agent 需要知道的内容：设置放在哪里、做到什么程度算完成…')}
+      onChange={(event) => setDraft(event.target.value)}
+      onFocus={() => setFocused(true)}
+      onBlur={flush}
+    />
+  );
 }
 
 export function FreshBlock({
   todo,
+  projectName,
   tags,
+  machineName,
+  agentOptions,
+  agentAvatarUrl,
+  onPickAgent,
+  agentRebindCopy,
+  spec,
+  onSaveSpec,
   action,
   onAction,
   actionInFlight,
-  hasSpec,
 }: FreshBlockProps) {
   const { t } = useI18n();
+  const projectMark = useProjectMark();
+  const agentName = todo.agent?.displayName ?? null;
+  const selected = agentOptions?.find((option) => option.id === todo.agent?.id);
   return (
-    <div className="fresh-block mx-auto max-w-180 px-4 pt-18" data-testid="fresh-block">
-      <h2 className="fresh-title m-0 font-serif text-page font-semibold break-words text-(--foreground)">
+    <div
+      className="fresh-block mx-auto w-[calc(100%-2rem)] max-w-(--chat-max-w) pt-18"
+      data-testid="fresh-block"
+    >
+      <h2 className="fresh-title m-0 mb-3 font-serif text-page font-semibold break-words text-(--foreground)">
         {todo.title}
       </h2>
-      {(tags ?? []).length > 0 && (
-        <div className="fresh-tags mt-4 flex items-center gap-4 text-(--text-tertiary)">
-          {(tags ?? []).map((tag) => (
-            <TagChip key={tag.id} tag={tag} className="fresh-tag-chip" />
-          ))}
-        </div>
-      )}
-      {hasSpec !== true && (
-        <div className="fresh-nodesc mt-4 text-ui text-(--text-tertiary)">{t('尚无描述')}</div>
-      )}
-      <div className="mt-5 flex items-center text-(--text-tertiary)">
-        <span className="text-meta">{formatCreatedAt(todo.phaseAt, t)}</span>
+      <div className="fresh-props mb-4 flex flex-wrap items-center gap-1.5">
+        {projectName !== undefined && (
+          <span className={CHIP} data-testid="fresh-project">
+            <ProjectAvatar name={projectName} {...projectMark(projectName)} bare />
+            <span className="font-medium text-foreground">{projectName}</span>
+          </span>
+        )}
+        {(agentName != null || agentOptions != null) && (
+          <AgentPicker
+            agents={agentOptions ?? []}
+            selectedId={todo.agent?.id ?? null}
+            onSelect={onPickAgent}
+            rebindCopy={agentRebindCopy}
+            align="start"
+            footnote={t('开始前更换 Agent，不会丢失任何内容。')}
+            trigger={
+              <Button
+                variant="ghost"
+                data-testid="fresh-agent-chip"
+                aria-label={t('执行 Agent')}
+                className={`${CHIP} h-7 cursor-pointer font-normal hover:bg-card aria-expanded:bg-(--menu-hover)`}
+              />
+            }
+          >
+            <SeededAvatar
+              className="size-4.5"
+              name={agentName ?? undefined}
+              src={agentAvatarUrl ?? null}
+              fallback="/avatar-robot-1.svg"
+            />
+            <span className="font-medium text-foreground">{agentName ?? t('未指派')}</span>
+            {selected?.summary != null && <span>{selected.summary}</span>}
+            <ChevronDown width={12} height={12} className="flex-none text-content-tertiary" />
+          </AgentPicker>
+        )}
+        {machineName != null && (
+          <span className={CHIP} data-testid="fresh-machine">
+            <Monitor width={14} height={14} className="flex-none text-content-tertiary" />
+            <span className="font-medium text-foreground">{machineName}</span>
+          </span>
+        )}
+        {(tags ?? []).map((tag) => (
+          <TagChip key={tag.id} tag={tag} className="fresh-tag-chip" />
+        ))}
       </div>
+      <DescriptionBox spec={spec} onSave={onSaveSpec} />
       {action != null && onAction != null && (
-        <div className="mt-8 flex items-center gap-3">
+        <div className="mt-5 flex items-center gap-3">
           {actionInFlight === true ? (
             <Button className="fresh-start" data-orchestrating="true" disabled>
               {t('编排中')}
@@ -80,12 +191,17 @@ export function FreshBlock({
             </Button>
           )}
           {action === '开始' && (
-            <span className="text-meta text-(--text-tertiary)">
-              {t('点开始后由总管编排派发，Agent 在你的机器上跑')}
+            <span className="text-meta text-(--text-tertiary)" data-testid="fresh-start-note">
+              {agentName != null
+                ? t('{agent} 会先写方案，你确认之前不会改动任何东西。', { agent: agentName })
+                : t('Agent 会先写方案，你确认之前不会改动任何东西。')}
             </span>
           )}
         </div>
       )}
+      <div className="mt-8 text-meta text-(--text-tertiary)">
+        {formatCreatedAt(todo.phaseAt, t)}
+      </div>
     </div>
   );
 }

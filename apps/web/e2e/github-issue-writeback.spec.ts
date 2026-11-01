@@ -140,7 +140,7 @@ test('3. unreachable (echo 404): whole row hidden, page shows no error state', a
   await page.goto('/app/todo/todo-self-1');
 
   await expect(page.locator('.fresh-title')).toHaveText(LOCAL_TITLE);
-  await expect(page.locator('.spec-block')).toContainText('复现步骤');
+  await expect(page.getByTestId('fresh-description')).toHaveValue(/复现步骤/);
   await expect(page.locator('[data-testid="source-issue-echo"]')).toHaveCount(0);
   await expect(page.locator('[data-testid="source-issue-pending"]')).toHaveCount(0);
 });

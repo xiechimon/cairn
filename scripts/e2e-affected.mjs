@@ -92,6 +92,7 @@ const DETAIL = [
   'ticket-cost',
   'accent-typo',
   'attachment-strip',
+  'avatar-spiral',
   'branch-button',
   'cds-composer',
   'cds-dialogs',
@@ -217,7 +218,11 @@ const SHARED_SURFACE_ONLY = [
 const SECONDARY = ['title-', 'shell-', 'segmented-'];
 
 const FILE_RULES = new Map([
-  ['apps/web/src/overlay/chip-popover.tsx', OVERLAYS],
+  ['apps/web/src/overlay/status-menu.tsx', [...OVERLAYS, ...DETAIL]],
+  [
+    'apps/web/src/components/agent-picker.tsx',
+    ['detail-', 'chip-', 'live-agent-model-line', 'avatar-spiral'],
+  ],
   ['apps/web/src/overlay/gesture-machine.ts', [...OVERLAYS, 'chief-toggle-flash']],
   ['apps/web/src/overlay/hotkeys.ts', OVERLAYS],
   ['apps/web/src/overlay/plan-dropdown.tsx', OVERLAYS],
