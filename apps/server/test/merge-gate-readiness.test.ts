@@ -91,6 +91,8 @@ const OVERSIZE_FILES = [
   file('apps/server/test/ci-loop.test.ts', { additions: 20 }),
 ];
 const OVERSIZE_DIGEST = computePatchDigest([...OVERSIZE_FILES, SHOT]).patchDigest as string;
+const NO_SIZE_ACCEPTANCE = 'no passing review on this patch accepts its size';
+const SPLIT_REQUESTED = 'a review on this patch asks to split it';
 
 const v = (
   kind: GateVerdictView['kind'],
@@ -153,6 +155,19 @@ function green(): GateInputs {
     },
   };
 }
+
+const sized = (sizeAssessment: NonNullable<GateVerdictView['sizeAssessment']>): GateInputs => {
+  const i = green();
+  setFiles(i, OVERSIZE_FILES);
+  pr(i).body = BODY_WITH_SIZE;
+  i.verdicts.push({
+    ...v('review', 'pass', 'correctness', OVERSIZE_DIGEST),
+    headSha: HEAD,
+    reviewerId: 'reviewer-size',
+    sizeAssessment,
+  });
+  return i;
+};
 
 type Row = [MergeBlockerCode, (i: GateInputs) => void];
 const pr = (i: GateInputs) => i.pr as NonNullable<GateInputs['pr']>;
@@ -999,15 +1014,79 @@ describe('mergeReadiness: files with no visible diff are left to a human, caps c
     };
     expect(withEvidence(40, 30)).toEqual([]);
     expect(withEvidence(41, 0)).toEqual([
-      ['size-review', 'transient', '41 lines, 41 files', 'the PR body has no ## Size section'],
+      [
+        'size-review',
+        'transient',
+        '41 lines, 41 files',
+        'the PR body has no ## Size section',
+        NO_SIZE_ACCEPTANCE,
+      ],
     ]);
   });
 
-  test('an oversize patch whose body has the Size section and whose reviews pass is ready', () => {
+  test('an oversize patch whose reviews pass without a size assessment stays blocked on the size review', () => {
     const i = green();
     setFiles(i, OVERSIZE_FILES);
     pr(i).body = BODY_WITH_SIZE;
-    expect(mergeReadiness(i).blockers).toEqual([]);
+    expect(classesOf(i)).toEqual([
+      ['size-review', 'transient', '812 lines, 2 files', NO_SIZE_ACCEPTANCE],
+    ]);
+  });
+
+  test('an accepting size assessment bound to another patch digest or head does not clear the size review', () => {
+    for (const over of [
+      { patchDigest: `pd2:${'0'.repeat(64)}` },
+      { patchDigest: null },
+      { headSha: OLD },
+      { headSha: null },
+    ]) {
+      const i = sized('accepted');
+      i.verdicts = i.verdicts.map((x) => (x.sizeAssessment !== undefined ? { ...x, ...over } : x));
+      expect(classesOf(i), JSON.stringify(over)).toEqual([
+        ['size-review', 'transient', '812 lines, 2 files', NO_SIZE_ACCEPTANCE],
+      ]);
+    }
+  });
+
+  test('a size assessment on a review that did not pass does not clear the size review', () => {
+    for (const outcome of ['block', 'extraction_failed', 'step_failed'] as const) {
+      const i = sized('accepted');
+      i.verdicts = [
+        ...i.verdicts.filter((x) => x.sizeAssessment === undefined),
+        {
+          ...v('review', outcome, 'size', OVERSIZE_DIGEST),
+          headSha: HEAD,
+          sizeAssessment: 'accepted',
+        },
+      ];
+      expect(codesOf(i), outcome).toContain('size-review');
+    }
+  });
+
+  test('a review asking to split the patch keeps the size review blocked, even beside an accepting one', () => {
+    const split = sized('split-needed');
+    expect(classesOf(split)).toEqual([
+      ['size-review', 'transient', '812 lines, 2 files', NO_SIZE_ACCEPTANCE, SPLIT_REQUESTED],
+    ]);
+    const both = sized('accepted');
+    both.verdicts.push({
+      ...v('review', 'pass', 'design', OVERSIZE_DIGEST),
+      headSha: HEAD,
+      sizeAssessment: 'split-needed',
+    });
+    expect(classesOf(both)).toEqual([
+      ['size-review', 'transient', '812 lines, 2 files', SPLIT_REQUESTED],
+    ]);
+  });
+
+  test('a passing review on this patch and head that accepts the size clears the size review', () => {
+    expect(mergeReadiness(sized('accepted')).blockers).toEqual([]);
+  });
+
+  test('an accepting size assessment from the author does not clear the size review', () => {
+    const i = sized('accepted');
+    i.author = { id: 'reviewer-size', model: 'claude-opus-4-8' };
+    expect(codesOf(i)).toContain('size-review');
   });
 
   test('an oversize patch with an empty Size section, or the heading only inside a code fence or a comment, still needs the section', () => {
@@ -1021,7 +1100,13 @@ describe('mergeReadiness: files with no visible diff are left to a human, caps c
       setFiles(i, OVERSIZE_FILES);
       pr(i).body = `${BODY}\n\n${size}`;
       expect(classesOf(i), size).toEqual([
-        ['size-review', 'transient', '812 lines, 2 files', 'the PR body has no ## Size section'],
+        [
+          'size-review',
+          'transient',
+          '812 lines, 2 files',
+          'the PR body has no ## Size section',
+          NO_SIZE_ACCEPTANCE,
+        ],
       ]);
     }
   });
@@ -1043,7 +1128,7 @@ describe('mergeReadiness: files with no visible diff are left to a human, caps c
       'size-review',
       'transient',
       '812 lines, 2 files',
-      'no review pass on this patch',
+      NO_SIZE_ACCEPTANCE,
     ]);
   });
 
@@ -1051,7 +1136,7 @@ describe('mergeReadiness: files with no visible diff are left to a human, caps c
     const i = green();
     setFiles(i, [...OVERSIZE_FILES, file('apps/server/src/services/secrets.ts')]);
     pr(i).body = BODY_WITH_SIZE;
-    expect(codesOf(i)).toEqual(['independent-review-missing']);
+    expect(codesOf(i)).toEqual(['size-review', 'independent-review-missing']);
   });
 
   test('a local patch has no PR body, so oversize keeps the human size-cap there', () => {
@@ -1079,7 +1164,13 @@ describe('mergeReadiness: files with no visible diff are left to a human, caps c
     };
     expect(withEvidence(800)).toEqual([]);
     expect(withEvidence(801)).toEqual([
-      ['size-review', 'transient', '801 lines, 2 files', 'the PR body has no ## Size section'],
+      [
+        'size-review',
+        'transient',
+        '801 lines, 2 files',
+        'the PR body has no ## Size section',
+        NO_SIZE_ACCEPTANCE,
+      ],
     ]);
   });
 });
@@ -1331,7 +1422,7 @@ describe('mergeReadiness: extraction failures clearable, unmergeable states, tru
         'transient',
         '299 lines, 299 files',
         'the PR body has no ## Size section',
-        'no review pass on this patch',
+        NO_SIZE_ACCEPTANCE,
       ],
     ]);
   });

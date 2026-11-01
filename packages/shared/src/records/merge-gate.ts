@@ -258,7 +258,8 @@ export const MERGE_BLOCKERS = [
   {
     code: 'size-review',
     class: 'transient',
-    label: '补丁超过 800 行或 40 个文件：PR 正文要有 ## Size 小节，且当前补丁要有评审通过',
+    label:
+      '补丁超过 800 行或 40 个文件：PR 正文要有 ## Size 小节，且当前补丁要有评审明确接受这个规模',
   },
   {
     code: 'independent-review-missing',

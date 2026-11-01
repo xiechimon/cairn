@@ -21,19 +21,20 @@ function outsideFences(body: string): string[] {
   return lines;
 }
 
-export function hasSizeSection(body: string | null): boolean {
-  if (body === null) return false;
+export function sizeSection(body: string | null): string | null {
+  if (body === null) return null;
   const lines = outsideFences(body.replace(COMMENT, (c) => c.replace(/[^\n]/g, ' ')));
   const start = lines.findIndex((line) => {
     const heading = HEADING.exec(line);
     return heading?.[1] === '##' && heading[2]?.toLowerCase() === 'size';
   });
-  if (start < 0) return false;
+  if (start < 0) return null;
   const rest = lines.slice(start + 1);
   const end = rest.findIndex((line) => {
     const level = HEADING.exec(line)?.[1]?.length;
     return level !== undefined && level <= 2;
   });
   const section = (end < 0 ? rest : rest.slice(0, end)).join('\n');
-  return section.replace(FOLD_MARKUP, '').trim() !== '';
+  const text = section.replace(FOLD_MARKUP, '').trim();
+  return text === '' ? null : text;
 }

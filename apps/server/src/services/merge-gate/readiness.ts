@@ -1,4 +1,4 @@
-import type { Phase } from '@cairn/shared';
+import type { Phase, ReviewSizeAssessment } from '@cairn/shared';
 import {
   CHIEF_DISPATCH_BASELINE_DECISION_OK_CI_LOWER,
   type CompareFile,
@@ -19,7 +19,7 @@ import { qualifyingEvidenceLinks } from './evidence-link.js';
 import { isLiveHarnessAttempt } from './harness-eval-route.js';
 import { independenceVendorDetail, modelsAreIndependent } from './model-identity.js';
 import { classifyPaths, touchesHarness } from './paths.js';
-import { hasSizeSection } from './size-section.js';
+import { sizeSection } from './size-section.js';
 
 export interface GateVerdictView {
   kind: 'review' | 'verify' | 'decision';
@@ -28,6 +28,7 @@ export interface GateVerdictView {
   reviewerModel?: string | null;
   gateLoosening?: boolean | null;
   evalRulerChange?: boolean | null;
+  sizeAssessment?: ReviewSizeAssessment | null;
   perspective: string | null;
   patchDigest: string | null;
   outcome:
@@ -358,7 +359,6 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
   }
   let D: string | null = null;
   let sizeReview: string | null = null;
-  let reviewPassed = false;
   if (compare !== null) {
     const digest = computePatchDigest(compare.files, {
       expectedFileCount: pr !== null && head !== null ? pr.changedFiles : null,
@@ -507,8 +507,6 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
       );
     }
 
-    reviewPassed = has(at('review'), 'pass');
-
     const blocking = at('review').filter((x) => x.outcome === 'block');
     if (blocking.length > 0)
       block('review-blocking', ...new Set(blocking.map((x) => x.perspective ?? 'review')));
@@ -527,9 +525,28 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
     }
   }
   if (sizeReview !== null) {
+    const assessed = i.verdicts.filter(
+      (x) =>
+        x.kind === 'review' &&
+        D !== null &&
+        x.patchDigest === D &&
+        head !== null &&
+        x.headSha === head &&
+        x.sizeAssessment != null,
+    );
+    const accepted = assessed.some(
+      (x) =>
+        x.outcome === 'pass' &&
+        x.sizeAssessment === 'accepted' &&
+        !!x.reviewerId?.trim() &&
+        x.reviewerId !== i.author?.id,
+    );
     const unmet = [
-      ...(hasSizeSection(pr?.body ?? null) ? [] : ['the PR body has no ## Size section']),
-      ...(reviewPassed ? [] : ['no review pass on this patch']),
+      ...(sizeSection(pr?.body ?? null) !== null ? [] : ['the PR body has no ## Size section']),
+      ...(accepted ? [] : ['no passing review on this patch accepts its size']),
+      ...(assessed.some((x) => x.sizeAssessment === 'split-needed')
+        ? ['a review on this patch asks to split it']
+        : []),
     ];
     if (unmet.length > 0) block('size-review', sizeReview, ...unmet);
   }
