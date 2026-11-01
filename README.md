@@ -66,7 +66,7 @@
 - **Multi-agent orchestration.** Each agent has its own model, role, skills, MCP servers, secrets and memory. A chief agent only dispatches, so its context stays clean; coder and reviewer agents do the work.
 - **An evidence-bound merge gate.** Before an agent merges, the gate counts only review verdicts bound to the PR's current patch digest and refuses if the head moved after the verdict; its rules are model-checked in TLA+. The manual merge button still checks only the pinned commit (spec 18, F1). Protected paths still stop for you; the AI reviewer can block a merge, not just comment on it.
 - **Bootstrap loop.** Cairn claims its own tickets, implements them, reviews them and opens the PRs: it is being used to build itself.
-- **Eval and trajectory driven.** Every build records its base SHA and a harness hash, and rejections are stored as structured records. Strong-vs-weak model A/B evals then decide which prompt, skill and routing changes stay. "Training" here means improving the harness, never fine-tuning weights.
+- **Eval and trajectory driven.** Every build records its base SHA and a harness hash, and rejections are stored as structured records. Changes to the chief-dispatch harness must clear an eval regression floor before they merge; paired-trial adoption for prompt, skill and routing changes is planned. "Training" here means improving the harness, never fine-tuning weights.
 - **Your machines.** Register any host by running the daemon on it. Builds run there in their own git worktree, and the board streams plans, diffs and tool calls back live.
 
 ## Showcase
