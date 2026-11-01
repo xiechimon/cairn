@@ -90,7 +90,7 @@ for (const theme of ['light', 'dark'] as const) {
     await setTheme(page, theme);
     let win = await openWindow(page, READY);
     await expect(win.getByTestId('chief-gate'), 'W2: bound has no gate').toHaveCount(0);
-    await expect(win.getByTestId('chief-composer-input'), 'W5').toHaveCSS('font-size', '14px');
+    await expect(win.getByTestId('chief-composer-input'), 'W5').toHaveCSS('font-size', '15px');
 
     win = await openWindow(page, SWITCHER);
     const menu = win.getByRole('menu');
