@@ -232,7 +232,11 @@ start_and_check() {
   systemctl --user start "$DAEMON_UNIT"
   daemon_healthy "$started_ms" || return 1
   if systemctl --user is-enabled --quiet "$ORB_UNIT"; then
-    systemctl --user start "$ORB_UNIT" || orb_alarm start
+    if systemctl --user start "$ORB_UNIT"; then
+      rm -f "$STATE"/alarms/orb-unit-*-failed
+    else
+      orb_alarm start
+    fi
   fi
   return 0
 }

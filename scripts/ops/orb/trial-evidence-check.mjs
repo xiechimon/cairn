@@ -42,14 +42,16 @@ export async function checkTrialEvidence(evidence, options = {}) {
     release !== null &&
     typeof release === 'object' &&
     !Array.isArray(release) &&
-    ['key', 'version', 'sha'].every(
+    ['key', 'version', 'sha', 'fullSha'].every(
       (name) => typeof release[name] === 'string' && release[name].trim().length > 0,
     ) &&
-    /^[a-f0-9]{4,40}$/.test(release.sha);
-  check('dist', validRelease, 'expected distRelease with key, version and git SHA');
+    /^[a-f0-9]{7,40}$/.test(release.sha) &&
+    /^[a-f0-9]{40}$/.test(release.fullSha);
+  check('dist', validRelease, 'expected distRelease with key, version, sha and fullSha');
   if (validRelease) {
     check('dist', !release.key.includes('-dirty'), 'release key must be clean');
-    check('dist', release.key.includes(release.sha), 'release key must contain its SHA');
+    check('dist', release.fullSha.startsWith(release.sha), 'fullSha must start with sha');
+    check('dist', release.key.includes(`-${release.sha}-`), 'release key must contain -<sha>-');
   }
   for (const name of ['labelsBefore', 'labelsAfter']) {
     check(
@@ -144,7 +146,7 @@ export async function checkTrialEvidence(evidence, options = {}) {
   else lines.push(...failures);
 
   const failuresBeforeDist = failures.length;
-  await github('dist', `compare/${release.sha}...main`, (comparison) => {
+  await github('dist', `compare/${release.fullSha}...main`, (comparison) => {
     check(
       'dist',
       ['ahead', 'identical'].includes(comparison.status),

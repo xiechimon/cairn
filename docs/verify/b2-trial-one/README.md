@@ -15,7 +15,7 @@ local fake runs must never be recorded as live evidence.
 | `conversationId` | Thread conversation ID used by the Orb executor. For build steps this is the build ID. |
 | `orbName` | Exactly `cairn-orb-<conversationId>`. |
 | `machinectlStatus` | Nonempty output of `machinectl status <orbName>` captured while the trial runs. |
-| `distRelease` | Required `{key, version, sha}` object copied from `/var/lib/cairn-orb/dist/current.json` while the trial runs. The key must contain the SHA and must not contain `-dirty`; the SHA must be reachable from `main`. |
+| `distRelease` | Required `{key, version, sha, fullSha}` object. Copy `key`, `version`, and `sha` from `/var/lib/cairn-orb/dist/current.json` while the trial runs. Record `fullSha` from that deployed checkout's `git rev-parse HEAD`. `sha` must be 7 to 40 lowercase hex characters; `fullSha` must be 40 lowercase hex characters starting with `sha`. The key must contain `-<sha>-` and must not contain `-dirty`; `fullSha` must be reachable from `main`. |
 | `pr` | Positive number of the merged PR delivering this issue. |
 | `mergeCommit` | Full merge commit SHA reported by GitHub for that PR. It must be reachable from `main`. |
 | `labelsBefore` | String array copied unchanged from the transfer script's JSON output. |
@@ -45,8 +45,10 @@ acceptance even when that label does not trigger an overnight timer.
    Record the build/conversation IDs, running Orb status, claimed machine,
    and actual host workspace absence check during the run. Copy the complete
    `{key, version, sha}` object from `/var/lib/cairn-orb/dist/current.json` into
-   `distRelease` during that same run. The trial must use a clean, merged daemon
-   build; preserve the publisher's SHA, which may be abbreviated.
+   `distRelease` during that same run, then add `fullSha` from
+   `git -C <deployed-checkout> rev-parse HEAD`. The trial must use a clean, merged
+   daemon build; preserve the publisher's SHA, which may be abbreviated, and
+   verify that it is a prefix of `fullSha`.
 5. After the PR merges and the issue is closed as completed, record the PR and
    merge SHA and re-read the lane lists. Do not copy tokens, machine credentials,
    private addresses, or unrelated personal information into public evidence.
@@ -67,9 +69,9 @@ The first reported check is `push: ok`. It verifies that the PR head commit
 exists in `repo` on GitHub, with the expected same-repository Thread branch,
 merged PR state and merge commit.
 Checking the commit also works after GitHub deletes the merged head branch.
-The next check is `dist: ok`. It requires a clean release key containing its
-recorded SHA and checks ancestry with
-`gh api repos/xiechimon/cairn/compare/<sha>...main`. Only `ahead` and `identical`
+The next check is `dist: ok`. It requires a clean release key containing
+`-<sha>-`, a matching full SHA, and checks ancestry with
+`gh api repos/xiechimon/cairn/compare/<fullSha>...main`. Only `ahead` and `identical`
 pass. Missing or malformed release metadata, a dirty key, a key/SHA mismatch,
 an unmerged SHA, or an unreadable comparison produces a named `dist:` failure
 and exits nonzero. A missing PR head commit or unreadable push response reports

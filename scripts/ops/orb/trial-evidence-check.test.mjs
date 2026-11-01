@@ -12,6 +12,7 @@ import { checkTrialEvidence } from './trial-evidence-check.mjs';
 const sha = 'a'.repeat(40);
 const headSha = 'b'.repeat(40);
 const distSha = 'c'.repeat(9);
+const distFullSha = 'c'.repeat(40);
 const evidence = () => ({
   repo: 'xiechimon/cairn',
   issue: 17,
@@ -21,7 +22,12 @@ const evidence = () => ({
   machinectlStatus: 'State: running',
   pr: 23,
   mergeCommit: sha,
-  distRelease: { key: `0.2.2-${distSha}-dist-0123456789abcdef`, version: '0.2.2', sha: distSha },
+  distRelease: {
+    key: `0.2.2-${distSha}-dist-0123456789abcdef`,
+    version: '0.2.2',
+    sha: distSha,
+    fullSha: distFullSha,
+  },
   labelsBefore: ['by:pi'],
   labelsAfter: ['by:cairn', 'ready-for-agent'],
   lanesAfter: { pending: [18], mine: [], hold: [] },
@@ -61,7 +67,7 @@ function world() {
     if (path.endsWith('/pulls/23')) return JSON.stringify(data.pull);
     if (path.endsWith('/issues/17')) return JSON.stringify(data.issue);
     if (path.endsWith(`/compare/${headSha}...${sha}`)) return JSON.stringify(data.pushCompare);
-    if (path.endsWith(`/compare/${distSha}...main`)) return JSON.stringify(data.distCompare);
+    if (path.endsWith(`/compare/${distFullSha}...main`)) return JSON.stringify(data.distCompare);
     if (path.endsWith(`/compare/${sha}...main`)) return JSON.stringify(data.compare);
     if (path.endsWith(`/commits/${headSha}`)) return JSON.stringify(data.headCommit);
     throw new Error(`Unexpected gh: ${path}`);
@@ -89,7 +95,7 @@ test('accepts a same-repository Thread branch without a merge trailer and prints
   assert.deepEqual(w.calls.slice(0, 3), [
     ['api', 'repos/xiechimon/cairn/pulls/23'],
     ['api', `repos/xiechimon/cairn/commits/${headSha}`],
-    ['api', `repos/xiechimon/cairn/compare/${distSha}...main`],
+    ['api', `repos/xiechimon/cairn/compare/${distFullSha}...main`],
   ]);
   w.data.distCompare.status = 'identical';
   w.data.compare.status = 'identical';
@@ -108,6 +114,23 @@ for (const [name, distRelease] of [
   ['missing sha', { key: `0.2.2-${distSha}`, version: '0.2.2' }],
   ['invalid sha', { ...evidence().distRelease, sha: '../main' }],
   [
+    'four-character sha',
+    { ...evidence().distRelease, sha: 'cccc', key: '0.2.2-cccc-dist-0123456789abcdef' },
+  ],
+  ['missing fullSha', { ...evidence().distRelease, fullSha: undefined }],
+  ['short fullSha', { ...evidence().distRelease, fullSha: distSha }],
+  ['invalid fullSha', { ...evidence().distRelease, fullSha: 'g'.repeat(40) }],
+  ['uppercase fullSha', { ...evidence().distRelease, fullSha: distFullSha.toUpperCase() }],
+  ['fullSha mismatch', { ...evidence().distRelease, fullSha: headSha }],
+  [
+    'missing left dash',
+    { ...evidence().distRelease, key: `0.2.2${distSha}-dist-0123456789abcdef` },
+  ],
+  [
+    'missing right dash',
+    { ...evidence().distRelease, key: `0.2.2-${distSha}dist-0123456789abcdef` },
+  ],
+  [
     'dirty key',
     { ...evidence().distRelease, key: `${evidence().distRelease.key}-dirty-0123456789abcdef` },
   ],
@@ -125,6 +148,21 @@ for (const [name, distRelease] of [
   });
 }
 
+for (const length of [7, 40]) {
+  test(`accepts a ${length}-character release SHA and compares fullSha`, async () => {
+    const w = world();
+    const sha = distFullSha.slice(0, length);
+    const result = await w.run({
+      ...evidence(),
+      distRelease: { ...evidence().distRelease, sha, key: `0.2.2-${sha}-dist-0123456789abcdef` },
+    });
+    assert.equal(result.ok, true);
+    assert.ok(
+      w.calls.some((args) => args[1] === `repos/xiechimon/cairn/compare/${distFullSha}...main`),
+    );
+  });
+}
+
 for (const status of ['behind', 'diverged', undefined]) {
   test(`rejects a dist SHA not on main: ${status}`, async () => {
     const w = world();
@@ -136,7 +174,7 @@ for (const status of ['behind', 'diverged', undefined]) {
     assert.ok(!result.lines.includes('dist: ok'));
     assert.ok(!result.lines.includes('trial-one: ok'));
     assert.ok(
-      w.calls.some((args) => args[1] === `repos/xiechimon/cairn/compare/${distSha}...main`),
+      w.calls.some((args) => args[1] === `repos/xiechimon/cairn/compare/${distFullSha}...main`),
     );
   });
 }
@@ -146,7 +184,7 @@ test('dist GitHub read failures fail closed', async () => {
     const w = world();
     const result = await w.run(evidence(), {
       runner: async (args) => {
-        if (args[1] === `repos/xiechimon/cairn/compare/${distSha}...main`) {
+        if (args[1] === `repos/xiechimon/cairn/compare/${distFullSha}...main`) {
           if (response === 'unavailable') throw new Error('network unavailable');
           return response;
         }
@@ -545,7 +583,7 @@ const value = process.argv[2] === 'pr' ? data.closing
   : path.endsWith('/issues/17') ? data.issue
   : path.endsWith('/commits/${headSha}') ? data.headCommit
   : path.endsWith('/compare/${headSha}...${sha}') ? data.pushCompare
-  : path.endsWith('/compare/${distSha}...main') ? data.distCompare
+  : path.endsWith('/compare/${distFullSha}...main') ? data.distCompare
   : path.endsWith('/compare/${sha}...main') ? data.compare : null;
 if (!value) process.exit(1);
 process.stdout.write(JSON.stringify(value));
