@@ -1,5 +1,11 @@
 # @xiechimon/cairn
 
+## 0.1.2
+
+### Patch Changes
+
+- Republish through the recreated npm Trusted Publishers so npm validates them; ships the changes merged since the last release.
+
 ## 0.1.1
 
 ### Patch Changes
