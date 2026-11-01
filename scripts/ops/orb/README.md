@@ -425,7 +425,13 @@ scripts/ops/orb/canary.sh --json --out docs/verify/2277/canary.json
 
 Use Node 22.19+ with the guest's Node major, installed checkout dependencies
 (including the native SQLite binding), `git`, `tailscale`, and the existing daemon build at
-`apps/daemon/dist/cli.mjs`. The canary performs no installation or build. It first
+`apps/daemon/dist/cli.mjs`. The checkout must be built at the same commit as the
+published release. The canary computes the exact publisher key, including dist
+bytes and dirty checkout contents, and compares it with
+`/var/lib/cairn-orb/dist/current.json` before starting the scratch stack.
+`CanaryReleaseMismatchError` refuses a different build without changing shared
+`current`; publish the operator's intended checkout first if they differ.
+The canary performs no installation or build. It first
 runs the real `orb-host-check` detection, including its disposable clone and
 cleanup in a separate terminal signal group. Repeated SIGINT/SIGTERM/SIGHUP signals
 only request cancellation and cannot bypass cleanup. Missing prerequisites refuse the run before planting sentinels. If
@@ -477,27 +483,30 @@ The three routes cover:
   bundle delivery. The host streams `git log -p --binary` and
   `git cat-file --batch-all-objects --batch` over the scratch repository, checking
   every random marker, including intermediate, deleted and packed objects.
-- A Node Unix-socket connect to `/var/run/docker.sock`, plus TCP connects to the
-  server endpoints required by the issue and the scratch port on both loopback
-  and the bridge. A canary-owned listener on the bridge binds that same scratch
-  port and must first accept a host-side TCP connection. Its guest direct probe
-  requires a timeout; connection refusal is inconclusive and cannot pass that
-  control. Other refused endpoints record current unreachability rather than
-  proving a firewall DROP. The known loopback scratch server also detects a
-  regression that shares the host network namespace. Each HTTP target is also attempted with an explicit CONNECT
-  through `HTTP_PROXY`, bypassing `NO_PROXY`. Proxy attempts require an explicit
-  HTTP 403; missing proxies and unexpected responses fail the canary. The host
-  tailnet address is discovered with `tailscale ip -4`; the scratch attacker uses
-  that address but reports only `tailnet-server`, keeping internal addresses out
-  of the public evidence and source code.
+- A Node Unix-socket connect to `/var/run/docker.sock`, plus TCP connects to
+  canary-owned listeners on loopback, bridge `10.203.0.1`, and the discovered
+  tailnet address, all using the scratch server port. Both control listeners
+  must bind and accept a host connection before probing. The host runner's
+  negative control must also connect to every owned endpoint; missing, refused
+  or duplicate controls fail the result. The Orb's bridge and tailnet probes
+  require timeouts rather than connection refusal. The separate
+  `127.0.0.1:8787` row explicitly identifies the Orb's own loopback in `detail`;
+  it makes no claim about a host production listener. The loopback scratch
+  server detects a shared host network namespace. Each HTTP target is also
+  attempted with an explicit CONNECT through `HTTP_PROXY`, bypassing `NO_PROXY`.
+  Proxy attempts require HTTP 403; missing proxies and unexpected responses
+  fail the canary. The host tailnet address comes from `tailscale ip -4` and
+  is reported only as `tailnet-server`.
 
 In that same Orb run, `git ls-remote https://github.com/xiechimon/cairn.git HEAD`
 must succeed through the egress proxy. `githubReach: {ok, ms}` is a positive
 control for GitHub HTTPS, independent of the denied private destinations. The
 same attacker then runs with `CAIRN_EXECUTOR=host` through the real host runner
 on the same scratch server. Its negative control must read at least one exact
-sentinel marker. Its separate repository intentionally contains synthetic leaked
-markers and is deleted during cleanup.
+sentinel marker. The same object scanner must also find a marker in that host
+control's delivered repository and branch (`negativeObjectsContainMarker: true`).
+A marker claim in the hook result alone cannot pass. Its separate repository
+intentionally contains synthetic leaked markers and is deleted during cleanup.
 
 ### Sentinel safety and evidence
 
@@ -521,11 +530,15 @@ new sentinel contents are read or copied. Real `~/.cairn/machine.json`, existing
 `~/.cairn/*.pem`, optional `~/.cairn/secretbox.key`, `~/.ssh`,
 `~/.codex/auth.json` and `~/.claude` are probed without reading their contents.
 Neither hook output nor public evidence contains raw markers; sentinel entries
-contain paths and SHA-256 hashes only.
+contain paths and SHA-256 hashes only. Public paths use `~`, and real PEM files
+use indexed aliases such as `~/.cairn/1.pem`, including `/proc/1/root` aliases.
+Failure JSON and leftover inventories also redact the real home and PEM names.
+Only `ENOENT` counts as an absent file or directory. `EACCES` and `EPERM` report
+`blocked: false` with `detail: "present-but-denied"`; `ENOTDIR` also fails closed.
 
 `ok` and exit zero require complete, unique probe rows, every Orb target blocked,
-clean pushed objects, a leaking host negative control and successful GitHub
-reachability. Any failed prerequisite, runner, push, control, probe or cleanup
+clean Orb objects, a scanner-confirmed leaking host control, live host listeners
+and successful GitHub reachability. Any failed prerequisite, runner, push, control, probe or cleanup
 prevents success. The final directory scan requires no `.cairn-canary-*` entries;
 leftovers set `ok: false`, exit nonzero, and appear in `sentinelsRemaining`.
 Cleanup runs on failure, timeout and SIGINT/SIGTERM/SIGHUP, stops only owned
@@ -537,8 +550,11 @@ retained by this publisher rather than pruned or deleted by the canary.
 
 A private `~/.cairn/orb-canary-runs/<runid>.jsonl` manifest records the run PID and
 created paths with device/inode identities, flushed before marker contents are
-written. It contains no raw markers. Successful cleanup removes the manifest;
-failed cleanup preserves it for retry. The shell wrapper traps exit and forwards
+written. It also records each scratch server/daemon PID, entry, working directory
+and OS start time before waiting for readiness, plus the exact Orb machine names
+and Project seed paths before the daemon can create them. The scratch directory
+is recorded with its device/inode identity. It contains no raw markers. Successful
+cleanup removes the manifest; failed cleanup preserves it for retry. The shell wrapper traps exit and forwards
 SIGINT/SIGTERM/SIGHUP to Node before waiting for cleanup. After SIGKILL or a host
 restart, the next run recovers manifests whose owning process no longer exists.
 To recover one stopped run explicitly without starting the stack:
@@ -547,6 +563,13 @@ To recover one stopped run explicitly without starting the stack:
 scripts/ops/orb/canary.sh --cleanup <runid>
 ```
 
+Recovery stops recorded children only after matching their start time, command
+and working directory; an empty Linux cmdline means an already exited zombie.
+It then removes only recorded machines through `machine-cleanup.mjs`, waits for
+their stop hooks, and removes recorded seeds and scratch directories. A failed
+process or machine cleanup preserves the remaining resources and manifest for
+retry. Tests simulate a parent SIGKILL with a live detached child and cover both
+explicit cleanup and the next-run sweep.
 Recovery removes only recorded files whose identities still match. Active runs,
 replaced files, symlinks and malformed manifests are preserved and refused.
 Untracked sentinel names are reported by the final assertion and never removed

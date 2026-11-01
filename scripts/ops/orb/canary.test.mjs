@@ -29,7 +29,7 @@ import {
   scanObjects,
   withCleanup,
 } from './canary.mjs';
-import { attack, connectionProbe, expectedTargets } from './canary-attacker.mjs';
+import { attack, connectionProbe, expectedTargets, networkTargets } from './canary-attacker.mjs';
 import { poll, runCommand } from './canary-process.mjs';
 import { startBridgeControl } from './canary-stack.mjs';
 import { cleanupCanaryMachine } from './machine-cleanup.mjs';
@@ -58,7 +58,16 @@ function green() {
   return {
     config,
     orb: { routes, githubReach: { ok: true, ms: 1 }, executor: 'orb' },
-    negative: { executor: 'host', leaked: ['/fixture/key'] },
+    negative: {
+      executor: 'host',
+      leaked: ['/fixture/key'],
+      routes: {
+        socketAndServer: networkTargets(config)
+          .filter((target) => target !== 'http://127.0.0.1:8787')
+          .map((target) => ({ target: `direct ${target}`, blocked: false, detail: 'connected' })),
+      },
+    },
+    negativeObjectsContainMarker: true,
     pushedObjectsClean: true,
     orbName: 'cairn-orb-fixture',
     durationMs: 1,
@@ -367,7 +376,7 @@ test('attacker attempts every direct and proxy target and forces GitHub HTTPS th
         blocked: true,
         detail: request
           ? 'proxy HTTP 403'
-          : options.host === '10.203.0.1'
+          : options.host !== '127.0.0.1'
             ? 'ETIMEDOUT'
             : 'ECONNREFUSED',
       };
@@ -385,7 +394,12 @@ test('attacker attempts every direct and proxy target and forces GitHub HTTPS th
       return { status: 0, stdout: `${'a'.repeat(40)}\tHEAD\n` };
     },
   });
-  assert.equal(calls.length, 11);
+  assert.equal(calls.length, 9);
+  assert.match(
+    result.routes.socketAndServer.find((row) => row.target === 'direct http://127.0.0.1:8787')
+      .detail,
+    /orb own loopback/,
+  );
   assert.deepEqual(
     result.routes.socketAndServer.map((row) => row.target),
     expectedTargets(config).socketAndServer,
@@ -444,7 +458,7 @@ test('a refused known bridge listener invalidates the run and tailnet targets st
   };
   const result = await attack(config, {
     cwd: join(home, 'workspace'),
-    env: { HOME: home },
+    env: { HOME: home, CAIRN_ORB: '1' },
     connectTarget: async (_options, request) => ({
       blocked: true,
       detail: request ? 'proxy HTTP 403' : 'ECONNREFUSED',
@@ -457,7 +471,9 @@ test('a refused known bridge listener invalidates the run and tailnet targets st
     false,
   );
   assert.ok(
-    result.routes.socketAndServer.some((row) => row.target === 'direct http://tailnet-server:8787'),
+    result.routes.socketAndServer.some(
+      (row) => row.target === 'direct http://tailnet-server:34567',
+    ),
   );
   assert.equal(JSON.stringify(result).includes(config.tailnetAddress), false);
 });
@@ -649,7 +665,9 @@ for (const recovery of ['explicit', 'next-run', 'shell-exit']) {
         },
       );
       assert.notEqual(result.status, 0);
-      assert.deepEqual(JSON.parse(result.stdout).sentinelsRemaining, [unrelated]);
+      assert.deepEqual(JSON.parse(result.stdout).sentinelsRemaining, [
+        unrelated.replace(home, '~'),
+      ]);
     } else {
       await assert.rejects(
         runCanary({
@@ -691,62 +709,97 @@ await canaryMain(['--json'], {
   assert.equal(result.status, 1, result.stderr);
   const json = JSON.parse(result.stdout);
   assert.equal(json.ok, false);
-  assert.deepEqual(json.sentinelsRemaining, [leftover]);
+  assert.deepEqual(json.sentinelsRemaining, [leftover.replace(home, '~')]);
   assert.equal(readFileSync(leftover, 'utf8'), 'preserve');
 });
 
-for (const leftover of [false, true]) {
-  test(`a completed run ${leftover ? 'fails its final leftover assertion' : 'cleans every sentinel'}`, async (t) => {
-    const home = fixture(t);
-    const result = await runCanary({
-      home,
-      preflight: async () => {},
-      stackFactory: async ({ root, config }) => {
-        await runCommand('git', ['init', '-b', 'main', root]);
-        await runCommand('git', [
-          '-c',
-          'user.name=Canary',
-          '-c',
-          'user.email=canary@example.invalid',
-          '-C',
-          root,
-          'commit',
-          '--allow-empty',
-          '-m',
-          'Seed',
-        ]);
-        return {
-          port: 34567,
-          run: async (executor) => {
-            if (executor === 'host') {
-              if (leftover) writeFileSync(join(home, '.ssh/.cairn-canary-leftover'), 'preserve');
-              return { result: { executor, leaked: [config.sentinels[0].path] } };
-            }
-            return {
-              repo: root,
-              branch: 'main',
-              orbName: 'fixture',
-              result: {
-                executor,
-                githubReach: { ok: true, ms: 1 },
-                routes: Object.fromEntries(
-                  Object.entries(expectedTargets(config)).map(([route, targets]) => [
-                    route,
-                    targets.map((target) => ({ target, blocked: true, detail: 'blocked' })),
-                  ]),
-                ),
-              },
-            };
-          },
-        };
-      },
+for (const controlMarker of [false, true]) {
+  for (const leftover of [false, true]) {
+    test(`a completed run with marker=${controlMarker} ${leftover ? 'fails its final leftover assertion' : 'cleans every sentinel'}`, async (t) => {
+      const home = fixture(t);
+      const result = await runCanary({
+        home,
+        preflight: async () => {},
+        stackFactory: async ({ root, config }) => {
+          await runCommand('git', ['init', '-b', 'main', root]);
+          await runCommand('git', [
+            '-c',
+            'user.name=Canary',
+            '-c',
+            'user.email=canary@example.invalid',
+            '-C',
+            root,
+            'commit',
+            '--allow-empty',
+            '-m',
+            'Seed',
+          ]);
+          return {
+            port: 34567,
+            run: async (executor) => {
+              if (executor === 'host') {
+                if (leftover) writeFileSync(join(home, '.ssh/.cairn-canary-leftover'), 'preserve');
+                writeFileSync(
+                  join(root, 'marker'),
+                  controlMarker ? readFileSync(config.sentinels[0].path) : 'missing marker',
+                );
+                await runCommand('git', ['-C', root, 'add', 'marker']);
+                await runCommand('git', [
+                  '-c',
+                  'user.name=Canary',
+                  '-c',
+                  'user.email=canary@example.invalid',
+                  '-C',
+                  root,
+                  'commit',
+                  '-m',
+                  'Control marker',
+                ]);
+                return {
+                  repo: root,
+                  branch: 'main',
+                  result: {
+                    executor,
+                    leaked: [config.sentinels[0].path],
+                    routes: {
+                      socketAndServer: networkTargets(config)
+                        .filter((target) => target !== 'http://127.0.0.1:8787')
+                        .map((target) => ({
+                          target: `direct ${target}`,
+                          blocked: false,
+                          detail: 'connected',
+                        })),
+                    },
+                  },
+                };
+              }
+              return {
+                repo: root,
+                branch: 'main',
+                orbName: 'fixture',
+                result: {
+                  executor,
+                  githubReach: { ok: true, ms: 1 },
+                  routes: Object.fromEntries(
+                    Object.entries(expectedTargets(config)).map(([route, targets]) => [
+                      route,
+                      targets.map((target) => ({ target, blocked: true, detail: 'blocked' })),
+                    ]),
+                  ),
+                },
+              };
+            },
+          };
+        },
+      });
+      assert.equal(result.ok, !leftover && controlMarker);
+      assert.equal(result.negativeObjectsContainMarker, controlMarker);
+      assert.deepEqual(
+        result.sentinelsRemaining,
+        leftover ? ['~/.ssh/.cairn-canary-leftover'] : [],
+      );
     });
-    assert.equal(result.ok, !leftover);
-    assert.deepEqual(
-      result.sentinelsRemaining,
-      leftover ? [join(home, '.ssh/.cairn-canary-leftover')] : [],
-    );
-  });
+  }
 }
 
 test('cleanup preserves replaced files and symlinks and keeps their recovery record', (t) => {

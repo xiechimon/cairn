@@ -1,10 +1,10 @@
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { lstatSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { lstatSync, mkdtempSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { isIPv4 } from 'node:net';
 import { homedir, tmpdir, userInfo } from 'node:os';
 import { join, resolve } from 'node:path';
-import { expectedTargets } from './canary-attacker.mjs';
+import { expectedTargets, networkTargets } from './canary-attacker.mjs';
 import { runCommand, withCleanup } from './canary-process.mjs';
 import { plantSentinels, recoverSentinels, remainingSentinels } from './canary-sentinels.mjs';
 import { startStack } from './canary-stack.mjs';
@@ -13,11 +13,29 @@ export { withCleanup } from './canary-process.mjs';
 
 export { plantSentinels, recoverSentinels, remainingSentinels } from './canary-sentinels.mjs';
 
+export function publicReport(value, home) {
+  const pemLabels = new Map();
+  const redact = (item) => {
+    if (typeof item === 'string') {
+      return item.replaceAll(home, '~').replace(/~\/\.cairn\/[^/"'\n]+?\.pem/g, (path) => {
+        if (!pemLabels.has(path)) pemLabels.set(path, `~/.cairn/${pemLabels.size + 1}.pem`);
+        return pemLabels.get(path);
+      });
+    }
+    if (Array.isArray(item)) return item.map(redact);
+    if (item && typeof item === 'object')
+      return Object.fromEntries(Object.entries(item).map(([key, entry]) => [key, redact(entry)]));
+    return item;
+  };
+  return redact(value);
+}
+
 export function aggregateResult({
   config,
   orb,
   negative,
   pushedObjectsClean,
+  negativeObjectsContainMarker,
   orbName,
   durationMs,
 }) {
@@ -45,12 +63,47 @@ export function aggregateResult({
     Array.isArray(leaked) &&
     leaked.length > 0 &&
     leaked.every((path) => config.sentinels.some((entry) => entry.path === path));
+  const hostTargets = networkTargets(config).filter((target) => target !== 'http://127.0.0.1:8787');
+  const hostConnections = negative?.routes?.socketAndServer ?? [];
+  const listenersLive = hostTargets.every((target) => {
+    const rows = hostConnections.filter((row) => row.target === `direct ${target}`);
+    return rows.length === 1 && rows[0].blocked === false && rows[0].detail === 'connected';
+  });
+  const labels = new Map();
+  let pemIndex = 0;
+  for (const path of [...config.sentinels.map((entry) => entry.path), ...config.realPaths]) {
+    labels.set(
+      path,
+      config.realPaths.includes(path) && path.endsWith('.pem')
+        ? `~/.cairn/${++pemIndex}.pem`
+        : path.replace(config.hostHome, '~'),
+    );
+  }
+  labels.set(config.hostHome, '~');
+  const redact = (value) => {
+    if (typeof value === 'string') {
+      for (const [path, label] of [...labels].sort((a, b) => b[0].length - a[0].length))
+        value = value.replaceAll(path, label);
+      return value;
+    }
+    if (Array.isArray(value)) return value.map(redact);
+    if (value && typeof value === 'object')
+      return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, redact(item)]));
+    return value;
+  };
   const githubReach = orb?.githubReach ?? { ok: false, ms: 0 };
-  return {
+  return redact({
     routes,
     sentinels: config.sentinels,
     pushedObjectsClean,
-    negativeControl: { executor: 'host', leaked },
+    negativeObjectsContainMarker,
+    negativeControl: {
+      executor: 'host',
+      leaked,
+      listeners: hostConnections.filter((row) =>
+        hostTargets.some((target) => row.target === `direct ${target}`),
+      ),
+    },
     githubReach,
     orbName,
     durationMs,
@@ -59,10 +112,12 @@ export function aggregateResult({
       orb?.executor === 'orb' &&
       pushedObjectsClean === true &&
       validControl &&
+      listenersLive &&
+      negativeObjectsContainMarker === true &&
       githubReach.ok === true &&
       Number.isFinite(githubReach.ms) &&
       githubReach.ms >= 0,
-  };
+  });
 }
 
 export async function scanObjects(repo, branch, markers) {
@@ -127,10 +182,11 @@ export async function runCanary({
     const prerequisites = await preflight();
     signal?.throwIfAborted();
     const result = await withCleanup(async (defer) => {
-      const root = realpathSync(mkdtempSync(join(tmpdir(), 'cairn-orb-canary-')));
-      defer(() => rmSync(root, { recursive: true, force: true }));
       const planted = plantSentinels(realpathSync(home), runId);
       defer(planted.cleanup);
+      const root = realpathSync(mkdtempSync(join(tmpdir(), 'cairn-orb-canary-')));
+      const { dev, ino } = lstatSync(root);
+      planted.record({ kind: 'scratch', path: root, dev, ino });
       const realPaths = [
         join(home, '.cairn/machine.json'),
         ...readdirSync(join(home, '.cairn'))
@@ -152,18 +208,24 @@ export async function runCanary({
         realPaths,
         tailnetAddress: prerequisites?.tailnetAddress,
       };
-      const stack = await stackFactory({ root, config, defer, signal });
+      const stack = await stackFactory({ root, config, defer, signal, record: planted.record });
       config.serverPort = stack.port;
       process.stderr.write('Canary: running orb attacker through the scratch daemon\n');
       const orb = await stack.run('orb');
       const pushedObjectsClean = await scanObjects(orb.repo, orb.branch, planted.markers);
       process.stderr.write('Canary: running host negative control through the scratch daemon\n');
       const negative = await stack.run('host');
+      const negativeObjectsContainMarker = !(await scanObjects(
+        negative.repo,
+        negative.branch,
+        planted.markers,
+      ));
       return aggregateResult({
         config,
         orb: orb.result,
         negative: negative.result,
         pushedObjectsClean,
+        negativeObjectsContainMarker,
         orbName: orb.orbName,
         durationMs: Date.now() - started,
       });
@@ -171,7 +233,7 @@ export async function runCanary({
     result.durationMs = Date.now() - started;
     result.sentinelsRemaining = remainingSentinels(home);
     if (result.sentinelsRemaining.length) result.ok = false;
-    return result;
+    return publicReport(result, home);
   } catch (error) {
     if (signal.aborted) error.message = `${signal.reason.message}; ${error.message}`;
     error.sentinelsRemaining = remainingSentinels(home);
@@ -215,6 +277,7 @@ export async function canaryMain(args = process.argv.slice(2), options = {}) {
     result.ok = false;
     result.errors = [...(result.errors ?? []), error.message];
   }
+  result = publicReport(result, options.home ?? homedir());
   if (out) {
     try {
       writeFileSync(out, `${JSON.stringify(result, null, 2)}\n`, { mode: 0o600, flag: 'wx' });

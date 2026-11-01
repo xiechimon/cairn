@@ -1,5 +1,6 @@
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { readFileSync, realpathSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
 export async function withCleanup(work) {
@@ -74,10 +75,23 @@ export async function poll(check, { signal, timeout = 120000, label = 'operation
   }
 }
 
-export async function stopChild(child, cwd, entry) {
+export async function stopChild(
+  child,
+  cwd,
+  entry,
+  { platform = process.platform, read = readFileSync } = {},
+) {
   if (child.exitCode !== null || child.signalCode !== null) return;
-  if (process.platform === 'linux') {
-    const command = readFileSync(`/proc/${child.pid}/cmdline`, 'utf8').split('\0');
+  if (platform === 'linux') {
+    let raw;
+    try {
+      raw = read(`/proc/${child.pid}/cmdline`, 'utf8');
+    } catch (error) {
+      if (error.code === 'ENOENT') return;
+      throw error;
+    }
+    if (!raw) return;
+    const command = raw.split('\0');
     if (!command.includes(entry) || realpathSync(`/proc/${child.pid}/cwd`) !== realpathSync(cwd))
       throw new Error('Refusing to stop a process with a different command or directory');
   }
@@ -94,4 +108,91 @@ export async function stopChild(child, cwd, entry) {
       label: 'scratch process kill',
     });
   }
+}
+
+function processStart(pid) {
+  if (process.platform === 'linux') {
+    const stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
+    return `linux:${stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19]}`;
+  }
+  return execFileSync('ps', ['-o', 'lstart=', '-p', String(pid)], { encoding: 'utf8' }).trim();
+}
+
+export function childRecord(child, cwd, entry) {
+  if (!Number.isSafeInteger(child.pid) || child.pid <= 0)
+    throw new Error('Scratch child did not start');
+  return {
+    kind: 'child',
+    pid: child.pid,
+    cwd: realpathSync(cwd),
+    entry,
+    startTime: processStart(child.pid),
+  };
+}
+
+function recordedChildRunning(record) {
+  try {
+    const started = processStart(record.pid);
+    if (!started) return false;
+    if (started !== record.startTime)
+      throw new Error('Refusing to stop a process with a different start time');
+    let command;
+    let cwd;
+    if (process.platform === 'linux') {
+      command = readFileSync(`/proc/${record.pid}/cmdline`, 'utf8');
+      if (!command) return false;
+      command = command.split('\0');
+      cwd = realpathSync(`/proc/${record.pid}/cwd`);
+    } else {
+      command = execFileSync('ps', ['-o', 'command=', '-p', String(record.pid)], {
+        encoding: 'utf8',
+      })
+        .trim()
+        .split(/\s+/);
+      cwd = execFileSync('lsof', ['-a', '-p', String(record.pid), '-d', 'cwd', '-Fn'], {
+        encoding: 'utf8',
+      })
+        .split('\n')
+        .find((line) => line.startsWith('n'))
+        ?.slice(1);
+    }
+    if (!command.includes(record.entry) || cwd !== realpathSync(record.cwd))
+      throw new Error('Refusing to stop a process with a different command or directory');
+    return true;
+  } catch (error) {
+    if (error.code === 'ENOENT' || error.code === 'ESRCH') return false;
+    if (error.status === 1) {
+      try {
+        process.kill(record.pid, 0);
+      } catch (probe) {
+        if (probe.code === 'ESRCH') return false;
+      }
+    }
+    throw error;
+  }
+}
+
+export function stopRecordedChildSync(record) {
+  const result = spawnSync(
+    process.execPath,
+    [import.meta.filename, '--stop', JSON.stringify(record)],
+    { encoding: 'utf8', timeout: 20000 },
+  );
+  if (result.status !== 0)
+    throw new Error(result.stderr.trim() || 'Recorded scratch process cleanup failed');
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
+  const record = JSON.parse(process.argv[3]);
+  const child = {
+    pid: record.pid,
+    get exitCode() {
+      return recordedChildRunning(record) ? null : 0;
+    },
+    signalCode: null,
+    kill(signal) {
+      if (recordedChildRunning(record)) process.kill(record.pid, signal);
+    },
+  };
+  await stopChild(child, record.cwd, record.entry);
 }

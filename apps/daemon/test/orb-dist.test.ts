@@ -16,6 +16,7 @@ import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { build } from 'esbuild';
 import { afterEach, expect, test, vi } from 'vitest';
+import { orbDistRelease } from '../src/orb/dist.js';
 import { NspawnOrbProvider, type OrbCommandRunner } from '../src/orb/provider.js';
 import { boot, CLAIMED, FakeMachineApi, waitFor } from './machine-loop-harness.js';
 import { createOrbCheckout } from './orb-dist-fixture.js';
@@ -346,4 +347,15 @@ test('a scratch daemon can retain every shared release without adopting other ma
   } finally {
     vi.unstubAllEnvs();
   }
+});
+
+test('release preflight computes the publisher key without deploying or changing current', async () => {
+  const f = fixture();
+  const expected = await orbDistRelease(f.distSource, f.runner);
+  expect(f.deployments).toHaveLength(0);
+  expect(readdirSync(f.distRoot)).toEqual([]);
+  await f.prepare();
+  expect(JSON.parse(readFileSync(join(f.distRoot, 'current.json'), 'utf8'))).toEqual(expected);
+  writeFileSync(join(f.checkout, 'source.txt'), 'dirty');
+  expect((await orbDistRelease(f.distSource, f.runner)).key).not.toBe(expected.key);
 });

@@ -38,12 +38,7 @@ function publishLink(root: string, target: string, name: string) {
   }
 }
 
-export async function publishOrbDist(
-  distSource: string,
-  root: string,
-  runner: OrbCommandRunner,
-  retainedKeys: () => ReadonlySet<string> | undefined = () => new Set(),
-) {
+export async function orbDistRelease(distSource: string, runner: OrbCommandRunner) {
   const checkout = resolve(distSource, '../../..');
   const { version } = JSON.parse(
     readFileSync(join(checkout, 'apps/daemon/package.json'), 'utf8'),
@@ -95,6 +90,17 @@ export async function publishOrbDist(
     }
     key += `-dirty-${hash.digest('hex').slice(0, 16)}`;
   }
+  return { key, version, sha };
+}
+
+export async function publishOrbDist(
+  distSource: string,
+  root: string,
+  runner: OrbCommandRunner,
+  retainedKeys: () => ReadonlySet<string> | undefined = () => new Set(),
+) {
+  const checkout = resolve(distSource, '../../..');
+  const { key, version, sha } = await orbDistRelease(distSource, runner);
   const releases = join(root, 'releases');
   mkdirSync(releases, { recursive: true, mode: 0o755 });
   const release = join(releases, key);

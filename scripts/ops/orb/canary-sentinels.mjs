@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
 import {
   closeSync,
@@ -10,10 +11,14 @@ import {
   readdirSync,
   readFileSync,
   realpathSync,
+  rmSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { isAbsolute, join } from 'node:path';
+
+import { stopRecordedChildSync } from './canary-process.mjs';
 
 const directories = ['.cairn', '.ssh', '.codex', '.claude'];
 
@@ -47,6 +52,53 @@ function manifestPath(home, id, create = false) {
   return join(parent, `${id}.jsonl`);
 }
 
+function validResource(resource) {
+  if (resource.kind === 'child')
+    return (
+      Number.isSafeInteger(resource.pid) &&
+      resource.pid > 0 &&
+      typeof resource.entry === 'string' &&
+      resource.entry.length > 0 &&
+      typeof resource.cwd === 'string' &&
+      isAbsolute(resource.cwd) &&
+      typeof resource.startTime === 'string' &&
+      resource.startTime.length > 0
+    );
+  if (resource.kind === 'machine') return /^cairn-orb-[a-f0-9-]{36}$/.test(resource.name);
+  if (resource.kind === 'seed')
+    return (
+      typeof resource.path === 'string' &&
+      /^\/var\/lib\/cairn-orb\/seed\/[a-zA-Z0-9-]+$/.test(resource.path)
+    );
+  if (resource.kind === 'scratch')
+    return (
+      typeof resource.path === 'string' &&
+      resource.path.startsWith(join(realpathSync(tmpdir()), 'cairn-orb-canary-')) &&
+      Number.isSafeInteger(resource.dev) &&
+      Number.isSafeInteger(resource.ino)
+    );
+  return false;
+}
+
+function cleanupResource(resource) {
+  if (resource.kind === 'child') return stopRecordedChildSync(resource);
+  if (resource.kind === 'machine') {
+    const result = spawnSync(
+      process.execPath,
+      [join(import.meta.dirname, 'machine-cleanup.mjs'), resource.name],
+      { encoding: 'utf8', timeout: 180000 },
+    );
+    if (result.status !== 0) throw new Error('Recorded scratch machine cleanup failed');
+    return;
+  }
+  const current = lstatSync(resource.path, { throwIfNoEntry: false });
+  if (!current) return;
+  checkDirectory(resource.path);
+  if (resource.kind === 'scratch' && (current.dev !== resource.dev || current.ino !== resource.ino))
+    throw new Error('Scratch directory replaced; preserved');
+  rmSync(resource.path, { recursive: true, force: true });
+}
+
 function readManifest(home, id) {
   const path = manifestPath(home, id);
   if (!path) return;
@@ -62,9 +114,13 @@ function readManifest(home, id) {
     if (!stat.isFile() || stat.uid !== process.getuid() || (stat.mode & 0o777) !== 0o600)
       throw new Error('Invalid canary manifest ownership or mode');
     const rows = readFileSync(fd, 'utf8').trim().split('\n').map(JSON.parse);
-    const [header, ...created] = rows;
+    const [header, ...inventory] = rows;
+    const created = inventory.filter((row) => !row.kind);
+    const resources = inventory.filter((row) => row.kind);
     const allowed = sentinelPaths(home, id);
     if (
+      !header ||
+      resources.some((resource) => !validResource(resource)) ||
       header.id !== id ||
       !Number.isInteger(header.pid) ||
       header.pid <= 0 ||
@@ -76,13 +132,13 @@ function readManifest(home, id) {
       )
     )
       throw new Error('Invalid canary manifest inventory');
-    return { path, header, created };
+    return { path, header, created, resources };
   } finally {
     closeSync(fd);
   }
 }
 
-function cleanupManifest(home, id, allowActive = false) {
+function cleanupManifest(home, id, allowActive = false, cleanup = cleanupResource) {
   const manifest = readManifest(home, id);
   if (!manifest) return;
   if (!allowActive) {
@@ -94,6 +150,16 @@ function cleanupManifest(home, id, allowActive = false) {
     }
   }
   const errors = [];
+  for (const kind of ['child', 'machine', 'seed', 'scratch']) {
+    for (const resource of manifest.resources.filter((row) => row.kind === kind).toReversed()) {
+      try {
+        cleanup(resource);
+      } catch (error) {
+        errors.push(error.message);
+      }
+    }
+    if (errors.length) throw new Error(errors.join('; '));
+  }
   for (const { path, dev, ino } of manifest.created.toReversed()) {
     try {
       checkDirectory(join(path, '..'));
@@ -110,9 +176,13 @@ function cleanupManifest(home, id, allowActive = false) {
   unlinkSync(manifest.path);
 }
 
-export function recoverSentinels(home, id) {
+export function recoverSentinels(
+  home,
+  id,
+  { read = readManifest, cleanupResource: cleanup = cleanupResource } = {},
+) {
   if (id !== undefined) {
-    cleanupManifest(home, id);
+    cleanupManifest(home, id, false, cleanup);
     return;
   }
   const parent = join(home, '.cairn/orb-canary-runs');
@@ -121,14 +191,15 @@ export function recoverSentinels(home, id) {
   for (const name of readdirSync(parent).sort()) {
     if (!/^[a-zA-Z0-9-]{1,128}\.jsonl$/.test(name)) continue;
     const runId = name.slice(0, -6);
-    const manifest = readManifest(home, runId);
+    const manifest = read(home, runId);
+    if (!manifest) continue;
     try {
       process.kill(manifest.header.pid, 0);
       continue;
     } catch (error) {
       if (error.code !== 'ESRCH') throw error;
     }
-    cleanupManifest(home, runId);
+    cleanupManifest(home, runId, false, cleanup);
   }
 }
 
@@ -178,7 +249,20 @@ export function plantSentinels(home, id = randomBytes(12).toString('hex')) {
     } finally {
       closeSync(fd);
     }
-    return { sentinels, markers, manifest, cleanup };
+    const record = (resource) => {
+      if (!validResource(resource)) throw new Error('Invalid canary resource inventory');
+      const inventory = openSync(
+        manifest,
+        constants.O_WRONLY | constants.O_APPEND | constants.O_NOFOLLOW,
+      );
+      try {
+        writeFileSync(inventory, `${JSON.stringify(resource)}\n`);
+        fsyncSync(inventory);
+      } finally {
+        closeSync(inventory);
+      }
+    };
+    return { sentinels, markers, manifest, cleanup, record };
   } finally {
     process.umask(previousUmask);
   }

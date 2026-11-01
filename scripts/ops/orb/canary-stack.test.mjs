@@ -18,14 +18,24 @@ test('real scratch server enrollment and host runner deliver the fake-home attac
     const planted = plantSentinels(home);
     defer(planted.cleanup);
     const config = { hostHome: home, sentinels: planted.sentinels, realPaths: [] };
+    const children = [];
     const stack = await startStack({
       root,
       config,
       defer,
       requireOrbBuild: false,
       probeNetwork: false,
+      record: (resource) => children.push(resource),
     });
+    assert.equal(children.length, 1);
     const run = await stack.run('host');
+    assert.equal(children.length, 3);
+    assert.ok(
+      children.every(
+        (child) =>
+          child.kind === 'child' && child.pid > 0 && child.entry && child.cwd && child.startTime,
+      ),
+    );
     assert.equal(run.result.executor, 'host');
     assert.equal(run.result.leaked.length, 5);
     assert.equal(await scanObjects(run.repo, run.branch, planted.markers), false);

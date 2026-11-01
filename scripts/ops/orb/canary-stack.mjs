@@ -1,9 +1,9 @@
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { existsSync, lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { connect, createServer } from 'node:net';
 import { join, resolve } from 'node:path';
-import { poll, runCommand, stopChild } from './canary-process.mjs';
+import { childRecord, poll, runCommand, stopChild } from './canary-process.mjs';
 
 export function freePort() {
   return new Promise((resolvePort, reject) => {
@@ -27,7 +27,7 @@ export async function startBridgeControl(port, host = '10.203.0.1') {
       const socket = connect({ host, port: bridge.address().port });
       socket.setTimeout(2000, () => {
         socket.destroy();
-        reject(new Error('Host bridge listener positive control timed out'));
+        reject(new Error('Host listener positive control timed out'));
       });
       socket.once('error', reject);
       socket.once('connect', () => {
@@ -42,6 +42,36 @@ export async function startBridgeControl(port, host = '10.203.0.1') {
   }
 }
 
+export async function requireMatchingRelease({
+  checkout = resolve(import.meta.dirname, '../../..'),
+  releaseFile = '/var/lib/cairn-orb/dist/current.json',
+  compute = async () =>
+    JSON.parse(
+      await runCommand(
+        process.execPath,
+        [
+          '--import',
+          'tsx',
+          '--input-type=module',
+          '-e',
+          "import { orbDistRelease } from './src/orb/dist.ts'; import { runOrbCommand } from './src/orb/provider.ts'; console.log(JSON.stringify(await orbDistRelease('dist', runOrbCommand)));",
+        ],
+        { cwd: join(checkout, 'apps/daemon') },
+      ),
+    ),
+} = {}) {
+  const expected = await compute();
+  const published = JSON.parse(readFileSync(releaseFile, 'utf8'));
+  if (!expected.key || expected.key !== published.key) {
+    const error = new Error(
+      'CanaryReleaseMismatchError: checkout build must match the published Orb release; publish first',
+    );
+    error.name = 'CanaryReleaseMismatchError';
+    throw error;
+  }
+  return expected;
+}
+
 export async function startStack({
   root,
   config,
@@ -49,12 +79,16 @@ export async function startStack({
   signal,
   requireOrbBuild = true,
   probeNetwork = true,
+  record,
 }) {
   const checkout = resolve(import.meta.dirname, '../../..');
+  if (typeof record !== 'function')
+    throw new Error('Scratch stack requires a run manifest recorder');
   if (requireOrbBuild && !existsSync(join(checkout, 'apps/daemon/dist/cli.mjs')))
     throw new Error(
       'Matching daemon dist/cli.mjs is required; use the normally built Linux checkout',
     );
+  if (requireOrbBuild) await requireMatchingRelease({ checkout });
   const port = await freePort();
   const modelPort = await freePort();
   const base = `http://127.0.0.1:${port}`;
@@ -97,6 +131,7 @@ export async function startStack({
     });
     child.on('error', () => {});
     defer(() => stopChild(child, directory, entry));
+    record(childRecord(child, directory, entry));
     return child;
   };
   const server = start(join(checkout, 'apps/server'), 'src/index.ts', [], {
@@ -117,8 +152,11 @@ export async function startStack({
     { signal, timeout: 60000, label: 'scratch server' },
   );
   if (probeNetwork) {
-    const bridge = await startBridgeControl(port);
-    defer(() => new Promise((closed) => bridge.close(closed)));
+    for (const host of ['10.203.0.1', config.tailnetAddress]) {
+      if (!host) throw new Error('Missing tailnet listener address');
+      const listener = await startBridgeControl(port, host);
+      defer(() => new Promise((closed) => listener.close(closed)));
+    }
   }
   const [team] = await api('GET', '/api/teams');
   const key = await api('POST', `/api/teams/${team.id}/api-keys`, {
@@ -226,7 +264,7 @@ export async function startStack({
         const seed = join('/var/lib/cairn-orb/seed', project.id);
         if (lstatSync(seed, { throwIfNoEntry: false }))
           throw new Error('Scratch Project seed already exists; refusing to adopt it');
-        defer(() => rmSync(seed, { recursive: true, force: true }));
+        record({ kind: 'seed', path: seed });
       }
       let buildId;
       for (let attempt = 0; attempt < 32; attempt++) {
@@ -261,19 +299,9 @@ export async function startStack({
         )
           throw new Error('Scratch Orb machine already exists; refusing to adopt it');
       }
-      let runnerDaemon;
-      if (executor === 'orb')
-        defer(async () => {
-          if (runnerDaemon)
-            await stopChild(runnerDaemon, join(checkout, 'apps/daemon'), 'src/cli.ts');
-          await runCommand(
-            process.execPath,
-            [join(import.meta.dirname, 'machine-cleanup.mjs'), orbName],
-            { timeout: null },
-          );
-        });
+      if (executor === 'orb') record({ kind: 'machine', name: orbName });
       const branch = `cairn/conv-${buildId}`;
-      runnerDaemon = start(
+      const runnerDaemon = start(
         join(checkout, 'apps/daemon'),
         'src/cli.ts',
         ['start', '--foreground', '--server', base, '--name', `canary-${executor}`],

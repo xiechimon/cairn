@@ -55,7 +55,7 @@ if (cmd === 'rm') {
   if (existsSync(join(target, '.fake-subvolume'))) { console.error('rm must never delete a subvolume'); process.exit(93); }
   rmSync(target, { recursive: true, force: true });
 }
-if (cmd === 'sha256sum') console.log('fake-recipe  ' + args[0]);
+if (cmd === 'sha256sum') { readFileSync(0); console.log('fake-recipe  ' + args[0]); }
 if (cmd === 'pacstrap') {
   if (process.env.APPEARED_IMAGE) {
     const appeared = join(root, 'var/lib/machines/cairn-orb-base/etc');
@@ -161,6 +161,29 @@ for (const file of [
     assert.match(readFileSync(join(source, file), 'utf8'), /^set -euo pipefail$/m);
   });
 }
+
+test('the recipe hash fixture drains its input before exiting', () => {
+  const f = fixture();
+  try {
+    const result = spawnSync(
+      '/bin/bash',
+      [
+        '-o',
+        'pipefail',
+        '-c',
+        `"$1" -e 'process.stdout.write(Buffer.alloc(8 * 1024 * 1024))' | "$2"`,
+        'recipe-test',
+        process.execPath,
+        join(f.root, 'bin/sha256sum'),
+      ],
+      { env: f.env, encoding: 'utf8' },
+    );
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /fake-recipe/);
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
 
 test('image dry-run prints pins and never invokes privileged mutations', () => {
   const f = fixture();

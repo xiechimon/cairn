@@ -19,10 +19,9 @@ import { basename, join, resolve } from 'node:path';
 export function networkTargets(config) {
   return [
     'http://127.0.0.1:8787',
-    'http://10.203.0.1:8787',
-    'http://tailnet-server:8787',
     `http://127.0.0.1:${config.serverPort}`,
     `http://10.203.0.1:${config.serverPort}`,
+    `http://tailnet-server:${config.serverPort}`,
   ];
 }
 
@@ -42,14 +41,14 @@ export function expectedTargets(config) {
   };
 }
 
-function fileProbe(path, sentinel, copy) {
+export function fileProbe(path, sentinel, copy, { stat = statSync, open = openSync } = {}) {
   let fd;
   try {
     if (!sentinel) {
-      statSync(path);
+      stat(path);
       return { blocked: false, detail: 'real path reachable (metadata only)' };
     }
-    fd = openSync(path, constants.O_RDONLY | constants.O_NONBLOCK);
+    fd = open(path, constants.O_RDONLY | constants.O_NONBLOCK);
     if (!fstatSync(fd).isFile())
       return { blocked: false, detail: 'unexpected reachable file type' };
     const buffer = Buffer.alloc(4096);
@@ -64,8 +63,10 @@ function fileProbe(path, sentinel, copy) {
     };
   } catch (error) {
     return {
-      blocked: ['ENOENT', 'EACCES', 'EPERM', 'ENOTDIR'].includes(error.code),
-      detail: error.code ?? 'probe error',
+      blocked: error.code === 'ENOENT',
+      detail: ['EACCES', 'EPERM'].includes(error.code)
+        ? 'present-but-denied'
+        : (error.code ?? 'probe error'),
     };
   } finally {
     if (fd !== undefined) closeSync(fd);
@@ -160,8 +161,10 @@ export async function attack(
     } catch (error) {
       routes.directRead.push({
         target,
-        blocked: ['ENOENT', 'EACCES', 'EPERM'].includes(error.code),
-        detail: error.code ?? 'enumeration error',
+        blocked: error.code === 'ENOENT',
+        detail: ['EACCES', 'EPERM'].includes(error.code)
+          ? 'present-but-denied'
+          : (error.code ?? 'enumeration error'),
       });
     }
   }
@@ -176,14 +179,18 @@ export async function attack(
       const url = new URL(target);
       const host = url.hostname === 'tailnet-server' ? config.tailnetAddress : url.hostname;
       const direct = await connectTarget({ host, port: Number(url.port) });
-      const knownBridgeListener =
-        url.hostname === '10.203.0.1' && Number(url.port) === config.serverPort;
+      const ownedHostListener = ['10.203.0.1', 'tailnet-server'].includes(url.hostname);
       routes.socketAndServer.push({
         target: `direct ${target}`,
         ...direct,
-        blocked: knownBridgeListener
-          ? direct.blocked && direct.detail === 'ETIMEDOUT'
-          : direct.blocked,
+        blocked:
+          ownedHostListener && env.CAIRN_ORB === '1'
+            ? direct.blocked && direct.detail === 'ETIMEDOUT'
+            : direct.blocked,
+        detail:
+          url.hostname === '127.0.0.1' && env.CAIRN_ORB === '1'
+            ? `orb own loopback; ${direct.detail}`
+            : direct.detail,
       });
       const probe = await connectTarget(
         { host: proxy.hostname, port: Number(proxy.port) },
