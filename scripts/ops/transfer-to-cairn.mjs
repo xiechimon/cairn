@@ -1,6 +1,5 @@
 import { execFileSync, spawn } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { closeSync, mkdirSync, openSync, readFileSync, writeSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -14,68 +13,6 @@ function readList(path) {
     return readFileSync(path).toString('latin1');
   } catch (err) {
     if (err.code === 'ENOENT') return '';
-    throw err;
-  }
-}
-
-function transferList(name, before, issue) {
-  const lines = before.match(/[^\n]*\n|[^\n]+$/g) ?? [];
-  return name === 'never'
-    ? lines.some((line) => line.trim() === String(issue))
-      ? before
-      : `${before}${before && !before.endsWith('\n') ? '\n' : ''}${issue}\n`
-    : lines.filter((line) => line.trim() !== String(issue)).join('');
-}
-
-function atomicWrite(path, before, after, beforeRename = () => {}) {
-  const temp = `${path}.${randomUUID()}.tmp`;
-  try {
-    writeFileSync(temp, Buffer.from(after, 'latin1'), { flag: 'wx', mode: 0o600 });
-    beforeRename(path);
-    if (readList(path) !== before) return false;
-    renameSync(temp, path);
-    return true;
-  } finally {
-    rmSync(temp, { force: true });
-  }
-}
-
-function restoreTransferLists(plan) {
-  for (const [name, list] of Object.entries(plan.lists).reverse()) {
-    if (!list.changed) continue;
-    const path = join(plan.stateDir, name);
-    for (let attempt = 0; ; attempt += 1) {
-      const current = readList(path);
-      if (!current.startsWith(list.after)) throw new Error(`list-rollback-conflict: ${name}`);
-      const appended = current.slice(list.after.length);
-      const restored = `${list.before}${appended && list.before && !list.before.endsWith('\n') ? '\n' : ''}${appended}`;
-      if (atomicWrite(path, current, restored)) {
-        if (!list.existed && restored === '') rmSync(path);
-        break;
-      }
-      if (attempt === 3) throw new Error(`list-rollback-cas-exhausted: ${name}`);
-    }
-  }
-}
-
-export function applyTransferLists(plan, { beforeRename } = {}) {
-  plan.lists = {};
-  try {
-    for (const name of ['never', 'pending', 'mine', 'hold']) {
-      const path = join(plan.stateDir, name);
-      for (let attempt = 0; ; attempt += 1) {
-        const existed = existsSync(path);
-        const before = readList(path);
-        const after = transferList(name, before, plan.issue);
-        if (before === after || atomicWrite(path, before, after, beforeRename)) {
-          plan.lists[name] = { before, after, existed, changed: before !== after };
-          break;
-        }
-        if (attempt === 3) throw new Error(`list-cas-exhausted: ${name}`);
-      }
-    }
-  } catch (err) {
-    restoreTransferLists(plan);
     throw err;
   }
 }
@@ -165,6 +102,31 @@ async function planTransfer(options, runner) {
   const closingPr = pulls.find((p) => closing.test(`${p.title ?? ''}\n${p.body ?? ''}`));
   if (lanePr) throw new Error(`lane-pr: #${lanePr.number}`);
   if (closingPr) throw new Error(`closing-pr: #${closingPr.number}`);
+  for (const pull of pulls) {
+    const ownership = JSON.parse(
+      await runner([
+        'pr',
+        'view',
+        String(pull.number),
+        '--repo',
+        repo,
+        '--json',
+        'closingIssuesReferences,commits',
+      ]),
+    );
+    if (
+      ownership.closingIssuesReferences.some(
+        (reference) => reference.url === `https://github.com/${repo}/issues/${issue}`,
+      )
+    )
+      throw new Error(`closing-pr-reference: #${pull.number}`);
+    if (
+      ownership.commits.some((commit) =>
+        closing.test(`${commit.messageHeadline ?? ''}\n${commit.messageBody ?? ''}`),
+      )
+    )
+      throw new Error(`closing-pr-commit: #${pull.number}`);
+  }
   if (branches.some((b) => b.ref === `refs/heads/lane/${issue}`))
     throw new Error(`lane-branch: lane/${issue}`);
   const labelsBefore = data.labels.map((label) => label.name);
@@ -186,14 +148,16 @@ async function planTransfer(options, runner) {
   }
   const lists = {};
   for (const name of ['never', 'pending', 'mine', 'hold']) {
-    const before = readList(join(stateDir, name));
-    const after = transferList(name, before, issue);
-    lists[name] = { before, after, changed: before !== after };
+    const content = readList(join(stateDir, name));
+    const present = content.split('\n').some((line) => line.trim() === String(issue));
+    if (name === 'never') {
+      if (!present && content && !content.endsWith('\n')) throw new Error('never-missing-newline');
+      lists.never = present ? 'already' : 'appended';
+    } else lists[name] = present;
   }
   const removed = labelsBefore.filter((name) => !labelsAfter.includes(name));
   const added = labelsAfter.filter((name) => !labelsBefore.includes(name));
-  const changes =
-    removed.length + added.length + Object.values(lists).filter((list) => list.changed).length;
+  const changes = removed.length + added.length + Number(lists.never === 'appended');
 
   const plan = {
     stateDir,
@@ -201,7 +165,7 @@ async function planTransfer(options, runner) {
     lock: {
       path: join(stateDir, 'lock2'),
       timeoutSeconds: options.lockTimeoutSeconds ?? 900,
-      macOSFallback: 'python3 fcntl.flock holds lock2 through list edits and label PATCH',
+      macOSFallback: 'python3 fcntl.flock holds lock2 through never append and label PATCH',
     },
     issue,
     labelsBefore,
@@ -226,7 +190,15 @@ export async function transferToCairn(options, runner = runGh) {
   mkdirSync(plan.stateDir, { recursive: true });
   await withTransferLock(plan.lock, async () => {
     Object.assign(plan, await planTransfer(options, runner));
-    applyTransferLists(plan);
+    if (plan.lists.never === 'appended') {
+      const entry = Buffer.from(`${plan.issue}\n`, 'ascii');
+      const fd = openSync(join(plan.stateDir, 'never'), 'a', 0o600);
+      try {
+        if (writeSync(fd, entry) !== entry.length) throw new Error('never-append-incomplete');
+      } finally {
+        closeSync(fd);
+      }
+    }
     try {
       if (JSON.stringify(plan.labelsBefore) !== JSON.stringify(plan.labelsAfter)) {
         await runner([
@@ -238,8 +210,10 @@ export async function transferToCairn(options, runner = runGh) {
         ]);
       }
     } catch (err) {
-      restoreTransferLists(plan);
-      throw err;
+      throw new Error(
+        `label-patch-failed: ${err.message}; never: ${plan.lists.never} (retained); rerun the transfer to retry labels`,
+        { cause: err },
+      );
     }
   });
   return plan;
