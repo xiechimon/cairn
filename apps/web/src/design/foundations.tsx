@@ -252,7 +252,7 @@ export function ColorSection() {
             return (
               <div key={ink.name} className="flex items-center gap-6 py-3">
                 <div className="w-28 flex-none">
-                  <div className="font-mono text-caption text-content-secondary">{ink.name}</div>
+                  <div className="font-mono text-code text-content-secondary">{ink.name}</div>
                   <div className="text-caption text-content-tertiary">{tokenHex(ink.cssVar)}</div>
                 </div>
                 <div
@@ -343,7 +343,7 @@ function Swatch({ name, cssVar }: { name: string; cssVar: string }) {
       />
       <span className="flex flex-col gap-0.5 px-2.5 py-2">
         <span className="text-meta font-medium text-foreground">{name}</span>
-        <span className="truncate font-mono text-caption text-content-tertiary">
+        <span className="truncate font-mono text-code text-content-tertiary">
           {copied ? 'Copied' : shown}
         </span>
       </span>
@@ -425,7 +425,7 @@ export function ShapeSection() {
                   />
                   <span className="min-w-0 flex-auto">
                     <span className="block text-ui text-foreground">{r.use}</span>
-                    <span className="font-mono text-caption text-content-tertiary">{r.token}</span>
+                    <span className="font-mono text-code text-content-tertiary">{r.token}</span>
                   </span>
                   <span className="text-ui text-content-secondary tabular-nums">{px}</span>
                 </div>
@@ -450,7 +450,7 @@ export function ElevationSection() {
           {ELEVATIONS.map((e) => (
             <div key={e.token} className={cn('absolute p-4', e.cls)} style={e.box}>
               <b className="block text-ui font-medium">{e.name}</b>
-              <span className="font-mono text-caption text-content-tertiary">{e.token}</span>
+              <span className="font-mono text-code text-content-tertiary">{e.token}</span>
             </div>
           ))}
         </div>
@@ -479,7 +479,7 @@ export function MotionSection() {
               <div key={m.name} className="flex items-center gap-6 py-2.5">
                 <div className="w-44 flex-none">
                   <div className="text-ui text-foreground">{m.name}</div>
-                  <div className="font-mono text-caption text-content-tertiary">{m.ease}</div>
+                  <div className="font-mono text-code text-content-tertiary">{m.ease}</div>
                 </div>
                 <div className="relative h-1 flex-auto rounded-full bg-(--running-track)">
                   <span
@@ -642,19 +642,19 @@ export function DocCheckSection({ theme }: { theme: GalleryTheme }) {
                   key={f.key}
                   className="grid grid-cols-[1.2fr_1fr_1fr] items-center gap-3 rounded-(--radius-menu-item) bg-danger-soft px-3 py-2.5"
                 >
-                  <span className="font-mono text-caption font-medium">{f.key}</span>
+                  <span className="font-mono text-code font-medium">{f.key}</span>
                   <span className="flex items-center gap-2">
                     <DocSwatch value={f.expected} kind={f.kind} />
                     <span className="flex flex-col">
                       <span className="text-caption text-content-tertiary">DESIGN.md</span>
-                      <span className="font-mono text-caption">{f.expected}</span>
+                      <span className="font-mono text-code">{f.expected}</span>
                     </span>
                   </span>
                   <span className="flex items-center gap-2">
                     <DocSwatch value={f.got} kind={f.kind} />
                     <span className="flex flex-col">
                       <span className="text-caption text-content-tertiary">Rendered</span>
-                      <span className="font-mono text-caption text-destructive">{f.got}</span>
+                      <span className="font-mono text-code text-destructive">{f.got}</span>
                     </span>
                   </span>
                 </div>
@@ -703,9 +703,7 @@ export function DocCheckSection({ theme }: { theme: GalleryTheme }) {
                     <DocSwatch value={c.expected} kind={c.kind} />
                     {c.key}
                   </span>
-                  <span className="font-mono text-caption text-content-secondary">
-                    {c.expected}
-                  </span>
+                  <span className="font-mono text-code text-content-secondary">{c.expected}</span>
                   <span
                     className={cn(
                       'text-meta font-medium',

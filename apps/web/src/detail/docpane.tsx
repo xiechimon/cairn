@@ -59,7 +59,7 @@ function dirName(path: string): string {
 const PANE_HEAD = 'flex h-10 flex-none items-center gap-1 px-2.5 text-meta text-(--text-secondary)';
 const PANE_SELECT = 'doc-pane-select ml-0 font-normal text-(--text-tertiary)';
 const DIFF_LINE =
-  'flex items-center font-mono text-caption leading-5 text-(--foreground) [font-variant-ligatures:none]';
+  'flex items-center font-mono text-code leading-5 text-(--foreground) [font-variant-ligatures:none]';
 const DIFF_NO = 'w-8 flex-none pr-2 text-right text-(--text-tertiary) select-none';
 const DIFF_KIND_SKIN: Record<string, string> = {
   add: 'bg-(--diff-add-bg) shadow-[inset_2px_0_0_var(--diff-add-fg)]',
@@ -143,7 +143,7 @@ export function DiffFileBlock({
               const wordDiff = wordDiffs[hi];
               return (
                 <div key={hunk.header}>
-                  <div className="diff-hunk-head bg-(--secondary) pl-18 font-mono text-caption leading-6 text-(--text-tertiary) [font-variant-ligatures:none]">
+                  <div className="diff-hunk-head bg-(--secondary) pl-18 font-mono text-code leading-6 text-(--text-tertiary) [font-variant-ligatures:none]">
                     {hunk.header}
                   </div>
                   {hunk.lines.map((line, i) => {
@@ -208,7 +208,7 @@ export function DiffFileBlock({
             </div>
           )}
           {(full.kind === 'loading' || full.kind === 'error' || full.kind === 'binary') && (
-            <div className="py-2 pr-3 pl-18 font-mono text-caption leading-4 text-(--text-tertiary)">
+            <div className="py-2 pr-3 pl-18 font-mono text-code leading-4 text-(--text-tertiary)">
               {full.kind === 'loading'
                 ? t('加载中…')
                 : full.kind === 'error'
