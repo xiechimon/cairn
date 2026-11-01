@@ -119,3 +119,6 @@ apps/web/.design-sync-css/
 apps/web/.design-sync/.cache/
 apps/web/.design-sync/learnings/
 apps/web/.design-sync/node_modules
+
+apps/web/e2e/*-snapshots/*-darwin.png
+apps/web/e2e/*-snapshots/*-win32.png
