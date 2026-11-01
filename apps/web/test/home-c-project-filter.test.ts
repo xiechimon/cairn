@@ -54,6 +54,23 @@ describe('the global Coordinator conversation filtered by project', () => {
     expect(text(streamForProject(interleaved, 'relay'))).toEqual(['relay probe finished']);
   });
 
+  it('background thread reports from two projects interleaved after one turn file under their own projects', () => {
+    const report = (todoId: string, seqNum: number, title: string) =>
+      JSON.stringify({ kind: 'thread-report', todoId, phase: 'done', seqNum, title });
+    const stream = mapChiefStream([
+      { id: 'u1', role: 'user', content: 'Fold turns first', createdAt: 1, projectId: 'cairn' },
+      { id: 'r1', role: 'system', content: report('todo-relay', 74, 'Relay probe'), createdAt: 2, projectId: 'relay' },
+      { id: 'r2', role: 'system', content: report('todo-cairn', 2271, 'Fold turns'), createdAt: 3, projectId: 'cairn' },
+      { id: 'r3', role: 'system', content: report('todo-relay-2', 75, 'Orb canary'), createdAt: 4, projectId: 'relay' },
+    ]);
+    const reports = (projectId: string) =>
+      streamForProject(stream, projectId).flatMap((item) =>
+        item.kind === 'thread-report' ? [item.title] : [],
+      );
+    expect(reports('cairn')).toEqual(['Fold turns']);
+    expect(reports('relay')).toEqual(['Relay probe', 'Orb canary']);
+  });
+
   it('a server that tags no rows leaves the conversation unfiltered instead of empty', () => {
     const untagged = mapChiefStream([
       { id: 'u1', role: 'user', content: 'Plan the week', createdAt: 1 },
