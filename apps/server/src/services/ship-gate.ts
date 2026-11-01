@@ -88,7 +88,7 @@ async function refusalOf(
   const brake = autonomousMergePolicy(
     deps.db,
     todoRow.teamId,
-    { mergePolicy: 'autonomous', localChecks: [] },
+    { mergePolicy: 'autonomous', localChecks: [], requireUpToDate: false },
     nowMs(),
     buildId,
   );
