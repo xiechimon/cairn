@@ -59,7 +59,12 @@ export interface GateCompareCommit {
 export interface GateInputs {
   correction?: boolean;
   author?: { id: string; model: string } | null;
-  policy: { mergePolicy: MergePolicy; autonomyPaused: boolean; dailyCapReached: boolean };
+  policy: {
+    mergePolicy: MergePolicy;
+    autonomyPaused: boolean;
+    dailyCapReached: boolean;
+    requireUpToDate?: boolean;
+  };
   build: {
     isGithubPr: boolean;
     repoKind?: 'github' | 'local';
@@ -265,6 +270,12 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
     }
   }
 
+  const requiredNames =
+    checks?.required != null && checks.required.length > 0
+      ? new Set([...checks.required, 'pr-evidence'].map((name) => name.toLowerCase()))
+      : null;
+  const isAdvisory = (x: GateCheckRun | GateCommitStatus) =>
+    requiredNames !== null && !requiredNames.has(checkName(x).toLowerCase());
   const notPassing =
     checks === null
       ? null
@@ -272,6 +283,7 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
           ...checks.runs.filter((r) => !runPasses(r)),
           ...checks.statuses.filter((s) => s.state !== 'success' && !isOwnStatus(s)),
         ];
+  const blockingNotPassing = notPassing?.filter((x) => !isAdvisory(x)) ?? null;
   const ownNotPassing =
     checks?.statuses.some((s) => s.state !== 'success' && isOwnStatus(s)) ?? false;
   if (pr !== null && !isLocal) {
@@ -280,11 +292,15 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
       block('mergeable-state', 'GitHub still computing');
     } else if (state === 'unstable') {
       if (notPassing === null) block('mergeable-state', 'unstable, checks unreadable');
-      else if (notPassing.length > 0)
-        block('mergeable-state', `unstable: ${names(notPassing.map(checkName)).join(', ')}`);
-      else if (!ownNotPassing) block('mergeable-state', 'unstable, no failing check visible');
+      else if (blockingNotPassing !== null && blockingNotPassing.length > 0)
+        block(
+          'mergeable-state',
+          `unstable: ${names(blockingNotPassing.map(checkName)).join(', ')}`,
+        );
+      else if (notPassing.length === 0 && !ownNotPassing)
+        block('mergeable-state', 'unstable, no failing check visible');
     } else if (state === 'clean' || state === 'has_hooks') {
-      const foreign = (notPassing ?? []).filter((x) => !judged.has(x));
+      const foreign = (blockingNotPassing ?? []).filter((x) => !judged.has(x));
       if (foreign.length > 0)
         block(
           'mergeable-state',
@@ -319,7 +335,11 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
     block('patch-unavailable', 'compare not read at the PR head');
     compare = null;
   }
-  if (pr !== null && (pr.baseBehindBy === null ? compare !== null : pr.baseBehindBy !== 0)) {
+  if (
+    i.policy.requireUpToDate === true &&
+    pr !== null &&
+    (pr.baseBehindBy === null ? compare !== null : pr.baseBehindBy !== 0)
+  ) {
     block('pr-behind-base');
   }
   if (

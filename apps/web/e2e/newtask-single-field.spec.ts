@@ -1,6 +1,71 @@
 import { expect, type Page, test } from '@playwright/test';
+import { evidenceShot } from './evidence.js';
 
 const BOARD = '/app?scenario=01&view=board';
+
+for (const width of [1440, 390]) {
+  for (const theme of ['light', 'dark']) {
+    test(`template stays a placeholder and start is primary (${width}px ${theme})`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 800 });
+      await page.addInitScript((theme) => {
+        localStorage.setItem('cairn-theme', theme);
+        localStorage.setItem('cairn.locale', 'en');
+      }, theme);
+      await page.goto(BOARD);
+      await page.getByTestId('board-new-task-bar').click();
+      const dialog = page.getByRole('dialog', { name: 'New task', exact: true });
+      const body = dialog.getByRole('textbox');
+      const save = dialog.locator('.new-task-save');
+      const start = dialog.locator('.new-task-start');
+      await expect(body).toHaveValue('');
+      await expect(body).toHaveAttribute('placeholder', [
+        'The outcome I want:',
+        'Where things stand now:',
+        'What must be kept or avoided:',
+        'How I will confirm this is done:',
+        'What I expect to receive:',
+      ].join('\n'));
+      expect(await body.evaluate((el) => el.matches(':placeholder-shown'))).toBe(true);
+      await expect(save).toBeDisabled();
+      await expect(start).toBeDisabled();
+      await expect(dialog).toHaveCSS('opacity', '1');
+      await expect(page.locator('[data-slot="dialog-overlay"]')).toHaveCSS('opacity', '1');
+      await evidenceShot(page, `${width}-${theme}-empty.png`);
+      await page.keyboard.press('Escape');
+      await expect(dialog).toBeHidden();
+      await expect(page.getByRole('alertdialog')).toHaveCount(0);
+      await page.getByTestId('board-new-task-bar').click();
+      await expect(body).toHaveValue('');
+      await body.fill(' \n\t ');
+      await expect(save).toBeDisabled();
+      await expect(start).toBeDisabled();
+      await body.fill('Ship the payment callback fix');
+      await expect(save).toBeEnabled();
+      await expect(start).toBeEnabled();
+      expect(await body.evaluate((el) => el.matches(':placeholder-shown'))).toBe(false);
+      const primary = await start.evaluate((el) => {
+        const probe = document.createElement('span');
+        probe.style.backgroundColor = 'var(--primary)';
+        el.append(probe);
+        const primary = getComputedStyle(probe).backgroundColor;
+        probe.remove();
+        return primary;
+      });
+      await expect(start).toHaveCSS('background-color', primary);
+      await expect(save).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await evidenceShot(page, `${width}-${theme}-populated.png`);
+      await body.fill('');
+      expect(await body.evaluate((el) => el.matches(':placeholder-shown'))).toBe(true);
+      await expect(start).toBeDisabled();
+      await body.fill('Ship the payment callback fix');
+      await save.click();
+      await expect(dialog).toBeHidden();
+      await expect(
+        page.locator('.todo-card-title', { hasText: 'Ship the payment callback fix' }),
+      ).toBeVisible();
+    });
+  }
+}
 
 async function openDialog(page: Page) {
   await page.goto(BOARD);

@@ -106,6 +106,7 @@ const DETAIL = [
   'live-agent-model-line',
   'live-project-name',
   'persona-verify',
+  'review-dialog-list',
   'registry-focus-ring',
   'review-reject',
   'skill-inject',

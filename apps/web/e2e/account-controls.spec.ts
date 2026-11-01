@@ -231,3 +231,74 @@ test('probe: every control on the account page has an observable effect on click
       .toBe(true);
   }
 });
+
+for (const width of [1440, 390]) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`avatar consistency at ${width}px in ${theme}`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.addInitScript((value) => localStorage.setItem('cairn-theme', value), theme);
+      await page.goto('/app/account?scenario=13');
+      await expect(page.locator('.account-avatar img')).toBeVisible();
+      if (width === 390) {
+        await page.getByRole('button', { name: '展开侧边栏' }).click();
+        await expect(page.getByRole('dialog', { name: '侧边栏' })).toBeVisible();
+      }
+      if (process.env.AVATAR_EVIDENCE) {
+        await page.screenshot({ animations: 'disabled', path: `${process.env.AVATAR_EVIDENCE}/${process.env.AVATAR_PHASE}-${width}-${theme}.png` });
+      }
+      const account = page.locator('.account-avatar img');
+      const sidebar = page.locator('[data-slot="sidebar-user"] img');
+      await expect(sidebar).toBeVisible();
+      for (const image of [account, sidebar]) {
+        await expect.poll(() => image.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth > 0)).toBe(true);
+      }
+      await expect(sidebar).toHaveAttribute('src', (await account.getAttribute('src'))!);
+      await expect(page.locator('.account-header')).not.toContainText('头像与名称');
+      if (width === 390) await page.keyboard.press('Escape');
+      await page.locator('.account-header').getByRole('button', { name: '编辑名称' }).click();
+      await page.locator('.account-header input').fill('Fixture Rename');
+      await page.locator('.account-header input').press('Enter');
+      await expect(page.locator('.account-header').getByRole('heading', { name: 'Fixture Rename' })).toBeVisible();
+      if (width === 390) {
+        await page.getByRole('button', { name: '展开侧边栏' }).click();
+        await expect(page.getByRole('dialog', { name: '侧边栏' })).toBeVisible();
+      }
+      await expect(sidebar).toHaveAttribute('src', (await account.getAttribute('src'))!);
+    });
+  }
+}
+
+for (const avatar of ['supplied', 'missing', 'broken']) {
+  test(`live avatar source stays consistent: ${avatar}`, async ({ page }) => {
+    let displayName = 'Avatar User';
+    const avatarUrl = avatar === 'missing' ? null : `/avatar-${avatar}.png`;
+    await page.route('**/avatar-supplied.png', (route) => route.fulfill({ path: 'public/avatar-user.png' }));
+    await page.route('**/avatar-broken.png', (route) => route.fulfill({ status: 404 }));
+    await page.route('**/api/user/me', (route) => {
+      if (route.request().method() === 'PATCH') displayName = route.request().postDataJSON().displayName;
+      return route.fulfill({ json: { id: 'user-1', displayName, avatarUrl, type: 'user' } });
+    });
+    await page.goto('/app/account');
+    const account = page.locator('.account-avatar img');
+    const sidebar = page.locator('[data-slot="sidebar-user"] img');
+    for (const name of ['Avatar User', 'Renamed User']) {
+      if (name === 'Renamed User') {
+        await page.locator('.account-header').getByRole('button', { name: '编辑名称' }).click();
+        await page.locator('.account-header input').fill(name);
+        await page.locator('.account-header input').press('Enter');
+      }
+      await expect(page.locator('.account-header').getByRole('heading', { name, exact: true })).toBeVisible();
+      await expect(sidebar).toBeVisible();
+      for (const image of [account, sidebar]) {
+        await expect.poll(() => image.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth > 0)).toBe(true);
+      }
+      await expect(sidebar).toHaveAttribute('src', (await account.getAttribute('src'))!);
+      if (avatar === 'broken') await expect(account).toHaveAttribute('src', '/avatar-user.png');
+      if (avatar === 'supplied') await expect(account).toHaveAttribute('src', '/avatar-supplied.png');
+    }
+    await page.getByRole('button', { name: '收起侧边栏' }).click();
+    const rail = page.locator('.board-sidebar--collapsed img').last();
+    await expect(rail).toHaveAttribute('src', (await account.getAttribute('src'))!);
+    await expect.poll(() => rail.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth > 0)).toBe(true);
+  });
+}

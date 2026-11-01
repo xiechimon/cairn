@@ -6,9 +6,11 @@ import {
   filesFromClipboardData,
   insertAttachmentTokens,
   isGenericClipboardName,
+  joinDraft,
   parseAttachmentTokens,
   pastedImageExt,
   preparePastedFiles,
+  splitDraft,
 } from '../src/overlay/attachment-paste.js';
 
 const TOKEN = '![pasted-image-1.png](attachment:team-1/att-1.png)';
@@ -304,5 +306,31 @@ describe('parseAttachmentTokens — whole-draft row-token parsing (#757 strip da
     expect(parsed.map((p) => p.key)).toEqual(
       blocks.map((b) => (b.kind === 'attachment' ? b.key : '')),
     );
+  });
+});
+
+describe('splitDraft and joinDraft', () => {
+  it('leaves a draft without tokens untouched', () => {
+    expect(splitDraft('hello\nworld\n')).toEqual({ tokens: [], text: 'hello\nworld\n' });
+    expect(joinDraft([], 'hello')).toBe('hello');
+  });
+
+  it('splits a tokens-only draft into tokens and empty text', () => {
+    expect(splitDraft(`${TOKEN}\n${TOKEN2}\n`)).toEqual({ tokens: [TOKEN, TOKEN2], text: '' });
+    expect(joinDraft([TOKEN, TOKEN2], '')).toBe(`${TOKEN}\n${TOKEN2}`);
+  });
+
+  it('round-trips tokens above text, keeping a trailing newline in the text', () => {
+    const joined = joinDraft([TOKEN, TOKEN2], 'why\ncrash\n');
+    expect(joined).toBe(`${TOKEN}\n${TOKEN2}\nwhy\ncrash\n`);
+    expect(splitDraft(joined)).toEqual({ tokens: [TOKEN, TOKEN2], text: 'why\ncrash\n' });
+  });
+
+  it('moves tokens found between text lines to the top and trims the gap they leave', () => {
+    expect(splitDraft(`first\n${TOKEN}\nsecond`)).toEqual({
+      tokens: [TOKEN],
+      text: 'first\nsecond',
+    });
+    expect(splitDraft(`${TOKEN}\n\nafter`)).toEqual({ tokens: [TOKEN], text: 'after' });
   });
 });

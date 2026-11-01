@@ -156,6 +156,7 @@
   --dialog-w-m: 480px;
   --dialog-w-l: 640px;
   --radius-composer: 14px;
+  --radius-tile: 10px;
   --radius-bubble: 14px;
   --radius-control: 8px;
   --radius-window: 18px;
@@ -196,6 +197,7 @@
   --sidebar-w: 248px;
   --chat-max-w: 768px;
   --composer-max-h: 384px;
+  --composer-bottom-gap: 24px;
   --scroll-fade-size: 28px;
   --chat-extra-space: 35vh;
   --font-size-caption: calc(0.6875rem * var(--rem-scale));
@@ -230,11 +232,15 @@
   --cds-shadow-lg: 0 4px 12px rgb(0 0 0 / 0.4), 0 24px 48px -12px rgb(0 0 0 / 0.6), var(--top);
   --elevated-ring: var(--ring-inset-highlight);
   --panel-shadow-hover: 0 0 0 1px var(--border-soft), 0 6px 18px -2px rgb(0 0 0 / 0.35);
-  --shadow-composer: var(--cds-shadow-sm), inset 0 0 0 var(--hairline) var(--input);
-  --shadow-composer-hover: var(--cds-shadow-sm), inset 0 0 0 var(--hairline) var(--text-dim);
+  --shadow-composer:
+    0 4px 20px rgb(0 0 0 / 0.2),
+    inset 0 0 0 var(--hairline) color-mix(in srgb, var(--foreground) 12%, transparent);
+  --shadow-composer-hover:
+    0 4px 20px rgb(0 0 0 / 0.2),
+    inset 0 0 0 var(--hairline) color-mix(in srgb, var(--foreground) 16%, transparent);
   --shadow-composer-focus:
-    0 0 0 4px color-mix(in srgb, var(--running) 18%, transparent),
-    inset 0 0 0 var(--hairline) var(--running);
+    0 4px 20px rgb(0 0 0 / 0.2),
+    inset 0 0 0 var(--hairline) color-mix(in srgb, var(--foreground) 22%, transparent);
   --drag-shadow: 0 10px 28px rgb(0 0 0 / 0.4);
   --canvas: #141715;
   --background: #1b1f1c;
@@ -373,11 +379,15 @@
   --cds-shadow-lg: 0 4px 12px rgb(29 35 31 / 0.08), 0 24px 48px -12px rgb(29 35 31 / 0.25);
   --elevated-ring: var(--border);
   --panel-shadow-hover: 0 0 0 1px var(--input), 0 8px 20px -4px rgb(29 35 31 / 0.14);
-  --shadow-composer: var(--cds-shadow-sm), inset 0 0 0 var(--hairline) var(--input);
-  --shadow-composer-hover: var(--cds-shadow-sm), inset 0 0 0 var(--hairline) var(--text-dim);
+  --shadow-composer:
+    0 4px 20px rgb(0 0 0 / 0.06),
+    inset 0 0 0 var(--hairline) color-mix(in srgb, var(--foreground) 12%, transparent);
+  --shadow-composer-hover:
+    0 4px 20px rgb(0 0 0 / 0.06),
+    inset 0 0 0 var(--hairline) color-mix(in srgb, var(--foreground) 16%, transparent);
   --shadow-composer-focus:
-    0 0 0 4px color-mix(in srgb, var(--running) 20%, transparent),
-    inset 0 0 0 var(--hairline) var(--running);
+    0 4px 20px rgb(0 0 0 / 0.06),
+    inset 0 0 0 var(--hairline) color-mix(in srgb, var(--foreground) 22%, transparent);
   --drag-shadow: 0 10px 28px rgb(29 35 31 / 0.16);
   --canvas: #e6e7e1;
   --background: #f6f6f2;
@@ -480,12 +490,12 @@
   --project-tile-4: #7a5b8e;
   --project-tile-5: #3d7c7a;
   --project-tile-6: #8a5560;
-  --project-ink-1: var(--project-tile-1);
-  --project-ink-2: var(--project-tile-2);
-  --project-ink-3: var(--project-tile-3);
-  --project-ink-4: var(--project-tile-4);
-  --project-ink-5: var(--project-tile-5);
-  --project-ink-6: var(--project-tile-6);
+  --project-ink-1: color-mix(in oklab, var(--project-tile-1), black 22%);
+  --project-ink-2: color-mix(in oklab, var(--project-tile-2), black 22%);
+  --project-ink-3: color-mix(in oklab, var(--project-tile-3), black 22%);
+  --project-ink-4: color-mix(in oklab, var(--project-tile-4), black 22%);
+  --project-ink-5: color-mix(in oklab, var(--project-tile-5), black 22%);
+  --project-ink-6: color-mix(in oklab, var(--project-tile-6), black 22%);
   --pebble-waiting: #d49a1c;
   --pebble-review: #5379a0;
   --pebble-working: #5f8f4f;

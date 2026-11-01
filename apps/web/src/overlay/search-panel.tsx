@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router';
 import { useProjects } from '../api/hooks.js';
 import { useAgentAvatarUrlById, useLiveData } from '../api/provider.js';
 import { ProjectAvatar } from '../board/project-avatar.js';
+import { useProjectMark } from '../board/project-mark.js';
 import { StatusGlyph } from '../components/status-glyph.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_FACE, DialogShell, VIEWPORT_POP_ANIM } from '../components/ui/dialog-shell.js';
@@ -111,6 +112,7 @@ function TodoRow({
   onActivate: () => void;
   projectName?: string;
 }) {
+  const projectMark = useProjectMark();
   const { t } = useI18n();
   const { glyph, ink } = PHASE_STATUS[todo.phase];
   return (
@@ -127,7 +129,7 @@ function TodoRow({
       <span className={ROW_END}>
         {projectName !== undefined && (
           <>
-            <ProjectAvatar name={projectName} tone={0} />
+            <ProjectAvatar name={projectName} {...projectMark(projectName)} bare />
             <span className="max-w-32 truncate">{projectName}</span>
           </>
         )}
@@ -159,6 +161,7 @@ export function SearchPanel({
   server,
   context,
 }: SearchPanelProps) {
+  const projectMark = useProjectMark();
   const { t } = useI18n();
   const navigate = useNavigate();
   const { search } = useLocation();
@@ -414,7 +417,7 @@ export function SearchPanel({
                           className={`${ROW_BASE} ${rowLitClasses(cursor === rowIndex, kbd)}`}
                           onClick={() => go(`/app/project/${project.id}`)}
                         >
-                          <ProjectAvatar name={project.name} tone={0} />
+                          <ProjectAvatar name={project.name} {...projectMark(project.id)} bare />
                           <span className="truncate">{project.name}</span>
                         </Button>
                       );
