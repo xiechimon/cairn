@@ -8,7 +8,11 @@ import {
   step as stepTable,
   stopPending,
 } from '../src/db/schema.js';
-import { CHIEF_TURN_MAX_MS, sweepOverlongChiefTurns } from '../src/services/chief-turns.js';
+import {
+  CHIEF_TURN_MAX_MS,
+  CHIEF_TURN_STOP_GRACE_MS,
+  sweepOverlongChiefTurns,
+} from '../src/services/chief-turns.js';
 import { CORRECTION_PROMPT } from '../src/services/merge-gate/correction.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import { H, registerChiefHarness } from './chief-harness.js';
@@ -97,6 +101,13 @@ describe('thread.orchestration describes the latest orchestrate turn', () => {
     expect(await orchestrationOf()).toBeNull();
   });
 
+  test('a stopped orchestration reports failed so it can be started again', async () => {
+    const todoId = await postTodo(H.projectId, 'first');
+    const stepId = await orchestrate(todoId);
+    setStep(stepId, { status: 'stopped', finishedAt: Date.now() });
+    expect(await orchestrationOf()).toEqual({ todoId, state: 'failed', error: null });
+  });
+
   test('two orchestrations in a row: the latest wins', async () => {
     const first = await postTodo(H.projectId, 'first');
     const second = await postTodo(H.projectId, 'second');
@@ -161,6 +172,18 @@ describe('overlong chief turns are stopped so one turn cannot block the thread',
     expect(H.s.db.select().from(stepTable).where(eq(stepTable.id, 'young')).get()?.status).toBe(
       'claimed',
     );
+  });
+
+  test('a turn that ignores the stop past the grace period is stopped on the server', () => {
+    const now = 10_000_000;
+    seedClaimed('deaf', now - CHIEF_TURN_MAX_MS - CHIEF_TURN_STOP_GRACE_MS - 1, now);
+    sweepOverlongChiefTurns(H.s.svc, now);
+    expect(H.s.db.select().from(stepTable).where(eq(stepTable.id, 'deaf')).get()?.status).toBe(
+      'stopped',
+    );
+    expect(
+      H.s.db.select().from(chiefThread).where(eq(chiefThread.id, H.threadId)).get()?.activeRun,
+    ).toBeNull();
   });
 
   test('a turn past the cap with a stale heartbeat is stopped on the server and frees the thread', () => {
@@ -236,6 +259,47 @@ describe('rewind never cuts another project out of the shared transcript', () =>
     const anchor = await send('plan demo', H.projectId);
     await send('general question');
     expect((await rewind(anchor)).status).toBe(409);
+  });
+
+  test('the daemon transcript rows of a turn belong to that turn, for rewind and the filter', async () => {
+    const site = await postProject(H.s.app, 'cairn-site');
+    const anchor = await send('plan demo', H.projectId);
+    const at = Date.now();
+    H.s.db
+      .insert(chiefMessage)
+      .values([
+        { id: `user-${anchor}`, threadId: H.threadId, role: 'user', content: 'p', createdAt: at },
+        {
+          id: `reply-${anchor}`,
+          threadId: H.threadId,
+          role: 'assistant',
+          content: 'r',
+          createdAt: at,
+        },
+      ])
+      .run();
+    const page = (await (
+      await req(H.s.app, 'GET', `/api/teams/${H.teamId}/coordinator?projectId=${H.projectId}`)
+    ).json()) as { messages: { id: string }[] };
+    expect(page.messages.map((m) => m.id)).toEqual([anchor, `user-${anchor}`, `reply-${anchor}`]);
+    const siteTurn = await send('plan the site', site);
+    H.s.db
+      .insert(chiefMessage)
+      .values({
+        id: `user-${siteTurn}`,
+        threadId: H.threadId,
+        role: 'user',
+        content: 'p',
+        createdAt: Date.now() + 1,
+      })
+      .run();
+    expect((await rewind(anchor)).status).toBe(409);
+    H.s.db.delete(chiefMessage).where(eq(chiefMessage.id, siteTurn)).run();
+    H.s.db
+      .delete(chiefMessage)
+      .where(eq(chiefMessage.id, `user-${siteTurn}`))
+      .run();
+    expect((await rewind(anchor)).status).toBe(200);
   });
 
   test('later turns of the same project rewind as before', async () => {

@@ -31,6 +31,7 @@ import {
   newChiefThreadId,
   orchestratedTodoIdOf,
   PLAN_PRIOR_ART_RULE,
+  TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
 } from '@cairn/shared';
 import { and, asc, desc, eq, inArray, isNull, like, ne, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -373,11 +374,10 @@ export function chiefThreadView(deps: ChiefDeps, teamId: string, r: ThreadRow): 
     .orderBy(desc(step.createdAt), sql`rowid desc`)
     .limit(1)
     .get();
-  const lastTurnError = latest?.status === 'failed' ? turnErrorOf(deps.db, latest.id) : null;
   return {
     ...record,
-    lastTurnError,
-    orchestration: latest === undefined ? null : orchestrationOf(latest, lastTurnError),
+    lastTurnError: latest?.status === 'failed' ? turnErrorOf(deps.db, latest.id) : null,
+    orchestration: latest === undefined ? null : orchestrationOf(deps.db, latest),
   };
 }
 
@@ -399,16 +399,14 @@ const ORCHESTRATION_STATE_OF_STATUS: Partial<
   waiting_quota: 'queued',
   claimed: 'running',
   failed: 'failed',
+  stopped: 'failed',
 };
 
-function orchestrationOf(
-  latest: typeof step.$inferSelect,
-  lastTurnError: string | null,
-): ChiefOrchestration | null {
+function orchestrationOf(db: Db, latest: typeof step.$inferSelect): ChiefOrchestration | null {
   const todoId = orchestratedTodoIdOf(latest.prompt);
   const state = ORCHESTRATION_STATE_OF_STATUS[latest.status];
   if (todoId === null || state === undefined) return null;
-  return { todoId, state, error: state === 'failed' ? lastTurnError : null };
+  return { todoId, state, error: state === 'failed' ? turnErrorOf(db, latest.id) : null };
 }
 
 export function listChiefThreads(deps: ChiefDeps, teamId: string): ChiefThread[] {
@@ -488,9 +486,11 @@ export function requireUnarchivedProject(db: Db, projectId: string): void {
   if (row?.archivedAt != null) throw new HttpError(409, `project ${projectId} is archived`);
 }
 
+const transcriptPromptRowPattern = `${TRANSCRIPT_PROMPT_ROW_ID_PREFIX}%`;
+
 export const turnProjectId = sql<
   string | null
->`coalesce(${chiefMessage.projectId}, case when ${chiefMessage.role} = 'user' then null else (select u.projectId from chief_message u where u.threadId = ${chiefMessage.threadId} and u.role = 'user' and (u.createdAt < ${chiefMessage.createdAt} or (u.createdAt = ${chiefMessage.createdAt} and u.rowid < ${chiefMessage}.rowid)) order by u.createdAt desc, u.rowid desc limit 1) end)`;
+>`coalesce(${chiefMessage.projectId}, case when ${chiefMessage.role} = 'user' and ${chiefMessage.id} not like ${transcriptPromptRowPattern} then null else (select u.projectId from chief_message u where u.threadId = ${chiefMessage.threadId} and u.role = 'user' and u.id not like ${transcriptPromptRowPattern} and (u.createdAt < ${chiefMessage.createdAt} or (u.createdAt = ${chiefMessage.createdAt} and u.rowid < ${chiefMessage}.rowid)) order by u.createdAt desc, u.rowid desc limit 1) end)`;
 
 function requireRewindStaysInProject(
   db: Db,
