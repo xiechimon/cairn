@@ -6,6 +6,7 @@ import { userInfo } from 'node:os';
 import { join, resolve } from 'node:path';
 
 import { readMetadata, validatePorts } from './guest-check.mjs';
+import { cleanupMachine } from './machine-cleanup.mjs';
 import { missingUfwRules } from './ufw-rules.mjs';
 
 export function parseHostCheck(input, { blockedPorts = [22, 5231] } = {}) {
@@ -326,58 +327,16 @@ export function checkHost({
     lifecycle = false;
     errors.push(error.message);
   } finally {
-    if (call('machinectl', ['--no-ask-password', 'poweroff', name]).status !== 0) lifecycle = false;
-    let stopped = false;
-    for (let attempt = 0; attempt < 30; attempt++) {
-      const machines = call('machinectl', [
-        '--no-ask-password',
-        'list',
-        '--no-legend',
-        '--no-pager',
-      ]);
-      if (machines.status !== 0) break;
-      if (
-        !(machines.stdout || '').split('\n').some((line) => line.trim().split(/\s+/)[0] === name)
-      ) {
-        stopped = true;
-        break;
-      }
-      if (
-        attempt === 14 &&
-        call('machinectl', ['--no-ask-password', 'terminate', name]).status !== 0
-      )
-        lifecycle = false;
-      if (attempt < 29) wait();
-    }
-    if (stopped) {
-      stopped = false;
-      for (let attempt = 0; attempt < 30; attempt++) {
-        const state = (
-          run('systemctl', ['is-active', `systemd-nspawn@${name}.service`]).stdout || ''
-        ).trim();
-        if (state === 'inactive' || state === 'failed') {
-          stopped = true;
-          break;
-        }
-        if (attempt < 29) wait();
-      }
-    }
-    if (!stopped) {
-      lifecycle = false;
-      errors.push('Timed out waiting for check machine to stop; runtime directory preserved');
-    } else {
-      const removed = call('machinectl', ['--no-ask-password', 'remove', name]).status === 0;
-      if (!removed) lifecycle = false;
-      if (removed && preparedDirectory) {
-        for (let attempt = 0; attempt < 30; attempt++) {
-          if (!lstatSync(directory, { throwIfNoEntry: false })) break;
-          if (attempt === 29) {
-            lifecycle = false;
-            errors.push('Timed out waiting for root stop cleanup of runtime directory');
-          } else wait();
-        }
-      }
-    }
+    lifecycle =
+      cleanupMachine({
+        name,
+        call,
+        run,
+        wait,
+        directory,
+        preparedDirectory,
+        errors,
+      }) && lifecycle;
   }
   input.cloneStartStop = lifecycle ? 'ok' : 'failed';
   const result = parseHostCheck(input, { blockedPorts });
