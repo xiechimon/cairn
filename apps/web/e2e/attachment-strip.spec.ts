@@ -261,7 +261,6 @@ test('detail face: paste paints a placeholder, landing swaps it for a chip at th
   await deferred.releaseAll(); // upload
   await expect(input).toHaveValue(`${TOKEN_1}\n`);
 
-  // FM2: the settled tile replaces the placeholder at the same x and size; the token line the draft gains only lifts it.
   await expect(placeholder).toHaveCount(0);
   const chip = strip.getByRole('button', { name: 'pasted-image-1.png' });
   await expect(chip).toBeVisible();
