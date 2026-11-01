@@ -67,7 +67,7 @@ import { MENTION_TEXTAREA_CLS, MentionHighlight } from '../overlay/mention-highl
 import { MentionInline } from '../overlay/mention-inline.js';
 import type { MentionGroups } from '../overlay/mention-token.js';
 import { SlashHelp, SlashMenu } from '../overlay/slash-menu.js';
-import { ChiefStreamRow, chiefStreamRowKey } from './chief-message-rows.js';
+import { ChiefStreamRow, chiefStreamRowKey, TurnElapsedContext } from './chief-message-rows.js';
 import { ChiefFallbackBanner, ChiefOutageBanner } from './chief-outage-banner.js';
 import { ProjectMenu } from './project-menu.js';
 
@@ -119,7 +119,7 @@ export function ChiefFollowArmed({ onAtBottom }: { onAtBottom: (atBottom: boolea
   return null;
 }
 
-export type ChiefConversationVariant = 'drawer' | 'home' | 'project';
+export type ChiefConversationVariant = 'drawer' | 'home' | 'global';
 
 export interface ChiefConversationProps {
   variant: ChiefConversationVariant;
@@ -152,6 +152,7 @@ export interface ChiefConversationProps {
   placeholder?: string;
   composerError?: string | null;
   composerReplacement?: ReactNode;
+  aboveComposer?: ReactNode;
 }
 
 export function ChiefConversation({
@@ -185,6 +186,7 @@ export function ChiefConversation({
   placeholder,
   composerError = null,
   composerReplacement,
+  aboveComposer,
 }: ChiefConversationProps) {
   const projectMark = useProjectMark();
   const { t } = useI18n();
@@ -231,7 +233,7 @@ export function ChiefConversation({
     }
   });
   const pickedProject = projectOptions.find((p) => p.id === storedProjectId) ?? null;
-  const chipVisible = variant !== 'project' && onSend != null && projectOptions.length > 1;
+  const chipVisible = variant !== 'global' && onSend != null && projectOptions.length > 1;
   const pickProject = useCallback((projectId: string | null) => {
     setStoredProjectId(projectId);
     try {
@@ -387,7 +389,7 @@ export function ChiefConversation({
     setThreadsOpen(false);
   }, [onNewThread]);
   const home = variant !== 'drawer';
-  const ownHeader = variant !== 'project';
+  const ownHeader = variant !== 'global';
   const newThreadFromKey = useCallback(() => {
     if (home && document.activeElement?.closest('[role="dialog"],[role="alertdialog"]')) return;
     newThread();
@@ -662,20 +664,22 @@ export function ChiefConversation({
                 className={home ? SCROLLER_CONTENT_HOME_CLS : SCROLLER_CONTENT_CLS}
                 data-testid="chief-stream"
               >
-                <TodoGlanceContext.Provider value={glances}>
-                  {lead}
-                  {day == null ? (
-                    rows.map(streamRow)
-                  ) : (
-                    <>
-                      <div data-testid="chief-earlier" className="opacity-60">
-                        {rows.slice(0, day.earlier).map(streamRow)}
-                      </div>
-                      {day.today}
-                      {rows.slice(day.earlier).map(streamRow)}
-                    </>
-                  )}
-                </TodoGlanceContext.Provider>
+                <TurnElapsedContext.Provider value={variant !== 'global'}>
+                  <TodoGlanceContext.Provider value={glances}>
+                    {lead}
+                    {day == null ? (
+                      rows.map(streamRow)
+                    ) : (
+                      <>
+                        <div data-testid="chief-earlier" className="opacity-60">
+                          {rows.slice(0, day.earlier).map(streamRow)}
+                        </div>
+                        {day.today}
+                        {rows.slice(day.earlier).map(streamRow)}
+                      </>
+                    )}
+                  </TodoGlanceContext.Provider>
+                </TurnElapsedContext.Provider>
               </MessageScrollerContent>
             </FadeScrollerViewport>
             <JumpToLatestButton>
@@ -693,6 +697,7 @@ export function ChiefConversation({
           <ChiefFallbackBanner model={chief.fallbackModel} onSettings={onSettings} />
         )
       )}
+      {aboveComposer}
       {composerReplacement ?? (
         <>
           {composerError != null && (

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { coordinatorLoad } from '../src/chief/use-project-coordinator.js';
+import { coordinatorLoad } from '../src/chief/coordinator-load.js';
 
 const ok = (data: unknown = {}) => ({ isLoading: false, isError: false, data });
 const failed = { isLoading: false, isError: true, data: undefined };

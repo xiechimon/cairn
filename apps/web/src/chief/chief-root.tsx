@@ -27,10 +27,6 @@ export function useChiefRoot(): ChiefRootApi {
   return api;
 }
 
-function isProjectHome(pathname: string): boolean {
-  return /^\/app\/project\/[^/]+$/.test(pathname) && pathname !== '/app/project/new';
-}
-
 function isDetailRoute(pathname: string): boolean {
   return pathname.startsWith('/app/todo/');
 }
@@ -75,7 +71,7 @@ export function ChiefRoot() {
     () => ({ surface, openChiefThread: setLinkThreadId }),
     [surface],
   );
-  const ownsConversation = onHome || isProjectHome(pathname);
+  const ownsConversation = onHome;
   const windowOpen = surface.chiefView === 'drawer' && !ownsConversation;
   const fabVisible =
     !ownsConversation && !windowOpen && (!isDetailRoute(pathname) || surface.chiefUnread > 0);

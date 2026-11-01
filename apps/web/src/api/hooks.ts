@@ -45,7 +45,6 @@ import type {
   PatchUserBody,
   PlanRow,
   ProjectCommitDetailResponse,
-  ProjectCoordinatorResponse,
   ProjectFileResponse,
   ProjectFilesResponse,
   ProjectRecord,
@@ -519,17 +518,6 @@ export const useChiefThreads = (teamId: string | undefined, enabled: boolean) =>
       query.state.data?.some(threadTurnInFlight) ? CHIEF_THREADS_INFLIGHT_POLL_MS : false,
   });
 
-export const useProjectCoordinator = (projectId: string | undefined, enabled: boolean) =>
-  useQuery({
-    queryKey: ['projectCoordinator', projectId],
-    queryFn: () => api.get<ProjectCoordinatorResponse>(`/api/projects/${projectId}/coordinator`),
-    enabled: enabled && projectId !== undefined,
-    refetchInterval: (query) => {
-      const thread = query.state.data?.thread;
-      return thread != null && threadTurnInFlight(thread) ? CHIEF_THREADS_INFLIGHT_POLL_MS : false;
-    },
-  });
-
 export const useNotifications = (teamId: string | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['notifications', teamId],
@@ -883,21 +871,6 @@ export function useApiMutations(teamId: string | undefined) {
               body,
             );
       },
-      onSuccess: invalidateAll,
-    }),
-    projectCoordinatorSend: useMutation({
-      mutationFn: (input: { projectId: string; content: string }) =>
-        api.post<{ thread: ChiefThread }>(`/api/projects/${input.projectId}/coordinator/messages`, {
-          content: input.content,
-        }),
-      onSuccess: invalidateAll,
-    }),
-    projectArchive: useMutation({
-      mutationFn: (input: { projectId: string; archived: boolean }) =>
-        api.post<ProjectRecord>(
-          `/api/projects/${input.projectId}/${input.archived ? 'archive' : 'unarchive'}`,
-          {},
-        ),
       onSuccess: invalidateAll,
     }),
     chiefRewind: useMutation({
