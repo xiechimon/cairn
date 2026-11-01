@@ -6,6 +6,8 @@ queue_rules:
       - -draft
       - -label = needs-decision
       - -label = owner-route
+      - -label = queue-hold
+      - check-success = commit-author
       - status-success = review-gate
       - check-success = merge-route
       - or:
@@ -68,6 +70,8 @@ queue_rules:
       - -draft
       - -label = needs-decision
       - -label = owner-route
+      - -label = queue-hold
+      - check-success = commit-author
       - status-success = review-gate
       - check-success = merge-route
       - or:

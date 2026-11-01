@@ -8,6 +8,7 @@ const prOnlyChecks = ['pr-evidence'];
 const maxLinesEachWay = 400;
 const botAuthor = 'cairnwright[bot]';
 const mergeBotAccount = 'xiechimon';
+export const holdLabel = 'queue-hold';
 const batchSize = 5;
 const batchWait = '3 min';
 const checkRetries = 1;
@@ -56,6 +57,8 @@ export function mergifyConfig(prGateSource) {
     '      - -draft',
     '      - -label = needs-decision',
     '      - -label = owner-route',
+    `      - -label = ${holdLabel}`,
+    '      - check-success = commit-author',
     '      - status-success = review-gate',
     '      - check-success = merge-route',
     ...prChecks.map(passedOrSkipped),

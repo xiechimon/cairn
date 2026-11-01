@@ -108,3 +108,11 @@ test('Mergify merges past its own required queue check as the merge bot account'
     assert.match(rules[name], /merge_bot_account: xiechimon(\n|$)/, name);
   }
 });
+
+test('queue entry needs a green commit-author check and no daily-cap hold', () => {
+  for (const name of ['default', 'bot']) {
+    const [queue] = rules[name].split('    merge_conditions:\n');
+    assert.match(queue, /- check-success = commit-author\n/, name);
+    assert.match(queue, /- -label = queue-hold\n/, name);
+  }
+});
