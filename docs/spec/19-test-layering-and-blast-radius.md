@@ -60,6 +60,8 @@ The other half of "coverage undiminished" is in the **merge gate**: branch prote
 
 The aggregate job itself has a criterion (#762): must be `if: always()` and explicitly judge `needs.e2e.result == 'success'`. Branch protection lets `skipped` through on par with `successful` / `neutral`, while writing only `needs` makes the aggregate job skip entirely on any shard failure — **the gate opens at the only moment it is needed**. Measured three red runs (37130371196 / 37128928219 / 37125498051) all concluded `e2e-gate` as `skipped`; after `always()` + explicit judgment the same conditions report `failure`.
 
+**CI tiers** (C1): the 4-shard `e2e` job runs only on pushes and on the draft PRs Mergify opens for a queued batch (`draft`, author `mergify[bot]`, head `mergify/merge-queue/*`); every other pull request runs the `e2e-affected` job (`pnpm --filter @cairn/web e2e:affected` against `origin/main`, full-fallback paths run the whole suite on one runner). The `changes` job publishes the choice as `e2e-tier` (`full` / `affected`), and `e2e-gate` needs both jobs and passes only when the job of that tier succeeded and the other one was skipped; a docs-only classification still lets both skip. `scripts/ci-tiers.test.mjs` evaluates these conditions and runs the gate shell over every result combination.
+
 ## vitest Affected Surface (usability verified, 2026-10-03)
 
 - `pnpm exec vitest related <source file>`: **usable** — root-level cross-project effective (measured `apps/web/src/board/dnd.ts` → exactly `dnd.test.ts` 7 cases, 2.1s).

@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       has-code: ${{ steps.classify.outputs.has-code }}
+      e2e-tier: ${{ (github.event_name == 'push' || (github.event.pull_request.draft && github.event.pull_request.user.login == 'mergify[bot]' && startsWith(github.head_ref, 'mergify/merge-queue/'))) && 'full' || 'affected' }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
@@ -169,7 +170,7 @@ jobs:
 
   e2e:
     needs: changes
-    if: github.event_name != 'pull_request' || needs.changes.outputs.has-code != 'false'
+    if: needs.changes.outputs.e2e-tier == 'full' && (github.event_name != 'pull_request' || needs.changes.outputs.has-code != 'false')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -212,20 +213,68 @@ jobs:
       - name: CSS mechanism gate (#747)
         run: node scripts/css-mechanism-gate.mjs
 
+  e2e-affected:
+    needs: changes
+    if: needs.changes.outputs.e2e-tier == 'affected' && needs.changes.outputs.has-code != 'false'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright chromium
+        run: pnpm exec playwright install chromium --with-deps
+
+      - name: E2E (specs affected by this PR)
+        run: pnpm --filter @cairn/web e2e:affected
+
+      - name: Fixture build for the CSS mechanism gate
+        if: ${{ !cancelled() }}
+        working-directory: apps/web
+        run: pnpm exec vite build --mode fixture
+
+      - name: CSS mechanism gate (#747)
+        if: ${{ !cancelled() }}
+        run: node scripts/css-mechanism-gate.mjs
+
+      - name: Upload gallery snapshot renders
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: gallery-snapshots-affected
+          path: |
+            apps/web/e2e/gallery-snapshots.spec.ts-snapshots/
+            apps/web/test-results/**/*-actual.png
+            apps/web/test-results/**/*-diff.png
+          if-no-files-found: ignore
+          retention-days: 7
+
   e2e-gate:
-    needs: [changes, e2e]
+    needs: [changes, e2e, e2e-affected]
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - name: Aggregate e2e shards
+      - name: Aggregate the e2e tier
         run: |
           [ "${{ needs.changes.result }}" = "success" ]
-          for result in "${{ needs.e2e.result }}"; do
-            if [ "$result" = "success" ]; then
-              continue
-            fi
-            [ "${{ needs.changes.outputs.has-code }}" = "false" ] && [ "$result" = "skipped" ] || exit 1
-          done
+          case "${{ needs.changes.outputs.e2e-tier }}" in
+            full) ran="${{ needs.e2e.result }}" idle="${{ needs.e2e-affected.result }}" ;;
+            affected) ran="${{ needs.e2e-affected.result }}" idle="${{ needs.e2e.result }}" ;;
+            *) exit 1 ;;
+          esac
+          [ "$idle" = "skipped" ]
+          [ "$ran" = "success" ] || { [ "${{ needs.changes.outputs.has-code }}" = "false" ] && [ "$ran" = "skipped" ]; }
 
   pack-smoke:
     needs: changes
@@ -313,6 +362,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: node --test scripts/dispatch-agent.test.mjs scripts/dispatch-dedupe.test.mjs scripts/lane-model-policy.test.mjs
 
+      - name: Mergify queue config follows pr-gate routing
+        if: ${{ !cancelled() }}
+        run: node --test scripts/mergify-config.test.mjs scripts/merge-route.test.mjs
+
       - name: UI debt ledger only shrinks against main
         if: ${{ !cancelled() }}
         run: node --test scripts/ui-debt-gate.test.mjs
@@ -327,7 +380,7 @@ jobs:
 
       - name: Merge routing size caps (#2371)
         if: ${{ !cancelled() }}
-        run: node --test scripts/pr-gate-routing.test.mjs scripts/batch-merger.test.mjs scripts/coordinator-merge.test.mjs
+        run: node --test scripts/pr-gate-routing.test.mjs scripts/batch-merger.test.mjs scripts/coordinator-merge.test.mjs scripts/merge-queue-drafts.test.mjs scripts/ci-tiers.test.mjs
 
       - name: Real smoke runner and checker fixtures (#2283)
         if: ${{ !cancelled() }}
@@ -339,6 +392,10 @@ jobs:
       - name: Host control script fixtures (#2380)
         if: ${{ !cancelled() }}
         run: node --test scripts/ops/host/aged-prs.test.mjs scripts/ops/host/as-bot-callers.test.mjs scripts/ops/host/as-bot.test.mjs scripts/ops/host/dispatch-issue.test.mjs scripts/ops/host/lanes-retry.test.mjs scripts/ops/host/identity-compat.test.mjs
+
+      - name: merge-pr Mergify queue fixtures
+        if: ${{ !cancelled() }}
+        run: node --test scripts/ops/host/merge-pr-queue.test.mjs
 
       - name: Runner secret isolation fixtures (#2189)
         if: ${{ !cancelled() }}

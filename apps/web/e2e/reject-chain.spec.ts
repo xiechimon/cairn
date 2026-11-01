@@ -21,7 +21,7 @@ test('reject loop: request changes → v2 → diff → confirm', async ({ page }
   await expect(page.locator('.version-menu-row').first()).toHaveText(/v2 · 刚刚/);
 
   await page.getByRole('menuitem', { name: '与其他版本对比…' }).click();
-  await expect(page.locator('.version-menu--sub')).toHaveText('上一版本');
+  await expect(page.locator('.version-menu--sub')).toContainText('上一版本');
   await page.getByRole('menuitem', { name: '上一版本' }).click();
   await expect(page.locator('.doc-range-chip')).toHaveText(/v1 → v2/);
   await expect(page.locator('.doc-file-row')).toHaveText(/plan\.md/);

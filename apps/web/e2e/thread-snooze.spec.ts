@@ -16,7 +16,7 @@ async function openSnoozeMenu(page: Page, title: string) {
   await expect(page.getByTestId('thread-snooze-menu')).toBeVisible();
 }
 
-test('the snooze submenu sits right after Mark as unread with the four choices', async ({
+test('the snooze submenu sits right after Rename with the four choices', async ({
   page,
 }) => {
   await page.goto(`/app?scenario=${SCENARIO}`);
@@ -24,15 +24,16 @@ test('the snooze submenu sits right after Mark as unread with the four choices',
   await row(page, 'active thread A').getByTestId('thread-row-menu').click();
   const items = page.getByRole('menuitem');
   await expect(items.nth(0)).toHaveAttribute('data-testid', 'thread-row-mark-unread');
-  await expect(items.nth(1)).toHaveAttribute('data-testid', 'thread-row-snooze');
+  await expect(items.nth(1)).toHaveAttribute('data-testid', 'thread-row-rename');
+  await expect(items.nth(2)).toHaveAttribute('data-testid', 'thread-row-snooze');
 
   await page.getByTestId('thread-row-snooze').hover();
   const choices = page.getByTestId('thread-snooze-menu').getByRole('menuitem');
   await expect(choices).toHaveText([
-    '需要时（智能体唤醒）',
-    '明天 09:00',
-    '下周一',
-    '选择时间…',
+    '需要时（智能体唤醒）N',
+    '明天 09:00T',
+    '下周一M',
+    '选择时间…P',
   ]);
 });
 

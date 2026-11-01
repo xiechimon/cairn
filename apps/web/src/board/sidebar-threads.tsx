@@ -3,13 +3,21 @@ import {
   AlarmClock,
   AlarmClockOff,
   Archive,
+  ArchiveRestore,
   ChevronDown,
   Copy,
   Ellipsis,
   MailOpen,
+  Pencil,
   Trash2,
 } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { type ReactNode, useRef, useState } from 'react';
+import {
+  KeyedMenuContent,
+  KeyedMenuItem,
+  KeyedMenuSubContent,
+  KeyedMenuSubTrigger,
+} from '../components/menu-keys.js';
 import {
   SidebarProjectRow,
   SidebarThreadList,
@@ -19,12 +27,8 @@ import type { StoneTone } from '../components/stone/tone.js';
 import { Button } from '../components/ui/button.js';
 import {
   DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu.js';
 import type { TodoRecord } from '../fixtures/records.js';
@@ -74,19 +78,36 @@ export function projectThreads(todos: readonly TodoRecord[], projectId: string):
 interface ThreadMenuProps {
   todo: TodoRecord;
   onMarkUnread: (todo: TodoRecord) => void;
+  onRename: (todo: TodoRecord) => void;
   onSnooze: (todo: TodoRecord, choice: SnoozeChoice) => void;
   onArchive: (todo: TodoRecord) => void;
   onDelete: (todo: TodoRecord) => void;
 }
 
-function ThreadMenu({ todo, onMarkUnread, onSnooze, onArchive, onDelete }: ThreadMenuProps) {
+function ThreadMenu({
+  todo,
+  onMarkUnread,
+  onRename,
+  onSnooze,
+  onArchive,
+  onDelete,
+}: ThreadMenuProps) {
   const { t } = useI18n();
   const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const [open, setOpen] = useState(false);
+  const [snoozeOpen, setSnoozeOpen] = useState(false);
   const copyLink = () => {
     void navigator.clipboard?.writeText(`${window.location.origin}${threadHref(todo.id)}`);
   };
+  const changeOpen = (next: boolean) => {
+    setOpen(next);
+    if (!next) setSnoozeOpen(false);
+  };
+  const label = t('线程操作：{title}', {
+    title: todo.title === '' ? `#${todo.seqNum}` : todo.title,
+  });
   return (
-    <DropdownMenu>
+    <DropdownMenu open={open} onOpenChange={changeOpen}>
       <DropdownMenuTrigger
         render={
           <Button
@@ -94,79 +115,93 @@ function ThreadMenu({ todo, onMarkUnread, onSnooze, onArchive, onDelete }: Threa
             variant="ghost"
             size="icon-xs"
             data-testid="thread-row-menu"
-            aria-label={t('线程操作：{title}', {
-              title: todo.title === '' ? `#${todo.seqNum}` : todo.title,
-            })}
+            aria-label={label}
             className="size-5.5"
           >
             <Ellipsis />
           </Button>
         }
       />
-      <DropdownMenuContent
+      <KeyedMenuContent
         align="end"
         side="bottom"
         sideOffset={4}
         anchor={() => triggerRef.current?.closest('[data-slot="sidebar-thread-row"]') ?? null}
-        aria-label={t('线程操作：{title}', {
-          title: todo.title === '' ? `#${todo.seqNum}` : todo.title,
-        })}
+        aria-label={label}
         className="w-48"
       >
-        <DropdownMenuItem data-testid="thread-row-mark-unread" onClick={() => onMarkUnread(todo)}>
+        <KeyedMenuItem
+          data-testid="thread-row-mark-unread"
+          shortcut="U"
+          onClick={() => onMarkUnread(todo)}
+        >
           <MailOpen />
           {t('标记为未读')}
-        </DropdownMenuItem>
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger data-testid="thread-row-snooze">
+        </KeyedMenuItem>
+        <KeyedMenuItem data-testid="thread-row-rename" shortcut="R" onClick={() => onRename(todo)}>
+          <Pencil />
+          {t('重命名')}
+        </KeyedMenuItem>
+        <DropdownMenuSub open={snoozeOpen} onOpenChange={setSnoozeOpen}>
+          <KeyedMenuSubTrigger data-testid="thread-row-snooze" shortcut="S">
             <AlarmClock />
             {t('暂停至')}
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent data-testid="thread-snooze-menu" className="w-60">
-            <DropdownMenuItem
+          </KeyedMenuSubTrigger>
+          <KeyedMenuSubContent data-testid="thread-snooze-menu" className="w-60">
+            <KeyedMenuItem
               data-testid="thread-snooze-needed"
+              shortcut="N"
               onClick={() => onSnooze(todo, 'needed')}
             >
               {t('需要时（智能体唤醒）')}
-            </DropdownMenuItem>
-            <DropdownMenuItem
+            </KeyedMenuItem>
+            <KeyedMenuItem
               data-testid="thread-snooze-tomorrow"
+              shortcut="T"
               onClick={() => onSnooze(todo, 'tomorrow-09:00')}
             >
               {t('明天 09:00')}
-            </DropdownMenuItem>
-            <DropdownMenuItem
+            </KeyedMenuItem>
+            <KeyedMenuItem
               data-testid="thread-snooze-monday"
+              shortcut="M"
               onClick={() => onSnooze(todo, 'next-monday')}
             >
               {t('下周一')}
-            </DropdownMenuItem>
-            <DropdownMenuItem
+            </KeyedMenuItem>
+            <KeyedMenuItem
               data-testid="thread-snooze-pick"
+              shortcut="P"
               onClick={() => onSnooze(todo, 'pick')}
             >
               {t('选择时间…')}
-            </DropdownMenuItem>
-          </DropdownMenuSubContent>
+            </KeyedMenuItem>
+          </KeyedMenuSubContent>
         </DropdownMenuSub>
-        <DropdownMenuItem data-testid="thread-row-copy-link" onClick={copyLink}>
+        <KeyedMenuItem data-testid="thread-row-copy-link" shortcut="L" onClick={copyLink}>
           <Copy />
           {t('复制链接')}
-        </DropdownMenuItem>
-        <DropdownMenuItem data-testid="thread-row-archive" onClick={() => onArchive(todo)}>
+        </KeyedMenuItem>
+        <KeyedMenuItem
+          data-testid="thread-row-archive"
+          shortcut="A"
+          onClick={() => onArchive(todo)}
+        >
           <Archive />
           {t('Archive')}
-        </DropdownMenuItem>
+        </KeyedMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem
+        <KeyedMenuItem
           variant="destructive"
           data-testid="thread-row-delete"
+          shortcut="D"
+          confirms
           onClick={() => onDelete(todo)}
         >
           <Trash2 />
           {t('删除')}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
+        </KeyedMenuItem>
+      </KeyedMenuContent>
     </DropdownMenu>
   );
 }
@@ -183,6 +218,7 @@ interface ProjectGroupProps {
   onOpenProject: () => void;
   onOpenThread: (todo: TodoRecord) => void;
   onMarkUnread: (todo: TodoRecord) => void;
+  onRename: (todo: TodoRecord) => void;
   onSnooze: (todo: TodoRecord, choice: SnoozeChoice) => void;
   onArchive: (todo: TodoRecord) => void;
   onDelete: (todo: TodoRecord) => void;
@@ -200,6 +236,7 @@ export function ProjectGroup({
   onOpenProject,
   onOpenThread,
   onMarkUnread,
+  onRename,
   onSnooze,
   onArchive,
   onDelete,
@@ -251,6 +288,7 @@ export function ProjectGroup({
                     <ThreadMenu
                       todo={todo}
                       onMarkUnread={onMarkUnread}
+                      onRename={onRename}
                       onSnooze={onSnooze}
                       onArchive={onArchive}
                       onDelete={onDelete}
@@ -276,6 +314,43 @@ export function ProjectGroup({
   );
 }
 
+interface CollapsibleGroupProps {
+  testId: string;
+  icon: ReactNode;
+  label: string;
+  count: number;
+  children: ReactNode;
+}
+
+function CollapsibleThreadGroup({ testId, icon, label, count, children }: CollapsibleGroupProps) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div data-testid={testId} data-count={count}>
+      <Button
+        variant="ghost"
+        data-testid={`${testId}-toggle`}
+        aria-expanded={expanded}
+        className="h-8 w-full justify-start gap-2.5 px-2 text-ui font-normal text-content-tertiary hover:bg-sidebar-hover hover:text-foreground dark:hover:bg-sidebar-hover"
+        onClick={() => setExpanded((open) => !open)}
+      >
+        {icon}
+        <span className="min-w-0 truncate">{label}</span>
+        <span
+          data-testid={`${testId}-count`}
+          className="ml-auto flex-none text-caption tabular-nums"
+        >
+          {count}
+        </span>
+        <ChevronDown
+          aria-hidden
+          className={`size-3 flex-none transition-transform duration-150 ${expanded ? '' : '-rotate-90'}`}
+        />
+      </Button>
+      {expanded && <SidebarThreadList>{children}</SidebarThreadList>}
+    </div>
+  );
+}
+
 interface SnoozedThreadGroupProps {
   threads: TodoRecord[];
   activeThreadId: string | null;
@@ -290,59 +365,104 @@ export function SnoozedThreadGroup({
   onUnsnooze,
 }: SnoozedThreadGroupProps) {
   const { t } = useI18n();
-  const [expanded, setExpanded] = useState(false);
   if (threads.length === 0) return null;
   return (
-    <div data-testid="group-snoozed" data-count={threads.length}>
-      <Button
-        variant="ghost"
-        data-testid="group-snoozed-toggle"
-        aria-expanded={expanded}
-        className="h-8 w-full justify-start gap-2.5 px-2 text-ui font-normal text-content-tertiary hover:bg-sidebar-hover hover:text-foreground dark:hover:bg-sidebar-hover"
-        onClick={() => setExpanded((open) => !open)}
-      >
-        <AlarmClockOff className="size-4 flex-none" />
-        <span className="min-w-0 truncate">{t('已暂停')}</span>
-        <span
-          data-testid="group-snoozed-count"
-          className="ml-auto flex-none text-caption tabular-nums"
-        >
-          {threads.length}
-        </span>
-        <ChevronDown
-          aria-hidden
-          className={`size-3 flex-none transition-transform duration-150 ${expanded ? '' : '-rotate-90'}`}
-        />
-      </Button>
-      {expanded && (
-        <SidebarThreadList>
-          {threads.map((todo) => (
-            <div key={todo.id} data-testid="snoozed-thread-row">
-              <SidebarThreadRow
-                title={todo.title === '' ? `#${todo.seqNum}` : todo.title}
-                tone="idle"
-                snoozed
-                open={todo.id === activeThreadId}
-                onClick={() => onOpenThread(todo)}
-                menu={<SnoozedThreadMenu todo={todo} onUnsnooze={onUnsnooze} />}
+    <CollapsibleThreadGroup
+      testId="group-snoozed"
+      icon={<AlarmClockOff className="size-4 flex-none" />}
+      label={t('已暂停')}
+      count={threads.length}
+    >
+      {threads.map((todo) => (
+        <div key={todo.id} data-testid="snoozed-thread-row">
+          <SidebarThreadRow
+            title={todo.title === '' ? `#${todo.seqNum}` : todo.title}
+            tone="idle"
+            snoozed
+            open={todo.id === activeThreadId}
+            onClick={() => onOpenThread(todo)}
+            menu={
+              <SingleActionMenu
+                todo={todo}
+                menuTestId="snoozed-row-menu"
+                itemTestId="thread-row-unsnooze"
+                icon={<AlarmClockOff />}
+                label={t('取消暂停')}
+                onRun={onUnsnooze}
               />
-            </div>
-          ))}
-        </SidebarThreadList>
-      )}
-    </div>
+            }
+          />
+        </div>
+      ))}
+    </CollapsibleThreadGroup>
   );
 }
 
-function SnoozedThreadMenu({
-  todo,
-  onUnsnooze,
-}: {
-  todo: TodoRecord;
-  onUnsnooze: (todo: TodoRecord) => void;
-}) {
+interface ArchivedThreadGroupProps {
+  threads: TodoRecord[];
+  activeThreadId: string | null;
+  onOpenThread: (todo: TodoRecord) => void;
+  onUnarchive: (todo: TodoRecord) => void;
+}
+
+export function ArchivedThreadGroup({
+  threads,
+  activeThreadId,
+  onOpenThread,
+  onUnarchive,
+}: ArchivedThreadGroupProps) {
   const { t } = useI18n();
-  const label = t('线程操作：{title}', {
+  if (threads.length === 0) return null;
+  return (
+    <CollapsibleThreadGroup
+      testId="group-archived"
+      icon={<Archive className="size-4 flex-none" />}
+      label={t('已归档')}
+      count={threads.length}
+    >
+      {threads.map((todo) => (
+        <div key={todo.id} data-testid="archived-thread-row">
+          <SidebarThreadRow
+            title={todo.title === '' ? `#${todo.seqNum}` : todo.title}
+            tone="idle"
+            open={todo.id === activeThreadId}
+            onClick={() => onOpenThread(todo)}
+            menu={
+              <SingleActionMenu
+                todo={todo}
+                menuTestId="archived-row-menu"
+                itemTestId="thread-row-unarchive"
+                icon={<ArchiveRestore />}
+                label={t('取消归档')}
+                onRun={onUnarchive}
+              />
+            }
+          />
+        </div>
+      ))}
+    </CollapsibleThreadGroup>
+  );
+}
+
+interface SingleActionMenuProps {
+  todo: TodoRecord;
+  menuTestId: string;
+  itemTestId: string;
+  icon: ReactNode;
+  label: string;
+  onRun: (todo: TodoRecord) => void;
+}
+
+function SingleActionMenu({
+  todo,
+  menuTestId,
+  itemTestId,
+  icon,
+  label,
+  onRun,
+}: SingleActionMenuProps) {
+  const { t } = useI18n();
+  const ariaLabel = t('线程操作：{title}', {
     title: todo.title === '' ? `#${todo.seqNum}` : todo.title,
   });
   return (
@@ -352,26 +472,26 @@ function SnoozedThreadMenu({
           <Button
             variant="ghost"
             size="icon-xs"
-            data-testid="snoozed-row-menu"
-            aria-label={label}
+            data-testid={menuTestId}
+            aria-label={ariaLabel}
             className="size-5.5"
           >
             <Ellipsis />
           </Button>
         }
       />
-      <DropdownMenuContent
+      <KeyedMenuContent
         align="end"
         side="bottom"
         sideOffset={4}
-        aria-label={label}
+        aria-label={ariaLabel}
         className="w-48"
       >
-        <DropdownMenuItem data-testid="thread-row-unsnooze" onClick={() => onUnsnooze(todo)}>
-          <AlarmClockOff />
-          {t('取消暂停')}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
+        <KeyedMenuItem data-testid={itemTestId} shortcut="U" onClick={() => onRun(todo)}>
+          {icon}
+          {label}
+        </KeyedMenuItem>
+      </KeyedMenuContent>
     </DropdownMenu>
   );
 }
