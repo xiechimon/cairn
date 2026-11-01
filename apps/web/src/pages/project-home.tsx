@@ -192,9 +192,7 @@ function ProjectHomeBody() {
       className="mx-auto flex w-[calc(100%-2rem)] max-w-182 flex-col gap-4 pt-[12vh]"
     >
       <SpiralMark className="size-8" />
-      <h2 className="m-0 font-heading text-xl leading-snug font-medium text-foreground text-balance">
-        {t('新项目：{name}。先从哪里开始？', { name })}
-      </h2>
+      <Greeting wrap>{t('新项目：{name}。先从哪里开始？', { name })}</Greeting>
       {goalLine}
       {starters}
       <p className="m-0 text-meta text-content-tertiary">
@@ -232,7 +230,7 @@ function ProjectHomeBody() {
         render={
           <Button
             variant="ghost"
-            className="-ml-1.5 h-8 gap-2 px-1.5 font-heading text-heading font-semibold text-foreground"
+            className="-ml-1.5 h-8 gap-2 px-1.5 font-serif text-page font-semibold tracking-[-0.01em] text-foreground"
           />
         }
       >
