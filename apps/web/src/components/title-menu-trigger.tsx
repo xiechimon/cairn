@@ -4,7 +4,7 @@ import { ChevronDown } from '../icons/index.js';
 import { DropdownMenuTrigger } from './ui/dropdown-menu.js';
 
 const SIZE_CLS = {
-  page: '-ml-1.5 h-8 gap-2 rounded-md px-1.5 font-heading text-heading',
+  page: '-ml-1.5 h-8 gap-2 rounded-md px-1.5 font-serif text-page tracking-[-0.01em]',
   pane: 'h-7 gap-1 rounded-lg px-2 text-ui',
 } as const;
 
