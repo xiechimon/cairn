@@ -178,7 +178,7 @@ test('1. connected github project: entry → sheet → pick to import → detail
   await expect(page).toHaveURL(/\/app\/todo\/todo-gh-1/);
   await expect(page.locator('.fresh-title')).toHaveText(ISSUE_TITLE);
   await expect(page.locator('.fresh-tag-chip')).toHaveText(['bug', 'area:auth']);
-  await expect(page.getByTestId('fresh-description')).toHaveValue(/复现步骤/);
+  await expect(page.locator('.spec-block')).toContainText('复现步骤');
   expect(importBodies).toEqual([{ number: 7 }]);
 });
 

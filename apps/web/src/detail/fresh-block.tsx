@@ -10,6 +10,7 @@ import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { ChevronDown, Monitor } from '../icons/index.js';
+import { SpecBlock } from './spec-block.js';
 
 const SAVE_DELAY_MS = 800;
 
@@ -91,9 +92,28 @@ function DescriptionBox({ spec, onSave }: { spec: string; onSave?: (spec: string
     save.current?.(draft);
   };
 
+  if (draft.trim() !== '' && !focused) {
+    return (
+      <div data-testid="fresh-description-view">
+        <SpecBlock spec={draft} className="m-0" />
+        {onSave != null && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="mt-1 h-6 px-1.5 text-meta font-normal text-content-tertiary"
+            onClick={() => setFocused(true)}
+          >
+            {t('编辑描述')}
+          </Button>
+        )}
+      </div>
+    );
+  }
+
   return (
     <Textarea
       data-testid="fresh-description"
+      autoFocus={focused}
       className="min-h-28 rounded-lg border-none bg-card px-3 py-2.5 text-card-title leading-6 text-foreground shadow-[inset_0_0_0_1px_var(--border)] placeholder:text-content-tertiary md:text-card-title dark:bg-card"
       value={draft}
       readOnly={onSave == null}

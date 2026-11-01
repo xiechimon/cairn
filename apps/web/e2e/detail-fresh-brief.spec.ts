@@ -73,7 +73,7 @@ test('fresh task reads as a brief: title, property chips, description box, Start
   const chip = block.getByTestId('fresh-agent-chip');
   await expect(chip).toContainText('r3-builder');
   await expect(chip).toContainText('claude-sonnet-5');
-  await expect(block.getByTestId('fresh-description')).toBeVisible();
+  await expect(block.getByTestId('fresh-description-view')).toBeVisible();
   await expect(block.getByRole('button', { name: '开始', exact: true })).toBeVisible();
   await expect(block.getByTestId('fresh-start-note')).toHaveText(
     'r3-builder 会先写方案，你确认之前不会改动任何东西。',
@@ -117,4 +117,18 @@ test('typing a description saves it on blur', async ({ page }) => {
   await expect.poll(() => writes.length).toBe(1);
   expect(writes[0]?.method()).toBe('PATCH');
   expect(writes[0]?.postDataJSON()).toEqual({ spec: 'Put the toggle under Appearance.' });
+});
+
+test('an existing description renders as markdown and turns editable on request', async ({
+  page,
+}) => {
+  const writes: Request[] = [];
+  await stubLive(page, writes);
+  WIRE_TASK.spec = '## Goal\n\nMake **dark mode** the default.';
+  await page.goto('/app/todo/todo-0');
+  const view = page.getByTestId('fresh-description-view');
+  await expect(view.locator('h2')).toHaveText('Goal');
+  await view.getByRole('button', { name: '编辑描述' }).click();
+  await expect(page.getByTestId('fresh-description')).toHaveValue(/dark mode/);
+  WIRE_TASK.spec = '';
 });
