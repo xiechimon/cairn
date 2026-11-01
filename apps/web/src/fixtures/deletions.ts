@@ -31,12 +31,28 @@ export function withCreatedSchedules(schedules: ScheduleRecord[]): ScheduleRecor
   return createdSchedules.length === 0 ? schedules : [...schedules, ...createdSchedules];
 }
 
-const archived = new Set<string>();
+const archivedOverrides = new Map<string, boolean>();
 
 export function markArchived(id: string): void {
-  archived.add(id);
+  archivedOverrides.set(id, true);
 }
 
-export function isArchived(id: string): boolean {
-  return archived.has(id);
+export function markUnarchived(id: string): void {
+  archivedOverrides.set(id, false);
+}
+
+export function isThreadArchived(todo: { id: string; archivedAt?: number | null }): boolean {
+  return archivedOverrides.get(todo.id) ?? todo.archivedAt != null;
+}
+
+const renamed = new Map<string, string>();
+
+export function markRenamed(id: string, title: string): void {
+  renamed.set(id, title);
+}
+
+export function withRenamedTitles<T extends { id: string; title: string }>(todos: T[]): T[] {
+  return renamed.size === 0
+    ? todos
+    : todos.map((todo) => ({ ...todo, title: renamed.get(todo.id) ?? todo.title }));
 }

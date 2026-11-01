@@ -177,6 +177,13 @@ export const useTodos = (teamId: string | undefined, enabled: boolean) =>
     enabled: enabled && teamId !== undefined,
   });
 
+export const useArchivedTodos = (teamId: string | undefined, enabled: boolean) =>
+  useQuery({
+    queryKey: ['todos', teamId, 'archived'],
+    queryFn: () => api.get<TodoRecord[]>(`/api/todos?teamId=${teamId}&archived=1`),
+    enabled: enabled && teamId !== undefined,
+  });
+
 export const useTodo = (id: string | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['todo', id],
