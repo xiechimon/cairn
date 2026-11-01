@@ -136,6 +136,7 @@ describe('chief settings 4 tabs + PATCH /chief (r5 section 2)', () => {
       model: { provider: 'stub-gw', modelId: 'm-override' },
     });
     expect(override.status).toBe(400);
+    H.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.status, 'claimed')).run();
     const send2 = await req(H.s.app, 'POST', `/api/teams/${H.teamId}/chief/threads`, {
       content: '覆盖已退役回合。',
     });

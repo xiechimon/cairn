@@ -105,6 +105,15 @@ export const chiefGetResponseSchema = z.object({
 });
 export type ChiefGetResponse = z.infer<typeof chiefGetResponseSchema>;
 
+export const CHIEF_ORCHESTRATION_STATES = ['queued', 'running', 'failed'] as const;
+
+export const chiefOrchestrationSchema = z.object({
+  todoId: recordId,
+  state: z.enum(CHIEF_ORCHESTRATION_STATES),
+  error: z.string().nullable(),
+});
+export type ChiefOrchestration = z.infer<typeof chiefOrchestrationSchema>;
+
 export const chiefThreadSchema = z.object({
   id: z.string(),
   chiefId: recordId,
@@ -127,6 +136,7 @@ export const chiefThreadSchema = z.object({
   lastTurnError: z.string().nullable().optional(),
   pending: z.array(chiefPendingMessageSchema).optional(),
   fallbackModel: z.string().nullable().optional(),
+  orchestration: chiefOrchestrationSchema.nullable().optional(),
   turnQueue: z
     .object({
       position: z.number().int().min(1),
@@ -170,7 +180,34 @@ export type ChiefSendMessageBody = z.infer<typeof chiefSendMessageBodySchema>;
 
 export const coordinatorSendBodySchema = z.object({
   content: z.string().refine((s) => s.trim() !== '', 'content is blank'),
+  projectId: z.string().min(1).nullish(),
 });
+export type CoordinatorSendBody = z.infer<typeof coordinatorSendBodySchema>;
+
+export const COORDINATOR_PAGE_LIMIT = 50;
+
+export const coordinatorPageQuerySchema = z.object({
+  projectId: z.string().min(1).optional(),
+  before: z.string().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(COORDINATOR_PAGE_LIMIT),
+});
+export type CoordinatorPageQuery = z.infer<typeof coordinatorPageQuerySchema>;
+
+export const coordinatorMessageSchema = z.object({
+  id: z.string(),
+  role: z.enum(['system', 'user', 'assistant']),
+  content: z.unknown(),
+  createdAt: epochMs,
+  projectId: z.string().nullable(),
+});
+export type CoordinatorMessage = z.infer<typeof coordinatorMessageSchema>;
+
+export const coordinatorPageResponseSchema = z.object({
+  thread: chiefThreadSchema,
+  messages: z.array(coordinatorMessageSchema),
+  hasEarlier: z.boolean(),
+});
+export type CoordinatorPageResponse = z.infer<typeof coordinatorPageResponseSchema>;
 
 export const projectCoordinatorResponseSchema = z.object({
   thread: chiefThreadSchema.nullable(),

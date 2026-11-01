@@ -308,6 +308,7 @@ describe('#1260 slot occupancy: chief steps are ordinary consumers of the machin
         toolDefHashes: {},
         toolResultHashes: {},
         activeRun: null,
+        archivedAt: 8,
       })
       .run();
     w.s.db

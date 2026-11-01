@@ -7163,7 +7163,23 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
   },
   {
     "method": "GET",
+    "note": "only the one global Coordinator thread (D58)",
     "path": "/api/teams/{id}/chief/threads",
+  },
+  {
+    "method": "GET",
+    "note": "{thread, messages, hasEarlier}; the one global Coordinator thread, created on first read (D58); thread.orchestration = latest orchestrate turn {todoId, state, error} or null",
+    "path": "/api/teams/{id}/coordinator",
+    "query": [
+      "projectId",
+      "before",
+      "limit",
+    ],
+  },
+  {
+    "method": "POST",
+    "note": "body {content, projectId?}; projectId only tags the turn, 409 when that project is archived",
+    "path": "/api/teams/{id}/coordinator/messages",
   },
   {
     "method": "GET",
@@ -7232,16 +7248,6 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "method": "POST",
     "note": "clears the snooze",
     "path": "/api/todos/{id}/unsnooze",
-  },
-  {
-    "method": "GET",
-    "note": "the project's Coordinator conversation, {thread} or {thread: null}",
-    "path": "/api/projects/{id}/coordinator",
-  },
-  {
-    "method": "POST",
-    "note": "body {content}; opens the conversation on the first message, 409 when archived",
-    "path": "/api/projects/{id}/coordinator/messages",
   },
   {
     "method": "POST",
@@ -8113,6 +8119,41 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > chi
       "type": [
         "string",
         "null",
+      ],
+    },
+    "orchestration": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "error": {
+              "type": [
+                "string",
+                "null",
+              ],
+            },
+            "state": {
+              "enum": [
+                "queued",
+                "running",
+                "failed",
+              ],
+              "type": "string",
+            },
+            "todoId": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "todoId",
+            "state",
+            "error",
+          ],
+          "type": "object",
+        },
+        {
+          "type": "null",
+        },
       ],
     },
     "pending": {

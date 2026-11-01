@@ -1,6 +1,6 @@
 import {
   githubIssueSourceRef,
-  orchestrateThreadTitle,
+  orchestratePromptHead,
   type Phase,
   parseGithubIssueSourceRef,
   type SecretBox,
@@ -9,7 +9,6 @@ import {
   and,
   asc,
   eq,
-  exists,
   gte,
   isNotNull,
   isNull,
@@ -437,24 +436,20 @@ export function createIssueIntake(
   }
 
   function startedSince(teamId: string, seqNum: number, importedAt: number): boolean {
-    const thread = deps.db
-      .select({ id: chiefThread.id })
-      .from(chiefThread)
+    const turn = deps.db
+      .select({ id: step.id })
+      .from(step)
+      .innerJoin(chiefThread, eq(chiefThread.id, step.buildId))
       .where(
         and(
           eq(chiefThread.teamId, teamId),
-          eq(chiefThread.title, orchestrateThreadTitle(seqNum)),
-          gte(chiefThread.createdAt, importedAt),
-          exists(
-            deps.db
-              .select({ id: step.id })
-              .from(step)
-              .where(and(eq(step.buildId, chiefThread.id), eq(step.kind, 'chief'))),
-          ),
+          eq(step.kind, 'chief'),
+          gte(step.createdAt, importedAt),
+          like(step.prompt, `%${orchestratePromptHead(seqNum)}\n\n编排请求：%`),
         ),
       )
       .get();
-    return thread !== undefined;
+    return turn !== undefined;
   }
 
   function retryOrchestration(

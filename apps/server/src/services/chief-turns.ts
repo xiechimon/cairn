@@ -4,7 +4,7 @@ import {
   type ChiefPendingMessage,
   type ChiefTurnStoppedContent,
 } from '@cairn/shared';
-import { and, asc, eq, gt, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, lt, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   agent,
@@ -31,6 +31,15 @@ const STEER_SENT_HOLD = 'steer_sent';
 const STEER_HOLDS = [STEERED_HOLD, STEER_SENT_HOLD];
 
 export const CHIEF_ABANDONED_STEP_MS = 120_000;
+
+export const CHIEF_TURN_MAX_MS = 30 * 60_000;
+
+export const PICKED_PROJECT_OPEN = '【输入框选定项目：';
+
+export function pickedProjectIdOf(prompt: string | null): string | null {
+  if (prompt === null || !prompt.startsWith(PICKED_PROJECT_OPEN)) return null;
+  return /^[^\n]*（id: ([^）\n]+)）】\n/.exec(prompt)?.[1] ?? null;
+}
 
 export interface ChiefTurnDeps {
   db: Db;
@@ -308,7 +317,32 @@ export function stopChiefTurn(
   if (head === undefined) {
     throw new HttpError(409, 'no chief turn in flight (总管当前没有在回复)');
   }
-  const now = nowMs();
+  return stopClaimedChiefStep(deps, thread, head, nowMs());
+}
+
+export function sweepOverlongChiefTurns(deps: ChiefTurnDeps, now: number = nowMs()): void {
+  const overlong = deps.db
+    .select({ step, thread: chiefThread })
+    .from(step)
+    .innerJoin(chiefThread, eq(chiefThread.id, step.buildId))
+    .where(
+      and(
+        eq(step.kind, 'chief'),
+        eq(step.status, 'claimed'),
+        lt(step.claimedAt, now - CHIEF_TURN_MAX_MS),
+      ),
+    )
+    .all();
+  for (const row of overlong) stopClaimedChiefStep(deps, row.thread, row.step, now);
+}
+
+function stopClaimedChiefStep(
+  deps: ChiefTurnDeps,
+  thread: typeof chiefThread.$inferSelect,
+  head: StepRow,
+  now: number,
+): { delegated: boolean } {
+  const threadId = thread.id;
   const abandoned =
     head.lastHeartbeatAt !== null && now - head.lastHeartbeatAt > CHIEF_ABANDONED_STEP_MS;
   if (!abandoned) {
@@ -388,6 +422,7 @@ export function recordChiefStop(
     threadId: stepRow.buildId,
     role: 'system' as const,
     content: JSON.stringify(content),
+    projectId: pickedProjectIdOf(stepRow.prompt),
     createdAt: nowMs(),
   };
   db.insert(chiefMessage)
