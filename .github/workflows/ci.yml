@@ -327,7 +327,7 @@ jobs:
 
       - name: Merge routing size caps (#2371)
         if: ${{ !cancelled() }}
-        run: node --test scripts/pr-gate-routing.test.mjs scripts/batch-merger.test.mjs scripts/coordinator-merge.test.mjs
+        run: node --test scripts/pr-gate-routing.test.mjs scripts/batch-merger.test.mjs scripts/coordinator-merge.test.mjs scripts/merge-queue-drafts.test.mjs
 
       - name: Real smoke runner and checker fixtures (#2283)
         if: ${{ !cancelled() }}

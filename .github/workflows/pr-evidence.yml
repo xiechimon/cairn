@@ -16,8 +16,9 @@ name: pr-evidence
 # The autonomy brake rejects paused repositories before body checks unless the
 # PR is an exact recovery revert. Brake failures also disarm auto-merge.
 #
-# The job has no `if:` and the trigger no `paths:`: a skipped run counts as
-# a passing required check and would supersede a red one.
+# The trigger has no `paths:` and the job skips only the draft PRs Mergify
+# opens to test a queued batch: a skipped run counts as a passing required
+# check and would supersede a red one.
 #
 # Separate file from ci.yml on purpose: the default `pull_request` activity
 # types are only opened/synchronize/reopened, and the body and labels are
@@ -56,6 +57,7 @@ concurrency:
 jobs:
   # Stable job name: it is in the branch-protection required checks.
   pr-evidence:
+    if: ${{ !(github.event.pull_request.draft && github.event.pull_request.user.login == 'mergify[bot]' && startsWith(github.head_ref, 'mergify/merge-queue/')) }}
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
