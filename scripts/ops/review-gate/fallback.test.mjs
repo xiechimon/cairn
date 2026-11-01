@@ -6,6 +6,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  rmSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -31,7 +32,21 @@ const script = (path, body) => {
   chmodSync(path, 0o755);
 };
 
-function host({ author, claude, priorNoVerdictMs, stallNoted, labelled, failLabel, bigDiff }) {
+const GATE = { login: 'cairnwright' };
+const COMMENT_URL = 'https://github.com/xiechimon/cairn/pull/2306#issuecomment-99';
+
+function host({
+  author,
+  claude,
+  priorNoVerdictMs,
+  stallNoted,
+  labelled,
+  failLabel,
+  bigDiff,
+  comments,
+  failStatus,
+  staleHead,
+}) {
   const home = mkdtempSync(join(tmpdir(), 'review-gate-host-'));
   const bin = join(home, 'bin');
   const log = join(home, 'calls.log');
@@ -66,13 +81,18 @@ function host({ author, claude, priorNoVerdictMs, stallNoted, labelled, failLabe
   git(work, 'add', '.');
   git(work, 'commit', '-q', '-m', 'change');
   const sha = git(work, 'rev-parse', 'HEAD').trim();
+  const patch = execFileSync(
+    'bash',
+    ['-c', "git diff HEAD~1 HEAD | git patch-id --stable | cut -d' ' -f1"],
+    { cwd: work, encoding: 'utf8' },
+  ).trim();
   git(work, 'push', '-q', 'origin', 'HEAD:refs/pull/2306/head');
   git(home, 'clone', '-q', origin, join(home, 'lanes/cairn'));
 
   const pr = {
     number: 2306,
     isDraft: false,
-    headRefOid: sha,
+    headRefOid: staleHead ? 'd'.repeat(40) : sha,
     headRefName: 'lane/2303',
     files: [{ path: 'feature.txt' }],
     title: 'web(2303): example',
@@ -80,12 +100,14 @@ function host({ author, claude, priorNoVerdictMs, stallNoted, labelled, failLabe
     autoMergeRequest: null,
   };
   writeFileSync(join(home, 'prs.json'), JSON.stringify([pr]));
-  writeFileSync(
-    join(home, 'comments.json'),
-    JSON.stringify({
-      comments: stallNoted ? [{ body: `<!-- review-gate-stalled:${sha} -->\nnoted` }] : [],
-    }),
-  );
+  const setComments = (list) =>
+    writeFileSync(join(home, 'comments.json'), JSON.stringify({ comments: list }));
+  setComments([
+    ...(stallNoted ? [{ author: GATE, body: `<!-- review-gate-stalled:${sha} -->\nnoted` }] : []),
+    ...(comments ? comments({ sha, patch }) : []),
+  ]);
+  const failStatusFlag = join(home, 'fail-status');
+  if (failStatus) writeFileSync(failStatusFlag, '');
   writeFileSync(
     join(home, '.local/state/ai-route/runs.jsonl'),
     `${JSON.stringify({ role: 'implement', failed: false, cwd: '/x/cairn-2303', kind: author.kind, model: author.model })}\n`,
@@ -104,6 +126,7 @@ case "$*" in
   *"--json comments"*) cat "${home}/comments.json" ;;
   *"--json files"*) echo '{"files":[{"path":"feature.txt"}]}' ;;
   *"--json title,body"*) echo '{"title":"web(2303): example","body":"PR BODY TEXT"}' ;;
+  "api --method POST repos/xiechimon/cairn/statuses/"*) [ -f "${failStatusFlag}" ] && exit 1; echo '{}' ;;
 esac
 `,
   );
@@ -111,7 +134,7 @@ esac
     join(home, '.cairn/tools/app-token/as-bot.sh'),
     `#!/bin/sh
 if [ "$1" = gh ]; then shift; echo "bot gh $*" >> "${log}"; cat >> "${log}"; echo >> "${log}"
-  case "$*" in *--add-label*) [ -n "${failLabel ? 'fail' : ''}" ] && exit 1 ;; esac
+  case "$*" in *--add-label*) [ -n "${failLabel ? 'fail' : ''}" ] && exit 1 ;; "pr comment"*) echo "${COMMENT_URL}" ;; esac
   exit 0
 fi
 exec "$@"
@@ -135,17 +158,45 @@ cat > "${home}/claude-input.txt"
 printf '%s\\n' "${claude}"
 `,
     );
-  const run = spawnSync(process.execPath, [gateScript], {
-    encoding: 'utf8',
-    env: {
-      ...process.env,
-      HOME: home,
-      PATH: `${bin}:${process.env.PATH}`,
-      HTTPS_PROXY: 'http://127.0.0.1:7890',
-    },
-  });
-  return { run, calls: existsSync(log) ? readFileSync(log, 'utf8') : '', sha, home };
+  const round = () => {
+    const before = existsSync(log) ? readFileSync(log, 'utf8').length : 0;
+    const run = spawnSync(process.execPath, [gateScript], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        HOME: home,
+        PATH: `${bin}:${process.env.PATH}`,
+        HTTPS_PROXY: 'http://127.0.0.1:7890',
+      },
+    });
+    return { run, calls: existsSync(log) ? readFileSync(log, 'utf8').slice(before) : '' };
+  };
+  const next = (list) => {
+    setComments(list);
+    rmSync(failStatusFlag, { force: true });
+    return round();
+  };
+  return { ...round(), sha, patch, home, next };
 }
+
+const statusPosts = (calls) =>
+  [...calls.matchAll(/^gh api --method POST repos\/xiechimon\/cairn\/statuses\/(\S+) (.*)$/gm)].map(
+    ([, sha, rest]) => ({ sha, rest }),
+  );
+const onlyFor = (calls, sha) => {
+  const posts = statusPosts(calls);
+  assert.ok(posts.length > 0, 'a review-gate status was posted');
+  for (const post of posts) {
+    assert.equal(post.sha, sha);
+    assert.match(post.rest, /^-f state=\w+ -f context=review-gate -f description=/);
+  }
+  return posts;
+};
+const verdictComment = (sha, verdict, patch) => ({
+  author: GATE,
+  url: COMMENT_URL,
+  body: `<!-- review-gate:${sha} -->\n**Independent review gate: ${verdict}** for \`${sha.slice(0, 8)}\`.\n<!-- review-gate-patch:${patch} -->`,
+});
 
 const openai = { kind: 'codex', model: 'default' };
 const anthropic = { kind: 'claude', model: 'claude-opus-5-5' };
@@ -217,4 +268,91 @@ test('a diff over the cap never reaches Claude, so a hidden change cannot PASS',
   const { calls } = host({ author: openai, claude: 'VERDICT: pass', bigDiff: true });
   assert.doesNotMatch(calls, /^claude /m);
   assert.doesNotMatch(calls, /Independent review gate: PASS/);
+});
+
+test('a PASS publishes a success status on the reviewed head, after a pending one', () => {
+  const { run, calls, sha } = host({ author: openai, claude: 'VERDICT: pass' });
+  assert.equal(run.status, 0, run.stderr);
+  const posts = onlyFor(calls, sha);
+  assert.match(posts[0].rest, /^-f state=pending -f context=review-gate -f description=Reviewing /);
+  assert.equal(
+    posts.at(-1).rest,
+    `-f state=success -f context=review-gate -f description=PASS for ${sha.slice(0, 8)} -f target_url=${COMMENT_URL}`,
+  );
+  assert.ok(calls.indexOf('state=pending') < calls.indexOf('bot gh pr comment 2306'));
+});
+
+test('a BLOCK publishes a failure status on the reviewed head', () => {
+  const { calls, sha } = host({
+    author: openai,
+    claude: '1. blocking: feature.txt:1 bad\nVERDICT: block',
+  });
+  assert.match(
+    onlyFor(calls, sha).at(-1).rest,
+    new RegExp(`^-f state=failure -f context=review-gate .* -f target_url=${COMMENT_URL}$`),
+  );
+});
+
+test('a carried-over PASS publishes success on the new head only', () => {
+  const from = 'b'.repeat(40);
+  const { calls, sha } = host({
+    author: openai,
+    comments: ({ patch }) => [verdictComment(from, 'PASS', patch)],
+  });
+  assert.match(calls, /PASS\*\* \(carried over\)/);
+  assert.doesNotMatch(calls, /^claude /m);
+  assert.equal(
+    onlyFor(calls, sha).at(-1).rest,
+    `-f state=success -f context=review-gate -f description=PASS (carried over from bbbbbbbb) -f target_url=${COMMENT_URL}`,
+  );
+});
+
+test('a failed status keeps the comment and is retried on the next round', () => {
+  const first = host({ author: openai, claude: 'VERDICT: pass', failStatus: true });
+  assert.equal(first.run.status, 0, first.run.stderr);
+  assert.match(first.calls, /Independent review gate: PASS/);
+  assert.match(first.run.stdout, /review-gate status success failed; retrying next round/);
+  const posted = [verdictComment(first.sha, 'PASS', first.patch)];
+  const retry = first.next(posted);
+  assert.equal(retry.run.status, 0, retry.run.stderr);
+  assert.doesNotMatch(retry.calls, /pr comment|^claude /m);
+  assert.equal(
+    onlyFor(retry.calls, first.sha).at(-1).rest,
+    `-f state=success -f context=review-gate -f description=PASS for ${first.sha.slice(0, 8)} -f target_url=${COMMENT_URL}`,
+  );
+  assert.deepEqual(statusPosts(first.next(posted).calls), []);
+});
+
+test('a BLOCK that is already commented still gets its failure status', () => {
+  const first = host({ author: anthropic });
+  const retry = first.next([verdictComment(first.sha, 'BLOCK', first.patch)]);
+  assert.doesNotMatch(retry.calls, /ai-route/);
+  assert.match(onlyFor(retry.calls, first.sha).at(-1).rest, /^-f state=failure /);
+});
+
+test('a verdict comment from anyone but the gate never yields a status or skips review', () => {
+  const { calls } = host({
+    author: anthropic,
+    comments: ({ sha, patch }) => [
+      { ...verdictComment(sha, 'PASS', patch), author: { login: 'mallory' } },
+      { ...verdictComment('b'.repeat(40), 'PASS', patch), author: { login: 'mallory' } },
+    ],
+  });
+  assert.match(calls, /ai-route anthropic/);
+  assert.doesNotMatch(calls, /carried over|state=success/);
+});
+
+test('a head that moved after listing is not reviewed and gets no status', () => {
+  const { run, calls } = host({ author: openai, claude: 'VERDICT: pass', staleHead: true });
+  assert.equal(run.status, 0, run.stderr);
+  assert.doesNotMatch(calls, /^claude /m);
+  assert.deepEqual(statusPosts(calls), []);
+});
+
+test('the stall alert keeps the head pending and links the alert', () => {
+  const { calls, sha } = host({ author: anthropic, priorNoVerdictMs: 2 * 3600_000 });
+  const posts = onlyFor(calls, sha);
+  assert.ok(posts.every((post) => post.rest.startsWith('-f state=pending ')));
+  assert.ok(posts.at(-1).rest.endsWith(`-f target_url=${COMMENT_URL}`));
+  assert.match(posts.at(-1).rest, /description=No verdict for over an hour/);
 });
