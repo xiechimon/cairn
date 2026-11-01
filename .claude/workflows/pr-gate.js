@@ -27,7 +27,7 @@ const MAX_SKEPTICS = 4
 // reviewer remembering it. Default deny: only AUTO_MERGE paths (product source
 // and tests, docs/verify evidence, Markdown under docs/) may auto-merge, and only when no PROTECTED
 // class matches them; every other path, deleted test files, binary files
-// outside docs/verify route to the user. A patch over 800 lines or 40 files
+// outside docs/verify and the gallery baselines route to the user. A patch over 800 lines or 40 files
 // does not: it reports sizeReview, and pr-evidence, the review gate and the
 // product gate require the Size section and the review answer (#2372). pr-gate runs 3, 4 and 5 each found another agent-steering or gate
 // file that a list of names missed
@@ -88,6 +88,7 @@ const PROTECTED_RE = PROTECTED.map((glob) => globToRegExp(glob, { protect: true 
 const AUTO_MERGE_RE = AUTO_MERGE.map(globToRegExp)
 const isProtected = (f) => PROTECTED_RE.some((re) => re.test(f))
 const EVIDENCE_RE = globToRegExp('docs/verify/**')
+const GALLERY_BASELINE_RE = globToRegExp('apps/web/e2e/gallery-snapshots.spec.ts-snapshots/*.png')
 
 // Without --no-renames a rename lists only its new name, so a protected file
 // moved elsewhere would not match; without core.quotePath=false git C-quotes
@@ -363,9 +364,11 @@ const deletedTests = allDeleted.filter(
 )
 // A binary row (- -) adds no lines and shows reviewers no diff; one NUL byte
 // makes git treat a source file as binary even with the empty tree's attributes
-// (/code-review on #1410), so only evidence may be binary without the user.
+// (/code-review on #1410), so only evidence and the gallery's PNG baselines,
+// which CI renders and scripts/gallery-snapshots-accept.mjs downloads, may be
+// binary without the user.
 const opaque = [...new Set([...binaryFiles, ...safetyBinary])].filter(
-  (f) => !EVIDENCE_RE.test(f),
+  (f) => !EVIDENCE_RE.test(f) && !GALLERY_BASELINE_RE.test(f),
 )
 const lines = Math.max(linesChanged, Number.isInteger(safety?.linesChanged) ? safety.linesChanged : 0)
 const allFiles = [...new Set([...changedFiles, ...unlistedFiles])]

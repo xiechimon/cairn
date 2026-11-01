@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { expect, test, vi } from 'vitest';
 import { gitPrim } from '../src/git.js';
 import { createDaemonLogger } from '../src/log.js';
+import { ORB_AGENT_HOME, ORB_WORKSPACES_ROOT } from '../src/orb/worker.js';
 import { WorkspaceManager } from '../src/workspace.js';
 
 test('seeds a private base clone, fetches with the step credential and leaves the seed untouched', async () => {
@@ -68,3 +69,8 @@ test('seeds a private base clone, fetches with the step credential and leaves th
     clone.mockRestore();
   }
 }, 30_000);
+
+test('orb worker workspaces live under the agent home the image creates', () => {
+  expect(ORB_WORKSPACES_ROOT.startsWith(`${ORB_AGENT_HOME}/`)).toBe(true);
+  expect(ORB_WORKSPACES_ROOT).not.toBe('/work');
+});

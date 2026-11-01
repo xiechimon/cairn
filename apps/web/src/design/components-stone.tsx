@@ -19,7 +19,7 @@ export function StoneSection() {
     <Section
       id="stone"
       title="Inbox groups"
-      lede="Five groups carry the inbox in a fixed order: waiting on you, ready for review, working, idle, resolved. A state is drawn once per context: the group header carries the glyph and its rows carry none; a row outside a group carries its own. The reason is written, not iconised."
+      lede="Six groups carry the inbox in a fixed order: waiting on you, failed, ready for review, working, idle, resolved. A state is drawn once per context: the group header carries the glyph and its rows carry none; a row outside a group carries its own. The reason is written, not iconised."
     >
       <Specimen
         title="Tone glyph"
@@ -136,6 +136,12 @@ const CARD_STATES: readonly CardState[] = [
     primary: 'Review PR',
   },
   {
+    tone: 'failed',
+    stateLabel: 'Failed',
+    reason: 'Run failed · typecheck broke in 2 files after the rebase.',
+    primary: 'Retry',
+  },
+  {
     tone: 'resolved',
     stateLabel: 'Merged',
     reason: 'PR #2271 merged into main.',
@@ -153,7 +159,7 @@ export function ThreadCardSection() {
       lede="The Coordinator stream shows each thread as one card that updates in place: glyph, title, one-line reason, and the next action. The glyph is the state; there is no second state tag. Step the state to see it change."
     >
       <Specimen
-        title="One card, five states"
+        title="One card, six states"
         note={`State ${index + 1} of ${CARD_STATES.length}`}
         stage="canvas"
         code={`<ThreadCard\n  title="Connect a Claude subscription"\n  tone="waiting"\n  stateLabel="Waiting on you"\n  reason="Asks whether to store the token once or per machine."\n  primaryLabel="Answer"\n/>`}
