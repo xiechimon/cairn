@@ -1,0 +1,46 @@
+{
+  "revision": "64770927",
+  "results": [
+    {
+      "theme": "light",
+      "viewportWidth": 1440,
+      "gap": 90.828125,
+      "overlap": 4,
+      "lines": 2,
+      "width": 384,
+      "maxWidth": 425,
+      "overflow": false
+    },
+    {
+      "theme": "light",
+      "viewportWidth": 390,
+      "gap": 54.921875,
+      "overlap": 4,
+      "lines": 2,
+      "width": 310,
+      "maxWidth": 425,
+      "overflow": false
+    },
+    {
+      "theme": "dark",
+      "viewportWidth": 1440,
+      "gap": 90.828125,
+      "overlap": 4,
+      "lines": 2,
+      "width": 384,
+      "maxWidth": 425,
+      "overflow": false
+    },
+    {
+      "theme": "dark",
+      "viewportWidth": 390,
+      "gap": 54.921875,
+      "overlap": 4,
+      "lines": 2,
+      "width": 310,
+      "maxWidth": 425,
+      "overflow": false
+    }
+  ],
+  "outcome": "4 failed (expected negative control)"
+}

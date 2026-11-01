@@ -807,3 +807,71 @@ test('inactive networkd does not manage foreign rules', (t) => {
   assert.equal(result.foreignRules, 'ok');
   assert.equal(result.ok, true, JSON.stringify(result));
 });
+
+for (const [failure, cloneResult, imagePresent] of [
+  [
+    'timeout',
+    {
+      status: null,
+      error: Object.assign(new Error('spawnSync machinectl ETIMEDOUT'), { code: 'ETIMEDOUT' }),
+    },
+    true,
+  ],
+  ['exit failure with image', { status: 1, stderr: 'clone failed' }, true],
+  ['exit failure without image', { status: 1, stderr: 'clone failed' }, false],
+]) {
+  test(`clone ${failure} checks for a leftover image before cleanup`, (t) => {
+    const f = fakeHost(t);
+    let cloned = false;
+    let cloneTimeout;
+    const result = checkHost({
+      ...f,
+      run: (cmd, args, options) => {
+        const value = f.run(cmd, args);
+        if (cmd === 'machinectl' && args.includes('clone') && args.includes(f.name)) {
+          cloned = true;
+          cloneTimeout = options?.timeout;
+          return cloneResult;
+        }
+        if (cloned && args.includes('list-images'))
+          return {
+            status: 0,
+            stdout: `cairn-orb-base subvolume no\n${imagePresent ? `${f.name} subvolume no\n` : ''}${f.name}-other subvolume no\n`,
+          };
+        return value;
+      },
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.cloneStartStop, 'failed');
+    assert.equal(cloneTimeout, 600000);
+    assert.ok(result.errors.some((error) => error.includes(`Clone ${f.name} failed`)));
+    assert.equal(f.calls.filter((call) => call.includes('list-images')).length, 2);
+    assert.equal(
+      f.calls.some((call) => call.includes('remove') && call.includes(f.name)),
+      imagePresent,
+    );
+    assert.ok(!f.calls.some((call) => call.includes('start') || call.includes('poweroff')));
+  });
+}
+
+test('failed clone cleanup reports the image removal failure', (t) => {
+  const f = fakeHost(t);
+  let cloned = false;
+  const result = checkHost({
+    ...f,
+    run: (cmd, args) => {
+      const value = f.run(cmd, args);
+      if (args.includes('clone') && args.includes(f.name)) {
+        cloned = true;
+        return { status: 1, stderr: 'clone failed' };
+      }
+      if (cloned && args.includes('list-images'))
+        return { status: 0, stdout: `${f.name} subvolume no\n` };
+      if (args.includes('remove')) return { status: 1, stderr: 'remove failed' };
+      return value;
+    },
+  });
+  assert.equal(result.ok, false);
+  assert.ok(result.errors.some((error) => error.includes('remove failed')));
+  assert.ok(f.calls.some((call) => call.includes('remove') && call.includes(f.name)));
+});
