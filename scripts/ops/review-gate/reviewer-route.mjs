@@ -13,12 +13,7 @@ export const CLAUDE_DENIED_TOOLS = [
 export const DIFF_LIMIT = 100_000;
 
 export function claudeFallback(authorVendor, run) {
-  return (
-    Boolean(authorVendor) &&
-    authorVendor !== 'anthropic' &&
-    run.status !== 0 &&
-    /no usable model/.test(run.stderr)
-  );
+  return authorVendor !== 'anthropic' && run.status !== 0 && /no usable model/.test(run.stderr);
 }
 
 export function claudeReviewArgs() {

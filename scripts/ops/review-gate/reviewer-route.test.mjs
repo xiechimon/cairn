@@ -33,8 +33,11 @@ test('Claude never reviews a Claude-authored PR', () => {
   assert.equal(claudeFallback('anthropic', noModel), false);
 });
 
-test('no fallback without an excluded author or on other failures', () => {
-  assert.equal(claudeFallback(null, noModel), false);
+test('a PR whose author vendor is unknown falls back to Claude when no model is usable', () => {
+  assert.equal(claudeFallback(null, noModel), true);
+});
+
+test('no fallback on other failures', () => {
   assert.equal(claudeFallback('openai', { status: 1, stderr: 'timeout' }), false);
   assert.equal(claudeFallback('openai', { status: 0, stderr: 'no usable model' }), false);
 });
