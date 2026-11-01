@@ -21,6 +21,19 @@
 import { PROBE_TOOL_CALL_LABEL, PROBE_TOOL_PILLS } from '../fixtures/fixtures.js';
 
 export const EN: Record<string, string> = {
+  Archive: 'Archive',
+  'Could not unarchive task.': 'Could not unarchive task.',
+  'Task archived': 'Task archived',
+  Undo: 'Undo',
+  'Could not archive task.': 'Could not archive task.',
+  '{name}: Claude subscription token expired. Run `claude setup-token` and add a new connection.':
+    '{name}: Claude subscription token expired. Run `claude setup-token` and add a new connection.',
+  '{name}: Claude subscription token expires in {days} days. Run `claude setup-token` and add a new connection.':
+    '{name}: Claude subscription token expires in {days} days. Run `claude setup-token` and add a new connection.',
+  Archived: 'Archived',
+  Agent: 'Agent',
+  'Unarchive to continue': 'Unarchive to continue',
+
   '思考 {n} 次': 'Thought {n#once|# times}',
   '读了 {n} 个文件': 'Read {n#1 file|# files}',
   '{n} 行未改动': '{n#1 unmodified line|# unmodified lines}',
