@@ -14,7 +14,7 @@ import type { FileMentionEntry, MentionGroups } from '../overlay/mention-token.j
 import { SlashHelp, SlashMenu } from '../overlay/slash-menu.js';
 
 const COMPOSER_CARD =
-  'composer relative mx-auto mb-4 w-[calc(100%-2rem)] max-w-(--chat-max-w) flex-none rounded-(--radius-composer) border-0 bg-(--card) shadow-(--shadow-composer) transition-[box-shadow] duration-[220ms] ease-(--ease-out-expo) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)';
+  'composer relative mx-auto mb-[max(var(--composer-bottom-gap),env(safe-area-inset-bottom))] w-[calc(100%-2rem)] max-w-(--chat-max-w) flex-none rounded-(--radius-composer) border-0 bg-(--card) shadow-(--shadow-composer) transition-[box-shadow] duration-[220ms] ease-(--ease-out-expo) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)';
 const COMPOSER_PLACEHOLDER = 'px-4 pt-3 text-ui';
 const COMPOSER_INPUT =
   "field-sizing-fixed h-12 min-h-0 max-h-(--composer-max-h) overflow-y-auto resize-none border-none bg-transparent px-4 pt-3 pb-0 [font-family:var(--font-inter),Inter,system-ui,-apple-system,'PingFang_SC','Microsoft_YaHei',sans-serif] text-ui text-(--foreground) tabular-nums transition-none outline-none placeholder:text-(--text-secondary) focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent";

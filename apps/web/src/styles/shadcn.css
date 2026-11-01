@@ -196,6 +196,7 @@
   --sidebar-w: 248px;
   --chat-max-w: 768px;
   --composer-max-h: 384px;
+  --composer-bottom-gap: 24px;
   --scroll-fade-size: 28px;
   --chat-extra-space: 35vh;
   --font-size-caption: calc(0.6875rem * var(--rem-scale));
