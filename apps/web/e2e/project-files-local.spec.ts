@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
-const LOCAL = '/app/project/ZAQczKCu0MOAzC1ZqcFlX?scenario=prj-local-files';
-const HOSTED = '/app/project/ZAQczKCu0MOAzC1ZqcFlX?scenario=r2-24';
+const LOCAL = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=prj-local-files';
+const HOSTED = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=r2-24';
 const OLD_DISABLE_LINE = '本地仓库项目暂不支持在线浏览文件';
 const LOCAL_README_LINE = '本地仓库：用户本机既有 git 工作树仓，Files tab 直读工作树 HEAD。';
 

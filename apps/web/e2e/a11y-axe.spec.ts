@@ -74,7 +74,7 @@ const PAGES: AuditPage[] = [
   { name: 'schedules form', url: '/app/schedules?scenario=r3-92', ready: (p) => p.getByRole('dialog', { name: '新建定时' }) },
   {
     name: 'project tasks',
-    url: '/app/project/ZAQczKCu0MOAzC1ZqcFlX?scenario=prj-tasks&tab=tasks',
+    url: '/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=prj-tasks&tab=tasks',
     ready: (p) => p.getByTestId('task-row').first(),
   },
   {

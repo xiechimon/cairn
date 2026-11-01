@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-const PROJ = '/app/project/ZAQczKCu0MOAzC1ZqcFlX';
+const PROJ = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/files';
 
 interface Control {
   name: string;

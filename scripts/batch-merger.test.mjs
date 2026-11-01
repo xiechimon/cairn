@@ -511,11 +511,10 @@ for (const [name, data, reason] of [
     { numstat: '-\t-\tapps/web/src/page.ts\n' },
     'binary files outside docs/verify',
   ],
-  ['line limit', { numstat: '401\t400\tapps/web/src/page.ts\n' }, '801 lines changed'],
   [
-    'file limit',
-    { numstat: Array.from({ length: 41 }, (_, i) => `1\t0\tapps/web/src/page${i}.ts\n`).join('') },
-    '41 files changed',
+    'security surface beside an oversize patch',
+    { numstat: `401\t400\tapps/web/src/page.ts\n1\t0\tapps/server/src/services/secrets.ts\n` },
+    'protected paths: apps/server/src/services/secrets.ts',
   ],
 ])
   test(`owner routing blocks ${name}`, (t) => {
@@ -547,18 +546,40 @@ test('an evidence binary stays eligible', (t) => {
     1,
   );
 });
-test('product lines beside evidence still hit the line limit', (t) => {
+const manyFiles = (n) =>
+  Array.from({ length: n }, (_, i) => `1\t0\tapps/web/src/page${i}.ts\n`).join('');
+const withoutSizeSection = (data) => ({
+  ...data,
+  checks: required.map((name, id) => ({
+    name,
+    id,
+    head_sha: head,
+    status: 'completed',
+    conclusion: name === 'pr-evidence' ? 'failure' : 'success',
+    app: { slug: 'github-actions' },
+  })),
+});
+test('product lines beside evidence over the line limit go to the size review, not the owner', (t) => {
   const f = fixture(t, {
     numstat: '401\t400\tapps/web/src/page.ts\n900\t0\tdocs/verify/2371/run.txt\n',
   });
-  assert.equal(f.queues.length, 0);
-  assert.ok(f.result.stdout.includes('801 lines changed'), f.result.stdout);
+  assert.equal(f.queues.length, 1, f.result.stdout);
+  assert.doesNotMatch(f.result.stdout, /owner-route/);
 });
-test('product files beside evidence still hit the file limit', (t) => {
-  const code = Array.from({ length: 41 }, (_, i) => `1\t0\tapps/web/src/page${i}.ts\n`).join('');
-  const f = fixture(t, { numstat: `${code}1\t0\tdocs/verify/2371/run.txt\n` });
+test('product files beside evidence over the file limit go to the size review, not the owner', (t) => {
+  const f = fixture(t, { numstat: `${manyFiles(41)}1\t0\tdocs/verify/2371/run.txt\n` });
+  assert.equal(f.queues.length, 1, f.result.stdout);
+  assert.doesNotMatch(f.result.stdout, /owner-route/);
+});
+test('an oversize patch without the Size section stays blocked by a red pr-evidence', (t) => {
+  const f = fixture(t, withoutSizeSection({ numstat: '401\t400\tapps/web/src/page.ts\n' }));
   assert.equal(f.queues.length, 0);
-  assert.ok(f.result.stdout.includes('41 files changed'), f.result.stdout);
+  assert.ok(f.result.stdout.includes('check:pr-evidence'), f.result.stdout);
+});
+test('an oversize patch with no passing review comment is not queued', (t) => {
+  const f = fixture(t, { numstat: manyFiles(41), comments: [] });
+  assert.equal(f.queues.length, 0);
+  assert.ok(f.result.stdout.includes('review-not-pass'), f.result.stdout);
 });
 test('clean product source remains eligible', (t) => {
   assert.equal(fixture(t).queues.length, 1);
@@ -571,7 +592,7 @@ test('an owner-routed head is labelled and never queued', (t) => {
 });
 
 const marker = `<!-- batch-merger-owner-route:${head} -->`;
-const oversize = { numstat: '401\t400\tapps/web/src/page.ts\n' };
+const ownerRouted = { numstat: '1\t0\tdocs/adr/0028.md\n' };
 const writes = (f) => f.calls.filter((args) => args.includes('--method'));
 const ownerComments = (f) => writes(f).filter((args) => args[1].endsWith('/issues/1/comments'));
 const labelAdds = (f) => writes(f).filter((args) => args[1].endsWith('/issues/1/labels'));
@@ -584,21 +605,21 @@ const markerComment = (sha = head) => ({
 const labelled = [{ name: 'review-gate' }, { name: 'owner-route' }];
 
 test('an owner-routed head gets one marked comment with reasons and the label', (t) => {
-  const f = fixture(t, oversize);
+  const f = fixture(t, ownerRouted);
   assert.equal(f.result.status, 0, f.result.stdout + f.result.stderr);
   assert.equal(f.queues.length, 0);
   const comments = ownerComments(f);
   assert.equal(comments.length, 1);
   const payload = JSON.parse(comments[0].at(-1));
   assert.ok(payload.body.startsWith(marker));
-  assert.ok(payload.body.includes('801 lines changed'));
+  assert.ok(payload.body.includes('protected paths: docs/adr/0028.md'));
   const adds = labelAdds(f);
   assert.equal(adds.length, 1);
   assert.deepEqual(JSON.parse(adds[0].at(-1)), { labels: ['owner-route'] });
 });
 test('a second pass on the same head does not comment again', (t) => {
   const f = fixture(t, {
-    ...oversize,
+    ...ownerRouted,
     comments: [markerComment(), ...defaultComments],
     pulls: [{ ...pull(), labels: labelled }],
   });
@@ -607,13 +628,13 @@ test('a second pass on the same head does not comment again', (t) => {
   assert.match(f.result.stdout, /owner-route/);
 });
 test('an already commented head missing the label only gets the label', (t) => {
-  const f = fixture(t, { ...oversize, comments: [markerComment(), ...defaultComments] });
+  const f = fixture(t, { ...ownerRouted, comments: [markerComment(), ...defaultComments] });
   assert.equal(ownerComments(f).length, 0);
   assert.equal(labelAdds(f).length, 1);
 });
 test('a new head gets a new comment', (t) => {
   const f = fixture(t, {
-    ...oversize,
+    ...ownerRouted,
     comments: [markerComment('c'.repeat(40)), ...defaultComments],
     pulls: [{ ...pull(), labels: labelled }],
   });
@@ -643,13 +664,13 @@ test('a PR without the label is not unlabelled', (t) => {
   assert.equal(labelRemovals(fixture(t)).length, 0);
 });
 test('a failed owner-route comment is an error and never merges', (t) => {
-  const f = fixture(t, { ...oversize, writeError: true, pulls: [pull(), pull(2)] });
+  const f = fixture(t, { ...ownerRouted, writeError: true, pulls: [pull(), pull(2)] });
   assert.equal(f.result.status, 1);
   assert.equal(f.queues.length, 0);
   assert.match(f.result.stdout, /"action":"error"/);
 });
 test('dry-run reports the owner-route mark without writing', (t) => {
-  const f = fixture(t, { ...oversize, args: ['--dry-run'] });
+  const f = fixture(t, { ...ownerRouted, args: ['--dry-run'] });
   assert.equal(f.result.status, 0, f.result.stdout + f.result.stderr);
   assert.equal(writes(f).length, 0);
   assert.match(f.result.stdout, /would-mark-owner-route/);

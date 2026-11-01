@@ -1,7 +1,7 @@
 import { expect, type Page, test } from '@playwright/test';
 
 const PROJECT_ID = 'proj-1097';
-const PROJ = `/app/project/${PROJECT_ID}`;
+const PROJ = `/app/project/${PROJECT_ID}/files`;
 
 const TEAM = { id: 'team-1', name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null };
 const USER = { id: 'user-1', displayName: '我', avatarUrl: null };

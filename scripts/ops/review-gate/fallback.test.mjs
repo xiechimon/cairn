@@ -43,6 +43,7 @@ function host({
   labelled,
   failLabel,
   bigDiff,
+  bulkFiles,
   comments,
   failStatus,
   staleHead,
@@ -109,6 +110,14 @@ function host({
     commit(
       {
         'feature.txt': 'change\n',
+        ...(bulkFiles
+          ? {
+              ...Object.fromEntries(
+                Array.from({ length: bulkFiles }, (_, i) => [`bulk/f${i}.txt`, 'x\n']),
+              ),
+              'docs/verify/2372/run.txt': `${'evidence\n'.repeat(900)}`,
+            }
+          : {}),
         ...(bigDiff
           ? {
               'benign.txt': `${'benign line\n'.repeat(12_000)}`,
@@ -306,6 +315,20 @@ test('a diff over the cap never reaches Claude, so a hidden change cannot PASS',
   const { calls } = host({ author: openai, claude: 'VERDICT: pass', bigDiff: true });
   assert.doesNotMatch(calls, /^claude /m);
   assert.doesNotMatch(calls, /Independent review gate: PASS/);
+});
+
+test('the reviewer is told the PR is oversize and must answer why it is this big', () => {
+  const { home } = host({ author: openai, claude: 'VERDICT: pass', bulkFiles: 41 });
+  const input = readFileSync(join(home, 'claude-input.txt'), 'utf8');
+  assert.match(input, /Size: OVERSIZE, 42 lines, 42 files outside docs\/verify/);
+  assert.match(input, /Why is it this big/);
+});
+
+test('a PR within limits gets the size facts without the oversize question', () => {
+  const { home } = host({ author: openai, claude: 'VERDICT: pass' });
+  const input = readFileSync(join(home, 'claude-input.txt'), 'utf8');
+  assert.match(input, /Size: within limits, 1 lines, 1 files outside docs\/verify/);
+  assert.doesNotMatch(input, /Size: OVERSIZE/);
 });
 
 test('a PASS publishes a success status on the reviewed head, after a pending one', () => {

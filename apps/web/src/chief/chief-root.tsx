@@ -27,6 +27,10 @@ export function useChiefRoot(): ChiefRootApi {
   return api;
 }
 
+function isProjectHome(pathname: string): boolean {
+  return /^\/app\/project\/[^/]+$/.test(pathname) && pathname !== '/app/project/new';
+}
+
 function isDetailRoute(pathname: string): boolean {
   return pathname.startsWith('/app/todo/');
 }
@@ -71,9 +75,10 @@ export function ChiefRoot() {
     () => ({ surface, openChiefThread: setLinkThreadId }),
     [surface],
   );
-  const windowOpen = surface.chiefView === 'drawer' && !onHome;
+  const ownsConversation = onHome || isProjectHome(pathname);
+  const windowOpen = surface.chiefView === 'drawer' && !ownsConversation;
   const fabVisible =
-    !onHome && !windowOpen && (!isDetailRoute(pathname) || surface.chiefUnread > 0);
+    !ownsConversation && !windowOpen && (!isDetailRoute(pathname) || surface.chiefUnread > 0);
   const fabExpanded = surface.chiefUnread > 0 || surface.chiefBusy;
   return (
     <ChiefRootContext.Provider value={api}>
@@ -128,7 +133,7 @@ export function ChiefRoot() {
             </TooltipContent>
           </Tooltip>
         )}
-        {!onHome && (
+        {!ownsConversation && (
           <ChiefDrawer
             open={windowOpen}
             chief={surface.chiefData}

@@ -1,7 +1,7 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import { settleTransitions } from './helpers.js';
 
-const PROJ = '/app/project/ZAQczKCu0MOAzC1ZqcFlX';
+const PROJ = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/files';
 
 const CARD_DARK = 'rgb(34, 39, 35)';
 const CARD_LIGHT = 'rgb(253, 253, 251)';
