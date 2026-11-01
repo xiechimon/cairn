@@ -119,7 +119,10 @@ for (const theme of ['light', 'dark'] as const) {
       page,
     }) => {
       await page.setViewportSize({ width, height: width === 390 ? 844 : 732 });
-      await page.addInitScript((value) => localStorage.setItem('cairn-theme', value), theme);
+      await page.addInitScript((value) => {
+        localStorage.setItem('cairn-theme', value);
+        localStorage.setItem('cairn.locale', 'zh');
+      }, theme);
       await page.goto('/app/team?scenario=01');
       if (width === 390) await page.locator('.app-menu-trigger').click();
       const brand = page.locator('.sidebar-team-name');
@@ -142,7 +145,10 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(brand).toHaveCSS('box-shadow', 'none');
       await keyboardFocus(page, brand);
       expect(await readRing(brand)).toEqual({ focused: true, outline: 'solid 2px', clippedBy: [] });
-      await page.locator('[data-slot="sidebar-nav-row"]').filter({ hasText: 'Projects' }).click();
+      await page
+        .getByRole('complementary')
+        .locator('[data-slot="sidebar-nav-row"]', { hasText: '工作台' })
+        .click();
       await expect(page).toHaveURL('/app?scenario=01');
       if (width === 390) await page.locator('.app-menu-trigger').click();
       await page.mouse.move(width - 1, 500);
