@@ -18,6 +18,9 @@ import { WorkspaceManager } from '../workspace.js';
 import { type OrbFrame, orbReleaseKeySchema } from './protocol.js';
 import { OrbStaleReleaseError, RelayMachineApi } from './relay.js';
 
+export const ORB_AGENT_HOME = '/home/agent';
+export const ORB_WORKSPACES_ROOT = `${ORB_AGENT_HOME}/work`;
+
 export async function runOrbWorker(options: {
   socketPath: string;
   entryPath?: string;
@@ -106,8 +109,8 @@ export async function runOrbWorker(options: {
           send({ type: 'log', message: args.at(-1) ?? '' }),
     });
     setupProxy(logger, { ...process.env, ...input.options.env });
-    const workspacesDir = options.workspacesRoot ?? '/work';
-    const paths = statePaths(options.home ?? '/home/agent/.cairn', workspacesDir);
+    const workspacesDir = options.workspacesRoot ?? ORB_WORKSPACES_ROOT;
+    const paths = statePaths(options.home ?? `${ORB_AGENT_HOME}/.cairn`, workspacesDir);
     ensureStateDirs(paths);
     const backends = new Map<string, AgentBackend>();
     const backendFor =
@@ -174,7 +177,7 @@ export async function runOrbWorker(options: {
           }
         })(paths.outboxDir),
         workspacesDir,
-        mcpConfigPath: '/home/agent/.cairn/mcp.json',
+        mcpConfigPath: `${ORB_AGENT_HOME}/.cairn/mcp.json`,
         machineName: input.machineName,
         workspace: new (class extends WorkspaceManager {
           override async push(...args: Parameters<WorkspaceManager['push']>): Promise<void> {
