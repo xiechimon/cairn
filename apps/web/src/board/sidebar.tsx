@@ -28,7 +28,8 @@ import {
   useState,
 } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import { useApiMutations, useNotifications } from '../api/hooks.js';
+import { useApiMutations, useArchivedTodos, useNotifications } from '../api/hooks.js';
+import { toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { SidebarNavRow } from '../components/shell/sidebar-nav-row.js';
 import { SidebarUser } from '../components/shell/sidebar-user.js';
@@ -40,7 +41,15 @@ import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { blockDemoWrite, DEMO_MODE } from '../demo/demo-gate.js';
 import { UserMenu } from '../detail/user-menu.js';
-import { isArchived, isDeleted, markArchived, markDeleted } from '../fixtures/deletions.js';
+import {
+  isDeleted,
+  isThreadArchived,
+  markArchived,
+  markDeleted,
+  markRenamed,
+  markUnarchived,
+  withRenamedTitles,
+} from '../fixtures/deletions.js';
 import { PROJECT_ID, PROJECT_NAME } from '../fixtures/fixtures.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { setFixtureSnooze, subscribeFixtureSnooze, withFixtureSnooze } from '../fixtures/snooze.js';
@@ -54,7 +63,14 @@ import { readStoredTheme } from '../theme.js';
 import { withColumnParam } from './columns.js';
 import { withoutBoardView } from './home.js';
 import { ProjectAvatar } from './project-avatar.js';
-import { ProjectGroup, projectThreads, SnoozedThreadGroup, threadHref } from './sidebar-threads.js';
+import { RenameThreadDialog } from './rename-dialog.js';
+import {
+  ArchivedThreadGroup,
+  ProjectGroup,
+  projectThreads,
+  SnoozedThreadGroup,
+  threadHref,
+} from './sidebar-threads.js';
 import { SnoozeConfirmDialog, SnoozePickDialog } from './snooze-dialogs.js';
 import { presetInstant, type SnoozeChoice, type SnoozeRequest } from './snooze-presets.js';
 import { keepThreadUnread } from './thread-read-keep.js';
@@ -232,6 +248,7 @@ export function BoardSidebar({
   const [pendingDelete, setPendingDelete] = useState<TodoRecord | null>(null);
   const [pendingSnooze, setPendingSnooze] = useState<TodoRecord | null>(null);
   const [pendingPick, setPendingPick] = useState<TodoRecord | null>(null);
+  const [pendingRename, setPendingRename] = useState<TodoRecord | null>(null);
   const { search, pathname } = useLocation();
   const stripped = withoutBoardView(withColumnParam(search, null));
   const baseParams = new URLSearchParams(stripped.startsWith('?') ? stripped.slice(1) : stripped);
@@ -243,9 +260,14 @@ export function BoardSidebar({
     () => (projects ?? [CANON_PROJECT]).filter((row) => !isDeleted(row.id)),
     [projects],
   );
-  const openThreads = (live ? (todos ?? []) : withFixtureSnooze(todos ?? [])).filter(
-    (todo) => todo.archivedAt == null && !isDeleted(todo.id) && !isArchived(todo.id),
-  );
+  const archivedQ = useArchivedTodos(teamId, live);
+  const knownThreads = live
+    ? (todos ?? [])
+    : withFixtureSnooze(withRenamedTitles(todos ?? [])).filter((todo) => !isDeleted(todo.id));
+  const openThreads = knownThreads.filter((todo) => !isThreadArchived(todo) && !isDeleted(todo.id));
+  const archivedThreads = live
+    ? (archivedQ.data ?? []).map(toDisplayTodo).filter((todo) => !isDeleted(todo.id))
+    : knownThreads.filter((todo) => isThreadArchived(todo));
   const liveThreads = openThreads.filter((todo) => todo.snoozeMode == null);
   const snoozedThreads = openThreads.filter((todo) => todo.snoozeMode != null);
   const activeThreadId = pathname.startsWith('/app/todo/')
@@ -293,7 +315,12 @@ export function BoardSidebar({
 
   const goTo = (target: string) => navigate({ pathname: target, search: plain });
   const unarchiveThread = (todo: TodoRecord) => {
-    if (!live) return;
+    if (!live) {
+      if (blockDemoWrite()) return;
+      markUnarchived(todo.id);
+      refresh();
+      return;
+    }
     mutations.setTodoArchived.mutate(
       { id: todo.id, archived: false },
       { onError: (error) => toastError(t('Could not unarchive task.'), error) },
@@ -353,6 +380,19 @@ export function BoardSidebar({
           }),
         onError: (error) => toastError(t('Could not archive task.'), error),
       },
+    );
+  };
+  const renameThread = (todo: TodoRecord, title: string) => {
+    setPendingRename(null);
+    if (!live) {
+      if (blockDemoWrite()) return;
+      markRenamed(todo.id, title);
+      refresh();
+      return;
+    }
+    mutations.patchTodo.mutate(
+      { id: todo.id, body: { title } },
+      { onError: (error) => toastError(t('无法重命名线程。'), error) },
     );
   };
   const confirmDeleteThread = () => {
@@ -644,6 +684,7 @@ export function BoardSidebar({
                 onOpenProject={() => goTo(href)}
                 onOpenThread={(todo) => goTo(threadHref(todo.id))}
                 onMarkUnread={markThreadUnread}
+                onRename={setPendingRename}
                 onSnooze={chooseSnooze}
                 onArchive={archiveThread}
                 onDelete={setPendingDelete}
@@ -656,6 +697,14 @@ export function BoardSidebar({
             activeThreadId={activeThreadId}
             onOpenThread={(todo) => goTo(threadHref(todo.id))}
             onUnsnooze={unsnoozeThread}
+          />
+        )}
+        {!groupCollapsed.project && (
+          <ArchivedThreadGroup
+            threads={archivedThreads}
+            activeThreadId={activeThreadId}
+            onOpenThread={(todo) => goTo(threadHref(todo.id))}
+            onUnarchive={unarchiveThread}
           />
         )}
       </nav>
@@ -746,6 +795,13 @@ export function BoardSidebar({
             setPendingPick(null);
             applySnooze(todo, at);
           }}
+        />
+      )}
+      {pendingRename != null && (
+        <RenameThreadDialog
+          initialTitle={pendingRename.title}
+          onClose={() => setPendingRename(null)}
+          onSave={(title) => renameThread(pendingRename, title)}
         />
       )}
       <DeleteConfirm

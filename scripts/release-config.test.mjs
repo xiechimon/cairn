@@ -153,7 +153,7 @@ jobs:
 
   publish:
     needs: pack
-    if: needs.pack.outputs.count != '0'
+    if: needs.pack.outputs.count != '0' && github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: npm
     timeout-minutes: 75
@@ -162,6 +162,15 @@ jobs:
       contents: write
       id-token: write
     steps:
+      - name: Refuse to publish outside a push to main
+        env:
+          EVENT_NAME: \${{ github.event_name }}
+          REF: \${{ github.ref }}
+        run: |
+          if [[ "$EVENT_NAME" != "push" || "$REF" != "refs/heads/main" ]]; then
+            echo "::error::Publishing requires a push to refs/heads/main, got $EVENT_NAME on $REF"
+            exit 1
+          fi
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 0
@@ -320,6 +329,16 @@ export const workflowFixtures = [
     before: '    runs-on: ubuntu-latest\n    environment: npm\n',
     after: '    runs-on: ubuntu-latest\n',
   },
+  {
+    name: '24: publish job without the main push guard',
+    before: " && github.event_name == 'push' && github.ref == 'refs/heads/main'",
+    after: '',
+  },
+  {
+    name: '25: publish guard step weakened to another ref',
+    before: '"$REF" != "refs/heads/main"',
+    after: '"$REF" != "refs/heads/release"',
+  },
 ];
 
 test('the release workflow matches the pinned text', () => {
@@ -357,3 +376,13 @@ for (const { name, before, after } of workflowFixtures) {
     ]);
   });
 }
+
+test('the publish job refuses anything but a push to main twice over', () => {
+  const publishJob = expectedReleaseWorkflow.slice(expectedReleaseWorkflow.indexOf('  publish:'));
+  assert.match(
+    publishJob,
+    /^ {4}if: .*github\.event_name == 'push' && github\.ref == 'refs\/heads\/main'$/m,
+  );
+  assert.match(publishJob, /^ {4}steps:\n {6}- name: Refuse to publish outside a push to main\n/m);
+  assert.match(publishJob, /"\$EVENT_NAME" != "push" \|\| "\$REF" != "refs\/heads\/main"/);
+});
