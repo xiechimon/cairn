@@ -475,7 +475,7 @@
   .board-topbar,
   [data-testid="page-topbar"],
   [data-testid="chief-settings-topbar"],
-  .task-panel [data-panel-head] {
+  .side-panel [data-panel-head] {
     padding-left: 52px;
   }
 

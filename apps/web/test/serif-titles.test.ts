@@ -36,6 +36,11 @@ describe('the greeting and page titles use the serif title voice (DESIGN.md Typo
   it('the project home title and first-run headline stay serif', () => {
     const page = readFileSync(join(SRC, 'pages/project-home.tsx'), 'utf8');
     expect(page).not.toMatch(/font-heading/);
-    expect(page).toContain('<Greeting wrap>');
+    expect(page).toContain('<Greeting as="h2" wrap>');
+  });
+
+  it('the page-size title menu trigger is serif', () => {
+    const trigger = readFileSync(join(SRC, 'components/title-menu-trigger.tsx'), 'utf8');
+    expect(trigger).toMatch(/page: '[^']*font-serif text-page/);
   });
 });
