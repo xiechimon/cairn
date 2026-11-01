@@ -1,3 +1,5 @@
+import { BRAND_MARK_PATH, BRAND_MARK_VIEWBOX } from '../../lib/brand-mark.js';
+
 export type TextureFilter = 'ascii' | 'dither';
 
 export type Rgb = readonly [number, number, number];
@@ -41,14 +43,6 @@ export function sweepField(x: number, phase: number): number {
   return Math.max(0, 1 - Math.abs(x - phase) * 3.2) * 0.85;
 }
 
-const SPIRAL_ARCS = [
-  'M0 0 A84 84 0 0 1 168 0',
-  'M168 0 A140 140 0 0 1 -112 0',
-  'M-112 0 A196 196 0 0 1 280 0',
-  'M280 0 A252 252 0 0 1 -224 0',
-  'M-224 0 A308 308 0 0 1 392 0',
-];
-
 export interface SpiralFrame {
   cx: number;
   cy: number;
@@ -74,23 +68,22 @@ export function paintSpiral(
 ): void {
   ctx.fillStyle = 'white';
   ctx.fillRect(0, 0, width, height);
-  const k = (Math.min(width, height) * frame.scale) / 760;
+  const [x, y, size] = BRAND_MARK_VIEWBOX;
+  const k = (Math.min(width, height) * frame.scale) / size / 1.28;
+  const mark = new Path2D(BRAND_MARK_PATH);
   ctx.save();
   ctx.translate(width * frame.cx, height * frame.cy);
   ctx.rotate(frame.rotate);
   ctx.scale(k, k);
-  ctx.translate(-84, 28);
-  ctx.lineCap = 'round';
-  SPIRAL_ARCS.forEach((d, n) => {
-    const path = new Path2D(d);
-    const step = frame.grow ? n : 2;
+  ctx.translate(-(x + size / 2), -(y + size / 2));
+  if (frame.grow) {
+    ctx.lineJoin = 'round';
     ctx.strokeStyle = 'rgb(0 0 0 / 0.14)';
-    ctx.lineWidth = 40 + step * 26;
-    ctx.stroke(path);
-    ctx.strokeStyle = `rgb(0 0 0 / ${frame.grow ? 0.95 - n * 0.08 : 0.95})`;
-    ctx.lineWidth = 22 + step * 12;
-    ctx.stroke(path);
-  });
+    ctx.lineWidth = size * 0.07;
+    ctx.stroke(mark);
+  }
+  ctx.fillStyle = 'rgb(0 0 0 / 0.95)';
+  ctx.fill(mark);
   ctx.restore();
 }
 
