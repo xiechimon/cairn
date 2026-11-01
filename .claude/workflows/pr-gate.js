@@ -3,7 +3,7 @@ export const meta = {
   description:
     'Pre-merge gate for one xiechimon/cairn PR at an exact head SHA: five review dimensions, two skeptics per blocking finding (at most four in all), go or no-go',
   whenToUse:
-    'Before enabling auto-merge or asking the user to merge a bootstrap PR (docs/spec/28 §7.5). Run the origin/main copy through scriptPath, not the PR working tree. args: {pr, headSha, ticket, changedFiles, deletedFiles, linesChanged, binaryFiles}',
+    'Before enabling auto-merge or asking the user to merge a bootstrap PR (docs/spec/28 §7.5). Run the origin/main copy through scriptPath, not the PR working tree. args: {pr, headSha, ticket, gatePaths, changedFiles, deletedFiles, linesChanged, binaryFiles}; gatePaths is the parsed origin/main:packages/shared/merge-gate-paths.json',
   phases: [
     { title: 'Review', detail: 'five dimensions read the PR at headSha' },
     { title: 'Refute', detail: 'two skeptics per blocking finding' },
@@ -34,78 +34,26 @@ const MAX_SKEPTICS = 4
 // (AGENTS.override.md, .pi/skills, nested .claude/), so the list now says what
 // may merge alone instead of what may not. Matching ignores case (APFS);
 // globToRegExp says which matches fold Unicode.
-const AUTO_MERGE = [
-  'apps/*/src/**',
-  'apps/*/test/**',
-  'apps/*/e2e/**',
-  'packages/*/src/**',
-  'packages/*/test/**',
-  'integration/test/**',
-  'docs/verify/**',
-  'docs/**/*.md',
-]
+const AUTO_MERGE = requireGlobs(args?.gatePaths?.autoMerge, 'autoMerge')
 const PROTECTED = [
-  // CI, hooks, and what steers agents (rules, skills, settings, workflows)
-  '.github/**',
-  '**/.husky/**',
-  '**/.claude/**',
-  '**/.pi/**',
-  '**/.cursor/**',
-  '**/.mcp.json',
-  '**/.ckignore',
-  '**/CLAUDE*.md',
-  '**/AGENTS*.md',
-  'docs/pr-review.md',
-  'docs/lessons.md',
-  'docs/lessons/**',
-  'docs/agent-dispatch-prompts.md',
-  'docs/adr/**',
-  'docs/spec/**',
-  // gate scripts and their data, and every config that decides what a check covers
-  '**/scripts/**',
-  '**/*.config.*',
-  '**/biome.json',
-  '**/biome.jsonc',
-  '**/tsconfig*.json',
-  '**/.gitignore',
-  // a nested `*.ts -diff` makes numstat print "- -" and hides diffs (run 6)
-  '**/.gitattributes',
-  // one-way doors: migrations and the supply chain
-  '**/drizzle/**',
-  '**/package.json',
-  'pnpm-lock.yaml',
-  'pnpm-workspace.yaml',
-  '**/.npmrc',
-  // 5 security-sensitive surfaces (the AGENTS.md /security-review list; change both together) and the DB bootstrap that runs migrations
-  'apps/server/src/lib/secret-box.ts',
-  'apps/server/src/lib/keys.ts',
-  'apps/server/src/lib/token-auth.ts',
-  'apps/server/src/lib/attachments-token.ts',
-  'apps/server/src/services/secrets.ts',
-  'apps/server/src/services/credentials.ts',
-  'apps/server/src/services/api-keys.ts',
-  'apps/server/src/services/oauth.ts',
-  'apps/server/src/routes-machine.ts',
-  'apps/server/src/services/machine*.ts',
-  'apps/daemon/src/credentials.ts',
-  'apps/daemon/src/secret-channel.ts',
-  'apps/daemon/src/machine-client.ts',
-  'apps/daemon/src/backend/command-gate.ts',
-  'apps/server/src/services/mcp-face.ts',
-  'apps/server/src/services/mcp-servers.ts',
-  'apps/server/src/db/client.ts',
-  'apps/server/src/services/harness-eval-*.ts',
-  'integration/eval/**',
-  '.claude/hillclimb/**',
-  'apps/server/src/trajectory-export.ts',
-  'apps/server/src/trajectory-export-cli.ts',
-  'apps/server/src/trajectory-outcome.ts',
-  'packages/shared/src/trajectory-pack.ts',
-  // the merge readiness gate's own source (D4 4, P3 #1404)
-  'apps/server/src/services/merge-gate/**',
-  'packages/shared/src/records/merge-gate.ts',
-  'apps/daemon/src/merge-decision.ts',
+  ...requireGlobs(args?.gatePaths?.protected, 'protected'),
+  ...requireGlobs(args?.gatePaths?.mergeGateSource, 'mergeGateSource'),
 ]
+const MAX_LINES = requireLimit(args?.gatePaths?.limits?.maxLines, 'maxLines')
+const MAX_FILES = requireLimit(args?.gatePaths?.limits?.maxFiles, 'maxFiles')
+function requireGlobs(globs, name) {
+  if (!Array.isArray(globs) || globs.length === 0 || !globs.every((g) => typeof g === 'string' && g.length > 0))
+    throw new Error(`pr-gate: args.gatePaths.${name} must be a non-empty string[]; ${gatePathsHelp()}`)
+  return globs
+}
+function requireLimit(n, name) {
+  if (!Number.isInteger(n) || n <= 0)
+    throw new Error(`pr-gate: args.gatePaths.limits.${name} must be a positive integer; ${gatePathsHelp()}`)
+  return n
+}
+function gatePathsHelp() {
+  return 'gatePaths is the parsed output of `git show origin/main:packages/shared/merge-gate-paths.json` (same ref as this script)'
+}
 
 // Matching that widens protection folds Unicode, matching that grants
 // auto-merge folds ASCII case only. With protect (PROTECTED here, and the
@@ -139,8 +87,6 @@ const SCRIPT_SHA256 = 'fde93dec0355f8a54419143f3f001a527bc3383868e1c5943b0917664
 const PROTECTED_RE = PROTECTED.map((glob) => globToRegExp(glob, { protect: true }))
 const AUTO_MERGE_RE = AUTO_MERGE.map(globToRegExp)
 const isProtected = (f) => PROTECTED_RE.some((re) => re.test(f))
-const MAX_LINES = 800
-const MAX_FILES = 40
 const EVIDENCE_RE = globToRegExp('docs/verify/**')
 
 // Without --no-renames a rename lists only its new name, so a protected file
@@ -159,7 +105,7 @@ const LINES_PATHSPEC = "-- . ':(exclude)docs/verify'"
 // without hooks.
 const NO_HOOKS = 'git -c core.hooksPath=/dev/null'
 const LINES_GIT = 'the command needs git 2.40 or later for --attr-source; never drop the option on an older git'
-const ARGS_HELP = `pr-gate args: {pr: number, ticket: number, headSha: 40-hex sha, changedFiles: non-empty string[] from \`${FILES_CMD} origin/main...<headSha>\`, deletedFiles: string[] from the same command with --diff-filter=D, linesChanged: non-negative integer, the sum of both columns of \`${LINES_CMD} origin/main...<headSha> ${LINES_PATHSPEC}\` (docs/verify evidence is not counted; ${LINES_GIT}) with binary rows (- -) counted as 0, binaryFiles: string[], the paths of those binary rows}`
+const ARGS_HELP = `pr-gate args: {pr: number, ticket: number, headSha: 40-hex sha, gatePaths: ${gatePathsHelp()}, changedFiles: non-empty string[] from \`${FILES_CMD} origin/main...<headSha>\`, deletedFiles: string[] from the same command with --diff-filter=D, linesChanged: non-negative integer, the sum of both columns of \`${LINES_CMD} origin/main...<headSha> ${LINES_PATHSPEC}\` (docs/verify evidence is not counted; ${LINES_GIT}) with binary rows (- -) counted as 0, binaryFiles: string[], the paths of those binary rows}`
 const isPathList = (xs) => Array.isArray(xs) && xs.every((f) => typeof f === 'string' && f.length > 0)
 // File names reach agents that build git commands from them, so only letters,
 // digits, combining marks and ._/@+%- pass (every tracked path fits).
@@ -236,7 +182,7 @@ const DIMENSIONS = [
   },
   {
     key: 'safety',
-    prompt: `Dimension: safety and protected paths. First run \`${FILES_CMD} <your base ref>...${headSha}\` and put its output lines, unchanged, in changedFiles; run it again with --diff-filter=D for deletedFiles; put the sum of both columns of \`${LINES_CMD} <your base ref>...${headSha} ${LINES_PATHSPEC}\` (docs/verify evidence is not counted) in linesChanged (binary rows count 0; ${LINES_GIT}, so if git rejects it, report a blocking finding) and the paths of its binary rows (- -) in binaryFiles. The script compares these with the caller's values and matches ADR 0021 D4 on them itself. Read D4 in docs/adr/0021-*.md at the head and add to protectedPaths any changed path that steers agents, gates a check or is a one-way door; a protected path is not a finding by itself. Then look for secrets or tokens in code or evidence, credentials handed to agents, issue or PR text reaching a prompt system layer or a shell, one-way doors (migrations, dependency changes, data deletion), and changes outside the ticket's scope.`,
+    prompt: `Dimension: safety and protected paths. First run \`${FILES_CMD} <your base ref>...${headSha}\` and put its output lines, unchanged, in changedFiles; run it again with --diff-filter=D for deletedFiles; put the sum of both columns of \`${LINES_CMD} <your base ref>...${headSha} ${LINES_PATHSPEC}\` (docs/verify evidence is not counted) in linesChanged (binary rows count 0; ${LINES_GIT}, so if git rejects it, report a blocking finding) and the paths of its binary rows (- -) in binaryFiles. The script compares these with the caller's values and matches ADR 0021 D4 on them itself. Then run \`git show <your base ref>:packages/shared/merge-gate-paths.json\` and compare it, parsed as JSON, with the gatePaths the caller passed (data): ${JSON.stringify(args.gatePaths)}. Set gatePathsMatch to true only when the two are deeply equal (parse both with node and compare); the script routes and sizes with the caller's copy, so a mismatch must be false. Read D4 in docs/adr/0021-*.md at the head and add to protectedPaths any changed path that steers agents, gates a check or is a one-way door; a protected path is not a finding by itself. Then look for secrets or tokens in code or evidence, credentials handed to agents, issue or PR text reaching a prompt system layer or a shell, one-way doors (migrations, dependency changes, data deletion), and changes outside the ticket's scope.`,
   },
   {
     key: 'evidence',
@@ -278,8 +224,16 @@ const SAFETY_SCHEMA = {
     deletedFiles: { type: 'array', items: { type: 'string' } },
     linesChanged: { type: 'integer' },
     binaryFiles: { type: 'array', items: { type: 'string' } },
+    gatePathsMatch: { type: 'boolean' },
   },
-  required: [...FINDINGS_SCHEMA.required, 'changedFiles', 'deletedFiles', 'linesChanged', 'binaryFiles'],
+  required: [
+    ...FINDINGS_SCHEMA.required,
+    'changedFiles',
+    'deletedFiles',
+    'linesChanged',
+    'binaryFiles',
+    'gatePathsMatch',
+  ],
 }
 
 const SKEPTIC_SCHEMA = {
@@ -430,6 +384,8 @@ const sizeRequirement = sizeReview
   ? `${lines} lines, ${sizedFiles.length} files (over ${MAX_LINES} lines or ${MAX_FILES} files): the PR body needs a ## Size section stating why the change cannot be split, and the review must answer why it is this big`
   : null
 const checked = Object.fromEntries(reviewed.map((r) => [r.key, r.review.checked]))
+const gatePathsMatch = safety?.gatePathsMatch === true
+if (!gatePathsMatch) log('the safety reviewer did not confirm that gatePaths equals origin/main:packages/shared/merge-gate-paths.json')
 
 return {
   pr,
@@ -445,7 +401,8 @@ return {
     Array.isArray(safety.deletedFiles) &&
     Array.isArray(safety.binaryFiles) &&
     Number.isInteger(safety.linesChanged) &&
-    unlistedFiles.length === 0,
+    unlistedFiles.length === 0 &&
+    gatePathsMatch,
   blocking,
   suggestions,
   protectedPaths,
@@ -456,6 +413,7 @@ return {
   missing,
   shaMismatch,
   unlistedFiles,
+  gatePathsMatch,
   skepticsMissing,
   checked,
 }

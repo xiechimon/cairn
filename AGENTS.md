@@ -13,7 +13,7 @@
 - Do not set `TMPDIR` without `CAIRN_HEAVY_SLOTS_DIR`; all lanes must share the heavy-work slot directory.
 - Run `/security-review` before opening a PR touching any security surface below; fix confirmed findings, or record the reason in Risk and ask ian to confirm an unfixed finding.
 
-Security surfaces (keep this list synchronized with `.claude/workflows/pr-gate.js` and `packages/shared/src/records/merge-gate.ts`):
+Security surfaces (the `credentials`, `machineAndCommandBoundary` and `externalEntryAuth` lists in `packages/shared/merge-gate-paths.json`, the one source for protected and auto-merge paths; `apps/server/test/merge-gate-paths-json.test.ts` fails when this list differs):
 
 - Keys and encryption: `apps/server/src/lib/{secret-box,keys,token-auth,attachments-token}.ts`, `apps/server/src/services/{secrets,credentials,api-keys,oauth}.ts`
 - Machine registration and dispatch protocol: `apps/server/src/routes-machine.ts`, `apps/server/src/services/machine*.ts`, `apps/daemon/src/{credentials,secret-channel,machine-client}.ts`, `apps/daemon/src/backend/command-gate.ts`

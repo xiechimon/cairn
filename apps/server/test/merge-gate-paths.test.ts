@@ -1,12 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import {
-  AUTO_MERGE_PATH_GLOBS,
-  CHIEF_DISPATCH_HARNESS_PATHS,
-  type CompareFile,
-  MERGE_GATE_SOURCE_GLOBS,
-  PROTECTED_PATH_GLOBS,
-} from '@cairn/shared';
+import { CHIEF_DISPATCH_HARNESS_PATHS, type CompareFile } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { classifyPaths, globToRegExp, touchesHarness } from '../src/services/merge-gate/paths.js';
 
@@ -88,6 +82,11 @@ describe('protected categories: any depth, case-insensitive, one true and one fa
       'packages/shared/src/records/review.ts',
     ],
     ['daemon 的合并决定', 'apps/daemon/src/merge-decision.ts', 'apps/daemon/src/merge.ts'],
+    [
+      'path policy JSON',
+      'packages/shared/merge-gate-paths.json',
+      'packages/shared/src/merge-gate-paths.ts',
+    ],
   ];
   for (const [label, hit, miss] of cases) {
     test(label, () => {
@@ -713,21 +712,6 @@ describe('executable extensions: the shell, PowerShell, Windows batch and HTML f
   }
 });
 
-function prGateArray(source: string, name: string): string[] {
-  const lines = source.split('\n');
-  const start = lines.indexOf(`const ${name} = [`);
-  if (start === -1) throw new Error(`pr-gate.js: \`const ${name} = [\` not found`);
-  const end = lines.indexOf(']', start + 1);
-  if (end === -1) throw new Error(`pr-gate.js: closing \`]\` of ${name} not found`);
-  return lines.slice(start + 1, end).flatMap((raw) => {
-    const line = raw.trim();
-    if (line === '' || line.startsWith('//')) return [];
-    const m = /^'([^'\\]+)',?$/.exec(line);
-    if (m?.[1] === undefined) throw new Error(`pr-gate.js: unexpected line in ${name}: ${raw}`);
-    return [m[1]];
-  });
-}
-
 describe('chief-dispatch harness paths', () => {
   test('_state.json.harness_paths and CHIEF_DISPATCH_HARNESS_PATHS item-for-item in the same order', () => {
     const st = JSON.parse(
@@ -752,32 +736,5 @@ describe('chief-dispatch harness paths', () => {
         }),
       ]),
     ).toBe(true);
-  });
-});
-
-describe('the same lists as .claude/workflows/pr-gate.js', () => {
-  const prGate = () =>
-    readFileSync(join(import.meta.dirname, '../../../.claude/workflows/pr-gate.js'), 'utf8');
-
-  test('AUTO_MERGE and AUTO_MERGE_PATH_GLOBS item-for-item in the same order', () => {
-    expect(prGateArray(prGate(), 'AUTO_MERGE')).toEqual([...AUTO_MERGE_PATH_GLOBS]);
-  });
-
-  test('PROTECTED and PROTECTED_PATH_GLOBS plus MERGE_GATE_SOURCE_GLOBS item-for-item in the same order', () => {
-    expect(prGateArray(prGate(), 'PROTECTED')).toEqual([
-      ...PROTECTED_PATH_GLOBS,
-      ...MERGE_GATE_SOURCE_GLOBS,
-    ]);
-  });
-
-  test('the parser errors on a missing array, a missing closing ] and unrecognized lines', () => {
-    expect(() => prGateArray("const X = [\n  'a/**',\n]", 'AUTO_MERGE')).toThrow(/not found/);
-    expect(() => prGateArray("const AUTO_MERGE = [\n  'a/**',\n", 'AUTO_MERGE')).toThrow(/closing/);
-    expect(() => prGateArray("const AUTO_MERGE = [\n  'a/**', 'b/**',\n]", 'AUTO_MERGE')).toThrow(
-      /unexpected line/,
-    );
-    expect(prGateArray("const AUTO_MERGE = [\n  // note's\n  'a/**',\n]", 'AUTO_MERGE')).toEqual([
-      'a/**',
-    ]);
   });
 });
