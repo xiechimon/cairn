@@ -27,6 +27,7 @@ export const H = {} as ChiefHarnessState;
 
 export function toolDeps() {
   return {
+    intakeAgentAllowlist: [AGENT_ID, AGENT2_ID],
     db: H.s.db,
     hub: H.s.hub,
     machineHub: H.s.machineHub,

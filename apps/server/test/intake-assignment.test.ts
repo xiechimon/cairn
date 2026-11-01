@@ -1,8 +1,26 @@
+import { DEFAULT_AUTONOMY_SETTINGS } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, expect, test } from 'vitest';
-import { agent, build, step, todo } from '../src/db/schema.js';
+import { agent, build, plan, project, step, todo } from '../src/db/schema.js';
+import {
+  applyBuildStepAction,
+  dispatchSplitChildren,
+  sendBuildSteer,
+  startBuilds,
+  sweepPlanAutoConfirm,
+} from '../src/services/builds.js';
+import { executeChiefTool } from '../src/services/chief-tools.js';
 import { executeMcpTool } from '../src/services/mcp-face.js';
-import { AGENT_ID, AGENT2_ID, H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
+import { createSplitTodo } from '../src/services/todo-split.js';
+import {
+  AGENT_ID,
+  AGENT2_ID,
+  ctx,
+  H,
+  registerChiefHarness,
+  relay,
+  toolDeps,
+} from './chief-harness.js';
 
 registerChiefHarness();
 afterEach(() => H.s.dispose());
@@ -227,4 +245,234 @@ test('deleting a batch allows ordinary tasks and intake presets that have a buil
     deleted: [normal.id, preset.id],
   });
   expect(H.s.db.select().from(todo).all()).toHaveLength(0);
+});
+
+for (const caller of ['Coordinator', 'MCP', 'split']) {
+  for (const slot of ['plan', 'build'] as const) {
+    for (const change of ['secret', 'MCP server', 'removed from allowlist']) {
+      test(`${caller} refuses an intake ${slot} agent ${change} after import`, async () => {
+        const normal = await assignedTodo(false);
+        const record = await assignedTodo(true);
+        const assignment = { ...record.assignment, [slot]: { agentId: AGENT2_ID } };
+        H.s.db.update(todo).set({ assignment }).where(eq(todo.id, record.id)).run();
+        const deps = { ...toolDeps(), intakeAgentAllowlist: [AGENT_ID, AGENT2_ID] };
+        if (change === 'secret')
+          H.s.db
+            .update(agent)
+            .set({ secrets: ['deploy-key'] })
+            .where(eq(agent.id, AGENT2_ID))
+            .run();
+        if (change === 'MCP server')
+          H.s.db
+            .update(agent)
+            .set({ mcpServers: ['production'] })
+            .where(eq(agent.id, AGENT2_ID))
+            .run();
+        if (change === 'removed from allowlist') deps.intakeAgentAllowlist = [AGENT_ID];
+        const args = {
+          todoIds: [normal.id, record.id],
+          withPlan: false,
+          assignment: { build: { agentId: AGENT_ID } },
+        };
+        await expect(
+          Promise.resolve().then(async () => {
+            if (caller === 'Coordinator') return executeChiefTool(deps, ctx(), 'run_builds', args);
+            if (caller === 'MCP')
+              return executeMcpTool(
+                deps,
+                { teamId: H.teamId, user: H.s.user, grants: new Set() },
+                'run_builds',
+                args,
+              );
+            return createSplitTodo(deps, {
+              parentId: record.id,
+              subtodos: [
+                { title: 'First', spec: 'First part', agentId: AGENT_ID },
+                { title: 'Second', spec: 'Second part', agentId: AGENT_ID },
+              ],
+              chiefAgentId: AGENT_ID,
+              chiefId: H.chiefId,
+              threadId: H.threadId,
+              actorName: 'Coordinator',
+            });
+          }),
+        ).rejects.toMatchObject({
+          status: 409,
+          message: expect.stringMatching(/^agent-label-privileged:/),
+        });
+        expect(H.s.db.select().from(build).all()).toHaveLength(0);
+        expect(H.s.db.select().from(step).all()).toHaveLength(0);
+        expect(H.s.db.select().from(todo).all()).toHaveLength(2);
+        expect(H.s.db.select().from(todo).where(eq(todo.id, record.id)).get()?.assignment).toEqual(
+          assignment,
+        );
+      });
+    }
+  }
+}
+
+test('split inheritance preserves an allowlisted intake preset', async () => {
+  const record = await assignedTodo(true);
+  const result = createSplitTodo(toolDeps(), {
+    parentId: record.id,
+    subtodos: [
+      { title: 'First', spec: 'First part', agentId: AGENT2_ID },
+      { title: 'Second', spec: 'Second part', agentId: AGENT2_ID },
+    ],
+    chiefAgentId: AGENT_ID,
+    chiefId: H.chiefId,
+    threadId: H.threadId,
+    actorName: 'Coordinator',
+  });
+  expect(result.children).toHaveLength(2);
+  for (const child of result.children)
+    expect(H.s.db.select().from(todo).where(eq(todo.id, child.id)).get()?.assignment).toEqual(
+      record.assignment,
+    );
+});
+
+for (const caller of ['Coordinator', 'MCP']) {
+  test(`${caller} fails closed without an intake agent allowlist`, async () => {
+    const record = await assignedTodo(true);
+    const deps = { ...toolDeps(), intakeAgentAllowlist: undefined };
+    const args = { todoIds: [record.id], withPlan: false };
+    const call =
+      caller === 'Coordinator'
+        ? executeChiefTool(deps, ctx(), 'run_builds', args)
+        : executeMcpTool(
+            deps,
+            { teamId: H.teamId, user: H.s.user, grants: new Set() },
+            'run_builds',
+            args,
+          );
+    await expect(call).rejects.toMatchObject({
+      status: 409,
+      message: expect.stringMatching(/^agent-label-privileged:/),
+    });
+    expect(H.s.db.select().from(build).all()).toHaveLength(0);
+  });
+}
+
+for (const caller of ['scheduled start', 'split children', 'plan confirmation', 'continuation']) {
+  for (const change of ['secret', 'MCP server', 'removed from allowlist']) {
+    test(`${caller} rechecks an intake preset after ${change}`, async () => {
+      const record = await assignedTodo(true);
+      const deps = { ...toolDeps(), intakeAgentAllowlist: [AGENT_ID, AGENT2_ID] };
+      if (caller === 'split children') {
+        createSplitTodo(deps, {
+          parentId: record.id,
+          subtodos: [
+            { title: 'First', spec: 'First part', agentId: AGENT2_ID },
+            { title: 'Second', spec: 'Second part', agentId: AGENT2_ID },
+          ],
+          chiefAgentId: AGENT_ID,
+          chiefId: H.chiefId,
+          threadId: H.threadId,
+          actorName: 'Coordinator',
+        });
+      }
+      if (caller === 'plan confirmation' || caller === 'continuation') {
+        await relay('run_builds', {
+          todoIds: [record.id],
+          withPlan: caller === 'plan confirmation',
+        });
+        H.s.db.update(step).set({ status: 'done' }).run();
+        H.s.db
+          .update(todo)
+          .set({ phase: caller === 'plan confirmation' ? 'confirm' : 'building' })
+          .where(eq(todo.id, record.id))
+          .run();
+      }
+      if (change === 'secret')
+        H.s.db
+          .update(agent)
+          .set({ secrets: ['deploy-key'] })
+          .where(eq(agent.id, AGENT_ID))
+          .run();
+      if (change === 'MCP server')
+        H.s.db
+          .update(agent)
+          .set({ mcpServers: ['production'] })
+          .where(eq(agent.id, AGENT_ID))
+          .run();
+      if (change === 'removed from allowlist') deps.intakeAgentAllowlist = [AGENT2_ID];
+      const before = H.s.db.select().from(todo).all();
+      if (caller === 'split children') {
+        expect(dispatchSplitChildren(deps, record.id)).toBe(0);
+      } else {
+        await expect(
+          Promise.resolve().then(async () => {
+            if (caller === 'scheduled start')
+              return startBuilds(deps, {
+                projectId: H.projectId,
+                todoIds: [record.id],
+                assignment: record.assignment,
+                withPlan: false,
+                triggerSource: 'schedule',
+              });
+            const buildId = H.s.db
+              .select()
+              .from(todo)
+              .where(eq(todo.id, record.id))
+              .get()?.latestBuildId;
+            if (!buildId) throw new Error('plan build missing');
+            if (caller === 'continuation')
+              return sendBuildSteer(
+                deps,
+                buildId,
+                { content: 'Scheduled follow-up' },
+                { afterTurn: true, human: false },
+              );
+            return applyBuildStepAction(deps, buildId, { action: 'confirm' });
+          }),
+        ).rejects.toMatchObject({
+          status: 409,
+          message: expect.stringMatching(/^agent-label-privileged:/),
+        });
+      }
+      expect(H.s.db.select().from(todo).all()).toEqual(before);
+      expect(H.s.db.select().from(build).all()).toHaveLength(caller === 'scheduled start' ? 0 : 1);
+      expect(H.s.db.select().from(step).all()).toHaveLength(
+        caller === 'plan confirmation' || caller === 'continuation' ? 1 : 0,
+      );
+    });
+  }
+}
+
+test('a blocked intake plan leaves other automatic confirmations running', async () => {
+  const held = await assignedTodo(true);
+  const ready = await assignedTodo(false);
+  await relay('run_builds', {
+    todoIds: [held.id, ready.id],
+    withPlan: true,
+    assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
+  });
+  H.s.db.update(step).set({ status: 'done' }).run();
+  H.s.db
+    .update(project)
+    .set({ autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, mergePolicy: 'autonomous' } })
+    .where(eq(project.id, H.projectId))
+    .run();
+  for (const record of [held, ready]) {
+    const buildId = H.s.db.select().from(todo).where(eq(todo.id, record.id)).get()?.latestBuildId;
+    if (!buildId) throw new Error('plan build missing');
+    H.s.db
+      .insert(plan)
+      .values({
+        id: `plan-${record.id}`,
+        buildId,
+        content: '# Plan\nKind: fix\nContext: x\n\n## Verification\n- `pnpm test` passes\n',
+        createdAt: 1,
+      })
+      .run();
+    H.s.db.update(todo).set({ phase: 'confirm', phaseAt: 0 }).where(eq(todo.id, record.id)).run();
+  }
+  H.s.db
+    .update(agent)
+    .set({ secrets: ['deploy-key'] })
+    .where(eq(agent.id, AGENT_ID))
+    .run();
+  expect(() => sweepPlanAutoConfirm(toolDeps())).not.toThrow();
+  expect(H.s.db.select().from(todo).where(eq(todo.id, held.id)).get()?.phase).toBe('confirm');
+  expect(H.s.db.select().from(todo).where(eq(todo.id, ready.id)).get()?.phase).toBe('building');
 });

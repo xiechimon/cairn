@@ -314,6 +314,7 @@ export function createIssueIntake(
     githubFetch: FetchLike;
     logger?: IssueIntakeLogger;
     label?: 'ready-for-agent' | 'correction';
+    intakeAgentAllowlist?: readonly string[];
   },
 ): IssueIntake {
   const intakeLabel = run.label ?? ISSUE_INTAKE_LABEL;
@@ -878,7 +879,12 @@ export function createIssueIntake(
         const namedAgents =
           agentLabels.length === 1
             ? deps.db
-                .select({ id: agent.id, secrets: agent.secrets, mcpServers: agent.mcpServers })
+                .select({
+                  id: agent.id,
+                  displayName: agent.displayName,
+                  secrets: agent.secrets,
+                  mcpServers: agent.mcpServers,
+                })
                 .from(agent)
                 .where(
                   and(
@@ -909,6 +915,14 @@ export function createIssueIntake(
           tally.held += 1;
           log(
             { projectId: row.id, issue: issue.number, reason: 'agent-label-privileged' },
+            'issue intake candidate held',
+          );
+          continue;
+        }
+        if (named && !(run.intakeAgentAllowlist ?? []).includes(named.displayName)) {
+          tally.held += 1;
+          log(
+            { projectId: row.id, issue: issue.number, reason: 'agent-label-not-allowlisted' },
             'issue intake candidate held',
           );
           continue;

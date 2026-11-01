@@ -244,7 +244,12 @@ interface World {
 }
 
 async function makeWorld(
-  opts: { chief?: ChiefMode; connection?: boolean; list?: number[] } = {},
+  opts: {
+    chief?: ChiefMode;
+    connection?: boolean;
+    list?: number[];
+    intakeAgentAllowlist?: string[];
+  } = {},
 ): Promise<World> {
   const gh = githubFake(REPO);
   if (opts.list !== undefined) {
@@ -265,6 +270,7 @@ async function makeWorld(
   const intake = createIssueIntake(
     { ...s.svc, box: s.secretBox },
     {
+      intakeAgentAllowlist: opts.intakeAgentAllowlist ?? ['orb-builder'],
       githubFetch: gh.impl,
       logger: { info: (obj, msg) => logs.push({ obj: obj as Record<string, unknown>, msg }) },
     },
@@ -1397,6 +1403,16 @@ describe('opt-in: CAIRN_ISSUE_INTAKE', () => {
     vi.unstubAllEnvs();
   });
 
+  test.each([undefined, '', ' , , '])('empty agent allowlist %j defaults to deny', (value) => {
+    vi.stubEnv('CAIRN_INTAKE_AGENT_ALLOWLIST', value);
+    expect(loadConfig().intakeAgentAllowlist).toEqual([]);
+  });
+
+  test('agent allowlist trims names and ignores empty entries without folding case', () => {
+    vi.stubEnv('CAIRN_INTAKE_AGENT_ALLOWLIST', ' Builder, ,Reviewer , builder,,');
+    expect(loadConfig().intakeAgentAllowlist).toEqual(['Builder', 'Reviewer', 'builder']);
+  });
+
   test('the variable name takes the brand slot', () => {
     expect(ENV_VARS.issueIntake).toBe('CAIRN_ISSUE_INTAKE');
   });
@@ -1609,9 +1625,11 @@ describe('opt-in wiring: index.ts takes the intake run slot via issueIntakeRunOf
     expect(lines[0]?.msg).toContain('CAIRN_ISSUE_INTAKE=1');
   });
 
-  test('on -> the run slot returned as is, one startup log line stating on', () => {
+  test('on -> the run slot carries the configured agent allowlist and logs on', () => {
     const { run, lines } = stubRun();
-    expect(issueIntakeRunOf({ issueIntake: true }, run)).toBe(run);
+    expect(
+      issueIntakeRunOf({ issueIntake: true, intakeAgentAllowlist: ['orb-builder'] }, run),
+    ).toEqual({ ...run, intakeAgentAllowlist: ['orb-builder'] });
     expect(lines).toHaveLength(1);
     expect(lines[0]?.obj.issueIntake).toBe(true);
     expect(lines[0]?.msg).toContain(' on ');
@@ -3317,6 +3335,60 @@ describe('16 merged closing PR', () => {
 });
 
 describe('agent label routing', () => {
+  test.each(
+    [[], ['other-agent'], ['ORB-BUILDER'], ['orb']].map((intakeAgentAllowlist) => ({
+      intakeAgentAllowlist,
+    })),
+  )(
+    'holds a label unless its exact display name is allowlisted: %j',
+    async ({ intakeAgentAllowlist }) => {
+      const w = await makeWorld({ list: [1406], intakeAgentAllowlist });
+      routeLabel(w);
+      builder(w, 'orb-agent');
+      const tally = await w.intake.sweep();
+      expect(tally?.held).toBe(1);
+      expect(takenNumbers(w.s)).toEqual([]);
+      expect(chiefThreads(w.s)).toHaveLength(0);
+      expect(w.logs.some((line) => line.obj.reason === 'agent-label-not-allowlisted')).toBe(true);
+    },
+  );
+
+  test.each(['ready-for-agent', 'correction'] as const)(
+    'scheduler forwards the configured allowlist to %s intake',
+    async (label) => {
+      const w = await makeWorld({ list: [1406] });
+      routeLabel(w);
+      builder(w, 'orb-agent');
+      if (label === 'correction') {
+        const issue = w.gh.state.open.find((item) => item.number === 1406);
+        if (!issue) throw new Error('issue missing');
+        issue.labels = issue.labels.filter((item) => item.name !== LABEL);
+        issue.labels.push({ name: label, color: 'ededed' });
+        w.gh.state.events
+          .get(1406)
+          ?.push(labelEvent('labeled', OWNER, '2026-10-23T00:00:00Z', 90001, label));
+      }
+      const scheduler = createScheduler(
+        { ...w.s.svc, box: w.s.secretBox },
+        { tickMs: 3_600_000 },
+        undefined,
+        undefined,
+        issueIntakeRunOf(loadConfig({ issueIntake: true, intakeAgentAllowlist: ['orb-builder'] }), {
+          githubFetch: w.gh.impl,
+          logger: { info: () => {} },
+        }),
+      );
+      try {
+        scheduler.start();
+        await vi.waitFor(() => {
+          expect(todoOf(w.s, 1406)?.assignment?.build?.agentId).toBe('orb-agent');
+        });
+      } finally {
+        scheduler.stop();
+      }
+    },
+  );
+
   function routeLabel(w: World, labels: string[] = ['agent:orb-builder']): void {
     const issue = w.gh.state.open.find((i) => i.number === 1406);
     if (!issue) throw new Error('issue missing');
@@ -3442,6 +3514,7 @@ describe('agent label routing', () => {
       await executeChiefTool(
         {
           ...w.s.svc,
+          intakeAgentAllowlist: ['orb-builder'],
           box: w.s.secretBox,
           reposDir: w.s.reposDir,
           attachmentsDir: w.s.attachmentsDir,

@@ -18,6 +18,7 @@ export function isChiefConversation(id: string): boolean {
 }
 
 export interface MachineDeps {
+  intakeAgentAllowlist?: readonly string[];
   db: Db;
   hub: TeamStreamHub;
   machineHub: MachineWakeHub;

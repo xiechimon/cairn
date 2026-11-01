@@ -18,9 +18,10 @@ import { verifyApiKey } from './api-keys.js';
 import { readAttachmentMeta } from './attachments.js';
 import { cancelBuild, messageTodo, startBuilds } from './builds.js';
 import type { ChiefToolDeps, TransitionActor } from './chief-tools.js';
-import { confirmBuild, requireIntakeAssignment, transitionTodos } from './chief-tools.js';
+import { confirmBuild, transitionTodos } from './chief-tools.js';
 import { readConversationPage } from './conversation-page.js';
 import { executeGithubReadTool } from './github-reads.js';
+import { requireIntakeAssignment } from './intake-assignment.js';
 import { isChiefConversation } from './machines.js';
 import {
   executeThreadMcpTool,
@@ -153,6 +154,7 @@ export async function executeMcpTool(
 ): Promise<string> {
   const { db } = deps;
   const svc = {
+    intakeAgentAllowlist: deps.intakeAgentAllowlist,
     db,
     hub: deps.hub,
     machineHub: deps.machineHub,
@@ -305,7 +307,7 @@ export async function executeMcpTool(
         return { row, assignment: effectiveAssignment };
       });
       for (const target of targets) {
-        requireIntakeAssignment(target.assignment);
+        requireIntakeAssignment(deps, ctx.teamId, target.assignment);
         for (const slot of [
           target.assignment.plan,
           target.assignment.build,

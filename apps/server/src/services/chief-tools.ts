@@ -1,4 +1,4 @@
-import type { Assignment, SecretBox, UserRecord } from '@cairn/shared';
+import type { SecretBox, UserRecord } from '@cairn/shared';
 import {
   AGENT_TOOL_DEFAULTS,
   createSkillBodySchema,
@@ -43,6 +43,7 @@ import { readConversationPage } from './conversation-page.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { isGithubRepoRef, readFile } from './git.js';
 import { executeGithubReadTool } from './github-reads.js';
+import { requireIntakeAssignment } from './intake-assignment.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { defaultMcpConfigPath, listMcpServers } from './mcp-servers.js';
 import {
@@ -65,6 +66,7 @@ import { createTodo, deleteTodo, getTodo, listTodos, setTodoPhase, updateTodo } 
 import { insertGateAnnouncement } from './transcript.js';
 
 export interface ChiefToolDeps {
+  intakeAgentAllowlist?: readonly string[];
   db: Db;
   hub: TeamStreamHub;
   machineHub?: MachineWakeHub;
@@ -171,19 +173,6 @@ function refuseIntakeSplit(row: typeof todo.$inferSelect): void {
   }
 }
 
-export function requireIntakeAssignment(assignment: Assignment): void {
-  if (
-    assignment.source === 'intake-label' &&
-    assignment.plan === null &&
-    assignment.build === null
-  ) {
-    throw new HttpError(
-      409,
-      'intake-label-assignment-failed: Restore the requested intake agent preset before dispatching this task.',
-    );
-  }
-}
-
 const DOCS_MAX_PATHS = 24;
 
 export const CHIEF_TASK_LIST_MAX_OUTPUT_BYTES = 32 * 1024;
@@ -218,6 +207,7 @@ export async function executeChiefTool(
 ): Promise<string> {
   const { db } = deps;
   const svc = {
+    intakeAgentAllowlist: deps.intakeAgentAllowlist,
     db,
     hub: deps.hub,
     machineHub: deps.machineHub,
@@ -493,6 +483,7 @@ export async function executeChiefTool(
           user: deps.user,
           vapidKeys: deps.vapidKeys,
           convHub: deps.convHub,
+          intakeAgentAllowlist: deps.intakeAgentAllowlist,
         },
         {
           parentId: todoId,
@@ -805,7 +796,7 @@ export async function executeChiefTool(
         };
       });
       for (const target of targets) {
-        requireIntakeAssignment(target.assignment);
+        requireIntakeAssignment(deps, ctx.teamId, target.assignment);
         if (target.assignment.plan === null && target.assignment.build === null) {
           throw new HttpError(
             400,
@@ -825,6 +816,7 @@ export async function executeChiefTool(
       for (const { todoId, row, projectName, assignment } of targets) {
         const builds = startBuilds(
           {
+            intakeAgentAllowlist: deps.intakeAgentAllowlist,
             db,
             hub: deps.hub,
             machineHub: deps.machineHub,
@@ -1023,7 +1015,7 @@ export type TransitionActor = { kind: 'user' | 'agent'; name: string };
 
 export type TransitionDeps = Pick<
   ChiefToolDeps,
-  'db' | 'hub' | 'machineHub' | 'user' | 'vapidKeys' | 'convHub'
+  'db' | 'hub' | 'machineHub' | 'user' | 'vapidKeys' | 'convHub' | 'intakeAgentAllowlist'
 >;
 
 export function transitionTodos(
@@ -1034,6 +1026,7 @@ export function transitionTodos(
   actor: TransitionActor,
 ): { transitioned: string[]; skipped: string[]; reasons?: Record<string, string> } {
   const svc = {
+    intakeAgentAllowlist: deps.intakeAgentAllowlist,
     db: deps.db,
     hub: deps.hub,
     machineHub: deps.machineHub,
@@ -1078,6 +1071,7 @@ export function transitionTodos(
         if (to === 'done' && owned.phase !== 'done') {
           advanceSplitWaves(
             {
+              intakeAgentAllowlist: deps.intakeAgentAllowlist,
               db: deps.db,
               hub: deps.hub,
               machineHub: deps.machineHub,
@@ -1099,6 +1093,7 @@ export function transitionTodos(
 
 function buildDeps(deps: ChiefToolDeps) {
   return {
+    intakeAgentAllowlist: deps.intakeAgentAllowlist,
     db: deps.db,
     hub: deps.hub,
     machineHub: deps.machineHub,
