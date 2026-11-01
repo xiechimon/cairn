@@ -8,11 +8,19 @@ import { fileURLToPath } from 'node:url';
 
 const SCRIPT = fileURLToPath(new URL('./dispatch-agent.mjs', import.meta.url));
 
-function runCli(args, statusDir) {
+function runCli(args, statusDir, env = {}) {
   return spawnSync(process.execPath, [SCRIPT, ...args], {
     encoding: 'utf8',
-    env: { ...process.env, CAIRN_DISPATCH_STATUS_DIR: statusDir },
+    env: { ...process.env, CAIRN_DISPATCH_STATUS_DIR: statusDir, ...env },
   });
+}
+
+async function logShows(path, text) {
+  for (let attempt = 0; attempt < 100; attempt++) {
+    if (readFileSync(path, 'utf8').includes(text)) return true;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  return false;
 }
 
 async function waitUntilDead(pid) {
@@ -51,7 +59,7 @@ test('start verifies the process and writes the status file', async () => {
     assert.equal(record.alive, true);
     assert.equal(record.cwd, workDir);
     assert.ok(record.pid > 0);
-    assert.ok(readFileSync(record.log, 'utf8').includes(workDir));
+    assert.ok(await logShows(record.log, workDir), readFileSync(record.log, 'utf8'));
     process.kill(record.pid, 'SIGKILL');
   } finally {
     rmSync(statusDir, { recursive: true, force: true });
@@ -154,6 +162,7 @@ test('start reports missing when the command dies immediately', () => {
     const result = runCli(
       ['start', 'instant', '--', process.execPath, '-e', 'process.exit(3)'],
       statusDir,
+      { CAIRN_DISPATCH_START_GRACE_MS: '10000' },
     );
     assert.equal(result.status, 1);
     assert.match(`${result.stdout}${result.stderr}`, /process missing/);
