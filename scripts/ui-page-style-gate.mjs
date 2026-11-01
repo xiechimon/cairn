@@ -64,7 +64,7 @@ const CANARY = [
   ['className="text-(--text-secondary) bg-card text-ui"', null],
   ['className="text-red-ink"', null],
   ['style={{ color: tag.color }}', null],
-  ['style={{ background: `var(--project-tile-${n})` }}', null],
+  ["style={{ background: 'var(--project-tile-3)' }}", null],
   ['sourceRef: "xiechimon/cairn#1182"', null],
   ['className="bg-[var(--card)]"', null],
 ];
