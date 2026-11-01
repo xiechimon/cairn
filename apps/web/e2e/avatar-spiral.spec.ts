@@ -73,12 +73,12 @@ test('live members projection: two agents → two distinct seeded srcs; avatarUr
   await expect(gamma.locator('img')).toHaveAttribute('src', override);
 });
 
-test('detail chip popover: user row + `执行对话` agent row both seeded', async ({ page }) => {
+test('detail agent picker: the agent row is seeded by its name', async ({ page }) => {
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=19');
-  const popover = page.getByRole('dialog', { name: '任务分配' });
-  await expect(popover).toBeVisible();
-  await expect(popover.locator('[data-row-kind="owner"] img')).toHaveAttribute('src', USER_SRC);
-  await expect(popover.locator('[data-row-kind="agent"][data-selected] img')).toHaveAttribute(
+  await page.getByTestId('agent-chip').click();
+  const picker = page.getByRole('dialog', { name: '选择执行 Agent' });
+  await expect(picker).toBeVisible();
+  await expect(picker.getByRole('option', { selected: true }).locator('img')).toHaveAttribute(
     'src',
     AGENT_SRC,
   );

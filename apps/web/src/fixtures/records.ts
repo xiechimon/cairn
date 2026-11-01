@@ -120,7 +120,7 @@ export interface BuildOverlayContent {
 export interface OverlayUi {
   searchOpen?: boolean;
   searchQuery?: string;
-  chipPopoverOpen?: boolean;
+  statusMenuOpen?: boolean;
   paneView?: PaneView;
   langDropdownOpen?: boolean;
   notificationBanner?: boolean;
