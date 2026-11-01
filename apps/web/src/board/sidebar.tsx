@@ -536,7 +536,7 @@ export function BoardSidebar({
         <Link
           className={`sidebar-team-name flex h-11 min-w-0 flex-1 items-center gap-2 rounded-(--cds-radius-lg) px-2 text-foreground no-underline transition-[background-color,box-shadow] duration-150 ease-out ${FOCUS} ${
             selected === 'team'
-              ? `sidebar-team-row--active bg-background shadow-xs ring-1 ring-border ${SEARCH_OPEN_DIM}`
+              ? `sidebar-team-row--active bg-(--sidebar-active) hover:bg-(--sidebar-active) dark:hover:bg-(--sidebar-active) ${SEARCH_OPEN_DIM}`
               : 'hover:bg-sidebar-hover'
           }`}
           to={{ pathname: '/app/team', search: plain }}
