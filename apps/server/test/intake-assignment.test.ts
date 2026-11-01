@@ -111,24 +111,24 @@ test('Coordinator refuses splitting or closing an intake preset and tells it to 
   expect(H.s.db.select().from(todo).where(eq(todo.id, parent.id)).get()?.phase).toBe('todo');
 });
 
-test('Coordinator refuses unlinked create_todo while a Project has a pending intake preset', async () => {
+test('a pending intake preset does not block the Coordinator from creating other tasks', async () => {
   const parent = await assignedTodo(true);
-  await expect(
-    relay('create_todo', {
-      projectId: H.projectId,
-      title: 'Child',
-      spec: 'Part of the intake task',
-    }),
-  ).rejects.toThrow(/intake-label-split-refused.*Build .* as is/);
-  expect(H.s.db.select().from(todo).all()).toHaveLength(1);
-  await relay('run_builds', {
-    todoIds: [parent.id],
-    withPlan: false,
-    assignment: { build: { agentId: AGENT2_ID } },
+  await relay('create_todo', {
+    projectId: H.projectId,
+    title: 'Independent',
+    spec: 'Unrelated work in the same Project',
   });
+  expect(H.s.db.select().from(todo).all()).toHaveLength(2);
   expect(H.s.db.select().from(todo).where(eq(todo.id, parent.id)).get()?.assignment).toMatchObject(
     parent.assignment,
   );
+});
+
+test('the Coordinator may close an intake preset once it has a build', async () => {
+  const parent = await assignedTodo(true);
+  await relay('run_builds', { todoIds: [parent.id], withPlan: false });
+  await relay('close_todos', { todoIds: [parent.id] });
+  expect(H.s.db.select().from(todo).where(eq(todo.id, parent.id)).get()?.phase).toBe('closed');
 });
 
 test('an intake preset preserves plan and build while a Coordinator retry changes the reviewer', async () => {
@@ -149,19 +149,6 @@ test('an intake preset preserves plan and build while a Coordinator retry change
   expect(assignment).toMatchObject(record.assignment);
   expect(assignment?.review?.agentId).toBe(AGENT2_ID);
 });
-
-for (const phase of ['done', 'closed'] as const) {
-  test(`a ${phase} intake preset does not block creating new tasks`, async () => {
-    const parent = await assignedTodo(true);
-    H.s.db.update(todo).set({ phase }).where(eq(todo.id, parent.id)).run();
-    await relay('create_todo', {
-      projectId: H.projectId,
-      title: 'New work',
-      spec: 'Independent work',
-    });
-    expect(H.s.db.select().from(todo).all()).toHaveLength(2);
-  });
-}
 
 test('closing a mixed batch refuses before changing any task', async () => {
   const normal = await assignedTodo(false);

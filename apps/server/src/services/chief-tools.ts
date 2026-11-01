@@ -10,7 +10,7 @@ import {
   todoOutputSchema,
   updateSkillToolParamsSchema,
 } from '@cairn/shared';
-import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
+import { and, eq, inArray, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   agent,
@@ -410,19 +410,6 @@ export async function executeChiefTool(
     case 'create_todo': {
       const projectId = str(params, 'projectId');
       requireProjectRow(db, projectId, ctx.teamId);
-      const pending = db
-        .select()
-        .from(todo)
-        .where(
-          and(
-            eq(todo.teamId, ctx.teamId),
-            eq(todo.projectId, projectId),
-            isNull(todo.archivedAt),
-            inArray(todo.phase, ['todo', 'failed']),
-          ),
-        )
-        .all();
-      for (const row of pending) refuseIntakeSplit(row);
       const output = optTodoOutput(params, 'output');
       const record = createTodo(svc, {
         teamId: ctx.teamId,
@@ -544,7 +531,7 @@ export async function executeChiefTool(
           .from(todo)
           .where(and(eq(todo.id, id), eq(todo.teamId, ctx.teamId)))
           .get();
-        if (row) refuseIntakeSplit(row);
+        if (row?.latestBuildId === null) refuseIntakeSplit(row);
       }
       return json(transitionTodos(deps, ctx.teamId, ids, 'closed', chiefActor));
     }
