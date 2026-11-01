@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { baselineNameFor, pickBaselines } from './gallery-snapshots-accept.mjs';
+import { ARTIFACT_PATTERN, baselineNameFor, pickBaselines } from './gallery-snapshots-accept.mjs';
 import { scanSource, scanTree, selfCheck } from './ui-page-style-gate.mjs';
 
 function tree(files) {
@@ -82,4 +82,12 @@ test('a CI render wins over an uploaded old baseline, and two different renders 
       ),
     /two different CI renders/,
   );
+});
+
+test('accept downloads every gallery snapshot artifact CI uploads', () => {
+  const ci = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8');
+  const names = [...ci.matchAll(/name: (gallery-snapshots[\w${}.-]*)/g)].map((m) => m[1]);
+  assert.ok(names.length >= 2, `found ${names.join(', ')}`);
+  const glob = new RegExp(`^${ARTIFACT_PATTERN.replaceAll('*', '.*')}$`);
+  for (const name of names) assert.match(name.replace(/\$\{\{[^}]*\}\}/g, '1'), glob);
 });
