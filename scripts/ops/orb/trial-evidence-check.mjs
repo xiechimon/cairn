@@ -7,8 +7,12 @@ function runGh(args) {
   return execFileSync('gh', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 }
 
+export function conversationBranch(conversationId) {
+  return `cairn/conv-${conversationId}`;
+}
+
 export async function checkTrialEvidence(evidence, options = {}) {
-  const { runner = runGh, env = process.env, fetchImpl = fetch, buildTrailerFor } = options;
+  const { runner = runGh, env = process.env, fetchImpl = fetch } = options;
   const failures = [];
   const lines = [];
   const check = (name, valid, message) => {
@@ -77,7 +81,9 @@ export async function checkTrialEvidence(evidence, options = {}) {
     'expected the absolute host workspace path ending in conversationId',
   );
   check('claimedMachineId', e.claimedMachineId === 'omarchy-orb', 'must be omarchy-orb');
-  if (failures.length > 0) return { ok: false, failures, lines: [...failures] };
+  if (failures.length > 0) {
+    return { ok: false, failures, lines: ['push: not checked (invalid evidence)', ...failures] };
+  }
 
   async function github(name, path, verify) {
     try {
@@ -87,14 +93,48 @@ export async function checkTrialEvidence(evidence, options = {}) {
     }
   }
 
-  await github('pr', `pulls/${e.pr}`, (pull) => {
+  let pull;
+  await github('push', `pulls/${e.pr}`, (value) => {
+    pull = value;
+  });
+  if (pull) {
+    const headSha = pull.head?.sha;
+    const validHead = typeof headSha === 'string' && /^[a-f0-9]{40}$/.test(headSha);
+    check('push', validHead, 'PR head must have a full commit SHA');
+    if (validHead) {
+      await github('push', `commits/${headSha}`, (commit) => {
+        check('push', commit.sha === headSha, 'PR head commit does not exist in the repository');
+      });
+      await github('push', `compare/${headSha}...${e.mergeCommit}`, (comparison) => {
+        check(
+          'push',
+          ['ahead', 'identical'].includes(comparison.status),
+          'PR head commit is not reachable from the merge commit',
+        );
+      });
+    }
+  } else if (failures.length === 0) {
+    failures.push('push: PR head is unavailable');
+  }
+  if (failures.length === 0) lines.push('push: ok');
+  else lines.push(...failures);
+
+  if (pull) {
+    check(
+      'branch-join',
+      pull.head?.ref === conversationBranch(e.conversationId) &&
+        typeof pull.head?.repo?.full_name === 'string' &&
+        pull.head.repo.full_name.toLowerCase() === repo.toLowerCase() &&
+        pull.head.repo.fork === false,
+      'PR head must be the Thread branch in the same repository, not a fork',
+    );
     check('pr-merged', pull.merged === true, 'PR is not merged');
     check(
       'merge-commit',
       pull.merge_commit_sha === e.mergeCommit,
       'PR merge commit differs from evidence',
     );
-  });
+  }
   await github('issue', `issues/${e.issue}`, (issue) => {
     check(
       'issue-completed',
@@ -109,38 +149,21 @@ export async function checkTrialEvidence(evidence, options = {}) {
       'merge commit is not reachable from main',
     );
   });
-  await github('commit', `commits/${e.mergeCommit}`, (commit) => {
-    if (!buildTrailerFor) {
-      failures.push(
-        'build-trailer-contract-unavailable: base 3980d6f46 has no B1 build trailer writer; identify the exact contract before certifying trial-one',
-      );
-      return;
-    }
-    const expected = buildTrailerFor(e.buildId);
-    check(
-      'build-trailer',
-      typeof expected === 'string' &&
-        expected.length > 0 &&
-        typeof commit.commit?.message === 'string' &&
-        commit.commit.message.split(/\r?\n/).includes(expected),
-      'merge commit lacks the exact build trailer',
-    );
-  });
-
-  if (!env.CAIRN_SERVER_URL) {
-    lines.push('server: skipped (no CAIRN_SERVER_URL)');
+  if (!env.CAIRN_SERVER_URL || !env.CAIRN_API_TOKEN) {
+    lines.push('server: skipped (CAIRN_SERVER_URL and CAIRN_API_TOKEN are both required)');
   } else {
     try {
       const base = env.CAIRN_SERVER_URL.replace(/\/$/, '');
       async function server(path) {
         const response = await fetchImpl(`${base}${path}`, {
-          headers: env.CAIRN_API_TOKEN ? { authorization: `Bearer ${env.CAIRN_API_TOKEN}` } : {},
+          headers: { authorization: `Bearer ${env.CAIRN_API_TOKEN}` },
           redirect: 'error',
           signal: AbortSignal.timeout(15_000),
         });
         if (!response.ok) throw new Error('server request failed');
         return response.json();
       }
+      const failuresBeforeServer = failures.length;
       const build = await server(`/api/builds/${encodeURIComponent(e.buildId)}`);
       const steps = await server(`/api/builds/${encodeURIComponent(e.buildId)}/steps`);
       const todo = await server(`/api/todos/${encodeURIComponent(build.todoId)}`);
@@ -163,16 +186,18 @@ export async function checkTrialEvidence(evidence, options = {}) {
       check(
         'server-machine',
         matching.length === 1 &&
+          typeof matching[0].id === 'string' &&
+          matching[0].id.length > 0 &&
           buildSteps.length > 0 &&
           buildSteps.every((step) => step.machineId === matching[0].id),
         'claimed build steps must resolve to omarchy-orb',
       );
-      lines.push('server: checked');
+      if (failures.length === failuresBeforeServer) lines.push('server: checked');
     } catch {
       failures.push('server: API verification failed');
     }
   }
-  lines.push(...failures);
+  lines.push(...failures.filter((failure) => !failure.startsWith('push:')));
   if (failures.length === 0) lines.push('trial-one: ok');
   return { ok: failures.length === 0, failures, lines };
 }

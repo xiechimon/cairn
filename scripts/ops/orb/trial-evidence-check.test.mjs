@@ -1,9 +1,15 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { execFile, spawnSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
+import { promisify } from 'node:util';
 import { checkTrialEvidence } from './trial-evidence-check.mjs';
 
 const sha = 'a'.repeat(40);
+const headSha = 'b'.repeat(40);
 const evidence = () => ({
   repo: 'owner/repo',
   issue: 17,
@@ -23,10 +29,19 @@ const evidence = () => ({
 
 function world() {
   const data = {
-    pull: { merged: true, merge_commit_sha: sha },
+    pull: {
+      merged: true,
+      merge_commit_sha: sha,
+      head: {
+        ref: 'cairn/conv-build-1',
+        sha: headSha,
+        repo: { full_name: 'owner/repo', fork: false },
+      },
+    },
     issue: { state: 'closed', state_reason: 'completed' },
     compare: { status: 'ahead' },
-    commit: { commit: { message: 'Delivery\n\nSynthetic-Build: build-1' } },
+    pushCompare: { status: 'ahead' },
+    headCommit: { sha: headSha },
   };
   const calls = [];
   const runner = async (args) => {
@@ -35,11 +50,12 @@ function world() {
     const path = args[1];
     if (path.endsWith('/pulls/23')) return JSON.stringify(data.pull);
     if (path.endsWith('/issues/17')) return JSON.stringify(data.issue);
-    if (path.includes('/compare/')) return JSON.stringify(data.compare);
-    if (path.endsWith(`/commits/${sha}`)) return JSON.stringify(data.commit);
+    if (path.endsWith(`/compare/${headSha}...${sha}`)) return JSON.stringify(data.pushCompare);
+    if (path.endsWith(`/compare/${sha}...main`)) return JSON.stringify(data.compare);
+    if (path.endsWith(`/commits/${headSha}`)) return JSON.stringify(data.headCommit);
     throw new Error(`Unexpected gh: ${path}`);
   };
-  const options = { runner, env: {}, buildTrailerFor: (buildId) => `Synthetic-Build: ${buildId}` };
+  const options = { runner, env: {} };
   return {
     data,
     calls,
@@ -48,23 +64,24 @@ function world() {
   };
 }
 
-test('all checks pass with an explicitly injected synthetic trailer contract and no server', async () => {
+test('accepts a same-repository Thread branch without a merge trailer and prints push first', async () => {
   const w = world();
   const result = await w.run();
   assert.equal(result.ok, true);
   assert.deepEqual(result.failures, []);
-  assert.deepEqual(result.lines, ['server: skipped (no CAIRN_SERVER_URL)', 'trial-one: ok']);
-  assert.ok(w.calls.some((args) => args[1] === `repos/owner/repo/compare/${sha}...main`));
+  assert.deepEqual(result.lines, [
+    'push: ok',
+    'server: skipped (CAIRN_SERVER_URL and CAIRN_API_TOKEN are both required)',
+    'trial-one: ok',
+  ]);
+  assert.deepEqual(w.calls.slice(0, 3), [
+    ['api', 'repos/owner/repo/pulls/23'],
+    ['api', `repos/owner/repo/commits/${headSha}`],
+    ['api', `repos/owner/repo/compare/${headSha}...${sha}`],
+  ]);
   w.data.compare.status = 'identical';
+  w.data.pushCompare.status = 'identical';
   assert.equal((await w.run()).ok, true);
-});
-
-test('the default fails closed while the production B1 trailer contract is unavailable', async () => {
-  const w = world();
-  const result = await checkTrialEvidence(evidence(), { runner: w.options.runner, env: {} });
-  assert.equal(result.ok, false);
-  assert.ok(result.failures.some((line) => line.startsWith('build-trailer-contract-unavailable')));
-  assert.ok(!result.lines.includes('trial-one: ok'));
 });
 
 for (const [name, patch] of [
@@ -138,21 +155,69 @@ for (const [name, mutate] of [
     },
   ],
   [
-    'build-trailer',
+    'branch-join',
     (d) => {
-      d.commit.commit.message = 'No trailer';
+      d.pull.head.ref = 'cairn/conv-build-10';
     },
   ],
   [
-    'build-trailer',
+    'branch-join',
     (d) => {
-      d.commit.commit.message = 'Synthetic-Build: build-10';
+      d.pull.head.repo.full_name = 'fork/repo';
     },
   ],
   [
-    'build-trailer',
+    'branch-join',
     (d) => {
-      d.commit.commit.message = 'Quoted Synthetic-Build: build-1';
+      d.pull.head.repo.fork = true;
+    },
+  ],
+  [
+    'branch-join',
+    (d) => {
+      d.pull.head.repo = null;
+    },
+  ],
+  [
+    'branch-join',
+    (d) => {
+      delete d.pull.head.repo.fork;
+    },
+  ],
+  [
+    'push',
+    (d) => {
+      d.pull.head.sha = '';
+    },
+  ],
+  [
+    'push',
+    (d) => {
+      delete d.pull.head;
+    },
+  ],
+  [
+    'push',
+    (d) => {
+      d.headCommit.sha = sha;
+    },
+  ],
+  [
+    'push',
+    (d) => {
+      d.pushCompare.status = 'behind';
+    },
+  ],
+  [
+    'push',
+    (d) => {
+      d.pushCompare.status = 'diverged';
+    },
+  ],
+  [
+    'push',
+    (d) => {
+      d.pushCompare.status = 'unknown';
     },
   ],
 ]) {
@@ -171,16 +236,18 @@ test('reports independent GitHub failures together and handles runner failures',
   w.data.issue.state = 'open';
   const result = await w.run();
   assert.equal(result.failures.length, 2);
+  assert.equal(result.lines[0], 'push: ok');
   const unavailable = await w.run(evidence(), {
     runner: async () => {
       throw new Error('network unavailable');
     },
   });
   assert.equal(unavailable.ok, false);
-  assert.equal(unavailable.failures.length, 4);
+  assert.match(unavailable.lines[0], /^push:/);
+  assert.ok(!unavailable.lines.includes('push: ok'));
 });
 
-test('verifies a claimed build step using the server machine ID and its name', async () => {
+function serverWorld() {
   const w = world();
   const calls = [];
   const responses = {
@@ -193,35 +260,180 @@ test('verifies a claimed build step using the server machine ID and its name', a
         status: 'done',
         machineId: 'machine-uuid',
       },
+      { id: 'step-2', buildId: 'build-1', kind: 'merge', machineId: 'other-machine' },
     ],
     '/api/todos/todo-1': { teamId: 'team-1', sourceRef: 'github:owner/repo#17' },
     '/api/teams/team-1/machines': [{ id: 'machine-uuid', name: 'omarchy-orb' }],
   };
-  const fetchImpl = async (url, init) => {
-    calls.push(url);
-    assert.equal(init.headers.authorization, 'Bearer test-token');
-    assert.equal(init.redirect, 'error');
-    const value = responses[new URL(url).pathname];
-    assert.ok(value);
-    return new Response(JSON.stringify(value), { status: 200 });
-  };
   const options = {
     env: { CAIRN_SERVER_URL: 'http://server.test/', CAIRN_API_TOKEN: 'test-token' },
-    fetchImpl,
+    fetchImpl: async (url, init) => {
+      calls.push(url);
+      assert.equal(init.headers.authorization, 'Bearer test-token');
+      assert.equal(init.redirect, 'error');
+      const value = responses[new URL(url).pathname];
+      assert.ok(value);
+      return new Response(JSON.stringify(value), { status: 200 });
+    },
   };
-  assert.equal((await w.run(evidence(), options)).ok, true);
-  assert.equal(calls.length, 4);
-  responses['/api/teams/team-1/machines'][0].name = 'omarchy';
-  assert.ok(
-    (await w.run(evidence(), options)).failures.some((line) => line.startsWith('server-machine:')),
-  );
-  responses['/api/teams/team-1/machines'][0].name = 'omarchy-orb';
-  responses['/api/builds/build-1/steps'][0].machineId = null;
-  assert.equal((await w.run(evidence(), options)).ok, false);
-  responses['/api/builds/build-1/steps'][0].machineId = 'machine-uuid';
-  responses['/api/todos/todo-1'].sourceRef = 'github:owner/repo#18';
-  assert.equal((await w.run(evidence(), options)).ok, false);
+  return { responses, calls, run: (file = evidence()) => w.run(file, options) };
+}
+
+test('verifies the server build, Thread and claimed machine after push', async () => {
+  const w = serverWorld();
+  const result = await w.run();
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.lines, ['push: ok', 'server: checked', 'trial-one: ok']);
+  assert.equal(w.calls.length, 4);
+  w.responses['/api/teams/team-1/machines'][0].name = 'omarchy';
+  const failed = await w.run();
+  assert.equal(failed.ok, false);
+  assert.equal(failed.lines[0], 'push: ok');
+  assert.ok(!failed.lines.includes('server: checked'));
 });
+
+for (const [name, mutate] of [
+  [
+    'server-build',
+    (r) => {
+      r['/api/builds/build-1'].id = 'other';
+    },
+  ],
+  [
+    'server-build',
+    (r) => {
+      r['/api/todos/todo-1'].sourceRef = 'github:owner/repo#18';
+    },
+  ],
+  [
+    'server-machine',
+    (r) => {
+      r['/api/builds/build-1/steps'] = [];
+    },
+  ],
+  [
+    'server-machine',
+    (r) => {
+      r['/api/builds/build-1/steps'][0].machineId = null;
+    },
+  ],
+  [
+    'server-machine',
+    (r) => {
+      delete r['/api/builds/build-1/steps'][0].machineId;
+    },
+  ],
+  [
+    'server-machine',
+    (r) => {
+      r['/api/builds/build-1/steps'][0].machineId = 'other';
+    },
+  ],
+  [
+    'server-machine',
+    (r) => {
+      r['/api/builds/build-1/steps'][0].buildId = 'other';
+    },
+  ],
+  [
+    'server-machine',
+    (r) => {
+      r['/api/builds/build-1/steps'][0].kind = 'plan';
+    },
+  ],
+  [
+    'server-machine',
+    (r) => {
+      r['/api/teams/team-1/machines'] = [];
+    },
+  ],
+  [
+    'server-machine',
+    (r) => {
+      r['/api/teams/team-1/machines'].push({ id: 'other', name: 'omarchy-orb' });
+    },
+  ],
+  [
+    'server-machine',
+    (r) => {
+      delete r['/api/teams/team-1/machines'][0].id;
+    },
+  ],
+  [
+    'server-machine',
+    (r) => {
+      r['/api/builds/build-1/steps'].push({
+        buildId: 'build-1',
+        kind: 'build',
+        machineId: 'other',
+      });
+    },
+  ],
+]) {
+  test(`rejects inconsistent server evidence: ${name} ${mutate}`, async () => {
+    const w = serverWorld();
+    mutate(w.responses);
+    const result = await w.run();
+    assert.equal(result.ok, false);
+    assert.ok(result.failures.some((line) => line.startsWith(`${name}:`)));
+    assert.ok(!result.lines.includes('server: checked'));
+  });
+}
+
+test('rejects a conversation that does not match the server build identity', async () => {
+  const w = world();
+  w.data.pull.head.ref = 'cairn/conv-other';
+  const result = await w.run(
+    {
+      ...evidence(),
+      conversationId: 'other',
+      orbName: 'cairn-orb-other',
+      hostWorkspacePath: '/workspace/other',
+    },
+    {
+      env: { CAIRN_SERVER_URL: 'http://server.test', CAIRN_API_TOKEN: 'test-token' },
+      fetchImpl: async (url) => {
+        const responses = serverWorld().responses;
+        return new Response(JSON.stringify(responses[new URL(url).pathname]));
+      },
+    },
+  );
+  assert.equal(result.ok, false);
+  assert.ok(result.failures.some((line) => line.startsWith('server-build:')));
+});
+
+for (const env of [
+  {},
+  { CAIRN_SERVER_URL: 'http://server.test' },
+  { CAIRN_API_TOKEN: 'test-token' },
+]) {
+  test(`skips server reads unless both settings exist: ${Object.keys(env)}`, async () => {
+    const result = await world().run(evidence(), {
+      env,
+      fetchImpl: async () => {
+        throw new Error('must not fetch');
+      },
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.lines[0], 'push: ok');
+    assert.match(result.lines[1], /^server: skipped/);
+  });
+}
+
+for (const endpoint of [`commits/${headSha}`, `compare/${headSha}...${sha}`]) {
+  test(`push fails first when GitHub cannot read ${endpoint}`, async () => {
+    const w = world();
+    const result = await w.run(evidence(), {
+      runner: async (args) => {
+        if (args[1].endsWith(endpoint)) throw new Error('not found');
+        return w.options.runner(args);
+      },
+    });
+    assert.equal(result.ok, false);
+    assert.match(result.lines[0], /^push:/);
+    assert.ok(!result.lines.includes('push: ok'));
+  });
+}
 
 test('server HTTP failures fail closed and do not expose the token', async () => {
   const w = world();
@@ -245,4 +457,58 @@ test('CLI returns a named failure for a missing evidence file without node_modul
   );
   assert.equal(result.status, 1);
   assert.match(result.stdout, /evidence-file:/);
+});
+
+test('CLI prints push first using fake GitHub and an authenticated local server', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'cairn-trial-'));
+  const w = world();
+  const responses = serverWorld().responses;
+  const requests = [];
+  const server = createServer((req, res) => {
+    requests.push(req.url);
+    assert.equal(req.headers.authorization, 'Bearer cli-test-token');
+    res.setHeader('content-type', 'application/json');
+    res.end(JSON.stringify(responses[req.url]));
+  });
+  try {
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+    writeFileSync(join(dir, 'world.json'), JSON.stringify(w.data));
+    writeFileSync(join(dir, 'evidence.json'), JSON.stringify(evidence()));
+    writeFileSync(
+      join(dir, 'gh'),
+      `#!/usr/bin/env node
+import { readFileSync } from 'node:fs';
+const data = JSON.parse(readFileSync(process.env.TRIAL_WORLD, 'utf8'));
+const path = process.argv[3];
+const value = path.endsWith('/pulls/23') ? data.pull
+  : path.endsWith('/issues/17') ? data.issue
+  : path.endsWith('/commits/${headSha}') ? data.headCommit
+  : path.endsWith('/compare/${headSha}...${sha}') ? data.pushCompare
+  : path.endsWith('/compare/${sha}...main') ? data.compare : null;
+if (!value) process.exit(1);
+process.stdout.write(JSON.stringify(value));
+`,
+      { mode: 0o700 },
+    );
+    const result = await promisify(execFile)(
+      process.execPath,
+      [new URL('./trial-evidence-check.mjs', import.meta.url).pathname, join(dir, 'evidence.json')],
+      {
+        cwd: dir,
+        env: {
+          ...process.env,
+          PATH: `${dir}:${process.env.PATH}`,
+          TRIAL_WORLD: join(dir, 'world.json'),
+          CAIRN_SERVER_URL: `http://127.0.0.1:${server.address().port}`,
+          CAIRN_API_TOKEN: 'cli-test-token',
+        },
+        timeout: 15_000,
+      },
+    );
+    assert.equal(result.stdout, 'push: ok\nserver: checked\ntrial-one: ok\n');
+    assert.equal(requests.length, 4);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

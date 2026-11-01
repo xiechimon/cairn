@@ -47,24 +47,39 @@ acceptance even when that label does not trigger an overnight timer.
    merge SHA and re-read the lane lists. Do not copy tokens, machine credentials,
    private addresses, or unrelated personal information into public evidence.
 
-The build-to-merge trailer check is blocked on the B1 trailer contract at this
-branch's base `3980d6f46`. The merge writer in
-`apps/server/src/services/builds.ts` currently sends only `closes #<issue>` or
-`Merged by cairn.` as the commit body, with no build-ID trailer. The exact
-trailer format and writer must be identified before the validator can certify
-a trial. A passing unit test with a fabricated trailer cannot establish that
-missing production contract.
+The PR joins to its Thread through its head branch, exactly
+`cairn/conv-<conversationId>`, using the rule in
+`packages/shared/src/brand.ts`. The head repository must match `repo` and must
+not be a fork. There is no build trailer contract; merge commit messages are
+not used for this join.
 
-When the checker is completed, run it from the repository root:
+Run the checker from the repository root:
 
 ```sh
 node scripts/ops/orb/trial-evidence-check.mjs docs/verify/b2-trial-one/trial-one.json
 ```
 
-For server verification, set `CAIRN_SERVER_URL` and, when authentication is
-required, `CAIRN_API_TOKEN` in the environment. The server exposes steps at
-`GET /api/builds/<buildId>/steps`; the build's `todoId` resolves the team through
-`GET /api/todos/<todoId>`, and `GET /api/teams/<teamId>/machines` resolves machine
-IDs to names. Without a server URL, the checker must print
-`server: skipped (no CAIRN_SERVER_URL)` and trust the recorded machine field.
-This skip does not prove that the host ran the trial on the claimed machine.
+The first reported check is `push: ok`. It verifies that the PR head commit
+exists in `repo` on GitHub and is reachable from the recorded merge commit.
+Checking the commit also works after GitHub deletes the merged head branch.
+The branch join, merged PR, completed issue, and merge reachability from `main`
+are checked afterward. A missing commit, unreadable GitHub response, or failed
+ancestry check reports a named `push:` failure first and exits nonzero.
+Invalid evidence reports `push: not checked (invalid evidence)` first.
+
+For server verification, set both `CAIRN_SERVER_URL` and `CAIRN_API_TOKEN` in
+the environment. The checker authenticates its reads and verifies that
+`GET /api/builds/<buildId>` returns the recorded build. Build-step Thread IDs
+are build IDs, so the returned ID must also equal `conversationId`. The build's
+`todoId` resolves the issue and team through `GET /api/todos/<todoId>`.
+`GET /api/builds/<buildId>/steps` must contain a claimed build step, and all
+claimed build steps must resolve through `GET /api/teams/<teamId>/machines` to
+the unique machine named `omarchy-orb`. Server errors fail validation.
+
+When either environment setting is absent, the checker prints
+`server: skipped (CAIRN_SERVER_URL and CAIRN_API_TOKEN are both required)`
+after the push result and trusts the recorded machine field. GitHub commit
+existence and ancestry supply the push check; attributing that push to the Orb
+step and its bound credentials also requires the live trial observations and
+server machine verification. A server skip does not prove that attribution.
+The final `trial-one: ok` appears only when every enabled check passes.
