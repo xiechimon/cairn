@@ -4,7 +4,7 @@ import { settleTransitions } from './helpers.js';
 const AGENT =
   '/app/resources/machines/Kd8fG2hJ4mN9pQ1rStUvWx3?scenario=06';
 const SKILLS = '/app/resources/skills?scenario=01';
-const TASKS = '/app/project/ZAQczKCu0MOAzC1ZqcFlX?scenario=prj-tasks&tab=tasks';
+const TASKS = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=prj-tasks&tab=tasks';
 const AGENT_PERMS = '/app/resources/agents/r3-builder?scenario=agent-detail';
 const ACCEPT = '/app?scenario=34';
 

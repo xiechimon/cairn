@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-const PROJ = '/app/project/ZAQczKCu0MOAzC1ZqcFlX';
+const PROJ = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/files';
 const TASKS = `${PROJ}?scenario=prj-tasks`;
 const EMPTY = `${PROJ}?scenario=r2-24b&tab=tasks`;
 const LOCAL_FILES = `${PROJ}?scenario=prj-local-files`;

@@ -5,6 +5,7 @@ import { Toaster } from './components/ui/toaster.js';
 import { TooltipProvider } from './components/ui/tooltip.js';
 import { I18nProvider } from './i18n/provider.js';
 import { TokenGate } from './overlay/token-gate.js';
+import { ProjectHome } from './pages/project-home.js';
 import { ProjectNewPage } from './pages/project-new-page.js';
 import { ProjectPage } from './pages/project-page.js';
 import { ProjectSettingsPage } from './pages/project-settings-page.js';
@@ -38,7 +39,8 @@ export const router = createBrowserRouter([
               { path: '/app/todo/:id', element: <TodoDetailPage /> },
               { path: '/app/schedules', element: <SchedulesPage /> },
               { path: '/app/project/new', element: <ProjectNewPage /> },
-              { path: '/app/project/:id', element: <ProjectPage /> },
+              { path: '/app/project/:id', element: <ProjectHome /> },
+              { path: '/app/project/:id/files', element: <ProjectPage /> },
               { path: '/app/project/:id/settings', element: <ProjectSettingsPage /> },
               { path: '/app/team', element: <TeamPage /> },
               { path: `${AGENTS_HREF}/:id`, element: <AgentDetailPage /> },

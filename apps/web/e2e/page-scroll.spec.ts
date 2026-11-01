@@ -205,7 +205,7 @@ test('project task list page scrolls to the bottom (#1032)', async ({ page }) =>
   await page.route('**/api/todos?*', (route) =>
     route.fulfill({ json: Array.from({ length: 40 }, (_, i) => wireTodo(i)) }),
   );
-  await page.goto('/app/project/proj-1?tab=tasks');
+  await page.goto('/app/project/proj-1/files?tab=tasks');
   const rows = page.getByTestId('task-row');
   await expect(rows).toHaveCount(40);
   const search = page.getByRole('textbox', { name: '搜索任务' });

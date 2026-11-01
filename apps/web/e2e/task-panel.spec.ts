@@ -201,7 +201,7 @@ test.describe('task panel hosts', () => {
   });
 
   test('project page: a task row opens the panel', async ({ page }) => {
-    await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX?scenario=prj-tasks&tab=tasks');
+    await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=prj-tasks&tab=tasks');
     const row = page.getByTestId('task-row').first();
     const title = (await row.locator('.prj-task-link').textContent()) ?? '';
     await row.locator('.prj-task-link').click();

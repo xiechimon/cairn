@@ -34,7 +34,7 @@ for (const [route, scenario] of [
   ['/app/resources/secrets', '08'],
   ['/app/resources/machines', '09'],
   ['/app/resources/providers', '10'],
-  ['/app/project/ZAQczKCu0MOAzC1ZqcFlX', 'r2-24'],
+  ['/app/project/ZAQczKCu0MOAzC1ZqcFlX/files', 'r2-24'],
 ] as const) {
   test(`sidebar destination renders no back arrow — ${route}`, async ({ page }) => {
     await page.goto(`${route}?scenario=${scenario}`);
