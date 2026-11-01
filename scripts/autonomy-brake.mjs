@@ -3,6 +3,7 @@ import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { assertExactRevertTree, git, revertedShas, shaPattern } from './exact-revert.mjs';
 
 export const repo = process.env.GITHUB_REPOSITORY;
 if (!/^[\w.-]+\/[\w.-]+$/.test(repo ?? '')) throw new Error('GITHUB_REPOSITORY is required');
@@ -29,14 +30,6 @@ export const markers = () =>
   pages(`repos/${repo}/issues?state=open&labels=autonomy-paused&per_page=100`)
     .flat()
     .filter((issue) => !issue.pull_request);
-const git = (cwd, ...args) =>
-  execFileSync('git', args, {
-    cwd,
-    encoding: 'utf8',
-    maxBuffer: 512 * 1024 * 1024,
-    stdio: ['ignore', 'pipe', 'pipe'],
-  }).trim();
-const shaPattern = /^[a-f0-9]{40}$/;
 
 export function verifyRecovery(number) {
   if (!/^[1-9]\d*$/.test(number ?? '')) throw new Error('A PR number is required');
@@ -50,11 +43,7 @@ export function verifyRecovery(number) {
   const commits = pages(`repos/${repo}/pulls/${number}/commits`).flat();
   if (commits.length !== 1 || commits[0].sha !== pr.head.sha)
     throw new Error('Recovery must have exactly one head commit');
-  const names = [
-    ...commits[0].commit.message.matchAll(/^This reverts commit ([a-f0-9]{40})\.?$/gm),
-  ].map((match) => match[1]);
-  if (!names.length || new Set(names).size !== names.length)
-    throw new Error('Reverted SHAs are missing or duplicated');
+  const names = revertedShas(commits[0].commit.message);
   const main = api(`repos/${repo}/branches/main`).commit.sha;
   for (const sha of [main, pr.base.sha, pr.head.sha, ...names])
     if (!shaPattern.test(sha)) throw new Error('Invalid SHA');
@@ -85,13 +74,12 @@ export function verifyRecovery(number) {
     if (green < 0 || names.some((sha) => history.indexOf(sha) < 0 || history.indexOf(sha) >= green))
       throw new Error('Reverts must follow the latest green main check');
     git(dir, 'merge-base', '--is-ancestor', pr.base.sha, main);
-    git(dir, 'checkout', '--detach', pr.base.sha);
-    for (const sha of names.sort((a, b) => history.indexOf(a) - history.indexOf(b))) {
-      const parents = git(dir, 'show', '-s', '--format=%P', sha).split(' ');
-      git(dir, 'revert', '--no-commit', ...(parents.length > 1 ? ['-m', '1'] : []), sha);
-    }
-    if (git(dir, 'write-tree') !== git(dir, 'rev-parse', `${pr.head.sha}^{tree}`))
-      throw new Error('Recovery tree differs from the exact revert');
+    assertExactRevertTree(dir, {
+      baseSha: pr.base.sha,
+      headSha: pr.head.sha,
+      names,
+      history,
+    });
     console.log(`recovery: GREEN #${number}`);
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -107,11 +95,24 @@ function checkPull(pr, paused) {
     } catch {}
   }
   if (!shaPattern.test(pr.head.sha)) throw new Error('Invalid PR head SHA');
-  api(`repos/${repo}/statuses/${pr.head.sha}`, {
+  const path = `repos/${repo}/statuses/${pr.head.sha}`;
+  const payload = {
     context: 'autonomy-brake',
     state: allowed ? 'success' : 'failure',
     description: allowed ? 'Autonomy brake permits this head' : 'Autonomous merging is paused',
-  });
+  };
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      api(path, payload);
+      break;
+    } catch (error) {
+      if (attempt < 3 && /^unexpected end of JSON input$/m.test(String(error.stderr))) continue;
+      throw new Error(
+        `Status publication failed for ${path} after ${attempt} attempt(s): ${error.message}`,
+        { cause: error },
+      );
+    }
+  }
   return allowed;
 }
 

@@ -73,11 +73,11 @@ typography:
   page-title:   { fontFamily: serif, fontSize: 20px, fontWeight: '600' }
   heading:      { fontFamily: display, fontSize: 17px, fontWeight: '650' }
   brand:        { fontFamily: display, fontSize: 20px, fontWeight: '650' }
-  card-title:   { fontFamily: sans, fontSize: 14px, fontWeight: '600', lineHeight: '1.5' }
+  card-title:   { fontFamily: sans, fontSize: 15px, fontWeight: '600', lineHeight: '1.5' }
   ui:           { fontFamily: sans, fontSize: 14px, fontWeight: '450' }
-  meta:         { fontFamily: sans, fontSize: 12.5px, fontWeight: '450' }
+  meta:         { fontFamily: sans, fontSize: 13px, fontWeight: '450' }
   caption:      { fontFamily: sans, fontSize: 12px, fontWeight: '500' }
-  code:         { fontFamily: mono, fontSize: 12px, fontWeight: '400' }
+  code:         { fontFamily: mono, fontSize: 13px, fontWeight: '400' }
 fonts:
   serif: var(--font-source-serif) # Source Serif 4 → Songti SC: greeting and page titles
   display: var(--font-display)   # Bricolage Grotesque → sans
@@ -137,7 +137,7 @@ Direction A, **Cairn**: a cairn is a pile of stones that marks a trail for the n
 - **Two title faces**: Source Serif 4 (`font-serif`, 600, -0.01em) for the Coordinator greeting and page titles (the board top bar, page shells, settings headers; the task detail header is a one-line sans bar, see below), so the top of every page has one quiet serif voice. Bricolage Grotesque (`font-heading` with `font-title`, 650) for the brand name, section and column headings, pane and dialog titles. Chinese falls back to Songti SC under the serif and PingFang SC under the sans.
 - **Everything else is Instrument Sans** (`--font-sans`): thread titles, rows, navigation, buttons, meta. Chinese falls back to PingFang SC. Code, times, ids and counters use JetBrains Mono (`--font-mono`) with tabular numbers.
 - Fonts are self-hosted latin subsets in `public/fonts` (SIL OFL 1.1, licenses next to the files), loaded with `font-display: swap` and preloaded in `index.html` and `design.html`; the metric-matched fallbacks keep the swap from shifting layout.
-- **Six font sizes, no seventh allowed**: 26 Coordinator greeting / 20 page title and brand / 17 column and section headings / 14 card titles and UI text / 12.5 meta / 12 badges and group labels. In code, use the corresponding Tailwind theme keys `text-greeting` / `text-page` / `text-heading` / `text-card-title` and `text-ui` / `text-meta` / `text-caption` (heading font `font-heading`), never arbitrary values like `text-[13px]`; `scripts/ui-debt-gate.mjs` D5 only allows the total count of arbitrary values to decrease.
+- **Seven font sizes, measured against Claude Code**: 26 Coordinator greeting / 20 page title and brand / 17 column and section headings / 15 body text and card titles (messages, plans, composer) / 14 UI text / 13 meta and code (mono) / 12 badges and group labels. Body steps above UI text so reading text and chrome do not blur together. In code, use the corresponding Tailwind theme keys `text-greeting` / `text-page` / `text-heading` / `text-card-title` / `text-ui` / `text-meta` and `text-code` / `text-caption` (heading font `font-heading`), never arbitrary values like `text-[13px]`; `scripts/ui-debt-gate.mjs` D5 only allows the total count of arbitrary values to decrease.
 - **Four font weights**: 450 body text (`font-normal` maps to 450, because Instrument Sans at 400 reads faint at 14px), 500 sidebar rows and captions, 600 card and row titles, the active nav row and count badges, 650 display titles (`font-title`, always paired with `font-heading`). 700 is not used.
 - The title of a completed task drops to 400 + `ink-3`, meaning "no longer needs to be read".
 
@@ -201,22 +201,31 @@ From top to bottom:
 ### Task header and status
 - The task detail header is one 44px line (Amp): back, project tile + project name + `#seq` in `ink-3`, the title in sans 15px/600, the status as a ghost pill (bg only on hover, full radius, glyph in its tone, label in `ink`), then on the right the agent, ⋯ and the primary action when there is one.
 - Status glyphs are one circular family (`StatusGlyph`, Linear's model) used in the header, search rows, mentions and home rows: dashed ring = to start, ring + clock = queued, a pie that fills with progress (quarter = planning in `chip-plan-fg`, half = confirm in accent, three quarters = building in `running` or review in accent), filled check = done, filled cross = failed, filled slash = closed. Ochre still means it waits on you.
-- The right pane switches views with visible segmented tabs (plan or changes, branch, usage, history); the plan version is a small ghost select on the right; the change summary and expand-all sit on a thin row under the header.
+- The right pane (`RightPane`, `DocPane`) is flat: a `--background` surface with one `--border` hairline on its left, no ring and no segmented control (Claude Code's right pane). The 40px header holds a plain dropdown title (`PaneTitle`: Plan or Changes) with the plan version beside it in `--text-tertiary` ("v2 · 10 min ago", still the version menu trigger), and on the right 26px icon buttons (`PaneViewButtons`, radius 7, hover `--menu-hover`) for plan and changes. Under the plan sit Branch, Usage and History as collapsible sections (`PaneSections`): 32px header in `--text-tertiary` meta 500 with a small triangle and an optional right-aligned summary, hairlines inset 14px between them; Usage starts open, Branch and History closed (Branch fetches its sync state only once opened); state is kept per section. Usage is one 6px stacked bar (1px gaps, `--project-tile-*` swatches) over a legend of label and tabular value, then cache hit rate, model and the cost group. Changes file rows read chevron, basename, directory in `--text-tertiary`, then +/- on the right; the change summary and expand-all sit on a thin row under the header.
 
 ### Settings lists (account page, agent overview)
 See "Page patterns · Settings list" below.
 
 ### Conversation
-- User turns sit on the right with no avatar: a `--secondary` bubble, at most `min(80%, 56ch)` wide, 32px tall for one line, with a tighter bottom-right corner. Their action row aligns right. Agent and chief turns keep the avatar on the left.
+- User turns sit on the right as a gradient bubble (`bubble-gradient` in `app.css`): 12px radius, `8px 12px` padding, at most `min(85%, 42rem)` wide. The surface is `--bubble-base` plus three radial washes (`--bubble-wash-a/b/c`, the moss, slate and plum hues), a 120px soft-light grain and a 1px conic hairline (`--bubble-rim-a/b/c`) drawn by a masked `::after`. It is the only coloured surface in the thread.
+- Agent and chief replies carry no avatar column: plain full-width text. A reply from a bound agent (not the coordinator) keeps a small identity line above it. Hovering a user message reveals a row under the bubble with its time, copy and restore actions; touch screens always show it.
+- Markers between turns ("Plan approved", handoffs, origin notes) are a centred hairline rule in `--text-tertiary`; an error marker stays a soft `danger-soft` box. A turn longer than a minute ends with a "Worked for N minutes" rule.
 - Copy icons under a message stay hidden until its row is hovered or focused (`.chat-copy` in `app.css`); touch screens always show them.
 - The plan preview fades out at the bottom with a mask instead of a hard cut.
 - The composer is a white card (`--card`) with a 1px `--input` ring that turns lichen with a soft halo on focus (`--shadow-composer*`); it is the one white surface in the conversation because it is where you act. The empty send button has no fill; once there is a draft it fills with `primary` (ink, never the ochre accent, which means waiting on you). The stop button is a `secondary` square with an ink stop glyph.
 
 ### Trace
-- Agent activity (tool calls, thinking, waiting) renders as Trace lines (`components/ui/trace.tsx`), never as hand-written rows. One line per action: optional icon, title, then a tabular-number description such as the duration. Every line is sans `text-meta` (12.5px) in `ink-2`; a command or tool name goes in an inline `font-mono text-caption` code span, never a mono line. Errors keep the line in `ink-2` and add a 500 `destructive` "Failed" label (and a `destructive` icon); the whole line never turns red. Pending lines use `ink-3`, not opacity. The live spinner is `running` green, because it means working, not waiting on you. The chief turn-tool panel uses a 1px `border` rule, the same weight as collapsible detail.
-- Status lives on the line: `running` sweeps the title with the `shimmer` utility (`app.css`, still under reduced motion), `error` turns the line `--destructive` and keeps a visible "failed" word, `pending` dims it to 60%.
-- Detail such as full thinking or tool output folds under its line with `TraceCollapsible`; the chevron sits after the title and the content hangs on a hairline left rule.
-- The chief turn panel is a Trace on `--secondary` with mono `text-caption` lines in `--text-tertiary`; agent rows in the task transcript use 12px `--text-dim` lines.
+- The agent's narration stays body text. Tool activity folds into one grey summary line in `--text-tertiary` ("Ran 2 commands (1 failed)") ending in a small triangle, right when closed and down when open (`components/chat/trace-parts.tsx`, composed by `TraceGroup`, `TraceRows` and `WorkTrace`). Never hand-write tool rows.
+- Open, the group is a hairline card (1px inset `--border` ring, 12px radius from `--cds-radius-xl`) of 36px rows separated by hairlines. A row reads "verb **target**": the verb in `--text-tertiary`, the target in `--foreground` at medium weight, no kind icon and no code pill; commands are mono without a background. The duration, diff size or exit code sits at the row end in tabular numbers.
+- A row with detail opens to a bordered command box (`$ command`, mono `text-code` 13/20, 8px radius, `--background`) with the output under it in grey mono `text-code`.
+- Failures: the summary shows a `--destructive` count and the row a `--destructive` "exit N" or "Failed" label; a failed command opens by default and prints its output in `--destructive`. Never use `--text-dim` for text.
+- Running: the summary switches to the present tense for the whole group ("Running 1 command") and sweeps with the `shimmer` utility, as does the verb of the running row. Under reduced motion the shimmer stops.
+- `components/ui/trace.tsx` keeps the low-level Trace primitives for thinking rows (`ThinkingRow`).
+
+### Live run
+- There is no separate live block: the open group is the live row. A 7px pulse dot (`live-pulse` in `app.css`, still under reduced motion) sits under the last line while the agent works; a quiet live row hides its label when a running group above already speaks.
+- The elapsed time lives in the composer next to the stop button ("Working · 1:12"), not in the transcript.
+- When the turn ends the pulse disappears and the group turns past tense.
 
 ### Stone language components
 
@@ -358,7 +367,7 @@ Cairn UI rules (source: apps/web/DESIGN.md):
 - Every status = icon + color + label. Every icon draws at stroke 1.75 (`test/icon-stroke.test.ts` pins `src/icons`). The spiral mark is the brand and the Coordinator avatar.
 - Primary button = shadcn default Button on --primary (light #233127 with #f4f6f1 text, dark #e6e8e2 with dark text), 8px corners, 32px tall. Card actions = accent text links. No solid buttons on cards except the one primary action of a thread card.
 - Radii: menu and dialog 18px, card and composer 14px, menu row 12px, button, input and row 8px.
-- Dialogs: DialogShell with size s (400) / m (480) / l (640), light dim backdrop (no blur), 17px display title + optional 12.5px sub-line, split footer (12px ink-3 hint left, actions right, primary button). Menus: popover color, 18px corners, 6px padding, 32px rows with 12px corners, 14px text, 15px ink-3 icons, --menu-hover, danger rows in destructive.
+- Dialogs: DialogShell with size s (400) / m (480) / l (640), light dim backdrop (no blur), 17px display title + optional 13px sub-line, split footer (12px ink-3 hint left, actions right, primary button). Menus: popover color, 18px corners, 6px padding, 32px rows with 12px corners, 14px text, 15px ink-3 icons, --menu-hover, danger rows in destructive.
 - Segmented controls only from components/segmented.tsx: SegmentedTabs for view switches, SegmentedRadio for value pickers. Canvas track, white selected option with a 1px ring, inset keyboard ring. Never hand-roll role=tab/radio or restyle TabsList.
 - One card corner: --radius-card (14px) on every card-like surface. Pages compose EmptyState / SettingsHeader+SettingsCard+SettingsRow / FormStack+FormField+FormActions; no tinted icon tiles, no full-width submit bars, no two-tone cards, no pill buttons.
 - Use components/ui primitives and tokens; no hex in components.

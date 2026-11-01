@@ -34,7 +34,7 @@ const ROW_LIT = ' bg-(--menu-hover) hover:bg-(--menu-hover) dark:hover:bg-(--men
 const BUBBLE_CLS =
   'pointer-events-none absolute left-[calc(100%+8px)] w-max max-w-56 rounded-md bg-foreground px-2.5 py-1.5 text-meta leading-snug text-background shadow-(--shadow-popover) max-sm:hidden';
 
-const NAME_CLS = 'flex-none font-mono text-caption text-foreground';
+const NAME_CLS = 'flex-none font-mono text-code text-foreground';
 const DESC_CLS = 'truncate text-meta text-content-tertiary';
 
 function MatchedName({ name, query }: { name: string; query: string }) {

@@ -119,7 +119,7 @@ test('split footer: hint left, actions right, no band fill', async ({ page }) =>
   await expect(foot).toHaveCSS('border-top-width', '0px');
   const hint = foot.getByRole('link', { name: '浏览器授权注册 →' });
   const done = foot.getByRole('button', { name: '完成' });
-  await expect(hint).toHaveCSS('font-size', '12.5px');
+  await expect(hint).toHaveCSS('font-size', '13px');
   const dialogBox = await dialog.boundingBox();
   const footBox = await foot.boundingBox();
   const hintBox = await hint.boundingBox();

@@ -2,8 +2,8 @@ import { useId, useState } from 'react';
 import { ClaudeMark, GeminiMark, PiMark } from '../components/brand-marks.js';
 import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.js';
 import { JumpToLatestButton } from '../components/chat/jump-to-latest.js';
-import { LiveRow } from '../components/chat/live-row.js';
-import { TraceSteps } from '../components/chat/trace-steps.js';
+import { LivePulse, LiveRow } from '../components/chat/live-row.js';
+import { TraceGroup, type TraceStep, TraceSteps } from '../components/chat/trace-steps.js';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { ProfileHeader } from '../components/profile-card.js';
@@ -217,24 +217,43 @@ export function IdentitySection() {
   );
 }
 
+const LIVE_STEPS: { id: string; step: TraceStep }[] = [
+  {
+    id: 'a',
+    step: { kind: 'run', command: 'git push origin fix/lockfile', exit: null, output: [], secs: 0 },
+  },
+];
+
+const FINISHED_STEPS: { id: string; step: TraceStep }[] = [
+  {
+    id: 'a',
+    step: {
+      kind: 'run',
+      command: 'pnpm install --frozen-lockfile',
+      exit: 1,
+      output: ['ERR_PNPM_OUTDATED_LOCKFILE  Cannot install with "frozen-lockfile"'],
+      secs: 4,
+    },
+  },
+  { id: 'b', step: { kind: 'run', command: 'pnpm install', exit: 0, output: [], secs: 12 } },
+];
+
 export function StreamSection() {
   const [steps, setSteps] = useState(() => SEED_TRANSCRIPT.map((step, i) => ({ id: i + 1, step })));
-  const [started] = useState(() => Date.now() - 12_000);
   return (
     <Section
       id="stream"
       title="Live stream"
-      lede="What a running agent looks like: finished steps as quiet trace lines, one live row with a shimmering label and a ticking timer, and a scroller that follows new steps and offers a jump back to the latest."
+      lede="What a running agent looks like: the open group is the live row, spoken in the present tense with a shimmer; a small pulse sits under the last line; the elapsed time lives in the composer next to stop. When the turn ends the pulse goes, the group turns past tense, and a long turn closes with a Worked for rule."
     >
-      <Specimen title="Live row" note="a ticking timer while an agent works">
-        <Cell label="detail: compact, in the task transcript">
-          <LiveRow variant="detail" label="Running tests" startedAt={started} />
+      <Specimen title="Live row" note="shimmering label, a pulse under it, no timer in the row">
+        <Cell label="detail: in the task transcript">
+          <LiveRow variant="detail" label="Running tests" />
         </Cell>
         <Cell label="chief: under a reply, click to expand">
           <LiveRow
             variant="chief"
             label="Planning the next step"
-            startedAt={started}
             disclosure={{ expand: 'Show details', collapse: 'Hide details' }}
           >
             <p className="m-0 mt-2 max-w-100 text-meta text-content-tertiary">
@@ -242,6 +261,20 @@ export function StreamSection() {
               the dependency.
             </p>
           </LiveRow>
+        </Cell>
+        <Cell label="the open group is the live row">
+          <div className="w-100">
+            <TraceGroup steps={LIVE_STEPS} />
+            <LivePulse className="mt-1 ml-0.5" />
+          </div>
+        </Cell>
+        <Cell label="the turn ended: past tense, no pulse, Worked for rule">
+          <div className="w-100">
+            <TraceGroup steps={FINISHED_STEPS} />
+            <div className="mt-3 flex items-center gap-3 text-center text-meta text-content-tertiary before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">
+              Worked for 4 minutes
+            </div>
+          </div>
         </Cell>
       </Specimen>
       <Specimen
@@ -268,8 +301,8 @@ export function StreamSection() {
               <FadeScrollerViewport>
                 <MessageScrollerContent className="block gap-0 px-5 pt-4 pb-5">
                   <TraceSteps steps={steps} />
-                  <div className="mt-4">
-                    <LiveRow variant="chief" label="Opening the pull request" startedAt={started} />
+                  <div className="mt-2">
+                    <LiveRow variant="chief" label="Opening the pull request" />
                   </div>
                 </MessageScrollerContent>
               </FadeScrollerViewport>
