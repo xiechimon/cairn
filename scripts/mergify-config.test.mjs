@@ -94,12 +94,17 @@ test('web and backend are separate scopes and shared packages touch both', () =>
   assert.match(config, / {2}barrier_files:\n {4}include:\n {6}- packages\/\*\*\/\*\n/);
 });
 
-test('eligible PRs enter the queue on their own once the gate and routing pass', () => {
+test('eligible PRs enter the queue on their own, and no merge protection rule can reach the drafts', () => {
   assert.match(config, /merge_protections_settings:\n {2}auto_merge_conditions: true\n/);
-  const protections = config.split('merge_protections:\n')[1].split('merge_queue:\n')[0];
-  assert.match(protections, / {4}if:\n {6}- base = main\n/);
-  assert.match(protections, /- status-success = review-gate\n/);
-  assert.match(protections, /- check-success = merge-route\n/);
+  assert.doesNotMatch(config, /^merge_protections:/m);
+});
+
+test('merge conditions never require a PR-only fact the queue draft cannot carry', () => {
+  for (const name of ['default', 'bot']) {
+    const merge = rules[name].split('    merge_conditions:\n')[1];
+    for (const fact of ['review-gate', 'merge-route', 'pr-evidence', 'commit-author'])
+      assert.doesNotMatch(merge, new RegExp(fact), `${name}: ${fact}`);
+  }
 });
 
 test('Mergify merges past its own required queue check as the merge bot account', () => {
