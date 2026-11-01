@@ -258,6 +258,10 @@ const FILE_RULES = new Map([
   ],
   ['apps/web/src/components/form-layout.tsx', ['paper-', 'account-', ...AGENT, ...PAGES]],
   ['apps/web/src/components/brand-marks.tsx', ['machines-', 'title-', 'brand-']],
+  [
+    'apps/web/src/components/queued-capsules.tsx',
+    ['detail-composer-queue-stop', 'chief-home-busy'],
+  ],
   ['apps/web/vitest.config.ts', []],
   ['apps/web/e2e/chief-home-mock.ts', ['chief-home-']],
   ['apps/web/e2e/demo-server.ts', ['demo-mode']],

@@ -866,28 +866,6 @@ export function TodoDetailPage() {
                   setDocChoice('plan');
                 }}
                 spec={live && todo.spec.trim() !== '' ? todo.spec : undefined}
-                queuedMessages={live ? messagesQ.data?.queuedMessages : undefined}
-                onCancelQueued={
-                  live && buildId
-                    ? (queuedMessageId, content) =>
-                        mutations.sendSteer.mutateAsync({
-                          conversationId: buildId,
-                          content,
-                          queuedMessageId,
-                          cancelQueued: true,
-                        })
-                    : undefined
-                }
-                onSteerQueued={
-                  live && buildId
-                    ? (queuedMessageId, content) =>
-                        mutations.sendSteer.mutateAsync({
-                          conversationId: buildId,
-                          content,
-                          queuedMessageId,
-                        })
-                    : undefined
-                }
                 autoScroll={live && view.transcript.length > 0}
               />
             )}
@@ -909,6 +887,28 @@ export function TodoDetailPage() {
                   aiReview={(phase === 'confirm' || phase === 'review') && !todo.awaitingReply}
                   streaming={streaming}
                   workingFor={workingFor}
+                  queuedMessages={live ? messagesQ.data?.queuedMessages : undefined}
+                  onRemoveQueued={
+                    live && buildId
+                      ? (queuedMessageId, content) =>
+                          mutations.sendSteer.mutateAsync({
+                            conversationId: buildId,
+                            content,
+                            queuedMessageId,
+                            cancelQueued: true,
+                          })
+                      : undefined
+                  }
+                  onSendQueuedNow={
+                    live && buildId
+                      ? (queuedMessageId, content) =>
+                          mutations.sendSteer.mutateAsync({
+                            conversationId: buildId,
+                            content,
+                            queuedMessageId,
+                          })
+                      : undefined
+                  }
                   editable={live || DEMO_MODE}
                   draft={live ? liveDraft : undefined}
                   onDraftChange={live ? setLiveDraft : undefined}

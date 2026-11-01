@@ -23,6 +23,7 @@ import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.
 import { JumpToLatestButton } from '../components/chat/jump-to-latest.js';
 import { formatClock, useLiveSeconds } from '../components/chat/live-row.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
+import { QueuedCapsules } from '../components/queued-capsules.js';
 import { Button } from '../components/ui/button.js';
 import {
   DIALOG_PRIMARY_BUTTON,
@@ -409,7 +410,20 @@ export function ChiefConversation({
             () => {},
           );
         };
-  const rows = (chief.stream ?? []).map((item, i) => ({ item, i }));
+  const allRows = (chief.stream ?? []).map((item, i) => ({ item, i }));
+  const rows = allRows.filter(({ item }) => item.kind !== 'user' || item.pending == null);
+  const queuedCapsules = allRows.flatMap(({ item }) =>
+    item.kind === 'user' && item.pending != null && item.id != null
+      ? [
+          {
+            id: item.id,
+            content: item.text,
+            ...(item.pending === 'held' ? { note: t('已存下，总管恢复后会处理') } : {}),
+            held: item.pending === 'held',
+          },
+        ]
+      : [],
+  );
   const streamRow = ({ item, i }: { item: ChiefStreamItem; i: number }) => (
     <ChiefStreamRow
       key={chiefStreamRowKey(item, i)}
@@ -425,8 +439,6 @@ export function ChiefConversation({
       onRewindRequest={(index, id) => setRewindConfirm({ index, id })}
       onAnswerQuestion={onAnswerQuestion}
       onCancelQuestion={onCancelQuestion}
-      onWithdraw={withdraw}
-      onSteer={onSteer}
     />
   );
   const intro = (
@@ -658,6 +670,12 @@ export function ChiefConversation({
         className={`chief-composer ${home ? HOME_COMPOSER_CLS : 'mx-4 my-2.5'} rounded-(--radius-composer) border-0 bg-card px-3.5 pt-3 pb-2.5 shadow-(--shadow-composer) transition-[box-shadow] duration-[220ms] ease-(--ease-out-expo) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)`}
         style={home ? { viewTransitionName: 'chief-composer' } : undefined}
       >
+        <QueuedCapsules
+          messages={queuedCapsules}
+          onSendNow={onSteer ? (id) => onSteer(id) : undefined}
+          onRemove={withdraw}
+          removeLabel={t('撤回')}
+        />
         <ComposerAttachments
           tokens={wire.tokens}
           pending={pendingAttachments}

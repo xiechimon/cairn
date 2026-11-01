@@ -174,27 +174,29 @@ for (const chord of ['Meta+Enter', 'Control+Enter']) {
     const task = await runningTask(page);
     await task.input.fill('Run the next turn');
     await task.input.press(chord);
-    await expect(page.getByTestId('queued-badge')).toBeVisible();
+    await expect(page.getByTestId('composer-card').getByTestId('queued-message')).toBeVisible();
+    await expect(page.getByTestId('transcript-col').getByTestId('queued-message')).toHaveCount(0);
     expect(task.steerPending).toEqual([]);
     expect(task.sent).toEqual([{ content: 'Run the next turn', mode: 'queue' }]);
     await expect(task.input).toHaveValue('');
+    await expect(page.getByTestId('transcript-col').getByTestId('queued-message')).toHaveCount(0);
     await page.reload();
-    await expect(page.getByTestId('queued-badge')).toBeVisible();
+    await expect(page.getByTestId('composer-card').getByTestId('queued-message')).toBeVisible();
     task.finish();
     await page.reload();
-    await expect(page.getByTestId('queued-badge')).toHaveCount(0);
+    await expect(page.getByTestId('composer-card').getByTestId('queued-message')).toHaveCount(0);
     await expect(page.getByTestId('user-bubble').filter({ hasText: 'Run the next turn' })).toHaveCount(1);
     expect(task.turns()).toBe(1);
   });
 }
 
-test('steer now delivers the queued bubble immediately and plain Enter still steers', async ({ page }) => {
+test('send now delivers the queued capsule immediately and plain Enter still steers', async ({ page }) => {
   const task = await runningTask(page);
   await task.input.fill('Queued steer');
   await task.input.press('Control+Enter');
   await page.getByTestId('steer-queued-message').click();
   await expect.poll(() => task.steerPending).toEqual(['Queued steer']);
-  await expect(page.getByTestId('queued-badge')).toHaveCount(0);
+  await expect(page.getByTestId('composer-card').getByTestId('queued-message')).toHaveCount(0);
   await task.input.fill('Plain steer');
   await task.input.press('Enter');
   await expect.poll(() => task.steerPending).toEqual(['Queued steer', 'Plain steer']);
@@ -204,14 +206,15 @@ test('Stop preserves changes without a dialog and cancelled tools show cancelled
   const task = await runningTask(page);
   await task.input.fill('A stays queued');
   await task.input.press('Control+Enter');
-  await expect(page.getByTestId('queued-badge')).toBeVisible();
+  await expect(page.getByTestId('composer-card').getByTestId('queued-message')).toBeVisible();
   await page.getByTestId('composer-card').getByRole('button', { name: '停止', exact: true }).click();
   await expect.poll(() => task.stops).toEqual([{ discard: false }]);
   await expect(page.getByRole('dialog')).toHaveCount(0);
   task.finish('stopped');
   await page.reload();
   expect(task.turns()).toBe(0);
-  await expect(page.getByTestId('queued-message')).toContainText('A stays queued');
+  await expect(page.getByTestId('composer-card').getByTestId('queued-message')).toContainText('A stays queued');
+  await expect(page.getByTestId('transcript-col').getByTestId('queued-message')).toHaveCount(0);
   await expect(page.getByTestId('work-cancelled')).toBeVisible();
   await expect(page.getByTestId('work-cancelled')).toHaveText('已取消');
   await expect(page.getByTestId('work-spinner')).toHaveCount(0);
@@ -222,7 +225,7 @@ test('Escape stops and a second Escape queues the draft after cancellation', asy
   const task = await runningTask(page);
   await task.input.fill('A stays queued');
   await task.input.press('Control+Enter');
-  await expect(page.getByTestId('queued-badge')).toBeVisible();
+  await expect(page.getByTestId('composer-card').getByTestId('queued-message')).toBeVisible();
   await task.input.fill('Use this draft next');
   await task.input.press('Escape');
   await task.input.press('Escape');
@@ -236,7 +239,7 @@ test('Escape stops and a second Escape queues the draft after cancellation', asy
   await page.reload();
   await expect(page.getByTestId('user-bubble').filter({ hasText: 'Use this draft next' })).toHaveCount(1);
   expect(task.turns()).toBe(1);
-  await expect(page.getByTestId('queued-message')).toContainText('A stays queued');
+  await expect(page.getByTestId('composer-card').getByTestId('queued-message')).toContainText('A stays queued');
 });
 
 test('discard is available during a running step only and requires confirmation', async ({ page }) => {
@@ -261,15 +264,47 @@ test('kept changes after Stop do not expose discard', async ({ page }) => {
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
-test('queued bubbles show delivery failures and can be cancelled', async ({ page }) => {
+test('a queued capsule sits in the composer above the input and shows the full text on hover', async ({ page }) => {
+  const task = await runningTask(page);
+  const long = 'Summarise the change in two lines and list every file you touched so the review stays quick and nobody has to open the diff';
+  await task.input.fill(long);
+  await task.input.press('Control+Enter');
+  const card = page.getByTestId('composer-card');
+  const capsule = card.getByTestId('queued-message');
+  await expect(capsule).toBeVisible();
+  await expect(capsule).toHaveAttribute('title', long);
+  await expect(capsule.getByRole('button', { name: '现在插话' })).toBeVisible();
+  await expect(capsule.getByRole('button', { name: '移除' })).toBeVisible();
+  const [capsuleBox, inputBox] = await Promise.all([capsule.boundingBox(), task.input.boundingBox()]);
+  expect(capsuleBox!.y + capsuleBox!.height).toBeLessThanOrEqual(inputBox!.y);
+  await expect(page.getByTestId('transcript-col').getByTestId('queued-message')).toHaveCount(0);
+  await expect(page.getByTestId('user-bubble').filter({ hasText: 'Summarise the change' })).toHaveCount(0);
+});
+
+test('a failed capsule is red with the reason and Retry delivers it', async ({ page }) => {
+  const task = await runningTask(page);
+  await task.input.fill('Retry this queued text');
+  await task.input.press('Control+Enter');
+  const capsule = page.getByTestId('composer-card').getByTestId('queued-message');
+  await expect(capsule).toHaveAttribute('data-state', 'queued');
+  task.queuedMessages[0]!.error = 'Task cannot accept a message';
+  await page.reload();
+  await expect(capsule).toHaveAttribute('data-state', 'failed');
+  await expect(capsule.getByTestId('queued-message-error')).toHaveText('Task cannot accept a message');
+  await expect(capsule.getByRole('button', { name: '现在插话' })).toHaveCount(0);
+  await capsule.getByRole('button', { name: '重试' }).click();
+  await expect.poll(() => task.steerPending).toEqual(['Retry this queued text']);
+  await expect(capsule).toHaveCount(0);
+});
+
+test('removing a capsule cancels the queued message', async ({ page }) => {
   const task = await runningTask(page);
   await task.input.fill('Cancel this queued text');
   await task.input.press('Control+Enter');
-  await expect(page.getByTestId('queued-badge')).toBeVisible();
-  task.queuedMessages[0]!.error = 'Task cannot accept a message';
-  await page.reload();
-  await expect(page.getByTestId('queued-message-error')).toHaveText('Task cannot accept a message');
-  await page.getByTestId('cancel-queued-message').click();
-  await expect(page.getByTestId('queued-message')).toHaveCount(0);
+  const capsule = page.getByTestId('composer-card').getByTestId('queued-message');
+  await expect(capsule).toBeVisible();
+  await capsule.getByRole('button', { name: '移除' }).click();
+  await expect(capsule).toHaveCount(0);
+  expect(task.sent.at(-1)?.cancelQueued).toBe(true);
   expect(task.steerPending).toEqual([]);
 });
