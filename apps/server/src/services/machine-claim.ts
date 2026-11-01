@@ -494,10 +494,10 @@ async function tryClaim(
       repoRef?.kind === 'hosted' && mergeTarget !== null
         ? { ...repoRef, baseBranch: mergeTarget.baseBranch }
         : repoRef;
-    const workerMcp =
-      cand.todoRow.assignment?.source === 'intake-label'
-        ? undefined
-        : claimMcpSlugs(machineRow.latestCliVersion, agentRow.mcpServers);
+    const workerMcp = claimMcpSlugs(
+      machineRow.latestCliVersion,
+      cand.todoRow.assignment?.source === 'intake-label' ? [] : agentRow.mcpServers,
+    );
     const isGithubProject = projectRow?.repoKind === 'github';
     const taskMeta =
       isGithubProject && projectRow

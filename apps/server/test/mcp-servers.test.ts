@@ -287,7 +287,7 @@ describe('claim payload: mcpServers slug-ized (string[]) + version-wall bump (ma
         intakePreset,
       });
       expect(step).not.toBeNull();
-      if (intakePreset) expect(step).not.toHaveProperty('mcpServers');
+      if (intakePreset) expect(step?.mcpServers).toEqual([]);
       else expect(step?.mcpServers).toEqual(['demo', 'ghost']);
       s.dispose();
     },
