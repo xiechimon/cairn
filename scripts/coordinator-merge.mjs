@@ -50,9 +50,11 @@ export function mergeMessage(number, messages) {
 
 const isGreen = (check) => check.bucket === 'pass' || check.bucket === 'skipping';
 
+const mustBeGreenStates = ['SUCCESS', 'SKIPPED'];
+
 function readChecks(number, ...extra) {
   return JSON.parse(
-    gh('pr', 'checks', String(number), '-R', repo, ...extra, '--json', 'name,bucket'),
+    gh('pr', 'checks', String(number), '-R', repo, ...extra, '--json', 'name,bucket,state'),
   );
 }
 
@@ -62,7 +64,7 @@ function checksGreen(number) {
   const all = readChecks(number);
   return mustBeGreenJobs.every((name) => {
     const runs = all.filter((check) => check.name === name);
-    return runs.length > 0 && runs.every(isGreen);
+    return runs.length > 0 && runs.every((check) => mustBeGreenStates.includes(check.state));
   });
 }
 

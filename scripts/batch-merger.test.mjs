@@ -17,6 +17,7 @@ const required = [
   'dead-class-gate',
   'ops-backup-test',
 ];
+const skippable = ['dead-class-gate', 'ops-backup-test'];
 const trailer = 'Merged-by: cairn-batch-merger';
 const mergerCommit = { commit: { message: `Batch work (#9)\n\n${trailer}` } };
 const pull = (number = 1) => ({
@@ -223,6 +224,32 @@ const completed = (name, id, conclusion) => ({
 test('a red gates run blocks an otherwise green batch', (t) => {
   const checks = required.map((name, id) =>
     completed(name, id, name === 'gates' ? 'failure' : 'success'),
+  );
+  assert.equal(fixture(t, { checks }).merges.length, 0);
+});
+test('a docs-only batch with the code-only jobs skipped still merges', (t) => {
+  const checks = required.map((name, id) =>
+    completed(name, id, skippable.includes(name) ? 'skipped' : 'success'),
+  );
+  assert.equal(fixture(t, { checks }).merges.length, 1);
+});
+test('gates skipped is treated like the other must-be-green jobs', (t) => {
+  const checks = required.map((name, id) =>
+    completed(name, id, name === 'gates' ? 'skipped' : 'success'),
+  );
+  assert.equal(fixture(t, { checks }).merges.length, 1);
+});
+test('neutral, cancelled and timed out must-be-green runs block', (t) => {
+  for (const conclusion of ['neutral', 'cancelled', 'timed_out']) {
+    const checks = required.map((name, id) =>
+      completed(name, id, name === 'ops-backup-test' ? conclusion : 'success'),
+    );
+    assert.equal(fixture(t, { checks }).merges.length, 0);
+  }
+});
+test('a skipped required check still blocks a batch', (t) => {
+  const checks = required.map((name, id) =>
+    completed(name, id, name === 'pack-smoke' ? 'skipped' : 'success'),
   );
   assert.equal(fixture(t, { checks }).merges.length, 0);
 });

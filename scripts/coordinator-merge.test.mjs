@@ -23,9 +23,17 @@ const green = ['check', 'pack-smoke', 'e2e-gate', 'pr-evidence'].map((name) => (
   name,
   bucket: 'pass',
 }));
+const states = {
+  pass: 'SUCCESS',
+  skipping: 'SKIPPED',
+  fail: 'FAILURE',
+  cancel: 'CANCELLED',
+  pending: 'IN_PROGRESS',
+};
 const mustBeGreen = ['gates', 'dead-class-gate', 'ops-backup-test'].map((name) => ({
   name,
   bucket: 'pass',
+  state: 'SUCCESS',
 }));
 const base = {
   head: [A],
@@ -169,8 +177,10 @@ test('skipped checks count as green', (t) => {
   assert.equal(run(t, { checks: [skipped] }).merges.length, 1);
 });
 
-const withJob = (name, bucket) =>
-  [...green, ...mustBeGreen].map((check) => (check.name === name ? { ...check, bucket } : check));
+const withJob = (name, bucket, state = states[bucket]) =>
+  [...green, ...mustBeGreen].map((check) =>
+    check.name === name ? { ...check, bucket, state } : check,
+  );
 const withoutJob = (name) => [...green, ...mustBeGreen].filter((check) => check.name !== name);
 
 test('required checks green but gates red does not merge', (t) => {
@@ -194,6 +204,11 @@ test('gates missing after required checks completed waits, then merges once it r
 test('every must-be-green job gates the merge', (t) => {
   for (const name of mustBeGreen.map((check) => check.name))
     assert.equal(run(t, { allChecks: [withJob(name, 'fail')] }).merges.length, 0);
+});
+
+test('a neutral or timed out must-be-green job does not count as green', (t) => {
+  assert.equal(run(t, { allChecks: [withJob('gates', 'pass', 'NEUTRAL')] }).merges.length, 0);
+  assert.equal(run(t, { allChecks: [withJob('gates', 'fail', 'TIMED_OUT')] }).merges.length, 0);
 });
 
 test('a skipped must-be-green job counts as green', (t) => {
