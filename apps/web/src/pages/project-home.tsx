@@ -112,7 +112,7 @@ function ProjectHomeBody() {
   const [renameOpen, setRenameOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const loading = live && (projectsQ.isLoading || coordinator.loading);
+  const loading = live && (projectsQ.isLoading || coordinator.load === 'loading');
   const failed = live && projectsQ.isError;
   const missing = live && !loading && !failed && wire === undefined;
   const running = todos.filter((todo) => threadStatus(todo) === 'running').length;
@@ -328,11 +328,20 @@ function ProjectHomeBody() {
           description={t('它可能已被删除，或链接不对。')}
           className="mt-[12vh]"
         />
+      ) : coordinator.load === 'error' ? (
+        <EmptyState
+          testId="project-home-conversation-error"
+          icon={FolderX}
+          title={t('对话加载失败')}
+          description={t('对话记录还在，重试一下。')}
+          action={{ label: t('重试'), onClick: coordinator.retry }}
+          className="mt-[12vh]"
+        />
       ) : (
         <section
           data-testid="project-home"
           aria-label={t('与 Coordinator 的对话')}
-          aria-busy={coordinator.loading}
+          aria-busy={coordinator.load === 'loading'}
           className="flex min-h-0 flex-1 flex-col"
         >
           <MessageScrollerProvider defaultScrollPosition="end">
