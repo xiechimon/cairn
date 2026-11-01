@@ -104,15 +104,6 @@ function ActionRow({
   t: TFunc;
   align?: 'start' | 'end';
 }) {
-  const tail = (
-    <>
-      {(seconds != null || bare === true) && (
-        <span className="border-l border-(--input) pl-2 text-meta whitespace-nowrap text-(--text-tertiary)">
-          {seconds != null ? formatElapsed(seconds, t) : t('完成')}
-        </span>
-      )}
-    </>
-  );
   return (
     <div
       className={`chat-row-icons mt-1.5 flex items-center gap-3.5 text-(--text-tertiary) ${align === 'end' ? 'justify-end' : ''}`}
@@ -121,6 +112,11 @@ function ActionRow({
       {stamp != null && (
         <span className="text-caption tabular-nums" data-testid="msg-stamp">
           {stamp}
+        </span>
+      )}
+      {(seconds != null || bare === true) && (
+        <span className="text-meta whitespace-nowrap text-(--text-tertiary)">
+          {seconds != null ? formatElapsed(seconds, t) : t('完成')}
         </span>
       )}
       {copy != null && (
@@ -135,7 +131,6 @@ function ActionRow({
           <Copy width={13} height={13} />
         </Button>
       )}
-      {tail}
     </div>
   );
 }
