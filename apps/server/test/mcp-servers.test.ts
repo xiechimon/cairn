@@ -8,9 +8,10 @@ import {
   mcpServerRecordSchema,
   WORKER_REMOTE_TOOLS,
 } from '@cairn/shared';
+import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
-import { agentMemory, agent as agentTable } from '../src/db/schema.js';
+import { agentMemory, agent as agentTable, todo } from '../src/db/schema.js';
 import { type ChiefToolCtx, executeChiefTool } from '../src/services/chief-tools.js';
 import { listMcpServers, readClaudeMcpServers } from '../src/services/mcp-servers.js';
 import {
@@ -217,7 +218,10 @@ describe('agent grant surface: mcpServers[] = config key names, unknown keys sil
 });
 
 describe('claim payload: mcpServers slug-ized (string[]) + version-wall bump (machine-wire contract break)', () => {
-  async function world(cliVersion: string, opts: { slugs?: string[] } = {}) {
+  async function world(
+    cliVersion: string,
+    opts: { slugs?: string[]; intakePreset?: boolean } = {},
+  ) {
     const s = bootServer({ claimHoldMs: 250 });
     const plain = await issueApiKey(s);
     const enroll = await call(s.app, 'POST', '/api/machine/enroll', {
@@ -234,7 +238,7 @@ describe('claim payload: mcpServers slug-ized (string[]) + version-wall bump (ma
         displayName: 'w',
         provider: 'stub-gw',
         modelId: 'stub-model',
-        mcpServers: opts.slugs ?? ['demo'],
+        mcpServers: [],
       })
       .run();
     bindAllAgents(s);
@@ -247,6 +251,18 @@ describe('claim payload: mcpServers slug-ized (string[]) + version-wall bump (ma
     await call(s.app, 'POST', `/api/projects/${projectId}/builds`, {
       body: { todoIds: [todoId], assignment: { plan: null, build: { agentId } }, withPlan: false },
     });
+    if (opts.intakePreset) {
+      s.db
+        .update(todo)
+        .set({ assignment: { source: 'intake-label', plan: null, build: { agentId } } })
+        .where(eq(todo.id, todoId))
+        .run();
+    }
+    s.db
+      .update(agentTable)
+      .set({ mcpServers: opts.slugs ?? ['demo'] })
+      .where(eq(agentTable.id, agentId))
+      .run();
     const claimRes = await call(s.app, 'POST', '/api/machine/tasks/claim', {
       cred: token,
       body: {},
@@ -262,6 +278,20 @@ describe('claim payload: mcpServers slug-ized (string[]) + version-wall bump (ma
     expect(step!.remoteTools?.map((t) => t.name)).toEqual(WORKER_REMOTE_TOOLS.map((t) => t.name));
     s.dispose();
   });
+
+  test.each([true, false])(
+    'worker claims filter newly granted agent MCP servers for intake preset=%s',
+    async (intakePreset) => {
+      const { s, step } = await world(MCP_MIN_CLI_VERSION, {
+        slugs: ['demo', 'ghost'],
+        intakePreset,
+      });
+      expect(step).not.toBeNull();
+      if (intakePreset) expect(step).not.toHaveProperty('mcpServers');
+      else expect(step?.mcpServers).toEqual(['demo', 'ghost']);
+      s.dispose();
+    },
+  );
 
   test('version wall: legacy daemon version line (0.1.x) receives no mcpServers (contract-break bump landed)', async () => {
     expect(MCP_MIN_CLI_VERSION).not.toBe('0.1.0');
