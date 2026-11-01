@@ -216,9 +216,22 @@ orb_alarm() {
   touch "$STATE/alarms/$reason" || true
 }
 
+ORB_STOP_FAILED=0
+
+orb_recovered() {
+  local action
+  for action in "$@"; do rm -f "$STATE/alarms/orb-unit-$action-failed"; done
+}
+
 stop_services() {
   if systemctl --user is-enabled --quiet "$ORB_UNIT"; then
-    systemctl --user stop "$ORB_UNIT" || orb_alarm stop
+    if systemctl --user stop "$ORB_UNIT"; then
+      ORB_STOP_FAILED=0
+      orb_recovered stop
+    else
+      ORB_STOP_FAILED=1
+      orb_alarm stop
+    fi
   fi
   systemctl --user stop "$DAEMON_UNIT" && systemctl --user stop "$SERVER_UNIT"
 }
@@ -232,8 +245,14 @@ start_and_check() {
   systemctl --user start "$DAEMON_UNIT"
   daemon_healthy "$started_ms" || return 1
   if systemctl --user is-enabled --quiet "$ORB_UNIT"; then
-    if systemctl --user start "$ORB_UNIT"; then
-      rm -f "$STATE"/alarms/orb-unit-*-failed
+    if [ "$ORB_STOP_FAILED" = 1 ]; then
+      if systemctl --user restart "$ORB_UNIT"; then
+        orb_recovered stop start
+      else
+        orb_alarm start
+      fi
+    elif systemctl --user start "$ORB_UNIT"; then
+      orb_recovered start
     else
       orb_alarm start
     fi

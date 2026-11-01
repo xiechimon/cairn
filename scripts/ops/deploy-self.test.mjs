@@ -597,7 +597,7 @@ for (const broken of [false, true]) {
 test('Orb failures alert again after recovery while persistent failures stay deduplicated', () => {
   const f = fixture();
   writeFileSync(join(f.fake, 'orb-enabled'), '');
-  for (const action of ['start', 'stop']) {
+  for (const action of ['start', 'stop', 'restart']) {
     writeFileSync(join(f.fake, `orb-${action}-fail`), '');
   }
   for (const name of ['first failure', 'persistent failure']) {
@@ -608,19 +608,48 @@ test('Orb failures alert again after recovery while persistent failures stay ded
       assert.equal(existsSync(join(f.state, 'alarms', `orb-unit-${action}-failed`)), true);
     }
   }
-  for (const action of ['start', 'stop']) unlinkSync(join(f.fake, `orb-${action}-fail`));
+  for (const action of ['start', 'stop', 'restart']) unlinkSync(join(f.fake, `orb-${action}-fail`));
   const unrelated = join(f.state, 'alarms', 'deploy-lag');
   writeFileSync(unrelated, '');
   const recovered = f.run(DEPLOY, [pushTarget(f, 'recovered')]);
   assert.equal(recovered.status, 0, recovered.stderr);
   assert.deepEqual(readdirSync(join(f.state, 'alarms')), ['deploy-lag']);
-  for (const action of ['start', 'stop']) {
+  for (const action of ['start', 'stop', 'restart']) {
     writeFileSync(join(f.fake, `orb-${action}-fail`), '');
   }
   const failedAgain = f.run(DEPLOY, [pushTarget(f, 'failed again')]);
   assert.equal(failedAgain.status, 0, failedAgain.stderr);
   assert.equal(f.log('gh.log').match(/gh issue (create|comment)/g).length, 4);
   assert.equal(existsSync(unrelated), true);
+});
+
+test('repeated Orb stop failures restart the unit and keep one deduplicated stop alarm', () => {
+  const f = fixture();
+  writeFileSync(join(f.fake, 'orb-enabled'), '');
+  writeFileSync(join(f.fake, 'orb-stop-fail'), '');
+  writeFileSync(join(f.fake, 'orb-restart-fail'), '');
+  for (const name of ['first', 'second']) {
+    const result = f.run(DEPLOY, [pushTarget(f, name)]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(existsSync(join(f.state, 'alarms', 'orb-unit-stop-failed')), true);
+  }
+  const calls = f.log('systemctl.log').trim().split('\n');
+  assert.ok(calls.includes('systemctl --user restart cairn-daemon-orb.service'));
+  assert.ok(!calls.includes('systemctl --user start cairn-daemon-orb.service'));
+  assert.equal(f.log('gh.log').match(/gh issue (create|comment)/g).length, 2);
+});
+
+test('a failed Orb stop followed by a successful restart clears only what recovered', () => {
+  const f = fixture();
+  writeFileSync(join(f.fake, 'orb-enabled'), '');
+  writeFileSync(join(f.fake, 'orb-stop-fail'), '');
+  mkdirSync(join(f.state, 'alarms'), { recursive: true });
+  writeFileSync(join(f.state, 'alarms', 'orb-unit-start-failed'), '');
+  const result = f.run(DEPLOY, [pushTarget(f, 'restart recovers')]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.ok(f.log('systemctl.log').includes('systemctl --user restart cairn-daemon-orb.service'));
+  assert.equal(existsSync(join(f.state, 'alarms', 'orb-unit-stop-failed')), false);
+  assert.equal(existsSync(join(f.state, 'alarms', 'orb-unit-start-failed')), false);
 });
 
 for (const action of ['start', 'stop']) {
