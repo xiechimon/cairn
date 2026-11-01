@@ -13,6 +13,7 @@ const between = (start, end) => {
 };
 const constants = between('const AUTO_MERGE =', 'const FILES_CMD =');
 const routing = between('const safety = reviewed.find', 'const checked =');
+const gatePaths = JSON.parse(readFileSync('packages/shared/merge-gate-paths.json', 'utf8'));
 const sandbox = { timeout: 1000, contextCodeGeneration: { strings: false, wasm: false } };
 
 const decide = ({ changedFiles, linesChanged = 1, binaryFiles = [], deletedFiles = [] }) =>
@@ -22,7 +23,7 @@ const matchedProtected = changedFiles.filter(isProtected);
 const reviewed = [];
 ${routing}
 ;({ humanReasons, sizeReview, sizeRequirement })`,
-    { changedFiles, deletedFiles, binaryFiles, linesChanged },
+    { args: { gatePaths }, changedFiles, deletedFiles, binaryFiles, linesChanged },
     sandbox,
   );
 const route = (input) => Array.from(decide(input).humanReasons);

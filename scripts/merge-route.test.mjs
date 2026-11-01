@@ -7,6 +7,7 @@ import { test } from 'node:test';
 
 const script = resolve('scripts/merge-route.mjs');
 const prGate = resolve('.claude/workflows/pr-gate.js');
+const gatePaths = resolve('packages/shared/merge-gate-paths.json');
 
 function repoWith(t, files) {
   const dir = mkdtempSync(join(tmpdir(), 'merge-route-'));
@@ -17,8 +18,10 @@ function repoWith(t, files) {
   git('config', 'user.name', 'test');
   mkdirSync(join(dir, '.claude/workflows'), { recursive: true });
   copyFileSync(prGate, join(dir, '.claude/workflows/pr-gate.js'));
+  mkdirSync(join(dir, 'packages/shared'), { recursive: true });
+  copyFileSync(gatePaths, join(dir, 'packages/shared/merge-gate-paths.json'));
   writeFileSync(join(dir, 'README.md'), 'base\n');
-  git('add', '.claude/workflows/pr-gate.js', 'README.md');
+  git('add', '.claude/workflows/pr-gate.js', 'packages/shared/merge-gate-paths.json', 'README.md');
   git('commit', '-q', '-m', 'base');
   git('update-ref', 'refs/remotes/origin/main', 'HEAD');
   git('switch', '-q', '-c', 'topic');

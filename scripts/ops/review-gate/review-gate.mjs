@@ -37,16 +37,14 @@ const globToRe = (g) =>
       .replace(/\uE000/g, '(?:.*/)?')
       .replace(/\uE001/g, '.*')}$`,
   );
-const repoProtected = () => {
-  const src = execFileSync(
-    'git',
-    ['show', 'origin/main:packages/shared/src/records/merge-gate.ts'],
-    { cwd: MAIN, encoding: 'utf8' },
+const repoGatePaths = () =>
+  JSON.parse(
+    execFileSync('git', ['show', 'origin/main:packages/shared/merge-gate-paths.json'], {
+      cwd: MAIN,
+      encoding: 'utf8',
+    }),
   );
-  const block = src.slice(src.indexOf('export const PROTECTED_PATH_GLOBS'));
-  const list = block.slice(block.indexOf('['), block.indexOf('];'));
-  return [...list.matchAll(/'([^']+)'/g)].map((m) => globToRe(m[1]));
-};
+const repoProtected = (gatePaths) => gatePaths.protected.map(globToRe);
 
 mkdirSync(`${STATE}/runs`, { recursive: true });
 mkdirSync(`${STATE}/disarmed`, { recursive: true });
@@ -297,7 +295,8 @@ try {
     ]),
   );
   execFileSync(BOT, ['git', 'fetch', '-q', 'origin', 'main'], { cwd: MAIN });
-  const PROTECTED = [...repoProtected(), ...EXTRA_PROTECTED];
+  const gatePaths = repoGatePaths();
+  const PROTECTED = [...repoProtected(gatePaths), ...EXTRA_PROTECTED];
   const checkIdx = process.argv.indexOf('--check');
   if (checkIdx > 0) {
     const files = JSON.parse(
@@ -503,6 +502,7 @@ try {
           ],
           { cwd: MAIN, encoding: 'utf8', maxBuffer: 64 << 20 },
         ),
+        gatePaths.limits,
       ),
     );
   const runReview = (pr, slot) =>

@@ -3,6 +3,7 @@ import { runInNewContext } from 'node:vm';
 import { mustBeGreenJobs, requiredChecks } from './merge-checks.mjs';
 
 const prGatePath = '.claude/workflows/pr-gate.js';
+const gatePathsPath = 'packages/shared/merge-gate-paths.json';
 export const configPath = '.mergify.yml';
 const prOnlyChecks = ['pr-evidence'];
 const maxLinesEachWay = 400;
@@ -19,7 +20,7 @@ const scopes = {
 };
 const barrierFiles = ['packages/**/*'];
 
-function routingPolicy(source) {
+function routingPolicy(source, gatePaths) {
   const extract = (start, end) => {
     const from = source.indexOf(start);
     const to = source.indexOf(end, from + start.length);
@@ -27,16 +28,16 @@ function routingPolicy(source) {
       throw new Error(`pr-gate.js no longer has a single ${start}`);
     return source.slice(from, to);
   };
-  const lists = extract('const AUTO_MERGE = [', '\n// Matching that widens');
   const matcher = extract('function globToRegExp', 'const SCRIPT_SHA256');
-  const limits = extract('const MAX_FILES =', 'const EVIDENCE_RE');
   return runInNewContext(
-    `${lists}\n${matcher}\n${limits}\n;({
-      protectedSources: PROTECTED.map((glob) => globToRegExp(glob, { protect: true }).source),
-      autoMergeSources: AUTO_MERGE.map((glob) => globToRegExp(glob).source),
-      maxFiles: MAX_FILES,
+    `${matcher}\n;({
+      protectedSources: [...gatePaths.protected, ...gatePaths.mergeGateSource].map(
+        (glob) => globToRegExp(glob, { protect: true }).source,
+      ),
+      autoMergeSources: gatePaths.autoMerge.map((glob) => globToRegExp(glob).source),
+      maxFiles: gatePaths.limits.maxFiles,
     })`,
-    {},
+    { gatePaths },
     { timeout: 1000, contextCodeGeneration: { strings: false, wasm: false } },
   );
 }
@@ -46,8 +47,8 @@ const quoted = (condition) => `'${condition.replaceAll("'", "''")}'`;
 const passedOrSkipped = (check) =>
   `      - or:\n          - check-success = ${check}\n          - check-skipped = ${check}`;
 
-export function mergifyConfig(prGateSource) {
-  const { protectedSources, autoMergeSources, maxFiles } = routingPolicy(prGateSource);
+export function mergifyConfig(prGateSource, gatePaths) {
+  const { protectedSources, autoMergeSources, maxFiles } = routingPolicy(prGateSource, gatePaths);
   const protectedRe = `(?i)^(?:${protectedSources.map(anchorless).join('|')})$`;
   const outsideRe = `(?ai)^(?!(?:${autoMergeSources.map(anchorless).join('|')})$)`;
   const deletedTestRe = '(?i)(^|/)(e2e|test|tests|__tests__)/|[.](test|spec)[.][cm]?[jt]sx?$';
@@ -109,5 +110,11 @@ ${barrierFiles.map((glob) => `      - ${glob}`).join('\n')}
 }
 
 if (process.argv[1] && realpathSync(process.argv[1]) === import.meta.filename) {
-  writeFileSync(configPath, mergifyConfig(readFileSync(prGatePath, 'utf8')));
+  writeFileSync(
+    configPath,
+    mergifyConfig(
+      readFileSync(prGatePath, 'utf8'),
+      JSON.parse(readFileSync(gatePathsPath, 'utf8')),
+    ),
+  );
 }

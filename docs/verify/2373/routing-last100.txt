@@ -1,0 +1,13 @@
+base commit (old inline lists: main + #2415)                        df6143da946e56a929728a3a5152ea4a3c3e2627
+merged PRs compared                                                 100 (#2337..#2510)
+files compared                                                      1328
+PRs touching a protected path (new)                                 62
+PRs routed to size review (new)                                     21
+PRs whose routing changed (reasons, size, auto)                     0
+files whose classification changed                                  0
+old merge-gate.ts lists identical to JSON (minus the JSON itself)   true
+limits identical (800 lines, 40 files)                              true
+negative control: JSON without '**/scripts/**'                      48 PRs, 220 files change routing
+.mergify.yml regenerated from the JSON                              only change: packages/shared/merge-gate-paths.json joins the protected regex
+file lists: gh pr list --state merged --limit 100 --json files (at most 100 files per PR)
+script: a vm run of both pr-gate.js copies' AUTO_MERGE..FILES_CMD and routing regions per PR

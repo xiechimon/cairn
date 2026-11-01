@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import { configPath, mergifyConfig } from './mergify-config.mjs';
 
 const prGate = readFileSync('.claude/workflows/pr-gate.js', 'utf8');
+const gatePaths = JSON.parse(readFileSync('packages/shared/merge-gate-paths.json', 'utf8'));
 const config = readFileSync(configPath, 'utf8');
 
 function fileCondition(prefix) {
@@ -14,8 +15,17 @@ function fileCondition(prefix) {
   return new RegExp(body, flags.includes('a') ? 'i' : 'iu');
 }
 
-test('.mergify.yml is generated from pr-gate.js and merge-checks.mjs', () => {
-  assert.equal(config, mergifyConfig(prGate), 'run node scripts/mergify-config.mjs');
+test('.mergify.yml is generated from merge-gate-paths.json, pr-gate.js and merge-checks.mjs', () => {
+  assert.equal(config, mergifyConfig(prGate, gatePaths), 'run node scripts/mergify-config.mjs');
+});
+
+test('negative control: a list or limit changed in merge-gate-paths.json changes .mergify.yml', () => {
+  for (const changed of [
+    { ...gatePaths, protected: [...gatePaths.protected, 'zz-extra/**'] },
+    { ...gatePaths, autoMerge: gatePaths.autoMerge.slice(1) },
+    { ...gatePaths, limits: { ...gatePaths.limits, maxFiles: gatePaths.limits.maxFiles + 1 } },
+  ])
+    assert.notEqual(mergifyConfig(prGate, changed), config);
 });
 
 test('protected paths never enter the queue', () => {

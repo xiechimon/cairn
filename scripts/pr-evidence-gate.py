@@ -12,7 +12,9 @@ count, and the template ships its guidance as HTML comments so an untouched
 template fails. Proof quality, including the old-code failing output and
 new-code passing output, is a reviewer judgment.
 
-Size check (#2372): a PR over 800 non-evidence lines or 40 non-evidence files
+Size check (#2372): a PR over limits.maxLines non-evidence lines or
+limits.maxFiles non-evidence files (packages/shared/merge-gate-paths.json,
+read beside this script; unreadable limits fail closed)
 (counted as apps/server/src/services/merge-gate/digest.ts counts: docs/verify
 evidence is left out, a rename counts two files) must carry a `## Size`
 section inside the collapsed details block, stating why the change cannot be
@@ -88,6 +90,7 @@ the URL (with its line for bare URLs).
 import json
 import os
 from html import unescape
+from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 import re
 import subprocess
@@ -125,8 +128,17 @@ SCHEMA_HEADING = re.compile(r'^### Schema changes[ \t]*$', re.M)
 ANY_HEADING = re.compile(r'^#{1,6}[ \t]+', re.M)
 NO_SCHEMA_CHANGES = 'No schema changes'
 EVIDENCE_PREFIX = 'docs/verify/'
-MAX_LINES = 800
-MAX_FILES = 40
+GATE_PATHS = Path(__file__).resolve().parent.parent / 'packages/shared/merge-gate-paths.json'
+
+
+def size_limits():
+    try:
+        limits = json.loads(GATE_PATHS.read_text(encoding='utf-8')).get('limits', {})
+    except (OSError, ValueError, AttributeError):
+        return None
+    values = (limits.get('maxLines'), limits.get('maxFiles'))
+    valid = all(isinstance(v, int) and not isinstance(v, bool) and v > 0 for v in values)
+    return values if valid else None
 
 
 def section_contents(body):
@@ -395,14 +407,19 @@ def main():
 
     if len(args) > 1:
         patch_files = load_patch_files(args[1])
+        limits = size_limits()
         if patch_files is None:
             failures.append('size-unreadable')
             print("FAIL size-unreadable: the context JSON has no usable pull request file list")
+        elif limits is None:
+            failures.append('size-unreadable')
+            print(f"FAIL size-unreadable: {GATE_PATHS} has no positive integer limits.maxLines and limits.maxFiles")
         else:
+            max_lines, max_files = limits
             lines, counted_files = patch_size(patch_files)
-            if lines > MAX_LINES or counted_files > MAX_FILES:
+            if lines > max_lines or counted_files > max_files:
                 print(f"pr-evidence: oversize ({lines} lines, {counted_files} files; "
-                      f"limits {MAX_LINES} lines, {MAX_FILES} files): a ## Size section is required")
+                      f"limits {max_lines} lines, {max_files} files): a ## Size section is required")
                 state = size_section_state(body)
                 if state == 'missing':
                     failures.append('Size')

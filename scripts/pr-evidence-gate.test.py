@@ -405,6 +405,8 @@ class SchemaGlanceWorkflowTests(unittest.TestCase):
         (self.repo / 'apps/server/drizzle/meta').mkdir(parents=True)
         for name in ('pr-evidence-gate.py', 'pr_body.py', 'schema-glance.mjs'):
             (self.repo / 'scripts' / name).write_text(Path('scripts', name).read_text())
+        (self.repo / 'packages/shared').mkdir(parents=True)
+        (self.repo / 'packages/shared/merge-gate-paths.json').write_text(Path('packages/shared/merge-gate-paths.json').read_text())
         self.git('init', '-q', '-b', 'main')
         self.git('config', 'user.email', 't@example.com')
         self.git('config', 'user.name', 't')
@@ -542,6 +544,30 @@ class SizeSectionTests(unittest.TestCase):
 
     def test_without_a_context_size_is_not_checked(self):
         self.assertEqual(self.run_gate(self.body(), None)[0], 0)
+
+    def test_limits_come_from_merge_gate_paths_json(self):
+        limits = json.loads(Path('packages/shared/merge-gate-paths.json').read_text())['limits']
+        self.assertEqual(gate.size_limits(), (limits['maxLines'], limits['maxFiles']))
+        with tempfile.TemporaryDirectory() as directory:
+            narrowed = Path(directory, 'merge-gate-paths.json')
+            narrowed.write_text(json.dumps({'limits': {'maxLines': 4, 'maxFiles': 40}}))
+            with patch.object(gate, 'GATE_PATHS', narrowed):
+                result, output = self.run_gate(self.body(), [self.source(5)])
+        self.assertEqual(result, 1, output)
+        self.assertIn('limits 4 lines, 40 files', output)
+
+    def test_unreadable_limits_fail_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            for content in (None, '{}', json.dumps({'limits': {'maxLines': 0, 'maxFiles': 40}}), 'not json'):
+                path = Path(directory, 'merge-gate-paths.json')
+                if content is not None:
+                    path.write_text(content)
+                elif path.exists():
+                    path.unlink()
+                with patch.object(gate, 'GATE_PATHS', path):
+                    result, output = self.run_gate(self.body(), [self.source(5)])
+                self.assertEqual(result, 1, output)
+                self.assertIn('FAIL size-unreadable', output)
 
 
 def load_tests(loader, tests, pattern):
