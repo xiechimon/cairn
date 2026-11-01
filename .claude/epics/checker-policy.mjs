@@ -59,9 +59,11 @@ export function validateManifest(manifest, epic) {
     requireFact(unique(ids, nonempty), 'Invalid manifest item ids');
     for (const item of manifest.items)
       requireFact(
-        exactKeys(item, ['id', 'issue', 'dependsOn'], ['humanHeld']) &&
+        exactKeys(item, ['id', 'issue', 'dependsOn'], ['humanHeld', 'scope', 'hotFiles']) &&
           unique(item.dependsOn, (id) => ids.includes(id) && id !== item.id) &&
-          (item.humanHeld === undefined || typeof item.humanHeld === 'boolean'),
+          (item.humanHeld === undefined || typeof item.humanHeld === 'boolean') &&
+          (item.scope === undefined || unique(item.scope, nonempty)) &&
+          (item.hotFiles === undefined || unique(item.hotFiles, nonempty)),
         'Invalid manifest dependency',
       );
     const visiting = new Set();

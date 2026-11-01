@@ -85,6 +85,18 @@ export function parseRuns(text) {
     });
 }
 
+export function evidenceRerun(runs, rerun = []) {
+  const newest = runs
+    .filter((run) => Number.isSafeInteger(run?.databaseId))
+    .sort((a, b) => b.databaseId - a.databaseId)[0];
+  if (newest?.status === 'completed' && newest.conclusion === 'success') return { done: true };
+  const failed =
+    newest?.status === 'completed' &&
+    newest.conclusion === 'failure' &&
+    !rerun.includes(newest.databaseId);
+  return { done: false, run: failed ? newest.databaseId : null };
+}
+
 export const HUMAN_LABEL = 'review-gate-human';
 export const HUMAN_MARKER = '<!-- review-gate-human:';
 export const BLOCK_ROUNDS = 3;

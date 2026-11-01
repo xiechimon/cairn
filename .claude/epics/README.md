@@ -10,8 +10,13 @@ of remote main; checks still run at the remote main SHA.
 The required fields are `epic` (matching the filename), `items`,
 `requiredChecks`, `checks`, and `maxHours` (a positive finite hour limit).
 `items` is non-empty, with unique string ids and positive, unique issue numbers.
-Each item has `id`, `issue`, `dependsOn` (an array of item ids), and optional
-boolean `humanHeld`. Dependencies must form an acyclic graph and reference
+Each item has `id`, `issue`, `dependsOn` (an array of item ids), optional
+boolean `humanHeld`, and optional `scope` and `hotFiles` arrays of unique path
+globs. `pr-evidence` reads them from main for a `<epic>/<item id>` branch: with
+`scope`, every changed file outside `docs/verify/` must match it. Once any item
+of the manifest declares `hotFiles`, a changed file listed in `hotFiles` of
+`packages/shared/merge-gate-paths.json` must match the item's `hotFiles`; an
+item without the field then may touch no hot file. Dependencies must form an acyclic graph and reference
 existing items. The v1 `issues` array remains supported in place of `items`;
 it cannot be combined with `items`.
 

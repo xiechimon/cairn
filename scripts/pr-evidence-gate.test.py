@@ -570,6 +570,187 @@ class SchemaGlanceWorkflowTests(unittest.TestCase):
         self.assertIn('schema-changes: matches', result.stdout)
 
 
+class MergeRulesTests(unittest.TestCase):
+    head = 'a' * 40
+    older = 'b' * 40
+    gate_paths = {'protected': ['scripts/**', '.github/**'], 'mergeGateSource': ['packages/shared/merge-gate-paths.json'],
+                  'requiredReviews': {'review-gate': ['protected', 'mergeGateSource']},
+                  'hotFiles': ['scripts/prepush.mjs', 'apps/web/src/i18n/en.ts', '**/*-allowlist.json']}
+    manifest = {'epic': 'C1', 'items': [
+        {'id': 'pr-evidence-ext', 'issue': 2375, 'dependsOn': [],
+         'scope': ['scripts/pr-evidence-gate*.py', '.github/workflows/pr-evidence.yml', 'scripts/prepush.mjs'],
+         'hotFiles': ['scripts/prepush.mjs']},
+        {'id': 'unscoped', 'issue': 2376, 'dependsOn': []}]}
+
+    def pass_comment(self, sha=None, login='cairnwright[bot]', verdict='PASS', id=1):
+        sha = sha or self.head
+        return {'id': id, 'user': {'login': login},
+                'body': f'<!-- review-gate:{sha} -->\n**Independent review gate: {verdict}** for `{sha[:8]}`.'}
+
+    def run_rules(self, paths, comments=(), head_ref='feature/x', gate_paths=None, manifest=None, head=None, statuses=None, **extra):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'epics').mkdir()
+            if manifest is not False:
+                (root / 'epics/C1.json').write_text(manifest if isinstance(manifest, str) else json.dumps(manifest or self.manifest))
+            (root / 'gate.json').write_text(json.dumps(gate_paths or self.gate_paths))
+            files = [{'filename': path, 'additions': 1, 'deletions': 0, **extra} for path in paths]
+            context = {'repository': 'xiechimon/cairn', 'head': head or self.head, 'headRef': head_ref,
+                       'commits': [], 'files': files, 'comments': list(comments), 'statuses': statuses or []}
+            (root / 'context.json').write_text(json.dumps(context))
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                result = gate.merge_rules(root / 'context.json', root / 'gate.json', root / 'epics')
+        return result, output.getvalue()
+
+    def test_compliant_protected_pr_with_a_head_bound_bot_pass_is_green(self):
+        result, output = self.run_rules(['scripts/pr-evidence-gate.py', 'docs/verify/2375/run.txt'], [self.pass_comment()],
+                                        head_ref='C1/pr-evidence-ext')
+        self.assertEqual(result, 0, output)
+        self.assertIn('merge-rules: review-gate PASS by cairnwright[bot]', output)
+        self.assertIn('keeps to its scope and hot files', output)
+
+    def test_unprotected_pr_needs_no_review(self):
+        result, output = self.run_rules(['apps/web/src/app.tsx'])
+        self.assertEqual(result, 0, output)
+        self.assertNotIn('review-gate required', output)
+
+    def test_forged_review_comment_from_another_login_is_red(self):
+        for login in ('xiechimon', 'cairnwright', 'github-actions[bot]'):
+            with self.subTest(login=login):
+                result, output = self.run_rules(['scripts/x.mjs'], [self.pass_comment(login=login)])
+                self.assertEqual(result, 1, output)
+                self.assertIn('FAIL review-missing: review-gate: no verdict', output)
+
+    def test_review_bound_to_an_older_head_is_red(self):
+        result, output = self.run_rules(['scripts/x.mjs'], [self.pass_comment(sha=self.older)])
+        self.assertEqual(result, 1, output)
+        self.assertIn(f'bound to head {self.head[:8]}', output)
+
+    def test_newest_verdict_for_the_head_wins(self):
+        block_after_pass = [self.pass_comment(id=1), self.pass_comment(verdict='BLOCK', id=2)]
+        result, output = self.run_rules(['scripts/x.mjs'], reversed(block_after_pass))
+        self.assertEqual(result, 1, output)
+        self.assertIn('the newest verdict is BLOCK', output)
+        result, output = self.run_rules(['scripts/x.mjs'], [self.pass_comment(verdict='BLOCK', id=1), self.pass_comment(id=2)])
+        self.assertEqual(result, 0, output)
+
+    def test_unanchored_verdicts_do_not_count(self):
+        quoted = self.pass_comment()
+        quoted['body'] = 'Copied: ' + quoted['body']
+        loose = self.pass_comment()
+        loose['body'] = loose['body'].replace('\n', '\n\n')
+        for comment in (quoted, loose):
+            with self.subTest(body=comment['body']):
+                self.assertEqual(self.run_rules(['scripts/x.mjs'], [comment])[0], 1)
+
+    def test_a_review_gate_status_without_the_bot_comment_is_red(self):
+        status = {'context': 'review-gate', 'state': 'success', 'creator': {'login': 'xiechimon'}}
+        result, output = self.run_rules(['scripts/x.mjs'], statuses=[status])
+        self.assertEqual(result, 1, output)
+        self.assertIn('FAIL review-missing', output)
+
+    def test_renames_out_of_protected_paths_and_unsafe_names_need_review(self):
+        result, output = self.run_rules(['apps/web/src/moved.ts'], previous_filename='scripts/moved.ts')
+        self.assertEqual(result, 1, output)
+        result, output = self.run_rules(['apps/web/src/a b.ts'])
+        self.assertEqual(result, 1, output)
+        self.assertIn('review-gate required', output)
+        self.assertFalse(gate.unsafe_path('apps/web/src/i18n/zh_中文é-1.ts'))
+        self.assertTrue(gate.unsafe_path('apps/web/src/a\tb.ts'))
+
+    def test_gate_source_and_case_variants_need_review(self):
+        for path in ('packages/shared/merge-gate-paths.json', 'Scripts/x.mjs', '.github'):
+            with self.subTest(path=path):
+                self.assertEqual(self.run_rules([path])[0], 1)
+
+    def test_malformed_head_or_rules_fail_closed(self):
+        result, output = self.run_rules(['scripts/x.mjs'], [self.pass_comment(sha='.*')], head='.*')
+        self.assertEqual(result, 1, output)
+        self.assertIn('FAIL merge-rules-unreadable', output)
+        for reviews in ({}, {'other-review': ['protected']}, {'review-gate': ['missingList']}):
+            with self.subTest(reviews=reviews):
+                result, output = self.run_rules(['apps/web/src/app.tsx'], gate_paths={**self.gate_paths, 'requiredReviews': reviews})
+                self.assertEqual(result, 1, output)
+                self.assertIn('FAIL merge-rules-unreadable', output)
+
+    def test_batch_branch_editing_an_undeclared_hot_file_is_red(self):
+        for path in ('apps/web/src/i18n/en.ts', 'scripts/comment-discipline-allowlist.json'):
+            with self.subTest(path=path):
+                result, output = self.run_rules([path], [self.pass_comment()], head_ref='C1/unscoped')
+                self.assertEqual(result, 1, output)
+                self.assertIn(f'FAIL undeclared-hot-file: {path}', output)
+        result, output = self.run_rules(['scripts/prepush.mjs'], [self.pass_comment()], head_ref='C1/pr-evidence-ext')
+        self.assertEqual(result, 0, output)
+
+    def test_batch_branch_outside_its_scope_is_red(self):
+        result, output = self.run_rules(['scripts/pr-evidence-gate.py', 'apps/server/src/index.ts'], [self.pass_comment()],
+                                        head_ref='C1/pr-evidence-ext')
+        self.assertEqual(result, 1, output)
+        self.assertIn('FAIL out-of-scope: apps/server/src/index.ts', output)
+        self.assertNotIn('FAIL out-of-scope: scripts/pr-evidence-gate.py', output)
+
+    def test_manifest_without_any_hot_file_declaration_skips_the_hot_file_check(self):
+        legacy = {'epic': 'C1', 'items': [{'id': 'unscoped', 'issue': 2376, 'dependsOn': []}]}
+        result, output = self.run_rules(['apps/web/src/i18n/en.ts'], head_ref='C1/unscoped', manifest=legacy)
+        self.assertEqual(result, 0, output)
+        self.assertIn('no C1.json item declares hotFiles', output)
+
+    def test_item_without_scope_is_only_held_to_hot_files(self):
+        result, output = self.run_rules(['apps/server/src/index.ts'], head_ref='C1/unscoped')
+        self.assertEqual(result, 0, output)
+
+    def test_item_is_found_in_a_nested_branch_name(self):
+        result, output = self.run_rules(['apps/web/src/i18n/en.ts'], head_ref='C1/epic/unscoped')
+        self.assertEqual(result, 1, output)
+        self.assertIn('C1/unscoped hotFiles', output)
+
+    def test_branches_without_a_manifest_item_are_unaffected(self):
+        for head_ref, manifest in (('feature/en', None), ('C1/not-an-item', None), ('B9/item', None), ('C1/unscoped', False)):
+            with self.subTest(head_ref=head_ref):
+                result, output = self.run_rules(['apps/web/src/i18n/en.ts'], head_ref=head_ref, manifest=manifest)
+                self.assertEqual(result, 0, output)
+                self.assertIn('not a batch manifest item', output)
+
+    def test_malformed_manifest_or_item_fails_closed(self):
+        broken_item = {'epic': 'C1', 'items': [{'id': 'unscoped', 'issue': 1, 'dependsOn': [], 'scope': 'apps/**'}]}
+        for manifest in ('not json', json.dumps({'epic': 'C1'}), json.dumps(broken_item)):
+            with self.subTest(manifest=manifest):
+                result, output = self.run_rules(['apps/web/src/app.tsx'], head_ref='C1/unscoped', manifest=manifest)
+                self.assertEqual(result, 1, output)
+                self.assertIn('FAIL merge-rules-unreadable', output)
+
+    def test_repository_rules_require_review_for_protected_paths_and_list_hot_files(self):
+        paths = json.loads(Path('packages/shared/merge-gate-paths.json').read_text())
+        self.assertEqual(paths['requiredReviews'], {'review-gate': ['protected', 'mergeGateSource']})
+        self.assertIn('scripts/prepush.mjs', paths['hotFiles'])
+        self.assertTrue(gate.glob_to_re('apps/server/drizzle/**').fullmatch('apps/server/drizzle'))
+        self.assertFalse(gate.glob_to_re('scripts/*.mjs').fullmatch('scripts/ops/a.mjs'))
+
+    def test_cli_entry_reads_rules_beside_the_script(self):
+        with tempfile.TemporaryDirectory() as directory:
+            context = Path(directory, 'context.json')
+            context.write_text(json.dumps({'head': self.head, 'headRef': 'feature/x', 'files': [
+                {'filename': 'scripts/x.mjs', 'additions': 1, 'deletions': 0}], 'comments': [self.pass_comment()]}))
+            result = subprocess.run([sys.executable, str(Path(__file__).with_name('pr-evidence-gate.py')), '--merge-rules', str(context)],
+                                    capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('merge-rules: GREEN', result.stdout)
+
+    def test_workflow_runs_main_copies_with_the_head_bound_context(self):
+        workflow = Path('.github/workflows/pr-evidence.yml').read_text()
+        self.assertIn('git archive origin/main scripts/pr-evidence-gate.py scripts/pr_body.py '
+                      'packages/shared/merge-gate-paths.json .claude/epics', workflow)
+        self.assertIn('python3 "$RUNNER_TEMP/main-rules/scripts/pr-evidence-gate.py" --merge-rules '
+                      '"$RUNNER_TEMP/pr-evidence-context.json"', workflow)
+        self.assertIn('issues/$PR_NUMBER/comments', workflow)
+        self.assertIn('head: $pr[0].head.sha, headRef: $pr[0].head.ref', workflow)
+        rules_step = workflow.index('--merge-rules')
+        self.assertLess(rules_step, workflow.index('python3 scripts/'), 'main rules run before any script from the PR head')
+        self.assertLess(rules_step, workflow.index('node scripts/'))
+        self.assertLess(rules_step, workflow.index('node "$RUNNER_TEMP/schema-glance.mjs"'))
+
+
 def load_tests(loader, tests, pattern):
     task_spec = importlib.util.spec_from_file_location('task_tests', Path(__file__).with_name('pr-tasks-gate.test.py'))
     task_tests = importlib.util.module_from_spec(task_spec)

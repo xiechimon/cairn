@@ -103,6 +103,21 @@
     "packages/shared/merge-gate-paths.json",
     "apps/daemon/src/merge-decision.ts"
   ],
+  "requiredReviews": {
+    "review-gate": [
+      "protected",
+      "mergeGateSource"
+    ]
+  },
+  "hotFiles": [
+    "apps/web/src/i18n/en.ts",
+    "apps/server/src/db/schema.ts",
+    "apps/server/drizzle/**",
+    "packages/shared/test/__snapshots__/snapshot.test.ts.snap",
+    "scripts/prepush.mjs",
+    ".github/workflows/ci.yml",
+    "**/*-allowlist.json"
+  ],
   "limits": {
     "maxLines": 800,
     "maxFiles": 40

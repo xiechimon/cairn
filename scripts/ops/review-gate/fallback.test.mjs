@@ -50,6 +50,8 @@ function host({
   setup,
   files,
   labels,
+  evidenceRuns,
+  headRefName,
 }) {
   const home = mkdtempSync(join(tmpdir(), 'review-gate-host-'));
   const bin = join(home, 'bin');
@@ -70,6 +72,8 @@ function host({
     join(work, 'packages/shared/merge-gate-paths.json'),
     `${JSON.stringify({
       protected: ['scripts/**', 'docs/adr/**'],
+      mergeGateSource: ['gate-src/**'],
+      requiredReviews: { 'review-gate': ['protected', 'mergeGateSource'] },
       limits: { maxLines: 800, maxFiles: 40 },
     })}\n`,
   );
@@ -141,7 +145,7 @@ function host({
     number: 2306,
     isDraft: false,
     headRefOid: staleHead ? 'd'.repeat(40) : sha,
-    headRefName: 'lane/2303',
+    headRefName: headRefName ?? 'lane/2303',
     files: files ?? [{ path: 'feature.txt' }],
     title: 'web(2303): example',
     labels: [...(labelled ? [{ name: 'review-stalled' }] : []), ...(labels ?? [])],
@@ -154,6 +158,7 @@ function host({
     ...(stallNoted ? [{ author: GATE, body: `<!-- review-gate-stalled:${sha} -->\nnoted` }] : []),
     ...(comments ? comments({ sha, patch, ...extra }) : []),
   ]);
+  writeFileSync(join(home, 'runs.json'), JSON.stringify(evidenceRuns ?? []));
   const failStatusFlag = join(home, 'fail-status');
   if (failStatus) writeFileSync(failStatusFlag, '');
   writeFileSync(
@@ -173,6 +178,7 @@ case "$*" in
   *"pr list"*) cat "${home}/prs.json" ;;
   *"--json comments"*) cat "${home}/comments.json" ;;
   *"--json files"*) echo '{"files":[{"path":"feature.txt"}]}' ;;
+  *"run list --workflow pr-evidence.yml"*) cat "${home}/runs.json" ;;
   *"--json title,body"*) echo '{"title":"web(2303): example","body":"PR BODY TEXT"}' ;;
   "api --method POST repos/xiechimon/cairn/statuses/"*) [ -f "${failStatusFlag}" ] && exit 1; echo '{}' ;;
 esac
@@ -270,6 +276,73 @@ test('openai author with no usable cross-vendor model gets a Claude verdict', ()
     new RegExp(`<!-- review-gate:${sha} -->\\n\\*\\*Independent review gate: PASS\\*\\* for `),
   );
   assert.match(calls, /reviewer: Claude \(opus\), author vendor openai excluded/);
+});
+
+test('a PASS status reruns the failed pr-evidence run on that head once', () => {
+  const first = host({
+    author: openai,
+    claude: 'VERDICT: pass',
+    evidenceRuns: [
+      { databaseId: 41, status: 'completed', conclusion: 'failure' },
+      { databaseId: 40, status: 'completed', conclusion: 'success' },
+    ],
+  });
+  assert.equal(first.run.status, 0, first.run.stderr);
+  assert.match(
+    first.calls,
+    new RegExp(
+      `^gh -R xiechimon/cairn run list --workflow pr-evidence.yml --commit ${first.sha} `,
+      'm',
+    ),
+  );
+  assert.match(first.calls, /^gh -R xiechimon\/cairn run rerun 41 --failed$/m);
+  const again = first.next([verdictComment(first.sha, 'PASS', first.patch)]);
+  assert.doesNotMatch(again.calls, /run rerun/);
+});
+
+test('a pr-evidence run still going at PASS is rerun on a later round once it fails', () => {
+  const first = host({
+    author: openai,
+    claude: 'VERDICT: pass',
+    evidenceRuns: [{ databaseId: 41, status: 'in_progress', conclusion: '' }],
+  });
+  assert.doesNotMatch(first.calls, /run rerun/);
+  const runs = join(first.home, 'runs.json');
+  writeFileSync(
+    runs,
+    JSON.stringify([{ databaseId: 41, status: 'completed', conclusion: 'failure' }]),
+  );
+  const posted = [verdictComment(first.sha, 'PASS', first.patch)];
+  assert.match(first.next(posted).calls, /^gh -R xiechimon\/cairn run rerun 41 --failed$/m);
+  writeFileSync(
+    runs,
+    JSON.stringify([{ databaseId: 41, status: 'completed', conclusion: 'success' }]),
+  );
+  assert.match(first.next(posted).calls, /run list/);
+  assert.doesNotMatch(first.next(posted).calls, /run (list|rerun)/);
+});
+
+test('every path pr-evidence requires a review for is reviewed, in any case or unsafe name', () => {
+  for (const path of ['gate-src/a.ts', 'Scripts/a.mjs', 'docs/a b.md']) {
+    const { calls } = host({ author: openai, headRefName: 'C1/item', files: [{ path }] });
+    assert.match(calls, /^ai-route /m, path);
+  }
+  const { calls } = host({
+    author: openai,
+    headRefName: 'C1/item',
+    files: [{ path: 'feature.txt' }],
+  });
+  assert.doesNotMatch(calls, /ai-route/);
+});
+
+test('a BLOCK status never reruns pr-evidence', () => {
+  const { calls } = host({
+    author: openai,
+    claude: '1. blocking: feature.txt:1 wrong\nVERDICT: block',
+    evidenceRuns: [{ databaseId: 41, status: 'completed', conclusion: 'failure' }],
+  });
+  assert.match(calls, /state=failure/);
+  assert.doesNotMatch(calls, /run (list|rerun)/);
 });
 
 test('a Claude BLOCK is posted as a block', () => {
