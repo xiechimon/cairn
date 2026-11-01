@@ -53,9 +53,9 @@ function seedOtherThread(threadId: string, userId: string): void {
     .insert(chiefThread)
     .values({
       id: threadId,
-      chiefId: H.chiefId,
+      chiefId: `${threadId}-chief`,
       userId,
-      teamId: H.teamId,
+      teamId: `${threadId}-team`,
       title: 'other',
       createdAt: BASE_TIME,
       updatedAt: BASE_TIME,
