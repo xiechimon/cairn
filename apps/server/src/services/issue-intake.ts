@@ -399,10 +399,19 @@ export function createIssueIntake(
     const history = await readHistory(eventsCache, key, token, { owner, repo, issueNumber });
     if (history === null) return { notTaken: 'unverifiable', reason: 'events-unreadable' };
     if (label.toLowerCase().startsWith('agent:')) {
+      const removedLater = (labeled: GithubIssueEvent) =>
+        history.events.some(
+          (event) =>
+            event.event === 'unlabeled' &&
+            event.label?.toLowerCase() === labeled.label?.toLowerCase() &&
+            later(event, labeled),
+        );
       const newestAgentLabel = newestOf(
         history.events,
         (event) =>
-          event.event === 'labeled' && event.label?.toLowerCase().startsWith('agent:') === true,
+          event.event === 'labeled' &&
+          event.label?.toLowerCase().startsWith('agent:') === true &&
+          !removedLater(event),
       );
       if (
         newestAgentLabel !== null &&
@@ -869,7 +878,7 @@ export function createIssueIntake(
         const namedAgents =
           agentLabels.length === 1
             ? deps.db
-                .select({ id: agent.id })
+                .select({ id: agent.id, secrets: agent.secrets, mcpServers: agent.mcpServers })
                 .from(agent)
                 .where(
                   and(
@@ -895,13 +904,22 @@ export function createIssueIntake(
           );
           continue;
         }
+        const named = namedAgents[0];
+        if (named && (named.secrets.length > 0 || named.mcpServers.length > 0)) {
+          tally.held += 1;
+          log(
+            { projectId: row.id, issue: issue.number, reason: 'agent-label-privileged' },
+            'issue intake candidate held',
+          );
+          continue;
+        }
         const outcome = await take(
           row,
           owner,
           repo,
           access,
           issue.number,
-          namedAgents[0]?.id ?? null,
+          named?.id ?? null,
           agentLabels[0]?.name ?? null,
           now,
           tally,

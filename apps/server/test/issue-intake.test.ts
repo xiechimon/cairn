@@ -3329,7 +3329,12 @@ describe('agent label routing', () => {
     ]);
   }
 
-  function builder(w: World, id: string, status = 'active'): void {
+  function builder(
+    w: World,
+    id: string,
+    status = 'active',
+    attached: { secrets?: string[]; mcpServers?: string[] } = {},
+  ): void {
     w.s.db
       .insert(agentTable)
       .values({
@@ -3339,9 +3344,39 @@ describe('agent label routing', () => {
         status,
         provider: 'claude-code',
         modelId: 'sonnet',
+        ...attached,
       })
       .run();
   }
+
+  test.each<[string, { secrets?: string[]; mcpServers?: string[] }]>([
+    ['secrets', { secrets: ['deploy-key'] }],
+    ['MCP servers', { mcpServers: ['prod-db'] }],
+  ])('holds routing to an agent with %s attached', async (_kind, attached) => {
+    const w = await makeWorld({ list: [1406] });
+    routeLabel(w);
+    builder(w, 'privileged-agent', 'active', attached);
+    const tally = await w.intake.sweep();
+    expect(tally?.held).toBe(1);
+    expect(takenNumbers(w.s)).toEqual([]);
+    expect(chiefThreads(w.s)).toHaveLength(0);
+    expect(w.logs.some((line) => line.obj.reason === 'agent-label-privileged')).toBe(true);
+  });
+
+  test('a newer agent label that was removed again does not hold the present one', async () => {
+    const w = await makeWorld({ list: [1406] });
+    routeLabel(w);
+    builder(w, 'orb-agent');
+    w.gh.state.events
+      .get(1406)
+      ?.push(
+        labelEvent('labeled', OWNER, '2026-10-23T00:00:00Z', 90001, 'agent:other'),
+        labelEvent('unlabeled', OWNER, '2026-10-24T00:00:00Z', 90002, 'agent:other'),
+      );
+    const tally = await w.intake.sweep();
+    expect(tally?.imported).toBe(1);
+    expect(todoOf(w.s, 1406)?.assignment?.build).toEqual({ agentId: 'orb-agent' });
+  });
 
   test('applies the unique active agent to plan and build before orchestration', async () => {
     const w = await makeWorld({ list: [1406] });
