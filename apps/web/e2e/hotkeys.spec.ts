@@ -7,7 +7,7 @@ const SCHEDULES = '/app/schedules?scenario=01';
 const PROJECTS = '/app?scenario=newtask-projects&view=board';
 
 const FIRST_PROJECT_ID = 'ZAQczKCu0MOAzC1ZqcFlX';
-const PROJECT = '/app/project/ZAQczKCu0MOAzC1ZqcFlX?scenario=r2-24b&tab=tasks';
+const PROJECT = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=r2-24b&tab=tasks';
 
 const AGENT_DETAIL = '/app/resources/agents/r3-builder?scenario=agent-detail';
 const AUTHORIZE = '/app/machines/authorize';

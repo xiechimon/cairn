@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 
-const TASKS = '/app/project/ZAQczKCu0MOAzC1ZqcFlX?scenario=prj-tasks';
+const TASKS = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=prj-tasks';
 const LAYOUT_KEY = 'cairn.projectTasksLayout';
 
 const REVIEW_TITLE = '在 README.md 末尾追加一行「r3 lifecycle probe」';
@@ -144,7 +144,7 @@ test('search filters by title; no-match shows the match line, not `暂无内容`
   await search.fill('');
   await expect(titles).toHaveCount(2);
 
-  await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX?scenario=r2-24b');
+  await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=r2-24b');
   await expect(page.getByText('暂无内容')).toBeVisible();
   await expect(page.getByText('没有匹配的任务')).toHaveCount(0);
 });

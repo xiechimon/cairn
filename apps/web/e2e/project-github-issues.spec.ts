@@ -148,7 +148,7 @@ const issueRows = (scope: ReturnType<Page['getByRole']>) =>
   scope.getByRole('button', { name: /#\d+/ });
 
 async function openDialog(page: Page) {
-  await page.goto('/app/project/proj-gh?tab=tasks');
+  await page.goto('/app/project/proj-gh/files?tab=tasks');
   const entry = page.getByRole('button', { name: '从 GitHub issue 建任务' });
   await expect(entry).toBeVisible();
   await entry.click();
@@ -207,14 +207,14 @@ test('tag chip lands on the registry Badge: tinted label, 20px tall, 4px corners
 
 test('2. local project: entry not rendered', async ({ page }) => {
   await stubWorld(page);
-  await page.goto('/app/project/proj-local?tab=tasks');
+  await page.goto('/app/project/proj-local/files?tab=tasks');
   await expect(page.getByRole('textbox', { name: '搜索任务' })).toBeVisible();
   await expect(page.getByRole('button', { name: '从 GitHub issue 建任务' })).toHaveCount(0);
 });
 
 test('3. unconnected github project: entry not rendered, task face normal, not blank', async ({ page }) => {
   await stubWorld(page, { connected: false });
-  await page.goto('/app/project/proj-gh?tab=tasks');
+  await page.goto('/app/project/proj-gh/files?tab=tasks');
   await expect(page.getByRole('textbox', { name: '搜索任务' })).toBeVisible();
   await expect(page.getByRole('button', { name: '从 GitHub issue 建任务' })).toHaveCount(0);
   await expect(page.getByRole('dialog', { name: '从 GitHub issue 建任务' })).toHaveCount(0);

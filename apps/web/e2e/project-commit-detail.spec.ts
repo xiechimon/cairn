@@ -19,7 +19,7 @@ const PROJECT_B = {
   githubRepo: null,
   localPath: null,
 };
-const PAGE_A = `/app/project/${PROJECT_A.id}`;
+const PAGE_A = `/app/project/${PROJECT_A.id}/files`;
 
 const TEAM = { id: 'team-1', name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null };
 const USER = { id: 'user-1', displayName: '我', avatarUrl: null };
@@ -169,6 +169,8 @@ test('C4 selection state keyed by (projectId, sha): old diff does not follow aft
 
   await page.locator('[data-slot="sidebar-project-row"]', { hasText: 'detail-b' }).click();
   await expect(page).toHaveURL(new RegExp(`/app/project/${PROJECT_B.id}`));
+  await page.getByRole('button', { name: '文件' }).click();
+  await expect(page).toHaveURL(new RegExp(`/app/project/${PROJECT_B.id}/files`));
   await historyTab(page).click();
 
   await expect(page.getByText('请选择一个提交查看')).toBeVisible();
@@ -208,7 +210,7 @@ test('C6 selected carrier aria-current + close button clears selection back to p
 test('C7 hosted fixture (r2-24): docs: README row shows a diff; empty-commit seed shows the defined state; closing restores', async ({
   page,
 }) => {
-  await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX?scenario=r2-24');
+  await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=r2-24');
   await historyTab(page).click();
   await historyRow(page, 'docs: README').click();
   await expect(page.locator('[data-commit-detail="message"]')).toHaveText('docs: README');
@@ -226,7 +228,7 @@ test('C7 hosted fixture (r2-24): docs: README row shows a diff; empty-commit see
 });
 
 test('C7 local fixture (prj-local-files): root commit = all-files-added', async ({ page }) => {
-  await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX?scenario=prj-local-files');
+  await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=prj-local-files');
   await historyTab(page).click();
   await historyRow(page, 'init local-repo').click();
   await expect(page.locator('[data-commit-detail="message"]')).toHaveText('init local-repo');

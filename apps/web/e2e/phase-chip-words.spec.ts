@@ -39,7 +39,7 @@ test('search rows: fresh reads `待开始`, review `审核`, done `已完成`', 
 });
 
 test('project task rows: fresh reads `待开始`, review `审核`', async ({ page }) => {
-  await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX?scenario=22&tab=tasks');
+  await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=22&tab=tasks');
   const status = (title: string) =>
     page.getByTestId('task-row').filter({ hasText: title }).getByTestId('task-status');
   await expect(status(FRESH_TITLE)).toHaveText('待开始');
