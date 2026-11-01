@@ -112,7 +112,7 @@ Live gallery: run `pnpm --filter @cairn/web dev` and open `/design.html`. It ren
 
 Two checks keep polished styles from drifting:
 
-- `e2e/gallery-snapshots.spec.ts` compares every gallery specimen (iframed page screens excluded) with a Linux baseline in both themes; one changed pixel in a thousand fails it. Baselines render only on CI. After an intended visual change, push, let the e2e job fail, then run `node scripts/gallery-snapshots-accept.mjs <branch or run id>` to copy the CI renders into `e2e/gallery-snapshots.spec.ts-snapshots/`, read the new images, and commit them with the change. `GALLERY_SNAPSHOTS_LOCAL=1` runs the spec on macOS for a quick local diff; `.gitignore` keeps the `-darwin` files it writes out of commits.
+- `e2e/gallery-snapshots.spec.ts` compares every gallery specimen (iframed page screens excluded) with a Linux baseline in both themes, rendered with reduced motion so shimmer and texture hold one frame; each specimen is snapped to whole pixels first, so adding a specimen above does not shift the ones below; one changed pixel in a thousand fails it. Baselines render only on CI. After an intended visual change, push, let the e2e job fail, then run `node scripts/gallery-snapshots-accept.mjs <branch or run id>` to copy the CI renders into `e2e/gallery-snapshots.spec.ts-snapshots/`, read the new images, and commit them with the change. `GALLERY_SNAPSHOTS_LOCAL=1` runs the spec on macOS for a quick local diff; `.gitignore` keeps the `-darwin` files it writes out of commits.
 - `scripts/ui-page-style-gate.mjs` (prepush) rejects Tailwind palette colours, arbitrary colour values, colour literals in styles or SVG attributes, and inline type outside `design/`, `components/ui/`, `icons/`, `fixtures/` and the brand marks. Arbitrary sizes are already held by `scripts/ui-debt-gate.mjs`, which only lets them shrink.
 
 ## Direction
@@ -342,6 +342,27 @@ The stone is quiet. Motion comes in four kinds, each with one duration and one e
 - `prefers-reduced-motion`: every keyframe animation shrinks to 0.01ms and loops run once (the site-wide rule in `motion.css`); transitions are untouched.
 - Not used: route transitions, list FLIP, cross-column flights, a spring family (only message entry uses `--spring-snappy`).
 - Pins: `e2e/cds-motion.spec.ts` pins the motion slots and `anim-*` class names; `e2e/card-press.spec.ts` pins instant press; `e2e/color-freeze.spec.ts` pins `--ease-out-expo`.
+
+## Texture
+
+Texture is the Cairn spiral and a slow noise field, drawn in the project hue as ASCII characters (` .,:;-=+xX08S#&@`) or 4×4 ordered-dither dots. It lives in `src/components/texture/`; every component takes `filter="ascii" | "dither"`.
+
+| Component | Use | Motion |
+| --- | --- | --- |
+| `SpiralArt` | Sign-in and first-run panels: the logo spiral enlarged, cropped, under a veil that clears the bottom third for a serif headline | none |
+| `SpiralMark` | `EmptyState media` for large empty states (no projects, threads, keys) | none |
+| `DriftField` | Behind the Coordinator greeting | drifts only while `active` (agents running) |
+| `DriftEdge` | Right edge of a running thread card | same as `DriftField` |
+| `TexturedTile` | Project tiles at 40px and larger | none |
+| `TextureSkeleton` | Loading a large block | sweeps while mounted |
+
+Rules:
+
+- The subject is always the logo spiral or the noise field; no other pictures.
+- Never behind text you have to read: transcripts, diffs, menus, forms and lists stay flat. Headlines sit on the veil, not on dense characters.
+- Ink is `--project-tile-N` in light and `--project-ink-N` in dark, at the alphas the components set; do not pass colours.
+- One animated texture per screen. Motion stops under `prefers-reduced-motion`, in background tabs and off screen, and a still frame is always the same frame (screenshot baselines depend on it).
+- Tiles under 40px stay flat (`ProjectAvatar`); dots blur into noise below that.
 
 ## Dark
 
