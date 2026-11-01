@@ -17,6 +17,7 @@ import {
 } from './components-controls.js';
 import { IdentitySection, StreamSection, StructureSection } from './components-more.js';
 import { DialogSection, MenuSection, ToastSection } from './components-overlays.js';
+import { PanelSection } from './components-panel.js';
 import {
   CoordinatorStreamSection,
   ProjectsSection,
@@ -112,6 +113,7 @@ const NAV = [
       ['sidebar', 'Sidebar parts'],
       ['projects-lists', 'Projects, lists, phone'],
       ['coordinator', 'Coordinator stream'],
+      ['side-panel', 'Side panel, title menus'],
       ['routing', 'Model routing'],
     ],
   },
@@ -294,6 +296,7 @@ export function Gallery() {
           <SidebarSection />
           <ProjectsSection />
           <CoordinatorStreamSection />
+          <PanelSection />
           <RoutingSection />
           <GroupTitle
             id="patterns"

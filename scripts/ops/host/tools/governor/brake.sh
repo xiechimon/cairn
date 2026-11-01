@@ -3,7 +3,8 @@
 set -uo pipefail
 R=xiechimon/cairn F=~/.local/state/overnight/brake
 since=$(date -u -d '-2 hours' +%FT%T); floor=2026-10-27T14:00:00; [[ $since < $floor ]] && since=$floor
-stats=$(jq -rs --arg s "$since" '[.[]|select(.at>$s and (.action!="carried-over"))] as $r | ($r|length) as $n | ([$r[]|select(.verdict==null)]|length) as $none | ([$r[]|select(.verdict=="block")]|length) as $b | ([$r[]|select(.verdict=="pass")]|length) as $p | "\($n) \($none) \($b) \($p)"' ~/.local/state/review-gate/runs.jsonl 2>/dev/null)
+stats=$(jq -rs --arg s "$since" '[.[]|select(.at>$s and has("verdict") and (.action!="carried-over"))] as $r | ($r|length) as $n | ([$r[]|select(.verdict==null)]|length) as $none | ([$r[]|select(.verdict=="block")]|length) as $b | ([$r[]|select(.verdict=="pass")]|length) as $p | "\($n) \($none) \($b) \($p)"' ~/.local/state/review-gate/runs.jsonl 2>/dev/null) \
+  || { echo "$(date -u +%H:%M) review history unreadable; brake left as it is" >&2; exit 0; }
 read -r n none b p <<<"$stats"
 reason=""
 if [ "${n:-0}" -ge 8 ]; then

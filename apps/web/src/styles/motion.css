@@ -349,23 +349,23 @@ body[data-board-dragging] {
   animation: task-panel-flash 1.4s var(--ease-standard);
 }
 
-@keyframes task-panel-in {
+@keyframes side-panel-in {
   from {
     opacity: 0;
     translate: 12px 0;
   }
 }
 
-.task-panel {
-  animation: task-panel-in 220ms var(--ease-standard);
+.side-panel {
+  animation: side-panel-in 220ms var(--ease-standard);
 }
 
-@keyframes task-panel-scrim-in {
+@keyframes side-panel-scrim-in {
   from {
     opacity: 0;
   }
 }
 
-.task-panel-scrim {
-  animation: task-panel-scrim-in 200ms var(--ease-standard);
+.side-panel-scrim {
+  animation: side-panel-scrim-in 200ms var(--ease-standard);
 }

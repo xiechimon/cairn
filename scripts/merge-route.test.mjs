@@ -64,6 +64,26 @@ test('binary evidence under docs/verify may enter the queue', (t) => {
   assert.equal(result.status, 0, result.stdout + result.stderr);
 });
 
+test('gallery snapshot baselines may enter the queue', (t) => {
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 0]);
+  const result = route(
+    repoWith(t, {
+      'apps/web/e2e/gallery-snapshots.spec.ts-snapshots/side-panel-dark-linux.png': png,
+      'apps/web/src/a.ts': 'export const a = 1;\n',
+    }),
+  );
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+});
+
+test('a PNG in another spec snapshot folder routes to the owner', (t) => {
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 0]);
+  const result = route(
+    repoWith(t, { 'apps/web/e2e/visual-polish.spec.ts-snapshots/rail-linux.png': png }),
+  );
+  assert.equal(result.status, 1, result.stdout + result.stderr);
+  assert.match(result.stdout, /binary files outside docs\/verify/);
+});
+
 test('protected paths route to the owner', (t) => {
   const result = route(repoWith(t, { 'scripts/x.mjs': 'export {};\n' }));
   assert.equal(result.status, 1);
