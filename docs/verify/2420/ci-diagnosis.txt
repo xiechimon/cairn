@@ -1,0 +1,36 @@
+PR #2441 CI diagnosis
+
+Observed branch: lane/2420 at 33600d0646291ac8c5455df52d387edb55ca078d.
+Observed remote main: e625237ad41e457f9e904455bc2dca87039d50e9,
+confirmed with the GitHub refs API.
+
+The failure is inherited from main, rather than introduced by #2420.
+git diff 41adbc43 HEAD -- apps/server packages/shared is empty.
+The parent 41adbc43 already has the incomplete policy literal at
+apps/server/src/services/ship-gate.ts:91.
+
+CI run 41274058359 reports TS2741 for missing requireUpToDate in
+check-core. The check job fails because it aggregates that failed job.
+Both pr-evidence checks are successful; the PR body has checked acceptance
+items and a single issue-closing line.
+
+Main already contains the fix in merged PR #2440 (e625237a):
+{ mergePolicy: 'autonomous', localChecks: [], requireUpToDate: false }
+Its commit message records the integration of #2400 with #2395 as the cause.
+No duplicate production change or regression test was added on this branch.
+
+Local reproduction was attempted with:
+flock /tmp/cairn-heavy.lock pnpm --filter @xiechimon/cairn typecheck
+The shared lock remained occupied; no compiler output was obtained.
+A bounded lock probe returned exit 1. No other lane's process was stopped.
+A 45-second bounded reproduction attempt timed out with exit 124 and an
+empty log, still waiting for the shared lock.
+Local reproduction and verification after rebasing remain outstanding.
+
+git rebase origin/main failed before changing the branch:
+error: could not create temporary /mnt/fast/lanes/cairn/.git/worktrees/cairn-2420/rebase-merge: Read-only file system
+The sandbox handoff must rebase lane/2420 onto origin/main outside this
+sandbox, then rerun the locked typecheck. No push was performed.
+
+docs/lessons.md is absent from both HEAD and origin/main. No lesson files
+were changed or removed.

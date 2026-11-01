@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { EN } from '../src/i18n/en.js';
 import {
   LOCALE_STORAGE_KEYS,
   htmlLangFor,
@@ -104,5 +105,33 @@ describe('translate plural form', () => {
 
   it('leaves zh renders on the plain placeholder', () => {
     expect(translate('zh', PLURAL, '跑了 {n} 条命令', { n: 3 })).toBe('跑了 3 条命令');
+  });
+});
+
+describe('English count rendering', () => {
+  it.each([0, 1, 2])('renders real dictionary counts for %s', (n) => {
+    expect(translate('en', EN, '{n} 个成员', { n })).toBe(`${n} ${n === 1 ? 'member' : 'members'}`);
+    expect(
+      translate('en', EN, '{running} 个任务运行中，今天合并了 {done} 个', { running: n, done: 7 }),
+    ).toBe(`${n} ${n === 1 ? 'task' : 'tasks'} running, 7 merged today`);
+  });
+
+  it.each([-1, 1, 0, 2, 1.5, '1', 'many', Number.NaN, Number.POSITIVE_INFINITY])(
+    'selects cardinal forms without coercing %s',
+    (n) => {
+      const dict = { count: '{n## member|# members}' };
+      const singular = typeof n === 'number' && Math.abs(n) === 1;
+      expect(translate('en', dict, 'count', { n })).toBe(`${n} ${singular ? 'member' : 'members'}`);
+    },
+  );
+
+  it('preserves missing variables, fallback, Chinese and independent counts', () => {
+    const dict = { count: '{a## member|# members}, {b## task|# tasks}' };
+    expect(translate('en', dict, 'count', { a: 1, b: 2 })).toBe('1 member, 2 tasks');
+    expect(translate('en', dict, 'count', { a: 2, b: 1 })).toBe('2 members, 1 task');
+    expect(translate('en', dict, 'count', { a: 1 })).toBe('1 member, {b## task|# tasks}');
+    expect(translate('en', dict, 'count')).toBe(dict.count);
+    expect(translate('en', dict, '{n} missing', { n: 'one' })).toBe('one missing');
+    expect(translate('zh', EN, '{n} 个成员', { n: 1 })).toBe('1 个成员');
   });
 });

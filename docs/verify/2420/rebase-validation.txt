@@ -1,0 +1,25 @@
+Rebase validation attempt
+
+The worktree was clean on lane/2420 before this attempt.
+git fetch origin main failed before rebase could start:
+error: cannot open '/mnt/fast/lanes/cairn/.git/worktrees/cairn-2420/FETCH_HEAD': Read-only file system
+
+No conflicts were produced or resolved. The remote main head could not be
+refreshed. The following results describe the existing branch, not a rebased
+branch. Rebase and post-rebase validation remain required in a writable Git
+environment. No push was performed.
+
+Gate output:
+english-only-gate: 0 line(s) with Chinese text
+comment-discipline-gate: 0 new comment line(s)
+single-use-helper-gate: unavailable; scripts/single-use-helper-gate.mjs does not
+exist on this checkout (Node reported MODULE_NOT_FOUND).
+
+Heavy checks ran sequentially through flock /tmp/cairn-heavy.lock:
+pnpm typecheck: exit 0; all workspace typechecks passed.
+pnpm --filter @cairn/web test: exit 0.
+Test Files  75 passed (75)
+Tests  779 passed (779)
+
+An initial vitest --project web invocation matched no named project and ran no
+tests; the package-filtered command above completed the web unit suite.
