@@ -162,7 +162,7 @@ export function DiffFileBlock({
                 <div key={hunk.header}>
                   {unmodifiedBefore(file.hunks, hi) > 0 && (
                     <div
-                      className="diff-fold flex h-7 items-center pl-3 text-meta text-(--text-tertiary)"
+                      className="flex h-7 items-center pl-3 text-meta text-(--text-tertiary)"
                       data-testid="diff-fold"
                     >
                       {t('{n} 行未改动', { n: unmodifiedBefore(file.hunks, hi) })}
