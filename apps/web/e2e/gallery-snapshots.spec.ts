@@ -8,7 +8,7 @@ test.skip(
   'Baselines are rendered on Linux CI; pull them with scripts/gallery-snapshots-accept.mjs',
 );
 
-test.use({ viewport: { width: 1280, height: 2400 } });
+test.use({ viewport: { width: 1280, height: 2400 }, reducedMotion: 'reduce' });
 
 async function openGallery(page: Page, theme: (typeof THEMES)[number]) {
   await page.clock.install({ time: FROZEN_AT });
@@ -44,6 +44,12 @@ for (const theme of THEMES) {
       const title = (await figure.locator('figcaption > span').first().textContent()) ?? `figure-${i}`;
       const slug = slugOf(title.trim(), seen);
       await figure.scrollIntoViewIfNeeded();
+      await figure.evaluate((el: HTMLElement) => {
+        const box = el.getBoundingClientRect();
+        el.style.position = 'relative';
+        el.style.left = `${Math.ceil(box.left) - box.left}px`;
+        el.style.top = `${Math.ceil(box.top) - box.top}px`;
+      });
       await expect.soft(figure).toHaveScreenshot(`${slug}-${theme}.png`, {
         animations: 'disabled',
         caret: 'hide',
