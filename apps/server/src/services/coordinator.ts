@@ -4,6 +4,10 @@ import { chiefMessage } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { type ChiefDeps, chiefThreadView, coordinatorThreadRow, ensureChief } from './chief.js';
 
+const turnProjectId = sql<
+  string | null
+>`coalesce(${chiefMessage.projectId}, case when ${chiefMessage.role} = 'user' then null else (select u.projectId from chief_message u where u.threadId = ${chiefMessage.threadId} and u.role = 'user' and (u.createdAt < ${chiefMessage.createdAt} or (u.createdAt = ${chiefMessage.createdAt} and u.rowid < ${chiefMessage}.rowid)) order by u.createdAt desc, u.rowid desc limit 1) end)`;
+
 function earlierThan(deps: ChiefDeps, threadId: string, messageId: string) {
   const cursor = deps.db
     .select({ createdAt: chiefMessage.createdAt, rowid: sql<number>`rowid` })
@@ -29,13 +33,13 @@ export function readCoordinatorPage(
       role: chiefMessage.role,
       content: chiefMessage.content,
       createdAt: chiefMessage.createdAt,
-      projectId: chiefMessage.projectId,
+      projectId: turnProjectId,
     })
     .from(chiefMessage)
     .where(
       and(
         eq(chiefMessage.threadId, thread.id),
-        query.projectId !== undefined ? eq(chiefMessage.projectId, query.projectId) : undefined,
+        query.projectId !== undefined ? sql`${turnProjectId} = ${query.projectId}` : undefined,
         query.before !== undefined ? earlierThan(deps, thread.id, query.before) : undefined,
       ),
     )

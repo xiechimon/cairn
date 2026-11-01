@@ -183,20 +183,19 @@ const PROJECT_WRITE_TOOLS = new Set([
   'save_memory',
 ]);
 
-function idsOf(params: Params, one: string, many: string): string[] {
-  const single = params[one];
-  const list = params[many];
-  return [
-    ...(typeof single === 'string' ? [single] : []),
-    ...(Array.isArray(list) ? list.filter((x): x is string => typeof x === 'string') : []),
-  ];
+function idsOf(params: Params, keys: string[]): string[] {
+  return keys.flatMap((key) => {
+    const value = params[key];
+    if (typeof value === 'string') return [value];
+    return Array.isArray(value) ? value.filter((x): x is string => typeof x === 'string') : [];
+  });
 }
 
 function requireUnarchivedTargets(db: Db, teamId: string, name: string, params: Params): void {
   if (!PROJECT_WRITE_TOOLS.has(name)) return;
-  const projectIds = idsOf(params, 'projectId', 'projectIds');
-  const todoIds = idsOf(params, 'todoId', 'todoIds');
-  const buildIds = idsOf(params, 'buildId', 'buildIds');
+  const projectIds = idsOf(params, ['projectId', 'projectIds']);
+  const todoIds = idsOf(params, ['todoId', 'todoIds', 'sourceTodoId']);
+  const buildIds = idsOf(params, ['buildId', 'buildIds']);
   const viaTodos =
     todoIds.length === 0
       ? []

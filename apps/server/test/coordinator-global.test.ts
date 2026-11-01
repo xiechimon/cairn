@@ -273,6 +273,38 @@ describe('Coordinator page filter and cursor', () => {
     expect(past.hasEarlier).toBe(false);
   });
 
+  test('replies and reports take the project of the user turn they follow', async () => {
+    seedMessage('ask-a', 10, H.projectId);
+    H.s.db
+      .insert(chiefMessage)
+      .values([
+        { id: 'reply-a', threadId: H.threadId, role: 'assistant', content: 'r', createdAt: 10 },
+        { id: 'report-a', threadId: H.threadId, role: 'system', content: 's', createdAt: 11 },
+      ])
+      .run();
+    seedMessage('ask-none', 20, null);
+    H.s.db
+      .insert(chiefMessage)
+      .values({
+        id: 'reply-none',
+        threadId: H.threadId,
+        role: 'assistant',
+        content: 'r',
+        createdAt: 21,
+      })
+      .run();
+    const all = await readCoordinator();
+    expect(all.messages.map((m) => [m.id, m.projectId])).toEqual([
+      ['ask-a', H.projectId],
+      ['reply-a', H.projectId],
+      ['report-a', H.projectId],
+      ['ask-none', null],
+      ['reply-none', null],
+    ]);
+    const filtered = await readCoordinator(`?projectId=${H.projectId}`);
+    expect(filtered.messages.map((m) => m.id)).toEqual(['ask-a', 'reply-a', 'report-a']);
+  });
+
   test('?before combines with ?projectId', async () => {
     seedMessage('p1', 10, H.projectId);
     seedMessage('x1', 15, null);
@@ -415,6 +447,9 @@ describe('archived projects stay read-only for the Coordinator', () => {
       relay('update_project', { projectId: H.projectId, name: 'renamed' }),
     ).rejects.toThrow(/archived/);
     await expect(relay('run_builds', { todoIds: [created.id] })).rejects.toThrow(/archived/);
+    await expect(
+      relay('save_memory', { title: 't', content: 'c', sourceTodoId: created.id }),
+    ).rejects.toThrow(/archived/);
     const other = await postProject(H.s.app, 'cairn-site');
     const otherTodo = (await relay('create_todo', {
       projectId: other,

@@ -113,12 +113,12 @@ test('per-project Coordinator threads merge into the one global thread per chief
 
     const active = sqlite
       .prepare(
-        "SELECT id, chiefId, projectId FROM chief_thread WHERE archivedAt IS NULL AND id NOT LIKE 'chief-digest-%' ORDER BY chiefId",
+        "SELECT id, chiefId, projectId, title FROM chief_thread WHERE archivedAt IS NULL AND id NOT LIKE 'chief-digest-%' ORDER BY chiefId",
       )
       .all();
     expect(active).toEqual([
-      { id: 'chief-global', chiefId: 'chief-u1-t1', projectId: null },
-      { id: 'chief-u2-only', chiefId: 'chief-u2-t1', projectId: null },
+      { id: 'chief-global', chiefId: 'chief-u1-t1', projectId: null, title: 'Coordinator' },
+      { id: 'chief-u2-only', chiefId: 'chief-u2-t1', projectId: null, title: 'Coordinator' },
     ]);
     expect(
       sqlite
