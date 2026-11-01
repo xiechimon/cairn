@@ -142,7 +142,10 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(brand).toHaveCSS('box-shadow', 'none');
       await keyboardFocus(page, brand);
       expect(await readRing(brand)).toEqual({ focused: true, outline: 'solid 2px', clippedBy: [] });
-      await page.locator('[data-slot="sidebar-nav-row"]').filter({ hasText: 'Projects' }).click();
+      await page
+        .getByRole('complementary')
+        .getByRole('button', { name: '工作台', exact: true })
+        .click();
       await expect(page).toHaveURL('/app?scenario=01');
       if (width === 390) await page.locator('.app-menu-trigger').click();
       await page.mouse.move(width - 1, 500);
