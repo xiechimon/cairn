@@ -8,11 +8,8 @@ import {
   step as stepTable,
   stopPending,
 } from '../src/db/schema.js';
-import {
-  CHIEF_TURN_MAX_MS,
-  CHIEF_TURN_STOP_GRACE_MS,
-  sweepOverlongChiefTurns,
-} from '../src/services/chief-turns.js';
+import { upsertChiefMessage } from '../src/services/chief.js';
+import { CHIEF_TURN_MAX_MS, sweepOverlongChiefTurns } from '../src/services/chief-turns.js';
 import { CORRECTION_PROMPT } from '../src/services/merge-gate/correction.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import { H, registerChiefHarness } from './chief-harness.js';
@@ -174,18 +171,6 @@ describe('overlong chief turns are stopped so one turn cannot block the thread',
     );
   });
 
-  test('a turn that ignores the stop past the grace period is stopped on the server', () => {
-    const now = 10_000_000;
-    seedClaimed('deaf', now - CHIEF_TURN_MAX_MS - CHIEF_TURN_STOP_GRACE_MS - 1, now);
-    sweepOverlongChiefTurns(H.s.svc, now);
-    expect(H.s.db.select().from(stepTable).where(eq(stepTable.id, 'deaf')).get()?.status).toBe(
-      'stopped',
-    );
-    expect(
-      H.s.db.select().from(chiefThread).where(eq(chiefThread.id, H.threadId)).get()?.activeRun,
-    ).toBeNull();
-  });
-
   test('a turn past the cap with a stale heartbeat is stopped on the server and frees the thread', () => {
     const now = 10_000_000;
     seedClaimed('hung', now - CHIEF_TURN_MAX_MS - 1, now - 10 * 60_000);
@@ -232,7 +217,7 @@ describe('rewind never cuts another project out of the shared transcript', () =>
     });
     expect(res.status).toBe(201);
     const id = ((await res.json()) as { message: { id: string } }).message.id;
-    setStep(id, { status: 'done', finishedAt: Date.now() });
+    setStep(id, { status: 'done', claimedAt: Date.now(), finishedAt: Date.now() });
     H.s.db.update(chiefThread).set({ activeRun: null }).where(eq(chiefThread.id, H.threadId)).run();
     return id;
   }
@@ -267,17 +252,21 @@ describe('rewind never cuts another project out of the shared transcript', () =>
     const at = Date.now();
     H.s.db
       .insert(chiefMessage)
-      .values([
-        { id: `user-${anchor}`, threadId: H.threadId, role: 'user', content: 'p', createdAt: at },
-        {
-          id: `reply-${anchor}`,
-          threadId: H.threadId,
-          role: 'assistant',
-          content: 'r',
-          createdAt: at,
-        },
-      ])
+      .values({
+        id: `user-${anchor}`,
+        threadId: H.threadId,
+        role: 'user',
+        content: 'p',
+        createdAt: at,
+      })
       .run();
+    upsertChiefMessage(H.s.db, {
+      id: `reply-${anchor}`,
+      threadId: H.threadId,
+      role: 'assistant',
+      content: 'r',
+      createdAt: at,
+    });
     const page = (await (
       await req(H.s.app, 'GET', `/api/teams/${H.teamId}/coordinator?projectId=${H.projectId}`)
     ).json()) as { messages: { id: string }[] };

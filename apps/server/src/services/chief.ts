@@ -33,7 +33,7 @@ import {
   PLAN_PRIOR_ART_RULE,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
 } from '@cairn/shared';
-import { and, asc, desc, eq, inArray, isNull, like, ne, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, isNull, like, ne, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   agent,
@@ -490,7 +490,7 @@ const transcriptPromptRowPattern = `${TRANSCRIPT_PROMPT_ROW_ID_PREFIX}%`;
 
 export const turnProjectId = sql<
   string | null
->`coalesce(${chiefMessage.projectId}, case when ${chiefMessage.role} = 'user' and ${chiefMessage.id} not like ${transcriptPromptRowPattern} then null else (select u.projectId from chief_message u where u.threadId = ${chiefMessage.threadId} and u.role = 'user' and u.id not like ${transcriptPromptRowPattern} and (u.createdAt < ${chiefMessage.createdAt} or (u.createdAt = ${chiefMessage.createdAt} and u.rowid < ${chiefMessage}.rowid)) order by u.createdAt desc, u.rowid desc limit 1) end)`;
+>`coalesce(${chiefMessage.projectId}, case when ${chiefMessage.id} like ${transcriptPromptRowPattern} then (select x.projectId from chief_message x where x.threadId = ${chiefMessage.threadId} and x.id = substr(${chiefMessage.id}, ${TRANSCRIPT_PROMPT_ROW_ID_PREFIX.length + 1})) end)`;
 
 function requireRewindStaysInProject(
   db: Db,
@@ -763,7 +763,7 @@ export function triggerChiefWakes(deps: ChiefDeps, todoRecord: TodoRecord, to: P
           content: JSON.stringify(content),
           createdAt: nowMs(),
         };
-        upsertChiefMessage(deps.db, report);
+        upsertChiefMessage(deps.db, { ...report, projectId: todoRecord.projectId });
         deps.convHub?.publishMessage(watch.threadId, report);
       }
       if (kind === 'gate') {
@@ -1114,6 +1114,33 @@ export function finishChiefTurn(deps: { db: Db }, threadId: string, body: Machin
   deps.db.update(chief).set({ lastTurnAt: now }).where(eq(chief.id, threadRow.chiefId)).run();
 }
 
+function writingTurnProjectId(db: Db, row: { id: string; threadId: string }): string | null {
+  const turnId = row.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX)
+    ? row.id.slice(TRANSCRIPT_PROMPT_ROW_ID_PREFIX.length)
+    : db
+        .select({ id: step.id })
+        .from(step)
+        .where(
+          and(
+            eq(step.buildId, row.threadId),
+            eq(step.kind, 'chief'),
+            isNotNull(step.claimedAt),
+            ne(step.status, 'pending'),
+          ),
+        )
+        .orderBy(desc(step.claimedAt), sql`rowid desc`)
+        .limit(1)
+        .get()?.id;
+  if (turnId === undefined) return null;
+  return (
+    db
+      .select({ projectId: chiefMessage.projectId })
+      .from(chiefMessage)
+      .where(and(eq(chiefMessage.id, turnId), eq(chiefMessage.threadId, row.threadId)))
+      .get()?.projectId ?? null
+  );
+}
+
 export function upsertChiefMessage(
   db: Db,
   row: {
@@ -1122,10 +1149,11 @@ export function upsertChiefMessage(
     role: 'system' | 'user' | 'assistant';
     content: unknown;
     createdAt: number;
+    projectId?: string | null;
   },
 ): void {
   db.insert(chiefMessage)
-    .values(row)
+    .values({ ...row, projectId: row.projectId ?? writingTurnProjectId(db, row) })
     .onConflictDoUpdate({
       target: chiefMessage.id,
       set: { role: row.role, content: row.content, createdAt: row.createdAt },

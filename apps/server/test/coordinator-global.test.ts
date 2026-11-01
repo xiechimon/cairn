@@ -10,6 +10,7 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import { newUuidv7 } from '../src/lib/ids.js';
+import { upsertChiefMessage } from '../src/services/chief.js';
 import { dueSchedules } from '../src/services/schedules.js';
 import { H, registerChiefHarness, relay } from './chief-harness.js';
 import { postProject, req } from './helpers.js';
@@ -273,36 +274,47 @@ describe('Coordinator page filter and cursor', () => {
     expect(past.hasEarlier).toBe(false);
   });
 
-  test('replies and reports take the project of the user turn they follow', async () => {
-    seedMessage('ask-a', 10, H.projectId);
-    H.s.db
-      .insert(chiefMessage)
-      .values([
-        { id: 'reply-a', threadId: H.threadId, role: 'assistant', content: 'r', createdAt: 10 },
-        { id: 'report-a', threadId: H.threadId, role: 'system', content: 's', createdAt: 11 },
-      ])
-      .run();
-    seedMessage('ask-none', 20, null);
-    H.s.db
-      .insert(chiefMessage)
-      .values({
-        id: 'reply-none',
-        threadId: H.threadId,
-        role: 'assistant',
-        content: 'r',
-        createdAt: 21,
-      })
-      .run();
-    const all = await readCoordinator();
-    expect(all.messages.map((m) => [m.id, m.projectId])).toEqual([
-      ['ask-a', H.projectId],
-      ['reply-a', H.projectId],
-      ['report-a', H.projectId],
-      ['ask-none', null],
-      ['reply-none', null],
-    ]);
+  test('rows written during a turn carry that turn project, even with another turn queued', async () => {
+    const site = await postProject(H.s.app, 'cairn-site');
+    const a = ((await (await sendToCoordinator('plan demo', H.projectId)).json()) as SendReply)
+      .message.id;
+    const b = ((await (await sendToCoordinator('plan the site', site)).json()) as SendReply).message
+      .id;
+    const status = (id: string, value: 'claimed' | 'done') =>
+      H.s.db
+        .update(stepTable)
+        .set({ status: value, claimedAt: Date.now() })
+        .where(eq(stepTable.id, id))
+        .run();
+    status(a, 'claimed');
+    upsertChiefMessage(H.s.db, {
+      id: `user-${a}`,
+      threadId: H.threadId,
+      role: 'user',
+      content: 'p',
+      createdAt: Date.now() + 10,
+    });
+    upsertChiefMessage(H.s.db, {
+      id: 'reply-a',
+      threadId: H.threadId,
+      role: 'assistant',
+      content: 'r',
+      createdAt: Date.now() + 11,
+    });
+    status(a, 'done');
+    await new Promise((resolve) => setTimeout(resolve, 2));
+    status(b, 'claimed');
+    upsertChiefMessage(H.s.db, {
+      id: 'reply-b',
+      threadId: H.threadId,
+      role: 'assistant',
+      content: 'r',
+      createdAt: Date.now() + 12,
+    });
     const filtered = await readCoordinator(`?projectId=${H.projectId}`);
-    expect(filtered.messages.map((m) => m.id)).toEqual(['ask-a', 'reply-a', 'report-a']);
+    expect(filtered.messages.map((m) => m.id)).toEqual([a, `user-${a}`, 'reply-a']);
+    const siteOnly = await readCoordinator(`?projectId=${site}`);
+    expect(siteOnly.messages.map((m) => m.id)).toEqual([b, 'reply-b']);
   });
 
   test('?before combines with ?projectId', async () => {

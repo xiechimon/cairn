@@ -34,8 +34,6 @@ export const CHIEF_ABANDONED_STEP_MS = 120_000;
 
 export const CHIEF_TURN_MAX_MS = 30 * 60_000;
 
-export const CHIEF_TURN_STOP_GRACE_MS = 5 * 60_000;
-
 export interface ChiefTurnDeps {
   db: Db;
   machineHub?: MachineWakeHub;
@@ -312,7 +310,7 @@ export function stopChiefTurn(
   if (head === undefined) {
     throw new HttpError(409, 'no chief turn in flight (总管当前没有在回复)');
   }
-  return stopClaimedChiefStep(deps, thread, head, nowMs(), false);
+  return stopClaimedChiefStep(deps, thread, head, nowMs());
 }
 
 export function sweepOverlongChiefTurns(deps: ChiefTurnDeps, now: number = nowMs()): void {
@@ -328,12 +326,7 @@ export function sweepOverlongChiefTurns(deps: ChiefTurnDeps, now: number = nowMs
       ),
     )
     .all();
-  for (const row of overlong) {
-    const ignoredStop =
-      row.step.claimedAt !== null &&
-      row.step.claimedAt < now - CHIEF_TURN_MAX_MS - CHIEF_TURN_STOP_GRACE_MS;
-    stopClaimedChiefStep(deps, row.thread, row.step, now, ignoredStop);
-  }
+  for (const row of overlong) stopClaimedChiefStep(deps, row.thread, row.step, now);
 }
 
 function stopClaimedChiefStep(
@@ -341,12 +334,10 @@ function stopClaimedChiefStep(
   thread: typeof chiefThread.$inferSelect,
   head: StepRow,
   now: number,
-  force: boolean,
 ): { delegated: boolean } {
   const threadId = thread.id;
   const abandoned =
-    force ||
-    (head.lastHeartbeatAt !== null && now - head.lastHeartbeatAt > CHIEF_ABANDONED_STEP_MS);
+    head.lastHeartbeatAt !== null && now - head.lastHeartbeatAt > CHIEF_ABANDONED_STEP_MS;
   if (!abandoned) {
     deps.db
       .insert(stopPending)
