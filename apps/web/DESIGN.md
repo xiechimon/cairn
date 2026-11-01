@@ -110,6 +110,11 @@ spacing:
 
 Live gallery: run `pnpm --filter @cairn/web dev` and open `/design.html`. It renders the shipped components and page patterns on the real tokens, and its Doc check section compares this frontmatter with the rendered values in both themes.
 
+Two checks keep polished styles from drifting:
+
+- `e2e/gallery-snapshots.spec.ts` compares every gallery specimen (iframed page screens excluded) with a Linux baseline in both themes; one changed pixel in a thousand fails it. Baselines render only on CI. After an intended visual change, push, let the e2e job fail, then run `node scripts/gallery-snapshots-accept.mjs <branch or run id>` to copy the CI renders into `e2e/gallery-snapshots.spec.ts-snapshots/`, read the new images, and commit them with the change. `GALLERY_SNAPSHOTS_LOCAL=1` runs the spec on macOS for a quick local diff; `.gitignore` keeps the `-darwin` files it writes out of commits.
+- `scripts/ui-page-style-gate.mjs` (prepush) rejects Tailwind palette colours, arbitrary colour values, colour literals in styles or SVG attributes, and inline type outside `design/`, `components/ui/`, `icons/`, `fixtures/` and the brand marks. Arbitrary sizes are already held by `scripts/ui-debt-gate.mjs`, which only lets them shrink.
+
 ## Direction
 
 Cairn is an open-source, self-hostable agent team. The user is a keyboard-first engineer who talks to a project's Coordinator, then checks back on the threads it ran; the core question is "what is waiting for me".
