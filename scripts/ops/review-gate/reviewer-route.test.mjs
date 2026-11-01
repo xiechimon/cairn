@@ -10,6 +10,7 @@ import {
   DIFF_LIMIT,
   diffDigest,
   escalation,
+  evidenceRerun,
   gateVerdicts,
   HUMAN_LABEL,
   lowRiskTier,
@@ -237,6 +238,27 @@ test('a product file, a gate doc or a protected file leaves the low-risk tier', 
     'apps/web/src/locales/zh/app.ts',
   ])
     assert.equal(tier(path), false, path);
+});
+
+test('only a failed newest pr-evidence run on the head is rerun after a PASS', () => {
+  const run = (databaseId, status, conclusion) => ({ databaseId, status, conclusion });
+  const none = { done: false, run: null };
+  const failedNewest = [run(7, 'completed', 'failure'), run(5, 'completed', 'success')];
+  assert.deepEqual(evidenceRerun(failedNewest), { done: false, run: 7 });
+  assert.deepEqual(evidenceRerun(failedNewest, [7]), none);
+  assert.deepEqual(
+    evidenceRerun([run(5, 'completed', 'failure'), run(7, 'completed', 'success')]),
+    {
+      done: true,
+    },
+  );
+  assert.deepEqual(
+    evidenceRerun([run(7, 'in_progress', ''), run(5, 'completed', 'failure')]),
+    none,
+  );
+  assert.deepEqual(evidenceRerun([run(7, 'completed', 'cancelled')]), none);
+  assert.deepEqual(evidenceRerun([{ status: 'completed', conclusion: 'failure' }]), none);
+  assert.deepEqual(evidenceRerun([]), none);
 });
 
 test('deleted files, symlinks and submodules leave the low-risk tier', () => {

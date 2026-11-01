@@ -1081,6 +1081,24 @@ function batchHarness() {
   return fixture;
 }
 
+test('items may declare scope and hot-file globs, and malformed ones fail closed', () => {
+  const manifest = () => {
+    const { state } = batchHarness();
+    return structuredClone(state.manifest);
+  };
+  const declared = manifest();
+  declared.items[3].scope = ['scripts/pr-evidence-gate*.py', 'docs/verify/**'];
+  declared.items[3].hotFiles = ['scripts/prepush.mjs'];
+  assert.equal(validateManifest(declared, declared.epic), declared);
+  for (const bad of [['a', 'a'], [''], 'scripts/**', [1], null]) {
+    for (const key of ['scope', 'hotFiles']) {
+      const broken = manifest();
+      broken.items[3][key] = bad;
+      assert.throws(() => validateManifest(broken, broken.epic), /manifest/i);
+    }
+  }
+});
+
 test('a human-held item blocks only its transitive dependents', async () => {
   const { invoke } = batchHarness();
   const result = await invoke();

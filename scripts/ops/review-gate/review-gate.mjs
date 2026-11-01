@@ -9,6 +9,7 @@ import {
   DIFF_LIMIT,
   diffDigest,
   escalation,
+  evidenceRerun,
   gateVerdicts,
   HUMAN_LABEL,
   HUMAN_MARKER,
@@ -45,6 +46,11 @@ const repoGatePaths = () =>
     }),
   );
 const repoProtected = (gatePaths) => gatePaths.protected.map(globToRe);
+const reviewRequired = (gatePaths) =>
+  (gatePaths.requiredReviews?.['review-gate'] ?? [])
+    .flatMap((key) => gatePaths[key] ?? [])
+    .map(globToRe);
+const SAFE_PATH = /^[\p{L}\p{M}\p{N}._/@+%-]+$/u;
 
 mkdirSync(`${STATE}/runs`, { recursive: true });
 mkdirSync(`${STATE}/disarmed`, { recursive: true });
@@ -105,6 +111,44 @@ const publishStatus = (pr, state, description, url) => {
   writeFileSync(statusFile(pr), key);
   record(pr, { action: 'status', state });
 };
+mkdirSync(`${STATE}/evidence`, { recursive: true });
+const evidenceFile = (pr) => `${STATE}/evidence/${pr.number}`;
+const evidenceSeen = (pr) => {
+  try {
+    return JSON.parse(readFileSync(evidenceFile(pr), 'utf8'));
+  } catch {
+    return {};
+  }
+};
+const rerunEvidence = (pr) => {
+  const seen = evidenceSeen(pr);
+  const mine = seen.sha === pr.headRefOid ? seen : { sha: pr.headRefOid, rerun: [], done: false };
+  if (mine.done) return;
+  try {
+    const runs = JSON.parse(
+      gh([
+        'run',
+        'list',
+        '--workflow',
+        'pr-evidence.yml',
+        '--commit',
+        pr.headRefOid,
+        '--limit',
+        '20',
+        '--json',
+        'databaseId,status,conclusion',
+      ]),
+    );
+    const { done, run } = evidenceRerun(runs, mine.rerun);
+    if (done) writeFileSync(evidenceFile(pr), JSON.stringify({ ...mine, done }));
+    if (!run) return;
+    gh(['run', 'rerun', String(run), '--failed']);
+    writeFileSync(evidenceFile(pr), JSON.stringify({ ...mine, rerun: [...mine.rerun, run] }));
+    record(pr, { action: 'evidence-rerun', run });
+  } catch (e) {
+    console.log(`#${pr.number}: pr-evidence rerun after PASS failed\n${e.message}`);
+  }
+};
 const verdictStatus = (body, sha) => {
   const m = new RegExp(
     `^<!-- review-gate:${sha} -->\\n\\*\\*Independent review gate: (PASS|BLOCK)\\*\\*( \\(carried over\\))? for `,
@@ -126,7 +170,10 @@ const verdictStatus = (body, sha) => {
 };
 const publishVerdict = (pr, body, url) => {
   const status = verdictStatus(body, pr.headRefOid);
-  if (status) publishStatus(pr, status.state, status.description, url);
+  if (!status) return;
+  publishStatus(pr, status.state, status.description, url);
+  if (status.state === 'success' && publishedStatus(pr).startsWith(`${pr.headRefOid} success `))
+    rerunEvidence(pr);
 };
 const clearStall = (pr) => {
   if (!pr.labels.some((l) => l.name === 'review-stalled')) return;
@@ -296,19 +343,21 @@ try {
   );
   execFileSync(BOT, ['git', 'fetch', '-q', 'origin', 'main'], { cwd: MAIN });
   const gatePaths = repoGatePaths();
-  const PROTECTED = [...repoProtected(gatePaths), ...EXTRA_PROTECTED];
+  const PROTECTED = [...repoProtected(gatePaths), ...reviewRequired(gatePaths), ...EXTRA_PROTECTED];
+  const needsReview = (path) =>
+    !SAFE_PATH.test(path) || PROTECTED.some((re) => new RegExp(re.source, 'i').test(path));
   const checkIdx = process.argv.indexOf('--check');
   if (checkIdx > 0) {
     const files = JSON.parse(
       gh(['pr', 'view', process.argv[checkIdx + 1], '--json', 'files']),
     ).files.map((f) => f.path);
     if (!files.length) process.exit(2);
-    process.exit(files.some((p) => PROTECTED.some((re) => re.test(p))) ? 0 : 3);
+    process.exit(files.some(needsReview) ? 0 : 3);
   }
   const todo = [];
   for (const pr of prs) {
     if (pr.isDraft) continue;
-    const touched = pr.files.map((f) => f.path).filter((p) => PROTECTED.some((re) => re.test(p)));
+    const touched = pr.files.map((f) => f.path).filter(needsReview);
     const optIn = pr.labels.some((l) => l.name === 'review-gate');
     const lane = pr.headRefName.match(/^lane\/(\d+)$/)?.[1];
     if (!touched.length && !optIn && !lane) continue;

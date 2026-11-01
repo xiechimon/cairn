@@ -98,7 +98,8 @@ jobs:
           gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" > "$RUNNER_TEMP/pr.json"
           gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/commits" > "$RUNNER_TEMP/pr-commits.json"
           gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" > "$RUNNER_TEMP/pr-files.json"
-          jq -n --arg repository "$(jq -r '.base.repo.full_name' "$RUNNER_TEMP/pr.json")" --slurpfile pages "$RUNNER_TEMP/pr-commits.json" --slurpfile filePages "$RUNNER_TEMP/pr-files.json" '{repository: $repository, commits: ($pages[0] | add), files: ($filePages[0] | add)}' > "$RUNNER_TEMP/pr-evidence-context.json"
+          gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" > "$RUNNER_TEMP/pr-comments.json"
+          jq -n --arg repository "$(jq -r '.base.repo.full_name' "$RUNNER_TEMP/pr.json")" --slurpfile pr "$RUNNER_TEMP/pr.json" --slurpfile pages "$RUNNER_TEMP/pr-commits.json" --slurpfile filePages "$RUNNER_TEMP/pr-files.json" --slurpfile commentPages "$RUNNER_TEMP/pr-comments.json" '{repository: $repository, head: $pr[0].head.sha, headRef: $pr[0].head.ref, commits: ($pages[0] | add), files: ($filePages[0] | add), comments: (($commentPages[0] | add) // [])}' > "$RUNNER_TEMP/pr-evidence-context.json"
           jq -r '.body // ""' "$RUNNER_TEMP/pr.json" > "$RUNNER_TEMP/pr-body.md"
           echo "labels=$(jq -r '[.labels[].name] | join(",")' "$RUNNER_TEMP/pr.json")" >> "$GITHUB_OUTPUT"
           echo "draft=$(jq -r '.draft' "$RUNNER_TEMP/pr.json")" >> "$GITHUB_OUTPUT"
@@ -131,6 +132,17 @@ jobs:
             echo "autonomy-brake: main has no brake script yet; nothing can be paused"
           fi
           rm autonomy-paused.flag
+
+      - name: Check required reviews and batch scope against main's rules, paths and manifests
+        if: ${{ !cancelled() && steps.pr.outcome == 'success' }}
+        run: |
+          if ! git show origin/main:scripts/pr-evidence-gate.py | grep -q -- "'--merge-rules'"; then
+            echo "merge-rules: main's pr-evidence-gate.py has no merge rules yet; nothing to check"
+            exit 0
+          fi
+          mkdir -p "$RUNNER_TEMP/main-rules"
+          git archive origin/main scripts/pr-evidence-gate.py scripts/pr_body.py packages/shared/merge-gate-paths.json .claude/epics | tar -x -C "$RUNNER_TEMP/main-rules"
+          python3 "$RUNNER_TEMP/main-rules/scripts/pr-evidence-gate.py" --merge-rules "$RUNNER_TEMP/pr-evidence-context.json"
 
       # !cancelled() so every gate's findings show in one run even when an
       # earlier step reds (#1240): a lane fixing a link problem should not

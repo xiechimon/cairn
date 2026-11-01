@@ -79,8 +79,33 @@ so migrations merged into main after the PR branched never count), the body
 must carry a
 `### Schema changes` section whose table rows equal that file's rows.
 
+Merge rules (#2375), run as `--merge-rules context.json` from main's copy of
+this script, packages/shared/merge-gate-paths.json and .claude/epics so a PR
+cannot edit the rules that judge it. The context JSON carries `head`,
+`headRef`, `files`, `comments` (issue comments) and `statuses` (of the head).
+
+1. Required reviews: `requiredReviews` in merge-gate-paths.json maps a review
+   to the path lists that require it. `review-gate` is met only by the
+   newest `cairnwright[bot]` comment that starts with
+   `<!-- review-gate:<head> -->` and the PASS verdict line; a verdict for
+   another head or from another login does not count. A `review-gate`
+   commit status does not count: every session holding the owner's gh
+   login can post one.
+2. Batch scope: a `B<n>/` or `C<n>/` branch whose rest names an item of
+   `.claude/epics/<batch>.json` must keep to the item's `scope` globs (when
+   declared; docs/verify evidence is always in scope) and may touch a
+   `hotFiles` path from merge-gate-paths.json only when the item's
+   `hotFiles` globs declare it. The hot-file rule applies once any item of
+   the manifest declares `hotFiles`, so manifests written before the field
+   existed do not red their items. Branches without a manifest item are not
+   checked.
+
+Both rules read the context file before any script from the PR head runs
+in the job, so a head script cannot rewrite the file list they judge.
+
 Usage:
   python3 scripts/pr-evidence-gate.py body.md context.json   # CI entry point
+  python3 scripts/pr-evidence-gate.py --merge-rules context.json
   PR_BODY='<pr body>' python3 scripts/pr-evidence-gate.py
   python3 scripts/pr-evidence-gate.py path/to/body.md        # local testing
 
@@ -95,6 +120,7 @@ from urllib.parse import parse_qs, urlsplit
 import re
 import subprocess
 import sys
+import unicodedata
 import concurrent.futures as cf
 from pr_body import TASK, visible_markdown
 
@@ -129,6 +155,189 @@ SCHEMA_HEADING = re.compile(r'^### Schema changes[ \t]*$', re.M)
 ANY_HEADING = re.compile(r'^#{1,6}[ \t]+', re.M)
 NO_SCHEMA_CHANGES = 'No schema changes'
 GATE_PATHS = Path(__file__).resolve().parent.parent / 'packages/shared/merge-gate-paths.json'
+EPICS = Path(__file__).resolve().parent.parent / '.claude/epics'
+REVIEWER = 'cairnwright[bot]'
+KNOWN_REVIEWS = ('review-gate',)
+HEAD_SHA = re.compile(r'[0-9a-f]{40}')
+BATCH_BRANCH = re.compile(r'(?P<batch>[BC]\d+)/(?P<rest>.+)')
+SAFE_PATH_PUNCTUATION = set('._/@+%-')
+
+
+class MergeRulesUnreadable(Exception):
+    pass
+
+
+def glob_to_re(glob):
+    tail = glob.endswith('/**')
+    rest = glob[:-3] if tail else glob
+    pattern = ''
+    at = 0
+    while at < len(rest):
+        if rest.startswith('**/', at):
+            pattern += '(?:.*/)?'
+            at += 3
+        elif rest.startswith('**', at):
+            pattern += '.*'
+            at += 2
+        elif rest[at] == '*':
+            pattern += '[^/]*'
+            at += 1
+        else:
+            pattern += re.escape(rest[at])
+            at += 1
+    return re.compile(pattern + ('(?:/.*)?' if tail else ''), re.IGNORECASE)
+
+
+def matching(paths, globs):
+    patterns = [glob_to_re(glob) for glob in globs]
+    return [path for path in paths if any(p.fullmatch(path) for p in patterns)]
+
+
+def string_list(value):
+    return isinstance(value, list) and all(isinstance(entry, str) and entry for entry in value)
+
+
+def unsafe_path(path):
+    return not all(ch.isalnum() or unicodedata.category(ch).startswith('M') or ch in SAFE_PATH_PUNCTUATION
+                   for ch in path)
+
+
+def touched_paths(files):
+    names = {name for file in files for name in (file['filename'], file.get('previous_filename')) if name}
+    return sorted(names)
+
+
+def required_review_globs(gate_paths):
+    reviews = gate_paths.get('requiredReviews') if isinstance(gate_paths, dict) else None
+    if not isinstance(reviews, dict) or not reviews:
+        raise MergeRulesUnreadable('requiredReviews is missing or empty')
+    required = {}
+    for name, keys in reviews.items():
+        if name not in KNOWN_REVIEWS or not string_list(keys):
+            raise MergeRulesUnreadable(f'requiredReviews.{name} is not a known review over path lists')
+        globs = []
+        for key in keys:
+            if not string_list(gate_paths.get(key)):
+                raise MergeRulesUnreadable(f'requiredReviews.{name} names {key}, which is not a path list')
+            globs += gate_paths[key]
+        required[name] = globs
+    return required
+
+
+def review_gate_verdict(comments, head):
+    verdict_line = re.compile(
+        rf'<!-- review-gate:{head} -->\n\*\*Independent review gate: (PASS|BLOCK)\*\*(?: \(carried over\))? for ')
+    ordered = sorted((c for c in comments if isinstance(c, dict)), key=lambda c: c.get('id') or 0)
+    verdicts = [match[1] for comment in ordered
+                if (comment.get('user') or {}).get('login') == REVIEWER
+                and (match := verdict_line.match(comment.get('body') or ''))]
+    return verdicts[-1] if verdicts else None
+
+
+def review_failures(context, gate_paths, paths):
+    head = context.get('head')
+    failures = []
+    for name, globs in required_review_globs(gate_paths).items():
+        hits = matching(paths, globs) + [p for p in paths if unsafe_path(p)]
+        if not hits:
+            continue
+        print(f"merge-rules: {name} required ({len(hits)} path(s), first {hits[0]})")
+        if not isinstance(head, str) or not HEAD_SHA.fullmatch(head):
+            raise MergeRulesUnreadable('the context has no 40-hex head SHA')
+        comments = context.get('comments')
+        if not isinstance(comments, list):
+            raise MergeRulesUnreadable('the context has no comment list')
+        verdict = review_gate_verdict(flatten_pages(comments), head)
+        if verdict == 'PASS':
+            print(f"merge-rules: {name} PASS by {REVIEWER} for {head[:8]}")
+        else:
+            failures.append(name)
+            found = f'the newest verdict is {verdict}' if verdict else 'no verdict'
+            print(f"FAIL review-missing: {name}: {found} by {REVIEWER} bound to head {head[:8]}")
+    return failures
+
+
+def batch_item(head_ref, epics):
+    branch = BATCH_BRANCH.fullmatch(head_ref) if isinstance(head_ref, str) else None
+    if branch is None:
+        return None
+    path = epics / f"{branch['batch']}.json"
+    try:
+        manifest = json.loads(path.read_text(encoding='utf-8'))
+    except FileNotFoundError:
+        return None
+    except (OSError, ValueError) as error:
+        raise MergeRulesUnreadable(f'{path.name} is unreadable: {error}')
+    items = manifest.get('items') if isinstance(manifest, dict) else None
+    if not isinstance(items, list) or not all(isinstance(item, dict) for item in items):
+        raise MergeRulesUnreadable(f'{path.name} has no item list')
+    rest = branch['rest']
+    for candidate in [rest, *rest.split('/')]:
+        for item in items:
+            if item.get('id') == candidate:
+                return branch['batch'], item, any('hotFiles' in other for other in items)
+    return None
+
+
+def scope_failures(context, gate_paths, paths, epics):
+    found = batch_item(context.get('headRef'), epics)
+    if found is None:
+        print("merge-rules: not a batch manifest item; scope and hot files not checked")
+        return []
+    batch, item, hot_files_adopted = found
+    hot_globs = gate_paths.get('hotFiles')
+    scope = item.get('scope')
+    declared = item.get('hotFiles', [])
+    if not string_list(hot_globs):
+        raise MergeRulesUnreadable('hotFiles is not a path list')
+    if (scope is not None and not string_list(scope)) or not string_list(declared):
+        raise MergeRulesUnreadable(f"{batch}.json item {item.get('id')} has a malformed scope or hotFiles")
+    failures = []
+    if scope is not None:
+        kept = [path for path in paths if not path.startswith(EVIDENCE_PREFIX)]
+        inside = set(matching(kept, scope))
+        for path in kept:
+            if path not in inside:
+                failures.append(path)
+                print(f"FAIL out-of-scope: {path} is outside {batch}/{item['id']} scope")
+    allowed = set(matching(paths, declared))
+    if not hot_files_adopted:
+        print(f"merge-rules: no {batch}.json item declares hotFiles; hot files not checked")
+    for path in matching(paths, hot_globs) if hot_files_adopted else []:
+        if path not in allowed:
+            failures.append(path)
+            print(f"FAIL undeclared-hot-file: {path} is not in {batch}/{item['id']} hotFiles")
+    if not failures:
+        print(f"merge-rules: {batch}/{item['id']} keeps to its scope and hot files")
+    return failures
+
+
+def merge_rules(context_path, gate_paths_path=None, epics=None):
+    gate_paths_path = gate_paths_path or GATE_PATHS
+    epics = epics or EPICS
+    try:
+        try:
+            with open(context_path, encoding='utf-8') as f:
+                context = json.load(f)
+            gate_paths = json.loads(Path(gate_paths_path).read_text(encoding='utf-8'))
+        except (OSError, ValueError) as error:
+            raise MergeRulesUnreadable(str(error))
+        if not isinstance(context, dict):
+            raise MergeRulesUnreadable('the context is not an object')
+        files = load_patch_files(context_path)
+        if files is None:
+            raise MergeRulesUnreadable('the context has no usable pull request file list')
+        paths = touched_paths(files)
+        failures = review_failures(context, gate_paths, paths) + scope_failures(context, gate_paths, paths, epics)
+    except MergeRulesUnreadable as error:
+        print(f"FAIL merge-rules-unreadable: {error}")
+        print("merge-rules: RED")
+        return 1
+    if failures:
+        print(f"merge-rules: RED ({len(failures)} problem(s))")
+        return 1
+    print("merge-rules: GREEN")
+    return 0
 
 
 def size_limits():
@@ -364,6 +573,8 @@ def split_schema_glance(argv):
 
 
 def main():
+    if sys.argv[1:2] == ['--merge-rules']:
+        return merge_rules(sys.argv[2])
     args, schema_glance = split_schema_glance(sys.argv[1:])
     if args:
         with open(args[0], encoding='utf-8') as f:
