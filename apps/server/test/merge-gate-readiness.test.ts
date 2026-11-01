@@ -775,7 +775,7 @@ describe('mergeReadiness: combinations the design names', () => {
       const i = green();
       setFiles(
         i,
-        Array.from({ length: n - 1 }, (_, k) =>
+        Array.from({ length: n }, (_, k) =>
           file(`apps/server/src/f${k}.ts`, { additions: 1, deletions: 0 }),
         ),
       );
@@ -968,31 +968,31 @@ describe('mergeReadiness: files with no visible diff are left to a human, caps c
     ]);
   });
 
-  test('the 40-file cap counts evidence: 35 code files plus 10 evidence files block, 30 plus 10 do not', () => {
-    const withEvidence = (code: number) => {
+  test('the 40-file cap leaves evidence out: 41 code files block, 40 code files with 30 evidence files do not', () => {
+    const withEvidence = (code: number, evidence: number) => {
       const i = green();
       setFiles(i, [
         ...many(code, (k) => `apps/server/src/f${k}.ts`),
-        ...many(9, (k) => `docs/verify/1404/e${k}.txt`, { status: 'added' }),
+        ...many(evidence, (k) => `docs/verify/1404/e${k}.txt`, { status: 'added' }),
       ]);
       return classesOf(i);
     };
-    expect(withEvidence(30)).toEqual([]);
-    expect(withEvidence(35)).toEqual([['size-cap', 'human', '44 lines, 45 files']]);
+    expect(withEvidence(40, 30)).toEqual([]);
+    expect(withEvidence(41, 0)).toEqual([['size-cap', 'human', '41 lines, 41 files']]);
   });
 
-  test('the 800-line cap counts evidence: 700 code lines, 100 evidence lines do not block, 101 do', () => {
-    const withEvidence = (n: number) => {
+  test('the 800-line cap leaves evidence out: 800 code lines with 500 evidence lines do not block, 801 code lines do', () => {
+    const withEvidence = (codeLines: number) => {
       const i = green();
       setFiles(i, [
-        file('apps/server/src/a.ts', { additions: 699, deletions: 0 }),
+        file('apps/server/src/a.ts', { additions: codeLines - 1, deletions: 0 }),
         file('apps/server/test/a.test.ts', { additions: 1, deletions: 0 }),
-        file('docs/verify/1404/log.txt', { status: 'added', additions: n, deletions: 0 }),
+        file('docs/verify/1404/log.txt', { status: 'added', additions: 500, deletions: 0 }),
       ]);
       return classesOf(i);
     };
-    expect(withEvidence(100)).toEqual([]);
-    expect(withEvidence(101)).toEqual([['size-cap', 'human', '801 lines, 4 files']]);
+    expect(withEvidence(800)).toEqual([]);
+    expect(withEvidence(801)).toEqual([['size-cap', 'human', '801 lines, 2 files']]);
   });
 });
 
@@ -1238,7 +1238,7 @@ describe('mergeReadiness: extraction failures clearable, unmergeable states, tru
     expect(pr(i).changedFiles).toBe(300);
     expect(classesOf(i)).toEqual([
       ['compare-truncated', 'human', 'truncated'],
-      ['size-cap', 'human', '299 lines, 300 files'],
+      ['size-cap', 'human', '299 lines, 299 files'],
     ]);
   });
 

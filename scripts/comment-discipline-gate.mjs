@@ -1,5 +1,38 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { assertExactRevertTree, git as gitIn, revertedShas } from './exact-revert.mjs';
+
+function isExactRevertOfMain(base) {
+  const cwd = process.cwd();
+  if (gitIn(cwd, 'status', '--porcelain', '--untracked-files=no')) return false;
+  const commits = gitIn(cwd, 'rev-list', '--no-merges', `${base}..HEAD`)
+    .split('\n')
+    .filter(Boolean);
+  if (!commits.length) return false;
+  const dir = mkdtempSync(join(tmpdir(), 'comment-gate-revert-'));
+  try {
+    const names = commits.flatMap((sha) =>
+      revertedShas(gitIn(cwd, 'show', '-s', '--format=%B', sha)),
+    );
+    if (new Set(names).size !== names.length) return false;
+    const history = gitIn(cwd, 'rev-list', '--first-parent', 'origin/main').split('\n');
+    if (names.some((sha) => !history.includes(sha))) return false;
+    gitIn(cwd, 'clone', '--shared', '--no-checkout', cwd, dir);
+    assertExactRevertTree(dir, {
+      baseSha: gitIn(cwd, 'rev-parse', base),
+      headSha: gitIn(cwd, 'rev-parse', 'HEAD'),
+      names,
+      history,
+    });
+    return true;
+  } catch {
+    return false;
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
 
 try {
   const git = (...args) =>
@@ -16,18 +49,12 @@ try {
   ) {
     throw new Error('Allowlist entries require path, line and reason');
   }
-  const files = git(
-    'diff',
-    '--name-only',
-    '-z',
-    '--diff-filter=ACMR',
-    base,
-    '--',
-    'apps',
-    'packages',
-  )
-    .split('\0')
-    .filter((path) => /\.(ts|tsx|mjs|css)$/.test(path));
+  const exactRevert = isExactRevertOfMain(base);
+  const files = exactRevert
+    ? []
+    : git('diff', '--name-only', '-z', '--diff-filter=ACMR', base, '--', 'apps', 'packages')
+        .split('\0')
+        .filter((path) => /\.(ts|tsx|mjs|css)$/.test(path));
   let violations = 0;
   for (const path of files) {
     const added = new Set();
@@ -64,7 +91,9 @@ try {
       if (block && trimmed.includes('*/')) block = false;
     }
   }
-  console.log(`comment-discipline-gate: ${violations} new comment line(s)`);
+  console.log(
+    `comment-discipline-gate: ${violations} new comment line(s)${exactRevert ? ' (exact revert of main commits)' : ''}`,
+  );
   process.exitCode = violations ? 1 : 0;
 } catch (error) {
   console.error(`comment-discipline-gate: ${error.message}`);

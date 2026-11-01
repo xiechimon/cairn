@@ -73,10 +73,7 @@ function JobNode({ job }: { job: RoutingJob }) {
       <div className="flex items-center justify-between border-t border-border px-2.5 pt-1.5 pb-1.75 text-content-secondary">
         <span>Model</span>
         <span
-          className={cn(
-            'font-mono text-caption',
-            off ? 'text-content-tertiary' : 'text-foreground',
-          )}
+          className={cn('font-mono text-code', off ? 'text-content-tertiary' : 'text-foreground')}
         >
           {job.model}
         </span>

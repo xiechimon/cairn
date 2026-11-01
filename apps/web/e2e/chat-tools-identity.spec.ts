@@ -9,10 +9,10 @@ async function readClipboard(page: Page): Promise<string> {
   return page.evaluate(() => navigator.clipboard.readText());
 }
 
-test('I1: the summary names the work performed and its duration', async ({ page }) => {
+test('I1: the summary names the work performed and ends in a triangle', async ({ page }) => {
   await page.goto(ROUTE);
   await expect(summary(page)).toContainText('跑了 2 条命令');
-  await expect(summary(page)).toContainText('19s');
+  await expect(summary(page)).not.toContainText('19s');
   await expect(summary(page).locator('svg').first()).toBeVisible();
 });
 
@@ -37,15 +37,14 @@ test('I3: copying work includes commands and outputs', async ({ page }) => {
   expect(clip).toContain('hello from cairn');
 });
 
-test('I4: call rows keep the agent column inset and compact height', async ({ page }) => {
+test('I4: call rows sit flush in a hairline card at 36px', async ({ page }) => {
   await page.goto(ROUTE);
   const geometry = await block(page).evaluate((el) => {
     const row = el.querySelector('[data-testid="work-call"]')!;
     return { inset: getComputedStyle(el).paddingLeft, height: row.getBoundingClientRect().height };
   });
-  expect(geometry.inset).toBe('32px');
-  expect(geometry.height).toBeGreaterThanOrEqual(26);
-  expect(geometry.height).toBeLessThanOrEqual(28);
+  expect(geometry.inset).toBe('0px');
+  expect(geometry.height).toBe(36);
 });
 
 test('I5: work summaries keep the transcript boundary free of horizontal rules', async ({ page }) => {

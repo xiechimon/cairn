@@ -317,6 +317,7 @@ export type TranscriptItem =
       title?: string;
       markdown?: string;
       id?: string;
+      at?: string;
     }
   | {
       kind: 'robot';
@@ -485,7 +486,14 @@ export type ChiefStreamItem =
       }[];
       answers: { header: string; choices?: string[]; text?: string }[] | null;
     }
-  | { kind: 'user'; text: string; id?: string; markdown?: string; pending?: 'queued' | 'held' }
+  | {
+      kind: 'user';
+      text: string;
+      id?: string;
+      markdown?: string;
+      pending?: 'queued' | 'held';
+      at?: string;
+    }
   | { kind: 'stopped'; todos: { id: string; seq: number; title: string }[]; id?: string }
   | {
       kind: 'robot';

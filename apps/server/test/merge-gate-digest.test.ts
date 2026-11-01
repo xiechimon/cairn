@@ -257,15 +257,15 @@ describe('computePatchDigest', () => {
     expect(r.unavailable).toBe('empty');
   });
 
-  test('line and file counts cover the whole patch, docs/verify/ evidence included; the digest still excludes evidence', () => {
+  test('line and file counts leave out docs/verify/ evidence, which the digest also excludes', () => {
     const r = computePatchDigest(base);
-    expect(r.countedFiles).toBe(3);
-    expect(r.countedLines).toBe(2 + 5 + 20);
+    expect(r.countedFiles).toBe(2);
+    expect(r.countedLines).toBe(2 + 5);
     expect(r.kept.map((f) => f.filename)).toEqual(['apps/server/src/a.ts', 'apps/server/src/b.ts']);
     expect(r.excluded.map((f) => f.filename)).toEqual(['docs/verify/1404/run.txt']);
   });
 
-  test('a rename (entry with previous_filename) counts two files, a pure rename has zero lines, evidence renames count too', () => {
+  test('a rename (entry with previous_filename) counts two files, a pure rename has zero lines, evidence renames do not count', () => {
     const r = computePatchDigest([
       file({ filename: 'apps/server/src/c.ts', additions: 3, deletions: 2 }),
       file({
@@ -285,8 +285,47 @@ describe('computePatchDigest', () => {
         patchSha: null,
       }),
     ]);
-    expect(r.countedFiles).toBe(1 + 2 + 2);
+    expect(r.countedFiles).toBe(1 + 2);
     expect(r.countedLines).toBe(5);
+  });
+
+  test('a rename between evidence and product source counts both its files', () => {
+    const r = computePatchDigest([
+      file({
+        filename: 'apps/server/src/moved.ts',
+        previousFilename: 'docs/verify/1404/moved.ts',
+        status: 'renamed',
+        additions: 4,
+        deletions: 1,
+      }),
+    ]);
+    expect(r.countedFiles).toBe(2);
+    expect(r.countedLines).toBe(5);
+  });
+
+  test('a patch whose only overflow is evidence stays inside the size caps', () => {
+    const evidence = Array.from({ length: GATE_LIMITS.maxFiles + 1 }, (_, i) =>
+      file({
+        filename: `docs/verify/2371/run-${i}.txt`,
+        status: 'added',
+        sha: String(i).padStart(40, '0'),
+        additions: GATE_LIMITS.maxLines,
+        deletions: 0,
+      }),
+    );
+    const r = computePatchDigest([
+      file({ filename: 'apps/server/src/a.ts', additions: 10, deletions: 0 }),
+      ...evidence,
+    ]);
+    expect(r.countedFiles).toBe(1);
+    expect(r.countedLines).toBe(10);
+  });
+
+  test('801 lines of product source are still over the line cap', () => {
+    const r = computePatchDigest([
+      file({ filename: 'apps/server/src/a.ts', additions: 401, deletions: 400 }),
+    ]);
+    expect(r.countedLines).toBe(GATE_LIMITS.maxLines + 1);
   });
 
   test('a copy (copied, with previous_filename) counts two files like a rename', () => {
@@ -338,13 +377,13 @@ describe('real compare response fixtures', () => {
     }
   });
 
-  test('the digest matches an independent implementation, the 22 evidence files stay out of the digest but count in files and lines', () => {
+  test('the digest matches an independent implementation, the 22 evidence files stay out of the digest and of the counts', () => {
     const files = compareFilesFromResponse(sample) ?? [];
     const r = computePatchDigest(files);
     expect(r.kept.length).toBe(36);
     expect(r.excluded.length).toBe(22);
-    expect(r.countedFiles).toBe(58);
-    expect(r.countedLines).toBe(932);
+    expect(r.countedFiles).toBe(36);
+    expect(r.countedLines).toBe(846);
     expect(r.patchDigest).toBe(
       'pd2:b8fc25a097b7a43e1929cee82b6ec03f0821c373e443df65612278baff845e4e',
     );
