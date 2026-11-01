@@ -16,7 +16,7 @@ describe('the global Coordinator conversation filtered by project', () => {
     expect(users.map((item) => (item.kind === 'user' ? item.projectId : undefined))).toEqual([
       'relay',
       'cairn',
-      null,
+      undefined,
     ]);
   });
 
@@ -40,6 +40,26 @@ describe('the global Coordinator conversation filtered by project', () => {
       },
     ];
     expect(streamForProject(stream, 'cairn').map((item) => item.kind)).toEqual(['question']);
+  });
+
+  it('a reply or report tagged with another project files under its own project, not the turn before it', () => {
+    const interleaved = mapChiefStream([
+      { id: 'u1', role: 'user', content: 'Fold turns first', createdAt: 1, projectId: 'cairn' },
+      { id: 'r1', role: 'assistant', content: 'relay probe finished', createdAt: 2, projectId: 'relay' },
+      { id: 'a1', role: 'assistant', content: 'Started it.', createdAt: 3, projectId: 'cairn' },
+    ]);
+    const text = (items: ReturnType<typeof mapChiefStream>) =>
+      items.map((item) => ('markdown' in item ? item.markdown : 'text' in item ? item.text : item.kind));
+    expect(text(streamForProject(interleaved, 'cairn'))).toEqual(['Fold turns first', 'Started it.']);
+    expect(text(streamForProject(interleaved, 'relay'))).toEqual(['relay probe finished']);
+  });
+
+  it('a server that tags no rows leaves the conversation unfiltered instead of empty', () => {
+    const untagged = mapChiefStream([
+      { id: 'u1', role: 'user', content: 'Plan the week', createdAt: 1 },
+      { id: 'a1', role: 'assistant', content: 'On it.', createdAt: 2 },
+    ]);
+    expect(streamForProject(untagged, 'cairn')).toHaveLength(2);
   });
 
   it('no project keeps the whole conversation', () => {

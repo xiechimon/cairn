@@ -43,11 +43,16 @@ export function streamForProject(
   projectId: string | null,
 ): ChiefStreamItem[] {
   if (projectId === null) return [...stream];
+  const ownProject = (item: ChiefStreamItem) => ('projectId' in item ? item.projectId : undefined);
+  if (!stream.some((item) => ownProject(item) !== undefined)) return [...stream];
   let turn: string | null = null;
   return stream.filter((item) => {
-    if (item.kind === 'user') turn = item.projectId ?? null;
+    const own = ownProject(item);
+    if (item.kind === 'user') turn = own ?? null;
+    const project = own !== undefined ? own : turn;
     return (
-      turn === projectId || (turn === null && item.kind === 'question' && item.status === 'pending')
+      project === projectId ||
+      (project === null && item.kind === 'question' && item.status === 'pending')
     );
   });
 }

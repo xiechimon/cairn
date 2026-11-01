@@ -112,7 +112,7 @@ export function useChiefSurface(
   const [linkedThreadId, setLinkedThreadId] = useState<string | null>(null);
   const liveThreads = chiefThreadsQ.data ?? [];
   const activeThread = live
-    ? ((onHome ? null : liveThreads.find((thread) => thread.id === linkedThreadId)) ??
+    ? (liveThreads.find((thread) => thread.id === linkedThreadId) ??
       globalCoordinatorThread(liveThreads))
     : null;
   const deepLinkId = deepLink?.threadId ?? null;

@@ -475,7 +475,7 @@ export interface ChiefSegment {
 }
 
 export type ChiefStreamItem =
-  | (ThreadReportContent & { id: string })
+  | (ThreadReportContent & { id: string; projectId?: string | null })
   | { kind: 'note'; text: string; machineName?: string }
   | { kind: 'error'; text: string }
   | { kind: 'handoff'; todoId: string; id?: string }
@@ -512,6 +512,7 @@ export type ChiefStreamItem =
       tools?: ChiefToolRow[];
       id?: string;
       fallbackModel?: string;
+      projectId?: string | null;
     }
   | {
       kind: 'thinking';

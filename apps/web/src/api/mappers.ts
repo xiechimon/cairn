@@ -140,6 +140,10 @@ export interface MessageRow {
   projectId?: string | null;
 }
 
+function rowProject(row: MessageRow): { projectId?: string | null } {
+  return row.projectId === undefined ? {} : { projectId: row.projectId };
+}
+
 export function toDisplayTodo(w: WireTodo): DisplayTodo {
   const agentId = w.assignment?.build?.agentId ?? w.assignment?.plan?.agentId ?? null;
   return {
@@ -1335,7 +1339,7 @@ function collectChiefStream(
         id: m.id,
         markdown: text,
         pending: pendingState,
-        projectId: m.projectId ?? null,
+        ...rowProject(m),
       });
       continue;
     }
@@ -1354,7 +1358,7 @@ function collectChiefStream(
       }
       const report = threadReportContentSchema.safeParse(parsed);
       if (report.success) {
-        items.push({ ...report.data, id: m.id });
+        items.push({ ...report.data, id: m.id, ...rowProject(m) });
         continue;
       }
       const stopped = chiefTurnStoppedContentSchema.safeParse(parsed);
@@ -1434,11 +1438,17 @@ function collectChiefStream(
       if (m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX) && postedTexts.has(text)) continue;
       pendingTools = [];
       const head = orchestratePromptHeadOf(text);
-      const projectId = m.projectId ?? null;
       items.push(
         head === null
-          ? { kind: 'user', text, id: m.id, markdown: text, at: clockTime(m.createdAt), projectId }
-          : { kind: 'user', text: head, id: m.id, at: clockTime(m.createdAt), projectId },
+          ? {
+              kind: 'user',
+              text,
+              id: m.id,
+              markdown: text,
+              at: clockTime(m.createdAt),
+              ...rowProject(m),
+            }
+          : { kind: 'user', text: head, id: m.id, at: clockTime(m.createdAt), ...rowProject(m) },
       );
       continue;
     }
@@ -1450,6 +1460,7 @@ function collectChiefStream(
       id: m.id,
       ...(pendingTools.length > 0 ? { tools: pendingTools } : {}),
       ...(fallback !== null ? { fallbackModel: fallback.model } : {}),
+      ...rowProject(m),
     });
     pendingTools = [];
   }
