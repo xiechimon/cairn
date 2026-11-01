@@ -1,0 +1,39 @@
+[WebServer] (node:19) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] [plugin builtin:vite-reporter] 
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+[WebServer] (node:18) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 1 test using 1 worker
+
+(node:125) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  1 e2e/sidebar-visual.spec.ts:118:5 › active team brand matches navigation fill without elevation (light, 1440px) (30.0s)
+
+
+  1) e2e/sidebar-visual.spec.ts:118:5 › active team brand matches navigation fill without elevation (light, 1440px) 
+
+    Test timeout of 30000ms exceeded.
+
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    Call log:
+      - waiting for locator('[data-slot="sidebar-nav-row"]').filter({ hasText: 'Projects' })
+
+
+      143 |       await keyboardFocus(page, brand);
+      144 |       expect(await readRing(brand)).toEqual({ focused: true, outline: 'solid 2px', clippedBy: [] });
+    > 145 |       await page.locator('[data-slot="sidebar-nav-row"]').filter({ hasText: 'Projects' }).click();
+          |                                                                                           ^
+      146 |       await expect(page).toHaveURL('/app?scenario=01');
+      147 |       if (width === 390) await page.locator('.app-menu-trigger').click();
+      148 |       await page.mouse.move(width - 1, 500);
+        at /tmp/cairn-2422-main/apps/web/e2e/sidebar-visual.spec.ts:145:91
+
+    Error Context: test-results/sidebar-visual-active-team-85af9-out-elevation-light-1440px-/error-context.md
+
+  1 failed
+    e2e/sidebar-visual.spec.ts:118:5 › active team brand matches navigation fill without elevation (light, 1440px) 
