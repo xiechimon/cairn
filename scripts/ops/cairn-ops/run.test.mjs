@@ -159,14 +159,18 @@ function commitTree(upstream, mutate) {
   return commit;
 }
 
-test('the fixture supplies a regular executable Node copy and launches the wrapper', () => {
-  const { base, out, layout, mainSha } = fixture();
+test('the fixture supplies a regular executable Node copy', () => {
+  const { base, layout } = fixture();
   assert.equal(layout.node, join(base, 'bin/node'));
   assert.notEqual(layout.node, process.execPath);
   const stat = lstatSync(layout.node);
   assert.equal(stat.isFile(), true);
   assert.equal(stat.isSymbolicLink(), false);
   assert.equal(stat.mode & 0o777, 0o755);
+});
+
+test('the wrapper launches the task through the fixture Node copy', { skip: !flockPath }, () => {
+  const { out, layout, mainSha } = fixture();
   const result = spawnSync('/bin/sh', [layout.runner, 'demo', mainSha], { encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr);
   assert.equal(readFileSync(join(out, 'args'), 'utf8'), '--fixed\n');
