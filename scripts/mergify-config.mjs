@@ -7,6 +7,9 @@ export const configPath = '.mergify.yml';
 const prOnlyChecks = ['pr-evidence'];
 const maxLinesEachWay = 400;
 const botAuthor = 'cairnwright[bot]';
+const mergeBotAccount = 'xiechimon';
+export const admitLabel = 'queue-admit';
+const batchHeadRe = '^B[0-9]+/';
 const batchSize = 5;
 const batchWait = '3 min';
 const checkRetries = 1;
@@ -55,6 +58,10 @@ export function mergifyConfig(prGateSource) {
     '      - -draft',
     '      - -label = needs-decision',
     '      - -label = owner-route',
+    '      - or:',
+    `          - -head ~= ${batchHeadRe}`,
+    `          - label = ${admitLabel}`,
+    '      - check-success = commit-author',
     '      - status-success = review-gate',
     '      - check-success = merge-route',
     ...prChecks.map(passedOrSkipped),
@@ -74,10 +81,21 @@ ${draftChecks.map(passedOrSkipped).join('\n')}
     merge_method: ${method}
     batch_size: ${batchSize}
     batch_max_wait_time: ${batchWait}
-    max_checks_retries: ${checkRetries}`;
+    max_checks_retries: ${checkRetries}
+    branch_protection_injection_mode: none
+    merge_bot_account: ${mergeBotAccount}`;
   return `queue_rules:
 ${rule('default', `-author = ${botAuthor}`, 'squash')}
 ${rule('bot', `author = ${botAuthor}`, 'rebase')}
+merge_protections_settings:
+  auto_merge_conditions: true
+merge_protections:
+  - name: queue entry needs the review gate and pr-gate routing
+    if:
+      - base = main
+    success_conditions:
+      - status-success = review-gate
+      - check-success = merge-route
 merge_queue:
   mode: parallel
   max_parallel_checks: 3

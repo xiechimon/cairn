@@ -14,7 +14,6 @@ const { spawnSync } = require('node:child_process');
 const args = process.argv.slice(2);
 fs.appendFileSync(process.env.CALLS, JSON.stringify(['gh', ...args]) + '\\n');
 const data = JSON.parse(fs.readFileSync(process.env.GH_DATA, 'utf8'));
-if (args[0] === 'pr' && args[1] === 'comment') process.exit(data.commentError ? 1 : 0);
 if (args[0] === 'pr' && args[1] === 'edit') process.exit(data.labelError ? 1 : 0);
 if (args[0] === 'pr' && args[1] === 'view' && args.includes('--jq')) {
   const out = spawnSync('jq', ['-r', args[args.indexOf('--jq') + 1]], { input: JSON.stringify(data.view), encoding: 'utf8' });
@@ -32,10 +31,7 @@ function writeExecutable(path, content) {
   chmodSync(path, 0o755);
 }
 
-function mergePr(
-  t,
-  { opener, gateExit, commentError = false, labelError = false, labels = [], ref = 'feature/x' },
-) {
+function mergePr(t, { opener, gateExit, labelError = false, labels = [], ref = 'feature/x' }) {
   const home = mkdtempSync(join(tmpdir(), 'merge-pr-queue-'));
   t.after(() => rmSync(home, { recursive: true, force: true }));
   const calls = join(home, 'calls');
@@ -43,7 +39,6 @@ function mergePr(
   writeFileSync(
     join(home, 'gh-data.json'),
     JSON.stringify({
-      commentError,
       labelError,
       view: {
         headRefName: ref,
@@ -83,71 +78,60 @@ function mergePr(
   const labelAt = recorded.findIndex(
     (c) => c[0] === 'gh' && c[1] === 'pr' && c[2] === 'edit' && c.includes('review-gate'),
   );
-  const queueAt = recorded.findIndex(
-    (c) => c[0] === 'gh' && c[1] === 'pr' && c[2] === 'comment' && c.includes('@mergifyio queue'),
-  );
   return {
     ...result,
     labelAt,
-    queueAt,
-    queued: recorded.some(
-      (c) => c[0] === 'gh' && c[1] === 'pr' && c[2] === 'comment' && c.includes('@mergifyio queue'),
-    ),
+    commented: recorded.some((c) => c[0] === 'gh' && c[1] === 'pr' && c[2] === 'comment'),
     merged: recorded.some((c) => c.includes('merge')),
   };
 }
 
-test('an unprotected human-opened PR is queued in Mergify, not merged', (t) => {
+test('an unprotected human-opened PR is labelled and left to Mergify, never commented or merged', (t) => {
   const result = mergePr(t, { opener: 'xiechimon', gateExit: 3 });
   assert.equal(result.status, 0, result.stderr);
-  assert.ok(result.queued);
+  assert.notEqual(result.labelAt, -1);
+  assert.equal(result.commented, false);
   assert.equal(result.merged, false);
+  assert.match(result.stdout, /Mergify queues it automatically/);
 });
 
-test('the review-gate label is added before queueing so the gate posts the status Mergify needs', (t) => {
-  const result = mergePr(t, { opener: 'xiechimon', gateExit: 3 });
-  assert.equal(result.status, 0, result.stderr);
-  assert.ok(result.labelAt !== -1 && result.labelAt < result.queueAt);
-});
-
-test('a PR that already has the review-gate label is queued without relabelling', (t) => {
+test('a PR that already has the review-gate label is not relabelled', (t) => {
   const result = mergePr(t, { opener: 'xiechimon', gateExit: 3, labels: ['review-gate'] });
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.labelAt, -1);
-  assert.ok(result.queued);
+  assert.equal(result.commented, false);
+  assert.equal(result.merged, false);
 });
 
-test('a failed label edit stops before the queue command', (t) => {
+test('a failed label edit fails the helper without merging', (t) => {
   const result = mergePr(t, { opener: 'xiechimon', gateExit: 3, labelError: true });
   assert.notEqual(result.status, 0);
-  assert.equal(result.queued, false);
+  assert.equal(result.merged, false);
   assert.match(result.stderr, /review-gate label/);
 });
 
-test('a failed queue comment fails the helper without merging', (t) => {
-  const result = mergePr(t, { opener: 'xiechimon', gateExit: 3, commentError: true });
-  assert.notEqual(result.status, 0);
+test('a PR Mergify already queued is neither commented nor merged', (t) => {
+  const result = mergePr(t, {
+    opener: 'xiechimon',
+    gateExit: 3,
+    labels: ['review-gate', 'queued'],
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.commented, false);
   assert.equal(result.merged, false);
 });
 
 test('an unprotected bot-opened PR keeps the rebase route', (t) => {
   const result = mergePr(t, { opener: 'app/cairnwright', gateExit: 3 });
   assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.queued, false);
+  assert.equal(result.commented, false);
   assert.ok(result.merged);
 });
 
-test('a protected human-opened PR without a passing review is never queued', (t) => {
+test('a protected human-opened PR without a passing review is never left to Mergify', (t) => {
   const result = mergePr(t, { opener: 'xiechimon', gateExit: 0 });
   assert.notEqual(result.status, 0);
-  assert.equal(result.queued, false);
-  assert.equal(result.merged, false);
-});
-
-test('a PR Mergify already queued gets no second command', (t) => {
-  const result = mergePr(t, { opener: 'xiechimon', gateExit: 3, labels: ['queued'] });
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.queued, false);
+  assert.equal(result.commented, false);
   assert.equal(result.merged, false);
 });
 
@@ -155,13 +139,13 @@ test('a PR Mergify dequeued is left for a human', (t) => {
   const result = mergePr(t, { opener: 'xiechimon', gateExit: 3, labels: ['dequeued'] });
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /dequeued/);
-  assert.equal(result.queued, false);
+  assert.equal(result.commented, false);
   assert.equal(result.merged, false);
 });
 
-test('a lane PR keeps its review requirement and is never queued', (t) => {
+test('a lane PR keeps its review requirement and is never left to Mergify', (t) => {
   const result = mergePr(t, { opener: 'xiechimon', gateExit: 3, ref: 'lane/12' });
   assert.notEqual(result.status, 0);
-  assert.equal(result.queued, false);
+  assert.equal(result.commented, false);
   assert.equal(result.merged, false);
 });

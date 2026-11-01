@@ -6,6 +6,10 @@ queue_rules:
       - -draft
       - -label = needs-decision
       - -label = owner-route
+      - or:
+          - -head ~= ^B[0-9]+/
+          - label = queue-admit
+      - check-success = commit-author
       - status-success = review-gate
       - check-success = merge-route
       - or:
@@ -58,6 +62,8 @@ queue_rules:
     batch_size: 5
     batch_max_wait_time: 3 min
     max_checks_retries: 1
+    branch_protection_injection_mode: none
+    merge_bot_account: xiechimon
   - name: bot
     queue_conditions:
       - author = cairnwright[bot]
@@ -66,6 +72,10 @@ queue_rules:
       - -draft
       - -label = needs-decision
       - -label = owner-route
+      - or:
+          - -head ~= ^B[0-9]+/
+          - label = queue-admit
+      - check-success = commit-author
       - status-success = review-gate
       - check-success = merge-route
       - or:
@@ -118,6 +128,17 @@ queue_rules:
     batch_size: 5
     batch_max_wait_time: 3 min
     max_checks_retries: 1
+    branch_protection_injection_mode: none
+    merge_bot_account: xiechimon
+merge_protections_settings:
+  auto_merge_conditions: true
+merge_protections:
+  - name: queue entry needs the review gate and pr-gate routing
+    if:
+      - base = main
+    success_conditions:
+      - status-success = review-gate
+      - check-success = merge-route
 merge_queue:
   mode: parallel
   max_parallel_checks: 3
