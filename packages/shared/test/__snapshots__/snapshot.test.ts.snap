@@ -1339,6 +1339,13 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
         "gateLoosening": {
           "type": "boolean",
         },
+        "sizeAssessment": {
+          "enum": [
+            "accepted",
+            "split-needed",
+          ],
+          "type": "string",
+        },
       },
       "required": [
         "conclusion",
@@ -6818,7 +6825,8 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > merge-gate blocke
   "compare-malformed: human, compare 的响应形状不对，或它的 SHA（请求的 head、提交、父提交）写错",
   "compare-truncated: human, compare 文件列表被截断",
   "patch-unbindable: human, 补丁无法取摘要（证据之外没有文件，或有文件缺 blob sha）",
-  "size-cap: human, 补丁超过 800 行或 40 个文件",
+  "size-cap: human, 本地补丁超过 800 行或 40 个文件",
+  "size-review: transient, 补丁超过 800 行或 40 个文件：PR 正文要有 ## Size 小节，且当前补丁要有评审明确接受这个规模",
   "independent-review-missing: transient, Protected changes require a bound independent review",
   "outside-auto-merge: human, 改动在可自动合并集之外",
   "opaque-file: human, 证据目录外有看不到 diff 的文件（二进制、diff 过大或纯改名）",

@@ -53,7 +53,7 @@ function ok(body: unknown): GateRaw {
 
 function scriptedPort(
   statuses: { sha: string; state: string; description: string }[],
-  options: { checksPending?: boolean; forked?: boolean } = {},
+  options: { checksPending?: boolean; forked?: boolean; additions?: number; body?: string } = {},
 ): GateGithubPort {
   const shot = 'docs/verify/1794/shot.png';
   const pull = {
@@ -63,7 +63,7 @@ function scriptedPort(
     draft: false,
     changed_files: 2,
     mergeable_state: 'clean',
-    body: `evidence: https://raw.githubusercontent.com/${OWNER}/${REPO}/${HEAD}/${shot}`,
+    body: `evidence: https://raw.githubusercontent.com/${OWNER}/${REPO}/${HEAD}/${shot}${options.body ?? ''}`,
     head: {
       sha: HEAD,
       ref: 'lane/1794',
@@ -83,7 +83,7 @@ function scriptedPort(
         filename: 'apps/server/src/services/merge-gate/readiness.ts',
         status: 'modified',
         sha: '1'.repeat(40),
-        additions: 4,
+        additions: options.additions ?? 4,
         deletions: 1,
         patch: '@@ protected\n+gate\n',
       },
@@ -438,6 +438,141 @@ describe('in-product merge gate', () => {
       .run();
     const loosened = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
     expect(loosened?.blockers.map((b) => b.code)).toContain('review-blocking');
+  });
+
+  test("an oversize patch gets one size review carrying the Size justification; only that step's patch-bound acceptance clears the size review, not one volunteered by an ordinary review", async () => {
+    const { s, buildId, stepId, reviewerId } = await world();
+    completeStep(s.svc, stepId, { hasChanges: true });
+    s.db.update(todo).set({ phase: 'review' }).where(eq(todo.id, 'todo-1794')).run();
+    const reviewsOf = () =>
+      s.db
+        .select()
+        .from(step)
+        .where(eq(step.buildId, buildId))
+        .all()
+        .filter((row) => row.kind === 'review')
+        .sort((a, b) => a.createdAt - b.createdAt);
+    const generic = reviewsOf()[0];
+    expect(generic).toBeDefined();
+    s.db
+      .update(step)
+      .set({ status: 'done', finishedAt: 2 })
+      .where(eq(step.id, generic?.id ?? ''))
+      .run();
+    const digest = computePatchDigest(
+      compareFilesFromResponse({
+        files: [
+          {
+            filename: 'apps/server/src/services/merge-gate/readiness.ts',
+            status: 'modified',
+            sha: '1'.repeat(40),
+            additions: 900,
+            deletions: 1,
+            patch: '@@ protected\n+gate\n',
+          },
+          {
+            filename: 'docs/verify/1794/shot.png',
+            status: 'added',
+            sha: '2'.repeat(40),
+            additions: 0,
+            deletions: 0,
+          },
+        ],
+      }) ?? [],
+      { expectedFileCount: 2 },
+    ).patchDigest;
+    const bindReview = (id: string, verdict: Record<string, unknown>) => {
+      s.db
+        .insert(gateVerdict)
+        .values({
+          stepId: id,
+          buildId,
+          kind: 'review',
+          perspective: 'code_reviewer',
+          outcome: 'pass',
+          patchDigest: digest,
+          headSha: HEAD,
+          expectedHeadSha: HEAD,
+          createdAt: 3,
+        })
+        .onConflictDoNothing()
+        .run();
+      s.db
+        .delete(message)
+        .where(eq(message.id, `msg-verdict-${id}`))
+        .run();
+      s.db
+        .insert(message)
+        .values({
+          id: `msg-verdict-${id}`,
+          conversationId: buildId,
+          role: 'system',
+          content: JSON.stringify({
+            kind: REVIEW_VERDICT_KIND,
+            stepId: id,
+            verdict: {
+              conclusion: 'No blocking findings',
+              gateLoosening: false,
+              evalRulerChange: false,
+              findings: [],
+              ...verdict,
+            },
+          }),
+          createdAt: 3,
+        })
+        .run();
+    };
+    bindReview(generic?.id ?? '', { sizeAssessment: 'accepted' });
+    const sizeDetail = async (body: string) =>
+      (
+        await evaluateMergeGate(s.svc, buildId, {
+          port: scriptedPort([], { additions: 900, body }),
+        })
+      )?.blockers.find((b) => b.code === 'size-review')?.detail;
+
+    expect(await sizeDetail('')).toEqual([
+      '901 lines, 1 files',
+      'the PR body has no ## Size section',
+      'no passing review on this patch accepts its size',
+    ]);
+    expect(reviewsOf()).toHaveLength(1);
+
+    const SIZE = '\n\n## Size\nThe gate and its callers must change together.\n';
+    expect(await sizeDetail(SIZE)).toEqual([
+      '901 lines, 1 files',
+      'no passing review on this patch accepts its size',
+    ]);
+    const sizeReview = reviewsOf()[1];
+    expect(reviewsOf()).toHaveLength(2);
+    const meta = parseReviewPromptMeta(sizeReview?.prompt ?? null);
+    expect(meta).toMatchObject({ agentId: reviewerId, sizeReview: true, expectedHeadSha: HEAD });
+    expect(sizeReview?.prompt ?? '').toContain('## Size review');
+    expect(sizeReview?.prompt ?? '').toContain('> The gate and its callers must change together.');
+    expect(sizeReview?.prompt ?? '').toContain('901 lines in 1 non-evidence files');
+
+    await sizeDetail(SIZE);
+    s.db
+      .update(step)
+      .set({ status: 'done', finishedAt: 4 })
+      .where(eq(step.id, sizeReview?.id ?? ''))
+      .run();
+    await sizeDetail(SIZE);
+    expect(reviewsOf()).toHaveLength(2);
+
+    bindReview(sizeReview?.id ?? '', {});
+    expect(await sizeDetail(SIZE)).toEqual([
+      '901 lines, 1 files',
+      'no passing review on this patch accepts its size',
+    ]);
+    bindReview(sizeReview?.id ?? '', { sizeAssessment: 'split-needed' });
+    expect(await sizeDetail(SIZE)).toEqual([
+      '901 lines, 1 files',
+      'no passing review on this patch accepts its size',
+      'a review on this patch asks to split it',
+    ]);
+    bindReview(sizeReview?.id ?? '', { sizeAssessment: 'accepted' });
+    expect(await sizeDetail(SIZE)).toBeUndefined();
+    expect(reviewsOf()).toHaveLength(2);
   });
 
   test('spoken safety answers bind by step id when reviews finish out of creation order', async () => {

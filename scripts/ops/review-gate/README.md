@@ -16,8 +16,9 @@ Files:
 
 - `review-gate.mjs`: the timer script.
 - `prompt.txt`: the review prompt.
+- `size-facts.mjs`: counts non-evidence lines and files of the PR diff; the script writes the result into the prompt, and an oversize PR (over 800 lines or 40 files) makes the reviewer answer `Why is it this big:` from the PR body's `## Size` section.
 - `reviewer-route.mjs`: the fallback and stall decisions, imported by the script.
-- `verdict.test.mjs`, `glob.test.mjs`, `rearm.test.mjs`, `reviewer-route.test.mjs`, `fallback.test.mjs` (runs the script against a fake host): the checks the unit runs in `ExecStartPre` (`node verdict.test.mjs review-gate.mjs` from this directory; `fixture-1828.txt` is its input).
+- `size-facts.test.mjs`, `verdict.test.mjs`, `glob.test.mjs`, `rearm.test.mjs`, `reviewer-route.test.mjs`, `fallback.test.mjs` (runs the script against a fake host): the checks the unit runs in `ExecStartPre` (`node verdict.test.mjs review-gate.mjs` from this directory; `fixture-1828.txt` is its input).
 
 The host currently runs its own copy under `~/.cairn/tools/review-gate/`; this directory holds the same code so changes go through a PR. To run it from a checkout instead, point the unit's `ExecStart` and `ExecStartPre` at a checkout of `origin/main` with a drop-in.
 
