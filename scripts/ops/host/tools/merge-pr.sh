@@ -18,10 +18,13 @@ for issue in $(gh pr view "$pr" -R "$R" --json body,headRefName --jq '"\(.headRe
   open=$(node ~/.cairn/tools/merge-order/deps-open.mjs "$issue") || { echo "PR #$pr: issue #$issue still depends on open $open; merge those first" >&2; exit 1; }
 done
 node ~/.cairn/tools/review-gate/review-gate.mjs --check "$pr" >/dev/null 2>&1; prot=$?
+case "$(gh pr view "$pr" -R "$R" --json headRefName --jq .headRefName)" in lane/*) prot=0;; esac
 if [ $prot = 3 ] && [ "$(gh pr view "$pr" -R "$R" --json author --jq .author.login)" != app/cairnwright ]; then
+  labels=$(gh pr view "$pr" -R "$R" --json labels --jq '.labels[].name')
+  grep -qx dequeued <<<"$labels" && { echo "PR #$pr was dequeued by Mergify; a human decides before it is queued again" >&2; exit 1; }
+  grep -qx queued <<<"$labels" && exit 0
   gh pr comment "$pr" -R "$R" --body '@mergifyio queue'; exit $?
 fi
-case "$(gh pr view "$pr" -R "$R" --json headRefName --jq .headRefName)" in lane/*) prot=0;; esac
 if [ $prot != 3 ]; then
   head=$(gh pr view "$pr" -R "$R" --json headRefOid --jq .headRefOid)
   gh pr view "$pr" -R "$R" --json comments --jq '.comments[].body' | grep -A1 "review-gate:$head" | grep -q 'gate: PASS' \

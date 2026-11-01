@@ -31,7 +31,7 @@ function writeExecutable(path, content) {
   chmodSync(path, 0o755);
 }
 
-function mergePr(t, { opener, gateExit, commentError = false }) {
+function mergePr(t, { opener, gateExit, commentError = false, labels = [], ref = 'feature/x' }) {
   const home = mkdtempSync(join(tmpdir(), 'merge-pr-queue-'));
   t.after(() => rmSync(home, { recursive: true, force: true }));
   const calls = join(home, 'calls');
@@ -41,7 +41,8 @@ function mergePr(t, { opener, gateExit, commentError = false }) {
     JSON.stringify({
       commentError,
       view: {
-        headRefName: 'feature/x',
+        headRefName: ref,
+        labels: labels.map((name) => ({ name })),
         body: '',
         headRefOid: 'a'.repeat(40),
         author: { login: opener },
@@ -105,6 +106,28 @@ test('an unprotected bot-opened PR keeps the rebase route', (t) => {
 
 test('a protected human-opened PR without a passing review is never queued', (t) => {
   const result = mergePr(t, { opener: 'xiechimon', gateExit: 0 });
+  assert.notEqual(result.status, 0);
+  assert.equal(result.queued, false);
+  assert.equal(result.merged, false);
+});
+
+test('a PR Mergify already queued gets no second command', (t) => {
+  const result = mergePr(t, { opener: 'xiechimon', gateExit: 3, labels: ['queued'] });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.queued, false);
+  assert.equal(result.merged, false);
+});
+
+test('a PR Mergify dequeued is left for a human', (t) => {
+  const result = mergePr(t, { opener: 'xiechimon', gateExit: 3, labels: ['dequeued'] });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /dequeued/);
+  assert.equal(result.queued, false);
+  assert.equal(result.merged, false);
+});
+
+test('a lane PR keeps its review requirement and is never queued', (t) => {
+  const result = mergePr(t, { opener: 'xiechimon', gateExit: 3, ref: 'lane/12' });
   assert.notEqual(result.status, 0);
   assert.equal(result.queued, false);
   assert.equal(result.merged, false);
