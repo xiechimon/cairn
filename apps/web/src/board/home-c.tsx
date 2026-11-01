@@ -46,7 +46,9 @@ export function streamForProject(
   let turn: string | null = null;
   return stream.filter((item) => {
     if (item.kind === 'user') turn = item.projectId ?? null;
-    return turn === projectId;
+    return (
+      turn === projectId || (turn === null && item.kind === 'question' && item.status === 'pending')
+    );
   });
 }
 
@@ -60,7 +62,7 @@ function needsYouThreads(todos: readonly TodoRecord[]): TodoRecord[] {
   return todos
     .filter((todo) => {
       const status = threadStatus(todo);
-      return (status === 'needs-you' || status === 'failed') && todo.snoozeMode == null;
+      return (status === 'needs-you' || status === 'failed') && todo.archivedAt == null;
     })
     .sort((a, b) => actRank(a) - actRank(b) || b.phaseAt - a.phaseAt);
 }
@@ -133,7 +135,9 @@ export function HomeC({
       status: ACT_ORDER[actRank(todo)] ?? 'needs-you',
     })),
   ];
-  const running = scoped.filter((todo) => threadStatus(todo) === 'running');
+  const running = scoped.filter(
+    (todo) => threadStatus(todo) === 'running' && todo.archivedAt == null,
+  );
   const shown = allOpen ? entries : entries.slice(0, 1);
 
   const greeting = (

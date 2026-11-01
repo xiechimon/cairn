@@ -275,7 +275,6 @@ export function BoardSurface({
   const pendingTodos = viewTodos('pending');
   const pendingSplit = splitStale(pendingTodos, fixture.now);
   const staleCount = pendingSplit.stale.length;
-  const _startOfToday = new Date(fixture.now).setHours(0, 0, 0, 0);
   const filterEmpty = (
     <>
       <span className="text-sm text-muted-foreground">{t('没有匹配筛选条件的任务')}</span>

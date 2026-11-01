@@ -28,6 +28,20 @@ describe('the global Coordinator conversation filtered by project', () => {
     ]);
   });
 
+  it('a pending question from an untagged turn stays visible under any project', () => {
+    const stream = [
+      { kind: 'user' as const, text: 'Plan the week', projectId: null },
+      {
+        kind: 'question' as const,
+        requestId: 'q1',
+        status: 'pending' as const,
+        answers: null,
+        questions: [{ header: 'h', question: 'Which first?', options: [{ label: 'A' }] }],
+      },
+    ];
+    expect(streamForProject(stream, 'cairn').map((item) => item.kind)).toEqual(['question']);
+  });
+
   it('no project keeps the whole conversation', () => {
     expect(streamForProject(mapChiefStream(rows), null)).toHaveLength(5);
   });

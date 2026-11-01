@@ -229,7 +229,7 @@ export function BoardSidebar({
     const counts = new Map<string, number>();
     for (const todo of todos ?? []) {
       const status = threadStatus(todo);
-      if (status !== 'needs-you' && status !== 'failed') continue;
+      if ((status !== 'needs-you' && status !== 'failed') || todo.archivedAt != null) continue;
       counts.set(todo.projectId, (counts.get(todo.projectId) ?? 0) + 1);
     }
     return counts;
@@ -325,7 +325,7 @@ export function BoardSidebar({
           <Link
             {...railLink(
               { pathname: '/app', search: homeSearch },
-              selected === 'board' || selected === 'kanban',
+              (selected === 'board' || selected === 'kanban') && activeProject === null,
               homeLabel,
             )}
           >
@@ -458,7 +458,7 @@ export function BoardSidebar({
           <SidebarNavRow
             icon={<Inbox className="size-4" strokeWidth={STROKE} />}
             label={t('工作台')}
-            active={selected === 'board' || selected === 'kanban'}
+            active={(selected === 'board' || selected === 'kanban') && activeProject === null}
             onClick={() => navigate({ pathname: '/app', search: homeSearch })}
           />
           {attention > 0 && (

@@ -12,7 +12,7 @@ import { PROJECT_NAME } from '../fixtures/fixtures.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { PHASE_STATUS } from '../phase.js';
-import { COLUMNS, cardFace, sortColumnTodos, splitStale } from './columns.js';
+import { cardFace, splitStale } from './columns.js';
 import { relativeTime } from './rel-time.js';
 import { ATTENTION } from './todo-card.js';
 
@@ -23,7 +23,6 @@ export function withoutBoardView(search: string): string {
   params.delete(BOARD_VIEW_PARAM);
   return `?${params}`;
 }
-const _DONE_PREVIEW = 5;
 
 export interface RowContext {
   now: number;
@@ -61,11 +60,6 @@ function RowAction({
 
 function orchestrationFor(ctx: RowContext, todo: TodoRecord): CardOrchestration | null {
   return canOrchestrate(todo.phase) ? (ctx.orchestrationOf?.(todo) ?? null) : null;
-}
-
-function _columnTodos(columnId: string, todos: TodoRecord[]): TodoRecord[] {
-  const column = COLUMNS.find((c) => c.id === columnId);
-  return column == null ? [] : sortColumnTodos(column, todos.filter(column.accepts));
 }
 
 function TaskRow({
@@ -119,10 +113,6 @@ function RowList({ children }: { children: ReactNode }) {
       {children}
     </div>
   );
-}
-
-function _StatusGlyph({ icon: Icon, className }: { icon: LucideIcon; className: string }) {
-  return <Icon aria-hidden strokeWidth={1.75} className={cn('size-3.75', className)} />;
 }
 
 function Fold({

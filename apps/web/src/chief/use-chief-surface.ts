@@ -32,7 +32,11 @@ import {
   type GestureEvent,
   getGestureStore,
 } from '../overlay/gesture-machine.js';
-import { type CoordinatorLoad, coordinatorLoad } from './coordinator-load.js';
+import {
+  type CoordinatorLoad,
+  coordinatorLoad,
+  globalCoordinatorThread,
+} from './coordinator-load.js';
 
 export type { ChiefView };
 
@@ -105,10 +109,12 @@ export function useChiefSurface(
     } catch {}
   }, [live, onHome, chiefView]);
 
-  const [activeThreadIdx, setActiveThreadIdx] = useState<number | null>(null);
+  const [linkedThreadId, setLinkedThreadId] = useState<string | null>(null);
   const liveThreads = chiefThreadsQ.data ?? [];
-  const activeThread =
-    live && liveThreads.length > 0 ? (liveThreads[activeThreadIdx ?? 0] ?? null) : null;
+  const activeThread = live
+    ? ((onHome ? null : liveThreads.find((thread) => thread.id === linkedThreadId)) ??
+      globalCoordinatorThread(liveThreads))
+    : null;
   const deepLinkId = deepLink?.threadId ?? null;
   const onDeepLinkConsumed = deepLink?.onConsumed;
   useEffect(() => {
@@ -118,9 +124,8 @@ export function useChiefSurface(
       return;
     }
     if (!live || deepLinkId === null || !chiefThreadsQ.isSuccess) return;
-    const idx = liveThreads.findIndex((thread) => thread.id === deepLinkId);
-    if (idx >= 0) {
-      setActiveThreadIdx(idx);
+    if (liveThreads.some((thread) => thread.id === deepLinkId)) {
+      setLinkedThreadId(deepLinkId);
       if (!onHome) setChiefView('drawer');
     }
     onDeepLinkConsumed?.();
@@ -263,9 +268,7 @@ export function useChiefSurface(
     ? (text: string, projectId: string | null) => {
         return mutations.chiefSend
           .mutateAsync({ threadId: activeThread?.id ?? null, content: text, projectId })
-          .then(() => {
-            if (activeThread === null) setActiveThreadIdx(0);
-          })
+          .then(() => undefined)
           .catch((error: unknown) => {
             toastError(t('发送失败，请重试。'), error);
             throw error;

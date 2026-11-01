@@ -98,6 +98,12 @@ export function BoardPage() {
   const boardView = DEMO_MODE ? viewParam !== 'home' : viewParam === 'board';
   const homeView = !boardView && onlyColumn == null;
   const homeProjectId = searchParams.get('project');
+  const homeProjectName =
+    homeProjectId === null
+      ? null
+      : live
+        ? ((projectsQ.data ?? []).find((p) => p.id === homeProjectId)?.name ?? null)
+        : (fixture.projectNames?.[homeProjectId] ?? null);
   const rawProjects = searchParams.get('projects');
   const selectedProjects = useMemo(() => parseProjectsParam(rawProjects), [rawProjects]);
   const selectedProjectSet = useMemo(() => new Set(selectedProjects), [selectedProjects]);
@@ -629,14 +635,8 @@ export function BoardPage() {
             surface={chief}
             todos={todos}
             now={live ? Date.now() : fixtureWithTodos.now}
-            projectId={homeProjectId}
-            projectName={
-              homeProjectId === null
-                ? null
-                : live
-                  ? ((projectsQ.data ?? []).find((p) => p.id === homeProjectId)?.name ?? null)
-                  : (fixture.projectNames?.[homeProjectId] ?? null)
-            }
+            projectId={homeProjectName === null ? null : homeProjectId}
+            projectName={homeProjectName}
             banner={homeBanner}
             onNewTask={openNewTask}
           />
