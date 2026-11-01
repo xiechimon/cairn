@@ -1,0 +1,36 @@
+[heavy-slots] acquired slot 1/2
+[WebServer] (node:175) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] [plugin builtin:vite-reporter] 
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+[WebServer] (node:297) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 13 tests using 2 workers
+
+(node:350) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:349) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   2 e2e/detail-narrow.spec.ts:28:1 › N1: 320px degrades instead of clipping — no page overflow, no swallowed column scroll (393ms)
+  ✓   1 e2e/mobile-narrow.spec.ts:63:5 › 窄屏 360px › M3 detail: compact header controls and 44px composer controls (419ms)
+  ✓   3 e2e/detail-narrow.spec.ts:42:1 › N2: 360 and 390 keep the same law (469ms)
+  ✓   4 e2e/mobile-narrow.spec.ts:159:5 › 窄屏 360px › M7 审批弹层：合并对话框在视口内可关 (600ms)
+  ✓   5 e2e/detail-narrow.spec.ts:56:1 › N3: the degradation stops at 816px — the 3-pane shell survives above it (356ms)
+  ✓   6 e2e/mobile-narrow.spec.ts:63:5 › 窄屏 390px › M3 detail: compact header controls and 44px composer controls (372ms)
+  ✓   7 e2e/detail-narrow.spec.ts:81:1 › N4: the docked chief panel cannot re-overflow the 320px shell (708ms)
+  ✓   8 e2e/mobile-narrow.spec.ts:159:5 › 窄屏 390px › M7 审批弹层：合并对话框在视口内可关 (578ms)
+  ✓   9 e2e/detail-narrow.spec.ts:102:1 › N5: head actions and the composer stay inside the 320px viewport (311ms)
+{"width":390,"theme":"light","titleWidth":184,"controls":[{"label":"返回","left":12,"right":346,"top":9.5,"bottom":10.5},{"label":"审核","left":264,"right":94,"top":9.5,"bottom":10.5},{"label":"更多","left":302,"right":56,"top":9.5,"bottom":10.5},{"label":"完成","left":346,"right":12,"top":9.5,"bottom":10.5}]}
+  ✓  10 e2e/detail-narrow.spec.ts:127:5 › N6: 390px light header preserves title and control clearance (579ms)
+{"width":1440,"theme":"light","titleWidth":376,"controls":[{"label":"返回","left":260,"right":1152,"top":7.5,"bottom":8.5},{"label":"审核","left":825,"right":531,"top":7.5,"bottom":8.5},{"label":"更多","left":1338,"right":74,"top":7.5,"bottom":8.5},{"label":"完成","left":1378,"right":12,"top":5.5,"bottom":6.5}]}
+  ✓  11 e2e/detail-narrow.spec.ts:127:5 › N6: 1440px light header preserves title and control clearance (988ms)
+{"width":390,"theme":"dark","titleWidth":184,"controls":[{"label":"返回","left":12,"right":346,"top":9.5,"bottom":10.5},{"label":"审核","left":264,"right":94,"top":9.5,"bottom":10.5},{"label":"更多","left":302,"right":56,"top":9.5,"bottom":10.5},{"label":"完成","left":346,"right":12,"top":9.5,"bottom":10.5}]}
+  ✓  12 e2e/detail-narrow.spec.ts:127:5 › N6: 390px dark header preserves title and control clearance (516ms)
+{"width":1440,"theme":"dark","titleWidth":376,"controls":[{"label":"返回","left":260,"right":1152,"top":7.5,"bottom":8.5},{"label":"审核","left":825,"right":531,"top":7.5,"bottom":8.5},{"label":"更多","left":1338,"right":74,"top":7.5,"bottom":8.5},{"label":"完成","left":1378,"right":12,"top":5.5,"bottom":6.5}]}
+  ✓  13 e2e/detail-narrow.spec.ts:127:5 › N6: 1440px dark header preserves title and control clearance (546ms)
+
+  13 passed (7.4s)
