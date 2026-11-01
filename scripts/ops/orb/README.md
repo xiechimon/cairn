@@ -413,3 +413,55 @@ under `/run` until reboot. Unrelated administrative actions retain their
 existing authentication policy for named targets; unscoped machine-management
 actions receive no grant. Image builds use an exclusive lock and preserve
 staging trees with active or unreadable mounts.
+
+## Separate trial daemon
+
+The trial uses a second user unit from the main checkout. Install it as the
+checkout owner after the normal daemon deployment has produced `apps/daemon/dist`:
+
+```sh
+systemctl --user link "$HOME/Code/AgentProjects/cairn/scripts/ops/systemd/cairn-daemon-orb.service"
+systemctl --user daemon-reload
+systemctl --user enable --now cairn-daemon-orb.service
+journalctl --user -u cairn-daemon-orb.service -f
+```
+
+Ensure the user manager's PATH resolves the same Node executable used by the
+production daemon. If needed, add a drop-in with that executable's directory in
+PATH before starting the trial unit. Do not edit the production unit.
+
+The daemon prints an authorize URL during enrollment. Open that URL and have a
+team owner approve `omarchy-orb` on the web authorize page. Approval lets the
+waiting daemon save its own `machine.json`; never copy production credentials.
+Bind the active `orb-builder` agent to that approved machine with the
+`claude-code` runtime. Transfer the chosen issue with
+`node scripts/ops/transfer-to-cairn.mjs <issue> --agent orb-builder`.
+Preview the label and lane-list changes with `--dry-run` first. Every run prints
+the complete plan, including each list's prior contents, before applying changes.
+The transfer refuses an existing `~/lanes/cairn-<issue>` directory or a matching
+`ai-route run ... -C` process; `--lanes-dir` selects a different lane root.
+
+The transfer applies the GitHub label PATCH before editing local lists. List
+edits take an exclusive lock on `<state-dir>/lock2`, shared with the overnight
+driver, with a ten-second timeout (`--lock-timeout` changes it in seconds).
+When available, the runner invokes the `flock` binary. On macOS without `flock`,
+Python 3's `fcntl.flock` takes the same lock and holds it while the list writer
+runs. A timeout reports `overnight-lock-timeout` and the lock path. A changed list
+or write failure reports `list-edit-failed` and the remaining paths and intended
+contents. Labels remain applied: inspect the reported edits, then rerun to print
+a fresh plan and retry under the lock. Concurrently changed lists are preserved.
+
+The normal `deploy-self.sh` deployment also stops and starts
+`cairn-daemon-orb.service` when that unit is enabled, so both daemons reload the
+rebuilt checkout during deployment and rollback.
+
+`CAIRN_EXECUTOR=orb` selects Orb execution. `CAIRN_HOME` and
+`CAIRN_WORKSPACES_DIR` keep `machine.json`, the outbox, and workspaces beneath
+`%h/.cairn-orb-daemon`, separate from the default `%h/.cairn` state. The machine
+name comes from `--name omarchy-orb`. The server remains
+`http://127.0.0.1:8787`. The production `cairn-daemon.service` is untouched.
+Do not inherit a production `CAIRN_API_KEY` or `CAIRN_TEAM` in this user unit;
+use the authorize URL for the separate enrollment.
+
+Record live acceptance using [the trial evidence template](../../../docs/verify/b2-trial-one/README.md).
+Local fake tests do not establish Linux enrollment or Orb execution.

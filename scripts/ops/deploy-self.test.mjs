@@ -7,6 +7,7 @@ import {
   readdirSync,
   readFileSync,
   renameSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
@@ -54,7 +55,14 @@ function commit(work, message, { allowBuilds = 'esbuild: true', date } = {}) {
   writeFileSync(join(work, 'marker.txt'), `${message}\n`);
   mkdirSync(join(work, 'apps/server/src/db'), { recursive: true });
   writeFileSync(join(work, 'apps/server/src/db/client.ts'), '');
-  git(work, 'add', '.');
+  git(
+    work,
+    'add',
+    'pnpm-workspace.yaml',
+    'marker.txt',
+    'apps/server/src/db/client.ts',
+    ...(existsSync(join(work, 'package.json')) ? ['package.json'] : []),
+  );
   const env = date ? ['-c', `user.name=t`] : [];
   execFileSync('git', [...env, 'commit', '-q', '-m', message], {
     cwd: work,
@@ -132,7 +140,9 @@ sqlite3 "$db" "insert into __drizzle_migrations(hash) values ('m1')"`,
   fakeTool(
     bin,
     'systemctl',
-    `echo "systemctl $*" >> "${fake}/systemctl.log"
+    `if [ "$2" = is-enabled ]; then [ -f "${fake}/orb-enabled" ]; exit $?; fi
+echo "systemctl $*" >> "${fake}/systemctl.log"
+[ ! -f "${fake}/orb-$2-fail" ] || [ "$3" != cairn-daemon-orb.service ] || exit 1
 [ ! -f "${fake}/phase-on-start" ] || [ "$2" != start ] || echo "start $3 @ $(sed -n 's/^phase=//p' "${dir}/state/in-progress" 2>/dev/null)" >> "${fake}/phases.log"
 if [ "$2 $3" = "start cairn-server.service" ]; then
   head=$(git -C "${checkout}" rev-parse HEAD)
@@ -558,3 +568,74 @@ test('watch stays quiet when the undeployed commit is younger than the limit', (
   assert.equal(f.run(WATCH, [], { CAIRN_DEPLOY_SCRIPT: DEPLOY }).status, 0);
   assert.doesNotMatch(f.log('gh.log'), /issue (create|comment)/);
 });
+
+for (const broken of [false, true]) {
+  test(`restarts the enabled Orb daemon during deploy and rollback: ${broken}`, () => {
+    const f = fixture();
+    const target = pushTarget(f);
+    writeFileSync(join(f.fake, 'orb-enabled'), '');
+    mkdirSync(join(f.state, 'alarms'), { recursive: true });
+    for (const action of ['start', 'stop']) {
+      writeFileSync(join(f.state, 'alarms', `orb-unit-${action}-failed`), '');
+    }
+    if (broken) writeFileSync(join(f.fake, 'broken-sha'), target);
+    const result = f.run(DEPLOY, [target]);
+    assert.equal(result.status, broken ? 1 : 0, result.stderr);
+    const calls = f.log('systemctl.log').trim().split('\n');
+    assert.ok(calls.includes('systemctl --user stop cairn-daemon-orb.service'));
+    assert.ok(calls.includes('systemctl --user start cairn-daemon-orb.service'));
+    assert.ok(
+      calls.indexOf('systemctl --user start cairn-daemon-orb.service') >
+        calls.indexOf('systemctl --user start cairn-server.service'),
+    );
+    for (const action of ['start', 'stop']) {
+      assert.equal(existsSync(join(f.state, 'alarms', `orb-unit-${action}-failed`)), false);
+    }
+  });
+}
+
+test('Orb failures alert again after recovery while persistent failures stay deduplicated', () => {
+  const f = fixture();
+  writeFileSync(join(f.fake, 'orb-enabled'), '');
+  for (const action of ['start', 'stop']) {
+    writeFileSync(join(f.fake, `orb-${action}-fail`), '');
+  }
+  for (const name of ['first failure', 'persistent failure']) {
+    const result = f.run(DEPLOY, [pushTarget(f, name)]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(f.log('gh.log').match(/gh issue (create|comment)/g).length, 2);
+    for (const action of ['start', 'stop']) {
+      assert.equal(existsSync(join(f.state, 'alarms', `orb-unit-${action}-failed`)), true);
+    }
+  }
+  for (const action of ['start', 'stop']) unlinkSync(join(f.fake, `orb-${action}-fail`));
+  const unrelated = join(f.state, 'alarms', 'deploy-lag');
+  writeFileSync(unrelated, '');
+  const recovered = f.run(DEPLOY, [pushTarget(f, 'recovered')]);
+  assert.equal(recovered.status, 0, recovered.stderr);
+  assert.deepEqual(readdirSync(join(f.state, 'alarms')), ['deploy-lag']);
+  for (const action of ['start', 'stop']) {
+    writeFileSync(join(f.fake, `orb-${action}-fail`), '');
+  }
+  const failedAgain = f.run(DEPLOY, [pushTarget(f, 'failed again')]);
+  assert.equal(failedAgain.status, 0, failedAgain.stderr);
+  assert.equal(f.log('gh.log').match(/gh issue (create|comment)/g).length, 4);
+  assert.equal(existsSync(unrelated), true);
+});
+
+for (const action of ['start', 'stop']) {
+  test(`an Orb ${action} failure alerts without rolling back a healthy deploy`, () => {
+    const f = fixture();
+    const target = pushTarget(f);
+    writeFileSync(join(f.fake, 'orb-enabled'), '');
+    writeFileSync(join(f.fake, `orb-${action}-fail`), '');
+    const result = f.run(DEPLOY, [target]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), target);
+    assert.equal(JSON.parse(readFileSync(join(f.state, 'deployed.json'))).result, 'deployed');
+    assert.match(result.stderr, new RegExp(`orb-unit-${action}-failed`));
+    assert.match(f.log('gh.log'), /gh issue create .*Orb daemon/);
+    assert.equal(existsSync(join(f.state, 'failed', target)), false);
+    assert.doesNotMatch(result.stdout, /rolling back|restarting/);
+  });
+}
