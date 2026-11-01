@@ -19,7 +19,7 @@ const FROZEN_HEX: Record<'dark' | 'light', Record<string, string>> = {
     'accent-foreground': '#e6e8e2',
     destructive: '#f09a88',
     border: '#353b36',
-    input: '#434a44',
+    input: '#6b726c',
     ring: '#9cc78b',
     'text-secondary': '#b4bab3',
     'text-tertiary': '#959c96',

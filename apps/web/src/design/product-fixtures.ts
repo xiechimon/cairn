@@ -11,6 +11,7 @@ import {
 } from '@cairn/shared';
 import type { ChiefQuestionItem } from '../chief/chief-question-card.js';
 import type { CardOrchestration } from '../chief/orchestration-inflight.js';
+import type { AgentPickerOption } from '../components/agent-picker.js';
 import type { TagChipData } from '../components/ui/tag-chip.js';
 import type { TaskMetaFields } from '../detail/task-meta-block.js';
 import type {
@@ -41,6 +42,27 @@ const tagById = new Map(TAGS.map((tag) => [tag.id, tag]));
 export const tagOf = (id: string): TagChipData | null => tagById.get(id) ?? null;
 
 const BUILDER = { id: 'builder', displayName: 'builder' };
+
+export const GALLERY_AGENTS: AgentPickerOption[] = [
+  {
+    id: 'builder',
+    name: 'builder',
+    detail: 'Claude Code · claude-sonnet-5-5 · high',
+    summary: 'claude-sonnet-5-5 · high',
+  },
+  {
+    id: 'reviewer',
+    name: 'reviewer',
+    detail: 'Codex · gpt-6.1-sol · medium',
+    summary: 'gpt-6.1-sol · medium',
+  },
+  {
+    id: 'coordinator',
+    name: 'coordinator',
+    detail: 'Claude Code · claude-haiku-5-5 · Default',
+    summary: 'claude-haiku-5-5 · Default',
+  },
+];
 
 let seq = 40;
 
@@ -389,6 +411,7 @@ export const TASK_META: TaskMetaFields = {
   },
   branch: 'cairn/build-7f3a2c',
   pr: { number: 1190, url: 'https://github.com' },
+  owner: 'Ian',
   machine: 'studio-mac',
   machineWaiting: false,
   model: 'claude-sonnet-5-5',

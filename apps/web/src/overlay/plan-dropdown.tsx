@@ -1,20 +1,16 @@
 import { cn } from 'cn';
+import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { Button } from '../components/ui/button.js';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '../components/ui/dropdown-menu.js';
+import { DropdownMenu, DropdownMenuTrigger } from '../components/ui/dropdown-menu.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronDown, DiffSquare, FileText } from '../icons/index.js';
 
 export type DocTypeLabel = '方案' | '变更';
 export type DocView = 'plan' | 'changes';
 
-const VIEWS: Array<{ view: DocView; label: DocTypeLabel }> = [
-  { view: 'plan', label: '方案' },
-  { view: 'changes', label: '变更' },
+const VIEWS: Array<{ view: DocView; label: DocTypeLabel; shortcut: string }> = [
+  { view: 'plan', label: '方案', shortcut: 'P' },
+  { view: 'changes', label: '变更', shortcut: 'C' },
 ];
 
 export function PaneTitle({
@@ -34,13 +30,13 @@ export function PaneTitle({
         {t(docLabel)}
         <ChevronDown width={12} height={12} className="text-(--text-tertiary)" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" side="bottom" sideOffset={4} className="w-36">
-        {VIEWS.map(({ view, label }) => (
-          <DropdownMenuItem key={view} onClick={() => onDocView(view)}>
+      <KeyedMenuContent align="start" side="bottom" sideOffset={4} className="w-36">
+        {VIEWS.map(({ view, label, shortcut }) => (
+          <KeyedMenuItem key={view} shortcut={shortcut} onClick={() => onDocView(view)}>
             {t(label)}
-          </DropdownMenuItem>
+          </KeyedMenuItem>
         ))}
-      </DropdownMenuContent>
+      </KeyedMenuContent>
     </DropdownMenu>
   );
 }

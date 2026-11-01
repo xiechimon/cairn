@@ -90,33 +90,39 @@ async function holdMembers(page: Page) {
 
 async function openRow(page: Page, todoId: string) {
   await page.goto(`/app/todo/${todoId}`);
-  await page.getByTestId('phase-chip').click();
-  const popover = page.locator('.chip-popover');
+  await page.getByTestId('agent-chip').click();
+  const popover = page.getByTestId('agent-picker');
   await expect(popover).toBeVisible();
-  return { popover, row: popover.locator('[data-row-kind="agent"][data-selected]') };
+  return popover;
 }
 
-async function expectAgentLine(row: Locator, name: string, model?: string) {
-  const lines = row.locator('.truncate');
+function agentRow(popover: Locator, name: string) {
+  return popover.getByRole('option').filter({ hasText: name });
+}
+
+async function expectAgentLine(popover: Locator, name: string, model?: string) {
+  const row = agentRow(popover, name);
+  await expect(row).toHaveCount(1);
+  const lines = row.locator('span.flex-col > span');
   await expect(lines.first()).toHaveText(name);
   if (model === undefined) await expect(lines).toHaveCount(1);
   else await expect(lines.nth(1)).toHaveText(model);
 }
 
-/** evidencePanelShot after the popover's enter fade; regression runs skip both. */
 async function shot(page: Page, name: string) {
   if (process.env.CAIRN_E2E_EVIDENCE === undefined) return;
   await page.waitForTimeout(300);
-  await evidencePanelShot(page, name, page.locator('.chip-popover'));
+  await evidencePanelShot(page, name, page.getByTestId('agent-picker'));
 }
 
-test('unassigned todo: `未指派` alone, no model segment', async ({ page }) => {
+test('unassigned todo: the chip reads `未指派` and no row is selected', async ({ page }) => {
   await stubLiveBoot(page);
   await serveMembers(page);
-  const { popover, row } = await openRow(page, 'todo-0');
-  await expect(popover).toContainText('model line probe 0');
+  const popover = await openRow(page, 'todo-0');
+  await expect(page.getByTestId('agent-chip')).toContainText('未指派');
+  await expect(popover.getByRole('option', { selected: true })).toHaveCount(0);
   await shot(page, 'unassigned.png');
-  await expectAgentLine(row, '未指派');
+  await expectAgentLine(popover, 'Alpha', 'gpt-5.5 · 默认');
 });
 
 test('assigned agent: its own model and thinking level, not another member’s', async ({
@@ -125,61 +131,52 @@ test('assigned agent: its own model and thinking level, not another member’s',
   await stubLiveBoot(page);
   await serveMembers(page);
   const beta = await openRow(page, 'todo-1');
-  await expect(beta.popover).toContainText('model line probe 1');
+  await expect(page.getByTestId('agent-chip')).toContainText('Beta');
   await shot(page, 'assigned-thinking-level.png');
-  await expectAgentLine(beta.row, 'Beta', 'qwen3.8-max · high');
-
-  const alpha = await openRow(page, 'todo-2');
-  await expect(alpha.popover).toContainText('model line probe 2');
-  await shot(page, 'assigned-default-level.png');
-  await expectAgentLine(alpha.row, 'Alpha', 'gpt-5.5 · 默认');
+  await expectAgentLine(beta, 'Beta', 'qwen3.8-max · high');
+  await expect(agentRow(beta, 'Beta')).toHaveAttribute('aria-selected', 'true');
+  await expectAgentLine(beta, 'Alpha', 'gpt-5.5 · 默认');
 });
 
 test('agent without a model configured: the name alone', async ({ page }) => {
   await stubLiveBoot(page);
   await serveMembers(page);
-  const { popover, row } = await openRow(page, 'todo-3');
-  await expect(popover).toContainText('model line probe 3');
-  await expect(popover).toContainText('Gamma');
-  await expectAgentLine(row, 'Gamma');
+  const popover = await openRow(page, 'todo-3');
+  await expect(page.getByTestId('agent-chip')).toContainText('Gamma');
+  await expectAgentLine(popover, 'Gamma');
   await expect(popover).not.toContainText(FIXTURE_MODEL);
 });
 
-test('members pending: the name alone, then the model fills in', async ({ page }) => {
+test('members pending: no rows yet, then the model fills in', async ({ page }) => {
   await stubLiveBoot(page);
   const members = await holdMembers(page);
-  const { popover, row } = await openRow(page, 'todo-1');
+  const popover = await openRow(page, 'todo-1');
   await expect.poll(members.count).toBeGreaterThan(0);
-  await expect(popover).toContainText('model line probe 1');
+  await expect(page.getByTestId('agent-chip')).toContainText('Beta');
+  await expect(popover.getByRole('option')).toHaveCount(0);
   await shot(page, 'members-pending.png');
-  await expectAgentLine(row, 'Beta');
 
   await members.release();
-  await expectAgentLine(row, 'Beta', 'qwen3.8-max · high');
+  await expectAgentLine(popover, 'Beta', 'qwen3.8-max · high');
 });
 
-test('members read failed: the name alone', async ({ page }) => {
+test('members read failed: the chip keeps the name, the picker stays empty', async ({ page }) => {
   await stubLiveBoot(page);
   let answered = 0;
   await page.route('**/api/teams/team-1/members', (route) => {
     answered += 1;
     return route.fulfill({ status: 500, json: { error: 'e2e stub: members read failed' } });
   });
-  const { popover, row } = await openRow(page, 'todo-1');
-  await expect(popover).toContainText('model line probe 1');
-  // React Query's single retry answered and painted
+  const popover = await openRow(page, 'todo-1');
+  await expect(page.getByTestId('agent-chip')).toContainText('Beta');
   await expect.poll(() => answered, { timeout: 10_000 }).toBeGreaterThanOrEqual(2);
-  await page.evaluate(
-    () => new Promise<void>((res) => requestAnimationFrame(() => requestAnimationFrame(() => res()))),
-  );
-  await expectAgentLine(row, 'Beta');
+  await expect(popover.getByRole('option')).toHaveCount(0);
 });
 
 test('en locale: the null thinking level reads Default', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn.locale', 'en'));
   await stubLiveBoot(page);
   await serveMembers(page);
-  const { popover, row } = await openRow(page, 'todo-2');
-  await expect(popover).toContainText('model line probe 2');
-  await expectAgentLine(row, 'Alpha', 'gpt-5.5 · Default');
+  const popover = await openRow(page, 'todo-2');
+  await expectAgentLine(popover, 'Alpha', 'gpt-5.5 · Default');
 });

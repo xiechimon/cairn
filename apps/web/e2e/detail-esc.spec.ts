@@ -5,10 +5,10 @@ const BOARD = /\/app\?scenario=27$/;
 
 const head = (page: import('@playwright/test').Page) => page.getByTestId('detail-head');
 const chip = (page: import('@playwright/test').Page) =>
-  head(page).locator('button[aria-expanded]');
+  head(page).getByTestId('phase-chip');
 
 const popover = (page: import('@playwright/test').Page) =>
-  page.getByRole('dialog', { name: '任务分配' });
+  page.getByRole('dialog', { name: '任务状态' });
 const confirmDialog = (page: import('@playwright/test').Page) => page.locator('.delete-confirm');
 
 test('E1: clean ESC leaves the detail, carrying the search home', async ({ page }) => {
@@ -17,7 +17,7 @@ test('E1: clean ESC leaves the detail, carrying the search home', async ({ page 
   await expect(page).toHaveURL(BOARD);
 });
 
-test('E2: ESC with the chip popover open closes the popover first', async ({ page }) => {
+test('E2: ESC with the status menu open closes the popover first', async ({ page }) => {
   await page.goto(DETAIL);
   await chip(page).click();
   await expect(popover(page)).toBeVisible();

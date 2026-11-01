@@ -4,13 +4,11 @@ const ROUTE = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=19';
 
 async function openAssignDialog(page: Page) {
   await page.goto(ROUTE);
-
-  const popover = page.getByRole('dialog', { name: '任务分配' });
-  await expect(popover).toBeVisible();
-  await popover.getByRole('button', { name: '编辑分配' }).click();
+  await expect(page.getByTestId('detail-head')).toBeVisible();
+  await page.keyboard.press('ControlOrMeta+k');
+  await page.getByRole('dialog', { name: '搜索' }).getByRole('button', { name: '编辑分配…' }).click();
   const dialog = page.getByRole('dialog', { name: '选择执行 Agent' });
   await expect(dialog).toBeVisible();
-  await expect(popover).toBeHidden();
   return dialog;
 }
 
@@ -25,16 +23,10 @@ test('edit assignment opens the agent pick dialog with search + bound row checke
   await expect(dialog.getByRole('option')).toHaveAttribute('aria-selected', 'true');
 });
 
-test('fixture pick closes the dialog (accept law); popover row echo unchanged', async ({ page }) => {
+test('fixture pick closes the dialog (accept law)', async ({ page }) => {
   const dialog = await openAssignDialog(page);
   await dialog.getByRole('option').click();
   await expect(page.getByRole('dialog', { name: '选择执行 Agent' })).toBeHidden();
-
-  await page.locator('.detail-chip').click();
-  const popover = page.getByRole('dialog', { name: '任务分配' });
-  await expect(popover).toBeVisible();
-
-  await expect(popover.locator('[data-selected]')).toContainText('r3-builder');
 });
 
 test('assign dialog family law: X, Escape and backdrop dismiss; panel clicks do not', async ({

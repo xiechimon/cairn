@@ -22,6 +22,8 @@ export interface ChiefAgentOption {
   id: string;
   name: string;
   model?: string;
+  provider?: string | null;
+  thinkingLevel?: string | null;
   avatarUrl?: string | null;
 }
 
@@ -32,12 +34,20 @@ export function assignOptionsFromMembers(members: readonly TeamMember[]): ChiefA
     .filter((m) => m.memberType === 'agent')
     .map((m) => {
       const actor = m.actor as
-        | { displayName?: string; modelId?: string | null; avatarUrl?: string | null }
+        | {
+            displayName?: string;
+            modelId?: string | null;
+            provider?: string | null;
+            thinkingLevel?: string | null;
+            avatarUrl?: string | null;
+          }
         | undefined;
       return {
         id: m.actorId,
         name: actor?.displayName ?? m.actorId,
         ...(actor?.modelId ? { model: actor.modelId } : {}),
+        provider: actor?.provider ?? null,
+        thinkingLevel: actor?.thinkingLevel ?? null,
         avatarUrl: actor?.avatarUrl ?? null,
       };
     });

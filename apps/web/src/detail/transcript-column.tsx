@@ -10,7 +10,6 @@ import {
 import type { TranscriptItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ArrowDown } from '../icons/index.js';
-import { QueuedMessages } from './queued-messages.js';
 import { SpecBlock } from './spec-block.js';
 import { type LiveStep, Transcript } from './transcript.js';
 
@@ -29,9 +28,6 @@ interface TranscriptColumnProps {
   onOpenPlan?: () => void;
   spec?: string;
   autoScroll: boolean;
-  queuedMessages?: { id: string; content: string; error?: string | null }[];
-  onCancelQueued?: (id: string, content: string) => Promise<unknown>;
-  onSteerQueued?: (id: string, content: string) => Promise<unknown>;
 }
 
 export const TranscriptColumn = forwardRef<TranscriptColumnHandle, TranscriptColumnProps>(
@@ -54,9 +50,6 @@ function TranscriptColumnInner({
   agent,
   onOpenPlan,
   spec,
-  queuedMessages,
-  onSteerQueued,
-  onCancelQueued,
   handleRef,
 }: Omit<TranscriptColumnProps, 'autoScroll'> & {
   handleRef: React.ForwardedRef<TranscriptColumnHandle>;
@@ -74,11 +67,6 @@ function TranscriptColumnInner({
             liveStep={liveStep}
             agent={agent}
             onOpenPlan={onOpenPlan}
-          />
-          <QueuedMessages
-            messages={queuedMessages ?? []}
-            onSteer={onSteerQueued}
-            onCancel={onCancelQueued}
           />
         </MessageScrollerContent>
       </FadeScrollerViewport>
