@@ -431,7 +431,10 @@ export function ProductDetailSection() {
             spec={
               'Add a toggle to Settings > Appearance.\n\nDone means the choice survives a reload.'
             }
-            onSaveSpec={(spec) => setLast(`Saved ${spec.length} characters`)}
+            onSaveSpec={(spec) => {
+              setLast(`Saved ${spec.length} characters`);
+              return Promise.resolve();
+            }}
             action="开始"
             onAction={() => setLast('start')}
           />
@@ -442,7 +445,7 @@ export function ProductDetailSection() {
             projectName={PROJECT_TITLE}
             agentOptions={GALLERY_AGENTS}
             spec=""
-            onSaveSpec={() => {}}
+            onSaveSpec={() => Promise.resolve()}
             action="开始"
             onAction={() => {}}
             actionInFlight

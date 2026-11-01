@@ -55,7 +55,7 @@ interface FreshBlockProps {
   onPickAgent?: (agentId: string) => void;
   agentRebindCopy?: string;
   spec: string;
-  onSaveSpec?: (spec: string) => Promise<unknown> | void;
+  onSaveSpec?: (spec: string) => Promise<unknown>;
   action?: string | null;
   onAction?: () => void;
   actionInFlight?: boolean;
@@ -66,7 +66,7 @@ function DescriptionBox({
   onSave,
 }: {
   spec: string;
-  onSave?: (spec: string) => Promise<unknown> | void;
+  onSave?: (spec: string) => Promise<unknown>;
 }) {
   const { t } = useI18n();
   const [draft, setDraft] = useState(spec);
