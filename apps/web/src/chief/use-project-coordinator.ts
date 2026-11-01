@@ -14,9 +14,32 @@ import { chiefDefault } from '../fixtures/fixtures.js';
 import type { ChiefContent, FixtureSet } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 
+export type CoordinatorLoad = 'loading' | 'error' | 'ready';
+
+interface QueryState {
+  isLoading: boolean;
+  isError: boolean;
+  data: unknown;
+}
+
+export function coordinatorLoad(input: {
+  chief: QueryState;
+  coordinator: QueryState;
+  messages: QueryState;
+  hasThread: boolean;
+}): CoordinatorLoad {
+  const needed = input.hasThread
+    ? [input.chief, input.coordinator, input.messages]
+    : [input.chief, input.coordinator];
+  if (needed.some((q) => q.isError && q.data === undefined)) return 'error';
+  if (needed.some((q) => q.isLoading)) return 'loading';
+  return 'ready';
+}
+
 export interface ProjectCoordinator {
   chiefData: ChiefContent;
-  loading: boolean;
+  load: CoordinatorLoad;
+  retry: () => void;
   sendError: string | null;
   onSend: (text: string) => Promise<void>;
   onRewind?: (messageId: string) => void;
@@ -86,7 +109,8 @@ export function useProjectCoordinatorSurface(
     const failure = fixture.projectHome?.sendError;
     return {
       chiefData: fixture.chief ?? chiefDefault,
-      loading: false,
+      load: 'ready',
+      retry: () => {},
       sendError: failure?.message ?? null,
       onSend: () => Promise.resolve(),
     };
@@ -100,7 +124,17 @@ export function useProjectCoordinatorSurface(
 
   return {
     chiefData: { ...(liveChief ?? chiefDefault), examples: undefined },
-    loading: chiefQ.isLoading || coordinatorQ.isLoading,
+    load: coordinatorLoad({
+      chief: chiefQ,
+      coordinator: coordinatorQ,
+      messages: messagesQ,
+      hasThread: threadId !== null,
+    }),
+    retry: () => {
+      void chiefQ.refetch();
+      void coordinatorQ.refetch();
+      if (threadId !== null) void messagesQ.refetch();
+    },
     sendError,
     onSend: (text: string) => {
       if (projectId === undefined) return Promise.resolve();

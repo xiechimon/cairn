@@ -1543,6 +1543,8 @@ export const EN: Record<string, string> = {
   '它可能已被删除，或链接不对。': 'It may have been deleted, or the link is wrong.',
   项目加载失败: 'Could not load the project',
   '请刷新页面重试。': 'Reload the page to try again.',
+  对话加载失败: 'Could not load the conversation',
+  '对话记录还在，重试一下。': 'Your conversation is still there. Try again.',
   Threads: 'Threads',
   '关闭 Threads': 'Close Threads',
   '需要你拍板、审阅或授权的。': 'Decisions, reviews and permission requests.',
