@@ -2,13 +2,7 @@ import type { CoordinatorPageQuery, CoordinatorPageResponse } from '@cairn/share
 import { and, desc, eq, lt, or, sql } from 'drizzle-orm';
 import { chiefMessage } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
-import {
-  type ChiefDeps,
-  chiefThreadView,
-  coordinatorThreadRow,
-  ensureChief,
-  turnProjectId,
-} from './chief.js';
+import { type ChiefDeps, chiefThreadView, coordinatorThreadRow, ensureChief } from './chief.js';
 
 function earlierThan(deps: ChiefDeps, threadId: string, messageId: string) {
   const cursor = deps.db
@@ -35,13 +29,13 @@ export function readCoordinatorPage(
       role: chiefMessage.role,
       content: chiefMessage.content,
       createdAt: chiefMessage.createdAt,
-      projectId: turnProjectId,
+      projectId: chiefMessage.projectId,
     })
     .from(chiefMessage)
     .where(
       and(
         eq(chiefMessage.threadId, thread.id),
-        query.projectId !== undefined ? sql`${turnProjectId} = ${query.projectId}` : undefined,
+        query.projectId !== undefined ? eq(chiefMessage.projectId, query.projectId) : undefined,
         query.before !== undefined ? earlierThan(deps, thread.id, query.before) : undefined,
       ),
     )

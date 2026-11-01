@@ -10,8 +10,9 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import { newUuidv7 } from '../src/lib/ids.js';
-import { upsertChiefMessage } from '../src/services/chief.js';
+import { enqueueChiefStep, triggerChiefWakes, upsertChiefMessage } from '../src/services/chief.js';
 import { dueSchedules } from '../src/services/schedules.js';
+import { getTodo } from '../src/services/todos.js';
 import { H, registerChiefHarness, relay } from './chief-harness.js';
 import { postProject, req } from './helpers.js';
 
@@ -315,6 +316,56 @@ describe('Coordinator page filter and cursor', () => {
     expect(filtered.messages.map((m) => m.id)).toEqual([a, `user-${a}`, 'reply-a']);
     const siteOnly = await readCoordinator(`?projectId=${site}`);
     expect(siteOnly.messages.map((m) => m.id)).toEqual([b, 'reply-b']);
+  });
+
+  test('rows of a wake turn stay untagged even after a later tagged user message', async () => {
+    const wake = enqueueChiefStep(H.s.svc, H.threadId, { prompt: 'gate facts', trigger: 'gate' });
+    H.s.db
+      .update(stepTable)
+      .set({ status: 'claimed', claimedAt: Date.now() })
+      .where(eq(stepTable.id, wake))
+      .run();
+    await sendToCoordinator('meanwhile, demo', H.projectId);
+    upsertChiefMessage(H.s.db, {
+      id: 'wake-reply',
+      threadId: H.threadId,
+      role: 'assistant',
+      content: 'r',
+      createdAt: Date.now() + 5,
+    });
+    upsertChiefMessage(H.s.db, {
+      id: `user-${wake}`,
+      threadId: H.threadId,
+      role: 'user',
+      content: 'p',
+      createdAt: Date.now() + 6,
+    });
+    const rows = H.s.db
+      .select()
+      .from(chiefMessage)
+      .where(eq(chiefMessage.threadId, H.threadId))
+      .all();
+    expect(rows.find((r) => r.id === 'wake-reply')?.projectId).toBeNull();
+    expect(rows.find((r) => r.id === `user-${wake}`)?.projectId).toBeNull();
+  });
+
+  test('a worker report carries its task project', async () => {
+    const created = (await relay('create_todo', {
+      projectId: H.projectId,
+      title: 'watched',
+      spec: '> watched',
+    })) as { id: string };
+    await relay('watch_todos', { todoIds: [created.id] });
+    H.s.db.update(todoTable).set({ phase: 'review' }).where(eq(todoTable.id, created.id)).run();
+    const deps = { db: H.s.db, hub: H.s.hub, user: H.s.user };
+    triggerChiefWakes(deps, getTodo(deps, created.id)!, 'done');
+    const report = H.s.db
+      .select()
+      .from(chiefMessage)
+      .where(eq(chiefMessage.threadId, H.threadId))
+      .all()
+      .find((r) => r.role === 'system');
+    expect(report?.projectId).toBe(H.projectId);
   });
 
   test('?before combines with ?projectId', async () => {

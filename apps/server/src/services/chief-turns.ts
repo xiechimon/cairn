@@ -34,6 +34,13 @@ export const CHIEF_ABANDONED_STEP_MS = 120_000;
 
 export const CHIEF_TURN_MAX_MS = 30 * 60_000;
 
+export const PICKED_PROJECT_OPEN = '【输入框选定项目：';
+
+export function pickedProjectIdOf(prompt: string | null): string | null {
+  if (prompt === null || !prompt.startsWith(PICKED_PROJECT_OPEN)) return null;
+  return /^[^\n]*（id: ([^）\n]+)）】\n/.exec(prompt)?.[1] ?? null;
+}
+
 export interface ChiefTurnDeps {
   db: Db;
   machineHub?: MachineWakeHub;
@@ -415,6 +422,7 @@ export function recordChiefStop(
     threadId: stepRow.buildId,
     role: 'system' as const,
     content: JSON.stringify(content),
+    projectId: pickedProjectIdOf(stepRow.prompt),
     createdAt: nowMs(),
   };
   db.insert(chiefMessage)

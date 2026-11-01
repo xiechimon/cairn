@@ -105,6 +105,11 @@ test('per-project Coordinator threads merge into the one global thread per chief
     seedMessage(sqlite, { id: 'a2', threadId: 'chief-proj-a', createdAt: 140 });
     seedMessage(sqlite, { id: 'b1', threadId: 'chief-proj-b', createdAt: 120 });
     seedMessage(sqlite, { id: 'g2', threadId: 'chief-global', createdAt: 130, projectId: 'pb' });
+    sqlite
+      .prepare(
+        "INSERT INTO chief_message (id, threadId, role, content, createdAt) VALUES ('g2r', 'chief-global', 'assistant', '\"r\"', 131), ('user-o1', 'chief-old-global', 'user', '\"p\"', 91)",
+      )
+      .run();
     seedMessage(sqlite, { id: 'o1', threadId: 'chief-old-global', createdAt: 90 });
     seedMessage(sqlite, { id: 'd1', threadId: 'chief-digest-chief-u1-t1', createdAt: 95 });
     seedMessage(sqlite, { id: 'u1', threadId: 'chief-u2-only', createdAt: 7 });
@@ -128,10 +133,12 @@ test('per-project Coordinator threads merge into the one global thread per chief
         .all(),
     ).toEqual([
       { id: 'o1', projectId: null },
+      { id: 'user-o1', projectId: null },
       { id: 'g1', projectId: null },
       { id: 'a1', projectId: 'pa' },
       { id: 'b1', projectId: 'pb' },
       { id: 'g2', projectId: 'pb' },
+      { id: 'g2r', projectId: 'pb' },
       { id: 'a2', projectId: 'pa' },
     ]);
     expect(

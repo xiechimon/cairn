@@ -56,6 +56,8 @@ import {
   chiefOutage,
   chiefPendingMessages,
   chiefThreadFallbackModel,
+  PICKED_PROJECT_OPEN,
+  pickedProjectIdOf,
   settleChiefActiveRun,
 } from './chief-turns.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
@@ -454,8 +456,6 @@ export function chiefBinding(
   }
 }
 
-const PICKED_PROJECT_OPEN = '【输入框选定项目：';
-
 function pickedProjectOf(
   db: ChiefDeps['db'],
   teamId: string,
@@ -486,12 +486,6 @@ export function requireUnarchivedProject(db: Db, projectId: string): void {
   if (row?.archivedAt != null) throw new HttpError(409, `project ${projectId} is archived`);
 }
 
-const transcriptPromptRowPattern = `${TRANSCRIPT_PROMPT_ROW_ID_PREFIX}%`;
-
-export const turnProjectId = sql<
-  string | null
->`coalesce(${chiefMessage.projectId}, case when ${chiefMessage.id} like ${transcriptPromptRowPattern} then (select x.projectId from chief_message x where x.threadId = ${chiefMessage.threadId} and x.id = substr(${chiefMessage.id}, ${TRANSCRIPT_PROMPT_ROW_ID_PREFIX.length + 1})) end)`;
-
 function requireRewindStaysInProject(
   db: Db,
   anchor: typeof chiefMessage.$inferSelect,
@@ -499,22 +493,19 @@ function requireRewindStaysInProject(
 ): void {
   if (laterIds.length === 0) return;
   const others = db
-    .selectDistinct({ projectId: turnProjectId })
+    .selectDistinct({ id: chiefMessage.projectId, name: project.name })
     .from(chiefMessage)
+    .leftJoin(project, eq(project.id, chiefMessage.projectId))
     .where(
-      and(inArray(chiefMessage.id, laterIds), sql`${turnProjectId} is not ${anchor.projectId}`),
+      and(
+        inArray(chiefMessage.id, laterIds),
+        isNotNull(chiefMessage.projectId),
+        sql`${chiefMessage.projectId} is not ${anchor.projectId}`,
+      ),
     )
     .all();
   if (others.length === 0) return;
-  const names = others.map((row) => {
-    if (row.projectId === null) return 'messages without a project';
-    const named = db
-      .select({ name: project.name })
-      .from(project)
-      .where(eq(project.id, row.projectId))
-      .get();
-    return `project ${named?.name ?? row.projectId}`;
-  });
+  const names = others.map((row) => `project ${row.name ?? row.id}`);
   throw new HttpError(
     409,
     `rewind would delete later turns of ${names.join(', ')}; rewind from a later message instead`,
@@ -1115,10 +1106,14 @@ export function finishChiefTurn(deps: { db: Db }, threadId: string, body: Machin
 }
 
 function writingTurnProjectId(db: Db, row: { id: string; threadId: string }): string | null {
-  const turnId = row.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX)
-    ? row.id.slice(TRANSCRIPT_PROMPT_ROW_ID_PREFIX.length)
+  const turn = row.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX)
+    ? db
+        .select({ prompt: step.prompt })
+        .from(step)
+        .where(eq(step.id, row.id.slice(TRANSCRIPT_PROMPT_ROW_ID_PREFIX.length)))
+        .get()
     : db
-        .select({ id: step.id })
+        .select({ prompt: step.prompt })
         .from(step)
         .where(
           and(
@@ -1130,15 +1125,8 @@ function writingTurnProjectId(db: Db, row: { id: string; threadId: string }): st
         )
         .orderBy(desc(step.claimedAt), sql`rowid desc`)
         .limit(1)
-        .get()?.id;
-  if (turnId === undefined) return null;
-  return (
-    db
-      .select({ projectId: chiefMessage.projectId })
-      .from(chiefMessage)
-      .where(and(eq(chiefMessage.id, turnId), eq(chiefMessage.threadId, row.threadId)))
-      .get()?.projectId ?? null
-  );
+        .get();
+  return pickedProjectIdOf(turn?.prompt ?? null);
 }
 
 export function upsertChiefMessage(

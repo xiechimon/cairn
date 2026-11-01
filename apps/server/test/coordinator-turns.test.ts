@@ -9,7 +9,11 @@ import {
   stopPending,
 } from '../src/db/schema.js';
 import { upsertChiefMessage } from '../src/services/chief.js';
-import { CHIEF_TURN_MAX_MS, sweepOverlongChiefTurns } from '../src/services/chief-turns.js';
+import {
+  CHIEF_TURN_MAX_MS,
+  recordChiefStop,
+  sweepOverlongChiefTurns,
+} from '../src/services/chief-turns.js';
 import { CORRECTION_PROMPT } from '../src/services/merge-gate/correction.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import { H, registerChiefHarness } from './chief-harness.js';
@@ -240,26 +244,42 @@ describe('rewind never cuts another project out of the shared transcript', () =>
     ).toHaveLength(2);
   });
 
-  test('a later untagged turn also refuses the rewind', async () => {
+  test('a later untagged turn does not block the rewind; a later tagged one after an untagged anchor does', async () => {
     const anchor = await send('plan demo', H.projectId);
     await send('general question');
-    expect((await rewind(anchor)).status).toBe(409);
+    expect((await rewind(anchor)).status).toBe(200);
+    H.s.db.update(chiefThread).set({ activeRun: null }).where(eq(chiefThread.id, H.threadId)).run();
+    const general = await send('another general question');
+    await send('back to demo', H.projectId);
+    const res = await rewind(general);
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { error: string }).error).toContain('demo');
+  });
+
+  test('a stop marker carries the stopped turn project', async () => {
+    const anchor = await send('plan demo', H.projectId);
+    const stopped = H.s.db.select().from(stepTable).where(eq(stepTable.id, anchor)).get();
+    if (!stopped) throw new Error('turn missing');
+    recordChiefStop({ db: H.s.db }, stopped);
+    const marker = H.s.db
+      .select()
+      .from(chiefMessage)
+      .where(eq(chiefMessage.id, `chief-stop-${anchor}`))
+      .get();
+    expect(marker?.projectId).toBe(H.projectId);
   });
 
   test('the daemon transcript rows of a turn belong to that turn, for rewind and the filter', async () => {
     const site = await postProject(H.s.app, 'cairn-site');
     const anchor = await send('plan demo', H.projectId);
     const at = Date.now();
-    H.s.db
-      .insert(chiefMessage)
-      .values({
-        id: `user-${anchor}`,
-        threadId: H.threadId,
-        role: 'user',
-        content: 'p',
-        createdAt: at,
-      })
-      .run();
+    upsertChiefMessage(H.s.db, {
+      id: `user-${anchor}`,
+      threadId: H.threadId,
+      role: 'user',
+      content: 'p',
+      createdAt: at,
+    });
     upsertChiefMessage(H.s.db, {
       id: `reply-${anchor}`,
       threadId: H.threadId,
@@ -272,16 +292,13 @@ describe('rewind never cuts another project out of the shared transcript', () =>
     ).json()) as { messages: { id: string }[] };
     expect(page.messages.map((m) => m.id)).toEqual([anchor, `user-${anchor}`, `reply-${anchor}`]);
     const siteTurn = await send('plan the site', site);
-    H.s.db
-      .insert(chiefMessage)
-      .values({
-        id: `user-${siteTurn}`,
-        threadId: H.threadId,
-        role: 'user',
-        content: 'p',
-        createdAt: Date.now() + 1,
-      })
-      .run();
+    upsertChiefMessage(H.s.db, {
+      id: `user-${siteTurn}`,
+      threadId: H.threadId,
+      role: 'user',
+      content: 'p',
+      createdAt: Date.now() + 1,
+    });
     expect((await rewind(anchor)).status).toBe(409);
     H.s.db.delete(chiefMessage).where(eq(chiefMessage.id, siteTurn)).run();
     H.s.db
