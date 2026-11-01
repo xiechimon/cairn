@@ -113,8 +113,12 @@ jobs:
               touch needs-decision.flag
               echo "FAIL needs-decision: a person has to remove the needs-decision label before this PR can merge"
               exit 1 ;;
+            *,coordinator-hold,*)
+              touch needs-decision.flag
+              echo "FAIL coordinator-hold: the coordinator asked for changes; this PR merges only after the author pushes them and the label is removed"
+              exit 1 ;;
           esac
-          echo "pr-decision: GREEN (no needs-decision label)"
+          echo "pr-decision: GREEN (no needs-decision or coordinator-hold label)"
 
       - name: Check the autonomy brake
         if: ${{ !cancelled() }}

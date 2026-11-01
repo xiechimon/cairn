@@ -72,7 +72,7 @@ fs.writeFileSync(counterFile, String(count + 1));
 const seq = d[key];
 const item = seq[Math.min(count, seq.length - 1)];
 if (item && item.error) process.exit(1);
-if (key === 'head') console.log(JSON.stringify({ head: { sha: item } }));
+if (key === 'head') console.log(JSON.stringify(typeof item === 'string' ? { head: { sha: item }, labels: [] } : { head: { sha: item.sha }, labels: item.labels.map((name) => ({ name })) }));
 else if (key === 'checks' || key === 'allChecks' || key === 'view') console.log(JSON.stringify(item));
 else console.log(JSON.stringify([item]));
 `,
@@ -224,6 +224,30 @@ test('head moved after PASS re-waits for the new head verdict', (t) => {
   assert.equal(result.status, 0, result.stderr);
   assert.equal(merges.length, 1);
   assert.equal(flag(merges[0], '--match-head-commit'), B);
+});
+
+test('a held PR never merges, even after a new head gets a PASS (the #2510 sequence)', (t) => {
+  const held = (head) => ({ sha: head, labels: ['coordinator-hold'] });
+  const { result, merges } = run(t, {
+    head: [held(A), held(B)],
+    comments: [[passComment(A)], [passComment(A), passComment(B)]],
+  });
+  assert.notEqual(result.status, 0);
+  assert.equal(merges.length, 0);
+  assert.match(result.stdout, /held by coordinator-hold/);
+});
+
+test('a hold added after the checks pass still stops the merge', (t) => {
+  const { merges } = run(t, { head: [A, { sha: A, labels: ['coordinator-hold'] }] });
+  assert.equal(merges.length, 0);
+});
+
+test('once the hold is removed the PR merges', (t) => {
+  const { result, merges } = run(t, {
+    head: [{ sha: A, labels: ['coordinator-hold'] }, A],
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(merges.length, 1);
 });
 
 test('multi-commit closing keywords are carried once', (t) => {
