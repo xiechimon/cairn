@@ -27,6 +27,7 @@ import { PHASE_UI } from '../phase.js';
 import {
   BUILD_CONTENT,
   CHANGES,
+  GALLERY_AGENTS,
   MENTION_GROUPS,
   MERGE_BLOCKED,
   MERGE_READY,
@@ -80,7 +81,19 @@ const HEADS: { label: string; todo: TodoRecord; reviewActive?: boolean; inFlight
   },
 ];
 
-const FRESH = todo({ title: 'Add a dark mode toggle to settings', phase: 'todo', phaseAt: NOW });
+const FRESH = todo({
+  title: 'Add a dark mode toggle to settings',
+  phase: 'todo',
+  phaseAt: NOW,
+  assignment: { agentId: 'builder' },
+  agent: { id: 'builder', displayName: 'builder' },
+});
+
+const FRESH_UNASSIGNED = todo({
+  title: 'Split the schedules page into tabs',
+  phase: 'todo',
+  phaseAt: NOW,
+});
 
 const READ_ONLY_REASON = '此任务为只读，请在实时工作区中打开后继续。';
 
@@ -95,7 +108,8 @@ function HeadSpecimen() {
     <Specimen
       title="Task header"
       note={
-        last ?? 'DetailHead: phase chip with its assignment popover, more menu and primary action'
+        last ??
+        'DetailHead: status chip with its status menu, agent chip with its picker, more menu and primary action'
       }
       stage="canvas"
       className="flex-col gap-y-4"
@@ -106,11 +120,14 @@ function HeadSpecimen() {
             <DetailHead
               todo={head.todo}
               projectName={PROJECT_TITLE}
-              agentModel={{ modelId: 'claude-sonnet-5-5', thinkingLevel: 'high' }}
+              now={NOW}
+              agentOptions={GALLERY_AGENTS}
+              onPickAgent={(id) => setLast(`Assign ${id}`)}
+              onMoveBack={() => setLast('Move back to To start')}
+              onMarkDone={() => setLast('Mark done')}
               reviewActive={head.reviewActive}
               actionInFlight={head.inFlight}
               onAction={() => setLast(`Primary action on #${head.todo.seqNum}`)}
-              onEditAssign={() => setLast('Edit assignment')}
               onMore={() => setMenuFor(head.label)}
               moreButtonRef={head === first ? moreRef : undefined}
             />
@@ -401,21 +418,41 @@ export function ProductDetailSection() {
       <HeadSpecimen />
       <Specimen
         title="Fresh task"
-        note="FreshBlock before the first run"
+        note="FreshBlock before the first run: properties, an editable description, then Start"
         stage="sheet"
         className="flex-col"
       >
-        <Labeled label="With tags and the start action">
+        <Labeled label="Described, with tags and the start action">
           <FreshBlock
             todo={FRESH}
+            projectName={PROJECT_TITLE}
             tags={TAGS.slice(0, 2)}
+            machineName="studio-mac"
+            agentOptions={GALLERY_AGENTS}
+            onPickAgent={(id) => setLast(`Assign ${id}`)}
+            agentRebindCopy="更换执行 Agent？后续运行将改由 <agent> 执行。"
+            spec={
+              'Add a toggle to Settings > Appearance.\n\nDone means the choice survives a reload.'
+            }
+            onSaveSpec={(spec) => {
+              setLast(`Saved ${spec.length} characters`);
+              return Promise.resolve();
+            }}
             action="开始"
             onAction={() => setLast('start')}
-            hasSpec
           />
         </Labeled>
-        <Labeled label="No description, orchestrating">
-          <FreshBlock todo={FRESH} action="开始" onAction={() => {}} actionInFlight />
+        <Labeled label="Empty description, no agent, orchestrating">
+          <FreshBlock
+            todo={FRESH_UNASSIGNED}
+            projectName={PROJECT_TITLE}
+            agentOptions={GALLERY_AGENTS}
+            spec=""
+            onSaveSpec={() => Promise.resolve()}
+            action="开始"
+            onAction={() => {}}
+            actionInFlight
+          />
         </Labeled>
       </Specimen>
       <Specimen title="Spec and meta" note="SpecBlock, TaskMetaBlock" stage="sheet">

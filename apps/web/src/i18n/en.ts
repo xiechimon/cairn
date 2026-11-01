@@ -302,10 +302,37 @@ export const EN: Record<string, string> = {
     'Notify you in the system notification center when a task needs you',
 
   // —— chip popover / plan dropdown (r7 19/20/29) ——
-  任务分配: 'Task assignment',
-  执行对话: 'Active run',
   未指派: 'Unassigned',
-  编辑分配: 'Edit assignment',
+  任务状态: 'Task status',
+  确认方案: 'Confirm plan',
+  构建中: 'Building',
+  移回待开始: 'Move back to To start',
+  标记为已完成: 'Mark done',
+  '点击开始后，Agent 会先写方案。': 'The agent writes a plan first once you start.',
+  '排队中，轮到它时会自动开始。': 'Queued. It starts on its own when its turn comes.',
+  '方案写好后，Agent 会把它移到确认方案。':
+    'The agent moves it to Confirm plan when the plan is ready.',
+  '你确认方案后，Agent 开始构建。': 'The agent starts building once you confirm the plan.',
+  '构建完成后，Agent 会把它移到审核。': 'The agent moves it to Review when the build is done.',
+  '审核无误后，你可以把它标记为已完成。': 'Mark it done once the review looks right.',
+  '任务已完成，发送消息即可继续。': 'The task is done. Send a message to continue.',
+  '这次运行失败了，可以重跑，或移回待开始。':
+    'This run failed. Rerun it, or move it back to To start.',
+  '任务已取消。': 'The task was cancelled.',
+  '更换 Agent 会重新开始当前这一步。': 'Switching agents restarts this step.',
+  '后续步骤会改由所选 Agent 执行。': 'Later steps will run on the agent you pick.',
+  '开始前更换 Agent，不会丢失任何内容。': 'Switching before you start loses nothing.',
+  '执行 Agent': 'Executing agent',
+  '分配给…': 'Assign to…',
+  编辑描述: 'Edit description',
+  '描述未能保存，内容仍保留在这里。':
+    'The description could not be saved. Your text is still here.',
+  '补充 Agent 需要知道的内容：设置放在哪里、做到什么程度算完成…':
+    'Add what the agent should know: where the setting lives, what done looks like…',
+  '{agent} 会先写方案，你确认之前不会改动任何东西。':
+    '{agent} writes a plan first; nothing changes until you confirm it.',
+  'Agent 会先写方案，你确认之前不会改动任何东西。':
+    'The agent writes a plan first; nothing changes until you confirm it.',
   面板视图: 'Pane view',
 
   // —— ⌘K search panel (r7 05/05b, r2 §8.4) ——
@@ -995,10 +1022,6 @@ export const EN: Record<string, string> = {
   失败: 'Failed',
   默认: 'Default',
   开始任务: 'Start task',
-  // XMON-55 P0 / #640: the hint that rides the 开始 button on the fresh brief
-  // —— 开始入口不再选机器/Agent，改为直发总管编排回合后派发。
-  '点开始后由总管编排派发，Agent 在你的机器上跑':
-    'The chief orchestrates and dispatches after you start — the agent runs on your machine',
   // #170 create-agent dialog family
   '创建 agent': 'Create agent',
   '输入 Agent 名称': 'Enter an agent name',
