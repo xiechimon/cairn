@@ -55,7 +55,7 @@ function seedOtherThread(threadId: string, userId: string): void {
       id: threadId,
       chiefId: `${threadId}-chief`,
       userId,
-      teamId: `${threadId}-team`,
+      teamId: H.teamId,
       title: 'other',
       createdAt: BASE_TIME,
       updatedAt: BASE_TIME,
