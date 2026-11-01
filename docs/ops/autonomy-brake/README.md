@@ -51,3 +51,32 @@ Red-first logs and green runtime logs are local under `/tmp/1405-*.log`. The tes
 After deployment, verify Actions can create the label and marker and disarm an armed test PR with the workflow token. Exercise a failed main `ci` run while omarchy is offline, observe the marker and sweep, and confirm scheduled execution continues without the host. Test an exact recovery PR and a tampered recovery PR against the live required check. Confirm successful main CI and an unpaused scheduled run perform no writes.
 
 On omarchy, deploy the server code, use the product pause against a test repository, observe the marker issue, and confirm server readiness returns `autonomy-paused` within the cache interval. Exercise main failure after a recorded autonomous merge and confirm the recovery branch, single revert commit, label, and PR appear without a merge or auto-merge request. Test a failed PR-label write followed by a polling retry. Confirm closing the GitHub marker clears the GitHub pause; clear a separately set product team pause in the product. GitHub and omarchy are unavailable to this sandbox, so all of these checks remain unverified.
+
+## Coordinator manual merge
+
+`scripts/coordinator-merge.mjs` is the coordinator's hand-run merge helper. It respects the brake like the batch merger and never arms auto-merge.
+
+```sh
+GITHUB_REPOSITORY=owner/repository node scripts/coordinator-merge.mjs 123 124
+```
+
+For each PR it polls up to 90 times, 60 seconds apart (`COORDINATOR_MERGE_ITERATIONS`, `COORDINATOR_MERGE_INTERVAL_MS`). Each iteration reads the current head; a `gh` or network error, or an empty head, retries on the next iteration and never changes state. It merges only when all of these hold on the current head:
+
+- The newest comment by `cairnwright[bot]` that starts with `<!-- review-gate:<head> -->` and an anchored `**Independent review gate: PASS**` (ordinary or carried over) or `BLOCK` line is a PASS. Comments by other users and verdicts quoted mid-comment are ignored. A BLOCK stops the helper with a nonzero exit.
+- Every `gh` call targets the repository named by `GITHUB_REPOSITORY` (`-R`), whatever `GH_REPO` or the checkout says.
+- At least 4 required checks are present and every one is success or skipped.
+- No `autonomy-paused` issue is open. A failed marker lookup counts as paused.
+
+The squash merge uses the first commit's subject plus ` (#n)`, the first commit's body plus every `closes|fixes|resolves #N` line from all commits that the body does not already contain, and `--match-head-commit <head>`. It then prints the PR state and merge SHA. If the head moves after a PASS, the next iteration waits for the new head's verdict. Exit is nonzero if any PR is blocked, times out, or fails to merge.
+
+```sh
+node --test scripts/coordinator-merge.test.mjs
+```
+
+### Recovery order after a bad autonomous merge (#2299)
+
+1. Pause the batch merger.
+2. Close the `autonomy-paused` brake issue so the forward fix may merge.
+3. Merge the forward fix with `node scripts/coordinator-merge.mjs <n>`.
+4. Wait for main CI to go green.
+5. Resume the batch merger.

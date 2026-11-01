@@ -1,17 +1,14 @@
 import type { AskUserAnswer } from '@cairn/shared';
 import { type CSSProperties, useContext } from 'react';
 import { Link } from 'react-router';
-import type { CurrentUser } from '../api/provider.js';
 import { ThinkingRow, ToolActivityRow } from '../components/chat/agent-rows.js';
-import { LiveRow, LiveSignal } from '../components/chat/live-row.js';
-import { TraceStepLine } from '../components/chat/trace-steps.js';
+import { LivePulse, LiveRow, LiveSignal } from '../components/chat/live-row.js';
+import { TraceGroup, TraceRows, type TraceStepItem } from '../components/chat/trace-steps.js';
 import { Bubble, BubbleContent } from '../components/ui/bubble.js';
 import { Button } from '../components/ui/button.js';
 import { Marker, MarkerContent } from '../components/ui/marker.js';
 import { Message, MessageContent } from '../components/ui/message.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
-import { SeededAvatar } from '../components/ui/seeded-avatar.js';
-import { Trace, TraceLine, TraceTitle } from '../components/ui/trace.js';
 import { ChatMarkdown } from '../detail/chat-markdown.js';
 import { TodoGlanceContext, TodoStatus } from '../detail/segments.js';
 import type {
@@ -21,22 +18,18 @@ import type {
   ChiefToolRow,
 } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { Check, ChevronDown, ChevronRight, Copy, FileText, Restore } from '../icons/index.js';
+import { Check, Copy, FileText, Restore } from '../icons/index.js';
 import { spiralAvatarUrl } from '../lib/spiral-avatar.js';
 import { mentionChipClass } from '../overlay/mention-chip.js';
 import { useOpenTaskInPlace } from '../task-panel/task-panel-root.js';
 import { ChiefDigestRow } from './chief-digest-row.js';
 import { ChiefIdentity } from './chief-identity.js';
 import { ChiefQuestionCard } from './chief-question-card.js';
-import { ChiefSpiralFace } from './chief-spiral-face.js';
-import { AVATAR_IMG_CLS, AVATAR_SLOT_CLS } from './recipes.js';
 
 const MSG_TOOL_BTN_CLS =
   "size-6 cursor-pointer rounded-none border-none bg-transparent text-(--text-tertiary) hover:bg-(--secondary) hover:text-(--text-secondary) dark:hover:bg-(--secondary) aria-expanded:bg-muted aria-expanded:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
 
-const TURN_TOOLS_CLS = 'mt-2 gap-1.5 border-l border-border py-0.5 pl-3';
-const TURN_TOOL_LINE_CLS =
-  'text-meta leading-5 text-content-secondary data-[status=error]:text-content-secondary data-[status=pending]:text-content-tertiary data-[status=pending]:opacity-100';
+const TURN_NOTE_CLS = 'px-3 py-2 text-meta leading-5 text-(--text-tertiary)';
 
 const MSG_COL_CLS =
   'min-w-0 flex-1 text-card-title leading-6 text-(--foreground) [&_.chat-para+.chat-para]:mt-0.5!';
@@ -44,15 +37,16 @@ const BUBBLE_MD_CLS = '[&>:first-child]:mt-0! [&>:last-child]:mb-0!';
 
 const SCROLLER_ITEM_STYLE: CSSProperties = { contentVisibility: 'visible' };
 
-const MSG_ROW_CLS = 'mt-3.5 gap-2.5';
-const MSG_ROW_IDENTITY_CLS = 'mt-3.5 flex-col gap-1.5';
+const MSG_ROW_CLS = 'mt-3.5';
 const MSG_COL_MID_CLS = `${MSG_COL_CLS} gap-0`;
 const MSG_COL_LIVE_CLS = 'min-w-0 flex-1 gap-0';
 
 const BUBBLE_WRAP_CLS = 'w-full max-w-full';
-const BUBBLE_USER_CLS = 'w-full rounded-(--radius-bubble) border-0 px-3 py-2.5 leading-6';
+const BUBBLE_USER_CLS =
+  'bubble-gradient w-fit max-w-full min-w-0 rounded-(--cds-radius-xl) px-3 py-2 text-card-title leading-6 break-words text-(--foreground)';
 const BUBBLE_ROBOT_CLS = 'w-full border-0 leading-6';
-const MARKER_NOTE_CLS = 'my-2.5 justify-center text-center text-meta text-(--text-tertiary)';
+const MARKER_NOTE_CLS = 'my-2.5 text-meta text-(--text-tertiary)';
+const MARKER_CONTENT_CLS = 'max-w-[85%]';
 const MARKER_ERROR_CLS =
   'my-2.5 flex-col items-start gap-0.5 rounded-(--radius-card) bg-danger-soft px-3 py-2.5 text-left text-meta text-(--destructive)';
 
@@ -118,21 +112,16 @@ function Segments({ segments }: { segments: ChiefSegment[] }) {
   );
 }
 
-function TurnToolLines({ tools }: { tools: ChiefToolRow[] | undefined }) {
-  const { t } = useI18n();
-  return tools?.map((tool, k) => (
-    <TraceStepLine
-      key={k}
-      density="compact"
-      failedLabel={t('失败')}
-      step={{
-        kind: 'tool',
-        name: tool.label,
-        status: tool.error === true ? 'failed' : 'done',
-        ...(tool.seconds !== undefined ? { secs: tool.seconds } : {}),
-      }}
-    />
-  ));
+function turnToolSteps(tools: ChiefToolRow[] | undefined): TraceStepItem[] {
+  return (tools ?? []).map((tool, k) => ({
+    id: k,
+    step: {
+      kind: 'tool',
+      name: tool.label,
+      status: tool.error === true ? 'failed' : 'done',
+      ...(tool.seconds !== undefined ? { secs: tool.seconds } : {}),
+    },
+  }));
 }
 
 function HandoffRow({ todoId }: { todoId: string }) {
@@ -141,8 +130,8 @@ function HandoffRow({ todoId }: { todoId: string }) {
   const openInPlace = useOpenTaskInPlace();
   return (
     <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>
-      <Marker className={MARKER_NOTE_CLS} data-testid="chief-handoff">
-        <MarkerContent>
+      <Marker variant="separator" className={MARKER_NOTE_CLS} data-testid="chief-handoff">
+        <MarkerContent className={MARKER_CONTENT_CLS}>
           {t('已转给任务')}
           <Link
             to={`/app/todo/${todoId}`}
@@ -182,7 +171,6 @@ interface ChiefStreamRowProps {
   bound: ChiefContent['bound'];
   agent: ChiefContent['agent'];
   runningTool: ChiefContent['runningTool'];
-  user: CurrentUser;
   copiedKey: string | null;
   onCopy: (key: string, text: string) => void;
   toolsOpen: ReadonlySet<number>;
@@ -198,8 +186,8 @@ function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string
   const { t } = useI18n();
   return (
     <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>
-      <Marker className={MARKER_NOTE_CLS} data-testid="chief-stopped">
-        <MarkerContent>
+      <Marker variant="separator" className={MARKER_NOTE_CLS} data-testid="chief-stopped">
+        <MarkerContent className={MARKER_CONTENT_CLS}>
           {todos.length === 0 ? (
             t('已停止，没有建任务。')
           ) : (
@@ -228,7 +216,6 @@ export function ChiefStreamRow({
   bound,
   agent,
   runningTool,
-  user,
   copiedKey,
   onCopy,
   toolsOpen,
@@ -244,8 +231,8 @@ export function ChiefStreamRow({
   if (item.kind === 'thread-report')
     return (
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
-        <Marker className={MARKER_NOTE_CLS} data-testid="thread-report-marker">
-          <MarkerContent>
+        <Marker variant="separator" className={MARKER_NOTE_CLS} data-testid="thread-report-marker">
+          <MarkerContent className={MARKER_CONTENT_CLS}>
             <Link to={`/app/todo/${item.todoId}`} className="hover:underline">
               {t('来自任务 #{n} {title} 的消息', { n: item.seqNum, title: item.title })}
             </Link>
@@ -268,8 +255,8 @@ export function ChiefStreamRow({
   if (item.kind === 'note')
     return (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>
-        <Marker className={MARKER_NOTE_CLS}>
-          <MarkerContent>
+        <Marker variant="separator" className={MARKER_NOTE_CLS}>
+          <MarkerContent className={MARKER_CONTENT_CLS}>
             {t(item.text)}
             {item.machineName && (
               <>
@@ -285,28 +272,21 @@ export function ChiefStreamRow({
     return (
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
         <Message
-          className={`${MSG_ROW_CLS} ${item.pending != null ? 'opacity-80' : ''}`}
+          className={`${MSG_ROW_CLS} justify-end ${item.pending != null ? 'opacity-80' : ''}`}
           data-testid={item.pending != null ? 'chief-pending' : 'chief-msg'}
           data-pending={item.pending}
         >
-          <span className={AVATAR_IMG_CLS}>
-            <SeededAvatar
-              className="size-6"
-              name={user.displayName}
-              src={user.avatarUrl}
-              fallback="/avatar-user.png"
-            />
-          </span>
-          <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
-            <Bubble variant="secondary" className={BUBBLE_WRAP_CLS}>
-              <BubbleContent
-                data-testid="chief-bubble"
-                data-md={item.markdown != null ? '' : undefined}
-                className={`${BUBBLE_USER_CLS} ${item.markdown != null ? BUBBLE_MD_CLS : ''}`}
-              >
-                {item.markdown != null ? <ChatMarkdown text={item.markdown} /> : item.text}
-              </BubbleContent>
-            </Bubble>
+          <MessageContent
+            className="max-w-[min(85%,42rem)] flex-none items-end gap-0"
+            data-testid="chief-msg-col"
+          >
+            <div
+              data-testid="chief-bubble"
+              data-md={item.markdown != null ? '' : undefined}
+              className={`${BUBBLE_USER_CLS} ${item.markdown != null ? BUBBLE_MD_CLS : ''}`}
+            >
+              {item.markdown != null ? <ChatMarkdown text={item.markdown} /> : item.text}
+            </div>
             {item.pending != null ? (
               <div className="mt-1.5 flex flex-wrap items-center justify-end gap-1.5 text-meta text-(--text-tertiary)">
                 <span className="mr-auto">
@@ -335,9 +315,14 @@ export function ChiefStreamRow({
               </div>
             ) : (
               <div
-                className="mt-2 flex gap-2.5 text-(--text-tertiary)"
+                className="mt-1 flex items-center gap-1 text-(--text-tertiary) opacity-0 transition-opacity duration-(--dur-fast) group-hover/message:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100"
                 data-testid="chief-msg-tools"
               >
+                {item.at != null && (
+                  <span className="mr-1.5 text-caption tabular-nums" data-testid="chief-msg-stamp">
+                    {item.at}
+                  </span>
+                )}
                 <Button
                   variant="ghost"
                   size="icon"
@@ -370,19 +355,6 @@ export function ChiefStreamRow({
     return (
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
         <Message className={`chief-msg ${MSG_ROW_CLS}`}>
-          {bound && agent ? (
-            <span className={AVATAR_IMG_CLS}>
-              <SeededAvatar
-                className="size-6"
-                name={agent.displayName}
-                src={agent.avatarUrl}
-                fallback="/avatar-robot-1.svg"
-                busy
-              />
-            </span>
-          ) : (
-            <ChiefSpiralFace size={24} busy className={AVATAR_SLOT_CLS} />
-          )}
           <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
             <ThinkingRow text={item.text} />
           </MessageContent>
@@ -393,7 +365,6 @@ export function ChiefStreamRow({
     return (
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
         <Message className={`chief-msg ${MSG_ROW_CLS}`}>
-          <span className="w-6 shrink-0" aria-hidden="true" />
           <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
             <ToolActivityRow
               name={item.label}
@@ -410,18 +381,6 @@ export function ChiefStreamRow({
     return (
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
         <Message className={`chief-msg ${MSG_ROW_CLS}`}>
-          {bound && agent ? (
-            <span className={AVATAR_IMG_CLS}>
-              <SeededAvatar
-                className="size-6"
-                name={agent.displayName}
-                src={agent.avatarUrl}
-                fallback="/avatar-robot-1.svg"
-              />
-            </span>
-          ) : (
-            <ChiefSpiralFace size={24} className={AVATAR_SLOT_CLS} />
-          )}
           <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
             <ChiefQuestionCard
               item={item}
@@ -432,23 +391,26 @@ export function ChiefStreamRow({
         </Message>
       </MessageScrollerItem>
     );
-  if (item.kind === 'streaming')
+  if (item.kind === 'streaming') {
+    const liveSteps: TraceStepItem[] = [
+      ...(runningTool != null
+        ? [
+            {
+              id: 'running',
+              step: {
+                kind: 'tool' as const,
+                verb: t('正在调用'),
+                name: runningTool,
+                status: 'running' as const,
+              },
+            },
+          ]
+        : []),
+      ...turnToolSteps(item.tools),
+    ];
     return (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>
         <Message className={MSG_ROW_CLS} data-testid="chief-msg">
-          {bound && agent ? (
-            <span className={AVATAR_IMG_CLS}>
-              <SeededAvatar
-                className="size-6"
-                name={agent.displayName}
-                src={agent.avatarUrl}
-                fallback="/avatar-robot-1.svg"
-                busy
-              />
-            </span>
-          ) : (
-            <ChiefSpiralFace size={24} busy className={AVATAR_SLOT_CLS} />
-          )}
           <MessageContent className={MSG_COL_LIVE_CLS}>
             <LiveRow
               variant="chief"
@@ -456,49 +418,44 @@ export function ChiefStreamRow({
               labelVars={item.labelVars}
               disclosure={{ expand: '展开实时步骤', collapse: '收起实时步骤' }}
             >
-              <Trace className={TURN_TOOLS_CLS} data-testid="chief-turn-tools">
-                {runningTool != null && (
-                  <TraceStepLine
-                    density="compact"
-                    step={{
-                      kind: 'tool',
-                      verb: t('正在调用'),
-                      name: runningTool,
-                      status: 'running',
-                    }}
-                  />
+              <div data-testid="chief-turn-tools">
+                {liveSteps.length > 0 && <TraceRows density="compact" steps={liveSteps} />}
+                {liveSteps.length === 0 && item.signalAt == null && (
+                  <p className={`m-0 ${TURN_NOTE_CLS}`}>{t('等待 Agent 响应…')}</p>
                 )}
-                <TurnToolLines tools={item.tools} />
-                {runningTool == null &&
-                  (item.tools?.length ?? 0) === 0 &&
-                  item.signalAt == null && (
-                    <TraceLine status="pending" className={TURN_TOOL_LINE_CLS}>
-                      <TraceTitle>{t('等待 Agent 响应…')}</TraceTitle>
-                    </TraceLine>
-                  )}
                 {item.signalAt != null && (
-                  <TraceLine className={TURN_TOOL_LINE_CLS}>
+                  <p className={`m-0 ${TURN_NOTE_CLS}`}>
                     <LiveSignal at={item.signalAt} className="min-w-0 truncate" />
-                  </TraceLine>
+                  </p>
                 )}
-              </Trace>
+              </div>
             </LiveRow>
           </MessageContent>
         </Message>
       </MessageScrollerItem>
     );
+  }
   const identity =
     bound && agent ? <ChiefIdentity agent={agent} busy={item.typing === true} /> : null;
+  const tools = turnToolSteps(item.tools);
   return (
     <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
-      <Message
-        className={identity != null ? MSG_ROW_IDENTITY_CLS : MSG_ROW_CLS}
-        data-testid="chief-msg"
-      >
-        {identity ?? (
-          <ChiefSpiralFace size={24} busy={item.typing === true} className={AVATAR_SLOT_CLS} />
-        )}
-        <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
+      <Message className={MSG_ROW_CLS} data-testid="chief-msg">
+        <MessageContent
+          className={identity != null ? `${MSG_COL_MID_CLS} gap-1.5` : MSG_COL_MID_CLS}
+          data-testid="chief-msg-col"
+        >
+          {identity}
+          {tools.length > 0 && (
+            <TraceGroup
+              density="compact"
+              steps={tools}
+              open={toolsOpen.has(i)}
+              onOpenChange={() => onToggleTools(i)}
+              summaryTestId="chief-tools-toggle"
+              cardTestId="chief-turn-tools"
+            />
+          )}
           <Bubble variant="ghost" className={BUBBLE_WRAP_CLS}>
             <BubbleContent className={BUBBLE_ROBOT_CLS}>
               {item.markdown != null ? (
@@ -527,6 +484,7 @@ export function ChiefStreamRow({
               )}
             </BubbleContent>
           </Bubble>
+          {item.typing === true && <LivePulse className="mt-1 ml-0.5" />}
           {item.typing !== true && (
             <div
               className="mt-2 flex items-center gap-2 text-meta text-(--text-tertiary)"
@@ -551,28 +509,7 @@ export function ChiefStreamRow({
                   {t('由备用模型 {model} 回答', { model: item.fallbackModel })}
                 </span>
               )}
-              {(item.tools?.length ?? 0) > 0 && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={MSG_TOOL_BTN_CLS}
-                  aria-label={toolsOpen.has(i) ? t('收起过程') : t('展开过程')}
-                  aria-expanded={toolsOpen.has(i)}
-                  onClick={() => onToggleTools(i)}
-                >
-                  {toolsOpen.has(i) ? (
-                    <ChevronDown width={11} height={11} />
-                  ) : (
-                    <ChevronRight width={11} height={11} />
-                  )}
-                </Button>
-              )}
             </div>
-          )}
-          {(item.tools?.length ?? 0) > 0 && toolsOpen.has(i) && (
-            <Trace className={TURN_TOOLS_CLS} data-testid="chief-turn-tools">
-              <TurnToolLines tools={item.tools} />
-            </Trace>
           )}
         </MessageContent>
       </Message>

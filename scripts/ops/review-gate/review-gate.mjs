@@ -1,5 +1,14 @@
 import { execFileSync, spawn } from 'node:child_process';
 import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  claudeFallback,
+  claudeReviewArgs,
+  claudeReviewPrompt,
+  DIFF_LIMIT,
+  parseRuns,
+  stallAlert,
+  stalled,
+} from './reviewer-route.mjs';
 
 const HOME = process.env.HOME;
 const REPO = 'xiechimon/cairn';
@@ -168,6 +177,19 @@ try {
         `${marker}\n**Independent review gate: PASS** (carried over) for \`${pr.headRefOid.slice(0, 8)}\`: same patch as the reviewed head \`${from.slice(0, 8)}\`; only the base moved.\n<!-- review-gate-patch:${patch} -->`,
       );
       record(pr, { verdict: 'pass', action: 'carried-over', from });
+      if (pr.labels.some((l) => l.name === 'review-stalled'))
+        try {
+          asBot([
+            'gh',
+            'pr',
+            'edit',
+            String(pr.number),
+            '-R',
+            REPO,
+            '--remove-label',
+            'review-stalled',
+          ]);
+        } catch {}
       rearm(pr);
       console.log(`#${pr.number}: PASS carried over from ${from.slice(0, 8)} (patch unchanged)`);
       continue;
@@ -181,6 +203,9 @@ try {
       .at(-1);
     const pendingMarker = `<!-- review-gate-pending:${pr.headRefOid} -->`;
     const pendingNoted = comments.some((c) => c.body.includes(pendingMarker));
+    const stallNoted = comments.some((c) =>
+      c.body.includes(`<!-- review-gate-stalled:${pr.headRefOid} -->`),
+    );
     todo.push({
       ...pr,
       touched,
@@ -190,6 +215,7 @@ try {
       lastBlock: lastBlock?.body,
       pendingMarker,
       pendingNoted,
+      stallNoted,
     });
   }
   const PRIORITY = (() => {
@@ -281,17 +307,97 @@ ${
       console.log(
         `reviewing #${pr.number} @ ${pr.headRefOid.slice(0, 8)} (slot ${slot}, prefer ${env.AI_ROUTE_PREFER}${av ? `, author ${av} excluded` : ''})`,
       );
-      const child = spawn('ai-route', ['run', 'review', '--hard', '-C', MAIN, prompt], { env });
-      let stdout = '';
-      let stderr = '';
-      child.stdout.on('data', (d) => (stdout += d));
-      child.stderr.on('data', (d) => (stderr += d));
-      const timer = setTimeout(() => child.kill('SIGKILL'), 3600_000);
-      child.on('close', (status) => {
-        clearTimeout(timer);
-        resolve({ status, stdout, stderr, excluded: Boolean(av) });
+      const reviewWith = (command, args, done, input) => {
+        const child = spawn(command, args, { env, cwd: MAIN });
+        child.stdin.on('error', () => {});
+        child.stdin.end(input ?? '');
+        let stdout = '';
+        let stderr = '';
+        child.stdout.on('data', (d) => (stdout += d));
+        child.stderr.on('data', (d) => (stderr += d));
+        child.on('error', (e) => (stderr += e.message));
+        const timer = setTimeout(() => child.kill('SIGKILL'), 3600_000);
+        child.on('close', (status) => {
+          clearTimeout(timer);
+          done({ status, stdout, stderr, excluded: Boolean(av), authorVendor: av });
+        });
+      };
+      reviewWith('ai-route', ['run', 'review', '--hard', '-C', MAIN, prompt], (routed) => {
+        if (!claudeFallback(av, routed)) return resolve(routed);
+        console.log(`#${pr.number}: no usable cross-vendor model; reviewing with Claude`);
+        let input;
+        try {
+          const diff = execFileSync('git', ['diff', `origin/main...review-gate-${pr.number}`], {
+            cwd: MAIN,
+            encoding: 'utf8',
+            maxBuffer: 64 << 20,
+          });
+          const { title, body } = JSON.parse(
+            gh(['pr', 'view', String(pr.number), '--json', 'title,body']),
+          );
+          input = claudeReviewPrompt(prompt, { diff, title, body });
+          if (input === null)
+            return resolve({
+              ...routed,
+              stderr: `${routed.stderr}\nclaude fallback: diff of ${diff.length} characters exceeds ${DIFF_LIMIT}; no partial review`,
+            });
+        } catch (e) {
+          return resolve({ ...routed, stderr: `${routed.stderr}\nclaude fallback: ${e.message}` });
+        }
+        reviewWith(
+          'claude',
+          claudeReviewArgs(),
+          (fallback) => resolve({ ...fallback, reviewer: 'claude' }),
+          input,
+        );
       });
     });
+  const alertIfStalled = (pr) => {
+    const labelled = pr.labels.some((l) => l.name === 'review-stalled');
+    if (pr.stallNoted && labelled) return;
+    let records;
+    try {
+      records = parseRuns(readFileSync(`${STATE}/runs.jsonl`, 'utf8'));
+    } catch {
+      return;
+    }
+    const since = stalled(records, pr.number, pr.headRefOid, Date.now());
+    if (!since) return;
+    if (!pr.stallNoted)
+      try {
+        asBot(
+          ['gh', 'pr', 'comment', String(pr.number), '-R', REPO, '--body-file', '-'],
+          stallAlert(pr, since),
+        );
+        record(pr, { action: 'stall-alert', since });
+      } catch (e) {
+        console.log(`#${pr.number}: stall comment failed; retrying next round\n${e.message}`);
+      }
+    if (!labelled)
+      try {
+        asBot(['gh', 'pr', 'edit', String(pr.number), '-R', REPO, '--add-label', 'review-stalled']);
+        record(pr, { action: 'stall-label', since });
+      } catch (e) {
+        console.log(
+          `#${pr.number}: review-stalled label failed; retrying next round\n${e.message}`,
+        );
+      }
+  };
+  const clearStall = (pr) => {
+    if (!pr.labels.some((l) => l.name === 'review-stalled')) return;
+    try {
+      asBot([
+        'gh',
+        'pr',
+        'edit',
+        String(pr.number),
+        '-R',
+        REPO,
+        '--remove-label',
+        'review-stalled',
+      ]);
+    } catch {}
+  };
   const finish = (pr, run) => {
     const out = run.stdout;
     const { verdict, review } = finalVerdict(out);
@@ -303,9 +409,12 @@ ${
       rc: run.status,
       raw: rawFile,
       reviewChars: (review ?? '').length,
+      ...(run.reviewer ? { reviewer: run.reviewer } : {}),
     });
     if (!verdict) {
-      console.log(`no verdict for #${pr.number}; rc=${run.status}\n${run.stderr.slice(-800)}`);
+      console.log(
+        `no verdict for #${pr.number}${run.reviewer ? ` (${run.reviewer})` : ''}; rc=${run.status}\n${(run.stderr || run.stdout).slice(-800)}`,
+      );
       if (pr.autoMergeRequest && !pr.pendingNoted) {
         try {
           asBot(
@@ -315,13 +424,19 @@ ${
         } catch {}
       }
       disarm(pr);
+      alertIfStalled(pr);
       return /no usable model/.test(run.stderr) && !run.excluded ? 'no-model' : 'none';
     }
+    const reviewer =
+      run.reviewer === 'claude'
+        ? ` (reviewer: Claude (opus), author vendor ${run.authorVendor} excluded)`
+        : '';
     const body =
       verdict === 'pass'
-        ? `${pr.marker}\n**Independent review gate: PASS** for \`${pr.headRefOid.slice(0, 8)}\`.\n<!-- review-gate-patch:${pr.patch} -->`
-        : `${pr.marker}\n**Independent review gate: BLOCK** for \`${pr.headRefOid.slice(0, 8)}\`.\n\n${review}\n<!-- review-gate-patch:${pr.patch} -->`;
+        ? `${pr.marker}\n**Independent review gate: PASS** for \`${pr.headRefOid.slice(0, 8)}\`${reviewer}.\n<!-- review-gate-patch:${pr.patch} -->`
+        : `${pr.marker}\n**Independent review gate: BLOCK** for \`${pr.headRefOid.slice(0, 8)}\`${reviewer}.\n\n${review}\n<!-- review-gate-patch:${pr.patch} -->`;
     asBot(['gh', 'pr', 'comment', String(pr.number), '-R', REPO, '--body-file', '-'], body);
+    clearStall(pr);
     if (verdict === 'pass') rearm(pr);
     else disarm(pr);
     console.log(`#${pr.number}: ${verdict}`);

@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 const DONE = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=36';
 const CONFIRM = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=17b';
 
-test('chat body reads at 14px (text-card-title) on a unitless 1.6', async ({ page }) => {
+test('chat body reads at 15px (text-card-title) on a unitless 1.6', async ({ page }) => {
   await page.goto(DONE);
   const text = page.getByTestId('agent-text').first();
   await expect(text).toBeVisible();
@@ -11,10 +11,8 @@ test('chat body reads at 14px (text-card-title) on a unitless 1.6', async ({ pag
     const s = getComputedStyle(el);
     return { fontSize: s.fontSize, lineHeight: s.lineHeight };
   });
-  // Paper PR 7: the six type keys have no 15px step; reading text takes
-  // text-card-title (14px) and keeps the unitless 1.6 (22.4px line box)
-  expect(cs.fontSize).toBe('14px');
-  expect(cs.lineHeight).toBe('22.4px');
+  expect(cs.fontSize).toBe('15px');
+  expect(cs.lineHeight).toBe('24px');
   // the declaration itself must stay unitless so the pitch tracks the size:
   // scan the stylesheets for a rule that matches THIS element and declares
   // line-height: 1.6 (the leading-[1.6] utility is that rule)
@@ -76,23 +74,27 @@ test('68ch measure cap binds the body text and the centered note', async ({ page
     };
     return {
       text: ratio('[data-testid="agent-text"]'),
-      note: ratio('[data-testid="transcript-note"]'),
+      note: ratio('[data-testid="transcript-note"] > span'),
     };
   });
   for (const r of [caps.text, caps.note]) {
     expect(r).toBeGreaterThan(67.5);
     expect(r).toBeLessThanOrEqual(68.5);
   }
-  // the note keeps its centered look inside the cap: equal auto margins
   const note = await page.getByTestId('transcript-note').first().evaluate((el) => {
     const s = getComputedStyle(el);
-    return { left: s.marginLeft, right: s.marginRight, align: s.textAlign };
+    const text = el.firstElementChild!.getBoundingClientRect();
+    const rule = el.getBoundingClientRect();
+    return {
+      align: s.textAlign,
+      display: s.display,
+      leftGap: text.left - rule.left,
+      rightGap: rule.right - text.right,
+    };
   });
   expect(note.align).toBe('center');
-  expect(Number.parseFloat(note.left)).toBeGreaterThan(0);
-  expect(Math.abs(Number.parseFloat(note.left) - Number.parseFloat(note.right))).toBeLessThanOrEqual(
-    1 / 64,
-  );
+  expect(note.display).toBe('flex');
+  expect(Math.abs(note.leftGap - note.rightGap)).toBeLessThanOrEqual(1);
   // the capped measure must not push the column into horizontal overflow
   const overflow = await page.evaluate(() => {
     const col = document.querySelector('[data-testid="transcript-col"]')!;
@@ -112,33 +114,32 @@ test('composer placeholder sits at 14px (text-ui) — the same size as the 14px 
     };
   });
   expect(sizes.placeholder).toBe('14px');
-  expect(sizes.body).toBe('14px');
+  expect(sizes.body).toBe('15px');
 });
 
-test('bubble / avatar / footer keep their own geometry (#470 scope fence)', async ({ page }) => {
+test('bubble / footer keep their own geometry, replies carry no avatar column', async ({ page }) => {
   await page.goto(DONE);
   const geo = await page.evaluate(() => {
     const bubble = document.querySelector('[data-testid="user-bubble"]')!;
-    const avatar = document.querySelector('[data-testid="msg-avatar"] img')!;
+    const avatars = document.querySelectorAll('[data-testid="msg-avatar"]').length;
     const userItem = bubble.closest('[data-slot="message-scroller-item"]')!;
     const userFooter = userItem.querySelector('[data-testid="msg-actions"]')!;
     const footer = [...document.querySelectorAll('[data-testid="msg-actions"]')].find(
       (el) => !userItem.contains(el),
     )!;
     const b = bubble.getBoundingClientRect();
-    const a = avatar.getBoundingClientRect();
     return {
       bubbleH: Math.round(b.height),
       bubbleFont: getComputedStyle(bubble).fontSize,
-      avatarBox: { w: Math.round(a.width), h: Math.round(a.height) },
+      avatars,
       footerPad: getComputedStyle(footer).paddingLeft,
       userFooterAlign: getComputedStyle(userFooter).justifyContent,
     };
   });
-  expect(geo.bubbleH).toBe(32);
-  expect(geo.bubbleFont).toBe('14px');
-  expect(geo.avatarBox).toEqual({ w: 20, h: 20 });
-  expect(geo.footerPad).toBe('32px');
+  expect(geo.bubbleH).toBe(40);
+  expect(geo.bubbleFont).toBe('15px');
+  expect(geo.avatars).toBe(0);
+  expect(geo.footerPad).toBe('0px');
   expect(geo.userFooterAlign).toBe('flex-end');
 });
 
@@ -154,7 +155,11 @@ test('turn boundary is air, not a rule: no divider between a user turn and the a
         const cs = getComputedStyle(el);
         const top = Number.parseFloat(cs.borderTopWidth) || 0;
         const bot = Number.parseFloat(cs.borderBottomWidth) || 0;
-        return (top > 0 || bot > 0) && el.getBoundingClientRect().height > 0;
+        return (
+          (top > 0 || bot > 0) &&
+          el.getBoundingClientRect().height > 0 &&
+          el.closest('[data-trace-card]') === null
+        );
       })
       .map((el) => el.className);
 

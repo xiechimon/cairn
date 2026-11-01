@@ -9,7 +9,7 @@ import {
   TraceTitle,
 } from '../ui/trace.js';
 import { useLiveSeconds } from './live-row.js';
-import { TraceStepLine } from './trace-steps.js';
+import { TraceRows } from './trace-steps.js';
 
 const PREVIEW_CHARS = 150;
 
@@ -65,18 +65,20 @@ export function ToolActivityRow({
   const shown = tick ?? seconds ?? null;
   const status = error === true ? 'failed' : running === true ? 'running' : 'done';
   return (
-    <Trace>
-      <TraceStepLine
-        density="compact"
-        failedLabel={t('失败')}
-        step={{
-          kind: 'tool',
-          ...(running === true ? { verb: t('正在调用') } : {}),
-          name,
-          status,
-          ...(shown != null ? { secs: shown } : {}),
-        }}
-      />
-    </Trace>
+    <TraceRows
+      density="compact"
+      steps={[
+        {
+          id: name,
+          step: {
+            kind: 'tool',
+            ...(running === true ? { verb: t('正在调用') } : {}),
+            name,
+            status,
+            ...(shown != null ? { secs: shown } : {}),
+          },
+        },
+      ]}
+    />
   );
 }
