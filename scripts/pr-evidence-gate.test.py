@@ -1,6 +1,7 @@
 import contextlib
 import importlib.util
 import io
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -302,6 +303,150 @@ class ProseCapTests(unittest.TestCase):
         result, output = self.verdict(body.replace('## Verified', '## Proof') + '## Review\nReviewed.\n')
         self.assertEqual(result, 1, output)
         self.assertIn('FAIL too-long:', output)
+
+
+class SchemaGlanceTests(unittest.TestCase):
+    table = ('### Schema changes\n\n| table | change | detail |\n|---|---|---|\n'
+             '| `tasks` | + due_at | integer |\n| `tasks` | - legacy | text |\n')
+    base = '## Proof\nOld run failed; new run passed.\n## What\nAdd a column.\n## Review\nReviewed.\n## Risk\nReversible.\n'
+
+    def verdict(self, body, expected=None):
+        output = io.StringIO()
+        with tempfile.TemporaryDirectory() as directory:
+            argv = ['pr-evidence-gate.py']
+            if expected is not None:
+                path = Path(directory, 'schema-glance.md')
+                path.write_text(expected)
+                argv += ['--schema-glance', str(path)]
+            with patch.object(sys, 'argv', argv), patch.dict(gate.os.environ, {'PR_BODY': body}), contextlib.redirect_stdout(output):
+                result = gate.main()
+        return result, output.getvalue()
+
+    def test_drizzle_body_without_the_table_is_red(self):
+        result, output = self.verdict(self.base, self.table)
+        self.assertEqual(result, 1, output)
+        self.assertIn('FAIL schema-changes: missing', output)
+
+    def test_stale_table_is_red(self):
+        stale = self.table.replace('+ due_at | integer', '+ due_at | text')
+        result, output = self.verdict(self.base + stale, self.table)
+        self.assertEqual(result, 1, output)
+        self.assertIn('FAIL schema-changes: stale', output)
+
+    def test_current_table_is_green(self):
+        result, output = self.verdict(self.base + self.table, self.table)
+        self.assertEqual(result, 0, output)
+        self.assertIn('schema-changes: matches', output)
+
+    def test_table_inside_details_counts(self):
+        body = self.base + '<details><summary>Schema</summary>\n\n' + self.table + '\n</details>\n'
+        result, output = self.verdict(body, self.table)
+        self.assertEqual(result, 0, output)
+
+    def test_extra_or_reordered_rows_are_red(self):
+        rows = self.table.splitlines()
+        reordered = '\n'.join(rows[:4] + [rows[5], rows[4]]) + '\n'
+        for body_table in (reordered, self.table + '| `tasks` | + extra | text |\n'):
+            result, output = self.verdict(self.base + body_table, self.table)
+            self.assertEqual(result, 1, output)
+            self.assertIn('FAIL schema-changes: stale', output)
+
+    def test_no_schema_changes_output_requires_the_heading_and_text(self):
+        expected = '### Schema changes\n\nNo schema changes\n'
+        result, output = self.verdict(self.base + expected, expected)
+        self.assertEqual(result, 0, output)
+        result, output = self.verdict(self.base, expected)
+        self.assertEqual(result, 1, output)
+
+    def test_non_drizzle_body_is_unaffected(self):
+        result, output = self.verdict(self.base)
+        self.assertEqual(result, 0, output)
+        self.assertNotIn('schema-changes', output)
+        result, output = self.verdict(self.base + self.table)
+        self.assertEqual(result, 0, output)
+
+    def test_workflow_passes_the_base_copy_output(self):
+        workflow = Path('.github/workflows/pr-evidence.yml').read_text()
+        self.assertIn('git show "$BASE_SHA:scripts/schema-glance.mjs"', workflow)
+        self.assertIn('--schema-glance', workflow)
+
+
+class SchemaGlanceWorkflowTests(unittest.TestCase):
+    body = '## Proof\nOld run failed; new run passed.\n## What\nAdd a column.\n## Review\nReviewed.\n## Risk\nReversible.\n'
+
+    @staticmethod
+    def step_script():
+        lines = Path('.github/workflows/pr-evidence.yml').read_text().splitlines()
+        at = next(i for i, line in enumerate(lines) if line.strip().startswith('- name: Check PR body evidence'))
+        run_at = next(i for i in range(at, len(lines)) if lines[i].strip() == 'run: |')
+        indent = len(lines[run_at]) - len(lines[run_at].lstrip()) + 2
+        block = []
+        for line in lines[run_at + 1:]:
+            if line.strip() and len(line) - len(line.lstrip()) < indent:
+                break
+            block.append(line[indent:])
+        return '\n'.join(block) + '\n'
+
+    @staticmethod
+    def snapshot(*tables):
+        return json.dumps({'version': '6', 'dialect': 'sqlite', 'tables': {
+            name: {'name': name, 'columns': {column: {'name': column, 'type': 'text'} for column in columns},
+                   'indexes': {}, 'foreignKeys': {}}
+            for name, columns in tables}})
+
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        root = Path(directory.name).resolve()
+        self.repo = root / 'repo'
+        self.temp = root / 'runner'
+        self.temp.mkdir()
+        (self.repo / 'scripts').mkdir(parents=True)
+        (self.repo / 'apps/server/drizzle/meta').mkdir(parents=True)
+        for name in ('pr-evidence-gate.py', 'pr_body.py', 'schema-glance.mjs'):
+            (self.repo / 'scripts' / name).write_text(Path('scripts', name).read_text())
+        self.git('init', '-q', '-b', 'main')
+        self.git('config', 'user.email', 't@example.com')
+        self.git('config', 'user.name', 't')
+        self.git('config', 'commit.gpgsign', 'false')
+        self.git('add', 'scripts')
+        self.commit('apps/server/drizzle/meta/0001_snapshot.json', self.snapshot(('task', ['id'])), 'base')
+        self.git('branch', 'feature')
+        self.commit('apps/server/drizzle/meta/0002_snapshot.json', self.snapshot(('task', ['id']), ('note', ['id'])), 'main migration')
+        self.git('checkout', '-q', 'feature')
+
+    def git(self, *args):
+        return subprocess.run(['git', '-C', str(self.repo), *args], check=True, capture_output=True, text=True).stdout.strip()
+
+    def commit(self, path, content, message):
+        (self.repo / path).write_text(content)
+        self.git('add', path)
+        self.git('commit', '-q', '-m', message)
+
+    def run_step(self, body):
+        (self.temp / 'pr.json').write_text(json.dumps({'base': {'sha': self.git('rev-parse', 'main')}, 'head': {'sha': self.git('rev-parse', 'feature')}}))
+        (self.temp / 'pr-body.md').write_text(body)
+        (self.temp / 'pr-evidence-context.json').write_text('{}')
+        return subprocess.run(['bash', '--noprofile', '--norc', '-eo', 'pipefail', '-c', self.step_script()], cwd=self.repo,
+                              env={**os.environ, 'RUNNER_TEMP': str(self.temp)}, capture_output=True, text=True)
+
+    def test_non_drizzle_pr_behind_a_main_migration_needs_no_table(self):
+        self.commit('README.md', 'docs\n', 'docs only')
+        result = self.run_step(self.body)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn('schema-changes', result.stdout)
+        self.assertFalse((self.temp / 'schema-glance.md').exists())
+
+    def test_drizzle_pr_behind_a_main_migration_diffs_from_the_merge_base(self):
+        self.commit('apps/server/drizzle/meta/0002_snapshot.json', self.snapshot(('task', ['id', 'due'])), 'feature migration')
+        result = self.run_step(self.body)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn('FAIL schema-changes: missing', result.stdout)
+        table = (self.temp / 'schema-glance.md').read_text()
+        self.assertEqual(table, '### Schema changes\n\n| table | change | detail |\n|---|---|---|\n| `task` | + due | text |\n')
+        result = self.run_step(self.body + table)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('schema-changes: matches', result.stdout)
 
 
 def load_tests(loader, tests, pattern):
