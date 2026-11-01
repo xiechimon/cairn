@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSyn
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import * as transfer from './transfer-to-cairn.mjs';
 
 const { transferToCairn } = transfer;
@@ -32,7 +33,7 @@ function world(t) {
     laneExists: false,
     processes: '',
     patchFails: false,
-    lockFails: false,
+    patchProbe: null,
   };
   const runner = async (args, command = 'gh') => {
     state.commands.push({ command, args });
@@ -43,22 +44,16 @@ function world(t) {
         : state.laneExists
           ? 'present'
           : '';
-    if (command === 'flock') {
-      if (state.lockFails) throw Object.assign(new Error('busy'), { status: 73 });
-      transfer.applyTransferLists(JSON.parse(args.at(-1)));
-      return '';
-    }
     assert.equal(args[0], 'api');
     const path = args[1];
     if (args.includes('PATCH')) {
-      if (state.patchFails) throw new Error('patch-failed');
       assert.ok(state.plan);
       for (const [name, list] of Object.entries(state.plan.lists).filter(
         ([name]) => name === 'pending',
       )) {
         const path = join(state.plan.stateDir, name);
         assert.equal(
-          list.before,
+          list.after,
           (() => {
             try {
               return readFileSync(path).toString('latin1');
@@ -68,6 +63,8 @@ function world(t) {
           })(),
         );
       }
+      state.patchProbe?.();
+      if (state.patchFails) throw new Error('patch-failed');
       state.writes.push(args);
       state.labels = args.filter((a) => a.startsWith('labels[]=')).map((a) => a.slice(9));
       return '{}';
@@ -133,11 +130,12 @@ test('transfers labels, preserves unrelated list bytes and reports an idempotent
   assert.equal(readFileSync(join(w.dir, 'hold'), 'utf8'), '9\n');
   assert.equal(readFileSync(join(w.dir, 'never'), 'utf8'), '3\n17\n');
   assert.equal(first.agent, 'orb-builder');
+  assert.equal(first.lock.timeoutSeconds, 900);
   assert.equal(first.lists.pending.changed, true);
   const second = await w.run({ agent: 'orb-builder' });
   assert.equal(second.changes, 0);
   assert.equal(w.state.writes.length, 1);
-  assert.deepEqual(readdirSync(w.dir).sort(), ['hold', 'mine', 'never', 'pending']);
+  assert.deepEqual(readdirSync(w.dir).sort(), ['hold', 'lock2', 'mine', 'never', 'pending']);
 });
 
 test('dry-run returns planned diffs without changing GitHub, lists or a missing directory', async (t) => {
@@ -188,7 +186,7 @@ test('similar issue numbers and branch names do not block; missing lists are fin
   const result = await w.run({ stateDir: join(w.dir, 'missing') });
   assert.equal(result.lanes.branch, false);
   assert.equal(readFileSync(join(w.dir, 'missing/never'), 'utf8'), '17\n');
-  assert.deepEqual(readdirSync(join(w.dir, 'missing')), ['never']);
+  assert.deepEqual(readdirSync(join(w.dir, 'missing')), ['lock2', 'never']);
 });
 
 test('closed issues and failed lane reads refuse without mutation', async (t) => {
@@ -244,7 +242,7 @@ else process.exit(1);
   const result = spawnSync(
     process.execPath,
     [
-      new URL('./transfer-to-cairn.mjs', import.meta.url).pathname,
+      fileURLToPath(new URL('./transfer-to-cairn.mjs', import.meta.url)),
       '17',
       '--dry-run',
       '--repo',
@@ -278,29 +276,53 @@ else process.exit(1);
   assert.deepEqual(readdirSync(w.dir).sort(), ['calls.jsonl', 'gh']);
 });
 
-test('a failed label PATCH leaves every list unchanged', async (t) => {
+test('a failed label PATCH restores all lists before releasing lock2', async (t) => {
   const w = world(t);
-  writeFileSync(join(w.dir, 'pending'), '17\n');
+  const before = { pending: '17\r\n18\n', mine: '7\n17', hold: '17\n9\n' };
+  for (const [name, content] of Object.entries(before)) writeFileSync(join(w.dir, name), content);
+  const probe = () =>
+    spawnSync('python3', [
+      '-c',
+      `import fcntl, sys
+with open(sys.argv[1], 'a') as lock:
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        sys.exit(73)
+`,
+      join(w.dir, 'lock2'),
+    ]);
+  w.state.patchProbe = () => {
+    assert.equal(probe().status, 73);
+    for (const [name, list] of Object.entries(w.state.plan.lists)) {
+      assert.equal(readFileSync(join(w.dir, name), 'latin1'), list.after);
+    }
+  };
   w.state.patchFails = true;
   await assert.rejects(w.run(), /patch-failed/);
-  assert.equal(readFileSync(join(w.dir, 'pending'), 'utf8'), '17\n');
-  assert.equal(w.state.plan.lists.pending.before, '17\n');
-  assert.ok(!w.state.commands.some((call) => call.command === 'flock'));
+  for (const [name, content] of Object.entries(before)) {
+    assert.equal(readFileSync(join(w.dir, name), 'latin1'), content);
+  }
+  assert.equal(w.state.labels.includes('by:cairn'), false);
+  assert.deepEqual(readdirSync(w.dir).sort(), ['hold', 'lock2', 'mine', 'pending']);
+  assert.equal(probe().status, 0);
 });
 
-test('lock timeout after PATCH names the lock and exact remaining list edits', async (t) => {
+test('PATCH rollback restores membership while preserving concurrent list appends', async (t) => {
   const w = world(t);
   writeFileSync(join(w.dir, 'pending'), '17\n18\n');
-  w.state.lockFails = true;
-  await assert.rejects(w.run(), (err) => {
-    assert.match(err.message, /overnight-lock-timeout/);
-    assert.ok(err.message.includes(join(w.dir, 'lock2')));
-    assert.ok(err.message.includes('pending'));
-    assert.ok(err.message.includes('never'));
-    return true;
-  });
-  assert.equal(w.state.writes.length, 1);
-  assert.equal(readFileSync(join(w.dir, 'pending'), 'utf8'), '17\n18\n');
+  writeFileSync(join(w.dir, 'mine'), '7\n17');
+  w.state.patchProbe = () => {
+    for (const name of ['pending', 'mine']) {
+      const path = join(w.dir, name);
+      writeFileSync(path, `${readFileSync(path, 'latin1')}99\n`, 'latin1');
+    }
+  };
+  w.state.patchFails = true;
+  await assert.rejects(w.run(), /patch-failed/);
+  assert.equal(readFileSync(join(w.dir, 'pending'), 'utf8'), '17\n18\n99\n');
+  assert.equal(readFileSync(join(w.dir, 'mine'), 'utf8'), '7\n17\n99\n');
+  assert.equal(w.state.labels.includes('by:cairn'), false);
 });
 
 for (const kind of ['directory', 'process']) {
@@ -318,20 +340,61 @@ for (const kind of ['directory', 'process']) {
   });
 }
 
-test('does not overwrite lists changed after planning', async (t) => {
+test('re-reads lists under the lock after planning', async (t) => {
   const w = world(t);
   writeFileSync(join(w.dir, 'pending'), '17\n');
-  await assert.rejects(
-    w.run({
-      printPlan: (plan) => {
-        w.state.plan = plan;
-        writeFileSync(join(w.dir, 'hold'), '99\n');
-      },
-    }),
-    /list-edit-failed.*lists-changed/,
-  );
+  await w.run({
+    printPlan: (plan) => {
+      w.state.plan = plan;
+      writeFileSync(join(w.dir, 'hold'), '99\n');
+    },
+  });
   assert.equal(readFileSync(join(w.dir, 'hold'), 'utf8'), '99\n');
-  assert.equal(readFileSync(join(w.dir, 'pending'), 'utf8'), '17\n');
+  assert.equal(readFileSync(join(w.dir, 'pending'), 'utf8'), '');
+});
+
+for (const name of ['pending', 'mine']) {
+  test(`compare-and-swap retries a concurrent append to ${name}`, (t) => {
+    const w = world(t);
+    const path = join(w.dir, name);
+    writeFileSync(path, '17\n');
+    let attempts = 0;
+    transfer.applyTransferLists(
+      { stateDir: w.dir, issue: 17 },
+      {
+        beforeRename: (target) => {
+          if (target === path && attempts++ === 0) writeFileSync(path, '17\n99\n');
+        },
+      },
+    );
+    assert.equal(readFileSync(path, 'utf8'), '99\n');
+    assert.equal(attempts, 2);
+  });
+}
+
+test('compare-and-swap stops after three retries with a named error', (t) => {
+  const w = world(t);
+  const path = join(w.dir, 'pending');
+  writeFileSync(path, '17\n');
+  let attempts = 0;
+  assert.throws(
+    () =>
+      transfer.applyTransferLists(
+        { stateDir: w.dir, issue: 17 },
+        {
+          beforeRename: (target) => {
+            if (target === path) writeFileSync(path, `17\n${++attempts}\n`);
+          },
+        },
+      ),
+    /list-cas-exhausted: pending/,
+  );
+  assert.equal(attempts, 4);
+  assert.equal(readFileSync(path, 'utf8'), '17\n4\n');
+  assert.equal(
+    readdirSync(w.dir).some((name) => name.endsWith('.tmp')),
+    false,
+  );
 });
 
 test('real list application uses the macOS fcntl fallback and preserves list bytes', async (t) => {
@@ -405,7 +468,7 @@ with open(sys.argv[1], 'a') as lock:
       ),
       /overnight-lock-timeout.*lock2/,
     );
-    assert.equal(w.state.writes.length, 1);
+    assert.equal(w.state.writes.length, 0);
     assert.equal(readFileSync(join(w.dir, 'pending'), 'utf8'), '17\n');
   } finally {
     holder.stdin.end('release\n');
@@ -430,4 +493,31 @@ test('a similar process lane number does not block transfer', async (t) => {
   const w = world(t);
   w.state.processes = `ai-route run implement -C ${join(w.dir, 'lanes/cairn-170')} prompt`;
   assert.equal((await w.run()).issue, 17);
+});
+
+test('revalidates lane ownership after waiting for lock2', async (t) => {
+  const w = world(t);
+  writeFileSync(join(w.dir, 'pending'), '17\n');
+  await assert.rejects(
+    w.run({
+      printPlan: (plan) => {
+        w.state.plan = plan;
+        w.state.laneExists = true;
+      },
+    }),
+    /lane-directory/,
+  );
+  assert.equal(w.state.writes.length, 0);
+  assert.equal(readFileSync(join(w.dir, 'pending'), 'utf8'), '17\n');
+});
+
+test('re-reads labels under lock2 to preserve changes made while waiting', async (t) => {
+  const w = world(t);
+  await w.run({
+    printPlan: (plan) => {
+      w.state.plan = plan;
+      w.state.labels.push('needs-triage');
+    },
+  });
+  assert.equal(w.state.labels.includes('needs-triage'), true);
 });

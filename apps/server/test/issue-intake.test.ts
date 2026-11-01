@@ -3521,31 +3521,76 @@ describe('agent label routing', () => {
     expect((await w.intake.sweep())?.imported).toBe(1);
   });
 
-  test('assignment update failure still orchestrates the created todo and logs the failure', async () => {
-    const w = await makeWorld({ list: [1406] });
-    routeLabel(w);
-    builder(w, 'orb-agent');
-    const update = vi.spyOn(todosService, 'updateTodo').mockImplementationOnce(() => {
-      throw new Error('assignment-write-failed');
-    });
-    try {
-      const tally = await w.intake.sweep();
-      expect(tally?.imported).toBe(1);
-      expect(tally?.orchestrated).toBe(1);
-      expect(tally?.errors).toBe(1);
-      expect(todoOf(w.s, 1406)).toBeDefined();
-      expect(chiefThreads(w.s)).toHaveLength(1);
-      expect(
-        w.logs.some(
-          (line) =>
-            line.msg === 'issue intake assignment failed' &&
-            line.obj.err === 'assignment-write-failed',
-        ),
-      ).toBe(true);
-    } finally {
-      update.mockRestore();
-    }
-  });
+  test.each(['before-write', 'after-write'])(
+    'assignment update failure holds the created todo and prevents Coordinator dispatch: %s',
+    async (failure) => {
+      const w = await makeWorld({ list: [1406] });
+      routeLabel(w);
+      builder(w, 'orb-agent');
+      const published = vi.spyOn(w.s.hub, 'publishTodoDoc');
+      const updateTodo = todosService.updateTodo;
+      const update = vi.spyOn(todosService, 'updateTodo').mockImplementationOnce((...args) => {
+        if (failure === 'after-write') updateTodo(...args);
+        throw new Error('assignment-write-failed');
+      });
+      try {
+        const tally = await w.intake.sweep();
+        expect(tally?.imported).toBe(1);
+        expect(tally?.orchestrated).toBe(0);
+        expect(tally?.held).toBe(1);
+        expect(tally?.errors).toBe(1);
+        expect(todoOf(w.s, 1406)).toBeDefined();
+        expect(chiefThreads(w.s)).toHaveLength(0);
+        const record = todoOf(w.s, 1406);
+        expect(published.mock.calls[0]?.[1].assignment).toEqual({
+          source: 'intake-label',
+          plan: null,
+          build: null,
+        });
+        expect(record?.assignment).toEqual({ source: 'intake-label', plan: null, build: null });
+        if (!record) throw new Error('import missing');
+        await expect(
+          executeChiefTool(
+            {
+              ...w.s.svc,
+              box: w.s.secretBox,
+              reposDir: w.s.reposDir,
+              attachmentsDir: w.s.attachmentsDir,
+            },
+            {
+              teamId: w.s.team.id,
+              userId: w.s.user.id,
+              chiefId: `chief-${w.s.user.id}-${w.s.team.id}`,
+              threadId: 'held-thread',
+              conversationId: 'held-thread',
+              chiefAgentId: CHIEF_AGENT_ID,
+            },
+            'run_builds',
+            { todoIds: [record.id], assignment: { build: { agentId: CHIEF_AGENT_ID } } },
+          ),
+        ).rejects.toThrow(/intake-label-assignment-failed/);
+        expect(w.s.db.select().from(buildTable).all()).toHaveLength(0);
+        await w.intake.sweep();
+        const restarted = createIssueIntake(
+          { ...w.s.svc, box: w.s.secretBox },
+          { githubFetch: w.gh.impl },
+        );
+        await restarted.sweep();
+        expect(chiefThreads(w.s)).toHaveLength(0);
+        expect(
+          w.logs.some(
+            (line) =>
+              line.msg === 'issue intake assignment failed' &&
+              line.obj.err === 'assignment-write-failed' &&
+              line.obj.reason === 'intake-label-assignment-failed',
+          ),
+        ).toBe(true);
+      } finally {
+        update.mockRestore();
+        published.mockRestore();
+      }
+    },
+  );
 
   test('without an agent label intake leaves the assignment unset', async () => {
     const w = await makeWorld({ list: [1406] });

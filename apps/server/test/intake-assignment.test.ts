@@ -96,30 +96,37 @@ test('Coordinator retry reassigns a previously built todo without a label preset
   expect(H.s.db.select().from(build).all()).toHaveLength(2);
 });
 
-test('Coordinator split children inherit the intake-label preset and retain it on dispatch', async () => {
+test('Coordinator refuses splitting or closing an intake preset and tells it to build as is', async () => {
   const parent = await assignedTodo(true);
-  H.s.db.update(agent).set({ persona: 'planner' }).where(eq(agent.id, AGENT2_ID)).run();
-  const result = (await relay('split_todo', {
-    todoId: parent.id,
-    subtodos: [
-      { title: 'First', spec: 'First part', agentId: AGENT2_ID },
-      { title: 'Second', spec: 'Second part', agentId: AGENT2_ID },
-    ],
-  })) as { children: { id: string }[] };
-  for (const child of result.children) {
-    expect(H.s.db.select().from(todo).where(eq(todo.id, child.id)).get()?.assignment).toEqual(
-      parent.assignment,
-    );
-    await relay('run_builds', {
-      todoIds: [child.id],
-      withPlan: false,
-      assignment: { build: { agentId: AGENT2_ID } },
-    });
-    expect(H.s.db.select().from(todo).where(eq(todo.id, child.id)).get()?.assignment).toMatchObject(
-      parent.assignment,
-    );
-  }
-  expect(H.s.db.select().from(todo).where(eq(todo.id, parent.id)).get()?.assignment).toEqual(
+  await expect(
+    relay('split_todo', {
+      todoId: parent.id,
+      subtodos: [{ title: 'First', spec: 'First part', agentId: AGENT2_ID }],
+    }),
+  ).rejects.toThrow(/intake-label-split-refused.*Build .* as is/);
+  await expect(relay('close_todos', { todoIds: [parent.id] })).rejects.toThrow(
+    /intake-label-split-refused.*Build .* as is/,
+  );
+  expect(H.s.db.select().from(todo).all()).toHaveLength(1);
+  expect(H.s.db.select().from(todo).where(eq(todo.id, parent.id)).get()?.phase).toBe('todo');
+});
+
+test('Coordinator refuses unlinked create_todo while a Project has a pending intake preset', async () => {
+  const parent = await assignedTodo(true);
+  await expect(
+    relay('create_todo', {
+      projectId: H.projectId,
+      title: 'Child',
+      spec: 'Part of the intake task',
+    }),
+  ).rejects.toThrow(/intake-label-split-refused.*Build .* as is/);
+  expect(H.s.db.select().from(todo).all()).toHaveLength(1);
+  await relay('run_builds', {
+    todoIds: [parent.id],
+    withPlan: false,
+    assignment: { build: { agentId: AGENT2_ID } },
+  });
+  expect(H.s.db.select().from(todo).where(eq(todo.id, parent.id)).get()?.assignment).toMatchObject(
     parent.assignment,
   );
 });
@@ -141,4 +148,39 @@ test('an intake preset preserves plan and build while a Coordinator retry change
   const assignment = H.s.db.select().from(todo).where(eq(todo.id, record.id)).get()?.assignment;
   expect(assignment).toMatchObject(record.assignment);
   expect(assignment?.review?.agentId).toBe(AGENT2_ID);
+});
+
+for (const phase of ['done', 'closed'] as const) {
+  test(`a ${phase} intake preset does not block creating new tasks`, async () => {
+    const parent = await assignedTodo(true);
+    H.s.db.update(todo).set({ phase }).where(eq(todo.id, parent.id)).run();
+    await relay('create_todo', {
+      projectId: H.projectId,
+      title: 'New work',
+      spec: 'Independent work',
+    });
+    expect(H.s.db.select().from(todo).all()).toHaveLength(2);
+  });
+}
+
+test('closing a mixed batch refuses before changing any task', async () => {
+  const normal = await assignedTodo(false);
+  const preset = await assignedTodo(true);
+  await expect(relay('close_todos', { todoIds: [normal.id, preset.id] })).rejects.toThrow(
+    /intake-label-split-refused/,
+  );
+  expect(
+    H.s.db
+      .select()
+      .from(todo)
+      .all()
+      .map((row) => row.phase),
+  ).toEqual(['todo', 'todo']);
+});
+
+test('closing missing tasks retains skipped results', async () => {
+  expect(await relay('close_todos', { todoIds: ['missing-task'] })).toEqual({
+    transitioned: [],
+    skipped: ['missing-task'],
+  });
 });

@@ -141,6 +141,7 @@ sqlite3 "$db" "insert into __drizzle_migrations(hash) values ('m1')"`,
     'systemctl',
     `if [ "$2" = is-enabled ]; then [ -f "${fake}/orb-enabled" ]; exit $?; fi
 echo "systemctl $*" >> "${fake}/systemctl.log"
+[ ! -f "${fake}/orb-$2-fail" ] || [ "$3" != cairn-daemon-orb.service ] || exit 1
 [ ! -f "${fake}/phase-on-start" ] || [ "$2" != start ] || echo "start $3 @ $(sed -n 's/^phase=//p' "${dir}/state/in-progress" 2>/dev/null)" >> "${fake}/phases.log"
 if [ "$2 $3" = "start cairn-server.service" ]; then
   head=$(git -C "${checkout}" rev-parse HEAD)
@@ -582,5 +583,22 @@ for (const broken of [false, true]) {
       calls.indexOf('systemctl --user start cairn-daemon-orb.service') >
         calls.indexOf('systemctl --user start cairn-server.service'),
     );
+  });
+}
+
+for (const action of ['start', 'stop']) {
+  test(`an Orb ${action} failure alerts without rolling back a healthy deploy`, () => {
+    const f = fixture();
+    const target = pushTarget(f);
+    writeFileSync(join(f.fake, 'orb-enabled'), '');
+    writeFileSync(join(f.fake, `orb-${action}-fail`), '');
+    const result = f.run(DEPLOY, [target]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), target);
+    assert.equal(JSON.parse(readFileSync(join(f.state, 'deployed.json'))).result, 'deployed');
+    assert.match(result.stderr, new RegExp(`orb-unit-${action}-failed`));
+    assert.match(f.log('gh.log'), /gh issue create .*Orb daemon/);
+    assert.equal(existsSync(join(f.state, 'failed', target)), false);
+    assert.doesNotMatch(result.stdout, /rolling back|restarting/);
   });
 }

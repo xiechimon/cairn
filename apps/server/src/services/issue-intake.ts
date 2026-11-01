@@ -711,28 +711,39 @@ export function createIssueIntake(
       return 'full';
     }
     let todoId: string;
+    let assignmentFailed = false;
     try {
       const record = await importGithubIssue(
         { ...deps, box: access.box, githubFetch: run.githubFetch },
         row,
         issueNumber,
-        { createdBy: access.createdBy },
+        { createdBy: access.createdBy, pendingIntakeAssignment: assignedAgentId !== null },
       );
       todoId = record.id;
       if (assignedAgentId !== null) {
         try {
-          const assigned = updateTodo(deps, todoId, {
-            assignment: {
-              source: 'intake-label',
-              plan: { agentId: assignedAgentId },
-              build: { agentId: assignedAgentId },
-            },
+          deps.db.transaction(() => {
+            const assigned = updateTodo(deps, todoId, {
+              assignment: {
+                source: 'intake-label',
+                plan: { agentId: assignedAgentId },
+                build: { agentId: assignedAgentId },
+              },
+            });
+            if (assigned === null) throw new Error('imported todo missing during assignment');
           });
-          if (assigned === null) throw new Error('imported todo missing during assignment');
         } catch (err) {
+          assignmentFailed = true;
           tally.errors += 1;
+          tally.held += 1;
           log(
-            { projectId: row.id, issue: issueNumber, todoId, err: errText(err) },
+            {
+              projectId: row.id,
+              issue: issueNumber,
+              todoId,
+              reason: 'intake-label-assignment-failed',
+              err: errText(err),
+            },
             'issue intake assignment failed',
           );
         }
@@ -755,7 +766,8 @@ export function createIssueIntake(
       'issue intake candidate taken',
     );
     seenOpen.add(refKey(row.teamId, githubIssueSourceRef(owner, repo, issueNumber)));
-    orchestrateImported(todoId, { teamId: row.teamId, importedAt: nowMs(), attempts: 1 }, tally);
+    if (!assignmentFailed)
+      orchestrateImported(todoId, { teamId: row.teamId, importedAt: nowMs(), attempts: 1 }, tally);
     return 'imported';
   }
 

@@ -202,9 +202,23 @@ daemon_healthy() {
   return 1
 }
 
+orb_alarm() {
+  local reason="orb-unit-$1-failed" title="Orb daemon needs attention" open_issue
+  echo "$reason: $ORB_UNIT; continuing the deploy" >&2
+  mkdir -p "$STATE/alarms" || return 0
+  [ ! -e "$STATE/alarms/$reason" ] || return 0
+  open_issue="$(gh issue list -R "$REPO" --state open --author "@me" --search "\"$title\" in:title" --json number --jq '.[0].number // empty')" || return 0
+  if [ -n "$open_issue" ]; then
+    gh issue comment "$open_issue" -R "$REPO" -b "$reason: $ORB_UNIT on $MACHINE_NAME. Core deployment continues; inspect the unit logs." >/dev/null || return 0
+  else
+    gh issue create -R "$REPO" -t "$title" -b "$reason: $ORB_UNIT on $MACHINE_NAME. Core deployment continues; inspect the unit logs." -a xiechimon >/dev/null || return 0
+  fi
+  touch "$STATE/alarms/$reason" || true
+}
+
 stop_services() {
   if systemctl --user is-enabled --quiet "$ORB_UNIT"; then
-    systemctl --user stop "$ORB_UNIT" || return 1
+    systemctl --user stop "$ORB_UNIT" || orb_alarm stop
   fi
   systemctl --user stop "$DAEMON_UNIT" && systemctl --user stop "$SERVER_UNIT"
 }
@@ -218,7 +232,7 @@ start_and_check() {
   systemctl --user start "$DAEMON_UNIT"
   daemon_healthy "$started_ms" || return 1
   if systemctl --user is-enabled --quiet "$ORB_UNIT"; then
-    systemctl --user start "$ORB_UNIT" || return 1
+    systemctl --user start "$ORB_UNIT" || orb_alarm start
   fi
   return 0
 }

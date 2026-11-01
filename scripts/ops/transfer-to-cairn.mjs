@@ -1,6 +1,6 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -18,27 +18,69 @@ function readList(path) {
   }
 }
 
-function atomicWrite(path, content) {
+function transferList(name, before, issue) {
+  const lines = before.match(/[^\n]*\n|[^\n]+$/g) ?? [];
+  return name === 'never'
+    ? lines.some((line) => line.trim() === String(issue))
+      ? before
+      : `${before}${before && !before.endsWith('\n') ? '\n' : ''}${issue}\n`
+    : lines.filter((line) => line.trim() !== String(issue)).join('');
+}
+
+function atomicWrite(path, before, after, beforeRename = () => {}) {
   const temp = `${path}.${randomUUID()}.tmp`;
   try {
-    writeFileSync(temp, Buffer.from(content, 'latin1'), { flag: 'wx', mode: 0o600 });
+    writeFileSync(temp, Buffer.from(after, 'latin1'), { flag: 'wx', mode: 0o600 });
+    beforeRename(path);
+    if (readList(path) !== before) return false;
     renameSync(temp, path);
+    return true;
   } finally {
     rmSync(temp, { force: true });
   }
 }
 
-export function applyTransferLists(plan) {
-  for (const [name, list] of Object.entries(plan.lists)) {
-    if (readList(join(plan.stateDir, name)) !== list.before)
-      throw new Error(`lists-changed: ${name}`);
-  }
-  for (const [name, list] of Object.entries(plan.lists)) {
-    if (list.changed) atomicWrite(join(plan.stateDir, name), list.after);
+function restoreTransferLists(plan) {
+  for (const [name, list] of Object.entries(plan.lists).reverse()) {
+    if (!list.changed) continue;
+    const path = join(plan.stateDir, name);
+    for (let attempt = 0; ; attempt += 1) {
+      const current = readList(path);
+      if (!current.startsWith(list.after)) throw new Error(`list-rollback-conflict: ${name}`);
+      const appended = current.slice(list.after.length);
+      const restored = `${list.before}${appended && list.before && !list.before.endsWith('\n') ? '\n' : ''}${appended}`;
+      if (atomicWrite(path, current, restored)) {
+        if (!list.existed && restored === '') rmSync(path);
+        break;
+      }
+      if (attempt === 3) throw new Error(`list-rollback-cas-exhausted: ${name}`);
+    }
   }
 }
 
-const MACOS_FLOCK_FALLBACK = `import fcntl, subprocess, sys, time
+export function applyTransferLists(plan, { beforeRename } = {}) {
+  plan.lists = {};
+  try {
+    for (const name of ['never', 'pending', 'mine', 'hold']) {
+      const path = join(plan.stateDir, name);
+      for (let attempt = 0; ; attempt += 1) {
+        const existed = existsSync(path);
+        const before = readList(path);
+        const after = transferList(name, before, plan.issue);
+        if (before === after || atomicWrite(path, before, after, beforeRename)) {
+          plan.lists[name] = { before, after, existed, changed: before !== after };
+          break;
+        }
+        if (attempt === 3) throw new Error(`list-cas-exhausted: ${name}`);
+      }
+    }
+  } catch (err) {
+    restoreTransferLists(plan);
+    throw err;
+  }
+}
+
+const LOCK_HOLDER = `import fcntl, sys, time
 with open(sys.argv[1], 'a') as lock:
     until = time.monotonic() + float(sys.argv[2])
     while True:
@@ -49,10 +91,46 @@ with open(sys.argv[1], 'a') as lock:
             if time.monotonic() >= until:
                 sys.exit(73)
             time.sleep(0.05)
-    sys.exit(subprocess.call(sys.argv[3:]))
+    print('locked', flush=True)
+    sys.stdin.read()
 `;
 
-export async function transferToCairn(options, runner = runGh) {
+async function withTransferLock(lock, action) {
+  const holder = spawn(
+    'python3',
+    ['-u', '-c', LOCK_HOLDER, lock.path, String(lock.timeoutSeconds)],
+    {
+      stdio: ['pipe', 'pipe', 'pipe'],
+    },
+  );
+  let stderr = '';
+  holder.stderr.on('data', (data) => {
+    stderr += data;
+  });
+  holder.stdin.on('error', () => {});
+  const exited = new Promise((resolve, reject) => {
+    holder.once('error', reject);
+    holder.once('exit', resolve);
+  });
+  try {
+    await Promise.race([
+      new Promise((resolve) => holder.stdout.once('data', resolve)),
+      exited.then((code) => {
+        throw new Error(
+          code === 73
+            ? `overnight-lock-timeout: ${lock.path}`
+            : `overnight-lock-failed: ${stderr.trim() || code}`,
+        );
+      }),
+    ]);
+    return await action();
+  } finally {
+    holder.stdin.end();
+    await exited;
+  }
+}
+
+async function planTransfer(options, runner) {
   const { issue, agent = null, dryRun = false, repo = 'xiechimon/cairn' } = options;
   if (!Number.isSafeInteger(issue) || issue < 1) throw new Error('invalid-issue');
   if (!/^[\w-]+\/[\w.-]+$/.test(repo)) throw new Error('invalid-repo');
@@ -109,14 +187,7 @@ export async function transferToCairn(options, runner = runGh) {
   const lists = {};
   for (const name of ['never', 'pending', 'mine', 'hold']) {
     const before = readList(join(stateDir, name));
-    const lines = before.match(/[^\n]*\n|[^\n]+$/g) ?? [];
-    const contains = lines.some((line) => line.trim() === String(issue));
-    const after =
-      name === 'never'
-        ? contains
-          ? before
-          : `${before}${before && !before.endsWith('\n') ? '\n' : ''}${issue}\n`
-        : lines.filter((line) => line.trim() !== String(issue)).join('');
+    const after = transferList(name, before, issue);
     lists[name] = { before, after, changed: before !== after };
   }
   const removed = labelsBefore.filter((name) => !labelsAfter.includes(name));
@@ -129,8 +200,8 @@ export async function transferToCairn(options, runner = runGh) {
     lanesDir,
     lock: {
       path: join(stateDir, 'lock2'),
-      timeoutSeconds: options.lockTimeoutSeconds ?? 10,
-      macOSFallback: 'python3 fcntl.flock holds the same lock2 while applying lists',
+      timeoutSeconds: options.lockTimeoutSeconds ?? 900,
+      macOSFallback: 'python3 fcntl.flock holds lock2 through list edits and label PATCH',
     },
     issue,
     labelsBefore,
@@ -143,70 +214,39 @@ export async function transferToCairn(options, runner = runGh) {
   };
   if (!Number.isFinite(plan.lock.timeoutSeconds) || plan.lock.timeoutSeconds < 0)
     throw new Error('invalid-lock-timeout');
+  return plan;
+}
+
+export async function transferToCairn(options, runner = runGh) {
+  const plan = await planTransfer(options, runner);
   (options.printPlan ?? ((value) => process.stdout.write(`${JSON.stringify(value, null, 2)}\n`)))(
     plan,
   );
-  if (dryRun) return plan;
-  if (removed.length || added.length) {
-    await runner([
-      'api',
-      `repos/${repo}/issues/${issue}`,
-      '--method',
-      'PATCH',
-      ...labelsAfter.flatMap((label) => ['-f', `labels[]=${label}`]),
-    ]);
-  }
-  if (Object.values(lists).some((list) => list.changed)) {
+  if (plan.dryRun) return plan;
+  mkdirSync(plan.stateDir, { recursive: true });
+  await withTransferLock(plan.lock, async () => {
+    Object.assign(plan, await planTransfer(options, runner));
+    applyTransferLists(plan);
     try {
-      mkdirSync(stateDir, { recursive: true });
-      const args = [
-        process.execPath,
-        new URL(import.meta.url).pathname,
-        '--apply-lists',
-        JSON.stringify(plan),
-      ];
-      const flock = (await runner(['-c', 'command -v flock || true'], 'sh')).trim();
-      if (flock) {
-        await runner(
-          [
-            '--exclusive',
-            '--timeout',
-            String(plan.lock.timeoutSeconds),
-            '--conflict-exit-code',
-            '73',
-            plan.lock.path,
-            ...args,
-          ],
-          'flock',
-        );
-      } else {
-        await runner(
-          ['-c', MACOS_FLOCK_FALLBACK, plan.lock.path, String(plan.lock.timeoutSeconds), ...args],
-          'python3',
-        );
+      if (JSON.stringify(plan.labelsBefore) !== JSON.stringify(plan.labelsAfter)) {
+        await runner([
+          'api',
+          `repos/${options.repo ?? 'xiechimon/cairn'}/issues/${plan.issue}`,
+          '--method',
+          'PATCH',
+          ...plan.labelsAfter.flatMap((label) => ['-f', `labels[]=${label}`]),
+        ]);
       }
     } catch (err) {
-      const redo = Object.entries(lists)
-        .filter(([name, list]) => readList(join(stateDir, name)) !== list.after)
-        .map(([name, list]) => ({ path: join(stateDir, name), after: list.after }));
-      const reason =
-        err.status === 73
-          ? `overnight-lock-timeout: ${plan.lock.path}`
-          : `list-edit-failed: ${err.stderr?.toString().trim() || err.message}`;
-      throw new Error(
-        `${reason}; labels already applied; redo list edits after re-planning under lock2: ${JSON.stringify(redo)}`,
-      );
+      restoreTransferLists(plan);
+      throw err;
     }
-  }
+  });
   return plan;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   try {
-    if (process.argv[2] === '--apply-lists') {
-      applyTransferLists(JSON.parse(process.argv[3]));
-      process.exit(0);
-    }
     const args = process.argv.slice(2);
     const options = { issue: Number(args.shift()) };
     while (args.length) {

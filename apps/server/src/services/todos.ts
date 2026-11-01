@@ -298,6 +298,7 @@ export function createTodo(
     orchestration?: { threadId: string };
     output?: TodoOutputKind;
     userSpecAttachmentIds?: string[];
+    assignment?: Assignment;
   },
 ): TodoRecord {
   const { db, hub } = deps;
@@ -331,7 +332,7 @@ export function createTodo(
       phaseAt: now,
       seqNum,
       orderIndex: (orderRow?.n ?? -1) + 1,
-      assignment: null,
+      assignment: input.assignment ?? null,
       latestBuildId: null,
       lastRunAt: null,
       hasChanges: false,

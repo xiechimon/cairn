@@ -5,6 +5,7 @@ import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { checkTrialEvidence } from './trial-evidence-check.mjs';
 
@@ -437,7 +438,7 @@ test('CLI returns a named failure for a missing evidence file without node_modul
   const result = spawnSync(
     process.execPath,
     [
-      new URL('./trial-evidence-check.mjs', import.meta.url).pathname,
+      fileURLToPath(new URL('./trial-evidence-check.mjs', import.meta.url)),
       '/missing/trial-evidence.json',
     ],
     { encoding: 'utf8', cwd: '/tmp' },
@@ -480,7 +481,10 @@ process.stdout.write(JSON.stringify(value));
     );
     const result = await promisify(execFile)(
       process.execPath,
-      [new URL('./trial-evidence-check.mjs', import.meta.url).pathname, join(dir, 'evidence.json')],
+      [
+        fileURLToPath(new URL('./trial-evidence-check.mjs', import.meta.url)),
+        join(dir, 'evidence.json'),
+      ],
       {
         cwd: dir,
         env: {

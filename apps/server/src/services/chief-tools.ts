@@ -10,7 +10,7 @@ import {
   todoOutputSchema,
   updateSkillToolParamsSchema,
 } from '@cairn/shared';
-import { and, eq, inArray, or, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   agent,
@@ -161,6 +161,14 @@ function requireTeamTodo(db: Db, todoId: string, teamId: string) {
     .get();
   if (!row) throw new HttpError(404, `todo ${todoId}`);
   return row;
+}
+function refuseIntakeSplit(row: typeof todo.$inferSelect): void {
+  if (row.assignment?.source === 'intake-label') {
+    throw new HttpError(
+      409,
+      `intake-label-split-refused: Build task #${row.seqNum} as is with its preset agent; an unlinked split cannot preserve its intake label.`,
+    );
+  }
 }
 const DOCS_MAX_PATHS = 24;
 
@@ -402,6 +410,19 @@ export async function executeChiefTool(
     case 'create_todo': {
       const projectId = str(params, 'projectId');
       requireProjectRow(db, projectId, ctx.teamId);
+      const pending = db
+        .select()
+        .from(todo)
+        .where(
+          and(
+            eq(todo.teamId, ctx.teamId),
+            eq(todo.projectId, projectId),
+            isNull(todo.archivedAt),
+            inArray(todo.phase, ['todo', 'failed']),
+          ),
+        )
+        .all();
+      for (const row of pending) refuseIntakeSplit(row);
       const output = optTodoOutput(params, 'output');
       const record = createTodo(svc, {
         teamId: ctx.teamId,
@@ -419,6 +440,7 @@ export async function executeChiefTool(
     case 'split_todo': {
       const todoId = str(params, 'todoId');
       const parent = requireTeamTodo(db, todoId, ctx.teamId);
+      refuseIntakeSplit(parent);
       const splitPolicy = requireProjectRow(db, parent.projectId, ctx.teamId).splitPolicy;
       const rawSubtodos = params.subtodos;
       if (!Array.isArray(rawSubtodos) || rawSubtodos.length === 0) {
@@ -514,10 +536,18 @@ export async function executeChiefTool(
       const deleted = ids.filter((id) => deleteTodo(svc, id));
       return json({ deleted });
     }
-    case 'close_todos':
-      return json(
-        transitionTodos(deps, ctx.teamId, strArr(params, 'todoIds'), 'closed', chiefActor),
-      );
+    case 'close_todos': {
+      const ids = strArr(params, 'todoIds');
+      for (const id of ids) {
+        const row = db
+          .select()
+          .from(todo)
+          .where(and(eq(todo.id, id), eq(todo.teamId, ctx.teamId)))
+          .get();
+        if (row) refuseIntakeSplit(row);
+      }
+      return json(transitionTodos(deps, ctx.teamId, ids, 'closed', chiefActor));
+    }
     case 'reopen_todos':
       return json(transitionTodos(deps, ctx.teamId, strArr(params, 'todoIds'), 'todo', chiefActor));
     case 'complete_todos':
@@ -771,6 +801,16 @@ export async function executeChiefTool(
         };
       });
       for (const target of targets) {
+        if (
+          target.row.assignment?.source === 'intake-label' &&
+          target.assignment.plan === null &&
+          target.assignment.build === null
+        ) {
+          throw new HttpError(
+            409,
+            'intake-label-assignment-failed: Restore the requested intake agent preset before dispatching this task.',
+          );
+        }
         if (target.assignment.plan === null && target.assignment.build === null) {
           throw new HttpError(
             400,
