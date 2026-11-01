@@ -1,10 +1,11 @@
 import { execFileSync } from 'node:child_process';
 import { runInNewContext } from 'node:vm';
 import { api, disarmAutoMerge, markers, pages, repo } from './autonomy-brake.mjs';
+import { requiredChecks as branchProtectionChecks, mustBeGreenJobs } from './merge-checks.mjs';
 
 const batchHead = /^B\d+\//;
 const mergerTrailer = 'Merged-by: cairn-batch-merger';
-const requiredChecks = ['check', 'pack-smoke', 'e2e-gate', 'pr-evidence'];
+const requiredChecks = [...branchProtectionChecks, ...mustBeGreenJobs];
 const sandboxOptions = { timeout: 1000, contextCodeGeneration: { strings: false, wasm: false } };
 const ownerRouteLabel = 'owner-route';
 const log = (pr, action, reasons) =>

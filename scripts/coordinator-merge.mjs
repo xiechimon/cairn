@@ -3,6 +3,7 @@ import { realpathSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { api, markers, pages, repo } from './autonomy-brake.mjs';
+import { mustBeGreenJobs } from './merge-checks.mjs';
 
 const minimumChecks = 4;
 const closingLine = /^(?:closes|fixes|resolves) #\d+$/i;
@@ -47,14 +48,22 @@ export function mergeMessage(number, messages) {
   return { subject, body };
 }
 
+const isGreen = (check) => check.bucket === 'pass' || check.bucket === 'skipping';
+
+function readChecks(number, ...extra) {
+  return JSON.parse(
+    gh('pr', 'checks', String(number), '-R', repo, ...extra, '--json', 'name,bucket'),
+  );
+}
+
 function checksGreen(number) {
-  const checks = JSON.parse(
-    gh('pr', 'checks', String(number), '-R', repo, '--required', '--json', 'name,bucket'),
-  );
-  return (
-    checks.length >= minimumChecks &&
-    checks.every((check) => check.bucket === 'pass' || check.bucket === 'skipping')
-  );
+  const required = readChecks(number, '--required');
+  if (required.length < minimumChecks || !required.every(isGreen)) return false;
+  const all = readChecks(number);
+  return mustBeGreenJobs.every((name) => {
+    const runs = all.filter((check) => check.name === name);
+    return runs.length > 0 && runs.every(isGreen);
+  });
 }
 
 function braked() {
