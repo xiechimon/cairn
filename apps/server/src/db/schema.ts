@@ -620,6 +620,25 @@ export const tokenUsage = sqliteTable(
   (t) => [primaryKey({ columns: [t.buildId, t.model] })],
 );
 
+export const chiefTurnUsage = sqliteTable(
+  'chief_turn_usage',
+  {
+    stepId: text('stepId').notNull(),
+    threadId: text('threadId').notNull(),
+    model: text('model').notNull(),
+    input: integer('input').notNull().default(0),
+    output: integer('output').notNull().default(0),
+    cacheRead: integer('cacheRead').notNull().default(0),
+    cacheWrite: integer('cacheWrite').notNull().default(0),
+    ttftMs: integer('ttftMs'),
+    createdAt: epochMs('createdAt').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.stepId, t.model] }),
+    index('chief_turn_usage_thread_idx').on(t.threadId, t.createdAt),
+  ],
+);
+
 export const chief = sqliteTable('chief', {
   id: text('id').primaryKey(),
   userId: text('userId').notNull(),
