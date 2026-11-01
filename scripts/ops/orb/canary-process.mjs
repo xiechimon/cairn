@@ -1,6 +1,6 @@
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
-import { readFileSync, realpathSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { closeSync, openSync, readFileSync, realpathSync } from 'node:fs';
+import { basename, join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
 export async function withCleanup(work) {
@@ -131,12 +131,24 @@ export function childRecord(child, cwd, entry) {
 }
 
 export function spawnRecordedChild(cwd, entry, args, env, record) {
+  const logDir = process.env.CAIRN_CANARY_LOG_DIR;
+  const log = logDir
+    ? openSync(
+        join(
+          logDir,
+          `${basename(cwd)}-${args.find((arg) => arg.startsWith('canary-')) ?? 'server'}-${Date.now()}.log`,
+        ),
+        'wx',
+        0o600,
+      )
+    : 'ignore';
   const child = spawn(process.execPath, ['--import', 'tsx', entry, ...args], {
     cwd,
     env,
-    stdio: ['ignore', 'ignore', 'ignore'],
+    stdio: ['ignore', log, log],
     detached: true,
   });
+  if (typeof log === 'number') closeSync(log);
   child.on('error', () => {});
   try {
     record(childRecord(child, cwd, entry));
