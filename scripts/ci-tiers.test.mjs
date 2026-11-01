@@ -130,8 +130,12 @@ function gatePasses(scenarios) {
   const script = scenarios
     .map((scenario) => `(\nset -e -o pipefail\n${gateShell(scenario)}\n) >/dev/null 2>&1; echo $?`)
     .join('\n');
-  const run = spawnSync('bash', ['-c', script], { encoding: 'utf8' });
-  assert.equal(run.status, 0, run.stderr);
+  const run = spawnSync('bash', ['-s'], {
+    input: script,
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  assert.equal(run.status, 0, run.error?.message ?? run.stderr);
   const statuses = run.stdout.trim().split('\n');
   assert.equal(statuses.length, scenarios.length);
   return statuses.map((status) => status === '0');
