@@ -54,6 +54,28 @@ test('binary files outside docs/verify still route to the owner', () => {
   assert.match(reason, /^binary files outside docs\/verify .*apps\/web\/src\/page0\.ts$/);
 });
 
+const BASELINES = 'apps/web/e2e/gallery-snapshots.spec.ts-snapshots';
+
+test('gallery snapshot baselines may be binary without the owner', () => {
+  const pngs = [
+    `${BASELINES}/side-panel-dark-linux.png`,
+    `${BASELINES}/side-panel-light-linux.png`,
+  ];
+  assert.deepEqual(route({ changedFiles: [...sourceFiles(1), ...pngs], binaryFiles: pngs }), []);
+});
+
+test('other binaries beside or near the gallery baselines still route to the owner', () => {
+  for (const path of [
+    `${BASELINES}/side-panel-dark-linux.js`,
+    `${BASELINES}/nested/side-panel-dark-linux.png`,
+    'apps/web/e2e/visual-polish.spec.ts-snapshots/rail-linux.png',
+    'apps/web/src/gallery-snapshots.spec.ts-snapshots/x.png',
+  ]) {
+    const [reason] = route({ changedFiles: [path], binaryFiles: [path] });
+    assert.match(reason ?? '', /^binary files outside docs\/verify/, path);
+  }
+});
+
 test('the line command named for callers leaves docs/verify out of the sum', () => {
   const dir = mkdtempSync(join(tmpdir(), 'pr-gate-lines-'));
   try {
