@@ -137,6 +137,10 @@ test('PR evidence executes only the trusted base brake', (t) => {
     text,
     /git show origin\/main:scripts\/autonomy-brake\.mjs > "\$RUNNER_TEMP\/autonomy-brake\.mjs"/,
   );
+  assert.match(
+    text,
+    /if git cat-file -e origin\/main:scripts\/exact-revert\.mjs; then\n\s+git show origin\/main:scripts\/exact-revert\.mjs > "\$RUNNER_TEMP\/exact-revert\.mjs"\n\s+fi/,
+  );
 });
 test('the trusted brake copy runs alone from RUNNER_TEMP', () => {
   const brake = readFileSync('scripts/autonomy-brake.mjs', 'utf8');
