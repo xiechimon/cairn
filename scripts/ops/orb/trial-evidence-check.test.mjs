@@ -392,6 +392,20 @@ test('verifies the server build, Thread and claimed machine after push', async (
   assert.ok(!failed.lines.includes('trial-one: ok'));
 });
 
+test('a failed build step followed by a completed retry on omarchy-orb passes', async () => {
+  const w = world();
+  w.responses['/api/builds/build-1/steps'].unshift({
+    id: 'step-0',
+    buildId: 'build-1',
+    kind: 'build',
+    status: 'failed',
+    machineId: 'machine-uuid',
+  });
+  const result = await w.run();
+  assert.equal(result.ok, true);
+  assert.ok(result.lines.includes('trial-one: ok'));
+});
+
 for (const [name, mutate] of [
   [
     'server-build',
@@ -415,6 +429,18 @@ for (const [name, mutate] of [
     'server-machine',
     (r) => {
       r['/api/builds/build-1/steps'][0].machineId = null;
+    },
+  ],
+  [
+    'server-step',
+    (r) => {
+      r['/api/builds/build-1/steps'][0].status = 'failed';
+    },
+  ],
+  [
+    'server-step',
+    (r) => {
+      r['/api/builds/build-1/steps'][0].status = 'running';
     },
   ],
   [

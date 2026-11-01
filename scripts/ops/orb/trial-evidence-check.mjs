@@ -249,6 +249,11 @@ export async function checkTrialEvidence(evidence, options = {}) {
           buildSteps.every((step) => step.machineId === matching[0].id),
         'claimed build steps must resolve to omarchy-orb',
       );
+      check(
+        'server-step',
+        buildSteps.some((step) => step.status === 'done'),
+        'the build step on omarchy-orb must have completed successfully',
+      );
       if (failures.length === failuresBeforeServer) lines.push('server: checked');
     } catch {
       failures.push('server: API verification failed');
