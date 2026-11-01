@@ -15,6 +15,7 @@ const args = process.argv.slice(2);
 fs.appendFileSync(process.env.CALLS, JSON.stringify(['gh', ...args]) + '\\n');
 const data = JSON.parse(fs.readFileSync(process.env.GH_DATA, 'utf8'));
 if (args[0] === 'pr' && args[1] === 'edit') process.exit(data.labelError ? 1 : 0);
+if (args[0] === 'pr' && args[1] === 'view' && data.labelsReadError && args.includes('labels')) process.exit(1);
 if (args[0] === 'pr' && args[1] === 'view' && args.includes('--jq')) {
   const out = spawnSync('jq', ['-r', args[args.indexOf('--jq') + 1]], { input: JSON.stringify(data.view), encoding: 'utf8' });
   process.stdout.write(out.stdout);
@@ -31,7 +32,10 @@ function writeExecutable(path, content) {
   chmodSync(path, 0o755);
 }
 
-function mergePr(t, { opener, gateExit, labelError = false, labels = [], ref = 'feature/x' }) {
+function mergePr(
+  t,
+  { opener, gateExit, labelError = false, labelsReadError = false, labels = [], ref = 'feature/x' },
+) {
   const home = mkdtempSync(join(tmpdir(), 'merge-pr-queue-'));
   t.after(() => rmSync(home, { recursive: true, force: true }));
   const calls = join(home, 'calls');
@@ -39,6 +43,7 @@ function mergePr(t, { opener, gateExit, labelError = false, labels = [], ref = '
   writeFileSync(
     join(home, 'gh-data.json'),
     JSON.stringify({
+      labelsReadError,
       labelError,
       view: {
         headRefName: ref,
@@ -85,6 +90,17 @@ function mergePr(t, { opener, gateExit, labelError = false, labels = [], ref = '
     merged: recorded.some((c) => c.includes('merge')),
   };
 }
+
+for (const [route, gateExit, opener] of [
+  ['a protected PR whose labels cannot be read', 0, 'xiechimon', true],
+  ['an unprotected PR whose labels cannot be read', 3, 'xiechimon', true],
+])
+  test(`${route} is refused, failing closed on the hold check`, (t) => {
+    const result = mergePr(t, { opener, gateExit, labelsReadError: true });
+    assert.notEqual(result.status, 0);
+    assert.equal(result.merged, false);
+    assert.match(result.stderr, /could not read its labels/);
+  });
 
 for (const [route, gateExit, opener] of [
   ['an unprotected human-opened', 3, 'xiechimon'],
