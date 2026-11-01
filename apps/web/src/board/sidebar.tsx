@@ -210,7 +210,7 @@ export function BoardSidebar({
   const { search, pathname } = useLocation();
   const stripped = withoutBoardView(withColumnParam(search, null));
   const baseParams = new URLSearchParams(stripped.startsWith('?') ? stripped.slice(1) : stripped);
-  const activeProject = pathname === '/app' ? baseParams.get('project') : null;
+  const projectParam = pathname === '/app' ? baseParams.get('project') : null;
   baseParams.delete('project');
   const homeParams = new URLSearchParams(baseParams);
   if (DEMO_MODE) homeParams.set('view', 'home');
@@ -225,6 +225,7 @@ export function BoardSidebar({
     () => (projects ?? [CANON_PROJECT]).filter((row) => !isDeleted(row.id)),
     [projects],
   );
+  const activeProject = projectRows.some((row) => row.id === projectParam) ? projectParam : null;
   const waitingByProject = useMemo(() => {
     const counts = new Map<string, number>();
     for (const todo of todos ?? []) {

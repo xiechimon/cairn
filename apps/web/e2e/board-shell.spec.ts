@@ -1,20 +1,26 @@
 import { expect, test } from '@playwright/test';
 
-test('a project filter keeps home; a filter that matches nothing counts nothing', async ({
+test('a project filter keeps home and marks the project; an unknown project leaves the home unfiltered', async ({
   page,
 }) => {
-  await page.goto('/app?scenario=board-repos&project=r2-inventory');
+  const workbench = page
+    .getByRole('complementary')
+    .locator('[data-slot="sidebar-nav-row"]', { hasText: '工作台' });
+  await page.goto('/app?scenario=home-c');
+  const unfiltered = await page.getByTestId('home-c-since').textContent();
+
+  await page.goto('/app?scenario=home-c&project=ZAQczKCu0MOAzC1ZqcFlX');
   await expect(page.getByTestId('home-c')).toBeVisible();
   await expect(page.locator('[data-column]')).toHaveCount(0);
-  await expect(page.getByRole('complementary').locator('[data-slot="sidebar-nav-row"]', { hasText: '工作台' })).toHaveAttribute(
-    'aria-current',
-    'page',
-  );
+  await expect(workbench).not.toHaveAttribute('aria-current', 'page');
+  await expect(
+    page.locator('[data-slot="sidebar-project-row"][aria-current="page"]'),
+  ).toContainText('cairn');
 
-  await page.goto('/app?scenario=board-repos&project=no-such-project');
-  await expect(page.getByTestId('home-c-since')).toContainText('0 项待你处理 · 0 件在进行');
-  await expect(page.getByTestId('needs-you')).toHaveCount(0);
-  await expect(page.getByTestId('in-progress-pill')).toHaveCount(0);
+  await page.goto('/app?scenario=home-c&project=no-such-project');
+  await expect(page.getByTestId('home-c-since')).toHaveText(unfiltered ?? '');
+  await expect(workbench).toHaveAttribute('aria-current', 'page');
+  await expect(page.locator('[data-slot="sidebar-project-row"][aria-current="page"]')).toHaveCount(0);
 });
 
 test('the needs-me inbox lists recent pending cards as rows and folds week-old ones', async ({
