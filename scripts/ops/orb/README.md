@@ -427,7 +427,7 @@ Use Node 22.19+ with the guest's Node major, installed checkout dependencies
 (including the native SQLite binding), `git`, `tailscale`, and the existing daemon build at
 `apps/daemon/dist/cli.mjs`. The canary performs no installation or build. It first
 runs the real `orb-host-check` detection, including its disposable clone and
-cleanup in a separate terminal signal group. Repeated SIGINT/SIGTERM signals
+cleanup in a separate terminal signal group. Repeated SIGINT/SIGTERM/SIGHUP signals
 only request cancellation and cannot bypass cleanup. Missing prerequisites refuse the run before planting sentinels. If
 interrupted during that check, it waits for the check's own cleanup before
 honoring the interruption. The output path must be new; an existing evidence
@@ -505,15 +505,16 @@ The issue originally proposed replacing real secret paths and restoring backups.
 This implementation deliberately creates only new random-named files:
 
 ```text
-~/.cairn/cairn-canary-<random>.pem
-~/.cairn/cairn-canary-<random>.key
-~/.ssh/cairn-canary-<random>
-~/.codex/cairn-canary-<random>.json
-~/.claude/cairn-canary-<random>.json
+~/.cairn/.cairn-canary-<runid>-pem
+~/.cairn/.cairn-canary-<runid>-key
+~/.ssh/.cairn-canary-<runid>
+~/.codex/.cairn-canary-<runid>
+~/.claude/.cairn-canary-<runid>
 ```
 
 The directories must already exist without symlinks. Exclusive creation refuses
-existing files or symlinks, rolls back partial planting, and cleanup checks each
+existing files or symlinks with `wx`, creates each sentinel with mode `0600`,
+rolls back partial planting, and cleanup checks each
 created inode before unlinking it. Real files are never moved, renamed,
 overwritten or backed up, so a crash can no longer strand real keys. Only the
 new sentinel contents are read or copied. Real `~/.cairn/machine.json`, existing
@@ -525,14 +526,31 @@ contain paths and SHA-256 hashes only.
 `ok` and exit zero require complete, unique probe rows, every Orb target blocked,
 clean pushed objects, a leaking host negative control and successful GitHub
 reachability. Any failed prerequisite, runner, push, control, probe or cleanup
-prevents success. Cleanup runs on failure and SIGINT/SIGTERM, stops only owned
+prevents success. The final directory scan requires no `.cairn-canary-*` entries;
+leftovers set `ok: false`, exit nonzero, and appear in `sentinelsRemaining`.
+Cleanup runs on failure, timeout and SIGINT/SIGTERM/SIGHUP, stops only owned
 scratch processes, and removes only the newly allocated machine/image and
 Project seed. Machine shutdown reuses `orb-host-check`'s cleanup helper, waits
 for stop hooks, and refuses to remove a running machine. The production
 provider's normal shared dist publisher is used; shared daemon releases are
-retained by this publisher rather than pruned or deleted by the canary. SIGKILL and power
-loss cannot run cleanup; any remaining sentinel is synthetic and real keys
-remain in place.
+retained by this publisher rather than pruned or deleted by the canary.
+
+A private `~/.cairn/orb-canary-runs/<runid>.jsonl` manifest records the run PID and
+created paths with device/inode identities, flushed before marker contents are
+written. It contains no raw markers. Successful cleanup removes the manifest;
+failed cleanup preserves it for retry. The shell wrapper traps exit and forwards
+SIGINT/SIGTERM/SIGHUP to Node before waiting for cleanup. After SIGKILL or a host
+restart, the next run recovers manifests whose owning process no longer exists.
+To recover one stopped run explicitly without starting the stack:
+
+```sh
+scripts/ops/orb/canary.sh --cleanup <runid>
+```
+
+Recovery removes only recorded files whose identities still match. Active runs,
+replaced files, symlinks and malformed manifests are preserved and refused.
+Untracked sentinel names are reported by the final assertion and never removed
+by a glob. Real keys remain in place.
 
 Offline verification:
 

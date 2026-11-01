@@ -1,23 +1,36 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { once } from 'node:events';
 import {
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   realpathSync,
+  renameSync,
   rmSync,
+  statSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { test } from 'node:test';
-import { aggregateResult, plantSentinels, runCanary, scanObjects, withCleanup } from './canary.mjs';
+import {
+  aggregateResult,
+  plantSentinels,
+  recoverSentinels,
+  remainingSentinels,
+  runCanary,
+  scanObjects,
+  withCleanup,
+} from './canary.mjs';
 import { attack, connectionProbe, expectedTargets } from './canary-attacker.mjs';
-import { runCommand } from './canary-process.mjs';
+import { poll, runCommand } from './canary-process.mjs';
 import { startBridgeControl } from './canary-stack.mjs';
 import { cleanupCanaryMachine } from './machine-cleanup.mjs';
 
@@ -91,11 +104,11 @@ test('aggregation requires every expected target and every control', () => {
 
 test('sentinels are exclusive new files with hashes; conflicts clean partial planting', (t) => {
   const home = fixture(t);
-  const existing = join(home, '.ssh/cairn-canary-fixed');
+  const existing = join(home, '.ssh/.cairn-canary-fixed');
   writeFileSync(existing, 'keep');
   assert.throws(() => plantSentinels(home, 'fixed'), /exist/i);
   assert.equal(readFileSync(existing, 'utf8'), 'keep');
-  assert.equal(existsSync(join(home, '.cairn/cairn-canary-fixed.pem')), false);
+  assert.equal(existsSync(join(home, '.cairn/.cairn-canary-fixed-pem')), false);
   const planted = plantSentinels(home, 'fresh');
   assert.equal(planted.sentinels.length, 5);
   for (const sentinel of planted.sentinels) {
@@ -112,7 +125,7 @@ test('sentinel symlink conflicts do not touch their target', (t) => {
   const home = fixture(t);
   const target = join(home, 'original');
   writeFileSync(target, 'keep');
-  symlinkSync(target, join(home, '.cairn/cairn-canary-fixed.pem'));
+  symlinkSync(target, join(home, '.cairn/.cairn-canary-fixed-pem'));
   assert.throws(() => plantSentinels(home, 'fixed'), /exist/i);
   assert.equal(readFileSync(target, 'utf8'), 'keep');
 });
@@ -469,4 +482,309 @@ test('the known host listener accepts TCP before it is used as the firewall cont
     (await connectionProbe({ host: '127.0.0.1', port: server.address().port })).blocked,
     false,
   );
+});
+
+async function childRun(t, home, mode, shell = false) {
+  const driver = join(home, 'driver.mjs');
+  writeFileSync(
+    driver,
+    `import { canaryMain } from ${JSON.stringify(new URL('./canary.mjs', import.meta.url).href)};
+import { poll } from ${JSON.stringify(new URL('./canary-process.mjs', import.meta.url).href)};
+await canaryMain(['--json'], {
+  home: ${JSON.stringify(home)},
+  preflight: async () => {},
+  stackFactory: async ({ signal }) => {
+    process.stdout.write('READY\\n');
+    if (${JSON.stringify(mode)} === 'kill') process.kill(process.pid, 'SIGKILL');
+    return { run: async () => poll(() => false, { signal, timeout: 10000 }) };
+  },
+  timeout: 10000,
+});
+`,
+  );
+  let command = process.execPath;
+  let args = [driver];
+  let env = { ...process.env, HOME: home, CAIRN_CANARY_RUN_ID: 'child-run' };
+  if (shell) {
+    const bin = join(home, 'bin');
+    mkdirSync(bin);
+    const node = join(bin, 'node');
+    writeFileSync(
+      node,
+      `#!/bin/sh\nif [ "$1" = '${join(import.meta.dirname, 'canary.mjs')}' ] && [ "$2" = '--json' ]; then\nexec '${process.execPath}' '${driver}'\nfi\nexec '${process.execPath}' "$@"\n`,
+      { mode: 0o700 },
+    );
+    command = '/bin/sh';
+    args = [join(import.meta.dirname, 'canary.sh'), '--json'];
+    env = { ...env, PATH: `${bin}:${process.env.PATH}` };
+  }
+  const child = spawn(command, args, { env, stdio: ['ignore', 'pipe', 'pipe'] });
+  let output = '';
+  let errors = '';
+  child.stdout.on('data', (chunk) => {
+    output += chunk;
+  });
+  child.stderr.on('data', (chunk) => {
+    errors += chunk;
+  });
+  const closed = once(child, 'close');
+  t.after(async () => {
+    if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+    await closed;
+  });
+  await poll(
+    () => {
+      if (output.includes('READY\n')) return true;
+      if (child.exitCode !== null || child.signalCode !== null)
+        throw new Error(`Child failed before planting: ${errors}`);
+      return false;
+    },
+    { timeout: 5000 },
+  );
+  return { child, closed, output: () => output };
+}
+
+test('sentinels use unique dotfiles and mode 0600 with a private recovery manifest', (t) => {
+  const home = fixture(t);
+  const planted = plantSentinels(home, 'mode');
+  t.after(planted.cleanup);
+  assert.equal(planted.sentinels.length, 5);
+  for (const { path } of planted.sentinels) {
+    assert.match(basename(path), /^\.cairn-canary-mode(?:-[a-z]+)?$/);
+    assert.equal(statSync(path).mode & 0o777, 0o600);
+  }
+  assert.equal(statSync(planted.manifest).mode & 0o777, 0o600);
+  const manifest = readFileSync(planted.manifest, 'utf8');
+  for (const { path } of planted.sentinels) assert.ok(manifest.includes(path));
+  for (const marker of planted.markers) assert.equal(manifest.includes(marker), false);
+  planted.cleanup();
+  assert.equal(existsSync(planted.manifest), false);
+  assert.deepEqual(remainingSentinels(home), []);
+});
+
+test('an existing dotfile aborts partial planting without modifying its bytes or metadata', (t) => {
+  const home = fixture(t);
+  const path = join(home, '.ssh/.cairn-canary-collision');
+  writeFileSync(path, 'owner file', { mode: 0o640 });
+  const before = lstatSync(path);
+  assert.throws(() => plantSentinels(home, 'collision'), /exist/i);
+  const after = lstatSync(path);
+  for (const field of ['ino', 'mode', 'mtimeMs', 'ctimeMs', 'atimeMs'])
+    assert.equal(after[field], before[field], field);
+  assert.equal(readFileSync(path, 'utf8'), 'owner file');
+  assert.deepEqual(remainingSentinels(home), [path]);
+});
+
+test('an error thrown immediately after planting removes every sentinel and manifest', async (t) => {
+  const home = fixture(t);
+  await assert.rejects(
+    runCanary({
+      home,
+      preflight: async () => {},
+      stackFactory: async () => {
+        throw new Error('after planting');
+      },
+    }),
+    /after planting/,
+  );
+  assert.deepEqual(remainingSentinels(home), []);
+  assert.deepEqual(readdirSync(join(home, '.cairn/orb-canary-runs')), []);
+});
+
+test('a timed out run removes every sentinel and manifest', async (t) => {
+  const home = fixture(t);
+  await assert.rejects(
+    runCanary({
+      home,
+      timeout: 30,
+      preflight: async () => {},
+      stackFactory: async ({ signal }) => ({
+        run: () => poll(() => false, { signal, timeout: 200 }),
+      }),
+    }),
+    /timeout|timed out/i,
+  );
+  assert.deepEqual(remainingSentinels(home), []);
+  assert.deepEqual(readdirSync(join(home, '.cairn/orb-canary-runs')), []);
+});
+
+for (const shell of [false, true]) {
+  for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
+    test(`a ${shell ? 'shell wrapper' : 'Node child'} receiving ${signal} cleans its sentinels and exits nonzero`, async (t) => {
+      const home = fixture(t);
+      const run = await childRun(t, home, 'signal', shell);
+      assert.equal(remainingSentinels(home).length, 5);
+      run.child.kill(signal);
+      const [code] = await run.closed;
+      assert.notEqual(code, 0);
+      assert.deepEqual(remainingSentinels(home), []);
+      assert.deepEqual(readdirSync(join(home, '.cairn/orb-canary-runs')), []);
+      const result = JSON.parse(run.output().slice('READY\n'.length));
+      assert.equal(result.ok, false);
+      assert.deepEqual(result.sentinelsRemaining, []);
+    });
+  }
+}
+
+for (const recovery of ['explicit', 'next-run', 'shell-exit']) {
+  test(`SIGKILL recovery through ${recovery} removes only recorded inodes`, async (t) => {
+    const home = fixture(t);
+    const run = await childRun(t, home, 'kill', recovery === 'shell-exit');
+    await run.closed;
+    if (recovery === 'shell-exit') {
+      assert.deepEqual(remainingSentinels(home), []);
+      return;
+    }
+    const paths = remainingSentinels(home);
+    assert.equal(paths.length, 5);
+    const unrelated = join(home, '.ssh/.cairn-canary-unrelated');
+    writeFileSync(unrelated, 'preserve', { mode: 0o640 });
+    if (recovery === 'explicit') {
+      const result = spawnSync(
+        '/bin/sh',
+        [join(import.meta.dirname, 'canary.sh'), '--cleanup', 'child-run'],
+        {
+          encoding: 'utf8',
+          env: { ...process.env, HOME: home },
+        },
+      );
+      assert.notEqual(result.status, 0);
+      assert.deepEqual(JSON.parse(result.stdout).sentinelsRemaining, [unrelated]);
+    } else {
+      await assert.rejects(
+        runCanary({
+          home,
+          preflight: async () => {
+            throw new Error('stop after recovery');
+          },
+        }),
+        /stop after recovery/,
+      );
+    }
+    assert.ok(paths.every((path) => !existsSync(path)));
+    assert.equal(readFileSync(unrelated, 'utf8'), 'preserve');
+    assert.equal(statSync(unrelated).mode & 0o777, 0o640);
+  });
+}
+
+test('the final assertion records leftovers in failure JSON and exits nonzero', async (t) => {
+  const home = fixture(t);
+  const leftover = join(home, '.claude/.cairn-canary-untracked');
+  const result = spawnSync(
+    process.execPath,
+    [
+      '--input-type=module',
+      '-e',
+      `
+import { canaryMain } from ${JSON.stringify(new URL('./canary.mjs', import.meta.url).href)};
+import { writeFileSync } from 'node:fs';
+await canaryMain(['--json'], {
+  home: ${JSON.stringify(home)}, preflight: async () => {},
+  stackFactory: async () => {
+    writeFileSync(${JSON.stringify(leftover)}, 'preserve');
+    throw new Error('injected failure');
+  },
+});`,
+    ],
+    { encoding: 'utf8' },
+  );
+  assert.equal(result.status, 1, result.stderr);
+  const json = JSON.parse(result.stdout);
+  assert.equal(json.ok, false);
+  assert.deepEqual(json.sentinelsRemaining, [leftover]);
+  assert.equal(readFileSync(leftover, 'utf8'), 'preserve');
+});
+
+for (const leftover of [false, true]) {
+  test(`a completed run ${leftover ? 'fails its final leftover assertion' : 'cleans every sentinel'}`, async (t) => {
+    const home = fixture(t);
+    const result = await runCanary({
+      home,
+      preflight: async () => {},
+      stackFactory: async ({ root, config }) => {
+        await runCommand('git', ['init', '-b', 'main', root]);
+        await runCommand('git', [
+          '-c',
+          'user.name=Canary',
+          '-c',
+          'user.email=canary@example.invalid',
+          '-C',
+          root,
+          'commit',
+          '--allow-empty',
+          '-m',
+          'Seed',
+        ]);
+        return {
+          port: 34567,
+          run: async (executor) => {
+            if (executor === 'host') {
+              if (leftover) writeFileSync(join(home, '.ssh/.cairn-canary-leftover'), 'preserve');
+              return { result: { executor, leaked: [config.sentinels[0].path] } };
+            }
+            return {
+              repo: root,
+              branch: 'main',
+              orbName: 'fixture',
+              result: {
+                executor,
+                githubReach: { ok: true, ms: 1 },
+                routes: Object.fromEntries(
+                  Object.entries(expectedTargets(config)).map(([route, targets]) => [
+                    route,
+                    targets.map((target) => ({ target, blocked: true, detail: 'blocked' })),
+                  ]),
+                ),
+              },
+            };
+          },
+        };
+      },
+    });
+    assert.equal(result.ok, !leftover);
+    assert.deepEqual(
+      result.sentinelsRemaining,
+      leftover ? [join(home, '.ssh/.cairn-canary-leftover')] : [],
+    );
+  });
+}
+
+test('cleanup preserves replaced files and symlinks and keeps their recovery record', (t) => {
+  const home = fixture(t);
+  const planted = plantSentinels(home, 'replace');
+  const [first, second] = planted.sentinels;
+  renameSync(first.path, join(home, 'original-inode'));
+  writeFileSync(first.path, 'replacement', { mode: 0o640 });
+  renameSync(second.path, join(home, 'second-inode'));
+  symlinkSync(join(home, 'original-inode'), second.path);
+  assert.throws(planted.cleanup, /replaced/i);
+  assert.equal(readFileSync(first.path, 'utf8'), 'replacement');
+  assert.equal(statSync(first.path).mode & 0o777, 0o640);
+  assert.ok(lstatSync(second.path).isSymbolicLink());
+  assert.ok(existsSync(planted.manifest));
+  assert.ok(planted.sentinels.slice(2).every(({ path }) => !existsSync(path)));
+});
+
+test('recovery refuses an active run and invalid run IDs', (t) => {
+  const home = fixture(t);
+  const planted = plantSentinels(home, 'active');
+  assert.throws(() => recoverSentinels(home, 'active'), /still active/i);
+  assert.throws(() => recoverSentinels(home, '../outside'), /invalid/i);
+  assert.ok(planted.sentinels.every(({ path }) => existsSync(path)));
+  planted.cleanup();
+});
+
+test('private creation uses mode 0600 even with a restrictive inherited umask', (t) => {
+  const home = fixture(t);
+  const previous = process.umask(0o777);
+  let planted;
+  try {
+    planted = plantSentinels(home, 'umask');
+    assert.equal(process.umask(), 0o777);
+    for (const { path } of planted.sentinels) assert.equal(statSync(path).mode & 0o777, 0o600);
+    assert.equal(statSync(planted.manifest).mode & 0o777, 0o600);
+  } finally {
+    process.umask(previous);
+    planted?.cleanup();
+  }
 });
