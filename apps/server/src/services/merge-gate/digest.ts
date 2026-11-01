@@ -46,8 +46,8 @@ export function computePatchDigest(
 ): PatchDigestResult {
   const kept = files.filter((f) => !isEvidenceEntry(f));
   const excluded = files.filter(isEvidenceEntry);
-  const countedFiles = files.reduce((n, f) => n + (f.previousFilename === null ? 1 : 2), 0);
-  const countedLines = files.reduce((n, f) => n + f.additions + f.deletions, 0);
+  const countedFiles = kept.reduce((n, f) => n + (f.previousFilename === null ? 1 : 2), 0);
+  const countedLines = kept.reduce((n, f) => n + f.additions + f.deletions, 0);
   const result = (
     patchDigest: string | null,
     unavailable: DigestUnavailable | null,

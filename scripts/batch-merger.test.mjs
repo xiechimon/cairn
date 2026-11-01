@@ -8,7 +8,16 @@ import { test } from 'node:test';
 const script = resolve('scripts/batch-merger.mjs');
 const policy = readFileSync('.claude/workflows/pr-gate.js', 'utf8');
 const head = 'a'.repeat(40);
-const required = ['check', 'pack-smoke', 'e2e-gate', 'pr-evidence'];
+const required = [
+  'check',
+  'pack-smoke',
+  'e2e-gate',
+  'pr-evidence',
+  'gates',
+  'dead-class-gate',
+  'ops-backup-test',
+];
+const skippable = ['dead-class-gate', 'ops-backup-test'];
 const trailer = 'Merged-by: cairn-batch-merger';
 const mergerCommit = { commit: { message: `Batch work (#9)\n\n${trailer}` } };
 const pull = (number = 1) => ({
@@ -204,6 +213,52 @@ test('latest required run wins over an older success', (t) => {
   checks.push({ ...checks[0], id: 100, conclusion: 'failure' });
   assert.equal(fixture(t, { checks }).merges.length, 0);
 });
+const completed = (name, id, conclusion) => ({
+  name,
+  id,
+  head_sha: head,
+  status: 'completed',
+  conclusion,
+  app: { slug: 'github-actions' },
+});
+test('a red gates run blocks an otherwise green batch', (t) => {
+  const checks = required.map((name, id) =>
+    completed(name, id, name === 'gates' ? 'failure' : 'success'),
+  );
+  assert.equal(fixture(t, { checks }).merges.length, 0);
+});
+test('a docs-only batch with the code-only jobs skipped still merges', (t) => {
+  const checks = required.map((name, id) =>
+    completed(name, id, skippable.includes(name) ? 'skipped' : 'success'),
+  );
+  assert.equal(fixture(t, { checks }).merges.length, 1);
+});
+test('gates skipped is treated like the other must-be-green jobs', (t) => {
+  const checks = required.map((name, id) =>
+    completed(name, id, name === 'gates' ? 'skipped' : 'success'),
+  );
+  assert.equal(fixture(t, { checks }).merges.length, 1);
+});
+test('neutral, cancelled and timed out must-be-green runs block', (t) => {
+  for (const conclusion of ['neutral', 'cancelled', 'timed_out']) {
+    const checks = required.map((name, id) =>
+      completed(name, id, name === 'ops-backup-test' ? conclusion : 'success'),
+    );
+    assert.equal(fixture(t, { checks }).merges.length, 0);
+  }
+});
+test('a skipped required check still blocks a batch', (t) => {
+  const checks = required.map((name, id) =>
+    completed(name, id, name === 'pack-smoke' ? 'skipped' : 'success'),
+  );
+  assert.equal(fixture(t, { checks }).merges.length, 0);
+});
+test('a missing gates run blocks an otherwise green batch', (t) => {
+  const checks = required
+    .filter((name) => name !== 'gates')
+    .map((name, id) => completed(name, id, 'success'));
+  assert.equal(fixture(t, { checks }).merges.length, 0);
+});
 test('a pause arriving during final validation prevents merging', (t) => {
   const f = fixture(t, { pauseOnSecondLookup: true });
   assert.equal(f.result.status, 0, f.result.stderr);
@@ -350,6 +405,36 @@ for (const data of [{ gitError: true }, { policy: 'invalid policy' }, { numstat:
     assert.equal(f.merges.length, 0);
     assert.match(f.result.stdout, /owner-routing-unavailable/);
   });
+test('a patch whose only overflow is docs/verify evidence stays eligible', (t) => {
+  const evidence = Array.from(
+    { length: 41 },
+    (_, i) => `900\t0\tdocs/verify/2371/run-${i}.txt\n`,
+  ).join('');
+  assert.equal(
+    fixture(t, { numstat: `800\t0\tapps/web/src/page.ts\n${evidence}` }).merges.length,
+    1,
+  );
+});
+test('an evidence binary stays eligible', (t) => {
+  assert.equal(
+    fixture(t, { numstat: '1\t0\tapps/web/src/page.ts\n-\t-\tdocs/verify/2371/shot.png\n' }).merges
+      .length,
+    1,
+  );
+});
+test('product lines beside evidence still hit the line limit', (t) => {
+  const f = fixture(t, {
+    numstat: '401\t400\tapps/web/src/page.ts\n900\t0\tdocs/verify/2371/run.txt\n',
+  });
+  assert.equal(f.merges.length, 0);
+  assert.ok(f.result.stdout.includes('801 lines changed'), f.result.stdout);
+});
+test('product files beside evidence still hit the file limit', (t) => {
+  const code = Array.from({ length: 41 }, (_, i) => `1\t0\tapps/web/src/page${i}.ts\n`).join('');
+  const f = fixture(t, { numstat: `${code}1\t0\tdocs/verify/2371/run.txt\n` });
+  assert.equal(f.merges.length, 0);
+  assert.ok(f.result.stdout.includes('41 files changed'), f.result.stdout);
+});
 test('clean product source remains eligible', (t) => {
   assert.equal(fixture(t).merges.length, 1);
 });

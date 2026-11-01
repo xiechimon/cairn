@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { ChiefSpiralFace } from '../chief/chief-spiral-face.js';
-import { type TraceStep, TraceSteps } from '../components/chat/trace-steps.js';
+import { MemoryRouter } from 'react-router';
+import { ChiefIdentity } from '../chief/chief-identity.js';
+import { TraceGroup, type TraceStep, TraceSteps } from '../components/chat/trace-steps.js';
 import { EmptyState } from '../components/empty-state.js';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
 import {
@@ -27,7 +28,17 @@ import { Message, MessageContent } from '../components/ui/message.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { Select, SelectContent, SelectItem, SelectValue } from '../components/ui/select.js';
 import { Skeleton } from '../components/ui/skeleton.js';
-import { FileText, Key, Lock, Paperclip, Server, SquarePen, X } from '../icons/index.js';
+import {
+  Copy,
+  FileText,
+  Key,
+  Lock,
+  Paperclip,
+  Restore,
+  Server,
+  SquarePen,
+  X,
+} from '../icons/index.js';
 import { SEED_TRANSCRIPT } from './agent-transcript.js';
 import { Cell, Section, Specimen } from './specimen.js';
 
@@ -214,25 +225,67 @@ export function ConversationSection() {
     >
       <Specimen
         title="Turns"
-        code={`<Message>\n  <MessageAvatar><SeededAvatar … /></MessageAvatar>\n  <MessageContent>\n    <Bubble variant="secondary"><BubbleContent>…</BubbleContent></Bubble>\n  </MessageContent>\n</Message>\n<Marker variant="separator"><MarkerContent>Plan approved</MarkerContent></Marker>`}
+        code={`<Message className="justify-end">\n  <MessageContent className="max-w-[min(85%,42rem)] items-end">\n    <div className="bubble-gradient rounded-(--cds-radius-xl) px-3 py-2">…</div>\n  </MessageContent>\n</Message>\n<Message><MessageContent>{agent && <ChiefIdentity … />}<TraceGroup … />…reply text</MessageContent></Message>\n<Marker variant="separator"><MarkerContent>Plan approved</MarkerContent></Marker>`}
       >
         <div className="mx-auto flex w-full max-w-170 flex-col gap-4">
-          <Message className="justify-end gap-2.5">
-            <MessageContent className="items-end">
-              <Bubble variant="secondary" className="max-w-md">
-                <BubbleContent className="rounded-(--radius-bubble) border-0 px-3 py-2.5 text-card-title leading-6">
-                  Why does pnpm install fail in CI?
-                </BubbleContent>
-              </Bubble>
+          <Message className="justify-end">
+            <MessageContent
+              className="max-w-[min(85%,42rem)] flex-none items-end gap-0"
+              data-testid="turn-user"
+            >
+              <div className="bubble-gradient w-fit max-w-full rounded-(--cds-radius-xl) px-3 py-2 text-card-title leading-6 text-foreground">
+                Why does pnpm install fail in CI?
+              </div>
+              <div className="mt-1 flex items-center gap-1 text-content-tertiary">
+                <span className="mr-1.5 text-caption tabular-nums">10:42</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-6 border-none bg-transparent text-content-tertiary"
+                  aria-label="Copy"
+                >
+                  <Copy width={13} height={13} />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-6 border-none bg-transparent text-content-tertiary"
+                  aria-label="Restore to here"
+                >
+                  <Restore width={13} height={13} />
+                </Button>
+              </div>
             </MessageContent>
           </Message>
-          <Message className="gap-2.5">
-            <ChiefSpiralFace size={24} className="mt-0.5 flex-none self-start" />
-            <MessageContent>
+          <Message>
+            <MessageContent className="gap-0">
               <Bubble variant="ghost">
                 <BubbleContent className="text-card-title leading-6">
                   The last commit bumped a version in package.json without updating the lockfile, so
                   the frozen install fails. I will run the install locally and commit the lockfile.
+                </BubbleContent>
+              </Bubble>
+            </MessageContent>
+          </Message>
+          <Message>
+            <MessageContent className="gap-1.5">
+              <MemoryRouter>
+                <ChiefIdentity agent={{ displayName: 'r3-builder', avatarUrl: null }} />
+              </MemoryRouter>
+              <TraceGroup
+                density="compact"
+                steps={[
+                  {
+                    id: 'a',
+                    step: { kind: 'tool', name: 'list_machines', status: 'done', secs: 1 },
+                  },
+                  { id: 'b', step: { kind: 'tool', name: 'open_pr', status: 'done', secs: 3 } },
+                ]}
+              />
+              <Bubble variant="ghost">
+                <BubbleContent className="text-card-title leading-6">
+                  A reply from a bound agent keeps a small identity line above it instead of an
+                  avatar column; tool activity folds into the grey line.
                 </BubbleContent>
               </Bubble>
             </MessageContent>
@@ -278,17 +331,34 @@ export function ConversationSection() {
   );
 }
 
-const TRACE_STATES: { id: string; step: TraceStep }[] = [
-  { id: 'done', step: { kind: 'search', query: 'open tasks', hits: 4, secs: 2 } },
+const TRACE_DONE: { id: string; step: TraceStep }[] = [
+  { id: 'a', step: { kind: 'search', query: 'open tasks', hits: 4, secs: 2 } },
+  { id: 'b', step: { kind: 'read', path: 'apps/web/src/main.tsx', lines: 64, secs: 1 } },
+];
+
+const TRACE_RUNNING: { id: string; step: TraceStep }[] = [
+  { id: 'a', step: { kind: 'run', command: 'pnpm install', exit: null, output: [], secs: 0 } },
+];
+
+const TRACE_FAILED: { id: string; step: TraceStep }[] = [
   {
-    id: 'running',
-    step: { kind: 'run', command: 'pnpm install', exit: null, output: [], secs: 0 },
+    id: 'a',
+    step: {
+      kind: 'run',
+      command: 'pnpm install --frozen-lockfile',
+      exit: 1,
+      output: ['ERR_PNPM_OUTDATED_LOCKFILE  Cannot install with "frozen-lockfile"'],
+      secs: 4,
+    },
   },
   {
-    id: 'failed',
+    id: 'b',
     step: { kind: 'tool', verb: 'Called', name: 'list_machines', status: 'failed', secs: 4 },
   },
-  { id: 'pending', step: { kind: 'wait', text: 'Waiting for the agent…' } },
+];
+
+const TRACE_PENDING: { id: string; step: TraceStep }[] = [
+  { id: 'a', step: { kind: 'wait', text: 'Waiting for the agent…' } },
 ];
 
 const TRACE_TOOLS: { id: string; step: TraceStep }[] = [
@@ -302,33 +372,43 @@ export function TraceSection() {
     <Section
       id="trace"
       title="Trace"
-      lede="One line per agent action. Every line comes from TraceStepLine: an icon for the kind, a verb, the target in a code pill, then the result and the time. Never hand-write tool rows."
+      lede="The agent's narration stays body text. Tool activity folds into one grey summary line ending in a triangle; open it for a hairline card with one 36px row per action: a quiet verb, the target in medium weight, and the result at the end. A row opens to its command and output. Never hand-write tool rows."
     >
       <Specimen
-        title="States"
-        note="done, running (shimmer), failed (red mark only), pending"
-        code={`<TraceSteps steps={[{ id, step: { kind: 'run', command: 'pnpm install', exit: null, output: [], secs: 0 } }]} />`}
+        title="Trace states"
+        note="done, running (present tense, shimmer on the verb), failed (red count and exit code), pending"
+        code={`<TraceSteps defaultOpen steps={[{ id, step: { kind: 'run', command: 'pnpm install', exit: null, output: [], secs: 0 } }]} />`}
       >
-        <TraceSteps steps={TRACE_STATES} className="max-w-120" />
+        <div className="grid w-full grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
+          <Cell label="Done">
+            <TraceSteps steps={TRACE_DONE} defaultOpen className="w-full" />
+          </Cell>
+          <Cell label="Running">
+            <TraceSteps steps={TRACE_RUNNING} defaultOpen className="w-full" />
+          </Cell>
+          <Cell label="Failed: the exit code opens by default">
+            <TraceSteps steps={TRACE_FAILED} defaultOpen className="w-full" />
+          </Cell>
+          <Cell label="Pending">
+            <TraceSteps steps={TRACE_PENDING} className="w-full" />
+          </Cell>
+        </div>
       </Specimen>
       <Specimen
         title="Step kinds"
-        note="think, search, read, say, run (folds its output), edit, push, check"
+        note="think, search, read, say, run (opens to command and output), edit, push, check"
       >
         <TraceSteps
           steps={SEED_TRANSCRIPT.map((step, i) => ({ id: i, step }))}
+          defaultOpen
           className="max-w-160"
         />
       </Specimen>
       <Specimen
         title="Chief turn tools"
-        note="the same lines at compact density under a chief reply"
+        note="the same group at compact density under a chief reply"
       >
-        <TraceSteps
-          steps={TRACE_TOOLS}
-          density="compact"
-          className="max-w-120 border-l border-border py-0.5 pl-3"
-        />
+        <TraceGroup steps={TRACE_TOOLS} density="compact" defaultOpen className="w-120" />
       </Specimen>
     </Section>
   );

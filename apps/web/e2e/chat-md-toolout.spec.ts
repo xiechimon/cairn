@@ -31,7 +31,7 @@ test('A2: expanding calls reveals one standalone block per tool output', async (
   await expect(outputs.nth(1)).toContainText('hello from cairn');
 });
 
-test('A3: the output block is left aligned, mono, normal contrast — not a chat-note', async ({
+test('A3: the output block is left aligned, mono, in the tertiary ink — not a chat-note', async ({
   page,
 }) => {
   await page.goto(ROUTE);
@@ -39,7 +39,7 @@ test('A3: the output block is left aligned, mono, normal contrast — not a chat
   for (const call of await page.getByTestId('work-call').all()) await call.click();
   const ink = await page.evaluate(() => {
     const probe = document.createElement('span');
-    probe.style.color = 'var(--foreground)';
+    probe.style.color = 'var(--text-tertiary)';
     document.body.appendChild(probe);
     const c = getComputedStyle(probe).color;
     probe.remove();

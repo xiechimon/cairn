@@ -1434,8 +1434,8 @@ function collectChiefStream(
       const head = orchestratePromptHeadOf(text);
       items.push(
         head === null
-          ? { kind: 'user', text, id: m.id, markdown: text }
-          : { kind: 'user', text: head, id: m.id },
+          ? { kind: 'user', text, id: m.id, markdown: text, at: clockTime(m.createdAt) }
+          : { kind: 'user', text: head, id: m.id, at: clockTime(m.createdAt) },
       );
       continue;
     }

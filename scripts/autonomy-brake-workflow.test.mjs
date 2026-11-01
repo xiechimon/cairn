@@ -137,6 +137,10 @@ test('PR evidence executes only the trusted base brake', (t) => {
     text,
     /git show origin\/main:scripts\/autonomy-brake\.mjs > "\$RUNNER_TEMP\/autonomy-brake\.mjs"/,
   );
+  assert.match(
+    text,
+    /if git cat-file -e origin\/main:scripts\/exact-revert\.mjs; then\n\s+git show origin\/main:scripts\/exact-revert\.mjs > "\$RUNNER_TEMP\/exact-revert\.mjs"\n\s+fi/,
+  );
 });
 for (const conclusion of ['cancelled', 'timed_out'])
   test(`main push conclusion ${conclusion} applies the brake`, (t) => {
