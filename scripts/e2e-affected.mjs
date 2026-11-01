@@ -296,6 +296,8 @@ const DIR_RULES = [
   { prefix: 'apps/web/src/resources/', specs: RESOURCES },
   { prefix: 'apps/web/src/secondary/', specs: SECONDARY },
   { prefix: 'apps/web/src/pwa/', specs: ['notify-', 'push-device-switch'] },
+  { prefix: 'apps/web/src/components/texture/', specs: ['texture-'] },
+  { prefix: 'apps/web/src/design/', specs: ['texture-'] },
   { prefix: 'apps/web/test/', specs: [] },
 ];
 

@@ -313,6 +313,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: node --test scripts/dispatch-agent.test.mjs scripts/dispatch-dedupe.test.mjs scripts/lane-model-policy.test.mjs
 
+      - name: Mergify queue config follows pr-gate routing
+        if: ${{ !cancelled() }}
+        run: node --test scripts/mergify-config.test.mjs scripts/merge-route.test.mjs
+
       - name: UI debt ledger only shrinks against main
         if: ${{ !cancelled() }}
         run: node --test scripts/ui-debt-gate.test.mjs
@@ -327,7 +331,7 @@ jobs:
 
       - name: Merge routing size caps (#2371)
         if: ${{ !cancelled() }}
-        run: node --test scripts/pr-gate-routing.test.mjs scripts/batch-merger.test.mjs scripts/coordinator-merge.test.mjs
+        run: node --test scripts/pr-gate-routing.test.mjs scripts/batch-merger.test.mjs scripts/coordinator-merge.test.mjs scripts/merge-queue-drafts.test.mjs
 
       - name: Real smoke runner and checker fixtures (#2283)
         if: ${{ !cancelled() }}

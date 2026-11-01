@@ -35,7 +35,11 @@ function MenuKeyHint({ shortcut, confirms }: MenuKeyProps) {
         </span>
       )}
       {shortcut !== undefined && (
-        <DropdownMenuShortcut aria-hidden="true" className="min-w-3 pl-3 text-right tabular-nums">
+        <DropdownMenuShortcut
+          data-testid="menu-key-hint"
+          aria-hidden="true"
+          className="min-w-3 pl-3 text-right tabular-nums"
+        >
           {shortcut.toUpperCase()}
         </DropdownMenuShortcut>
       )}
