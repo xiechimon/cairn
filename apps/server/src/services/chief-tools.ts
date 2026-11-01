@@ -1,4 +1,4 @@
-import type { SecretBox, UserRecord } from '@cairn/shared';
+import type { Assignment, SecretBox, UserRecord } from '@cairn/shared';
 import {
   AGENT_TOOL_DEFAULTS,
   createSkillBodySchema,
@@ -27,6 +27,7 @@ import { HttpError, parseWith } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
 import { newRecordId } from '../lib/ids.js';
 import { todoAuthorizesAttachment } from './attachment-authorization.js';
+import { readAttachmentMeta } from './attachments.js';
 import {
   advanceSplitWaves,
   applyBuildStepAction,
@@ -161,6 +162,28 @@ function requireTeamTodo(db: Db, todoId: string, teamId: string) {
   if (!row) throw new HttpError(404, `todo ${todoId}`);
   return row;
 }
+function refuseIntakeSplit(row: typeof todo.$inferSelect): void {
+  if (row.assignment?.source === 'intake-label') {
+    throw new HttpError(
+      409,
+      `intake-label-split-refused: Build task #${row.seqNum} as is with its preset agent; an unlinked split cannot preserve its intake label.`,
+    );
+  }
+}
+
+export function requireIntakeAssignment(assignment: Assignment): void {
+  if (
+    assignment.source === 'intake-label' &&
+    assignment.plan === null &&
+    assignment.build === null
+  ) {
+    throw new HttpError(
+      409,
+      'intake-label-assignment-failed: Restore the requested intake agent preset before dispatching this task.',
+    );
+  }
+}
+
 const DOCS_MAX_PATHS = 24;
 
 export const CHIEF_TASK_LIST_MAX_OUTPUT_BYTES = 32 * 1024;
@@ -171,9 +194,9 @@ function requireTeamAgent(db: Db, agentId: string, teamId: string) {
   const row = db
     .select()
     .from(agent)
-    .where(and(eq(agent.id, agentId), eq(agent.teamId, teamId)))
+    .where(and(eq(agent.id, agentId), eq(agent.teamId, teamId), eq(agent.status, 'active')))
     .get();
-  if (!row) throw new HttpError(404, `agent ${agentId}（不在本团队，或 id 抄错了）`);
+  if (!row) throw new HttpError(404, `agent ${agentId} is unavailable in this team`);
   return row;
 }
 function requireTeamBuild(db: Db, buildId: string, teamId: string) {
@@ -391,7 +414,6 @@ export async function executeChiefTool(
       return json(await executeGithubReadTool(deps, ctx.teamId, name, params));
     case 'attachment': {
       const attachmentId = str(params, 'attachmentId');
-      const { readAttachmentMeta } = await import('./attachments.js');
       return json(readAttachmentMeta(deps, ctx.teamId, attachmentId));
     }
     case 'conversation': {
@@ -419,6 +441,7 @@ export async function executeChiefTool(
     case 'split_todo': {
       const todoId = str(params, 'todoId');
       const parent = requireTeamTodo(db, todoId, ctx.teamId);
+      refuseIntakeSplit(parent);
       const splitPolicy = requireProjectRow(db, parent.projectId, ctx.teamId).splitPolicy;
       const rawSubtodos = params.subtodos;
       if (!Array.isArray(rawSubtodos) || rawSubtodos.length === 0) {
@@ -510,14 +533,25 @@ export async function executeChiefTool(
     }
     case 'delete_todos': {
       const ids = strArr(params, 'todoIds');
-      for (const id of ids) requireTeamTodo(db, id, ctx.teamId);
+      for (const id of ids) {
+        const row = requireTeamTodo(db, id, ctx.teamId);
+        if (row.latestBuildId === null) refuseIntakeSplit(row);
+      }
       const deleted = ids.filter((id) => deleteTodo(svc, id));
       return json({ deleted });
     }
-    case 'close_todos':
-      return json(
-        transitionTodos(deps, ctx.teamId, strArr(params, 'todoIds'), 'closed', chiefActor),
-      );
+    case 'close_todos': {
+      const ids = strArr(params, 'todoIds');
+      for (const id of ids) {
+        const row = db
+          .select()
+          .from(todo)
+          .where(and(eq(todo.id, id), eq(todo.teamId, ctx.teamId)))
+          .get();
+        if (row?.latestBuildId === null) refuseIntakeSplit(row);
+      }
+      return json(transitionTodos(deps, ctx.teamId, ids, 'closed', chiefActor));
+    }
     case 'reopen_todos':
       return json(transitionTodos(deps, ctx.teamId, strArr(params, 'todoIds'), 'todo', chiefActor));
     case 'complete_todos':
@@ -752,26 +786,43 @@ export async function executeChiefTool(
         review: assignmentIn?.review?.agentId ? { agentId: assignmentIn.review.agentId } : null,
         verify: assignmentIn?.verify?.agentId ? { agentId: assignmentIn.verify.agentId } : null,
       };
-      if (assignment.plan === null && assignment.build === null) {
-        throw new HttpError(
-          400,
-          'assignment 整参缺失或两槽全空：无指派 Agent 的 build 无人可领。请传 assignment 指派 Agent（至少一个槽非空），例如 {"assignment":{"build":{"agentId":"<agentId>"}}}，然后重试 run_builds。',
-        );
-      }
-      for (const slot of [
-        assignment.plan,
-        assignment.build,
-        assignment.review,
-        assignment.verify,
-      ]) {
-        if (slot !== null) requireTeamAgent(db, slot.agentId, ctx.teamId);
-      }
       const targets = todoIds.map((todoId) => {
         const row = requireTeamTodo(db, todoId, ctx.teamId);
-        return { todoId, row, projectName: requireProjectRow(db, row.projectId, ctx.teamId).name };
+        const effectiveAssignment =
+          row.assignment?.source === 'intake-label'
+            ? {
+                ...assignment,
+                source: row.assignment.source,
+                plan: row.assignment.plan,
+                build: row.assignment.build,
+              }
+            : assignment;
+        return {
+          todoId,
+          row,
+          assignment: effectiveAssignment,
+          projectName: requireProjectRow(db, row.projectId, ctx.teamId).name,
+        };
       });
+      for (const target of targets) {
+        requireIntakeAssignment(target.assignment);
+        if (target.assignment.plan === null && target.assignment.build === null) {
+          throw new HttpError(
+            400,
+            'No agent is assigned to plan or build. Set assignment.build.agentId or assignment.plan.agentId, then retry run_builds.',
+          );
+        }
+        for (const slot of [
+          target.assignment.plan,
+          target.assignment.build,
+          target.assignment.review,
+          target.assignment.verify,
+        ]) {
+          if (slot !== null) requireTeamAgent(db, slot.agentId, ctx.teamId);
+        }
+      }
       const started: unknown[] = [];
-      for (const { todoId, row, projectName } of targets) {
+      for (const { todoId, row, projectName, assignment } of targets) {
         const builds = startBuilds(
           {
             db,
@@ -1145,7 +1196,6 @@ export async function executeWorkerMemoryTool(
       );
     }
     case 'attachment': {
-      const { readAttachmentMeta } = await import('./attachments.js');
       const attachmentId = str(params, 'attachmentId');
       if (!todoAuthorizesAttachment(db, ctx.todoId, attachmentId)) {
         throw new HttpError(404, `attachment ${attachmentId}`);

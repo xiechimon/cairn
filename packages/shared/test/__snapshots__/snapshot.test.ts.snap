@@ -5012,6 +5012,10 @@ exports[`body/envelope schema snapshots > startBuildsBody > startBuildsBody.json
             },
           ],
         },
+        "source": {
+          "const": "intake-label",
+          "type": "string",
+        },
         "verify": {
           "anyOf": [
             {
@@ -5599,6 +5603,10 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                           "type": "null",
                         },
                       ],
+                    },
+                    "source": {
+                      "const": "intake-label",
+                      "type": "string",
                     },
                     "verify": {
                       "anyOf": [
@@ -9476,6 +9484,10 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
                   "type": "null",
                 },
               ],
+            },
+            "source": {
+              "const": "intake-label",
+              "type": "string",
             },
             "verify": {
               "anyOf": [

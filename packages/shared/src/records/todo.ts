@@ -7,6 +7,7 @@ import { quotaWaitSchema } from './step.js';
 
 export const assignmentSlotSchema = z.object({ agentId: recordId });
 export const assignmentSchema = z.object({
+  source: z.literal('intake-label').optional(),
   plan: assignmentSlotSchema.nullable(),
   build: assignmentSlotSchema.nullable(),
   review: assignmentSlotSchema.nullish(),

@@ -1,4 +1,5 @@
 import {
+  type Assignment,
   BRAND,
   CHIEF_REMOTE_TOOLS,
   githubReadToolParamsSchemas,
@@ -17,7 +18,7 @@ import { verifyApiKey } from './api-keys.js';
 import { readAttachmentMeta } from './attachments.js';
 import { cancelBuild, messageTodo, startBuilds } from './builds.js';
 import type { ChiefToolDeps, TransitionActor } from './chief-tools.js';
-import { confirmBuild, transitionTodos } from './chief-tools.js';
+import { confirmBuild, requireIntakeAssignment, transitionTodos } from './chief-tools.js';
 import { readConversationPage } from './conversation-page.js';
 import { executeGithubReadTool } from './github-reads.js';
 import { isChiefConversation } from './machines.js';
@@ -100,7 +101,7 @@ function requireTeamAgent(db: Db, agentId: string, teamId: string) {
   const row = db
     .select({ id: agent.id })
     .from(agent)
-    .where(and(eq(agent.id, agentId), eq(agent.teamId, teamId)))
+    .where(and(eq(agent.id, agentId), eq(agent.teamId, teamId), eq(agent.status, 'active')))
     .get();
   if (!row) throw new HttpError(404, `agent ${agentId}`);
 }
@@ -286,16 +287,36 @@ export async function executeMcpTool(
         plan: assignmentIn?.plan?.agentId ? { agentId: assignmentIn.plan.agentId } : null,
         build: assignmentIn?.build?.agentId ? { agentId: assignmentIn.build.agentId } : null,
       };
-      for (const slot of [assignment.plan, assignment.build]) {
-        if (slot !== null) requireTeamAgent(db, slot.agentId, ctx.teamId);
-      }
       const rows = todoIds.map((todoId) => {
         const row = requireTeamTodo(db, todoId, ctx.teamId);
         requireProjectRow(db, row.projectId, ctx.teamId);
         return row;
       });
+      const targets = rows.map((row) => {
+        const effectiveAssignment: Assignment =
+          row.assignment?.source === 'intake-label'
+            ? {
+                ...assignment,
+                source: row.assignment.source,
+                plan: row.assignment.plan,
+                build: row.assignment.build,
+              }
+            : assignment;
+        return { row, assignment: effectiveAssignment };
+      });
+      for (const target of targets) {
+        requireIntakeAssignment(target.assignment);
+        for (const slot of [
+          target.assignment.plan,
+          target.assignment.build,
+          target.assignment.review,
+          target.assignment.verify,
+        ]) {
+          if (slot != null) requireTeamAgent(db, slot.agentId, ctx.teamId);
+        }
+      }
       const started: unknown[] = [];
-      for (const row of rows) {
+      for (const { row, assignment } of targets) {
         started.push(
           ...startBuilds(svc, {
             projectId: row.projectId,
