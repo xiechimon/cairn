@@ -64,7 +64,9 @@ export function applyPromptSet(systemPrompt: string, set: PromptSet): string {
         'the cut arm would silently run with the current prompt',
     );
   }
-  return `${lines.slice(0, headerAt).join('\n')}\n${CUT_CONVENTIONS}`;
+  const nextHeaderAt = lines.findIndex((line, i) => i > headerAt && line.startsWith('## '));
+  const tail = nextHeaderAt === -1 ? '' : `\n\n${lines.slice(nextHeaderAt).join('\n')}`;
+  return `${lines.slice(0, headerAt).join('\n')}\n${CUT_CONVENTIONS}${tail}`;
 }
 
 export function rewriteClaimResponseBody(body: string, set: PromptSet): string {
