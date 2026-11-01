@@ -73,8 +73,9 @@ if ! mkdir "$LOCK" 2>/dev/null; then
   elif [ -z "$(find "$LOCK" -maxdepth 0 -mmin +10)" ]; then
     busy "deploy lock is being taken"
   fi
-  rm -rf "$LOCK"
-  mkdir "$LOCK" || busy "deploy lock taken concurrently"
+  mv "$LOCK" "$LOCK.stale.$$" 2>/dev/null || busy "deploy lock reclaimed concurrently"
+  rm -rf "$LOCK.stale.$$"
+  mkdir "$LOCK" 2>/dev/null || busy "deploy lock taken concurrently"
 fi
 echo $$ >"$LOCK/pid"
 trap 'rm -rf "$LOCK"; rm -f "$RUNNING_COPY"' EXIT
@@ -193,8 +194,7 @@ daemon_healthy() {
 }
 
 stop_services() {
-  systemctl --user stop "$DAEMON_UNIT"
-  systemctl --user stop "$SERVER_UNIT"
+  systemctl --user stop "$DAEMON_UNIT" && systemctl --user stop "$SERVER_UNIT"
 }
 
 start_and_check() {
@@ -206,9 +206,18 @@ start_and_check() {
   daemon_healthy "$started_ms"
 }
 
+PREVIOUS_BUILT=0
+
+build_previous() {
+  [ "$PREVIOUS_BUILT" = 1 ] && return 0
+  switch_code "$PREVIOUS" || return 1
+  PREVIOUS_BUILT=1
+}
+
 restart_previous() {
   log "restarting $PREVIOUS: $1"
-  if switch_code "$PREVIOUS" && start_and_check; then
+  build_previous || log "rebuilding $PREVIOUS failed; starting with the checkout as it is"
+  if start_and_check; then
     echo "$1; restarted $PREVIOUS with its DB untouched" >&2
     exit 1
   fi
@@ -224,23 +233,41 @@ prune_snapshots() {
 UNTRACKED_TABLES=" __drizzle_migrations machine autonomy_state "
 
 user_tables() {
-  sqlite3 -readonly "$1" "select name from sqlite_master where type = 'table' and name not like 'sqlite_%'" |
-    while read -r table; do [[ "$UNTRACKED_TABLES" == *" $table "* ]] || echo "$table"; done
+  local names
+  names="$(sqlite3 -readonly "$1" "select name from sqlite_master where type = 'table' and name not like 'sqlite_%'")" || return 1
+  [ -n "$names" ] || return 1
+  while read -r table; do [[ "$UNTRACKED_TABLES" == *" $table "* ]] || echo "$table"; done <<<"$names"
+}
+
+quoted_columns() {
+  sqlite3 -readonly "$1" "select group_concat('\"' || replace(name, '\"', '\"\"') || '\"', ',') from pragma_table_info('$2')"
+}
+
+added_column_checks() {
+  sqlite3 -readonly "$DB" "attach '$1' as snap;
+    select group_concat('\"' || replace(c.name, '\"', '\"\"') || '\" is not ' || coalesce(c.dflt_value, 'null'), ' or ')
+    from pragma_table_info('$2', 'main') c
+    where c.name not in (select name from pragma_table_info('$2', 'snap'));"
 }
 
 writes_after_snapshot() {
-  local snapshot="$1" table columns differing
+  local snapshot="$1" table columns added differing snapshot_tables current_tables
+  snapshot_tables="$(user_tables "$snapshot")" || return 0
+  current_tables="$(user_tables "$DB")" || return 0
   while read -r table; do
-    columns="$(sqlite3 -readonly "$snapshot" "select group_concat('\"' || replace(name, '\"', '\"\"') || '\"', ',') from pragma_table_info('$table')")"
+    grep -qxF "$table" <<<"$current_tables" || return 0
+    columns="$(quoted_columns "$snapshot" "$table")" || return 0
+    added="$(added_column_checks "$snapshot" "$table")" || return 0
     differing="$(sqlite3 -readonly "$DB" "attach '$snapshot' as snap;
       select (select count(*) from (select $columns from main.\"$table\" except select $columns from snap.\"$table\"))
-           + (select count(*) from (select $columns from snap.\"$table\" except select $columns from main.\"$table\"));")" || return 0
+           + (select count(*) from (select $columns from snap.\"$table\" except select $columns from main.\"$table\"))
+           + (select count(*) from main.\"$table\" where ${added:-0});")" || return 0
     [ "$differing" = 0 ] || return 0
-  done < <(user_tables "$snapshot")
+  done <<<"$snapshot_tables"
   while read -r table; do
-    user_tables "$snapshot" | grep -qxF "$table" && continue
+    grep -qxF "$table" <<<"$snapshot_tables" && continue
     [ "$(sqlite3 -readonly "$DB" "select count(*) from \"$table\"")" = 0 ] || return 0
-  done < <(user_tables "$DB")
+  done <<<"$current_tables"
   return 1
 }
 
@@ -258,12 +285,12 @@ roll_back() {
   stop_or_give_up "$snapshot"
   if writes_after_snapshot "$snapshot"; then
     log "data changed after the snapshot; keeping the DB and rolling back code only"
-    if switch_code "$PREVIOUS" && start_and_check; then
+    if build_previous && start_and_check; then
       write_record "$PREVIOUS" "$PREVIOUS" rolled-back-code "$TARGET" "$snapshot"
       echo "deploy of $TARGET failed ($reason); rolled code back to $PREVIOUS and kept the DB, which changed after the snapshot" >&2
       exit 1
     fi
-    log "$PREVIOUS is unhealthy on the kept DB; restoring the snapshot"
+    log "$PREVIOUS is unhealthy on the kept DB; restoring the snapshot, the written DB stays in the failed directory"
     stop_or_give_up "$snapshot"
   fi
   failed_dir="$BACKUPS/failed-$(date -u +%Y%m%dT%H%M%SZ)-${TARGET:0:12}"
@@ -272,7 +299,8 @@ roll_back() {
     [ ! -e "$DATA_DIR/$file" ] || mv "$DATA_DIR/$file" "$failed_dir/$file"
   done
   cp "$snapshot" "$DB"
-  if { [ "$(git -C "$CHECKOUT" rev-parse HEAD)" = "$PREVIOUS" ] || switch_code "$PREVIOUS"; } && start_and_check; then
+  build_previous || log "rebuilding $PREVIOUS failed; starting with the checkout as it is"
+  if start_and_check; then
     write_record "$PREVIOUS" "$PREVIOUS" rolled-back "$TARGET" "$snapshot"
     echo "deploy of $TARGET failed ($reason); rolled back to $PREVIOUS, failed DB kept in $failed_dir" >&2
     exit 1

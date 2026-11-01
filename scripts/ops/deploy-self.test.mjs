@@ -138,6 +138,8 @@ if [ "$2 $3" = "start cairn-server.service" ]; then
   if [ "$head" = "$(cat "${fake}/broken-sha" 2>/dev/null)" ]; then
     rm -f "${fake}/up"
     [ ! -f "${fake}/write-on-broken-start" ] || sqlite3 "${db}" "insert or ignore into step values ('written-after', 'done')"
+    [ ! -f "${fake}/column-on-broken-start" ] || sqlite3 "${db}" "alter table step add column note text; alter table step add column tier text default 'low'"
+    [ ! -s "${fake}/column-on-broken-start" ] || sqlite3 "${db}" "update step set note = '$(cat "${fake}/column-on-broken-start")'"
   else touch "${fake}/up"; fi
 fi
 [ "$2 $3" = "stop cairn-server.service" ] && rm -f "${fake}/up"
@@ -337,6 +339,23 @@ test('keeps the DB and rolls back only code when data changed after the snapshot
   const record = JSON.parse(readFileSync(join(f.state, 'deployed.json'), 'utf8'));
   assert.equal(record.result, 'rolled-back-code');
   assert.ok(!readdirSync(f.backups).some((name) => name.startsWith('failed-')));
+});
+
+test('treats values in a column added after the snapshot as writes, but not its default', () => {
+  for (const [note, expected] of [
+    ['written', 'rolled-back-code'],
+    ['', 'rolled-back'],
+  ]) {
+    const f = fixture();
+    sqlite(f.db, "insert into step values ('done-before', 'done')");
+    const target = pushTarget(f);
+    writeFileSync(join(f.fake, 'broken-sha'), target);
+    writeFileSync(join(f.fake, 'column-on-broken-start'), note);
+    const result = f.run(DEPLOY, [target]);
+    assert.equal(result.status, 1, result.stderr);
+    const record = JSON.parse(readFileSync(join(f.state, 'deployed.json'), 'utf8'));
+    assert.equal(record.result, expected, result.stderr);
+  }
 });
 
 test('watch deploys the newest green main commit and skips a SHA that already failed', () => {
