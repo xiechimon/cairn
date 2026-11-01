@@ -50,7 +50,7 @@ console.log(
 );
 bad += !(dup.review.split('a.ts:1').length === 2);
 
-const priorBody = src.slice(src.indexOf('    const prior ='), src.indexOf('    if (prior)'));
+const priorBody = src.slice(src.indexOf('    const prior ='), src.indexOf('    const head ='));
 const findPrior = new Function('comments', 'patch', `${priorBody}; return prior;`);
 const marker = `<!-- review-gate:${'a'.repeat(40)} -->`;
 for (const carried of ['', ' (carried over)']) {
