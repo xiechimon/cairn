@@ -301,6 +301,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: node --test scripts/dispatch-agent.test.mjs scripts/dispatch-dedupe.test.mjs scripts/lane-model-policy.test.mjs
 
+      - name: Mergify queue config follows pr-gate routing
+        if: ${{ !cancelled() }}
+        run: node --test scripts/mergify-config.test.mjs
+
       - name: UI debt ledger only shrinks against main
         if: ${{ !cancelled() }}
         run: node --test scripts/ui-debt-gate.test.mjs
