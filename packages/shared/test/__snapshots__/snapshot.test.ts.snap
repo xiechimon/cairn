@@ -8766,6 +8766,9 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > pro
     "repoName": {
       "type": "string",
     },
+    "requireUpToDate": {
+      "type": "boolean",
+    },
     "splitPolicy": {
       "default": "human",
       "enum": [

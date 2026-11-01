@@ -39,6 +39,7 @@ export function projectMergeConfigOf(row: ProjectRow): ProjectMergeConfig {
   return projectMergeConfigSchema.parse({
     mergePolicy: raw?.mergePolicy,
     localChecks: raw?.localChecks,
+    requireUpToDate: raw?.requireUpToDate,
   });
 }
 
