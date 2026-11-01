@@ -3,6 +3,7 @@ import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from '
 import { resolve as resolvePath } from 'node:path';
 import {
   BLOCK_ROUNDS,
+  CLAUDE_DIFF_PATHSPEC,
   claudeFallback,
   claudeReviewArgs,
   claudeReviewPrompt,
@@ -16,6 +17,7 @@ import {
   parseRawDiff,
   parseRuns,
   priorFindings,
+  roundStops,
   stallAlert,
   stalled,
 } from './reviewer-route.mjs';
@@ -568,11 +570,15 @@ ${
         console.log(`#${pr.number}: no usable cross-vendor model; reviewing with Claude`);
         let input;
         try {
-          const diff = execFileSync('git', ['diff', `origin/main...review-gate-${pr.number}`], {
-            cwd: MAIN,
-            encoding: 'utf8',
-            maxBuffer: 64 << 20,
-          });
+          const diff = execFileSync(
+            'git',
+            ['diff', `origin/main...review-gate-${pr.number}`, ...CLAUDE_DIFF_PATHSPEC],
+            {
+              cwd: MAIN,
+              encoding: 'utf8',
+              maxBuffer: 64 << 20,
+            },
+          );
           const { title, body } = JSON.parse(
             gh(['pr', 'view', String(pr.number), '--json', 'title,body']),
           );
@@ -663,7 +669,7 @@ ${
       }
       disarm(pr);
       alertIfStalled(pr);
-      return /no usable model/.test(run.stderr) && !run.excluded ? 'no-model' : 'none';
+      return roundStops(run) ? 'no-model' : 'none';
     }
     const reviewer =
       run.reviewer === 'claude'

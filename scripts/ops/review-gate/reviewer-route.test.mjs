@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import {
   BLOCK_ROUNDS,
   CLAUDE_DENIED_TOOLS,
+  CLAUDE_DIFF_PATHSPEC,
   CLAUDE_REVIEW_TOOLS,
   claudeFallback,
   claudeReviewArgs,
@@ -16,6 +17,7 @@ import {
   parseRawDiff,
   parseRuns,
   priorFindings,
+  roundStops,
   STALL_MS,
   stallAlert,
   stalled,
@@ -250,4 +252,27 @@ test('deleted files, symlinks and submodules leave the low-risk tier', () => {
   assert.equal(one({ status: 'A', mode: '120000' }), false);
   assert.equal(one({ status: 'A', mode: '160000' }), false);
   assert.equal(one({ status: 'T', mode: '100644' }), false);
+});
+
+test('the Claude diff limit fits a large session PR', () => {
+  assert.ok(DIFF_LIMIT >= 400_000);
+});
+
+test('the Claude diff omits deleted file bodies, verify evidence and generated snapshots', () => {
+  assert.equal(CLAUDE_DIFF_PATHSPEC[0], '-D');
+  for (const path of [':(exclude)docs/verify', ':(exclude)apps/server/drizzle/meta'])
+    assert.ok(CLAUDE_DIFF_PATHSPEC.includes(path));
+});
+
+test('a round stops only when no reviewer was tried', () => {
+  assert.equal(roundStops({ stderr: 'ai-route: no usable model for role review' }), true);
+  assert.equal(
+    roundStops({
+      stderr:
+        'ai-route: no usable model for role review\nclaude fallback: diff of 9 characters exceeds 1; no partial review',
+    }),
+    false,
+  );
+  assert.equal(roundStops({ stderr: 'no usable model', excluded: true }), false);
+  assert.equal(roundStops({ stderr: 'timeout' }), false);
 });

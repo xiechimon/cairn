@@ -10,7 +10,21 @@ export const CLAUDE_DENIED_TOOLS = [
   'WebFetch',
   'WebSearch',
 ];
-export const DIFF_LIMIT = 100_000;
+export const DIFF_LIMIT = 400_000;
+export const CLAUDE_DIFF_PATHSPEC = [
+  '-D',
+  '--',
+  '.',
+  ':(exclude)docs/verify',
+  ':(exclude)**/__snapshots__/**',
+  ':(exclude)apps/server/drizzle/meta',
+];
+
+export function roundStops(run) {
+  return (
+    /no usable model/.test(run.stderr) && !run.excluded && !/claude fallback:/.test(run.stderr)
+  );
+}
 
 export function claudeFallback(authorVendor, run) {
   return authorVendor !== 'anthropic' && run.status !== 0 && /no usable model/.test(run.stderr);
@@ -39,7 +53,7 @@ export function claudeReviewPrompt(prompt, { diff, title, body }) {
   if (diff.length > DIFF_LIMIT) return null;
   return `${prompt}
 
-You cannot run commands. The PR description and the full diff against origin/main are below; the checkout is origin/main, so Read/Grep/Glob show the base side only.
+You cannot run commands. The PR description and the diff against origin/main are below. Deleted files appear without their old content, and docs/verify evidence, test snapshots and drizzle meta are omitted. The checkout is origin/main, so Read/Grep/Glob show the base side only.
 
 PR title: ${title}
 
