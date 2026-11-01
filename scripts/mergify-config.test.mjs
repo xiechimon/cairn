@@ -38,7 +38,9 @@ test('protected paths never enter the queue', () => {
 
 test('only files inside the auto-merge set may enter the queue', () => {
   const lines = config.split('\n').filter((entry) => entry.startsWith("      - '-files ~= "));
-  assert.equal(lines.length, 2);
+  assert.equal(lines.length, 4);
+  assert.equal(lines[0], lines[2]);
+  assert.equal(lines[1], lines[3]);
   const body = lines[1].slice("      - '-files ~= (?ai)".length, -1);
   const outsideRe = new RegExp(body, 'i');
   for (const path of ['README.md', '.mergify.yml', 'docs/x.png', 'apps/web/vite.ts'])
@@ -51,17 +53,43 @@ test('only files inside the auto-merge set may enter the queue', () => {
     assert.doesNotMatch(path, outsideRe, path);
 });
 
-test('the queue requires the review-gate status and keeps PR-only gates off the draft', () => {
-  const [queue, merge] = config.split('    merge_conditions:\n');
-  assert.match(queue, /- status-success = review-gate\n/);
-  assert.match(queue, /- check-success = merge-route\n/);
-  assert.doesNotMatch(queue, /check-skipped = merge-route/);
-  assert.match(queue, /- -label = owner-route\n/);
-  assert.match(queue, /- -author = cairnwright\[bot\]\n/);
-  for (const check of ['check', 'pack-smoke', 'e2e-gate', 'pr-evidence', 'gates'])
-    assert.match(queue, new RegExp(`check-success = ${check}\\n`), check);
-  for (const check of ['check', 'pack-smoke', 'e2e-gate', 'gates'])
-    assert.match(merge, new RegExp(`check-success = ${check}\\n`), check);
-  for (const check of ['pr-evidence', 'merge-route']) assert.doesNotMatch(merge, new RegExp(check));
-  assert.match(merge, /merge_method: squash\n/);
+const rules = Object.fromEntries(
+  config
+    .split('merge_queue:\n')[0]
+    .split('\n  - name: ')
+    .slice(1)
+    .map((block) => [block.split('\n')[0], block]),
+);
+
+for (const [name, author, method] of [
+  ['default', '- -author = cairnwright[bot]', 'squash'],
+  ['bot', '- author = cairnwright[bot]', 'rebase'],
+])
+  test(`the ${name} rule requires the review-gate status and keeps PR-only gates off the draft`, () => {
+    const [queue, merge] = rules[name].split('    merge_conditions:\n');
+    assert.ok(queue.includes(`      ${author}\n`));
+    assert.match(queue, /- status-success = review-gate\n/);
+    assert.match(queue, /- check-success = merge-route\n/);
+    assert.doesNotMatch(queue, /check-skipped = merge-route/);
+    assert.match(queue, /- -label = owner-route\n/);
+    for (const check of ['check', 'pack-smoke', 'e2e-gate', 'pr-evidence', 'gates'])
+      assert.match(queue, new RegExp(`check-success = ${check}\\n`), check);
+    for (const check of ['check', 'pack-smoke', 'e2e-gate', 'gates'])
+      assert.match(merge, new RegExp(`check-success = ${check}\\n`), check);
+    for (const check of ['pr-evidence', 'merge-route'])
+      assert.doesNotMatch(merge, new RegExp(check));
+    assert.match(merge, new RegExp(`merge_method: ${method}\\n`));
+    assert.match(merge, /max_checks_retries: 1$/m);
+  });
+
+test('bot PRs need exactly one commit so a rebase keeps the Cairnwright author', () => {
+  assert.match(rules.bot, /- '#commits = 1'\n/);
+  assert.doesNotMatch(rules.default, /#commits/);
+});
+
+test('web and backend are separate scopes and shared packages touch both', () => {
+  assert.match(config, /merge_queue:\n {2}mode: parallel\n/);
+  assert.match(config, / {6}web:\n {8}include:\n {10}- apps\/web\/\*\*\/\*\n/);
+  assert.match(config, / {6}backend:\n {8}include:\n {10}- apps\/server\/\*\*\/\*\n/);
+  assert.match(config, / {2}barrier_files:\n {4}include:\n {6}- packages\/\*\*\/\*\n/);
 });
