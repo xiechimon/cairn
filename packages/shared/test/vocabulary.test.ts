@@ -451,6 +451,7 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
       skillsDir,
       customModelReasoning,
       piCacheRetention,
+      coordinatorIdleCompactMs,
       hookTimeoutMs,
       issueIntake,
       scheduling,
@@ -478,6 +479,7 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
     expect(skillsDir).toBe('CAIRN_SKILLS_DIR');
     expect(customModelReasoning).toBe('CAIRN_CUSTOM_MODEL_REASONING');
     expect(piCacheRetention).toBe('CAIRN_PI_CACHE_RETENTION');
+    expect(coordinatorIdleCompactMs).toBe('CAIRN_COORDINATOR_IDLE_COMPACT_MS');
     expect(hookTimeoutMs).toBe('CAIRN_HOOK_TIMEOUT_MS');
     expect(issueIntake).toBe('CAIRN_ISSUE_INTAKE');
     expect(scheduling).toBe('CAIRN_SCHEDULING');

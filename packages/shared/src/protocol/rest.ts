@@ -57,6 +57,16 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
     path: '/api/teams/{id}/coordinator/messages',
     note: 'body {content, projectId?}; projectId only tags the turn, 409 when that project is archived',
   },
+  {
+    method: 'GET',
+    path: '/api/teams/{id}/coordinator/context',
+    note: '{budgetTokens, usedTokens, sections[{name, tokens}], summary, cacheReadShare}; usedTokens and cacheReadShare come from the last turn usage, system/tools are tokenized estimates, brief/index are 0 under session resume, summary/recent split usedTokens (#2522)',
+  },
+  {
+    method: 'POST',
+    path: '/api/teams/{id}/coordinator/compact',
+    note: 'compact the resumed session now, on the idle-compaction path: 200 {summary} once landed, 200 {skipped: "unchanged"} when nothing new is covered, 409 while a turn runs or waits (#2522)',
+  },
   { method: 'GET', path: '/api/projects', query: ['teamId'] },
   { method: 'GET', path: '/api/projects/{id}/todos' },
   { method: 'GET', path: '/api/projects/{id}/branches' },

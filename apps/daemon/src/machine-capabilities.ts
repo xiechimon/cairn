@@ -2,6 +2,7 @@ import { readdirSync, readFileSync, statfsSync, statSync } from 'node:fs';
 import { cpus, freemem, loadavg, totalmem } from 'node:os';
 import { join } from 'node:path';
 import {
+  MACHINE_FEATURES,
   type MachineCapabilities,
   type MachineHardware,
   parseClaudeMcpEntries,
@@ -77,6 +78,7 @@ export function probeMachineCapabilities(sources: MachineCapabilitySources): Mac
     mcpServers: scanMcpSlugs(sources.mcpConfigPath),
     skills: scanSkillNames(sources.skillsDir),
     ...(hardware !== undefined ? { hardware } : {}),
+    features: [...MACHINE_FEATURES],
   };
 }
 
@@ -114,6 +116,7 @@ export function createMachineCapabilitiesProbe(
       mcpServers: mcpCache.value,
       skills: skillsCache.value,
       ...(hardware !== undefined ? { hardware } : {}),
+      features: [...MACHINE_FEATURES],
     };
   };
 }

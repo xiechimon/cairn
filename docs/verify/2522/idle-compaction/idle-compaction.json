@@ -1,0 +1,92 @@
+{
+  "model": "anthropic/claude-haiku-5-5",
+  "thinking": "low",
+  "compaction": {
+    "thresholdTokens": 64000,
+    "keepRecentTokens": 16384
+  },
+  "spentUsd": 0.0212,
+  "measuredAt": "2026-11-01T19:21:54.269Z",
+  "arms": [
+    {
+      "name": "in-turn",
+      "seedTurns": 275,
+      "seedTokensEstimate": 72109,
+      "rows": [
+        {
+          "arm": "in-turn",
+          "kind": "user-turn",
+          "turn": 1,
+          "ttftMs": 27794,
+          "wallMs": 28386,
+          "inTurnCompactionMs": 17159,
+          "contextTokens": 36791,
+          "input": 2,
+          "cacheRead": 0,
+          "cacheWrite": 36527,
+          "costUsd": 0.004697074999999999,
+          "reply": "Nothing is blocked on you right now; every open item is with its owning agent."
+        },
+        {
+          "arm": "in-turn",
+          "kind": "user-turn",
+          "turn": 2,
+          "ttftMs": 1236,
+          "wallMs": 1387,
+          "inTurnCompactionMs": 0,
+          "contextTokens": 36851,
+          "input": 4,
+          "cacheRead": 36527,
+          "cacheWrite": 283,
+          "costUsd": 0.00041954499999999995,
+          "reply": "build-07, after 02:30 UTC under change ticket KST-4471, and it is not scheduled yet."
+        }
+      ]
+    },
+    {
+      "name": "idle",
+      "seedTurns": 275,
+      "seedTokensEstimate": 72109,
+      "rows": [
+        {
+          "arm": "idle",
+          "kind": "idle-compaction",
+          "wallMs": 20019,
+          "compacted": true,
+          "tokensBefore": 72389,
+          "tokensAfter": 18699,
+          "summaryTokens": 2564,
+          "costUsd": 0.010708700000000002
+        },
+        {
+          "arm": "idle",
+          "kind": "user-turn",
+          "turn": 1,
+          "ttftMs": 2643,
+          "wallMs": 7450,
+          "inTurnCompactionMs": 0,
+          "contextTokens": 37618,
+          "input": 2,
+          "cacheRead": 1310,
+          "cacheWrite": 35322,
+          "costUsd": 0.00492055,
+          "reply": "Nothing is blocked on you in the last status checks. I also need to correct my earlier replies: I never recorded the flag decisions or told the agents about the"
+        },
+        {
+          "arm": "idle",
+          "kind": "user-turn",
+          "turn": 2,
+          "ttftMs": 994,
+          "wallMs": 1023,
+          "inTurnCompactionMs": 0,
+          "contextTokens": 37647,
+          "input": 4,
+          "cacheRead": 36632,
+          "cacheWrite": 1005,
+          "costUsd": 0.000495345,
+          "reply": "build-07."
+        }
+      ]
+    }
+  ]
+}

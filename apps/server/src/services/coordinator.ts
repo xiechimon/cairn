@@ -1,8 +1,22 @@
-import type { CoordinatorPageQuery, CoordinatorPageResponse } from '@cairn/shared';
+import {
+  CHIEF_REMOTE_TOOLS,
+  type CoordinatorCompactResponse,
+  type CoordinatorContextResponse,
+  type CoordinatorPageQuery,
+  type CoordinatorPageResponse,
+} from '@cairn/shared';
 import { and, desc, eq, lt, or, sql } from 'drizzle-orm';
 import { chiefMessage } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
-import { type ChiefDeps, chiefThreadView, coordinatorThreadRow, ensureChief } from './chief.js';
+import {
+  buildChiefSystemPrompt,
+  type ChiefDeps,
+  type ChiefResourceDeps,
+  chiefThreadView,
+  coordinatorThreadRow,
+  ensureChief,
+} from './chief.js';
+import { compactThreadNow, threadContextUsage } from './chief-compaction.js';
 
 function earlierThan(deps: ChiefDeps, threadId: string, messageId: string) {
   const cursor = deps.db
@@ -47,4 +61,32 @@ export function readCoordinatorPage(
     messages: rows.slice(0, query.limit).reverse(),
     hasEarlier: rows.length > query.limit,
   };
+}
+
+function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 4);
+}
+
+export function readCoordinatorContext(
+  deps: ChiefResourceDeps,
+  teamId: string,
+): CoordinatorContextResponse {
+  const thread = coordinatorThreadRow(deps, ensureChief(deps, teamId));
+  const tools = CHIEF_REMOTE_TOOLS.map((t) => ({
+    name: t.name,
+    description: t.description,
+    parameters: t.parameters,
+  }));
+  return threadContextUsage(deps.db, thread, {
+    system: estimateTokens(buildChiefSystemPrompt(deps, teamId, thread.id).text),
+    tools: estimateTokens(JSON.stringify(tools)),
+  });
+}
+
+export function compactCoordinator(
+  deps: ChiefDeps,
+  teamId: string,
+  timeoutMs?: number,
+): Promise<CoordinatorCompactResponse> {
+  return compactThreadNow(deps, coordinatorThreadRow(deps, ensureChief(deps, teamId)), timeoutMs);
 }

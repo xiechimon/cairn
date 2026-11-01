@@ -36,6 +36,11 @@ import {
   toBuildRecord,
 } from './builds.js';
 import { fireDueChiefWakes, sweepAbandonedChiefSteps } from './chief.js';
+import {
+  IDLE_COMPACTION_DEFAULTS,
+  type IdleCompactionPolicy,
+  planIdleCompactions,
+} from './chief-compaction.js';
 import { planChiefDigests } from './chief-digest.js';
 import { sweepOverlongChiefTurns } from './chief-turns.js';
 import { CI_POLL_INTERVAL_MS, type CiPollLogger, createCiPoller } from './ci-loop.js';
@@ -75,6 +80,7 @@ import { insertMessageRow } from './transcript.js';
 export interface SchedulerOptions {
   tickMs: number;
   pushDigestTimes?: readonly string[];
+  idleCompaction?: Partial<IdleCompactionPolicy>;
 }
 
 export interface CiPollRun {
@@ -212,6 +218,7 @@ export function createScheduler(
 ): Scheduler {
   let timer: NodeJS.Timeout | null = null;
   const lastDigestRun = new Map<string, number>();
+  const idleCompaction = { ...IDLE_COMPACTION_DEFAULTS, ...opts.idleCompaction };
   let digestSweeping = false;
   let alertsSweeping = false;
   const ciPoller =
@@ -484,6 +491,7 @@ export function createScheduler(
     sweepSnoozeExpiry(deps, now);
     fireDueChiefWakes(deps, now);
     planChiefDigests(deps, now);
+    planIdleCompactions(deps, now, idleCompaction);
     sweepStaleMachines(deps);
     sweepAbandonedChiefSteps(deps, now);
     sweepOverlongChiefTurns(deps, now);

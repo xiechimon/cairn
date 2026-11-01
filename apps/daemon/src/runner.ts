@@ -386,6 +386,31 @@ async function runClaimedStep(
   const convId = claimed.conversationId;
   const running = opts.running ?? 1;
   logger.raw(`step ${stepId} for conv ${convId} (${running} running)`);
+  if (claimed.chief?.compactOnly === true) {
+    const sessionId = opts.resume?.sessionId ?? claimed.session.sessionId;
+    const claimedEntry = journal.claim({
+      stepId,
+      buildId: claimed.step.buildId,
+      kind: claimed.step.kind,
+      conversationId: convId,
+      sessionAction: claimed.session.action,
+      sessionId,
+      prompt: null,
+      claimed,
+      stopRequest: stop.request,
+    });
+    const doneBody = await compactChiefSession(deps, claimed, sessionId, stop);
+    logger.step(
+      `compaction ${doneBody.status}${doneBody.errorMessage !== undefined ? `: ${doneBody.errorMessage}` : ''}`,
+    );
+    journal.update(stepId, { state: 'awaiting-upload', doneBody });
+    await resumePendingUpload(
+      deps,
+      journal.get(stepId) ?? { ...claimedEntry, state: 'awaiting-upload', doneBody },
+      { running },
+    );
+    return;
+  }
 
   let activityRelayWarned = false;
   const activity = createActivityTracker({
@@ -876,6 +901,7 @@ async function runClaimedStep(
     ...(teamSkillsDir !== null ? { teamSkillsDir } : {}),
     ...(isReview ? { readOnly: true } : {}),
     ...(claimed.remoteToolsOnly === true ? { remoteToolsOnly: true } : {}),
+    ...(claimed.chief?.compaction !== undefined ? { compaction: claimed.chief.compaction } : {}),
     ...(telemetry !== undefined ? { telemetry } : {}),
     ...(Object.keys(stepEnv).length > 0 ? { env: stepEnv } : {}),
   };
@@ -2201,6 +2227,71 @@ export async function resumePendingUpload(
   rmSync(join(deps.paths.outboxDir, `step-${stepId}.session.jsonl`), { force: true });
   deps.sessionHandles?.delete(stepId);
   logger.raw(`finished (${running - 1} running)`);
+}
+
+async function compactChiefSession(
+  deps: RunStepDeps,
+  claimed: ClaimedStep,
+  sessionId: string | null,
+  stop: RunStop,
+): Promise<MachineDoneBody> {
+  const agent = claimed.agent;
+  if (sessionId === null || !agent?.modelId) {
+    return { status: 'failed', errorMessage: 'compaction step has no session or model' };
+  }
+  const creds = pushCredential(await deps.client.token(claimed.step.id), null);
+  const redact = credentialRedactor(creds.claudeSubscriptionToken);
+  try {
+    const provider: ProviderConfig | null =
+      creds.provider ?? (agent.provider ? { kind: 'api_key', providerId: agent.provider } : null);
+    const backend = deps.backendFor(agent.provider, agent.id);
+    if (provider === null || backend.compactSession === undefined) {
+      return {
+        status: 'failed',
+        errorMessage: `runtime ${backend.capabilities.name} cannot compact`,
+      };
+    }
+    const cwd = join(deps.workspacesDir, claimed.conversationId);
+    mkdirSync(cwd, { recursive: true });
+    const abort = new AbortController();
+    await stop.attach({ stop: async () => abort.abort() });
+    try {
+      const result = await backend.compactSession(
+        sessionId,
+        {
+          provider,
+          modelId: agent.modelId,
+          ...(agent.thinkingLevel ? { thinkingLevel: agent.thinkingLevel } : {}),
+          cwd,
+          ...(claimed.chief?.compaction !== undefined
+            ? { compaction: claimed.chief.compaction }
+            : {}),
+        },
+        abort.signal,
+      );
+      return {
+        status: 'success',
+        sessionId,
+        usage: [...result.usage],
+        compaction: {
+          compacted: result.compacted,
+          tokensBefore: result.tokensBefore,
+          tokensAfter: result.tokensAfter,
+          summaryTokens: result.summaryTokens,
+        },
+      };
+    } catch (err) {
+      if (stop.request !== null) return { status: 'stopped' };
+      return {
+        status: 'failed',
+        errorMessage: redact(err instanceof Error ? err.message : String(err)),
+      };
+    } finally {
+      stop.detach();
+    }
+  } finally {
+    clearCredentials(creds);
+  }
 }
 
 async function failStep(

@@ -49,7 +49,15 @@ describe('pi sessions measure time to first token from the prompt send', () => {
     mapPiSessionEvent(delta('text_delta'), state);
     mapPiSessionEvent(end(), state);
     expect(settle(state)).toEqual([
-      { model: 'gw/m1', input: 10, output: 2, cacheRead: 5, cacheWrite: 0, ttftMs: 250 },
+      {
+        model: 'gw/m1',
+        input: 10,
+        output: 2,
+        cacheRead: 5,
+        cacheWrite: 0,
+        ttftMs: 250,
+        contextTokens: 17,
+      },
     ]);
   });
 

@@ -52,6 +52,21 @@ const epochMs = (name: string) => integer(name);
 const bool = (name: string) => integer(name, { mode: 'boolean' });
 const json = <T>(name: string) => text(name, { mode: 'json' }).$type<T>();
 
+export interface ChiefCompactSummary {
+  coveredThroughMessageId: string;
+  sessionId: string;
+  updatedAt: number;
+  tokensBefore: number | null;
+  tokensAfter: number | null;
+  summaryTokens: number | null;
+}
+
+export interface ChiefCompactAttempt {
+  cursor: string;
+  count: number;
+  nothingToCompact?: true;
+}
+
 export const user = sqliteTable('user', {
   id: text('id').primaryKey(),
   displayName: text('displayName').notNull(),
@@ -223,6 +238,7 @@ export const step = sqliteTable(
     finishedAt: epochMs('finishedAt'),
     prompt: text('prompt'),
     freshSession: bool('freshSession').notNull().default(false),
+    compactOnly: bool('compactOnly').notNull().default(false),
     skillInjection: json<SkillInjectionRecord>('skillInjection'),
     blockerHandoff: json<BlockerHandoffRecord>('blockerHandoff'),
     holdReason: text('holdReason'),
@@ -631,6 +647,7 @@ export const chiefTurnUsage = sqliteTable(
     cacheRead: integer('cacheRead').notNull().default(0),
     cacheWrite: integer('cacheWrite').notNull().default(0),
     ttftMs: integer('ttftMs'),
+    contextTokens: integer('contextTokens'),
     createdAt: epochMs('createdAt').notNull(),
   },
   (t) => [
@@ -674,6 +691,9 @@ export const chiefThread = sqliteTable(
     toolResultHashes: json<Record<string, string>>('toolResultHashes').notNull().default(sql`'{}'`),
     activeRun: json<ActiveRun>('activeRun'),
     archivedAt: epochMs('archivedAt'),
+    compactGeneration: integer('compactGeneration').notNull().default(0),
+    compactSummary: json<ChiefCompactSummary>('compactSummary'),
+    compactAttempt: json<ChiefCompactAttempt>('compactAttempt'),
   },
   (t) => [
     uniqueIndex('chief_thread_coordinator_unique')

@@ -47,6 +47,7 @@ import {
   toBuildRecord,
 } from './builds.js';
 import { finishChiefTurn, notifyChiefTurn, recoverGateWake } from './chief.js';
+import { finishChiefCompaction, isChiefCompactStep } from './chief-compaction.js';
 import { finishChiefDigest, isChiefDigestStep } from './chief-digest.js';
 import { cancelPendingQuestions } from './chief-questions.js';
 import { recordChiefStop, releaseUnconsumedSteer } from './chief-turns.js';
@@ -417,7 +418,8 @@ async function finishStepReport(
     if (
       stepRow.kind === 'chief' &&
       isChiefConversation(stepRow.buildId) &&
-      !isChiefDigestStep(stepRow)
+      !isChiefDigestStep(stepRow) &&
+      !isChiefCompactStep(stepRow)
     ) {
       db.insert(chiefTurnUsage)
         .values({
@@ -429,6 +431,7 @@ async function finishStepReport(
           cacheRead: u.cacheRead,
           cacheWrite: u.cacheWrite,
           ttftMs: u.ttftMs ?? null,
+          contextTokens: u.contextTokens ?? null,
           createdAt: nowMs(),
         })
         .onConflictDoUpdate({
@@ -439,12 +442,19 @@ async function finishStepReport(
             cacheRead: sql`${chiefTurnUsage.cacheRead} + ${u.cacheRead}`,
             cacheWrite: sql`${chiefTurnUsage.cacheWrite} + ${u.cacheWrite}`,
             ttftMs: sql`coalesce(${chiefTurnUsage.ttftMs}, ${u.ttftMs ?? null})`,
+            contextTokens: sql`coalesce(${u.contextTokens ?? null}, ${chiefTurnUsage.contextTokens})`,
           },
         })
         .run();
     }
   }
   db.delete(stopPending).where(eq(stopPending.stepId, stepId)).run();
+  if (isChiefCompactStep(stepRow)) {
+    finishChiefCompaction(deps, stepRow, outcome, nowMs());
+    publishStepStatus(deps, stepId);
+    emitRuntimeStepSpan(deps.db, stepId);
+    return;
+  }
   const worker = workerStepContext(deps, stepRow);
   if (
     db.select({ archiveStop: step.archiveStop }).from(step).where(eq(step.id, stepId)).get()

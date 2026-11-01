@@ -139,6 +139,20 @@ export const localMergeReportSchema = z.object({
 });
 export type LocalMergeReport = z.infer<typeof localMergeReportSchema>;
 
+export const chiefCompactionSettingsSchema = z.object({
+  thresholdTokens: z.number().int().positive(),
+  keepRecentTokens: z.number().int().positive(),
+});
+export type ChiefCompactionSettings = z.infer<typeof chiefCompactionSettingsSchema>;
+
+export const chiefCompactionReportSchema = z.object({
+  compacted: z.boolean(),
+  tokensBefore: z.number().int().nonnegative().nullable(),
+  tokensAfter: z.number().int().nonnegative().nullable(),
+  summaryTokens: z.number().int().nonnegative().nullable(),
+});
+export type ChiefCompactionReport = z.infer<typeof chiefCompactionReportSchema>;
+
 export const claimedStepSchema = z.object({
   localMerge: localMergeCommandSchema.optional(),
   step: stepRecordSchema,
@@ -201,6 +215,8 @@ export const claimedStepSchema = z.object({
       threadId: recordId,
       systemPrompt: z.string(),
       trigger: z.enum(['user', 'gate', 'settle', 'failed', 'wake']),
+      compaction: chiefCompactionSettingsSchema.optional(),
+      compactOnly: z.literal(true).optional(),
     })
     .optional(),
   remoteTools: z.array(remoteToolDefSchema).optional(),
@@ -407,6 +423,7 @@ export const machineDoneBodySchema = z.object({
   noOutput: z.literal(true).optional(),
   skillInjectionFacts: skillInjectionFactsSchema.optional(),
   report: z.string().max(INFO_REPORT_MAX_BYTES).optional(),
+  compaction: chiefCompactionReportSchema.optional(),
 });
 export type MachineDoneBody = z.infer<typeof machineDoneBodySchema>;
 export const machineDoneResponseSchema = machineOkResponseSchema;
