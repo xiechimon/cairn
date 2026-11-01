@@ -390,7 +390,53 @@ function currentSha() {
   }
 }
 
-function writeBaseline(scan) {
+function raisesOverBase(scan, base) {
+  const raises = [];
+  for (const [file, n] of Object.entries(scan.perFaceCss)) {
+    const before = base.perFaceCss?.[file] ?? 0;
+    if (n > before) raises.push(`per-face css ${file}: ${before} -> ${n}`);
+  }
+  const controlsBefore = base.rawControls?.total ?? 0;
+  if (scan.controlTotal > controlsBefore) {
+    const grew = Object.entries(scan.controlFiles)
+      .filter(([file, n]) => n > (base.rawControls?.files?.[file] ?? 0))
+      .map(([file]) => file);
+    raises.push(`bare controls: ${controlsBefore} -> ${scan.controlTotal} (${grew.join(', ')})`);
+  }
+  if (base.arbitraryValues) {
+    for (const key of ['text', 'spacing']) {
+      const before = base.arbitraryValues[`${key}Total`];
+      const now = scan.arbitrary[`${key}Total`];
+      if (now > before) {
+        const grew = Object.entries(scan.arbitrary.files)
+          .filter(
+            ([file, counts]) => counts[key] > (base.arbitraryValues.files?.[file]?.[key] ?? 0),
+          )
+          .map(([file]) => file);
+        raises.push(`arbitrary ${key}: ${before} -> ${now} (${grew.join(', ')})`);
+      }
+    }
+  }
+  return raises;
+}
+
+function writeBaseline(scan, baseSha) {
+  if (baseSha) {
+    const loaded = loadBaseBaseline(baseSha);
+    if (loaded.mode === 'base') {
+      const raises = raisesOverBase(scan, loaded.baseline);
+      if (raises.length > 0) {
+        for (const r of raises)
+          console.error(
+            `[ui-debt-gate] D3 refusing to raise vs base ${baseSha.slice(0, 12)}: ${r}`,
+          );
+        console.error(
+          '[ui-debt-gate] FAIL: the ledger may only shrink. Remove the new debt in the files listed above, then re-run --write; on a merge conflict, take the base side of the baseline first.',
+        );
+        process.exit(1);
+      }
+    }
+  }
   const previous = existsSync(BASELINE_PATH)
     ? safeParse(readFileSync(BASELINE_PATH, 'utf8'))
     : null;
@@ -581,6 +627,15 @@ function check(baseSha) {
   process.exit(0);
 }
 
+function mainMergeBase() {
+  try {
+    git(['rev-parse', '--verify', '--quiet', 'refs/remotes/origin/main']);
+    return git(['merge-base', 'HEAD', 'refs/remotes/origin/main']).trim();
+  } catch {
+    return '';
+  }
+}
+
 const argv = process.argv.slice(2);
 let writeMode = false;
 let baseSha = process.env.UI_DEBT_BASE_SHA || '';
@@ -599,8 +654,10 @@ for (let i = 0; i < argv.length; i++) {
   }
 }
 
+if (!baseSha) baseSha = mainMergeBase();
+
 if (writeMode) {
-  writeBaseline(scanTree());
+  writeBaseline(scanTree(), baseSha);
 } else {
   check(baseSha);
 }

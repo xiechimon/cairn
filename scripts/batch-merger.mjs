@@ -1,10 +1,11 @@
 import { execFileSync } from 'node:child_process';
 import { runInNewContext } from 'node:vm';
 import { api, disarmAutoMerge, markers, pages, repo } from './autonomy-brake.mjs';
+import { requiredChecks as branchProtectionChecks, mustBeGreenJobs } from './merge-checks.mjs';
 
 const batchHead = /^B\d+\//;
 const mergerTrailer = 'Merged-by: cairn-batch-merger';
-const requiredChecks = ['check', 'pack-smoke', 'e2e-gate', 'pr-evidence'];
+const requiredChecks = branchProtectionChecks;
 const sandboxOptions = { timeout: 1000, contextCodeGeneration: { strings: false, wasm: false } };
 const ownerRouteLabel = 'owner-route';
 const log = (pr, action, reasons) =>
@@ -139,6 +140,16 @@ function eligibility(number, expectedHead, dailyCap) {
       )
       .sort((a, b) => b.id - a.id)[0];
     if (latest?.status !== 'completed' || latest.conclusion !== 'success')
+      reasons.push(`check:${name}`);
+  }
+  for (const name of mustBeGreenJobs) {
+    const latest = runs
+      .filter(
+        (run) =>
+          run.name === name && run.head_sha === pr.head.sha && run.app?.slug === 'github-actions',
+      )
+      .sort((a, b) => b.id - a.id)[0];
+    if (latest?.status !== 'completed' || !['success', 'skipped'].includes(latest.conclusion))
       reasons.push(`check:${name}`);
   }
   const verdict = pages(`repos/${repo}/issues/${number}/comments?per_page=100`)

@@ -48,6 +48,23 @@ interface DocPaneProps {
   emptyMeta?: ReactNode;
 }
 
+const HUNK_RANGE = /^@@ -(\d+)(?:,(\d+))? /;
+
+function oldRange(header: string): { start: number; length: number } | null {
+  const match = HUNK_RANGE.exec(header);
+  if (match == null) return null;
+  return { start: Number(match[1]), length: match[2] === undefined ? 1 : Number(match[2]) };
+}
+
+export function unmodifiedBefore(hunks: readonly { header: string }[], index: number): number {
+  const current = oldRange(hunks[index]?.header ?? '');
+  if (current == null) return 0;
+  if (index === 0) return Math.max(current.start - 1, 0);
+  const previous = oldRange(hunks[index - 1]?.header ?? '');
+  if (previous == null) return 0;
+  return Math.max(current.start - (previous.start + previous.length), 0);
+}
+
 function baseName(path: string): string {
   return path.slice(path.lastIndexOf('/') + 1);
 }
@@ -59,7 +76,7 @@ function dirName(path: string): string {
 const PANE_HEAD = 'flex h-10 flex-none items-center gap-1 px-2.5 text-meta text-(--text-secondary)';
 const PANE_SELECT = 'doc-pane-select ml-0 font-normal text-(--text-tertiary)';
 const DIFF_LINE =
-  'flex items-center font-mono text-caption leading-5 text-(--foreground) [font-variant-ligatures:none]';
+  'flex items-center font-mono text-code leading-5 text-(--foreground) [font-variant-ligatures:none]';
 const DIFF_NO = 'w-8 flex-none pr-2 text-right text-(--text-tertiary) select-none';
 const DIFF_KIND_SKIN: Record<string, string> = {
   add: 'bg-(--diff-add-bg) shadow-[inset_2px_0_0_var(--diff-add-fg)]',
@@ -143,7 +160,15 @@ export function DiffFileBlock({
               const wordDiff = wordDiffs[hi];
               return (
                 <div key={hunk.header}>
-                  <div className="diff-hunk-head bg-(--secondary) pl-18 font-mono text-caption leading-6 text-(--text-tertiary) [font-variant-ligatures:none]">
+                  {unmodifiedBefore(file.hunks, hi) > 0 && (
+                    <div
+                      className="flex h-7 items-center pl-3 text-meta text-(--text-tertiary)"
+                      data-testid="diff-fold"
+                    >
+                      {t('{n} 行未改动', { n: unmodifiedBefore(file.hunks, hi) })}
+                    </div>
+                  )}
+                  <div className="diff-hunk-head bg-(--secondary) pl-18 font-mono text-code leading-6 text-(--text-tertiary) [font-variant-ligatures:none]">
                     {hunk.header}
                   </div>
                   {hunk.lines.map((line, i) => {
@@ -208,7 +233,7 @@ export function DiffFileBlock({
             </div>
           )}
           {(full.kind === 'loading' || full.kind === 'error' || full.kind === 'binary') && (
-            <div className="py-2 pr-3 pl-18 font-mono text-caption leading-4 text-(--text-tertiary)">
+            <div className="py-2 pr-3 pl-18 font-mono text-code leading-4 text-(--text-tertiary)">
               {full.kind === 'loading'
                 ? t('加载中…')
                 : full.kind === 'error'
@@ -355,7 +380,7 @@ function VersionControl({
 }
 
 function docBlockClass(kind: string, first: boolean): string {
-  const base = 'text-card-title leading-6 break-words text-(--foreground)';
+  const base = 'text-card-title break-words text-(--foreground)';
   if (kind === 'para') return `${base}${first ? '' : ' mt-2'}`;
   if (kind === 'bullet') return `${base} relative mt-1 pl-4`;
   return `${base} ${first ? 'mt-0' : 'mt-6'} mb-1.5 text-meta font-medium tracking-[0.02em] text-(--text-tertiary)`;

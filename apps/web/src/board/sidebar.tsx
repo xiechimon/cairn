@@ -289,7 +289,7 @@ export function BoardSidebar({
   const navRef = useRef<HTMLElement | null>(null);
   useScrollFade(navRef, { enabled: !collapsed });
   const resourceListId = useId();
-  const homeLabel = attention > 0 ? `${t('Projects')} ${attention}` : t('Projects');
+  const homeLabel = attention > 0 ? `${t('工作台')} ${attention}` : t('工作台');
 
   const goTo = (target: string) => navigate({ pathname: target, search: plain });
   const unarchiveThread = (todo: TodoRecord) => {
@@ -456,7 +456,7 @@ export function BoardSidebar({
             {...railLink(
               { pathname: '/app/schedules', search: plain },
               selected === 'schedules',
-              t('Scheduled'),
+              t('定时'),
             )}
           >
             <Clock className={ICON} strokeWidth={STROKE} />
@@ -465,7 +465,7 @@ export function BoardSidebar({
             variant="ghost"
             className={`rail-group group mt-2 ${RAIL_ROW} ${RAIL_BTN} ${groupCollapsed.project ? 'rail-group--collapsed' : ''}`}
             aria-label={t(groupCollapsed.project ? '展开{label}' : '收起{label}', {
-              label: t('Projects'),
+              label: t('项目'),
             })}
             aria-expanded={!groupCollapsed.project}
             onClick={() => toggleGroup('project')}
@@ -536,7 +536,7 @@ export function BoardSidebar({
         <Link
           className={`sidebar-team-name flex h-11 min-w-0 flex-1 items-center gap-2 rounded-(--cds-radius-lg) px-2 text-foreground no-underline transition-[background-color,box-shadow] duration-150 ease-out ${FOCUS} ${
             selected === 'team'
-              ? `sidebar-team-row--active bg-background shadow-xs ring-1 ring-border ${SEARCH_OPEN_DIM}`
+              ? `sidebar-team-row--active bg-(--sidebar-active) hover:bg-(--sidebar-active) dark:hover:bg-(--sidebar-active) ${SEARCH_OPEN_DIM}`
               : 'hover:bg-sidebar-hover'
           }`}
           to={{ pathname: '/app/team', search: plain }}
@@ -578,7 +578,7 @@ export function BoardSidebar({
         <div className="relative">
           <SidebarNavRow
             icon={<Inbox className="size-4" strokeWidth={STROKE} />}
-            label={t('Projects')}
+            label={t('工作台')}
             active={selected === 'board' || selected === 'kanban'}
             onClick={() => navigate({ pathname: '/app', search: homeSearch })}
           />
@@ -590,7 +590,7 @@ export function BoardSidebar({
         </div>
         <SidebarNavRow
           icon={<Clock className="size-4" strokeWidth={STROKE} />}
-          label={t('Scheduled')}
+          label={t('定时')}
           active={selected === 'schedules'}
           onClick={() => goTo('/app/schedules')}
         />
@@ -612,7 +612,7 @@ export function BoardSidebar({
             aria-expanded={!groupCollapsed.project}
             onClick={() => toggleGroup('project')}
           >
-            {t('Projects')}
+            {t('项目')}
             <ChevronDown
               aria-hidden
               className="sidebar-group-chevron size-3 text-content-dim transition-transform duration-150 group-[.sidebar-group--collapsed]:-rotate-90"
@@ -714,6 +714,7 @@ export function BoardSidebar({
               aria-label={user.displayName}
             >
               <SidebarUser
+                avatar={userAvatar}
                 name={user.displayName}
                 machinesOnline={machinesOnline}
                 action={

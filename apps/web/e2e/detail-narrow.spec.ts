@@ -6,13 +6,13 @@ async function overflowProbe(page: import('@playwright/test').Page) {
   return page.evaluate(() => {
     const doc = document.scrollingElement!;
     const col = document.querySelector('[data-testid="transcript-col"]')!;
-    const center = document
-      .querySelector('[data-testid="detail-center"]')!
-      .getBoundingClientRect();
+    const center = document.querySelector('[data-testid="detail-center"]')!.getBoundingClientRect();
     const sidebar = document.querySelector('[data-route="todo-detail"] > aside');
     const right = document.querySelector('[data-testid="detail-right"]');
     const visible = (el: Element | null) =>
-      el !== null && el.getBoundingClientRect().width > 0 && getComputedStyle(el).display !== 'none';
+      el !== null &&
+      el.getBoundingClientRect().width > 0 &&
+      getComputedStyle(el).display !== 'none';
     return {
       docScroll: doc.scrollWidth,
       docClient: doc.clientWidth,
@@ -32,13 +32,9 @@ test('N1: 320px degrades instead of clipping — no page overflow, no swallowed 
   await page.goto(DETAIL);
   await page.waitForSelector('[data-testid="transcript-col"]');
   const probe = await overflowProbe(page);
-  // the shell no longer hides a horizontal overflow behind overflow:hidden
   expect(probe.docScroll).toBeLessThanOrEqual(probe.docClient);
-  // the thread column reads at the full viewport width — the #885 35px box
-  // is gone, and with it the 133px of content it scrolled sideways
   expect(probe.colScroll).toBeLessThanOrEqual(probe.colClient + 1);
   expect(probe.centerWidth).toBe(320);
-  // both fixed panes dropped; the back chevron in the head is the way out
   expect(probe.sidebarVisible).toBe(false);
   expect(probe.rightVisible).toBe(false);
 });
@@ -113,7 +109,6 @@ test('N5: head actions and the composer stay inside the 320px viewport', async (
     const left = (sel: string) =>
       Math.round(document.querySelector(sel)!.getBoundingClientRect().left);
     return {
-
       actionsRight: right('[data-testid="detail-head-actions"]'),
       compLeft: left('[data-testid="composer-card"]'),
       compRight: right('[data-testid="composer-card"]'),
@@ -125,3 +120,70 @@ test('N5: head actions and the composer stay inside the 320px viewport', async (
   expect(geo.compLeft).toBeGreaterThanOrEqual(0);
   expect(geo.compRight).toBeLessThanOrEqual(320);
 });
+
+for (const theme of ['light', 'dark'] as const) {
+  for (const width of [390, 1440]) {
+    test(`N6: ${width}px ${theme} header preserves title and control clearance`, async ({
+      page,
+    }, testInfo) => {
+      await page.setViewportSize({ width, height: 732 });
+      await page.goto(DETAIL.replace('scenario=26', 'scenario=27'));
+      await page.getByTestId('detail-title').waitFor();
+      await page.evaluate(
+        (light) => document.documentElement.classList.toggle('light', light),
+        theme === 'light',
+      );
+      const header = page.getByTestId('detail-head');
+      const action = header.locator('.detail-head-action');
+      await expect(action).toBeVisible();
+      const geometry = await header.evaluate((element) => {
+        const head = element.getBoundingClientRect();
+        return {
+          titleWidth: element.querySelector('[data-testid="detail-title"]')!.getBoundingClientRect()
+            .width,
+          controls: [...element.querySelectorAll('button, a')]
+            .filter((control) => control.getBoundingClientRect().width > 0)
+            .map((control) => {
+              const rect = control.getBoundingClientRect();
+              return {
+                label: control.getAttribute('aria-label') ?? control.textContent,
+                left: rect.left,
+                right: innerWidth - rect.right,
+                top: rect.top - head.top,
+                bottom: head.bottom - rect.bottom,
+              };
+            }),
+        };
+      });
+      console.log(JSON.stringify({ width, theme, ...geometry }));
+      await testInfo.attach('header-geometry', {
+        body: JSON.stringify(geometry, null, 2),
+        contentType: 'application/json',
+      });
+      await page.screenshot({ path: testInfo.outputPath('header.png') });
+      if (width === 390) {
+        expect.soft(geometry.titleWidth).toBeGreaterThanOrEqual(120);
+        for (const control of geometry.controls) {
+          for (const clearance of [control.left, control.right, control.top, control.bottom])
+            expect.soft(clearance, JSON.stringify(control)).toBeGreaterThanOrEqual(8);
+        }
+        await expect(header.getByText(/^#\d+$/)).toBeHidden();
+        await expect(header.getByTestId('chip-chevron')).toBeHidden();
+        await expect(
+          header.getByTestId('phase-chip').locator('span').filter({ hasText: '审核' }),
+        ).toBeHidden();
+        await expect(action).toHaveAccessibleName('完成');
+        expect((await action.boundingBox())!.height).toBe(32);
+      } else {
+        await expect(header.getByTestId('chip-chevron')).toBeVisible();
+        await expect(header.getByText(/^#\d+$/)).toBeVisible();
+      }
+      await expect(header.getByTestId('phase-chip')).toHaveAccessibleName('审核');
+      await header.getByTestId('phase-chip').click();
+      await expect(page.getByRole('dialog', { name: '任务分配' })).toBeVisible();
+      await page.keyboard.press('Escape');
+      await action.click();
+      await expect(page.getByRole('dialog', { name: '完成任务' })).toBeVisible();
+    });
+  }
+}

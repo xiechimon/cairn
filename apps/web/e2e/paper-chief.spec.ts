@@ -90,7 +90,7 @@ for (const theme of ['light', 'dark'] as const) {
     await setTheme(page, theme);
     let win = await openWindow(page, READY);
     await expect(win.getByTestId('chief-gate'), 'W2: bound has no gate').toHaveCount(0);
-    await expect(win.getByTestId('chief-composer-input'), 'W5').toHaveCSS('font-size', '14px');
+    await expect(win.getByTestId('chief-composer-input'), 'W5').toHaveCSS('font-size', '15px');
 
     win = await openWindow(page, SWITCHER);
     const menu = win.getByRole('menu');
@@ -104,12 +104,12 @@ for (const theme of ['light', 'dark'] as const) {
 
     win = await openWindow(page, THREAD);
     const note = win.getByTestId('chief-stream').locator('[data-slot="marker"]').first();
-    await expect(note, 'W5').toHaveCSS('font-size', '12.5px');
+    await expect(note, 'W5').toHaveCSS('font-size', '13px');
     const foot = win.getByTestId('chief-msg-foot').first();
-    await expect(foot, 'W5').toHaveCSS('font-size', '12.5px');
+    await expect(foot, 'W5').toHaveCSS('font-size', '13px');
     await win.getByTestId('chief-tools-toggle').click();
     const toolRow = win.getByTestId('chief-turn-tools').locator('[data-trace-verb]').first();
-    await expect(toolRow, 'W5').toHaveCSS('font-size', '12.5px');
+    await expect(toolRow, 'W5').toHaveCSS('font-size', '13px');
   });
 
   test(`settings: Paper top bar, one settings card, empty rows in the card (${theme})`, async ({
@@ -199,7 +199,7 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(done.locator('svg'), 'Q1').toHaveCount(1);
     await expect(done, 'Q1').toHaveCSS('color', ink3);
 
-    await expect(pending.getByTestId('chief-question-text'), 'Q2').toHaveCSS('font-size', '14px');
+    await expect(pending.getByTestId('chief-question-text'), 'Q2').toHaveCSS('font-size', '15px');
     await expect(pending.getByTestId('chief-question-text'), 'Q2').toHaveCSS('font-weight', '500');
     await expect(pending.getByTestId('chief-question-step'), 'Q2').toHaveCSS(
       'font-size',

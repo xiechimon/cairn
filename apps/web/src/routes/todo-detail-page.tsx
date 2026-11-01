@@ -1187,10 +1187,12 @@ export function TodoDetailPage() {
       <ReviewDialog
         open={overlay?.kind === 'review'}
         onClose={closeOverlay}
-        agents={reviewAgents}
-        defaultAgentId={reviewDefaultId ?? undefined}
-        producerProvider={reviewProducerProvider}
-        fanoutAvailable={live ? fanoutAvailable : undefined}
+        agents={live ? reviewAgents : fixture.reviewChoice?.agents}
+        defaultAgentId={
+          live ? (reviewDefaultId ?? undefined) : fixture.reviewChoice?.defaultAgentId
+        }
+        producerProvider={live ? reviewProducerProvider : fixture.reviewChoice?.producerProvider}
+        fanoutAvailable={live ? fanoutAvailable : fixture.reviewChoice?.fanoutAvailable}
         onStart={
           live && buildId
             ? (input) => {

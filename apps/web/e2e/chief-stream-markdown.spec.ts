@@ -639,7 +639,7 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
     await expect(items.nth(3)).toHaveAttribute('data-message-id', 'm9');
   });
 
-  test('F-R16: single-paragraph plain-text bubble geometry does not drift (40px pill); multi-block bubble first/last block margin trimming works', async ({
+  test('F-R16: single-paragraph plain-text bubble geometry does not drift (one-line pill); multi-block bubble first/last block margin trimming works', async ({
     page,
   }) => {
     const drawer = await boot(page);
@@ -649,8 +649,9 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
       const r = el.getBoundingClientRect();
       return { h: Math.round(r.height), font: getComputedStyle(el).fontSize };
     });
-    expect(geo.h).toBe(40);
-    expect(geo.font).toBe('14px');
+    expect(geo.h).toBeGreaterThanOrEqual(38);
+    expect(geo.h).toBeLessThanOrEqual(39);
+    expect(geo.font).toBe('15px');
 
     const fence = drawer.getByTestId('chief-bubble').filter({ hasText: 'echo before-and-after' });
     const pre = fence.locator('pre.chat-md-code');

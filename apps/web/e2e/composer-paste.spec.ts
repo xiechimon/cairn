@@ -277,7 +277,7 @@ async function bootDetail(page: Page) {
   return input;
 }
 
-test('detail face: a mid-line image paste lands the token whole-line at the caret', async ({
+test('detail face: a mid-line image paste becomes a tile and leaves the text and caret alone', async ({
   page,
 }) => {
   const uploads = await stubUploads(page);
@@ -287,8 +287,8 @@ test('detail face: a mid-line image paste lands the token whole-line at the care
   await setCaret(page, COMPOSER, 5);
   await pasteFiles(page, COMPOSER, [{ name: 'image.png', type: 'image/png' }]);
 
-  // FM1: the caret sat mid-line — the insert broke the line on both sides.
-  await expect(input).toHaveValue(`hello\n${TOKEN_1}\n world`);
+  await expect(input).toHaveValue('hello world');
+  await expect(page.getByTestId('composer-attachments').locator('[data-state="ready"]')).toHaveCount(1);
   // FM2/FM6: the generic clipboard blob got the synthesized per-draft name,
   // and exactly one grant + one upload hit the wire (no double-fire).
   await expect.poll(() => uploads.grants.length).toBe(1);
@@ -298,14 +298,13 @@ test('detail face: a mid-line image paste lands the token whole-line at the care
     scope: 'message',
   });
   await expect.poll(() => uploads.uploads).toBe(1);
-  // The caret rests on the line below the token block (CC cursor canon).
   await expect
     .poll(() => input.evaluate((el) => (el as HTMLTextAreaElement).selectionStart))
-    .toBe('hello\n'.length + TOKEN_1.length + 1);
+    .toBe(5);
   await evidenceShot(page, 'paste-detail-caret-insert.png');
 });
 
-test('detail face: one multi-image paste puts every token on its own line', async ({ page }) => {
+test('detail face: one multi-image paste makes one tile per image', async ({ page }) => {
   const uploads = await stubUploads(page);
   const input = await bootDetail(page);
 
@@ -314,7 +313,8 @@ test('detail face: one multi-image paste puts every token on its own line', asyn
     { name: 'image.png', type: 'image/png' },
   ]);
 
-  await expect(input).toHaveValue(`${TOKEN_1}\n${TOKEN_2}\n`);
+  await expect(input).toHaveValue('');
+  await expect(page.getByTestId('composer-attachments').locator('[data-state="ready"]')).toHaveCount(2);
   await expect.poll(() => uploads.grants.length).toBe(2);
   // Same-draft numbering never collides (FM6).
   expect(uploads.grants.map((g) => g.fileName)).toEqual([
@@ -382,7 +382,9 @@ test('detail face: a non-image whitelist file (text/plain) is accepted under its
   await pasteFiles(page, COMPOSER, [{ name: 'notes.txt', type: 'text/plain' }]);
 
   // Real names are never renamed — only generic clipboard blobs are.
-  await expect(input).toHaveValue(`![notes.txt](attachment:team-1/att-1.png)\n`);
+  await expect(input).toHaveValue('');
+  await expect(page.getByTestId('composer-attachments').locator('[data-state="ready"]')).toHaveCount(1);
+  await expect(page.getByTestId('composer-attachments').getByRole('img', { name: 'notes.txt' })).toBeVisible();
   await expect.poll(() => uploads.grants.length).toBe(1);
   expect(uploads.grants[0]).toMatchObject({
     fileName: 'notes.txt',
@@ -415,7 +417,8 @@ test('detail face: a mixed file+text clipboard takes the files and drops the tex
   });
 
   expect(prevented).toBe(true);
-  await expect(input).toHaveValue(`${TOKEN_1}\n`);
+  await expect(input).toHaveValue('');
+  await expect(page.getByTestId('composer-attachments').locator('[data-state="ready"]')).toHaveCount(1);
   await expect.poll(() => uploads.grants.length).toBe(1);
 });
 
@@ -474,11 +477,13 @@ test('detail face: Enter during the upload does not send; after it lands, Enter 
   await deferred.releaseAll(); // grant
   await expect.poll(() => deferred.held.length).toBe(1);
   await deferred.releaseAll(); // upload
-  await expect(input).toHaveValue(`look at this\n${TOKEN_1}\n`);
+  await expect(input).toHaveValue('look at this');
+  await expect(page.getByTestId('composer-attachments').locator('[data-state="ready"]')).toHaveCount(1);
 
   await input.press('Enter');
   await expect.poll(() => steers).toBe(1);
-  expect(lastContent).toBe(`look at this\n${TOKEN_1}`);
+  expect(lastContent).toBe(`${TOKEN_1}\nlook at this`);
+  await expect(page.getByTestId('composer-attachments').locator('[data-state="ready"]')).toHaveCount(0);
   await expect(input).toHaveValue('');
   await evidenceShot(page, 'paste-detail-send-after-upload.png');
 });
@@ -609,7 +614,8 @@ test('detail face probe: a real Cmd/Ctrl+V clipboard image paste rides the same 
   });
   test.skip(!fired, 'real keyboard paste unavailable on this platform — synthetic route covers it');
 
-  await expect(input).toHaveValue(`![pasted-image-1.png](attachment:team-1/att-1.png)\n`);
+  await expect(input).toHaveValue('');
+  await expect(page.getByTestId('composer-attachments').locator('[data-state="ready"]')).toHaveCount(1);
   expect(uploads.grants[0]?.fileName).toBe('pasted-image-1.png');
   await evidenceShot(page, 'paste-detail-real-keyboard.png');
 });

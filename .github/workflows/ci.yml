@@ -301,21 +301,28 @@ jobs:
         if: ${{ !cancelled() }}
         run: node --test scripts/dispatch-agent.test.mjs scripts/dispatch-dedupe.test.mjs scripts/lane-model-policy.test.mjs
 
+      - name: UI debt ledger only shrinks against main
+        if: ${{ !cancelled() }}
+        run: node --test scripts/ui-debt-gate.test.mjs
+
       - name: Gardener sweep self-test (#1617)
         if: ${{ !cancelled() }}
         run: node --test scripts/gardener-ratchet.test.mjs scripts/gardener-weekly.test.mjs scripts/doc-drift.test.mjs scripts/evidence-prune.test.mjs scripts/delivery-metrics.test.mjs
 
       - name: Merge routing size caps (#2371)
         if: ${{ !cancelled() }}
-        run: node --test scripts/pr-gate-routing.test.mjs scripts/batch-merger.test.mjs
+        run: node --test scripts/pr-gate-routing.test.mjs scripts/batch-merger.test.mjs scripts/coordinator-merge.test.mjs
 
       - name: Real smoke runner and checker fixtures (#2283)
         if: ${{ !cancelled() }}
         run: node --test scripts/ops/real-smoke.test.mjs
 
+      - name: Orb host provisioning fixtures (#2273)
+        if: ${{ !cancelled() }}
+        run: node --test scripts/ops/orb/egress-relay.test.mjs scripts/ops/orb/orb-host-check.test.mjs scripts/ops/orb/provision.test.mjs scripts/ops/orb/shell.test.mjs
       - name: Host control script fixtures (#2380)
         if: ${{ !cancelled() }}
-        run: node --test scripts/ops/host/aged-prs.test.mjs scripts/ops/host/dispatch-issue.test.mjs scripts/ops/host/lanes-retry.test.mjs
+        run: node --test scripts/ops/host/aged-prs.test.mjs scripts/ops/host/dispatch-issue.test.mjs scripts/ops/host/lanes-retry.test.mjs scripts/ops/host/identity-compat.test.mjs
 
       - name: Runner secret isolation fixtures (#2189)
         if: ${{ !cancelled() }}
