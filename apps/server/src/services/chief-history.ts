@@ -34,15 +34,15 @@ function requireOwnThread(db: Db, scope: HistoryScope): void {
   if (!thread) throw new HttpError(404, `chief thread ${scope.threadId}`);
 }
 
-function likeContains(term: string): string {
-  const jsonEscaped = JSON.stringify(term).slice(1, -1);
-  return `%${jsonEscaped.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+function fold(text: string): string {
+  return text.normalize('NFKC').toLowerCase();
 }
 
-function snippetAround(text: string, lowerTerms: string[]): string {
-  const lower = text.toLowerCase();
-  const index = Math.min(...lowerTerms.map((term) => lower.indexOf(term)).filter((i) => i >= 0));
-  const start = Math.max(0, index - SNIPPET_LEAD_CHARS);
+function snippetAround(text: string, folded: string, foldedTerms: string[]): string {
+  const index = Math.min(...foldedTerms.map((term) => folded.indexOf(term)).filter((i) => i >= 0));
+  const scaled =
+    folded.length === text.length ? index : Math.floor((index * text.length) / folded.length);
+  const start = Math.max(0, scaled - SNIPPET_LEAD_CHARS);
   return text.slice(start, start + SNIPPET_CHARS);
 }
 
@@ -79,10 +79,7 @@ export function searchHistory(
           .get();
   if (input.before !== undefined && cursor === undefined)
     throw new HttpError(404, `chief message ${input.before}`);
-  const lowerTerms = terms.map((term) => term.toLowerCase());
-  const likeFilters = terms
-    .filter((term) => term.toLowerCase() === term.toUpperCase() || /^\p{ASCII}*$/u.test(term))
-    .map((term) => sql`${chiefMessage.content} LIKE ${likeContains(term)} ESCAPE '\\'`);
+  const foldedTerms = terms.map(fold);
   const hits: {
     id: string;
     role: string;
@@ -98,9 +95,6 @@ export function searchHistory(
       .where(
         and(
           inThread,
-          likeFilters.length === 0
-            ? undefined
-            : or(sql`substr(${chiefMessage.content}, 1, 1) != '"'`, and(...likeFilters)),
           position === undefined
             ? undefined
             : or(
@@ -114,8 +108,8 @@ export function searchHistory(
       .all();
     for (const row of batch) {
       const text = messageText(row.content);
-      const lower = text.toLowerCase();
-      if (!lowerTerms.every((term) => lower.includes(term))) continue;
+      const folded = fold(text);
+      if (!foldedTerms.every((term) => folded.includes(term))) continue;
       if (hits.length === limit) {
         return { trust: HISTORY_TRUST, hits, nextBefore: hits.at(-1)?.id ?? null };
       }
@@ -124,7 +118,7 @@ export function searchHistory(
         role: row.role,
         createdAt: row.createdAt,
         projectId: row.projectId,
-        snippet: snippetAround(text, lowerTerms),
+        snippet: snippetAround(text, folded, foldedTerms),
       });
     }
     if (batch.length < SEARCH_BATCH_ROWS) return { trust: HISTORY_TRUST, hits, nextBefore: null };

@@ -200,6 +200,27 @@ describe('search_history', () => {
     expect((await search({ query: 'twice absent' })).hits).toEqual([]);
   });
 
+  test('Kelvin sign and full-width Latin fold to plain letters (NFKC plus lowercase)', async () => {
+    seedMessages(H.threadId, [
+      { id: 'k1', content: '\u212Aelvin calibration done' },
+      { id: 'k2', content: 'plain Kelvin scale' },
+      { id: 'k3', content: '\uFF2B\uFF25\uFF2C\uFF36\uFF29\uFF2E full width' },
+    ]);
+    const ids = async (query: string) => (await search({ query })).hits.map((h) => h.id).sort();
+    expect(await ids('kelvin')).toEqual(['k1', 'k2', 'k3']);
+    expect(await ids('\u212Aelvin')).toEqual(['k1', 'k2', 'k3']);
+    expect(await ids('\uFF2B\uFF25\uFF2C\uFF36\uFF29\uFF2E')).toEqual(['k1', 'k2', 'k3']);
+  });
+
+  test('Turkish dotted capital I lowercases to i plus a combining dot: it matches i and its own spelling, not the plain word', async () => {
+    seedMessages(H.threadId, [{ id: 't1', content: '\u0130stanbul office' }]);
+    const ids = async (query: string) => (await search({ query })).hits.map((h) => h.id);
+    expect(await ids('\u0130stanbul')).toEqual(['t1']);
+    expect(await ids('stanbul')).toEqual(['t1']);
+    expect(await ids('i')).toEqual(['t1']);
+    expect(await ids('istanbul')).toEqual([]);
+  });
+
   test('non-ASCII cased text matches case-insensitively', async () => {
     seedMessages(H.threadId, [{ id: 'u1', content: 'Die Überprüfung läuft' }]);
     expect((await search({ query: 'überprüfung' })).hits.map((h) => h.id)).toEqual(['u1']);
