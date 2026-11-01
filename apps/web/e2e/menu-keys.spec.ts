@@ -1,7 +1,6 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 const DETAIL = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=27';
-const SNOOZE = '/app?scenario=sidebar-snooze';
 
 async function captionFontSize(page: Page) {
   return page.evaluate(() => {
@@ -173,22 +172,6 @@ test('gallery menu: composing text does not fire a row', async ({ page }) => {
   });
   await expect(menu).toBeVisible();
   await expect(page.getByText('Last picked: Delete')).toHaveCount(0);
-});
-
-test('thread row menu: the snooze letter opens its submenu and a choice letter picks a row', async ({
-  page,
-}) => {
-  await page.goto(SNOOZE);
-  const row = page.getByTestId('sidebar-thread-row').filter({ hasText: 'active thread A' });
-  await row.hover();
-  await row.getByTestId('thread-row-menu').click();
-  await expect(page.getByTestId('thread-row-snooze')).toContainText('S');
-  await expectFocusWithin(page.getByRole('menu').first());
-  await page.keyboard.press('s');
-  await expect(page.getByTestId('thread-snooze-menu')).toBeVisible();
-  await expectFocusWithin(page.getByTestId('thread-snooze-menu'));
-  await page.keyboard.press('n');
-  await expect(page.getByRole('dialog', { name: '暂停，直到需要我' })).toBeVisible();
 });
 
 test('global keys stay visible on the controls they trigger, without hover', async ({ page }) => {

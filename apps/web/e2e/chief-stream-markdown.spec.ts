@@ -217,7 +217,7 @@ test.describe('chief drawer markdown face (fixture, #650)', () => {
     await expect(fence).toContainText('curl -s localhost:8787/healthz');
   });
 
-  test('F-R13: todo mentions render as chips, anchors point at task detail and a click opens the task panel; literal #seq/pseudo schemes render no chip (#675)', async ({
+  test('F-R13: todo mentions render as chips, anchors point at task detail and a click opens it; literal #seq/pseudo schemes render no chip (#675)', async ({
     page,
   }) => {
     const stream = page.getByTestId('chief-stream');
@@ -234,8 +234,7 @@ test.describe('chief drawer markdown face (fixture, #650)', () => {
     );
 
     await chip.click();
-    await expect(page.getByRole('complementary', { name: '任务面板' })).toBeVisible();
-    await expect.poll(() => new URL(page.url()).searchParams.get('task')).toBe('r3-legacy-1');
+    await expect(page).toHaveURL(/\/app\/todo\/r3-legacy-1/);
   });
 
   test('F-R4/R5: typing rows have no foot; final rows keep the foot (copy + done 44s)', async ({ page }) => {
@@ -308,7 +307,7 @@ test.describe('chief drawer streaming face (live mock, #651)', () => {
 
     const drawer = page.locator('.chief-drawer');
     await expect(drawer).toBeVisible();
-    await expect(drawer.getByRole('button', { name: '主题', exact: true })).toHaveText('线程乙');
+    await expect(drawer.getByTestId('chief-msg').first()).toContainText('派一下凭证链路验证');
 
     const userRow = drawer.getByTestId('chief-msg').first();
     await expect(userRow.locator('img')).toHaveCount(0);
@@ -386,7 +385,7 @@ test.describe('chief drawer streaming face (live mock, #651)', () => {
 
     const drawer = page.locator('.chief-drawer');
     await expect(drawer).toBeVisible();
-    await expect(drawer.getByRole('button', { name: '主题', exact: true })).toHaveText('线程乙');
+    await expect(drawer.getByTestId('chief-msg').first()).toContainText('派一下凭证链路验证');
 
     const presence = drawer.getByTestId('chief-msg').last();
     const toggle = presence.getByRole('button', { name: /实时步骤/ });
@@ -607,8 +606,7 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
     await expect(bubble.locator('.mention-chip')).toHaveCount(1);
 
     await chip.click();
-    await expect(page.getByRole('complementary', { name: '任务面板' })).toBeVisible();
-    await expect.poll(() => new URL(page.url()).searchParams.get('task')).toBe('t16');
+    await expect(page).toHaveURL(/\/app\/todo\/t16/);
   });
 
   test('F-R15: copy payload = markdown source (not rendered output); the two-button row (copy/restore) is unaffected', async ({

@@ -71,11 +71,11 @@ test('`Workbench` badge counts the `待处理` column and opens the home view', 
   await expect(page).not.toHaveURL(/view=/);
   await expect(page).toHaveURL(/[?&]scenario=01/);
   await expect(columns(page)).toHaveCount(0);
-  await expect(page.getByTestId('home-sections')).toBeVisible();
+  await expect(page.getByTestId('home-c')).toBeVisible();
   await expect(home).toHaveAttribute('aria-current', 'page');
 
   await page.reload();
-  await expect(page.getByTestId('home-sections')).toBeVisible();
+  await expect(page.getByTestId('home-c')).toBeVisible();
 });
 
 test('active row = sidebar-active fill, no ring', async ({ page }) => {
@@ -208,7 +208,7 @@ test('collapsed rail keeps `Workbench` with its badge dot and the expand toggle'
   const home = aside.getByRole('link', { name: /工作台/ });
   await expect(home).toBeVisible();
   await home.click();
-  await expect(page.getByTestId('home-sections')).toBeVisible();
+  await expect(page.getByTestId('home-c')).toBeVisible();
   await expect(home).toHaveAttribute('aria-current', 'page');
   await aside.getByRole('button', { name: '展开侧边栏' }).click();
   expect(await aside.evaluate((el) => el.getBoundingClientRect().width)).toBe(248);
