@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router';
 import { useAgentAvatarUrlById, useLiveData } from '../api/provider.js';
 import { TOPBAR_PRIMARY_BUTTON } from '../board/filter-panel.js';
 import { ProjectAvatar } from '../board/project-avatar.js';
+import { useProjectMark } from '../board/project-mark.js';
 import { type GlyphKind, StatusGlyph } from '../components/status-glyph.js';
 import { Badge } from '../components/ui/badge.js';
 import { Button } from '../components/ui/button.js';
@@ -44,6 +45,7 @@ export function DetailHead({
   actionInFlight,
   moreButtonRef,
 }: DetailHeadProps) {
+  const projectMark = useProjectMark();
   const { t } = useI18n();
   const shown = phase ?? todo.phase;
   const status: { chip: string; glyph: GlyphKind; ink: string } = verifyActive
@@ -74,7 +76,7 @@ export function DetailHead({
       <span className="flex flex-none items-center gap-1.5 text-meta text-content-tertiary">
         {project !== undefined && (
           <>
-            <ProjectAvatar name={project} tone={0} />
+            <ProjectAvatar name={project} {...projectMark(project)} bare />
             <span className="max-w-40 truncate max-md:hidden">{project}</span>
             <span aria-hidden="true" className="max-md:hidden">
               /

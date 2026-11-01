@@ -23,10 +23,23 @@ const green = ['check', 'pack-smoke', 'e2e-gate', 'pr-evidence'].map((name) => (
   name,
   bucket: 'pass',
 }));
+const states = {
+  pass: 'SUCCESS',
+  skipping: 'SKIPPED',
+  fail: 'FAILURE',
+  cancel: 'CANCELLED',
+  pending: 'IN_PROGRESS',
+};
+const mustBeGreen = ['gates', 'dead-class-gate', 'ops-backup-test'].map((name) => ({
+  name,
+  bucket: 'pass',
+  state: 'SUCCESS',
+}));
 const base = {
   head: [A],
   comments: [[passComment(A)]],
   checks: [green],
+  allChecks: [[...green, ...mustBeGreen]],
   markers: [[]],
   commits: [[{ commit: { message: 'Subject line\n\nBody text\n\ncloses #42' } }]],
   view: [{ state: 'MERGED', mergeCommit: { oid: sha('c') } }],
@@ -45,7 +58,7 @@ fs.appendFileSync(process.env.CALLS, JSON.stringify(args) + '\\n');
 const d = JSON.parse(fs.readFileSync(process.env.DATA));
 const p = args[1] ?? '';
 let key;
-if (args[0] === 'pr' && args[1] === 'checks') key = 'checks';
+if (args[0] === 'pr' && args[1] === 'checks') key = args.includes('--required') ? 'checks' : 'allChecks';
 else if (args[0] === 'pr' && args[1] === 'view') key = 'view';
 else if (args[0] === 'pr' && args[1] === 'merge') process.exit(0);
 else if (p.includes('/issues?')) key = 'markers';
@@ -60,7 +73,7 @@ const seq = d[key];
 const item = seq[Math.min(count, seq.length - 1)];
 if (item && item.error) process.exit(1);
 if (key === 'head') console.log(JSON.stringify({ head: { sha: item } }));
-else if (key === 'checks' || key === 'view') console.log(JSON.stringify(item));
+else if (key === 'checks' || key === 'allChecks' || key === 'view') console.log(JSON.stringify(item));
 else console.log(JSON.stringify([item]));
 `,
     { mode: 0o755 },
@@ -164,6 +177,44 @@ test('skipped checks count as green', (t) => {
   assert.equal(run(t, { checks: [skipped] }).merges.length, 1);
 });
 
+const withJob = (name, bucket, state = states[bucket]) =>
+  [...green, ...mustBeGreen].map((check) =>
+    check.name === name ? { ...check, bucket, state } : check,
+  );
+const withoutJob = (name) => [...green, ...mustBeGreen].filter((check) => check.name !== name);
+
+test('required checks green but gates red does not merge', (t) => {
+  for (const bucket of ['fail', 'cancel', 'pending']) {
+    const { result, merges } = run(t, { allChecks: [withJob('gates', bucket)] });
+    assert.notEqual(result.status, 0);
+    assert.equal(merges.length, 0);
+  }
+});
+
+test('gates green merges', (t) => {
+  assert.equal(run(t, { allChecks: [withJob('gates', 'pass')] }).merges.length, 1);
+});
+
+test('gates missing after required checks completed waits, then merges once it reports', (t) => {
+  assert.equal(run(t, { allChecks: [withoutJob('gates')] }).merges.length, 0);
+  const { merges } = run(t, { allChecks: [withoutJob('gates'), withJob('gates', 'pass')] });
+  assert.equal(merges.length, 1);
+});
+
+test('every must-be-green job gates the merge', (t) => {
+  for (const name of mustBeGreen.map((check) => check.name))
+    assert.equal(run(t, { allChecks: [withJob(name, 'fail')] }).merges.length, 0);
+});
+
+test('a neutral or timed out must-be-green job does not count as green', (t) => {
+  assert.equal(run(t, { allChecks: [withJob('gates', 'pass', 'NEUTRAL')] }).merges.length, 0);
+  assert.equal(run(t, { allChecks: [withJob('gates', 'fail', 'TIMED_OUT')] }).merges.length, 0);
+});
+
+test('a skipped must-be-green job counts as green', (t) => {
+  assert.equal(run(t, { allChecks: [withJob('ops-backup-test', 'skipping')] }).merges.length, 1);
+});
+
 test('head moved after PASS re-waits for the new head verdict', (t) => {
   const { result, merges } = run(t, {
     head: [A, B, B],
@@ -219,7 +270,7 @@ test('every gh call targets the configured repo, not GH_REPO', (t) => {
   const { result, calls } = run(t);
   assert.equal(result.status, 0, result.stderr);
   const prCalls = calls.filter((c) => c[0] === 'pr');
-  assert.equal(prCalls.length, 3);
+  assert.equal(prCalls.length, 4);
   for (const c of prCalls) assert.equal(flag(c, '-R'), 'owner/repo');
   for (const c of calls.filter((c) => c[0] === 'api')) assert.match(c[1], /^repos\/owner\/repo\//);
 });

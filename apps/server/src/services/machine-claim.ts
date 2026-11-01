@@ -53,7 +53,8 @@ import {
 } from './machine-deps.js';
 import { injectMemories } from './memory.js';
 import { effectiveModel } from './model-fallback.js';
-import { projectMergeConfigOf } from './projects.js';
+import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
+import { reverifyShip } from './ship-gate.js';
 import { scanLocalSkills } from './skills.js';
 import { listProjectTagVocab } from './tags.js';
 import { isThreadScheduleTool } from './thread-schedule-tools.js';
@@ -321,6 +322,11 @@ async function tryClaim(
   }
 
   for (const cand of workerCands) {
+    const shipRefusal = await reverifyShip(deps, cand.stepRow);
+    if (shipRefusal !== null) {
+      failStepWithEvents(deps, cand.stepRow, `Ship refused: ${shipRefusal}`);
+      continue;
+    }
     const localMerge = parseLocalMergeInstruction(cand.stepRow.prompt);
     if (localMerge !== null) {
       const project = projectOfTodo(db, cand.todoRow);
@@ -328,7 +334,8 @@ async function tryClaim(
       if (
         project?.repoKind !== 'local' ||
         project.id !== localMerge.projectId ||
-        config?.mergePolicy !== 'autonomous' ||
+        config === null ||
+        (config.mergePolicy !== 'autonomous' && projectShipRouteOf(project) !== 'local-merge') ||
         JSON.stringify(config.localChecks) !== JSON.stringify(localMerge.localChecks) ||
         cand.todoRow.phase !== 'review' ||
         cand.todoRow.latestBuildId !== localMerge.buildId

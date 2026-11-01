@@ -5,9 +5,13 @@ import {
   type FsPickResult,
   githubIssuesResponseSchema,
   importGithubIssueBodySchema,
+  type NamedPromptId,
+  namedPromptIdSchema,
   patchAutonomyBodySchema,
   patchProjectBodySchema,
   patchProjectMergeConfigSchema,
+  putNamedPromptBodySchema,
+  putShipRouteBodySchema,
 } from '@cairn/shared';
 import { eq, inArray } from 'drizzle-orm';
 import type { Hono } from 'hono';
@@ -45,15 +49,24 @@ import {
   validateLocalRepoPath,
 } from './services/git.js';
 import { importGithubIssue, listProjectGithubIssues } from './services/github-issues.js';
+import { listNamedPrompts, putNamedPrompt, resetNamedPrompt } from './services/named-prompts.js';
 import {
   deleteProject,
   projectMergeConfigOf,
+  projectShipRouteOf,
   updateProject,
   updateProjectMergeConfig,
+  updateProjectShipRoute,
 } from './services/projects.js';
 import { latestScheduleReport } from './services/scheduling/store.js';
 import { seedFixedTags } from './services/tags.js';
 import { listTodos } from './services/todos.js';
+
+function parseNamedPromptId(raw: string): NamedPromptId {
+  const parsed = namedPromptIdSchema.safeParse(raw);
+  if (!parsed.success) throw notFound(`prompt ${raw}`);
+  return parsed.data;
+}
 
 export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
   const svc = svcOf(ctx);
@@ -75,6 +88,29 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
     const body = parseWith(patchProjectMergeConfigSchema, await jsonBody(c), 'body');
     return c.json(updateProjectMergeConfig(ctx.db, row, body));
   });
+
+  app.get('/api/projects/:id/ship-route', (c) => {
+    const row = requireProject(ctx, c.req.param('id'));
+    return c.json({ shipRoute: projectShipRouteOf(row) });
+  });
+
+  app.put('/api/projects/:id/ship-route', async (c) => {
+    const row = requireProject(ctx, c.req.param('id'));
+    const body = parseWith(putShipRouteBodySchema, await jsonBody(c), 'body');
+    return c.json({ shipRoute: updateProjectShipRoute(ctx.db, row, body.shipRoute) });
+  });
+
+  app.get('/api/prompts', (c) => c.json(listNamedPrompts(ctx.db, ctx.team.id)));
+
+  app.put('/api/prompts/:id', async (c) => {
+    const id = parseNamedPromptId(c.req.param('id'));
+    const body = parseWith(putNamedPromptBodySchema, await jsonBody(c), 'body');
+    return c.json(putNamedPrompt(ctx.db, ctx.team.id, id, body.text));
+  });
+
+  app.delete('/api/prompts/:id', (c) =>
+    c.json(resetNamedPrompt(ctx.db, ctx.team.id, parseNamedPromptId(c.req.param('id')))),
+  );
 
   app.get('/api/projects/:id/todos', (c) => {
     const row = requireProject(ctx, c.req.param('id'));

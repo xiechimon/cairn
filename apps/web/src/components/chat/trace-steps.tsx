@@ -335,7 +335,7 @@ export function TraceSteps({
         const { step } = block;
         if (step.kind === 'say')
           return (
-            <p key={block.key} className="m-0 mb-3 text-card-title leading-6 text-foreground">
+            <p key={block.key} className="m-0 mb-3 text-card-title text-foreground">
               {step.text}
             </p>
           );

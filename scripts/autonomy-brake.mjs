@@ -95,11 +95,24 @@ function checkPull(pr, paused) {
     } catch {}
   }
   if (!shaPattern.test(pr.head.sha)) throw new Error('Invalid PR head SHA');
-  api(`repos/${repo}/statuses/${pr.head.sha}`, {
+  const path = `repos/${repo}/statuses/${pr.head.sha}`;
+  const payload = {
     context: 'autonomy-brake',
     state: allowed ? 'success' : 'failure',
     description: allowed ? 'Autonomy brake permits this head' : 'Autonomous merging is paused',
-  });
+  };
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      api(path, payload);
+      break;
+    } catch (error) {
+      if (attempt < 3 && /^unexpected end of JSON input$/m.test(String(error.stderr))) continue;
+      throw new Error(
+        `Status publication failed for ${path} after ${attempt} attempt(s): ${error.message}`,
+        { cause: error },
+      );
+    }
+  }
   return allowed;
 }
 

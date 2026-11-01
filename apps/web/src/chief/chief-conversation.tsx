@@ -18,8 +18,10 @@ import {
 import { useMachines, useMembers, useProjects, useSkills, useTodos } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { ProjectAvatar } from '../board/project-avatar.js';
+import { useProjectMark } from '../board/project-mark.js';
 import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.js';
 import { JumpToLatestButton } from '../components/chat/jump-to-latest.js';
+import { formatClock, useLiveSeconds } from '../components/chat/live-row.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
 import {
@@ -170,6 +172,7 @@ export function ChiefConversation({
   composerRef,
   day,
 }: ChiefConversationProps) {
+  const projectMark = useProjectMark();
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
   const todosQ = useTodos(teamId, live);
@@ -387,6 +390,13 @@ export function ChiefConversation({
   const heroScrollRef = useRef<HTMLDivElement | null>(null);
   useScrollFade(heroScrollRef, { enabled: heroLayout });
   const stopMode = chief.running === true && wire.draft === '' && onStop != null;
+  const liveTurn =
+    chief.running === true
+      ? chief.stream?.findLast((item) => item.kind === 'streaming')
+      : undefined;
+  const turnTick = useLiveSeconds(liveTurn?.kind === 'streaming' ? liveTurn.startedAt : null);
+  const turnElapsed =
+    turnTick ?? (liveTurn?.kind === 'streaming' ? liveTurn.seconds : undefined) ?? null;
   const withdraw =
     onWithdraw == null
       ? undefined
@@ -771,6 +781,9 @@ export function ChiefConversation({
                 <ProjectAvatar
                   name={pickedProject.name}
                   tone={projectOptions.indexOf(pickedProject)}
+                  icon={projectMark(pickedProject.id).icon}
+                  color={projectMark(pickedProject.id).color}
+                  bare
                 />
               ) : (
                 <CircleDashed className="size-4 flex-none" />
@@ -779,12 +792,20 @@ export function ChiefConversation({
               <ChevronDown width={12} height={12} />
             </ProjectMenu>
           )}
+          {chief.running === true && turnElapsed != null && (
+            <span
+              className="ml-auto flex h-8 items-center text-meta tabular-nums text-(--text-tertiary)"
+              data-testid="chief-composer-working"
+            >
+              {t('工作中 · {time}', { time: formatClock(turnElapsed) })}
+            </span>
+          )}
           {stopMode ? (
             <Button
               variant="ghost"
               size="icon"
               aria-label={t('停止总管这次回复')}
-              className={cn(SEND_BTN_CLS, STOP_ON_CLS)}
+              className={cn(SEND_BTN_CLS, STOP_ON_CLS, turnElapsed != null && 'ml-2')}
               onClick={onStop}
             >
               <span className="size-2.5 rounded-(--cds-radius-xs) bg-current" />
@@ -794,7 +815,11 @@ export function ChiefConversation({
               variant="ghost"
               size="icon"
               aria-label={t('发送')}
-              className={cn(SEND_BTN_CLS, wire.draft !== '' && SEND_ON_CLS)}
+              className={cn(
+                SEND_BTN_CLS,
+                wire.draft !== '' && SEND_ON_CLS,
+                turnElapsed != null && 'ml-2',
+              )}
               onClick={wire.send}
             >
               <ArrowUp width={16} height={16} />
