@@ -46,6 +46,9 @@ queue_rules:
           - check-success = e2e-gate
           - check-skipped = e2e-gate
       - or:
+          - check-success = gates
+          - check-skipped = gates
+      - or:
           - check-success = dead-class-gate
           - check-skipped = dead-class-gate
       - or:

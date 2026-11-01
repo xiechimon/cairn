@@ -4,7 +4,7 @@ import { mustBeGreenJobs, requiredChecks } from './merge-checks.mjs';
 
 const prGatePath = '.claude/workflows/pr-gate.js';
 export const configPath = '.mergify.yml';
-const prOnlyChecks = ['pr-evidence', 'gates'];
+const prOnlyChecks = ['pr-evidence'];
 const maxLinesEachWay = 400;
 
 function routingPolicy(source) {

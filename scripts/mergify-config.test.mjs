@@ -60,8 +60,8 @@ test('the queue requires the review-gate status and keeps PR-only gates off the 
   assert.match(queue, /- -author = cairnwright\[bot\]\n/);
   for (const check of ['check', 'pack-smoke', 'e2e-gate', 'pr-evidence', 'gates'])
     assert.match(queue, new RegExp(`check-success = ${check}\\n`), check);
-  for (const check of ['check', 'pack-smoke', 'e2e-gate'])
+  for (const check of ['check', 'pack-smoke', 'e2e-gate', 'gates'])
     assert.match(merge, new RegExp(`check-success = ${check}\\n`), check);
-  for (const check of ['pr-evidence', 'gates']) assert.doesNotMatch(merge, new RegExp(check));
+  for (const check of ['pr-evidence', 'merge-route']) assert.doesNotMatch(merge, new RegExp(check));
   assert.match(merge, /merge_method: squash\n/);
 });
