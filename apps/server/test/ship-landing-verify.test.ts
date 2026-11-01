@@ -142,6 +142,23 @@ describe('the custom merge step is verified when it finishes', () => {
     );
   });
 
+  test('success reported with an unchanged head but no merge: the step fails without the brake', async () => {
+    const { s, machineId, deps } = world({ merged: false, head: JUDGED });
+    await finishStep(deps, machineId, 'm1', { status: 'success' });
+    expect(stepRow(s)?.status).toBe('failed');
+    expect(failure(s)).toMatch(/PR is not merged/);
+    expect(s.db.select().from(team).where(eq(team.id, s.team.id)).get()?.autonomyPaused).toBe(
+      false,
+    );
+  });
+
+  test('a failed report with an unchanged unmerged head is an ordinary failure', async () => {
+    const { s, machineId, deps } = world({ merged: false, head: JUDGED });
+    await finishStep(deps, machineId, 'm1', { status: 'failed', errorMessage: 'agent gave up' });
+    expect(stepRow(s)?.status).toBe('failed');
+    expect(failure(s)).toBe('agent gave up');
+  });
+
   test('a push after claim then a merge: step failed, alert raised, brake opened', async () => {
     const { s, machineId, deps } = world({ merged: true, head: PUSHED });
     await finishStep(deps, machineId, 'm1', { status: 'success' });

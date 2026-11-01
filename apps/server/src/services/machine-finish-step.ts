@@ -287,7 +287,8 @@ async function finishStepReport(
   }
   if (body.status === 'success' && parseLocalMergeInstruction(stepRow.prompt) !== null)
     throw conflict('Local merge command reported no landing result');
-  const shipFailure = stepRow.kind === 'merge' ? await verifyShipLanding(deps, stepRow) : null;
+  const shipFailure =
+    stepRow.kind === 'merge' ? await verifyShipLanding(deps, stepRow, body.status) : null;
   const mergeSuccess =
     stepRow.kind === 'merge' && body.status === 'success' && shipFailure === null;
   let landingSkipped = mergeSuccess && mergeCardLeftReview(deps, stepRow);

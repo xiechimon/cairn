@@ -153,6 +153,7 @@ async function raiseUnjudgedLanding(
 
 type LandingInspection =
   | { kind: 'ok' }
+  | { kind: 'not-merged' }
   | { kind: 'unverifiable' | 'head-moved'; reason: string }
   | { kind: 'unjudged'; reason: string; teamId: string };
 
@@ -187,7 +188,9 @@ async function inspectShipLanding(
       reason: 'cannot verify the landing: the pull request could not be read',
     };
   }
-  if (pull.headSha === instruction.judgedHead) return { kind: 'ok' };
+  if (pull.headSha === instruction.judgedHead) {
+    return pull.merged ? { kind: 'ok' } : { kind: 'not-merged' };
+  }
   const moved = `pull request head ${pull.headSha.slice(0, 7)} differs from the judged head ${instruction.judgedHead.slice(0, 7)}`;
   if (!pull.merged) return { kind: 'head-moved', reason: `head-moved: ${moved}` };
   return { kind: 'unjudged', reason: `unjudged code was merged: ${moved}`, teamId: todoRow.teamId };
@@ -196,11 +199,18 @@ async function inspectShipLanding(
 export async function verifyShipLanding(
   deps: BuildDeps,
   stepRow: typeof step.$inferSelect,
+  reportedStatus: 'success' | 'failed' | 'stopped',
 ): Promise<string | null> {
   const found = await inspectShipLanding(deps, stepRow);
   if (found.kind === 'ok') return null;
-  if (found.kind === 'unjudged')
+  if (found.kind === 'not-merged') {
+    return reportedStatus === 'success'
+      ? 'custom ship reported success but the PR is not merged'
+      : null;
+  }
+  if (found.kind === 'unjudged') {
     await raiseUnjudgedLanding(deps, stepRow, found.teamId, found.reason);
+  }
   return found.reason;
 }
 
