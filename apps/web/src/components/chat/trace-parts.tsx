@@ -116,12 +116,8 @@ export function TraceGroupSummary({
       className={cn(SUMMARY_BTN, compact ? 'text-meta leading-5' : 'text-ui leading-6', className)}
       {...props}
     >
-      <span
-        className={cn('min-w-0 truncate', running && 'shimmer motion-reduce:shimmer-none')}
-        data-trace-summary=""
-        title={summaryTitle}
-      >
-        {summary}
+      <span className="min-w-0 truncate" data-trace-summary="" title={summaryTitle}>
+        <span className={cn(running && 'shimmer motion-reduce:shimmer-none')}>{summary}</span>
         {failed != null && (
           <span className="ml-1 text-destructive" data-trace-failed="">
             {failed}
