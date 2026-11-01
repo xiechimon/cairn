@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, statSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 
@@ -18,6 +18,22 @@ export function baselineNameFor(path) {
   )
     return name;
   return null;
+}
+
+export function pickBaselines(files, read = (file) => readFileSync(file)) {
+  const chosen = new Map();
+  const fromRender = new Set();
+  for (const file of files) {
+    const target = baselineNameFor(file);
+    if (target == null) continue;
+    const render = file.endsWith('-actual.png');
+    if (!render && fromRender.has(target)) continue;
+    if (render && fromRender.has(target) && !read(chosen.get(target)).equals(read(file)))
+      throw new Error(`two different CI renders for ${target}: ${chosen.get(target)} and ${file}`);
+    chosen.set(target, file);
+    if (render) fromRender.add(target);
+  }
+  return chosen;
 }
 
 function walk(dir, out = []) {
@@ -76,14 +92,10 @@ function main() {
     ],
     { stdio: 'inherit' },
   );
+  const chosen = pickBaselines(walk(work));
   mkdirSync(SNAPSHOT_DIR, { recursive: true });
-  const accepted = new Set();
-  for (const file of walk(work)) {
-    const target = baselineNameFor(file);
-    if (target == null) continue;
-    copyFileSync(file, join(SNAPSHOT_DIR, target));
-    accepted.add(target);
-  }
+  for (const [target, file] of chosen) copyFileSync(file, join(SNAPSHOT_DIR, target));
+  const accepted = new Set(chosen.keys());
   for (const name of [...accepted].sort()) console.log(`accepted ${name}`);
   console.log(`[gallery-snapshots-accept] ${accepted.size} baseline(s) from run ${runId}`);
   if (accepted.size === 0) process.exit(1);

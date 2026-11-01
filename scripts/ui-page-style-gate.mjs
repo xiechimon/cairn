@@ -12,6 +12,7 @@ const EXEMPT = [
   /^icons\//,
   /^i18n\//,
   /^components\/brand-marks\.tsx$/,
+  /^components\/status-glyph\.tsx$/,
   /\.test\.tsx?$/,
 ];
 
@@ -19,6 +20,12 @@ const COLOR_UTILITY =
   '(?:text|bg|border|border-[trblxyse]|ring|ring-offset|fill|stroke|from|to|via|outline|divide|decoration|shadow|accent|caret|placeholder)';
 const PALETTE =
   '(?:red|green|blue|yellow|orange|amber|lime|emerald|teal|cyan|sky|indigo|violet|purple|fuchsia|pink|rose|slate|gray|zinc|neutral|stone|white|black)';
+
+const NAMED =
+  '(?:red|green|blue|white|black|gray|grey|orange|yellow|purple|pink|brown|cyan|magenta|lime|navy|teal|maroon|olive|silver|gold|indigo|violet|crimson|tomato|coral|salmon|beige|ivory|khaki|lavender|plum|orchid|turquoise|aqua|fuchsia|chocolate|tan|wheat|snow|azure|mintcream|whitesmoke|darkgray|lightgray|darkgrey|lightgrey)';
+const COLOR_FN = '(?:#[0-9a-f]{3,8}\\b|rgba?\\(|hsla?\\(|oklch\\(|oklab\\()';
+const COLOR_PROPS =
+  '(?:fill|stroke|stopColor|color|caretColor|accentColor|background\\w*|border\\w*|outline\\w*|boxShadow|textShadow)';
 
 export const RULES = [
   {
@@ -34,20 +41,22 @@ export const RULES = [
     id: 'arbitrary-color',
     message: 'arbitrary colour value; add a token to styles/shadcn.css and use it',
     pattern: new RegExp(
-      `(?<![\\w-])(?:[\\w-]+:)*${COLOR_UTILITY}-\\[(?:#|rgba?\\(|hsla?\\(|oklch\\(|oklab\\(|color-mix\\(|color:)`,
+      `(?<![\\w-])(?:[\\w-]+:)*${COLOR_UTILITY}-\\[(?:#|rgba?\\(|hsla?\\(|oklch\\(|oklab\\(|color-mix\\(|color:|${NAMED}\\])`,
       'gi',
     ),
   },
   {
     id: 'color-literal',
     message: 'colour literal in a style or SVG attribute; use var(--token) or currentColor',
-    pattern:
-      /\b(?:fill|stroke|color|stopColor|background|backgroundColor|borderColor|outlineColor)\s*[=:]\s*\{?\s*["'`]\s*(?:#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(|oklch\(|oklab\()/gi,
+    pattern: new RegExp(
+      `\\b${COLOR_PROPS}\\s*[=:]\\s*\\{?\\s*(["'\`])(?:[^"'\`]*?${COLOR_FN}|\\s*${NAMED}\\s*\\1)`,
+      'gi',
+    ),
   },
   {
     id: 'inline-type',
     message: 'type set in an inline style; use the text-* scale keys',
-    pattern: /style=\{\{[^}]*?\b(?:fontSize|fontWeight|lineHeight|fontFamily|letterSpacing)\s*:/g,
+    pattern: /\b(?:fontSize|fontWeight|lineHeight|fontFamily|letterSpacing)\s*:/g,
   },
 ];
 
@@ -61,7 +70,17 @@ const CANARY = [
   ["style={{ color: '#333' }}", 'color-literal'],
   ['style={{ fontSize: 13 }}', 'inline-type'],
   ['style={{\n  marginTop: 4,\n  fontWeight: 600 }}', 'inline-type'],
+  ['className="bg-[red] text-[blue]"', 'arbitrary-color'],
+  ['style={{ color: "red" }}', 'color-literal'],
+  ["style={{ border: '1px solid #fff' }}", 'color-literal'],
+  ['style={ { fontSize: 13 } }', 'inline-type'],
+  ['const title = { fontWeight: 600 };', 'inline-type'],
   ['className="text-(--text-secondary) bg-card text-ui"', null],
+  ['<Button color="secondary" />', null],
+  ['<path fill="none" stroke="currentColor" />', null],
+  ["style={{ border: '1px solid var(--border)' }}", null],
+  ['style={{ borderColor: `color-mix(in oklab, var(--tile) 55%, transparent)` }}', null],
+  ['className="shadow-[none]"', null],
   ['className="text-red-ink"', null],
   ['style={{ color: tag.color }}', null],
   ["style={{ background: 'var(--project-tile-3)' }}", null],

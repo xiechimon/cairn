@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { baselineNameFor } from './gallery-snapshots-accept.mjs';
+import { baselineNameFor, pickBaselines } from './gallery-snapshots-accept.mjs';
 import { scanSource, scanTree, selfCheck } from './ui-page-style-gate.mjs';
 
 function tree(files) {
@@ -61,4 +61,25 @@ test('accept maps CI renders onto Linux baseline names', () => {
     null,
   );
   assert.equal(baselineNameFor('/x/test-results/board-dnd/card-actual.png'), null);
+});
+
+test('a CI render wins over an uploaded old baseline, and two different renders are refused', () => {
+  const old = '/x/shard-3/e2e/gallery-snapshots.spec.ts-snapshots/sidebar-dark-linux.png';
+  const fresh = '/x/shard-2/test-results/gallery-snapshots-every-dark/sidebar-dark-actual.png';
+  const bytes = {
+    [old]: 'old',
+    [fresh]: 'new',
+    '/x/shard-4/test-results/gallery-snapshots-b/sidebar-dark-actual.png': 'other',
+  };
+  const read = (file) => Buffer.from(bytes[file]);
+  assert.equal(pickBaselines([fresh, old], read).get('sidebar-dark-linux.png'), fresh);
+  assert.equal(pickBaselines([old, fresh], read).get('sidebar-dark-linux.png'), fresh);
+  assert.throws(
+    () =>
+      pickBaselines(
+        [fresh, '/x/shard-4/test-results/gallery-snapshots-b/sidebar-dark-actual.png'],
+        read,
+      ),
+    /two different CI renders/,
+  );
 });
