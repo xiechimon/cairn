@@ -5,6 +5,7 @@ import type { StoneTone } from './tone.js';
 
 const TONE_GLYPH: Record<Exclude<StoneTone, 'working'>, { kind: GlyphKind; ink: string }> = {
   waiting: { kind: 'half', ink: ACCENT_INK },
+  failed: { kind: 'failed', ink: 'text-destructive' },
   review: { kind: 'three-quarter', ink: ACCENT_INK },
   idle: { kind: 'ring', ink: 'text-content-tertiary' },
   resolved: { kind: 'done', ink: 'text-content-dim' },
