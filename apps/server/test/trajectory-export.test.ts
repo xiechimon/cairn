@@ -4,7 +4,6 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
-  realpathSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -177,9 +176,7 @@ test('selects builds by creation time and writes defaults under the instance', (
   ]);
   expect(result.status, result.stderr).toBe(0);
   const path = result.stdout.trim().split('out=')[1] ?? '';
-  expect(path.startsWith(join(realpathSync(join(home, 'server')), 'trajectory-exports/'))).toBe(
-    true,
-  );
+  expect(path.startsWith(join(home, 'server/trajectory-exports/'))).toBe(true);
   expect(trajectoryPackSchema.parse(JSON.parse(readFileSync(path, 'utf8').trim())).buildId).toBe(
     'build-1',
   );
