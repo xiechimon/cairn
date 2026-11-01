@@ -379,8 +379,24 @@ export function chiefThreadView(deps: ChiefDeps, teamId: string, r: ThreadRow): 
   return {
     ...record,
     lastTurnError: latest?.status === 'failed' ? turnErrorOf(deps.db, latest.id) : null,
-    orchestration: latest === undefined ? null : orchestrationOf(deps.db, latest),
+    orchestration: orchestrationOf(deps.db, latestOrchestrationStep(deps.db, r.id)),
   };
+}
+
+function latestOrchestrationStep(db: Db, threadId: string): typeof step.$inferSelect | undefined {
+  return db
+    .select()
+    .from(step)
+    .where(
+      and(
+        eq(step.buildId, threadId),
+        eq(step.kind, 'chief'),
+        like(step.prompt, `%${ORCHESTRATE_REQUEST_MARK}%`),
+      ),
+    )
+    .orderBy(desc(step.createdAt), sql`rowid desc`)
+    .all()
+    .find((row) => orchestratedTodoIdOf(row.prompt) !== null);
 }
 
 function turnErrorOf(db: Db, stepId: string): string | null {
@@ -404,7 +420,13 @@ const ORCHESTRATION_STATE_OF_STATUS: Partial<
   stopped: 'failed',
 };
 
-function orchestrationOf(db: Db, latest: typeof step.$inferSelect): ChiefOrchestration | null {
+const ORCHESTRATE_REQUEST_MARK = '\n\n编排请求：[#';
+
+function orchestrationOf(
+  db: Db,
+  latest: typeof step.$inferSelect | undefined,
+): ChiefOrchestration | null {
+  if (latest === undefined) return null;
   const todoId = orchestratedTodoIdOf(latest.prompt);
   const state = ORCHESTRATION_STATE_OF_STATUS[latest.status];
   if (todoId === null || state === undefined) return null;
