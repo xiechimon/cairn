@@ -24,7 +24,7 @@ for n in $(cat $ST/mine); do
   [ -n "$(git status --porcelain | grep -v '^??')" ] && { log "#$n dirty tree, skip"; continue; }
   git log origin/main..HEAD --format=%B | grep -qi "^closes #$n" || { log "#$n no closing line, skip"; continue; }
   pr=$(gh pr list -R $R --head $b --state open --json number --jq '.[0].number // empty')
-  by=$(~/.cairn/tools/overnight/lane-replaced.sh $n $pr 9>&-) && { log "#$n replaced by PR #$by, skip"; continue; }
+  by=$(~/.cairn/tools/overnight/lane-replaced.sh $n $pr 9>&-) && { log "#$n replaced or obsolete ($by), skip"; continue; }
   skip_push=0
   if [ -n "$pr" ] && [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/$b 2>/dev/null)" ] && [ "$(gh pr view $pr -R $R --json mergeStateStatus --jq .mergeStateStatus)" != DIRTY ]; then skip_push=1; fi
   if [ $skip_push = 0 ] && ! ~/lanes/rebase-main.sh >/dev/null 2>&1; then
