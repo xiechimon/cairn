@@ -94,9 +94,9 @@ function fixture({ claimed = 0 } = {}) {
   sqlite(
     db,
     `create table step(id text primary key, status text);
-     create table machine(id text primary key, name text, lastSeenAt integer);
+     create table machine(id text primary key, name text, lastSeenAt integer, maxConcurrent integer default 1);
      create table __drizzle_migrations(id integer primary key, hash text);
-     insert into machine values ('m1', 'omarchy', 0);
+     insert into machine values ('m1', 'omarchy', 0, 1);
      insert into __drizzle_migrations(hash) values ('m0');`,
   );
   for (let i = 0; i < claimed; i++) sqlite(db, `insert into step values ('s${i}', 'claimed')`);
@@ -135,8 +135,12 @@ sqlite3 "$db" "insert into __drizzle_migrations(hash) values ('m1')"`,
 if [ "$2 $3" = "start cairn-server.service" ]; then
   head=$(git -C "${checkout}" rev-parse HEAD)
   [ "$head" = "${previous}" ] || sqlite3 "${db}" "insert or ignore into __drizzle_migrations(id, hash) values (2, 'm1')"
-  if [ "$head" = "$(cat "${fake}/broken-sha" 2>/dev/null)" ]; then
+  if [ "$head" = "${previous}" ] && [ -f "${fake}/broken-previous" ]; then
     rm -f "${fake}/up"
+  elif [ "$head" = "$(cat "${fake}/broken-sha" 2>/dev/null)" ]; then
+    rm -f "${fake}/up"
+    sqlite3 "${db}" "update machine set lastSeenAt = lastSeenAt + 1"
+    [ ! -f "${fake}/machine-write-on-broken-start" ] || sqlite3 "${db}" "update machine set maxConcurrent = 4"
     [ ! -f "${fake}/write-on-broken-start" ] || sqlite3 "${db}" "insert or ignore into step values ('written-after', 'done')"
     [ ! -f "${fake}/column-on-broken-start" ] || sqlite3 "${db}" "alter table step add column note text; alter table step add column tier text default 'low'"
     [ ! -s "${fake}/column-on-broken-start" ] || sqlite3 "${db}" "update step set note = '$(cat "${fake}/column-on-broken-start")'"
@@ -356,6 +360,66 @@ test('treats values in a column added after the snapshot as writes, but not its 
     const record = JSON.parse(readFileSync(join(f.state, 'deployed.json'), 'utf8'));
     assert.equal(record.result, expected, result.stderr);
   }
+});
+
+test('counts a persistent machine field as a write but not a heartbeat', () => {
+  const f = fixture();
+  const target = pushTarget(f);
+  writeFileSync(join(f.fake, 'broken-sha'), target);
+  writeFileSync(join(f.fake, 'machine-write-on-broken-start'), '');
+  const result = f.run(DEPLOY, [target]);
+  assert.equal(result.status, 1, result.stderr);
+  const record = JSON.parse(readFileSync(join(f.state, 'deployed.json'), 'utf8'));
+  assert.equal(record.result, 'rolled-back-code');
+  assert.equal(sqlite(f.db, 'select maxConcurrent from machine'), '4');
+});
+
+test('keeps the written DB and reports critical when the previous build is unhealthy too', () => {
+  const f = fixture();
+  const target = pushTarget(f);
+  writeFileSync(join(f.fake, 'broken-sha'), target);
+  writeFileSync(join(f.fake, 'broken-previous'), '');
+  writeFileSync(join(f.fake, 'write-on-broken-start'), '');
+  const result = f.run(DEPLOY, [target]);
+  assert.equal(result.status, 3, result.stderr);
+  assert.match(result.stderr, /CRITICAL: .* kept that DB/);
+  assert.equal(sqlite(f.db, "select count(*) from step where id = 'written-after'"), '1');
+  assert.ok(!readdirSync(f.backups).some((name) => name.startsWith('failed-')));
+  assert.ok(!existsSync(join(f.state, 'in-progress')));
+});
+
+test('recovers an interrupted switch: finishes a healthy target, rolls back an unhealthy one', () => {
+  for (const broken of [false, true]) {
+    const f = fixture();
+    const target = pushTarget(f);
+    git(f.checkout, 'fetch', '-q', 'origin', 'main');
+    git(f.checkout, 'checkout', '-q', '--detach', target);
+    mkdirSync(f.state, { recursive: true });
+    mkdirSync(f.backups, { recursive: true });
+    const snapshot = join(f.backups, 'stopped-interrupted.db');
+    sqlite(f.db, `vacuum into '${snapshot}'`);
+    writeFileSync(
+      join(f.state, 'in-progress'),
+      `phase=switching\ntarget=${target}\nprevious=${f.previous}\nsnapshot=${snapshot}\n`,
+    );
+    if (broken) writeFileSync(join(f.fake, 'broken-sha'), target);
+    const result = f.run(DEPLOY, ['--recover']);
+    assert.equal(result.status, broken ? 1 : 0, result.stderr);
+    const record = JSON.parse(readFileSync(join(f.state, 'deployed.json'), 'utf8'));
+    assert.equal(record.result, broken ? 'rolled-back' : 'deployed');
+    assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), broken ? f.previous : target);
+    assert.ok(!existsSync(join(f.state, 'in-progress')));
+  }
+});
+
+test('does not treat a checkout at the target as deployed without a record and a healthy server', () => {
+  const f = fixture();
+  const target = pushTarget(f);
+  git(f.checkout, 'fetch', '-q', 'origin', 'main');
+  git(f.checkout, 'checkout', '-q', '--detach', target);
+  const result = f.run(DEPLOY, [target]);
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /without a deploy record/);
 });
 
 test('watch deploys the newest green main commit and skips a SHA that already failed', () => {

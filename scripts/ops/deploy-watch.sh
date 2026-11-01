@@ -43,6 +43,12 @@ newest_green_after() {
 
 deploy_newest_green() {
   local deployed target
+  if [ -e "$STATE/in-progress" ]; then
+    log "recovering an interrupted deploy"
+    CAIRN_DEPLOY_RUNNING_COPY= bash "$DEPLOY_SCRIPT" --recover >>"$STATE/last-attempt.log" 2>&1 ||
+      echo "$(date -u +%FT%TZ) recovery exit $?" >"$STATE/last-attempt"
+    [ ! -e "$STATE/in-progress" ] || return 0
+  fi
   deployed="$(git -C "$CHECKOUT" rev-parse HEAD)"
   target="$(newest_green_after "$deployed")"
   [ -n "$target" ] || return 0

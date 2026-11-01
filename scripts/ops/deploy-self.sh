@@ -4,7 +4,7 @@ umask 077
 
 usage() {
   cat >&2 <<'EOF'
-usage: deploy-self.sh <40-hex sha on origin/main>
+usage: deploy-self.sh <40-hex sha on origin/main> | --recover
 
 Deploys one green main commit to this host's cairn checkout and user units, with rollback.
   1. refuses a SHA not on origin/main, without every required check green, while autonomy
@@ -15,6 +15,8 @@ Deploys one green main commit to this host's cairn checkout and user units, with
   5. stops daemon and server, snapshots the DB, starts server then daemon, health-checks both
   6. on a failed health check restores the snapshot and the previous checkout (exit 1;
      exit 3 when the rollback itself is unhealthy)
+An interrupted deploy leaves $CAIRN_DEPLOY_STATE/in-progress; the next run (or --recover) health-checks
+the target and finishes it or rolls it back before doing anything else.
 Writes the result to $CAIRN_DEPLOY_STATE/deployed.json and $CAIRN_DATA_DIR/deploy.json.
 
 Environment (defaults in brackets):
@@ -49,8 +51,14 @@ EXIT_BUSY=75
 EXIT_ROLLBACK_UNHEALTHY=3
 
 [ $# -eq 1 ] || usage
+RECOVER_ONLY=0
 TARGET="$1"
-[[ "$TARGET" =~ ^[0-9a-f]{40}$ ]] || { echo "refused: '$TARGET' is not a full 40-hex SHA" >&2; exit "$EXIT_REFUSED"; }
+if [ "$TARGET" = --recover ]; then
+  RECOVER_ONLY=1
+  TARGET=""
+else
+  [[ "$TARGET" =~ ^[0-9a-f]{40}$ ]] || { echo "refused: '$TARGET' is not a full 40-hex SHA" >&2; exit "$EXIT_REFUSED"; }
+fi
 
 mkdir -p "$STATE"
 if [ "${CAIRN_DEPLOY_RUNNING_COPY:-}" != 1 ]; then
@@ -218,10 +226,12 @@ restart_previous() {
   log "restarting $PREVIOUS: $1"
   build_previous || log "rebuilding $PREVIOUS failed; starting with the checkout as it is"
   if start_and_check; then
+    clear_in_progress
     echo "$1; restarted $PREVIOUS with its DB untouched" >&2
     exit 1
   fi
   write_record "$PREVIOUS" "$PREVIOUS" rollback-unhealthy "$TARGET" ""
+  clear_in_progress
   echo "CRITICAL: $1, and $PREVIOUS did not come back healthy" >&2
   exit "$EXIT_ROLLBACK_UNHEALTHY"
 }
@@ -230,7 +240,8 @@ prune_snapshots() {
   find "$BACKUPS" -maxdepth 1 -name 'stopped-*.db' -print | sort -r | tail -n +"$((KEEP_SNAPSHOTS + 1))" | xargs -r rm -f
 }
 
-UNTRACKED_TABLES=" __drizzle_migrations machine autonomy_state "
+UNTRACKED_TABLES=" __drizzle_migrations "
+HEARTBEAT_COLUMNS=" machine.lastSeenAt machine.capabilities autonomy_state.lastEvaluatedAt "
 
 user_tables() {
   local names
@@ -240,7 +251,13 @@ user_tables() {
 }
 
 quoted_columns() {
-  sqlite3 -readonly "$1" "select group_concat('\"' || replace(name, '\"', '\"\"') || '\"', ',') from pragma_table_info('$2')"
+  local names column quoted=""
+  names="$(sqlite3 -readonly "$1" "select name from pragma_table_info('$2')")" || return 1
+  while read -r column; do
+    [[ "$HEARTBEAT_COLUMNS" == *" $2.$column "* ]] && continue
+    quoted+="${quoted:+,}\"${column//\"/\"\"}\""
+  done <<<"$names"
+  echo "${quoted:-1}"
 }
 
 added_column_checks() {
@@ -274,6 +291,7 @@ writes_after_snapshot() {
 stop_or_give_up() {
   stop_services && return 0
   write_record "$TARGET" "$PREVIOUS" rollback-unhealthy "$TARGET" "$1"
+  clear_in_progress
   echo "CRITICAL: could not stop services to roll back $TARGET; DB left in place, snapshot $1" >&2
   exit "$EXIT_ROLLBACK_UNHEALTHY"
 }
@@ -287,11 +305,14 @@ roll_back() {
     log "data changed after the snapshot; keeping the DB and rolling back code only"
     if build_previous && start_and_check; then
       write_record "$PREVIOUS" "$PREVIOUS" rolled-back-code "$TARGET" "$snapshot"
+      clear_in_progress
       echo "deploy of $TARGET failed ($reason); rolled code back to $PREVIOUS and kept the DB, which changed after the snapshot" >&2
       exit 1
     fi
-    log "$PREVIOUS is unhealthy on the kept DB; restoring the snapshot, the written DB stays in the failed directory"
-    stop_or_give_up "$snapshot"
+    write_record "$PREVIOUS" "$PREVIOUS" rollback-unhealthy "$TARGET" "$snapshot"
+    clear_in_progress
+    echo "CRITICAL: $PREVIOUS is unhealthy on the DB that changed after the snapshot; kept that DB, snapshot $snapshot" >&2
+    exit "$EXIT_ROLLBACK_UNHEALTHY"
   fi
   failed_dir="$BACKUPS/failed-$(date -u +%Y%m%dT%H%M%SZ)-${TARGET:0:12}"
   mkdir -p "$failed_dir"
@@ -302,20 +323,78 @@ roll_back() {
   build_previous || log "rebuilding $PREVIOUS failed; starting with the checkout as it is"
   if start_and_check; then
     write_record "$PREVIOUS" "$PREVIOUS" rolled-back "$TARGET" "$snapshot"
+    clear_in_progress
     echo "deploy of $TARGET failed ($reason); rolled back to $PREVIOUS, failed DB kept in $failed_dir" >&2
     exit 1
   fi
   write_record "$PREVIOUS" "$PREVIOUS" rollback-unhealthy "$TARGET" "$snapshot"
+  clear_in_progress
   echo "CRITICAL: rollback to $PREVIOUS is unhealthy; snapshot $snapshot, failed DB in $failed_dir" >&2
   exit "$EXIT_ROLLBACK_UNHEALTHY"
 }
 
+IN_PROGRESS="$STATE/in-progress"
+
+set_in_progress() {
+  printf 'phase=%s\ntarget=%s\nprevious=%s\nsnapshot=%s\n' "$1" "$TARGET" "$PREVIOUS" "${2:-}" >"$IN_PROGRESS.tmp"
+  mv "$IN_PROGRESS.tmp" "$IN_PROGRESS"
+}
+
+clear_in_progress() {
+  rm -f "$IN_PROGRESS"
+}
+
+recorded() {
+  sed -nE "s/.*\"$1\":\"([^\"]*)\".*/\1/p" "$STATE/deployed.json" 2>/dev/null
+}
+
+recover_interrupted() {
+  [ -e "$IN_PROGRESS" ] || return 0
+  local phase="" key value snapshot=""
+  while IFS='=' read -r key value; do
+    case "$key" in
+      phase) phase="$value" ;;
+      target) TARGET="$value" ;;
+      previous) PREVIOUS="$value" ;;
+      snapshot) snapshot="$value" ;;
+    esac
+  done <"$IN_PROGRESS"
+  log "recovering an interrupted deploy of $TARGET (phase $phase, previous $PREVIOUS)"
+  if [ "$phase" = building ]; then
+    build_previous || echo "CRITICAL: could not rebuild $PREVIOUS after an interrupted build" >&2
+    clear_in_progress
+    log "restored the $PREVIOUS checkout; running services were not touched"
+    return 0
+  fi
+  if [ -s "$snapshot" ] && [ "$(git -C "$CHECKOUT" rev-parse HEAD)" = "$TARGET" ] && start_and_check; then
+    write_record "$TARGET" "$PREVIOUS" deployed "" "$snapshot"
+    clear_in_progress
+    log "finished the interrupted deploy of $TARGET"
+    return 0
+  fi
+  if [ -s "$snapshot" ]; then
+    roll_back "$snapshot" "interrupted deploy was unhealthy"
+  fi
+  restart_previous "interrupted deploy had no snapshot"
+}
+
+recover_interrupted
+[ "$RECOVER_ONLY" = 0 ] || exit 0
+
 PREVIOUS="$(git -C "$CHECKOUT" rev-parse HEAD)"
-if [ "$PREVIOUS" = "$TARGET" ]; then
+if [ "$PREVIOUS" = "$TARGET" ] && [ "$(recorded sha)" = "$TARGET" ] && [ "$(recorded result)" = deployed ]; then
   log "already deployed: $TARGET"
   exit 0
 fi
-
+if [ "$PREVIOUS" = "$TARGET" ]; then
+  if server_healthy; then
+    write_record "$TARGET" "$(recorded previous)" deployed "" ""
+    log "already deployed: $TARGET (record written after a health check)"
+    exit 0
+  fi
+  echo "checkout is at $TARGET without a deploy record and the server is unhealthy; deploy the previous SHA by hand" >&2
+  exit 1
+fi
 assert_deployable
 assert_idle
 
@@ -327,31 +406,37 @@ if ! rehearse_migrations; then
 fi
 
 log "building $TARGET in $CHECKOUT"
+set_in_progress building
 if ! switch_code "$TARGET"; then
   mark_failed "$TARGET" "install or build failed"
   switch_code "$PREVIOUS" || echo "CRITICAL: could not rebuild $PREVIOUS after a failed build" >&2
+  clear_in_progress
   echo "install or build failed for $TARGET; running services untouched" >&2
   exit 1
 fi
 
 if ! (assert_idle); then
   switch_code "$PREVIOUS" || echo "CRITICAL: could not rebuild $PREVIOUS" >&2
+  clear_in_progress
   busy "a step started during the build; restored $PREVIOUS"
 fi
 
 mkdir -p "$BACKUPS" || restart_previous "creating $BACKUPS failed"
 SNAPSHOT="$BACKUPS/stopped-$(date -u +%Y%m%dT%H%M%SZ)-${PREVIOUS:0:12}.db"
 log "stopping services and snapshotting the DB to $SNAPSHOT"
+set_in_progress switching
 stop_services || restart_previous "stopping the services failed"
 if ! sqlite3 "$DB" ".backup '$SNAPSHOT'" || [ "$(sqlite3 -readonly "$SNAPSHOT" 'pragma integrity_check')" != ok ]; then
   rm -f "$SNAPSHOT"
   restart_previous "the DB snapshot failed"
 fi
+set_in_progress switching "$SNAPSHOT"
 
 if ! start_and_check; then
   roll_back "$SNAPSHOT" "health check failed after starting $TARGET"
 fi
 
 write_record "$TARGET" "$PREVIOUS" deployed "" "$SNAPSHOT"
+clear_in_progress
 prune_snapshots
 log "deployed $TARGET (previous $PREVIOUS)"
