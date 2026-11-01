@@ -3,14 +3,12 @@ import { cn } from 'cn';
 import { useRef, useState } from 'react';
 import { ComposerAttachmentTile } from '../components/composer-attachment-tile.js';
 import { Button } from '../components/ui/button.js';
-import { MessageScrollerProvider } from '../components/ui/message-scroller.js';
 import { AcceptDialog } from '../detail/accept-dialog.js';
 import { Composer } from '../detail/composer.js';
 import { DetailHead } from '../detail/dhead.js';
 import { DocPane } from '../detail/docpane.js';
 import { FreshBlock } from '../detail/fresh-block.js';
 import { MergeGateVerdict } from '../detail/merge-gate-verdict.js';
-import { QueuedMessages } from '../detail/queued-messages.js';
 import { RejectDialog } from '../detail/reject-dialog.js';
 import { ReviewDialog } from '../detail/review-dialog.js';
 import { PaneSections, RightPane } from '../detail/right-pane.js';
@@ -400,6 +398,11 @@ export function ProductDetailSection() {
   const [queued, setQueued] = useState([
     { id: 'q1', content: 'Also cover the done column.' },
     { id: 'q2', content: 'And keep the scroll position per project.', error: 'Delivery failed' },
+    {
+      id: 'q3',
+      content:
+        'Also, when you are done, summarise the change in two lines and list every file you touched so the review is quick.',
+    },
   ]);
   const [last, setLast] = useState<string | null>(null);
   const settle = (what: string) => {
@@ -553,20 +556,26 @@ export function ProductDetailSection() {
       </Specimen>
       <Specimen
         title="Queued messages"
-        note={last ?? 'QueuedMessages: steer or cancel each one'}
+        note={
+          last ??
+          'Capsules inside the composer: send now or remove each one; a failed one offers Retry'
+        }
         stage="canvas"
       >
-        <div className="flex w-160 flex-col">
-          <MessageScrollerProvider>
-            <QueuedMessages
-              messages={queued}
-              onSteer={(id) => settle(`steer ${id}`)}
-              onCancel={(id) => {
-                setQueued((all) => all.filter((m) => m.id !== id));
-                return settle(`cancel ${id}`);
-              }}
-            />
-          </MessageScrollerProvider>
+        <div className="w-160 pt-2">
+          <Composer
+            placeholder={PHASE_UI.building.placeholder ?? ''}
+            aiReview={false}
+            streaming
+            workingFor={{ seconds: 72 }}
+            editable
+            queuedMessages={queued}
+            onSendQueuedNow={(id) => settle(`send now ${id}`)}
+            onRemoveQueued={(id) => {
+              setQueued((all) => all.filter((m) => m.id !== id));
+              return settle(`remove ${id}`);
+            }}
+          />
         </div>
       </Specimen>
       <ComposerSpecimen />
