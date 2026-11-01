@@ -1471,4 +1471,5 @@ export const EN: Record<string, string> = {
     'Tell the Coordinator something, or describe a new task…',
   收起其余: 'Show less',
   首页: 'Home',
+  往上滑看更早的对话: 'Scroll up for earlier messages',
 };
