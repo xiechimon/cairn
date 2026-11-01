@@ -173,7 +173,7 @@ const CSS_NAMED_COLORS = [
 ];
 const NAMED = `(?:${CSS_NAMED_COLORS.join('|')})`;
 const COLOR_IN_VALUE = new RegExp(
-  `#[0-9a-f]{3,8}\\b|\\b(?:rgba?|hsla?|oklch|oklab|lab|lch|hwb)\\(|\\b${NAMED}\\b`,
+  `#[0-9a-f]{3,8}\\b|\\b(?:rgba?|hsla?|oklch|oklab|lab|lch|hwb|color)\\(|\\b${NAMED}\\b`,
   'i',
 );
 const COLOR_PROPS =
@@ -181,13 +181,7 @@ const COLOR_PROPS =
 const TYPE_PROPS = '(?:fontSize|fontWeight|lineHeight|fontFamily|letterSpacing)';
 
 export function withoutTokens(value) {
-  let previous;
-  let current = value;
-  do {
-    previous = current;
-    current = current.replace(/var\([^()]*\)/g, '');
-  } while (current !== previous);
-  return current;
+  return value.replace(/var\(\s*--[\w${}.-]+\s*,?/g, '');
 }
 
 export const RULES = [
@@ -247,6 +241,9 @@ const CANARY = [
   ['const x: { fontSize: number } = value;', null],
   ["style={{ background: 'var(--white-ish)' }}", null],
   ["style={{ borderColor: 'transparent' }}", null],
+  ['style={{ color: "var(--missing, red)" }}', 'color-literal'],
+  ['style={{ color: "color(display-p3 1 0 0)" }}', 'color-literal'],
+  ['style={{ color: "var(--a, var(--b))" }}', null],
   ['className="text-(--text-secondary) bg-card text-ui"', null],
   ['<Button color="secondary" />', null],
   ['<path fill="none" stroke="currentColor" />', null],
