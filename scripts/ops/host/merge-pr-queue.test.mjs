@@ -15,6 +15,7 @@ const args = process.argv.slice(2);
 fs.appendFileSync(process.env.CALLS, JSON.stringify(['gh', ...args]) + '\\n');
 const data = JSON.parse(fs.readFileSync(process.env.GH_DATA, 'utf8'));
 if (args[0] === 'pr' && args[1] === 'comment') process.exit(data.commentError ? 1 : 0);
+if (args[0] === 'pr' && args[1] === 'edit') process.exit(data.labelError ? 1 : 0);
 if (args[0] === 'pr' && args[1] === 'view' && args.includes('--jq')) {
   const out = spawnSync('jq', ['-r', args[args.indexOf('--jq') + 1]], { input: JSON.stringify(data.view), encoding: 'utf8' });
   process.stdout.write(out.stdout);
@@ -31,7 +32,10 @@ function writeExecutable(path, content) {
   chmodSync(path, 0o755);
 }
 
-function mergePr(t, { opener, gateExit, commentError = false, labels = [], ref = 'feature/x' }) {
+function mergePr(
+  t,
+  { opener, gateExit, commentError = false, labelError = false, labels = [], ref = 'feature/x' },
+) {
   const home = mkdtempSync(join(tmpdir(), 'merge-pr-queue-'));
   t.after(() => rmSync(home, { recursive: true, force: true }));
   const calls = join(home, 'calls');
@@ -40,6 +44,7 @@ function mergePr(t, { opener, gateExit, commentError = false, labels = [], ref =
     join(home, 'gh-data.json'),
     JSON.stringify({
       commentError,
+      labelError,
       view: {
         headRefName: ref,
         labels: labels.map((name) => ({ name })),
@@ -75,8 +80,16 @@ function mergePr(t, { opener, gateExit, commentError = false, labels = [], ref =
     },
   });
   const recorded = readFileSync(calls, 'utf8').split('\n').filter(Boolean).map(JSON.parse);
+  const labelAt = recorded.findIndex(
+    (c) => c[0] === 'gh' && c[1] === 'pr' && c[2] === 'edit' && c.includes('review-gate'),
+  );
+  const queueAt = recorded.findIndex(
+    (c) => c[0] === 'gh' && c[1] === 'pr' && c[2] === 'comment' && c.includes('@mergifyio queue'),
+  );
   return {
     ...result,
+    labelAt,
+    queueAt,
     queued: recorded.some(
       (c) => c[0] === 'gh' && c[1] === 'pr' && c[2] === 'comment' && c.includes('@mergifyio queue'),
     ),
@@ -89,6 +102,26 @@ test('an unprotected human-opened PR is queued in Mergify, not merged', (t) => {
   assert.equal(result.status, 0, result.stderr);
   assert.ok(result.queued);
   assert.equal(result.merged, false);
+});
+
+test('the review-gate label is added before queueing so the gate posts the status Mergify needs', (t) => {
+  const result = mergePr(t, { opener: 'xiechimon', gateExit: 3 });
+  assert.equal(result.status, 0, result.stderr);
+  assert.ok(result.labelAt !== -1 && result.labelAt < result.queueAt);
+});
+
+test('a PR that already has the review-gate label is queued without relabelling', (t) => {
+  const result = mergePr(t, { opener: 'xiechimon', gateExit: 3, labels: ['review-gate'] });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.labelAt, -1);
+  assert.ok(result.queued);
+});
+
+test('a failed label edit stops before the queue command', (t) => {
+  const result = mergePr(t, { opener: 'xiechimon', gateExit: 3, labelError: true });
+  assert.notEqual(result.status, 0);
+  assert.equal(result.queued, false);
+  assert.match(result.stderr, /review-gate label/);
 });
 
 test('a failed queue comment fails the helper without merging', (t) => {

@@ -23,6 +23,8 @@ if [ $prot = 3 ] && [ "$(gh pr view "$pr" -R "$R" --json author --jq .author.log
   labels=$(gh pr view "$pr" -R "$R" --json labels --jq '.labels[].name')
   grep -qx dequeued <<<"$labels" && { echo "PR #$pr was dequeued by Mergify; a human decides before it is queued again" >&2; exit 1; }
   grep -qx queued <<<"$labels" && exit 0
+  grep -qx review-gate <<<"$labels" || gh pr edit "$pr" -R "$R" --add-label review-gate \
+    || { echo "PR #$pr: could not add the review-gate label, so the gate would never post the status Mergify needs" >&2; exit 1; }
   gh pr comment "$pr" -R "$R" --body '@mergifyio queue'; exit $?
 fi
 if [ $prot != 3 ]; then
