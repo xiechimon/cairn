@@ -1,5 +1,4 @@
 #!/bin/bash
-# usage: surface-stuck-rebase.sh <issue> <stamp-file> [pr]
 set -uo pipefail
 n=$1; f=$2; pr=${3:-}
 R=xiechimon/cairn
