@@ -5,8 +5,8 @@ import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-export function runGh(args) {
-  return execFileSync('gh', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+export function runGh(args, command = 'gh') {
+  return execFileSync(command, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 }
 
 function readList(path) {
@@ -28,6 +28,30 @@ function atomicWrite(path, content) {
   }
 }
 
+export function applyTransferLists(plan) {
+  for (const [name, list] of Object.entries(plan.lists)) {
+    if (readList(join(plan.stateDir, name)) !== list.before)
+      throw new Error(`lists-changed: ${name}`);
+  }
+  for (const [name, list] of Object.entries(plan.lists)) {
+    if (list.changed) atomicWrite(join(plan.stateDir, name), list.after);
+  }
+}
+
+const MACOS_FLOCK_FALLBACK = `import fcntl, subprocess, sys, time
+with open(sys.argv[1], 'a') as lock:
+    until = time.monotonic() + float(sys.argv[2])
+    while True:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            break
+        except BlockingIOError:
+            if time.monotonic() >= until:
+                sys.exit(73)
+            time.sleep(0.05)
+    sys.exit(subprocess.call(sys.argv[3:]))
+`;
+
 export async function transferToCairn(options, runner = runGh) {
   const { issue, agent = null, dryRun = false, repo = 'xiechimon/cairn' } = options;
   if (!Number.isSafeInteger(issue) || issue < 1) throw new Error('invalid-issue');
@@ -35,6 +59,17 @@ export async function transferToCairn(options, runner = runGh) {
   if (agent !== null && (typeof agent !== 'string' || !agent.trim()))
     throw new Error('invalid-agent');
   const stateDir = resolve(options.stateDir ?? join(homedir(), '.local/state/overnight'));
+  const lanesDir = resolve(options.lanesDir ?? join(homedir(), 'lanes'));
+  const lane = join(lanesDir, `cairn-${issue}`);
+  if ((await runner(['-c', 'if [ -e "$1" ]; then printf present; fi', 'sh', lane], 'sh')).trim())
+    throw new Error(`lane-directory: ${lane}`);
+  const processes = await runner(['-axo', 'command='], 'ps');
+  const escapedLane = lane.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const runningLane = new RegExp(
+    `\\bai-route\\s+run\\b.*?\\s-C\\s+['"]?${escapedLane}(?:['"]?(?:\\s|$))`,
+  );
+  if (processes.split('\n').some((line) => runningLane.test(line)))
+    throw new Error(`lane-process: ${lane}`);
   const data = JSON.parse(await runner(['api', `repos/${repo}/issues/${issue}`]));
   if (data.state !== 'open') throw new Error('issue-closed');
   const pulls = JSON.parse(
@@ -88,22 +123,15 @@ export async function transferToCairn(options, runner = runGh) {
   const added = labelsAfter.filter((name) => !labelsBefore.includes(name));
   const changes =
     removed.length + added.length + Object.values(lists).filter((list) => list.changed).length;
-  if (!dryRun) {
-    if (Object.values(lists).some((list) => list.changed)) mkdirSync(stateDir, { recursive: true });
-    for (const [name, list] of Object.entries(lists)) {
-      if (list.changed) atomicWrite(join(stateDir, name), list.after);
-    }
-    if (removed.length || added.length) {
-      await runner([
-        'api',
-        `repos/${repo}/issues/${issue}`,
-        '--method',
-        'PATCH',
-        ...labelsAfter.flatMap((label) => ['-f', `labels[]=${label}`]),
-      ]);
-    }
-  }
-  return {
+
+  const plan = {
+    stateDir,
+    lanesDir,
+    lock: {
+      path: join(stateDir, 'lock2'),
+      timeoutSeconds: options.lockTimeoutSeconds ?? 10,
+      macOSFallback: 'python3 fcntl.flock holds the same lock2 while applying lists',
+    },
     issue,
     labelsBefore,
     labelsAfter,
@@ -113,25 +141,93 @@ export async function transferToCairn(options, runner = runGh) {
     changes,
     dryRun,
   };
+  if (!Number.isFinite(plan.lock.timeoutSeconds) || plan.lock.timeoutSeconds < 0)
+    throw new Error('invalid-lock-timeout');
+  (options.printPlan ?? ((value) => process.stdout.write(`${JSON.stringify(value, null, 2)}\n`)))(
+    plan,
+  );
+  if (dryRun) return plan;
+  if (removed.length || added.length) {
+    await runner([
+      'api',
+      `repos/${repo}/issues/${issue}`,
+      '--method',
+      'PATCH',
+      ...labelsAfter.flatMap((label) => ['-f', `labels[]=${label}`]),
+    ]);
+  }
+  if (Object.values(lists).some((list) => list.changed)) {
+    try {
+      mkdirSync(stateDir, { recursive: true });
+      const args = [
+        process.execPath,
+        new URL(import.meta.url).pathname,
+        '--apply-lists',
+        JSON.stringify(plan),
+      ];
+      const flock = (await runner(['-c', 'command -v flock || true'], 'sh')).trim();
+      if (flock) {
+        await runner(
+          [
+            '--exclusive',
+            '--timeout',
+            String(plan.lock.timeoutSeconds),
+            '--conflict-exit-code',
+            '73',
+            plan.lock.path,
+            ...args,
+          ],
+          'flock',
+        );
+      } else {
+        await runner(
+          ['-c', MACOS_FLOCK_FALLBACK, plan.lock.path, String(plan.lock.timeoutSeconds), ...args],
+          'python3',
+        );
+      }
+    } catch (err) {
+      const redo = Object.entries(lists)
+        .filter(([name, list]) => readList(join(stateDir, name)) !== list.after)
+        .map(([name, list]) => ({ path: join(stateDir, name), after: list.after }));
+      const reason =
+        err.status === 73
+          ? `overnight-lock-timeout: ${plan.lock.path}`
+          : `list-edit-failed: ${err.stderr?.toString().trim() || err.message}`;
+      throw new Error(
+        `${reason}; labels already applied; redo list edits after re-planning under lock2: ${JSON.stringify(redo)}`,
+      );
+    }
+  }
+  return plan;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   try {
+    if (process.argv[2] === '--apply-lists') {
+      applyTransferLists(JSON.parse(process.argv[3]));
+      process.exit(0);
+    }
     const args = process.argv.slice(2);
     const options = { issue: Number(args.shift()) };
     while (args.length) {
       const arg = args.shift();
       if (arg === '--dry-run') options.dryRun = true;
       else if (
-        ['--state-dir', '--repo', '--agent'].includes(arg) &&
+        ['--state-dir', '--lanes-dir', '--repo', '--agent', '--lock-timeout'].includes(arg) &&
         args[0] &&
         !args[0].startsWith('--')
       ) {
-        options[{ '--state-dir': 'stateDir', '--repo': 'repo', '--agent': 'agent' }[arg]] =
-          args.shift();
+        const key = {
+          '--state-dir': 'stateDir',
+          '--lanes-dir': 'lanesDir',
+          '--repo': 'repo',
+          '--agent': 'agent',
+          '--lock-timeout': 'lockTimeoutSeconds',
+        }[arg];
+        options[key] = arg === '--lock-timeout' ? Number(args.shift()) : args.shift();
       } else throw new Error(`invalid-option: ${arg}`);
     }
-    process.stdout.write(`${JSON.stringify(await transferToCairn(options), null, 2)}\n`);
+    await transferToCairn(options);
   } catch (err) {
     process.stderr.write(`${err.message}\n`);
     process.exitCode = 1;

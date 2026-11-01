@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { transferToCairn } from './transfer-to-cairn.mjs';
+import * as transfer from './transfer-to-cairn.mjs';
+
+const { transferToCairn } = transfer;
 
 function world(t) {
   const dir = mkdtempSync(join(tmpdir(), 'cairn-transfer-'));
@@ -25,11 +27,47 @@ function world(t) {
     pulls: [],
     branches: [],
     writes: [],
+    commands: [],
+    plan: null,
+    laneExists: false,
+    processes: '',
+    patchFails: false,
+    lockFails: false,
   };
-  const runner = async (args) => {
+  const runner = async (args, command = 'gh') => {
+    state.commands.push({ command, args });
+    if (command === 'ps') return state.processes;
+    if (command === 'sh')
+      return args.some((arg) => arg.startsWith('command -v flock'))
+        ? '/usr/bin/flock'
+        : state.laneExists
+          ? 'present'
+          : '';
+    if (command === 'flock') {
+      if (state.lockFails) throw Object.assign(new Error('busy'), { status: 73 });
+      transfer.applyTransferLists(JSON.parse(args.at(-1)));
+      return '';
+    }
     assert.equal(args[0], 'api');
     const path = args[1];
     if (args.includes('PATCH')) {
+      if (state.patchFails) throw new Error('patch-failed');
+      assert.ok(state.plan);
+      for (const [name, list] of Object.entries(state.plan.lists).filter(
+        ([name]) => name === 'pending',
+      )) {
+        const path = join(state.plan.stateDir, name);
+        assert.equal(
+          list.before,
+          (() => {
+            try {
+              return readFileSync(path).toString('latin1');
+            } catch {
+              return '';
+            }
+          })(),
+        );
+      }
       state.writes.push(args);
       state.labels = args.filter((a) => a.startsWith('labels[]=')).map((a) => a.slice(9));
       return '{}';
@@ -45,7 +83,19 @@ function world(t) {
     state,
     runner,
     run: (opts = {}) =>
-      transferToCairn({ issue: 17, stateDir: dir, repo: 'owner/repo', ...opts }, runner),
+      transferToCairn(
+        {
+          issue: 17,
+          stateDir: dir,
+          lanesDir: join(dir, 'lanes'),
+          repo: 'owner/repo',
+          printPlan: (plan) => {
+            state.plan = plan;
+          },
+          ...opts,
+        },
+        runner,
+      ),
   };
 }
 
@@ -201,6 +251,8 @@ else process.exit(1);
       'owner/repo',
       '--state-dir',
       join(w.dir, 'state'),
+      '--lanes-dir',
+      join(w.dir, 'lanes'),
       '--agent',
       'orb-builder',
     ],
@@ -224,4 +276,158 @@ else process.exit(1);
   assert.equal(calls.length, 3);
   assert.ok(calls.every((args) => !args.includes('PATCH')));
   assert.deepEqual(readdirSync(w.dir).sort(), ['calls.jsonl', 'gh']);
+});
+
+test('a failed label PATCH leaves every list unchanged', async (t) => {
+  const w = world(t);
+  writeFileSync(join(w.dir, 'pending'), '17\n');
+  w.state.patchFails = true;
+  await assert.rejects(w.run(), /patch-failed/);
+  assert.equal(readFileSync(join(w.dir, 'pending'), 'utf8'), '17\n');
+  assert.equal(w.state.plan.lists.pending.before, '17\n');
+  assert.ok(!w.state.commands.some((call) => call.command === 'flock'));
+});
+
+test('lock timeout after PATCH names the lock and exact remaining list edits', async (t) => {
+  const w = world(t);
+  writeFileSync(join(w.dir, 'pending'), '17\n18\n');
+  w.state.lockFails = true;
+  await assert.rejects(w.run(), (err) => {
+    assert.match(err.message, /overnight-lock-timeout/);
+    assert.ok(err.message.includes(join(w.dir, 'lock2')));
+    assert.ok(err.message.includes('pending'));
+    assert.ok(err.message.includes('never'));
+    return true;
+  });
+  assert.equal(w.state.writes.length, 1);
+  assert.equal(readFileSync(join(w.dir, 'pending'), 'utf8'), '17\n18\n');
+});
+
+for (const kind of ['directory', 'process']) {
+  test(`refuses an existing lane ${kind} through the runner`, async (t) => {
+    const w = world(t);
+    w.state.laneExists = kind === 'directory';
+    w.state.processes =
+      kind === 'process' ? `ai-route run implement -C ${join(w.dir, 'lanes/cairn-17')} prompt` : '';
+    await assert.rejects(
+      w.run(),
+      new RegExp(kind === 'directory' ? 'lane-directory' : 'lane-process'),
+    );
+    assert.equal(w.state.writes.length, 0);
+    assert.deepEqual(readdirSync(w.dir), []);
+  });
+}
+
+test('does not overwrite lists changed after planning', async (t) => {
+  const w = world(t);
+  writeFileSync(join(w.dir, 'pending'), '17\n');
+  await assert.rejects(
+    w.run({
+      printPlan: (plan) => {
+        w.state.plan = plan;
+        writeFileSync(join(w.dir, 'hold'), '99\n');
+      },
+    }),
+    /list-edit-failed.*lists-changed/,
+  );
+  assert.equal(readFileSync(join(w.dir, 'hold'), 'utf8'), '99\n');
+  assert.equal(readFileSync(join(w.dir, 'pending'), 'utf8'), '17\n');
+});
+
+test('real list application uses the macOS fcntl fallback and preserves list bytes', async (t) => {
+  const w = world(t);
+  writeFileSync(join(w.dir, 'pending'), '17\n18\n');
+  const result = await transferToCairn(
+    {
+      issue: 17,
+      stateDir: w.dir,
+      lanesDir: join(w.dir, 'lanes'),
+      printPlan: (plan) => {
+        w.state.plan = plan;
+      },
+    },
+    (args, command = 'gh') => {
+      if (command === 'gh') return w.runner(args);
+      if (command === 'sh' && args[1].startsWith('command -v flock')) return '';
+      return transfer.runGh(args, command);
+    },
+  );
+  assert.equal(result.lock.path, join(w.dir, 'lock2'));
+  assert.match(result.lock.macOSFallback, /fcntl.flock/);
+  assert.equal(readFileSync(join(w.dir, 'pending'), 'utf8'), '18\n');
+  assert.equal(readFileSync(join(w.dir, 'never'), 'utf8'), '17\n');
+});
+
+test('a real competing flock causes a named timeout without changing lists', async (t) => {
+  const w = world(t);
+  writeFileSync(join(w.dir, 'pending'), '17\n');
+  const holder = spawn(
+    'python3',
+    [
+      '-u',
+      '-c',
+      `import fcntl, sys
+with open(sys.argv[1], 'a') as lock:
+    fcntl.flock(lock, fcntl.LOCK_EX)
+    print('locked', flush=True)
+    sys.stdin.readline()
+`,
+      join(w.dir, 'lock2'),
+    ],
+    { stdio: ['pipe', 'pipe', 'pipe'], cwd: w.dir },
+  );
+  const exited = new Promise((resolve, reject) => {
+    holder.once('exit', resolve);
+    holder.once('error', reject);
+  });
+  try {
+    await new Promise((resolve, reject) => {
+      holder.stdout.once('data', resolve);
+      holder.once('error', reject);
+      holder.once('exit', () => reject(new Error('lock holder exited before readiness')));
+    });
+    await assert.rejects(
+      transferToCairn(
+        {
+          issue: 17,
+          stateDir: w.dir,
+          lanesDir: join(w.dir, 'lanes'),
+          lockTimeoutSeconds: 0.05,
+          printPlan: (plan) => {
+            w.state.plan = plan;
+          },
+        },
+        (args, command = 'gh') => {
+          if (command === 'gh') return w.runner(args);
+          if (command === 'sh' && args[1].startsWith('command -v flock')) return '';
+          return transfer.runGh(args, command);
+        },
+      ),
+      /overnight-lock-timeout.*lock2/,
+    );
+    assert.equal(w.state.writes.length, 1);
+    assert.equal(readFileSync(join(w.dir, 'pending'), 'utf8'), '17\n');
+  } finally {
+    holder.stdin.end('release\n');
+    await exited;
+  }
+});
+
+test('the real runner refuses a lane directory under the configured lanes root', async (t) => {
+  const w = world(t);
+  const lanesDir = join(w.dir, 'lanes');
+  mkdirSync(join(lanesDir, 'cairn-17'), { recursive: true });
+  await assert.rejects(
+    transferToCairn({ issue: 17, stateDir: w.dir, lanesDir }, (args, command = 'gh') =>
+      command === 'gh' ? w.runner(args) : transfer.runGh(args, command),
+    ),
+    /lane-directory/,
+  );
+  assert.equal(w.state.writes.length, 0);
+});
+
+test('a similar process lane number does not block transfer', async (t) => {
+  const w = world(t);
+  w.state.processes = `ai-route run implement -C ${join(w.dir, 'lanes/cairn-170')} prompt`;
+  assert.equal((await w.run()).issue, 17);
 });

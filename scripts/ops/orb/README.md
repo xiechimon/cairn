@@ -436,7 +436,24 @@ waiting daemon save its own `machine.json`; never copy production credentials.
 Bind the active `orb-builder` agent to that approved machine with the
 `claude-code` runtime. Transfer the chosen issue with
 `node scripts/ops/transfer-to-cairn.mjs <issue> --agent orb-builder`.
-Preview the label and lane-list changes with `--dry-run` first.
+Preview the label and lane-list changes with `--dry-run` first. Every run prints
+the complete plan, including each list's prior contents, before applying changes.
+The transfer refuses an existing `~/lanes/cairn-<issue>` directory or a matching
+`ai-route run ... -C` process; `--lanes-dir` selects a different lane root.
+
+The transfer applies the GitHub label PATCH before editing local lists. List
+edits take an exclusive lock on `<state-dir>/lock2`, shared with the overnight
+driver, with a ten-second timeout (`--lock-timeout` changes it in seconds).
+When available, the runner invokes the `flock` binary. On macOS without `flock`,
+Python 3's `fcntl.flock` takes the same lock and holds it while the list writer
+runs. A timeout reports `overnight-lock-timeout` and the lock path. A changed list
+or write failure reports `list-edit-failed` and the remaining paths and intended
+contents. Labels remain applied: inspect the reported edits, then rerun to print
+a fresh plan and retry under the lock. Concurrently changed lists are preserved.
+
+The normal `deploy-self.sh` deployment also stops and starts
+`cairn-daemon-orb.service` when that unit is enabled, so both daemons reload the
+rebuilt checkout during deployment and rollback.
 
 `CAIRN_EXECUTOR=orb` selects Orb execution. `CAIRN_HOME` and
 `CAIRN_WORKSPACES_DIR` keep `machine.json`, the outbox, and workspaces beneath

@@ -44,6 +44,7 @@ MACHINE_NAME="${CAIRN_MACHINE_NAME:-$(hostname -s)}"
 KEEP_SNAPSHOTS="${CAIRN_DEPLOY_KEEP_SNAPSHOTS:-10}"
 SERVER_UNIT=cairn-server.service
 DAEMON_UNIT=cairn-daemon.service
+ORB_UNIT=cairn-daemon-orb.service
 DB="$DATA_DIR/server.db"
 
 EXIT_REFUSED=2
@@ -202,6 +203,9 @@ daemon_healthy() {
 }
 
 stop_services() {
+  if systemctl --user is-enabled --quiet "$ORB_UNIT"; then
+    systemctl --user stop "$ORB_UNIT" || return 1
+  fi
   systemctl --user stop "$DAEMON_UNIT" && systemctl --user stop "$SERVER_UNIT"
 }
 
@@ -212,7 +216,11 @@ start_and_check() {
   server_healthy || return 1
   started_ms="$(($(date +%s) * 1000))"
   systemctl --user start "$DAEMON_UNIT"
-  daemon_healthy "$started_ms"
+  daemon_healthy "$started_ms" || return 1
+  if systemctl --user is-enabled --quiet "$ORB_UNIT"; then
+    systemctl --user start "$ORB_UNIT" || return 1
+  fi
+  return 0
 }
 
 PREVIOUS_BUILT=0

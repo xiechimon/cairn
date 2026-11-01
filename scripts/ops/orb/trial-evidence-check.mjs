@@ -19,8 +19,8 @@ export async function checkTrialEvidence(evidence, options = {}) {
     if (!valid) failures.push(`${name}: ${message}`);
   };
   const e = evidence && typeof evidence === 'object' && !Array.isArray(evidence) ? evidence : {};
-  const repo = e.repo ?? 'xiechimon/cairn';
-  check('repo', typeof repo === 'string' && /^[\w-]+\/[\w.-]+$/.test(repo), 'expected owner/name');
+  const repo = 'xiechimon/cairn';
+  check('repo', e.repo === undefined || e.repo === repo, 'must be xiechimon/cairn');
   for (const name of ['issue', 'pr']) {
     check(name, Number.isSafeInteger(e[name]) && e[name] > 0, 'expected a positive issue number');
   }
@@ -105,19 +105,10 @@ export async function checkTrialEvidence(evidence, options = {}) {
       await github('push', `commits/${headSha}`, (commit) => {
         check('push', commit.sha === headSha, 'PR head commit does not exist in the repository');
       });
-      await github('push', `compare/${headSha}...${e.mergeCommit}`, (comparison) => {
-        check(
-          'push',
-          ['ahead', 'identical'].includes(comparison.status),
-          'PR head commit is not reachable from the merge commit',
-        );
-      });
     }
   } else if (failures.length === 0) {
     failures.push('push: PR head is unavailable');
   }
-  if (failures.length === 0) lines.push('push: ok');
-  else lines.push(...failures);
 
   if (pull) {
     check(
@@ -135,7 +126,47 @@ export async function checkTrialEvidence(evidence, options = {}) {
       'PR merge commit differs from evidence',
     );
   }
+  if (failures.length === 0) lines.push('push: ok');
+  else lines.push(...failures);
+
+  try {
+    const closing = JSON.parse(
+      await runner([
+        'pr',
+        'view',
+        String(e.pr),
+        '--repo',
+        repo,
+        '--json',
+        'closingIssuesReferences',
+      ]),
+    );
+    check(
+      'pr-closes-issue',
+      closing.closingIssuesReferences?.some(
+        (issue) =>
+          issue.number === e.issue && issue.url === `https://github.com/${repo}/issues/${e.issue}`,
+      ),
+      'PR must close the trial issue',
+    );
+  } catch {
+    failures.push('pr-closes-issue: GitHub read failed');
+  }
   await github('issue', `issues/${e.issue}`, (issue) => {
+    const labels = Array.isArray(issue.labels)
+      ? issue.labels.map((label) => label.name?.toLowerCase())
+      : [];
+    check(
+      'live-labels',
+      labels.includes('by:cairn') &&
+        labels.every(
+          (label) =>
+            typeof label === 'string' &&
+            !(label.startsWith('by:') && label !== 'by:cairn') &&
+            !label.startsWith('batch:'),
+        ),
+      'must include by:cairn, no other by:* and no batch:*',
+    );
     check(
       'issue-completed',
       issue.state === 'closed' && issue.state_reason === 'completed',

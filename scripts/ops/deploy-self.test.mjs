@@ -54,7 +54,14 @@ function commit(work, message, { allowBuilds = 'esbuild: true', date } = {}) {
   writeFileSync(join(work, 'marker.txt'), `${message}\n`);
   mkdirSync(join(work, 'apps/server/src/db'), { recursive: true });
   writeFileSync(join(work, 'apps/server/src/db/client.ts'), '');
-  git(work, 'add', '.');
+  git(
+    work,
+    'add',
+    'pnpm-workspace.yaml',
+    'marker.txt',
+    'apps/server/src/db/client.ts',
+    ...(existsSync(join(work, 'package.json')) ? ['package.json'] : []),
+  );
   const env = date ? ['-c', `user.name=t`] : [];
   execFileSync('git', [...env, 'commit', '-q', '-m', message], {
     cwd: work,
@@ -132,7 +139,8 @@ sqlite3 "$db" "insert into __drizzle_migrations(hash) values ('m1')"`,
   fakeTool(
     bin,
     'systemctl',
-    `echo "systemctl $*" >> "${fake}/systemctl.log"
+    `if [ "$2" = is-enabled ]; then [ -f "${fake}/orb-enabled" ]; exit $?; fi
+echo "systemctl $*" >> "${fake}/systemctl.log"
 [ ! -f "${fake}/phase-on-start" ] || [ "$2" != start ] || echo "start $3 @ $(sed -n 's/^phase=//p' "${dir}/state/in-progress" 2>/dev/null)" >> "${fake}/phases.log"
 if [ "$2 $3" = "start cairn-server.service" ]; then
   head=$(git -C "${checkout}" rev-parse HEAD)
@@ -558,3 +566,21 @@ test('watch stays quiet when the undeployed commit is younger than the limit', (
   assert.equal(f.run(WATCH, [], { CAIRN_DEPLOY_SCRIPT: DEPLOY }).status, 0);
   assert.doesNotMatch(f.log('gh.log'), /issue (create|comment)/);
 });
+
+for (const broken of [false, true]) {
+  test(`restarts the enabled Orb daemon during deploy and rollback: ${broken}`, () => {
+    const f = fixture();
+    const target = pushTarget(f);
+    writeFileSync(join(f.fake, 'orb-enabled'), '');
+    if (broken) writeFileSync(join(f.fake, 'broken-sha'), target);
+    const result = f.run(DEPLOY, [target]);
+    assert.equal(result.status, broken ? 1 : 0, result.stderr);
+    const calls = f.log('systemctl.log').trim().split('\n');
+    assert.ok(calls.includes('systemctl --user stop cairn-daemon-orb.service'));
+    assert.ok(calls.includes('systemctl --user start cairn-daemon-orb.service'));
+    assert.ok(
+      calls.indexOf('systemctl --user start cairn-daemon-orb.service') >
+        calls.indexOf('systemctl --user start cairn-server.service'),
+    );
+  });
+}

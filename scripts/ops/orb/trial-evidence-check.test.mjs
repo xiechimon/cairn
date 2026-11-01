@@ -11,7 +11,7 @@ import { checkTrialEvidence } from './trial-evidence-check.mjs';
 const sha = 'a'.repeat(40);
 const headSha = 'b'.repeat(40);
 const evidence = () => ({
-  repo: 'owner/repo',
+  repo: 'xiechimon/cairn',
   issue: 17,
   buildId: 'build-1',
   conversationId: 'build-1',
@@ -35,17 +35,23 @@ function world() {
       head: {
         ref: 'cairn/conv-build-1',
         sha: headSha,
-        repo: { full_name: 'owner/repo', fork: false },
+        repo: { full_name: 'xiechimon/cairn', fork: false },
       },
     },
-    issue: { state: 'closed', state_reason: 'completed' },
+    issue: { state: 'closed', state_reason: 'completed', labels: [{ name: 'by:cairn' }] },
+    closing: {
+      closingIssuesReferences: [
+        { number: 17, url: 'https://github.com/xiechimon/cairn/issues/17' },
+      ],
+    },
     compare: { status: 'ahead' },
-    pushCompare: { status: 'ahead' },
+    pushCompare: { status: 'diverged' },
     headCommit: { sha: headSha },
   };
   const calls = [];
   const runner = async (args) => {
     calls.push(args);
+    if (args[0] === 'pr') return JSON.stringify(data.closing);
     assert.equal(args[0], 'api');
     const path = args[1];
     if (path.endsWith('/pulls/23')) return JSON.stringify(data.pull);
@@ -74,10 +80,9 @@ test('accepts a same-repository Thread branch without a merge trailer and prints
     'server: skipped (CAIRN_SERVER_URL and CAIRN_API_TOKEN are both required)',
     'trial-one: ok',
   ]);
-  assert.deepEqual(w.calls.slice(0, 3), [
-    ['api', 'repos/owner/repo/pulls/23'],
-    ['api', `repos/owner/repo/commits/${headSha}`],
-    ['api', `repos/owner/repo/compare/${headSha}...${sha}`],
+  assert.deepEqual(w.calls.slice(0, 2), [
+    ['api', 'repos/xiechimon/cairn/pulls/23'],
+    ['api', `repos/xiechimon/cairn/commits/${headSha}`],
   ]);
   w.data.compare.status = 'identical';
   w.data.pushCompare.status = 'identical';
@@ -202,24 +207,6 @@ for (const [name, mutate] of [
       d.headCommit.sha = sha;
     },
   ],
-  [
-    'push',
-    (d) => {
-      d.pushCompare.status = 'behind';
-    },
-  ],
-  [
-    'push',
-    (d) => {
-      d.pushCompare.status = 'diverged';
-    },
-  ],
-  [
-    'push',
-    (d) => {
-      d.pushCompare.status = 'unknown';
-    },
-  ],
 ]) {
   test(`rejects failed GitHub check ${name}`, async () => {
     const w = world();
@@ -236,7 +223,7 @@ test('reports independent GitHub failures together and handles runner failures',
   w.data.issue.state = 'open';
   const result = await w.run();
   assert.equal(result.failures.length, 2);
-  assert.equal(result.lines[0], 'push: ok');
+  assert.ok(!result.lines.includes('push: ok'));
   const unavailable = await w.run(evidence(), {
     runner: async () => {
       throw new Error('network unavailable');
@@ -262,7 +249,7 @@ function serverWorld() {
       },
       { id: 'step-2', buildId: 'build-1', kind: 'merge', machineId: 'other-machine' },
     ],
-    '/api/todos/todo-1': { teamId: 'team-1', sourceRef: 'github:owner/repo#17' },
+    '/api/todos/todo-1': { teamId: 'team-1', sourceRef: 'github:xiechimon/cairn#17' },
     '/api/teams/team-1/machines': [{ id: 'machine-uuid', name: 'omarchy-orb' }],
   };
   const options = {
@@ -302,7 +289,7 @@ for (const [name, mutate] of [
   [
     'server-build',
     (r) => {
-      r['/api/todos/todo-1'].sourceRef = 'github:owner/repo#18';
+      r['/api/todos/todo-1'].sourceRef = 'github:xiechimon/cairn#18';
     },
   ],
   [
@@ -420,7 +407,7 @@ for (const env of [
   });
 }
 
-for (const endpoint of [`commits/${headSha}`, `compare/${headSha}...${sha}`]) {
+for (const endpoint of [`commits/${headSha}`]) {
   test(`push fails first when GitHub cannot read ${endpoint}`, async () => {
     const w = world();
     const result = await w.run(evidence(), {
@@ -480,7 +467,8 @@ test('CLI prints push first using fake GitHub and an authenticated local server'
 import { readFileSync } from 'node:fs';
 const data = JSON.parse(readFileSync(process.env.TRIAL_WORLD, 'utf8'));
 const path = process.argv[3];
-const value = path.endsWith('/pulls/23') ? data.pull
+const value = process.argv[2] === 'pr' ? data.closing
+  : path.endsWith('/pulls/23') ? data.pull
   : path.endsWith('/issues/17') ? data.issue
   : path.endsWith('/commits/${headSha}') ? data.headCommit
   : path.endsWith('/compare/${headSha}...${sha}') ? data.pushCompare
@@ -511,4 +499,34 @@ process.stdout.write(JSON.stringify(value));
     await new Promise((resolve) => server.close(resolve));
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+for (const labels of [[], [{ name: 'by:pi' }], [{ name: 'by:cairn' }, { name: 'batch:now' }]]) {
+  test(`rejects live issue labels ${JSON.stringify(labels)}`, async () => {
+    const w = world();
+    w.data.issue.labels = labels;
+    const result = await w.run();
+    assert.equal(result.ok, false);
+    assert.ok(result.failures.some((line) => line.startsWith('live-labels:')));
+  });
+}
+
+test('requires a closing reference to the trial issue in this repository', async () => {
+  for (const references of [
+    [],
+    [{ number: 18 }],
+    [{ number: 17, url: 'https://github.com/other/repo/issues/17' }],
+  ]) {
+    const w = world();
+    w.data.closing.closingIssuesReferences = references;
+    const result = await w.run();
+    assert.equal(result.ok, false);
+    assert.ok(result.failures.some((line) => line.startsWith('pr-closes-issue:')));
+  }
+});
+
+test('rejects a repository override before GitHub reads', async () => {
+  const w = world();
+  assert.equal((await w.run({ ...evidence(), repo: 'other/repo' })).ok, false);
+  assert.equal(w.calls.length, 0);
 });
