@@ -1,12 +1,14 @@
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, MessageSquareWarning } from 'lucide-react';
 import { type ReactNode, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useLiveData } from '../api/provider.js';
 import { ChiefConversation } from '../chief/chief-conversation.js';
 import { ChiefQuestionCard, type ChiefQuestionItem } from '../chief/chief-question-card.js';
 import type { ChiefSurface } from '../chief/use-chief-surface.js';
+import { EmptyState } from '../components/empty-state.js';
 import { Greeting } from '../components/stream/greeting.js';
 import { SuggestionChip } from '../components/stream/suggestion-chip.js';
+import { TextureSkeleton } from '../components/texture/texture.js';
 import { ThreadCard } from '../components/thread/thread-card.js';
 import { ThreadRow } from '../components/thread/thread-row.js';
 import { Button } from '../components/ui/button.js';
@@ -253,6 +255,25 @@ export function HomeC({ surface, todos, now, projectId, projectName, banner }: H
     </div>
   );
 
+  if (surface.load !== 'ready') {
+    return (
+      <section data-testid="home-c" className="flex min-h-0 min-w-0 flex-1 flex-col">
+        {surface.load === 'loading' ? (
+          <TextureSkeleton className="mx-auto mt-[12vh] h-40 w-[calc(100%-2rem)] max-w-182" />
+        ) : (
+          <EmptyState
+            testId="home-c-error"
+            icon={MessageSquareWarning}
+            title={t('对话加载失败')}
+            description={t('对话记录还在，重试一下。')}
+            action={{ label: t('重试'), onClick: surface.retry }}
+            className="mt-[12vh]"
+          />
+        )}
+      </section>
+    );
+  }
+
   return (
     <section
       data-testid="home-c"
@@ -280,8 +301,6 @@ export function HomeC({ surface, todos, now, projectId, projectName, banner }: H
           onSteer={surface.onSteer}
           onStop={surface.onStop}
           onSettings={() => surface.setChiefView('settings')}
-          threadsOpen={false}
-          setThreadsOpen={() => {}}
           hero={hero}
           lead={lead}
           prefill={prefill}

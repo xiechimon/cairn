@@ -1,5 +1,4 @@
 import { Link, useLocation } from 'react-router';
-import type { HomeOverview } from '../board/board.js';
 import { withColumnParam } from '../board/columns.js';
 import { useI18n } from '../i18n/provider.js';
 
@@ -7,7 +6,11 @@ export function HomeSummary({
   needsYou,
   running,
   doneToday,
-}: Omit<HomeOverview, 'sections' | 'brief'>) {
+}: {
+  needsYou: number;
+  running: number;
+  doneToday: number;
+}) {
   const { t } = useI18n();
   const { search } = useLocation();
   return (

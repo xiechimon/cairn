@@ -108,3 +108,77 @@ test('at phone width the home stays one column', async ({ page }) => {
   expect(box?.width ?? 0).toBeLessThanOrEqual(390);
   await expect(composer(page)).toBeVisible();
 });
+
+test('a failed conversation load shows Retry instead of the greeting, with no composer, and Retry recovers', async ({
+  page,
+}) => {
+  const TEAM_ID = 'team-1';
+  const USER = { id: 'user-1', displayName: 'ian', avatarUrl: null };
+  const THREAD = {
+    id: 'chief-global',
+    chiefId: 'chief-user-1-team-1',
+    userId: USER.id,
+    teamId: TEAM_ID,
+    title: 'Coordinator',
+    createdAt: 1,
+    updatedAt: 1,
+    lastTurnAt: null,
+    session: { runtime: 'pi', id: 's1', openedAt: 1 },
+    pendingSessionResumeAt: null,
+    toolDefHashes: {},
+    toolResultHashes: {},
+    activeRun: null,
+  };
+  let messagesFail = true;
+  await page.route('**/api/**', (route, request) => {
+    if (request.method() !== 'GET') return route.fallback();
+    return route.fulfill({ status: 500, json: { error: 'e2e stub: not the surface under test' } });
+  });
+  await page.route('**/api/teams', (route) =>
+    route.fulfill({ json: [{ id: TEAM_ID, name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null }] }),
+  );
+  await page.route('**/api/user/me', (route) => route.fulfill({ json: USER }));
+  await page.route(`**/api/teams/${TEAM_ID}/notifications`, (route) =>
+    route.fulfill({ json: { unreadThreadIds: [] } }),
+  );
+  await page.route('**/api/todos?*', (route) => route.fulfill({ json: [] }));
+  await page.route('**/api/projects?*', (route) => route.fulfill({ json: [] }));
+  await page.route(`**/api/teams/${TEAM_ID}/chief`, (route) =>
+    route.fulfill({
+      json: {
+        chief: {
+          id: THREAD.chiefId,
+          userId: USER.id,
+          teamId: TEAM_ID,
+          agent: { agentId: 'agent-1' },
+          charter: null,
+          lastTurnAt: null,
+          createdAt: 0,
+          tz: null,
+        },
+        agentActor: null,
+        context: null,
+        watches: [],
+        wakes: [],
+      },
+    }),
+  );
+  await page.route(`**/api/teams/${TEAM_ID}/chief/threads`, (route) => route.fulfill({ json: [THREAD] }));
+  await page.route(`**/api/conversations/${THREAD.id}/messages*`, (route) =>
+    messagesFail
+      ? route.fulfill({ status: 500, json: { error: 'messages read failed' } })
+      : route.fulfill({
+          json: { messages: [{ id: 'm1', role: 'user', content: 'Make a plan', createdAt: 1 }] },
+        }),
+  );
+
+  await page.goto('/app');
+  const error = page.getByTestId('home-c-error');
+  await expect(error).toBeVisible();
+  await expect(page.getByTestId('home-c-hero')).toHaveCount(0);
+  await expect(page.getByTestId('chief-composer-input')).toHaveCount(0);
+  messagesFail = false;
+  await error.getByRole('button', { name: 'Retry' }).click();
+  await expect(page.getByTestId('chief-stream').getByText('Make a plan')).toBeVisible();
+  await expect(composer(page)).toBeVisible();
+});

@@ -21,7 +21,6 @@ import { useI18n } from '../i18n/provider.js';
 import { Check, Copy, FileText, Restore } from '../icons/index.js';
 import { spiralAvatarUrl } from '../lib/spiral-avatar.js';
 import { mentionChipClass } from '../overlay/mention-chip.js';
-import { useOpenTaskInPlace } from '../task-panel/task-panel-root.js';
 import { ChiefDigestRow } from './chief-digest-row.js';
 import { ChiefIdentity } from './chief-identity.js';
 import { ChiefQuestionCard } from './chief-question-card.js';
@@ -129,7 +128,6 @@ function HandoffRow({ todoId }: { todoId: string }) {
   const { t } = useI18n();
   const glance = useContext(TodoGlanceContext)?.get(todoId);
   const renderCard = useContext(HandoffCardContext);
-  const openInPlace = useOpenTaskInPlace();
   const card = renderCard?.(todoId);
   if (card != null) {
     return (
@@ -151,7 +149,6 @@ function HandoffRow({ todoId }: { todoId: string }) {
             to={`/app/todo/${todoId}`}
             className={`${mentionChipClass('todo')} cursor-pointer`}
             data-phase={glance?.phase}
-            onClick={(event) => openInPlace(event, todoId, glance)}
           >
             {glance != null && <TodoStatus phase={glance.phase} />}
             {glance?.seq != null ? `#${glance.seq}` : t('任务')}

@@ -5,16 +5,7 @@ import {
 } from '@cairn/shared';
 import { cn } from 'cn';
 import { CircleDashed, TriangleAlert } from 'lucide-react';
-import {
-  type Dispatch,
-  type ReactNode,
-  type SetStateAction,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMachines, useMembers, useProjects, useSkills, useTodos } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { ProjectAvatar } from '../board/project-avatar.js';
@@ -30,7 +21,6 @@ import {
   DIALOG_TEXT_BUTTON,
   DialogShell,
 } from '../components/ui/dialog-shell.js';
-import { Kbd } from '../components/ui/kbd.js';
 import {
   MessageScroller,
   MessageScrollerContent,
@@ -38,7 +28,6 @@ import {
   useMessageScrollerScrollable,
 } from '../components/ui/message-scroller.js';
 import { Textarea } from '../components/ui/textarea.js';
-import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { type TodoGlance, TodoGlanceContext } from '../detail/segments.js';
 import type { ChiefContent, ChiefStreamItem, Phase } from '../fixtures/records.js';
 import { useScrollFade } from '../hooks/use-scroll-fade.js';
@@ -50,7 +39,6 @@ import {
   ChevronDown,
   ChiefFolder,
   ChiefGear,
-  ChiefHash,
   ChiefUserPlus,
   Grid2x2,
   Minus,
@@ -61,8 +49,6 @@ import {
 import { uploadMessageAttachments } from '../overlay/attachment-paste.js';
 import { ComposerAttachments } from '../overlay/composer-attachments.js';
 import { useComposerWire } from '../overlay/composer-wire.js';
-import { dropEscLayer, pushEscLayer } from '../overlay/gesture-machine.js';
-import { useChiefNewThreadHotkey } from '../overlay/hotkeys.js';
 import { MENTION_TEXTAREA_CLS, MentionHighlight } from '../overlay/mention-highlight.js';
 import { MentionInline } from '../overlay/mention-inline.js';
 import type { MentionGroups } from '../overlay/mention-token.js';
@@ -119,7 +105,7 @@ export function ChiefFollowArmed({ onAtBottom }: { onAtBottom: (atBottom: boolea
   return null;
 }
 
-export type ChiefConversationVariant = 'drawer' | 'home' | 'global';
+export type ChiefConversationVariant = 'drawer' | 'global';
 
 export interface ChiefConversationProps {
   variant: ChiefConversationVariant;
@@ -128,8 +114,6 @@ export interface ChiefConversationProps {
   onSettings?: () => void;
   onClose?: () => void;
   onSend?: (text: string, projectId: string | null) => void | Promise<void>;
-  onThread?: (title: string, index: number) => void;
-  onNewThread?: () => void;
   onRewind?: (messageId: string) => void;
   onAnswerQuestion?: (input: { requestId: string; answers: AskUserAnswer[] }) => void;
   onCancelQuestion?: (requestId: string) => void;
@@ -137,8 +121,6 @@ export interface ChiefConversationProps {
   onSteer?: (messageId: string) => void;
   onStop?: () => void;
   onNewTask?: () => void;
-  threadsOpen: boolean;
-  setThreadsOpen: Dispatch<SetStateAction<boolean>>;
   hero?: ReactNode;
   below?: ReactNode;
   heroCollapsed?: boolean;
@@ -162,8 +144,6 @@ export function ChiefConversation({
   onSettings,
   onClose,
   onSend,
-  onThread,
-  onNewThread,
   onRewind,
   onAnswerQuestion,
   onCancelQuestion,
@@ -171,8 +151,6 @@ export function ChiefConversation({
   onSteer,
   onStop,
   onNewTask,
-  threadsOpen,
-  setThreadsOpen,
   hero,
   below,
   heroCollapsed = false,
@@ -341,7 +319,6 @@ export function ChiefConversation({
   } = wire;
   useEffect(() => {
     if (open) return;
-    setThreadsOpen(false);
     setRewindConfirm(null);
     closeInline();
     closeSlash();
@@ -383,23 +360,8 @@ export function ChiefConversation({
     },
     [textareaRef, composerRef],
   );
-  const newThread = useCallback(() => {
-    if (onNewThread == null) return;
-    onNewThread();
-    setThreadsOpen(false);
-  }, [onNewThread]);
   const home = variant !== 'drawer';
   const ownHeader = variant !== 'global';
-  const newThreadFromKey = useCallback(() => {
-    if (home && document.activeElement?.closest('[role="dialog"],[role="alertdialog"]')) return;
-    newThread();
-  }, [home, newThread]);
-  useChiefNewThreadHotkey(open && onNewThread != null, newThreadFromKey);
-  useEffect(() => {
-    if (!home || !threadsOpen) return;
-    const layer = pushEscLayer(() => setThreadsOpen(false));
-    return () => dropEscLayer(layer);
-  }, [home, threadsOpen, setThreadsOpen]);
   const glances = useMemo(
     () =>
       todoGlances ??
@@ -528,38 +490,10 @@ export function ChiefConversation({
           }
         >
           <div className="flex items-center">
-            <Button
-              variant="ghost"
-              className="h-auto min-w-0 shrink cursor-pointer gap-1.5 rounded-none border-none bg-transparent p-0 leading-[inherit] text-(--text-tertiary) hover:bg-transparent hover:text-(--text-tertiary) dark:hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto"
-              aria-label={t('主题')}
-              onClick={() => setThreadsOpen((v) => !v)}
-            >
-              <ChiefHash />
-              <span className="max-w-52 truncate font-heading text-heading font-title text-(--foreground)">
-                {t(chief.threadTitle)}
-              </span>
-              <ChevronDown width={12} height={12} />
-            </Button>
+            <h2 className="m-0 min-w-0 truncate font-heading text-heading font-title text-(--foreground)">
+              Coordinator
+            </h2>
             <div className="ml-auto flex items-center gap-2.5">
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={`relative ${HEAD_ICON_BTN_CLS}`}
-                      aria-label={t('新主题')}
-                      aria-keyshortcuts="N"
-                      onClick={onNewThread != null ? newThread : undefined}
-                    />
-                  }
-                >
-                  <Plus width={18} height={18} />
-                </TooltipTrigger>
-                <TooltipContent side="bottom" sideOffset={8}>
-                  <Kbd>N</Kbd>
-                </TooltipContent>
-              </Tooltip>
               {onSettings != null && (
                 <Button
                   variant="ghost"
@@ -613,33 +547,6 @@ export function ChiefConversation({
                   <span className="min-w-0 truncate">{chief.modelSlot}</span>
                 )}
               </span>
-            </div>
-          )}
-          {threadsOpen && (
-            <div
-              className="absolute top-8 left-3 z-[5] max-h-55 w-66 overflow-y-auto rounded-(--radius-popover) bg-(--popover) p-(--menu-pad) shadow-(--shadow-popover)"
-              role="menu"
-            >
-              {(chief.threads ?? []).map((thread, index) => (
-                <Button
-                  variant="ghost"
-                  role="menuitem"
-                  key={thread.title}
-                  aria-current={thread.active ? 'true' : undefined}
-                  className="h-8 w-full cursor-pointer justify-start gap-2 rounded-(--radius-menu-item) border-none bg-transparent px-2.5 text-left text-ui font-normal text-(--text-secondary) hover:bg-(--menu-hover) hover:text-(--foreground) dark:hover:bg-(--menu-hover) aria-expanded:bg-transparent aria-[current=true]:bg-(--menu-hover) aria-[current=true]:font-medium aria-[current=true]:text-(--foreground) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto"
-                  onClick={
-                    onThread != null
-                      ? () => {
-                          onThread(thread.title, index);
-                          setThreadsOpen(false);
-                        }
-                      : undefined
-                  }
-                >
-                  <ChiefHash width={11} height={11} className="flex-none text-(--text-tertiary)" />
-                  <span className="truncate">{t(thread.title)}</span>
-                </Button>
-              ))}
             </div>
           )}
         </header>

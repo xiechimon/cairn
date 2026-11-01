@@ -32,18 +32,19 @@ import {
   type GestureEvent,
   getGestureStore,
 } from '../overlay/gesture-machine.js';
+import { type CoordinatorLoad, coordinatorLoad } from './coordinator-load.js';
 
 export type { ChiefView };
 
 export interface ChiefSurface {
+  load: CoordinatorLoad;
+  retry: () => void;
   chiefView: ChiefView;
   setChiefView: (view: ChiefView) => void;
   chiefData: ChiefContent;
   chiefUnread: number;
   chiefBusy: boolean;
   onSend?: (text: string, projectId: string | null) => void | Promise<void>;
-  onThread?: (title: string, index: number) => void;
-  onNewThread?: () => void;
   onRewind?: (messageId: string) => void;
   onAnswerQuestion?: (input: { requestId: string; answers: AskUserAnswer[] }) => void;
   onCancelQuestion?: (requestId: string) => void;
@@ -51,8 +52,6 @@ export interface ChiefSurface {
   onSteer?: (messageId: string) => void;
   onStop?: () => void;
 }
-
-const NEW_THREAD = -1;
 
 export interface ChiefDeepLink {
   threadId: string | null;
@@ -109,9 +108,7 @@ export function useChiefSurface(
   const [activeThreadIdx, setActiveThreadIdx] = useState<number | null>(null);
   const liveThreads = chiefThreadsQ.data ?? [];
   const activeThread =
-    live && liveThreads.length > 0 && activeThreadIdx !== NEW_THREAD
-      ? (liveThreads[activeThreadIdx ?? 0] ?? null)
-      : null;
+    live && liveThreads.length > 0 ? (liveThreads[activeThreadIdx ?? 0] ?? null) : null;
   const deepLinkId = deepLink?.threadId ?? null;
   const onDeepLinkConsumed = deepLink?.onConsumed;
   useEffect(() => {
@@ -279,18 +276,30 @@ export function useChiefSurface(
           blockDemoWrite();
         }
       : undefined;
-  const onThread = live ? (_title: string, index: number) => setActiveThreadIdx(index) : undefined;
-  const onNewThread = live ? () => setActiveThreadIdx(NEW_THREAD) : undefined;
+
+  const load: CoordinatorLoad = live
+    ? coordinatorLoad({
+        chief: chiefQ,
+        coordinator: chiefThreadsQ,
+        messages: chiefMessagesQ,
+        hasThread: activeThread !== null,
+      })
+    : 'ready';
+  const retry = () => {
+    void chiefQ.refetch();
+    void chiefThreadsQ.refetch();
+    if (activeThread !== null) void chiefMessagesQ.refetch();
+  };
 
   return {
+    load,
+    retry,
     chiefView,
     setChiefView,
     chiefData,
     chiefUnread,
     chiefBusy,
     onSend,
-    onThread,
-    onNewThread,
     onRewind,
     onAnswerQuestion,
     onCancelQuestion,

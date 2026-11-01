@@ -31,7 +31,6 @@ import type { TagChipData } from '../components/ui/tag-chip.js';
 import type { FixtureSet, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { safeLocalStorage, safeSessionStorage, safeSetItem } from '../safe-storage.js';
-import { TaskPanelToggle } from '../task-panel/task-panel.js';
 import {
   type BoardColumnDef,
   COLUMNS,
@@ -52,7 +51,7 @@ import {
   FilterPanel,
   TOPBAR_TEXT_BUTTON,
 } from './filter-panel.js';
-import { DailyBrief, HomeSections, NeedsYouInbox, withoutBoardView } from './home.js';
+import { NeedsYouInbox, withoutBoardView } from './home.js';
 import { BrandMark } from './sidebar.js';
 import { cardTag } from './tag-filter.js';
 
@@ -83,15 +82,6 @@ interface BoardProps {
   tagsById?: ReadonlyMap<string, TagChipData>;
   onNewTask?: () => void;
   loading?: boolean;
-  renderHome?: (home: HomeOverview) => ReactNode;
-}
-
-export interface HomeOverview {
-  sections: ReactNode;
-  brief: ReactNode;
-  needsYou: number;
-  running: number;
-  doneToday: number;
 }
 
 const COLUMN_ICON = {
@@ -174,7 +164,6 @@ export function BoardSurface({
   tagsById,
   onNewTask,
   loading = false,
-  renderHome,
 }: BoardProps) {
   const { t } = useI18n();
   const { search } = useLocation();
@@ -286,8 +275,7 @@ export function BoardSurface({
   const pendingTodos = viewTodos('pending');
   const pendingSplit = splitStale(pendingTodos, fixture.now);
   const staleCount = pendingSplit.stale.length;
-  const chatHome = home && renderHome != null;
-  const startOfToday = new Date(fixture.now).setHours(0, 0, 0, 0);
+  const _startOfToday = new Date(fixture.now).setHours(0, 0, 0, 0);
   const filterEmpty = (
     <>
       <span className="text-sm text-muted-foreground">{t('没有匹配筛选条件的任务')}</span>
@@ -325,12 +313,11 @@ export function BoardSurface({
             <Clock aria-hidden strokeWidth={1.75} className="size-3.5 text-content-tertiary" />
             {t('定时')}
           </Button>
-          <TaskPanelToggle />
         </div>
       </header>
 
       {banner != null && <div className="flex-none px-[17px] pt-3">{banner}</div>}
-      {onNewTask != null && !chatHome && (
+      {onNewTask != null && (
         <Button
           variant="ghost"
           data-testid="board-new-task-bar"
@@ -342,7 +329,7 @@ export function BoardSurface({
           <KeyHint>C</KeyHint>
         </Button>
       )}
-      {onlyColumn == null && !chatHome && (sinceLastSeen.done > 0 || sinceLastSeen.failed > 0) && (
+      {onlyColumn == null && (sinceLastSeen.done > 0 || sinceLastSeen.failed > 0) && (
         <span
           data-testid="board-since-last-seen"
           className="mx-auto block w-full max-w-190 px-4 pt-2 text-right text-meta text-content-tertiary"
@@ -351,48 +338,7 @@ export function BoardSurface({
         </span>
       )}
 
-      {chatHome ? (
-        renderHome({
-          sections: showFilterEmpty ? (
-            <div className="board-filter-empty mx-auto flex w-full max-w-190 flex-col items-center gap-3 px-4 pt-10">
-              {filterEmpty}
-            </div>
-          ) : (
-            <HomeSections
-              todos={visibleTodos}
-              now={fixture.now}
-              projectNames={fixture.projectNames}
-              onAction={onAction}
-              orchestrationOf={orchestrationOf}
-              loading={loading}
-            />
-          ),
-          brief: (
-            <DailyBrief
-              todos={visibleTodos}
-              machines={fixture.resources?.machines}
-              now={fixture.now}
-              projectNames={fixture.projectNames}
-              onAction={onAction}
-              orchestrationOf={orchestrationOf}
-            />
-          ),
-          needsYou: pendingSplit.fresh.length,
-          running: viewTodos('building').length,
-          doneToday: visibleTodos.filter(
-            (todo) => todo.phase === 'done' && todo.phaseAt >= startOfToday,
-          ).length,
-        })
-      ) : home && !showFilterEmpty ? (
-        <HomeSections
-          todos={visibleTodos}
-          now={fixture.now}
-          projectNames={fixture.projectNames}
-          onAction={onAction}
-          orchestrationOf={orchestrationOf}
-          loading={loading}
-        />
-      ) : onlyColumn === 'pending' && !showFilterEmpty ? (
+      {onlyColumn === 'pending' && !showFilterEmpty ? (
         <NeedsYouInbox
           todos={pendingTodos}
           now={fixture.now}
