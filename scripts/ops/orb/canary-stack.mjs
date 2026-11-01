@@ -320,7 +320,10 @@ export async function startStack({
             throw new Error('Scratch daemon exited during the Thread');
           const steps = await api('GET', `/api/builds/${buildId}/steps`);
           const step = steps.find((entry) => entry.kind === 'build');
-          if (step?.status === 'failed') throw new Error(`Scratch ${executor} runner failed`);
+          if (step?.status === 'failed')
+            throw new Error(
+              `Scratch ${executor} runner failed: ${String(step.errorMessage ?? 'no error message').slice(0, 2000)}`,
+            );
           return step?.status === 'done';
         },
         { signal, timeout: 600000, label: `${executor} runner delivery` },
