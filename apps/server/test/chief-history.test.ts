@@ -102,6 +102,14 @@ describe('search_history', () => {
     expect(hit?.snippet.length).toBeGreaterThanOrEqual(150);
   });
 
+  test('the snippet stays on the match when folding changes the text length', async () => {
+    seedMessages(H.threadId, [
+      { id: 'f1', content: `${'a'.repeat(1000)}needle${'\uFB03'.repeat(1000)}` },
+    ]);
+    const [hit] = (await search({ query: 'needle' })).hits;
+    expect(hit?.snippet).toContain('needle');
+  });
+
   test('LIKE wildcards in the query match literally', async () => {
     seedMessages(H.threadId, [
       { id: 'w1', content: 'coverage reached 100% today' },

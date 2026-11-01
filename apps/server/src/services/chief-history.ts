@@ -38,11 +38,20 @@ function fold(text: string): string {
   return text.normalize('NFKC').toLowerCase();
 }
 
+function originalOffset(text: string, foldedIndex: number): number {
+  let low = 0;
+  let high = text.length;
+  while (low < high) {
+    const mid = Math.floor((low + high) / 2);
+    if (fold(text.slice(0, mid)).length >= foldedIndex) high = mid;
+    else low = mid + 1;
+  }
+  return low;
+}
+
 function snippetAround(text: string, folded: string, foldedTerms: string[]): string {
   const index = Math.min(...foldedTerms.map((term) => folded.indexOf(term)).filter((i) => i >= 0));
-  const scaled =
-    folded.length === text.length ? index : Math.floor((index * text.length) / folded.length);
-  const start = Math.max(0, scaled - SNIPPET_LEAD_CHARS);
+  const start = Math.max(0, originalOffset(text, index) - SNIPPET_LEAD_CHARS);
   return text.slice(start, start + SNIPPET_CHARS);
 }
 
