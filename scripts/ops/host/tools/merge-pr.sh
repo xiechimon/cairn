@@ -21,8 +21,9 @@ head=$(gh pr view "$pr" -R "$R" --json headRefOid --jq .headRefOid)
 node ~/.cairn/tools/review-gate/review-gate.mjs --check "$pr" >/dev/null 2>&1; prot=$?
 case "$(gh pr view "$pr" -R "$R" --json headRefName --jq .headRefName)" in lane/*) prot=0;; esac
 if [ $prot != 3 ]; then
-  gh pr view "$pr" -R "$R" --json comments --jq '.comments[].body' | grep -A1 "review-gate:$head" | grep -q 'gate: PASS' \
-    || { echo "PR #$pr is a lane PR or touches protected paths (or the check failed) and has no review-gate PASS for $head" >&2; exit 1; }
+  gate=$(gh api "repos/$R/commits/$head/statuses?per_page=100" --jq '[.[] | select(.context == "review-gate" and .creator.login == "xiechimon")][0].state // ""')
+  [ "$gate" = success ] \
+    || { echo "PR #$pr is a lane PR or touches protected paths (or the check failed) and its review-gate status for $head is '${gate:-missing}', not success" >&2; exit 1; }
 fi
 opener=$(gh pr view "$pr" -R "$R" --json author --jq .author.login)
 if [ "$opener" = "app/cairnwright" ]; then
