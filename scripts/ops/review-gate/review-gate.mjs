@@ -4,6 +4,7 @@ import { resolve as resolvePath } from 'node:path';
 import {
   BLOCK_ROUNDS,
   CLAUDE_DIFF_PATHSPEC,
+  CLAUDE_OMITTED_PATHS,
   claudeFallback,
   claudeReviewArgs,
   claudeReviewPrompt,
@@ -582,7 +583,18 @@ ${
           const { title, body } = JSON.parse(
             gh(['pr', 'view', String(pr.number), '--json', 'title,body']),
           );
-          input = claudeReviewPrompt(prompt, { diff, title, body });
+          const omitted = execFileSync(
+            'git',
+            [
+              'diff',
+              '--name-status',
+              `origin/main...review-gate-${pr.number}`,
+              '--',
+              ...CLAUDE_OMITTED_PATHS,
+            ],
+            { cwd: MAIN, encoding: 'utf8', maxBuffer: 16 << 20 },
+          );
+          input = claudeReviewPrompt(prompt, { diff, title, body, omitted });
           if (input === null)
             return resolve({
               ...routed,

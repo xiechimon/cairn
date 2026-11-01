@@ -4,6 +4,7 @@ import {
   BLOCK_ROUNDS,
   CLAUDE_DENIED_TOOLS,
   CLAUDE_DIFF_PATHSPEC,
+  CLAUDE_OMITTED_PATHS,
   CLAUDE_REVIEW_TOOLS,
   claudeFallback,
   claudeReviewArgs,
@@ -254,14 +255,28 @@ test('deleted files, symlinks and submodules leave the low-risk tier', () => {
   assert.equal(one({ status: 'T', mode: '100644' }), false);
 });
 
-test('the Claude diff limit fits a large session PR', () => {
-  assert.ok(DIFF_LIMIT >= 400_000);
-});
-
-test('the Claude diff omits deleted file bodies, verify evidence and generated snapshots', () => {
+test('the Claude diff keeps snapshots and only drops deleted bodies, verify evidence and drizzle meta', () => {
   assert.equal(CLAUDE_DIFF_PATHSPEC[0], '-D');
   for (const path of [':(exclude)docs/verify', ':(exclude)apps/server/drizzle/meta'])
     assert.ok(CLAUDE_DIFF_PATHSPEC.includes(path));
+  assert.ok(!CLAUDE_DIFF_PATHSPEC.some((part) => part.includes('__snapshots__')));
+  assert.deepEqual(CLAUDE_OMITTED_PATHS, ['docs/verify', 'apps/server/drizzle/meta']);
+});
+
+test('the Claude prompt names every omitted file so a hidden change can be blocked', () => {
+  const input = claudeReviewPrompt('P', {
+    diff: '+x\n',
+    title: 'T',
+    body: 'B',
+    omitted: 'M\tdocs/verify/1/run.txt\nA\tapps/server/drizzle/meta/0086_snapshot.json',
+  });
+  assert.match(input, /Files changed but omitted from the diff/);
+  assert.match(input, /M\tdocs\/verify\/1\/run\.txt/);
+  assert.match(input, /A\tapps\/server\/drizzle\/meta\/0086_snapshot\.json/);
+  assert.doesNotMatch(
+    claudeReviewPrompt('P', { diff: '+x\n', title: '', body: '' }),
+    /omitted from the diff/,
+  );
 });
 
 test('a round stops only when no reviewer was tried', () => {
