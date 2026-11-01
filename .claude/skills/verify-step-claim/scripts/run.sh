@@ -88,6 +88,7 @@ for prop in $props; do
     exit 2
   fi
   name="${prop#P[0-9]_}"
+  name="${name%%__*}"
   want="$(awk -v p="$prop" '$1 == p {print $2}' "$SKILL_DIR/expected.txt")"
   want_trace="$(awk -v p="$prop" '$1 == p {print $3}' "$SKILL_DIR/expected.txt")"
   if [ -z "$want" ]; then
