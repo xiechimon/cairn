@@ -137,6 +137,7 @@ export interface MessageRow {
   content: unknown;
   createdAt: number;
   actor?: string | null;
+  projectId?: string | null;
 }
 
 export function toDisplayTodo(w: WireTodo): DisplayTodo {
@@ -1432,10 +1433,11 @@ function collectChiefStream(
       if (m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX) && postedTexts.has(text)) continue;
       pendingTools = [];
       const head = orchestratePromptHeadOf(text);
+      const projectId = m.projectId ?? null;
       items.push(
         head === null
-          ? { kind: 'user', text, id: m.id, markdown: text, at: clockTime(m.createdAt) }
-          : { kind: 'user', text: head, id: m.id, at: clockTime(m.createdAt) },
+          ? { kind: 'user', text, id: m.id, markdown: text, at: clockTime(m.createdAt), projectId }
+          : { kind: 'user', text: head, id: m.id, at: clockTime(m.createdAt), projectId },
       );
       continue;
     }

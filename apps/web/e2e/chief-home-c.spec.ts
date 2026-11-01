@@ -97,6 +97,8 @@ test('a first run greets and offers starters, with nothing pinned', async ({ pag
   await expect(page.getByTestId('home-c-hero').getByRole('heading', { level: 2 })).toBeVisible();
   await expect(needsYou(page)).toHaveCount(0);
   await expect(pill(page)).toHaveCount(0);
+  await expect(page.getByTestId('home-c-since')).not.toContainText('waiting on you');
+  await expect(page.getByTestId('home-c-since')).not.toContainText('in progress');
   await page.getByTestId('home-c-starters').getByRole('button', { name: 'Make a plan' }).click();
   await expect(composer(page)).toHaveValue('Make a plan');
 });

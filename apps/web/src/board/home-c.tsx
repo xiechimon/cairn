@@ -152,8 +152,8 @@ export function HomeC({
           day: 'numeric',
           weekday: 'short',
         }).format(now),
-        t('{n} 项待你处理', { n: entries.length }),
-        t('{n} 件在进行', { n: running.length }),
+        ...(entries.length > 0 ? [t('{n} 项待你处理', { n: entries.length })] : []),
+        ...(running.length > 0 ? [t('{n} 件在进行', { n: running.length })] : []),
       ].join(' · ')}
     </p>
   );
