@@ -186,7 +186,7 @@ export function HomeC({ surface, todos, now, projectId, projectName, banner }: H
           onClick={() => setAllOpen(!allOpen)}
           className="-ml-2.5 self-start text-meta text-content-tertiary hover:text-foreground"
         >
-          {allOpen ? t('收起') : t('还有 {n} 件', { n: entries.length - 1 })}
+          {allOpen ? t('收起其余') : t('还有 {n} 件', { n: entries.length - 1 })}
         </Button>
       )}
     </section>

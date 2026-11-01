@@ -15,7 +15,7 @@ test('the home is one Coordinator conversation: serif greeting, a pinned decisio
 }) => {
   await page.goto(home('home-c'));
   const greeting = page.getByTestId('home-c').getByRole('heading', { level: 2 }).first();
-  await expect(greeting).toHaveCSS('font-family', /Source Serif/);
+  await expect(greeting).toHaveCSS('font-family', /sourceSerif4/);
   await expect(page.getByTestId('home-c-since')).toContainText('4 waiting on you · 3 in progress');
   await expect(needsYou(page).locator('[data-slot="needs-you-item"]')).toHaveCount(1);
   await expect(needsYou(page)).toContainText('relay-186 cannot run glm-5.3-flash');

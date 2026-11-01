@@ -594,13 +594,6 @@ export function BoardPage() {
     : { ...fixture, todos };
   const quotaInfos = quotaBannerInfo(todos);
   const backupWarning = backupQ.data ?? null;
-  const todoGlances = useMemo(
-    () =>
-      new Map(
-        todos.map((todo) => [todo.id, { phase: todo.phase, seq: todo.seqNum, title: todo.title }]),
-      ),
-    [todos],
-  );
   const homeBanner =
     backupWarning != null ? (
       <BackupBanner notice={backupWarning} />

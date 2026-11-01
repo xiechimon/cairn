@@ -1545,4 +1545,12 @@ export const EN: Record<string, string> = {
   '请刷新页面重试。': 'Reload the page to try again.',
   对话加载失败: 'Could not load the conversation',
   '对话记录还在，重试一下。': 'Your conversation is still there. Try again.',
+  '{n} 件在进行': '{n} in progress',
+  待你决定: 'Needs you',
+  '还有 {n} 件': '{n} more',
+  首页概况: 'Home overview',
+  '跟 Coordinator 说（在 {name} 里）…': 'Talk to the Coordinator (in {name})…',
+  '跟 Coordinator 说点什么，或描述一个新任务…':
+    'Tell the Coordinator something, or describe a new task…',
+  收起其余: 'Show less',
 };
