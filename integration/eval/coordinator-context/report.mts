@@ -25,9 +25,9 @@ const { values: args } = parseArgs({
   options: { raw: { type: 'string', default: 'docs/verify/2522/raw' } },
 });
 
-function quantile(xs: number[], q: number): number {
+function quantile(xs: number[], q: number): string {
   const sorted = [...xs].sort((a, b) => a - b);
-  return sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))] ?? 0;
+  return String(sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))] ?? 'n/a');
 }
 
 const pct = (n: number, d: number) => (d === 0 ? 'n/a' : `${((100 * n) / d).toFixed(1)}%`);

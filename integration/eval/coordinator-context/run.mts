@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { CHIEF_REMOTE_TOOLS } from '@cairn/shared';
 import { sql } from 'drizzle-orm';
+import { FIRST_TOKEN_EVENTS } from '../../../apps/daemon/src/backend/pi.js';
 import { openMemoryDb } from '../../../apps/server/src/db/client.js';
 import {
   agent as agentTable,
@@ -26,10 +27,12 @@ import { readHistory, searchHistory } from '../../../apps/server/src/services/ch
 import { TeamStreamHub } from '../../../apps/server/src/services/events.js';
 import { assemble, estimateTokens } from './assemble.mts';
 import {
+  AGENTS,
   buildFixture,
   type FixtureToolCall,
   type FixtureTurn,
   messageId,
+  PROJECTS,
   RECALL_QUESTION,
   RECALL_TURN,
   recalled,
@@ -39,14 +42,6 @@ import {
 
 const here = dirname(fileURLToPath(import.meta.url));
 const EXTENSION = join(here, 'chief-tools-ext.mjs');
-const FIRST_TOKEN_EVENTS = new Set([
-  'text_delta',
-  'thinking_delta',
-  'toolcall_delta',
-  'toolcall_end',
-]);
-const PROJECTS = ['Heron', 'Osprey', 'Wren', 'Lark', 'Finch', 'Plover', 'Tern', 'Egret'];
-const AGENTS = ['Builder', 'Reviewer', 'Verifier', 'Docs', 'Ops'];
 
 const { values: args } = parseArgs({
   options: {
@@ -57,6 +52,7 @@ const { values: args } = parseArgs({
     budgetUsd: { type: 'string', default: '4.5' },
     out: { type: 'string', default: 'docs/verify/2522/raw' },
     inputBudget: { type: 'string', default: '64000' },
+    contextWindow: { type: 'string', default: '1000000' },
   },
 });
 const MODEL = args.model;
@@ -77,7 +73,11 @@ const ARMS: Record<string, ArmSpec> = {
   a1: {
     name: 'a1-resume-tuned-compaction',
     mode: 'resume',
-    compaction: { enabled: true, reserveTokens: 1_000_000 - INPUT_BUDGET, keepRecentTokens: 16384 },
+    compaction: {
+      enabled: true,
+      reserveTokens: Number(args.contextWindow) - INPUT_BUDGET,
+      keepRecentTokens: 16384,
+    },
     align: 1,
   },
   b1: { name: 'b1-fresh-retrieval', mode: 'fresh', compaction: { enabled: true }, align: 1 },

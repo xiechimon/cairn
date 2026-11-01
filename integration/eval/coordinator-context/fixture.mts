@@ -25,8 +25,8 @@ export interface FixtureTurn {
   reply: string;
 }
 
-const PROJECTS = ['Heron', 'Osprey', 'Wren', 'Lark', 'Finch', 'Plover', 'Tern', 'Egret'];
-const AGENTS = ['Builder', 'Reviewer', 'Verifier', 'Docs', 'Ops'];
+export const PROJECTS = ['Heron', 'Osprey', 'Wren', 'Lark', 'Finch', 'Plover', 'Tern', 'Egret'];
+export const AGENTS = ['Builder', 'Reviewer', 'Verifier', 'Docs', 'Ops'];
 const AREAS = [
   'login form validation',
   'invoice export',
