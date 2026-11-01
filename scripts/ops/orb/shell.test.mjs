@@ -25,7 +25,7 @@ function fixture() {
   writeFileSync(
     fake,
     `#!${process.execPath}
-import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, realpathSync, renameSync, writeFileSync } from 'node:fs';
+import { appendFileSync, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { runInNewContext } from 'node:vm';
 const cmd = basename(process.argv[1]);
@@ -39,7 +39,22 @@ if (cmd === 'id') console.log(args[0] === '-un' ? (process.env.FAKE_USER || 'roo
 if (cmd === 'runuser' || cmd === 'bash') console.log(args.some((arg) => arg.includes('daemon-package.mjs')) ? (process.env.CAIRN_ORB_NODE_MAJOR || process.env.HOST_NODE_MAJOR || '26') : args.at(-1).includes('claude') ? (process.env.BAD_VERSION || '2.1.302 (Claude Code)') : 'codex-cli 0.163.0');
 if (cmd !== 'systemd-nspawn' && cmd !== 'pacstrap' && args.some((arg) => arg === '-M' || arg.startsWith('--machine'))) process.exit(91);
 if (cmd === 'machinectl' && args.some((arg) => ['bind', 'shell', 'login', 'copy-to', 'copy-from'].includes(arg))) process.exit(92);
-if (cmd === 'stat') console.log(process.env.DIR_OWNER || 'ian:700');
+if (cmd === 'stat') console.log(args.includes('-f') ? (process.env.MACHINES_FILESYSTEM || 'ext4') : args.includes('%i') ? (existsSync(join(args.at(-1), '.fake-subvolume')) ? '256' : '257') : (process.env.DIR_OWNER || 'ian:700'));
+if (cmd === 'btrfs') {
+  const target = args.at(-1);
+  if (args[1] === 'create') { mkdirSync(target); writeFileSync(join(target, '.fake-subvolume'), ''); }
+  else if (args[1] === 'delete') {
+    if (!existsSync(join(target, '.fake-subvolume'))) process.exit(2);
+    const nested = readdirSync(target, { recursive: true }).some((entry) => String(entry).endsWith('/.fake-subvolume'));
+    if (nested && !args.includes('-R')) { console.error('ERROR: Could not destroy subvolume: Directory not empty'); process.exit(1); }
+    rmSync(target, { recursive: true });
+  } else process.exit(2);
+}
+if (cmd === 'rm') {
+  const target = args.at(-1);
+  if (existsSync(join(target, '.fake-subvolume'))) { console.error('rm must never delete a subvolume'); process.exit(93); }
+  rmSync(target, { recursive: true, force: true });
+}
 if (cmd === 'sha256sum') console.log('fake-recipe  ' + args[0]);
 if (cmd === 'pacstrap') {
   if (process.env.APPEARED_IMAGE) {
@@ -48,6 +63,10 @@ if (cmd === 'pacstrap') {
     writeFileSync(join(appeared, 'cairn-orb-image'), 'owner-created-image');
   }
   mkdirSync(join(args[2], 'etc'), { recursive: true });
+  if (existsSync(join(args[2], '.fake-subvolume'))) {
+    mkdirSync(join(args[2], 'var/lib/machines'), { recursive: true });
+    writeFileSync(join(args[2], 'var/lib/machines/.fake-subvolume'), '');
+  }
   if (process.env.MOUNTED_STAGE) writeFileSync(join(root, 'active-mount'), args[2] + '/dev');
 }
 if (cmd === 'findmnt' && args.includes('--target')) { console.log(process.env.RUN_MOUNT_OPTIONS ?? 'rw,nosuid,nodev'); process.exit(0); }
@@ -106,6 +125,8 @@ if (cmd === 'ip') console.log('7: vz-cairn inet ' + (process.env.BRIDGE_IP || '1
     'ip',
     'socat',
     'stat',
+    'btrfs',
+    'rm',
     'systemd-nspawn',
     'systemd-run',
   ])
@@ -150,7 +171,7 @@ test('image dry-run prints pins and never invokes privileged mutations', () => {
     assert.match(result.stdout, /@openai\/codex@0.163.0/);
     assert.match(result.stdout, /write \/etc\/environment/);
     assert.match(result.stdout, /mask SSH server/);
-    assert.ok(f.calls().every(([cmd]) => ['id', 'runuser', 'sha256sum'].includes(cmd)));
+    assert.ok(f.calls().every(([cmd]) => ['id', 'runuser', 'sha256sum', 'stat'].includes(cmd)));
     assert.equal(existsSync(join(f.root, 'var')), false);
   } finally {
     rmSync(f.root, { recursive: true, force: true });
@@ -643,6 +664,141 @@ test('generated guest check unit permits the network wait and subsequent probes'
       unit,
       /^ExecStart=\/usr\/bin\/node \/usr\/local\/lib\/cairn-orb\/guest-check.mjs$/m,
     );
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+test('btrfs image build publishes a subvolume and reruns without changes', () => {
+  const f = fixture();
+  try {
+    const env = { MACHINES_FILESYSTEM: 'btrfs' };
+    const first = f.run('build-image.sh', [], env);
+    assert.equal(first.status, 0, first.stderr);
+    assert.match(first.stdout, /1 changes/);
+    const image = join(f.root, 'var/lib/machines/cairn-orb-base');
+    assert.ok(existsSync(join(image, '.fake-subvolume')));
+    const calls = f.calls();
+    const create = calls.findIndex(([cmd, , action]) => cmd === 'btrfs' && action === 'create');
+    assert.ok(create >= 0 && create < calls.findIndex(([cmd]) => cmd === 'pacstrap'));
+    assert.equal(f.run('build-image.sh', [], env).stdout.trim(), '0 changes');
+    assert.equal(f.calls().filter(([cmd]) => cmd === 'pacstrap').length, 1);
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+test('a directory base on btrfs rebuilds once even with matching image pins', () => {
+  const f = fixture();
+  try {
+    assert.equal(f.run('build-image.sh').status, 0);
+    const changed = f.run('build-image.sh', [], { MACHINES_FILESYSTEM: 'btrfs' });
+    assert.equal(changed.status, 0, changed.stderr);
+    assert.match(changed.stdout, /rebuild cairn-orb-base:.*subvolume/);
+    assert.match(changed.stdout, /1 changes/);
+    assert.ok(existsSync(join(f.root, 'var/lib/machines/cairn-orb-base/.fake-subvolume')));
+    assert.equal(
+      f.run('build-image.sh', [], { MACHINES_FILESYSTEM: 'btrfs' }).stdout.trim(),
+      '0 changes',
+    );
+    assert.equal(f.calls().filter(([cmd]) => cmd === 'pacstrap').length, 2);
+    assert.ok(
+      f
+        .calls()
+        .some(([cmd, ...args]) => cmd === 'rm' && args.at(-1).includes('.cairn-orb-previous.')),
+    );
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+test('btrfs replacement deletes the old subvolume and its nested subvolumes without rm', () => {
+  const f = fixture();
+  try {
+    const env = { MACHINES_FILESYSTEM: 'btrfs' };
+    assert.equal(f.run('build-image.sh', [], env).status, 0);
+    const changed = f.run('build-image.sh', [], { ...env, BAD_VERSION: '2.2.0' });
+    assert.equal(changed.status, 0, changed.stderr);
+    assert.ok(
+      f
+        .calls()
+        .some(
+          ([cmd, , action, ...rest]) =>
+            cmd === 'btrfs' &&
+            action === 'delete' &&
+            rest.includes('-R') &&
+            rest.at(-1).includes('.cairn-orb-previous.'),
+        ),
+    );
+    assert.deepEqual(readdirSync(join(f.root, 'var/lib/machines')), ['cairn-orb-base']);
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+for (const failure of ['pacstrap', 'arch-chroot', 'publish']) {
+  test(`btrfs ${failure} failure preserves the base and deletes the staging subvolume`, () => {
+    const f = fixture();
+    try {
+      const env = { MACHINES_FILESYSTEM: 'btrfs' };
+      assert.equal(f.run('build-image.sh', [], env).status, 0);
+      const image = join(f.root, 'var/lib/machines/cairn-orb-base');
+      const original = readFileSync(join(image, 'etc/cairn-orb-image'), 'utf8');
+      const result = f.run('build-image.sh', [], {
+        ...env,
+        BAD_VERSION: '2.2.0',
+        ...(failure === 'publish' ? { FAIL_PUBLISH: '1' } : { FAIL_COMMAND: failure }),
+      });
+      assert.notEqual(result.status, 0);
+      assert.ok(existsSync(join(image, '.fake-subvolume')));
+      assert.equal(readFileSync(join(image, 'etc/cairn-orb-image'), 'utf8'), original);
+      assert.ok(
+        f
+          .calls()
+          .some(
+            ([cmd, , action, ...rest]) =>
+              cmd === 'btrfs' &&
+              action === 'delete' &&
+              rest.includes('-R') &&
+              rest.at(-1).includes('.cairn-orb-build.'),
+          ),
+      );
+      assert.deepEqual(readdirSync(join(f.root, 'var/lib/machines')), ['cairn-orb-base']);
+      if (failure === 'publish') assert.match(result.stdout, /restore previous base/);
+    } finally {
+      rmSync(f.root, { recursive: true, force: true });
+    }
+  });
+}
+
+test('btrfs dry run plans subvolume staging without creating it', () => {
+  const f = fixture();
+  try {
+    const result = f.run('build-image.sh', ['--dry-run'], { MACHINES_FILESYSTEM: 'btrfs' });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /subvolume/);
+    assert.ok(!f.calls().some(([cmd]) => ['btrfs', 'pacstrap', 'rm'].includes(cmd)));
+    assert.equal(existsSync(join(f.root, 'var')), false);
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+test('btrfs mounted staging subvolume is preserved on failure', () => {
+  const f = fixture();
+  try {
+    const result = f.run('build-image.sh', [], {
+      MACHINES_FILESYSTEM: 'btrfs',
+      FAIL_COMMAND: 'arch-chroot',
+      MOUNTED_STAGE: '1',
+    });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /mounted image/);
+    const stage = readdirSync(join(f.root, 'var/lib/machines')).find((name) =>
+      name.startsWith('.cairn-orb-build.'),
+    );
+    assert.ok(stage && existsSync(join(f.root, 'var/lib/machines', stage, '.fake-subvolume')));
+    assert.ok(!f.calls().some(([cmd, , action]) => cmd === 'btrfs' && action === 'delete'));
   } finally {
     rmSync(f.root, { recursive: true, force: true });
   }

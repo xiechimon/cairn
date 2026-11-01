@@ -107,6 +107,17 @@ and is replaced only after the staging image is complete and unmounted.
 Unrecognized images are preserved and stop installation. The rebuild is printed
 and counted; the next run prints `0 changes`. Existing clones keep their tools.
 
+On btrfs, detected with `stat -f -c %T`, the builder creates the staging image
+with `btrfs subvolume create` and publishes that subvolume as `cairn-orb-base`.
+`machinectl clone` can then snapshot the base for each Thread instead of
+recursively copying a directory image. The builder detects subvolumes from their
+host inode number, so a directory base on btrfs is reported as image-type drift
+and rebuilt once even when its completion marker matches. Non-btrfs hosts retain
+directory images. Replacement keeps the previous base until publication succeeds
+and restores it if publication fails. Staging and previous subvolumes are removed
+with `btrfs subvolume delete`; directory images use recursive removal. Mounted
+images remain preserved.
+
 The proxy subnet is `10.203.0.0/24`, with the relay at `10.203.0.1:7890` on
 `vz-cairn`. The subnet must be unused on the host. The container DHCP server
 advertises no router or DNS server. The relay resolves names locally, checks
@@ -311,6 +322,11 @@ selected ports rather than proving every firewall rule. The guest proxy negative
 require HTTP 403 for both `127.0.0.1:80` and `10.203.0.1:22` (allowed ports, so the address filter refuses them); connectivity
 errors cannot count as successful proxy filtering. Public egress has three
 retries bounded by a 20-second retry window and a 30-second subprocess timeout.
+
+The clone subprocess has a 600-second timeout. After any clone failure or
+timeout, the checker lists images and removes a leftover matching the exact check
+machine name before returning a named clone error. A missing image needs no
+removal; listing or removal errors also appear in `errors`.
 
 After start, the checker waits at most 30 polls for the root-prepared private
 runtime directory and writes a request ID and blocked-port list to `check-request`.

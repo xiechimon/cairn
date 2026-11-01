@@ -51,9 +51,12 @@ export function EmptyState({
             </Button>
           )}
           {hint != null && (
-            <p className="m-0 flex items-center gap-1 text-meta text-content-tertiary">
+            <p className="m-0 max-w-sm text-center text-meta text-content-tertiary">
               {HintIcon != null && (
-                <HintIcon className="size-3 text-content-dim" strokeWidth={1.75} />
+                <HintIcon
+                  className="mr-1 inline-block size-3 align-text-bottom text-content-dim"
+                  strokeWidth={1.75}
+                />
               )}
               {hint.text}
             </p>

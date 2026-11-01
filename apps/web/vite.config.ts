@@ -23,8 +23,12 @@ function previewApiReject(): Plugin {
   };
 }
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react(), previewApiReject()],
+  build:
+    mode === 'fixture'
+      ? { rollupOptions: { input: { main: 'index.html', design: 'design.html' } } }
+      : {},
   resolve: {
     alias: [
       { find: '@', replacement: new URL('./src', import.meta.url).pathname },
@@ -49,4 +53,4 @@ export default defineConfig({
   preview: {
     proxy: {},
   },
-});
+}));

@@ -1,0 +1,25 @@
+[heavy-slots] acquired slot 1/2
+[WebServer] (node:181) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] [plugin builtin:vite-reporter] 
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+[WebServer] (node:303) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 4 tests using 1 worker
+
+(node:355) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+{"theme":"light","viewportWidth":1440,"gap":4,"overlap":12,"lines":2,"width":384,"maxWidth":442,"overflow":false}
+  ✓  1 e2e/accent-typo.spec.ts:284:5 › schedules empty-state hint icon stays beside its first text line (light, 1440) (384ms)
+{"theme":"light","viewportWidth":390,"gap":4,"overlap":12,"lines":2,"width":310,"maxWidth":442,"overflow":false}
+  ✓  2 e2e/accent-typo.spec.ts:284:5 › schedules empty-state hint icon stays beside its first text line (light, 390) (274ms)
+{"theme":"dark","viewportWidth":1440,"gap":4,"overlap":12,"lines":2,"width":384,"maxWidth":442,"overflow":false}
+  ✓  3 e2e/accent-typo.spec.ts:284:5 › schedules empty-state hint icon stays beside its first text line (dark, 1440) (302ms)
+{"theme":"dark","viewportWidth":390,"gap":4,"overlap":12,"lines":2,"width":310,"maxWidth":442,"overflow":false}
+  ✓  4 e2e/accent-typo.spec.ts:284:5 › schedules empty-state hint icon stays beside its first text line (dark, 390) (284ms)
+
+  4 passed (4.8s)
