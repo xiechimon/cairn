@@ -41,7 +41,7 @@ export function StatusMenu({ phase, elapsed, onMoveBack, onMarkDone }: StatusMen
   const { t } = useI18n();
   const hasMoves = onMoveBack != null || onMarkDone != null;
   return (
-    <div className="status-menu flex flex-col gap-px text-left" data-testid="status-menu">
+    <div className="flex flex-col gap-px text-left" data-testid="status-menu">
       {LIST_PHASES.map((row) => {
         const current = row.phase === phase;
         const status = PHASE_STATUS[row.phase];

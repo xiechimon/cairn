@@ -153,7 +153,7 @@ export function FreshBlock({
       <h2 className="fresh-title m-0 mb-3 font-serif text-page font-semibold break-words text-(--foreground)">
         {todo.title}
       </h2>
-      <div className="fresh-props mb-4 flex flex-wrap items-center gap-1.5">
+      <div className="mb-4 flex flex-wrap items-center gap-1.5">
         {projectName !== undefined && (
           <span className={CHIP} data-testid="fresh-project">
             <ProjectAvatar name={projectName} {...projectMark(projectName)} bare />
