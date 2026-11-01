@@ -17,6 +17,8 @@ for issue in $(gh pr view "$pr" -R "$R" --json body,headRefName --jq '"\(.headRe
   open=$(node ~/.cairn/tools/merge-order/deps-open.mjs "$issue") || { echo "PR #$pr: issue #$issue still depends on open $open; merge those first" >&2; exit 1; }
 done
 head=$(gh pr view "$pr" -R "$R" --json headRefOid --jq .headRefOid)
+gh pr view "$pr" -R "$R" --json labels --jq '.labels[].name' | grep -qx coordinator-hold \
+  && { echo "PR #$pr carries coordinator-hold: the coordinator asked for changes; it merges only after the author says ready and the label is removed" >&2; exit 1; }
 node ~/.cairn/tools/review-gate/review-gate.mjs --check "$pr" >/dev/null 2>&1; prot=$?
 case "$(gh pr view "$pr" -R "$R" --json headRefName --jq .headRefName)" in lane/*) prot=0;; esac
 if [ $prot = 3 ] && [ "$(gh pr view "$pr" -R "$R" --json author --jq .author.login)" != app/cairnwright ]; then

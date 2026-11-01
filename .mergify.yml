@@ -6,6 +6,7 @@ queue_rules:
       - -draft
       - -label = needs-decision
       - -label = owner-route
+      - -label = coordinator-hold
       - or:
           - -head ~= ^B[0-9]+/
           - label = queue-admit
@@ -72,6 +73,7 @@ queue_rules:
       - -draft
       - -label = needs-decision
       - -label = owner-route
+      - -label = coordinator-hold
       - or:
           - -head ~= ^B[0-9]+/
           - label = queue-admit

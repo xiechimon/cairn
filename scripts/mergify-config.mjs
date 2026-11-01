@@ -58,6 +58,7 @@ export function mergifyConfig(prGateSource) {
     '      - -draft',
     '      - -label = needs-decision',
     '      - -label = owner-route',
+    '      - -label = coordinator-hold',
     '      - or:',
     `          - -head ~= ${batchHeadRe}`,
     `          - label = ${admitLabel}`,

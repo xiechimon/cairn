@@ -86,6 +86,18 @@ function mergePr(t, { opener, gateExit, labelError = false, labels = [], ref = '
   };
 }
 
+for (const [route, gateExit, opener] of [
+  ['an unprotected human-opened', 3, 'xiechimon'],
+  ['a protected', 0, 'xiechimon'],
+  ['a bot-opened', 3, 'app/cairnwright'],
+])
+  test(`${route} PR carrying coordinator-hold is never merged`, (t) => {
+    const result = mergePr(t, { opener, gateExit, labels: ['coordinator-hold'] });
+    assert.notEqual(result.status, 0);
+    assert.equal(result.merged, false);
+    assert.match(result.stderr, /coordinator-hold/);
+  });
+
 test('an unprotected human-opened PR is labelled and left to Mergify, never commented or merged', (t) => {
   const result = mergePr(t, { opener: 'xiechimon', gateExit: 3 });
   assert.equal(result.status, 0, result.stderr);

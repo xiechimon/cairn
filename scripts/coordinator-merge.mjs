@@ -8,15 +8,18 @@ import { mustBeGreenJobs } from './merge-checks.mjs';
 const minimumChecks = 4;
 const closingLine = /^(?:closes|fixes|resolves) #\d+$/i;
 const reviewer = 'cairnwright[bot]';
+export const holdLabel = 'coordinator-hold';
 
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 const gh = (...args) =>
   execFileSync('gh', args, { encoding: 'utf8', maxBuffer: 512 * 1024 * 1024 }).trim();
 
-function readHead(number) {
+function readPull(number) {
   try {
-    const sha = api(`repos/${repo}/pulls/${number}`)?.head?.sha;
-    return /^[a-f0-9]{40}$/.test(sha ?? '') ? sha : null;
+    const pull = api(`repos/${repo}/pulls/${number}`);
+    const sha = pull?.head?.sha;
+    if (!/^[a-f0-9]{40}$/.test(sha ?? '')) return null;
+    return { head: sha, held: (pull.labels ?? []).some((label) => label.name === holdLabel) };
   } catch {
     return null;
   }
@@ -105,8 +108,13 @@ function merge(number, head) {
 export async function coordinate(number, { iterations = 90, intervalMs = 60_000 } = {}) {
   for (let i = 0; i < iterations; i++) {
     if (i) await sleep(intervalMs);
-    const head = readHead(number);
-    if (!head) continue;
+    const pull = readPull(number);
+    if (!pull) continue;
+    if (pull.held) {
+      console.log(`${number} held by ${holdLabel}`);
+      continue;
+    }
+    const { head } = pull;
     let green;
     try {
       const verdict = verdictFor(
@@ -123,6 +131,8 @@ export async function coordinate(number, { iterations = 90, intervalMs = 60_000 
       continue;
     }
     if (!green || braked()) continue;
+    const latest = readPull(number);
+    if (!latest || latest.held || latest.head !== head) continue;
     try {
       merge(number, head);
       return true;
