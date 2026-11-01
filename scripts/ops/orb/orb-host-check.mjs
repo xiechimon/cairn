@@ -93,10 +93,10 @@ export function parseHostCheck(input, { blockedPorts = [22, 5231] } = {}) {
 }
 
 export function checkHost({
-  run = (cmd, args) =>
+  run = (cmd, args, { timeout = 90_000 } = {}) =>
     spawnSync(cmd, args, {
       encoding: 'utf8',
-      timeout: 90_000,
+      timeout,
       env: { ...process.env, SYSTEMD_ASK_PASSWORD: '0', LC_ALL: 'C' },
     }),
   wait = () => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1000),
@@ -209,8 +209,29 @@ export function checkHost({
   }
   input.negativeExit = negative.status;
   input.negativeError = negative.stderr || '';
-  const clone = call('machinectl', ['--no-ask-password', 'clone', 'cairn-orb-base', name]);
-  if (clone.status !== 0) return { ...parseHostCheck(input, { blockedPorts }), errors };
+  let clone;
+  try {
+    clone = run('machinectl', ['--no-ask-password', 'clone', 'cairn-orb-base', name], {
+      timeout: 600_000,
+    });
+  } catch (error) {
+    clone = { status: null, error };
+  }
+  if (clone.status !== 0) {
+    errors.push(`Clone ${name} failed: ${clone.stderr || clone.error || clone.status}`);
+    const images = call('machinectl', [
+      '--no-ask-password',
+      'list-images',
+      '--no-legend',
+      '--no-pager',
+    ]);
+    if (
+      images.status === 0 &&
+      (images.stdout || '').split('\n').some((line) => line.trim().split(/\s+/)[0] === name)
+    )
+      call('machinectl', ['--no-ask-password', 'remove', name]);
+    return { ...parseHostCheck(input, { blockedPorts }), errors };
+  }
   const directory = join(runtimeRoot, name);
   const requestId = randomUUID();
   let preparedDirectory = false;
