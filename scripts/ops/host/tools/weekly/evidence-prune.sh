@@ -22,7 +22,8 @@ node scripts/evidence-prune.mjs
 node scripts/generate-feature-map.mjs
 git add -A docs
 git diff --cached --quiet && { echo "no changes after prune"; exit 0; }
-"$BOT" bash -c 'git commit -q --no-verify -m "docs: weekly evidence prune (ADR 0022)" -m "$CAIRN_COAUTHOR"'
+"$BOT" git commit -q --no-verify -m "docs: weekly evidence prune (ADR 0022)" -m "Co-authored-by: xiechimon <157263579+xiechimon@users.noreply.github.com>"
+HEAD_SHA=$(git rev-parse HEAD)
 "$BOT" git push -q --no-verify -u origin "$BRANCH"
 
 BODY=$(cat <<MD
@@ -53,7 +54,7 @@ MD
 )
 URL=$("$BOT" gh pr create --base main --head "$BRANCH" --title 'docs: weekly evidence prune (ADR 0022)' --body "$BODY")
 echo "$URL"
-"$BOT" gh pr merge "$URL" --squash --auto
+gh pr merge "$URL" --squash --auto --match-head-commit "$HEAD_SHA"
 sleep 120
 if ! gh pr checks "$URL" --watch --interval 300 >/dev/null 2>&1; then
   "$BOT" gh pr comment "$URL" --body "@xiechimon CI failed on the weekly evidence prune; it will not auto-merge until fixed."
