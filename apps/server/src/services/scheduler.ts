@@ -30,6 +30,7 @@ import {
   sendBuildSteer,
   startBuilds,
   sweepAbandonedBuildSteps,
+  sweepAbandonedShipSteps,
   sweepPlanAutoConfirm,
   sweepZombieQueuedTodos,
   toBuildRecord,
@@ -485,6 +486,7 @@ export function createScheduler(
     sweepStaleMachines(deps);
     sweepAbandonedChiefSteps(deps, now);
     sweepAbandonedBuildSteps(deps, now);
+    void sweepAbandonedShipSteps(deps, now).catch(() => {});
     sweepZombieQueuedTodos(deps, now);
     sweepPlanAutoConfirm(deps, now);
     sweepQuotaWaitSteps(deps, now);
