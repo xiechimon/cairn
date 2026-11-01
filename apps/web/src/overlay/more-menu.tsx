@@ -1,11 +1,7 @@
 import { Archive, CircleStop, Undo2 } from 'lucide-react';
 import type { ComponentProps } from 'react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-} from '../components/ui/dropdown-menu.js';
+import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
+import { DropdownMenu, DropdownMenuSeparator } from '../components/ui/dropdown-menu.js';
 import { useI18n } from '../i18n/provider.js';
 import { Ban, Check, Copy, MessageSquare, Trash2 } from '../icons/index.js';
 
@@ -21,7 +17,7 @@ interface MoreMenuProps {
   onStop?: () => void;
   onReject?: () => void;
   onDiscard?: () => void;
-  anchor?: ComponentProps<typeof DropdownMenuContent>['anchor'];
+  anchor?: ComponentProps<typeof KeyedMenuContent>['anchor'];
 }
 
 const PANEL_CLS = 'more-menu w-[220px]';
@@ -48,6 +44,7 @@ export function MoreMenu({
   const rows = [
     {
       key: 'complete',
+      shortcut: 'C',
       label: t('完成'),
       Icon: Check,
       disabled: !canComplete,
@@ -57,6 +54,7 @@ export function MoreMenu({
       ? [
           {
             key: 'reject',
+            shortcut: 'R',
             label: t('请求修改'),
             Icon: MessageSquare,
             action: 'reject',
@@ -69,6 +67,7 @@ export function MoreMenu({
       ? [
           {
             key: 'stop',
+            shortcut: 'S',
             label: t('停止'),
             Icon: CircleStop,
             action: 'stop',
@@ -79,6 +78,7 @@ export function MoreMenu({
       : []),
     {
       key: 'copy',
+      shortcut: 'L',
       label: t('复制链接'),
       Icon: Copy,
       disabled: false,
@@ -88,6 +88,7 @@ export function MoreMenu({
       ? [
           {
             key: 'archive',
+            shortcut: 'A',
             label: t('Archive'),
             Icon: Archive,
             action: 'archive',
@@ -98,6 +99,7 @@ export function MoreMenu({
       : []),
     {
       key: 'close',
+      shortcut: 'X',
       label: t('关闭'),
       Icon: Ban,
       disabled: !canClose,
@@ -107,6 +109,8 @@ export function MoreMenu({
       ? [
           {
             key: 'discard-changes',
+            shortcut: 'G',
+            confirms: true,
             label: t('丢弃修改'),
             Icon: Undo2,
             disabled: false,
@@ -117,9 +121,11 @@ export function MoreMenu({
       : []),
     {
       key: 'delete',
+      shortcut: 'D',
       label: t('删除'),
       Icon: Trash2,
       action: 'delete',
+      confirms: true,
       disabled: false,
       danger: true,
       onClick: onDelete,
@@ -132,7 +138,7 @@ export function MoreMenu({
         if (!next) onClose();
       }}
     >
-      <DropdownMenuContent
+      <KeyedMenuContent
         anchor={anchor}
         align="end"
         side="bottom"
@@ -144,8 +150,10 @@ export function MoreMenu({
           row.danger === true && rows[index - 1]?.danger !== true && (
             <DropdownMenuSeparator key={`${row.key}-sep`} />
           ),
-          <DropdownMenuItem
+          <KeyedMenuItem
             key={row.key}
+            shortcut={row.shortcut}
+            confirms={'confirms' in row}
             variant={row.danger === true ? 'destructive' : 'default'}
             className="more-menu-item"
             {...('action' in row ? { 'data-action': row.action } : {})}
@@ -161,9 +169,9 @@ export function MoreMenu({
           >
             <row.Icon />
             {row.label}
-          </DropdownMenuItem>,
+          </KeyedMenuItem>,
         ])}
-      </DropdownMenuContent>
+      </KeyedMenuContent>
     </DropdownMenu>
   );
 }

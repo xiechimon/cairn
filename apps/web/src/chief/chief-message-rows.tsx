@@ -50,9 +50,6 @@ const MARKER_CONTENT_CLS = 'max-w-[85%]';
 const MARKER_ERROR_CLS =
   'my-2.5 flex-col items-start gap-0.5 rounded-(--radius-card) bg-danger-soft px-3 py-2.5 text-left text-meta text-(--destructive)';
 
-const PENDING_BTN_CLS =
-  'h-7 cursor-pointer rounded-(--radius-menu-item) px-2.5 text-meta font-normal text-(--text-secondary)';
-
 const CHIP_INLINE_CLS =
   'mx-0.5 inline-flex items-center gap-1 rounded-(--cds-radius-sm) px-1.5 py-px align-[1px] text-meta';
 
@@ -178,8 +175,6 @@ interface ChiefStreamRowProps {
   onRewindRequest: (index: number, id: string | null) => void;
   onAnswerQuestion?: ((input: { requestId: string; answers: AskUserAnswer[] }) => void) | undefined;
   onCancelQuestion?: ((requestId: string) => void) | undefined;
-  onWithdraw?: ((messageId: string, text: string) => void) | undefined;
-  onSteer?: ((messageId: string) => void) | undefined;
 }
 
 function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string }[] }) {
@@ -223,8 +218,6 @@ export function ChiefStreamRow({
   onRewindRequest,
   onAnswerQuestion,
   onCancelQuestion,
-  onWithdraw,
-  onSteer,
 }: ChiefStreamRowProps) {
   const { t } = useI18n();
   if (item.kind === 'stopped') return <StoppedRow todos={item.todos} />;
@@ -271,11 +264,7 @@ export function ChiefStreamRow({
   if (item.kind === 'user')
     return (
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
-        <Message
-          className={`${MSG_ROW_CLS} justify-end ${item.pending != null ? 'opacity-80' : ''}`}
-          data-testid={item.pending != null ? 'chief-pending' : 'chief-msg'}
-          data-pending={item.pending}
-        >
+        <Message className={`${MSG_ROW_CLS} justify-end`} data-testid="chief-msg">
           <MessageContent
             className="max-w-[min(85%,42rem)] flex-none items-end gap-0"
             data-testid="chief-msg-col"
@@ -287,66 +276,38 @@ export function ChiefStreamRow({
             >
               {item.markdown != null ? <ChatMarkdown text={item.markdown} /> : item.text}
             </div>
-            {item.pending != null ? (
-              <div className="mt-1.5 flex flex-wrap items-center justify-end gap-1.5 text-meta text-(--text-tertiary)">
-                <span className="mr-auto">
-                  {item.pending === 'held'
-                    ? t('已存下，总管恢复后会处理')
-                    : t('排队中，总管回完上一条就看')}
+            <div
+              className="mt-1 flex items-center gap-1 text-(--text-tertiary) opacity-0 transition-opacity duration-(--dur-fast) group-hover/message:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100"
+              data-testid="chief-msg-tools"
+            >
+              {item.at != null && (
+                <span className="mr-1.5 text-caption tabular-nums" data-testid="chief-msg-stamp">
+                  {item.at}
                 </span>
-                {item.pending === 'queued' && item.id != null && onSteer != null && (
-                  <Button
-                    variant="outline"
-                    className={PENDING_BTN_CLS}
-                    onClick={() => onSteer(item.id ?? '')}
-                  >
-                    {t('现在插话')}
-                  </Button>
-                )}
-                {item.id != null && onWithdraw != null && (
-                  <Button
-                    variant="outline"
-                    className={PENDING_BTN_CLS}
-                    onClick={() => onWithdraw(item.id ?? '', item.text)}
-                  >
-                    {t('撤回')}
-                  </Button>
-                )}
-              </div>
-            ) : (
-              <div
-                className="mt-1 flex items-center gap-1 text-(--text-tertiary) opacity-0 transition-opacity duration-(--dur-fast) group-hover/message:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100"
-                data-testid="chief-msg-tools"
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className={MSG_TOOL_BTN_CLS}
+                aria-label={t('复制')}
+                onClick={() => onCopy(`u${i}`, item.text)}
               >
-                {item.at != null && (
-                  <span className="mr-1.5 text-caption tabular-nums" data-testid="chief-msg-stamp">
-                    {item.at}
-                  </span>
+                {copiedKey === `u${i}` ? (
+                  <Check width={13} height={13} />
+                ) : (
+                  <Copy width={13} height={13} />
                 )}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={MSG_TOOL_BTN_CLS}
-                  aria-label={t('复制')}
-                  onClick={() => onCopy(`u${i}`, item.text)}
-                >
-                  {copiedKey === `u${i}` ? (
-                    <Check width={13} height={13} />
-                  ) : (
-                    <Copy width={13} height={13} />
-                  )}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={MSG_TOOL_BTN_CLS}
-                  aria-label={t('恢复到此处')}
-                  onClick={() => onRewindRequest(i, item.id ?? null)}
-                >
-                  <Restore width={13} height={13} />
-                </Button>
-              </div>
-            )}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={MSG_TOOL_BTN_CLS}
+                aria-label={t('恢复到此处')}
+                onClick={() => onRewindRequest(i, item.id ?? null)}
+              >
+                <Restore width={13} height={13} />
+              </Button>
+            </div>
           </MessageContent>
         </Message>
       </MessageScrollerItem>

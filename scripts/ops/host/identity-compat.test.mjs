@@ -146,10 +146,12 @@ test('merge-pr still requires exactly one commit for a bot-opened PR', (t) => {
   assert.equal(result.rebased, false);
 });
 
-test('merge-pr squashes a human-opened PR whatever the commit authors', (t) => {
+test('merge-pr queues an unprotected human-opened PR whatever the commit authors', (t) => {
   const result = mergeWithCommits(t, [commit(bot, botBody)], 'xiechimon');
   assert.equal(result.status, 0, result.stderr);
-  assert.ok(result.calls.some((c) => c[0] === 'gh' && c.includes('--squash')));
+  assert.equal(result.rebased, false);
+  assert.ok(result.calls.some((c) => c[0] === 'gh' && c[1] === 'pr' && c[2] === 'comment'));
+  assert.ok(!result.calls.some((c) => c[0] === 'gh' && c[2] === 'merge'));
 });
 
 const rearmCalls = (t, commits, mergeMethod) => {

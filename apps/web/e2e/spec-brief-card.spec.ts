@@ -157,13 +157,13 @@ test('4b. wide screens line length takes the 68ch cap (same law as the 60–75 c
   expect(Math.abs(capped.maxWidth - capped.zero68)).toBeLessThanOrEqual(2);
 });
 
-test('5. live tasks with a spec no longer show `尚无描述`; empty spec keeps the placeholder', async ({ page }) => {
+test('5. live tasks with a spec render it; an empty spec shows the editable description box', async ({ page }) => {
   await stubWorld(page);
   await page.goto(`/app/todo/${BRIEF_ID}`);
   await expect(page.locator('.spec-block')).toBeVisible();
-  await expect(page.locator('.fresh-nodesc')).toHaveCount(0);
+  await expect(page.getByTestId('fresh-description')).toHaveCount(0);
   await page.goto(`/app/todo/${BRIEF_EMPTY_ID}`);
-  await expect(page.locator('.fresh-nodesc')).toBeVisible();
+  await expect(page.getByTestId('fresh-description')).toBeVisible();
   await expect(page.locator('.spec-block')).toHaveCount(0);
 });
 

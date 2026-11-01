@@ -211,12 +211,11 @@ test('drag overlay: no project while pending, the card’s own project once load
   expect(writes.list).toEqual([]);
 });
 
-test.describe('detail chip popover', () => {
+test.describe('detail head', () => {
   const openPopover = async (page: Page) => {
-    await page.getByTestId('phase-chip').click();
-    const popover = page.getByRole('dialog', { name: '任务分配' });
-    await expect(popover).toBeVisible();
-    return popover;
+    const head = page.getByTestId('detail-head');
+    await expect(head).toBeVisible();
+    return head;
   };
 
   test('projects loaded: the head names the todo’s own project', async ({ page }) => {
@@ -226,8 +225,8 @@ test.describe('detail chip popover', () => {
     await expect(sidebarProject(page, 'atlas')).toBeVisible();
 
     const popover = await openPopover(page);
-    await expect(popover).toContainText('project probe beta');
-    await shot(page, 'chip-popover-loaded.png', popover);
+    await expect(page.getByTestId('detail-title')).toHaveText('project probe beta');
+    await shot(page, 'head-loaded.png', popover);
     await expect(popover).toContainText('atlas');
     await expect(popover).toContainText('#2');
     await expect(popover).not.toContainText(FIXTURE_PROJECT);
@@ -242,7 +241,7 @@ test.describe('detail chip popover', () => {
 
     const popover = await openPopover(page);
     await expect(popover).toContainText('#2');
-    await shot(page, 'chip-popover-pending.png', popover);
+    await shot(page, 'head-pending.png', popover);
     await expect(popover).not.toContainText(FIXTURE_PROJECT);
 
     await projects.release();

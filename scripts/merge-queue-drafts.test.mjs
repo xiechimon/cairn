@@ -44,5 +44,8 @@ test('pr-evidence skips only the draft PRs Mergify opens for a queued batch', ()
 
 for (const job of ['gates', 'check', 'e2e-gate', 'pack-smoke'])
   test(`${job} still runs on merge-queue draft PRs`, () => {
-    assert.doesNotMatch(jobBlock('.github/workflows/ci.yml', job), /mergify/);
+    assert.doesNotMatch(
+      jobBlock('.github/workflows/ci.yml', job),
+      /mergify\[bot\]|mergify\/merge-queue\//,
+    );
   });

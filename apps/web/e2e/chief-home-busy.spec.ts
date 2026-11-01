@@ -193,11 +193,12 @@ test.describe('chief unavailable (T4)', () => {
     await expect(banner).toContainText('任务照常在跑');
     await expect(banner.getByRole('button', { name: '给总管换模型' })).toBeVisible();
     await expect(banner.getByRole('button', { name: '直接建任务' })).toBeVisible();
-    const held = home.getByTestId('chief-pending');
+    const held = home.getByTestId('queued-message');
     await expect(held).toHaveCount(2);
-    await expect(held.first()).toContainText('已存下，总管恢复后会处理');
+    await expect(held.first()).toHaveAttribute('title', '已存下，总管恢复后会处理');
     await expect(held.first().getByRole('button', { name: '撤回' })).toBeVisible();
     await expect(held.first().getByRole('button', { name: '现在插话' })).toHaveCount(0);
+    await expect(home.getByTestId('chief-stream').getByTestId('queued-message')).toHaveCount(0);
     await expect(home.getByRole('button', { name: '停止总管这次回复' })).toHaveCount(0);
     await expect(home.getByTestId('chief-composer-input')).toHaveAttribute(
       'placeholder',
@@ -221,10 +222,10 @@ test.describe('chief unavailable (T4)', () => {
     const calls = await mockLive(page, outageState());
     await page.goto('/app');
     const home = page.getByTestId('chief-home');
-    await home.getByTestId('chief-pending').nth(1).getByRole('button', { name: '撤回' }).click();
+    await home.getByTestId('queued-message').nth(1).getByRole('button', { name: '撤回' }).click();
     await expect.poll(() => calls).toContain('DELETE /messages/m2');
     await expect(home.getByTestId('chief-composer-input')).toHaveValue('顺便把空列提示也改一下');
-    await expect(home.getByTestId('chief-pending')).toHaveCount(1);
+    await expect(home.getByTestId('queued-message')).toHaveCount(1);
   });
 
   test('phone width: the banner collapses to one line with `详情`', async ({ page }) => {
@@ -297,28 +298,23 @@ test.describe('queue, steer and stop while the chief is replying (T5)', () => {
     await mockLive(page, busyState());
     await page.goto('/app');
     const home = page.getByTestId('chief-home');
-    const queued = home.getByTestId('chief-pending');
+    const queued = home.getByTestId('queued-message');
     await expect(queued).toHaveCount(2);
     await expect(queued.first()).toContainText('只看 cairn 项目就行');
-    await expect(queued.first()).toContainText('排队中，总管回完上一条就看');
+    await expect(queued.first()).toHaveAttribute('data-state', 'queued');
     await expect(queued.nth(1)).toContainText('再顺便看下空列提示');
-    const stream = home.getByTestId('chief-stream');
-    const order = await stream.evaluate((el) =>
-      [...el.querySelectorAll('[data-testid="chief-pending"], [data-testid="chief-msg"]')].map(
-        (n) => n.getAttribute('data-testid'),
-      ),
-    );
-    expect(order.slice(-2)).toEqual(['chief-pending', 'chief-pending']);
+    await expect(home.getByTestId('chief-stream').getByTestId('queued-message')).toHaveCount(0);
+    await expect(home.getByTestId('chief-msg').filter({ hasText: '只看 cairn 项目就行' })).toHaveCount(0);
     await evidenceShot(page, 'queued.png');
     await page.reload();
-    await expect(home.getByTestId('chief-pending').first()).toContainText('只看 cairn 项目就行');
+    await expect(home.getByTestId('queued-message').first()).toContainText('只看 cairn 项目就行');
   });
 
   test('`现在插话` steers the queued message into the running reply', async ({ page }) => {
     const calls = await mockLive(page, busyState());
     await page.goto('/app');
     await page
-      .getByTestId('chief-pending')
+      .getByTestId('queued-message')
       .first()
       .getByRole('button', { name: '现在插话' })
       .click();

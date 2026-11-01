@@ -1,6 +1,14 @@
 import { useId, useState } from 'react';
 import { toast } from 'sonner';
 import { FORM_CONTROL_CLS, FormField, FormStack } from '../components/form-layout.js';
+import {
+  KeyedMenuCheckboxItem,
+  KeyedMenuContent,
+  KeyedMenuItem,
+  KeyedMenuRadioItem,
+  KeyedMenuSubContent,
+  KeyedMenuSubTrigger,
+} from '../components/menu-keys.js';
 import { AlertDialogActions, AlertDialogShell } from '../components/ui/alert-dialog-shell.js';
 import { Button } from '../components/ui/button.js';
 import {
@@ -11,18 +19,11 @@ import {
 } from '../components/ui/dialog-shell.js';
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
   DropdownMenuGroup,
-  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
-  DropdownMenuShortcut,
   DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu.js';
 import { Input } from '../components/ui/input.js';
@@ -61,85 +62,123 @@ export function MenuSection() {
     <Section
       id="menu"
       title="Menu"
-      lede="One menu surface for dropdowns, selects and popovers. Rows are 32px with concentric corners; shortcuts sit on the right; danger rows go red."
+      lede="One menu surface for dropdowns, selects and popovers. Rows are 32px with concentric corners. Every row carries one letter on the right; pressing it while the menu is open runs the row. Rows that ask before acting end in an ellipsis; danger rows go red."
     >
       <Specimen
         title="Dropdown menu"
-        note={last == null ? 'Open it with a click or the keyboard' : `Last picked: ${last}`}
+        note={
+          last == null
+            ? "Open it with a click or the keyboard, then press a row's letter"
+            : `Last picked: ${last}`
+        }
         stage="canvas"
-        code={`<DropdownMenu>\n  <DropdownMenuTrigger render={<Button variant="outline" />}>Actions</DropdownMenuTrigger>\n  <DropdownMenuContent>\n    <DropdownMenuItem>Edit<DropdownMenuShortcut>E</DropdownMenuShortcut></DropdownMenuItem>\n    <DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>\n  </DropdownMenuContent>\n</DropdownMenu>`}
+        code={`<DropdownMenu>\n  <DropdownMenuTrigger render={<Button variant="outline" />}>Actions</DropdownMenuTrigger>\n  <KeyedMenuContent>\n    <KeyedMenuItem shortcut="E">Edit</KeyedMenuItem>\n    <KeyedMenuItem shortcut="D" confirms variant="destructive">Delete</KeyedMenuItem>\n  </KeyedMenuContent>\n</DropdownMenu>`}
       >
         <DropdownMenu>
           <DropdownMenuTrigger render={<Button variant="outline" />}>
             Task actions
             <ChevronDown data-icon="inline-end" />
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-56">
+          <KeyedMenuContent className="w-56" data-testid="gallery-task-menu">
             <DropdownMenuGroup>
-              <DropdownMenuItem onClick={() => setLast('Edit')}>
+              <KeyedMenuItem shortcut="E" onClick={() => setLast('Edit')}>
                 <SquarePen />
                 Edit
-                <DropdownMenuShortcut>E</DropdownMenuShortcut>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setLast('Duplicate')}>
+              </KeyedMenuItem>
+              <KeyedMenuItem shortcut="U" onClick={() => setLast('Duplicate')}>
                 <Copy />
                 Duplicate
-                <DropdownMenuShortcut>⌘D</DropdownMenuShortcut>
-              </DropdownMenuItem>
+              </KeyedMenuItem>
               <DropdownMenuSub>
-                <DropdownMenuSubTrigger>
+                <KeyedMenuSubTrigger shortcut="M">
                   <Folder />
                   Move to project
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent>
-                  {['cairn', 'web', 'scripts'].map((p) => (
-                    <DropdownMenuItem key={p} onClick={() => setLast(`Move to ${p}`)}>
+                </KeyedMenuSubTrigger>
+                <KeyedMenuSubContent>
+                  {[
+                    ['cairn', 'C'],
+                    ['web', 'W'],
+                    ['scripts', 'S'],
+                  ].map(([p, key]) => (
+                    <KeyedMenuItem key={p} shortcut={key} onClick={() => setLast(`Move to ${p}`)}>
                       {p}
-                    </DropdownMenuItem>
+                    </KeyedMenuItem>
                   ))}
-                </DropdownMenuSubContent>
+                </KeyedMenuSubContent>
               </DropdownMenuSub>
-              <DropdownMenuItem onClick={() => setLast('Open in GitHub')}>
+              <KeyedMenuItem shortcut="G" onClick={() => setLast('Open in GitHub')}>
                 <ExternalLink className="size-4.5" />
                 Open in GitHub
-              </DropdownMenuItem>
+              </KeyedMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem variant="destructive" onClick={() => setLast('Delete')}>
+            <KeyedMenuItem
+              shortcut="D"
+              confirms
+              variant="destructive"
+              onClick={() => setLast('Delete')}
+            >
               <Trash2 />
               Delete
-              <DropdownMenuShortcut>⌫</DropdownMenuShortcut>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
+            </KeyedMenuItem>
+          </KeyedMenuContent>
         </DropdownMenu>
         <DropdownMenu>
           <DropdownMenuTrigger render={<Button variant="ghost" />}>
             View options
             <ChevronDown data-icon="inline-end" />
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-52">
+          <KeyedMenuContent className="w-52">
             <DropdownMenuGroup>
               <DropdownMenuLabel>Sort by</DropdownMenuLabel>
               <DropdownMenuRadioGroup value={sort} onValueChange={(v) => setSort(String(v))}>
-                <DropdownMenuRadioItem value="updated">Last updated</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="created">Created</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="title">Title</DropdownMenuRadioItem>
+                <KeyedMenuRadioItem value="updated" shortcut="L">
+                  Last updated
+                </KeyedMenuRadioItem>
+                <KeyedMenuRadioItem value="created" shortcut="C">
+                  Created
+                </KeyedMenuRadioItem>
+                <KeyedMenuRadioItem value="title" shortcut="T">
+                  Title
+                </KeyedMenuRadioItem>
               </DropdownMenuRadioGroup>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuCheckboxItem checked={showDone} onCheckedChange={setShowDone}>
+            <KeyedMenuCheckboxItem checked={showDone} shortcut="S" onCheckedChange={setShowDone}>
               Show done tasks
-            </DropdownMenuCheckboxItem>
-          </DropdownMenuContent>
+            </KeyedMenuCheckboxItem>
+          </KeyedMenuContent>
+        </DropdownMenu>
+        <DropdownMenu>
+          <DropdownMenuTrigger render={<Button variant="ghost" />}>
+            Label filter
+            <ChevronDown data-icon="inline-end" />
+          </DropdownMenuTrigger>
+          <KeyedMenuContent className="w-52" data-testid="gallery-label-menu">
+            <Input aria-label="Filter labels" placeholder="Filter labels" className="mb-1" />
+            {[
+              ['bug', 'B'],
+              ['docs', 'D'],
+              ['feature', 'F'],
+            ].map(([name, key]) => (
+              <KeyedMenuItem key={name} shortcut={key} onClick={() => setLast(`Label ${name}`)}>
+                {name}
+              </KeyedMenuItem>
+            ))}
+          </KeyedMenuContent>
         </DropdownMenu>
         <DropdownMenu>
           <DropdownMenuTrigger render={<Button variant="ghost" size="icon" aria-label="More" />}>
             <EllipsisVertical />
           </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem onClick={() => setLast('Copy link')}>Copy link</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setLast('Archive')}>Archive</DropdownMenuItem>
-          </DropdownMenuContent>
+          <KeyedMenuContent>
+            <KeyedMenuItem shortcut="L" onClick={() => setLast('Copy link')}>
+              Copy link
+            </KeyedMenuItem>
+            <KeyedMenuItem shortcut="A" onClick={() => setLast('Archive')}>
+              Archive
+            </KeyedMenuItem>
+          </KeyedMenuContent>
         </DropdownMenu>
       </Specimen>
       <Specimen title="Popover" note="For a small panel anchored to its trigger" stage="canvas">

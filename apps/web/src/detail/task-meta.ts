@@ -13,6 +13,7 @@ export function buildTaskMeta(input: {
   agentModel: string | null;
   usage: ReturnType<typeof useBuildUsage>['data'];
   sourceEchoTitle: string | undefined;
+  ownerName: string | null;
 }): TaskMetaFields | null {
   const { live, wireTodo, buildId, build, machineField, machineWaiting, agentModel, usage } = input;
   if (!live || wireTodo == null || buildId == null) return null;
@@ -30,6 +31,7 @@ export function buildTaskMeta(input: {
         : null,
     branch: conversationBranch(buildId),
     pr: prUrl != null && prNumber != null ? { number: prNumber, url: prUrl } : null,
+    owner: input.ownerName,
     machine: machineField,
     machineWaiting,
     model: agentModel ?? usage?.[0]?.model ?? null,
