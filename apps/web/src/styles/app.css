@@ -545,9 +545,6 @@
   [data-testid="page-topbar"] :is(button, a) {
     min-height: 44px;
   }
-  .detail-head :is(button, a) {
-    min-height: 44px;
-  }
 
   .composer-tool,
   .composer-send,
@@ -572,5 +569,14 @@
   }
   body:has(.board-new-task-bar) .chief-drawer {
     transform-origin: calc(100% - 1.25rem) calc(100% - 60px - 1.25rem);
+  }
+}
+
+@media (width < 48rem) {
+  .detail-head :is(button, a) {
+    width: 32px;
+    height: 32px;
+    min-height: 32px;
+    padding: 0;
   }
 }
