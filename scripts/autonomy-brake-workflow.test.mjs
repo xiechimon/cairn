@@ -142,6 +142,19 @@ test('PR evidence executes only the trusted base brake', (t) => {
     /if git cat-file -e origin\/main:scripts\/exact-revert\.mjs; then\n\s+git show origin\/main:scripts\/exact-revert\.mjs > "\$RUNNER_TEMP\/exact-revert\.mjs"\n\s+fi/,
   );
 });
+test('the trusted brake copy runs alone from RUNNER_TEMP', () => {
+  const brake = readFileSync('scripts/autonomy-brake.mjs', 'utf8');
+  assert.doesNotMatch(brake, /from '\.\.?\//);
+  const shared = readFileSync('scripts/exact-revert.mjs', 'utf8');
+  const strip = (source) => source.replace(/^export /gm, '');
+  for (const name of ['function revertedShas', 'function assertExactRevertTree']) {
+    const pick = (source) => {
+      const from = source.indexOf(name);
+      return source.slice(from, source.indexOf('\n}\n', from) + 2);
+    };
+    assert.equal(pick(strip(brake)), pick(strip(shared)), name);
+  }
+});
 for (const conclusion of ['cancelled', 'timed_out'])
   test(`main push conclusion ${conclusion} applies the brake`, (t) => {
     const f = runStep(t, '.github/workflows/autonomy-brake.yml', 'Apply the brake', {

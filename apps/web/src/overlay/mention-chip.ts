@@ -21,12 +21,11 @@ const ICON_BASE =
   'inline-flex size-7 shrink-0 items-center justify-center rounded-(--cds-radius-md) bg-(--surface-tertiary) text-(--foreground)';
 
 const KIND_ICON_CLS: Record<string, string> = {
-  todo: 'bg-[color-mix(in_srgb,var(--spot-text-on-tint)_18%,transparent)] text-(--spot-text-on-tint)',
-  skill: 'bg-[color-mix(in_srgb,var(--chip-idle-fg)_18%,transparent)] text-(--chip-idle-fg)',
-  agent: 'bg-[color-mix(in_srgb,var(--col-dot-done)_18%,transparent)] text-(--col-dot-done)',
-  project: 'bg-[color-mix(in_srgb,var(--tile-orange-fg)_18%,transparent)] text-(--tile-orange-fg)',
-  machine:
-    'bg-[color-mix(in_srgb,var(--col-dot-building)_18%,transparent)] text-(--col-dot-building)',
+  todo: 'bg-(--spot-text-on-tint)/18 text-(--spot-text-on-tint)',
+  skill: 'bg-(--chip-idle-fg)/18 text-(--chip-idle-fg)',
+  agent: 'bg-(--col-dot-done)/18 text-(--col-dot-done)',
+  project: 'bg-(--tile-orange-fg)/18 text-(--tile-orange-fg)',
+  machine: 'bg-(--col-dot-building)/18 text-(--col-dot-building)',
 };
 
 export function mentionIconClass(kind: string): string {

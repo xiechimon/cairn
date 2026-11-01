@@ -27,6 +27,7 @@ The notes and captures from the early study of todos.dev (the r1 to r9 series an
 | [r16-model-catalog-liveness.md](r16-model-catalog-liveness.md) | none | Model catalog liveness: withdrawn upstream models still listed, live models rejected |
 | [1607-acp-execution-surface.md](1607-acp-execution-surface.md) | none | ACP as an execution surface |
 | [2330-claude-entrypoint-and-setup-token-quota.md](2330-claude-entrypoint-and-setup-token-quota.md) | none | `claude -p` (sdk-cli) and interactive mode cost the same allowance; setup-token rate-limit events not yet measurable on omarchy (D50 spike) |
+| [mergify-merge-queue-spike.md](mergify-merge-queue-spike.md) | none | Mergify merge queue on a personal-account scratch repo: free install, semantic conflict caught with batching and bisect, label/status entry gates, author/committer, outside merges; go as a cairn pilot |
 
 ### Design system and front-end craft (from 2026-09-23)
 

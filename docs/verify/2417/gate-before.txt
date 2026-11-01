@@ -1,0 +1,52 @@
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-2417
+
+ ❯ |@cairn/web| test/i18n-coverage.test.ts (6 tests | 1 failed) 172ms
+   ❯ translation call coverage (1)
+     × every literal t() key contains CJK or is an own EN key 62ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cairn/web| test/i18n-coverage.test.ts > translation call coverage > every literal t() key contains CJK or is an own EN key
+AssertionError: expected [ …(17) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "board/sidebar-threads.tsx: \"Archive\"",
++   "board/sidebar.tsx: \"Projects\"",
++   "board/sidebar.tsx: \"Could not unarchive task.\"",
++   "board/sidebar.tsx: \"Task archived\"",
++   "board/sidebar.tsx: \"Undo\"",
++   "board/sidebar.tsx: \"Could not archive task.\"",
++   "board/sidebar.tsx: \"Scheduled\"",
++   "claude-login-warning.ts: \"{name}: Claude subscription token expired. Run `claude setup-token` and add a new connection.\"",
++   "claude-login-warning.ts: \"{name}: Claude subscription token expires in {days} days. Run `claude setup-token` and add a new connection.\"",
++   "detail/dhead.tsx: \"Archived\"",
++   "overlay/more-menu.tsx: \"Archive\"",
++   "routes/agent-detail-page.tsx: \"Agent\"",
++   "routes/todo-detail-page.tsx: \"Could not unarchive task.\"",
++   "routes/todo-detail-page.tsx: \"Task archived\"",
++   "routes/todo-detail-page.tsx: \"Undo\"",
++   "routes/todo-detail-page.tsx: \"Could not archive task.\"",
++   "routes/todo-detail-page.tsx: \"Unarchive to continue\"",
++ ]
+
+ ❯ test/i18n-coverage.test.ts:140:35
+    138|       .filter((item) => !/[一-鿿]/.test(item.text) && !Object.hasOwn(EN,…
+    139|       .map((item) => `${item.rel}: ${JSON.stringify(item.text)}`);
+    140|     expect([...new Set(missing)]).toEqual([]);
+       |                                   ^
+    141|   });
+    142| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  1 failed | 34 passed (35)
+   Start at  20:41:12
+   Duration  793ms (transform 50%, import 28%, tests 22%, worker 1%)
+

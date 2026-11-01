@@ -6,7 +6,7 @@ const skills = (page: Page) => page.getByRole('complementary').getByRole('link',
 test('sidebar group collapse hides sub-rows, flips aria, survives reload', async ({ page }) => {
   await page.goto('/app?scenario=01');
 
-  const header = page.locator('.sidebar-group', { hasText: 'Projects' });
+  const header = page.locator('.sidebar-group', { hasText: '项目' });
   await expect(header).toHaveAttribute('aria-expanded', 'true');
   await expect(projectRows(page)).toHaveCount(1);
 
@@ -28,14 +28,14 @@ test('sidebar group collapse hides sub-rows, flips aria, survives reload', async
   await expect(skills(page)).toHaveCount(0);
 
   await page.reload();
-  await expect(page.locator('.sidebar-group', { hasText: 'Projects' })).toHaveAttribute(
+  await expect(page.locator('.sidebar-group', { hasText: '项目' })).toHaveAttribute(
     'aria-expanded',
     'false',
   );
   await expect(projectRows(page)).toHaveCount(0);
 
   // expand again and that sticks too
-  await page.locator('.sidebar-group', { hasText: 'Projects' }).click();
+  await page.locator('.sidebar-group', { hasText: '项目' }).click();
   await page.reload();
   await expect(projectRows(page)).toHaveCount(1);
 });
@@ -50,11 +50,11 @@ test('rail group collapse hides member rows and survives reload', async ({ page 
   await page.locator('.rail-group[aria-label="展开资源"]').click();
   await expect(page.locator('.rail-row[aria-label="技能"]')).toBeVisible();
 
-  await page.locator('.rail-group[aria-label="收起Projects"]').click();
+  await page.locator('.rail-group[aria-label="收起项目"]').click();
   await expect(page.locator('.rail-row .project-avatar')).toHaveCount(0);
 
   await page.reload();
-  await expect(page.locator('.rail-group[aria-label="展开Projects"]')).toBeVisible();
+  await expect(page.locator('.rail-group[aria-label="展开项目"]')).toBeVisible();
   await expect(page.locator('.rail-row .project-avatar')).toHaveCount(0);
   await expect(page.locator('.rail-row[aria-label="技能"]')).toBeVisible();
 });
@@ -62,7 +62,7 @@ test('rail group collapse hides member rows and survives reload', async ({ page 
 test('both sidebar groups persist side by side', async ({ page }) => {
   await page.goto('/app?scenario=01');
   await page.locator('.sidebar-group', { hasText: '资源' }).click();
-  await page.locator('.sidebar-group', { hasText: 'Projects' }).click();
+  await page.locator('.sidebar-group', { hasText: '项目' }).click();
 
   await page.reload();
   await expect(skills(page)).toBeVisible();
