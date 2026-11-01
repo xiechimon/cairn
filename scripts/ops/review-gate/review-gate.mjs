@@ -50,6 +50,70 @@ const gh = (args) =>
   execFileSync('gh', ['-R', REPO, ...args], { encoding: 'utf8', maxBuffer: 64 << 20 });
 const asBot = (args, input) =>
   execFileSync(BOT, args, { encoding: 'utf8', input, cwd: MAIN, maxBuffer: 64 << 20 });
+const comment = (pr, body) =>
+  asBot(['gh', 'pr', 'comment', String(pr.number), '-R', REPO, '--body-file', '-'], body).match(
+    /^https:\/\/github\.com\/\S+#issuecomment-\d+$/m,
+  )?.[0];
+
+const GATE_LOGIN = 'cairnwright';
+mkdirSync(`${STATE}/status`, { recursive: true });
+const statusFile = (pr) => `${STATE}/status/${pr.number}`;
+const publishedStatus = (pr) => {
+  try {
+    return readFileSync(statusFile(pr), 'utf8');
+  } catch {
+    return '';
+  }
+};
+const publishStatus = (pr, state, description, url) => {
+  const sha = pr.headRefOid;
+  const key = `${sha} ${state} ${description}`;
+  if (!/^[0-9a-f]{40}$/.test(sha) || publishedStatus(pr) === key) return;
+  try {
+    execFileSync(
+      'gh',
+      [
+        'api',
+        '--method',
+        'POST',
+        `repos/${REPO}/statuses/${sha}`,
+        '-f',
+        `state=${state}`,
+        '-f',
+        'context=review-gate',
+        '-f',
+        `description=${description}`,
+        ...(url ? ['-f', `target_url=${url}`] : []),
+      ],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+    );
+  } catch (e) {
+    console.log(
+      `#${pr.number}: review-gate status ${state} failed; retrying next round\n${e.message}`,
+    );
+    return;
+  }
+  writeFileSync(statusFile(pr), key);
+  record(pr, { action: 'status', state });
+};
+const verdictStatus = (body, sha) => {
+  const m = new RegExp(
+    `^<!-- review-gate:${sha} -->\\n\\*\\*Independent review gate: (PASS|BLOCK)\\*\\*( \\(carried over\\))? for `,
+  ).exec(body);
+  if (!m) return null;
+  const short = sha.slice(0, 8);
+  if (m[1] === 'BLOCK')
+    return { state: 'failure', description: `BLOCK for ${short}; see the review comment` };
+  const from = m[2] && body.match(/the reviewed head `([0-9a-f]{8})`/)?.[1];
+  return {
+    state: 'success',
+    description: from ? `PASS (carried over from ${from})` : `PASS for ${short}`,
+  };
+};
+const publishVerdict = (pr, body, url) => {
+  const status = verdictStatus(body, pr.headRefOid);
+  if (status) publishStatus(pr, status.state, status.description, url);
+};
 
 const disarmedFile = (pr) => `${STATE}/disarmed/${pr.number}`;
 const disarm = (pr) => {
@@ -135,9 +199,11 @@ try {
     const marker = `<!-- review-gate:${pr.headRefOid} -->`;
     const comments = JSON.parse(
       gh(['pr', 'view', String(pr.number), '--json', 'comments']),
-    ).comments;
+    ).comments.filter((c) => c.author?.login === GATE_LOGIN);
     if (comments.some((c) => c.body.includes(marker))) {
       if (comments.some((c) => passedFor(c.body, pr.headRefOid))) rearm(pr);
+      const verdict = comments.filter((c) => verdictStatus(c.body, pr.headRefOid)).at(-1);
+      if (verdict) publishVerdict(pr, verdict.body, verdict.url);
       continue;
     }
     execFileSync(
@@ -153,6 +219,16 @@ try {
       ],
       { cwd: MAIN },
     );
+    const fetched = execFileSync('git', ['rev-parse', `review-gate-${pr.number}`], {
+      cwd: MAIN,
+      encoding: 'utf8',
+    }).trim();
+    if (fetched !== pr.headRefOid) {
+      console.log(
+        `#${pr.number}: head moved from ${pr.headRefOid.slice(0, 8)} to ${fetched.slice(0, 8)}; reviewing next round`,
+      );
+      continue;
+    }
     const patch = execFileSync(
       'bash',
       [
@@ -172,11 +248,10 @@ try {
       );
     if (prior) {
       const from = prior.body.match(/review-gate:([0-9a-f]{40})/)?.[1] ?? '?';
-      asBot(
-        ['gh', 'pr', 'comment', String(pr.number), '-R', REPO, '--body-file', '-'],
-        `${marker}\n**Independent review gate: PASS** (carried over) for \`${pr.headRefOid.slice(0, 8)}\`: same patch as the reviewed head \`${from.slice(0, 8)}\`; only the base moved.\n<!-- review-gate-patch:${patch} -->`,
-      );
+      const body = `${marker}\n**Independent review gate: PASS** (carried over) for \`${pr.headRefOid.slice(0, 8)}\`: same patch as the reviewed head \`${from.slice(0, 8)}\`; only the base moved.\n<!-- review-gate-patch:${patch} -->`;
+      const url = comment(pr, body);
       record(pr, { verdict: 'pass', action: 'carried-over', from });
+      publishVerdict(pr, body, url);
       if (pr.labels.some((l) => l.name === 'review-stalled'))
         try {
           asBot([
@@ -365,11 +440,14 @@ ${
     if (!since) return;
     if (!pr.stallNoted)
       try {
-        asBot(
-          ['gh', 'pr', 'comment', String(pr.number), '-R', REPO, '--body-file', '-'],
-          stallAlert(pr, since),
-        );
+        const url = comment(pr, stallAlert(pr, since));
         record(pr, { action: 'stall-alert', since });
+        publishStatus(
+          pr,
+          'pending',
+          `No verdict for over an hour on ${pr.headRefOid.slice(0, 8)}`,
+          url,
+        );
       } catch (e) {
         console.log(`#${pr.number}: stall comment failed; retrying next round\n${e.message}`);
       }
@@ -417,10 +495,11 @@ ${
       );
       if (pr.autoMergeRequest && !pr.pendingNoted) {
         try {
-          asBot(
-            ['gh', 'pr', 'comment', String(pr.number), '-R', REPO, '--body-file', '-'],
+          const url = comment(
+            pr,
             `${pr.pendingMarker}\n**Independent review gate: no verdict yet** for \`${pr.headRefOid.slice(0, 8)}\`: the reviewer run ended without a verdict, so auto-merge is paused. The gate retries on its next round and re-arms auto-merge once a later run passes.`,
           );
+          publishStatus(pr, 'pending', `No verdict yet for ${pr.headRefOid.slice(0, 8)}`, url);
         } catch {}
       }
       disarm(pr);
@@ -435,7 +514,8 @@ ${
       verdict === 'pass'
         ? `${pr.marker}\n**Independent review gate: PASS** for \`${pr.headRefOid.slice(0, 8)}\`${reviewer}.\n<!-- review-gate-patch:${pr.patch} -->`
         : `${pr.marker}\n**Independent review gate: BLOCK** for \`${pr.headRefOid.slice(0, 8)}\`${reviewer}.\n\n${review}\n<!-- review-gate-patch:${pr.patch} -->`;
-    asBot(['gh', 'pr', 'comment', String(pr.number), '-R', REPO, '--body-file', '-'], body);
+    const url = comment(pr, body);
+    publishVerdict(pr, body, url);
     clearStall(pr);
     if (verdict === 'pass') rearm(pr);
     else disarm(pr);
@@ -447,6 +527,8 @@ ${
   const worker = async (slot) => {
     while (!stop && next < todo.length) {
       const pr = todo[next++];
+      if (!publishedStatus(pr).startsWith(`${pr.headRefOid} `))
+        publishStatus(pr, 'pending', `Reviewing ${pr.headRefOid.slice(0, 8)}`);
       const result = finish(pr, await runReview(pr, slot));
       if (result === 'no-model') {
         console.log('no reviewer model available; stopping this round');
