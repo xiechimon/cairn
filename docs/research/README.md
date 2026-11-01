@@ -42,8 +42,10 @@ The notes and captures from the early study of todos.dev (the r1 to r9 series an
 
 | Note | Assets | Content |
 |---|---|---|
+| [2513-tla-statecharts.md](2513-tla-statecharts.md) | `assets/2513/` (Mermaid charts and pstack view modules) | pstack `statechart` on the merge-gate and step-claim TLA+ models: readability, two model coverage findings, a scoped go on emitting charts from the verify skills |
 | [892-gate-usage-measurement.md](892-gate-usage-measurement.md) | none | Gate usage measured: withPlan distribution and every path that skips the gate; the basis for ADR 0014 and spec 18 §5 |
 | [amp-native-sandbox-orb.md](amp-native-sandbox-orb.md) | none | Amp's native machine execution model, sandbox design and Orbs; where the permission-rules philosophy comes from |
+| [dsh-sig-walk-2026-11.md](dsh-sig-walk-2026-11.md) | none (screenshots on `pr-assets/2490`) | #2489 walk of DeepSeek Harness's super-agent prototype and sig: routing, fast path, watchdog, memory, pairing; comparison with cairn, adoptions for #2487, #2488, #1784, and a proposed positioning rewrite |
 | [eval-methods.md](eval-methods.md) | none | Agent and LLM evaluation methods and current practice (including a close read of pi's evaluation side) |
 | [m7-w5-ai-review-slice.md](m7-w5-ai-review-slice.md) | none | M7-W5.1 (#312) slice decision, grill and premortem |
 | [migration-surface.md](migration-surface.md) | none | #409 migration inventory (appendices A and B list the selectors of 46+3 specs file by file); the ledger behind spec 16 acceptance |

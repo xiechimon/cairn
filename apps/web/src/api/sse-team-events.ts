@@ -18,7 +18,12 @@ export function teamEventInvalidations(
       ];
     }
     case 'notification':
-      return [['notifications', teamId], ['chiefThreads', teamId], ['todos']];
+      return [
+        ['notifications', teamId],
+        ['chiefThreads', teamId],
+        ['projectCoordinator'],
+        ['todos'],
+      ];
     case 'machine_presence':
       return [['machines', teamId], ['todos']];
     case 'branch_sync': {

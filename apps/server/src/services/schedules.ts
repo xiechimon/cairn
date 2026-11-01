@@ -3,7 +3,7 @@ import { classifyStepFailure, isProviderOutage, SCHEDULE_MINUTE_STEPS } from '@c
 import { CronExpressionParser } from 'cron-parser';
 import { and, desc, eq, isNotNull, isNull, like, lte, max, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { build, message, schedule, step, todo } from '../db/schema.js';
+import { build, message, project, schedule, step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import type { TeamStreamHub } from './events.js';
@@ -209,17 +209,20 @@ export function deleteSchedule(deps: ScheduleDeps & { user: UserRecord }, id: st
 
 export function dueSchedules(deps: ScheduleDeps, nowMsValue: number): ScheduleRow[] {
   return deps.db
-    .select()
+    .select({ schedule })
     .from(schedule)
+    .leftJoin(project, eq(project.id, schedule.projectId))
     .where(
       and(
         eq(schedule.enabled, true),
         isNotNull(schedule.nextRunAt),
         lte(schedule.nextRunAt, nowMsValue),
         or(isNull(schedule.retryNotBefore), lte(schedule.retryNotBefore, nowMsValue)),
+        isNull(project.archivedAt),
       ),
     )
-    .all();
+    .all()
+    .map((r) => r.schedule);
 }
 
 export function updateNextRunAt(deps: ScheduleDeps, id: string, nextRunAt: number | null): void {

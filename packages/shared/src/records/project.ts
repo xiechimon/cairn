@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { recordId } from './common.js';
+import { epochMs, recordId } from './common.js';
 import { diffFileSchema } from './document-diff.js';
 import { mergePolicySchema } from './merge-gate.js';
 
@@ -64,6 +64,7 @@ export const projectRecordSchema = z.object({
   baseBranch: z.string().nullable().optional(),
   icon: projectIconSchema.nullable().optional(),
   color: projectColorSchema.nullable().optional(),
+  archivedAt: epochMs.nullable().optional(),
   mergePolicy: mergePolicySchema.optional(),
   localChecks: z.array(z.string().min(1)).optional(),
   requireUpToDate: z.boolean().optional(),

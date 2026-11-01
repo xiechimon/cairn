@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import gatePaths from '../../merge-gate-paths.json' with { type: 'json' };
 import {
   MOTION_TOKEN_PATHS,
   RECORDING_EXTENSIONS,
@@ -13,8 +14,7 @@ export type MergePolicy = z.infer<typeof mergePolicySchema>;
 export const MERGE_GATE_STATUS_CONTEXT = 'cairn/merge-gate';
 
 export const GATE_LIMITS = {
-  maxLines: 800,
-  maxFiles: 40,
+  ...gatePaths.limits,
   compareFileCap: 300,
   fixRoundsMax: 2,
   roundsMax: 4,
@@ -52,76 +52,13 @@ export const EVIDENCE_EXECUTABLE_EXTENSIONS = [
   '.htm',
 ] as const;
 
-export const AUTO_MERGE_PATH_GLOBS = [
-  'apps/*/src/**',
-  'apps/*/test/**',
-  'apps/*/e2e/**',
-  'packages/*/src/**',
-  'packages/*/test/**',
-  'integration/test/**',
-  'docs/verify/**',
-  'docs/**/*.md',
-] as const;
+export const AUTO_MERGE_PATH_GLOBS: readonly string[] = gatePaths.autoMerge;
 
-export const PROTECTED_PATH_GLOBS = [
-  '.github/**',
-  '**/.husky/**',
-  '**/.claude/**',
-  '**/.pi/**',
-  '**/.cursor/**',
-  '**/.mcp.json',
-  '**/.ckignore',
-  '**/CLAUDE*.md',
-  '**/AGENTS*.md',
-  'docs/pr-review.md',
-  'docs/lessons.md',
-  'docs/lessons/**',
-  'docs/agent-dispatch-prompts.md',
-  'docs/adr/**',
-  'docs/spec/**',
-  '**/scripts/**',
-  '**/*.config.*',
-  '**/biome.json',
-  '**/biome.jsonc',
-  '**/tsconfig*.json',
-  '**/.gitignore',
-  '**/.gitattributes',
-  '**/drizzle/**',
-  '**/package.json',
-  'pnpm-lock.yaml',
-  'pnpm-workspace.yaml',
-  '**/.npmrc',
-  'apps/server/src/lib/secret-box.ts',
-  'apps/server/src/lib/keys.ts',
-  'apps/server/src/lib/token-auth.ts',
-  'apps/server/src/lib/attachments-token.ts',
-  'apps/server/src/services/secrets.ts',
-  'apps/server/src/services/credentials.ts',
-  'apps/server/src/services/api-keys.ts',
-  'apps/server/src/services/oauth.ts',
-  'apps/server/src/routes-machine.ts',
-  'apps/server/src/services/machine*.ts',
-  'apps/daemon/src/credentials.ts',
-  'apps/daemon/src/secret-channel.ts',
-  'apps/daemon/src/machine-client.ts',
-  'apps/daemon/src/backend/command-gate.ts',
-  'apps/server/src/services/mcp-face.ts',
-  'apps/server/src/services/mcp-servers.ts',
-  'apps/server/src/db/client.ts',
-  'apps/server/src/services/harness-eval-*.ts',
-  'integration/eval/**',
-  '.claude/hillclimb/**',
-  'apps/server/src/trajectory-export.ts',
-  'apps/server/src/trajectory-export-cli.ts',
-  'apps/server/src/trajectory-outcome.ts',
-  'packages/shared/src/trajectory-pack.ts',
-] as const;
+export const PROTECTED_PATH_GLOBS: readonly string[] = gatePaths.protected;
 
-export const MERGE_GATE_SOURCE_GLOBS = [
-  'apps/server/src/services/merge-gate/**',
-  'packages/shared/src/records/merge-gate.ts',
-  'apps/daemon/src/merge-decision.ts',
-] as const;
+export const MERGE_GATE_SOURCE_GLOBS: readonly string[] = gatePaths.mergeGateSource;
+
+export const HUMAN_QUEUE_PATH_GLOBS = gatePaths.humanQueue;
 
 const CHIEF_DISPATCH_DIR = 'integration/eval/chief-dispatch';
 
@@ -254,7 +191,13 @@ export const MERGE_BLOCKERS = [
     class: 'human',
     label: '补丁无法取摘要（证据之外没有文件，或有文件缺 blob sha）',
   },
-  { code: 'size-cap', class: 'human', label: '补丁超过 800 行或 40 个文件' },
+  { code: 'size-cap', class: 'human', label: '本地补丁超过 800 行或 40 个文件' },
+  {
+    code: 'size-review',
+    class: 'transient',
+    label:
+      '补丁超过 800 行或 40 个文件：PR 正文要有 ## Size 小节，且当前补丁要有评审明确接受这个规模',
+  },
   {
     code: 'independent-review-missing',
     class: 'transient',
@@ -342,12 +285,14 @@ for (const value of [
   AUTO_MERGE_PATH_GLOBS,
   PROTECTED_PATH_GLOBS,
   MERGE_GATE_SOURCE_GLOBS,
+  HUMAN_QUEUE_PATH_GLOBS,
   CHIEF_DISPATCH_HARNESS_PATHS,
   COMPARE_FILE_STATUSES,
   BLOCKER_CLASSES,
   ...MERGE_BLOCKERS,
   MERGE_BLOCKERS,
   MERGE_BLOCKER_CODES,
+  ...Object.values(HUMAN_QUEUE_PATH_GLOBS),
 ]) {
   Object.freeze(value);
 }

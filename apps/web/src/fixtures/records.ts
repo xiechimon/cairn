@@ -228,9 +228,17 @@ export interface FixtureSet {
   projectNames?: Record<string, string>;
   projectAvatars?: Record<string, { icon?: ProjectIcon; color?: ProjectColor }>;
   chief?: ChiefContent;
+  projectHome?: ProjectHomeFixture;
   github?: GithubFixture;
   tags?: Array<Pick<TagRecord, 'id' | 'name' | 'color'>>;
   agentTasks?: AgentTask[];
+}
+
+export interface ProjectHomeFixture {
+  goal: string | null;
+  repo?: string;
+  archived?: boolean;
+  sendError?: { draft: string; message: string };
 }
 
 export interface GithubFixture {

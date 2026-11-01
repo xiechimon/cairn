@@ -1,0 +1,55 @@
+---
+title: "Local landing (LocalLanding.tla)"
+---
+stateDiagram-v2
+  state "Legend" as legend {
+    lg0: open
+    lg1: decided
+    lg2: landed
+  }
+  class lg0 blue
+  class lg1 orange
+  class lg2 teal
+  s0: Not judged
+  s1: Judged
+  s2: Commit built, not judged
+  s3: Judged (base moved since judgement)
+  s4: Commit built, judged
+  s5: Judged (patch changed since judgement)
+  s6: Decided to land
+  s7: Commit built, judged (base moved since judgement)
+  s8: Judged (patch changed, base moved since judgement)
+  s9: Commit built, judged (patch changed since judgement)
+  s10: Landed the judged patch
+  s11: Decided to land (base moved since judgement)
+  s12: Commit built, judged (patch changed, base moved since judgement)
+  [*] --> s0
+  s0 --> s1: judge patch
+  s0 --> s2: build merge commit
+  s1 --> s3: default branch moves
+  s1 --> s4: build merge commit
+  s1 --> s5: patch changes
+  s2 --> s4: judge patch
+  s3 --> s7: build merge commit
+  s3 --> s8: patch changes
+  s4 --> s6: decideLocalMerge says land
+  s4 --> s7: default branch moves
+  s5 --> s8: default branch moves
+  s5 --> s9: build merge commit
+  s6 --> s10: applyMergeLanding updates ref
+  s6 --> s11: default branch moves
+  s8 --> s12: build merge commit
+  s9 --> s12: default branch moves
+  class s0 blue
+  class s1 blue
+  class s2 blue
+  class s3 blue
+  class s4 blue
+  class s5 blue
+  class s6 orange
+  class s7 blue
+  class s8 blue
+  class s9 blue
+  class s10 teal
+  class s11 orange
+  class s12 blue

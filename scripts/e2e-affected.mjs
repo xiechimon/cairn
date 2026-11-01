@@ -17,6 +17,7 @@ const E2E_PREFIX = 'apps/web/e2e/';
 const PORT = process.env.E2E_PORT ?? process.env.E2E_AFFECTED_PORT ?? '8398';
 
 const BOARD = [
+  'menu-keys',
   'board-',
   'card-',
   'chip-',
@@ -48,6 +49,7 @@ const BOARD = [
   'task-panel',
 ];
 const SIDEBAR = [
+  'menu-keys',
   'sidebar-',
   'collapse-',
   'visual-',
@@ -68,6 +70,7 @@ const SIDEBAR = [
   'thread-snooze',
 ];
 const DETAIL = [
+  'menu-keys',
   'composer-tool-tips',
   'detail-',
   'chat-',
@@ -132,6 +135,7 @@ const CHIEF = [
   'task-panel',
 ];
 const AGENT = [
+  'menu-keys',
   'agent-',
   'team-create-agent',
   'registry-focus-ring',
@@ -141,6 +145,7 @@ const AGENT = [
 ];
 const LIVE_SERVER = ['token-gate', 'live-server-', 'agent-fallback-models', 'split-autostart'];
 const OVERLAY = [
+  'menu-keys',
   'newtask-',
   'mention-',
   'token-gate',
@@ -177,6 +182,7 @@ const OVERLAYS = [
   'mobile-narrow',
 ];
 const PAGES = [
+  'menu-keys',
   'project-',
   'file-viewer',
   'github-issue-writeback',
@@ -192,6 +198,7 @@ const PAGES = [
   'task-panel',
 ];
 const RESOURCES = [
+  'menu-keys',
   'machine-',
   'machines-',
   'agent-settings-row-label',
@@ -218,6 +225,16 @@ const SHARED_SURFACE_ONLY = [
 const SECONDARY = ['title-', 'shell-', 'segmented-'];
 
 const FILE_RULES = new Map([
+  ['apps/web/src/design/components-overlays.tsx', ['menu-keys', 'shadcn-primitives']],
+  [
+    'apps/web/src/components/menu-keys.tsx',
+    ['menu-keys', 'detail-archive', 'thread-snooze', 'dead-buttons', 'hotkeys', 'sidebar-'],
+  ],
+  ['apps/web/src/components/key-hint.tsx', ['menu-keys', 'hotkeys', 'sidebar-', 'board-shell']],
+  [
+    'apps/web/src/components/shell/sidebar-nav-row.tsx',
+    ['menu-keys', 'sidebar-', 'cds-sidebar', 'paper-sidebar'],
+  ],
   ['apps/web/src/overlay/status-menu.tsx', [...OVERLAYS, ...DETAIL]],
   [
     'apps/web/src/components/agent-picker.tsx',

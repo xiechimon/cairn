@@ -2,13 +2,13 @@ import { execFileSync } from 'node:child_process';
 import { api, disarmAutoMerge, markers, pages, repo } from './autonomy-brake.mjs';
 import { requiredChecks as branchProtectionChecks, mustBeGreenJobs } from './merge-checks.mjs';
 import { ownerRouting } from './merge-route.mjs';
+import { admitLabel } from './mergify-config.mjs';
 
 const batchHead = /^B\d+\//;
-const queueCommand = '@mergifyio queue';
-const queueMarker = (sha) => `<!-- batch-merger-queued:${sha} -->`;
-const queueRequest = new RegExp(`^${queueCommand}\\n<!-- batch-merger-queued:[a-f0-9]{40} -->$`);
 const requiredChecks = branchProtectionChecks;
 const ownerRouteLabel = 'owner-route';
+const hasLabel = (pr, name) => pr.labels.some((label) => label.name === name);
+const isBatch = (pr) => batchHead.test(pr.head.ref) && pr.head.repo?.full_name === repo;
 const log = (pr, action, reasons) =>
   console.log(
     JSON.stringify({ pr: pr?.number ?? null, head: pr?.head?.sha ?? null, action, reasons }),
@@ -33,31 +33,39 @@ function markOwnerRoute(pr, reasons, dryRun) {
   log(pr, 'marked-owner-route', reasons);
 }
 
+function removeLabel(pr, name) {
+  execFileSync(
+    'gh',
+    ['api', '--method', 'DELETE', `repos/${repo}/issues/${pr.number}/labels/${name}`],
+    { encoding: 'utf8', maxBuffer: 512 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] },
+  );
+}
+
 function clearOwnerRoute(pr, dryRun) {
-  if (!pr.labels.some((label) => label.name === ownerRouteLabel)) return;
+  if (!hasLabel(pr, ownerRouteLabel)) return;
   if (dryRun) {
     log(pr, 'would-unmark-owner-route', []);
     return;
   }
-  execFileSync(
-    'gh',
-    ['api', '--method', 'DELETE', `repos/${repo}/issues/${pr.number}/labels/${ownerRouteLabel}`],
-    { encoding: 'utf8', maxBuffer: 512 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] },
-  );
+  removeLabel(pr, ownerRouteLabel);
   log(pr, 'unmarked-owner-route', []);
 }
 
-function queueState(pr) {
-  const requested = pages(`repos/${repo}/issues/${pr.number}/comments?per_page=100`)
-    .flat()
-    .some((comment) => comment.body === `${queueCommand}\n${queueMarker(pr.head.sha)}`);
-  const labelled = (name) => pr.labels.some((label) => label.name === name);
-  if (labelled('dequeued') && requested) return 'dequeued-needs-human';
-  if (labelled('queued') || requested) return 'already-queued';
-  return null;
+function admissionsToday(openBatches) {
+  const since = `${new Date().toISOString().slice(0, 10)}T00:00:00Z`;
+  let merged = 0;
+  for (let page = 1; ; page++) {
+    const closed = api(
+      `repos/${repo}/pulls?state=closed&sort=updated&direction=desc&per_page=100&page=${page}`,
+    );
+    if (!closed?.length) break;
+    merged += closed.filter((pr) => isBatch(pr) && pr.merged_at && pr.merged_at >= since).length;
+    if (closed.at(-1).updated_at < since) break;
+  }
+  return merged + openBatches.filter((pr) => hasLabel(pr, admitLabel)).length;
 }
 
-function eligibility(number, expectedHead, dailyCap) {
+function eligibility(number, expectedHead) {
   const pr = api(`repos/${repo}/pulls/${number}`);
   const reasons = [];
   if (pr.state !== 'open') reasons.push('not-open');
@@ -108,20 +116,13 @@ function eligibility(number, expectedHead, dailyCap) {
     ).test(verdict.body)
   )
     reasons.push('review-not-pass');
-  const today = new Date().toISOString().slice(0, 10);
-  const queued = pages(`repos/${repo}/issues/comments?since=${today}T00:00:00Z&per_page=100`)
-    .flat()
-    .filter(
-      (comment) => comment.created_at >= `${today}T00:00:00Z` && queueRequest.test(comment.body),
-    ).length;
-  if (queued >= dailyCap) reasons.push('daily-cap');
   if (markers().length) reasons.push('autonomy-paused');
   return { pr, reasons };
 }
 
 try {
-  let dailyCap = 10;
   let dryRun = false;
+  let dailyCap = 10;
   const args = process.argv.slice(2);
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--dry-run') dryRun = true;
@@ -130,9 +131,8 @@ try {
       if (!Number.isSafeInteger(dailyCap)) throw new Error('Invalid daily cap');
     } else throw new Error('Expected --dry-run or --daily-cap <integer>');
   }
-  const pulls = pages(`repos/${repo}/pulls?state=open&per_page=100`)
-    .flat()
-    .filter((pr) => batchHead.test(pr.head.ref) && pr.head.repo?.full_name === repo);
+  const pulls = pages(`repos/${repo}/pulls?state=open&per_page=100`).flat().filter(isBatch);
+  let admissions;
   const blocked = new Set();
   for (const pr of pulls) {
     if (!pr.auto_merge) continue;
@@ -145,10 +145,10 @@ try {
       process.exitCode = 1;
     }
   }
-  for (const candidate of pulls) {
+  for (const candidate of [...pulls].sort((a, b) => a.number - b.number)) {
     if (blocked.has(candidate.number)) continue;
     try {
-      let result = eligibility(candidate.number, candidate.head.sha, dailyCap);
+      let result = eligibility(candidate.number, candidate.head.sha);
       if (result.reasons.length) {
         log(result.pr, 'skip', result.reasons);
         continue;
@@ -165,12 +165,7 @@ try {
         markOwnerRoute(result.pr, ownerReasons, dryRun);
         continue;
       }
-      const state = queueState(result.pr);
-      if (state) {
-        log(result.pr, 'skip', [state]);
-        continue;
-      }
-      result = eligibility(candidate.number, candidate.head.sha, dailyCap);
+      result = eligibility(candidate.number, candidate.head.sha);
       if (result.reasons.length) {
         log(result.pr, 'skip', result.reasons);
         continue;
@@ -182,11 +177,18 @@ try {
         continue;
       }
       clearOwnerRoute(result.pr, dryRun);
-      if (!dryRun)
-        api(`repos/${repo}/issues/${candidate.number}/comments`, {
-          body: `${queueCommand}\n${queueMarker(result.pr.head.sha)}`,
-        });
-      log(result.pr, dryRun ? 'would-queue' : 'queued', []);
+      if (!hasLabel(result.pr, admitLabel)) {
+        admissions ??= admissionsToday(pulls);
+        if (admissions >= dailyCap) {
+          log(result.pr, 'skip', ['daily-cap']);
+          continue;
+        }
+        if (!dryRun)
+          api(`repos/${repo}/issues/${candidate.number}/labels`, { labels: [admitLabel] });
+        admissions++;
+        log(result.pr, dryRun ? 'would-admit' : 'admitted', []);
+      }
+      log(result.pr, 'auto-queue', []);
     } catch (error) {
       log(candidate, 'error', [error.message]);
       process.exitCode = 1;

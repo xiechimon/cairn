@@ -54,6 +54,7 @@ import {
   deleteProject,
   projectMergeConfigOf,
   projectShipRouteOf,
+  setProjectArchived,
   updateProject,
   updateProjectMergeConfig,
   updateProjectShipRoute,
@@ -307,6 +308,19 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
     const row = requireProject(ctx, c.req.param('id'));
     return c.json({ report: latestScheduleReport(ctx.db, row.id) });
   });
+
+  for (const [action, archived] of [
+    ['archive', true],
+    ['unarchive', false],
+  ] as const) {
+    app.post(`/api/projects/:id/${action}`, (c) => {
+      const row = requireProject(ctx, c.req.param('id'));
+      if (row.teamId !== ctx.team.id) throw notFound(`project ${row.id}`);
+      const updated = setProjectArchived(ctx.db, row.id, archived);
+      if (updated === undefined) throw notFound(`project ${row.id}`);
+      return c.json(toProjectRecord(updated, requestOrigin(c)));
+    });
+  }
 
   app.delete('/api/projects/:id', (c) => {
     const id = c.req.param('id');

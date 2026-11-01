@@ -1,6 +1,7 @@
 import contextlib
 import importlib.util
 import io
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -302,6 +303,271 @@ class ProseCapTests(unittest.TestCase):
         result, output = self.verdict(body.replace('## Verified', '## Proof') + '## Review\nReviewed.\n')
         self.assertEqual(result, 1, output)
         self.assertIn('FAIL too-long:', output)
+
+
+class SizeSectionTests(unittest.TestCase):
+    base = '## Proof\nOld run failed; new run passed.\n## What\nUpdate the contract.\n'
+    review = '## Review\nFresh review passed.\n## Risk\nReversible gate change.\n'
+
+    def body(self, size=None, inside=True):
+        folded = self.review + (size or '') if inside else self.review
+        outside = '' if inside else (size or '')
+        return f'{self.base}{outside}<details><summary>Review and risk</summary>\n\n{folded}\n</details>\n'
+
+    def run_gate(self, body, files):
+        with tempfile.TemporaryDirectory() as directory:
+            body_path = Path(directory, 'body.md')
+            body_path.write_text(body)
+            argv = ['pr-evidence-gate.py', str(body_path)]
+            if files is not None:
+                context_path = Path(directory, 'context.json')
+                context_path.write_text(json.dumps({'repository': 'xiechimon/cairn', 'commits': [], 'files': files}))
+                argv.append(str(context_path))
+            output = io.StringIO()
+            with patch.object(sys, 'argv', argv), contextlib.redirect_stdout(output):
+                result = gate.main()
+        return result, output.getvalue()
+
+    def source(self, additions, deletions=0, name='apps/server/src/a.ts', **extra):
+        return {'filename': name, 'additions': additions, 'deletions': deletions, **extra}
+
+    def test_oversize_without_size_section_is_red(self):
+        result, output = self.run_gate(self.body(), [self.source(801)])
+        self.assertEqual(result, 1, output)
+        self.assertIn('FAIL missing-section: Size', output)
+
+    def test_oversize_with_size_section_inside_details_is_green(self):
+        size = '## Size\nThe migration and its callers must land together.\n'
+        result, output = self.run_gate(self.body(size), [self.source(801)])
+        self.assertEqual(result, 0, output)
+
+    def test_oversize_with_empty_size_section_is_red(self):
+        result, output = self.run_gate(self.body('## Size\n<!-- why -->\n'), [self.source(801)])
+        self.assertEqual(result, 1, output)
+        self.assertIn('FAIL empty-section: Size', output)
+
+    def test_size_section_outside_details_is_red(self):
+        size = '## Size\nThe migration and its callers must land together.\n'
+        result, output = self.run_gate(self.body(size, inside=False), [self.source(801)])
+        self.assertEqual(result, 1, output)
+        self.assertIn('FAIL size-outside-details: Size', output)
+
+    def test_size_heading_in_fenced_code_does_not_count(self):
+        size = '```\n## Size\nnot a heading\n```\n'
+        result, output = self.run_gate(self.body(size), [self.source(801)])
+        self.assertEqual(result, 1, output)
+        self.assertIn('FAIL missing-section: Size', output)
+
+    def test_limits_are_inclusive_at_800_lines_and_40_files(self):
+        self.assertEqual(self.run_gate(self.body(), [self.source(400, 400)])[0], 0)
+        self.assertEqual(self.run_gate(self.body(), [self.source(400, 401)])[0], 1)
+        files = [self.source(1, name=f'apps/server/src/f{k}.ts') for k in range(40)]
+        self.assertEqual(self.run_gate(self.body(), files)[0], 0)
+        self.assertEqual(self.run_gate(self.body(), files + [self.source(1, name='apps/server/src/extra.ts')])[0], 1)
+
+    def test_evidence_does_not_make_a_patch_oversize(self):
+        evidence = [self.source(900, name=f'docs/verify/2372/run-{k}.txt') for k in range(60)]
+        result, output = self.run_gate(self.body(), [self.source(5), *evidence])
+        self.assertEqual(result, 0, output)
+
+    def test_rename_counts_two_files_and_moves_out_of_evidence_count_as_kept(self):
+        renames = [self.source(0, name=f'apps/server/src/n{k}.ts', previous_filename=f'apps/server/src/o{k}.ts') for k in range(21)]
+        self.assertEqual(self.run_gate(self.body(), renames)[0], 1)
+        out_of_evidence = self.source(1, name='apps/server/src/a.ts', previous_filename='docs/verify/1/a.ts')
+        self.assertEqual(gate.patch_size([out_of_evidence]), (1, 2))
+        into_evidence = self.source(1, name='docs/verify/2/a.ts', previous_filename='docs/verify/1/a.ts')
+        self.assertEqual(gate.patch_size([into_evidence]), (0, 0))
+
+    def test_api_pages_are_flattened(self):
+        pages = [[self.source(500)], [self.source(301, name='apps/server/src/b.ts')]]
+        result, output = self.run_gate(self.body(), pages)
+        self.assertEqual(result, 1, output)
+        self.assertIn('FAIL missing-section: Size', output)
+
+    def test_missing_file_list_in_a_given_context_fails_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            body_path = Path(directory, 'body.md')
+            body_path.write_text(self.body())
+            context_path = Path(directory, 'context.json')
+            context_path.write_text(json.dumps({'repository': 'xiechimon/cairn', 'commits': []}))
+            output = io.StringIO()
+            with patch.object(sys, 'argv', ['gate', str(body_path), str(context_path)]), contextlib.redirect_stdout(output):
+                result = gate.main()
+        self.assertEqual(result, 1, output.getvalue())
+        self.assertIn('FAIL size-unreadable', output.getvalue())
+
+    def test_without_a_context_size_is_not_checked(self):
+        self.assertEqual(self.run_gate(self.body(), None)[0], 0)
+
+    def test_limits_come_from_merge_gate_paths_json(self):
+        limits = json.loads(Path('packages/shared/merge-gate-paths.json').read_text())['limits']
+        self.assertEqual(gate.size_limits(), (limits['maxLines'], limits['maxFiles']))
+        with tempfile.TemporaryDirectory() as directory:
+            narrowed = Path(directory, 'merge-gate-paths.json')
+            narrowed.write_text(json.dumps({'limits': {'maxLines': 4, 'maxFiles': 40}}))
+            with patch.object(gate, 'GATE_PATHS', narrowed):
+                result, output = self.run_gate(self.body(), [self.source(5)])
+        self.assertEqual(result, 1, output)
+        self.assertIn('limits 4 lines, 40 files', output)
+
+    def test_unreadable_limits_fail_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            for content in (None, '{}', json.dumps({'limits': {'maxLines': 0, 'maxFiles': 40}}), 'not json'):
+                path = Path(directory, 'merge-gate-paths.json')
+                if content is not None:
+                    path.write_text(content)
+                elif path.exists():
+                    path.unlink()
+                with patch.object(gate, 'GATE_PATHS', path):
+                    result, output = self.run_gate(self.body(), [self.source(5)])
+                self.assertEqual(result, 1, output)
+                self.assertIn('FAIL size-unreadable', output)
+
+
+class SchemaGlanceTests(unittest.TestCase):
+    table = ('### Schema changes\n\n| table | change | detail |\n|---|---|---|\n'
+             '| `tasks` | + due_at | integer |\n| `tasks` | - legacy | text |\n')
+    base = '## Proof\nOld run failed; new run passed.\n## What\nAdd a column.\n## Review\nReviewed.\n## Risk\nReversible.\n'
+
+    def verdict(self, body, expected=None):
+        output = io.StringIO()
+        with tempfile.TemporaryDirectory() as directory:
+            argv = ['pr-evidence-gate.py']
+            if expected is not None:
+                path = Path(directory, 'schema-glance.md')
+                path.write_text(expected)
+                argv += ['--schema-glance', str(path)]
+            with patch.object(sys, 'argv', argv), patch.dict(gate.os.environ, {'PR_BODY': body}), contextlib.redirect_stdout(output):
+                result = gate.main()
+        return result, output.getvalue()
+
+    def test_drizzle_body_without_the_table_is_red(self):
+        result, output = self.verdict(self.base, self.table)
+        self.assertEqual(result, 1, output)
+        self.assertIn('FAIL schema-changes: missing', output)
+
+    def test_stale_table_is_red(self):
+        stale = self.table.replace('+ due_at | integer', '+ due_at | text')
+        result, output = self.verdict(self.base + stale, self.table)
+        self.assertEqual(result, 1, output)
+        self.assertIn('FAIL schema-changes: stale', output)
+
+    def test_current_table_is_green(self):
+        result, output = self.verdict(self.base + self.table, self.table)
+        self.assertEqual(result, 0, output)
+        self.assertIn('schema-changes: matches', output)
+
+    def test_table_inside_details_counts(self):
+        body = self.base + '<details><summary>Schema</summary>\n\n' + self.table + '\n</details>\n'
+        result, output = self.verdict(body, self.table)
+        self.assertEqual(result, 0, output)
+
+    def test_extra_or_reordered_rows_are_red(self):
+        rows = self.table.splitlines()
+        reordered = '\n'.join(rows[:4] + [rows[5], rows[4]]) + '\n'
+        for body_table in (reordered, self.table + '| `tasks` | + extra | text |\n'):
+            result, output = self.verdict(self.base + body_table, self.table)
+            self.assertEqual(result, 1, output)
+            self.assertIn('FAIL schema-changes: stale', output)
+
+    def test_no_schema_changes_output_requires_the_heading_and_text(self):
+        expected = '### Schema changes\n\nNo schema changes\n'
+        result, output = self.verdict(self.base + expected, expected)
+        self.assertEqual(result, 0, output)
+        result, output = self.verdict(self.base, expected)
+        self.assertEqual(result, 1, output)
+
+    def test_non_drizzle_body_is_unaffected(self):
+        result, output = self.verdict(self.base)
+        self.assertEqual(result, 0, output)
+        self.assertNotIn('schema-changes', output)
+        result, output = self.verdict(self.base + self.table)
+        self.assertEqual(result, 0, output)
+
+    def test_workflow_passes_the_base_copy_output(self):
+        workflow = Path('.github/workflows/pr-evidence.yml').read_text()
+        self.assertIn('git show "$BASE_SHA:scripts/schema-glance.mjs"', workflow)
+        self.assertIn('--schema-glance', workflow)
+
+
+class SchemaGlanceWorkflowTests(unittest.TestCase):
+    body = '## Proof\nOld run failed; new run passed.\n## What\nAdd a column.\n## Review\nReviewed.\n## Risk\nReversible.\n'
+
+    @staticmethod
+    def step_script():
+        lines = Path('.github/workflows/pr-evidence.yml').read_text().splitlines()
+        at = next(i for i, line in enumerate(lines) if line.strip().startswith('- name: Check PR body evidence'))
+        run_at = next(i for i in range(at, len(lines)) if lines[i].strip() == 'run: |')
+        indent = len(lines[run_at]) - len(lines[run_at].lstrip()) + 2
+        block = []
+        for line in lines[run_at + 1:]:
+            if line.strip() and len(line) - len(line.lstrip()) < indent:
+                break
+            block.append(line[indent:])
+        return '\n'.join(block) + '\n'
+
+    @staticmethod
+    def snapshot(*tables):
+        return json.dumps({'version': '6', 'dialect': 'sqlite', 'tables': {
+            name: {'name': name, 'columns': {column: {'name': column, 'type': 'text'} for column in columns},
+                   'indexes': {}, 'foreignKeys': {}}
+            for name, columns in tables}})
+
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        root = Path(directory.name).resolve()
+        self.repo = root / 'repo'
+        self.temp = root / 'runner'
+        self.temp.mkdir()
+        (self.repo / 'scripts').mkdir(parents=True)
+        (self.repo / 'apps/server/drizzle/meta').mkdir(parents=True)
+        for name in ('pr-evidence-gate.py', 'pr_body.py', 'schema-glance.mjs'):
+            (self.repo / 'scripts' / name).write_text(Path('scripts', name).read_text())
+        (self.repo / 'packages/shared').mkdir(parents=True)
+        (self.repo / 'packages/shared/merge-gate-paths.json').write_text(Path('packages/shared/merge-gate-paths.json').read_text())
+        self.git('init', '-q', '-b', 'main')
+        self.git('config', 'user.email', 't@example.com')
+        self.git('config', 'user.name', 't')
+        self.git('config', 'commit.gpgsign', 'false')
+        self.git('add', 'scripts')
+        self.commit('apps/server/drizzle/meta/0001_snapshot.json', self.snapshot(('task', ['id'])), 'base')
+        self.git('branch', 'feature')
+        self.commit('apps/server/drizzle/meta/0002_snapshot.json', self.snapshot(('task', ['id']), ('note', ['id'])), 'main migration')
+        self.git('checkout', '-q', 'feature')
+
+    def git(self, *args):
+        return subprocess.run(['git', '-C', str(self.repo), *args], check=True, capture_output=True, text=True).stdout.strip()
+
+    def commit(self, path, content, message):
+        (self.repo / path).write_text(content)
+        self.git('add', path)
+        self.git('commit', '-q', '-m', message)
+
+    def run_step(self, body):
+        (self.temp / 'pr.json').write_text(json.dumps({'base': {'sha': self.git('rev-parse', 'main')}, 'head': {'sha': self.git('rev-parse', 'feature')}}))
+        (self.temp / 'pr-body.md').write_text(body)
+        (self.temp / 'pr-evidence-context.json').write_text('{"files": []}')
+        return subprocess.run(['bash', '--noprofile', '--norc', '-eo', 'pipefail', '-c', self.step_script()], cwd=self.repo,
+                              env={**os.environ, 'RUNNER_TEMP': str(self.temp)}, capture_output=True, text=True)
+
+    def test_non_drizzle_pr_behind_a_main_migration_needs_no_table(self):
+        self.commit('README.md', 'docs\n', 'docs only')
+        result = self.run_step(self.body)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn('schema-changes', result.stdout)
+        self.assertFalse((self.temp / 'schema-glance.md').exists())
+
+    def test_drizzle_pr_behind_a_main_migration_diffs_from_the_merge_base(self):
+        self.commit('apps/server/drizzle/meta/0002_snapshot.json', self.snapshot(('task', ['id', 'due'])), 'feature migration')
+        result = self.run_step(self.body)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn('FAIL schema-changes: missing', result.stdout)
+        table = (self.temp / 'schema-glance.md').read_text()
+        self.assertEqual(table, '### Schema changes\n\n| table | change | detail |\n|---|---|---|\n| `task` | + due | text |\n')
+        result = self.run_step(self.body + table)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('schema-changes: matches', result.stdout)
 
 
 def load_tests(loader, tests, pattern):

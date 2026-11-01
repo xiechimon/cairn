@@ -13,20 +13,20 @@ const between = (start, end) => {
 };
 const constants = between('const AUTO_MERGE =', 'const FILES_CMD =');
 const routing = between('const safety = reviewed.find', 'const checked =');
+const gatePaths = JSON.parse(readFileSync('packages/shared/merge-gate-paths.json', 'utf8'));
 const sandbox = { timeout: 1000, contextCodeGeneration: { strings: false, wasm: false } };
 
-const route = ({ changedFiles, linesChanged = 1, binaryFiles = [], deletedFiles = [] }) =>
-  Array.from(
-    runInNewContext(
-      `${constants}
+const decide = ({ changedFiles, linesChanged = 1, binaryFiles = [], deletedFiles = [] }) =>
+  runInNewContext(
+    `${constants}
 const matchedProtected = changedFiles.filter(isProtected);
 const reviewed = [];
 ${routing}
-humanReasons`,
-      { changedFiles, deletedFiles, binaryFiles, linesChanged },
-      sandbox,
-    ),
+;({ humanReasons, sizeReview, sizeRequirement })`,
+    { args: { gatePaths }, changedFiles, deletedFiles, binaryFiles, linesChanged },
+    sandbox,
   );
+const route = (input) => Array.from(decide(input).humanReasons);
 const sourceFiles = (n) => Array.from({ length: n }, (_, i) => `apps/web/src/page${i}.ts`);
 const evidenceFiles = (n) => Array.from({ length: n }, (_, i) => `docs/verify/2371/run-${i}.txt`);
 
@@ -34,16 +34,41 @@ test('evidence beyond the file cap does not make a patch oversize', () => {
   assert.deepEqual(route({ changedFiles: [...sourceFiles(40), ...evidenceFiles(60)] }), []);
 });
 
-test('one source file over the file cap still routes to the owner', () => {
-  const reasons = route({ changedFiles: [...sourceFiles(41), ...evidenceFiles(60)] });
-  assert.deepEqual(reasons, ['41 files changed (over 40)']);
+test('one source file over the file cap asks for a size review and does not route to the owner', () => {
+  const decision = decide({ changedFiles: [...sourceFiles(41), ...evidenceFiles(60)] });
+  assert.deepEqual(Array.from(decision.humanReasons), []);
+  assert.equal(decision.sizeReview, true);
+  assert.match(decision.sizeRequirement, /41 files/);
+  assert.match(decision.sizeRequirement, /## Size/);
 });
 
-test('the line cap is the caller sum and 801 still routes to the owner', () => {
-  assert.deepEqual(route({ changedFiles: sourceFiles(1), linesChanged: 800 }), []);
-  assert.deepEqual(route({ changedFiles: sourceFiles(1), linesChanged: 801 }), [
-    '801 lines changed (over 800)',
-  ]);
+test('the line cap is the caller sum and 801 asks for a size review', () => {
+  const at = decide({ changedFiles: sourceFiles(1), linesChanged: 800 });
+  assert.equal(at.sizeReview, false);
+  assert.equal(at.sizeRequirement, null);
+  const over = decide({ changedFiles: sourceFiles(1), linesChanged: 801 });
+  assert.deepEqual(Array.from(over.humanReasons), []);
+  assert.equal(over.sizeReview, true);
+  assert.match(over.sizeRequirement, /801 lines/);
+});
+
+test('an oversize patch touching a security surface still routes to the owner', () => {
+  for (const surface of [
+    'apps/server/src/services/secrets.ts',
+    'apps/server/src/routes-machine.ts',
+    'apps/daemon/src/backend/command-gate.ts',
+    'apps/server/src/services/mcp-face.ts',
+  ]) {
+    const decision = decide({ changedFiles: [...sourceFiles(41), surface], linesChanged: 900 });
+    assert.equal(decision.sizeReview, true);
+    assert.deepEqual(Array.from(decision.humanReasons), [`protected paths: ${surface}`]);
+  }
+});
+
+test('size review never hides the other owner reasons', () => {
+  const reasons = route({ changedFiles: ['README.md', ...sourceFiles(41)], linesChanged: 900 });
+  assert.equal(reasons.length, 1);
+  assert.match(reasons[0], /^outside the auto-merge set/);
 });
 
 test('binary files outside docs/verify still route to the owner', () => {
@@ -52,6 +77,28 @@ test('binary files outside docs/verify still route to the owner', () => {
     binaryFiles: [sourceFiles(1)[0], evidenceFiles(1)[0]],
   });
   assert.match(reason, /^binary files outside docs\/verify .*apps\/web\/src\/page0\.ts$/);
+});
+
+const BASELINES = 'apps/web/e2e/gallery-snapshots.spec.ts-snapshots';
+
+test('gallery snapshot baselines may be binary without the owner', () => {
+  const pngs = [
+    `${BASELINES}/side-panel-dark-linux.png`,
+    `${BASELINES}/side-panel-light-linux.png`,
+  ];
+  assert.deepEqual(route({ changedFiles: [...sourceFiles(1), ...pngs], binaryFiles: pngs }), []);
+});
+
+test('other binaries beside or near the gallery baselines still route to the owner', () => {
+  for (const path of [
+    `${BASELINES}/side-panel-dark-linux.js`,
+    `${BASELINES}/nested/side-panel-dark-linux.png`,
+    'apps/web/e2e/visual-polish.spec.ts-snapshots/rail-linux.png',
+    'apps/web/src/gallery-snapshots.spec.ts-snapshots/x.png',
+  ]) {
+    const [reason] = route({ changedFiles: [path], binaryFiles: [path] });
+    assert.match(reason ?? '', /^binary files outside docs\/verify/, path);
+  }
 });
 
 test('the line command named for callers leaves docs/verify out of the sum', () => {

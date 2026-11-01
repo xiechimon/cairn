@@ -23,6 +23,7 @@ import { mapCommits, mapDiffFiles, toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { relativeTime } from '../board/rel-time.js';
 import { EmptyState } from '../components/empty-state.js';
+import { KeyedMenuContent, KeyedMenuRadioItem } from '../components/menu-keys.js';
 import { SegmentedTabs } from '../components/segmented.js';
 import { CARD_RADIUS_CLS, SETTINGS_ROW_CLS, SettingsCard } from '../components/settings-list.js';
 import { StatusGlyph } from '../components/status-glyph.js';
@@ -31,9 +32,7 @@ import { Button } from '../components/ui/button.js';
 import { Card } from '../components/ui/card.js';
 import {
   DropdownMenu,
-  DropdownMenuContent,
   DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu.js';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '../components/ui/input-group.js';
@@ -469,16 +468,16 @@ function sortTodos(rows: TaskRow[], sort: TaskSort): TaskRow[] {
   return rows;
 }
 
-const TASK_FILTERS: { id: TaskFilter; label: string }[] = [
-  { id: 'all', label: '全部' },
-  { id: 'active', label: '进行中' },
-  { id: 'done', label: '已完成' },
+const TASK_FILTERS: { id: TaskFilter; label: string; shortcut: string }[] = [
+  { id: 'all', label: '全部', shortcut: 'A' },
+  { id: 'active', label: '进行中', shortcut: 'P' },
+  { id: 'done', label: '已完成', shortcut: 'D' },
 ];
 
-const TASK_SORTS: { id: TaskSort; label: string }[] = [
-  { id: 'default', label: '默认' },
-  { id: 'recent', label: '最近更新' },
-  { id: 'title', label: '标题' },
+const TASK_SORTS: { id: TaskSort; label: string; shortcut: string }[] = [
+  { id: 'default', label: '默认', shortcut: 'D' },
+  { id: 'recent', label: '最近更新', shortcut: 'R' },
+  { id: 'title', label: '标题', shortcut: 'T' },
 ];
 
 function TasksMenu<T extends string>({
@@ -486,7 +485,7 @@ function TasksMenu<T extends string>({
   value,
   onSelect,
 }: {
-  options: { id: T; label: string }[];
+  options: { id: T; label: string; shortcut: string }[];
   value: T;
   onSelect: (id: T) => void;
 }) {
@@ -494,9 +493,14 @@ function TasksMenu<T extends string>({
   return (
     <DropdownMenuRadioGroup value={value} onValueChange={(next) => onSelect(next as T)}>
       {options.map((option) => (
-        <DropdownMenuRadioItem key={option.id} value={option.id} closeOnClick>
+        <KeyedMenuRadioItem
+          key={option.id}
+          value={option.id}
+          shortcut={option.shortcut}
+          closeOnClick
+        >
           {t(option.label)}
-        </DropdownMenuRadioItem>
+        </KeyedMenuRadioItem>
       ))}
     </DropdownMenuRadioGroup>
   );
@@ -511,7 +515,7 @@ function TasksMenuButton<T extends string>({
 }: {
   icon: ReactNode;
   label: string;
-  options: { id: T; label: string }[];
+  options: { id: T; label: string; shortcut: string }[];
   value: T;
   onSelect: (id: T) => void;
 }) {
@@ -525,9 +529,9 @@ function TasksMenuButton<T extends string>({
           <ChevronDown width={12} height={12} />
         </DropdownMenuTrigger>
       </span>
-      <DropdownMenuContent sideOffset={6} aria-label={t(label)} className="w-auto min-w-37">
+      <KeyedMenuContent sideOffset={6} aria-label={t(label)} className="w-auto min-w-37">
         <TasksMenu options={options} value={value} onSelect={onSelect} />
-      </DropdownMenuContent>
+      </KeyedMenuContent>
     </DropdownMenu>
   );
 }

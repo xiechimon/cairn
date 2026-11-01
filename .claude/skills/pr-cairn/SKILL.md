@@ -46,6 +46,12 @@ within lines, and decoded HTML entities; formatting and whitespace between
 lines do not count. Over the limit, it reports
 `too-long: <n> characters of prose outside tables, images, code and details (limit 600)`.
 Keep Proof and What short; put supporting output in tables or code blocks.
+
+A patch over 800 non-evidence lines or 40 non-evidence files (`docs/verify/**`
+left out, a rename counts two files) also needs `## Size` inside the collapsed
+details block: say why the change cannot be split. Oversize no longer routes
+to ian; the gate reds as `missing-section: Size` until the section is answered,
+and the review must answer why the change is this big.
 A section containing only fenced code or HTML comments is unanswered.
 
 A legacy `## Verified` aliases Proof. The complete legacy six-section shape
@@ -55,6 +61,15 @@ Use the new shape for new bodies. Any unchecked task outside fenced code and
 HTML comments still makes the task gate red, including inside details.
 Closing keywords belong in commit messages. For a multi-segment ticket,
 only the closing segment's commit message carries the parent closing keyword.
+
+## Glance card by change type
+
+Put one glance card under Proof so a reviewer sees the change without reading the diff:
+
+- Migrations (`apps/server/drizzle/**`): paste the output of `node scripts/schema-glance.mjs --base "$(git merge-base origin/main HEAD)" --head HEAD`, heading included. When the PR changes `apps/server/drizzle/**` since its merge base, the `pr-evidence` gate reds it if its `### Schema changes` rows differ from the script's output from that merge base to the PR head.
+- API changes: before and after request and response, captured with `verify-cairn`.
+- Cross-component flows: a Mermaid `sequenceDiagram`.
+- `scripts/ops/**`: the command and its run output.
 
 ## Screenshots
 
@@ -84,6 +99,17 @@ links using the pushed asset commit's full SHA:
 Use the side-branch commit SHA, never the implementation head or a branch
 name. Push before linking and never merge the asset branch. Keep the branch
 so the images remain reachable. Images belong outside code fences.
+
+## Pre-push review
+
+Before every push of a code change, get a fresh-context review from the other vendor and fix what it confirms before pushing. With Claude as the implementer, run Codex:
+
+```
+git diff origin/main...HEAD > /tmp/review.diff
+codex exec --sandbox read-only "Review /tmp/review.diff against docs/pr-review.md. List only defects with file:line, why it is wrong and a concrete failure. Say NO FINDINGS if there are none." < /dev/null
+```
+
+With Codex as the implementer, run the same prompt through `claude -p --permission-mode default --tools Read,Grep,Glob`. Fix each confirmed finding and rerun the review on the new diff. Record a skipped finding with its reason under Review. Docs-only changes outside protected paths skip this step.
 
 ## Mechanics
 
@@ -116,11 +142,13 @@ so the images remain reachable. Images belong outside code fences.
   or file path in backticks. The pr-evidence check runs
   `node scripts/english-only-gate.mjs --text <body>` and reds otherwise;
   run it locally on `/tmp/pr.md` before opening.
+- `coordinator-hold` means the coordinator asked for changes: `.mergify.yml`, `coordinator-merge.mjs` and `merge-pr.sh` all refuse the PR while it is on. Keep it on until you have pushed the requested work, then ask the coordinator to remove it.
 - Never add the `needs-decision` label to a PR. Agents decide by their own recommendation, say what they chose and why in chat, and continue; decisions routed to ian follow `AGENTS.md`, "Merge routes". Before asking ian about a PR whose auto-merge is armed, disarm it with `gh pr merge <n> --disable-auto`.
 - Before an agent enables merge, require passing CI checks and a pr-gate verdict of go with `mergedBy: 'auto-merge'` (`AGENTS.md`, "Merge routes"; protected-path PRs and every other route go to ian), with no unchecked tasks anywhere in the body. ian may admin-merge; agents may not use that authority.
 - Read the PR opener and every commit author: `gh pr view <n> --json author,commits`. Follow `docs/ops/agent-bot-identity.md` for the identity checks.
 - Bot-opened PRs require exactly one commit authored by `Cairnwright` (`merge-pr.sh` also accepts `cairnwright[bot]` with `Cairn-Thread:` and `Co-authored-by: xiechimon` trailers; see `docs/pr-review.md`, "Merge method by commit author") before a rebase merge. Use the dispatcher's `~/.cairn/tools/merge-pr.sh`; inspect its source and usage on the dispatch host before invoking it. If the helper is unavailable or the commit identity is wrong, stop and return the PR to the dispatcher.
-- Human-opened PRs use `gh pr merge <n> --squash --auto` after verifying their commits contain no `cairnwright[bot]` author. After a merge, read the main commit author and the `commit-author` Actions result.
+- PRs that `.mergify.yml` admits (not protected, not owner-routed, a `review-gate` success status and a green `merge-route` check) enter the Mergify merge queue automatically: add the `review-gate` label, then never `gh pr merge` them; the required `Mergify Merge Queue` check refuses a direct merge while a PR is queued. That check and `Mergify Merge Protections` list any unmet condition; a new push dequeues the PR and it re-enters once CI passes again. Protected and owner-routed PRs keep the human route.
+- Human-opened PRs that Mergify does not admit use `gh pr merge <n> --squash --auto` after verifying their commits contain no `cairnwright[bot]` author, on the route `AGENTS.md` gives them. After a merge, read the main commit author and the `commit-author` Actions result.
 - Prepare commits outside the App token wrapper, following `docs/ops/agent-bot-identity.md`. Verify that neither the author name nor email of any prepared commit contains `cairnwright[bot]` before pushing.
 - If main's author check fails, follow the recovery procedure in `docs/ops/agent-bot-identity.md`. Preserve main history. A subsequent compliant push checks its own `BEFORE_SHA..HEAD` range; verify the actual main commit author and Actions result after merging.
 
@@ -130,6 +158,7 @@ so the images remain reachable. Images belong outside code fences.
 |---|---|
 | `## Proof`, `## What`, `## Review`, `## Risk` answered, including headings inside details (legacy `## Verified` aliases Proof; Upstream is optional) | pr-evidence (required check) |
 | at most 600 visible prose characters outside tables, images, code, comments and details; complete legacy six-section bodies exempt | pr-evidence (required check) |
+| over 800 non-evidence lines or 40 non-evidence files: `## Size` answered inside the details block | pr-evidence (required check, file list from the PR files API) |
 | image links embedded + HTTP 200 | pr-evidence (required check) |
 | no unchecked tasks anywhere outside fenced code and HTML comments; no tasks required | pr-evidence (required check, pr-tasks step) |
 | body is English (Chinese only inside backticks or fences) | pr-evidence (required check, language step) |

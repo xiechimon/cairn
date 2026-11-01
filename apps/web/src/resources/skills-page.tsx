@@ -7,12 +7,11 @@ import { mapSkills } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { TOPBAR_TEXT_BUTTON } from '../board/filter-panel.js';
 import { EmptyState } from '../components/empty-state.js';
+import { KeyedMenuContent, KeyedMenuRadioItem } from '../components/menu-keys.js';
 import { Button } from '../components/ui/button.js';
 import {
   DropdownMenu,
-  DropdownMenuContent,
   DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu.js';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '../components/ui/input-group.js';
@@ -36,6 +35,7 @@ import { SkillImportDialog } from './skill-import-dialog.js';
 export const SKILLS_HREF = '/app/resources/skills';
 
 const SORT_OPTIONS = ['默认', '名称'] as const;
+const SORT_KEYS: Record<(typeof SORT_OPTIONS)[number], string> = { 默认: 'D', 名称: 'N' };
 type SortKind = (typeof SORT_OPTIONS)[number];
 
 export function SkillsPage() {
@@ -101,18 +101,23 @@ export function SkillsPage() {
                 <span>{t('排序')}</span>
                 <ChevronDown />
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" side="bottom" sideOffset={8} aria-label={t('排序')}>
+              <KeyedMenuContent align="end" side="bottom" sideOffset={8} aria-label={t('排序')}>
                 <DropdownMenuRadioGroup
                   value={sort}
                   onValueChange={(next) => setSort(next as SortKind)}
                 >
                   {SORT_OPTIONS.map((option) => (
-                    <DropdownMenuRadioItem key={option} value={option} closeOnClick>
+                    <KeyedMenuRadioItem
+                      key={option}
+                      value={option}
+                      shortcut={SORT_KEYS[option]}
+                      closeOnClick
+                    >
                       <span>{t(option)}</span>
-                    </DropdownMenuRadioItem>
+                    </KeyedMenuRadioItem>
                   ))}
                 </DropdownMenuRadioGroup>
-              </DropdownMenuContent>
+              </KeyedMenuContent>
             </DropdownMenu>
           </div>
           <ResourceList>

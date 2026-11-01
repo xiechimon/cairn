@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { collectTicketSources, findTicketConflicts } from './dispatch-dedupe.mjs';
 
-const START_GRACE_MS = 500;
+const START_GRACE_MS = Number(process.env.CAIRN_DISPATCH_START_GRACE_MS) || 500;
 const WAIT_POLL_MS = 500;
 const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const SCRIPT = fileURLToPath(import.meta.url);

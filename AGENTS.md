@@ -13,7 +13,7 @@
 - Do not set `TMPDIR` without `CAIRN_HEAVY_SLOTS_DIR`; all lanes must share the heavy-work slot directory.
 - Run `/security-review` before opening a PR touching any security surface below; fix confirmed findings, or record the reason in Risk and ask ian to confirm an unfixed finding.
 
-Security surfaces (keep this list synchronized with `.claude/workflows/pr-gate.js` and `packages/shared/src/records/merge-gate.ts`):
+Security surfaces (the `credentials`, `machineAndCommandBoundary` and `externalEntryAuth` lists in `packages/shared/merge-gate-paths.json`, the one source for protected and auto-merge paths; `apps/server/test/merge-gate-paths-json.test.ts` fails when this list differs):
 
 - Keys and encryption: `apps/server/src/lib/{secret-box,keys,token-auth,attachments-token}.ts`, `apps/server/src/services/{secrets,credentials,api-keys,oauth}.ts`
 - Machine registration and dispatch protocol: `apps/server/src/routes-machine.ts`, `apps/server/src/services/machine*.ts`, `apps/daemon/src/{credentials,secret-channel,machine-client}.ts`, `apps/daemon/src/backend/command-gate.ts`
@@ -40,8 +40,9 @@ Security surfaces (keep this list synchronized with `.claude/workflows/pr-gate.j
 - ian may admin-merge. That authority does not extend to agents.
 - Never add the `needs-decision` label. Agents decide by their own recommendation, say what they chose and why in chat, and continue; ask ian for payments, credentials, intended-behavior or ADR changes, and decisions explicitly routed to him. A `needs-decision` label already on a PR keeps `pr-evidence` red and disarms auto-merge until it is removed; agents remove it only with `CAIRN_DECIDED=1` after ian gave the decision in chat.
 - Before asking ian about a PR with auto-merge armed, disarm it with `gh pr merge <n> --disable-auto`.
+- A PR labelled `coordinator-hold` neither queues nor merges: the coordinator asked for changes. The session that owns it keeps the label on until it has pushed the requested work, then asks the coordinator to remove it.
 - Follow `.claude/skills/pr-cairn/SKILL.md` for PR creation and merge mechanics, and `docs/ops/agent-bot-identity.md` for bot versus human identity and merge methods.
-- After opening an eligible PR, arm its merge and stop; CI owns the remaining checks.
+- PRs that `.mergify.yml` admits enter the Mergify merge queue automatically once the review gate and `merge-route` pass; add the `review-gate` label and stop, and never `gh pr merge` them. Protected-path and owner-routed PRs keep ian's route.
 
 ## How to work
 
@@ -55,6 +56,7 @@ Security surfaces (keep this list synchronized with `.claude/workflows/pr-gate.j
 - After code changes, run `pnpm lint`, `pnpm typecheck` and `pnpm spec:parse`; also run `pnpm spec:parse` after resolving e2e conflicts. Do not run `pnpm build` before committing.
 - Run `pnpm prepush` before pushing. It runs fast checks only; tests run in CI. A push is unverified until CI reports on that head. Run the exact command of any CI step your diff changes.
 - Verify mechanism changes on compiled output, runtime logs or snapshots; use `.claude/skills/verify-cairn/SKILL.md` for acceptance guidance.
+- Before every push of a code change, run a fresh-context review on the other vendor (`codex exec` from Claude, `claude -p` from Codex; see `.claude/skills/pr-cairn/SKILL.md`, "Pre-push review") and fix confirmed findings before pushing.
 - Use one review round before opening a code PR; require a fresh, other-vendor independent review only for protected or security paths. Docs-only changes outside protected or security paths skip code review; protected or security paths always get the independent review. Fix confirmed findings and record unfixed findings with reasons in Risk.
 - After three review rounds, rethink the approach or hand the PR to ian.
 - Review PRs with `docs/pr-review.md`; read diffs without switching branches in a shared worktree.

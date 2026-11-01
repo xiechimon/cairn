@@ -7,7 +7,7 @@ const SCHEDULES = '/app/schedules?scenario=01';
 const PROJECTS = '/app?scenario=newtask-projects&view=board';
 
 const FIRST_PROJECT_ID = 'ZAQczKCu0MOAzC1ZqcFlX';
-const PROJECT = '/app/project/ZAQczKCu0MOAzC1ZqcFlX?scenario=r2-24b&tab=tasks';
+const PROJECT = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=r2-24b&tab=tasks';
 
 const AGENT_DETAIL = '/app/resources/agents/r3-builder?scenario=agent-detail';
 const AUTHORIZE = '/app/machines/authorize';
@@ -423,7 +423,8 @@ test('plain ↵ in the spec textarea stays the newline key — no hijack', async
 
 test('the `保存并开始` button carries a visible ⌘↵ badge at rest', async ({ page }) => {
   const dialog = await openNewTask(page);
-  const badge = dialog.locator('.new-task-start kbd');
+  const badge = dialog.locator('.new-task-start [data-slot="key-hint"]');
+  await expect(dialog.locator('.new-task-start kbd')).toHaveCount(0);
   // always-on form (not kbd-hint's hover chip): visible with no pointer on it
   await expect(badge).toBeVisible();
   await expect(badge).toHaveText('⌘↵');

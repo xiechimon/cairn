@@ -10,7 +10,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
@@ -43,9 +43,13 @@ function host({
   labelled,
   failLabel,
   bigDiff,
+  bulkFiles,
   comments,
   failStatus,
   staleHead,
+  setup,
+  files,
+  labels,
 }) {
   const home = mkdtempSync(join(tmpdir(), 'review-gate-host-'));
   const bin = join(home, 'bin');
@@ -59,12 +63,15 @@ function host({
     join(home, '.cairn/tools/governor'),
     join(home, '.local/state/ai-route'),
     join(home, '.local/state/review-gate'),
-    join(work, 'packages/shared/src/records'),
+    join(work, 'packages/shared'),
   ])
     mkdirSync(dir, { recursive: true });
   writeFileSync(
-    join(work, 'packages/shared/src/records/merge-gate.ts'),
-    "export const PROTECTED_PATH_GLOBS = [\n  'scripts/**',\n];\n",
+    join(work, 'packages/shared/merge-gate-paths.json'),
+    `${JSON.stringify({
+      protected: ['scripts/**', 'docs/adr/**'],
+      limits: { maxLines: 800, maxFiles: 40 },
+    })}\n`,
   );
   git(home, 'init', '-q', '--bare', origin);
   git(work, 'init', '-q', '-b', 'main');
@@ -72,20 +79,61 @@ function host({
   git(work, 'commit', '-q', '-m', 'base');
   git(work, 'remote', 'add', 'origin', origin);
   git(work, 'push', '-q', 'origin', 'main');
-  writeFileSync(join(work, 'feature.txt'), 'change\n');
-  if (bigDiff) {
-    writeFileSync(join(work, 'benign.txt'), `${'benign line\n'.repeat(12_000)}`);
-    mkdirSync(join(work, 'scripts'), { recursive: true });
-    writeFileSync(join(work, 'scripts/zz-gate.mjs'), 'export const gate = false;\n');
-  }
-  git(work, 'add', '.');
-  git(work, 'commit', '-q', '-m', 'change');
+  git(work, 'checkout', '-q', '-b', 'pr');
+  const commit = (changes, message) => {
+    for (const [path, content] of Object.entries(changes)) {
+      if (content === null) rmSync(join(work, path));
+      else {
+        mkdirSync(dirname(join(work, path)), { recursive: true });
+        writeFileSync(join(work, path), content);
+      }
+    }
+    git(work, 'add', '-A');
+    git(work, 'commit', '-q', '-m', message);
+    return git(work, 'rev-parse', 'HEAD').trim();
+  };
+  const onMain = (changes, message) => {
+    git(work, 'checkout', '-q', 'main');
+    const moved = commit(changes, message);
+    git(work, 'push', '-q', 'origin', 'main');
+    git(work, 'checkout', '-q', 'pr');
+    return moved;
+  };
+  const merge = (changes) => {
+    git(work, 'merge', '-q', '--no-ff', '--no-edit', '--no-commit', 'main');
+    return commit(changes ?? {}, 'merge main');
+  };
+  const patchOf = (ref) =>
+    execFileSync(
+      'bash',
+      ['-c', `git diff origin/main...${ref} | git patch-id --stable | cut -d' ' -f1`],
+      { cwd: work, encoding: 'utf8' },
+    ).trim();
+  const featureChange = () => {
+    commit(
+      {
+        'feature.txt': 'change\n',
+        ...(bulkFiles
+          ? {
+              ...Object.fromEntries(
+                Array.from({ length: bulkFiles }, (_, i) => [`bulk/f${i}.txt`, 'x\n']),
+              ),
+              'docs/verify/2372/run.txt': `${'evidence\n'.repeat(900)}`,
+            }
+          : {}),
+        ...(bigDiff
+          ? {
+              'benign.txt': `${'benign line\n'.repeat(12_000)}`,
+              'scripts/zz-gate.mjs': 'export const gate = false;\n',
+            }
+          : {}),
+      },
+      'change',
+    );
+  };
+  const extra = (setup ?? featureChange)({ commit, onMain, merge, patchOf }) ?? {};
   const sha = git(work, 'rev-parse', 'HEAD').trim();
-  const patch = execFileSync(
-    'bash',
-    ['-c', "git diff HEAD~1 HEAD | git patch-id --stable | cut -d' ' -f1"],
-    { cwd: work, encoding: 'utf8' },
-  ).trim();
+  const patch = patchOf('HEAD');
   git(work, 'push', '-q', 'origin', 'HEAD:refs/pull/2306/head');
   git(home, 'clone', '-q', origin, join(home, 'lanes/cairn'));
 
@@ -94,9 +142,9 @@ function host({
     isDraft: false,
     headRefOid: staleHead ? 'd'.repeat(40) : sha,
     headRefName: 'lane/2303',
-    files: [{ path: 'feature.txt' }],
+    files: files ?? [{ path: 'feature.txt' }],
     title: 'web(2303): example',
-    labels: labelled ? [{ name: 'review-stalled' }] : [],
+    labels: [...(labelled ? [{ name: 'review-stalled' }] : []), ...(labels ?? [])],
     autoMergeRequest: null,
   };
   writeFileSync(join(home, 'prs.json'), JSON.stringify([pr]));
@@ -104,7 +152,7 @@ function host({
     writeFileSync(join(home, 'comments.json'), JSON.stringify({ comments: list }));
   setComments([
     ...(stallNoted ? [{ author: GATE, body: `<!-- review-gate-stalled:${sha} -->\nnoted` }] : []),
-    ...(comments ? comments({ sha, patch }) : []),
+    ...(comments ? comments({ sha, patch, ...extra }) : []),
   ]);
   const failStatusFlag = join(home, 'fail-status');
   if (failStatus) writeFileSync(failStatusFlag, '');
@@ -145,6 +193,8 @@ exec "$@"
     join(bin, 'ai-route'),
     `#!/bin/sh
 echo "ai-route $AI_ROUTE_EXCLUDE_VENDORS" >> "${log}"
+for arg; do prompt=$arg; done
+printf '%s' "$prompt" > "${home}/ai-route-prompt.txt"
 echo "ai-route: no usable model for role review" >&2
 exit 1
 `,
@@ -176,7 +226,7 @@ printf '%s\\n' "${claude}"
     rmSync(failStatusFlag, { force: true });
     return round();
   };
-  return { ...round(), sha, patch, home, next };
+  return { ...round(), sha, patch, home, next, ...extra };
 }
 
 const statusPosts = (calls) =>
@@ -270,6 +320,20 @@ test('a diff over the cap never reaches Claude, so a hidden change cannot PASS',
   assert.doesNotMatch(calls, /Independent review gate: PASS/);
 });
 
+test('the reviewer is told the PR is oversize and must answer why it is this big', () => {
+  const { home } = host({ author: openai, claude: 'VERDICT: pass', bulkFiles: 41 });
+  const input = readFileSync(join(home, 'claude-input.txt'), 'utf8');
+  assert.match(input, /Size: OVERSIZE, 42 lines, 42 files outside docs\/verify/);
+  assert.match(input, /Why is it this big/);
+});
+
+test('a PR within limits gets the size facts without the oversize question', () => {
+  const { home } = host({ author: openai, claude: 'VERDICT: pass' });
+  const input = readFileSync(join(home, 'claude-input.txt'), 'utf8');
+  assert.match(input, /Size: within limits, 1 lines, 1 files outside docs\/verify/);
+  assert.doesNotMatch(input, /Size: OVERSIZE/);
+});
+
 test('a PASS publishes a success status on the reviewed head, after a pending one', () => {
   const { run, calls, sha } = host({ author: openai, claude: 'VERDICT: pass' });
   assert.equal(run.status, 0, run.stderr);
@@ -355,4 +419,222 @@ test('the stall alert keeps the head pending and links the alert', () => {
   assert.ok(posts.every((post) => post.rest.startsWith('-f state=pending ')));
   assert.ok(posts.at(-1).rest.endsWith(`-f target_url=${COMMENT_URL}`));
   assert.match(posts.at(-1).rest, /description=No verdict for over an hour/);
+});
+
+const blockComment = (sha, review) => ({
+  author: GATE,
+  url: COMMENT_URL,
+  body: `<!-- review-gate:${sha} -->\n**Independent review gate: BLOCK** for \`${sha.slice(0, 8)}\`.\n\n${review}\n<!-- review-gate-patch:p -->`,
+});
+const tenLines = (over = {}) =>
+  `${Array.from({ length: 10 }, (_, k) => over[k + 1] ?? `line ${k + 1}`).join('\n')}\n`;
+const mergedMain =
+  ({ mergeChanges, after } = {}) =>
+  ({ commit, onMain, merge, patchOf }) => {
+    onMain({ 'shared.txt': tenLines() }, 'shared');
+    merge();
+    const old = commit({ 'shared.txt': tenLines({ 6: 'six from the PR' }) }, 'pr change');
+    const oldPatch = patchOf(old);
+    onMain({ 'shared.txt': tenLines({ 4: 'four from main' }) }, 'main moved');
+    merge(mergeChanges);
+    if (after) commit(after, 'after the merge');
+    return { old, oldPatch };
+  };
+
+test('a head that only merged main carries over the PASS even when the patch id moved', () => {
+  const { calls, sha, old, oldPatch, patch } = host({
+    author: anthropic,
+    setup: mergedMain(),
+    comments: ({ old, oldPatch }) => [verdictComment(old, 'PASS', oldPatch)],
+  });
+  assert.notEqual(patch, oldPatch);
+  assert.doesNotMatch(calls, /ai-route/);
+  assert.match(
+    calls,
+    new RegExp(
+      `<!-- review-gate:${sha} -->\\n\\*\\*Independent review gate: PASS\\*\\* \\(carried over\\) for \`${sha.slice(0, 8)}\`: the reviewed head \`${old.slice(0, 8)}\` only merged main`,
+    ),
+  );
+  assert.equal(
+    onlyFor(calls, sha).at(-1).rest,
+    `-f state=success -f context=review-gate -f description=PASS (carried over from ${old.slice(0, 8)}) -f target_url=${COMMENT_URL}`,
+  );
+});
+
+test('a BLOCK is never carried over to a head that only merged main', () => {
+  const { calls } = host({
+    author: anthropic,
+    setup: mergedMain(),
+    comments: ({ old, oldPatch }) => [verdictComment(old, 'BLOCK', oldPatch)],
+  });
+  assert.match(calls, /ai-route anthropic/);
+  assert.doesNotMatch(calls, /carried over/);
+});
+
+test('a merge that edits the PR, or a commit after the merge, is reviewed again', () => {
+  for (const variant of [
+    { mergeChanges: { 'shared.txt': tenLines({ 4: 'four from main', 6: 'six from the merge' }) } },
+    { mergeChanges: { 'smuggled.txt': 'x\n' } },
+    { after: { 'other.txt': 'x\n' } },
+  ]) {
+    const { calls } = host({
+      author: anthropic,
+      setup: mergedMain(variant),
+      comments: ({ old, oldPatch }) => [verdictComment(old, 'PASS', oldPatch)],
+    });
+    assert.match(calls, /ai-route anthropic/, JSON.stringify(variant));
+    assert.doesNotMatch(calls, /carried over/, JSON.stringify(variant));
+  }
+});
+
+test('a new head after a BLOCK is judged on its changes since the blocked head', () => {
+  const { home, old } = host({
+    author: openai,
+    claude: 'VERDICT: pass',
+    setup: ({ commit }) => {
+      const old = commit({ 'feature.txt': 'change\n' }, 'change');
+      commit({ 'second file [x]*.txt': 'fix\n', 'naïve.txt': 'also\n' }, 'fix');
+      return { old };
+    },
+    comments: ({ old }) => [blockComment(old, '1. blocking: feature.txt:1 wrong')],
+  });
+  const prompt = readFileSync(join(home, 'ai-route-prompt.txt'), 'utf8');
+  assert.match(prompt, /1\. blocking: feature\.txt:1 wrong/);
+  assert.match(prompt, /"still unfixed"/);
+  assert.match(prompt, /read `\.git\/review-gate-2306-since\.diff`/);
+  assert.equal(
+    git(join(home, 'lanes/cairn'), 'rev-parse', 'review-gate-2306-reviewed').trim(),
+    old,
+  );
+  const sinceFile = readFileSync(
+    join(home, 'lanes/cairn/.git/review-gate-2306-since.diff'),
+    'utf8',
+  );
+  assert.match(sinceFile, /second file \[x\]\*\.txt/);
+  assert.match(sinceFile, /^\+fix$/m);
+  assert.match(sinceFile, /^\+also$/m);
+  assert.doesNotMatch(sinceFile, /^\+change$/m);
+  const input = readFileSync(join(home, 'claude-input.txt'), 'utf8');
+  const since = input.slice(input.lastIndexOf(`Changes since \`${old.slice(0, 8)}\` in this PR`));
+  assert.match(since, /^\+fix$/m);
+  assert.doesNotMatch(since, /^\+change$/m);
+  assert.match(input.slice(0, input.length - since.length), /^\+change$/m);
+});
+
+test('earlier findings still reach the reviewer when the blocked head is gone', () => {
+  const { home } = host({
+    author: anthropic,
+    comments: () => [blockComment('e'.repeat(40), '1. blocking: feature.txt:1 wrong')],
+  });
+  const prompt = readFileSync(join(home, 'ai-route-prompt.txt'), 'utf8');
+  assert.match(prompt, /feature\.txt:1 wrong/);
+  assert.match(prompt, /review the full diff/);
+  assert.doesNotMatch(prompt, /review-gate-2306-reviewed/);
+});
+
+const threeBlocks = ['1', '2', '3'].map((c) => blockComment(c.repeat(40), `${c}. blocking: x`));
+const humanNote = (sha) => ({
+  author: GATE,
+  url: COMMENT_URL,
+  body: `<!-- review-gate-human:${sha} -->\nnote`,
+});
+
+test('three BLOCK rounds stop the reviews and hand the PR to a human', () => {
+  const { calls, sha } = host({ author: anthropic, comments: () => threeBlocks });
+  assert.doesNotMatch(calls, /ai-route/);
+  assert.match(calls, /bot gh pr edit 2306 -R xiechimon\/cairn --add-label review-gate-human/);
+  assert.equal(calls.match(/bot gh pr comment 2306/g)?.length, 1);
+  assert.match(calls, new RegExp(`<!-- review-gate-human:${sha} -->`));
+  assert.match(calls, /needs a human after 3 BLOCK rounds/);
+  assert.equal(
+    onlyFor(calls, sha).at(-1).rest,
+    `-f state=failure -f context=review-gate -f description=3 BLOCK rounds; needs a human -f target_url=${COMMENT_URL}`,
+  );
+});
+
+test('the review-gate-human label keeps the PR skipped until it is removed', () => {
+  const human = [{ name: 'review-gate-human' }];
+  const held = host({
+    author: anthropic,
+    labels: human,
+    comments: ({ sha }) => [...threeBlocks, humanNote(sha)],
+  });
+  assert.doesNotMatch(held.calls, /ai-route|pr comment|add-label/);
+  assert.match(onlyFor(held.calls, held.sha).at(-1).rest, /^-f state=failure .*needs a human/);
+  const noted = host({ author: anthropic, labels: human, comments: () => threeBlocks });
+  assert.equal(noted.calls.match(/bot gh pr comment 2306/g)?.length, 1);
+  assert.doesNotMatch(noted.calls, /ai-route|add-label/);
+  const resumed = host({
+    author: anthropic,
+    comments: ({ sha }) => [...threeBlocks, humanNote(sha)],
+  });
+  assert.match(resumed.calls, /ai-route anthropic/);
+  assert.doesNotMatch(resumed.calls, /review-gate-human/);
+});
+
+test('a failed review-gate-human label is retried before the comment is posted', () => {
+  const { run, calls } = host({ author: anthropic, failLabel: true, comments: () => threeBlocks });
+  assert.equal(run.status, 0, run.stderr);
+  assert.match(calls, /--add-label review-gate-human/);
+  assert.doesNotMatch(calls, /pr comment|ai-route/);
+  assert.match(run.stdout, /review-gate-human label failed; retrying next round/);
+});
+
+test('a PR of only docs, tests and locale strings passes as the low-risk tier', () => {
+  const { calls, sha } = host({
+    author: anthropic,
+    setup: ({ commit }) => {
+      commit(
+        {
+          'docs/guide.md': 'x\n',
+          'apps/web/test/a.test.ts': 'x\n',
+          'apps/web/src/locales/zh/app.json': '{}\n',
+        },
+        'docs',
+      );
+    },
+  });
+  assert.doesNotMatch(calls, /ai-route/);
+  assert.match(
+    calls,
+    new RegExp(
+      `<!-- review-gate:${sha} -->\\n\\*\\*Independent review gate: PASS\\*\\* for \`${sha.slice(0, 8)}\` \\(low-risk tier\\)`,
+    ),
+  );
+  assert.equal(
+    onlyFor(calls, sha).at(-1).rest,
+    `-f state=success -f context=review-gate -f description=PASS (low-risk tier) -f target_url=${COMMENT_URL}`,
+  );
+});
+
+test('a PR that was blocked before never leaves through the low-risk tier', () => {
+  const { calls } = host({
+    author: anthropic,
+    setup: ({ commit }) => {
+      commit({ 'apps/web/test/a.test.ts': 'weakened\n' }, 'tests only');
+    },
+    comments: () => [blockComment('1'.repeat(40), '1. blocking: a.test.ts:1 weakened')],
+  });
+  assert.match(calls, /ai-route anthropic/);
+  assert.doesNotMatch(calls, /low-risk tier/);
+});
+
+test('a protected doc, a file the PR list missed or a deleted test is still reviewed', () => {
+  for (const setup of [
+    ({ commit }) => {
+      commit({ 'docs/adr/0001-x.md': 'x\n' }, 'adr');
+    },
+    ({ commit }) => {
+      commit({ 'docs/guide.md': 'x\n', 'feature.txt': 'x\n' }, 'mixed');
+    },
+    ({ commit, onMain, merge }) => {
+      onMain({ 'apps/web/test/old.test.ts': 'x\n' }, 'add test');
+      merge();
+      commit({ 'apps/web/test/old.test.ts': null }, 'drop test');
+    },
+  ]) {
+    const { calls } = host({ author: anthropic, files: [{ path: 'docs/guide.md' }], setup });
+    assert.match(calls, /ai-route anthropic/);
+    assert.doesNotMatch(calls, /low-risk tier/);
+  }
 });

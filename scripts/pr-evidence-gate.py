@@ -12,6 +12,16 @@ count, and the template ships its guidance as HTML comments so an untouched
 template fails. Proof quality, including the old-code failing output and
 new-code passing output, is a reviewer judgment.
 
+Size check (#2372): a PR over limits.maxLines non-evidence lines or
+limits.maxFiles non-evidence files (packages/shared/merge-gate-paths.json,
+read beside this script; unreadable limits fail closed)
+(counted as apps/server/src/services/merge-gate/digest.ts counts: docs/verify
+evidence is left out, a rename counts two files) must carry a `## Size`
+section inside the collapsed details block, stating why the change cannot be
+split. The file list comes from the `files` key of the context JSON given as
+the second argument (the GitHub pulls/files response, paginated or flat); a
+run without a context argument does not check size.
+
 Link checks (#750): image links in the PR body must be embedded
 (`![label](url)`) and must answer HTTP 200 (catches bad SHAs).
 
@@ -62,15 +72,25 @@ Fenced code blocks do not exempt image links: agents list evidence in
 code fences, and an image link in a fence renders nowhere (#940 keeps
 this a non-goal).
 
+Schema evidence: with `--schema-glance <file>` (the output of
+scripts/schema-glance.mjs from the merge base of base and head to head,
+passed by the workflow only when base...head touches apps/server/drizzle/**,
+so migrations merged into main after the PR branched never count), the body
+must carry a
+`### Schema changes` section whose table rows equal that file's rows.
+
 Usage:
-  PR_BODY='<pr body>' python3 scripts/pr-evidence-gate.py   # CI entry point
+  python3 scripts/pr-evidence-gate.py body.md context.json   # CI entry point
+  PR_BODY='<pr body>' python3 scripts/pr-evidence-gate.py
   python3 scripts/pr-evidence-gate.py path/to/body.md        # local testing
 
 Exit 0 when the body passes, 1 otherwise. Findings name the section or
 the URL (with its line for bare URLs).
 """
+import json
 import os
 from html import unescape
+from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 import re
 import subprocess
@@ -104,6 +124,21 @@ FOLD_MARKUP = re.compile(r'</?details\b[^>]*>|<summary\b[^>]*>.*?</summary\s*>',
 INLINE_CODE = re.compile(r'(?P<ticks>`+)(?!`).*?(?<!`)(?P=ticks)(?!`)', re.S)
 DETAILS_TAG = re.compile(r'<(?P<closing>/)?details\b[^>]*>', re.I)
 PROSE_LIMIT = 600
+EVIDENCE_PREFIX = 'docs/verify/'
+SCHEMA_HEADING = re.compile(r'^### Schema changes[ \t]*$', re.M)
+ANY_HEADING = re.compile(r'^#{1,6}[ \t]+', re.M)
+NO_SCHEMA_CHANGES = 'No schema changes'
+GATE_PATHS = Path(__file__).resolve().parent.parent / 'packages/shared/merge-gate-paths.json'
+
+
+def size_limits():
+    try:
+        limits = json.loads(GATE_PATHS.read_text(encoding='utf-8')).get('limits', {})
+    except (OSError, ValueError, AttributeError):
+        return None
+    values = (limits.get('maxLines'), limits.get('maxFiles'))
+    valid = all(isinstance(v, int) and not isinstance(v, bool) and v > 0 for v in values)
+    return values if valid else None
 
 
 def section_contents(body):
@@ -115,6 +150,39 @@ def section_contents(body):
         nxt = headers[i + 1][0] if i + 1 < len(headers) else len(text)
         contents.setdefault(heading.lower(), text[hend:nxt])
     return contents
+
+
+def is_evidence_entry(file):
+    previous = file.get('previous_filename')
+    return file['filename'].startswith(EVIDENCE_PREFIX) and (
+        not previous or previous.startswith(EVIDENCE_PREFIX))
+
+
+def patch_size(files):
+    kept = [file for file in files if not is_evidence_entry(file)]
+    lines = sum(file['additions'] + file['deletions'] for file in kept)
+    counted_files = sum(2 if file.get('previous_filename') else 1 for file in kept)
+    return lines, counted_files
+
+
+def flatten_pages(files):
+    return [file for page in files for file in (page if isinstance(page, list) else [page])]
+
+
+def size_section_state(body):
+    text = visible_markdown(body)
+    headings = [(m.start(), m.end(), m.group(1).strip().lower()) for m in H2.finditer(text)]
+    for i, (start, end, heading) in enumerate(headings):
+        if heading != 'size':
+            continue
+        stop = headings[i + 1][0] if i + 1 < len(headings) else len(text)
+        if not FOLD_MARKUP.sub('', text[end:stop]).strip():
+            return 'empty'
+        depth = 0
+        for tag in DETAILS_TAG.finditer(text[:start]):
+            depth = max(depth - 1, 0) if tag['closing'] else depth + 1
+        return 'answered' if depth else 'outside-details'
+    return 'missing'
 
 
 def is_legacy_body(contents):
@@ -253,9 +321,52 @@ def describe(link):
     return f"[{link['label']}]({link['url']})"
 
 
+def load_patch_files(path):
+    with open(path, encoding='utf-8') as f:
+        files = json.load(f).get('files')
+    if not isinstance(files, list):
+        return None
+    files = flatten_pages(files)
+    valid = all(isinstance(file, dict) and isinstance(file.get('filename'), str)
+                and isinstance(file.get('additions'), int) and isinstance(file.get('deletions'), int)
+                for file in files)
+    return files if valid else None
+
+
+def schema_rows(markdown):
+    text = visible_markdown(markdown)
+    heading = SCHEMA_HEADING.search(text)
+    if heading is None:
+        return None
+    rest = text[heading.end():]
+    following = ANY_HEADING.search(rest)
+    section = rest[:following.start()] if following else rest
+    return [' '.join(line.split()) for line in section.splitlines()
+            if line.strip().startswith('|') or line.strip() == NO_SCHEMA_CHANGES]
+
+
+def schema_verdict(body, expected_markdown):
+    expected = schema_rows(expected_markdown)
+    actual = schema_rows(body)
+    if actual is None:
+        return 'missing'
+    return 'matches' if actual == expected else 'stale'
+
+
+def split_schema_glance(argv):
+    args = list(argv)
+    if '--schema-glance' not in args:
+        return args, None
+    at = args.index('--schema-glance')
+    with open(args[at + 1], encoding='utf-8') as f:
+        expected = f.read()
+    return args[:at] + args[at + 2:], expected
+
+
 def main():
-    if len(sys.argv) > 1:
-        with open(sys.argv[1], encoding='utf-8') as f:
+    args, schema_glance = split_schema_glance(sys.argv[1:])
+    if args:
+        with open(args[0], encoding='utf-8') as f:
             body = f.read()
     else:
         body = os.environ.get('PR_BODY', '')
@@ -263,6 +374,14 @@ def main():
         body = ''
 
     failures = []
+
+    if schema_glance is not None:
+        verdict = schema_verdict(body, schema_glance)
+        if verdict == 'matches':
+            print("pr-evidence: schema-changes: matches the schema-glance output")
+        else:
+            failures.append('schema-changes')
+            print(f"FAIL schema-changes: {verdict}: paste the output of scripts/schema-glance.mjs from the merge base to head under '### Schema changes'")
 
     verdicts = section_verdicts(body)
     answered = sum(1 for v in verdicts.values() if v == 'answered')
@@ -286,6 +405,32 @@ def main():
         print("pr-evidence: the global show-me /pr template "
               "(Summary/Evidence/Merge Danger) does not satisfy this gate; "
               "use the repo skill .claude/skills/pr-cairn/SKILL.md.")
+
+    if len(args) > 1:
+        patch_files = load_patch_files(args[1])
+        limits = size_limits()
+        if patch_files is None:
+            failures.append('size-unreadable')
+            print("FAIL size-unreadable: the context JSON has no usable pull request file list")
+        elif limits is None:
+            failures.append('size-unreadable')
+            print(f"FAIL size-unreadable: {GATE_PATHS} has no positive integer limits.maxLines and limits.maxFiles")
+        else:
+            max_lines, max_files = limits
+            lines, counted_files = patch_size(patch_files)
+            if lines > max_lines or counted_files > max_files:
+                print(f"pr-evidence: oversize ({lines} lines, {counted_files} files; "
+                      f"limits {max_lines} lines, {max_files} files): a ## Size section is required")
+                state = size_section_state(body)
+                if state == 'missing':
+                    failures.append('Size')
+                    print("FAIL missing-section: Size (state why this change cannot be split)")
+                elif state == 'empty':
+                    failures.append('Size')
+                    print("FAIL empty-section: Size (state why this change cannot be split)")
+                elif state == 'outside-details':
+                    failures.append('Size')
+                    print("FAIL size-outside-details: Size belongs inside the collapsed details block")
 
     characters = prose_length(body)
     if not legacy and characters > PROSE_LIMIT:

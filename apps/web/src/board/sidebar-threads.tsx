@@ -11,7 +11,13 @@ import {
   Pencil,
   Trash2,
 } from 'lucide-react';
-import { type KeyboardEvent, type ReactNode, useRef, useState } from 'react';
+import { type ReactNode, useRef, useState } from 'react';
+import {
+  KeyedMenuContent,
+  KeyedMenuItem,
+  KeyedMenuSubContent,
+  KeyedMenuSubTrigger,
+} from '../components/menu-keys.js';
 import {
   SidebarProjectRow,
   SidebarThreadList,
@@ -21,13 +27,8 @@ import type { StoneTone } from '../components/stone/tone.js';
 import { Button } from '../components/ui/button.js';
 import {
   DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuShortcut,
   DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu.js';
 import type { TodoRecord } from '../fixtures/records.js';
@@ -36,7 +37,7 @@ import type { SnoozeChoice } from './snooze-presets.js';
 
 export type ThreadStatus = 'running' | 'needs-you' | 'failed' | 'done' | 'idle';
 
-const THREAD_TONE: Record<ThreadStatus, StoneTone> = {
+export const THREAD_TONE: Record<ThreadStatus, StoneTone> = {
   running: 'working',
   'needs-you': 'waiting',
   failed: 'waiting',
@@ -83,14 +84,6 @@ interface ThreadMenuProps {
   onDelete: (todo: TodoRecord) => void;
 }
 
-function KeyHint({ children }: { children: ReactNode }) {
-  return (
-    <DropdownMenuShortcut data-testid="menu-key-hint" className="flex-1 text-right">
-      {children}
-    </DropdownMenuShortcut>
-  );
-}
-
 function ThreadMenu({
   todo,
   onMarkUnread,
@@ -109,26 +102,6 @@ function ThreadMenu({
   const changeOpen = (next: boolean) => {
     setOpen(next);
     if (!next) setSnoozeOpen(false);
-  };
-  const runAndClose = (action: () => void) => () => {
-    changeOpen(false);
-    action();
-  };
-  const keyActions: Record<string, () => void> = {
-    u: runAndClose(() => onMarkUnread(todo)),
-    r: runAndClose(() => onRename(todo)),
-    s: () => setSnoozeOpen(true),
-    l: runAndClose(copyLink),
-    a: runAndClose(() => onArchive(todo)),
-    d: runAndClose(() => onDelete(todo)),
-  };
-  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.ctrlKey || event.metaKey || event.altKey) return;
-    if (!event.currentTarget.contains(event.target as Node)) return;
-    const action = keyActions[event.key.toLowerCase()];
-    if (action === undefined) return;
-    event.preventDefault();
-    action();
   };
   const label = t('线程操作：{title}', {
     title: todo.title === '' ? `#${todo.seqNum}` : todo.title,
@@ -149,79 +122,86 @@ function ThreadMenu({
           </Button>
         }
       />
-      <DropdownMenuContent
+      <KeyedMenuContent
         align="end"
         side="bottom"
         sideOffset={4}
         anchor={() => triggerRef.current?.closest('[data-slot="sidebar-thread-row"]') ?? null}
         aria-label={label}
         className="w-48"
-        onKeyDown={handleKeyDown}
       >
-        <DropdownMenuItem data-testid="thread-row-mark-unread" onClick={() => onMarkUnread(todo)}>
+        <KeyedMenuItem
+          data-testid="thread-row-mark-unread"
+          shortcut="U"
+          onClick={() => onMarkUnread(todo)}
+        >
           <MailOpen />
           {t('标记为未读')}
-          <KeyHint>U</KeyHint>
-        </DropdownMenuItem>
-        <DropdownMenuItem data-testid="thread-row-rename" onClick={() => onRename(todo)}>
+        </KeyedMenuItem>
+        <KeyedMenuItem data-testid="thread-row-rename" shortcut="R" onClick={() => onRename(todo)}>
           <Pencil />
           {t('重命名')}
-          <KeyHint>R</KeyHint>
-        </DropdownMenuItem>
+        </KeyedMenuItem>
         <DropdownMenuSub open={snoozeOpen} onOpenChange={setSnoozeOpen}>
-          <DropdownMenuSubTrigger data-testid="thread-row-snooze">
+          <KeyedMenuSubTrigger data-testid="thread-row-snooze" shortcut="S">
             <AlarmClock />
             {t('暂停至')}
-            <KeyHint>S</KeyHint>
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent data-testid="thread-snooze-menu" className="w-60">
-            <DropdownMenuItem
+          </KeyedMenuSubTrigger>
+          <KeyedMenuSubContent data-testid="thread-snooze-menu" className="w-60">
+            <KeyedMenuItem
               data-testid="thread-snooze-needed"
+              shortcut="N"
               onClick={() => onSnooze(todo, 'needed')}
             >
               {t('需要时（智能体唤醒）')}
-            </DropdownMenuItem>
-            <DropdownMenuItem
+            </KeyedMenuItem>
+            <KeyedMenuItem
               data-testid="thread-snooze-tomorrow"
+              shortcut="T"
               onClick={() => onSnooze(todo, 'tomorrow-09:00')}
             >
               {t('明天 09:00')}
-            </DropdownMenuItem>
-            <DropdownMenuItem
+            </KeyedMenuItem>
+            <KeyedMenuItem
               data-testid="thread-snooze-monday"
+              shortcut="M"
               onClick={() => onSnooze(todo, 'next-monday')}
             >
               {t('下周一')}
-            </DropdownMenuItem>
-            <DropdownMenuItem
+            </KeyedMenuItem>
+            <KeyedMenuItem
               data-testid="thread-snooze-pick"
+              shortcut="P"
               onClick={() => onSnooze(todo, 'pick')}
             >
               {t('选择时间…')}
-            </DropdownMenuItem>
-          </DropdownMenuSubContent>
+            </KeyedMenuItem>
+          </KeyedMenuSubContent>
         </DropdownMenuSub>
-        <DropdownMenuItem data-testid="thread-row-copy-link" onClick={copyLink}>
+        <KeyedMenuItem data-testid="thread-row-copy-link" shortcut="L" onClick={copyLink}>
           <Copy />
           {t('复制链接')}
-          <KeyHint>L</KeyHint>
-        </DropdownMenuItem>
-        <DropdownMenuItem data-testid="thread-row-archive" onClick={() => onArchive(todo)}>
+        </KeyedMenuItem>
+        <KeyedMenuItem
+          data-testid="thread-row-archive"
+          shortcut="A"
+          onClick={() => onArchive(todo)}
+        >
           <Archive />
           {t('Archive')}
-          <KeyHint>A</KeyHint>
-        </DropdownMenuItem>
+        </KeyedMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem
+        <KeyedMenuItem
           variant="destructive"
           data-testid="thread-row-delete"
+          shortcut="D"
+          confirms
           onClick={() => onDelete(todo)}
         >
           <Trash2 />
           {t('删除')}
-          <KeyHint>D</KeyHint>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
+        </KeyedMenuItem>
+      </KeyedMenuContent>
     </DropdownMenu>
   );
 }
@@ -500,18 +480,18 @@ function SingleActionMenu({
           </Button>
         }
       />
-      <DropdownMenuContent
+      <KeyedMenuContent
         align="end"
         side="bottom"
         sideOffset={4}
         aria-label={ariaLabel}
         className="w-48"
       >
-        <DropdownMenuItem data-testid={itemTestId} onClick={() => onRun(todo)}>
+        <KeyedMenuItem data-testid={itemTestId} shortcut="U" onClick={() => onRun(todo)}>
           {icon}
           {label}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
+        </KeyedMenuItem>
+      </KeyedMenuContent>
     </DropdownMenu>
   );
 }

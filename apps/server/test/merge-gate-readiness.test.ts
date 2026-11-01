@@ -84,6 +84,15 @@ const SHOT = opaque('docs/verify/1404/shot.png');
 const link = (sha: string, path = SHOT.filename) =>
   `https://raw.githubusercontent.com/xiechimon/cairn/${sha}/${path}`;
 const BODY = `evidence: ${link(HEAD)}`;
+const SIZE_SECTION = '## Size\nThe schema change and its callers must land together.\n';
+const BODY_WITH_SIZE = `${BODY}\n\n<details><summary>Review and risk</summary>\n\n${SIZE_SECTION}\n</details>\n`;
+const OVERSIZE_FILES = [
+  file('apps/server/src/services/ci-loop.ts', { additions: 790 }),
+  file('apps/server/test/ci-loop.test.ts', { additions: 20 }),
+];
+const OVERSIZE_DIGEST = computePatchDigest([...OVERSIZE_FILES, SHOT]).patchDigest as string;
+const NO_SIZE_ACCEPTANCE = 'no passing review on this patch accepts its size';
+const SPLIT_REQUESTED = 'a review on this patch asks to split it';
 
 const v = (
   kind: GateVerdictView['kind'],
@@ -147,6 +156,19 @@ function green(): GateInputs {
   };
 }
 
+const sized = (sizeAssessment: NonNullable<GateVerdictView['sizeAssessment']>): GateInputs => {
+  const i = green();
+  setFiles(i, OVERSIZE_FILES);
+  pr(i).body = BODY_WITH_SIZE;
+  i.verdicts.push({
+    ...v('review', 'pass', 'correctness', OVERSIZE_DIGEST),
+    headSha: HEAD,
+    reviewerId: 'reviewer-size',
+    sizeAssessment,
+  });
+  return i;
+};
+
 type Row = [MergeBlockerCode, (i: GateInputs) => void];
 const pr = (i: GateInputs) => i.pr as NonNullable<GateInputs['pr']>;
 const checks = (i: GateInputs) => i.checks as NonNullable<GateInputs['checks']>;
@@ -187,6 +209,7 @@ const CLASS: Record<MergeBlockerCode, BlockerClass> = {
   'compare-truncated': 'human',
   'patch-unbindable': 'human',
   'size-cap': 'human',
+  'size-review': 'transient',
   'independent-review-missing': 'transient',
   'outside-auto-merge': 'human',
   'opaque-file': 'human',
@@ -374,11 +397,23 @@ const ROWS: Row[] = [
   ['patch-unbindable', (i) => setFiles(i, [file('docs/verify/1404/result.json')])],
   [
     'size-cap',
-    (i) =>
-      setFiles(i, [
-        file('apps/server/src/services/ci-loop.ts', { additions: 790 }),
-        file('apps/server/test/ci-loop.test.ts', { additions: 20 }),
-      ]),
+    (i) => {
+      i.build = { ...i.build, isGithubPr: false, repoKind: 'local' };
+      i.pr = null;
+      i.evidence = [];
+      i.compare = readAt(
+        HEAD,
+        withCommits({ files: [...OVERSIZE_FILES, SHOT] }, chain(EARLIER, HEAD)),
+      );
+      i.verdicts = i.verdicts.map((x) => ({ ...x, patchDigest: OVERSIZE_DIGEST }));
+    },
+  ],
+  [
+    'size-review',
+    (i) => {
+      setFiles(i, OVERSIZE_FILES);
+      pr(i).body = BODY;
+    },
   ],
   [
     'independent-review-missing',
@@ -770,7 +805,7 @@ describe('mergeReadiness: combinations the design names', () => {
       return codesOf(i);
     };
     expect(lines(800)).toEqual([]);
-    expect(lines(801)).toEqual(['size-cap']);
+    expect(lines(801)).toEqual(['size-review']);
     const files = (n: number) => {
       const i = green();
       setFiles(
@@ -782,7 +817,7 @@ describe('mergeReadiness: combinations the design names', () => {
       return codesOf(i);
     };
     expect(files(40)).toEqual([]);
-    expect(files(41)).toEqual(['size-cap']);
+    expect(files(41)).toEqual(['size-review']);
   });
 
   test('every blocker carries a class and fixed copy', () => {
@@ -978,7 +1013,143 @@ describe('mergeReadiness: files with no visible diff are left to a human, caps c
       return classesOf(i);
     };
     expect(withEvidence(40, 30)).toEqual([]);
-    expect(withEvidence(41, 0)).toEqual([['size-cap', 'human', '41 lines, 41 files']]);
+    expect(withEvidence(41, 0)).toEqual([
+      [
+        'size-review',
+        'transient',
+        '41 lines, 41 files',
+        'the PR body has no ## Size section',
+        NO_SIZE_ACCEPTANCE,
+      ],
+    ]);
+  });
+
+  test('an oversize patch whose reviews pass without a size assessment stays blocked on the size review', () => {
+    const i = green();
+    setFiles(i, OVERSIZE_FILES);
+    pr(i).body = BODY_WITH_SIZE;
+    expect(classesOf(i)).toEqual([
+      ['size-review', 'transient', '812 lines, 2 files', NO_SIZE_ACCEPTANCE],
+    ]);
+  });
+
+  test('an accepting size assessment bound to another patch digest or head does not clear the size review', () => {
+    for (const over of [
+      { patchDigest: `pd2:${'0'.repeat(64)}` },
+      { patchDigest: null },
+      { headSha: OLD },
+      { headSha: null },
+    ]) {
+      const i = sized('accepted');
+      i.verdicts = i.verdicts.map((x) => (x.sizeAssessment !== undefined ? { ...x, ...over } : x));
+      expect(classesOf(i), JSON.stringify(over)).toEqual([
+        ['size-review', 'transient', '812 lines, 2 files', NO_SIZE_ACCEPTANCE],
+      ]);
+    }
+  });
+
+  test('a size assessment on a review that did not pass does not clear the size review', () => {
+    for (const outcome of ['block', 'extraction_failed', 'step_failed'] as const) {
+      const i = sized('accepted');
+      i.verdicts = [
+        ...i.verdicts.filter((x) => x.sizeAssessment === undefined),
+        {
+          ...v('review', outcome, 'size', OVERSIZE_DIGEST),
+          headSha: HEAD,
+          sizeAssessment: 'accepted',
+        },
+      ];
+      expect(codesOf(i), outcome).toContain('size-review');
+    }
+  });
+
+  test('a review asking to split the patch keeps the size review blocked, even beside an accepting one', () => {
+    const split = sized('split-needed');
+    expect(classesOf(split)).toEqual([
+      ['size-review', 'transient', '812 lines, 2 files', NO_SIZE_ACCEPTANCE, SPLIT_REQUESTED],
+    ]);
+    const both = sized('accepted');
+    both.verdicts.push({
+      ...v('review', 'pass', 'design', OVERSIZE_DIGEST),
+      headSha: HEAD,
+      sizeAssessment: 'split-needed',
+    });
+    expect(classesOf(both)).toEqual([
+      ['size-review', 'transient', '812 lines, 2 files', SPLIT_REQUESTED],
+    ]);
+  });
+
+  test('a passing review on this patch and head that accepts the size clears the size review', () => {
+    expect(mergeReadiness(sized('accepted')).blockers).toEqual([]);
+  });
+
+  test('an accepting size assessment from the author does not clear the size review', () => {
+    const i = sized('accepted');
+    i.author = { id: 'reviewer-size', model: 'claude-opus-4-8' };
+    expect(codesOf(i)).toContain('size-review');
+  });
+
+  test('an oversize patch with an empty Size section, or the heading only inside a code fence or a comment, still needs the section', () => {
+    for (const size of [
+      '## Size\n<!-- why -->\n',
+      '```\n## Size\nbecause\n```\n',
+      '<!--\n## Size\nbecause\n-->\n',
+      '### Size\nbecause\n',
+    ]) {
+      const i = green();
+      setFiles(i, OVERSIZE_FILES);
+      pr(i).body = `${BODY}\n\n${size}`;
+      expect(classesOf(i), size).toEqual([
+        [
+          'size-review',
+          'transient',
+          '812 lines, 2 files',
+          'the PR body has no ## Size section',
+          NO_SIZE_ACCEPTANCE,
+        ],
+      ]);
+    }
+  });
+
+  test('a Size section ends at the next heading, so text under another heading does not count', () => {
+    const i = green();
+    setFiles(i, OVERSIZE_FILES);
+    pr(i).body = `${BODY}\n\n## Size\n\n## Risk\nreversible\n`;
+    expect(codesOf(i)).toEqual(['size-review']);
+  });
+
+  test('an oversize patch with the Size section but no review pass waits on the review and names it', () => {
+    const i = green();
+    setFiles(i, OVERSIZE_FILES);
+    pr(i).body = BODY_WITH_SIZE;
+    i.verdicts = i.verdicts.filter((x) => x.kind !== 'review');
+    expect(classesOf(i).map(([code]) => code)).toEqual(['size-review', 'review-missing']);
+    expect(classesOf(i)[0]).toEqual([
+      'size-review',
+      'transient',
+      '812 lines, 2 files',
+      NO_SIZE_ACCEPTANCE,
+    ]);
+  });
+
+  test('an oversize patch touching a security surface still needs the independent review besides the size review', () => {
+    const i = green();
+    setFiles(i, [...OVERSIZE_FILES, file('apps/server/src/services/secrets.ts')]);
+    pr(i).body = BODY_WITH_SIZE;
+    expect(codesOf(i)).toEqual(['size-review', 'independent-review-missing']);
+  });
+
+  test('a local patch has no PR body, so oversize keeps the human size-cap there', () => {
+    const i = green();
+    i.build = { ...i.build, isGithubPr: false, repoKind: 'local' };
+    i.pr = null;
+    i.evidence = [];
+    i.compare = readAt(
+      HEAD,
+      withCommits({ files: [...OVERSIZE_FILES, SHOT] }, chain(EARLIER, HEAD)),
+    );
+    i.verdicts = i.verdicts.map((x) => ({ ...x, patchDigest: OVERSIZE_DIGEST }));
+    expect(classesOf(i)).toEqual([['size-cap', 'human', '812 lines, 2 files']]);
   });
 
   test('the 800-line cap leaves evidence out: 800 code lines with 500 evidence lines do not block, 801 code lines do', () => {
@@ -992,7 +1163,15 @@ describe('mergeReadiness: files with no visible diff are left to a human, caps c
       return classesOf(i);
     };
     expect(withEvidence(800)).toEqual([]);
-    expect(withEvidence(801)).toEqual([['size-cap', 'human', '801 lines, 2 files']]);
+    expect(withEvidence(801)).toEqual([
+      [
+        'size-review',
+        'transient',
+        '801 lines, 2 files',
+        'the PR body has no ## Size section',
+        NO_SIZE_ACCEPTANCE,
+      ],
+    ]);
   });
 });
 
@@ -1238,7 +1417,13 @@ describe('mergeReadiness: extraction failures clearable, unmergeable states, tru
     expect(pr(i).changedFiles).toBe(300);
     expect(classesOf(i)).toEqual([
       ['compare-truncated', 'human', 'truncated'],
-      ['size-cap', 'human', '299 lines, 299 files'],
+      [
+        'size-review',
+        'transient',
+        '299 lines, 299 files',
+        'the PR body has no ## Size section',
+        NO_SIZE_ACCEPTANCE,
+      ],
     ]);
   });
 

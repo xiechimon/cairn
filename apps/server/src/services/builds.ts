@@ -5,6 +5,7 @@ import type {
   MergeReadiness,
   Phase,
   ReviewGate,
+  ReviewSizeContext,
   ReviewVerdict,
   SecretBox,
   StepJournalRow,
@@ -1069,25 +1070,37 @@ export function maybeEnqueueIndependentReview(
   deps: BuildDeps,
   todoRow: TodoRow,
   buildId: string,
+  size?: { headSha: string } & ReviewSizeContext,
 ): void {
   const buildRow = deps.db.select().from(build).where(eq(build.id, buildId)).get();
   if (buildRow === undefined || githubPrOf(deps, todoRow, buildRow.prNumber) === null) return;
   const head = dispatchHeadSha(deps, buildId);
   if (head === null) return;
+  if (size !== undefined && size.headSha !== head) return;
   const reviews = deps.db
     .select()
     .from(step)
     .where(and(eq(step.buildId, buildId), eq(step.kind, 'review')))
     .all();
   if (reviews.some((row) => (REVIEW_IN_FLIGHT as readonly string[]).includes(row.status))) return;
-  const since = roundStart(deps, buildId);
-  if (
-    reviews.some(
-      (row) =>
-        row.createdAt >= since && parseReviewPromptMeta(row.prompt)?.expectedHeadSha === head,
+  if (size !== undefined) {
+    if (
+      reviews.some((row) => {
+        const meta = parseReviewPromptMeta(row.prompt);
+        return meta?.sizeReview === true && meta.expectedHeadSha === head;
+      })
     )
-  )
-    return;
+      return;
+  } else {
+    const since = roundStart(deps, buildId);
+    if (
+      reviews.some(
+        (row) =>
+          row.createdAt >= since && parseReviewPromptMeta(row.prompt)?.expectedHeadSha === head,
+      )
+    )
+      return;
+  }
   const slotted = todoRow.assignment?.review?.agentId ?? null;
   const personaReviewer = deps.db
     .select({ id: agent.id })
@@ -1109,6 +1122,15 @@ export function maybeEnqueueIndependentReview(
     expectedHeadSha: head,
     ...(focus !== undefined && focus !== '' ? { focus } : {}),
     ...(reviewInstruction !== undefined ? { instruction: reviewInstruction } : {}),
+    ...(size !== undefined
+      ? {
+          size: {
+            countedLines: size.countedLines,
+            countedFiles: size.countedFiles,
+            justification: size.justification,
+          },
+        }
+      : {}),
   });
   insertGateAnnouncement(deps, buildId, REVIEW_ANNOUNCEMENT, deps.user.displayName);
   enqueueStep(deps, buildId, 'review', todoRow.teamId, prompt);

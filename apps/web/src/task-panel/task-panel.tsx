@@ -9,7 +9,6 @@ import {
   LoaderCircle,
   Maximize2,
   PanelRight,
-  X,
 } from 'lucide-react';
 import {
   type FormEvent,
@@ -34,6 +33,7 @@ import {
 } from '../board/columns.js';
 import { relativeTime } from '../board/rel-time.js';
 import { ATTENTION } from '../board/todo-card.js';
+import { SidePanel, SidePanelHead, SidePanelTitle } from '../components/side-panel.js';
 import { Button } from '../components/ui/button.js';
 import { Skeleton } from '../components/ui/skeleton.js';
 import { Textarea } from '../components/ui/textarea.js';
@@ -209,53 +209,29 @@ function OpenPanel({
   }, [taskId, todos, seed]);
 
   return (
-    <>
-      <div
-        data-testid="task-panel-scrim"
-        aria-hidden
-        className="task-panel-scrim absolute inset-0 z-(--z-backdrop-low) hidden bg-(--dialog-backdrop) max-[1100px]:block"
-        onClick={close}
-      />
-      <aside
-        ref={ref}
-        aria-label={t('任务面板')}
-        className="task-panel flex w-105 min-w-0 flex-none flex-col bg-background shadow-[inset_1px_0_0_var(--border)] max-[1100px]:absolute max-[1100px]:inset-y-0 max-[1100px]:right-0 max-[1100px]:z-(--z-panel-low) max-[1100px]:w-[min(420px,100%)] max-[1100px]:shadow-(--floating-shadow) max-[640px]:w-full"
-      >
-        {view == null ? (
-          <ListView panel={panel} todos={todos} now={now} projectOf={projectOf} flash={flash} />
-        ) : (
-          <TaskDetail
-            key={view.id}
-            panel={panel}
-            view={view}
-            ready={ready}
-            now={now}
-            projectOf={projectOf}
-          />
-        )}
-      </aside>
-    </>
+    <SidePanel ref={ref} label={t('任务面板')} onDismiss={close} scrimTestId="task-panel-scrim">
+      {view == null ? (
+        <ListView panel={panel} todos={todos} now={now} projectOf={projectOf} flash={flash} />
+      ) : (
+        <TaskDetail
+          key={view.id}
+          panel={panel}
+          view={view}
+          ready={ready}
+          now={now}
+          projectOf={projectOf}
+        />
+      )}
+    </SidePanel>
   );
 }
 
 function PanelHead({ children, panel }: { children: ReactNode; panel: TaskPanelApi }) {
   const { t } = useI18n();
   return (
-    <div
-      data-panel-head=""
-      className="flex h-13 flex-none items-center gap-1 border-b border-border pr-2.5 pl-4"
-    >
+    <SidePanelHead closeLabel={t('关闭面板')} onClose={panel.close}>
       {children}
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        className="text-content-tertiary"
-        aria-label={t('关闭面板')}
-        onClick={panel.close}
-      >
-        <X aria-hidden strokeWidth={1.75} className="size-4" />
-      </Button>
-    </div>
+    </SidePanelHead>
   );
 }
 
@@ -288,9 +264,7 @@ function ListView({
   return (
     <>
       <PanelHead panel={panel}>
-        <h2 className="m-0 min-w-0 flex-1 truncate text-ui font-medium text-foreground">
-          {t('任务')}
-        </h2>
+        <SidePanelTitle>{t('任务')}</SidePanelTitle>
       </PanelHead>
       <div className="min-h-0 flex-1 overflow-y-auto px-2.5 pt-2 pb-6">
         {GROUPS.map((group) => {
@@ -464,7 +438,7 @@ function TaskDetail({
   return (
     <>
       <PanelHead panel={panel}>
-        <h2 className="m-0 flex min-w-0 flex-1 items-center gap-1.5 truncate text-ui font-medium text-foreground">
+        <SidePanelTitle>
           <Button
             variant="ghost"
             size="xs"
@@ -479,7 +453,7 @@ function TaskDetail({
             className="size-3 flex-none text-content-dim"
           />
           {view.seq != null && <span className="tabular-nums">#{view.seq}</span>}
-        </h2>
+        </SidePanelTitle>
         <Button
           variant="ghost"
           size="icon-sm"

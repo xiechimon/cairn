@@ -7,6 +7,7 @@ import { test } from 'node:test';
 
 const script = resolve('scripts/merge-route.mjs');
 const prGate = resolve('.claude/workflows/pr-gate.js');
+const gatePaths = resolve('packages/shared/merge-gate-paths.json');
 
 function repoWith(t, files) {
   const dir = mkdtempSync(join(tmpdir(), 'merge-route-'));
@@ -17,8 +18,10 @@ function repoWith(t, files) {
   git('config', 'user.name', 'test');
   mkdirSync(join(dir, '.claude/workflows'), { recursive: true });
   copyFileSync(prGate, join(dir, '.claude/workflows/pr-gate.js'));
+  mkdirSync(join(dir, 'packages/shared'), { recursive: true });
+  copyFileSync(gatePaths, join(dir, 'packages/shared/merge-gate-paths.json'));
   writeFileSync(join(dir, 'README.md'), 'base\n');
-  git('add', '.claude/workflows/pr-gate.js', 'README.md');
+  git('add', '.claude/workflows/pr-gate.js', 'packages/shared/merge-gate-paths.json', 'README.md');
   git('commit', '-q', '-m', 'base');
   git('update-ref', 'refs/remotes/origin/main', 'HEAD');
   git('switch', '-q', '-c', 'topic');
@@ -59,6 +62,26 @@ test('binary evidence under docs/verify may enter the queue', (t) => {
     repoWith(t, { 'docs/verify/1/shot.png': png, 'apps/web/src/a.ts': 'export const a = 1;\n' }),
   );
   assert.equal(result.status, 0, result.stdout + result.stderr);
+});
+
+test('gallery snapshot baselines may enter the queue', (t) => {
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 0]);
+  const result = route(
+    repoWith(t, {
+      'apps/web/e2e/gallery-snapshots.spec.ts-snapshots/side-panel-dark-linux.png': png,
+      'apps/web/src/a.ts': 'export const a = 1;\n',
+    }),
+  );
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+});
+
+test('a PNG in another spec snapshot folder routes to the owner', (t) => {
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 0]);
+  const result = route(
+    repoWith(t, { 'apps/web/e2e/visual-polish.spec.ts-snapshots/rail-linux.png': png }),
+  );
+  assert.equal(result.status, 1, result.stdout + result.stderr);
+  assert.match(result.stdout, /binary files outside docs\/verify/);
 });
 
 test('protected paths route to the owner', (t) => {

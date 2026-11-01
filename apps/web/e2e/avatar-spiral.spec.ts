@@ -164,7 +164,7 @@ test('search agent rows + project task rows are seeded (`Agent 列表` / task-ro
     AGENT_SRC,
   );
 
-  await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX?scenario=prj-tasks');
+  await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=prj-tasks');
   await expect(page.locator('.prj-task-avatar img').first()).toHaveAttribute('src', USER_SRC);
 });
 

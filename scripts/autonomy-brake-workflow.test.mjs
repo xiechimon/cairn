@@ -191,3 +191,9 @@ test('brake sweeps share a non-cancelling concurrency group', () => {
   const text = readFileSync('.github/workflows/autonomy-brake.yml', 'utf8');
   assert.match(text, /^concurrency:\n {2}group: autonomy-brake\n {2}cancel-in-progress: false$/m);
 });
+
+test('pr-evidence runs are never cancelled by a concurrency group', () => {
+  const text = readFileSync('.github/workflows/pr-evidence.yml', 'utf8');
+  assert.doesNotMatch(text, /^\s*concurrency:/m);
+  assert.doesNotMatch(text, /cancel-in-progress/);
+});
