@@ -124,10 +124,10 @@ FOLD_MARKUP = re.compile(r'</?details\b[^>]*>|<summary\b[^>]*>.*?</summary\s*>',
 INLINE_CODE = re.compile(r'(?P<ticks>`+)(?!`).*?(?<!`)(?P=ticks)(?!`)', re.S)
 DETAILS_TAG = re.compile(r'<(?P<closing>/)?details\b[^>]*>', re.I)
 PROSE_LIMIT = 600
+EVIDENCE_PREFIX = 'docs/verify/'
 SCHEMA_HEADING = re.compile(r'^### Schema changes[ \t]*$', re.M)
 ANY_HEADING = re.compile(r'^#{1,6}[ \t]+', re.M)
 NO_SCHEMA_CHANGES = 'No schema changes'
-EVIDENCE_PREFIX = 'docs/verify/'
 GATE_PATHS = Path(__file__).resolve().parent.parent / 'packages/shared/merge-gate-paths.json'
 
 
@@ -321,6 +321,18 @@ def describe(link):
     return f"[{link['label']}]({link['url']})"
 
 
+def load_patch_files(path):
+    with open(path, encoding='utf-8') as f:
+        files = json.load(f).get('files')
+    if not isinstance(files, list):
+        return None
+    files = flatten_pages(files)
+    valid = all(isinstance(file, dict) and isinstance(file.get('filename'), str)
+                and isinstance(file.get('additions'), int) and isinstance(file.get('deletions'), int)
+                for file in files)
+    return files if valid else None
+
+
 def schema_rows(markdown):
     text = visible_markdown(markdown)
     heading = SCHEMA_HEADING.search(text)
@@ -349,17 +361,6 @@ def split_schema_glance(argv):
     with open(args[at + 1], encoding='utf-8') as f:
         expected = f.read()
     return args[:at] + args[at + 2:], expected
-
-def load_patch_files(path):
-    with open(path, encoding='utf-8') as f:
-        files = json.load(f).get('files')
-    if not isinstance(files, list):
-        return None
-    files = flatten_pages(files)
-    valid = all(isinstance(file, dict) and isinstance(file.get('filename'), str)
-                and isinstance(file.get('additions'), int) and isinstance(file.get('deletions'), int)
-                for file in files)
-    return files if valid else None
 
 
 def main():

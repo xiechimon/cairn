@@ -79,7 +79,7 @@ test('board renders exactly the four #351 columns, retired names and collapse fa
 test('project files pane: no export button, static branch chip, wired `文件|历史` segment', async ({
   page,
 }) => {
-  await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX?scenario=r2-24');
+  await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=r2-24');
 
   await expect(page.locator('.prj-files-share')).toHaveCount(0);
 
@@ -451,7 +451,7 @@ test('reuse panel `查看方案` flips the doc pane to the plan face (#318)', as
 });
 
 test('project task rows and cards are real links to the todo detail that open in the panel (#318, #1937)', async ({ page }) => {
-  await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX?scenario=prj-tasks&tab=tasks');
+  await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=prj-tasks&tab=tasks');
   const row = page.locator('.prj-task-row').first();
   await expect(row).toBeVisible();
 
@@ -464,7 +464,7 @@ test('project task rows and cards are real links to the todo detail that open in
   await expect(page).toHaveURL(/[?&]task=[^&]+/);
   await expect(page.getByRole('complementary', { name: '任务面板' })).toBeVisible();
 
-  await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX?scenario=prj-tasks&tab=tasks');
+  await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=prj-tasks&tab=tasks');
   await page.locator('.prj-tasks-view-btn').nth(1).click();
   const card = page.locator('.prj-task-card').first();
   await expect(card).toBeVisible();

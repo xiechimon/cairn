@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-const PROJ = '/app/project/ZAQczKCu0MOAzC1ZqcFlX?scenario=r2-24';
+const PROJ = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=r2-24';
 
 test('viewer opens with the placeholder and no selected row', async ({ page }) => {
   await page.goto(PROJ);

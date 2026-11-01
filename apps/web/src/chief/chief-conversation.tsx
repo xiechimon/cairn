@@ -4,7 +4,7 @@ import {
   CHIEF_INPUT_PLACEHOLDER_STEERING,
 } from '@cairn/shared';
 import { cn } from 'cn';
-import { CircleDashed } from 'lucide-react';
+import { CircleDashed, TriangleAlert } from 'lucide-react';
 import {
   type Dispatch,
   type ReactNode,
@@ -103,9 +103,9 @@ const EXAMPLE_ICONS = {
 export const CHIEF_DRAFT_STORAGE_KEY = 'cairn.chief-draft';
 export const CHIEF_PROJECT_STORAGE_KEY = 'cairn.chief-project';
 
-function readStoredChiefDraft(): string {
+function readStoredChiefDraft(key: string): string {
   try {
-    return localStorage.getItem(CHIEF_DRAFT_STORAGE_KEY) ?? '';
+    return localStorage.getItem(key) ?? '';
   } catch {
     return '';
   }
@@ -119,7 +119,7 @@ export function ChiefFollowArmed({ onAtBottom }: { onAtBottom: (atBottom: boolea
   return null;
 }
 
-export type ChiefConversationVariant = 'drawer' | 'home';
+export type ChiefConversationVariant = 'drawer' | 'home' | 'project';
 
 export interface ChiefConversationProps {
   variant: ChiefConversationVariant;
@@ -145,6 +145,13 @@ export interface ChiefConversationProps {
   todoGlances?: ReadonlyMap<string, TodoGlance>;
   composerRef?: (node: HTMLTextAreaElement | null) => void;
   day?: { earlier: number; today: ReactNode };
+  lead?: ReactNode;
+  draftStorageKey?: string;
+  initialDraft?: string;
+  prefill?: { text: string; key: number } | null;
+  placeholder?: string;
+  composerError?: string | null;
+  composerReplacement?: ReactNode;
 }
 
 export function ChiefConversation({
@@ -171,6 +178,13 @@ export function ChiefConversation({
   todoGlances,
   composerRef,
   day,
+  lead,
+  draftStorageKey = CHIEF_DRAFT_STORAGE_KEY,
+  initialDraft = '',
+  prefill = null,
+  placeholder,
+  composerError = null,
+  composerReplacement,
 }: ChiefConversationProps) {
   const projectMark = useProjectMark();
   const { t } = useI18n();
@@ -217,7 +231,7 @@ export function ChiefConversation({
     }
   });
   const pickedProject = projectOptions.find((p) => p.id === storedProjectId) ?? null;
-  const chipVisible = onSend != null && projectOptions.length > 1;
+  const chipVisible = variant !== 'project' && onSend != null && projectOptions.length > 1;
   const pickProject = useCallback((projectId: string | null) => {
     setStoredProjectId(projectId);
     try {
@@ -258,14 +272,16 @@ export function ChiefConversation({
       else next.add(i);
       return next;
     });
-  const [liveDraft, setLiveDraft] = useState(() => (live ? readStoredChiefDraft() : ''));
+  const [liveDraft, setLiveDraft] = useState(() =>
+    live ? readStoredChiefDraft(draftStorageKey) : initialDraft,
+  );
   useEffect(() => {
     if (!live) return;
     try {
-      if (liveDraft === '') localStorage.removeItem(CHIEF_DRAFT_STORAGE_KEY);
-      else localStorage.setItem(CHIEF_DRAFT_STORAGE_KEY, liveDraft);
+      if (liveDraft === '') localStorage.removeItem(draftStorageKey);
+      else localStorage.setItem(draftStorageKey, liveDraft);
     } catch {}
-  }, [live, liveDraft]);
+  }, [live, liveDraft, draftStorageKey]);
   const wire = useComposerWire({
     editable: onSend != null,
     draft: onSend != null ? liveDraft : (chief.draft ?? ''),
@@ -330,6 +346,13 @@ export function ChiefConversation({
     closeHelp();
   }, [open, closeInline, closeSlash, closeHelp]);
   const { textareaRef } = wire;
+  const prefillKey = prefill?.key;
+  const prefillText = prefill?.text;
+  useEffect(() => {
+    if (prefillKey == null || prefillText == null) return;
+    setLiveDraft(prefillText);
+    textareaRef.current?.focus({ preventScroll: true });
+  }, [prefillKey, prefillText, textareaRef]);
   const prevOpenRef = useRef(open);
   useEffect(() => {
     const wasOpen = prevOpenRef.current;
@@ -363,7 +386,8 @@ export function ChiefConversation({
     onNewThread();
     setThreadsOpen(false);
   }, [onNewThread]);
-  const home = variant === 'home';
+  const home = variant !== 'drawer';
+  const ownHeader = variant !== 'project';
   const newThreadFromKey = useCallback(() => {
     if (home && document.activeElement?.closest('[role="dialog"],[role="alertdialog"]')) return;
     newThread();
@@ -493,129 +517,131 @@ export function ChiefConversation({
   );
   return (
     <>
-      <header
-        className={
-          home
-            ? 'relative mx-auto w-full max-w-190 flex-none px-4 pt-3 pb-2'
-            : 'relative px-4 pt-1 pb-3'
-        }
-      >
-        <div className="flex items-center">
-          <Button
-            variant="ghost"
-            className="h-auto min-w-0 shrink cursor-pointer gap-1.5 rounded-none border-none bg-transparent p-0 leading-[inherit] text-(--text-tertiary) hover:bg-transparent hover:text-(--text-tertiary) dark:hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto"
-            aria-label={t('主题')}
-            onClick={() => setThreadsOpen((v) => !v)}
-          >
-            <ChiefHash />
-            <span className="max-w-52 truncate font-heading text-heading font-title text-(--foreground)">
-              {t(chief.threadTitle)}
-            </span>
-            <ChevronDown width={12} height={12} />
-          </Button>
-          <div className="ml-auto flex items-center gap-2.5">
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className={`relative ${HEAD_ICON_BTN_CLS}`}
-                    aria-label={t('新主题')}
-                    aria-keyshortcuts="N"
-                    onClick={onNewThread != null ? newThread : undefined}
-                  />
-                }
-              >
-                <Plus width={18} height={18} />
-              </TooltipTrigger>
-              <TooltipContent side="bottom" sideOffset={8}>
-                <Kbd>N</Kbd>
-              </TooltipContent>
-            </Tooltip>
-            {onSettings != null && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className={HEAD_ICON_BTN_CLS}
-                aria-label={t('总管设置')}
-                onClick={onSettings}
-              >
-                <ChiefGear />
-              </Button>
-            )}
-            {onClose != null && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className={HEAD_ICON_BTN_CLS}
-                aria-label={t('最小化')}
-                onClick={onClose}
-              >
-                <Minus width={16} height={16} />
-              </Button>
-            )}
+      {ownHeader && (
+        <header
+          className={
+            home
+              ? 'relative mx-auto w-full max-w-190 flex-none px-4 pt-3 pb-2'
+              : 'relative px-4 pt-1 pb-3'
+          }
+        >
+          <div className="flex items-center">
+            <Button
+              variant="ghost"
+              className="h-auto min-w-0 shrink cursor-pointer gap-1.5 rounded-none border-none bg-transparent p-0 leading-[inherit] text-(--text-tertiary) hover:bg-transparent hover:text-(--text-tertiary) dark:hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto"
+              aria-label={t('主题')}
+              onClick={() => setThreadsOpen((v) => !v)}
+            >
+              <ChiefHash />
+              <span className="max-w-52 truncate font-heading text-heading font-title text-(--foreground)">
+                {t(chief.threadTitle)}
+              </span>
+              <ChevronDown width={12} height={12} />
+            </Button>
+            <div className="ml-auto flex items-center gap-2.5">
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={`relative ${HEAD_ICON_BTN_CLS}`}
+                      aria-label={t('新主题')}
+                      aria-keyshortcuts="N"
+                      onClick={onNewThread != null ? newThread : undefined}
+                    />
+                  }
+                >
+                  <Plus width={18} height={18} />
+                </TooltipTrigger>
+                <TooltipContent side="bottom" sideOffset={8}>
+                  <Kbd>N</Kbd>
+                </TooltipContent>
+              </Tooltip>
+              {onSettings != null && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={HEAD_ICON_BTN_CLS}
+                  aria-label={t('总管设置')}
+                  onClick={onSettings}
+                >
+                  <ChiefGear />
+                </Button>
+              )}
+              {onClose != null && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={HEAD_ICON_BTN_CLS}
+                  aria-label={t('最小化')}
+                  onClick={onClose}
+                >
+                  <Minus width={16} height={16} />
+                </Button>
+              )}
+            </div>
           </div>
-        </div>
-        {chief.bound && (
-          <div
-            className="mt-1 flex items-center gap-1 text-meta text-(--text-tertiary)"
-            data-testid="chief-model-row"
-          >
-            <span className="flex min-w-0 items-center gap-1 px-1">
-              <span className="inline-flex flex-none items-center">
-                {(chief.modelProvider ?? 'pi') === 'claude-code' ? (
-                  <RuntimeClaudeCode width={12} height={12} />
+          {chief.bound && (
+            <div
+              className="mt-1 flex items-center gap-1 text-meta text-(--text-tertiary)"
+              data-testid="chief-model-row"
+            >
+              <span className="flex min-w-0 items-center gap-1 px-1">
+                <span className="inline-flex flex-none items-center">
+                  {(chief.modelProvider ?? 'pi') === 'claude-code' ? (
+                    <RuntimeClaudeCode width={12} height={12} />
+                  ) : (
+                    <RuntimePi width={12} height={12} />
+                  )}
+                </span>
+                {chief.fallbackModel != null ? (
+                  <>
+                    <span className="min-w-0 truncate">
+                      {t('备用模型 {model}', { model: chief.fallbackModel })}
+                    </span>
+                    <span
+                      aria-hidden="true"
+                      data-testid="chief-fallback-dot"
+                      className="ml-0.5 size-1.5 flex-none rounded-full bg-(--badge-attention)"
+                    />
+                    <span className="sr-only">{t('，主模型暂时用不了')}</span>
+                  </>
                 ) : (
-                  <RuntimePi width={12} height={12} />
+                  <span className="min-w-0 truncate">{chief.modelSlot}</span>
                 )}
               </span>
-              {chief.fallbackModel != null ? (
-                <>
-                  <span className="min-w-0 truncate">
-                    {t('备用模型 {model}', { model: chief.fallbackModel })}
-                  </span>
-                  <span
-                    aria-hidden="true"
-                    data-testid="chief-fallback-dot"
-                    className="ml-0.5 size-1.5 flex-none rounded-full bg-(--badge-attention)"
-                  />
-                  <span className="sr-only">{t('，主模型暂时用不了')}</span>
-                </>
-              ) : (
-                <span className="min-w-0 truncate">{chief.modelSlot}</span>
-              )}
-            </span>
-          </div>
-        )}
-        {threadsOpen && (
-          <div
-            className="absolute top-8 left-3 z-[5] max-h-55 w-66 overflow-y-auto rounded-(--radius-popover) bg-(--popover) p-(--menu-pad) shadow-(--shadow-popover)"
-            role="menu"
-          >
-            {(chief.threads ?? []).map((thread, index) => (
-              <Button
-                variant="ghost"
-                role="menuitem"
-                key={thread.title}
-                aria-current={thread.active ? 'true' : undefined}
-                className="h-8 w-full cursor-pointer justify-start gap-2 rounded-(--radius-menu-item) border-none bg-transparent px-2.5 text-left text-ui font-normal text-(--text-secondary) hover:bg-(--menu-hover) hover:text-(--foreground) dark:hover:bg-(--menu-hover) aria-expanded:bg-transparent aria-[current=true]:bg-(--menu-hover) aria-[current=true]:font-medium aria-[current=true]:text-(--foreground) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto"
-                onClick={
-                  onThread != null
-                    ? () => {
-                        onThread(thread.title, index);
-                        setThreadsOpen(false);
-                      }
-                    : undefined
-                }
-              >
-                <ChiefHash width={11} height={11} className="flex-none text-(--text-tertiary)" />
-                <span className="truncate">{t(thread.title)}</span>
-              </Button>
-            ))}
-          </div>
-        )}
-      </header>
+            </div>
+          )}
+          {threadsOpen && (
+            <div
+              className="absolute top-8 left-3 z-[5] max-h-55 w-66 overflow-y-auto rounded-(--radius-popover) bg-(--popover) p-(--menu-pad) shadow-(--shadow-popover)"
+              role="menu"
+            >
+              {(chief.threads ?? []).map((thread, index) => (
+                <Button
+                  variant="ghost"
+                  role="menuitem"
+                  key={thread.title}
+                  aria-current={thread.active ? 'true' : undefined}
+                  className="h-8 w-full cursor-pointer justify-start gap-2 rounded-(--radius-menu-item) border-none bg-transparent px-2.5 text-left text-ui font-normal text-(--text-secondary) hover:bg-(--menu-hover) hover:text-(--foreground) dark:hover:bg-(--menu-hover) aria-expanded:bg-transparent aria-[current=true]:bg-(--menu-hover) aria-[current=true]:font-medium aria-[current=true]:text-(--foreground) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto"
+                  onClick={
+                    onThread != null
+                      ? () => {
+                          onThread(thread.title, index);
+                          setThreadsOpen(false);
+                        }
+                      : undefined
+                  }
+                >
+                  <ChiefHash width={11} height={11} className="flex-none text-(--text-tertiary)" />
+                  <span className="truncate">{t(thread.title)}</span>
+                </Button>
+              ))}
+            </div>
+          )}
+        </header>
+      )}
 
       {heroLayout ? (
         <div
@@ -637,6 +663,7 @@ export function ChiefConversation({
                 data-testid="chief-stream"
               >
                 <TodoGlanceContext.Provider value={glances}>
+                  {lead}
                   {day == null ? (
                     rows.map(streamRow)
                   ) : (
@@ -666,196 +693,217 @@ export function ChiefConversation({
           <ChiefFallbackBanner model={chief.fallbackModel} onSettings={onSettings} />
         )
       )}
-      <div
-        className={`chief-composer ${home ? HOME_COMPOSER_CLS : 'mx-4 my-2.5'} rounded-(--radius-composer) border-0 bg-card px-3.5 pt-3 pb-2.5 shadow-(--shadow-composer) transition-[box-shadow] duration-[220ms] ease-(--ease-out-expo) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)`}
-        style={home ? { viewTransitionName: 'chief-composer' } : undefined}
-      >
-        <QueuedCapsules
-          messages={queuedCapsules}
-          onSendNow={onSteer ? (id) => onSteer(id) : undefined}
-          onRemove={withdraw}
-          removeLabel={t('撤回')}
-        />
-        <ComposerAttachments
-          tokens={wire.tokens}
-          pending={pendingAttachments}
-          onRemove={wire.removeToken}
-        />
-        <div className="relative">
-          <Textarea
-            ref={attachComposer}
-            data-testid="chief-composer-input"
-            className={`h-9 max-h-30 min-h-0 resize-none overflow-y-auto rounded-none border-none bg-transparent px-0.5 pt-0.5 pb-2.5 font-sans text-card-title md:text-card-title tabular-nums shadow-none field-sizing-fixed focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none dark:bg-transparent ${MENTION_TEXTAREA_CLS} placeholder:text-(--text-tertiary)`}
-            readOnly={onSend == null}
-            value={wire.draft}
-            onChange={wire.handleChange}
-            onKeyDown={wire.handleKeyDown}
-            onPaste={handlePaste}
-            onKeyUp={handleCaretMoved}
-            onClick={handleCaretMoved}
-            onSelect={handleCaretMoved}
-            onCompositionEnd={handleCompositionEnd}
-            onBlur={handleBlur}
-            placeholder={t(
-              chief.outage != null
-                ? '可以继续说，总管恢复后会按顺序处理…'
-                : chief.running === true
-                  ? CHIEF_INPUT_PLACEHOLDER_STEERING
-                  : CHIEF_INPUT_PLACEHOLDER,
-            )}
-            {...(inlineOpen
-              ? {
-                  role: 'combobox',
-                  'aria-expanded': true,
-                  'aria-controls': inlineListboxId,
-                  'aria-autocomplete': 'list' as const,
-                }
-              : slashOpen
-                ? {
-                    role: 'combobox',
-                    'aria-expanded': true,
-                    'aria-controls': slashListboxId,
-                    'aria-autocomplete': 'list' as const,
-                  }
-                : {})}
-            {...(inlineOpen && inlineHighlight != null
-              ? { 'aria-activedescendant': `${inlineListboxId}-opt-${inlineHighlight}` }
-              : slashOpen && slashHighlight != null
-                ? { 'aria-activedescendant': `${slashListboxId}-opt-${slashHighlight}` }
-                : {})}
-          />
-          <MentionHighlight
-            text={wire.draft}
-            registry={wire.mentionRegistry}
-            textareaRef={wire.textareaRef}
-          />
-          <MentionInline
-            open={inlineOpen}
-            rows={inlineRows}
-            caret={inlineCaret}
-            query={inlineQuery}
-            highlight={inlineHighlight}
-            onHover={setInlineHighlight}
-            onPick={acceptInlineRow}
-            listboxRef={inlineListboxRef}
-            listboxId={inlineListboxId}
-          />
-          <SlashMenu
-            open={slashOpen}
-            sections={slashSections.map((s) => ({
-              title: s.section === 'builtin' ? t('命令') : t('技能'),
-              rows: s.rows,
-            }))}
-            caret={slashCaret}
-            query={slashQuery}
-            highlight={slashHighlight}
-            onHover={setSlashHighlight}
-            onPick={(row) => acceptSlashRow(row, 'enter')}
-            listboxRef={slashListboxRef}
-            listboxId={slashListboxId}
-          />
-        </div>
-        {/* deliberate-native: hidden file picker trigger (display:none, opened programmatically); the visible skin is the attachment Button */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          style={{ display: 'none' }}
-          onChange={onPickFiles}
-          accept="text/*,image/*,application/json,application/pdf,application/xml"
-        />
-        <div className="-ml-1 flex items-center gap-0.5">
-          <IconTooltip
-            label={t('添加附件')}
-            trigger={
-              <Button
-                variant="ghost"
-                size="icon"
-                className={`${TOOL_BTN_CLS} disabled:pointer-events-auto`}
-                disabled={attaching || onAttachment == null}
-                onClick={openFilePicker}
-              />
-            }
+      {composerReplacement ?? (
+        <>
+          {composerError != null && (
+            <p
+              role="alert"
+              data-testid="chief-composer-error"
+              className={`${home ? 'mx-auto w-[calc(100%-2rem)] max-w-182' : 'mx-4'} mt-2 mb-0 flex items-center gap-1.5 text-meta text-destructive`}
+            >
+              <TriangleAlert aria-hidden="true" className="size-3.5 flex-none" />
+              {composerError}
+            </p>
+          )}
+          <div
+            data-invalid={composerError != null ? '' : undefined}
+            className={`chief-composer ${home ? HOME_COMPOSER_CLS : 'mx-4 my-2.5'} data-invalid:ring-1 data-invalid:ring-destructive rounded-(--radius-composer) border-0 bg-card px-3.5 pt-3 pb-2.5 shadow-(--shadow-composer) transition-[box-shadow] duration-[220ms] ease-(--ease-out-expo) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)`}
+            style={home ? { viewTransitionName: 'chief-composer' } : undefined}
           >
-            <Plus width={16} height={16} />
-          </IconTooltip>
-          {chipVisible && (
-            <ProjectMenu
-              title="发给哪个项目"
-              projects={projectOptions}
-              value={pickedProject?.id ?? null}
-              withAuto
-              side="top"
-              onPick={pickProject}
-              trigger={
+            <QueuedCapsules
+              messages={queuedCapsules}
+              onSendNow={onSteer ? (id) => onSteer(id) : undefined}
+              onRemove={withdraw}
+              removeLabel={t('撤回')}
+            />
+            <ComposerAttachments
+              tokens={wire.tokens}
+              pending={pendingAttachments}
+              onRemove={wire.removeToken}
+            />
+            <div className="relative">
+              <Textarea
+                ref={attachComposer}
+                data-testid="chief-composer-input"
+                aria-invalid={composerError != null ? true : undefined}
+                className={`h-9 max-h-30 min-h-0 resize-none overflow-y-auto rounded-none border-none bg-transparent px-0.5 pt-0.5 pb-2.5 font-sans text-card-title md:text-card-title tabular-nums shadow-none field-sizing-fixed focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none dark:bg-transparent ${MENTION_TEXTAREA_CLS} placeholder:text-(--text-tertiary)`}
+                readOnly={onSend == null}
+                value={wire.draft}
+                onChange={wire.handleChange}
+                onKeyDown={wire.handleKeyDown}
+                onPaste={handlePaste}
+                onKeyUp={handleCaretMoved}
+                onClick={handleCaretMoved}
+                onSelect={handleCaretMoved}
+                onCompositionEnd={handleCompositionEnd}
+                onBlur={handleBlur}
+                placeholder={
+                  placeholder ??
+                  t(
+                    chief.outage != null
+                      ? '可以继续说，总管恢复后会按顺序处理…'
+                      : chief.running === true
+                        ? CHIEF_INPUT_PLACEHOLDER_STEERING
+                        : CHIEF_INPUT_PLACEHOLDER,
+                  )
+                }
+                {...(inlineOpen
+                  ? {
+                      role: 'combobox',
+                      'aria-expanded': true,
+                      'aria-controls': inlineListboxId,
+                      'aria-autocomplete': 'list' as const,
+                    }
+                  : slashOpen
+                    ? {
+                        role: 'combobox',
+                        'aria-expanded': true,
+                        'aria-controls': slashListboxId,
+                        'aria-autocomplete': 'list' as const,
+                      }
+                    : {})}
+                {...(inlineOpen && inlineHighlight != null
+                  ? { 'aria-activedescendant': `${inlineListboxId}-opt-${inlineHighlight}` }
+                  : slashOpen && slashHighlight != null
+                    ? { 'aria-activedescendant': `${slashListboxId}-opt-${slashHighlight}` }
+                    : {})}
+              />
+              <MentionHighlight
+                text={wire.draft}
+                registry={wire.mentionRegistry}
+                textareaRef={wire.textareaRef}
+              />
+              <MentionInline
+                open={inlineOpen}
+                rows={inlineRows}
+                caret={inlineCaret}
+                query={inlineQuery}
+                highlight={inlineHighlight}
+                onHover={setInlineHighlight}
+                onPick={acceptInlineRow}
+                listboxRef={inlineListboxRef}
+                listboxId={inlineListboxId}
+              />
+              <SlashMenu
+                open={slashOpen}
+                sections={slashSections.map((s) => ({
+                  title: s.section === 'builtin' ? t('命令') : t('技能'),
+                  rows: s.rows,
+                }))}
+                caret={slashCaret}
+                query={slashQuery}
+                highlight={slashHighlight}
+                onHover={setSlashHighlight}
+                onPick={(row) => acceptSlashRow(row, 'enter')}
+                listboxRef={slashListboxRef}
+                listboxId={slashListboxId}
+              />
+            </div>
+            {/* deliberate-native: hidden file picker trigger (display:none, opened programmatically); the visible skin is the attachment Button */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              style={{ display: 'none' }}
+              onChange={onPickFiles}
+              accept="text/*,image/*,application/json,application/pdf,application/xml"
+            />
+            <div className="-ml-1 flex items-center gap-0.5">
+              <IconTooltip
+                label={t('添加附件')}
+                trigger={
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={`${TOOL_BTN_CLS} disabled:pointer-events-auto`}
+                    disabled={attaching || onAttachment == null}
+                    onClick={openFilePicker}
+                  />
+                }
+              >
+                <Plus width={16} height={16} />
+              </IconTooltip>
+              {chipVisible && (
+                <ProjectMenu
+                  title="发给哪个项目"
+                  projects={projectOptions}
+                  value={pickedProject?.id ?? null}
+                  withAuto
+                  side="top"
+                  onPick={pickProject}
+                  trigger={
+                    <Button
+                      variant="ghost"
+                      data-testid="chief-project-chip"
+                      data-set={pickedProject != null ? '' : undefined}
+                      aria-label={t('发给哪个项目：{name}', {
+                        name: pickedProject?.name ?? t('自动，由总管判断'),
+                      })}
+                      className={PROJECT_CHIP_CLS}
+                    />
+                  }
+                >
+                  {pickedProject != null ? (
+                    <ProjectAvatar
+                      name={pickedProject.name}
+                      tone={projectOptions.indexOf(pickedProject)}
+                      icon={projectMark(pickedProject.id).icon}
+                      color={projectMark(pickedProject.id).color}
+                      bare
+                    />
+                  ) : (
+                    <CircleDashed className="size-4 flex-none" />
+                  )}
+                  <span className="truncate">{pickedProject?.name ?? t('自动')}</span>
+                  <ChevronDown width={12} height={12} />
+                </ProjectMenu>
+              )}
+              {chief.running === true && turnElapsed != null && (
+                <span
+                  className="ml-auto flex h-7 items-center text-meta tabular-nums text-(--text-tertiary)"
+                  data-testid="chief-composer-working"
+                >
+                  {t('工作中 · {time}', { time: formatClock(turnElapsed) })}
+                </span>
+              )}
+              {stopMode ? (
                 <Button
                   variant="ghost"
-                  data-testid="chief-project-chip"
-                  data-set={pickedProject != null ? '' : undefined}
-                  aria-label={t('发给哪个项目：{name}', {
-                    name: pickedProject?.name ?? t('自动，由总管判断'),
-                  })}
-                  className={PROJECT_CHIP_CLS}
-                />
-              }
-            >
-              {pickedProject != null ? (
-                <ProjectAvatar
-                  name={pickedProject.name}
-                  tone={projectOptions.indexOf(pickedProject)}
-                  icon={projectMark(pickedProject.id).icon}
-                  color={projectMark(pickedProject.id).color}
-                  bare
-                />
+                  size="icon"
+                  aria-label={t('停止总管这次回复')}
+                  className={cn(SEND_BTN_CLS, STOP_CLS, turnElapsed != null && 'ml-2')}
+                  onClick={onStop}
+                >
+                  <span className="size-2.25 rounded-(--cds-radius-xs) bg-current" />
+                </Button>
               ) : (
-                <CircleDashed className="size-4 flex-none" />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={t('发送')}
+                  className={cn(
+                    SEND_BTN_CLS,
+                    (wire.draft !== '' ||
+                      wire.tokens.length > 0 ||
+                      pendingAttachments.length > 0) &&
+                      SEND_ON_CLS,
+                    turnElapsed != null && 'ml-2',
+                  )}
+                  onClick={wire.send}
+                >
+                  <ArrowUp width={16} height={16} />
+                </Button>
               )}
-              <span className="truncate">{pickedProject?.name ?? t('自动')}</span>
-              <ChevronDown width={12} height={12} />
-            </ProjectMenu>
-          )}
-          {chief.running === true && turnElapsed != null && (
-            <span
-              className="ml-auto flex h-7 items-center text-meta tabular-nums text-(--text-tertiary)"
-              data-testid="chief-composer-working"
-            >
-              {t('工作中 · {time}', { time: formatClock(turnElapsed) })}
-            </span>
-          )}
-          {stopMode ? (
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={t('停止总管这次回复')}
-              className={cn(SEND_BTN_CLS, STOP_CLS, turnElapsed != null && 'ml-2')}
-              onClick={onStop}
-            >
-              <span className="size-2.25 rounded-(--cds-radius-xs) bg-current" />
-            </Button>
-          ) : (
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={t('发送')}
-              className={cn(
-                SEND_BTN_CLS,
-                (wire.draft !== '' || wire.tokens.length > 0 || pendingAttachments.length > 0) &&
-                  SEND_ON_CLS,
-                turnElapsed != null && 'ml-2',
-              )}
-              onClick={wire.send}
-            >
-              <ArrowUp width={16} height={16} />
-            </Button>
-          )}
-        </div>
-        <SlashHelp
-          open={helpOpen}
-          onClose={closeHelp}
-          commands={helpRows}
-          skillCount={helpSkillCount}
-        />
-      </div>
+            </div>
+            <SlashHelp
+              open={helpOpen}
+              onClose={closeHelp}
+              commands={helpRows}
+              skillCount={helpSkillCount}
+            />
+          </div>
+        </>
+      )}
       <DialogShell
         title={t('恢复到此处')}
         open={rewindConfirm !== null}

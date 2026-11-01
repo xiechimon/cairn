@@ -305,6 +305,125 @@ class ProseCapTests(unittest.TestCase):
         self.assertIn('FAIL too-long:', output)
 
 
+class SizeSectionTests(unittest.TestCase):
+    base = '## Proof\nOld run failed; new run passed.\n## What\nUpdate the contract.\n'
+    review = '## Review\nFresh review passed.\n## Risk\nReversible gate change.\n'
+
+    def body(self, size=None, inside=True):
+        folded = self.review + (size or '') if inside else self.review
+        outside = '' if inside else (size or '')
+        return f'{self.base}{outside}<details><summary>Review and risk</summary>\n\n{folded}\n</details>\n'
+
+    def run_gate(self, body, files):
+        with tempfile.TemporaryDirectory() as directory:
+            body_path = Path(directory, 'body.md')
+            body_path.write_text(body)
+            argv = ['pr-evidence-gate.py', str(body_path)]
+            if files is not None:
+                context_path = Path(directory, 'context.json')
+                context_path.write_text(json.dumps({'repository': 'xiechimon/cairn', 'commits': [], 'files': files}))
+                argv.append(str(context_path))
+            output = io.StringIO()
+            with patch.object(sys, 'argv', argv), contextlib.redirect_stdout(output):
+                result = gate.main()
+        return result, output.getvalue()
+
+    def source(self, additions, deletions=0, name='apps/server/src/a.ts', **extra):
+        return {'filename': name, 'additions': additions, 'deletions': deletions, **extra}
+
+    def test_oversize_without_size_section_is_red(self):
+        result, output = self.run_gate(self.body(), [self.source(801)])
+        self.assertEqual(result, 1, output)
+        self.assertIn('FAIL missing-section: Size', output)
+
+    def test_oversize_with_size_section_inside_details_is_green(self):
+        size = '## Size\nThe migration and its callers must land together.\n'
+        result, output = self.run_gate(self.body(size), [self.source(801)])
+        self.assertEqual(result, 0, output)
+
+    def test_oversize_with_empty_size_section_is_red(self):
+        result, output = self.run_gate(self.body('## Size\n<!-- why -->\n'), [self.source(801)])
+        self.assertEqual(result, 1, output)
+        self.assertIn('FAIL empty-section: Size', output)
+
+    def test_size_section_outside_details_is_red(self):
+        size = '## Size\nThe migration and its callers must land together.\n'
+        result, output = self.run_gate(self.body(size, inside=False), [self.source(801)])
+        self.assertEqual(result, 1, output)
+        self.assertIn('FAIL size-outside-details: Size', output)
+
+    def test_size_heading_in_fenced_code_does_not_count(self):
+        size = '```\n## Size\nnot a heading\n```\n'
+        result, output = self.run_gate(self.body(size), [self.source(801)])
+        self.assertEqual(result, 1, output)
+        self.assertIn('FAIL missing-section: Size', output)
+
+    def test_limits_are_inclusive_at_800_lines_and_40_files(self):
+        self.assertEqual(self.run_gate(self.body(), [self.source(400, 400)])[0], 0)
+        self.assertEqual(self.run_gate(self.body(), [self.source(400, 401)])[0], 1)
+        files = [self.source(1, name=f'apps/server/src/f{k}.ts') for k in range(40)]
+        self.assertEqual(self.run_gate(self.body(), files)[0], 0)
+        self.assertEqual(self.run_gate(self.body(), files + [self.source(1, name='apps/server/src/extra.ts')])[0], 1)
+
+    def test_evidence_does_not_make_a_patch_oversize(self):
+        evidence = [self.source(900, name=f'docs/verify/2372/run-{k}.txt') for k in range(60)]
+        result, output = self.run_gate(self.body(), [self.source(5), *evidence])
+        self.assertEqual(result, 0, output)
+
+    def test_rename_counts_two_files_and_moves_out_of_evidence_count_as_kept(self):
+        renames = [self.source(0, name=f'apps/server/src/n{k}.ts', previous_filename=f'apps/server/src/o{k}.ts') for k in range(21)]
+        self.assertEqual(self.run_gate(self.body(), renames)[0], 1)
+        out_of_evidence = self.source(1, name='apps/server/src/a.ts', previous_filename='docs/verify/1/a.ts')
+        self.assertEqual(gate.patch_size([out_of_evidence]), (1, 2))
+        into_evidence = self.source(1, name='docs/verify/2/a.ts', previous_filename='docs/verify/1/a.ts')
+        self.assertEqual(gate.patch_size([into_evidence]), (0, 0))
+
+    def test_api_pages_are_flattened(self):
+        pages = [[self.source(500)], [self.source(301, name='apps/server/src/b.ts')]]
+        result, output = self.run_gate(self.body(), pages)
+        self.assertEqual(result, 1, output)
+        self.assertIn('FAIL missing-section: Size', output)
+
+    def test_missing_file_list_in_a_given_context_fails_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            body_path = Path(directory, 'body.md')
+            body_path.write_text(self.body())
+            context_path = Path(directory, 'context.json')
+            context_path.write_text(json.dumps({'repository': 'xiechimon/cairn', 'commits': []}))
+            output = io.StringIO()
+            with patch.object(sys, 'argv', ['gate', str(body_path), str(context_path)]), contextlib.redirect_stdout(output):
+                result = gate.main()
+        self.assertEqual(result, 1, output.getvalue())
+        self.assertIn('FAIL size-unreadable', output.getvalue())
+
+    def test_without_a_context_size_is_not_checked(self):
+        self.assertEqual(self.run_gate(self.body(), None)[0], 0)
+
+    def test_limits_come_from_merge_gate_paths_json(self):
+        limits = json.loads(Path('packages/shared/merge-gate-paths.json').read_text())['limits']
+        self.assertEqual(gate.size_limits(), (limits['maxLines'], limits['maxFiles']))
+        with tempfile.TemporaryDirectory() as directory:
+            narrowed = Path(directory, 'merge-gate-paths.json')
+            narrowed.write_text(json.dumps({'limits': {'maxLines': 4, 'maxFiles': 40}}))
+            with patch.object(gate, 'GATE_PATHS', narrowed):
+                result, output = self.run_gate(self.body(), [self.source(5)])
+        self.assertEqual(result, 1, output)
+        self.assertIn('limits 4 lines, 40 files', output)
+
+    def test_unreadable_limits_fail_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            for content in (None, '{}', json.dumps({'limits': {'maxLines': 0, 'maxFiles': 40}}), 'not json'):
+                path = Path(directory, 'merge-gate-paths.json')
+                if content is not None:
+                    path.write_text(content)
+                elif path.exists():
+                    path.unlink()
+                with patch.object(gate, 'GATE_PATHS', path):
+                    result, output = self.run_gate(self.body(), [self.source(5)])
+                self.assertEqual(result, 1, output)
+                self.assertIn('FAIL size-unreadable', output)
+
+
 class SchemaGlanceTests(unittest.TestCase):
     table = ('### Schema changes\n\n| table | change | detail |\n|---|---|---|\n'
              '| `tasks` | + due_at | integer |\n| `tasks` | - legacy | text |\n')
@@ -449,125 +568,6 @@ class SchemaGlanceWorkflowTests(unittest.TestCase):
         result = self.run_step(self.body + table)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn('schema-changes: matches', result.stdout)
-
-
-class SizeSectionTests(unittest.TestCase):
-    base = '## Proof\nOld run failed; new run passed.\n## What\nUpdate the contract.\n'
-    review = '## Review\nFresh review passed.\n## Risk\nReversible gate change.\n'
-
-    def body(self, size=None, inside=True):
-        folded = self.review + (size or '') if inside else self.review
-        outside = '' if inside else (size or '')
-        return f'{self.base}{outside}<details><summary>Review and risk</summary>\n\n{folded}\n</details>\n'
-
-    def run_gate(self, body, files):
-        with tempfile.TemporaryDirectory() as directory:
-            body_path = Path(directory, 'body.md')
-            body_path.write_text(body)
-            argv = ['pr-evidence-gate.py', str(body_path)]
-            if files is not None:
-                context_path = Path(directory, 'context.json')
-                context_path.write_text(json.dumps({'repository': 'xiechimon/cairn', 'commits': [], 'files': files}))
-                argv.append(str(context_path))
-            output = io.StringIO()
-            with patch.object(sys, 'argv', argv), contextlib.redirect_stdout(output):
-                result = gate.main()
-        return result, output.getvalue()
-
-    def source(self, additions, deletions=0, name='apps/server/src/a.ts', **extra):
-        return {'filename': name, 'additions': additions, 'deletions': deletions, **extra}
-
-    def test_oversize_without_size_section_is_red(self):
-        result, output = self.run_gate(self.body(), [self.source(801)])
-        self.assertEqual(result, 1, output)
-        self.assertIn('FAIL missing-section: Size', output)
-
-    def test_oversize_with_size_section_inside_details_is_green(self):
-        size = '## Size\nThe migration and its callers must land together.\n'
-        result, output = self.run_gate(self.body(size), [self.source(801)])
-        self.assertEqual(result, 0, output)
-
-    def test_oversize_with_empty_size_section_is_red(self):
-        result, output = self.run_gate(self.body('## Size\n<!-- why -->\n'), [self.source(801)])
-        self.assertEqual(result, 1, output)
-        self.assertIn('FAIL empty-section: Size', output)
-
-    def test_size_section_outside_details_is_red(self):
-        size = '## Size\nThe migration and its callers must land together.\n'
-        result, output = self.run_gate(self.body(size, inside=False), [self.source(801)])
-        self.assertEqual(result, 1, output)
-        self.assertIn('FAIL size-outside-details: Size', output)
-
-    def test_size_heading_in_fenced_code_does_not_count(self):
-        size = '```\n## Size\nnot a heading\n```\n'
-        result, output = self.run_gate(self.body(size), [self.source(801)])
-        self.assertEqual(result, 1, output)
-        self.assertIn('FAIL missing-section: Size', output)
-
-    def test_limits_are_inclusive_at_800_lines_and_40_files(self):
-        self.assertEqual(self.run_gate(self.body(), [self.source(400, 400)])[0], 0)
-        self.assertEqual(self.run_gate(self.body(), [self.source(400, 401)])[0], 1)
-        files = [self.source(1, name=f'apps/server/src/f{k}.ts') for k in range(40)]
-        self.assertEqual(self.run_gate(self.body(), files)[0], 0)
-        self.assertEqual(self.run_gate(self.body(), files + [self.source(1, name='apps/server/src/extra.ts')])[0], 1)
-
-    def test_evidence_does_not_make_a_patch_oversize(self):
-        evidence = [self.source(900, name=f'docs/verify/2372/run-{k}.txt') for k in range(60)]
-        result, output = self.run_gate(self.body(), [self.source(5), *evidence])
-        self.assertEqual(result, 0, output)
-
-    def test_rename_counts_two_files_and_moves_out_of_evidence_count_as_kept(self):
-        renames = [self.source(0, name=f'apps/server/src/n{k}.ts', previous_filename=f'apps/server/src/o{k}.ts') for k in range(21)]
-        self.assertEqual(self.run_gate(self.body(), renames)[0], 1)
-        out_of_evidence = self.source(1, name='apps/server/src/a.ts', previous_filename='docs/verify/1/a.ts')
-        self.assertEqual(gate.patch_size([out_of_evidence]), (1, 2))
-        into_evidence = self.source(1, name='docs/verify/2/a.ts', previous_filename='docs/verify/1/a.ts')
-        self.assertEqual(gate.patch_size([into_evidence]), (0, 0))
-
-    def test_api_pages_are_flattened(self):
-        pages = [[self.source(500)], [self.source(301, name='apps/server/src/b.ts')]]
-        result, output = self.run_gate(self.body(), pages)
-        self.assertEqual(result, 1, output)
-        self.assertIn('FAIL missing-section: Size', output)
-
-    def test_missing_file_list_in_a_given_context_fails_closed(self):
-        with tempfile.TemporaryDirectory() as directory:
-            body_path = Path(directory, 'body.md')
-            body_path.write_text(self.body())
-            context_path = Path(directory, 'context.json')
-            context_path.write_text(json.dumps({'repository': 'xiechimon/cairn', 'commits': []}))
-            output = io.StringIO()
-            with patch.object(sys, 'argv', ['gate', str(body_path), str(context_path)]), contextlib.redirect_stdout(output):
-                result = gate.main()
-        self.assertEqual(result, 1, output.getvalue())
-        self.assertIn('FAIL size-unreadable', output.getvalue())
-
-    def test_without_a_context_size_is_not_checked(self):
-        self.assertEqual(self.run_gate(self.body(), None)[0], 0)
-
-    def test_limits_come_from_merge_gate_paths_json(self):
-        limits = json.loads(Path('packages/shared/merge-gate-paths.json').read_text())['limits']
-        self.assertEqual(gate.size_limits(), (limits['maxLines'], limits['maxFiles']))
-        with tempfile.TemporaryDirectory() as directory:
-            narrowed = Path(directory, 'merge-gate-paths.json')
-            narrowed.write_text(json.dumps({'limits': {'maxLines': 4, 'maxFiles': 40}}))
-            with patch.object(gate, 'GATE_PATHS', narrowed):
-                result, output = self.run_gate(self.body(), [self.source(5)])
-        self.assertEqual(result, 1, output)
-        self.assertIn('limits 4 lines, 40 files', output)
-
-    def test_unreadable_limits_fail_closed(self):
-        with tempfile.TemporaryDirectory() as directory:
-            for content in (None, '{}', json.dumps({'limits': {'maxLines': 0, 'maxFiles': 40}}), 'not json'):
-                path = Path(directory, 'merge-gate-paths.json')
-                if content is not None:
-                    path.write_text(content)
-                elif path.exists():
-                    path.unlink()
-                with patch.object(gate, 'GATE_PATHS', path):
-                    result, output = self.run_gate(self.body(), [self.source(5)])
-                self.assertEqual(result, 1, output)
-                self.assertIn('FAIL size-unreadable', output)
 
 
 def load_tests(loader, tests, pattern):

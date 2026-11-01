@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 
-const EMPTY_TASKS = '/app/project/ZAQczKCu0MOAzC1ZqcFlX?scenario=r2-24b&tab=tasks';
+const EMPTY_TASKS = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=r2-24b&tab=tasks';
 const TITLE = '空项目第一个任务';
 
 async function openDialog(page: Page) {

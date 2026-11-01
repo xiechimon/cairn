@@ -34,7 +34,7 @@ const SCREENS = [
   },
   {
     title: 'Project tasks',
-    url: '/app/project/ZAQczKCu0MOAzC1ZqcFlX?scenario=prj-tasks&tab=tasks',
+    url: '/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=prj-tasks&tab=tasks',
     parts: 'Project header, segmented tabs, task list',
   },
   {
