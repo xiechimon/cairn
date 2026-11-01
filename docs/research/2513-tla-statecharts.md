@@ -53,6 +53,8 @@ Not charted:
 - **StepClaim one-machine: legible, at the edge.** 17 states and 39 arrows, about twice the guideline. Status × card state (open, closed or archived) is the right abstraction: P3 (no closed card reaches `Claimed` again), P5 and P7 (no "Claimed (task archived)" state without an archive stop) can be checked by eye. The network, crash and presence actions are all self-loops at this granularity and do not appear, so the chart shows the step lifecycle, not the concurrency the model exists to check.
 - **Bug-path charts: always readable.** 3 to 7 states, and the same content as the counterexample in `expected.txt`, with readable state names.
 
+Rendering, checked on GitHub's file view on this branch: every `.mmd` renders, including the group classes that have no `classDef`. The bug-path charts read at page width. `merge-gate.mmd` and `step-claim-one-machine.mmd` render as a dense web at page width, and their labels are legible only with the viewer's zoom. So the whole-graph charts work as review material for a model change, not as an at-a-glance picture in a PR body.
+
 Across all models, the chart is only as good as the view, and the view is hand-written judgement. A model change that adds a variable or an action needs the view checked as well. Otherwise the new behavior collapses into an existing label.
 
 ## Check against the skills' prose
