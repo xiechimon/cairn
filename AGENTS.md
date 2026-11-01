@@ -41,7 +41,7 @@ Security surfaces (keep this list synchronized with `.claude/workflows/pr-gate.j
 - Never add the `needs-decision` label. Agents decide by their own recommendation, say what they chose and why in chat, and continue; ask ian for payments, credentials, intended-behavior or ADR changes, and decisions explicitly routed to him. A `needs-decision` label already on a PR keeps `pr-evidence` red and disarms auto-merge until it is removed; agents remove it only with `CAIRN_DECIDED=1` after ian gave the decision in chat.
 - Before asking ian about a PR with auto-merge armed, disarm it with `gh pr merge <n> --disable-auto`.
 - Follow `.claude/skills/pr-cairn/SKILL.md` for PR creation and merge mechanics, and `docs/ops/agent-bot-identity.md` for bot versus human identity and merge methods.
-- PRs that `.mergify.yml` admits land through the Mergify merge queue: after opening one, comment `@mergifyio queue` and stop; the queue and CI own the rest. Protected-path and owner-routed PRs keep ian's route.
+- PRs that `.mergify.yml` admits enter the Mergify merge queue automatically once the review gate and `merge-route` pass; add the `review-gate` label and stop, and never `gh pr merge` them. Protected-path and owner-routed PRs keep ian's route.
 
 ## How to work
 

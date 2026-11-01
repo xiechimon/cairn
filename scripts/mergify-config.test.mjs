@@ -93,3 +93,18 @@ test('web and backend are separate scopes and shared packages touch both', () =>
   assert.match(config, / {6}backend:\n {8}include:\n {10}- apps\/server\/\*\*\/\*\n/);
   assert.match(config, / {2}barrier_files:\n {4}include:\n {6}- packages\/\*\*\/\*\n/);
 });
+
+test('eligible PRs enter the queue on their own once the gate and routing pass', () => {
+  assert.match(config, /merge_protections_settings:\n {2}auto_merge_conditions: true\n/);
+  const protections = config.split('merge_protections:\n')[1].split('merge_queue:\n')[0];
+  assert.match(protections, / {4}if:\n {6}- base = main\n/);
+  assert.match(protections, /- status-success = review-gate\n/);
+  assert.match(protections, /- check-success = merge-route\n/);
+});
+
+test('Mergify merges past its own required queue check as the merge bot account', () => {
+  for (const name of ['default', 'bot']) {
+    assert.match(rules[name], /branch_protection_injection_mode: none\n/, name);
+    assert.match(rules[name], /merge_bot_account: xiechimon(\n|$)/, name);
+  }
+});
