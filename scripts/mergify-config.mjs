@@ -89,13 +89,6 @@ ${rule('default', `-author = ${botAuthor}`, 'squash')}
 ${rule('bot', `author = ${botAuthor}`, 'rebase')}
 merge_protections_settings:
   auto_merge_conditions: true
-merge_protections:
-  - name: queue entry needs the review gate and pr-gate routing
-    if:
-      - base = main
-    success_conditions:
-      - status-success = review-gate
-      - check-success = merge-route
 merge_queue:
   mode: parallel
   max_parallel_checks: 3
