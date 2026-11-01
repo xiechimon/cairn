@@ -1,0 +1,14 @@
+[Unit]
+Description=Cairn self-deploy: deploy the newest green main commit and alarm on deploy lag
+
+[Service]
+Type=oneshot
+UMask=0077
+Environment=PATH=%h/.local/share/mise/shims:/usr/local/bin:/usr/bin:/bin
+Environment=CAIRN_CHECKOUT=%h/Code/AgentProjects/cairn
+Environment=CAIRN_DATA_DIR=%h/.cairn/server
+Environment=CAIRN_DEPLOY_STATE=%h/.local/state/cairn-deploy
+ExecStart=/bin/bash -c 'exec /bin/bash "$${CAIRN_CHECKOUT}/scripts/ops/deploy-watch.sh"'
+StandardOutput=append:%h/.local/state/cairn-self-deploy.log
+StandardError=append:%h/.local/state/cairn-self-deploy.log
+TimeoutStartSec=45min
