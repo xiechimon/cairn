@@ -13,12 +13,11 @@ import { ApiError } from '../api/client.js';
 import { useApiMutations, useGithubConnection, useGithubRepos } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
+import { KeyedMenuContent, KeyedMenuRadioItem } from '../components/menu-keys.js';
 import { Button } from '../components/ui/button.js';
 import {
   DropdownMenu,
-  DropdownMenuContent,
   DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu.js';
 import { Input } from '../components/ui/input.js';
@@ -502,7 +501,7 @@ export function ProjectNewPage() {
                     <ChevronRight width={14} height={14} />
                   </DropdownMenuTrigger>
                 )}
-                <DropdownMenuContent
+                <KeyedMenuContent
                   anchor={repoFieldRef}
                   sideOffset={6}
                   aria-label={t('仓库')}
@@ -517,14 +516,14 @@ export function ProjectNewPage() {
                       if (sel === 'github') setPickerOpen(false);
                     }}
                   >
-                    <DropdownMenuRadioItem value="github" closeOnClick>
+                    <KeyedMenuRadioItem value="github" shortcut="G" closeOnClick>
                       {t('GitHub 仓库')}
-                    </DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="local" closeOnClick>
+                    </KeyedMenuRadioItem>
+                    <KeyedMenuRadioItem value="local" shortcut="L" closeOnClick>
                       {t('本地文件夹')}
-                    </DropdownMenuRadioItem>
+                    </KeyedMenuRadioItem>
                   </DropdownMenuRadioGroup>
-                </DropdownMenuContent>
+                </KeyedMenuContent>
                 <PopoverContent
                   side="bottom"
                   align="start"

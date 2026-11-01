@@ -29,6 +29,7 @@ import {
 import { toModelOptions, toThinkingLevelDisplay } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { EmptyState } from '../components/empty-state.js';
+import { KeyedMenuContent, KeyedMenuRadioItem } from '../components/menu-keys.js';
 import { ProfileHeader, useEditorFocus } from '../components/profile-card.js';
 import { SegmentedTabs } from '../components/segmented.js';
 import {
@@ -45,9 +46,7 @@ import { Button } from '../components/ui/button.js';
 import { Card } from '../components/ui/card.js';
 import {
   DropdownMenu,
-  DropdownMenuContent,
   DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu.js';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '../components/ui/input-group.js';
@@ -99,6 +98,10 @@ const TAB_LABELS: { id: AgentTab; label: string }[] = [
 ];
 
 const MEMORY_SORT_OPTIONS = ['默认', '添加时间'] as const;
+const MEMORY_SORT_KEYS: Record<(typeof MEMORY_SORT_OPTIONS)[number], string> = {
+  默认: 'D',
+  添加时间: 'A',
+};
 type MemorySort = (typeof MEMORY_SORT_OPTIONS)[number];
 
 const CLAUDE_CODE_THINKING_LEVELS: readonly string[] = [
@@ -511,7 +514,7 @@ export function AgentDetailPage() {
                         <span>{t(MEMORY_UI_COPY.sort)}</span>
                         <ChevronDown width={12} height={12} className="size-3" />
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent
+                      <KeyedMenuContent
                         align="end"
                         side="bottom"
                         sideOffset={8}
@@ -523,12 +526,17 @@ export function AgentDetailPage() {
                           onValueChange={(next) => setMemorySort(next as MemorySort)}
                         >
                           {MEMORY_SORT_OPTIONS.map((option) => (
-                            <DropdownMenuRadioItem key={option} value={option} closeOnClick>
+                            <KeyedMenuRadioItem
+                              key={option}
+                              value={option}
+                              shortcut={MEMORY_SORT_KEYS[option]}
+                              closeOnClick
+                            >
                               <span>{t(option)}</span>
-                            </DropdownMenuRadioItem>
+                            </KeyedMenuRadioItem>
                           ))}
                         </DropdownMenuRadioGroup>
-                      </DropdownMenuContent>
+                      </KeyedMenuContent>
                     </DropdownMenu>
                   </span>
                 </div>
