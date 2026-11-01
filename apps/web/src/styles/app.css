@@ -469,12 +469,6 @@
   [data-slot="message-scroller-item"]:not(:hover, :focus-within) .chat-row-icons .chat-copy {
     opacity: 0;
   }
-  [data-slot="message-scroller-item"]:not(:hover, :focus-within)
-    .chat-row-icons
-    .chat-copy
-    ~ .border-l {
-    border-color: transparent;
-  }
 }
 
 @media (max-width: 640px) {
