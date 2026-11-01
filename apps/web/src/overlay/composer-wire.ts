@@ -406,9 +406,20 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     if (growCap == null) return;
     const ta = textareaRef.current;
     if (ta == null) return;
-    ta.style.height = '';
-    const grown = Math.min(ta.scrollHeight, growCap);
-    if (grown > ta.clientHeight) ta.style.height = `${grown}px`;
+    const grow = () => {
+      ta.style.height = '';
+      const grown = Math.min(ta.scrollHeight, growCap);
+      if (grown > ta.clientHeight) ta.style.height = `${grown}px`;
+    };
+    grow();
+    let width = ta.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (ta.clientWidth === width) return;
+      width = ta.clientWidth;
+      grow();
+    });
+    observer.observe(ta);
+    return () => observer.disconnect();
   }, [draft, growCap]);
 
   const applyTextInsert = (

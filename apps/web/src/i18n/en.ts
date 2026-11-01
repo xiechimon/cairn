@@ -195,6 +195,10 @@ export const EN: Record<string, string> = {
   打开方案: 'Open plan',
   添加附件: 'Add attachment',
   'AI 审核': 'AI review',
+  移除附件: 'Remove attachment',
+  '上传中 {percent}%': 'Uploading {percent}%',
+  '此任务为只读，请在实时工作区中打开后继续。':
+    'This task is read only. Open it in the live workspace to continue.',
   审核中: 'Reviewing',
   'AI 审核进行中…': 'AI review in progress…',
   提及: 'Mention',

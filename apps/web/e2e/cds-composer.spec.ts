@@ -145,7 +145,7 @@ test('CDS composer: multi-line draft grows the card and text clears the toolbar'
   await expect(input).toBeVisible();
 
   const emptyHeight = await card.evaluate((el) => el.getBoundingClientRect().height);
-  expect(Math.round(emptyHeight)).toBe(84);
+  expect(Math.round(emptyHeight)).toBe(86);
 
   await input.fill('line one\nline two\nline three');
   await expect(input).toHaveValue('line one\nline two\nline three');
@@ -163,7 +163,7 @@ test('CDS composer: multi-line draft grows the card and text clears the toolbar'
     };
   });
 
-  expect(geom.cardHeight).toBeGreaterThan(84);
+  expect(geom.cardHeight).toBeGreaterThan(86);
   expect(geom.contentBottom).toBeLessThanOrEqual(geom.toolbarTop);
   await evidencePanelShot(page, 'after.png', card);
 });
@@ -189,7 +189,7 @@ test('CDS composer: a wrapped single paragraph also clears the toolbar', async (
     };
   });
 
-  expect(geom.cardHeight).toBeGreaterThan(84);
+  expect(geom.cardHeight).toBeGreaterThan(86);
   expect(geom.contentBottom).toBeLessThanOrEqual(geom.toolbarTop);
 });
 
@@ -203,10 +203,10 @@ test('CDS composer: a width change that wraps the draft re-reserves toolbar clea
   await expect(input).toBeVisible();
 
   const wideWidth = await input.evaluate((el) => el.clientWidth);
-  const words = Math.floor((wideWidth - 60) / 36);
+  const words = Math.floor((wideWidth - 20) / 38);
   await input.fill('wrap '.repeat(words).trim());
   const wide = await card.evaluate((el) => el.getBoundingClientRect().height);
-  expect(Math.round(wide)).toBe(84);
+  expect(Math.round(wide)).toBe(86);
 
   await page.setViewportSize({ width: 900, height: 732 });
 
@@ -222,5 +222,5 @@ test('CDS composer: a width change that wraps the draft re-reserves toolbar clea
     )
     .toBe(true);
   const narrow = await card.evaluate((el) => el.getBoundingClientRect().height);
-  expect(narrow).toBeGreaterThan(84);
+  expect(narrow).toBeGreaterThan(86);
 });

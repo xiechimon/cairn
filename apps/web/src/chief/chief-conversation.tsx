@@ -53,13 +53,12 @@ import {
   ChiefUserPlus,
   Grid2x2,
   Minus,
-  Paperclip,
   Plus,
   RuntimeClaudeCode,
   RuntimePi,
 } from '../icons/index.js';
 import { uploadMessageAttachments } from '../overlay/attachment-paste.js';
-import { AttachmentStrip } from '../overlay/attachment-strip.js';
+import { ComposerAttachments } from '../overlay/composer-attachments.js';
 import { useComposerWire } from '../overlay/composer-wire.js';
 import { dropEscLayer, pushEscLayer } from '../overlay/gesture-machine.js';
 import { useChiefNewThreadHotkey } from '../overlay/hotkeys.js';
@@ -75,17 +74,17 @@ const HEAD_ICON_BTN_CLS =
   "size-6 cursor-pointer justify-center rounded-none border-none bg-transparent p-0 text-(--text-tertiary) hover:bg-transparent hover:text-(--text-tertiary) dark:hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
 
 const TOOL_BTN_CLS =
-  "size-6 cursor-pointer text-(--text-tertiary) hover:text-(--text-secondary) dark:hover:text-(--text-secondary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
+  "size-7 cursor-pointer rounded-(--radius-control) text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover) dark:hover:text-foreground active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
 
 const PROJECT_CHIP_CLS =
   "h-7 max-w-48 cursor-pointer gap-1.5 rounded-lg border-none bg-transparent px-2 text-meta font-normal text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-(--foreground) dark:hover:bg-(--menu-hover) aria-expanded:bg-(--menu-hover) data-[set]:bg-(--menu-hover) data-[set]:text-(--foreground) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
 
 const SEND_BTN_CLS =
-  'ml-auto size-7 cursor-pointer rounded-(--radius-control) border-0 bg-(--menu-hover) text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-(--text-secondary) dark:hover:bg-(--menu-hover) aria-expanded:bg-transparent active:not-aria-[haspopup]:translate-y-0';
+  'ml-auto size-7 cursor-pointer rounded-(--radius-control) border-0 bg-secondary text-(--text-tertiary) hover:bg-secondary hover:text-(--text-tertiary) dark:hover:bg-secondary aria-expanded:bg-transparent active:not-aria-[haspopup]:translate-y-0';
 const SEND_ON_CLS =
-  'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground dark:hover:bg-primary/90';
-const STOP_ON_CLS =
-  'bg-(--foreground) text-(--background) hover:bg-(--foreground) hover:text-(--background) dark:hover:bg-(--foreground)';
+  'bg-foreground text-background hover:bg-foreground/90 hover:text-background dark:hover:bg-foreground/90';
+const STOP_CLS =
+  'text-foreground hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover)';
 
 const SCROLLER_ROOT_CLS = 'h-auto min-h-0 flex-1';
 const SCROLLER_CONTENT_CLS = 'block gap-0 px-4 pt-3.5';
@@ -655,14 +654,19 @@ export function ChiefConversation({
         )
       )}
       <div
-        className={`chief-composer ${home ? HOME_COMPOSER_CLS : 'mx-4 my-2.5'} [&>.attachment-strip]:mt-2 rounded-(--radius-composer) border-0 bg-card px-3.5 pt-3 pb-2.5 shadow-(--shadow-composer) transition-[box-shadow] duration-[220ms] ease-(--ease-out-expo) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)`}
+        className={`chief-composer ${home ? HOME_COMPOSER_CLS : 'mx-4 my-2.5'} rounded-(--radius-composer) border-0 bg-card px-3.5 pt-3 pb-2.5 shadow-(--shadow-composer) transition-[box-shadow] duration-[220ms] ease-(--ease-out-expo) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)`}
         style={home ? { viewTransitionName: 'chief-composer' } : undefined}
       >
+        <ComposerAttachments
+          draft={wire.draft}
+          pending={pendingAttachments}
+          onDraftChange={wire.setDraft}
+        />
         <div className="relative">
           <Textarea
             ref={attachComposer}
             data-testid="chief-composer-input"
-            className={`h-10 max-h-30 min-h-0 resize-none overflow-y-auto rounded-none border-none bg-transparent p-0 font-sans text-ui leading-5 md:text-ui tabular-nums shadow-none field-sizing-fixed focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none dark:bg-transparent ${MENTION_TEXTAREA_CLS} placeholder:text-(--text-secondary)`}
+            className={`h-9 max-h-30 min-h-0 resize-none overflow-y-auto rounded-none border-none bg-transparent px-0.5 pt-0.5 pb-2.5 font-sans text-card-title md:text-card-title tabular-nums shadow-none field-sizing-fixed focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none dark:bg-transparent ${MENTION_TEXTAREA_CLS} placeholder:text-(--text-tertiary)`}
             readOnly={onSend == null}
             value={wire.draft}
             onChange={wire.handleChange}
@@ -732,7 +736,6 @@ export function ChiefConversation({
             listboxId={slashListboxId}
           />
         </div>
-        <AttachmentStrip draft={wire.draft} pending={pendingAttachments} />
         {/* deliberate-native: hidden file picker trigger (display:none, opened programmatically); the visible skin is the attachment Button */}
         <input
           ref={fileInputRef}
@@ -742,7 +745,7 @@ export function ChiefConversation({
           onChange={onPickFiles}
           accept="text/*,image/*,application/json,application/pdf,application/xml"
         />
-        <div className="mt-2.5 flex items-center gap-3">
+        <div className="-ml-1 flex items-center gap-0.5">
           <IconTooltip
             label={t('添加附件')}
             trigger={
@@ -755,7 +758,7 @@ export function ChiefConversation({
               />
             }
           >
-            <Paperclip width={16} height={16} />
+            <Plus width={16} height={16} />
           </IconTooltip>
           {chipVisible && (
             <ProjectMenu
@@ -773,7 +776,7 @@ export function ChiefConversation({
                   aria-label={t('发给哪个项目：{name}', {
                     name: pickedProject?.name ?? t('自动，由总管判断'),
                   })}
-                  className={`-ml-2 ${PROJECT_CHIP_CLS}`}
+                  className={PROJECT_CHIP_CLS}
                 />
               }
             >
@@ -794,7 +797,7 @@ export function ChiefConversation({
           )}
           {chief.running === true && turnElapsed != null && (
             <span
-              className="ml-auto flex h-8 items-center text-meta tabular-nums text-(--text-tertiary)"
+              className="ml-auto flex h-7 items-center text-meta tabular-nums text-(--text-tertiary)"
               data-testid="chief-composer-working"
             >
               {t('工作中 · {time}', { time: formatClock(turnElapsed) })}
@@ -805,10 +808,10 @@ export function ChiefConversation({
               variant="ghost"
               size="icon"
               aria-label={t('停止总管这次回复')}
-              className={cn(SEND_BTN_CLS, STOP_ON_CLS, turnElapsed != null && 'ml-2')}
+              className={cn(SEND_BTN_CLS, STOP_CLS, turnElapsed != null && 'ml-2')}
               onClick={onStop}
             >
-              <span className="size-2.5 rounded-(--cds-radius-xs) bg-current" />
+              <span className="size-2.25 rounded-(--cds-radius-xs) bg-current" />
             </Button>
           ) : (
             <Button
@@ -817,7 +820,7 @@ export function ChiefConversation({
               aria-label={t('发送')}
               className={cn(
                 SEND_BTN_CLS,
-                wire.draft !== '' && SEND_ON_CLS,
+                (wire.draft !== '' || pendingAttachments.length > 0) && SEND_ON_CLS,
                 turnElapsed != null && 'ml-2',
               )}
               onClick={wire.send}

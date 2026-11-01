@@ -62,10 +62,29 @@ export function parseAttachmentTokens(text: string): AttachmentToken[] {
   return out;
 }
 
+export function removeAttachmentToken(text: string, index: number): string {
+  const lines = text.split('\n');
+  let seen = 0;
+  const kept = lines.filter((line) => {
+    if (!ATTACHMENT_LINE.test(line)) return true;
+    const drop = seen === index;
+    seen += 1;
+    return !drop;
+  });
+  return kept.join('\n');
+}
+
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export interface PendingAttachment {
   uid: string;
   name: string;
   mime: string;
+  size: number;
   url: string | null;
 }
 

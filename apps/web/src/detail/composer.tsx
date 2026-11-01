@@ -1,12 +1,11 @@
-import { useLayoutEffect, useState } from 'react';
 import { formatClock, useLiveSeconds } from '../components/chat/live-row.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
 import { Input } from '../components/ui/input.js';
 import { Textarea } from '../components/ui/textarea.js';
 import { useI18n } from '../i18n/provider.js';
-import { ArrowUp, Paperclip, SearchPlus } from '../icons/index.js';
-import { AttachmentStrip } from '../overlay/attachment-strip.js';
+import { ArrowUp, Lock, Plus, SearchPlus } from '../icons/index.js';
+import { ComposerAttachments } from '../overlay/composer-attachments.js';
 import { useComposerWire } from '../overlay/composer-wire.js';
 import { MENTION_TEXTAREA_CLS, MentionHighlight } from '../overlay/mention-highlight.js';
 import { MentionInline } from '../overlay/mention-inline.js';
@@ -14,14 +13,16 @@ import type { FileMentionEntry, MentionGroups } from '../overlay/mention-token.j
 import { SlashHelp, SlashMenu } from '../overlay/slash-menu.js';
 
 const COMPOSER_CARD =
-  'composer relative mx-auto mb-4 w-[calc(100%-2rem)] max-w-(--chat-max-w) flex-none rounded-(--radius-composer) border-0 bg-(--card) shadow-(--shadow-composer) transition-[box-shadow] duration-[220ms] ease-(--ease-out-expo) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)';
-const COMPOSER_PLACEHOLDER = 'px-4 pt-3 text-ui';
+  'composer relative mx-auto mb-4 flex w-[calc(100%-2rem)] max-w-(--chat-max-w) flex-none flex-col rounded-(--radius-composer) border-0 px-3.5 pt-3 pb-2.5 transition-[box-shadow] duration-[220ms] ease-(--ease-out-expo)';
+const COMPOSER_CARD_EDITABLE =
+  'bg-(--card) shadow-(--shadow-composer) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)';
+const COMPOSER_CARD_READ_ONLY = 'bg-secondary shadow-(--shadow-composer)';
 const COMPOSER_INPUT =
-  "field-sizing-fixed h-12 min-h-0 max-h-(--composer-max-h) overflow-y-auto resize-none border-none bg-transparent px-4 pt-3 pb-0 [font-family:var(--font-inter),Inter,system-ui,-apple-system,'PingFang_SC','Microsoft_YaHei',sans-serif] text-ui text-(--foreground) tabular-nums transition-none outline-none placeholder:text-(--text-secondary) focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent";
+  "field-sizing-fixed h-9 min-h-0 max-h-(--composer-max-h) overflow-y-auto resize-none border-none bg-transparent px-0.5 pt-0.5 pb-2.5 [font-family:var(--font-inter),Inter,system-ui,-apple-system,'PingFang_SC','Microsoft_YaHei',sans-serif] text-card-title text-(--foreground) tabular-nums transition-none outline-none placeholder:text-(--text-tertiary) focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent";
 const COMPOSER_TOOL =
-  'flex size-7 cursor-pointer items-center justify-center border-none bg-transparent p-0 text-(--text-tertiary) hover:bg-transparent hover:text-(--text-secondary) dark:hover:bg-transparent dark:hover:text-(--text-secondary) active:not-aria-[haspopup]:translate-y-0';
+  "flex size-7 cursor-pointer items-center justify-center rounded-(--radius-control) border-none bg-transparent p-0 font-normal text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover) dark:hover:text-foreground active:not-aria-[haspopup]:translate-y-0 disabled:pointer-events-auto disabled:opacity-100 [&_svg:not([class*='size-'])]:size-auto";
 const COMPOSER_SQUARE =
-  'absolute bottom-3 flex size-8 cursor-pointer items-center justify-center rounded-(--radius-control) border-none p-0 active:not-aria-[haspopup]:translate-y-0';
+  "flex size-7 cursor-pointer items-center justify-center rounded-(--radius-control) border-none p-0 active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
 
 interface ComposerProps {
   placeholder: string;
@@ -31,6 +32,7 @@ interface ComposerProps {
   onQueue?: (text: string) => void | Promise<void>;
   onStopAndSend?: (text: string) => void | Promise<void>;
   editable?: boolean;
+  readOnly?: boolean;
   onAttachment?: (files: File[]) => string[] | Promise<string[]>;
   draft?: string;
   onDraftChange?: (next: string) => void;
@@ -49,6 +51,7 @@ export function Composer({
   onQueue,
   onStopAndSend,
   editable,
+  readOnly = false,
   onAttachment,
   draft: draftProp,
   onDraftChange,
@@ -63,6 +66,7 @@ export function Composer({
   const elapsed = tick ?? workingFor?.seconds ?? null;
   const {
     draft,
+    setDraft,
     send,
     handleChange,
     handleKeyDown,
@@ -118,65 +122,48 @@ export function Composer({
     growCap: 384,
   });
 
-  const [multiLine, setMultiLine] = useState(false);
-  useLayoutEffect(() => {
-    const ta = textareaRef.current;
-    if (ta == null) {
-      setMultiLine(false);
-      return;
-    }
-    const trailingBlank = draft.length - draft.replace(/\n+$/, '').length;
-    const measure = () => {
-      const cs = getComputedStyle(ta);
-      const visualLines = Math.floor(
-        (ta.scrollHeight - Number.parseFloat(cs.paddingTop)) / Number.parseFloat(cs.lineHeight),
-      );
-      setMultiLine(visualLines - trailingBlank >= 2);
-    };
-    measure();
-    let width = ta.clientWidth;
-    const observer = new ResizeObserver(() => {
-      if (ta.clientWidth === width) return;
-      width = ta.clientWidth;
-      measure();
-    });
-    observer.observe(ta);
-    return () => observer.disconnect();
-  }, [draft, textareaRef]);
+  const hasContent = draft.trim() !== '' || pendingAttachments.length > 0;
 
   return (
     <div
-      className={`${COMPOSER_CARD} min-h-21 ${multiLine ? 'pb-12' : ''}`}
+      className={`${COMPOSER_CARD} ${readOnly ? COMPOSER_CARD_READ_ONLY : COMPOSER_CARD_EDITABLE}`}
       data-testid="composer-card"
     >
       {editable ? (
-        <div className="relative">
-          <Textarea
-            ref={textareaRef}
-            className={`composer-placeholder composer-input ${COMPOSER_INPUT} ${MENTION_TEXTAREA_CLS}`}
-            placeholder={t(placeholder)}
-            value={draft}
-            onChange={handleChange}
-            onKeyDown={handleKeyDown}
-            onPaste={handlePaste}
-            onKeyUp={handleCaretMoved}
-            onClick={handleCaretMoved}
-            onSelect={handleCaretMoved}
-            onCompositionEnd={handleCompositionEnd}
-            onBlur={handleBlur}
-            {...(inlineOpen
-              ? {
-                  role: 'combobox',
-                  'aria-expanded': true,
-                  'aria-controls': inlineListboxId,
-                  'aria-autocomplete': 'list' as const,
-                }
-              : {})}
-            {...(inlineOpen && inlineHighlight != null
-              ? { 'aria-activedescendant': `${inlineListboxId}-opt-${inlineHighlight}` }
-              : {})}
+        <>
+          <ComposerAttachments
+            draft={draft}
+            pending={pendingAttachments}
+            onDraftChange={setDraft}
           />
-          <MentionHighlight text={draft} registry={mentionRegistry} textareaRef={textareaRef} />
+          <div className="relative">
+            <Textarea
+              ref={textareaRef}
+              className={`composer-placeholder composer-input ${COMPOSER_INPUT} ${MENTION_TEXTAREA_CLS}`}
+              placeholder={t(placeholder)}
+              value={draft}
+              onChange={handleChange}
+              onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
+              onKeyUp={handleCaretMoved}
+              onClick={handleCaretMoved}
+              onSelect={handleCaretMoved}
+              onCompositionEnd={handleCompositionEnd}
+              onBlur={handleBlur}
+              {...(inlineOpen
+                ? {
+                    role: 'combobox',
+                    'aria-expanded': true,
+                    'aria-controls': inlineListboxId,
+                    'aria-autocomplete': 'list' as const,
+                  }
+                : {})}
+              {...(inlineOpen && inlineHighlight != null
+                ? { 'aria-activedescendant': `${inlineListboxId}-opt-${inlineHighlight}` }
+                : {})}
+            />
+            <MentionHighlight text={draft} registry={mentionRegistry} textareaRef={textareaRef} />
+          </div>
           <MentionInline
             open={inlineOpen}
             rows={inlineRows}
@@ -202,21 +189,16 @@ export function Composer({
             listboxRef={slashListboxRef}
             listboxId={slashListboxId}
           />
-        </div>
+        </>
       ) : (
         <div
-          className={`composer-placeholder ${COMPOSER_PLACEHOLDER} text-(--text-secondary)`}
+          className="flex items-center gap-2 px-0.5 pb-2.5 text-card-title text-(--text-secondary)"
           data-testid="composer-placeholder"
         >
+          {readOnly && <Lock width={16} height={16} className="flex-none" />}
           {t(placeholder)}
         </div>
       )}
-      <div
-        data-testid="composer-float"
-        className="pointer-events-none absolute inset-x-0 bottom-[calc(100%+6px)] z-30 flex flex-col gap-1.5 [&>.attachment-strip]:pointer-events-auto"
-      >
-        <AttachmentStrip draft={draft} pending={pendingAttachments} />
-      </div>
       <Input
         ref={fileInputRef}
         type="file"
@@ -225,68 +207,73 @@ export function Composer({
         onChange={onPickFiles}
         accept="text/*,image/*,application/json,application/pdf,application/xml"
       />
-      <div
-        className="composer-toolbar absolute bottom-3.5 left-2.5 flex items-center"
-        data-testid="composer-toolbar"
-      >
-        <IconTooltip
-          label={t('添加附件')}
-          trigger={
-            <Button
-              variant="ghost"
-              className={`composer-tool ${COMPOSER_TOOL} mr-1.5 font-normal disabled:pointer-events-auto disabled:opacity-100 [&_svg:not([class*='size-'])]:size-auto`}
-              disabled={attaching || !onAttachment}
-              onClick={openFilePicker}
-            />
-          }
+      {!readOnly && (
+        <div
+          className="composer-toolbar -ml-1 flex items-center gap-0.5"
+          data-testid="composer-toolbar"
         >
-          <Paperclip width={16} height={16} />
-        </IconTooltip>
-        {aiReview && (
           <IconTooltip
-            label={t('AI 审核')}
+            label={t('添加附件')}
             trigger={
               <Button
                 variant="ghost"
-                className={`composer-tool ${COMPOSER_TOOL} mr-1.5 font-normal [&_svg:not([class*='size-'])]:size-auto`}
-                onClick={onReview}
+                className={`composer-tool ${COMPOSER_TOOL}`}
+                disabled={attaching || !onAttachment}
+                onClick={openFilePicker}
               />
             }
           >
-            <SearchPlus width={16} height={16} />
+            <Plus width={16} height={16} />
           </IconTooltip>
-        )}
-      </div>
-      {streaming && elapsed != null && (
-        <span
-          className="absolute right-24 bottom-3 flex h-8 items-center text-meta tabular-nums text-(--text-tertiary)"
-          data-testid="composer-working"
-        >
-          {t('工作中 · {time}', { time: formatClock(elapsed) })}
-        </span>
+          {aiReview && (
+            <IconTooltip
+              label={t('AI 审核')}
+              trigger={
+                <Button
+                  variant="ghost"
+                  className={`composer-tool ${COMPOSER_TOOL} w-auto gap-1.5 px-2 text-meta`}
+                  onClick={onReview}
+                />
+              }
+            >
+              <SearchPlus width={16} height={16} />
+              {t('审阅')}
+            </IconTooltip>
+          )}
+          <div className="ml-auto flex items-center gap-2">
+            {streaming && elapsed != null && (
+              <span
+                className="text-meta tabular-nums text-(--text-tertiary)"
+                data-testid="composer-working"
+              >
+                {t('工作中 · {time}', { time: formatClock(elapsed) })}
+              </span>
+            )}
+            {streaming && (
+              <Button
+                variant="ghost"
+                className={`composer-stop ${COMPOSER_SQUARE} bg-secondary text-foreground hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover) dark:hover:text-foreground`}
+                aria-label={t('停止')}
+                onClick={onStop}
+              >
+                <span className="size-2.25 rounded-(--cds-radius-xs) bg-current" />
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              className={`composer-send ${COMPOSER_SQUARE} transition-[background-color,color] duration-(--dur-fast) ease-[cubic-bezier(0.2,0,0,1)] ${
+                hasContent
+                  ? 'bg-foreground text-background hover:bg-foreground/90 hover:text-background dark:hover:bg-foreground/90 dark:hover:text-background'
+                  : 'bg-secondary text-(--text-tertiary) hover:bg-secondary hover:text-(--text-tertiary) dark:hover:bg-secondary dark:hover:text-(--text-tertiary)'
+              }`}
+              aria-label={t('发送')}
+              onClick={send}
+            >
+              <ArrowUp width={14} height={14} />
+            </Button>
+          </div>
+        </div>
       )}
-      {streaming && (
-        <Button
-          variant="ghost"
-          className={`composer-stop ${COMPOSER_SQUARE} right-13 bg-secondary text-foreground hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover) dark:hover:text-foreground [&_svg:not([class*='size-'])]:size-auto`}
-          aria-label={t('停止')}
-          onClick={onStop}
-        >
-          <span className="size-2.5 rounded-(--cds-radius-xs) bg-current" />
-        </Button>
-      )}
-      <Button
-        variant="ghost"
-        className={`composer-send ${COMPOSER_SQUARE} right-3 transition-[background-color,color] duration-(--dur-fast) ease-[cubic-bezier(0.2,0,0,1)] ${
-          draft.trim() === ''
-            ? 'bg-transparent text-(--text-tertiary) hover:bg-transparent hover:text-(--text-tertiary) dark:hover:bg-transparent dark:hover:text-(--text-tertiary)'
-            : 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground dark:hover:bg-primary/90 dark:hover:text-primary-foreground'
-        } [&_svg:not([class*='size-'])]:size-auto`}
-        aria-label={t('发送')}
-        onClick={send}
-      >
-        <ArrowUp width={14} height={14} />
-      </Button>
       <SlashHelp
         open={helpOpen}
         onClose={closeHelp}

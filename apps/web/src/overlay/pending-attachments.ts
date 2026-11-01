@@ -20,6 +20,7 @@ export function usePendingAttachments(): PendingTracker {
         uid: `pending-${seqRef.current}`,
         name: file.name,
         mime: file.type,
+        size: file.size,
         url: file.type.toLowerCase().startsWith('image/') ? URL.createObjectURL(file) : null,
       };
     });

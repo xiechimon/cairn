@@ -136,14 +136,14 @@ test("composer controls share one bottom row: stop is the send button's sibling"
     };
   });
   // a real hit target, not a 14px smudge
-  expect(geo.stop.w).toBe(32);
-  expect(geo.stop.h).toBe(32);
+  expect(geo.stop.w).toBe(28);
+  expect(geo.stop.h).toBe(28);
   expect(geo.stop.cy).toBeCloseTo(geo.send.cy, 0);
   expect(Math.abs(geo.toolCy - geo.send.cy)).toBeLessThanOrEqual(1);
   // an 8px sibling gap, not an orphaned 27px float
   expect(geo.send.l - geo.stop.r).toBeCloseTo(8, 0);
-  expect(geo.sendFill).toBe('rgba(0, 0, 0, 0)');
-  expect(geo.stopFill).not.toBe(geo.sendFill);
+  expect(geo.sendFill).toBe(geo.stopFill);
+  expect(geo.sendFill).not.toBe('rgba(0, 0, 0, 0)');
   expect(geo.stopGlyph).toBe(1);
   // the toolbar's ink starts on the placeholder text's own left edge
   expect(Math.abs(geo.toolGlyphL - geo.phTextL)).toBeLessThanOrEqual(2);
