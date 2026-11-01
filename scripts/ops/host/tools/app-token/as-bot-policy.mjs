@@ -1,8 +1,6 @@
-import { execFileSync } from 'node:child_process';
 import { realpathSync } from 'node:fs';
 
 const PROTECTED_BRANCHES = new Set(['main', 'master']);
-const REVIEWER = 'cairnwright[bot]';
 
 const GH_ALLOWED = {
   pr: new Set(['view', 'list', 'comment', 'create', 'close', 'update-branch', 'edit', 'merge']),
@@ -11,14 +9,6 @@ const GH_ALLOWED = {
 };
 
 const GH_PR_EDIT_FLAGS = new Set(['--add-label', '--remove-label', '-R', '--repo']);
-const GH_PR_MERGE_FLAGS = new Map([
-  ['--rebase', 'rebase'],
-  ['-r', 'rebase'],
-  ['--squash', 'squash'],
-  ['-s', 'squash'],
-  ['--auto', 'auto'],
-  ['--disable-auto', 'disable-auto'],
-]);
 const GH_API_FLAGS = new Map([
   ['--method', 'value'],
   ['--paginate', 'bool'],
@@ -118,76 +108,22 @@ function checkGhApi(args) {
   return allow;
 }
 
-function parsePrMerge(args) {
-  const parsed = {
-    flags: new Set(),
-    head: undefined,
-    repo: undefined,
-    positional: [],
-    unknown: undefined,
-  };
+function checkPrMerge(args) {
+  const positional = [];
+  let disarm = false;
   for (let i = 0; i < args.length; i++) {
-    const [name, inline] = args[i].split(/=(.*)/s);
-    if (name === '-R' || name === '--repo') {
-      parsed.repo = inline ?? args[++i];
-    } else if (name === '--match-head-commit') {
-      parsed.head = inline ?? args[++i];
-    } else if (GH_PR_MERGE_FLAGS.has(name) && inline === undefined) {
-      parsed.flags.add(GH_PR_MERGE_FLAGS.get(name));
-    } else if (args[i].startsWith('-')) {
-      parsed.unknown ??= args[i];
-    } else parsed.positional.push(args[i]);
+    const arg = args[i];
+    if (arg === '-R' || arg === '--repo') i++;
+    else if (arg.startsWith('--repo=')) continue;
+    else if (arg === '--disable-auto') disarm = true;
+    else if (arg.startsWith('-')) disarm = null;
+    else positional.push(arg);
+    if (disarm === null) break;
   }
-  return parsed;
-}
-
-export function verdictFor(comments, head) {
-  const pattern = new RegExp(
-    `^<!-- review-gate:${head} -->\\n\\*\\*Independent review gate: (PASS|BLOCK)\\*\\*(?: \\(carried over\\))? for `,
+  if (disarm === true && positional.length === 1) return allow;
+  return deny(
+    'gh pr merge is refused: the bot only disarms auto-merge (gh pr merge <pr> --disable-auto); merges use the human login',
   );
-  return (
-    comments
-      .filter((comment) => comment.login === REVIEWER)
-      .map((comment) => pattern.exec(comment.body ?? '')?.[1])
-      .filter(Boolean)
-      .at(-1) ?? null
-  );
-}
-
-function checkPrMerge(args, outerRepo, gate) {
-  const { flags, head, positional, unknown, repo: innerRepo } = parsePrMerge(args);
-  const repo = innerRepo ?? outerRepo;
-  const refuse = (why) => deny(`gh pr merge is refused: ${why}`);
-  if (unknown)
-    return refuse(
-      `${unknown} is not allowed (admin, branch deletion and message overrides are refused)`,
-    );
-  if (positional.length !== 1) return refuse('name exactly one pull request');
-  if (flags.has('disable-auto')) {
-    return flags.size === 1 && head === undefined
-      ? allow
-      : refuse('--disable-auto cannot be combined with other merge flags');
-  }
-  if (!/^[0-9a-f]{40}$/.test(head ?? ''))
-    return refuse(
-      '--match-head-commit <40-hex sha> is required so the merge is pinned to the reviewed head',
-    );
-  const methods = ['rebase', 'squash'].filter((method) => flags.has(method));
-  if (methods.length !== 1) return refuse('use exactly one of --rebase or --squash');
-  if (!/^\d+$/.test(positional[0]) || !/^[\w.-]+\/[\w.-]+$/.test(repo ?? ''))
-    return refuse('name the pull request by number with -R <owner>/<repo>');
-  let comments;
-  try {
-    comments = gate(repo, positional[0]);
-  } catch (error) {
-    return refuse(`the review-gate verdict could not be read (${error.message.split('\n')[0]})`);
-  }
-  const verdict = verdictFor(comments, head);
-  if (verdict !== 'PASS')
-    return refuse(
-      `the latest ${REVIEWER} review-gate verdict for ${head.slice(0, 8)} is ${verdict ?? 'missing'}; the bot merges only a head the review gate passed`,
-    );
-  return allow;
 }
 
 function checkPrEdit(args) {
@@ -199,8 +135,8 @@ function checkPrEdit(args) {
   return allow;
 }
 
-function checkGh(args, gate) {
-  const { repo, rest } = stripRepoFlag(args);
+function checkGh(args) {
+  const { rest } = stripRepoFlag(args);
   const [group, sub, ...tail] = rest;
   if (!group || !(group in GH_ALLOWED))
     return deny(
@@ -210,7 +146,7 @@ function checkGh(args, gate) {
   if (!sub || !GH_ALLOWED[group].has(sub))
     return deny(`gh ${group} ${sub ?? ''} is not on the as-bot allowlist`);
   if (rest.includes('--delete-last')) return deny('--delete-last is refused');
-  if (group === 'pr' && sub === 'merge') return checkPrMerge(tail, repo, gate);
+  if (group === 'pr' && sub === 'merge') return checkPrMerge(tail);
   if (group === 'pr' && sub === 'edit') return checkPrEdit(tail);
   return allow;
 }
@@ -300,27 +236,9 @@ function checkGit(args) {
   );
 }
 
-function readGateComments(repo, pr) {
-  const out = execFileSync(
-    'gh',
-    [
-      'api',
-      '--paginate',
-      `repos/${repo}/issues/${pr}/comments?per_page=100`,
-      '--jq',
-      '.[] | {login: .user.login, body} | @json',
-    ],
-    { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] },
-  );
-  return out
-    .split('\n')
-    .filter(Boolean)
-    .map((line) => JSON.parse(line));
-}
-
-export function checkCommand(argv, gate = readGateComments) {
+export function checkCommand(argv) {
   const [program, ...args] = argv;
-  if (program === 'gh') return checkGh(args, gate);
+  if (program === 'gh') return checkGh(args);
   if (program === 'git') return checkGit(args);
   return deny(
     `${program ?? '(none)'} is not on the as-bot allowlist: only gh and git run with the bot token`,

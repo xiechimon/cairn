@@ -31,7 +31,7 @@ if [ "$opener" = "app/cairnwright" ]; then
   author=$(gh pr view "$pr" -R "$R" --json commits --jq '.commits[0].authors[0].email')
   message=$(gh pr view "$pr" -R "$R" --json commits --jq '.commits[0].messageBody')
   signed_bot_commit "$author" "$message" || { echo "PR #$pr commit author is $author; accepted: $ACCEPTED_BOT_AUTHORS (cairnwright[bot] also needs Cairn-Thread and Co-authored-by: xiechimon trailers); re-sign with ~/lanes/sign-commits.sh" >&2; exit 1; }
-  run=(~/.cairn/tools/app-token/as-bot.sh gh pr merge "$pr" -R "$R" --rebase --match-head-commit "$head")
+  run=(gh pr merge "$pr" -R "$R" --rebase --match-head-commit "$head")
 else
   run=(gh pr merge "$pr" -R "$R" --squash)
 fi

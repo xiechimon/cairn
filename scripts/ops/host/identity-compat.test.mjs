@@ -105,7 +105,13 @@ const commit = (author, messageBody) => ({
 const mergeWithCommits = (t, commits, opener) => {
   const f = fixture(t, prView(commits, opener));
   const result = f.run('bash', [join(hostRoot, 'tools/merge-pr.sh'), '7']);
-  const rebased = result.calls.some((c) => c[0] === 'as-bot' && c.includes('--rebase'));
+  const rebased = result.calls.some(
+    (c) => c[0] === 'gh' && c[1] === 'pr' && c[2] === 'merge' && c.includes('--rebase'),
+  );
+  assert.equal(
+    result.calls.some((c) => c[0] === 'as-bot' && c.includes('merge')),
+    false,
+  );
   return { ...result, rebased };
 };
 

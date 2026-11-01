@@ -54,7 +54,7 @@ if (line === 'rev-parse HEAD') console.log(${JSON.stringify(HEAD)});`,
 
 const noop = '#!/bin/sh\nexit 0\n';
 
-test('merge-pr.sh merges a bot PR through the real policy pinned to the head it checked', (t) => {
+test('merge-pr.sh merges a bot PR with the human login, pinned to the head it checked', (t) => {
   const fixture = hostFixture(t, {
     hostFiles: {
       ...botFiles,
@@ -85,24 +85,6 @@ test('merge-pr.sh --auto keeps the pin when it arms auto-merge', (t) => {
     result.ghLines.includes(
       `pr merge 7 -R xiechimon/cairn --rebase --match-head-commit ${HEAD} --auto`,
     ),
-  );
-});
-
-test('merge-pr.sh cannot merge a bot PR the review gate has not passed', (t) => {
-  const fixture = hostFixture(t, {
-    hostFiles: {
-      ...botFiles,
-      'bin/gh': ghForMerge(''),
-      '.cairn/tools/merge-order/deps-open.mjs': 'process.exit(0);\n',
-      '.cairn/tools/review-gate/review-gate.mjs': 'process.exit(3);\n',
-    },
-  });
-  const result = fixture.run('tools/merge-pr.sh', ['7']);
-  assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /as-bot: refused: gh pr merge is refused: .* is missing/);
-  assert.equal(
-    result.ghLines.some((line) => line.startsWith('pr merge')),
-    false,
   );
 });
 

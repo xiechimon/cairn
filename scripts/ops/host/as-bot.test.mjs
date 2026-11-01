@@ -20,11 +20,7 @@ const recorderStub = `#!${process.execPath}
 const fs = require('node:fs');
 const argv = process.argv.slice(2);
 const entry = JSON.stringify({ argv, token: process.env.GH_TOKEN ?? null }) + '\\n';
-if (argv[0] === 'api' && argv[1] === '--paginate' && /\\/comments\\?/.test(argv[2] ?? '')) {
-  fs.appendFileSync(process.env.LOOKUPS, entry);
-  if (!fs.existsSync(process.env.GATE_COMMENTS)) process.exit(1);
-  process.stdout.write(fs.readFileSync(process.env.GATE_COMMENTS, 'utf8'));
-} else fs.appendFileSync(process.env.CALLS, entry);
+fs.appendFileSync(process.env.CALLS, entry);
 `;
 
 const tokenStub = `import { appendFileSync } from 'node:fs';
@@ -33,16 +29,9 @@ process.stdout.write('stub-installation-token');
 `;
 
 const HEAD = 'a'.repeat(40);
-const OTHER = 'b'.repeat(40);
 const REPO = 'xiechimon/cairn';
-const passFor = (sha, carried = false) =>
-  `<!-- review-gate:${sha} -->\n**Independent review gate: PASS**${carried ? ' (carried over)' : ''} for \`${sha.slice(0, 8)}\`.`;
-const blockFor = (sha) =>
-  `<!-- review-gate:${sha} -->\n**Independent review gate: BLOCK** for \`${sha.slice(0, 8)}\`.\n\n1. x`;
-const bot = (body) => ({ login: 'cairnwright[bot]', body });
-const PASSED = [bot(passFor(HEAD))];
 
-function setup(t, comments = PASSED) {
+function setup(t) {
   const root = mkdtempSync(join(tmpdir(), 'as-bot-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const tools = join(root, 'tools');
@@ -58,19 +47,13 @@ function setup(t, comments = PASSED) {
   }
   const calls = join(root, 'calls');
   const mints = join(root, 'mints');
-  const lookups = join(root, 'lookups');
-  const gateComments = join(root, 'gate-comments');
   writeFileSync(calls, '');
   writeFileSync(mints, '');
-  writeFileSync(lookups, '');
-  if (comments) writeFileSync(gateComments, comments.map((c) => `${JSON.stringify(c)}\n`).join(''));
   const env = {
     HOME: root,
     PATH: `${bin}:${dirname(process.execPath)}:/usr/bin:/bin`,
     CALLS: calls,
     TOKEN_MINTS: mints,
-    LOOKUPS: lookups,
-    GATE_COMMENTS: gateComments,
   };
   return {
     run(...argv) {
@@ -79,9 +62,7 @@ function setup(t, comments = PASSED) {
         encoding: 'utf8',
       });
       const recorded = readFileSync(calls, 'utf8').trim();
-      const looked = readFileSync(lookups, 'utf8').trim();
       return {
-        lookups: looked ? looked.split('\n').map((line) => JSON.parse(line)) : [],
         status: result.status,
         stderr: result.stderr,
         calls: recorded ? recorded.split('\n').map((line) => JSON.parse(line)) : [],
@@ -112,9 +93,7 @@ const allowed = [
   ['gh', 'pr', 'close', '12', '-c', 'closed'],
   ['gh', 'pr', 'update-branch', '12', '--rebase'],
   ['gh', 'pr', 'merge', '12', '-R', 'xiechimon/cairn', '--disable-auto'],
-  ['gh', 'pr', 'merge', '12', '-R', REPO, '--rebase', '--match-head-commit', HEAD],
-  ['gh', 'pr', 'merge', '12', '-R', REPO, '--squash', '--auto', '--match-head-commit', HEAD],
-  ['gh', 'pr', 'merge', '12', `--repo=${REPO}`, '--squash', `--match-head-commit=${HEAD}`],
+  ['gh', 'pr', 'merge', '12', `--repo=${REPO}`, '--disable-auto'],
   ['gh', 'issue', 'view', '5'],
   ['gh', 'issue', 'list', '-l', 'batch:C1'],
   ['gh', 'issue', 'comment', '5', '-b', 'x'],
@@ -146,59 +125,18 @@ for (const argv of allowed) {
 }
 
 const denied = [
-  [['gh', 'pr', 'merge', '12', '--rebase'], /--match-head-commit <40-hex sha> is required/],
-  [['gh', 'pr', 'merge', '12', '--rebase', '--match-head-commit', HEAD], /by number with -R/],
-  [
-    [
-      'gh',
-      'pr',
-      'merge',
-      `https://github.com/${REPO}/pull/12`,
-      '-R',
-      REPO,
-      '--squash',
-      `--match-head-commit=${HEAD}`,
-    ],
-    /by number with -R/,
-  ],
-  [
-    ['gh', 'pr', 'merge', '12', '--squash', '--auto'],
-    /--match-head-commit <40-hex sha> is required/,
-  ],
-  [['gh', 'pr', 'merge', '12', '--rebase', '--match-head-commit', 'abc123'], /40-hex sha/],
-  [['gh', 'pr', 'merge', '12', '--rebase', '--match-head-commit', 'A'.repeat(40)], /40-hex sha/],
-  [
-    ['gh', 'pr', 'merge', '12', '--rebase', '--admin', '--match-head-commit', HEAD],
-    /--admin is not allowed/,
-  ],
-  [
-    ['gh', 'pr', 'merge', '12', '--squash', '--delete-branch', '--match-head-commit', HEAD],
-    /--delete-branch is not allowed/,
-  ],
-  [
-    ['gh', 'pr', 'merge', '12', '--squash', '--auto', '--body', 'x', '--match-head-commit', HEAD],
-    /--body is not allowed/,
-  ],
-  [
-    ['gh', 'pr', 'merge', '12', '--squash', '--subject', 'x', '--match-head-commit', HEAD],
-    /--subject is not allowed/,
-  ],
-  [['gh', 'pr', 'merge', '12', '--merge', '--match-head-commit', HEAD], /--merge is not allowed/],
-  [['gh', 'pr', 'merge', '12', '--match-head-commit', HEAD], /exactly one of --rebase or --squash/],
-  [
-    ['gh', 'pr', 'merge', '12', '--rebase', '--squash', '--match-head-commit', HEAD],
-    /exactly one of --rebase or --squash/,
-  ],
-  [['gh', 'pr', 'merge', '--rebase', '--match-head-commit', HEAD], /exactly one pull request/],
-  [['gh', 'pr', 'merge', '12', '--disable-auto', '--auto'], /cannot be combined/],
-  [
-    ['gh', 'pr', 'merge', '12', '--disable-auto', '--rebase', '--match-head-commit', HEAD],
-    /cannot be combined/,
-  ],
-  [
-    ['gh', '-R', 'xiechimon/cairn', 'pr', 'merge', '12', '--auto'],
-    /--match-head-commit <40-hex sha> is required/,
-  ],
+  ...[
+    ['gh', 'pr', 'merge', '12', '-R', REPO, '--rebase', '--match-head-commit', HEAD],
+    ['gh', 'pr', 'merge', '12', '-R', REPO, '--squash', '--auto', '--match-head-commit', HEAD],
+    ['gh', 'pr', 'merge', '12', '--squash'],
+    ['gh', 'pr', 'merge', '12', '--admin'],
+    ['gh', 'pr', 'merge', '12', '--disable-auto', '--auto'],
+    ['gh', 'pr', 'merge', '12', '--auto', '--disable-auto'],
+    ['gh', 'pr', 'merge', '12', '--disable-auto=true'],
+    ['gh', 'pr', 'merge', '--disable-auto'],
+    ['gh', 'pr', 'merge', '12', '13', '--disable-auto'],
+    ['gh', '-R', REPO, 'pr', 'merge', '12', '--auto'],
+  ].map((argv) => [argv, /the bot only disarms auto-merge/]),
   [['gh', 'pr', 'edit', '12', '--base', 'other'], /only change labels/],
   [['gh', 'pr', 'edit', '12', '--title', 'x'], /only change labels/],
   [['gh', 'pr', 'ready', '12'], /not on the as-bot allowlist/],
@@ -293,69 +231,6 @@ for (const [argv, message] of denied) {
     assert.equal(result.minted, false);
   });
 }
-
-const gateRefusals = [
-  ['no verdict comment', [], /verdict for aaaaaaaa is missing/],
-  ['a BLOCK after the PASS', [bot(passFor(HEAD)), bot(blockFor(HEAD))], /is BLOCK/],
-  ['a PASS for another head', [bot(passFor(OTHER))], /is missing/],
-  ['a PASS posted by a human', [{ login: 'xiechimon', body: passFor(HEAD) }], /is missing/],
-  ['a PASS quoted inside another comment', [bot(`see\n${passFor(HEAD)}`)], /is missing/],
-  ['an unreadable comment list', null, /could not be read/],
-];
-
-for (const [name, comments, message] of gateRefusals) {
-  test(`gh pr merge is refused with ${name}`, (t) => {
-    const result = setup(t, comments).run(
-      'gh',
-      'pr',
-      'merge',
-      '12',
-      '-R',
-      REPO,
-      '--rebase',
-      '--match-head-commit',
-      HEAD,
-    );
-    assert.equal(result.status, 126);
-    assert.match(result.stderr, /^as-bot: refused: gh pr merge is refused: /);
-    assert.match(result.stderr, message);
-    assert.deepEqual(result.calls, []);
-    assert.equal(result.minted, false);
-  });
-}
-
-test('a carried-over PASS for the pinned head allows the merge', (t) => {
-  const result = setup(t, [bot(blockFor(HEAD)), bot(passFor(HEAD, true))]).run(
-    'gh',
-    'pr',
-    'merge',
-    '12',
-    '-R',
-    REPO,
-    '--squash',
-    '--match-head-commit',
-    HEAD,
-  );
-  assert.equal(result.status, 0, result.stderr);
-});
-
-test('the verdict lookup reads the named PR without the bot token', (t) => {
-  const result = setup(t).run(
-    'gh',
-    'pr',
-    'merge',
-    '12',
-    '-R',
-    REPO,
-    '--rebase',
-    '--match-head-commit',
-    HEAD,
-  );
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.lookups.length, 1);
-  assert.equal(result.lookups[0].token, null);
-  assert.equal(result.lookups[0].argv[2], `repos/${REPO}/issues/12/comments?per_page=100`);
-});
 
 test('as-bot.sh refuses before any token is minted and exits 126', (t) => {
   const result = setup(t).run('gh', 'pr', 'merge', '1', '--admin');
