@@ -729,8 +729,9 @@ export const EN: Record<string, string> = {
   开始三视角审核: 'Start three-perspective review',
   // #509 审核选人独立性提示：默认值优先跨厂商；无跨厂商可选时出声。两档措辞
   // ——确证同源 vs 无法判定（未配置厂商 = 没有比对基准），都不静默。
-  本次审核与产出同源: 'This review shares a vendor with the producing step',
-  无法判定审核独立性: 'Cannot determine review independence',
+  选择谁来审这份方案: 'Pick who reviews this plan',
+  其他厂商: 'Other vendor',
+  与方案作者同厂商: 'same vendor as the plan author',
   '审核人与产出该方案的 Agent 来自同一模型厂商，不构成独立复核。':
     'The reviewer and the Agent that produced this plan use the same model vendor; this is not an independent review.',
   '产出该方案的 Agent 或所选审核人未配置模型厂商，缺少比对基准，不构成独立复核。':
@@ -877,7 +878,8 @@ export const EN: Record<string, string> = {
   总管用的模型暂时过载: "The chief's model is overloaded",
   '例如：测试在远端机器上失败，请先修复':
     'For example: tests fail on the remote machine, fix them first',
-  '例如：并发、错误处理、测试覆盖': 'For example: concurrency, error handling, test coverage',
+  '重点关注什么？例如：并发、错误处理、测试覆盖（可选）':
+    'Focus on… e.g. concurrency, error handling, test coverage (optional)',
   将改动合并到默认分支: 'Merge the changes into the default branch',
   // #1313：已上报且文件集为空时完成弹层不提供合并勾选。
   '本轮没有文件改动，完成不会合并分支。':
