@@ -13,7 +13,7 @@ import type { FileMentionEntry, MentionGroups } from '../overlay/mention-token.j
 import { SlashHelp, SlashMenu } from '../overlay/slash-menu.js';
 
 const COMPOSER_CARD =
-  'composer relative mx-auto mb-4 flex w-[calc(100%-2rem)] max-w-(--chat-max-w) flex-none flex-col rounded-(--radius-composer) border-0 px-3.5 pt-3 pb-2.5 transition-[box-shadow] duration-[220ms] ease-(--ease-out-expo)';
+  'composer relative mx-auto mb-[max(var(--composer-bottom-gap),env(safe-area-inset-bottom))] flex w-[calc(100%-2rem)] max-w-(--chat-max-w) flex-none flex-col rounded-(--radius-composer) border-0 px-3.5 pt-3 pb-2.5 transition-[box-shadow] duration-[220ms] ease-(--ease-out-expo)';
 const COMPOSER_CARD_EDITABLE =
   'bg-(--card) shadow-(--shadow-composer) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)';
 const COMPOSER_CARD_READ_ONLY = 'bg-secondary shadow-(--shadow-composer)';

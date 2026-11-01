@@ -18,7 +18,7 @@ export function useEditorFocus<T extends HTMLElement>(editing: boolean) {
 interface ProfileHeaderProps {
   avatar: ReactNode;
   name: string;
-  sub: string;
+  sub?: string;
   onRename: (next: string) => void;
   className?: string;
   avatarClassName?: string;

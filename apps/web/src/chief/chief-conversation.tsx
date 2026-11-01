@@ -90,7 +90,7 @@ const SCROLLER_ROOT_CLS = 'h-auto min-h-0 flex-1';
 const SCROLLER_CONTENT_CLS = 'block gap-0 px-4 pt-3.5';
 const SCROLLER_CONTENT_HOME_CLS = 'mx-auto block w-full max-w-190 gap-0 px-4 pt-3.5 pb-4';
 const HOME_COMPOSER_CLS =
-  'mx-auto mt-2 mb-[max(0.75rem,env(safe-area-inset-bottom))] w-[calc(100%-2rem)] max-w-182 flex-none';
+  'mx-auto mt-2 mb-[max(var(--composer-bottom-gap),env(safe-area-inset-bottom))] w-[calc(100%-2rem)] max-w-182 flex-none';
 
 const EXAMPLE_ICONS = {
   'user-plus': ChiefUserPlus,

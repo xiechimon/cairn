@@ -197,6 +197,7 @@
   --sidebar-w: 248px;
   --chat-max-w: 768px;
   --composer-max-h: 384px;
+  --composer-bottom-gap: 24px;
   --scroll-fade-size: 28px;
   --chat-extra-space: 35vh;
   --font-size-caption: calc(0.6875rem * var(--rem-scale));
@@ -489,12 +490,12 @@
   --project-tile-4: #7a5b8e;
   --project-tile-5: #3d7c7a;
   --project-tile-6: #8a5560;
-  --project-ink-1: var(--project-tile-1);
-  --project-ink-2: var(--project-tile-2);
-  --project-ink-3: var(--project-tile-3);
-  --project-ink-4: var(--project-tile-4);
-  --project-ink-5: var(--project-tile-5);
-  --project-ink-6: var(--project-tile-6);
+  --project-ink-1: color-mix(in oklab, var(--project-tile-1), black 22%);
+  --project-ink-2: color-mix(in oklab, var(--project-tile-2), black 22%);
+  --project-ink-3: color-mix(in oklab, var(--project-tile-3), black 22%);
+  --project-ink-4: color-mix(in oklab, var(--project-tile-4), black 22%);
+  --project-ink-5: color-mix(in oklab, var(--project-tile-5), black 22%);
+  --project-ink-6: color-mix(in oklab, var(--project-tile-6), black 22%);
   --pebble-waiting: #d49a1c;
   --pebble-review: #5379a0;
   --pebble-working: #5f8f4f;
