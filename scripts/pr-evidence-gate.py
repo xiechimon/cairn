@@ -63,8 +63,10 @@ code fences, and an image link in a fence renders nowhere (#940 keeps
 this a non-goal).
 
 Schema evidence: with `--schema-glance <file>` (the output of
-scripts/schema-glance.mjs for the PR's base...head, passed by the workflow
-only when the PR touches apps/server/drizzle/**), the body must carry a
+scripts/schema-glance.mjs from the merge base of base and head to head,
+passed by the workflow only when base...head touches apps/server/drizzle/**,
+so migrations merged into main after the PR branched never count), the body
+must carry a
 `### Schema changes` section whose table rows equal that file's rows.
 
 Usage:
@@ -309,7 +311,7 @@ def main():
             print("pr-evidence: schema-changes: matches the schema-glance output")
         else:
             failures.append('schema-changes')
-            print(f"FAIL schema-changes: {verdict}: paste the output of scripts/schema-glance.mjs for base...head under '### Schema changes'")
+            print(f"FAIL schema-changes: {verdict}: paste the output of scripts/schema-glance.mjs from the merge base to head under '### Schema changes'")
 
     verdicts = section_verdicts(body)
     answered = sum(1 for v in verdicts.values() if v == 'answered')

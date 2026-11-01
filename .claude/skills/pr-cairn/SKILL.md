@@ -60,7 +60,7 @@ only the closing segment's commit message carries the parent closing keyword.
 
 Put one glance card under Proof so a reviewer sees the change without reading the diff:
 
-- Migrations (`apps/server/drizzle/**`): paste the output of `node scripts/schema-glance.mjs --base origin/main --head HEAD`, heading included. The `pr-evidence` gate reds a drizzle PR whose `### Schema changes` rows differ from the script's output for the PR head.
+- Migrations (`apps/server/drizzle/**`): paste the output of `node scripts/schema-glance.mjs --base "$(git merge-base origin/main HEAD)" --head HEAD`, heading included. When the PR changes `apps/server/drizzle/**` since its merge base, the `pr-evidence` gate reds it if its `### Schema changes` rows differ from the script's output from that merge base to the PR head.
 - API changes: before and after request and response, captured with `verify-cairn`.
 - Cross-component flows: a Mermaid `sequenceDiagram`.
 - `scripts/ops/**`: the command and its run output.
