@@ -74,7 +74,11 @@ export function createSplitTodo(
   if (existing.length > 0) {
     throw new HttpError(409, `todo ${input.parentId} 已拆解（${existing.length} 张子卡在位）`);
   }
-  const items = input.subtodos;
+  const preset = parent.assignment?.source === 'intake-label' ? parent.assignment : null;
+  const items = input.subtodos.map((item) => ({
+    ...item,
+    agentId: preset?.build?.agentId ?? item.agentId,
+  }));
   let checkerPassed = false;
   let checkerReasons: string[] = [];
   if (splitPolicy !== 'human') {
@@ -213,7 +217,7 @@ export function createSplitTodo(
         .set({
           sourceTodo: parent.id,
           blockedBy: blockerIds.length > 0 ? blockerIds : null,
-          assignment: { plan: null, build: { agentId: item.agentId } },
+          assignment: preset ?? { plan: null, build: { agentId: item.agentId } },
           sourceBuildId: input.chiefId,
         })
         .where(eq(todo.id, child.id))
@@ -286,7 +290,7 @@ export function createSplitTodo(
       hasPlan: true,
       latestBuildId: parentBuildId,
       lastRunAt: nowMs(),
-      ...(!autoStart && planner !== undefined
+      ...(!autoStart && planner !== undefined && preset === null
         ? { assignment: { plan: { agentId: planner.id }, build: null } }
         : {}),
     },

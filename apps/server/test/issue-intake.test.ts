@@ -38,6 +38,7 @@ import {
 } from '../src/services/issue-intake.js';
 import { createScheduler, issueIntakeRunOf } from '../src/services/scheduler.js';
 import { createSplitTodo } from '../src/services/todo-split.js';
+import * as todosService from '../src/services/todos.js';
 import { setTodoPhase } from '../src/services/todos.js';
 import {
   type ClosingPullNode,
@@ -3320,6 +3321,12 @@ describe('agent label routing', () => {
     const issue = w.gh.state.open.find((i) => i.number === 1406);
     if (!issue) throw new Error('issue missing');
     issue.labels.push(...labels.map((name) => ({ name, color: 'ededed' })));
+    w.gh.state.events.set(1406, [
+      ...HUMAN_EVENTS_1406,
+      ...labels.map((label, index) =>
+        labelEvent('labeled', OWNER, '2026-10-22T00:00:00Z', 90000 + index, label),
+      ),
+    ]);
   }
 
   function builder(w: World, id: string, status = 'active'): void {
@@ -3345,6 +3352,7 @@ describe('agent label routing', () => {
     expect(tally?.imported).toBe(1);
     expect(tally?.orchestrated).toBe(1);
     expect(todoOf(w.s, 1406)?.assignment).toEqual({
+      source: 'intake-label',
       plan: { agentId: 'orb-agent' },
       build: { agentId: 'orb-agent' },
     });
@@ -3387,7 +3395,13 @@ describe('agent label routing', () => {
       if (!row || !thread) throw new Error('import missing');
       w.s.db
         .update(todoTable)
-        .set({ assignment: { plan: { agentId: 'orb-agent' }, build: { agentId: 'orb-agent' } } })
+        .set({
+          assignment: {
+            source: 'intake-label',
+            plan: { agentId: 'orb-agent' },
+            build: { agentId: 'orb-agent' },
+          },
+        })
         .where(eq(todoTable.id, row.id))
         .run();
       await executeChiefTool(
@@ -3422,6 +3436,116 @@ describe('agent label routing', () => {
       expect(steps.map((step) => step.kind)).toEqual([withPlan ? 'plan' : 'build']);
     },
   );
+
+  test('matches the agent prefix case-insensitively', async () => {
+    const w = await makeWorld({ list: [1406] });
+    routeLabel(w, ['AGENT:orb-builder']);
+    builder(w, 'orb-agent');
+    await w.intake.sweep();
+    expect(todoOf(w.s, 1406)?.assignment?.build?.agentId).toBe('orb-agent');
+  });
+
+  test.each(['outsider', 'app', 'bot', 'removed', 'missing', 'deleted', 'permission-unreadable'])(
+    'holds an untrusted agent label: %s',
+    async (kind) => {
+      const w = await makeWorld({ list: [1406] });
+      routeLabel(w);
+      builder(w, 'orb-agent');
+      const events: RawEvent[] = [...HUMAN_EVENTS_1406];
+      if (kind !== 'missing') {
+        events.push(
+          labelEvent('labeled', OWNER, '2026-10-22T00:00:00Z', 90000, 'agent:orb-builder'),
+        );
+        const latest = labelEvent(
+          kind === 'removed' ? 'unlabeled' : 'labeled',
+          kind === 'outsider'
+            ? 'outsider'
+            : kind === 'bot'
+              ? 'claude[bot]'
+              : kind === 'deleted'
+                ? null
+                : OWNER,
+          '2026-10-23T00:00:00Z',
+          90001,
+          'AGENT:orb-builder',
+        );
+        if (kind === 'app' || kind === 'bot')
+          latest.performed_via_github_app = { slug: kind === 'app' ? 'untrusted' : 'claude' };
+        events.push(latest);
+      }
+      w.gh.state.events.set(1406, events);
+      if (kind === 'permission-unreadable')
+        w.gh.overrides.set(`/repos/${REPO}/collaborators/${OWNER}/permission`, () => ({
+          status: 502,
+          body: {},
+        }));
+      const tally = await w.intake.sweep();
+      expect(takenNumbers(w.s)).toEqual([]);
+      expect(chiefThreads(w.s)).toHaveLength(0);
+      if (kind !== 'permission-unreadable') {
+        expect(tally?.held).toBe(1);
+        expect(w.logs.some((line) => String(line.obj.reason).startsWith('agent-label-'))).toBe(
+          true,
+        );
+      }
+    },
+  );
+
+  test('a newer different agent label event holds a stale issue list', async () => {
+    const w = await makeWorld({ list: [1406] });
+    routeLabel(w);
+    builder(w, 'orb-agent');
+    w.gh.state.events
+      .get(1406)
+      ?.push(labelEvent('labeled', 'outsider', '2026-10-23T00:00:00Z', 90001, 'agent:other'));
+    const tally = await w.intake.sweep();
+    expect(tally?.held).toBe(1);
+    expect(takenNumbers(w.s)).toEqual([]);
+    expect(w.logs.some((line) => line.obj.reason === 'agent-label-label-changed')).toBe(true);
+  });
+
+  test('trusts a triager applying an agent label through the trusted app', async () => {
+    const w = await makeWorld({ list: [1406] });
+    routeLabel(w);
+    builder(w, 'orb-agent');
+    const event = labelEvent(
+      'labeled',
+      'triager',
+      '2026-10-23T00:00:00Z',
+      90001,
+      'agent:orb-builder',
+    );
+    event.performed_via_github_app = { slug: 'claude' };
+    w.gh.state.events.set(1406, [...HUMAN_EVENTS_1406, event]);
+    w.gh.state.permissions.set('triager', { body: permissionBody('triager', 'read', 'triage') });
+    expect((await w.intake.sweep())?.imported).toBe(1);
+  });
+
+  test('assignment update failure still orchestrates the created todo and logs the failure', async () => {
+    const w = await makeWorld({ list: [1406] });
+    routeLabel(w);
+    builder(w, 'orb-agent');
+    const update = vi.spyOn(todosService, 'updateTodo').mockImplementationOnce(() => {
+      throw new Error('assignment-write-failed');
+    });
+    try {
+      const tally = await w.intake.sweep();
+      expect(tally?.imported).toBe(1);
+      expect(tally?.orchestrated).toBe(1);
+      expect(tally?.errors).toBe(1);
+      expect(todoOf(w.s, 1406)).toBeDefined();
+      expect(chiefThreads(w.s)).toHaveLength(1);
+      expect(
+        w.logs.some(
+          (line) =>
+            line.msg === 'issue intake assignment failed' &&
+            line.obj.err === 'assignment-write-failed',
+        ),
+      ).toBe(true);
+    } finally {
+      update.mockRestore();
+    }
+  });
 
   test('without an agent label intake leaves the assignment unset', async () => {
     const w = await makeWorld({ list: [1406] });

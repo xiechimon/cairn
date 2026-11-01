@@ -172,9 +172,9 @@ function requireTeamAgent(db: Db, agentId: string, teamId: string) {
   const row = db
     .select()
     .from(agent)
-    .where(and(eq(agent.id, agentId), eq(agent.teamId, teamId)))
+    .where(and(eq(agent.id, agentId), eq(agent.teamId, teamId), eq(agent.status, 'active')))
     .get();
-  if (!row) throw new HttpError(404, `agent ${agentId}（不在本团队，或 id 抄错了）`);
+  if (!row) throw new HttpError(404, `agent ${agentId} is unavailable in this team`);
   return row;
 }
 function requireTeamBuild(db: Db, buildId: string, teamId: string) {
@@ -754,11 +754,15 @@ export async function executeChiefTool(
       };
       const targets = todoIds.map((todoId) => {
         const row = requireTeamTodo(db, todoId, ctx.teamId);
-        const effectiveAssignment = {
-          ...assignment,
-          plan: row.assignment?.plan ?? assignment.plan,
-          build: row.assignment?.build ?? assignment.build,
-        };
+        const effectiveAssignment =
+          row.assignment?.source === 'intake-label'
+            ? {
+                ...assignment,
+                source: row.assignment.source,
+                plan: row.assignment.plan,
+                build: row.assignment.build,
+              }
+            : assignment;
         return {
           todoId,
           row,

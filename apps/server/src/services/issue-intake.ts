@@ -393,13 +393,26 @@ export function createIssueIntake(
     repo: string,
     issueNumber: number,
     now: number,
+    label: string = intakeLabel,
   ): Promise<Verdict> {
     const key = `${teamId}\u0000${owner}/${repo}#${issueNumber}`.toLowerCase();
     const history = await readHistory(eventsCache, key, token, { owner, repo, issueNumber });
     if (history === null) return { notTaken: 'unverifiable', reason: 'events-unreadable' };
-    const found = newestLabeler(history, intakeLabel);
+    if (label.toLowerCase().startsWith('agent:')) {
+      const newestAgentLabel = newestOf(
+        history.events,
+        (event) =>
+          event.event === 'labeled' && event.label?.toLowerCase().startsWith('agent:') === true,
+      );
+      if (
+        newestAgentLabel !== null &&
+        newestAgentLabel.label?.toLowerCase() !== label.toLowerCase()
+      )
+        return { notTaken: 'not-eligible', reason: 'label-changed' };
+    }
+    const found = newestLabeler(history, label.toLowerCase());
     if ('reason' in found) return { notTaken: 'not-eligible', ...found };
-    if (intakeLabel === 'correction' && isCairnIdentity(found.labeler)) return found;
+    if (label === 'correction' && isCairnIdentity(found.labeler)) return found;
     const trusted = await hasRepoTriage(
       run.githubFetch,
       teamId,
@@ -519,6 +532,7 @@ export function createIssueIntake(
     access: TeamAccess,
     issueNumber: number,
     assignedAgentId: string | null,
+    assignedAgentLabel: string | null,
     now: number,
     tally: IssueIntakeTally,
   ): Promise<'imported' | 'full' | 'not-taken'> {
@@ -534,6 +548,30 @@ export function createIssueIntake(
         );
       } else log(at, 'issue intake candidate not taken');
       return 'not-taken';
+    }
+    if (assignedAgentLabel !== null) {
+      const agentVerdict = await labelerVerdict(
+        row.teamId,
+        access.token,
+        owner,
+        repo,
+        issueNumber,
+        now,
+        assignedAgentLabel,
+      );
+      if ('notTaken' in agentVerdict) {
+        tally.held += 1;
+        log(
+          {
+            projectId: row.id,
+            issue: issueNumber,
+            label: assignedAgentLabel,
+            reason: `agent-label-${agentVerdict.reason}`,
+          },
+          'issue intake candidate held',
+        );
+        return 'not-taken';
+      }
     }
     if (projectAtInFlightCap(deps.db, row.id)) {
       tally.atCap += 1;
@@ -682,12 +720,22 @@ export function createIssueIntake(
       );
       todoId = record.id;
       if (assignedAgentId !== null) {
-        updateTodo(deps, todoId, {
-          assignment: {
-            plan: { agentId: assignedAgentId },
-            build: { agentId: assignedAgentId },
-          },
-        });
+        try {
+          const assigned = updateTodo(deps, todoId, {
+            assignment: {
+              source: 'intake-label',
+              plan: { agentId: assignedAgentId },
+              build: { agentId: assignedAgentId },
+            },
+          });
+          if (assigned === null) throw new Error('imported todo missing during assignment');
+        } catch (err) {
+          tally.errors += 1;
+          log(
+            { projectId: row.id, issue: issueNumber, todoId, err: errText(err) },
+            'issue intake assignment failed',
+          );
+        }
       }
     } catch (err) {
       if (err instanceof HttpError && err.status === 409) {
@@ -803,7 +851,9 @@ export function createIssueIntake(
           tally.atCap += 1;
           continue;
         }
-        const agentLabels = issue.labels.filter((label) => label.name.startsWith('agent:'));
+        const agentLabels = issue.labels.filter((label) =>
+          label.name.toLowerCase().startsWith('agent:'),
+        );
         const namedAgents =
           agentLabels.length === 1
             ? deps.db
@@ -840,6 +890,7 @@ export function createIssueIntake(
           access,
           issue.number,
           namedAgents[0]?.id ?? null,
+          agentLabels[0]?.name ?? null,
           now,
           tally,
         );
