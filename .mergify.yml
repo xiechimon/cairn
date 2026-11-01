@@ -1,11 +1,11 @@
 queue_rules:
   - name: default
     queue_conditions:
+      - -author = cairnwright[bot]
       - base = main
       - -draft
       - -label = needs-decision
       - -label = owner-route
-      - -author = cairnwright[bot]
       - status-success = review-gate
       - check-success = merge-route
       - or:
@@ -55,7 +55,84 @@ queue_rules:
           - check-success = ops-backup-test
           - check-skipped = ops-backup-test
     merge_method: squash
-    batch_size: 3
-    batch_max_wait_time: 2 min
+    batch_size: 5
+    batch_max_wait_time: 3 min
+    max_checks_retries: 1
+  - name: bot
+    queue_conditions:
+      - author = cairnwright[bot]
+      - '#commits = 1'
+      - base = main
+      - -draft
+      - -label = needs-decision
+      - -label = owner-route
+      - status-success = review-gate
+      - check-success = merge-route
+      - or:
+          - check-success = check
+          - check-skipped = check
+      - or:
+          - check-success = pack-smoke
+          - check-skipped = pack-smoke
+      - or:
+          - check-success = e2e-gate
+          - check-skipped = e2e-gate
+      - or:
+          - check-success = pr-evidence
+          - check-skipped = pr-evidence
+      - or:
+          - check-success = gates
+          - check-skipped = gates
+      - or:
+          - check-success = dead-class-gate
+          - check-skipped = dead-class-gate
+      - or:
+          - check-success = ops-backup-test
+          - check-skipped = ops-backup-test
+      - '-files ~= (?i)^(?:\.github(?:\/.*)?|(?:.*\/)?\.husky(?:\/.*)?|(?:.*\/)?\.claude(?:\/.*)?|(?:.*\/)?\.pi(?:\/.*)?|(?:.*\/)?\.cursor(?:\/.*)?|(?:.*\/)?\.mcp\.json|(?:.*\/)?\.ckignore|(?:.*\/)?CLAUDE[^/]*\.md|(?:.*\/)?AGENTS[^/]*\.md|docs\/pr-review\.md|docs\/lessons\.md|docs\/lessons(?:\/.*)?|docs\/agent-dispatch-prompts\.md|docs\/adr(?:\/.*)?|docs\/spec(?:\/.*)?|(?:.*\/)?scripts(?:\/.*)?|(?:.*\/)?[^/]*\.config\.[^/]*|(?:.*\/)?biome\.json|(?:.*\/)?biome\.jsonc|(?:.*\/)?tsconfig[^/]*\.json|(?:.*\/)?\.gitignore|(?:.*\/)?\.gitattributes|(?:.*\/)?drizzle(?:\/.*)?|(?:.*\/)?package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|(?:.*\/)?\.npmrc|apps\/server\/src\/lib\/secret-box\.ts|apps\/server\/src\/lib\/keys\.ts|apps\/server\/src\/lib\/token-auth\.ts|apps\/server\/src\/lib\/attachments-token\.ts|apps\/server\/src\/services\/secrets\.ts|apps\/server\/src\/services\/credentials\.ts|apps\/server\/src\/services\/api-keys\.ts|apps\/server\/src\/services\/oauth\.ts|apps\/server\/src\/routes-machine\.ts|apps\/server\/src\/services\/machine[^/]*\.ts|apps\/daemon\/src\/credentials\.ts|apps\/daemon\/src\/secret-channel\.ts|apps\/daemon\/src\/machine-client\.ts|apps\/daemon\/src\/backend\/command-gate\.ts|apps\/server\/src\/services\/mcp-face\.ts|apps\/server\/src\/services\/mcp-servers\.ts|apps\/server\/src\/db\/client\.ts|apps\/server\/src\/services\/harness-eval-[^/]*\.ts|integration\/eval(?:\/.*)?|\.claude\/hillclimb(?:\/.*)?|apps\/server\/src\/trajectory-export\.ts|apps\/server\/src\/trajectory-export-cli\.ts|apps\/server\/src\/trajectory-outcome\.ts|packages\/shared\/src\/trajectory-pack\.ts|apps\/server\/src\/services\/merge-gate(?:\/.*)?|packages\/shared\/src\/records\/merge-gate\.ts|apps\/daemon\/src\/merge-decision\.ts)$'
+      - '-files ~= (?ai)^(?!(?:apps\/[^/]*\/src\/.*|apps\/[^/]*\/test\/.*|apps\/[^/]*\/e2e\/.*|packages\/[^/]*\/src\/.*|packages\/[^/]*\/test\/.*|integration\/test\/.*|docs\/verify\/.*|docs\/(?:.*\/)?[^/]*\.md)$)'
+      - '-removed-files ~= (?i)(^|/)(e2e|test|tests|__tests__)/|[.](test|spec)[.][cm]?[jt]sx?$'
+      - '#files <= 40'
+      - '#added-lines <= 400'
+      - '#deleted-lines <= 400'
+    merge_conditions:
+      - or:
+          - check-success = check
+          - check-skipped = check
+      - or:
+          - check-success = pack-smoke
+          - check-skipped = pack-smoke
+      - or:
+          - check-success = e2e-gate
+          - check-skipped = e2e-gate
+      - or:
+          - check-success = gates
+          - check-skipped = gates
+      - or:
+          - check-success = dead-class-gate
+          - check-skipped = dead-class-gate
+      - or:
+          - check-success = ops-backup-test
+          - check-skipped = ops-backup-test
+    merge_method: rebase
+    batch_size: 5
+    batch_max_wait_time: 3 min
+    max_checks_retries: 1
 merge_queue:
-  max_parallel_checks: 2
+  mode: parallel
+  max_parallel_checks: 3
+  dequeued_label: dequeued
+scopes:
+  source:
+    files:
+      web:
+        include:
+          - apps/web/**/*
+      backend:
+        include:
+          - apps/server/**/*
+          - apps/daemon/**/*
+          - integration/**/*
+  barrier_files:
+    include:
+      - packages/**/*

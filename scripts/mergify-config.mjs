@@ -6,6 +6,15 @@ const prGatePath = '.claude/workflows/pr-gate.js';
 export const configPath = '.mergify.yml';
 const prOnlyChecks = ['pr-evidence'];
 const maxLinesEachWay = 400;
+const botAuthor = 'cairnwright[bot]';
+const batchSize = 5;
+const batchWait = '3 min';
+const checkRetries = 1;
+const scopes = {
+  web: ['apps/web/**/*'],
+  backend: ['apps/server/**/*', 'apps/daemon/**/*', 'integration/**/*'],
+};
+const barrierFiles = ['packages/**/*'];
 
 function routingPolicy(source) {
   const extract = (start, end) => {
@@ -41,30 +50,50 @@ export function mergifyConfig(prGateSource) {
   const deletedTestRe = '(?i)(^|/)(e2e|test|tests|__tests__)/|[.](test|spec)[.][cm]?[jt]sx?$';
   const prChecks = [...requiredChecks, ...mustBeGreenJobs];
   const draftChecks = prChecks.filter((check) => !prOnlyChecks.includes(check));
-  return `queue_rules:
-  - name: default
+  const queueConditions = [
+    '      - base = main',
+    '      - -draft',
+    '      - -label = needs-decision',
+    '      - -label = owner-route',
+    '      - status-success = review-gate',
+    '      - check-success = merge-route',
+    ...prChecks.map(passedOrSkipped),
+    `      - ${quoted(`-files ~= ${protectedRe}`)}`,
+    `      - ${quoted(`-files ~= ${outsideRe}`)}`,
+    `      - ${quoted(`-removed-files ~= ${deletedTestRe}`)}`,
+    `      - '#files <= ${maxFiles}'`,
+    `      - '#added-lines <= ${maxLinesEachWay}'`,
+    `      - '#deleted-lines <= ${maxLinesEachWay}'`,
+  ].join('\n');
+  const rule = (name, author, method) => `  - name: ${name}
     queue_conditions:
-      - base = main
-      - -draft
-      - -label = needs-decision
-      - -label = owner-route
-      - -author = cairnwright[bot]
-      - status-success = review-gate
-      - check-success = merge-route
-${prChecks.map(passedOrSkipped).join('\n')}
-      - ${quoted(`-files ~= ${protectedRe}`)}
-      - ${quoted(`-files ~= ${outsideRe}`)}
-      - ${quoted(`-removed-files ~= ${deletedTestRe}`)}
-      - '#files <= ${maxFiles}'
-      - '#added-lines <= ${maxLinesEachWay}'
-      - '#deleted-lines <= ${maxLinesEachWay}'
+      - ${author}
+${name === 'bot' ? "      - '#commits = 1'\n" : ''}${queueConditions}
     merge_conditions:
 ${draftChecks.map(passedOrSkipped).join('\n')}
-    merge_method: squash
-    batch_size: 3
-    batch_max_wait_time: 2 min
+    merge_method: ${method}
+    batch_size: ${batchSize}
+    batch_max_wait_time: ${batchWait}
+    max_checks_retries: ${checkRetries}`;
+  return `queue_rules:
+${rule('default', `-author = ${botAuthor}`, 'squash')}
+${rule('bot', `author = ${botAuthor}`, 'rebase')}
 merge_queue:
-  max_parallel_checks: 2
+  mode: parallel
+  max_parallel_checks: 3
+  dequeued_label: dequeued
+scopes:
+  source:
+    files:
+${Object.entries(scopes)
+  .map(
+    ([name, globs]) =>
+      `      ${name}:\n        include:\n${globs.map((glob) => `          - ${glob}`).join('\n')}`,
+  )
+  .join('\n')}
+  barrier_files:
+    include:
+${barrierFiles.map((glob) => `      - ${glob}`).join('\n')}
 `;
 }
 
