@@ -166,7 +166,7 @@ async function runningTask(page: Page) {
   await page.goto(`/app/todo/${task.id}`);
   const input = page.getByTestId('composer-card').getByRole('textbox');
   await expect(input).toBeEnabled();
-  return { input, sent, stops, steerPending, queuedMessages, finish, turns: () => turns };
+  return { input, sent, stops, steerPending, queuedMessages, finish, setPhase: (phase: string) => { task.phase = phase; }, turns: () => turns };
 }
 
 for (const chord of ['Meta+Enter', 'Control+Enter']) {
@@ -213,8 +213,13 @@ test('Stop preserves changes without a dialog and cancelled tools show cancelled
   task.finish('stopped');
   await page.reload();
   expect(task.turns()).toBe(0);
-  await expect(page.getByTestId('composer-card').getByTestId('queued-message')).toContainText('A stays queued');
+  const capsule = page.getByTestId('queued-message');
+  await expect(capsule).toContainText('A stays queued');
+  await expect(capsule.getByRole('button', { name: '移除' })).toBeEnabled();
+  await expect(capsule.getByRole('button', { name: '现在插话' })).toBeEnabled();
   await expect(page.getByTestId('transcript-col').getByTestId('queued-message')).toHaveCount(0);
+  await capsule.getByRole('button', { name: '移除' }).click();
+  await expect(capsule).toHaveCount(0);
   await expect(page.getByTestId('work-cancelled')).toBeVisible();
   await expect(page.getByTestId('work-cancelled')).toHaveText('已取消');
   await expect(page.getByTestId('work-spinner')).toHaveCount(0);
@@ -307,4 +312,19 @@ test('removing a capsule cancels the queued message', async ({ page }) => {
   await expect(capsule).toHaveCount(0);
   expect(task.sent.at(-1)?.cancelQueued).toBe(true);
   expect(task.steerPending).toEqual([]);
+});
+
+test('queued capsules stay usable when the phase has no composer', async ({ page }) => {
+  const task = await runningTask(page);
+  await task.input.fill('Still queued after close');
+  await task.input.press('Control+Enter');
+  await expect(page.getByTestId('composer-card').getByTestId('queued-message')).toBeVisible();
+  task.setPhase('closed');
+  await page.reload();
+  await expect(page.getByTestId('composer-card')).toHaveCount(0);
+  const capsule = page.getByTestId('queued-capsules-standalone').getByTestId('queued-message');
+  await expect(capsule).toContainText('Still queued after close');
+  await capsule.getByRole('button', { name: '移除' }).click();
+  await expect(capsule).toHaveCount(0);
+  expect(task.sent.at(-1)?.cancelQueued).toBe(true);
 });

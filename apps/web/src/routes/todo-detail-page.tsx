@@ -61,6 +61,7 @@ import { ChiefAgentDialog } from '../chief/chief-agent-dialog.js';
 import { useChiefRoot } from '../chief/chief-root.js';
 import { inflightOrchestrationFor } from '../chief/orchestration-inflight.js';
 import { useOrchestrateStart } from '../chief/use-orchestrate-start.js';
+import { QueuedCapsules } from '../components/queued-capsules.js';
 import { Button } from '../components/ui/button.js';
 import { Spinner } from '../components/ui/spinner.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
@@ -792,6 +793,27 @@ export function TodoDetailPage() {
     );
   };
 
+  const queuedMessages = live ? messagesQ.data?.queuedMessages : undefined;
+  const removeQueued =
+    live && buildId
+      ? (queuedMessageId: string, content: string) =>
+          mutations.sendSteer.mutateAsync({
+            conversationId: buildId,
+            content,
+            queuedMessageId,
+            cancelQueued: true,
+          })
+      : undefined;
+  const sendQueuedNow =
+    live && buildId
+      ? (queuedMessageId: string, content: string) =>
+          mutations.sendSteer.mutateAsync({
+            conversationId: buildId,
+            content,
+            queuedMessageId,
+          })
+      : undefined;
+
   return (
     <div
       className="detail-shell flex h-full overflow-hidden bg-(--surface-1) [--detail-pane-right:488px] max-[816px]:[--detail-pane-right:0px] [&>.app-menu-trigger]:hidden [&>.board-sidebar]:max-[816px]:hidden"
@@ -880,58 +902,51 @@ export function TodoDetailPage() {
                   {t('Unarchive to continue')}
                 </Button>
               </div>
-            ) : (
-              ui.placeholder != null && (
-                <Composer
-                  placeholder={reviewActive ? t('AI 审核进行中…') : ui.placeholder}
-                  aiReview={(phase === 'confirm' || phase === 'review') && !todo.awaitingReply}
-                  streaming={streaming}
-                  workingFor={workingFor}
-                  queuedMessages={live ? messagesQ.data?.queuedMessages : undefined}
-                  onRemoveQueued={
-                    live && buildId
-                      ? (queuedMessageId, content) =>
-                          mutations.sendSteer.mutateAsync({
-                            conversationId: buildId,
-                            content,
-                            queuedMessageId,
-                            cancelQueued: true,
-                          })
-                      : undefined
-                  }
-                  onSendQueuedNow={
-                    live && buildId
-                      ? (queuedMessageId, content) =>
-                          mutations.sendSteer.mutateAsync({
-                            conversationId: buildId,
-                            content,
-                            queuedMessageId,
-                          })
-                      : undefined
-                  }
-                  editable={live || DEMO_MODE}
-                  draft={live ? liveDraft : undefined}
-                  onDraftChange={live ? setLiveDraft : undefined}
-                  onAttachment={onAttachment}
-                  mentionGroups={mentionGroups}
-                  mentionFiles={mentionFiles}
-                  onStop={
-                    live && buildId
-                      ? () => {
-                          stopTurn(false);
-                        }
-                      : undefined
-                  }
-                  onReview={
-                    live && (phase === 'confirm' || phase === 'review') && !reviewActive
-                      ? () => setOverlay({ kind: 'review' })
-                      : undefined
-                  }
-                  onQueue={running ? queueMessage : undefined}
-                  onStopAndSend={queueMessage ? (text) => queueMessage(text, true) : undefined}
-                  onSend={stoppedBeforeStart ? queueMessage : onSend}
-                />
+            ) : ui.placeholder == null ? (
+              queuedMessages != null &&
+              queuedMessages.length > 0 && (
+                <div
+                  className="mx-auto mb-3 w-[calc(100%-2rem)] max-w-(--chat-max-w)"
+                  data-testid="queued-capsules-standalone"
+                >
+                  <QueuedCapsules
+                    messages={queuedMessages}
+                    onSendNow={sendQueuedNow}
+                    onRemove={removeQueued}
+                  />
+                </div>
               )
+            ) : (
+              <Composer
+                placeholder={reviewActive ? t('AI 审核进行中…') : ui.placeholder}
+                aiReview={(phase === 'confirm' || phase === 'review') && !todo.awaitingReply}
+                streaming={streaming}
+                workingFor={workingFor}
+                queuedMessages={queuedMessages}
+                onRemoveQueued={removeQueued}
+                onSendQueuedNow={sendQueuedNow}
+                editable={live || DEMO_MODE}
+                draft={live ? liveDraft : undefined}
+                onDraftChange={live ? setLiveDraft : undefined}
+                onAttachment={onAttachment}
+                mentionGroups={mentionGroups}
+                mentionFiles={mentionFiles}
+                onStop={
+                  live && buildId
+                    ? () => {
+                        stopTurn(false);
+                      }
+                    : undefined
+                }
+                onReview={
+                  live && (phase === 'confirm' || phase === 'review') && !reviewActive
+                    ? () => setOverlay({ kind: 'review' })
+                    : undefined
+                }
+                onQueue={running ? queueMessage : undefined}
+                onStopAndSend={queueMessage ? (text) => queueMessage(text, true) : undefined}
+                onSend={stoppedBeforeStart ? queueMessage : onSend}
+              />
             )}
           </div>
           {detail != null && (
