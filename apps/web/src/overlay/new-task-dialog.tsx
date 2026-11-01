@@ -1,5 +1,6 @@
 import type { ClipboardEvent } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { KeyHint } from '../components/key-hint.js';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -482,12 +483,9 @@ export function NewTaskDialog({
                 onClick={saveAndStart}
               >
                 {t('保存并开始')}
-                <Kbd
-                  aria-hidden="true"
-                  className="h-4 min-w-0 rounded-sm bg-current/10 px-1 text-caption font-normal text-current"
-                >
+                <KeyHint aria-hidden="true" className="text-current opacity-70">
                   {START_SHORTCUT_LABEL}
-                </Kbd>
+                </KeyHint>
               </Button>
             </div>
           </div>

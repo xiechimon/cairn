@@ -69,8 +69,6 @@ test.describe('quiescent building gap (scenario spinner-quiescent)', () => {
     await expect(row(page).getByText('执行中...')).toBeVisible();
     await expect(row(page).getByText(/^\d+s$/)).toHaveCount(0);
     await expect(row(page)).not.toContainText('undefined');
-    await expect(
-      page.getByTestId('detail-head').locator('button[aria-expanded]'),
-    ).toHaveText(/执行中/);
+    await expect(page.getByTestId('phase-chip')).toHaveText(/执行中/);
   });
 });

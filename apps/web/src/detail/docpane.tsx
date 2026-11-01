@@ -5,13 +5,9 @@ import { useMemo, useState } from 'react';
 import { useBuildChangeFile } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { relativeTime } from '../board/rel-time.js';
+import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { Button } from '../components/ui/button.js';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '../components/ui/dropdown-menu.js';
+import { DropdownMenu, DropdownMenuTrigger } from '../components/ui/dropdown-menu.js';
 import type {
   ChangesContent,
   DiffFile,
@@ -279,46 +275,48 @@ function VersionMenu({
   const { t } = useI18n();
   if (menu === 'compare') {
     return (
-      <DropdownMenuContent
+      <KeyedMenuContent
         align="end"
         side="bottom"
         sideOffset={8}
         className="version-menu--sub w-auto min-w-17"
       >
-        <DropdownMenuItem className="version-menu-row" onClick={onCompare}>
+        <KeyedMenuItem className="version-menu-row" shortcut="P" onClick={onCompare}>
           {t('上一版本')}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
+        </KeyedMenuItem>
+      </KeyedMenuContent>
     );
   }
   return (
-    <DropdownMenuContent align="end" side="bottom" sideOffset={8} className="w-53">
+    <KeyedMenuContent align="end" side="bottom" sideOffset={8} className="w-53">
       {versions.map((row, i) => (
-        <DropdownMenuItem
+        <KeyedMenuItem
           key={row.v}
-          className={`version-menu-row justify-between${i === 0 ? ' font-semibold' : ''}`}
+          shortcut={i < 9 ? String(i + 1) : undefined}
+          className={`version-menu-row${i === 0 ? ' font-semibold' : ''}`}
           onClick={() => onMenu(undefined)}
         >
-          <span>
+          <span className="flex-1">
             {row.v} · {relativeTime(row.at, now, t)}
           </span>
           <Restore width={13} height={13} className="text-(--text-tertiary)" />
-        </DropdownMenuItem>
+        </KeyedMenuItem>
       ))}
-      <DropdownMenuItem
-        className="version-menu-row justify-between"
+      <KeyedMenuItem
+        className="version-menu-row"
+        shortcut="C"
         closeOnClick={false}
         onClick={() => onMenu('compare')}
       >
-        <span>{t('与其他版本对比…')}</span>
+        <span className="flex-1">{t('与其他版本对比…')}</span>
         {diffOpen && diffFrom != null && <span className="text-(--text-tertiary)">{diffFrom}</span>}
-      </DropdownMenuItem>
+      </KeyedMenuItem>
       {diffOpen && (
-        <DropdownMenuItem className="version-menu-row" onClick={onBase}>
+        <KeyedMenuItem className="version-menu-row" shortcut="B" onClick={onBase}>
           <span>{t('回到与 base 对比')}</span>
-        </DropdownMenuItem>
+        </KeyedMenuItem>
       )}
-    </DropdownMenuContent>
+    </KeyedMenuContent>
   );
 }
 

@@ -56,11 +56,14 @@ import {
 import { useAgentAvatarUrlById, useLiveData } from '../api/provider.js';
 import { useConversationStream } from '../api/sse.js';
 import { AppSidebar } from '../board/app-sidebar.js';
+import { ResetConfirmDialog } from '../board/reset-confirm-dialog.js';
 import { useMarkThreadRead } from '../board/use-mark-thread-read.js';
 import { ChiefAgentDialog } from '../chief/chief-agent-dialog.js';
 import { useChiefRoot } from '../chief/chief-root.js';
 import { inflightOrchestrationFor } from '../chief/orchestration-inflight.js';
 import { useOrchestrateStart } from '../chief/use-orchestrate-start.js';
+import { type AgentPickerOption, agentLines } from '../components/agent-picker.js';
+import { QueuedCapsules } from '../components/queued-capsules.js';
 import { Button } from '../components/ui/button.js';
 import { Spinner } from '../components/ui/spinner.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
@@ -78,7 +81,6 @@ import { RejectDialog } from '../detail/reject-dialog.js';
 import { ReviewDialog } from '../detail/review-dialog.js';
 import { PaneSections, RightPane } from '../detail/right-pane.js';
 import { SourceIssueLine } from '../detail/source-issue.js';
-import { SpecBlock } from '../detail/spec-block.js';
 import { StopConfirmDialog } from '../detail/stop-confirm-dialog.js';
 import { buildTaskMeta } from '../detail/task-meta.js';
 import { TaskMetaBlock, type TaskMetaFields } from '../detail/task-meta-block.js';
@@ -88,7 +90,7 @@ import { useDetailActions } from '../detail/use-detail-actions.js';
 import { type ChainState, useDetailComposer } from '../detail/use-detail-composer.js';
 import { UserMenu } from '../detail/user-menu.js';
 import { markDeleted, withoutDeleted } from '../fixtures/deletions.js';
-import { overlayContent } from '../fixtures/fixtures.js';
+import { AGENT_MODEL, overlayContent, PROJECT_NAME } from '../fixtures/fixtures.js';
 import type {
   DetailContent,
   OverlayState,
@@ -209,6 +211,7 @@ export function TodoDetailPage() {
     : (fixtureTodos.find((t) => t.id === id) ?? fixtureTodos[0]);
 
   const [overlay, setOverlay] = useState<OverlayState | null>(fixture.overlay ?? null);
+  const [resetOpen, setResetOpen] = useState(false);
   const [mergeReject, setMergeReject] = useState<string | null>(null);
   const [rejectError, setRejectError] = useState<string | null>(null);
   const closeOverlay = useCallback(() => {
@@ -392,21 +395,19 @@ export function TodoDetailPage() {
     return (member?.actor as { modelId?: string | null } | undefined)?.modelId ?? null;
   }, [wireTodo?.assignment, membersQ.data]);
 
-  const chipAgentId = todo?.agent?.id;
-  const chipAgentModel = useMemo(() => {
-    if (chipAgentId === undefined) return undefined;
-    const actor = (membersQ.data ?? []).find(
-      (m) => m.memberType === 'agent' && m.actorId === chipAgentId,
-    )?.actor as { modelId?: string | null; thinkingLevel?: string | null } | undefined;
-    return actor?.modelId
-      ? { modelId: actor.modelId, thinkingLevel: actor.thinkingLevel ?? null }
-      : undefined;
-  }, [chipAgentId, membersQ.data]);
-
   const sourceEchoQ = useGithubIssueEcho(
     live ? wireTodo?.id : undefined,
     live && wireTodo?.sourceRef != null,
   );
+
+  const ownerName = useMemo(() => {
+    const ownerId = wireTodo?.ownerId;
+    if (ownerId == null) return null;
+    const member = (membersQ.data ?? []).find(
+      (m) => m.memberType === 'user' && m.actorId === ownerId,
+    );
+    return (member?.actor as { displayName?: string } | undefined)?.displayName ?? null;
+  }, [wireTodo?.ownerId, membersQ.data]);
 
   const taskMeta = useMemo<TaskMetaFields | null>(
     () =>
@@ -420,6 +421,7 @@ export function TodoDetailPage() {
         agentModel,
         usage: usageQ.data,
         sourceEchoTitle: sourceEchoQ.data?.title,
+        ownerName,
       }),
     [
       live,
@@ -431,6 +433,7 @@ export function TodoDetailPage() {
       agentModel,
       usageQ.data,
       sourceEchoQ.data,
+      ownerName,
     ],
   );
 
@@ -498,6 +501,41 @@ export function TodoDetailPage() {
     reviewProducerProvider,
     fanoutAvailable,
   } = actions;
+  const agentPickerOptions = useMemo<AgentPickerOption[]>(() => {
+    const source = live
+      ? (assignOptions ?? [])
+      : fixture.team?.agents != null && fixture.team.agents.length > 0
+        ? fixture.team.agents.map((a) => ({
+            id: a.id,
+            name: a.displayName,
+            model: a.model,
+            provider: a.provider ?? null,
+            thinkingLevel: null,
+            avatarUrl: a.avatarUrl ?? null,
+          }))
+        : todo?.agent != null
+          ? [
+              {
+                id: todo.agent.id,
+                name: todo.agent.displayName,
+                model: AGENT_MODEL.modelId,
+                provider: null,
+                thinkingLevel: AGENT_MODEL.thinkingLevel,
+                avatarUrl: null,
+              },
+            ]
+          : [];
+    return source.map((option) => ({
+      id: option.id,
+      name: option.name,
+      avatarUrl: option.avatarUrl ?? null,
+      ...agentLines(
+        { provider: option.provider, model: option.model, thinkingLevel: option.thinkingLevel },
+        t,
+      ),
+    }));
+  }, [live, assignOptions, fixture.team, todo?.agent, t]);
+
   const { onSend, onAttachment } = useDetailComposer({
     live,
     phase,
@@ -770,6 +808,30 @@ export function TodoDetailPage() {
     if (phase === 'failed') setOverlay({ kind: 'rerun' });
   };
 
+  const confirmReset = () => {
+    if (!live) {
+      blockDemoWrite();
+      setResetOpen(false);
+      return;
+    }
+    mutations.resetTodo.mutate(
+      { id: todo.id, expectedPhase: todo.phase, expectedBuildId: todo.latestBuildId },
+      {
+        onSuccess: () => setResetOpen(false),
+        onError: (error) => {
+          setResetOpen(false);
+          toastError(t('重置任务失败，请重试。'), error);
+        },
+      },
+    );
+  };
+
+  const saveSpec = (spec: string) =>
+    mutations.patchTodo.mutateAsync({ id: todo.id, body: { spec } }).catch((error: unknown) => {
+      toastError(t('保存失败，请重试。'), error);
+      throw error;
+    });
+
   const unarchiveTask = () => {
     if (!live) return;
     mutations.setTodoArchived.mutate(
@@ -792,6 +854,27 @@ export function TodoDetailPage() {
     );
   };
 
+  const queuedMessages = live ? messagesQ.data?.queuedMessages : undefined;
+  const removeQueued =
+    live && buildId
+      ? (queuedMessageId: string, content: string) =>
+          mutations.sendSteer.mutateAsync({
+            conversationId: buildId,
+            content,
+            queuedMessageId,
+            cancelQueued: true,
+          })
+      : undefined;
+  const sendQueuedNow =
+    live && buildId
+      ? (queuedMessageId: string, content: string) =>
+          mutations.sendSteer.mutateAsync({
+            conversationId: buildId,
+            content,
+            queuedMessageId,
+          })
+      : undefined;
+
   return (
     <div
       className="detail-shell flex h-full overflow-hidden bg-(--surface-1) [--detail-pane-right:488px] max-[816px]:[--detail-pane-right:0px] [&>.app-menu-trigger]:hidden [&>.board-sidebar]:max-[816px]:hidden"
@@ -811,15 +894,29 @@ export function TodoDetailPage() {
         <DetailHead
           todo={todo}
           projectName={projectsQ.data?.find((p) => p.id === todo.projectId)?.name}
-          agentModel={chipAgentModel}
           phase={shownPhase}
+          now={live ? undefined : fixture.now}
           onMore={() => setMoreOpen(true)}
           reviewActive={reviewActive}
           verifyActive={verifyActive}
           actionInFlight={actionInFlight}
           onAction={handlePrimaryAction}
-          chipPopoverOpen={fixture.ui?.chipPopoverOpen === true}
-          onEditAssign={() => setAssignOpen(true)}
+          statusMenuOpen={fixture.ui?.statusMenuOpen === true}
+          onMoveBack={
+            archived || phase === 'todo' || phase === 'closed'
+              ? undefined
+              : () => setResetOpen(true)
+          }
+          onMarkDone={
+            archived || !canComplete
+              ? undefined
+              : () => {
+                  completeTask();
+                }
+          }
+          agentOptions={archived ? undefined : agentPickerOptions}
+          onPickAgent={bindAssign}
+          agentRebindCopy={ASSIGN_AGENT_REBIND_CONFIRM_COPY}
           moreButtonRef={moreAnchorRef}
         />
         <div className="relative flex min-h-0 flex-1" data-testid="detail-body">
@@ -841,13 +938,21 @@ export function TodoDetailPage() {
               <div className="detail-fresh min-h-0 flex-1 overflow-y-auto pb-4">
                 <FreshBlock
                   todo={todo}
+                  projectName={
+                    live ? projectsQ.data?.find((p) => p.id === todo.projectId)?.name : PROJECT_NAME
+                  }
                   tags={freshTags}
+                  machineName={machineField}
+                  agentOptions={archived ? undefined : agentPickerOptions}
+                  agentAvatarUrl={todo.agent ? (agentAvatarUrl.get(todo.agent.id) ?? null) : null}
+                  onPickAgent={bindAssign}
+                  agentRebindCopy={ASSIGN_AGENT_REBIND_CONFIRM_COPY}
+                  spec={todo.spec}
+                  onSaveSpec={live && !archived ? saveSpec : undefined}
                   action={archived ? null : ui.action}
                   actionInFlight={actionInFlight}
                   onAction={handlePrimaryAction}
-                  hasSpec={live && todo.spec.trim() !== ''}
                 />
-                {live && todo.spec.trim() !== '' && <SpecBlock spec={todo.spec} fresh />}
               </div>
             ) : (
               <TranscriptColumn
@@ -866,28 +971,6 @@ export function TodoDetailPage() {
                   setDocChoice('plan');
                 }}
                 spec={live && todo.spec.trim() !== '' ? todo.spec : undefined}
-                queuedMessages={live ? messagesQ.data?.queuedMessages : undefined}
-                onCancelQueued={
-                  live && buildId
-                    ? (queuedMessageId, content) =>
-                        mutations.sendSteer.mutateAsync({
-                          conversationId: buildId,
-                          content,
-                          queuedMessageId,
-                          cancelQueued: true,
-                        })
-                    : undefined
-                }
-                onSteerQueued={
-                  live && buildId
-                    ? (queuedMessageId, content) =>
-                        mutations.sendSteer.mutateAsync({
-                          conversationId: buildId,
-                          content,
-                          queuedMessageId,
-                        })
-                    : undefined
-                }
                 autoScroll={live && view.transcript.length > 0}
               />
             )}
@@ -902,36 +985,51 @@ export function TodoDetailPage() {
                   {t('Unarchive to continue')}
                 </Button>
               </div>
-            ) : (
-              ui.placeholder != null && (
-                <Composer
-                  placeholder={reviewActive ? t('AI 审核进行中…') : ui.placeholder}
-                  aiReview={(phase === 'confirm' || phase === 'review') && !todo.awaitingReply}
-                  streaming={streaming}
-                  workingFor={workingFor}
-                  editable={live || DEMO_MODE}
-                  draft={live ? liveDraft : undefined}
-                  onDraftChange={live ? setLiveDraft : undefined}
-                  onAttachment={onAttachment}
-                  mentionGroups={mentionGroups}
-                  mentionFiles={mentionFiles}
-                  onStop={
-                    live && buildId
-                      ? () => {
-                          stopTurn(false);
-                        }
-                      : undefined
-                  }
-                  onReview={
-                    live && (phase === 'confirm' || phase === 'review') && !reviewActive
-                      ? () => setOverlay({ kind: 'review' })
-                      : undefined
-                  }
-                  onQueue={running ? queueMessage : undefined}
-                  onStopAndSend={queueMessage ? (text) => queueMessage(text, true) : undefined}
-                  onSend={stoppedBeforeStart ? queueMessage : onSend}
-                />
+            ) : ui.placeholder == null ? (
+              queuedMessages != null &&
+              queuedMessages.length > 0 && (
+                <div
+                  className="mx-auto mb-3 w-[calc(100%-2rem)] max-w-(--chat-max-w)"
+                  data-testid="queued-capsules-standalone"
+                >
+                  <QueuedCapsules
+                    messages={queuedMessages}
+                    onSendNow={sendQueuedNow}
+                    onRemove={removeQueued}
+                  />
+                </div>
               )
+            ) : (
+              <Composer
+                placeholder={reviewActive ? t('AI 审核进行中…') : ui.placeholder}
+                aiReview={(phase === 'confirm' || phase === 'review') && !todo.awaitingReply}
+                streaming={streaming}
+                workingFor={workingFor}
+                queuedMessages={queuedMessages}
+                onRemoveQueued={removeQueued}
+                onSendQueuedNow={sendQueuedNow}
+                editable={live || DEMO_MODE}
+                draft={live ? liveDraft : undefined}
+                onDraftChange={live ? setLiveDraft : undefined}
+                onAttachment={onAttachment}
+                mentionGroups={mentionGroups}
+                mentionFiles={mentionFiles}
+                onStop={
+                  live && buildId
+                    ? () => {
+                        stopTurn(false);
+                      }
+                    : undefined
+                }
+                onReview={
+                  live && (phase === 'confirm' || phase === 'review') && !reviewActive
+                    ? () => setOverlay({ kind: 'review' })
+                    : undefined
+                }
+                onQueue={running ? queueMessage : undefined}
+                onStopAndSend={queueMessage ? (text) => queueMessage(text, true) : undefined}
+                onSend={stoppedBeforeStart ? queueMessage : onSend}
+              />
             )}
           </div>
           {detail != null && (
@@ -1183,6 +1281,12 @@ export function TodoDetailPage() {
         onBind={bindAssign}
         title={t(ASSIGN_AGENT_DIALOG_TITLE)}
         confirmCopy={ASSIGN_AGENT_REBIND_CONFIRM_COPY}
+      />
+      <ResetConfirmDialog
+        open={resetOpen}
+        onClose={() => setResetOpen(false)}
+        onConfirm={confirmReset}
+        confirming={mutations.resetTodo.isPending}
       />
       <ReviewDialog
         open={overlay?.kind === 'review'}
