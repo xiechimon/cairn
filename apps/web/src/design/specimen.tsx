@@ -81,7 +81,7 @@ export function Specimen({
             />
             Code
           </summary>
-          <pre className="m-0 overflow-x-auto bg-canvas px-5 py-4 font-mono text-caption leading-5 text-content-secondary">
+          <pre className="m-0 overflow-x-auto bg-canvas px-5 py-4 font-mono text-code leading-5 text-content-secondary">
             <code>{code.trim()}</code>
           </pre>
         </details>

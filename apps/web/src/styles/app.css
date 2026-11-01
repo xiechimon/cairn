@@ -29,7 +29,9 @@
   --text-ui: var(--type-ui);
   --text-ui--line-height: calc(20 / 14);
   --text-meta: var(--type-meta);
-  --text-meta--line-height: calc(18 / 12.5);
+  --text-meta--line-height: calc(18 / 13);
+  --text-code: var(--type-code);
+  --text-code--line-height: calc(20 / 13);
   --text-caption: var(--type-caption);
   --text-caption--line-height: calc(16 / 12);
 }
