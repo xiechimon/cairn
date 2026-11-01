@@ -11,6 +11,7 @@ import type { VapidKeys } from './services/push.js';
 import type { SkillImportFetch } from './services/skill-import.js';
 
 export interface AppContext {
+  intakeAgentAllowlist?: readonly string[];
   db: Db;
   hub: TeamStreamHub;
   machineHub: MachineWakeHub;

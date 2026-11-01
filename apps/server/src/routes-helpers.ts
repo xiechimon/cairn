@@ -148,6 +148,7 @@ export function verifyGitBasicAuth(ctx: AppContext, header: string): string | un
 
 export function svcOf(ctx: AppContext) {
   return {
+    intakeAgentAllowlist: ctx.intakeAgentAllowlist,
     db: ctx.db,
     hub: ctx.hub,
     machineHub: ctx.machineHub,

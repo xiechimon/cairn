@@ -298,6 +298,7 @@ export function createTodo(
     orchestration?: { threadId: string };
     output?: TodoOutputKind;
     userSpecAttachmentIds?: string[];
+    assignment?: Assignment;
   },
 ): TodoRecord {
   const { db, hub } = deps;
@@ -331,7 +332,7 @@ export function createTodo(
       phaseAt: now,
       seqNum,
       orderIndex: (orderRow?.n ?? -1) + 1,
-      assignment: null,
+      assignment: input.assignment ?? null,
       latestBuildId: null,
       lastRunAt: null,
       hasChanges: false,
@@ -380,6 +381,7 @@ export function updateTodo(
     orderIndex?: number;
     projectId?: string;
     assignment?: {
+      source?: Assignment['source'];
       plan?: NonNullable<Assignment['plan']>;
       build?: NonNullable<Assignment['build']>;
       review?: NonNullable<Assignment['review']>;
@@ -427,6 +429,8 @@ export function updateTodo(
           ? patch.assignment.verify
           : (row.assignment?.verify ?? null);
     }
+    const source = patch.assignment.source ?? row.assignment?.source;
+    if (source !== undefined) merged.source = source;
     sets.assignment = merged;
   }
   let manualPhaseApplied = false;
