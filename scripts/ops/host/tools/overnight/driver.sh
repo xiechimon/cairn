@@ -28,7 +28,8 @@ for n in $(cat $ST/mine); do
   if [ -n "$pr" ] && [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/$b 2>/dev/null)" ] && [ "$(gh pr view $pr -R $R --json mergeStateStatus --jq .mergeStateStatus)" != DIRTY ]; then skip_push=1; fi
   if [ $skip_push = 0 ] && ! ~/lanes/rebase-main.sh >/dev/null 2>&1; then
     f=$ST/rebase-$n-$(git rev-parse --short HEAD)
-    [ -e $f ] && continue; touch $f
+    [ -e $f ] && { ~/.cairn/tools/overnight/surface-stuck-rebase.sh $n $f $pr 9>&-; continue; }
+    touch $f
     sed "s#__BRANCH__#$b#g" ~/lanes/prompts/rebase-round.txt > /tmp/rr-$n.txt
     AI_ROUTE_PREFER=pi AI_ROUTE_PREFER_MODEL=glm-5.3 setsid nohup bash -c "timeout 5400 ai-route run implement -C $d \"\$(cat /tmp/rr-$n.txt)\"; rc=\$?; if [ \$rc != 0 ]; then echo x >> $f.fail; [ \$(wc -l < $f.fail) -lt 3 ] && rm -f $f; fi" >> ~/lanes/logs/rr-$n.log 2>&1 < /dev/null 9>&- &
     log "#$n rebase conflict -> worker"; continue
