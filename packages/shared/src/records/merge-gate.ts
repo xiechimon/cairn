@@ -58,7 +58,8 @@ export const PROTECTED_PATH_GLOBS: readonly string[] = gatePaths.protected;
 
 export const MERGE_GATE_SOURCE_GLOBS: readonly string[] = gatePaths.mergeGateSource;
 
-export const HUMAN_QUEUE_PATH_GLOBS = gatePaths.humanQueue;
+export const HUMAN_QUEUE_PATH_GLOBS: Readonly<Record<string, readonly string[]>> =
+  gatePaths.humanQueue;
 
 const CHIEF_DISPATCH_DIR = 'integration/eval/chief-dispatch';
 
@@ -202,6 +203,12 @@ export const MERGE_BLOCKERS = [
     code: 'independent-review-missing',
     class: 'transient',
     label: 'Protected changes require a bound independent review',
+  },
+  {
+    code: 'human-queue',
+    class: 'human',
+    label:
+      'Changes to credentials, the machine boundary, external entry auth, data destruction or release wait in the human queue',
   },
   { code: 'outside-auto-merge', class: 'human', label: '改动在可自动合并集之外' },
   {

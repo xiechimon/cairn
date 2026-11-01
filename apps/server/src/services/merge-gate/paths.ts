@@ -4,6 +4,7 @@ import {
   type CompareFile,
   EVIDENCE_EXECUTABLE_EXTENSIONS,
   EVIDENCE_PREFIX,
+  HUMAN_QUEUE_PATH_GLOBS,
   MERGE_GATE_SOURCE_GLOBS,
   PROTECTED_PATH_GLOBS,
 } from '@cairn/shared/merge-gate';
@@ -34,6 +35,9 @@ const protectedRe = (glob: string) => globToRegExp(glob, { protect: true });
 const PROTECTED_RE = [...PROTECTED_PATH_GLOBS, ...MERGE_GATE_SOURCE_GLOBS].map(protectedRe);
 const GATE_SOURCE_RE = MERGE_GATE_SOURCE_GLOBS.map(protectedRe);
 const AUTO_MERGE_RE = AUTO_MERGE_PATH_GLOBS.map((glob) => globToRegExp(glob));
+const HUMAN_QUEUE_RE = Object.entries(HUMAN_QUEUE_PATH_GLOBS).map(
+  ([category, globs]) => [category, globs.map(protectedRe)] as const,
+);
 const TEST_DIR_RE = /(^|\/)(e2e|test|tests|__tests__)\//iu;
 const TEST_FILE_RE = /\.(test|spec)\.[cm]?[jt]sx?$/iu;
 const EVIDENCE_RE = protectedRe(`${EVIDENCE_PREFIX}**`);
@@ -59,6 +63,7 @@ export function touchesHarness(files: readonly CompareFile[]): boolean {
 export interface PathFindings {
   protected: string[];
   gateSource: string[];
+  humanQueue: Record<string, string[]>;
   outsideAutoMerge: string[];
   deletedTests: string[];
   otherTicketEvidence: string[];
@@ -70,6 +75,7 @@ export function classifyPaths(files: readonly CompareFile[], ticketRef: string):
   const out: PathFindings = {
     protected: [],
     gateSource: [],
+    humanQueue: {},
     outsideAutoMerge: [],
     deletedTests: [],
     otherTicketEvidence: [],
@@ -90,6 +96,10 @@ export function classifyPaths(files: readonly CompareFile[], ticketRef: string):
       if (!SAFE_PATH.test(name) || matches(name, PROTECTED_RE)) {
         push(out.protected, name);
         if (matches(name, GATE_SOURCE_RE)) push(out.gateSource, name);
+        for (const [category, res] of HUMAN_QUEUE_RE) {
+          if (matches(name, res))
+            out.humanQueue[category] = [...(out.humanQueue[category] ?? []), name];
+        }
       } else if (!matches(name, AUTO_MERGE_RE)) {
         push(out.outsideAutoMerge, name);
       }
