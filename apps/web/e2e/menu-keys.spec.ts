@@ -1,4 +1,4 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, type Locator, type Page, test } from '@playwright/test';
 
 const DETAIL = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=27';
 const SNOOZE = '/app?scenario=sidebar-snooze';
@@ -17,10 +17,17 @@ async function captionFontSize(page: Page) {
 const moreMenu = (page: Page) => page.getByRole('menu', { name: '更多' });
 const confirmDialog = (page: Page) => page.locator('.delete-confirm');
 
+async function expectFocusWithin(locator: Locator) {
+  await expect
+    .poll(() => locator.evaluate((el) => el.contains(document.activeElement)))
+    .toBe(true);
+}
+
 async function openMoreMenu(page: Page) {
   await page.goto(DETAIL);
   await page.getByRole('button', { name: '更多' }).click();
   await expect(moreMenu(page)).toBeVisible();
+  await expectFocusWithin(moreMenu(page));
 }
 
 async function openGalleryMenu(page: Page) {
@@ -102,7 +109,10 @@ test('arrow keys, Enter and Escape keep working in a keyed menu', async ({ page 
   await expect(moreMenu(page)).toBeHidden();
 
   await page.getByRole('button', { name: '更多' }).click();
+  await expect(moreMenu(page)).toBeVisible();
+  await expectFocusWithin(moreMenu(page));
   await page.keyboard.press('End');
+  await expect(rows.last()).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(confirmDialog(page)).toBeVisible();
 });
@@ -173,8 +183,10 @@ test('thread row menu: the snooze letter opens its submenu and a choice letter p
   await row.hover();
   await row.getByTestId('thread-row-menu').click();
   await expect(page.getByTestId('thread-row-snooze')).toContainText('S');
+  await expectFocusWithin(page.getByRole('menu').first());
   await page.keyboard.press('s');
   await expect(page.getByTestId('thread-snooze-menu')).toBeVisible();
+  await expectFocusWithin(page.getByTestId('thread-snooze-menu'));
   await page.keyboard.press('n');
   await expect(page.getByRole('dialog', { name: '暂停，直到需要我' })).toBeVisible();
 });
