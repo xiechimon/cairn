@@ -101,3 +101,13 @@ test('a row opens its thread', async ({ page }) => {
   await row(page, 'Push for finished and failed threads').getByRole('button').first().click();
   await expect(page).toHaveURL(/\/app\/todo\/project-home-working/);
 });
+
+test('at phone width the inbox covers the conversation and closes to it', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(home('project-home'));
+  const box = await inbox(page).boundingBox();
+  const pane = await page.getByTestId('project-home').boundingBox();
+  expect(box?.width).toBeCloseTo(pane?.width ?? 0, 0);
+  await inbox(page).getByRole('button', { name: 'Close Threads' }).click();
+  await expect(page.getByTestId('project-home').getByTestId('chief-composer-input')).toBeVisible();
+});

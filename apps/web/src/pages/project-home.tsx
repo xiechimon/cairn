@@ -337,7 +337,7 @@ function ProjectHomeBody() {
           className="mt-[12vh]"
         />
       ) : (
-        <div className="flex min-h-0 flex-1">
+        <div className="relative flex min-h-0 flex-1">
           <section
             data-testid="project-home"
             aria-label={t('与 Coordinator 的对话')}

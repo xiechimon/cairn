@@ -60,7 +60,7 @@ export function ThreadsInbox({ todos, now, onOpen, onClose }: ThreadsInboxProps)
     <aside
       data-testid="threads-inbox"
       aria-label={t('Threads')}
-      className="relative flex w-105 max-w-full flex-none flex-col border-l border-border"
+      className="relative flex w-105 max-w-full flex-none flex-col border-l border-border bg-background max-md:absolute max-md:inset-y-0 max-md:right-0 max-md:z-10 max-md:w-full max-md:border-l-0"
     >
       <header className="flex h-14 flex-none items-center gap-2.5 px-4">
         <h2 className="m-0 font-heading text-heading font-semibold text-foreground">
