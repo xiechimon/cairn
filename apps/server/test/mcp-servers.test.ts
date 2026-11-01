@@ -293,6 +293,12 @@ describe('claim payload: mcpServers slug-ized (string[]) + version-wall bump (ma
     },
   );
 
+  test('a daemon below the MCP version gate does not claim an intake-preset step', async () => {
+    const { s, step } = await world('0.1.1', { intakePreset: true });
+    expect(step).toBeNull();
+    s.dispose();
+  });
+
   test('version wall: legacy daemon version line (0.1.x) receives no mcpServers (contract-break bump landed)', async () => {
     expect(MCP_MIN_CLI_VERSION).not.toBe('0.1.0');
     const { s, step } = await world('0.1.1');

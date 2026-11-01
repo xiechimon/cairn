@@ -358,6 +358,11 @@ async function tryClaim(
       continue;
     }
     if (!agentRow.modelId) continue;
+    if (
+      cand.todoRow.assignment?.source === 'intake-label' &&
+      !meetsMcpVersionGate(machineRow?.latestCliVersion ?? null)
+    )
+      continue;
     const model = effectiveModel(agentRow, cand.stepRow);
     const runtime = stepRuntimeFor(model.provider);
     if (runtime === 'claude-code' && claudeBlocked(machineId)) continue;
