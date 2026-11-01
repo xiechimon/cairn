@@ -195,14 +195,10 @@ export async function attack(
       const url = new URL(target);
       const host = url.hostname === 'tailnet-server' ? config.tailnetAddress : url.hostname;
       const direct = await connectTarget({ host, port: Number(url.port) });
-      const ownedHostListener = ['10.203.0.1', 'tailnet-server'].includes(url.hostname);
       routes.socketAndServer.push({
         target: `direct ${target}`,
         ...direct,
-        blocked:
-          ownedHostListener && env.CAIRN_ORB === '1'
-            ? direct.blocked && direct.detail === 'ETIMEDOUT'
-            : direct.blocked,
+        blocked: direct.blocked,
         detail:
           url.hostname === '127.0.0.1' && env.CAIRN_ORB === '1'
             ? `orb own loopback; ${direct.detail}`

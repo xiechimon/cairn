@@ -498,7 +498,8 @@ The three routes cover:
   connection. The host runner's negative control must connect through loopback
   and the tailnet address; it does not require the bridge address after the Orb
   stops. Missing, refused or duplicate required controls fail the result. The
-  Orb's bridge and tailnet probes require timeouts rather than connection refusal.
+  Orb's bridge and tailnet probes count any connect failure as blocked, because the
+  host control proves the wildcard listener live; only a completed connect is a leak.
   The separate
   `127.0.0.1:8787` row explicitly identifies the Orb's own loopback in `detail`;
   it makes no claim about a host production listener. The loopback control

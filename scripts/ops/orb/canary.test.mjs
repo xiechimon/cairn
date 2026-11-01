@@ -408,6 +408,48 @@ test('attacker attempts every direct and proxy target and forces GitHub HTTPS th
   assert.equal(result.githubReach.ok, true);
 });
 
+for (const code of ['ETIMEDOUT', 'ENETUNREACH', 'EHOSTUNREACH', 'ECONNREFUSED']) {
+  test(`an orb connect failure ${code} to a live owned listener counts as blocked`, async (t) => {
+    const home = fixture(t);
+    const result = await attack(
+      { hostHome: '/nonexistent-canary-home', sentinels: [], realPaths: [], serverPort: 34567 },
+      {
+        cwd: join(home, 'workspace'),
+        env: { HOME: home, CAIRN_ORB: '1', HTTP_PROXY: 'http://127.0.0.1:12345', NO_PROXY: '*' },
+        connectTarget: async (_options, request) => ({
+          blocked: true,
+          detail: request ? 'proxy HTTP 403' : code,
+        }),
+        run: () => ({ status: 0, stdout: `${'a'.repeat(40)}\tHEAD\n` }),
+      },
+    );
+    assert.ok(result.routes.socketAndServer.every((row) => row.blocked));
+  });
+}
+
+test('an orb that connects to a live owned listener is not blocked', async (t) => {
+  const home = fixture(t);
+  const result = await attack(
+    { hostHome: '/nonexistent-canary-home', sentinels: [], realPaths: [], serverPort: 34567 },
+    {
+      cwd: join(home, 'workspace'),
+      env: { HOME: home, CAIRN_ORB: '1', HTTP_PROXY: 'http://127.0.0.1:12345', NO_PROXY: '*' },
+      connectTarget: async (options, request) =>
+        request
+          ? { blocked: true, detail: 'proxy HTTP 403' }
+          : options.host === '10.203.0.1'
+            ? { blocked: false, detail: 'connected' }
+            : { blocked: true, detail: 'ETIMEDOUT' },
+      run: () => ({ status: 0, stdout: `${'a'.repeat(40)}\tHEAD\n` }),
+    },
+  );
+  assert.equal(
+    result.routes.socketAndServer.find((row) => row.target.startsWith('direct http://10.203.0.1'))
+      .blocked,
+    false,
+  );
+});
+
 test('partial clones wait for stop hooks and cleanup removes only the exact scratch image', () => {
   const name = 'cairn-orb-019a3f00-0000-7000-8000-000000000001';
   const calls = [];
@@ -447,7 +489,7 @@ test('partial clones wait for stop hooks and cleanup removes only the exact scra
   );
 });
 
-test('a refused known bridge listener invalidates the run and tailnet targets stay redacted', async (t) => {
+test('a refused live bridge listener counts as a firewall block and tailnet targets stay redacted', async (t) => {
   const home = fixture(t);
   const config = {
     hostHome: '/nonexistent-canary-home',
@@ -468,7 +510,7 @@ test('a refused known bridge listener invalidates the run and tailnet targets st
   assert.equal(
     result.routes.socketAndServer.find((row) => row.target === 'direct http://10.203.0.1:34567')
       .blocked,
-    false,
+    true,
   );
   assert.ok(
     result.routes.socketAndServer.some(
