@@ -11,6 +11,7 @@ const SEARCH_MAX_TERMS = 10;
 const SNIPPET_CHARS = 200;
 const SNIPPET_LEAD_CHARS = 80;
 const SEARCH_BATCH_ROWS = 200;
+export const SEARCH_SCAN_CAP_ROWS = 2000;
 const READ_MAX_IDS = 20;
 
 export interface HistoryScope {
@@ -34,19 +35,28 @@ function requireOwnThread(db: Db, scope: HistoryScope): void {
   if (!thread) throw new HttpError(404, `chief thread ${scope.threadId}`);
 }
 
-function likeContains(term: string): string {
-  const jsonEscaped = JSON.stringify(term).slice(1, -1);
-  return `%${jsonEscaped.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+function fold(text: string): string {
+  return text.normalize('NFKC').toLowerCase();
 }
 
-function snippetAround(text: string, lowerTerms: string[]): string {
-  const lower = text.toLowerCase();
-  const index = Math.min(...lowerTerms.map((term) => lower.indexOf(term)).filter((i) => i >= 0));
-  const start = Math.max(0, index - SNIPPET_LEAD_CHARS);
+function originalOffset(text: string, foldedIndex: number): number {
+  let low = 0;
+  let high = text.length;
+  while (low < high) {
+    const mid = Math.floor((low + high) / 2);
+    if (fold(text.slice(0, mid)).length >= foldedIndex) high = mid;
+    else low = mid + 1;
+  }
+  return low;
+}
+
+function snippetAround(text: string, folded: string, foldedTerms: string[]): string {
+  const index = Math.min(...foldedTerms.map((term) => folded.indexOf(term)).filter((i) => i >= 0));
+  const start = Math.max(0, originalOffset(text, index) - SNIPPET_LEAD_CHARS);
   return text.slice(start, start + SNIPPET_CHARS);
 }
 
-export function searchHistory(
+export async function searchHistory(
   db: Db,
   scope: HistoryScope,
   input: { query: string; limit?: number; before?: string },
@@ -79,10 +89,7 @@ export function searchHistory(
           .get();
   if (input.before !== undefined && cursor === undefined)
     throw new HttpError(404, `chief message ${input.before}`);
-  const lowerTerms = terms.map((term) => term.toLowerCase());
-  const likeFilters = terms
-    .filter((term) => term.toLowerCase() === term.toUpperCase() || /^\p{ASCII}*$/u.test(term))
-    .map((term) => sql`${chiefMessage.content} LIKE ${likeContains(term)} ESCAPE '\\'`);
+  const foldedTerms = terms.map(fold);
   const hits: {
     id: string;
     role: string;
@@ -91,6 +98,7 @@ export function searchHistory(
     snippet: string;
   }[] = [];
   let position = cursor;
+  let scanned = 0;
   for (;;) {
     const batch = db
       .select(fields)
@@ -98,9 +106,6 @@ export function searchHistory(
       .where(
         and(
           inThread,
-          likeFilters.length === 0
-            ? undefined
-            : or(sql`substr(${chiefMessage.content}, 1, 1) != '"'`, and(...likeFilters)),
           position === undefined
             ? undefined
             : or(
@@ -114,21 +119,31 @@ export function searchHistory(
       .all();
     for (const row of batch) {
       const text = messageText(row.content);
-      const lower = text.toLowerCase();
-      if (!lowerTerms.every((term) => lower.includes(term))) continue;
+      const folded = fold(text);
+      if (!foldedTerms.every((term) => folded.includes(term))) continue;
       if (hits.length === limit) {
-        return { trust: HISTORY_TRUST, hits, nextBefore: hits.at(-1)?.id ?? null };
+        return {
+          trust: HISTORY_TRUST,
+          hits,
+          truncated: false,
+          nextBefore: hits.at(-1)?.id ?? null,
+        };
       }
       hits.push({
         id: row.id,
         role: row.role,
         createdAt: row.createdAt,
         projectId: row.projectId,
-        snippet: snippetAround(text, lowerTerms),
+        snippet: snippetAround(text, folded, foldedTerms),
       });
     }
-    if (batch.length < SEARCH_BATCH_ROWS) return { trust: HISTORY_TRUST, hits, nextBefore: null };
+    if (batch.length < SEARCH_BATCH_ROWS)
+      return { trust: HISTORY_TRUST, hits, truncated: false, nextBefore: null };
     position = batch.at(-1);
+    scanned += batch.length;
+    if (scanned >= SEARCH_SCAN_CAP_ROWS)
+      return { trust: HISTORY_TRUST, hits, truncated: true, nextBefore: position?.id ?? null };
+    await new Promise<void>((resolve) => setImmediate(resolve));
   }
 }
 

@@ -472,7 +472,7 @@ export async function executeChiefTool(
     }
     case 'search_history':
       return json(
-        searchHistory(db, ctx, {
+        await searchHistory(db, ctx, {
           query: str(params, 'query'),
           limit: num(params, 'limit'),
           before: optStr(params, 'before'),

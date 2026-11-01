@@ -1,8 +1,10 @@
 import { CHIEF_DIGEST_KIND, CHIEF_DIGEST_ROW_ID_PREFIX } from '@cairn/shared';
+import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { chiefMessage, chiefThread } from '../src/db/schema.js';
 import { HttpError } from '../src/lib/errors.js';
 import { buildChiefSystemPrompt, composeChiefSystemPrompt } from '../src/services/chief.js';
+import { SEARCH_SCAN_CAP_ROWS } from '../src/services/chief-history.js';
 import { H, registerChiefHarness, relay } from './chief-harness.js';
 
 registerChiefHarness();
@@ -17,6 +19,7 @@ interface Hit {
 interface SearchResult {
   trust: string;
   hits: Hit[];
+  truncated: boolean;
   nextBefore: string | null;
 }
 interface ReadResult {
@@ -100,6 +103,14 @@ describe('search_history', () => {
     expect(hit?.snippet).toContain('needle');
     expect(hit?.snippet.length).toBeLessThanOrEqual(210);
     expect(hit?.snippet.length).toBeGreaterThanOrEqual(150);
+  });
+
+  test('the snippet stays on the match when folding changes the text length', async () => {
+    seedMessages(H.threadId, [
+      { id: 'f1', content: `${'a'.repeat(1000)}needle${'\uFB03'.repeat(1000)}` },
+    ]);
+    const [hit] = (await search({ query: 'needle' })).hits;
+    expect(hit?.snippet).toContain('needle');
   });
 
   test('LIKE wildcards in the query match literally', async () => {
@@ -200,10 +211,77 @@ describe('search_history', () => {
     expect((await search({ query: 'twice absent' })).hits).toEqual([]);
   });
 
+  test('Kelvin sign and full-width Latin fold to plain letters (NFKC plus lowercase)', async () => {
+    seedMessages(H.threadId, [
+      { id: 'k1', content: '\u212Aelvin calibration done' },
+      { id: 'k2', content: 'plain Kelvin scale' },
+      { id: 'k3', content: '\uFF2B\uFF25\uFF2C\uFF36\uFF29\uFF2E full width' },
+    ]);
+    const ids = async (query: string) => (await search({ query })).hits.map((h) => h.id).sort();
+    expect(await ids('kelvin')).toEqual(['k1', 'k2', 'k3']);
+    expect(await ids('\u212Aelvin')).toEqual(['k1', 'k2', 'k3']);
+    expect(await ids('\uFF2B\uFF25\uFF2C\uFF36\uFF29\uFF2E')).toEqual(['k1', 'k2', 'k3']);
+  });
+
+  test('Turkish dotted capital I lowercases to i plus a combining dot: it matches i and its own spelling, not the plain word', async () => {
+    seedMessages(H.threadId, [{ id: 't1', content: '\u0130stanbul office' }]);
+    const ids = async (query: string) => (await search({ query })).hits.map((h) => h.id);
+    expect(await ids('\u0130stanbul')).toEqual(['t1']);
+    expect(await ids('stanbul')).toEqual(['t1']);
+    expect(await ids('i')).toEqual(['t1']);
+    expect(await ids('istanbul')).toEqual([]);
+  });
+
   test('non-ASCII cased text matches case-insensitively', async () => {
     seedMessages(H.threadId, [{ id: 'u1', content: 'Die Überprüfung läuft' }]);
     expect((await search({ query: 'überprüfung' })).hits.map((h) => h.id)).toEqual(['u1']);
     expect((await search({ query: 'ÜBERPRÜFUNG LÄUFT' })).hits.map((h) => h.id)).toEqual(['u1']);
+  });
+});
+
+describe('search_history scan budget', () => {
+  function seedFiller(count: number, bytes = 2000): void {
+    seedMessages(
+      H.threadId,
+      Array.from({ length: count }, (_, i) => ({
+        id: `b${i}`,
+        content: `turn ${i} ${'routine status ping '.repeat(Math.ceil(bytes / 20))}`,
+      })),
+    );
+  }
+
+  test('a hit beyond the per-call scan cap yields truncated and a cursor that continues to it', async () => {
+    seedFiller(SEARCH_SCAN_CAP_ROWS + 500);
+    H.s.db
+      .update(chiefMessage)
+      .set({ content: 'the only needle-hit is here' })
+      .where(eq(chiefMessage.id, 'b0'))
+      .run();
+    const first = await search({ query: 'needle-hit' });
+    expect(first.hits).toEqual([]);
+    expect(first.truncated).toBe(true);
+    expect(first.nextBefore).toBe(`b${500}`);
+    const second = await search({ query: 'needle-hit', before: first.nextBefore });
+    expect(second.hits.map((h) => h.id)).toEqual(['b0']);
+    expect(second.truncated).toBe(false);
+    expect(second.nextBefore).toBeNull();
+  });
+
+  test('a scan that finishes inside the cap is not truncated', async () => {
+    seedFiller(50);
+    const result = await search({ query: 'absent-needle' });
+    expect(result.truncated).toBe(false);
+    expect(result.nextBefore).toBeNull();
+  });
+
+  test('the event loop is not blocked: a zero timeout fires before a long scan resolves', async () => {
+    seedFiller(5000);
+    let timerFired = false;
+    setTimeout(() => {
+      timerFired = true;
+    }, 0);
+    await search({ query: 'absent-needle' });
+    expect(timerFired).toBe(true);
   });
 });
 
