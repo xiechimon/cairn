@@ -2,10 +2,14 @@ import { execFileSync } from 'node:child_process';
 import { api, disarmAutoMerge, markers, pages, repo } from './autonomy-brake.mjs';
 import { requiredChecks as branchProtectionChecks, mustBeGreenJobs } from './merge-checks.mjs';
 import { ownerRouting } from './merge-route.mjs';
+import { holdLabel } from './mergify-config.mjs';
 
 const batchHead = /^B\d+\//;
 const requiredChecks = branchProtectionChecks;
 const ownerRouteLabel = 'owner-route';
+const queuedLabel = 'queued';
+const hasLabel = (pr, name) => pr.labels.some((label) => label.name === name);
+const isBatch = (pr) => batchHead.test(pr.head.ref) && pr.head.repo?.full_name === repo;
 const log = (pr, action, reasons) =>
   console.log(
     JSON.stringify({ pr: pr?.number ?? null, head: pr?.head?.sha ?? null, action, reasons }),
@@ -30,18 +34,52 @@ function markOwnerRoute(pr, reasons, dryRun) {
   log(pr, 'marked-owner-route', reasons);
 }
 
+function removeLabel(pr, name) {
+  execFileSync(
+    'gh',
+    ['api', '--method', 'DELETE', `repos/${repo}/issues/${pr.number}/labels/${name}`],
+    { encoding: 'utf8', maxBuffer: 512 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] },
+  );
+}
+
 function clearOwnerRoute(pr, dryRun) {
-  if (!pr.labels.some((label) => label.name === ownerRouteLabel)) return;
+  if (!hasLabel(pr, ownerRouteLabel)) return;
   if (dryRun) {
     log(pr, 'would-unmark-owner-route', []);
     return;
   }
-  execFileSync(
-    'gh',
-    ['api', '--method', 'DELETE', `repos/${repo}/issues/${pr.number}/labels/${ownerRouteLabel}`],
-    { encoding: 'utf8', maxBuffer: 512 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] },
-  );
+  removeLabel(pr, ownerRouteLabel);
   log(pr, 'unmarked-owner-route', []);
+}
+
+function admissionsToday(openBatches) {
+  const since = `${new Date().toISOString().slice(0, 10)}T00:00:00Z`;
+  let merged = 0;
+  for (let page = 1; ; page++) {
+    const closed = api(
+      `repos/${repo}/pulls?state=closed&sort=updated&direction=desc&per_page=100&page=${page}`,
+    );
+    if (!closed?.length) break;
+    merged += closed.filter((pr) => isBatch(pr) && pr.merged_at && pr.merged_at >= since).length;
+    if (closed.at(-1).updated_at < since) break;
+  }
+  return merged + openBatches.filter((pr) => hasLabel(pr, queuedLabel)).length;
+}
+
+function admit(pr, admissions, dailyCap, dryRun) {
+  const held = hasLabel(pr, holdLabel);
+  if (admissions < dailyCap) {
+    if (held) {
+      if (!dryRun) removeLabel(pr, holdLabel);
+      log(pr, dryRun ? 'would-release' : 'released', []);
+    }
+    return true;
+  }
+  if (!held) {
+    if (!dryRun) api(`repos/${repo}/issues/${pr.number}/labels`, { labels: [holdLabel] });
+    log(pr, dryRun ? 'would-hold' : 'held', ['daily-cap']);
+  }
+  return false;
 }
 
 function eligibility(number, expectedHead) {
@@ -101,15 +139,17 @@ function eligibility(number, expectedHead) {
 
 try {
   let dryRun = false;
+  let dailyCap = 10;
   const args = process.argv.slice(2);
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--dry-run') dryRun = true;
-    else if (args[i] === '--daily-cap' && /^\d+$/.test(args[i + 1] ?? '')) i++;
-    else throw new Error('Expected --dry-run or --daily-cap <integer>');
+    else if (args[i] === '--daily-cap' && /^\d+$/.test(args[i + 1] ?? '')) {
+      dailyCap = Number(args[++i]);
+      if (!Number.isSafeInteger(dailyCap)) throw new Error('Invalid daily cap');
+    } else throw new Error('Expected --dry-run or --daily-cap <integer>');
   }
-  const pulls = pages(`repos/${repo}/pulls?state=open&per_page=100`)
-    .flat()
-    .filter((pr) => batchHead.test(pr.head.ref) && pr.head.repo?.full_name === repo);
+  const pulls = pages(`repos/${repo}/pulls?state=open&per_page=100`).flat().filter(isBatch);
+  let admissions;
   const blocked = new Set();
   for (const pr of pulls) {
     if (!pr.auto_merge) continue;
@@ -122,7 +162,7 @@ try {
       process.exitCode = 1;
     }
   }
-  for (const candidate of pulls) {
+  for (const candidate of [...pulls].sort((a, b) => a.number - b.number)) {
     if (blocked.has(candidate.number)) continue;
     try {
       let result = eligibility(candidate.number, candidate.head.sha);
@@ -154,6 +194,14 @@ try {
         continue;
       }
       clearOwnerRoute(result.pr, dryRun);
+      if (!hasLabel(result.pr, queuedLabel)) {
+        admissions ??= admissionsToday(pulls);
+        if (!admit(result.pr, admissions, dailyCap, dryRun)) {
+          log(result.pr, 'skip', ['daily-cap']);
+          continue;
+        }
+        admissions++;
+      }
       log(result.pr, 'auto-queue', []);
     } catch (error) {
       log(candidate, 'error', [error.message]);

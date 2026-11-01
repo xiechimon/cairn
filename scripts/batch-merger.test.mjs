@@ -78,7 +78,7 @@ if(args[0] === 'pr') process.exit(0);
 if(p === 'graphql') { console.log(JSON.stringify({data:{disablePullRequestAutoMerge:{pullRequest:{number:1}}}})); }
 
 else if(p.includes('/issues?')) { if(d.markerError) process.exit(1); const countFile = process.env.DATA+'.count'; const count = fs.existsSync(countFile) ? Number(fs.readFileSync(countFile,'utf8')) : 0; fs.writeFileSync(countFile,String(count+1)); console.log(JSON.stringify([d.pauseOnSecondLookup && count > 0 ? [{number:4}] : d.issues ?? []])); }
-else if(p.includes('/pulls?')) { if(p.includes('state=closed')) { if(d.closedError) process.exit(1); console.log(JSON.stringify(d.closedPages?.[Number(new URL('https://api/'+p).searchParams.get('page') ?? 1)-1] ?? (d.closed ?? []).map(pr=>({...pr,updated_at:pr.updated_at ?? new Date().toISOString()})))); } else console.log(JSON.stringify([d.pulls])); }
+else if(p.includes('/pulls?')) { if(p.includes('state=closed')) { if(d.closedError) process.exit(1); const page = Number(new URL('https://api/'+p).searchParams.get('page') ?? 1); console.log(JSON.stringify(page === 1 ? (d.closed ?? []).map(pr=>({...pr,updated_at:pr.updated_at ?? new Date().toISOString()})) : [])); } else console.log(JSON.stringify([d.pulls])); }
 else if(p.includes('/check-runs')) { if(d.checkError) process.exit(1); console.log(JSON.stringify([{check_runs:d.checks}])); }
 else if(p.endsWith('/comments?per_page=100')) console.log(JSON.stringify([d.comments]));
 else if(p.endsWith('/commits?per_page=100')) console.log(JSON.stringify([d.commits]));
@@ -314,10 +314,142 @@ test('the latest review for this head blocks an older pass', (t) => {
   }));
   assert.equal(fixture(t, { comments }).queues.length, 0);
 });
-test('the daily cap flag is still accepted from existing units', (t) => {
-  const f = fixture(t, { args: ['--daily-cap', '10'] });
+test('mergify-config exports the hold label the merger writes', async () => {
+  const { holdLabel } = await import('./mergify-config.mjs');
+  assert.equal(holdLabel, 'queue-hold');
+  assert.match(readFileSync('.mergify.yml', 'utf8'), /- -label = queue-hold/);
+});
+const today = new Date().toISOString();
+const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+const mergedBatch = (number, mergedAt = today, ref = 'B1/done') => ({
+  number,
+  head: { ref, sha: 'd'.repeat(40), repo: { full_name: 'owner/repo' } },
+  labels: [],
+  merged_at: mergedAt,
+});
+const holdAdds = (f) =>
+  writes(f).filter(
+    (args) => args[1].endsWith('/labels') && JSON.parse(args.at(-1)).labels.includes('queue-hold'),
+  );
+const holdRemovals = (f) =>
+  writes(f).filter((args) => args.includes('DELETE') && args.at(-1).endsWith('/labels/queue-hold'));
+const decisions = (f) =>
+  f.result.stdout
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
+const capped = (f) =>
+  decisions(f)
+    .filter((decision) => decision.action === 'skip' && decision.reasons.includes('daily-cap'))
+    .map((decision) => decision.pr);
+const held = (number = 1) => ({
+  ...pull(number),
+  labels: [{ name: 'review-gate' }, { name: 'queue-hold' }],
+});
+test('the cap admits up to the remaining room and holds the rest', (t) => {
+  const f = fixture(t, {
+    args: ['--daily-cap', '2'],
+    pulls: [pull(1), pull(2)],
+    closed: [mergedBatch(50)],
+  });
   assert.equal(f.result.status, 0, f.result.stdout + f.result.stderr);
+  assert.deepEqual(
+    f.queues.map((decision) => decision.pr),
+    [1],
+  );
+  assert.deepEqual(capped(f), [2]);
+  assert.equal(holdRemovals(f).length, 0);
+  const adds = holdAdds(f);
+  assert.equal(adds.length, 1);
+  assert.equal(adds[0][1], 'repos/owner/repo/issues/2/labels');
+});
+test('a zero cap holds every eligible batch PR', (t) => {
+  const f = fixture(t, { args: ['--daily-cap', '0'], pulls: [pull(1), pull(2)] });
+  assert.equal(f.result.status, 0, f.result.stdout + f.result.stderr);
+  assert.equal(f.queues.length, 0);
+  assert.deepEqual(capped(f), [1, 2]);
+  assert.equal(holdAdds(f).length, 2);
+});
+test('an existing hold is removed when the cap has room', (t) => {
+  const f = fixture(t, { args: ['--daily-cap', '1'], pulls: [held()] });
+  assert.equal(f.result.status, 0, f.result.stdout + f.result.stderr);
+  const removals = holdRemovals(f);
+  assert.equal(removals.length, 1);
+  assert.ok(removals[0].includes('repos/owner/repo/issues/1/labels/queue-hold'));
   assert.equal(f.queues.length, 1);
+  assert.match(f.result.stdout, /"action":"released"/);
+});
+test('an existing hold past the cap is kept without writing', (t) => {
+  const f = fixture(t, { args: ['--daily-cap', '0'], pulls: [held()] });
+  assert.equal(writes(f).length, 0);
+  assert.deepEqual(capped(f), [1]);
+});
+test('batch PRs merged yesterday do not count against today', (t) => {
+  const f = fixture(t, {
+    args: ['--daily-cap', '1'],
+    closed: [mergedBatch(50, `${yesterday}T23:00:00Z`)],
+  });
+  assert.equal(f.queues.length, 1, f.result.stdout + f.result.stderr);
+  assert.equal(holdAdds(f).length, 0);
+});
+test('closed unmerged, non-batch and fork PRs do not count', (t) => {
+  const f = fixture(t, {
+    args: ['--daily-cap', '1'],
+    closed: [
+      { ...mergedBatch(50), merged_at: null },
+      mergedBatch(51, today, 'feature/x'),
+      { ...mergedBatch(52), head: { ...mergedBatch(52).head, repo: { full_name: 'fork/repo' } } },
+    ],
+  });
+  assert.equal(f.queues.length, 1, f.result.stdout + f.result.stderr);
+});
+test('an open batch PR already queued by Mergify counts as an admission', (t) => {
+  const queued = {
+    ...pull(9),
+    head: { ...pull().head, ref: 'B2/queued' },
+    labels: [{ name: 'queued' }],
+  };
+  const f = fixture(t, { args: ['--daily-cap', '1'], pulls: [queued, pull(1)] });
+  assert.equal(f.result.status, 0, f.result.stdout + f.result.stderr);
+  assert.deepEqual(capped(f), [1]);
+  assert.equal(holdAdds(f).length, 1);
+});
+test('a failed hold write is an error and never removes a hold', (t) => {
+  const f = fixture(t, {
+    args: ['--daily-cap', '0'],
+    pulls: [pull(1), held(2)],
+    writeError: true,
+  });
+  assert.equal(f.result.status, 1);
+  assert.equal(f.queues.length, 0);
+  assert.equal(holdRemovals(f).length, 0);
+  assert.equal(
+    decisions(f).filter((decision) => decision.action === 'error' && decision.pr === 1).length,
+    1,
+  );
+});
+test('a failed hold removal is an error and does not queue', (t) => {
+  const f = fixture(t, { args: ['--daily-cap', '1'], pulls: [held()], writeError: true });
+  assert.equal(f.result.status, 1);
+  assert.equal(f.queues.length, 0);
+  assert.match(f.result.stdout, /"action":"error"/);
+});
+test('a closed-PR lookup failure is an error and changes no labels', (t) => {
+  const f = fixture(t, { pulls: [held()], closedError: true });
+  assert.equal(f.result.status, 1);
+  assert.equal(f.queues.length, 0);
+  assert.equal(writes(f).length, 0);
+});
+test('dry-run reports holds and releases without writing', (t) => {
+  const f = fixture(t, { args: ['--dry-run', '--daily-cap', '1'], pulls: [held(1), pull(2)] });
+  assert.equal(f.result.status, 0, f.result.stdout + f.result.stderr);
+  assert.equal(writes(f).length, 0);
+  assert.match(f.result.stdout, /would-release/);
+  assert.match(f.result.stdout, /would-hold/);
+  assert.deepEqual(
+    f.queues.map((decision) => decision.pr),
+    [1],
+  );
 });
 
 for (const carried of [false, true])
