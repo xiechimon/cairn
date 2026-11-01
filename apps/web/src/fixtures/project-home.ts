@@ -7,6 +7,8 @@ function homeTodo(id: string, seqNum: number, title: string, phase: TodoRecord['
   return { ...probeTodo(phase, r7(8, 41)), id, seqNum, title, spec: title, projectId: PROJECT_ID };
 }
 
+const OTHER_PROJECT = 'project-home-other';
+
 const CAIRN_GOAL =
   'Ship an open-source, self-hostable agent team that merges its own PRs unattended and gets better every week.';
 
@@ -55,7 +57,7 @@ export const projectHome: FixtureSet = {
 
 export const projectHomeEmpty: FixtureSet = {
   ...boardDefault,
-  projectNames: { [PROJECT_ID]: 'api-latency' },
+  projectNames: { [PROJECT_ID]: 'api-latency', [OTHER_PROJECT]: 'cairn-site' },
   todos: [],
   chief: { ...coordinator, stream: [], streamAt: [] },
   projectHome: {
@@ -67,6 +69,7 @@ export const projectHomeEmpty: FixtureSet = {
 
 export const projectHomeSendError: FixtureSet = {
   ...projectHome,
+  projectNames: { [PROJECT_ID]: 'cairn', [OTHER_PROJECT]: 'cairn-site' },
   projectHome: {
     goal: CAIRN_GOAL,
     repo: 'xiechimon/cairn',

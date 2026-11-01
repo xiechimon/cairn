@@ -77,6 +77,11 @@ function cardCopy(todo: TodoRecord): CardCopy {
 }
 
 export function ProjectHome() {
+  const { id } = useParams();
+  return <ProjectHomeBody key={id} />;
+}
+
+function ProjectHomeBody() {
   const { t } = useI18n();
   const { id } = useParams();
   const navigate = useNavigate();

@@ -122,3 +122,12 @@ test('confirming Archive swaps the composer for the banner', async ({ page }) =>
   await page.getByTestId('project-archived-banner').getByRole('button', { name: 'Unarchive' }).click();
   await expect(composer(page)).toBeVisible();
 });
+
+test('switching projects drops the starter text picked in the previous one', async ({ page }) => {
+  await page.goto(home('project-home-empty'));
+  await page.getByTestId('project-starter-chips').getByRole('button', { name: 'Make a plan' }).click();
+  await expect(composer(page)).toHaveValue('Make a plan');
+  await page.locator('[data-slot="sidebar-project-row"]', { hasText: 'cairn-site' }).click();
+  await expect(page).toHaveURL(/\/app\/project\/project-home-other/);
+  await expect(composer(page)).toHaveValue('');
+});
