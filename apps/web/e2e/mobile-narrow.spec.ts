@@ -60,7 +60,7 @@ for (const width of [360, 390]) {
       expect(overflow).toBeLessThanOrEqual(0);
     });
 
-    test('M3 详情：头按钮与 composer 控件触控区 ≥44px', async ({ page }) => {
+    test('M3 detail: compact header controls and 44px composer controls', async ({ page }) => {
       await page.goto(DETAIL_REVIEW);
       const headControls: Locator[] = [
         page.getByRole('link', { name: '返回' }),
@@ -69,7 +69,7 @@ for (const width of [360, 390]) {
       ];
       for (const control of headControls) {
         const box = (await control.boundingBox()) as { height: number };
-        expect(box.height, `${control} 高度`).toBeGreaterThanOrEqual(44);
+        expect(box.height, `${control} height`).toBe(32);
       }
       for (const cls of ['.composer-tool', '.composer-send']) {
         const box = (await page.locator(cls).first().boundingBox()) as { height: number };

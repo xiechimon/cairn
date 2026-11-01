@@ -12,7 +12,7 @@ import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { PROJECT_NAME } from '../fixtures/fixtures.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { ChevronDown, ChevronLeft, EllipsisVertical } from '../icons/index.js';
+import { ChevronDown, ChevronLeft, ChevronRight, EllipsisVertical } from '../icons/index.js';
 import { type ChipAgentModel, ChipPopover } from '../overlay/chip-popover.js';
 import { PHASE_STATUS, PHASE_UI, RUNNING_INK } from '../phase.js';
 
@@ -63,7 +63,7 @@ export function DetailHead({
   const [popover, setPopover] = useState(chipPopoverOpen === true);
   return (
     <header
-      className="detail-head flex h-11 flex-none items-center gap-2.5 border-b border-border pr-3 pl-4 whitespace-nowrap"
+      className="detail-head flex h-11 flex-none items-center gap-2.5 border-b border-border pr-3 pl-4 whitespace-nowrap max-md:h-13 max-md:gap-1.5"
       data-testid="detail-head"
     >
       <Link
@@ -83,10 +83,10 @@ export function DetailHead({
             </span>
           </>
         )}
-        <span className="tabular-nums">#{todo.seqNum}</span>
+        <span className="tabular-nums max-md:hidden">#{todo.seqNum}</span>
       </span>
       <h1
-        className="min-w-0 truncate text-card-title font-semibold text-foreground"
+        className="min-w-0 max-md:flex-1 truncate text-card-title font-semibold text-foreground"
         title={todo.title}
         data-testid="detail-title"
       >
@@ -103,6 +103,7 @@ export function DetailHead({
             <Button
               variant="ghost"
               size="sm"
+              aria-label={t(status.chip)}
               data-testid="phase-chip"
               data-tone={PHASE_UI[shown].tone}
               className="detail-chip h-7 flex-none gap-1.5 rounded-full pr-2 pl-1.5 text-ui font-medium text-foreground"
@@ -110,8 +111,11 @@ export function DetailHead({
           }
         >
           <StatusGlyph kind={status.glyph} className={status.ink} />
-          {t(status.chip)}
-          <span className="flex flex-none text-content-tertiary" data-testid="chip-chevron">
+          <span className="max-md:hidden">{t(status.chip)}</span>
+          <span
+            className="flex flex-none text-content-tertiary max-md:hidden"
+            data-testid="chip-chevron"
+          >
             <ChevronDown width={12} height={12} />
           </span>
         </PopoverTrigger>
@@ -167,14 +171,21 @@ export function DetailHead({
           (actionInFlight === true ? (
             <Button
               className={`detail-head-action ${TOPBAR_PRIMARY_BUTTON}`}
+              aria-label={t('编排中')}
               data-orchestrating="true"
               disabled
             >
-              {t('编排中')}
+              <EllipsisVertical className="md:hidden" />
+              <span className="max-md:hidden">{t('编排中')}</span>
             </Button>
           ) : (
-            <Button className={`detail-head-action ${TOPBAR_PRIMARY_BUTTON}`} onClick={onAction}>
-              {t(action)}
+            <Button
+              className={`detail-head-action ${TOPBAR_PRIMARY_BUTTON}`}
+              aria-label={t(action)}
+              onClick={onAction}
+            >
+              <ChevronRight className="md:hidden" />
+              <span className="max-md:hidden">{t(action)}</span>
             </Button>
           ))}
       </div>
