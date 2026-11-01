@@ -29,6 +29,8 @@ test('the header names the project and the Coordinator, and the goal leads the c
   await expect(page.getByTestId('project-goal')).toContainText(
     'Ship an open-source, self-hostable agent team',
   );
+  await expect(page.getByTestId('chief-composer-input')).toHaveCount(1);
+  await expect(page.locator('.chief-fab')).toHaveCount(0);
 });
 
 test('threads the Coordinator started show as cards with the action each one needs', async ({

@@ -1541,4 +1541,6 @@ export const EN: Record<string, string> = {
     'Could not reach the Coordinator. Your message is kept; try again.',
   找不到这个项目: 'Project not found',
   '它可能已被删除，或链接不对。': 'It may have been deleted, or the link is wrong.',
+  项目加载失败: 'Could not load the project',
+  '请刷新页面重试。': 'Reload the page to try again.',
 };

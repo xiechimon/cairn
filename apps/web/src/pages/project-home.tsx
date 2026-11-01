@@ -108,7 +108,8 @@ export function ProjectHome() {
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const loading = live && (projectsQ.isLoading || coordinator.loading);
-  const missing = live && !loading && wire === undefined;
+  const failed = live && projectsQ.isError;
+  const missing = live && !loading && !failed && wire === undefined;
   const running = todos.filter((todo) => threadStatus(todo) === 'running').length;
 
   const setArchived = (next: boolean) => {
@@ -206,7 +207,7 @@ export function ProjectHome() {
       {goalLine}
       <Greeting>
         {t('{greeting}，{name}', {
-          greeting: t(greetingFor(new Date(fixture.now ?? Date.now()).getHours())),
+          greeting: t(greetingFor(new Date(live ? Date.now() : fixture.now).getHours())),
           name: user.displayName,
         })}
       </Greeting>
@@ -306,6 +307,14 @@ export function ProjectHome() {
     >
       {loading ? (
         <TextureSkeleton className="mx-auto mt-[12vh] h-40 w-[calc(100%-2rem)] max-w-182" />
+      ) : failed ? (
+        <EmptyState
+          testId="project-home-error"
+          icon={FolderX}
+          title={t('项目加载失败')}
+          description={t('请刷新页面重试。')}
+          className="mt-[12vh]"
+        />
       ) : missing ? (
         <EmptyState
           testId="project-home-missing"
@@ -334,7 +343,7 @@ export function ProjectHome() {
                 onWithdraw={coordinator.onWithdraw}
                 onSteer={coordinator.onSteer}
                 onStop={coordinator.onStop}
-                onSettings={() => navigate(`/app/project/${id}?chief=settings`)}
+                onSettings={() => navigate('/app?chief=settings')}
                 threadsOpen={false}
                 setThreadsOpen={() => {}}
                 hero={hero}
