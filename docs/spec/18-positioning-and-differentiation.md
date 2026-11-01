@@ -24,7 +24,7 @@
 > **cairn is a self-hosted agent team whose output is trusted because of how it lands, not because of who routed it.** Three pillars carry that trust; as of 2026-11-01 neither DeepSeek Harness's super-agent nor sig has any of them (walk: `docs/research/dsh-sig-walk-2026-11.md`, #2489, PR #2490):
 >
 > 1. **An evidence-bound merge gate, model-checked.** The gate rule counts a verdict only for the patch it judged: verdicts bind to `patchDigest`, the independent review additionally to `headSha`, and a later passing verdict cannot clear a blocking one on the same digest (`apps/server/src/services/merge-gate/readiness.ts`; ADR 0021, 0026, 0028). The autonomous ship path evaluates that rule before merging and refuses when the head moved after the verdict (`apps/server/src/services/ship-gate.ts`). TLA+ models (`MergeGate`, `LocalLanding`, `RepeatedVerdict`, `ReviewHeadCausality`, plus `StepClaim` for who may run a step) are checked by TLC with negative controls (`.claude/skills/verify-merge-gate/`, `.claude/skills/verify-step-claim/`). Open gap, recorded there as F1: the manual REST merge (`mergeThroughGithub`) pins the merge to the checkpoint commit but does not yet re-read verdicts or re-derive the digest; closing it belongs to this pillar.
-> 2. **Harness eval and self-evolution under a ruler the agents cannot edit.** A PR that touches the harness cannot pass the gate without a digest-bound eval result at or above the baseline lower bound (`readiness.ts`, harness-regression blockers); every build leaves a trajectory pack; rejections feed the bench; the ruler itself is a protected path (spec 29, ADR 0025). The paired-trial adoption judge (`integration/eval/adoption/judge.mts`) exists and is tested but is not yet wired into a merge path, and the self-optimizing outer loop (spec 29 E3, E4) has no tickets yet: today the claim is a regression floor on harness changes, with judged adoption and self-evolution as the stated next steps.
+> 2. **Harness eval and self-evolution under a ruler the agents cannot edit.** A PR that touches the harness cannot pass the gate without a digest-bound eval result at or above the baseline lower bound (`readiness.ts`, harness-regression blockers); builds record trajectory data that exports into validated trajectory packs, with incomplete exports reported (`apps/server/src/trajectory-export.ts`); rejections feed the bench; the ruler itself is a protected path (spec 29, ADR 0025). The paired-trial adoption judge (`integration/eval/adoption/judge.mts`) exists and is tested but is not yet wired into a merge path, and the self-optimizing outer loop (spec 29 E3, E4) has no tickets yet: today the claim is a regression floor on harness changes, with judged adoption and self-evolution as the stated next steps.
 > 3. **Per-task isolation that is a real boundary.** With the orb executor, each build conversation runs in its own orb, an nspawn container cloned from a base image with a user namespace and proxied egress, rather than as the operator's OS user (`apps/daemon/src/orb/provider.ts`). The orb executor is opt-in today (`CAIRN_EXECUTOR=orb`); the target is default-on wherever orbs are available.
 >
 > The router (chief / coordinator), the daemon and machine pairing are necessary plumbing: cairn matches the best existing designs there (thread-subscription fast path #2487, watchdog #2488, quiet by default #1784) rather than claiming them as differentiators.
@@ -33,10 +33,10 @@ Why the thesis changed: the earlier thesis (#516, 2026-10-01: "two hard gates + 
 
 In-volume terms (do not enter `CONTEXT.md` — that only manages product-domain entities):
 
-- **Hard gate**: a fixed stopping point in the phase machine, two in total — Confirm (before any code is touched, review the plan) and Review (before release, review the diff). The server-side edge table enforces the transition; gates are not status labels. Since ADR 0026 / 0028 the passer is the owner only where the merge route sends work to the owner; elsewhere a deterministic checker passes the gate.
+- **Hard gate**: a fixed stopping point in the phase machine, two in total — Confirm (before any code is touched, review the plan) and Review (before release, review the diff). The server-side edge table enforces the transition; gates are not status labels. Confirm can be passed by plan auto-confirm per project policy (`sweepPlanAutoConfirm`); for merging, since ADR 0026 the default is the autonomous gate, and ADR 0028's phase-1 routes send protected paths and ADRs to the owner.
 - **AI review with teeth**: the reviewer's blocking verdict directly drives the `review→planning` auto-reflow (#330 loop) — it can block a merge, not just leave a comment.
 - **Versioned plan documents**: Plan / Changes class documents, comparable version by version, the object "looked at" on the gate.
-- **Evidence-bound**: a verdict counts only for the head commit and patch digest it judged (ADR 0021 D3).
+- **Evidence-bound**: a verdict counts only for the patch digest it judged (ADR 0021 D3); the independent review is additionally bound to the current head (ADR 0026).
 - **Semantic axis / runtime axis**: the semantic axis = how a task flows (gates, review, evidence, eval, state machine); the runtime axis = where a task runs (runtime, daemon, orb, self-hosted deployment).
 - **Self-use first**: sees §2.
 
@@ -52,7 +52,7 @@ Supporting discipline (#515 hard constraint): **reference implementation first, 
 
 ### 3.1 Semantic axis: aligned with todos's three core points
 
-> D55 (2026-11-01): the semantic axis is now the machine-verified merge gate (ADR 0026 / 0028) plus eval-gated harness changes (spec 29). The human Confirm and Review gates in the table below remain where the merge route sends work to the owner (protected paths, ADRs); elsewhere a deterministic checker passes the gate. The table is kept as the record of the todos alignment.
+> D55 (2026-11-01): the semantic axis is now the machine-verified merge gate (ADR 0026 / 0028) plus eval-gated harness changes (spec 29). In the table below, Confirm can be passed by plan auto-confirm per project policy; for the merge, the owner remains the passer only where ADR 0028's routes send the PR to the owner (protected paths, ADRs), and the autonomous gate passes the rest. The table is kept as the record of the todos alignment.
 
 | Core piece | pacman landing spot | Comparison |
 |---|---|---|
@@ -88,9 +88,9 @@ Constraints:
 
 - Output that is code passes the gates, independent of entry and whether a PR is opened. "No board means no gate" equals removing the gates for a subset of users, becoming a weaker Raven, not adopted.
 - The gate is a phase-machine stopping point; the passer can be a human or a deterministic checker per project policy (ADR 0021's merge-readiness gate, #1623's decomposition checker); since ADR 0026 the default policy is autonomous, with protected paths requiring an independent review; in this repository ADR 0028's phase-1 routes send protected paths and ADRs to the owner. (Superseded wording, 2026-10-24: "the default is always a human, same caliber as ADR 0021 D1".)
-- Same-kind comparison (2026-10-24): Vibe Kanban, Conductor's local worktree shapes all ultimately land through PRs, Raven's coding specialist has no repo-level merge gate. "Local repo, no PR, gate before merge" has no existing implementation.
+- Same-kind comparison (historical, 2026-10-24): Vibe Kanban, Conductor's local worktree shapes all ultimately land through PRs, Raven's coding specialist has no repo-level merge gate. At that date "local repo, no PR, gate before merge" had no existing implementation; cairn's own gated local landing has since landed (#2050: `apps/daemon/src/local-merge.ts` calls `decideLocalMerge`).
 
-Construction tickets: #1623 (decomposition checker passes → auto-run) → #1625 (local-shape auto-merge) → #1626 (info-class fast lane); #1624 (sub-card injection pre-delivery summary) parallel with #1623. The IM entry and external-agent onboarding wait on the #1607 research conclusion.
+Construction tickets (2026-10-24; #1625 has since landed through #2050): #1623 (decomposition checker passes → auto-run) → #1625 (local-shape auto-merge) → #1626 (info-class fast lane); #1624 (sub-card injection pre-delivery summary) parallel with #1623. The IM entry and external-agent onboarding wait on the #1607 research conclusion.
 
 ## 4. What Not to Do (#515 Out of scope fixed)
 
