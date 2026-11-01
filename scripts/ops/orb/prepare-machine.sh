@@ -55,9 +55,9 @@ if ! cmp -s "$source_file" "$target_file"; then
 fi
 unit=systemd-nspawn@$name.service
 current=$(systemctl show "$unit" -p MemoryMax -p CPUQuotaPerSecUSec -p TasksMax)
-if ! { printf '%s\n' "$current" | grep -qx 'MemoryMax=4294967296' &&
-       printf '%s\n' "$current" | grep -qx 'CPUQuotaPerSecUSec=4s' &&
-       printf '%s\n' "$current" | grep -qx 'TasksMax=4096'; }; then
+if ! { grep -qx 'MemoryMax=4294967296' <<< "$current" &&
+       grep -qx 'CPUQuotaPerSecUSec=4s' <<< "$current" &&
+       grep -qx 'TasksMax=4096' <<< "$current"; }; then
   properties=()
   while IFS='=' read -r key value; do
     case "$key" in MemoryMax|CPUQuota|TasksMax) properties+=("$key=$value");; esac

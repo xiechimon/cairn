@@ -55,7 +55,7 @@ if (cmd === 'rm') {
   if (existsSync(join(target, '.fake-subvolume'))) { console.error('rm must never delete a subvolume'); process.exit(93); }
   rmSync(target, { recursive: true, force: true });
 }
-if (cmd === 'sha256sum') console.log('fake-recipe  ' + args[0]);
+if (cmd === 'sha256sum') { readFileSync(0); console.log('fake-recipe  ' + args[0]); }
 if (cmd === 'pacstrap') {
   if (process.env.APPEARED_IMAGE) {
     const appeared = join(root, 'var/lib/machines/cairn-orb-base/etc');
@@ -162,6 +162,29 @@ for (const file of [
   });
 }
 
+test('the recipe hash fixture drains its input before exiting', () => {
+  const f = fixture();
+  try {
+    const result = spawnSync(
+      '/bin/bash',
+      [
+        '-o',
+        'pipefail',
+        '-c',
+        `"$1" -e 'process.stdout.write(Buffer.alloc(8 * 1024 * 1024))' | "$2"`,
+        'recipe-test',
+        process.execPath,
+        join(f.root, 'bin/sha256sum'),
+      ],
+      { env: f.env, encoding: 'utf8' },
+    );
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /fake-recipe/);
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
 test('image dry-run prints pins and never invokes privileged mutations', () => {
   const f = fixture();
   try {
@@ -244,6 +267,10 @@ test('preparation applies the shared template and actual runtime limits idempote
     const first = f.run('prepare-machine.sh', ['cairn-orb-test-a']);
     assert.equal(first.status, 0, first.stderr);
     assert.match(first.stdout, /MemoryMax=4G CPUQuota=400% TasksMax=4096/);
+    writeFileSync(
+      join(f.root, 'properties'),
+      `MemoryMax=4294967296\nCPUQuotaPerSecUSec=4s\nTasksMax=4096\nExtra=${'x'.repeat(1024 * 1024)}`,
+    );
     assert.equal(f.run('prepare-machine.sh', ['cairn-orb-test-a']).stdout.trim(), '0 changes');
     for (const flags of ['rw,nodev', 'rw,nosuid', 'rw', '']) {
       assert.notEqual(
@@ -484,6 +511,16 @@ test('image ships enabled guest worker and trigger units with one daemon entry',
 test('preparation delegates source creation and stop to the root fd helper', () => {
   const f = fixture();
   try {
+    for (const [from, to] of [
+      ['cairn-orb.nspawn', 'etc/systemd/nspawn/cairn-orb.nspawn'],
+      [
+        'systemd-nspawn@cairn-orb-.service.d/limits.conf',
+        'etc/systemd/system/systemd-nspawn@cairn-orb-.service.d/limits.conf',
+      ],
+    ]) {
+      mkdirSync(join(f.root, to, '..'), { recursive: true });
+      writeFileSync(join(f.root, to), readFileSync(join(source, from)));
+    }
     const name = 'cairn-orb-test-a';
     mkdirSync(join(f.root, 'run/cairn-orb'), { recursive: true });
     writeFileSync(
