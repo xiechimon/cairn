@@ -1,0 +1,90 @@
+{
+  "before": [
+    {
+      "title": "Profile the slowest endpoints",
+      "phase": "todo",
+      "archivedAt": null,
+      "snoozeMode": null
+    },
+    {
+      "title": "Cache the auth lookup",
+      "phase": "todo",
+      "archivedAt": null,
+      "snoozeMode": null
+    },
+    {
+      "title": "Batch the audit writes",
+      "phase": "todo",
+      "archivedAt": null,
+      "snoozeMode": null
+    }
+  ],
+  "afterArchive": [
+    {
+      "title": "Profile the slowest endpoints",
+      "phase": "todo",
+      "archivedAt": null,
+      "snoozeMode": null
+    }
+  ],
+  "afterUndo": [
+    {
+      "title": "Profile the slowest endpoints",
+      "phase": "todo",
+      "archivedAt": null,
+      "snoozeMode": null
+    },
+    {
+      "title": "Cache the auth lookup",
+      "phase": "todo",
+      "archivedAt": null,
+      "snoozeMode": null
+    },
+    {
+      "title": "Batch the audit writes",
+      "phase": "todo",
+      "archivedAt": null,
+      "snoozeMode": null
+    }
+  ],
+  "afterSnooze": [
+    {
+      "title": "Profile the slowest endpoints",
+      "phase": "todo",
+      "archivedAt": null,
+      "snoozeMode": "needed"
+    },
+    {
+      "title": "Cache the auth lookup",
+      "phase": "todo",
+      "archivedAt": null,
+      "snoozeMode": null
+    },
+    {
+      "title": "Batch the audit writes",
+      "phase": "todo",
+      "archivedAt": null,
+      "snoozeMode": null
+    }
+  ],
+  "afterResolve": [
+    {
+      "title": "Profile the slowest endpoints",
+      "phase": "todo",
+      "archivedAt": null,
+      "snoozeMode": "needed"
+    },
+    {
+      "title": "Cache the auth lookup",
+      "phase": "todo",
+      "archivedAt": null,
+      "snoozeMode": null
+    },
+    {
+      "title": "Batch the audit writes",
+      "phase": "done",
+      "archivedAt": null,
+      "snoozeMode": null
+    }
+  ]
+}
