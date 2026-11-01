@@ -8,7 +8,7 @@ import {
   step as stepTable,
   stopPending,
 } from '../src/db/schema.js';
-import { upsertChiefMessage } from '../src/services/chief.js';
+import { enqueueChiefStep, upsertChiefMessage } from '../src/services/chief.js';
 import {
   CHIEF_TURN_MAX_MS,
   recordChiefStop,
@@ -92,14 +92,22 @@ describe('thread.orchestration describes the latest orchestrate turn', () => {
     });
   });
 
-  test('a finished orchestration and a later ordinary turn both report null', async () => {
+  test('a finished orchestration reports null, and so does a thread without one', async () => {
+    await req(H.s.app, 'POST', `/api/teams/${H.teamId}/coordinator/messages`, { content: 'hi' });
+    expect(await orchestrationOf()).toBeNull();
     const todoId = await postTodo(H.projectId, 'first');
     const stepId = await orchestrate(todoId);
     setStep(stepId, { status: 'done', finishedAt: Date.now() });
     expect(await orchestrationOf()).toBeNull();
-    setStep(stepId, { status: 'pending' });
+  });
+
+  test('later ordinary turns and wakes do not hide a running orchestration', async () => {
+    const todoId = await postTodo(H.projectId, 'first');
+    const stepId = await orchestrate(todoId);
+    setStep(stepId, { status: 'claimed', claimedAt: Date.now() });
     await req(H.s.app, 'POST', `/api/teams/${H.teamId}/coordinator/messages`, { content: 'hi' });
-    expect(await orchestrationOf()).toBeNull();
+    enqueueChiefStep(H.s.svc, H.threadId, { prompt: 'gate facts', trigger: 'gate' });
+    expect(await orchestrationOf()).toEqual({ todoId, state: 'running', error: null });
   });
 
   test('a stopped orchestration reports failed so it can be started again', async () => {
