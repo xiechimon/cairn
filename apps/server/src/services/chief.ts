@@ -561,6 +561,7 @@ export function rewindChiefThread(
   if (!threadRow || threadRow.teamId !== teamId) {
     throw new HttpError(404, `chief thread ${threadId}`);
   }
+  if (threadRow.projectId !== null) requireUnarchivedProject(deps.db, threadRow.projectId);
   const anchor = deps.db
     .select()
     .from(chiefMessage)

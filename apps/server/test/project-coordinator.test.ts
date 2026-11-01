@@ -173,6 +173,27 @@ describe('project archive', () => {
     expect(chiefPrompts(sent.thread.id)).toHaveLength(1);
   });
 
+  test('an archived project refuses a rewind of its Coordinator conversation', async () => {
+    const sent = (await (await sendToCoordinator(H.projectId, 'hi')).json()) as {
+      thread: { id: string };
+      message: { id: string };
+    };
+    H.s.db
+      .update(chiefThread)
+      .set({ activeRun: null })
+      .where(eq(chiefThread.id, sent.thread.id))
+      .run();
+    await req(H.s.app, 'POST', `/api/projects/${H.projectId}/archive`);
+    const res = await req(
+      H.s.app,
+      'POST',
+      `/api/teams/${H.teamId}/chief/threads/${sent.thread.id}/rewind`,
+      { messageId: sent.message.id },
+    );
+    expect(res.status).toBe(409);
+    expect(chiefPrompts(sent.thread.id)).toHaveLength(1);
+  });
+
   test('an archived project refuses Coordinator messages until unarchived', async () => {
     await req(H.s.app, 'POST', `/api/projects/${H.projectId}/archive`);
     expect((await sendToCoordinator(H.projectId, 'hi')).status).toBe(409);
