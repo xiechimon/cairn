@@ -35,8 +35,8 @@ test('five parts stack top to bottom in a 248px sidebar', async ({ page }) => {
     await top(page, '[data-testid="team-row"]'),
     await top(page, '.sidebar-new-task'),
     await aside.getByRole('button', { name: /搜索/ }).evaluate((el) => el.getBoundingClientRect().top),
-    await aside.locator('[data-slot="sidebar-nav-row"]', { hasText: 'Projects' }).evaluate((el) => el.getBoundingClientRect().top),
-    await aside.locator('[data-slot="sidebar-nav-row"]', { hasText: 'Scheduled' }).evaluate((el) => el.getBoundingClientRect().top),
+    await aside.locator('[data-slot="sidebar-nav-row"]', { hasText: '工作台' }).evaluate((el) => el.getBoundingClientRect().top),
+    await aside.locator('[data-slot="sidebar-nav-row"]', { hasText: '定时' }).evaluate((el) => el.getBoundingClientRect().top),
     await top(page, '[data-testid="project-group"]'),
     await aside.getByRole('button', { name: '资源' }).evaluate((el) => el.getBoundingClientRect().top),
     await top(page, '.sidebar-user'),
@@ -58,12 +58,12 @@ test('`新任务` row opens the new-task dialog without a sidebar key badge', as
   await expect(page.getByRole('dialog')).toBeVisible();
 });
 
-test('`Projects` badge counts the `待处理` column and opens the home view', async ({ page }) => {
+test('`Workbench` badge counts the `待处理` column and opens the home view', async ({ page }) => {
   await page.goto('/app?scenario=01&view=board');
   const pendingCount = await page
     .locator('[data-column="pending"] [data-testid="column-count"]')
     .textContent();
-  const home = sidebar(page).locator('[data-slot="sidebar-nav-row"]', { hasText: 'Projects' });
+  const home = sidebar(page).locator('[data-slot="sidebar-nav-row"]', { hasText: '工作台' });
   await expect(sidebar(page).getByTestId('attention-badge')).toHaveText(pendingCount ?? '');
   await expect(columns(page)).toHaveCount(4);
 
@@ -200,12 +200,12 @@ test('user row second line reads machines online', async ({ page }) => {
   await expect(page.locator('[data-slot="sidebar-user"]')).toContainText(/\d+ machines? online/);
 });
 
-test('collapsed rail keeps `Projects` with its badge dot and the expand toggle', async ({ page }) => {
+test('collapsed rail keeps `Workbench` with its badge dot and the expand toggle', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
   await page.goto('/app?scenario=01&view=board');
   const aside = sidebar(page);
   expect(await aside.evaluate((el) => el.getBoundingClientRect().width)).toBe(40);
-  const home = aside.getByRole('link', { name: /Projects/ });
+  const home = aside.getByRole('link', { name: /工作台/ });
   await expect(home).toBeVisible();
   await home.click();
   await expect(page.getByTestId('home-sections')).toBeVisible();

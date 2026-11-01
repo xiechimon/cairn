@@ -82,3 +82,36 @@ describe('zero-advance guard (#681 seatbelt)', () => {
     expect(() => scanSource('f(#(x));\n', 'bad2.ts')).toThrow(/bad2\.ts:1:3/);
   });
 });
+
+describe('translation call literals', () => {
+  it.each([
+    ["t('Projects')", 'Projects'],
+    ["t?.('Projects')", 'Projects'],
+    ["const el = <span>{t?.('Scheduled')}</span>", 'Scheduled'],
+    ["const el = <span>{t('Scheduled')}</span>", 'Scheduled'],
+    ['t(`Projects`)', 'Projects'],
+    ["t('工作台')", '工作台'],
+    ["t('Undo', { count: 1 })", 'Undo'],
+    ["t /* gap */ ('Scheduled')", 'Scheduled'],
+  ])('collects %s', (source, text) => {
+    expect(scanSource(source, 'x.tsx', true).filter((item) => item.kind === 'translation')).toEqual([
+      { rel: 'x.tsx', text, kind: 'translation' },
+    ]);
+  });
+
+  it.each([
+    "const label = 'Projects'",
+    "// t('Projects')",
+    "/* t('Scheduled') */",
+    "other('Projects')",
+    "object.t('Projects')",
+    "object?.t('Projects')",
+    "object.t?.('Projects')",
+    't(key)',
+    't(`Projects ${count}`)',
+    "t('Projects' + suffix)",
+    "t(prefix, 'Projects')",
+  ])('ignores %s', (source) => {
+    expect(scanSource(source, 'x.tsx', true).filter((item) => item.kind === 'translation')).toEqual([]);
+  });
+});
