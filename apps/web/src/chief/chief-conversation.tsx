@@ -67,7 +67,7 @@ import { MENTION_TEXTAREA_CLS, MentionHighlight } from '../overlay/mention-highl
 import { MentionInline } from '../overlay/mention-inline.js';
 import type { MentionGroups } from '../overlay/mention-token.js';
 import { SlashHelp, SlashMenu } from '../overlay/slash-menu.js';
-import { ChiefStreamRow, chiefStreamRowKey } from './chief-message-rows.js';
+import { ChiefStreamRow, chiefStreamRowKey, TurnElapsedContext } from './chief-message-rows.js';
 import { ChiefFallbackBanner, ChiefOutageBanner } from './chief-outage-banner.js';
 import { ProjectMenu } from './project-menu.js';
 
@@ -662,20 +662,22 @@ export function ChiefConversation({
                 className={home ? SCROLLER_CONTENT_HOME_CLS : SCROLLER_CONTENT_CLS}
                 data-testid="chief-stream"
               >
-                <TodoGlanceContext.Provider value={glances}>
-                  {lead}
-                  {day == null ? (
-                    rows.map(streamRow)
-                  ) : (
-                    <>
-                      <div data-testid="chief-earlier" className="opacity-60">
-                        {rows.slice(0, day.earlier).map(streamRow)}
-                      </div>
-                      {day.today}
-                      {rows.slice(day.earlier).map(streamRow)}
-                    </>
-                  )}
-                </TodoGlanceContext.Provider>
+                <TurnElapsedContext.Provider value={variant !== 'project'}>
+                  <TodoGlanceContext.Provider value={glances}>
+                    {lead}
+                    {day == null ? (
+                      rows.map(streamRow)
+                    ) : (
+                      <>
+                        <div data-testid="chief-earlier" className="opacity-60">
+                          {rows.slice(0, day.earlier).map(streamRow)}
+                        </div>
+                        {day.today}
+                        {rows.slice(day.earlier).map(streamRow)}
+                      </>
+                    )}
+                  </TodoGlanceContext.Provider>
+                </TurnElapsedContext.Provider>
               </MessageScrollerContent>
             </FadeScrollerViewport>
             <JumpToLatestButton>
