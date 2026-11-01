@@ -4,7 +4,7 @@
     <img alt="Cairn: agents stacking a cairn on a mountain path while a person waits at the gate" src="site/img/banner-light.webp" width="100%">
   </picture>
 
-  <p><b>You write the tickets. Agents build them on your machines. You gate what merges.</b></p>
+  <p><b>You write the tickets. Agents build them on your machines. Only the patch the evidence judged can merge.</b></p>
 
   <p>A self-hosted, open-source multi-agent workspace that also develops itself.</p>
 
@@ -64,7 +64,7 @@
 </table>
 
 - **Multi-agent orchestration.** Each agent has its own model, role, skills, MCP servers, secrets and memory. A chief agent only dispatches, so its context stays clean; coder and reviewer agents do the work.
-- **Human gates, enforced.** Every run stops twice for you: at the plan and at the diff. The AI reviewer can block a merge, not just comment on it.
+- **An evidence-bound merge gate.** A merge lands only the exact patch a review verdict judged, bound to its head commit and patch digest, and the gate is model-checked in TLA+. Protected paths still stop for you; the AI reviewer can block a merge, not just comment on it.
 - **Bootstrap loop.** Cairn claims its own tickets, implements them, reviews them and opens the PRs: it is being used to build itself.
 - **Eval and trajectory driven.** Every build records its base SHA and a harness hash, and rejections are stored as structured records. Strong-vs-weak model A/B evals then decide which prompt, skill and routing changes stay. "Training" here means improving the harness, never fine-tuning weights.
 - **Your machines.** Register any host by running the daemon on it. Builds run there in their own git worktree, and the board streams plans, diffs and tool calls back live.
