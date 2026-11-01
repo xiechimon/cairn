@@ -35,6 +35,7 @@ import { Greeting } from '../components/stream/greeting.js';
 import { StreamDigest } from '../components/stream/stream-digest.js';
 import { SuggestionChip } from '../components/stream/suggestion-chip.js';
 import { Button } from '../components/ui/button.js';
+import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { toastSuccess } from '../components/ui/toaster.js';
 import { Section, Specimen } from './specimen.js';
 
@@ -50,7 +51,7 @@ export function SidebarSection() {
         title="Sidebar"
         note="Click a project"
         stage="canvas"
-        code={`<SidebarNavRow icon={<Plus />} label="New" shortcut="C" />\n<SidebarProjectRow name="cairn" tone={0} waiting={2} active />\n<SidebarThreadList><SidebarThreadRow title="Snooze until needed" tone="waiting" open /></SidebarThreadList>\n<SidebarUser name="ian" machinesOnline={2} />`}
+        code={`<SidebarNavRow icon={<Plus />} label="New" shortcut="C" />\n<SidebarProjectRow name="cairn" tone={0} waiting={2} active />\n<SidebarThreadList><SidebarThreadRow title="Snooze until needed" tone="waiting" open /></SidebarThreadList>\n<SidebarUser name="ian" avatar={<SeededAvatar name="ian" fallback="/avatar-user.png" className="size-6" />} machinesOnline={2} />`}
       >
         <div className="flex w-62 flex-col gap-0.5 py-1">
           <SidebarNavRow icon={<Plus className="size-4" />} label="New" shortcut="C" />
@@ -116,6 +117,7 @@ export function SidebarSection() {
             onClick={() => setActive('docs')}
           />
           <SidebarUser
+            avatar={<SeededAvatar name="ian" fallback="/avatar-user.png" className="size-6" />}
             name="ian"
             machinesOnline={2}
             action={

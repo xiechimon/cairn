@@ -92,7 +92,7 @@ function WorkStepRow({ step, enter, t }: { step: WorkStep; enter: boolean; t: TF
         trailing={
           <>
             {call?.diff !== undefined && (
-              <span className="flex gap-1 font-mono text-caption">
+              <span className="flex gap-1 font-mono text-code">
                 <span className="text-(--diff-add-fg)">+{call.diff.added}</span>
                 <span className="text-destructive">−{call.diff.removed}</span>
               </span>

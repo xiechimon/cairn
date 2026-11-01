@@ -78,7 +78,7 @@ function Secs({ secs }: { secs: number | undefined }) {
 
 function Diff({ added, removed }: { added: number; removed: number }) {
   return (
-    <span className="font-mono text-caption font-medium">
+    <span className="font-mono text-code font-medium">
       <span className="text-running-text">+{added}</span>{' '}
       <span className="text-destructive">−{removed}</span>
     </span>
@@ -153,7 +153,7 @@ function ActionRow({ step, compact }: { step: ActionStep; compact: boolean }) {
           target={step.branch}
           trailing={
             <>
-              <span className="font-mono text-caption">{step.commit}</span>
+              <span className="font-mono text-code">{step.commit}</span>
               <Secs secs={step.secs} />
             </>
           }
@@ -335,7 +335,7 @@ export function TraceSteps({
         const { step } = block;
         if (step.kind === 'say')
           return (
-            <p key={block.key} className="m-0 mb-3 text-card-title leading-6 text-foreground">
+            <p key={block.key} className="m-0 mb-3 text-card-title text-foreground">
               {step.text}
             </p>
           );

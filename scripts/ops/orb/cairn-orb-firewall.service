@@ -1,0 +1,12 @@
+[Unit]
+Description=Cairn Orb bridge isolation
+Before=systemd-networkd.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/nft -f /etc/cairn-orb/firewall.nft
+ExecReload=/usr/bin/nft -f /etc/cairn-orb/firewall.nft
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

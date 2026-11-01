@@ -1,0 +1,142 @@
+[
+  {
+    "width": 390,
+    "theme": "light",
+    "titleWidth": 184,
+    "controls": [
+      {
+        "label": "\u8fd4\u56de",
+        "left": 12,
+        "right": 346,
+        "top": 9.5,
+        "bottom": 10.5
+      },
+      {
+        "label": "\u5ba1\u6838",
+        "left": 264,
+        "right": 94,
+        "top": 9.5,
+        "bottom": 10.5
+      },
+      {
+        "label": "\u66f4\u591a",
+        "left": 302,
+        "right": 56,
+        "top": 9.5,
+        "bottom": 10.5
+      },
+      {
+        "label": "\u5b8c\u6210",
+        "left": 346,
+        "right": 12,
+        "top": 9.5,
+        "bottom": 10.5
+      }
+    ]
+  },
+  {
+    "width": 1440,
+    "theme": "light",
+    "titleWidth": 376,
+    "controls": [
+      {
+        "label": "\u8fd4\u56de",
+        "left": 260,
+        "right": 1152,
+        "top": 7.5,
+        "bottom": 8.5
+      },
+      {
+        "label": "\u5ba1\u6838",
+        "left": 825,
+        "right": 531,
+        "top": 7.5,
+        "bottom": 8.5
+      },
+      {
+        "label": "\u66f4\u591a",
+        "left": 1338,
+        "right": 74,
+        "top": 7.5,
+        "bottom": 8.5
+      },
+      {
+        "label": "\u5b8c\u6210",
+        "left": 1378,
+        "right": 12,
+        "top": 5.5,
+        "bottom": 6.5
+      }
+    ]
+  },
+  {
+    "width": 390,
+    "theme": "dark",
+    "titleWidth": 184,
+    "controls": [
+      {
+        "label": "\u8fd4\u56de",
+        "left": 12,
+        "right": 346,
+        "top": 9.5,
+        "bottom": 10.5
+      },
+      {
+        "label": "\u5ba1\u6838",
+        "left": 264,
+        "right": 94,
+        "top": 9.5,
+        "bottom": 10.5
+      },
+      {
+        "label": "\u66f4\u591a",
+        "left": 302,
+        "right": 56,
+        "top": 9.5,
+        "bottom": 10.5
+      },
+      {
+        "label": "\u5b8c\u6210",
+        "left": 346,
+        "right": 12,
+        "top": 9.5,
+        "bottom": 10.5
+      }
+    ]
+  },
+  {
+    "width": 1440,
+    "theme": "dark",
+    "titleWidth": 376,
+    "controls": [
+      {
+        "label": "\u8fd4\u56de",
+        "left": 260,
+        "right": 1152,
+        "top": 7.5,
+        "bottom": 8.5
+      },
+      {
+        "label": "\u5ba1\u6838",
+        "left": 825,
+        "right": 531,
+        "top": 7.5,
+        "bottom": 8.5
+      },
+      {
+        "label": "\u66f4\u591a",
+        "left": 1338,
+        "right": 74,
+        "top": 7.5,
+        "bottom": 8.5
+      },
+      {
+        "label": "\u5b8c\u6210",
+        "left": 1378,
+        "right": 12,
+        "top": 5.5,
+        "bottom": 6.5
+      }
+    ]
+  }
+]

@@ -2,3 +2,8 @@ P1_SingleExecutorPerMachine PASS
 P2_OnlyHolderResultApplied PASS
 P3_NoClaimAfterClose PASS
 P4_AcceptedStopReachesWorkers PASS
+P5_ArchivedNeverClaimed PASS
+P5_ArchivedNeverClaimed__ClaimIgnoresArchive FAIL ArchiveCard,EnqueueAfterArchive,TryClaim
+P6_ArchivedStopSettles PASS
+P6_ArchivedStopSettles__ApplyIgnoresArchive FAIL TryClaim,FinishSession,ArchiveCard,FinishStepOwnedCheck
+P7_ArchiveFlagMatchesStep PASS

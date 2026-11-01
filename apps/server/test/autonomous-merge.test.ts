@@ -182,7 +182,23 @@ test('updating checks preserves an existing human policy and zero cap', () => {
   expect(updateProjectMergeConfig(s.db, row, { localChecks: ['new'] })).toEqual({
     mergePolicy: 'human',
     localChecks: ['new'],
+    requireUpToDate: false,
   });
+});
+
+test('requireUpToDate defaults off, is stored by the merge config patch, and survives a checks patch', () => {
+  const { s } = fixture();
+  const read = () => {
+    const row = s.db.select().from(project).where(eq(project.id, 'p')).get();
+    if (!row) throw new Error('missing project');
+    return row;
+  };
+  expect(projectMergeConfigOf(read()).requireUpToDate).toBe(false);
+  expect(updateProjectMergeConfig(s.db, read(), { requireUpToDate: true }).requireUpToDate).toBe(
+    true,
+  );
+  expect(projectMergeConfigOf(read()).requireUpToDate).toBe(true);
+  expect(updateProjectMergeConfig(s.db, read(), { localChecks: ['x'] }).requireUpToDate).toBe(true);
 });
 
 test('team cap is stored and returned by the team settings API', async () => {

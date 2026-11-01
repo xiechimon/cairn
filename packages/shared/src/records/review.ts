@@ -47,6 +47,9 @@ export function parseReviewPromptMeta(prompt: string | null): ReviewPromptMeta |
   }
 }
 
+export const REVIEW_GATE_HEAD =
+  '请审核以下方案与本轮变更。**只读**：不得修改文件、不得提交、不得推送；如有 blocking 风险请明确标注，suggestion / info 请按需给出。';
+
 export function buildReviewStepPrompt(args: {
   agentId: string;
   gate: ReviewGate;
@@ -55,6 +58,7 @@ export function buildReviewStepPrompt(args: {
   checkout?: boolean;
   focus?: string;
   expectedHeadSha?: string;
+  instruction?: string;
 }): string {
   const meta: ReviewPromptMeta = {
     kind: 'review',
@@ -68,7 +72,7 @@ export function buildReviewStepPrompt(args: {
       : '';
   const head =
     args.gate === 'review'
-      ? '请审核以下方案与本轮变更。**只读**：不得修改文件、不得提交、不得推送；如有 blocking 风险请明确标注，suggestion / info 请按需给出。'
+      ? (args.instruction ?? REVIEW_GATE_HEAD)
       : '请审核以下方案。**只审核、不修改 worktree、不动 plan.md**；如有 blocking 风险请明确标注，suggestion / info 请按需给出。';
   const sections = [
     JSON.stringify(meta),

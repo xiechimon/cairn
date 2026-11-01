@@ -107,7 +107,7 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(title, 'T4').toHaveCSS('color', ink);
     const meta = rows.nth(0).getByTestId('task-meta');
     await expect(meta, 'T4').toHaveText(/^#1 · .+前$/);
-    await expect(meta, 'T4').toHaveCSS('font-size', '12.5px');
+    await expect(meta, 'T4').toHaveCSS('font-size', '13px');
     await expect(meta, 'T4').toHaveCSS('color', ink3);
 
     await expect(rows.nth(1).getByRole('link'), 'T5').toHaveCSS('color', ink3);
@@ -155,12 +155,12 @@ for (const theme of ['light', 'dark'] as const) {
     await page.locator('.prj-files-seg-tab', { hasText: '历史' }).click();
     const commit = page.locator('[data-history-entry="commit"]').first();
     await expect(commit.getByTestId('history-message'), 'F2').toHaveCSS('font-size', '14px');
-    await expect(commit.getByTestId('history-meta'), 'F2').toHaveCSS('font-size', '12.5px');
+    await expect(commit.getByTestId('history-meta'), 'F2').toHaveCSS('font-size', '13px');
     await commit.click();
     await expect(page.locator('[data-commit-detail="message"]'), 'F2').toHaveCSS(
       'font-size',
       '14px',
     );
-    await expect(page.locator('[data-commit-detail="meta"]'), 'F2').toHaveCSS('font-size', '12.5px');
+    await expect(page.locator('[data-commit-detail="meta"]'), 'F2').toHaveCSS('font-size', '13px');
   });
 }

@@ -104,15 +104,6 @@ function ActionRow({
   t: TFunc;
   align?: 'start' | 'end';
 }) {
-  const tail = (
-    <>
-      {(seconds != null || bare === true) && (
-        <span className="border-l border-(--input) pl-2 text-meta whitespace-nowrap text-(--text-tertiary)">
-          {seconds != null ? formatElapsed(seconds, t) : t('完成')}
-        </span>
-      )}
-    </>
-  );
   return (
     <div
       className={`chat-row-icons mt-1.5 flex items-center gap-3.5 text-(--text-tertiary) ${align === 'end' ? 'justify-end' : ''}`}
@@ -121,6 +112,11 @@ function ActionRow({
       {stamp != null && (
         <span className="text-caption tabular-nums" data-testid="msg-stamp">
           {stamp}
+        </span>
+      )}
+      {(seconds != null || bare === true) && (
+        <span className="text-meta whitespace-nowrap text-(--text-tertiary)">
+          {seconds != null ? formatElapsed(seconds, t) : t('完成')}
         </span>
       )}
       {copy != null && (
@@ -135,7 +131,6 @@ function ActionRow({
           <Copy width={13} height={13} />
         </Button>
       )}
-      {tail}
     </div>
   );
 }
@@ -265,7 +260,7 @@ function Row({
         <>
           <div className={`${ROW_BASE} chat-row--user justify-end ${margin}`}>
             <span
-              className={`chat-bubble bubble-gradient anim-message-fade-up min-w-0 max-w-[min(85%,42rem)] rounded-(--cds-radius-xl) px-3 py-2 text-card-title leading-6 break-words text-(--foreground) ${
+              className={`chat-bubble bubble-gradient anim-message-fade-up min-w-0 max-w-[min(85%,42rem)] rounded-(--cds-radius-xl) px-3 py-2 text-card-title break-words text-(--foreground) ${
                 item.markdown != null
                   ? 'whitespace-normal [&>:first-child]:mt-0 [&>:last-child]:mb-0'
                   : 'whitespace-pre-wrap'
@@ -294,7 +289,7 @@ function Row({
         <>
           <div className={`${ROW_BASE} chat-row--agent ${margin}`} data-row="agent">
             <span
-              className="chat-text -mt-px max-w-[68ch] min-w-0 text-card-title leading-[1.6] break-words text-(--foreground)"
+              className="chat-text -mt-px max-w-[68ch] min-w-0 text-card-title break-words text-(--foreground)"
               data-testid="agent-text"
             >
               {item.markdown != null ? (
@@ -320,7 +315,7 @@ function Row({
       return (
         <div className={`${ROW_BASE} chat-row--agent ${margin}`} data-row="agent">
           <span
-            className="chat-text -mt-px max-w-[68ch] min-w-0 text-card-title leading-[1.6] break-words text-(--foreground)"
+            className="chat-text -mt-px max-w-[68ch] min-w-0 text-card-title break-words text-(--foreground)"
             data-testid="info-report"
           >
             <ChatMarkdown text={item.markdown} />
@@ -330,7 +325,7 @@ function Row({
     case 'thinking':
       return (
         <div className={`${ROW_BASE} chat-row--agent ${margin}`} data-row="agent">
-          <span className="chat-text -mt-px max-w-[68ch] min-w-0 text-card-title leading-[1.6] break-words text-(--foreground)">
+          <span className="chat-text -mt-px max-w-[68ch] min-w-0 text-card-title break-words text-(--foreground)">
             <ThinkingRow text={item.text} />
           </span>
         </div>
@@ -438,7 +433,7 @@ function Row({
       return (
         <div className={`${ROW_BASE} chat-row--agent ${margin}`} data-row="agent">
           <span
-            className="chat-text -mt-px max-w-[68ch] min-w-0 text-card-title leading-[1.6] break-words text-(--foreground)"
+            className="chat-text -mt-px max-w-[68ch] min-w-0 text-card-title break-words text-(--foreground)"
             data-testid="agent-text"
           >
             <p className={`${PARA} mb-1.5 flex items-baseline gap-2`}>
@@ -522,7 +517,7 @@ function Row({
       return (
         <div className={`${ROW_BASE} chat-row--agent ${margin}`} data-row="agent">
           <span
-            className="chat-text -mt-px max-w-[68ch] min-w-0 text-card-title leading-[1.6] break-words text-(--foreground)"
+            className="chat-text -mt-px max-w-[68ch] min-w-0 text-card-title break-words text-(--foreground)"
             data-testid="agent-text"
           >
             <p className={`${PARA} mb-1.5 flex items-baseline gap-2`}>
@@ -580,7 +575,7 @@ function FailRow({
   return (
     <div className={`${ROW_BASE} chat-row--agent ${margin}`} data-row="agent">
       <span
-        className="chat-text -mt-px max-w-[68ch] min-w-0 text-card-title leading-[1.6] break-words text-(--foreground)"
+        className="chat-text -mt-px max-w-[68ch] min-w-0 text-card-title break-words text-(--foreground)"
         data-testid="agent-text"
       >
         <p className={`${PARA} chat-para--fail text-(--fail-fg)`}>{item.title}</p>
@@ -600,7 +595,7 @@ function FailRow({
       <ActionRow copy={[item.title, item.body].join('\n')} t={t} />
       <DialogShell title={t('原始错误')} open={rawOpen} onClose={() => setRawOpen(false)} size="l">
         <pre
-          className="m-0 rounded-(--cds-radius-sm) border border-(--border) bg-(--muted) px-2.5 py-2 text-left font-mono text-caption break-words whitespace-pre-wrap text-(--foreground) [word-break:break-word]"
+          className="m-0 rounded-(--cds-radius-sm) border border-(--border) bg-(--muted) px-2.5 py-2 text-left font-mono text-code break-words whitespace-pre-wrap text-(--foreground) [word-break:break-word]"
           data-testid="fail-raw-error"
         >
           {item.title}

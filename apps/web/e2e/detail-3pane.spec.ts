@@ -51,7 +51,7 @@ test('detail head keeps the `更多` icon only — branch/token/history icons ar
   }
 });
 
-test('composer stays in-flow inside the center column: card form, 16px insets, scroll port ends above it', async ({
+test('composer stays in-flow inside the center column: card form, 16px horizontal and 24px bottom insets, scroll port ends above it', async ({
   page,
 }) => {
   await page.goto(`${DETAIL_ROUTE}?scenario=17b`);
@@ -83,21 +83,12 @@ test('composer stays in-flow inside the center column: card form, 16px insets, s
     };
   });
   expect(geo.radius).toBe('14px');
-  // CDS PR-7: 1px hairline retired; --shadow-composer carries the ring
   expect(geo.border).toBe('0px');
-  // #472 in-flow law: a layout participant, never an overlay again —
-  // relative (not static) because the in-card toolbar/send/stop absolutes
-  // anchor to it
   expect(geo.position).toBe('relative');
-  // 16px insets inside the center column — never crossing into the pane
   expect(geo.compLeft).toBeCloseTo(geo.centerLeft + 16, 0);
   expect(geo.compRight).toBeCloseTo(geo.centerRight - 16, 0);
-  // the card keeps its 16px bottom inset (the old absolute-anchor visual)
-  expect(geo.mainBottom - geo.compBottom).toBeCloseTo(16, 0);
-  // the transcript scroll port ends exactly at the card top: text can no
-  // longer pass under the opaque card…
+  expect(geo.mainBottom - geo.compBottom).toBeCloseTo(24, 0);
   expect(geo.colBottom).toBeCloseTo(geo.compTop, 0);
-  // …and a bottom-pinned last row keeps a real gap from the card edge
   expect(geo.colPadBottom).toBeGreaterThanOrEqual(16);
 });
 
@@ -136,14 +127,14 @@ test("composer controls share one bottom row: stop is the send button's sibling"
     };
   });
   // a real hit target, not a 14px smudge
-  expect(geo.stop.w).toBe(32);
-  expect(geo.stop.h).toBe(32);
+  expect(geo.stop.w).toBe(28);
+  expect(geo.stop.h).toBe(28);
   expect(geo.stop.cy).toBeCloseTo(geo.send.cy, 0);
   expect(Math.abs(geo.toolCy - geo.send.cy)).toBeLessThanOrEqual(1);
   // an 8px sibling gap, not an orphaned 27px float
   expect(geo.send.l - geo.stop.r).toBeCloseTo(8, 0);
-  expect(geo.sendFill).toBe('rgba(0, 0, 0, 0)');
-  expect(geo.stopFill).not.toBe(geo.sendFill);
+  expect(geo.sendFill).toBe(geo.stopFill);
+  expect(geo.sendFill).not.toBe('rgba(0, 0, 0, 0)');
   expect(geo.stopGlyph).toBe(1);
   // the toolbar's ink starts on the placeholder text's own left edge
   expect(Math.abs(geo.toolGlyphL - geo.phTextL)).toBeLessThanOrEqual(2);

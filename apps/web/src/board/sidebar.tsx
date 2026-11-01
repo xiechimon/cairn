@@ -714,6 +714,7 @@ export function BoardSidebar({
               aria-label={user.displayName}
             >
               <SidebarUser
+                avatar={userAvatar}
                 name={user.displayName}
                 machinesOnline={machinesOnline}
                 action={
