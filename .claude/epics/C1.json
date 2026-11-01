@@ -132,6 +132,13 @@
       "id": "review-converge",
       "issue": 1909,
       "dependsOn": []
+    },
+    {
+      "id": "gates-required",
+      "issue": 2429,
+      "dependsOn": [
+        "coordinator-brake"
+      ]
     }
   ],
   "requiredChecks": [
