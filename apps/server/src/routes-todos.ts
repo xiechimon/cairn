@@ -57,7 +57,7 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
 
   app.get('/api/todos', (c) => {
     const teamId = c.req.query('teamId') ?? ctx.team.id;
-    return c.json(listTodos(svc, { teamId }));
+    return c.json(listTodos(svc, { teamId, archived: c.req.query('archived') === '1' }));
   });
 
   app.get('/api/needs-you', (c) => {

@@ -19,7 +19,7 @@ import {
   PLACEHOLDER_TITLE_FALLBACK,
   parseGithubIssueSourceRef,
 } from '@cairn/shared';
-import { and, asc, eq, inArray, isNull, max, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, isNull, max, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   agent,
@@ -247,10 +247,10 @@ export function setTodoArchived(deps: TodoDeps, id: string, archived: boolean): 
 
 export function listTodos(
   deps: TodoDeps,
-  filter: { teamId?: string; projectId?: string } = {},
+  filter: { teamId?: string; projectId?: string; archived?: boolean } = {},
 ): TodoRecord[] {
   const conds = [
-    isNull(todo.archivedAt),
+    filter.archived === true ? isNotNull(todo.archivedAt) : isNull(todo.archivedAt),
     filter.teamId !== undefined ? eq(todo.teamId, filter.teamId) : undefined,
     filter.projectId !== undefined ? eq(todo.projectId, filter.projectId) : undefined,
   ].filter((c) => c !== undefined);
