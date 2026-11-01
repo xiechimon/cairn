@@ -10,7 +10,25 @@ host_root=${CAIRN_ORB_ROOT:-}
 daemon_entry=/opt/cairn/daemon/cli.mjs
 agent_uid=$(id -u ian)
 [[ $agent_uid =~ ^[0-9]+$ && $agent_uid -gt 0 && $agent_uid -lt 65534 ]] || { printf 'Cannot map ian to guest agent UID\n' >&2; exit 1; }
-image=$host_root/var/lib/machines/cairn-orb-base
+machines_dir=$host_root/var/lib/machines
+image=$machines_dir/cairn-orb-base
+filesystem_path=$machines_dir
+while [[ ! -d $filesystem_path ]]; do filesystem_path=$(dirname -- "$filesystem_path"); done
+filesystem=$(stat -f -c %T -- "$filesystem_path")
+image_type() {
+  local inode
+  if [[ $filesystem == btrfs ]]; then
+    inode=$(stat -c %i -- "$1") || return 1
+    if [[ $inode == 256 ]]; then printf 'subvolume'; else printf 'directory'; fi
+  else
+    printf 'directory'
+  fi
+}
+remove_image() {
+  local type
+  type=$(image_type "$1") || return 1
+  if [[ $type == subvolume ]]; then btrfs subvolume delete "$1"; else rm -rf -- "$1"; fi
+}
 if ! $dry_run; then
   lock_dir=$host_root/run/lock/cairn-orb
   if [[ ! -d $lock_dir ]]; then printf 'create %s mode 700\n' "$lock_dir"; install -d -m 700 "$lock_dir"; fi
@@ -39,7 +57,8 @@ recipe=$(cat "$script_dir/build-image.sh" "$script_dir/guest-check.mjs" "$script
 expected=$(printf 'recipe=%s\nclaude=%s\ncodex=%s\nnode_major=%s\nagent_uid=%s' "$recipe" "$claude_version" "$codex_version" "$node_major" "$agent_uid")
 previous_marker=
 if [[ -d $image ]]; then
-  if [[ -f $image/etc/cairn-orb-image && $(cat "$image/etc/cairn-orb-image") == "$expected" ]]; then
+  current_image_type=$(image_type "$image")
+  if [[ -f $image/etc/cairn-orb-image && $(cat "$image/etc/cairn-orb-image") == "$expected" && ( $filesystem != btrfs || $current_image_type == subvolume ) ]]; then
     machinectl list-images --no-legend --no-pager | awk '$1 == "cairn-orb-base" {found=1} END {exit !found}'
     printf '0 changes\n'
     exit 0
@@ -61,12 +80,20 @@ daemon=[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?)?$'
     exit 1
   fi
   previous_marker=$(cat "$image/etc/cairn-orb-image")
-  printf 'rebuild cairn-orb-base: recipe or pinned Node/CLI versions changed\n'
+  if [[ $filesystem == btrfs && $current_image_type != subvolume ]]; then
+    printf 'rebuild cairn-orb-base: directory image must become a btrfs subvolume\n'
+  else
+    printf 'rebuild cairn-orb-base: recipe or pinned Node/CLI versions changed\n'
+  fi
 fi
 printf 'build cairn-orb-base with pacstrap: base git nodejs npm openssh ca-certificates curl\n'
 printf 'pin Node major %s @anthropic-ai/claude-code@%s @openai/codex@%s; create agent; install proxy settings; register image\n' "$node_major" "$claude_version" "$codex_version"
+if [[ $filesystem == btrfs ]]; then
+  printf 'create a locked staging subvolume under /var/lib/machines\n'
+else
+  printf 'create a locked staging directory under /var/lib/machines\n'
+fi
 printf '%s\n' \
-  'create a locked staging image under /var/lib/machines' \
   'install pinned CLI packages with npm lifecycle scripts disabled' \
   'create unprivileged agent user and validate its CLI versions' \
   'lock root login and mask SSH server units' \
@@ -83,8 +110,8 @@ export HTTP_PROXY=${HTTP_PROXY:-http://127.0.0.1:7890}
 export HTTPS_PROXY=${HTTPS_PROXY:-$HTTP_PROXY}
 export http_proxy=$HTTP_PROXY https_proxy=$HTTPS_PROXY
 printf 'create /var/lib/machines and temporary image\n'
-install -d -m 755 "$host_root/var/lib/machines"
-stage=$(mktemp -d "$host_root/var/lib/machines/.cairn-orb-build.XXXXXX")
+install -d -m 755 "$machines_dir"
+stage=$(mktemp -d "$machines_dir/.cairn-orb-build.XXXXXX")
 stage=$(cd -- "$stage" && pwd -P)
 [[ $stage =~ ^/[a-zA-Z0-9/._-]+$ ]] || { printf 'Preserve image at unsupported path: %s\n' "$stage" >&2; exit 1; }
 unmounted() {
@@ -102,9 +129,13 @@ unmounted() {
 cleanup() {
   if [[ -n ${stage:-} && -d $stage ]]; then
     unmounted || return 1
-    printf 'remove incomplete image %s\n' "$stage"; rm -rf -- "$stage"; fi
+    printf 'remove incomplete image %s\n' "$stage"; remove_image "$stage"; fi
 }
 trap cleanup EXIT
+if [[ $filesystem == btrfs ]]; then
+  rmdir -- "$stage"
+  btrfs subvolume create "$stage"
+fi
 pacstrap -K -M "$stage" base git nodejs npm openssh ca-certificates curl
 printf 'configure image and pinned tools\n'
 arch-chroot "$stage" /usr/bin/env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/bin HOME=/root HTTP_PROXY="$HTTP_PROXY" HTTPS_PROXY="$HTTPS_PROXY" http_proxy="$http_proxy" https_proxy="$https_proxy" bash -s -- "$claude_version" "$codex_version" "$agent_uid" "$daemon_entry" "$node_major" <<'GUEST'
@@ -184,7 +215,7 @@ if [[ -e $image ]]; then
     exit 1
   fi
   unmounted "$image"
-  backup=$(mktemp -d "$host_root/var/lib/machines/.cairn-orb-previous.XXXXXX")
+  backup=$(mktemp -d "$machines_dir/.cairn-orb-previous.XXXXXX")
   rmdir -- "$backup"
   printf 'preserve previous base at %s until replacement is registered\n' "$backup"
   mv -T -- "$image" "$backup"
@@ -198,7 +229,7 @@ stage=
 if [[ -n $backup ]]; then
   unmounted "$backup"
   printf 'remove previous base %s\n' "$backup"
-  rm -rf -- "$backup"
+  remove_image "$backup"
 fi
 machinectl list-images --no-legend --no-pager | awk '$1 == "cairn-orb-base" {found=1} END {exit !found}'
 printf '1 changes\n'
