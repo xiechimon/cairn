@@ -2,12 +2,13 @@ import {
   buildSteerBodySchema,
   chiefRewindBodySchema,
   chiefSendMessageBodySchema,
+  coordinatorSendBodySchema,
   patchChiefBodySchema,
 } from '@cairn/shared';
 import type { Hono } from 'hono';
 import type { AppContext } from './context.js';
 import { notFound, parseWith } from './lib/errors.js';
-import { jsonBody, requireTeam, svcOf } from './routes-helpers.js';
+import { jsonBody, requireProject, requireTeam, svcOf } from './routes-helpers.js';
 import { sendBuildSteer } from './services/builds.js';
 import {
   getChiefEnvelope,
@@ -21,6 +22,10 @@ import { answerQuestion, cancelQuestion, parseAnswerBody } from './services/chie
 import { steerChiefMessage, stopChiefTurn, withdrawChiefMessage } from './services/chief-turns.js';
 import { isChiefConversation } from './services/machines.js';
 import {
+  projectCoordinatorThread,
+  sendProjectCoordinatorMessage,
+} from './services/project-coordinator.js';
+import {
   cancelQueuedMessage,
   deliverQueuedMessage,
   queueTaskMessage,
@@ -28,6 +33,25 @@ import {
 
 export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
   const svc = svcOf(ctx);
+
+  const requireTeamProject = (id: string) => {
+    const row = requireProject(ctx, id);
+    if (row.teamId !== ctx.team.id) throw notFound(`project ${id}`);
+    return row;
+  };
+
+  app.get('/api/projects/:id/coordinator', (c) => {
+    const row = requireTeamProject(c.req.param('id'));
+    return c.json({ thread: projectCoordinatorThread(svc, row) });
+  });
+
+  app.post('/api/projects/:id/coordinator/messages', async (c) => {
+    const row = requireTeamProject(c.req.param('id'));
+    const body = parseWith(coordinatorSendBodySchema, await jsonBody(c), 'body');
+    const result = sendProjectCoordinatorMessage(svc, row, body.content);
+    ctx.convHub?.publishMessage(result.thread.id, { ...result.message });
+    return c.json(result, 201);
+  });
 
   app.get('/api/teams/:id/chief', (c) => {
     const teamId = c.req.param('id');

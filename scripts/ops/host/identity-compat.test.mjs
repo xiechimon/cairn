@@ -105,7 +105,13 @@ const commit = (author, messageBody) => ({
 const mergeWithCommits = (t, commits, opener) => {
   const f = fixture(t, prView(commits, opener));
   const result = f.run('bash', [join(hostRoot, 'tools/merge-pr.sh'), '7']);
-  const rebased = result.calls.some((c) => c[0] === 'as-bot' && c.includes('--rebase'));
+  const rebased = result.calls.some(
+    (c) => c[0] === 'gh' && c[1] === 'pr' && c[2] === 'merge' && c.includes('--rebase'),
+  );
+  assert.equal(
+    result.calls.some((c) => c[0] === 'as-bot' && c.includes('merge')),
+    false,
+  );
   return { ...result, rebased };
 };
 
@@ -146,11 +152,11 @@ test('merge-pr still requires exactly one commit for a bot-opened PR', (t) => {
   assert.equal(result.rebased, false);
 });
 
-test('merge-pr queues an unprotected human-opened PR whatever the commit authors', (t) => {
+test('merge-pr leaves an unprotected human-opened PR to Mergify whatever the commit authors', (t) => {
   const result = mergeWithCommits(t, [commit(bot, botBody)], 'xiechimon');
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.rebased, false);
-  assert.ok(result.calls.some((c) => c[0] === 'gh' && c[1] === 'pr' && c[2] === 'comment'));
+  assert.ok(!result.calls.some((c) => c[0] === 'gh' && c[1] === 'pr' && c[2] === 'comment'));
   assert.ok(!result.calls.some((c) => c[0] === 'gh' && c[2] === 'merge'));
 });
 

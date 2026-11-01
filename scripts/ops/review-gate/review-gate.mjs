@@ -1,11 +1,21 @@
 import { execFileSync, spawn } from 'node:child_process';
 import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { resolve as resolvePath } from 'node:path';
 import {
+  BLOCK_ROUNDS,
   claudeFallback,
   claudeReviewArgs,
   claudeReviewPrompt,
   DIFF_LIMIT,
+  diffDigest,
+  escalation,
+  gateVerdicts,
+  HUMAN_LABEL,
+  HUMAN_MARKER,
+  lowRiskTier,
+  parseRawDiff,
   parseRuns,
+  priorFindings,
   stallAlert,
   stalled,
 } from './reviewer-route.mjs';
@@ -106,14 +116,124 @@ const verdictStatus = (body, sha) => {
   if (m[1] === 'BLOCK')
     return { state: 'failure', description: `BLOCK for ${short}; see the review comment` };
   const from = m[2] && body.match(/the reviewed head `([0-9a-f]{8})`/)?.[1];
+  const lowRisk = !m[2] && body.split('\n')[1].includes(`\`${short}\` (low-risk tier):`);
   return {
     state: 'success',
-    description: from ? `PASS (carried over from ${from})` : `PASS for ${short}`,
+    description: from
+      ? `PASS (carried over from ${from})`
+      : lowRisk
+        ? 'PASS (low-risk tier)'
+        : `PASS for ${short}`,
   };
 };
 const publishVerdict = (pr, body, url) => {
   const status = verdictStatus(body, pr.headRefOid);
   if (status) publishStatus(pr, status.state, status.description, url);
+};
+const clearStall = (pr) => {
+  if (!pr.labels.some((l) => l.name === 'review-stalled')) return;
+  try {
+    asBot(['gh', 'pr', 'edit', String(pr.number), '-R', REPO, '--remove-label', 'review-stalled']);
+  } catch {}
+};
+
+const git = (args) =>
+  execFileSync('git', args, {
+    cwd: MAIN,
+    encoding: 'utf8',
+    maxBuffer: 64 << 20,
+    stdio: ['ignore', 'pipe', 'ignore'],
+  });
+const tryGit = (args) => {
+  try {
+    return git(args);
+  } catch {
+    return null;
+  }
+};
+const ownDiff = (ref, args) => {
+  const base = tryGit(['merge-base', 'origin/main', ref])?.trim();
+  return base
+    ? tryGit(['diff', '--no-color', '--no-ext-diff', '--no-renames', ...args, base, ref])
+    : null;
+};
+const ownDigest = (ref) => {
+  const diff = ownDiff(ref, ['--no-textconv', '--binary', '-U0']);
+  return diff === null ? null : diffDigest(diff);
+};
+const ownPaths = (ref) => (ownDiff(ref, ['--name-only', '-z']) ?? '').split('\0').filter(Boolean);
+const writeSince = (from, head, file) => {
+  const paths = [...new Set([...ownPaths(from), ...ownPaths(head)])];
+  const since = paths.length
+    ? tryGit([
+        'diff',
+        '--no-color',
+        '--no-ext-diff',
+        from,
+        head,
+        '--',
+        ...paths.map((p) => `:(literal)${p}`),
+      ])
+    : '';
+  if (since === null) return false;
+  try {
+    writeFileSync(file, since);
+    return true;
+  } catch {
+    return false;
+  }
+};
+const cleanMerge = (sha) => {
+  const parents = (tryGit(['rev-list', '--parents', '-n', '1', sha]) ?? '')
+    .trim()
+    .split(' ')
+    .slice(1);
+  if (parents.length !== 2) return false;
+  const tree = tryGit(['merge-tree', '--write-tree', ...parents])?.split('\n')[0];
+  return Boolean(tree) && tree === tryGit(['rev-parse', `${sha}^{tree}`])?.trim();
+};
+const mergeOnlyFrom = (head, verdicts) => {
+  const last = verdicts.at(-1);
+  if (last?.verdict !== 'PASS') return null;
+  if (tryGit(['merge-base', '--is-ancestor', last.sha, head]) === null) return null;
+  const range = [`${last.sha}..${head}`, '--not', 'origin/main'];
+  if (tryGit(['rev-list', '--no-merges', ...range]) !== '') return null;
+  const merges = (tryGit(['rev-list', '--merges', ...range]) ?? '').split('\n').filter(Boolean);
+  if (!merges.length || !merges.every(cleanMerge)) return null;
+  const digest = ownDigest(head);
+  return digest && digest === ownDigest(last.sha) ? last.sha : null;
+};
+const reachable = (sha) => {
+  if (tryGit(['cat-file', '-e', `${sha}^{commit}`]) !== null) return true;
+  try {
+    execFileSync(BOT, ['git', 'fetch', '-q', 'origin', sha], { cwd: MAIN, stdio: 'ignore' });
+  } catch {}
+  return tryGit(['cat-file', '-e', `${sha}^{commit}`]) !== null;
+};
+
+const handToHuman = (pr, comments, { addLabel, comment: due }) => {
+  if (addLabel)
+    try {
+      asBot(['gh', 'pr', 'edit', String(pr.number), '-R', REPO, '--add-label', HUMAN_LABEL]);
+      record(pr, { action: 'human-label' });
+    } catch (e) {
+      console.log(`#${pr.number}: ${HUMAN_LABEL} label failed; retrying next round\n${e.message}`);
+      return;
+    }
+  let url = comments.filter((c) => c.body.startsWith(HUMAN_MARKER)).at(-1)?.url;
+  if (due)
+    try {
+      url = comment(
+        pr,
+        `${HUMAN_MARKER}${pr.headRefOid} -->\n**Independent review gate: needs a human after ${BLOCK_ROUNDS} BLOCK rounds** for \`${pr.headRefOid.slice(0, 8)}\`. The gate stops reviewing this PR; remove the \`${HUMAN_LABEL}\` label to give it ${BLOCK_ROUNDS} more rounds.`,
+      );
+      record(pr, { action: 'human' });
+    } catch (e) {
+      console.log(`#${pr.number}: needs-a-human comment failed; retrying next round\n${e.message}`);
+      return;
+    }
+  publishStatus(pr, 'failure', `${BLOCK_ROUNDS} BLOCK rounds; needs a human`, url);
+  console.log(`#${pr.number}: ${BLOCK_ROUNDS} BLOCK rounds; waiting for a human`);
 };
 
 const disarmedFile = (pr) => `${STATE}/disarmed/${pr.number}`;
@@ -201,6 +321,11 @@ try {
     const comments = JSON.parse(
       gh(['pr', 'view', String(pr.number), '--json', 'comments']),
     ).comments.filter((c) => c.author?.login === GATE_LOGIN);
+    const handOff = escalation(comments, pr.labels);
+    if (handOff) {
+      handToHuman(pr, comments, handOff);
+      continue;
+    }
     if (comments.some((c) => c.body.includes(marker))) {
       if (comments.some((c) => passedFor(c.body, pr.headRefOid))) rearm(pr);
       const verdict = comments.filter((c) => verdictStatus(c.body, pr.headRefOid)).at(-1);
@@ -247,36 +372,50 @@ try {
             c.body,
           ),
       );
-    if (prior) {
-      const from = prior.body.match(/review-gate:([0-9a-f]{40})/)?.[1] ?? '?';
-      const body = `${marker}\n**Independent review gate: PASS** (carried over) for \`${pr.headRefOid.slice(0, 8)}\`: same patch as the reviewed head \`${from.slice(0, 8)}\`; only the base moved.\n<!-- review-gate-patch:${patch} -->`;
+    const head = `review-gate-${pr.number}`;
+    const verdicts = gateVerdicts(comments);
+    const short = pr.headRefOid.slice(0, 8);
+    const pass = (headline, fields, why) => {
+      const body = `${marker}\n**Independent review gate: PASS** ${headline}\n<!-- review-gate-patch:${patch} -->`;
       const url = comment(pr, body);
-      record(pr, { verdict: 'pass', action: 'carried-over', from });
+      record(pr, { verdict: 'pass', ...fields });
       publishVerdict(pr, body, url);
-      if (pr.labels.some((l) => l.name === 'review-stalled'))
-        try {
-          asBot([
-            'gh',
-            'pr',
-            'edit',
-            String(pr.number),
-            '-R',
-            REPO,
-            '--remove-label',
-            'review-stalled',
-          ]);
-        } catch {}
+      clearStall(pr);
       rearm(pr);
-      console.log(`#${pr.number}: PASS carried over from ${from.slice(0, 8)} (patch unchanged)`);
+      console.log(`#${pr.number}: PASS ${why}`);
+    };
+    const mergedFrom = prior ? null : mergeOnlyFrom(head, verdicts);
+    if (prior || mergedFrom) {
+      const from = mergedFrom ?? prior.body.match(/review-gate:([0-9a-f]{40})/)?.[1] ?? '?';
+      pass(
+        mergedFrom
+          ? `(carried over) for \`${short}\`: the reviewed head \`${from.slice(0, 8)}\` only merged main; its own diff against main is unchanged.`
+          : `(carried over) for \`${short}\`: same patch as the reviewed head \`${from.slice(0, 8)}\`; only the base moved.`,
+        { action: 'carried-over', from, ...(mergedFrom ? { mergeOnly: true } : {}) },
+        `carried over from ${from.slice(0, 8)} (${mergedFrom ? 'only merged main' : 'patch unchanged'})`,
+      );
       continue;
     }
-    const lastBlock = comments
-      .filter(
-        (c) =>
-          /<!-- review-gate:[0-9a-f]{40} -->/.test(c.body) &&
-          /Independent review gate: BLOCK/.test(c.body),
-      )
-      .at(-1);
+    const blocks = verdicts.filter((v) => v.verdict === 'BLOCK');
+    const changes = parseRawDiff(
+      tryGit(['diff', '--raw', '-z', '--no-renames', '--no-abbrev', `origin/main...${head}`]) ?? '',
+    );
+    if (!blocks.length && lowRiskTier(changes, PROTECTED)) {
+      pass(
+        `for \`${short}\` (low-risk tier): every changed file is docs, tests or locale strings, and none is protected.`,
+        { action: 'low-risk' },
+        'low-risk tier',
+      );
+      continue;
+    }
+    const reviewed = blocks.length && verdicts.at(-1).sha;
+    const sinceFile = tryGit(['rev-parse', '--git-path', `${head}-since.diff`])?.trim();
+    const incremental =
+      Boolean(reviewed) &&
+      Boolean(sinceFile) &&
+      reachable(reviewed) &&
+      tryGit(['update-ref', `refs/heads/${head}-reviewed`, reviewed]) !== null &&
+      writeSince(reviewed, head, resolvePath(MAIN, sinceFile));
     const pendingMarker = `<!-- review-gate-pending:${pr.headRefOid} -->`;
     const pendingNoted = comments.some((c) => c.body.includes(pendingMarker));
     const stallNoted = comments.some((c) =>
@@ -288,7 +427,9 @@ try {
       marker,
       patch,
       lane,
-      lastBlock: lastBlock?.body,
+      findings: blocks.length ? priorFindings(blocks) : null,
+      reviewed: incremental ? reviewed : null,
+      sinceFile,
       pendingMarker,
       pendingNoted,
       stallNoted,
@@ -371,12 +512,17 @@ try {
   PR: #${pr.number} ${pr.title}
   Review: \`git diff origin/main...review-gate-${pr.number}\` in this checkout (do not check anything out), plus \`gh pr view ${pr.number} --json title,body\`.
 ${
-  pr.lastBlock
+  pr.findings
     ? `
-  This is a re-review. The previous review blocked an earlier head with the findings below. Check ONLY whether each of those findings is now fixed (answer per finding: fixed / not fixed, with file:line). Do not raise new findings unless the new commits since that review introduce a blocking bug. Block only if a previous blocking finding is not fixed or a new commit broke something.
+  Earlier rounds of this gate blocked this PR with the findings below. Never repeat an already-reported finding unless it is still unfixed; then report it once more, marked "still unfixed", with its current file:line. Do not list fixed findings.
+${
+  pr.reviewed
+    ? `  Judge ONLY the changes since the last reviewed head \`${pr.reviewed.slice(0, 8)}\` (local branch \`review-gate-${pr.number}-reviewed\`): read \`${pr.sinceFile}\` in this checkout, the diff from that head to this one over every file this PR changes now or changed then. Lines that main brought in through a merge are not this PR's. Use the full diff for context only, and raise no new finding about code that did not change since \`${pr.reviewed.slice(0, 8)}\`. Block only if an earlier blocking finding is still unfixed or the changes since \`${pr.reviewed.slice(0, 8)}\` introduce a blocking bug.`
+    : '  The last reviewed head is no longer available, so review the full diff.'
+}
 
-  Previous review:
-  ${pr.lastBlock.replace(/<!--[^>]*-->/g, '').slice(0, 6000)}
+  Earlier findings:
+  ${pr.findings}
 `
     : ''
 }
@@ -436,6 +582,14 @@ ${
               ...routed,
               stderr: `${routed.stderr}\nclaude fallback: diff of ${diff.length} characters exceeds ${DIFF_LIMIT}; no partial review`,
             });
+          if (pr.reviewed) {
+            const from = pr.reviewed.slice(0, 8);
+            const since = readFileSync(resolvePath(MAIN, pr.sinceFile), 'utf8');
+            input +=
+              diff.length + since.length > DIFF_LIMIT
+                ? `\n\nThe changes since \`${from}\` are too large to show separately; review the full diff.`
+                : `\n\nChanges since \`${from}\` in this PR's files:\n\`\`\`diff\n${since}\n\`\`\``;
+          }
         } catch (e) {
           return resolve({ ...routed, stderr: `${routed.stderr}\nclaude fallback: ${e.message}` });
         }
@@ -480,21 +634,6 @@ ${
           `#${pr.number}: review-stalled label failed; retrying next round\n${e.message}`,
         );
       }
-  };
-  const clearStall = (pr) => {
-    if (!pr.labels.some((l) => l.name === 'review-stalled')) return;
-    try {
-      asBot([
-        'gh',
-        'pr',
-        'edit',
-        String(pr.number),
-        '-R',
-        REPO,
-        '--remove-label',
-        'review-stalled',
-      ]);
-    } catch {}
   };
   const finish = (pr, run) => {
     const out = run.stdout;

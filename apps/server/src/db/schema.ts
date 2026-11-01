@@ -89,6 +89,7 @@ export const project = sqliteTable('project', {
   baseBranch: text('baseBranch'),
   icon: text('icon').$type<ProjectIcon>(),
   color: text('color').$type<ProjectColor>(),
+  archivedAt: epochMs('archivedAt'),
   autonomy: json<
     (AutonomySettings & Partial<ProjectMergeConfig> & { shipRoute?: ShipRoute }) | null
   >('autonomy'),
@@ -639,6 +640,7 @@ export const chiefThread = sqliteTable('chief_thread', {
   chiefId: text('chiefId').notNull(),
   userId: text('userId').notNull(),
   teamId: text('teamId').notNull(),
+  projectId: text('projectId'),
   title: text('title').notNull(),
   createdAt: epochMs('createdAt').notNull(),
   updatedAt: epochMs('updatedAt').notNull(),

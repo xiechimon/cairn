@@ -1,0 +1,512 @@
+[
+  {
+    "name": "bind the Coordinator agent",
+    "request": "PATCH /api/teams/vB1TU5kbd_SpX06FyUbLl/chief",
+    "body": {
+      "chief": {
+        "id": "chief-LHyZQmwPXNBQ1lU86WtMt-vB1TU5kbd_SpX06FyUbLl",
+        "userId": "LHyZQmwPXNBQ1lU86WtMt",
+        "teamId": "vB1TU5kbd_SpX06FyUbLl",
+        "agent": {
+          "agentId": "l7jSTBFMtvOBNSbIcu_07"
+        },
+        "charter": "",
+        "lastTurnAt": null,
+        "createdAt": 1793536278282,
+        "tz": "Asia/Singapore"
+      },
+      "agentActor": {
+        "id": "l7jSTBFMtvOBNSbIcu_07",
+        "displayName": "Coordinator",
+        "description": null,
+        "status": "active",
+        "avatarUrl": null,
+        "provider": "stub-gw",
+        "modelId": "stub-model",
+        "thinkingLevel": null,
+        "tools": [
+          "推送分支"
+        ],
+        "secrets": [],
+        "defaultSkill": null,
+        "skillsAllowlist": null,
+        "mcpServers": [],
+        "machineId": "4cgwfNJht8qLT-q7trcJC"
+      },
+      "context": null,
+      "watches": [],
+      "wakes": [],
+      "orchestration": {
+        "homeMachineId": "4cgwfNJht8qLT-q7trcJC",
+        "activity": []
+      },
+      "outage": null
+    },
+    "status": 200
+  },
+  {
+    "name": "create project api-latency",
+    "request": "POST /api/projects",
+    "body": {
+      "id": "7nkzFMCKDWkN2lFfuZlnq",
+      "name": "api-latency",
+      "teamId": "vB1TU5kbd_SpX06FyUbLl",
+      "splitPolicy": "human",
+      "baseBranch": null,
+      "archivedAt": null,
+      "mergePolicy": "autonomous",
+      "localChecks": [],
+      "requireUpToDate": false
+    },
+    "status": 201
+  },
+  {
+    "name": "no conversation yet",
+    "request": "GET /api/projects/7nkzFMCKDWkN2lFfuZlnq/coordinator",
+    "status": 200,
+    "body": {
+      "thread": null
+    }
+  },
+  {
+    "name": "first message opens it",
+    "request": "POST /api/projects/7nkzFMCKDWkN2lFfuZlnq/coordinator/messages",
+    "body": {
+      "thread": {
+        "id": "chief-01a19717-bf28-7590-93be-02f7adca6dcf",
+        "chiefId": "chief-LHyZQmwPXNBQ1lU86WtMt-vB1TU5kbd_SpX06FyUbLl",
+        "userId": "LHyZQmwPXNBQ1lU86WtMt",
+        "teamId": "vB1TU5kbd_SpX06FyUbLl",
+        "projectId": "7nkzFMCKDWkN2lFfuZlnq",
+        "title": "Make a plan",
+        "createdAt": 1793536278312,
+        "updatedAt": 1793536278312,
+        "lastTurnAt": null,
+        "session": {
+          "runtime": "pi",
+          "id": "",
+          "openedAt": 1793536278312
+        },
+        "pendingSessionResumeAt": null,
+        "toolDefHashes": {
+          "projects": "FW60_FjNnZL4",
+          "todos": "uLzUOv7bFTBV",
+          "agents": "GWdG2KpgKv5_",
+          "models": "60ZlTYhl5ads",
+          "machines": "pCsJIF7evK6-",
+          "skills": "qrlBCLlVVAG_",
+          "secrets": "CX0KIW3tpMKf",
+          "mcp_servers": "YK5D0P3KMuMC",
+          "schedules": "v4_VyDYhdqeH",
+          "docs": "wzcaieklSJAX",
+          "usage": "XvKL3XM6tHOZ",
+          "issues": "a3-H2cwsZlrl",
+          "pull_requests": "M2cLODjGpuhR",
+          "workflow_runs": "kCfhtkc4Ctvr",
+          "attachment": "_E-u1oKHyVBj",
+          "conversation": "JodxpOI48YP9",
+          "create_todo": "zyW0rfA1DiD8",
+          "split_todo": "434yeEF-2q-J",
+          "update_todo": "u1fP8P_D26Ge",
+          "delete_todos": "hZFJUor4NH5H",
+          "close_todos": "PD7BAQB8NXYZ",
+          "reopen_todos": "h0Esa6EoRR_i",
+          "complete_todos": "-zSk9Q7oPJV6",
+          "message_todo": "MT-6EYFrPWai",
+          "create_project": "50Xg5pl5Sfuz",
+          "update_project": "4C2iO3t5l-nh",
+          "connect_repo": "TGxFoySYg_Mn",
+          "create_agent": "Ue_N86ODAg81",
+          "update_agent": "TJ_kbRO9X18X",
+          "delete_agents": "XKQDbdR_F1jq",
+          "create_skill": "3Yn6RqD7IrgE",
+          "update_skill": "1EvHxVIrCjqw",
+          "set_secret": "gFag3kaqJh2w",
+          "delete_secrets": "5w-QjvnoCgqX",
+          "schedule_todo": "qqjEvlbNxkF6",
+          "unschedule_todo": "0ZyPOUtmsoa6",
+          "snooze_todos": "uGf1CcgeWFZB",
+          "run_builds": "Mag9km33BkZg",
+          "run_review": "-MOgigsR4NtU",
+          "confirm_builds": "Y7xbAmvYhTqo",
+          "cancel_builds": "60i3R2mDrr9P",
+          "merge_builds": "l-j3LSi8_Pqb",
+          "ask_user": "OvlyeHsXUWlv",
+          "notify_user": "rPIgCSgaVDJj",
+          "save_memory": "ywrNI2Xnc8Gh",
+          "update_memory": "freZEGyHM5Dc",
+          "delete_memory": "NQROnfvEUP9q",
+          "memories": "hs0Qg2_XCjyY",
+          "watch_todos": "FEd8hcCSmKHq",
+          "unwatch_todos": "3x95_gGi2QmK",
+          "wakes": "dLUw1wjUh5uG",
+          "set_wake": "QAandJbUK-ep",
+          "clear_wake": "FfZbBcW3XWzA"
+        },
+        "toolResultHashes": {},
+        "activeRun": null,
+        "turnQueue": {
+          "position": 1,
+          "waitingFor": {
+            "machineId": "4cgwfNJht8qLT-q7trcJC",
+            "name": "coordinator-walk-machine",
+            "running": 0,
+            "capacity": 3
+          },
+          "blocked": {
+            "kind": "machine-offline",
+            "missing": []
+          }
+        }
+      },
+      "message": {
+        "id": "SYsA-BJWV6DcIy8ulc74J",
+        "role": "user",
+        "content": "Make a plan",
+        "createdAt": 1793536278312
+      }
+    },
+    "status": 201
+  },
+  {
+    "name": "second message reuses it",
+    "request": "POST /api/projects/7nkzFMCKDWkN2lFfuZlnq/coordinator/messages",
+    "body": {
+      "thread": {
+        "id": "chief-01a19717-bf28-7590-93be-02f7adca6dcf",
+        "chiefId": "chief-LHyZQmwPXNBQ1lU86WtMt-vB1TU5kbd_SpX06FyUbLl",
+        "userId": "LHyZQmwPXNBQ1lU86WtMt",
+        "teamId": "vB1TU5kbd_SpX06FyUbLl",
+        "projectId": "7nkzFMCKDWkN2lFfuZlnq",
+        "title": "Make a plan",
+        "createdAt": 1793536278312,
+        "updatedAt": 1793536278315,
+        "lastTurnAt": null,
+        "session": {
+          "runtime": "pi",
+          "id": "",
+          "openedAt": 1793536278312
+        },
+        "pendingSessionResumeAt": null,
+        "toolDefHashes": {
+          "projects": "FW60_FjNnZL4",
+          "todos": "uLzUOv7bFTBV",
+          "agents": "GWdG2KpgKv5_",
+          "models": "60ZlTYhl5ads",
+          "machines": "pCsJIF7evK6-",
+          "skills": "qrlBCLlVVAG_",
+          "secrets": "CX0KIW3tpMKf",
+          "mcp_servers": "YK5D0P3KMuMC",
+          "schedules": "v4_VyDYhdqeH",
+          "docs": "wzcaieklSJAX",
+          "usage": "XvKL3XM6tHOZ",
+          "issues": "a3-H2cwsZlrl",
+          "pull_requests": "M2cLODjGpuhR",
+          "workflow_runs": "kCfhtkc4Ctvr",
+          "attachment": "_E-u1oKHyVBj",
+          "conversation": "JodxpOI48YP9",
+          "create_todo": "zyW0rfA1DiD8",
+          "split_todo": "434yeEF-2q-J",
+          "update_todo": "u1fP8P_D26Ge",
+          "delete_todos": "hZFJUor4NH5H",
+          "close_todos": "PD7BAQB8NXYZ",
+          "reopen_todos": "h0Esa6EoRR_i",
+          "complete_todos": "-zSk9Q7oPJV6",
+          "message_todo": "MT-6EYFrPWai",
+          "create_project": "50Xg5pl5Sfuz",
+          "update_project": "4C2iO3t5l-nh",
+          "connect_repo": "TGxFoySYg_Mn",
+          "create_agent": "Ue_N86ODAg81",
+          "update_agent": "TJ_kbRO9X18X",
+          "delete_agents": "XKQDbdR_F1jq",
+          "create_skill": "3Yn6RqD7IrgE",
+          "update_skill": "1EvHxVIrCjqw",
+          "set_secret": "gFag3kaqJh2w",
+          "delete_secrets": "5w-QjvnoCgqX",
+          "schedule_todo": "qqjEvlbNxkF6",
+          "unschedule_todo": "0ZyPOUtmsoa6",
+          "snooze_todos": "uGf1CcgeWFZB",
+          "run_builds": "Mag9km33BkZg",
+          "run_review": "-MOgigsR4NtU",
+          "confirm_builds": "Y7xbAmvYhTqo",
+          "cancel_builds": "60i3R2mDrr9P",
+          "merge_builds": "l-j3LSi8_Pqb",
+          "ask_user": "OvlyeHsXUWlv",
+          "notify_user": "rPIgCSgaVDJj",
+          "save_memory": "ywrNI2Xnc8Gh",
+          "update_memory": "freZEGyHM5Dc",
+          "delete_memory": "NQROnfvEUP9q",
+          "memories": "hs0Qg2_XCjyY",
+          "watch_todos": "FEd8hcCSmKHq",
+          "unwatch_todos": "3x95_gGi2QmK",
+          "wakes": "dLUw1wjUh5uG",
+          "set_wake": "QAandJbUK-ep",
+          "clear_wake": "FfZbBcW3XWzA"
+        },
+        "toolResultHashes": {},
+        "activeRun": {
+          "phase": "chief"
+        },
+        "turnQueue": {
+          "position": 2,
+          "waitingFor": {
+            "machineId": "4cgwfNJht8qLT-q7trcJC",
+            "name": "coordinator-walk-machine",
+            "running": 0,
+            "capacity": 3
+          },
+          "blocked": {
+            "kind": "machine-offline",
+            "missing": []
+          }
+        }
+      },
+      "message": {
+        "id": "6AvXdODg7-NHxQleTIlU4",
+        "role": "user",
+        "content": "Add a repo",
+        "createdAt": 1793536278324
+      }
+    },
+    "status": 201
+  },
+  {
+    "name": "the project conversation",
+    "request": "GET /api/projects/7nkzFMCKDWkN2lFfuZlnq/coordinator",
+    "status": 200,
+    "body": {
+      "thread": {
+        "id": "chief-01a19717-bf28-7590-93be-02f7adca6dcf",
+        "chiefId": "chief-LHyZQmwPXNBQ1lU86WtMt-vB1TU5kbd_SpX06FyUbLl",
+        "userId": "LHyZQmwPXNBQ1lU86WtMt",
+        "teamId": "vB1TU5kbd_SpX06FyUbLl",
+        "projectId": "7nkzFMCKDWkN2lFfuZlnq",
+        "title": "Make a plan",
+        "createdAt": 1793536278312,
+        "updatedAt": 1793536278325,
+        "lastTurnAt": null,
+        "session": {
+          "runtime": "pi",
+          "id": "",
+          "openedAt": 1793536278312
+        },
+        "pendingSessionResumeAt": null,
+        "toolDefHashes": {
+          "projects": "FW60_FjNnZL4",
+          "todos": "uLzUOv7bFTBV",
+          "agents": "GWdG2KpgKv5_",
+          "models": "60ZlTYhl5ads",
+          "machines": "pCsJIF7evK6-",
+          "skills": "qrlBCLlVVAG_",
+          "secrets": "CX0KIW3tpMKf",
+          "mcp_servers": "YK5D0P3KMuMC",
+          "schedules": "v4_VyDYhdqeH",
+          "docs": "wzcaieklSJAX",
+          "usage": "XvKL3XM6tHOZ",
+          "issues": "a3-H2cwsZlrl",
+          "pull_requests": "M2cLODjGpuhR",
+          "workflow_runs": "kCfhtkc4Ctvr",
+          "attachment": "_E-u1oKHyVBj",
+          "conversation": "JodxpOI48YP9",
+          "create_todo": "zyW0rfA1DiD8",
+          "split_todo": "434yeEF-2q-J",
+          "update_todo": "u1fP8P_D26Ge",
+          "delete_todos": "hZFJUor4NH5H",
+          "close_todos": "PD7BAQB8NXYZ",
+          "reopen_todos": "h0Esa6EoRR_i",
+          "complete_todos": "-zSk9Q7oPJV6",
+          "message_todo": "MT-6EYFrPWai",
+          "create_project": "50Xg5pl5Sfuz",
+          "update_project": "4C2iO3t5l-nh",
+          "connect_repo": "TGxFoySYg_Mn",
+          "create_agent": "Ue_N86ODAg81",
+          "update_agent": "TJ_kbRO9X18X",
+          "delete_agents": "XKQDbdR_F1jq",
+          "create_skill": "3Yn6RqD7IrgE",
+          "update_skill": "1EvHxVIrCjqw",
+          "set_secret": "gFag3kaqJh2w",
+          "delete_secrets": "5w-QjvnoCgqX",
+          "schedule_todo": "qqjEvlbNxkF6",
+          "unschedule_todo": "0ZyPOUtmsoa6",
+          "snooze_todos": "uGf1CcgeWFZB",
+          "run_builds": "Mag9km33BkZg",
+          "run_review": "-MOgigsR4NtU",
+          "confirm_builds": "Y7xbAmvYhTqo",
+          "cancel_builds": "60i3R2mDrr9P",
+          "merge_builds": "l-j3LSi8_Pqb",
+          "ask_user": "OvlyeHsXUWlv",
+          "notify_user": "rPIgCSgaVDJj",
+          "save_memory": "ywrNI2Xnc8Gh",
+          "update_memory": "freZEGyHM5Dc",
+          "delete_memory": "NQROnfvEUP9q",
+          "memories": "hs0Qg2_XCjyY",
+          "watch_todos": "FEd8hcCSmKHq",
+          "unwatch_todos": "3x95_gGi2QmK",
+          "wakes": "dLUw1wjUh5uG",
+          "set_wake": "QAandJbUK-ep",
+          "clear_wake": "FfZbBcW3XWzA"
+        },
+        "toolResultHashes": {},
+        "activeRun": {
+          "phase": "chief"
+        }
+      }
+    }
+  },
+  {
+    "name": "archive",
+    "request": "POST /api/projects/7nkzFMCKDWkN2lFfuZlnq/archive",
+    "status": 200,
+    "body": {
+      "id": "7nkzFMCKDWkN2lFfuZlnq",
+      "name": "api-latency",
+      "teamId": "vB1TU5kbd_SpX06FyUbLl",
+      "splitPolicy": "human",
+      "baseBranch": null,
+      "archivedAt": 1793536278335,
+      "mergePolicy": "autonomous",
+      "localChecks": [],
+      "requireUpToDate": false
+    }
+  },
+  {
+    "name": "send while archived",
+    "request": "POST /api/projects/7nkzFMCKDWkN2lFfuZlnq/coordinator/messages",
+    "body": {
+      "error": "project 7nkzFMCKDWkN2lFfuZlnq is archived"
+    },
+    "status": 409
+  },
+  {
+    "name": "follow-up via conversation route while archived",
+    "request": "POST /api/conversations/chief-01a19717-bf28-7590-93be-02f7adca6dcf/messages",
+    "body": {
+      "error": "project 7nkzFMCKDWkN2lFfuZlnq is archived"
+    },
+    "status": 409
+  },
+  {
+    "name": "unarchive",
+    "request": "POST /api/projects/7nkzFMCKDWkN2lFfuZlnq/unarchive",
+    "status": 200,
+    "body": {
+      "id": "7nkzFMCKDWkN2lFfuZlnq",
+      "name": "api-latency",
+      "teamId": "vB1TU5kbd_SpX06FyUbLl",
+      "splitPolicy": "human",
+      "baseBranch": null,
+      "archivedAt": null,
+      "mergePolicy": "autonomous",
+      "localChecks": [],
+      "requireUpToDate": false
+    }
+  },
+  {
+    "name": "send after unarchive",
+    "request": "POST /api/projects/7nkzFMCKDWkN2lFfuZlnq/coordinator/messages",
+    "body": {
+      "thread": {
+        "id": "chief-01a19717-bf28-7590-93be-02f7adca6dcf",
+        "chiefId": "chief-LHyZQmwPXNBQ1lU86WtMt-vB1TU5kbd_SpX06FyUbLl",
+        "userId": "LHyZQmwPXNBQ1lU86WtMt",
+        "teamId": "vB1TU5kbd_SpX06FyUbLl",
+        "projectId": "7nkzFMCKDWkN2lFfuZlnq",
+        "title": "Make a plan",
+        "createdAt": 1793536278312,
+        "updatedAt": 1793536278325,
+        "lastTurnAt": null,
+        "session": {
+          "runtime": "pi",
+          "id": "",
+          "openedAt": 1793536278312
+        },
+        "pendingSessionResumeAt": null,
+        "toolDefHashes": {
+          "projects": "FW60_FjNnZL4",
+          "todos": "uLzUOv7bFTBV",
+          "agents": "GWdG2KpgKv5_",
+          "models": "60ZlTYhl5ads",
+          "machines": "pCsJIF7evK6-",
+          "skills": "qrlBCLlVVAG_",
+          "secrets": "CX0KIW3tpMKf",
+          "mcp_servers": "YK5D0P3KMuMC",
+          "schedules": "v4_VyDYhdqeH",
+          "docs": "wzcaieklSJAX",
+          "usage": "XvKL3XM6tHOZ",
+          "issues": "a3-H2cwsZlrl",
+          "pull_requests": "M2cLODjGpuhR",
+          "workflow_runs": "kCfhtkc4Ctvr",
+          "attachment": "_E-u1oKHyVBj",
+          "conversation": "JodxpOI48YP9",
+          "create_todo": "zyW0rfA1DiD8",
+          "split_todo": "434yeEF-2q-J",
+          "update_todo": "u1fP8P_D26Ge",
+          "delete_todos": "hZFJUor4NH5H",
+          "close_todos": "PD7BAQB8NXYZ",
+          "reopen_todos": "h0Esa6EoRR_i",
+          "complete_todos": "-zSk9Q7oPJV6",
+          "message_todo": "MT-6EYFrPWai",
+          "create_project": "50Xg5pl5Sfuz",
+          "update_project": "4C2iO3t5l-nh",
+          "connect_repo": "TGxFoySYg_Mn",
+          "create_agent": "Ue_N86ODAg81",
+          "update_agent": "TJ_kbRO9X18X",
+          "delete_agents": "XKQDbdR_F1jq",
+          "create_skill": "3Yn6RqD7IrgE",
+          "update_skill": "1EvHxVIrCjqw",
+          "set_secret": "gFag3kaqJh2w",
+          "delete_secrets": "5w-QjvnoCgqX",
+          "schedule_todo": "qqjEvlbNxkF6",
+          "unschedule_todo": "0ZyPOUtmsoa6",
+          "snooze_todos": "uGf1CcgeWFZB",
+          "run_builds": "Mag9km33BkZg",
+          "run_review": "-MOgigsR4NtU",
+          "confirm_builds": "Y7xbAmvYhTqo",
+          "cancel_builds": "60i3R2mDrr9P",
+          "merge_builds": "l-j3LSi8_Pqb",
+          "ask_user": "OvlyeHsXUWlv",
+          "notify_user": "rPIgCSgaVDJj",
+          "save_memory": "ywrNI2Xnc8Gh",
+          "update_memory": "freZEGyHM5Dc",
+          "delete_memory": "NQROnfvEUP9q",
+          "memories": "hs0Qg2_XCjyY",
+          "watch_todos": "FEd8hcCSmKHq",
+          "unwatch_todos": "3x95_gGi2QmK",
+          "wakes": "dLUw1wjUh5uG",
+          "set_wake": "QAandJbUK-ep",
+          "clear_wake": "FfZbBcW3XWzA"
+        },
+        "toolResultHashes": {},
+        "activeRun": {
+          "phase": "chief"
+        },
+        "turnQueue": {
+          "position": 3,
+          "waitingFor": {
+            "machineId": "4cgwfNJht8qLT-q7trcJC",
+            "name": "coordinator-walk-machine",
+            "running": 0,
+            "capacity": 3
+          },
+          "blocked": {
+            "kind": "machine-offline",
+            "missing": []
+          }
+        }
+      },
+      "message": {
+        "id": "rV3n_Ak185ylu5qOKijSK",
+        "role": "user",
+        "content": "Pick up recent work",
+        "createdAt": 1793536278362
+      }
+    },
+    "status": 201
+  },
+  {
+    "name": "team thread list leaves the project conversation out",
+    "request": "GET /api/teams/vB1TU5kbd_SpX06FyUbLl/chief/threads",
+    "status": 200,
+    "containsProjectThread": false
+  }
+]

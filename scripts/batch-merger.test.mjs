@@ -18,14 +18,6 @@ const required = [
   'ops-backup-test',
 ];
 const skippable = ['dead-class-gate', 'ops-backup-test'];
-const queueBody = (sha = head) => `@mergifyio queue\n<!-- batch-merger-queued:${sha} -->`;
-const today = new Date().toISOString().slice(0, 10);
-const queueRequest = (sha = head, created_at = `${today}T01:00:00Z`) => ({
-  id: 50,
-  user: { login: 'cairnwright[bot]' },
-  created_at,
-  body: queueBody(sha),
-});
 const pull = (number = 1) => ({
   number,
   node_id: `pr${number}`,
@@ -86,8 +78,7 @@ if(args[0] === 'pr') process.exit(0);
 if(p === 'graphql') { console.log(JSON.stringify({data:{disablePullRequestAutoMerge:{pullRequest:{number:1}}}})); }
 
 else if(p.includes('/issues?')) { if(d.markerError) process.exit(1); const countFile = process.env.DATA+'.count'; const count = fs.existsSync(countFile) ? Number(fs.readFileSync(countFile,'utf8')) : 0; fs.writeFileSync(countFile,String(count+1)); console.log(JSON.stringify([d.pauseOnSecondLookup && count > 0 ? [{number:4}] : d.issues ?? []])); }
-else if(p.includes('/pulls?')) { if(p.includes('state=closed')) { if(d.closedError) process.exit(1); console.log(JSON.stringify(d.closedPages?.[Number(new URL('https://api/'+p).searchParams.get('page') ?? 1)-1] ?? (d.closed ?? []).map(pr=>({...pr,updated_at:pr.updated_at ?? new Date().toISOString()})))); } else console.log(JSON.stringify([d.pulls])); }
-else if(p.includes('/issues/comments?since=')) { if(d.queueError) process.exit(1); console.log(JSON.stringify(d.queuePages ?? [d.queueComments ?? []])); }
+else if(p.includes('/pulls?')) { if(p.includes('state=closed')) { if(d.closedError) process.exit(1); const page = Number(new URL('https://api/'+p).searchParams.get('page') ?? 1); console.log(JSON.stringify(page === 1 ? (d.closed ?? []).map(pr=>({...pr,updated_at:pr.updated_at ?? new Date().toISOString()})) : [])); } else console.log(JSON.stringify([d.pulls])); }
 else if(p.includes('/check-runs')) { if(d.checkError) process.exit(1); console.log(JSON.stringify([{check_runs:d.checks}])); }
 else if(p.endsWith('/comments?per_page=100')) console.log(JSON.stringify([d.comments]));
 else if(p.endsWith('/commits?per_page=100')) console.log(JSON.stringify([d.commits]));
@@ -128,15 +119,23 @@ else process.exit(2);
     calls.filter((args) => args[0] === 'pr' && args[1] === 'merge'),
     [],
   );
-  return {
-    result,
-    calls,
-    queues: calls.filter(
+  assert.deepEqual(
+    calls.filter(
       (args) =>
         args.includes('--method') &&
         args[1].endsWith('/comments') &&
-        JSON.parse(args.at(-1)).body.startsWith('@mergifyio queue'),
+        JSON.parse(args.at(-1)).body.includes('@mergifyio'),
     ),
+    [],
+  );
+  return {
+    result,
+    calls,
+    queues: result.stdout
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => JSON.parse(line))
+      .filter((decision) => decision.action === 'auto-queue'),
   };
 }
 for (const [name, data] of [
@@ -168,7 +167,6 @@ for (const [name, data] of [
       ],
     },
   ],
-  ['cap reached', { args: ['--daily-cap', '1'], queueComments: [queueRequest('c'.repeat(40))] }],
   ['recovery label', { pulls: [{ ...pull(), labels: [{ name: 'cairn-recovery' }] }] }],
   ['draft', { pulls: [{ ...pull(), draft: true }] }],
   ['other base', { pulls: [{ ...pull(), base: { ref: 'release' } }] }],
@@ -189,17 +187,17 @@ test('armed batch auto-merge is disarmed even while paused', (t) => {
   assert.ok(f.calls.some((args) => args.includes('pullRequestId=pr1')));
   assert.equal(f.queues.length, 0);
 });
-test('all green queues every eligible head through Mergify instead of merging', (t) => {
+test('all green leaves every eligible head to Mergify without writing or merging', (t) => {
   const f = fixture(t, { pulls: [pull(), pull(2)] });
   assert.equal(f.result.status, 0, f.result.stderr);
   assert.deepEqual(
-    f.queues.map((args) => [args[1], JSON.parse(args.at(-1)).body]),
-    [
-      ['repos/owner/repo/issues/1/comments', queueBody()],
-      ['repos/owner/repo/issues/2/comments', queueBody()],
-    ],
+    f.queues.map((decision) => decision.pr),
+    [1, 2],
   );
-  assert.ok(f.calls.filter((args) => args[1]?.includes('/issues?')).length >= 2);
+  const methodWrites = f.calls.filter((args) => args.includes('--method'));
+  assert.equal(methodWrites.length, 2);
+  for (const args of methodWrites)
+    assert.deepEqual(JSON.parse(args.at(-1)), { labels: ['queue-admit'] });
 });
 test('non-batch branches are ignored entirely', (t) => {
   const f = fixture(t, {
@@ -214,9 +212,9 @@ test('non-batch branches are ignored entirely', (t) => {
 test('dry-run writes nothing', (t) => {
   const f = fixture(t, { args: ['--dry-run'], pulls: [{ ...pull(), auto_merge: {} }] });
   assert.equal(f.result.status, 0, f.result.stderr);
-  assert.equal(f.queues.length, 0);
   assert.ok(!f.calls.some((args) => args.includes('graphql') || args.includes('POST')));
-  assert.match(f.result.stdout, /would-queue/);
+  assert.match(f.result.stdout, /would-disarm/);
+  assert.equal(f.queues.length, 1);
 });
 test('latest required run wins over an older success', (t) => {
   const checks = required.map((name, id) => ({
@@ -318,11 +316,120 @@ test('the latest review for this head blocks an older pass', (t) => {
   }));
   assert.equal(fixture(t, { comments }).queues.length, 0);
 });
-test('a failed queue comment is an error', (t) => {
-  const f = fixture(t, { writeError: true });
+test('mergify-config exports the admit label the merger writes', async () => {
+  const { admitLabel } = await import('./mergify-config.mjs');
+  assert.equal(admitLabel, 'queue-admit');
+  assert.match(readFileSync('.mergify.yml', 'utf8'), /- label = queue-admit/);
+});
+const today = new Date().toISOString();
+const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+const mergedBatch = (number, mergedAt = today, ref = 'B1/done') => ({
+  number,
+  head: { ref, sha: 'd'.repeat(40), repo: { full_name: 'owner/repo' } },
+  labels: [],
+  merged_at: mergedAt,
+});
+const admitAdds = (f) =>
+  writes(f).filter(
+    (args) => args[1].endsWith('/labels') && JSON.parse(args.at(-1)).labels.includes('queue-admit'),
+  );
+const decisions = (f) =>
+  f.result.stdout
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
+const capped = (f) =>
+  decisions(f)
+    .filter((decision) => decision.action === 'skip' && decision.reasons.includes('daily-cap'))
+    .map((decision) => decision.pr);
+const admitted = (number = 1) => ({
+  ...pull(number),
+  labels: [{ name: 'review-gate' }, { name: 'queue-admit' }],
+});
+test('the cap admits up to the remaining room and leaves the rest unadmitted', (t) => {
+  const f = fixture(t, {
+    args: ['--daily-cap', '2'],
+    pulls: [pull(1), pull(2)],
+    closed: [mergedBatch(50)],
+  });
+  assert.equal(f.result.status, 0, f.result.stdout + f.result.stderr);
+  assert.deepEqual(
+    f.queues.map((decision) => decision.pr),
+    [1],
+  );
+  assert.deepEqual(capped(f), [2]);
+  const adds = admitAdds(f);
+  assert.equal(adds.length, 1);
+  assert.equal(adds[0][1], 'repos/owner/repo/issues/1/labels');
+});
+test('a zero cap admits no batch PR, so none can enter the queue', (t) => {
+  const f = fixture(t, { args: ['--daily-cap', '0'], pulls: [pull(1), pull(2)] });
+  assert.equal(f.result.status, 0, f.result.stdout + f.result.stderr);
+  assert.equal(f.queues.length, 0);
+  assert.deepEqual(capped(f), [1, 2]);
+  assert.equal(writes(f).length, 0);
+});
+test('an eligible batch PR the merger has not admitted cannot match the queue rule', () => {
+  const config = readFileSync('.mergify.yml', 'utf8');
+  for (const rule of config.split('merge_protections_settings:')[0].split('\n  - name: ').slice(1))
+    assert.match(rule, / {6}- or:\n {10}- -head ~= \^B\[0-9\]\+\/\n {10}- label = queue-admit\n/);
+});
+test('an admitted PR keeps its admission without another write and counts against the cap', (t) => {
+  const f = fixture(t, { args: ['--daily-cap', '1'], pulls: [admitted(1), pull(2)] });
+  assert.equal(f.result.status, 0, f.result.stdout + f.result.stderr);
+  assert.equal(writes(f).length, 0);
+  assert.deepEqual(
+    f.queues.map((decision) => decision.pr),
+    [1],
+  );
+  assert.deepEqual(capped(f), [2]);
+});
+test('batch PRs merged yesterday do not count against today', (t) => {
+  const f = fixture(t, {
+    args: ['--daily-cap', '1'],
+    closed: [mergedBatch(50, `${yesterday}T23:00:00Z`)],
+  });
+  assert.equal(f.queues.length, 1, f.result.stdout + f.result.stderr);
+  assert.equal(admitAdds(f).length, 1);
+});
+test('closed unmerged, non-batch and fork PRs do not count', (t) => {
+  const f = fixture(t, {
+    args: ['--daily-cap', '1'],
+    closed: [
+      { ...mergedBatch(50), merged_at: null },
+      mergedBatch(51, today, 'feature/x'),
+      { ...mergedBatch(52), head: { ...mergedBatch(52).head, repo: { full_name: 'fork/repo' } } },
+    ],
+  });
+  assert.equal(f.queues.length, 1, f.result.stdout + f.result.stderr);
+});
+test('an open admitted batch PR that is not eligible still counts as an admission', (t) => {
+  const other = {
+    ...admitted(9),
+    head: { ...pull().head, ref: 'B2/other', sha: 'e'.repeat(40) },
+  };
+  const f = fixture(t, { args: ['--daily-cap', '1'], pulls: [other, pull(1)] });
+  assert.deepEqual(capped(f), [1]);
+  assert.equal(admitAdds(f).length, 0);
+});
+test('a failed admit write is an error and does not queue', (t) => {
+  const f = fixture(t, { args: ['--daily-cap', '1'], pulls: [pull(1)], writeError: true });
   assert.equal(f.result.status, 1);
+  assert.equal(f.queues.length, 0);
   assert.match(f.result.stdout, /"action":"error"/);
-  assert.doesNotMatch(f.result.stdout, /"action":"queued"/);
+});
+test('a closed-PR lookup failure is an error and admits nothing', (t) => {
+  const f = fixture(t, { pulls: [pull(1)], closedError: true });
+  assert.equal(f.result.status, 1);
+  assert.equal(f.queues.length, 0);
+  assert.equal(writes(f).length, 0);
+});
+test('dry-run reports admissions without writing', (t) => {
+  const f = fixture(t, { args: ['--dry-run', '--daily-cap', '1'], pulls: [pull(1), pull(2)] });
+  assert.equal(f.result.status, 0, f.result.stdout + f.result.stderr);
+  assert.equal(writes(f).length, 0);
+  assert.match(f.result.stdout, /would-admit/);
+  assert.deepEqual(capped(f), [2]);
 });
 
 for (const carried of [false, true])
@@ -478,75 +585,6 @@ test('clean product source remains eligible', (t) => {
   assert.equal(fixture(t).queues.length, 1);
 });
 
-test('comments that are not queue requests do not consume the cap', (t) => {
-  const f = fixture(t, {
-    args: ['--daily-cap', '1'],
-    queueComments: [
-      { ...queueRequest('c'.repeat(40)), body: `please ${queueBody('c'.repeat(40))}` },
-      { ...queueRequest(), body: '@mergifyio queue' },
-      queueRequest('c'.repeat(40), '2020-01-01T23:00:00Z'),
-    ],
-  });
-  assert.equal(f.result.status, 0, f.result.stderr);
-  assert.equal(f.queues.length, 1, f.result.stdout);
-});
-test('the cap counts queue requests since UTC midnight across pages', (t) => {
-  const f = fixture(t, {
-    args: ['--daily-cap', '101'],
-    queuePages: [
-      Array.from({ length: 100 }, () => queueRequest('c'.repeat(40))),
-      [queueRequest('c'.repeat(40))],
-    ],
-  });
-  assert.equal(f.queues.length, 0);
-  assert.match(f.result.stdout, /daily-cap/);
-  assert.ok(
-    f.calls.some(
-      (args) =>
-        args[1] === `repos/owner/repo/issues/comments?since=${today}T00:00:00Z&per_page=100`,
-    ),
-    JSON.stringify(f.calls),
-  );
-});
-test('queue request lookup errors fail closed', (t) => {
-  const f = fixture(t, { queueError: true });
-  assert.equal(f.result.status, 1);
-  assert.equal(f.queues.length, 0);
-});
-test('a PR carrying the queued label is not queued again', (t) => {
-  const f = fixture(t, {
-    pulls: [{ ...pull(), labels: [{ name: 'review-gate' }, { name: 'queued' }] }],
-  });
-  assert.equal(f.result.status, 0, f.result.stderr);
-  assert.equal(f.queues.length, 0);
-  assert.match(f.result.stdout, /already-queued/);
-});
-test('a head already requested is not queued again', (t) => {
-  const f = fixture(t, { comments: [...defaultComments, queueRequest()] });
-  assert.equal(f.result.status, 0, f.result.stderr);
-  assert.equal(f.queues.length, 0);
-  assert.match(f.result.stdout, /already-queued/);
-});
-test('a request for an older head does not block queueing the new head', (t) => {
-  const f = fixture(t, { comments: [...defaultComments, queueRequest('c'.repeat(40))] });
-  assert.equal(f.queues.length, 1, f.result.stdout);
-});
-test('a head Mergify dequeued is left for a human', (t) => {
-  const f = fixture(t, {
-    comments: [...defaultComments, queueRequest()],
-    pulls: [{ ...pull(), labels: [{ name: 'review-gate' }, { name: 'dequeued' }] }],
-  });
-  assert.equal(f.result.status, 0, f.result.stderr);
-  assert.equal(f.queues.length, 0);
-  assert.match(f.result.stdout, /dequeued-needs-human/);
-});
-test('a new head after a dequeue is queued again', (t) => {
-  const f = fixture(t, {
-    comments: [...defaultComments, queueRequest('c'.repeat(40))],
-    pulls: [{ ...pull(), labels: [{ name: 'review-gate' }, { name: 'dequeued' }] }],
-  });
-  assert.equal(f.queues.length, 1, f.result.stdout);
-});
 test('an owner-routed head is labelled and never queued', (t) => {
   const f = fixture(t, { numstat: '1\t0\tdocs/adr/0028.md\n' });
   assert.equal(f.queues.length, 0);
@@ -610,10 +648,11 @@ test('a PR that is no longer owner-routed loses the label before queueing', (t) 
   assert.equal(removals.length, 1);
   assert.ok(removals[0].includes('repos/owner/repo/issues/1/labels/owner-route'));
   assert.equal(f.queues.length, 1);
-  const order = f.calls.map((args) =>
-    f.queues.includes(args) ? 'queue' : args.includes('DELETE') ? 'unlabel' : '',
-  );
-  assert.ok(order.indexOf('unlabel') < order.indexOf('queue'));
+  const actions = f.result.stdout
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line).action);
+  assert.ok(actions.indexOf('unmarked-owner-route') < actions.indexOf('auto-queue'));
 });
 test('a failed label removal blocks the merge', (t) => {
   const f = fixture(t, { pulls: [{ ...pull(), labels: labelled }], writeError: true });

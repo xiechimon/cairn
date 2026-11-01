@@ -4,34 +4,43 @@
 
 > Canonical status: this volume = the pacman positioning source of truth (thesis / criterion / two axes / what not to do / honesty list),
 > revising volume 06 D1's positioning narrative (**revision does not replace** — D1's other components stay valid).
-> Ruling chain: #515 criterion and two axes → #516 adversarial ruling (thesis final draft) → #520 carrier six items (user 2026-10-02 agree).
+> Ruling chain: #515 criterion and two axes → #516 adversarial ruling (thesis final draft) → #520 carrier six items (user 2026-10-02 agree). → D55 three-pillar thesis (#2489, PR #2490; owner accepted 2026-11-01).
 > Argument and trade-offs go to `docs/adr/0008`: **the ADR records why, this volume records what**, mutually referencing.
 
 ## 0. Overview
 
 | # | Item | Ruling |
 |---|---|---|
-| P1 | Thesis | in an open-source self-hostable world, only pacman is doing todos's semantic core (the full sentence verbatim sees §1) |
+| P1 | Thesis | output trusted because of how it lands: an evidence-bound, model-checked merge gate; eval-gated harness changes under a protected ruler; per-task orb isolation, opt-in today (D55, 2026-11-01; full text §1) |
 | P2 | Criterion | self-use first |
-| P3 | Semantic axis | aligned with todos's three core points: two hard gates / AI review with teeth / versioned plan documents |
+| P3 | Semantic axis | machine-verified merge gate (ADR 0026 / 0028) plus eval-gated harness changes; human gates remain where the merge route sends work to the owner (§3.1) |
 | P4 | Runtime axis | aligned with the Multica runtime model: runtime = one computer × one CLI tool |
-| P5 | Not aligned | Multica's three philosophical tenets: no hard gates / status-first / daemon not a sandbox boundary |
-| P6 | Chief | the gates' established consumer (withdrawn from the differentiation pillar), survival ruled by real closed-loop measurement |
+| P5 | Not aligned | Multica's three philosophical tenets: no hard gates / status-first / daemon not a sandbox boundary; plus workers as the operator's OS user (DSH super-agent, sig) and merge rules as prompt text (DSH) (§3.3) |
+| P6 | Chief | the gates' established consumer (withdrawn from the differentiation pillar), survival ruled by real closed-loop measurement, including the slow-path share once #2487 lands |
 | P7 | Shape | one chief; the entry chosen by the user; output that is code passes the gates; whether to open a PR is only how the code lands (§3.5) |
 
-## 1. Thesis (#516 ruling final draft, verbatim)
+## 1. Thesis (D55, 2026-11-01)
 
-> **In an open-source self-hostable world, todos's semantic core (two hard gates + AI review with teeth + versioned plan documents) is being done only by pacman — Multica has the source but not this semantics, todos has this semantics but not the source.** The resident orchestrator (Chief) exists as the gates' established consumer, its survival ruled by real closed-loop measurement.
+> **cairn is a self-hosted agent team whose output is trusted because of how it lands, not because of who routed it.** Three pillars carry that trust; as of 2026-11-01 neither DeepSeek Harness's super-agent nor sig has any of them (walk: `docs/research/dsh-sig-walk-2026-11.md`, #2489, PR #2490):
+>
+> 1. **An evidence-bound merge gate, model-checked.** The gate rule counts a verdict only for the patch it judged: verdicts bind to `patchDigest`, the independent review additionally to `headSha`, and a later passing verdict cannot clear a blocking one on the same digest (`apps/server/src/services/merge-gate/readiness.ts`; ADR 0021, 0026, 0028). The autonomous ship path evaluates that rule before merging and refuses when the head moved after the verdict (`apps/server/src/services/ship-gate.ts`). TLA+ models (`MergeGate`, `LocalLanding`, `RepeatedVerdict`, `ReviewHeadCausality`, plus `StepClaim` for who may run a step) are checked by TLC with negative controls (`.claude/skills/verify-merge-gate/`, `.claude/skills/verify-step-claim/`). Open gap, recorded there as F1: the manual REST merge (`mergeThroughGithub`) pins the merge to the checkpoint commit but does not yet re-read verdicts or re-derive the digest; closing it belongs to this pillar.
+> 2. **Harness eval and self-evolution under a ruler the agents cannot edit.** A PR that touches the enumerated chief-dispatch harness paths (`CHIEF_DISPATCH_HARNESS_PATHS`) cannot pass the gate without a digest-bound regression result at or above the baseline lower bound (`readiness.ts`, harness-regression blockers; broader prompt, skill, context and routing coverage is future work); builds record trajectory data that exports into validated trajectory packs, with incomplete exports reported (`apps/server/src/trajectory-export.ts`); rejections feed the bench; the ruler itself is a protected path (spec 29, ADR 0025). The paired-trial adoption judge (`integration/eval/adoption/judge.mts`) exists and is tested but is not yet wired into a merge path, and the self-optimizing outer loop (spec 29 E3, E4) has no tickets yet: today the claim is a regression floor on harness changes, with judged adoption and self-evolution as the stated next steps.
+> 3. **Per-task isolation that is a real boundary.** With the orb executor, each build conversation runs in its own orb, an nspawn container cloned from a base image with a user namespace and proxied egress, rather than as the operator's OS user (`apps/daemon/src/orb/provider.ts`). The orb executor is opt-in today (`CAIRN_EXECUTOR=orb`); the target is default-on wherever orbs are available.
+>
+> The router (chief / coordinator), the daemon and machine pairing are necessary plumbing: cairn matches the best existing designs there (thread-subscription fast path #2487, watchdog #2488, quiet by default #1784) rather than claiming them as differentiators.
+
+Why the thesis changed: the earlier thesis (#516, 2026-10-01: "two hard gates + AI review with teeth + versioned plan documents", scarcity against Multica and todos) predates ADR 0026 / 0028, which replaced the human merge gate with machine trust, and the 2026-11-01 walk showed two shipped products (DSH super-agent, sig) with cairn's routing shape: a resident router over isolated workers on the user's own machines is table stakes. The earlier text is in git history and in `docs/adr/0008`.
 
 In-volume terms (do not enter `CONTEXT.md` — that only manages product-domain entities):
 
-- **Hard gate**: a fixed human-must-be-present stopping point, two in total — Confirm (before any code is touched, review the plan) and Review (before release, review the diff). Gates are part of the phase machine (the server-side edge table enforces the transition), not status labels.
+- **Hard gate**: a fixed stopping point in the phase machine, two in total — Confirm (before any code is touched, review the plan) and Review (before release, review the diff). The server-side edge table enforces the transition; gates are not status labels. Confirm can be passed by plan auto-confirm per project policy (`sweepPlanAutoConfirm`); for merging, since ADR 0026 the default is the autonomous gate, and ADR 0028's phase-1 routes send protected paths and ADRs to the owner.
 - **AI review with teeth**: the reviewer's blocking verdict directly drives the `review→planning` auto-reflow (#330 loop) — it can block a merge, not just leave a comment.
 - **Versioned plan documents**: Plan / Changes class documents, comparable version by version, the object "looked at" on the gate.
-- **Semantic axis / runtime axis**: the semantic axis = how a task flows (gates, review, documents, state machine); the runtime axis = where a task runs (runtime, daemon, self-hosted deployment).
+- **Evidence-bound**: a verdict counts only for the patch digest it judged (ADR 0021 D3); the independent review is additionally bound to the current head (ADR 0026).
+- **Semantic axis / runtime axis**: the semantic axis = how a task flows (gates, review, evidence, eval, state machine); the runtime axis = where a task runs (runtime, daemon, orb, self-hosted deployment).
 - **Self-use first**: sees §2.
 
-**Maintenance trigger**: this thesis's scarcity has a clock — the source-available camp (Multica etc.) adding gates, or todos going open-source/self-hosted, expires the thesis the same day. On trigger, rewrite this section and README's Why thesis sentence (README is the de-pointed short version, low maintenance cost on expiry), leaving no hung thesis.
+**Maintenance trigger**: this thesis's scarcity has a clock. Any of these expires it the same day: the source-available camp (Multica etc.) adds hard gates; todos goes open-source or self-hosted; DSH or sig ships a merge gate bound to judged patches, a protected eval ruler, or per-task containers. On trigger, rewrite this section and README's lead sentence, leaving no hung thesis.
 
 ## 2. Criterion: Self-Use First
 
@@ -42,6 +51,8 @@ Supporting discipline (#515 hard constraint): **reference implementation first, 
 ## 3. Two Axes
 
 ### 3.1 Semantic axis: aligned with todos's three core points
+
+> D55 (2026-11-01): the semantic axis is now the machine-verified merge gate (ADR 0026 / 0028) plus eval-gated harness changes (spec 29). In the table below, Confirm can be passed by plan auto-confirm per project policy; for the merge, owner approval remains wherever ADR 0028 routes the PR to the owner (protected paths, ADRs, lockfile changes, unsplittable oversized PRs, paths outside the auto-merge set); only route A merges autonomously. The table is kept as the record of the todos alignment.
 
 | Core piece | pacman landing spot | Comparison |
 |---|---|---|
@@ -57,9 +68,11 @@ runtime = one computer × one CLI tool; board + agent as handler + daemon as run
 
 no hard gates / status-first / daemon not a sandbox boundary ("Treat every run as unsandboxed"). Choosing them equals deleting one's own differentiation, becoming "a weaker Multica".
 
+Added by D55 (2026-11-01, `docs/research/dsh-sig-walk-2026-11.md`): **workers as the operator's OS user** (DSH super-agent presets run `danger-full-access`; sig runs Claude Code with permission checks skipped) and **merge rules as prompt text** (DSH leaves merge conditions to the agent's instructions and GitHub branch protection). cairn takes neither as its target: workers belong in orbs (opt-in today, default-on wherever orbs are available is the goal), and merges pass the evidence-bound gate (with the F1 gap in §1 still open).
+
 ### 3.4 Chief: the gates' established consumer
 
-Chief withdraws from the differentiation pillar (#516 ruling, 2026-10-01; the earlier #515 two-axes wording includes Chief, #521 still writes "differentiation four pieces", this item wins over both, corrected in the same batch). It exists as the two hard gates' **established consumer** — who watches the gates for you, dispatches work, collects results; **survival ruled by real closed-loop measurement**. In a single-person self-use scenario the user is the orchestrator themselves, Multica's "human assignment + squad leader routing" covers the same need; Chief cannot self-wake, the actual shape is a delegation panel + watchdog. The criterion is same-sourced with §5 honesty-list item 2: count the withPlan distribution and Chief's actual usage rate in the real closed-loop measurement.
+Chief withdraws from the differentiation pillar (#516 ruling, 2026-10-01; the earlier #515 two-axes wording includes Chief, #521 still writes "differentiation four pieces", this item wins over both, corrected in the same batch). It exists as the two hard gates' **established consumer** — who watches the gates for you, dispatches work, collects results; **survival ruled by real closed-loop measurement**. In a single-person self-use scenario the user is the orchestrator themselves, Multica's "human assignment + squad leader routing" covers the same need; Chief cannot self-wake, the actual shape is a delegation panel + watchdog. The criterion is same-sourced with §5 honesty-list item 2: count the withPlan distribution and Chief's actual usage rate in the real closed-loop measurement. Once the thread-subscription fast path (#2487) lands, the measurement also counts the slow-path share: the fraction of events on existing work that still needs a chief turn (D55).
 
 ### 3.5 Shape principle: one chief, code must pass the gates (2026-10-24 user ruling)
 
@@ -73,11 +86,11 @@ Origin: after comparing EverMind Raven (the chief draws a task-dependency graph 
 
 Constraints:
 
-- Output that is code passes the gates, independent of entry and whether a PR is opened. "No board means no gate" equals removing §1's three core pieces for a subset of users, becoming a weaker Raven, not adopted.
-- The gate is a phase-machine stopping point; the passer can be a human or a deterministic checker per project policy (ADR 0021's merge-readiness gate, #1623's decomposition checker); the default is always a human, same caliber as ADR 0021 D1.
-- Same-kind comparison (2026-10-24): Vibe Kanban, Conductor's local worktree shapes all ultimately land through PRs, Raven's coding specialist has no repo-level merge gate. "Local repo, no PR, gate before merge" has no existing implementation.
+- Output that is code passes the gates, independent of entry and whether a PR is opened. "No board means no gate" equals removing the gates for a subset of users, becoming a weaker Raven, not adopted.
+- The gate is a phase-machine stopping point; the passer can be a human or a deterministic checker per project policy (ADR 0021's merge-readiness gate, #1623's decomposition checker); since ADR 0026 the default policy is autonomous, with protected paths requiring an independent review; in this repository ADR 0028's phase-1 routes send protected paths and ADRs to the owner. (Superseded wording, 2026-10-24: "the default is always a human, same caliber as ADR 0021 D1".)
+- Same-kind comparison (historical, 2026-10-24): Vibe Kanban, Conductor's local worktree shapes all ultimately land through PRs, Raven's coding specialist has no repo-level merge gate. At that date "local repo, no PR, gate before merge" had no existing implementation; cairn's own gated local landing has since landed (#2050: `apps/daemon/src/local-merge.ts` calls `decideLocalMerge`).
 
-Construction tickets: #1623 (decomposition checker passes → auto-run) → #1625 (local-shape auto-merge) → #1626 (info-class fast lane); #1624 (sub-card injection pre-delivery summary) parallel with #1623. The IM entry and external-agent onboarding wait on the #1607 research conclusion.
+Construction tickets (2026-10-24; #1625 has since landed through #2050): #1623 (decomposition checker passes → auto-run) → #1625 (local-shape auto-merge) → #1626 (info-class fast lane); #1624 (sub-card injection pre-delivery summary) parallel with #1623. The IM entry and external-agent onboarding wait on the #1607 research conclusion.
 
 ## 4. What Not to Do (#515 Out of scope fixed)
 
@@ -96,7 +109,7 @@ Construction tickets: #1623 (decomposition checker passes → auto-run) → #162
 
 1. **"Better" depends on unattended being real** — the gates' value proposition (queue up and leave, come back to check only two points) and the runtime axis (an always-on machine running at night) are each other's premise; when the real closed-loop measurement fails and a human stays present watching the run, the gates are just verbosity.
 2. **withPlan already measured — bypass dominates (2026-10-05 #892 measured)** — direct-execute skipping confirm is a built-in ability (`withPlan=false`), board drag can also bypass the funnel; measured (local 28 builds / 17 done cards): direct-execute 39% (chief dispatch 8/8 all direct), the confirm gate entered 13 times only 3 confirmed, the review main door passed only 1, 15/17 done cards landed through manual board phase changes (both gates skipped), versioned plan documents 0 rows. The "rubber stamp" did not appear (the only 4 human gate dwells were all substantive), but "bypass" holds — the degraded shape is really "two gates + a side door everyone walks", not "one gate + a ritual". Data and improvement-ticket suggestions: `docs/research/892-gate-usage-measurement.md`.
-3. **The runtime surface is currently in debt** — #518 inventoried 25 gaps (no runtime object / no capability advertisement / no liveness judgment / no task-level identity), of which 6 block #519. The differentiation thesis currently holds only on the semantic surface.
+3. **The runtime surface is currently in debt** — #518 inventoried 25 gaps (no runtime object / no capability advertisement / no liveness judgment / no task-level identity), of which 6 block #519. The differentiation thesis currently holds only on the semantic surface. (Historical, 2026-10-02; the D55 thesis adds per-task orb isolation on the runtime axis.)
 4. **single-person repo vs a live project** — Multica v0.6.0 (2026-09-28) is live; the security-fix and protocol-follow long-run risk cannot be refuted, only absorbed through self-use first.
 5. **Chief** — in a single-person self-use scenario the user is the orchestrator themselves; per the 2026-10-01 ruling it withdraws from the pillar, demoted to "the gates' established consumer", survival awaits real closed-loop measurement.
 
@@ -108,6 +121,7 @@ Construction tickets: #1623 (decomposition checker passes → auto-run) → #162
 
 ## 6. Sources
 
+- #2489 / PR #2490 (hands-on walk of DeepSeek Harness's super-agent and sig, 2026-11-01) and plan decision D55 (owner accepted the three-pillar thesis, 2026-11-01) — §1 thesis, P3, P5, P6, maintenance trigger.
 - #515 (Map: pacman self-positioning) — criterion / two axes / Out of scope ruling.
 - #516 (Decision: why pacman exists — adversarial argument) — thesis final draft + three evidence items + honesty list five items.
 - #519 (Task: control-surface migration + real closed-loop measurement) — the breakpoint list and the delivery comment.

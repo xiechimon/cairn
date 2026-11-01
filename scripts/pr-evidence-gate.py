@@ -70,6 +70,13 @@ Fenced code blocks do not exempt image links: agents list evidence in
 code fences, and an image link in a fence renders nowhere (#940 keeps
 this a non-goal).
 
+Schema evidence: with `--schema-glance <file>` (the output of
+scripts/schema-glance.mjs from the merge base of base and head to head,
+passed by the workflow only when base...head touches apps/server/drizzle/**,
+so migrations merged into main after the PR branched never count), the body
+must carry a
+`### Schema changes` section whose table rows equal that file's rows.
+
 Usage:
   python3 scripts/pr-evidence-gate.py body.md context.json   # CI entry point
   PR_BODY='<pr body>' python3 scripts/pr-evidence-gate.py
@@ -117,6 +124,9 @@ PROSE_LIMIT = 600
 EVIDENCE_PREFIX = 'docs/verify/'
 MAX_LINES = 800
 MAX_FILES = 40
+SCHEMA_HEADING = re.compile(r'^### Schema changes[ \t]*$', re.M)
+ANY_HEADING = re.compile(r'^#{1,6}[ \t]+', re.M)
+NO_SCHEMA_CHANGES = 'No schema changes'
 
 
 def section_contents(body):
@@ -311,9 +321,40 @@ def load_patch_files(path):
     return files if valid else None
 
 
+def schema_rows(markdown):
+    text = visible_markdown(markdown)
+    heading = SCHEMA_HEADING.search(text)
+    if heading is None:
+        return None
+    rest = text[heading.end():]
+    following = ANY_HEADING.search(rest)
+    section = rest[:following.start()] if following else rest
+    return [' '.join(line.split()) for line in section.splitlines()
+            if line.strip().startswith('|') or line.strip() == NO_SCHEMA_CHANGES]
+
+
+def schema_verdict(body, expected_markdown):
+    expected = schema_rows(expected_markdown)
+    actual = schema_rows(body)
+    if actual is None:
+        return 'missing'
+    return 'matches' if actual == expected else 'stale'
+
+
+def split_schema_glance(argv):
+    args = list(argv)
+    if '--schema-glance' not in args:
+        return args, None
+    at = args.index('--schema-glance')
+    with open(args[at + 1], encoding='utf-8') as f:
+        expected = f.read()
+    return args[:at] + args[at + 2:], expected
+
+
 def main():
-    if len(sys.argv) > 1:
-        with open(sys.argv[1], encoding='utf-8') as f:
+    args, schema_glance = split_schema_glance(sys.argv[1:])
+    if args:
+        with open(args[0], encoding='utf-8') as f:
             body = f.read()
     else:
         body = os.environ.get('PR_BODY', '')
@@ -321,6 +362,14 @@ def main():
         body = ''
 
     failures = []
+
+    if schema_glance is not None:
+        verdict = schema_verdict(body, schema_glance)
+        if verdict == 'matches':
+            print("pr-evidence: schema-changes: matches the schema-glance output")
+        else:
+            failures.append('schema-changes')
+            print(f"FAIL schema-changes: {verdict}: paste the output of scripts/schema-glance.mjs from the merge base to head under '### Schema changes'")
 
     verdicts = section_verdicts(body)
     answered = sum(1 for v in verdicts.values() if v == 'answered')
@@ -345,8 +394,8 @@ def main():
               "(Summary/Evidence/Merge Danger) does not satisfy this gate; "
               "use the repo skill .claude/skills/pr-cairn/SKILL.md.")
 
-    if len(sys.argv) > 2:
-        patch_files = load_patch_files(sys.argv[2])
+    if len(args) > 1:
+        patch_files = load_patch_files(args[1])
         if patch_files is None:
             failures.append('size-unreadable')
             print("FAIL size-unreadable: the context JSON has no usable pull request file list")

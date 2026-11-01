@@ -110,6 +110,7 @@ export const chiefThreadSchema = z.object({
   chiefId: recordId,
   userId: recordId,
   teamId: recordId,
+  projectId: recordId.nullable().optional(),
   title: z.string(),
   createdAt: epochMs,
   updatedAt: epochMs,
@@ -166,6 +167,15 @@ export const chiefSendMessageBodySchema = z.object({
   projectId: z.string().min(1).nullish(),
 });
 export type ChiefSendMessageBody = z.infer<typeof chiefSendMessageBodySchema>;
+
+export const coordinatorSendBodySchema = z.object({
+  content: z.string().refine((s) => s.trim() !== '', 'content is blank'),
+});
+
+export const projectCoordinatorResponseSchema = z.object({
+  thread: chiefThreadSchema.nullable(),
+});
+export type ProjectCoordinatorResponse = z.infer<typeof projectCoordinatorResponseSchema>;
 
 export const chiefRewindBodySchema = z.object({
   messageId: z.string().min(1),
