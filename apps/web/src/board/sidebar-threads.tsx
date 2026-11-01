@@ -11,6 +11,12 @@ import {
 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import {
+  KeyedMenuContent,
+  KeyedMenuItem,
+  KeyedMenuSubContent,
+  KeyedMenuSubTrigger,
+} from '../components/menu-keys.js';
+import {
   SidebarProjectRow,
   SidebarThreadList,
   SidebarThreadRow,
@@ -19,12 +25,8 @@ import type { StoneTone } from '../components/stone/tone.js';
 import { Button } from '../components/ui/button.js';
 import {
   DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu.js';
 import type { TodoRecord } from '../fixtures/records.js';
@@ -103,7 +105,7 @@ function ThreadMenu({ todo, onMarkUnread, onSnooze, onArchive, onDelete }: Threa
           </Button>
         }
       />
-      <DropdownMenuContent
+      <KeyedMenuContent
         align="end"
         side="bottom"
         sideOffset={4}
@@ -113,60 +115,74 @@ function ThreadMenu({ todo, onMarkUnread, onSnooze, onArchive, onDelete }: Threa
         })}
         className="w-48"
       >
-        <DropdownMenuItem data-testid="thread-row-mark-unread" onClick={() => onMarkUnread(todo)}>
+        <KeyedMenuItem
+          data-testid="thread-row-mark-unread"
+          shortcut="U"
+          onClick={() => onMarkUnread(todo)}
+        >
           <MailOpen />
           {t('标记为未读')}
-        </DropdownMenuItem>
+        </KeyedMenuItem>
         <DropdownMenuSub>
-          <DropdownMenuSubTrigger data-testid="thread-row-snooze">
+          <KeyedMenuSubTrigger data-testid="thread-row-snooze" shortcut="S">
             <AlarmClock />
             {t('暂停至')}
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent data-testid="thread-snooze-menu" className="w-60">
-            <DropdownMenuItem
+          </KeyedMenuSubTrigger>
+          <KeyedMenuSubContent data-testid="thread-snooze-menu" className="w-60">
+            <KeyedMenuItem
               data-testid="thread-snooze-needed"
+              shortcut="N"
               onClick={() => onSnooze(todo, 'needed')}
             >
               {t('需要时（智能体唤醒）')}
-            </DropdownMenuItem>
-            <DropdownMenuItem
+            </KeyedMenuItem>
+            <KeyedMenuItem
               data-testid="thread-snooze-tomorrow"
+              shortcut="T"
               onClick={() => onSnooze(todo, 'tomorrow-09:00')}
             >
               {t('明天 09:00')}
-            </DropdownMenuItem>
-            <DropdownMenuItem
+            </KeyedMenuItem>
+            <KeyedMenuItem
               data-testid="thread-snooze-monday"
+              shortcut="M"
               onClick={() => onSnooze(todo, 'next-monday')}
             >
               {t('下周一')}
-            </DropdownMenuItem>
-            <DropdownMenuItem
+            </KeyedMenuItem>
+            <KeyedMenuItem
               data-testid="thread-snooze-pick"
+              shortcut="P"
               onClick={() => onSnooze(todo, 'pick')}
             >
               {t('选择时间…')}
-            </DropdownMenuItem>
-          </DropdownMenuSubContent>
+            </KeyedMenuItem>
+          </KeyedMenuSubContent>
         </DropdownMenuSub>
-        <DropdownMenuItem data-testid="thread-row-copy-link" onClick={copyLink}>
+        <KeyedMenuItem data-testid="thread-row-copy-link" shortcut="L" onClick={copyLink}>
           <Copy />
           {t('复制链接')}
-        </DropdownMenuItem>
-        <DropdownMenuItem data-testid="thread-row-archive" onClick={() => onArchive(todo)}>
+        </KeyedMenuItem>
+        <KeyedMenuItem
+          data-testid="thread-row-archive"
+          shortcut="A"
+          onClick={() => onArchive(todo)}
+        >
           <Archive />
           {t('Archive')}
-        </DropdownMenuItem>
+        </KeyedMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem
+        <KeyedMenuItem
           variant="destructive"
           data-testid="thread-row-delete"
+          shortcut="D"
+          confirms
           onClick={() => onDelete(todo)}
         >
           <Trash2 />
           {t('删除')}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
+        </KeyedMenuItem>
+      </KeyedMenuContent>
     </DropdownMenu>
   );
 }
@@ -360,18 +376,22 @@ function SnoozedThreadMenu({
           </Button>
         }
       />
-      <DropdownMenuContent
+      <KeyedMenuContent
         align="end"
         side="bottom"
         sideOffset={4}
         aria-label={label}
         className="w-48"
       >
-        <DropdownMenuItem data-testid="thread-row-unsnooze" onClick={() => onUnsnooze(todo)}>
+        <KeyedMenuItem
+          data-testid="thread-row-unsnooze"
+          shortcut="U"
+          onClick={() => onUnsnooze(todo)}
+        >
           <AlarmClockOff />
           {t('取消暂停')}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
+        </KeyedMenuItem>
+      </KeyedMenuContent>
     </DropdownMenu>
   );
 }

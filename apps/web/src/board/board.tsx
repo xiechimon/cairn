@@ -24,8 +24,8 @@ import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useSta
 import { Link, useLocation } from 'react-router';
 import { useLiveData } from '../api/provider.js';
 import type { CardOrchestration } from '../chief/orchestration-inflight.js';
+import { KeyHint } from '../components/key-hint.js';
 import { Button } from '../components/ui/button.js';
-import { Kbd } from '../components/ui/kbd.js';
 import { Skeleton } from '../components/ui/skeleton.js';
 import type { TagChipData } from '../components/ui/tag-chip.js';
 import type { FixtureSet, TodoRecord } from '../fixtures/records.js';
@@ -339,7 +339,7 @@ export function BoardSurface({
         >
           <BrandMark className="size-5 text-(--card-button)" />
           <span className="min-w-0 flex-1 truncate">{t('新任务：接下来让 agent 做什么？')}</span>
-          <Kbd>C</Kbd>
+          <KeyHint>C</KeyHint>
         </Button>
       )}
       {onlyColumn == null && !chatHome && (sinceLastSeen.done > 0 || sinceLastSeen.failed > 0) && (

@@ -423,7 +423,8 @@ test('plain ↵ in the spec textarea stays the newline key — no hijack', async
 
 test('the `保存并开始` button carries a visible ⌘↵ badge at rest', async ({ page }) => {
   const dialog = await openNewTask(page);
-  const badge = dialog.locator('.new-task-start kbd');
+  const badge = dialog.locator('.new-task-start [data-slot="key-hint"]');
+  await expect(dialog.locator('.new-task-start kbd')).toHaveCount(0);
   // always-on form (not kbd-hint's hover chip): visible with no pointer on it
   await expect(badge).toBeVisible();
   await expect(badge).toHaveText('⌘↵');

@@ -8,16 +8,12 @@ import { useLiveData } from '../api/provider.js';
 import { TOPBAR_PRIMARY_BUTTON } from '../board/filter-panel.js';
 import { EmptyState } from '../components/empty-state.js';
 import { FormActions } from '../components/form-layout.js';
+import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { SegmentedRadio } from '../components/segmented.js';
 import { SETTINGS_ROW_CLS, SettingsCard } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '../components/ui/dropdown-menu.js';
+import { DropdownMenu, DropdownMenuTrigger } from '../components/ui/dropdown-menu.js';
 import {
   Select,
   SelectContent,
@@ -178,13 +174,15 @@ function ScheduleCard({
           >
             <EllipsisVertical />
           </DropdownMenuTrigger>
-          <DropdownMenuContent
+          <KeyedMenuContent
             align="end"
             sideOffset={4}
             aria-label={t('更多')}
             className="sched-card-menu w-40"
           >
-            <DropdownMenuItem
+            <KeyedMenuItem
+              shortcut="D"
+              confirms
               variant="destructive"
               className="sched-card-menu-row cursor-pointer"
               data-action="delete"
@@ -192,8 +190,8 @@ function ScheduleCard({
             >
               <Trash2 />
               {t('删除')}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
+            </KeyedMenuItem>
+          </KeyedMenuContent>
         </DropdownMenu>
       </span>
     </div>
