@@ -25,7 +25,7 @@ function fixture() {
   writeFileSync(
     fake,
     `#!${process.execPath}
-import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { runInNewContext } from 'node:vm';
 const cmd = basename(process.argv[1]);
@@ -45,6 +45,8 @@ if (cmd === 'btrfs') {
   if (args[1] === 'create') { mkdirSync(target); writeFileSync(join(target, '.fake-subvolume'), ''); }
   else if (args[1] === 'delete') {
     if (!existsSync(join(target, '.fake-subvolume'))) process.exit(2);
+    const nested = readdirSync(target, { recursive: true }).some((entry) => String(entry).endsWith('/.fake-subvolume'));
+    if (nested && !args.includes('-R')) { console.error('ERROR: Could not destroy subvolume: Directory not empty'); process.exit(1); }
     rmSync(target, { recursive: true });
   } else process.exit(2);
 }
@@ -61,6 +63,10 @@ if (cmd === 'pacstrap') {
     writeFileSync(join(appeared, 'cairn-orb-image'), 'owner-created-image');
   }
   mkdirSync(join(args[2], 'etc'), { recursive: true });
+  if (existsSync(join(args[2], '.fake-subvolume'))) {
+    mkdirSync(join(args[2], 'var/lib/machines'), { recursive: true });
+    writeFileSync(join(args[2], 'var/lib/machines/.fake-subvolume'), '');
+  }
   if (process.env.MOUNTED_STAGE) writeFileSync(join(root, 'active-mount'), args[2] + '/dev');
 }
 if (cmd === 'findmnt' && args.includes('--target')) { console.log(process.env.RUN_MOUNT_OPTIONS ?? 'rw,nosuid,nodev'); process.exit(0); }
@@ -706,7 +712,7 @@ test('a directory base on btrfs rebuilds once even with matching image pins', ()
   }
 });
 
-test('btrfs replacement deletes the old subvolume without recursive rm', () => {
+test('btrfs replacement deletes the old subvolume and its nested subvolumes without rm', () => {
   const f = fixture();
   try {
     const env = { MACHINES_FILESYSTEM: 'btrfs' };
@@ -717,8 +723,11 @@ test('btrfs replacement deletes the old subvolume without recursive rm', () => {
       f
         .calls()
         .some(
-          ([cmd, , action, target]) =>
-            cmd === 'btrfs' && action === 'delete' && target.includes('.cairn-orb-previous.'),
+          ([cmd, , action, ...rest]) =>
+            cmd === 'btrfs' &&
+            action === 'delete' &&
+            rest.includes('-R') &&
+            rest.at(-1).includes('.cairn-orb-previous.'),
         ),
     );
     assert.deepEqual(readdirSync(join(f.root, 'var/lib/machines')), ['cairn-orb-base']);
@@ -747,8 +756,11 @@ for (const failure of ['pacstrap', 'arch-chroot', 'publish']) {
         f
           .calls()
           .some(
-            ([cmd, , action, target]) =>
-              cmd === 'btrfs' && action === 'delete' && target.includes('.cairn-orb-build.'),
+            ([cmd, , action, ...rest]) =>
+              cmd === 'btrfs' &&
+              action === 'delete' &&
+              rest.includes('-R') &&
+              rest.at(-1).includes('.cairn-orb-build.'),
           ),
       );
       assert.deepEqual(readdirSync(join(f.root, 'var/lib/machines')), ['cairn-orb-base']);

@@ -27,7 +27,7 @@ image_type() {
 remove_image() {
   local type
   type=$(image_type "$1") || return 1
-  if [[ $type == subvolume ]]; then btrfs subvolume delete "$1"; else rm -rf -- "$1"; fi
+  if [[ $type == subvolume ]]; then btrfs subvolume delete -R "$1"; else rm -rf -- "$1"; fi
 }
 if ! $dry_run; then
   lock_dir=$host_root/run/lock/cairn-orb
