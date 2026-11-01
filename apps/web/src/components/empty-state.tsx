@@ -1,5 +1,5 @@
 import { cn } from 'cn';
-import type { ComponentType, SVGProps } from 'react';
+import type { ComponentType, ReactNode, SVGProps } from 'react';
 import { Button } from './ui/button.js';
 import { DIALOG_PRIMARY_BUTTON } from './ui/dialog-shell.js';
 import { Empty, EmptyContent, EmptyHeader, EmptyMedia } from './ui/empty.js';
@@ -8,6 +8,7 @@ type EmptyStateIcon = ComponentType<SVGProps<SVGSVGElement>>;
 
 export interface EmptyStateProps {
   icon: EmptyStateIcon;
+  media?: ReactNode;
   title: string;
   description?: string;
   action?: { label: string; onClick?: () => void; disabled?: boolean };
@@ -18,6 +19,7 @@ export interface EmptyStateProps {
 
 export function EmptyState({
   icon: Icon,
+  media,
   title,
   description,
   action,
@@ -30,7 +32,7 @@ export function EmptyState({
     <Empty data-testid={testId} className={cn('empty-state', className)}>
       <EmptyHeader className="gap-1">
         <EmptyMedia className="mb-3 text-icon">
-          <Icon className="size-8" strokeWidth={1.5} />
+          {media ?? <Icon className="size-8" strokeWidth={1.5} />}
         </EmptyMedia>
         <h2 className="m-0 font-heading text-heading font-title text-balance text-foreground">
           {title}
