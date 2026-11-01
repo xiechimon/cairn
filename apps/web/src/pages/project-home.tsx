@@ -1,13 +1,4 @@
-import {
-  Archive,
-  ChevronDown,
-  FolderOpen,
-  FolderX,
-  Link2,
-  Pencil,
-  Settings2,
-  Trash2,
-} from 'lucide-react';
+import { Archive, FolderOpen, FolderX, Link2, Pencil, Settings2, Trash2 } from 'lucide-react';
 import { type ReactNode, useCallback, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { useApiMutations, useProjects, useTodos } from '../api/hooks.js';
@@ -31,14 +22,11 @@ import { StreamDigest } from '../components/stream/stream-digest.js';
 import { SuggestionChip } from '../components/stream/suggestion-chip.js';
 import { SpiralMark, TextureSkeleton } from '../components/texture/texture.js';
 import { ThreadCard } from '../components/thread/thread-card.js';
+import { TitleMenuTrigger } from '../components/title-menu-trigger.js';
 import { AlertDialogShell } from '../components/ui/alert-dialog-shell.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON, DIALOG_TEXT_BUTTON } from '../components/ui/dialog-shell.js';
-import {
-  DropdownMenu,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '../components/ui/dropdown-menu.js';
+import { DropdownMenu, DropdownMenuSeparator } from '../components/ui/dropdown-menu.js';
 import { MessageScrollerProvider } from '../components/ui/message-scroller.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import type { TodoRecord } from '../fixtures/records.js';
@@ -192,9 +180,9 @@ function ProjectHomeBody() {
       className="mx-auto flex w-[calc(100%-2rem)] max-w-182 flex-col gap-4 pt-[12vh]"
     >
       <SpiralMark className="size-8" />
-      <h2 className="m-0 font-heading text-xl leading-snug font-medium text-foreground text-balance">
+      <Greeting as="h2" wrap>
         {t('新项目：{name}。先从哪里开始？', { name })}
-      </h2>
+      </Greeting>
       {goalLine}
       {starters}
       <p className="m-0 text-meta text-content-tertiary">
@@ -228,18 +216,13 @@ function ProjectHomeBody() {
 
   const title = (
     <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button
-            variant="ghost"
-            className="-ml-1.5 h-8 gap-2 px-1.5 font-heading text-heading font-semibold text-foreground"
-          />
+      <TitleMenuTrigger
+        media={
+          <ProjectAvatar name={name} tone={mark.tone} icon={mark.icon} color={mark.color} bare />
         }
       >
-        <ProjectAvatar name={name} tone={mark.tone} icon={mark.icon} color={mark.color} bare />
         {name}
-        <ChevronDown aria-hidden="true" className="size-3.5 text-content-tertiary" />
-      </DropdownMenuTrigger>
+      </TitleMenuTrigger>
       <KeyedMenuContent align="start" className="w-52">
         <KeyedMenuItem shortcut="R" onClick={() => setRenameOpen(true)}>
           <Pencil />

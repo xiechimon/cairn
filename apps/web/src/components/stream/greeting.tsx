@@ -16,7 +16,7 @@ export function Greeting({
     <div data-slot="greeting" className="flex flex-col gap-0.5">
       <Tag
         className={cn(
-          'm-0 font-heading text-xl leading-snug font-medium tracking-tight text-foreground',
+          'm-0 font-serif text-greeting font-semibold tracking-[-0.01em] text-foreground',
           wrap ? 'text-balance' : 'whitespace-nowrap',
         )}
       >
