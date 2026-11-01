@@ -321,7 +321,6 @@ export function BoardSurface({
             size="sm"
             className={`board-topbar-schedule ${TOPBAR_TEXT_BUTTON}`}
             render={<Link to={{ pathname: '/app/schedules', search: withoutBoardView(search) }} />}
-            nativeButton={false}
           >
             <Clock aria-hidden strokeWidth={1.75} className="size-3.5 text-content-tertiary" />
             {t('定时')}

@@ -540,7 +540,6 @@ function TaskDetail({
                   variant="outline"
                   size="sm"
                   render={<Link to={href} onClick={panel.close} />}
-                  nativeButton={false}
                 >
                   {t(ATTENTION[need].action)}
                 </Button>
