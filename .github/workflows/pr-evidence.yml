@@ -47,12 +47,11 @@ permissions:
   issues: read
   statuses: write
 
-# One run per PR at a time, newest wins: a label added seconds after a body
-# edit must not be outlived by the edit's run finishing green. A cancelled
-# run is not a passing check.
-concurrency:
-  group: pr-evidence-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+# No concurrency group: GitHub cancels the pending run of a group whenever a
+# newer one is queued, and branch protection judges pr-evidence by the newest
+# check suite on the head, so a cancelled newest suite kept PRs blocked after
+# an older run passed (#2461, #2496). Every run reads the PR as it is now, so
+# the newest run's result is the current one.
 
 jobs:
   merge-route:
