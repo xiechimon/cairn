@@ -31,6 +31,15 @@
 
 Why the thesis changed: the earlier thesis (#516, 2026-10-01: "two hard gates + AI review with teeth + versioned plan documents", scarcity against Multica and todos) predates ADR 0026 / 0028, which replaced the human merge gate with machine trust, and the 2026-11-01 walk showed two shipped products (DSH super-agent, sig) with cairn's routing shape: a resident router over isolated workers on the user's own machines is table stakes. The earlier text is in git history and in `docs/adr/0008`.
 
+In-volume terms (do not enter `CONTEXT.md` — that only manages product-domain entities):
+
+- **Hard gate**: a fixed stopping point in the phase machine, two in total — Confirm (before any code is touched, review the plan) and Review (before release, review the diff). The server-side edge table enforces the transition; gates are not status labels. Since ADR 0026 / 0028 the passer is the owner only where the merge route sends work to the owner; elsewhere a deterministic checker passes the gate.
+- **AI review with teeth**: the reviewer's blocking verdict directly drives the `review→planning` auto-reflow (#330 loop) — it can block a merge, not just leave a comment.
+- **Versioned plan documents**: Plan / Changes class documents, comparable version by version, the object "looked at" on the gate.
+- **Evidence-bound**: a verdict counts only for the head commit and patch digest it judged (ADR 0021 D3).
+- **Semantic axis / runtime axis**: the semantic axis = how a task flows (gates, review, evidence, eval, state machine); the runtime axis = where a task runs (runtime, daemon, orb, self-hosted deployment).
+- **Self-use first**: sees §2.
+
 **Maintenance trigger**: this thesis's scarcity has a clock. Any of these expires it the same day: the source-available camp (Multica etc.) adds hard gates; todos goes open-source or self-hosted; DSH or sig ships a merge gate bound to judged patches, a protected eval ruler, or per-task containers. On trigger, rewrite this section and README's lead sentence, leaving no hung thesis.
 
 ## 2. Criterion: Self-Use First
