@@ -3,12 +3,13 @@ import {
   ChevronDown,
   FolderOpen,
   FolderX,
+  Inbox,
   Link2,
   Pencil,
   Settings2,
   Trash2,
 } from 'lucide-react';
-import { type ReactNode, useCallback, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useReducer, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { useApiMutations, useProjects, useTodos } from '../api/hooks.js';
 import { toDisplayTodo } from '../api/mappers.js';
@@ -16,7 +17,9 @@ import { useLiveData } from '../api/provider.js';
 import { ProjectAvatar } from '../board/project-avatar.js';
 import { useProjectMark } from '../board/project-mark.js';
 import { RenameThreadDialog } from '../board/rename-dialog.js';
-import { THREAD_TONE, threadHref, threadStatus } from '../board/sidebar-threads.js';
+import { threadHref, threadStatus } from '../board/sidebar-threads.js';
+import { threadCopy, threadTone } from '../board/thread-copy.js';
+import { ThreadsInbox } from '../board/threads-inbox.js';
 import { ChiefConversation } from '../chief/chief-conversation.js';
 import { greetingFor } from '../chief/chief-home.js';
 import { HandoffCardContext } from '../chief/chief-message-rows.js';
@@ -41,40 +44,20 @@ import {
 } from '../components/ui/dropdown-menu.js';
 import { MessageScrollerProvider } from '../components/ui/message-scroller.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
+import {
+  isThreadArchived,
+  subscribeFixtureThreads,
+  withoutDeleted,
+  withResolved,
+} from '../fixtures/deletions.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
+import { subscribeFixtureSnooze, withFixtureSnooze } from '../fixtures/snooze.js';
 import { useI18n } from '../i18n/provider.js';
 import { DeleteProjectConfirm } from '../overlay/delete-project-confirm.js';
 import { PageShell } from './shell.js';
 
 const STARTERS = ['做个计划', '接一个仓库', '接着最近的活', '用我的工具'] as const;
-
-type CardCopy = { state: string; reason: string; primary?: string };
-
-function cardCopy(todo: TodoRecord): CardCopy {
-  if (todo.awaitingReply === true) {
-    return { state: '待你处理', reason: '在问你一个问题。', primary: '回答' };
-  }
-  switch (todo.phase) {
-    case 'confirm':
-      return { state: '待你处理', reason: '计划已就绪，批准后开工。', primary: '看计划' };
-    case 'review':
-      return { state: '等你审阅', reason: '已就绪，等你审阅。', primary: '审阅' };
-    case 'failed':
-      return { state: '待你处理', reason: '失败了，打开它重试。' };
-    case 'queued':
-      return { state: '运行中', reason: '排队等机器。' };
-    case 'planning':
-      return { state: '运行中', reason: '正在写计划。' };
-    case 'building':
-      return { state: '运行中', reason: '正在动手。' };
-    case 'done':
-    case 'closed':
-      return { state: '已解决', reason: '已完成。' };
-    case 'todo':
-      return { state: '空闲', reason: '还没开始。' };
-  }
-}
 
 export function ProjectHome() {
   const { id } = useParams();
@@ -85,7 +68,7 @@ function ProjectHomeBody() {
   const { t } = useI18n();
   const { id } = useParams();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const fixture = resolveScenario(searchParams);
   const { live, teamId, user } = useLiveData();
   const projectsQ = useProjects(teamId, live);
@@ -100,13 +83,28 @@ function ProjectHomeBody() {
     : (fixture.projectHome?.repo ?? null);
   const [fixtureArchived, setFixtureArchived] = useState(fixture.projectHome?.archived === true);
   const archived = live ? wire?.archivedAt != null : fixtureArchived;
+  const [fixtureTick, refresh] = useReducer((n: number) => n + 1, 0);
+  useEffect(() => subscribeFixtureThreads(refresh), []);
+  useEffect(() => subscribeFixtureSnooze(refresh), []);
   const todos: TodoRecord[] = useMemo(
     () =>
-      (live ? (todosQ.data ?? []).map(toDisplayTodo) : fixture.todos).filter(
-        (todo) => todo.projectId === id,
-      ),
-    [live, todosQ.data, fixture.todos, id],
+      (live
+        ? (todosQ.data ?? []).map(toDisplayTodo)
+        : withResolved(withoutDeleted(withFixtureSnooze(fixture.todos)))
+      ).filter((todo) => todo.projectId === id && !isThreadArchived(todo)),
+    [live, todosQ.data, fixture.todos, id, fixtureTick],
   );
+  const inboxOpen = searchParams.get('inbox') !== '0';
+  const setInboxOpen = (open: boolean) =>
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (open) next.delete('inbox');
+        else next.set('inbox', '0');
+        return next;
+      },
+      { replace: true },
+    );
   const coordinator = useProjectCoordinatorSurface(id, fixture);
   const [prefill, setPrefill] = useState<{ text: string; key: number } | null>(null);
   const [renameOpen, setRenameOpen] = useState(false);
@@ -115,6 +113,7 @@ function ProjectHomeBody() {
   const loading = live && (projectsQ.isLoading || coordinator.loading);
   const failed = live && projectsQ.isError;
   const missing = live && !loading && !failed && wire === undefined;
+  const waitingCount = todos.filter((todo) => threadTone(todo) === 'waiting').length;
   const running = todos.filter((todo) => threadStatus(todo) === 'running').length;
 
   const setArchived = (next: boolean) => {
@@ -136,12 +135,12 @@ function ProjectHomeBody() {
     (todoId: string): ReactNode => {
       const todo = todos.find((row) => row.id === todoId);
       if (todo == null) return null;
-      const copy = cardCopy(todo);
+      const copy = threadCopy(todo);
       const open = () => navigate(threadHref(todo.id));
       return (
         <ThreadCard
           title={todo.title}
-          tone={todo.phase === 'review' ? 'review' : THREAD_TONE[threadStatus(todo)]}
+          tone={threadTone(todo)}
           stateLabel={t(copy.state)}
           reason={t(copy.reason)}
           {...(copy.primary != null ? { primaryLabel: t(copy.primary), onPrimary: open } : {})}
@@ -156,7 +155,7 @@ function ProjectHomeBody() {
   const digest = [
     {
       tone: 'waiting' as const,
-      count: todos.filter((todo) => threadStatus(todo) === 'needs-you').length,
+      count: waitingCount,
       label: t('待你处理'),
     },
     { tone: 'working' as const, count: running, label: t('运行中') },
@@ -296,6 +295,15 @@ function ProjectHomeBody() {
       actions={
         <>
           <HeaderIconButton
+            data-testid="threads-inbox-toggle"
+            aria-label={t('Threads')}
+            active={inboxOpen}
+            attention={!inboxOpen && waitingCount > 0}
+            onClick={() => setInboxOpen(!inboxOpen)}
+          >
+            <Inbox className="size-4" />
+          </HeaderIconButton>
+          <HeaderIconButton
             aria-label={t('文件')}
             onClick={() => navigate(`/app/project/${id}/files`)}
           >
@@ -329,55 +337,65 @@ function ProjectHomeBody() {
           className="mt-[12vh]"
         />
       ) : (
-        <section
-          data-testid="project-home"
-          aria-label={t('与 Coordinator 的对话')}
-          aria-busy={coordinator.loading}
-          className="flex min-h-0 flex-1 flex-col"
-        >
-          <MessageScrollerProvider defaultScrollPosition="end">
-            <HandoffCardContext.Provider value={renderCard}>
-              <ChiefConversation
-                key={id}
-                variant="project"
-                chief={coordinator.chiefData}
-                onSend={archived ? undefined : coordinator.onSend}
-                onRewind={coordinator.onRewind}
-                onAnswerQuestion={coordinator.onAnswerQuestion}
-                onCancelQuestion={coordinator.onCancelQuestion}
-                onWithdraw={coordinator.onWithdraw}
-                onSteer={coordinator.onSteer}
-                onStop={coordinator.onStop}
-                onSettings={() => navigate('/app?chief=settings')}
-                threadsOpen={false}
-                setThreadsOpen={() => {}}
-                hero={hero}
-                lead={lead}
-                draftStorageKey={`cairn.coordinator-draft.${id}`}
-                initialDraft={fixture.projectHome?.sendError?.draft ?? ''}
-                prefill={prefill}
-                placeholder={t('问 Coordinator，或描述一个新 thread…')}
-                composerError={coordinator.sendError}
-                composerReplacement={
-                  archived ? (
-                    <NoticeBanner
-                      data-testid="project-archived-banner"
-                      tone="info"
-                      icon={Archive}
-                      className="mx-auto mt-2 mb-4 w-[calc(100%-2rem)] max-w-182"
-                      title={t('项目已归档。thread 只读，定时任务已暂停。')}
-                      actions={
-                        <Button size="sm" onClick={() => setArchived(false)}>
-                          {t('取消归档')}
-                        </Button>
-                      }
-                    />
-                  ) : undefined
-                }
-              />
-            </HandoffCardContext.Provider>
-          </MessageScrollerProvider>
-        </section>
+        <div className="flex min-h-0 flex-1">
+          <section
+            data-testid="project-home"
+            aria-label={t('与 Coordinator 的对话')}
+            aria-busy={coordinator.loading}
+            className="flex min-h-0 flex-1 flex-col"
+          >
+            <MessageScrollerProvider defaultScrollPosition="end">
+              <HandoffCardContext.Provider value={renderCard}>
+                <ChiefConversation
+                  key={id}
+                  variant="project"
+                  chief={coordinator.chiefData}
+                  onSend={archived ? undefined : coordinator.onSend}
+                  onRewind={coordinator.onRewind}
+                  onAnswerQuestion={coordinator.onAnswerQuestion}
+                  onCancelQuestion={coordinator.onCancelQuestion}
+                  onWithdraw={coordinator.onWithdraw}
+                  onSteer={coordinator.onSteer}
+                  onStop={coordinator.onStop}
+                  onSettings={() => navigate('/app?chief=settings')}
+                  threadsOpen={false}
+                  setThreadsOpen={() => {}}
+                  hero={hero}
+                  lead={lead}
+                  draftStorageKey={`cairn.coordinator-draft.${id}`}
+                  initialDraft={fixture.projectHome?.sendError?.draft ?? ''}
+                  prefill={prefill}
+                  placeholder={t('问 Coordinator，或描述一个新 thread…')}
+                  composerError={coordinator.sendError}
+                  composerReplacement={
+                    archived ? (
+                      <NoticeBanner
+                        data-testid="project-archived-banner"
+                        tone="info"
+                        icon={Archive}
+                        className="mx-auto mt-2 mb-4 w-[calc(100%-2rem)] max-w-182"
+                        title={t('项目已归档。thread 只读，定时任务已暂停。')}
+                        actions={
+                          <Button size="sm" onClick={() => setArchived(false)}>
+                            {t('取消归档')}
+                          </Button>
+                        }
+                      />
+                    ) : undefined
+                  }
+                />
+              </HandoffCardContext.Provider>
+            </MessageScrollerProvider>
+          </section>
+          {inboxOpen && (
+            <ThreadsInbox
+              todos={todos}
+              now={live ? Date.now() : fixture.now}
+              onOpen={(todo) => navigate(threadHref(todo.id))}
+              onClose={() => setInboxOpen(false)}
+            />
+          )}
+        </div>
       )}
       {renameOpen && (
         <RenameThreadDialog

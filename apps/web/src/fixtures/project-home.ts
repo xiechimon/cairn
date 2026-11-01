@@ -44,6 +44,13 @@ const cairnTodos = [
   homeTodo('project-home-waiting', 2301, 'Connect a Claude subscription token', 'confirm'),
   homeTodo('project-home-review', 2271, 'Fold finished turns into purpose and duration', 'review'),
   homeTodo('project-home-working', 2302, 'Push for finished and failed threads', 'building'),
+  homeTodo('project-home-idle', 2240, 'Sidebar status groups', 'todo'),
+  {
+    ...homeTodo('project-home-snoozed', 2236, 'Automation badge and popover', 'todo'),
+    snoozeMode: 'needed' as const,
+  },
+  homeTodo('project-home-done-a', 2201, 'Unread dot on threads', 'done'),
+  homeTodo('project-home-done-b', 2202, 'Snooze until a time', 'done'),
 ];
 
 export const projectHome: FixtureSet = {

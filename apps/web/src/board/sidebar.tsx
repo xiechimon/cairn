@@ -37,22 +37,22 @@ import { Button } from '../components/ui/button.js';
 import { Kbd } from '../components/ui/kbd.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
-import { toastError, toastSuccess } from '../components/ui/toaster.js';
+import { toastError } from '../components/ui/toaster.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { blockDemoWrite, DEMO_MODE } from '../demo/demo-gate.js';
 import { UserMenu } from '../detail/user-menu.js';
 import {
   isDeleted,
   isThreadArchived,
-  markArchived,
   markDeleted,
   markRenamed,
-  markUnarchived,
+  subscribeFixtureThreads,
   withRenamedTitles,
+  withResolved,
 } from '../fixtures/deletions.js';
 import { PROJECT_ID, PROJECT_NAME } from '../fixtures/fixtures.js';
 import type { TodoRecord } from '../fixtures/records.js';
-import { setFixtureSnooze, subscribeFixtureSnooze, withFixtureSnooze } from '../fixtures/snooze.js';
+import { subscribeFixtureSnooze, withFixtureSnooze } from '../fixtures/snooze.js';
 import { isFixtureUnread, setFixtureUnread, subscribeFixtureUnread } from '../fixtures/unread.js';
 import { scrollFadeClassName, useScrollFade } from '../hooks/use-scroll-fade.js';
 import { useI18n } from '../i18n/provider.js';
@@ -72,8 +72,9 @@ import {
   threadHref,
 } from './sidebar-threads.js';
 import { SnoozeConfirmDialog, SnoozePickDialog } from './snooze-dialogs.js';
-import { presetInstant, type SnoozeChoice, type SnoozeRequest } from './snooze-presets.js';
+import type { SnoozeChoice, SnoozeRequest } from './snooze-presets.js';
 import { keepThreadUnread } from './thread-read-keep.js';
+import { useThreadActions } from './use-thread-actions.js';
 
 export type SidebarSelected =
   | 'board'
@@ -242,9 +243,11 @@ export function BoardSidebar({
   const { user, live, teamId } = useLiveData();
   const navigate = useNavigate();
   const mutations = useApiMutations(teamId);
+  const threadActions = useThreadActions();
   const [, refresh] = useReducer((n: number) => n + 1, 0);
   useEffect(() => subscribeFixtureUnread(refresh), []);
   useEffect(() => subscribeFixtureSnooze(refresh), []);
+  useEffect(() => subscribeFixtureThreads(refresh), []);
   const [pendingDelete, setPendingDelete] = useState<TodoRecord | null>(null);
   const [pendingSnooze, setPendingSnooze] = useState<TodoRecord | null>(null);
   const [pendingPick, setPendingPick] = useState<TodoRecord | null>(null);
@@ -263,7 +266,9 @@ export function BoardSidebar({
   const archivedQ = useArchivedTodos(teamId, live);
   const knownThreads = live
     ? (todos ?? [])
-    : withFixtureSnooze(withRenamedTitles(todos ?? [])).filter((todo) => !isDeleted(todo.id));
+    : withResolved(withFixtureSnooze(withRenamedTitles(todos ?? []))).filter(
+        (todo) => !isDeleted(todo.id),
+      );
   const openThreads = knownThreads.filter((todo) => !isThreadArchived(todo) && !isDeleted(todo.id));
   const archivedThreads = live
     ? (archivedQ.data ?? []).map(toDisplayTodo).filter((todo) => !isDeleted(todo.id))
@@ -314,74 +319,16 @@ export function BoardSidebar({
   const homeLabel = attention > 0 ? `${t('工作台')} ${attention}` : t('工作台');
 
   const goTo = (target: string) => navigate({ pathname: target, search: plain });
-  const unarchiveThread = (todo: TodoRecord) => {
-    if (!live) {
-      if (blockDemoWrite()) return;
-      markUnarchived(todo.id);
-      refresh();
-      return;
-    }
-    mutations.setTodoArchived.mutate(
-      { id: todo.id, archived: false },
-      { onError: (error) => toastError(t('Could not unarchive task.'), error) },
-    );
-  };
-  const unsnoozeThread = (todo: TodoRecord) => {
-    if (!live) {
-      setFixtureSnooze(todo.id, { snoozeMode: null, snoozedUntil: null });
-      return;
-    }
-    mutations.unsnoozeTodo.mutate(todo.id, {
-      onError: (error) => toastError(t('无法取消暂停。'), error),
-    });
-  };
-  const applySnooze = (todo: TodoRecord, request: SnoozeRequest) => {
-    const announce = () =>
-      toastSuccess(t('线程已暂停'), { label: t('撤销'), onClick: () => unsnoozeThread(todo) });
-    if (!live) {
-      if (blockDemoWrite()) return;
-      const until =
-        request === 'needed'
-          ? null
-          : typeof request === 'number'
-            ? request
-            : presetInstant(request, Date.now());
-      setFixtureSnooze(todo.id, {
-        snoozeMode: request === 'needed' ? 'needed' : 'until',
-        snoozedUntil: until,
-      });
-      announce();
-      return;
-    }
-    mutations.snoozeTodo.mutate(
-      { id: todo.id, until: request },
-      { onSuccess: announce, onError: (error) => toastError(t('无法暂停线程。'), error) },
-    );
-  };
+  const unarchiveThread = (todo: TodoRecord) => threadActions.unarchive([todo]);
+  const unsnoozeThread = (todo: TodoRecord) => threadActions.unsnooze([todo]);
+  const applySnooze = (todo: TodoRecord, request: SnoozeRequest) =>
+    threadActions.snooze([todo], request);
   const chooseSnooze = (todo: TodoRecord, choice: SnoozeChoice) => {
     if (choice === 'needed') setPendingSnooze(todo);
     else if (choice === 'pick') setPendingPick(todo);
     else applySnooze(todo, choice);
   };
-  const archiveThread = (todo: TodoRecord) => {
-    if (!live) {
-      if (blockDemoWrite()) return;
-      markArchived(todo.id);
-      refresh();
-      return;
-    }
-    mutations.setTodoArchived.mutate(
-      { id: todo.id, archived: true },
-      {
-        onSuccess: () =>
-          toastSuccess(t('Task archived'), {
-            label: t('Undo'),
-            onClick: () => unarchiveThread(todo),
-          }),
-        onError: (error) => toastError(t('Could not archive task.'), error),
-      },
-    );
-  };
+  const archiveThread = (todo: TodoRecord) => threadActions.archive([todo]);
   const renameThread = (todo: TodoRecord, title: string) => {
     setPendingRename(null);
     if (!live) {

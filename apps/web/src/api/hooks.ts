@@ -708,6 +708,13 @@ export function useApiMutations(teamId: string | undefined) {
         qc.setQueryData(['todos', teamId], context?.previousList);
       },
     }),
+    resolveTodo: useMutation({
+      mutationFn: (id: string) =>
+        api.post<{ state: 'done' | 'stopping'; todo: TodoRecord }>(
+          `/api/todos/${id}/stop-and-done`,
+        ),
+      onSuccess: invalidateAll,
+    }),
     snoozeTodo: useMutation({
       mutationFn: (input: { id: string; until: SnoozeUntil }) =>
         api.post<TodoRecord>(`/api/todos/${input.id}/snooze`, {

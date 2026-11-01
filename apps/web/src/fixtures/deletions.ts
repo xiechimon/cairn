@@ -1,4 +1,4 @@
-import type { ScheduleRecord } from './records.js';
+import type { ScheduleRecord, TodoRecord } from './records.js';
 
 const deleted = new Set<string>();
 
@@ -7,9 +7,37 @@ export function markDeleted(id: string): void {
 }
 
 const closed = new Set<string>();
+const threadListeners = new Set<() => void>();
+
+export function subscribeFixtureThreads(listener: () => void): () => void {
+  threadListeners.add(listener);
+  return () => {
+    threadListeners.delete(listener);
+  };
+}
+
+function notifyThreads(): void {
+  for (const listener of threadListeners) listener();
+}
 
 export function markClosed(id: string): void {
   closed.add(id);
+  notifyThreads();
+}
+
+const resolved = new Set<string>();
+
+export function markResolved(id: string): void {
+  resolved.add(id);
+  notifyThreads();
+}
+
+export function withResolved<T extends { id: string; phase: TodoRecord['phase'] }>(
+  todos: T[],
+): T[] {
+  return resolved.size === 0
+    ? todos
+    : todos.map((todo) => (resolved.has(todo.id) ? { ...todo, phase: 'done' as const } : todo));
 }
 
 export function isDeleted(id: string): boolean {
@@ -35,10 +63,12 @@ const archivedOverrides = new Map<string, boolean>();
 
 export function markArchived(id: string): void {
   archivedOverrides.set(id, true);
+  notifyThreads();
 }
 
 export function markUnarchived(id: string): void {
   archivedOverrides.set(id, false);
+  notifyThreads();
 }
 
 export function isThreadArchived(todo: { id: string; archivedAt?: number | null }): boolean {
