@@ -64,7 +64,7 @@ export const EN: Record<string, string> = {
   正在运行: 'Running',
   正在修改: 'Editing',
   '已加载 {n} 个技能': 'Skills loaded: {n}',
-  '还有 {n} 行': '{n} more lines',
+  '还有 {n} 行': '{n## more line|# more lines}',
   无输出: 'No output',
   未完成: 'Not finished',
 
@@ -82,7 +82,8 @@ export const EN: Record<string, string> = {
   下午好: 'Good afternoon',
   晚上好: 'Good evening',
   与总管的对话: 'Conversation with the Chief',
-  '{running} 个任务运行中，今天合并了 {done} 个': '{running} tasks running, {done} merged today',
+  '{running} 个任务运行中，今天合并了 {done} 个':
+    '{running## task|# tasks} running, {done} merged today',
   '，': ', ',
   '{n} 项待你处理': '{n} waiting on you',
   '，没有需要你的事': ', nothing needs you',
@@ -114,7 +115,7 @@ export const EN: Record<string, string> = {
   新任务: 'New task', // sidebar action row (#389) — the dialog title stays 新建任务
   '新任务：接下来让 agent 做什么？': 'New task: What should the agent do next?',
   '上次查看后：{done} 个完成，{failed} 个新失败':
-    '{done} completed, {failed} new failures since last visit',
+    '{done} completed, {failed## new failure|# new failures} since last visit',
   '较早的 {count} 条': '{count} older',
   '超过 7 天没动': 'untouched for over 7 days',
   需要你: 'Needs you',
@@ -134,7 +135,7 @@ export const EN: Record<string, string> = {
   '收起{label}': 'Collapse {label}',
   '展开{label}': 'Expand {label}',
   总管: 'Chief',
-  '{n} 个总管会话有未读': '{n} chief sessions have unread',
+  '{n} 个总管会话有未读': '{n## chief session has unread|# chief sessions have unread}',
   个会话未读: 'unread threads',
   '思考中…': 'Thinking…',
   返回: 'Back',
@@ -404,7 +405,7 @@ export const EN: Record<string, string> = {
   '可以在 GitHub Discussions 发一条帖子，说明第一支 PR 用了多久':
     'You can post in GitHub Discussions to say how long the first PR took',
   '第一支 PR 用了 {days} 天。可以在 GitHub Discussions 发一条帖子':
-    'Your first PR took {days} days. You can post about it in GitHub Discussions',
+    'Your first PR took {days## day|# days}. You can post about it in GitHub Discussions',
   '分享到 Discussions': 'Share on Discussions',
   不再显示: 'Do not show again',
   // #1031: the switch is a preference; when it's on but the browser permission
@@ -414,7 +415,7 @@ export const EN: Record<string, string> = {
 
   // —— team route (r7 12) ——
   设置: 'Settings',
-  '{n} 个成员': '{n} members',
+  '{n} 个成员': '{n## member|# members}',
   // team empty state, grid and chart (r2 §8.1 17c title)
   暂无成员: 'No members yet',
   '创建 Agent 后，它会出现在这里。': 'Create an agent and it shows up here.',
@@ -498,7 +499,7 @@ export const EN: Record<string, string> = {
   文件: 'Files',
   历史: 'History',
   '1 次运行': '1 run',
-  '{n} 次运行': '{n} runs',
+  '{n} 次运行': '{n## run|# runs}',
   '尚无提交历史。': 'No commits yet.',
   // #1097 files-pane folder drill-down
   目录导航: 'Directory navigation',
@@ -564,7 +565,7 @@ export const EN: Record<string, string> = {
     'Move every agent homed on this machine to another one.',
   删除机器: 'Delete machine',
   '先迁走归属这台机器的 {n} 个 agent 才能删除。':
-    'Move the {n} agents homed on this machine first, then delete it.',
+    'Move the {n## agent|# agents} homed on this machine first, then delete it.',
   '删除后，这台机器要重新注册才能再接任务。':
     'Once deleted, the machine has to enroll again before it takes work.',
   '确定删除这台机器？此操作不可撤销。': 'Delete this machine? This cannot be undone.',
@@ -574,7 +575,7 @@ export const EN: Record<string, string> = {
   机器不存在或已移除: 'Machine missing or removed',
   '整机迁移失败，请重试。': 'Migration failed. Try again.',
   '删除机器失败，请重试。': 'Could not delete the machine. Try again.',
-  '{n} 个 agent 未过校验留在原机': '{n} agents failed validation and stayed put',
+  '{n} 个 agent 未过校验留在原机': '{n## agent|# agents} failed validation and stayed put',
   // 桌面通知标题（M5 SSE notification 事件面，02 §9.1 三事件；api/sse.ts
   // 纯函数位消费——非组件 t()，i18n-coverage 以本键位兑现 en 兜底）
   方案已就绪: 'Plan ready',
@@ -586,10 +587,10 @@ export const EN: Record<string, string> = {
   '等额度：{lane} {kind}，{probe} 自动探测续跑':
     'Waiting for quota: {lane} {kind}, auto-probe at {probe}',
   '{lane} {kind}，{count} 个任务挂起等额度':
-    '{lane} {kind}, {count#1 task|# tasks} waiting for quota',
+    '{lane} {kind}, {count## task|# tasks} waiting for quota',
   '额度恢复后自动续跑；{probe} 自动探测':
     'Runs resume automatically once quota recovers; next probe at {probe}',
-  '{count} 个任务因额度/限流挂起': '{count#1 task|# tasks} suspended on quota/rate limits',
+  '{count} 个任务因额度/限流挂起': '{count## task|# tasks} suspended on quota/rate limits',
   '额度恢复后自动续跑，无需人工操作':
     'Runs resume automatically once quota recovers — no action needed',
   // #1261 标签 vars 值（kind 位的中英对译——vars 插值不查词典，单列键位）。
@@ -744,7 +745,7 @@ export const EN: Record<string, string> = {
   // #615 返工：恢复钮（参考站 live aria 正词）+ 过程折叠 + 确认层 + 工具行失败徽标。
   恢复到此处: 'Restore to here',
   '恢复到此处？该条之后的 {n} 条消息会移除，总管从这条重发开新回合。':
-    'Restore to here? The {n} messages after it are removed and the Chief resends from this one as a fresh turn.',
+    'Restore to here? The {n## message after it is removed|# messages after it are removed} and the Chief resends from this one as a fresh turn.',
   // #822 在飞存在行展开面：行开关 aria + 正在调用的工具 + 空面 fallback。
   展开实时步骤: 'Show live steps',
   收起实时步骤: 'Hide live steps',
@@ -1225,7 +1226,7 @@ export const EN: Record<string, string> = {
   不可跑: 'Not runnable',
   '暂无机器。': 'No machines yet.',
   '{name} 上的 Claude Code 登录将在 {days} 天后过期。在该机器上运行 `claude auth login` 重新登录。':
-    'Claude Code login on {name} expires in {days} days. On that machine run `claude auth login`.',
+    'Claude Code login on {name} expires in {days## day|# days}. On that machine run `claude auth login`.',
   '{name} 上的 Claude Code 登录将在 1 天后过期。在该机器上运行 `claude auth login` 重新登录。':
     'Claude Code login on {name} expires in 1 day. On that machine run `claude auth login`.',
   '{name} 上的 Claude Code 登录将在不到 1 天内过期。在该机器上运行 `claude auth login` 重新登录。':
@@ -1239,13 +1240,13 @@ export const EN: Record<string, string> = {
   '服务器数据库备份状态文件无法读取，无法确认备份是否在运行。':
     'The server database backup status file cannot be read, so the backup cannot be confirmed as running.',
   '{host} 上的服务器数据库备份已有 {hours} 小时没有成功，备份可能已停止。在该机器上运行 `systemctl --user list-timers cairn-db-backup.timer` 检查定时器。':
-    'The server database backup on {host} has not succeeded for {hours} hours and may have stopped. On that machine run `systemctl --user list-timers cairn-db-backup.timer` to check the timer.',
+    'The server database backup on {host} has not succeeded for {hours## hour|# hours} and may have stopped. On that machine run `systemctl --user list-timers cairn-db-backup.timer` to check the timer.',
   '{host} 上的服务器数据库备份最近一次运行失败（{detail}），还没有成功过的备份。在该机器上运行 `systemctl --user status cairn-db-backup.service` 查看原因。':
     'The latest server database backup run on {host} failed ({detail}), and no backup has succeeded yet. On that machine run `systemctl --user status cairn-db-backup.service` to see why.',
   '{host} 上的服务器数据库备份最近一次运行失败（{detail}），上次成功备份在不到 1 小时前。在该机器上运行 `systemctl --user status cairn-db-backup.service` 查看原因。':
     'The latest server database backup run on {host} failed ({detail}); the last successful backup was less than an hour ago. On that machine run `systemctl --user status cairn-db-backup.service` to see why.',
   '{host} 上的服务器数据库备份最近一次运行失败（{detail}），上次成功备份在 {hours} 小时前。在该机器上运行 `systemctl --user status cairn-db-backup.service` 查看原因。':
-    'The latest server database backup run on {host} failed ({detail}); the last successful backup was {hours} hours ago. On that machine run `systemctl --user status cairn-db-backup.service` to see why.',
+    'The latest server database backup run on {host} failed ({detail}); the last successful backup was {hours## hour|# hours} ago. On that machine run `systemctl --user status cairn-db-backup.service` to see why.',
   // #895 机器页三态读标注（spec 21 A8；orchestration 块 join 行集）+ chief
   // 设置 Agent tab「机器」槽的描述（A6）。徽标/状态 = 机器与总管编排的
   // 关系面，非机器自身状态。
@@ -1440,9 +1441,10 @@ export const EN: Record<string, string> = {
   决定: 'Decided',
   还开着: 'Still open',
   记住了: 'Remembered',
-  '总管把昨天的对话整理成了 {n} 条摘要': "The chief summarized yesterday's chat into {n} items",
+  '总管把昨天的对话整理成了 {n} 条摘要':
+    "The chief summarized yesterday's chat into {n## item|# items}",
   '对话太长了，总管把上面的内容整理成了 {n} 条摘要':
-    'The chat got long, so the chief summarized everything above into {n} items',
+    'The chat got long, so the chief summarized everything above into {n## item|# items}',
   '昨天的摘要 · {time} 整理': "Yesterday's summary · made at {time}",
   '上面内容的摘要 · {time} 整理': 'Summary of the chat above · made at {time}',
   '原文都还在，往上滑就能看到。总管接着聊时用的是这份摘要；任务的进度它会直接去任务里查，不靠记对话。摘要漏了或写错了，直接在下面告诉总管。':
