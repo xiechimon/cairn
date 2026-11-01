@@ -56,7 +56,6 @@ import type {
   SecretRecord,
   SetSecretBody,
   SkillRecord,
-  SnoozeUntil,
   StepJournalRow,
   TagRecord,
   TeamMember,
@@ -174,13 +173,6 @@ export const useTodos = (teamId: string | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['todos', teamId],
     queryFn: () => api.get<TodoRecord[]>(`/api/todos?teamId=${teamId}`),
-    enabled: enabled && teamId !== undefined,
-  });
-
-export const useArchivedTodos = (teamId: string | undefined, enabled: boolean) =>
-  useQuery({
-    queryKey: ['todos', teamId, 'archived'],
-    queryFn: () => api.get<TodoRecord[]>(`/api/todos?teamId=${teamId}&archived=1`),
     enabled: enabled && teamId !== undefined,
   });
 
@@ -694,30 +686,6 @@ export function useApiMutations(teamId: string | undefined) {
       onError: (_error, input, context) => {
         qc.setQueryData(['todo', input.id], context?.previous);
         qc.setQueryData(['todos', teamId], context?.previousList);
-      },
-    }),
-    snoozeTodo: useMutation({
-      mutationFn: (input: { id: string; until: SnoozeUntil }) =>
-        api.post<TodoRecord>(`/api/todos/${input.id}/snooze`, {
-          until: input.until,
-          tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        }),
-      onSuccess: (record) => {
-        qc.setQueryData(['todo', record.id], record);
-        qc.setQueryData<TodoRecord[]>(['todos', teamId], (records) =>
-          records?.map((row) => (row.id === record.id ? record : row)),
-        );
-        invalidateAll();
-      },
-    }),
-    unsnoozeTodo: useMutation({
-      mutationFn: (id: string) => api.post<TodoRecord>(`/api/todos/${id}/unsnooze`),
-      onSuccess: (record) => {
-        qc.setQueryData(['todo', record.id], record);
-        qc.setQueryData<TodoRecord[]>(['todos', teamId], (records) =>
-          records?.map((row) => (row.id === record.id ? record : row)),
-        );
-        invalidateAll();
       },
     }),
     deleteTodo: useMutation({

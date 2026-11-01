@@ -1,6 +1,39 @@
 import type { StoneTone } from '../components/stone/tone.js';
 import type { TodoRecord } from '../fixtures/records.js';
-import { THREAD_TONE, threadStatus } from './sidebar-threads.js';
+
+export type ThreadStatus = 'running' | 'needs-you' | 'failed' | 'done' | 'idle';
+
+const THREAD_TONE: Record<ThreadStatus, StoneTone> = {
+  running: 'working',
+  'needs-you': 'waiting',
+  failed: 'idle',
+  done: 'resolved',
+  idle: 'idle',
+};
+
+export function threadStatus(todo: TodoRecord): ThreadStatus {
+  if (todo.awaitingReply === true) return 'needs-you';
+  switch (todo.phase) {
+    case 'queued':
+    case 'planning':
+    case 'building':
+      return 'running';
+    case 'confirm':
+    case 'review':
+      return 'needs-you';
+    case 'failed':
+      return 'failed';
+    case 'done':
+    case 'closed':
+      return 'done';
+    case 'todo':
+      return 'idle';
+  }
+}
+
+export function threadHref(id: string): string {
+  return `/app/todo/${id}`;
+}
 
 export interface ThreadCopy {
   state: string;
@@ -35,7 +68,6 @@ export function threadCopy(todo: TodoRecord): ThreadCopy {
 
 export function threadTone(todo: TodoRecord): StoneTone {
   if (todo.phase === 'done' || todo.phase === 'closed') return 'resolved';
-  if (todo.phase === 'failed') return 'idle';
   if (todo.snoozeMode != null) return 'idle';
   if (todo.phase === 'review' && todo.awaitingReply !== true) return 'review';
   return THREAD_TONE[threadStatus(todo)];

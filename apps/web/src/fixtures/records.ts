@@ -575,7 +575,6 @@ export interface ChiefContent {
   modelProvider?: string | null;
   threadTitle: string;
   threadId?: string;
-  threadsOpen?: boolean;
   threads?: ChiefThreadRef[];
   examples?: ChiefExample[];
   draft?: string;

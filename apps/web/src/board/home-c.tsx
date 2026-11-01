@@ -16,8 +16,7 @@ import { MessageScrollerProvider } from '../components/ui/message-scroller.js';
 import type { ChiefStreamItem, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { relativeTime } from './rel-time.js';
-import { threadHref, threadStatus } from './sidebar-threads.js';
-import { threadCopy, threadTone } from './thread-copy.js';
+import { threadCopy, threadHref, threadStatus, threadTone } from './thread-copy.js';
 
 const GREETINGS: [number, string][] = [
   [5, '夜深了'],
