@@ -19,6 +19,8 @@ import {
 import { join, resolve } from 'node:path';
 import type { OrbCommandRunner, OrbExecResult } from './provider.js';
 
+const ORB_DEPLOY_TIMEOUT_MS = 600_000;
+
 async function checkoutCommand(runner: OrbCommandRunner, checkout: string, args: string[]) {
   const result = await runner(['git', '-C', checkout, ...args], {
     signal: AbortSignal.timeout(30_000),
@@ -38,12 +40,7 @@ function publishLink(root: string, target: string, name: string) {
   }
 }
 
-export async function publishOrbDist(
-  distSource: string,
-  root: string,
-  runner: OrbCommandRunner,
-  retainedKeys: () => ReadonlySet<string> | undefined = () => new Set(),
-) {
+export async function orbDistRelease(distSource: string, runner: OrbCommandRunner) {
   const checkout = resolve(distSource, '../../..');
   const { version } = JSON.parse(
     readFileSync(join(checkout, 'apps/daemon/package.json'), 'utf8'),
@@ -95,6 +92,17 @@ export async function publishOrbDist(
     }
     key += `-dirty-${hash.digest('hex').slice(0, 16)}`;
   }
+  return { key, version, sha };
+}
+
+export async function publishOrbDist(
+  distSource: string,
+  root: string,
+  runner: OrbCommandRunner,
+  retainedKeys: () => ReadonlySet<string> | undefined = () => new Set(),
+) {
+  const checkout = resolve(distSource, '../../..');
+  const { key, version, sha } = await orbDistRelease(distSource, runner);
   const releases = join(root, 'releases');
   mkdirSync(releases, { recursive: true, mode: 0o755 });
   const release = join(releases, key);
@@ -102,6 +110,7 @@ export async function publishOrbDist(
     const temporary = mkdtempSync(join(root, '.release-'));
     try {
       let result: OrbExecResult;
+      const deploySignal = AbortSignal.timeout(ORB_DEPLOY_TIMEOUT_MS);
       try {
         result = await runner(
           [
@@ -117,10 +126,14 @@ export async function publishOrbDist(
           ],
           {
             env: { ...process.env, PNPM_CONFIG_IGNORE_SCRIPTS: 'true' },
-            signal: AbortSignal.timeout(120_000),
+            signal: deploySignal,
           },
         );
       } catch (error) {
+        if (deploySignal.aborted || (error instanceof Error && error.name === 'TimeoutError'))
+          throw new Error(
+            `Orb pnpm deploy timed out after ${ORB_DEPLOY_TIMEOUT_MS / 1000} seconds`,
+          );
         throw new Error(
           `Orb pnpm deploy failed: ${error instanceof Error ? error.message : String(error)}`,
         );

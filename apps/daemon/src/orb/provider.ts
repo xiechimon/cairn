@@ -180,6 +180,7 @@ export class NspawnOrbProvider implements OrbProvider {
   private readonly runtimeDirectoryTimeoutMs: number;
   private publishing: Promise<void> = Promise.resolve();
   private readonly starting = new Set<Promise<void>>();
+  private readonly retainDistReleases = process.env.CAIRN_ORB_RETAIN_RELEASES === '1';
 
   constructor(
     options: {
@@ -273,6 +274,7 @@ export class NspawnOrbProvider implements OrbProvider {
         this.distRoot,
         this.runner,
         () => {
+          if (this.retainDistReleases) return undefined;
           const running = [...this.handles.values()].filter((machine) => machine.running);
           if (running.some((machine) => !machine.releaseKey)) return undefined;
           return new Set(
