@@ -1,5 +1,5 @@
 import type { AskUserAnswer } from '@cairn/shared';
-import { type CSSProperties, useContext } from 'react';
+import { type CSSProperties, createContext, type ReactNode, useContext } from 'react';
 import { Link } from 'react-router';
 import { ThinkingRow, ToolActivityRow } from '../components/chat/agent-rows.js';
 import { LivePulse, LiveRow, LiveSignal } from '../components/chat/live-row.js';
@@ -121,10 +121,25 @@ function turnToolSteps(tools: ChiefToolRow[] | undefined): TraceStepItem[] {
   }));
 }
 
+export const HandoffCardContext = createContext<((todoId: string) => ReactNode) | null>(null);
+
 function HandoffRow({ todoId }: { todoId: string }) {
   const { t } = useI18n();
   const glance = useContext(TodoGlanceContext)?.get(todoId);
+  const renderCard = useContext(HandoffCardContext);
   const openInPlace = useOpenTaskInPlace();
+  const card = renderCard?.(todoId);
+  if (card != null) {
+    return (
+      <MessageScrollerItem
+        style={SCROLLER_ITEM_STYLE}
+        data-testid="chief-handoff-card"
+        className="pb-3"
+      >
+        {card}
+      </MessageScrollerItem>
+    );
+  }
   return (
     <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>
       <Marker variant="separator" className={MARKER_NOTE_CLS} data-testid="chief-handoff">

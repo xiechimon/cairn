@@ -111,6 +111,12 @@ import {
   versionMenuV2,
   versionMenuV3,
 } from './fixtures.js';
+import {
+  projectHome,
+  projectHomeArchived,
+  projectHomeEmpty,
+  projectHomeSendError,
+} from './project-home.js';
 import type { FixtureSet } from './records.js';
 
 export const SCENARIO_PARAM = 'scenario';
@@ -154,6 +160,10 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       'sidebar-unread': sidebarUnread,
       'sidebar-snooze': sidebarSnooze,
       'sidebar-groups': sidebarGroups,
+      'project-home': projectHome,
+      'project-home-empty': projectHomeEmpty,
+      'project-home-send-error': projectHomeSendError,
+      'project-home-archived': projectHomeArchived,
       'sidebar-thread-statuses': sidebarThreadStatuses,
       'board-overflow': boardOverflow,
       'board-stress': boardStress,

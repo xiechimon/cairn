@@ -10,12 +10,18 @@ import { Input } from '../components/ui/input.js';
 import { useI18n } from '../i18n/provider.js';
 
 interface RenameThreadDialogProps {
+  title?: string;
   initialTitle: string;
   onClose: () => void;
   onSave: (title: string) => void;
 }
 
-export function RenameThreadDialog({ initialTitle, onClose, onSave }: RenameThreadDialogProps) {
+export function RenameThreadDialog({
+  title: dialogTitle,
+  initialTitle,
+  onClose,
+  onSave,
+}: RenameThreadDialogProps) {
   const { t } = useI18n();
   const [value, setValue] = useState(initialTitle);
   const title = value.trim();
@@ -24,7 +30,7 @@ export function RenameThreadDialog({ initialTitle, onClose, onSave }: RenameThre
   };
   return (
     <DialogShell
-      title={t('重命名线程')}
+      title={dialogTitle ?? t('重命名线程')}
       onClose={onClose}
       size="s"
       footer={

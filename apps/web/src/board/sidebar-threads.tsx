@@ -37,7 +37,7 @@ import type { SnoozeChoice } from './snooze-presets.js';
 
 export type ThreadStatus = 'running' | 'needs-you' | 'failed' | 'done' | 'idle';
 
-const THREAD_TONE: Record<ThreadStatus, StoneTone> = {
+export const THREAD_TONE: Record<ThreadStatus, StoneTone> = {
   running: 'working',
   'needs-you': 'waiting',
   failed: 'waiting',
