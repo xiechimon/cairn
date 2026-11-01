@@ -63,7 +63,7 @@ test('a new project greets with its goal and starter chips that fill the compose
   page,
 }) => {
   await page.goto(home('project-home-empty'));
-  await expect(page.getByRole('heading', { name: /New project: api-latency/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /New project: api-latency/ })).toBeVisible();
   await expect(page.getByTestId('project-goal')).toContainText('Bring p95 latency under 200 ms');
   const chips = page.getByTestId('project-starter-chips').getByRole('button');
   await expect(chips).toHaveText(['Make a plan', 'Add a repo', 'Pick up recent work', 'Use my tools']);
@@ -130,4 +130,84 @@ test('switching projects drops the starter text picked in the previous one', asy
   await page.locator('[data-slot="sidebar-project-row"]', { hasText: 'cairn-site' }).click();
   await expect(page).toHaveURL(/\/app\/project\/project-home-other/);
   await expect(composer(page)).toHaveValue('');
+});
+
+test('a failed conversation load shows Retry instead of the first-run greeting, with no composer', async ({
+  page,
+}) => {
+  const TEAM_ID = 'team-1';
+  const USER = { id: 'user-1', displayName: 'ian', avatarUrl: null };
+  const THREAD = {
+    id: 'chief-proj-live',
+    chiefId: 'chief-user-1-team-1',
+    userId: USER.id,
+    teamId: TEAM_ID,
+    projectId: 'proj-live',
+    title: 'Plan',
+    createdAt: 1,
+    updatedAt: 1,
+    lastTurnAt: null,
+    session: { runtime: 'pi', id: 's1', openedAt: 1 },
+    pendingSessionResumeAt: null,
+    toolDefHashes: {},
+    toolResultHashes: {},
+    activeRun: null,
+  };
+  let messagesFail = true;
+  await page.route('**/api/**', (route, request) => {
+    if (request.method() !== 'GET') return route.fallback();
+    return route.fulfill({ status: 500, json: { error: 'e2e stub: not the surface under test' } });
+  });
+  await page.route('**/api/teams', (route) =>
+    route.fulfill({ json: [{ id: TEAM_ID, name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null }] }),
+  );
+  await page.route('**/api/user/me', (route) => route.fulfill({ json: USER }));
+  await page.route(`**/api/teams/${TEAM_ID}/notifications`, (route) =>
+    route.fulfill({ json: { unreadThreadIds: [] } }),
+  );
+  await page.route('**/api/todos?*', (route) => route.fulfill({ json: [] }));
+  await page.route('**/api/projects?*', (route) =>
+    route.fulfill({
+      json: [{ id: 'proj-live', name: 'api-latency', teamId: TEAM_ID, splitPolicy: 'human', archivedAt: null }],
+    }),
+  );
+  await page.route(`**/api/teams/${TEAM_ID}/chief`, (route) =>
+    route.fulfill({
+      json: {
+        chief: {
+          id: THREAD.chiefId,
+          userId: USER.id,
+          teamId: TEAM_ID,
+          agent: { agentId: 'agent-1' },
+          charter: null,
+          lastTurnAt: null,
+          createdAt: 0,
+          tz: null,
+        },
+        agentActor: null,
+        context: null,
+        watches: [],
+        wakes: [],
+      },
+    }),
+  );
+  await page.route('**/api/projects/proj-live/coordinator', (route) =>
+    route.fulfill({ json: { thread: THREAD } }),
+  );
+  await page.route(`**/api/conversations/${THREAD.id}/messages*`, (route) =>
+    messagesFail
+      ? route.fulfill({ status: 500, json: { error: 'messages read failed' } })
+      : route.fulfill({ json: { messages: [{ id: 'm1', role: 'user', content: 'Make a plan', createdAt: 1 }] } }),
+  );
+
+  await page.goto('/app/project/proj-live');
+  const error = page.getByTestId('project-home-conversation-error');
+  await expect(error).toBeVisible();
+  await expect(page.getByTestId('project-home-hero')).toHaveCount(0);
+  await expect(page.getByTestId('chief-composer-input')).toHaveCount(0);
+
+  messagesFail = false;
+  await error.getByRole('button', { name: 'Retry' }).click();
+  await expect(page.getByTestId('chief-stream').getByText('Make a plan')).toBeVisible();
+  await expect(composer(page)).toBeVisible();
 });

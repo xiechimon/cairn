@@ -29,7 +29,7 @@ import { GoalLine } from '../components/stream/goal-line.js';
 import { Greeting } from '../components/stream/greeting.js';
 import { StreamDigest } from '../components/stream/stream-digest.js';
 import { SuggestionChip } from '../components/stream/suggestion-chip.js';
-import { SpiralMark, TextureSkeleton } from '../components/texture/texture.js';
+import { TextureSkeleton } from '../components/texture/texture.js';
 import { ThreadCard } from '../components/thread/thread-card.js';
 import { AlertDialogShell } from '../components/ui/alert-dialog-shell.js';
 import { Button } from '../components/ui/button.js';
@@ -189,15 +189,12 @@ function ProjectHomeBody() {
   const hero = (
     <header
       data-testid="project-home-hero"
-      className="mx-auto flex w-[calc(100%-2rem)] max-w-182 flex-col gap-4 pt-[12vh]"
+      className="mx-auto w-[calc(100%-2rem)] max-w-182 flex-none pt-[6vh]"
     >
-      <SpiralMark className="size-8" />
-      <h2 className="m-0 font-heading text-xl leading-snug font-medium text-foreground text-balance">
-        {t('新项目：{name}。先从哪里开始？', { name })}
-      </h2>
-      {goalLine}
-      {starters}
-      <p className="m-0 text-meta text-content-tertiary">
+      <Greeting wrap>{t('新项目：{name}。先从哪里开始？', { name })}</Greeting>
+      {goalLine !== false && <div className="mt-2">{goalLine}</div>}
+      <div className="mt-4 -ml-2.5">{starters}</div>
+      <p className="mt-3 mb-0 text-meta text-content-tertiary">
         {t('Coordinator 按目标做计划并开出 thread，thread 随进展出现在这里。')}
       </p>
     </header>
@@ -232,7 +229,7 @@ function ProjectHomeBody() {
         render={
           <Button
             variant="ghost"
-            className="-ml-1.5 h-8 gap-2 px-1.5 font-heading text-heading font-semibold text-foreground"
+            className="-ml-1.5 h-8 gap-2 px-1.5 font-serif text-page font-semibold tracking-[-0.01em] text-foreground"
           />
         }
       >
@@ -350,7 +347,7 @@ function ProjectHomeBody() {
                 key={id}
                 variant="project"
                 chief={coordinator.chiefData}
-                onSend={archived ? undefined : coordinator.onSend}
+                onSend={archived || coordinator.load !== 'ready' ? undefined : coordinator.onSend}
                 onRewind={coordinator.onRewind}
                 onAnswerQuestion={coordinator.onAnswerQuestion}
                 onCancelQuestion={coordinator.onCancelQuestion}
