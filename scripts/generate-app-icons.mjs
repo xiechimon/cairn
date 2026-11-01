@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-// App icon assets from one spiral path: a cream spiral over a moss tile in 4x4 ordered-dither dots, flat below 64px.
+// Brand assets from one hand-drawn spiral, outlined to a single filled path: the mark, the favicon tile, and app icons with a moss tile in 4x4 ordered-dither dots (flat below 64px).
 // The macOS tile is Apple's 824/1024 body; macOS 26 masks icons to that shape, so the corners must match.
 // Run: node scripts/generate-app-icons.mjs  (macOS only: AppIcon.icns needs iconutil; PNGs render through Playwright Chromium)
 
@@ -17,8 +17,91 @@ const ASSETS_DIR = join(ROOT, 'assets');
 const CREAM = '#f2ead7';
 const MOSS_DEEP = '#244b32';
 const MOSS = '#6f9c5f';
-const SPIRAL_PATH =
-  'M0 0 A84 84 0 0 1 168 0 A140 140 0 0 1 -112 0 A196 196 0 0 1 280 0 A252 252 0 0 1 -224 0 A308 308 0 0 1 392 0';
+const MARK_STROKE = 0.085;
+
+function seeded(seed) {
+  let state = seed;
+  return () => {
+    state = (state * 16807) % 2147483647;
+    return state / 2147483647;
+  };
+}
+
+function spiralCentreline() {
+  const random = seeded(7);
+  const jitter = Array.from({ length: 10 }, () => (random() - 0.5) * 2);
+  const points = [];
+  const samples = 220;
+  for (let i = 0; i <= samples; i += 1) {
+    const u = i / samples;
+    const angle = u * 2.35 * Math.PI * 2;
+    const band = Math.floor(u * 8);
+    const blend = (u * 8) % 1;
+    const wobble = (jitter[band] ?? 0) * (1 - blend) + (jitter[band + 1] ?? 0) * blend;
+    const radius = (0.1 + u ** 1.18 * 0.36) * (1 + 0.035 * wobble);
+    points.push([Math.cos(angle - Math.PI / 2) * radius, Math.sin(angle - Math.PI / 2) * radius]);
+  }
+  const last = points[points.length - 1];
+  const before = points[points.length - 6];
+  const dx = last[0] - before[0];
+  const dy = last[1] - before[1];
+  const length = Math.hypot(dx, dy);
+  const tx = dx / length;
+  const ty = dy / length;
+  for (let i = 1; i <= 30; i += 1) {
+    const u = i / 30;
+    points.push([
+      last[0] + tx * 0.32 * 0.42 * u - ty * 0.6 * 0.06 * u * u,
+      last[1] + ty * 0.32 * 0.42 * u + tx * 0.6 * 0.06 * u * u,
+    ]);
+  }
+  return points;
+}
+
+const fixed = (n) => Number(n.toFixed(4));
+
+function smoothThrough(points) {
+  let d = '';
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const p0 = points[i - 1] ?? points[i];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[i + 2] ?? p2;
+    d += `C${fixed(p1[0] + (p2[0] - p0[0]) / 6)} ${fixed(p1[1] + (p2[1] - p0[1]) / 6)} ${fixed(p2[0] - (p3[0] - p1[0]) / 6)} ${fixed(p2[1] - (p3[1] - p1[1]) / 6)} ${fixed(p2[0])} ${fixed(p2[1])}`;
+  }
+  return d;
+}
+
+function outlinedMark() {
+  const centre = spiralCentreline().filter((_, i, all) => i % 2 === 0 || i === all.length - 1);
+  const half = MARK_STROKE / 2;
+  const left = [];
+  const right = [];
+  centre.forEach((point, i) => {
+    const a = centre[Math.max(0, i - 1)];
+    const b = centre[Math.min(centre.length - 1, i + 1)];
+    const dx = b[0] - a[0];
+    const dy = b[1] - a[1];
+    const length = Math.hypot(dx, dy) || 1;
+    left.push([point[0] - (dy / length) * half, point[1] + (dx / length) * half]);
+    right.push([point[0] + (dy / length) * half, point[1] - (dx / length) * half]);
+  });
+  const back = right.reverse();
+  const cap = (to) => `A${fixed(half)} ${fixed(half)} 0 0 0 ${fixed(to[0])} ${fixed(to[1])}`;
+  const d = `M${fixed(left[0][0])} ${fixed(left[0][1])}${smoothThrough(left)}${cap(back[0])}${smoothThrough(back)}${cap(left[0])}Z`;
+  const xs = centre.map((p) => p[0]);
+  const ys = centre.map((p) => p[1]);
+  const size =
+    Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) +
+    MARK_STROKE * 2;
+  const cx = (Math.max(...xs) + Math.min(...xs)) / 2;
+  const cy = (Math.max(...ys) + Math.min(...ys)) / 2;
+  return { d, viewBox: [fixed(cx - size / 2), fixed(cy - size / 2), fixed(size), fixed(size)] };
+}
+
+const MARK_GEOMETRY = outlinedMark();
+const [VB_X, VB_Y, VB_SIZE] = MARK_GEOMETRY.viewBox;
+
 const BAYER_4 = [
   [0, 8, 2, 10],
   [12, 4, 14, 6],
@@ -32,8 +115,10 @@ const svg = (body, defs = '') =>
 const SHADOW =
   '<defs><filter id="lift" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="12" stdDeviation="12" flood-color="#0a1910" flood-opacity="0.45"/></filter></defs>';
 
-const spiral = (scale, lifted) =>
-  `<g transform="translate(512 512) scale(${scale}) translate(-84 28)"${lifted ? ' filter="url(#lift)"' : ''}><path d="${SPIRAL_PATH}" fill="none" stroke="${CREAM}" stroke-width="58" stroke-linecap="round"/></g>`;
+const spiral = (span, lifted) => {
+  const k = span / VB_SIZE;
+  return `<g transform="translate(512 512) scale(${fixed(k)}) translate(${fixed(-(VB_X + VB_SIZE / 2))} ${fixed(-(VB_Y + VB_SIZE / 2))})"${lifted ? ' filter="url(#lift)"' : ''}><path d="${MARK_GEOMETRY.d}" fill="${CREAM}"/></g>`;
+};
 
 function ditherDots(x0, y0, size, cell) {
   const dots = [];
@@ -56,22 +141,22 @@ const tile = (cell) => {
   const clip =
     '<clipPath id="tile"><rect x="100" y="100" width="824" height="824" rx="185"/></clipPath>';
   const base = `<rect x="100" y="100" width="824" height="824" rx="185" fill="${MOSS_DEEP}"/>`;
-  if (cell == null) return svg(`${base}${spiral(0.9, false)}`);
+  if (cell == null) return svg(`${base}${spiral(640, false)}`);
   return svg(
-    `${base}<g clip-path="url(#tile)">${ditherDots(100, 100, 824, cell)}</g>${spiral(0.9, true)}`,
+    `${base}<g clip-path="url(#tile)">${ditherDots(100, 100, 824, cell)}</g>${spiral(640, true)}`,
     `${SHADOW}<defs>${clip}</defs>`,
   );
 };
 const fullBleed = (cell) => {
   const base = `<rect width="1024" height="1024" fill="${MOSS_DEEP}"/>`;
-  if (cell == null) return svg(`${base}${spiral(0.72, false)}`);
-  return svg(`${base}${ditherDots(0, 0, 1024, cell)}${spiral(0.72, true)}`, SHADOW);
+  if (cell == null) return svg(`${base}${spiral(520, false)}`);
+  return svg(`${base}${ditherDots(0, 0, 1024, cell)}${spiral(520, true)}`, SHADOW);
 };
 
 const cellFor = (px) => (px >= 256 ? 26 : px >= 128 ? 40 : px >= 64 ? 64 : null);
 
-const MARK_PATH = SPIRAL_PATH.split(' A').slice(0, 4).join(' A');
-const MARK = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-142 -254 452 452" width="16" height="16"><path d="${MARK_PATH}" fill="none" stroke="#000" stroke-width="58" stroke-linecap="round"/></svg>\n`;
+const MARK = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${MARK_GEOMETRY.viewBox.join(' ')}" width="16" height="16"><path d="${MARK_GEOMETRY.d}" fill="#000"/></svg>\n`;
+const MARK_MODULE = `export const BRAND_MARK_VIEWBOX = [${MARK_GEOMETRY.viewBox.join(', ')}] as const;\n\nexport const BRAND_MARK_PATH =\n  '${MARK_GEOMETRY.d}';\n`;
 
 const { chromium } = requireFrom(join(ROOT, 'apps/web/package.json'))('@playwright/test');
 const browser = await chromium.launch();
@@ -108,7 +193,8 @@ for (const size of [192, 512]) {
 writeFileSync(join(PUBLIC_DIR, 'logo.svg'), tile(null));
 writeFileSync(join(ROOT, 'site/logo.svg'), tile(null));
 writeFileSync(join(PUBLIC_DIR, 'logo-mark.svg'), MARK);
-console.log('wrote apps/web/public/logo.svg, site/logo.svg, logo-mark.svg');
+writeFileSync(join(ROOT, 'apps/web/src/lib/brand-mark.ts'), MARK_MODULE);
+console.log('wrote apps/web/public/logo.svg, site/logo.svg, logo-mark.svg, src/lib/brand-mark.ts');
 
 const iconset = join(mkdtempSync(join(tmpdir(), 'cairn-icon-')), 'AppIcon.iconset');
 mkdirSync(iconset);
