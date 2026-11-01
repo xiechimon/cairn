@@ -650,7 +650,7 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
       return { h: Math.round(r.height), font: getComputedStyle(el).fontSize };
     });
     expect(geo.h).toBe(40);
-    expect(geo.font).toBe('14px');
+    expect(geo.font).toBe('15px');
 
     const fence = drawer.getByTestId('chief-bubble').filter({ hasText: 'echo before-and-after' });
     const pre = fence.locator('pre.chat-md-code');

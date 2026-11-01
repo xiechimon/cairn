@@ -301,9 +301,17 @@ jobs:
         if: ${{ !cancelled() }}
         run: node --test scripts/dispatch-agent.test.mjs scripts/dispatch-dedupe.test.mjs scripts/lane-model-policy.test.mjs
 
+      - name: UI debt ledger only shrinks against main
+        if: ${{ !cancelled() }}
+        run: node --test scripts/ui-debt-gate.test.mjs
+
       - name: Gardener sweep self-test (#1617)
         if: ${{ !cancelled() }}
         run: node --test scripts/gardener-ratchet.test.mjs scripts/gardener-weekly.test.mjs scripts/doc-drift.test.mjs scripts/evidence-prune.test.mjs scripts/delivery-metrics.test.mjs
+
+      - name: Merge routing size caps (#2371)
+        if: ${{ !cancelled() }}
+        run: node --test scripts/pr-gate-routing.test.mjs scripts/batch-merger.test.mjs
 
       - name: Real smoke runner and checker fixtures (#2283)
         if: ${{ !cancelled() }}
@@ -319,6 +327,10 @@ jobs:
       - name: Runner secret isolation fixtures (#2189)
         if: ${{ !cancelled() }}
         run: node --test scripts/ops/secret-reach/canary.test.mjs scripts/ops/secret-reach/broker.test.mjs scripts/ops/secret-reach/setup-runner-user.test.mjs
+
+      - name: Scoped root runner for ops scripts (#2362)
+        if: ${{ !cancelled() }}
+        run: node --test scripts/ops/cairn-ops/run.test.mjs scripts/ops/cairn-ops/install.test.mjs
 
   ops-backup-test:
     needs: changes
