@@ -140,3 +140,32 @@ describe('translation call coverage', () => {
     expect([...new Set(missing)]).toEqual([]);
   });
 });
+
+function unbranchedPlurals(template: string): string[] {
+  return [...template.matchAll(/\{\w+\}\s+[A-Za-z]+s\b/g)]
+    .filter((match) => !['is', 'has', 'expires', 'writes'].includes(match[0].split(/\s+/)[1] ?? ''))
+    .map((match) => match[0]);
+}
+
+describe('English plural coverage', () => {
+  it('gives every count followed by a plural noun a singular form', () => {
+    expect(
+      Object.entries(EN).flatMap(([key, value]) =>
+        unbranchedPlurals(value).map((match) => `${key}: ${match}`),
+      ),
+    ).toEqual([]);
+  });
+
+  it.each(['{n} members', '{running} tasks running, {done} merged today'])(
+    'rejects the audit negative control %s',
+    (value) => {
+      expect(unbranchedPlurals(value)).toHaveLength(1);
+    },
+  );
+
+  it('checks each occurrence even when another count has a singular branch', () => {
+    expect(unbranchedPlurals('{n#1 member|# members}, {m} tasks')).toEqual(['{m} tasks']);
+    expect(unbranchedPlurals('{n#1 member|# members}, {n} tasks')).toEqual(['{n} tasks']);
+    expect(unbranchedPlurals('{n#1 member|# members}')).toEqual([]);
+  });
+});
