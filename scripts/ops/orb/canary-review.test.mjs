@@ -382,13 +382,32 @@ for (const code of ['EACCES', 'EPERM', 'root']) {
           if (code === 'root') return '/';
           throw Object.assign(new Error(code), { code });
         },
-        stat: () => assert.fail('guest root alias probed'),
-        open: () => assert.fail('guest root alias opened'),
+        stat: () => {
+          throw Object.assign(new Error('EACCES'), { code: 'EACCES' });
+        },
+        open: () => {
+          throw Object.assign(new Error('EACCES'), { code: 'EACCES' });
+        },
       });
       assert.deepEqual(result, { blocked: true, detail: 'proc1-root-not-host' });
     }
   });
 }
+
+test('a guest-root proc1 alias that still opens a sentinel is a leak', () => {
+  const result = attacker.fileProbe('/proc/1/root/fixture', { hash: 'a'.repeat(64) }, undefined, {
+    readlink: () => '/',
+    open: () => {
+      throw Object.assign(new Error('EISDIR'), { code: 'EISDIR' });
+    },
+  });
+  assert.equal(result.blocked, false);
+  const readable = attacker.fileProbe('/proc/1/root/fixture', undefined, undefined, {
+    readlink: () => '/',
+    stat: () => ({}),
+  });
+  assert.deepEqual(readable, { blocked: false, detail: 'real path reachable (metadata only)' });
+});
 
 test('host-root aliases and ordinary paths still require ENOENT', () => {
   for (const path of ['/fixture', '/proc/1/root/fixture', '/proc/1/rootish/fixture']) {

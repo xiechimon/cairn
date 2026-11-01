@@ -49,16 +49,15 @@ export function fileProbe(
   { stat = statSync, open = openSync, readlink = readlinkSync } = {},
 ) {
   let fd;
+  let guestRoot = false;
   try {
     if (path.startsWith('/proc/1/root/')) {
-      let guestRoot = false;
       try {
         guestRoot = readlink('/proc/1/root') === '/';
       } catch (error) {
         if (!['EACCES', 'EPERM'].includes(error.code)) throw error;
         guestRoot = true;
       }
-      if (guestRoot) return { blocked: true, detail: 'proc1-root-not-host' };
     }
     if (!sentinel) {
       stat(path);
@@ -78,6 +77,8 @@ export function fileProbe(
       marker,
     };
   } catch (error) {
+    if (guestRoot && ['EACCES', 'EPERM'].includes(error.code))
+      return { blocked: true, detail: 'proc1-root-not-host' };
     return {
       blocked: error.code === 'ENOENT',
       detail: ['EACCES', 'EPERM'].includes(error.code)
