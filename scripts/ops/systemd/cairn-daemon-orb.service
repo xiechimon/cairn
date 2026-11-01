@@ -1,0 +1,19 @@
+[Unit]
+Description=Cairn Orb executor daemon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Code/AgentProjects/cairn/apps/daemon
+Environment=CAIRN_EXECUTOR=orb
+Environment=CAIRN_HOME=%h/.cairn-orb-daemon
+Environment=CAIRN_WORKSPACES_DIR=%h/.cairn-orb-daemon/workspaces
+ExecStartPre=/usr/bin/mkdir -p %h/.cairn-orb-daemon
+ExecStart=/usr/bin/env node dist/cli.mjs start -f --server http://127.0.0.1:8787 --name omarchy-orb
+Restart=always
+RestartSec=5
+UMask=0077
+
+[Install]
+WantedBy=default.target

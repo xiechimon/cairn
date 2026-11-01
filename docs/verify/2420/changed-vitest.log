@@ -1,0 +1,57 @@
+[heavy-slots] acquired slot 1/2
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-2420
+
+ ✓ |@cairn/web| test/thread-presence.test.ts (5 tests) 19ms
+ ✓ |@cairn/web| test/composer-queue-stop.test.ts (7 tests) 12ms
+ ✓ |@cairn/web| test/chief-flight-expand.test.ts (7 tests) 23ms
+ ✓ |@cairn/web| test/chief-user-echo.test.ts (13 tests) 25ms
+ ✓ |@cairn/web| test/chief-markdown.test.ts (33 tests) 33ms
+ ✓ |@cairn/web| test/transcript-tool-echo.test.ts (6 tests) 9ms
+ ✓ |@cairn/web| test/thinking-live-row.test.ts (6 tests) 19ms
+ ✓ |@cairn/web| test/i18n.test.ts (26 tests) 10ms
+ ✓ |@cairn/web| test/work-trace-mapper.test.ts (9 tests) 21ms
+ ✓ |@cairn/web| test/chief-thread-report.test.ts (13 tests) 26ms
+ ✓ |@cairn/web| test/activity-live-row.test.ts (18 tests) 31ms
+ ✓ |@cairn/web| test/transcript-user-words.test.ts (21 tests) 30ms
+(node:154) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |@cairn/web| test/sse-conversation-stream.test.ts (21 tests) 45ms
+(node:200) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |@cairn/web| test/chief-stream-handoff.test.ts (6 tests) 56ms
+ ✓ |@cairn/web| test/transcript-quiescent.test.ts (8 tests) 45ms
+ ✓ |@cairn/web| test/model-options.test.ts (10 tests) 9ms
+ ✓ |@cairn/web| test/chief-segments.test.ts (7 tests) 11ms
+ ✓ |@cairn/web| test/i18n-coverage.test.ts (9 tests) 153ms
+ ✓ |@cairn/web| test/agent-todo-row.test.ts (5 tests) 48ms
+ ✓ |@cairn/web| test/transcript-issue-fence.test.ts (2 tests) 20ms
+ ✓ |@cairn/web| test/injected-skills-row.test.ts (5 tests) 27ms
+ ✓ |@cairn/web| test/fail-row-ansi.test.ts (3 tests) 26ms
+ ✓ |@cairn/web| test/detail-continue-thread.test.ts (3 tests) 7ms
+ ✓ |@cairn/web| test/schedule-wake.test.ts (3 tests) 35ms
+ ✓ |@cairn/web| test/thread-presence-unavailable.test.ts (1 test) 8ms
+ ✓ |@cairn/web| test/chief-orchestrate-echo.test.ts (2 tests) 30ms
+ ✓ |@cairn/web| test/chief-todo-handoff.test.ts (4 tests) 24ms
+ ✓ |@cairn/web| test/first-pr-card.test.ts (8 tests) 7ms
+ ✓ |@cairn/web| test/thinking-level.test.ts (5 tests) 4ms
+ ✓ |@cairn/web| test/rel-time.test.ts (6 tests) 9ms
+ ✓ |@cairn/web| test/claude-login-copy.test.ts (3 tests) 5ms
+ ✓ |@cairn/web| test/detail-confirm-stale-step.test.ts (1 test) 14ms
+ ✓ |@cairn/web| test/chief-orchestration-failure.test.ts (2 tests) 50ms
+ ✓ |@cairn/web| test/merge-gate.test.ts (7 tests) 6ms
+ ✓ |@cairn/web| test/detail-confirm-request-changes.test.ts (2 tests) 11ms
+ ✓ |@cairn/web| test/usage-cost.test.ts (2 tests) 3ms
+ ✓ |@cairn/web| test/created-at.test.ts (2 tests) 14ms
+ ✓ |@cairn/web| test/project-base-branch-label.test.ts (1 test) 2ms
+ ✓ |@cairn/web| test/api-key-mcp-grants.test.ts (1 test) 36ms
+ ✓ |@cairn/web| test/attachment-paste.test.ts (35 tests) 8ms
+ ✓ |@cairn/web| test/segments-mention-nav.test.ts (5 tests) 12ms
+ ✓ |@cairn/web| test/chief-identity.test.ts (5 tests) 13ms
+
+ Test Files  42 passed (42)
+      Tests  338 passed (338)
+   Start at  21:08:37
+   Duration  1.67s (import 72%, transform 20%, tests 6%, worker 1%)
+
+JSON report written to /mnt/fast/tmp/ai-route-tmp/run-eue8kqe8/prepush-vitest-YY7AUS/report.json

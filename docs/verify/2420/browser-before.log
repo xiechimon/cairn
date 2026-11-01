@@ -1,0 +1,21 @@
+[heavy-slots] acquired slot 1/2
+[WebServer] (node:183) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] [plugin builtin:vite-reporter] 
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+[WebServer] (node:305) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 4 tests using 1 worker
+
+(node:357) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 e2e/shell-locale-default.spec.ts:43:7 › English count grammar › one member and one running task at 1440px in light (594ms)
+  ✓  2 e2e/shell-locale-default.spec.ts:43:7 › English count grammar › one member and one running task at 390px in light (444ms)
+  ✓  3 e2e/shell-locale-default.spec.ts:43:7 › English count grammar › one member and one running task at 1440px in dark (523ms)
+  ✓  4 e2e/shell-locale-default.spec.ts:43:7 › English count grammar › one member and one running task at 390px in dark (449ms)
+
+  4 passed (4.3s)

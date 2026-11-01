@@ -12,7 +12,7 @@ For example, a protected-path PR outside class ⑤ could satisfy R2's independen
 
 On this repository the route of a PR follows from the verdict of `.claude/workflows/pr-gate.js`:
 
-- Route A: pr-gate returns go with `mergedBy: 'auto-merge'` (only auto-mergeable paths, within 800 lines and 40 files, no deleted test files, no binaries outside `docs/verify/`). The PR merges itself.
+- Route A: pr-gate returns go with `mergedBy: 'auto-merge'` (only auto-mergeable paths, within 800 lines and 40 files, no deleted test files, no binaries outside `docs/verify/` except the gallery's PNG baselines in `apps/web/e2e/gallery-snapshots.spec.ts-snapshots/`). The PR merges itself.
 - Route C: pr-gate returns `mergedBy: 'user'`, and the PR touches class ⑤, an ADR or the lockfile, or is over 800 lines or 40 files and cannot be split. ian merges it for all of phase 1.
 - Route B: pr-gate returns `mergedBy: 'user'` for any other reason, such as another protected path or a path outside the auto-merge set. ian merges it until the in-product independent review lands (roadmap E1.1b-4) and a later ADR moves it to ADR 0026 R2.
 

@@ -7,6 +7,7 @@ import { Checkbox } from '../ui/checkbox.js';
 
 const TONE_LABEL: Record<StoneTone, string> = {
   waiting: 'Waiting on you',
+  failed: 'Failed',
   review: 'Ready for review',
   working: 'Working',
   idle: 'Idle',

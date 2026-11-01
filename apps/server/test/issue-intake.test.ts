@@ -24,6 +24,7 @@ import {
 } from '../src/db/schema.js';
 import { type FetchLike, githubIssueEvents } from '../src/lib/github.js';
 import { composeChiefSystemPrompt } from '../src/services/chief.js';
+import { executeChiefTool } from '../src/services/chief-tools.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { importGithubIssue } from '../src/services/github-issues.js';
 import {
@@ -37,6 +38,7 @@ import {
 } from '../src/services/issue-intake.js';
 import { createScheduler, issueIntakeRunOf } from '../src/services/scheduler.js';
 import { createSplitTodo } from '../src/services/todo-split.js';
+import * as todosService from '../src/services/todos.js';
 import { setTodoPhase } from '../src/services/todos.js';
 import {
   type ClosingPullNode,
@@ -242,7 +244,12 @@ interface World {
 }
 
 async function makeWorld(
-  opts: { chief?: ChiefMode; connection?: boolean; list?: number[] } = {},
+  opts: {
+    chief?: ChiefMode;
+    connection?: boolean;
+    list?: number[];
+    intakeAgentAllowlist?: string[];
+  } = {},
 ): Promise<World> {
   const gh = githubFake(REPO);
   if (opts.list !== undefined) {
@@ -263,6 +270,7 @@ async function makeWorld(
   const intake = createIssueIntake(
     { ...s.svc, box: s.secretBox },
     {
+      intakeAgentAllowlist: opts.intakeAgentAllowlist ?? ['orb-builder'],
       githubFetch: gh.impl,
       logger: { info: (obj, msg) => logs.push({ obj: obj as Record<string, unknown>, msg }) },
     },
@@ -1404,6 +1412,16 @@ describe('opt-in: CAIRN_ISSUE_INTAKE', () => {
     vi.unstubAllEnvs();
   });
 
+  test.each([undefined, '', ' , , '])('empty agent allowlist %j defaults to deny', (value) => {
+    vi.stubEnv('CAIRN_INTAKE_AGENT_ALLOWLIST', value);
+    expect(loadConfig().intakeAgentAllowlist).toEqual([]);
+  });
+
+  test('agent allowlist trims names and ignores empty entries without folding case', () => {
+    vi.stubEnv('CAIRN_INTAKE_AGENT_ALLOWLIST', ' Builder, ,Reviewer , builder,,');
+    expect(loadConfig().intakeAgentAllowlist).toEqual(['Builder', 'Reviewer', 'builder']);
+  });
+
   test('the variable name takes the brand slot', () => {
     expect(ENV_VARS.issueIntake).toBe('CAIRN_ISSUE_INTAKE');
   });
@@ -1616,9 +1634,11 @@ describe('opt-in wiring: index.ts takes the intake run slot via issueIntakeRunOf
     expect(lines[0]?.msg).toContain('CAIRN_ISSUE_INTAKE=1');
   });
 
-  test('on -> the run slot returned as is, one startup log line stating on', () => {
+  test('on -> the run slot carries the configured agent allowlist and logs on', () => {
     const { run, lines } = stubRun();
-    expect(issueIntakeRunOf({ issueIntake: true }, run)).toBe(run);
+    expect(
+      issueIntakeRunOf({ issueIntake: true, intakeAgentAllowlist: ['orb-builder'] }, run),
+    ).toEqual({ ...run, intakeAgentAllowlist: ['orb-builder'] });
     expect(lines).toHaveLength(1);
     expect(lines[0]?.obj.issueIntake).toBe(true);
     expect(lines[0]?.msg).toContain(' on ');
@@ -3322,5 +3342,380 @@ describe('16 merged closing PR', () => {
     expect(res.status).toBe(201);
     expect(takenNumbers(w.s)).toEqual([1406]);
     expect(w.gh.calls.filter((c) => c.method === 'PATCH')).toHaveLength(0);
+  });
+});
+
+describe('agent label routing', () => {
+  test.each(
+    [[], ['other-agent'], ['ORB-BUILDER'], ['orb']].map((intakeAgentAllowlist) => ({
+      intakeAgentAllowlist,
+    })),
+  )(
+    'holds a label unless its exact display name is allowlisted: %j',
+    async ({ intakeAgentAllowlist }) => {
+      const w = await makeWorld({ list: [1406], intakeAgentAllowlist });
+      routeLabel(w);
+      builder(w, 'orb-agent');
+      const tally = await w.intake.sweep();
+      expect(tally?.held).toBe(1);
+      expect(takenNumbers(w.s)).toEqual([]);
+      expect(chiefThreads(w.s)).toHaveLength(0);
+      expect(w.logs.some((line) => line.obj.reason === 'agent-label-not-allowlisted')).toBe(true);
+    },
+  );
+
+  test.each(['ready-for-agent', 'correction'] as const)(
+    'scheduler forwards the configured allowlist to %s intake',
+    async (label) => {
+      const w = await makeWorld({ list: [1406] });
+      routeLabel(w);
+      builder(w, 'orb-agent');
+      if (label === 'correction') {
+        const issue = w.gh.state.open.find((item) => item.number === 1406);
+        if (!issue) throw new Error('issue missing');
+        issue.labels = issue.labels.filter((item) => item.name !== LABEL);
+        issue.labels.push({ name: label, color: 'ededed' });
+        w.gh.state.events
+          .get(1406)
+          ?.push(labelEvent('labeled', OWNER, '2026-10-23T00:00:00Z', 90001, label));
+      }
+      const scheduler = createScheduler(
+        { ...w.s.svc, box: w.s.secretBox },
+        { tickMs: 3_600_000 },
+        undefined,
+        undefined,
+        issueIntakeRunOf(loadConfig({ issueIntake: true, intakeAgentAllowlist: ['orb-builder'] }), {
+          githubFetch: w.gh.impl,
+          logger: { info: () => {} },
+        }),
+      );
+      try {
+        scheduler.start();
+        await vi.waitFor(() => {
+          expect(todoOf(w.s, 1406)?.assignment?.build?.agentId).toBe('orb-agent');
+        });
+      } finally {
+        scheduler.stop();
+      }
+    },
+  );
+
+  function routeLabel(w: World, labels: string[] = ['agent:orb-builder']): void {
+    const issue = w.gh.state.open.find((i) => i.number === 1406);
+    if (!issue) throw new Error('issue missing');
+    issue.labels.push(...labels.map((name) => ({ name, color: 'ededed' })));
+    w.gh.state.events.set(1406, [
+      ...HUMAN_EVENTS_1406,
+      ...labels.map((label, index) =>
+        labelEvent('labeled', OWNER, '2026-10-22T00:00:00Z', 90000 + index, label),
+      ),
+    ]);
+  }
+
+  function builder(
+    w: World,
+    id: string,
+    status = 'active',
+    attached: { secrets?: string[]; mcpServers?: string[] } = {},
+  ): void {
+    w.s.db
+      .insert(agentTable)
+      .values({
+        id,
+        teamId: w.s.team.id,
+        displayName: 'orb-builder',
+        status,
+        provider: 'claude-code',
+        modelId: 'sonnet',
+        ...attached,
+      })
+      .run();
+  }
+
+  test.each<[string, { secrets?: string[]; mcpServers?: string[] }]>([
+    ['secrets', { secrets: ['deploy-key'] }],
+    ['MCP servers', { mcpServers: ['prod-db'] }],
+  ])('holds routing to an agent with %s attached', async (_kind, attached) => {
+    const w = await makeWorld({ list: [1406] });
+    routeLabel(w);
+    builder(w, 'privileged-agent', 'active', attached);
+    const tally = await w.intake.sweep();
+    expect(tally?.held).toBe(1);
+    expect(takenNumbers(w.s)).toEqual([]);
+    expect(chiefThreads(w.s)).toHaveLength(0);
+    expect(w.logs.some((line) => line.obj.reason === 'agent-label-privileged')).toBe(true);
+  });
+
+  test('a newer agent label that was removed again does not hold the present one', async () => {
+    const w = await makeWorld({ list: [1406] });
+    routeLabel(w);
+    builder(w, 'orb-agent');
+    w.gh.state.events
+      .get(1406)
+      ?.push(
+        labelEvent('labeled', OWNER, '2026-10-23T00:00:00Z', 90001, 'agent:other'),
+        labelEvent('unlabeled', OWNER, '2026-10-24T00:00:00Z', 90002, 'agent:other'),
+      );
+    const tally = await w.intake.sweep();
+    expect(tally?.imported).toBe(1);
+    expect(todoOf(w.s, 1406)?.assignment?.build).toEqual({ agentId: 'orb-agent' });
+  });
+
+  test('applies the unique active agent to plan and build before orchestration', async () => {
+    const w = await makeWorld({ list: [1406] });
+    routeLabel(w);
+    builder(w, 'orb-agent');
+    builder(w, 'retired-agent', 'inactive');
+    const tally = await w.intake.sweep();
+    expect(tally?.imported).toBe(1);
+    expect(tally?.orchestrated).toBe(1);
+    expect(todoOf(w.s, 1406)?.assignment).toEqual({
+      source: 'intake-label',
+      plan: { agentId: 'orb-agent' },
+      build: { agentId: 'orb-agent' },
+    });
+  });
+
+  test.each(['unknown', 'inactive', 'ambiguous', 'multiple-labels'] as const)(
+    'holds %s routing without importing or orchestrating',
+    async (kind) => {
+      const w = await makeWorld({ list: [1406] });
+      routeLabel(w, kind === 'multiple-labels' ? ['agent:orb-builder', 'agent:other'] : undefined);
+      if (kind === 'inactive') builder(w, 'inactive-agent', 'inactive');
+      if (kind === 'ambiguous') {
+        builder(w, 'first');
+        builder(w, 'second');
+      }
+      const tally = await w.intake.sweep();
+      expect(tally?.held).toBe(1);
+      expect(takenNumbers(w.s)).toEqual([]);
+      expect(chiefThreads(w.s)).toHaveLength(0);
+      expect(
+        w.logs.some(
+          (line) =>
+            line.obj.reason ===
+            (kind === 'ambiguous' || kind === 'multiple-labels'
+              ? 'agent-label-ambiguous'
+              : 'agent-label-unknown'),
+        ),
+      ).toBe(true);
+    },
+  );
+
+  test.each([true, false])(
+    'Coordinator respects preset plan and build withPlan=%s',
+    async (withPlan) => {
+      const w = await makeWorld({ list: [1406] });
+      await w.intake.sweep();
+      builder(w, 'orb-agent');
+      const row = todoOf(w.s, 1406);
+      const thread = chiefThreads(w.s)[0];
+      if (!row || !thread) throw new Error('import missing');
+      w.s.db
+        .update(todoTable)
+        .set({
+          assignment: {
+            source: 'intake-label',
+            plan: { agentId: 'orb-agent' },
+            build: { agentId: 'orb-agent' },
+          },
+        })
+        .where(eq(todoTable.id, row.id))
+        .run();
+      await executeChiefTool(
+        {
+          ...w.s.svc,
+          intakeAgentAllowlist: ['orb-builder'],
+          box: w.s.secretBox,
+          reposDir: w.s.reposDir,
+          attachmentsDir: w.s.attachmentsDir,
+        },
+        {
+          teamId: w.s.team.id,
+          userId: w.s.user.id,
+          chiefId: `chief-${w.s.user.id}-${w.s.team.id}`,
+          threadId: thread.id,
+          conversationId: thread.id,
+          chiefAgentId: CHIEF_AGENT_ID,
+        },
+        'run_builds',
+        {
+          todoIds: [row.id],
+          withPlan,
+          assignment: { plan: { agentId: CHIEF_AGENT_ID }, build: { agentId: CHIEF_AGENT_ID } },
+        },
+      );
+      expect(todoOf(w.s, 1406)?.assignment?.build?.agentId).toBe('orb-agent');
+      expect(todoOf(w.s, 1406)?.assignment?.plan?.agentId).toBe('orb-agent');
+      const steps = w.s.db
+        .select()
+        .from(stepTable)
+        .all()
+        .filter((step) => step.kind !== 'chief');
+      expect(steps.map((step) => step.kind)).toEqual([withPlan ? 'plan' : 'build']);
+    },
+  );
+
+  test('matches the agent prefix case-insensitively', async () => {
+    const w = await makeWorld({ list: [1406] });
+    routeLabel(w, ['AGENT:orb-builder']);
+    builder(w, 'orb-agent');
+    await w.intake.sweep();
+    expect(todoOf(w.s, 1406)?.assignment?.build?.agentId).toBe('orb-agent');
+  });
+
+  test.each(['outsider', 'app', 'bot', 'removed', 'missing', 'deleted', 'permission-unreadable'])(
+    'holds an untrusted agent label: %s',
+    async (kind) => {
+      const w = await makeWorld({ list: [1406] });
+      routeLabel(w);
+      builder(w, 'orb-agent');
+      const events: RawEvent[] = [...HUMAN_EVENTS_1406];
+      if (kind !== 'missing') {
+        events.push(
+          labelEvent('labeled', OWNER, '2026-10-22T00:00:00Z', 90000, 'agent:orb-builder'),
+        );
+        const latest = labelEvent(
+          kind === 'removed' ? 'unlabeled' : 'labeled',
+          kind === 'outsider'
+            ? 'outsider'
+            : kind === 'bot'
+              ? 'claude[bot]'
+              : kind === 'deleted'
+                ? null
+                : OWNER,
+          '2026-10-23T00:00:00Z',
+          90001,
+          'AGENT:orb-builder',
+        );
+        if (kind === 'app' || kind === 'bot')
+          latest.performed_via_github_app = { slug: kind === 'app' ? 'untrusted' : 'claude' };
+        events.push(latest);
+      }
+      w.gh.state.events.set(1406, events);
+      if (kind === 'permission-unreadable')
+        w.gh.overrides.set(`/repos/${REPO}/collaborators/${OWNER}/permission`, () => ({
+          status: 502,
+          body: {},
+        }));
+      const tally = await w.intake.sweep();
+      expect(takenNumbers(w.s)).toEqual([]);
+      expect(chiefThreads(w.s)).toHaveLength(0);
+      if (kind !== 'permission-unreadable') {
+        expect(tally?.held).toBe(1);
+        expect(w.logs.some((line) => String(line.obj.reason).startsWith('agent-label-'))).toBe(
+          true,
+        );
+      }
+    },
+  );
+
+  test('a newer different agent label event holds a stale issue list', async () => {
+    const w = await makeWorld({ list: [1406] });
+    routeLabel(w);
+    builder(w, 'orb-agent');
+    w.gh.state.events
+      .get(1406)
+      ?.push(labelEvent('labeled', 'outsider', '2026-10-23T00:00:00Z', 90001, 'agent:other'));
+    const tally = await w.intake.sweep();
+    expect(tally?.held).toBe(1);
+    expect(takenNumbers(w.s)).toEqual([]);
+    expect(w.logs.some((line) => line.obj.reason === 'agent-label-label-changed')).toBe(true);
+  });
+
+  test('trusts a triager applying an agent label through the trusted app', async () => {
+    const w = await makeWorld({ list: [1406] });
+    routeLabel(w);
+    builder(w, 'orb-agent');
+    const event = labelEvent(
+      'labeled',
+      'triager',
+      '2026-10-23T00:00:00Z',
+      90001,
+      'agent:orb-builder',
+    );
+    event.performed_via_github_app = { slug: 'claude' };
+    w.gh.state.events.set(1406, [...HUMAN_EVENTS_1406, event]);
+    w.gh.state.permissions.set('triager', { body: permissionBody('triager', 'read', 'triage') });
+    expect((await w.intake.sweep())?.imported).toBe(1);
+  });
+
+  test.each(['before-write', 'after-write'])(
+    'assignment update failure holds the created todo and prevents Coordinator dispatch: %s',
+    async (failure) => {
+      const w = await makeWorld({ list: [1406] });
+      routeLabel(w);
+      builder(w, 'orb-agent');
+      const published = vi.spyOn(w.s.hub, 'publishTodoDoc');
+      const updateTodo = todosService.updateTodo;
+      const update = vi.spyOn(todosService, 'updateTodo').mockImplementationOnce((...args) => {
+        if (failure === 'after-write') updateTodo(...args);
+        throw new Error('assignment-write-failed');
+      });
+      try {
+        const tally = await w.intake.sweep();
+        expect(tally?.imported).toBe(1);
+        expect(tally?.orchestrated).toBe(0);
+        expect(tally?.held).toBe(1);
+        expect(tally?.errors).toBe(1);
+        expect(todoOf(w.s, 1406)).toBeDefined();
+        expect(chiefThreads(w.s)).toHaveLength(0);
+        const record = todoOf(w.s, 1406);
+        expect(published.mock.calls[0]?.[1].assignment).toEqual({
+          source: 'intake-label',
+          plan: null,
+          build: null,
+        });
+        expect(record?.assignment).toEqual({ source: 'intake-label', plan: null, build: null });
+        if (!record) throw new Error('import missing');
+        await expect(
+          executeChiefTool(
+            {
+              ...w.s.svc,
+              box: w.s.secretBox,
+              reposDir: w.s.reposDir,
+              attachmentsDir: w.s.attachmentsDir,
+            },
+            {
+              teamId: w.s.team.id,
+              userId: w.s.user.id,
+              chiefId: `chief-${w.s.user.id}-${w.s.team.id}`,
+              threadId: 'held-thread',
+              conversationId: 'held-thread',
+              chiefAgentId: CHIEF_AGENT_ID,
+            },
+            'run_builds',
+            { todoIds: [record.id], assignment: { build: { agentId: CHIEF_AGENT_ID } } },
+          ),
+        ).rejects.toThrow(/intake-label-assignment-failed/);
+        expect(w.s.db.select().from(buildTable).all()).toHaveLength(0);
+        await w.intake.sweep();
+        const restarted = createIssueIntake(
+          { ...w.s.svc, box: w.s.secretBox },
+          { githubFetch: w.gh.impl },
+        );
+        await restarted.sweep();
+        expect(chiefThreads(w.s)).toHaveLength(0);
+        expect(
+          w.logs.some(
+            (line) =>
+              line.msg === 'issue intake assignment failed' &&
+              line.obj.err === 'assignment-write-failed' &&
+              line.obj.reason === 'intake-label-assignment-failed',
+          ),
+        ).toBe(true);
+      } finally {
+        update.mockRestore();
+        published.mockRestore();
+      }
+    },
+  );
+
+  test('without an agent label intake leaves the assignment unset', async () => {
+    const w = await makeWorld({ list: [1406] });
+    builder(w, 'orb-agent');
+    await w.intake.sweep();
+    expect(todoOf(w.s, 1406)?.assignment).toBeNull();
+    expect(chiefThreads(w.s)).toHaveLength(1);
   });
 });
