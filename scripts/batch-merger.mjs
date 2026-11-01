@@ -4,9 +4,6 @@ import { requiredChecks as branchProtectionChecks, mustBeGreenJobs } from './mer
 import { ownerRouting } from './merge-route.mjs';
 
 const batchHead = /^B\d+\//;
-const queueCommand = '@mergifyio queue';
-const queueMarker = (sha) => `<!-- batch-merger-queued:${sha} -->`;
-const queueRequest = new RegExp(`^${queueCommand}\\n<!-- batch-merger-queued:[a-f0-9]{40} -->$`);
 const requiredChecks = branchProtectionChecks;
 const ownerRouteLabel = 'owner-route';
 const log = (pr, action, reasons) =>
@@ -47,17 +44,7 @@ function clearOwnerRoute(pr, dryRun) {
   log(pr, 'unmarked-owner-route', []);
 }
 
-function queueState(pr) {
-  const requested = pages(`repos/${repo}/issues/${pr.number}/comments?per_page=100`)
-    .flat()
-    .some((comment) => comment.body === `${queueCommand}\n${queueMarker(pr.head.sha)}`);
-  const labelled = (name) => pr.labels.some((label) => label.name === name);
-  if (labelled('dequeued') && requested) return 'dequeued-needs-human';
-  if (labelled('queued') || requested) return 'already-queued';
-  return null;
-}
-
-function eligibility(number, expectedHead, dailyCap) {
+function eligibility(number, expectedHead) {
   const pr = api(`repos/${repo}/pulls/${number}`);
   const reasons = [];
   if (pr.state !== 'open') reasons.push('not-open');
@@ -108,27 +95,17 @@ function eligibility(number, expectedHead, dailyCap) {
     ).test(verdict.body)
   )
     reasons.push('review-not-pass');
-  const today = new Date().toISOString().slice(0, 10);
-  const queued = pages(`repos/${repo}/issues/comments?since=${today}T00:00:00Z&per_page=100`)
-    .flat()
-    .filter(
-      (comment) => comment.created_at >= `${today}T00:00:00Z` && queueRequest.test(comment.body),
-    ).length;
-  if (queued >= dailyCap) reasons.push('daily-cap');
   if (markers().length) reasons.push('autonomy-paused');
   return { pr, reasons };
 }
 
 try {
-  let dailyCap = 10;
   let dryRun = false;
   const args = process.argv.slice(2);
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--dry-run') dryRun = true;
-    else if (args[i] === '--daily-cap' && /^\d+$/.test(args[i + 1] ?? '')) {
-      dailyCap = Number(args[++i]);
-      if (!Number.isSafeInteger(dailyCap)) throw new Error('Invalid daily cap');
-    } else throw new Error('Expected --dry-run or --daily-cap <integer>');
+    else if (args[i] === '--daily-cap' && /^\d+$/.test(args[i + 1] ?? '')) i++;
+    else throw new Error('Expected --dry-run or --daily-cap <integer>');
   }
   const pulls = pages(`repos/${repo}/pulls?state=open&per_page=100`)
     .flat()
@@ -148,7 +125,7 @@ try {
   for (const candidate of pulls) {
     if (blocked.has(candidate.number)) continue;
     try {
-      let result = eligibility(candidate.number, candidate.head.sha, dailyCap);
+      let result = eligibility(candidate.number, candidate.head.sha);
       if (result.reasons.length) {
         log(result.pr, 'skip', result.reasons);
         continue;
@@ -165,12 +142,7 @@ try {
         markOwnerRoute(result.pr, ownerReasons, dryRun);
         continue;
       }
-      const state = queueState(result.pr);
-      if (state) {
-        log(result.pr, 'skip', [state]);
-        continue;
-      }
-      result = eligibility(candidate.number, candidate.head.sha, dailyCap);
+      result = eligibility(candidate.number, candidate.head.sha);
       if (result.reasons.length) {
         log(result.pr, 'skip', result.reasons);
         continue;
@@ -182,11 +154,7 @@ try {
         continue;
       }
       clearOwnerRoute(result.pr, dryRun);
-      if (!dryRun)
-        api(`repos/${repo}/issues/${candidate.number}/comments`, {
-          body: `${queueCommand}\n${queueMarker(result.pr.head.sha)}`,
-        });
-      log(result.pr, dryRun ? 'would-queue' : 'queued', []);
+      log(result.pr, 'auto-queue', []);
     } catch (error) {
       log(candidate, 'error', [error.message]);
       process.exitCode = 1;
