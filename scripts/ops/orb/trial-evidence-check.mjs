@@ -37,6 +37,20 @@ export async function checkTrialEvidence(evidence, options = {}) {
     typeof e.mergeCommit === 'string' && /^[a-f0-9]{40}$/.test(e.mergeCommit),
     'expected a full commit SHA',
   );
+  const release = e.distRelease;
+  const validRelease =
+    release !== null &&
+    typeof release === 'object' &&
+    !Array.isArray(release) &&
+    ['key', 'version', 'sha'].every(
+      (name) => typeof release[name] === 'string' && release[name].trim().length > 0,
+    ) &&
+    /^[a-f0-9]{4,40}$/.test(release.sha);
+  check('dist', validRelease, 'expected distRelease with key, version and git SHA');
+  if (validRelease) {
+    check('dist', !release.key.includes('-dirty'), 'release key must be clean');
+    check('dist', release.key.includes(release.sha), 'release key must contain its SHA');
+  }
   for (const name of ['labelsBefore', 'labelsAfter']) {
     check(
       name,
@@ -128,6 +142,16 @@ export async function checkTrialEvidence(evidence, options = {}) {
   }
   if (failures.length === 0) lines.push('push: ok');
   else lines.push(...failures);
+
+  const failuresBeforeDist = failures.length;
+  await github('dist', `compare/${release.sha}...main`, (comparison) => {
+    check(
+      'dist',
+      ['ahead', 'identical'].includes(comparison.status),
+      'release SHA is not reachable from main',
+    );
+  });
+  if (failures.length === failuresBeforeDist) lines.push('dist: ok');
 
   try {
     const closing = JSON.parse(

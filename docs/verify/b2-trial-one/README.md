@@ -15,6 +15,7 @@ local fake runs must never be recorded as live evidence.
 | `conversationId` | Thread conversation ID used by the Orb executor. For build steps this is the build ID. |
 | `orbName` | Exactly `cairn-orb-<conversationId>`. |
 | `machinectlStatus` | Nonempty output of `machinectl status <orbName>` captured while the trial runs. |
+| `distRelease` | Required `{key, version, sha}` object copied from `/var/lib/cairn-orb/dist/current.json` while the trial runs. The key must contain the SHA and must not contain `-dirty`; the SHA must be reachable from `main`. |
 | `pr` | Positive number of the merged PR delivering this issue. |
 | `mergeCommit` | Full merge commit SHA reported by GitHub for that PR. It must be reachable from `main`. |
 | `labelsBefore` | String array copied unchanged from the transfer script's JSON output. |
@@ -42,7 +43,10 @@ acceptance even when that label does not trigger an overnight timer.
    from that successful transfer, rather than reconstructing them afterward.
 4. Let intake create the Thread and run through the ordinary merge gate.
    Record the build/conversation IDs, running Orb status, claimed machine,
-   and actual host workspace absence check during the run.
+   and actual host workspace absence check during the run. Copy the complete
+   `{key, version, sha}` object from `/var/lib/cairn-orb/dist/current.json` into
+   `distRelease` during that same run. The trial must use a clean, merged daemon
+   build; preserve the publisher's SHA, which may be abbreviated.
 5. After the PR merges and the issue is closed as completed, record the PR and
    merge SHA and re-read the lane lists. Do not copy tokens, machine credentials,
    private addresses, or unrelated personal information into public evidence.
@@ -60,11 +64,17 @@ node scripts/ops/orb/trial-evidence-check.mjs docs/verify/b2-trial-one/trial-one
 ```
 
 The first reported check is `push: ok`. It verifies that the PR head commit
-exists in `repo` on GitHub and is reachable from the recorded merge commit.
+exists in `repo` on GitHub, with the expected same-repository Thread branch,
+merged PR state and merge commit.
 Checking the commit also works after GitHub deletes the merged head branch.
-The branch join, merged PR, completed issue, and merge reachability from `main`
-are checked afterward. A missing commit, unreadable GitHub response, or failed
-ancestry check reports a named `push:` failure first and exits nonzero.
+The next check is `dist: ok`. It requires a clean release key containing its
+recorded SHA and checks ancestry with
+`gh api repos/xiechimon/cairn/compare/<sha>...main`. Only `ahead` and `identical`
+pass. Missing or malformed release metadata, a dirty key, a key/SHA mismatch,
+an unmerged SHA, or an unreadable comparison produces a named `dist:` failure
+and exits nonzero. A missing PR head commit or unreadable push response reports
+a named `push:` failure first and exits nonzero. The completed issue and merge
+reachability from `main` are checked afterward.
 Invalid evidence reports `push: not checked (invalid evidence)` first.
 
 For server verification, set both `CAIRN_SERVER_URL` and `CAIRN_API_TOKEN` in
@@ -78,8 +88,8 @@ the unique machine named `omarchy-orb`. Server errors fail validation.
 
 When either environment setting is absent, the checker prints
 `server: skipped (CAIRN_SERVER_URL and CAIRN_API_TOKEN are both required)`
-after the push result and trusts the recorded machine field. GitHub commit
-existence and ancestry supply the push check; attributing that push to the Orb
+after the push and dist results and trusts the recorded machine field. GitHub commit
+existence supplies the push check; attributing that push to the Orb
 step and its bound credentials also requires the live trial observations and
 server machine verification. A server skip does not prove that attribution.
 The final `trial-one: ok` appears only when every enabled check passes.

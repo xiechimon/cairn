@@ -11,6 +11,7 @@ import { checkTrialEvidence } from './trial-evidence-check.mjs';
 
 const sha = 'a'.repeat(40);
 const headSha = 'b'.repeat(40);
+const distSha = 'c'.repeat(9);
 const evidence = () => ({
   repo: 'xiechimon/cairn',
   issue: 17,
@@ -20,6 +21,7 @@ const evidence = () => ({
   machinectlStatus: 'State: running',
   pr: 23,
   mergeCommit: sha,
+  distRelease: { key: `0.2.2-${distSha}-dist-0123456789abcdef`, version: '0.2.2', sha: distSha },
   labelsBefore: ['by:pi'],
   labelsAfter: ['by:cairn', 'ready-for-agent'],
   lanesAfter: { pending: [18], mine: [], hold: [] },
@@ -46,6 +48,7 @@ function world() {
       ],
     },
     compare: { status: 'ahead' },
+    distCompare: { status: 'ahead' },
     pushCompare: { status: 'diverged' },
     headCommit: { sha: headSha },
   };
@@ -58,6 +61,7 @@ function world() {
     if (path.endsWith('/pulls/23')) return JSON.stringify(data.pull);
     if (path.endsWith('/issues/17')) return JSON.stringify(data.issue);
     if (path.endsWith(`/compare/${headSha}...${sha}`)) return JSON.stringify(data.pushCompare);
+    if (path.endsWith(`/compare/${distSha}...main`)) return JSON.stringify(data.distCompare);
     if (path.endsWith(`/compare/${sha}...main`)) return JSON.stringify(data.compare);
     if (path.endsWith(`/commits/${headSha}`)) return JSON.stringify(data.headCommit);
     throw new Error(`Unexpected gh: ${path}`);
@@ -78,16 +82,83 @@ test('accepts a same-repository Thread branch without a merge trailer and prints
   assert.deepEqual(result.failures, []);
   assert.deepEqual(result.lines, [
     'push: ok',
+    'dist: ok',
     'server: skipped (CAIRN_SERVER_URL and CAIRN_API_TOKEN are both required)',
     'trial-one: ok',
   ]);
-  assert.deepEqual(w.calls.slice(0, 2), [
+  assert.deepEqual(w.calls.slice(0, 3), [
     ['api', 'repos/xiechimon/cairn/pulls/23'],
     ['api', `repos/xiechimon/cairn/commits/${headSha}`],
+    ['api', `repos/xiechimon/cairn/compare/${distSha}...main`],
   ]);
+  w.data.distCompare.status = 'identical';
   w.data.compare.status = 'identical';
   w.data.pushCompare.status = 'identical';
   assert.equal((await w.run()).ok, true);
+});
+
+for (const [name, distRelease] of [
+  ['missing', undefined],
+  ['null', null],
+  ['array', []],
+  ['missing key', { version: '0.2.2', sha: distSha }],
+  ['empty key', { ...evidence().distRelease, key: '' }],
+  ['missing version', { key: `0.2.2-${distSha}`, sha: distSha }],
+  ['empty version', { ...evidence().distRelease, version: ' ' }],
+  ['missing sha', { key: `0.2.2-${distSha}`, version: '0.2.2' }],
+  ['invalid sha', { ...evidence().distRelease, sha: '../main' }],
+  [
+    'dirty key',
+    { ...evidence().distRelease, key: `${evidence().distRelease.key}-dirty-0123456789abcdef` },
+  ],
+  ['key/sha mismatch', { ...evidence().distRelease, key: `0.2.2-${headSha}` }],
+]) {
+  test(`rejects invalid dist release: ${name}`, async () => {
+    const w = world();
+    const result = await w.run({ ...evidence(), distRelease });
+    assert.equal(result.ok, false);
+    assert.ok(result.failures.some((line) => line.startsWith('dist:')));
+    assert.ok(result.lines.some((line) => line.startsWith('dist:')));
+    assert.ok(!result.lines.includes('dist: ok'));
+    assert.ok(!result.lines.includes('trial-one: ok'));
+    assert.equal(w.calls.length, 0);
+  });
+}
+
+for (const status of ['behind', 'diverged', undefined]) {
+  test(`rejects a dist SHA not on main: ${status}`, async () => {
+    const w = world();
+    w.data.distCompare.status = status;
+    const result = await w.run();
+    assert.equal(result.ok, false);
+    assert.deepEqual(result.failures, ['dist: release SHA is not reachable from main']);
+    assert.equal(result.lines[0], 'push: ok');
+    assert.ok(!result.lines.includes('dist: ok'));
+    assert.ok(!result.lines.includes('trial-one: ok'));
+    assert.ok(
+      w.calls.some((args) => args[1] === `repos/xiechimon/cairn/compare/${distSha}...main`),
+    );
+  });
+}
+
+test('dist GitHub read failures fail closed', async () => {
+  for (const response of ['unavailable', 'invalid JSON', 'null']) {
+    const w = world();
+    const result = await w.run(evidence(), {
+      runner: async (args) => {
+        if (args[1] === `repos/xiechimon/cairn/compare/${distSha}...main`) {
+          if (response === 'unavailable') throw new Error('network unavailable');
+          return response;
+        }
+        return w.options.runner(args);
+      },
+    });
+    assert.equal(result.ok, false);
+    assert.deepEqual(result.failures, ['dist: GitHub read failed']);
+    assert.equal(result.lines[0], 'push: ok');
+    assert.ok(!result.lines.includes('dist: ok'));
+    assert.ok(!result.lines.includes('trial-one: ok'));
+  }
 });
 
 for (const [name, patch] of [
@@ -271,7 +342,7 @@ test('verifies the server build, Thread and claimed machine after push', async (
   const w = serverWorld();
   const result = await w.run();
   assert.equal(result.ok, true);
-  assert.deepEqual(result.lines, ['push: ok', 'server: checked', 'trial-one: ok']);
+  assert.deepEqual(result.lines, ['push: ok', 'dist: ok', 'server: checked', 'trial-one: ok']);
   assert.equal(w.calls.length, 4);
   w.responses['/api/teams/team-1/machines'][0].name = 'omarchy';
   const failed = await w.run();
@@ -404,7 +475,8 @@ for (const env of [
     });
     assert.equal(result.ok, true);
     assert.equal(result.lines[0], 'push: ok');
-    assert.match(result.lines[1], /^server: skipped/);
+    assert.equal(result.lines[1], 'dist: ok');
+    assert.match(result.lines[2], /^server: skipped/);
   });
 }
 
@@ -473,6 +545,7 @@ const value = process.argv[2] === 'pr' ? data.closing
   : path.endsWith('/issues/17') ? data.issue
   : path.endsWith('/commits/${headSha}') ? data.headCommit
   : path.endsWith('/compare/${headSha}...${sha}') ? data.pushCompare
+  : path.endsWith('/compare/${distSha}...main') ? data.distCompare
   : path.endsWith('/compare/${sha}...main') ? data.compare : null;
 if (!value) process.exit(1);
 process.stdout.write(JSON.stringify(value));
@@ -497,7 +570,7 @@ process.stdout.write(JSON.stringify(value));
         timeout: 15_000,
       },
     );
-    assert.equal(result.stdout, 'push: ok\nserver: checked\ntrial-one: ok\n');
+    assert.equal(result.stdout, 'push: ok\ndist: ok\nserver: checked\ntrial-one: ok\n');
     assert.equal(requests.length, 4);
   } finally {
     await new Promise((resolve) => server.close(resolve));
