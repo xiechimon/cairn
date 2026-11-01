@@ -50,7 +50,7 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
     method: 'GET',
     path: '/api/teams/{id}/coordinator',
     query: ['projectId', 'before', 'limit'],
-    note: '{thread, messages, hasEarlier}; the one global Coordinator thread, created on first read (D58)',
+    note: '{thread, messages, hasEarlier}; the one global Coordinator thread, created on first read (D58); thread.orchestration = latest orchestrate turn {todoId, state, error} or null',
   },
   {
     method: 'POST',

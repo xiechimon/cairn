@@ -421,6 +421,12 @@ export function buildOrchestratePrompt(
   return `${orchestratePromptHead(todo.seqNum)}\n\n编排请求：[#${todo.seqNum}](todo:${todo.id}) —— ${intent}\n\n${source}${verification}${machine}`;
 }
 
+export function orchestratedTodoIdOf(prompt: string | null): string | null {
+  return (
+    /(?:^|\n)开始任务 #(\d+)\n\n编排请求：\[#\1\]\(todo:([^)\s]+)\)/.exec(prompt ?? '')?.[2] ?? null
+  );
+}
+
 export function orchestrateThreadTitle(seqNum: number): string {
   return chiefThreadTitle(orchestratePromptHead(seqNum));
 }

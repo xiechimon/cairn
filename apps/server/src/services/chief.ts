@@ -2,6 +2,7 @@ import type {
   ActiveRun,
   AgentRecord,
   ChiefGetResponse,
+  ChiefOrchestration,
   ChiefThread,
   ChiefWakeKind,
   ChiefWatch,
@@ -28,6 +29,7 @@ import {
   isChiefDigestThreadId,
   isIssueSourcedTask,
   newChiefThreadId,
+  orchestratedTodoIdOf,
   PLAN_PRIOR_ART_RULE,
 } from '@cairn/shared';
 import { and, asc, desc, eq, inArray, isNull, like, ne, sql } from 'drizzle-orm';
@@ -371,15 +373,42 @@ export function chiefThreadView(deps: ChiefDeps, teamId: string, r: ThreadRow): 
     .orderBy(desc(step.createdAt), sql`rowid desc`)
     .limit(1)
     .get();
-  if (latest?.status !== 'failed') return { ...record, lastTurnError: null };
-  const error = deps.db
+  const lastTurnError = latest?.status === 'failed' ? turnErrorOf(deps.db, latest.id) : null;
+  return {
+    ...record,
+    lastTurnError,
+    orchestration: latest === undefined ? null : orchestrationOf(latest, lastTurnError),
+  };
+}
+
+function turnErrorOf(db: Db, stepId: string): string | null {
+  const error = db
     .select()
     .from(chiefMessage)
-    .where(eq(chiefMessage.id, `chief-err-${latest.id}`))
+    .where(eq(chiefMessage.id, `chief-err-${stepId}`))
     .get();
   const content = typeof error?.content === 'string' ? JSON.parse(error.content) : error?.content;
   const parsed = chiefTurnErrorContentSchema.safeParse(content);
-  return { ...record, lastTurnError: parsed.success ? parsed.data.message : null };
+  return parsed.success ? parsed.data.message : null;
+}
+
+const ORCHESTRATION_STATE_OF_STATUS: Partial<
+  Record<(typeof step.$inferSelect)['status'], ChiefOrchestration['state']>
+> = {
+  pending: 'queued',
+  waiting_quota: 'queued',
+  claimed: 'running',
+  failed: 'failed',
+};
+
+function orchestrationOf(
+  latest: typeof step.$inferSelect,
+  lastTurnError: string | null,
+): ChiefOrchestration | null {
+  const todoId = orchestratedTodoIdOf(latest.prompt);
+  const state = ORCHESTRATION_STATE_OF_STATUS[latest.status];
+  if (todoId === null || state === undefined) return null;
+  return { todoId, state, error: state === 'failed' ? lastTurnError : null };
 }
 
 export function listChiefThreads(deps: ChiefDeps, teamId: string): ChiefThread[] {
@@ -457,6 +486,39 @@ export function requireUnarchivedProject(db: Db, projectId: string): void {
     .where(eq(project.id, projectId))
     .get();
   if (row?.archivedAt != null) throw new HttpError(409, `project ${projectId} is archived`);
+}
+
+export const turnProjectId = sql<
+  string | null
+>`coalesce(${chiefMessage.projectId}, case when ${chiefMessage.role} = 'user' then null else (select u.projectId from chief_message u where u.threadId = ${chiefMessage.threadId} and u.role = 'user' and (u.createdAt < ${chiefMessage.createdAt} or (u.createdAt = ${chiefMessage.createdAt} and u.rowid < ${chiefMessage}.rowid)) order by u.createdAt desc, u.rowid desc limit 1) end)`;
+
+function requireRewindStaysInProject(
+  db: Db,
+  anchor: typeof chiefMessage.$inferSelect,
+  laterIds: string[],
+): void {
+  if (laterIds.length === 0) return;
+  const others = db
+    .selectDistinct({ projectId: turnProjectId })
+    .from(chiefMessage)
+    .where(
+      and(inArray(chiefMessage.id, laterIds), sql`${turnProjectId} is not ${anchor.projectId}`),
+    )
+    .all();
+  if (others.length === 0) return;
+  const names = others.map((row) => {
+    if (row.projectId === null) return 'messages without a project';
+    const named = db
+      .select({ name: project.name })
+      .from(project)
+      .where(eq(project.id, row.projectId))
+      .get();
+    return `project ${named?.name ?? row.projectId}`;
+  });
+  throw new HttpError(
+    409,
+    `rewind would delete later turns of ${names.join(', ')}; rewind from a later message instead`,
+  );
 }
 
 function requireWritableThread(row: ThreadRow): void {
@@ -590,6 +652,11 @@ export function rewindChiefThread(
     .orderBy(asc(chiefMessage.createdAt), sql`rowid`)
     .all();
   const doomed = ordered.slice(ordered.findIndex((row) => row.id === anchor.id) + 1);
+  requireRewindStaysInProject(
+    deps.db,
+    anchor,
+    doomed.map((row) => row.id),
+  );
   for (const row of doomed) {
     deps.db.delete(chiefMessage).where(eq(chiefMessage.id, row.id)).run();
   }

@@ -7168,7 +7168,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
   },
   {
     "method": "GET",
-    "note": "{thread, messages, hasEarlier}; the one global Coordinator thread, created on first read (D58)",
+    "note": "{thread, messages, hasEarlier}; the one global Coordinator thread, created on first read (D58); thread.orchestration = latest orchestrate turn {todoId, state, error} or null",
     "path": "/api/teams/{id}/coordinator",
     "query": [
       "projectId",
@@ -8119,6 +8119,41 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > chi
       "type": [
         "string",
         "null",
+      ],
+    },
+    "orchestration": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "error": {
+              "type": [
+                "string",
+                "null",
+              ],
+            },
+            "state": {
+              "enum": [
+                "queued",
+                "running",
+                "failed",
+              ],
+              "type": "string",
+            },
+            "todoId": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "todoId",
+            "state",
+            "error",
+          ],
+          "type": "object",
+        },
+        {
+          "type": "null",
+        },
       ],
     },
     "pending": {

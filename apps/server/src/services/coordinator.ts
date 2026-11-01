@@ -2,11 +2,13 @@ import type { CoordinatorPageQuery, CoordinatorPageResponse } from '@cairn/share
 import { and, desc, eq, lt, or, sql } from 'drizzle-orm';
 import { chiefMessage } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
-import { type ChiefDeps, chiefThreadView, coordinatorThreadRow, ensureChief } from './chief.js';
-
-const turnProjectId = sql<
-  string | null
->`coalesce(${chiefMessage.projectId}, case when ${chiefMessage.role} = 'user' then null else (select u.projectId from chief_message u where u.threadId = ${chiefMessage.threadId} and u.role = 'user' and (u.createdAt < ${chiefMessage.createdAt} or (u.createdAt = ${chiefMessage.createdAt} and u.rowid < ${chiefMessage}.rowid)) order by u.createdAt desc, u.rowid desc limit 1) end)`;
+import {
+  type ChiefDeps,
+  chiefThreadView,
+  coordinatorThreadRow,
+  ensureChief,
+  turnProjectId,
+} from './chief.js';
 
 function earlierThan(deps: ChiefDeps, threadId: string, messageId: string) {
   const cursor = deps.db

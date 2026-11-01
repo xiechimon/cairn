@@ -105,6 +105,15 @@ export const chiefGetResponseSchema = z.object({
 });
 export type ChiefGetResponse = z.infer<typeof chiefGetResponseSchema>;
 
+export const CHIEF_ORCHESTRATION_STATES = ['queued', 'running', 'failed'] as const;
+
+export const chiefOrchestrationSchema = z.object({
+  todoId: recordId,
+  state: z.enum(CHIEF_ORCHESTRATION_STATES),
+  error: z.string().nullable(),
+});
+export type ChiefOrchestration = z.infer<typeof chiefOrchestrationSchema>;
+
 export const chiefThreadSchema = z.object({
   id: z.string(),
   chiefId: recordId,
@@ -127,6 +136,7 @@ export const chiefThreadSchema = z.object({
   lastTurnError: z.string().nullable().optional(),
   pending: z.array(chiefPendingMessageSchema).optional(),
   fallbackModel: z.string().nullable().optional(),
+  orchestration: chiefOrchestrationSchema.nullable().optional(),
   turnQueue: z
     .object({
       position: z.number().int().min(1),

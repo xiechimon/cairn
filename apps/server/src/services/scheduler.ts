@@ -37,6 +37,7 @@ import {
 } from './builds.js';
 import { fireDueChiefWakes, sweepAbandonedChiefSteps } from './chief.js';
 import { planChiefDigests } from './chief-digest.js';
+import { sweepOverlongChiefTurns } from './chief-turns.js';
 import { CI_POLL_INTERVAL_MS, type CiPollLogger, createCiPoller } from './ci-loop.js';
 import { projectOfTodo } from './git.js';
 import { githubTokenOrNull } from './github-connection.js';
@@ -485,6 +486,7 @@ export function createScheduler(
     planChiefDigests(deps, now);
     sweepStaleMachines(deps);
     sweepAbandonedChiefSteps(deps, now);
+    sweepOverlongChiefTurns(deps, now);
     sweepAbandonedBuildSteps(deps, now);
     void sweepAbandonedShipSteps(deps, now).catch(() => {});
     sweepZombieQueuedTodos(deps, now);
