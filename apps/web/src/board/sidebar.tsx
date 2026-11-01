@@ -254,7 +254,7 @@ export function BoardSidebar({
   const navRef = useRef<HTMLElement | null>(null);
   useScrollFade(navRef, { enabled: !collapsed });
   const resourceListId = useId();
-  const homeLabel = attention > 0 ? `${t('工作台')} ${attention}` : t('工作台');
+  const homeLabel = attention > 0 ? `${t('首页')} ${attention}` : t('首页');
 
   const goTo = (target: string) => navigate({ pathname: target, search: plain });
 
@@ -458,7 +458,7 @@ export function BoardSidebar({
         <div className="relative">
           <SidebarNavRow
             icon={<Inbox className="size-4" strokeWidth={STROKE} />}
-            label={t('工作台')}
+            label={t('首页')}
             active={(selected === 'board' || selected === 'kanban') && activeProject === null}
             onClick={() => navigate({ pathname: '/app', search: homeSearch })}
           />

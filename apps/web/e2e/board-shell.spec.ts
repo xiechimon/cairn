@@ -5,7 +5,7 @@ test('a project filter keeps home and marks the project; an unknown project leav
 }) => {
   const workbench = page
     .getByRole('complementary')
-    .locator('[data-slot="sidebar-nav-row"]', { hasText: '工作台' });
+    .locator('[data-slot="sidebar-nav-row"]', { hasText: '首页' });
   await page.goto('/app?scenario=home-c');
   const unfiltered = await page.getByTestId('home-c-since').textContent();
 

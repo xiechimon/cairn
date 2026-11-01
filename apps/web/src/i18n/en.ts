@@ -1555,4 +1555,5 @@ export const EN: Record<string, string> = {
   '跟 Coordinator 说点什么，或描述一个新任务…':
     'Tell the Coordinator something, or describe a new task…',
   收起其余: 'Show less',
+  首页: 'Home',
 };

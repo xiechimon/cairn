@@ -19,7 +19,7 @@ function boxRing(locator: Locator) {
 
 test('mouse click then Escape on a sidebar row paints no focus ring', async ({ page }) => {
   await page.goto('/app?scenario=01');
-  const board = navRow(page, '工作台');
+  const board = navRow(page, '首页');
   await board.click();
   await page.keyboard.press('Escape');
   await settleTransitions(page);
@@ -30,7 +30,7 @@ test('mouse click then Escape on a sidebar row paints no focus ring', async ({ p
 test('mouse click then Escape on a rail row paints no focus ring', async ({ page }) => {
   await page.addInitScript((key) => localStorage.setItem(key, '1'), SIDEBAR_COLLAPSED_KEY);
   await page.goto('/app?scenario=01');
-  const board = sidebarLink(page, /^工作台/);
+  const board = sidebarLink(page, /^首页/);
   await board.click();
   await page.keyboard.press('Escape');
   await settleTransitions(page);
@@ -39,7 +39,7 @@ test('mouse click then Escape on a rail row paints no focus ring', async ({ page
 
 test('keyboard focus rings on sidebar rows stay whole', async ({ page }) => {
   await page.goto('/app?scenario=01');
-  for (const name of ['工作台', '定时']) {
+  for (const name of ['首页', '定时']) {
     const row = navRow(page, name);
     await keyboardFocus(page, row);
     expect({ name, ...(await readRing(row)), ringShown: (await boxRing(row)) !== 'none' }).toEqual({
@@ -57,7 +57,7 @@ test('keyboard focus rings on rail rows stay whole', async ({ page }) => {
   await page.goto('/app?scenario=01');
   const rail = page.getByRole('complementary').getByRole('navigation');
   const rows = [
-    sidebarLink(page, /^工作台/),
+    sidebarLink(page, /^首页/),
     sidebarLink(page, '定时'),
     rail.getByRole('button').first(),
   ];
@@ -69,7 +69,7 @@ test('keyboard focus rings on rail rows stay whole', async ({ page }) => {
 
 test('Escape after Tab keeps the keyboard focus ring', async ({ page }) => {
   await page.goto('/app?scenario=01');
-  const board = navRow(page, '工作台');
+  const board = navRow(page, '首页');
   await board.click();
   await keyboardFocus(page, board);
   await page.keyboard.press('Escape');

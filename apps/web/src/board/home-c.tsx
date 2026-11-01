@@ -327,11 +327,11 @@ export function HomeC({
       aria-label={t('与 Coordinator 的对话')}
       className="flex min-h-0 min-w-0 flex-1 flex-col"
     >
-      <h1 className="sr-only">{t('工作台')}</h1>
+      <h1 className="sr-only">{t('首页')}</h1>
       {banner != null && (
         <div className="mx-auto w-[calc(100%-2rem)] max-w-182 flex-none pt-3">{banner}</div>
       )}
-      <MessageScrollerProvider defaultScrollPosition="end">
+      <MessageScrollerProvider defaultScrollPosition="start">
         <ChiefConversation
           variant="global"
           chief={{ ...chiefData, stream: conversation, examples: undefined }}

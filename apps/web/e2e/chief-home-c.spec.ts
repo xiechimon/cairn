@@ -202,3 +202,20 @@ test('a project link with board or column params still lands on the filtered hom
   await expect(page.getByTestId('home-c')).toBeVisible();
   await expect(page).not.toHaveURL(/view=board|column=/);
 });
+
+test('the home lands at the top: greeting and the pinned decision in view, the conversation below', async ({
+  page,
+}) => {
+  await page.goto(home('home-c'));
+  await expect(page.getByTestId('home-c').getByRole('heading', { level: 2 }).first()).toBeInViewport();
+  await expect(needsYou(page).getByRole('heading', { name: 'Needs you' })).toBeInViewport();
+  await expect(needsYou(page).locator('[data-slot="needs-you-item"]').first()).toBeInViewport();
+});
+
+test('at phone width the number-key hint of a question is hidden', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(home('home-c'));
+  await expect(needsYou(page).getByTestId('chief-question-hint')).toBeHidden();
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(needsYou(page).getByTestId('chief-question-hint')).toBeVisible();
+});

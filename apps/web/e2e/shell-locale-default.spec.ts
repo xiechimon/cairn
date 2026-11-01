@@ -10,14 +10,14 @@ test.describe('a browser set to English', () => {
 
   test('opens the workbench in English with no stored choice', async ({ page }) => {
     await page.goto('/app');
-    await expect(workbench(page, 'Workbench')).toBeVisible();
+    await expect(workbench(page, 'Home')).toBeVisible();
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   });
 
   test('keeps a stored Chinese choice', async ({ page }) => {
     await page.addInitScript(() => localStorage.setItem('cairn-locale', 'zh'));
     await page.goto('/app');
-    await expect(workbench(page, '工作台')).toBeVisible();
+    await expect(workbench(page, '首页')).toBeVisible();
     await expect(page.locator('html')).toHaveAttribute('lang', 'zh-CN');
   });
 });
@@ -27,14 +27,14 @@ test.describe('a browser set to Chinese', () => {
 
   test('opens the workbench in Chinese with no stored choice', async ({ page }) => {
     await page.goto('/app');
-    await expect(workbench(page, '工作台')).toBeVisible();
+    await expect(workbench(page, '首页')).toBeVisible();
     await expect(page.locator('html')).toHaveAttribute('lang', 'zh-CN');
   });
 
   test('keeps a stored English choice', async ({ page }) => {
     await page.addInitScript(() => localStorage.setItem('cairn-locale', 'en'));
     await page.goto('/app');
-    await expect(workbench(page, 'Workbench')).toBeVisible();
+    await expect(workbench(page, 'Home')).toBeVisible();
   });
 });
 
