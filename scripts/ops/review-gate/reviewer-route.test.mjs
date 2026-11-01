@@ -1,13 +1,21 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  BLOCK_ROUNDS,
   CLAUDE_DENIED_TOOLS,
   CLAUDE_REVIEW_TOOLS,
   claudeFallback,
   claudeReviewArgs,
   claudeReviewPrompt,
   DIFF_LIMIT,
+  diffDigest,
+  escalation,
+  gateVerdicts,
+  HUMAN_LABEL,
+  lowRiskTier,
+  parseRawDiff,
   parseRuns,
+  priorFindings,
   STALL_MS,
   stallAlert,
   stalled,
@@ -92,4 +100,151 @@ test('the alert carries a per-head marker', () => {
 
 test('run records skip malformed lines', () => {
   assert.deepEqual(parseRuns('{"pr":1}\nnot json\n\n{"pr":2}\n'), [{ pr: 1 }, { pr: 2 }]);
+});
+
+const verdictBody = (head, verdict, review = '') =>
+  `<!-- review-gate:${head} -->\n**Independent review gate: ${verdict}** for \`${head.slice(0, 8)}\`.${review ? `\n\n${review}` : ''}\n<!-- review-gate-patch:p -->`;
+const humanNote = {
+  body: `<!-- review-gate-human:${sha} -->\n**Independent review gate: needs a human**`,
+};
+const blocks = (n) =>
+  Array.from({ length: n }, (_, k) => ({
+    body: verdictBody(String(k + 1).repeat(40), 'BLOCK', `${k + 1}. blocking: f.ts:${k} bug`),
+  }));
+
+test('only the verdict line of a gate comment makes it a verdict', () => {
+  const list = gateVerdicts([
+    { body: verdictBody(sha, 'PASS'), url: 'u' },
+    { body: `quoted\n${verdictBody(other, 'BLOCK')}` },
+    { body: `<!-- review-gate-pending:${sha} -->\n**Independent review gate: no verdict yet**` },
+    { body: verdictBody(other, 'BLOCK') },
+  ]);
+  assert.deepEqual(
+    list.map((v) => [v.sha, v.verdict, v.url]),
+    [
+      [sha, 'PASS', 'u'],
+      [other, 'BLOCK', undefined],
+    ],
+  );
+});
+
+test('three BLOCK rounds hand the PR to a human until the label is removed', () => {
+  assert.equal(BLOCK_ROUNDS, 3);
+  assert.equal(escalation(blocks(2), []), null);
+  assert.deepEqual(escalation(blocks(3), []), { addLabel: true, comment: true });
+  assert.deepEqual(escalation(blocks(3), [{ name: HUMAN_LABEL }]), {
+    addLabel: false,
+    comment: true,
+  });
+  assert.deepEqual(escalation([...blocks(3), humanNote], [{ name: HUMAN_LABEL }]), {
+    addLabel: false,
+    comment: false,
+  });
+  assert.equal(escalation([...blocks(3), humanNote], []), null);
+  assert.equal(escalation([...blocks(3), humanNote, ...blocks(2)], []), null);
+  assert.deepEqual(escalation([...blocks(3), humanNote, ...blocks(3)], []), {
+    addLabel: true,
+    comment: true,
+  });
+});
+
+test('a PASS after the BLOCK rounds is not handed to a human', () => {
+  assert.equal(escalation([...blocks(3), { body: verdictBody(sha, 'PASS') }], []), null);
+  assert.equal(
+    escalation([...blocks(2), { body: verdictBody(sha, 'PASS') }, ...blocks(1)], [])?.comment,
+    true,
+  );
+});
+
+test('earlier findings list every BLOCK round without the gate markers', () => {
+  const text = priorFindings(gateVerdicts([...blocks(2), { body: verdictBody(sha, 'PASS') }]));
+  assert.match(text, /1\. blocking: f\.ts:0 bug/);
+  assert.match(text, /2\. blocking: f\.ts:1 bug/);
+  assert.match(text, /Head `11111111`/);
+  assert.doesNotMatch(text, /<!--|Independent review gate/);
+  assert.ok(text.indexOf('f.ts:0') < text.indexOf('f.ts:1'));
+  const long = priorFindings(
+    gateVerdicts([{ body: verdictBody(sha, 'BLOCK', 'x'.repeat(20_000)) }]),
+  );
+  assert.ok(long.length <= 9_002);
+});
+
+const hunk = (at, context) =>
+  `diff --git a/f b/f\nindex 1111111..2222222 100644\n--- a/f\n+++ b/f\n@@ -${at},1 +${at},1 @@ ${context}\n-old\n+new\n`;
+
+test('the diff digest ignores blob ids and hunk positions but not changed lines', () => {
+  assert.equal(diffDigest(hunk(3, 'fn a')), diffDigest(hunk(30, 'fn b')));
+  assert.equal(
+    diffDigest(hunk(3, 'x').replace('1111111..2222222', '3333333..4444444')),
+    diffDigest(hunk(3, 'x')),
+  );
+  assert.notEqual(diffDigest(hunk(3, 'x')), diffDigest(hunk(3, 'x').replace('+new', '+other')));
+  assert.notEqual(diffDigest(hunk(3, 'x')), diffDigest(hunk(3, 'x').replaceAll(' b/f', ' b/g')));
+  assert.notEqual(diffDigest(''), diffDigest(hunk(3, 'x')));
+});
+
+test('raw diff entries carry path, status and mode', () => {
+  const z = [
+    ':100644 100644 aaa bbb M',
+    'docs/a b.md',
+    ':000000 120000 000 ccc A',
+    'docs/link.md',
+    ':100644 000000 ddd 000 D',
+    'apps/web/test/x.test.ts',
+    '',
+  ].join('\0');
+  assert.deepEqual(parseRawDiff(z), [
+    { path: 'docs/a b.md', status: 'M', mode: '100644' },
+    { path: 'docs/link.md', status: 'A', mode: '120000' },
+    { path: 'apps/web/test/x.test.ts', status: 'D', mode: '100644' },
+  ]);
+});
+
+const PROTECTED_RES = [/^docs\/adr\//, /^(?:.*\/)?scripts\/.*$/, /^(?:.*\/)?CLAUDE[^/]*\.md$/];
+const tier = (...paths) =>
+  lowRiskTier(
+    paths.map((path) => ({ path, status: 'M', mode: '100644' })),
+    PROTECTED_RES,
+  );
+
+test('docs, tests, locale strings and Markdown are the low-risk tier', () => {
+  assert.equal(tier('docs/guide/setup.md'), true);
+  assert.equal(tier('docs/verify/2300/shot.png'), true);
+  assert.equal(tier('apps/web/test/x.test.ts', 'apps/server/test/fixtures/y.json'), true);
+  assert.equal(tier('apps/web/e2e/sidebar.spec.ts', 'packages/shared/src/a.test.ts'), true);
+  assert.equal(tier('apps/web/src/locales/zh/app.json'), true);
+  assert.equal(tier('README.md', 'apps/web/README.zh.md'), true);
+});
+
+test('a product file, a gate doc or a protected file leaves the low-risk tier', () => {
+  assert.equal(tier(), false);
+  assert.equal(tier('docs/guide.md', 'apps/web/src/app.tsx'), false);
+  for (const path of [
+    'docs/adr/0028-merge-routes.md',
+    'docs/spec/19-test-layering.md',
+    'docs/pr-review.md',
+    'docs/lessons.md',
+    'docs/lessons/2026/a.md',
+    'docs/agent-dispatch-prompts.md',
+    '.claude/skills/x/SKILL.md',
+    'apps/web/.claude/notes.md',
+    '.Claude/x.md',
+    'CLAUDE.md',
+    'claude.md',
+    'scripts/ops/review-gate/glob.test.mjs',
+    'apps/web/src/i18n/translate.ts',
+    'apps/web/src/i18n/en.ts',
+    'apps/web/src/locales/zh/app.ts',
+  ])
+    assert.equal(tier(path), false, path);
+});
+
+test('deleted files, symlinks and submodules leave the low-risk tier', () => {
+  const one = (entry) => lowRiskTier([{ path: 'docs/a.md', ...entry }], PROTECTED_RES);
+  assert.equal(one({ status: 'M', mode: '100644' }), true);
+  assert.equal(one({ status: 'A', mode: '100755' }), true);
+  assert.equal(one({ status: 'D', mode: '100644' }), false);
+  assert.equal(one({ status: 'A', mode: '120000' }), false);
+  assert.equal(one({ status: 'A', mode: '160000' }), false);
+  assert.equal(one({ status: 'T', mode: '100644' }), false);
 });

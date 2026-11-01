@@ -131,9 +131,19 @@ jobs:
       # !cancelled() so every gate's findings show in one run even when an
       # earlier step reds (#1240): a lane fixing a link problem should not
       # have to push again to discover a tasks problem.
-      - name: Check PR body evidence (sections + links embedded + reachable)
+      - name: Check PR body evidence (sections + links embedded + reachable + schema table)
         if: ${{ !cancelled() && steps.pr.outcome == 'success' }}
-        run: python3 scripts/pr-evidence-gate.py "$RUNNER_TEMP/pr-body.md" "$RUNNER_TEMP/pr-evidence-context.json"
+        run: |
+          BASE_SHA="$(jq -r '.base.sha' "$RUNNER_TEMP/pr.json")"
+          HEAD_SHA="$(jq -r '.head.sha' "$RUNNER_TEMP/pr.json")"
+          MERGE_BASE="$(git merge-base "$BASE_SHA" "$HEAD_SHA")"
+          schema_args=()
+          if [ -n "$(git diff --name-only "$MERGE_BASE" "$HEAD_SHA" -- apps/server/drizzle)" ]; then
+            git show "$BASE_SHA:scripts/schema-glance.mjs" > "$RUNNER_TEMP/schema-glance.mjs" 2>/dev/null || git show "$HEAD_SHA:scripts/schema-glance.mjs" > "$RUNNER_TEMP/schema-glance.mjs"
+            node "$RUNNER_TEMP/schema-glance.mjs" --base "$MERGE_BASE" --head "$HEAD_SHA" > "$RUNNER_TEMP/schema-glance.md"
+            schema_args=(--schema-glance "$RUNNER_TEMP/schema-glance.md")
+          fi
+          python3 scripts/pr-evidence-gate.py "$RUNNER_TEMP/pr-body.md" "$RUNNER_TEMP/pr-evidence-context.json" "${schema_args[@]}"
 
       - name: Check PR body tasks (no unchecked task anywhere)
         if: ${{ !cancelled() && steps.pr.outcome == 'success' }}
