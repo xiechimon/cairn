@@ -32,7 +32,7 @@ const MSG_TOOL_BTN_CLS =
 const TURN_NOTE_CLS = 'px-3 py-2 text-meta leading-5 text-(--text-tertiary)';
 
 const MSG_COL_CLS =
-  'min-w-0 flex-1 text-card-title leading-6 text-(--foreground) [&_.chat-para+.chat-para]:mt-0.5!';
+  'min-w-0 flex-1 text-card-title text-(--foreground) [&_.chat-para+.chat-para]:mt-0.5!';
 const BUBBLE_MD_CLS = '[&>:first-child]:mt-0! [&>:last-child]:mb-0!';
 
 const SCROLLER_ITEM_STYLE: CSSProperties = { contentVisibility: 'visible' };
@@ -43,7 +43,7 @@ const MSG_COL_LIVE_CLS = 'min-w-0 flex-1 gap-0';
 
 const BUBBLE_WRAP_CLS = 'w-full max-w-full';
 const BUBBLE_USER_CLS =
-  'bubble-gradient w-fit max-w-full min-w-0 rounded-(--cds-radius-xl) px-3 py-2 text-card-title leading-6 break-words text-(--foreground)';
+  'bubble-gradient w-fit max-w-full min-w-0 rounded-(--cds-radius-xl) px-3 py-2 text-card-title break-words text-(--foreground)';
 const BUBBLE_ROBOT_CLS = 'w-full border-0 leading-6';
 const MARKER_NOTE_CLS = 'my-2.5 text-meta text-(--text-tertiary)';
 const MARKER_CONTENT_CLS = 'max-w-[85%]';
@@ -463,17 +463,12 @@ export function ChiefStreamRow({
               ) : (
                 <>
                   {(item.paragraphs ?? []).map((p, j) => (
-                    <p
-                      key={j}
-                      className={
-                        j > 0 ? 'mt-0.5 text-card-title leading-6' : 'text-card-title leading-6'
-                      }
-                    >
+                    <p key={j} className={j > 0 ? 'mt-0.5 text-card-title' : 'text-card-title'}>
                       <Segments segments={p} />
                     </p>
                   ))}
                   {item.bullets?.map((b, j) => (
-                    <p key={`b${j}`} className="mt-0.5 flex gap-2 text-card-title leading-6">
+                    <p key={`b${j}`} className="mt-0.5 flex gap-2 text-card-title">
                       <span className="flex-none">•</span>
                       <span>
                         <Segments segments={b} />

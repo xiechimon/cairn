@@ -48,6 +48,7 @@ export {
   chiefThread,
   chiefThreadsLong,
   chiefThreadsOpen,
+  chiefWorking,
 } from './chief.js';
 export {
   AGENT_MODEL,

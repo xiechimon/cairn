@@ -48,6 +48,23 @@ interface DocPaneProps {
   emptyMeta?: ReactNode;
 }
 
+const HUNK_RANGE = /^@@ -(\d+)(?:,(\d+))? /;
+
+function oldRange(header: string): { start: number; length: number } | null {
+  const match = HUNK_RANGE.exec(header);
+  if (match == null) return null;
+  return { start: Number(match[1]), length: match[2] === undefined ? 1 : Number(match[2]) };
+}
+
+export function unmodifiedBefore(hunks: readonly { header: string }[], index: number): number {
+  const current = oldRange(hunks[index]?.header ?? '');
+  if (current == null) return 0;
+  if (index === 0) return Math.max(current.start - 1, 0);
+  const previous = oldRange(hunks[index - 1]?.header ?? '');
+  if (previous == null) return 0;
+  return Math.max(current.start - (previous.start + previous.length), 0);
+}
+
 function baseName(path: string): string {
   return path.slice(path.lastIndexOf('/') + 1);
 }
@@ -143,6 +160,14 @@ export function DiffFileBlock({
               const wordDiff = wordDiffs[hi];
               return (
                 <div key={hunk.header}>
+                  {unmodifiedBefore(file.hunks, hi) > 0 && (
+                    <div
+                      className="diff-fold flex h-7 items-center pl-3 text-meta text-(--text-tertiary)"
+                      data-testid="diff-fold"
+                    >
+                      {t('{n} 行未改动', { n: unmodifiedBefore(file.hunks, hi) })}
+                    </div>
+                  )}
                   <div className="diff-hunk-head bg-(--secondary) pl-18 font-mono text-code leading-6 text-(--text-tertiary) [font-variant-ligatures:none]">
                     {hunk.header}
                   </div>
@@ -355,7 +380,7 @@ function VersionControl({
 }
 
 function docBlockClass(kind: string, first: boolean): string {
-  const base = 'text-card-title leading-6 break-words text-(--foreground)';
+  const base = 'text-card-title break-words text-(--foreground)';
   if (kind === 'para') return `${base}${first ? '' : ' mt-2'}`;
   if (kind === 'bullet') return `${base} relative mt-1 pl-4`;
   return `${base} ${first ? 'mt-0' : 'mt-6'} mb-1.5 text-meta font-medium tracking-[0.02em] text-(--text-tertiary)`;

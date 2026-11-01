@@ -206,7 +206,7 @@ test('4. real steer utterances go through markdown: fences become code blocks, l
   await expect(md).not.toContainText('```');
 });
 
-test('5. a one-line message keeps the 40px bubble height (no geometry drift)', async ({ page }) => {
+test('5. a one-line message keeps the one-line bubble height (no geometry drift)', async ({ page }) => {
   await stubWorld(page);
   const short = page.getByTestId('user-bubble').filter({ hasText: '收到，谢谢' });
   await expect(short).toBeVisible();
@@ -214,7 +214,8 @@ test('5. a one-line message keeps the 40px bubble height (no geometry drift)', a
     const r = el.getBoundingClientRect();
     return { h: Math.round(r.height), font: getComputedStyle(el).fontSize };
   });
-  expect(box.h).toBe(40);
+  expect(box.h).toBeGreaterThanOrEqual(38);
+  expect(box.h).toBeLessThanOrEqual(39);
   expect(box.font).toBe('15px');
 });
 

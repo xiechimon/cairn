@@ -265,7 +265,7 @@ function Row({
         <>
           <div className={`${ROW_BASE} chat-row--user justify-end ${margin}`}>
             <span
-              className={`chat-bubble bubble-gradient anim-message-fade-up min-w-0 max-w-[min(85%,42rem)] rounded-(--cds-radius-xl) px-3 py-2 text-card-title leading-6 break-words text-(--foreground) ${
+              className={`chat-bubble bubble-gradient anim-message-fade-up min-w-0 max-w-[min(85%,42rem)] rounded-(--cds-radius-xl) px-3 py-2 text-card-title break-words text-(--foreground) ${
                 item.markdown != null
                   ? 'whitespace-normal [&>:first-child]:mt-0 [&>:last-child]:mb-0'
                   : 'whitespace-pre-wrap'
@@ -294,7 +294,7 @@ function Row({
         <>
           <div className={`${ROW_BASE} chat-row--agent ${margin}`} data-row="agent">
             <span
-              className="chat-text -mt-px max-w-[68ch] min-w-0 text-card-title leading-[1.6] break-words text-(--foreground)"
+              className="chat-text -mt-px max-w-[68ch] min-w-0 text-card-title break-words text-(--foreground)"
               data-testid="agent-text"
             >
               {item.markdown != null ? (
@@ -320,7 +320,7 @@ function Row({
       return (
         <div className={`${ROW_BASE} chat-row--agent ${margin}`} data-row="agent">
           <span
-            className="chat-text -mt-px max-w-[68ch] min-w-0 text-card-title leading-[1.6] break-words text-(--foreground)"
+            className="chat-text -mt-px max-w-[68ch] min-w-0 text-card-title break-words text-(--foreground)"
             data-testid="info-report"
           >
             <ChatMarkdown text={item.markdown} />
@@ -330,7 +330,7 @@ function Row({
     case 'thinking':
       return (
         <div className={`${ROW_BASE} chat-row--agent ${margin}`} data-row="agent">
-          <span className="chat-text -mt-px max-w-[68ch] min-w-0 text-card-title leading-[1.6] break-words text-(--foreground)">
+          <span className="chat-text -mt-px max-w-[68ch] min-w-0 text-card-title break-words text-(--foreground)">
             <ThinkingRow text={item.text} />
           </span>
         </div>
@@ -438,7 +438,7 @@ function Row({
       return (
         <div className={`${ROW_BASE} chat-row--agent ${margin}`} data-row="agent">
           <span
-            className="chat-text -mt-px max-w-[68ch] min-w-0 text-card-title leading-[1.6] break-words text-(--foreground)"
+            className="chat-text -mt-px max-w-[68ch] min-w-0 text-card-title break-words text-(--foreground)"
             data-testid="agent-text"
           >
             <p className={`${PARA} mb-1.5 flex items-baseline gap-2`}>
@@ -522,7 +522,7 @@ function Row({
       return (
         <div className={`${ROW_BASE} chat-row--agent ${margin}`} data-row="agent">
           <span
-            className="chat-text -mt-px max-w-[68ch] min-w-0 text-card-title leading-[1.6] break-words text-(--foreground)"
+            className="chat-text -mt-px max-w-[68ch] min-w-0 text-card-title break-words text-(--foreground)"
             data-testid="agent-text"
           >
             <p className={`${PARA} mb-1.5 flex items-baseline gap-2`}>
@@ -580,7 +580,7 @@ function FailRow({
   return (
     <div className={`${ROW_BASE} chat-row--agent ${margin}`} data-row="agent">
       <span
-        className="chat-text -mt-px max-w-[68ch] min-w-0 text-card-title leading-[1.6] break-words text-(--foreground)"
+        className="chat-text -mt-px max-w-[68ch] min-w-0 text-card-title break-words text-(--foreground)"
         data-testid="agent-text"
       >
         <p className={`${PARA} chat-para--fail text-(--fail-fg)`}>{item.title}</p>

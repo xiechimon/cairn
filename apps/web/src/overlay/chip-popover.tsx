@@ -1,5 +1,6 @@
 import { useAgentAvatarUrlById, useLiveData } from '../api/provider.js';
 import { ProjectAvatar } from '../board/project-avatar.js';
+import { useProjectMark } from '../board/project-mark.js';
 import { Button } from '../components/ui/button.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { AGENT_MODEL, PROJECT_NAME } from '../fixtures/fixtures.js';
@@ -12,6 +13,7 @@ const ROW_LABEL = 'text-meta text-content-tertiary';
 const ROW_VALUE = 'flex min-w-0 items-center gap-2 text-ui text-foreground';
 
 export function ChipPopover({ todo, projectName, agentModel, onEditAssign }: ChipPopoverProps) {
+  const projectMark = useProjectMark();
   const { t } = useI18n();
   const { user, live } = useLiveData();
   const project = live ? projectName : PROJECT_NAME;
@@ -24,7 +26,7 @@ export function ChipPopover({ todo, projectName, agentModel, onEditAssign }: Chi
         <div className="flex items-center gap-1.5 text-meta text-content-tertiary">
           {project !== undefined && (
             <>
-              <ProjectAvatar name={project} tone={0} />
+              <ProjectAvatar name={project} {...projectMark(project)} bare />
               <span className="truncate">{project}</span>
               <span aria-hidden="true">·</span>
             </>

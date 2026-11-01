@@ -3,48 +3,23 @@ import { expect, test } from '@playwright/test';
 const DONE = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=36';
 const CONFIRM = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=17b';
 
-test('chat body reads at 15px (text-card-title) on a unitless 1.6', async ({ page }) => {
+test('chat body reads at 15px (text-card-title) on the unitless 1.5 type line height', async ({
+  page,
+}) => {
   await page.goto(DONE);
   const text = page.getByTestId('agent-text').first();
   await expect(text).toBeVisible();
   const cs = await text.evaluate((el) => {
     const s = getComputedStyle(el);
-    return { fontSize: s.fontSize, lineHeight: s.lineHeight };
+    const before = { fontSize: s.fontSize, lineHeight: s.lineHeight };
+    (el as HTMLElement).style.fontSize = '20px';
+    const scaled = getComputedStyle(el).lineHeight;
+    (el as HTMLElement).style.fontSize = '';
+    return { ...before, scaled };
   });
   expect(cs.fontSize).toBe('15px');
-  expect(cs.lineHeight).toBe('24px');
-  // the declaration itself must stay unitless so the pitch tracks the size:
-  // scan the stylesheets for a rule that matches THIS element and declares
-  // line-height: 1.6 (the leading-[1.6] utility is that rule)
-  const declared = await text.evaluate((el) => {
-
-    const scan = (rules: CSSRuleList): string | null => {
-      for (const rule of rules) {
-        if (
-          rule instanceof CSSStyleRule &&
-          rule.style.lineHeight === '1.6' &&
-          el.matches(rule.selectorText)
-        ) {
-          return rule.style.lineHeight;
-        }
-        if ('cssRules' in rule) {
-          const found = scan((rule as CSSGroupingRule).cssRules);
-          if (found !== null) return found;
-        }
-      }
-      return null;
-    };
-    for (const sheet of document.styleSheets) {
-      try {
-        const found = scan(sheet.cssRules);
-        if (found !== null) return found;
-      } catch {
-        continue;
-      }
-    }
-    return null;
-  });
-  expect(declared).toBe('1.6');
+  expect(cs.lineHeight).toBe('22.5px');
+  expect(cs.scaled).toBe('30px');
 });
 
 test('68ch measure cap binds the body text and the centered note', async ({ page }) => {
@@ -136,7 +111,8 @@ test('bubble / footer keep their own geometry, replies carry no avatar column', 
       userFooterAlign: getComputedStyle(userFooter).justifyContent,
     };
   });
-  expect(geo.bubbleH).toBe(40);
+  expect(geo.bubbleH).toBeGreaterThanOrEqual(38);
+  expect(geo.bubbleH).toBeLessThanOrEqual(39);
   expect(geo.bubbleFont).toBe('15px');
   expect(geo.avatars).toBe(0);
   expect(geo.footerPad).toBe('0px');
