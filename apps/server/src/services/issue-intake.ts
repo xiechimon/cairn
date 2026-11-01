@@ -21,7 +21,7 @@ import {
 } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
 import type { Db } from '../db/client.js';
-import { build, chiefThread, project, step, todo } from '../db/schema.js';
+import { agent, build, chiefThread, project, step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import {
   type FetchLike,
@@ -59,6 +59,7 @@ import { githubRepoOfProject } from './git.js';
 import { teamGithubToken } from './github-connection.js';
 import { importGithubIssue, importsInFlightFor } from './github-issues.js';
 import { orchestrateTodo } from './orchestrate.js';
+import { updateTodo } from './todos.js';
 
 export const ISSUE_INTAKE_INTERVAL_MS = 300_000;
 
@@ -517,6 +518,7 @@ export function createIssueIntake(
     repo: string,
     access: TeamAccess,
     issueNumber: number,
+    assignedAgentId: string | null,
     now: number,
     tally: IssueIntakeTally,
   ): Promise<'imported' | 'full' | 'not-taken'> {
@@ -679,6 +681,14 @@ export function createIssueIntake(
         { createdBy: access.createdBy },
       );
       todoId = record.id;
+      if (assignedAgentId !== null) {
+        updateTodo(deps, todoId, {
+          assignment: {
+            plan: { agentId: assignedAgentId },
+            build: { agentId: assignedAgentId },
+          },
+        });
+      }
     } catch (err) {
       if (err instanceof HttpError && err.status === 409) {
         tally.claimed += 1;
@@ -793,7 +803,46 @@ export function createIssueIntake(
           tally.atCap += 1;
           continue;
         }
-        const outcome = await take(row, owner, repo, access, issue.number, now, tally);
+        const agentLabels = issue.labels.filter((label) => label.name.startsWith('agent:'));
+        const namedAgents =
+          agentLabels.length === 1
+            ? deps.db
+                .select({ id: agent.id })
+                .from(agent)
+                .where(
+                  and(
+                    eq(agent.teamId, row.teamId),
+                    eq(agent.status, 'active'),
+                    eq(agent.displayName, agentLabels[0]?.name.slice('agent:'.length) ?? ''),
+                  ),
+                )
+                .all()
+            : [];
+        if (agentLabels.length > 0 && (agentLabels.length !== 1 || namedAgents.length !== 1)) {
+          tally.held += 1;
+          log(
+            {
+              projectId: row.id,
+              issue: issue.number,
+              reason:
+                agentLabels.length > 1 || namedAgents.length > 1
+                  ? 'agent-label-ambiguous'
+                  : 'agent-label-unknown',
+            },
+            'issue intake candidate held',
+          );
+          continue;
+        }
+        const outcome = await take(
+          row,
+          owner,
+          repo,
+          access,
+          issue.number,
+          namedAgents[0]?.id ?? null,
+          now,
+          tally,
+        );
         if (outcome === 'full') atCap = true;
         if (outcome === 'imported') {
           claimed.add(ref.toLowerCase());

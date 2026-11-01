@@ -24,6 +24,7 @@ import {
 } from '../src/db/schema.js';
 import { type FetchLike, githubIssueEvents } from '../src/lib/github.js';
 import { composeChiefSystemPrompt } from '../src/services/chief.js';
+import { executeChiefTool } from '../src/services/chief-tools.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { importGithubIssue } from '../src/services/github-issues.js';
 import {
@@ -3311,5 +3312,122 @@ describe('16 merged closing PR', () => {
     expect(res.status).toBe(201);
     expect(takenNumbers(w.s)).toEqual([1406]);
     expect(w.gh.calls.filter((c) => c.method === 'PATCH')).toHaveLength(0);
+  });
+});
+
+describe('agent label routing', () => {
+  function routeLabel(w: World, labels: string[] = ['agent:orb-builder']): void {
+    const issue = w.gh.state.open.find((i) => i.number === 1406);
+    if (!issue) throw new Error('issue missing');
+    issue.labels.push(...labels.map((name) => ({ name, color: 'ededed' })));
+  }
+
+  function builder(w: World, id: string, status = 'active'): void {
+    w.s.db
+      .insert(agentTable)
+      .values({
+        id,
+        teamId: w.s.team.id,
+        displayName: 'orb-builder',
+        status,
+        provider: 'claude-code',
+        modelId: 'sonnet',
+      })
+      .run();
+  }
+
+  test('applies the unique active agent to plan and build before orchestration', async () => {
+    const w = await makeWorld({ list: [1406] });
+    routeLabel(w);
+    builder(w, 'orb-agent');
+    builder(w, 'retired-agent', 'inactive');
+    const tally = await w.intake.sweep();
+    expect(tally?.imported).toBe(1);
+    expect(tally?.orchestrated).toBe(1);
+    expect(todoOf(w.s, 1406)?.assignment).toEqual({
+      plan: { agentId: 'orb-agent' },
+      build: { agentId: 'orb-agent' },
+    });
+  });
+
+  test.each(['unknown', 'inactive', 'ambiguous', 'multiple-labels'] as const)(
+    'holds %s routing without importing or orchestrating',
+    async (kind) => {
+      const w = await makeWorld({ list: [1406] });
+      routeLabel(w, kind === 'multiple-labels' ? ['agent:orb-builder', 'agent:other'] : undefined);
+      if (kind === 'inactive') builder(w, 'inactive-agent', 'inactive');
+      if (kind === 'ambiguous') {
+        builder(w, 'first');
+        builder(w, 'second');
+      }
+      const tally = await w.intake.sweep();
+      expect(tally?.held).toBe(1);
+      expect(takenNumbers(w.s)).toEqual([]);
+      expect(chiefThreads(w.s)).toHaveLength(0);
+      expect(
+        w.logs.some(
+          (line) =>
+            line.obj.reason ===
+            (kind === 'ambiguous' || kind === 'multiple-labels'
+              ? 'agent-label-ambiguous'
+              : 'agent-label-unknown'),
+        ),
+      ).toBe(true);
+    },
+  );
+
+  test.each([true, false])(
+    'Coordinator respects preset plan and build withPlan=%s',
+    async (withPlan) => {
+      const w = await makeWorld({ list: [1406] });
+      await w.intake.sweep();
+      builder(w, 'orb-agent');
+      const row = todoOf(w.s, 1406);
+      const thread = chiefThreads(w.s)[0];
+      if (!row || !thread) throw new Error('import missing');
+      w.s.db
+        .update(todoTable)
+        .set({ assignment: { plan: { agentId: 'orb-agent' }, build: { agentId: 'orb-agent' } } })
+        .where(eq(todoTable.id, row.id))
+        .run();
+      await executeChiefTool(
+        {
+          ...w.s.svc,
+          box: w.s.secretBox,
+          reposDir: w.s.reposDir,
+          attachmentsDir: w.s.attachmentsDir,
+        },
+        {
+          teamId: w.s.team.id,
+          userId: w.s.user.id,
+          chiefId: `chief-${w.s.user.id}-${w.s.team.id}`,
+          threadId: thread.id,
+          conversationId: thread.id,
+          chiefAgentId: CHIEF_AGENT_ID,
+        },
+        'run_builds',
+        {
+          todoIds: [row.id],
+          withPlan,
+          assignment: { plan: { agentId: CHIEF_AGENT_ID }, build: { agentId: CHIEF_AGENT_ID } },
+        },
+      );
+      expect(todoOf(w.s, 1406)?.assignment?.build?.agentId).toBe('orb-agent');
+      expect(todoOf(w.s, 1406)?.assignment?.plan?.agentId).toBe('orb-agent');
+      const steps = w.s.db
+        .select()
+        .from(stepTable)
+        .all()
+        .filter((step) => step.kind !== 'chief');
+      expect(steps.map((step) => step.kind)).toEqual([withPlan ? 'plan' : 'build']);
+    },
+  );
+
+  test('without an agent label intake leaves the assignment unset', async () => {
+    const w = await makeWorld({ list: [1406] });
+    builder(w, 'orb-agent');
+    await w.intake.sweep();
+    expect(todoOf(w.s, 1406)?.assignment).toBeNull();
+    expect(chiefThreads(w.s)).toHaveLength(1);
   });
 });

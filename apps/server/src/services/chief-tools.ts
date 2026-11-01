@@ -27,6 +27,7 @@ import { HttpError, parseWith } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
 import { newRecordId } from '../lib/ids.js';
 import { todoAuthorizesAttachment } from './attachment-authorization.js';
+import { readAttachmentMeta } from './attachments.js';
 import {
   advanceSplitWaves,
   applyBuildStepAction,
@@ -391,7 +392,6 @@ export async function executeChiefTool(
       return json(await executeGithubReadTool(deps, ctx.teamId, name, params));
     case 'attachment': {
       const attachmentId = str(params, 'attachmentId');
-      const { readAttachmentMeta } = await import('./attachments.js');
       return json(readAttachmentMeta(deps, ctx.teamId, attachmentId));
     }
     case 'conversation': {
@@ -752,26 +752,38 @@ export async function executeChiefTool(
         review: assignmentIn?.review?.agentId ? { agentId: assignmentIn.review.agentId } : null,
         verify: assignmentIn?.verify?.agentId ? { agentId: assignmentIn.verify.agentId } : null,
       };
-      if (assignment.plan === null && assignment.build === null) {
-        throw new HttpError(
-          400,
-          'assignment 整参缺失或两槽全空：无指派 Agent 的 build 无人可领。请传 assignment 指派 Agent（至少一个槽非空），例如 {"assignment":{"build":{"agentId":"<agentId>"}}}，然后重试 run_builds。',
-        );
-      }
-      for (const slot of [
-        assignment.plan,
-        assignment.build,
-        assignment.review,
-        assignment.verify,
-      ]) {
-        if (slot !== null) requireTeamAgent(db, slot.agentId, ctx.teamId);
-      }
       const targets = todoIds.map((todoId) => {
         const row = requireTeamTodo(db, todoId, ctx.teamId);
-        return { todoId, row, projectName: requireProjectRow(db, row.projectId, ctx.teamId).name };
+        const effectiveAssignment = {
+          ...assignment,
+          plan: row.assignment?.plan ?? assignment.plan,
+          build: row.assignment?.build ?? assignment.build,
+        };
+        return {
+          todoId,
+          row,
+          assignment: effectiveAssignment,
+          projectName: requireProjectRow(db, row.projectId, ctx.teamId).name,
+        };
       });
+      for (const target of targets) {
+        if (target.assignment.plan === null && target.assignment.build === null) {
+          throw new HttpError(
+            400,
+            'No agent is assigned to plan or build. Set assignment.build.agentId or assignment.plan.agentId, then retry run_builds.',
+          );
+        }
+        for (const slot of [
+          target.assignment.plan,
+          target.assignment.build,
+          target.assignment.review,
+          target.assignment.verify,
+        ]) {
+          if (slot !== null) requireTeamAgent(db, slot.agentId, ctx.teamId);
+        }
+      }
       const started: unknown[] = [];
-      for (const { todoId, row, projectName } of targets) {
+      for (const { todoId, row, projectName, assignment } of targets) {
         const builds = startBuilds(
           {
             db,
@@ -1145,7 +1157,6 @@ export async function executeWorkerMemoryTool(
       );
     }
     case 'attachment': {
-      const { readAttachmentMeta } = await import('./attachments.js');
       const attachmentId = str(params, 'attachmentId');
       if (!todoAuthorizesAttachment(db, ctx.todoId, attachmentId)) {
         throw new HttpError(404, `attachment ${attachmentId}`);
