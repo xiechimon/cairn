@@ -1323,6 +1323,7 @@ export async function applyBuildStepAction(
       throw new HttpError(409, `restart 仅适用于 failed 相位（当前 ${todoRecord.phase}）`);
     }
     const assignment = todoRecord.assignment ?? { plan: null, build: null };
+    requireIntakeAssignment(deps, todoRecord.teamId, assignment);
     const feedbackText = body.feedback.trim() === '' ? null : body.feedback;
     const preservedStep = deps.db
       .select({ id: step.id })

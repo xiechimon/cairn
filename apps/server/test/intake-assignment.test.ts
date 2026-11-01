@@ -353,7 +353,13 @@ for (const caller of ['Coordinator', 'MCP']) {
   });
 }
 
-for (const caller of ['scheduled start', 'split children', 'plan confirmation', 'continuation']) {
+for (const caller of [
+  'scheduled start',
+  'split children',
+  'plan confirmation',
+  'continuation',
+  'restart',
+]) {
   for (const change of ['secret', 'MCP server', 'removed from allowlist']) {
     test(`${caller} rechecks an intake preset after ${change}`, async () => {
       const record = await assignedTodo(true);
@@ -371,15 +377,25 @@ for (const caller of ['scheduled start', 'split children', 'plan confirmation', 
           actorName: 'Coordinator',
         });
       }
-      if (caller === 'plan confirmation' || caller === 'continuation') {
+      if (caller === 'plan confirmation' || caller === 'continuation' || caller === 'restart') {
         await relay('run_builds', {
           todoIds: [record.id],
           withPlan: caller === 'plan confirmation',
         });
-        H.s.db.update(step).set({ status: 'done' }).run();
+        H.s.db
+          .update(step)
+          .set({ status: caller === 'restart' ? 'failed' : 'done' })
+          .run();
         H.s.db
           .update(todo)
-          .set({ phase: caller === 'plan confirmation' ? 'confirm' : 'building' })
+          .set({
+            phase:
+              caller === 'plan confirmation'
+                ? 'confirm'
+                : caller === 'restart'
+                  ? 'failed'
+                  : 'building',
+          })
           .where(eq(todo.id, record.id))
           .run();
       }
@@ -416,6 +432,12 @@ for (const caller of ['scheduled start', 'split children', 'plan confirmation', 
               .where(eq(todo.id, record.id))
               .get()?.latestBuildId;
             if (!buildId) throw new Error('plan build missing');
+            if (caller === 'restart')
+              return applyBuildStepAction(deps, buildId, {
+                action: 'restart',
+                feedback: '',
+                clientMessageId: 'restart-recheck',
+              });
             if (caller === 'continuation')
               return sendBuildSteer(
                 deps,
@@ -433,7 +455,7 @@ for (const caller of ['scheduled start', 'split children', 'plan confirmation', 
       expect(H.s.db.select().from(todo).all()).toEqual(before);
       expect(H.s.db.select().from(build).all()).toHaveLength(caller === 'scheduled start' ? 0 : 1);
       expect(H.s.db.select().from(step).all()).toHaveLength(
-        caller === 'plan confirmation' || caller === 'continuation' ? 1 : 0,
+        caller === 'plan confirmation' || caller === 'continuation' || caller === 'restart' ? 1 : 0,
       );
     });
   }
