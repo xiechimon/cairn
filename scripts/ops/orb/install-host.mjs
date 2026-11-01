@@ -72,8 +72,14 @@ export function installHost(options = {}) {
     ['/var/lib/cairn-orb/seed', 'ian', '-'],
   ];
   const tmpfiles = `${directories.map(([path, owner, group]) => `d ${path} 0755 ${owner} ${group} -`).join('\n')}\n`;
+  const foreignRules = [
+    '/etc/systemd/networkd.conf.d/10-cairn-keep-foreign.conf',
+    '[Network]\nManageForeignRoutingPolicyRules=no\nManageForeignRoutes=no\n',
+  ];
+  const foreignRulesChanged = !change.matches(...foreignRules);
   const files = [
     ['/etc/tmpfiles.d/cairn-orb.conf', tmpfiles],
+    foreignRules,
     ['/usr/local/lib/cairn-orb/node', nodeBinary, 0o755],
     ...assets.map(([source, target, mode]) => [
       target,
@@ -157,8 +163,10 @@ export function installHost(options = {}) {
   }
   if (needsReload) {
     change.exec('nmcli', ['general', 'reload', 'conf']);
-    if (change.probe('systemctl', ['is-active', 'systemd-networkd.service']).status === 0)
+    if (change.probe('systemctl', ['is-active', 'systemd-networkd.service']).status === 0) {
+      if (foreignRulesChanged) change.exec('systemctl', ['restart', 'systemd-networkd.service']);
       change.exec('networkctl', ['reload']);
+    }
   }
   for (const [probe, action] of [
     ['is-enabled', 'enable'],

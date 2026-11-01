@@ -28,11 +28,20 @@ for (const name of [
   'ufw-ok',
   'ufw-inactive',
   'ufw-missing-rules',
+  'foreign-rules-ok',
+  'foreign-rules-managed',
+  'foreign-rules-lost',
+  'foreign-rules-no-tun',
 ]) {
   test(`recorded ${name} command outputs`, () => {
     const input = JSON.parse(readFileSync(new URL(`./fixtures/${name}.json`, import.meta.url)));
     const result = parseHostCheck(input);
-    assert.equal(result.ok, ['pass', 'ufw-ok', 'ufw-inactive'].includes(name));
+    assert.equal(
+      result.ok,
+      ['pass', 'ufw-ok', 'ufw-inactive', 'foreign-rules-ok', 'foreign-rules-no-tun'].includes(name),
+    );
+    if (name.startsWith('foreign-rules-'))
+      assert.equal(result.foreignRules, name.slice('foreign-rules-'.length));
     if (name.startsWith('ufw-'))
       assert.equal(result.ufw, name.slice(4) === 'inactive' ? 'inactive' : name.slice(4));
     if (name === 'pass') {
@@ -82,6 +91,12 @@ function fakeHost(
   const root = mkdtempSync(join(tmpdir(), 'cairn-orb-check-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const calls = [];
+  const networkdDirectory = join(root, 'systemd');
+  mkdirSync(join(networkdDirectory, 'networkd.conf.d'), { recursive: true });
+  writeFileSync(
+    join(networkdDirectory, 'networkd.conf.d/10-cairn-keep-foreign.conf'),
+    '[Network]\nManageForeignRoutingPolicyRules=no\nManageForeignRoutes=no\n',
+  );
   let prepared = false;
   const run = (cmd, args) => {
     calls.push([cmd, ...args]);
@@ -91,6 +106,15 @@ function fakeHost(
       cmd !== 'machinectl' ||
         !args.some((arg) => ['bind', 'shell', 'login', 'copy-to', 'copy-from'].includes(arg)),
     );
+    if (cmd === 'ip') {
+      if (args[0] === 'link') return { status: 0, stdout: '7: sbtun0: <POINTOPOINT,UP>\n' };
+      assert.deepEqual(args, ['rule', 'show']);
+      return {
+        status: 0,
+        stdout:
+          '9002: from all lookup 2022 suppress_prefixlength 0\n9003: from all iif sbtun0 goto 9010\n',
+      };
+    }
     if (cmd === 'systemctl' && args[1] === 'ufw')
       return { status: ufw === 'active' ? 0 : 3, stdout: `${ufw}\n` };
     if (args.includes('not-cairn-x')) return { status: 1, stderr: 'Access denied' };
@@ -144,6 +168,7 @@ function fakeHost(
     calls,
     run,
     runtimeRoot: root,
+    networkdDirectory,
     ufwRulesFile: join(root, 'user.rules'),
     user: 'ian',
     name: 'cairn-orb-check-fixture',
@@ -679,3 +704,106 @@ for (const ready of [false, true]) {
     assert.equal(calls.filter((cmd) => cmd !== 'ip').length, 7);
   });
 }
+
+for (const [name, rules] of [
+  ['both absent', '0: from all lookup local\n32766: from all lookup main\n'],
+  ['table absent', '9003: from all iif sbtun0 goto 9010\n'],
+  ['interface absent', '9002: from all lookup 2022 suppress_prefixlength 0\n'],
+  ['similar tokens', '9002: from all lookup 20220\n9003: from all iif sbtun01 goto 9010\n'],
+]) {
+  test(`sing-box rules lost: ${name}`, (t) => {
+    const f = fakeHost(t);
+    const result = checkHost({
+      ...f,
+      run: (cmd, args) =>
+        cmd === 'ip' && args[0] === 'rule' ? { status: 0, stdout: rules } : f.run(cmd, args),
+    });
+    assert.equal(result.foreignRules, 'lost');
+    assert.equal(result.ok, false);
+    assert.ok(
+      result.errors.includes(
+        'sing-box tun policy rules (table 2022) are missing; restart sing-box',
+      ),
+    );
+  });
+}
+
+for (const config of [
+  '',
+  '[Network]\nManageForeignRoutingPolicyRules=yes\n',
+  '# ManageForeignRoutingPolicyRules=no\n',
+  '[Link]\nManageForeignRoutingPolicyRules=no\n',
+]) {
+  test(`active networkd diagnoses managed foreign rules: ${JSON.stringify(config)}`, (t) => {
+    const f = fakeHost(t);
+    writeFileSync(join(f.networkdDirectory, 'networkd.conf.d/10-cairn-keep-foreign.conf'), config);
+    const result = checkHost(f);
+    assert.equal(result.foreignRules, 'managed');
+    assert.equal(result.ok, false);
+    assert.ok(
+      result.errors.includes(
+        'systemd-networkd manages foreign routing policy rules; set ManageForeignRoutingPolicyRules=no',
+      ),
+    );
+    assert.ok(!f.calls.some(([cmd]) => cmd === 'sudo'));
+  });
+}
+
+for (const source of ['networkd.conf', 'networkd.conf.d/90-local.conf']) {
+  test(`equivalent foreign routing settings in ${source} are accepted`, (t) => {
+    const f = fakeHost(t);
+    rmSync(join(f.networkdDirectory, 'networkd.conf.d/10-cairn-keep-foreign.conf'));
+    writeFileSync(
+      join(f.networkdDirectory, source),
+      '# Local policy\n[Network]\nManageForeignRoutingPolicyRules = no\nManageForeignRoutes=no\n',
+    );
+    const result = checkHost(f);
+    assert.equal(result.foreignRules, 'ok');
+    assert.equal(result.ok, true, JSON.stringify(result));
+  });
+}
+
+test('later drop-ins override main and earlier foreign routing settings', (t) => {
+  const f = fakeHost(t);
+  writeFileSync(
+    join(f.networkdDirectory, 'networkd.conf'),
+    '[Network]\nManageForeignRoutingPolicyRules=yes\n',
+  );
+  assert.equal(checkHost(f).foreignRules, 'ok');
+  writeFileSync(
+    join(f.networkdDirectory, 'networkd.conf.d/90-local.conf'),
+    '[Network]\nManageForeignRoutingPolicyRules=yes\n',
+  );
+  assert.equal(checkHost(f).foreignRules, 'managed');
+});
+
+test('a host without sbtun0 reports no-tun without requiring policy rules', (t) => {
+  const f = fakeHost(t);
+  const result = checkHost({
+    ...f,
+    run: (cmd, args) => {
+      if (cmd === 'ip' && args[0] === 'link') {
+        assert.deepEqual(args, ['link', 'show', 'dev', 'sbtun0']);
+        return { status: 1, stderr: 'Device sbtun0 does not exist' };
+      }
+      if (cmd === 'ip') assert.fail('no tun needs no policy rule query');
+      return f.run(cmd, args);
+    },
+  });
+  assert.equal(result.foreignRules, 'no-tun');
+  assert.equal(result.ok, true, JSON.stringify(result));
+});
+
+test('inactive networkd does not manage foreign rules', (t) => {
+  const f = fakeHost(t);
+  rmSync(f.networkdDirectory, { recursive: true });
+  const result = checkHost({
+    ...f,
+    run: (cmd, args) =>
+      cmd === 'systemctl' && args[1] === 'systemd-networkd.service'
+        ? { status: 3, stdout: 'inactive\n' }
+        : f.run(cmd, args),
+  });
+  assert.equal(result.foreignRules, 'ok');
+  assert.equal(result.ok, true, JSON.stringify(result));
+});

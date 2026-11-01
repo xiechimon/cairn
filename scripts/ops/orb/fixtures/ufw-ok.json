@@ -35,5 +35,9 @@
   "ufwRules": "*filter\n:ufw-user-input - [0:0]\n-A ufw-user-input -i vz-cairn -p udp --sport 68 --dport 67 -j ACCEPT\n-A ufw-user-input -i vz-cairn -s 10.203.0.0/24 -d 10.203.0.1/32 -p tcp --dport 7890 -j ACCEPT\nCOMMIT\n",
   "networkReady": true,
   "networkWaitMs": 50000,
-  "ipv4": "10.203.0.2"
+  "ipv4": "10.203.0.2",
+  "networkdService": "active",
+  "networkdConfig": "[Network]\nManageForeignRoutingPolicyRules=no\nManageForeignRoutes=no\n",
+  "tunPresent": true,
+  "policyRules": "9001: from all to 172.19.0.0/30 lookup 2022\n9002: from all lookup 2022 suppress_prefixlength 0\n9003: from all iif sbtun0 goto 9010\n"
 }

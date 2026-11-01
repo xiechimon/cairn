@@ -125,7 +125,14 @@ function fixture() {
             : 'directory:root:root:755'
           : '',
       };
-    if (cmd === 'systemd-tmpfiles') state.add('directories');
+    if (cmd === 'systemd-tmpfiles') {
+      assert.ok(
+        readFileSync(join(root, 'etc/tmpfiles.d/cairn-orb.conf'), 'utf8').includes(
+          'd /run/cairn-orb 0755 root root -',
+        ),
+      );
+      state.add('directories');
+    }
     if ((cmd === 'systemctl' || userCommand) && ['is-active', 'is-enabled'].includes(ctl[0]))
       return { status: state.has(scope + ctl.join(' ')) ? 0 : 1, stdout: '' };
     if ((cmd === 'systemctl' || userCommand) && ['start', 'enable'].includes(ctl[0]))
@@ -1262,4 +1269,121 @@ test('failed ufw commands stop installation and are retried on rerun', (t) => {
   f.logs.length = 0;
   installHost(f);
   assert.equal(f.logs.at(-1), '2 changes');
+});
+
+for (const active of [false, true]) {
+  test(`foreign routing configuration precedes every networkd action: active=${active}`, (t) => {
+    const f = fixture();
+    t.after(() => rmSync(f.root, { recursive: true, force: true }));
+    if (active) f.state.add('is-active systemd-networkd.service');
+    const path = join(f.root, 'etc/systemd/networkd.conf.d/10-cairn-keep-foreign.conf');
+    const content = '[Network]\nManageForeignRoutingPolicyRules=no\nManageForeignRoutes=no\n';
+    const actions = [];
+    installHost({
+      ...f,
+      run: (cmd, args) => {
+        if (
+          (cmd === 'systemctl' &&
+            args[1] === 'systemd-networkd.service' &&
+            ['enable', 'start', 'reload', 'restart'].includes(args[0])) ||
+          (cmd === 'networkctl' && args[0] === 'reload')
+        ) {
+          assert.equal(readFileSync(path, 'utf8'), content);
+          assert.equal(statSync(path).mode & 0o777, 0o644);
+          actions.push([cmd, ...args].join(' '));
+        }
+        return f.run(cmd, args);
+      },
+    });
+    assert.ok(actions.length > 0);
+    const write = f.logs.indexOf(
+      'install /etc/systemd/networkd.conf.d/10-cairn-keep-foreign.conf mode 644',
+    );
+    assert.ok(write >= 0);
+    for (const action of actions) assert.ok(write < f.logs.indexOf(action));
+    assert.equal(actions.includes('systemctl restart systemd-networkd.service'), active);
+    f.logs.length = 0;
+    f.calls.length = 0;
+    installHost(f);
+    assert.equal(f.logs.at(-1), '0 changes');
+    assert.ok(!f.calls.includes('systemctl restart systemd-networkd.service'));
+  });
+}
+
+test('changed foreign routing settings restart active networkd once and count the restart', (t) => {
+  const f = fixture();
+  t.after(() => rmSync(f.root, { recursive: true, force: true }));
+  installHost(f);
+  const path = join(f.root, 'etc/systemd/networkd.conf.d/10-cairn-keep-foreign.conf');
+  writeFileSync(path, '[Network]\nManageForeignRoutingPolicyRules=yes\n');
+  f.logs.length = 0;
+  f.calls.length = 0;
+  installHost(f);
+  assert.equal(
+    f.calls.filter((call) => call === 'systemctl restart systemd-networkd.service').length,
+    1,
+  );
+  assert.ok(f.logs.includes('systemctl restart systemd-networkd.service'));
+  const withRestart = Number.parseInt(f.logs.at(-1), 10);
+  const commandChanges = f.calls.filter((call) =>
+    /^(systemctl (daemon-reload|reload|restart)|networkctl reload|nmcli general reload|runuser .* (daemon-reload|restart))/.test(
+      call,
+    ),
+  ).length;
+  assert.equal(
+    withRestart,
+    commandChanges + f.logs.filter((line) => line.startsWith('install ')).length,
+  );
+  f.logs.length = 0;
+  installHost(f);
+  assert.equal(f.logs.at(-1), '0 changes');
+});
+
+for (const active of [false, true]) {
+  test(`foreign routing dry-run plans configuration and conditional restart: active=${active}`, (t) => {
+    const f = fixture();
+    t.after(() => rmSync(f.root, { recursive: true, force: true }));
+    if (active) f.state.add('is-active systemd-networkd.service');
+    const before = [...f.state];
+    installHost({ ...f, dryRun: true });
+    assert.deepEqual(readdirSync(f.root), []);
+    assert.deepEqual([...f.state], before);
+    const write = f.logs.indexOf(
+      'plan: install /etc/systemd/networkd.conf.d/10-cairn-keep-foreign.conf mode 644',
+    );
+    assert.ok(write >= 0);
+    assert.equal(f.logs.includes('plan: systemctl restart systemd-networkd.service'), active);
+    for (const [index, line] of f.logs.entries()) {
+      if (
+        /^plan: (systemctl (enable|start|reload|restart) systemd-networkd.service|networkctl reload)$/.test(
+          line,
+        )
+      )
+        assert.ok(write < index);
+    }
+    assert.ok(!f.calls.includes('systemctl restart systemd-networkd.service'));
+  });
+}
+
+test('unrelated configuration changes reload active networkd without restarting it', (t) => {
+  const f = fixture();
+  t.after(() => rmSync(f.root, { recursive: true, force: true }));
+  installHost(f);
+  writeFileSync(join(f.root, 'etc/systemd/network/10-cairn.netdev'), 'outdated');
+  f.calls.length = 0;
+  installHost(f);
+  assert.ok(f.calls.includes('networkctl reload'));
+  assert.ok(!f.calls.includes('systemctl restart systemd-networkd.service'));
+});
+
+test('changed foreign routing settings start inactive networkd without restarting it', (t) => {
+  const f = fixture();
+  t.after(() => rmSync(f.root, { recursive: true, force: true }));
+  installHost(f);
+  f.state.delete('is-active systemd-networkd.service');
+  writeFileSync(join(f.root, 'etc/systemd/networkd.conf.d/10-cairn-keep-foreign.conf'), 'outdated');
+  f.calls.length = 0;
+  installHost(f);
+  assert.ok(f.calls.includes('systemctl start systemd-networkd.service'));
+  assert.ok(!f.calls.includes('systemctl restart systemd-networkd.service'));
 });

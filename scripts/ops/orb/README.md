@@ -57,7 +57,8 @@ host check, but guests need a published release to run a Thread.
 A passing result exits zero and contains `image: "cairn-orb-base"`,
 `cloneStartStop: "ok"`, `egress: "ok"`, `memoryMax: 4294967296`,
 `homeVisible: false`, `negativeControl: "denied"`, `privateEgress: "denied"`,
-`firewall: "ok"`, `ufw: "ok"` (or `"inactive"`), and `networkReady: true`,
+`firewall: "ok"`, `ufw: "ok"` (or `"inactive"`), `foreignRules: "ok"` (or `"no-tun"`),
+and `networkReady: true`,
 with `ok: true` and an empty `errors` array. Save the actual host output to `docs/verify/2273/host-check.json` after installation. Local fixtures
 are not host acceptance evidence. The check creates and cleans up a unique
 `cairn-orb-check-*` container and refuses password prompts.
@@ -116,6 +117,36 @@ absolute URIs use that same tunnel with an origin-form request and the destinati
 Host header; HTTPS retains the client TLS handshake and SNI.
 NetworkManager ignores `ve-*`, `vz-*`, and nspawn's bridged `vb-*` slave links.
 Networkd manages only `ve-*`, `vz-*` and the `vb-*` zone ports (stock `80-container-vb.network`); every other link is unmanaged.
+
+The installer writes root-owned, mode `0644`
+`/etc/systemd/networkd.conf.d/10-cairn-keep-foreign.conf` before enabling,
+starting, reloading or restarting networkd:
+
+```ini
+[Network]
+ManageForeignRoutingPolicyRules=no
+ManageForeignRoutes=no
+```
+
+Networkd's default foreign-rule management can delete policy rules installed by
+another service even when its tun interface is unmanaged. On a host with a tun
+proxy, this can bypass the proxy for traffic without HTTP(S) proxy settings and
+send DNS to the router. Foreign routes and rules must remain unmanaged so
+sing-box retains its `sbtun0` rules for table `2022`. If this file is created or
+changed while networkd is active, the installer prints and counts a networkd
+restart to load the global settings. An unchanged rerun does not restart it;
+`--dry-run` prints the plan without changing files or services.
+
+The unprivileged host check reads `/etc/systemd/networkd.conf` and sorted `.conf`
+drop-ins under `/etc/systemd/networkd.conf.d`. Equivalent settings there are
+accepted, with later assignments taking precedence. Active networkd without
+`ManageForeignRoutingPolicyRules=no` reports `foreignRules: "managed"` and a
+named error. If `sbtun0` exists, `ip rule show` must include both `lookup 2022`
+and `iif sbtun0`; otherwise the check reports `foreignRules: "lost"` and
+`sing-box tun policy rules (table 2022) are missing; restart sing-box`.
+Healthy tun rules report `"ok"`; a host without `sbtun0` reports `"no-tun"`.
+Both `"managed"` and `"lost"` make the overall check fail. Changing the networkd
+settings prevents future deletion; it does not restore rules already lost.
 
 Systemd does not expand instance-name prefixes when looking up drop-ins. A
 shared start-preparation hook clears fixed binds for unrelated machines and
@@ -307,7 +338,8 @@ container; the installer addresses the host user manager through `runuser`.
 The `--json` result has `image` (base-image name or null), `cloneStartStop`
 (`ok` or `failed`), `egress` (`ok` or `failed`), `privateEgress` (`denied` or
 `failed`), `firewall` (`ok` or `failed`), `ufw` (`ok`, `inactive` or
-`missing-rules`), `networkReady` (boolean), `networkWaitMs` (milliseconds or null),
+`missing-rules`), `foreignRules` (`ok`, `managed`, `lost` or `no-tun`),
+`networkReady` (boolean), `networkWaitMs` (milliseconds or null),
 `ipv4` (address only or null), `memoryMax` (bytes or null),
 `homeVisible` (boolean or null), `negativeControl` (`denied` or `failed`),
 `daemonRelease` (`{key, version, sha}` from `/var/lib/cairn-orb/dist/current.json`,

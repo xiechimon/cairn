@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { lstatSync, readFileSync, writeFileSync } from 'node:fs';
+import { lstatSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { isIPv4 } from 'node:net';
 import { userInfo } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -13,7 +13,26 @@ export function parseHostCheck(input, { blockedPorts = [22, 5231] } = {}) {
     (match) => !/connection established/i.test(match[2]),
   );
   const memory = /^MemoryMax=(\d+)\s*$/m.exec(input.memory);
+  let section = '';
+  let manageForeignRules = 'yes';
+  for (const line of (input.networkdConfig ?? '').split('\n')) {
+    const value = line.trim();
+    if (/^\[.*\]$/.test(value)) section = value;
+    if (section !== '[Network]') continue;
+    const setting = /^ManageForeignRoutingPolicyRules\s*=\s*(.*)$/.exec(value);
+    if (setting) manageForeignRules = setting[1];
+  }
+  const foreignRules =
+    input.networkdService === 'active' && !['no', 'false', 'off', '0'].includes(manageForeignRules)
+      ? 'managed'
+      : input.tunPresent
+        ? /\blookup\s+2022(?=\s|$)/m.test(input.policyRules ?? '') &&
+          /\biif\s+sbtun0(?=\s|$)/m.test(input.policyRules ?? '')
+          ? 'ok'
+          : 'lost'
+        : 'no-tun';
   const record = {
+    foreignRules,
     daemonRelease: input.daemonRelease ?? null,
     ufw:
       input.ufwService === 'active'
@@ -59,6 +78,7 @@ export function parseHostCheck(input, { blockedPorts = [22, 5231] } = {}) {
   return {
     ...record,
     ok:
+      ['ok', 'no-tun'].includes(record.foreignRules) &&
       record.image !== null &&
       record.cloneStartStop === 'ok' &&
       record.egress === 'ok' &&
@@ -85,6 +105,7 @@ export function checkHost({
   runtimeRoot = '/run/cairn-orb',
   releaseFile = '/var/lib/cairn-orb/dist/current.json',
   ufwRulesFile = '/etc/ufw/user.rules',
+  networkdDirectory = '/etc/systemd',
   blockedPorts = (process.env.CAIRN_ORB_CHECK_BLOCKED_PORTS ?? '22,5231').split(',').map(Number),
 } = {}) {
   if (user !== 'ian') throw new Error('Run the host check as ian without sudo');
@@ -121,6 +142,41 @@ export function checkHost({
       );
     return result;
   };
+  const networkd = run('systemctl', ['is-active', 'systemd-networkd.service']);
+  input.networkdService = networkd.status === 0 ? 'active' : 'inactive';
+  const configs = [join(networkdDirectory, 'networkd.conf')];
+  const dropins = join(networkdDirectory, 'networkd.conf.d');
+  try {
+    configs.push(
+      ...readdirSync(dropins)
+        .filter((name) => name.endsWith('.conf'))
+        .sort()
+        .map((name) => join(dropins, name)),
+    );
+  } catch (error) {
+    if (error.code !== 'ENOENT') errors.push(`Cannot read networkd drop-ins: ${error.message}`);
+  }
+  input.networkdConfig = '';
+  for (const path of configs) {
+    try {
+      input.networkdConfig += `\n[]\n${readFileSync(path, 'utf8')}\n`;
+    } catch (error) {
+      if (error.code !== 'ENOENT')
+        errors.push(`Cannot read networkd configuration: ${error.message}`);
+    }
+  }
+  const tun = run('ip', ['link', 'show', 'dev', 'sbtun0']);
+  input.tunPresent = tun.status === 0;
+  if (tun.status !== 0 && tun.status !== 1)
+    errors.push('Cannot inspect sing-box tun interface sbtun0');
+  if (input.tunPresent) input.policyRules = call('ip', ['rule', 'show']).stdout || '';
+  const { foreignRules } = parseHostCheck(input, { blockedPorts });
+  if (foreignRules === 'managed')
+    errors.push(
+      'systemd-networkd manages foreign routing policy rules; set ManageForeignRoutingPolicyRules=no',
+    );
+  if (foreignRules === 'lost')
+    errors.push('sing-box tun policy rules (table 2022) are missing; restart sing-box');
   const ufw = run('systemctl', ['is-active', 'ufw']);
   input.ufwService = ufw.status === 0 ? 'active' : 'inactive';
   if (input.ufwService === 'active') {
