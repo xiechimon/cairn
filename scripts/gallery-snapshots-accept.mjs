@@ -7,6 +7,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 const REPO_ROOT = resolve(import.meta.dirname, '..');
 const SNAPSHOT_DIR = join(REPO_ROOT, 'apps/web/e2e/gallery-snapshots.spec.ts-snapshots');
 const REPO = 'xiechimon/cairn';
+export const ARTIFACT_PATTERN = 'gallery-snapshots-*';
 
 export function baselineNameFor(path) {
   const name = basename(path);
@@ -79,17 +80,7 @@ function main() {
   const work = mkdtempSync(join(tmpdir(), 'gallery-snapshots-'));
   execFileSync(
     'gh',
-    [
-      'run',
-      'download',
-      runId,
-      '--repo',
-      REPO,
-      '--pattern',
-      'gallery-snapshots-shard-*',
-      '--dir',
-      work,
-    ],
+    ['run', 'download', runId, '--repo', REPO, '--pattern', ARTIFACT_PATTERN, '--dir', work],
     { stdio: 'inherit' },
   );
   const chosen = pickBaselines(walk(work));
