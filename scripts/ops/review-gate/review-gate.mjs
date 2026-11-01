@@ -673,7 +673,7 @@ ${
     }
     const reviewer =
       run.reviewer === 'claude'
-        ? ` (reviewer: Claude (opus), ${run.authorVendor ? `author vendor ${run.authorVendor} excluded` : 'author vendor unknown'})`
+        ? ` (reviewer: Claude (opus), ${run.authorVendor ? `author vendor ${run.authorVendor} excluded` : 'author vendor unknown, same-vendor review possible'})`
         : '';
     const body =
       verdict === 'pass'

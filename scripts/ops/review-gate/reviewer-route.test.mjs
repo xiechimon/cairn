@@ -36,7 +36,7 @@ test('Claude never reviews a Claude-authored PR', () => {
 });
 
 test('a PR whose author vendor is unknown falls back to Claude when no model is usable', () => {
-  assert.equal(claudeFallback(null, noModel), true);
+  for (const unknown of [null, undefined, '']) assert.equal(claudeFallback(unknown, noModel), true);
 });
 
 test('no fallback on other failures', () => {
