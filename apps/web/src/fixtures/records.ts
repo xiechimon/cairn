@@ -530,6 +530,7 @@ export type ChiefStreamItem =
   | {
       kind: 'streaming';
       seconds?: number;
+      startedAt?: number;
       label: string;
       tools?: ChiefToolRow[];
       labelVars?: Record<string, string | number>;

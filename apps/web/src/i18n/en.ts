@@ -23,6 +23,7 @@ import { PROBE_TOOL_CALL_LABEL, PROBE_TOOL_PILLS } from '../fixtures/fixtures.js
 export const EN: Record<string, string> = {
   '思考 {n} 次': 'Thought {n#once|# times}',
   '读了 {n} 个文件': 'Read {n#1 file|# files}',
+  '{n} 行未改动': '{n#1 unmodified line|# unmodified lines}',
   '搜索 {n} 次': 'Searched {n#once|# times}',
   '跑了 {n} 条命令': 'Ran {n#1 command|# commands}',
   '改了 {n} 个文件': 'Edited {n#1 file|# files}',

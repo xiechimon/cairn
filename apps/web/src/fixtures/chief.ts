@@ -77,6 +77,19 @@ export const chiefStreaming: FixtureSet = {
   },
 };
 
+const streamingChief = chiefStreaming.chief as ChiefContent;
+
+export const chiefWorking: FixtureSet = {
+  ...chiefStreaming,
+  chief: {
+    ...streamingChief,
+    stream: [
+      ...(streamingChief.stream ?? []),
+      { kind: 'streaming', seconds: 72, label: '处理中...' },
+    ],
+  },
+};
+
 export const chiefThread: FixtureSet = {
   todos: [legacyReview, legacyDone],
   now: r7(13, 14),

@@ -233,7 +233,7 @@ export function ConversationSection() {
               className="max-w-[min(85%,42rem)] flex-none items-end gap-0"
               data-testid="turn-user"
             >
-              <div className="bubble-gradient w-fit max-w-full rounded-(--cds-radius-xl) px-3 py-2 text-card-title leading-6 text-foreground">
+              <div className="bubble-gradient w-fit max-w-full rounded-(--cds-radius-xl) px-3 py-2 text-card-title text-foreground">
                 Why does pnpm install fail in CI?
               </div>
               <div className="mt-1 flex items-center gap-1 text-content-tertiary">
@@ -260,7 +260,7 @@ export function ConversationSection() {
           <Message>
             <MessageContent className="gap-0">
               <Bubble variant="ghost">
-                <BubbleContent className="text-card-title leading-6">
+                <BubbleContent className="text-card-title">
                   The last commit bumped a version in package.json without updating the lockfile, so
                   the frozen install fails. I will run the install locally and commit the lockfile.
                 </BubbleContent>
@@ -283,7 +283,7 @@ export function ConversationSection() {
                 ]}
               />
               <Bubble variant="ghost">
-                <BubbleContent className="text-card-title leading-6">
+                <BubbleContent className="text-card-title">
                   A reply from a bound agent keeps a small identity line above it instead of an
                   avatar column; tool activity folds into the grey line.
                 </BubbleContent>
