@@ -85,6 +85,17 @@ Use the side-branch commit SHA, never the implementation head or a branch
 name. Push before linking and never merge the asset branch. Keep the branch
 so the images remain reachable. Images belong outside code fences.
 
+## Pre-push review
+
+Before every push of a code change, get a fresh-context review from the other vendor and fix what it confirms before pushing. With Claude as the implementer, run Codex:
+
+```
+git diff origin/main...HEAD > /tmp/review.diff
+codex exec --sandbox read-only "Review /tmp/review.diff against docs/pr-review.md. List only defects with file:line, why it is wrong and a concrete failure. Say NO FINDINGS if there are none." < /dev/null
+```
+
+With Codex as the implementer, run the same prompt through `claude -p --permission-mode default --tools Read,Grep,Glob`. Fix each confirmed finding and rerun the review on the new diff. Record a skipped finding with its reason under Review. Docs-only changes outside protected paths skip this step.
+
 ## Mechanics
 
 - Small changes need no issue or overlap lookup. Reuse an existing issue or PR for the same ask; record known overlaps under What or inside details.
@@ -120,7 +131,8 @@ so the images remain reachable. Images belong outside code fences.
 - Before an agent enables merge, require passing CI checks and a pr-gate verdict of go with `mergedBy: 'auto-merge'` (`AGENTS.md`, "Merge routes"; protected-path PRs and every other route go to ian), with no unchecked tasks anywhere in the body. ian may admin-merge; agents may not use that authority.
 - Read the PR opener and every commit author: `gh pr view <n> --json author,commits`. Follow `docs/ops/agent-bot-identity.md` for the identity checks.
 - Bot-opened PRs require exactly one commit authored by `Cairnwright` (`merge-pr.sh` also accepts `cairnwright[bot]` with `Cairn-Thread:` and `Co-authored-by: xiechimon` trailers; see `docs/pr-review.md`, "Merge method by commit author") before a rebase merge. Use the dispatcher's `~/.cairn/tools/merge-pr.sh`; inspect its source and usage on the dispatch host before invoking it. If the helper is unavailable or the commit identity is wrong, stop and return the PR to the dispatcher.
-- Human-opened PRs use `gh pr merge <n> --squash --auto` after verifying their commits contain no `cairnwright[bot]` author. After a merge, read the main commit author and the `commit-author` Actions result.
+- PRs that `.mergify.yml` admits (not protected, not owner-routed, a `review-gate` success status and a green `merge-route` check) land through the Mergify merge queue: comment `@mergifyio queue` on the PR. Its `Mergify Merge Queue` check lists any unmet condition. Protected and owner-routed PRs keep the human route.
+- Human-opened PRs that Mergify does not admit use `gh pr merge <n> --squash --auto` after verifying their commits contain no `cairnwright[bot]` author, on the route `AGENTS.md` gives them. After a merge, read the main commit author and the `commit-author` Actions result.
 - Prepare commits outside the App token wrapper, following `docs/ops/agent-bot-identity.md`. Verify that neither the author name nor email of any prepared commit contains `cairnwright[bot]` before pushing.
 - If main's author check fails, follow the recovery procedure in `docs/ops/agent-bot-identity.md`. Preserve main history. A subsequent compliant push checks its own `BEFORE_SHA..HEAD` range; verify the actual main commit author and Actions result after merging.
 
