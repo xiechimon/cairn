@@ -4,6 +4,7 @@ import {
   chmodSync,
   copyFileSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -79,12 +80,15 @@ function fixture({ trustedUid = process.getuid(), tasks } = {}) {
     lock: join(base, 'state/run.lock'),
     log: join(base, 'log/run.log'),
     git: gitPath,
-    node: process.execPath,
+    node: join(base, 'bin/node'),
     flock: flockPath,
     env: '/usr/bin/env',
     taskPath: '/usr/bin:/bin',
     taskHome: base,
   };
+  mkdirSync(dirname(layout.node), { recursive: true });
+  copyFileSync(process.execPath, layout.node);
+  chmodSync(layout.node, 0o755);
   mkdirSync(dirname(layout.module), { recursive: true });
   copyFileSync(join(here, 'run.mjs'), layout.module);
   writeFileSync(join(dirname(layout.module), 'layout.json'), JSON.stringify(layout));
@@ -154,6 +158,23 @@ function commitTree(upstream, mutate) {
   git(upstream, 'update-ref', 'refs/heads/main', commit);
   return commit;
 }
+
+test('the fixture supplies a regular executable Node copy', () => {
+  const { base, layout } = fixture();
+  assert.equal(layout.node, join(base, 'bin/node'));
+  assert.notEqual(layout.node, process.execPath);
+  const stat = lstatSync(layout.node);
+  assert.equal(stat.isFile(), true);
+  assert.equal(stat.isSymbolicLink(), false);
+  assert.equal(stat.mode & 0o777, 0o755);
+});
+
+test('the wrapper launches the task through the fixture Node copy', { skip: !flockPath }, () => {
+  const { out, layout, mainSha } = fixture();
+  const result = spawnSync('/bin/sh', [layout.runner, 'demo', mainSha], { encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(readFileSync(join(out, 'args'), 'utf8'), '--fixed\n');
+});
 
 test('runs the task from a main commit with fixed argv and clean env, and logs start and end', () => {
   const { out, layout, mainSha } = fixture();
@@ -426,9 +447,10 @@ test('refuses --env names outside the task allowlist and values that do not matc
   assert.equal(code, 2);
 });
 
-test('refuses group- or world-writable runner, module, config, state, log or interpreter paths', () => {
+test('refuses group- or world-writable runner, module, config, state, log, Node or interpreter paths', () => {
   for (const pick of [
     (layout) => layout.runner,
+    (layout) => layout.node,
     (layout) => layout.config,
     (layout) => dirname(layout.config),
     (layout) => layout.state,
@@ -453,6 +475,23 @@ test('refuses group- or world-writable runner, module, config, state, log or int
   const { code, messages } = run(layout, ['demo', mainSha]);
   assert.equal(code, 2);
   assert.match(messages, /writable by group or others/);
+});
+
+test('refuses Node beneath a group-writable ancestor without executing the task', () => {
+  const { out, layout, mainSha } = fixture();
+  const directory = dirname(layout.node);
+  chmodSync(directory, 0o775);
+  try {
+    const { code, messages } = run(layout, ['demo', mainSha]);
+    assert.equal(code, 2);
+    assert.equal(
+      messages,
+      `cairn-ops-run: refused: node: ${directory} is writable by group or others`,
+    );
+    assert.equal(existsSync(join(out, 'args')), false);
+  } finally {
+    chmodSync(directory, 0o755);
+  }
 });
 
 test('refuses to run anything when its files live in a checkout not owned by the trusted user', () => {

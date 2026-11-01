@@ -1,6 +1,8 @@
 import { CircleDashed } from 'lucide-react';
 import type { ReactElement, ReactNode } from 'react';
 import { ProjectAvatar } from '../board/project-avatar.js';
+import { useProjectMark } from '../board/project-mark.js';
+
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -53,6 +55,7 @@ export function ProjectMenu({
   onPick: (projectId: string | null) => void;
 }) {
   const { t } = useI18n();
+  const projectMark = useProjectMark();
   return (
     <DropdownMenu>
       <DropdownMenuTrigger render={trigger}>{children}</DropdownMenuTrigger>
@@ -76,7 +79,13 @@ export function ProjectMenu({
             )}
             {projects.map((p, i) => (
               <DropdownMenuRadioItem key={p.id} value={p.id} closeOnClick className={ITEM_CLS}>
-                <ProjectAvatar name={p.name} tone={i} className="mt-0.5" />
+                <ProjectAvatar
+                  name={p.name}
+                  {...projectMark(p.id)}
+                  tone={i}
+                  bare
+                  className="mt-0.5"
+                />
                 <OptionText title={p.name} hint={p.description} />
               </DropdownMenuRadioItem>
             ))}

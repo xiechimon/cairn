@@ -23,7 +23,7 @@ const CJK = /[一-鿿]/;
 export interface Found {
   rel: string;
   text: string;
-  kind: 'literal' | 'template' | 'jsx-text';
+  kind: 'literal' | 'template' | 'jsx-text' | 'translation';
 }
 
 /** Tokens after which `<` continues an expression (comparison, generic
@@ -98,7 +98,7 @@ function lineCol(text: string, pos: number): string {
 
 /** Walk `text` and collect every CJK-bearing literal / template / JSX text.
  *  `rel` is the src-relative path used in findings and guard errors. */
-export function scanSource(text: string, rel: string): Found[] {
+export function scanSource(text: string, rel: string, includeTranslations = false): Found[] {
   const isTsx = rel.endsWith('.tsx');
   const scanner = createScanner(
     /* skipTrivia */ true,
@@ -106,6 +106,9 @@ export function scanSource(text: string, rel: string): Found[] {
     text,
   );
   const found: Found[] = [];
+  let translationIdentifier = false;
+  let translationArgument = false;
+  let translationLiteral: string | undefined;
   let braceDepth = 0;
   /** braceDepth at which `}` closes the innermost template substitution. */
   const templateStack: number[] = [];
@@ -147,6 +150,26 @@ export function scanSource(text: string, rel: string): Found[] {
       tok = scanner.reScanSlashToken(); // regex position: one literal, not body-as-code (#681)
     }
     guardAdvance(tok, prevEnd);
+    if (includeTranslations) {
+      if (
+        translationLiteral !== undefined &&
+        (tok === SyntaxKind.CommaToken || tok === SyntaxKind.CloseParenToken)
+      ) {
+        found.push({ rel, text: translationLiteral, kind: 'translation' });
+      }
+      translationLiteral =
+        translationArgument &&
+        (tok === SyntaxKind.StringLiteral || tok === SyntaxKind.NoSubstitutionTemplateLiteral)
+          ? scanner.getTokenValue()
+          : undefined;
+      translationArgument = tok === SyntaxKind.OpenParenToken && translationIdentifier;
+      translationIdentifier =
+        (tok === SyntaxKind.QuestionDotToken && translationIdentifier) ||
+        (tok === SyntaxKind.Identifier &&
+          scanner.getTokenText() === 't' &&
+          lastTok !== SyntaxKind.DotToken &&
+          lastTok !== SyntaxKind.QuestionDotToken);
+    }
     prevTok = lastTok;
     lastTok = tok;
     if (tok === SyntaxKind.OpenBraceToken) {
@@ -270,6 +293,10 @@ export function scanSource(text: string, rel: string): Found[] {
 }
 
 /** Read `file` and walk it; `rel` is computed against `srcRoot`. */
-export function scanFile(file: string, srcRoot: string): Found[] {
-  return scanSource(readFileSync(file, 'utf8'), relative(srcRoot, file).replaceAll('\\', '/'));
+export function scanFile(file: string, srcRoot: string, includeTranslations = false): Found[] {
+  return scanSource(
+    readFileSync(file, 'utf8'),
+    relative(srcRoot, file).replaceAll('\\', '/'),
+    includeTranslations,
+  );
 }

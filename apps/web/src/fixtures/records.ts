@@ -206,6 +206,12 @@ export interface FixtureSet {
   detail?: DetailContent;
   details?: Record<string, DetailContent>;
   overlay?: OverlayState;
+  reviewChoice?: {
+    agents: { id: string; name: string; model: string; provider: string | null }[];
+    defaultAgentId?: string;
+    producerProvider: string | null;
+    fanoutAvailable: boolean;
+  };
   chiefUnread?: number;
   unreadThreadIds?: string[];
   chiefBusy?: boolean;
@@ -530,6 +536,7 @@ export type ChiefStreamItem =
   | {
       kind: 'streaming';
       seconds?: number;
+      startedAt?: number;
       label: string;
       tools?: ChiefToolRow[];
       labelVars?: Record<string, string | number>;

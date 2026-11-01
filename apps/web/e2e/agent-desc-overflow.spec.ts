@@ -26,7 +26,7 @@ test('team card: long duties stay off the card, only name and one meta line insi
   const text = (await card.textContent()) ?? '';
   expect(text.length).toBeLessThan(100);
   const h = await card.evaluate((el) => el.getBoundingClientRect().height);
-  expect(h).toBeLessThanOrEqual(64);
+  expect(h).toBeLessThanOrEqual(66);
 });
 
 test('detail page: long duties do not break the line width, label column does not wrap vertically', async ({ page }) => {

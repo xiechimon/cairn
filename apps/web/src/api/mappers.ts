@@ -1503,6 +1503,8 @@ export function mapChief(
         seconds: '',
       });
     } else if (chiefStream[chiefStream.length - 1]?.kind !== 'robot') {
+      const lastUser = collected?.items.findLastIndex((item) => item.kind === 'user') ?? -1;
+      const turnStartedAt = lastUser >= 0 ? collected?.itemsAt[lastUser] : undefined;
       const turnQueue = active?.turnQueue ?? null;
       if (turnQueue != null) {
         const queued = queueLabel(turnQueue);
@@ -1515,6 +1517,7 @@ export function mapChief(
         const actLabel = opts.activity != null ? activityLabel(opts.activity) : null;
         chiefStream.push({
           kind: 'streaming',
+          ...(turnStartedAt !== undefined ? { startedAt: turnStartedAt } : {}),
           label: actLabel?.label ?? '处理中...',
           ...(actLabel?.vars !== undefined ? { labelVars: actLabel.vars } : {}),
           ...(opts.activity != null ? { signalAt: opts.activity.at } : {}),

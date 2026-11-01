@@ -20,6 +20,13 @@ fs.appendFileSync(process.env.CALLS, JSON.stringify(args)+'\\n');
 const d = JSON.parse(fs.readFileSync(process.env.DATA));
 if(args.includes('--input')) fs.appendFileSync(process.env.CALLS, fs.readFileSync(0,'utf8')+'\\n');
 const path = args[1];
+const response = d.responses?.[path]?.shift();
+if (response) {
+ fs.writeFileSync(process.env.DATA, JSON.stringify(d));
+ if (response.error) { console.error(response.error); process.exit(1); }
+ console.log(response.output ?? '{}');
+ process.exit(0);
+}
 if (path === 'graphql') {
  if(args.includes('pullRequestId=bad')) process.exit(1);
  console.log(JSON.stringify({data:{disablePullRequestAutoMerge:{pullRequest:{number:1}}}}));
@@ -268,4 +275,88 @@ for (const scenario of [
     assert.match(r.stdout, /#8: disarmed/);
     if (scenario !== 'status failure') assert.match(f.calls(), /actions\/runs\/90\/rerun/);
     if (scenario === 'permission failure') assert.doesNotMatch(f.calls(), /runs\/90"/);
+  });
+
+for (const paused of [false, true])
+  test(`sweep replays the complete status body after a transient failure: paused=${paused}`, (t) => {
+    const path = `repos/owner/repo/statuses/${'a'.repeat(40)}`;
+    const f = fixture(t, {
+      issues: paused ? [{ number: 5 }] : [],
+      pulls: [{ number: 7, head: { sha: 'a'.repeat(40) }, labels: [], auto_merge: null }],
+      responses: { [path]: [{ error: 'unexpected end of JSON input' }, {}] },
+    });
+    const r = f.run(['sweep']);
+    assert.equal(r.status, 0, r.stderr);
+    const rows = f
+      .calls()
+      .trim()
+      .split('\n')
+      .map((row) => JSON.parse(row));
+    const bodies = rows.filter((row) => row.context === 'autonomy-brake');
+    assert.deepEqual(
+      bodies,
+      Array(2).fill({
+        context: 'autonomy-brake',
+        state: paused ? 'failure' : 'success',
+        description: paused ? 'Autonomous merging is paused' : 'Autonomy brake permits this head',
+      }),
+    );
+  });
+
+for (const scenario of ['exhausted', 'permission', 'malformed response'])
+  test(`status publication fails safely: ${scenario}`, (t) => {
+    const path = `repos/owner/repo/statuses/${'a'.repeat(40)}`;
+    const attempts = scenario === 'exhausted' ? 3 : 1;
+    const response =
+      scenario === 'malformed response'
+        ? { output: '{' }
+        : {
+            error:
+              scenario === 'permission'
+                ? 'Resource not accessible (HTTP 403)'
+                : 'unexpected end of JSON input',
+          };
+    const f = fixture(t, {
+      issues: [{ number: 5 }],
+      pulls: [
+        { number: 7, node_id: 'good', head: { sha: 'a'.repeat(40) }, labels: [], auto_merge: {} },
+        { number: 8, node_id: 'next', head: { sha: 'b'.repeat(40) }, labels: [], auto_merge: {} },
+      ],
+      responses: { [path]: Array(attempts).fill(response) },
+    });
+    const r = f.run(['sweep']);
+    assert.equal(r.status, 1);
+    assert.equal(
+      f
+        .calls()
+        .split('\n')
+        .filter((row) => row.includes(path)).length,
+      attempts,
+    );
+    assert.match(r.stderr, new RegExp(path));
+    assert.match(r.stdout, /#7: disarmed/);
+    assert.match(r.stdout, /#8: disarmed/);
+  });
+
+for (const operation of ['marker', 'rerun'])
+  test(`transient errors do not retry ${operation} writes`, (t) => {
+    const path =
+      operation === 'marker' ? 'repos/owner/repo/issues' : 'repos/owner/repo/actions/runs/90/rerun';
+    const f = fixture(t, {
+      labels: [{ name: 'autonomy-paused' }],
+      pulls: [{ number: 7, head: { sha: 'a'.repeat(40) }, labels: [], auto_merge: null }],
+      runs: [
+        { id: 90, status: 'completed', head_sha: 'a'.repeat(40), pull_requests: [{ number: 7 }] },
+      ],
+      responses: { [path]: [{ error: 'unexpected end of JSON input' }, {}] },
+    });
+    const r = f.run(operation === 'marker' ? ['pause', '--reason', 'Failed main'] : ['sweep']);
+    assert.equal(r.status, 1);
+    assert.equal(
+      f
+        .calls()
+        .split('\n')
+        .filter((row) => row.includes(`"${path}"`)).length,
+      1,
+    );
   });

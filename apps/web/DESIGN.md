@@ -73,11 +73,11 @@ typography:
   page-title:   { fontFamily: serif, fontSize: 20px, fontWeight: '600' }
   heading:      { fontFamily: display, fontSize: 17px, fontWeight: '650' }
   brand:        { fontFamily: display, fontSize: 20px, fontWeight: '650' }
-  card-title:   { fontFamily: sans, fontSize: 14px, fontWeight: '600', lineHeight: '1.5' }
+  card-title:   { fontFamily: sans, fontSize: 15px, fontWeight: '600', lineHeight: '1.5' }
   ui:           { fontFamily: sans, fontSize: 14px, fontWeight: '450' }
-  meta:         { fontFamily: sans, fontSize: 12.5px, fontWeight: '450' }
+  meta:         { fontFamily: sans, fontSize: 13px, fontWeight: '450' }
   caption:      { fontFamily: sans, fontSize: 12px, fontWeight: '500' }
-  code:         { fontFamily: mono, fontSize: 12px, fontWeight: '400' }
+  code:         { fontFamily: mono, fontSize: 13px, fontWeight: '400' }
 fonts:
   serif: var(--font-source-serif) # Source Serif 4 → Songti SC: greeting and page titles
   display: var(--font-display)   # Bricolage Grotesque → sans
@@ -137,7 +137,7 @@ Direction A, **Cairn**: a cairn is a pile of stones that marks a trail for the n
 - **Two title faces**: Source Serif 4 (`font-serif`, 600, -0.01em) for the Coordinator greeting and page titles (the board top bar, page shells, settings headers; the task detail header is a one-line sans bar, see below), so the top of every page has one quiet serif voice. Bricolage Grotesque (`font-heading` with `font-title`, 650) for the brand name, section and column headings, pane and dialog titles. Chinese falls back to Songti SC under the serif and PingFang SC under the sans.
 - **Everything else is Instrument Sans** (`--font-sans`): thread titles, rows, navigation, buttons, meta. Chinese falls back to PingFang SC. Code, times, ids and counters use JetBrains Mono (`--font-mono`) with tabular numbers.
 - Fonts are self-hosted latin subsets in `public/fonts` (SIL OFL 1.1, licenses next to the files), loaded with `font-display: swap` and preloaded in `index.html` and `design.html`; the metric-matched fallbacks keep the swap from shifting layout.
-- **Six font sizes, no seventh allowed**: 26 Coordinator greeting / 20 page title and brand / 17 column and section headings / 14 card titles and UI text / 12.5 meta / 12 badges and group labels. In code, use the corresponding Tailwind theme keys `text-greeting` / `text-page` / `text-heading` / `text-card-title` and `text-ui` / `text-meta` / `text-caption` (heading font `font-heading`), never arbitrary values like `text-[13px]`; `scripts/ui-debt-gate.mjs` D5 only allows the total count of arbitrary values to decrease.
+- **Seven font sizes, measured against Claude Code**: 26 Coordinator greeting / 20 page title and brand / 17 column and section headings / 15 body text and card titles (messages, plans, composer) / 14 UI text / 13 meta and code (mono) / 12 badges and group labels. Body steps above UI text so reading text and chrome do not blur together. In code, use the corresponding Tailwind theme keys `text-greeting` / `text-page` / `text-heading` / `text-card-title` / `text-ui` / `text-meta` and `text-code` / `text-caption` (heading font `font-heading`), never arbitrary values like `text-[13px]`; `scripts/ui-debt-gate.mjs` D5 only allows the total count of arbitrary values to decrease.
 - **Four font weights**: 450 body text (`font-normal` maps to 450, because Instrument Sans at 400 reads faint at 14px), 500 sidebar rows and captions, 600 card and row titles, the active nav row and count badges, 650 display titles (`font-title`, always paired with `font-heading`). 700 is not used.
 - The title of a completed task drops to 400 + `ink-3`, meaning "no longer needs to be read".
 
@@ -217,7 +217,7 @@ See "Page patterns · Settings list" below.
 ### Trace
 - The agent's narration stays body text. Tool activity folds into one grey summary line in `--text-tertiary` ("Ran 2 commands (1 failed)") ending in a small triangle, right when closed and down when open (`components/chat/trace-parts.tsx`, composed by `TraceGroup`, `TraceRows` and `WorkTrace`). Never hand-write tool rows.
 - Open, the group is a hairline card (1px inset `--border` ring, 12px radius from `--cds-radius-xl`) of 36px rows separated by hairlines. A row reads "verb **target**": the verb in `--text-tertiary`, the target in `--foreground` at medium weight, no kind icon and no code pill; commands are mono without a background. The duration, diff size or exit code sits at the row end in tabular numbers.
-- A row with detail opens to a bordered command box (`$ command`, mono 12.5/19, 8px radius, `--background`) with the output under it in grey mono `text-caption`.
+- A row with detail opens to a bordered command box (`$ command`, mono `text-code` 13/20, 8px radius, `--background`) with the output under it in grey mono `text-code`.
 - Failures: the summary shows a `--destructive` count and the row a `--destructive` "exit N" or "Failed" label; a failed command opens by default and prints its output in `--destructive`. Never use `--text-dim` for text.
 - Running: the summary switches to the present tense for the whole group ("Running 1 command") and sweeps with the `shimmer` utility, as does the verb of the running row. Under reduced motion the shimmer stops.
 - `components/ui/trace.tsx` keeps the low-level Trace primitives for thinking rows (`ThinkingRow`).
@@ -367,7 +367,7 @@ Cairn UI rules (source: apps/web/DESIGN.md):
 - Every status = icon + color + label. Every icon draws at stroke 1.75 (`test/icon-stroke.test.ts` pins `src/icons`). The spiral mark is the brand and the Coordinator avatar.
 - Primary button = shadcn default Button on --primary (light #233127 with #f4f6f1 text, dark #e6e8e2 with dark text), 8px corners, 32px tall. Card actions = accent text links. No solid buttons on cards except the one primary action of a thread card.
 - Radii: menu and dialog 18px, card and composer 14px, menu row 12px, button, input and row 8px.
-- Dialogs: DialogShell with size s (400) / m (480) / l (640), light dim backdrop (no blur), 17px display title + optional 12.5px sub-line, split footer (12px ink-3 hint left, actions right, primary button). Menus: popover color, 18px corners, 6px padding, 32px rows with 12px corners, 14px text, 15px ink-3 icons, --menu-hover, danger rows in destructive.
+- Dialogs: DialogShell with size s (400) / m (480) / l (640), light dim backdrop (no blur), 17px display title + optional 13px sub-line, split footer (12px ink-3 hint left, actions right, primary button). Menus: popover color, 18px corners, 6px padding, 32px rows with 12px corners, 14px text, 15px ink-3 icons, --menu-hover, danger rows in destructive.
 - Segmented controls only from components/segmented.tsx: SegmentedTabs for view switches, SegmentedRadio for value pickers. Canvas track, white selected option with a 1px ring, inset keyboard ring. Never hand-roll role=tab/radio or restyle TabsList.
 - One card corner: --radius-card (14px) on every card-like surface. Pages compose EmptyState / SettingsHeader+SettingsCard+SettingsRow / FormStack+FormField+FormActions; no tinted icon tiles, no full-width submit bars, no two-tone cards, no pill buttons.
 - Use components/ui primitives and tokens; no hex in components.

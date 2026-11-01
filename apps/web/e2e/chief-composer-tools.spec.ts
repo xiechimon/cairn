@@ -338,7 +338,7 @@ test('Esc closes the listbox and the drawer survives (#146 ladder, FM9)', async 
 
 // —— clipboard paste face (FM6/FM10) ——
 
-test('a mid-line image paste lands the token whole-line at the caret (FM6)', async ({ page }) => {
+test('a mid-line image paste becomes a tile and leaves the text alone (FM6)', async ({ page }) => {
   await stubBoot(page);
   const uploads = await stubUploads(page);
   await stubMentionSources(page);
@@ -351,9 +351,8 @@ test('a mid-line image paste lands the token whole-line at the caret (FM6)', asy
   await setCaret(page, COMPOSER, 5);
   await pasteFiles(page, COMPOSER, [{ name: 'image.png', type: 'image/png' }]);
 
-  // The caret sat mid-line — the insert broke the line on both sides so the
-  // token is a whole line (ATTACHMENT_LINE is whole-line anchored).
-  await expect(input).toHaveValue(`hello\n${TOKEN_1}\n world`);
+  await expect(input).toHaveValue('hello world');
+  await expect(page.getByTestId('composer-attachments').locator('[data-state="ready"]')).toHaveCount(1);
   await expect.poll(() => uploads.grants.length).toBe(1);
   expect(uploads.grants[0]).toMatchObject({
     fileName: 'pasted-image-1.png',
@@ -389,13 +388,12 @@ test('Enter during the upload does not send; after it lands Enter sends the toke
   await deferred.releaseAll();
   await expect.poll(() => deferred.held.length).toBe(1);
   await deferred.releaseAll();
-  await expect(input).toHaveValue(`look at this\n${TOKEN_1}\n`);
+  await expect(input).toHaveValue('look at this');
+  await expect(page.getByTestId('composer-attachments').locator('[data-state="ready"]')).toHaveCount(1);
 
   await input.press('Enter');
   await expect.poll(() => sent.length).toBe(1);
-  // The content is the draft verbatim — the token rides the string, zero
-  // wire change on the chief send path.
-  expect(sent[0]).toBe(`look at this\n${TOKEN_1}`);
+  expect(sent[0]).toBe(`${TOKEN_1}\nlook at this`);
 });
 
 // —— transcript rendering (FM7) ——

@@ -29,7 +29,9 @@
   --text-ui: var(--type-ui);
   --text-ui--line-height: calc(20 / 14);
   --text-meta: var(--type-meta);
-  --text-meta--line-height: calc(18 / 12.5);
+  --text-meta--line-height: calc(18 / 13);
+  --text-code: var(--type-code);
+  --text-code--line-height: calc(20 / 13);
   --text-caption: var(--type-caption);
   --text-caption--line-height: calc(16 / 12);
 }
@@ -467,12 +469,6 @@
   [data-slot="message-scroller-item"]:not(:hover, :focus-within) .chat-row-icons .chat-copy {
     opacity: 0;
   }
-  [data-slot="message-scroller-item"]:not(:hover, :focus-within)
-    .chat-row-icons
-    .chat-copy
-    ~ .border-l {
-    border-color: transparent;
-  }
 }
 
 @media (max-width: 640px) {
@@ -543,9 +539,6 @@
   [data-testid="page-topbar"] :is(button, a) {
     min-height: 44px;
   }
-  .detail-head :is(button, a) {
-    min-height: 44px;
-  }
 
   .composer-tool,
   .composer-send,
@@ -570,5 +563,14 @@
   }
   body:has(.board-new-task-bar) .chief-drawer {
     transform-origin: calc(100% - 1.25rem) calc(100% - 60px - 1.25rem);
+  }
+}
+
+@media (width < 48rem) {
+  .detail-head :is(button, a) {
+    width: 32px;
+    height: 32px;
+    min-height: 32px;
+    padding: 0;
   }
 }

@@ -54,6 +54,14 @@ Three hard rules:
 
 The review verdict lands as a **PR comment** (`gh pr comment`; write long content to a one-off file and use `--body-file`), not by editing the PR body — the body is the author's evidence surface, and the review does not change it.
 
+## Merge method by commit author
+
+Read the PR opener and every commit author (`gh pr view <n> --json author,commits`) before choosing the merge method. A bot-opened PR merges by rebase from exactly one commit whose author is one of the accepted bot authors; a human-opened PR merges by squash.
+
+Accepted bot commit authors: `Cairnwright`, `cairnwright[bot]`.
+
+Both are treated the same by the merge helper `merge-pr.sh`. A `cairnwright[bot]` commit must also carry a `Cairn-Thread:` trailer and a `Co-authored-by: xiechimon` trailer. Any other bot author is foreign and the PR goes back to the dispatcher. The `commit-author` workflow still rejects `cairnwright[bot]` until the identity switch (#2289) lands, so a `cairnwright[bot]` commit that reaches main fails that check until then.
+
 ## Mechanical checks are not the reviewer's job (do not be a CI parrot)
 
 lint / typecheck / spec:parse / vitest / e2e are covered by the CI `check` job and the `pack-smoke` / `e2e-gate` required checks; the "has answers" property of the What / Proof / Review / Risk sections (legacy Verified aliases Proof; Upstream is optional) is pinned by `pr-evidence-gate.py`; the absence of unchecked tasks anywhere in the body outside fenced code and HTML comments (no tasks are required) is pinned by `pr-tasks-gate.py` (the pr-tasks step of the pr-evidence job). The reviewer spends judgment where machines cannot see:

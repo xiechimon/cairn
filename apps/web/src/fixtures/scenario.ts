@@ -41,6 +41,7 @@ import {
   chiefThread,
   chiefThreadsLong,
   chiefThreadsOpen,
+  chiefWorking,
   compareMenuV2,
   detailBuilding,
   detailConfirm,
@@ -186,6 +187,19 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
         ...detailReview({ userMenuOpen: false }),
         overlay: { kind: 'review' },
       },
+      'review-dialog-choice': {
+        ...detailReview({ userMenuOpen: false }),
+        overlay: { kind: 'review' },
+        reviewChoice: {
+          agents: [
+            { id: 'builder', name: 'builder', model: 'claude-sonnet-5-5', provider: 'anthropic' },
+            { id: 'reviewer', name: 'reviewer', model: 'gpt-6.1-sol', provider: 'openai' },
+          ],
+          defaultAgentId: 'reviewer',
+          producerProvider: 'anthropic',
+          fanoutAvailable: true,
+        },
+      },
       '30': {
         ...detailReview({ userMenuOpen: false, changesExpanded: true, toolsExpanded: true }),
         ui: { paneView: 'token' },
@@ -287,6 +301,7 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       '104': chiefSettings('watches'),
       '111': chiefReady,
       '113': chiefStreaming,
+      'chief-working': chiefWorking,
       '114': chiefThread,
       '116': chiefThreadsOpen,
       'chief-threads-long': chiefThreadsLong,

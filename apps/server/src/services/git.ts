@@ -191,6 +191,7 @@ export function toProjectRecord(row: ProjectRow, origin?: string): ProjectRecord
     ...projectMergeConfigSchema.parse({
       mergePolicy: (row.autonomy as { mergePolicy?: unknown } | null)?.mergePolicy,
       localChecks: (row.autonomy as { localChecks?: unknown } | null)?.localChecks,
+      requireUpToDate: (row.autonomy as { requireUpToDate?: unknown } | null)?.requireUpToDate,
     }),
     ...(row.repoKind === 'hosted' && row.repoName !== null && origin !== undefined
       ? { cloneUrl: hostedCloneUrl(origin, row.teamId, row.repoName) }

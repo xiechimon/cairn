@@ -3,22 +3,24 @@
 EXTENDS Naturals, FiniteSets
 
 CONSTANTS Machines, NoMachine, ExecIds, InitialHome,
-          MaxClaims, MaxPartitions, MaxCrashes, MaxRebinds
+          MaxClaims, MaxPartitions, MaxCrashes, MaxRebinds,
+          MaxLateEnqueues, ClaimChecksArchive, ApplyChecksArchive
 
 VARIABLES
   st, sm, fresh, progressed, probeDue,
-  phase, stopPending,
+  phase, stopPending, archived, archiveStop,
   online, presenceFresh, home,
   connected, dm, stopEvt, stopInHand, journal, jout, jstop,
   ex,
   holder, staleApply, stopDelivered,
-  claims, partitions, crashes, rebinds
+  claims, partitions, crashes, rebinds, enqueues
 
-server  == <<st, sm, fresh, progressed, probeDue, phase, stopPending,
+server  == <<st, sm, fresh, progressed, probeDue, phase, stopPending, archived, archiveStop,
              online, presenceFresh, home>>
+arch    == <<archived, archiveStop>>
 daemon  == <<connected, dm, stopEvt, stopInHand, journal, jout, jstop>>
 ghosts  == <<holder, staleApply, stopDelivered>>
-budgets == <<claims, partitions, crashes, rebinds>>
+budgets == <<claims, partitions, crashes, rebinds, enqueues>>
 vars    == <<server, daemon, ex, ghosts, budgets>>
 
 None     == 0
@@ -27,6 +29,7 @@ Stages   == {"idle", "preparing", "running", "reporting", "applying", "orphan", 
 Working  == {"preparing", "running"}
 Live     == {"preparing", "running", "reporting", "applying"}
 Outcomes == {"success", "failed", "stopped", "quota"}
+Terminal == {"done", "failed", "stopped"}
 
 Idle == [mach |-> InitialHome, stage |-> "idle", beat |-> FALSE,
          halt |-> FALSE, out |-> "none", seen |-> 0]
@@ -37,6 +40,8 @@ TypeOK ==
   /\ fresh \in BOOLEAN /\ progressed \in BOOLEAN /\ probeDue \in BOOLEAN
   /\ phase \in {"open", "closed"}
   /\ stopPending \in BOOLEAN
+  /\ archived \in BOOLEAN /\ archiveStop \in {"none", "requested", "acknowledged"}
+  /\ enqueues \in 0..MaxLateEnqueues
   /\ online \in [Machines -> BOOLEAN] /\ presenceFresh \in [Machines -> BOOLEAN]
   /\ home \in Machines
   /\ connected \in [Machines -> BOOLEAN]
@@ -56,6 +61,7 @@ Init ==
   /\ st = "pending" /\ sm = NoMachine /\ fresh = TRUE /\ progressed = FALSE
   /\ probeDue = FALSE
   /\ phase = "open" /\ stopPending = FALSE
+  /\ archived = FALSE /\ archiveStop = "none"
   /\ online = [m \in Machines |-> TRUE] /\ presenceFresh = [m \in Machines |-> TRUE]
   /\ home = InitialHome
   /\ connected = [m \in Machines |-> TRUE]
@@ -66,7 +72,7 @@ Init ==
   /\ ex = [e \in ExecIds |-> Idle]
   /\ holder = None /\ staleApply = FALSE
   /\ stopDelivered = [m \in Machines |-> FALSE]
-  /\ claims = 0 /\ partitions = 0 /\ crashes = 0 /\ rebinds = 0
+  /\ claims = 0 /\ partitions = 0 /\ crashes = 0 /\ rebinds = 0 /\ enqueues = 0
 
 FreeIds == {e \in ExecIds : ex[e].stage = "idle"}
 NextId  == CHOOSE e \in FreeIds : \A f \in FreeIds : e <= f
@@ -86,11 +92,16 @@ KeepsFresh ==
 InFlight(m) == {e \in ExecIds : ex[e].mach = m /\ ex[e].stage \in Live}
 Carrier(m)  == IF InFlight(m) = {} THEN None ELSE CHOOSE e \in InFlight(m) : TRUE
 
+ClaimAllowed == ~(ClaimChecksArchive /\ archived)
+
+SettledAs(o) == IF ApplyChecksArchive /\ archiveStop /= "none" THEN "stopped" ELSE o
+
 ----------------------------------------------------------------------------
 
 TryClaim(m) ==
   /\ dm[m] = "up" /\ connected[m]
   /\ st = "pending" /\ home = m
+  /\ ClaimAllowed
   /\ claims < MaxClaims
   /\ IF Carrier(m) /= None
        THEN /\ holder' = Carrier(m)
@@ -104,19 +115,20 @@ TryClaim(m) ==
             /\ jstop' = [jstop EXCEPT ![m] = FALSE]
   /\ st' = "claimed" /\ sm' = m /\ fresh' = TRUE /\ progressed' = FALSE
   /\ claims' = claims + 1
-  /\ UNCHANGED <<probeDue, phase, stopPending, online, presenceFresh, home,
+  /\ UNCHANGED <<probeDue, phase, stopPending, arch, online, presenceFresh, home,
                  connected, dm, stopEvt, stopInHand,
-                 staleApply, stopDelivered, partitions, crashes, rebinds>>
+                 staleApply, stopDelivered, partitions, crashes, rebinds, enqueues>>
 
 TryClaimResponseLost(m) ==
   /\ dm[m] = "up" /\ connected[m]
   /\ st = "pending" /\ home = m
+  /\ ClaimAllowed
   /\ claims < MaxClaims
   /\ st' = "claimed" /\ sm' = m /\ fresh' = TRUE /\ progressed' = FALSE
   /\ holder' = Carrier(m)
   /\ claims' = claims + 1
-  /\ UNCHANGED <<probeDue, phase, stopPending, online, presenceFresh, home,
-                 daemon, ex, staleApply, stopDelivered, partitions, crashes, rebinds>>
+  /\ UNCHANGED <<probeDue, phase, stopPending, arch, online, presenceFresh, home,
+                 daemon, ex, staleApply, stopDelivered, partitions, crashes, rebinds, enqueues>>
 
 StartSession(e) ==
   /\ ex[e].stage = "preparing" /\ ~ex[e].halt
@@ -130,7 +142,7 @@ HeartbeatStep(e) ==
   /\ ~(fresh /\ progressed /\ ex[e].beat)
   /\ fresh' = TRUE /\ progressed' = TRUE
   /\ ex' = [ex EXCEPT ![e].beat = TRUE]
-  /\ UNCHANGED <<st, sm, probeDue, phase, stopPending, online, presenceFresh, home,
+  /\ UNCHANGED <<st, sm, probeDue, phase, stopPending, arch, online, presenceFresh, home,
                  daemon, ghosts, budgets>>
 
 FinishOutcomes(e) ==
@@ -153,10 +165,11 @@ ApplyOutcome(e) ==
   LET m       == ex[e].mach
       o       == ex[e].out
       orphan  == ex[e].stage = "orphan" IN
-  /\ st' = CASE o = "quota"   -> "waiting_quota"
-             [] o = "success" -> "done"
-             [] o = "failed"  -> "failed"
-             [] o = "stopped" -> "stopped"
+  /\ st' = SettledAs(CASE o = "quota"   -> "waiting_quota"
+                        [] o = "success" -> "done"
+                        [] o = "failed"  -> "failed"
+                        [] o = "stopped" -> "stopped")
+  /\ archiveStop' = "none"
   /\ probeDue' = FALSE
   /\ stopPending' = FALSE
   /\ staleApply' = (staleApply \/ (holder /= e /\ ~(orphan /\ ex[e].seen = claims)))
@@ -165,7 +178,7 @@ ApplyOutcome(e) ==
   /\ journal' = IF orphan THEN journal ELSE [journal EXCEPT ![m] = "none"]
   /\ jout' = IF orphan THEN jout ELSE [jout EXCEPT ![m] = "none"]
   /\ jstop' = IF orphan THEN jstop ELSE [jstop EXCEPT ![m] = FALSE]
-  /\ UNCHANGED <<sm, fresh, progressed, phase, online, presenceFresh, home,
+  /\ UNCHANGED <<sm, fresh, progressed, phase, archived, online, presenceFresh, home,
                  connected, dm, stopEvt, stopInHand, stopDelivered, budgets>>
 
 FinishStepOwnedCheck(e) ==
@@ -199,24 +212,26 @@ FinishStepApply(e) ==
 
 SchedulerTick ==
   LET online1  == [m \in Machines |-> online[m] /\ presenceFresh[m]]
-      leftover == phase = "closed" /\ st \in {"pending", "waiting_quota"}
+      exited   == phase = "closed" \/ archived
+      leftover == exited /\ st \in {"pending", "waiting_quota"}
       st1      == IF leftover THEN "stopped" ELSE st
       sp1      == IF leftover THEN FALSE ELSE stopPending
       stale    == st1 = "claimed" /\ ~fresh /\ (~online1[sm] \/ ~progressed)
-      stopIt   == stale /\ phase = "closed"
-      release  == stale /\ phase /= "closed"
+      stopIt   == stale /\ exited
+      release  == stale /\ ~exited
       st2      == IF stopIt THEN "stopped" ELSE IF release THEN "pending" ELSE st1
       sm2      == IF release THEN NoMachine ELSE sm
       sp2      == IF stopIt THEN FALSE ELSE sp1
+      as2      == IF stopIt THEN "none" ELSE archiveStop
       quotaRel == st2 = "waiting_quota" /\ probeDue
       st3      == IF quotaRel THEN "pending" ELSE st2
       sm3      == IF quotaRel THEN NoMachine ELSE sm2
   IN
-  /\ <<online1, st3, sm3, sp2>> /= <<online, st, sm, stopPending>>
+  /\ <<online1, st3, sm3, sp2, as2>> /= <<online, st, sm, stopPending, archiveStop>>
   /\ online' = online1
-  /\ st' = st3 /\ sm' = sm3 /\ stopPending' = sp2
+  /\ st' = st3 /\ sm' = sm3 /\ stopPending' = sp2 /\ archiveStop' = as2
   /\ holder' = IF release THEN None ELSE holder
-  /\ UNCHANGED <<fresh, progressed, probeDue, phase, presenceFresh, home,
+  /\ UNCHANGED <<fresh, progressed, probeDue, phase, archived, presenceFresh, home,
                  daemon, ex, staleApply, stopDelivered, budgets>>
 
 ----------------------------------------------------------------------------
@@ -232,18 +247,43 @@ CloseCard ==
               /\ stopEvt' = [stopEvt EXCEPT ![sm] = (dm[sm] = "up" /\ connected[sm])]
               /\ UNCHANGED st
          ELSE UNCHANGED <<st, stopPending, stopEvt>>
-  /\ UNCHANGED <<sm, fresh, progressed, probeDue, online, presenceFresh, home,
+  /\ UNCHANGED <<sm, fresh, progressed, probeDue, arch, online, presenceFresh, home,
                  connected, dm, stopInHand, journal, jout, jstop,
                  ex, ghosts, budgets>>
+
+ArchiveCard ==
+  /\ ~archived
+  /\ archived' = TRUE
+  /\ IF st \in {"pending", "waiting_quota"}
+       THEN /\ st' = "stopped" /\ stopPending' = FALSE
+            /\ UNCHANGED <<archiveStop, stopEvt>>
+       ELSE IF st = "claimed"
+         THEN /\ archiveStop' = "requested" /\ stopPending' = FALSE
+              /\ stopEvt' = [stopEvt EXCEPT ![sm] = (dm[sm] = "up" /\ connected[sm])]
+              /\ UNCHANGED st
+         ELSE UNCHANGED <<st, stopPending, archiveStop, stopEvt>>
+  /\ UNCHANGED <<sm, fresh, progressed, probeDue, phase, online, presenceFresh, home,
+                 connected, dm, stopInHand, journal, jout, jstop,
+                 ex, ghosts, budgets>>
+
+EnqueueAfterArchive ==
+  /\ archived /\ st \in Terminal
+  /\ enqueues < MaxLateEnqueues
+  /\ ~\E e \in ExecIds : ex[e].stage \in Live \cup {"orphan"}
+  /\ st' = "pending" /\ sm' = NoMachine /\ stopPending' = FALSE
+  /\ enqueues' = enqueues + 1
+  /\ UNCHANGED <<fresh, progressed, probeDue, phase, arch, online, presenceFresh, home,
+                 daemon, ex, ghosts, claims, partitions, crashes, rebinds>>
 
 DeliverStopFetch(m) ==
   /\ stopEvt[m] /\ dm[m] = "up" /\ connected[m]
   /\ stopEvt' = [stopEvt EXCEPT ![m] = FALSE]
-  /\ IF st = "claimed" /\ sm = m /\ stopPending
+  /\ IF st = "claimed" /\ sm = m /\ (stopPending \/ archiveStop = "requested")
        THEN /\ stopPending' = FALSE
             /\ stopInHand' = [stopInHand EXCEPT ![m] = TRUE]
-       ELSE UNCHANGED <<stopPending, stopInHand>>
-  /\ UNCHANGED <<st, sm, fresh, progressed, probeDue, phase, online, presenceFresh, home,
+            /\ archiveStop' = IF archiveStop = "requested" THEN "acknowledged" ELSE archiveStop
+       ELSE UNCHANGED <<stopPending, stopInHand, archiveStop>>
+  /\ UNCHANGED <<st, sm, fresh, progressed, probeDue, phase, archived, online, presenceFresh, home,
                  connected, dm, journal, jout, jstop, ex, ghosts, budgets>>
 
 DeliverStopToRun(m) ==
@@ -265,20 +305,20 @@ DeliverStopToRun(m) ==
 HeartbeatAges ==
   /\ st = "claimed" /\ fresh /\ ~KeepsFresh
   /\ fresh' = FALSE
-  /\ UNCHANGED <<st, sm, progressed, probeDue, phase, stopPending, online,
+  /\ UNCHANGED <<st, sm, progressed, probeDue, phase, stopPending, arch, online,
                  presenceFresh, home, daemon, ex, ghosts, budgets>>
 
 PresenceAges(m) ==
   /\ Involved(m)
   /\ presenceFresh[m] /\ ~(dm[m] = "up" /\ connected[m])
   /\ presenceFresh' = [presenceFresh EXCEPT ![m] = FALSE]
-  /\ UNCHANGED <<st, sm, fresh, progressed, probeDue, phase, stopPending, online, home,
+  /\ UNCHANGED <<st, sm, fresh, progressed, probeDue, phase, stopPending, arch, online, home,
                  daemon, ex, ghosts, budgets>>
 
 QuotaProbeDue ==
   /\ st = "waiting_quota" /\ ~probeDue
   /\ probeDue' = TRUE
-  /\ UNCHANGED <<st, sm, fresh, progressed, phase, stopPending, online,
+  /\ UNCHANGED <<st, sm, fresh, progressed, phase, stopPending, arch, online,
                  presenceFresh, home, daemon, ex, ghosts, budgets>>
 
 MarkPresence(m) ==
@@ -287,7 +327,7 @@ MarkPresence(m) ==
   /\ ~(online[m] /\ presenceFresh[m])
   /\ online' = [online EXCEPT ![m] = TRUE]
   /\ presenceFresh' = [presenceFresh EXCEPT ![m] = TRUE]
-  /\ UNCHANGED <<st, sm, fresh, progressed, probeDue, phase, stopPending, home,
+  /\ UNCHANGED <<st, sm, fresh, progressed, probeDue, phase, stopPending, arch, home,
                  daemon, ex, ghosts, budgets>>
 
 MachineStreamAbort(m) ==
@@ -295,7 +335,7 @@ MachineStreamAbort(m) ==
   /\ online[m]
   /\ online' = [online EXCEPT ![m] = FALSE]
   /\ stopEvt' = [stopEvt EXCEPT ![m] = FALSE]
-  /\ UNCHANGED <<st, sm, fresh, progressed, probeDue, phase, stopPending, presenceFresh, home,
+  /\ UNCHANGED <<st, sm, fresh, progressed, probeDue, phase, stopPending, arch, presenceFresh, home,
                  connected, dm, stopInHand, journal, jout, jstop, ex, ghosts, budgets>>
 
 Partition(m) ==
@@ -305,7 +345,7 @@ Partition(m) ==
   /\ stopEvt' = [stopEvt EXCEPT ![m] = FALSE]
   /\ partitions' = partitions + 1
   /\ UNCHANGED <<server, dm, stopInHand, journal, jout, jstop, ex, ghosts,
-                 claims, crashes, rebinds>>
+                 claims, crashes, rebinds, enqueues>>
 
 Reconnect(m) ==
   /\ Involved(m)
@@ -327,7 +367,7 @@ DaemonCrash(m) ==
   /\ stopInHand' = [stopInHand EXCEPT ![m] = FALSE]
   /\ crashes' = crashes + 1
   /\ UNCHANGED <<server, connected, journal, jout, jstop, ghosts, claims, partitions,
-                 rebinds>>
+                 rebinds, enqueues>>
 
 DaemonStartRecover(m) ==
   /\ Involved(m)
@@ -336,7 +376,8 @@ DaemonStartRecover(m) ==
   /\ presenceFresh' = [presenceFresh EXCEPT ![m] = TRUE]
   /\ IF st = "claimed" /\ sm = m
        THEN IF journal[m] = "none"
-              THEN /\ st' = "failed" /\ stopPending' = FALSE /\ holder' = None
+              THEN /\ st' = SettledAs("failed") /\ stopPending' = FALSE /\ holder' = None
+                   /\ archiveStop' = "none"
                    /\ dm' = [dm EXCEPT ![m] = "up"]
                    /\ UNCHANGED ex
               ELSE /\ FreeIds /= {}
@@ -347,10 +388,10 @@ DaemonStartRecover(m) ==
                                       ELSE [NewExec(m, "preparing", "none") EXCEPT !.halt = jstop[m]]]
                         /\ holder' = e
                    /\ dm' = [dm EXCEPT ![m] = "recovering"]
-                   /\ UNCHANGED <<st, stopPending>>
+                   /\ UNCHANGED <<st, stopPending, archiveStop>>
        ELSE /\ dm' = [dm EXCEPT ![m] = "up"]
-            /\ UNCHANGED <<st, stopPending, ex, holder>>
-  /\ UNCHANGED <<sm, fresh, progressed, probeDue, phase, home,
+            /\ UNCHANGED <<st, stopPending, archiveStop, ex, holder>>
+  /\ UNCHANGED <<sm, fresh, progressed, probeDue, phase, archived, home,
                  connected, stopEvt, stopInHand, journal, jout, jstop,
                  staleApply, stopDelivered, budgets>>
 
@@ -365,8 +406,8 @@ RebindHomeMachine(m) ==
   /\ rebinds < MaxRebinds /\ m /= home
   /\ home' = m
   /\ rebinds' = rebinds + 1
-  /\ UNCHANGED <<st, sm, fresh, progressed, probeDue, phase, stopPending, online,
-                 presenceFresh, daemon, ex, ghosts, claims, partitions, crashes>>
+  /\ UNCHANGED <<st, sm, fresh, progressed, probeDue, phase, stopPending, arch, online,
+                 presenceFresh, daemon, ex, ghosts, claims, partitions, crashes, enqueues>>
 
 ----------------------------------------------------------------------------
 
@@ -381,7 +422,8 @@ Next ==
   \/ \E e \in ExecIds :
        \/ StartSession(e) \/ HeartbeatStep(e) \/ FinishSession(e)
        \/ FinishStepOwnedCheck(e) \/ FinishStepApply(e)
-  \/ SchedulerTick \/ CloseCard \/ HeartbeatAges \/ QuotaProbeDue
+  \/ SchedulerTick \/ CloseCard \/ ArchiveCard \/ EnqueueAfterArchive
+  \/ HeartbeatAges \/ QuotaProbeDue
 
 Spec == Init /\ [][Next]_vars
 
@@ -389,7 +431,7 @@ StateView ==
   <<st, sm,
     IF st = "claimed" THEN <<fresh, progressed>> ELSE <<>>,
     IF st = "waiting_quota" THEN probeDue ELSE FALSE,
-    phase, stopPending, online, presenceFresh, home,
+    phase, stopPending, archived, archiveStop, online, presenceFresh, home,
     connected, dm, stopEvt, stopInHand, journal,
     [m \in Machines |-> IF journal[m] = "awaiting" THEN jout[m] ELSE "none"], jstop,
     ex, ghosts, budgets>>
@@ -409,5 +451,15 @@ AcceptedStopReachesWorkers ==
   \A m \in Machines :
     stopDelivered[m] =>
       \A e \in ExecIds : (ex[e].mach = m /\ ex[e].stage \in Working) => ex[e].halt
+
+ArchivedNeverClaimed ==
+  [][archived => ~(st /= "claimed" /\ st' = "claimed")]_vars
+
+ArchivedStopSettles ==
+  [][(archived /\ st = "claimed") => st' \in {"claimed", "stopped"}]_vars
+
+ArchiveFlagMatchesStep ==
+  /\ (archived /\ st = "claimed") => archiveStop /= "none"
+  /\ archiveStop /= "none" => (archived /\ st = "claimed")
 
 =============================================================================

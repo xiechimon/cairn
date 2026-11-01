@@ -116,12 +116,8 @@ export function TraceGroupSummary({
       className={cn(SUMMARY_BTN, compact ? 'text-meta leading-5' : 'text-ui leading-6', className)}
       {...props}
     >
-      <span
-        className={cn('min-w-0 truncate', running && 'shimmer motion-reduce:shimmer-none')}
-        data-trace-summary=""
-        title={summaryTitle}
-      >
-        {summary}
+      <span className="min-w-0 truncate" data-trace-summary="" title={summaryTitle}>
+        <span className={cn(running && 'shimmer motion-reduce:shimmer-none')}>{summary}</span>
         {failed != null && (
           <span className="ml-1 text-destructive" data-trace-failed="">
             {failed}
@@ -177,7 +173,7 @@ export function TraceRowButton({
         <span
           className={cn(
             'min-w-0 truncate font-medium text-(--foreground)',
-            mono && 'font-mono text-meta',
+            mono && 'font-mono text-code',
           )}
         >
           {target}
@@ -229,7 +225,7 @@ export function TraceCommandBox({
   return (
     <div
       className={cn(
-        'rounded-lg bg-(--background) px-3 py-2 font-mono text-meta leading-5 whitespace-pre-wrap text-(--foreground) ring-1 ring-(--border) ring-inset [overflow-wrap:anywhere]',
+        'rounded-lg bg-(--background) px-3 py-2 font-mono text-code leading-5 whitespace-pre-wrap text-(--foreground) ring-1 ring-(--border) ring-inset [overflow-wrap:anywhere]',
         className,
       )}
       data-trace-command=""
@@ -244,7 +240,7 @@ export function TraceOutput({ className, ...props }: ComponentProps<'pre'>) {
   return (
     <pre
       className={cn(
-        'm-0 max-h-60 overflow-auto px-0.5 pt-2 text-left font-mono text-caption leading-[18px] whitespace-pre-wrap text-(--text-tertiary) [overflow-wrap:anywhere]',
+        'm-0 max-h-60 overflow-auto px-0.5 pt-2 text-left font-mono text-code leading-[18px] whitespace-pre-wrap text-(--text-tertiary) [overflow-wrap:anywhere]',
         className,
       )}
       {...props}

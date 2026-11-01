@@ -2,6 +2,7 @@ import type {
   Assignment,
   BuildRecord,
   GithubRepoRef,
+  MergeReadiness,
   Phase,
   ReviewGate,
   ReviewVerdict,
@@ -29,6 +30,7 @@ import {
   CONFIRM_ANNOUNCEMENT,
   checkPlanContract,
   conversationBranch,
+  DEFAULT_SHIP_ROUTE,
   EVIDENCE_PREFIX,
   GATE_LIMITS,
   hasBlockingFinding,
@@ -131,14 +133,23 @@ import type { MachineWakeHub } from './machine-wake-hub.js';
 import { readCompareAt } from './merge-gate/github-facts.js';
 import { bindGateVerdict } from './merge-gate/verdict.js';
 import { githubGatePort } from './merge-gate-github.js';
+import { resolveNamedPrompt } from './named-prompts.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { assertPhaseTransition, canTransitionPhase } from './phase.js';
 import { planHasOpenDecisions } from './plan-decisions.js';
-import { projectMergeConfigOf } from './projects.js';
+import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
 import type { VapidKeys } from './push.js';
 import { publishStepRow, toQuotaWait } from './quota-wait.js';
 import { retryLessonsOf } from './retry-lessons.js';
 import { finishScheduledStep } from './schedules.js';
+import {
+  appendShipGateInstruction,
+  CUSTOM_NEEDS_PR,
+  hasGithubPr,
+  judgeShip,
+  parseShipGateInstruction,
+  settleAbandonedShip,
+} from './ship-gate.js';
 import { endSnoozeOn } from './snooze.js';
 import { assertSplitProposalExecutable } from './split-proposal.js';
 import { stepQueueProjector } from './step-queue.js';
@@ -165,6 +176,7 @@ export interface BuildDeps {
   oauthClient?: OAuthClientConfig | null;
   attachmentsDir?: string;
   gitOps?: typeof systemGitOps;
+  mergeVerdict?: (buildId: string) => Promise<MergeReadiness | null>;
   harnessEval?: {
     dispatch: HarnessEvalDispatchPort;
     attemptTimeoutMs?: number;
@@ -1087,6 +1099,7 @@ export function maybeEnqueueIndependentReview(
   const reviewer = deps.db.select().from(agent).where(eq(agent.id, agentId)).get();
   const focus = reviewer?.persona != null ? personaByRole(reviewer.persona).reviewFocus : undefined;
   const plan = latestPlanRow(deps, buildId);
+  const reviewInstruction = reviewInstructionOf(deps, todoRow.teamId, 'review');
   const prompt = buildReviewStepPrompt({
     agentId,
     gate: 'review',
@@ -1095,6 +1108,7 @@ export function maybeEnqueueIndependentReview(
     checkout: hasRepoBinding(projectOfTodo(deps.db, todoRow)),
     expectedHeadSha: head,
     ...(focus !== undefined && focus !== '' ? { focus } : {}),
+    ...(reviewInstruction !== undefined ? { instruction: reviewInstruction } : {}),
   });
   insertGateAnnouncement(deps, buildId, REVIEW_ANNOUNCEMENT, deps.user.displayName);
   enqueueStep(deps, buildId, 'review', todoRow.teamId, prompt);
@@ -1446,9 +1460,11 @@ export async function applyBuildStepAction(
     }
     insertGateAnnouncement(deps, buildId, REVIEW_ANNOUNCEMENT, actorName);
     const expectedHeadSha = gate === 'review' ? dispatchHeadSha(deps, buildId) : null;
+    const reviewInstruction = reviewInstructionOf(deps, todoRecord.teamId, gate);
     const promptArgs = {
       gate,
       planText,
+      ...(reviewInstruction !== undefined ? { instruction: reviewInstruction } : {}),
       ...(changes !== undefined ? { changes } : {}),
       checkout,
       ...(expectedHeadSha !== null ? { expectedHeadSha } : {}),
@@ -1550,6 +1566,16 @@ function assertDeliveredBuild(deps: BuildDeps, row: BuildRow): void {
   }
 }
 
+function reviewInstructionOf(
+  deps: BuildDeps,
+  teamId: string,
+  gate: ReviewGate,
+): string | undefined {
+  if (gate !== 'review') return undefined;
+  const prompt = resolveNamedPrompt(deps.db, teamId, 'review');
+  return prompt.overridden ? prompt.text : undefined;
+}
+
 export async function requestMerge(
   deps: BuildDeps,
   buildId: string,
@@ -1573,14 +1599,22 @@ export async function requestMerge(
     )
     .get();
   if (inFlight) throw new HttpError(409, '这个构建已有一个合并步在排队或在跑，等它结束再发起');
-  const pr = githubPrOf(deps, todoRow, row.prNumber);
+  const projectRow = projectOfTodo(deps.db, todoRow);
+  const shipRoute = projectRow === undefined ? DEFAULT_SHIP_ROUTE : projectShipRouteOf(projectRow);
+  if (shipRoute === 'local-merge' && projectRow?.repoKind !== 'local') {
+    throw new HttpError(409, 'local-merge requires a local repository project');
+  }
+  if (shipRoute === 'custom' && !hasGithubPr(deps, buildId))
+    throw new HttpError(409, CUSTOM_NEEDS_PR);
+  const judged = shipRoute === 'merge-gate' ? null : await judgeShip(deps, buildId);
+  const pr = shipRoute === 'custom' ? null : githubPrOf(deps, todoRow, row.prNumber);
   if (pr !== null) {
     return mergeThroughGithub(deps, row, pr.prNumber, pr.repoRef, actor ?? deps.user.displayName);
   }
-  const projectRow = projectOfTodo(deps.db, todoRow);
   if (
     projectRow?.repoKind === 'local' &&
-    projectMergeConfigOf(projectRow).mergePolicy === 'autonomous'
+    shipRoute !== 'custom' &&
+    (shipRoute === 'local-merge' || projectMergeConfigOf(projectRow).mergePolicy === 'autonomous')
   ) {
     if (todoRow.phase === 'failed') assertDeliveredBuild(deps, row);
     else assertPhaseTransition(todoRow.phase, 'done');
@@ -1598,7 +1632,7 @@ export async function requestMerge(
       deps,
       buildId,
       projectRow.baseBranch ?? listing.defaultBranch,
-      false,
+      shipRoute === 'local-merge',
       todoRow.phase === 'failed',
     );
     if (local.enqueued) {
@@ -1624,7 +1658,12 @@ export async function requestMerge(
   assertMergeTools(deps, todoRow);
   insertGateAnnouncement(deps, buildId, MERGE_ANNOUNCEMENT, actor ?? deps.user.displayName);
   let prompt: string | undefined;
-  if (projectRow?.repoKind === 'hosted' && projectRow.repoName !== null) {
+  if (shipRoute === 'custom' && judged !== null) {
+    prompt = appendShipGateInstruction(resolveNamedPrompt(deps.db, todoRow.teamId, 'ship').text, {
+      buildId,
+      judgedHead: judged.headSha,
+    });
+  } else if (projectRow?.repoKind === 'hosted' && projectRow.repoName !== null) {
     if (deps.reposDir === undefined) throw new HttpError(409, 'Hosted repository unavailable');
     const dir = repoDirFor(deps.reposDir, todoRow.teamId, projectRow.repoName);
     const { defaultBranch } = await systemGitOps.listBranches(dir);
@@ -2339,25 +2378,79 @@ export function sweepAbandonedBuildSteps(deps: BuildDeps, now: number = nowMs())
     if (!buildRow) continue;
     const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
     if (!todoRow) continue;
-    const effectiveBeat = stepActivityAt(row);
-    if (now - effectiveBeat > BUILD_ABANDONED_STEP_MS) {
-      const machineRow = row.machineId
-        ? deps.db.select().from(machine).where(eq(machine.id, row.machineId)).get()
-        : undefined;
-      const progressed =
-        row.lastHeartbeatAt !== null && row.lastHeartbeatAt > (row.claimedAt ?? row.createdAt);
-      if (machineRow === undefined || !machineRow.online || !progressed) {
-        if (
-          row.archiveStop !== null ||
-          todoRow.archivedAt !== null ||
-          todoRow.phase === 'closed' ||
-          todoRow.phase === 'done'
-        )
-          stopStepKeepPhase(deps, row.id);
-        else releaseClaimedStep(deps, row, todoRow);
-      }
-    }
+    const ending = abandonedEnding(deps, row, todoRow, now);
+    if (ending === null || parseShipGateInstruction(row.prompt) !== null) continue;
+    applyAbandonedEnding(deps, row, todoRow, ending);
   }
+}
+
+type AbandonedEnding = 'stop' | 'release';
+
+function abandonedEnding(
+  deps: BuildDeps,
+  row: typeof step.$inferSelect,
+  todoRow: typeof todo.$inferSelect,
+  now: number,
+): AbandonedEnding | null {
+  if (now - stepActivityAt(row) <= BUILD_ABANDONED_STEP_MS) return null;
+  const machineRow = row.machineId
+    ? deps.db.select().from(machine).where(eq(machine.id, row.machineId)).get()
+    : undefined;
+  const progressed =
+    row.lastHeartbeatAt !== null && row.lastHeartbeatAt > (row.claimedAt ?? row.createdAt);
+  if (machineRow?.online && progressed) return null;
+  return row.archiveStop !== null ||
+    todoRow.archivedAt !== null ||
+    todoRow.phase === 'closed' ||
+    todoRow.phase === 'done'
+    ? 'stop'
+    : 'release';
+}
+
+function applyAbandonedEnding(
+  deps: BuildDeps,
+  row: typeof step.$inferSelect,
+  todoRow: typeof todo.$inferSelect,
+  ending: AbandonedEnding,
+): void {
+  if (ending === 'stop') stopStepKeepPhase(deps, row.id);
+  else releaseClaimedStep(deps, row, todoRow);
+}
+
+export async function sweepAbandonedShipSteps(
+  deps: BuildDeps,
+  now: number = nowMs(),
+): Promise<void> {
+  const candidates = deps.db
+    .select()
+    .from(step)
+    .where(and(eq(step.kind, 'merge'), eq(step.status, 'claimed')))
+    .all()
+    .filter((row) => parseShipGateInstruction(row.prompt) !== null);
+  for (const row of candidates) {
+    const todoRow = todoOfBuild(deps, row.buildId);
+    if (todoRow === undefined || abandonedEnding(deps, row, todoRow, now) === null) continue;
+    const violation = await settleAbandonedShip(deps, row);
+    const current = deps.db.select().from(step).where(eq(step.id, row.id)).get();
+    const currentTodo = todoOfBuild(deps, row.buildId);
+    if (
+      current?.status !== 'claimed' ||
+      current.claimedAt !== row.claimedAt ||
+      currentTodo === undefined
+    )
+      continue;
+    if (violation !== null) {
+      applyStepFailure(deps, current, violation);
+      continue;
+    }
+    const ending = abandonedEnding(deps, current, currentTodo, now);
+    if (ending !== null) applyAbandonedEnding(deps, current, currentTodo, ending);
+  }
+}
+
+function todoOfBuild(deps: BuildDeps, buildId: string): typeof todo.$inferSelect | undefined {
+  const buildRow = deps.db.select().from(build).where(eq(build.id, buildId)).get();
+  return buildRow && deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
 }
 
 function releaseClaimedStep(
