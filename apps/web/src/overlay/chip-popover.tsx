@@ -60,7 +60,7 @@ export function ChipPopover({ todo, projectName, agentModel, onEditAssign }: Chi
               {todo.agent?.displayName ?? t('未指派')}
             </span>
             {modelLine !== undefined && (
-              <span className="truncate font-mono text-caption text-content-tertiary">
+              <span className="truncate font-mono text-code text-content-tertiary">
                 {modelLine}
               </span>
             )}
