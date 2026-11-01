@@ -1,7 +1,7 @@
 #!/bin/bash
 # usage: merge-pr.sh <pr> [--auto]
 # Bot-opened PRs (one signed commit: author Cairnwright, or cairnwright[bot] with Cairn-Thread and Co-authored-by trailers) merge by rebase so the commit keeps its author.
-# Human-opened PRs keep GitHub's default squash: author is the PR opener, commit co-authors are kept. Never override author or body.
+# Human-opened PRs off protected paths are queued in Mergify with `@mergifyio queue`; the rest keep GitHub's default squash: author is the PR opener, commit co-authors are kept. Never override author or body.
 set -uo pipefail
 pr=$1; mode=${2:-}
 R=xiechimon/cairn
@@ -18,6 +18,9 @@ for issue in $(gh pr view "$pr" -R "$R" --json body,headRefName --jq '"\(.headRe
   open=$(node ~/.cairn/tools/merge-order/deps-open.mjs "$issue") || { echo "PR #$pr: issue #$issue still depends on open $open; merge those first" >&2; exit 1; }
 done
 node ~/.cairn/tools/review-gate/review-gate.mjs --check "$pr" >/dev/null 2>&1; prot=$?
+if [ $prot = 3 ] && [ "$(gh pr view "$pr" -R "$R" --json author --jq .author.login)" != app/cairnwright ]; then
+  gh pr comment "$pr" -R "$R" --body '@mergifyio queue'; exit $?
+fi
 case "$(gh pr view "$pr" -R "$R" --json headRefName --jq .headRefName)" in lane/*) prot=0;; esac
 if [ $prot != 3 ]; then
   head=$(gh pr view "$pr" -R "$R" --json headRefOid --jq .headRefOid)
