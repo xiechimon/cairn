@@ -159,7 +159,9 @@ function commitTree(upstream, mutate) {
   return commit;
 }
 
-test('the fixture supplies a regular executable Node copy and launches the wrapper', () => {
+test('the fixture supplies a regular executable Node copy and launches the wrapper', {
+  skip: !flockPath,
+}, () => {
   const { base, out, layout, mainSha } = fixture();
   assert.equal(layout.node, join(base, 'bin/node'));
   assert.notEqual(layout.node, process.execPath);
