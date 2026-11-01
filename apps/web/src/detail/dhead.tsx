@@ -4,6 +4,8 @@ import { useAgentAvatarUrlById, useLiveData } from '../api/provider.js';
 import { TOPBAR_PRIMARY_BUTTON } from '../board/filter-panel.js';
 import { ProjectAvatar } from '../board/project-avatar.js';
 import { useProjectMark } from '../board/project-mark.js';
+import { relativeTime } from '../board/rel-time.js';
+import { AgentPicker, type AgentPickerOption } from '../components/agent-picker.js';
 import { type GlyphKind, StatusGlyph } from '../components/status-glyph.js';
 import { Badge } from '../components/ui/badge.js';
 import { Button } from '../components/ui/button.js';
@@ -13,18 +15,22 @@ import { PROJECT_NAME } from '../fixtures/fixtures.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronDown, ChevronLeft, ChevronRight, EllipsisVertical } from '../icons/index.js';
-import { type ChipAgentModel, ChipPopover } from '../overlay/chip-popover.js';
+import { StatusMenu } from '../overlay/status-menu.js';
 import { PHASE_STATUS, PHASE_UI, RUNNING_INK } from '../phase.js';
 
 interface DetailHeadProps {
   todo: TodoRecord;
   projectName?: string;
-  agentModel?: ChipAgentModel;
   phase?: TodoRecord['phase'];
+  now?: number;
   onMore?: () => void;
   onAction: () => void;
-  chipPopoverOpen?: boolean;
-  onEditAssign?: () => void;
+  statusMenuOpen?: boolean;
+  onMoveBack?: () => void;
+  onMarkDone?: () => void;
+  agentOptions?: AgentPickerOption[];
+  onPickAgent?: (agentId: string) => void;
+  agentRebindCopy?: string;
   reviewActive?: boolean;
   verifyActive?: boolean;
   actionInFlight?: boolean;
@@ -34,12 +40,16 @@ interface DetailHeadProps {
 export function DetailHead({
   todo,
   projectName,
-  agentModel,
   phase,
+  now,
   onMore,
   onAction,
-  chipPopoverOpen,
-  onEditAssign,
+  statusMenuOpen,
+  onMoveBack,
+  onMarkDone,
+  agentOptions,
+  onPickAgent,
+  agentRebindCopy,
   reviewActive,
   verifyActive,
   actionInFlight,
@@ -60,7 +70,8 @@ export function DetailHead({
   const agentAvatarUrl = useAgentAvatarUrlById();
   const action = PHASE_UI[shown].action;
   const { search } = useLocation();
-  const [popover, setPopover] = useState(chipPopoverOpen === true);
+  const [popover, setPopover] = useState(statusMenuOpen === true);
+  const inFlight = shown === 'planning' || shown === 'building';
   return (
     <header
       className="detail-head flex h-11 flex-none items-center gap-2.5 border-b border-border pr-3 pl-4 whitespace-nowrap max-md:h-13 max-md:gap-1.5"
@@ -125,19 +136,26 @@ export function DetailHead({
           alignOffset={-6}
           sideOffset={8}
           initialFocus={false}
-          aria-label={t('任务分配')}
-          className="w-74.5"
+          aria-label={t('任务状态')}
+          className="w-72 gap-0 p-(--menu-pad)"
         >
-          <ChipPopover
-            todo={todo}
-            projectName={projectName}
-            agentModel={agentModel}
-            onEditAssign={
-              onEditAssign == null
+          <StatusMenu
+            phase={shown}
+            elapsed={relativeTime(todo.phaseAt, now ?? Date.now(), t)}
+            onMoveBack={
+              onMoveBack == null
                 ? undefined
                 : () => {
                     setPopover(false);
-                    onEditAssign();
+                    onMoveBack();
+                  }
+            }
+            onMarkDone={
+              onMarkDone == null
+                ? undefined
+                : () => {
+                    setPopover(false);
+                    onMarkDone();
                   }
             }
           />
@@ -145,16 +163,36 @@ export function DetailHead({
       </Popover>
 
       <div className="ml-auto flex flex-none items-center gap-1" data-testid="detail-head-actions">
-        {todo.agent != null && (
-          <span className="mr-1 flex items-center gap-1.5 text-meta text-content-tertiary max-md:hidden">
+        {(todo.agent != null || agentOptions != null) && (
+          <AgentPicker
+            agents={agentOptions ?? []}
+            selectedId={todo.agent?.id ?? null}
+            onSelect={onPickAgent}
+            rebindCopy={agentRebindCopy}
+            footnote={
+              inFlight
+                ? t('更换 Agent 会重新开始当前这一步。')
+                : t('后续步骤会改由所选 Agent 执行。')
+            }
+            trigger={
+              <Button
+                variant="ghost"
+                size="sm"
+                data-testid="agent-chip"
+                aria-label={t('执行 Agent')}
+                className="mr-1 h-7 flex-none gap-1.5 rounded-lg px-1.5 text-meta font-normal text-content-secondary aria-expanded:bg-(--menu-hover) max-md:hidden"
+              />
+            }
+          >
             <SeededAvatar
               className="size-4.5"
-              name={todo.agent.displayName}
-              src={agentAvatarUrl.get(todo.agent.id) ?? null}
+              name={todo.agent?.displayName}
+              src={todo.agent ? (agentAvatarUrl.get(todo.agent.id) ?? null) : null}
               fallback="/avatar-robot-1.svg"
             />
-            {todo.agent.displayName}
-          </span>
+            <span>{todo.agent?.displayName ?? t('未指派')}</span>
+            <ChevronDown width={12} height={12} className="flex-none text-content-tertiary" />
+          </AgentPicker>
         )}
         <Button
           variant="ghost"

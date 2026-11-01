@@ -657,6 +657,14 @@ export function useApiMutations(teamId: string | undefined) {
       }) => api.patch<TodoRecord>(`/api/todos/${input.id}`, input.body),
       onSuccess: invalidateAll,
     }),
+    resetTodo: useMutation({
+      mutationFn: (input: { id: string; expectedPhase: string; expectedBuildId: string | null }) =>
+        api.post<TodoRecord>(`/api/todos/${input.id}/reset`, {
+          expectedPhase: input.expectedPhase,
+          expectedBuildId: input.expectedBuildId,
+        }),
+      onSuccess: invalidateAll,
+    }),
     setTodoArchived: useMutation({
       mutationFn: (input: { id: string; archived: boolean }) =>
         api.post<TodoRecord>(`/api/todos/${input.id}/${input.archived ? 'archive' : 'unarchive'}`),

@@ -30,10 +30,10 @@ test('the snooze submenu sits right after Rename with the four choices', async (
   await page.getByTestId('thread-row-snooze').hover();
   const choices = page.getByTestId('thread-snooze-menu').getByRole('menuitem');
   await expect(choices).toHaveText([
-    '需要时（智能体唤醒）',
-    '明天 09:00',
-    '下周一',
-    '选择时间…',
+    '需要时（智能体唤醒）N',
+    '明天 09:00T',
+    '下周一M',
+    '选择时间…P',
   ]);
 });
 

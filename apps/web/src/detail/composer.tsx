@@ -1,5 +1,6 @@
 import { formatClock, useLiveSeconds } from '../components/chat/live-row.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
+import { type QueuedCapsule, QueuedCapsules } from '../components/queued-capsules.js';
 import { Button } from '../components/ui/button.js';
 import { Input } from '../components/ui/input.js';
 import { Textarea } from '../components/ui/textarea.js';
@@ -41,6 +42,9 @@ interface ComposerProps {
   onStop?: () => void;
   onReview?: () => void;
   workingFor?: { startedAt?: number | undefined; seconds?: number | undefined } | undefined;
+  queuedMessages?: QueuedCapsule[] | undefined;
+  onSendQueuedNow?: ((id: string, content: string) => Promise<unknown>) | undefined;
+  onRemoveQueued?: ((id: string, content: string) => Promise<unknown>) | undefined;
 }
 
 export function Composer({
@@ -60,6 +64,9 @@ export function Composer({
   onStop,
   onReview,
   workingFor,
+  queuedMessages,
+  onSendQueuedNow,
+  onRemoveQueued,
 }: ComposerProps) {
   const { t } = useI18n();
   const tick = useLiveSeconds(streaming ? workingFor?.startedAt : null);
@@ -132,6 +139,11 @@ export function Composer({
     >
       {editable ? (
         <>
+          <QueuedCapsules
+            messages={queuedMessages ?? []}
+            onSendNow={onSendQueuedNow}
+            onRemove={onRemoveQueued}
+          />
           <ComposerAttachments
             tokens={tokens}
             pending={pendingAttachments}

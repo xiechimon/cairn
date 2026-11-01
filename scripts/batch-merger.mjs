@@ -4,7 +4,9 @@ import { requiredChecks as branchProtectionChecks, mustBeGreenJobs } from './mer
 import { ownerRouting } from './merge-route.mjs';
 
 const batchHead = /^B\d+\//;
-const mergerTrailer = 'Merged-by: cairn-batch-merger';
+const queueCommand = '@mergifyio queue';
+const queueMarker = (sha) => `<!-- batch-merger-queued:${sha} -->`;
+const queueRequest = new RegExp(`^${queueCommand}\\n<!-- batch-merger-queued:[a-f0-9]{40} -->$`);
 const requiredChecks = branchProtectionChecks;
 const ownerRouteLabel = 'owner-route';
 const log = (pr, action, reasons) =>
@@ -43,6 +45,16 @@ function clearOwnerRoute(pr, dryRun) {
     { encoding: 'utf8', maxBuffer: 512 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] },
   );
   log(pr, 'unmarked-owner-route', []);
+}
+
+function queueState(pr) {
+  const requested = pages(`repos/${repo}/issues/${pr.number}/comments?per_page=100`)
+    .flat()
+    .some((comment) => comment.body === `${queueCommand}\n${queueMarker(pr.head.sha)}`);
+  const labelled = (name) => pr.labels.some((label) => label.name === name);
+  if (labelled('dequeued') && requested) return 'dequeued-needs-human';
+  if (labelled('queued') || requested) return 'already-queued';
+  return null;
 }
 
 function eligibility(number, expectedHead, dailyCap) {
@@ -97,10 +109,12 @@ function eligibility(number, expectedHead, dailyCap) {
   )
     reasons.push('review-not-pass');
   const today = new Date().toISOString().slice(0, 10);
-  const merged = pages(`repos/${repo}/commits?sha=main&since=${today}T00:00:00Z&per_page=100`)
+  const queued = pages(`repos/${repo}/issues/comments?since=${today}T00:00:00Z&per_page=100`)
     .flat()
-    .filter((commit) => commit.commit.message.split('\n').includes(mergerTrailer)).length;
-  if (merged >= dailyCap) reasons.push('daily-cap');
+    .filter(
+      (comment) => comment.created_at >= `${today}T00:00:00Z` && queueRequest.test(comment.body),
+    ).length;
+  if (queued >= dailyCap) reasons.push('daily-cap');
   if (markers().length) reasons.push('autonomy-paused');
   return { pr, reasons };
 }
@@ -131,35 +145,12 @@ try {
       process.exitCode = 1;
     }
   }
-  let attempted = false;
   for (const candidate of pulls) {
     if (blocked.has(candidate.number)) continue;
     try {
-      if (attempted) {
-        log(candidate, 'skip', ['one-merge-per-pass']);
-        continue;
-      }
       let result = eligibility(candidate.number, candidate.head.sha, dailyCap);
       if (result.reasons.length) {
         log(result.pr, 'skip', result.reasons);
-        continue;
-      }
-      const commits = pages(`repos/${repo}/pulls/${candidate.number}/commits?per_page=100`).flat();
-      if (commits.at(-1)?.sha !== candidate.head.sha) throw new Error('Commit list head mismatch');
-      const body = commits
-        .map((commit) => commit.commit.message.split('\n').slice(1).join('\n').trim())
-        .filter(Boolean)
-        .concat(mergerTrailer)
-        .join('\n\n');
-      result = eligibility(candidate.number, candidate.head.sha, dailyCap);
-      if (result.reasons.length) {
-        log(result.pr, 'skip', result.reasons);
-        continue;
-      }
-      if (result.pr.auto_merge && !dryRun) {
-        disarmAutoMerge(result.pr);
-        log(result.pr, 'disarmed', []);
-        log(result.pr, 'skip', ['auto-merge-rearmed']);
         continue;
       }
       let ownerReasons;
@@ -174,28 +165,28 @@ try {
         markOwnerRoute(result.pr, ownerReasons, dryRun);
         continue;
       }
+      const state = queueState(result.pr);
+      if (state) {
+        log(result.pr, 'skip', [state]);
+        continue;
+      }
+      result = eligibility(candidate.number, candidate.head.sha, dailyCap);
+      if (result.reasons.length) {
+        log(result.pr, 'skip', result.reasons);
+        continue;
+      }
+      if (result.pr.auto_merge && !dryRun) {
+        disarmAutoMerge(result.pr);
+        log(result.pr, 'disarmed', []);
+        log(result.pr, 'skip', ['auto-merge-rearmed']);
+        continue;
+      }
       clearOwnerRoute(result.pr, dryRun);
-      attempted = true;
       if (!dryRun)
-        execFileSync(
-          'gh',
-          [
-            'pr',
-            'merge',
-            String(candidate.number),
-            '--repo',
-            repo,
-            '--squash',
-            '--match-head-commit',
-            result.pr.head.sha,
-            '--subject',
-            `${result.pr.title} (#${candidate.number})`,
-            '--body',
-            body,
-          ],
-          { encoding: 'utf8', maxBuffer: 512 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] },
-        );
-      log(result.pr, dryRun ? 'would-merge' : 'merged', []);
+        api(`repos/${repo}/issues/${candidate.number}/comments`, {
+          body: `${queueCommand}\n${queueMarker(result.pr.head.sha)}`,
+        });
+      log(result.pr, dryRun ? 'would-queue' : 'queued', []);
     } catch (error) {
       log(candidate, 'error', [error.message]);
       process.exitCode = 1;
