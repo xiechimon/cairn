@@ -216,3 +216,16 @@ test('e2e-gate never turns a failed, cancelled or wrong-tier input into a pass',
     assert.ok(ran === 'success' || (outputs['has-code'] === 'false' && ran === 'skipped'), label);
   });
 });
+
+test('both e2e tiers run the CSS mechanism gate after a fixture build', () => {
+  for (const name of ['e2e', 'e2e-affected']) {
+    const block = job(name);
+    const gate = block.indexOf('run: node scripts/css-mechanism-gate.mjs');
+    assert.notEqual(gate, -1, `${name} runs the CSS mechanism gate`);
+    const build =
+      name === 'e2e'
+        ? block.indexOf('pnpm prepush --e2e-shard')
+        : block.indexOf('vite build --mode fixture');
+    assert.ok(build !== -1 && build < gate, `${name} builds the fixture before the gate`);
+  }
+});

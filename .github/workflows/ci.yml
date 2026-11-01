@@ -239,6 +239,15 @@ jobs:
       - name: E2E (specs affected by this PR)
         run: pnpm --filter @cairn/web e2e:affected
 
+      - name: Fixture build for the CSS mechanism gate
+        if: ${{ !cancelled() }}
+        working-directory: apps/web
+        run: pnpm exec vite build --mode fixture
+
+      - name: CSS mechanism gate (#747)
+        if: ${{ !cancelled() }}
+        run: node scripts/css-mechanism-gate.mjs
+
       - name: Upload gallery snapshot renders
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
