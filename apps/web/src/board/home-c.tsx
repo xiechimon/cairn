@@ -1,5 +1,5 @@
 import { ChevronDown, MessageSquareWarning } from 'lucide-react';
-import { type ReactNode, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useLiveData } from '../api/provider.js';
 import { ChiefConversation } from '../chief/chief-conversation.js';
@@ -81,16 +81,31 @@ interface HomeCProps {
   projectId: string | null;
   projectName: string | null;
   banner?: ReactNode;
+  onNewTask?: () => void;
 }
 
-export function HomeC({ surface, todos, now, projectId, projectName, banner }: HomeCProps) {
+export function HomeC({
+  surface,
+  todos,
+  now,
+  projectId,
+  projectName,
+  banner,
+  onNewTask,
+}: HomeCProps) {
   const { t, locale } = useI18n();
   const { user, live } = useLiveData();
   const navigate = useNavigate();
   const [allOpen, setAllOpen] = useState(false);
   const [runningOpen, setRunningOpen] = useState(false);
   const [prefill, setPrefill] = useState<{ text: string; key: number } | null>(null);
-  const { chiefData } = surface;
+  const { chiefData, chiefView, setChiefView } = surface;
+  const composerRef = useRef<HTMLTextAreaElement | null>(null);
+  useEffect(() => {
+    if (chiefView !== 'drawer') return;
+    setChiefView('none');
+    composerRef.current?.focus({ preventScroll: true });
+  }, [chiefView, setChiefView]);
   const scoped = useMemo(
     () => todos.filter((todo) => projectId === null || todo.projectId === projectId),
     [todos, projectId],
@@ -279,6 +294,7 @@ export function HomeC({ surface, todos, now, projectId, projectName, banner }: H
       aria-label={t('与 Coordinator 的对话')}
       className="flex min-h-0 min-w-0 flex-1 flex-col"
     >
+      <h1 className="sr-only">{t('工作台')}</h1>
       {banner != null && (
         <div className="mx-auto w-[calc(100%-2rem)] max-w-182 flex-none pt-3">{banner}</div>
       )}
@@ -309,6 +325,10 @@ export function HomeC({ surface, todos, now, projectId, projectName, banner }: H
               : t('跟 Coordinator 说点什么，或描述一个新任务…')
           }
           aboveComposer={pill}
+          onNewTask={onNewTask}
+          composerRef={(node) => {
+            composerRef.current = node;
+          }}
         />
       </MessageScrollerProvider>
     </section>

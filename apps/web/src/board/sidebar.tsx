@@ -41,7 +41,7 @@ import { readStoredTheme } from '../theme.js';
 import { withColumnParam } from './columns.js';
 import { withoutBoardView } from './home.js';
 import { ProjectAvatar } from './project-avatar.js';
-import { threadTone } from './thread-copy.js';
+import { threadStatus } from './thread-copy.js';
 
 export type SidebarSelected =
   | 'board'
@@ -228,7 +228,8 @@ export function BoardSidebar({
   const waitingByProject = useMemo(() => {
     const counts = new Map<string, number>();
     for (const todo of todos ?? []) {
-      if (threadTone(todo) !== 'waiting') continue;
+      const status = threadStatus(todo);
+      if (status !== 'needs-you' && status !== 'failed') continue;
       counts.set(todo.projectId, (counts.get(todo.projectId) ?? 0) + 1);
     }
     return counts;

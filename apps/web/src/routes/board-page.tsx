@@ -638,6 +638,7 @@ export function BoardPage() {
                   : (fixture.projectNames?.[homeProjectId] ?? null)
             }
             banner={homeBanner}
+            onNewTask={openNewTask}
           />
         ) : (
           <BoardSurface
