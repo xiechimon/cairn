@@ -650,14 +650,11 @@ export function ChiefConversation({
                 onCompositionEnd={handleCompositionEnd}
                 onBlur={handleBlur}
                 placeholder={
-                  placeholder ??
-                  t(
-                    chief.outage != null
-                      ? '可以继续说，总管恢复后会按顺序处理…'
-                      : chief.running === true
-                        ? CHIEF_INPUT_PLACEHOLDER_STEERING
-                        : CHIEF_INPUT_PLACEHOLDER,
-                  )
+                  chief.outage != null
+                    ? t('可以继续说，总管恢复后会按顺序处理…')
+                    : chief.running === true
+                      ? t(CHIEF_INPUT_PLACEHOLDER_STEERING)
+                      : (placeholder ?? t(CHIEF_INPUT_PLACEHOLDER))
                 }
                 {...(inlineOpen
                   ? {

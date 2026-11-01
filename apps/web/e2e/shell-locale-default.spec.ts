@@ -49,9 +49,7 @@ test.describe('English count grammar', () => {
         await page.addInitScript((value) => localStorage.setItem('cairn-theme', value), theme);
         await mockLive(page, { threads: [], messages: [], todos: [TASK] });
         await page.goto('/app');
-        await expect(
-          page.getByText('1 task running, 0 merged today', { exact: false }),
-        ).toBeVisible();
+        await expect(page.getByTestId('home-c-since')).toContainText('1 in progress');
         await page.screenshot({
           path: resolve(`../../docs/verify/2420/after-home-${width}-${theme}.png`),
           fullPage: true,
@@ -73,7 +71,7 @@ test.describe('English count grammar', () => {
       todos: [TASK, { ...TASK, id: 'todo-2', seqNum: 10 }],
     });
     await page.goto('/app');
-    await expect(page.getByText('2 tasks running, 0 merged today', { exact: false })).toBeVisible();
+    await expect(page.getByTestId('home-c-since')).toContainText('2 in progress');
     await page.goto('/app/team?scenario=team-org-chart-pair');
     await expect(page.getByText('2 members', { exact: true })).toBeVisible();
   });
@@ -82,7 +80,7 @@ test.describe('English count grammar', () => {
     await page.addInitScript(() => localStorage.setItem('cairn-locale', 'zh'));
     await mockLive(page, { threads: [], messages: [], todos: [TASK] });
     await page.goto('/app');
-    await expect(page.getByText('1 个任务运行中，今天合并了 0 个', { exact: false })).toBeVisible();
+    await expect(page.getByTestId('home-c-since')).toContainText('1 件在进行');
     await page.goto('/app/team?scenario=team-org-chart-single');
     await expect(page.getByText('1 个成员', { exact: true })).toBeVisible();
   });

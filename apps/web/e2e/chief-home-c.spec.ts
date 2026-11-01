@@ -53,7 +53,7 @@ test('"N more" opens the rest of the decisions, grouped by who acts next, a fail
   await expect(cards.nth(0)).toHaveAttribute('data-tone', 'waiting');
   await expect(cards.nth(1)).toContainText('Rerun the relay probe');
   await expect(items.nth(2)).toHaveAttribute('data-status', 'failed');
-  await expect(cards.nth(1)).not.toHaveAttribute('data-tone', 'waiting');
+  await expect(cards.nth(1)).toHaveAttribute('data-tone', 'failed');
   await expect(cards.nth(2)).toContainText('Fold finished turns');
   await expect(cards.nth(2)).toHaveAttribute('data-tone', 'review');
   await needsYou(page).getByRole('button', { name: 'Show less' }).click();

@@ -6,7 +6,7 @@ export type ThreadStatus = 'running' | 'needs-you' | 'failed' | 'done' | 'idle';
 const THREAD_TONE: Record<ThreadStatus, StoneTone> = {
   running: 'working',
   'needs-you': 'waiting',
-  failed: 'idle',
+  failed: 'failed',
   done: 'resolved',
   idle: 'idle',
 };
