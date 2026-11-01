@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { useApiMutations, useSession, useTeams } from '../api/hooks.js';
+import { useApiMutations, useTeams } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { useNotificationPermission } from '../board/notify-banner.js';
 import { type NotifyPref, persistNotifyPref, readNotifyPref } from '../board/notify-pref.js';
@@ -21,7 +21,6 @@ import {
 } from '../components/ui/select.js';
 import { toastError } from '../components/ui/toaster.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
-import { USER_NAME } from '../fixtures/fixtures.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { LOCALE_NAMES, LOCALES } from '../i18n/locale.js';
 import { useI18n } from '../i18n/provider.js';
@@ -40,13 +39,12 @@ export function AccountPage() {
   const { locale, setLocale, t } = useI18n();
   const [searchParams] = useSearchParams();
   const fixture = resolveScenario(searchParams);
-  const { live, teamId } = useLiveData();
-  const sessionQ = useSession(live);
+  const { live, teamId, user } = useLiveData();
   const teamsQ = useTeams(live);
   const team = teamsQ.data?.find((candidate) => candidate.id === teamId);
   const mutations = useApiMutations(teamId);
   const [fixtureName, setFixtureName] = useState<string | null>(null);
-  const userName = live ? (sessionQ.data?.displayName ?? USER_NAME) : (fixtureName ?? USER_NAME);
+  const userName = live ? user.displayName : (fixtureName ?? user.displayName);
   const commitName = (next: string) => {
     if (!live) {
       if (blockDemoWrite()) return;
@@ -88,13 +86,12 @@ export function AccountPage() {
           avatar={
             <SeededAvatar
               className="size-14"
-              name={userName}
-              src={sessionQ.data?.avatarUrl ?? null}
+              name={user.displayName}
+              src={user.avatarUrl}
               fallback="/avatar-user.png"
             />
           }
           name={userName}
-          sub={t('头像与名称')}
           onRename={commitName}
         />
         <SettingsCard className="account-card">

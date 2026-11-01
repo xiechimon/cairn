@@ -1,7 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { BackupBanner } from '../board/backup-banner.js';
-import { type BoardFilters, BoardSurface } from '../board/board.js';
-import { COLUMNS } from '../board/columns.js';
+import type { BoardFilters } from '../board/board.js';
 import {
   type FilterChip,
   FilterChips,
@@ -12,17 +11,8 @@ import { FirstPrCard } from '../board/first-pr-card.js';
 import { NotificationBanner } from '../board/notify-banner.js';
 import { ProjectAvatar } from '../board/project-avatar.js';
 import { QuotaBanner, quotaBannerInfo } from '../board/quota-banner.js';
-import { TodoCard } from '../board/todo-card.js';
 import type { TodoRecord } from '../fixtures/records.js';
-import {
-  BOARD_FIXTURE,
-  CARD_FACES,
-  NOW,
-  PROJECT_TITLE,
-  TAGS,
-  tagOf,
-  todo,
-} from './product-fixtures.js';
+import { BOARD_FIXTURE, NOW, TAGS, tagOf, todo } from './product-fixtures.js';
 import { Cell, Labeled, Section, Specimen } from './specimen.js';
 
 const quotaTodo = (providerId: string, kind: 'quota' | 'capacity', minutes: number) =>
@@ -81,42 +71,6 @@ function useTagFilters(todos: readonly TodoRecord[]): BoardFilters {
   };
 }
 
-function BoardSpecimen() {
-  const [todos, setTodos] = useState(BOARD_FIXTURE.todos);
-  const filters = useTagFilters(todos);
-  const tagsById = useMemo(() => new Map(TAGS.map((tag) => [tag.id, tag])), []);
-  const [newTasks, setNewTasks] = useState(0);
-  return (
-    <Specimen
-      title="Board"
-      note={
-        newTasks === 0
-          ? 'BoardSurface with column headers, the new-task bar and filters. Drag cards between columns.'
-          : `New task clicked ${newTasks} time(s)`
-      }
-      stage="canvas"
-      className="block p-0"
-    >
-      <div className="flex h-150 flex-col overflow-hidden">
-        <BoardSurface
-          fixture={{ ...BOARD_FIXTURE, todos }}
-          filters={filters}
-          boardView
-          tagsById={tagsById}
-          onNewTask={() => setNewTasks((n) => n + 1)}
-          onPhaseDrop={(todo, columnId) => {
-            const phase = COLUMNS.find((c) => c.id === columnId)?.dropPhase;
-            if (phase == null) return;
-            setTodos((all) =>
-              all.map((t) => (t.id === todo.id ? { ...t, phase, phaseAt: Date.now() } : t)),
-            );
-          }}
-        />
-      </div>
-    </Specimen>
-  );
-}
-
 function FilterSpecimen() {
   const filters = useTagFilters(BOARD_FIXTURE.todos);
   return (
@@ -137,40 +91,26 @@ function FilterSpecimen() {
   );
 }
 
+const AVATAR_ICONS = [
+  ['folder', undefined],
+  ['flask-conical', 'plum'],
+  ['rocket', 'amber'],
+  ['leaf', 'moss'],
+  ['database', 'slate'],
+  ['cloud', 'teal'],
+  ['heart', 'rose'],
+  ['server', 'gray'],
+] as const;
+
 export function ProductBoardSection() {
-  const [lastAction, setLastAction] = useState<string | null>(null);
+  const [_lastAction, setLastAction] = useState<string | null>(null);
   const [firstPrShown, setFirstPrShown] = useState(true);
   return (
     <Section
       id="product-board"
-      title="Board"
-      lede="The board's own components: the task card in every face, the board surface with its columns, filters, and the banners above the columns."
+      title="Filters and banners"
+      lede="Filters, the banners shown above a list, and the project avatar. The board and its task cards are retired with prototype A."
     >
-      <Specimen
-        title="Task card"
-        note={
-          lastAction == null
-            ? 'TodoCard, one per face. Hover a card for its actions.'
-            : `Action: ${lastAction}`
-        }
-        stage="canvas"
-        className="grid grid-cols-3 gap-x-4 gap-y-5"
-      >
-        {CARD_FACES.map((face) => (
-          <Labeled key={face.label} label={face.label}>
-            <TodoCard
-              todo={face.todo}
-              now={NOW}
-              projectName={PROJECT_TITLE}
-              tag={face.todo.tagIds[0] != null ? tagOf(face.todo.tagIds[0]) : null}
-              orchestration={face.orchestration ?? null}
-              onAction={(todo) => setLastAction(`${todo.title} (#${todo.seqNum})`)}
-              onBranch={(todo) => setLastAction(`branch of #${todo.seqNum}`)}
-            />
-          </Labeled>
-        ))}
-      </Specimen>
-      <BoardSpecimen />
       <FilterSpecimen />
       <Specimen title="Banners" note="Shown above the columns" stage="canvas" className="flex-col">
         <Labeled label="NotificationBanner">
@@ -206,7 +146,10 @@ export function ProductBoardSection() {
           )}
         </Labeled>
       </Specimen>
-      <Specimen title="Project avatar" note="ProjectAvatar, six tones cycling by index">
+      <Specimen
+        title="Project avatar"
+        note="ProjectAvatar: letter tile by index tone, or a chosen icon and colour"
+      >
         {['cairn', 'docs-site', 'mobile', 'infra', 'billing', 'search', 'api'].map((name, i) => (
           <Cell key={name} label={`tone ${i}`}>
             <ProjectAvatar name={name} tone={i} />
@@ -214,6 +157,16 @@ export function ProductBoardSection() {
             <span className="text-ui">{name}</span>
           </Cell>
         ))}
+        <Cell label="icon tiles">
+          {AVATAR_ICONS.map(([icon, color]) => (
+            <ProjectAvatar key={icon} name={icon} tone={0} icon={icon} color={color} />
+          ))}
+        </Cell>
+        <Cell label="icon bare">
+          {AVATAR_ICONS.map(([icon, color]) => (
+            <ProjectAvatar key={icon} name={icon} tone={0} icon={icon} color={color} bare />
+          ))}
+        </Cell>
       </Specimen>
     </Section>
   );

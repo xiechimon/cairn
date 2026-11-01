@@ -1,0 +1,404 @@
+[heavy-slots] acquired slot 1/2
+[WebServer] (node:175) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] [plugin builtin:vite-reporter] 
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+[WebServer] (node:297) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 4 tests using 1 worker
+
+(node:349) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+1440px light home: 12px
+1440px light detail: 16px
+  ✘  1 e2e/board-shell.spec.ts:207:5 › home and detail share a 24px composer bottom gap at 1440px in light (1.0s)
+(node:450) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+1440px dark home: 12px
+1440px dark detail: 16px
+  ✘  2 e2e/board-shell.spec.ts:207:5 › home and detail share a 24px composer bottom gap at 1440px in dark (672ms)
+(node:549) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+390px light home: 12px
+390px light detail: 16px
+  ✘  3 e2e/board-shell.spec.ts:207:5 › home and detail share a 24px composer bottom gap at 390px in light (571ms)
+(node:645) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+390px dark home: 12px
+390px dark detail: 16px
+  ✘  4 e2e/board-shell.spec.ts:207:5 › home and detail share a 24px composer bottom gap at 390px in dark (576ms)
+
+
+  1) e2e/board-shell.spec.ts:207:5 › home and detail share a 24px composer bottom gap at 1440px in light 
+
+    Error: expect(received).toBeGreaterThanOrEqual(expected)
+
+    Expected: >= 20
+    Received:    12
+
+      225 |       }
+      226 |       for (const gap of gaps) {
+    > 227 |         expect.soft(gap).toBeGreaterThanOrEqual(20);
+          |                          ^
+      228 |         expect.soft(gap).toBeCloseTo(24, 0);
+      229 |       }
+      230 |       expect(Math.abs(gaps[0] - gaps[1])).toBeLessThanOrEqual(1);
+        at /mnt/fast/lanes/cairn-2421/apps/web/e2e/board-shell.spec.ts:227:26
+
+    Error: expect(received).toBeCloseTo(expected, precision)
+
+    Expected: 24
+    Received: 12
+
+    Expected precision:    0
+    Expected difference: < 0.5
+    Received difference:   12
+
+      226 |       for (const gap of gaps) {
+      227 |         expect.soft(gap).toBeGreaterThanOrEqual(20);
+    > 228 |         expect.soft(gap).toBeCloseTo(24, 0);
+          |                          ^
+      229 |       }
+      230 |       expect(Math.abs(gaps[0] - gaps[1])).toBeLessThanOrEqual(1);
+      231 |     });
+        at /mnt/fast/lanes/cairn-2421/apps/web/e2e/board-shell.spec.ts:228:26
+
+    Error: expect(received).toBeGreaterThanOrEqual(expected)
+
+    Expected: >= 20
+    Received:    16
+
+      225 |       }
+      226 |       for (const gap of gaps) {
+    > 227 |         expect.soft(gap).toBeGreaterThanOrEqual(20);
+          |                          ^
+      228 |         expect.soft(gap).toBeCloseTo(24, 0);
+      229 |       }
+      230 |       expect(Math.abs(gaps[0] - gaps[1])).toBeLessThanOrEqual(1);
+        at /mnt/fast/lanes/cairn-2421/apps/web/e2e/board-shell.spec.ts:227:26
+
+    Error: expect(received).toBeCloseTo(expected, precision)
+
+    Expected: 24
+    Received: 16
+
+    Expected precision:    0
+    Expected difference: < 0.5
+    Received difference:   8
+
+      226 |       for (const gap of gaps) {
+      227 |         expect.soft(gap).toBeGreaterThanOrEqual(20);
+    > 228 |         expect.soft(gap).toBeCloseTo(24, 0);
+          |                          ^
+      229 |       }
+      230 |       expect(Math.abs(gaps[0] - gaps[1])).toBeLessThanOrEqual(1);
+      231 |     });
+        at /mnt/fast/lanes/cairn-2421/apps/web/e2e/board-shell.spec.ts:228:26
+
+    Error: expect(received).toBeLessThanOrEqual(expected)
+
+    Expected: <= 1
+    Received:    4
+
+      228 |         expect.soft(gap).toBeCloseTo(24, 0);
+      229 |       }
+    > 230 |       expect(Math.abs(gaps[0] - gaps[1])).toBeLessThanOrEqual(1);
+          |                                           ^
+      231 |     });
+      232 |   }
+      233 | }
+        at /mnt/fast/lanes/cairn-2421/apps/web/e2e/board-shell.spec.ts:230:43
+
+    attachment #1: home (image/png) ────────────────────────────────────────────────────────────────
+    test-results/board-shell-home-and-detai-028df-ttom-gap-at-1440px-in-light/attachments/home-d61d9d0aee1cfdb88cf510d89d01756bbdedf7ab.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: detail (image/png) ──────────────────────────────────────────────────────────────
+    test-results/board-shell-home-and-detai-028df-ttom-gap-at-1440px-in-light/attachments/detail-960a31918c018b31c04ad0c8982668778e6f7edb.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/board-shell-home-and-detai-028df-ttom-gap-at-1440px-in-light/error-context.md
+
+  2) e2e/board-shell.spec.ts:207:5 › home and detail share a 24px composer bottom gap at 1440px in dark 
+
+    Error: expect(received).toBeGreaterThanOrEqual(expected)
+
+    Expected: >= 20
+    Received:    12
+
+      225 |       }
+      226 |       for (const gap of gaps) {
+    > 227 |         expect.soft(gap).toBeGreaterThanOrEqual(20);
+          |                          ^
+      228 |         expect.soft(gap).toBeCloseTo(24, 0);
+      229 |       }
+      230 |       expect(Math.abs(gaps[0] - gaps[1])).toBeLessThanOrEqual(1);
+        at /mnt/fast/lanes/cairn-2421/apps/web/e2e/board-shell.spec.ts:227:26
+
+    Error: expect(received).toBeCloseTo(expected, precision)
+
+    Expected: 24
+    Received: 12
+
+    Expected precision:    0
+    Expected difference: < 0.5
+    Received difference:   12
+
+      226 |       for (const gap of gaps) {
+      227 |         expect.soft(gap).toBeGreaterThanOrEqual(20);
+    > 228 |         expect.soft(gap).toBeCloseTo(24, 0);
+          |                          ^
+      229 |       }
+      230 |       expect(Math.abs(gaps[0] - gaps[1])).toBeLessThanOrEqual(1);
+      231 |     });
+        at /mnt/fast/lanes/cairn-2421/apps/web/e2e/board-shell.spec.ts:228:26
+
+    Error: expect(received).toBeGreaterThanOrEqual(expected)
+
+    Expected: >= 20
+    Received:    16
+
+      225 |       }
+      226 |       for (const gap of gaps) {
+    > 227 |         expect.soft(gap).toBeGreaterThanOrEqual(20);
+          |                          ^
+      228 |         expect.soft(gap).toBeCloseTo(24, 0);
+      229 |       }
+      230 |       expect(Math.abs(gaps[0] - gaps[1])).toBeLessThanOrEqual(1);
+        at /mnt/fast/lanes/cairn-2421/apps/web/e2e/board-shell.spec.ts:227:26
+
+    Error: expect(received).toBeCloseTo(expected, precision)
+
+    Expected: 24
+    Received: 16
+
+    Expected precision:    0
+    Expected difference: < 0.5
+    Received difference:   8
+
+      226 |       for (const gap of gaps) {
+      227 |         expect.soft(gap).toBeGreaterThanOrEqual(20);
+    > 228 |         expect.soft(gap).toBeCloseTo(24, 0);
+          |                          ^
+      229 |       }
+      230 |       expect(Math.abs(gaps[0] - gaps[1])).toBeLessThanOrEqual(1);
+      231 |     });
+        at /mnt/fast/lanes/cairn-2421/apps/web/e2e/board-shell.spec.ts:228:26
+
+    Error: expect(received).toBeLessThanOrEqual(expected)
+
+    Expected: <= 1
+    Received:    4
+
+      228 |         expect.soft(gap).toBeCloseTo(24, 0);
+      229 |       }
+    > 230 |       expect(Math.abs(gaps[0] - gaps[1])).toBeLessThanOrEqual(1);
+          |                                           ^
+      231 |     });
+      232 |   }
+      233 | }
+        at /mnt/fast/lanes/cairn-2421/apps/web/e2e/board-shell.spec.ts:230:43
+
+    attachment #1: home (image/png) ────────────────────────────────────────────────────────────────
+    test-results/board-shell-home-and-detai-32c00-ottom-gap-at-1440px-in-dark/attachments/home-01bf7eb9e777da29a19042eb5ab5656cc2acc21c.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: detail (image/png) ──────────────────────────────────────────────────────────────
+    test-results/board-shell-home-and-detai-32c00-ottom-gap-at-1440px-in-dark/attachments/detail-3c333246998d0594bdd8d129c482486005547340.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/board-shell-home-and-detai-32c00-ottom-gap-at-1440px-in-dark/error-context.md
+
+  3) e2e/board-shell.spec.ts:207:5 › home and detail share a 24px composer bottom gap at 390px in light 
+
+    Error: expect(received).toBeGreaterThanOrEqual(expected)
+
+    Expected: >= 20
+    Received:    12
+
+      225 |       }
+      226 |       for (const gap of gaps) {
+    > 227 |         expect.soft(gap).toBeGreaterThanOrEqual(20);
+          |                          ^
+      228 |         expect.soft(gap).toBeCloseTo(24, 0);
+      229 |       }
+      230 |       expect(Math.abs(gaps[0] - gaps[1])).toBeLessThanOrEqual(1);
+        at /mnt/fast/lanes/cairn-2421/apps/web/e2e/board-shell.spec.ts:227:26
+
+    Error: expect(received).toBeCloseTo(expected, precision)
+
+    Expected: 24
+    Received: 12
+
+    Expected precision:    0
+    Expected difference: < 0.5
+    Received difference:   12
+
+      226 |       for (const gap of gaps) {
+      227 |         expect.soft(gap).toBeGreaterThanOrEqual(20);
+    > 228 |         expect.soft(gap).toBeCloseTo(24, 0);
+          |                          ^
+      229 |       }
+      230 |       expect(Math.abs(gaps[0] - gaps[1])).toBeLessThanOrEqual(1);
+      231 |     });
+        at /mnt/fast/lanes/cairn-2421/apps/web/e2e/board-shell.spec.ts:228:26
+
+    Error: expect(received).toBeGreaterThanOrEqual(expected)
+
+    Expected: >= 20
+    Received:    16
+
+      225 |       }
+      226 |       for (const gap of gaps) {
+    > 227 |         expect.soft(gap).toBeGreaterThanOrEqual(20);
+          |                          ^
+      228 |         expect.soft(gap).toBeCloseTo(24, 0);
+      229 |       }
+      230 |       expect(Math.abs(gaps[0] - gaps[1])).toBeLessThanOrEqual(1);
+        at /mnt/fast/lanes/cairn-2421/apps/web/e2e/board-shell.spec.ts:227:26
+
+    Error: expect(received).toBeCloseTo(expected, precision)
+
+    Expected: 24
+    Received: 16
+
+    Expected precision:    0
+    Expected difference: < 0.5
+    Received difference:   8
+
+      226 |       for (const gap of gaps) {
+      227 |         expect.soft(gap).toBeGreaterThanOrEqual(20);
+    > 228 |         expect.soft(gap).toBeCloseTo(24, 0);
+          |                          ^
+      229 |       }
+      230 |       expect(Math.abs(gaps[0] - gaps[1])).toBeLessThanOrEqual(1);
+      231 |     });
+        at /mnt/fast/lanes/cairn-2421/apps/web/e2e/board-shell.spec.ts:228:26
+
+    Error: expect(received).toBeLessThanOrEqual(expected)
+
+    Expected: <= 1
+    Received:    4
+
+      228 |         expect.soft(gap).toBeCloseTo(24, 0);
+      229 |       }
+    > 230 |       expect(Math.abs(gaps[0] - gaps[1])).toBeLessThanOrEqual(1);
+          |                                           ^
+      231 |     });
+      232 |   }
+      233 | }
+        at /mnt/fast/lanes/cairn-2421/apps/web/e2e/board-shell.spec.ts:230:43
+
+    attachment #1: home (image/png) ────────────────────────────────────────────────────────────────
+    test-results/board-shell-home-and-detai-31243-ottom-gap-at-390px-in-light/attachments/home-7c9a41225881beb7c34b4b0f95cc0e9ae8876f7f.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: detail (image/png) ──────────────────────────────────────────────────────────────
+    test-results/board-shell-home-and-detai-31243-ottom-gap-at-390px-in-light/attachments/detail-55e7876b7b423b20b3668bd3b8a8b14490b7b2f0.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/board-shell-home-and-detai-31243-ottom-gap-at-390px-in-light/error-context.md
+
+  4) e2e/board-shell.spec.ts:207:5 › home and detail share a 24px composer bottom gap at 390px in dark 
+
+    Error: expect(received).toBeGreaterThanOrEqual(expected)
+
+    Expected: >= 20
+    Received:    12
+
+      225 |       }
+      226 |       for (const gap of gaps) {
+    > 227 |         expect.soft(gap).toBeGreaterThanOrEqual(20);
+          |                          ^
+      228 |         expect.soft(gap).toBeCloseTo(24, 0);
+      229 |       }
+      230 |       expect(Math.abs(gaps[0] - gaps[1])).toBeLessThanOrEqual(1);
+        at /mnt/fast/lanes/cairn-2421/apps/web/e2e/board-shell.spec.ts:227:26
+
+    Error: expect(received).toBeCloseTo(expected, precision)
+
+    Expected: 24
+    Received: 12
+
+    Expected precision:    0
+    Expected difference: < 0.5
+    Received difference:   12
+
+      226 |       for (const gap of gaps) {
+      227 |         expect.soft(gap).toBeGreaterThanOrEqual(20);
+    > 228 |         expect.soft(gap).toBeCloseTo(24, 0);
+          |                          ^
+      229 |       }
+      230 |       expect(Math.abs(gaps[0] - gaps[1])).toBeLessThanOrEqual(1);
+      231 |     });
+        at /mnt/fast/lanes/cairn-2421/apps/web/e2e/board-shell.spec.ts:228:26
+
+    Error: expect(received).toBeGreaterThanOrEqual(expected)
+
+    Expected: >= 20
+    Received:    16
+
+      225 |       }
+      226 |       for (const gap of gaps) {
+    > 227 |         expect.soft(gap).toBeGreaterThanOrEqual(20);
+          |                          ^
+      228 |         expect.soft(gap).toBeCloseTo(24, 0);
+      229 |       }
+      230 |       expect(Math.abs(gaps[0] - gaps[1])).toBeLessThanOrEqual(1);
+        at /mnt/fast/lanes/cairn-2421/apps/web/e2e/board-shell.spec.ts:227:26
+
+    Error: expect(received).toBeCloseTo(expected, precision)
+
+    Expected: 24
+    Received: 16
+
+    Expected precision:    0
+    Expected difference: < 0.5
+    Received difference:   8
+
+      226 |       for (const gap of gaps) {
+      227 |         expect.soft(gap).toBeGreaterThanOrEqual(20);
+    > 228 |         expect.soft(gap).toBeCloseTo(24, 0);
+          |                          ^
+      229 |       }
+      230 |       expect(Math.abs(gaps[0] - gaps[1])).toBeLessThanOrEqual(1);
+      231 |     });
+        at /mnt/fast/lanes/cairn-2421/apps/web/e2e/board-shell.spec.ts:228:26
+
+    Error: expect(received).toBeLessThanOrEqual(expected)
+
+    Expected: <= 1
+    Received:    4
+
+      228 |         expect.soft(gap).toBeCloseTo(24, 0);
+      229 |       }
+    > 230 |       expect(Math.abs(gaps[0] - gaps[1])).toBeLessThanOrEqual(1);
+          |                                           ^
+      231 |     });
+      232 |   }
+      233 | }
+        at /mnt/fast/lanes/cairn-2421/apps/web/e2e/board-shell.spec.ts:230:43
+
+    attachment #1: home (image/png) ────────────────────────────────────────────────────────────────
+    test-results/board-shell-home-and-detai-8ed69-bottom-gap-at-390px-in-dark/attachments/home-f7679a89767525eb4e2c70f9b3efa26f3ccd8457.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: detail (image/png) ──────────────────────────────────────────────────────────────
+    test-results/board-shell-home-and-detai-8ed69-bottom-gap-at-390px-in-dark/attachments/detail-11e1a313a079cdf12aa5484d36c269c0fab73856.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/board-shell-home-and-detai-8ed69-bottom-gap-at-390px-in-dark/error-context.md
+
+  4 failed
+    e2e/board-shell.spec.ts:207:5 › home and detail share a 24px composer bottom gap at 1440px in light 
+    e2e/board-shell.spec.ts:207:5 › home and detail share a 24px composer bottom gap at 1440px in dark 
+    e2e/board-shell.spec.ts:207:5 › home and detail share a 24px composer bottom gap at 390px in light 
+    e2e/board-shell.spec.ts:207:5 › home and detail share a 24px composer bottom gap at 390px in dark 
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /mnt/fast/lanes/cairn-2421/apps/web
+

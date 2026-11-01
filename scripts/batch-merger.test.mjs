@@ -8,7 +8,16 @@ import { test } from 'node:test';
 const script = resolve('scripts/batch-merger.mjs');
 const policy = readFileSync('.claude/workflows/pr-gate.js', 'utf8');
 const head = 'a'.repeat(40);
-const required = ['check', 'pack-smoke', 'e2e-gate', 'pr-evidence'];
+const required = [
+  'check',
+  'pack-smoke',
+  'e2e-gate',
+  'pr-evidence',
+  'gates',
+  'dead-class-gate',
+  'ops-backup-test',
+];
+const skippable = ['dead-class-gate', 'ops-backup-test'];
 const trailer = 'Merged-by: cairn-batch-merger';
 const mergerCommit = { commit: { message: `Batch work (#9)\n\n${trailer}` } };
 const pull = (number = 1) => ({
@@ -22,6 +31,13 @@ const pull = (number = 1) => ({
   draft: false,
   auto_merge: null,
 });
+const defaultComments = [
+  {
+    id: 1,
+    user: { login: 'cairnwright[bot]' },
+    body: `<!-- review-gate:${head} -->\n**Independent review gate: PASS** for \`${head.slice(0, 8)}\`.`,
+  },
+];
 function fixture(t, overrides = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'batch-merger-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
@@ -54,9 +70,12 @@ function fixture(t, overrides = {}) {
     `#!${process.execPath}
 const fs = require('node:fs');
 const args = process.argv.slice(2);
-fs.appendFileSync(process.env.CALLS, JSON.stringify(args)+'\\n');
 const d = JSON.parse(fs.readFileSync(process.env.DATA));
 const p = args[1];
+const write = args.includes('--method') && p !== 'graphql';
+const input = write && args.includes('--input') ? fs.readFileSync(0, 'utf8') : null;
+fs.appendFileSync(process.env.CALLS, JSON.stringify(input === null ? args : [...args, input])+'\\n');
+if(write) { if(d.writeError) process.exit(1); console.log('{}'); process.exit(0); }
 if(args[0] === 'pr') process.exit(d.mergeError ? 1 : 0);
 if(p === 'graphql') { console.log(JSON.stringify({data:{disablePullRequestAutoMerge:{pullRequest:{number:1}}}})); }
 
@@ -192,6 +211,52 @@ test('latest required run wins over an older success', (t) => {
     app: { slug: 'github-actions' },
   }));
   checks.push({ ...checks[0], id: 100, conclusion: 'failure' });
+  assert.equal(fixture(t, { checks }).merges.length, 0);
+});
+const completed = (name, id, conclusion) => ({
+  name,
+  id,
+  head_sha: head,
+  status: 'completed',
+  conclusion,
+  app: { slug: 'github-actions' },
+});
+test('a red gates run blocks an otherwise green batch', (t) => {
+  const checks = required.map((name, id) =>
+    completed(name, id, name === 'gates' ? 'failure' : 'success'),
+  );
+  assert.equal(fixture(t, { checks }).merges.length, 0);
+});
+test('a docs-only batch with the code-only jobs skipped still merges', (t) => {
+  const checks = required.map((name, id) =>
+    completed(name, id, skippable.includes(name) ? 'skipped' : 'success'),
+  );
+  assert.equal(fixture(t, { checks }).merges.length, 1);
+});
+test('gates skipped is treated like the other must-be-green jobs', (t) => {
+  const checks = required.map((name, id) =>
+    completed(name, id, name === 'gates' ? 'skipped' : 'success'),
+  );
+  assert.equal(fixture(t, { checks }).merges.length, 1);
+});
+test('neutral, cancelled and timed out must-be-green runs block', (t) => {
+  for (const conclusion of ['neutral', 'cancelled', 'timed_out']) {
+    const checks = required.map((name, id) =>
+      completed(name, id, name === 'ops-backup-test' ? conclusion : 'success'),
+    );
+    assert.equal(fixture(t, { checks }).merges.length, 0);
+  }
+});
+test('a skipped required check still blocks a batch', (t) => {
+  const checks = required.map((name, id) =>
+    completed(name, id, name === 'pack-smoke' ? 'skipped' : 'success'),
+  );
+  assert.equal(fixture(t, { checks }).merges.length, 0);
+});
+test('a missing gates run blocks an otherwise green batch', (t) => {
+  const checks = required
+    .filter((name) => name !== 'gates')
+    .map((name, id) => completed(name, id, 'success'));
   assert.equal(fixture(t, { checks }).merges.length, 0);
 });
 test('a pause arriving during final validation prevents merging', (t) => {
@@ -340,6 +405,36 @@ for (const data of [{ gitError: true }, { policy: 'invalid policy' }, { numstat:
     assert.equal(f.merges.length, 0);
     assert.match(f.result.stdout, /owner-routing-unavailable/);
   });
+test('a patch whose only overflow is docs/verify evidence stays eligible', (t) => {
+  const evidence = Array.from(
+    { length: 41 },
+    (_, i) => `900\t0\tdocs/verify/2371/run-${i}.txt\n`,
+  ).join('');
+  assert.equal(
+    fixture(t, { numstat: `800\t0\tapps/web/src/page.ts\n${evidence}` }).merges.length,
+    1,
+  );
+});
+test('an evidence binary stays eligible', (t) => {
+  assert.equal(
+    fixture(t, { numstat: '1\t0\tapps/web/src/page.ts\n-\t-\tdocs/verify/2371/shot.png\n' }).merges
+      .length,
+    1,
+  );
+});
+test('product lines beside evidence still hit the line limit', (t) => {
+  const f = fixture(t, {
+    numstat: '401\t400\tapps/web/src/page.ts\n900\t0\tdocs/verify/2371/run.txt\n',
+  });
+  assert.equal(f.merges.length, 0);
+  assert.ok(f.result.stdout.includes('801 lines changed'), f.result.stdout);
+});
+test('product files beside evidence still hit the file limit', (t) => {
+  const code = Array.from({ length: 41 }, (_, i) => `1\t0\tapps/web/src/page${i}.ts\n`).join('');
+  const f = fixture(t, { numstat: `${code}1\t0\tdocs/verify/2371/run.txt\n` });
+  assert.equal(f.merges.length, 0);
+  assert.ok(f.result.stdout.includes('41 files changed'), f.result.stdout);
+});
 test('clean product source remains eligible', (t) => {
   assert.equal(fixture(t).merges.length, 1);
 });
@@ -378,4 +473,88 @@ test('the merger writes its trailer into the squash body', (t) => {
   const body = f.merges[0]?.[f.merges[0].indexOf('--body') + 1] ?? '';
   assert.ok(body.endsWith(`\n\n${trailer}`), body);
   assert.match(body, /closes #42/);
+});
+
+const marker = `<!-- batch-merger-owner-route:${head} -->`;
+const oversize = { numstat: '401\t400\tapps/web/src/page.ts\n' };
+const writes = (f) => f.calls.filter((args) => args.includes('--method'));
+const ownerComments = (f) => writes(f).filter((args) => args[1].endsWith('/issues/1/comments'));
+const labelAdds = (f) => writes(f).filter((args) => args[1].endsWith('/issues/1/labels'));
+const labelRemovals = (f) => writes(f).filter((args) => args.includes('DELETE'));
+const markerComment = (sha = head) => ({
+  id: 7,
+  user: { login: 'cairnwright[bot]' },
+  body: `<!-- batch-merger-owner-route:${sha} -->\nOwner route`,
+});
+const labelled = [{ name: 'review-gate' }, { name: 'owner-route' }];
+
+test('an owner-routed head gets one marked comment with reasons and the label', (t) => {
+  const f = fixture(t, oversize);
+  assert.equal(f.result.status, 0, f.result.stdout + f.result.stderr);
+  assert.equal(f.merges.length, 0);
+  const comments = ownerComments(f);
+  assert.equal(comments.length, 1);
+  const payload = JSON.parse(comments[0].at(-1));
+  assert.ok(payload.body.startsWith(marker));
+  assert.ok(payload.body.includes('801 lines changed'));
+  const adds = labelAdds(f);
+  assert.equal(adds.length, 1);
+  assert.deepEqual(JSON.parse(adds[0].at(-1)), { labels: ['owner-route'] });
+});
+test('a second pass on the same head does not comment again', (t) => {
+  const f = fixture(t, {
+    ...oversize,
+    comments: [markerComment(), ...defaultComments],
+    pulls: [{ ...pull(), labels: labelled }],
+  });
+  assert.equal(f.result.status, 0, f.result.stdout + f.result.stderr);
+  assert.equal(writes(f).length, 0);
+  assert.match(f.result.stdout, /owner-route/);
+});
+test('an already commented head missing the label only gets the label', (t) => {
+  const f = fixture(t, { ...oversize, comments: [markerComment(), ...defaultComments] });
+  assert.equal(ownerComments(f).length, 0);
+  assert.equal(labelAdds(f).length, 1);
+});
+test('a new head gets a new comment', (t) => {
+  const f = fixture(t, {
+    ...oversize,
+    comments: [markerComment('c'.repeat(40)), ...defaultComments],
+    pulls: [{ ...pull(), labels: labelled }],
+  });
+  assert.equal(ownerComments(f).length, 1);
+  assert.equal(labelAdds(f).length, 0);
+});
+test('a PR that is no longer owner-routed loses the label before merging', (t) => {
+  const f = fixture(t, { pulls: [{ ...pull(), labels: labelled }] });
+  assert.equal(f.result.status, 0, f.result.stdout + f.result.stderr);
+  const removals = labelRemovals(f);
+  assert.equal(removals.length, 1);
+  assert.ok(removals[0].includes('repos/owner/repo/issues/1/labels/owner-route'));
+  assert.equal(f.merges.length, 1);
+  const order = f.calls.map((args) =>
+    args[0] === 'pr' ? 'merge' : args.includes('DELETE') ? 'unlabel' : '',
+  );
+  assert.ok(order.indexOf('unlabel') < order.indexOf('merge'));
+});
+test('a failed label removal blocks the merge', (t) => {
+  const f = fixture(t, { pulls: [{ ...pull(), labels: labelled }], writeError: true });
+  assert.equal(f.result.status, 1);
+  assert.equal(f.merges.length, 0);
+  assert.match(f.result.stdout, /"action":"error"/);
+});
+test('a PR without the label is not unlabelled', (t) => {
+  assert.equal(writes(fixture(t)).length, 0);
+});
+test('a failed owner-route comment is an error and never merges', (t) => {
+  const f = fixture(t, { ...oversize, writeError: true, pulls: [pull(), pull(2)] });
+  assert.equal(f.result.status, 1);
+  assert.equal(f.merges.length, 0);
+  assert.match(f.result.stdout, /"action":"error"/);
+});
+test('dry-run reports the owner-route mark without writing', (t) => {
+  const f = fixture(t, { ...oversize, args: ['--dry-run'] });
+  assert.equal(f.result.status, 0, f.result.stdout + f.result.stderr);
+  assert.equal(writes(f).length, 0);
+  assert.match(f.result.stdout, /would-mark-owner-route/);
 });

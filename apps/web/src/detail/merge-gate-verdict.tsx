@@ -1,17 +1,15 @@
 import type { MergeReadiness } from '@cairn/shared';
-import { CircleCheck, CircleX, Minus } from 'lucide-react';
-import { CODE_PILL_CLS } from '../components/code-pill.js';
+import { StatusGlyph } from '../components/status-glyph.js';
 import { useI18n } from '../i18n/provider.js';
 
 export function MergeGateVerdict({ state }: { state: MergeReadiness }) {
   const { t } = useI18n();
-  const Icon = state.ready ? CircleCheck : CircleX;
   return (
-    <section className="border-b border-(--border) px-4 py-3" data-testid="merge-gate-verdict">
+    <section className="px-4 py-3" data-testid="merge-gate-verdict">
       <p className="m-0 flex items-center gap-2 text-ui">
-        <Icon
-          aria-hidden="true"
-          className={`size-4 flex-none ${state.ready ? 'text-running-text' : 'text-destructive'}`}
+        <StatusGlyph
+          kind={state.ready ? 'done' : 'failed'}
+          className={state.ready ? 'text-running' : 'text-destructive'}
         />
         <span className="text-content-tertiary">{t('合并闸')}</span>
         <span className={`font-medium ${state.ready ? 'text-running-text' : 'text-destructive'}`}>
@@ -19,25 +17,17 @@ export function MergeGateVerdict({ state }: { state: MergeReadiness }) {
         </span>
       </p>
       {state.blockers.length > 0 && (
-        <ul className="m-0 mt-2 flex list-none flex-col gap-1.5 p-0 pl-6">
+        <ul className="m-0 mt-2 flex list-none flex-col gap-2 p-0 pl-5.5">
           {state.blockers.map((blocker) => (
             <li
               key={blocker.code}
-              className="flex items-baseline gap-2 text-meta text-content-secondary"
+              data-code={blocker.code}
+              className="relative text-meta leading-5 text-content-secondary before:absolute before:top-2 before:-left-3 before:size-1 before:rounded-full before:bg-content-tertiary"
             >
-              <Minus
-                aria-hidden="true"
-                className="size-3 flex-none self-center text-content-tertiary"
-              />
-              <span>
-                {blocker.label}
-                {blocker.detail.length > 0 && (
-                  <span className="text-content-tertiary">{` · ${blocker.detail.join(' ')}`}</span>
-                )}
-              </span>
-              <code className={`ml-auto flex-none ${CODE_PILL_CLS} text-content-tertiary`}>
-                {blocker.code}
-              </code>
+              {blocker.label}
+              {blocker.detail.length > 0 && (
+                <span className="block text-content-tertiary">{blocker.detail.join(' · ')}</span>
+              )}
             </li>
           ))}
         </ul>

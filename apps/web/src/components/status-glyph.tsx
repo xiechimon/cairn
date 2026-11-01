@@ -5,6 +5,7 @@ export type GlyphKind =
   | 'todo'
   | 'queued'
   | 'ring'
+  | 'working'
   | 'quarter'
   | 'half'
   | 'three-quarter'
@@ -64,7 +65,21 @@ export function StatusGlyph({
         </>
       ) : (
         <>
-          <circle {...RING} strokeDasharray={kind === 'todo' ? '2.2 2' : undefined} />
+          <circle
+            {...RING}
+            strokeDasharray={kind === 'todo' ? '2.2 2' : undefined}
+            opacity={kind === 'working' ? 0.25 : undefined}
+          />
+          {kind === 'working' && (
+            <path
+              className="glyph-working origin-center motion-safe:animate-spin"
+              d="M7 1.5A5.5 5.5 0 0 1 12.5 7"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            />
+          )}
           {kind === 'queued' && (
             <path
               d="M7 4.2V7l1.8 1.2"

@@ -51,7 +51,7 @@ test('detail head keeps the `更多` icon only — branch/token/history icons ar
   }
 });
 
-test('composer stays in-flow inside the center column: card form, 16px insets, scroll port ends above it', async ({
+test('composer stays in-flow inside the center column: card form, 16px horizontal and 24px bottom insets, scroll port ends above it', async ({
   page,
 }) => {
   await page.goto(`${DETAIL_ROUTE}?scenario=17b`);
@@ -83,21 +83,12 @@ test('composer stays in-flow inside the center column: card form, 16px insets, s
     };
   });
   expect(geo.radius).toBe('14px');
-  // CDS PR-7: 1px hairline retired; --shadow-composer carries the ring
   expect(geo.border).toBe('0px');
-  // #472 in-flow law: a layout participant, never an overlay again —
-  // relative (not static) because the in-card toolbar/send/stop absolutes
-  // anchor to it
   expect(geo.position).toBe('relative');
-  // 16px insets inside the center column — never crossing into the pane
   expect(geo.compLeft).toBeCloseTo(geo.centerLeft + 16, 0);
   expect(geo.compRight).toBeCloseTo(geo.centerRight - 16, 0);
-  // the card keeps its 16px bottom inset (the old absolute-anchor visual)
-  expect(geo.mainBottom - geo.compBottom).toBeCloseTo(16, 0);
-  // the transcript scroll port ends exactly at the card top: text can no
-  // longer pass under the opaque card…
+  expect(geo.mainBottom - geo.compBottom).toBeCloseTo(24, 0);
   expect(geo.colBottom).toBeCloseTo(geo.compTop, 0);
-  // …and a bottom-pinned last row keeps a real gap from the card edge
   expect(geo.colPadBottom).toBeGreaterThanOrEqual(16);
 });
 
@@ -136,14 +127,14 @@ test("composer controls share one bottom row: stop is the send button's sibling"
     };
   });
   // a real hit target, not a 14px smudge
-  expect(geo.stop.w).toBe(32);
-  expect(geo.stop.h).toBe(32);
+  expect(geo.stop.w).toBe(28);
+  expect(geo.stop.h).toBe(28);
   expect(geo.stop.cy).toBeCloseTo(geo.send.cy, 0);
   expect(Math.abs(geo.toolCy - geo.send.cy)).toBeLessThanOrEqual(1);
   // an 8px sibling gap, not an orphaned 27px float
   expect(geo.send.l - geo.stop.r).toBeCloseTo(8, 0);
-  expect(geo.sendFill).toBe('rgba(0, 0, 0, 0)');
-  expect(geo.stopFill).not.toBe(geo.sendFill);
+  expect(geo.sendFill).toBe(geo.stopFill);
+  expect(geo.sendFill).not.toBe('rgba(0, 0, 0, 0)');
   expect(geo.stopGlyph).toBe(1);
   // the toolbar's ink starts on the placeholder text's own left edge
   expect(Math.abs(geo.toolGlyphL - geo.phTextL)).toBeLessThanOrEqual(2);
@@ -175,7 +166,7 @@ test('composer width tracks the center column; the floating window overlays with
   expect(open.comp).toBeCloseTo(pane.comp, 0);
 });
 
-test('right pane type select switches between the doc surface and the three sections', async ({
+test('right pane title switches plan and changes; usage, branch and history are sections', async ({
   page,
 }) => {
   await page.goto(`${DETAIL_ROUTE}?scenario=27`);
@@ -183,26 +174,45 @@ test('right pane type select switches between the doc surface and the three sect
   const right = page.getByTestId('detail-right');
   await expect(right.getByTestId('doc-pane')).toBeVisible();
   await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(right.getByRole('tablist')).toHaveCount(0);
+  await expect(right.getByTestId('pane-title')).toHaveText('变更');
 
-  const tabs = right.getByRole('tablist', { name: '面板视图' });
-  await expect(tabs.getByRole('tab')).toHaveCount(4);
-  await expect(tabs.getByRole('tab').first()).toHaveText('变更');
+  await right.getByTestId('pane-title').click();
+  await page.getByRole('menuitem', { name: '方案' }).click();
+  await expect(right.getByTestId('pane-title')).toHaveText('方案');
+  await expect(right.getByTestId('pane-view-plan')).toHaveAttribute('aria-pressed', 'true');
 
-  await tabs.getByRole('tab', { name: '用量' }).click();
-  await expect(page.getByRole('dialog')).toHaveCount(0);
-  await expect(right.getByTestId('doc-pane')).toHaveCount(0);
-  await expect(right.getByText('tokens', { exact: true })).toBeVisible();
+  const branch = right.getByTestId('pane-section-branch');
+  const usage = right.getByTestId('pane-section-token');
+  const history = right.getByTestId('pane-section-history');
+  await expect(branch.getByRole('button', { name: '分支' })).toHaveAttribute(
+    'aria-expanded',
+    'false',
+  );
+  await branch.getByRole('button', { name: '分支' }).click();
+  await expect(branch.getByText('构建分支')).toBeVisible();
+  await expect(usage).toContainText('tokens');
+  await expect(history.getByRole('button', { name: '历史' })).toHaveAttribute(
+    'aria-expanded',
+    'false',
+  );
+  await expect(history.getByTestId('history-row')).toHaveCount(0);
 
-  await right.getByRole('tab', { name: '变更' }).click();
-  await expect(right.getByTestId('doc-pane')).toBeVisible();
-  await expect(right.getByText('tokens', { exact: true })).toHaveCount(0);
+  await usage.getByRole('button', { name: '用量' }).click();
+  await expect(usage).not.toContainText('tokens');
+  await history.getByRole('button', { name: '历史' }).click();
+  await expect(history.getByTestId('history-row').first()).toBeVisible();
+
+  await right.getByTestId('pane-view-changes').click();
+  await expect(right.getByTestId('pane-title')).toHaveText('变更');
+  await expect(right.getByTestId('pane-sections')).toHaveCount(0);
 });
 
 test('scenarios 30/31/32 freeze the pane view instead of popping dialogs', async ({ page }) => {
   const right = page.getByTestId('detail-right');
   await page.goto(`${DETAIL_ROUTE}?scenario=30`);
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await expect(right.getByText('tokens', { exact: true })).toBeVisible();
+  await expect(right.getByTestId('pane-section-token')).toContainText('tokens');
 
   await page.goto(`${DETAIL_ROUTE}?scenario=31`);
   await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -218,9 +228,9 @@ test('plan card activation in the thread opens the plan doc in the right pane', 
 }) => {
   await page.goto(`${DETAIL_ROUTE}?scenario=plan-open`);
 
-  await expect(page.getByTestId('pane-tab-doc')).toHaveText('变更');
+  await expect(page.getByTestId('pane-title')).toHaveText('变更');
   await page.getByRole('button', { name: '打开方案' }).first().click();
-  await expect(page.getByTestId('pane-tab-doc')).toHaveText('方案');
+  await expect(page.getByTestId('pane-title')).toHaveText('方案');
   await expect(page.getByTestId('doc-body').locator('p').first()).toBeVisible();
 });
 

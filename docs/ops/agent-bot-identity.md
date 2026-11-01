@@ -65,6 +65,8 @@ The GitHub App identity opens PRs and authenticates pushes. The Git author on ma
 
 Read the PR opener and all commit authors with `gh pr view <n> --json author,commits` before choosing the merge method.
 
+- Accepted bot commit authors: `Cairnwright`, `cairnwright[bot]`.
+- The latter is accepted only with `Cairn-Thread:` and `Co-authored-by: xiechimon` trailers; `merge-pr.sh` and `sign-commits.sh` treat them the same and any other bot author is foreign. Commits are still made as `Cairnwright`, and the `commit-author` workflow still rejects `cairnwright[bot]` until #2289.
 - Bot-opened PRs require exactly one commit authored by `Cairnwright` before a rebase merge. Check that neither its author name nor email contains `cairnwright[bot]`. Use the dispatcher's `~/.cairn/tools/merge-pr.sh` after inspecting its source and usage on the dispatch host. If the helper is unavailable or authorship is wrong, return the PR to the dispatcher for preparation.
 - Human-opened PRs use `gh pr merge <n> --squash --auto` after checking that none of their commit authors contains `cairnwright[bot]`.
 - Both paths require a pr-gate go with `mergedBy: 'auto-merge'` (every other PR goes to ian), no unchecked tasks anywhere in the body and no `needs-decision` label. After merging, verify the resulting main commit's author and its `commit-author` Actions result.

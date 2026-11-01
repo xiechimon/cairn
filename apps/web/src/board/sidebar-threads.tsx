@@ -1,3 +1,4 @@
+import type { ProjectColor, ProjectIcon } from '@cairn/shared';
 import {
   AlarmClock,
   AlarmClockOff,
@@ -228,6 +229,8 @@ function ThreadMenu({
 interface ProjectGroupProps {
   name: string;
   tone: number;
+  icon?: ProjectIcon | null | undefined;
+  color?: ProjectColor | null | undefined;
   active: boolean;
   activeThreadId: string | null;
   threads: TodoRecord[];
@@ -244,6 +247,8 @@ interface ProjectGroupProps {
 export function ProjectGroup({
   name,
   tone,
+  icon,
+  color,
   active,
   activeThreadId,
   threads,
@@ -269,6 +274,8 @@ export function ProjectGroup({
       <SidebarProjectRow
         name={name}
         tone={tone}
+        icon={icon}
+        color={color}
         waiting={waiting}
         active={active}
         onClick={onOpenProject}

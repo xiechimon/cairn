@@ -1,4 +1,4 @@
-import { BRAND } from '@cairn/shared';
+import { BRAND, type ProjectColor, type ProjectIcon } from '@cairn/shared';
 import {
   Box,
   ChartColumn,
@@ -90,6 +90,8 @@ export type SidebarSelected =
 export interface SidebarProject {
   id: string;
   name: string;
+  icon?: ProjectIcon | null | undefined;
+  color?: ProjectColor | null | undefined;
 }
 
 const CANON_PROJECT: SidebarProject = { id: PROJECT_ID, name: PROJECT_NAME };
@@ -521,7 +523,7 @@ export function BoardSidebar({
                   key={row.id}
                   {...railLink({ pathname: href, search: plain }, pathname === href, row.name)}
                 >
-                  <ProjectAvatar name={row.name} tone={i} />
+                  <ProjectAvatar name={row.name} tone={i} icon={row.icon} color={row.color} bare />
                 </Link>
               );
             })}
@@ -673,6 +675,8 @@ export function BoardSidebar({
                 key={row.id}
                 name={row.name}
                 tone={i}
+                icon={row.icon}
+                color={row.color}
                 active={pathname === href}
                 activeThreadId={activeThreadId}
                 threads={projectThreads(liveThreads, row.id)}
@@ -759,6 +763,7 @@ export function BoardSidebar({
               aria-label={user.displayName}
             >
               <SidebarUser
+                avatar={userAvatar}
                 name={user.displayName}
                 machinesOnline={machinesOnline}
                 action={

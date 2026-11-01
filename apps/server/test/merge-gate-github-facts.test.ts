@@ -1048,7 +1048,12 @@ describe('readGateGithubFacts into mergeReadiness and gateStatusFor: an unusable
   const statusOf = async (over: Partial<GateAnswers>) => {
     const f = await read(over);
     const r = mergeReadiness({
-      policy: { mergePolicy: 'autonomous', autonomyPaused: false, dailyCapReached: false },
+      policy: {
+        mergePolicy: 'autonomous',
+        autonomyPaused: false,
+        dailyCapReached: false,
+        requireUpToDate: true,
+      },
       build: { isGithubPr: true, isCurrent: true, phase: 'review', stepsInFlight: 0 },
       repo: { owner: REQ.owner, name: REQ.repo, defaultBranch: f.defaultBranch },
       ticketRef: REQ.ticketRef,

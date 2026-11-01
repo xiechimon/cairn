@@ -1,5 +1,4 @@
 import { cn } from 'cn';
-import { SpiralMark } from '../../chief/chief-fab-icon.js';
 import { ACCENT_INK } from '../../phase.js';
 import { type GlyphKind, StatusGlyph } from '../status-glyph.js';
 import type { StoneTone } from './tone.js';
@@ -22,9 +21,10 @@ export function ToneGlyph({
 }) {
   if (tone === 'working') {
     return (
-      <span data-tone={tone} className={cn('inline-flex size-3.5 flex-none', className)}>
-        <SpiralMark busy={!still} className="size-full text-running" />
-      </span>
+      <StatusGlyph
+        kind="working"
+        className={cn('text-running', still && '[&_.glyph-working]:animate-none', className)}
+      />
     );
   }
   const { kind, ink } = TONE_GLYPH[tone];

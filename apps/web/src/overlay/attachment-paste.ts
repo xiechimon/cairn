@@ -62,10 +62,34 @@ export function parseAttachmentTokens(text: string): AttachmentToken[] {
   return out;
 }
 
+export function splitDraft(draft: string): { tokens: string[]; text: string } {
+  const tokens: string[] = [];
+  const rest: string[] = [];
+  for (const line of draft.split('\n')) {
+    if (ATTACHMENT_LINE.test(line)) tokens.push(line);
+    else rest.push(line);
+  }
+  if (tokens.length === 0) return { tokens, text: draft };
+  while (rest.length > 0 && rest[0]?.trim() === '') rest.shift();
+  return { tokens, text: rest.join('\n') };
+}
+
+export function joinDraft(tokens: string[], text: string): string {
+  if (tokens.length === 0) return text;
+  return tokens.join('\n') + (text === '' ? '' : `\n${text}`);
+}
+
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export interface PendingAttachment {
   uid: string;
   name: string;
   mime: string;
+  size: number;
   url: string | null;
 }
 

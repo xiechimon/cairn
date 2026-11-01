@@ -1,5 +1,6 @@
 import {
   DEFAULT_AUTONOMY_SETTINGS,
+  DEFAULT_SHIP_ROUTE,
   type PatchProjectBody,
   type ProjectMergeConfig,
   patchProjectMergeConfigSchema,
@@ -8,6 +9,8 @@ import {
   projectMergeConfigSchema,
   projectRenamedNote,
   type SecretBox,
+  type ShipRoute,
+  shipRouteSchema,
 } from '@cairn/shared';
 import { and, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -39,6 +42,7 @@ export function projectMergeConfigOf(row: ProjectRow): ProjectMergeConfig {
   return projectMergeConfigSchema.parse({
     mergePolicy: raw?.mergePolicy,
     localChecks: raw?.localChecks,
+    requireUpToDate: raw?.requireUpToDate,
   });
 }
 
@@ -53,6 +57,19 @@ export function updateProjectMergeConfig(
   const autonomy = { ...DEFAULT_AUTONOMY_SETTINGS, ...(row.autonomy ?? {}), ...next };
   db.update(project).set({ autonomy }).where(eq(project.id, row.id)).run();
   return next;
+}
+
+export function projectShipRouteOf(row: ProjectRow): ShipRoute {
+  return shipRouteSchema.catch(DEFAULT_SHIP_ROUTE).parse(row.autonomy?.shipRoute);
+}
+
+export function updateProjectShipRoute(db: Db, row: ProjectRow, shipRoute: ShipRoute): ShipRoute {
+  if (shipRoute === 'local-merge' && row.repoKind !== 'local') {
+    throw new HttpError(409, 'local-merge requires a local repository project');
+  }
+  const autonomy = { ...DEFAULT_AUTONOMY_SETTINGS, ...(row.autonomy ?? {}), shipRoute };
+  db.update(project).set({ autonomy }).where(eq(project.id, row.id)).run();
+  return shipRoute;
 }
 
 export interface ProjectDeps {
@@ -138,11 +155,13 @@ export async function updateProject(
     body.repoKind !== undefined ||
     body.githubRepo !== undefined ||
     body.localPath !== undefined ||
-    body.baseBranch !== undefined;
+    body.baseBranch !== undefined ||
+    body.icon !== undefined ||
+    body.color !== undefined;
   if (!carriesKey) {
     throw new HttpError(
       400,
-      'invalid body: nothing to update (at least one of name/description/repoKind/githubRepo/localPath/baseBranch)',
+      'invalid body: nothing to update (at least one of name/description/repoKind/githubRepo/localPath/baseBranch/icon/color)',
     );
   }
 
@@ -260,6 +279,8 @@ export async function updateProject(
       localPath: nextLocalPath,
       description: nextDescription,
       baseBranch: body.baseBranch !== undefined ? body.baseBranch : row.baseBranch,
+      icon: body.icon !== undefined ? body.icon : row.icon,
+      color: body.color !== undefined ? body.color : row.color,
     })
     .where(eq(project.id, id))
     .run();

@@ -201,3 +201,33 @@ test('the phone chief launcher clears the new-task bar on the board and sits in 
   const elsewhere = await page.locator('.chief-fab').boundingBox();
   expect(844 - (elsewhere!.y + elsewhere!.height)).toBeLessThan(16);
 });
+
+for (const viewport of [{ width: 1440, height: 732 }, { width: 390, height: 844 }]) {
+  for (const theme of ['light', 'dark']) {
+    test(`home and detail share a 24px composer bottom gap at ${viewport.width}px in ${theme}`, async ({ page }, testInfo) => {
+      await page.setViewportSize(viewport);
+      await page.addInitScript((value) => localStorage.setItem('cairn-theme', value), theme);
+      const gaps: number[] = [];
+      for (const route of [
+        { name: 'home', url: '/app?scenario=board-inbox', selector: '[data-testid="chief-home"] .chief-composer' },
+        { name: 'detail', url: '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=17b', selector: '[data-testid="composer-card"]' },
+      ]) {
+        await page.goto(route.url);
+        const composer = page.locator(route.selector);
+        await expect(composer).toBeVisible();
+        await page.evaluate(() => document.fonts.ready);
+        const gap = await composer.evaluate((element) => window.innerHeight - element.getBoundingClientRect().bottom);
+        gaps.push(gap);
+        console.log(`${viewport.width}px ${theme} ${route.name}: ${gap}px`);
+        const screenshot = testInfo.outputPath(`${route.name}-${viewport.width}-${theme}.png`);
+        await page.screenshot({ path: screenshot });
+        await testInfo.attach(route.name, { path: screenshot, contentType: 'image/png' });
+      }
+      for (const gap of gaps) {
+        expect.soft(gap).toBeGreaterThanOrEqual(20);
+        expect.soft(gap).toBeCloseTo(24, 0);
+      }
+      expect(Math.abs(gaps[0] - gaps[1])).toBeLessThanOrEqual(1);
+    });
+  }
+}

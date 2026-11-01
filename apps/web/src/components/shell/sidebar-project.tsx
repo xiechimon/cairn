@@ -1,3 +1,4 @@
+import type { ProjectColor, ProjectIcon } from '@cairn/shared';
 import { cn } from 'cn';
 import { AlarmClockOff, Ellipsis } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -9,6 +10,8 @@ import { Button } from '../ui/button.js';
 export interface SidebarProjectRowProps {
   name: string;
   tone: number;
+  icon?: ProjectIcon | null | undefined;
+  color?: ProjectColor | null | undefined;
   waiting?: number;
   active?: boolean;
   onClick?: () => void;
@@ -17,6 +20,8 @@ export interface SidebarProjectRowProps {
 export function SidebarProjectRow({
   name,
   tone,
+  icon,
+  color,
   waiting = 0,
   active = false,
   onClick,
@@ -30,14 +35,24 @@ export function SidebarProjectRow({
       className={cn(
         'h-8 w-full justify-start gap-2.5 px-2 text-ui font-normal',
         active
-          ? 'bg-(--sidebar-active) font-semibold text-foreground hover:bg-(--sidebar-active) dark:hover:bg-(--sidebar-active)'
+          ? 'font-semibold text-foreground hover:bg-sidebar-hover dark:hover:bg-sidebar-hover'
           : 'text-content-secondary hover:bg-sidebar-hover hover:text-foreground dark:hover:bg-sidebar-hover',
       )}
     >
-      <ProjectAvatar name={name} tone={tone} className="rounded-sm" />
+      <ProjectAvatar
+        name={name}
+        tone={tone}
+        icon={icon}
+        color={color}
+        bare
+        className="rounded-sm"
+      />
       <span className="min-w-0 truncate">{name}</span>
       {waiting > 0 && (
-        <span className="ml-auto flex-none rounded-full bg-(--chip-confirm-bg) px-1.5 text-caption leading-4.5 font-semibold text-(--chip-confirm-fg)">
+        <span
+          data-slot="sidebar-project-count"
+          className="ml-auto flex-none text-caption font-normal text-content-tertiary tabular-nums"
+        >
           {waiting}
         </span>
       )}
@@ -76,7 +91,7 @@ export function SidebarThreadRow({
       data-open={open ? '' : undefined}
       className={cn(
         'group/thread flex h-7 items-center rounded-(--radius-control) pr-1',
-        open ? 'bg-card text-foreground shadow-(--e1)' : 'hover:bg-sidebar-hover',
+        open ? 'bg-sidebar-hover text-foreground' : 'hover:bg-sidebar-hover',
       )}
     >
       <Button

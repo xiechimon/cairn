@@ -14,9 +14,12 @@ import type {
   MachineCapabilities,
   MemoryCandidateStatus,
   ModelRef,
+  NamedPromptOverrides,
   NotificationType,
   PersonaRole,
   Phase,
+  ProjectColor,
+  ProjectIcon,
   ProjectMergeConfig,
   ProjectRepoKind,
   ProviderApi,
@@ -25,6 +28,7 @@ import type {
   RequiredCapabilities,
   ScheduleKind,
   ScheduleReport,
+  ShipRoute,
   SkillInjectionRecord,
   SnoozeMode,
   SplitPolicy,
@@ -67,6 +71,7 @@ export const team = sqliteTable('team', {
   firstPrReportPromptDismissedAt: epochMs('firstPrReportPromptDismissedAt'),
   firstPrReportPromptFirstPrAt: epochMs('firstPrReportPromptFirstPrAt'),
   firstPrReportPromptFirstPrNumber: integer('firstPrReportPromptFirstPrNumber'),
+  namedPrompts: json<NamedPromptOverrides | null>('namedPrompts'),
 });
 
 export const project = sqliteTable('project', {
@@ -82,7 +87,11 @@ export const project = sqliteTable('project', {
   githubRepo: text('githubRepo'),
   localPath: text('localPath'),
   baseBranch: text('baseBranch'),
-  autonomy: json<(AutonomySettings & Partial<ProjectMergeConfig>) | null>('autonomy'),
+  icon: text('icon').$type<ProjectIcon>(),
+  color: text('color').$type<ProjectColor>(),
+  autonomy: json<
+    (AutonomySettings & Partial<ProjectMergeConfig> & { shipRoute?: ShipRoute }) | null
+  >('autonomy'),
 });
 
 export const todo = sqliteTable(

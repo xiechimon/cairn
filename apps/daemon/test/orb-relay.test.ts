@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, statSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createConnection } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -7,6 +7,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { type MachineApi, MachineApiError, MachineClient } from '../src/machine-client.js';
 import { ORB_STEP_METHODS } from '../src/orb/protocol.js';
 import { RelayMachineApi, RelayMachineError, RelayMachineServer } from '../src/orb/relay.js';
+import { orbTestRelease } from './orb-release-fixture.js';
 
 const cleanup: (() => Promise<void>)[] = [];
 afterEach(async () => {
@@ -33,12 +34,13 @@ async function fixture() {
   ) as MachineApi;
   const server = new RelayMachineServer({
     socketPath,
+    release: orbTestRelease(socketPath),
     stepId: 'step',
     machineId: 'host',
     upstream,
   });
   await server.listen();
-  const client = await RelayMachineApi.connect(socketPath);
+  const client = await RelayMachineApi.connect(socketPath, orbTestRelease(socketPath));
   cleanup.push(async () => {
     client.close();
     await server.close();
@@ -100,7 +102,7 @@ test('refuses arbitrary uploads and returns binary skills intact', async () => {
   ).rejects.toBeInstanceOf(RelayMachineError);
   expect(forwarded).not.toHaveBeenCalled();
   expect(await client.api.skillFile('step', 'skill', 'SKILL.md')).toEqual(Buffer.from('skill'));
-  expect(statSync(socketPath).mode & 0o777).toBe(0o666);
+  expect(statSync(socketPath).mode & 0o777).toBe(0o600);
   expect(statSync(join(socketPath, '..')).mode & 0o777).toBe(0o700);
 });
 
@@ -169,7 +171,7 @@ test('refuses a second completion while the first is in flight and after it sett
   expect(forwarded).toHaveBeenCalledTimes(1);
 });
 
-test('reclaims a socket left by a dead process', async () => {
+test('replaces stale socket and token files left by a dead daemon', async () => {
   const root = mkdtempSync(join(tmpdir(), 'orb-stale-relay-'));
   const socketPath = join(root, 'step.sock');
   execFileSync(process.execPath, [
@@ -178,17 +180,20 @@ test('reclaims a socket left by a dead process', async () => {
     socketPath,
   ]);
   expect(statSync(socketPath).isSocket()).toBe(true);
+  writeFileSync(`${socketPath}.token`, 'stale token');
   const upstream = new Proxy({}, { get: () => vi.fn(async () => undefined) }) as MachineApi;
   const server = new RelayMachineServer({
     socketPath,
+    release: orbTestRelease(socketPath),
     stepId: 'step',
     machineId: 'host',
     upstream,
   });
   try {
     await server.listen();
-    const client = await RelayMachineApi.connect(socketPath);
+    const client = await RelayMachineApi.connect(socketPath, orbTestRelease(socketPath));
     await expect(client.api.heartbeat('step')).resolves.toBeUndefined();
+    expect(readFileSync(`${socketPath}.token`, 'utf8')).toMatch(/^[a-f0-9]{64}$/);
     client.close();
   } finally {
     await server.close();
@@ -200,6 +205,7 @@ test('does not remove a live listener when another server tries to use its path'
   const { socketPath, client, forwarded } = await fixture();
   const duplicate = new RelayMachineServer({
     socketPath,
+    release: orbTestRelease(socketPath),
     stepId: 'other',
     upstream: {} as MachineApi,
   });
@@ -321,7 +327,12 @@ test.each([
 test('destroys a socket when an unterminated frame exceeds the byte limit', async () => {
   const home = mkdtempSync(join(tmpdir(), 'relay-limit-'));
   const socketPath = join(home, 'step.sock');
-  const server = new RelayMachineServer({ socketPath, stepId: 'step', upstream: {} as MachineApi });
+  const server = new RelayMachineServer({
+    socketPath,
+    release: orbTestRelease(socketPath),
+    stepId: 'step',
+    upstream: {} as MachineApi,
+  });
   await server.listen();
   const socket = createConnection(socketPath);
   socket.on('error', () => {});
@@ -344,6 +355,7 @@ test('disconnects a non-reading worker when queued output exceeds the frame budg
   const heartbeat = vi.spyOn(upstream, 'heartbeat').mockResolvedValue(undefined);
   const server = new RelayMachineServer({
     socketPath,
+    release: orbTestRelease(socketPath),
     stepId: 'step',
     upstream,
   });
@@ -352,6 +364,9 @@ test('disconnects a non-reading worker when queued output exceeds the frame budg
   socket.on('error', () => {});
   try {
     await new Promise<void>((resolve) => socket.once('connect', resolve));
+    socket.write(
+      `cairn-orb-rpc:${JSON.stringify({ type: 'auth', token: readFileSync(`${socketPath}.token`, 'utf8'), release: orbTestRelease(socketPath) })}\n`,
+    );
     socket.write('cairn-orb-rpc:{"type":"call","id":0,"method":"heartbeat","args":["step"]}\n');
     await vi.waitFor(() => expect(heartbeat).toHaveBeenCalledTimes(1));
     const message = 'x'.repeat(1024 * 1024);
@@ -362,5 +377,51 @@ test('disconnects a non-reading worker when queued output exceeds the frame budg
     socket.destroy();
     await server.close();
     rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test.each(['step.sock', 'step.sock.token'])(
+  'close tolerates a guest directory replacing %s and still cleans the other path',
+  async (name) => {
+    const { server, socketPath } = await fixture();
+    const directory = join(socketPath, '..', name);
+    rmSync(directory);
+    mkdirSync(directory);
+    await expect(server.close()).resolves.toBeUndefined();
+    expect(statSync(directory).isDirectory()).toBe(true);
+    const other = name.endsWith('.token') ? socketPath : `${socketPath}.token`;
+    expect(() => statSync(other)).toThrow();
+  },
+);
+
+test('caps pre-auth connections at four and releases capacity after disconnect', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'relay-auth-cap-'));
+  const socketPath = join(root, 'step.sock');
+  const server = new RelayMachineServer({
+    socketPath,
+    release: orbTestRelease(socketPath),
+    stepId: 'step',
+    upstream: {} as MachineApi,
+  });
+  const sockets: ReturnType<typeof createConnection>[] = [];
+  await server.listen();
+  try {
+    for (let index = 0; index < 5; index++) {
+      const socket = createConnection(socketPath);
+      socket.on('error', () => {});
+      socket.resume();
+      sockets.push(socket);
+      await new Promise<void>((resolve) => socket.once('connect', resolve));
+    }
+    await vi.waitFor(() => expect(sockets[4]?.destroyed).toBe(true), { timeout: 1000 });
+    expect(sockets.slice(0, 4).every((socket) => !socket.destroyed)).toBe(true);
+    sockets[0]?.destroy();
+    await new Promise<void>((resolve) => sockets[0]?.once('close', resolve));
+    const client = await RelayMachineApi.connect(socketPath, orbTestRelease(socketPath));
+    client.close();
+  } finally {
+    for (const socket of sockets) socket.destroy();
+    await server.close();
+    rmSync(root, { recursive: true, force: true });
   }
 });

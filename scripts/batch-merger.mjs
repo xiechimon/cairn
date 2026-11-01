@@ -1,10 +1,13 @@
 import { execFileSync } from 'node:child_process';
 import { runInNewContext } from 'node:vm';
 import { api, disarmAutoMerge, markers, pages, repo } from './autonomy-brake.mjs';
+import { requiredChecks as branchProtectionChecks, mustBeGreenJobs } from './merge-checks.mjs';
 
 const batchHead = /^B\d+\//;
 const mergerTrailer = 'Merged-by: cairn-batch-merger';
-const requiredChecks = ['check', 'pack-smoke', 'e2e-gate', 'pr-evidence'];
+const requiredChecks = branchProtectionChecks;
+const sandboxOptions = { timeout: 1000, contextCodeGeneration: { strings: false, wasm: false } };
+const ownerRouteLabel = 'owner-route';
 const log = (pr, action, reasons) =>
   console.log(
     JSON.stringify({ pr: pr?.number ?? null, head: pr?.head?.sha ?? null, action, reasons }),
@@ -23,6 +26,11 @@ function ownerRouting(headSha) {
   };
   const constants = extract('const AUTO_MERGE =', 'const FILES_CMD =');
   const routing = extract('const safety = reviewed.find', 'const checked =');
+  const isEvidence = runInNewContext(
+    `${constants}\n;(path) => EVIDENCE_RE.test(path)`,
+    {},
+    sandboxOptions,
+  );
   const range = `origin/main...${headSha}`;
   const numstat = git([
     '-c',
@@ -43,7 +51,7 @@ function ownerRouting(headSha) {
     const [, added, removed, path] = match;
     changedFiles.push(path);
     if (added === '-') binaryFiles.push(path);
-    else linesChanged += Number(added) + Number(removed);
+    else if (!isEvidence(path)) linesChanged += Number(added) + Number(removed);
   }
   const deleted = git([
     '-c',
@@ -64,11 +72,44 @@ const reviewed = [];
 ${routing}
 humanReasons`,
     { changedFiles, deletedFiles, binaryFiles, linesChanged },
-    { timeout: 1000, contextCodeGeneration: { strings: false, wasm: false } },
+    sandboxOptions,
   );
   if (!Array.isArray(reasons) || !reasons.every((reason) => typeof reason === 'string'))
     throw new Error('Invalid owner routing result');
   return reasons;
+}
+
+function markOwnerRoute(pr, reasons, dryRun) {
+  const marker = `<!-- batch-merger-owner-route:${pr.head.sha} -->`;
+  const commented = pages(`repos/${repo}/issues/${pr.number}/comments?per_page=100`)
+    .flat()
+    .some((comment) => comment.body.startsWith(marker));
+  const labelled = pr.labels.some((label) => label.name === ownerRouteLabel);
+  if (commented && labelled) return;
+  if (dryRun) {
+    log(pr, 'would-mark-owner-route', reasons);
+    return;
+  }
+  if (!commented)
+    api(`repos/${repo}/issues/${pr.number}/comments`, {
+      body: `${marker}\n**Batch merger: owner route** for \`${pr.head.sha.slice(0, 8)}\`. This PR needs the owner:\n\n${reasons.map((reason) => `- ${reason}`).join('\n')}`,
+    });
+  if (!labelled) api(`repos/${repo}/issues/${pr.number}/labels`, { labels: [ownerRouteLabel] });
+  log(pr, 'marked-owner-route', reasons);
+}
+
+function clearOwnerRoute(pr, dryRun) {
+  if (!pr.labels.some((label) => label.name === ownerRouteLabel)) return;
+  if (dryRun) {
+    log(pr, 'would-unmark-owner-route', []);
+    return;
+  }
+  execFileSync(
+    'gh',
+    ['api', '--method', 'DELETE', `repos/${repo}/issues/${pr.number}/labels/${ownerRouteLabel}`],
+    { encoding: 'utf8', maxBuffer: 512 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] },
+  );
+  log(pr, 'unmarked-owner-route', []);
 }
 
 function eligibility(number, expectedHead, dailyCap) {
@@ -95,6 +136,16 @@ function eligibility(number, expectedHead, dailyCap) {
       )
       .sort((a, b) => b.id - a.id)[0];
     if (latest?.status !== 'completed' || latest.conclusion !== 'success')
+      reasons.push(`check:${name}`);
+  }
+  for (const name of mustBeGreenJobs) {
+    const latest = runs
+      .filter(
+        (run) =>
+          run.name === name && run.head_sha === pr.head.sha && run.app?.slug === 'github-actions',
+      )
+      .sort((a, b) => b.id - a.id)[0];
+    if (latest?.status !== 'completed' || !['success', 'skipped'].includes(latest.conclusion))
       reasons.push(`check:${name}`);
   }
   const verdict = pages(`repos/${repo}/issues/${number}/comments?per_page=100`)
@@ -187,8 +238,10 @@ try {
       }
       if (ownerReasons.length) {
         log(result.pr, 'owner-route', ownerReasons);
+        markOwnerRoute(result.pr, ownerReasons, dryRun);
         continue;
       }
+      clearOwnerRoute(result.pr, dryRun);
       attempted = true;
       if (!dryRun)
         execFileSync(

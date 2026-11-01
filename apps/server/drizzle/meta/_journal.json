@@ -575,6 +575,20 @@
       "when": 1793445334854,
       "tag": "0081_todo_snooze",
       "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "6",
+      "when": 1793461817647,
+      "tag": "0082_project_avatar",
+      "breakpoints": true
+    },
+    {
+      "idx": 83,
+      "version": "6",
+      "when": 1793471349417,
+      "tag": "0083_team_named_prompts",
+      "breakpoints": true
     }
   ]
 }

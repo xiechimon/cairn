@@ -8662,11 +8662,74 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > pro
     "cloneUrl": {
       "type": "string",
     },
+    "color": {
+      "anyOf": [
+        {
+          "enum": [
+            "moss",
+            "amber",
+            "slate",
+            "plum",
+            "teal",
+            "rose",
+            "gray",
+          ],
+          "type": "string",
+        },
+        {
+          "type": "null",
+        },
+      ],
+    },
     "description": {
       "type": "string",
     },
     "githubRepo": {
       "type": "string",
+    },
+    "icon": {
+      "anyOf": [
+        {
+          "enum": [
+            "folder",
+            "code",
+            "terminal",
+            "database",
+            "flask-conical",
+            "box",
+            "globe",
+            "book-open",
+            "leaf",
+            "mountain",
+            "rocket",
+            "zap",
+            "chart-column",
+            "heart",
+            "star",
+            "layers",
+            "cpu",
+            "cloud",
+            "server",
+            "smartphone",
+            "palette",
+            "pen-tool",
+            "bug",
+            "shield",
+            "key",
+            "wrench",
+            "git-branch",
+            "package",
+            "music",
+            "camera",
+            "map",
+            "graduation-cap",
+          ],
+          "type": "string",
+        },
+        {
+          "type": "null",
+        },
+      ],
     },
     "id": {
       "type": "string",
@@ -8702,6 +8765,9 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > pro
     },
     "repoName": {
       "type": "string",
+    },
+    "requireUpToDate": {
+      "type": "boolean",
     },
     "splitPolicy": {
       "default": "human",

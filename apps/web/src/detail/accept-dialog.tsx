@@ -94,7 +94,7 @@ export function AcceptDialog({
       {blocked && (
         <p className="mt-2 text-meta text-(--text-tertiary)">
           {t('缺少「{tools}」授权，无法合并。请在该 Agent 的权限里开启。', {
-            tools: (missingTools ?? []).join('、'),
+            tools: (missingTools ?? []).map((tool) => t(tool)).join(t('、')),
           })}
         </p>
       )}

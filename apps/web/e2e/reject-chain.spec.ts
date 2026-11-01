@@ -35,3 +35,21 @@ test('reject loop: request changes → v2 → diff → confirm', async ({ page }
   await expect(page.getByTestId('phase-chip')).toHaveText(/执行中/);
   await expect(page.locator('.chat-streaming-label').last()).toHaveText('处理中...');
 });
+
+test('comparing with the previous version from the Changes view shows the plan diff', async ({
+  page,
+}) => {
+  await page.goto('/app/todo/r8-15?scenario=64c');
+
+  await page.getByTestId('pane-view-changes').click();
+  await expect(page.getByTestId('pane-title')).toHaveText('变更');
+  await expect(page.locator('.doc-range-chip')).toHaveCount(0);
+
+  await page.locator('.doc-range-wrap .doc-pane-select').click();
+  await page.getByRole('menuitem', { name: '与其他版本对比…' }).click();
+  await page.getByRole('menuitem', { name: '上一版本' }).click();
+
+  await expect(page.getByTestId('pane-title')).toHaveText('方案');
+  await expect(page.locator('.doc-range-chip')).toHaveText(/v1 → v2/);
+  await expect(page.locator('.doc-file-row')).toHaveText(/plan\.md/);
+});

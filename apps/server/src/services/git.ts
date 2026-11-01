@@ -181,6 +181,8 @@ export function toProjectRecord(row: ProjectRow, origin?: string): ProjectRecord
     teamId: row.teamId,
     splitPolicy: row.splitPolicy,
     baseBranch: row.baseBranch,
+    ...(row.icon !== null ? { icon: row.icon } : {}),
+    ...(row.color !== null ? { color: row.color } : {}),
     ...(row.description !== null ? { description: row.description } : {}),
     ...(row.repoKind !== null ? { repoKind: row.repoKind } : {}),
     ...(row.repoName !== null ? { repoName: row.repoName } : {}),
@@ -189,6 +191,7 @@ export function toProjectRecord(row: ProjectRow, origin?: string): ProjectRecord
     ...projectMergeConfigSchema.parse({
       mergePolicy: (row.autonomy as { mergePolicy?: unknown } | null)?.mergePolicy,
       localChecks: (row.autonomy as { localChecks?: unknown } | null)?.localChecks,
+      requireUpToDate: (row.autonomy as { requireUpToDate?: unknown } | null)?.requireUpToDate,
     }),
     ...(row.repoKind === 'hosted' && row.repoName !== null && origin !== undefined
       ? { cloneUrl: hostedCloneUrl(origin, row.teamId, row.repoName) }

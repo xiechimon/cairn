@@ -31,6 +31,7 @@ export {
   boardTagFilterEmpty,
   boardWithProbe,
   sidebarGroups,
+  sidebarProjectIcons,
   sidebarSnooze,
   sidebarThreadStatuses,
   sidebarThreads,
@@ -48,6 +49,7 @@ export {
   chiefThread,
   chiefThreadsLong,
   chiefThreadsOpen,
+  chiefWorking,
 } from './chief.js';
 export {
   AGENT_MODEL,
@@ -117,6 +119,7 @@ export {
   skillInject,
   skillInjectZero,
   skillsRouting,
+  versionCompareWithChanges,
   versionMenuV2,
   versionMenuV3,
 } from './r8-dynamic.js';

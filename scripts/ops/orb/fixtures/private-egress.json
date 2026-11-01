@@ -1,0 +1,43 @@
+{
+  "images": "cairn-orb-base directory no 123456789\n",
+  "cloneStartStop": "ok",
+  "headers": "HTTP/1.1 200 Connection established\r\n\r\nHTTP/2 301\r\nlocation: https://github.com/\r\n",
+  "memory": "MemoryMax=4294967296\n",
+  "homeExit": 0,
+  "negativeExit": 1,
+  "negativeError": "Failed to clone image: Access denied\n",
+  "privateEgress": [
+    {
+      "status": 0,
+      "code": "200"
+    },
+    {
+      "status": 22,
+      "code": "403"
+    }
+  ],
+  "firewallService": "active",
+  "firewallProbes": [
+    {
+      "port": 7890,
+      "status": 0
+    },
+    {
+      "port": 22,
+      "status": 124
+    },
+    {
+      "port": 5231,
+      "status": 124
+    }
+  ],
+  "ufwService": "inactive",
+  "ufwRules": "",
+  "networkReady": true,
+  "networkWaitMs": 50000,
+  "ipv4": "10.203.0.2",
+  "networkdService": "active",
+  "networkdConfig": "[Network]\nManageForeignRoutingPolicyRules=no\nManageForeignRoutes=no\n",
+  "tunPresent": true,
+  "policyRules": "9001: from all to 172.19.0.0/30 lookup 2022\n9002: from all lookup 2022 suppress_prefixlength 0\n9003: from all iif sbtun0 goto 9010\n"
+}

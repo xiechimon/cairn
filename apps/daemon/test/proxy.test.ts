@@ -1,5 +1,9 @@
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { fetch, getGlobalDispatcher, setGlobalDispatcher } from 'undici';
 import { describe, expect, test } from 'vitest';
-import { detectProxyEnv, loopbackNoProxy } from '../src/proxy.js';
+import { createDaemonLogger } from '../src/log.js';
+import { detectProxyEnv, loopbackNoProxy, setupProxy } from '../src/proxy.js';
 
 describe('loopbackNoProxy', () => {
   test('127.0.0.1 server merged into existing NO_PROXY without swallowing entries', () => {
@@ -42,4 +46,33 @@ describe('detectProxyEnv', () => {
     expect(detectProxyEnv({ https_proxy: 'http://p:2' })).toBe('http://p:2');
     expect(detectProxyEnv({})).toBeNull();
   });
+});
+
+test('per-step proxy configuration routes real HTTP traffic without changing process env', async () => {
+  const original = getGlobalDispatcher();
+  const destinations: string[] = [];
+  const proxy = createServer((request, response) => {
+    destinations.push(request.url ?? '');
+    response.end('proxied');
+  });
+  await new Promise<void>((resolve) => proxy.listen(0, '127.0.0.1', resolve));
+  const address = proxy.address() as AddressInfo;
+  const before = process.env.HTTP_PROXY;
+  setupProxy(createDaemonLogger({}), {
+    HTTP_PROXY: `http://127.0.0.1:${address.port}`,
+    NO_PROXY: '',
+  });
+  const configured = getGlobalDispatcher();
+  try {
+    const response = await fetch('http://orb-proxy.test/status', {
+      signal: AbortSignal.timeout(2000),
+    });
+    expect(await response.text()).toBe('proxied');
+    expect(destinations).toEqual(['http://orb-proxy.test/status']);
+    expect(process.env.HTTP_PROXY).toBe(before);
+  } finally {
+    setGlobalDispatcher(original);
+    await configured.destroy();
+    await new Promise<void>((resolve) => proxy.close(() => resolve()));
+  }
 });

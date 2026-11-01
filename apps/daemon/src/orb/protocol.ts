@@ -6,6 +6,13 @@ import type { RunStepOptions } from '../runner.js';
 export const ORB_MAX_FRAME_BYTES = 16 * 1024 * 1024;
 export const ORB_MAX_CHECKPOINT_CONTENT_BYTES = 4 * 1024 * 1024;
 
+export const orbReleaseKeySchema = z
+  .string()
+  .max(240)
+  .regex(
+    /^[0-9]+\.[0-9]+\.[0-9]+(?:-[a-zA-Z0-9.-]+)?(?:\+[a-zA-Z0-9.-]+)?-[a-f0-9]{4,40}-dist-[a-f0-9]{16}(?:-dirty-[a-f0-9]{16})?$/,
+  );
+
 export const ORB_RPC_PREFIX = 'cairn-orb-rpc:';
 export const ORB_STEP_METHODS = [
   'heartbeat',
@@ -87,6 +94,9 @@ export const orbWorkerFrameSchema = z.discriminatedUnion('type', [
 ]);
 
 export type OrbFrame =
+  | { type: 'auth'; token: string; release: string }
+  | { type: 'authenticated' }
+  | { type: 'refused'; reason: 'stale-release' }
   | { type: 'init'; input: OrbStepInput }
   | { type: 'call'; id: number; method: OrbStepMethod; args: unknown[]; cancellable?: boolean }
   | { type: 'cancel'; id: number }
