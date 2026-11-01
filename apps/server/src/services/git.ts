@@ -183,6 +183,7 @@ export function toProjectRecord(row: ProjectRow, origin?: string): ProjectRecord
     baseBranch: row.baseBranch,
     ...(row.icon !== null ? { icon: row.icon } : {}),
     ...(row.color !== null ? { color: row.color } : {}),
+    archivedAt: row.archivedAt,
     ...(row.description !== null ? { description: row.description } : {}),
     ...(row.repoKind !== null ? { repoKind: row.repoKind } : {}),
     ...(row.repoName !== null ? { repoName: row.repoName } : {}),

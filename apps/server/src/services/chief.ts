@@ -31,7 +31,7 @@ import {
   newChiefThreadId,
   PLAN_PRIOR_ART_RULE,
 } from '@cairn/shared';
-import { and, asc, desc, eq, inArray, like, ne, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, like, ne, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   agent,
@@ -296,6 +296,7 @@ export function toChiefThreadRecord(
     chiefId: row.chiefId,
     userId: row.userId,
     teamId: row.teamId,
+    projectId: row.projectId,
     title: row.title,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -315,7 +316,13 @@ export function listChiefThreads(deps: ChiefDeps, teamId: string): ChiefThread[]
   return deps.db
     .select()
     .from(chiefThread)
-    .where(and(eq(chiefThread.chiefId, row.id), ne(chiefThread.id, chiefDigestThreadId(row.id))))
+    .where(
+      and(
+        eq(chiefThread.chiefId, row.id),
+        ne(chiefThread.id, chiefDigestThreadId(row.id)),
+        isNull(chiefThread.projectId),
+      ),
+    )
     .orderBy(desc(chiefThread.updatedAt))
     .all()
     .map((r) => {
@@ -408,18 +415,28 @@ function promptWithPickedProject(picked: { id: string; name: string } | null, co
     : `${PICKED_PROJECT_OPEN}${picked.name.replace(/[【】\r\n]+/g, ' ').trim()}（id: ${picked.id}）】\n${content}`;
 }
 
+function requireUnarchivedProject(db: ChiefDeps['db'], projectId: string): void {
+  const row = db
+    .select({ archivedAt: project.archivedAt })
+    .from(project)
+    .where(eq(project.id, projectId))
+    .get();
+  if (row?.archivedAt != null) throw new HttpError(409, `project ${projectId} is archived`);
+}
+
 export function sendChiefMessage(
   deps: ChiefDeps,
   teamId: string,
   body: { threadId: string | null; content: string; projectId?: string | null | undefined },
+  options: { bindNewThreadToProject?: boolean } = {},
 ): {
   thread: ChiefThread;
   message: { id: string; role: 'user'; content: string; createdAt: number };
 } {
   const chiefRow = ensureChief(deps, teamId);
   requireBoundAgent(deps, chiefRow);
-  const picked = pickedProjectOf(deps.db, teamId, body.projectId);
-  if (body.projectId != null && picked === null) {
+  const chosen = pickedProjectOf(deps.db, teamId, body.projectId);
+  if (body.projectId != null && chosen === null) {
     throw new HttpError(400, `project ${body.projectId} not in team`);
   }
 
@@ -430,6 +447,15 @@ export function sendChiefMessage(
       throw new HttpError(404, `chief thread ${body.threadId}`);
     }
   }
+  const boundProjectId =
+    threadRow !== undefined
+      ? threadRow.projectId
+      : options.bindNewThreadToProject === true
+        ? (chosen?.id ?? null)
+        : null;
+  if (boundProjectId !== null) requireUnarchivedProject(deps.db, boundProjectId);
+  const picked =
+    boundProjectId !== null ? pickedProjectOf(deps.db, teamId, boundProjectId) : chosen;
   const now = nowMs();
   if (!threadRow) {
     const id = newChiefThreadId(newUuidv7());
@@ -440,6 +466,7 @@ export function sendChiefMessage(
         chiefId: chiefRow.id,
         userId: deps.user.id,
         teamId,
+        projectId: boundProjectId,
         title: chiefThreadTitle(body.content),
         createdAt: now,
         updatedAt: now,
@@ -534,6 +561,7 @@ export function rewindChiefThread(
   if (!threadRow || threadRow.teamId !== teamId) {
     throw new HttpError(404, `chief thread ${threadId}`);
   }
+  if (threadRow.projectId !== null) requireUnarchivedProject(deps.db, threadRow.projectId);
   const anchor = deps.db
     .select()
     .from(chiefMessage)

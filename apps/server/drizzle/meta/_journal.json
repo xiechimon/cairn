@@ -589,6 +589,13 @@
       "when": 1793471349417,
       "tag": "0083_team_named_prompts",
       "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "6",
+      "when": 1793534925906,
+      "tag": "0084_project_coordinator",
+      "breakpoints": true
     }
   ]
 }

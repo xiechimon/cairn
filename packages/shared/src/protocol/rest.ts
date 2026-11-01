@@ -68,6 +68,18 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
     note: 'body {until: needed|tomorrow|tomorrow-09:00|next-monday|epoch ms|ISO, tz?}',
   },
   { method: 'POST', path: '/api/todos/{id}/unsnooze', note: 'clears the snooze' },
+  {
+    method: 'GET',
+    path: '/api/projects/{id}/coordinator',
+    note: "the project's Coordinator conversation, {thread} or {thread: null}",
+  },
+  {
+    method: 'POST',
+    path: '/api/projects/{id}/coordinator/messages',
+    note: 'body {content}; opens the conversation on the first message, 409 when archived',
+  },
+  { method: 'POST', path: '/api/projects/{id}/archive', note: 'sets project.archivedAt' },
+  { method: 'POST', path: '/api/projects/{id}/unarchive', note: 'clears project.archivedAt' },
   { method: 'GET', path: '/api/builds/{id}' },
   { method: 'GET', path: '/api/builds/{id}/steps' },
   { method: 'GET', path: '/api/conversations/{id}/messages', note: 'chief 会话同族（r5 §3.6）' },
