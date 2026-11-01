@@ -18,7 +18,13 @@ const sourceDir = resolve('scripts/ops/host/tools/app-token');
 
 const recorderStub = `#!${process.execPath}
 const fs = require('node:fs');
-fs.appendFileSync(process.env.CALLS, JSON.stringify({ argv: process.argv.slice(2), token: process.env.GH_TOKEN ?? null }) + '\\n');
+const argv = process.argv.slice(2);
+const entry = JSON.stringify({ argv, token: process.env.GH_TOKEN ?? null }) + '\\n';
+if (argv[0] === 'api' && argv[1] === '--paginate' && /\\/comments\\?/.test(argv[2] ?? '')) {
+  fs.appendFileSync(process.env.LOOKUPS, entry);
+  if (!fs.existsSync(process.env.GATE_COMMENTS)) process.exit(1);
+  process.stdout.write(fs.readFileSync(process.env.GATE_COMMENTS, 'utf8'));
+} else fs.appendFileSync(process.env.CALLS, entry);
 `;
 
 const tokenStub = `import { appendFileSync } from 'node:fs';
@@ -26,7 +32,17 @@ appendFileSync(process.env.TOKEN_MINTS, 'minted\\n');
 process.stdout.write('stub-installation-token');
 `;
 
-function setup(t) {
+const HEAD = 'a'.repeat(40);
+const OTHER = 'b'.repeat(40);
+const REPO = 'xiechimon/cairn';
+const passFor = (sha, carried = false) =>
+  `<!-- review-gate:${sha} -->\n**Independent review gate: PASS**${carried ? ' (carried over)' : ''} for \`${sha.slice(0, 8)}\`.`;
+const blockFor = (sha) =>
+  `<!-- review-gate:${sha} -->\n**Independent review gate: BLOCK** for \`${sha.slice(0, 8)}\`.\n\n1. x`;
+const bot = (body) => ({ login: 'cairnwright[bot]', body });
+const PASSED = [bot(passFor(HEAD))];
+
+function setup(t, comments = PASSED) {
   const root = mkdtempSync(join(tmpdir(), 'as-bot-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const tools = join(root, 'tools');
@@ -42,13 +58,19 @@ function setup(t) {
   }
   const calls = join(root, 'calls');
   const mints = join(root, 'mints');
+  const lookups = join(root, 'lookups');
+  const gateComments = join(root, 'gate-comments');
   writeFileSync(calls, '');
   writeFileSync(mints, '');
+  writeFileSync(lookups, '');
+  if (comments) writeFileSync(gateComments, comments.map((c) => `${JSON.stringify(c)}\n`).join(''));
   const env = {
     HOME: root,
     PATH: `${bin}:${dirname(process.execPath)}:/usr/bin:/bin`,
     CALLS: calls,
     TOKEN_MINTS: mints,
+    LOOKUPS: lookups,
+    GATE_COMMENTS: gateComments,
   };
   return {
     run(...argv) {
@@ -57,7 +79,9 @@ function setup(t) {
         encoding: 'utf8',
       });
       const recorded = readFileSync(calls, 'utf8').trim();
+      const looked = readFileSync(lookups, 'utf8').trim();
       return {
+        lookups: looked ? looked.split('\n').map((line) => JSON.parse(line)) : [],
         status: result.status,
         stderr: result.stderr,
         calls: recorded ? recorded.split('\n').map((line) => JSON.parse(line)) : [],
@@ -66,8 +90,6 @@ function setup(t) {
     },
   };
 }
-
-const HEAD = 'a'.repeat(40);
 
 const allowed = [
   ['gh', 'pr', 'view', '12', '-R', 'xiechimon/cairn', '--json', 'state'],
@@ -90,16 +112,9 @@ const allowed = [
   ['gh', 'pr', 'close', '12', '-c', 'closed'],
   ['gh', 'pr', 'update-branch', '12', '--rebase'],
   ['gh', 'pr', 'merge', '12', '-R', 'xiechimon/cairn', '--disable-auto'],
-  ['gh', 'pr', 'merge', '12', '-R', 'xiechimon/cairn', '--rebase', '--match-head-commit', HEAD],
-  ['gh', 'pr', 'merge', '12', '--squash', '--auto', '--match-head-commit', HEAD],
-  [
-    'gh',
-    'pr',
-    'merge',
-    'https://github.com/xiechimon/cairn/pull/12',
-    '--squash',
-    `--match-head-commit=${HEAD}`,
-  ],
+  ['gh', 'pr', 'merge', '12', '-R', REPO, '--rebase', '--match-head-commit', HEAD],
+  ['gh', 'pr', 'merge', '12', '-R', REPO, '--squash', '--auto', '--match-head-commit', HEAD],
+  ['gh', 'pr', 'merge', '12', `--repo=${REPO}`, '--squash', `--match-head-commit=${HEAD}`],
   ['gh', 'issue', 'view', '5'],
   ['gh', 'issue', 'list', '-l', 'batch:C1'],
   ['gh', 'issue', 'comment', '5', '-b', 'x'],
@@ -132,6 +147,20 @@ for (const argv of allowed) {
 
 const denied = [
   [['gh', 'pr', 'merge', '12', '--rebase'], /--match-head-commit <40-hex sha> is required/],
+  [['gh', 'pr', 'merge', '12', '--rebase', '--match-head-commit', HEAD], /by number with -R/],
+  [
+    [
+      'gh',
+      'pr',
+      'merge',
+      `https://github.com/${REPO}/pull/12`,
+      '-R',
+      REPO,
+      '--squash',
+      `--match-head-commit=${HEAD}`,
+    ],
+    /by number with -R/,
+  ],
   [
     ['gh', 'pr', 'merge', '12', '--squash', '--auto'],
     /--match-head-commit <40-hex sha> is required/,
@@ -181,8 +210,23 @@ const denied = [
   [['gh', 'api', '--method=PATCH', 'repos/xiechimon/cairn'], /read-only/],
   [['gh', 'api', '-XPOST', 'repos/xiechimon/cairn/issues'], /read-only/],
   [['gh', 'api', 'repos/xiechimon/cairn/issues', '-f', 'title=x'], /implicit POST/],
-  [['gh', 'api', 'repos/xiechimon/cairn/issues', '--input', '-'], /implicit POST/],
+  [['gh', 'api', 'repos/xiechimon/cairn/issues', '--input', '-'], /--input is refused/],
   [['gh', 'api', 'graphql', '-f', 'query=x'], /graphql/],
+  [['gh', 'api', 'repos/xiechimon/cairn/actions/variables', '--input=-'], /--input=- is refused/],
+  [['gh', 'api', 'repos/xiechimon/cairn/issues', '--field=title=x'], /implicit POST/],
+  [['gh', 'api', 'repos/xiechimon/cairn/issues', '--raw-field=title=x'], /implicit POST/],
+  [['gh', 'api', 'repos/xiechimon/cairn/issues', '-Ftitle=x'], /implicit POST/],
+  [['gh', 'api', 'repos/xiechimon/cairn/issues', '-if', 'title=x'], /implicit POST/],
+  [
+    ['gh', 'api', 'repos/xiechimon/cairn/issues', '-H', 'X-HTTP-Method-Override: POST'],
+    /-H is refused/,
+  ],
+  [
+    ['gh', 'api', 'repos/xiechimon/cairn/issues', '--hostname=evil.invalid'],
+    /--hostname=evil.invalid is refused/,
+  ],
+  [['gh', 'api', '-XPOS', 'repos/xiechimon/cairn/issues'], /read-only/],
+  [['gh', 'api', 'repos/a', 'repos/b'], /exactly one endpoint/],
   [['gh', 'variable', 'set', 'X', '-b', 'y'], /not on the as-bot allowlist/],
   [['gh', 'variable', 'delete', 'X'], /not on the as-bot allowlist/],
   [['gh', 'secret', 'set', 'X'], /not on the as-bot allowlist/],
@@ -217,7 +261,20 @@ const denied = [
   [['git', 'fetch', '--upload-pack=evil', 'origin'], /git fetch --upload-pack=evil is refused/],
   [['git', 'fetch', 'https://example.invalid/x.git'], /origin remote/],
   [['git', 'rebase', '--exec', 'evil', 'origin/main'], /refused/],
+  [['git', 'rebase', "--exec='touch pwned'", 'origin/main'], /refused/],
+  [['git', 'rebase', '--exe=evil', 'origin/main'], /refused/],
+  [['git', 'rebase', '--ex', 'evil', 'origin/main'], /refused/],
+  [['git', 'rebase', '-xevil', 'origin/main'], /refused/],
+  [['git', 'rebase', '-qx', 'evil', 'origin/main'], /refused/],
   [['git', 'rebase', '-i', 'origin/main'], /refused/],
+  [['git', 'rebase', '--interac', 'origin/main'], /refused/],
+  [['git', 'rebase', '-s', 'evil', 'origin/main'], /refused/],
+  [['git', 'rebase', '--strategy=evil', 'origin/main'], /refused/],
+  [['git', 'rebase', '-X', 'evil', 'origin/main'], /only -X theirs or -X ours/],
+  [['git', 'rebase', '--continue', 'origin/main'], /exactly one upstream/],
+  [['git', 'rebase', 'origin/main', 'topic'], /exactly one upstream/],
+  [['git', 'fetch', '--upload-p=evil', 'origin'], /refused/],
+  [['git', 'fetch', '--upl', 'evil', 'origin'], /refused/],
   [['git', 'reset', '--hard'], /not on the as-bot allowlist/],
   [['git', 'config', 'x', 'y'], /not on the as-bot allowlist/],
   [['git'], /not on the as-bot allowlist/],
@@ -236,6 +293,69 @@ for (const [argv, message] of denied) {
     assert.equal(result.minted, false);
   });
 }
+
+const gateRefusals = [
+  ['no verdict comment', [], /verdict for aaaaaaaa is missing/],
+  ['a BLOCK after the PASS', [bot(passFor(HEAD)), bot(blockFor(HEAD))], /is BLOCK/],
+  ['a PASS for another head', [bot(passFor(OTHER))], /is missing/],
+  ['a PASS posted by a human', [{ login: 'xiechimon', body: passFor(HEAD) }], /is missing/],
+  ['a PASS quoted inside another comment', [bot(`see\n${passFor(HEAD)}`)], /is missing/],
+  ['an unreadable comment list', null, /could not be read/],
+];
+
+for (const [name, comments, message] of gateRefusals) {
+  test(`gh pr merge is refused with ${name}`, (t) => {
+    const result = setup(t, comments).run(
+      'gh',
+      'pr',
+      'merge',
+      '12',
+      '-R',
+      REPO,
+      '--rebase',
+      '--match-head-commit',
+      HEAD,
+    );
+    assert.equal(result.status, 126);
+    assert.match(result.stderr, /^as-bot: refused: gh pr merge is refused: /);
+    assert.match(result.stderr, message);
+    assert.deepEqual(result.calls, []);
+    assert.equal(result.minted, false);
+  });
+}
+
+test('a carried-over PASS for the pinned head allows the merge', (t) => {
+  const result = setup(t, [bot(blockFor(HEAD)), bot(passFor(HEAD, true))]).run(
+    'gh',
+    'pr',
+    'merge',
+    '12',
+    '-R',
+    REPO,
+    '--squash',
+    '--match-head-commit',
+    HEAD,
+  );
+  assert.equal(result.status, 0, result.stderr);
+});
+
+test('the verdict lookup reads the named PR without the bot token', (t) => {
+  const result = setup(t).run(
+    'gh',
+    'pr',
+    'merge',
+    '12',
+    '-R',
+    REPO,
+    '--rebase',
+    '--match-head-commit',
+    HEAD,
+  );
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.lookups.length, 1);
+  assert.equal(result.lookups[0].token, null);
+  assert.equal(result.lookups[0].argv[2], `repos/${REPO}/issues/12/comments?per_page=100`);
+});
 
 test('as-bot.sh refuses before any token is minted and exits 126', (t) => {
   const result = setup(t).run('gh', 'pr', 'merge', '1', '--admin');

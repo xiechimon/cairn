@@ -25,14 +25,21 @@ const line = args.join(' ');
 ${respond}
 `;
 
-const ghForMerge = recordingStub(
-  'gh',
-  `if (line.includes('headRefOid')) console.log(${JSON.stringify(HEAD)});
+const PASS = JSON.stringify({
+  login: 'cairnwright[bot]',
+  body: `<!-- review-gate:${HEAD} -->\n**Independent review gate: PASS** for \`${HEAD.slice(0, 8)}\`.`,
+});
+
+const ghForMerge = (verdict) =>
+  recordingStub(
+    'gh',
+    `if (line.includes('/comments?')) console.log(${JSON.stringify(verdict)});
+else if (line.includes('headRefOid')) console.log(${JSON.stringify(HEAD)});
 else if (line.includes('headRefName')) console.log('feature/x');
 else if (line.includes('authors')) console.log('348051526+cairnwright@users.noreply.github.com');
 else if (line.includes('author')) console.log('app/cairnwright');
 else if (line.includes('length')) console.log('1');`,
-);
+  );
 
 const ghForPrune = recordingStub(
   'gh',
@@ -51,7 +58,7 @@ test('merge-pr.sh merges a bot PR through the real policy pinned to the head it 
   const fixture = hostFixture(t, {
     hostFiles: {
       ...botFiles,
-      'bin/gh': ghForMerge,
+      'bin/gh': ghForMerge(PASS),
       '.cairn/tools/merge-order/deps-open.mjs': 'process.exit(0);\n',
       '.cairn/tools/review-gate/review-gate.mjs': 'process.exit(3);\n',
     },
@@ -67,7 +74,7 @@ test('merge-pr.sh --auto keeps the pin when it arms auto-merge', (t) => {
   const fixture = hostFixture(t, {
     hostFiles: {
       ...botFiles,
-      'bin/gh': ghForMerge,
+      'bin/gh': ghForMerge(PASS),
       '.cairn/tools/merge-order/deps-open.mjs': 'process.exit(0);\n',
       '.cairn/tools/review-gate/review-gate.mjs': 'process.exit(3);\n',
     },
@@ -81,7 +88,25 @@ test('merge-pr.sh --auto keeps the pin when it arms auto-merge', (t) => {
   );
 });
 
-test('evidence-prune.sh commits and arms a pinned squash auto-merge through the real policy', (t) => {
+test('merge-pr.sh cannot merge a bot PR the review gate has not passed', (t) => {
+  const fixture = hostFixture(t, {
+    hostFiles: {
+      ...botFiles,
+      'bin/gh': ghForMerge(''),
+      '.cairn/tools/merge-order/deps-open.mjs': 'process.exit(0);\n',
+      '.cairn/tools/review-gate/review-gate.mjs': 'process.exit(3);\n',
+    },
+  });
+  const result = fixture.run('tools/merge-pr.sh', ['7']);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /as-bot: refused: gh pr merge is refused: .* is missing/);
+  assert.equal(
+    result.ghLines.some((line) => line.startsWith('pr merge')),
+    false,
+  );
+});
+
+test('evidence-prune.sh commits through the bot and arms a pinned squash auto-merge as the human login', (t) => {
   const stamp = new Date().toISOString().slice(0, 10).replaceAll('-', '');
   const fixture = hostFixture(t, {
     hostFiles: {

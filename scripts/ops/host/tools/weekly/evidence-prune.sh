@@ -54,7 +54,7 @@ MD
 )
 URL=$("$BOT" gh pr create --base main --head "$BRANCH" --title 'docs: weekly evidence prune (ADR 0022)' --body "$BODY")
 echo "$URL"
-"$BOT" gh pr merge "$URL" --squash --auto --match-head-commit "$HEAD_SHA"
+gh pr merge "$URL" --squash --auto --match-head-commit "$HEAD_SHA"
 sleep 120
 if ! gh pr checks "$URL" --watch --interval 300 >/dev/null 2>&1; then
   "$BOT" gh pr comment "$URL" --body "@xiechimon CI failed on the weekly evidence prune; it will not auto-merge until fixed."
