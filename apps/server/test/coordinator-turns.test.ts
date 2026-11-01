@@ -246,6 +246,25 @@ describe('rewind never cuts another project out of the shared transcript', () =>
     expect(((await res.json()) as { deletedCount: number }).deletedCount).toBe(1);
   });
 
+  test('orchestrations carry their task project, so rewinding across them is refused', async () => {
+    const site = await postProject(H.s.app, 'cairn-site');
+    const first = await orchestrate(await postTodo(H.projectId, 'demo task'));
+    setStep(first, { status: 'done', finishedAt: Date.now() });
+    const second = await orchestrate(await postTodo(site, 'site task'));
+    setStep(second, { status: 'done', finishedAt: Date.now() });
+    H.s.db.update(chiefThread).set({ activeRun: null }).where(eq(chiefThread.id, H.threadId)).run();
+    const tags = H.s.db
+      .select()
+      .from(chiefMessage)
+      .where(eq(chiefMessage.threadId, H.threadId))
+      .all()
+      .map((m) => m.projectId);
+    expect(tags).toEqual([H.projectId, site]);
+    const res = await rewind(first);
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { error: string }).error).toContain('cairn-site');
+  });
+
   test('a queued turn refuses the rewind', async () => {
     const anchor = await send('plan demo', H.projectId);
     await req(H.s.app, 'POST', `/api/teams/${H.teamId}/coordinator/messages`, {
