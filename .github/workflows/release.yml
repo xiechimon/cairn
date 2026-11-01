@@ -75,7 +75,7 @@ jobs:
 
   publish:
     needs: pack
-    if: needs.pack.outputs.count != '0'
+    if: needs.pack.outputs.count != '0' && github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: npm
     timeout-minutes: 75
@@ -84,6 +84,15 @@ jobs:
       contents: write
       id-token: write
     steps:
+      - name: Refuse to publish outside a push to main
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+        run: |
+          if [[ "$EVENT_NAME" != "push" || "$REF" != "refs/heads/main" ]]; then
+            echo "::error::Publishing requires a push to refs/heads/main, got $EVENT_NAME on $REF"
+            exit 1
+          fi
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 0
