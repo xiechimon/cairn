@@ -325,6 +325,8 @@ export const EN: Record<string, string> = {
   '执行 Agent': 'Executing agent',
   '分配给…': 'Assign to…',
   编辑描述: 'Edit description',
+  '描述未能保存，内容仍保留在这里。':
+    'The description could not be saved. Your text is still here.',
   '补充 Agent 需要知道的内容：设置放在哪里、做到什么程度算完成…':
     'Add what the agent should know: where the setting lives, what done looks like…',
   '{agent} 会先写方案，你确认之前不会改动任何东西。':

@@ -132,3 +132,49 @@ test('an existing description renders as markdown and turns editable on request'
   await expect(page.getByTestId('fresh-description')).toHaveValue(/dark mode/);
   WIRE_TASK.spec = '';
 });
+
+test('a save in flight keeps the typed description, then settles', async ({ page }) => {
+  const writes: Request[] = [];
+  await stubLive(page, writes);
+  let release: () => void = () => {};
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route('**/api/todos/todo-0', async (route, request) => {
+    if (request.method() !== 'PATCH') return route.fallback();
+    writes.push(request);
+    await gate;
+    return route.fulfill({ json: { ...WIRE_TASK, spec: 'Keep me.' } });
+  });
+  await page.goto('/app/todo/todo-0');
+  const box = page.getByTestId('fresh-description');
+  await box.fill('Keep me.');
+  await box.blur();
+  await expect.poll(() => writes.length).toBe(1);
+  await expect(box).toHaveValue('Keep me.');
+  release();
+  await expect(page.getByTestId('fresh-description-view')).toContainText('Keep me.');
+  await expect(page.getByTestId('fresh-description-error')).toHaveCount(0);
+});
+
+test('a failed save keeps the text, says so and can be retried', async ({ page }) => {
+  const writes: Request[] = [];
+  await stubLive(page, writes);
+  let fail = true;
+  await page.route('**/api/todos/todo-0', (route, request) => {
+    if (request.method() !== 'PATCH') return route.fallback();
+    writes.push(request);
+    if (fail) return route.fulfill({ status: 500, json: { error: 'e2e stub: save failed' } });
+    return route.fulfill({ json: { ...WIRE_TASK, spec: 'Retry me.' } });
+  });
+  await page.goto('/app/todo/todo-0');
+  const box = page.getByTestId('fresh-description');
+  await box.fill('Retry me.');
+  await box.blur();
+  await expect(page.getByTestId('fresh-description-error')).toBeVisible();
+  await expect(box).toHaveValue('Retry me.');
+  fail = false;
+  await page.getByTestId('fresh-description-error').getByRole('button', { name: '重试' }).click();
+  await expect(page.getByTestId('fresh-description-error')).toHaveCount(0);
+  await expect(page.getByTestId('fresh-description-view')).toContainText('Retry me.');
+});

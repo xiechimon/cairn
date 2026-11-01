@@ -825,12 +825,11 @@ export function TodoDetailPage() {
     );
   };
 
-  const saveSpec = (spec: string) => {
-    mutations.patchTodo.mutate(
-      { id: todo.id, body: { spec } },
-      { onError: (error) => toastError(t('保存失败，请重试。'), error) },
-    );
-  };
+  const saveSpec = (spec: string) =>
+    mutations.patchTodo.mutateAsync({ id: todo.id, body: { spec } }).catch((error: unknown) => {
+      toastError(t('保存失败，请重试。'), error);
+      throw error;
+    });
 
   const unarchiveTask = () => {
     if (!live) return;

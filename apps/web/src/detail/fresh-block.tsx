@@ -55,44 +55,69 @@ interface FreshBlockProps {
   onPickAgent?: (agentId: string) => void;
   agentRebindCopy?: string;
   spec: string;
-  onSaveSpec?: (spec: string) => void;
+  onSaveSpec?: (spec: string) => Promise<unknown> | void;
   action?: string | null;
   onAction?: () => void;
   actionInFlight?: boolean;
 }
 
-function DescriptionBox({ spec, onSave }: { spec: string; onSave?: (spec: string) => void }) {
+function DescriptionBox({
+  spec,
+  onSave,
+}: {
+  spec: string;
+  onSave?: (spec: string) => Promise<unknown> | void;
+}) {
   const { t } = useI18n();
   const [draft, setDraft] = useState(spec);
   const [focused, setFocused] = useState(false);
-  const saved = useRef(spec);
+  const [saving, setSaving] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const base = useRef(spec);
+  const inFlight = useRef(false);
   const save = useRef(onSave);
   save.current = onSave;
+  const dirty = draft !== base.current;
 
+  const seen = useRef(spec);
   useEffect(() => {
-    if (!focused && spec !== saved.current) {
-      saved.current = spec;
+    if (spec === seen.current) return;
+    seen.current = spec;
+    if (!saving && !failed && draft === base.current) {
+      base.current = spec;
       setDraft(spec);
     }
-  }, [spec, focused]);
+  }, [spec, saving, failed, draft]);
+
+  const commit = async () => {
+    const value = draft;
+    if (value === base.current || inFlight.current || save.current == null) return;
+    inFlight.current = true;
+    setSaving(true);
+    setFailed(false);
+    try {
+      await save.current(value);
+      base.current = value;
+    } catch {
+      setFailed(true);
+    } finally {
+      inFlight.current = false;
+      setSaving(false);
+    }
+  };
 
   useEffect(() => {
-    if (draft === saved.current) return;
-    const timer = setTimeout(() => {
-      saved.current = draft;
-      save.current?.(draft);
-    }, SAVE_DELAY_MS);
+    if (draft === base.current || saving || failed) return;
+    const timer = setTimeout(() => void commit(), SAVE_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [draft]);
+  });
 
   const flush = () => {
     setFocused(false);
-    if (draft === saved.current) return;
-    saved.current = draft;
-    save.current?.(draft);
+    void commit();
   };
 
-  if (draft.trim() !== '' && !focused) {
+  if (draft.trim() !== '' && !focused && !dirty && !saving && !failed) {
     return (
       <div data-testid="fresh-description-view">
         <SpecBlock spec={draft} className="m-0" />
@@ -110,7 +135,7 @@ function DescriptionBox({ spec, onSave }: { spec: string; onSave?: (spec: string
     );
   }
 
-  return (
+  const field = (
     <Textarea
       data-testid="fresh-description"
       autoFocus={focused}
@@ -119,10 +144,36 @@ function DescriptionBox({ spec, onSave }: { spec: string; onSave?: (spec: string
       readOnly={onSave == null}
       aria-label={t('描述')}
       placeholder={t('补充 Agent 需要知道的内容：设置放在哪里、做到什么程度算完成…')}
-      onChange={(event) => setDraft(event.target.value)}
+      onChange={(event) => {
+        setFailed(false);
+        setDraft(event.target.value);
+      }}
       onFocus={() => setFocused(true)}
       onBlur={flush}
     />
+  );
+
+  return (
+    <>
+      {field}
+      {failed && (
+        <div
+          role="alert"
+          data-testid="fresh-description-error"
+          className="mt-1.5 flex items-center gap-2 text-meta text-destructive"
+        >
+          {t('描述未能保存，内容仍保留在这里。')}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-1.5 text-meta font-normal"
+            onClick={() => void commit()}
+          >
+            {t('重试')}
+          </Button>
+        </div>
+      )}
+    </>
   );
 }
 
