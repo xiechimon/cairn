@@ -193,6 +193,29 @@ describe('the coordinator route (D70 C5)', () => {
     expect(fallbacks).toEqual([]);
   });
 
+  test('a keyed relay speaking the Anthropic API is never seeded as the Coordinator', async () => {
+    const w = await world();
+    createProvider(
+      { db: w.s.db, box: w.s.secretBox },
+      {
+        teamId: w.teamId,
+        body: {
+          providerId: 'relay-186',
+          label: 'Relay',
+          baseUrl: 'https://relay.example.com/v1',
+          api: 'anthropic-messages',
+          apiKey: 'relay-key',
+          models: [{ id: 'glm-5.3', name: 'GLM' }],
+        },
+        createdBy: w.s.user.id,
+      },
+    );
+    allowPaidClaude(w);
+    expect((await claim(w)).agent).toMatchObject({ provider: 'stub-gw', modelId: 'stub-model' });
+    expect(w.s.db.select().from(routingRule).all()).toEqual([]);
+    expect(fallbacks).toEqual([[w.teamId, 'no-api-key-provider']]);
+  });
+
   test('a keyed provider while the team is subscription-only falls back instead of spending', async () => {
     const w = await world();
     addAnthropicKey(w);

@@ -34,9 +34,19 @@ function fallback(teamId: string, reason: CoordinatorRouteFallback): null {
 
 const MODEL_PREFERENCE = [/haiku/i, /sonnet/i];
 
+const ANTHROPIC_API_HOST = 'api.anthropic.com';
+
+function isAnthropicApi(baseUrl: string): boolean {
+  try {
+    return new URL(baseUrl).hostname === ANTHROPIC_API_HOST;
+  } catch {
+    return false;
+  }
+}
+
 function keyedAnthropicProvider(db: Db, teamId: string) {
   return db
-    .select({ providerId: provider.providerId, models: provider.models })
+    .select({ providerId: provider.providerId, models: provider.models, baseUrl: provider.baseUrl })
     .from(provider)
     .where(
       and(
@@ -45,7 +55,8 @@ function keyedAnthropicProvider(db: Db, teamId: string) {
         isNotNull(provider.apiKeyCipher),
       ),
     )
-    .get();
+    .all()
+    .find((row) => isAnthropicApi(row.baseUrl));
 }
 
 function seedCoordinatorRule(db: Db, teamId: string) {
