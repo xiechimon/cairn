@@ -5,6 +5,7 @@ import {
   BLOCK_ROUNDS,
   CLAUDE_DIFF_PATHSPEC,
   CLAUDE_OMITTED_PATHS,
+  CLAUDE_REVIEW_MODEL,
   claudeFallback,
   claudeReviewArgs,
   claudeReviewPrompt,
@@ -687,7 +688,7 @@ ${
     }
     const reviewer =
       run.reviewer === 'claude'
-        ? ` (reviewer: Claude (opus), ${run.authorVendor ? `author vendor ${run.authorVendor} excluded` : 'author vendor unknown, same-vendor review possible'})`
+        ? ` (reviewer: Claude (${CLAUDE_REVIEW_MODEL}), ${run.authorVendor ? `author vendor ${run.authorVendor} excluded` : 'author vendor unknown, same-vendor review possible'})`
         : '';
     const body =
       verdict === 'pass'
