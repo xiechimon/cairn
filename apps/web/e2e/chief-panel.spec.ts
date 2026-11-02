@@ -274,7 +274,7 @@ test.describe('chief panel floating form (ADR 0013)', () => {
       return composer.getAttribute('placeholder');
     };
 
-    expect(await placeholderAt('113')).toBe('总管回完这条就看；想马上补充，发出后点「现在插话」');
+    expect(await placeholderAt('113')).toBe('发出的话会直接插进总管这一轮');
     expect(await placeholderAt('111')).toBe('有什么可以帮你的？');
     expect(await placeholderAt('114')).toBe('有什么可以帮你的？');
   });
