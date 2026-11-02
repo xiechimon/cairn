@@ -13,6 +13,10 @@ export const orbReleaseKeySchema = z
     /^[0-9]+\.[0-9]+\.[0-9]+(?:-[a-zA-Z0-9.-]+)?(?:\+[a-zA-Z0-9.-]+)?-[a-f0-9]{4,40}-dist-[a-f0-9]{16}(?:-dirty-[a-f0-9]{16})?$/,
   );
 
+export function isOrbPathId(id: string): boolean {
+  return /^[A-Za-z0-9_-]{1,128}$/.test(id);
+}
+
 export const ORB_RPC_PREFIX = 'cairn-orb-rpc:';
 export const ORB_STEP_METHODS = [
   'heartbeat',

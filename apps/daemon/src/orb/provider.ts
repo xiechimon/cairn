@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 import type { WorkspaceHookNoteData } from '@cairn/shared';
 import { ensurePrivateDir, writePrivateFile } from '../private-fs.js';
 import { publishOrbDist } from './dist.js';
-import { orbReleaseKeySchema } from './protocol.js';
+import { isOrbPathId, orbReleaseKeySchema } from './protocol.js';
 import { prepareOrbSeed } from './seed.js';
 
 export interface OrbHandle {
@@ -288,7 +288,7 @@ export class NspawnOrbProvider implements OrbProvider {
       );
       this.save();
       if (seed) {
-        if (!/^[a-zA-Z0-9-]+$/.test(handle.projectId)) throw new Error('Invalid orb project id');
+        if (!isOrbPathId(handle.projectId)) throw new Error('Invalid orb project id');
         const project = join(this.seedRoot, handle.projectId);
         mkdirSync(project, { recursive: true, mode: 0o755 });
         const snapshot = mkdtempSync(join(project, '.snapshot-'));
