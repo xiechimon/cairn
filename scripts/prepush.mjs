@@ -156,15 +156,47 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
       ];
 }
 
-export function runPlan(plan, { cwd, env, exit = (code) => process.exit(code) }) {
+export const NODE_TEST_TIMEOUT_MS = 300_000;
+export const NODE_TEST_STEP_TIMEOUT_MS = 15 * 60_000;
+
+export function runPlan(
+  plan,
+  {
+    cwd,
+    env,
+    exit = (code) => process.exit(code),
+    testTimeoutMs = NODE_TEST_TIMEOUT_MS,
+    stepTimeoutMs = NODE_TEST_STEP_TIMEOUT_MS,
+  },
+) {
   for (const step of plan) {
     const [command, ...commandArgs] = step;
     console.log(`[prepush] ${command} ${commandArgs.join(' ')}`);
-    const result = spawnSync(command, commandArgs, {
-      cwd,
-      stdio: 'inherit',
-      env: scrubGitEnv({ ...env }),
-    });
+    const nodeTest = command === 'node' && commandArgs[0] === '--test';
+    const result = spawnSync(
+      command,
+      nodeTest
+        ? [
+            '--test',
+            '--test-force-exit',
+            `--test-timeout=${testTimeoutMs}`,
+            ...commandArgs.slice(1),
+          ]
+        : commandArgs,
+      {
+        cwd,
+        stdio: 'inherit',
+        env: scrubGitEnv({ ...env }),
+        ...(nodeTest ? { timeout: stepTimeoutMs, killSignal: 'SIGKILL' } : {}),
+      },
+    );
+    if (result.error?.code === 'ETIMEDOUT') {
+      console.error(
+        `[prepush] ${command} ${commandArgs.join(' ')} did not exit within ${stepTimeoutMs / 60_000} min; killed`,
+      );
+      exit(1);
+      return;
+    }
     if (result.status !== 0) {
       exit(result.status ?? 1);
       return;
