@@ -308,7 +308,7 @@ export function ChiefConversation({
     ...(chipVisible ? { onPickProject: (p: { id: string }) => pickProject(p.id) } : {}),
     slash: {
       reviewAvailable: false,
-      stopAvailable: chief.running === true && onStop != null,
+      stopAvailable: targetPlaceholder === null && chief.running === true && onStop != null,
       onStop: () => stopTurnRef.current?.(),
     },
     growCap: 120,

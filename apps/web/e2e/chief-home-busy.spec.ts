@@ -347,6 +347,7 @@ test.describe('queue, steer and stop while the chief is replying (T5)', () => {
     await input.press('ArrowDown');
     await input.press('Enter');
     await expect.poll(() => calls.filter((c) => c === 'POST /stop').length).toBe(2);
+    await expect(input).toHaveValue('');
     expect(calls).not.toContain('send');
   });
 
