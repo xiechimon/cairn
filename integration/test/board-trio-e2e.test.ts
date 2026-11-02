@@ -2,11 +2,11 @@ import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { orchestrateThreadTitle } from '@cairn/shared';
+import { orchestratePromptHead } from '@cairn/shared';
 import { type Browser, chromium, type Page, expect as pexpect } from '@playwright/test';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { chiefThread, todo as todoTable } from '../../apps/server/src/db/schema.js';
+import { step as stepTable, todo as todoTable } from '../../apps/server/src/db/schema.js';
 import { AGENT_ID, api, bootRealServer, type RealServer, waitFor } from './helpers.js';
 
 const ROOT = resolve(fileURLToPath(import.meta.url), '../../..');
@@ -24,12 +24,14 @@ const SPECS = {
   deletable: '删除探针：failed 卡详情必须可删。',
 };
 
-function orchestrateThreads(seqNum: number) {
+function orchestrationTurns(seqNum: number) {
+  const request = `${orchestratePromptHead(seqNum)}\n\n编排请求：`;
   return server.db
     .select()
-    .from(chiefThread)
-    .where(eq(chiefThread.title, orchestrateThreadTitle(seqNum)))
-    .all();
+    .from(stepTable)
+    .where(eq(stepTable.kind, 'chief'))
+    .all()
+    .filter((row) => (row.prompt ?? '').includes(request));
 }
 
 function latestBuildIdOf(todoId: string): string | null {
@@ -267,21 +269,21 @@ describe('#1216 board UI reliability triple defect (real web dist + real server 
       seqNum = row.seqNum;
       return true;
     }, 15_000);
-    expect(orchestrateThreads(seqNum).length).toBe(0);
+    expect(orchestrationTurns(seqNum).length).toBe(0);
     await openBoard();
     const card = page.locator(`[data-todo-id="${todoId}"]`);
     await card.locator('.todo-card-action').click();
-    await waitFor(() => orchestrateThreads(seqNum).length === 1, 15_000);
+    await waitFor(() => orchestrationTurns(seqNum).length === 1, 15_000);
 
     await pexpect(card.locator('.todo-card-orchestration')).toContainText('编排中', {
       timeout: 15_000,
     });
     await pexpect(card.locator('.todo-card-action')).toHaveCount(0);
-    expect(orchestrateThreads(seqNum).length).toBe(1);
+    expect(orchestrationTurns(seqNum).length).toBe(1);
 
-    const thread = orchestrateThreads(seqNum)[0];
-    if (thread === undefined) throw new Error('orchestration thread missing');
-    await runChiefDispatch(tokens.m1, thread.id, {
+    const turn = orchestrationTurns(seqNum)[0];
+    if (turn === undefined) throw new Error('orchestration turn missing');
+    await runChiefDispatch(tokens.m1, turn.buildId, {
       todoIds: [todoId],
       withPlan: true,
     });
@@ -297,7 +299,7 @@ describe('#1216 board UI reliability triple defect (real web dist + real server 
     await waitFor(() => server.todoPhase(todoId) === 'planning', 15_000);
 
     await pexpect(cardInColumn('执行中', todoId)).toBeVisible({ timeout: 30_000 });
-    expect(orchestrateThreads(seqNum).length).toBe(1);
+    expect(orchestrationTurns(seqNum).length).toBe(1);
   }, 180_000);
 
   test('② failed rerun: thread must land + visible in-flight + buildHistory grows after chief dispatch', async () => {
@@ -310,16 +312,16 @@ describe('#1216 board UI reliability triple defect (real web dist + real server 
     await pexpect(dialog).toBeVisible();
     await dialog.getByRole('button', { name: '重跑' }).click();
 
-    await waitFor(() => orchestrateThreads(seeded.seqNum).length === 1, 15_000);
+    await waitFor(() => orchestrationTurns(seeded.seqNum).length === 1, 15_000);
     await pexpect(page.locator('.detail-head-action[data-orchestrating="true"]')).toHaveText(
       '编排中',
       { timeout: 15_000 },
     );
     await pexpect(page.locator('.detail-head-action[data-orchestrating="true"]')).toBeDisabled();
 
-    const thread = orchestrateThreads(seeded.seqNum)[0];
-    if (thread === undefined) throw new Error('rerun orchestration thread missing');
-    await runChiefDispatch(tokens.m1, thread.id, {
+    const turn = orchestrationTurns(seeded.seqNum)[0];
+    if (turn === undefined) throw new Error('rerun orchestration turn missing');
+    await runChiefDispatch(tokens.m1, turn.buildId, {
       todoIds: [seeded.id],
       withPlan: false,
     });

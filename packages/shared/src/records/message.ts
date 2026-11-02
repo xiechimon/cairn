@@ -149,6 +149,7 @@ export const askUserQuestionContentSchema = z.object({
   questions: z.array(askUserQuestionSchema).min(1).max(4),
   answers: z.array(askUserAnswerSchema).nullable(),
   cancelReason: z.string().optional(),
+  parkedAt: z.number().int().optional(),
 });
 export type AskUserQuestionContent = z.infer<typeof askUserQuestionContentSchema>;
 

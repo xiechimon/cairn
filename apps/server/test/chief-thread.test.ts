@@ -20,10 +20,10 @@ describe('chief thread surface persistence (02 section 4.3 / r5 section 3.6)', (
     });
     expect(res.status).toBe(201);
     const body = (await res.json()) as { thread: { id: string }; message: { role: string } };
-    expect(body.thread.id.startsWith('chief-')).toBe(true);
+    expect(body.thread.id).toBe(H.threadId);
     expect(body.message.role).toBe('user');
     const threads = H.s.db.select().from(chiefThread).all();
-    expect(threads.length).toBeGreaterThanOrEqual(2);
+    expect(threads.map((t) => t.id)).toEqual([H.threadId]);
     const msgs = H.s.db
       .select()
       .from(chiefMessage)

@@ -4,6 +4,7 @@ import { useLocation } from 'react-router';
 import { useMachines, useProjects, useSearchResults, useTodos } from '../api/hooks.js';
 import { toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
+import { useOptionalChiefRoot } from '../chief/chief-root.js';
 import { Button } from '../components/ui/button.js';
 import { Dialog, DialogContent, DialogTitle } from '../components/ui/dialog.js';
 import type { FixtureSet, TodoRecord } from '../fixtures/records.js';
@@ -11,7 +12,7 @@ import { useI18n } from '../i18n/provider.js';
 import { useNewTaskHotkey } from '../overlay/hotkeys.js';
 import { SearchPanel, useSearchState } from '../overlay/search-panel.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
-import { attentionCount } from './columns.js';
+import { needsYouCount } from './needs-you.js';
 import { useOpenComposer } from './open-composer.js';
 import { BoardSidebar, type SidebarProject, type SidebarSelected } from './sidebar.js';
 
@@ -102,8 +103,9 @@ export function AppSidebar({
   const openComposer = useOpenComposer();
   const openNewTask = useCallback(() => openComposer(), [openComposer]);
   useNewTaskHotkey(openNewTask);
+  const chiefStream = useOptionalChiefRoot()?.surface.chiefData.stream ?? [];
   const sidebarProps = {
-    attention: attentionCount(resolvedTodos, live ? Date.now() : fixture.now),
+    attention: needsYouCount(resolvedTodos, chiefStream),
     machinesOnline,
     todos: resolvedTodos,
     onSearch: onSearch ?? (() => search.setOpen(true)),

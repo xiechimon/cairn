@@ -45,10 +45,6 @@ describe('worker reports in the chief conversation', () => {
     '%s persists and publishes a system report before the wake reply',
     async (phase) => {
       const { deps, todoId } = await seedTask(true);
-      const unrelated = sendChiefMessage(deps, H.teamId, {
-        threadId: null,
-        content: 'An unrelated conversation',
-      }).thread;
       const publish = vi.spyOn(H.s.convHub, 'publishMessage');
       setTodoPhase(deps, todoId, phase);
       const rows = await messages();
@@ -75,7 +71,6 @@ describe('worker reports in the chief conversation', () => {
         createdAt: report.createdAt,
       });
       expect((await messages()).map((row) => row.id)).toEqual([report.id, `reply-${wake.id}`]);
-      expect(await messages(unrelated.id)).toHaveLength(1);
       setTodoPhase(deps, todoId, phase);
       expect(await messages()).toHaveLength(2);
     },

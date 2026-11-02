@@ -16,6 +16,7 @@ import { MessageScrollerProvider } from '../components/ui/message-scroller.js';
 import type { ChiefStreamItem, MachineRow, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ClaudeLoginBanner } from './claude-login-banner.js';
+import { ACT_ORDER, actRank, needsYouThreads, pendingQuestions } from './needs-you.js';
 import { composeRequest } from './open-composer.js';
 import { relativeTime } from './rel-time.js';
 import { threadCopy, threadHref, threadStatus, threadTone } from './thread-copy.js';
@@ -33,8 +34,6 @@ export function greetingFor(hour: number): string {
 }
 
 const STARTERS = ['做个计划', '接一个仓库', '接着最近的活', '用我的工具'] as const;
-
-const ACT_ORDER = ['needs-you', 'failed', 'review'] as const;
 
 type NeedsYouEntry =
   | { kind: 'question'; key: string; item: ChiefQuestionItem }
@@ -59,26 +58,21 @@ export function streamForProject(
   });
 }
 
-function actRank(todo: TodoRecord): number {
-  if (todo.awaitingReply === true || todo.phase === 'confirm') return 0;
-  if (todo.phase === 'failed') return 1;
-  return 2;
-}
-
-function needsYouThreads(todos: readonly TodoRecord[]): TodoRecord[] {
-  return todos
-    .filter((todo) => {
-      const status = threadStatus(todo);
-      return (status === 'needs-you' || status === 'failed') && todo.archivedAt == null;
-    })
-    .sort((a, b) => actRank(a) - actRank(b) || b.phaseAt - a.phaseAt);
-}
-
-function SectionHead({ children, count }: { children: ReactNode; count: number }) {
+function SectionHead({
+  children,
+  count,
+  countTestId,
+}: {
+  children: ReactNode;
+  count: number;
+  countTestId?: string;
+}) {
   return (
     <div className="flex items-baseline gap-2">
       <h3 className="m-0 font-heading text-ui font-semibold text-foreground">{children}</h3>
-      <span className="text-meta text-content-tertiary tabular-nums">{count}</span>
+      <span data-testid={countTestId} className="text-meta text-content-tertiary tabular-nums">
+        {count}
+      </span>
     </div>
   );
 }
@@ -136,9 +130,7 @@ export function HomeC({
     () => streamForProject(chiefData.stream ?? [], projectId),
     [chiefData.stream, projectId],
   );
-  const questions = stream.filter(
-    (item): item is ChiefQuestionItem => item.kind === 'question' && item.status === 'pending',
-  );
+  const questions = pendingQuestions(stream);
   const conversation = stream.filter(
     (item) => !(item.kind === 'question' && item.status === 'pending'),
   );
@@ -215,7 +207,9 @@ export function HomeC({
       aria-label={t('待你决定')}
       className="mt-6 flex flex-col gap-3"
     >
-      <SectionHead count={entries.length}>{t('待你决定')}</SectionHead>
+      <SectionHead count={entries.length} countTestId="needs-you-count">
+        {t('待你决定')}
+      </SectionHead>
       {shown.map((entry) => (
         <div
           key={entry.key}
@@ -291,6 +285,14 @@ export function HomeC({
       {projectLinks}
       <ClaudeLoginBanner machines={machines} now={now} />
       {needsYou}
+      {chiefData.hasEarlier === true && (
+        <p
+          data-testid="home-c-earlier"
+          className="m-0 mt-8 text-center text-caption text-content-dim"
+        >
+          {t('往上滑看更早的对话')}
+        </p>
+      )}
     </section>
   );
 

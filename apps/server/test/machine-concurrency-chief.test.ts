@@ -184,6 +184,7 @@ function insertPendingChiefStep(s: TestServer, opts: { createdAt?: number } = {}
       toolDefHashes: {},
       toolResultHashes: {},
       activeRun: { phase: 'chief' },
+      archivedAt: now,
     })
     .run();
   const stepId = `step-chief-cc-${suffix}`;

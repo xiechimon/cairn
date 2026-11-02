@@ -355,6 +355,7 @@ describe('#1260 chief step delivery = bound Agent home machine', () => {
     const got = await claim(w.s.app, w.tokenB);
     expect(got).not.toBeNull();
     expect(got!.step.kind).toBe('chief');
+    w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.id, got!.step.id)).run();
 
     const back = await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/agents/${AGENT_ID}`, {
       machineId: w.machineAId,

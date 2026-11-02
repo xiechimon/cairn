@@ -31,7 +31,7 @@ test('the needs-me inbox lists recent pending cards as rows and folds week-old o
   const pendingColumn = page.locator('.board-column[data-column="pending"]');
   await expect(pendingColumn.getByTestId('column-count')).toHaveText('4');
   await expect(page.getByTestId('needs-you')).toHaveText('4 项等你处理');
-  await expect(page.getByTestId('attention-badge')).toHaveText('4');
+  await expect(page.getByTestId('attention-badge')).toHaveText('9');
   await pendingColumn.getByTestId('column-stale-pending').click();
   await expect(page).toHaveURL(/[?&]column=pending/);
 
