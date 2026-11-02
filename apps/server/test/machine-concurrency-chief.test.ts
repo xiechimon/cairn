@@ -460,3 +460,35 @@ describe('a chief turn claimed after the worker loop respects capacity filled me
     );
   });
 });
+
+describe('the late chief claim reads the machine as it is after the worker loop', () => {
+  test('a capability the machine drops while the worker loop awaited blocks the newer chief turn', async () => {
+    const w = await setupWorld();
+    setCap(w, 8);
+    w.s.db
+      .update(agentTable)
+      .set({ requiredCapabilities: { mcpServers: ['linear'] } })
+      .where(eq(agentTable.id, AGENT_ID))
+      .run();
+    w.s.db
+      .update(machineTable)
+      .set({ capabilities: { mcpServers: ['linear'], skills: [] } })
+      .where(eq(machineTable.id, w.machineAId))
+      .run();
+    const worker = insertPendingBuildStep(w.s, w);
+    const workerRow = w.s.db.select().from(stepTable).where(eq(stepTable.id, worker)).get()!;
+    const chiefStepId = insertPendingChiefStep(w.s, { createdAt: workerRow.createdAt + 5 });
+    shipGate.duringReverify = () => {
+      w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.id, worker)).run();
+      w.s.db
+        .update(machineTable)
+        .set({ capabilities: { mcpServers: [], skills: [] } })
+        .where(eq(machineTable.id, w.machineAId))
+        .run();
+    };
+    expect(await claimAs(w)).toBeNull();
+    expect(w.s.db.select().from(stepTable).where(eq(stepTable.id, chiefStepId)).get()!.status).toBe(
+      'pending',
+    );
+  });
+});

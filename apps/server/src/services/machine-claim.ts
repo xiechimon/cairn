@@ -268,8 +268,7 @@ async function tryClaim(
     if (id === null) return false;
     const cached = blockedCache.get(id);
     if (cached !== undefined) return cached;
-    const row =
-      id === machineId ? machineRow : db.select().from(machine).where(eq(machine.id, id)).get();
+    const row = db.select().from(machine).where(eq(machine.id, id)).get();
     const blocked = claudeRateBlock(row?.claudeRateLimits ?? [], nowMs()) !== null;
     blockedCache.set(id, blocked);
     return blocked;
@@ -287,12 +286,12 @@ async function tryClaim(
         (a, b) => Number(isChiefDigestStep(a.stepRow)) - Number(isChiefDigestStep(b.stepRow)),
       );
   const earliestWorker = workerCands[0]?.stepRow.createdAt ?? Number.POSITIVE_INFINITY;
-  const claimChief = (cands: typeof chiefCands): ClaimedStep | null => {
+  const claimChief = (cands: typeof chiefCands, hostRow: typeof machineRow): ClaimedStep | null => {
     for (const cand of cands) {
       if (hasEarlierLiveChiefStep(db, cand.stepRow)) continue;
       if (
         isChiefDigestStep(cand.stepRow) &&
-        !cliVersionAtLeast(machineRow.latestCliVersion, CHIEF_DIGEST_MIN_CLI_VERSION)
+        !cliVersionAtLeast(hostRow.latestCliVersion, CHIEF_DIGEST_MIN_CLI_VERSION)
       ) {
         continue;
       }
@@ -313,7 +312,7 @@ async function tryClaim(
         cand.stepRow,
         cand.threadRow,
         cand.agentRow,
-        machineRow,
+        hostRow,
       );
       if (claimed) {
         publishStepStatus(deps, claimed.step.id);
@@ -324,6 +323,7 @@ async function tryClaim(
   };
   const chiefAhead = claimChief(
     chiefCands.filter((cand) => cand.stepRow.createdAt <= earliestWorker),
+    machineRow,
   );
   if (chiefAhead) return chiefAhead;
 
@@ -577,8 +577,13 @@ async function tryClaim(
       ...(workerMcp !== undefined ? { mcpServers: workerMcp } : {}),
     };
   }
-  if (machineRunningCount(db, machineId) >= workerCap) return null;
-  return claimChief(chiefCands.filter((cand) => cand.stepRow.createdAt > earliestWorker));
+  const hostNow = db.select().from(machine).where(eq(machine.id, machineId)).get();
+  if (!hostNow || machineRunningCount(db, machineId) >= workerCap) return null;
+  blockedCache.clear();
+  return claimChief(
+    chiefCands.filter((cand) => cand.stepRow.createdAt > earliestWorker),
+    hostNow,
+  );
 }
 
 export async function claimStep(
