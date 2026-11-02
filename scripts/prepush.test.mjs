@@ -19,10 +19,12 @@ import {
   ciOnlyTestSteps,
   hasCode,
   localOnly,
+  needsGates,
   prepushModules,
   prepushPlan,
   runPlan,
   selfTests,
+  testsRead,
   workflowTestSteps,
 } from './prepush.mjs';
 import { scrubGateEnv } from './scrub-git-env.mjs';
@@ -301,6 +303,31 @@ test('folded gates stay visibly red, continue after failures and retain full his
   for (const job of jobs.values()) assert.doesNotMatch(job, /^ {4}needs:.*\bgates\b/m);
   assert.ok(jobs.get('dead-class-gate').includes('pnpm prepush --advisory'));
   assert.ok(!jobs.get('check').includes('pnpm prepush --advisory'));
+});
+
+for (const [name, paths, expected] of [
+  ['a research note no test reads', ['docs/research/unread-note.md'], false],
+  ['docs evidence and lessons', ['docs/verify/2182/README.md', 'docs/lessons.md'], false],
+  ['a doc a test reads, as identity-compat reads docs/pr-review.md', ['docs/pr-review.md'], true],
+  ['AGENTS.md, which lane-model-policy reads', ['AGENTS.md'], true],
+  ['root docs', ['README.md', 'CLAUDE.md'], true],
+  ['skill docs the probe reach gate reads', ['.claude/skills/verify-cairn/features/a.md'], true],
+  ['an executable check under docs', ['docs/verify/1542/reach.test.mjs'], true],
+  ['a script', ['scripts/dispatch-agent.test.mjs'], true],
+  ['docs plus a script', ['docs/research/a.md', 'scripts/prepush.mjs'], true],
+  ['empty changes', [], false],
+]) {
+  test(`needsGates classifies ${name}`, () => {
+    assert.equal(
+      needsGates(paths, (path) => path === 'docs/pr-review.md'),
+      expected,
+    );
+  });
+}
+
+test('testsRead finds a doc a test names in the real tree and not an unread one', () => {
+  assert.equal(testsRead('docs/pr-review.md'), true);
+  assert.equal(testsRead(['docs', 'research', 'duet-proactive-coordinator.md'].join('/')), false);
 });
 
 test('documentation skips code checks, unknown paths fail closed', () => {

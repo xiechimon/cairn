@@ -60,6 +60,21 @@ export function hasCode(paths) {
   return paths.some((path) => !path.startsWith('.claude/epics/') && !isDocument(path));
 }
 
+export function needsGates(paths, testsRead) {
+  return hasCode(paths) || paths.some((path) => !path.startsWith('docs/') || testsRead(path));
+}
+
+export function testsRead(path) {
+  const result = spawnSync(
+    'git',
+    ['-c', 'color.ui=never', 'grep', '-l', '-F', '-e', path, '--', '*.test.ts', '*.test.mjs'],
+    { cwd: root, encoding: 'utf8' },
+  );
+  if (result.status === 1) return false;
+  if (result.status !== 0) throw new Error(result.stderr);
+  return true;
+}
+
 export function workflowTestSteps(workflows = join(root, '.github/workflows')) {
   if (!existsSync(workflows)) return [];
   return readdirSync(workflows)
@@ -183,20 +198,21 @@ export function changedPaths(base = process.env.PREPUSH_BASE_SHA || 'origin/main
 
 if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
   const args = process.argv.slice(2);
-  const modes = ['--ci', '--advisory', '--e2e-shard', '--self-test', '--has-code'];
+  const modes = ['--ci', '--advisory', '--e2e-shard', '--self-test', '--has-code', '--needs-gates'];
   if (
     args.length > 0 &&
     (!modes.includes(args[0]) || args.length !== (args[0] === '--e2e-shard' ? 2 : 1))
   ) {
     console.error(
-      'Usage: pnpm prepush [--ci | --advisory | --e2e-shard N/4 | --self-test | --has-code]',
+      'Usage: pnpm prepush [--ci | --advisory | --e2e-shard N/4 | --self-test | --has-code | --needs-gates]',
     );
     process.exit(2);
   }
   if (args[0] === '--e2e-shard' && !/^[1-4]\/4$/.test(args[1] ?? '')) process.exit(2);
-  if (args[0] === '--has-code') {
+  if (args[0] === '--has-code' || args[0] === '--needs-gates') {
     try {
-      console.log(hasCode(changedPaths()));
+      const paths = changedPaths();
+      console.log(args[0] === '--has-code' ? hasCode(paths) : needsGates(paths, testsRead));
     } catch {
       console.log(true);
     }
