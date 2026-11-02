@@ -85,8 +85,8 @@ export const EN: Record<string, string> = {
   '{n} 项待你处理': '{n} waiting on you',
   发给哪个项目: 'Send to which project',
   '发给哪个项目：{name}': 'Send to project: {name}',
-  '自动，由总管判断': 'Auto, the Chief decides',
-  '总管判断，拿不准会问你': 'The Chief decides and asks when unsure',
+  '自动，由 Coordinator 判断': 'Auto, the Coordinator decides',
+  'Coordinator 判断，拿不准会问你': 'The Coordinator decides and asks when unsure',
   换项目: 'Move project',
   已转给任务: 'Passed to task',
   '来自任务 #{n} {title} 的消息': 'Message from task #{n} {title}',
@@ -498,7 +498,6 @@ export const EN: Record<string, string> = {
   网格视图: 'Grid view',
   暂无内容: 'Nothing yet',
   '创建第一个任务以开始使用。': 'Create your first todo to get started.',
-  默认项目: 'Default Project',
   // #446（ADR 0005 读向）项目页「从 GitHub issue 建任务」入口 + 选择弹层
   // （状态过滤 / 分页 / 三态行）。
   '从 GitHub issue 建任务': 'New task from GitHub issue',
@@ -857,12 +856,6 @@ export const EN: Record<string, string> = {
   '2 天前': '2d ago',
   // —— overlay dialogs (issues #66 / #68) ——
   新建任务: 'New task',
-  '我想要的结果：': 'The outcome I want:',
-  '现在的情况：': 'Where things stand now:',
-  '需要保留或避免：': 'What must be kept or avoided:',
-  '我会这样确认完成：': 'How I will confirm this is done:',
-  '我希望收到：': 'What I expect to receive:',
-  保存并开始: 'Save and start',
   删除任务: 'Delete todo',
   '确定删除该任务？此操作不可撤销。': 'Delete this todo? This cannot be undone.',
   // #306 sched-card 菜单删除确认（DeleteConfirm 家族泛化随加）。
@@ -1110,10 +1103,6 @@ export const EN: Record<string, string> = {
   // spec 非空承载（附件 token 注入后归 spec）,标签 add 仍为桩（本票不动）。
   // （#640：开始任务 dialog 统一面的 规划/执行/在线/离线/选择 Agent 五键随
   // 选择面撤销退役——开始入口不再有 dialog 选择器。）
-  '放弃新建任务？': 'Discard this new task?',
-  '未保存的内容将丢失。': 'Unsaved content will be lost.',
-  继续编辑: 'Keep editing',
-  放弃并关闭: 'Discard and close',
 
   没有可引用的对象: 'Nothing to mention',
   '没有与"{query}"匹配的结果': 'No results matching “{query}”',
@@ -1285,7 +1274,6 @@ export const EN: Record<string, string> = {
   '{why}，{when}。任务照常在跑；你说的话先存下，恢复后按顺序处理。':
     '{why}; {when}. Tasks keep running; your messages are saved and handled in order once it is back.',
   详情: 'Details',
-  直接建任务: 'Create a task directly',
   给总管换模型: "Change the chief's model",
   '总管的主模型暂时用不了，这次改用备用模型 {model} 回复，判断可能没那么准。':
     "The chief's main model is unavailable, so backup model {model} is replying. Its judgment may be less sharp.",
@@ -1314,7 +1302,6 @@ export const EN: Record<string, string> = {
   总管编排会话: 'Chief orchestration session',
   '这张任务将交给总管重新编排。': 'The chief will re-orchestrate this task.',
   已交给总管编排: 'Handed to the chief',
-  '已保存，交给总管编排': 'Saved — handed to the chief',
   '总管将直接规划，并按活的类型派发执行。':
     'The chief plans first, then dispatches each piece to the right agent.',
   查看会话: 'View session',
@@ -1343,7 +1330,6 @@ export const EN: Record<string, string> = {
   // —— #638 全站静默 mutation 失败面接线（toast 标题句；server 原因进
   // description 透传不译，#631 同律。已有面内 canon 位的面——merge 拒绝行 /
   // issue 导入内联 / fs-pick 提示行 / OAuth 内联 / 技能弹窗内联——不在此列）——
-  '新建任务失败，请重试。': 'Could not create the task. Try again.',
   '创建项目失败，请重试。': 'Could not create the project. Try again.',
   '移动任务失败，请重试。': 'Could not move the task. Try again.',
   '重置任务失败，请重试。': 'Could not reset the task. Try again.',

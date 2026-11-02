@@ -120,7 +120,6 @@ export interface ChiefConversationProps {
   onWithdraw?: (messageId: string) => Promise<void>;
   onSteer?: (messageId: string) => void;
   onStop?: () => void;
-  onNewTask?: () => void;
   hero?: ReactNode;
   below?: ReactNode;
   heroCollapsed?: boolean;
@@ -150,7 +149,6 @@ export function ChiefConversation({
   onWithdraw,
   onSteer,
   onStop,
-  onNewTask,
   hero,
   below,
   heroCollapsed = false,
@@ -598,7 +596,7 @@ export function ChiefConversation({
       )}
 
       {chief.outage != null ? (
-        <ChiefOutageBanner outage={chief.outage} onSettings={onSettings} onNewTask={onNewTask} />
+        <ChiefOutageBanner outage={chief.outage} onSettings={onSettings} />
       ) : (
         chief.fallbackModel != null && (
           <ChiefFallbackBanner model={chief.fallbackModel} onSettings={onSettings} />
@@ -746,7 +744,7 @@ export function ChiefConversation({
                       data-testid="chief-project-chip"
                       data-set={pickedProject != null ? '' : undefined}
                       aria-label={t('发给哪个项目：{name}', {
-                        name: pickedProject?.name ?? t('自动，由总管判断'),
+                        name: pickedProject?.name ?? t('自动，由 Coordinator 判断'),
                       })}
                       className={PROJECT_CHIP_CLS}
                     />

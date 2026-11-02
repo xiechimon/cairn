@@ -1,31 +1,6 @@
 import { expect, type Page, type Route, test } from '@playwright/test';
 import { evidenceShot } from './evidence';
 
-// Clipboard paste → the existing #310 attachment chain (issue #729, canon
-// #727 Part 2 + r9 §3.1). Both faces are pinned: the detail conversation
-// composer (steer send path) and the new-task dialog (spec create path).
-//
-// Failure modes pinned here (issue #729 list, one test per mode):
-//  1. line atomicity — a mid-line paste must break the line; the token
-//     lands whole-line at the caret (ATTACHMENT_LINE is whole-line
-//     anchored, a shared line silently degrades the chip to text);
-//  2./6. synthesized names — generic clipboard blobs become
-//     pasted-image-<n>.<ext>, multi-image pastes never collide;
-//  3. send race — Enter while the upload is in flight is blocked; once the
-//     token lands, Enter sends it inside the content;
-//  4./5. rejections — a non-whitelisted file or an over-cap file never
-//     reaches grant, the toast names the reason, the draft survives;
-//  7. a text-only paste never sees preventDefault (zero behavior change);
-//  9. both faces run the same shared insert (same expectations, two DOMs);
-//  10. clipboard simulation — the synthetic DataTransfer paste event is the
-//     deterministic route (assertions below); the real keyboard route
-//     (permissions + ClipboardItem.write + Cmd/Ctrl+V) rides the last test
-//     so a browser-shape regression surfaces there, not in every pin.
-//
-// Data face = live face stubbed (composer-wire-reject stubBoot discipline):
-// no ?scenario= means the real API branch; grant/upload get deterministic
-// stubs and every other GET falls through to a tolerated 500.
-
 const TEAM_ID = 'team-1';
 const USER = { id: 'user-1', displayName: '我', avatarUrl: null };
 const TEAM = { id: TEAM_ID, name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null };
@@ -486,82 +461,6 @@ test('detail face: Enter during the upload does not send; after it lands, Enter 
   await expect(page.getByTestId('composer-attachments').locator('[data-state="ready"]')).toHaveCount(0);
   await expect(input).toHaveValue('');
   await evidenceShot(page, 'paste-detail-send-after-upload.png');
-});
-
-// —— new-task face: spec textarea, save posts the createTodo wire ————
-
-const SPEC = '.new-task-spec';
-
-async function bootNewTask(page: Page) {
-  await stubBoot(page);
-  // The live hook fetches /api/projects?teamId=… — the glob must carry the
-  // query wildcard or the catch-all 500s it and the dialog falls back to
-  // the fixture default project id.
-  await page.route('**/api/projects?*', (route) => route.fulfill({ json: [PROJECT] }));
-  await page.goto('/app');
-  await page.locator('.sidebar-new-task').click();
-  const dialog = page.locator('.new-task-dialog');
-  await expect(dialog).toBeVisible();
-  const spec = page.locator(SPEC);
-  await expect(spec).toBeVisible();
-  return { dialog, spec };
-}
-
-test('new-task face: paste inserts the token line-atomic into the spec and save carries it', async ({
-  page,
-}) => {
-  const uploads = await stubUploads(page);
-  const { spec } = await bootNewTask(page);
-  let created: { title?: string; spec?: string } | null = null;
-  await page.route(`**/api/projects/${PROJECT_ID}/todos`, (route, request) => {
-    if (request.method() !== 'POST') return route.fallback();
-    created = JSON.parse(request.postData() ?? '{}');
-    return route.fulfill({ status: 201, json: { ...WIRE_CARD, id: 'todo-2' } });
-  });
-
-  await spec.fill('修复登录\n复现步骤');
-  await setCaret(page, SPEC, 4); // end of the first line
-  await pasteFiles(page, SPEC, [{ name: 'image.png', type: 'image/png' }]);
-
-  // FM9: the shared insert produces the same line-atomic shape on this face.
-  await expect(spec).toHaveValue(`修复登录\n${TOKEN_1}\n复现步骤`);
-  await expect.poll(() => uploads.grants.length).toBe(1);
-  expect(uploads.grants[0]).toMatchObject({
-    fileName: 'pasted-image-1.png',
-    scope: 'spec',
-  });
-
-  await page.getByRole('button', { name: '保存', exact: true }).click();
-  await expect.poll(() => created !== null).toBe(true);
-  expect((created as { spec?: string }).spec).toBe(`修复登录\n${TOKEN_1}\n复现步骤`);
-  await evidenceShot(page, 'paste-newtask-spec-token.png');
-});
-
-test('new-task face: save is blocked while the paste upload is in flight', async ({ page }) => {
-  const deferred = await deferUploads(page);
-  const { spec } = await bootNewTask(page);
-  let creates = 0;
-  await page.route(`**/api/projects/${PROJECT_ID}/todos`, (route, request) => {
-    if (request.method() !== 'POST') return route.fallback();
-    creates += 1;
-    return route.fulfill({ status: 201, json: { ...WIRE_CARD, id: 'todo-3' } });
-  });
-
-  await spec.fill('任务正文');
-  await pasteFiles(page, SPEC, [{ name: 'image.png', type: 'image/png' }]);
-
-  // FM3 on this face: the save must not leave with the upload in flight.
-  await page.getByRole('button', { name: '保存', exact: true }).click();
-  expect(creates).toBe(0);
-
-  await expect.poll(() => deferred.held.length).toBe(1);
-  await deferred.releaseAll(); // grant
-  await expect.poll(() => deferred.held.length).toBe(1);
-  await deferred.releaseAll(); // upload
-  await expect(spec).toHaveValue(`任务正文\n${TOKEN_1}\n`);
-
-  await page.getByRole('button', { name: '保存', exact: true }).click();
-  await expect.poll(() => creates).toBe(1);
 });
 
 // —— FM10 probe: the real keyboard route (permissions + ClipboardItem) ————

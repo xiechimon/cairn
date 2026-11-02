@@ -1,6 +1,6 @@
 import { ChevronDown, FolderOpen, MessageSquareWarning, Settings2 } from 'lucide-react';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router';
 import { useLiveData } from '../api/provider.js';
 import { ChiefConversation } from '../chief/chief-conversation.js';
 import { ChiefQuestionCard, type ChiefQuestionItem } from '../chief/chief-question-card.js';
@@ -17,6 +17,7 @@ import type { ChiefStreamItem, MachineRow, TodoRecord } from '../fixtures/record
 import { useI18n } from '../i18n/provider.js';
 import { ClaudeLoginBanner } from './claude-login-banner.js';
 import { ACT_ORDER, actRank, needsYouThreads, pendingQuestions } from './needs-you.js';
+import { composeRequest } from './open-composer.js';
 import { relativeTime } from './rel-time.js';
 import { threadCopy, threadHref, threadStatus, threadTone } from './thread-copy.js';
 
@@ -83,7 +84,6 @@ interface HomeCProps {
   projectId: string | null;
   projectName: string | null;
   banner?: ReactNode;
-  onNewTask?: () => void;
   machines?: readonly MachineRow[];
 }
 
@@ -94,12 +94,13 @@ export function HomeC({
   projectId,
   projectName,
   banner,
-  onNewTask,
   machines,
 }: HomeCProps) {
   const { t, locale } = useI18n();
   const { user, live } = useLiveData();
   const navigate = useNavigate();
+  const location = useLocation();
+  const composeAt = composeRequest(location.state);
   const [allOpen, setAllOpen] = useState(false);
   const [runningOpen, setRunningOpen] = useState(false);
   const [prefill, setPrefill] = useState<{ text: string; key: number } | null>(null);
@@ -110,6 +111,15 @@ export function HomeC({
     setChiefView('none');
     composerRef.current?.focus({ preventScroll: true });
   }, [chiefView, setChiefView]);
+  const loaded = surface.load === 'ready';
+  useEffect(() => {
+    if (composeAt === null || !loaded) return;
+    composerRef.current?.focus({ preventScroll: true });
+    navigate(
+      { pathname: location.pathname, search: location.search },
+      { replace: true, state: null },
+    );
+  }, [composeAt, loaded, navigate, location.pathname, location.search]);
   const scoped = useMemo(
     () => todos.filter((todo) => projectId === null || todo.projectId === projectId),
     [todos, projectId],
@@ -376,7 +386,6 @@ export function HomeC({
               : t('跟 Coordinator 说点什么，或描述一个新任务…')
           }
           aboveComposer={pill}
-          onNewTask={onNewTask}
           composerRef={(node) => {
             composerRef.current = node;
           }}

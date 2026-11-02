@@ -4,9 +4,6 @@ import { pressAndExpect } from './helpers.js';
 const BOARD = '/app?scenario=01&view=board';
 const SCHEDULES = '/app/schedules?scenario=01';
 
-const PROJECTS = '/app?scenario=newtask-projects&view=board';
-
-const FIRST_PROJECT_ID = 'ZAQczKCu0MOAzC1ZqcFlX';
 const PROJECT = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=r2-24b&tab=tasks';
 
 const AGENT_DETAIL = '/app/resources/agents/r3-builder?scenario=agent-detail';
@@ -14,7 +11,9 @@ const AUTHORIZE = '/app/machines/authorize';
 
 const MACHINES = '/app/resources/machines?scenario=06';
 
-const dialog = (page: Page) => page.locator('.new-task-dialog');
+const dialog = (page: Page) => page.getByRole('dialog', { name: '新建任务' });
+const home = (page: Page) => page.getByTestId('home-c');
+const composerInput = (page: Page) => home(page).getByTestId('chief-composer-input');
 const drawer = (page: Page) => page.locator('.chief-drawer');
 
 /** Retired-binding negative (XMON-37), the retry law inverted: six delivered
@@ -44,59 +43,49 @@ async function pressesStayHidden(
   }
 }
 
-test('C on the board opens the new-task dialog; ⌘C and the retired N do not', async ({
+test('C on the board lands on the home composer; ⌘C and the retired N do nothing', async ({
   page,
 }) => {
   await page.goto(BOARD);
   await expect(page.getByRole('complementary')).toBeVisible();
-  // modifier chords pass through — ⌘C is the browser's own copy chord and
-  // must keep working (the dialog may not steal it)
   await page.keyboard.press('Meta+c');
-  await expect(dialog(page)).toHaveCount(0);
-  // XMON-37: N is retired — the same press that used to open the dialog now
-  // does nothing, and the listener is proven live by the C press below
-  await pressesStayClosed(page, 'n', dialog(page));
+  await expect(home(page)).toHaveCount(0);
+  await pressesStayClosed(page, 'n', home(page));
+  await expect(page).toHaveURL(/view=board/);
 
-  await pressAndExpect(page, 'c', dialog(page));
-
-  await expect(page.locator('.new-task-spec')).toBeFocused();
-  await pressAndExpect(page, 'Escape', dialog(page), 'hidden');
+  await page.keyboard.press('c');
+  await expect(composerInput(page)).toBeFocused();
+  await expect(page).not.toHaveURL(/view=board/);
   await expect(dialog(page)).toHaveCount(0);
 });
 
-test('sidebar `新任务` row drops the C badge and click-opens the dialog', async ({ page }) => {
+test('sidebar `新任务` row drops the C badge and click lands on the home composer', async ({ page }) => {
   await page.goto(BOARD);
   const row = page.getByRole('complementary').getByRole('button', { name: '新任务' });
   await expect(row).toBeVisible();
   await expect(row.locator('kbd')).toHaveCount(0);
   await row.click();
-  await expect(dialog(page)).toBeVisible();
-  await pressAndExpect(page, 'Escape', dialog(page), 'hidden');
+  await expect(composerInput(page)).toBeFocused();
   await expect(dialog(page)).toHaveCount(0);
 });
 
-test('C on a non-board route opens the dialog in place', async ({ page }) => {
+test('C on a non-board route lands on the home composer', async ({ page }) => {
   await page.goto(SCHEDULES);
   await expect(page.getByRole('complementary')).toBeVisible();
-  await pressAndExpect(page, 'c', dialog(page));
-  // in place — the route never hops to the board
-  await expect(page).toHaveURL(/\/app\/schedules/);
-  await pressAndExpect(page, 'Escape', dialog(page), 'hidden');
+  await page.keyboard.press('c');
+  await expect(page).not.toHaveURL(/\/app\/schedules/);
+  await expect(composerInput(page)).toBeFocused();
   await expect(dialog(page)).toHaveCount(0);
 });
 
-test('C on the project page opens the page’s own dialog (route project chip)', async ({
+test('C on the project page lands on the home composer filtered to that project', async ({
   page,
 }) => {
   await page.goto(PROJECT);
   await expect(page.getByRole('complementary')).toBeVisible();
-  await pressAndExpect(page, 'c', dialog(page));
-  // exactly one instance — the page's own (project-empty-new-task.spec pins
-  // the chip = the route's project, which the global sidebar dialog cannot
-  // know); a second global instance would read 2 here
-  await expect(dialog(page)).toHaveCount(1);
-  await expect(dialog(page).locator('.new-task-project-name')).toHaveText('r3-lifecycle');
-  await pressAndExpect(page, 'Escape', dialog(page), 'hidden');
+  await page.keyboard.press('c');
+  await expect(page).toHaveURL(/\/app\?.*project=ZAQczKCu0MOAzC1ZqcFlX/);
+  await expect(composerInput(page)).toBeFocused();
   await expect(dialog(page)).toHaveCount(0);
 });
 
@@ -172,8 +161,6 @@ test('textarea focus (chief composer) swallows C', async ({ page }) => {
   await pressAndExpect(page, 'Meta+j', drawer(page));
   const composer = page.getByTestId('chief-composer-input');
   await expect(composer).toBeFocused();
-  // fixture composer is readOnly — focus holds but typing lands nowhere;
-  // the guard must keep C from opening the dialog behind the drawer
   await page.keyboard.press('c');
   await expect(dialog(page)).toHaveCount(0);
   await expect(drawer(page)).toBeVisible();
@@ -187,13 +174,6 @@ test('Space on a focused button activates it natively; ⌘J fires past button fo
   await page.goto(BOARD);
   const searchRow = page.getByRole('button', { name: '搜索' });
   await expect(searchRow).toBeVisible();
-
-  // C is guarded by editability only — a focused button does not block it
-  await searchRow.focus();
-  await page.keyboard.press('c');
-  await expect(dialog(page)).toBeVisible();
-  await pressAndExpect(page, 'Escape', dialog(page), 'hidden');
-  await expect(dialog(page)).toHaveCount(0);
 
   await searchRow.focus();
   await page.keyboard.press('Space');
@@ -211,6 +191,11 @@ test('Space on a focused button activates it natively; ⌘J fires past button fo
   await expect(page.getByTestId('chief-composer-input')).toBeFocused();
   await pressAndExpect(page, 'Meta+j', drawer(page), 'hidden');
   await expect(drawer(page)).toBeHidden();
+
+  await page.goto(BOARD);
+  await searchRow.focus();
+  await page.keyboard.press('c');
+  await expect(composerInput(page)).toBeFocused();
 });
 
 test('⌘J toggles: the second press closes the drawer from its own composer focus', async ({
@@ -305,231 +290,6 @@ test('with the drawer closed, N stays retired — neither drawer nor dialog open
   await expect(page.getByRole('complementary')).toBeVisible();
   await pressesStayHidden(page, 'n', drawer(page));
   await expect(dialog(page)).toHaveCount(0);
-});
-
-async function openNewTask(page: Page) {
-  await page.goto(BOARD);
-  await page.getByRole('complementary').getByRole('button', { name: '新任务' }).click();
-  const dialog = page.locator('.new-task-dialog');
-  await expect(dialog).toBeVisible();
-  return dialog;
-}
-
-/** Card landed by the save path, titled by the spec's first line. */
-const landedCard = (page: Page, title: string) =>
-  page.locator('[data-column="todo"] [data-todo-id]', { hasText: title });
-
-test('⌘↵ and Ctrl+↵ inside the dialog fire `保存并开始` (card lands, dialog closes)', async ({
-  page,
-}) => {
-  const dialog = await openNewTask(page);
-  await dialog.locator('.new-task-spec').fill('⌘↵ 建的卡');
-  // The autofocused spec textarea is an editable target — the chord must
-  // still fire from it (dialog-interior exemption; without it the guard
-  // swallows the press and this wait times out).
-  await pressAndExpect(page, 'Meta+Enter', landedCard(page, '⌘↵ 建的卡'));
-  await expect(dialog).not.toBeVisible();
-
-  // Same registration, non-mac receipt: Ctrl+↵ lands a second card
-  await page.getByRole('complementary').getByRole('button', { name: '新任务' }).click();
-  await expect(dialog).toBeVisible();
-  await dialog.locator('.new-task-spec').fill('Ctrl 建的卡');
-  await pressAndExpect(page, 'Control+Enter', landedCard(page, 'Ctrl 建的卡'));
-  await expect(dialog).not.toBeVisible();
-});
-
-test('with the dialog closed, ⌘↵ on the board lands nothing', async ({ page }) => {
-  await page.goto(BOARD);
-  await expect(page.getByRole('complementary')).toBeVisible();
-  const cards = page.locator('[data-column="todo"] [data-todo-id]');
-  const before = await cards.count();
-  // Six delivered presses of a bound chord would land six cards (or at
-  // least one) — a count that never moves is proof the listener is off the
-  // window while the dialog is shut.
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    await page.keyboard.press('Meta+Enter');
-    await page.waitForTimeout(120);
-    await expect(cards).toHaveCount(before);
-  }
-  await expect(dialog(page)).toHaveCount(0);
-});
-
-test('⌘↵ with an empty spec creates nothing (the button gate holds on the chord)', async ({
-  page,
-}) => {
-  const dialog = await openNewTask(page);
-  const cards = page.locator('[data-column="todo"] [data-todo-id]');
-  const before = await cards.count();
-  await expect(dialog.locator('.new-task-start')).toBeDisabled();
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    await page.keyboard.press('Meta+Enter');
-    await page.waitForTimeout(120);
-    await expect(cards).toHaveCount(before);
-  }
-  await expect(dialog).toBeVisible();
-});
-
-test('⌘↵ under the `未保存闸` confirm layer saves nothing (the layer owns the screen)', async ({
-  page,
-}) => {
-  const dialog = await openNewTask(page);
-  await dialog.locator('.new-task-spec').fill('闸下不该落的卡');
-  const cards = page.locator('[data-column="todo"] [data-todo-id]');
-  const before = await cards.count();
-
-  await dialog.locator('.new-task-close').click();
-  const layer = page.locator('.new-task-discard');
-  await expect(layer).toBeVisible();
-
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    await page.keyboard.press('Meta+Enter');
-    await page.waitForTimeout(120);
-    await expect(cards).toHaveCount(before);
-  }
-  await expect(layer).toBeVisible();
-  await expect(dialog).toBeVisible();
-});
-
-test('plain ↵ in the spec textarea stays the newline key — no hijack', async ({ page }) => {
-  const dialog = await openNewTask(page);
-  const spec = dialog.locator('.new-task-spec');
-  await spec.fill('第一行');
-  await page.keyboard.press('Enter');
-  // the native default is untouched: the newline lands in the field and the
-  // dialog stays open
-  await expect(spec).toHaveValue('第一行\n');
-  await expect(dialog).toBeVisible();
-  await expect(page.locator('[data-column="todo"] [data-todo-id]', { hasText: '第一行' })).toHaveCount(0);
-});
-
-test('the `保存并开始` button carries a visible ⌘↵ badge at rest', async ({ page }) => {
-  const dialog = await openNewTask(page);
-  const badge = dialog.locator('.new-task-start [data-slot="key-hint"]');
-  await expect(dialog.locator('.new-task-start kbd')).toHaveCount(0);
-  // always-on form (not kbd-hint's hover chip): visible with no pointer on it
-  await expect(badge).toBeVisible();
-  await expect(badge).toHaveText('⌘↵');
-  // aria-hidden — the chip is a visual hint; the button's own name is its
-  // accessible label (a glyph inside the name would be read aloud)
-  await expect(badge).toHaveAttribute('aria-hidden', 'true');
-});
-
-test('Tab cycles the dialog’s project chip from the composer focus', async ({ page }) => {
-  await page.goto(PROJECTS);
-  await expect(page.getByRole('complementary')).toBeVisible();
-  await pressAndExpect(page, 'c', dialog(page));
-  const chipName = page.locator('.new-task-project-name');
-  await expect(page.locator('.new-task-spec')).toBeFocused();
-  await expect(chipName).toHaveText('r3-lifecycle');
-
-  await page.keyboard.press('Tab');
-  await expect(chipName).toHaveText('r2-inventory');
-
-  await expect(page.locator('.new-task-spec')).toBeFocused();
-  await expect
-    .poll(() => page.evaluate(() => localStorage.getItem('cairn.newTaskProjectId')))
-    .toBe('r2-inventory');
-
-  await page.keyboard.press('Tab');
-  await expect(chipName).toHaveText('r3-lifecycle');
-  await expect
-    .poll(() => page.evaluate(() => localStorage.getItem('cairn.newTaskProjectId')))
-    .toBe(FIRST_PROJECT_ID);
-
-  await pressAndExpect(page, 'Escape', dialog(page), 'hidden');
-});
-
-test('the chip cycles on Tab while the list is open; Shift+Tab keeps native movement', async ({
-  page,
-}) => {
-  await page.goto(PROJECTS);
-  await expect(page.getByRole('complementary')).toBeVisible();
-  await pressAndExpect(page, 'c', dialog(page));
-  const chip = page.locator('.new-task-project');
-  const menu = page.locator('.new-task-project-menu');
-  const checked = menu.locator('.new-task-project-row[aria-selected="true"] .new-task-project-row-name');
-
-  await chip.click();
-  await expect(menu).toBeVisible();
-  await expect(checked).toHaveText('r3-lifecycle');
-  await page.keyboard.press('Tab');
-  await expect(checked).toHaveText('r2-inventory');
-  await expect(page.locator('.new-task-project-name')).toHaveText('r2-inventory');
-  await expect(chip).toBeFocused();
-  await expect(menu).toBeVisible();
-
-  await page.keyboard.press('Shift+Tab');
-  await expect(chip).not.toBeFocused();
-  await expect(menu).toBeHidden();
-  await expect(page.locator('.new-task-project-name')).toHaveText('r2-inventory');
-  await expect(dialog(page)).toBeVisible();
-  await pressAndExpect(page, 'Escape', dialog(page), 'hidden');
-});
-
-test('Tab off the driving seats stays native (close button keeps its own walk)', async ({
-  page,
-}) => {
-  await page.goto(PROJECTS);
-  await expect(page.getByRole('complementary')).toBeVisible();
-  await pressAndExpect(page, 'c', dialog(page));
-  const chipName = page.locator('.new-task-project-name');
-  await expect(chipName).toHaveText('r3-lifecycle');
-
-  const close = page.locator('.new-task-dialog .new-task-close');
-  await close.focus();
-  await page.keyboard.press('Tab');
-
-  await expect(chipName).toHaveText('r3-lifecycle');
-  await expect(close).not.toBeFocused();
-
-  await pressAndExpect(page, 'Escape', dialog(page), 'hidden');
-});
-
-test('the project chip hovers its Tab hint (hidden at rest)', async ({ page }) => {
-  await page.goto(PROJECTS);
-  await expect(page.getByRole('complementary')).toBeVisible();
-  await pressAndExpect(page, 'c', dialog(page));
-  const chip = page.locator('.new-task-project');
-
-  const hint = page.locator('[data-slot="tooltip-content"]');
-  await expect(hint).toHaveCount(0);
-  await chip.hover();
-  await expect(hint).toBeVisible();
-  await expect(hint.locator('[data-slot="kbd"]')).toHaveText('Tab');
-  await pressAndExpect(page, 'Escape', dialog(page), 'hidden');
-});
-
-test('Tab cycles nothing while the `未保存闸` confirm layer is up (that layer owns the keyboard)', async ({
-  page,
-}) => {
-  await page.goto(PROJECTS);
-  await expect(page.getByRole('complementary')).toBeVisible();
-  await pressAndExpect(page, 'c', dialog(page));
-  const chipName = page.locator('.new-task-project-name');
-  await expect(chipName).toHaveText('r3-lifecycle');
-  await dialog(page).locator('.new-task-spec').fill('脏面');
-
-  await page.keyboard.press('Escape');
-  const layer = page.locator('.new-task-discard');
-  await expect(layer).toBeVisible();
-  await expect(layer.locator('.new-task-discard-keep')).toBeFocused();
-  await page.keyboard.press('Tab');
-  await expect(chipName).toHaveText('r3-lifecycle');
-
-  expect(await page.evaluate(() => localStorage.getItem('cairn.newTaskProjectId'))).toBeNull();
-});
-
-test('with the dialog closed Tab stays native', async ({ page }) => {
-  await page.goto(PROJECTS);
-  await expect(page.getByRole('complementary')).toBeVisible();
-  await page.keyboard.press('Tab');
-  await expect(dialog(page)).toHaveCount(0);
-  await expect(page.locator('.new-task-project')).toHaveCount(0);
-
-  await expect
-    .poll(() => page.evaluate(() => document.activeElement?.tagName ?? ''))
-    .not.toBe('BODY');
-  await expect(page.locator('.new-task-project-menu')).toHaveCount(0);
 });
 
 // ---- #1141: suppression retired — the chief surface is site-wide ---------

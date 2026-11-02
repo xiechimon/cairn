@@ -438,57 +438,6 @@ test('detail face: a picked file shows an uploading tile, then a file tile whose
   await expect(input).not.toHaveValue(/attachment:/);
 });
 
-// —— new-task face ————
-
-const SPEC = '[data-testid="new-task-spec"]';
-
-async function bootNewTask(page: Page, art: TestArt) {
-  await stubBoot(page, art);
-  await page.route('**/api/projects?*', (route) => route.fulfill({ json: [PROJECT] }));
-  await page.goto('/app');
-  await page.locator('.sidebar-new-task').click();
-  const dialog = page.getByRole('dialog', { name: '新建任务' });
-  await expect(dialog).toBeVisible();
-  const spec = dialog.getByRole('textbox');
-  await expect(spec).toBeVisible();
-  return { dialog, spec };
-}
-
-test('new-task face: placeholder → settled chip → preview', async ({ page }) => {
-  const deferred = await deferUploads(page);
-  const art: TestArt = { b64: PNG_1PX };
-  const { dialog, spec } = await bootNewTask(page, art);
-  art.b64 = await renderTestCard(page);
-
-  await pastePng(page, SPEC, art.b64);
-
-  const strip = dialog.getByRole('status', { name: '附件' });
-  await expect(strip).toBeVisible();
-  const placeholder = strip.getByTestId('attachment-pending');
-  await expect(placeholder).toBeVisible();
-  await expect(placeholder.getByText('上传中')).toHaveText('上传中');
-  await evidenceShot(page, 'strip-newtask-placeholder.png');
-
-  await expect.poll(() => deferred.held.length).toBe(1);
-  await deferred.releaseAll(); // grant
-  await expect.poll(() => deferred.held.length).toBe(1);
-  await deferred.releaseAll(); // upload
-  await expect(spec).toHaveValue(`${TOKEN_1}\n`);
-
-  const chip = strip.getByRole('button', { name: 'pasted-image-1.png' });
-  await expect(chip).toBeVisible();
-  await chip.click();
-  const preview = page.getByRole('dialog', { name: 'pasted-image-1.png' });
-  await expect(preview).toBeVisible();
-  const view = preview.getByRole('img', { name: 'pasted-image-1.png' });
-  await expect.poll(() => view.evaluate((el) => (el as HTMLImageElement).naturalWidth)).toBe(
-    CARD_W,
-  );
-  await evidenceShot(page, 'strip-newtask-preview.png');
-  await page.keyboard.press('Escape');
-  await expect(preview).toHaveCount(0);
-});
-
 // —— chief face ————
 
 const AGENTS = [

@@ -192,7 +192,6 @@ test.describe('chief unavailable (T4)', () => {
     await expect(banner).toContainText('relay-a/claude-opus');
     await expect(banner).toContainText('任务照常在跑');
     await expect(banner.getByRole('button', { name: '给总管换模型' })).toBeVisible();
-    await expect(banner.getByRole('button', { name: '直接建任务' })).toBeVisible();
     const held = home.getByTestId('queued-message');
     await expect(held).toHaveCount(2);
     await expect(held.first()).toHaveAttribute('title', '已存下，总管恢复后会处理');
@@ -207,13 +206,6 @@ test.describe('chief unavailable (T4)', () => {
     await evidenceShot(page, 'outage-desktop.png');
     await banner.getByRole('button', { name: '给总管换模型' }).click();
     await expect(page.getByTestId('chief-settings-col')).toBeVisible();
-  });
-
-  test('direct task creation opens the new task dialog', async ({ page }) => {
-    await mockLive(page, outageState());
-    await page.goto('/app');
-    await page.getByTestId('chief-outage').getByRole('button', { name: '直接建任务' }).click();
-    await expect(page.getByRole('dialog', { name: '新建任务' })).toBeVisible();
   });
 
   test('withdrawing a held message deletes it and puts the text back in the composer', async ({

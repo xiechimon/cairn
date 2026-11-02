@@ -35,7 +35,9 @@ function Toaster({ ...props }: ToasterProps) {
   return (
     <Sonner
       theme={theme}
-      position="bottom-left"
+      position="top-center"
+      offset={{ top: 16 }}
+      mobileOffset={{ top: 56, left: 16, right: 16 }}
       className="group"
       icons={{
         success: <CircleCheck className="size-4 text-running-text" />,

@@ -6,10 +6,9 @@
   "scope": "apps/web/src; per-face css = *.css minus the ui-debt-gate.mjs WHITELIST (carrier layer); bare controls = <button|<input|<select|<textarea occurrences in *.tsx minus components/ui/; arbitrary values = text-[<len>] and SPACING_UTILITIES-[<len>] (px|rem|em, or interpolated) in *.ts/*.tsx minus components/ui/ and test files",
   "perFaceCss": {},
   "rawControls": {
-    "total": 3,
+    "total": 2,
     "files": {
       "chief/chief-conversation.tsx": 1,
-      "overlay/new-task-dialog.tsx": 1,
       "overlay/search-panel.tsx": 1
     }
   },

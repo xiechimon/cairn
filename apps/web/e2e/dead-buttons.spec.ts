@@ -45,7 +45,8 @@ test('board topbar drops the `看板指南` button — right actions = `筛选` 
   await expect(bar).toBeVisible();
   await expect(bar).toContainText('新任务：接下来让 agent 做什么？');
   await bar.click();
-  await expect(page.getByRole('dialog', { name: '新建任务' })).toBeVisible();
+  await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toBeFocused();
+  await expect(page.getByRole('dialog', { name: '新建任务' })).toHaveCount(0);
 });
 
 test('board renders exactly the four #351 columns, retired names and collapse family gone', async ({
@@ -168,18 +169,6 @@ test('composer toolbar drops the `语音输入` button, keeps attachment', async
 
   await expect(toolbar.locator('button[aria-label="语音输入"]')).toHaveCount(0);
   await expect(toolbar.locator('button[aria-label="添加附件"]')).toBeVisible();
-});
-
-test('new-task dialog tools drop the `语音输入` button, keep the attachment tool', async ({ page }) => {
-  await page.goto('/app?scenario=01&view=board');
-  await page.locator('.sidebar-new-task').click();
-
-  const tools = page.getByTestId('new-task-tools');
-  await expect(tools).toBeVisible();
-
-  await expect(tools.getByRole('button', { name: '语音输入' })).toHaveCount(0);
-  await expect(tools.getByRole('button')).toHaveCount(1);
-  await expect(tools.getByRole('button', { name: '添加附件' })).toBeVisible();
 });
 
 test('api-keys empty state drops the `查看文档` button, keeps `新建密钥` (#307)', async ({ page }) => {
@@ -469,62 +458,6 @@ test('project task rows and cards are real links that open the todo detail (#318
   await expect(card.locator('a.prj-task-link')).toHaveCount(1);
   await card.click();
   await expect(page).toHaveURL(/\/app\/todo\/[^?]+\?scenario=prj-tasks/);
-});
-
-test('new-task dialog: the close control anchors to the head’s right edge (#574 re-key debt)', async ({
-  page,
-}) => {
-  await page.goto('/app?scenario=01&view=board');
-  const dialog = page.getByRole('dialog', { name: '新建任务' });
-  await page.locator('.sidebar-new-task').click();
-  await expect(dialog).toBeVisible();
-  // #656: settle the dialog enter animation (tw-animate-css zoom-in-95) before the
-  // head/close right-edge geometry is measured off the laid-out box.
-  await dialog.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
-  const hb = await dialog.getByTestId('new-task-head').boundingBox();
-  const cb = await dialog.getByRole('button', { name: '关闭' }).boundingBox();
-  if (hb === null || cb === null) throw new Error('head / close not laid out');
-
-  expect(Math.abs(hb.x + hb.width - (cb.x + cb.width) - 4)).toBeLessThan(1.5);
-  expect(cb.width).toBeCloseTo(28, 0);
-  expect(cb.height).toBeCloseTo(28, 0);
-});
-
-test('new-task dialog gates unsaved closes and resets on discard (#318)', async ({ page }) => {
-  await page.goto('/app?scenario=01&view=board');
-  const dialog = page.getByRole('dialog', { name: '新建任务' });
-  const discard = page.getByRole('alertdialog', { name: '放弃新建任务？' });
-
-  await page.locator('.sidebar-new-task').click();
-  await expect(dialog).toBeVisible();
-  await dialog.getByRole('button', { name: '关闭' }).click();
-  await expect(dialog).toBeHidden();
-  await expect(discard).toHaveCount(0);
-
-  await page.locator('.sidebar-new-task').click();
-  await dialog.getByRole('textbox').fill('未保存探针');
-  await dialog.getByRole('button', { name: '关闭' }).click();
-  await expect(discard).toBeVisible();
-  await expect(discard).toContainText('放弃新建任务？');
-  await expect(discard).toContainText('未保存的内容将丢失。');
-
-  await discard.getByRole('button', { name: '继续编辑' }).click();
-  await expect(discard).toBeHidden();
-  await expect(dialog).toBeVisible();
-  await expect(dialog.getByRole('textbox')).toHaveValue('未保存探针');
-
-  await page.keyboard.press('Escape');
-  await expect(discard).toBeVisible();
-  await expect(discard.getByRole('button', { name: '继续编辑' })).toBeFocused();
-  await page.keyboard.press('Escape');
-  await expect(discard).toBeHidden();
-  await expect(dialog).toBeVisible();
-
-  await dialog.getByRole('button', { name: '关闭' }).click();
-  await discard.getByRole('button', { name: '放弃并关闭' }).click();
-  await expect(dialog).toBeHidden();
-  await page.locator('.sidebar-new-task').click();
-  await expect(dialog.getByRole('textbox')).toHaveValue('');
 });
 
 test('detail transcript action rows carry no restore glyph (#884)', async ({ page }) => {

@@ -106,7 +106,6 @@ export function ProductChiefSection() {
           <ChiefOutageBanner
             outage={{ reason: 'quota', model: 'claude-opus-5-5', retryAt: NOW + 45 * 60_000 }}
             onSettings={() => setLast('Open chief settings')}
-            onNewTask={() => setLast('New task')}
           />
         </Labeled>
         <Labeled label="Overloaded, no retry time">

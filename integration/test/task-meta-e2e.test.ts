@@ -61,21 +61,17 @@ describe('spec 15 #394 title-less surface + fixed tag vocabulary (live UI → wi
     expect(rows).toHaveLength(FIXED_TAGS.length);
   });
 
-  test('dialog has no title input / no tag UI; first body line becomes the placeholder title; detail page has no tag add surface', async () => {
+  test('a draft takes its first body line as the placeholder title; detail page has no tag add surface', async () => {
     await page.goto(`${server.url}/app?view=board`);
     await pexpect(
       page.getByRole('complementary').getByRole('button', { name: '新任务' }),
     ).toBeVisible({ timeout: 30_000 });
 
-    await page.getByRole('complementary').getByRole('button', { name: '新任务' }).click();
-    const dialog = page.locator('.new-task-dialog');
-    await pexpect(dialog).toBeVisible();
-    await pexpect(dialog.locator('.new-task-input')).toHaveCount(0);
-    await pexpect(dialog.locator('.new-task-tags')).toHaveCount(0);
-    await pexpect(dialog.locator('.new-task-tag-add')).toHaveCount(0);
-
-    await dialog.locator('.new-task-spec').fill('394 占位标题探针\n\n现在的情况：第二行不进标题');
-    await page.locator('.new-task-save').click();
+    await api(server.url, 'POST', `/api/projects/${projectId}/todos`, {
+      title: '',
+      spec: '394 占位标题探针\n\n现在的情况：第二行不进标题',
+    });
+    await page.goto(`${server.url}/app?view=board`);
     await pexpect(page.getByRole('link', { name: '394 占位标题探针' })).toBeVisible({
       timeout: 30_000,
     });

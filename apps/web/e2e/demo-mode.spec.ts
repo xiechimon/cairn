@@ -167,18 +167,15 @@ test('the selling points browse end to end with no backend traffic', async ({ pa
   expectQuiet(traffic);
 });
 
-test('write: a new task is blocked with the toast, the board is unchanged', async ({ page }) => {
+test('write: a new task is blocked with the toast and nothing is added', async ({ page }) => {
   const traffic = watchTraffic(page);
   await page.goto(`${demo.base}/app`);
-  const before = await cards(page).count();
   await page.locator('.sidebar-new-task').click();
-  const dialog = page.getByRole('dialog', { name: '新建任务' });
-  await dialog.getByRole('textbox').fill('演示里不该落库的任务');
-  await dialog.getByRole('button', { name: '保存', exact: true }).click();
+  const input = page.getByTestId('home-c').getByTestId('chief-composer-input');
+  await input.fill('演示里不该落库的任务');
+  await input.press('Enter');
   await expect(toast(page)).toBeVisible();
-  await expect(page.getByText('演示里不该落库的任务', { exact: true })).toHaveCount(0);
-  await page.keyboard.press('Escape');
-  expect(await cards(page).count()).toBe(before);
+  await expect(page.locator('[data-todo-id]', { hasText: '演示里不该落库的任务' })).toHaveCount(0);
   expectQuiet(traffic);
 });
 
@@ -262,9 +259,9 @@ test('the blocked toast is English under the en locale', async ({ page }) => {
   });
   await page.goto(`${demo.base}/app`);
   await page.locator('.sidebar-new-task').click();
-  const dialog = page.getByRole('dialog');
-  await dialog.getByRole('textbox').fill('not saved');
-  await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+  const input = page.getByTestId('home-c').getByTestId('chief-composer-input');
+  await input.fill('not saved');
+  await input.press('Enter');
   await expect(toast(page, BLOCKED_TOAST_EN)).toBeVisible();
 });
 

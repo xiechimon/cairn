@@ -19,10 +19,11 @@ test('R1: ⌘K at load opens search', async ({ page }) => {
   await expect(page.getByRole('dialog', { name: '搜索' })).toBeVisible();
 });
 
-test('R2: C at load opens the new-task dialog', async ({ page }) => {
+test('R2: C at load focuses the home composer', async ({ page }) => {
   await pressAtLoad(page, { key: 'c' });
   await page.goto(BOARD);
-  await expect(page.locator('.new-task-dialog')).toBeVisible();
+  await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toBeFocused();
+  await expect(page.getByRole('dialog', { name: '新建任务' })).toHaveCount(0);
 });
 
 test('R3: ⌘J at load opens the chief drawer', async ({ page }) => {

@@ -9,12 +9,6 @@ export const isEditableOutsideChiefDrawer = (target: EventTarget | null): boolea
   isEditableTarget(target) &&
   !(target instanceof HTMLElement && target.closest('.chief-drawer') !== null);
 
-const TAB_CYCLE_SEATS = ['.new-task-project', '.new-task-spec'];
-
-const isTabCycleSeat = (target: EventTarget | null): boolean =>
-  target instanceof HTMLElement &&
-  TAB_CYCLE_SEATS.some((selector) => target.closest(selector) !== null);
-
 function useHotkey(
   key: string,
   guard: (target: EventTarget | null) => boolean,
@@ -42,50 +36,6 @@ function useHotkey(
   }, [key, enabled]);
 }
 
-export function useChordHotkey(
-  key: string,
-  guard: (target: EventTarget | null) => boolean,
-  onFire: () => void,
-  enabled = true,
-) {
-  const guardRef = useRef(guard);
-  const onFireRef = useRef(onFire);
-  useLayoutEffect(() => {
-    guardRef.current = guard;
-    onFireRef.current = onFire;
-  });
-  useLayoutEffect(() => {
-    if (!enabled) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.isComposing) return;
-      if (event.repeat) return;
-      if (!(event.metaKey || event.ctrlKey)) return;
-      if (event.key.toLowerCase() !== key) return;
-      if (guardRef.current(event.target)) return;
-      event.preventDefault();
-      onFireRef.current();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [key, enabled]);
-}
-
 export function useNewTaskHotkey(onOpen: () => void): void {
   useHotkey('c', isEditableTarget, onOpen);
-}
-
-export function useProjectCycleHotkey(active: boolean, onCycle: () => void): void {
-  useLayoutEffect(() => {
-    if (!active) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Tab') return;
-      if (event.defaultPrevented || event.isComposing) return;
-      if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
-      if (!isTabCycleSeat(event.target)) return;
-      event.preventDefault();
-      onCycle();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [active, onCycle]);
 }

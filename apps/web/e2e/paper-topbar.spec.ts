@@ -76,15 +76,16 @@ test('`定时` is a client-side link to the schedules page, scenario kept', asyn
   ).toBe('alive');
 });
 
-test('the new-task bar opens the new-task dialog', async ({ page }) => {
+test('the new-task bar lands on the home composer with no dialog', async ({ page }) => {
   await page.goto('/app?scenario=01&view=board');
   await expect(newTaskBar(page)).toBeVisible();
   await expect(newTaskBar(page)).toContainText('新任务：接下来让 agent 做什么？');
   await newTaskBar(page).click();
-  await expect(page.getByRole('dialog', { name: '新建任务' })).toBeVisible();
+  await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toBeFocused();
+  await expect(page.getByRole('dialog', { name: '新建任务' })).toHaveCount(0);
 });
 
-test('keyboard: Tab reaches all three controls with a visible focus ring; Enter on `新任务` opens the dialog', async ({
+test('keyboard: Tab reaches all three controls with a visible focus ring; Enter on `新任务` lands on the home composer', async ({
   page,
 }) => {
   await page.goto('/app?scenario=01&view=board');
@@ -104,7 +105,8 @@ test('keyboard: Tab reaches all three controls with a visible focus ring; Enter 
     expect(ring.shadow).not.toBe('none');
   }
   await page.keyboard.press('Enter');
-  await expect(page.getByRole('dialog', { name: '新建任务' })).toBeVisible();
+  await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toBeFocused();
+  await expect(page.getByRole('dialog', { name: '新建任务' })).toHaveCount(0);
 });
 
 test('narrow window: the summary truncates, the controls stay on one row inside the bar', async ({

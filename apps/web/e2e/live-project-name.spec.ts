@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page, type Route, test } from '@playwright/test';
+import { mockLive, PROJECT as HOME_PROJECT } from './chief-home-mock';
 import { evidencePanelShot } from './evidence';
 
 // Live face, every surface that used to fall back to the fixture capture
@@ -58,6 +59,8 @@ const WIRE_TASKS = [
   wireTodo(0, 'proj-a', 'project probe alpha'),
   wireTodo(1, 'proj-b', 'project probe beta'),
 ];
+
+type Json = (body: unknown, status?: number) => Promise<void>;
 
 interface Writes {
   list: { method: string; path: string }[];
@@ -247,85 +250,5 @@ test.describe('detail head', () => {
     await projects.release();
     await expect(popover).toContainText('atlas');
     await expect(popover).not.toContainText(FIXTURE_PROJECT);
-  });
-});
-
-test.describe('new-task dialog', () => {
-  const openDialog = async (page: Page) => {
-    await page.locator('.sidebar-new-task').click();
-    const dialog = page.getByRole('dialog', { name: '新建任务' });
-    await expect(dialog).toBeVisible();
-    return dialog;
-  };
-
-  test('projects pending: no project chip, and saving sends nothing to a fixture project', async ({
-    page,
-  }) => {
-    const writes = await stubLiveBoot(page);
-    const projects = await holdProjects(page);
-    await page.goto('/app?view=board');
-    await expect(card(page, 'todo-0')).toContainText('project probe alpha');
-    await expect.poll(projects.count).toBeGreaterThan(0);
-
-    const dialog = await openDialog(page);
-    await expect(dialog.getByTestId('new-task-head')).toContainText('新建任务');
-    await shot(page, 'newtask-pending.png', dialog.getByTestId('new-task-head'));
-    await expect(dialog.getByTestId('new-task-project-chip')).toHaveCount(0);
-    await expect(dialog).not.toContainText(FIXTURE_PROJECT);
-
-    await dialog.getByTestId('new-task-spec').fill('pending save probe');
-    await dialog.getByRole('button', { name: '保存', exact: true }).click();
-    await expect(page.getByText('新建任务失败，请重试。')).toBeVisible();
-    // neither a todo under the fixture project id nor a stray default project
-    expect(writes.list).toEqual([]);
-
-    await projects.release();
-    await expect(sidebarProject(page, 'atlas')).toBeVisible();
-    const reopened = await openDialog(page);
-    const chip = reopened.getByTestId('new-task-project-chip');
-    await expect(chip).toContainText('verify-1400');
-    await chip.click();
-    const menu = page.getByRole('listbox', { name: '项目' });
-    await expect(menu.getByRole('option')).toHaveCount(2);
-    await shot(page, 'newtask-loaded.png', reopened);
-    await expect(menu).not.toContainText(FIXTURE_PROJECT);
-  });
-
-  test('projects read failed: no project chip', async ({ page }) => {
-    await stubLiveBoot(page);
-    const projects = await failProjects(page);
-    await page.goto('/app?view=board');
-    await expect(card(page, 'todo-0')).toContainText('project probe alpha');
-    await projects.settled();
-
-    const dialog = await openDialog(page);
-    await expect(dialog.getByTestId('new-task-head')).toContainText('新建任务');
-    await expect(dialog.getByTestId('new-task-project-chip')).toHaveCount(0);
-    await expect(dialog).not.toContainText(FIXTURE_PROJECT);
-  });
-
-  test('projects loaded and empty: no project chip, saving creates the default project', async ({
-    page,
-  }) => {
-    const writes = await stubLiveBoot(page);
-    let answered = 0;
-    await page.route('**/api/projects?*', (route) => {
-      answered += 1;
-      return route.fulfill({ json: [] });
-    });
-    await page.goto('/app?view=board');
-    await expect(card(page, 'todo-0')).toContainText('project probe alpha');
-    await expect.poll(() => answered).toBeGreaterThan(0);
-
-    const dialog = await openDialog(page);
-    await expect(dialog.getByTestId('new-task-head')).toContainText('新建任务');
-    await expect(dialog.getByTestId('new-task-project-chip')).toHaveCount(0);
-    await expect(dialog).not.toContainText(FIXTURE_PROJECT);
-
-    await dialog.getByTestId('new-task-spec').fill('empty list save probe');
-    await dialog.getByRole('button', { name: '保存', exact: true }).click();
-    // the stub answers the write 404, so the create-project leg toasts
-    await expect(page.getByText('创建项目失败，请重试。')).toBeVisible();
-    expect(writes.list).toEqual([{ method: 'POST', path: '/api/projects' }]);
   });
 });

@@ -176,10 +176,17 @@ async function openBoard(): Promise<void> {
 }
 
 async function createAndStart(title: string): Promise<void> {
-  await page.getByRole('complementary').getByRole('button', { name: '新任务' }).click();
-  await pexpect(page.locator('.new-task-spec')).toBeVisible();
-  await page.locator('.new-task-spec').fill(title);
-  await page.locator('.new-task-dialog').getByRole('button', { name: '保存', exact: true }).click();
+  const projects = (await api(server.url, 'GET', '/api/projects')).body as { id: string }[];
+  const projectId =
+    projects[0]?.id ??
+    (
+      (await api(server.url, 'POST', '/api/projects', { name: '默认项目', repoKind: 'hosted' }))
+        .body as {
+        id: string;
+      }
+    ).id;
+  await api(server.url, 'POST', `/api/projects/${projectId}/todos`, { title: '', spec: title });
+  await openBoard();
   await pexpect(page.getByRole('link', { name: title })).toBeVisible({
     timeout: 30_000,
   });
