@@ -13,18 +13,18 @@ import { needsYouThreads } from './needs-you.js';
 import { relativeTime } from './rel-time.js';
 import { threadCopy, threadHref, threadStatus, threadTone } from './thread-copy.js';
 
-export type WorkPane = 'tasks' | 'made';
+export type WorkPane = 'tasks' | 'made' | 'machines';
 
 export const PANE_PARAM = 'pane';
 
 export function paneOf(value: string | null): WorkPane | null {
-  return value === 'tasks' || value === 'made' ? value : null;
+  return value === 'tasks' || value === 'made' || value === 'machines' ? value : null;
 }
 
 const live = (todo: TodoRecord) => todo.archivedAt == null;
 
 interface WorkPanelProps {
-  pane: WorkPane;
+  pane: Exclude<WorkPane, 'machines'>;
   todos: readonly TodoRecord[];
   schedules: readonly ScheduleRecord[];
   now: number;
