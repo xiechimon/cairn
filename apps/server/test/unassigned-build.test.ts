@@ -183,11 +183,13 @@ describe('#1104 A: chief run_builds without an assignment -> 400 rejection', () 
       );
 
     const todoId = await createTodo(w);
-    await expect(relay({ todoIds: [todoId] })).rejects.toThrow(/两槽全空/);
-    await expect(relay({ todoIds: [todoId], assignment: {} })).rejects.toThrow(/两槽全空/);
+    await expect(relay({ todoIds: [todoId] })).rejects.toThrow(/No agent is assigned/);
+    await expect(relay({ todoIds: [todoId], assignment: {} })).rejects.toThrow(
+      /No agent is assigned/,
+    );
     await expect(
       relay({ todoIds: [todoId], assignment: { plan: null, build: null } }),
-    ).rejects.toThrow(/两槽全空/);
+    ).rejects.toThrow(/No agent is assigned/);
     const todoRow = w.s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get()!;
     expect(todoRow.phase).toBe('todo');
     const out = JSON.parse(

@@ -418,6 +418,49 @@ existing authentication policy for named targets; unscoped machine-management
 actions receive no grant. Image builds use an exclusive lock and preserve
 staging trees with active or unreadable mounts.
 
+## Separate trial daemon
+
+The trial uses a second user unit from the main checkout. Install it as the
+checkout owner after the normal daemon deployment has produced `apps/daemon/dist`:
+
+```sh
+systemctl --user link "$HOME/Code/AgentProjects/cairn/scripts/ops/systemd/cairn-daemon-orb.service"
+systemctl --user daemon-reload
+systemctl --user enable --now cairn-daemon-orb.service
+journalctl --user -u cairn-daemon-orb.service -f
+```
+
+Ensure the user manager's PATH resolves the same Node executable used by the
+production daemon. If needed, add a drop-in with that executable's directory in
+PATH before starting the trial unit. Do not edit the production unit.
+
+The daemon does not yet drive the browser enrollment itself (#2530). Start an
+enrollment with `POST /api/machine/enroll/start` and the name `omarchy-orb`,
+have a team owner approve it on the web authorize page, then let a poller of
+`POST /api/machine/enroll/poll` write the returned machine record to
+`%h/.cairn-orb-daemon/machine.json` (mode 0600) before starting the unit. Never
+copy production credentials. Enable `claude-code` on the machine, bind the
+active `orb-builder` agent to it, and add `orb-builder` to the server's
+`CAIRN_INTAKE_AGENT_ALLOWLIST`. Transfer the chosen issue with
+`node scripts/ops/transfer-to-cairn.mjs <issue> --agent orb-builder`; see
+`scripts/ops/transfer-to-cairn.README.md` for its ownership checks and the
+append-only `never` entry it writes.
+
+The normal `deploy-self.sh` deployment also stops and starts
+`cairn-daemon-orb.service` when that unit is enabled, so both daemons reload the
+rebuilt checkout during deployment and rollback.
+
+`CAIRN_EXECUTOR=orb` selects Orb execution. `CAIRN_HOME` and
+`CAIRN_WORKSPACES_DIR` keep `machine.json`, the outbox, and workspaces beneath
+`%h/.cairn-orb-daemon`, separate from the default `%h/.cairn` state. The machine
+name comes from `--name omarchy-orb`. The server remains
+`http://127.0.0.1:8787`. The production `cairn-daemon.service` is untouched.
+Do not inherit a production `CAIRN_API_KEY` or `CAIRN_TEAM` in this user unit;
+use the authorize URL for the separate enrollment.
+
+Record live acceptance using [the trial evidence template](../../../docs/verify/b2-trial-one/README.md).
+Local fake tests do not establish Linux enrollment or Orb execution.
+
 ## Secret isolation canary (#2277)
 
 From the normally built, matching Linux checkout on omarchy, as `ian` without

@@ -126,6 +126,58 @@ describe('resolveStepCredentials (per-step dispatch interface surface)', () => {
     expect(bundle.provider?.apiKey).toBe(RELAY_KEY);
   });
 
+  test.each([true, false])(
+    'claimed follow-up steps filter newly granted agent secrets for intake preset=%s',
+    async (intakePreset) => {
+      const s = await withAgentStack({ secretsGranted: false });
+      s.db
+        .update(todo)
+        .set({
+          assignment: {
+            ...(intakePreset ? { source: 'intake-label' as const } : {}),
+            plan: null,
+            build: { agentId: 'agent-xiaolin' },
+          },
+        })
+        .where(eq(todo.id, s.todoId))
+        .run();
+      const secret = createSecret(s.keysvc, {
+        teamId: s.team.id,
+        name: 'FOLLOWUP_SECRET',
+        description: null,
+        value: 'followup-secret-value',
+      });
+      s.db
+        .update(agent)
+        .set({ secrets: [secret.id] })
+        .where(eq(agent.id, 'agent-xiaolin'))
+        .run();
+      const machineId = insertMachine(s, { name: 'followup-secrets' });
+      const stepId = addStep(s, s.buildId, 'build');
+      s.db
+        .update(stepTable)
+        .set({ status: 'claimed', machineId })
+        .where(eq(stepTable.id, stepId))
+        .run();
+      const bundle = await stepToken(
+        {
+          ...s.svc,
+          box: s.secretBox,
+          reposDir: s.reposDir,
+          attachmentsDir: s.attachmentsDir,
+          skillsDir: s.skillsDir,
+        },
+        machineId,
+        stepId,
+      );
+      expect(bundle.secrets).toEqual(
+        intakePreset ? {} : { FOLLOWUP_SECRET: 'followup-secret-value' },
+      );
+      expect(bundle.provider).toMatchObject({ apiKey: RELAY_KEY });
+      s.dispose();
+    },
+  );
+
   test('no Agent assigned = provider null + empty access surface; unknown step 404', async () => {
     const s = await withAgentStack();
     const second = (await (

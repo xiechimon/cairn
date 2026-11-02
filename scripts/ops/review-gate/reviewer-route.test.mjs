@@ -3,6 +3,8 @@ import { test } from 'node:test';
 import {
   BLOCK_ROUNDS,
   CLAUDE_DENIED_TOOLS,
+  CLAUDE_DIFF_PATHSPEC,
+  CLAUDE_OMITTED_PATHS,
   CLAUDE_REVIEW_TOOLS,
   claudeFallback,
   claudeReviewArgs,
@@ -16,6 +18,7 @@ import {
   parseRawDiff,
   parseRuns,
   priorFindings,
+  roundStops,
   STALL_MS,
   stallAlert,
   stalled,
@@ -33,8 +36,11 @@ test('Claude never reviews a Claude-authored PR', () => {
   assert.equal(claudeFallback('anthropic', noModel), false);
 });
 
-test('no fallback without an excluded author or on other failures', () => {
-  assert.equal(claudeFallback(null, noModel), false);
+test('a PR whose author vendor is unknown falls back to Claude when no model is usable', () => {
+  for (const unknown of [null, undefined, '']) assert.equal(claudeFallback(unknown, noModel), true);
+});
+
+test('no fallback on other failures', () => {
   assert.equal(claudeFallback('openai', { status: 1, stderr: 'timeout' }), false);
   assert.equal(claudeFallback('openai', { status: 0, stderr: 'no usable model' }), false);
 });
@@ -247,4 +253,41 @@ test('deleted files, symlinks and submodules leave the low-risk tier', () => {
   assert.equal(one({ status: 'A', mode: '120000' }), false);
   assert.equal(one({ status: 'A', mode: '160000' }), false);
   assert.equal(one({ status: 'T', mode: '100644' }), false);
+});
+
+test('the Claude diff keeps snapshots and only drops deleted bodies, verify evidence and drizzle meta', () => {
+  assert.equal(CLAUDE_DIFF_PATHSPEC[0], '-D');
+  for (const path of [':(exclude)docs/verify', ':(exclude)apps/server/drizzle/meta'])
+    assert.ok(CLAUDE_DIFF_PATHSPEC.includes(path));
+  assert.ok(!CLAUDE_DIFF_PATHSPEC.some((part) => part.includes('__snapshots__')));
+  assert.deepEqual(CLAUDE_OMITTED_PATHS, ['docs/verify', 'apps/server/drizzle/meta']);
+});
+
+test('the Claude prompt names every omitted file so a hidden change can be blocked', () => {
+  const input = claudeReviewPrompt('P', {
+    diff: '+x\n',
+    title: 'T',
+    body: 'B',
+    omitted: 'M\tdocs/verify/1/run.txt\nA\tapps/server/drizzle/meta/0086_snapshot.json',
+  });
+  assert.match(input, /Files changed but omitted from the diff/);
+  assert.match(input, /M\tdocs\/verify\/1\/run\.txt/);
+  assert.match(input, /A\tapps\/server\/drizzle\/meta\/0086_snapshot\.json/);
+  assert.doesNotMatch(
+    claudeReviewPrompt('P', { diff: '+x\n', title: '', body: '' }),
+    /omitted from the diff/,
+  );
+});
+
+test('a round stops only when no reviewer was tried', () => {
+  assert.equal(roundStops({ stderr: 'ai-route: no usable model for role review' }), true);
+  assert.equal(
+    roundStops({
+      stderr:
+        'ai-route: no usable model for role review\nclaude fallback: diff of 9 characters exceeds 1; no partial review',
+    }),
+    false,
+  );
+  assert.equal(roundStops({ stderr: 'no usable model', excluded: true }), false);
+  assert.equal(roundStops({ stderr: 'timeout' }), false);
 });
