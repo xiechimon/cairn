@@ -7,7 +7,8 @@ import {
 } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
-import { afterAll, describe, expect, test } from 'vitest';
+import { afterAll, describe, expect, test, vi } from 'vitest';
+import webpush from 'web-push';
 import {
   agent as agentTable,
   chiefMessage,
@@ -293,5 +294,55 @@ describe('quiet by default for event-triggered Coordinator turns (#1784)', () =>
         provenance: watchProvenance('todo-a'),
       }),
     ]);
+  });
+
+  test('answering a pending card with its recommended option resumes the thread and fires nothing else', async () => {
+    const w = await setup();
+    w.wake(watchProvenance('todo-a'));
+    const wake = await w.claim();
+    const asked = await w.ask(wake.step.id, {
+      requestId: 'ask-00000000-0003',
+      questions: [
+        {
+          ...QUESTION,
+          options: [{ label: '重试' }, { label: '换机器', recommended: true }],
+        },
+      ],
+      provenance: watchProvenance('todo-a'),
+    });
+    expect(asked.status).toBe(200);
+    const card = w.s.db
+      .select()
+      .from(chiefMessage)
+      .where(eq(chiefMessage.id, 'ask-00000000-0003'))
+      .get();
+    const parked = { ...JSON.parse(String(card?.content)), parkedAt: Date.now() };
+    expect(parked.questions[0].options[1]).toEqual({ label: '换机器', recommended: true });
+    w.s.db
+      .update(chiefMessage)
+      .set({ content: JSON.stringify(parked) })
+      .where(eq(chiefMessage.id, 'ask-00000000-0003'))
+      .run();
+    await w.done(wake.step.id, '已经问了用户。');
+    const notificationsBefore = w.s.db.select().from(notificationTable).all();
+    const send = vi.spyOn(webpush, 'sendNotification');
+    const answer = await call(
+      w.s.app,
+      'POST',
+      `/api/teams/${w.teamId}/chief/threads/${w.threadId}/questions/ask-00000000-0003/answer`,
+      { body: { answers: [{ header: '下一步', choices: ['换机器'] }] } },
+    );
+    expect(answer.status).toBe(200);
+    const resumed = w.s.db
+      .select({ prompt: stepTable.prompt })
+      .from(stepTable)
+      .where(and(eq(stepTable.buildId, w.threadId), eq(stepTable.status, 'pending')))
+      .all();
+    expect(resumed).toHaveLength(1);
+    expect(resumed[0]?.prompt ?? '').not.toMatch(/^\[wake:/);
+    expect(resumed[0]?.prompt).toContain('换机器');
+    expect(send).not.toHaveBeenCalled();
+    expect(w.s.db.select().from(notificationTable).all()).toEqual(notificationsBefore);
+    send.mockRestore();
   });
 });

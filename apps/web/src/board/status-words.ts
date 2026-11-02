@@ -12,16 +12,12 @@ export const STATUS_WORDS = {
 
 export type StatusWord = (typeof STATUS_WORDS)[keyof typeof STATUS_WORDS];
 
-export function doneStatusWord(verified: boolean | null | undefined): StatusWord {
-  return verified === true ? STATUS_WORDS.verified : STATUS_WORDS.doneUnverified;
-}
-
 export function reportStatusWord(
   report: Pick<ThreadReportContent, 'phase' | 'verified'>,
 ): StatusWord {
   switch (report.phase) {
     case 'done':
-      return doneStatusWord(report.verified);
+      return report.verified === true ? STATUS_WORDS.verified : STATUS_WORDS.doneUnverified;
     case 'failed':
       return STATUS_WORDS.failed;
     case 'review':

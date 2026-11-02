@@ -1,6 +1,7 @@
 import type { AskUserAnswer } from '@cairn/shared';
 import { Ban, CircleCheck, CircleHelp, type LucideIcon } from 'lucide-react';
 import { type ReactNode, useLayoutEffect, useMemo, useState } from 'react';
+import { STATUS_WORDS } from '../board/status-words.js';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON, DIALOG_TEXT_BUTTON } from '../components/ui/dialog-shell.js';
@@ -14,6 +15,7 @@ export interface ChiefQuestionCardProps {
   item: ChiefQuestionItem;
   onAnswer?: (input: { requestId: string; answers: AskUserAnswer[] }) => void;
   onCancel?: (requestId: string) => void;
+  numberKeys?: boolean;
 }
 
 type Draft =
@@ -42,7 +44,7 @@ const QUESTION_STATUS: Record<
   ChiefQuestionItem['status'],
   { icon: LucideIcon; ink: string; label: string }
 > = {
-  pending: { icon: CircleHelp, ink: STATUS_WAITING_INK, label: '等你回答' },
+  pending: { icon: CircleHelp, ink: STATUS_WAITING_INK, label: STATUS_WORDS.needsYou },
   answered: { icon: CircleCheck, ink: 'text-content-tertiary', label: '已回答' },
   cancelled: { icon: Ban, ink: 'text-content-tertiary', label: '已取消' },
 };
@@ -61,19 +63,46 @@ function QuestionStatus({ status }: { status: ChiefQuestionItem['status'] }) {
   );
 }
 
-export function ChiefQuestionCard({ item, onAnswer, onCancel }: ChiefQuestionCardProps) {
+type Question = ChiefQuestionItem['questions'][number];
+
+export function recommendedFirst(question: Question): Question {
+  return {
+    ...question,
+    options: [
+      ...question.options.filter((option) => option.recommended === true),
+      ...question.options.filter((option) => option.recommended !== true),
+    ],
+  };
+}
+
+function RecommendedMark() {
+  const { t } = useI18n();
+  return (
+    <span data-testid="chief-question-recommended" className="text-meta text-content-tertiary">
+      {t('（推荐）')}
+    </span>
+  );
+}
+
+export function ChiefQuestionCard({
+  item,
+  onAnswer,
+  onCancel,
+  numberKeys = true,
+}: ChiefQuestionCardProps) {
   const { t } = useI18n();
   const pending = item.status === 'pending' && onAnswer !== undefined;
-  const [drafts, setDrafts] = useState<Draft[]>(() => initialDrafts(item));
+  const questions = useMemo(() => item.questions.map(recommendedFirst), [item.questions]);
+  const [drafts, setDrafts] = useState<Draft[]>(() => initialDrafts(questions));
   const [step, setStep] = useState(0);
-  const total = item.questions.length;
+  const total = questions.length;
   const lastStep = total - 1;
   const last = step === lastStep;
-  const question = item.questions[step] ?? item.questions[0];
+  const question = questions[step] ?? questions[0];
   const draft = drafts[step];
 
   useLayoutEffect(() => {
-    if (!pending || question === undefined || question.options.length === 0) return;
+    if (!pending || !numberKeys || question === undefined || question.options.length === 0) return;
     const max = question.options.length + 1;
     const handler = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -89,12 +118,12 @@ export function ChiefQuestionCard({ item, onAnswer, onCancel }: ChiefQuestionCar
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [pending, step, question]);
+  }, [pending, numberKeys, step, question]);
 
   const stepComplete = useMemo(() => draftComplete(draft, question), [draft, question]);
   const allComplete = useMemo(
-    () => pending && item.questions.every((q, i) => draftComplete(drafts[i], q)),
-    [pending, drafts, item.questions],
+    () => pending && questions.every((q, i) => draftComplete(drafts[i], q)),
+    [pending, drafts, questions],
   );
 
   const submit = () => {
@@ -102,7 +131,7 @@ export function ChiefQuestionCard({ item, onAnswer, onCancel }: ChiefQuestionCar
     onAnswer?.({
       requestId: item.requestId,
       answers: drafts.map((d, i) => {
-        const header = item.questions[i]?.header ?? '';
+        const header = questions[i]?.header ?? '';
         if (d.kind === 'text') return { header, text: d.value.trim() };
         const choices = [...d.picked];
         if (d.other && d.otherText.trim() !== '') choices.push(d.otherText.trim());
@@ -125,7 +154,7 @@ export function ChiefQuestionCard({ item, onAnswer, onCancel }: ChiefQuestionCar
           <QuestionStatus status={item.status} />
         </div>
         <div className="flex flex-col gap-3">
-          {item.questions.map((q, qi) => (
+          {questions.map((q, qi) => (
             <div key={qi} className="flex flex-col gap-1.5">
               <div className="text-caption text-content-tertiary">{q.header}</div>
               <div className="text-ui text-foreground">{q.question}</div>
@@ -156,12 +185,14 @@ export function ChiefQuestionCard({ item, onAnswer, onCancel }: ChiefQuestionCar
         ? pickedCount > 0
           ? t('已选 {n} 项', { n: pickedCount })
           : t('未选')
-        : t('数字键 1–{n} 选择', { n: question.options.length + 1 });
+        : numberKeys
+          ? t('数字键 1–{n} 选择', { n: question.options.length + 1 })
+          : '';
 
   return (
     <div data-testid="chief-question-card" data-status={item.status} className={CARD_CLS}>
       <div className="flex gap-1" aria-hidden="true">
-        {item.questions.map((_, i) => (
+        {questions.map((_, i) => (
           <span key={i} className={`${PIP_CLS}${i <= step ? ` ${PIP_ON_CLS}` : ''}`} />
         ))}
       </div>
@@ -205,7 +236,15 @@ export function ChiefQuestionCard({ item, onAnswer, onCancel }: ChiefQuestionCar
                 <span className={`${NUM_CLS} ${selected ? NUM_ON_CLS : NUM_OFF_CLS}`}>
                   {oi + 1}
                 </span>
-                <span className={OPT_TXT_CLS}>{option.label}</span>
+                <span className={OPT_TXT_CLS}>
+                  {option.label}
+                  {option.recommended === true && (
+                    <>
+                      {' '}
+                      <RecommendedMark />
+                    </>
+                  )}
+                </span>
               </Button>
             );
           })}
@@ -224,7 +263,7 @@ export function ChiefQuestionCard({ item, onAnswer, onCancel }: ChiefQuestionCar
             <span className={`${NUM_CLS} ${otherSelected ? NUM_ON_CLS : NUM_OFF_CLS}`}>
               {question.options.length + 1}
             </span>
-            <span className={OPT_TXT_CLS}>{t('其他…')}</span>
+            <span className={OPT_TXT_CLS}>{t('用我自己的话回答')}</span>
           </Button>
           {otherSelected && (
             <Input
@@ -304,7 +343,15 @@ function answeredRows(
             className={`${ROW_STATIC_CLS}${picked ? ` ${OPT_SEL_CLS}` : ''}`}
           >
             <span className={`${NUM_CLS} ${picked ? NUM_ON_CLS : NUM_OFF_CLS}`}>{oi + 1}</span>
-            <span className={OPT_TXT_CLS}>{option.label}</span>
+            <span className={OPT_TXT_CLS}>
+              {option.label}
+              {option.recommended === true && (
+                <>
+                  {' '}
+                  <RecommendedMark />
+                </>
+              )}
+            </span>
           </div>
         );
       })}
@@ -320,8 +367,8 @@ function answeredRows(
   );
 }
 
-function initialDrafts(item: ChiefQuestionItem): Draft[] {
-  return item.questions.map((q) =>
+function initialDrafts(questions: readonly Question[]): Draft[] {
+  return questions.map((q) =>
     q.options.length === 0
       ? { kind: 'text' as const, value: '' }
       : { kind: 'choices' as const, picked: [], other: false, otherText: '' },

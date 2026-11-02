@@ -177,7 +177,7 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(pending, 'Q1').toHaveCSS('border-top-left-radius', await token(page, '--radius-card'));
     await expect(pending, 'Q1').toHaveCSS('background-color', card);
     const waiting = pending.getByTestId('chief-question-status');
-    await expect(waiting, 'Q1').toHaveText('等你回答');
+    await expect(waiting, 'Q1').toHaveText('待你决定');
     await expect(waiting.locator('svg'), 'Q1').toHaveCount(1);
     await expect(waiting, 'Q1').toHaveCSS('color', accent);
 
