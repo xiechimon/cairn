@@ -51,11 +51,24 @@ if (mode === '--in-process-fixture') {
   }
   const thread = opened.db.select().from(chiefThread).get();
   if (!thread) throw new Error('fixture chief thread missing');
-  const response = await app.request(
-    `/api/conversations/${encodeURIComponent(thread.id)}/messages`,
-  );
-  if (response.status !== 200) throw new Error('fixture chief thread API failed');
-  const payload = await response.json();
+  const returned: string[] = [];
+  let before: string | null = null;
+  do {
+    const query: string = before === null ? '' : `?before=${encodeURIComponent(before)}`;
+    const response = await app.request(
+      `/api/conversations/${encodeURIComponent(thread.id)}/messages${query}`,
+    );
+    if (response.status !== 200) throw new Error('fixture chief thread API failed');
+    const payload = (await response.json()) as {
+      messages: { id: string }[];
+      nextCursor?: unknown;
+    };
+    returned.push(...payload.messages.map((row) => row.id));
+    const cursor = typeof payload.nextCursor === 'string' ? payload.nextCursor : null;
+    if (cursor !== null && cursor === before)
+      throw new Error('fixture chief cursor did not advance');
+    before = cursor;
+  } while (before !== null);
   const expected = opened.db
     .select()
     .from(chiefMessage)
@@ -63,10 +76,7 @@ if (mode === '--in-process-fixture') {
     .filter((row) => row.threadId === thread.id)
     .map((row) => row.id)
     .sort();
-  if (
-    JSON.stringify(payload.messages.map((row: { id: string }) => row.id).sort()) !==
-    JSON.stringify(expected)
-  )
+  if (JSON.stringify(returned.sort()) !== JSON.stringify(expected))
     throw new Error('fixture chief messages mismatch');
   console.log(
     JSON.stringify({
