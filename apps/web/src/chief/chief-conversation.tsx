@@ -238,8 +238,8 @@ export function ChiefConversation({
     onSend != null ? (files: File[]) => uploadMessageAttachments(files, t) : undefined;
   const { scrollToEnd } = useMessageScroller();
   const followSentRef = useRef(false);
-  const latestUserRef = useRef<{ key: string | number; i: number } | null>(null);
-  const userAtSendRef = useRef<{ key: string | number; i: number } | null>(null);
+  const latestUserKeyRef = useRef<string | number | null>(null);
+  const userKeyAtSendRef = useRef<string | number | null>(null);
   const prevThreadRef = useRef(chief.threadTitle);
   useEffect(() => {
     if (prevThreadRef.current === chief.threadTitle) return;
@@ -295,7 +295,7 @@ export function ChiefConversation({
         ? undefined
         : (text: string) => {
             followSentRef.current = true;
-            userAtSendRef.current = latestUserRef.current;
+            userKeyAtSendRef.current = latestUserKeyRef.current;
             const sent = onSend(text, chipProjectId);
             Promise.resolve(sent).catch(() => {
               followSentRef.current = false;
@@ -426,6 +426,7 @@ export function ChiefConversation({
       : (messageId: string, text: string) => {
           onWithdraw(messageId).then(
             () => {
+              followSentRef.current = false;
               setLiveDraft((cur) => (cur === '' ? text : `${cur}\n${text}`));
               textareaRef.current?.focus({ preventScroll: true });
             },
@@ -440,16 +441,23 @@ export function ChiefConversation({
   const latestUser = rows.findLast(({ item }) => item.kind === 'user');
   const latestUserKey =
     latestUser == null ? null : chiefStreamRowKey(latestUser.item, latestUser.i);
-  latestUserRef.current =
-    latestUser == null || latestUserKey == null ? null : { key: latestUserKey, i: latestUser.i };
+  latestUserKeyRef.current = latestUserKey;
+  const keyAtSend = userKeyAtSendRef.current;
+  const sentRowPosition =
+    keyAtSend == null
+      ? -1
+      : rows.findIndex(({ item, i }) => chiefStreamRowKey(item, i) === keyAtSend);
+  const latestUserPosition = latestUser == null ? -1 : rows.indexOf(latestUser);
   useLayoutEffect(() => {
-    const before = userAtSendRef.current;
-    const now = latestUserRef.current;
-    if (!followSentRef.current || now == null) return;
-    if (before != null && (now.key === before.key || now.i < before.i)) return;
+    if (!followSentRef.current || latestUserPosition < 0) return;
+    if (keyAtSend != null && sentRowPosition < 0) {
+      followSentRef.current = false;
+      return;
+    }
+    if (latestUserPosition <= sentRowPosition) return;
     followSentRef.current = false;
     scrollToEnd();
-  }, [latestUserKey, scrollToEnd]);
+  }, [latestUserKey, keyAtSend, sentRowPosition, latestUserPosition, scrollToEnd]);
   const queuedCapsules = allRows.flatMap(({ item }) =>
     item.kind === 'user' && item.pending != null && item.id != null
       ? [
