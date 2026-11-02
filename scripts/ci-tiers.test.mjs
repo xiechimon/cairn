@@ -33,6 +33,7 @@ function evaluate(expression, context) {
     else if (token === '==' || token === '!=') js += `${token}=`;
     else if (['&&', '||', '!', '(', ')', ','].includes(token)) js += token;
     else if (token === 'startsWith') js += 'startsWith';
+    else if (token === 'cancelled') js += 'cancelled';
     else if (token === 'true' || token === 'false' || token === 'null') js += token;
     else {
       assert.ok(token in context, `the scenario does not define ${token}`);
@@ -43,7 +44,8 @@ function evaluate(expression, context) {
     String(value ?? '')
       .toLowerCase()
       .startsWith(String(prefix).toLowerCase());
-  return new Function('startsWith', `return (${js});`)(startsWith);
+  const cancelled = () => context['job.cancelled'] === true;
+  return new Function('startsWith', 'cancelled', `return (${js});`)(startsWith, cancelled);
 }
 
 const condition = (name) => job(name).match(/^ {4}if: (.*)$/m)?.[1];
@@ -232,4 +234,29 @@ test('both e2e tiers run the CSS mechanism gate after a fixture build', () => {
         : block.indexOf('vite build --mode fixture');
     assert.ok(build !== -1 && build < gate, `${name} builds the fixture before the gate`);
   }
+});
+
+test('gates skips only a docs-only pull request whose classifier succeeded', () => {
+  assert.match(job('gates'), /^ {4}needs: changes$/m);
+  assert.match(
+    job('changes'),
+    /^ {6}gates-needed: \$\{\{ steps\.classify\.outputs\.gates-needed \}\}$/m,
+  );
+  for (const [name, github] of Object.entries(events))
+    for (const result of ['success', 'failure', 'skipped'])
+      for (const needed of ['true', 'false', ''])
+        for (const cancelled of [false, true]) {
+          const runs = evaluate(condition('gates'), {
+            ...github,
+            'job.cancelled': cancelled,
+            'needs.changes.result': result,
+            'needs.changes.outputs.gates-needed': needed,
+          });
+          const skip =
+            cancelled ||
+            (github['github.event_name'] === 'pull_request' &&
+              result === 'success' &&
+              needed === 'false');
+          assert.equal(runs, !skip, `${name}: ${JSON.stringify({ result, needed, cancelled })}`);
+        }
 });

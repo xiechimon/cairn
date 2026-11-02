@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       has-code: ${{ steps.classify.outputs.has-code }}
+      gates-needed: ${{ steps.classify.outputs.gates-needed }}
       e2e-tier: ${{ (github.event_name == 'push' || (github.event.pull_request.draft && github.event.pull_request.user.login == 'mergify[bot]' && startsWith(github.head_ref, 'mergify/merge-queue/'))) && 'full' || 'affected' }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -27,10 +28,13 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
         run: |
           has_code=true
+          gates_needed=true
           if [ "$EVENT_NAME" = "pull_request" ]; then
             has_code=$(node scripts/prepush.mjs --has-code) || has_code=true
+            gates_needed=$(node scripts/prepush.mjs --needs-gates) || gates_needed=true
           fi
           echo "has-code=$has_code" >> "$GITHUB_OUTPUT"
+          echo "gates-needed=$gates_needed" >> "$GITHUB_OUTPUT"
 
   # #762: branch protection treats skipped jobs as success; always() ensures aggregates report failures.
   check:
@@ -336,6 +340,8 @@ jobs:
         run: pnpm prepush --advisory
 
   gates:
+    needs: changes
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.gates-needed != 'false') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read

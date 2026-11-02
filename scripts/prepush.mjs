@@ -60,6 +60,10 @@ export function hasCode(paths) {
   return paths.some((path) => !path.startsWith('.claude/epics/') && !isDocument(path));
 }
 
+export function needsGates(paths) {
+  return hasCode(paths) || paths.some((path) => !path.startsWith('docs/'));
+}
+
 export function workflowTestSteps(workflows = join(root, '.github/workflows')) {
   if (!existsSync(workflows)) return [];
   return readdirSync(workflows)
@@ -183,20 +187,21 @@ export function changedPaths(base = process.env.PREPUSH_BASE_SHA || 'origin/main
 
 if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
   const args = process.argv.slice(2);
-  const modes = ['--ci', '--advisory', '--e2e-shard', '--self-test', '--has-code'];
+  const modes = ['--ci', '--advisory', '--e2e-shard', '--self-test', '--has-code', '--needs-gates'];
   if (
     args.length > 0 &&
     (!modes.includes(args[0]) || args.length !== (args[0] === '--e2e-shard' ? 2 : 1))
   ) {
     console.error(
-      'Usage: pnpm prepush [--ci | --advisory | --e2e-shard N/4 | --self-test | --has-code]',
+      'Usage: pnpm prepush [--ci | --advisory | --e2e-shard N/4 | --self-test | --has-code | --needs-gates]',
     );
     process.exit(2);
   }
   if (args[0] === '--e2e-shard' && !/^[1-4]\/4$/.test(args[1] ?? '')) process.exit(2);
-  if (args[0] === '--has-code') {
+  if (args[0] === '--has-code' || args[0] === '--needs-gates') {
+    const classify = args[0] === '--has-code' ? hasCode : needsGates;
     try {
-      console.log(hasCode(changedPaths()));
+      console.log(classify(changedPaths()));
     } catch {
       console.log(true);
     }

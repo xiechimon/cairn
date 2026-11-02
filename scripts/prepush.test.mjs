@@ -19,6 +19,7 @@ import {
   ciOnlyTestSteps,
   hasCode,
   localOnly,
+  needsGates,
   prepushModules,
   prepushPlan,
   runPlan,
@@ -302,6 +303,22 @@ test('folded gates stay visibly red, continue after failures and retain full his
   assert.ok(jobs.get('dead-class-gate').includes('pnpm prepush --advisory'));
   assert.ok(!jobs.get('check').includes('pnpm prepush --advisory'));
 });
+
+for (const [name, paths, expected] of [
+  ['the #2587 research note', ['docs/research/duet-proactive-coordinator.md'], false],
+  ['docs evidence and lessons', ['docs/verify/2182/README.md', 'docs/lessons.md'], false],
+  ['AGENTS.md, which lane-model-policy reads', ['AGENTS.md'], true],
+  ['root docs', ['README.md', 'CLAUDE.md'], true],
+  ['skill docs the probe reach gate reads', ['.claude/skills/verify-cairn/features/a.md'], true],
+  ['an executable check under docs', ['docs/verify/1542/reach.test.mjs'], true],
+  ['a script', ['scripts/dispatch-agent.test.mjs'], true],
+  ['docs plus a script', ['docs/research/a.md', 'scripts/prepush.mjs'], true],
+  ['empty changes', [], false],
+]) {
+  test(`needsGates classifies ${name}`, () => {
+    assert.equal(needsGates(paths), expected);
+  });
+}
 
 test('documentation skips code checks, unknown paths fail closed', () => {
   assert.deepEqual(prepushPlan(['docs/lessons.md', 'AGENTS.md']), [
