@@ -14,6 +14,8 @@ async function mockSlowSend(page: Page, total = 250) {
   const history = historyOf(total);
   let running = false;
   await mockLive(page, { threads: [THREAD], messages: [] }, (path, route, json) => {
+    if (path === '/api/teams/t1/chief/threads' && route.request().method() === 'GET')
+      return json([{ ...THREAD, activeRun: running ? { phase: 'chief' } : null }]);
     if (path !== `/api/conversations/${THREAD.id}/messages`) return undefined;
     if (route.request().method() === 'POST') {
       const content = (route.request().postDataJSON() as { content: string }).content;
@@ -23,12 +25,6 @@ async function mockSlowSend(page: Page, total = 250) {
             id: `s-${history.length}`,
             role: 'user',
             content,
-            createdAt: 1_000 + history.length,
-          });
-          history.push({
-            id: `s-${history.length}`,
-            role: 'assistant',
-            content: 'queued behind the machine',
             createdAt: 1_000 + history.length,
           });
           running = true;
@@ -42,7 +38,6 @@ async function mockSlowSend(page: Page, total = 250) {
     return json({
       messages: history.slice(start, end),
       nextCursor: start > 0 ? (history[start]?.id ?? null) : null,
-      activeRun: running ? { phase: 'chief' } : null,
     });
   });
 }
@@ -72,7 +67,18 @@ test('a sent message scrolls into view even when the reader was scrolled up', as
   await input.press('Enter');
 
   await expect(row(page, 'follow me down')).toBeInViewport();
-  await expect(row(page, 'queued behind the machine')).toBeInViewport();
+  const streamUrl = `/api/conversations/${THREAD.id}/stream`;
+  await expect
+    .poll(() => page.evaluate((u) => window.__es.some((es) => es.url.includes(u)), streamUrl))
+    .toBe(true);
+  await page.evaluate((u) => {
+    window.__es.find((es) => es.url.includes(u))?.emit({ type: 'text_delta', text: 'typing back' });
+  }, streamUrl);
+  await expect(home(page).getByText('typing back')).toBeInViewport();
+  await expect(row(page, 'follow me down')).toBeInViewport();
+  await expect
+    .poll(() => opacityOf(messageOf(page, 'follow me down').getByTestId('chief-msg-tools')))
+    .toBe(1);
   await evidenceShot(page, 'chief-follow-send');
 });
 
