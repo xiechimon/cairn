@@ -17,6 +17,9 @@ import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 
 const source = import.meta.dirname;
+const repoPnpm = /^pnpm@(\d+\.\d+\.\d+)$/.exec(
+  JSON.parse(readFileSync(join(source, '../../../package.json'), 'utf8')).packageManager,
+)[1];
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'cairn-orb-shell-'));
   const bin = join(root, 'bin');
@@ -192,6 +195,7 @@ test('image dry-run prints pins and never invokes privileged mutations', () => {
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /@anthropic-ai\/claude-code@2.1.302/);
     assert.match(result.stdout, /@openai\/codex@0.163.0/);
+    assert.ok(result.stdout.includes(` pnpm@${repoPnpm};`));
     assert.match(result.stdout, /write \/etc\/environment/);
     assert.match(result.stdout, /mask SSH server/);
     assert.ok(f.calls().every(([cmd]) => ['id', 'runuser', 'sha256sum', 'stat'].includes(cmd)));
@@ -314,10 +318,13 @@ test('relay binds only its expected bridge and forwards only to loopback', () =>
   }
 });
 
-test('guest image provides Node and CLIs without package-manager bootstrapping', () => {
+test("guest image pins the repo's pnpm through npm, not corepack, and verifies it as agent", () => {
   const script = readFileSync(join(source, 'build-image.sh'), 'utf8');
-  assert.doesNotMatch(script, /corepack install|pnpm --version/);
-  assert.match(script, /npm install --global --ignore-scripts/);
+  assert.doesNotMatch(script, /corepack/);
+  const install = script.indexOf('npm install --global --ignore-scripts');
+  const pnpmCheck = script.indexOf('runuser -u agent -- pnpm --version');
+  assert.ok(install >= 0);
+  assert.ok(pnpmCheck > install, 'the agent verifies pnpm after the scripted-off install');
 });
 
 test("guest image runs only Claude Code's own native installer and verifies both CLIs as agent", () => {
@@ -349,7 +356,7 @@ test('ian can preview image creation without runuser or privilege', () => {
 });
 
 test('the actual image Node gate rejects a different major with an actionable error', () => {
-  const gate = /^node -e '(.+)' "\$5"$/m.exec(
+  const gate = /^node -e '(.+)' "\$6"$/m.exec(
     readFileSync(join(source, 'build-image.sh'), 'utf8'),
   )?.[1];
   assert.ok(gate);
@@ -614,6 +621,7 @@ test('image recipe only installs CLI packages and retains the mounted release en
           '--no-fund',
           '@anthropic-ai/claude-code@2.1.302',
           '@openai/codex@0.163.0',
+          `pnpm@${repoPnpm}`,
         ],
       ],
     );
@@ -623,7 +631,8 @@ test('image recipe only installs CLI packages and retains the mounted release en
       'utf8',
     );
     assert.match(marker, /node_major=26/);
-    assert.doesNotMatch(marker, /daemon=|daemon_package=|pnpm=/);
+    assert.ok(marker.includes(`\npnpm=${repoPnpm}\n`));
+    assert.doesNotMatch(marker, /daemon=|daemon_package=/);
     assert.equal(
       f.run('build-image.sh', [], { CAIRN_ORB_DAEMON_VERSION: '999.0.0' }).stdout.trim(),
       '0 changes',
@@ -667,6 +676,25 @@ test('legacy image markers rebuild without retaining npm daemon pins', () => {
       assert.match(readFileSync(marker, 'utf8'), /node_major=26/);
       assert.doesNotMatch(readFileSync(marker, 'utf8'), /daemon=/);
     }
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+test('an image built before pnpm was pinned rebuilds once and converges', () => {
+  const f = fixture();
+  try {
+    const marker = join(f.root, 'var/lib/machines/cairn-orb-base/etc/cairn-orb-image');
+    mkdirSync(join(marker, '..'), { recursive: true });
+    writeFileSync(
+      marker,
+      'recipe=fake-recipe\nclaude=2.1.302\ncodex=0.163.0\nnode_major=26\nagent_uid=1000\n',
+    );
+    const changed = f.run('build-image.sh');
+    assert.equal(changed.status, 0, changed.stderr);
+    assert.match(changed.stdout, /rebuild cairn-orb-base/);
+    assert.ok(readFileSync(marker, 'utf8').includes(`\npnpm=${repoPnpm}\n`));
+    assert.equal(f.run('build-image.sh').stdout.trim(), '0 changes');
   } finally {
     rmSync(f.root, { recursive: true, force: true });
   }

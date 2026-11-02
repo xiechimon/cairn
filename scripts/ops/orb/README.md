@@ -97,12 +97,15 @@ to `/usr/local/lib/cairn-orb/node` for the relay, so a home-based Node install
 works with the user unit's `ProtectHome=yes`. Binary content and mode converge
 on reruns. Existing networkd-managed host links or earlier network configuration
 files stop the installer before changes.
-The image contains Node and pinned Claude Code/Codex CLIs, with npm lifecycle
-scripts disabled. It installs no daemon package or production dependencies.
-`/etc/cairn-orb-image` records `node_major`, `claude`, `codex`, `agent_uid`, and
-the recipe hash. A completed base image is rebuilt when those values change.
-Legacy markers containing pnpm or daemon package/version pins are recognized
-and rebuilt once into this contract. The previous base survives failed builds
+The image contains Node, pinned Claude Code/Codex CLIs and the repository's
+pnpm (the `packageManager` version in the root `package.json`), installed with
+npm lifecycle scripts disabled. Node 25 and later ship no corepack, so project
+setup hooks and agents in the Orb need pnpm on the image's PATH. The image
+installs no daemon package or production dependencies.
+`/etc/cairn-orb-image` records `node_major`, `claude`, `codex`, `pnpm`,
+`agent_uid`, and the recipe hash. A completed base image is rebuilt when those
+values change. Markers without a pnpm pin, and legacy markers with daemon
+package/version pins, are recognized and rebuilt once into this contract. The previous base survives failed builds
 and is replaced only after the staging image is complete and unmounted.
 Unrecognized images are preserved and stop installation. The rebuild is printed
 and counted; the next run prints `0 changes`. Existing clones keep their tools.
