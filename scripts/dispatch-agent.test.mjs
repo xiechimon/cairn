@@ -32,7 +32,16 @@ function logShows(path, text) {
   return pollUntil(() => readFileSync(path, 'utf8').includes(text));
 }
 
+function supervisorPid(statusDir, id) {
+  try {
+    return JSON.parse(readFileSync(join(statusDir, `${id}.json`), 'utf8')).pid ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
 async function waitUntilDead(pid) {
+  if (!(pid > 0)) return;
   const dead = await pollUntil(() => {
     try {
       process.kill(pid, 0);
@@ -76,8 +85,8 @@ test('start verifies the process and writes the status file', async () => {
 
 test('check reports alive while the job runs and missing after it exits', async () => {
   const statusDir = mkdtempSync(join(tmpdir(), 'dispatch-agent-test-'));
+  const release = join(statusDir, 'release');
   try {
-    const release = join(statusDir, 'release');
     const start = runCli(
       [
         'start',
@@ -85,7 +94,7 @@ test('check reports alive while the job runs and missing after it exits', async 
         '--',
         process.execPath,
         '-e',
-        'const { existsSync } = require("node:fs"); setInterval(() => existsSync(process.argv[1]) && process.exit(0), 50)',
+        'const { existsSync } = require("node:fs"); setInterval(() => existsSync(process.argv[1]) && process.exit(0), 50); setTimeout(() => process.exit(1), 60000)',
         release,
       ],
       statusDir,
@@ -102,6 +111,8 @@ test('check reports alive while the job runs and missing after it exits', async 
     assert.match(`${second.stdout}${second.stderr}`, /process missing/);
     assert.equal(JSON.parse(readFileSync(join(statusDir, 'short.json'), 'utf8')).alive, false);
   } finally {
+    writeFileSync(release, '');
+    await waitUntilDead(supervisorPid(statusDir, 'short'));
     rmSync(statusDir, { recursive: true, force: true });
   }
 });

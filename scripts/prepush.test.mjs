@@ -24,6 +24,7 @@ import {
   prepushPlan,
   runPlan,
   selfTests,
+  testsRead,
   workflowTestSteps,
 } from './prepush.mjs';
 import { scrubGateEnv } from './scrub-git-env.mjs';
@@ -305,8 +306,9 @@ test('folded gates stay visibly red, continue after failures and retain full his
 });
 
 for (const [name, paths, expected] of [
-  ['the #2587 research note', ['docs/research/duet-proactive-coordinator.md'], false],
+  ['a research note no test reads', ['docs/research/unread-note.md'], false],
   ['docs evidence and lessons', ['docs/verify/2182/README.md', 'docs/lessons.md'], false],
+  ['a doc a test reads, as identity-compat reads docs/pr-review.md', ['docs/pr-review.md'], true],
   ['AGENTS.md, which lane-model-policy reads', ['AGENTS.md'], true],
   ['root docs', ['README.md', 'CLAUDE.md'], true],
   ['skill docs the probe reach gate reads', ['.claude/skills/verify-cairn/features/a.md'], true],
@@ -316,9 +318,17 @@ for (const [name, paths, expected] of [
   ['empty changes', [], false],
 ]) {
   test(`needsGates classifies ${name}`, () => {
-    assert.equal(needsGates(paths), expected);
+    assert.equal(
+      needsGates(paths, (path) => path === 'docs/pr-review.md'),
+      expected,
+    );
   });
 }
+
+test('testsRead finds a doc a test names in the real tree and not an unread one', () => {
+  assert.equal(testsRead('docs/pr-review.md'), true);
+  assert.equal(testsRead(['docs', 'research', 'duet-proactive-coordinator.md'].join('/')), false);
+});
 
 test('documentation skips code checks, unknown paths fail closed', () => {
   assert.deepEqual(prepushPlan(['docs/lessons.md', 'AGENTS.md']), [

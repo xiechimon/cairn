@@ -60,8 +60,19 @@ export function hasCode(paths) {
   return paths.some((path) => !path.startsWith('.claude/epics/') && !isDocument(path));
 }
 
-export function needsGates(paths) {
-  return hasCode(paths) || paths.some((path) => !path.startsWith('docs/'));
+export function needsGates(paths, testsRead) {
+  return hasCode(paths) || paths.some((path) => !path.startsWith('docs/') || testsRead(path));
+}
+
+export function testsRead(path) {
+  const result = spawnSync(
+    'git',
+    ['-c', 'color.ui=never', 'grep', '-l', '-F', '-e', path, '--', '*.test.ts', '*.test.mjs'],
+    { cwd: root, encoding: 'utf8' },
+  );
+  if (result.status === 1) return false;
+  if (result.status !== 0) throw new Error(result.stderr);
+  return true;
 }
 
 export function workflowTestSteps(workflows = join(root, '.github/workflows')) {
@@ -199,9 +210,9 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
   }
   if (args[0] === '--e2e-shard' && !/^[1-4]\/4$/.test(args[1] ?? '')) process.exit(2);
   if (args[0] === '--has-code' || args[0] === '--needs-gates') {
-    const classify = args[0] === '--has-code' ? hasCode : needsGates;
     try {
-      console.log(classify(changedPaths()));
+      const paths = changedPaths();
+      console.log(args[0] === '--has-code' ? hasCode(paths) : needsGates(paths, testsRead));
     } catch {
       console.log(true);
     }
