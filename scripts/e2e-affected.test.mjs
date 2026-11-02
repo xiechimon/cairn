@@ -318,10 +318,7 @@ test('shared web surfaces and the e2e runner itself still run everything', () =>
     'apps/web/src/fixtures/records.ts',
     'apps/web/src/components/settings/quota-row.tsx',
     'apps/web/playwright.config.ts',
-    'scripts/e2e-affected.mjs',
-    'scripts/e2e-affected-select.mjs',
     'scripts/heavy-slots.mjs',
-    'scripts/timed-partition.mjs',
   ]) {
     const result = select([path]);
     assert.equal(result.full, true, path);
