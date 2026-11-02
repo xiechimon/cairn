@@ -492,3 +492,36 @@ describe('the late chief claim reads the machine as it is after the worker loop'
     );
   });
 });
+
+describe('the late chief claim sees agent changes made while the worker loop awaited', () => {
+  test('a chief agent moved to another machine meanwhile is not claimed here', async () => {
+    const w = await setupWorld();
+    setCap(w, 8);
+    const key = await issueApiKey(w.s);
+    await w.s.app.request('/api/machine/enroll', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ teamId: w.s.team.id, name: 'other-box', cliVersion: '0.1.0' }),
+    });
+    const otherId = w.s.db
+      .select()
+      .from(machineTable)
+      .where(eq(machineTable.name, 'other-box'))
+      .get()!.id;
+    const worker = insertPendingBuildStep(w.s, w);
+    const workerRow = w.s.db.select().from(stepTable).where(eq(stepTable.id, worker)).get()!;
+    const chiefStepId = insertPendingChiefStep(w.s, { createdAt: workerRow.createdAt + 5 });
+    shipGate.duringReverify = () => {
+      w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.id, worker)).run();
+      w.s.db
+        .update(agentTable)
+        .set({ machineId: otherId })
+        .where(eq(agentTable.id, AGENT_ID))
+        .run();
+    };
+    expect(await claimAs(w)).toBeNull();
+    expect(w.s.db.select().from(stepTable).where(eq(stepTable.id, chiefStepId)).get()!.status).toBe(
+      'pending',
+    );
+  });
+});
