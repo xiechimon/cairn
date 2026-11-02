@@ -80,7 +80,7 @@ import { threadTurnInFlight } from '../chief/orchestration-inflight.js';
 import { api } from './client.js';
 
 const CHIEF_THREADS_INFLIGHT_POLL_MS = 3000;
-const BACKUP_HEALTH_POLL_MS = 5 * 60 * 1000;
+const BACKUP_HEALTH_POLL_MS = 300_000;
 
 export type { ApiKeyRow, PlanRow };
 export type StepRow = StepJournalRow;
