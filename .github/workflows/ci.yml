@@ -131,6 +131,10 @@ jobs:
     needs: changes
     if: github.event_name != 'pull_request' || needs.changes.outputs.has-code != 'false'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
@@ -147,12 +151,16 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Test (vitest, light project)
-        run: VITEST_PROJECT_SET=light pnpm test
+        run: VITEST_PROJECT_SET=light pnpm test --shard=${{ matrix.shard }}/${{ strategy.job-total }}
 
   vitest-integration:
     needs: changes
     if: github.event_name != 'pull_request' || needs.changes.outputs.has-code != 'false'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
@@ -173,7 +181,7 @@ jobs:
         run: pnpm exec playwright install chromium --with-deps
 
       - name: Test (vitest, integration stack)
-        run: VITEST_PROJECT_SET=integration pnpm test
+        run: VITEST_PROJECT_SET=integration pnpm test --shard=${{ matrix.shard }}/${{ strategy.job-total }}
 
   e2e:
     needs: changes
@@ -376,6 +384,10 @@ jobs:
       - name: UI debt ledger only shrinks against main
         if: ${{ !cancelled() }}
         run: node --test scripts/ui-debt-gate.test.mjs
+
+      - name: Vitest shards split by recorded file times
+        if: ${{ !cancelled() }}
+        run: node --test scripts/vitest-timed-shard.test.mjs
 
       - name: Pages keep to tokens; gallery baselines map from CI renders
         if: ${{ !cancelled() }}
