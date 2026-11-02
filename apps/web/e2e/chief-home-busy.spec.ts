@@ -118,6 +118,10 @@ async function mockLive(page: Page, state: State) {
       if (withdrawn && request.method() === 'DELETE') {
         state.pending = state.pending.filter((x) => x.messageId !== withdrawn[1]);
         state.messages = state.messages.filter((m) => m.id !== withdrawn[1]);
+        if (state.turnQueue?.stepId === withdrawn[1]) {
+          state.turnQueue = null;
+          state.activeRun = null;
+        }
         return json({ ok: true });
       }
       if (p.endsWith('/steer')) return json({ steered: true });
@@ -375,16 +379,17 @@ test.describe('queue, steer and stop while the chief is replying (T5)', () => {
       turnQueue: {
         stepId: 'm1',
         position: 1,
-        waitingFor: { machineId: 'mac-1', name: 'xmonsMac-3574.local', running: 0, capacity: 8 },
+        waitingFor: { machineId: 'mac-1', name: 'studio-mac.local', running: 0, capacity: 8 },
       },
     });
     await page.goto('/app');
     const home = page.getByTestId('home-c');
-    await expect(home.getByTestId('chief-msg').last()).toContainText('xmonsMac-3574.local');
+    await expect(home.getByTestId('chief-msg').last()).toContainText('studio-mac.local');
     await home.getByRole('button', { name: '停止总管这次回复' }).click();
     await expect.poll(() => calls).toContain('DELETE /messages/m1');
     expect(calls).not.toContain('POST /stop');
     await expect(home.getByTestId('chief-composer-input')).toHaveValue(FIRST.content);
+    await expect(home.getByRole('button', { name: '发送' })).toBeVisible();
     await evidenceShot(page, 'stop-queued-turn.png');
   });
 
