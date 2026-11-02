@@ -1,0 +1,275 @@
+import type { ClaimedStep } from '@cairn/shared';
+import { claimedStepSchema } from '@cairn/shared';
+import { eq } from 'drizzle-orm';
+import { afterAll, afterEach, beforeEach, describe, expect, test } from 'vitest';
+import {
+  agent as agentTable,
+  machine as machineTable,
+  routingRule,
+  team as teamTable,
+  todo as todoTable,
+} from '../src/db/schema.js';
+import { newRecordId } from '../src/lib/ids.js';
+import { agentForStep } from '../src/services/dispatch-eligibility.js';
+import { seedRoutingRules, setRoutingRulesEnabled } from '../src/services/routing-rules.js';
+import {
+  bindAllAgents,
+  bootServer,
+  issueApiKey,
+  postProject,
+  req,
+  type TestServer,
+} from './helpers.js';
+
+const AGENT_BUILD = 'agent-route-build';
+
+const servers: TestServer[] = [];
+afterAll(() => {
+  for (const s of servers) s.dispose();
+});
+beforeEach(() => setRoutingRulesEnabled(true));
+afterEach(() => setRoutingRulesEnabled(false));
+
+interface World {
+  s: TestServer;
+  machineToken: string;
+  machineId: string;
+  projectId: string;
+}
+
+async function setupWorld(): Promise<World> {
+  const s = bootServer({ claimHoldMs: 50 });
+  servers.push(s);
+  const key = await issueApiKey(s);
+  const res = await s.app.request('/api/machine/enroll', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ teamId: s.team.id, name: 'route-mbp', cliVersion: '0.1.0' }),
+  });
+  expect(res.status).toBe(200);
+  const machineToken = ((await res.json()) as { token: string }).token;
+  s.db
+    .insert(agentTable)
+    .values({
+      id: AGENT_BUILD,
+      teamId: s.team.id,
+      displayName: AGENT_BUILD,
+      provider: 'agent-provider',
+      modelId: 'agent-model',
+      thinkingLevel: 'low',
+    })
+    .run();
+  bindAllAgents(s);
+  const machineId = s.db
+    .select({ id: machineTable.id })
+    .from(machineTable)
+    .where(eq(machineTable.teamId, s.team.id))
+    .get()!.id;
+  const projectId = await postProject(s.app, 'route-proj');
+  return { s, machineToken, machineId, projectId };
+}
+
+function insertRule(
+  s: TestServer,
+  values: Partial<typeof routingRule.$inferInsert> & { teamId: string },
+): void {
+  s.db
+    .insert(routingRule)
+    .values({
+      id: newRecordId(),
+      use: 'session',
+      provider: 'rule-provider',
+      modelId: 'rule-model',
+      thinkingLevel: 'high',
+      createdAt: 1,
+      updatedAt: 1,
+      ...values,
+    })
+    .run();
+}
+
+async function buildTodo(w: World): Promise<typeof todoTable.$inferSelect> {
+  const todoRes = await req(w.s.app, 'POST', `/api/projects/${w.projectId}/todos`, {
+    title: 'route probe',
+    spec: 'probe body',
+  });
+  expect(todoRes.status).toBe(201);
+  const todoId = ((await todoRes.json()) as { id: string }).id;
+  const started = await req(w.s.app, 'POST', `/api/projects/${w.projectId}/builds`, {
+    todoIds: [todoId],
+    assignment: { plan: null, build: { agentId: AGENT_BUILD } },
+    withPlan: false,
+  });
+  expect(started.status).toBe(201);
+  return w.s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get()!;
+}
+
+async function claim(w: World): Promise<ClaimedStep | null> {
+  const res = await w.s.app.request('/api/machine/tasks/claim', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${w.machineToken}`, 'content-type': 'application/json' },
+    body: '{}',
+  });
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { step: ClaimedStep | null };
+  return body.step === null ? null : claimedStepSchema.parse(body.step);
+}
+
+describe('routeForStep: the session rule replaces the agent model and machine', () => {
+  test('flag off: a session rule is ignored and the agent fields stand', async () => {
+    const w = await setupWorld();
+    insertRule(w.s, { teamId: w.s.team.id });
+    const todoRow = await buildTodo(w);
+    setRoutingRulesEnabled(false);
+    const row = agentForStep(w.s.db, todoRow, 'build');
+    expect(row?.modelId).toBe('agent-model');
+    expect(row?.provider).toBe('agent-provider');
+  });
+
+  test('flag on: plan, build and verify steps take the rule model, thinking and fallbacks', async () => {
+    const w = await setupWorld();
+    insertRule(w.s, {
+      teamId: w.s.team.id,
+      fallbackModels: [{ provider: 'rule-provider', modelId: 'rule-fallback' }],
+    });
+    const todoRow = await buildTodo(w);
+    for (const kind of ['plan', 'build', 'verify'] as const) {
+      const row = agentForStep(
+        w.s.db,
+        {
+          ...todoRow,
+          assignment: {
+            plan: { agentId: AGENT_BUILD },
+            build: { agentId: AGENT_BUILD },
+            verify: { agentId: AGENT_BUILD },
+          },
+        },
+        kind,
+      );
+      expect(row?.id).toBe(AGENT_BUILD);
+      expect(row?.provider).toBe('rule-provider');
+      expect(row?.modelId).toBe('rule-model');
+      expect(row?.thinkingLevel).toBe('high');
+      expect(row?.fallbackModels).toEqual([
+        { provider: 'rule-provider', modelId: 'rule-fallback' },
+      ]);
+      expect(row?.machineId).toBe(w.machineId);
+    }
+  });
+
+  test('flag on: a rule machine replaces the home machine; a rule without one keeps it', async () => {
+    const w = await setupWorld();
+    const otherMachine = newRecordId();
+    w.s.db
+      .insert(machineTable)
+      .values({
+        id: otherMachine,
+        teamId: w.s.team.id,
+        name: 'route-other',
+        tokenHash: 'x'.repeat(64),
+        createdAt: 1,
+      } as typeof machineTable.$inferInsert)
+      .run();
+    insertRule(w.s, { teamId: w.s.team.id, machineId: otherMachine });
+    const todoRow = await buildTodo(w);
+    expect(agentForStep(w.s.db, todoRow, 'build')?.machineId).toBe(otherMachine);
+    w.s.db.update(routingRule).set({ machineId: null }).run();
+    expect(agentForStep(w.s.db, todoRow, 'build')?.machineId).toBe(w.machineId);
+  });
+
+  test('flag on: review steps and other teams are not routed by the session rule', async () => {
+    const w = await setupWorld();
+    const otherTeam = newRecordId();
+    w.s.db
+      .insert(teamTable)
+      .values({ ...w.s.db.select().from(teamTable).get()!, id: otherTeam, name: 'other-team' })
+      .run();
+    insertRule(w.s, { teamId: otherTeam });
+    const todoRow = await buildTodo(w);
+    expect(agentForStep(w.s.db, todoRow, 'build')?.modelId).toBe('agent-model');
+    insertRule(w.s, { teamId: w.s.team.id });
+    const prompt = `${JSON.stringify({ kind: 'review', agentId: AGENT_BUILD })}\nreview body`;
+    expect(agentForStep(w.s.db, todoRow, 'build')?.modelId).toBe('rule-model');
+    expect(agentForStep(w.s.db, todoRow, 'review', prompt)?.modelId).toBe('agent-model');
+  });
+
+  test('flag on: the claimed build step carries the rule model to the daemon', async () => {
+    const w = await setupWorld();
+    insertRule(w.s, { teamId: w.s.team.id });
+    await buildTodo(w);
+    const claimed = await claim(w);
+    expect(claimed?.step.kind).toBe('build');
+    expect(claimed?.agent?.modelId).toBe('rule-model');
+    expect(claimed?.agent?.provider).toBe('rule-provider');
+  });
+
+  test('deleting the rule machine clears the rule machine instead of failing on the foreign key', async () => {
+    const w = await setupWorld();
+    const spare = newRecordId();
+    w.s.db
+      .insert(machineTable)
+      .values({
+        id: spare,
+        teamId: w.s.team.id,
+        name: 'route-spare',
+        tokenHash: 'y'.repeat(64),
+        createdAt: 1,
+      } as typeof machineTable.$inferInsert)
+      .run();
+    insertRule(w.s, { teamId: w.s.team.id, machineId: spare });
+    const res = await req(w.s.app, 'DELETE', `/api/machines/${spare}`);
+    expect(res.status).toBe(204);
+    expect(w.s.db.select().from(routingRule).get()?.machineId).toBeNull();
+  });
+});
+
+describe('seedRoutingRules: one session rule per team from its agents', () => {
+  test('the implementer seeds the rule, and a second run changes nothing', async () => {
+    const w = await setupWorld();
+    w.s.db.delete(agentTable).where(eq(agentTable.persona, 'implementer')).run();
+    w.s.db
+      .insert(agentTable)
+      .values({
+        id: 'agent-impl',
+        teamId: w.s.team.id,
+        displayName: 'impl',
+        persona: 'implementer',
+        provider: 'claude-code',
+        modelId: 'claude-sonnet-5-5',
+        machineId: w.machineId,
+      })
+      .run();
+    expect(seedRoutingRules(w.s.db)).toBe(1);
+    const rule = w.s.db.select().from(routingRule).get()!;
+    expect(rule).toMatchObject({
+      teamId: w.s.team.id,
+      use: 'session',
+      provider: 'claude-code',
+      modelId: 'claude-sonnet-5-5',
+      machineId: w.machineId,
+      seededFromAgentId: 'agent-impl',
+    });
+    w.s.db.update(routingRule).set({ modelId: 'edited' }).run();
+    expect(seedRoutingRules(w.s.db)).toBe(0);
+    expect(w.s.db.select().from(routingRule).get()?.modelId).toBe('edited');
+  });
+
+  test('without an implementer the most-assigned build agent seeds the rule', async () => {
+    const w = await setupWorld();
+    w.s.db.delete(agentTable).where(eq(agentTable.persona, 'implementer')).run();
+    await buildTodo(w);
+    await buildTodo(w);
+    expect(seedRoutingRules(w.s.db)).toBe(1);
+    expect(w.s.db.select().from(routingRule).get()).toMatchObject({
+      seededFromAgentId: AGENT_BUILD,
+      modelId: 'agent-model',
+    });
+  });
+
+  test('a team with no agent that has a model gets no rule', async () => {
+    const w = await setupWorld();
+    w.s.db.update(agentTable).set({ modelId: null }).run();
+    expect(seedRoutingRules(w.s.db)).toBe(0);
+    expect(w.s.db.select().from(routingRule).all()).toEqual([]);
+  });
+});

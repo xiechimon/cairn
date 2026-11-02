@@ -540,6 +540,8 @@ describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; 
     expect(INTERNAL_ONLY_TABLES).toContain('push_delivery');
     expect(DB_TABLES).toContain('harness_eval_attempts');
     expect(INTERNAL_ONLY_TABLES).toContain('harness_eval_attempts');
+    expect(DB_TABLES).toContain('routing_rule');
+    expect(INTERNAL_ONLY_TABLES).toContain('routing_rule');
     expect(DB_TABLES).not.toContain('shell_command');
     expect(DB_TABLES).not.toContain('whats_new');
     expect(DB_TABLES).not.toContain('skill');

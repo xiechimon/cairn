@@ -14,6 +14,7 @@ import {
 import { and, eq, like, ne, not } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { agent, build, chief, chiefThread, step, todo } from '../db/schema.js';
+import { applyRoute, routeForStep } from './routing-rules.js';
 
 export function stepRuntimeFor(
   agentProvider: string | null | undefined,
@@ -102,7 +103,9 @@ export function agentForStep(
 ): typeof agent.$inferSelect | null {
   const agentId = agentIdForStep(todoRow, kind, prompt);
   if (agentId === null) return null;
-  return db.select().from(agent).where(eq(agent.id, agentId)).get() ?? null;
+  const agentRow = db.select().from(agent).where(eq(agent.id, agentId)).get();
+  if (agentRow === undefined) return null;
+  return applyRoute(agentRow, routeForStep(db, todoRow, kind));
 }
 
 function planSlotFor(

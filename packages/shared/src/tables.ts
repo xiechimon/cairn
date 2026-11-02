@@ -46,6 +46,7 @@ export const DB_TABLES = [
   'push_delivery',
   'harness_eval_attempts',
   'autonomous_merge_admission',
+  'routing_rule',
 ] as const;
 
 export type DbTable = (typeof DB_TABLES)[number];
@@ -78,4 +79,5 @@ export const INTERNAL_ONLY_TABLES = [
   'push_delivery',
   'harness_eval_attempts',
   'autonomous_merge_admission',
+  'routing_rule',
 ] as const;
