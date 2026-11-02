@@ -329,7 +329,7 @@ const FULL_PATH_PREFIXES = [
   'scripts/timed-partition.mjs',
 ];
 
-function classify(path, dependencies) {
+function classify(path, dependencies, workspace) {
   if (path.startsWith(E2E_PREFIX) && path.endsWith('.spec.ts')) {
     return { specs: [path.slice(E2E_PREFIX.length)], why: 'the spec itself' };
   }
@@ -357,7 +357,7 @@ function classify(path, dependencies) {
       why: 'server surface (these specs spawn a real server; the stack layer is the real coverage)',
     };
   }
-  return { specs: [], why: 'outside the web e2e surface' };
+  return workspace()(path) ?? { specs: [], why: 'outside the web e2e surface' };
 }
 
 let e2eSources = null;
@@ -431,17 +431,22 @@ function expand(prefixes, allSpecs) {
   return [...matched].sort();
 }
 
-export function selectSpecs({ paths, allSpecs, dependencies }) {
+export function selectSpecs({ paths, allSpecs, dependencies, workspace }) {
   let impact = null;
   const dependencyImpact = () => {
     impact ??= dependencies();
     return impact;
   };
+  let reach = null;
+  const workspaceReach = () => {
+    reach ??= workspace();
+    return reach;
+  };
   let full = false;
   const picked = new Set();
   const reasons = [];
   for (const path of paths) {
-    const { specs, why } = classify(path, dependencyImpact);
+    const { specs, why } = classify(path, dependencyImpact, workspaceReach);
     const axe = specs !== null && path.startsWith('apps/web/src/');
     reasons.push(
       `  ${path} → ${specs === null ? `FULL (${why})` : specs.length === 0 && !axe ? `none (${why})` : why}${axe ? ' + a11y-axe + gallery-snapshots' : ''}`,
@@ -565,6 +570,7 @@ function closure(lock, roots) {
   const sorted = (map) => [...map].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
   return {
     fingerprint: JSON.stringify([sorted(importers), sorted(snapshots)]),
+    importers: new Set(importers.keys()),
     names: new Set([...snapshots.keys()].map(packageName)),
   };
 }
@@ -616,5 +622,33 @@ export function dependencyImpact({ base, head }) {
     return { specs: [], why: 'no package the web app or the live server installs changed' };
   } catch (error) {
     return { specs: null, why: `cannot compare dependencies: ${error.message}` };
+  }
+}
+
+export function workspacePackages(lockfile) {
+  try {
+    if (lockfile == null) throw new Error('pnpm-lock.yaml is missing');
+    const lock = lockfileDocument(lockfile);
+    const packages = Object.keys(lock.importers)
+      .filter((dir) => dir !== '.')
+      .sort((a, b) => b.length - a.length);
+    const web = closure(lock, WEB_IMPORTERS).importers;
+    const server = closure(lock, SERVER_IMPORTERS).importers;
+    return (path) => {
+      const owner = packages.find((dir) => path.startsWith(`${dir}/`));
+      if (owner === undefined) return null;
+      if (web.has(owner)) {
+        return {
+          specs: null,
+          why: `workspace package ${owner}, linked by the web app or the root`,
+        };
+      }
+      if (server.has(owner)) {
+        return { specs: LIVE_SERVER, why: `workspace package ${owner}, linked by the live server` };
+      }
+      return { specs: [], why: `workspace package ${owner}, which neither app links` };
+    };
+  } catch (error) {
+    return () => ({ specs: null, why: `cannot read the workspace links: ${error.message}` });
   }
 }
