@@ -657,7 +657,7 @@ test('e2e:affected outside prepush uses only the port of the slot it acquired an
     assert.equal(call.CAIRN_HEAVY_SLOT, '2');
     assert.equal(call.E2E_DIST_DIR, join(env.TMPDIR, 'cairn-heavy-slot-2', 'web-dist'));
     assert.notEqual(call.E2E_PORT, env.E2E_AFFECTED_PORT);
-    assert.ok(call.argv.includes('branch-button.spec.ts'));
+    assert.ok(call.argv.includes('e2e/branch-button.spec.ts'));
     const configPath = call.argv[call.argv.indexOf('--config') + 1];
     const config = readFileSync(configPath, 'utf8');
     assert.match(config, new RegExp(`http://127\\.0\\.0\\.1:${slotTwoPort}`));
