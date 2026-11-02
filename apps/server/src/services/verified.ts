@@ -20,7 +20,7 @@ export function buildVerified(db: Db, buildId: string): boolean {
     .from(gateState)
     .where(eq(gateState.buildId, buildId))
     .get();
-  if (judged === undefined || judged.headSha === null) return true;
+  if (judged === undefined || judged.headSha === null) return false;
   if (judged.headSha === latest.headSha) return true;
   return judged.patchDigest !== null && judged.patchDigest === latest.patchDigest;
 }
