@@ -93,7 +93,7 @@ export const EN: Record<string, string> = {
   定时: 'Schedules',
   '执行中 {n}': '{n} running',
   项目: 'Project', // sidebar group / search group / schedule-form field — one fit
-  资源: 'Resources',
+  Coordinator: 'Coordinator',
   新建项目: 'New project',
   新任务: 'New task', // sidebar action row (#389) — the dialog title stays 新建任务
   '新任务：接下来让 agent 做什么？': 'New task: What should the agent do next?',

@@ -44,28 +44,23 @@ test('nav rows hop client-side: no reload, pill + aria-current follow', async ({
 
   const board = page
     .getByRole('complementary')
-    .locator('[data-slot="sidebar-nav-row"]', { hasText: '首页' });
+    .locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' });
   await expect(board).not.toHaveAttribute('aria-current', 'page');
 });
 
-test('subrow and team name hop client-side too', async ({ page }) => {
-
-  await page.addInitScript(() => localStorage.setItem('cairn.sidebarResourcesCollapsed', '0'));
+test('user menu resource and team links hop client-side', async ({ page }) => {
   await page.goto('/app?scenario=01');
   await plantCanary(page);
 
+  await page.locator('.sidebar-user').click();
   await page.getByRole('link', { name: '技能' }).click();
   await expect(page).toHaveURL('/app/resources/skills?scenario=01');
   expect(await page.evaluate(() => window.__spaCanary)).toBe('alive');
 
-  await page.getByRole('link', { name: 'Cairn' }).click();
+  await page.locator('.sidebar-user').click();
+  await page.getByRole('link', { name: '团队' }).click();
   await expect(page).toHaveURL('/app/team?scenario=01');
   expect(await page.evaluate(() => window.__spaCanary)).toBe('alive');
-
-  await expect(page.getByRole('link', { name: 'Cairn' })).toHaveAttribute(
-    'aria-current',
-    'page',
-  );
 });
 
 test('rail rows hop client-side', async ({ page }) => {
@@ -131,7 +126,7 @@ test('selected row keeps its sheet fill under hover', async ({ page }) => {
   await page.goto('/app?scenario=01');
   const board = page
     .getByRole('complementary')
-    .locator('[data-slot="sidebar-nav-row"]', { hasText: '首页' });
+    .locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' });
   await expect(board).toHaveAttribute('aria-current', 'page');
 
   const sheet = await tokenBg(page, '--sidebar-active');
@@ -145,7 +140,7 @@ test('selected row keeps its sheet fill under hover', async ({ page }) => {
 for (const locale of ['zh', 'en']) {
   for (const layout of ['expanded', 'rail', 'phone']) {
     test(`navigation names match page titles: ${locale} ${layout}`, async ({ page }) => {
-      const home = locale === 'zh' ? '首页' : 'Home';
+      const home = 'Coordinator';
       const schedules = locale === 'zh' ? '定时' : 'Schedules';
       await page.addInitScript(({ locale, layout }) => {
         localStorage.setItem('cairn.locale', locale);

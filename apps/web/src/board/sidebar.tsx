@@ -1,25 +1,9 @@
 import { BRAND, type ProjectColor, type ProjectIcon } from '@cairn/shared';
-import {
-  Box,
-  ChartColumn,
-  ChevronDown,
-  ChevronRight,
-  Clock,
-  EllipsisVertical,
-  Inbox,
-  KeyRound,
-  Layers,
-  type LucideIcon,
-  PanelLeft,
-  Plug,
-  Plus,
-  Puzzle,
-  Search,
-  Server,
-} from 'lucide-react';
-import { type ReactElement, useCallback, useId, useMemo, useRef, useState } from 'react';
+import { ChevronDown, Clock, EllipsisVertical, PanelLeft, Plus, Search } from 'lucide-react';
+import { type ReactElement, useCallback, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { useLiveData } from '../api/provider.js';
+import { SpiralMark } from '../chief/chief-fab-icon.js';
 import { SidebarNavRow } from '../components/shell/sidebar-nav-row.js';
 import { SidebarProjectRow } from '../components/shell/sidebar-project.js';
 import { SidebarUser } from '../components/shell/sidebar-user.js';
@@ -70,44 +54,21 @@ interface BoardSidebarProps {
   attention?: number;
   machinesOnline?: number;
   onSearch?: () => void;
-  onNewTask: () => void;
   usageNav?: boolean;
   selected?: SidebarSelected;
   projects?: SidebarProject[];
   todos?: TodoRecord[];
 }
 
-interface ResourceRow {
-  label: string;
-  href: string;
-  Icon: LucideIcon;
-}
-
-const RESOURCE_ROWS: ResourceRow[] = [
-  { label: '技能', href: '/app/resources/skills', Icon: Puzzle },
-  { label: 'MCP', href: '/app/resources/mcp-servers', Icon: Plug },
-  { label: '密钥', href: '/app/resources/secrets', Icon: KeyRound },
-  { label: '机器', href: '/app/resources/machines', Icon: Server },
-  { label: '模型服务', href: '/app/resources/providers', Icon: Layers },
-];
-
-const USAGE_ROW: ResourceRow = { label: '用量', href: '/app/usage', Icon: ChartColumn };
-
 export const GROUP_STORAGE_KEYS = {
   project: 'cairn.sidebarProjectsCollapsed',
-  resource: 'cairn.sidebarResourcesCollapsed',
 } as const;
 
-type GroupId = keyof typeof GROUP_STORAGE_KEYS;
-
-function readGroupCollapsed(storage: Storage | null): Record<GroupId, boolean> {
+function readProjectsCollapsed(storage: Storage | null): boolean {
   try {
-    return {
-      project: storage?.getItem(GROUP_STORAGE_KEYS.project) === '1',
-      resource: storage?.getItem(GROUP_STORAGE_KEYS.resource) !== '0',
-    };
+    return storage?.getItem(GROUP_STORAGE_KEYS.project) === '1';
   } catch {
-    return { project: false, resource: true };
+    return false;
   }
 }
 
@@ -138,13 +99,6 @@ const SEARCH_OPEN_DIM =
 const SEARCH_OPEN_DIM_CURRENT =
   '[html[data-search-open]_&_[aria-current=page]]:bg-transparent [html[data-search-open]_&_[aria-current=page]]:text-content-secondary';
 
-const ROW = `flex h-9 w-full flex-none items-center gap-2.5 rounded-(--cds-radius-lg) px-2.5 text-left text-ui font-medium text-foreground no-underline transition-[background-color,color] duration-150 ease-out ${FOCUS_RING_INSET}`;
-const ROW_IDLE = 'hover:bg-sidebar-hover hover:text-foreground';
-const ROW_ACTIVE = `bg-(--hover-1) font-semibold text-foreground [&>svg:first-child]:text-(--card-button) ${SEARCH_OPEN_DIM}`;
-
-const ROW_BTN =
-  'justify-start border-none dark:hover:bg-sidebar-hover active:not-aria-[haspopup]:translate-y-0';
-
 const ICON_BTN = `size-7 flex-none cursor-pointer rounded-(--radius-control) border-none bg-transparent p-0 text-content-tertiary hover:bg-sidebar-hover hover:text-foreground dark:hover:bg-sidebar-hover active:not-aria-[haspopup]:translate-y-0 ${FOCUS}`;
 
 const RAIL_ROW = `rail-row relative flex size-8 flex-none items-center justify-center rounded-(--cds-radius-lg) text-content-tertiary no-underline transition-[background-color,box-shadow,color] duration-150 ease-out hover:bg-sidebar-hover hover:text-foreground ${FOCUS_RING_INSET}`;
@@ -156,10 +110,14 @@ function UserMenuPopover({
   open,
   onOpenChange,
   trigger,
+  usageNav,
+  machinesOnline,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   trigger: ReactElement;
+  usageNav: boolean;
+  machinesOnline: number;
 }) {
   const { t } = useI18n();
   return (
@@ -175,7 +133,12 @@ function UserMenuPopover({
         aria-label={t('用户菜单')}
         className="block w-auto rounded-none border-none bg-transparent p-0 shadow-none ring-0"
       >
-        <UserMenu floating theme={readStoredTheme(safeLocalStorage())} />
+        <UserMenu
+          floating
+          theme={readStoredTheme(safeLocalStorage())}
+          usageNav={usageNav}
+          machinesOnline={machinesOnline}
+        />
       </PopoverContent>
     </Popover>
   );
@@ -198,7 +161,6 @@ export function BoardSidebar({
   attention = 0,
   machinesOnline = 0,
   onSearch,
-  onNewTask,
   usageNav = false,
   selected = 'board',
   projects,
@@ -234,25 +196,21 @@ export function BoardSidebar({
     return counts;
   }, [todos]);
 
-  const resourceRows = usageNav
-    ? [...RESOURCE_ROWS.slice(0, 4), USAGE_ROW, ...RESOURCE_ROWS.slice(4)]
-    : RESOURCE_ROWS;
-  const resourceActive = resourceRows.some((row) => row.href === selected);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [groupCollapsed, setGroupCollapsed] = useState(() =>
-    readGroupCollapsed(safeLocalStorage()),
+  const [projectsCollapsed, setProjectsCollapsed] = useState(() =>
+    readProjectsCollapsed(safeLocalStorage()),
   );
-  const toggleGroup = useCallback((id: GroupId) => {
-    setGroupCollapsed((prev) => {
-      const next = { ...prev, [id]: !prev[id] };
-      safeSetItem(GROUP_STORAGE_KEYS[id], next[id] ? '1' : '0');
-      return next;
+  const toggleProjects = useCallback(() => {
+    setProjectsCollapsed((prev) => {
+      safeSetItem(GROUP_STORAGE_KEYS.project, prev ? '0' : '1');
+      return !prev;
     });
   }, []);
   const navRef = useRef<HTMLElement | null>(null);
   useScrollFade(navRef, { enabled: !collapsed });
-  const resourceListId = useId();
-  const homeLabel = attention > 0 ? `${t('首页')} ${attention}` : t('首页');
+  const coordinatorLabel = attention > 0 ? `${t('Coordinator')} ${attention}` : t('Coordinator');
+  const coordinatorActive =
+    (selected === 'board' || selected === 'kanban') && activeProject === null;
 
   const goTo = (target: string) => navigate({ pathname: target, search: plain });
 
@@ -303,32 +261,15 @@ export function BoardSidebar({
             <Kbd>⌘K</Kbd>
           </TooltipContent>
         </Tooltip>
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                variant="ghost"
-                className={`sidebar-new-task ${RAIL_ROW} ${RAIL_BTN} text-(--card-button)`}
-                aria-label={t('新任务')}
-                onClick={onNewTask}
-              >
-                <Plus className={ICON} strokeWidth={STROKE} />
-              </Button>
-            }
-          />
-          <TooltipContent side="right" sideOffset={8}>
-            <Kbd>C</Kbd>
-          </TooltipContent>
-        </Tooltip>
         <nav className="mt-2 flex min-h-0 flex-1 flex-col items-center gap-px overflow-y-auto">
           <Link
             {...railLink(
               { pathname: '/app', search: homeSearch },
-              (selected === 'board' || selected === 'kanban') && activeProject === null,
-              homeLabel,
+              coordinatorActive,
+              coordinatorLabel,
             )}
           >
-            <Inbox className={ICON} strokeWidth={STROKE} />
+            <SpiralMark busy={false} className={ICON} />
             {attention > 0 && (
               <span className="absolute top-1 right-1 size-1.5 rounded-full bg-(--card-button)" />
             )}
@@ -344,19 +285,19 @@ export function BoardSidebar({
           </Link>
           <Button
             variant="ghost"
-            className={`rail-group group mt-2 ${RAIL_ROW} ${RAIL_BTN} ${groupCollapsed.project ? 'rail-group--collapsed' : ''}`}
-            aria-label={t(groupCollapsed.project ? '展开{label}' : '收起{label}', {
+            className={`rail-group group mt-2 ${RAIL_ROW} ${RAIL_BTN} ${projectsCollapsed ? 'rail-group--collapsed' : ''}`}
+            aria-label={t(projectsCollapsed ? '展开{label}' : '收起{label}', {
               label: t('项目'),
             })}
-            aria-expanded={!groupCollapsed.project}
-            onClick={() => toggleGroup('project')}
+            aria-expanded={!projectsCollapsed}
+            onClick={toggleProjects}
           >
             <ChevronDown
               className="size-3.5 transition-transform duration-150 group-[.rail-group--collapsed]:-rotate-90"
               strokeWidth={STROKE}
             />
           </Button>
-          {!groupCollapsed.project &&
+          {!projectsCollapsed &&
             projectRows.map((row, i) => {
               const href = projectHref(row.id);
               return (
@@ -366,29 +307,11 @@ export function BoardSidebar({
               );
             })}
         </nav>
-        <Button
-          variant="ghost"
-          className={`rail-group group ${RAIL_ROW} ${RAIL_BTN} ${groupCollapsed.resource ? 'rail-group--collapsed' : ''} ${groupCollapsed.resource && resourceActive ? RAIL_ACTIVE : ''}`}
-          aria-label={t(groupCollapsed.resource ? '展开{label}' : '收起{label}', {
-            label: t('资源'),
-          })}
-          aria-expanded={!groupCollapsed.resource}
-          onClick={() => toggleGroup('resource')}
-        >
-          <Box className={ICON} strokeWidth={STROKE} />
-        </Button>
-        {!groupCollapsed.resource &&
-          resourceRows.map(({ label, href, Icon }) => (
-            <Link
-              key={href}
-              {...railLink({ pathname: href, search: plain }, selected === href, t(label))}
-            >
-              <Icon className={ICON} strokeWidth={STROKE} />
-            </Link>
-          ))}
         <UserMenuPopover
           open={userMenuOpen}
           onOpenChange={setUserMenuOpen}
+          usageNav={usageNav}
+          machinesOnline={machinesOnline}
           trigger={
             <Button
               variant="ghost"
@@ -411,23 +334,27 @@ export function BoardSidebar({
         data-testid="team-row"
         className="sidebar-team-row flex h-11 flex-none items-center gap-0.5 text-foreground"
       >
-        <Link
-          className={`sidebar-team-name flex h-11 min-w-0 flex-1 items-center gap-2 rounded-(--cds-radius-lg) px-2 text-foreground no-underline transition-[background-color,box-shadow] duration-150 ease-out ${FOCUS} ${
-            selected === 'team'
-              ? `sidebar-team-row--active bg-(--sidebar-active) hover:bg-(--sidebar-active) dark:hover:bg-(--sidebar-active) ${SEARCH_OPEN_DIM}`
-              : 'hover:bg-sidebar-hover'
-          }`}
-          to={{ pathname: '/app/team', search: plain }}
-          aria-current={selected === 'team' ? 'page' : undefined}
-        >
+        <span className="sidebar-team-name flex h-11 min-w-0 flex-1 items-center gap-2 px-2 text-foreground">
           <BrandMark className="size-5.5" />
           <span className="truncate font-heading text-page font-title">{BRAND.manifestName}</span>
-          <ChevronDown
-            aria-hidden
-            className="size-3.5 flex-none text-content-tertiary"
-            strokeWidth={STROKE}
+        </span>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                variant="ghost"
+                className={`sidebar-search ${ICON_BTN}`}
+                aria-label={t('搜索')}
+                onClick={onSearch}
+              >
+                <Search className="size-4" strokeWidth={STROKE} />
+              </Button>
+            }
           />
-        </Link>
+          <TooltipContent side="bottom" sideOffset={6}>
+            <Kbd>⌘K</Kbd>
+          </TooltipContent>
+        </Tooltip>
         <Button
           variant="ghost"
           className={`sidebar-team-collapse ${ICON_BTN}`}
@@ -439,25 +366,11 @@ export function BoardSidebar({
       </div>
 
       <div className="mt-2 flex flex-none flex-col gap-px">
-        <div className="sidebar-new-task">
-          <SidebarNavRow
-            icon={<Plus className="size-4" strokeWidth={STROKE} />}
-            label={t('新任务')}
-            shortcut="C"
-            onClick={onNewTask}
-          />
-        </div>
-        <SidebarNavRow
-          icon={<Search className="size-4" strokeWidth={STROKE} />}
-          label={t('搜索')}
-          shortcut="⌘K"
-          onClick={onSearch}
-        />
         <div className="relative">
           <SidebarNavRow
-            icon={<Inbox className="size-4" strokeWidth={STROKE} />}
-            label={t('首页')}
-            active={(selected === 'board' || selected === 'kanban') && activeProject === null}
+            icon={<SpiralMark busy={false} className="size-4" />}
+            label={t('Coordinator')}
+            active={coordinatorActive}
             onClick={() => navigate({ pathname: '/app', search: homeSearch })}
           />
           {attention > 0 && (
@@ -485,10 +398,10 @@ export function BoardSidebar({
           <Button
             variant="ghost"
             className={`sidebar-group group h-6 cursor-pointer gap-1 rounded-(--radius-control) border-none bg-transparent px-0 text-caption font-medium text-content-tertiary hover:bg-transparent hover:text-content-secondary dark:hover:bg-transparent aria-expanded:bg-transparent active:not-aria-[haspopup]:translate-y-0 ${FOCUS} ${
-              groupCollapsed.project ? 'sidebar-group--collapsed' : ''
+              projectsCollapsed ? 'sidebar-group--collapsed' : ''
             }`}
-            aria-expanded={!groupCollapsed.project}
-            onClick={() => toggleGroup('project')}
+            aria-expanded={!projectsCollapsed}
+            onClick={toggleProjects}
           >
             {t('项目')}
             <ChevronDown
@@ -505,7 +418,7 @@ export function BoardSidebar({
             <Plus className="size-3.5" strokeWidth={STROKE} />
           </Link>
         </div>
-        {!groupCollapsed.project &&
+        {!projectsCollapsed &&
           projectRows.map((row, i) => (
             <SidebarProjectRow
               key={row.id}
@@ -521,52 +434,11 @@ export function BoardSidebar({
       </nav>
 
       <div className="flex flex-none flex-col gap-px pt-2">
-        <Button
-          variant="ghost"
-          className={`sidebar-group group ${ROW} ${ROW_BTN} cursor-pointer aria-expanded:bg-transparent aria-expanded:hover:bg-sidebar-hover ${
-            groupCollapsed.resource ? 'sidebar-group--collapsed' : ''
-          } ${groupCollapsed.resource && resourceActive ? ROW_ACTIVE : `${ROW_IDLE} bg-transparent`}`}
-          aria-expanded={!groupCollapsed.resource}
-          aria-controls={resourceListId}
-          data-active={groupCollapsed.resource && resourceActive ? 'true' : undefined}
-          onClick={() => toggleGroup('resource')}
-        >
-          <Box className={ICON} strokeWidth={STROKE} />
-          <span className="flex-1 truncate">{t('资源')}</span>
-          <ChevronRight
-            aria-hidden
-            className="sidebar-group-chevron size-3.5 text-content-dim transition-transform duration-150 group-aria-expanded:rotate-90"
-            strokeWidth={STROKE}
-          />
-        </Button>
-        {!groupCollapsed.resource && (
-          <div
-            id={resourceListId}
-            className="mb-1 ml-4 flex flex-col gap-px border-l border-border pl-1.5"
-          >
-            {resourceRows.map(({ label, href, Icon }) => (
-              <Link
-                key={href}
-                className={`sidebar-subrow ${ROW} ${selected === href ? ROW_ACTIVE : ROW_IDLE}`}
-                to={{ pathname: href, search: plain }}
-                aria-current={selected === href ? 'page' : undefined}
-              >
-                <Icon className={ICON} strokeWidth={STROKE} />
-                <span className="min-w-0 flex-1 truncate">{t(label)}</span>
-                {machinesOnline > 0 && label === '机器' && (
-                  <span
-                    data-testid="online-dot"
-                    className="size-1.5 flex-none rounded-full bg-running"
-                  />
-                )}
-              </Link>
-            ))}
-          </div>
-        )}
-
         <UserMenuPopover
           open={userMenuOpen}
           onOpenChange={setUserMenuOpen}
+          usageNav={usageNav}
+          machinesOnline={machinesOnline}
           trigger={
             <Button
               variant="ghost"

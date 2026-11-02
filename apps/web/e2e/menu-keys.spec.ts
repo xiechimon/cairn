@@ -174,20 +174,6 @@ test('gallery menu: composing text does not fire a row', async ({ page }) => {
   await expect(page.getByText('Last picked: Delete')).toHaveCount(0);
 });
 
-test('global keys stay visible on the controls they trigger, without hover', async ({ page }) => {
-  await page.goto('/app?scenario=01');
-  const captionSize = await captionFontSize(page);
-  const aside = page.getByRole('complementary');
-  const search = aside.getByRole('button', { name: /搜索/ }).locator('[data-slot="key-hint"]');
-  const create = aside.getByRole('button', { name: /新任务/ }).locator('[data-slot="key-hint"]');
-  await expect(search).toHaveText('⌘K');
-  await expect(create).toHaveText('C');
-  for (const hint of [search, create]) {
-    await expect(hint).toHaveCSS('opacity', '1');
-    await expect(hint).toHaveCSS('font-size', captionSize);
-  }
-});
-
 test('the board new-task bar shows its key as the same quiet hint, not a boxed key', async ({
   page,
 }) => {

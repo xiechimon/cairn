@@ -85,10 +85,11 @@ export function ChiefQuestionCard({ item, onAnswer, onCancel }: ChiefQuestionCar
         return;
       const n = Number.parseInt(e.key, 10);
       if (!Number.isInteger(n) || n < 1 || n > max) return;
+      e.preventDefault();
       setDrafts((prev) => applyPick(prev, step, question, n - 1));
     };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    window.addEventListener('keydown', handler, true);
+    return () => window.removeEventListener('keydown', handler, true);
   }, [pending, step, question]);
 
   const stepComplete = useMemo(() => draftComplete(draft, question), [draft, question]);

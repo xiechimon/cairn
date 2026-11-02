@@ -13,7 +13,6 @@ const MACHINES = '/app/resources/machines?scenario=06';
 
 const dialog = (page: Page) => page.getByRole('dialog', { name: '新建任务' });
 const home = (page: Page) => page.getByTestId('home-c');
-const composerInput = (page: Page) => home(page).getByTestId('chief-composer-input');
 const drawer = (page: Page) => page.locator('.chief-drawer');
 
 /** Retired-binding negative (XMON-37), the retry law inverted: six delivered
@@ -43,50 +42,14 @@ async function pressesStayHidden(
   }
 }
 
-test('C on the board lands on the home composer; ⌘C and the retired N do nothing', async ({
-  page,
-}) => {
+test('⌘C and the retired N and C do nothing on the board', async ({ page }) => {
   await page.goto(BOARD);
   await expect(page.getByRole('complementary')).toBeVisible();
   await page.keyboard.press('Meta+c');
   await expect(home(page)).toHaveCount(0);
   await pressesStayClosed(page, 'n', home(page));
+  await pressesStayClosed(page, 'c', home(page));
   await expect(page).toHaveURL(/view=board/);
-
-  await page.keyboard.press('c');
-  await expect(composerInput(page)).toBeFocused();
-  await expect(page).not.toHaveURL(/view=board/);
-  await expect(dialog(page)).toHaveCount(0);
-});
-
-test('sidebar `新任务` row drops the C badge and click lands on the home composer', async ({ page }) => {
-  await page.goto(BOARD);
-  const row = page.getByRole('complementary').getByRole('button', { name: '新任务' });
-  await expect(row).toBeVisible();
-  await expect(row.locator('kbd')).toHaveCount(0);
-  await row.click();
-  await expect(composerInput(page)).toBeFocused();
-  await expect(dialog(page)).toHaveCount(0);
-});
-
-test('C on a non-board route lands on the home composer', async ({ page }) => {
-  await page.goto(SCHEDULES);
-  await expect(page.getByRole('complementary')).toBeVisible();
-  await page.keyboard.press('c');
-  await expect(page).not.toHaveURL(/\/app\/schedules/);
-  await expect(composerInput(page)).toBeFocused();
-  await expect(dialog(page)).toHaveCount(0);
-});
-
-test('C on the project page lands on the home composer filtered to that project', async ({
-  page,
-}) => {
-  await page.goto(PROJECT);
-  await expect(page.getByRole('complementary')).toBeVisible();
-  await page.keyboard.press('c');
-  await expect(page).toHaveURL(/\/app\?.*project=ZAQczKCu0MOAzC1ZqcFlX/);
-  await expect(composerInput(page)).toBeFocused();
-  await expect(dialog(page)).toHaveCount(0);
 });
 
 test('Space no longer opens the drawer; ⌘J does, composer focused, default consumed', async ({
@@ -191,11 +154,6 @@ test('Space on a focused button activates it natively; ⌘J fires past button fo
   await expect(page.getByTestId('chief-composer-input')).toBeFocused();
   await pressAndExpect(page, 'Meta+j', drawer(page), 'hidden');
   await expect(drawer(page)).toBeHidden();
-
-  await page.goto(BOARD);
-  await searchRow.focus();
-  await page.keyboard.press('c');
-  await expect(composerInput(page)).toBeFocused();
 });
 
 test('⌘J toggles: the second press closes the drawer from its own composer focus', async ({
