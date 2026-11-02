@@ -35,6 +35,8 @@ import {
 import { hasEarlierLiveChiefStep } from './chief-turns.js';
 import { claudeUsageGatePasses, refreshClaudeRateParks } from './claude-rate-limit.js';
 import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
+import { contextWindowOf, coordinatorServerContextEnabled } from './coordinator-context.js';
+import { assembleCoordinatorHistory } from './coordinator-history.js';
 import {
   agentRunningCount,
   capabilityGatePasses,
@@ -196,7 +198,31 @@ function buildChiefClaim(
   const digest = isChiefDigestStep(stepRow);
   const ctx = digest ? null : chiefClaimContext(deps, threadRow.id);
   const trigger = parseChiefTrigger(stepRow.prompt);
-  const systemPrompt = digest ? CHIEF_DIGEST_SYSTEM_PROMPT : (ctx?.systemPrompt ?? '');
+  const baseSystemPrompt = digest ? CHIEF_DIGEST_SYSTEM_PROMPT : (ctx?.systemPrompt ?? '');
+  const serverContext =
+    !digest && coordinatorServerContextEnabled() && stepRuntimeFor(model.provider) === 'pi'
+      ? assembleCoordinatorHistory(deps.db, {
+          threadId: threadRow.id,
+          turnCreatedAt: stepRow.createdAt,
+          contextWindow: contextWindowOf(
+            deps.db,
+            threadRow.teamId,
+            `${model.provider}/${model.modelId}`,
+          ),
+          fixedText: `${baseSystemPrompt}\n${stepRow.prompt ?? ''}`,
+        })
+      : null;
+  const systemPrompt =
+    serverContext?.summarySection != null
+      ? `${baseSystemPrompt}\n\n${serverContext.summarySection}`
+      : baseSystemPrompt;
+  const unanswered = (serverContext?.unanswered ?? []).filter(
+    (text) => !(stepRow.prompt ?? '').includes(text),
+  );
+  const turnPrompt =
+    stepRow.prompt === null || unanswered.length === 0
+      ? stepRow.prompt
+      : `Earlier messages that got no reply:\n${unanswered.join('\n\n')}\n\n${stepRow.prompt}`;
   let routeSection = '';
   if (ctx && trigger === 'user') {
     const hint = suggestSkillsForMessage(
@@ -222,14 +248,13 @@ function buildChiefClaim(
       createdAt: stepRow.createdAt,
     },
     conversationId: stepRow.buildId,
-    session: {
-      action: !stepRow.freshSession && threadRow.sessionId !== '' ? 'continue' : 'new',
-      sessionId: !stepRow.freshSession && threadRow.sessionId !== '' ? threadRow.sessionId : null,
-    },
-    ...(stepRow.prompt !== null
+    session:
+      serverContext === null && !stepRow.freshSession && threadRow.sessionId !== ''
+        ? { action: 'continue', sessionId: threadRow.sessionId }
+        : { action: 'new', sessionId: null },
+    ...(turnPrompt !== null
       ? {
-          instruction:
-            routeSection === '' ? stepRow.prompt : `${stepRow.prompt}\n\n${routeSection}`,
+          instruction: routeSection === '' ? turnPrompt : `${turnPrompt}\n\n${routeSection}`,
         }
       : {}),
     agent: {
@@ -245,6 +270,7 @@ function buildChiefClaim(
       threadId: threadRow.id,
       systemPrompt,
       trigger,
+      ...(serverContext !== null ? { history: serverContext.messages } : {}),
     },
     remoteTools: [...(digest ? CHIEF_DIGEST_REMOTE_TOOLS : CHIEF_REMOTE_TOOLS)],
     ...(chiefMcp !== undefined ? { mcpServers: chiefMcp } : {}),

@@ -851,6 +851,7 @@ async function runClaimedStep(
     ...(systemPrompt && backend.brief === undefined ? { systemPrompt } : {}),
     cwd,
     ...(deliveryPrompt !== null ? { prompt: deliveryPrompt } : {}),
+    ...(isChief && claimed.chief?.history !== undefined ? { history: claimed.chief.history } : {}),
     ...(promptImages !== undefined ? { promptImages } : {}),
     ...(localToolDefs.length > 0 ? { localTools: localToolDefs } : {}),
     ...(remoteTools && remoteTools.length > 0

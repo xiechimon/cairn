@@ -156,6 +156,7 @@ export interface SessionOpts {
   telemetry?: StepOtelContext;
   cwd: string;
   prompt?: string;
+  history?: readonly { role: 'user' | 'assistant'; text: string }[];
   promptImages?: readonly DeliveredImage[];
   onClaudeRateLimit?: (notice: ClaudeRateLimitNotice) => void;
 }

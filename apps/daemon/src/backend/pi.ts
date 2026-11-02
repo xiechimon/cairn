@@ -834,6 +834,37 @@ export interface PiBackendOpts {
   machineName?: string;
 }
 
+export function seedHistory(
+  sessionManager: { appendMessage: SessionManager['appendMessage'] },
+  model: { api: string; provider: string; id: string },
+  history: readonly { role: 'user' | 'assistant'; text: string }[],
+): void {
+  const at = Date.now();
+  for (const [i, entry] of history.entries()) {
+    if (entry.role === 'user') {
+      sessionManager.appendMessage({ role: 'user', content: entry.text, timestamp: at + i });
+    } else {
+      sessionManager.appendMessage({
+        role: 'assistant',
+        content: [{ type: 'text', text: entry.text }],
+        api: model.api,
+        provider: model.provider,
+        model: model.id,
+        usage: {
+          input: 0,
+          output: 0,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 0,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
+        stopReason: 'stop',
+        timestamp: at + i,
+      } as Parameters<SessionManager['appendMessage']>[0]);
+    }
+  }
+}
+
 export class PiBackend implements AgentBackend {
   readonly capabilities = PI_CAPABILITIES;
 
@@ -981,6 +1012,7 @@ export class PiBackend implements AgentBackend {
     const sessionManager = resumeFile
       ? SessionManager.open(resumeFile, this.opts.sessionDir, opts.cwd)
       : SessionManager.create(opts.cwd, this.opts.sessionDir);
+    if (resumeFile === null) seedHistory(sessionManager, model, opts.history ?? []);
     const customTools =
       remoteTools.length > 0 && relay
         ? remoteTools.map((def) =>
