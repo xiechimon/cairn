@@ -236,6 +236,13 @@ describe('chief turn queue (T5): one turn per thread, oldest first', () => {
     expect(view.turnQueue ?? null).toBeNull();
   });
 
+  test('with two messages waiting for a machine, the thread names the oldest as the waiting turn', async () => {
+    const w = await setupWorld();
+    const first = await w.send('第一句');
+    await w.send('第二句');
+    expect((await w.thread()).turnQueue).toMatchObject({ stepId: first });
+  });
+
   test('sending never creates a task by itself', async () => {
     const w = await setupWorld();
     await w.send('把看板计数修一下');

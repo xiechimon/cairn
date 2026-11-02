@@ -168,9 +168,19 @@ export function stepQueueProjector(db: Db, teamId: string) {
   }
 
   function chiefTurnQueueOf(threadId: string): ChiefThread['turnQueue'] {
-    const waiting = pendingChiefOf(threadId);
-    const info = waiting === null ? null : project(waiting);
-    return waiting === null || info === null ? null : { ...info, stepId: waiting.id };
+    if (pendingChiefOf(threadId) === null) return null;
+    const head = chiefRows
+      .filter((r) => r.threadId === threadId)
+      .sort((a, b) => a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1))[0];
+    if (head === undefined) return null;
+    const info = project({
+      id: head.id,
+      createdAt: head.createdAt,
+      homeMachineId: head.home,
+      holdReason: head.holdReason,
+      holdUntil: head.holdUntil,
+    });
+    return info === null ? null : { ...info, stepId: head.id };
   }
 
   return { project, pendingChiefOf, chiefTurnQueueOf };
