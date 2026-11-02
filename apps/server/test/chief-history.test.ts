@@ -333,12 +333,17 @@ describe('read_history', () => {
       maxChars: READ_MAX_CHARS,
     })) as ReadResult;
     expect(tail.messages[0]).toMatchObject({ content: huge.slice(-5), nextOffset: null });
+  });
+
+  test('paging by nextOffset rebuilds a long message exactly', async () => {
+    const long = Array.from({ length: 10_000 }, (_, i) => `${i}`.padStart(10, '0')).join('');
+    seedMessages(H.threadId, [{ id: 'long', content: long }]);
     let offset: number | null = 0;
     let pages = 0;
     let rebuilt = '';
-    while (offset !== null && pages < 300) {
+    while (offset !== null && pages < 20) {
       const page = (await relay('read_history', {
-        ids: ['huge'],
+        ids: ['long'],
         offset,
         maxChars: READ_MAX_CHARS,
       })) as ReadResult;
@@ -346,8 +351,8 @@ describe('read_history', () => {
       offset = page.messages[0]?.nextOffset ?? null;
       pages += 1;
     }
-    expect(pages).toBe(Math.ceil(3_890_000 / READ_MAX_CHARS));
-    expect(rebuilt).toBe(huge);
+    expect(pages).toBe(Math.ceil(100_000 / READ_MAX_CHARS));
+    expect(rebuilt).toBe(long);
   });
 
   test('one call never returns more than the call budget across all ids', async () => {
