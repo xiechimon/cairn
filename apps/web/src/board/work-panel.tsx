@@ -1,0 +1,152 @@
+import { PackageCheck } from 'lucide-react';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router';
+import { EmptyState } from '../components/empty-state.js';
+import { SegmentedTabs } from '../components/segmented.js';
+import { SidePanel, SidePanelHead, SidePanelTitle } from '../components/side-panel.js';
+import { StoneGroup, StoneTrail } from '../components/stone/stone-group.js';
+import { ThreadRow } from '../components/thread/thread-row.js';
+import { Button } from '../components/ui/button.js';
+import type { ScheduleRecord, TodoRecord } from '../fixtures/records.js';
+import { useI18n } from '../i18n/provider.js';
+import { scheduleSummary } from '../pages/schedule-summary.js';
+import { needsYouThreads } from './needs-you.js';
+import { relativeTime } from './rel-time.js';
+import { threadCopy, threadHref, threadStatus, threadTone } from './thread-copy.js';
+
+export type WorkPane = 'tasks' | 'made';
+
+export const PANE_PARAM = 'pane';
+
+export function paneOf(value: string | null): WorkPane | null {
+  return value === 'tasks' || value === 'made' ? value : null;
+}
+
+type TasksTab = 'active' | 'next' | 'scheduled';
+
+const live = (todo: TodoRecord) => todo.archivedAt == null;
+
+interface WorkPanelProps {
+  pane: WorkPane;
+  todos: readonly TodoRecord[];
+  schedules: readonly ScheduleRecord[];
+  now: number;
+  onClose: () => void;
+}
+
+export function WorkPanel({ pane, todos, schedules, now, onClose }: WorkPanelProps) {
+  const { t } = useI18n();
+  const navigate = useNavigate();
+  const [tab, setTab] = useState<TasksTab>('active');
+  const title = pane === 'tasks' ? t('任务') : t('成果');
+  const row = (todo: TodoRecord, tone = threadTone(todo)) => (
+    <ThreadRow
+      key={todo.id}
+      title={todo.title}
+      tone={tone}
+      reason={t(threadCopy(todo).reason)}
+      age={relativeTime(todo.phaseAt, now, t)}
+      onOpen={() => navigate(threadHref(todo.id))}
+    />
+  );
+  const needsYou = needsYouThreads(todos);
+  const running = todos.filter((todo) => threadStatus(todo) === 'running' && live(todo));
+  const upNext = todos.filter((todo) => todo.phase === 'todo' && live(todo));
+  const made = todos
+    .filter((todo) => threadStatus(todo) === 'done' && live(todo))
+    .sort((a, b) => b.phaseAt - a.phaseAt);
+
+  return (
+    <SidePanel label={title} onDismiss={onClose}>
+      <SidePanelHead closeLabel={t('关闭')} onClose={onClose}>
+        <SidePanelTitle>{title}</SidePanelTitle>
+      </SidePanelHead>
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-3 pb-4">
+        {pane === 'tasks' ? (
+          <>
+            <SegmentedTabs
+              value={tab}
+              onChange={setTab}
+              label={t('任务视图')}
+              options={[
+                { value: 'active', label: t('进行中') },
+                { value: 'next', label: t('接下来') },
+                { value: 'scheduled', label: t('定时') },
+              ]}
+            />
+            {tab === 'active' && (
+              <StoneTrail className="mt-2 px-0">
+                <StoneGroup
+                  tone="waiting"
+                  label={t('等你处理')}
+                  count={needsYou.length}
+                  emptyHint={t('没有等你的事')}
+                >
+                  {needsYou.map((todo) => row(todo))}
+                </StoneGroup>
+                <StoneGroup
+                  tone="working"
+                  label={t('在进行')}
+                  count={running.length}
+                  emptyHint={t('没有在进行的任务')}
+                >
+                  {running.map((todo) => row(todo, 'working'))}
+                </StoneGroup>
+              </StoneTrail>
+            )}
+            {tab === 'next' && (
+              <StoneTrail className="mt-2 px-0">
+                <StoneGroup
+                  tone="idle"
+                  label={t('接下来')}
+                  count={upNext.length}
+                  emptyHint={t('没有排队的任务')}
+                >
+                  {upNext.map((todo) => row(todo, 'idle'))}
+                </StoneGroup>
+              </StoneTrail>
+            )}
+            {tab === 'scheduled' && (
+              <StoneTrail className="mt-2 px-0">
+                <StoneGroup
+                  tone="working"
+                  label={t('定时')}
+                  count={schedules.length}
+                  emptyHint={t('还没有定时任务，跟 Coordinator 说一声就能建')}
+                >
+                  {schedules.map((schedule) => (
+                    <ThreadRow
+                      key={schedule.id}
+                      title={`#${schedule.todo.seqNum} ${schedule.todo.title}`}
+                      tone="idle"
+                      reason={scheduleSummary(schedule, now, t)}
+                      onOpen={() => navigate(threadHref(schedule.todoId))}
+                    />
+                  ))}
+                </StoneGroup>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="mt-1 self-start text-meta text-content-secondary"
+                  render={<Link to="/app/schedules" />}
+                >
+                  {t('管理定时')}
+                </Button>
+              </StoneTrail>
+            )}
+          </>
+        ) : made.length === 0 ? (
+          <EmptyState
+            testId="made-empty"
+            icon={PackageCheck}
+            title={t('还没有完成的工作')}
+            description={t('任务合并完成后会出现在这里。')}
+            className="mt-[10vh]"
+          />
+        ) : (
+          <StoneTrail className="px-0">{made.map((todo) => row(todo, 'resolved'))}</StoneTrail>
+        )}
+      </div>
+    </SidePanel>
+  );
+}

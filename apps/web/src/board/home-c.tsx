@@ -1,6 +1,12 @@
-import { ChevronDown, FolderOpen, MessageSquareWarning, Settings2 } from 'lucide-react';
+import {
+  FolderOpen,
+  ListChecks,
+  MessageSquareWarning,
+  PackageCheck,
+  Settings2,
+} from 'lucide-react';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { useLiveData } from '../api/provider.js';
 import { ChiefConversation } from '../chief/chief-conversation.js';
 import { ChiefQuestionCard, type ChiefQuestionItem } from '../chief/chief-question-card.js';
@@ -9,17 +15,21 @@ import { EmptyState } from '../components/empty-state.js';
 import { Greeting } from '../components/stream/greeting.js';
 import { SuggestionChip } from '../components/stream/suggestion-chip.js';
 import { TextureSkeleton } from '../components/texture/texture.js';
-import { ThreadRow } from '../components/thread/thread-row.js';
 import { Button } from '../components/ui/button.js';
 import { MessageScrollerProvider } from '../components/ui/message-scroller.js';
-import type { ChiefStreamItem, MachineRow, TodoRecord } from '../fixtures/records.js';
+import type {
+  ChiefStreamItem,
+  MachineRow,
+  ScheduleRecord,
+  TodoRecord,
+} from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ClaudeLoginBanner } from './claude-login-banner.js';
 import { ACT_ORDER, actRank, needsYouThreads, pendingQuestions } from './needs-you.js';
 import { NeedsYouThreadCard } from './needs-you-thread-card.js';
 import { composeRequest } from './open-composer.js';
-import { relativeTime } from './rel-time.js';
 import { threadCopy, threadHref, threadStatus, threadTone } from './thread-copy.js';
+import { PANE_PARAM, paneOf, type WorkPane, WorkPanel } from './work-panel.js';
 
 const GREETINGS: [number, string][] = [
   [5, '夜深了'],
@@ -87,6 +97,7 @@ interface HomeCProps {
   projectName: string | null;
   banner?: ReactNode;
   machines?: readonly MachineRow[];
+  schedules?: readonly ScheduleRecord[];
 }
 
 export function HomeC({
@@ -97,6 +108,7 @@ export function HomeC({
   projectName,
   banner,
   machines,
+  schedules = [],
 }: HomeCProps) {
   const { t, locale } = useI18n();
   const { user, live } = useLiveData();
@@ -104,7 +116,15 @@ export function HomeC({
   const location = useLocation();
   const composeAt = composeRequest(location.state);
   const [allOpen, setAllOpen] = useState(false);
-  const [runningOpen, setRunningOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const pane = paneOf(searchParams.get(PANE_PARAM));
+  const showPane = (next: WorkPane | null) => {
+    const params = new URLSearchParams(searchParams);
+    if (next === null) params.delete(PANE_PARAM);
+    else params.set(PANE_PARAM, next);
+    setSearchParams(params, { replace: true, state: location.state });
+  };
+  const togglePane = (next: WorkPane) => showPane(pane === next ? null : next);
   const [prefill, setPrefill] = useState<{ text: string; key: number } | null>(null);
   const { chiefData, chiefView, setChiefView } = surface;
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
@@ -303,28 +323,48 @@ export function HomeC({
       <Button
         variant="ghost"
         data-testid="in-progress-pill"
-        aria-expanded={runningOpen}
-        onClick={() => setRunningOpen(!runningOpen)}
+        aria-pressed={pane === 'tasks'}
+        onClick={() => showPane('tasks')}
         className="h-7 gap-2 self-start rounded-full bg-card px-3 text-meta font-normal text-content-secondary shadow-(--e1) hover:bg-card hover:text-foreground dark:hover:bg-card"
       >
         <span aria-hidden="true" className="size-1.5 rounded-full bg-running" />
         {t('{n} 件在进行', { n: running.length })}
-        <ChevronDown aria-hidden="true" className={runningOpen ? 'size-3 rotate-180' : 'size-3'} />
       </Button>
-      {runningOpen && (
-        <div data-testid="in-progress-list" className="mt-2 flex max-h-60 flex-col overflow-y-auto">
-          {running.map((todo) => (
-            <ThreadRow
-              key={todo.id}
-              title={todo.title}
-              tone="working"
-              reason={t(threadCopy(todo).reason)}
-              age={relativeTime(todo.phaseAt, now, t)}
-              onOpen={() => navigate(threadHref(todo.id))}
-            />
-          ))}
-        </div>
-      )}
+    </div>
+  );
+
+  const paneButtons = (
+    <div
+      data-testid="home-c-pane-buttons"
+      className="absolute top-2.5 right-3 z-(--z-docked) flex items-center gap-0.5"
+    >
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        aria-label={t('任务')}
+        aria-pressed={pane === 'tasks'}
+        onClick={() => togglePane('tasks')}
+        className="relative text-content-tertiary hover:text-foreground aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
+      >
+        <ListChecks aria-hidden="true" />
+        {entries.length > 0 && (
+          <span
+            data-testid="tasks-attention-dot"
+            aria-hidden="true"
+            className="absolute top-1 right-1 size-1.5 rounded-full bg-(--card-button)"
+          />
+        )}
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        aria-label={t('成果')}
+        aria-pressed={pane === 'made'}
+        onClick={() => togglePane('made')}
+        className="text-content-tertiary hover:text-foreground aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
+      >
+        <PackageCheck aria-hidden="true" />
+      </Button>
     </div>
   );
 
@@ -354,47 +394,63 @@ export function HomeC({
   }
 
   return (
-    <section
-      data-testid="home-c"
-      aria-label={t('与 Coordinator 的对话')}
-      className="flex min-h-0 min-w-0 flex-1 flex-col"
-    >
-      <h1 className="sr-only">{t('Coordinator')}</h1>
-      {banner != null && (
-        <div className="mx-auto w-[calc(100%-2rem)] max-w-182 flex-none pt-3">{banner}</div>
-      )}
-      <MessageScrollerProvider defaultScrollPosition="start">
-        <ChiefConversation
-          variant="global"
-          chief={{ ...chiefData, stream: conversation, examples: undefined }}
-          onSend={
-            surface.onSend != null
-              ? (text: string) => surface.onSend?.(text, projectId)
-              : live
-                ? undefined
-                : () => Promise.resolve()
+    <div className="relative flex min-h-0 min-w-0 flex-1">
+      <section
+        data-testid="home-c"
+        aria-label={t('与 Coordinator 的对话')}
+        className="relative flex min-h-0 min-w-0 flex-1 flex-col"
+      >
+        <h1 className="sr-only">{t('Coordinator')}</h1>
+        {paneButtons}
+        {banner != null && (
+          <div className="mx-auto w-[calc(100%-2rem)] max-w-182 flex-none pt-3">{banner}</div>
+        )}
+        <MessageScrollerProvider defaultScrollPosition="start">
+          <ChiefConversation
+            variant="global"
+            chief={{ ...chiefData, stream: conversation, examples: undefined }}
+            onSend={
+              surface.onSend != null
+                ? (text: string) => surface.onSend?.(text, projectId)
+                : live
+                  ? undefined
+                  : () => Promise.resolve()
+            }
+            onRewind={surface.onRewind}
+            onAnswerQuestion={surface.onAnswerQuestion}
+            onCancelQuestion={surface.onCancelQuestion}
+            onWithdraw={surface.onWithdraw}
+            onSteer={surface.onSteer}
+            onStop={surface.onStop}
+            onSettings={() => surface.setChiefView('settings')}
+            hero={hero}
+            lead={lead}
+            prefill={prefill}
+            placeholder={
+              projectName != null
+                ? t('跟 Coordinator 说（在 {name} 里）…', { name: projectName })
+                : t('跟 Coordinator 说点什么，或描述一个新任务…')
+            }
+            aboveComposer={pill}
+            composerRef={(node) => {
+              composerRef.current = node;
+            }}
+          />
+        </MessageScrollerProvider>
+      </section>
+      {pane !== null && (
+        <WorkPanel
+          pane={pane}
+          todos={scoped}
+          schedules={
+            projectId === null
+              ? schedules
+              : schedules.filter((schedule) => schedule.projectId === projectId)
           }
-          onRewind={surface.onRewind}
-          onAnswerQuestion={surface.onAnswerQuestion}
-          onCancelQuestion={surface.onCancelQuestion}
-          onWithdraw={surface.onWithdraw}
-          onSteer={surface.onSteer}
-          onStop={surface.onStop}
-          onSettings={() => surface.setChiefView('settings')}
-          hero={hero}
-          lead={lead}
-          prefill={prefill}
-          placeholder={
-            projectName != null
-              ? t('跟 Coordinator 说（在 {name} 里）…', { name: projectName })
-              : t('跟 Coordinator 说点什么，或描述一个新任务…')
-          }
-          aboveComposer={pill}
-          composerRef={(node) => {
-            composerRef.current = node;
-          }}
+          now={now}
+          onClose={() => showPane(null)}
         />
-      </MessageScrollerProvider>
-    </section>
+      )}
+    </div>
   );
 }
