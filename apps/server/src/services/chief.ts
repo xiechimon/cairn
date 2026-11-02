@@ -1138,12 +1138,7 @@ function writingTurnProjectId(db: Db, row: { id: string; threadId: string }): st
         .select({ prompt: step.prompt })
         .from(step)
         .where(
-          and(
-            eq(step.buildId, row.threadId),
-            eq(step.kind, 'chief'),
-            isNotNull(step.claimedAt),
-            ne(step.status, 'pending'),
-          ),
+          and(eq(step.buildId, row.threadId), eq(step.kind, 'chief'), eq(step.status, 'claimed')),
         )
         .orderBy(desc(step.claimedAt), sql`rowid desc`)
         .limit(1)
@@ -1163,7 +1158,10 @@ export function upsertChiefMessage(
   },
 ): void {
   db.insert(chiefMessage)
-    .values({ ...row, projectId: row.projectId ?? writingTurnProjectId(db, row) })
+    .values({
+      ...row,
+      projectId: row.projectId === undefined ? writingTurnProjectId(db, row) : row.projectId,
+    })
     .onConflictDoUpdate({
       target: chiefMessage.id,
       set: { role: row.role, content: row.content, createdAt: row.createdAt },

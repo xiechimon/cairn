@@ -9,6 +9,7 @@ import {
   stopPending,
 } from '../src/db/schema.js';
 import { enqueueChiefStep, upsertChiefMessage } from '../src/services/chief.js';
+import { ASK_EXPIRED_REASON, createOrGetQuestion } from '../src/services/chief-questions.js';
 import {
   CHIEF_TURN_MAX_MS,
   recordChiefStop,
@@ -205,6 +206,41 @@ describe('overlong chief turns are stopped so one turn cannot block the thread',
       'pending',
     );
   });
+  test('an overlong turn waiting on ask_user expires the question first, then stops; a late answer is refused', async () => {
+    const now = Date.now();
+    seedClaimed('asking', now - CHIEF_TURN_MAX_MS - 1, now);
+    createOrGetQuestion(
+      { db: H.s.db },
+      {
+        threadId: H.threadId,
+        requestId: 'ask-late',
+        questions: [{ header: 'pick', question: 'which?', options: [] }],
+      },
+    );
+    sweepOverlongChiefTurns(H.s.svc, now);
+    const row = H.s.db.select().from(chiefMessage).where(eq(chiefMessage.id, 'ask-late')).get();
+    const content = JSON.parse(row?.content as string) as { status: string; cancelReason?: string };
+    expect(content.status).toBe('cancelled');
+    expect(content.cancelReason).toBe(ASK_EXPIRED_REASON);
+    expect(H.s.db.select().from(stopPending).all()).toEqual([]);
+    sweepOverlongChiefTurns(H.s.svc, now + 60_000);
+    expect(
+      H.s.db
+        .select()
+        .from(stopPending)
+        .all()
+        .map((r) => r.stepId),
+    ).toEqual(['asking']);
+    const answer = await req(
+      H.s.app,
+      'POST',
+      `/api/teams/${H.teamId}/chief/threads/${H.threadId}/questions/ask-late/answer`,
+      { answers: [{ header: 'pick', text: 'this one' }] },
+    );
+    expect(answer.status).toBe(409);
+    expect(((await answer.json()) as { error: string }).error).toContain('expired after 30 min');
+  });
+
   test('the scheduler tick runs the watchdog', () => {
     const now = Date.now();
     seedClaimed('ticked', now - CHIEF_TURN_MAX_MS - 1, now);
@@ -288,6 +324,7 @@ describe('rewind never cuts another project out of the shared transcript', () =>
       content: 'p',
       createdAt: at,
     });
+    setStep(anchor, { status: 'claimed' });
     upsertChiefMessage(H.s.db, {
       id: `reply-${anchor}`,
       threadId: H.threadId,
@@ -295,6 +332,7 @@ describe('rewind never cuts another project out of the shared transcript', () =>
       content: 'r',
       createdAt: at,
     });
+    setStep(anchor, { status: 'done' });
     const page = (await (
       await req(H.s.app, 'GET', `/api/teams/${H.teamId}/coordinator?projectId=${H.projectId}`)
     ).json()) as { messages: { id: string }[] };

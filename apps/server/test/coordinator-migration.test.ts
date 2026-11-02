@@ -113,6 +113,14 @@ test('per-project Coordinator threads merge into the one global thread per chief
     seedMessage(sqlite, { id: 'o1', threadId: 'chief-old-global', createdAt: 90 });
     seedMessage(sqlite, { id: 'd1', threadId: 'chief-digest-chief-u1-t1', createdAt: 95 });
     seedMessage(sqlite, { id: 'u1', threadId: 'chief-u2-only', createdAt: 7 });
+    sqlite.pragma('foreign_keys = OFF');
+    seedMessage(sqlite, { id: 'orphan', threadId: 'chief-gone', createdAt: 8 });
+    sqlite.pragma('foreign_keys = ON');
+    sqlite
+      .prepare(
+        "INSERT INTO step (id, buildId, kind, status, prompt, createdAt) VALUES ('queued-a', 'chief-proj-a', 'chief', 'pending', 'q', 1), ('quota-b', 'chief-proj-b', 'chief', 'waiting_quota', 'q', 2), ('running-a', 'chief-proj-a', 'chief', 'claimed', 'r', 3), ('done-a', 'chief-proj-a', 'chief', 'done', 'd', 4)",
+      )
+      .run();
 
     migrate(drizzle(sqlite), { migrationsFolder: MIGRATIONS_FOLDER });
 
@@ -144,6 +152,22 @@ test('per-project Coordinator threads merge into the one global thread per chief
     expect(
       sqlite.prepare("SELECT threadId, projectId FROM chief_message WHERE id = 'u1'").get(),
     ).toEqual({ threadId: 'chief-u2-only', projectId: 'pb' });
+    expect(sqlite.prepare("SELECT threadId FROM chief_message WHERE id = 'orphan'").get()).toEqual({
+      threadId: 'chief-gone',
+    });
+    expect(sqlite.prepare('SELECT id, buildId FROM step ORDER BY createdAt').all()).toEqual([
+      { id: 'queued-a', buildId: 'chief-global' },
+      { id: 'quota-b', buildId: 'chief-global' },
+      { id: 'running-a', buildId: 'chief-proj-a' },
+      { id: 'done-a', buildId: 'chief-proj-a' },
+    ]);
+    expect(
+      sqlite
+        .prepare(
+          "SELECT activeRun IS NOT NULL AS active FROM chief_thread WHERE id = 'chief-global'",
+        )
+        .get(),
+    ).toEqual({ active: 1 });
     expect(sqlite.prepare("SELECT threadId FROM chief_message WHERE id = 'd1'").get()).toEqual({
       threadId: 'chief-digest-chief-u1-t1',
     });

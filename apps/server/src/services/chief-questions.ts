@@ -29,6 +29,8 @@ export interface ChiefQuestionDeps {
 
 export const ASK_HOLD_MS = 70_000;
 
+export const ASK_EXPIRED_REASON = 'expired after 30 min; reply to continue';
+
 const ASK_POLL_MS = 400;
 
 export function askQuestionContentOf(content: unknown): AskUserQuestionContent | null {
@@ -176,7 +178,11 @@ export function answerQuestion(
   const content = readQuestion(deps.db, input.threadId, input.requestId);
   if (content === null) throw new HttpError(404, `question ${input.requestId}`);
   if (content.status !== 'pending') {
-    throw new HttpError(409, `question ${input.requestId} already ${content.status}`);
+    const reason = content.status === 'cancelled' ? content.cancelReason : undefined;
+    throw new HttpError(
+      409,
+      `question ${input.requestId} already ${content.status}${reason ? `: ${reason}` : ''}`,
+    );
   }
   if (input.answers.length !== content.questions.length) {
     throw new HttpError(
@@ -234,8 +240,9 @@ export function cancelPendingQuestions(
   deps: ChiefQuestionDeps,
   threadId: string,
   reason: string,
-): void {
+): number {
   const rows = deps.db.select().from(chiefMessage).where(eq(chiefMessage.threadId, threadId)).all();
+  let cancelled = 0;
   for (const row of rows) {
     if (row.id.startsWith('user-') || row.id.startsWith('chief-err-')) continue;
     const content = askQuestionContentOf(row.content);
@@ -243,7 +250,9 @@ export function cancelPendingQuestions(
     const next: AskUserQuestionContent = { ...content, status: 'cancelled', cancelReason: reason };
     writeQuestion(deps.db, threadId, row.id, next, nowMs());
     publishRow(deps, threadId, row.id);
+    cancelled += 1;
   }
+  return cancelled;
 }
 
 export function parseAnswerBody(raw: unknown): AskUserAnswer[] {

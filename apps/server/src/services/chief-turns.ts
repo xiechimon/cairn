@@ -18,6 +18,7 @@ import {
 } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
+import { ASK_EXPIRED_REASON, cancelPendingQuestions } from './chief-questions.js';
 import type { ConversationStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { publishStepRow } from './quota-wait.js';
@@ -333,7 +334,10 @@ export function sweepOverlongChiefTurns(deps: ChiefTurnDeps, now: number = nowMs
       ),
     )
     .all();
-  for (const row of overlong) stopClaimedChiefStep(deps, row.thread, row.step, now);
+  for (const row of overlong) {
+    const expired = cancelPendingQuestions(deps, row.thread.id, ASK_EXPIRED_REASON);
+    if (expired === 0) stopClaimedChiefStep(deps, row.thread, row.step, now);
+  }
 }
 
 function stopClaimedChiefStep(
