@@ -331,6 +331,7 @@ export function sweepOverlongChiefTurns(deps: ChiefTurnDeps, now: number = nowMs
       and(
         eq(step.kind, 'chief'),
         eq(step.status, 'claimed'),
+        eq(step.compactOnly, false),
         lt(step.claimedAt, now - CHIEF_TURN_MAX_MS),
       ),
     )

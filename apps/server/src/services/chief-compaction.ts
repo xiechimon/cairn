@@ -6,7 +6,7 @@ import {
   isChiefDigestThreadId,
   type MachineDoneBody,
 } from '@cairn/shared';
-import { and, desc, eq, gte, isNotNull, isNull, lte, ne, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, isNotNull, isNull, lt, lte, ne, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Db } from '../db/client.js';
 import {
@@ -35,6 +35,8 @@ export const CHIEF_COMPACTION: ChiefCompactionSettings = {
 export const CHIEF_COMPACT_MAX_ATTEMPTS = 2;
 
 export const CHIEF_COMPACT_WAIT_MS = 180_000;
+
+export const CHIEF_COMPACT_MAX_MS = 5 * 60_000;
 
 export interface IdleCompactionPolicy {
   idleMs: number;
@@ -83,6 +85,7 @@ type CompactOutcome =
   | { kind: 'landed'; summary: CoordinatorSummary }
   | { kind: 'nothing' }
   | { kind: 'discarded' }
+  | { kind: 'unsupported' }
   | { kind: 'stopped' }
   | { kind: 'failed'; error: string };
 
@@ -252,10 +255,59 @@ export function compactStepIsCurrent(db: Db, stepRow: StepRow): boolean {
   );
 }
 
-export function discardCompactStep(deps: CompactionDeps, stepRow: StepRow): void {
+export function discardCompactStep(
+  deps: CompactionDeps,
+  stepRow: StepRow,
+  reason: 'stale' | 'unsupported',
+): void {
   deps.db.delete(step).where(eq(step.id, stepRow.id)).run();
+  if (reason === 'unsupported') refundAttempt(deps.db, stepRow);
   publishStepRow(deps, { ...stepRow, status: 'stopped' });
-  settleWaiter(stepRow.id, { kind: 'discarded' });
+  settleWaiter(stepRow.id, { kind: reason === 'stale' ? 'discarded' : 'unsupported' });
+}
+
+function refundAttempt(db: Db, stepRow: StepRow): void {
+  const binding = compactBindingOf(stepRow);
+  const thread = db.select().from(chiefThread).where(eq(chiefThread.id, stepRow.buildId)).get();
+  const attempt = thread?.compactAttempt;
+  if (binding === null || attempt == null || attempt.cursor !== binding.cursor) return;
+  db.update(chiefThread)
+    .set({ compactAttempt: attempt.count > 1 ? { ...attempt, count: attempt.count - 1 } : null })
+    .where(eq(chiefThread.id, stepRow.buildId))
+    .run();
+}
+
+export function sweepOverlongCompactions(deps: CompactionDeps, now: number = nowMs()): void {
+  const overlong = deps.db
+    .select({ step, thread: chiefThread })
+    .from(step)
+    .innerJoin(chiefThread, eq(chiefThread.id, step.buildId))
+    .where(
+      and(
+        eq(step.compactOnly, true),
+        eq(step.status, 'claimed'),
+        lt(step.claimedAt, now - CHIEF_COMPACT_MAX_MS),
+      ),
+    )
+    .all();
+  for (const row of overlong) {
+    if (!chiefStepAbandoned(row.step, now)) {
+      requestChiefStepStop(deps, row.thread, row.step, now);
+      continue;
+    }
+    deps.db
+      .update(step)
+      .set({ status: 'stopped', finishedAt: now })
+      .where(eq(step.id, row.step.id))
+      .run();
+    deps.db.delete(stopPending).where(eq(stopPending.stepId, row.step.id)).run();
+    publishStepRow(deps, { ...row.step, status: 'stopped' });
+    settleWaiter(row.step.id, {
+      kind: 'failed',
+      error: 'compaction timed out on a machine that stopped reporting',
+    });
+    deps.machineHub?.wake(row.thread.teamId);
+  }
 }
 
 export function preemptChiefCompaction(deps: CompactionDeps, threadId: string): void {
@@ -416,6 +468,9 @@ export async function compactThreadNow(
   if (outcome.kind === 'landed') return { summary: outcome.summary };
   if (outcome.kind === 'nothing') return { skipped: 'unchanged' };
   if (outcome.kind === 'failed') throw new HttpError(502, outcome.error);
+  if (outcome.kind === 'unsupported') {
+    throw new HttpError(503, 'the Coordinator machine cannot compact sessions');
+  }
   throw new HttpError(409, 'a new Coordinator turn superseded the compaction');
 }
 

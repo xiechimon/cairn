@@ -40,6 +40,7 @@ import {
   IDLE_COMPACTION_DEFAULTS,
   type IdleCompactionPolicy,
   planIdleCompactions,
+  sweepOverlongCompactions,
 } from './chief-compaction.js';
 import { planChiefDigests } from './chief-digest.js';
 import { sweepOverlongChiefTurns } from './chief-turns.js';
@@ -495,6 +496,7 @@ export function createScheduler(
     sweepStaleMachines(deps);
     sweepAbandonedChiefSteps(deps, now);
     sweepOverlongChiefTurns(deps, now);
+    sweepOverlongCompactions(deps, now);
     sweepAbandonedBuildSteps(deps, now);
     void sweepAbandonedShipSteps(deps, now).catch(() => {});
     sweepZombieQueuedTodos(deps, now);

@@ -18,11 +18,17 @@ import {
 } from '../src/db/schema.js';
 import { enqueueChiefStep } from '../src/services/chief.js';
 import {
+  CHIEF_COMPACT_MAX_MS,
   CHIEF_COMPACTION,
   IDLE_COMPACTION_DEFAULTS,
   planIdleCompactions,
+  sweepOverlongCompactions,
 } from '../src/services/chief-compaction.js';
-import { steerChiefMessage } from '../src/services/chief-turns.js';
+import {
+  CHIEF_TURN_MAX_MS,
+  steerChiefMessage,
+  sweepOverlongChiefTurns,
+} from '../src/services/chief-turns.js';
 import { claimStep } from '../src/services/machine-claim.js';
 import { finishStep } from '../src/services/machines.js';
 import { H, registerChiefHarness, toolDeps } from './chief-harness.js';
@@ -497,5 +503,119 @@ describe('GET /coordinator/context reports the working set', () => {
     });
     expect(after.sections.find((s) => s.name === 'summary')?.tokens).toBe(1500);
     expect(after.sections.find((s) => s.name === 'recent')?.tokens).toBe(18_000 - 1500);
+  });
+});
+
+function dropFeature(machineId: string): void {
+  H.s.db
+    .update(machineTable)
+    .set({ capabilities: { mcpServers: [], skills: [], features: [] } })
+    .where(eq(machineTable.id, machineId))
+    .run();
+}
+
+function insertWake(id: string): void {
+  H.s.db
+    .insert(stepTable)
+    .values({
+      id,
+      buildId: H.threadId,
+      kind: 'chief',
+      status: 'pending',
+      prompt: '[wake:gate] facts',
+      createdAt: Date.now() + 1,
+    })
+    .run();
+}
+
+describe('a compaction the claiming machine cannot run never blocks the thread', () => {
+  test('it is dropped at claim without spending an attempt, and the next step runs', async () => {
+    const machineId = world();
+    const attemptBefore = threadRow().compactAttempt;
+    planIdleCompactions(H.s.svc, T0 + IDLE + 1);
+    expect(threadRow().compactAttempt).toEqual({ cursor: 'm-2', count: 1 });
+    dropFeature(machineId);
+    insertWake('wake-after');
+    expect((await claim(machineId))?.step.id).toBe('wake-after');
+    expect(liveCompactions()).toEqual([]);
+    expect(chiefSteps().filter((row) => row.compactOnly)).toEqual([]);
+    expect(threadRow().compactAttempt).toEqual(attemptBefore);
+  });
+
+  test('a waiting compact request gets a clear answer instead of a timeout', async () => {
+    const machineId = world();
+    const pending = req(H.s.app, 'POST', `/api/teams/${H.teamId}/coordinator/compact`);
+    await vi.waitFor(() => expect(liveCompactions()).toHaveLength(1));
+    dropFeature(machineId);
+    expect(await claim(machineId)).toBeNull();
+    const res = await pending;
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({ error: expect.stringMatching(/cannot compact/i) });
+  });
+});
+
+describe('an overlong compaction is ended by its own watchdog', () => {
+  function age(stepId: string, heartbeatAgo: number): void {
+    const now = Date.now();
+    H.s.db
+      .update(stepTable)
+      .set({ claimedAt: now - CHIEF_TURN_MAX_MS - 1, lastHeartbeatAt: now - heartbeatAgo })
+      .where(eq(stepTable.id, stepId))
+      .run();
+  }
+
+  test('the turn watchdog leaves compactions alone and writes no stop card', async () => {
+    const machineId = world();
+    const compaction = await idleCompactionClaimed(machineId);
+    age(compaction.step.id, 10 * 60_000);
+    sweepOverlongChiefTurns(H.s.svc);
+    expect(
+      H.s.db.select().from(stepTable).where(eq(stepTable.id, compaction.step.id)).get()?.status,
+    ).toBe('claimed');
+    expect(
+      H.s.db
+        .select()
+        .from(chiefMessage)
+        .where(eq(chiefMessage.id, `chief-stop-${compaction.step.id}`))
+        .get(),
+    ).toBeUndefined();
+  });
+
+  test('a live overlong compaction is asked to stop', async () => {
+    const machineId = world();
+    const compaction = await idleCompactionClaimed(machineId);
+    age(compaction.step.id, 1000);
+    H.s.db
+      .update(stepTable)
+      .set({ claimedAt: Date.now() - CHIEF_COMPACT_MAX_MS - 1 })
+      .where(eq(stepTable.id, compaction.step.id))
+      .run();
+    sweepOverlongCompactions(H.s.svc);
+    expect(
+      H.s.db.select().from(stopPending).where(eq(stopPending.stepId, compaction.step.id)).get(),
+    ).toBeDefined();
+    expect(
+      H.s.db.select().from(stepTable).where(eq(stepTable.id, compaction.step.id)).get()?.status,
+    ).toBe('claimed');
+  });
+
+  test('an abandoned overlong compaction is ended and its compact request answered', async () => {
+    const machineId = world();
+    const pending = req(H.s.app, 'POST', `/api/teams/${H.teamId}/coordinator/compact`);
+    await vi.waitFor(() => expect(liveCompactions()).toHaveLength(1));
+    const claimed = await claim(machineId);
+    age(claimed?.step.id ?? '', 10 * 60_000);
+    sweepOverlongCompactions(H.s.svc);
+    const res = await pending;
+    expect(res.status).toBe(502);
+    expect(await res.json()).toMatchObject({ error: expect.stringMatching(/timed out/i) });
+    expect(
+      H.s.db
+        .select()
+        .from(stepTable)
+        .where(eq(stepTable.id, claimed?.step.id ?? ''))
+        .get()?.status,
+    ).toBe('stopped');
+    expect(liveCompactions()).toEqual([]);
   });
 });

@@ -301,12 +301,9 @@ async function tryClaim(
   for (const cand of chiefCands) {
     if (cand.stepRow.createdAt > earliestWorker) break;
     if (hasEarlierLiveChiefStep(db, cand.stepRow)) continue;
-    if (isChiefCompactStep(cand.stepRow)) {
-      if (!machineCompacts(machineRow)) continue;
-      if (!compactStepIsCurrent(db, cand.stepRow)) {
-        discardCompactStep(deps, cand.stepRow);
-        continue;
-      }
+    if (isChiefCompactStep(cand.stepRow) && !compactStepIsCurrent(db, cand.stepRow)) {
+      discardCompactStep(deps, cand.stepRow, 'stale');
+      continue;
     }
     if (
       isChiefDigestStep(cand.stepRow) &&
@@ -318,6 +315,10 @@ async function tryClaim(
     if (chiefRuntime === 'claude-code' && claudeBlocked(machineId)) continue;
     if (cand.agentRow.machineId !== machineId) {
       if (chiefRuntime !== 'claude-code' || !claudeBlocked(cand.agentRow.machineId)) continue;
+    }
+    if (isChiefCompactStep(cand.stepRow) && !machineCompacts(machineRow)) {
+      discardCompactStep(deps, cand.stepRow, 'unsupported');
+      continue;
     }
     if (
       cand.agentRow.maxConcurrentTasks !== null &&
