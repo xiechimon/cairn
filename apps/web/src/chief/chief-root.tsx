@@ -19,6 +19,10 @@ export interface ChiefRootApi {
 
 const ChiefRootContext = createContext<ChiefRootApi | null>(null);
 
+export function useOptionalChiefRoot(): ChiefRootApi | null {
+  return useContext(ChiefRootContext);
+}
+
 export function useChiefRoot(): ChiefRootApi {
   const api = useContext(ChiefRootContext);
   if (api === null)

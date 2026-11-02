@@ -3,7 +3,7 @@ import { KeyRound } from 'lucide-react';
 import { useClaudeSubscriptions } from '../api/claude-subscriptions.js';
 import { useLiveData } from '../api/provider.js';
 import { formatClaudeLoginWarning, subscriptionLoginWarning } from '../claude-login-warning.js';
-import { NoticeBanner } from '../components/notice-banner.js';
+import { NoticeBanner, withCodeSpans } from '../components/notice-banner.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 
@@ -63,7 +63,7 @@ export function ClaudeLoginBanner({
               data-login={warning.kind}
               role="status"
             >
-              {warning.text}
+              {withCodeSpans(warning.text)}
             </li>
           ))}
         </ul>

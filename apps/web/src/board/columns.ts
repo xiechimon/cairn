@@ -139,10 +139,6 @@ export function splitStale(
   return { fresh, stale };
 }
 
-export function attentionCount(todos: TodoRecord[], now: number): number {
-  return countInColumn(splitStale(todos, now).fresh, 'pending');
-}
-
 export function countInColumn(todos: TodoRecord[], columnId: string): number {
   const column = COLUMNS.find((c) => c.id === columnId);
   return column == null ? 0 : todos.filter(column.accepts).length;
