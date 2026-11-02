@@ -95,6 +95,8 @@ async function world(): Promise<World> {
   });
   expect(sent.status).toBe(201);
   const { thread } = (await sent.json()) as { thread: { id: string } };
+  fallbacks = [];
+  setCoordinatorRouteLog((team, reason) => fallbacks.push([team, reason]));
   return { s, teamId, threadId: thread.id, token };
 }
 

@@ -43,7 +43,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
       id: step.id,
       createdAt: step.createdAt,
       threadId: step.buildId,
-      home: agent.machineId,
+      boundAgent: agent,
       holdReason: step.holdReason,
       holdUntil: step.holdUntil,
       chiefId: chiefThread.chiefId,
@@ -53,7 +53,11 @@ export function stepQueueProjector(db: Db, teamId: string) {
     .innerJoin(chief, eq(chiefThread.chiefId, chief.id))
     .innerJoin(agent, eq(chief.agentId, agent.id))
     .where(and(eq(step.status, 'pending'), eq(step.kind, 'chief'), eq(chiefThread.teamId, teamId)))
-    .all();
+    .all()
+    .map(({ boundAgent, ...row }) => ({
+      ...row,
+      home: routedChiefAgent(db, teamId, boundAgent).machineId,
+    }));
   const queue = [...workerQueue, ...chiefRows].sort(
     (a, b) => a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1),
   );
