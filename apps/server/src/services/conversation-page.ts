@@ -6,9 +6,9 @@ import { HttpError } from '../lib/errors.js';
 
 const CONVERSATION_MAX_CHARS = 60000;
 
-function summary(content: unknown): string {
+export function messageText(content: unknown): string {
   if (typeof content === 'string') return content;
-  if (Array.isArray(content)) return content.map(summary).join('\n');
+  if (Array.isArray(content)) return content.map(messageText).join('\n');
   if (content === null || typeof content !== 'object') return '';
   const block = content as Record<string, unknown>;
   if (block.type === 'text' && typeof block.text === 'string') return block.text;
@@ -67,7 +67,7 @@ export function readConversationPage(db: Db, conversationId: string, before?: st
     const item = {
       id: row.id,
       role: row.role,
-      content: summary(row.content),
+      content: messageText(row.content),
       createdAt: row.createdAt,
     };
     messages.push(item);
@@ -84,7 +84,7 @@ export function readConversationPage(db: Db, conversationId: string, before?: st
       const available = CONVERSATION_MAX_CHARS - JSON.stringify(page).length;
       let low = 0;
       let high = Math.max(0, available);
-      const text = summary(row.content);
+      const text = messageText(row.content);
       while (low < high) {
         const mid = Math.ceil((low + high) / 2);
         item.content = text.slice(0, mid);

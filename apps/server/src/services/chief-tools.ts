@@ -38,6 +38,7 @@ import {
   stopActiveStepsAfterExit,
 } from './builds.js';
 import { addChiefWatch, clearChiefWake, removeChiefWatches, setChiefWake } from './chief.js';
+import { readHistory, searchHistory } from './chief-history.js';
 import { askUserQuestionsOfParams, createOrGetQuestion } from './chief-questions.js';
 import { readConversationPage } from './conversation-page.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
@@ -481,6 +482,16 @@ export async function executeChiefTool(
       const conversationId = str(params, 'conversationId');
       return json(readConversationPage(db, conversationId, optStr(params, 'before')));
     }
+    case 'search_history':
+      return json(
+        await searchHistory(db, ctx, {
+          query: str(params, 'query'),
+          limit: num(params, 'limit'),
+          before: optStr(params, 'before'),
+        }),
+      );
+    case 'read_history':
+      return json(readHistory(db, ctx, strArr(params, 'ids')));
 
     case 'create_todo': {
       const projectId = str(params, 'projectId');
