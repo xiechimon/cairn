@@ -89,7 +89,10 @@ export const EN: Record<string, string> = {
   'Coordinator 判断，拿不准会问你': 'The Coordinator decides and asks when unsure',
   换项目: 'Move project',
   已转给任务: 'Passed to task',
-  '来自任务 #{n} {title} 的消息': 'Message from task #{n} {title}',
+  '任务 #{n} {title}：{status}': 'Task #{n} {title}: {status}',
+  审阅中: 'In review',
+  '已完成，未验证': 'Done, not verified',
+  已验证: 'Verified',
   定时: 'Schedules',
   '执行中 {n}': '{n} running',
   项目: 'Project', // sidebar group / search group / schedule-form field — one fit
@@ -1525,4 +1528,12 @@ export const EN: Record<string, string> = {
   '还没有 {vendor} 账户': 'No account for {vendor} yet',
   '还没有路由，添加一个订阅账户后这里会画出每种用途走哪个连接。':
     'No routing yet. Add a subscription account and this shows which connection each use runs on.',
+  '直接发给 #{seq}，插进它这一轮。': 'Goes straight to #{seq}, into its current turn.',
+  '作为改计划的意见发给 #{seq}，不算批准。': 'Plan feedback for #{seq}, not an approval.',
+  '#{seq} 会带着这句话重跑。': 'Reruns #{seq} with this note.',
+  '已发给 #{seq}。': 'Sent to #{seq}.',
+  '没发出去，再试一次。': 'Not sent. Try again.',
+  '回复 #{seq}': 'Reply to #{seq}',
+  '回复 #{seq}…': 'Reply to #{seq}…',
+  '你直接对 #{n} 说：{excerpt}': 'You told #{n} directly: {excerpt}',
 };

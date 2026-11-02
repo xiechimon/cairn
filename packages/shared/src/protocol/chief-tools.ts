@@ -106,6 +106,8 @@ const obj = (properties: Record<string, unknown>, required: string[] = []) => ({
   ...(required.length > 0 ? { required } : {}),
 });
 const num = (description: string) => ({ type: 'number', description });
+const PROVENANCE_PARAM =
+  'What caused this message. Required in event turns (prompt starts with [wake:…]): copy the value after provenance= on the first prompt line. Omit in turns the user started.';
 
 export const GITHUB_READ_PER_PAGE_MAX = {
   issues: 30,
@@ -664,14 +666,18 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
           ),
           'Questions to ask in this call (1-4); each renders one block on the card.',
         ),
+        provenance: str(PROVENANCE_PARAM),
       },
       ['questions'],
     ),
   },
   {
     name: 'notify_user',
-    description: 'Push an in-app notification to the user (chief_message event).',
-    parameters: obj({ message: str('Notification body.') }, ['message']),
+    description:
+      'Tell the user something they need to know: posts a notice into this conversation and an in-app notification. In event turns this and ask_user are the only ways to reach the user.',
+    parameters: obj({ message: str('Notification body.'), provenance: str(PROVENANCE_PARAM) }, [
+      'message',
+    ]),
   },
   {
     name: 'save_memory',

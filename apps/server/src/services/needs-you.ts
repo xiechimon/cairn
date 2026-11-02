@@ -1,6 +1,7 @@
 import type { NeedsYouQuery, NeedsYouReason } from '@cairn/shared';
 import { isProviderAuthFailure } from '@cairn/shared';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
+import type { Db } from '../db/client.js';
 import { build, project, step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
@@ -41,10 +42,10 @@ export function failureNeedsHuman(errorMessage: string): boolean {
   return MISSING_CREDENTIALS.some((mark) => lower.includes(mark.toLowerCase()));
 }
 
-function lastStepScheduledBuildIds(deps: BuildDeps, buildIds: string[]): Set<string> {
+function lastStepScheduledBuildIds(db: Db, buildIds: string[]): Set<string> {
   if (buildIds.length === 0) return new Set();
   const latestByBuild = new Map<string, { scheduleId: string | null; createdAt: number }>();
-  for (const row of deps.db
+  for (const row of db
     .select({ buildId: step.buildId, scheduleId: step.scheduleId, createdAt: step.createdAt })
     .from(step)
     .where(inArray(step.buildId, buildIds))
@@ -67,6 +68,13 @@ function owedAutomaticRetry(
   return buildRow.prevPhase !== 'failed';
 }
 
+export function failureAwaitsAutomaticRetry(
+  db: Db,
+  buildRow: { id: string; errorMessage: string | null; prevPhase: string | null },
+): boolean {
+  return owedAutomaticRetry(buildRow, lastStepScheduledBuildIds(db, [buildRow.id]));
+}
+
 export function listNeedsYou(deps: BuildDeps, teamId: string, now = nowMs()): NeedsYouQuery {
   const rows = deps.db
     .select()
@@ -87,7 +95,7 @@ export function listNeedsYou(deps: BuildDeps, teamId: string, now = nowMs()): Ne
     ).map((row) => [row.id, row]),
   );
   const scheduledBuildIds = lastStepScheduledBuildIds(
-    deps,
+    deps.db,
     rows.flatMap((row) =>
       row.phase === 'failed' && row.latestBuildId !== null ? [row.latestBuildId] : [],
     ),
@@ -138,7 +146,7 @@ export async function sweepFailedRetries(deps: BuildDeps): Promise<void> {
     const buildRow = deps.db.select().from(build).where(eq(build.id, row.latestBuildId)).get();
     if (
       buildRow === undefined ||
-      !owedAutomaticRetry(buildRow, lastStepScheduledBuildIds(deps, [row.latestBuildId]))
+      !owedAutomaticRetry(buildRow, lastStepScheduledBuildIds(deps.db, [row.latestBuildId]))
     ) {
       continue;
     }

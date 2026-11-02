@@ -12,6 +12,7 @@ import { agent, build, chief, chiefThread, type step, todo } from '../db/schema.
 import { HttpError, parseWith } from '../lib/errors.js';
 import { attachWorkerFile } from './agent-attachments.js';
 import { NotFoundError } from './builds.js';
+import { requireTurnProvenance } from './chief.js';
 import { assertChiefDigestTool } from './chief-digest.js';
 import {
   ASK_HOLD_MS,
@@ -45,10 +46,12 @@ export async function machineAsk(
     vapidKeys: deps.vapidKeys,
     ...(deps.convHub !== undefined ? { convHub: deps.convHub } : {}),
   };
+  const provenance = requireTurnProvenance(row.prompt, body.provenance, 'ask_user');
   const { content } = createOrGetQuestion(qDeps, {
     threadId: row.buildId,
     requestId: body.requestId,
     questions: body.questions,
+    provenance,
   });
   const final =
     content.status === 'pending'
@@ -119,6 +122,7 @@ export async function executeRelayToolCall(
       threadId,
       chiefAgentId: chiefRow.agentId,
       conversationId: threadId,
+      turnPrompt: row.prompt,
     },
     name,
     params,

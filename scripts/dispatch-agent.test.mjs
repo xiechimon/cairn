@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -15,26 +15,42 @@ function runCli(args, statusDir, env = {}) {
   });
 }
 
-async function logShows(path, text) {
-  for (let attempt = 0; attempt < 100; attempt++) {
-    if (readFileSync(path, 'utf8').includes(text)) return true;
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-  return false;
-}
+const POLL_CEILING_MS = 30_000;
 
-async function waitUntilDead(pid) {
-  for (let attempt = 0; attempt < 100; attempt++) {
-    try {
-      process.kill(pid, 0);
-    } catch {
-      return;
-    }
+async function pollUntil(done) {
+  const deadline = Date.now() + POLL_CEILING_MS;
+  while (Date.now() < deadline) {
+    if (done()) return true;
     await new Promise((resolve) => {
       setTimeout(resolve, 50);
     });
   }
-  assert.fail(`pid ${pid} is still signalable`);
+  return done();
+}
+
+function logShows(path, text) {
+  return pollUntil(() => readFileSync(path, 'utf8').includes(text));
+}
+
+function supervisorPid(statusDir, id) {
+  try {
+    return JSON.parse(readFileSync(join(statusDir, `${id}.json`), 'utf8')).pid ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+async function waitUntilDead(pid) {
+  if (!(pid > 0)) return;
+  const dead = await pollUntil(() => {
+    try {
+      process.kill(pid, 0);
+      return false;
+    } catch {
+      return true;
+    }
+  });
+  assert.ok(dead, `pid ${pid} is still signalable`);
 }
 
 test('start verifies the process and writes the status file', async () => {
@@ -69,9 +85,18 @@ test('start verifies the process and writes the status file', async () => {
 
 test('check reports alive while the job runs and missing after it exits', async () => {
   const statusDir = mkdtempSync(join(tmpdir(), 'dispatch-agent-test-'));
+  const release = join(statusDir, 'release');
   try {
     const start = runCli(
-      ['start', 'short', '--', process.execPath, '-e', 'setTimeout(() => {}, 3000)'],
+      [
+        'start',
+        'short',
+        '--',
+        process.execPath,
+        '-e',
+        'const { existsSync } = require("node:fs"); setInterval(() => existsSync(process.argv[1]) && process.exit(0), 50); setTimeout(() => process.exit(1), 60000)',
+        release,
+      ],
       statusDir,
     );
     assert.equal(start.status, 0, `${start.stdout}${start.stderr}`);
@@ -79,12 +104,15 @@ test('check reports alive while the job runs and missing after it exits', async 
     const first = runCli(['check', 'short'], statusDir);
     assert.equal(first.status, 0, `${first.stdout}${first.stderr}`);
     assert.match(first.stdout, new RegExp(`pid ${record.pid} alive`));
+    writeFileSync(release, '');
     await waitUntilDead(record.pid);
     const second = runCli(['check', 'short'], statusDir);
     assert.equal(second.status, 1);
     assert.match(`${second.stdout}${second.stderr}`, /process missing/);
     assert.equal(JSON.parse(readFileSync(join(statusDir, 'short.json'), 'utf8')).alive, false);
   } finally {
+    writeFileSync(release, '');
+    await waitUntilDead(supervisorPid(statusDir, 'short'));
     rmSync(statusDir, { recursive: true, force: true });
   }
 });

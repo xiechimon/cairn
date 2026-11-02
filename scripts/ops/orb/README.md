@@ -98,8 +98,10 @@ works with the user unit's `ProtectHome=yes`. Binary content and mode converge
 on reruns. Existing networkd-managed host links or earlier network configuration
 files stop the installer before changes.
 The image contains Node, pinned Claude Code/Codex CLIs and the repository's
-pnpm (the `packageManager` version in the root `package.json`), installed with
-npm lifecycle scripts disabled. Node 25 and later ship no corepack, so project
+pnpm, installed with npm lifecycle scripts disabled. The pnpm version lives in
+`pnpm.version` beside the script, because `cairn-ops-run` materializes only
+`scripts/ops/orb`; `shell.test.mjs` fails when it differs from the root
+`packageManager`. Node 25 and later ship no corepack, so project
 setup hooks and agents in the Orb need pnpm on the image's PATH. The image
 installs no daemon package or production dependencies.
 `/etc/cairn-orb-image` records `node_major`, `claude`, `codex`, `pnpm`,

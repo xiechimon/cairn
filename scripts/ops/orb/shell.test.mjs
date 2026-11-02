@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -318,6 +319,26 @@ test('relay binds only its expected bridge and forwards only to loopback', () =>
   }
 });
 
+test("the Orb pnpm pin matches the repository's packageManager", () => {
+  assert.equal(readFileSync(join(source, 'pnpm.version'), 'utf8'), `${repoPnpm}\n`);
+});
+
+test('image dry-run works from a checkout of only scripts/ops/orb, as cairn-ops-run materializes it', () => {
+  const f = fixture();
+  try {
+    const orbOnly = join(f.root, 'materialized/scripts/ops/orb');
+    cpSync(source, orbOnly, { recursive: true });
+    const result = spawnSync('/bin/bash', [join(orbOnly, 'build-image.sh'), '--dry-run'], {
+      env: f.env,
+      encoding: 'utf8',
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.ok(result.stdout.includes(` pnpm@${repoPnpm};`));
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
 test("guest image pins the repo's pnpm through npm, not corepack, and verifies it as agent", () => {
   const script = readFileSync(join(source, 'build-image.sh'), 'utf8');
   assert.doesNotMatch(script, /corepack/);
@@ -331,7 +352,7 @@ test("guest image runs only Claude Code's own native installer and verifies both
   const script = readFileSync(join(source, 'build-image.sh'), 'utf8');
   const install = script.indexOf('npm install --global --ignore-scripts');
   const native = script.indexOf('node install.cjs');
-  const claudeCheck = script.indexOf('runuser -u agent -- claude --version');
+  const claudeCheck = script.indexOf('runuser -u agent -- /usr/bin/claude --version');
   const codexCheck = script.indexOf('runuser -u agent -- codex --version');
   assert.ok(install >= 0, 'global CLI install keeps --ignore-scripts');
   assert.ok(native > install, "Claude Code's install.cjs runs after the scripted-off install");
