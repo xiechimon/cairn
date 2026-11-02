@@ -111,6 +111,12 @@ export const homeC: FixtureSet = {
       todoId: 'home-c-idle',
       todo: { ...scheduleOnce.todo, seqNum: 2240, title: 'Sidebar status groups', phase: 'todo' },
     },
+    {
+      ...scheduleOnce,
+      id: 'home-c-schedule-running',
+      todoId: 'home-c-working-c',
+      todo: { ...scheduleOnce.todo, seqNum: 75, title: 'Orb canary round 7', phase: 'building' },
+    },
   ],
   now: r7(20, 30),
 };

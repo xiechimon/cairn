@@ -40,7 +40,7 @@ test('an idle row opens its thread', async ({ page }) => {
   await expect(page).toHaveURL(/\/app\/todo\/home-c-idle/);
 });
 
-test('schedules sit in the idle group once, without repeating their task, and link to the full schedules page', async ({ page }) => {
+test('a schedule sits in idle once, never beside its own running or idle task, and links to the full schedules page', async ({ page }) => {
   await page.goto(`${HOME}&pane=tasks`);
   const idle = panel(page).locator('[data-slot="stone-group"][data-tone="idle"]');
   await expect(idle.locator('[data-slot="thread-row"]').filter({ hasText: '#1' })).toHaveCount(1);
@@ -48,6 +48,7 @@ test('schedules sit in the idle group once, without repeating their task, and li
     idle.locator('[data-slot="thread-row"]').filter({ hasText: 'Sidebar status groups' }),
   ).toHaveCount(1);
   await expect(idle.locator('[data-slot="thread-row"]')).toHaveCount(2);
+  await expect(idle).not.toContainText('Orb canary round 7');
   await panel(page).getByRole('link', { name: '管理定时' }).click();
   await expect(page).toHaveURL(/\/app\/schedules/);
 });

@@ -52,10 +52,13 @@ export function WorkPanel({ pane, todos, schedules, now, onClose }: WorkPanelPro
   );
   const needsYou = needsYouThreads(todos);
   const running = todos.filter((todo) => threadStatus(todo) === 'running' && live(todo));
-  const scheduled = new Set(schedules.map((schedule) => schedule.todoId));
+  const active = new Set([...needsYou, ...running].map((todo) => todo.id));
+  const waitingSchedules = schedules.filter((schedule) => !active.has(schedule.todoId));
+  const scheduled = new Set(waitingSchedules.map((schedule) => schedule.todoId));
   const idle = todos.filter(
     (todo) => threadStatus(todo) === 'idle' && live(todo) && !scheduled.has(todo.id),
   );
+
   const made = todos
     .filter((todo) => threadStatus(todo) === 'done' && live(todo))
     .sort((a, b) => b.phaseAt - a.phaseAt);
@@ -90,11 +93,11 @@ export function WorkPanel({ pane, todos, schedules, now, onClose }: WorkPanelPro
               tone="idle"
               label={t('空闲')}
               {...fold('idle')}
-              count={idle.length + schedules.length}
+              count={idle.length + waitingSchedules.length}
               emptyHint={t('没有空闲的任务')}
             >
               {idle.map((todo) => row(todo, 'idle'))}
-              {schedules.map((schedule) => (
+              {waitingSchedules.map((schedule) => (
                 <ThreadRow
                   key={schedule.id}
                   title={`#${schedule.todo.seqNum} ${schedule.todo.title}`}
