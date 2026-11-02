@@ -268,6 +268,25 @@
         }
       }
     },
+    "chief-daily-report": {
+      "recipe": null,
+      "cases": {
+        "report-retro-accept": {
+          "script": "docs/verify/2592/drive-chief-daily-report.mjs",
+          "args": [],
+          "needs": [
+            "stack",
+            "fresh-stack"
+          ],
+          "status": "current",
+          "purpose": "The real scheduler queues one 08:00 report run on the hidden digest thread; a fake machine claims it over the machine wire with read-only tools (a write call is 403) and answers with a sourced and a sourceless retro finding; the posted report reads yesterday from the ledger, counts Needs-you, drops the sourceless finding, writes no memory, and accepting the draft in the browser creates an unstarted thread.",
+          "usage": "Evidence goes to VERIFY_EVIDENCE_DIR, else .claude/verify-evidence/<timestamp>-2592-daily-report",
+          "evidence": {
+            "env": "VERIFY_EVIDENCE_DIR"
+          }
+        }
+      }
+    },
     "chief-dispatch-judgment": {
       "recipe": "features/chief-dispatch-judgment.md",
       "cases": {

@@ -17,7 +17,9 @@ if (!existsSync(portsFile)) {
 const stack = JSON.parse(readFileSync(portsFile, 'utf8'));
 const SERVER = `http://127.0.0.1:${stack.serverPort}`;
 const WEB = `http://127.0.0.1:${stack.webPort}`;
-const EVIDENCE = process.env.VERIFY_EVIDENCE_DIR ?? join(SCRIPT_DIR, 'evidence');
+const EVIDENCE =
+  process.env.VERIFY_EVIDENCE_DIR ??
+  join(REPO, `.claude/verify-evidence/${new Date().toISOString().replace(/[:.]/g, '-')}-2592-daily-report`);
 mkdirSync(EVIDENCE, { recursive: true });
 
 const require = createRequire(join(REPO, 'apps/server/package.json'));
@@ -25,7 +27,14 @@ const Database = require('better-sqlite3');
 const db = new Database(join(stack.homeDir, 'server', 'server.db'));
 db.pragma('busy_timeout = 5000');
 
-const TZ = 'Asia/Shanghai';
+const OFFSET_HOURS = [...Array(27).keys()]
+  .map((i) => i - 12)
+  .find((h) => {
+    const local = (new Date().getUTCHours() + h + 24) % 24;
+    return local >= 9 && local <= 22;
+  });
+const TZ = OFFSET_HOURS === 0 ? 'Etc/GMT' : `Etc/GMT${OFFSET_HOURS > 0 ? '-' : '+'}${Math.abs(OFFSET_HOURS)}`;
+const OFFSET = `${OFFSET_HOURS < 0 ? '-' : '+'}${String(Math.abs(OFFSET_HOURS)).padStart(2, '0')}:00`;
 const checks = [];
 function check(name, ok, detail) {
   checks.push({ name, ok, detail: detail ?? null });
@@ -54,9 +63,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const today = new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date());
 const yesterday = new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(
-  new Date(Date.parse(`${today}T12:00:00+08:00`) - 86_400_000),
+  new Date(Date.parse(`${today}T12:00:00${OFFSET}`) - 86_400_000),
 );
-const at = (hhmm) => Date.parse(`${yesterday}T${hhmm}:00+08:00`);
+const at = (hhmm) => Date.parse(`${yesterday}T${hhmm}:00${OFFSET}`);
 
 const teams = await (await fetch(`${SERVER}/api/teams`)).json();
 const teamId = (Array.isArray(teams) ? teams : teams.teams)[0].id;
