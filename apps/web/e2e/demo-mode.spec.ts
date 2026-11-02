@@ -171,6 +171,10 @@ test('the selling points browse end to end with no backend traffic', async ({ pa
 test('write: a new task is blocked with the toast and nothing is added', async ({ page }) => {
   const traffic = watchTraffic(page);
   await page.goto(`${demo.base}/app`);
+  await page
+    .getByRole('complementary')
+    .locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' })
+    .click();
   const input = page.getByTestId('home-c').getByTestId('chief-composer-input');
   await input.fill('演示里不该落库的任务');
   await input.press('Enter');
@@ -258,6 +262,10 @@ test('the blocked toast is English under the en locale', async ({ page }) => {
     localStorage.setItem('cairn-locale', 'en');
   });
   await page.goto(`${demo.base}/app`);
+  await page
+    .getByRole('complementary')
+    .locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' })
+    .click();
   const input = page.getByTestId('home-c').getByTestId('chief-composer-input');
   await input.fill('not saved');
   await input.press('Enter');
