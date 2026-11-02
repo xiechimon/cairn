@@ -12,7 +12,15 @@ function homeTodo(
   phase: TodoRecord['phase'],
   projectId: string,
 ): TodoRecord {
-  return { ...probeTodo(phase, r7(20, 10)), id, seqNum, title, spec: title, projectId };
+  return {
+    ...probeTodo(phase, r7(20, 10)),
+    id,
+    seqNum,
+    title,
+    spec: title,
+    projectId,
+    latestBuildId: phase === 'todo' ? null : `build-${id}`,
+  };
 }
 
 const conversation: ChiefContent = {
