@@ -129,6 +129,46 @@ describe('worker reports in the chief conversation', () => {
     },
   );
 
+  test.each([
+    ['no gate state', undefined],
+    ['a gate state with no judged head', null],
+  ] as const)('a passing verify verdict with %s is not verified', async (_label, judgedHead) => {
+    const { deps, todoId } = await seedTask(true);
+    H.s.db
+      .insert(build)
+      .values({ id: 'build-u', todoId, triggerSource: 'chief', withPlan: false, createdAt: 1 })
+      .run();
+    H.s.db.update(todo).set({ latestBuildId: 'build-u' }).where(eq(todo.id, todoId)).run();
+    if (judgedHead !== undefined)
+      H.s.db
+        .insert(gateState)
+        .values({
+          buildId: 'build-u',
+          ready: true,
+          policy: 'autonomous',
+          headSha: judgedHead,
+          patchDigest: null,
+          blockers: [],
+          evaluatedAt: 2,
+        })
+        .run();
+    H.s.db
+      .insert(gateVerdict)
+      .values({
+        stepId: 'verify-unbound',
+        buildId: 'build-u',
+        kind: 'verify',
+        outcome: 'pass',
+        headSha: 'head-1',
+        expectedHeadSha: 'head-1',
+        createdAt: 2,
+      })
+      .run();
+    setTodoPhase(deps, todoId, 'done');
+    const [report] = await messages();
+    expect(JSON.parse(report!.content as string)).toMatchObject({ phase: 'done', verified: false });
+  });
+
   test('two reports queued behind a busy chief identify distinct wake steps', async () => {
     const { deps, todoId: firstId } = await seedTask(true);
     const { todoId: secondId } = await seedTask(true);
