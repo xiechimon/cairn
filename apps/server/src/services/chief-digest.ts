@@ -49,6 +49,7 @@ import {
   startReportRun,
   THREAD_FENCE_OPEN,
 } from './chief-report.js';
+import { coordinatorServerContextEnabled } from './coordinator-context.js';
 import type { ConversationStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { listMemoryEntries, saveMemoryEntry } from './memory.js';
@@ -87,7 +88,7 @@ export function assertChiefDigestTool(threadId: string, name: string): void {
   }
 }
 
-interface DigestDeps {
+export interface DigestDeps {
   db: Db;
   machineHub?: MachineWakeHub;
   convHub?: ConversationStreamHub;
@@ -208,7 +209,10 @@ function foldCandidate(
   const daily =
     allowDaily && reportHourReached(now, tz) && localDay(stats.first, tz) < localDay(now, tz);
   const threshold =
-    !daily && (stats.chars ?? 0) >= CHIEF_DIGEST_THRESHOLD_CHARS && !threadBusy(db, thread);
+    !daily &&
+    !coordinatorServerContextEnabled() &&
+    (stats.chars ?? 0) >= CHIEF_DIGEST_THRESHOLD_CHARS &&
+    !threadBusy(db, thread);
   if (!daily && !threshold) return null;
   return { since, reason: daily ? 'daily' : 'threshold' };
 }
@@ -259,7 +263,7 @@ function digestMeta(threadId: string, last: CoordinatorLine, reason: FoldCandida
   return `\nDigest thread=${threadId} until=${last.at} last=${last.id} reason=${reason}`;
 }
 
-function queueDigestStep(
+export function queueDigestStep(
   deps: DigestDeps,
   chiefRow: typeof chief.$inferSelect,
   prompt: string,
