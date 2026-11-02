@@ -367,7 +367,7 @@ jobs:
 
       - name: Dispatch agent start/check round trip (#1556)
         if: ${{ !cancelled() }}
-        run: node --test scripts/dispatch-agent.test.mjs scripts/dispatch-dedupe.test.mjs scripts/lane-model-policy.test.mjs
+        run: node --test scripts/dispatch-agent.test.mjs scripts/dispatch-dedupe.test.mjs scripts/lane-model-policy.test.mjs scripts/pr-body-hook.test.mjs
 
       - name: Mergify queue config follows pr-gate routing
         if: ${{ !cancelled() }}
