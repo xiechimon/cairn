@@ -19,7 +19,7 @@ function pageBefore(history: Row[], size: number, before: string | null) {
   };
 }
 
-async function mockPagedHistory(page: Page, total = 250, size = 100) {
+async function mockPagedHistory(page: Page, total = 250, size = 100, olderFails = false) {
   const history = historyOf(total);
   const requested: (string | null)[] = [];
   await mockLive(page, { threads: [THREAD], messages: [] }, (path, route, json) => {
@@ -27,6 +27,7 @@ async function mockPagedHistory(page: Page, total = 250, size = 100) {
     if (route.request().method() !== 'GET') return undefined;
     const before = new URL(route.request().url()).searchParams.get('before');
     requested.push(before);
+    if (olderFails && before !== null) return json({ error: 'older page failed' }, 500);
     return json(pageBefore(history, size, before));
   });
   return requested;
@@ -89,4 +90,17 @@ test('a newest page too short to fill the view keeps loading older pages until h
   expect(requested).toEqual([null, 'h-0006', 'h-0003']);
   await expect(row(page, 'question 8')).toBeInViewport();
   await expect(page.getByTestId('home-c-earlier')).toHaveCount(0);
+});
+
+test('a failing older page is not retried on its own while the reader stays at the top', async ({
+  page,
+}) => {
+  const requested = await mockPagedHistory(page, 250, 100, true);
+  await page.goto('/app');
+  await expect(row(page, 'answer 249')).toBeInViewport();
+  await offsetOf(page, 'question 150', true);
+  await expect.poll(() => requested.filter((before) => before !== null).length).toBe(2);
+  await page.waitForTimeout(3_000);
+  expect(requested.filter((before) => before !== null)).toHaveLength(2);
+  await expect(row(page, 'question 150')).toHaveCount(1);
 });

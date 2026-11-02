@@ -54,20 +54,28 @@ export function ChiefEarlierLoader({
   viewportRef: RefObject<HTMLDivElement | null>;
 }) {
   const anchorRef = useRef<Anchor | null>(null);
-  const { loading, onLoad } = earlier;
-  const maybeLoad = useCallback(() => {
-    const viewport = viewportRef.current;
-    if (!hasEarlier || loading || anchorRef.current !== null || viewport === null) return;
-    if (!wantsEarlier(viewport)) return;
-    anchorRef.current = readAnchor(viewport);
-    onLoad();
-  }, [hasEarlier, loading, onLoad, viewportRef]);
+  const { loading, failed, onLoad } = earlier;
+  const maybeLoad = useCallback(
+    (byScroll: boolean) => {
+      const viewport = viewportRef.current;
+      if (viewport === null) return;
+      if (anchorRef.current !== null) {
+        anchorRef.current = readAnchor(viewport);
+        return;
+      }
+      if (!hasEarlier || loading || (failed && !byScroll) || !wantsEarlier(viewport)) return;
+      anchorRef.current = readAnchor(viewport);
+      onLoad();
+    },
+    [hasEarlier, loading, failed, onLoad, viewportRef],
+  );
   useEffect(() => {
     const viewport = viewportRef.current;
     if (viewport === null) return;
-    maybeLoad();
-    viewport.addEventListener('scroll', maybeLoad, { passive: true });
-    return () => viewport.removeEventListener('scroll', maybeLoad);
+    maybeLoad(false);
+    const onScroll = () => maybeLoad(true);
+    viewport.addEventListener('scroll', onScroll, { passive: true });
+    return () => viewport.removeEventListener('scroll', onScroll);
   }, [maybeLoad, rowCount, viewportRef]);
   const wasLoading = useRef(loading);
   useLayoutEffect(() => {

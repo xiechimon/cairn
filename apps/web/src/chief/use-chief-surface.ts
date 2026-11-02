@@ -43,6 +43,7 @@ export type { ChiefView };
 
 export interface ChiefEarlier {
   loading: boolean;
+  failed: boolean;
   onLoad: () => void;
 }
 
@@ -219,12 +220,12 @@ export function useChiefSurface(
     liveThinking,
     activity,
   ]);
-  const { fetchNextPage, isFetchingNextPage } = chiefMessagesQ;
+  const { fetchNextPage, isFetchingNextPage, isFetchNextPageError } = chiefMessagesQ;
   const loadEarlier = useCallback(() => {
     void fetchNextPage();
   }, [fetchNextPage]);
   const earlier: ChiefEarlier | undefined = live
-    ? { loading: isFetchingNextPage, onLoad: loadEarlier }
+    ? { loading: isFetchingNextPage, failed: isFetchNextPageError, onLoad: loadEarlier }
     : undefined;
 
   const chiefData = live ? (liveChief ?? chiefDefault) : (chief ?? chiefDefault);
