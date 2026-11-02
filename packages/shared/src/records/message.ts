@@ -88,6 +88,79 @@ export const chiefDigestContentSchema = z.object({
 });
 export type ChiefDigestContent = z.infer<typeof chiefDigestContentSchema>;
 
+export const CHIEF_REPORT_KIND = 'chief_daily_report';
+export const CHIEF_REPORT_ROW_ID_PREFIX = 'chief-report-';
+export const CHIEF_REPORT_REF_MAX = 8;
+export const CHIEF_REPORT_RETRO_MAX = 5;
+
+const chiefReportTodoRefSchema = z.object({
+  id: z.string(),
+  seq: z.number().int(),
+  title: z.string(),
+});
+export type ChiefReportTodoRef = z.infer<typeof chiefReportTodoRefSchema>;
+
+const chiefReportPrRefSchema = chiefReportTodoRefSchema.extend({
+  prNumber: z.number().int().nullable(),
+  prUrl: z.string().nullable(),
+});
+export type ChiefReportPrRef = z.infer<typeof chiefReportPrRefSchema>;
+
+export const RETRO_PROPOSAL_STATUSES = ['draft', 'accepted', 'dismissed'] as const;
+export const retroProposalStatusSchema = z.enum(RETRO_PROPOSAL_STATUSES);
+export type RetroProposalStatus = z.infer<typeof retroProposalStatusSchema>;
+
+export const RETRO_SOURCE_KINDS = ['coordinator', 'thread', 'step'] as const;
+
+export const retroProposalSchema = z.object({
+  id: z.string(),
+  title: z.string().min(1).max(120),
+  what: z.string().min(1).max(400),
+  why: z.string().min(1).max(400),
+  safeguard: z.string().min(1).max(400),
+  source: z.object({
+    kind: z.enum(RETRO_SOURCE_KINDS),
+    id: z.string(),
+    label: z.string(),
+    todoId: z.string().nullable(),
+  }),
+  projectId: z.string(),
+  status: retroProposalStatusSchema,
+  todoId: z.string().nullable(),
+});
+export type RetroProposal = z.infer<typeof retroProposalSchema>;
+
+export const chiefReportLedgerSchema = z.object({
+  finished: z.array(chiefReportTodoRefSchema),
+  finishedCount: z.number().int(),
+  merged: z.array(chiefReportPrRefSchema),
+  mergedCount: z.number().int(),
+  failed: z.array(chiefReportTodoRefSchema),
+  failedCount: z.number().int(),
+  retries: z.number().int(),
+  quotaWaits: z.number().int(),
+  verdicts: z.object({ pass: z.number().int(), block: z.number().int() }),
+});
+export type ChiefReportLedger = z.infer<typeof chiefReportLedgerSchema>;
+
+export const chiefReportContentSchema = z.object({
+  kind: z.literal(CHIEF_REPORT_KIND),
+  day: z.string(),
+  covers: z.string(),
+  status: z.enum(['posted', 'retrying', 'failed']),
+  madeAt: z.number(),
+  yesterday: chiefReportLedgerSchema,
+  needsYou: z.object({
+    count: z.number().int(),
+    todos: z.array(chiefReportTodoRefSchema),
+    questions: z.number().int(),
+  }),
+  retro: z.array(retroProposalSchema),
+  retroRan: z.boolean(),
+  truncated: z.array(z.string()),
+});
+export type ChiefReportContent = z.infer<typeof chiefReportContentSchema>;
+
 export const CHIEF_TURN_STOPPED_KIND = 'chief_turn_stopped';
 export const chiefTurnStoppedContentSchema = z.object({
   kind: z.literal(CHIEF_TURN_STOPPED_KIND),
