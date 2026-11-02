@@ -352,7 +352,7 @@ test("guest image runs only Claude Code's own native installer and verifies both
   const script = readFileSync(join(source, 'build-image.sh'), 'utf8');
   const install = script.indexOf('npm install --global --ignore-scripts');
   const native = script.indexOf('node install.cjs');
-  const claudeCheck = script.indexOf('runuser -u agent -- claude --version');
+  const claudeCheck = script.indexOf('runuser -u agent -- /usr/bin/claude --version');
   const codexCheck = script.indexOf('runuser -u agent -- codex --version');
   assert.ok(install >= 0, 'global CLI install keeps --ignore-scripts');
   assert.ok(native > install, "Claude Code's install.cjs runs after the scripted-off install");
