@@ -598,7 +598,8 @@ export function sdkTranscriptPath(cwd: string, sessionId: string): string {
 }
 
 const HOST_MCP_SERVER_NAME = 'cairn';
-const HOST_ALLOWED_TOOLS = [`mcp__${HOST_MCP_SERVER_NAME}`, 'Read', 'Glob', 'Grep'] as const;
+const HOST_BUILTIN_TOOLS = ['Read', 'Glob', 'Grep'] as const;
+const HOST_ALLOWED_TOOLS = [`mcp__${HOST_MCP_SERVER_NAME}`, ...HOST_BUILTIN_TOOLS] as const;
 
 function jsonSchemaToZod(schema: unknown, where: string): z.ZodType {
   if (typeof schema !== 'object' || schema === null || Array.isArray(schema)) {
@@ -886,7 +887,11 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
       ? { permissionMode: 'bypassPermissions' as const, allowDangerouslySkipPermissions: true }
       : { permissionMode: 'dontAsk' as const, allowedTools: [...HOST_ALLOWED_TOOLS] }),
     disallowedTools: parts.disallowedTools,
-    ...(parts.builtinTools !== undefined ? { tools: parts.builtinTools } : {}),
+    ...(parts.inOrb
+      ? parts.builtinTools !== undefined
+        ? { tools: parts.builtinTools }
+        : {}
+      : { tools: parts.builtinTools ?? [...HOST_BUILTIN_TOOLS] }),
     includePartialMessages: true,
     settingSources: [...CLAUDE_SETTING_SOURCES],
     ...mcpSection,
@@ -903,6 +908,7 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
     ...(parts.resumeId !== null ? { resume: parts.resumeId } : { sessionId: parts.sessionId }),
     settings: {
       env: claudeCliEnv({}),
+      ...(parts.inOrb ? {} : { disableAllHooks: true }),
       ...(parts.skillDenyRules !== undefined && parts.skillDenyRules.length > 0
         ? { permissions: { deny: [...parts.skillDenyRules] } }
         : {}),
@@ -915,7 +921,9 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
       ...parts.env,
       ...(parts.env?.CLAUDE_CODE_OAUTH_TOKEN !== undefined ? METERED_CLAUDE_AUTH_BLANK : {}),
     }),
-    ...(parts.plugins !== undefined && parts.plugins.length > 0 ? { plugins: parts.plugins } : {}),
+    ...(parts.inOrb && parts.plugins !== undefined && parts.plugins.length > 0
+      ? { plugins: parts.plugins }
+      : {}),
     abortController: parts.abortController,
   };
 }
@@ -1016,7 +1024,7 @@ export class ClaudeCodeBackend implements AgentBackend {
       resumeId,
       sessionId,
       disallowedTools,
-      inOrb: this.opts.inOrb ?? process.env.CAIRN_ORB === '1',
+      inOrb: this.opts.inOrb === true,
       ...(opts.remoteToolsOnly === true ? { builtinTools: [] } : {}),
       mcpServers,
       ...(managedMcp ? { strictMcpConfig: true } : {}),

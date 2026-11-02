@@ -242,14 +242,34 @@ describe('buildClaudeSdkOptions permission mode by execution place', () => {
     expect(opts.allowedTools).toBeUndefined();
   });
 
-  test('a host step never bypasses: cairn MCP and read-only tools only, Bash denied', () => {
-    const opts = buildClaudeSdkOptions({ ...baseParts(), inOrb: false, builtinTools: [] });
+  test('a host step never bypasses: only Read, Glob and Grep exist, hooks and plugins off', () => {
+    const opts = buildClaudeSdkOptions({
+      ...baseParts(),
+      inOrb: false,
+      plugins: [{ type: 'local', path: '/skills' }],
+    });
     expect(opts.permissionMode).toBe('dontAsk');
     expect(opts.allowDangerouslySkipPermissions).toBeUndefined();
+    expect(opts.tools).toEqual(['Read', 'Glob', 'Grep']);
     expect(opts.allowedTools).toEqual(['mcp__cairn', 'Read', 'Glob', 'Grep']);
-    for (const tool of ['Bash', 'Edit', 'Write', 'NotebookEdit', 'WebFetch'])
-      expect(opts.allowedTools).not.toContain(tool);
-    expect(opts.tools).toEqual([]);
+    expect(opts.settings).toMatchObject({ disableAllHooks: true });
+    expect(opts.plugins).toBeUndefined();
+  });
+
+  test('a host step that asks for no built-ins keeps none', () => {
+    expect(buildClaudeSdkOptions({ ...baseParts(), inOrb: false, builtinTools: [] }).tools).toEqual(
+      [],
+    );
+  });
+
+  test('an orb step keeps its tools, hooks and plugins', () => {
+    const opts = buildClaudeSdkOptions({
+      ...baseParts(),
+      plugins: [{ type: 'local', path: '/skills' }],
+    });
+    expect(opts.tools).toBeUndefined();
+    expect(opts.settings).not.toHaveProperty('disableAllHooks');
+    expect(opts.plugins).toEqual([{ type: 'local', path: '/skills' }]);
   });
 });
 
