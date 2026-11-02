@@ -851,6 +851,7 @@ export interface ClaudeSdkOptionParts {
   sessionId: string;
   disallowedTools: string[];
   builtinTools?: string[];
+  inOrb?: boolean;
   mcpServers: Record<string, McpServerConfig>;
   strictMcpConfig?: boolean;
   effort?: EffortLevel;
@@ -881,6 +882,7 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
     cwd: parts.cwd,
     model: parts.modelId,
     permissionMode: 'bypassPermissions',
+    ...(parts.inOrb === true ? { allowDangerouslySkipPermissions: true } : {}),
     disallowedTools: parts.disallowedTools,
     ...(parts.builtinTools !== undefined ? { tools: parts.builtinTools } : {}),
     includePartialMessages: true,
@@ -923,6 +925,7 @@ export function claudeSessionEnv(opts: SessionOpts): Record<string, string> | un
 }
 
 export interface ClaudeCodeBackendOpts {
+  inOrb?: boolean;
   skills?: { skillsDir: string; cwd: string };
   onSkillsLog?: (msg: string) => void;
   machineName?: string;
@@ -1011,6 +1014,7 @@ export class ClaudeCodeBackend implements AgentBackend {
       resumeId,
       sessionId,
       disallowedTools,
+      ...(this.opts.inOrb === true ? { inOrb: true } : {}),
       ...(opts.remoteToolsOnly === true ? { builtinTools: [] } : {}),
       mcpServers,
       ...(managedMcp ? { strictMcpConfig: true } : {}),

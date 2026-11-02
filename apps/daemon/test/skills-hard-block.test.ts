@@ -233,6 +233,30 @@ function baseParts() {
   };
 }
 
+describe('buildClaudeSdkOptions inside and outside an orb', () => {
+  test('an orb session opts in to the SDK permission bypass', () => {
+    const opts = buildClaudeSdkOptions({ ...baseParts(), inOrb: true });
+    expect(opts.permissionMode).toBe('bypassPermissions');
+    expect(opts.allowDangerouslySkipPermissions).toBe(true);
+  });
+
+  test('a host session builds exactly the options main builds', () => {
+    const host = buildClaudeSdkOptions(baseParts());
+    const { abortController: _a, ...rest } = host;
+    const { abortController: _b, ...explicit } = buildClaudeSdkOptions({
+      ...baseParts(),
+      inOrb: false,
+    });
+    expect(rest).toEqual(explicit);
+    expect(host.permissionMode).toBe('bypassPermissions');
+    expect(host.allowDangerouslySkipPermissions).toBeUndefined();
+    expect(host.settingSources).toEqual(['user', 'project', 'local']);
+    expect(host.tools).toBeUndefined();
+    expect(host.allowedTools).toBeUndefined();
+    expect(host.settings).not.toHaveProperty('disableAllHooks');
+  });
+});
+
 describe('buildClaudeSdkOptions (spec 14 §post-ruling scope 1/2: settingSources + deny hard block)', () => {
   test("settingSources always pinned to ['user','project','local'] ('project' = the brief-bearing slot, spec 24)", () => {
     const opts = buildClaudeSdkOptions(baseParts());
