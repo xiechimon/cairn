@@ -430,14 +430,14 @@ describe('chief digest execution surface (#1939)', () => {
     expect(captured[0]!.localTools).toBeUndefined();
   });
 
-  test('host lockdown: chief, review and verify sessions are locked down, build sessions are not', async () => {
+  test('host lockdown: chief and review sessions are locked down, verify and build sessions are not', async () => {
     const chief = await setup(claimedDigest);
     expect(chief.captured[0]!.lockedDown).toBe(true);
     const review = await setup(claimedReview('review', HOSTED_REPO));
     expect(review.captured[0]!.lockedDown).toBe(true);
     const base = claimedReview('review', HOSTED_REPO);
     const verify = await setup({ ...base, step: { ...base.step, kind: 'verify' } });
-    expect(verify.captured[0]!.lockedDown).toBe(true);
+    expect(verify.captured[0]!.lockedDown).toBeUndefined();
     const build = await setup({ ...base, step: { ...base.step, kind: 'build' } });
     expect(build.captured[0]!.lockedDown).toBeUndefined();
   });
