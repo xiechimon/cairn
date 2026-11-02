@@ -19,6 +19,7 @@ import {
   type SecretRecord,
   type SkillFact,
   type TagRecord,
+  type ThreadMessageContent,
   type ThreadReportContent,
   type UsageCost,
 } from '@cairn/shared';
@@ -70,6 +71,7 @@ export interface TodoRecord {
   sourceKind?: string | null;
   sourceRef?: string | null;
   usageCost?: UsageCost;
+  verified?: boolean;
 }
 
 export interface TokenUsageContent {
@@ -476,6 +478,7 @@ export interface ChiefSegment {
 
 export type ChiefStreamItem =
   | (ThreadReportContent & { id: string; projectId?: string | null })
+  | (ThreadMessageContent & { id: string; projectId?: string | null })
   | { kind: 'note'; text: string; machineName?: string }
   | { kind: 'error'; text: string }
   | { kind: 'handoff'; todoId: string; id?: string }
@@ -487,7 +490,7 @@ export type ChiefStreamItem =
       questions: {
         header: string;
         question: string;
-        options: { label: string; description?: string }[];
+        options: { label: string; description?: string; recommended?: boolean }[];
         multiSelect?: boolean;
       }[];
       answers: { header: string; choices?: string[]; text?: string }[] | null;

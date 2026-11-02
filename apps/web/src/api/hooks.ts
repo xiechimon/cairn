@@ -60,6 +60,7 @@ import type {
   TagRecord,
   TeamMember,
   TeamRecord,
+  ThreadMessageResult,
   TodoRecord,
   TokenUsage,
   UpdateSkillBody,
@@ -995,6 +996,19 @@ export function useApiMutations(teamId: string | undefined) {
       onSuccess: (_data, input) => {
         void qc.invalidateQueries({ queryKey: ['messages', input.conversationId] });
         void qc.invalidateQueries({ queryKey: ['steps', input.conversationId] });
+        void qc.invalidateQueries({ queryKey: ['todo'] });
+        void qc.invalidateQueries({ queryKey: ['todos', teamId] });
+      },
+    }),
+    messageThread: useMutation({
+      mutationFn: (input: { todoId: string; content: string }) =>
+        api.post<ThreadMessageResult>(`/api/todos/${input.todoId}/messages`, {
+          content: input.content,
+          clientMessageId: crypto.randomUUID(),
+        }),
+      onSuccess: (result) => {
+        void qc.invalidateQueries({ queryKey: ['messages'] });
+        void qc.invalidateQueries({ queryKey: ['steps', result.conversationId] });
         void qc.invalidateQueries({ queryKey: ['todo'] });
         void qc.invalidateQueries({ queryKey: ['todos', teamId] });
       },

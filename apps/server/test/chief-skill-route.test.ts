@@ -171,6 +171,7 @@ describe('claim-surface skill routing (#823)', () => {
     enqueueChiefStep({ db: s.db, hub: s.hub, machineHub: s.machineHub, user: s.user }, threadId, {
       prompt: '任务 #1 已合并完成（done）。请向用户汇报。',
       trigger: 'settle',
+      provenance: 'watch:test',
     });
     const claimed = await claim(await claimToken());
     expect(claimed.chief?.systemPrompt).not.toContain('发送后自动检测');

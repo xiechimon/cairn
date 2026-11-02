@@ -5913,6 +5913,9 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
               "minimum": -9007199254740991,
               "type": "integer",
             },
+            "verified": {
+              "type": "boolean",
+            },
             "waitingOn": {
               "additionalProperties": false,
               "properties": {
@@ -7257,6 +7260,11 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "method": "POST",
     "note": "clears the snooze",
     "path": "/api/todos/{id}/unsnooze",
+  },
+  {
+    "method": "POST",
+    "note": "body {content, clientMessageId}; a person messages the thread directly (steer, plan revision or restart by phase) and the Coordinator gets a thread-message row (D65)",
+    "path": "/api/todos/{id}/messages",
   },
   {
     "method": "POST",
@@ -9835,6 +9843,9 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
       "maximum": 9007199254740991,
       "minimum": -9007199254740991,
       "type": "integer",
+    },
+    "verified": {
+      "type": "boolean",
     },
     "waitingOn": {
       "additionalProperties": false,

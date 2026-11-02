@@ -111,8 +111,48 @@ export const threadReportContentSchema = z.object({
   seqNum: z.number().int().positive(),
   title: z.string(),
   wakeStepId: recordId.optional(),
+  verified: z.boolean().optional(),
 });
 export type ThreadReportContent = z.infer<typeof threadReportContentSchema>;
+
+export const THREAD_MESSAGE_EXCERPT_MAX = 280;
+
+export const threadMessageDeliverySchema = z.enum(['steer', 'new-turn', 'revision', 'restart']);
+export type ThreadMessageDelivery = z.infer<typeof threadMessageDeliverySchema>;
+
+export const threadMessageContentSchema = z.object({
+  kind: z.literal('thread-message'),
+  todoId: recordId,
+  seqNum: z.number().int().positive(),
+  title: z.string(),
+  excerpt: z.string().max(THREAD_MESSAGE_EXCERPT_MAX),
+  delivered: threadMessageDeliverySchema,
+  conversationId: recordId,
+});
+export type ThreadMessageContent = z.infer<typeof threadMessageContentSchema>;
+
+export const threadMessageBodySchema = z.object({
+  content: z.string().trim().min(1).max(20_000),
+  clientMessageId: z.string().min(1).max(200),
+});
+export type ThreadMessageBody = z.infer<typeof threadMessageBodySchema>;
+
+export const threadMessageResultSchema = z.object({
+  todoId: recordId,
+  conversationId: recordId,
+  delivered: threadMessageDeliverySchema,
+});
+export type ThreadMessageResult = z.infer<typeof threadMessageResultSchema>;
+
+export const CHIEF_NOTICE_KIND = 'chief_notice';
+export const PROVENANCE_MAX_LENGTH = 200;
+export const provenanceSchema = z.string().min(1).max(PROVENANCE_MAX_LENGTH);
+export const chiefNoticeContentSchema = z.object({
+  kind: z.literal(CHIEF_NOTICE_KIND),
+  message: z.string(),
+  provenance: provenanceSchema,
+});
+export type ChiefNoticeContent = z.infer<typeof chiefNoticeContentSchema>;
 
 export const ASK_USER_QUESTION_KIND = 'ask_user_question';
 
@@ -124,6 +164,7 @@ export const askUserQuestionSchema = z.object({
       z.object({
         label: z.string().min(1),
         description: z.string().optional(),
+        recommended: z.boolean().optional(),
       }),
     )
     .max(8),
@@ -150,6 +191,7 @@ export const askUserQuestionContentSchema = z.object({
   answers: z.array(askUserAnswerSchema).nullable(),
   cancelReason: z.string().optional(),
   parkedAt: z.number().int().optional(),
+  provenance: provenanceSchema.optional(),
 });
 export type AskUserQuestionContent = z.infer<typeof askUserQuestionContentSchema>;
 
@@ -162,6 +204,7 @@ export const ASK_REQUEST_ID_PATTERN = /^ask-[0-9a-f][0-9a-f-]{7,63}$/;
 export const machineAskBodySchema = z.object({
   requestId: z.string().regex(ASK_REQUEST_ID_PATTERN),
   questions: z.array(askUserQuestionSchema).min(1).max(4),
+  provenance: provenanceSchema.optional(),
 });
 export type MachineAskBody = z.infer<typeof machineAskBodySchema>;
 

@@ -149,7 +149,7 @@ claude_package="$(npm root --global)/@anthropic-ai/claude-code"
 [[ -f $claude_package/install.cjs ]] || { printf 'Claude Code package has no install.cjs; cannot place its native binary\n' >&2; exit 1; }
 (cd "$claude_package" && node install.cjs)
 useradd --uid "$3" --create-home --shell /bin/bash agent
-[[ $(runuser -u agent -- claude --version | awk 'NR == 1 {print $1}') == "$1" ]] || { printf 'Claude Code %s is not runnable by agent\n' "$1" >&2; exit 1; }
+[[ $(runuser -u agent -- /usr/bin/claude --version | awk 'NR == 1 {print $1}') == "$1" ]] || { printf 'Claude Code %s is not runnable by agent\n' "$1" >&2; exit 1; }
 [[ $(runuser -u agent -- codex --version | awk 'NR == 1 {print $NF}') == "$2" ]] || { printf 'codex %s is not runnable by agent\n' "$2" >&2; exit 1; }
 [[ $(cd /tmp && runuser -u agent -- pnpm --version) == "$5" ]] || { printf 'pnpm %s is not runnable by agent\n' "$5" >&2; exit 1; }
 passwd --lock root

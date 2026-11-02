@@ -1,6 +1,7 @@
 import type { AskUserAnswer } from '@cairn/shared';
 import { type CSSProperties, createContext, type ReactNode, useContext } from 'react';
 import { Link } from 'react-router';
+import { reportStatusWord } from '../board/status-words.js';
 import { ThinkingRow, ToolActivityRow } from '../components/chat/agent-rows.js';
 import { LivePulse, LiveRow, LiveSignal } from '../components/chat/live-row.js';
 import { TraceGroup, TraceRows, type TraceStepItem } from '../components/chat/trace-steps.js';
@@ -170,6 +171,7 @@ export function chiefStreamRowKey(item: ChiefStreamItem, index: number): string 
     case 'digest':
     case 'stopped':
     case 'thread-report':
+    case 'thread-message':
       return item.id ?? index;
     default:
       return index;
@@ -242,7 +244,23 @@ export function ChiefStreamRow({
         <Marker variant="separator" className={MARKER_NOTE_CLS} data-testid="thread-report-marker">
           <MarkerContent className={MARKER_CONTENT_CLS}>
             <Link to={`/app/todo/${item.todoId}`} className="hover:underline">
-              {t('来自任务 #{n} {title} 的消息', { n: item.seqNum, title: item.title })}
+              {t('任务 #{n} {title}：{status}', {
+                n: item.seqNum,
+                title: item.title,
+                status: t(reportStatusWord(item)),
+              })}
+            </Link>
+          </MarkerContent>
+        </Marker>
+      </MessageScrollerItem>
+    );
+  if (item.kind === 'thread-message')
+    return (
+      <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
+        <Marker variant="separator" className={MARKER_NOTE_CLS} data-testid="thread-message-marker">
+          <MarkerContent className={MARKER_CONTENT_CLS}>
+            <Link to={`/app/todo/${item.todoId}`} className="hover:underline">
+              {t('你直接对 #{n} 说：{excerpt}', { n: item.seqNum, excerpt: item.excerpt })}
             </Link>
           </MarkerContent>
         </Marker>

@@ -25,6 +25,7 @@ import {
   CHIEF_TURN_ERROR_KIND,
   chiefDigestContentSchema,
   chiefModelFallbackContentSchema,
+  chiefNoticeContentSchema,
   chiefTurnErrorContentSchema,
   chiefTurnStoppedContentSchema,
   classifySkillFact,
@@ -41,6 +42,7 @@ import {
   stripAnsiEscapes,
   stripSkillRouteSection,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
+  threadMessageContentSchema,
   threadReportContentSchema,
   transcriptPromptRowId,
   VERIFY_VERDICT_KIND,
@@ -175,6 +177,7 @@ export function toDisplayTodo(w: WireTodo): DisplayTodo {
     sourceKind: w.sourceKind,
     sourceRef: w.sourceRef,
     usageCost: w.usageCost,
+    ...(w.verified !== undefined ? { verified: w.verified } : {}),
   };
 }
 
@@ -1291,6 +1294,7 @@ function collectChiefStream(
   itemsAt: number[];
   trailingTools: ChiefToolRow[];
   pending: ChiefStreamItem[];
+  eventTurn: boolean;
 } {
   const items: ChiefStreamItem[] = [];
   const itemsAt: number[] = [];
@@ -1302,21 +1306,8 @@ function collectChiefStream(
       .filter((m) => m.role === 'user' && !m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX))
       .map((m) => chiefUserText(textOfContent(m.content).trim())),
   );
-  const reportedWakePromptIds = new Set<string>();
-  for (const message of messages) {
-    if (message.role !== 'system' || typeof message.content !== 'string') continue;
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(message.content);
-    } catch {
-      parsed = null;
-    }
-    const report = threadReportContentSchema.safeParse(parsed);
-    if (report.success && report.data.wakeStepId !== undefined) {
-      reportedWakePromptIds.add(transcriptPromptRowId(report.data.wakeStepId));
-    }
-  }
   let pendingTools: ChiefToolRow[] = [];
+  let eventTurn = false;
   for (const m of messages) {
     while (itemsAt.length < items.length) itemsAt.push(lastAt);
     lastAt = m.createdAt;
@@ -1326,9 +1317,12 @@ function collectChiefStream(
         : m.id;
       if (stepOfRow !== fallback.stepId) fallback = null;
     }
-    if (m.role === 'user' && reportedWakePromptIds.has(m.id)) {
-      pendingTools = [];
-      continue;
+    if (m.role === 'user' && m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX)) {
+      eventTurn = WAKE_MARKER_PREFIX_RE.test(textOfContent(m.content).trim());
+      if (eventTurn) {
+        pendingTools = [];
+        continue;
+      }
     }
     const pendingState = m.role === 'user' ? pendingIds.get(m.id) : undefined;
     if (pendingState !== undefined) {
@@ -1361,6 +1355,11 @@ function collectChiefStream(
         items.push({ ...report.data, id: m.id, ...rowProject(m) });
         continue;
       }
+      const direct = threadMessageContentSchema.safeParse(parsed);
+      if (direct.success) {
+        items.push({ ...direct.data, id: m.id, ...rowProject(m) });
+        continue;
+      }
       const stopped = chiefTurnStoppedContentSchema.safeParse(parsed);
       if (stopped.success) {
         pendingTools = [];
@@ -1370,6 +1369,12 @@ function collectChiefStream(
       const switched = chiefModelFallbackContentSchema.safeParse(parsed);
       if (switched.success) {
         fallback = { model: switched.data.to, stepId: switched.data.stepId };
+        continue;
+      }
+      const notice = chiefNoticeContentSchema.safeParse(parsed);
+      if (notice.success) {
+        pendingTools = [];
+        items.push({ kind: 'robot', markdown: notice.data.message, seconds: '', id: m.id });
         continue;
       }
       const digest = chiefDigestContentSchema.safeParse(parsed);
@@ -1387,6 +1392,7 @@ function collectChiefStream(
       }
     }
     const call = toolCallOfContent(m.content);
+    if (call !== null && eventTurn) continue;
     if (call !== null) {
       pendingTools.push({
         label: pillOf(call),
@@ -1426,6 +1432,7 @@ function collectChiefStream(
       });
       continue;
     }
+    if (eventTurn && m.role === 'assistant') continue;
     const rawText = textOfContent(m.content).trim();
     if (rawText === '') {
       const thinking = m.role === 'assistant' ? thinkingOfContent(m.content) : null;
@@ -1469,7 +1476,7 @@ function collectChiefStream(
     const item = pendingById.get(id);
     return item === undefined ? [] : [item];
   });
-  return { items, itemsAt, trailingTools: pendingTools, pending };
+  return { items, itemsAt, trailingTools: pendingTools, pending, eventTurn };
 }
 
 function autoCloseStrong(text: string): string {
@@ -1505,7 +1512,7 @@ export function mapChief(
   const running = active?.activeRun != null && !parked;
   const collected = active === null ? null : collectChiefStream(opts.messages, running, pendingIds);
   const chiefStream: ChiefStreamItem[] = collected?.items ?? [];
-  if (running) {
+  if (running && collected?.eventTurn !== true) {
     if ((opts.liveThinking ?? '').trim() !== '') {
       chiefStream.push({ kind: 'thinking', text: opts.liveThinking ?? '' });
     }
