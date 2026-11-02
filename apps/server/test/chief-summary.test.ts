@@ -122,6 +122,55 @@ describe('rolling Coordinator summary (D70 C2)', () => {
     expect(summaryRow()).toBeUndefined();
   });
 
+  test('a batch over the transcript budget stops early and the cursor covers only what was sent', () => {
+    H.s.db
+      .insert(chiefMessage)
+      .values([
+        {
+          id: 'big0',
+          threadId: H.threadId,
+          role: 'user',
+          content: 'a'.repeat(30_000),
+          createdAt: BASE,
+        },
+        {
+          id: 'big1',
+          threadId: H.threadId,
+          role: 'assistant',
+          content: 'b'.repeat(15_000),
+          createdAt: BASE + 1,
+        },
+      ])
+      .run();
+    seed(98, 2);
+    planChiefSummaries(H.s.svc, NOW);
+    const queued = summarySteps()[0]!;
+    expect(queued.prompt?.endsWith(`through=big0 count=1`)).toBe(true);
+    expect(queued.prompt).not.toContain('bbbb');
+    finishLast('success', 'Covered big0.');
+    expect(summaryRow()).toMatchObject({ coveredThroughId: 'big0', compactedMessages: 1 });
+    expect(uncompactedCount(H.s.db, H.threadId)).toBe(99);
+  });
+
+  test('a single message larger than the budget is cut alone and still advances by one', () => {
+    H.s.db
+      .insert(chiefMessage)
+      .values({
+        id: 'huge',
+        threadId: H.threadId,
+        role: 'user',
+        content: 'z'.repeat(3_890_000),
+        createdAt: BASE,
+      })
+      .run();
+    seed(99, 1);
+    planChiefSummaries(H.s.svc, NOW);
+    const queued = summarySteps()[0]!;
+    expect(queued.prompt).toContain('(cut for length)');
+    expect(queued.prompt!.length).toBeLessThan(45_000);
+    expect(queued.prompt?.endsWith('through=huge count=1')).toBe(true);
+  });
+
   test('the summary is capped and a fenced reply is unwrapped', () => {
     seed(100);
     planChiefSummaries(H.s.svc, NOW);

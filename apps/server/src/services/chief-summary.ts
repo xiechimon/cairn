@@ -105,15 +105,29 @@ export function summaryPrompt(
   threadId: string,
   previous: string | null,
   rows: readonly (typeof chiefMessage.$inferSelect)[],
-): string {
-  let transcript = chiefTranscriptLines(rows)
-    .map((l) => l.text)
-    .join('\n');
-  if (transcript.length > SUMMARY_TRANSCRIPT_MAX_CHARS) {
-    transcript = `${transcript.slice(0, SUMMARY_TRANSCRIPT_MAX_CHARS)}\n(the rest of this batch was cut for length)`;
+): { prompt: string; sent: number } | null {
+  const lines = chiefTranscriptLines(rows);
+  const chunks: string[] = [];
+  let used = 0;
+  let sent = 0;
+  for (const row of rows) {
+    const text = lines
+      .filter((l) => l.id === row.id)
+      .map((l) => l.text)
+      .join('\n');
+    const room = SUMMARY_TRANSCRIPT_MAX_CHARS - used;
+    if (sent > 0 && text.length > room) break;
+    const kept = text.length > room ? `${text.slice(0, room)} (cut for length)` : text;
+    if (kept !== '') chunks.push(kept);
+    used += kept.length + 1;
+    sent += 1;
   }
-  const last = rows.at(-1);
-  return `${SUMMARY_PROMPT_HEAD}\n\nEarlier summary:\n${previous ?? '(none yet)'}\n\nNew messages:\n${transcript}\nSummary thread=${threadId} through=${last?.id ?? ''} count=${rows.length}`;
+  const through = rows[sent - 1];
+  if (through === undefined) return null;
+  return {
+    sent,
+    prompt: `${SUMMARY_PROMPT_HEAD}\n\nEarlier summary:\n${previous ?? '(none yet)'}\n\nNew messages:\n${chunks.join('\n')}\nSummary thread=${threadId} through=${through.id} count=${sent}`,
+  };
 }
 
 function queueSummary(
@@ -130,12 +144,12 @@ function queueSummary(
     .orderBy(asc(chiefMessage.createdAt), sql`rowid asc`)
     .limit(SUMMARY_BATCH_MESSAGES)
     .all();
-  const last = rows.at(-1);
-  if (last === undefined) return false;
   const previous =
     db.select().from(chiefSummary).where(eq(chiefSummary.threadId, thread.id)).get()?.summary ??
     null;
-  queueDigestStep(deps, chiefRow, summaryPrompt(thread.id, previous, rows), now);
+  const built = summaryPrompt(thread.id, previous, rows);
+  if (built === null) return false;
+  queueDigestStep(deps, chiefRow, built.prompt, now);
   return true;
 }
 
