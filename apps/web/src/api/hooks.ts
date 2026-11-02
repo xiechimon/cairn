@@ -52,6 +52,7 @@ import type {
   ProjectTreeResponse,
   ProviderPreset,
   ProviderRecord,
+  RetroProposal,
   ScheduleRecord,
   SearchResponse,
   SecretRecord,
@@ -973,6 +974,14 @@ export function useApiMutations(teamId: string | undefined) {
     }),
     deleteAgent: useMutation({
       mutationFn: (id: string) => api.del<void>(`/api/teams/${teamId}/agents/${id}`),
+      onSuccess: invalidateAll,
+    }),
+    decideRetroProposal: useMutation({
+      mutationFn: (input: { proposalId: string; decision: 'accept' | 'dismiss' }) =>
+        api.post<RetroProposal>(
+          `/api/teams/${teamId}/chief/retro-proposals/${input.proposalId}/${input.decision}`,
+          {},
+        ),
       onSuccess: invalidateAll,
     }),
     deleteMemory: useMutation({
