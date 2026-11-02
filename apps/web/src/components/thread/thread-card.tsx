@@ -13,6 +13,7 @@ export interface ThreadCardProps {
   onPrimary?: () => void;
   viewLabel?: string;
   onView?: () => void;
+  footer?: ReactNode;
   className?: string;
 }
 
@@ -25,6 +26,7 @@ export function ThreadCard({
   onPrimary,
   viewLabel = 'View thread',
   onView,
+  footer,
   className,
 }: ThreadCardProps) {
   return (
@@ -58,6 +60,7 @@ export function ThreadCard({
             {viewLabel}
           </Button>
         </div>
+        {footer != null && <div className="mt-3">{footer}</div>}
       </div>
     </article>
   );
