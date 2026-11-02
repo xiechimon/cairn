@@ -286,7 +286,7 @@ Tier 2 costs about 15 times the tokens of a chat (Anthropic [verified]), so it i
 Decided (D63, ian, 2026-11-02):
 - **Trigger:** CI-fix round 2 of 3 still red, or a second rejection in a round; at most once per round.
 - **Waiting:** the retry waits up to 20 minutes for the report, then continues; whether research ran is recorded.
-- **Runtime:** research is not tied to a runtime. pi gets a search tool, so every unlocked runtime can search; locked steps stay without search. The option and provider are open below.
+- **Runtime:** research is not tied to a runtime. pi gets a search tool, so every unlocked runtime can search; locked steps stay without search. The option and provider are decided below (D64).
 - **Plan check:** prior-art citation in plans is a soft check for 14 days, then decided from data.
 - **Who decides:** research is its own thread, opened by the Coordinator as routing with a strong or cheap model by complexity, under D60.
 - **X:** no X timeline in v1; added only after S4 and ian placing the cookie himself.
@@ -294,14 +294,15 @@ Decided (D63, ian, 2026-11-02):
 - **Memory:** only after a merged retry that used the report, with source and date, 90-day expiry.
 - **Order:** spikes S1 to S6 first, then phases.
 
-Still open:
+Decided (D64, ian, 2026-11-02, all as recommended):
+- **Search option for pi:** Option 2, the daemon-side `web_search`/`web_fetch` tool reading the key from the secret vault; Option 1 (MCP server in `~/.claude.json`) only as a stopgap for S1.
+- **Provider:** Exa first, Brave as the configured alternative.
+- **Spend cap:** $20 per month for metered search, enforced in the tool, which returns "search budget exhausted" past it.
+- **Codex share:** research threads route to Claude models by default, and to pi with `gpt-6.1-sol` only when the citation check needs the other vendor or Claude is unavailable.
+- **Citation check:** every tier-2 report and every report injected into a retry; reports a code thread reads only as background are covered by that thread's own review.
+- **Phase 1 and D60:** Phase 1 does not wait for D60's thread API; it runs on an info todo plus `run_builds` routing, opened by the Coordinator on the stuck event, behind a thin "open research thread" function that D60 later replaces.
 
-1. **Which search option for pi?** Recommended: Option 2, the daemon-side `web_search`/`web_fetch` tool reading the key from the secret vault. Why: the key stays in SecretBox and the audited channel, nothing downloads at run time, and the provider sits behind one tested interface. Option 1 (MCP server in `~/.claude.json`) only as a stopgap for S1.
-2. **Which provider first?** Recommended: Exa, with Brave as the configured alternative. Why: Exa returns search and page contents from one API at the lowest listed per-search price ($4 per 1,000) with a $10 monthly credit. Brave's independent index is the hedge if Exa's results or availability disappoint.
-3. **What is the monthly cap on metered search spend?** Recommended: $20 per month, enforced in the tool, which returns "search budget exhausted" past it. Why: it covers the high end of the estimate after free credit and stops a runaway loop from billing silently.
-4. **How much research may run on Codex models?** Recommended: route research threads to Claude models by default and to pi with `gpt-6.1-sol` only when the citation check needs the other vendor or Claude is unavailable. Why: Codex usage is budgeted and Claude usage is not, while pi's search tool keeps the Codex path working.
-5. **How often does the other-vendor citation check run?** Recommended: on every tier-2 report and every report injected into a retry. Skip it for reports the code thread reads only as background, where the code thread's own review covers them. Why: injected reports steer a session running with bypass permissions, so they carry the injection risk.
-6. **Does Phase 1 wait for D60's thread API?** Recommended: no. Build Phase 1 on today's primitives (an info todo plus `run_builds` routing, opened by the Coordinator on the stuck event), behind a thin "open research thread" function that D60 later replaces. Why: the trigger, injection and wait are independent of D60, and waiting would delay the concrete fix.
+No decisions remain open; S1 and S2 can still reorder the phases as stated in section 10.
 
 ## 13. Not verified
 
