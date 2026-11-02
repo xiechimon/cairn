@@ -49,17 +49,22 @@ const PAGES: AuditPage[] = [
   {
     name: 'new task home composer',
     url: '/app?scenario=01&view=board',
-    open: (page) => page.locator('.sidebar-new-task').click(),
+    open: (page) =>
+      page.getByRole('complementary').locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' }).click(),
     ready: (p) => p.getByTestId('home-c').getByTestId('chief-composer-input'),
   },
   {
     name: 'new task home composer filled',
     url: '/app?scenario=01&view=board',
     open: async (page) => {
-      await page.locator('.sidebar-new-task').click();
+      await page
+        .getByRole('complementary')
+        .locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' })
+        .click();
       const input = page.getByTestId('home-c').getByTestId('chief-composer-input');
-      await expect(input).toBeFocused();
+      await expect(input).toBeVisible();
       await page.keyboard.type('probe');
+      await expect(input).toBeFocused();
     },
     ready: (p) => p.getByTestId('home-c').getByTestId('chief-composer-input'),
   },

@@ -260,7 +260,7 @@ test('openai author with no usable cross-vendor model gets a Claude verdict', ()
   assert.match(calls, /ai-route openai/);
   assert.match(
     calls,
-    /^claude -p --model opus .*--tools Read,Grep,Glob .*proxy=http:\/\/127\.0\.0\.1:7890$/m,
+    /^claude -p --model sonnet .*--tools Read,Grep,Glob .*proxy=http:\/\/127\.0\.0\.1:7890$/m,
   );
   const input = readFileSync(join(home, 'claude-input.txt'), 'utf8');
   assert.match(input, /PR description:\nPR BODY TEXT/);
@@ -269,7 +269,7 @@ test('openai author with no usable cross-vendor model gets a Claude verdict', ()
     calls,
     new RegExp(`<!-- review-gate:${sha} -->\\n\\*\\*Independent review gate: PASS\\*\\* for `),
   );
-  assert.match(calls, /reviewer: Claude \(opus\), author vendor openai excluded/);
+  assert.match(calls, /reviewer: Claude \(sonnet\), author vendor openai excluded/);
 });
 
 test('a Claude BLOCK is posted as a block', () => {

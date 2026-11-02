@@ -152,6 +152,7 @@ export function Composer({
           <div className="relative">
             <Textarea
               ref={textareaRef}
+              data-compose-target=""
               className={`composer-placeholder composer-input ${COMPOSER_INPUT} ${MENTION_TEXTAREA_CLS}`}
               placeholder={t(placeholder)}
               value={draft}

@@ -53,7 +53,7 @@ const headContentX = (page: Page) =>
 
     const row = document.querySelector('[data-testid="team-row"]');
     const mark = row?.querySelector('[data-testid="brand-mark"]');
-    const name = row?.querySelector('a');
+    const name = row?.querySelector('.sidebar-team-name');
     const toggle = row?.querySelector('button[aria-label="收起侧边栏"]');
     if (!row || !mark || !name || !toggle) throw new Error('sidebar brand head missing');
     return {
@@ -103,21 +103,21 @@ test.describe('sidebar form is route-invariant', () => {
   test('expanded sidebar keeps identical geometry across /app ↔ /app/team ↔ resources hops', async ({
     page,
   }) => {
-
-    await page.addInitScript(() => localStorage.setItem('cairn.sidebarResourcesCollapsed', '0'));
     await page.goto('/app?scenario=01');
     const sidebar = page.getByRole('complementary');
     const boardBox = await captureSidebarBox(page, sidebar, '/app');
 
-    await page.getByRole('link', { name: 'Cairn' }).click();
+    await page.locator('.sidebar-user').click();
+    await page.getByRole('link', { name: '团队' }).click();
     await expect(page).toHaveURL('/app/team?scenario=01');
     await expectSidebarBox(page, sidebar, '/app/team', boardBox);
 
+    await page.locator('.sidebar-user').click();
     await page.getByRole('link', { name: '技能' }).click();
     await expect(page).toHaveURL('/app/resources/skills?scenario=01');
     await expectSidebarBox(page, sidebar, '/app/resources/skills', boardBox);
 
-    await page.getByRole('complementary').locator('[data-slot="sidebar-nav-row"]', { hasText: '首页' }).click();
+    await page.getByRole('complementary').locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' }).click();
     await expect(page).toHaveURL('/app?scenario=01');
     await expectSidebarBox(page, sidebar, '/app', boardBox);
   });
@@ -129,7 +129,8 @@ test.describe('sidebar form is route-invariant', () => {
     await expect(page.locator(ROUTE_ANCHOR['/app'])).toBeVisible();
     const board = await headContentX(page);
 
-    await page.getByRole('link', { name: 'Cairn' }).click();
+    await page.locator('.sidebar-user').click();
+    await page.getByRole('link', { name: '团队' }).click();
     await expect(page).toHaveURL('/app/team?scenario=01');
     // the active face repaints the row's background only (Paper Grouped
     // sidebar: sheet + hairline); the icon and the name must not drift as it
@@ -141,12 +142,12 @@ test.describe('sidebar form is route-invariant', () => {
   test('collapsed rail survives route hops (storage-backed on every shell)', async ({ page }) => {
     await page.addInitScript((k) => {
       localStorage.setItem(k, '1');
-      localStorage.setItem('cairn.sidebarResourcesCollapsed', '0');
     }, SIDEBAR_KEY);
     await page.goto('/app?scenario=03');
     const rail = page.getByRole('complementary');
     const railBox = await captureSidebarBox(page, rail, '/app');
 
+    await page.locator('.rail-user').click();
     await page.getByRole('link', { name: '技能' }).click();
     await expect(page).toHaveURL('/app/resources/skills?scenario=03');
     // the rail box (40px) doubles as the collapsed-state probe: an
@@ -169,7 +170,7 @@ test.describe('sidebar form is route-invariant', () => {
       .poll(() => page.evaluate((k) => localStorage.getItem(k), SIDEBAR_KEY))
       .toBe('1');
 
-    await page.getByRole('link', { name: '首页' }).click();
+    await page.getByRole('link', { name: /^Coordinator/ }).click();
     await expect(page).toHaveURL('/app?scenario=12');
     await expect(page.locator('[data-route="board"]')).toBeVisible();
 

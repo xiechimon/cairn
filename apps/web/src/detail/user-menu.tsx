@@ -1,5 +1,17 @@
 import { cn } from 'cn';
-import { KeyRound, Plug, User } from 'lucide-react';
+import {
+  ChartColumn,
+  KeyRound,
+  Layers,
+  type LucideIcon,
+  Plug,
+  Puzzle,
+  Route,
+  Server,
+  ShieldEllipsis,
+  User,
+  Users,
+} from 'lucide-react';
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import { useLiveData } from '../api/provider.js';
@@ -13,13 +25,34 @@ interface UserMenuProps {
   theme: Theme;
   floating?: boolean;
   className?: string;
+  usageNav?: boolean;
+  machinesOnline?: number;
 }
 
-const ROWS = [
+interface MenuRow {
+  label: string;
+  href: string;
+  Icon: LucideIcon;
+}
+
+const ACCOUNT_ROWS: MenuRow[] = [
   { label: '账号', href: '/app/account', Icon: User },
   { label: 'API 密钥', href: '/app/api-keys', Icon: KeyRound },
-  { label: 'MCP', href: '/app/resources/mcp-servers', Icon: Plug },
+  { label: '团队', href: '/app/team', Icon: Users },
 ];
+
+const MACHINES_HREF = '/app/resources/machines';
+
+const RESOURCE_ROWS: MenuRow[] = [
+  { label: '技能', href: '/app/resources/skills', Icon: Puzzle },
+  { label: 'MCP', href: '/app/resources/mcp-servers', Icon: Plug },
+  { label: '密钥', href: '/app/resources/secrets', Icon: ShieldEllipsis },
+  { label: '机器', href: MACHINES_HREF, Icon: Server },
+  { label: '模型服务', href: '/app/resources/providers', Icon: Layers },
+  { label: '模型路由', href: '/app/resources/model-routing', Icon: Route },
+];
+
+const USAGE_ROW: MenuRow = { label: '用量', href: '/app/usage', Icon: ChartColumn };
 
 const PANEL = `user-menu absolute bottom-12 left-2 z-10 flex w-60 flex-col ${MENU_SURFACE_CLS}`;
 const PANEL_FLOATING = 'relative bottom-auto left-auto z-auto';
@@ -37,7 +70,13 @@ const NAV_ROW_CLS = cn(
   'user-menu-row cursor-pointer no-underline hover:bg-menu-hover focus-visible:bg-menu-hover',
 );
 
-export function UserMenu({ theme: initialTheme, floating = false, className }: UserMenuProps) {
+export function UserMenu({
+  theme: initialTheme,
+  floating = false,
+  className,
+  usageNav = false,
+  machinesOnline = 0,
+}: UserMenuProps) {
   const { t } = useI18n();
   const { user } = useLiveData();
   const { search } = useLocation();
@@ -78,10 +117,20 @@ export function UserMenu({ theme: initialTheme, floating = false, className }: U
         />
       </div>
       <div className={MENU_SEPARATOR_CLS} aria-hidden />
-      {ROWS.map(({ label, href, Icon }) => (
+      {ACCOUNT_ROWS.map(({ label, href, Icon }) => (
         <Link key={label} className={NAV_ROW_CLS} to={{ pathname: href, search }}>
           <Icon aria-hidden />
           {t(label)}
+        </Link>
+      ))}
+      <div className={MENU_SEPARATOR_CLS} aria-hidden />
+      {(usageNav ? [...RESOURCE_ROWS, USAGE_ROW] : RESOURCE_ROWS).map(({ label, href, Icon }) => (
+        <Link key={label} className={NAV_ROW_CLS} to={{ pathname: href, search }}>
+          <Icon aria-hidden />
+          <span className="min-w-0 flex-1 truncate">{t(label)}</span>
+          {href === MACHINES_HREF && machinesOnline > 0 && (
+            <span data-testid="online-dot" className="size-1.5 flex-none rounded-full bg-running" />
+          )}
         </Link>
       ))}
     </div>

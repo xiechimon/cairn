@@ -54,7 +54,7 @@ test.describe('#15 focus ring incorporated', () => {
     for (let i = 0; i < 40 && !found; i++) {
       await page.keyboard.press('Tab');
       found = await page.evaluate(
-        () => document.activeElement?.closest('.sidebar-new-task') != null,
+        () => document.activeElement?.closest('.sidebar-search') != null,
       );
     }
     expect(found).toBe(true);

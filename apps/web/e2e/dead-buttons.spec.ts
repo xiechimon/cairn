@@ -19,7 +19,7 @@ test('user menu drops its dead rows — `反馈` (#149), `新功能/快捷键` (
   for (const live of ['外观', '账号', 'API 密钥', 'MCP']) {
     await expect(menu).toContainText(live);
   }
-  await expect(menu.locator('a.user-menu-row')).toHaveCount(3);
+  await expect(menu.locator('a.user-menu-row')).toHaveCount(9);
 });
 
 test('board topbar drops the `看板指南` button — right actions = `筛选` / `定时`, `新任务` lives in the new-task bar (#363, claude shell)', async ({

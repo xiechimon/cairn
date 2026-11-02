@@ -635,6 +635,7 @@ export function ChiefConversation({
               <Textarea
                 ref={attachComposer}
                 data-testid="chief-composer-input"
+                data-compose-target=""
                 aria-invalid={composerError != null ? true : undefined}
                 className={`h-9 max-h-30 min-h-0 resize-none overflow-y-auto rounded-none border-none bg-transparent px-0.5 pt-0.5 pb-2.5 font-sans text-card-title md:text-card-title tabular-nums shadow-none field-sizing-fixed focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none dark:bg-transparent ${MENTION_TEXTAREA_CLS} placeholder:text-(--text-tertiary)`}
                 readOnly={onSend == null}

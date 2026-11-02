@@ -131,7 +131,6 @@ test('live face: minimize and SPA route switches keep the draft (D6 zero regress
   page,
 }) => {
 
-  await page.addInitScript(() => localStorage.setItem('cairn.sidebarResourcesCollapsed', '0'));
   const { drawer, input } = await openChiefComposer(page);
   await input.fill(DRAFT);
   await expect.poll(() => storedDraft(page)).toBe(DRAFT);
@@ -142,10 +141,11 @@ test('live face: minimize and SPA route switches keep the draft (D6 zero regress
   await expect(input).toBeVisible();
   await expect(input).toHaveValue(DRAFT);
 
+  await page.locator('.sidebar-user').click();
   await page.getByRole('link', { name: '技能' }).click();
   await expect(page).toHaveURL(/\/app\/resources\/skills/);
   await expect(input).toHaveValue(DRAFT);
-  await page.getByRole('complementary').locator('[data-slot="sidebar-nav-row"]', { hasText: '首页' }).click();
+  await page.getByRole('complementary').locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' }).click();
   await expect(page).toHaveURL(/\/app$/);
   await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toHaveValue(DRAFT);
   await evidenceShot(page, 'd6-legs-draft-intact.png');
