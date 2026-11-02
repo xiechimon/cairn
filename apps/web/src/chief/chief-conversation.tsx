@@ -5,7 +5,15 @@ import {
 } from '@cairn/shared';
 import { cn } from 'cn';
 import { CircleDashed, TriangleAlert } from 'lucide-react';
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useMachines, useMembers, useProjects, useSkills, useTodos } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { ProjectAvatar } from '../board/project-avatar.js';
@@ -229,6 +237,9 @@ export function ChiefConversation({
   const onAttachment =
     onSend != null ? (files: File[]) => uploadMessageAttachments(files, t) : undefined;
   const { scrollToEnd } = useMessageScroller();
+  const followSentRef = useRef(false);
+  const latestUserKeyRef = useRef<string | number | null>(null);
+  const userKeyAtSendRef = useRef<string | number | null>(null);
   const prevThreadRef = useRef(chief.threadTitle);
   useEffect(() => {
     if (prevThreadRef.current === chief.threadTitle) return;
@@ -283,7 +294,8 @@ export function ChiefConversation({
       onSend == null
         ? undefined
         : (text: string) => {
-            scrollToEnd();
+            followSentRef.current = true;
+            userKeyAtSendRef.current = latestUserKeyRef.current;
             return onSend(text, chipProjectId);
           },
     onAttachment,
@@ -418,6 +430,18 @@ export function ChiefConversation({
         };
   const allRows = (chief.stream ?? []).map((item, i) => ({ item, i }));
   const rows = allRows.filter(({ item }) => item.kind !== 'user' || item.pending == null);
+  const latestMessage = rows.findLast(
+    ({ item }) => item.kind === 'user' || (item.kind === 'robot' && item.typing !== true),
+  );
+  const latestUser = rows.findLast(({ item }) => item.kind === 'user');
+  const latestUserKey =
+    latestUser == null ? null : chiefStreamRowKey(latestUser.item, latestUser.i);
+  latestUserKeyRef.current = latestUserKey;
+  useLayoutEffect(() => {
+    if (!followSentRef.current || latestUserKey === userKeyAtSendRef.current) return;
+    followSentRef.current = false;
+    scrollToEnd();
+  }, [latestUserKey, scrollToEnd]);
   const queuedCapsules = allRows.flatMap(({ item }) =>
     item.kind === 'user' && item.pending != null && item.id != null
       ? [
@@ -435,6 +459,7 @@ export function ChiefConversation({
       key={chiefStreamRowKey(item, i)}
       item={item}
       index={i}
+      latest={i === latestMessage?.i}
       bound={chief.bound}
       agent={chief.agent}
       runningTool={chief.runningTool}
