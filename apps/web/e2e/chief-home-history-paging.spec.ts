@@ -104,3 +104,30 @@ test('a failing older page is not retried on its own while the reader stays at t
   expect(requested.filter((before) => before !== null)).toHaveLength(2);
   await expect(row(page, 'question 150')).toHaveCount(1);
 });
+
+test('typing in the composer does not re-render the conversation rows', async ({ page }) => {
+  await mockPagedHistory(page, 40, 100);
+  await page.goto('/app');
+  await expect(row(page, 'answer 39')).toBeInViewport();
+  const rowProps = () =>
+    viewport(page).evaluate((node) => {
+      const w = window as unknown as { __rowProps?: unknown[] };
+      const props = [...node.querySelectorAll('[data-slot="message-scroller-item"]')].map((el) => {
+        const key = Object.keys(el).find((k) => k.startsWith('__reactProps$'));
+        return key === undefined ? null : (el as unknown as Record<string, unknown>)[key];
+      });
+      if (w.__rowProps === undefined) {
+        w.__rowProps = props;
+        return { rows: props.length, rerendered: 0 };
+      }
+      const before = w.__rowProps;
+      return {
+        rows: props.length,
+        rerendered: props.filter((p, i) => p === null || p !== before[i]).length,
+      };
+    });
+  expect((await rowProps()).rows).toBe(40);
+  await page.getByTestId('home-c').getByTestId('chief-composer-input').pressSequentially('hello');
+  await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toHaveValue('hello');
+  expect(await rowProps()).toEqual({ rows: 40, rerendered: 0 });
+});

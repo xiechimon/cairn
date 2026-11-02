@@ -240,7 +240,7 @@ export function ChiefConversation({
   );
   const [toolsOpen, setToolsOpen] = useState<Set<number>>(() => new Set());
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
-  const copyText = (key: string, text: string) => {
+  const copyText = useCallback((key: string, text: string) => {
     const clip = navigator.clipboard;
     if (!clip) return;
     void clip.writeText(text).then(
@@ -250,14 +250,21 @@ export function ChiefConversation({
       },
       () => {},
     );
-  };
-  const toggleTools = (i: number) =>
-    setToolsOpen((cur) => {
-      const next = new Set(cur);
-      if (next.has(i)) next.delete(i);
-      else next.add(i);
-      return next;
-    });
+  }, []);
+  const toggleTools = useCallback(
+    (i: number) =>
+      setToolsOpen((cur) => {
+        const next = new Set(cur);
+        if (next.has(i)) next.delete(i);
+        else next.add(i);
+        return next;
+      }),
+    [],
+  );
+  const requestRewind = useCallback(
+    (index: number, id: string | null) => setRewindConfirm({ index, id }),
+    [],
+  );
   const [liveDraft, setLiveDraft] = useState(() =>
     live ? readStoredChiefDraft(draftStorageKey) : initialDraft,
   );
@@ -435,7 +442,7 @@ export function ChiefConversation({
       onCopy={copyText}
       toolsOpen={toolsOpen}
       onToggleTools={toggleTools}
-      onRewindRequest={(index, id) => setRewindConfirm({ index, id })}
+      onRewindRequest={requestRewind}
       onAnswerQuestion={onAnswerQuestion}
       onCancelQuestion={onCancelQuestion}
     />
