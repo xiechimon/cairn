@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 
 export const STALL_MS = 3600_000;
+export const CLAUDE_REVIEW_MODEL = 'sonnet';
 export const CLAUDE_REVIEW_TOOLS = ['Read', 'Grep', 'Glob'];
 export const CLAUDE_DENIED_TOOLS = [
   'Bash',
@@ -33,7 +34,7 @@ export function claudeReviewArgs() {
   return [
     '-p',
     '--model',
-    'opus',
+    CLAUDE_REVIEW_MODEL,
     '--permission-mode',
     'default',
     '--setting-sources',
