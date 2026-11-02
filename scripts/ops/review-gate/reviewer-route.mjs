@@ -192,3 +192,14 @@ export function lowRiskTier(entries, protectedRes) {
     )
   );
 }
+
+export function syncReviewCheckout(git) {
+  const main = git(['rev-parse', '--verify', '--quiet', 'origin/main^{commit}']).trim();
+  const changes = git(['status', '--porcelain', '--untracked-files=no']).trim();
+  if (changes)
+    throw new Error(
+      `review-gate: the review checkout has local changes, so reviewers would read files that are not origin/main; refusing this round:\n${changes}`,
+    );
+  git(['checkout', '-q', '--detach', main]);
+  return main;
+}
