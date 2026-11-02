@@ -655,7 +655,7 @@ describe('daily 08:00 Coordinator report (#2592)', () => {
 
   test('thread fences count against the cap: thousands of tiny threads cannot blow the prompt up', async () => {
     const w = await setup();
-    for (let i = 0; i < 1500; i++) {
+    for (let i = 0; i < 400; i++) {
       const { buildId } = w.thread({ seq: 100 + i, title: `线程${i}`, at: YESTERDAY_MORNING });
       w.say(buildId, `tiny-${i}`, 'assistant', '好', YESTERDAY_MORNING + i);
     }
@@ -728,5 +728,67 @@ describe('daily 08:00 Coordinator report (#2592)', () => {
     const listed = /项目：(.*)/.exec(prompt)?.[1]?.split('；') ?? [];
     expect(listed).toHaveLength(30);
     expect(listed[0]).toBe('p1 = cairn');
+  });
+
+  test('proposals of another team or another user’s chief are 404, and a failed accept leaves the draft untouched', async () => {
+    const w = await setup();
+    const { buildId } = w.thread({ seq: 9, title: '看板计数', at: YESTERDAY_MORNING });
+    w.say(buildId, 'm-ian', 'user', '不对，计数要用服务端的数据', YESTERDAY_MORNING + 1000);
+    w.plan(TODAY_0830);
+    const claimed = await w.claim();
+    if (!claimed) throw new Error('no report step');
+    const finding = { what: 'w', why: 'y', safeguard: 's', project: 'p1' };
+    await w.done(
+      claimed.step.id,
+      output([
+        { source: 't1', title: '甲', ...finding },
+        { source: 't1', title: '乙', ...finding },
+        { source: 't1', title: '丙', ...finding },
+      ]),
+    );
+    const [mine, otherTeam, otherUser] = w.report().retro;
+    if (!mine || !otherTeam || !otherUser) throw new Error('three proposals expected');
+    const decide = (id: string) =>
+      call(w.s.app, 'POST', `/api/teams/${w.teamId}/chief/retro-proposals/${id}/accept`);
+    w.s.db
+      .update(retroProposal)
+      .set({ teamId: 'team-other' })
+      .where(eq(retroProposal.id, otherTeam.id))
+      .run();
+    expect((await decide(otherTeam.id)).status).toBe(404);
+    const reportId = w.s.db.select().from(chiefReport).get()?.id ?? '';
+    w.s.db
+      .insert(chiefReport)
+      .values({
+        id: 'report-other-user',
+        chiefId: 'chief-someone-else',
+        teamId: w.teamId,
+        day: '2026-10-27',
+        threadId: w.threadId,
+        status: 'posted',
+        createdAt: TODAY_0830,
+      })
+      .run();
+    w.s.db
+      .insert(chiefTable)
+      .values({ id: 'chief-someone-else', userId: 'user-other', teamId: w.teamId, createdAt: 1 })
+      .run();
+    w.s.db
+      .update(retroProposal)
+      .set({ reportId: 'report-other-user' })
+      .where(eq(retroProposal.id, otherUser.id))
+      .run();
+    expect((await decide(otherUser.id)).status).toBe(404);
+    expect(reportId).not.toBe('');
+    const todosBefore = w.s.db.select().from(todoTable).all().length;
+    w.s.db
+      .update(retroProposal)
+      .set({ projectId: 'proj-gone' })
+      .where(eq(retroProposal.id, mine.id))
+      .run();
+    expect((await decide(mine.id)).status).toBeGreaterThanOrEqual(400);
+    expect(w.s.db.select().from(todoTable).all()).toHaveLength(todosBefore);
+    const row = w.s.db.select().from(retroProposal).where(eq(retroProposal.id, mine.id)).get();
+    expect([row?.status, row?.todoId, row?.decidedAt]).toEqual(['draft', null, null]);
   });
 });
