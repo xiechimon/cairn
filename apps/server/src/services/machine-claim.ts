@@ -287,39 +287,45 @@ async function tryClaim(
         (a, b) => Number(isChiefDigestStep(a.stepRow)) - Number(isChiefDigestStep(b.stepRow)),
       );
   const earliestWorker = workerCands[0]?.stepRow.createdAt ?? Number.POSITIVE_INFINITY;
-  for (const cand of chiefCands) {
-    if (cand.stepRow.createdAt > earliestWorker) break;
-    if (hasEarlierLiveChiefStep(db, cand.stepRow)) continue;
-    if (
-      isChiefDigestStep(cand.stepRow) &&
-      !cliVersionAtLeast(machineRow.latestCliVersion, CHIEF_DIGEST_MIN_CLI_VERSION)
-    ) {
-      continue;
+  const claimChief = (cands: typeof chiefCands): ClaimedStep | null => {
+    for (const cand of cands) {
+      if (hasEarlierLiveChiefStep(db, cand.stepRow)) continue;
+      if (
+        isChiefDigestStep(cand.stepRow) &&
+        !cliVersionAtLeast(machineRow.latestCliVersion, CHIEF_DIGEST_MIN_CLI_VERSION)
+      ) {
+        continue;
+      }
+      const chiefRuntime = stepRuntimeFor(cand.agentRow.provider);
+      if (chiefRuntime === 'claude-code' && claudeBlocked(machineId)) continue;
+      if (cand.agentRow.machineId !== machineId) {
+        if (chiefRuntime !== 'claude-code' || !claudeBlocked(cand.agentRow.machineId)) continue;
+      }
+      if (
+        cand.agentRow.maxConcurrentTasks !== null &&
+        agentRunningCount(db, cand.agentRow.id) >= cand.agentRow.maxConcurrentTasks
+      ) {
+        continue;
+      }
+      const claimed = buildChiefClaim(
+        deps,
+        machineId,
+        cand.stepRow,
+        cand.threadRow,
+        cand.agentRow,
+        machineRow,
+      );
+      if (claimed) {
+        publishStepStatus(deps, claimed.step.id);
+        return claimed;
+      }
     }
-    const chiefRuntime = stepRuntimeFor(cand.agentRow.provider);
-    if (chiefRuntime === 'claude-code' && claudeBlocked(machineId)) continue;
-    if (cand.agentRow.machineId !== machineId) {
-      if (chiefRuntime !== 'claude-code' || !claudeBlocked(cand.agentRow.machineId)) continue;
-    }
-    if (
-      cand.agentRow.maxConcurrentTasks !== null &&
-      agentRunningCount(db, cand.agentRow.id) >= cand.agentRow.maxConcurrentTasks
-    ) {
-      continue;
-    }
-    const claimed = buildChiefClaim(
-      deps,
-      machineId,
-      cand.stepRow,
-      cand.threadRow,
-      cand.agentRow,
-      machineRow,
-    );
-    if (claimed) {
-      publishStepStatus(deps, claimed.step.id);
-      return claimed;
-    }
-  }
+    return null;
+  };
+  const chiefAhead = claimChief(
+    chiefCands.filter((cand) => cand.stepRow.createdAt <= earliestWorker),
+  );
+  if (chiefAhead) return chiefAhead;
 
   for (const cand of workerCands) {
     const shipRefusal = await reverifyShip(deps, cand.stepRow);
@@ -571,7 +577,7 @@ async function tryClaim(
       ...(workerMcp !== undefined ? { mcpServers: workerMcp } : {}),
     };
   }
-  return null;
+  return claimChief(chiefCands.filter((cand) => cand.stepRow.createdAt > earliestWorker));
 }
 
 export async function claimStep(

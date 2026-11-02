@@ -365,3 +365,66 @@ describe('#1148/#1260 claim body maxWorkers (env fallback server consumption sur
     expect(res.status).toBe(400);
   });
 });
+
+describe('chief turns never wait behind a worker step another machine owns', () => {
+  test('an older pending step bound to an offline machine does not hold back a newer chief turn', async () => {
+    const w = await setupWorld();
+    setCap(w, 8);
+    const key = await issueApiKey(w.s);
+    const other = await w.s.app.request('/api/machine/enroll', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ teamId: w.s.team.id, name: 'offline-orb', cliVersion: '0.1.0' }),
+    });
+    expect(other.status).toBe(200);
+    const otherMachineId = w.s.db
+      .select()
+      .from(machineTable)
+      .where(eq(machineTable.name, 'offline-orb'))
+      .get()!.id;
+    w.s.db
+      .insert(agentTable)
+      .values({
+        id: 'agent-planner-elsewhere',
+        teamId: w.s.team.id,
+        displayName: 'planner-elsewhere',
+        machineId: otherMachineId,
+        status: 'active',
+        avatarUrl: null,
+        provider: 'stub-gw',
+        modelId: 'stub-model',
+        thinkingLevel: null,
+        tools: [],
+        secrets: [],
+        skillsAllowlist: null,
+        mcpServers: [],
+      })
+      .run();
+    const elsewhere = insertPendingBuildStep(w.s, w);
+    const elsewhereRow = w.s.db.select().from(stepTable).where(eq(stepTable.id, elsewhere)).get()!;
+    w.s.db
+      .update(todoTable)
+      .set({ assignment: { plan: null, build: { agentId: 'agent-planner-elsewhere' } } })
+      .where(eq(todoTable.id, elsewhereRow.buildId.replace('build-', 'todo-')))
+      .run();
+    const chiefStepId = insertPendingChiefStep(w.s, { createdAt: elsewhereRow.createdAt + 5 });
+    expect((await claimAs(w))?.step.id).toBe(chiefStepId);
+    expect(w.s.db.select().from(stepTable).where(eq(stepTable.id, elsewhere)).get()!.status).toBe(
+      'pending',
+    );
+  });
+
+  test('an older worker step this machine can run still goes before a newer chief turn', async () => {
+    const w = await setupWorld();
+    setCap(w, 8);
+    const worker = insertPendingBuildStep(w.s, w);
+    const workerAt = w.s.db
+      .select()
+      .from(stepTable)
+      .where(eq(stepTable.id, worker))
+      .get()!.createdAt;
+    const chiefStepId = insertPendingChiefStep(w.s, { createdAt: workerAt + 5 });
+    expect((await claimAs(w))?.step.id).toBe(worker);
+    expect((await claimAs(w))?.step.id).toBe(chiefStepId);
+  });
+});
