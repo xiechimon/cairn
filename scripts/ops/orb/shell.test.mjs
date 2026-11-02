@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -313,6 +314,26 @@ test('relay binds only its expected bridge and forwards only to loopback', () =>
     assert.ok(relay[1].endsWith('/egress-relay.mjs'));
     assert.ok(!f.calls().some(([cmd]) => cmd === 'socat'));
     assert.notEqual(f.run('egress-relay.sh', [], { BRIDGE_IP: '192.0.2.1' }).status, 0);
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+test("the Orb pnpm pin matches the repository's packageManager", () => {
+  assert.equal(readFileSync(join(source, 'pnpm.version'), 'utf8'), `${repoPnpm}\n`);
+});
+
+test('image dry-run works from a checkout of only scripts/ops/orb, as cairn-ops-run materializes it', () => {
+  const f = fixture();
+  try {
+    const orbOnly = join(f.root, 'materialized/scripts/ops/orb');
+    cpSync(source, orbOnly, { recursive: true });
+    const result = spawnSync('/bin/bash', [join(orbOnly, 'build-image.sh'), '--dry-run'], {
+      env: f.env,
+      encoding: 'utf8',
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.ok(result.stdout.includes(` pnpm@${repoPnpm};`));
   } finally {
     rmSync(f.root, { recursive: true, force: true });
   }
