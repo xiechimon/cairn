@@ -57,7 +57,7 @@ test('C no longer navigates: a page without a composer ignores typing', async ({
   await expect(page).toHaveURL(/\/app\/schedules/);
 });
 
-test('a pending question card keeps its number keys out of the composer', async ({ page }) => {
+async function mockPendingQuestion(page: Page) {
   const question = {
     kind: 'ask_user_question',
     requestId: 'req-1',
@@ -79,6 +79,10 @@ test('a pending question card keeps its number keys out of the composer', async 
       { id: 'm2', role: 'assistant', content: JSON.stringify(question), createdAt: 11 },
     ],
   });
+}
+
+test('a pending question card keeps its number keys out of the composer', async ({ page }) => {
+  await mockPendingQuestion(page);
   await page.goto('/app');
   const home = page.getByTestId('home-c');
   const option = home.getByTestId('chief-question-option-0-0').first();
@@ -87,4 +91,16 @@ test('a pending question card keeps its number keys out of the composer', async 
   await page.keyboard.press('1');
   await expect(option).toHaveAttribute('aria-pressed', 'true');
   await expect(homeComposer(page)).toHaveValue('');
+});
+
+test('a hidden question card leaves number keys to the composer', async ({ page }) => {
+  await mockPendingQuestion(page);
+  await page.goto('/app');
+  const option = page.getByTestId('home-c').getByTestId('chief-question-option-0-0').first();
+  await expect(option).toBeVisible();
+  await page.addStyleTag({ content: '[data-testid="chief-question-card"] { display: none !important; }' });
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press('1');
+  await expect(homeComposer(page)).toHaveValue('1');
+  await expect(option).toHaveAttribute('aria-pressed', 'false');
 });

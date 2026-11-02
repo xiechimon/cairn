@@ -1,6 +1,6 @@
 import type { AskUserAnswer } from '@cairn/shared';
 import { Ban, CircleCheck, CircleHelp, type LucideIcon } from 'lucide-react';
-import { type ReactNode, useLayoutEffect, useMemo, useState } from 'react';
+import { type ReactNode, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON, DIALOG_TEXT_BUTTON } from '../components/ui/dialog-shell.js';
@@ -71,12 +71,14 @@ export function ChiefQuestionCard({ item, onAnswer, onCancel }: ChiefQuestionCar
   const last = step === lastStep;
   const question = item.questions[step] ?? item.questions[0];
   const draft = drafts[step];
+  const cardRef = useRef<HTMLDivElement | null>(null);
 
   useLayoutEffect(() => {
     if (!pending || question === undefined || question.options.length === 0) return;
     const max = question.options.length + 1;
     const handler = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (cardRef.current?.checkVisibility() !== true) return;
       const target = e.target;
       if (
         target instanceof HTMLElement &&
@@ -160,7 +162,12 @@ export function ChiefQuestionCard({ item, onAnswer, onCancel }: ChiefQuestionCar
         : t('数字键 1–{n} 选择', { n: question.options.length + 1 });
 
   return (
-    <div data-testid="chief-question-card" data-status={item.status} className={CARD_CLS}>
+    <div
+      ref={cardRef}
+      data-testid="chief-question-card"
+      data-status={item.status}
+      className={CARD_CLS}
+    >
       <div className="flex gap-1" aria-hidden="true">
         {item.questions.map((_, i) => (
           <span key={i} className={`${PIP_CLS}${i <= step ? ` ${PIP_ON_CLS}` : ''}`} />
