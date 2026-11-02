@@ -1191,8 +1191,8 @@ describe('mergeReadiness: a docs-only patch (#1621) is a go under shadow; a prot
     expect(r.policy).toBe('shadow');
   });
 
-  test('docs/spec or a case variant of docs/ADR mixed into the docs patch under shadow: an independent review is required', () => {
-    for (const name of ['docs/spec/28-x.md', 'docs/ADR/0021-x.md', 'docs/\u{17F}pec/28-x.md']) {
+  test('docs/spec or a case variant of it mixed into the docs patch under shadow: an independent review is required', () => {
+    for (const name of ['docs/spec/28-x.md', 'docs/SPEC/28-y.md', 'docs/\u{17F}pec/28-x.md']) {
       const i = green();
       i.policy.mergePolicy = 'shadow';
       setFiles(i, [...docsOnly, file(name)]);

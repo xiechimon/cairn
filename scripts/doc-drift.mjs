@@ -4,7 +4,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const DOC_DIRS = ['docs/spec', 'docs/adr'];
+const DOC_DIRS = ['docs/spec'];
 const SCOPE_DIRS = ['apps', 'packages', 'scripts'];
 const IDENT_RE = /(?<![\w.])((?:[a-z][A-Za-z0-9]*[A-Z][A-Za-z0-9]*|[A-Z][A-Za-z0-9]*))\(/g;
 const SPAN_RE = /`([^`]+)`/g;
@@ -130,12 +130,12 @@ export function renderDriftSection({ docs, rows }) {
     .map((row) => `| ${row.doc} | \`${row.name}\` | ${row.kind} | ${row.line} |`)
     .join('\n');
   return [
-    '## Spec/ADR drift at HEAD',
+    '## Spec drift at HEAD',
     '',
     `Scanned ${docs.length} docs under ${DOC_DIRS.join(' and ')}. ${rows.length} missing names: ${kinds.path} paths, ${kinds.identifier} identifiers.`,
     '',
     ...(rows.length === 0
-      ? ['No spec/ADR drift found.']
+      ? ['No spec drift found.']
       : ['| doc | missing | kind | line |', '| --- | --- | --- | --- |', table]),
     '',
   ].join('\n');

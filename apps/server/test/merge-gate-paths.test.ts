@@ -57,7 +57,6 @@ describe('protected categories: any depth, case-insensitive, one true and one fa
     ['error ledger', 'docs/lessons.md', 'docs/lessons-archive.md'],
     ['error ledger entry', 'docs/lessons/1651-probe-reach.md', 'docs/lessonsx/1651.md'],
     ['dispatch template', 'docs/agent-dispatch-prompts.md', 'docs/agent-dispatch.md'],
-    ['ADR', 'docs/adr/0021-x.md', 'docs/adrs.md'],
     ['design decisions', 'docs/spec/28-x.md', 'docs/specs.md'],
     ['闸脚本', 'apps/server/scripts/db-check.mjs', 'apps/server/src/scriptsx.ts'],
     ['配置', 'apps/web/vite.config.mts', 'apps/web/src/config.ts'],
@@ -147,7 +146,7 @@ describe('protected categories: any depth, case-insensitive, one true and one fa
       'apps/web/src/drizzle',
       'apps/web/src/.Husky',
       '.github',
-      'docs/adr',
+      'docs/spec',
     ]) {
       const r = classify([f(p, { status: 'added' })]);
       expect(r.protected, p).toEqual([p]);
@@ -156,7 +155,7 @@ describe('protected categories: any depth, case-insensitive, one true and one fa
     const gate = classify([f('apps/server/src/services/merge-gate', { status: 'added' })]);
     expect(gate.protected).toEqual(['apps/server/src/services/merge-gate']);
     expect(gate.gateSource).toEqual(['apps/server/src/services/merge-gate']);
-    for (const p of ['apps/web/src/.claudex', 'apps/server/src/scripts.ts', 'apps/web/src/adr']) {
+    for (const p of ['apps/web/src/.claudex', 'apps/server/src/scripts.ts', 'apps/web/src/spec']) {
       expect(classify([f(p)]).protected, p).toEqual([]);
     }
   });
@@ -395,7 +394,7 @@ describe('default deny: anything outside the auto-merge set is left to a human',
   });
 });
 
-describe('docs-only (#1621): Markdown under docs joins the auto-merge set; design decisions, ADRs and the review guide still stay with the user', () => {
+describe('docs-only (#1621): Markdown under docs joins the auto-merge set; design decisions and the review guide still stay with the user', () => {
   test('Markdown at any depth under docs is in the set', () => {
     const files = ['docs/ops/langfuse.md', 'docs/README.md', 'docs/a3/x.md', 'docs/research/r1.MD'];
     const r = classify(files.map((p) => f(p)));
@@ -405,13 +404,13 @@ describe('docs-only (#1621): Markdown under docs joins the auto-merge set; desig
 
   test('protected doc paths still match under case or Unicode folds and never land in the set', () => {
     for (const p of [
-      'docs/ADR/0021-x.md',
-      'Docs/Adr/0021-x.md',
+      'docs/Spec/28-x.md',
+      'Docs/Spec/28-x.md',
       'docs/SPEC/28-x.md',
       'docs/\u{17F}pec/28-x.md',
       'docs/PR-Review.md',
       'doc\u{17F}/pr-review.md',
-      'doc\u{17F}/adr/0021-x.md',
+      'doc\u{17F}/spec/28-x.md',
       'docs/spec',
     ]) {
       const asciiFold = p.normalize('NFKC').toLowerCase();
@@ -429,11 +428,11 @@ describe('docs-only (#1621): Markdown under docs joins the auto-merge set; desig
     expect(r.outsideAutoMerge).toEqual([p]);
   });
 
-  test('renaming an ADR into a plain doc counts as protected by its original name', () => {
+  test('renaming a spec into a plain doc counts as protected by its original name', () => {
     const r = classify([
-      f('docs/notes/0021.md', { status: 'renamed', previousFilename: 'docs/adr/0021-x.md' }),
+      f('docs/notes/0021.md', { status: 'renamed', previousFilename: 'docs/spec/28-x.md' }),
     ]);
-    expect(r.protected).toEqual(['docs/adr/0021-x.md']);
+    expect(r.protected).toEqual(['docs/spec/28-x.md']);
   });
 });
 

@@ -7,7 +7,6 @@ This directory holds two kinds of things: **long-lived documents** (specs, decis
 | Directory / file | Content |
 |---|---|
 | `spec/` | Numbered specs (test layering, PR process, etc.); the canonical text of the engineering rules |
-| `adr/` | Architecture decision records (ADRs), ordered by number; decided matters are not re-debated in review, and overturning one takes a new ADR |
 | `privacy.md` | What Cairn sends (nothing) and what the optional first-PR discussion prompt does and does not carry |
 | `community/welcome.md` | Discussion categories, where bugs and security reports go, and how to post a first-PR write-up |
 | `pr-review.md` | The PR review process (five-step process + six-section scorecard) |
@@ -21,5 +20,5 @@ This directory holds two kinds of things: **long-lived documents** (specs, decis
 
 | Directory | Content | Discipline |
 |---|---|---|
-| `verify/<ticket>/` | Optional verification archives (screenshots, probe output, mechanism diagrams) | When archived, lands with its PR; a weekly run removes folders older than 14 days from `main` and records their last commit in `verify/pruned.json` (`git show <sha>:docs/verify/<ticket>/`). Merged PR bodies keep working because their raw links pin a commit. Decision: [`adr/0022-prune-merged-evidence-weekly.md`](adr/0022-prune-merged-evidence-weekly.md) |
+| `verify/<ticket>/` | Optional verification archives (screenshots, probe output, mechanism diagrams) | When archived, lands with its PR; a weekly run removes folders older than 14 days from `main` and records their last commit in `verify/pruned.json` (`git show <sha>:docs/verify/<ticket>/`). Merged PR bodies keep working because their raw links pin a commit. Decision: ADR 0022 (removed; see the git history at 608eabac0) |
 | `research/` | Research notes archived per ticket (`r*.md`, measurement records) | Archived once written. Cite them as historical material; do not read them as current specs |

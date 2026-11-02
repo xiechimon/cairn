@@ -11,7 +11,7 @@ const cases = [
   ['**/scripts/**', 'scripts/prepush.mjs', true],
   ['**/*.config.*', 'apps/web/vite.config.ts', true],
   ['**/*.config.*', 'apps/web/src/config.ts', false],
-  ['docs/adr/**', 'docs/spec/x.md', false],
+  ['docs/spec/**', 'docs/specs.md', false],
 ];
 let bad = 0;
 for (const [g, p, want] of cases) {
