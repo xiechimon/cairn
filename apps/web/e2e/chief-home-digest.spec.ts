@@ -73,7 +73,7 @@ test.describe('long-chat summaries on the home chat (T7)', () => {
   }) => {
     await mockDigest(page, withDigest('daily'));
     await page.goto('/app');
-    const stream = page.getByTestId('chief-home').getByTestId('chief-stream');
+    const stream = page.getByTestId('home-c').getByTestId('chief-stream');
     const toggle = stream.getByRole('button', { name: '总管把昨天的对话整理成了 4 条摘要' });
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
     await expect(stream).toContainText('看板拖完卡片计数不对，修一下');
@@ -115,7 +115,7 @@ test.describe('long-chat summaries on the home chat (T7)', () => {
   }) => {
     const deleted = await mockDigest(page, withDigest('daily'));
     await page.goto('/app');
-    const stream = page.getByTestId('chief-home').getByTestId('chief-stream');
+    const stream = page.getByTestId('home-c').getByTestId('chief-stream');
     await stream.getByRole('button', { name: /整理成了 4 条摘要/ }).click();
     const item = stream.getByTestId('chief-digest-item').filter({ hasText: '先查 npm 源' });
     await expect(item.getByRole('link', { name: '查看这条记忆' })).toHaveAttribute(
@@ -133,7 +133,7 @@ test.describe('long-chat summaries on the home chat (T7)', () => {
   test('the memory link opens the memory tab with that row in view', async ({ page }) => {
     await mockDigest(page, withDigest('daily'));
     await page.goto('/app');
-    const stream = page.getByTestId('chief-home').getByTestId('chief-stream');
+    const stream = page.getByTestId('home-c').getByTestId('chief-stream');
     await stream.getByRole('button', { name: /整理成了 4 条摘要/ }).click();
     await stream.getByRole('link', { name: '查看这条记忆' }).click();
     await expect(page).toHaveURL(/\/app\/resources\/agents\/agent-1\?tab=memory#memory-mem-1$/);
@@ -144,7 +144,7 @@ test.describe('long-chat summaries on the home chat (T7)', () => {
   test('a memory deleted elsewhere shows as forgotten without a delete button', async ({ page }) => {
     await mockDigest(page, withDigest('daily', 'mem-gone'));
     await page.goto('/app');
-    const stream = page.getByTestId('chief-home').getByTestId('chief-stream');
+    const stream = page.getByTestId('home-c').getByTestId('chief-stream');
     await stream.getByRole('button', { name: /整理成了 4 条摘要/ }).click();
     const item = stream.getByTestId('chief-digest-item').filter({ hasText: '先查 npm 源' });
     await expect(item).toHaveAttribute('data-gone', '');
@@ -154,7 +154,7 @@ test.describe('long-chat summaries on the home chat (T7)', () => {
   test('a threshold digest says the chat got long', async ({ page }) => {
     await mockDigest(page, withDigest('threshold'));
     await page.goto('/app');
-    const stream = page.getByTestId('chief-home').getByTestId('chief-stream');
+    const stream = page.getByTestId('home-c').getByTestId('chief-stream');
     await stream.getByRole('button', { name: '对话太长了，总管把上面的内容整理成了 4 条摘要' }).click();
     await expect(stream.getByTestId('chief-digest-card')).toContainText('上面内容的摘要');
   });
@@ -163,7 +163,7 @@ test.describe('long-chat summaries on the home chat (T7)', () => {
     const empty = { ...digestRow('daily'), content: JSON.stringify({ kind: 'chief_digest', reason: 'daily', coversUntil: 12, madeAt: 1, items: [] }) };
     await mockDigest(page, [...HISTORY.slice(0, 3), empty, ...HISTORY.slice(3)]);
     await page.goto('/app');
-    const stream = page.getByTestId('chief-home').getByTestId('chief-stream');
+    const stream = page.getByTestId('home-c').getByTestId('chief-stream');
     await expect(stream).toContainText('已经补给它了');
     await expect(stream.getByTestId('chief-digest')).toHaveCount(0);
   });
@@ -172,7 +172,7 @@ test.describe('long-chat summaries on the home chat (T7)', () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await mockDigest(page, withDigest('daily'));
     await page.goto('/app');
-    const stream = page.getByTestId('chief-home').getByTestId('chief-stream');
+    const stream = page.getByTestId('home-c').getByTestId('chief-stream');
     await stream.getByRole('button', { name: /整理成了 4 条摘要/ }).click();
     await stream.getByTestId('chief-digest-card').scrollIntoViewIfNeeded();
     const width = await page.evaluate(() => document.documentElement.scrollWidth);

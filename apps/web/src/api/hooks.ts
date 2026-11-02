@@ -45,7 +45,6 @@ import type {
   PatchUserBody,
   PlanRow,
   ProjectCommitDetailResponse,
-  ProjectCoordinatorResponse,
   ProjectFileResponse,
   ProjectFilesResponse,
   ProjectRecord,
@@ -57,7 +56,6 @@ import type {
   SecretRecord,
   SetSecretBody,
   SkillRecord,
-  SnoozeUntil,
   StepJournalRow,
   TagRecord,
   TeamMember,
@@ -175,13 +173,6 @@ export const useTodos = (teamId: string | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['todos', teamId],
     queryFn: () => api.get<TodoRecord[]>(`/api/todos?teamId=${teamId}`),
-    enabled: enabled && teamId !== undefined,
-  });
-
-export const useArchivedTodos = (teamId: string | undefined, enabled: boolean) =>
-  useQuery({
-    queryKey: ['todos', teamId, 'archived'],
-    queryFn: () => api.get<TodoRecord[]>(`/api/todos?teamId=${teamId}&archived=1`),
     enabled: enabled && teamId !== undefined,
   });
 
@@ -519,17 +510,6 @@ export const useChiefThreads = (teamId: string | undefined, enabled: boolean) =>
       query.state.data?.some(threadTurnInFlight) ? CHIEF_THREADS_INFLIGHT_POLL_MS : false,
   });
 
-export const useProjectCoordinator = (projectId: string | undefined, enabled: boolean) =>
-  useQuery({
-    queryKey: ['projectCoordinator', projectId],
-    queryFn: () => api.get<ProjectCoordinatorResponse>(`/api/projects/${projectId}/coordinator`),
-    enabled: enabled && projectId !== undefined,
-    refetchInterval: (query) => {
-      const thread = query.state.data?.thread;
-      return thread != null && threadTurnInFlight(thread) ? CHIEF_THREADS_INFLIGHT_POLL_MS : false;
-    },
-  });
-
 export const useNotifications = (teamId: string | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['notifications', teamId],
@@ -708,30 +688,6 @@ export function useApiMutations(teamId: string | undefined) {
         qc.setQueryData(['todos', teamId], context?.previousList);
       },
     }),
-    snoozeTodo: useMutation({
-      mutationFn: (input: { id: string; until: SnoozeUntil }) =>
-        api.post<TodoRecord>(`/api/todos/${input.id}/snooze`, {
-          until: input.until,
-          tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        }),
-      onSuccess: (record) => {
-        qc.setQueryData(['todo', record.id], record);
-        qc.setQueryData<TodoRecord[]>(['todos', teamId], (records) =>
-          records?.map((row) => (row.id === record.id ? record : row)),
-        );
-        invalidateAll();
-      },
-    }),
-    unsnoozeTodo: useMutation({
-      mutationFn: (id: string) => api.post<TodoRecord>(`/api/todos/${id}/unsnooze`),
-      onSuccess: (record) => {
-        qc.setQueryData(['todo', record.id], record);
-        qc.setQueryData<TodoRecord[]>(['todos', teamId], (records) =>
-          records?.map((row) => (row.id === record.id ? record : row)),
-        );
-        invalidateAll();
-      },
-    }),
     deleteTodo: useMutation({
       mutationFn: (id: string) => api.del<void>(`/api/todos/${id}`),
       onSuccess: invalidateAll,
@@ -883,21 +839,6 @@ export function useApiMutations(teamId: string | undefined) {
               body,
             );
       },
-      onSuccess: invalidateAll,
-    }),
-    projectCoordinatorSend: useMutation({
-      mutationFn: (input: { projectId: string; content: string }) =>
-        api.post<{ thread: ChiefThread }>(`/api/projects/${input.projectId}/coordinator/messages`, {
-          content: input.content,
-        }),
-      onSuccess: invalidateAll,
-    }),
-    projectArchive: useMutation({
-      mutationFn: (input: { projectId: string; archived: boolean }) =>
-        api.post<ProjectRecord>(
-          `/api/projects/${input.projectId}/${input.archived ? 'archive' : 'unarchive'}`,
-          {},
-        ),
       onSuccess: invalidateAll,
     }),
     chiefRewind: useMutation({

@@ -28,7 +28,7 @@ export function useOrchestrateStart(): OrchestrateStart {
       if (!live || inFlight.current) return;
       const existing = inflightOrchestrationFor(
         queryClient.getQueryData<ChiefThread[]>(['chiefThreads', teamId]),
-        todo.seqNum,
+        todo,
       );
       if (existing !== null) {
         toast.warning(t('总管正在编排这张任务，等这一轮结束再发起。'), {

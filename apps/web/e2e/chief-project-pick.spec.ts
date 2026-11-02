@@ -117,7 +117,6 @@ async function mockLive(page: Page, opts: { projects?: typeof PROJECTS } = {}) {
   const projects = opts.projects ?? PROJECTS;
   const state = {
     sent: [] as Sent[],
-    patched: [] as { id: string; body: Record<string, unknown> }[],
     todos: [UNSTARTED, RUNNING, DONE] as Record<string, unknown>[],
     threads: [] as (typeof THREAD)[],
     messages: [] as { id: string; role: string; content: unknown; createdAt: number }[],
@@ -161,13 +160,6 @@ async function mockLive(page: Page, opts: { projects?: typeof PROJECTS } = {}) {
       });
     if (p === `/api/conversations/${THREAD.id}/messages`) return json({ messages: state.messages });
     if (p === '/api/teams/t1/agents/agent-1') return json(AGENT);
-    if (p.startsWith('/api/todos/') && request.method() === 'PATCH') {
-      const id = p.slice('/api/todos/'.length);
-      const body = request.postDataJSON() as Record<string, unknown>;
-      state.patched.push({ id, body });
-      state.todos = state.todos.map((t) => (t.id === id ? { ...t, ...body } : t));
-      return json(state.todos.find((t) => t.id === id));
-    }
     if (p === '/api/todos') return json(state.todos);
     if (p === '/api/projects') return json(projects);
     return json([]);
@@ -187,16 +179,23 @@ async function shot(page: Page, name: string) {
   await evidenceShot(page, name);
 }
 
-const home = (page: Page) => page.getByTestId('chief-home');
-const chip = (page: Page) => home(page).getByTestId('chief-project-chip');
-const input = (page: Page) => home(page).getByTestId('chief-composer-input');
+const drawer = (page: Page) => page.locator('.chief-drawer');
+const chip = (page: Page) => drawer(page).getByTestId('chief-project-chip');
+const input = (page: Page) => drawer(page).getByTestId('chief-composer-input');
+const homeInput = (page: Page) => page.getByTestId('home-c').getByTestId('chief-composer-input');
 
-test.describe('the home composer picks a project (T6 #2009)', () => {
+async function openDrawer(page: Page) {
+  await page.goto('/app?view=board');
+  await page.getByRole('button', { name: '总管', exact: true }).click();
+  await expect(drawer(page)).toBeVisible();
+}
+
+test.describe('the drawer composer picks a project (T6 #2009)', () => {
   test('the chip starts on 自动, lists every project with its description, and the pick rides on the send', async ({
     page,
   }) => {
     const state = await mockLive(page);
-    await page.goto('/app');
+    await openDrawer(page);
     await expect(chip(page)).toHaveText(/自动/);
     await expect(chip(page)).toHaveAttribute('aria-label', '发给哪个项目：自动，由总管判断');
     await chip(page).click();
@@ -222,10 +221,11 @@ test.describe('the home composer picks a project (T6 #2009)', () => {
 
   test('the pick survives a reload, and 自动 sends no projectId', async ({ page }) => {
     const state = await mockLive(page);
-    await page.goto('/app');
+    await openDrawer(page);
     await chip(page).click();
     await page.getByRole('menuitemradio', { name: /radar-digest/ }).click();
     await page.reload();
+    await expect(drawer(page)).toBeVisible();
     await expect(chip(page)).toHaveText(/radar-digest/);
     await chip(page).click();
     await page.getByRole('menuitemradio', { name: /自动/ }).click();
@@ -239,7 +239,7 @@ test.describe('the home composer picks a project (T6 #2009)', () => {
     page,
   }) => {
     const state = await mockLive(page);
-    await page.goto('/app');
+    await openDrawer(page);
     await input(page).fill('修一下链接 ');
     await input(page).pressSequentially('@site');
     const option = page.getByRole('option', { name: /cairn-site/ });
@@ -257,48 +257,40 @@ test.describe('the home composer picks a project (T6 #2009)', () => {
 
   test('a team with one project shows no chip', async ({ page }) => {
     await mockLive(page, { projects: [PROJECTS[0]!] });
-    await page.goto('/app');
+    await openDrawer(page);
     await expect(input(page)).toBeVisible();
     await expect(chip(page)).toHaveCount(0);
   });
 });
 
-test.describe('moving a task to another project (T6 #2009)', () => {
-  test('an unstarted task offers 换项目 and the pick patches its project', async ({ page }) => {
+test.describe('the home sends to the project it is filtered to (#2531)', () => {
+  test('the home has no chip; a project-filtered home sends that projectId and the unfiltered home sends none', async ({
+    page,
+  }) => {
     const state = await mockLive(page);
-    await page.goto('/app?task=todo-1');
-    const panel = page.getByRole('complementary', { name: '任务面板' });
-    await expect(panel.getByTestId('task-panel-meta')).toContainText('cairn');
-    const move = panel.getByTestId('task-panel-move');
-    await expect(move).toContainText('还没开始，放错了可以');
-    await move.getByRole('button', { name: '换项目' }).click();
-    const menu = page.getByRole('group', { name: '挪到哪个项目' });
-    await expect(menu.getByRole('menuitemradio')).toHaveCount(3);
-    await expect(menu.getByRole('menuitemradio', { name: /^cairn\b/ }).first()).toHaveAttribute(
-      'aria-checked',
-      'true',
-    );
-    await shot(page, 'move-menu.png');
-    await menu.getByRole('menuitemradio', { name: /cairn-site/ }).click();
-    await expect.poll(() => state.patched).toEqual([{ id: 'todo-1', body: { projectId: 'proj-2' } }]);
-    await expect(panel.getByTestId('task-panel-meta')).toContainText('cairn-site');
+    await page.goto('/app?project=proj-2');
+    await expect(homeInput(page)).toHaveAttribute('placeholder', /cairn-site/);
+    await expect(page.getByTestId('home-c').getByTestId('chief-project-chip')).toHaveCount(0);
+    await homeInput(page).fill('把按钮颜色统一一下');
+    await homeInput(page).press('Enter');
+    await expect
+      .poll(() => state.sent)
+      .toEqual([{ content: '把按钮颜色统一一下', projectId: 'proj-2' }]);
+    await page.goto('/app');
+    await homeInput(page).fill('早上的摘要没收到');
+    await homeInput(page).press('Enter');
+    await expect
+      .poll(() => state.sent.at(-1))
+      .toEqual({ content: '早上的摘要没收到' });
   });
 
-  test('a running task has no 换项目', async ({ page }) => {
-    await mockLive(page);
-    await page.goto('/app?task=todo-2');
-    const panel = page.getByRole('complementary', { name: '任务面板' });
-    await expect(panel.getByTestId('task-panel-title')).toHaveText('换作品区截图');
-    await expect(panel.getByTestId('task-panel-move')).toHaveCount(0);
-  });
-
-  test('phone width keeps the chip and the composer on screen', async ({ page }) => {
+  test('phone width keeps the composer on screen', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await mockLive(page);
-    await page.goto('/app');
-    await expect(chip(page)).toBeInViewport();
+    await page.goto('/app?project=proj-2');
+    await expect(homeInput(page)).toBeInViewport();
     const width = await page.evaluate(() => document.documentElement.scrollWidth);
     expect(width).toBeLessThanOrEqual(390);
-    await shot(page, 'chip-phone.png');
+    await shot(page, 'home-project-phone.png');
   });
 });

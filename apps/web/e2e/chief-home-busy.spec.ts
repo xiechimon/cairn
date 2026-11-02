@@ -186,7 +186,7 @@ test.describe('chief unavailable (T4)', () => {
   }) => {
     await mockLive(page, outageState());
     await page.goto('/app');
-    const home = page.getByTestId('chief-home');
+    const home = page.getByTestId('home-c');
     const banner = home.getByTestId('chief-outage');
     await expect(banner).toContainText('总管暂时不可用');
     await expect(banner).toContainText('relay-a/claude-opus');
@@ -221,7 +221,7 @@ test.describe('chief unavailable (T4)', () => {
   }) => {
     const calls = await mockLive(page, outageState());
     await page.goto('/app');
-    const home = page.getByTestId('chief-home');
+    const home = page.getByTestId('home-c');
     await home.getByTestId('queued-message').nth(1).getByRole('button', { name: '撤回' }).click();
     await expect.poll(() => calls).toContain('DELETE /messages/m2');
     await expect(home.getByTestId('chief-composer-input')).toHaveValue('顺便把空列提示也改一下');
@@ -249,7 +249,7 @@ test.describe('chief unavailable (T4)', () => {
     expect(width).toBeLessThanOrEqual(390);
   });
 
-  test('with a backup model the model row gets a dot, and the reply says which model answered', async ({
+  test('with a backup model the drawer model row gets a dot, and the reply says which model answered', async ({
     page,
   }) => {
     await mockLive(page, {
@@ -277,17 +277,19 @@ test.describe('chief unavailable (T4)', () => {
       ],
     });
     await page.goto('/app');
-    const home = page.getByTestId('chief-home');
-    const row = home.getByTestId('chief-model-row');
-    await expect(row).toContainText('备用模型 relay-b/glm-4.6');
-    await expect(row.getByTestId('chief-fallback-dot')).toBeVisible();
-    await expect(row).toContainText('主模型暂时用不了');
+    const home = page.getByTestId('home-c');
     const notes = home.getByTestId('chief-fallback-note');
     await expect(notes).toHaveCount(1);
     await expect(notes).toContainText('由备用模型 relay-b/glm-4.6 回答');
     await expect(home.getByTestId('chief-fallback-banner')).toContainText('relay-b/glm-4.6');
     await expect(home.getByTestId('chief-outage')).toHaveCount(0);
     await evidenceShot(page, 'fallback.png');
+    await page.goto('/app?view=board');
+    await page.getByRole('button', { name: '总管', exact: true }).click();
+    const row = page.locator('.chief-drawer').getByTestId('chief-model-row');
+    await expect(row).toContainText('备用模型 relay-b/glm-4.6');
+    await expect(row.getByTestId('chief-fallback-dot')).toBeVisible();
+    await expect(row).toContainText('主模型暂时用不了');
   });
 });
 
@@ -297,7 +299,7 @@ test.describe('queue, steer and stop while the chief is replying (T5)', () => {
   }) => {
     await mockLive(page, busyState());
     await page.goto('/app');
-    const home = page.getByTestId('chief-home');
+    const home = page.getByTestId('home-c');
     const queued = home.getByTestId('queued-message');
     await expect(queued).toHaveCount(2);
     await expect(queued.first()).toContainText('只看 cairn 项目就行');
@@ -324,7 +326,7 @@ test.describe('queue, steer and stop while the chief is replying (T5)', () => {
   test('the send button is a stop square only while busy with an empty input', async ({ page }) => {
     const calls = await mockLive(page, busyState());
     await page.goto('/app');
-    const home = page.getByTestId('chief-home');
+    const home = page.getByTestId('home-c');
     const stop = home.getByRole('button', { name: '停止总管这次回复' });
     await expect(stop).toBeVisible();
     const input = home.getByTestId('chief-composer-input');
@@ -353,7 +355,7 @@ test.describe('queue, steer and stop while the chief is replying (T5)', () => {
       ],
     });
     await page.goto('/app');
-    const home = page.getByTestId('chief-home');
+    const home = page.getByTestId('home-c');
     await expect(home.getByTestId('chief-stopped')).toHaveText('已停止，没有建任务。');
     await expect(home.getByRole('alert')).toHaveCount(0);
     await expect(home.getByRole('button', { name: '发送' })).toBeVisible();

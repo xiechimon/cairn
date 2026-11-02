@@ -17,63 +17,31 @@ import {
   Search,
   Server,
 } from 'lucide-react';
-import {
-  type ReactElement,
-  useCallback,
-  useEffect,
-  useId,
-  useMemo,
-  useReducer,
-  useRef,
-  useState,
-} from 'react';
+import { type ReactElement, useCallback, useId, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import { useApiMutations, useArchivedTodos, useNotifications } from '../api/hooks.js';
-import { toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { SidebarNavRow } from '../components/shell/sidebar-nav-row.js';
+import { SidebarProjectRow } from '../components/shell/sidebar-project.js';
 import { SidebarUser } from '../components/shell/sidebar-user.js';
 import { Button } from '../components/ui/button.js';
 import { Kbd } from '../components/ui/kbd.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
-import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
-import { blockDemoWrite, DEMO_MODE } from '../demo/demo-gate.js';
+import { DEMO_MODE } from '../demo/demo-gate.js';
 import { UserMenu } from '../detail/user-menu.js';
-import {
-  isDeleted,
-  isThreadArchived,
-  markArchived,
-  markDeleted,
-  markRenamed,
-  markUnarchived,
-  withRenamedTitles,
-} from '../fixtures/deletions.js';
+import { isDeleted } from '../fixtures/deletions.js';
 import { PROJECT_ID, PROJECT_NAME } from '../fixtures/fixtures.js';
 import type { TodoRecord } from '../fixtures/records.js';
-import { setFixtureSnooze, subscribeFixtureSnooze, withFixtureSnooze } from '../fixtures/snooze.js';
-import { isFixtureUnread, setFixtureUnread, subscribeFixtureUnread } from '../fixtures/unread.js';
 import { scrollFadeClassName, useScrollFade } from '../hooks/use-scroll-fade.js';
 import { useI18n } from '../i18n/provider.js';
 import { FOCUS_RING_INSET } from '../lib/focus-ring.js';
-import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { readStoredTheme } from '../theme.js';
 import { withColumnParam } from './columns.js';
 import { withoutBoardView } from './home.js';
 import { ProjectAvatar } from './project-avatar.js';
-import { RenameThreadDialog } from './rename-dialog.js';
-import {
-  ArchivedThreadGroup,
-  ProjectGroup,
-  projectThreads,
-  SnoozedThreadGroup,
-  threadHref,
-} from './sidebar-threads.js';
-import { SnoozeConfirmDialog, SnoozePickDialog } from './snooze-dialogs.js';
-import { presetInstant, type SnoozeChoice, type SnoozeRequest } from './snooze-presets.js';
-import { keepThreadUnread } from './thread-read-keep.js';
+import { threadStatus } from './thread-copy.js';
 
 export type SidebarSelected =
   | 'board'
@@ -107,7 +75,6 @@ interface BoardSidebarProps {
   selected?: SidebarSelected;
   projects?: SidebarProject[];
   todos?: TodoRecord[];
-  fixtureUnreadIds?: string[];
 }
 
 interface ResourceRow {
@@ -236,63 +203,39 @@ export function BoardSidebar({
   selected = 'board',
   projects,
   todos,
-  fixtureUnreadIds,
 }: BoardSidebarProps) {
   const { t } = useI18n();
-  const { user, live, teamId } = useLiveData();
+  const { user } = useLiveData();
   const navigate = useNavigate();
-  const mutations = useApiMutations(teamId);
-  const [, refresh] = useReducer((n: number) => n + 1, 0);
-  useEffect(() => subscribeFixtureUnread(refresh), []);
-  useEffect(() => subscribeFixtureSnooze(refresh), []);
-  const [pendingDelete, setPendingDelete] = useState<TodoRecord | null>(null);
-  const [pendingSnooze, setPendingSnooze] = useState<TodoRecord | null>(null);
-  const [pendingPick, setPendingPick] = useState<TodoRecord | null>(null);
-  const [pendingRename, setPendingRename] = useState<TodoRecord | null>(null);
   const { search, pathname } = useLocation();
   const stripped = withoutBoardView(withColumnParam(search, null));
   const baseParams = new URLSearchParams(stripped.startsWith('?') ? stripped.slice(1) : stripped);
+  const projectParam = pathname === '/app' ? baseParams.get('project') : null;
+  baseParams.delete('project');
   const homeParams = new URLSearchParams(baseParams);
   if (DEMO_MODE) homeParams.set('view', 'home');
+  const projectHref = (id: string) => {
+    const next = new URLSearchParams(homeParams);
+    next.set('project', id);
+    return { pathname: '/app', search: `?${next}` };
+  };
   const plain = `?${baseParams}`;
   const homeSearch = `?${homeParams}`;
   const projectRows = useMemo(
     () => (projects ?? [CANON_PROJECT]).filter((row) => !isDeleted(row.id)),
     [projects],
   );
-  const archivedQ = useArchivedTodos(teamId, live);
-  const knownThreads = live
-    ? (todos ?? [])
-    : withFixtureSnooze(withRenamedTitles(todos ?? [])).filter((todo) => !isDeleted(todo.id));
-  const openThreads = knownThreads.filter((todo) => !isThreadArchived(todo) && !isDeleted(todo.id));
-  const archivedThreads = live
-    ? (archivedQ.data ?? []).map(toDisplayTodo).filter((todo) => !isDeleted(todo.id))
-    : knownThreads.filter((todo) => isThreadArchived(todo));
-  const liveThreads = openThreads.filter((todo) => todo.snoozeMode == null);
-  const snoozedThreads = openThreads.filter((todo) => todo.snoozeMode != null);
-  const activeThreadId = pathname.startsWith('/app/todo/')
-    ? (pathname.split('/')[3] ?? null)
-    : null;
-  const notificationsQ = useNotifications(teamId, live);
-  const unreadIds = new Set(
-    live
-      ? (notificationsQ.data?.unreadThreadIds ?? [])
-      : liveThreads
-          .filter((todo) => isFixtureUnread(todo.id, fixtureUnreadIds))
-          .map((todo) => todo.id),
-  );
-  const setThreadRead = (id: string, read: boolean) => {
-    if (live) {
-      mutations.setThreadRead.mutate({ id, read });
-      return;
+  const activeProject = projectRows.some((row) => row.id === projectParam) ? projectParam : null;
+  const waitingByProject = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const todo of todos ?? []) {
+      const status = threadStatus(todo);
+      if ((status !== 'needs-you' && status !== 'failed') || todo.archivedAt != null) continue;
+      counts.set(todo.projectId, (counts.get(todo.projectId) ?? 0) + 1);
     }
-    setFixtureUnread(id, !read);
-  };
-  const markThreadUnread = (todo: TodoRecord) => {
-    if (!live && blockDemoWrite()) return;
-    if (todo.id === activeThreadId) keepThreadUnread(todo.id);
-    setThreadRead(todo.id, false);
-  };
+    return counts;
+  }, [todos]);
+
   const resourceRows = usageNav
     ? [...RESOURCE_ROWS.slice(0, 4), USAGE_ROW, ...RESOURCE_ROWS.slice(4)]
     : RESOURCE_ROWS;
@@ -311,109 +254,9 @@ export function BoardSidebar({
   const navRef = useRef<HTMLElement | null>(null);
   useScrollFade(navRef, { enabled: !collapsed });
   const resourceListId = useId();
-  const homeLabel = attention > 0 ? `${t('工作台')} ${attention}` : t('工作台');
+  const homeLabel = attention > 0 ? `${t('首页')} ${attention}` : t('首页');
 
   const goTo = (target: string) => navigate({ pathname: target, search: plain });
-  const unarchiveThread = (todo: TodoRecord) => {
-    if (!live) {
-      if (blockDemoWrite()) return;
-      markUnarchived(todo.id);
-      refresh();
-      return;
-    }
-    mutations.setTodoArchived.mutate(
-      { id: todo.id, archived: false },
-      { onError: (error) => toastError(t('Could not unarchive task.'), error) },
-    );
-  };
-  const unsnoozeThread = (todo: TodoRecord) => {
-    if (!live) {
-      setFixtureSnooze(todo.id, { snoozeMode: null, snoozedUntil: null });
-      return;
-    }
-    mutations.unsnoozeTodo.mutate(todo.id, {
-      onError: (error) => toastError(t('无法取消暂停。'), error),
-    });
-  };
-  const applySnooze = (todo: TodoRecord, request: SnoozeRequest) => {
-    const announce = () =>
-      toastSuccess(t('线程已暂停'), { label: t('撤销'), onClick: () => unsnoozeThread(todo) });
-    if (!live) {
-      if (blockDemoWrite()) return;
-      const until =
-        request === 'needed'
-          ? null
-          : typeof request === 'number'
-            ? request
-            : presetInstant(request, Date.now());
-      setFixtureSnooze(todo.id, {
-        snoozeMode: request === 'needed' ? 'needed' : 'until',
-        snoozedUntil: until,
-      });
-      announce();
-      return;
-    }
-    mutations.snoozeTodo.mutate(
-      { id: todo.id, until: request },
-      { onSuccess: announce, onError: (error) => toastError(t('无法暂停线程。'), error) },
-    );
-  };
-  const chooseSnooze = (todo: TodoRecord, choice: SnoozeChoice) => {
-    if (choice === 'needed') setPendingSnooze(todo);
-    else if (choice === 'pick') setPendingPick(todo);
-    else applySnooze(todo, choice);
-  };
-  const archiveThread = (todo: TodoRecord) => {
-    if (!live) {
-      if (blockDemoWrite()) return;
-      markArchived(todo.id);
-      refresh();
-      return;
-    }
-    mutations.setTodoArchived.mutate(
-      { id: todo.id, archived: true },
-      {
-        onSuccess: () =>
-          toastSuccess(t('Task archived'), {
-            label: t('Undo'),
-            onClick: () => unarchiveThread(todo),
-          }),
-        onError: (error) => toastError(t('Could not archive task.'), error),
-      },
-    );
-  };
-  const renameThread = (todo: TodoRecord, title: string) => {
-    setPendingRename(null);
-    if (!live) {
-      if (blockDemoWrite()) return;
-      markRenamed(todo.id, title);
-      refresh();
-      return;
-    }
-    mutations.patchTodo.mutate(
-      { id: todo.id, body: { title } },
-      { onError: (error) => toastError(t('无法重命名线程。'), error) },
-    );
-  };
-  const confirmDeleteThread = () => {
-    const todo = pendingDelete;
-    setPendingDelete(null);
-    if (todo == null) return;
-    const leave = () => {
-      if (activeThreadId === todo.id) goTo('/app');
-    };
-    if (live) {
-      mutations.deleteTodo.mutate(todo.id, {
-        onSuccess: leave,
-        onError: (error) => toastError(t('删除任务失败，请重试。'), error),
-      });
-      return;
-    }
-    if (blockDemoWrite()) return;
-    markDeleted(todo.id);
-    refresh();
-    leave();
-  };
 
   const userAvatar = (
     <SeededAvatar
@@ -483,7 +326,7 @@ export function BoardSidebar({
           <Link
             {...railLink(
               { pathname: '/app', search: homeSearch },
-              selected === 'board' || selected === 'kanban',
+              (selected === 'board' || selected === 'kanban') && activeProject === null,
               homeLabel,
             )}
           >
@@ -517,12 +360,9 @@ export function BoardSidebar({
           </Button>
           {!groupCollapsed.project &&
             projectRows.map((row, i) => {
-              const href = `/app/project/${row.id}`;
+              const href = projectHref(row.id);
               return (
-                <Link
-                  key={row.id}
-                  {...railLink({ pathname: href, search: plain }, pathname === href, row.name)}
-                >
+                <Link key={row.id} {...railLink(href, activeProject === row.id, row.name)}>
                   <ProjectAvatar name={row.name} tone={i} icon={row.icon} color={row.color} bare />
                 </Link>
               );
@@ -618,8 +458,8 @@ export function BoardSidebar({
         <div className="relative">
           <SidebarNavRow
             icon={<Inbox className="size-4" strokeWidth={STROKE} />}
-            label={t('工作台')}
-            active={selected === 'board' || selected === 'kanban'}
+            label={t('首页')}
+            active={(selected === 'board' || selected === 'kanban') && activeProject === null}
             onClick={() => navigate({ pathname: '/app', search: homeSearch })}
           />
           {attention > 0 && (
@@ -668,45 +508,18 @@ export function BoardSidebar({
           </Link>
         </div>
         {!groupCollapsed.project &&
-          projectRows.map((row, i) => {
-            const href = `/app/project/${row.id}`;
-            return (
-              <ProjectGroup
-                key={row.id}
-                name={row.name}
-                tone={i}
-                icon={row.icon}
-                color={row.color}
-                active={pathname === href}
-                activeThreadId={activeThreadId}
-                threads={projectThreads(liveThreads, row.id)}
-                unreadIds={unreadIds}
-                onOpenProject={() => goTo(href)}
-                onOpenThread={(todo) => goTo(threadHref(todo.id))}
-                onMarkUnread={markThreadUnread}
-                onRename={setPendingRename}
-                onSnooze={chooseSnooze}
-                onArchive={archiveThread}
-                onDelete={setPendingDelete}
-              />
-            );
-          })}
-        {!groupCollapsed.project && (
-          <SnoozedThreadGroup
-            threads={snoozedThreads}
-            activeThreadId={activeThreadId}
-            onOpenThread={(todo) => goTo(threadHref(todo.id))}
-            onUnsnooze={unsnoozeThread}
-          />
-        )}
-        {!groupCollapsed.project && (
-          <ArchivedThreadGroup
-            threads={archivedThreads}
-            activeThreadId={activeThreadId}
-            onOpenThread={(todo) => goTo(threadHref(todo.id))}
-            onUnarchive={unarchiveThread}
-          />
-        )}
+          projectRows.map((row, i) => (
+            <SidebarProjectRow
+              key={row.id}
+              name={row.name}
+              tone={i}
+              icon={row.icon}
+              color={row.color}
+              waiting={waitingByProject.get(row.id) ?? 0}
+              active={activeProject === row.id}
+              onClick={() => navigate(projectHref(row.id))}
+            />
+          ))}
       </nav>
 
       <div className="flex flex-none flex-col gap-px pt-2">
@@ -777,46 +590,6 @@ export function BoardSidebar({
           }
         />
       </div>
-      <SnoozeConfirmDialog
-        open={pendingSnooze != null}
-        onClose={() => setPendingSnooze(null)}
-        onConfirm={() => {
-          const todo = pendingSnooze;
-          setPendingSnooze(null);
-          if (todo != null) applySnooze(todo, 'needed');
-        }}
-      />
-      {pendingPick != null && (
-        <SnoozePickDialog
-          open
-          onClose={() => setPendingPick(null)}
-          onConfirm={(at) => {
-            const todo = pendingPick;
-            setPendingPick(null);
-            applySnooze(todo, at);
-          }}
-        />
-      )}
-      {pendingRename != null && (
-        <RenameThreadDialog
-          initialTitle={pendingRename.title}
-          onClose={() => setPendingRename(null)}
-          onSave={(title) => renameThread(pendingRename, title)}
-        />
-      )}
-      <DeleteConfirm
-        open={pendingDelete != null}
-        title={t('确定删除该任务？此操作不可撤销。')}
-        summary={
-          <>
-            <span className="text-(--text-tertiary)">#{pendingDelete?.seqNum}</span>
-            {pendingDelete?.title}
-          </>
-        }
-        ariaLabel={t('删除任务')}
-        onClose={() => setPendingDelete(null)}
-        onConfirm={confirmDeleteThread}
-      />
     </aside>
   );
 }

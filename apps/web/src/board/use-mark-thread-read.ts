@@ -4,7 +4,6 @@ import { useApiMutations, useNotifications } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { isFixtureUnread, setFixtureUnread, subscribeFixtureUnread } from '../fixtures/unread.js';
-import { isThreadKeptUnread, releaseThreadKeep } from './thread-read-keep.js';
 
 function useDocumentVisible(): boolean {
   const [visible, setVisible] = useState(() => document.visibilityState === 'visible');
@@ -28,7 +27,6 @@ export function useMarkThreadRead(todoId: string | undefined): void {
   const autoReadFor = useRef<string | null>(null);
 
   useEffect(() => subscribeFixtureUnread(refresh), []);
-  useEffect(() => () => (todoId === undefined ? undefined : releaseThreadKeep(todoId)), [todoId]);
 
   const unread =
     todoId !== undefined &&
@@ -42,7 +40,7 @@ export function useMarkThreadRead(todoId: string | undefined): void {
       return;
     }
     if (!visible || todoId === undefined) return;
-    if (isThreadKeptUnread(todoId) || autoReadFor.current === todoId) return;
+    if (autoReadFor.current === todoId) return;
     autoReadFor.current = todoId;
     if (live) mutations.setThreadRead.mutate({ id: todoId, read: true });
     else setFixtureUnread(todoId, false);

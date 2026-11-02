@@ -228,17 +228,9 @@ export interface FixtureSet {
   projectNames?: Record<string, string>;
   projectAvatars?: Record<string, { icon?: ProjectIcon; color?: ProjectColor }>;
   chief?: ChiefContent;
-  projectHome?: ProjectHomeFixture;
   github?: GithubFixture;
   tags?: Array<Pick<TagRecord, 'id' | 'name' | 'color'>>;
   agentTasks?: AgentTask[];
-}
-
-export interface ProjectHomeFixture {
-  goal: string | null;
-  repo?: string;
-  archived?: boolean;
-  sendError?: { draft: string; message: string };
 }
 
 export interface GithubFixture {
@@ -483,7 +475,7 @@ export interface ChiefSegment {
 }
 
 export type ChiefStreamItem =
-  | (ThreadReportContent & { id: string })
+  | (ThreadReportContent & { id: string; projectId?: string | null })
   | { kind: 'note'; text: string; machineName?: string }
   | { kind: 'error'; text: string }
   | { kind: 'handoff'; todoId: string; id?: string }
@@ -507,6 +499,7 @@ export type ChiefStreamItem =
       markdown?: string;
       pending?: 'queued' | 'held';
       at?: string;
+      projectId?: string | null;
     }
   | { kind: 'stopped'; todos: { id: string; seq: number; title: string }[]; id?: string }
   | {
@@ -519,6 +512,7 @@ export type ChiefStreamItem =
       tools?: ChiefToolRow[];
       id?: string;
       fallbackModel?: string;
+      projectId?: string | null;
     }
   | {
       kind: 'thinking';
@@ -582,7 +576,6 @@ export interface ChiefContent {
   modelProvider?: string | null;
   threadTitle: string;
   threadId?: string;
-  threadsOpen?: boolean;
   threads?: ChiefThreadRef[];
   examples?: ChiefExample[];
   draft?: string;
