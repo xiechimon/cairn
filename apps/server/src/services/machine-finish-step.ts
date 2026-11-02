@@ -59,6 +59,7 @@ import {
 } from './ci-loop.js';
 import { recoverClaudeRateLimitFailure } from './claude-rate-limit.js';
 import { coordinatorServerContextEnabled } from './coordinator-context.js';
+import { routedChiefAgent } from './coordinator-route.js';
 import { revokeStepGitCredential } from './credentials.js';
 import { quotaHoldBackoffMs, quotaHoldNote } from './dispatch-timeouts.js';
 import { diffTextNamesAFile, githubRepoOfProject, parseUnifiedDiff, projectOfTodo } from './git.js';
@@ -728,11 +729,11 @@ function chiefStepAgent(
 ): typeof agent.$inferSelect | null {
   if (stepRow.kind !== 'chief' || !isChiefConversation(stepRow.buildId)) return null;
   const row = deps.db
-    .select({ agentRow: agentTable })
+    .select({ agentRow: agentTable, teamId: chiefThread.teamId })
     .from(chiefThread)
     .innerJoin(chief, eq(chiefThread.chiefId, chief.id))
     .innerJoin(agentTable, eq(chief.agentId, agentTable.id))
     .where(eq(chiefThread.id, stepRow.buildId))
     .get();
-  return row?.agentRow ?? null;
+  return row ? routedChiefAgent(deps.db, row.teamId, row.agentRow) : null;
 }

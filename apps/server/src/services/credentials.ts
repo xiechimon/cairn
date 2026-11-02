@@ -11,6 +11,7 @@ import { agent, apiKey, build, chief, chiefThread, step, todo } from '../db/sche
 import { notFound } from '../lib/errors.js';
 import { createApiKey } from './api-keys.js';
 import { openClaudeSubscription } from './claude-subscriptions.js';
+import { routedChiefAgent } from './coordinator-route.js';
 import { agentForStep } from './dispatch-eligibility.js';
 import { openProviderKey, type ProviderDeps } from './providers.js';
 import { applyRoute, routeForStep } from './routing-rules.js';
@@ -132,8 +133,9 @@ export function resolveChiefStepCredentials(
   if (!threadRow) throw notFound(`chief thread ${threadId}`);
   const chiefRow = deps.db.select().from(chief).where(eq(chief.id, threadRow.chiefId)).get();
   if (!chiefRow?.agentId) throw notFound(`chief agent binding for ${threadId}`);
-  const agentRow = deps.db.select().from(agent).where(eq(agent.id, chiefRow.agentId)).get();
-  if (!agentRow) throw notFound(`agent ${chiefRow.agentId}`);
+  const boundAgent = deps.db.select().from(agent).where(eq(agent.id, chiefRow.agentId)).get();
+  if (!boundAgent) throw notFound(`agent ${chiefRow.agentId}`);
+  const agentRow = routedChiefAgent(deps.db, threadRow.teamId, boundAgent);
 
   const boxDeps: ProviderDeps & SecretDeps = deps;
   let provider: StepCredentialBundle['provider'] = null;

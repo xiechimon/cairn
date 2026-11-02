@@ -35,6 +35,7 @@ import {
 import { hasEarlierLiveChiefStep } from './chief-turns.js';
 import { claudeUsageGatePasses, refreshClaudeRateParks } from './claude-rate-limit.js';
 import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
+import { routedChiefAgent } from './coordinator-route.js';
 import {
   agentRunningCount,
   capabilityGatePasses,
@@ -121,7 +122,8 @@ function claimChiefCandidates(deps: MachineDeps, _machineId: string, teamId: str
       ),
     )
     .orderBy(asc(step.createdAt))
-    .all();
+    .all()
+    .map((row) => ({ ...row, agentRow: routedChiefAgent(deps.db, teamId, row.agentRow) }));
 }
 
 export function meetsMcpVersionGate(latestCliVersion: string | null): boolean {

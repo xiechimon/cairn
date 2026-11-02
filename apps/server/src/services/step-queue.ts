@@ -2,6 +2,7 @@ import type { StepQueueBlocked, StepQueueInfo } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { agent, build, chief, chiefThread, machine, step, todo } from '../db/schema.js';
+import { routedChiefAgent } from './coordinator-route.js';
 import {
   agentForStep,
   agentIdForStep,
@@ -93,7 +94,10 @@ export function stepQueueProjector(db: Db, teamId: string) {
       return base === null ? null : applyRoute(base, routeForStep(db, row.todoRow, row.kind));
     }
     const chiefRow = db.select().from(chief).where(eq(chief.id, row.chiefId)).get();
-    return agentRowOf(chiefRow?.agentId ?? null);
+    const bound = agentRowOf(chiefRow?.agentId ?? null);
+    return bound === null || chiefRow === undefined
+      ? bound
+      : routedChiefAgent(db, chiefRow.teamId, bound);
   }
 
   function blockedFor(
