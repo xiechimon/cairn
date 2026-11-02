@@ -898,7 +898,7 @@ test('a node --test file that hangs before registering any test is killed at the
   try {
     writeFileSync(
       join(root, 'linger.test.mjs'),
-      "import { test } from 'node:test';\nawait new Promise(() => setInterval(() => {}, 1000));\ntest('never registered', () => {});\n",
+      "import { writeFileSync } from 'node:fs';\nimport { test } from 'node:test';\nwriteFileSync('child.pid', String(process.pid));\nawait new Promise(() => setInterval(() => {}, 1000));\ntest('never registered', () => {});\n",
     );
     const exits = [];
     const started = Date.now();
@@ -911,6 +911,8 @@ test('a node --test file that hangs before registering any test is killed at the
     });
     assert.deepEqual(exits, [1]);
     assert.ok(Date.now() - started < 30_000);
+    const child = Number(readFileSync(join(root, 'child.pid'), 'utf8'));
+    assert.throws(() => process.kill(child, 0), { code: 'ESRCH' });
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
