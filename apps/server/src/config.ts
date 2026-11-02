@@ -58,6 +58,7 @@ export const serverConfigSchema = z.object({
   issueIntake: z.boolean(),
   intakeAgentAllowlist: z.array(z.string()),
   scheduling: z.boolean(),
+  routingRules: z.boolean(),
   trajectoryOutcomeBackfill: z.boolean(),
   trajectoryReflectCurate: z.boolean(),
   trajectoryReflectOpenGuardIssues: z.boolean(),
@@ -168,6 +169,7 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
       .map((name) => name.trim())
       .filter((name) => name !== ''),
     scheduling: envFlag(ENV_VARS.scheduling),
+    routingRules: envFlag(ENV_VARS.routingRules),
     trajectoryOutcomeBackfill: envFlag(ENV_VARS.trajectoryOutcomeBackfill),
     trajectoryReflectCurate: envFlag(ENV_VARS.trajectoryReflectCurate),
     trajectoryReflectOpenGuardIssues: envFlag(ENV_VARS.trajectoryReflectOpenGuardIssues),

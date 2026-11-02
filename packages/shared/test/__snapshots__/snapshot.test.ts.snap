@@ -6581,6 +6581,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > executor minimum-
     "mcpConfig": "CAIRN_MCP_CONFIG",
     "piCacheRetention": "CAIRN_PI_CACHE_RETENTION",
     "requireToken": "CAIRN_REQUIRE_TOKEN",
+    "routingRules": "CAIRN_ROUTING_RULES",
     "scheduling": "CAIRN_SCHEDULING",
     "server": "CAIRN_SERVER",
     "skillsDir": "CAIRN_SKILLS_DIR",
@@ -7064,6 +7065,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "autonomous_merge_admission",
   "chief_report",
   "retro_proposal",
+  "routing_rule",
 ]
 `;
 
