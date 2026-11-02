@@ -1,6 +1,6 @@
 import { and, desc, eq, inArray, isNotNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { agent, chiefThread, chiefTurnUsage, provider } from '../db/schema.js';
+import { chiefThread, chiefTurnUsage, provider } from '../db/schema.js';
 
 export const DEFAULT_CONTEXT_WINDOW = 128_000;
 
@@ -14,27 +14,25 @@ export function coordinatorServerContextEnabled(): boolean {
   return serverContextOn;
 }
 
-function contextWindowOf(db: Db, teamId: string, agentId: string | null): number {
-  if (agentId === null) return DEFAULT_CONTEXT_WINDOW;
-  const agentRow = db.select().from(agent).where(eq(agent.id, agentId)).get();
-  if (agentRow?.provider == null || agentRow.modelId == null) return DEFAULT_CONTEXT_WINDOW;
+function contextWindowOf(db: Db, teamId: string, usageModel: string): number {
+  const slash = usageModel.indexOf('/');
+  if (slash <= 0) return DEFAULT_CONTEXT_WINDOW;
+  const providerId = usageModel.slice(0, slash);
+  const modelId = usageModel.slice(slash + 1);
   const providerRow = db
     .select({ models: provider.models })
     .from(provider)
-    .where(and(eq(provider.teamId, teamId), eq(provider.providerId, agentRow.provider)))
+    .where(and(eq(provider.teamId, teamId), eq(provider.providerId, providerId)))
     .get();
-  return (
-    providerRow?.models.find((m) => m.id === agentRow.modelId)?.contextWindow ??
-    DEFAULT_CONTEXT_WINDOW
-  );
+  return providerRow?.models.find((m) => m.id === modelId)?.contextWindow ?? DEFAULT_CONTEXT_WINDOW;
 }
 
 export function lastTurnContext(
   db: Db,
-  chiefRow: { id: string; teamId: string; agentId: string | null },
+  chiefRow: { id: string; teamId: string },
 ): { tokens: number; contextWindow: number } | null {
   const last = db
-    .select({ tokens: chiefTurnUsage.contextTokens })
+    .select({ tokens: chiefTurnUsage.contextTokens, model: chiefTurnUsage.model })
     .from(chiefTurnUsage)
     .where(
       and(
@@ -53,6 +51,6 @@ export function lastTurnContext(
   if (last?.tokens == null) return null;
   return {
     tokens: last.tokens,
-    contextWindow: contextWindowOf(db, chiefRow.teamId, chiefRow.agentId),
+    contextWindow: contextWindowOf(db, chiefRow.teamId, last.model),
   };
 }

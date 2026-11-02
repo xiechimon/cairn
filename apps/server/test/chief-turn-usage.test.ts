@@ -287,7 +287,7 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
     expect(getChiefEnvelope(H.s.svc, H.teamId).context).toBeNull();
   });
 
-  test('flag on: the window comes from the chief model in its provider catalog', async () => {
+  test('flag on: the window comes from the model that ran the last turn, from its provider catalog', async () => {
     H.s.db
       .insert(providerTable)
       .values({
@@ -308,11 +308,20 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
     claimedStep(machineId, 'turn-w');
     await finishStep(deps(), machineId, 'turn-w', {
       status: 'success',
-      usage: [usage('pi/stub-model', 100, 0, { contextTokens: 110 })],
+      usage: [usage('stub-gw/stub-model', 100, 0, { contextTokens: 110 })],
     });
     expect(getChiefEnvelope(H.s.svc, H.teamId).context).toEqual({
       tokens: 110,
       contextWindow: 200_000,
+    });
+    claimedStep(machineId, 'turn-fallback', { createdAt: Date.now() + 5 });
+    await finishStep(deps(), machineId, 'turn-fallback', {
+      status: 'success',
+      usage: [usage('other-gw/fallback-model', 100, 0, { contextTokens: 120 })],
+    });
+    expect(getChiefEnvelope(H.s.svc, H.teamId).context).toEqual({
+      tokens: 120,
+      contextWindow: DEFAULT_CONTEXT_WINDOW,
     });
   });
 });
