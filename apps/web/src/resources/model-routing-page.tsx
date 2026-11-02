@@ -39,6 +39,8 @@ import { PROVIDERS_HREF } from './providers-page.js';
 
 export const MODEL_ROUTING_HREF = '/app/resources/model-routing';
 
+type PageTabId = 'accounts' | 'routing';
+
 const VENDOR_PRESETS: Record<Exclude<AccountVendor, 'claude'>, string> = {
   codex: 'openai-codex',
   grok: 'xai',
@@ -75,6 +77,7 @@ export function ModelRoutingPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const vendorParam = searchParams.get('vendor');
   const vendor: AccountVendor = ACCOUNT_VENDORS.find((v) => v === vendorParam) ?? 'claude';
+  const tab: PageTabId = searchParams.get('tab') === 'routing' ? 'routing' : 'accounts';
   const fixture = resolveScenario(searchParams);
   const fixtureAccounts = fixture.resources?.accounts;
   const { live, teamId } = useLiveData();
@@ -179,8 +182,19 @@ export function ModelRoutingPage() {
       title={t('模型路由')}
       selected={MODEL_ROUTING_HREF}
       fixture={fixture}
+      tabs={[
+        { id: 'accounts', label: '账户' },
+        { id: 'routing', label: '路由' },
+      ]}
+      tab={tab}
+      onTab={(next) => {
+        const params = new URLSearchParams(searchParams);
+        if (next === 'routing') params.set('tab', 'routing');
+        else params.delete('tab');
+        setSearchParams(params, { replace: true });
+      }}
     >
-      <div className="flex flex-col gap-10 pb-16">
+      {tab === 'accounts' ? (
         <SubscriptionAccounts
           accounts={accounts}
           stepsByAccount={stepsByAccount}
@@ -240,44 +254,49 @@ export function ModelRoutingPage() {
             };
           }}
         />
-        <section className="flex flex-col gap-2">
-          <SectionHead title={t('Claude 用量')} />
-          <SettingsCard>
-            <SettingsRow label={t('付费方式')} className="flex-wrap gap-y-2 py-2.5">
-              <SettingsSegmented
-                label={t('Claude 用量')}
-                value={claudeUsage}
-                onChange={setClaudeUsage}
-                options={[
-                  { value: 'subscription-only', label: t('只用订阅') },
-                  { value: 'allow-paid', label: t('允许按量付费') },
-                ]}
-              />
-            </SettingsRow>
-          </SettingsCard>
-          <p data-testid="claude-usage-hint" className="m-0 px-1 text-meta text-content-tertiary">
-            {claudeUsage === 'subscription-only'
-              ? t('只用订阅，按 token 付费的 Claude 调用一律拦下，包括后台任务。')
-              : t('订阅不够时，可以改用按 token 付费的 Claude API key。')}
-          </p>
-        </section>
-        <section data-testid="routing-section" className="flex flex-col gap-2">
-          <SectionHead title={t('路由')} hint={t('每种用途用哪个模型、走哪个连接')} />
-          <div className="overflow-x-auto rounded-(--radius-card) bg-card px-4 py-4 shadow-(--e1)">
-            {graph === null ? (
-              <p className="m-0 text-meta text-content-tertiary">{t('正在读取路由…')}</p>
-            ) : graph.jobs.length === 0 ? (
-              <p data-testid="routing-empty" className="m-0 text-meta text-content-tertiary">
-                {t('还没有路由，添加一个订阅账户后这里会画出每种用途走哪个连接。')}
-              </p>
-            ) : (
-              <div className="min-w-160">
-                <RoutingGraph jobs={graph.jobs} connections={graph.connections} />
-              </div>
-            )}
-          </div>
-        </section>
-      </div>
+      ) : (
+        <div className="flex flex-col gap-8 pb-16">
+          <section className="flex flex-col gap-2">
+            <SectionHead title={t('Claude 用量')} />
+            <SettingsCard>
+              <SettingsRow label={t('付费方式')} className="flex-wrap gap-y-2 py-2.5">
+                <SettingsSegmented
+                  label={t('Claude 用量')}
+                  value={claudeUsage}
+                  onChange={setClaudeUsage}
+                  options={[
+                    { value: 'subscription-only', label: t('只用订阅') },
+                    { value: 'allow-paid', label: t('允许按量付费') },
+                  ]}
+                />
+              </SettingsRow>
+            </SettingsCard>
+            <p data-testid="claude-usage-hint" className="m-0 px-1 text-meta text-content-tertiary">
+              {claudeUsage === 'subscription-only'
+                ? t('只用订阅，按 token 付费的 Claude 调用一律拦下，包括后台任务。')
+                : t('订阅不够时，可以改用按 token 付费的 Claude API key。')}
+            </p>
+          </section>
+          <section data-testid="routing-section" className="flex flex-col gap-2">
+            <p className="m-0 px-1 text-meta text-content-tertiary">
+              {t('每种用途用哪个模型、走哪个连接')}
+            </p>
+            <div className="overflow-x-auto rounded-(--radius-card) bg-card px-4 py-4 shadow-(--e1)">
+              {graph === null ? (
+                <p className="m-0 text-meta text-content-tertiary">{t('正在读取路由…')}</p>
+              ) : graph.jobs.length === 0 ? (
+                <p data-testid="routing-empty" className="m-0 text-meta text-content-tertiary">
+                  {t('还没有路由，添加一个订阅账户后这里会画出每种用途走哪个连接。')}
+                </p>
+              ) : (
+                <div className="min-w-160">
+                  <RoutingGraph jobs={graph.jobs} connections={graph.connections} />
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
+      )}
       {adding && (
         <AddClaudeSubscriptionDialog
           onClose={() => {

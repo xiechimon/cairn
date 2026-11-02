@@ -31,6 +31,10 @@ test('fixture: vendor sections pool quota per window and the graph routes every 
   await page.reload();
   await expect(page.getByRole('tab', { name: /Grok 1/ })).toHaveAttribute('aria-selected', 'true');
 
+  await expect(page.getByTestId('routing-section')).toHaveCount(0);
+  await page.getByRole('tab', { name: '路由' }).click();
+  await expect(page).toHaveURL(/tab=routing/);
+  await expect(page.getByTestId('subscription-accounts')).toHaveCount(0);
   const graph = page.getByTestId('routing-section');
   await expect(graph.locator('[data-slot="routing-node"]')).toHaveCount(11);
   await expect(graph.locator('[data-slot="routing-node"][data-unavailable]')).toHaveCount(2);
@@ -41,11 +45,16 @@ test('fixture: vendor sections pool quota per window and the graph routes every 
 
 test('fixture: empty team shows every vendor with an add action and no quota', async ({ page }) => {
   await page.goto('/app/resources/model-routing?scenario=model-routing-empty');
-  await expect(page.getByRole('tab')).toHaveText([/Claude 0/, /Codex 0/, /Grok 0/]);
+  await expect(page.getByRole('tablist', { name: '订阅账户' }).getByRole('tab')).toHaveText([
+    /Claude 0/,
+    /Codex 0/,
+    /Grok 0/,
+  ]);
   await expect(page.getByTestId('pool-window')).toHaveCount(0);
   await expect(page.getByText('还没有 Claude 账户')).toBeVisible();
   await page.getByRole('tab', { name: /Grok 0/ }).click();
   await expect(page.getByText('还没有 Grok 账户')).toBeVisible();
+  await page.getByRole('tab', { name: '路由' }).click();
   await expect(page.getByTestId('routing-empty')).toBeVisible();
 });
 
@@ -180,6 +189,7 @@ test('live: rename, verify, remove and the Claude usage switch hit the agreed ro
   await confirm.getByRole('button', { name: '移除', exact: true }).click();
   await expect.poll(() => calls).toContain('DELETE s2');
 
+  await page.getByRole('tab', { name: '路由' }).click();
   await expect(page.getByTestId('claude-usage-hint')).toContainText('只用订阅');
   await page.getByRole('radio', { name: '允许按量付费' }).click();
   await expect.poll(() => calls).toContain('PATCH team allow-paid');
