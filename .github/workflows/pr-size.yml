@@ -1,11 +1,12 @@
 name: pr-size
 
 # A size:* label for context only (D68), as t3code does: it never blocks and
-# no required check depends on it. The script runs from main, never from the
-# PR head, because this job holds a token that can write labels.
+# no required check depends on it. pull_request_target so fork and Dependabot
+# PRs get a token that can write labels; it is safe because the job checks out
+# only main's script and reads the PR through the API, never running PR code.
 
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, reopened, synchronize, ready_for_review]
 
 permissions:
