@@ -1,5 +1,6 @@
 import { defineConfig } from 'vitest/config';
 import { scrubGitEnv } from './scripts/scrub-git-env.mjs';
+import { TimedShardSequencer } from './scripts/vitest-timed-shard.mjs';
 
 scrubGitEnv();
 
@@ -16,5 +17,6 @@ const projects =
 export default defineConfig({
   test: {
     projects,
+    sequence: { sequencer: TimedShardSequencer },
   },
 });
