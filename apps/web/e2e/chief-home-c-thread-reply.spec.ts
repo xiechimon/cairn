@@ -123,6 +123,7 @@ test('a needs-you card replies straight to its thread and says where it went', a
   await box.press('Enter');
   await expect(target).toContainText('Sent to #7.');
   await expect(box).toHaveValue('');
+  await expect(box).not.toBeEditable();
   expect(sent).toHaveLength(1);
   expect(sent[0]).toMatchObject({
     todoId: 'todo-7',

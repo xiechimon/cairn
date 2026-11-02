@@ -70,7 +70,7 @@ export function ThreadReply({ seq, delivery, onSend, autoFocus, className }: Thr
         placeholder={t('回复 #{seq}…', { seq })}
         rows={1}
         autoFocus={autoFocus}
-        readOnly={state === 'sending'}
+        readOnly={state === 'sending' || state === 'sent'}
         value={draft}
         onChange={(event) => {
           setDraft(event.target.value);
