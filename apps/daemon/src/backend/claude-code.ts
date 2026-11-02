@@ -875,25 +875,30 @@ const METERED_CLAUDE_AUTH_BLANK = {
 
 export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
   const managedMcp = parts.strictMcpConfig === true;
-  const mcpSection: Pick<Options, 'mcpServers' | 'strictMcpConfig'> = managedMcp
-    ? { mcpServers: parts.mcpServers, strictMcpConfig: true }
-    : Object.keys(parts.mcpServers).length > 0
-      ? { mcpServers: parts.mcpServers }
-      : {};
+  const hostMcp = Object.fromEntries(
+    Object.entries(parts.mcpServers).filter(([slug]) => slug === HOST_MCP_SERVER_NAME),
+  );
+  const mcpSection: Pick<Options, 'mcpServers' | 'strictMcpConfig'> = !parts.inOrb
+    ? { mcpServers: hostMcp, strictMcpConfig: true }
+    : managedMcp
+      ? { mcpServers: parts.mcpServers, strictMcpConfig: true }
+      : Object.keys(parts.mcpServers).length > 0
+        ? { mcpServers: parts.mcpServers }
+        : {};
   return {
     cwd: parts.cwd,
     model: parts.modelId,
     ...(parts.inOrb
       ? { permissionMode: 'bypassPermissions' as const, allowDangerouslySkipPermissions: true }
       : { permissionMode: 'dontAsk' as const, allowedTools: [...HOST_ALLOWED_TOOLS] }),
-    disallowedTools: parts.disallowedTools,
+    disallowedTools: parts.inOrb ? parts.disallowedTools : [...parts.disallowedTools, 'Bash'],
     ...(parts.inOrb
       ? parts.builtinTools !== undefined
         ? { tools: parts.builtinTools }
         : {}
       : { tools: parts.builtinTools ?? [...HOST_BUILTIN_TOOLS] }),
     includePartialMessages: true,
-    settingSources: [...CLAUDE_SETTING_SOURCES],
+    settingSources: parts.inOrb ? [...CLAUDE_SETTING_SOURCES] : ['project'],
     ...mcpSection,
     ...(parts.effort !== undefined ? { effort: parts.effort } : {}),
     ...(parts.append !== undefined
@@ -908,7 +913,7 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
     ...(parts.resumeId !== null ? { resume: parts.resumeId } : { sessionId: parts.sessionId }),
     settings: {
       env: claudeCliEnv({}),
-      ...(parts.inOrb ? {} : { disableAllHooks: true }),
+      ...(parts.inOrb ? {} : { disableAllHooks: true, disableSkillShellExecution: true }),
       ...(parts.skillDenyRules !== undefined && parts.skillDenyRules.length > 0
         ? { permissions: { deny: [...parts.skillDenyRules] } }
         : {}),

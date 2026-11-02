@@ -256,6 +256,25 @@ describe('buildClaudeSdkOptions permission mode by execution place', () => {
     expect(opts.plugins).toBeUndefined();
   });
 
+  test('a host step inherits no user or local settings, no shell and only the cairn MCP server', () => {
+    const opts = buildClaudeSdkOptions({
+      ...baseParts(),
+      inOrb: false,
+      mcpServers: {
+        cairn: { type: 'sdk', name: 'cairn', instance: {} } as never,
+        attached: { type: 'stdio', command: 'sh' },
+      },
+    });
+    expect(opts.settingSources).toEqual(['project']);
+    expect(opts.settings).toMatchObject({
+      disableAllHooks: true,
+      disableSkillShellExecution: true,
+    });
+    expect(opts.disallowedTools).toContain('Bash');
+    expect(opts.strictMcpConfig).toBe(true);
+    expect(Object.keys(opts.mcpServers ?? {})).toEqual(['cairn']);
+  });
+
   test('a host step that asks for no built-ins keeps none', () => {
     expect(buildClaudeSdkOptions({ ...baseParts(), inOrb: false, builtinTools: [] }).tools).toEqual(
       [],
