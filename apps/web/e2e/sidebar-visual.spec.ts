@@ -52,8 +52,8 @@ for (const theme of ['light', 'dark'] as const) {
       const selected = document.querySelector(
         'aside [data-slot="sidebar-nav-row"][aria-current="page"]',
       );
-      const plain = [...document.querySelectorAll('aside [data-slot="sidebar-nav-row"]')].find(
-        (el) => el.getAttribute('aria-current') !== 'page' && el.textContent?.includes('定时'),
+      const plain = document.querySelector(
+        'aside [data-slot="sidebar-project-row"]:not([aria-current="page"])',
       );
       if (!selected || !plain) throw new Error('sidebar rows missing');
       return { selected: box(selected), plain: box(plain) };
@@ -71,7 +71,7 @@ for (const theme of ['light', 'dark'] as const) {
     const sidebarBg = await page.evaluate(
       () => getComputedStyle(document.querySelector('aside')!).backgroundColor,
     );
-    const schedules = page.getByRole('complementary').getByRole('button', { name: '定时' });
+    const schedules = page.getByRole('complementary').locator('[data-slot="sidebar-project-row"]').first();
     await schedules.hover();
     await page.waitForTimeout(300);
     const hoverBg = await schedules.evaluate((el) => getComputedStyle(el).backgroundColor);

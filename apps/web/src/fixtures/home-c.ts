@@ -2,6 +2,7 @@ import { boardDefault } from './board.js';
 import { chiefDefault } from './chief.js';
 import { PROJECT_ID, probeTodo, r7 } from './core.js';
 import type { ChiefContent, FixtureSet, TodoRecord } from './records.js';
+import { scheduleOnce } from './schedules.js';
 
 export const HOME_C_CRED = 'home-c-cred';
 
@@ -102,6 +103,7 @@ export const homeC: FixtureSet = {
     homeTodo('home-c-done', 2201, 'Unread dot on threads', 'done', PROJECT_ID),
   ],
   chief: conversation,
+  schedules: [scheduleOnce],
   now: r7(20, 30),
 };
 
