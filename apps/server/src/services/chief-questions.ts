@@ -12,11 +12,12 @@ import {
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Db } from '../db/client.js';
-import { agent, chief, chiefMessage, chiefThread } from '../db/schema.js';
+import { agent, chief, chiefMessage, chiefThread, step } from '../db/schema.js';
 import { HttpError, parseWith } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { notifyChiefMessage } from './notifications.js';
+import { pickedProjectIdOf } from './picked-project.js';
 import { pushToUserSafely, type VapidKeys } from './push.js';
 
 export interface ChiefQuestionDeps {
@@ -29,7 +30,10 @@ export interface ChiefQuestionDeps {
 
 export const ASK_HOLD_MS = 70_000;
 
-export const ASK_EXPIRED_REASON = 'expired after 30 min; reply to continue';
+export const ASK_PARK_MS = ASK_HOLD_MS;
+
+export const ASK_PARKED_REASON =
+  '用户还没有回答。问题已留在用户的待办和对话里，用户回答后会开新一轮把问题和答复一起带给你。请现在简短说明在等用户回答，然后结束本轮，不要继续等待。';
 
 const ASK_POLL_MS = 400;
 
@@ -61,6 +65,29 @@ function readQuestion(db: Db, threadId: string, requestId: string): AskUserQuest
   return row === undefined ? null : askQuestionContentOf(row.content);
 }
 
+function askingTurnProjectId(db: Db, threadId: string): string | null {
+  const turn = db
+    .select({ prompt: step.prompt })
+    .from(step)
+    .where(and(eq(step.buildId, threadId), eq(step.kind, 'chief'), eq(step.status, 'claimed')))
+    .get();
+  return pickedProjectIdOf(turn?.prompt ?? null);
+}
+
+function questionAskedAt(db: Db, threadId: string, requestId: string): number | null {
+  return (
+    db
+      .select({ createdAt: chiefMessage.createdAt })
+      .from(chiefMessage)
+      .where(and(eq(chiefMessage.id, requestId), eq(chiefMessage.threadId, threadId)))
+      .get()?.createdAt ?? null
+  );
+}
+
+function parkedReply(content: AskUserQuestionContent): AskUserQuestionContent {
+  return { ...content, status: 'cancelled', cancelReason: ASK_PARKED_REASON };
+}
+
 function writeQuestion(
   db: Db,
   threadId: string,
@@ -74,6 +101,7 @@ function writeQuestion(
       threadId,
       role: 'assistant',
       content: JSON.stringify(content),
+      projectId: askingTurnProjectId(db, threadId),
       createdAt,
     })
     .onConflictDoUpdate({
@@ -166,6 +194,14 @@ export async function holdForQuestion(
     if (input.signal?.aborted === true) return null;
     const content = readQuestion(deps.db, input.threadId, input.requestId);
     if (content === null || content.status !== 'pending') return content;
+    if (content.parkedAt !== undefined) return parkedReply(content);
+    const askedAt = questionAskedAt(deps.db, input.threadId, input.requestId);
+    if (askedAt !== null && Date.now() - askedAt >= ASK_PARK_MS) {
+      const parked: AskUserQuestionContent = { ...content, parkedAt: Date.now() };
+      writeQuestion(deps.db, input.threadId, input.requestId, parked, askedAt);
+      publishRow(deps, input.threadId, input.requestId);
+      return parkedReply(parked);
+    }
     if (Date.now() >= deadline) return null;
     await new Promise((r) => setTimeout(r, ASK_POLL_MS));
   }
@@ -240,19 +276,18 @@ export function cancelPendingQuestions(
   deps: ChiefQuestionDeps,
   threadId: string,
   reason: string,
-): number {
+): void {
   const rows = deps.db.select().from(chiefMessage).where(eq(chiefMessage.threadId, threadId)).all();
-  let cancelled = 0;
   for (const row of rows) {
     if (row.id.startsWith('user-') || row.id.startsWith('chief-err-')) continue;
     const content = askQuestionContentOf(row.content);
-    if (content === null || content.status !== 'pending') continue;
+    if (content === null || content.status !== 'pending' || content.parkedAt !== undefined) {
+      continue;
+    }
     const next: AskUserQuestionContent = { ...content, status: 'cancelled', cancelReason: reason };
     writeQuestion(deps.db, threadId, row.id, next, nowMs());
     publishRow(deps, threadId, row.id);
-    cancelled += 1;
   }
-  return cancelled;
 }
 
 export function parseAnswerBody(raw: unknown): AskUserAnswer[] {

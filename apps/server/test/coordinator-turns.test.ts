@@ -1,4 +1,8 @@
-import { buildOrchestratePrompt, CHIEF_TURN_ERROR_KIND } from '@cairn/shared';
+import {
+  ASK_USER_QUESTION_KIND,
+  buildOrchestratePrompt,
+  CHIEF_TURN_ERROR_KIND,
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import {
@@ -9,7 +13,6 @@ import {
   stopPending,
 } from '../src/db/schema.js';
 import { enqueueChiefStep, upsertChiefMessage } from '../src/services/chief.js';
-import { ASK_EXPIRED_REASON, createOrGetQuestion } from '../src/services/chief-questions.js';
 import {
   CHIEF_TURN_MAX_MS,
   recordChiefStop,
@@ -206,39 +209,36 @@ describe('overlong chief turns are stopped so one turn cannot block the thread',
       'pending',
     );
   });
-  test('an overlong turn waiting on ask_user expires the question first, then stops; a late answer is refused', async () => {
+  test('the watchdog leaves a parked question alone while it stops an overlong running turn', () => {
     const now = Date.now();
-    seedClaimed('asking', now - CHIEF_TURN_MAX_MS - 1, now);
-    createOrGetQuestion(
-      { db: H.s.db },
-      {
+    H.s.db
+      .insert(chiefMessage)
+      .values({
+        id: 'ask-parked',
         threadId: H.threadId,
-        requestId: 'ask-late',
-        questions: [{ header: 'pick', question: 'which?', options: [] }],
-      },
-    );
+        role: 'assistant',
+        content: JSON.stringify({
+          kind: ASK_USER_QUESTION_KIND,
+          requestId: 'ask-parked',
+          status: 'pending',
+          questions: [{ header: 'pick', question: 'which?', options: [] }],
+          answers: null,
+          parkedAt: now - CHIEF_TURN_MAX_MS,
+        }),
+        createdAt: now - CHIEF_TURN_MAX_MS - 5000,
+      })
+      .run();
+    seedClaimed('running', now - CHIEF_TURN_MAX_MS - 1, now);
     sweepOverlongChiefTurns(H.s.svc, now);
-    const row = H.s.db.select().from(chiefMessage).where(eq(chiefMessage.id, 'ask-late')).get();
-    const content = JSON.parse(row?.content as string) as { status: string; cancelReason?: string };
-    expect(content.status).toBe('cancelled');
-    expect(content.cancelReason).toBe(ASK_EXPIRED_REASON);
-    expect(H.s.db.select().from(stopPending).all()).toEqual([]);
-    sweepOverlongChiefTurns(H.s.svc, now + 60_000);
     expect(
       H.s.db
         .select()
         .from(stopPending)
         .all()
         .map((r) => r.stepId),
-    ).toEqual(['asking']);
-    const answer = await req(
-      H.s.app,
-      'POST',
-      `/api/teams/${H.teamId}/chief/threads/${H.threadId}/questions/ask-late/answer`,
-      { answers: [{ header: 'pick', text: 'this one' }] },
-    );
-    expect(answer.status).toBe(409);
-    expect(((await answer.json()) as { error: string }).error).toContain('expired after 30 min');
+    ).toEqual(['running']);
+    const row = H.s.db.select().from(chiefMessage).where(eq(chiefMessage.id, 'ask-parked')).get();
+    expect((JSON.parse(row?.content as string) as { status: string }).status).toBe('pending');
   });
 
   test('the scheduler tick runs the watchdog', () => {
