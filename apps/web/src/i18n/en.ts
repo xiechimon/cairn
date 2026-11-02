@@ -1387,6 +1387,38 @@ export const EN: Record<string, string> = {
   决定: 'Decided',
   还开着: 'Still open',
   记住了: 'Remembered',
+  '没能更新这条建议，请重试。': "Couldn't update this suggestion. Try again.",
+  '为什么没拦住：{why}': 'Why it slipped through: {why}',
+  '防护：{safeguard}': 'Safeguard: {safeguard}',
+  '出处：': 'Source: ',
+  协调者对话: 'Coordinator chat',
+  建成线程: 'Make it a thread',
+  不用了: 'Dismiss',
+  已建成线程: 'Made into a thread',
+  已忽略: 'Dismissed',
+  '今天的日报：昨天没有新进展。': "Today's report: nothing new yesterday. ",
+  '{n} 件等你': '{n## item|# items} waiting on you',
+  今天的日报: "Today's report",
+  '今天的日报 · 昨天（{day}）': "Today's report · yesterday ({day})",
+  '日报没写成，过一会儿再试一次；先看昨天的数字。':
+    "The report couldn't be written; it will try once more shortly. Here are yesterday's numbers.",
+  '日报两次都没写成；下面是昨天的原始数字。':
+    "The report failed twice; here are yesterday's raw numbers.",
+  昨天的进展: 'Yesterday',
+  '完成 {done} · 合并 {merged} · 失败 {failed} · 重跑 {retries} · 等额度 {quota} · 审查通过 {pass} / 拦下 {block}':
+    'Done {done} · merged {merged} · failed {failed} · reruns {retries} · quota waits {quota} · reviews passed {pass} / blocked {block}',
+  '失败：': 'Failed: ',
+  '完成：': 'Done: ',
+  '合并：': 'Merged: ',
+  等你的事: 'Needs you',
+  没有等你的事: 'Nothing is waiting on you',
+  '{n} 件等你，去处理': '{n## item|# items} waiting on you, open the inbox',
+  复盘: 'Retro',
+  昨天的对话里没找到值得改的地方: "Nothing in yesterday's conversations needs a safeguard",
+  '这些来源太长，只读了后面的部分：{sources}。':
+    'These sources were too long, so only their latest part was read: {sources}. ',
+  '复盘建议只是草稿：点「建成线程」才会建线程，建好后也要你自己开始。':
+    'Retro suggestions are drafts: a thread is created only when you choose "Make it a thread", and you still start it yourself.',
   '总管把昨天的对话整理成了 {n} 条摘要':
     "The chief summarized yesterday's chat into {n## item|# items}",
   '对话太长了，总管把上面的内容整理成了 {n} 条摘要':

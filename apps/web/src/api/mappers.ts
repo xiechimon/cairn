@@ -26,6 +26,7 @@ import {
   chiefDigestContentSchema,
   chiefModelFallbackContentSchema,
   chiefNoticeContentSchema,
+  chiefReportContentSchema,
   chiefTurnErrorContentSchema,
   chiefTurnStoppedContentSchema,
   classifySkillFact,
@@ -1379,6 +1380,12 @@ function collectChiefStream(
       if (notice.success) {
         pendingTools = [];
         items.push({ kind: 'robot', markdown: notice.data.message, seconds: '', id: m.id });
+        continue;
+      }
+      const dailyReport = chiefReportContentSchema.safeParse(parsed);
+      if (dailyReport.success) {
+        pendingTools = [];
+        items.push({ kind: 'daily-report', id: m.id, report: dailyReport.data });
         continue;
       }
       const digest = chiefDigestContentSchema.safeParse(parsed);
