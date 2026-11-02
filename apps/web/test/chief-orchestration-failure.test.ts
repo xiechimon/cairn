@@ -27,13 +27,13 @@ function render(threads: ChiefThread[]) {
   return renderToStaticMarkup(
     createElement(MemoryRouter, {}, createElement(I18nProvider, {
       initialLocale: 'zh',
-      children: createElement(TodoCard, { todo, now: 0, orchestration: cardOrchestration(threads, 1586) }),
+      children: createElement(TodoCard, { todo, now: 0, orchestration: cardOrchestration(threads, todo) }),
     })),
   );
 }
 
 test('a failed context-length round leaves orchestration and displays its reason with retry', () => {
-  expect(inflightOrchestrationFor([failed], 1586)).toBeNull();
+  expect(inflightOrchestrationFor([failed], todo)).toBeNull();
   const html = render([failed]);
   expect(html).toContain('编排失败');
   expect(html).toContain('上下文超出模型上限，精简任务后重试');
@@ -46,5 +46,30 @@ test('a newer round clears the old failure and unrelated cards do not inherit it
   const retry = { ...failed, id: 'chief-retry', createdAt: 3, activeRun: { phase: 'chief' }, lastTurnError: undefined };
   expect(render([failed, retry])).toContain('data-orchestrating="true"');
   expect(render([failed, retry])).not.toContain(reason);
-  expect(cardOrchestration([failed], 1587)).toBeNull();
+  expect(cardOrchestration([failed], { id: 'todo-1587', seqNum: 1587 })).toBeNull();
+});
+
+const global = { ...failed, id: 'chief-global', title: 'Coordinator', lastTurnError: null };
+
+test('a thread that reports its orchestration is matched by todo id, not by title', () => {
+  const running = { ...global, activeRun: { phase: 'chief' as const }, orchestration: { todoId: todo.id, state: 'running' as const, error: null } };
+  expect(inflightOrchestrationFor([running], todo)?.id).toBe('chief-global');
+  expect(cardOrchestration([running], todo)?.wait).toBeNull();
+  expect(inflightOrchestrationFor([running], { id: 'todo-other', seqNum: 1586 })).toBeNull();
+});
+
+test('a reported failed orchestration shows its error on that card only, and a reported null clears it', () => {
+  const broken = { ...global, orchestration: { todoId: todo.id, state: 'failed' as const, error: reason } };
+  expect(inflightOrchestrationFor([broken], todo)).toBeNull();
+  expect(cardOrchestration([broken], todo)?.error).toBe(reason);
+  expect(cardOrchestration([broken], { id: 'todo-other', seqNum: 1587 })).toBeNull();
+  const idle = { ...global, orchestration: null, lastTurnError: reason };
+  expect(cardOrchestration([idle], todo)).toBeNull();
+});
+
+test('without the orchestration field the title match still decides, as before the global thread', () => {
+  const titled = { ...failed, id: 'chief-titled', createdAt: 5, activeRun: { phase: 'chief' as const }, lastTurnError: undefined };
+  expect(inflightOrchestrationFor([titled], todo)?.id).toBe('chief-titled');
+  const succeeded = { ...failed, id: 'chief-ok', createdAt: 6, lastTurnError: undefined };
+  expect(cardOrchestration([failed, succeeded], todo)).toBeNull();
 });

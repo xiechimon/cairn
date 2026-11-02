@@ -663,8 +663,7 @@ test('click opening survives sensor arming on the newly draggable columns (#753/
   for (const id of ['dm-confirm', 'dm-done-changes']) {
     const card = page.locator(`[data-todo-id="${id}"]`);
     await card.click();
-    await page.waitForURL((u) => u.searchParams.get('task') === id);
-    expect(new URL(page.url()).pathname).toBe('/app');
+    await page.waitForURL((u) => u.pathname === `/app/todo/${id}`);
     await page.goto('/app?scenario=board-drag-matrix&view=board');
     await expect(page.locator(`[data-todo-id="${id}"]`)).toBeVisible();
   }

@@ -5,21 +5,6 @@ const USER = { id: 'u1', displayName: '我', avatarUrl: null };
 
 const THREADS = [
   {
-    id: 'chief-bbb',
-    chiefId: 'chief-u1-t1',
-    userId: 'u1',
-    teamId: 't1',
-    title: '线程乙',
-    createdAt: 2,
-    updatedAt: 2,
-    lastTurnAt: null,
-    session: { runtime: 'pi', id: 's2', openedAt: 2 },
-    pendingSessionResumeAt: null,
-    toolDefHashes: {},
-    toolResultHashes: {},
-    activeRun: null,
-  },
-  {
     id: 'chief-aaa',
     chiefId: 'chief-u1-t1',
     userId: 'u1',
@@ -29,6 +14,21 @@ const THREADS = [
     updatedAt: 1,
     lastTurnAt: null,
     session: { runtime: 'pi', id: 's1', openedAt: 1 },
+    pendingSessionResumeAt: null,
+    toolDefHashes: {},
+    toolResultHashes: {},
+    activeRun: null,
+  },
+  {
+    id: 'chief-bbb',
+    chiefId: 'chief-u1-t1',
+    userId: 'u1',
+    teamId: 't1',
+    title: '线程乙',
+    createdAt: 2,
+    updatedAt: 2,
+    lastTurnAt: null,
+    session: { runtime: 'pi', id: 's2', openedAt: 2 },
     pendingSessionResumeAt: null,
     toolDefHashes: {},
     toolResultHashes: {},
@@ -143,6 +143,11 @@ function mockLiveApi(page: Page) {
         }),
       );
     }
+    const thread = THREADS.find((row) => p === `/api/conversations/${row.id}/messages`);
+    if (thread !== undefined)
+      return route.fulfill(
+        json({ messages: [{ id: `m-${thread.id}`, role: 'user', content: `${thread.title}的消息`, createdAt: 1 }] }),
+      );
     if (p.startsWith('/api/conversations/')) return route.fulfill(json({ messages: [] }));
     if (p === '/api/todos' || p === '/api/projects') return route.fulfill(json([]));
     if (
@@ -379,23 +384,28 @@ test.describe('push notification click loop (XMON-106)', () => {
     const drawer = page.locator('.chief-drawer');
     await expect(drawer).toBeVisible();
 
-    const chip = drawer.getByRole('button', { name: '主题', exact: true });
-    await expect(chip.locator('span')).toHaveText('线程乙');
+    await expect(drawer.getByTestId('chief-stream')).toContainText('线程乙的消息');
 
     await expect.poll(() => page.url()).not.toContain('chief=');
     expect(page.url()).toContain('/app');
   });
 
-  test('T4 home: a chief deep link on home opens the target thread in the home chat and strips the param', async ({ page }) => {
+  test('T4 home: a chief deep link on home opens the target thread in the home chat, strips the param, and lets go once the user leaves', async ({ page }) => {
     await stubEventSource(page);
+    await page.addInitScript(() => localStorage.setItem('cairn.sidebarResourcesCollapsed', '0'));
     await mockLiveApi(page);
     await page.goto('/app?chief=chief-bbb');
 
-    const home = page.getByTestId('chief-home');
-    const chip = home.getByRole('button', { name: '主题', exact: true });
-    await expect(chip.locator('span')).toHaveText('线程乙');
+    const home = page.getByTestId('home-c');
+    await expect(home.getByTestId('chief-stream')).toContainText('线程乙的消息');
     await expect.poll(() => page.url()).not.toContain('chief=');
     await expect(page.locator('.chief-drawer')).toHaveCount(0);
+
+    await page.getByRole('link', { name: '技能' }).click();
+    await expect(page).toHaveURL(/\/app\/resources\/skills/);
+    await page.getByRole('complementary').locator('[data-slot="sidebar-nav-row"]', { hasText: '首页' }).click();
+    await expect(home.getByTestId('chief-stream')).toContainText('线程甲的消息');
+    await expect(home.getByTestId('chief-stream')).not.toContainText('线程乙的消息');
   });
 
   test('T4b: chief deep link pointing at a missing thread → drawer does not open, params still cleared', async ({ page }) => {
@@ -406,7 +416,7 @@ test.describe('push notification click loop (XMON-106)', () => {
     await expect.poll(() => page.url()).not.toContain('chief=');
 
     await expect(page.locator('.chief-drawer')).toHaveCount(0);
-    await expect(page.getByTestId('chief-home')).toBeVisible();
+    await expect(page.getByTestId('home-c')).toBeVisible();
 
     await expect(page.locator('[data-route="board"]')).toBeVisible();
   });

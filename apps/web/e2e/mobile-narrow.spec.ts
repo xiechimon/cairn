@@ -30,7 +30,7 @@ for (const width of [360, 390]) {
       await expect(drawer).toBeHidden();
       await page.goto('/app?view=board');
       await menu.click();
-      await drawer.locator('[data-slot="sidebar-nav-row"]', { hasText: '工作台' }).click();
+      await drawer.locator('[data-slot="sidebar-nav-row"]', { hasText: '首页' }).click();
       await expect(page).not.toHaveURL(/view=board/);
       await expect(drawer).toBeHidden();
       await page.goto('/app?view=board');

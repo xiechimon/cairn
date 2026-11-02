@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 
-const projectRows = (page: Page) => page.locator('[data-testid="sidebar-project-group"]');
+const projectRows = (page: Page) => page.locator('[data-slot="sidebar-project-row"]');
 const skills = (page: Page) => page.getByRole('complementary').getByRole('link', { name: '技能' });
 
 test('sidebar group collapse hides sub-rows, flips aria, survives reload', async ({ page }) => {

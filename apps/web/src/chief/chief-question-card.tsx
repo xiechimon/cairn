@@ -254,7 +254,12 @@ export function ChiefQuestionCard({ item, onAnswer, onCancel }: ChiefQuestionCar
         >
           {t('取消提问')}
         </Button>
-        <span className={HINT_CLS}>{hintText}</span>
+        <span
+          data-testid="chief-question-hint"
+          className={question.multiSelect === true ? HINT_CLS : `${HINT_CLS} max-md:invisible`}
+        >
+          {hintText}
+        </span>
         {step > 0 && (
           <Button
             variant="ghost"

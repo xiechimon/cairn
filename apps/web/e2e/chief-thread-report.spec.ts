@@ -42,7 +42,7 @@ for (const phase of ['done', 'failed', 'review']) {
       todos: [],
     });
     await page.goto('/app');
-    const stream = page.getByTestId('chief-home').getByTestId('chief-stream');
+    const stream = page.getByTestId('home-c').getByTestId('chief-stream');
     const marker = stream.getByTestId('thread-report-marker');
     await expect(marker).toHaveText('来自任务 #9 Repair board counts 的消息');
     await expect(marker.getByRole('link')).toHaveAttribute('href', `/app/todo/${TASK.id}`);
@@ -82,7 +82,7 @@ test('two queued reports hide their own prompts while a non-report wake stays vi
     todos: [],
   });
   await page.goto('/app');
-  const stream = page.getByTestId('chief-home').getByTestId('chief-stream');
+  const stream = page.getByTestId('home-c').getByTestId('chief-stream');
   await expect(stream.getByTestId('thread-report-marker')).toHaveCount(2);
   await expect(stream).toContainText('来自任务 #9 first task 的消息');
   await expect(stream).toContainText('来自任务 #10 second task 的消息');

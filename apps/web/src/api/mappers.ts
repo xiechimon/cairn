@@ -137,6 +137,11 @@ export interface MessageRow {
   content: unknown;
   createdAt: number;
   actor?: string | null;
+  projectId?: string | null;
+}
+
+function rowProject(row: MessageRow): { projectId?: string | null } {
+  return row.projectId === undefined ? {} : { projectId: row.projectId };
 }
 
 export function toDisplayTodo(w: WireTodo): DisplayTodo {
@@ -1334,6 +1339,7 @@ function collectChiefStream(
         id: m.id,
         markdown: text,
         pending: pendingState,
+        ...rowProject(m),
       });
       continue;
     }
@@ -1352,7 +1358,7 @@ function collectChiefStream(
       }
       const report = threadReportContentSchema.safeParse(parsed);
       if (report.success) {
-        items.push({ ...report.data, id: m.id });
+        items.push({ ...report.data, id: m.id, ...rowProject(m) });
         continue;
       }
       const stopped = chiefTurnStoppedContentSchema.safeParse(parsed);
@@ -1434,8 +1440,15 @@ function collectChiefStream(
       const head = orchestratePromptHeadOf(text);
       items.push(
         head === null
-          ? { kind: 'user', text, id: m.id, markdown: text, at: clockTime(m.createdAt) }
-          : { kind: 'user', text: head, id: m.id, at: clockTime(m.createdAt) },
+          ? {
+              kind: 'user',
+              text,
+              id: m.id,
+              markdown: text,
+              at: clockTime(m.createdAt),
+              ...rowProject(m),
+            }
+          : { kind: 'user', text: head, id: m.id, at: clockTime(m.createdAt), ...rowProject(m) },
       );
       continue;
     }
@@ -1447,6 +1460,7 @@ function collectChiefStream(
       id: m.id,
       ...(pendingTools.length > 0 ? { tools: pendingTools } : {}),
       ...(fallback !== null ? { fallbackModel: fallback.model } : {}),
+      ...rowProject(m),
     });
     pendingTools = [];
   }

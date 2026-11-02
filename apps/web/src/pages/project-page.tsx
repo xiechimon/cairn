@@ -65,7 +65,6 @@ import {
 import { type NewTaskSurfaceApi, NewTaskSurfaceRoot } from '../overlay/new-task-surface-root.js';
 import { PHASE_STATUS, PHASE_UI } from '../phase.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
-import { useOpenTaskInPlace } from '../task-panel/task-panel-root.js';
 import { GithubIssuesDialog } from './github-issues-dialog.js';
 import { PageShell } from './shell.js';
 
@@ -550,7 +549,6 @@ function TasksPane({
   const { t } = useI18n();
   const { user } = useLiveData();
   const { search } = useLocation();
-  const openInPlace = useOpenTaskInPlace();
   const [layout, setLayout] = useState<TasksLayout>(() => readStoredLayout(safeLocalStorage()));
   const switchLayout = useCallback((next: TasksLayout) => {
     setLayout(next);
@@ -637,7 +635,6 @@ function TasksPane({
                     isSettled(todo.phase) ? 'text-content-tertiary' : 'text-foreground',
                   )}
                   to={{ pathname: `/app/todo/${todo.id}`, search }}
-                  onClick={(event) => openInPlace(event, todo.id)}
                 >
                   {todo.title}
                 </Link>
@@ -674,7 +671,6 @@ function TasksPane({
                     : 'font-medium text-foreground',
                 )}
                 to={{ pathname: `/app/todo/${todo.id}`, search }}
-                onClick={(event) => openInPlace(event, todo.id)}
               >
                 {todo.title}
               </Link>
@@ -818,7 +814,6 @@ export function ProjectPage() {
   return (
     <PageShell
       route="project"
-      taskPanel
       bleed={tab === 'files'}
       fixture={
         live ? { ...fixture, todos } : { ...fixture, todos: [...fixture.todos, ...fixtureAdded] }

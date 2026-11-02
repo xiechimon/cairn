@@ -144,25 +144,11 @@
       "contrast": "measured 2026-10-25 in the fixture build (light / dark): 12.26 / 6.11 on --card"
     },
     {
-      "file": "apps/web/src/board/home.tsx",
-      "anchor": "tone=\"text-(--card-button)\"",
-      "role": "indicator",
-      "reason": "Home `需要你` section header alert-circle glyph. DESIGN.md 图标: needs-you icons take the accent; non-text glyph, 3:1 gate.",
-      "contrast": "apps/web/DESIGN.md 颜色 (accent on sheet 4.99, measured in PR #1369)"
-    },
-    {
       "file": "apps/web/src/board/board.tsx",
       "anchor": "<BrandMark className=\"size-5 text-(--card-button)\" />",
       "role": "indicator",
       "reason": "Spiral brand mark at the start of the board new-task bar.",
       "contrast": "measured 2026-10-25 in the fixture build (light / dark): 12.26 / 6.11 on --card; non-text glyph, 3:1 gate"
-    },
-    {
-      "file": "apps/web/src/task-panel/task-panel.tsx",
-      "anchor": "const NEEDS_YOU_INK = 'text-(--card-button)'",
-      "role": "indicator",
-      "reason": "Task panel needs-you marks (#1937): the row status glyph and reason label, the waiting and failed stage glyphs, and the ask box label. DESIGN.md: accent only for needs-you; each carries an icon or a text label, so the state does not rely on color.",
-      "contrast": "apps/web/DESIGN.md 颜色 (accent on sheet 4.99, AA for 12px text)"
     },
     {
       "file": "apps/web/src/components/notice-banner.tsx",
