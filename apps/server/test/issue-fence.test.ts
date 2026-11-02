@@ -269,7 +269,9 @@ describe('W1-W5 chief wake prompt: issue-import task titles only inside the fenc
     const { seqNum } = getTodo(deps(), todoId)!;
     for (const prompt of prompts) {
       expectTitleOnlyFenced(prompt, ISSUE_TITLE);
-      expect(prompt).toMatch(new RegExp(`^\\[wake:\\w+\\] 任务 #${seqNum}（`));
+      expect(prompt).toMatch(
+        new RegExp(`^\\[wake:\\w+\\] provenance=watch:${todoId}\\n任务 #${seqNum}（`),
+      );
     }
   });
 
@@ -290,14 +292,17 @@ describe('W1-W5 chief wake prompt: issue-import task titles only inside the fenc
     const { id, seqNum } = (await created.json()) as { id: string; seqNum: number };
     const prompts = await wakePrompts(id);
     const ref = `任务 #${seqNum}「修登录按钮」`;
+    const provenance = `provenance=watch:${id}\n`;
     expect(prompts).toContain(
-      `[wake:settle] ${ref} 已合并完成（done）。请向用户汇报结果已确认落地；该任务的关注已自动解除。`,
+      `[wake:settle] ${provenance}${ref} 已合并完成（done）。对话里已记下这条，不用再告诉用户；该任务的关注已自动解除。`,
     );
     expect(prompts).toContain(
-      `[wake:failed] ${ref} 运行失败。请先调用 machines 等工具核实环境，再向用户做法证式汇报（失败原因/定性/工作保全位置/环境建议）。`,
+      `[wake:failed] ${provenance}${ref} 运行失败。请先调用 machines 等工具核实环境；需要用户决定或动手时，用 ask_user 或 notify_user 做法证式说明（失败原因/定性/工作保全位置/环境建议），否则不发消息。`,
     );
     for (const head of [`停驻在 confirm 关口。`, `停驻在 review 关口：`]) {
-      expect(prompts.some((p) => p.startsWith(`[wake:gate] ${ref} ${head}`))).toBe(true);
+      expect(prompts.some((p) => p.startsWith(`[wake:gate] ${provenance}${ref} ${head}`))).toBe(
+        true,
+      );
     }
     for (const prompt of prompts) expect(prompt).not.toContain('【GitHub issue 原文');
     const plain = getTodo(deps(), id)!;

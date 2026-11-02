@@ -1,8 +1,22 @@
 import { expect, test } from '@playwright/test';
 import { mockLive, TASK, THREAD } from './chief-home-mock';
 
-for (const phase of ['done', 'failed', 'review']) {
-  test(`${phase}: task report links to its task before the assistant summary`, async ({ page }) => {
+const STATUS = {
+  done: '已完成，未验证',
+  verified: '已验证',
+  failed: '失败',
+  review: '审阅中',
+} as const;
+
+for (const [label, phase, verified] of [
+  ['done', 'done', false],
+  ['verified', 'done', true],
+  ['failed', 'failed', undefined],
+  ['review', 'review', undefined],
+] as const) {
+  test(`${label}: the task report names its status and the event turn stays silent`, async ({
+    page,
+  }) => {
     await mockLive(page, {
       threads: [THREAD],
       messages: [
@@ -17,19 +31,14 @@ for (const phase of ['done', 'failed', 'review']) {
             seqNum: TASK.seqNum,
             title: 'Repair board counts',
             wakeStepId: 'wake-step',
+            ...(verified !== undefined ? { verified } : {}),
           }),
           createdAt: 20,
         },
         {
-          id: 'busy-reply',
-          role: 'assistant',
-          content: 'The current turn has finished.',
-          createdAt: 21,
-        },
-        {
           id: 'user-wake-step',
           role: 'user',
-          content: `[wake:${phase === 'done' ? 'settle' : phase === 'failed' ? 'failed' : 'gate'}] Internal worker reporting instructions`,
+          content: `[wake:${phase === 'done' ? 'settle' : phase === 'failed' ? 'failed' : 'gate'}] provenance=watch:${TASK.id}\nInternal worker reporting instructions`,
           createdAt: 30,
         },
         {
@@ -44,53 +53,45 @@ for (const phase of ['done', 'failed', 'review']) {
     await page.goto('/app');
     const stream = page.getByTestId('home-c').getByTestId('chief-stream');
     const marker = stream.getByTestId('thread-report-marker');
-    await expect(marker).toHaveText('来自任务 #9 Repair board counts 的消息');
+    await expect(marker).toHaveText(`任务 #9 Repair board counts：${STATUS[label]}`);
     await expect(marker.getByRole('link')).toHaveAttribute('href', `/app/todo/${TASK.id}`);
-    await expect(stream.getByTestId('chief-msg').last()).toContainText(`The worker has reported ${phase}.`);
-    const text = await stream.innerText();
-    expect(text.indexOf('来自任务')).toBeLessThan(text.indexOf('The worker has reported'));
     await expect(stream.getByTestId('chief-bubble')).toHaveCount(1);
     await expect(stream).not.toContainText('[wake:');
     await expect(stream).not.toContainText('Internal worker reporting instructions');
+    await expect(stream).not.toContainText(`The worker has reported ${phase}.`);
   });
 }
 
-test('two queued reports hide their own prompts while a non-report wake stays visible', async ({ page }) => {
+test('a notify_user notice from an event turn shows in the conversation', async ({ page }) => {
   await mockLive(page, {
     threads: [THREAD],
     messages: [
-      ...['first', 'second'].map((name, index) => ({
-        id: `report-${name}`,
+      { id: 'request', role: 'user', content: 'Repair the board counts', createdAt: 10 },
+      {
+        id: 'user-wake-step',
+        role: 'user',
+        content: `[wake:failed] provenance=watch:${TASK.id}\nInternal failure instructions`,
+        createdAt: 30,
+      },
+      { id: 'wake-thoughts', role: 'assistant', content: 'Checking machines first.', createdAt: 31 },
+      {
+        id: 'notice',
         role: 'system',
         content: JSON.stringify({
-          kind: 'thread-report',
-          todoId: `todo-${name}`,
-          phase: 'done',
-          seqNum: 9 + index,
-          title: `${name} task`,
-          wakeStepId: `${name}-step`,
+          kind: 'chief_notice',
+          message: '#9 failed twice on the same machine. Move it to another machine?',
+          provenance: `watch:${TASK.id}`,
         }),
-        createdAt: 10 + index,
-      })),
-      { id: 'busy-reply', role: 'assistant', content: 'The current turn has finished.', createdAt: 20 },
-      { id: 'user-first-step', role: 'user', content: '[wake:settle] Internal first task instructions', createdAt: 30 },
-      { id: 'first-reply', role: 'assistant', content: 'The first task has finished.', createdAt: 31 },
-      { id: 'user-second-step', role: 'user', content: '[wake:settle] Internal second task instructions', createdAt: 40 },
-      { id: 'second-reply', role: 'assistant', content: 'The second task has finished.', createdAt: 41 },
-      { id: 'user-other-step', role: 'user', content: '[wake:settle] Check another task', createdAt: 50 },
+        createdAt: 32,
+      },
     ],
     todos: [],
   });
   await page.goto('/app');
   const stream = page.getByTestId('home-c').getByTestId('chief-stream');
-  await expect(stream.getByTestId('thread-report-marker')).toHaveCount(2);
-  await expect(stream).toContainText('来自任务 #9 first task 的消息');
-  await expect(stream).toContainText('来自任务 #10 second task 的消息');
-  await expect(stream).toContainText('The first task has finished.');
-  await expect(stream).toContainText('The second task has finished.');
-  await expect(stream.getByTestId('chief-bubble')).toHaveCount(1);
-  await expect(stream.getByTestId('chief-bubble')).toHaveText('Check another task');
-  await expect(stream).not.toContainText('Internal first task instructions');
-  await expect(stream).not.toContainText('Internal second task instructions');
-  await expect(stream).not.toContainText('[wake:');
+  await expect(stream.getByTestId('chief-msg').last()).toContainText(
+    '#9 failed twice on the same machine. Move it to another machine?',
+  );
+  await expect(stream).not.toContainText('Checking machines first.');
+  await expect(stream).not.toContainText('Internal failure instructions');
 });

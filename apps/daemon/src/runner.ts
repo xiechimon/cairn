@@ -820,6 +820,7 @@ async function runClaimedStep(
         {
           requestId,
           questions: (params.questions ?? []) as MachineAskBody['questions'],
+          ...(typeof params.provenance === 'string' ? { provenance: params.provenance } : {}),
         },
         { signal: askAbort.signal },
       );

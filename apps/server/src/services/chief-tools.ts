@@ -1,6 +1,7 @@
-import type { SecretBox, UserRecord } from '@cairn/shared';
+import type { ChiefNoticeContent, SecretBox, UserRecord } from '@cairn/shared';
 import {
   AGENT_TOOL_DEFAULTS,
+  CHIEF_NOTICE_KIND,
   createSkillBodySchema,
   DONE_ANNOUNCEMENT,
   IN_PROGRESS_PHASES,
@@ -25,7 +26,7 @@ import {
 } from '../db/schema.js';
 import { HttpError, parseWith } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
-import { newRecordId } from '../lib/ids.js';
+import { newRecordId, nowMs } from '../lib/ids.js';
 import { todoAuthorizesAttachment } from './attachment-authorization.js';
 import { readAttachmentMeta } from './attachments.js';
 import {
@@ -37,7 +38,14 @@ import {
   startBuilds,
   stopActiveStepsAfterExit,
 } from './builds.js';
-import { addChiefWatch, clearChiefWake, removeChiefWatches, setChiefWake } from './chief.js';
+import {
+  addChiefWatch,
+  clearChiefWake,
+  removeChiefWatches,
+  requireTurnProvenance,
+  setChiefWake,
+  upsertChiefMessage,
+} from './chief.js';
 import { readHistory, searchHistory } from './chief-history.js';
 import { askUserQuestionsOfParams, createOrGetQuestion } from './chief-questions.js';
 import { readConversationPage } from './conversation-page.js';
@@ -90,6 +98,7 @@ export interface ChiefToolCtx {
   threadId: string;
   chiefAgentId: string | null;
   conversationId: string;
+  turnPrompt?: string | null;
 }
 
 function skillAuditActor(ctx: ChiefToolCtx): { type: 'member' | 'agent'; id: string } {
@@ -951,6 +960,11 @@ export async function executeChiefTool(
     }
 
     case 'ask_user': {
+      const provenance = requireTurnProvenance(
+        ctx.turnPrompt ?? null,
+        params.provenance,
+        'ask_user',
+      );
       const questions = askUserQuestionsOfParams(params);
       const requestId = optStr(params, 'requestId') ?? `ask-${newRecordId()}`;
       const { content } = createOrGetQuestion(
@@ -965,6 +979,7 @@ export async function executeChiefTool(
           threadId: ctx.threadId,
           requestId,
           questions,
+          provenance,
         },
       );
       return json({
@@ -974,7 +989,25 @@ export async function executeChiefTool(
       });
     }
     case 'notify_user': {
+      const provenance = requireTurnProvenance(
+        ctx.turnPrompt ?? null,
+        params.provenance,
+        'notify_user',
+      );
       const text = str(params, 'message');
+      const notice = {
+        id: newRecordId(),
+        threadId: ctx.threadId,
+        role: 'system' as const,
+        content: JSON.stringify({
+          kind: CHIEF_NOTICE_KIND,
+          message: text,
+          provenance,
+        } satisfies ChiefNoticeContent),
+        createdAt: nowMs(),
+      };
+      upsertChiefMessage(db, notice);
+      deps.convHub?.publishMessage(ctx.threadId, notice);
       const agentRow = ctx.chiefAgentId
         ? db.select().from(agent).where(eq(agent.id, ctx.chiefAgentId)).get()
         : undefined;
