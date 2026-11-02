@@ -227,8 +227,8 @@ describe('chief turn queue (T5): one turn per thread, oldest first', () => {
 
   test('a message queued behind a running turn does not make the thread look queued for a machine', async () => {
     const w = await setupWorld();
-    await w.send('第一句');
-    expect((await w.thread()).turnQueue).not.toBeNull();
+    const first = await w.send('第一句');
+    expect((await w.thread()).turnQueue).toMatchObject({ stepId: first });
     await w.claim();
     await w.send('第二句');
     const view = await w.thread();

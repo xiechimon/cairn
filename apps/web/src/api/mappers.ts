@@ -1533,7 +1533,9 @@ export function mapChief(
       const turnStartedAt = lastUser >= 0 ? collected?.itemsAt[lastUser] : undefined;
       const turnQueue = active?.turnQueue ?? null;
       if (turnQueue != null) {
-        const asked = lastUser >= 0 ? collected?.items[lastUser] : undefined;
+        const asked = collected?.items.find(
+          (item) => item.kind === 'user' && item.id !== undefined && item.id === turnQueue.stepId,
+        );
         if (asked?.kind === 'user' && asked.id !== undefined)
           waitingTurn = { messageId: asked.id, text: asked.markdown ?? asked.text };
         const queued = queueLabel(turnQueue);

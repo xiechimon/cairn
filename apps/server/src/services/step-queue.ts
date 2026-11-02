@@ -1,4 +1,4 @@
-import type { StepQueueBlocked, StepQueueInfo } from '@cairn/shared';
+import type { ChiefThread, StepQueueBlocked, StepQueueInfo } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { agent, build, chief, chiefThread, machine, step, todo } from '../db/schema.js';
@@ -167,5 +167,11 @@ export function stepQueueProjector(db: Db, teamId: string) {
     };
   }
 
-  return { project, pendingChiefOf };
+  function chiefTurnQueueOf(threadId: string): ChiefThread['turnQueue'] {
+    const waiting = pendingChiefOf(threadId);
+    const info = waiting === null ? null : project(waiting);
+    return waiting === null || info === null ? null : { ...info, stepId: waiting.id };
+  }
+
+  return { project, pendingChiefOf, chiefTurnQueueOf };
 }

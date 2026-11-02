@@ -60,6 +60,7 @@ interface State {
   outage: Outage;
   messages: Row[];
   turnQueue?: {
+    stepId?: string;
     position: number;
     waitingFor: { machineId: string; name: string; running: number; capacity: number } | null;
   } | null;
@@ -371,6 +372,7 @@ test.describe('queue, steer and stop while the chief is replying (T5)', () => {
       outage: null,
       messages: [FIRST],
       turnQueue: {
+        stepId: 'm1',
         position: 1,
         waitingFor: { machineId: 'mac-1', name: 'xmonsMac-3574.local', running: 0, capacity: 8 },
       },
@@ -382,6 +384,7 @@ test.describe('queue, steer and stop while the chief is replying (T5)', () => {
     await expect.poll(() => calls).toContain('DELETE /messages/m1');
     expect(calls).not.toContain('POST /stop');
     await expect(home.getByTestId('chief-composer-input')).toHaveValue(FIRST.content);
+    await evidenceShot(page, 'stop-queued-turn.png');
   });
 
   test('a stopped turn says no task was created', async ({ page }) => {

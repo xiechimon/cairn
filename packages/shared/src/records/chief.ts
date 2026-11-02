@@ -139,6 +139,7 @@ export const chiefThreadSchema = z.object({
   orchestration: chiefOrchestrationSchema.nullable().optional(),
   turnQueue: z
     .object({
+      stepId: recordId.optional(),
       position: z.number().int().min(1),
       waitingFor: z
         .object({

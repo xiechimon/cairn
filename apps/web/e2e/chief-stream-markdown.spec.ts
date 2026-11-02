@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
+import { evidenceShot } from './evidence';
 
 declare global {
   interface Window {
@@ -887,11 +888,12 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
     const drawer = page.locator('.chief-drawer');
     const reply = drawer.getByTestId('chief-msg').filter({ hasText: '已派发 #104。' });
     await expect(reply).toHaveCount(1);
+    await reply.getByTestId('chief-tools-toggle').click();
+    await evidenceShot(page, 'tools-once.png');
     const replyBox = await reply.boundingBox();
     const question = drawer.getByTestId('chief-msg').filter({ hasText: '？' }).first();
     const questionBox = await question.boundingBox();
     expect(replyBox!.y - (questionBox!.y + questionBox!.height)).toBeLessThan(40);
-    await reply.getByTestId('chief-tools-toggle').click();
     for (const name of ['pull_requests', 'issues', 'run_builds']) {
       await expect(drawer.getByText(name, { exact: true })).toHaveCount(1);
     }
