@@ -47,11 +47,12 @@ const conversation: ChiefContent = {
           header: 'Credential relay · #74',
           question: 'relay-186 cannot run glm-5.3-flash. Which model should rerun it?',
           options: [
-            {
-              label: 'Claude subscription (recommended)',
-              description: 'Verified, uses the subscription',
-            },
             { label: 'wokey · deepseek-v4.1-flash', description: 'Metered' },
+            {
+              label: 'Claude subscription',
+              description: 'Verified, uses the subscription',
+              recommended: true,
+            },
             { label: 'Hold it', description: '' },
           ],
         },

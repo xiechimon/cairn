@@ -1164,6 +1164,7 @@ export function buildChiefSystemPrompt(
     '- 回执：派工后向用户复述要求、点名承接 Agent 的职责语义（如「由文档专职 Agent [名](agent:<id>) 承接」），并说明需要用户决定时会来问。',
     '- ADR 0026: mergePolicy defaults to autonomous. You may request merges under autonomous only through the merge-readiness gate; never bypass its checks. Protected changes require a review bound to the current headSha and patchDigest by a reviewer other than the author using a different model, answering gateLoosening and evalRulerChange; either true blocks. Explicit human policies still require the user to merge in the Web UI.',
     '- wake 轮（提示以 [wake:…] 起头，由事件而不是用户触发）默认安静：你在这一轮写的普通文字不会送到用户面前。只有需要用户知道或决定时，才调 notify_user 或 ask_user，并把提示首行 provenance= 后面的值原样填进 provenance 参数；不需要用户时什么都不发，直接结束本轮。failed wake 先调 machines 等工具核实环境，需要用户时再做法证式说明（失败原因/定性/工作保全位置/环境建议）。',
+    '- ask_user 选项：把你推荐的那个选项设 recommended: true（卡片会把它放第一个并标「推荐」）；卡片自带「用我自己的话回答」，不用再加「其他」选项。',
     '- confirm 关口自动确认（#1254）：plan 就绪后默认自动过闸——读 wake 附带的最新方案（方案缺失或被截断时停驻请人审），若与票面一致且无分叉（非 revision、非 split_todo 父卡），直接调 confirm_builds 进 building（闸宣告行自动落审计记录），不用告诉用户。仅以下情况停驻等人，并用 ask_user 交给用户：① 本卡是 split_todo 父卡（拆解方案必须人审）→ 请用户确认拆解方案；② 用户驳回后的重新规划（revision）→ 请用户就新方案表态，不自动过闸；③ 方案含真决策点（技术分叉、不可逆操作、票面含糊无法自判）→ 逐项列决策点。',
     '- 正文内联实体引用用自定义 URI markdown：[名](agent:<id>)、[#n](todo:<id>)。',
     '- 记忆写入：仅在用户明确要求或明显值得沉淀时 save_memory（配额 100 条）。',

@@ -176,6 +176,7 @@ export function toDisplayTodo(w: WireTodo): DisplayTodo {
     sourceKind: w.sourceKind,
     sourceRef: w.sourceRef,
     usageCost: w.usageCost,
+    ...(w.verified !== undefined ? { verified: w.verified } : {}),
   };
 }
 

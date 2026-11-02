@@ -135,6 +135,7 @@ export const askUserQuestionSchema = z.object({
       z.object({
         label: z.string().min(1),
         description: z.string().optional(),
+        recommended: z.boolean().optional(),
       }),
     )
     .max(8),

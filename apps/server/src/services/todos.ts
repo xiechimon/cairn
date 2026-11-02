@@ -59,6 +59,7 @@ import { ARCHIVED_SCHEDULE_PAUSE_REASON, pauseTodoSchedule } from './schedules.j
 import { endSnoozeOn } from './snooze.js';
 import { notifyThreadPhase } from './thread-push.js';
 import { insertGateAnnouncement } from './transcript.js';
+import { buildVerified } from './verified.js';
 
 type TodoRow = typeof todo.$inferSelect;
 
@@ -166,6 +167,9 @@ export function toTodoRecord(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoReco
     sourceRef: row.sourceRef,
     output: row.output,
     ...(waitingOn !== undefined ? { waitingOn } : {}),
+    ...((row.phase === 'done' || row.phase === 'closed') && row.latestBuildId !== null
+      ? { verified: buildVerified(db, row.latestBuildId) }
+      : {}),
     quotaWait,
     ...(usage !== undefined && usage.rows > 0
       ? {

@@ -108,6 +108,7 @@ export const todoRecordSchema = z.object({
     .optional(),
   quotaWait: quotaWaitSchema.nullable().optional(),
   usageCost: usageCostSchema.optional(),
+  verified: z.boolean().optional(),
 });
 export type TodoRecord = z.infer<typeof todoRecordSchema>;
 export type TodoWaitingOn = NonNullable<TodoRecord['waitingOn']>;
