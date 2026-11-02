@@ -15,6 +15,7 @@ import { MessageScrollerProvider } from '../components/ui/message-scroller.js';
 import type { ChiefStreamItem, MachineRow, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ClaudeLoginBanner } from './claude-login-banner.js';
+import { ComposerThreadTarget, useComposerThreadTarget } from './composer-thread-target.js';
 import { ACT_ORDER, actRank, needsYouThreads, pendingQuestions } from './needs-you.js';
 import { NeedsYouThreadCard } from './needs-you-thread-card.js';
 import { composeRequest } from './open-composer.js';
@@ -147,6 +148,7 @@ export function HomeC({
       status: ACT_ORDER[actRank(todo)] ?? 'needs-you',
     })),
   ];
+  const thread = useComposerThreadTarget(scoped);
   const running = scoped.filter(
     (todo) => threadStatus(todo) === 'running' && todo.archivedAt == null,
   );
@@ -368,11 +370,13 @@ export function HomeC({
           variant="global"
           chief={{ ...chiefData, stream: conversation, examples: undefined }}
           onSend={
-            surface.onSend != null
-              ? (text: string) => surface.onSend?.(text, projectId)
-              : live
-                ? undefined
-                : () => Promise.resolve()
+            thread.picked !== null
+              ? thread.send
+              : surface.onSend != null
+                ? (text: string) => surface.onSend?.(text, projectId)
+                : live
+                  ? undefined
+                  : () => Promise.resolve()
           }
           onRewind={surface.onRewind}
           onAnswerQuestion={surface.onAnswerQuestion}
@@ -390,6 +394,16 @@ export function HomeC({
               : t('跟 Coordinator 说点什么，或描述一个新任务…')
           }
           aboveComposer={pill}
+          composerError={thread.error}
+          targetPlaceholder={thread.placeholder}
+          composerTools={
+            <ComposerThreadTarget
+              targets={thread.targets}
+              picked={thread.picked}
+              composerRef={composerRef}
+              onPick={thread.pick}
+            />
+          }
           composerRef={(node) => {
             composerRef.current = node;
           }}
