@@ -13,6 +13,7 @@ import { createApiKey } from './api-keys.js';
 import { openClaudeSubscription } from './claude-subscriptions.js';
 import { agentForStep } from './dispatch-eligibility.js';
 import { openProviderKey, type ProviderDeps } from './providers.js';
+import { applyRoute, routeForStep } from './routing-rules.js';
 import { openSecretValues, type SecretDeps } from './secrets.js';
 
 export interface CredentialsDeps {
@@ -76,7 +77,12 @@ export function resolveStepCredentials(
   if (!todoRow) throw notFound(`todo ${buildRow.todoId}`);
 
   const agentId = todoRow.assignment?.build?.agentId ?? todoRow.assignment?.plan?.agentId ?? null;
-  const agentRow = agentId ? deps.db.select().from(agent).where(eq(agent.id, agentId)).get() : null;
+  const assignedAgent = agentId
+    ? deps.db.select().from(agent).where(eq(agent.id, agentId)).get()
+    : undefined;
+  const agentRow = assignedAgent
+    ? applyRoute(assignedAgent, routeForStep(deps.db, todoRow, stepRow.kind))
+    : null;
 
   const boxDeps: ProviderDeps & SecretDeps = deps;
   let provider: StepCredentialBundle['provider'] = null;
