@@ -93,7 +93,7 @@ if (mode === '--in-process-fixture') {
     if (
       request.method !== 'GET' ||
       (!request.url?.startsWith('/api/todos?') &&
-        !/^\/api\/conversations\/[^/]+\/messages$/.test(request.url ?? ''))
+        !/^\/api\/conversations\/[^/?]+\/messages(\?before=[^&]+)?$/.test(request.url ?? ''))
     ) {
       response.writeHead(404).end();
       return;
