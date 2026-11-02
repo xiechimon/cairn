@@ -54,6 +54,7 @@ interface ThreadView {
   activeRun: unknown;
   pending?: PendingEntry[];
   fallbackModel?: string | null;
+  turnQueue?: unknown;
 }
 
 async function setupWorld(fallbackModels: { provider: string; modelId: string }[] | null = null) {
@@ -222,6 +223,17 @@ describe('chief turn queue (T5): one turn per thread, oldest first', () => {
     const next = await w.claim();
     expect(next?.instruction).toBe('第二句');
     expect((await w.thread()).pending).toEqual([]);
+  });
+
+  test('a message queued behind a running turn does not make the thread look queued for a machine', async () => {
+    const w = await setupWorld();
+    await w.send('第一句');
+    expect((await w.thread()).turnQueue).not.toBeNull();
+    await w.claim();
+    await w.send('第二句');
+    const view = await w.thread();
+    expect(view.pending?.map((p) => p.state)).toEqual(['queued']);
+    expect(view.turnQueue ?? null).toBeNull();
   });
 
   test('sending never creates a task by itself', async () => {

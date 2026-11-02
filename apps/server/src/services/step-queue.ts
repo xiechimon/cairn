@@ -149,6 +149,12 @@ export function stepQueueProjector(db: Db, teamId: string) {
   }
 
   function pendingChiefOf(threadId: string): QueueTargetStep | null {
+    const turnRunning = db
+      .select({ id: step.id })
+      .from(step)
+      .where(and(eq(step.buildId, threadId), eq(step.kind, 'chief'), eq(step.status, 'claimed')))
+      .get();
+    if (turnRunning !== undefined) return null;
     const rows = chiefRows.filter((r) => r.threadId === threadId);
     const last = rows[rows.length - 1];
     if (last === undefined) return null;
