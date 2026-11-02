@@ -93,7 +93,7 @@ export function AccountsSection() {
       </Specimen>
       <Specimen
         title="Subscription accounts"
-        note="Claude, ChatGPT · Codex and Grok; a Claude row opens to its steps and sticky threads"
+        note="one vendor at a time through SegmentedTabs (icon + count); Add account follows the selected vendor; a Claude row opens to its steps and sticky threads"
         stage="sheet"
       >
         <div className="w-full">

@@ -1488,7 +1488,6 @@ export const EN: Record<string, string> = {
   '{time} 回补 {n}%': '+{n}% at {time}',
   '{name} {window} 剩余': '{name} {window} left',
   未上报: 'not reported',
-  '{n} 个账户': '{n#1 account|# accounts}',
   添加账户: 'Add account',
   '添加 {vendor} 账户': 'Add a {vendor} account',
   不可用: 'Unavailable',

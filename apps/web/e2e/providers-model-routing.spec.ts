@@ -14,18 +14,22 @@ test('fixture: vendor sections pool quota per window and the graph routes every 
   await expect(claude.getByTestId('account-row')).toHaveCount(3);
   await expect(claude.locator('[data-window="five_hour"]')).toContainText('29%');
   await expect(claude.locator('[data-window="five_hour"]')).toContainText('未上报');
-  await expect(
-    page.locator('[data-testid="vendor-section"][data-vendor="grok"] [data-window="billing_period"]'),
-  ).toContainText('88%');
-  await expect(page.locator('[data-testid="vendor-section"][data-vendor="codex"]')).toContainText(
-    'ChatGPT · Codex',
-  );
+  await expect(page.getByTestId('vendor-section')).toHaveCount(1);
 
   const work = claude.locator('[data-testid="account-row"][data-state="cooling"]');
   await expect(work).toContainText('冷却至');
   await claude.getByRole('button', { name: '展开 Personal' }).click();
   await expect(claude.getByTestId('account-detail')).toContainText('Fix flaky merge-gate test');
   await expect(claude.getByTestId('account-detail')).toContainText('Daemon claim loop rework');
+
+  await page.getByRole('tab', { name: /Grok 1/ }).click();
+  await expect(page).toHaveURL(/vendor=grok/);
+  await expect(
+    page.locator('[data-testid="vendor-section"][data-vendor="grok"] [data-window="billing_period"]'),
+  ).toContainText('88%');
+  await expect(page.getByRole('button', { name: '添加 Grok 账户' })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('tab', { name: /Grok 1/ })).toHaveAttribute('aria-selected', 'true');
 
   const graph = page.getByTestId('routing-section');
   await expect(graph.locator('[data-slot="routing-node"]')).toHaveCount(11);
@@ -37,9 +41,10 @@ test('fixture: vendor sections pool quota per window and the graph routes every 
 
 test('fixture: empty team shows every vendor with an add action and no quota', async ({ page }) => {
   await page.goto('/app/resources/model-routing?scenario=model-routing-empty');
-  await expect(page.getByTestId('vendor-section')).toHaveCount(3);
+  await expect(page.getByRole('tab')).toHaveText([/Claude 0/, /Codex 0/, /Grok 0/]);
   await expect(page.getByTestId('pool-window')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: /添加 .* 账户/ })).toHaveCount(3);
+  await expect(page.getByText('还没有 Claude 账户')).toBeVisible();
+  await page.getByRole('tab', { name: /Grok 0/ }).click();
   await expect(page.getByText('还没有 Grok 账户')).toBeVisible();
   await expect(page.getByTestId('routing-empty')).toBeVisible();
 });
@@ -143,10 +148,6 @@ test('live: rename, verify, remove and the Claude usage switch hit the agreed ro
   await expect(claude.getByTestId('account-row')).toHaveCount(2);
   await expect(claude.locator('[data-window="seven_day"]')).toContainText('10%');
   await expect(claude.getByRole('button', { name: /^展开/ })).toHaveCount(0);
-  await expect(
-    page.locator('[data-testid="vendor-section"][data-vendor="codex"] [data-testid="account-row"]'),
-  ).toContainText('ChatGPT Pro');
-
   const personal = claude.locator('[data-account-id="s1"]');
   await personal.getByTestId('account-more').click();
   await page.getByRole('menuitem', { name: /重命名/ }).click();
@@ -158,13 +159,16 @@ test('live: rename, verify, remove and the Claude usage switch hit the agreed ro
   await page.getByRole('menuitem', { name: /验证/ }).click();
   await expect.poll(() => calls).toContain('verify s1');
 
+  await page.getByRole('tab', { name: /Codex 1/ }).click();
   const codexRow = page.locator('[data-account-id="p1"]');
+  await expect(codexRow).toContainText('ChatGPT Pro');
   await codexRow.getByTestId('account-more').click();
   const codexMenu = page.getByRole('menu', { name: 'ChatGPT Pro 的操作' });
   await expect(codexMenu.getByRole('menuitem', { name: /重命名/ })).toBeVisible();
   await expect(codexMenu.getByRole('menuitem', { name: /验证/ })).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(codexMenu).toHaveCount(0);
+  await page.getByRole('tab', { name: /Claude 2/ }).click();
 
   await claude.locator('[data-account-id="s2"]').getByTestId('account-more').click();
   const legacyMenu = page.getByRole('menu', { name: 'Legacy 的操作' });

@@ -12,6 +12,7 @@ import type {
   StickyThread,
   SubscriptionAccount,
 } from '../../api/claude-accounts.js';
+import { ACCOUNT_VENDORS } from '../../api/claude-accounts.js';
 import { ProjectAvatar } from '../../board/project-avatar.js';
 import { relativeTime } from '../../board/rel-time.js';
 import { useI18n } from '../../i18n/provider.js';
@@ -21,6 +22,7 @@ import { ClaudeMark, GrokMark, OpenAIMark, PiMark } from '../brand-marks.js';
 import { FORM_CONTROL_CLS } from '../form-layout.js';
 import { ListRow } from '../list-card.js';
 import { KeyedMenuContent, KeyedMenuItem } from '../menu-keys.js';
+import { SegmentedTabs } from '../segmented.js';
 import { isLowQuota } from '../settings/quota-row.js';
 import { SETTINGS_ROW_CLS, SettingsCard } from '../settings-list.js';
 import { type GlyphKind, StatusGlyph } from '../status-glyph.js';
@@ -35,10 +37,10 @@ const DAY = 86_400_000;
 
 type Mark = ComponentType<SVGProps<SVGSVGElement>>;
 
-export const VENDORS: Record<AccountVendor, { label: string; Mark: Mark }> = {
-  claude: { label: 'Claude', Mark: ClaudeMark },
-  codex: { label: 'ChatGPT · Codex', Mark: OpenAIMark },
-  grok: { label: 'Grok', Mark: GrokMark },
+export const VENDORS: Record<AccountVendor, { label: string; short: string; Mark: Mark }> = {
+  claude: { label: 'Claude', short: 'Claude', Mark: ClaudeMark },
+  codex: { label: 'ChatGPT · Codex', short: 'Codex', Mark: OpenAIMark },
+  grok: { label: 'Grok', short: 'Grok', Mark: GrokMark },
 };
 
 const WINDOW_LABELS: Record<string, string> = {
@@ -393,40 +395,20 @@ export function VendorSection({
   vendor,
   accounts,
   now,
-  onAdd,
   renderRow,
 }: {
   vendor: AccountVendor;
   accounts: SubscriptionAccount[];
   now: number;
-  onAdd: () => void;
   renderRow: (account: SubscriptionAccount, index: number) => ReactNode;
 }) {
   const { t } = useI18n();
-  const { label, Mark } = VENDORS[vendor];
+  const { label } = VENDORS[vendor];
   const windows = WINDOW_ORDER.filter((name) =>
     accounts.some((a) => a.windows.some((w) => w.name === name)),
   );
   return (
     <section data-testid="vendor-section" data-vendor={vendor} className="flex flex-col gap-3">
-      <header className="flex items-center gap-2 px-1">
-        <Mark width={18} height={18} className="flex-none text-foreground" />
-        <h3 className="m-0 truncate text-card-title font-medium whitespace-nowrap text-foreground">
-          {label}
-        </h3>
-        <span className="flex-none text-meta whitespace-nowrap text-content-tertiary tabular-nums">
-          {t('{n} 个账户', { n: accounts.length })}
-        </span>
-        <Button
-          variant="ghost"
-          className="ml-auto flex-none"
-          aria-label={t('添加 {vendor} 账户', { vendor: label })}
-          onClick={onAdd}
-        >
-          <Plus aria-hidden strokeWidth={1.75} className="size-3.5" />
-          <span className="hidden sm:inline">{t('添加账户')}</span>
-        </Button>
-      </header>
       {accounts.length === 0 ? (
         <SettingsCard>
           <div className={cn(SETTINGS_ROW_CLS, 'text-meta text-content-tertiary')}>
@@ -446,6 +428,48 @@ export function VendorSection({
         </>
       )}
     </section>
+  );
+}
+
+export function VendorTabs({
+  value,
+  counts,
+  onChange,
+  onAdd,
+}: {
+  value: AccountVendor;
+  counts: Record<AccountVendor, number>;
+  onChange: (vendor: AccountVendor) => void;
+  onAdd: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <div className="flex items-center gap-3">
+      <SegmentedTabs
+        label={t('订阅账户')}
+        value={value}
+        onChange={onChange}
+        className="min-w-0"
+        options={ACCOUNT_VENDORS.map((vendor) => {
+          const { short, Mark } = VENDORS[vendor];
+          return {
+            value: vendor,
+            label: `${short} ${counts[vendor]}`,
+            icon: <Mark width={14} height={14} className="block flex-none text-foreground" />,
+            data: { 'data-vendor': vendor },
+          };
+        })}
+      />
+      <Button
+        variant="ghost"
+        className="ml-auto flex-none"
+        aria-label={t('添加 {vendor} 账户', { vendor: VENDORS[value].label })}
+        onClick={onAdd}
+      >
+        <Plus aria-hidden strokeWidth={1.75} className="size-3.5" />
+        <span className="hidden sm:inline">{t('添加账户')}</span>
+      </Button>
+    </div>
   );
 }
 

@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import {
+  ACCOUNT_VENDORS,
   type AccountStep,
   type AccountVendor,
   type SubscriptionAccount,
@@ -71,7 +72,9 @@ function SectionHead({ title, hint }: { title: string; hint?: string }) {
 export function ModelRoutingPage() {
   const { t } = useI18n();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const vendorParam = searchParams.get('vendor');
+  const vendor: AccountVendor = ACCOUNT_VENDORS.find((v) => v === vendorParam) ?? 'claude';
   const fixture = resolveScenario(searchParams);
   const fixtureAccounts = fixture.resources?.accounts;
   const { live, teamId } = useLiveData();
@@ -183,6 +186,12 @@ export function ModelRoutingPage() {
           stepsByAccount={stepsByAccount}
           stickiness={stickiness}
           now={now}
+          vendor={vendor}
+          onVendorChange={(next) => {
+            const params = new URLSearchParams(searchParams);
+            params.set('vendor', next);
+            setSearchParams(params, { replace: true });
+          }}
           onAdd={(vendor) => {
             if (vendor === 'claude') {
               createSubscription.reset();

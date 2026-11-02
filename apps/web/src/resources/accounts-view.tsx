@@ -1,11 +1,10 @@
 import { cn } from 'cn';
 import { type ReactNode, useState } from 'react';
-import {
-  ACCOUNT_VENDORS,
-  type AccountStep,
-  type AccountVendor,
-  type StickyThread,
-  type SubscriptionAccount,
+import type {
+  AccountStep,
+  AccountVendor,
+  StickyThread,
+  SubscriptionAccount,
 } from '../api/claude-accounts.js';
 import {
   AccountRow,
@@ -13,6 +12,7 @@ import {
   AccountStepRow,
   StickyThreadRow,
   VendorSection,
+  VendorTabs,
 } from '../components/accounts/account-parts.js';
 import { ListCard } from '../components/list-card.js';
 import { SETTINGS_ROW_CLS } from '../components/settings-list.js';
@@ -26,6 +26,8 @@ export interface SubscriptionAccountsProps {
   actionsFor: (account: SubscriptionAccount) => AccountRowActions;
   statusFor?: (account: SubscriptionAccount) => ReactNode;
   onAdd: (vendor: AccountVendor) => void;
+  vendor?: AccountVendor;
+  onVendorChange?: (vendor: AccountVendor) => void;
 }
 
 function EmptyLine({ children }: { children: ReactNode }) {
@@ -77,43 +79,54 @@ function AccountDetail({
 
 export function SubscriptionAccounts(props: SubscriptionAccountsProps) {
   const [open, setOpen] = useState<string | null>(null);
+  const [localVendor, setLocalVendor] = useState<AccountVendor>('claude');
+  const vendor = props.vendor ?? localVendor;
+  const count = (v: AccountVendor) => props.accounts.filter((a) => a.vendor === v).length;
+  const counts = { claude: count('claude'), codex: count('codex'), grok: count('grok') };
   return (
-    <div data-testid="subscription-accounts" className="flex flex-col gap-10">
-      {ACCOUNT_VENDORS.map((vendor) => (
-        <VendorSection
-          key={vendor}
-          vendor={vendor}
-          accounts={props.accounts.filter((a) => a.vendor === vendor)}
-          now={props.now}
-          onAdd={() => props.onAdd(vendor)}
-          renderRow={(account, index) => {
-            const steps = props.stepsByAccount[account.id];
-            const expanded = open === account.id;
-            return (
-              <div key={account.id} className="flex flex-col">
-                <AccountRow
-                  account={account}
-                  index={index}
+    <div data-testid="subscription-accounts" className="flex flex-col gap-4">
+      <VendorTabs
+        value={vendor}
+        counts={counts}
+        onChange={(next) => {
+          setOpen(null);
+          setLocalVendor(next);
+          props.onVendorChange?.(next);
+        }}
+        onAdd={() => props.onAdd(vendor)}
+      />
+      <VendorSection
+        key={vendor}
+        vendor={vendor}
+        accounts={props.accounts.filter((a) => a.vendor === vendor)}
+        now={props.now}
+        renderRow={(account, index) => {
+          const steps = props.stepsByAccount[account.id];
+          const expanded = open === account.id;
+          return (
+            <div key={account.id} className="flex flex-col">
+              <AccountRow
+                account={account}
+                index={index}
+                now={props.now}
+                actions={props.actionsFor(account)}
+                status={props.statusFor?.(account)}
+                expanded={expanded}
+                onToggleExpanded={
+                  steps === undefined ? undefined : () => setOpen(expanded ? null : account.id)
+                }
+              />
+              {expanded && steps !== undefined && (
+                <AccountDetail
+                  steps={steps}
+                  sticky={props.stickiness.filter((s) => s.subscriptionId === account.id)}
                   now={props.now}
-                  actions={props.actionsFor(account)}
-                  status={props.statusFor?.(account)}
-                  expanded={expanded}
-                  onToggleExpanded={
-                    steps === undefined ? undefined : () => setOpen(expanded ? null : account.id)
-                  }
                 />
-                {expanded && steps !== undefined && (
-                  <AccountDetail
-                    steps={steps}
-                    sticky={props.stickiness.filter((s) => s.subscriptionId === account.id)}
-                    now={props.now}
-                  />
-                )}
-              </div>
-            );
-          }}
-        />
-      ))}
+              )}
+            </div>
+          );
+        }}
+      />
     </div>
   );
 }
