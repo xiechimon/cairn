@@ -2,6 +2,7 @@ import { type RefObject, useCallback, useEffect, useLayoutEffect, useRef } from 
 import type { ChiefEarlier } from './use-chief-surface.js';
 
 const LOAD_EDGE = 200;
+const READER_EVENTS = ['scroll', 'wheel', 'touchmove'] as const;
 
 interface Anchor {
   element: Element | null;
@@ -73,9 +74,13 @@ export function ChiefEarlierLoader({
     const viewport = viewportRef.current;
     if (viewport === null) return;
     maybeLoad(false);
-    const onScroll = () => maybeLoad(true);
-    viewport.addEventListener('scroll', onScroll, { passive: true });
-    return () => viewport.removeEventListener('scroll', onScroll);
+    const byReader = () => maybeLoad(true);
+    for (const type of READER_EVENTS) {
+      viewport.addEventListener(type, byReader, { passive: true });
+    }
+    return () => {
+      for (const type of READER_EVENTS) viewport.removeEventListener(type, byReader);
+    };
   }, [maybeLoad, rowCount, viewportRef]);
   const wasLoading = useRef(loading);
   useLayoutEffect(() => {
