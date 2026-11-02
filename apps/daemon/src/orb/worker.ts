@@ -21,6 +21,43 @@ import { OrbStaleReleaseError, RelayMachineApi } from './relay.js';
 export const ORB_AGENT_HOME = '/home/agent';
 export const ORB_WORKSPACES_ROOT = `${ORB_AGENT_HOME}/work`;
 
+export const ORB_CLAUDE_BIN = '/usr/bin/claude';
+
+export function orbBackendFor(deps: {
+  paths: ReturnType<typeof statePaths>;
+  machineName?: string;
+}): (provider: string | null | undefined) => AgentBackend {
+  const { paths } = deps;
+  const backends = new Map<string, AgentBackend>();
+  return (provider) => {
+    const runtime = provider === 'claude-code' || provider === 'gemini' ? provider : 'pi';
+    const existing = backends.get(runtime);
+    if (existing) return existing;
+    const backend =
+      runtime === 'gemini'
+        ? createGeminiBackend()
+        : runtime === 'claude-code'
+          ? createClaudeCodeBackend({
+              inOrb: true,
+              executablePath: ORB_CLAUDE_BIN,
+              skills: { skillsDir: '', cwd: paths.home },
+              teamSkillsCacheDir: paths.teamSkillsCacheDir,
+            })
+          : createPiBackend({
+              agentDir: paths.agentRuntimeDir,
+              sessionDir: paths.chatSessionsDir,
+              skills: { skillsDir: '', cwd: paths.home },
+              resolveSessionFile: (id) => resolveSessionFile(paths, id),
+              onSession: (id, file) => {
+                if (file) recordSession(paths, id, file);
+              },
+              ...(deps.machineName !== undefined ? { machineName: deps.machineName } : {}),
+            });
+    backends.set(runtime, backend);
+    return backend;
+  };
+}
+
 export async function runOrbWorker(options: {
   socketPath: string;
   entryPath?: string;
@@ -112,35 +149,8 @@ export async function runOrbWorker(options: {
     const workspacesDir = options.workspacesRoot ?? ORB_WORKSPACES_ROOT;
     const paths = statePaths(options.home ?? `${ORB_AGENT_HOME}/.cairn`, workspacesDir);
     ensureStateDirs(paths);
-    const backends = new Map<string, AgentBackend>();
     const backendFor =
-      options.backendFor ??
-      ((provider: string | null | undefined): AgentBackend => {
-        const runtime = provider === 'claude-code' || provider === 'gemini' ? provider : 'pi';
-        const existing = backends.get(runtime);
-        if (existing) return existing;
-        const backend =
-          runtime === 'gemini'
-            ? createGeminiBackend()
-            : runtime === 'claude-code'
-              ? createClaudeCodeBackend({
-                  inOrb: true,
-                  skills: { skillsDir: '', cwd: paths.home },
-                  teamSkillsCacheDir: paths.teamSkillsCacheDir,
-                })
-              : createPiBackend({
-                  agentDir: paths.agentRuntimeDir,
-                  sessionDir: paths.chatSessionsDir,
-                  skills: { skillsDir: '', cwd: paths.home },
-                  resolveSessionFile: (id) => resolveSessionFile(paths, id),
-                  onSession: (id, file) => {
-                    if (file) recordSession(paths, id, file);
-                  },
-                  machineName: input.machineName,
-                });
-        backends.set(runtime, backend);
-        return backend;
-      });
+      options.backendFor ?? orbBackendFor({ paths, machineName: input.machineName });
     await runStep(
       {
         client,
