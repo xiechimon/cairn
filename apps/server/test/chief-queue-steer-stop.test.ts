@@ -279,6 +279,7 @@ describe('chief turn queue (T5): one turn per thread, oldest first', () => {
         .run();
     }
     expect((await w.thread()).pending?.map((p) => p.messageId)).toEqual(['turn-a']);
+    expect((await w.thread()).turnQueue).toMatchObject({ stepId: 'turn-z' });
     const first = await w.claim();
     expect(first?.step.id).toBe('turn-z');
     expect(await w.claim()).toBeNull();

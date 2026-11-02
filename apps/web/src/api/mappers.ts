@@ -1421,7 +1421,6 @@ function collectChiefStream(
     }
     const ask = m.role === 'assistant' ? askQuestionOfContent(m.content) : null;
     if (ask !== null) {
-      pendingTools = [];
       items.push({
         kind: 'question',
         id: m.id,

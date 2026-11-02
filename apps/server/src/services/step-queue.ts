@@ -1,5 +1,5 @@
 import type { ChiefThread, StepQueueBlocked, StepQueueInfo } from '@cairn/shared';
-import { and, eq } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { agent, build, chief, chiefThread, machine, step, todo } from '../db/schema.js';
 import {
@@ -169,9 +169,13 @@ export function stepQueueProjector(db: Db, teamId: string) {
 
   function chiefTurnQueueOf(threadId: string): ChiefThread['turnQueue'] {
     if (pendingChiefOf(threadId) === null) return null;
-    const head = chiefRows
-      .filter((r) => r.threadId === threadId)
-      .sort((a, b) => a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1))[0];
+    const oldest = db
+      .select({ id: step.id })
+      .from(step)
+      .where(and(eq(step.buildId, threadId), eq(step.kind, 'chief'), eq(step.status, 'pending')))
+      .orderBy(asc(step.createdAt), sql`rowid`)
+      .get();
+    const head = chiefRows.find((r) => r.id === oldest?.id);
     if (head === undefined) return null;
     const info = project({
       id: head.id,

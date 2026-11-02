@@ -140,6 +140,29 @@ describe('each Coordinator tool call renders once', () => {
     expect(toolMentions(stream)).toBe(1);
   });
 
+  test('tools called before a question fold into the reply after it', () => {
+    const stream = streamOf(null, [
+      row('u-q', 'user', '派一下', NOW),
+      toolMsg('t-1', 'mcp__cairn__todos', NOW + 1),
+      row(
+        'q-1',
+        'assistant',
+        JSON.stringify({
+          kind: 'ask_user_question',
+          requestId: 'r1',
+          status: 'answered',
+          questions: [{ header: '项目', question: '哪个项目？', options: [{ label: 'cairn' }] }],
+          answers: [{ header: '项目', choices: ['cairn'] }],
+        }),
+        NOW + 2,
+      ),
+      row('a-1', 'assistant', '好，派到 cairn。', NOW + 3),
+    ]);
+    expect(stream.map((item) => item.kind)).toEqual(['user', 'question', 'robot']);
+    const reply = stream.find((item) => item.kind === 'robot' && item.id === 'a-1');
+    expect(reply?.kind === 'robot' ? reply.tools?.length : 0).toBe(1);
+  });
+
   test('an idle thread renders the same rows as a running one for answered turns', () => {
     const idle = streamOf(null, ANSWERED_TURN);
     expect(toolMentions(idle)).toBe(3);
