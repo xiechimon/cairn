@@ -345,15 +345,17 @@ test('the committed lockfile and workspace parse, and their closures reach the p
   const workspace = readFileSync(new URL('../pnpm-workspace.yaml', import.meta.url), 'utf8');
   const real = { lockfile, workspace };
   assert.deepEqual(dependencyImpact({ base: real, head: real }).specs, []);
-  const swap = (from, to) => {
-    assert.ok(workspace.includes(from), `pnpm-workspace.yaml lacks ${from}`);
-    return dependencyImpact({
-      base: real,
-      head: { lockfile, workspace: workspace.replace(from, to) },
-    });
+  const flipBuild = (name) => {
+    const line = new RegExp(`^( +'?${name}'?: )(true|false)$`, 'm');
+    assert.match(workspace, line, `pnpm-workspace.yaml has no build setting for ${name}`);
+    const flipped = workspace.replace(
+      line,
+      (_, key, value) => `${key}${value === 'true' ? 'false' : 'true'}`,
+    );
+    return dependencyImpact({ base: real, head: { lockfile, workspace: flipped } });
   };
-  assert.equal(swap('esbuild: true', 'esbuild: false').specs, null);
-  assert.deepEqual(swap('better-sqlite3: false', 'better-sqlite3: true').specs, LIVE_SERVER);
+  assert.equal(flipBuild('esbuild').specs, null);
+  assert.deepEqual(flipBuild('better-sqlite3').specs, LIVE_SERVER);
   const reactKey = lockfile.match(/^ {2}react@(\d+\.\d+\.\d+):/m);
   assert.ok(reactKey, 'pnpm-lock.yaml has a react snapshot');
   const bumped = lockfile.replace(
