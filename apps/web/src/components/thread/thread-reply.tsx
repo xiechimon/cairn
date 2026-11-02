@@ -36,7 +36,7 @@ export function ThreadReply({ seq, delivery, onSend, autoFocus, className }: Thr
     setState('sending');
     onSend(text).then(
       () => {
-        setDraft('');
+        setDraft((current) => (current.trim() === text ? '' : current));
         setState('sent');
       },
       () => setState('failed'),

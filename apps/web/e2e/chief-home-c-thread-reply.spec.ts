@@ -47,7 +47,12 @@ interface Sent {
   body: Record<string, unknown>;
 }
 
-async function stubHome(page: Page, todos: unknown[], status = 201): Promise<Sent[]> {
+async function stubHome(
+  page: Page,
+  todos: unknown[],
+  status = 201,
+  hold: Promise<void> = Promise.resolve(),
+): Promise<Sent[]> {
   const sent: Sent[] = [];
   await page.addInitScript(() => localStorage.setItem('cairn.locale', 'en'));
   await page.route('**/api/**', (route, request) => {
@@ -87,10 +92,11 @@ async function stubHome(page: Page, todos: unknown[], status = 201): Promise<Sen
   await page.route(`**/api/conversations/${THREAD.id}/messages*`, (route) =>
     route.fulfill({ json: { messages: [] } }),
   );
-  await page.route('**/api/todos/*/messages', (route, request) => {
+  await page.route('**/api/todos/*/messages', async (route, request) => {
     if (request.method() !== 'POST') return route.fallback();
     const todoId = new URL(request.url()).pathname.split('/')[3] ?? '';
     sent.push({ todoId, body: JSON.parse(request.postData() ?? '{}') as Record<string, unknown> });
+    await hold;
     return status === 201
       ? route.fulfill({
           status,
@@ -145,4 +151,28 @@ test('a failed thread offers a reply that reruns it; an empty reply cannot be se
   await expect(target.getByRole('button', { name: 'Send' })).toBeDisabled();
   await target.getByRole('textbox', { name: 'Reply to #12' }).press('Enter');
   expect(sent).toHaveLength(0);
+});
+
+test('text typed while a reply is in flight survives its success', async ({ page }) => {
+  let release = () => {};
+  const hold = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const sent = await stubHome(
+    page,
+    [todo('todo-7', 7, 'Split the routing migration', 'confirm', 'build-1')],
+    201,
+    hold,
+  );
+  await page.goto('/app');
+  const target = card(page, 'Split the routing migration');
+  await target.getByRole('button', { name: 'Reply', exact: true }).click();
+  const box = target.getByRole('textbox', { name: 'Reply to #7' });
+  await box.fill('Do A');
+  await box.press('Enter');
+  await expect.poll(() => sent.length).toBe(1);
+  await box.fill('Also do B');
+  release();
+  await expect(target).toContainText('Sent to #7.');
+  await expect(box).toHaveValue('Also do B');
 });
