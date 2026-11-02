@@ -46,8 +46,8 @@ host_version() {
 claude_version=$(host_version claude | awk 'NR == 1 {print $1}')
 codex_version=$(host_version codex | awk 'NR == 1 {print $NF}')
 [[ $claude_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ && $codex_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { printf 'Cannot pin host Claude Code and Codex versions\n' >&2; exit 1; }
-pnpm_version=$(sed -n 's/^  "packageManager": "pnpm@\([0-9][0-9.]*\)",*$/\1/p' "$script_dir/../../../package.json")
-[[ $pnpm_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { printf 'Cannot pin pnpm from the repository packageManager field\n' >&2; exit 1; }
+pnpm_version=$(cat "$script_dir/pnpm.version")
+[[ $pnpm_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { printf 'Cannot pin pnpm from %s/pnpm.version\n' "$script_dir" >&2; exit 1; }
 daemon_args=(bash -lc 'export XDG_RUNTIME_DIR=/run/user/$(id -u); node "$1" "$2"' cairn-orb "$script_dir/daemon-package.mjs" "${CAIRN_ORB_NODE_MAJOR:-}")
 if [[ $(id -un) == ian ]]; then
   node_major=$("${daemon_args[@]}")
