@@ -198,24 +198,21 @@ function buildChiefClaim(
   const digest = isChiefDigestStep(stepRow);
   const ctx = digest ? null : chiefClaimContext(deps, threadRow.id);
   const trigger = parseChiefTrigger(stepRow.prompt);
-  const baseSystemPrompt = digest ? CHIEF_DIGEST_SYSTEM_PROMPT : (ctx?.systemPrompt ?? '');
+  const systemPrompt = digest ? CHIEF_DIGEST_SYSTEM_PROMPT : (ctx?.systemPrompt ?? '');
   const serverContext =
     !digest && coordinatorServerContextEnabled() && stepRuntimeFor(model.provider) === 'pi'
       ? assembleCoordinatorHistory(deps.db, {
           threadId: threadRow.id,
           turnCreatedAt: stepRow.createdAt,
+          claimedAt: nowMs(),
           contextWindow: contextWindowOf(
             deps.db,
             threadRow.teamId,
             `${model.provider}/${model.modelId}`,
           ),
-          fixedText: `${baseSystemPrompt}\n${stepRow.prompt ?? ''}`,
+          fixedText: `${systemPrompt}\n${stepRow.prompt ?? ''}`,
         })
       : null;
-  const systemPrompt =
-    serverContext?.summarySection != null
-      ? `${baseSystemPrompt}\n\n${serverContext.summarySection}`
-      : baseSystemPrompt;
   const unanswered = (serverContext?.unanswered ?? []).filter(
     (text) => !(stepRow.prompt ?? '').includes(text),
   );

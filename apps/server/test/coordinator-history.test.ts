@@ -25,6 +25,7 @@ function assemble(contextWindow = 200_000, fixedText = '') {
   return assembleCoordinatorHistory(H.s.db, {
     threadId: H.threadId,
     turnCreatedAt: BASE + 1_000_000,
+    claimedAt: BASE + 1_500_000,
     contextWindow,
     fixedText,
   });
@@ -59,18 +60,18 @@ describe('assembleCoordinatorHistory (D70 C3)', () => {
     add('user', 'q3 now');
     const h = assemble();
     expect(h.messages.at(-1)?.role).toBe('assistant');
-    expect(h.unanswered).toEqual(['q2 got no reply\n\nq3 now']);
+    expect(h.unanswered).toEqual(['q2 got no reply', 'q3 now']);
   });
 
-  test('a daemon prompt row that repeats a posted message is not counted twice; a wake prompt row is kept', () => {
+  test('the prompt the model saw wins over the raw posted copy, even when it carries extra notes; a wake prompt row is kept', () => {
     n = 0;
     add('user', 'posted question');
-    add('user', 'posted question', 'user-step1');
+    add('user', 'posted question\n\n[project: demo]', 'user-step1');
     add('assistant', 'answer');
     add('user', '[wake:gate] provenance=watch:t1\ncheck #12', 'user-step2');
     add('assistant', 'checked');
     const h = assemble();
-    expect(h.messages[0]?.text).toBe('posted question');
+    expect(h.messages[0]?.text).toBe('posted question\n\n[project: demo]');
     expect(h.messages[2]?.text).toContain('[event] provenance=watch:t1');
   });
 
@@ -99,7 +100,10 @@ describe('assembleCoordinatorHistory (D70 C3)', () => {
       })
       .run();
     const h = assemble();
-    expect(h.messages.map((m) => m.text)).toEqual(['new q', 'new a']);
+    expect(h.messages.map((m) => m.role)).toEqual(['user', 'assistant']);
+    expect(h.messages[0]?.text.startsWith(h.summarySection ?? 'missing')).toBe(true);
+    expect(h.messages[0]?.text.endsWith('new q')).toBe(true);
+    expect(JSON.stringify(h.messages)).not.toContain('old q');
     expect(h.summarySection).toContain(
       '<compacted_thread_summary>\nSUMMARY\n</compacted_thread_summary>',
     );

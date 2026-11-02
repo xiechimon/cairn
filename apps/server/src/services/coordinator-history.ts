@@ -69,7 +69,7 @@ function rawRowText(row: typeof chiefMessage.$inferSelect): HistoryMessage | nul
     try {
       kind = (JSON.parse(text) as { kind?: unknown }).kind;
     } catch {}
-    if (kind === ASK_USER_QUESTION_KIND)
+    if (kind === ASK_USER_QUESTION_KIND && row.role === 'assistant')
       return { role: 'assistant', text: `[asked the user] ${text}` };
     if (typeof kind === 'string') return null;
   }
@@ -104,6 +104,7 @@ export function assembleCoordinatorHistory(
   input: {
     threadId: string;
     turnCreatedAt: number;
+    claimedAt: number;
     contextWindow: number;
     fixedText: string;
   },
@@ -122,7 +123,8 @@ export function assembleCoordinatorHistory(
         not(like(chiefMessage.id, `${CHIEF_DIGEST_ROW_ID_PREFIX}%`)),
         not(like(chiefMessage.id, `${CHIEF_REPORT_ROW_ID_PREFIX}%`)),
         ne(chiefMessage.role, 'system'),
-        lte(chiefMessage.createdAt, input.turnCreatedAt),
+        lte(chiefMessage.createdAt, input.claimedAt),
+        or(ne(chiefMessage.role, 'user'), lte(chiefMessage.createdAt, input.turnCreatedAt)),
         summaryRow === undefined
           ? undefined
           : or(
@@ -138,23 +140,21 @@ export function assembleCoordinatorHistory(
     .limit(HISTORY_MAX_ROWS)
     .all()
     .reverse();
-  const posted = new Set(
-    rows
-      .filter((r) => r.role === 'user' && !r.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX))
-      .map((r) => (extractText(r.content) ?? '').trim()),
-  );
+  const sent = rows
+    .filter((r) => r.role === 'user' && r.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX))
+    .map((r) => (extractText(r.content) ?? '').trim());
   const rendered = rows
-    .filter(
-      (r) =>
-        !r.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX) ||
-        !posted.has((extractText(r.content) ?? '').trim()),
-    )
+    .filter((r) => {
+      if (r.role !== 'user' || r.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX)) return true;
+      const text = (extractText(r.content) ?? '').trim();
+      return text === '' || !sent.some((prompt) => prompt.includes(text));
+    })
     .map(rowText)
     .filter((m): m is HistoryMessage => m !== null);
-  let messages = coalesce(rendered);
   const unanswered: string[] = [];
-  while (messages.at(-1)?.role === 'user')
-    unanswered.unshift((messages.pop() as HistoryMessage).text);
+  while (rendered.at(-1)?.role === 'user')
+    unanswered.unshift((rendered.pop() as HistoryMessage).text);
+  let messages = coalesce(rendered);
   const summarySection =
     summaryRow === undefined
       ? null
@@ -176,6 +176,8 @@ export function assembleCoordinatorHistory(
     messages = messages.slice(1);
     dropped += 1;
   }
+  if (summarySection !== null)
+    messages = coalesce([{ role: 'user', text: summarySection }, ...messages]);
   return {
     summarySection,
     messages,

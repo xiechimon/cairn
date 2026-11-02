@@ -141,7 +141,9 @@ describe('D70 C3: the server owns the Coordinator context', () => {
     const third = stub.requests[2]!;
     const system = texts(third.messages.filter((m) => m.role === 'system')).join('\n');
     const rest = texts(third.messages.filter((m) => m.role !== 'system'));
-    expect(system).toContain('SUMMARY-MARK');
+    expect(system).not.toContain('SUMMARY-MARK');
+    expect(rest[0]?.startsWith('user:')).toBe(true);
+    expect(rest[0]).toContain('SUMMARY-MARK');
     expect(rest.some((t) => t.includes('ANSWER-ONE'))).toBe(false);
     expect(rest.some((t) => t.includes('ANSWER-TWO'))).toBe(true);
     expect(rest.filter((t) => t.includes('QUESTION-THREE'))).toHaveLength(1);
