@@ -197,13 +197,13 @@ test.describe('the drawer composer picks a project (T6 #2009)', () => {
     const state = await mockLive(page);
     await openDrawer(page);
     await expect(chip(page)).toHaveText(/自动/);
-    await expect(chip(page)).toHaveAttribute('aria-label', '发给哪个项目：自动，由总管判断');
+    await expect(chip(page)).toHaveAttribute('aria-label', '发给哪个项目：自动，由 Coordinator 判断');
     await chip(page).click();
     const menu = page.getByRole('menu', { name: '发给哪个项目' });
     await expect(menu).toBeVisible();
     const items = menu.getByRole('menuitemradio');
     await expect(items).toHaveCount(4);
-    await expect(items.nth(0)).toContainText('总管判断，拿不准会问你');
+    await expect(items.nth(0)).toContainText('Coordinator 判断，拿不准会问你');
     await expect(items.nth(0)).toHaveAttribute('aria-checked', 'true');
     await expect(items.nth(2)).toContainText('官网 cairn.xmon.me');
     await shot(page, 'chip-menu.png');

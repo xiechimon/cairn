@@ -134,3 +134,50 @@ test('repeated C presses on the home add no history entries', async ({ page }) =
   await expect(composer(page)).toBeFocused();
   expect(await page.evaluate(() => history.length)).toBe(depth);
 });
+
+test('at phone width the icon-only Save as draft has an accessible name and a tooltip on keyboard focus', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockWorld(page);
+  await page.goto('/app');
+  const button = page.getByRole('button', { name: '存为草稿，不开始' });
+  await expect(button).toBeVisible();
+  await expect(button.getByText('存为草稿', { exact: true })).toBeHidden();
+  await composer(page).fill('x');
+  await page.getByTestId('chief-project-chip').focus();
+  await page.keyboard.press('Tab');
+  await expect(button).toBeFocused();
+  await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText('存为草稿，不开始');
+});
+
+test('a toast lands over the main column, clear of the sidebar and the composer', async ({ page }) => {
+  const { todoPosts } = await mockWorld(page);
+  await page.goto('/app');
+  await composer(page).fill('Toast placement');
+  await saveDraft(page).click();
+  await expect.poll(() => todoPosts.length).toBe(1);
+  const toast = page.locator('[data-sonner-toast]').first();
+  await expect(toast).toBeVisible();
+  await page.waitForTimeout(500);
+  const box = (await toast.boundingBox())!;
+  const sidebar = (await page.locator('.board-sidebar').boundingBox())!;
+  const composerBox = (await page.getByTestId('home-c').locator('.chief-composer').boundingBox())!;
+  expect(box.x).toBeGreaterThanOrEqual(sidebar.x + sidebar.width);
+  expect(box.y + box.height).toBeLessThanOrEqual(composerBox.y);
+});
+
+test('at phone width a toast lands below the menu button and clear of the composer', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { todoPosts } = await mockWorld(page);
+  await page.goto('/app');
+  await composer(page).fill('Toast placement narrow');
+  await saveDraft(page).click();
+  await expect.poll(() => todoPosts.length).toBe(1);
+  const toast = page.locator('[data-sonner-toast]').first();
+  await expect(toast).toBeVisible();
+  await page.waitForTimeout(500);
+  const box = (await toast.boundingBox())!;
+  const composerBox = (await page.getByTestId('home-c').locator('.chief-composer').boundingBox())!;
+  const menu = (await page.locator('.app-menu-trigger').boundingBox())!;
+  expect(box.y).toBeGreaterThanOrEqual(menu.y + menu.height);
+  expect(box.y + box.height).toBeLessThanOrEqual(composerBox.y);
+});

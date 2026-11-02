@@ -770,7 +770,7 @@ export function ChiefConversation({
                       data-testid="chief-project-chip"
                       data-set={pickedProject != null ? '' : undefined}
                       aria-label={t('发给哪个项目：{name}', {
-                        name: pickedProject?.name ?? t('自动，由总管判断'),
+                        name: pickedProject?.name ?? t('自动，由 Coordinator 判断'),
                       })}
                       className={PROJECT_CHIP_CLS}
                     />
