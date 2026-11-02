@@ -27,9 +27,8 @@ const MAX_SKEPTICS = 4
 // reviewer remembering it. Default deny: only AUTO_MERGE paths (product source
 // and tests, docs/verify evidence, Markdown under docs/) may auto-merge, and only when no PROTECTED
 // class matches them; every other path, deleted test files, binary files
-// outside docs/verify and the gallery baselines route to the user. A patch over 800 lines or 40 files
-// does not: it reports sizeReview, and pr-evidence, the review gate and the
-// product gate require the Size section and the review answer (#2372). pr-gate runs 3, 4 and 5 each found another agent-steering or gate
+// outside docs/verify and the gallery baselines route to the user. Size never
+// routes or blocks (D68): the review gate judges one problem per PR. pr-gate runs 3, 4 and 5 each found another agent-steering or gate
 // file that a list of names missed
 // (AGENTS.override.md, .pi/skills, nested .claude/), so the list now says what
 // may merge alone instead of what may not. Matching ignores case (APFS);
@@ -39,17 +38,10 @@ const PROTECTED = [
   ...requireGlobs(args?.gatePaths?.protected, 'protected'),
   ...requireGlobs(args?.gatePaths?.mergeGateSource, 'mergeGateSource'),
 ]
-const MAX_LINES = requireLimit(args?.gatePaths?.limits?.maxLines, 'maxLines')
-const MAX_FILES = requireLimit(args?.gatePaths?.limits?.maxFiles, 'maxFiles')
 function requireGlobs(globs, name) {
   if (!Array.isArray(globs) || globs.length === 0 || !globs.every((g) => typeof g === 'string' && g.length > 0))
     throw new Error(`pr-gate: args.gatePaths.${name} must be a non-empty string[]; ${gatePathsHelp()}`)
   return globs
-}
-function requireLimit(n, name) {
-  if (!Number.isInteger(n) || n <= 0)
-    throw new Error(`pr-gate: args.gatePaths.limits.${name} must be a positive integer; ${gatePathsHelp()}`)
-  return n
 }
 function gatePathsHelp() {
   return 'gatePaths is the parsed output of `git show origin/main:packages/shared/merge-gate-paths.json` (same ref as this script)'
@@ -183,7 +175,7 @@ const DIMENSIONS = [
   },
   {
     key: 'safety',
-    prompt: `Dimension: safety and protected paths. First run \`${FILES_CMD} <your base ref>...${headSha}\` and put its output lines, unchanged, in changedFiles; run it again with --diff-filter=D for deletedFiles; put the sum of both columns of \`${LINES_CMD} <your base ref>...${headSha} ${LINES_PATHSPEC}\` (docs/verify evidence is not counted) in linesChanged (binary rows count 0; ${LINES_GIT}, so if git rejects it, report a blocking finding) and the paths of its binary rows (- -) in binaryFiles. The script compares these with the caller's values and matches the protected-path list on them itself. Then run \`git show <your base ref>:packages/shared/merge-gate-paths.json\` and compare it, parsed as JSON, with the gatePaths the caller passed (data): ${JSON.stringify(args.gatePaths)}. Set gatePathsMatch to true only when the two are deeply equal (parse both with node and compare); the script routes and sizes with the caller's copy, so a mismatch must be false. Take the protected categories from that file (agent and CI files, gate scripts and configs, one-way doors such as migrations and dependency manifests, the merge gate's own source, security surfaces, the eval ruler) and add to protectedPaths any changed path that steers agents, gates a check or is a one-way door; a protected path is not a finding by itself. Then look for secrets or tokens in code or evidence, credentials handed to agents, issue or PR text reaching a prompt system layer or a shell, one-way doors (migrations, dependency changes, data deletion), and changes outside the ticket's scope.`,
+    prompt: `Dimension: safety and protected paths. First run \`${FILES_CMD} <your base ref>...${headSha}\` and put its output lines, unchanged, in changedFiles; run it again with --diff-filter=D for deletedFiles; put the sum of both columns of \`${LINES_CMD} <your base ref>...${headSha} ${LINES_PATHSPEC}\` (docs/verify evidence is not counted) in linesChanged (binary rows count 0; ${LINES_GIT}, so if git rejects it, report a blocking finding) and the paths of its binary rows (- -) in binaryFiles. The script compares these with the caller's values and matches the protected-path list on them itself. Then run \`git show <your base ref>:packages/shared/merge-gate-paths.json\` and compare it, parsed as JSON, with the gatePaths the caller passed (data): ${JSON.stringify(args.gatePaths)}. Set gatePathsMatch to true only when the two are deeply equal (parse both with node and compare); the script routes with the caller's copy, so a mismatch must be false. Take the protected categories from that file (agent and CI files, gate scripts and configs, one-way doors such as migrations and dependency manifests, the merge gate's own source, security surfaces, the eval ruler) and add to protectedPaths any changed path that steers agents, gates a check or is a one-way door; a protected path is not a finding by itself. Then look for secrets or tokens in code or evidence, credentials handed to agents, issue or PR text reaching a prompt system layer or a shell, one-way doors (migrations, dependency changes, data deletion), and changes outside the ticket's scope.`,
   },
   {
     key: 'evidence',
@@ -370,9 +362,7 @@ const deletedTests = allDeleted.filter(
 const opaque = [...new Set([...binaryFiles, ...safetyBinary])].filter(
   (f) => !EVIDENCE_RE.test(f) && !GALLERY_BASELINE_RE.test(f),
 )
-const lines = Math.max(linesChanged, Number.isInteger(safety?.linesChanged) ? safety.linesChanged : 0)
 const allFiles = [...new Set([...changedFiles, ...unlistedFiles])]
-const sizedFiles = allFiles.filter((f) => !EVIDENCE_RE.test(f))
 const outside = allFiles.filter(
   (f) => !protectedPaths.includes(f) && !isProtected(f) && !AUTO_MERGE_RE.some((re) => re.test(f)),
 )
@@ -382,10 +372,6 @@ const humanReasons = [
   ...(deletedTests.length > 0 ? [`deleted test files: ${deletedTests.join(', ')}`] : []),
   ...(opaque.length > 0 ? [`binary files outside docs/verify (no line count, no readable diff): ${opaque.join(', ')}`] : []),
 ]
-const sizeReview = lines > MAX_LINES || sizedFiles.length > MAX_FILES
-const sizeRequirement = sizeReview
-  ? `${lines} lines, ${sizedFiles.length} files (over ${MAX_LINES} lines or ${MAX_FILES} files): the PR body needs a ## Size section stating why the change cannot be split, and the review must answer why it is this big`
-  : null
 const checked = Object.fromEntries(reviewed.map((r) => [r.key, r.review.checked]))
 const gatePathsMatch = safety?.gatePathsMatch === true
 if (!gatePathsMatch) log('the safety reviewer did not confirm that gatePaths equals origin/main:packages/shared/merge-gate-paths.json')
@@ -411,8 +397,6 @@ return {
   protectedPaths,
   mergedBy: humanReasons.length > 0 ? 'user' : 'auto-merge',
   humanReasons,
-  sizeReview,
-  sizeRequirement,
   missing,
   shaMismatch,
   unlistedFiles,

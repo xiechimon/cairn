@@ -550,7 +550,7 @@ test('an evidence binary stays eligible', (t) => {
 });
 const manyFiles = (n) =>
   Array.from({ length: n }, (_, i) => `1\t0\tapps/web/src/page${i}.ts\n`).join('');
-const withoutSizeSection = (data) => ({
+const withRedPrEvidence = (data) => ({
   ...data,
   checks: required.map((name, id) => ({
     name,
@@ -561,20 +561,20 @@ const withoutSizeSection = (data) => ({
     app: { slug: 'github-actions' },
   })),
 });
-test('product lines beside evidence over the line limit go to the size review, not the owner', (t) => {
+test('product lines beside evidence over the line limit are queued, not owner-routed', (t) => {
   const f = fixture(t, {
     numstat: '401\t400\tapps/web/src/page.ts\n900\t0\tdocs/verify/2371/run.txt\n',
   });
   assert.equal(f.queues.length, 1, f.result.stdout);
   assert.doesNotMatch(f.result.stdout, /owner-route/);
 });
-test('product files beside evidence over the file limit go to the size review, not the owner', (t) => {
+test('product files beside evidence over the file limit are queued, not owner-routed', (t) => {
   const f = fixture(t, { numstat: `${manyFiles(41)}1\t0\tdocs/verify/2371/run.txt\n` });
   assert.equal(f.queues.length, 1, f.result.stdout);
   assert.doesNotMatch(f.result.stdout, /owner-route/);
 });
-test('an oversize patch without the Size section stays blocked by a red pr-evidence', (t) => {
-  const f = fixture(t, withoutSizeSection({ numstat: '401\t400\tapps/web/src/page.ts\n' }));
+test('a red pr-evidence keeps a patch out of the queue', (t) => {
+  const f = fixture(t, withRedPrEvidence({}));
   assert.equal(f.queues.length, 0);
   assert.ok(f.result.stdout.includes('check:pr-evidence'), f.result.stdout);
 });

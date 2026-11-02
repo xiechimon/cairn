@@ -98,7 +98,7 @@ jobs:
 
       - name: Review gate reviewer routing and checkout
         if: ${{ !cancelled() }}
-        run: node --test scripts/ops/review-gate/checkout.test.mjs scripts/ops/review-gate/reviewer-route.test.mjs scripts/ops/review-gate/fallback.test.mjs scripts/ops/review-gate/size-facts.test.mjs
+        run: node --test scripts/ops/review-gate/checkout.test.mjs scripts/ops/review-gate/reviewer-route.test.mjs scripts/ops/review-gate/fallback.test.mjs
 
       - name: PR evidence regression tests
         run: python3 scripts/pr-evidence-gate.test.py
@@ -405,7 +405,7 @@ jobs:
 
       - name: Merge routing size caps (#2371)
         if: ${{ !cancelled() }}
-        run: node --test scripts/pr-gate-routing.test.mjs scripts/batch-merger.test.mjs scripts/coordinator-merge.test.mjs scripts/merge-queue-drafts.test.mjs scripts/ci-tiers.test.mjs
+        run: node --test scripts/pr-gate-routing.test.mjs scripts/pr-size.test.mjs scripts/batch-merger.test.mjs scripts/coordinator-merge.test.mjs scripts/merge-queue-drafts.test.mjs scripts/ci-tiers.test.mjs
 
       - name: Real smoke runner and checker fixtures (#2283)
         if: ${{ !cancelled() }}

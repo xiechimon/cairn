@@ -320,18 +320,11 @@ test('a diff over the cap never reaches Claude, so a hidden change cannot PASS',
   assert.doesNotMatch(calls, /Independent review gate: PASS/);
 });
 
-test('the reviewer is told the PR is oversize and must answer why it is this big', () => {
+test('a large PR gets no size facts; the reviewer judges one problem per PR (D68)', () => {
   const { home } = host({ author: openai, claude: 'VERDICT: pass', bulkFiles: 41 });
   const input = readFileSync(join(home, 'claude-input.txt'), 'utf8');
-  assert.match(input, /Size: OVERSIZE, 42 lines, 42 files outside docs\/verify/);
-  assert.match(input, /Why is it this big/);
-});
-
-test('a PR within limits gets the size facts without the oversize question', () => {
-  const { home } = host({ author: openai, claude: 'VERDICT: pass' });
-  const input = readFileSync(join(home, 'claude-input.txt'), 'utf8');
-  assert.match(input, /Size: within limits, 1 lines, 1 files outside docs\/verify/);
-  assert.doesNotMatch(input, /Size: OVERSIZE/);
+  assert.doesNotMatch(input, /Size: |Why is it this big/);
+  assert.match(input, /one underlying problem per PR/);
 });
 
 test('a PASS publishes a success status on the reviewed head, after a pending one', () => {

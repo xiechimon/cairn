@@ -306,7 +306,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   }
   if (result.block) {
     process.stderr.write(
-      `${result.reason}\n\nThe PR body fails checks pr-evidence runs in CI (CI also checks the ## Size section and schema tables, which this hook skips). Fix the body and retry.\n`,
+      `${result.reason}\n\nThe PR body fails checks pr-evidence runs in CI (CI also checks the schema tables, which this hook skips). Fix the body and retry.\n`,
     );
     process.exit(2);
   }
