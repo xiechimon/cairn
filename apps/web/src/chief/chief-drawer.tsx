@@ -6,6 +6,7 @@ import { MessageScrollerProvider } from '../components/ui/message-scroller.js';
 import type { ChiefContent } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChiefConversation, ChiefFollowArmed } from './chief-conversation.js';
+import type { ChiefEarlier } from './use-chief-surface.js';
 
 export { CHIEF_DRAFT_STORAGE_KEY } from './chief-conversation.js';
 
@@ -27,6 +28,7 @@ interface DrawerProps {
   onWithdraw?: (messageId: string) => Promise<void>;
   onSteer?: (messageId: string) => void;
   onStop?: () => void;
+  earlier?: ChiefEarlier;
 }
 
 export function ChiefDrawer(props: DrawerProps) {

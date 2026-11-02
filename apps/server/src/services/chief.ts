@@ -1445,12 +1445,3 @@ export function extractText(content: unknown): string | null {
   }
   return null;
 }
-
-export function chiefThreadMessages(db: Db, threadId: string) {
-  return db
-    .select()
-    .from(chiefMessage)
-    .where(eq(chiefMessage.threadId, threadId))
-    .orderBy(asc(chiefMessage.createdAt), sql`rowid`)
-    .all();
-}

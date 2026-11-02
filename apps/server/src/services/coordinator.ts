@@ -17,12 +17,11 @@ function earlierThan(deps: ChiefDeps, threadId: string, messageId: string) {
   );
 }
 
-export function readCoordinatorPage(
+export function chiefMessagePage(
   deps: ChiefDeps,
-  teamId: string,
-  query: CoordinatorPageQuery,
-): CoordinatorPageResponse {
-  const thread = coordinatorThreadRow(deps, ensureChief(deps, teamId));
+  threadId: string,
+  query: { before?: string; limit: number; projectId?: string },
+) {
   const rows = deps.db
     .select({
       id: chiefMessage.id,
@@ -34,17 +33,28 @@ export function readCoordinatorPage(
     .from(chiefMessage)
     .where(
       and(
-        eq(chiefMessage.threadId, thread.id),
+        eq(chiefMessage.threadId, threadId),
         query.projectId !== undefined ? eq(chiefMessage.projectId, query.projectId) : undefined,
-        query.before !== undefined ? earlierThan(deps, thread.id, query.before) : undefined,
+        query.before !== undefined ? earlierThan(deps, threadId, query.before) : undefined,
       ),
     )
     .orderBy(desc(chiefMessage.createdAt), sql`rowid desc`)
     .limit(query.limit + 1)
     .all();
   return {
-    thread: chiefThreadView(deps, teamId, thread),
     messages: rows.slice(0, query.limit).reverse(),
     hasEarlier: rows.length > query.limit,
+  };
+}
+
+export function readCoordinatorPage(
+  deps: ChiefDeps,
+  teamId: string,
+  query: CoordinatorPageQuery,
+): CoordinatorPageResponse {
+  const thread = coordinatorThreadRow(deps, ensureChief(deps, teamId));
+  return {
+    thread: chiefThreadView(deps, teamId, thread),
+    ...chiefMessagePage(deps, thread.id, query),
   };
 }
