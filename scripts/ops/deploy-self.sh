@@ -44,6 +44,7 @@ MACHINE_NAME="${CAIRN_MACHINE_NAME:-$(hostname -s)}"
 KEEP_SNAPSHOTS="${CAIRN_DEPLOY_KEEP_SNAPSHOTS:-10}"
 SERVER_UNIT=cairn-server.service
 DAEMON_UNIT=cairn-daemon.service
+ORB_UNIT=cairn-daemon-orb.service
 DB="$DATA_DIR/server.db"
 
 EXIT_REFUSED=2
@@ -201,7 +202,37 @@ daemon_healthy() {
   return 1
 }
 
+orb_alarm() {
+  local reason="orb-unit-$1-failed" title="Orb daemon needs attention" open_issue
+  echo "$reason: $ORB_UNIT; continuing the deploy" >&2
+  mkdir -p "$STATE/alarms" || return 0
+  [ ! -e "$STATE/alarms/$reason" ] || return 0
+  open_issue="$(gh issue list -R "$REPO" --state open --author "@me" --search "\"$title\" in:title" --json number --jq '.[0].number // empty')" || return 0
+  if [ -n "$open_issue" ]; then
+    gh issue comment "$open_issue" -R "$REPO" -b "$reason: $ORB_UNIT on $MACHINE_NAME. Core deployment continues; inspect the unit logs." >/dev/null || return 0
+  else
+    gh issue create -R "$REPO" -t "$title" -b "$reason: $ORB_UNIT on $MACHINE_NAME. Core deployment continues; inspect the unit logs." -a xiechimon >/dev/null || return 0
+  fi
+  touch "$STATE/alarms/$reason" || true
+}
+
+ORB_STOP_FAILED=0
+
+orb_recovered() {
+  local action
+  for action in "$@"; do rm -f "$STATE/alarms/orb-unit-$action-failed"; done
+}
+
 stop_services() {
+  if systemctl --user is-enabled --quiet "$ORB_UNIT"; then
+    if systemctl --user stop "$ORB_UNIT"; then
+      ORB_STOP_FAILED=0
+      orb_recovered stop
+    else
+      ORB_STOP_FAILED=1
+      orb_alarm stop
+    fi
+  fi
   systemctl --user stop "$DAEMON_UNIT" && systemctl --user stop "$SERVER_UNIT"
 }
 
@@ -212,7 +243,21 @@ start_and_check() {
   server_healthy || return 1
   started_ms="$(($(date +%s) * 1000))"
   systemctl --user start "$DAEMON_UNIT"
-  daemon_healthy "$started_ms"
+  daemon_healthy "$started_ms" || return 1
+  if systemctl --user is-enabled --quiet "$ORB_UNIT"; then
+    if [ "$ORB_STOP_FAILED" = 1 ]; then
+      if systemctl --user restart "$ORB_UNIT"; then
+        orb_recovered stop start
+      else
+        orb_alarm start
+      fi
+    elif systemctl --user start "$ORB_UNIT"; then
+      orb_recovered start
+    else
+      orb_alarm start
+    fi
+  fi
+  return 0
 }
 
 PREVIOUS_BUILT=0

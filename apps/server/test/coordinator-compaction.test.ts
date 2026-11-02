@@ -25,6 +25,11 @@ import {
   sweepOverlongCompactions,
 } from '../src/services/chief-compaction.js';
 import {
+  ASK_PARK_MS,
+  createOrGetQuestion,
+  holdForQuestion,
+} from '../src/services/chief-questions.js';
+import {
   CHIEF_TURN_MAX_MS,
   steerChiefMessage,
   sweepOverlongChiefTurns,
@@ -617,5 +622,59 @@ describe('an overlong compaction is ended by its own watchdog', () => {
         .get()?.status,
     ).toBe('stopped');
     expect(liveCompactions()).toEqual([]);
+  });
+});
+
+describe('a parked ask_user question and idle compaction', () => {
+  async function park(): Promise<void> {
+    createOrGetQuestion(
+      { db: H.s.db },
+      {
+        threadId: H.threadId,
+        requestId: 'ask-q',
+        questions: [{ header: 'scope', question: 'Which pages?', options: [] }],
+      },
+    );
+    H.s.db
+      .update(chiefMessage)
+      .set({ createdAt: T0 - ASK_PARK_MS - 1 })
+      .where(eq(chiefMessage.id, 'ask-q'))
+      .run();
+    const held = await holdForQuestion(
+      { db: H.s.db },
+      { threadId: H.threadId, requestId: 'ask-q', holdMs: 0 },
+    );
+    expect(held?.status).toBe('cancelled');
+  }
+
+  test('a thread waiting only on a parked question counts as idle and is compacted', async () => {
+    const machineId = world();
+    await park();
+    planIdleCompactions(H.s.svc, T0 + IDLE + 1);
+    expect(liveCompactions()).toHaveLength(1);
+    expect((await claim(machineId))?.chief?.compactOnly).toBe(true);
+  });
+
+  test('answering the parked question stops the compaction and its resume turn runs next', async () => {
+    const machineId = world();
+    await park();
+    const compaction = await idleCompactionClaimed(machineId);
+    const res = await req(
+      H.s.app,
+      'POST',
+      `/api/teams/${H.teamId}/chief/threads/${H.threadId}/questions/ask-q/answer`,
+      { answers: [{ header: 'scope', text: 'only the board' }] },
+    );
+    expect(res.status).toBe(200);
+    expect(
+      H.s.db.select().from(stopPending).where(eq(stopPending.stepId, compaction.step.id)).get(),
+    ).toBeDefined();
+    expect(await claim(machineId)).toBeNull();
+    await finishStep(deps(), machineId, compaction.step.id, { status: 'stopped' });
+    const resumed = await claim(machineId);
+    expect(resumed?.chief?.compactOnly).toBeUndefined();
+    expect(resumed?.instruction).toContain('only the board');
+    expect(resumed?.session).toEqual({ action: 'continue', sessionId: SESSION });
+    expect(threadRow()).toMatchObject({ compactGeneration: 0, compactSummary: null });
   });
 });

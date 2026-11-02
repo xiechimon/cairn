@@ -1,4 +1,8 @@
-import { buildOrchestratePrompt, CHIEF_TURN_ERROR_KIND } from '@cairn/shared';
+import {
+  ASK_USER_QUESTION_KIND,
+  buildOrchestratePrompt,
+  CHIEF_TURN_ERROR_KIND,
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import {
@@ -205,6 +209,38 @@ describe('overlong chief turns are stopped so one turn cannot block the thread',
       'pending',
     );
   });
+  test('the watchdog leaves a parked question alone while it stops an overlong running turn', () => {
+    const now = Date.now();
+    H.s.db
+      .insert(chiefMessage)
+      .values({
+        id: 'ask-parked',
+        threadId: H.threadId,
+        role: 'assistant',
+        content: JSON.stringify({
+          kind: ASK_USER_QUESTION_KIND,
+          requestId: 'ask-parked',
+          status: 'pending',
+          questions: [{ header: 'pick', question: 'which?', options: [] }],
+          answers: null,
+          parkedAt: now - CHIEF_TURN_MAX_MS,
+        }),
+        createdAt: now - CHIEF_TURN_MAX_MS - 5000,
+      })
+      .run();
+    seedClaimed('running', now - CHIEF_TURN_MAX_MS - 1, now);
+    sweepOverlongChiefTurns(H.s.svc, now);
+    expect(
+      H.s.db
+        .select()
+        .from(stopPending)
+        .all()
+        .map((r) => r.stepId),
+    ).toEqual(['running']);
+    const row = H.s.db.select().from(chiefMessage).where(eq(chiefMessage.id, 'ask-parked')).get();
+    expect((JSON.parse(row?.content as string) as { status: string }).status).toBe('pending');
+  });
+
   test('the scheduler tick runs the watchdog', () => {
     const now = Date.now();
     seedClaimed('ticked', now - CHIEF_TURN_MAX_MS - 1, now);
@@ -288,6 +324,7 @@ describe('rewind never cuts another project out of the shared transcript', () =>
       content: 'p',
       createdAt: at,
     });
+    setStep(anchor, { status: 'claimed' });
     upsertChiefMessage(H.s.db, {
       id: `reply-${anchor}`,
       threadId: H.threadId,
@@ -295,6 +332,7 @@ describe('rewind never cuts another project out of the shared transcript', () =>
       content: 'r',
       createdAt: at,
     });
+    setStep(anchor, { status: 'done' });
     const page = (await (
       await req(H.s.app, 'GET', `/api/teams/${H.teamId}/coordinator?projectId=${H.projectId}`)
     ).json()) as { messages: { id: string }[] };

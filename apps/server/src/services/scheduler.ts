@@ -90,12 +90,13 @@ export interface CiPollRun {
 }
 
 export interface IssueIntakeRun {
+  intakeAgentAllowlist?: readonly string[];
   githubFetch: FetchLike;
   logger: IssueIntakeLogger;
 }
 
 export function issueIntakeRunOf(
-  config: { issueIntake: boolean },
+  config: { issueIntake: boolean; intakeAgentAllowlist?: readonly string[] },
   run: IssueIntakeRun,
 ): IssueIntakeRun | null {
   run.logger.info(
@@ -104,7 +105,9 @@ export function issueIntakeRunOf(
       ? `github issue intake on (${ENV_VARS.issueIntake})`
       : `github issue intake off (set ${ENV_VARS.issueIntake}=1 to enable)`,
   );
-  return config.issueIntake ? run : null;
+  return config.issueIntake
+    ? { ...run, intakeAgentAllowlist: config.intakeAgentAllowlist ?? [] }
+    : null;
 }
 
 export function schedulingRunOf(
@@ -233,9 +236,7 @@ export function createScheduler(
     ? createIssueIntake(deps, { ...intake, label: 'correction' })
     : null;
   const issueIntake =
-    intake !== undefined && intake !== null
-      ? createIssueIntake(deps, { githubFetch: intake.githubFetch, logger: intake.logger })
-      : null;
+    intake !== undefined && intake !== null ? createIssueIntake(deps, intake) : null;
   let intakeTimer: NodeJS.Timeout | null = null;
   const schedulingSweep =
     scheduling !== undefined && scheduling !== null

@@ -20,7 +20,7 @@ import {
 } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
 import type { Db } from '../db/client.js';
-import { build, chiefThread, project, step, todo } from '../db/schema.js';
+import { agent, build, chiefThread, project, step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import {
   type FetchLike,
@@ -58,6 +58,7 @@ import { githubRepoOfProject } from './git.js';
 import { teamGithubToken } from './github-connection.js';
 import { importGithubIssue, importsInFlightFor } from './github-issues.js';
 import { orchestrateTodo } from './orchestrate.js';
+import { updateTodo } from './todos.js';
 
 export const ISSUE_INTAKE_INTERVAL_MS = 300_000;
 
@@ -312,6 +313,7 @@ export function createIssueIntake(
     githubFetch: FetchLike;
     logger?: IssueIntakeLogger;
     label?: 'ready-for-agent' | 'correction';
+    intakeAgentAllowlist?: readonly string[];
   },
 ): IssueIntake {
   const intakeLabel = run.label ?? ISSUE_INTAKE_LABEL;
@@ -391,13 +393,35 @@ export function createIssueIntake(
     repo: string,
     issueNumber: number,
     now: number,
+    label: string = intakeLabel,
   ): Promise<Verdict> {
     const key = `${teamId}\u0000${owner}/${repo}#${issueNumber}`.toLowerCase();
     const history = await readHistory(eventsCache, key, token, { owner, repo, issueNumber });
     if (history === null) return { notTaken: 'unverifiable', reason: 'events-unreadable' };
-    const found = newestLabeler(history, intakeLabel);
+    if (label.toLowerCase().startsWith('agent:')) {
+      const removedLater = (labeled: GithubIssueEvent) =>
+        history.events.some(
+          (event) =>
+            event.event === 'unlabeled' &&
+            event.label?.toLowerCase() === labeled.label?.toLowerCase() &&
+            later(event, labeled),
+        );
+      const newestAgentLabel = newestOf(
+        history.events,
+        (event) =>
+          event.event === 'labeled' &&
+          event.label?.toLowerCase().startsWith('agent:') === true &&
+          !removedLater(event),
+      );
+      if (
+        newestAgentLabel !== null &&
+        newestAgentLabel.label?.toLowerCase() !== label.toLowerCase()
+      )
+        return { notTaken: 'not-eligible', reason: 'label-changed' };
+    }
+    const found = newestLabeler(history, label.toLowerCase());
     if ('reason' in found) return { notTaken: 'not-eligible', ...found };
-    if (intakeLabel === 'correction' && isCairnIdentity(found.labeler)) return found;
+    if (label === 'correction' && isCairnIdentity(found.labeler)) return found;
     const trusted = await hasRepoTriage(
       run.githubFetch,
       teamId,
@@ -512,6 +536,8 @@ export function createIssueIntake(
     repo: string,
     access: TeamAccess,
     issueNumber: number,
+    assignedAgentId: string | null,
+    assignedAgentLabel: string | null,
     now: number,
     tally: IssueIntakeTally,
   ): Promise<'imported' | 'full' | 'not-taken'> {
@@ -527,6 +553,30 @@ export function createIssueIntake(
         );
       } else log(at, 'issue intake candidate not taken');
       return 'not-taken';
+    }
+    if (assignedAgentLabel !== null) {
+      const agentVerdict = await labelerVerdict(
+        row.teamId,
+        access.token,
+        owner,
+        repo,
+        issueNumber,
+        now,
+        assignedAgentLabel,
+      );
+      if ('notTaken' in agentVerdict) {
+        tally.held += 1;
+        log(
+          {
+            projectId: row.id,
+            issue: issueNumber,
+            label: assignedAgentLabel,
+            reason: `agent-label-${agentVerdict.reason}`,
+          },
+          'issue intake candidate held',
+        );
+        return 'not-taken';
+      }
     }
     if (projectAtInFlightCap(deps.db, row.id)) {
       tally.atCap += 1;
@@ -666,14 +716,43 @@ export function createIssueIntake(
       return 'full';
     }
     let todoId: string;
+    let assignmentFailed = false;
     try {
       const record = await importGithubIssue(
         { ...deps, box: access.box, githubFetch: run.githubFetch },
         row,
         issueNumber,
-        { createdBy: access.createdBy },
+        { createdBy: access.createdBy, pendingIntakeAssignment: assignedAgentId !== null },
       );
       todoId = record.id;
+      if (assignedAgentId !== null) {
+        try {
+          deps.db.transaction(() => {
+            const assigned = updateTodo(deps, todoId, {
+              assignment: {
+                source: 'intake-label',
+                plan: { agentId: assignedAgentId },
+                build: { agentId: assignedAgentId },
+              },
+            });
+            if (assigned === null) throw new Error('imported todo missing during assignment');
+          });
+        } catch (err) {
+          assignmentFailed = true;
+          tally.errors += 1;
+          tally.held += 1;
+          log(
+            {
+              projectId: row.id,
+              issue: issueNumber,
+              todoId,
+              reason: 'intake-label-assignment-failed',
+              err: errText(err),
+            },
+            'issue intake assignment failed',
+          );
+        }
+      }
     } catch (err) {
       if (err instanceof HttpError && err.status === 409) {
         tally.claimed += 1;
@@ -692,7 +771,8 @@ export function createIssueIntake(
       'issue intake candidate taken',
     );
     seenOpen.add(refKey(row.teamId, githubIssueSourceRef(owner, repo, issueNumber)));
-    orchestrateImported(todoId, { teamId: row.teamId, importedAt: nowMs(), attempts: 1 }, tally);
+    if (!assignmentFailed)
+      orchestrateImported(todoId, { teamId: row.teamId, importedAt: nowMs(), attempts: 1 }, tally);
     return 'imported';
   }
 
@@ -788,7 +868,71 @@ export function createIssueIntake(
           tally.atCap += 1;
           continue;
         }
-        const outcome = await take(row, owner, repo, access, issue.number, now, tally);
+        const agentLabels = issue.labels.filter((label) =>
+          label.name.toLowerCase().startsWith('agent:'),
+        );
+        const namedAgents =
+          agentLabels.length === 1
+            ? deps.db
+                .select({
+                  id: agent.id,
+                  displayName: agent.displayName,
+                  secrets: agent.secrets,
+                  mcpServers: agent.mcpServers,
+                })
+                .from(agent)
+                .where(
+                  and(
+                    eq(agent.teamId, row.teamId),
+                    eq(agent.status, 'active'),
+                    eq(agent.displayName, agentLabels[0]?.name.slice('agent:'.length) ?? ''),
+                  ),
+                )
+                .all()
+            : [];
+        if (agentLabels.length > 0 && (agentLabels.length !== 1 || namedAgents.length !== 1)) {
+          tally.held += 1;
+          log(
+            {
+              projectId: row.id,
+              issue: issue.number,
+              reason:
+                agentLabels.length > 1 || namedAgents.length > 1
+                  ? 'agent-label-ambiguous'
+                  : 'agent-label-unknown',
+            },
+            'issue intake candidate held',
+          );
+          continue;
+        }
+        const named = namedAgents[0];
+        if (named && (named.secrets.length > 0 || named.mcpServers.length > 0)) {
+          tally.held += 1;
+          log(
+            { projectId: row.id, issue: issue.number, reason: 'agent-label-privileged' },
+            'issue intake candidate held',
+          );
+          continue;
+        }
+        if (named && !(run.intakeAgentAllowlist ?? []).includes(named.displayName)) {
+          tally.held += 1;
+          log(
+            { projectId: row.id, issue: issue.number, reason: 'agent-label-not-allowlisted' },
+            'issue intake candidate held',
+          );
+          continue;
+        }
+        const outcome = await take(
+          row,
+          owner,
+          repo,
+          access,
+          issue.number,
+          named?.id ?? null,
+          agentLabels[0]?.name ?? null,
+          now,
+          tally,
+        );
         if (outcome === 'full') atCap = true;
         if (outcome === 'imported') {
           claimed.add(ref.toLowerCase());

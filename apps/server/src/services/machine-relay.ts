@@ -107,6 +107,7 @@ export async function executeRelayToolCall(
       reposDir: deps.reposDir,
       attachmentsDir: deps.attachmentsDir,
       skillsDir: deps.skillsDir,
+      intakeAgentAllowlist: deps.intakeAgentAllowlist,
       ...(deps.convHub !== undefined ? { convHub: deps.convHub } : {}),
       ...(deps.mcpConfigPath !== undefined ? { mcpConfigPath: deps.mcpConfigPath } : {}),
       ...(deps.githubFetch !== undefined ? { githubFetch: deps.githubFetch } : {}),

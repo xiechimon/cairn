@@ -12,6 +12,7 @@ import { notFound, parseWith } from './lib/errors.js';
 import { jsonBody, requireTeam, svcOf } from './routes-helpers.js';
 import { sendBuildSteer } from './services/builds.js';
 import {
+  answerChiefQuestion,
   getChiefEnvelope,
   getChiefThread,
   listChiefThreads,
@@ -19,7 +20,7 @@ import {
   rewindChiefThread,
   sendChiefMessage,
 } from './services/chief.js';
-import { answerQuestion, cancelQuestion, parseAnswerBody } from './services/chief-questions.js';
+import { cancelQuestion, parseAnswerBody } from './services/chief-questions.js';
 import { steerChiefMessage, stopChiefTurn, withdrawChiefMessage } from './services/chief-turns.js';
 import {
   compactCoordinator,
@@ -130,7 +131,7 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
     if (!thread || thread.teamId !== teamId) throw notFound(`chief thread ${threadId}`);
     const answers = parseAnswerBody(await jsonBody(c));
     return c.json(
-      answerQuestion(svc, {
+      answerChiefQuestion(svc, teamId, {
         threadId,
         requestId: c.req.param('requestId'),
         answers,

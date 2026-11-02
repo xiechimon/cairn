@@ -349,6 +349,38 @@ describe('Coordinator page filter and cursor', () => {
     expect(rows.find((r) => r.id === `user-${wake}`)?.projectId).toBeNull();
   });
 
+  test('rows written between turns are not attributed to the finished turn, and explicit null stays null', async () => {
+    const a = ((await (await sendToCoordinator('plan demo', H.projectId)).json()) as SendReply)
+      .message.id;
+    H.s.db
+      .update(stepTable)
+      .set({ status: 'done', claimedAt: Date.now(), finishedAt: Date.now() })
+      .where(eq(stepTable.id, a))
+      .run();
+    upsertChiefMessage(H.s.db, {
+      id: 'wake-report',
+      threadId: H.threadId,
+      role: 'system',
+      content: 's',
+      createdAt: Date.now() + 1,
+      projectId: null,
+    });
+    upsertChiefMessage(H.s.db, {
+      id: 'between-turns',
+      threadId: H.threadId,
+      role: 'system',
+      content: 's',
+      createdAt: Date.now() + 2,
+    });
+    const rows = H.s.db
+      .select()
+      .from(chiefMessage)
+      .where(eq(chiefMessage.threadId, H.threadId))
+      .all();
+    expect(rows.find((r) => r.id === 'wake-report')?.projectId).toBeNull();
+    expect(rows.find((r) => r.id === 'between-turns')?.projectId).toBeNull();
+  });
+
   test('a worker report carries its task project', async () => {
     const created = (await relay('create_todo', {
       projectId: H.projectId,

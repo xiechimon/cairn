@@ -57,6 +57,7 @@ export const serverConfigSchema = z.object({
   host: z.string().nullable(),
   mcpConfigPath: z.string(),
   issueIntake: z.boolean(),
+  intakeAgentAllowlist: z.array(z.string()),
   scheduling: z.boolean(),
   trajectoryOutcomeBackfill: z.boolean(),
   trajectoryReflectCurate: z.boolean(),
@@ -167,6 +168,10 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
       process.env[ENV_VARS.mcpConfig] || join(homedir(), CLAUDE_CONFIG_FILE_NAME),
     ),
     issueIntake: envFlag(ENV_VARS.issueIntake),
+    intakeAgentAllowlist: (process.env[ENV_VARS.intakeAgentAllowlist] ?? '')
+      .split(',')
+      .map((name) => name.trim())
+      .filter((name) => name !== ''),
     scheduling: envFlag(ENV_VARS.scheduling),
     trajectoryOutcomeBackfill: envFlag(ENV_VARS.trajectoryOutcomeBackfill),
     trajectoryReflectCurate: envFlag(ENV_VARS.trajectoryReflectCurate),

@@ -63,6 +63,7 @@ export const ENV_VARS = {
   coordinatorIdleCompactMs: 'CAIRN_COORDINATOR_IDLE_COMPACT_MS',
   hookTimeoutMs: 'CAIRN_HOOK_TIMEOUT_MS',
   issueIntake: 'CAIRN_ISSUE_INTAKE',
+  intakeAgentAllowlist: 'CAIRN_INTAKE_AGENT_ALLOWLIST',
   scheduling: 'CAIRN_SCHEDULING',
   trajectoryOutcomeBackfill: 'CAIRN_TRAJ_OUTCOME_BACKFILL',
   trajectoryReflectCurate: 'CAIRN_TRAJ_REFLECT_CURATE',
