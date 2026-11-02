@@ -147,9 +147,9 @@ test('the full 4-shard e2e runs exactly on merge-queue drafts and pushes', () =>
   assert.ok(tierExpression);
   assert.match(job('e2e'), /shard: \[1, 2, 3, 4\]/);
   assert.match(job('e2e'), /run: pnpm prepush --e2e-shard \$\{\{ matrix.shard \}\}\/4/);
-  assert.match(job('e2e-affected'), /run: pnpm --filter @cairn\/web e2e:affected\n/);
+  assert.match(job('e2e-affected'), /run: pnpm --filter @cairn\/web e2e:affected --shard=/);
   assert.match(job('e2e-affected'), /fetch-depth: 0/);
-  assert.doesNotMatch(job('e2e-affected'), /shard/);
+  assert.doesNotMatch(job('e2e-affected'), /prepush --e2e-shard/);
   for (const [name, github] of Object.entries(events)) {
     const full = fullTier.has(name);
     const { tier, e2e, 'e2e-affected': affected } = plan(github, 'true');

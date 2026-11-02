@@ -236,7 +236,11 @@ jobs:
     needs: changes
     if: needs.changes.outputs.e2e-tier == 'affected' && needs.changes.outputs.has-code != 'false'
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5]
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
@@ -255,23 +259,23 @@ jobs:
       - name: Install Playwright chromium
         run: pnpm exec playwright install chromium --with-deps
 
-      - name: E2E (specs affected by this PR)
-        run: pnpm --filter @cairn/web e2e:affected
+      - name: E2E (specs affected by this PR, split by recorded spec times)
+        run: pnpm --filter @cairn/web e2e:affected --shard=${{ matrix.shard }}/${{ strategy.job-total }}
 
       - name: Fixture build for the CSS mechanism gate
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 1 }}
         working-directory: apps/web
         run: pnpm exec vite build --mode fixture
 
       - name: CSS mechanism gate (#747)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 1 }}
         run: node scripts/css-mechanism-gate.mjs
 
       - name: Upload gallery snapshot renders
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: gallery-snapshots-affected
+          name: gallery-snapshots-affected-${{ matrix.shard }}
           path: |
             apps/web/e2e/gallery-snapshots.spec.ts-snapshots/
             apps/web/test-results/**/*-actual.png
@@ -394,6 +398,10 @@ jobs:
       - name: Vitest shards split by recorded file times
         if: ${{ !cancelled() }}
         run: node --test scripts/vitest-timed-shard.test.mjs
+
+      - name: E2E selection and timed shards
+        if: ${{ !cancelled() }}
+        run: node --test scripts/e2e-affected.test.mjs
 
       - name: Pages keep to tokens; gallery baselines map from CI renders
         if: ${{ !cancelled() }}
