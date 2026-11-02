@@ -2,33 +2,32 @@ import { expect, type Page, test } from '@playwright/test';
 import { mockLive, type Row, THREAD } from './chief-home-mock';
 import { evidenceShot } from './evidence';
 
-const TOTAL = 250;
-const PAGE = 100;
+const historyOf = (total: number): Row[] =>
+  Array.from({ length: total }, (_, i) => ({
+    id: `h-${String(i).padStart(4, '0')}`,
+    role: i % 2 === 0 ? 'user' : 'assistant',
+    content: i % 2 === 0 ? `question ${i}` : `answer ${i}`,
+    createdAt: 1_000 + i,
+  }));
 
-const history: Row[] = Array.from({ length: TOTAL }, (_, i) => ({
-  id: `h-${String(i).padStart(4, '0')}`,
-  role: i % 2 === 0 ? 'user' : 'assistant',
-  content: i % 2 === 0 ? `question ${i}` : `answer ${i}`,
-  createdAt: 1_000 + i,
-}));
-
-function pageBefore(before: string | null) {
+function pageBefore(history: Row[], size: number, before: string | null) {
   const end = before === null ? history.length : history.findIndex((row) => row.id === before);
-  const start = Math.max(0, end - PAGE);
+  const start = Math.max(0, end - size);
   return {
     messages: history.slice(start, end),
     nextCursor: start > 0 ? (history[start]?.id ?? null) : null,
   };
 }
 
-async function mockPagedHistory(page: Page) {
+async function mockPagedHistory(page: Page, total = 250, size = 100) {
+  const history = historyOf(total);
   const requested: (string | null)[] = [];
   await mockLive(page, { threads: [THREAD], messages: [] }, (path, route, json) => {
     if (path !== `/api/conversations/${THREAD.id}/messages`) return undefined;
     if (route.request().method() !== 'GET') return undefined;
     const before = new URL(route.request().url()).searchParams.get('before');
     requested.push(before);
-    return json(pageBefore(before));
+    return json(pageBefore(history, size, before));
   });
   return requested;
 }
@@ -78,5 +77,16 @@ test('scrolling to the top loads the older page and keeps the reading position',
   await offsetOf(page, 'question 50', true);
   await expect(row(page, 'question 0')).toHaveCount(1);
   expect(requested).toEqual([null, 'h-0150', 'h-0050']);
+  await expect(page.getByTestId('home-c-earlier')).toHaveCount(0);
+});
+
+test('a newest page too short to fill the view keeps loading older pages until history ends', async ({
+  page,
+}) => {
+  const requested = await mockPagedHistory(page, 9, 3);
+  await page.goto('/app');
+  await expect(row(page, 'question 0')).toHaveCount(1);
+  expect(requested).toEqual([null, 'h-0006', 'h-0003']);
+  await expect(row(page, 'question 8')).toBeInViewport();
   await expect(page.getByTestId('home-c-earlier')).toHaveCount(0);
 });

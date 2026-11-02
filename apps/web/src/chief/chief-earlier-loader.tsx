@@ -1,8 +1,7 @@
-import { type RefObject, useEffect, useLayoutEffect, useRef } from 'react';
-import { useMessageScrollerScrollable } from '../components/ui/message-scroller.js';
+import { type RefObject, useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import type { ChiefEarlier } from './use-chief-surface.js';
 
-const TOP_EDGE = 8;
+const LOAD_EDGE = 200;
 
 interface Anchor {
   element: Element | null;
@@ -37,6 +36,12 @@ function restoreAnchor(anchor: Anchor, viewport: HTMLElement): void {
   viewport.scrollTop = anchor.scrollTop + viewport.scrollHeight - anchor.scrollHeight;
 }
 
+function wantsEarlier(viewport: HTMLElement): boolean {
+  if (viewport.clientHeight === 0) return false;
+  const fits = viewport.scrollHeight <= viewport.clientHeight;
+  return fits || viewport.scrollTop <= LOAD_EDGE;
+}
+
 export function ChiefEarlierLoader({
   earlier,
   hasEarlier,
@@ -48,17 +53,22 @@ export function ChiefEarlierLoader({
   rowCount: number;
   viewportRef: RefObject<HTMLDivElement | null>;
 }) {
-  const scrollable = useMessageScrollerScrollable();
-  const atTop = !scrollable.start && scrollable.end;
   const anchorRef = useRef<Anchor | null>(null);
   const { loading, onLoad } = earlier;
-  useEffect(() => {
+  const maybeLoad = useCallback(() => {
     const viewport = viewportRef.current;
-    if (!atTop || !hasEarlier || loading || anchorRef.current !== null || viewport === null) return;
-    if (viewport.scrollTop > TOP_EDGE) return;
+    if (!hasEarlier || loading || anchorRef.current !== null || viewport === null) return;
+    if (!wantsEarlier(viewport)) return;
     anchorRef.current = readAnchor(viewport);
     onLoad();
-  }, [atTop, hasEarlier, loading, onLoad, viewportRef]);
+  }, [hasEarlier, loading, onLoad, viewportRef]);
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (viewport === null) return;
+    maybeLoad();
+    viewport.addEventListener('scroll', maybeLoad, { passive: true });
+    return () => viewport.removeEventListener('scroll', maybeLoad);
+  }, [maybeLoad, rowCount, viewportRef]);
   const wasLoading = useRef(loading);
   useLayoutEffect(() => {
     const settled = wasLoading.current && !loading;
