@@ -59,6 +59,10 @@ interface State {
   fallbackModel: string | null;
   outage: Outage;
   messages: Row[];
+  turnQueue?: {
+    position: number;
+    waitingFor: { machineId: string; name: string; running: number; capacity: number } | null;
+  } | null;
 }
 
 const thread = (s: State) => ({
@@ -77,6 +81,7 @@ const thread = (s: State) => ({
   activeRun: s.activeRun,
   pending: s.pending,
   fallbackModel: s.fallbackModel,
+  turnQueue: s.turnQueue ?? null,
 });
 
 const FIRST = { id: 'm1', role: 'user', content: '看板拖完卡片计数不对，修一下', createdAt: 10 };
@@ -328,6 +333,55 @@ test.describe('queue, steer and stop while the chief is replying (T5)', () => {
     await input.fill('');
     await home.getByRole('button', { name: '停止总管这次回复' }).click();
     await expect.poll(() => calls).toContain('POST /stop');
+  });
+
+  test('Esc in the composer and `/stop` both stop the running reply', async ({ page }) => {
+    const calls = await mockLive(page, busyState());
+    await page.goto('/app');
+    const input = page.getByTestId('home-c').getByTestId('chief-composer-input');
+    await input.focus();
+    await input.press('Escape');
+    await expect.poll(() => calls.filter((c) => c === 'POST /stop').length).toBe(1);
+    await input.fill('/stop');
+    await input.press('ArrowDown');
+    await input.press('Enter');
+    await expect.poll(() => calls.filter((c) => c === 'POST /stop').length).toBe(2);
+    expect(calls).not.toContain('send');
+  });
+
+  test('typing 停止 sends it as a message to the chief, it does not press stop', async ({
+    page,
+  }) => {
+    const calls = await mockLive(page, busyState());
+    await page.goto('/app');
+    const input = page.getByTestId('home-c').getByTestId('chief-composer-input');
+    await input.fill('停止');
+    await input.press('Enter');
+    await expect.poll(() => calls).toContain('send');
+    expect(calls).not.toContain('POST /stop');
+  });
+
+  test('stop on a turn still waiting for a machine withdraws that message and returns its text', async ({
+    page,
+  }) => {
+    const calls = await mockLive(page, {
+      activeRun: { phase: 'chief' },
+      pending: [],
+      fallbackModel: null,
+      outage: null,
+      messages: [FIRST],
+      turnQueue: {
+        position: 1,
+        waitingFor: { machineId: 'mac-1', name: 'xmonsMac-3574.local', running: 0, capacity: 8 },
+      },
+    });
+    await page.goto('/app');
+    const home = page.getByTestId('home-c');
+    await expect(home.getByTestId('chief-msg').last()).toContainText('xmonsMac-3574.local');
+    await home.getByRole('button', { name: '停止总管这次回复' }).click();
+    await expect.poll(() => calls).toContain('DELETE /messages/m1');
+    expect(calls).not.toContain('POST /stop');
+    await expect(home.getByTestId('chief-composer-input')).toHaveValue(FIRST.content);
   });
 
   test('a stopped turn says no task was created', async ({ page }) => {

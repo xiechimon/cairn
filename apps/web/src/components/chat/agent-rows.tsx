@@ -8,8 +8,6 @@ import {
   TraceLine,
   TraceTitle,
 } from '../ui/trace.js';
-import { useLiveSeconds } from './live-row.js';
-import { TraceRows } from './trace-steps.js';
 
 const PREVIEW_CHARS = 150;
 
@@ -44,41 +42,5 @@ export function ThinkingRow({ text }: { text: string }) {
         </TraceCollapsibleContent>
       </TraceCollapsible>
     </Trace>
-  );
-}
-
-export function ToolActivityRow({
-  name,
-  startedAt,
-  seconds,
-  running,
-  error,
-}: {
-  name: string;
-  startedAt?: number;
-  seconds?: number;
-  running?: boolean;
-  error?: boolean;
-}) {
-  const { t } = useI18n();
-  const tick = useLiveSeconds(running === true ? (startedAt ?? null) : null);
-  const shown = tick ?? seconds ?? null;
-  const status = error === true ? 'failed' : running === true ? 'running' : 'done';
-  return (
-    <TraceRows
-      density="compact"
-      steps={[
-        {
-          id: name,
-          step: {
-            kind: 'tool',
-            ...(running === true ? { verb: t('正在调用') } : {}),
-            name,
-            status,
-            ...(shown != null ? { secs: shown } : {}),
-          },
-        },
-      ]}
-    />
   );
 }

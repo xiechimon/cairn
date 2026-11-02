@@ -675,7 +675,7 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
     await expect(bubble.locator('.chat-para, .chat-md-item, .chat-md-code')).toHaveCount(0);
   });
 
-  test('F-R19: segment-row projection (#955) — thinking rows in a single column, in-flight tool rows flat with real seconds', async ({ page }) => {
+  test('F-R19: segment-row projection (#955) — thinking rows in a single column, the in-flight call inside the live row', async ({ page }) => {
     await stubEventSource(page);
     await stubCdnAvatar(page);
 
@@ -742,17 +742,14 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
     await thinking.getByRole('button', { name: '展开思考' }).click();
     await expect(thinking.locator('pre')).toHaveText('先把凭证面捋一遍');
 
-    const toolRow = drawer.locator('.chief-msg', { hasText: /正在调用\s*todo_write/ });
-    await expect(toolRow).toHaveCount(1);
-    await expect(toolRow.locator('span.tabular-nums')).toHaveText(/^[3-9]s$/);
-
-    await expect(toolRow).toHaveCSS('display', 'flex');
-    await expect(toolRow.locator('> div')).toHaveCSS('flex-grow', '1');
-
-    await expect(drawer.getByTestId('chief-turn-tools')).toHaveCount(0);
+    await expect(drawer.locator('.chief-msg', { hasText: 'todo_write' })).toHaveCount(0);
+    const live = drawer.getByTestId('chief-msg').last();
+    await live.getByRole('button', { name: '展开实时步骤' }).click();
+    await expect(live.getByTestId('chief-turn-tools')).toContainText(/正在调用\s*todo_write/);
+    await expect(drawer.getByText('todo_write')).toHaveCount(1);
   });
 
-  test('F-R20: in-flight tool rows carry the concrete command (not a bare tool name)', async ({ page }) => {
+  test('F-R20: the in-flight call carries the concrete command (not a bare tool name)', async ({ page }) => {
 
     const state: Parameters<typeof mockChiefLiveApi>[1] = {
       final: false,
@@ -778,13 +775,12 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
     await page.goto('/app?view=board&chief=chief-bbb');
 
     const drawer = page.locator('.chief-drawer');
-    const bashRow = drawer.locator('.chief-msg', { hasText: /正在调用\s*Bash/ });
-    await expect(bashRow).toHaveCount(1);
-
-    await expect(bashRow).toContainText(/正在调用\s*Bash ls -la/);
+    const live = drawer.getByTestId('chief-msg').last();
+    await live.getByRole('button', { name: '展开实时步骤' }).click();
+    await expect(live.getByTestId('chief-turn-tools')).toContainText(/正在调用\s*Bash ls -la/);
   });
 
-  test('F-R21: segment-order contract (#1003 / ADR 0011 premortem) — text segments first, their tool rows after, each exactly once; after settle tools fold into the trailing row', async ({
+  test('F-R21: segment-order contract (#1003 / ADR 0011 premortem) — each call folds into the reply after it, the same in flight and after settle', async ({
     page,
   }) => {
 
@@ -838,36 +834,67 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
     await expect(drawer).toBeVisible();
 
     const rows = drawer.locator('.chief-msg, [data-testid="chief-msg"]');
-    await expect(rows).toHaveCount(6);
-    await expect(rows.nth(0)).toContainText('派一下凭证链路验证');
-    await expect(rows.nth(1)).toContainText('先盘点凭证面');
-    await expect(rows.nth(2)).toContainText('先看现状');
-    await expect(rows.nth(3)).toContainText(/正在调用\s*todo_write/);
-    await expect(rows.nth(4)).toContainText('再核对补发语义');
-    await expect(rows.nth(5)).toContainText('最后收口票');
-
-    for (const text of [
-      '先看现状',
-      /正在调用\s*todo_write/,
-      '再核对补发语义',
-      '最后收口票',
-    ]) {
-      await expect(rows.filter({ hasText: text })).toHaveCount(1);
-    }
+    const expectFolded = async () => {
+      await expect(rows).toHaveCount(5);
+      await expect(rows.nth(0)).toContainText('派一下凭证链路验证');
+      await expect(rows.nth(1)).toContainText('先盘点凭证面');
+      await expect(rows.nth(2)).toContainText('先看现状');
+      await expect(rows.nth(2).getByTestId('chief-tools-toggle')).toHaveCount(0);
+      await expect(rows.nth(3)).toContainText('再核对补发语义');
+      await expect(rows.nth(4)).toContainText('最后收口票');
+      const fold = rows.nth(3).getByTestId('chief-tools-toggle');
+      await expect(fold).toHaveCount(1);
+      await fold.click();
+      await expect(rows.nth(3).getByTestId('chief-turn-tools')).toContainText('todo_write');
+      await expect(drawer.getByText('todo_write')).toHaveCount(1);
+      await expect(rows.filter({ hasText: '正在调用' })).toHaveCount(0);
+    };
+    await expectFolded();
 
     state.activeRun = null;
     await page.goto('/app?view=board&chief=chief-bbb');
-    const settled = drawer.locator('.chief-msg, [data-testid="chief-msg"]');
-    await expect(settled).toHaveCount(5);
-    await expect(settled.nth(2)).toContainText('先看现状');
-    await expect(settled.nth(2).getByTestId('chief-tools-toggle')).toHaveCount(0);
-    await expect(settled.nth(3)).toContainText('再核对补发语义');
-    const fold = settled.nth(3).getByTestId('chief-tools-toggle');
-    await expect(fold).toHaveCount(1);
-    await fold.click();
-    await expect(settled.nth(3).getByTestId('chief-turn-tools')).toContainText('todo_write');
-    await expect(settled.filter({ hasText: '正在调用' })).toHaveCount(0);
+    await expectFolded();
+  });
 
+  test('F-R23: a running turn leaves the answered turn above it alone — its tools show once, under the reply header', async ({
+    page,
+  }) => {
+    await stubEventSource(page);
+    await stubCdnAvatar(page);
+    const call = (id: string, name: string, at: number) => ({
+      id,
+      role: 'assistant',
+      content: {
+        kind: 'toolcall',
+        call: { id, name, arguments: {}, startedAt: at, endedAt: at + 1000, result: '{}' },
+      },
+      createdAt: at,
+    });
+    await mockChiefLiveApi(page, {
+      final: false,
+      activeRun: { phase: 'chief' },
+      messages: [
+        { id: 'u-q', role: 'user', content: '？', createdAt: 1 },
+        call('t-1', 'pull_requests', 2),
+        call('t-2', 'issues', 3),
+        call('t-3', 'run_builds', 4),
+        { id: 'a-1', role: 'assistant', content: '已派发 #104。', createdAt: 5 },
+        { id: 'u-stop', role: 'user', content: '停止', createdAt: 6 },
+      ],
+    });
+    await page.goto('/app?view=board&chief=chief-bbb');
+
+    const drawer = page.locator('.chief-drawer');
+    const reply = drawer.getByTestId('chief-msg').filter({ hasText: '已派发 #104。' });
+    await expect(reply).toHaveCount(1);
+    const replyBox = await reply.boundingBox();
+    const question = drawer.getByTestId('chief-msg').filter({ hasText: '？' }).first();
+    const questionBox = await question.boundingBox();
+    expect(replyBox!.y - (questionBox!.y + questionBox!.height)).toBeLessThan(40);
+    await reply.getByTestId('chief-tools-toggle').click();
+    for (const name of ['pull_requests', 'issues', 'run_builds']) {
+      await expect(drawer.getByText(name, { exact: true })).toHaveCount(1);
+    }
   });
 
   test('F-R22: long preview truncated by CSS — button width ≤ column width, ellipsis works, zero horizontal overflow (#1034)', async ({
