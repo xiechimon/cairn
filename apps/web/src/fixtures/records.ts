@@ -71,6 +71,7 @@ export interface TodoRecord {
   sourceKind?: string | null;
   sourceRef?: string | null;
   usageCost?: UsageCost;
+  verified?: boolean;
 }
 
 export interface TokenUsageContent {
@@ -489,7 +490,7 @@ export type ChiefStreamItem =
       questions: {
         header: string;
         question: string;
-        options: { label: string; description?: string }[];
+        options: { label: string; description?: string; recommended?: boolean }[];
         multiSelect?: boolean;
       }[];
       answers: { header: string; choices?: string[]; text?: string }[] | null;

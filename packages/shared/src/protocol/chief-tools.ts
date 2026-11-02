@@ -651,6 +651,11 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
                   {
                     label: str('Choice label shown as a button.'),
                     description: str('Optional one-line hint under the label.'),
+                    recommended: {
+                      type: 'boolean',
+                      description:
+                        'Mark the one option you recommend; the card shows it first, labelled Recommended.',
+                    },
                   },
                   ['label'],
                 ),

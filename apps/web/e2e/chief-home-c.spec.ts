@@ -17,7 +17,7 @@ test('the home is one Coordinator conversation: serif greeting, a pinned decisio
   const greeting = page.getByTestId('home-c').getByRole('heading', { level: 2 }).first();
   await expect(greeting).toHaveCSS('font-family', /sourceSerif4/);
   await expect(page.getByTestId('home-c-since')).toContainText('4 waiting on you · 3 in progress');
-  await expect(needsYou(page).locator('[data-slot="needs-you-item"]')).toHaveCount(1);
+  await expect(needsYou(page).locator('[data-slot="needs-you-item"]')).toHaveCount(3);
   await expect(needsYou(page)).toContainText('relay-186 cannot run glm-5.3-flash');
   await expect(page.getByTestId('chief-stream')).toContainText('Run the orb canary until it passes');
   await expect(pill(page)).toHaveText(/3 in progress/);
@@ -44,7 +44,7 @@ test('"N more" opens the rest of the decisions, grouped by who acts next, a fail
   page,
 }) => {
   await page.goto(home('home-c'));
-  await needsYou(page).getByRole('button', { name: '3 more' }).click();
+  await needsYou(page).getByRole('button', { name: '1 more' }).click();
   const items = needsYou(page).locator('[data-slot="needs-you-item"]');
   await expect(items).toHaveCount(4);
   const cards = needsYou(page).locator('[data-slot="thread-card"]');
@@ -57,7 +57,7 @@ test('"N more" opens the rest of the decisions, grouped by who acts next, a fail
   await expect(cards.nth(2)).toContainText('Fold finished turns');
   await expect(cards.nth(2)).toHaveAttribute('data-tone', 'review');
   await needsYou(page).getByRole('button', { name: 'Show less' }).click();
-  await expect(items).toHaveCount(1);
+  await expect(items).toHaveCount(3);
 });
 
 test('the in-progress pill expands the running threads and a row opens its thread', async ({

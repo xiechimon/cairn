@@ -33,6 +33,8 @@ export function greetingFor(hour: number): string {
   return GREETINGS.find(([until]) => hour < until)?.[1] ?? '晚上好';
 }
 
+const NEEDS_YOU_PINNED = 3;
+
 const STARTERS = ['做个计划', '接一个仓库', '接着最近的活', '用我的工具'] as const;
 
 type NeedsYouEntry =
@@ -148,7 +150,7 @@ export function HomeC({
   const running = scoped.filter(
     (todo) => threadStatus(todo) === 'running' && todo.archivedAt == null,
   );
-  const shown = allOpen ? entries : entries.slice(0, 1);
+  const shown = allOpen ? entries : entries.slice(0, NEEDS_YOU_PINNED);
 
   const greeting = (
     <Greeting as="h2">
@@ -219,6 +221,7 @@ export function HomeC({
               item={entry.item}
               onAnswer={surface.onAnswerQuestion}
               onCancel={surface.onCancelQuestion}
+              numberKeys={entry.key === questions[0]?.requestId}
             />
           ) : (
             <NeedsYouThreadCard
@@ -239,14 +242,14 @@ export function HomeC({
           )}
         </div>
       ))}
-      {entries.length > 1 && (
+      {entries.length > NEEDS_YOU_PINNED && (
         <Button
           variant="ghost"
           size="sm"
           onClick={() => setAllOpen(!allOpen)}
           className="-ml-2.5 self-start text-meta text-content-tertiary hover:text-foreground"
         >
-          {allOpen ? t('收起其余') : t('还有 {n} 件', { n: entries.length - 1 })}
+          {allOpen ? t('收起其余') : t('还有 {n} 件', { n: entries.length - NEEDS_YOU_PINNED })}
         </Button>
       )}
     </section>
