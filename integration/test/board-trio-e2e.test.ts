@@ -168,7 +168,7 @@ async function seedFailedTodo(
 async function openBoard(): Promise<void> {
   await page.goto(`${server.url}/app?view=board`);
   await pexpect(
-    page.getByRole('complementary').getByRole('button', { name: '新任务' }),
+    page.getByRole('complementary').getByRole('button', { name: 'Coordinator' }),
   ).toBeVisible({ timeout: 30_000 });
 }
 
@@ -367,7 +367,7 @@ describe('#1216 board UI reliability triple defect (real web dist + real server 
     await unavailable.getByRole('button', { name: '回看板' }).click();
     await pexpect(page).toHaveURL(/\/app$/);
     await pexpect(
-      page.getByRole('complementary').getByRole('button', { name: '新任务' }),
+      page.getByRole('complementary').getByRole('button', { name: 'Coordinator' }),
     ).toBeVisible();
 
     const rerunRow = server.db

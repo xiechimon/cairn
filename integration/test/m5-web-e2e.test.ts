@@ -171,7 +171,7 @@ function collectConvStream(buildId: string): { types: Set<string>; stop(): void 
 async function openBoard(): Promise<void> {
   await page.goto(`${server.url}/app?view=board`);
   await pexpect(
-    page.getByRole('complementary').getByRole('button', { name: '新任务' }),
+    page.getByRole('complementary').getByRole('button', { name: 'Coordinator' }),
   ).toBeVisible({ timeout: 30_000 });
 }
 
