@@ -191,6 +191,18 @@ test('a build permission change on a package the web build installs runs everyth
   assert.equal(impact(workspaceWith('esbuild: true', 'esbuild: false')).specs, null);
 });
 
+test('a build setting written inline cannot be read, so its change runs everything', () => {
+  const inline = (sqlite) => ({
+    workspace: WORKSPACE.replace(
+      'allowBuilds:\n  better-sqlite3: true\n  esbuild: true\n',
+      `allowBuilds: {better-sqlite3: ${sqlite}, esbuild: true}\n`,
+    ),
+  });
+  assert.notEqual(inline(true).workspace, WORKSPACE);
+  assert.equal(impact(inline(false), { lockfile: LOCKFILE, ...inline(true) }).specs, null);
+  assert.equal(impact({ workspace: `${WORKSPACE}onlyBuiltDependencies: [esbuild]\n` }).specs, null);
+});
+
 test('a workspace edit that resolves no different package selects nothing', () => {
   assert.deepEqual(
     impact(workspaceWith('  - packages/*\n', '  - packages/*\n  - site\n')).specs,

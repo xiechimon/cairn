@@ -575,8 +575,11 @@ function changedBuildPackages(before, after) {
     if (JSON.stringify(before[key]) === JSON.stringify(after[key])) continue;
     if (LOCKFILE_RESOLVED_SETTINGS.has(key)) continue;
     if (!BUILD_SETTINGS.has(key)) throw new Error(`pnpm-workspace.yaml changes ${key}`);
-    const was = typeof before[key] === 'object' ? before[key] : {};
-    const now = typeof after[key] === 'object' ? after[key] : {};
+    const [was, now] = [before[key], after[key]].map((value) => {
+      if (value === undefined) return {};
+      if (typeof value === 'object') return value;
+      throw new Error(`pnpm-workspace.yaml writes ${key} inline`);
+    });
     for (const entry of new Set([...Object.keys(was), ...Object.keys(now)])) {
       if (was[entry] === now[entry]) continue;
       names.add(entry.replace(/^- /, '').replace(/(?<=.)@.*$/, ''));
