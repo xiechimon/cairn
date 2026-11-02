@@ -28,7 +28,7 @@ test.use({ viewport: { width: 1440, height: 900 } });
 for (const theme of ['light', 'dark'] as const) {
   for (const rail of [false, true]) {
     const label = `${theme}${rail ? ', rail' : ''}`;
-    test(`board sheet matches the page shell sheet (${label})`, async ({ page }) => {
+    test(`board sheet is the same inset sheet as the page shell (${label})`, async ({ page }) => {
       await page.addInitScript(
         ([t, r]) => {
           localStorage.setItem('cairn-theme', t);
@@ -42,12 +42,12 @@ for (const theme of ['light', 'dark'] as const) {
       const pages = await sheetOf(page, '.page-main');
 
       const left = rail ? 40 : 248;
-      expect(board.box).toEqual({ x: left, y: 0, w: 1440 - left, h: 900 });
+      expect(board.box).toEqual({ x: left, y: 8, w: 1440 - left - 8, h: 900 - 16 });
       expect(board).toEqual(pages);
-      expect(board.radius).toBe('0px');
+      expect(board.radius).toBe('14px');
       expect(board.shadow).toBe('none');
-      expect(board.selfShadow).toBe('none');
-      expect(board.sidebarBorderRightW).toBe('1px');
+      expect(board.selfShadow).not.toBe('none');
+      expect(board.sidebarBorderRightW).toBe('0px');
       expect(board.canvas).toBe(board.sidebarBg);
       expect(board.canvas).not.toBe(board.bg);
     });
@@ -60,7 +60,7 @@ test('board header stays the banner, at the top of the sheet', async ({ page }) 
   await expect(banner).toHaveCount(1);
   await expect(page.locator('.board-sheet header').first()).toHaveClass(/board-topbar/);
   const box = await banner.boundingBox();
-  expect(box).toEqual({ x: 248, y: 0, width: 1192, height: 56 });
+  expect(box).toEqual({ x: 248, y: 8, width: 1184, height: 56 });
 });
 
 test('chief settings swaps in inside the same sheet', async ({ page }) => {
@@ -69,7 +69,7 @@ test('chief settings swaps in inside the same sheet', async ({ page }) => {
   await expect(heading).toBeVisible();
   await expect(page.locator('.board-main')).toHaveCount(0);
   const sheet = await sheetOf(page, '.board-sheet');
-  expect(sheet.box).toEqual({ x: 248, y: 0, w: 1192, h: 900 });
+  expect(sheet.box).toEqual({ x: 248, y: 8, w: 1184, h: 884 });
 });
 
 test.describe('on a 2x screen', () => {

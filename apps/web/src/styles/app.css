@@ -548,18 +548,12 @@
     min-height: 44px;
   }
 
-  .chief-fab {
-    min-width: 44px;
-    min-height: 44px;
-    right: max(0.5rem, env(safe-area-inset-right));
-    bottom: max(0.5rem, env(safe-area-inset-bottom));
+  body:has(.side-panel) .app-menu-trigger {
+    display: none;
   }
   .chief-drawer {
     right: max(0.5rem, env(safe-area-inset-right));
     bottom: max(0.5rem, env(safe-area-inset-bottom));
-  }
-  body:has(.board-new-task-bar) .chief-fab {
-    bottom: calc(max(0.5rem, env(safe-area-inset-bottom)) + 60px);
   }
   body:has(.board-new-task-bar) .chief-drawer {
     transform-origin: calc(100% - 1.25rem) calc(100% - 60px - 1.25rem);

@@ -108,3 +108,11 @@ export async function keyboardFocus(page: Page, locator: Locator) {
   await page.keyboard.press('Shift+Tab');
   await settleTransitions(page);
 }
+
+export async function openChiefWindow(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement) active.blur();
+  });
+  await page.keyboard.press('ControlOrMeta+j');
+}

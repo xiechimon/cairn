@@ -185,49 +185,6 @@ test('⌘J toggle rides the non-board singleton hook too (schedules)', async ({ 
   await expect(page).toHaveURL(/\/app\/schedules/);
 });
 
-test('FAB click stays open-only; ⌘J closes what the click opened', async ({ page }) => {
-  await page.goto(BOARD);
-  const fab = page.getByRole('button', { name: '总管' });
-  await expect(fab).toBeVisible();
-  await fab.click();
-  await expect(drawer(page)).toBeVisible();
-  // ADR 0013 D4: the floating form unmounts the FAB while the window is
-  // open (mutual exclusion) — a re-click cannot even land (the button is
-  // gone), so the click face has no toggle to leak. The chord stays the
-  // only keyboard close: the open autofocused the composer, and the
-  // drawer-interior guard exemption lets ⌘J fire from there.
-  await pressAndExpect(page, 'Meta+j', drawer(page), 'hidden');
-  await expect(drawer(page)).toBeHidden();
-});
-
-test('the robot FAB surfaces the ⌘J hint on hover; at rest it stays hidden', async ({
-  page,
-}) => {
-  await page.goto(BOARD);
-  const fab = page.getByRole('button', { name: '总管' });
-
-  const hint = page.locator('[data-slot="tooltip-content"]');
-  await expect(hint).toHaveCount(0);
-  await fab.hover();
-  await expect(hint).toBeVisible();
-  await expect(hint.locator('[data-slot="kbd"]')).toHaveText('⌘J');
-});
-
-test('a wake-family route carries the same ⌘J hint (single root FAB)', async ({
-  page,
-}) => {
-  // ADR 0013 D4/D6: the per-shell wake FABs retired into one root-host FAB —
-  // the hint rides the same Tooltip+Kbd carrier on every route (#983/#1004).
-  await page.goto('/app/team?scenario=12');
-  const fab = page.locator('button[aria-label="总管"]');
-
-  const hint = page.locator('[data-slot="tooltip-content"]');
-  await expect(hint).toHaveCount(0);
-  await fab.hover();
-  await expect(hint).toBeVisible();
-  await expect(hint.locator('[data-slot="kbd"]')).toHaveText('⌘J');
-});
-
 test('the collapsed rail search icon hovers the ⌘K hint', async ({ page }) => {
   await page.goto(BOARD);
   await page.locator('button[aria-label="收起侧边栏"]').click();
@@ -252,17 +209,10 @@ test('with the drawer closed, N stays retired — neither drawer nor dialog open
 
 // ---- #1141: suppression retired — the chief surface is site-wide ---------
 
-// The FAB assertion uses the chief-fab class hook (the spec-facing carrier,
-// #1009 A0 ⑨) — the editable-guard faces are already pinned by tests 7/8
-// above, these only pin that the formerly suppressed routes now render the
-// launcher and answer the chord.
 test.describe('#1141 suppression retired', () => {
-  const fab = (page: Page) => page.locator('.chief-fab');
-
-  test('agent detail renders the FAB; ⌘J wakes the drawer in place', async ({ page }) => {
+  test('agent detail: ⌘J wakes the drawer in place', async ({ page }) => {
     await page.goto(AGENT_DETAIL);
     await expect(page.locator('.agent-detail')).toBeVisible();
-    await expect(fab(page)).toBeVisible();
     await pressAndExpect(page, 'Meta+j', drawer(page));
     await expect(page.getByTestId('chief-composer-input')).toBeFocused();
     await expect(page).toHaveURL(/\/app\/resources\/agents\/r3-builder/);
@@ -270,10 +220,9 @@ test.describe('#1141 suppression retired', () => {
     await expect(drawer(page)).toBeHidden();
   });
 
-  test('machine authorize renders the FAB; ⌘J wakes the drawer in place', async ({ page }) => {
+  test('machine authorize: ⌘J wakes the drawer in place', async ({ page }) => {
     await page.goto(AUTHORIZE);
     await expect(page.locator('.authorize-backdrop')).toBeVisible();
-    await expect(fab(page)).toBeVisible();
     await pressAndExpect(page, 'Meta+j', drawer(page));
     await expect(page.getByTestId('chief-composer-input')).toBeFocused();
     await expect(page).toHaveURL(/\/app\/machines\/authorize/);

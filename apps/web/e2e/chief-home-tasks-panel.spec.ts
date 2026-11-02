@@ -7,7 +7,7 @@ const madePanel = (page: Page) => page.getByRole('complementary', { name: '成�
 const tasksButton = (page: Page) => page.getByTestId('home-c').getByRole('button', { name: '任务' });
 const madeButton = (page: Page) => page.getByTestId('home-c').getByRole('button', { name: '成果' });
 
-test('the Tasks button opens the panel on Active: needs-you first, then in progress', async ({
+test('the Tasks button opens one list grouped as needs you, in progress, idle', async ({
   page,
 }) => {
   await page.goto(HOME);
@@ -16,15 +16,15 @@ test('the Tasks button opens the panel on Active: needs-you first, then in progr
   await tasksButton(page).click();
   await expect(panel(page)).toBeVisible();
   await expect(page).toHaveURL(/[?&]pane=tasks/);
-  await expect(panel(page).getByRole('tab', { name: '进行中' })).toHaveAttribute(
-    'aria-selected',
-    'true',
-  );
+  await expect(panel(page).getByRole('tab')).toHaveCount(0);
   const groups = panel(page).locator('[data-slot="stone-group"]');
+  await expect(groups).toHaveCount(3);
   await expect(groups.nth(0)).toHaveAttribute('data-tone', 'waiting');
   await expect(groups.nth(1)).toHaveAttribute('data-tone', 'working');
-  await expect(panel(page)).toContainText('Connect a Claude subscription token');
-  await expect(panel(page)).toContainText('Orb canary round 7');
+  await expect(groups.nth(2)).toHaveAttribute('data-tone', 'idle');
+  await expect(groups.nth(0)).toContainText('Connect a Claude subscription token');
+  await expect(groups.nth(1)).toContainText('Orb canary round 7');
+  await expect(groups.nth(2)).toContainText('Sidebar status groups');
   await expect(panel(page)).not.toContainText('Unread dot on threads');
 
   await page.reload();
@@ -34,21 +34,20 @@ test('the Tasks button opens the panel on Active: needs-you first, then in progr
   await expect(page).not.toHaveURL(/pane=/);
 });
 
-test('Up next lists tasks not started; a row opens its thread', async ({ page }) => {
+test('an idle row opens its thread', async ({ page }) => {
   await page.goto(`${HOME}&pane=tasks`);
-  await panel(page).getByRole('tab', { name: '接下来' }).click();
-  await expect(panel(page)).toContainText('Sidebar status groups');
-  await expect(panel(page)).not.toContainText('Orb canary round 7');
   await panel(page).getByText('Sidebar status groups').click();
   await expect(page).toHaveURL(/\/app\/todo\/home-c-idle/);
 });
 
-test('Scheduled lists schedules and links to the full schedules page', async ({ page }) => {
+test('schedules sit in the idle group once, without repeating their task, and link to the full schedules page', async ({ page }) => {
   await page.goto(`${HOME}&pane=tasks`);
-  await panel(page).getByRole('tab', { name: '定时' }).click();
-  const rows = panel(page).locator('[data-slot="thread-row"]');
-  await expect(rows).toHaveCount(1);
-  await expect(rows.first()).toContainText('#1');
+  const idle = panel(page).locator('[data-slot="stone-group"][data-tone="idle"]');
+  await expect(idle.locator('[data-slot="thread-row"]').filter({ hasText: '#1' })).toHaveCount(1);
+  await expect(
+    idle.locator('[data-slot="thread-row"]').filter({ hasText: 'Sidebar status groups' }),
+  ).toHaveCount(1);
+  await expect(idle.locator('[data-slot="thread-row"]')).toHaveCount(2);
   await panel(page).getByRole('link', { name: '管理定时' }).click();
   await expect(page).toHaveURL(/\/app\/schedules/);
 });
@@ -70,20 +69,10 @@ test('Made shows an empty state when nothing has finished', async ({ page }) => 
   await expect(madePanel(page).getByTestId('made-empty')).toBeVisible();
 });
 
-test('the in-progress pill opens the Tasks panel on In progress', async ({ page }) => {
+test('the composer has no in-progress pill above it', async ({ page }) => {
   await page.goto(HOME);
-  await page.getByTestId('in-progress-pill').click();
-  await expect(panel(page)).toBeVisible();
-  await expect(panel(page)).toContainText('Push for finished threads');
-
-  await panel(page).getByRole('tab', { name: '定时' }).click();
-  await madeButton(page).click();
-  await page.getByTestId('in-progress-pill').click();
-  await expect(panel(page).getByRole('tab', { name: '进行中' })).toHaveAttribute(
-    'aria-selected',
-    'true',
-  );
-  await expect(panel(page)).toContainText('Push for finished threads');
+  await expect(page.getByTestId('home-c').locator('.chief-composer')).toBeVisible();
+  await expect(page.getByTestId('in-progress-pill')).toHaveCount(0);
 });
 
 test('the sidebar has no Schedules row in any layout', async ({ page }) => {

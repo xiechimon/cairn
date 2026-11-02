@@ -132,7 +132,7 @@ test('regression #486/#494: skills list reachable by wheel, scrollbar hugs the p
 
   expect((await col.boundingBox())?.width).toBe(widthBefore);
   const topbar = await page.getByTestId('page-topbar').boundingBox();
-  expect(topbar?.y).toBe(0);
+  expect(topbar?.y).toBe(8);
   expect(topbar?.height).toBe(56);
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
 });

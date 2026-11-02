@@ -1,5 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import { evidenceShot } from './evidence';
+import { openChiefWindow } from './helpers.js';
 
 const TEAM = { id: 't1', name: '团队' };
 const USER = { id: 'u1', displayName: 'ian', avatarUrl: null };
@@ -186,7 +187,7 @@ const homeInput = (page: Page) => page.getByTestId('home-c').getByTestId('chief-
 
 async function openDrawer(page: Page) {
   await page.goto('/app?view=board');
-  await page.getByRole('button', { name: '总管', exact: true }).click();
+  await openChiefWindow(page);
   await expect(drawer(page)).toBeVisible();
 }
 

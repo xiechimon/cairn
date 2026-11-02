@@ -1,5 +1,6 @@
 import { expect, type Page, type Route, test } from '@playwright/test';
 import { evidenceShot } from './evidence';
+import { openChiefWindow } from './helpers.js';
 
 // #732: the chief drawer composer gets the detail composer's tool face
 // (ruling (a), issue comment 2026-10-03). The interaction set is the same
@@ -126,7 +127,7 @@ async function openChief(page: Page) {
   await page.goto('/app?view=board');
   await membersLoaded;
 
-  await page.getByRole('button', { name: '总管' }).click();
+  await openChiefWindow(page);
   const drawer = page.locator('.chief-drawer');
   await expect(drawer).toBeVisible();
   const input = page.getByTestId('chief-composer-input');
@@ -343,7 +344,7 @@ test('a mid-line image paste becomes a tile and leaves the text alone (FM6)', as
   const uploads = await stubUploads(page);
   await stubMentionSources(page);
   await page.goto('/app?view=board');
-  await page.getByRole('button', { name: '总管' }).click();
+  await openChiefWindow(page);
   const input = page.getByTestId('chief-composer-input');
   await expect(input).toBeEditable();
 
@@ -370,7 +371,7 @@ test('Enter during the upload does not send; after it lands Enter sends the toke
   await stubMentionSources(page);
   const deferred = await deferUploads(page);
   await page.goto('/app?view=board');
-  await page.getByRole('button', { name: '总管' }).click();
+  await openChiefWindow(page);
   const input = page.getByTestId('chief-composer-input');
   await expect(input).toBeEditable();
   const sent = await countChiefSends(page);

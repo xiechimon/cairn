@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { expect, type Page, test } from '@playwright/test';
 import { type BuiltSite, buildAndServe } from './demo-server';
+import { openChiefWindow } from './helpers.js';
 
 const SITE_URL = 'https://cairn.xmon.me';
 
@@ -150,7 +151,7 @@ test('the selling points browse end to end with no backend traffic', async ({ pa
   await expect(page.getByTestId('phase-chip')).toHaveText(/完成/);
 
   await page.goto(`${demo.base}/app`);
-  await page.getByRole('button', { name: '总管' }).click();
+  await openChiefWindow(page);
   const chief = page.getByRole('dialog', { name: /总管/ });
   await expect(chief).toBeVisible();
   await expect(chief.getByText('购物车').first()).toBeVisible();
@@ -233,7 +234,7 @@ test('write: the primary action and the delete confirm are blocked', async ({ pa
 test('write: sending to the chief is blocked', async ({ page }) => {
   const traffic = watchTraffic(page);
   await page.goto(`${demo.base}/app`);
-  await page.getByRole('button', { name: '总管' }).click();
+  await openChiefWindow(page);
   const chief = page.getByRole('dialog', { name: /总管/ });
   const input = chief.getByRole('textbox');
   await input.fill('把购物车那张票提到最前面');

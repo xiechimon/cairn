@@ -124,14 +124,12 @@ for (const theme of ['light', 'dark'] as const) {
         sidebarBg: cs.backgroundColor,
         mainBg: getComputedStyle(main).backgroundColor,
         borderRight: cs.borderRightWidth,
-        seamColor: cs.borderRightColor,
         topbarBorderWidth: getComputedStyle(document.querySelector('.board-topbar')!).borderBottomWidth,
         shadow: cs.boxShadow,
       };
     });
     expect(probe.sidebarBg).not.toBe(probe.mainBg);
-    expect(probe.borderRight).toBe('1px');
-    expect(probe.seamColor).not.toBe('transparent');
+    expect(probe.borderRight).toBe('0px');
     expect(probe.topbarBorderWidth).toBe('0px');
     expect(probe.shadow).toBe('none');
   });
@@ -186,6 +184,6 @@ test('collapsed rail draws no seam either (Paper PR 7)', async ({ page }) => {
     const cs = getComputedStyle(el);
     return { borderRight: cs.borderRightWidth, shadow: cs.boxShadow };
   });
-  expect(rail.borderRight).toBe('1px');
+  expect(rail.borderRight).toBe('0px');
   expect(rail.shadow).toBe('none');
 });

@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
+import { openChiefWindow } from './helpers.js';
 
 const THEME_KEY = 'cairn-theme'; // apps/web/src/theme.ts THEME_STORAGE_KEY
 const SIDEBAR_KEY = 'cairn.sidebar-collapsed'; // apps/web/src/board/app-sidebar.tsx
@@ -63,7 +64,7 @@ const headContentX = (page: Page) =>
     };
   });
 
-test.describe('the root FAB wakes the window on every shell family', () => {
+test.describe('⌘J wakes the window on every shell family', () => {
   const families = [
     { name: 'board', route: '/app?view=board&scenario=01', gear: true },
     { name: 'pages', route: '/app/schedules?scenario=11', gear: true },
@@ -78,7 +79,7 @@ test.describe('the root FAB wakes the window on every shell family', () => {
   ] as const;
 
   for (const { name, route, gear } of families) {
-    test(`${name}: the root FAB opens the window, minimize returns to the surface`, async ({
+    test(`${name}: ⌘J opens the window, minimize returns to the surface`, async ({
       page,
     }) => {
       await page.goto(route);
@@ -86,7 +87,7 @@ test.describe('the root FAB wakes the window on every shell family', () => {
       await expect(page.locator('.chief-drawer')).toBeHidden();
       await expect(page.locator('.chief-drawer')).toHaveCount(1);
 
-      await page.locator('.chief-fab').click();
+      await openChiefWindow(page);
       await expect(page.locator('.chief-drawer')).toBeVisible();
 
       await expect(page.locator('.chief-drawer button[aria-label="总管设置"]')).toHaveCount(

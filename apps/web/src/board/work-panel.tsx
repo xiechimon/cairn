@@ -2,7 +2,6 @@ import { PackageCheck } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { EmptyState } from '../components/empty-state.js';
-import { SegmentedTabs } from '../components/segmented.js';
 import { SidePanel, SidePanelHead, SidePanelTitle } from '../components/side-panel.js';
 import { StoneGroup, StoneTrail } from '../components/stone/stone-group.js';
 import { ThreadRow } from '../components/thread/thread-row.js';
@@ -22,8 +21,6 @@ export function paneOf(value: string | null): WorkPane | null {
   return value === 'tasks' || value === 'made' ? value : null;
 }
 
-export type TasksTab = 'active' | 'next' | 'scheduled';
-
 const live = (todo: TodoRecord) => todo.archivedAt == null;
 
 interface WorkPanelProps {
@@ -31,12 +28,10 @@ interface WorkPanelProps {
   todos: readonly TodoRecord[];
   schedules: readonly ScheduleRecord[];
   now: number;
-  tab: TasksTab;
-  onTab: (tab: TasksTab) => void;
   onClose: () => void;
 }
 
-export function WorkPanel({ pane, todos, schedules, now, tab, onTab, onClose }: WorkPanelProps) {
+export function WorkPanel({ pane, todos, schedules, now, onClose }: WorkPanelProps) {
   const { t } = useI18n();
   const navigate = useNavigate();
   const [folded, setFolded] = useState<Record<string, boolean>>({});
@@ -57,7 +52,10 @@ export function WorkPanel({ pane, todos, schedules, now, tab, onTab, onClose }: 
   );
   const needsYou = needsYouThreads(todos);
   const running = todos.filter((todo) => threadStatus(todo) === 'running' && live(todo));
-  const upNext = todos.filter((todo) => todo.phase === 'todo' && live(todo));
+  const scheduled = new Set(schedules.map((schedule) => schedule.todoId));
+  const idle = todos.filter(
+    (todo) => threadStatus(todo) === 'idle' && live(todo) && !scheduled.has(todo.id),
+  );
   const made = todos
     .filter((todo) => threadStatus(todo) === 'done' && live(todo))
     .sort((a, b) => b.phaseAt - a.phaseAt);
@@ -69,82 +67,52 @@ export function WorkPanel({ pane, todos, schedules, now, tab, onTab, onClose }: 
       </SidePanelHead>
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-3 pb-4">
         {pane === 'tasks' ? (
-          <>
-            <SegmentedTabs
-              value={tab}
-              onChange={onTab}
-              label={t('任务视图')}
-              options={[
-                { value: 'active', label: t('进行中') },
-                { value: 'next', label: t('接下来') },
-                { value: 'scheduled', label: t('定时') },
-              ]}
-            />
-            {tab === 'active' && (
-              <StoneTrail className="mt-2 px-0">
-                <StoneGroup
-                  tone="waiting"
-                  label={t('等你处理')}
-                  {...fold('needs-you')}
-                  count={needsYou.length}
-                  emptyHint={t('没有等你的事')}
-                >
-                  {needsYou.map((todo) => row(todo))}
-                </StoneGroup>
-                <StoneGroup
-                  tone="working"
-                  label={t('在进行')}
-                  {...fold('running')}
-                  count={running.length}
-                  emptyHint={t('没有在进行的任务')}
-                >
-                  {running.map((todo) => row(todo, 'working'))}
-                </StoneGroup>
-              </StoneTrail>
-            )}
-            {tab === 'next' && (
-              <StoneTrail className="mt-2 px-0">
-                <StoneGroup
+          <StoneTrail className="px-0">
+            <StoneGroup
+              tone="waiting"
+              label={t('等你处理')}
+              {...fold('needs-you')}
+              count={needsYou.length}
+              emptyHint={t('没有等你的事')}
+            >
+              {needsYou.map((todo) => row(todo))}
+            </StoneGroup>
+            <StoneGroup
+              tone="working"
+              label={t('在进行')}
+              {...fold('running')}
+              count={running.length}
+              emptyHint={t('没有在进行的任务')}
+            >
+              {running.map((todo) => row(todo, 'working'))}
+            </StoneGroup>
+            <StoneGroup
+              tone="idle"
+              label={t('空闲')}
+              {...fold('idle')}
+              count={idle.length + schedules.length}
+              emptyHint={t('没有空闲的任务')}
+            >
+              {idle.map((todo) => row(todo, 'idle'))}
+              {schedules.map((schedule) => (
+                <ThreadRow
+                  key={schedule.id}
+                  title={`#${schedule.todo.seqNum} ${schedule.todo.title}`}
                   tone="idle"
-                  label={t('接下来')}
-                  {...fold('next')}
-                  count={upNext.length}
-                  emptyHint={t('没有排队的任务')}
-                >
-                  {upNext.map((todo) => row(todo, 'idle'))}
-                </StoneGroup>
-              </StoneTrail>
-            )}
-            {tab === 'scheduled' && (
-              <StoneTrail className="mt-2 px-0">
-                <StoneGroup
-                  tone="working"
-                  label={t('定时')}
-                  {...fold('scheduled')}
-                  count={schedules.length}
-                  emptyHint={t('还没有定时任务，跟 Coordinator 说一声就能建')}
-                >
-                  {schedules.map((schedule) => (
-                    <ThreadRow
-                      key={schedule.id}
-                      title={`#${schedule.todo.seqNum} ${schedule.todo.title}`}
-                      tone="idle"
-                      reason={scheduleSummary(schedule, now, t)}
-                      onOpen={() => navigate(threadHref(schedule.todoId))}
-                    />
-                  ))}
-                </StoneGroup>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="mt-1 self-start text-meta text-content-secondary"
-                  render={<Link to="/app/schedules" />}
-                >
-                  {t('管理定时')}
-                </Button>
-              </StoneTrail>
-            )}
-          </>
+                  reason={scheduleSummary(schedule, now, t)}
+                  onOpen={() => navigate(threadHref(schedule.todoId))}
+                />
+              ))}
+            </StoneGroup>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mt-1 self-start text-meta text-content-secondary"
+              render={<Link to="/app/schedules" />}
+            >
+              {t('管理定时')}
+            </Button>
+          </StoneTrail>
         ) : made.length === 0 ? (
           <EmptyState
             testId="made-empty"

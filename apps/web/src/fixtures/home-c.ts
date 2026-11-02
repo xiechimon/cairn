@@ -103,7 +103,15 @@ export const homeC: FixtureSet = {
     homeTodo('home-c-done', 2201, 'Unread dot on threads', 'done', PROJECT_ID),
   ],
   chief: conversation,
-  schedules: [scheduleOnce],
+  schedules: [
+    scheduleOnce,
+    {
+      ...scheduleOnce,
+      id: 'home-c-schedule-idle',
+      todoId: 'home-c-idle',
+      todo: { ...scheduleOnce.todo, seqNum: 2240, title: 'Sidebar status groups', phase: 'todo' },
+    },
+  ],
   now: r7(20, 30),
 };
 
