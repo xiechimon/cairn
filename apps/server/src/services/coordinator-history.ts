@@ -124,7 +124,6 @@ export function assembleCoordinatorHistory(
         not(like(chiefMessage.id, `${CHIEF_REPORT_ROW_ID_PREFIX}%`)),
         ne(chiefMessage.role, 'system'),
         lte(chiefMessage.createdAt, input.claimedAt),
-        or(ne(chiefMessage.role, 'user'), lte(chiefMessage.createdAt, input.turnCreatedAt)),
         summaryRow === undefined
           ? undefined
           : or(
@@ -143,17 +142,21 @@ export function assembleCoordinatorHistory(
   const sent = rows
     .filter((r) => r.role === 'user' && r.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX))
     .map((r) => (extractText(r.content) ?? '').trim());
+  const unanswered: string[] = [];
   const rendered = rows
     .filter((r) => {
       if (r.role !== 'user' || r.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX)) return true;
       const text = (extractText(r.content) ?? '').trim();
-      return text === '' || !sent.some((prompt) => prompt.includes(text));
+      if (text === '' || sent.some((prompt) => prompt.includes(text))) return false;
+      if (r.createdAt <= input.turnCreatedAt) unanswered.push(text);
+      return false;
     })
     .map(rowText)
     .filter((m): m is HistoryMessage => m !== null);
-  const unanswered: string[] = [];
+  const trailing: string[] = [];
   while (rendered.at(-1)?.role === 'user')
-    unanswered.unshift((rendered.pop() as HistoryMessage).text);
+    trailing.unshift((rendered.pop() as HistoryMessage).text);
+  unanswered.unshift(...trailing);
   let messages = coalesce(rendered);
   const summarySection =
     summaryRow === undefined

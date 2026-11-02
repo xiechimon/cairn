@@ -12,7 +12,11 @@ registerChiefHarness();
 
 const BASE = 1_700_000_000_000;
 let n = 0;
-function add(role: 'user' | 'assistant' | 'system', content: unknown, id = `r${n}`): string {
+function add(
+  role: 'user' | 'assistant' | 'system',
+  content: unknown,
+  id = role === 'user' ? `user-step${n}` : `r${n}`,
+): string {
   H.s.db
     .insert(chiefMessage)
     .values({ id, threadId: H.threadId, role, content, createdAt: BASE + n })
@@ -65,7 +69,7 @@ describe('assembleCoordinatorHistory (D70 C3)', () => {
 
   test('the prompt the model saw wins over the raw posted copy, even when it carries extra notes; a wake prompt row is kept', () => {
     n = 0;
-    add('user', 'posted question');
+    add('user', 'posted question', 'posted-1');
     add('user', 'posted question\n\n[project: demo]', 'user-step1');
     add('assistant', 'answer');
     add('user', '[wake:gate] provenance=watch:t1\ncheck #12', 'user-step2');
@@ -142,20 +146,35 @@ describe('assembleCoordinatorHistory (D70 C3)', () => {
     expect(first).toContain(`read_history ids ["${id}"] offset 8000`);
   });
 
-  test('messages after the turn was queued are not part of its history', () => {
+  test('a turn queued behind a running one sees that reply, and its own posted message stays out of history', () => {
     n = 0;
-    add('user', 'before');
-    add('assistant', 'reply');
-    H.s.db
-      .insert(chiefMessage)
-      .values({
-        id: 'late',
-        threadId: H.threadId,
-        role: 'user',
-        content: 'later',
-        createdAt: BASE + 2_000_000,
-      })
-      .run();
-    expect(JSON.stringify(assemble().messages)).not.toContain('later');
+    add('user', 'qA', 'posted-a');
+    add('user', 'qA', 'user-stepA');
+    add('user', 'qB', 'posted-b');
+    add('assistant', 'aA');
+    const h = assembleCoordinatorHistory(H.s.db, {
+      threadId: H.threadId,
+      turnCreatedAt: BASE + 2,
+      claimedAt: BASE + 10,
+      contextWindow: 200_000,
+      fixedText: '',
+    });
+    expect(h.messages.map((m) => `${m.role}:${m.text}`)).toEqual(['user:qA', 'assistant:aA']);
+    expect(h.unanswered).toEqual(['qB']);
+  });
+
+  test('a message posted after this turn was queued is left to its own turn', () => {
+    n = 0;
+    add('user', 'q1');
+    add('assistant', 'a1');
+    add('user', 'later question', 'posted-later');
+    const h = assembleCoordinatorHistory(H.s.db, {
+      threadId: H.threadId,
+      turnCreatedAt: BASE + 1,
+      claimedAt: BASE + 10,
+      contextWindow: 200_000,
+      fixedText: '',
+    });
+    expect(JSON.stringify(h)).not.toContain('later question');
   });
 });
