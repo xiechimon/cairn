@@ -124,6 +124,7 @@ export async function runOrbWorker(options: {
             ? createGeminiBackend()
             : runtime === 'claude-code'
               ? createClaudeCodeBackend({
+                  inOrb: true,
                   skills: { skillsDir: '', cwd: paths.home },
                   teamSkillsCacheDir: paths.teamSkillsCacheDir,
                 })

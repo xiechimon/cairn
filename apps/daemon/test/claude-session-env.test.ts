@@ -62,6 +62,8 @@ test.each([undefined, {}])(
       sessionId: 'telemetry-test',
       disallowedTools: [],
       mcpServers: {},
+      inOrb: true,
+      lockedDown: false,
       abortController: new AbortController(),
       ...(env !== undefined ? { env } : {}),
     });
@@ -95,6 +97,8 @@ test('subscription authentication reaches the CLI through env with subprocess sc
     sessionId: 'env-test',
     disallowedTools: [],
     mcpServers: {},
+    inOrb: true,
+    lockedDown: false,
     abortController: new AbortController(),
     env,
   });
@@ -120,6 +124,8 @@ test('a team subscription token blanks inherited metered Claude auth so the CLI 
     sessionId: 'metered-env-test',
     disallowedTools: [],
     mcpServers: {},
+    inOrb: true,
+    lockedDown: false,
     abortController: new AbortController(),
   };
   const team = buildClaudeSdkOptions({

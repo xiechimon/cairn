@@ -127,6 +127,7 @@ export interface AgentBackendCapabilities {
 
 export interface SessionOpts {
   provider: ProviderConfig;
+  lockedDown?: boolean;
   modelId: string;
   thinkingLevel?: string;
   systemPrompt?: string;
