@@ -105,6 +105,7 @@ export function assembleCoordinatorHistory(
     threadId: string;
     turnCreatedAt: number;
     claimedAt: number;
+    turnPrompt: string;
     contextWindow: number;
     fixedText: string;
   },
@@ -148,7 +149,8 @@ export function assembleCoordinatorHistory(
       if (r.role !== 'user' || r.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX)) return true;
       const text = (extractText(r.content) ?? '').trim();
       if (text === '' || sent.some((prompt) => prompt.includes(text))) return false;
-      if (r.createdAt <= input.turnCreatedAt) unanswered.push(text);
+      if (r.createdAt <= input.turnCreatedAt && !input.turnPrompt.includes(text))
+        unanswered.push(capped(r.id, text));
       return false;
     })
     .map(rowText)
@@ -162,7 +164,10 @@ export function assembleCoordinatorHistory(
     summaryRow === undefined
       ? null
       : formatSummarySection(summaryRow.summary, summaryRow.coveredThroughId);
-  const fixed = estimateTokens(input.fixedText) + estimateTokens(summarySection ?? '');
+  const fixed =
+    estimateTokens(input.fixedText) +
+    estimateTokens(summarySection ?? '') +
+    estimateTokens(unanswered.join('\n\n'));
   const available = Math.max(0, input.contextWindow - OUTPUT_RESERVE_TOKENS - fixed);
   const tokensOf = (list: readonly HistoryMessage[]) =>
     list.reduce((n, m) => n + estimateTokens(m.text), 0);

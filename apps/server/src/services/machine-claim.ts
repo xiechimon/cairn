@@ -205,6 +205,7 @@ function buildChiefClaim(
           threadId: threadRow.id,
           turnCreatedAt: stepRow.createdAt,
           claimedAt: nowMs(),
+          turnPrompt: stepRow.prompt ?? '',
           contextWindow: contextWindowOf(
             deps.db,
             threadRow.teamId,
@@ -213,9 +214,7 @@ function buildChiefClaim(
           fixedText: `${systemPrompt}\n${stepRow.prompt ?? ''}`,
         })
       : null;
-  const unanswered = (serverContext?.unanswered ?? []).filter(
-    (text) => !(stepRow.prompt ?? '').includes(text),
-  );
+  const unanswered = serverContext?.unanswered ?? [];
   const turnPrompt =
     stepRow.prompt === null || unanswered.length === 0
       ? stepRow.prompt

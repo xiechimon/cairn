@@ -30,6 +30,7 @@ function assemble(contextWindow = 200_000, fixedText = '') {
     threadId: H.threadId,
     turnCreatedAt: BASE + 1_000_000,
     claimedAt: BASE + 1_500_000,
+    turnPrompt: '',
     contextWindow,
     fixedText,
   });
@@ -156,11 +157,39 @@ describe('assembleCoordinatorHistory (D70 C3)', () => {
       threadId: H.threadId,
       turnCreatedAt: BASE + 2,
       claimedAt: BASE + 10,
+      turnPrompt: '',
       contextWindow: 200_000,
       fixedText: '',
     });
     expect(h.messages.map((m) => `${m.role}:${m.text}`)).toEqual(['user:qA', 'assistant:aA']);
     expect(h.unanswered).toEqual(['qB']);
+    const own = assembleCoordinatorHistory(H.s.db, {
+      threadId: H.threadId,
+      turnCreatedAt: BASE + 2,
+      claimedAt: BASE + 10,
+      turnPrompt: 'qB',
+      contextWindow: 200_000,
+      fixedText: '',
+    });
+    expect(own.unanswered).toEqual([]);
+  });
+
+  test('a long unanswered message is capped and counted against the budget', () => {
+    n = 0;
+    add('user', 'q1');
+    add('assistant', 'a1');
+    add('user', 'u'.repeat(50_000), 'posted-long');
+    const h = assembleCoordinatorHistory(H.s.db, {
+      threadId: H.threadId,
+      turnCreatedAt: BASE + 5,
+      claimedAt: BASE + 10,
+      turnPrompt: 'something else',
+      contextWindow: 200_000,
+      fixedText: '',
+    });
+    expect(h.unanswered[0]?.length).toBeLessThan(8_200);
+    expect(h.unanswered[0]).toContain('read_history ids ["posted-long"]');
+    expect(h.estimatedTokens).toBeGreaterThan(2_000);
   });
 
   test('a message posted after this turn was queued is left to its own turn', () => {
@@ -172,6 +201,7 @@ describe('assembleCoordinatorHistory (D70 C3)', () => {
       threadId: H.threadId,
       turnCreatedAt: BASE + 1,
       claimedAt: BASE + 10,
+      turnPrompt: '',
       contextWindow: 200_000,
       fixedText: '',
     });
