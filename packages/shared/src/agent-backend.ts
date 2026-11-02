@@ -39,6 +39,7 @@ export const modelUsageSchema = z.object({
   cacheRead: z.number().int(),
   cacheWrite: z.number().int(),
   cost: modelCostSchema.optional(),
+  ttftMs: z.number().int().nonnegative().optional(),
 });
 export type ModelUsage = z.infer<typeof modelUsageSchema>;
 

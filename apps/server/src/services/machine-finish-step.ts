@@ -15,7 +15,7 @@ import {
   secondPrWarningNoteRowId,
   skillFactsFromContents,
 } from '@cairn/shared';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import {
   type agent,
   agent as agentTable,
@@ -23,6 +23,7 @@ import {
   chief,
   chiefMessage,
   chiefThread,
+  chiefTurnUsage,
   machine,
   message,
   type StepFallbackRow,
@@ -413,6 +414,35 @@ async function finishStepReport(
         set: cost === null ? tokens : { ...tokens, ...cost },
       })
       .run();
+    if (
+      stepRow.kind === 'chief' &&
+      isChiefConversation(stepRow.buildId) &&
+      !isChiefDigestStep(stepRow)
+    ) {
+      db.insert(chiefTurnUsage)
+        .values({
+          stepId: stepRow.id,
+          threadId: stepRow.buildId,
+          model: u.model,
+          input: u.input,
+          output: u.output,
+          cacheRead: u.cacheRead,
+          cacheWrite: u.cacheWrite,
+          ttftMs: u.ttftMs ?? null,
+          createdAt: nowMs(),
+        })
+        .onConflictDoUpdate({
+          target: [chiefTurnUsage.stepId, chiefTurnUsage.model],
+          set: {
+            input: sql`${chiefTurnUsage.input} + ${u.input}`,
+            output: sql`${chiefTurnUsage.output} + ${u.output}`,
+            cacheRead: sql`${chiefTurnUsage.cacheRead} + ${u.cacheRead}`,
+            cacheWrite: sql`${chiefTurnUsage.cacheWrite} + ${u.cacheWrite}`,
+            ttftMs: sql`coalesce(${chiefTurnUsage.ttftMs}, ${u.ttftMs ?? null})`,
+          },
+        })
+        .run();
+    }
   }
   db.delete(stopPending).where(eq(stopPending.stepId, stepId)).run();
   const worker = workerStepContext(deps, stepRow);
