@@ -102,7 +102,10 @@ describe('composer project chip reaches the chief (#2009)', () => {
       thread: { id: string };
       message: { id: string };
     };
-    await req(H.s.app, 'POST', `/api/conversations/${thread.id}/messages`, { content: '再改字号' });
+    await req(H.s.app, 'POST', `/api/conversations/${thread.id}/messages`, {
+      content: '再改字号',
+      projectId: site,
+    });
     H.s.db.update(chiefThread).set({ activeRun: null }).where(eq(chiefThread.id, thread.id)).run();
     const rewound = await req(
       H.s.app,

@@ -39,6 +39,7 @@ export function orchestrateTodo(deps: OrchestrateDeps, todoId: string) {
   });
   const result = sendChiefMessage(deps, record.teamId, {
     threadId: null,
+    projectId: record.projectId,
     content: isCorrectionTask(deps.db, todoId) ? `${CORRECTION_PROMPT}\n\n${content}` : content,
   });
   deps.convHub?.publishMessage(result.thread.id, { ...result.message });

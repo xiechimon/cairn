@@ -234,6 +234,7 @@ describe('idle chief unread sweep (#1303)', () => {
         sessionOpenedAt: updatedAt,
         toolDefHashes: {},
         toolResultHashes: {},
+        archivedAt: updatedAt,
       })
       .run();
     notifyChiefMessage(

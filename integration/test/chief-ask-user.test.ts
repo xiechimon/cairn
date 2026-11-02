@@ -13,6 +13,7 @@ import {
   notification as notificationTable,
   step as stepTable,
 } from '../../apps/server/src/db/schema.js';
+import { ASK_PARK_MS } from '../../apps/server/src/services/chief-questions.js';
 import { AGENT_ID, api, bootRealServer, type RealServer, waitFor } from './helpers.js';
 import { type StubLlm, startStubLlm } from './stub-llm.js';
 
@@ -105,6 +106,9 @@ beforeAll(async () => {
     { content: '已收到你的答复，本轮照此执行。' },
     { toolCall: { name: 'ask_user', arguments: ASK_ARGS } },
     { content: '已收到你的答复，本轮照此执行。' },
+    { toolCall: { name: 'ask_user', arguments: ASK_ARGS } },
+    { content: '在等你回答，本轮先结束。' },
+    { content: '收到答复，按优先级继续。' },
   ]);
   server = await bootRealServer({ providerBaseUrl: stub.url, claimHoldMs: 1_000 });
   home = mkdtempSync(join(tmpdir(), 'cairn-ask-home-'));
@@ -242,8 +246,17 @@ describe('#1049 chief ask_user blocking Q&A full chain (pi backend)', () => {
     const sent = await teamApi('POST', `/api/teams/${server.teamId}/chief/threads`, {
       content: '再问一次，这次我会取消',
     });
-    const threadId = (sent.body as { thread: { id: string } }).thread.id;
-    const askRow = await waitForValue(() => askRowsOf(threadId)[0] ?? null);
+    const { thread, message } = sent.body as {
+      thread: { id: string };
+      message: { id: string; createdAt: number };
+    };
+    const threadId = thread.id;
+    const askRow = await waitForValue(
+      () =>
+        askRowsOf(threadId).find(
+          (r) => (JSON.parse(r.content as string) as { status: string }).status === 'pending',
+        ) ?? null,
+    );
 
     const cancelled = await teamApi(
       'POST',
@@ -253,23 +266,76 @@ describe('#1049 chief ask_user blocking Q&A full chain (pi backend)', () => {
     expect(cancelled.status).toBe(200);
 
     await waitFor(() => {
+      const turn = server.db.select().from(stepTable).where(eq(stepTable.id, message.id)).get();
       const th = server.db.select().from(chiefThread).where(eq(chiefThread.id, threadId)).get();
-      return th?.lastTurnAt != null && th.activeRun === null;
+      return turn?.status === 'done' && th?.activeRun === null;
     }, 120_000);
-    const steps = server.db
+    const turn = server.db.select().from(stepTable).where(eq(stepTable.id, message.id)).get();
+    expect(turn?.kind).toBe('chief');
+    expect(turn?.status).toBe('done');
+    const cancelledRow = askRowsOf(threadId).find((r) => r.id === askRow.id);
+    expect((JSON.parse(cancelledRow?.content as string) as { status: string }).status).toBe(
+      'cancelled',
+    );
+    const later = server.db
       .select()
-      .from(stepTable)
-      .where(eq(stepTable.buildId, threadId))
+      .from(chiefMessage)
+      .where(eq(chiefMessage.threadId, threadId))
       .all()
-      .filter((st) => st.kind === 'chief');
-    expect(steps).toHaveLength(1);
-    expect(steps[0]?.status).toBe('done');
-    expect(
-      (JSON.parse(askRowsOf(threadId)[0]?.content as string) as { status: string }).status,
-    ).toBe('cancelled');
+      .filter((r) => r.createdAt >= message.createdAt && r.role === 'assistant');
+    expect(JSON.stringify(later)).toContain('已收到你的答复');
+  }, 180_000);
+  test('an unanswered question parks: the turn ends, a later answer starts a new turn with question and answer', async () => {
+    const sent = await teamApi('POST', `/api/teams/${server.teamId}/chief/threads`, {
+      content: '这次我晚点再答',
+    });
+    const { thread, message } = sent.body as { thread: { id: string }; message: { id: string } };
+    const threadId = thread.id;
+    const askRow = await waitForValue(
+      () =>
+        askRowsOf(threadId).find(
+          (r) => (JSON.parse(r.content as string) as { status: string }).status === 'pending',
+        ) ?? null,
+    );
+    server.db
+      .update(chiefMessage)
+      .set({ createdAt: askRow.createdAt - ASK_PARK_MS - 1 })
+      .where(eq(chiefMessage.id, askRow.id))
+      .run();
+    await waitFor(() => {
+      const turn = server.db.select().from(stepTable).where(eq(stepTable.id, message.id)).get();
+      return turn?.status === 'done';
+    }, 120_000);
+    const parked = JSON.parse(
+      askRowsOf(threadId).find((r) => r.id === askRow.id)?.content as string,
+    ) as { status: string; parkedAt?: number };
+    expect(parked.status).toBe('pending');
+    expect(typeof parked.parkedAt).toBe('number');
+
+    const answered = await teamApi(
+      'POST',
+      `/api/teams/${server.teamId}/chief/threads/${threadId}/questions/${askRow.id}/answer`,
+      {
+        answers: [
+          { header: '缩进', choices: ['Spaces'] },
+          { header: '优先级', choices: ['先修测试'] },
+          { header: '备注', text: '晚点的答复' },
+        ],
+      },
+    );
+    expect(answered.status).toBe(200);
+    await waitFor(() => {
+      const resumed = server.db
+        .select()
+        .from(stepTable)
+        .where(eq(stepTable.buildId, threadId))
+        .all()
+        .find((st) => st.kind === 'chief' && (st.prompt ?? '').includes('晚点的答复'));
+      return resumed?.status === 'done';
+    }, 120_000);
     const flat = JSON.stringify(
       server.db.select().from(chiefMessage).where(eq(chiefMessage.threadId, threadId)).all(),
     );
-    expect(flat).toContain('已收到你的答复');
+    expect(flat).toContain('收到答复，按优先级继续。');
   }, 180_000);
 });

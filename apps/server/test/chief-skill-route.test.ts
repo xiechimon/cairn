@@ -1,8 +1,14 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { claimedStepSchema } from '@cairn/shared';
+import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, test } from 'vitest';
-import { agent as agentTable, chief as chiefTable, chiefThread } from '../src/db/schema.js';
+import {
+  agent as agentTable,
+  chief as chiefTable,
+  chiefThread,
+  step as stepTable,
+} from '../src/db/schema.js';
 import { nowMs } from '../src/lib/ids.js';
 import { enqueueChiefStep } from '../src/services/chief.js';
 import {
@@ -134,6 +140,7 @@ describe('claim-surface skill routing (#823)', () => {
 
     const token = await claimToken();
     const first = await claim(token);
+    s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.id, first.step.id)).run();
     const second = await claim(token);
     expect(first.chief?.systemPrompt).toBe(second.chief?.systemPrompt);
     expect((first as { instruction?: string }).instruction).not.toBe(
