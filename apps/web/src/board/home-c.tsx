@@ -9,7 +9,6 @@ import { EmptyState } from '../components/empty-state.js';
 import { Greeting } from '../components/stream/greeting.js';
 import { SuggestionChip } from '../components/stream/suggestion-chip.js';
 import { TextureSkeleton } from '../components/texture/texture.js';
-import { ThreadCard } from '../components/thread/thread-card.js';
 import { ThreadRow } from '../components/thread/thread-row.js';
 import { Button } from '../components/ui/button.js';
 import { MessageScrollerProvider } from '../components/ui/message-scroller.js';
@@ -17,6 +16,7 @@ import type { ChiefStreamItem, MachineRow, TodoRecord } from '../fixtures/record
 import { useI18n } from '../i18n/provider.js';
 import { ClaudeLoginBanner } from './claude-login-banner.js';
 import { ACT_ORDER, actRank, needsYouThreads, pendingQuestions } from './needs-you.js';
+import { NeedsYouThreadCard } from './needs-you-thread-card.js';
 import { composeRequest } from './open-composer.js';
 import { relativeTime } from './rel-time.js';
 import { threadCopy, threadHref, threadStatus, threadTone } from './thread-copy.js';
@@ -221,7 +221,8 @@ export function HomeC({
               onCancel={surface.onCancelQuestion}
             />
           ) : (
-            <ThreadCard
+            <NeedsYouThreadCard
+              todo={entry.todo}
               title={entry.todo.title}
               tone={threadTone(entry.todo)}
               stateLabel={t(threadCopy(entry.todo).state)}

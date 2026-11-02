@@ -96,7 +96,7 @@ const NAV = [
       ['product-board', 'Filters and banners'],
       ['product-detail', 'Task detail'],
       ['product-chief', 'Coordinator'],
-      ['product-thread-reply', 'Talk to a thread'],
+      ['product-thread-reply', 'Thread reply'],
       ['product-overlays', 'Overlays and pickers'],
       ['product-pages', 'Page parts'],
     ],
