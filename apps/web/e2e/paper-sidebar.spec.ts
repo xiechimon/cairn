@@ -36,7 +36,6 @@ test('four parts stack top to bottom in a 248px sidebar', async ({ page }) => {
   const order = [
     await top(page, '[data-testid="team-row"]'),
     await aside.locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' }).evaluate((el) => el.getBoundingClientRect().top),
-    await aside.locator('[data-slot="sidebar-nav-row"]', { hasText: '定时' }).evaluate((el) => el.getBoundingClientRect().top),
     await top(page, '[data-testid="project-group"]'),
     await top(page, '.sidebar-user'),
   ];

@@ -33,42 +33,11 @@ import {
 import type { ScheduleRecord } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
-import type { TFunc } from '../i18n/translate.js';
 import { EllipsisVertical, Trash2 } from '../icons/index.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { PHASE_UI } from '../phase.js';
+import { pad, scheduleSummary, TZ_OFFSET } from './schedule-summary.js';
 import { PageShell } from './shell.js';
-
-const TZ_OFFSET = 8 * 3_600_000;
-const pad = (n: number) => String(n).padStart(2, '0');
-const hourMinute = (ts: number) => {
-  const d = new Date(ts + TZ_OFFSET);
-  return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
-};
-const EN_MONTHS = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-];
-const monthDay = (ts: number, t: TFunc) => {
-  const d = new Date(ts + TZ_OFFSET);
-  return t('{mo}月{d}日', {
-    mo: d.getUTCMonth() + 1,
-    d: d.getUTCDate(),
-    monthShort: EN_MONTHS[d.getUTCMonth()] ?? '',
-  });
-};
-const dayWord = (ts: number, now: number, t: TFunc) =>
-  monthDay(ts, t) === monthDay(now, t) ? t('今天') : monthDay(ts, t);
 
 type ScheduleKind = Exclude<ScheduleRecord['kind'], 'cron'>;
 
@@ -80,14 +49,6 @@ const FREQ_LABEL: Record<ScheduleKind, string> = {
 };
 const MINUTE_STEPS = ['00', '15', '30', '45'];
 const HOURS = Array.from({ length: 24 }, (_, h) => pad(h));
-
-const RUN_WORD: Record<ScheduleRecord['kind'], string> = {
-  hourly: '每小时运行',
-  daily: '每天运行',
-  weekly: '每周运行',
-  once: '运行一次',
-  cron: 'Cron',
-};
 
 const FORM_ROW_CLS =
   'sched-form-row flex h-8 items-center justify-between gap-3 rounded-md border border-border bg-card px-3 shadow-xs dark:bg-input/30';
@@ -148,13 +109,7 @@ function ScheduleCard({
       <div className="flex min-w-0 flex-1 flex-col">
         <span className="truncate text-ui text-foreground">{`#${schedule.todo.seqNum} ${schedule.todo.title}`}</span>
         <span className="truncate text-meta text-content-tertiary">
-          {`${schedule.kind === 'cron' ? '' : `${monthDay(schedule.at, t)} ${hourMinute(schedule.at)} `}${t(RUN_WORD[schedule.kind])} · ${t(
-            '下次 {day} {time}',
-            {
-              day: dayWord(schedule.nextRunAt, now, t),
-              time: hourMinute(schedule.nextRunAt),
-            },
-          )} · ${schedule.todo.projectName}`}
+          {`${scheduleSummary(schedule, now, t)} · ${schedule.todo.projectName}`}
         </span>
       </div>
       <StatusChip tone={ui.tone} className="flex-none">

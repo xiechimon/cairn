@@ -97,6 +97,18 @@ export const EN: Record<string, string> = {
   '执行中 {n}': '{n} running',
   项目: 'Project', // sidebar group / search group / schedule-form field — one fit
   Coordinator: 'Coordinator',
+  成果: 'Made',
+  接下来: 'Up next',
+  在进行: 'In progress',
+  等你处理: 'Needs you',
+  管理定时: 'Manage schedules',
+  任务视图: 'Task view',
+  没有在进行的任务: 'Nothing in progress',
+  没有排队的任务: 'Nothing queued',
+  还没有完成的工作: 'Nothing finished yet',
+  '任务合并完成后会出现在这里。': 'Tasks show up here once they merge.',
+  '还没有定时任务，跟 Coordinator 说一声就能建':
+    'No schedules yet; ask the Coordinator to set one up',
   新建项目: 'New project',
   新任务: 'New task', // sidebar action row (#389) — the dialog title stays 新建任务
   '新任务：接下来让 agent 做什么？': 'New task: What should the agent do next?',
@@ -132,7 +144,7 @@ export const EN: Record<string, string> = {
   今天: 'today',
 
   // —— board surface (r2 §4.1, r7 01/02; #351 6→4 列收敛) ——
-  任务: 'Todo', // topbar +任务 button / search nav row / popover section
+  任务: 'Tasks',
   待开始: 'To start',
   // 规划中 survives as the planning phase chip (detail header), not a column
   规划中: 'Planning',

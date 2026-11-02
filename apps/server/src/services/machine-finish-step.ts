@@ -49,6 +49,7 @@ import {
 import { finishChiefTurn, notifyChiefTurn, recoverGateWake } from './chief.js';
 import { finishChiefDigest, isChiefDigestStep } from './chief-digest.js';
 import { cancelPendingQuestions } from './chief-questions.js';
+import { finishChiefSummary, isChiefSummaryStep } from './chief-summary.js';
 import { recordChiefStop, releaseUnconsumedSteer } from './chief-turns.js';
 import {
   buildCiFixPrompt,
@@ -539,7 +540,8 @@ async function finishStepReport(
     recordSkillInjectionCheck(deps, stepRow, outcome.skillInjectionFacts);
   }
   if (stepRow.kind === 'chief' && isChiefDigestStep(stepRow)) {
-    finishChiefDigest(deps, stepRow, outcome, nowMs());
+    if (isChiefSummaryStep(stepRow)) finishChiefSummary(deps, stepRow, outcome, nowMs());
+    else finishChiefDigest(deps, stepRow, outcome, nowMs());
     publishStepStatus(deps, stepId);
     emitRuntimeStepSpan(deps.db, stepId);
     return;

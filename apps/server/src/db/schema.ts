@@ -661,6 +661,17 @@ export const chiefTurnUsage = sqliteTable(
   ],
 );
 
+export const chiefSummary = sqliteTable('chief_summary', {
+  threadId: text('threadId').primaryKey(),
+  summary: text('summary').notNull(),
+  coveredThroughId: text('coveredThroughId').notNull(),
+  coveredAt: epochMs('coveredAt').notNull(),
+  coveredRowid: integer('coveredRowid').notNull(),
+  compactedMessages: integer('compactedMessages').notNull(),
+  generation: integer('generation').notNull(),
+  updatedAt: epochMs('updatedAt').notNull(),
+});
+
 export const chief = sqliteTable('chief', {
   id: text('id').primaryKey(),
   userId: text('userId').notNull(),

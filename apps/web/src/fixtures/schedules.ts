@@ -11,7 +11,7 @@ import {
 } from './core.js';
 import type { FixtureSet, ScheduleRecord } from './records.js';
 
-const scheduleOnce: ScheduleRecord = {
+export const scheduleOnce: ScheduleRecord = {
   id: 'r3-schedule-1',
   teamId: TEAM_ID,
   projectId: PROJECT_ID,

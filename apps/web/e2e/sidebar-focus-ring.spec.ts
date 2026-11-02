@@ -39,8 +39,11 @@ test('mouse click then Escape on a rail row paints no focus ring', async ({ page
 
 test('keyboard focus rings on sidebar rows stay whole', async ({ page }) => {
   await page.goto('/app?scenario=01');
-  for (const name of ['Coordinator', '定时']) {
-    const row = navRow(page, name);
+  const rows = {
+    Coordinator: navRow(page, 'Coordinator'),
+    project: page.getByRole('complementary').locator('[data-slot="sidebar-project-row"]').first(),
+  };
+  for (const [name, row] of Object.entries(rows)) {
     await keyboardFocus(page, row);
     expect({ name, ...(await readRing(row)), ringShown: (await boxRing(row)) !== 'none' }).toEqual({
       name,
@@ -58,7 +61,7 @@ test('keyboard focus rings on rail rows stay whole', async ({ page }) => {
   const rail = page.getByRole('complementary').getByRole('navigation');
   const rows = [
     sidebarLink(page, /^Coordinator/),
-    sidebarLink(page, '定时'),
+    page.getByRole('complementary').locator('.rail-row:has(.project-avatar)').first(),
     rail.getByRole('button').first(),
   ];
   for (const row of rows) {
