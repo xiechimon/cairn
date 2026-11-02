@@ -7,6 +7,7 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react';
+import { useLocation } from 'react-router';
 import { toast } from 'sonner';
 import { activityStore } from '../api/activity.js';
 import {
@@ -64,6 +65,12 @@ export interface ChiefDeepLink {
 
 export const CHIEF_OPEN_STORAGE_KEY = 'cairn.chief-open';
 
+function placeOf(pathname: string, search: string): string {
+  const params = new URLSearchParams(search);
+  params.delete('chief');
+  return `${pathname}?${params.toString()}`;
+}
+
 function readStoredChiefOpen(): boolean {
   try {
     return localStorage.getItem(CHIEF_OPEN_STORAGE_KEY) === '1';
@@ -109,7 +116,13 @@ export function useChiefSurface(
     } catch {}
   }, [live, onHome, chiefView]);
 
-  const [linkedThreadId, setLinkedThreadId] = useState<string | null>(null);
+  const { pathname, search } = useLocation();
+  const place = placeOf(pathname, search);
+  const [linked, setLinked] = useState<{ threadId: string; place: string } | null>(null);
+  const linkedThreadId = linked?.place === place ? linked.threadId : null;
+  useEffect(() => {
+    if (linked !== null && linked.place !== place) setLinked(null);
+  }, [linked, place]);
   const liveThreads = chiefThreadsQ.data ?? [];
   const activeThread = live
     ? (liveThreads.find((thread) => thread.id === linkedThreadId) ??
@@ -125,7 +138,7 @@ export function useChiefSurface(
     }
     if (!live || deepLinkId === null || !chiefThreadsQ.isSuccess) return;
     if (liveThreads.some((thread) => thread.id === deepLinkId)) {
-      setLinkedThreadId(deepLinkId);
+      setLinked({ threadId: deepLinkId, place });
       if (!onHome) setChiefView('drawer');
     }
     onDeepLinkConsumed?.();
@@ -137,6 +150,7 @@ export function useChiefSurface(
     onDeepLinkConsumed,
     setChiefView,
     onHome,
+    place,
   ]);
   const chiefMessagesQ = useMessages(live ? (activeThread?.id ?? null) : null, live);
   const streamHandlers = useMemo(

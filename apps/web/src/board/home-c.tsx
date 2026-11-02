@@ -13,8 +13,9 @@ import { ThreadCard } from '../components/thread/thread-card.js';
 import { ThreadRow } from '../components/thread/thread-row.js';
 import { Button } from '../components/ui/button.js';
 import { MessageScrollerProvider } from '../components/ui/message-scroller.js';
-import type { ChiefStreamItem, TodoRecord } from '../fixtures/records.js';
+import type { ChiefStreamItem, MachineRow, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
+import { ClaudeLoginBanner } from './claude-login-banner.js';
 import { relativeTime } from './rel-time.js';
 import { threadCopy, threadHref, threadStatus, threadTone } from './thread-copy.js';
 
@@ -89,6 +90,7 @@ interface HomeCProps {
   projectName: string | null;
   banner?: ReactNode;
   onNewTask?: () => void;
+  machines?: readonly MachineRow[];
 }
 
 export function HomeC({
@@ -99,6 +101,7 @@ export function HomeC({
   projectName,
   banner,
   onNewTask,
+  machines,
 }: HomeCProps) {
   const { t, locale } = useI18n();
   const { user, live } = useLiveData();
@@ -252,6 +255,7 @@ export function HomeC({
       {greeting}
       {since}
       {projectLinks}
+      <ClaudeLoginBanner machines={machines} now={now} />
       {needsYou}
       {entries.length === 0 && (
         <div data-testid="home-c-starters" className="mt-4 -ml-2.5 flex flex-wrap gap-1">
@@ -273,6 +277,7 @@ export function HomeC({
       {greeting}
       {since}
       {projectLinks}
+      <ClaudeLoginBanner machines={machines} now={now} />
       {needsYou}
     </section>
   );
@@ -313,14 +318,20 @@ export function HomeC({
         {surface.load === 'loading' ? (
           <TextureSkeleton className="mx-auto mt-[12vh] h-40 w-[calc(100%-2rem)] max-w-182" />
         ) : (
-          <EmptyState
-            testId="home-c-error"
-            icon={MessageSquareWarning}
-            title={t('对话加载失败')}
-            description={t('对话记录还在，重试一下。')}
-            action={{ label: t('重试'), onClick: surface.retry }}
-            className="mt-[12vh]"
-          />
+          <>
+            <div className="mx-auto w-[calc(100%-2rem)] max-w-182 flex-none pt-6">
+              {projectLinks}
+              <ClaudeLoginBanner machines={machines} now={now} />
+            </div>
+            <EmptyState
+              testId="home-c-error"
+              icon={MessageSquareWarning}
+              title={t('对话加载失败')}
+              description={t('对话记录还在，重试一下。')}
+              action={{ label: t('重试'), onClick: surface.retry }}
+              className="mt-[12vh]"
+            />
+          </>
         )}
       </section>
     );

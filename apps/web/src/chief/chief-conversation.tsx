@@ -491,7 +491,7 @@ export function ChiefConversation({
         >
           <div className="flex items-center">
             <h2 className="m-0 min-w-0 truncate font-heading text-heading font-title text-(--foreground)">
-              Coordinator
+              {t('总管')}
             </h2>
             <div className="ml-auto flex items-center gap-2.5">
               {onSettings != null && (

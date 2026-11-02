@@ -639,6 +639,7 @@ export function BoardPage() {
             projectName={homeProjectName}
             banner={homeBanner}
             onNewTask={openNewTask}
+            machines={fixtureWithTodos.resources?.machines}
           />
         ) : (
           <BoardSurface

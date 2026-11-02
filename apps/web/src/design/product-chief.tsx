@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { ChiefDigestRow } from '../chief/chief-digest-row.js';
-import { HomeSummary } from '../chief/chief-home-summary.js';
 import { ChiefIdentity } from '../chief/chief-identity.js';
 import { ChiefFallbackBanner, ChiefOutageBanner } from '../chief/chief-outage-banner.js';
 import { ChiefQuestionCard } from '../chief/chief-question-card.js';
@@ -86,17 +85,7 @@ export function ProductChiefSection() {
           </Labeled>
         </MessageScrollerProvider>
       </Specimen>
-      <Specimen title="Home summary and identity" note="HomeSummary, ChiefIdentity" stage="canvas">
-        <Cell label="Something needs you">
-          <p className="m-0 text-card-title text-content-secondary">
-            <HomeSummary needsYou={3} running={2} doneToday={5} />
-          </p>
-        </Cell>
-        <Cell label="Nothing needs you">
-          <p className="m-0 text-card-title text-content-secondary">
-            <HomeSummary needsYou={0} running={0} doneToday={1} />
-          </p>
-        </Cell>
+      <Specimen title="Identity" note="ChiefIdentity" stage="canvas">
         <Cell label="Identity, idle">
           <ChiefIdentity agent={CHIEF} />
         </Cell>

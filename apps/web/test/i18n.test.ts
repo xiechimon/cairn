@@ -111,9 +111,7 @@ describe('translate plural form', () => {
 describe('English count rendering', () => {
   it.each([0, 1, 2])('renders real dictionary counts for %s', (n) => {
     expect(translate('en', EN, '{n} 个成员', { n })).toBe(`${n} ${n === 1 ? 'member' : 'members'}`);
-    expect(
-      translate('en', EN, '{running} 个任务运行中，今天合并了 {done} 个', { running: n, done: 7 }),
-    ).toBe(`${n} ${n === 1 ? 'task' : 'tasks'} running, 7 merged today`);
+    expect(translate('en', EN, '{n} 次运行', { n })).toBe(`${n} ${n === 1 ? 'run' : 'runs'}`);
   });
 
   it.each([-1, 1, 0, 2, 1.5, '1', 'many', Number.NaN, Number.POSITIVE_INFINITY])(
