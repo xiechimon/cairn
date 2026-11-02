@@ -116,4 +116,16 @@ describe('chief thread reports and quiet event turns (#1784)', () => {
     expect(items.map((item) => item.kind)).toEqual(['user', 'thread-report', 'robot']);
     expect(items[2]).toMatchObject({ markdown: 'The board is fine.', tools: [{ label: 'todos' }] });
   });
+
+  test('a message sent during a wake turn shows, but the wake turn stays silent until the next turn starts', () => {
+    const items = mapChiefStream([
+      row('user-wake', 'user', '[wake:failed] provenance=watch:todo-1\nThe task failed.'),
+      row('posted-1', 'user', 'Also check the relay'),
+      row('wake-text', 'assistant', 'Checking machines.'),
+      row('user-posted-1', 'user', 'Also check the relay'),
+      row('reply', 'assistant', 'The relay is up.'),
+    ]);
+    expect(items.map((item) => item.kind)).toEqual(['user', 'robot']);
+    expect(items[1]).toMatchObject({ markdown: 'The relay is up.' });
+  });
 });

@@ -1315,10 +1315,8 @@ function collectChiefStream(
         : m.id;
       if (stepOfRow !== fallback.stepId) fallback = null;
     }
-    if (m.role === 'user') {
-      eventTurn =
-        m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX) &&
-        WAKE_MARKER_PREFIX_RE.test(textOfContent(m.content).trim());
+    if (m.role === 'user' && m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX)) {
+      eventTurn = WAKE_MARKER_PREFIX_RE.test(textOfContent(m.content).trim());
       if (eventTurn) {
         pendingTools = [];
         continue;
