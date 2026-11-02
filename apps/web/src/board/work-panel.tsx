@@ -1,4 +1,5 @@
 import { PackageCheck } from 'lucide-react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { EmptyState } from '../components/empty-state.js';
 import { SegmentedTabs } from '../components/segmented.js';
@@ -38,6 +39,11 @@ interface WorkPanelProps {
 export function WorkPanel({ pane, todos, schedules, now, tab, onTab, onClose }: WorkPanelProps) {
   const { t } = useI18n();
   const navigate = useNavigate();
+  const [folded, setFolded] = useState<Record<string, boolean>>({});
+  const fold = (id: string) => ({
+    collapsed: folded[id] === true,
+    onCollapsedChange: (next: boolean) => setFolded((prev) => ({ ...prev, [id]: next })),
+  });
   const title = pane === 'tasks' ? t('任务') : t('成果');
   const row = (todo: TodoRecord, tone = threadTone(todo)) => (
     <ThreadRow
@@ -79,6 +85,7 @@ export function WorkPanel({ pane, todos, schedules, now, tab, onTab, onClose }: 
                 <StoneGroup
                   tone="waiting"
                   label={t('等你处理')}
+                  {...fold('needs-you')}
                   count={needsYou.length}
                   emptyHint={t('没有等你的事')}
                 >
@@ -87,6 +94,7 @@ export function WorkPanel({ pane, todos, schedules, now, tab, onTab, onClose }: 
                 <StoneGroup
                   tone="working"
                   label={t('在进行')}
+                  {...fold('running')}
                   count={running.length}
                   emptyHint={t('没有在进行的任务')}
                 >
@@ -99,6 +107,7 @@ export function WorkPanel({ pane, todos, schedules, now, tab, onTab, onClose }: 
                 <StoneGroup
                   tone="idle"
                   label={t('接下来')}
+                  {...fold('next')}
                   count={upNext.length}
                   emptyHint={t('没有排队的任务')}
                 >
@@ -111,6 +120,7 @@ export function WorkPanel({ pane, todos, schedules, now, tab, onTab, onClose }: 
                 <StoneGroup
                   tone="working"
                   label={t('定时')}
+                  {...fold('scheduled')}
                   count={schedules.length}
                   emptyHint={t('还没有定时任务，跟 Coordinator 说一声就能建')}
                 >
