@@ -17,6 +17,7 @@ import {
 import { openDbWithHandle } from './db/client.js';
 import { seed } from './db/seed.js';
 import { createKeyfileSecretBox } from './lib/secret-box.js';
+import { setCoordinatorServerContextEnabled } from './services/coordinator-context.js';
 import { ConversationStreamHub, TeamStreamHub } from './services/events.js';
 import { killInFlightPick } from './services/fs-pick.js';
 import { refreshingGithubFetch } from './services/github-connection.js';
@@ -64,6 +65,7 @@ seedLocalMachine(db, seeded.team.id);
 backfillFixedTags(db);
 backfillPersonas(db);
 setRoutingRulesEnabled(config.routingRules);
+setCoordinatorServerContextEnabled(config.coordinatorServerContext);
 if (config.routingRules) seedRoutingRules(db);
 backfillTokenUsageCost(db);
 const concurrencyBackfilled = backfillMachineConcurrency(db);

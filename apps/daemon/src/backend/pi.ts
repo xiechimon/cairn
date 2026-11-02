@@ -447,6 +447,34 @@ export interface MapState {
   usage: Map<string, ModelUsage>;
   calls: Map<string, ToolCallRecord>;
   diagnose?: (message: string) => string;
+  now: () => number;
+  promptSentAt?: number;
+  firstToken?: { model: string; ms: number };
+  lastContext?: { model: string; tokens: number };
+}
+
+export const FIRST_TOKEN_EVENTS: ReadonlySet<string> = new Set([
+  'text_delta',
+  'thinking_delta',
+  'toolcall_delta',
+  'toolcall_end',
+]);
+
+export function notePromptSent(state: MapState): void {
+  state.promptSentAt = state.now();
+  delete state.firstToken;
+}
+
+function noteFirstToken(state: MapState, event: AgentSessionEventLike): void {
+  if (state.promptSentAt === undefined || state.firstToken !== undefined) return;
+  const msg = event.message;
+  const type = event.assistantMessageEvent?.type;
+  if (msg?.provider === undefined || msg.model === undefined) return;
+  if (type === undefined || !FIRST_TOKEN_EVENTS.has(type)) return;
+  state.firstToken = {
+    model: `${msg.provider}/${msg.model}`,
+    ms: Math.max(0, Math.round(state.now() - state.promptSentAt)),
+  };
 }
 
 export function recordPiSpanEvent(sink: PiStepSpanSink, event: AgentSessionEventLike): void {
@@ -488,10 +516,14 @@ export function recordPiSpanEvent(sink: PiStepSpanSink, event: AgentSessionEvent
   }
 }
 
-export function newMapState(opts?: { diagnose?: (message: string) => string }): MapState {
+export function newMapState(opts?: {
+  diagnose?: (message: string) => string;
+  now?: () => number;
+}): MapState {
   return {
     usage: new Map(),
     calls: new Map(),
+    now: opts?.now ?? (() => performance.now()),
     ...(opts?.diagnose !== undefined ? { diagnose: opts.diagnose } : {}),
   };
 }
@@ -525,6 +557,7 @@ export function mapPiSessionEvent(event: AgentSessionEventLike, state: MapState)
     case 'message_update': {
       const msg = event.message;
       if (!msg) return [];
+      noteFirstToken(state, event);
       const record = toMessageRecord(msg);
       const ame = event.assistantMessageEvent;
       if (!ame) return [{ type: 'message_update', message: record }];
@@ -587,6 +620,8 @@ export function mapPiSessionEvent(event: AgentSessionEventLike, state: MapState)
           next.cost = prev.cost;
         }
         state.usage.set(key, next);
+        const context = contextTokensOf(msg);
+        if (context > 0) state.lastContext = { model: key, tokens: context };
       }
       if (msg.stopReason === 'aborted') {
         return [{ type: 'message_stop', message: toMessageRecord(msg) }];
@@ -626,14 +661,33 @@ export function mapPiSessionEvent(event: AgentSessionEventLike, state: MapState)
     case 'auto_retry_end':
       return [{ type: 'auto_retry_end', attempt: event.attempt ?? 1 }];
     case 'agent_settled': {
-      const usage: ModelUsage[] = [...state.usage.values()];
-      return [{ type: 'done', usage }];
+      return [{ type: 'done', usage: settledUsage(state) }];
     }
     case 'agent_end':
       return [];
     default:
       return [];
   }
+}
+
+function contextTokensOf(msg: PiMessageLike): number {
+  if (msg.stopReason === 'aborted' || msg.stopReason === 'error' || msg.usage === undefined) {
+    return 0;
+  }
+  const u = msg.usage;
+  return (u.input ?? 0) + (u.output ?? 0) + (u.cacheRead ?? 0) + (u.cacheWrite ?? 0);
+}
+
+function settledUsage(state: MapState): ModelUsage[] {
+  const first = state.firstToken;
+  const context = state.lastContext;
+  return [...state.usage.values()].map((u) => ({
+    ...u,
+    ...(first !== undefined && u.model === first.model ? { ttftMs: first.ms } : {}),
+    ...(context !== undefined && u.model === context.model
+      ? { contextTokens: context.tokens }
+      : {}),
+  }));
 }
 
 class EventQueue {
@@ -756,7 +810,11 @@ class PiSessionHandle implements AgentSessionHandle {
   }
 
   usage(): AgentTokenUsage {
-    return [...this.state.usage.values()];
+    return settledUsage(this.state);
+  }
+
+  notePromptSent(): void {
+    notePromptSent(this.state);
   }
 }
 
@@ -1058,6 +1116,7 @@ export class PiBackend implements AgentBackend {
       if (promptImages !== undefined) {
         ensureImageInput(model);
       }
+      handle.notePromptSent();
       const sent =
         promptImages !== undefined
           ? session.prompt(opts.prompt, { images: toPiImages(promptImages) })
