@@ -1459,4 +1459,12 @@ export const EN: Record<string, string> = {
   首页: 'Home',
   往上滑看更早的对话: 'Scroll up for earlier messages',
   'Claude 登录需要处理': 'Claude sign-in needs attention',
+  '直接发给 #{seq}，插进它这一轮。': 'Goes straight to #{seq}, into its current turn.',
+  '作为改计划的意见发给 #{seq}，不算批准。': 'Plan feedback for #{seq}, not an approval.',
+  '#{seq} 会带着这句话重跑。': 'Reruns #{seq} with this note.',
+  '已发给 #{seq}。': 'Sent to #{seq}.',
+  '没发出去，再试一次。': 'Not sent. Try again.',
+  '回复 #{seq}': 'Reply to #{seq}',
+  '回复 #{seq}…': 'Reply to #{seq}…',
+  '你直接对 #{n} 说：{excerpt}': 'You told #{n} directly: {excerpt}',
 };

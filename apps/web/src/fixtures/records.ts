@@ -19,6 +19,7 @@ import {
   type SecretRecord,
   type SkillFact,
   type TagRecord,
+  type ThreadMessageContent,
   type ThreadReportContent,
   type UsageCost,
 } from '@cairn/shared';
@@ -476,6 +477,7 @@ export interface ChiefSegment {
 
 export type ChiefStreamItem =
   | (ThreadReportContent & { id: string; projectId?: string | null })
+  | (ThreadMessageContent & { id: string; projectId?: string | null })
   | { kind: 'note'; text: string; machineName?: string }
   | { kind: 'error'; text: string }
   | { kind: 'handoff'; todoId: string; id?: string }

@@ -42,6 +42,7 @@ import {
   stripAnsiEscapes,
   stripSkillRouteSection,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
+  threadMessageContentSchema,
   threadReportContentSchema,
   transcriptPromptRowId,
   VERIFY_VERDICT_KIND,
@@ -1351,6 +1352,11 @@ function collectChiefStream(
       const report = threadReportContentSchema.safeParse(parsed);
       if (report.success) {
         items.push({ ...report.data, id: m.id, ...rowProject(m) });
+        continue;
+      }
+      const direct = threadMessageContentSchema.safeParse(parsed);
+      if (direct.success) {
+        items.push({ ...direct.data, id: m.id, ...rowProject(m) });
         continue;
       }
       const stopped = chiefTurnStoppedContentSchema.safeParse(parsed);
