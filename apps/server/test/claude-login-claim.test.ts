@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { ClaudeAuthStateWire, ClaudeCodeReport } from '@cairn/shared';
+import type { ClaudeAuthStateWire, ClaudeCodeReport, MachineTokenResponse } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
@@ -14,6 +14,7 @@ import {
 } from '../src/db/schema.js';
 import { hasActiveClaudeSubscription } from '../src/services/claude-subscriptions.js';
 import { claimStep, markPresence } from '../src/services/machines.js';
+import { createProvider } from '../src/services/providers.js';
 import {
   bootServer,
   insertMachine,
@@ -605,4 +606,206 @@ test('team-scoped revocation removes future credentials and restores the machine
   const nextCredentials = await s.app.request(`/api/machine/token/${nextStep}`, { headers });
   expect(nextCredentials.status).toBe(200);
   expect(await nextCredentials.text()).not.toContain(token);
+});
+
+describe('pi steps on an Anthropic model use the team subscription', () => {
+  const token = `sk-ant-oat01-${'p'.repeat(64)}`;
+  const storedKey = `sk-ant-api03-${'k'.repeat(40)}`;
+
+  async function claimedStepFor(kind: 'build' | 'chief', provider: string) {
+    const { s, projectId } = await world();
+    const machineId = insertMachine(s, { name: `anthropic-${kind}-${provider}` });
+    const stepId =
+      kind === 'chief'
+        ? insertChief(s, machineId, provider)
+        : (() => {
+            insertAgent(s, { id: `anthropic-builder-${provider}`, machineId, provider });
+            return insertBuildStep(s, projectId, `anthropic-builder-${provider}`);
+          })();
+    s.db
+      .update(stepTable)
+      .set({ status: 'claimed', machineId })
+      .where(eq(stepTable.id, stepId))
+      .run();
+    const machineToken = `anthropic-${kind}-${provider}-auth`;
+    s.db
+      .update(machineTable)
+      .set({ tokenHash: createHash('sha256').update(machineToken).digest('hex') })
+      .where(eq(machineTable.id, machineId))
+      .run();
+    const credentials = async (): Promise<MachineTokenResponse> => {
+      const response = await s.app.request(`/api/machine/token/${stepId}`, {
+        headers: { authorization: `Bearer ${machineToken}` },
+      });
+      expect(response.status).toBe(200);
+      return (await response.json()) as MachineTokenResponse;
+    };
+    const subscribe = async (expiresAt?: number) => {
+      const created = await req(s.app, 'POST', `/api/teams/${s.team.id}/claude-subscriptions`, {
+        label: 'Team',
+        token,
+        ...(expiresAt !== undefined ? { expiresAt } : {}),
+      });
+      expect(created.status).toBe(201);
+    };
+    const setFallback = (fallbackProvider: string) =>
+      s.db
+        .update(stepTable)
+        .set({
+          fallback: {
+            model: { provider: fallbackProvider, modelId: 'stub-model' },
+            tried: [],
+            zeroUsageRetried: false,
+          },
+        })
+        .where(eq(stepTable.id, stepId))
+        .run();
+    return { s, stepId, credentials, subscribe, setFallback };
+  }
+
+  test.each(['build', 'chief'] as const)(
+    '%s step with an anthropic agent and no stored anthropic key receives the subscription',
+    async (kind) => {
+      const step = await claimedStepFor(kind, 'anthropic');
+      await step.subscribe();
+      const body = await step.credentials();
+      expect(body.provider).toEqual({ kind: 'api_key', providerId: 'anthropic' });
+      expect(body.claudeSubscriptionToken).toBe(token);
+    },
+  );
+
+  test.each(['build', 'chief'] as const)(
+    '%s step with a stored anthropic key keeps the key and receives no subscription',
+    async (kind) => {
+      const step = await claimedStepFor(kind, 'anthropic');
+      await step.subscribe();
+      createProvider(
+        { db: step.s.db, box: step.s.secretBox },
+        {
+          teamId: step.s.team.id,
+          body: {
+            providerId: 'anthropic',
+            label: 'Anthropic',
+            baseUrl: 'https://api.anthropic.com',
+            api: 'anthropic-messages',
+            apiKey: storedKey,
+          },
+          createdBy: step.s.user.id,
+        },
+      );
+      const body = await step.credentials();
+      expect(body.provider).toMatchObject({ providerId: 'anthropic', apiKey: storedKey });
+      expect(body).not.toHaveProperty('claudeSubscriptionToken');
+      expect(JSON.stringify(body)).not.toContain(token);
+    },
+  );
+
+  test.each(['build', 'chief'] as const)(
+    '%s step with an anthropic agent and no active subscription keeps the keyless provider',
+    async (kind) => {
+      const step = await claimedStepFor(kind, 'anthropic');
+      const none = await step.credentials();
+      expect(none.provider).toEqual({ kind: 'api_key', providerId: 'anthropic' });
+      expect(none).not.toHaveProperty('claudeSubscriptionToken');
+      await step.subscribe(1);
+      const expired = await step.credentials();
+      expect(expired).not.toHaveProperty('claudeSubscriptionToken');
+      expect(JSON.stringify(expired)).not.toContain(token);
+    },
+  );
+
+  test.each(
+    (['build', 'chief'] as const).flatMap((kind) =>
+      ['stub-gw', 'openai', 'anthropic-relay'].map((provider) => ({ kind, provider })),
+    ),
+  )('$kind step on $provider never receives the subscription', async ({ kind, provider }) => {
+    const step = await claimedStepFor(kind, provider);
+    await step.subscribe();
+    const body = await step.credentials();
+    expect(body).not.toHaveProperty('claudeSubscriptionToken');
+    expect(JSON.stringify(body)).not.toContain(token);
+  });
+
+  test.each(['build', 'chief'] as const)(
+    '%s step stops receiving the subscription once it is no longer claimed',
+    async (kind) => {
+      const step = await claimedStepFor(kind, 'anthropic');
+      await step.subscribe();
+      for (const status of ['done', 'failed', 'stopped', 'waiting_quota', 'pending'] as const) {
+        step.s.db.update(stepTable).set({ status }).where(eq(stepTable.id, step.stepId)).run();
+        expect(JSON.stringify(await step.credentials())).not.toContain(token);
+      }
+    },
+  );
+
+  test.each(['build', 'chief'] as const)(
+    '%s step falling back from anthropic to another provider drops the subscription',
+    async (kind) => {
+      const step = await claimedStepFor(kind, 'anthropic');
+      await step.subscribe();
+      step.setFallback('stub-gw');
+      const body = await step.credentials();
+      expect(body).not.toHaveProperty('claudeSubscriptionToken');
+      expect(JSON.stringify(body)).not.toContain(token);
+    },
+  );
+
+  test.each(
+    (['build', 'chief'] as const).flatMap((kind) =>
+      (['subscription', 'stored key', 'none'] as const).map((auth) => ({ kind, auth })),
+    ),
+  )('subscription-only $kind claim of an anthropic pi step with $auth', async ({ kind, auth }) => {
+    const { s, projectId } = await world();
+    const machineId = insertMachine(s, { name: `anthropic-claim-${kind}` });
+    const stepId =
+      kind === 'chief'
+        ? insertChief(s, machineId, 'anthropic')
+        : (() => {
+            insertAgent(s, { id: 'anthropic-claimer', machineId, provider: 'anthropic' });
+            return insertBuildStep(s, projectId, 'anthropic-claimer');
+          })();
+    if (auth !== 'none') {
+      const created = await req(s.app, 'POST', `/api/teams/${s.team.id}/claude-subscriptions`, {
+        label: 'Team',
+        token,
+      });
+      expect(created.status).toBe(201);
+    }
+    if (auth === 'stored key') {
+      createProvider(
+        { db: s.db, box: s.secretBox },
+        {
+          teamId: s.team.id,
+          body: {
+            providerId: 'anthropic',
+            label: 'Anthropic',
+            baseUrl: 'https://api.anthropic.com',
+            api: 'anthropic-messages',
+            apiKey: storedKey,
+          },
+          createdBy: s.user.id,
+        },
+      );
+    }
+    const claimed = await claimAs(s, machineId);
+    if (auth === 'subscription') {
+      expect(claimed?.step).toMatchObject({ id: stepId, machineId });
+      expect(JSON.stringify(claimed)).not.toContain(token);
+    } else {
+      expect(claimed).toBeNull();
+      expect(stepStatus(s, stepId)).toBe('waiting_quota');
+    }
+  });
+
+  test.each(['build', 'chief'] as const)(
+    '%s step falling back to anthropic receives the subscription with the anthropic provider',
+    async (kind) => {
+      const step = await claimedStepFor(kind, 'stub-gw');
+      await step.subscribe();
+      step.setFallback('anthropic');
+      const body = await step.credentials();
+      expect(body.provider).toEqual({ kind: 'api_key', providerId: 'anthropic' });
+      expect(body.claudeSubscriptionToken).toBe(token);
+    },
+  );
 });

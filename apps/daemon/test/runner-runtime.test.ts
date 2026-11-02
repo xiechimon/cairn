@@ -487,6 +487,86 @@ describe('subscription credential isolation', () => {
   });
 });
 
+describe('pi on an Anthropic model uses the subscription token as its key', () => {
+  const token = `sk-ant-oat01-${'d'.repeat(64)}`;
+  const anthropic: ProviderConfig = { kind: 'api_key', providerId: 'anthropic' };
+
+  test('a keyless anthropic provider runs pi with the token as the anthropic key', async () => {
+    const pi = await setup(claimedStep({ provider: 'anthropic', modelId: 'claude-haiku-5-5' }), {
+      tokenProvider: anthropic,
+      subscriptionToken: token,
+    });
+    expect(pi.sessions[0]?.provider).toEqual({ ...anthropic, apiKey: token });
+    expect(pi.sessions[0]?.env?.CLAUDE_CODE_OAUTH_TOKEN).toBeUndefined();
+    expect(pi.probeCalls).toHaveLength(0);
+    expect(pi.lines).toContain('using model anthropic/claude-haiku-5-5');
+    expect(pi.lines).toContain('[step] anthropic key: team Claude subscription');
+    expect(pi.lines.join('')).not.toContain(token);
+    expect(pi.client.doneBodies[0]?.body.status).toBe('success');
+  });
+
+  test('a stored anthropic key is never replaced by the token', async () => {
+    const stored: ProviderConfig = {
+      kind: 'http',
+      providerId: 'anthropic',
+      baseUrl: 'https://api.anthropic.com',
+      api: 'anthropic-messages',
+      apiKey: 'stored-anthropic-key',
+    };
+    const pi = await setup(claimedStep({ provider: 'anthropic', modelId: 'claude-haiku-5-5' }), {
+      tokenProvider: stored,
+      subscriptionToken: token,
+    });
+    expect(pi.sessions[0]?.provider).toEqual(stored);
+    expect(pi.lines).not.toContain('[step] anthropic key: team Claude subscription');
+  });
+
+  test('without a token the anthropic provider stays keyless', async () => {
+    const pi = await setup(claimedStep({ provider: 'anthropic', modelId: 'claude-haiku-5-5' }), {
+      tokenProvider: anthropic,
+    });
+    expect(pi.sessions[0]?.provider).toEqual(anthropic);
+  });
+
+  test('other providers never receive the token as a key', async () => {
+    for (const providerId of ['stub-gw', 'openai', 'anthropic-relay']) {
+      const pi = await setup(claimedStep({ provider: providerId, modelId: 'stub-model' }), {
+        tokenProvider: { kind: 'api_key', providerId },
+        subscriptionToken: token,
+      });
+      expect(pi.sessions[0]?.provider).toEqual({ kind: 'api_key', providerId });
+      expect(JSON.stringify(pi.sessions[0]?.provider)).not.toContain(token);
+    }
+  });
+
+  test('Claude Code keeps the token in its environment, not in a provider key', async () => {
+    const claude = await setup(claimedStep({ provider: 'claude-code', modelId: 'sonnet' }), {
+      tokenProvider: null,
+      subscriptionToken: token,
+    });
+    expect(claude.sessions[0]?.provider).toEqual({ kind: 'api_key', providerId: 'claude-code' });
+    expect(claude.sessions[0]?.env?.CLAUDE_CODE_OAUTH_TOKEN).toBe(token);
+  });
+
+  test('a pi anthropic step that echoes the token keeps it out of logs, reports and outbox files', async () => {
+    const result = await setup(
+      claimedStep({ provider: 'anthropic', modelId: 'claude-haiku-5-5' }),
+      { tokenProvider: anthropic, subscriptionToken: token, echoToken: true },
+    );
+    expect(result.sessions[0]?.provider.apiKey).toBe(token);
+    expect(result.lines.join('')).not.toContain(token);
+    expect(JSON.stringify(result.client.doneBodies)).not.toContain(token);
+    expect(JSON.stringify(result.client.uploads)).not.toContain(token);
+    for (const entry of readdirSync(result.paths.outboxDir, {
+      recursive: true,
+      withFileTypes: true,
+    })) {
+      if (entry.isFile())
+        expect(readFileSync(join(entry.parentPath, entry.name), 'utf8')).not.toContain(token);
+    }
+  });
+});
+
 test('subscription session uploads stay redacted when a failed final report is replayed after restart', async () => {
   const token = 'private-recovery-subscription-token';
   const directory = mkdtempSync(join(tmpdir(), 'cairn-subscription-session-'));

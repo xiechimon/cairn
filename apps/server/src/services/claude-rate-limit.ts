@@ -24,7 +24,7 @@ import {
   todo,
 } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
-import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
+import { hasActiveClaudeSubscription, piRunsOnClaudeSubscription } from './claude-subscriptions.js';
 import {
   agentForStep,
   capabilityGatePasses,
@@ -49,7 +49,8 @@ export function claudeUsageGatePasses(
   if (!isClaudeModel(model.provider, model.modelId)) return true;
   const settings = deps.db.select().from(team).where(eq(team.id, machineRow.teamId)).get();
   if (settings?.claudeUsage === 'allow-paid') return true;
-  if (stepRuntimeFor(model.provider) !== 'claude-code') return false;
+  if (stepRuntimeFor(model.provider) !== 'claude-code')
+    return piRunsOnClaudeSubscription(deps, machineRow.teamId, model.provider);
   return (
     hasActiveClaudeSubscription(deps, machineRow.teamId) ||
     machineUsesClaudeSubscription(machineRow.claudeCodeReport)
@@ -149,7 +150,8 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
     const subscriptionClaimant = claimants.some((row) => claudeUsageGatePasses(deps, row, model));
     const claude = isClaudeModel(model.provider, model.modelId);
     const paid =
-      stepRuntimeFor(model.provider) !== 'claude-code' ||
+      (stepRuntimeFor(model.provider) !== 'claude-code' &&
+        !piRunsOnClaudeSubscription(deps, teamId, model.provider)) ||
       (owner !== undefined && !claudeUsageGatePasses(deps, owner, model)) ||
       claimants.some((row) => !claudeUsageGatePasses(deps, row, model));
     const rateLimitedSubscriptionOwner =

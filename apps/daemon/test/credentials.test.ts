@@ -35,3 +35,36 @@ test('subscription credentials are cleared with the step lifetime', () => {
   clearCredentials(credentials);
   expect(credentials.claudeSubscriptionToken).toBeUndefined();
 });
+
+describe('subscription token as the anthropic key for pi', () => {
+  const subscription = 'private-anthropic-subscription-token';
+  const anthropic = { kind: 'api_key' as const, providerId: 'anthropic' };
+
+  test('a keyless anthropic provider takes the token and loses it on clear', () => {
+    const credentials = pushCredential(
+      { ...TOKEN, provider: anthropic, claudeSubscriptionToken: subscription },
+      null,
+    );
+    expect(credentials.provider).toEqual({ ...anthropic, apiKey: subscription });
+    clearCredentials(credentials);
+    expect(credentials.provider).toBeNull();
+    expect(JSON.stringify(credentials)).not.toContain(subscription);
+  });
+
+  test('a stored key, another provider or a missing token leave the provider unchanged', () => {
+    const stored = { ...anthropic, kind: 'http' as const, apiKey: 'stored-key' };
+    const keylessRow = { kind: 'http' as const, providerId: 'anthropic', baseUrl: 'https://relay' };
+    const other = { kind: 'api_key' as const, providerId: 'openai' };
+    for (const provider of [stored, keylessRow, { ...anthropic, apiKey: 'stored-key' }, other]) {
+      expect(
+        pushCredential({ ...TOKEN, provider, claudeSubscriptionToken: subscription }, null)
+          .provider,
+      ).toEqual(provider);
+    }
+    expect(pushCredential({ ...TOKEN, provider: anthropic }, null).provider).toEqual(anthropic);
+    expect(
+      pushCredential({ ...TOKEN, provider: null, claudeSubscriptionToken: subscription }, null)
+        .provider,
+    ).toBeNull();
+  });
+});

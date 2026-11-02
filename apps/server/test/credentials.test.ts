@@ -271,6 +271,34 @@ test('planning with a pi agent cannot receive the build agent subscription', asy
   expect(resolveStepCredentials(s.keysvc, s.stepId).claudeSubscriptionToken).toBeUndefined();
 });
 
+test('an anthropic planner whose step carries another provider key receives no subscription', async () => {
+  const s = await withAgentStack();
+  await req(s.app, 'POST', `/api/teams/${s.team.id}/claude-subscriptions`, {
+    label: 'Team',
+    token: `sk-ant-oat01-${'m'.repeat(64)}`,
+  });
+  s.db
+    .insert(agent)
+    .values({
+      id: 'anthropic-planner',
+      teamId: s.team.id,
+      displayName: 'Planner',
+      provider: 'anthropic',
+      modelId: 'claude-haiku-5-5',
+    })
+    .run();
+  s.db
+    .update(todo)
+    .set({
+      assignment: { plan: { agentId: 'anthropic-planner' }, build: { agentId: 'agent-xiaolin' } },
+    })
+    .where(eq(todo.id, s.todoId))
+    .run();
+  const bundle = resolveStepCredentials(s.keysvc, s.stepId);
+  expect(bundle.provider).toMatchObject({ providerId: 'r3-gw', apiKey: RELAY_KEY });
+  expect(bundle.claudeSubscriptionToken).toBeUndefined();
+});
+
 test('finished steps retain provider-key responses', async () => {
   const s = await withAgentStack();
   const machineId = insertMachine(s, { name: 'finished-provider' });

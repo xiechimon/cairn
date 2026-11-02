@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ProviderCompat, ProviderConfig } from '@cairn/shared';
@@ -23,6 +23,26 @@ function loadCompat(path: string, providerId: string): ProviderCompat | undefine
   };
   return raw.providers[providerId]?.compat;
 }
+
+describe('a keyless built-in provider drops a stale models.json overlay', () => {
+  test('a former anthropic relay entry is removed so the built-in Anthropic host is used', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-cfg-'));
+    const path = join(dir, 'models.json');
+    materializeProvider(path, { ...gateway('anthropic'), baseUrl: 'https://relay.invalid' });
+    materializeProvider(path, gateway('cfg-kept'));
+    materializeProvider(path, { kind: 'api_key', providerId: 'anthropic', apiKey: 'token' });
+    const raw = JSON.parse(readFileSync(path, 'utf8')) as { providers: Record<string, unknown> };
+    expect(Object.keys(raw.providers)).toEqual(['cfg-kept']);
+    expect(readFileSync(path, 'utf8')).not.toContain('token');
+  });
+
+  test('a keyless provider with no models.json writes nothing', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-cfg-'));
+    const path = join(dir, 'models.json');
+    materializeProvider(path, { kind: 'api_key', providerId: 'anthropic' });
+    expect(existsSync(path)).toBe(false);
+  });
+});
 
 describe('materializeProvider config changes take effect immediately (#708 failure mode 3)', () => {
   test('failure mode 1: server compat deletes the knob the learning slot filled → learning voided, old shape does not flow back', () => {

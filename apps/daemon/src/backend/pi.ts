@@ -1084,7 +1084,10 @@ function mergedCompat(provider: ProviderConfig): ProviderCompat | undefined {
 }
 
 export function materializeProvider(modelsPath: string, provider: ProviderConfig): void {
-  if (!provider.baseUrl) return;
+  if (!provider.baseUrl) {
+    dropProviderOverlay(modelsPath, provider.providerId);
+    return;
+  }
   const serverCompatKey = JSON.stringify(provider.compat ?? null);
   if (
     lastServerCompat.has(provider.providerId) &&
@@ -1118,6 +1121,16 @@ export function materializeProvider(modelsPath: string, provider: ProviderConfig
     })),
   };
   writeFileSync(modelsPath, `${JSON.stringify({ providers }, null, 2)}\n`, 'utf8');
+}
+
+function dropProviderOverlay(modelsPath: string, providerId: string): void {
+  if (!existsSync(modelsPath)) return;
+  const raw = JSON.parse(readFileSync(modelsPath, 'utf8')) as {
+    providers?: Record<string, Record<string, unknown>>;
+  };
+  if (raw.providers?.[providerId] === undefined) return;
+  delete raw.providers[providerId];
+  writeFileSync(modelsPath, `${JSON.stringify(raw, null, 2)}\n`, 'utf8');
 }
 
 export function createPiBackend(opts: PiBackendOpts): AgentBackend {

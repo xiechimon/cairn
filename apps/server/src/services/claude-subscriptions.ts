@@ -1,7 +1,12 @@
-import type { ClaudeSubscription, CreateClaudeSubscription, SecretBox } from '@cairn/shared';
+import {
+  type ClaudeSubscription,
+  type CreateClaudeSubscription,
+  type SecretBox,
+  SUBSCRIPTION_PI_PROVIDER_ID,
+} from '@cairn/shared';
 import { and, desc, eq, gt, isNull, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { claudeSubscription } from '../db/schema.js';
+import { claudeSubscription, provider as providerTable } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { verifyClaudeSubscription } from './claude-subscription-verification.js';
@@ -87,9 +92,34 @@ export function openClaudeSubscription(
   teamId: string,
   provider: string | null | undefined,
 ): string | undefined {
-  if (provider !== 'claude-code') return undefined;
+  if (provider !== 'claude-code' && !piProviderTakesSubscription(deps, teamId, provider))
+    return undefined;
   const row = activeSubscriptionRow(deps, teamId);
   return row ? deps.box.open(row.tokenCipher) : undefined;
+}
+
+export function piRunsOnClaudeSubscription(
+  deps: { db: Db },
+  teamId: string,
+  provider: string | null | undefined,
+): boolean {
+  return (
+    piProviderTakesSubscription(deps, teamId, provider) && hasActiveClaudeSubscription(deps, teamId)
+  );
+}
+
+function piProviderTakesSubscription(
+  deps: { db: Db },
+  teamId: string,
+  provider: string | null | undefined,
+): boolean {
+  if (provider !== SUBSCRIPTION_PI_PROVIDER_ID) return false;
+  const stored = deps.db
+    .select({ id: providerTable.id })
+    .from(providerTable)
+    .where(and(eq(providerTable.teamId, teamId), eq(providerTable.providerId, provider)))
+    .get();
+  return stored === undefined;
 }
 
 export function hasActiveClaudeSubscription(deps: { db: Db }, teamId: string): boolean {

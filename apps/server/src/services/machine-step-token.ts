@@ -96,7 +96,10 @@ function chiefStepToken(
     ? deps.db.select().from(agent).where(eq(agent.id, chiefRow.agentId)).get()
     : undefined;
   return {
-    provider: toProviderConfig(bundle.provider, agentRow?.provider),
+    provider: toProviderConfig(
+      bundle.provider,
+      stepRow?.fallback?.model?.provider ?? agentRow?.provider,
+    ),
     secrets: bundle.secrets,
     ...(claimed && bundle.claudeSubscriptionToken !== undefined
       ? { claudeSubscriptionToken: bundle.claudeSubscriptionToken }
