@@ -6,6 +6,7 @@ import {
   type LucideIcon,
   Plug,
   Puzzle,
+  Route,
   Server,
   ShieldEllipsis,
   User,
@@ -48,6 +49,7 @@ const RESOURCE_ROWS: MenuRow[] = [
   { label: '密钥', href: '/app/resources/secrets', Icon: ShieldEllipsis },
   { label: '机器', href: MACHINES_HREF, Icon: Server },
   { label: '模型服务', href: '/app/resources/providers', Icon: Layers },
+  { label: '模型路由', href: '/app/resources/model-routing', Icon: Route },
 ];
 
 const USAGE_ROW: MenuRow = { label: '用量', href: '/app/usage', Icon: ChartColumn };

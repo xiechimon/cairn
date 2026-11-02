@@ -41,6 +41,7 @@ import type {
   PatchChiefBody,
   PatchMachineBody,
   PatchProjectBody,
+  PatchProviderBody,
   PatchTeamBody,
   PatchUserBody,
   PlanRow,
@@ -916,6 +917,11 @@ export function useApiMutations(teamId: string | undefined) {
     }),
     deleteProvider: useMutation({
       mutationFn: (id: string) => api.del<void>(`/api/teams/${teamId}/providers/${id}`),
+      onSuccess: invalidateAll,
+    }),
+    patchProvider: useMutation({
+      mutationFn: (input: { id: string; body: PatchProviderBody }) =>
+        api.patch<ProviderRecord>(`/api/teams/${teamId}/providers/${input.id}`, input.body),
       onSuccess: invalidateAll,
     }),
     createSecret: useMutation({

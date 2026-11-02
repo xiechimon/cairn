@@ -37,7 +37,8 @@ export type SidebarSelected =
   | '/app/resources/mcp-servers'
   | '/app/resources/secrets'
   | '/app/resources/machines'
-  | '/app/resources/providers';
+  | '/app/resources/providers'
+  | '/app/resources/model-routing';
 
 export interface SidebarProject {
   id: string;

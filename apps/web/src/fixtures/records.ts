@@ -23,6 +23,7 @@ import {
   type ThreadReportContent,
   type UsageCost,
 } from '@cairn/shared';
+import type { AccountsContent } from './accounts.js';
 
 export type { Phase };
 export { PHASE_VALUES };
@@ -282,6 +283,7 @@ export interface ResourcesContent {
   providers?: ProviderRecord[];
   memories?: MemoryRecord[];
   secrets?: SecretRecord[];
+  accounts?: AccountsContent;
 }
 
 export interface DocSegment {

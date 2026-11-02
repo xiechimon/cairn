@@ -2,11 +2,7 @@ import { MODEL_SOURCE_RUNTIMES, type ModelSource, type ModelSourceRuntime } from
 import { cn } from 'cn';
 import { CircleAlert, CircleCheck, Cpu } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router';
-import {
-  useClaudeSubscriptions,
-  useCreateClaudeSubscription,
-} from '../api/claude-subscriptions.js';
+import { useNavigate, useSearchParams } from 'react-router';
 import { useApiMutations, useModelSources } from '../api/hooks.js';
 import { RUNTIME_LABELS } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
@@ -19,8 +15,8 @@ import { resolveScenario } from '../fixtures/scenario.js';
 import { oauthReasonCopy } from '../i18n/oauth-reason.js';
 import { useI18n } from '../i18n/provider.js';
 import { PageShell } from '../pages/shell.js';
-import { AddClaudeSubscriptionDialog, ClaudeSubscriptionRow } from './claude-subscriptions.js';
 import { CreateProviderDialog } from './create-provider-dialog.js';
+import { MODEL_ROUTING_HREF, PROVIDERS_HREF } from './hrefs.js';
 import {
   ResourceList,
   ResourceNewButton,
@@ -30,8 +26,6 @@ import {
   RowText,
   RowTitle,
 } from './parts.js';
-
-export const PROVIDERS_HREF = '/app/resources/providers';
 
 const RUNTIME_DESCRIPTIONS: Record<ModelSourceRuntime, string> = {
   pi: 'cairn 自有运行时。模型来自你添加的服务商。',
@@ -123,12 +117,10 @@ function RuntimeHead({ source }: { source: ModelSource }) {
 export function ProvidersPage() {
   const { t } = useI18n();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const fixture = resolveScenario(searchParams);
   const { live, teamId } = useLiveData();
   const sourcesQ = useModelSources(teamId, live);
-  const subscriptions = useClaudeSubscriptions(teamId, live);
-  const createSubscription = useCreateClaudeSubscription(teamId);
-  const [subscriptionOpen, setSubscriptionOpen] = useState(false);
   const sources = live
     ? (sourcesQ.data?.sources ?? [])
     : (fixture.resources?.providerSources ?? []);
@@ -151,6 +143,14 @@ export function ProvidersPage() {
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams, t]);
 
+  useEffect(() => {
+    if (searchParams.get('add') === null) return;
+    setCreateOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('add');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
   const selectRuntime = (next: ModelSourceRuntime) => {
     const params = new URLSearchParams(searchParams);
     params.set('runtime', next);
@@ -165,42 +165,19 @@ export function ProvidersPage() {
       actions={
         <>
           <Button
-            data-testid="add-claude-subscription"
+            data-testid="open-subscription-accounts"
             variant="ghost"
-            onClick={() => {
-              createSubscription.reset();
-              setSubscriptionOpen(true);
-            }}
+            onClick={() =>
+              navigate({ pathname: MODEL_ROUTING_HREF, search: searchParams.toString() })
+            }
           >
-            Add Claude subscription
+            {t('订阅账户')}
           </Button>
           <ResourceNewButton onClick={() => setCreateOpen(true)} />
         </>
       }
       fixture={fixture}
     >
-      {(subscriptions.data ?? []).map((connection) => (
-        <ClaudeSubscriptionRow key={connection.id} connection={connection} teamId={teamId} />
-      ))}
-      {subscriptionOpen && (
-        <AddClaudeSubscriptionDialog
-          onClose={() => {
-            createSubscription.reset();
-            setSubscriptionOpen(false);
-          }}
-          onCreate={(body) => {
-            if (!live) return;
-            createSubscription.mutate(body, {
-              onSuccess: () => {
-                createSubscription.reset();
-                setSubscriptionOpen(false);
-              },
-            });
-          }}
-          pending={createSubscription.isPending}
-          error={createSubscription.isError}
-        />
-      )}
       <SegmentedTabs
         label={t('模型服务')}
         value={runtime}

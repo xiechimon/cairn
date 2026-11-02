@@ -1,5 +1,6 @@
 import { cn } from 'cn';
 import { type ComponentProps, useLayoutEffect, useRef, useState } from 'react';
+import { useI18n } from '../../i18n/provider.js';
 import { QuotaRow } from './quota-row.js';
 
 export interface RoutingJob {
@@ -15,7 +16,7 @@ export interface RoutingConnection {
   id: string;
   name: string;
   tier?: string;
-  quota?: { fiveHour: number; week: number };
+  quota?: { fiveHour: number | null; week: number | null };
   unavailable?: boolean;
 }
 
@@ -29,9 +30,10 @@ const UNAVAILABLE_NODE =
   'border-dashed bg-transparent shadow-none [border-color:color-mix(in_oklab,var(--destructive)_45%,transparent)]';
 
 function UnavailableTag() {
+  const { t } = useI18n();
   return (
     <span className="ml-auto rounded-sm bg-danger-soft px-1.5 py-px text-caption font-medium text-destructive">
-      Unavailable
+      {t('不可用')}
     </span>
   );
 }
@@ -51,6 +53,7 @@ function Dot({ side, className, ...props }: { side: 'left' | 'right' } & Compone
 }
 
 function JobNode({ job }: { job: RoutingJob }) {
+  const { t } = useI18n();
   const off = job.unavailable === true;
   return (
     <div
@@ -71,7 +74,7 @@ function JobNode({ job }: { job: RoutingJob }) {
         {off && <UnavailableTag />}
       </div>
       <div className="flex items-center justify-between border-t border-border px-2.5 pt-1.5 pb-1.75 text-content-secondary">
-        <span>Model</span>
+        <span>{t('模型')}</span>
         <span
           className={cn('font-mono text-code', off ? 'text-content-tertiary' : 'text-foreground')}
         >
@@ -90,6 +93,7 @@ function JobNode({ job }: { job: RoutingJob }) {
 }
 
 function ConnectionNode({ connection }: { connection: RoutingConnection }) {
+  const { t } = useI18n();
   const off = connection.unavailable === true;
   return (
     <div
@@ -114,8 +118,12 @@ function ConnectionNode({ connection }: { connection: RoutingConnection }) {
       </div>
       {!off && connection.quota != null && (
         <div className="px-2.5 pb-2">
-          <QuotaRow name={connection.name} label="5h" percent={connection.quota.fiveHour} />
-          <QuotaRow name={connection.name} label="week" percent={connection.quota.week} />
+          {connection.quota.fiveHour !== null && (
+            <QuotaRow name={connection.name} label="5h" left={connection.quota.fiveHour} />
+          )}
+          {connection.quota.week !== null && (
+            <QuotaRow name={connection.name} label={t('周')} left={connection.quota.week} />
+          )}
         </div>
       )}
       {!off && <Dot side="left" data-wire-in={connection.id} className="bg-(--text-dim)" />}
@@ -130,6 +138,7 @@ export function RoutingGraph({
   jobs: RoutingJob[];
   connections: RoutingConnection[];
 }) {
+  const { t } = useI18n();
   const boxRef = useRef<HTMLDivElement>(null);
   const [wires, setWires] = useState<Wire[]>([]);
 
@@ -183,13 +192,13 @@ export function RoutingGraph({
         ))}
       </svg>
       <div className="col-start-1 flex flex-col gap-2.5">
-        <div className="text-caption font-medium text-content-tertiary">Jobs</div>
+        <div className="text-caption font-medium text-content-tertiary">{t('用途')}</div>
         {jobs.map((job) => (
           <JobNode key={job.id} job={job} />
         ))}
       </div>
       <div className="col-start-3 flex flex-col justify-center gap-2.5">
-        <div className="text-caption font-medium text-content-tertiary">Connections</div>
+        <div className="text-caption font-medium text-content-tertiary">{t('连接')}</div>
         {connections.map((connection) => (
           <ConnectionNode key={connection.id} connection={connection} />
         ))}
