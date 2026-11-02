@@ -26,19 +26,21 @@ Security surfaces (the `credentials`, `machineAndCommandBoundary` and `externalE
 | Orchestration | `claude-opus-5-5` |
 | Implementation | Codex CLI with `gpt-6.1-sol`, or `claude-sonnet-5-5` |
 | Mechanical work | `claude-haiku-5-5` |
-| Review | Always by the other vendor than the implementer (ADR 0027), from a fresh context |
+| Review | Always by the other vendor than the implementer, from a fresh context |
 
 - A run never switches models on quota exhaustion: save progress and pause until the quota window resets.
 - **Do not use**: extra models, gpt-6-astra (Codex too; keep its original model), the GPT 5.6 series, older-generation models, MiniMax M3, DeepSeek V4 Flash. The machine-checked ids are `deepseek-v4-flash`, `minimax-m3`, `gpt-6-astra` and `gpt-5.6*`: `BANNED_MODEL_IDS` in `scripts/lane-model-policy.mjs` holds them, and `scripts/lane-model-policy.test.mjs` fails when this list and `BANNED_MODEL_IDS` differ or when a role in the table names one of them.
 - The table binds orchestrator-dispatched runs. Overnight lanes use `ai-route`; routing and its quota limitations are documented in `docs/ops/lane-workers.md`.
 - The Review row governs independent reviews when required below; ordinary changes do not require another vendor.
+- Another vendor means another lab, not another model id: the merge gate normalizes provider prefixes, variant suffixes and relay route names, and an unknown vendor fails closed (`apps/server/src/services/merge-gate/model-identity.ts`).
 
 ## Merge routes
 
 - Required CI checks must pass on the PR's current head before an agent enables merge; a local pass does not substitute for CI.
-- Agents may enable merge only when `.claude/workflows/pr-gate.js` returns go with `mergedBy: 'auto-merge'` ([ADR 0028](docs/adr/0028-phase-1-merge-routes.md)); protected-path PRs and every other route go to ian. Never merge or arm auto-merge on ian's route unless ian authorizes it in chat.
+- Agents may enable merge only when `.claude/workflows/pr-gate.js` returns go with `mergedBy: 'auto-merge'`; protected-path PRs and every other route go to ian. Never merge or arm auto-merge on ian's route unless ian authorizes it in chat.
 - ian may admin-merge. That authority does not extend to agents.
-- Never add the `needs-decision` label. Agents decide by their own recommendation, say what they chose and why in chat, and continue; ask ian for payments, credentials, intended-behavior or ADR changes, and decisions explicitly routed to him. A `needs-decision` label already on a PR keeps `pr-evidence` red and disarms auto-merge until it is removed; agents remove it only with `CAIRN_DECIDED=1` after ian gave the decision in chat.
+- The eval ruler is protected so no PR can edit what judges it: `integration/eval/**`, `.claude/hillclimb/**`, the trajectory exporter, its outcome fields and the pack schema (the eval globs in `packages/shared/merge-gate-paths.json`).
+- Never add the `needs-decision` label. Agents decide by their own recommendation, say what they chose and why in chat, and continue; ask ian for payments, credentials, intended-behavior or design changes, and decisions explicitly routed to him. A `needs-decision` label already on a PR keeps `pr-evidence` red and disarms auto-merge until it is removed; agents remove it only with `CAIRN_DECIDED=1` after ian gave the decision in chat.
 - Before asking ian about a PR with auto-merge armed, disarm it with `gh pr merge <n> --disable-auto`.
 - A PR labelled `coordinator-hold` neither queues nor merges: the coordinator asked for changes. The session that owns it keeps the label on until it has pushed the requested work, then asks the coordinator to remove it.
 - Follow `.claude/skills/pr-cairn/SKILL.md` for PR creation and merge mechanics, and `docs/ops/agent-bot-identity.md` for bot versus human identity and merge methods.
@@ -60,6 +62,7 @@ Security surfaces (the `credentials`, `machineAndCommandBoundary` and `externalE
 - Use one review round before opening a code PR; require a fresh, other-vendor independent review only for protected or security paths. Docs-only changes outside protected or security paths skip code review; protected or security paths always get the independent review. Fix confirmed findings and record unfixed findings with reasons in Risk.
 - After three review rounds, rethink the approach or hand the PR to ian.
 - Review PRs with `docs/pr-review.md`; read diffs without switching branches in a shared worktree.
+- Decisions are recorded in the owner's plan decision table, not as ADRs; rules that must hold are enforced by checks (tests, gates, `packages/shared/merge-gate-paths.json`).
 - Small changes need no issue or overlap lookup. Reuse an existing issue or PR when it already covers the request.
 - Write PR bodies per `.claude/skills/pr-cairn/SKILL.md`: Proof first, then What, with Review and Risk collapsed; visible prose is capped at 600 characters.
 - Commit format: `<scope>(<ticket>): <subject>`, in English. Put `closes #N` in the commit message for the closing segment, never only in the PR body; do not close a parent ticket from an intermediate segment.

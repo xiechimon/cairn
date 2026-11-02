@@ -161,7 +161,6 @@ export function parseRawDiff(text) {
 }
 
 const GATE_DOCS = [
-  /^docs\/adr(\/|$)/i,
   /^docs\/spec(\/|$)/i,
   /^docs\/pr-review\.md$/i,
   /^docs\/lessons/i,

@@ -5,7 +5,7 @@
 > Canonical status: this volume = the pacman positioning source of truth (thesis / criterion / two axes / what not to do / honesty list),
 > revising volume 06 D1's positioning narrative (**revision does not replace** — D1's other components stay valid).
 > Ruling chain: #515 criterion and two axes → #516 adversarial ruling (thesis final draft) → #520 carrier six items (user 2026-10-02 agree). → D55 three-pillar thesis (#2489, PR #2490; owner accepted 2026-11-01).
-> Argument and trade-offs go to `docs/adr/0008`: **the ADR records why, this volume records what**, mutually referencing.
+> Argument and trade-offs were in ADR 0008 (removed; see the git history at 608eabac0): **the ADR recorded why, this volume records what**.
 
 ## 0. Overview
 
@@ -127,4 +127,4 @@ Construction tickets (2026-10-24; #1625 has since landed through #2050): #1623 (
 - #519 (Task: control-surface migration + real closed-loop measurement) — the breakpoint list and the delivery comment.
 - the user knowledge-base page "todos.dev vs Multica comparison" (both sides' official docs 33 pages + 41 pages full close read, 2026-09-30; the r10 / r11 fact base).
 - `docs/research/r10-multica-runtime.md`, `docs/research/r11-runtime-gap.md` (the runtime model full explanation + capability-gap inventory, PR #524 / #526).
-- `docs/adr/0008` (the two-axes trade-off argument: the strongest rebuttal + reconnaissance facts + Premortem).
+- ADR 0008 (removed; see the git history at 608eabac0) (the two-axes trade-off argument: the strongest rebuttal + reconnaissance facts + Premortem).

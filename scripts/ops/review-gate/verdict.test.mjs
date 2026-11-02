@@ -5,7 +5,7 @@ const fn = src
   .slice(src.indexOf('export function finalVerdict'), src.indexOf('\ntry {'))
   .replace('export ', '');
 const finalVerdict = new Function(`${fn}; return finalVerdict;`)();
-const prompt = `${readFileSync('prompt.txt', 'utf8')}\n  Protected paths touched: docs/adr/x.md`;
+const prompt = `${readFileSync('prompt.txt', 'utf8')}\n  Protected paths touched: docs/spec/x.md`;
 const cases = [
   [
     'echo then block',

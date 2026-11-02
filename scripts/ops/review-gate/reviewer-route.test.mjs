@@ -206,7 +206,7 @@ test('raw diff entries carry path, status and mode', () => {
   ]);
 });
 
-const PROTECTED_RES = [/^docs\/adr\//, /^(?:.*\/)?scripts\/.*$/, /^(?:.*\/)?CLAUDE[^/]*\.md$/];
+const PROTECTED_RES = [/^docs\/spec\//, /^(?:.*\/)?scripts\/.*$/, /^(?:.*\/)?CLAUDE[^/]*\.md$/];
 const tier = (...paths) =>
   lowRiskTier(
     paths.map((path) => ({ path, status: 'M', mode: '100644' })),
@@ -226,7 +226,6 @@ test('a product file, a gate doc or a protected file leaves the low-risk tier', 
   assert.equal(tier(), false);
   assert.equal(tier('docs/guide.md', 'apps/web/src/app.tsx'), false);
   for (const path of [
-    'docs/adr/0028-merge-routes.md',
     'docs/spec/19-test-layering.md',
     'docs/pr-review.md',
     'docs/lessons.md',

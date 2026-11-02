@@ -69,7 +69,7 @@ function host({
   writeFileSync(
     join(work, 'packages/shared/merge-gate-paths.json'),
     `${JSON.stringify({
-      protected: ['scripts/**', 'docs/adr/**'],
+      protected: ['scripts/**', 'docs/spec/**'],
       limits: { maxLines: 800, maxFiles: 40 },
     })}\n`,
   );
@@ -622,7 +622,7 @@ test('a PR that was blocked before never leaves through the low-risk tier', () =
 test('a protected doc, a file the PR list missed or a deleted test is still reviewed', () => {
   for (const setup of [
     ({ commit }) => {
-      commit({ 'docs/adr/0001-x.md': 'x\n' }, 'adr');
+      commit({ 'docs/spec/0001-x.md': 'x\n' }, 'spec');
     },
     ({ commit }) => {
       commit({ 'docs/guide.md': 'x\n', 'feature.txt': 'x\n' }, 'mixed');

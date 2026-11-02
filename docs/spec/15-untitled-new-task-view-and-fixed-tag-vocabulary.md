@@ -1,7 +1,7 @@
 > Ticket: #394 (ready-for-agent).
 # spec 15 · Untitled New-Task View and Fixed Tag Vocabulary
 
-> Decision record: docs/adr/0002-untitled-new-task-view-and-fixed-tag-vocabulary.md (D1–D7).
+> Decision record: ADR 0002 (removed; see the git history at 608eabac0) (D1–D7).
 > From this surface the new-task dialog no longer 1:1 replicates todos.dev (the first deliberate departure surface, ADR 0002 D7).
 
 ## Problem Statement

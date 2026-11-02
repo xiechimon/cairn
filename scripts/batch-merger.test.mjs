@@ -501,7 +501,7 @@ test('a fresh fork head fails eligibility', (t) => {
 });
 
 for (const [name, data, reason] of [
-  ['protected path', { numstat: '1\t0\tdocs/adr/0028.md\n' }, 'protected paths'],
+  ['protected path', { numstat: '1\t0\tdocs/spec/28.md\n' }, 'protected paths'],
   ['outside set', { numstat: '1\t0\tREADME.md\n' }, 'outside the auto-merge set'],
   [
     'deleted test',
@@ -588,13 +588,13 @@ test('clean product source remains eligible', (t) => {
 });
 
 test('an owner-routed head is labelled and never queued', (t) => {
-  const f = fixture(t, { numstat: '1\t0\tdocs/adr/0028.md\n' });
+  const f = fixture(t, { numstat: '1\t0\tdocs/spec/28.md\n' });
   assert.equal(f.queues.length, 0);
   assert.ok(f.calls.some((args) => args[1] === 'repos/owner/repo/issues/1/labels'));
 });
 
 const marker = `<!-- batch-merger-owner-route:${head} -->`;
-const ownerRouted = { numstat: '1\t0\tdocs/adr/0028.md\n' };
+const ownerRouted = { numstat: '1\t0\tdocs/spec/28.md\n' };
 const writes = (f) => f.calls.filter((args) => args.includes('--method'));
 const ownerComments = (f) => writes(f).filter((args) => args[1].endsWith('/issues/1/comments'));
 const labelAdds = (f) => writes(f).filter((args) => args[1].endsWith('/issues/1/labels'));
@@ -614,7 +614,7 @@ test('an owner-routed head gets one marked comment with reasons and the label', 
   assert.equal(comments.length, 1);
   const payload = JSON.parse(comments[0].at(-1));
   assert.ok(payload.body.startsWith(marker));
-  assert.ok(payload.body.includes('protected paths: docs/adr/0028.md'));
+  assert.ok(payload.body.includes('protected paths: docs/spec/28.md'));
   const adds = labelAdds(f);
   assert.equal(adds.length, 1);
   assert.deepEqual(JSON.parse(adds[0].at(-1)), { labels: ['owner-route'] });
