@@ -15,6 +15,7 @@ export interface ChiefQuestionCardProps {
   item: ChiefQuestionItem;
   onAnswer?: (input: { requestId: string; answers: AskUserAnswer[] }) => void;
   onCancel?: (requestId: string) => void;
+  numberKeys?: boolean;
 }
 
 type Draft =
@@ -83,7 +84,12 @@ function RecommendedMark() {
   );
 }
 
-export function ChiefQuestionCard({ item, onAnswer, onCancel }: ChiefQuestionCardProps) {
+export function ChiefQuestionCard({
+  item,
+  onAnswer,
+  onCancel,
+  numberKeys = true,
+}: ChiefQuestionCardProps) {
   const { t } = useI18n();
   const pending = item.status === 'pending' && onAnswer !== undefined;
   const questions = useMemo(() => item.questions.map(recommendedFirst), [item.questions]);
@@ -96,7 +102,7 @@ export function ChiefQuestionCard({ item, onAnswer, onCancel }: ChiefQuestionCar
   const draft = drafts[step];
 
   useLayoutEffect(() => {
-    if (!pending || question === undefined || question.options.length === 0) return;
+    if (!pending || !numberKeys || question === undefined || question.options.length === 0) return;
     const max = question.options.length + 1;
     const handler = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -112,7 +118,7 @@ export function ChiefQuestionCard({ item, onAnswer, onCancel }: ChiefQuestionCar
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [pending, step, question]);
+  }, [pending, numberKeys, step, question]);
 
   const stepComplete = useMemo(() => draftComplete(draft, question), [draft, question]);
   const allComplete = useMemo(
@@ -179,7 +185,9 @@ export function ChiefQuestionCard({ item, onAnswer, onCancel }: ChiefQuestionCar
         ? pickedCount > 0
           ? t('已选 {n} 项', { n: pickedCount })
           : t('未选')
-        : t('数字键 1–{n} 选择', { n: question.options.length + 1 });
+        : numberKeys
+          ? t('数字键 1–{n} 选择', { n: question.options.length + 1 })
+          : '';
 
   return (
     <div data-testid="chief-question-card" data-status={item.status} className={CARD_CLS}>

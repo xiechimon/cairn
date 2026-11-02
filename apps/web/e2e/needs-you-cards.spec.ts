@@ -106,3 +106,27 @@ test('own words: the free-text row takes a typed answer', async ({ page }) => {
     .poll(() => answered)
     .toEqual([{ answers: [{ header: 'Model · #74', choices: ['Use the metered key this once'] }] }]);
 });
+
+test('number keys pick only in the first pinned decision card', async ({ page }) => {
+  await mockLive(page, {
+    threads: [THREAD],
+    messages: [
+      question('ask-0000000a', 'Model · #74', 'Which model?', [
+        { label: 'Claude subscription', recommended: true },
+        { label: 'Hold it' },
+      ]),
+      question('ask-0000000b', 'Merge · #2271', 'Who merges it?', [
+        { label: 'Send it to ian', recommended: true },
+        { label: 'Hold it' },
+      ]),
+    ],
+    todos: [],
+  });
+  await page.goto('/app');
+  const cards = page.getByTestId('needs-you').getByTestId('chief-question-card');
+  await expect(cards).toHaveCount(2);
+  await page.keyboard.press('2');
+  await expect(cards.first().getByTestId('chief-question-option-0-1')).toHaveAttribute('aria-pressed', 'true');
+  await expect(cards.nth(1).getByTestId('chief-question-option-0-1')).toHaveAttribute('aria-pressed', 'false');
+  await expect(cards.nth(1).getByTestId('chief-question-hint')).toHaveText('');
+});
