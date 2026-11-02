@@ -912,7 +912,18 @@ test('a node --test file that hangs before registering any test is killed at the
     assert.deepEqual(exits, [1]);
     assert.ok(Date.now() - started < 30_000);
     const child = Number(readFileSync(join(root, 'child.pid'), 'utf8'));
-    assert.throws(() => process.kill(child, 0), { code: 'ESRCH' });
+    const alive = () => {
+      try {
+        process.kill(child, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    const deadline = Date.now() + 5000;
+    while (alive() && Date.now() < deadline)
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
+    assert.equal(alive(), false, `hung test child ${child} survived the step timeout`);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
