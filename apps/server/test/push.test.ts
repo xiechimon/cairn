@@ -796,12 +796,12 @@ describe('delivery: only decisions push immediately', () => {
   });
 });
 
-describe('digest routing: merged, failed, plan-ready, review queue; 410 prunes', () => {
+describe('phase pushes reach only needs-human events (#1784); 410 prunes', () => {
   function digestRows(s: ReturnType<typeof bootServer>) {
     return s.db.select().from(pushDigestItem).all();
   }
 
-  test('PATCH todo phase to confirm queues for the digest and sends no immediate push', async () => {
+  test('PATCH todo phase to confirm with no open decision sends and queues nothing', async () => {
     const fake = await fakePushServer();
     const s = bootServer({ pushEndpointHosts: TEST_PUSH_HOSTS });
     try {
@@ -811,15 +811,14 @@ describe('digest routing: merged, failed, plan-ready, review queue; 410 prunes',
       expect(response.status).toBe(200);
       await new Promise((resolve) => setTimeout(resolve, 300));
       expect(fake.requests).toHaveLength(0);
-      expect(digestRows(s)).toHaveLength(1);
-      expect(digestRows(s)[0]?.href).toBe(`/app/todo/${todo.id}`);
+      expect(digestRows(s)).toHaveLength(0);
     } finally {
       fake.close();
       s.dispose();
     }
   });
 
-  test('queues build review for the digest without an immediate push', async () => {
+  test('an autonomous build review sends and queues nothing', async () => {
     const fake = await fakePushServer();
     const s = bootServer({ pushEndpointHosts: TEST_PUSH_HOSTS });
     try {
@@ -830,14 +829,14 @@ describe('digest routing: merged, failed, plan-ready, review queue; 410 prunes',
       setTodoPhase(s.svc, todo.id, 'review');
       await new Promise((resolve) => setTimeout(resolve, 300));
       expect(fake.requests).toHaveLength(0);
-      expect(digestRows(s)).toHaveLength(2);
+      expect(digestRows(s)).toHaveLength(0);
     } finally {
       fake.close();
       s.dispose();
     }
   });
 
-  test('pushes user-started PR completion once without a completion digest', async () => {
+  test('a user-started PR completion is fyi: no push and no digest', async () => {
     const fake = await fakePushServer();
     const s = bootServer({ pushEndpointHosts: TEST_PUSH_HOSTS });
     try {
@@ -861,16 +860,16 @@ describe('digest routing: merged, failed, plan-ready, review queue; 410 prunes',
       setTodoPhase(s.svc, todo.id, 'review');
       await subscribe(s.app, s.team.id, endpoint, 'https://cairn.example');
       finishTodoDone(s.svc, todo.id, buildId);
-      await expect.poll(() => fake.requests.length, { timeout: 5_000 }).toBe(1);
-      const rows = digestRows(s);
-      expect(rows.some((row) => row.body.includes('PR #42'))).toBe(false);
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      expect(fake.requests).toHaveLength(0);
+      expect(digestRows(s)).toHaveLength(0);
     } finally {
       fake.close();
       s.dispose();
     }
   });
 
-  test('queues failed work for the digest without an immediate push', async () => {
+  test('a first failure that will be retried sends and queues nothing', async () => {
     const fake = await fakePushServer();
     const s = bootServer({ pushEndpointHosts: TEST_PUSH_HOSTS });
     try {
@@ -881,14 +880,14 @@ describe('digest routing: merged, failed, plan-ready, review queue; 410 prunes',
       setTodoPhase(s.svc, todo.id, 'failed');
       await new Promise((resolve) => setTimeout(resolve, 300));
       expect(fake.requests).toHaveLength(0);
-      expect(digestRows(s).some((row) => row.body.includes('写周报'))).toBe(true);
+      expect(digestRows(s)).toHaveLength(0);
     } finally {
       fake.close();
       s.dispose();
     }
   });
 
-  test('completed work without a PR is queued once and never pushed immediately', async () => {
+  test('completed work without a PR is neither queued nor pushed', async () => {
     const s = bootServer();
     const send = vi.spyOn(webpush, 'sendNotification');
     try {
@@ -897,7 +896,7 @@ describe('digest routing: merged, failed, plan-ready, review queue; 410 prunes',
       setTodoPhase(s.svc, todo.id, 'building');
       setTodoPhase(s.svc, todo.id, 'done');
       setTodoPhase(s.svc, todo.id, 'done');
-      expect(digestRows(s).filter((row) => row.title === '任务已完成')).toHaveLength(1);
+      expect(digestRows(s)).toHaveLength(0);
       expect(send).not.toHaveBeenCalled();
     } finally {
       send.mockRestore();
@@ -960,8 +959,12 @@ describe('digest sweep job', () => {
     try {
       await subscribe(s.app, s.team.id, 'https://fcm.googleapis.com/sub-1');
       await subscribe(s.app, s.team.id, 'https://fcm.googleapis.com/sub-2');
-      const todo = await makeTodo(s);
-      setTodoPhase(s.svc, todo.id, 'confirm');
+      queuePushDigest(s.db, s.user.id, s.team.id, {
+        title: '方案已就绪',
+        body: '#1 写周报',
+        href: '/app/todo/x',
+        tag: 'digest-item',
+      });
       const vapid = s.vapidKeys;
       if (vapid === null) throw new Error('test VAPID keys missing');
       await sweepPushDigest(s.db, vapid);

@@ -111,6 +111,7 @@ export const threadReportContentSchema = z.object({
   seqNum: z.number().int().positive(),
   title: z.string(),
   wakeStepId: recordId.optional(),
+  verified: z.boolean().optional(),
 });
 export type ThreadReportContent = z.infer<typeof threadReportContentSchema>;
 
@@ -142,6 +143,16 @@ export const threadMessageResultSchema = z.object({
   delivered: threadMessageDeliverySchema,
 });
 export type ThreadMessageResult = z.infer<typeof threadMessageResultSchema>;
+
+export const CHIEF_NOTICE_KIND = 'chief_notice';
+export const PROVENANCE_MAX_LENGTH = 200;
+export const provenanceSchema = z.string().min(1).max(PROVENANCE_MAX_LENGTH);
+export const chiefNoticeContentSchema = z.object({
+  kind: z.literal(CHIEF_NOTICE_KIND),
+  message: z.string(),
+  provenance: provenanceSchema,
+});
+export type ChiefNoticeContent = z.infer<typeof chiefNoticeContentSchema>;
 
 export const ASK_USER_QUESTION_KIND = 'ask_user_question';
 
@@ -179,6 +190,7 @@ export const askUserQuestionContentSchema = z.object({
   answers: z.array(askUserAnswerSchema).nullable(),
   cancelReason: z.string().optional(),
   parkedAt: z.number().int().optional(),
+  provenance: provenanceSchema.optional(),
 });
 export type AskUserQuestionContent = z.infer<typeof askUserQuestionContentSchema>;
 
@@ -191,6 +203,7 @@ export const ASK_REQUEST_ID_PATTERN = /^ask-[0-9a-f][0-9a-f-]{7,63}$/;
 export const machineAskBodySchema = z.object({
   requestId: z.string().regex(ASK_REQUEST_ID_PATTERN),
   questions: z.array(askUserQuestionSchema).min(1).max(4),
+  provenance: provenanceSchema.optional(),
 });
 export type MachineAskBody = z.infer<typeof machineAskBodySchema>;
 

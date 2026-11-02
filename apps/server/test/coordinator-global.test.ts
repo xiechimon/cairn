@@ -319,7 +319,11 @@ describe('Coordinator page filter and cursor', () => {
   });
 
   test('rows of a wake turn stay untagged even after a later tagged user message', async () => {
-    const wake = enqueueChiefStep(H.s.svc, H.threadId, { prompt: 'gate facts', trigger: 'gate' });
+    const wake = enqueueChiefStep(H.s.svc, H.threadId, {
+      prompt: 'gate facts',
+      trigger: 'gate',
+      provenance: 'watch:test',
+    });
     H.s.db
       .update(stepTable)
       .set({ status: 'claimed', claimedAt: Date.now() })

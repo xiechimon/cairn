@@ -89,7 +89,10 @@ export const EN: Record<string, string> = {
   'Coordinator 判断，拿不准会问你': 'The Coordinator decides and asks when unsure',
   换项目: 'Move project',
   已转给任务: 'Passed to task',
-  '来自任务 #{n} {title} 的消息': 'Message from task #{n} {title}',
+  '任务 #{n} {title}：{status}': 'Task #{n} {title}: {status}',
+  审阅中: 'In review',
+  '已完成，未验证': 'Done, not verified',
+  已验证: 'Verified',
   定时: 'Schedules',
   '执行中 {n}': '{n} running',
   项目: 'Project', // sidebar group / search group / schedule-form field — one fit

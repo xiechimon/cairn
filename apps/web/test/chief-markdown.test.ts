@@ -407,7 +407,7 @@ describe('mapChiefStream user-row markdown slot (#742 F-D1..D5)', () => {
     expect(users[0]?.markdown).toBe(text);
   });
 
-  test('F-D3 wake echo rows (no twin) survive, marker stripped and slotted; multi-row source is not flattened inside the slot', () => {
+  test('F-D3 wake echo rows are hidden (#1784); a later multi-line user row is not flattened inside the slot', () => {
     const wake = '[wake:settle] 任务 #5「修复」已合并完成';
     const steer = '按这个改：\n\n- 圆角 8px\n- 悬停加过渡';
     const items = mapChiefStream([
@@ -415,11 +415,8 @@ describe('mapChiefStream user-row markdown slot (#742 F-D1..D5)', () => {
       row('u-post-2', 'user', steer, NOW + 5000),
     ]);
     const users = userItems(items);
-    expect(users).toHaveLength(2);
-    expect(users[0]?.markdown).toBe('任务 #5「修复」已合并完成');
-    expect(users[0]?.text).toBe('任务 #5「修复」已合并完成');
-
-    expect(users[1]?.markdown).toBe(steer);
+    expect(users).toHaveLength(1);
+    expect(users[0]?.markdown).toBe(steer);
   });
 
   test('F-D4 javascript: pseudo-links do not become mention segments (scheme whitelist, degradation negative case)', () => {

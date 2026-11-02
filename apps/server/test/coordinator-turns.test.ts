@@ -110,7 +110,11 @@ describe('thread.orchestration describes the latest orchestrate turn', () => {
     const stepId = await orchestrate(todoId);
     setStep(stepId, { status: 'claimed', claimedAt: Date.now() });
     await req(H.s.app, 'POST', `/api/teams/${H.teamId}/coordinator/messages`, { content: 'hi' });
-    enqueueChiefStep(H.s.svc, H.threadId, { prompt: 'gate facts', trigger: 'gate' });
+    enqueueChiefStep(H.s.svc, H.threadId, {
+      prompt: 'gate facts',
+      trigger: 'gate',
+      provenance: 'watch:test',
+    });
     expect(await orchestrationOf()).toEqual({ todoId, state: 'running', error: null });
   });
 

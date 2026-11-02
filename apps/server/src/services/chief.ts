@@ -71,6 +71,7 @@ import { scanLocalSkills } from './skills.js';
 import { stepQueueProjector } from './step-queue.js';
 import { getTodo } from './todos.js';
 import { insertMessageRow } from './transcript.js';
+import { buildVerified } from './verified.js';
 
 export interface ChiefDeps {
   db: Db;
@@ -700,16 +701,55 @@ function enqueueResumedTurn(
   });
 }
 
+type ChiefStepTrigger =
+  | { trigger: 'user' }
+  | { trigger: ChiefWakeKind | 'wake'; provenance: string };
+
+export function watchProvenance(todoId: string): string {
+  return `watch:${todoId}`;
+}
+
+export function wakeProvenance(wakeId: string): string {
+  return `wake:${wakeId}`;
+}
+
+const WAKE_PROVENANCE_RE = /^\[wake:\w+\] provenance=(\S+)\n/;
+
+export function turnProvenance(prompt: string | null): string | null {
+  return WAKE_PROVENANCE_RE.exec(prompt ?? '')?.[1] ?? null;
+}
+
+export function requireTurnProvenance(
+  turnPrompt: string | null,
+  given: unknown,
+  tool: 'notify_user' | 'ask_user',
+): string {
+  if (parseChiefTrigger(turnPrompt) === 'user') return 'user';
+  const expected = turnProvenance(turnPrompt);
+  if (expected === null) {
+    throw new HttpError(400, `${tool} rejected: this event turn has no provenance to cite`);
+  }
+  if (given !== expected) {
+    throw new HttpError(
+      400,
+      `${tool} rejected: event turns reach the user only with the provenance of the event that started them (pass provenance "${expected}"); if the user is not needed, end the turn without messaging`,
+    );
+  }
+  return expected;
+}
+
 export function enqueueChiefStep(
   deps: ChiefDeps,
   threadId: string,
-  opts: { prompt: string; trigger: 'user' | ChiefWakeKind | 'wake'; id?: string },
+  opts: { prompt: string; id?: string } & ChiefStepTrigger,
 ): string {
   const threadRow = getChiefThread(deps, threadId);
   if (!threadRow) throw new HttpError(404, `chief thread ${threadId}`);
   const id = opts.id ?? newRecordId();
   const prompt =
-    opts.trigger === 'user' ? opts.prompt : `${WAKE_PROMPT_PREFIX}${opts.trigger}] ${opts.prompt}`;
+    opts.trigger === 'user'
+      ? opts.prompt
+      : `${WAKE_PROMPT_PREFIX}${opts.trigger}] provenance=${opts.provenance}\n${opts.prompt}`;
   deps.db
     .insert(step)
     .values({
@@ -870,6 +910,9 @@ export function triggerChiefWakes(deps: ChiefDeps, todoRecord: TodoRecord, to: P
           seqNum: todoRecord.seqNum,
           title: todoRecord.title,
           wakeStepId,
+          ...(to === 'done'
+            ? { verified: buildId !== null && buildVerified(deps.db, buildId) }
+            : {}),
         } satisfies ThreadReportContent;
         const report = {
           id: newRecordId(),
@@ -894,7 +937,12 @@ export function triggerChiefWakes(deps: ChiefDeps, todoRecord: TodoRecord, to: P
         const facts = wakeFacts(kind, todoRecord, buildRow?.errorMessage ?? null, {
           isSplitParent,
         });
-        enqueueChiefStep(deps, watch.threadId, { id: wakeStepId, prompt: facts, trigger: kind });
+        enqueueChiefStep(deps, watch.threadId, {
+          id: wakeStepId,
+          prompt: facts,
+          trigger: kind,
+          provenance: watchProvenance(todoRecord.id),
+        });
       }
     }
     if (kind === 'settle' || kind === 'failed') {
@@ -923,7 +971,12 @@ function enqueueGateWake(
       : undefined;
   const facts = wakeFacts('gate', record, null, { isSplitParent, planText: latestPlan?.content });
   const metadata = `Gate todo=${encodeURIComponent(record.id)} build=${encodeURIComponent(record.latestBuildId ?? '')} phase=${record.phase} attempt=${retry ? 1 : 0}`;
-  enqueueChiefStep(deps, threadId, { id, prompt: `${facts}\n${metadata}`, trigger: 'gate' });
+  enqueueChiefStep(deps, threadId, {
+    id,
+    prompt: `${facts}\n${metadata}`,
+    trigger: 'gate',
+    provenance: watchProvenance(record.id),
+  });
   if (retry) deps.db.update(step).set({ freshSession: true }).where(eq(step.id, id)).run();
 }
 
@@ -990,7 +1043,7 @@ function wakeFactText(
         return [
           `任务 ${ref} 停驻在 review 关口：Evaluate merge readiness under the project's mergePolicy.`,
           'This is not a confirm gate; do not call confirm_builds. Under autonomous, you may request a merge only through the merge-readiness gate (ADR 0026).',
-          'Read this build conversation for CI, verification, and review results. Report readiness and unresolved blockers. Projects that explicitly choose human still require the user to click the review gate completion button.',
+          'Read this build conversation for CI, verification, and review results. Message the user only when a blocker needs them (ask_user or notify_user); otherwise end the turn. Projects that explicitly choose human still require the user to click the review gate completion button.',
           '本轮还没有审核结论时，可以调 run_review 发起一次独立审核。',
         ].join('');
       }
@@ -1004,7 +1057,7 @@ function wakeFactText(
         return (
           [
             `任务 ${ref} 停驻在 ${todo.phase} 关口。`,
-            '本卡是 split_todo 父卡——拆解方案必须人审，不自动过闸。请向用户汇报拆解方案内容，等用户在对话里确认后才调 confirm_builds。',
+            '本卡是 split_todo 父卡——拆解方案必须人审，不自动过闸。用 ask_user 把拆解方案交给用户确认，用户确认后才调 confirm_builds。',
           ].join('') + planText
         );
       }
@@ -1012,16 +1065,16 @@ function wakeFactText(
         [
           `任务 ${ref} 停驻在 ${todo.phase} 关口。自动确认规则：`,
           '先读下附方案，判以下三档——',
-          '1. 用户驳回后的重新规划（revision）→ 汇报新方案内容，不调 confirm_builds，等用户表态；',
+          '1. 用户驳回后的重新规划（revision）→ 不调 confirm_builds，用 ask_user 请用户就新方案表态；',
           '2. 方案含真决策点（技术分叉、不可逆操作、票面含糊无法自判）→ 用 ask_user 结构化提问，逐项列决策点，不自动过闸；',
-          '3. 方案与票面一致、无分叉 → 直接调 confirm_builds 过闸进 building（闸宣告行自动落审计记录），然后向用户汇报「已自动确认，进入施工」。',
+          '3. 方案与票面一致、无分叉 → 直接调 confirm_builds 过闸进 building（闸宣告行自动落审计记录），不用告诉用户。',
         ].join('') + planText
       );
     }
     case 'settle':
-      return `任务 ${ref} 已合并完成（done）。请向用户汇报结果已确认落地；该任务的关注已自动解除。`;
+      return `任务 ${ref} 已合并完成（done）。对话里已记下这条，不用再告诉用户；该任务的关注已自动解除。`;
     case 'failed':
-      return `任务 ${ref} 运行失败${errorMessage ? `：${errorMessage}` : ''}。请先调用 machines 等工具核实环境，再向用户做法证式汇报（失败原因/定性/工作保全位置/环境建议）。`;
+      return `任务 ${ref} 运行失败${errorMessage ? `：${errorMessage}` : ''}。请先调用 machines 等工具核实环境；需要用户决定或动手时，用 ask_user 或 notify_user 做法证式说明（失败原因/定性/工作保全位置/环境建议），否则不发消息。`;
   }
 }
 
@@ -1068,8 +1121,9 @@ export function fireDueChiefWakes(deps: ChiefDeps, now: number): void {
     for (const wake of due) {
       const note = typeof wake.note === 'string' ? wake.note : '约定时间已到';
       enqueueChiefStep(deps, String(wake.threadId), {
-        prompt: `${note}。请回头核实相关任务状态并向用户汇报。`,
+        prompt: `${note}。请回头核实相关任务状态；只有需要用户知道或决定时，才用 notify_user 或 ask_user 告诉用户。`,
         trigger: 'wake',
+        provenance: wakeProvenance(String(wake.id)),
       });
     }
   }
@@ -1140,10 +1194,10 @@ export function buildChiefSystemPrompt(
     '- 交付物优先于路径：归属看交付物，不看请求里出现的路径或技术词——要更新的是 README 就归文档职责，哪怕那个 README 躺在 apps/web 下。',
     '- 主任务定归属：一句请求含多个同类子项时按主任务定归属，不拆成多个 todo，次任务随主任务交给同一个 Agent。',
     '- 症状按改动范围定：同一个用户可见症状可能归不同职责，看要改的代码在哪——接口返回错归后端，界面上点不到归前端。',
-    '- 回执：派工后向用户复述要求、点名承接 Agent 的职责语义（如「由文档专职 Agent [名](agent:<id>) 承接」），并说明完成或需要确认时会跟进汇报。',
-    '- ADR 0026: mergePolicy defaults to autonomous. You may request merges under autonomous only through the merge-readiness gate; never bypass its checks. Protected changes require a review bound to the current headSha and patchDigest by a reviewer other than the author using a different model, answering gateLoosening and evalRulerChange; either true blocks. Explicit human policies still require the user to merge in the Web UI. Report confirmed delivery after the settle notification.',
-    '- wake 轮：汇报区分「委派已受理」与「结果已确认」两阶段；failed wake 先调 machines 等工具核实环境，再做法证式汇报（失败原因/定性/工作保全位置/环境建议）。',
-    '- confirm 关口自动确认（#1254）：plan 就绪后默认自动过闸——读 wake 附带的最新方案（方案缺失或被截断时停驻请人审），若与票面一致且无分叉（非 revision、非 split_todo 父卡），直接调 confirm_builds 进 building（闸宣告行自动落审计记录），然后向用户汇报「已自动确认，进入施工」。仅以下情况停驻等人：① 本卡是 split_todo 父卡（拆解方案必须人审）→ 汇报拆解内容，等用户确认；② 用户驳回后的重新规划（revision）→ 汇报新方案，不自动过闸；③ 方案含真决策点（技术分叉、不可逆操作、票面含糊无法自判）→ 用 ask_user 结构化提问，逐项列决策点。',
+    '- 回执：派工后向用户复述要求、点名承接 Agent 的职责语义（如「由文档专职 Agent [名](agent:<id>) 承接」），并说明需要用户决定时会来问。',
+    '- ADR 0026: mergePolicy defaults to autonomous. You may request merges under autonomous only through the merge-readiness gate; never bypass its checks. Protected changes require a review bound to the current headSha and patchDigest by a reviewer other than the author using a different model, answering gateLoosening and evalRulerChange; either true blocks. Explicit human policies still require the user to merge in the Web UI.',
+    '- wake 轮（提示以 [wake:…] 起头，由事件而不是用户触发）默认安静：你在这一轮写的普通文字不会送到用户面前。只有需要用户知道或决定时，才调 notify_user 或 ask_user，并把提示首行 provenance= 后面的值原样填进 provenance 参数；不需要用户时什么都不发，直接结束本轮。failed wake 先调 machines 等工具核实环境，需要用户时再做法证式说明（失败原因/定性/工作保全位置/环境建议）。',
+    '- confirm 关口自动确认（#1254）：plan 就绪后默认自动过闸——读 wake 附带的最新方案（方案缺失或被截断时停驻请人审），若与票面一致且无分叉（非 revision、非 split_todo 父卡），直接调 confirm_builds 进 building（闸宣告行自动落审计记录），不用告诉用户。仅以下情况停驻等人，并用 ask_user 交给用户：① 本卡是 split_todo 父卡（拆解方案必须人审）→ 请用户确认拆解方案；② 用户驳回后的重新规划（revision）→ 请用户就新方案表态，不自动过闸；③ 方案含真决策点（技术分叉、不可逆操作、票面含糊无法自判）→ 逐项列决策点。',
     '- 正文内联实体引用用自定义 URI markdown：[名](agent:<id>)、[#n](todo:<id>)。',
     '- 记忆写入：仅在用户明确要求或明显值得沉淀时 save_memory（配额 100 条）。',
     '- 对话续接：create_todo 前先查同类进行中的 todo；若存在，用 message_todo 追加到运行中的 todo，不重复 create_todo。',
@@ -1309,6 +1363,7 @@ export function notifyChiefTurn(
   threadId: string,
   stepPrompt?: string | null,
 ): void {
+  if (parseChiefTrigger(stepPrompt ?? null) !== 'user') return;
   const threadRow = getChiefThread(deps, threadId);
   if (!threadRow) return;
   const last = deps.db
@@ -1324,14 +1379,12 @@ export function notifyChiefTurn(
   const agentRow = chiefRow?.agentId
     ? deps.db.select().from(agent).where(eq(agent.id, chiefRow.agentId)).get()
     : undefined;
-  const machineTurn = parseChiefTrigger(stepPrompt ?? null) !== 'user';
   notifyChiefMessage(deps, {
     threadId,
     message: text,
     agent: agentRow
       ? { name: agentRow.displayName, avatarUrl: agentRow.avatarUrl }
       : { name: deps.user.displayName, avatarUrl: deps.user.avatarUrl },
-    ...(machineTurn ? { readAt: nowMs() } : {}),
   });
 }
 
