@@ -125,5 +125,6 @@ test('column header: display name, fixed status icon, plus only on `待开始` a
   await page.locator('[data-column="todo"] header').hover();
   await expect(plus).toHaveCSS('opacity', '1');
   await plus.click();
-  await expect(page.getByRole('dialog', { name: '新建任务' })).toBeVisible();
+  await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toBeFocused();
+  await expect(page.getByRole('dialog', { name: '新建任务' })).toHaveCount(0);
 });

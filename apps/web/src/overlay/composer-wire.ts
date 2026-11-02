@@ -58,6 +58,7 @@ export interface ComposerWireOptions {
   draft?: string;
   onDraftChange?: (next: string) => void;
   onSend?: (text: string) => void | Promise<void>;
+  onSaveDraft?: (text: string) => void | Promise<void>;
   onQueue?: (text: string) => void | Promise<void>;
   onStopAndSend?: (text: string) => void | Promise<void>;
   onAttachment?: (files: File[]) => string[] | Promise<string[]>;
@@ -79,6 +80,7 @@ export interface ComposerWire {
   tokens: string[];
   removeToken: (index: number) => void;
   send: () => void;
+  saveDraft: () => void;
   handleChange: (event: ChangeEvent<HTMLTextAreaElement>) => void;
   handleKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
   handleCaretMoved: () => void;
@@ -129,6 +131,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     draft: draftProp,
     onDraftChange,
     onSend,
+    onSaveDraft,
     onQueue,
     onStopAndSend,
     onAttachment,
@@ -348,6 +351,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
   };
 
   const send = () => submit(onSend);
+  const saveDraft = () => submit(onSaveDraft);
 
   const openFilePicker = () => fileInputRef.current?.click();
 
@@ -693,6 +697,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     tokens,
     removeToken,
     send,
+    saveDraft,
     handleChange,
     handleKeyDown,
     handleCaretMoved: reevaluate,

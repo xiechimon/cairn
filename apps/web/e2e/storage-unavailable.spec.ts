@@ -1,39 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
 
-// #1091: boot and first paint must degrade silently when the Storage surface
-// itself is unavailable. A sandboxed iframe without `allow-same-origin` gets
-// an opaque origin, where Chromium makes every `window.localStorage` access
-// throw SecurityError — the exact shape found in the wild (BuilderIO
-// visual-edit canvas iframe, 2026-10-09: `#root` childElementCount 0, body
-// text length 0; adding `allow-same-origin` alone restored the render).
-//
-// Failure modes pinned (inventory: docs/verify/1091/failure-modes.md):
-//  F1/F2 module top level — main.tsx evaluates the `localStorage` argument,
-//      SecurityError aborts the module before createRoot().render() runs.
-//  F4-F7 React render path — I18nProvider / AppSidebar / BoardSidebar /
-//      NewTaskDialog useState initializers evaluate `localStorage` during
-//      the first render; no error boundary exists in the repo, so one throw
-//      unmounts the whole tree.
-//  F3 default parameter — applyTheme(theme) resolves `storage = localStorage`
-//      at call time, throwing even when the read side is guarded.
-//  Degraded defaults — theme follows the system scheme (dark is pinned by
-//      the playwright config, #129), locale falls back to zh-CN (#74).
-//
-// A try/catch inside a reader cannot guard any of these: the throw happens
-// while evaluating the identifier at the call site. The fix lives at the
-// acquisition point (src/safe-storage.ts).
-//
-// Harness note (deliberate, test-side only): the opaque-origin iframe sends
-// `Origin: null`, and vite preview ships no Access-Control-Allow-Origin, so
-// the module/CSS/font fetches would be CORS-blocked before any app code runs
-// — that would test the harness, not the app. The route below re-attaches
-// ACAO to same-origin responses only, which restores subresource loading
-// while keeping the frame's origin opaque, i.e. the localStorage accessor
-// still throws the real SecurityError. This is NOT the vite.config cors
-// change the ticket rules out: the app ships unchanged headers; only this
-// spec's browser-level plumbing differs. The real-world canvas hit the same
-// asymmetry (dev server CORS-on for subresources, opaque origin for storage).
-
 /** Same-origin responses get ACAO so the sandboxed frame can load the app. */
 const allowSandboxedSubresources = (page: Page, baseURL: string) =>
   page.route(`${baseURL}/**`, async (route) => {

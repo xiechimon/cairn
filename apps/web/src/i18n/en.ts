@@ -857,12 +857,6 @@ export const EN: Record<string, string> = {
   '2 天前': '2d ago',
   // —— overlay dialogs (issues #66 / #68) ——
   新建任务: 'New task',
-  '我想要的结果：': 'The outcome I want:',
-  '现在的情况：': 'Where things stand now:',
-  '需要保留或避免：': 'What must be kept or avoided:',
-  '我会这样确认完成：': 'How I will confirm this is done:',
-  '我希望收到：': 'What I expect to receive:',
-  保存并开始: 'Save and start',
   删除任务: 'Delete todo',
   '确定删除该任务？此操作不可撤销。': 'Delete this todo? This cannot be undone.',
   // #306 sched-card 菜单删除确认（DeleteConfirm 家族泛化随加）。
@@ -1110,10 +1104,6 @@ export const EN: Record<string, string> = {
   // spec 非空承载（附件 token 注入后归 spec）,标签 add 仍为桩（本票不动）。
   // （#640：开始任务 dialog 统一面的 规划/执行/在线/离线/选择 Agent 五键随
   // 选择面撤销退役——开始入口不再有 dialog 选择器。）
-  '放弃新建任务？': 'Discard this new task?',
-  '未保存的内容将丢失。': 'Unsaved content will be lost.',
-  继续编辑: 'Keep editing',
-  放弃并关闭: 'Discard and close',
 
   没有可引用的对象: 'Nothing to mention',
   '没有与"{query}"匹配的结果': 'No results matching “{query}”',
@@ -1285,7 +1275,6 @@ export const EN: Record<string, string> = {
   '{why}，{when}。任务照常在跑；你说的话先存下，恢复后按顺序处理。':
     '{why}; {when}. Tasks keep running; your messages are saved and handled in order once it is back.',
   详情: 'Details',
-  直接建任务: 'Create a task directly',
   给总管换模型: "Change the chief's model",
   '总管的主模型暂时用不了，这次改用备用模型 {model} 回复，判断可能没那么准。':
     "The chief's main model is unavailable, so backup model {model} is replying. Its judgment may be less sharp.",
@@ -1314,7 +1303,6 @@ export const EN: Record<string, string> = {
   总管编排会话: 'Chief orchestration session',
   '这张任务将交给总管重新编排。': 'The chief will re-orchestrate this task.',
   已交给总管编排: 'Handed to the chief',
-  '已保存，交给总管编排': 'Saved — handed to the chief',
   '总管将直接规划，并按活的类型派发执行。':
     'The chief plans first, then dispatches each piece to the right agent.',
   查看会话: 'View session',
@@ -1469,4 +1457,8 @@ export const EN: Record<string, string> = {
   收起其余: 'Show less',
   首页: 'Home',
   'Claude 登录需要处理': 'Claude sign-in needs attention',
+  存为草稿: 'Save as draft',
+  '存为草稿，不开始': 'Save as a draft without starting',
+  已存为草稿: 'Saved as a draft',
+  项目列表还没加载: 'Projects have not loaded yet',
 };

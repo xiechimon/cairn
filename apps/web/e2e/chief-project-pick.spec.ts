@@ -264,13 +264,13 @@ test.describe('the drawer composer picks a project (T6 #2009)', () => {
 });
 
 test.describe('the home sends to the project it is filtered to (#2531)', () => {
-  test('the home has no chip; a project-filtered home sends that projectId and the unfiltered home sends none', async ({
+  test('a project-filtered home pins its chip and sends that projectId; the unfiltered home sends none', async ({
     page,
   }) => {
     const state = await mockLive(page);
     await page.goto('/app?project=proj-2');
     await expect(homeInput(page)).toHaveAttribute('placeholder', /cairn-site/);
-    await expect(page.getByTestId('home-c').getByTestId('chief-project-chip')).toHaveCount(0);
+    await expect(page.getByTestId('home-c').getByTestId('chief-project-chip')).toContainText('cairn-site');
     await homeInput(page).fill('把按钮颜色统一一下');
     await homeInput(page).press('Enter');
     await expect

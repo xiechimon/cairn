@@ -177,9 +177,11 @@ async function openBoard(): Promise<void> {
 
 async function createAndStart(title: string): Promise<void> {
   await page.getByRole('complementary').getByRole('button', { name: '新任务' }).click();
-  await pexpect(page.locator('.new-task-spec')).toBeVisible();
-  await page.locator('.new-task-spec').fill(title);
-  await page.locator('.new-task-dialog').getByRole('button', { name: '保存', exact: true }).click();
+  const composer = page.getByTestId('home-c').getByTestId('chief-composer-input');
+  await pexpect(composer).toBeFocused({ timeout: 30_000 });
+  await composer.fill(title);
+  await page.getByTestId('composer-save-draft').click();
+  await openBoard();
   await pexpect(page.getByRole('link', { name: title })).toBeVisible({
     timeout: 30_000,
   });

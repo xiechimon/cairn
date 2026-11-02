@@ -50,12 +50,13 @@ test('five parts stack top to bottom in a 248px sidebar', async ({ page }) => {
   expect(asideBottom - userBottom).toBeLessThanOrEqual(16);
 });
 
-test('`新任务` row opens the new-task dialog without a sidebar key badge', async ({ page }) => {
+test('`新任务` row focuses the home composer without a sidebar key badge', async ({ page }) => {
   await page.goto('/app?scenario=01&view=board');
   const button = page.locator('.sidebar-new-task');
   await expect(button.locator('kbd')).toHaveCount(0);
   await button.click();
-  await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toBeFocused();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
 test('`Home` badge counts the `待处理` column and opens the home view', async ({ page }) => {

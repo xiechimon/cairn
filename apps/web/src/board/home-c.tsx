@@ -1,6 +1,6 @@
 import { ChevronDown, FolderOpen, MessageSquareWarning, Settings2 } from 'lucide-react';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router';
 import { useLiveData } from '../api/provider.js';
 import { ChiefConversation } from '../chief/chief-conversation.js';
 import { ChiefQuestionCard, type ChiefQuestionItem } from '../chief/chief-question-card.js';
@@ -16,6 +16,7 @@ import { MessageScrollerProvider } from '../components/ui/message-scroller.js';
 import type { ChiefStreamItem, MachineRow, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ClaudeLoginBanner } from './claude-login-banner.js';
+import { composeRequest } from './open-composer.js';
 import { relativeTime } from './rel-time.js';
 import { threadCopy, threadHref, threadStatus, threadTone } from './thread-copy.js';
 
@@ -89,7 +90,7 @@ interface HomeCProps {
   projectId: string | null;
   projectName: string | null;
   banner?: ReactNode;
-  onNewTask?: () => void;
+  onSaveDraft?: (spec: string, projectId: string | null) => Promise<void>;
   machines?: readonly MachineRow[];
 }
 
@@ -100,12 +101,14 @@ export function HomeC({
   projectId,
   projectName,
   banner,
-  onNewTask,
+  onSaveDraft,
   machines,
 }: HomeCProps) {
   const { t, locale } = useI18n();
   const { user, live } = useLiveData();
   const navigate = useNavigate();
+  const location = useLocation();
+  const composeAt = composeRequest(location.state);
   const [allOpen, setAllOpen] = useState(false);
   const [runningOpen, setRunningOpen] = useState(false);
   const [prefill, setPrefill] = useState<{ text: string; key: number } | null>(null);
@@ -116,6 +119,15 @@ export function HomeC({
     setChiefView('none');
     composerRef.current?.focus({ preventScroll: true });
   }, [chiefView, setChiefView]);
+  const loaded = surface.load === 'ready';
+  useEffect(() => {
+    if (composeAt === null || !loaded) return;
+    composerRef.current?.focus({ preventScroll: true });
+    navigate(
+      { pathname: location.pathname, search: location.search },
+      { replace: true, state: null },
+    );
+  }, [composeAt, loaded, navigate, location.pathname, location.search]);
   const scoped = useMemo(
     () => todos.filter((todo) => projectId === null || todo.projectId === projectId),
     [todos, projectId],
@@ -353,7 +365,7 @@ export function HomeC({
           chief={{ ...chiefData, stream: conversation, examples: undefined }}
           onSend={
             surface.onSend != null
-              ? (text: string) => surface.onSend?.(text, projectId)
+              ? (text: string, chipProject: string | null) => surface.onSend?.(text, chipProject)
               : live
                 ? undefined
                 : () => Promise.resolve()
@@ -374,7 +386,12 @@ export function HomeC({
               : t('跟 Coordinator 说点什么，或描述一个新任务…')
           }
           aboveComposer={pill}
-          onNewTask={onNewTask}
+          pinnedProjectId={projectId}
+          onSaveDraft={
+            onSaveDraft != null
+              ? (text: string, chipProject: string | null) => onSaveDraft(text, chipProject)
+              : undefined
+          }
           composerRef={(node) => {
             composerRef.current = node;
           }}

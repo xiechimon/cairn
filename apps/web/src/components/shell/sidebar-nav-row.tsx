@@ -33,7 +33,7 @@ export function SidebarNavRow({
     >
       <span className="flex-none text-icon">{icon}</span>
       <span className="min-w-0 truncate">{label}</span>
-      {shortcut != null && <KeyHint className="ml-auto">{shortcut}</KeyHint>}
+      {shortcut != null && <KeyHint className="ml-auto text-content-secondary">{shortcut}</KeyHint>}
     </Button>
   );
 }

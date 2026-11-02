@@ -246,12 +246,13 @@ afterAll(async () => {
 });
 
 describe('#1216 board UI reliability triple defect (real web dist + real server + fake machine wire)', () => {
-  test('① save-and-start: one click enters the dispatch flow; in-flight state rejects duplicate orchestration', async () => {
+  test('① a draft saved from the home composer starts from its card into the dispatch flow; in-flight state rejects duplicate orchestration', async () => {
     await openBoard();
     await page.getByRole('complementary').getByRole('button', { name: '新任务' }).click();
-    await pexpect(page.locator('.new-task-spec')).toBeVisible();
-    await page.locator('.new-task-spec').fill(SPECS.oneClick);
-    await page.locator('.new-task-dialog').getByRole('button', { name: '保存并开始' }).click();
+    const composer = page.getByTestId('home-c').getByTestId('chief-composer-input');
+    await pexpect(composer).toBeFocused({ timeout: 30_000 });
+    await composer.fill(SPECS.oneClick);
+    await page.getByTestId('composer-save-draft').click();
 
     let todoId = '';
     let seqNum = 0;
@@ -266,9 +267,12 @@ describe('#1216 board UI reliability triple defect (real web dist + real server 
       seqNum = row.seqNum;
       return true;
     }, 15_000);
+    expect(orchestrateThreads(seqNum).length).toBe(0);
+    await openBoard();
+    const card = page.locator(`[data-todo-id="${todoId}"]`);
+    await card.locator('.todo-card-action').click();
     await waitFor(() => orchestrateThreads(seqNum).length === 1, 15_000);
 
-    const card = page.locator(`[data-todo-id="${todoId}"]`);
     await pexpect(card.locator('.todo-card-orchestration')).toContainText('编排中', {
       timeout: 15_000,
     });

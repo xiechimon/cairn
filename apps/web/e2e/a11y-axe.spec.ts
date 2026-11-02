@@ -47,19 +47,21 @@ const PAGES: AuditPage[] = [
     ready: (p) => searchDialog(p).locator('[data-row-kind="todo"]').first(),
   },
   {
-    name: 'new task dialog',
+    name: 'new task home composer',
     url: '/app?scenario=01&view=board',
     open: (page) => page.locator('.sidebar-new-task').click(),
-    ready: (p) => p.getByRole('dialog', { name: '新建任务' }),
+    ready: (p) => p.getByTestId('home-c').getByTestId('chief-composer-input'),
   },
   {
-    name: 'new task dialog filled',
+    name: 'new task home composer filled',
     url: '/app?scenario=01&view=board',
     open: async (page) => {
       await page.locator('.sidebar-new-task').click();
+      const input = page.getByTestId('home-c').getByTestId('chief-composer-input');
+      await expect(input).toBeFocused();
       await page.keyboard.type('probe');
     },
-    ready: (p) => p.locator('.new-task-start:enabled'),
+    ready: (p) => p.getByTestId('composer-save-draft').and(p.locator(':enabled')),
   },
   { name: 'detail fresh', url: '/app/todo/fresh-probe?scenario=23', ready: phaseChip },
   { name: 'detail confirm', url: '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=17b', ready: phaseChip },

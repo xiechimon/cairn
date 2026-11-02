@@ -7,7 +7,7 @@ import {
 } from '@cairn/shared';
 import { cn } from 'cn';
 import { ListTodo } from 'lucide-react';
-import { Fragment, type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
+import { Fragment, type ReactNode, useCallback, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { ApiError } from '../api/client.js';
 import {
@@ -21,6 +21,7 @@ import {
 } from '../api/hooks.js';
 import { mapCommits, mapDiffFiles, toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
+import { useOpenComposer } from '../board/open-composer.js';
 import { relativeTime } from '../board/rel-time.js';
 import { EmptyState } from '../components/empty-state.js';
 import { KeyedMenuContent, KeyedMenuRadioItem } from '../components/menu-keys.js';
@@ -38,14 +39,7 @@ import {
 import { InputGroup, InputGroupAddon, InputGroupInput } from '../components/ui/input-group.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { DiffFileBlock } from '../detail/docpane.js';
-import { localTodo } from '../fixtures/fixtures.js';
-import type {
-  DiffFile,
-  Phase,
-  ProjectCommitRow,
-  ProjectContent,
-  TodoRecord,
-} from '../fixtures/records.js';
+import type { DiffFile, Phase, ProjectCommitRow, ProjectContent } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import {
@@ -62,7 +56,6 @@ import {
   Settings,
   X,
 } from '../icons/index.js';
-import { type NewTaskSurfaceApi, NewTaskSurfaceRoot } from '../overlay/new-task-surface-root.js';
 import { PHASE_STATUS, PHASE_UI } from '../phase.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { GithubIssuesDialog } from './github-issues-dialog.js';
@@ -700,7 +693,6 @@ export function ProjectPage() {
   const { live, teamId } = useLiveData();
   const projectsQ = useProjects(teamId, live);
   const todosQ = useTodos(teamId, live);
-  const [fixtureAdded, setFixtureAdded] = useState<TodoRecord[]>([]);
   const wireProject = live ? (projectsQ.data ?? []).find((p) => p.id === id) : undefined;
   const hostedRepo = live && wireProject?.repoKind === 'hosted';
   const localRepo = live && wireProject?.repoKind === 'local';
@@ -780,22 +772,9 @@ export function ProjectPage() {
   );
   const todos = live
     ? (todosQ.data ?? []).map(toDisplayTodo).filter((x) => x.projectId === id)
-    : [...fixture.todos, ...fixtureAdded].filter((x) => x.projectId === id);
-  const onFixtureSave = useCallback(
-    (spec: string) => {
-      setFixtureAdded((prev) => [
-        ...prev,
-        localTodo(
-          [...fixture.todos, ...prev].reduce((max, t) => Math.max(max, t.seqNum), 0) + 1,
-          spec,
-          fixture.now,
-        ),
-      ]);
-    },
-    [fixture],
-  );
-  const newTaskApiRef = useRef<NewTaskSurfaceApi | null>(null);
-  const openNewTask = useCallback(() => newTaskApiRef.current?.openDialog(), []);
+    : fixture.todos.filter((x) => x.projectId === id);
+  const openComposer = useOpenComposer();
+  const openNewTask = useCallback(() => openComposer(id), [openComposer, id]);
   const githubFilesUrl =
     isGithubRepoEntry && wireProject?.githubRepo != null
       ? `https://github.com/${wireProject.githubRepo}`
@@ -815,12 +794,9 @@ export function ProjectPage() {
     <PageShell
       route="project"
       bleed={tab === 'files'}
-      fixture={
-        live ? { ...fixture, todos } : { ...fixture, todos: [...fixture.todos, ...fixtureAdded] }
-      }
+      fixture={live ? { ...fixture, todos } : fixture}
       selected="none"
       title={project?.name ?? ''}
-      onNewTask={openNewTask}
       tabs={[
         { id: 'tasks', label: '任务' },
         { id: 'files', label: '文件' },
@@ -916,11 +892,6 @@ export function ProjectPage() {
           {...(ghIssuesAvailable ? { onOpenGithubIssues: () => setIssuesOpen(true) } : {})}
         />
       )}
-      <NewTaskSurfaceRoot
-        fixture={fixture}
-        opts={{ onFixtureSave, anchorProjectId: id }}
-        apiRef={newTaskApiRef}
-      />
       {ghIssuesAvailable && id !== undefined && (
         <GithubIssuesDialog
           open={issuesOpen}

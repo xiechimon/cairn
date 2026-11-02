@@ -74,10 +74,12 @@ test('since-last-seen counts tasks finished after the stored visit and hides whe
   await expect(page.getByTestId('board-since-last-seen')).toBeHidden();
 });
 
-test('the new-task bar opens the existing new-task surface', async ({ page }) => {
+test('the new-task bar lands on the home composer with no dialog', async ({ page }) => {
   await page.goto('/app?scenario=01&view=board');
   await page.getByTestId('board-new-task-bar').click();
-  await expect(page.getByRole('dialog', { name: '新建任务' })).toBeVisible();
+  await expect(page).toHaveURL(/\/app\?(?!.*view=board)/);
+  await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toBeFocused();
+  await expect(page.getByRole('dialog', { name: '新建任务' })).toHaveCount(0);
 });
 
 test('a 390px board stacks non-empty columns tightly with no horizontal scroll', async ({

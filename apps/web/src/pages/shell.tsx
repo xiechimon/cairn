@@ -50,7 +50,6 @@ interface PageShellProps {
   tab?: string;
   onTab?: (id: string) => void;
   actions?: ReactNode;
-  onNewTask?: () => void;
   bleed?: boolean;
   children: ReactNode;
 }
@@ -65,14 +64,13 @@ export function PageShell({
   tab,
   onTab,
   actions,
-  onNewTask,
   bleed = false,
   children,
 }: PageShellProps) {
   const { t } = useI18n();
   return (
     <div className="page-shell flex h-full overflow-hidden bg-(--surface-1)" data-route={route}>
-      <AppSidebar fixture={fixture} selected={selected} onNewTask={onNewTask} />
+      <AppSidebar fixture={fixture} selected={selected} />
       <div className={`page-main ${SHEET_PANEL}`}>
         <div className="page-main-col flex min-w-0 flex-1 flex-col">
           <header

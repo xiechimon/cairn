@@ -1,6 +1,6 @@
 import type { TodoRecord as WireTodo } from '@cairn/shared';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router';
 import { ApiError, api } from '../api/client.js';
 import {
@@ -35,6 +35,7 @@ import { FirstPrCard, firstPrCardInfo } from '../board/first-pr-card.js';
 import { BOARD_VIEW_PARAM } from '../board/home.js';
 import { HomeC } from '../board/home-c.js';
 import { NotificationBanner, useNotificationBanner } from '../board/notify-banner.js';
+import { useOpenComposer } from '../board/open-composer.js';
 import { QuotaBanner, quotaBannerInfo } from '../board/quota-banner.js';
 import {
   buildRepoOptions,
@@ -58,8 +59,8 @@ import { localTodo, overlayContent } from '../fixtures/fixtures.js';
 import type { FixtureSet, OverlayState, TodoRecord } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
-import { type NewTaskSurfaceApi, NewTaskSurfaceRoot } from '../overlay/new-task-surface-root.js';
 import { SearchPanel, useSearchState } from '../overlay/search-panel.js';
+import { useCreateTodo } from '../overlay/use-create-todo.js';
 import { SHEET_PANEL } from '../pages/shell.js';
 
 interface ReorderPatch {
@@ -321,8 +322,9 @@ export function BoardPage() {
     },
     [fixture],
   );
-  const newTaskApiRef = useRef<NewTaskSurfaceApi | null>(null);
-  const openNewTask = useCallback(() => newTaskApiRef.current?.openDialog(), []);
+  const saveDraft = useCreateTodo(onFixtureSave);
+  const openComposer = useOpenComposer();
+  const openNewTask = useCallback(() => openComposer(), [openComposer]);
   const [overlay, setOverlay] = useState<OverlayState | null>(fixture.overlay ?? null);
   const [overlayTodo, setOverlayTodo] = useState<TodoRecord | null>(null);
   const [mergeReject, setMergeReject] = useState<string | null>(null);
@@ -621,7 +623,6 @@ export function BoardPage() {
         selected={chiefView === 'settings' ? 'none' : boardView ? 'kanban' : 'board'}
         searchPanel={false}
         onSearch={() => search.setOpen(true)}
-        onNewTask={openNewTask}
       />
       <div className={`board-sheet ${SHEET_PANEL}`}>
         {chiefView === 'settings' ? (
@@ -638,7 +639,7 @@ export function BoardPage() {
             projectId={homeProjectName === null ? null : homeProjectId}
             projectName={homeProjectName}
             banner={homeBanner}
-            onNewTask={openNewTask}
+            onSaveDraft={saveDraft}
             machines={fixtureWithTodos.resources?.machines}
           />
         ) : (
@@ -680,7 +681,6 @@ export function BoardPage() {
         onClose={() => search.setOpen(false)}
         server={live ? searchResults.data : undefined}
       />
-      <NewTaskSurfaceRoot fixture={fixture} opts={{ onFixtureSave }} apiRef={newTaskApiRef} />
       <AcceptDialog
         open={overlay?.kind === 'accept'}
         onClose={closeOverlay}
