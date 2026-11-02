@@ -216,6 +216,64 @@ describe('the coordinator route (D70 C5)', () => {
     expect(fallbacks).toEqual([[w.teamId, 'no-api-key-provider']]);
   });
 
+  test('a hand-written rule to a gateway with non-Claude model names still needs allow-paid', async () => {
+    const w = await world();
+    createProvider(
+      { db: w.s.db, box: w.s.secretBox },
+      {
+        teamId: w.teamId,
+        body: {
+          providerId: 'company-gateway',
+          label: 'Gateway',
+          baseUrl: 'https://gw.example.com/v1',
+          api: 'anthropic-messages',
+          apiKey: 'gw-key',
+          models: [{ id: 'sonnet', name: 'sonnet' }],
+        },
+        createdBy: w.s.user.id,
+      },
+    );
+    w.s.db
+      .insert(routingRule)
+      .values({
+        id: 'rule-gw',
+        teamId: w.teamId,
+        use: 'coordinator',
+        provider: 'company-gateway',
+        modelId: 'sonnet',
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      .run();
+    expect((await claim(w)).agent).toMatchObject({ provider: 'stub-gw', modelId: 'stub-model' });
+    expect(fallbacks).toEqual([[w.teamId, 'paid-claude-not-allowed']]);
+  });
+
+  test('a keyed Anthropic provider with no models does not shadow one that has them', async () => {
+    const w = await world();
+    createProvider(
+      { db: w.s.db, box: w.s.secretBox },
+      {
+        teamId: w.teamId,
+        body: {
+          providerId: 'anthropic-empty',
+          label: 'Empty',
+          baseUrl: 'https://api.anthropic.com',
+          api: 'anthropic-messages',
+          apiKey: 'empty-key',
+          models: [],
+        },
+        createdBy: w.s.user.id,
+      },
+    );
+    addAnthropicKey(w);
+    allowPaidClaude(w);
+    expect((await claim(w)).agent).toMatchObject({
+      provider: 'anthropic',
+      modelId: 'claude-haiku-5-5',
+    });
+  });
+
   test('a keyed provider while the team is subscription-only falls back instead of spending', async () => {
     const w = await world();
     addAnthropicKey(w);

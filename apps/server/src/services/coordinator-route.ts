@@ -3,7 +3,6 @@ import type { Db } from '../db/client.js';
 import { type agent, provider, routingRule, team } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { coordinatorServerContextEnabled } from './coordinator-context.js';
-import { isClaudeModel } from './model-routing.js';
 import { applyRoute } from './routing-rules.js';
 
 type AgentRow = typeof agent.$inferSelect;
@@ -56,7 +55,7 @@ function keyedAnthropicProvider(db: Db, teamId: string) {
       ),
     )
     .all()
-    .find((row) => isAnthropicApi(row.baseUrl));
+    .find((row) => isAnthropicApi(row.baseUrl) && row.models.length > 0);
 }
 
 function seedCoordinatorRule(db: Db, teamId: string) {
@@ -112,7 +111,7 @@ export function coordinatorRoute(db: Db, teamId: string) {
     .from(team)
     .where(eq(team.id, teamId))
     .get();
-  if (isClaudeModel(rule.provider, rule.modelId) && usage?.claudeUsage !== 'allow-paid') {
+  if (usage?.claudeUsage !== 'allow-paid') {
     return fallback(teamId, 'paid-claude-not-allowed');
   }
   return rule;
