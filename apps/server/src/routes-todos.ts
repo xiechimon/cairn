@@ -7,6 +7,7 @@ import {
   phaseSchema,
   snoozeTodoBodySchema,
   type TodoRecord,
+  threadMessageBodySchema,
 } from '@cairn/shared';
 import type { Hono } from 'hono';
 import { z } from 'zod';
@@ -31,6 +32,7 @@ import { listNeedsYou } from './services/needs-you.js';
 import { orchestrateTodo } from './services/orchestrate.js';
 import { PhaseTransitionError } from './services/phase.js';
 import { snoozeTodo, unsnoozeTodo } from './services/snooze.js';
+import { messageThreadAsUser } from './services/thread-message.js';
 import {
   createTodo,
   deleteTodo,
@@ -75,6 +77,11 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
   app.post('/api/todos/:id/orchestrate', (c) => {
     const result = orchestrateTodo(svc, c.req.param('id'));
     return c.json(result, 201);
+  });
+
+  app.post('/api/todos/:id/messages', async (c) => {
+    const body = parseWith(threadMessageBodySchema, await jsonBody(c), 'body');
+    return c.json(await messageThreadAsUser(svc, ctx.team.id, c.req.param('id'), body), 201);
   });
 
   app.post('/api/projects/:id/todos', async (c) => {

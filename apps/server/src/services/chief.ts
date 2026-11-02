@@ -34,6 +34,7 @@ import {
   orchestratedTodoIdOf,
   PLAN_PRIOR_ART_RULE,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
+  threadMessageContentSchema,
 } from '@cairn/shared';
 import { and, asc, desc, eq, inArray, isNotNull, isNull, like, ne, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -557,6 +558,37 @@ function requireWritableThread(row: ThreadRow): void {
   if (row.archivedAt !== null) throw new HttpError(409, `chief thread ${row.id} is archived`);
 }
 
+function directThreadMessagesSinceLastTurn(db: Db, threadId: string): string | null {
+  const lastUser = db
+    .select({ createdAt: chiefMessage.createdAt })
+    .from(chiefMessage)
+    .where(and(eq(chiefMessage.threadId, threadId), eq(chiefMessage.role, 'user')))
+    .orderBy(desc(chiefMessage.createdAt))
+    .get();
+  const lines = db
+    .select({ content: chiefMessage.content })
+    .from(chiefMessage)
+    .where(
+      and(
+        eq(chiefMessage.threadId, threadId),
+        eq(chiefMessage.role, 'system'),
+        like(chiefMessage.content, '%thread-message%'),
+        lastUser !== undefined ? sql`${chiefMessage.createdAt} > ${lastUser.createdAt}` : undefined,
+      ),
+    )
+    .orderBy(asc(chiefMessage.createdAt))
+    .all()
+    .flatMap((row) => {
+      const parsed = threadMessageContentSchema.safeParse(
+        typeof row.content === 'string' ? JSON.parse(row.content) : row.content,
+      );
+      return parsed.success ? [`- #${parsed.data.seqNum}：${parsed.data.excerpt}`] : [];
+    });
+  return lines.length === 0
+    ? null
+    : `【你上一轮之后，用户直接对这些 thread 说了话（已送达，不用转述）】\n${lines.join('\n')}\n\n`;
+}
+
 export function sendChiefMessage(
   deps: ChiefDeps,
   teamId: string,
@@ -585,6 +617,7 @@ export function sendChiefMessage(
     threadRow = coordinatorThreadRow(deps, chiefRow);
   }
   const now = nowMs();
+  const directNote = directThreadMessagesSinceLastTurn(deps.db, threadRow.id);
 
   const message = {
     id: newRecordId(),
@@ -606,7 +639,7 @@ export function sendChiefMessage(
   deps.db.update(chiefThread).set({ updatedAt: now }).where(eq(chiefThread.id, threadRow.id)).run();
 
   enqueueChiefStep(deps, threadRow.id, {
-    prompt: promptWithPickedProject(picked, body.content),
+    prompt: promptWithPickedProject(picked, `${directNote ?? ''}${body.content}`),
     trigger: 'user',
     id: message.id,
   });

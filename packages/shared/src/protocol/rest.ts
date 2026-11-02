@@ -83,6 +83,11 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
     note: 'body {until: needed|tomorrow|tomorrow-09:00|next-monday|epoch ms|ISO, tz?}',
   },
   { method: 'POST', path: '/api/todos/{id}/unsnooze', note: 'clears the snooze' },
+  {
+    method: 'POST',
+    path: '/api/todos/{id}/messages',
+    note: 'body {content, clientMessageId}; a person messages the thread directly (steer, plan revision or restart by phase) and the Coordinator gets a thread-message row (D65)',
+  },
   { method: 'POST', path: '/api/projects/{id}/archive', note: 'sets project.archivedAt' },
   { method: 'POST', path: '/api/projects/{id}/unarchive', note: 'clears project.archivedAt' },
   { method: 'GET', path: '/api/builds/{id}' },
