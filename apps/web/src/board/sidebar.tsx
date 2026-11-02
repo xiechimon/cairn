@@ -14,6 +14,7 @@ import {
   Plug,
   Plus,
   Puzzle,
+  Route,
   Search,
   Server,
 } from 'lucide-react';
@@ -53,7 +54,8 @@ export type SidebarSelected =
   | '/app/resources/mcp-servers'
   | '/app/resources/secrets'
   | '/app/resources/machines'
-  | '/app/resources/providers';
+  | '/app/resources/providers'
+  | '/app/resources/model-routing';
 
 export interface SidebarProject {
   id: string;
@@ -89,6 +91,7 @@ const RESOURCE_ROWS: ResourceRow[] = [
   { label: '密钥', href: '/app/resources/secrets', Icon: KeyRound },
   { label: '机器', href: '/app/resources/machines', Icon: Server },
   { label: '模型服务', href: '/app/resources/providers', Icon: Layers },
+  { label: '模型路由', href: '/app/resources/model-routing', Icon: Route },
 ];
 
 const USAGE_ROW: ResourceRow = { label: '用量', href: '/app/usage', Icon: ChartColumn };

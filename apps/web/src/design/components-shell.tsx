@@ -331,8 +331,8 @@ const ROUTING_JOBS: RoutingJob[] = [
 ];
 
 const ROUTING_CONNECTIONS: RoutingConnection[] = [
-  { id: 'claude', name: 'Claude subscription', tier: 'Max 20x', quota: { fiveHour: 38, week: 22 } },
-  { id: 'codex', name: 'Codex', tier: 'Pro', quota: { fiveHour: 86, week: 61 } },
+  { id: 'claude', name: 'Claude subscription', tier: 'Max 20x', quota: { fiveHour: 62, week: 78 } },
+  { id: 'codex', name: 'Codex', tier: 'Pro', quota: { fiveHour: 14, week: 39 } },
   { id: 'openrouter', name: 'OpenRouter key', unavailable: true },
 ];
 
@@ -342,12 +342,12 @@ export function RoutingSection() {
     <Section
       id="routing"
       title="Model routing parts"
-      lede="Jobs on the left name their model; a curve runs to the connection that serves them, which shows its 5-hour and weekly quota. A bar turns ochre from 80%."
+      lede="Jobs on the left name their model; a curve runs to the connection that serves them, which shows how much of its 5-hour and weekly quota is left. A bar turns ochre at 20% left."
     >
       <Specimen
         title="Routing nodes and quota bar"
         stage="canvas"
-        code={`<RoutingGraph jobs={[{ id: 'coordinator', name: 'Coordinator', model: 'claude-opus-5-5', tone: 1, connectionId: 'claude' }]} connections={[{ id: 'claude', name: 'Claude subscription', tier: 'Max 20x', quota: { fiveHour: 38, week: 22 } }]} />`}
+        code={`<RoutingGraph jobs={[{ id: 'coordinator', name: 'Coordinator', model: 'claude-opus-5-5', tone: 1, connectionId: 'claude' }]} connections={[{ id: 'claude', name: 'Claude subscription', tier: 'Max 20x', quota: { fiveHour: 62, week: 78 } }]} />`}
       >
         <div className="flex w-full max-w-170 flex-col gap-4">
           <SegmentedRadio

@@ -14,6 +14,7 @@ import { PwaBridge } from './pwa/register.js';
 import { MachineDetailPage } from './resources/machine-detail-page.js';
 import { MACHINES_HREF, MachinesPage } from './resources/machines-page.js';
 import { MCP_HREF, McpServersPage } from './resources/mcp-servers-page.js';
+import { MODEL_ROUTING_HREF, ModelRoutingPage } from './resources/model-routing-page.js';
 import { PROVIDERS_HREF, ProvidersPage } from './resources/providers-page.js';
 import { SECRETS_HREF, SecretsPage } from './resources/secrets-page.js';
 import { SKILLS_HREF, SkillsPage } from './resources/skills-page.js';
@@ -53,6 +54,7 @@ export const router = createBrowserRouter([
               { path: `${MACHINES_HREF}/:id`, element: <MachineDetailPage /> },
               { path: '/app/machines/authorize', element: <MachineAuthorizePage /> },
               { path: PROVIDERS_HREF, element: <ProvidersPage /> },
+              { path: MODEL_ROUTING_HREF, element: <ModelRoutingPage /> },
               { path: '*', element: <Navigate to="/app" replace /> },
             ],
           },

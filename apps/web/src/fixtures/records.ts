@@ -22,6 +22,8 @@ import {
   type ThreadReportContent,
   type UsageCost,
 } from '@cairn/shared';
+import type { MachineProvider } from '../api/claude-accounts.js';
+import type { AccountsContent } from './accounts.js';
 
 export type { Phase };
 export { PHASE_VALUES };
@@ -270,6 +272,7 @@ export interface MachineRow {
   concurrencyRange?: { min: number; max: number };
   concurrencySource?: 'measured' | 'estimate' | 'manual';
   claudeLogin?: ClaudeLogin;
+  providers?: MachineProvider[];
 }
 
 export interface ResourcesContent {
@@ -280,6 +283,7 @@ export interface ResourcesContent {
   providers?: ProviderRecord[];
   memories?: MemoryRecord[];
   secrets?: SecretRecord[];
+  accounts?: AccountsContent;
 }
 
 export interface DocSegment {
