@@ -4,11 +4,22 @@ import { runInNewContext } from 'node:vm';
 
 const sandboxOptions = { timeout: 1000, contextCodeGeneration: { strings: false, wasm: false } };
 
-export function ownerRouting(headSha) {
-  const git = (args) =>
-    execFileSync('git', args, { encoding: 'utf8', maxBuffer: 512 * 1024 * 1024 });
+const git = (args) => execFileSync('git', args, { encoding: 'utf8', maxBuffer: 512 * 1024 * 1024 });
+
+const isGlobList = (globs) =>
+  Array.isArray(globs) && globs.every((glob) => typeof glob === 'string' && glob.length > 0);
+
+export function mainRoutingPolicy() {
   const source = git(['show', 'origin/main:.claude/workflows/pr-gate.js']);
   const gatePaths = JSON.parse(git(['show', 'origin/main:packages/shared/merge-gate-paths.json']));
+  const queue = gatePaths?.humanQueue;
+  if (
+    queue === null ||
+    typeof queue !== 'object' ||
+    Array.isArray(queue) ||
+    !Object.values(queue).every(isGlobList)
+  )
+    throw new Error('Invalid human queue paths');
   const extract = (start, end) => {
     const from = source.indexOf(start);
     const to = source.indexOf(end, from + start.length);
@@ -16,8 +27,32 @@ export function ownerRouting(headSha) {
       throw new Error('Unsupported owner routing policy');
     return source.slice(from, to);
   };
-  const constants = extract('const AUTO_MERGE =', 'const FILES_CMD =');
-  const routing = extract('const safety = reviewed.find', 'const checked =');
+  return {
+    gatePaths,
+    constants: extract('const AUTO_MERGE =', 'const FILES_CMD ='),
+    routing: extract('const safety = reviewed.find', 'const checked ='),
+  };
+}
+
+export function humanQueueReasons(changedFiles, { constants, gatePaths }) {
+  const reasons = runInNewContext(
+    `${constants}
+Object.entries(args.gatePaths.humanQueue).flatMap(([category, globs]) => {
+  const res = globs.map((glob) => globToRegExp(glob, { protect: true }))
+  const hits = changedFiles.filter((f) => res.some((re) => re.test(f)))
+  return hits.length > 0 ? ['human queue (' + category + '): ' + hits.join(', ')] : []
+})`,
+    { args: { gatePaths }, changedFiles: [...changedFiles] },
+    sandboxOptions,
+  );
+  if (!Array.isArray(reasons) || !reasons.every((reason) => typeof reason === 'string'))
+    throw new Error('Invalid human queue result');
+  return [...reasons];
+}
+
+export function ownerRouting(headSha) {
+  const policy = mainRoutingPolicy();
+  const { constants, routing, gatePaths } = policy;
   const isEvidence = runInNewContext(
     `${constants}\n;(path) => EVIDENCE_RE.test(path)`,
     { args: { gatePaths } },
@@ -68,7 +103,7 @@ humanReasons`,
   );
   if (!Array.isArray(reasons) || !reasons.every((reason) => typeof reason === 'string'))
     throw new Error('Invalid owner routing result');
-  return reasons;
+  return [...humanQueueReasons(changedFiles, policy), ...reasons];
 }
 
 if (process.argv[1] && realpathSync(process.argv[1]) === import.meta.filename) {

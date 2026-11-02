@@ -237,7 +237,7 @@ describe('merge-gate-paths.json is the single source', () => {
   test('merge-route.mjs takes the JSON from origin/main, beside pr-gate.js', () => {
     const source = read('scripts/merge-route.mjs');
     expect(source).toContain("'origin/main:packages/shared/merge-gate-paths.json'");
-    expect(source.match(/args: \{ gatePaths \}/g)).toHaveLength(2);
+    expect(source.match(/args: \{ gatePaths \}/g)).toHaveLength(3);
     expect(source).not.toMatch(/secret-box|\*\*\/drizzle\/\*\*/);
   });
 

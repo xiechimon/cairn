@@ -97,7 +97,7 @@ const d = JSON.parse(fs.readFileSync(process.env.DATA));
 const args = process.argv.slice(2);
 if (d.gitError) process.exit(1);
 if (args[0] === 'show') process.stdout.write(args[1].endsWith('merge-gate-paths.json') ? d.gatePaths : d.policy);
-else if (args.includes('--numstat')) process.stdout.write(d.numstat);
+else if (args.includes('--numstat')) process.stdout.write(d.numstatByHead?.[args.at(-1).split('...')[1]] ?? d.numstat);
 else if (args.includes('--diff-filter=D')) process.stdout.write(d.deleted);
 else process.exit(2);
 `,
@@ -670,6 +670,40 @@ test('a failed owner-route comment is an error and never merges', (t) => {
   assert.equal(f.result.status, 1);
   assert.equal(f.queues.length, 0);
   assert.match(f.result.stdout, /"action":"error"/);
+});
+test('a human-queue PR is marked owner-route while other ready work is queued', (t) => {
+  const other = 'b'.repeat(40);
+  const second = { ...pull(2), head: { ...pull(2).head, sha: other } };
+  const checksAt = (sha) =>
+    required.map((name, id) => ({
+      name,
+      id: id + (sha === head ? 0 : 100),
+      head_sha: sha,
+      status: 'completed',
+      conclusion: 'success',
+      app: { slug: 'github-actions' },
+    }));
+  const f = fixture(t, {
+    pulls: [pull(), second],
+    checks: [...checksAt(head), ...checksAt(other)],
+    comments: [
+      ...defaultComments,
+      {
+        id: 2,
+        user: { login: 'cairnwright[bot]' },
+        body: `<!-- review-gate:${other} -->\n**Independent review gate: PASS** for \`${other.slice(0, 8)}\`.`,
+      },
+    ],
+    numstatByHead: { [head]: '1\t0\tapps/server/src/services/oauth.ts\n' },
+  });
+  assert.equal(f.result.status, 0, f.result.stdout + f.result.stderr);
+  assert.deepEqual(
+    f.queues.map((q) => q.pr),
+    [2],
+  );
+  const payload = JSON.parse(ownerComments(f)[0].at(-1));
+  assert.ok(payload.body.includes('human queue (credentials): apps/server/src/services/oauth.ts'));
+  assert.deepEqual(JSON.parse(labelAdds(f)[0].at(-1)), { labels: ['owner-route'] });
 });
 test('dry-run reports the owner-route mark without writing', (t) => {
   const f = fixture(t, { ...ownerRouted, args: ['--dry-run'] });

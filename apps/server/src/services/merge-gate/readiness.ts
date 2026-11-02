@@ -414,6 +414,12 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
         block('review-blocking', 'Independent review reports gate loosening or eval ruler change');
       }
     }
+    const queued = Object.entries(paths.humanQueue);
+    if (queued.length > 0)
+      block(
+        'human-queue',
+        ...queued.map(([category, list]) => `${category}: ${names(list).join(', ')}`),
+      );
     if (paths.outsideAutoMerge.length > 0)
       block('outside-auto-merge', ...names(paths.outsideAutoMerge));
     if (paths.opaque.length > 0) block('opaque-file', ...names(paths.opaque));

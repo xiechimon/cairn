@@ -6837,6 +6837,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > merge-gate blocke
   "size-cap: human, 本地补丁超过 800 行或 40 个文件",
   "size-review: transient, 补丁超过 800 行或 40 个文件：PR 正文要有 ## Size 小节，且当前补丁要有评审明确接受这个规模",
   "independent-review-missing: transient, Protected changes require a bound independent review",
+  "human-queue: human, Changes to credentials, the machine boundary, external entry auth, data destruction or release wait in the human queue",
   "outside-auto-merge: human, 改动在可自动合并集之外",
   "opaque-file: human, 证据目录外有看不到 diff 的文件（二进制、diff 过大或纯改名）",
   "evidence-outside-ticket: human, 改动了别的票的证据目录",

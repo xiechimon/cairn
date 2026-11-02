@@ -4,6 +4,7 @@ import {
   type BlockerClass,
   CHIEF_DISPATCH_BASELINE_DECISION_OK_CI_LOWER,
   type CompareFile,
+  HUMAN_QUEUE_PATH_GLOBS,
   MERGE_BLOCKER_CODES,
   MERGE_BLOCKERS,
   type MergeBlockerCode,
@@ -169,6 +170,22 @@ const sized = (sizeAssessment: NonNullable<GateVerdictView['sizeAssessment']>): 
   return i;
 };
 
+const independentReview = (i: GateInputs): GateVerdictView => ({
+  ...v('review', 'pass', 'security', computePatchDigest(compare(i).files).patchDigest),
+  headSha: HEAD,
+  reviewerId: 'reviewer',
+  reviewerModel: 'gpt-5.5',
+  gateLoosening: false,
+  evalRulerChange: false,
+});
+const reviewedChange = (files: CompareFile[]): GateInputs => {
+  const i = green();
+  setFiles(i, files);
+  i.author = { id: 'writer', model: 'claude-opus-5-5' };
+  i.verdicts.push(independentReview(i));
+  return i;
+};
+
 type Row = [MergeBlockerCode, (i: GateInputs) => void];
 const pr = (i: GateInputs) => i.pr as NonNullable<GateInputs['pr']>;
 const checks = (i: GateInputs) => i.checks as NonNullable<GateInputs['checks']>;
@@ -211,6 +228,7 @@ const CLASS: Record<MergeBlockerCode, BlockerClass> = {
   'size-cap': 'human',
   'size-review': 'transient',
   'independent-review-missing': 'transient',
+  'human-queue': 'human',
   'outside-auto-merge': 'human',
   'opaque-file': 'human',
   'evidence-outside-ticket': 'human',
@@ -415,9 +433,11 @@ const ROWS: Row[] = [
       pr(i).body = BODY;
     },
   ],
+  ['independent-review-missing', (i) => setFiles(i, [...FILES, file('.github/workflows/ci.yml')])],
   [
-    'independent-review-missing',
-    (i) => setFiles(i, [...FILES, file('apps/server/drizzle/0044_x.sql', { status: 'added' })]),
+    'human-queue',
+    (i) =>
+      Object.assign(i, reviewedChange([...FILES, file('apps/server/src/services/secrets.ts')])),
   ],
   ['outside-auto-merge', (i) => setFiles(i, [...FILES, file('README.md')])],
   ['opaque-file', (i) => setFiles(i, [...FILES, opaque('apps/web/src/assets/logo.png')])],
@@ -998,6 +1018,7 @@ describe('mergeReadiness: files with no visible diff are left to a human, caps c
     ]);
     expect(codesOf(i)).toEqual([
       'independent-review-missing',
+      'human-queue',
       'opaque-file',
       'evidence-outside-ticket',
     ]);
@@ -1136,7 +1157,7 @@ describe('mergeReadiness: files with no visible diff are left to a human, caps c
     const i = green();
     setFiles(i, [...OVERSIZE_FILES, file('apps/server/src/services/secrets.ts')]);
     pr(i).body = BODY_WITH_SIZE;
-    expect(codesOf(i)).toEqual(['size-review', 'independent-review-missing']);
+    expect(codesOf(i)).toEqual(['size-review', 'independent-review-missing', 'human-queue']);
   });
 
   test('a local patch has no PR body, so oversize keeps the human size-cap there', () => {
@@ -1945,6 +1966,76 @@ describe('mergeReadiness P4-0 base freshness', () => {
       expect(codesOf(i)).toContain('pr-behind-base');
     },
   );
+});
+
+describe('mergeReadiness: the human queue', () => {
+  const samplePath = (glob: string) => glob.replace('**/', '').replaceAll('*', 'x');
+
+  test.each(
+    Object.entries(HUMAN_QUEUE_PATH_GLOBS).flatMap(([category, globs]) =>
+      globs.map((glob) => [category, samplePath(glob)] as const),
+    ),
+  )('a reviewed change to %s path %s goes to the human queue', (category, path) => {
+    const i = reviewedChange([...FILES, file(path)]);
+    const queued = mergeReadiness(i).blockers.find((b) => b.code === 'human-queue');
+    expect(queued?.class).toBe('human');
+    expect(queued?.detail).toContain(`${category}: "${path}"`);
+  });
+
+  test('paths in several categories are named under each category', () => {
+    const i = reviewedChange([
+      ...FILES,
+      file('apps/server/src/services/secrets.ts'),
+      file('apps/server/src/services/oauth.ts'),
+      file('apps/server/drizzle/0044_x.sql', { status: 'added' }),
+    ]);
+    expect(classesOf(i)).toEqual([
+      [
+        'human-queue',
+        'human',
+        'credentials: "apps/server/src/services/secrets.ts", "apps/server/src/services/oauth.ts"',
+        'dataDestruction: "apps/server/drizzle/0044_x.sql"',
+      ],
+    ]);
+  });
+
+  test('a rename away from a human-queue path still goes to the human queue', () => {
+    const i = reviewedChange([
+      ...FILES,
+      file('apps/server/src/services/vault.ts', {
+        status: 'renamed',
+        previousFilename: 'apps/server/src/services/credentials.ts',
+      }),
+    ]);
+    expect(classesOf(i)).toEqual([
+      ['human-queue', 'human', 'credentials: "apps/server/src/services/credentials.ts"'],
+    ]);
+  });
+
+  test('a case variant of a human-queue path still goes to the human queue', () => {
+    const i = reviewedChange([...FILES, file('apps/server/src/services/Secrets.ts')]);
+    expect(codesOf(i)).toEqual(['human-queue']);
+  });
+
+  test('a reviewed protected change outside the human queue is not queued', () => {
+    expect(mergeReadiness(reviewedChange([...FILES, file('.github/workflows/ci.yml')])).ready).toBe(
+      true,
+    );
+  });
+
+  test('a product change that touches no human-queue path is unaffected', () => {
+    expect(codesOf(green())).toEqual([]);
+    expect(
+      codesOf(reviewedChange([...FILES, file('apps/server/src/services/secret-scan.ts')])),
+    ).toEqual([]);
+  });
+
+  test('the human queue holds only the PR that touches it, the green one stays ready', () => {
+    expect(mergeReadiness(reviewedChange([...FILES])).ready).toBe(true);
+    expect(
+      mergeReadiness(reviewedChange([...FILES, file('scripts/ops/deploy-self.sh')])).ready,
+    ).toBe(false);
+  });
 });
 
 describe('ADR 0026 independent protected-path review', () => {

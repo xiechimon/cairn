@@ -44,7 +44,7 @@ Security surfaces (the `credentials`, `machineAndCommandBoundary` and `externalE
 - Before asking ian about a PR with auto-merge armed, disarm it with `gh pr merge <n> --disable-auto`.
 - A PR labelled `coordinator-hold` neither queues nor merges: the coordinator asked for changes. The session that owns it keeps the label on until it has pushed the requested work, then asks the coordinator to remove it.
 - Follow `.claude/skills/pr-cairn/SKILL.md` for PR creation and merge mechanics, and `docs/ops/agent-bot-identity.md` for bot versus human identity and merge methods.
-- PRs that `.mergify.yml` admits enter the Mergify merge queue automatically once the review gate and `merge-route` pass; add the `review-gate` label and stop, and never `gh pr merge` them. Protected-path and owner-routed PRs keep ian's route.
+- PRs that `.mergify.yml` admits enter the Mergify merge queue automatically once the review gate and `merge-route` pass; add the `review-gate` label and stop, and never `gh pr merge` them. Protected-path and owner-routed PRs keep ian's route; `node scripts/human-queue.mjs` lists open PRs labelled `owner-route` or touching a `humanQueue` path in `packages/shared/merge-gate-paths.json`, with age and reason.
 
 ## How to work
 
