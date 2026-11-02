@@ -31,6 +31,13 @@ function hasClaimedStep(deps: BuildDeps, buildId: string): boolean {
   );
 }
 
+function latestBuildOf(deps: BuildDeps, todoId: string): string | null {
+  return (
+    deps.db.select({ id: todo.latestBuildId }).from(todo).where(eq(todo.id, todoId)).get()?.id ??
+    null
+  );
+}
+
 async function deliver(
   deps: BuildDeps,
   row: TodoRow,
@@ -49,7 +56,7 @@ async function deliver(
       feedback: body.content,
       clientMessageId: body.clientMessageId,
     });
-    return { conversationId: buildId, delivered: 'revision' };
+    return { conversationId: latestBuildOf(deps, row.id) ?? buildId, delivered: 'revision' };
   }
   if (row.phase === 'failed') {
     await applyBuildStepAction(deps, buildId, {
@@ -57,7 +64,7 @@ async function deliver(
       feedback: body.content,
       clientMessageId: body.clientMessageId,
     });
-    return { conversationId: buildId, delivered: 'restart' };
+    return { conversationId: latestBuildOf(deps, row.id) ?? buildId, delivered: 'restart' };
   }
   throw new HttpError(409, `thread #${row.seqNum} cannot take a message while ${row.phase}`);
 }

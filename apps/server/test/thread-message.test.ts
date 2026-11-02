@@ -2,6 +2,7 @@ import { threadMessageContentSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test, vi } from 'vitest';
 import { build, chiefMessage, message, steerPending, step, todo } from '../src/db/schema.js';
+import { pickedProjectIdOf } from '../src/services/picked-project.js';
 import { messageThreadAsUser } from '../src/services/thread-message.js';
 import { AGENT_ID, H, registerChiefHarness, toolDeps } from './chief-harness.js';
 import { req } from './helpers.js';
@@ -127,8 +128,11 @@ describe('POST /api/todos/:id/messages', () => {
     seedThread('failed');
     const res = await send({ content: 'Retry on the orb machine', clientMessageId: 'c-3' });
     expect(res.status).toBe(201);
-    expect(await res.json()).toMatchObject({ delivered: 'restart' });
-    expect(markers()[0]?.content.delivered).toBe('restart');
+    const result = (await res.json()) as { conversationId: string; delivered: string };
+    expect(result.delivered).toBe('restart');
+    const latest = H.s.db.select().from(todo).get()?.latestBuildId;
+    expect(result.conversationId).toBe(latest);
+    expect(markers()[0]?.content).toMatchObject({ delivered: 'restart', conversationId: latest });
   });
 
   test.each([
@@ -221,6 +225,19 @@ describe('Coordinator awareness of direct thread messages', () => {
     H.s.db.update(step).set({ status: 'done' }).where(eq(step.kind, 'chief')).run();
     await sayToCoordinator('And now?');
     expect(coordinatorPrompts().at(-1)).toBe('And now?');
+  });
+
+  test('keeps the picked project readable when a direct-message note is attached', async () => {
+    seedThread('building', 'claimed');
+    await send({ content: 'Use the cached index', clientMessageId: 'c-9' });
+    const res = await req(H.s.app, 'POST', `/api/teams/${H.teamId}/coordinator/messages`, {
+      content: 'Status?',
+      projectId: H.projectId,
+    });
+    expect(res.status).toBe(201);
+    const prompt = coordinatorPrompts().at(-1) ?? '';
+    expect(pickedProjectIdOf(prompt)).toBe(H.projectId);
+    expect(prompt).toContain('#7');
   });
 
   test('a message to another team’s thread is refused at the service', async () => {

@@ -638,7 +638,7 @@ export function sendChiefMessage(
   deps.db.update(chiefThread).set({ updatedAt: now }).where(eq(chiefThread.id, threadRow.id)).run();
 
   enqueueChiefStep(deps, threadRow.id, {
-    prompt: `${directNote ?? ''}${promptWithPickedProject(picked, body.content)}`,
+    prompt: promptWithPickedProject(picked, `${directNote ?? ''}${body.content}`),
     trigger: 'user',
     id: message.id,
   });
