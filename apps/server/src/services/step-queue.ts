@@ -45,6 +45,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
       holdReason: step.holdReason,
       holdUntil: step.holdUntil,
       chiefId: chiefThread.chiefId,
+      compactOnly: step.compactOnly,
     })
     .from(step)
     .innerJoin(chiefThread, eq(step.buildId, chiefThread.id))
@@ -147,7 +148,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
   }
 
   function pendingChiefOf(threadId: string): QueueTargetStep | null {
-    const rows = chiefRows.filter((r) => r.threadId === threadId);
+    const rows = chiefRows.filter((r) => r.threadId === threadId && !r.compactOnly);
     const last = rows[rows.length - 1];
     if (last === undefined) return null;
     return {

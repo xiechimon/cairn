@@ -15,7 +15,7 @@ import {
   secondPrWarningNoteRowId,
   skillFactsFromContents,
 } from '@cairn/shared';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import {
   type agent,
   agent as agentTable,
@@ -23,6 +23,7 @@ import {
   chief,
   chiefMessage,
   chiefThread,
+  chiefTurnUsage,
   machine,
   message,
   type StepFallbackRow,
@@ -46,6 +47,7 @@ import {
   toBuildRecord,
 } from './builds.js';
 import { finishChiefTurn, notifyChiefTurn, recoverGateWake } from './chief.js';
+import { finishChiefCompaction, isChiefCompactStep } from './chief-compaction.js';
 import { finishChiefDigest, isChiefDigestStep } from './chief-digest.js';
 import { cancelPendingQuestions } from './chief-questions.js';
 import { recordChiefStop, releaseUnconsumedSteer } from './chief-turns.js';
@@ -413,8 +415,46 @@ async function finishStepReport(
         set: cost === null ? tokens : { ...tokens, ...cost },
       })
       .run();
+    if (
+      stepRow.kind === 'chief' &&
+      isChiefConversation(stepRow.buildId) &&
+      !isChiefDigestStep(stepRow) &&
+      !isChiefCompactStep(stepRow)
+    ) {
+      db.insert(chiefTurnUsage)
+        .values({
+          stepId: stepRow.id,
+          threadId: stepRow.buildId,
+          model: u.model,
+          input: u.input,
+          output: u.output,
+          cacheRead: u.cacheRead,
+          cacheWrite: u.cacheWrite,
+          ttftMs: u.ttftMs ?? null,
+          contextTokens: u.contextTokens ?? null,
+          createdAt: nowMs(),
+        })
+        .onConflictDoUpdate({
+          target: [chiefTurnUsage.stepId, chiefTurnUsage.model],
+          set: {
+            input: sql`${chiefTurnUsage.input} + ${u.input}`,
+            output: sql`${chiefTurnUsage.output} + ${u.output}`,
+            cacheRead: sql`${chiefTurnUsage.cacheRead} + ${u.cacheRead}`,
+            cacheWrite: sql`${chiefTurnUsage.cacheWrite} + ${u.cacheWrite}`,
+            ttftMs: sql`coalesce(${chiefTurnUsage.ttftMs}, ${u.ttftMs ?? null})`,
+            contextTokens: sql`coalesce(${u.contextTokens ?? null}, ${chiefTurnUsage.contextTokens})`,
+          },
+        })
+        .run();
+    }
   }
   db.delete(stopPending).where(eq(stopPending.stepId, stepId)).run();
+  if (isChiefCompactStep(stepRow)) {
+    finishChiefCompaction(deps, stepRow, outcome, nowMs());
+    publishStepStatus(deps, stepId);
+    emitRuntimeStepSpan(deps.db, stepId);
+    return;
+  }
   const worker = workerStepContext(deps, stepRow);
   if (
     db.select({ archiveStop: step.archiveStop }).from(step).where(eq(step.id, stepId)).get()

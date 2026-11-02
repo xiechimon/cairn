@@ -53,6 +53,7 @@ import {
 import { sha256Hex } from '../lib/crypto.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
+import { preemptChiefCompaction } from './chief-compaction.js';
 import { answerQuestion, askQuestionContentOf } from './chief-questions.js';
 import {
   CHIEF_ABANDONED_STEP_MS,
@@ -374,7 +375,7 @@ export function chiefThreadView(deps: ChiefDeps, teamId: string, r: ThreadRow): 
   const latest = deps.db
     .select()
     .from(step)
-    .where(and(eq(step.buildId, r.id), eq(step.kind, 'chief')))
+    .where(and(eq(step.buildId, r.id), eq(step.kind, 'chief'), eq(step.compactOnly, false)))
     .orderBy(desc(step.createdAt), sql`rowid desc`)
     .limit(1)
     .get();
@@ -677,6 +678,7 @@ export function enqueueChiefStep(
   const id = opts.id ?? newRecordId();
   const prompt =
     opts.trigger === 'user' ? opts.prompt : `${WAKE_PROMPT_PREFIX}${opts.trigger}] ${opts.prompt}`;
+  preemptChiefCompaction(deps, threadId);
   deps.db
     .insert(step)
     .values({

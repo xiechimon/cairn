@@ -60,6 +60,7 @@ export const ENV_VARS = {
   mcpConfig: 'CAIRN_MCP_CONFIG',
   customModelReasoning: 'CAIRN_CUSTOM_MODEL_REASONING',
   piCacheRetention: 'CAIRN_PI_CACHE_RETENTION',
+  coordinatorIdleCompactMs: 'CAIRN_COORDINATOR_IDLE_COMPACT_MS',
   hookTimeoutMs: 'CAIRN_HOOK_TIMEOUT_MS',
   issueIntake: 'CAIRN_ISSUE_INTAKE',
   intakeAgentAllowlist: 'CAIRN_INTAKE_AGENT_ALLOWLIST',

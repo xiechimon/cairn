@@ -48,6 +48,7 @@ export const serverConfigSchema = z.object({
   pingIntervalMs: z.number().int().positive(),
   claimHoldMs: z.number().int().positive(),
   schedulerTickMs: z.number().int().positive(),
+  coordinatorIdleCompactMs: z.number().int().positive().nullable(),
   webDir: z.string().nullable(),
   githubOauth: z.object({ clientId: z.string(), clientSecret: z.string() }).nullable(),
   authToken: z.string().nullable(),
@@ -147,6 +148,10 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
     pingIntervalMs: TEAM_STREAM_PING_INTERVAL_MS,
     claimHoldMs: CLAIM_POLL_INTERVAL_MS,
     schedulerTickMs: 15_000,
+    coordinatorIdleCompactMs: (() => {
+      const raw = envStr(ENV_VARS.coordinatorIdleCompactMs);
+      return raw === null ? null : Number(raw);
+    })(),
     webDir: webDirEnv !== undefined && webDirEnv !== '' ? resolve(webDirEnv) : defaultWebDir(),
     githubOauth:
       oauthId !== undefined && oauthSecret !== undefined

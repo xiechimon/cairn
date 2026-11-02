@@ -27,6 +27,13 @@ import { blockerHandoffForClaim } from './blocker-handoff.js';
 import { failStepWithEvents, mergedPrElsewhere } from './builds.js';
 import { chiefClaimContext, parseChiefTrigger } from './chief.js';
 import {
+  CHIEF_COMPACTION,
+  compactStepIsCurrent,
+  discardCompactStep,
+  isChiefCompactStep,
+  machineCompacts,
+} from './chief-compaction.js';
+import {
   CHIEF_DIGEST_MIN_CLI_VERSION,
   CHIEF_DIGEST_REMOTE_TOOLS,
   CHIEF_DIGEST_SYSTEM_PROMPT,
@@ -194,7 +201,8 @@ function buildChiefClaim(
     .run();
   if (res.changes === 0) return null;
   const digest = isChiefDigestStep(stepRow);
-  const ctx = digest ? null : chiefClaimContext(deps, threadRow.id);
+  const compactOnly = isChiefCompactStep(stepRow);
+  const ctx = digest || compactOnly ? null : chiefClaimContext(deps, threadRow.id);
   const trigger = parseChiefTrigger(stepRow.prompt);
   const systemPrompt = digest ? CHIEF_DIGEST_SYSTEM_PROMPT : (ctx?.systemPrompt ?? '');
   let routeSection = '';
@@ -210,9 +218,10 @@ function buildChiefClaim(
     if (hint) routeSection = formatSkillRouteSection(hint);
   }
   const memories = injectMemories(deps.db, { agentId: agentRow.id });
-  const chiefMcp = digest
-    ? []
-    : claimMcpSlugs(machineRow?.latestCliVersion ?? null, agentRow.mcpServers);
+  const chiefMcp =
+    digest || compactOnly
+      ? []
+      : claimMcpSlugs(machineRow?.latestCliVersion ?? null, agentRow.mcpServers);
   return {
     step: {
       id: stepRow.id,
@@ -226,7 +235,7 @@ function buildChiefClaim(
       action: !stepRow.freshSession && threadRow.sessionId !== '' ? 'continue' : 'new',
       sessionId: !stepRow.freshSession && threadRow.sessionId !== '' ? threadRow.sessionId : null,
     },
-    ...(stepRow.prompt !== null
+    ...(stepRow.prompt !== null && !compactOnly
       ? {
           instruction:
             routeSection === '' ? stepRow.prompt : `${stepRow.prompt}\n\n${routeSection}`,
@@ -245,10 +254,12 @@ function buildChiefClaim(
       threadId: threadRow.id,
       systemPrompt,
       trigger,
+      ...(digest ? {} : { compaction: CHIEF_COMPACTION }),
+      ...(compactOnly ? { compactOnly: true as const } : {}),
     },
-    remoteTools: [...(digest ? CHIEF_DIGEST_REMOTE_TOOLS : CHIEF_REMOTE_TOOLS)],
+    remoteTools: compactOnly ? [] : [...(digest ? CHIEF_DIGEST_REMOTE_TOOLS : CHIEF_REMOTE_TOOLS)],
     ...(chiefMcp !== undefined ? { mcpServers: chiefMcp } : {}),
-    ...(digest ? { remoteToolsOnly: true as const } : {}),
+    ...(digest || compactOnly ? { remoteToolsOnly: true as const } : {}),
   };
 }
 
@@ -290,6 +301,10 @@ async function tryClaim(
   for (const cand of chiefCands) {
     if (cand.stepRow.createdAt > earliestWorker) break;
     if (hasEarlierLiveChiefStep(db, cand.stepRow)) continue;
+    if (isChiefCompactStep(cand.stepRow) && !compactStepIsCurrent(db, cand.stepRow)) {
+      discardCompactStep(deps, cand.stepRow, 'stale');
+      continue;
+    }
     if (
       isChiefDigestStep(cand.stepRow) &&
       !cliVersionAtLeast(machineRow.latestCliVersion, CHIEF_DIGEST_MIN_CLI_VERSION)
@@ -300,6 +315,10 @@ async function tryClaim(
     if (chiefRuntime === 'claude-code' && claudeBlocked(machineId)) continue;
     if (cand.agentRow.machineId !== machineId) {
       if (chiefRuntime !== 'claude-code' || !claudeBlocked(cand.agentRow.machineId)) continue;
+    }
+    if (isChiefCompactStep(cand.stepRow) && !machineCompacts(machineRow)) {
+      discardCompactStep(deps, cand.stepRow, 'unsupported');
+      continue;
     }
     if (
       cand.agentRow.maxConcurrentTasks !== null &&

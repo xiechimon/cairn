@@ -6,7 +6,7 @@ export interface StopRequest {
 
 export class RunStop {
   private current: StopRequest | null = null;
-  private session: AgentSessionHandle | null = null;
+  private session: Pick<AgentSessionHandle, 'stop'> | null = null;
 
   constructor(
     private readonly persist: (req: StopRequest | null) => void,
@@ -27,7 +27,7 @@ export class RunStop {
     await this.interrupt();
   }
 
-  attach(session: AgentSessionHandle): Promise<void> {
+  attach(session: Pick<AgentSessionHandle, 'stop'>): Promise<void> {
     this.session = session;
     return this.interrupt();
   }

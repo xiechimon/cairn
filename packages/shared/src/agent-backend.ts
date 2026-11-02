@@ -39,6 +39,8 @@ export const modelUsageSchema = z.object({
   cacheRead: z.number().int(),
   cacheWrite: z.number().int(),
   cost: modelCostSchema.optional(),
+  ttftMs: z.number().int().nonnegative().optional(),
+  contextTokens: z.number().int().nonnegative().optional(),
 });
 export type ModelUsage = z.infer<typeof modelUsageSchema>;
 
@@ -151,6 +153,15 @@ export interface SessionOpts {
   prompt?: string;
   promptImages?: readonly DeliveredImage[];
   onClaudeRateLimit?: (notice: ClaudeRateLimitNotice) => void;
+  compaction?: { thresholdTokens: number; keepRecentTokens: number };
+}
+
+export interface SessionCompaction {
+  compacted: boolean;
+  tokensBefore: number | null;
+  tokensAfter: number | null;
+  summaryTokens: number | null;
+  usage: AgentTokenUsage;
 }
 
 export interface DeliveredImage {
@@ -180,6 +191,7 @@ export interface AgentBackend {
   adaptProviderCompat?(provider: ProviderConfig, errorMessage: string): ProviderConfig | null;
   modelSupportsImages?(provider: ProviderConfig, modelId: string): Promise<boolean | null>;
   rememberNoVision?(provider: ProviderConfig, modelId: string): void;
+  compactSession?(id: string, opts: SessionOpts, signal: AbortSignal): Promise<SessionCompaction>;
 }
 
 export const BACKEND_RUNTIME_IDS = ['claude-code', 'gemini'] as const;

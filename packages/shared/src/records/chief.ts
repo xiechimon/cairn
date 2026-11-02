@@ -209,6 +209,42 @@ export const coordinatorPageResponseSchema = z.object({
 });
 export type CoordinatorPageResponse = z.infer<typeof coordinatorPageResponseSchema>;
 
+export const COORDINATOR_CONTEXT_SECTIONS = [
+  'system',
+  'tools',
+  'brief',
+  'index',
+  'summary',
+  'recent',
+] as const;
+
+export const coordinatorSummarySchema = z.object({
+  coveredThroughMessageId: z.string(),
+  generation: z.number().int().nonnegative(),
+  updatedAt: epochMs,
+});
+export type CoordinatorSummary = z.infer<typeof coordinatorSummarySchema>;
+
+export const coordinatorContextResponseSchema = z.object({
+  budgetTokens: z.number().int().nonnegative(),
+  usedTokens: z.number().int().nonnegative(),
+  sections: z.array(
+    z.object({
+      name: z.enum(COORDINATOR_CONTEXT_SECTIONS),
+      tokens: z.number().int().nonnegative(),
+    }),
+  ),
+  summary: coordinatorSummarySchema.nullable(),
+  cacheReadShare: z.number().min(0).max(1).nullable(),
+});
+export type CoordinatorContextResponse = z.infer<typeof coordinatorContextResponseSchema>;
+
+export const coordinatorCompactResponseSchema = z.union([
+  z.object({ summary: coordinatorSummarySchema }),
+  z.object({ skipped: z.literal('unchanged') }),
+]);
+export type CoordinatorCompactResponse = z.infer<typeof coordinatorCompactResponseSchema>;
+
 export const projectCoordinatorResponseSchema = z.object({
   thread: chiefThreadSchema.nullable(),
 });

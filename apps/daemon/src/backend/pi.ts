@@ -12,6 +12,7 @@ import type {
   ModelUsage,
   ProviderCompat,
   ProviderConfig,
+  SessionCompaction,
   SessionOpts,
   StepEvent,
   ToolCallRecord,
@@ -19,10 +20,12 @@ import type {
 import { ENV_VARS, THINKING_LEVELS } from '@cairn/shared';
 import {
   type AgentSession,
+  type CompactionSettings,
   createAgentSession,
   createBashToolDefinition,
   createMcpExtension,
   createReadToolDefinition,
+  DEFAULT_COMPACTION_SETTINGS,
   DefaultResourceLoader,
   defineTool,
   type ExtensionUIContext,
@@ -89,11 +92,28 @@ export const PI_DAEMON_SETTINGS: PiSettingsSeed = {
   cacheWarming: 'off',
 };
 
-export function daemonSettingsManager(): SettingsManager {
+export function daemonSettingsManager(
+  compaction: CompactionSettings = { ...DEFAULT_COMPACTION_SETTINGS, enabled: true },
+): SettingsManager {
   return SettingsManager.inMemory(
-    { ...buildPiSessionSettings(), ...PI_DAEMON_SETTINGS },
+    { ...buildPiSessionSettings(), ...PI_DAEMON_SETTINGS, compaction },
     { projectTrusted: false },
   );
+}
+
+export function sessionCompactionSettings(
+  tuned: SessionOpts['compaction'],
+  contextWindow: number,
+): CompactionSettings {
+  if (tuned === undefined) return { ...DEFAULT_COMPACTION_SETTINGS, enabled: true };
+  return {
+    enabled: true,
+    reserveTokens: Math.max(
+      DEFAULT_COMPACTION_SETTINGS.reserveTokens,
+      contextWindow - tuned.thresholdTokens,
+    ),
+    keepRecentTokens: tuned.keepRecentTokens,
+  };
 }
 
 export const PI_SETTINGS_BYPASS = [
@@ -414,6 +434,7 @@ interface PiMessageLike {
     output?: number;
     cacheRead?: number;
     cacheWrite?: number;
+    totalTokens?: number;
     cost?: {
       input?: number;
       output?: number;
@@ -447,6 +468,34 @@ export interface MapState {
   usage: Map<string, ModelUsage>;
   calls: Map<string, ToolCallRecord>;
   diagnose?: (message: string) => string;
+  now: () => number;
+  promptSentAt?: number;
+  firstToken?: { model: string; ms: number };
+  lastContext?: { model: string; tokens: number };
+}
+
+export const FIRST_TOKEN_EVENTS: ReadonlySet<string> = new Set([
+  'text_delta',
+  'thinking_delta',
+  'toolcall_delta',
+  'toolcall_end',
+]);
+
+export function notePromptSent(state: MapState): void {
+  state.promptSentAt = state.now();
+  delete state.firstToken;
+}
+
+function noteFirstToken(state: MapState, event: AgentSessionEventLike): void {
+  if (state.promptSentAt === undefined || state.firstToken !== undefined) return;
+  const msg = event.message;
+  const type = event.assistantMessageEvent?.type;
+  if (msg?.provider === undefined || msg.model === undefined) return;
+  if (type === undefined || !FIRST_TOKEN_EVENTS.has(type)) return;
+  state.firstToken = {
+    model: `${msg.provider}/${msg.model}`,
+    ms: Math.max(0, Math.round(state.now() - state.promptSentAt)),
+  };
 }
 
 export function recordPiSpanEvent(sink: PiStepSpanSink, event: AgentSessionEventLike): void {
@@ -488,10 +537,14 @@ export function recordPiSpanEvent(sink: PiStepSpanSink, event: AgentSessionEvent
   }
 }
 
-export function newMapState(opts?: { diagnose?: (message: string) => string }): MapState {
+export function newMapState(opts?: {
+  diagnose?: (message: string) => string;
+  now?: () => number;
+}): MapState {
   return {
     usage: new Map(),
     calls: new Map(),
+    now: opts?.now ?? (() => performance.now()),
     ...(opts?.diagnose !== undefined ? { diagnose: opts.diagnose } : {}),
   };
 }
@@ -525,6 +578,7 @@ export function mapPiSessionEvent(event: AgentSessionEventLike, state: MapState)
     case 'message_update': {
       const msg = event.message;
       if (!msg) return [];
+      noteFirstToken(state, event);
       const record = toMessageRecord(msg);
       const ame = event.assistantMessageEvent;
       if (!ame) return [{ type: 'message_update', message: record }];
@@ -587,6 +641,8 @@ export function mapPiSessionEvent(event: AgentSessionEventLike, state: MapState)
           next.cost = prev.cost;
         }
         state.usage.set(key, next);
+        const context = contextTokensOf(msg);
+        if (context > 0) state.lastContext = { model: key, tokens: context };
       }
       if (msg.stopReason === 'aborted') {
         return [{ type: 'message_stop', message: toMessageRecord(msg) }];
@@ -626,14 +682,35 @@ export function mapPiSessionEvent(event: AgentSessionEventLike, state: MapState)
     case 'auto_retry_end':
       return [{ type: 'auto_retry_end', attempt: event.attempt ?? 1 }];
     case 'agent_settled': {
-      const usage: ModelUsage[] = [...state.usage.values()];
-      return [{ type: 'done', usage }];
+      return [{ type: 'done', usage: settledUsage(state) }];
     }
     case 'agent_end':
       return [];
     default:
       return [];
   }
+}
+
+function contextTokensOf(msg: PiMessageLike): number {
+  if (msg.stopReason === 'aborted' || msg.stopReason === 'error' || msg.usage === undefined) {
+    return 0;
+  }
+  const u = msg.usage;
+  return (
+    u.totalTokens || (u.input ?? 0) + (u.output ?? 0) + (u.cacheRead ?? 0) + (u.cacheWrite ?? 0)
+  );
+}
+
+function settledUsage(state: MapState): ModelUsage[] {
+  const first = state.firstToken;
+  const context = state.lastContext;
+  return [...state.usage.values()].map((u) => ({
+    ...u,
+    ...(first !== undefined && u.model === first.model ? { ttftMs: first.ms } : {}),
+    ...(context !== undefined && u.model === context.model
+      ? { contextTokens: context.tokens }
+      : {}),
+  }));
 }
 
 class EventQueue {
@@ -756,9 +833,73 @@ class PiSessionHandle implements AgentSessionHandle {
   }
 
   usage(): AgentTokenUsage {
-    return [...this.state.usage.values()];
+    return settledUsage(this.state);
+  }
+
+  notePromptSent(): void {
+    notePromptSent(this.state);
+  }
+
+  async compact(signal: AbortSignal): Promise<SessionCompaction> {
+    const abort = (): void => {
+      void this.session.abort();
+    };
+    signal.addEventListener('abort', abort, { once: true });
+    try {
+      if (signal.aborted) throw new Error('Compaction cancelled');
+      const result = await this.session.compact();
+      const model = this.session.model;
+      const usage = result.usage;
+      return {
+        compacted: true,
+        tokensBefore: result.tokensBefore,
+        tokensAfter: result.estimatedTokensAfter ?? null,
+        summaryTokens: Math.ceil(result.summary.length / 4),
+        usage:
+          usage === undefined || model === undefined
+            ? []
+            : [
+                {
+                  model: `${model.provider}/${model.id}`,
+                  input: usage.input,
+                  output: usage.output,
+                  cacheRead: usage.cacheRead,
+                  cacheWrite: usage.cacheWrite,
+                  cost: usage.cost,
+                },
+              ],
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (!signal.aborted && PI_ALREADY_COMPACTED.test(message)) {
+        return {
+          compacted: true,
+          tokensBefore: null,
+          tokensAfter: null,
+          summaryTokens: null,
+          usage: [],
+        };
+      }
+      if (!signal.aborted && PI_NOTHING_TO_COMPACT.test(message)) {
+        return {
+          compacted: false,
+          tokensBefore: null,
+          tokensAfter: null,
+          summaryTokens: null,
+          usage: [],
+        };
+      }
+      throw err;
+    } finally {
+      signal.removeEventListener('abort', abort);
+      this.finish();
+    }
   }
 }
+
+const PI_NOTHING_TO_COMPACT = /^Nothing to compact/;
+
+const PI_ALREADY_COMPACTED = /^Already compacted/;
 
 export interface PiBackendOpts {
   agentDir: string;
@@ -816,11 +957,25 @@ export class PiBackend implements AgentBackend {
   }
 
   async continueSession(id: string, opts: SessionOpts): Promise<AgentSessionHandle> {
+    return this.open(opts, this.resumableFile(id));
+  }
+
+  async compactSession(
+    id: string,
+    opts: SessionOpts,
+    signal: AbortSignal,
+  ): Promise<SessionCompaction> {
+    const { prompt: _prompt, promptImages: _images, ...rest } = opts;
+    const handle = await this.open(rest, this.resumableFile(id));
+    return handle.compact(signal);
+  }
+
+  private resumableFile(id: string): string {
     const file = this.opts.resolveSessionFile?.(id) ?? null;
     if (!file || !existsSync(file)) {
       throw new SessionNotResumableError(id);
     }
-    return this.open(opts, file);
+    return file;
   }
 
   adaptProviderCompat(provider: ProviderConfig, errorMessage: string): ProviderConfig | null {
@@ -835,7 +990,7 @@ export class PiBackend implements AgentBackend {
     rememberNoVision(provider.providerId, modelId);
   }
 
-  private async open(opts: SessionOpts, resumeFile: string | null): Promise<AgentSessionHandle> {
+  private async open(opts: SessionOpts, resumeFile: string | null): Promise<PiSessionHandle> {
     const modelsPath = join(this.opts.agentDir, 'models.json');
     materializeProvider(modelsPath, opts.provider);
     const authPath = join(this.opts.agentDir, 'auth.json');
@@ -862,7 +1017,9 @@ export class PiBackend implements AgentBackend {
           : { machineName: hostname() }),
         ...(opts.provider.baseUrl !== undefined ? { providerBaseUrl: opts.provider.baseUrl } : {}),
       });
-    const settingsManager = daemonSettingsManager();
+    const settingsManager = daemonSettingsManager(
+      sessionCompactionSettings(opts.compaction, model.contextWindow),
+    );
     const protectedPresent = detectTrustProtectedResources(opts.cwd);
     if (protectedPresent.length > 0) {
       this.opts.onTrustLog?.(
@@ -1058,6 +1215,7 @@ export class PiBackend implements AgentBackend {
       if (promptImages !== undefined) {
         ensureImageInput(model);
       }
+      handle.notePromptSent();
       const sent =
         promptImages !== undefined
           ? session.prompt(opts.prompt, { images: toPiImages(promptImages) })

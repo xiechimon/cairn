@@ -112,7 +112,14 @@ describe('mapPiSessionEvent (AgentSessionEvent → StepEvent projection)', () =>
       {
         type: 'done',
         usage: [
-          { model: 'stub-gw/stub-model', input: 13, output: 982, cacheRead: 100, cacheWrite: 50 },
+          {
+            model: 'stub-gw/stub-model',
+            input: 13,
+            output: 982,
+            cacheRead: 100,
+            cacheWrite: 50,
+            contextTokens: 3,
+          },
         ],
       },
     ]);
@@ -165,7 +172,9 @@ describe('mapPiSessionEvent (AgentSessionEvent → StepEvent projection)', () =>
     expect(done).toEqual([
       {
         type: 'done',
-        usage: [{ model: 'gw/m', input: 5, output: 7, cacheRead: 0, cacheWrite: 0 }],
+        usage: [
+          { model: 'gw/m', input: 5, output: 7, cacheRead: 0, cacheWrite: 0, contextTokens: 12 },
+        ],
       },
     ]);
   });
@@ -229,6 +238,7 @@ describe('mapPiSessionEvent (AgentSessionEvent → StepEvent projection)', () =>
             cacheRead: 101,
             cacheWrite: 0,
             cost: { input: 3, output: 1964, cacheRead: 50.5, cacheWrite: 0, total: 2017.5 },
+            contextTokens: 6,
           },
         ],
       },
@@ -253,7 +263,14 @@ describe('mapPiSessionEvent (AgentSessionEvent → StepEvent projection)', () =>
     const done = map({ type: 'agent_settled' }, state);
     const usage = (done[0] as { usage: Record<string, unknown>[] }).usage[0]!;
     expect(usage).not.toHaveProperty('cost');
-    expect(usage).toEqual({ model: 'p/m', input: 1, output: 2, cacheRead: 3, cacheWrite: 4 });
+    expect(usage).toEqual({
+      model: 'p/m',
+      input: 1,
+      output: 2,
+      cacheRead: 3,
+      cacheWrite: 4,
+      contextTokens: 10,
+    });
   });
 
   test('stopReason=length passes through rawStopReason / responseModel (#1512)', () => {

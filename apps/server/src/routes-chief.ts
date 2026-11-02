@@ -22,7 +22,11 @@ import {
 } from './services/chief.js';
 import { cancelQuestion, parseAnswerBody } from './services/chief-questions.js';
 import { steerChiefMessage, stopChiefTurn, withdrawChiefMessage } from './services/chief-turns.js';
-import { readCoordinatorPage } from './services/coordinator.js';
+import {
+  compactCoordinator,
+  readCoordinatorContext,
+  readCoordinatorPage,
+} from './services/coordinator.js';
 import { isChiefConversation } from './services/machines.js';
 import {
   cancelQueuedMessage,
@@ -47,6 +51,18 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
     const result = sendChiefMessage(svc, teamId, { threadId: null, ...body });
     ctx.convHub?.publishMessage(result.thread.id, { ...result.message });
     return c.json(result, 201);
+  });
+
+  app.get('/api/teams/:id/coordinator/context', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    return c.json(readCoordinatorContext({ ...svc, skillsDir: ctx.skillsDir }, teamId));
+  });
+
+  app.post('/api/teams/:id/coordinator/compact', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    return c.json(await compactCoordinator(svc, teamId));
   });
 
   app.get('/api/teams/:id/chief', (c) => {

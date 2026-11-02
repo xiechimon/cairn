@@ -109,6 +109,30 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
     "chief": {
       "additionalProperties": false,
       "properties": {
+        "compactOnly": {
+          "const": true,
+          "type": "boolean",
+        },
+        "compaction": {
+          "additionalProperties": false,
+          "properties": {
+            "keepRecentTokens": {
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991,
+              "type": "integer",
+            },
+            "thresholdTokens": {
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991,
+              "type": "integer",
+            },
+          },
+          "required": [
+            "thresholdTokens",
+            "keepRecentTokens",
+          ],
+          "type": "object",
+        },
         "systemPrompt": {
           "type": "string",
         },
@@ -758,6 +782,30 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
             "chief": {
               "additionalProperties": false,
               "properties": {
+                "compactOnly": {
+                  "const": true,
+                  "type": "boolean",
+                },
+                "compaction": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "keepRecentTokens": {
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991,
+                      "type": "integer",
+                    },
+                    "thresholdTokens": {
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991,
+                      "type": "integer",
+                    },
+                  },
+                  "required": [
+                    "thresholdTokens",
+                    "keepRecentTokens",
+                  ],
+                  "type": "object",
+                },
                 "systemPrompt": {
                   "type": "string",
                 },
@@ -1281,6 +1329,57 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
     "commit": {
       "type": "string",
     },
+    "compaction": {
+      "additionalProperties": false,
+      "properties": {
+        "compacted": {
+          "type": "boolean",
+        },
+        "summaryTokens": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            {
+              "type": "null",
+            },
+          ],
+        },
+        "tokensAfter": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            {
+              "type": "null",
+            },
+          ],
+        },
+        "tokensBefore": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            {
+              "type": "null",
+            },
+          ],
+        },
+      },
+      "required": [
+        "compacted",
+        "tokensBefore",
+        "tokensAfter",
+        "summaryTokens",
+      ],
+      "type": "object",
+    },
     "errorMessage": {
       "type": "string",
     },
@@ -1604,6 +1703,11 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
             "minimum": -9007199254740991,
             "type": "integer",
           },
+          "contextTokens": {
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer",
+          },
           "cost": {
             "additionalProperties": false,
             "properties": {
@@ -1643,6 +1747,11 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
           "output": {
             "maximum": 9007199254740991,
             "minimum": -9007199254740991,
+            "type": "integer",
+          },
+          "ttftMs": {
+            "maximum": 9007199254740991,
+            "minimum": 0,
             "type": "integer",
           },
         },
@@ -3155,6 +3264,11 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                 "minimum": -9007199254740991,
                 "type": "integer",
               },
+              "contextTokens": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
               "cost": {
                 "additionalProperties": false,
                 "properties": {
@@ -3194,6 +3308,11 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
               "output": {
                 "maximum": 9007199254740991,
                 "minimum": -9007199254740991,
+                "type": "integer",
+              },
+              "ttftMs": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
                 "type": "integer",
               },
             },
@@ -6570,6 +6689,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > executor minimum-
   ],
   "ENV_VARS": {
     "apiKey": "CAIRN_API_KEY",
+    "coordinatorIdleCompactMs": "CAIRN_COORDINATOR_IDLE_COMPACT_MS",
     "customModelReasoning": "CAIRN_CUSTOM_MODEL_REASONING",
     "githubCreateHourlyCap": "CAIRN_GITHUB_CREATE_HOURLY_CAP",
     "githubCreateMinIntervalMs": "CAIRN_GITHUB_CREATE_MIN_INTERVAL_MS",
@@ -7043,6 +7163,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "chief",
   "chief_thread",
   "chief_message",
+  "chief_turn_usage",
   "attachment",
   "branch_sync",
   "github_connection",
@@ -7189,6 +7310,16 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "method": "POST",
     "note": "body {content, projectId?}; projectId only tags the turn, 409 when that project is archived",
     "path": "/api/teams/{id}/coordinator/messages",
+  },
+  {
+    "method": "GET",
+    "note": "{budgetTokens, usedTokens, sections[{name, tokens}], summary, cacheReadShare}; usedTokens and cacheReadShare come from the last turn usage, system/tools are tokenized estimates, brief/index are 0 under session resume, summary/recent split usedTokens (#2522)",
+    "path": "/api/teams/{id}/coordinator/context",
+  },
+  {
+    "method": "POST",
+    "note": "compact the resumed session now, on the idle-compaction path: 200 {summary} once landed, 200 {skipped: "unchanged"} when nothing new is covered, 409 while a turn runs or waits (#2522)",
+    "path": "/api/teams/{id}/coordinator/compact",
   },
   {
     "method": "GET",
@@ -8371,6 +8502,12 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
         {
           "additionalProperties": false,
           "properties": {
+            "features": {
+              "items": {
+                "type": "string",
+              },
+              "type": "array",
+            },
             "hardware": {
               "additionalProperties": false,
               "properties": {

@@ -10,10 +10,14 @@ export const machineHardwareSchema = z.object({
 });
 export type MachineHardware = z.infer<typeof machineHardwareSchema>;
 
+export const MACHINE_FEATURES = ['chief-compact'] as const;
+export type MachineFeature = (typeof MACHINE_FEATURES)[number];
+
 export const machineCapabilitiesSchema = z.object({
   mcpServers: z.array(z.string()),
   skills: z.array(z.string()),
   hardware: machineHardwareSchema.optional(),
+  features: z.array(z.string()).optional(),
 });
 export type MachineCapabilities = z.infer<typeof machineCapabilitiesSchema>;
 
@@ -27,9 +31,13 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
     })
     .safeParse({ mcpServers: rec.mcpServers, skills: rec.skills });
   if (!base.success) return undefined;
-  if (rec.hardware === undefined) return base.data;
+  const features = z.array(z.string()).safeParse(rec.features);
   const hardware = machineHardwareSchema.safeParse(rec.hardware);
-  return hardware.success ? { ...base.data, hardware: hardware.data } : base.data;
+  return {
+    ...base.data,
+    ...(hardware.success ? { hardware: hardware.data } : {}),
+    ...(features.success ? { features: features.data } : {}),
+  };
 }
 
 export const requiredCapabilitiesSchema = z.object({
