@@ -71,13 +71,13 @@ test('home stays quiet for a fresh backup and for a server without one', async (
   const fresh = page.waitForResponse('**/api/server/backup');
   await page.goto('/app');
   await fresh;
-  await expect(page.getByTestId('chief-home-today').getByTestId('chief-brief')).toBeVisible();
+  await expect(page.getByTestId('home-c').getByTestId('chief-stream')).toContainText('已经补给它了');
   await expect(page.getByTestId('backup-warning')).toHaveCount(0);
 
   await mockLive(page, { threads: [THREAD], messages: MESSAGES, backup: { state: 'none' } });
   const none = page.waitForResponse('**/api/server/backup');
   await page.goto('/app');
   await none;
-  await expect(page.getByTestId('chief-home-today').getByTestId('chief-brief')).toBeVisible();
+  await expect(page.getByTestId('home-c').getByTestId('chief-stream')).toContainText('已经补给它了');
   await expect(page.getByTestId('backup-warning')).toHaveCount(0);
 });

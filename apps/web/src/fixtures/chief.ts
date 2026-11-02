@@ -139,7 +139,6 @@ export const chiefThreadsOpen: FixtureSet = {
     bound: true,
     modelSlot: 'claude-sonnet-5 · 默认',
     threadTitle: '给 r3-lifecycle 做三件小事…',
-    threadsOpen: true,
     threads: CHIEF_THREADS,
     stream: [
       {
@@ -207,7 +206,6 @@ export const chiefThreadsLong: FixtureSet = {
     bound: true,
     modelSlot: 'claude-sonnet-5 · 默认',
     threadTitle: '给 r3-lifecycle 做三件小事…',
-    threadsOpen: true,
     threads: CHIEF_THREADS_LONG,
     stream: [
       {

@@ -22,6 +22,27 @@ async function stubBoot(page: Page) {
     if (request.method() !== 'GET') return route.fallback();
     return route.fulfill({ json: [] });
   });
+  await page.route(`**/api/teams/${TEAM_ID}/chief`, (route, request) => {
+    if (request.method() !== 'GET') return route.fallback();
+    return route.fulfill({
+      json: {
+        chief: {
+          id: `chief-${USER.id}-${TEAM_ID}`,
+          userId: USER.id,
+          teamId: TEAM_ID,
+          agent: null,
+          charter: '',
+          lastTurnAt: null,
+          createdAt: 0,
+          tz: null,
+        },
+        agentActor: null,
+        context: null,
+        watches: [],
+        wakes: [],
+      },
+    });
+  });
 }
 
 async function openChiefComposer(page: Page) {
@@ -124,9 +145,9 @@ test('live face: minimize and SPA route switches keep the draft (D6 zero regress
   await page.getByRole('link', { name: '技能' }).click();
   await expect(page).toHaveURL(/\/app\/resources\/skills/);
   await expect(input).toHaveValue(DRAFT);
-  await page.getByRole('complementary').locator('[data-slot="sidebar-nav-row"]', { hasText: '工作台' }).click();
+  await page.getByRole('complementary').locator('[data-slot="sidebar-nav-row"]', { hasText: '首页' }).click();
   await expect(page).toHaveURL(/\/app$/);
-  await expect(input).toHaveValue(DRAFT);
+  await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toHaveValue(DRAFT);
   await evidenceShot(page, 'd6-legs-draft-intact.png');
 });
 

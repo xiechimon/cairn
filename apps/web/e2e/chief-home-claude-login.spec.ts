@@ -1,34 +1,7 @@
 import { expect, test } from '@playwright/test';
-import { HISTORY, mockLive, PROJECT, TASK, THREAD } from './chief-home-mock';
+import { mockLive, PROJECT, TASK, THREAD } from './chief-home-mock';
 
 const DAY = 24 * 60 * 60 * 1000;
-const YESTERDAY_BASE = new Date().setHours(0, 0, 0, 0) - 10 * 60 * 60 * 1000;
-const YESTERDAY_HISTORY = HISTORY.map((row, i) => ({
-  ...row,
-  createdAt: YESTERDAY_BASE + i * 60_000,
-}));
-const SITE = { ...PROJECT, id: 'proj-2', name: 'cairn-site', repoName: 'cairn-site' };
-const DAY_TASKS = [
-  TASK,
-  {
-    ...TASK,
-    id: 'todo-2',
-    seqNum: 12,
-    title: '首页问候语对齐原型',
-    phase: 'review',
-    phaseAt: Date.now() - 2 * 60 * 60 * 1000,
-  },
-  {
-    ...TASK,
-    id: 'todo-3',
-    projectId: 'proj-2',
-    seqNum: 4,
-    title: '官网作品区换成真实截图',
-    phase: 'done',
-    phaseAt: Date.now() - 3 * 60 * 60 * 1000,
-  },
-];
-
 const MACHINES = [
   {
     id: 'machine-omarchy',
@@ -72,18 +45,19 @@ const MACHINES = [
   },
 ];
 
-test('daily brief warns for expiring and expired Claude Code logins', async ({ page }) => {
+test('home warns for expiring and expired Claude Code logins above Needs you', async ({ page }) => {
   await mockLive(page, {
     threads: [THREAD],
-    messages: YESTERDAY_HISTORY,
-    todos: DAY_TASKS,
-    projects: [PROJECT, SITE],
+    messages: [],
+    todos: [TASK],
+    projects: [PROJECT],
     machines: MACHINES,
   });
   await page.goto('/app');
-  const today = page.getByTestId('chief-home-today');
-  await expect(today.getByTestId('chief-brief')).toBeVisible();
-  const warnings = today.getByTestId('claude-login-warning');
+  const home = page.getByTestId('home-c');
+  const banner = home.getByTestId('claude-login-banner');
+  await expect(banner).toBeVisible();
+  const warnings = banner.getByTestId('claude-login-warning');
   await expect(warnings).toHaveCount(2);
   await expect(warnings.nth(0)).toHaveAttribute('data-login', 'expiring');
   await expect(warnings.nth(0)).toHaveText(
@@ -93,6 +67,6 @@ test('daily brief warns for expiring and expired Claude Code logins', async ({ p
   await expect(warnings.nth(1)).toHaveText(
     'ghost 上的 Claude Code 登录已过期。在该机器上运行 `claude auth login` 重新登录。',
   );
-  await expect(today.getByText('steady', { exact: true })).toHaveCount(0);
-  await expect(today.getByText('mystery', { exact: true })).toHaveCount(0);
+  await expect(home.getByText('steady', { exact: true })).toHaveCount(0);
+  await expect(home.getByText('mystery', { exact: true })).toHaveCount(0);
 });

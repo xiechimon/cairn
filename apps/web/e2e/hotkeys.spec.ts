@@ -298,30 +298,11 @@ test('the collapsed rail search icon hovers the ⌘K hint', async ({ page }) => 
   await expect(hint.locator('[data-slot="kbd"]')).toHaveText('⌘K');
 });
 
-test('the drawer new-thread + hovers the N hint and advertises aria-keyshortcuts', async ({
-  page,
-}) => {
-  await page.goto(BOARD);
-  await pressAndExpect(page, 'Meta+j', drawer(page));
-  const newThread = drawer(page).locator('button[aria-label="新主题"]');
-  await expect(newThread).toBeVisible();
-  await expect(newThread).toHaveAttribute('aria-keyshortcuts', 'N');
-
-  const hint = page.locator('[data-slot="tooltip-content"]');
-  await expect(hint).toHaveCount(0);
-  await newThread.hover();
-  await expect(hint).toBeVisible();
-  await expect(hint.locator('[data-slot="kbd"]')).toHaveText('N');
-});
-
 test('with the drawer closed, N stays retired — neither drawer nor dialog opens', async ({
   page,
 }) => {
   await page.goto(BOARD);
   await expect(page.getByRole('complementary')).toBeVisible();
-  // The new binding is drawer-scoped (the enabled gate): with the drawer
-  // shut the listener is off the window, so the retired-global law
-  // (XMON-37, test 1) holds on the drawer face too.
   await pressesStayHidden(page, 'n', drawer(page));
   await expect(dialog(page)).toHaveCount(0);
 });

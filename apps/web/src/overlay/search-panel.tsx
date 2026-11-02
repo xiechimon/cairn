@@ -31,7 +31,7 @@ import { PHASE_STATUS, PHASE_UI } from '../phase.js';
 
 const NAV_ROWS = [
   { label: '任务', Icon: FileCheck, href: '/app' },
-  { label: '工作台', Icon: Kanban, href: '/app' },
+  { label: '首页', Icon: Kanban, href: '/app' },
   { label: '定时', Icon: Clock, href: '/app/schedules' },
   { label: '团队', Icon: Users, href: '/app/team' },
   { label: '技能', Icon: Puzzle, href: '/app/resources/skills' },

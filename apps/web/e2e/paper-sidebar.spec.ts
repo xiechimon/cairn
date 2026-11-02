@@ -35,7 +35,7 @@ test('five parts stack top to bottom in a 248px sidebar', async ({ page }) => {
     await top(page, '[data-testid="team-row"]'),
     await top(page, '.sidebar-new-task'),
     await aside.getByRole('button', { name: /搜索/ }).evaluate((el) => el.getBoundingClientRect().top),
-    await aside.locator('[data-slot="sidebar-nav-row"]', { hasText: '工作台' }).evaluate((el) => el.getBoundingClientRect().top),
+    await aside.locator('[data-slot="sidebar-nav-row"]', { hasText: '首页' }).evaluate((el) => el.getBoundingClientRect().top),
     await aside.locator('[data-slot="sidebar-nav-row"]', { hasText: '定时' }).evaluate((el) => el.getBoundingClientRect().top),
     await top(page, '[data-testid="project-group"]'),
     await aside.getByRole('button', { name: '资源' }).evaluate((el) => el.getBoundingClientRect().top),
@@ -58,12 +58,12 @@ test('`新任务` row opens the new-task dialog without a sidebar key badge', as
   await expect(page.getByRole('dialog')).toBeVisible();
 });
 
-test('`Workbench` badge counts the `待处理` column and opens the home view', async ({ page }) => {
+test('`Home` badge counts the `待处理` column and opens the home view', async ({ page }) => {
   await page.goto('/app?scenario=01&view=board');
   const pendingCount = await page
     .locator('[data-column="pending"] [data-testid="column-count"]')
     .textContent();
-  const home = sidebar(page).locator('[data-slot="sidebar-nav-row"]', { hasText: '工作台' });
+  const home = sidebar(page).locator('[data-slot="sidebar-nav-row"]', { hasText: '首页' });
   await expect(sidebar(page).getByTestId('attention-badge')).toHaveText(pendingCount ?? '');
   await expect(columns(page)).toHaveCount(4);
 
@@ -71,11 +71,11 @@ test('`Workbench` badge counts the `待处理` column and opens the home view', 
   await expect(page).not.toHaveURL(/view=/);
   await expect(page).toHaveURL(/[?&]scenario=01/);
   await expect(columns(page)).toHaveCount(0);
-  await expect(page.getByTestId('home-sections')).toBeVisible();
+  await expect(page.getByTestId('home-c')).toBeVisible();
   await expect(home).toHaveAttribute('aria-current', 'page');
 
   await page.reload();
-  await expect(page.getByTestId('home-sections')).toBeVisible();
+  await expect(page.getByTestId('home-c')).toBeVisible();
 });
 
 test('active row = sidebar-active fill, no ring', async ({ page }) => {
@@ -200,15 +200,15 @@ test('user row second line reads machines online', async ({ page }) => {
   await expect(page.locator('[data-slot="sidebar-user"]')).toContainText(/\d+ machines? online/);
 });
 
-test('collapsed rail keeps `Workbench` with its badge dot and the expand toggle', async ({ page }) => {
+test('collapsed rail keeps `Home` with its badge dot and the expand toggle', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
   await page.goto('/app?scenario=01&view=board');
   const aside = sidebar(page);
   expect(await aside.evaluate((el) => el.getBoundingClientRect().width)).toBe(40);
-  const home = aside.getByRole('link', { name: /工作台/ });
+  const home = aside.getByRole('link', { name: /首页/ });
   await expect(home).toBeVisible();
   await home.click();
-  await expect(page.getByTestId('home-sections')).toBeVisible();
+  await expect(page.getByTestId('home-c')).toBeVisible();
   await expect(home).toHaveAttribute('aria-current', 'page');
   await aside.getByRole('button', { name: '展开侧边栏' }).click();
   expect(await aside.evaluate((el) => el.getBoundingClientRect().width)).toBe(248);

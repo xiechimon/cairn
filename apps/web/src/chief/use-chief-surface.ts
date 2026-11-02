@@ -7,6 +7,7 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react';
+import { useLocation } from 'react-router';
 import { toast } from 'sonner';
 import { activityStore } from '../api/activity.js';
 import {
@@ -32,18 +33,23 @@ import {
   type GestureEvent,
   getGestureStore,
 } from '../overlay/gesture-machine.js';
+import {
+  type CoordinatorLoad,
+  coordinatorLoad,
+  globalCoordinatorThread,
+} from './coordinator-load.js';
 
 export type { ChiefView };
 
 export interface ChiefSurface {
+  load: CoordinatorLoad;
+  retry: () => void;
   chiefView: ChiefView;
   setChiefView: (view: ChiefView) => void;
   chiefData: ChiefContent;
   chiefUnread: number;
   chiefBusy: boolean;
   onSend?: (text: string, projectId: string | null) => void | Promise<void>;
-  onThread?: (title: string, index: number) => void;
-  onNewThread?: () => void;
   onRewind?: (messageId: string) => void;
   onAnswerQuestion?: (input: { requestId: string; answers: AskUserAnswer[] }) => void;
   onCancelQuestion?: (requestId: string) => void;
@@ -52,14 +58,18 @@ export interface ChiefSurface {
   onStop?: () => void;
 }
 
-const NEW_THREAD = -1;
-
 export interface ChiefDeepLink {
   threadId: string | null;
   onConsumed: () => void;
 }
 
 export const CHIEF_OPEN_STORAGE_KEY = 'cairn.chief-open';
+
+function placeOf(pathname: string, search: string): string {
+  const params = new URLSearchParams(search);
+  params.delete('chief');
+  return `${pathname}?${params.toString()}`;
+}
 
 function readStoredChiefOpen(): boolean {
   try {
@@ -106,12 +116,18 @@ export function useChiefSurface(
     } catch {}
   }, [live, onHome, chiefView]);
 
-  const [activeThreadIdx, setActiveThreadIdx] = useState<number | null>(null);
+  const { pathname, search } = useLocation();
+  const place = placeOf(pathname, search);
+  const [linked, setLinked] = useState<{ threadId: string; place: string } | null>(null);
+  const linkedThreadId = linked?.place === place ? linked.threadId : null;
+  useEffect(() => {
+    if (linked !== null && linked.place !== place) setLinked(null);
+  }, [linked, place]);
   const liveThreads = chiefThreadsQ.data ?? [];
-  const activeThread =
-    live && liveThreads.length > 0 && activeThreadIdx !== NEW_THREAD
-      ? (liveThreads[activeThreadIdx ?? 0] ?? null)
-      : null;
+  const activeThread = live
+    ? (liveThreads.find((thread) => thread.id === linkedThreadId) ??
+      globalCoordinatorThread(liveThreads))
+    : null;
   const deepLinkId = deepLink?.threadId ?? null;
   const onDeepLinkConsumed = deepLink?.onConsumed;
   useEffect(() => {
@@ -121,9 +137,8 @@ export function useChiefSurface(
       return;
     }
     if (!live || deepLinkId === null || !chiefThreadsQ.isSuccess) return;
-    const idx = liveThreads.findIndex((thread) => thread.id === deepLinkId);
-    if (idx >= 0) {
-      setActiveThreadIdx(idx);
+    if (liveThreads.some((thread) => thread.id === deepLinkId)) {
+      setLinked({ threadId: deepLinkId, place });
       if (!onHome) setChiefView('drawer');
     }
     onDeepLinkConsumed?.();
@@ -135,6 +150,7 @@ export function useChiefSurface(
     onDeepLinkConsumed,
     setChiefView,
     onHome,
+    place,
   ]);
   const chiefMessagesQ = useMessages(live ? (activeThread?.id ?? null) : null, live);
   const streamHandlers = useMemo(
@@ -266,9 +282,7 @@ export function useChiefSurface(
     ? (text: string, projectId: string | null) => {
         return mutations.chiefSend
           .mutateAsync({ threadId: activeThread?.id ?? null, content: text, projectId })
-          .then(() => {
-            if (activeThread === null) setActiveThreadIdx(0);
-          })
+          .then(() => undefined)
           .catch((error: unknown) => {
             toastError(t('发送失败，请重试。'), error);
             throw error;
@@ -279,18 +293,30 @@ export function useChiefSurface(
           blockDemoWrite();
         }
       : undefined;
-  const onThread = live ? (_title: string, index: number) => setActiveThreadIdx(index) : undefined;
-  const onNewThread = live ? () => setActiveThreadIdx(NEW_THREAD) : undefined;
+
+  const load: CoordinatorLoad = live
+    ? coordinatorLoad({
+        chief: chiefQ,
+        coordinator: chiefThreadsQ,
+        messages: chiefMessagesQ,
+        hasThread: activeThread !== null,
+      })
+    : 'ready';
+  const retry = () => {
+    void chiefQ.refetch();
+    void chiefThreadsQ.refetch();
+    if (activeThread !== null) void chiefMessagesQ.refetch();
+  };
 
   return {
+    load,
+    retry,
     chiefView,
     setChiefView,
     chiefData,
     chiefUnread,
     chiefBusy,
     onSend,
-    onThread,
-    onNewThread,
     onRewind,
     onAnswerQuestion,
     onCancelQuestion,

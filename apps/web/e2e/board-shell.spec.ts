@@ -1,46 +1,26 @@
 import { expect, test } from '@playwright/test';
 
-test('home splits work into needs-you, running and done, and folds week-old and not-started cards', async ({
+test('a project filter keeps home and marks the project; an unknown project leaves the home unfiltered', async ({
   page,
 }) => {
-  await page.goto('/app?scenario=board-inbox');
-  const needsYou = page.getByTestId('home-needs-you');
-  const running = page.getByTestId('home-running');
-  const done = page.getByTestId('home-done');
-  await expect(needsYou.getByTestId('home-section-count')).toHaveText('4');
-  await expect(needsYou.getByTestId('needs-you-row')).toHaveCount(4);
-  await expect(page.getByTestId('needs-you')).toHaveCount(0);
-  await needsYou.getByTestId('needs-you-stale').getByRole('button').click();
-  await expect(needsYou.getByTestId('needs-you-row')).toHaveCount(9);
+  const workbench = page
+    .getByRole('complementary')
+    .locator('[data-slot="sidebar-nav-row"]', { hasText: '首页' });
+  await page.goto('/app?scenario=home-c');
+  const unfiltered = await page.getByTestId('home-c-since').textContent();
 
-  await expect(running.getByTestId('home-section-count')).toHaveText('1');
-  await expect(running.getByTestId('home-running-row')).toContainText('执行中');
-  await expect(running.getByTestId('home-not-started-row')).toHaveCount(0);
-  await running.getByTestId('home-not-started').getByRole('button').click();
-  await expect(running.getByTestId('home-not-started-row').getByRole('button', { name: '开始' })).toBeVisible();
-
-  await expect(done.getByTestId('home-section-count')).toHaveText('4');
-  await expect(done.getByTestId('home-done-row')).toHaveCount(4);
-  await expect(done.getByTestId('home-done-row').filter({ hasText: '已取消' })).toHaveCount(1);
-  await done.getByTestId('home-open-board').click();
-  await expect(page).toHaveURL(/[?&]view=board/);
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('看板');
-});
-
-test('a project filter keeps home; a filter that matches nothing shows the filter-empty state', async ({
-  page,
-}) => {
-  await page.goto('/app?scenario=board-repos&projects=r2-inventory');
-  await expect(page.getByTestId('home-sections')).toBeVisible();
+  await page.goto('/app?scenario=home-c&project=ZAQczKCu0MOAzC1ZqcFlX');
+  await expect(page.getByTestId('home-c')).toBeVisible();
   await expect(page.locator('[data-column]')).toHaveCount(0);
-  await expect(page.getByRole('complementary').locator('[data-slot="sidebar-nav-row"]', { hasText: '工作台' })).toHaveAttribute(
-    'aria-current',
-    'page',
-  );
+  await expect(workbench).not.toHaveAttribute('aria-current', 'page');
+  await expect(
+    page.locator('[data-slot="sidebar-project-row"][aria-current="page"]'),
+  ).toContainText('cairn');
 
-  await page.goto('/app?scenario=board-repos&projects=no-such-project');
-  await expect(page.getByTestId('home-sections')).toHaveCount(0);
-  await expect(page.getByText('没有匹配筛选条件的任务')).toBeVisible();
+  await page.goto('/app?scenario=home-c&project=no-such-project');
+  await expect(page.getByTestId('home-c-since')).toHaveText(unfiltered ?? '');
+  await expect(workbench).toHaveAttribute('aria-current', 'page');
+  await expect(page.locator('[data-slot="sidebar-project-row"][aria-current="page"]')).toHaveCount(0);
 });
 
 test('the needs-me inbox lists recent pending cards as rows and folds week-old ones', async ({
@@ -66,8 +46,7 @@ test('the needs-me inbox lists recent pending cards as rows and folds week-old o
   await expect(inbox).toContainText('16 天前');
 
   await rows.first().getByRole('link').click();
-  await expect(page).toHaveURL(/[?&]task=[^&]+/);
-  await expect(page.getByRole('complementary', { name: '任务面板' }).getByTestId('task-panel-title')).toBeVisible();
+  await expect(page).toHaveURL(/\/app\/todo\/[^?]+/);
 });
 
 test('the needs-me inbox shares its edges with the new-task bar', async ({ page }) => {
@@ -162,18 +141,6 @@ test('a 390px needs-you row shows the whole title and keeps its actions on scree
   expect(rowBox.y + rowBox.height).toBeLessThanOrEqual(bar.y);
 });
 
-test('a 390px home scrolls down to its last row above the pinned composer', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/app?scenario=board-inbox');
-  await page.getByTestId('chief-home-scroll').evaluate((el) => el.scrollTo(0, el.scrollHeight));
-  const lastRow = page.getByTestId('home-done-row').last();
-  await expect(lastRow).toBeInViewport();
-  const rowBox = await lastRow.boundingBox();
-  const composer = await page.getByTestId('chief-home').locator('.chief-composer').boundingBox();
-  expect(rowBox && composer).toBeTruthy();
-  if (rowBox && composer) expect(rowBox.y + rowBox.height).toBeLessThanOrEqual(composer.y);
-});
-
 test('a short phone screen scrolls the board as one page to reach the last group', async ({
   page,
 }) => {
@@ -209,7 +176,7 @@ for (const viewport of [{ width: 1440, height: 732 }, { width: 390, height: 844 
       await page.addInitScript((value) => localStorage.setItem('cairn-theme', value), theme);
       const gaps: number[] = [];
       for (const route of [
-        { name: 'home', url: '/app?scenario=board-inbox', selector: '[data-testid="chief-home"] .chief-composer' },
+        { name: 'home', url: '/app?scenario=board-inbox', selector: '[data-testid="home-c"] .chief-composer' },
         { name: 'detail', url: '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=17b', selector: '[data-testid="composer-card"]' },
       ]) {
         await page.goto(route.url);

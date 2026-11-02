@@ -34,10 +34,10 @@ test('board topbar drops the `看板指南` button — right actions = `筛选` 
 
   const actions = page.locator('.board-topbar-actions');
   await expect(actions).toBeVisible();
-  await expect(actions.getByRole('button')).toHaveCount(2);
+  await expect(actions.getByRole('button')).toHaveCount(1);
   await expect(actions.getByRole('link')).toHaveCount(1);
   await expect(actions.getByRole('button', { name: '筛选', exact: true })).toBeVisible();
-  await expect(actions.getByRole('button', { name: '任务面板' })).toBeVisible();
+  await expect(actions.getByRole('button', { name: '任务面板' })).toHaveCount(0);
   await expect(actions.getByRole('link', { name: '定时' })).toBeVisible();
   await expect(actions.getByRole('button', { name: '新任务' })).toHaveCount(0);
 
@@ -287,24 +287,23 @@ test('project settings drops the avatar `更换` ink (#307, supersedes the #177 
   await expect(page.locator('span.prj-set-branch')).toBeVisible();
 });
 
-test('chief drawer drops the ⋮ `更多` button — thread view keeps three head actions (#306)', async ({
+test('chief drawer drops the ⋮ `更多` button and the new-topic button — thread view keeps two head actions (#306, #2531)', async ({
   page,
 }) => {
   await page.goto('/app?scenario=114&view=board');
   const drawer = page.locator('.chief-drawer');
 
   const actions = drawer
-    .getByRole('button', { name: '新主题', exact: true })
+    .getByRole('button', { name: '总管设置', exact: true })
     .locator('xpath=..')
     .getByRole('button');
 
   await expect(drawer.getByRole('button', { name: '更多', exact: true })).toHaveCount(0);
-
+  await expect(drawer.getByRole('button', { name: '新主题', exact: true })).toHaveCount(0);
   await expect(drawer.getByRole('button', { name: '全屏', exact: true })).toHaveCount(0);
-  await expect(actions).toHaveCount(3);
-  await expect(actions.nth(0)).toHaveAttribute('aria-label', '新主题');
-  await expect(actions.nth(1)).toHaveAttribute('aria-label', '总管设置');
-  await expect(actions.nth(2)).toHaveAttribute('aria-label', '最小化');
+  await expect(actions).toHaveCount(2);
+  await expect(actions.nth(0)).toHaveAttribute('aria-label', '总管设置');
+  await expect(actions.nth(1)).toHaveAttribute('aria-label', '最小化');
 });
 
 test('sched card `更多` opens a menu and deletes the row through the confirm (#306)', async ({
@@ -450,7 +449,7 @@ test('reuse panel `查看方案` flips the doc pane to the plan face (#318)', as
   await expect(page.locator('.doc-empty')).toContainText('暂无方案');
 });
 
-test('project task rows and cards are real links to the todo detail that open in the panel (#318, #1937)', async ({ page }) => {
+test('project task rows and cards are real links that open the todo detail (#318, #2531)', async ({ page }) => {
   await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=prj-tasks&tab=tasks');
   const row = page.locator('.prj-task-row').first();
   await expect(row).toBeVisible();
@@ -461,8 +460,7 @@ test('project task rows and cards are real links to the todo detail that open in
     /\/app\/todo\/[^?]+\?scenario=prj-tasks&tab=tasks/,
   );
   await row.click();
-  await expect(page).toHaveURL(/[?&]task=[^&]+/);
-  await expect(page.getByRole('complementary', { name: '任务面板' })).toBeVisible();
+  await expect(page).toHaveURL(/\/app\/todo\/[^?]+\?scenario=prj-tasks/);
 
   await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=prj-tasks&tab=tasks');
   await page.locator('.prj-tasks-view-btn').nth(1).click();
@@ -470,7 +468,7 @@ test('project task rows and cards are real links to the todo detail that open in
   await expect(card).toBeVisible();
   await expect(card.locator('a.prj-task-link')).toHaveCount(1);
   await card.click();
-  await expect(page).toHaveURL(/[?&]task=[^&]+/);
+  await expect(page).toHaveURL(/\/app\/todo\/[^?]+\?scenario=prj-tasks/);
 });
 
 test('new-task dialog: the close control anchors to the head’s right edge (#574 re-key debt)', async ({

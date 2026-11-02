@@ -21,7 +21,6 @@ import { useI18n } from '../i18n/provider.js';
 import { Check, Copy, FileText, Restore } from '../icons/index.js';
 import { spiralAvatarUrl } from '../lib/spiral-avatar.js';
 import { mentionChipClass } from '../overlay/mention-chip.js';
-import { useOpenTaskInPlace } from '../task-panel/task-panel-root.js';
 import { ChiefDigestRow } from './chief-digest-row.js';
 import { ChiefIdentity } from './chief-identity.js';
 import { ChiefQuestionCard } from './chief-question-card.js';
@@ -121,13 +120,14 @@ function turnToolSteps(tools: ChiefToolRow[] | undefined): TraceStepItem[] {
   }));
 }
 
+export const TurnElapsedContext = createContext(true);
+
 export const HandoffCardContext = createContext<((todoId: string) => ReactNode) | null>(null);
 
 function HandoffRow({ todoId }: { todoId: string }) {
   const { t } = useI18n();
   const glance = useContext(TodoGlanceContext)?.get(todoId);
   const renderCard = useContext(HandoffCardContext);
-  const openInPlace = useOpenTaskInPlace();
   const card = renderCard?.(todoId);
   if (card != null) {
     return (
@@ -149,7 +149,6 @@ function HandoffRow({ todoId }: { todoId: string }) {
             to={`/app/todo/${todoId}`}
             className={`${mentionChipClass('todo')} cursor-pointer`}
             data-phase={glance?.phase}
-            onClick={(event) => openInPlace(event, todoId, glance)}
           >
             {glance != null && <TodoStatus phase={glance.phase} />}
             {glance?.seq != null ? `#${glance.seq}` : t('任务')}
@@ -234,6 +233,7 @@ export function ChiefStreamRow({
   onAnswerQuestion,
   onCancelQuestion,
 }: ChiefStreamRowProps) {
+  const showElapsed = useContext(TurnElapsedContext);
   const { t } = useI18n();
   if (item.kind === 'stopped') return <StoppedRow todos={item.todos} />;
   if (item.kind === 'thread-report')
@@ -474,7 +474,9 @@ export function ChiefStreamRow({
                   <Copy width={13} height={13} />
                 )}
               </Button>
-              {item.seconds !== '' && <span>{t('完成 {n}', { n: item.seconds })}</span>}
+              {showElapsed && item.seconds !== '' && (
+                <span>{t('完成 {n}', { n: item.seconds })}</span>
+              )}
               {item.fallbackModel != null && (
                 <span data-testid="chief-fallback-note">
                   {t('由备用模型 {model} 回答', { model: item.fallbackModel })}

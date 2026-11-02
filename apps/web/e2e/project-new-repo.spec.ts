@@ -215,7 +215,7 @@ test('the name input focus is the field ring: --focus-ring border plus a 3px hal
 
 // ——— submit + error face (live build, stubbed network) ———
 
-test('untouched submit posts a repo-less body and navigates on 201', async ({ page }) => {
+test('untouched submit posts a repo-less body and lands on the home filtered to the new project on 201', async ({ page }) => {
   await stubBoot(page);
   const bodies = await stubCreateProject(page, () => ({ json: okProject }));
   await page.goto(NEW_PROJECT_LIVE);
@@ -223,7 +223,7 @@ test('untouched submit posts a repo-less body and navigates on 201', async ({ pa
   const submit = page.getByRole('button', { name: '创建项目' });
   await expect(submit).toBeEnabled();
   await submit.click();
-  await expect(page).toHaveURL(/\/app\/project\/proj-1$/);
+  await expect(page).toHaveURL(/\/app\?project=proj-1$/);
   expect(bodies).toEqual([{ name: 'Plain', teamId: 'team-1' }]);
 });
 
@@ -233,12 +233,12 @@ test('local and github submits carry kind + their wire field', async ({ page }) 
   await page.goto(NEW_PROJECT_LIVE);
   await fillLiveForm(page, { kind: 'local', value: '/tmp/my-repo' });
   await page.getByRole('button', { name: '创建项目' }).click();
-  await expect(page).toHaveURL(/\/app\/project\/proj-1$/);
+  await expect(page).toHaveURL(/\/app\?project=proj-1$/);
 
   await page.goto(NEW_PROJECT_LIVE);
   await fillLiveForm(page, { kind: 'github', value: 'xiechimon/cairn' });
   await page.getByRole('button', { name: '创建项目' }).click();
-  await expect(page).toHaveURL(/\/app\/project\/proj-1$/);
+  await expect(page).toHaveURL(/\/app\?project=proj-1$/);
 
   expect(bodies).toEqual([
     { name: 'my-repo', teamId: 'team-1', kind: 'local', localPath: '/tmp/my-repo' },

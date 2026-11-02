@@ -3,7 +3,6 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 const GATED = '/app?view=board&scenario=100';
 const READY = '/app?view=board&scenario=111';
 const THREAD = '/app?view=board&scenario=114';
-const SWITCHER = '/app?view=board&scenario=116';
 const QUESTION = '/app?view=board&scenario=chief-question';
 const SETTINGS = (tab: string) => `/app?view=board&scenario=${tab}`;
 
@@ -59,14 +58,13 @@ for (const theme of ['light', 'dark'] as const) {
     const card = await probe(page, 'backgroundColor', 'var(--card)');
     const secondary = await probe(page, 'backgroundColor', 'var(--secondary)');
 
-    const chip = win.getByRole('button', { name: '主题', exact: true });
-    const title = chip.locator('span').first();
+    const title = win.getByRole('heading', { name: '总管', level: 2 });
     await expect(title, 'W1').toHaveCSS('font-family', display);
     await expect(title, 'W1').toHaveCSS('font-size', '17px');
     await expect(title, 'W1').toHaveCSS('font-weight', '650');
     const winBox = await win.boundingBox();
-    const chipBox = await chip.boundingBox();
-    expect((chipBox?.x ?? 0) - (winBox?.x ?? 0), 'W1').toBeCloseTo(16, 0);
+    const titleBox = await title.boundingBox();
+    expect((titleBox?.x ?? 0) - (winBox?.x ?? 0), 'W1').toBeCloseTo(16, 0);
 
     const banner = win.getByTestId('chief-gate');
     await expect(banner, 'W2').toHaveCSS('border-top-left-radius', await token(page, '--radius-card'));
@@ -86,21 +84,11 @@ for (const theme of ['light', 'dark'] as const) {
     expect(await css(tile, 'background-color'), 'W3: bare icon').toBe('rgba(0, 0, 0, 0)');
   });
 
-  test(`window: bound hero, switcher menu and stream type keys (${theme})`, async ({ page }) => {
+  test(`window: bound hero and stream type keys (${theme})`, async ({ page }) => {
     await setTheme(page, theme);
     let win = await openWindow(page, READY);
     await expect(win.getByTestId('chief-gate'), 'W2: bound has no gate').toHaveCount(0);
     await expect(win.getByTestId('chief-composer-input'), 'W5').toHaveCSS('font-size', '15px');
-
-    win = await openWindow(page, SWITCHER);
-    const menu = win.getByRole('menu');
-    await expect(menu, 'W4').toHaveCSS(
-      'border-top-left-radius',
-      await token(page, '--radius-popover'),
-    );
-    const row = menu.getByRole('menuitem').first();
-    expect((await row.boundingBox())?.height, 'W4').toBe(32);
-    await expect(row, 'W4').toHaveCSS('font-size', '14px');
 
     win = await openWindow(page, THREAD);
     const note = win.getByTestId('chief-stream').locator('[data-slot="marker"]').first();

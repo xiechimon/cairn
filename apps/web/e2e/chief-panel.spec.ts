@@ -37,26 +37,10 @@ test.describe('chief panel floating form (ADR 0013)', () => {
     await expect(drawer(page)).toBeVisible();
   });
 
-  test('Esc layers: the open thread switcher closes first, the panel survives both', async ({
-    page,
-  }) => {
-    await page.goto('/app?scenario=116&view=board');
-    await expect(drawer(page)).toBeVisible();
-
-    await expect(page.getByRole('menu')).toBeVisible();
-
-    await page.keyboard.press('Escape');
-    await expect(page.getByRole('menu')).toHaveCount(0);
-    await expect(drawer(page)).toBeVisible();
-
-    await page.keyboard.press('Escape');
-    await expect(drawer(page)).toBeVisible();
-  });
-
   test('chief header and composer tools retain 24px header and 28px composer-tool targets after conversation extraction', async ({ page }, testInfo) => {
     await page.goto('/app?scenario=111&view=board');
     await settled(page);
-    for (const name of ['新主题', '总管设置', '最小化', '添加附件']) {
+    for (const name of ['总管设置', '最小化', '添加附件']) {
       const control = drawer(page).getByRole('button', { name, exact: true });
       await expect(control).toBeVisible();
       const box = await control.boundingBox();

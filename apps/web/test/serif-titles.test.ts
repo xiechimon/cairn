@@ -33,10 +33,9 @@ describe('the greeting and page titles use the serif title voice (DESIGN.md Typo
     expect(offenders).toEqual([]);
   });
 
-  it('the project home title and first-run headline stay serif', () => {
-    const page = readFileSync(join(SRC, 'pages/project-home.tsx'), 'utf8');
-    expect(page).not.toMatch(/font-heading/);
-    expect(page).toContain('<Greeting as="h2" wrap>');
+  it('the home greets with the serif Greeting', () => {
+    const home = readFileSync(join(SRC, 'board/home-c.tsx'), 'utf8');
+    expect(home).toContain('<Greeting as="h2">');
   });
 
   it('the page-size title menu trigger is serif', () => {
