@@ -274,6 +274,20 @@ describe('runner quota circuit breaker (#1261)', () => {
     expect(lines.some((l) => l.includes('quota circuit breaker'))).toBe(false);
   });
 
+  test('Q7 agent process crash whose stderr dumps source mentioning RATE_LIMIT: plain failure, no quotaBlock', async () => {
+    const crash =
+      'Claude Code process exited with code 1. stderr: 11 | var Ryt=["CLAUDE_BG_DISPATCHER_RATE_LIMIT_TIER"];\nerror: bubblewrap is required for subprocess env scrubbing and isolation.';
+    const script: StepEvent[] = [
+      ...sessionOpenEcho(),
+      { type: 'error', error: { message: crash, retryable: false, processCrash: true } },
+      { type: 'done', usage: [] },
+    ];
+    const { client, lines } = await runQuotaCase(script);
+    expect(client.doneBodies[0]?.body.status).toBe('failed');
+    expect(client.doneBodies[0]?.body.quotaBlock).toBeUndefined();
+    expect(lines.some((l) => l.includes('quota circuit breaker'))).toBe(false);
+  });
+
   test('Q6 quota hit after progress: still suspends (continue session semantics), not a plain failure', async () => {
     const script: StepEvent[] = [
       ...sessionOpenEcho(),

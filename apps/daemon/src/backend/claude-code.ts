@@ -473,7 +473,7 @@ class ClaudeSessionHandle implements AgentSessionHandle {
         return;
       }
       const message = err instanceof Error ? err.message : String(err);
-      this.queue.push({ type: 'error', error: { message, retryable: false } });
+      this.queue.push({ type: 'error', error: { message, retryable: false, processCrash: true } });
     } finally {
       this.finish();
       await this.spans?.flush();

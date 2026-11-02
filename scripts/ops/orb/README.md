@@ -98,7 +98,9 @@ works with the user unit's `ProtectHome=yes`. Binary content and mode converge
 on reruns. Existing networkd-managed host links or earlier network configuration
 files stop the installer before changes.
 The image contains Node, pinned Claude Code/Codex CLIs and the repository's
-pnpm, installed with npm lifecycle scripts disabled. The pnpm version lives in
+pnpm, installed with npm lifecycle scripts disabled, plus bubblewrap: Claude
+Code refuses to start without it, because it scrubs subprocess environments
+through `bwrap`. The pnpm version lives in
 `pnpm.version` beside the script, because `cairn-ops-run` materializes only
 `scripts/ops/orb`; `shell.test.mjs` fails when it differs from the root
 `packageManager`. Node 25 and later ship no corepack, so project

@@ -1048,6 +1048,7 @@ async function runClaimedStep(
   let lastError: string | null = null;
   let closingPushHookError: GitPushHookError | null = null;
   let lastModelError: string | null = null;
+  let lastErrorWasProcessCrash = false;
   let messageSeq = 0;
   let sawChangeTool = false;
   let sawDone = false;
@@ -1379,6 +1380,7 @@ async function runClaimedStep(
       priorPassMadeProgress ||= sawProgress;
       lastError = null;
       lastModelError = null;
+      lastErrorWasProcessCrash = false;
       sawDone = false;
       sawProgress = false;
       timedOut = false;
@@ -1585,9 +1587,12 @@ async function runClaimedStep(
           case 'error':
             lastError = ev.error.message;
             lastModelError = ev.error.message;
+            lastErrorWasProcessCrash = ev.error.processCrash === true;
             logger.step(`error: ${ev.error.message} (retryable=${ev.error.retryable})`);
             {
-              const failureKind = classifyAgentFailure(ev.error.message);
+              const failureKind = lastErrorWasProcessCrash
+                ? 'other'
+                : classifyAgentFailure(ev.error.message);
               if (failureKind === 'quota' || failureKind === 'capacity') {
                 if (quotaTrip === null) {
                   quotaTrip = {
@@ -1719,7 +1724,7 @@ async function runClaimedStep(
     if (quotaTrip !== null) {
       return quotaBlockOf(quotaTrip.kind, quotaTrip.reason, quotaTrip.retryAfterMs);
     }
-    if (stopped) return null;
+    if (stopped || lastErrorWasProcessCrash) return null;
     const failureText = lastModelError ?? lastError;
     if (failureText === null) return null;
     const failureKind = classifyAgentFailure(failureText);

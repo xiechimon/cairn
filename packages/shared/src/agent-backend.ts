@@ -103,7 +103,11 @@ export const stepEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('done'), usage: agentTokenUsageSchema }),
   z.object({
     type: z.literal('error'),
-    error: z.object({ message: z.string(), retryable: z.boolean() }),
+    error: z.object({
+      message: z.string(),
+      retryable: z.boolean(),
+      processCrash: z.boolean().optional(),
+    }),
   }),
 ]);
 export type StepEvent = z.infer<typeof stepEventSchema>;

@@ -348,6 +348,12 @@ test("guest image pins the repo's pnpm through npm, not corepack, and verifies i
   assert.ok(pnpmCheck > install, 'the agent verifies pnpm after the scripted-off install');
 });
 
+test('guest image installs bubblewrap for Claude Code subprocess isolation and verifies it as agent', () => {
+  const script = readFileSync(join(source, 'build-image.sh'), 'utf8');
+  assert.match(script, /^pacstrap -K -M "\$stage" .*\bbubblewrap\b/m);
+  assert.match(script, /runuser -u agent -- \/usr\/bin\/bwrap --version/);
+});
+
 test("guest image runs only Claude Code's own native installer and verifies both CLIs as agent", () => {
   const script = readFileSync(join(source, 'build-image.sh'), 'utf8');
   const install = script.indexOf('npm install --global --ignore-scripts');
