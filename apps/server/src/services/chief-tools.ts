@@ -500,7 +500,12 @@ export async function executeChiefTool(
         }),
       );
     case 'read_history':
-      return json(readHistory(db, ctx, strArr(params, 'ids')));
+      return json(
+        readHistory(db, ctx, strArr(params, 'ids'), {
+          offset: num(params, 'offset'),
+          maxChars: num(params, 'maxChars'),
+        }),
+      );
 
     case 'create_todo': {
       const projectId = str(params, 'projectId');

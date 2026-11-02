@@ -182,6 +182,7 @@ export function chiefStreamRowKey(item: ChiefStreamItem, index: number): string 
 interface ChiefStreamRowProps {
   item: ChiefStreamItem;
   index: number;
+  latest: boolean;
   bound: ChiefContent['bound'];
   agent: ChiefContent['agent'];
   runningTool: ChiefContent['runningTool'];
@@ -222,9 +223,15 @@ function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string
   );
 }
 
+const messageToolsReveal = (latest: boolean) =>
+  latest
+    ? 'opacity-100'
+    : 'opacity-0 transition-opacity duration-(--dur-fast) group-hover/message:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100';
+
 export const ChiefStreamRow = memo(function ChiefStreamRow({
   item,
   index: i,
+  latest,
   bound,
   agent,
   runningTool,
@@ -312,7 +319,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
               {item.markdown != null ? <ChatMarkdown text={item.markdown} /> : item.text}
             </div>
             <div
-              className="mt-1 flex items-center gap-1 text-(--text-tertiary) opacity-0 transition-opacity duration-(--dur-fast) group-hover/message:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100"
+              className={`mt-1 flex items-center gap-1 text-(--text-tertiary) ${messageToolsReveal(latest)}`}
               data-testid="chief-msg-tools"
             >
               {item.at != null && (
@@ -478,7 +485,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
           {item.typing === true && <LivePulse className="mt-1 ml-0.5" />}
           {item.typing !== true && (
             <div
-              className="mt-2 flex items-center gap-2 text-meta text-(--text-tertiary)"
+              className={`mt-2 flex items-center gap-2 text-meta text-(--text-tertiary) ${messageToolsReveal(latest)}`}
               data-testid="chief-msg-foot"
             >
               <Button

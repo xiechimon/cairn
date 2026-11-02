@@ -1,5 +1,5 @@
 import { BRAND, type ProjectColor, type ProjectIcon } from '@cairn/shared';
-import { ChevronDown, Clock, EllipsisVertical, PanelLeft, Plus, Search } from 'lucide-react';
+import { ChevronDown, EllipsisVertical, PanelLeft, Plus, Search } from 'lucide-react';
 import { type ReactElement, useCallback, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { useLiveData } from '../api/provider.js';
@@ -213,8 +213,6 @@ export function BoardSidebar({
   const coordinatorActive =
     (selected === 'board' || selected === 'kanban') && activeProject === null;
 
-  const goTo = (target: string) => navigate({ pathname: target, search: plain });
-
   const userAvatar = (
     <SeededAvatar
       className="size-6"
@@ -274,15 +272,6 @@ export function BoardSidebar({
             {attention > 0 && (
               <span className="absolute top-1 right-1 size-1.5 rounded-full bg-(--card-button)" />
             )}
-          </Link>
-          <Link
-            {...railLink(
-              { pathname: '/app/schedules', search: plain },
-              selected === 'schedules',
-              t('定时'),
-            )}
-          >
-            <Clock className={ICON} strokeWidth={STROKE} />
           </Link>
           <Button
             variant="ghost"
@@ -380,17 +369,11 @@ export function BoardSidebar({
             </span>
           )}
         </div>
-        <SidebarNavRow
-          icon={<Clock className="size-4" strokeWidth={STROKE} />}
-          label={t('定时')}
-          active={selected === 'schedules'}
-          onClick={() => goTo('/app/schedules')}
-        />
       </div>
 
       <nav
         ref={navRef}
-        className={`mt-3 flex min-h-0 flex-1 flex-col gap-px overflow-y-auto ${scrollFadeClassName()}`}
+        className={`-mx-1 mt-3 flex min-h-0 flex-1 flex-col gap-px overflow-y-auto px-1 ${scrollFadeClassName()}`}
       >
         <div
           data-testid="project-group"

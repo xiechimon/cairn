@@ -154,8 +154,7 @@ test.describe('sidebar form is route-invariant', () => {
     // expanded sidebar on the new route would never equal it
     await expectSidebarBox(page, rail, '/app/resources/skills', railBox);
 
-    await page.getByRole('link', { name: '定时' }).click();
-    await expect(page).toHaveURL('/app/schedules?scenario=03');
+    await page.goto('/app/schedules?scenario=03');
     await expectSidebarBox(page, rail, '/app/schedules', railBox);
   });
 

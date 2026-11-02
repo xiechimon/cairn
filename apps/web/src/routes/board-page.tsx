@@ -11,12 +11,13 @@ import {
   useMachines,
   useProjects,
   useProjectTags,
+  useSchedules,
   useSearchResults,
   useSteps,
   useTeams,
   useTodos,
 } from '../api/hooks.js';
-import { mapBranchInfo, mapMachines, toDisplayTodo } from '../api/mappers.js';
+import { mapBranchInfo, mapMachines, mapSchedules, toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { AppSidebar } from '../board/app-sidebar.js';
 import { BackupBanner } from '../board/backup-banner.js';
@@ -81,6 +82,7 @@ export function BoardPage() {
   const { chiefView, setChiefView, chiefData } = chief;
 
   const todosQ = useTodos(teamId, live);
+  const schedulesQ = useSchedules(live);
   const projectsQ = useProjects(teamId, live);
   const chiefThreadsQ = useChiefThreads(teamId, live);
   const mutations = useApiMutations(teamId);
@@ -629,6 +631,7 @@ export function BoardPage() {
             projectName={homeProjectName}
             banner={homeBanner}
             machines={fixtureWithTodos.resources?.machines}
+            schedules={live ? mapSchedules(schedulesQ.data ?? []) : (fixture.schedules ?? [])}
           />
         ) : (
           <BoardSurface
