@@ -6,6 +6,7 @@ import { afterAll, beforeEach, describe, expect, test } from 'vitest';
 import {
   agent as agentTable,
   chiefMessage,
+  chiefThread as chiefThreadTable,
   machine as machineTable,
   provider as providerTable,
   steerPending,
@@ -554,21 +555,50 @@ describe('chief unavailable (T4)', () => {
     });
   });
 
-  test('a backup model on another runtime is skipped, so the thread session stays usable', async () => {
+  test('a backup model on the same runtime keeps resuming the thread session', async () => {
+    const w = await setupWorld([{ provider: 'relay-b', modelId: 'model-b' }]);
+    await w.send('first');
+    const opening = await w.claim();
+    await w.done(opening!.step.id, { status: 'success', sessionId: 'sess-pi-1' });
+    await w.send('second');
+    const running = await w.claim();
+    expect(running?.session).toEqual({ action: 'continue', sessionId: 'sess-pi-1' });
+    await w.done(running!.step.id, { status: 'failed', errorMessage: QUOTA_ERROR });
+    const retried = await w.claim();
+    expect(retried?.agent?.provider).toBe('relay-b');
+    expect(retried?.session).toEqual({ action: 'continue', sessionId: 'sess-pi-1' });
+  });
+
+  test('a backup model on another runtime opens a new session instead of resuming the old one', async () => {
     const w = await setupWorld([{ provider: 'claude-code', modelId: 'sonnet' }]);
     w.s.db
       .update(machineTable)
-      .set({ enabledRuntimes: ['pi', 'claude-code'] })
+      .set({ enabledRuntimes: ['pi', 'claude-code'], claudeCodeReport: subscriptionClaudeReport })
       .run();
-    await w.send('第一句');
+    await w.send('first');
+    const opening = await w.claim();
+    await w.done(opening!.step.id, { status: 'success', sessionId: 'sess-pi-1' });
+    await w.send('second');
     const running = await w.claim();
+    expect(running?.session.action).toBe('continue');
     await w.done(running!.step.id, { status: 'failed', errorMessage: QUOTA_ERROR });
-    expect((await w.envelope()).outage?.reason).toBe('quota');
-    expect(w.stepRow(running!.step.id)?.fallback ?? null).toBeNull();
+    expect((await w.envelope()).outage ?? null).toBeNull();
+    const retried = await w.claim();
+    expect(retried?.step.id).toBe(running!.step.id);
+    expect(retried?.agent?.provider).toBe('claude-code');
+    expect(retried?.session).toEqual({ action: 'new', sessionId: null });
+    await w.done(retried!.step.id, { status: 'success', sessionId: 'sess-cc-1' });
+    const thread = w.s.db
+      .select()
+      .from(chiefThreadTable)
+      .where(eq(chiefThreadTable.id, w.threadId))
+      .get()!;
+    expect(thread.sessionId).toBe('sess-cc-1');
+    expect(thread.sessionRuntime).toBe('claude-code');
   });
 
-  test('a backup model on a different backend runtime is skipped too', async () => {
-    const w = await setupWorld([{ provider: 'gemini', modelId: 'gemini-pro' }]);
+  test('a claude-code chief falls back to a pi provider with a new session, and the next turn does not resume the pi session on claude-code', async () => {
+    const w = await setupWorld([{ provider: 'relay-b', modelId: 'model-b' }]);
     w.s.db
       .update(agentTable)
       .set({ provider: 'claude-code', modelId: 'sonnet' })
@@ -576,16 +606,25 @@ describe('chief unavailable (T4)', () => {
       .run();
     w.s.db
       .update(machineTable)
-      .set({
-        enabledRuntimes: ['pi', 'claude-code', 'gemini'],
-        claudeCodeReport: subscriptionClaudeReport,
-      })
+      .set({ enabledRuntimes: ['pi', 'claude-code'], claudeCodeReport: subscriptionClaudeReport })
       .run();
-    await w.send('第一句');
+    await w.send('first');
+    const opening = await w.claim();
+    expect(opening?.agent?.provider).toBe('claude-code');
+    await w.done(opening!.step.id, { status: 'success', sessionId: 'sess-cc-1' });
+    await w.send('second');
     const running = await w.claim();
-    expect(running?.agent?.provider).toBe('claude-code');
+    expect(running?.session).toEqual({ action: 'continue', sessionId: 'sess-cc-1' });
     await w.done(running!.step.id, { status: 'failed', errorMessage: QUOTA_ERROR });
-    expect(w.stepRow(running!.step.id)?.fallback ?? null).toBeNull();
+    const retried = await w.claim();
+    expect(retried?.step.id).toBe(running!.step.id);
+    expect(retried?.agent?.provider).toBe('relay-b');
+    expect(retried?.session).toEqual({ action: 'new', sessionId: null });
+    await w.done(retried!.step.id, { status: 'success', sessionId: 'sess-pi-2' });
+    await w.send('third');
+    const next = await w.claim();
+    expect(next?.agent?.provider).toBe('claude-code');
+    expect(next?.session).toEqual({ action: 'new', sessionId: null });
   });
 
   test('fallback chain exhausted: the turn parks on quota and the outage shows', async () => {

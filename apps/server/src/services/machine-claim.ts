@@ -196,6 +196,10 @@ function buildChiefClaim(
   const digest = isChiefDigestStep(stepRow);
   const ctx = digest ? null : chiefClaimContext(deps, threadRow.id);
   const trigger = parseChiefTrigger(stepRow.prompt);
+  const resumableSession =
+    !stepRow.freshSession &&
+    threadRow.sessionId !== '' &&
+    threadRow.sessionRuntime === stepRuntimeFor(model.provider);
   const systemPrompt = digest ? CHIEF_DIGEST_SYSTEM_PROMPT : (ctx?.systemPrompt ?? '');
   let routeSection = '';
   if (ctx && trigger === 'user') {
@@ -223,8 +227,8 @@ function buildChiefClaim(
     },
     conversationId: stepRow.buildId,
     session: {
-      action: !stepRow.freshSession && threadRow.sessionId !== '' ? 'continue' : 'new',
-      sessionId: !stepRow.freshSession && threadRow.sessionId !== '' ? threadRow.sessionId : null,
+      action: resumableSession ? 'continue' : 'new',
+      sessionId: resumableSession ? threadRow.sessionId : null,
     },
     ...(stepRow.prompt !== null
       ? {

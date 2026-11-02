@@ -257,34 +257,86 @@ describe('model fallback chain (#1493)', () => {
     expect(c.session).toEqual({ action: 'continue', sessionId: 'sess-relay-b' });
   });
 
-  test.each(['review', 'merge'] as const)(
-    'X3：%s 步禁止降级——额度用完只等不换（负对照）',
+  test.each(['review', 'verify'] as const)(
+    '%s step: quota exhausted falls back to the next chain model',
     async (kind) => {
       const w = await setupWorld();
       await startBuild(w);
       const pending = w.s.db.select().from(stepTable).where(eq(stepTable.status, 'pending')).get()!;
       w.s.db
         .update(stepTable)
-        .set({
-          kind,
-          prompt: kind === 'review' ? `{"kind":"review","agentId":"${AGENT_ID}"}\n审一下` : null,
-        })
+        .set({ kind, prompt: `{"kind":"${kind}","agentId":"${AGENT_ID}"}\ncheck it` })
         .where(eq(stepTable.id, pending.id))
+        .run();
+      w.s.db
+        .update(todoTable)
+        .set({
+          assignment: { plan: null, build: { agentId: AGENT_ID }, verify: { agentId: AGENT_ID } },
+        })
+        .where(eq(todoTable.id, w.todoId))
         .run();
       const c = await claim(w);
       expect(c.stepId).toBe(pending.id);
       await done(w, c.stepId, quotaDone('relay-a'));
       const row = stepRow(w, c.stepId);
-      expect(row.status).toBe('waiting_quota');
-      expect(row.fallback).toBeNull();
-      const notif = w.s.db
-        .select()
-        .from(notificationTable)
-        .where(eq(notificationTable.type, 'model_fallback'))
-        .all();
-      expect(notif).toHaveLength(0);
+      expect(row.status).toBe('pending');
+      expect(row.fallback?.model).toEqual({ provider: 'relay-b', modelId: 'model-b' });
+      const again = await claim(w);
+      expect(again.stepId).toBe(c.stepId);
+      expect(again.provider).toBe('relay-b');
+      expect(again.session.action).toBe('new');
     },
   );
+
+  test.each(['review', 'verify'] as const)(
+    '%s step: a git failure does not fall back',
+    async (kind) => {
+      const w = await setupWorld();
+      await startBuild(w);
+      const pending = w.s.db.select().from(stepTable).where(eq(stepTable.status, 'pending')).get()!;
+      w.s.db
+        .update(stepTable)
+        .set({ kind, prompt: `{"kind":"${kind}","agentId":"${AGENT_ID}"}\ncheck it` })
+        .where(eq(stepTable.id, pending.id))
+        .run();
+      w.s.db
+        .update(todoTable)
+        .set({
+          assignment: { plan: null, build: { agentId: AGENT_ID }, verify: { agentId: AGENT_ID } },
+        })
+        .where(eq(todoTable.id, w.todoId))
+        .run();
+      const c = await claim(w);
+      await done(w, c.stepId, {
+        status: 'failed',
+        errorMessage: 'git fetch failed (exit 128): 429 rate limit exceeded',
+      });
+      expect(stepRow(w, c.stepId).fallback).toBeNull();
+    },
+  );
+
+  test('X3：merge 步禁止降级——额度用完只等不换（负对照）', async () => {
+    const w = await setupWorld();
+    await startBuild(w);
+    const pending = w.s.db.select().from(stepTable).where(eq(stepTable.status, 'pending')).get()!;
+    w.s.db
+      .update(stepTable)
+      .set({ kind: 'merge', prompt: null })
+      .where(eq(stepTable.id, pending.id))
+      .run();
+    const c = await claim(w);
+    expect(c.stepId).toBe(pending.id);
+    await done(w, c.stepId, quotaDone('relay-a'));
+    const row = stepRow(w, c.stepId);
+    expect(row.status).toBe('waiting_quota');
+    expect(row.fallback).toBeNull();
+    const notif = w.s.db
+      .select()
+      .from(notificationTable)
+      .where(eq(notificationTable.type, 'model_fallback'))
+      .all();
+    expect(notif).toHaveLength(0);
+  });
 
   test('X4: agent has no fallbacks -> old behavior (waiting_quota)', async () => {
     const w = await setupWorld(null);

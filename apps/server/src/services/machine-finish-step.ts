@@ -58,6 +58,7 @@ import {
 } from './ci-loop.js';
 import { recoverClaudeRateLimitFailure } from './claude-rate-limit.js';
 import { revokeStepGitCredential } from './credentials.js';
+import { stepRuntimeFor } from './dispatch-eligibility.js';
 import { quotaHoldBackoffMs, quotaHoldNote } from './dispatch-timeouts.js';
 import { diffTextNamesAFile, githubRepoOfProject, parseUnifiedDiff, projectOfTodo } from './git.js';
 import { githubTokenOrNull } from './github-connection.js';
@@ -450,10 +451,16 @@ async function finishStepReport(
         to: modelKey(plan.to),
         stepId: stepRow.id,
       };
-      requeueStep(deps, stepRow, plan.row, {
-        id: `chief-fallback-${stepRow.id}-${plan.row.tried.length}`,
-        content: JSON.stringify(content),
-      });
+      requeueStep(
+        deps,
+        stepRow,
+        plan.row,
+        {
+          id: `chief-fallback-${stepRow.id}-${plan.row.tried.length}`,
+          content: JSON.stringify(content),
+        },
+        stepRuntimeFor(plan.from.provider) !== stepRuntimeFor(plan.to.provider),
+      );
       return;
     }
   }
@@ -534,7 +541,12 @@ async function finishStepReport(
       stepRow.buildId,
       '回合已结束',
     );
-    finishChiefTurn(deps, stepRow.buildId, outcome);
+    finishChiefTurn(
+      deps,
+      stepRow.buildId,
+      outcome,
+      stepRuntimeFor(chiefAgent ? effectiveModel(chiefAgent, stepRow).provider : null),
+    );
     if (outcome.status === 'success') notifyChiefTurn(deps, stepRow.buildId, stepRow.prompt);
     if (outcome.status === 'failed') recoverGateWake(deps, stepRow);
     if (outcome.status === 'failed' && outcome.errorMessage) {
@@ -661,10 +673,12 @@ function requeueStep(
   stepRow: typeof step.$inferSelect,
   fallback: StepFallbackRow,
   note: { id: string; content: string },
+  freshSession = false,
 ): void {
   deps.db
     .update(step)
     .set({
+      ...(freshSession ? { freshSession: true } : {}),
       status: 'pending',
       machineId: null,
       sessionId: null,
