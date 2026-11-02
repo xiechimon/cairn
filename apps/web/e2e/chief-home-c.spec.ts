@@ -181,6 +181,8 @@ test('a failed conversation load shows Retry instead of the greeting, with no co
   await expect(error).toBeVisible();
   await expect(page.getByTestId('home-c-hero')).toHaveCount(0);
   await expect(page.getByTestId('chief-composer-input')).toHaveCount(0);
+  await page.getByTestId('home-c').getByRole('button', { name: 'Tasks' }).click();
+  await expect(page.getByRole('complementary', { name: 'Tasks' })).toBeVisible();
   messagesFail = false;
   await error.getByRole('button', { name: 'Retry' }).click();
   await expect(page.getByTestId('chief-stream').getByText('Make a plan')).toBeVisible();

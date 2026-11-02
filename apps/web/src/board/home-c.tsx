@@ -372,28 +372,48 @@ export function HomeC({
     </div>
   );
 
+  const workPanel = pane !== null && (
+    <WorkPanel
+      pane={pane}
+      todos={scoped}
+      schedules={
+        projectId === null
+          ? schedules
+          : schedules.filter((schedule) => schedule.projectId === projectId)
+      }
+      now={now}
+      tab={tasksTab}
+      onTab={setTasksTab}
+      onClose={() => showPane(null)}
+    />
+  );
+
   if (surface.load !== 'ready') {
     return (
-      <section data-testid="home-c" className="flex min-h-0 min-w-0 flex-1 flex-col">
-        {surface.load === 'loading' ? (
-          <TextureSkeleton className="mx-auto mt-[12vh] h-40 w-[calc(100%-2rem)] max-w-182" />
-        ) : (
-          <>
-            <div className="mx-auto w-[calc(100%-2rem)] max-w-182 flex-none pt-6">
-              {projectLinks}
-              <ClaudeLoginBanner machines={machines} now={now} />
-            </div>
-            <EmptyState
-              testId="home-c-error"
-              icon={MessageSquareWarning}
-              title={t('对话加载失败')}
-              description={t('对话记录还在，重试一下。')}
-              action={{ label: t('重试'), onClick: surface.retry }}
-              className="mt-[12vh]"
-            />
-          </>
-        )}
-      </section>
+      <div className="relative flex min-h-0 min-w-0 flex-1">
+        <section data-testid="home-c" className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+          {paneButtons}
+          {surface.load === 'loading' ? (
+            <TextureSkeleton className="mx-auto mt-[12vh] h-40 w-[calc(100%-2rem)] max-w-182" />
+          ) : (
+            <>
+              <div className="mx-auto w-[calc(100%-2rem)] max-w-182 flex-none pt-6">
+                {projectLinks}
+                <ClaudeLoginBanner machines={machines} now={now} />
+              </div>
+              <EmptyState
+                testId="home-c-error"
+                icon={MessageSquareWarning}
+                title={t('对话加载失败')}
+                description={t('对话记录还在，重试一下。')}
+                action={{ label: t('重试'), onClick: surface.retry }}
+                className="mt-[12vh]"
+              />
+            </>
+          )}
+        </section>
+        {workPanel}
+      </div>
     );
   }
 
@@ -442,21 +462,7 @@ export function HomeC({
           />
         </MessageScrollerProvider>
       </section>
-      {pane !== null && (
-        <WorkPanel
-          pane={pane}
-          todos={scoped}
-          schedules={
-            projectId === null
-              ? schedules
-              : schedules.filter((schedule) => schedule.projectId === projectId)
-          }
-          now={now}
-          tab={tasksTab}
-          onTab={setTasksTab}
-          onClose={() => showPane(null)}
-        />
-      )}
+      {workPanel}
     </div>
   );
 }

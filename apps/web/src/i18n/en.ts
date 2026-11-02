@@ -145,7 +145,7 @@ export const EN: Record<string, string> = {
   今天: 'today',
 
   // —— board surface (r2 §4.1, r7 01/02; #351 6→4 列收敛) ——
-  任务: 'Todo', // topbar +任务 button / search nav row / popover section
+  任务: 'Tasks',
   待开始: 'To start',
   // 规划中 survives as the planning phase chip (detail header), not a column
   规划中: 'Planning',
