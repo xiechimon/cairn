@@ -577,6 +577,7 @@ async function tryClaim(
       ...(workerMcp !== undefined ? { mcpServers: workerMcp } : {}),
     };
   }
+  if (machineRunningCount(db, machineId) >= workerCap) return null;
   return claimChief(chiefCands.filter((cand) => cand.stepRow.createdAt > earliestWorker));
 }
 

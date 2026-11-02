@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { afterAll, describe, expect, test } from 'vitest';
+import { afterAll, describe, expect, test, vi } from 'vitest';
 import {
   agent as agentTable,
   build as buildTable,
@@ -13,6 +13,20 @@ import { listChiefThreads } from '../src/services/chief.js';
 import { claimStep } from '../src/services/machines.js';
 import { stepQueueProjector } from '../src/services/step-queue.js';
 import { bootServer, issueApiKey, postProject, req, type TestServer } from './helpers.js';
+
+const shipGate = vi.hoisted(() => ({ duringReverify: null as (() => void) | null }));
+vi.mock('../src/services/ship-gate.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/services/ship-gate.js')>();
+  return {
+    ...actual,
+    reverifyShip: async (...args: Parameters<typeof actual.reverifyShip>) => {
+      const hook = shipGate.duringReverify;
+      shipGate.duringReverify = null;
+      hook?.();
+      return actual.reverifyShip(...args);
+    },
+  };
+});
 
 const disposables: (() => void)[] = [];
 afterAll(() => {
@@ -426,5 +440,23 @@ describe('chief turns never wait behind a worker step another machine owns', () 
     const chiefStepId = insertPendingChiefStep(w.s, { createdAt: workerAt + 5 });
     expect((await claimAs(w))?.step.id).toBe(worker);
     expect((await claimAs(w))?.step.id).toBe(chiefStepId);
+  });
+});
+
+describe('a chief turn claimed after the worker loop respects capacity filled meanwhile', () => {
+  test('capacity filled while the worker loop awaited leaves the newer chief turn pending', async () => {
+    const w = await setupWorld();
+    setCap(w, 1);
+    const worker = insertPendingBuildStep(w.s, w);
+    const workerRow = w.s.db.select().from(stepTable).where(eq(stepTable.id, worker)).get()!;
+    const chiefStepId = insertPendingChiefStep(w.s, { createdAt: workerRow.createdAt + 5 });
+    shipGate.duringReverify = () => {
+      w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.id, worker)).run();
+      insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() });
+    };
+    expect(await claimAs(w)).toBeNull();
+    expect(w.s.db.select().from(stepTable).where(eq(stepTable.id, chiefStepId)).get()!.status).toBe(
+      'pending',
+    );
   });
 });
