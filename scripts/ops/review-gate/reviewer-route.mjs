@@ -10,15 +10,23 @@ export const CLAUDE_DENIED_TOOLS = [
   'WebFetch',
   'WebSearch',
 ];
-export const DIFF_LIMIT = 100_000;
+export const DIFF_LIMIT = 400_000;
+export const CLAUDE_OMITTED_PATHS = ['docs/verify', 'apps/server/drizzle/meta'];
+export const CLAUDE_DIFF_PATHSPEC = [
+  '-D',
+  '--',
+  '.',
+  ...CLAUDE_OMITTED_PATHS.map((path) => `:(exclude)${path}`),
+];
+
+export function roundStops(run) {
+  return (
+    /no usable model/.test(run.stderr) && !run.excluded && !/claude fallback:/.test(run.stderr)
+  );
+}
 
 export function claudeFallback(authorVendor, run) {
-  return (
-    Boolean(authorVendor) &&
-    authorVendor !== 'anthropic' &&
-    run.status !== 0 &&
-    /no usable model/.test(run.stderr)
-  );
+  return authorVendor !== 'anthropic' && run.status !== 0 && /no usable model/.test(run.stderr);
 }
 
 export function claudeReviewArgs() {
@@ -40,11 +48,11 @@ export function claudeReviewArgs() {
   ];
 }
 
-export function claudeReviewPrompt(prompt, { diff, title, body }) {
+export function claudeReviewPrompt(prompt, { diff, title, body, omitted = '' }) {
   if (diff.length > DIFF_LIMIT) return null;
   return `${prompt}
 
-You cannot run commands. The PR description and the full diff against origin/main are below; the checkout is origin/main, so Read/Grep/Glob show the base side only.
+You cannot run commands. The PR description and the diff against origin/main are below. Deleted files appear without their old content. Changes under docs/verify and drizzle meta are left out of the diff and listed by name instead. The checkout is origin/main, so Read/Grep/Glob show the base side only.
 
 PR title: ${title}
 
@@ -54,7 +62,16 @@ ${body}
 Diff:
 \`\`\`diff
 ${diff}
-\`\`\``;
+\`\`\`${
+    omitted.trim()
+      ? `
+
+Files changed but omitted from the diff (status and path):
+\`\`\`
+${omitted.trim()}
+\`\`\``
+      : ''
+  }`;
 }
 
 export function stalledSince(records, number, sha) {

@@ -6,6 +6,7 @@ import { agent, build, machine, plan as planTable, project, team, todo } from '.
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
+import { requireIntakeAssignment } from './intake-assignment.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { mergedCatalogModels } from './model-liveness.js';
 import type { VapidKeys } from './push.js';
@@ -31,6 +32,7 @@ export interface SplitSubtodoInput {
 }
 
 export interface SplitDeps {
+  intakeAgentAllowlist?: readonly string[];
   db: Db;
   hub: TeamStreamHub;
   machineHub?: MachineWakeHub;
@@ -74,7 +76,12 @@ export function createSplitTodo(
   if (existing.length > 0) {
     throw new HttpError(409, `todo ${input.parentId} 已拆解（${existing.length} 张子卡在位）`);
   }
-  const items = input.subtodos;
+  const preset = parent.assignment?.source === 'intake-label' ? parent.assignment : null;
+  if (preset !== null) requireIntakeAssignment(deps, parent.teamId, preset);
+  const items = input.subtodos.map((item) => ({
+    ...item,
+    agentId: preset?.build?.agentId ?? item.agentId,
+  }));
   let checkerPassed = false;
   let checkerReasons: string[] = [];
   if (splitPolicy !== 'human') {
@@ -213,7 +220,7 @@ export function createSplitTodo(
         .set({
           sourceTodo: parent.id,
           blockedBy: blockerIds.length > 0 ? blockerIds : null,
-          assignment: { plan: null, build: { agentId: item.agentId } },
+          assignment: preset ?? { plan: null, build: { agentId: item.agentId } },
           sourceBuildId: input.chiefId,
         })
         .where(eq(todo.id, child.id))
@@ -286,7 +293,7 @@ export function createSplitTodo(
       hasPlan: true,
       latestBuildId: parentBuildId,
       lastRunAt: nowMs(),
-      ...(!autoStart && planner !== undefined
+      ...(!autoStart && planner !== undefined && preset === null
         ? { assignment: { plan: { agentId: planner.id }, build: null } }
         : {}),
     },

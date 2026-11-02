@@ -1,6 +1,8 @@
 import type {
   ActiveRun,
   AgentRecord,
+  AskUserAnswer,
+  AskUserQuestionContent,
   ChiefGetResponse,
   ChiefOrchestration,
   ChiefThread,
@@ -51,19 +53,19 @@ import {
 import { sha256Hex } from '../lib/crypto.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
+import { answerQuestion, askQuestionContentOf } from './chief-questions.js';
 import {
   CHIEF_ABANDONED_STEP_MS,
   chiefOutage,
   chiefPendingMessages,
   chiefThreadFallbackModel,
-  PICKED_PROJECT_OPEN,
-  pickedProjectIdOf,
   settleChiefActiveRun,
 } from './chief-turns.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { injectMemories } from './memory.js';
 import { notifyChiefMessage } from './notifications.js';
+import { PICKED_PROJECT_OPEN, pickedProjectIdOf } from './picked-project.js';
 import { scanLocalSkills } from './skills.js';
 import { stepQueueProjector } from './step-queue.js';
 import { getTodo } from './todos.js';
@@ -508,6 +510,22 @@ export function requireUnarchivedProject(db: Db, projectId: string): void {
   if (row?.archivedAt != null) throw new HttpError(409, `project ${projectId} is archived`);
 }
 
+function requireNoWaitingQuestion(db: Db, laterIds: string[]): void {
+  if (laterIds.length === 0) return;
+  const waiting = db
+    .select({ content: chiefMessage.content })
+    .from(chiefMessage)
+    .where(inArray(chiefMessage.id, laterIds))
+    .all()
+    .some((row) => askQuestionContentOf(row.content)?.status === 'pending');
+  if (waiting) {
+    throw new HttpError(
+      409,
+      'a later question is still waiting for an answer; answer or cancel it before rewinding',
+    );
+  }
+}
+
 function requireRewindStaysInProject(
   db: Db,
   anchor: typeof chiefMessage.$inferSelect,
@@ -602,6 +620,53 @@ export function sendChiefMessage(
   };
 }
 
+export function answerChiefQuestion(
+  deps: ChiefDeps,
+  teamId: string,
+  input: { threadId: string; requestId: string; answers: AskUserAnswer[] },
+): AskUserQuestionContent {
+  const waiting = deps.db
+    .select()
+    .from(chiefMessage)
+    .where(and(eq(chiefMessage.id, input.requestId), eq(chiefMessage.threadId, input.threadId)))
+    .get();
+  if (askQuestionContentOf(waiting?.content)?.parkedAt === undefined) {
+    return answerQuestion(deps, input);
+  }
+  const threadRow = getChiefThread(deps, input.threadId);
+  if (!threadRow) throw new HttpError(404, `chief thread ${input.threadId}`);
+  requireWritableThread(threadRow);
+  requireBoundAgent(deps, ensureChief(deps, teamId));
+  const projectId = waiting?.projectId ?? null;
+  if (projectId !== null) requireUnarchivedProject(deps.db, projectId);
+  return deps.db.transaction(() => {
+    const answered = answerQuestion(deps, input);
+    enqueueResumedTurn(deps, teamId, input.threadId, answered, projectId);
+    return answered;
+  });
+}
+
+function enqueueResumedTurn(
+  deps: ChiefDeps,
+  teamId: string,
+  threadId: string,
+  answered: AskUserQuestionContent,
+  projectId: string | null,
+): void {
+  const lines = answered.questions.map((question, i) => {
+    const reply = answered.answers?.[i];
+    const text = reply?.text ?? reply?.choices?.join('、') ?? '';
+    return `- ${question.header}：${question.question}\n  答复：${text}`;
+  });
+  enqueueChiefStep(deps, threadId, {
+    prompt: promptWithPickedProject(
+      pickedProjectOf(deps.db, teamId, projectId),
+      `你之前用 ask_user 提的问题，用户现在答复了：\n${lines.join('\n')}\n请从这里继续。`,
+    ),
+    trigger: 'user',
+  });
+}
+
 export function enqueueChiefStep(
   deps: ChiefDeps,
   threadId: string,
@@ -665,6 +730,10 @@ export function rewindChiefThread(
     .orderBy(asc(chiefMessage.createdAt), sql`rowid`)
     .all();
   const doomed = ordered.slice(ordered.findIndex((row) => row.id === anchor.id) + 1);
+  requireNoWaitingQuestion(
+    deps.db,
+    doomed.map((row) => row.id),
+  );
   requireRewindStaysInProject(
     deps.db,
     anchor,
@@ -1170,12 +1239,7 @@ function writingTurnProjectId(db: Db, row: { id: string; threadId: string }): st
         .select({ prompt: step.prompt })
         .from(step)
         .where(
-          and(
-            eq(step.buildId, row.threadId),
-            eq(step.kind, 'chief'),
-            isNotNull(step.claimedAt),
-            ne(step.status, 'pending'),
-          ),
+          and(eq(step.buildId, row.threadId), eq(step.kind, 'chief'), eq(step.status, 'claimed')),
         )
         .orderBy(desc(step.claimedAt), sql`rowid desc`)
         .limit(1)
@@ -1195,7 +1259,10 @@ export function upsertChiefMessage(
   },
 ): void {
   db.insert(chiefMessage)
-    .values({ ...row, projectId: row.projectId ?? writingTurnProjectId(db, row) })
+    .values({
+      ...row,
+      projectId: row.projectId === undefined ? writingTurnProjectId(db, row) : row.projectId,
+    })
     .onConflictDoUpdate({
       target: chiefMessage.id,
       set: { role: row.role, content: row.content, createdAt: row.createdAt },

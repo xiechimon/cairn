@@ -5022,6 +5022,10 @@ exports[`body/envelope schema snapshots > startBuildsBody > startBuildsBody.json
             },
           ],
         },
+        "source": {
+          "const": "intake-label",
+          "type": "string",
+        },
         "verify": {
           "anyOf": [
             {
@@ -5609,6 +5613,10 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                           "type": "null",
                         },
                       ],
+                    },
+                    "source": {
+                      "const": "intake-label",
+                      "type": "string",
                     },
                     "verify": {
                       "anyOf": [
@@ -6579,6 +6587,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > executor minimum-
     "githubOauthClientSecret": "CAIRN_GITHUB_OAUTH_CLIENT_SECRET",
     "home": "CAIRN_HOME",
     "hookTimeoutMs": "CAIRN_HOOK_TIMEOUT_MS",
+    "intakeAgentAllowlist": "CAIRN_INTAKE_AGENT_ALLOWLIST",
     "issueIntake": "CAIRN_ISSUE_INTAKE",
     "mcpConfig": "CAIRN_MCP_CONFIG",
     "piCacheRetention": "CAIRN_PI_CACHE_RETENTION",
@@ -9528,6 +9537,10 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
                   "type": "null",
                 },
               ],
+            },
+            "source": {
+              "const": "intake-label",
+              "type": "string",
             },
             "verify": {
               "anyOf": [

@@ -129,6 +129,7 @@ import { githubText } from './github-text.js';
 import type { HarnessEvalDispatchPort } from './harness-eval-coordinator.js';
 import { buildHostedMergeInstruction } from './hosted-merge-instruction.js';
 import { storeInfoReport } from './info-handoff.js';
+import { requireIntakeAssignment } from './intake-assignment.js';
 import { enqueueLocalMerge } from './local-merge.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { readCompareAt } from './merge-gate/github-facts.js';
@@ -164,6 +165,7 @@ import {
 import { insertGateAnnouncement, insertMessageRow } from './transcript.js';
 
 export interface BuildDeps {
+  intakeAgentAllowlist?: readonly string[];
   steerOptions?: Pick<BuildSteerOptions, 'human'>;
   db: Db;
   hub: TeamStreamHub;
@@ -343,6 +345,8 @@ export async function sendBuildSteer(
       'Scheduled continuation would require a new build after the previous delivery. Create a new task.',
     );
   }
+  if (!running && todoRow.assignment !== null)
+    requireIntakeAssignment(deps, todoRow.teamId, todoRow.assignment);
   const sent = db.transaction(() => {
     if (continuationOptions.schedule) {
       const wake = continuationOptions.schedule;
@@ -957,6 +961,7 @@ export function startBuilds(
     if (projectRow?.teamId !== todoRecord.teamId) {
       throw new NotFoundError(`project ${input.projectId}`);
     }
+    requireIntakeAssignment(deps, todoRecord.teamId, input.assignment);
     const previous =
       todoRecord.latestBuildId === null
         ? undefined
@@ -1283,6 +1288,8 @@ function applyBuildConfirm(deps: BuildDeps, buildId: string, actorName: string):
   if (todoRecord.phase !== 'confirm') {
     throw new HttpError(409, `确认仅适用于待确认（confirm）关口，当前相位 ${todoRecord.phase}`);
   }
+  if (todoRecord.assignment !== null)
+    requireIntakeAssignment(deps, todoRecord.teamId, todoRecord.assignment);
   insertGateAnnouncement(deps, buildId, CONFIRM_ANNOUNCEMENT, actorName);
   if (childrenOfTodo(deps.db, todoRecord.id).length > 0) {
     dispatchSplitChildren(deps, todoRecord.id);
@@ -1316,6 +1323,7 @@ export async function applyBuildStepAction(
       throw new HttpError(409, `restart 仅适用于 failed 相位（当前 ${todoRecord.phase}）`);
     }
     const assignment = todoRecord.assignment ?? { plan: null, build: null };
+    requireIntakeAssignment(deps, todoRecord.teamId, assignment);
     const feedbackText = body.feedback.trim() === '' ? null : body.feedback;
     const preservedStep = deps.db
       .select({ id: step.id })
@@ -2642,7 +2650,19 @@ export function sweepPlanAutoConfirm(deps: BuildDeps, now: number = nowMs()): vo
         .all()
         .some((row) => askQuestionContentOf(row.content)?.status === 'pending');
     if (pendingQuestion) continue;
-    applyBuildConfirm(deps, buildId, 'server');
+    try {
+      applyBuildConfirm(deps, buildId, 'server');
+    } catch (error) {
+      if (
+        !(
+          error instanceof HttpError &&
+          error.status === 409 &&
+          (error.message.startsWith('agent-label-privileged:') ||
+            error.message.startsWith('intake-label-assignment-failed:'))
+        )
+      )
+        throw error;
+    }
   }
 }
 

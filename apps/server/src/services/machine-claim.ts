@@ -358,6 +358,11 @@ async function tryClaim(
       continue;
     }
     if (!agentRow.modelId) continue;
+    if (
+      cand.todoRow.assignment?.source === 'intake-label' &&
+      !meetsMcpVersionGate(machineRow?.latestCliVersion ?? null)
+    )
+      continue;
     const model = effectiveModel(agentRow, cand.stepRow);
     const runtime = stepRuntimeFor(model.provider);
     if (runtime === 'claude-code' && claudeBlocked(machineId)) continue;
@@ -494,7 +499,10 @@ async function tryClaim(
       repoRef?.kind === 'hosted' && mergeTarget !== null
         ? { ...repoRef, baseBranch: mergeTarget.baseBranch }
         : repoRef;
-    const workerMcp = claimMcpSlugs(machineRow.latestCliVersion, agentRow.mcpServers);
+    const workerMcp = claimMcpSlugs(
+      machineRow.latestCliVersion,
+      cand.todoRow.assignment?.source === 'intake-label' ? [] : agentRow.mcpServers,
+    );
     const isGithubProject = projectRow?.repoKind === 'github';
     const taskMeta =
       isGithubProject && projectRow

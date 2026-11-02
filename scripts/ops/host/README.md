@@ -19,7 +19,7 @@ Units are the host's `cairn-<name>.service` user units. "Called by" lists script
 | `tools/rearm-automerge.sh` | called by `overnight/driver.sh` | Disarms and re-arms auto-merge on bot PRs whose merge state changed |
 | `tools/overnight/driver.sh` | `cairn-overnight.service` | Per-lane loop: rebase, sign, push, open PRs, fix red CI, merge |
 | `tools/overnight/surface-stuck-rebase.sh` | called by `overnight/driver.sh` | When a lane's rebase worker has failed 3 times on one head, labels the PR `stale-pr` and comments the files `git merge-tree` reports as conflicting with main (the issue when there is no PR), once per head, instead of the driver skipping the lane silently |
-| `tools/overnight/lane-replaced.sh` | called by `overnight/driver.sh` | Exits 0 and prints the PR when another open PR closes the lane's issue (a coordinator-prepared replacement), so the driver skips the lane instead of pushing a duplicate PR; an unreadable issue also skips |
+| `tools/overnight/lane-replaced.sh` | called by `overnight/driver.sh` | Exits 0 when the lane's issue is closed (prints `closed`) or another open PR closes it (prints that PR, a coordinator-prepared replacement), so the driver skips the lane instead of pushing a duplicate PR or surfacing a finished lane; an unreadable issue also skips |
 | `tools/plan/plan-issues.sh` | `cairn-plan-issues.service` (under `flock`), called by `lanes/run-worker.sh` | Writes an implementation plan into issues that lack one |
 | `tools/reminders/resume-1727.sh` | `cairn-resume-1727.service` | One-off reminder that releases the held Web Push ticket |
 | `tools/schedule/issue-schedule.mjs` | `cairn-issue-schedule.service` | Rewrites the scheduling issue from `batch:*` labels |

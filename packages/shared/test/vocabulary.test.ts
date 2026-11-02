@@ -453,6 +453,7 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
       piCacheRetention,
       hookTimeoutMs,
       issueIntake,
+      intakeAgentAllowlist,
       scheduling,
       trajectoryOutcomeBackfill,
       trajectoryReflectCurate,
@@ -480,6 +481,7 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
     expect(piCacheRetention).toBe('CAIRN_PI_CACHE_RETENTION');
     expect(hookTimeoutMs).toBe('CAIRN_HOOK_TIMEOUT_MS');
     expect(issueIntake).toBe('CAIRN_ISSUE_INTAKE');
+    expect(intakeAgentAllowlist).toBe('CAIRN_INTAKE_AGENT_ALLOWLIST');
     expect(scheduling).toBe('CAIRN_SCHEDULING');
     expect(trajectoryOutcomeBackfill).toBe('CAIRN_TRAJ_OUTCOME_BACKFILL');
     expect(trajectoryReflectCurate).toBe('CAIRN_TRAJ_REFLECT_CURATE');

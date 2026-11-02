@@ -123,7 +123,7 @@ function host({
           : {}),
         ...(bigDiff
           ? {
-              'benign.txt': `${'benign line\n'.repeat(12_000)}`,
+              'benign.txt': `${'benign line\n'.repeat(40_000)}`,
               'scripts/zz-gate.mjs': 'export const gate = false;\n',
             }
           : {}),

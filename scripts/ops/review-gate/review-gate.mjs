@@ -3,6 +3,8 @@ import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from '
 import { resolve as resolvePath } from 'node:path';
 import {
   BLOCK_ROUNDS,
+  CLAUDE_DIFF_PATHSPEC,
+  CLAUDE_OMITTED_PATHS,
   claudeFallback,
   claudeReviewArgs,
   claudeReviewPrompt,
@@ -16,6 +18,7 @@ import {
   parseRawDiff,
   parseRuns,
   priorFindings,
+  roundStops,
   stallAlert,
   stalled,
 } from './reviewer-route.mjs';
@@ -568,15 +571,30 @@ ${
         console.log(`#${pr.number}: no usable cross-vendor model; reviewing with Claude`);
         let input;
         try {
-          const diff = execFileSync('git', ['diff', `origin/main...review-gate-${pr.number}`], {
-            cwd: MAIN,
-            encoding: 'utf8',
-            maxBuffer: 64 << 20,
-          });
+          const diff = execFileSync(
+            'git',
+            ['diff', `origin/main...review-gate-${pr.number}`, ...CLAUDE_DIFF_PATHSPEC],
+            {
+              cwd: MAIN,
+              encoding: 'utf8',
+              maxBuffer: 64 << 20,
+            },
+          );
           const { title, body } = JSON.parse(
             gh(['pr', 'view', String(pr.number), '--json', 'title,body']),
           );
-          input = claudeReviewPrompt(prompt, { diff, title, body });
+          const omitted = execFileSync(
+            'git',
+            [
+              'diff',
+              '--name-status',
+              `origin/main...review-gate-${pr.number}`,
+              '--',
+              ...CLAUDE_OMITTED_PATHS,
+            ],
+            { cwd: MAIN, encoding: 'utf8', maxBuffer: 16 << 20 },
+          );
+          input = claudeReviewPrompt(prompt, { diff, title, body, omitted });
           if (input === null)
             return resolve({
               ...routed,
@@ -663,11 +681,11 @@ ${
       }
       disarm(pr);
       alertIfStalled(pr);
-      return /no usable model/.test(run.stderr) && !run.excluded ? 'no-model' : 'none';
+      return roundStops(run) ? 'no-model' : 'none';
     }
     const reviewer =
       run.reviewer === 'claude'
-        ? ` (reviewer: Claude (opus), author vendor ${run.authorVendor} excluded)`
+        ? ` (reviewer: Claude (opus), ${run.authorVendor ? `author vendor ${run.authorVendor} excluded` : 'author vendor unknown, same-vendor review possible'})`
         : '';
     const body =
       verdict === 'pass'

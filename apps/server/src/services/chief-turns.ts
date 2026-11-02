@@ -20,6 +20,7 @@ import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import type { ConversationStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
+import { pickedProjectIdOf } from './picked-project.js';
 import { publishStepRow } from './quota-wait.js';
 
 type StepRow = typeof step.$inferSelect;
@@ -33,13 +34,6 @@ const STEER_HOLDS = [STEERED_HOLD, STEER_SENT_HOLD];
 export const CHIEF_ABANDONED_STEP_MS = 120_000;
 
 export const CHIEF_TURN_MAX_MS = 30 * 60_000;
-
-export const PICKED_PROJECT_OPEN = '【输入框选定项目：';
-
-export function pickedProjectIdOf(prompt: string | null): string | null {
-  if (prompt === null || !prompt.startsWith(PICKED_PROJECT_OPEN)) return null;
-  return /^[^\n]*（id: ([^）\n]+)）】\n/.exec(prompt)?.[1] ?? null;
-}
 
 export interface ChiefTurnDeps {
   db: Db;

@@ -7,15 +7,19 @@ import { test } from 'node:test';
 
 const script = resolve('scripts/ops/host/tools/overnight/lane-replaced.sh');
 
-function replaced(t, { linked, own = '', ghFails = false }) {
+function replaced(t, { linked, own = '', ghFails = false, state = 'OPEN' }) {
   const bin = mkdtempSync(join(tmpdir(), 'lane-replaced-'));
   t.after(() => rmSync(bin, { recursive: true, force: true }));
-  const refs = JSON.stringify(linked.map((number) => ({ number })));
+  const issue = JSON.stringify({
+    state,
+    closedByPullRequestsReferences: linked.map((number) => ({ number })),
+  });
+  writeFileSync(join(bin, 'issue.json'), issue);
   writeFileSync(
     join(bin, 'gh'),
     ghFails
       ? '#!/bin/sh\nexit 1\n'
-      : `#!/bin/sh\ncase "$*" in "issue view 2420 "*) printf '%s' '${refs}' | jq -r '.[].number';; *) exit 1;; esac\n`,
+      : `#!/bin/sh\n[ "$1 $2 $3" = "issue view 2420" ] || exit 1\nwhile [ $# -gt 0 ]; do [ "$1" = --jq ] && f=$2; shift; done\njq -r "$f" "${join(bin, 'issue.json')}"\n`,
   );
   chmodSync(join(bin, 'gh'), 0o755);
   const result = spawnSync('bash', [script, '2420', own], {
@@ -45,4 +49,15 @@ test('an unreadable issue counts as replaced so the driver never pushes a duplic
   const r = replaced(t, { linked: [], ghFails: true });
   assert.equal(r.code, 0);
   assert.equal(r.out, 'unknown');
+});
+
+test('a lane whose issue is closed is obsolete, so its stale rebase markers are never surfaced', (t) => {
+  assert.deepEqual(replaced(t, { linked: [], state: 'CLOSED' }), { code: 0, out: 'closed' });
+});
+
+test('a closed issue wins over the lane still having its own PR', (t) => {
+  assert.deepEqual(replaced(t, { linked: [2542], own: '2542', state: 'CLOSED' }), {
+    code: 0,
+    out: 'closed',
+  });
 });
