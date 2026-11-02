@@ -193,12 +193,6 @@ export const MERGE_BLOCKERS = [
   },
   { code: 'size-cap', class: 'human', label: '本地补丁超过 800 行或 40 个文件' },
   {
-    code: 'size-review',
-    class: 'transient',
-    label:
-      '补丁超过 800 行或 40 个文件：PR 正文要有 ## Size 小节，且当前补丁要有评审明确接受这个规模',
-  },
-  {
     code: 'independent-review-missing',
     class: 'transient',
     label: 'Protected changes require a bound independent review',

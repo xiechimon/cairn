@@ -22,7 +22,7 @@ const decide = ({ changedFiles, linesChanged = 1, binaryFiles = [], deletedFiles
 const matchedProtected = changedFiles.filter(isProtected);
 const reviewed = [];
 ${routing}
-;({ humanReasons, sizeReview, sizeRequirement })`,
+;({ humanReasons, size: typeof sizeReview })`,
     { args: { gatePaths }, changedFiles, deletedFiles, binaryFiles, linesChanged },
     sandbox,
   );
@@ -30,45 +30,22 @@ const route = (input) => Array.from(decide(input).humanReasons);
 const sourceFiles = (n) => Array.from({ length: n }, (_, i) => `apps/web/src/page${i}.ts`);
 const evidenceFiles = (n) => Array.from({ length: n }, (_, i) => `docs/verify/2371/run-${i}.txt`);
 
-test('evidence beyond the file cap does not make a patch oversize', () => {
-  assert.deepEqual(route({ changedFiles: [...sourceFiles(40), ...evidenceFiles(60)] }), []);
-});
-
-test('one source file over the file cap asks for a size review and does not route to the owner', () => {
-  const decision = decide({ changedFiles: [...sourceFiles(41), ...evidenceFiles(60)] });
+test('a large patch neither routes to the owner nor reports a size review (D68)', () => {
+  const decision = decide({ changedFiles: sourceFiles(120), linesChanged: 5000 });
   assert.deepEqual(Array.from(decision.humanReasons), []);
-  assert.equal(decision.sizeReview, true);
-  assert.match(decision.sizeRequirement, /41 files/);
-  assert.match(decision.sizeRequirement, /## Size/);
+  assert.equal(decision.size, 'undefined');
 });
 
-test('the line cap is the caller sum and 801 asks for a size review', () => {
-  const at = decide({ changedFiles: sourceFiles(1), linesChanged: 800 });
-  assert.equal(at.sizeReview, false);
-  assert.equal(at.sizeRequirement, null);
-  const over = decide({ changedFiles: sourceFiles(1), linesChanged: 801 });
-  assert.deepEqual(Array.from(over.humanReasons), []);
-  assert.equal(over.sizeReview, true);
-  assert.match(over.sizeRequirement, /801 lines/);
-});
-
-test('an oversize patch touching a security surface still routes to the owner', () => {
+test('a large patch touching a security surface routes to the owner for the surface only', () => {
   for (const surface of [
     'apps/server/src/services/secrets.ts',
     'apps/server/src/routes-machine.ts',
     'apps/daemon/src/backend/command-gate.ts',
     'apps/server/src/services/mcp-face.ts',
   ]) {
-    const decision = decide({ changedFiles: [...sourceFiles(41), surface], linesChanged: 900 });
-    assert.equal(decision.sizeReview, true);
-    assert.deepEqual(Array.from(decision.humanReasons), [`protected paths: ${surface}`]);
+    const reasons = route({ changedFiles: [...sourceFiles(41), surface], linesChanged: 900 });
+    assert.deepEqual(reasons, [`protected paths: ${surface}`]);
   }
-});
-
-test('size review never hides the other owner reasons', () => {
-  const reasons = route({ changedFiles: ['README.md', ...sourceFiles(41)], linesChanged: 900 });
-  assert.equal(reasons.length, 1);
-  assert.match(reasons[0], /^outside the auto-merge set/);
 });
 
 test('binary files outside docs/verify still route to the owner', () => {
