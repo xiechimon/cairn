@@ -52,15 +52,12 @@ describe('mapChiefStream echo-row dedup (#667 F-C1..C7)', () => {
     expect(users.map((u) => u.text)).toEqual(['总结项目进展', '再查一下 token 用量']);
   });
 
-  test('F-C4 wake echo rows (no POST twin) survive with the marker stripped — the remainder renders', () => {
+  test('F-C4 wake echo rows and their event-turn reply stay out of the conversation (#1784)', () => {
     const items = mapChiefStream([
       row('user-LFnKO1KhDH4F1HylsEAfY', 'user', '[wake:settle] 任务 #5「修复」已合并完成', NOW),
       row('msg-r1', 'assistant', '已确认落地', NOW + 9000),
     ]);
-    const users = userItems(items);
-    expect(users).toHaveLength(1);
-    expect(users[0]?.text).toBe('任务 #5「修复」已合并完成');
-    expect(users[0]?.text).not.toContain('[wake:');
+    expect(items).toEqual([]);
   });
 
   test('F-C5 steer same-text (two POSTs + two echoes) → exactly two (each real action renders once)', () => {
@@ -95,15 +92,12 @@ describe('mapChiefStream echo-row dedup (#667 F-C1..C7)', () => {
 });
 
 describe('mapChiefStream internal marker stripping (#778 F-W1..W6)', () => {
-  test('F-W1 all four same-family markers (gate/settle/failed/wake) strip their leading marker', () => {
+  test('F-W1 all four same-family markers (gate/settle/failed/wake) hide their transcript prompt row (#1784)', () => {
     for (const kind of ['gate', 'settle', 'failed', 'wake']) {
       const items = mapChiefStream([
         row('user-stepW', 'user', `[wake:${kind}] 任务 #5 已合并完成`, NOW),
       ]);
-      const users = userItems(items);
-      expect(users).toHaveLength(1);
-      expect(users[0]?.text).toBe('任务 #5 已合并完成');
-      expect(users[0]?.markdown).toBe('任务 #5 已合并完成');
+      expect(userItems(items)).toHaveLength(0);
     }
   });
 

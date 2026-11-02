@@ -144,7 +144,7 @@ describe('chief unread badge (#1303)', () => {
     expect(await unreadChief(w.s, w.teamId)).toContain(w.threadId);
   });
 
-  test('a wake-only turn is stored already read and does not join the unread set', async () => {
+  test('a wake-only turn writes no notification and does not join the unread set (#1784)', async () => {
     const w = await setupTurn('回头提醒');
     w.s.db
       .update(stepTable)
@@ -153,9 +153,7 @@ describe('chief unread badge (#1303)', () => {
       .run();
     const claimed = await w.claim();
     await w.done(claimed.step.id, '机器回头：任务仍在跑，无需处理。');
-    const row = chiefNotif(w.s, w.threadId);
-    expect(row?.snippet).toContain('机器回头');
-    expect(row?.readAt).not.toBeNull();
+    expect(chiefNotif(w.s, w.threadId)).toBeUndefined();
     expect(await unreadChief(w.s, w.teamId)).not.toContain(w.threadId);
   });
 
@@ -167,7 +165,7 @@ describe('chief unread badge (#1303)', () => {
     enqueueChiefStep(
       { db: w.s.db, hub: w.s.hub, machineHub: w.s.machineHub, user: w.s.user },
       w.threadId,
-      { prompt: '任务停在确认关口。', trigger: 'gate' },
+      { prompt: '任务停在确认关口。', trigger: 'gate', provenance: 'watch:test' },
     );
     const wake = await w.claim();
     await w.done(wake.step.id, '关口汇报：方案已停住。');
@@ -188,7 +186,7 @@ describe('chief unread badge (#1303)', () => {
     enqueueChiefStep(
       { db: w.s.db, hub: w.s.hub, machineHub: w.s.machineHub, user: w.s.user },
       w.threadId,
-      { prompt: '约定时间已到。', trigger: 'wake' },
+      { prompt: '约定时间已到。', trigger: 'wake', provenance: 'wake:test' },
     );
     const wake = await w.claim();
     await w.done(wake.step.id, '到点回头：没有新情况。');
