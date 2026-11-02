@@ -25,6 +25,7 @@ import { mentionChipClass } from '../overlay/mention-chip.js';
 import { ChiefDigestRow } from './chief-digest-row.js';
 import { ChiefIdentity } from './chief-identity.js';
 import { ChiefQuestionCard } from './chief-question-card.js';
+import { ChiefReportRow } from './chief-report-row.js';
 
 const MSG_TOOL_BTN_CLS =
   "size-6 cursor-pointer rounded-none border-none bg-transparent text-(--text-tertiary) hover:bg-(--secondary) hover:text-(--text-secondary) dark:hover:bg-(--secondary) aria-expanded:bg-muted aria-expanded:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
@@ -278,6 +279,7 @@ export function ChiefStreamRow({
   if (item.kind === 'handoff') return <HandoffRow todoId={item.todoId} />;
   if (item.kind === 'digest')
     return <ChiefDigestRow reason={item.reason} madeAt={item.madeAt} items={item.items} />;
+  if (item.kind === 'daily-report') return <ChiefReportRow report={item.report} />;
   if (item.kind === 'note')
     return (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>

@@ -3,6 +3,7 @@ import {
   type AgentTask,
   type AgentTodoItem,
   type ChiefDigestItem,
+  type ChiefReportContent,
   type ClaudeLogin,
   type DocumentDiffFile,
   type GithubRepoSummary,
@@ -541,6 +542,11 @@ export type ChiefStreamItem =
       reason: 'daily' | 'threshold';
       madeAt: number;
       items: ChiefDigestItem[];
+    }
+  | {
+      kind: 'daily-report';
+      id: string;
+      report: ChiefReportContent;
     }
   | {
       kind: 'streaming';
