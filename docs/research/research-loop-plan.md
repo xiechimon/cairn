@@ -1,19 +1,28 @@
 # Research loop plan: cairn agents that look outward
 
-Status: draft for ian, 2026-11-02. Baseline `origin/main` at `82f610499`. This document stands alone; it does not depend on any earlier plan version.
+Status: revised 2026-11-02 after the owner's decisions (plan decision D63, which builds on the thread model of D60). Code facts are checked against `origin/main` at `456edfe36`. This document stands alone; it does not depend on any earlier plan version.
 
 Labels used throughout:
 - **[verified]**: read in the source (code on `origin/main`, a web page, a PR) during this session.
 - **[inferred]**: reasoned from verified facts; can be re-checked.
 - **[guessed]**: everything else, including predictions and numbers not yet measured.
+- **[D60 work]**: depends on the thread model of D60, which is decided but not yet built on `origin/main`.
 
 ## 0. Summary
 
-- **End state.** When a cairn build gets stuck, cairn searches how others solved the problem before it retries. Plans for new mechanisms cite outside sources. Once a day, the Coordinator posts a short list of outside developments that match open work. What it learns is kept as sourced, expiring memory.
-- **Today.** Claude Code build agents *can* search the web but are never asked to, and nothing records whether they did. Codex/GPT agents (pi runtime) have no search tool. The Coordinator and reviewers can read only local files. The learning loop looks only at cairn's own trajectories.
-- **Recommendation.** Reuse what exists: info cards (read-only report cards) and the retry-lessons injection. Phase 1 adds a research card before the last retry of a stuck build. Phase 2 keeps its findings as sourced memory with an expiry date. Phase 3 asks plans for new mechanisms to cite prior art, first as a soft check. Phase 4 adds a daily intake card. No new server-side search or LLM calls; all outside access runs in daemon sessions behind `apps/daemon/src/backend/`.
-- **Next step.** Run spikes S1 to S5 (section 8) before building anything. S2 (how often builds get stuck) decides whether Phase 1 is worth it.
-- **Waiting on ian.** The decisions in section 10, mainly the trigger threshold, whether research blocks the retry, X as an intake source, and the memory promotion rule.
+- **End state.**
+  - A stuck build gets outside research before its last retry.
+  - Work on a new mechanism starts with a research thread whose report the code thread reads.
+  - Once a day, the Coordinator digest lists at most 5 outside developments that match open work.
+  - Findings that helped a merged retry are kept as sourced memory that expires after 90 days.
+  - Every runtime that runs unlocked work can search the web, including pi.
+- **Thread model (D60).**
+  - Research runs as its own thread: one thread, one session, owning the work to the end.
+  - The Coordinator only listens, opens threads and intercepts. Opening a research thread, and choosing a strong or cheap model for it by task complexity, is routing, not planning.
+  - The Coordinator does not wait. The code thread waits on the research report through the blocker handoff, or the stuck-retry path injects the report.
+- **Search for pi.** Recommended: a daemon-side `web_search` / `web_fetch` tool behind `apps/daemon/src/backend/`. It reads the provider key from the per-step secret vault and calls Exa first, with Brave as the alternative. Claude Code keeps its native `WebSearch`. Locked steps (Coordinator, review, `remoteToolsOnly`) stay without search.
+- **Next step.** Run spikes S1 to S6 (section 10). S2 (how often builds get stuck) decides whether Phase 1 goes first.
+- **Waiting on ian.** The questions still open in section 12: the search option, the provider, a monthly spend cap, citation-check frequency, and whether Phase 1 waits for D60.
 
 ## 1. Problem
 
@@ -30,199 +39,274 @@ ian wants cairn itself, not his personal Claude Code setup, to do three things:
 
 | Area | Fact | Source | Label |
 |---|---|---|---|
-| Build agents, Claude Code runtime | `disallowedTools` is `AskUserQuestion` plus `Edit`/`Write` when `readOnly`; `WebSearch`/`WebFetch` are not removed | `apps/daemon/src/backend/claude-code.ts` (`SDK_ASK_TOOL`, `SDK_WRITE_TOOLS`, `buildClaudeSdkOptions`) | [verified] |
-| Coordinator and review steps | Run `lockedDown` outside an Orb: built-in tools are limited to `Read`, `Glob`, `Grep` (`HOST_BUILTIN_TOOLS`) and `Bash` is disallowed. No web access | `apps/daemon/src/runner.ts` (`isChief \|\| isReview ? { lockedDown: true }`), `claude-code.ts` | [verified] |
-| Build agents, pi runtime (Codex/GPT models via `openai-codex` OAuth) | Built-in tools are `read, bash, edit, write` (read-only: `read, bash`). No search tool; only `curl` through bash | `apps/daemon/src/backend/pi.ts` (`PI_BUILTIN_TOOLS`, `PI_READONLY_TOOLS`) | [verified] |
+| Claude Code runtime, build and info steps | `disallowedTools` is `AskUserQuestion` plus `Edit`/`Write` when `readOnly`; `WebSearch`/`WebFetch` stay available | `apps/daemon/src/backend/claude-code.ts` (`SDK_ASK_TOOL`, `SDK_WRITE_TOOLS`, `buildClaudeSdkOptions`) | [verified] |
+| Locked steps | Coordinator and review steps run `lockedDown` outside an Orb. Built-in tools are limited to `Read`, `Glob`, `Grep` (`HOST_BUILTIN_TOOLS`), `Bash` is disallowed, and only the host MCP server is kept. `remoteToolsOnly` sets built-in tools to none | `apps/daemon/src/runner.ts` (`isChief \|\| isReview ? { lockedDown: true }`), `claude-code.ts`, `pi.ts` (`sessionToolNames`) | [verified] |
+| pi runtime (Codex/GPT models through the `openai-codex` OAuth provider) | Built-in tools are `read, bash, edit, write` (read-only: `read, bash`). No search tool | `apps/daemon/src/backend/pi.ts` (`PI_BUILTIN_TOOLS`, `PI_READONLY_TOOLS`) | [verified] |
+| pi MCP bridge | `opts.mcpServers` endpoints are registered through the `cairn-mcp-bridge` extension (`pi.registerMcpServer`). Tools are exposed through `MCP_TOOL_ALLOWLIST` (`mcp__*` plus resource tools) unless `remoteToolsOnly` | `pi.ts` (`mcpRegisterExtension`, `MCP_TOOL_ALLOWLIST`) | [verified] |
+| pi custom tools | Remote tools (relayed to the server) and local tools (run in the daemon) are both wrapped with `defineTool` into `customTools`. Local tools today are `get_secret`, the create-tag tool and the skill loader | `pi.ts` (`customTools`, `localTools`), `runner.ts` (`localToolDefs`) | [verified] |
+| Where MCP servers come from | The daemon resolves granted slugs from the machine's Claude config file (`~/.claude.json`, `CLAUDE_CONFIG_FILE_NAME`). The grant is the agent's `mcpServers` list, and dispatch eligibility checks the machine's reported MCP capability. Credentials for an MCP server live in that file's `env` on each host | `apps/daemon/src/backend/mcp-config.ts`, `apps/server/src/services/mcp-servers.ts`, `apps/server/src/services/dispatch-eligibility.ts` | [verified] |
+| Secret channel | Per-step credentials carry a `SecretVault` (names plus `take(name)`). Secrets are not in the shell environment; `get_secret` is the agent's only way to read one, and every read is audited | `apps/daemon/src/credentials.ts`, `apps/daemon/src/secret-channel.ts` | [verified] |
 | Prompts | No server, daemon or shared prompt mentions research or web search. The only "research" strings describe the info deliverable kind | `git grep -i research` over `apps/*/src`, `packages/shared/src` | [verified] |
-| Coordinator tools | Projects, todos, agents, models, machines, skills, secrets, MCP servers, schedules, docs, usage, issues, pull requests, workflow runs, memory (`save_memory`, `update_memory`, `delete_memory`), `search_history`/`read_history` over its own thread, `create_todo`/`split_todo` with deliverable `"code"` or `"info"`. No outward tool | `packages/shared/src/protocol/chief-tools.ts` | [verified] |
-| Info cards | `output === 'info'`: read-only workspace, no commits, the report is stored as an attachment (`reportAttachmentId`), merge is refused | `apps/daemon/src/runner.ts` (`readonlyWorkspace`), `apps/server/src/services/builds.ts` (`INFO_CARD_MERGE_REFUSAL`) | [verified] |
-| Info report handoff | When a todo is `blockedBy` an info card, its plan/build claim receives the report content. The handoff is snapshotted once per build, at the build's first step | `apps/server/src/services/blocker-handoff.ts` (`blockerHandoffForClaim`) | [verified] |
-| Retry lessons | Builds the retry section from the last failed CI checks, plan/build rejection feedback, blocking review findings, verify verdicts and merge-gate blocks, parsed from build-conversation system messages | `apps/server/src/services/retry-lessons.ts` (`retryLessonsOf`), called from `builds.ts` | [verified] |
-| CI-fix loop | At most `CI_FIX_ROUNDS_MAX = 3` fix rounds; then the build fails with a dead-loop message | `apps/server/src/services/ci-loop.ts` | [verified] |
-| Learning loop | The daily reflect-curate turns trajectories into experience candidates (promoted to memory after `PROMOTION_MIN_BUILDS = 2` builds), skill drafts and guard candidates. Off unless env-enabled; the reflector calls an OpenAI-compatible `/chat/completions` endpoint from the server | `apps/server/src/trajectory-curate.ts`, `trajectory-reflect-curate.ts`, `trajectory-reflect.ts`, `services/scheduler.ts`, `packages/shared/src/experience-candidate.ts` | [verified] |
-| Memory | `agent_memory` has `sourceTodoId`, `sourceBuildId`, `history`, `invalidAt`, `supersededBy`, `lastInjectedAt`. `injectMemories` injects every still-valid memory for the agent and project, with no retrieval step | `apps/server/src/db/schema.ts`, `apps/server/src/services/memory.ts` | [verified] |
-| Failure attribution | `where` includes `'knowledge'`, `why` includes `'context_missing'`. It lives in the trajectory pack schema, which is a protected eval-ruler file, and is labeled after the fact | `packages/shared/src/failure-attribution.ts`, `packages/shared/src/trajectory-pack.ts`, `packages/shared/merge-gate-paths.json` | [verified] |
-| Schedules | Coordinator and worker schedules, cron or one-shot, minimum interval 15 minutes, `WORKER_SCHEDULE_RUN_LIMIT = 10` | `apps/server/src/services/schedules.ts`, `chief-tools.ts` (`schedule_create`) | [verified] |
-| Coordinator digest | A digest message kind already exists in the Coordinator thread | `apps/server/src/services/chief-digest.ts` | [verified] |
-| Harness changes are measured | Prompt, skill and context-assembly changes are judged by paired trials | `docs/spec/29-evaluation-and-data-loop.md` | [verified] |
-| Research today | Manual: tickets such as #1607 and #1775 with notes under `docs/research/`; link roundups ian feeds by hand (`link-roundup-2026-11-01.md`) | `docs/research/README.md` | [verified] |
+| Coordinator tools | Projects, todos, agents, models, machines, skills, secrets, MCP servers, schedules, docs, usage, issues, pull requests, workflow runs, memory, `watch_todos`, its own history search, `create_todo` and `split_todo` with deliverable `"code"` or `"info"`, `run_builds`. No outward tool | `packages/shared/src/protocol/chief-tools.ts` | [verified] |
+| Routing today | `run_builds` routes by agent: `assignment.plan/build.agentId`. A model is a property of the agent (`create_agent`/`update_agent` `modelId`). No per-thread model choice exists | `chief-tools.ts` | [verified] |
+| Blockers | `blockedBy` edges are set only through `split_todo` sub-cards; `create_todo` has no blocker parameter | `chief-tools.ts` | [verified] |
+| Info cards | `output === 'info'`: read-only workspace, no commits, the report is an attachment (`reportAttachmentId`), merge is refused | `runner.ts` (`readonlyWorkspace`), `apps/server/src/services/builds.ts` (`INFO_CARD_MERGE_REFUSAL`) | [verified] |
+| Report handoff | A plan/build claim on a todo `blockedBy` an info card receives the report. The handoff is snapshotted once per build, at its first step | `apps/server/src/services/blocker-handoff.ts` (`blockerHandoffForClaim`) | [verified] |
+| Retry lessons | The retry section is built from failed CI checks, rejection feedback, blocking review findings, verify verdicts and merge-gate blocks, parsed from build-conversation system messages | `apps/server/src/services/retry-lessons.ts` (`retryLessonsOf`) | [verified] |
+| CI-fix loop | At most `CI_FIX_ROUNDS_MAX = 3` fix rounds, then the build fails with a dead-loop message | `apps/server/src/services/ci-loop.ts` | [verified] |
+| Learning loop | Daily reflect-curate turns trajectories into experience candidates (promoted after `PROMOTION_MIN_BUILDS = 2`), skill drafts and guard candidates. Off unless env-enabled | `apps/server/src/trajectory-curate.ts`, `trajectory-reflect-curate.ts`, `services/scheduler.ts` | [verified] |
+| Memory | `agent_memory` has `sourceTodoId`, `sourceBuildId`, `invalidAt`, `supersededBy`. `injectMemories` injects every still-valid memory, with no retrieval step | `apps/server/src/db/schema.ts`, `apps/server/src/services/memory.ts` | [verified] |
+| Failure attribution | `where` includes `'knowledge'`. It lives in the trajectory pack schema, a protected eval-ruler file, and is labeled after the fact | `packages/shared/src/failure-attribution.ts`, `packages/shared/src/trajectory-pack.ts` | [verified] |
+| Schedules and digest | Coordinator and worker schedules (cron or one-shot, minimum 15 minutes); a Coordinator digest message kind | `apps/server/src/services/schedules.ts`, `apps/server/src/services/chief-digest.ts` | [verified] |
+| Thread model | D60: no fixed role agents; the Coordinator opens a thread; one thread, one session, owns plan, tests, implementation and self-check; the Coordinator picks model and machine per task; the Coordinator does not plan or wait (events are pushed). Decided, not built | Owner's plan decision table, D60 | [D60 work] |
 
 What follows from this [inferred]:
-- The brief's claim that "build agents can already use the web" holds only for the Claude Code runtime, and only for build and info steps.
-- Codex-model agents cannot search at all.
-- The Coordinator, which decides what work happens, is the role least able to look outward. It can, however, already delegate research by creating an info card.
+- Only Claude Code build and info steps can search today. Codex-model threads cannot.
+- The Coordinator cannot search, and under D60 it should not: it routes, and research is work that a thread owns.
+- Two pieces the research loop needs belong to D60 and do not exist yet: opening a thread with a per-thread model, and blocking a code thread on a research thread outside `split_todo`.
 
 ## 3. Prior art
 
 | System | What it does about outside knowledge | Who decides to retrieve | Source | Label |
 |---|---|---|---|---|
-| Hermes Agent (Nous Research) | Bounded curated memory (`MEMORY.md` ~2,200 chars, `USER.md`). The agent creates and updates skills with `skill_manage` after multi-step workflows, dead ends or user corrections, and a background review can stage skill changes behind an optional `write_approval` gate. Session search, cron jobs with per-job toolsets (also event-triggered by webhooks), `web_search`/`web_extract` with Exa as one backend. Opt-in `x_search` | The agent, at its discretion. Nothing enforces retrieval | hermes-agent.nousresearch.com/docs (features: skills, memory, cron, web-search, tools) | [verified] |
-| Amp Librarian | A subagent that searches public GitHub and private repos, reads framework and dependency source, and returns findings | The user or main agent asks for it ("summon the Librarian") | ampcode.com/news/librarian (2025-10-20) | [verified]. Return format with file/line ranges: [inferred] from the screenshot |
-| Devin | Ask Devin answers with cited code search over indexed repos and generates a context-rich prompt to hand to an Agent session. DeepWiki indexes repos | User-initiated, research before execution | docs.devin.ai/work-with-devin/ask-devin | [verified] |
-| Anthropic multi-agent research system | A lead agent plans and spawns parallel search subagents; a citation step attributes claims. Effort scaling rules (1 agent / 3-10 calls for simple facts, more than 10 subagents for complex research). Multi-agent runs use about 15x the tokens of chat; token use explains 80% of BrowseComp variance | The lead agent, under explicit scaling rules in its prompt | anthropic.com/engineering/multi-agent-research-system | [verified] |
-| Phased workflow (Infobip, CIKM '26) | Research, planning, task definition, implementation. Upstream research errors compound, so human review is front-loaded. When implementation shows a badly defined task, return to task definition rather than patch the code | A process rule, not the agent | arxiv.org/html/2608.30701v1 | [verified] |
-| ACE, Agentic Context Engineering (ICLR 2026) | Generator, Reflector and Curator evolve an itemized playbook with incremental delta updates, avoiding brevity bias and context collapse from full rewrites. +10.6% on agent benchmarks | Execution feedback drives updates | proceedings.iclr.cc (ACE), arxiv.org/abs/2510.04618 | [verified] |
-| FLARE (Jiang et al., EMNLP 2023) | Retrieve only when the model is about to produce low-confidence tokens; use the tentative next sentence as the query | A confidence threshold | aclanthology.org/2023.emnlp-main.495 | [verified] |
-| OpenHands | Web search through a Tavily search API key; on by default in OpenHands Cloud, off without a key | The agent, at its discretion | docs.openhands.dev/openhands/usage/advanced/search-engine-setup | [verified] |
-| Codex CLI | Hosted `web_search` tool, cached by default (an OpenAI-maintained index, less prompt-injection exposure) or `live`; separate from the sandbox's network policy; domain allowlist | Config, then the agent | learn.chatgpt.com/docs/web-search | [verified] |
-| Renovate Merge Confidence | Watches dependency releases and flags undeclared breaking releases from adoption and test data across users | Automatic, on every dependency update | docs.renovatebot.com/merge-confidence | [verified] |
-| Depot test splitting | Splits test files into shards balanced by historical timing; the same technique that fixed cairn's CI | Not an agent; shows the kind of fact research should find | depot.dev/docs/ci/how-to-guides/split-tests | [verified] |
+| Hermes Agent (Nous Research) | Bounded curated memory (`MEMORY.md` ~2,200 chars). The agent writes skills with `skill_manage` after multi-step workflows, dead ends or corrections; a background review can stage skill changes behind an optional `write_approval` gate. Session search, cron jobs with per-job toolsets, `web_search`/`web_extract` with Exa as one backend, opt-in `x_search` | The agent, at its discretion | hermes-agent.nousresearch.com/docs (skills, memory, cron, web-search, tools) | [verified] |
+| Amp Librarian | A subagent that searches public and private GitHub code, reads dependency source and returns findings | The user or main agent asks for it | ampcode.com/news/librarian (2025-10-20) | [verified]; file/line return format [inferred] from a screenshot |
+| Devin | Ask Devin answers with cited code search and generates a context-rich prompt for an Agent session | User-initiated, research before execution | docs.devin.ai/work-with-devin/ask-devin | [verified] |
+| Anthropic multi-agent research system | Lead agent plans and spawns parallel search subagents; claims are attributed to sources; an LLM judge grades factual and citation accuracy | The lead agent, under explicit effort-scaling rules | anthropic.com/engineering/multi-agent-research-system | [verified] |
+| Phased workflow (Infobip, CIKM '26) | Research, planning, task definition, implementation. Upstream research errors compound, so review is front-loaded | A process rule | arxiv.org/html/2608.30701v1 | [verified] |
+| ACE, Agentic Context Engineering (ICLR 2026) | Generator, Reflector and Curator evolve an itemized playbook with incremental delta updates, avoiding context collapse | Execution feedback | proceedings.iclr.cc (ACE), arxiv.org/abs/2510.04618 | [verified] |
+| FLARE (Jiang et al., EMNLP 2023) | Retrieve only when the model is about to produce low-confidence tokens | A confidence threshold | aclanthology.org/2023.emnlp-main.495 | [verified] |
+| OpenHands | Web search through a Tavily API key; off without a key | The agent | docs.openhands.dev/openhands/usage/advanced/search-engine-setup | [verified] |
+| Codex CLI | Hosted `web_search`: cached by default (an OpenAI-maintained index, less prompt-injection exposure) or `live` for the latest information; separate from the sandbox network policy; domain allowlist | Config, then the agent | learn.chatgpt.com/docs/web-search | [verified] |
+| Renovate Merge Confidence | Watches dependency releases and flags undeclared breaking releases | Automatic | docs.renovatebot.com/merge-confidence | [verified] |
+| Depot test splitting | Shards balanced by historical timing; the technique that fixed cairn's CI | Not an agent; an example of what research should find | depot.dev/docs/ci/how-to-guides/split-tests | [verified] |
 
 Patterns across the table [inferred]:
-1. Every coding-agent product gives agents a search tool, and none of them forces its use. Retrieval stays at the agent's discretion, which is exactly the failure ian describes.
-2. Systems that research well split research into its own context: Amp, Anthropic and Devin each use a subagent or a separate mode. cairn's equivalent is the info card.
-3. Learning loops that last (Hermes, ACE) store small, itemized, incrementally updated entries with a review gate, not rewritten blobs.
-4. Feed watching is a solved, deterministic problem for dependencies (Renovate). Only cross-domain intake, such as X posts, needs an agent.
+1. Every coding-agent product gives agents a search tool, and none forces its use. That is exactly the failure ian describes, so cairn needs triggers, not just a tool.
+2. Systems that research well give research its own context (Amp, Anthropic, Devin). In D60 terms, that is a research thread.
+3. Learning loops that last (Hermes, ACE) store small, itemized, reviewed entries.
+4. Dependency watching is deterministic (Renovate). Only cross-domain intake needs an agent.
 
 ## 4. Options compared
 
-| # | Option | Covers | Cost | Main risk | Origin |
-|---|---|---|---|---|---|
-| A | Prompt only: one line in the build brief telling the agent to search when stuck | (a) partly | Near zero | Same discretion problem as every product above; unmeasurable | Hermes and OpenHands pattern [inferred] |
-| B | Stuck to research: when a build is rejected twice or a CI-fix loop reaches its last round, insert an info research card, then feed its findings into the retry through retry-lessons | (a) | One research card per stuck build | Injected web content reaches a build agent running with bypass permissions | The brief's direction 1, [inferred] |
-| C | Research as a pipeline stage: new mechanisms, new dependencies, performance problems and technology choices get a read-only research step with cited sources before the plan; the plan must cite it | (a) upstream | One research card per qualifying task | Over-triggering slows small work; a citation check is easy to game with any URL | The brief's direction 2, [inferred]; phased-workflow paper |
-| D | Daily intake: a scheduled info card scans sources (dependency releases, HN or Exa topic search, optionally ian's X timeline) and scores items against open issues and the plan | (b) | One card per day | Noise; X needs credentials on the daemon host | The brief's direction 3, [inferred]; Renovate for the dependency half |
-| E | External knowledge into the learning loop: findings become memory candidates with source URL, date and expiry; `knowledge`-attributed failures trigger research | (c) | Small | Stale facts injected forever; attribution is offline and protected, so it cannot trigger in real time | The brief's direction 4, [inferred]; ACE and Hermes |
-| F | A Coordinator search tool (give the locked-down Coordinator `WebSearch`) | (a), (b) | Small code change | Breaks the deliberate lock-down of the Coordinator; untrusted text in the role that dispatches work | [inferred], not recommended |
-| G | A server-side search service (Exa API called from `apps/server`) | All | Metered key | Breaks the seam rule: outside access must stay behind `apps/daemon/src/backend/` | [inferred], rejected |
-
-Recommendation: **B, then E, then C (soft), then D**, with A folded into B as the prompt the research card itself receives.
-
-Why [inferred]:
-- B targets the concrete failure: guess-and-retry on a stuck build. It reuses info cards and retry-lessons, and it is measurable with existing data (stuck builds before versus after).
-- E is small once B exists, because B's report is the only new knowledge source.
-- C changes how every non-trivial task starts. It needs B's measured hit rate first, or it adds latency without evidence.
-- D is independent and can start right after spike S4.
-- F and G are rejected because the Coordinator's lock-down and the backend seam are deliberate. Delegating to an info card gets the same result inside the existing trust boundary.
-
-## 5. Recommended phased plan
-
-### Phase 0: spikes (section 8)
-
-Nothing in Phases 1 to 4 starts until S1, S2 and S5 pass. S3 gates Phase 1's prompt; S4 gates Phase 4's X source.
-
-### Phase 1: research before the last retry
-
-Behavior:
-1. **Trigger.** The server checks a pure predicate at two points: (i) the CI loop sees red with `rounds === CI_FIX_ROUNDS_MAX - 1`, that is, before the last fix round; (ii) a build gets its second `revision:build` rejection in the current round. The predicate holds at most once per build round.
-2. **Research card.** The server creates a child info todo with `output: 'info'`. Its prompt holds the failure context that retry-lessons already builds (failed checks, blocking findings, rejection feedback), plus the question "how have others solved this; what does the cited source say; how sure are you". The card is routed to an agent on the Claude Code runtime, the only runtime with a search tool today.
-3. **Report shape.** At most 1,500 words. Each claim carries a URL and a fetched date, or the label "from training knowledge". The report ends with one recommended change and a confidence level.
-4. **Handoff.** When the research card finishes, the server appends a system message to the stuck build's conversation: `{ kind: 'research-report', attachmentId, todoId }`. `retryLessonsOf` parses it, as it parses review verdicts, and renders an "Outside research" section inside the existing quoted-data fence. No schema migration is needed.
-5. **Waiting.** The next retry step waits for the report up to a time cap, 20 minutes [guessed]; after the cap it proceeds without the report and records that research timed out.
-6. **Record.** The build conversation shows the research card and its outcome, so "did it research" becomes a queryable fact (a system-message kind) rather than a guess.
-
-Acceptance:
-- An integration test drives CI red twice and asserts four things: one info todo is created; the third fix step's prompt contains the report inside the fence; a second red does not create a second card; the run proceeds after the cap when the card never finishes.
-- On omarchy, the success rate of stuck builds over 14 days is reported against the S2 baseline.
-
-### Phase 2: sourced, expiring memory from research
-
-Behavior:
-1. When a build that received a research report later merges, reflect-curate emits an experience candidate. Its content holds the recommended change, the source URL(s) and the fetched date. Evidence points at the research message.
-2. Promotion follows the rule ian picks (decision 8). The recommendation is one build when the retry that used the report merged, because external facts arrive with their own evidence.
-3. A promoted memory gets `invalidAt` = promotion date + 90 days [guessed]. Expiry reuses the existing `stillValid` filter. A re-promotion with a newer source extends it.
-4. The `knowledge` attribution is used as a metric only: compare the share of `where: 'knowledge'` failures before and after Phase 1. It does not trigger anything at run time, because it is labeled offline in a protected file.
-
-Acceptance: unit tests cover the candidate built from a research message, `invalidAt` set at promotion, and an expired memory no longer injected (`injectMemories`).
-
-### Phase 3: prior-art citation for new mechanisms (soft)
-
-Behavior:
-1. The Coordinator decides per dispatch whether a task is a new mechanism, a new dependency, a performance problem or a technology choice. It says why in its dispatch reason, and the user can override with one sentence. This follows the existing decide, explain, overridable dispatch rule for plan-first; no rule table in code.
-2. For such tasks the Coordinator first creates an info research card and `blockedBy`-links the code todo to it. The report reaches the planner through the existing blocker handoff, so no new plumbing is needed.
-3. The plan template gains a "Prior art" section. In the soft phase, plan review raises a non-blocking finding when a flagged task's plan cites no source. After 14 days of data, ian decides whether to make it blocking (decision 4).
-
-Acceptance:
-- A Coordinator eval case with a "make X faster" task produces an info card plus a blocked code todo.
-- A plan without a source for a flagged task yields a non-blocking review finding.
-- The prompt change passes the paired-trial adoption judge (`docs/spec/29-evaluation-and-data-loop.md`).
-
-### Phase 4: daily intake
-
-Behavior:
-1. A Coordinator schedule, cron `0 8 * * *` in server time, creates one info card per day.
-2. The card covers three sources:
-   - (i) GitHub releases of cairn's direct dependencies, read from the workspace `package.json` files with the existing GitHub connection: free and deterministic;
-   - (ii) a topic search over HN and the web, with topics taken from open issue titles and the plan's current phase;
-   - (iii) ian's X home timeline through agent-reach, only if S4 passes and ian agrees (decision 6).
-3. Output: at most 5 items. Each has a source URL, a one-line claim, the open issue or plan item it matches, and a proposed action. It is posted as a digest in the Coordinator thread. Accepting an item creates a todo; nothing is auto-filed as a GitHub issue.
-4. Dedupe: the card receives the previous 7 reports through `blockedBy`-style handoff of earlier intake cards, or reads its own earlier attachments, and drops repeated URLs. Spike S4 settles which.
-
-Acceptance:
-- Over 14 days, ian accepts or explicitly rejects at least 1 item in 5 [guessed target]. Below that, intake is narrowed or stopped.
-- The integration test uses fixture release feeds and asserts at most 5 items, every item with a URL, and no repeated URL across two days.
-
-## 6. Per-item feasibility, seams and failure modes
-
-| Item | Feasibility | Files and seams touched | Protected or security path? | Failure modes |
+| # | Option | Covers | Main risk | Status |
 |---|---|---|---|---|
-| P1 trigger predicate | High [inferred]: CI round counting (`countMarkedRounds`) and rejection feedback rows already exist | New pure module `apps/server/src/services/research-trigger.ts`; call sites in `apps/server/src/services/ci-loop.ts` and the rejection path in `builds.ts` | No (`apps/*/src/**` is auto-merge) | Fires twice per round (double card); fires on infra-red CI (provider outage) where research is waste, so skip when `isProviderOutage`/`classifyStepFailure` says infra; fires on `coordinator-hold`-style paused builds |
-| P1 research card creation and routing | Medium [inferred]: child info todos exist (`split_todo`), but server-initiated creation with forced Claude Code routing needs an agent selection rule | `apps/server/src/services/todo-split.ts` or `todos.ts`; agent pick by runtime | No | No Claude Code agent available or its token is rate-limited, so fall back to no research and record it; the card runs on pi and silently has no search, so assert the runtime |
-| P1 report handoff into retry | High [inferred]: `retryLessonsOf` already parses system-message JSON kinds | `apps/server/src/services/retry-lessons.ts`; shared kind constant in `packages/shared/src/` | No | Report too long (clip like `BLOCKER_HANDOFF_SUMMARY_MAX_CHARS`); prompt injection from web content, mitigated by the existing quoted fence (`quoteIssueLines`, `ISSUE_FENCE_OPEN`) and the S5 spike; stale report from an earlier round, so scope by `roundStart` |
-| P1 waiting with cap | Medium [inferred]: step enqueue happens immediately today; waiting needs a deferred enqueue on the scheduler tick | `ci-loop.ts`, `scheduler.ts` | No | Deadlock if the card never finishes (the cap is the guard); the step-claim invariants change, so run `verify-step-claim` if the claim or tick order changes |
-| P1 research prompt | High | Prompt text in `packages/shared/src/records/prompts.ts` | No, but it is a harness change: adoption judge | Agent answers from training data and labels it as sourced, so the report schema requires URL plus fetched date per claim and review spot-checks one URL |
-| P2 sourced memory candidates | High [inferred]: `memory_candidate.content` is free text, `agent_memory.invalidAt` exists | `apps/server/src/trajectory-curate.ts`, `apps/server/src/services/memory.ts` | No. A new column would touch `**/drizzle/**` (protected), so keep source and date inside `content` | Expired fact still injected (test `stillValid`); conflicting sources produce two memories (existing `conflictIds` path); reflect-curate is env-gated off, so Phase 2 is inert until it is enabled |
-| P3 Coordinator research routing | Medium [inferred]: prompt plus existing `create_todo`/`blockedBy` | Coordinator system prompt (server-side prompt module) | No; harness change, adoption judge | Over-triggering on small tasks; Coordinator ignores the rule (same discretion problem), measured by counting flagged dispatches with no info card |
-| P3 plan "Prior art" soft check | Medium | Plan template and plan-review prompt; optional parse helper next to `planVerificationItems` | No | Any URL passes (gaming); non-blocking findings ignored |
-| P4 intake schedule and card | Medium [inferred]: schedules and info cards exist; the digest kind exists | `apps/server/src/services/schedules.ts` (Coordinator schedule), `chief-digest.ts`; no new outside access in the server | X access needs a credential on the daemon host, so it falls under the credentials rules and goes to ian | Noise; X cookies expire; GitHub API rate limit (5,000/h authenticated is ample [guessed from GitHub's published limit]); duplicates across days |
-| Optional: Exa MCP for pi agents | Medium | MCP server config through the existing `mcp_servers` mechanism; key as a cairn secret | Touches `apps/server/src/services/mcp-servers.ts` only if code changes; that is a security surface, routed to ian with `/security-review` | Metered spend; key leak into transcripts (existing `guardCredentialOutputs`) |
+| A | Prompt only: tell agents to search when stuck | (a) partly | Same discretion problem as every product above | Folded into the research thread's prompt |
+| B | Stuck to research: at CI-fix round 2 of 3 or a second rejection in a round, a research thread runs and its report feeds the retry | (a) | Injected web content reaches a build session running with bypass permissions | **Decided (D63)** |
+| C | Research before planning for new mechanisms, dependencies, performance problems and technology choices; the plan cites it | (a) upstream | Over-triggering; any URL satisfies a mechanical check | **Decided: soft for 14 days (D63)** |
+| D | Daily intake: dependency releases plus topic search, scored against open work | (b) | Noise | **Decided: Coordinator digest, at most 5 items, no X in v1 (D63)** |
+| E | Research findings become sourced, expiring memory | (c) | Stale facts | **Decided: only after a merged retry that used the report, 90-day expiry (D63)** |
+| F | Give the locked Coordinator a search tool | (a), (b) | Breaks the Coordinator's lock-down and D60's "does not plan" | Rejected |
+| G | A server-side search service in `apps/server` | All | Breaks the backend seam rule | Rejected |
+
+## 5. Search for every runtime
+
+ian's decision: research is not tied to Claude Code; pi gets a search tool. Claude Code keeps its native `WebSearch`/`WebFetch`, which costs nothing per search. Locked steps stay without search under both options.
+
+| | Option 1: team MCP search server | Option 2: daemon-side search tool for pi |
+|---|---|---|
+| Shape | An Exa (or Brave) MCP server entry in each daemon host's `~/.claude.json`, granted by slug; pi registers it through `cairn-mcp-bridge` and exposes `mcp__exa__*` | A local tool pair `web_search` / `web_fetch`, built in the daemon like `get_secret` and passed to pi as `localTools`, then `defineTool` into `customTools`. The tool calls the provider over HTTPS with a key it takes from the step's `SecretVault`. The agent never sees the key |
+| Code files | None for the basic path. A machine-capability report already covers MCP slugs (`dispatch-eligibility.ts`). Grants change only if D60 replaces agent `mcpServers` | New `apps/daemon/src/backend/web-search.ts` (provider client: Exa first, Brave second, one interface, injectable `fetch`); `apps/daemon/src/runner.ts` (add the tool to `localToolDefs` when the step is not locked and the provider secret is granted); `packages/shared/src/` (tool names and result shape) |
+| Backend seam | Holds: the daemon's MCP client already sits behind `apps/daemon/src/backend/` | Holds if the provider client lives in `apps/daemon/src/backend/web-search.ts` and `runner.ts` only wires it |
+| Security surfaces (`packages/shared/merge-gate-paths.json`) | No code change. Any change to `apps/server/src/services/mcp-servers.ts` is a security surface (external entry auth) | `apps/daemon/src/credentials.ts` and `secret-channel.ts` are security surfaces, touched only if the vault API changes; reading `creds.secrets.take` from a new file needs no change there. Granting a team secret to a research thread goes through `apps/server/src/services/secrets.ts` (security surface) if D60 changes how grants attach to threads |
+| Where the key lives | Plain text in `~/.claude.json` `env` on every daemon host; outside SecretBox; rotated by hand per host | Team secret in SecretBox, delivered per step, audited per read, absent from the shell environment |
+| Supply chain | A stdio server is typically launched with `npx` at run time, which downloads and runs a package on the host; a remote HTTP server instead sends queries and key to a third-party endpoint | No new package; a direct HTTPS call to the provider API |
+| Testing | Needs a live or stubbed MCP server | Unit tests with a fake `fetch`; an integration test with a fixture provider |
+| Locked steps | Locked steps keep only the host MCP server, so no search | The tool is not added when `lockedDown` or `remoteToolsOnly` |
+| Provider swap | Edit every host's config | One interface, provider chosen by which secret is granted |
+
+**Recommendation: Option 2.** The key stays in SecretBox and the audited secret channel instead of plain text on every host. Nothing is downloaded at run time. The provider sits behind one tested interface. It also fits D60: grants follow the thread's step credentials rather than a fixed agent's `mcpServers` list [inferred]. Option 1 remains a zero-code stopgap if spike S1 needs search on pi before Option 2 lands.
+
+Providers, with prices read on 2026-11-02:
+
+| Provider | Price | Free allowance | Notes | Label |
+|---|---|---|---|---|
+| Exa (first choice) | From $4 per 1,000 search requests (higher tiers up to $12); page contents $1 per 1,000 pages | $10 credit per month | Neural search plus contents in one API; also a Hermes Agent backend | [verified] exa.ai/pricing |
+| Brave Search API (alternative) | $5 per 1,000 requests | $5 credit per month (with attribution) | Independent index | [verified] brave.com/blog/most-powerful-search-api-for-ai |
+| Tavily (alternative) | $0.008 per credit pay-as-you-go; a basic search costs 1 credit | 1,000 credits per month | OpenHands' default | [verified] docs.tavily.com/documentation/api-credits; credits per search [inferred] |
+
+Metered cost: see section 11.
+
+## 6. Harness and model for research
+
+What the sources say:
+- Anthropic's multi-agent research post [verified]:
+  - Token usage alone explains 80% of BrowseComp performance variance.
+  - An Opus lead with Sonnet subagents beat single-agent Opus by 90.2% on their internal research eval.
+  - Multi-agent runs use about 15 times the tokens of a chat.
+  - The lead runs 3 to 5 subagents in parallel, each using 3 or more tools in parallel, which cut research time by up to 90% on complex queries.
+  - Multi-agent setups fit breadth-first questions. Most coding tasks have fewer truly parallel parts.
+- OpenAI's Codex docs [verified]: cached web search lowers, but does not remove, prompt-injection risk. Live search is for tasks that depend on the latest information.
+
+Two tiers for cairn [inferred]:
+
+| Tier | Used for | Harness | Default model role (mirrors the repository's model table) |
+|---|---|---|---|
+| 1: single agent | Stuck-retry research; prior-art research for one task | One research thread, one session, with parallel tool calls (several searches per turn) and a 3-to-15-call budget in its prompt | Implementation role (`claude-sonnet-5-5`, or `gpt-6.1-sol` on pi); the Coordinator picks this tier by default |
+| 2: multi-agent | Daily intake; large questions (technology choice, new subsystem) | A lead research thread fans out 3 to 5 sub-searches in parallel, then merges | Lead: orchestration role (`claude-opus-5-5`); sub-searches: implementation role; dedupe and extraction: mechanical role (`claude-haiku-5-5`) |
+
+Rules for both tiers:
+- **Search mode.** Live search, because stuck builds and intake need fresh facts. The provider tool has no cached mode, so injection risk is handled by three controls instead:
+  - the research thread is read-only (info deliverable);
+  - the report enters other sessions only inside the quoted-data fence;
+  - citations are checked.
+- **Citation check.** A session from the other vendor than the report's author checks that each cited URL supports its claim, using the rubric from Anthropic's LLM judge (factual accuracy, citation accuracy, source quality). Claims that fail are dropped or marked "unsupported" before the report is handed off.
+- **Model choice.** Model choice is routing. Under D60 the Coordinator makes it when it opens the thread [D60 work]. Until then, the closest primitive is choosing which agent runs the research card in `run_builds`.
+
+## 7. Recommended phased plan
+
+Phase 0, spikes (section 10), comes first, as decided in D63.
+
+### Phase 1: research before the last retry (decided)
+
+Behavior:
+1. **Trigger, server-side.** A pure predicate fires when CI is red with `rounds === CI_FIX_ROUNDS_MAX - 1`, or on the second `revision:build` rejection in a round. It fires at most once per round and skips infra failures (`isProviderOutage`, `classifyStepFailure`). It does not create work. It pushes a "stuck" event to the Coordinator for that thread. A dedicated event kind is new work; `watch_todos` shows that per-thread events reach the Coordinator today [verified].
+2. **Routing, Coordinator.** On the event, the Coordinator opens a research thread (info deliverable) at tier 1 and chooses its model by the failure's complexity. It does not plan the research and does not wait for it [D60 work]. The interim equivalent on `origin/main` is `create_todo` with `output: "info"` plus `run_builds` with a chosen agent [verified primitives].
+3. **Research thread.** Its prompt holds the failure context that retry-lessons already builds (failed checks, blocking findings, rejection feedback) and asks how others solved it. The report:
+   - is at most 1,500 words;
+   - gives every claim a URL and fetched date, or the label "from training knowledge";
+   - ends with one recommended change and a confidence level.
+   The citation check (section 6) runs before handoff.
+4. **Injection.** When the report is ready, the server appends `{ kind: 'research-report', attachmentId, todoId }` to the stuck build's conversation. `retryLessonsOf` renders it as an "Outside research" section inside the quoted-data fence. This is the stuck-retry injection path, and it needs no schema migration.
+5. **Waiting (decided).** The code thread's last retry waits for the report for at most 20 minutes, then continues without it. Whether research happened, or timed out, is recorded as a message kind.
+
+Acceptance:
+- An integration test (CI red twice) asserts:
+  - one stuck event and one research thread;
+  - the third fix prompt contains the fenced report;
+  - a repeat red in the same round does not open a second thread;
+  - the retry proceeds after 20 minutes without a report.
+- Over 14 days on omarchy, the stuck-build success rate is compared with the S2 baseline.
+
+### Phase 2: sourced, expiring memory (decided)
+
+Behavior:
+1. When a retry that used a research report merges, reflect-curate emits an experience candidate whose content holds the change, the source URLs and the fetched date. Evidence points at the research message.
+2. It is promoted after that one merged build, and `invalidAt` is set to promotion plus 90 days. A newer source re-promotes it and extends the expiry.
+3. The `knowledge` attribution is a metric only: its share of failures is compared before and after Phase 1.
+
+Acceptance: unit tests cover the candidate built from a research message, `invalidAt` set at promotion, and an expired memory no longer injected.
+
+### Phase 3: research before planning for new mechanisms (decided: soft)
+
+Behavior:
+1. When the Coordinator opens a thread for a new mechanism, dependency, performance problem or technology choice, it opens a research thread first. It picks tier 1, or tier 2 for large questions, and blocks the code thread on it. This is routing: the Coordinator states the reason in one line, and the user can override it [D60 work for the blocker edge; today only `split_todo` creates `blockedBy`].
+2. The code thread's first step receives the report through the existing blocker handoff. The thread's own plan then gains a "Prior art" section that cites it.
+3. For 14 days the check is soft: a plan for a flagged task without a cited source gets a non-blocking review finding. ian then decides from the data whether it blocks.
+
+Acceptance:
+- A Coordinator eval case ("make X faster") opens a research thread plus a code thread blocked on it.
+- A plan without a source gets the non-blocking finding.
+- The Coordinator and research prompt changes pass the paired-trial adoption judge (`docs/spec/29-evaluation-and-data-loop.md`).
+
+### Phase 4: daily intake (decided)
+
+Behavior:
+1. A Coordinator schedule (cron `0 8 * * *`, server time) opens one tier-2 research thread per day.
+2. Sources:
+   - GitHub releases of cairn's direct dependencies through the existing GitHub connection (free, deterministic);
+   - a topic search with topics from open issue titles and the plan's current phase.
+   - No X timeline in v1. X is added only after S4 passes and ian places the cookie himself.
+3. Output: at most 5 items, each with a source URL, a one-line claim, the matching open issue or plan item, and a proposed action. Items go into the Coordinator digest. Accepting an item opens a thread; nothing becomes a GitHub issue automatically.
+4. Dedupe against the previous 7 reports; spike S4 picks the mechanism.
+
+Acceptance:
+- An integration test with fixture release feeds asserts at most 5 items, every item with a URL, and no repeated URL across two days.
+- Over 14 days, at least 1 item in 5 is accepted or explicitly rejected [guessed target]; below that, intake is narrowed.
+
+### Phase 1b: search tool for pi (Option 2, in parallel with Phase 1)
+
+Behavior:
+- `web_search` and `web_fetch` are local tools for unlocked pi steps when the provider secret is granted.
+- Results are clipped and returned with URL and fetched date.
+- Every call is logged with the step id so search volume is measurable.
+
+Acceptance:
+- Unit tests cover provider request and response mapping, the missing-key message, and the tool being absent for `lockedDown` and `remoteToolsOnly` steps.
+- An integration test runs a pi info step with a fixture provider and shows `web_search` in its transcript.
+
+## 8. Per-item feasibility, seams and failure modes
+
+| Item | Feasibility | Files and seams | Protected or security path? | Failure modes |
+|---|---|---|---|---|
+| P1 trigger and stuck event | High [inferred]: round counting (`countMarkedRounds`) and rejection rows exist | New `apps/server/src/services/research-trigger.ts`; calls from `ci-loop.ts` and the rejection path in `builds.ts`; a new event kind toward the Coordinator | No | Double fire in one round; firing on infra-red CI; the Coordinator ignores the event, which the 20-minute cap absorbs, and "no research" is recorded |
+| P1 Coordinator routing of research threads | Interim high, using `create_todo` info plus `run_builds`; target [D60 work] | Coordinator prompt; D60's thread-opening API | No; a harness change, judged by the adoption judge | Wrong tier chosen; the research thread lands on a runtime without search, so it asserts a search tool or Claude Code |
+| P1 report injection | High [inferred]: `retryLessonsOf` already parses system-message kinds | `apps/server/src/services/retry-lessons.ts`; shared kind constant in `packages/shared/src/` | No | Report too long (clip it); prompt injection from web text (quoted fence, citation check, spike S5); a stale report from an earlier round (scope by `roundStart`) |
+| P1 20-minute wait | Medium [inferred]: fix steps are enqueued immediately today | `ci-loop.ts`, `scheduler.ts` | No | The research thread never finishes (the cap guards); claim or tick order changes (run `verify-step-claim`) |
+| P1b pi search tool | High [inferred]: the `localTools` to `defineTool` path exists and is used by `get_secret` | `apps/daemon/src/backend/web-search.ts` (new), `apps/daemon/src/runner.ts`, `packages/shared/src/` | No, unless the vault API changes (`credentials.ts`, `secret-channel.ts`) or thread secret grants change (`secrets.ts`); then it is a security surface on ian's route with `/security-review` | Key leaks into a transcript (results must never echo the key; `guardCredentialOutputs` stays in place); provider outage (return a clear error, no retry storm); runaway spend (per-step call cap plus the monthly cap in decision 3) |
+| P1 citation check | Medium | A check step on the research thread before handoff, run by the other vendor | No | The checker cannot fetch a page (the claim is marked unverified rather than dropped silently); double the tokens per report |
+| P2 sourced memory | High [inferred]: `memory_candidate.content` is free text; `agent_memory.invalidAt` exists | `apps/server/src/trajectory-curate.ts`, `apps/server/src/services/memory.ts` | No; a new column would touch `**/drizzle/**`, which is protected, so source and date stay in `content` | An expired fact still injected (test `stillValid`); reflect-curate is env-gated off, so Phase 2 stays inert until it is enabled |
+| P3 research-first routing | Medium; the blocker edge outside `split_todo` is [D60 work] | Coordinator prompt; D60 thread API | No; adoption judge | Over-triggering on small tasks; the Coordinator skips it (count flagged threads without a research thread) |
+| P4 intake | Medium [inferred]: schedules, info deliverables and the digest exist | `apps/server/src/services/schedules.ts`, `chief-digest.ts`; no outside access in the server | No in v1 (no X credential) | Noise; GitHub rate limit; repeats across days |
 
 Seam check [inferred]:
-- Every outward call (web search, page fetch, X) happens inside a daemon session: Claude Code's built-in tools, or an MCP server configured through the backend.
-- The server only creates todos, parses messages and builds prompts. No new GitOps, MCP or LLM client code is added outside `apps/daemon/src/backend/`.
-- The existing server-side reflector call in `trajectory-reflect.ts` is not extended.
+- Every outward call happens inside a daemon session: Claude Code's built-in tools, or the pi tool in `apps/daemon/src/backend/web-search.ts`.
+- The server only detects triggers, records messages and builds prompts. No new GitOps, MCP or LLM client code is added outside `apps/daemon/src/backend/`.
 
-## 7. Test strategy
+## 9. Test strategy
 
 Layers follow `docs/spec/19-test-layering-and-blast-radius.md`:
 
 | Layer | What | Run |
 |---|---|---|
-| unit (vitest light) | Trigger predicate truth table (round counts, infra-red skip, once per round); retry-lessons rendering of a `research-report` message inside the fence and clipped; memory candidate from a research message, `invalidAt` set, expired memory skipped; intake item scoring and URL dedupe | `pnpm exec vitest run --changed` locally, CI required |
-| integration (vitest integration: real server plus daemon with a fake backend) | CI red twice, then info todo, then report attachment, then the third fix prompt contains the report; cap expiry proceeds without a report; intake schedule fires, fixture releases go in, digest has at most 5 items with URLs | CI required; run the touched file locally |
-| eval (adoption judge) | Research prompt and Coordinator routing prompt as harness changes, paired before/after trials | Per `docs/spec/29-evaluation-and-data-loop.md` |
-| live acceptance (`verify-cairn`) | One real stuck build on omarchy, with the research card's transcript showing `WebSearch` tool use and the retry prompt showing the report | Once per phase, evidence in the PR |
-| web e2e | Only if the build conversation gains a new card rendering for the research message | `pnpm --filter @cairn/web e2e:affected` |
+| unit (vitest light) | Trigger predicate truth table; `research-report` rendering inside the fence and clipped; search provider mapping and missing key; tool absent on locked steps; memory candidate with `invalidAt`; intake scoring and dedupe | `pnpm exec vitest run --changed`; CI required |
+| integration (real server plus daemon, fake backend) | CI red twice, stuck event, research thread, report, fenced in the third fix prompt; 20-minute cap; pi info step calling `web_search` against a fixture provider; intake with fixture releases | CI required; run the touched file locally |
+| eval (adoption judge) | Research prompt, Coordinator routing prompt | `docs/spec/29-evaluation-and-data-loop.md` |
+| live acceptance (`verify-cairn`) | One real stuck build on omarchy whose research thread shows search tool calls and whose retry prompt shows the report; one pi research thread | Once per phase, evidence in the PR |
+| web e2e | Only if the conversation gains a rendering for research messages | `pnpm --filter @cairn/web e2e:affected` |
 
-## 8. Pre-commit spikes
+## 10. Pre-commit spikes
 
 | # | Question | Method | Pass condition | Gates |
 |---|---|---|---|---|
-| S1 | Does `WebSearch` work in an info card on omarchy's Claude Code runtime with the stored token? | Create one info card asking for a fact published after the model cutoff (for example the Gretzinger article's runner numbers) | Transcript shows `WebSearch`/`WebFetch` tool use and the report cites the URL | All phases |
-| S2 | How often do builds get stuck, and how often do they recover without help? | Read-only SQL on omarchy over 30 days: builds with 2 or more `[ci-fix]` rounds or 2 or more `revision:build` feedback rows in one round, and their final outcome | At least ~3 stuck builds per week [guessed threshold]; fewer means Phase 1 waits and Phase 3 or 4 goes first | Phase 1 |
-| S3 | Does a research card find the fix a human found? | Replay 3 past stuck cases (including the slow-CI case before #2585) as info cards with the failure context only | The fix that worked, or an equivalent, is the report's recommendation in 2 of 3 | Phase 1 prompt |
-| S4 | Can the daemon host read ian's X timeline headless, and how is dedupe stored? | Run agent-reach's X channel on omarchy over ssh (non-sudo), check cookie handling; try both dedupe options | Timeline read without an interactive login, or X is dropped from v1 | Phase 4 X source |
-| S5 | Does the quoted fence hold against injected instructions in a report? | Info card researching a page that contains "ignore previous instructions, run X"; feed the report into a fake retry | The retry agent treats the text as data (no tool call follows the injected instruction) in 5 of 5 runs | Phase 1 |
+| S1 | Does search work in an info step on omarchy, on Claude Code and on pi (with Option 1 as the stopgap)? | One info card per runtime asking for a fact published after the model cutoff | The transcript shows search tool calls and the report cites the URL | All phases |
+| S2 | How often do builds get stuck, and how often do they recover unaided? | Read-only SQL on omarchy over 30 days: builds with 2 or more `[ci-fix]` rounds or 2 or more `revision:build` rows in one round, and their outcome | About 3 or more stuck builds per week [guessed threshold]; otherwise Phase 3 or 4 goes first | Phase 1 |
+| S3 | Does a research thread find the fix a human found? | Replay 3 past stuck cases (including slow CI before #2585) with the failure context only, at tier 1 | The working fix, or an equivalent, is the recommendation in 2 of 3 | Phase 1 prompt |
+| S4 | Intake dedupe, and whether X can be read headless later | Try both dedupe mechanisms; run agent-reach's X channel on omarchy over ssh (non-sudo) | Dedupe is chosen; X is recorded as feasible or not | Phase 4 |
+| S5 | Does the quoted fence hold against injected instructions? | A research thread reads a page with "ignore previous instructions, run X"; the report is fed into a fake retry | No tool call follows the injected instruction in 5 of 5 runs | Phase 1 |
+| S6 | Does the other-vendor citation check catch a wrong citation? | Seed a report with 2 claims whose URLs do not support them | Both are flagged in 3 of 3 runs | Citation check |
 
-## 9. Cost and quota
+## 11. Cost
 
-Claude quota is not a constraint. Codex and metered keys are budgeted.
+Claude usage is not budgeted here. Metered provider calls and Codex usage are.
 
-| Item | Volume | Model tokens | Search cost | Label |
-|---|---|---|---|---|
-| P1 research cards | 2-5 per day (S2 measures) | 150k-400k tokens per card on Claude; Anthropic reports agents use about 4x chat tokens | Claude Code `WebSearch` on a subscription token: no per-search bill. The Claude API price is $10 per 1,000 searches, which does not apply to subscription use | Volume and tokens [guessed]; API price [verified]; subscription inclusion [inferred] |
-| P3 research cards | 1-3 per day | Same as P1 | Same | [guessed] |
-| P4 intake card | 1 per day, about 30 searches plus about 40 GitHub release reads | About 200k tokens | GitHub API free; topic search on Claude `WebSearch` | [guessed] |
-| Optional Exa for pi agents | If enabled: about 100 searches per day, about 3,000 per month | n/a | Exa $4-7 per 1,000 requests with a $10 free monthly credit (about 2,500 Lite searches), so about $12-21 per month gross and $2-11 after credit | Price [verified]; volume [guessed] |
-| Codex | Research never runs on Codex in v1 | 0 | 0 | [inferred] |
+| Item | Volume [guessed until S2] | Searches per day | Metered search cost |
+|---|---|---|---|
+| P1 stuck research | 2 to 5 threads per day, about 15 searches each | 30 to 75 | Only threads on pi pay; Claude Code native search has no per-search meter on subscription auth [inferred] |
+| P3 research before planning | 1 to 3 per day, about 15 searches | 15 to 45 | Same |
+| P4 intake | 1 tier-2 thread per day, about 30 searches plus about 40 GitHub reads | 30 | Same; GitHub API free |
+| Total if every research thread ran on pi | | 75 to 150 (2,250 to 4,500 per month) | Exa at $4 per 1,000: $9 to $18 per month gross, about $0 to $8 after the $10 credit; plus page contents at $1 per 1,000. Brave at $5 per 1,000: $11 to $23, minus $5 credit. Tavily at $0.008: $18 to $36, minus 1,000 free credits |
+| Citation check | One check per report, about the report's size again | 0 searches (fetches only) | Fetch cost only on pi |
+| Codex | Research threads routed to pi with `gpt-6.1-sol` consume Codex usage at about 150k to 400k tokens per tier-1 thread [guessed] | | Decision 4 sets how much research goes to Codex |
 
-Capacity note [inferred]: the binding constraint is the rate limit of the Claude Code token stored in cairn on omarchy, which is a different account from the one these sessions run on. Five to nine research cards per day on top of normal builds may hit that limit [guessed]. This is why Phase 1 routing must fall back to "no research, recorded" rather than wait indefinitely, and why decision 3 matters.
+Tier 2 costs about 15 times the tokens of a chat (Anthropic [verified]), so it is limited to intake and large questions by design.
 
-## 10. Open decisions for ian
+## 12. Decisions
 
-1. **When does research trigger?** Recommended: before the last CI-fix round (red at round 2 of 3) and at the second build rejection in a round, at most once per round. Why: it leaves one retry to use the findings, and `CI_FIX_ROUNDS_MAX = 3` already defines "stuck".
-2. **Does the retry wait for the research card?** Recommended: yes, capped at 20 minutes, then proceed without it and record the timeout. Why: a parallel retry would not use the findings, and the cap prevents a dead loop.
-3. **Which runtime runs research cards?** Recommended: Claude Code only in v1, with no Exa key. Why: it is the only runtime with search today, and it costs no metered spend. If spike S1 or the first week shows the stored token cannot carry the load, add Exa through MCP for pi agents (about $2-21 per month) as a security-surface PR on your route.
-4. **Should the prior-art check on plans block?** Recommended: soft (non-blocking review finding) for 14 days, then you decide from the data. Why: any URL satisfies a mechanical check, and a blocking gate without hit-rate data repeats the failure of gates that revoke work silently.
-5. **Who decides that a task needs upstream research?** Recommended: the Coordinator, per dispatch, stating its reason, overridable by you with one sentence. Why: it matches the existing plan-first rule; a rule table in code hardens into unauditable behavior.
-6. **Is your X timeline an intake source?** Recommended: not in v1. Start with dependency releases plus topic search, and add X only after spike S4 passes and you place the X cookie on omarchy yourself. Why: it is a credential on a shared host, and the first two sources are free and deterministic.
-7. **Where do intake items go?** Recommended: a digest in the Coordinator thread, at most 5 items; accepting one creates a todo; no automatic GitHub issues. Why: you asked not to scroll feeds, and automatic issues would recreate the feed inside GitHub.
-8. **How does external knowledge become memory?** Recommended: promote after one build when the retry that used the research merged, store source URL and date in the memory text, expire after 90 days. Why: an external finding already carries evidence, waiting for `PROMOTION_MIN_BUILDS = 2` would lose most of them, and expiry stops stale facts from being injected forever (`injectMemories` has no retrieval step).
-9. **What order?** Recommended: spikes, then Phase 1, 2, 3, with Phase 4 in parallel after S4. Why: Phase 1 fixes the concrete failure, and each later phase depends on its measured hit rate. If S2 shows few stuck builds, Phase 4 moves first.
+Decided (D63, ian, 2026-11-02):
+- **Trigger:** CI-fix round 2 of 3 still red, or a second rejection in a round; at most once per round.
+- **Waiting:** the retry waits up to 20 minutes for the report, then continues; whether research ran is recorded.
+- **Runtime:** research is not tied to a runtime. pi gets a search tool, so every unlocked runtime can search; locked steps stay without search. The option and provider are open below.
+- **Plan check:** prior-art citation in plans is a soft check for 14 days, then decided from data.
+- **Who decides:** research is its own thread, opened by the Coordinator as routing with a strong or cheap model by complexity, under D60.
+- **X:** no X timeline in v1; added only after S4 and ian placing the cookie himself.
+- **Intake:** Coordinator digest, at most 5 items, accepting opens work, no automatic issues.
+- **Memory:** only after a merged retry that used the report, with source and date, 90-day expiry.
+- **Order:** spikes S1 to S6 first, then phases.
 
-## 11. Not verified
+Still open:
 
-- Whether Claude Code `WebSearch` is available and unbilled when the session authenticates with the stored setup token (spike S1).
-- The real frequency of stuck builds on omarchy (spike S2); all volume numbers in section 9 are guesses until then.
-- Amp Librarian's exact return format (file and line ranges); the announcement page shows it only in a screenshot.
-- agent-reach's X channel on a headless Linux host (spike S4).
+1. **Which search option for pi?** Recommended: Option 2, the daemon-side `web_search`/`web_fetch` tool reading the key from the secret vault. Why: the key stays in SecretBox and the audited channel, nothing downloads at run time, and the provider sits behind one tested interface. Option 1 (MCP server in `~/.claude.json`) only as a stopgap for S1.
+2. **Which provider first?** Recommended: Exa, with Brave as the configured alternative. Why: Exa returns search and page contents from one API at the lowest listed per-search price ($4 per 1,000) with a $10 monthly credit. Brave's independent index is the hedge if Exa's results or availability disappoint.
+3. **What is the monthly cap on metered search spend?** Recommended: $20 per month, enforced in the tool, which returns "search budget exhausted" past it. Why: it covers the high end of the estimate after free credit and stops a runaway loop from billing silently.
+4. **How much research may run on Codex models?** Recommended: route research threads to Claude models by default and to pi with `gpt-6.1-sol` only when the citation check needs the other vendor or Claude is unavailable. Why: Codex usage is budgeted and Claude usage is not, while pi's search tool keeps the Codex path working.
+5. **How often does the other-vendor citation check run?** Recommended: on every tier-2 report and every report injected into a retry. Skip it for reports the code thread reads only as background, where the code thread's own review covers them. Why: injected reports steer a session running with bypass permissions, so they carry the injection risk.
+6. **Does Phase 1 wait for D60's thread API?** Recommended: no. Build Phase 1 on today's primitives (an info todo plus `run_builds` routing, opened by the Coordinator on the stuck event), behind a thin "open research thread" function that D60 later replaces. Why: the trigger, injection and wait are independent of D60, and waiting would delay the concrete fix.
+
+## 13. Not verified
+
+- Whether native `WebSearch` works with the token stored in cairn on omarchy, and whether a pi step can reach a search provider from that host (S1).
+- The frequency of stuck builds on omarchy (S2); every volume and cost figure in section 11 is a guess until then.
+- Amp Librarian's exact return format; the announcement shows it only in a screenshot.
+- Tavily's credit cost per basic search, inferred from its docs' credit model.
+- Exa's tier boundaries between $4 and $12 per 1,000; the pricing page lists several endpoint columns.

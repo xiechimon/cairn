@@ -51,7 +51,7 @@ The notes and captures from the early study of todos.dev (the r1 to r9 series an
 | [migration-surface.md](migration-surface.md) | none | #409 migration inventory (appendices A and B list the selectors of 46+3 specs file by file); the ledger behind spec 16 acceptance |
 | [xmon48-filter-panel-closure.md](xmon48-filter-panel-closure.md) | none | XMON-48 board filter interaction research, wrap-up and decision material |
 | [r15-agent-responsibility-default.md](r15-agent-responsibility-default.md) | none | Default responsibility text for the first agent: evidence from seven ecosystems' sources and the trade-off (t-0198; shares a number with r15-multica-run-rendering but is a different ticket) |
-| [research-loop-plan.md](research-loop-plan.md) | none | Design plan for agents that research outward: research before the last retry of a stuck build, sourced expiring memory, prior-art citation for new mechanisms, daily intake; spikes, cost and open decisions |
+| [research-loop-plan.md](research-loop-plan.md) | none | Design plan for agents that research outward (D63, on D60's thread model): research threads before a stuck build's last retry and before new mechanisms, a search tool for pi, sourced expiring memory, daily intake; spikes, cost and open decisions |
 
 ### Build-time captures (before ADR 0015, around 2026-09-24)
 
