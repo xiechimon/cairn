@@ -18,7 +18,7 @@ import {
 import { and, eq, isNull } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import type { AppContext } from './context.js';
-import { agent, machine, provider, todo } from './db/schema.js';
+import { agent, machine, provider, routingRule, todo } from './db/schema.js';
 import { conflict, HttpError, notFound, parseWith } from './lib/errors.js';
 import { githubUserRepos } from './lib/github.js';
 import {
@@ -175,6 +175,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
           .join('、')}）——先换绑或整机迁移，再删除。`,
       );
     }
+    ctx.db.update(routingRule).set({ machineId: null }).where(eq(routingRule.machineId, id)).run();
     ctx.db.delete(machine).where(eq(machine.id, id)).run();
     return c.body(null, 204);
   });

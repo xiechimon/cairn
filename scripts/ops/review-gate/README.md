@@ -16,9 +16,8 @@ Files:
 
 - `review-gate.mjs`: the timer script.
 - `prompt.txt`: the review prompt.
-- `size-facts.mjs`: counts non-evidence lines and files of the PR diff; the script writes the result into the prompt, and an oversize PR (over `limits` in `packages/shared/merge-gate-paths.json`, read from origin/main) makes the reviewer answer `Why is it this big:` from the PR body's `## Size` section.
 - `reviewer-route.mjs`: the fallback and stall decisions, imported by the script.
-- `size-facts.test.mjs`, `verdict.test.mjs`, `glob.test.mjs`, `rearm.test.mjs`, `reviewer-route.test.mjs`, `fallback.test.mjs` (runs the script against a fake host): the checks the unit runs in `ExecStartPre` (`node verdict.test.mjs review-gate.mjs` from this directory; `fixture-1828.txt` is its input).
+- `verdict.test.mjs`, `glob.test.mjs`, `rearm.test.mjs`, `reviewer-route.test.mjs`, `fallback.test.mjs` (runs the script against a fake host): the checks the unit runs in `ExecStartPre` (`node verdict.test.mjs review-gate.mjs` from this directory; `fixture-1828.txt` is its input).
 
 Each round, after fetching `origin/main`, the gate detaches its checkout (`~/lanes/cairn`) at `origin/main`, because reviewers read base files from that tree. If the tree has tracked local changes, the round is refused with an error instead of reviewing against stale files.
 

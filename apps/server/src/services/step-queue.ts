@@ -8,6 +8,7 @@ import {
   missingCapabilities,
   runtimeGatePasses,
 } from './dispatch-eligibility.js';
+import { applyRoute, routeForStep } from './routing-rules.js';
 
 export interface QueueTargetStep {
   id: string;
@@ -88,7 +89,8 @@ export function stepQueueProjector(db: Db, teamId: string) {
 
   function agentForRow(row: (typeof queue)[number]): typeof agent.$inferSelect | null {
     if ('todoRow' in row) {
-      return agentRowOf(agentIdForStep(row.todoRow, row.kind, row.prompt));
+      const base = agentRowOf(agentIdForStep(row.todoRow, row.kind, row.prompt));
+      return base === null ? null : applyRoute(base, routeForStep(db, row.todoRow, row.kind));
     }
     const chiefRow = db.select().from(chief).where(eq(chief.id, row.chiefId)).get();
     return agentRowOf(chiefRow?.agentId ?? null);

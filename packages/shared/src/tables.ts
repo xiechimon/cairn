@@ -48,6 +48,7 @@ export const DB_TABLES = [
   'autonomous_merge_admission',
   'chief_report',
   'retro_proposal',
+  'routing_rule',
 ] as const;
 
 export type DbTable = (typeof DB_TABLES)[number];
@@ -82,4 +83,5 @@ export const INTERNAL_ONLY_TABLES = [
   'autonomous_merge_admission',
   'chief_report',
   'retro_proposal',
+  'routing_rule',
 ] as const;

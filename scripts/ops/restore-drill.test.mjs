@@ -367,6 +367,19 @@ for (const table of ['step', 'message', 'chief_message'])
     sql(f.db, query);
     fails(f, table === 'chief_message' ? /relationship.*ct/ : /relationship.*build b(?:\s|:)/);
   });
+test('a Coordinator thread longer than one page is read through every page', () => {
+  const f = fixture();
+  const rows = `with recursive n(i) as (select 1 union all select i + 1 from n where i < 150)
+    insert into chief_message(id,threadId,role,content,createdAt)
+    select printf('page-%03d', i),'chief-ct','user','"page"',1000 + i from n;`;
+  sql(f.db, rows);
+  sql(f.backupDb, rows);
+  f.pack();
+  const r = f.run();
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(JSON.parse(readFileSync(f.report)).api.chiefMessages, 151);
+});
+
 test('post-backup relationships are excluded while boundary rows are required', () => {
   const f = fixture();
   sql(

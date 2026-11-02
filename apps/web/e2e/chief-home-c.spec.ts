@@ -207,10 +207,15 @@ test('a project link with board or column params still lands on the filtered hom
   await expect(page).not.toHaveURL(/view=board|column=/);
 });
 
-test('the home lands at the top: greeting and the pinned decision in view, the conversation below', async ({
+test('the home lands at the newest message, with the greeting and the pinned decision above it', async ({
   page,
 }) => {
   await page.goto(home('home-c'));
+  const rows = page.getByTestId('chief-stream').locator('[data-slot="message-scroller-item"]');
+  await expect(rows.last()).toBeInViewport();
+  await page.getByTestId('home-c').getByTestId('chief-body').evaluate((node) => {
+    node.scrollTop = 0;
+  });
   await expect(page.getByTestId('home-c').getByRole('heading', { level: 2 }).first()).toBeInViewport();
   await expect(needsYou(page).getByRole('heading', { name: 'Needs you' })).toBeInViewport();
   await expect(needsYou(page).locator('[data-slot="needs-you-item"]').first()).toBeInViewport();

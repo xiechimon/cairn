@@ -24,6 +24,7 @@ import { MachineWakeHub } from './services/machine-wake-hub.js';
 import { backfillMachineConcurrency, seedLocalMachine } from './services/machines.js';
 import { backfillPersonas } from './services/personas.js';
 import { loadOrCreateVapidKeys } from './services/push.js';
+import { seedRoutingRules, setRoutingRulesEnabled } from './services/routing-rules.js';
 import {
   createScheduler,
   issueIntakeRunOf,
@@ -62,6 +63,8 @@ const seeded = seed(db);
 seedLocalMachine(db, seeded.team.id);
 backfillFixedTags(db);
 backfillPersonas(db);
+setRoutingRulesEnabled(config.routingRules);
+if (config.routingRules) seedRoutingRules(db);
 backfillTokenUsageCost(db);
 const concurrencyBackfilled = backfillMachineConcurrency(db);
 if (concurrencyBackfilled > 0) {

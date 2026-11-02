@@ -1,5 +1,5 @@
 import type { AskUserAnswer } from '@cairn/shared';
-import { type CSSProperties, createContext, type ReactNode, useContext } from 'react';
+import { type CSSProperties, createContext, memo, type ReactNode, useContext } from 'react';
 import { Link } from 'react-router';
 import { reportStatusWord } from '../board/status-words.js';
 import { ThinkingRow, ToolActivityRow } from '../components/chat/agent-rows.js';
@@ -222,7 +222,7 @@ function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string
   );
 }
 
-export function ChiefStreamRow({
+export const ChiefStreamRow = memo(function ChiefStreamRow({
   item,
   index: i,
   bound,
@@ -508,4 +508,4 @@ export function ChiefStreamRow({
       </Message>
     </MessageScrollerItem>
   );
-}
+});

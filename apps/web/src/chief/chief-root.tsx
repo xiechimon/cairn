@@ -144,6 +144,7 @@ export function ChiefRoot() {
           onWithdraw={surface.onWithdraw}
           onSteer={surface.onSteer}
           onStop={surface.onStop}
+          earlier={surface.earlier}
         />
       )}
     </ChiefRootContext.Provider>

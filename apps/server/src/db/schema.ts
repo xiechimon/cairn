@@ -26,6 +26,7 @@ import type {
   ProviderCompat,
   ProviderModel,
   RequiredCapabilities,
+  RouteUse,
   ScheduleKind,
   ScheduleReport,
   ShipRoute,
@@ -412,6 +413,26 @@ export const agent = sqliteTable(
       .on(t.teamId, t.persona)
       .where(sql`${t.persona} is not null`),
   ],
+);
+
+export const routingRule = sqliteTable(
+  'routing_rule',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id),
+    use: text('use').$type<RouteUse>().notNull(),
+    provider: text('provider').notNull(),
+    modelId: text('modelId').notNull(),
+    thinkingLevel: text('thinkingLevel'),
+    fallbackModels: json<ModelRef[] | null>('fallbackModels'),
+    machineId: text('machineId').references(() => machine.id),
+    seededFromAgentId: text('seededFromAgentId'),
+    createdAt: epochMs('createdAt').notNull(),
+    updatedAt: epochMs('updatedAt').notNull(),
+  },
+  (t) => [uniqueIndex('routing_rule_team_use_unique').on(t.teamId, t.use)],
 );
 
 export const agentMemory = sqliteTable('agent_memory', {
