@@ -33,11 +33,11 @@ const resolve = (page: Page, token: string) =>
   }, token);
 
 for (const theme of ['light', 'dark'] as const) {
-  test(`⌘K hint shows on the search row (${theme})`, async ({ page }) => {
+  test(`⌘K hint shows on the search icon's tooltip (${theme})`, async ({ page }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     await page.goto('/app?scenario=01');
-    const button = page.getByRole('complementary').getByRole('button', { name: /搜索/ });
-    await expect(button).toContainText('⌘K');
+    await page.getByRole('complementary').getByRole('button', { name: '搜索' }).hover();
+    await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText('⌘K');
   });
 
   test(`hover and selected rows share one geometry (${theme})`, async ({ page }) => {
@@ -91,12 +91,12 @@ for (const theme of ['light', 'dark'] as const) {
   });
 }
 
-test('machine-online dot sits centered on the `机器` row', async ({ page }) => {
+test('machine-online dot sits centered on the user menu `机器` row', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('cairn-theme', 'dark');
-    localStorage.setItem('cairn.sidebarResourcesCollapsed', '0');
   });
   await page.goto('/app?scenario=100');
+  await page.locator('.sidebar-user').click();
 
   const dot = await page.evaluate(() => {
     const el = document.querySelector('[data-testid="online-dot"]');
@@ -112,49 +112,3 @@ test('machine-online dot sits centered on the `机器` row', async ({ page }) =>
   expect(dot.centerYDelta).toBeLessThan(2);
   expect(dot.insideRow).toBe(true);
 });
-
-for (const theme of ['light', 'dark'] as const) {
-  for (const width of [1440, 390]) {
-    test(`active team brand matches navigation fill without elevation (${theme}, ${width}px)`, async ({
-      page,
-    }) => {
-      await page.setViewportSize({ width, height: width === 390 ? 844 : 732 });
-      await page.addInitScript((value) => localStorage.setItem('cairn-theme', value), theme);
-      await page.goto('/app/team?scenario=01');
-      if (width === 390) await page.locator('.app-menu-trigger').click();
-      const brand = page.locator('.sidebar-team-name');
-      await expect(brand).toHaveAttribute('aria-current', 'page');
-      await page.mouse.move(width - 1, 500);
-      await brand.evaluate((element) => (element as HTMLElement).blur());
-      await settleTransitions(page);
-      const phase = process.env.TEAM_BRAND_CAPTURE;
-      if (phase === 'before' || phase === 'after') {
-        const directory = resolvePath('..', '..', 'docs', 'verify', '2426');
-        await mkdir(directory, { recursive: true });
-        await page.screenshot({ path: resolvePath(directory, `${phase}-${theme}-${width}.png`) });
-      }
-      const active = await resolve(page, '--sidebar-active');
-      await expect(brand).toHaveCSS('background-color', active);
-      await expect(brand).toHaveCSS('box-shadow', 'none');
-      await brand.hover();
-      await settleTransitions(page);
-      await expect(brand).toHaveCSS('background-color', active);
-      await expect(brand).toHaveCSS('box-shadow', 'none');
-      await keyboardFocus(page, brand);
-      expect(await readRing(brand)).toEqual({ focused: true, outline: 'solid 2px', clippedBy: [] });
-      await page.locator('[data-slot="sidebar-nav-row"]').filter({ hasText: '首页' }).click();
-      await expect(page).toHaveURL('/app?scenario=01');
-      if (width === 390) await page.locator('.app-menu-trigger').click();
-      await page.mouse.move(width - 1, 500);
-      await expect(brand).not.toHaveAttribute('aria-current', 'page');
-      await expect(brand).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-      await brand.click();
-      if (width === 390) await page.locator('.app-menu-trigger').click();
-      await page.getByRole('complementary').getByRole('button', { name: /搜索/ }).click();
-      await expect(page.locator('html')).toHaveAttribute('data-search-open', '');
-      if (width === 1440) {
-        await expect(brand).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-      }
-    });
-  }
-}

@@ -9,11 +9,10 @@ import { Button } from '../components/ui/button.js';
 import { Dialog, DialogContent, DialogTitle } from '../components/ui/dialog.js';
 import type { FixtureSet, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { useNewTaskHotkey } from '../overlay/hotkeys.js';
+import { useTypeToCompose } from '../overlay/hotkeys.js';
 import { SearchPanel, useSearchState } from '../overlay/search-panel.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { needsYouCount } from './needs-you.js';
-import { useOpenComposer } from './open-composer.js';
 import { BoardSidebar, type SidebarProject, type SidebarSelected } from './sidebar.js';
 
 export const SIDEBAR_STORAGE_KEY = 'cairn.sidebar-collapsed';
@@ -100,16 +99,13 @@ export function AppSidebar({
       : fixture.chief != null
         ? 1
         : 0;
-  const openComposer = useOpenComposer();
-  const openNewTask = useCallback(() => openComposer(), [openComposer]);
-  useNewTaskHotkey(openNewTask);
+  useTypeToCompose();
   const chiefStream = useOptionalChiefRoot()?.surface.chiefData.stream ?? [];
   const sidebarProps = {
     attention: needsYouCount(resolvedTodos, chiefStream),
     machinesOnline,
     todos: resolvedTodos,
     onSearch: onSearch ?? (() => search.setOpen(true)),
-    onNewTask: openNewTask,
     usageNav: fixture.usageNav === true,
     selected,
     projects,
@@ -144,10 +140,6 @@ export function AppSidebar({
                 onSearch={() => {
                   closeDrawer();
                   sidebarProps.onSearch();
-                }}
-                onNewTask={() => {
-                  closeDrawer();
-                  openNewTask();
                 }}
               />
             </DialogContent>

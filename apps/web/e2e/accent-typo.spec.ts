@@ -63,8 +63,7 @@ for (const theme of ['light', 'dark'] as const) {
     expect(m.markText).toBe('');
     expect(m.markBox).toEqual({ w: 22, h: 22 });
     expect(m.nameText).toContain('Cairn');
-    // the head row keeps its /app/team navigation law
-    expect(m.nameHref).toContain('/app/team');
+    expect(m.nameHref).toBeNull();
   });
 
   test(`page shell back chevron hover shows no background change (${theme})`, async ({ page }) => {

@@ -1,6 +1,6 @@
 import type { AskUserAnswer } from '@cairn/shared';
 import { Ban, CircleCheck, CircleHelp, type LucideIcon } from 'lucide-react';
-import { type ReactNode, useLayoutEffect, useMemo, useState } from 'react';
+import { type ReactNode, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { STATUS_WORDS } from '../board/status-words.js';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
 import { Button } from '../components/ui/button.js';
@@ -100,12 +100,14 @@ export function ChiefQuestionCard({
   const last = step === lastStep;
   const question = questions[step] ?? questions[0];
   const draft = drafts[step];
+  const cardRef = useRef<HTMLDivElement | null>(null);
 
   useLayoutEffect(() => {
     if (!pending || !numberKeys || question === undefined || question.options.length === 0) return;
     const max = question.options.length + 1;
     const handler = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (cardRef.current?.checkVisibility() !== true) return;
       const target = e.target;
       if (
         target instanceof HTMLElement &&
@@ -114,10 +116,11 @@ export function ChiefQuestionCard({
         return;
       const n = Number.parseInt(e.key, 10);
       if (!Number.isInteger(n) || n < 1 || n > max) return;
+      e.preventDefault();
       setDrafts((prev) => applyPick(prev, step, question, n - 1));
     };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    window.addEventListener('keydown', handler, true);
+    return () => window.removeEventListener('keydown', handler, true);
   }, [pending, numberKeys, step, question]);
 
   const stepComplete = useMemo(() => draftComplete(draft, question), [draft, question]);
@@ -190,7 +193,12 @@ export function ChiefQuestionCard({
           : '';
 
   return (
-    <div data-testid="chief-question-card" data-status={item.status} className={CARD_CLS}>
+    <div
+      ref={cardRef}
+      data-testid="chief-question-card"
+      data-status={item.status}
+      className={CARD_CLS}
+    >
       <div className="flex gap-1" aria-hidden="true">
         {questions.map((_, i) => (
           <span key={i} className={`${PIP_CLS}${i <= step ? ` ${PIP_ON_CLS}` : ''}`} />

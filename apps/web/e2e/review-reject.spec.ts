@@ -257,3 +257,15 @@ test('FM2: reject denied (409 race) keeps the draft verbatim + hint row explicit
   await expect(page.locator('.composer-reject')).toContainText('任务状态已变化，消息未送出');
   await evidenceShot(page, 'review-reject-409-keeps-draft.png');
 });
+
+test('typing with nothing focused lands in the thread composer', async ({ page }) => {
+  await stubBoot(page);
+  await stubReviewDetail(page, { phase: 'review' });
+  await page.goto(`/app/todo/${CARD_ID}`);
+  const input = page.locator('.composer-input');
+  await expect(input).toBeVisible();
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.type('ok');
+  await expect(input).toBeFocused();
+  await expect(input).toHaveValue('ok');
+});
