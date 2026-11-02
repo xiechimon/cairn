@@ -18,7 +18,7 @@ import {
   listChiefThreads,
   patchChief,
   rewindChiefThread,
-  sendChiefMessage,
+  sendChiefMessageFromComposer,
 } from './services/chief.js';
 import { cancelQuestion, parseAnswerBody } from './services/chief-questions.js';
 import { decideRetroProposal } from './services/chief-report.js';
@@ -45,7 +45,7 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
     const body = parseWith(coordinatorSendBodySchema, await jsonBody(c), 'body');
-    const result = sendChiefMessage(svc, teamId, { threadId: null, ...body });
+    const result = sendChiefMessageFromComposer(svc, teamId, { threadId: null, ...body });
     ctx.convHub?.publishMessage(result.thread.id, { ...result.message });
     return c.json(result, 201);
   });
@@ -78,7 +78,7 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
       { threadId: null, content: raw?.content, projectId: raw?.projectId },
       'body',
     );
-    const result = sendChiefMessage(svc, teamId, body);
+    const result = sendChiefMessageFromComposer(svc, teamId, body);
     ctx.convHub?.publishMessage(result.thread.id, { ...result.message });
     return c.json(result, 201);
   });
@@ -169,7 +169,7 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
       { threadId: conversationId, content: raw?.content, projectId: raw?.projectId },
       'body',
     );
-    const result = sendChiefMessage(svc, thread.teamId, body);
+    const result = sendChiefMessageFromComposer(svc, thread.teamId, body);
     ctx.convHub?.publishMessage(conversationId, { ...result.message });
     return c.json(result, 201);
   });

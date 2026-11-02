@@ -61,6 +61,7 @@ import {
   chiefPendingMessages,
   chiefThreadFallbackModel,
   settleChiefActiveRun,
+  steerChiefMessage,
 } from './chief-turns.js';
 import { coordinatorServerContextEnabled, lastTurnContext } from './coordinator-context.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
@@ -655,6 +656,25 @@ export function sendChiefMessage(
     ),
     message,
   };
+}
+
+export function sendChiefMessageFromComposer(
+  deps: ChiefDeps,
+  teamId: string,
+  body: { threadId: string | null; content: string; projectId?: string | null | undefined },
+): ReturnType<typeof sendChiefMessage> {
+  const result = sendChiefMessage(deps, teamId, body);
+  const replying = deps.db
+    .select({ prompt: step.prompt })
+    .from(step)
+    .where(
+      and(eq(step.buildId, result.thread.id), eq(step.kind, 'chief'), eq(step.status, 'claimed')),
+    )
+    .get();
+  if (replying !== undefined && parseChiefTrigger(replying.prompt) === 'user') {
+    steerChiefMessage(deps, teamId, result.thread.id, result.message.id);
+  }
+  return result;
 }
 
 export function answerChiefQuestion(
