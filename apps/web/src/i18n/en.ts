@@ -1526,4 +1526,12 @@ export const EN: Record<string, string> = {
   '回复 #{seq}': 'Reply to #{seq}',
   '回复 #{seq}…': 'Reply to #{seq}…',
   '你直接对 #{n} 说：{excerpt}': 'You told #{n} directly: {excerpt}',
+  '对某个 thread 说': 'Talk to a thread',
+  '正在对 #{seq} 说': 'Talking to #{seq}',
+  发给谁: 'Send to',
+  '默认，由它安排': 'Default. It decides who does what.',
+  '改回对 Coordinator 说': 'Back to the Coordinator',
+  '没发给 #{seq}，再试一次。': 'Not sent to #{seq}. Try again.',
+  '#{seq} 现在收不了消息。改回 Coordinator，或换一个 thread。':
+    '#{seq} cannot take a message now. Switch back to the Coordinator or pick another thread.',
 };

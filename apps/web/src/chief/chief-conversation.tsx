@@ -60,10 +60,10 @@ import { ProjectMenu } from './project-menu.js';
 const HEAD_ICON_BTN_CLS =
   "size-6 cursor-pointer justify-center rounded-none border-none bg-transparent p-0 text-(--text-tertiary) hover:bg-transparent hover:text-(--text-tertiary) dark:hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
 
-const TOOL_BTN_CLS =
+export const TOOL_BTN_CLS =
   "size-7 cursor-pointer rounded-(--radius-control) text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover) dark:hover:text-foreground active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
 
-const PROJECT_CHIP_CLS =
+export const PROJECT_CHIP_CLS =
   "h-7 max-w-48 cursor-pointer gap-1.5 rounded-lg border-none bg-transparent px-2 text-meta font-normal text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-(--foreground) dark:hover:bg-(--menu-hover) aria-expanded:bg-(--menu-hover) data-[set]:bg-(--menu-hover) data-[set]:text-(--foreground) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
 
 const SEND_BTN_CLS =
@@ -134,6 +134,8 @@ export interface ChiefConversationProps {
   composerError?: string | null;
   composerReplacement?: ReactNode;
   aboveComposer?: ReactNode;
+  composerTools?: ReactNode;
+  targetPlaceholder?: string | null;
 }
 
 export function ChiefConversation({
@@ -163,6 +165,8 @@ export function ChiefConversation({
   composerError = null,
   composerReplacement,
   aboveComposer,
+  composerTools,
+  targetPlaceholder = null,
 }: ChiefConversationProps) {
   const projectMark = useProjectMark();
   const { t } = useI18n();
@@ -376,7 +380,11 @@ export function ChiefConversation({
   const heroScrollRef = useRef<HTMLDivElement | null>(null);
   useScrollFade(heroScrollRef, { enabled: heroLayout });
   const stopMode =
-    chief.running === true && wire.draft === '' && wire.tokens.length === 0 && onStop != null;
+    targetPlaceholder === null &&
+    chief.running === true &&
+    wire.draft === '' &&
+    wire.tokens.length === 0 &&
+    onStop != null;
   const liveTurn =
     chief.running === true
       ? chief.stream?.findLast((item) => item.kind === 'streaming')
@@ -649,11 +657,12 @@ export function ChiefConversation({
                 onCompositionEnd={handleCompositionEnd}
                 onBlur={handleBlur}
                 placeholder={
-                  chief.outage != null
+                  targetPlaceholder ??
+                  (chief.outage != null
                     ? t('可以继续说，总管恢复后会按顺序处理…')
                     : chief.running === true
                       ? t(CHIEF_INPUT_PLACEHOLDER_STEERING)
-                      : (placeholder ?? t(CHIEF_INPUT_PLACEHOLDER))
+                      : (placeholder ?? t(CHIEF_INPUT_PLACEHOLDER)))
                 }
                 {...(inlineOpen
                   ? {
@@ -731,6 +740,7 @@ export function ChiefConversation({
               >
                 <Plus width={16} height={16} />
               </IconTooltip>
+              {composerTools}
               {chipVisible && (
                 <ProjectMenu
                   title="发给哪个项目"
