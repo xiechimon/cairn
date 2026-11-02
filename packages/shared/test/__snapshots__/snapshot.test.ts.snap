@@ -7070,6 +7070,8 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "push_delivery",
   "harness_eval_attempts",
   "autonomous_merge_admission",
+  "chief_report",
+  "retro_proposal",
 ]
 `;
 
