@@ -107,54 +107,70 @@ afterEach(() => vi.restoreAllMocks());
 const sources = [null, 'github-issue', 'github-issue-self'] as const;
 const terminalCases = (['user', 'chief', 'schedule'] as const).flatMap((triggerSource) =>
   sources.flatMap((sourceKind) =>
-    (['done', 'failed'] as const).map((phase) => ({ triggerSource, sourceKind, phase })),
+    [true, false].map((retriesExhausted) => ({ triggerSource, sourceKind, retriesExhausted })),
   ),
 );
 
-describe('terminal thread push routing', () => {
+function exhaustRetries(s: ReturnType<typeof world>): void {
+  s.db.update(build).set({ prevPhase: 'failed' }).where(eq(build.id, 'build')).run();
+}
+
+describe('terminal thread push routing (#1784: push only when a human is needed)', () => {
   test.each(terminalCases)(
-    '$triggerSource / $sourceKind / $phase',
-    async ({ triggerSource, sourceKind, phase }) => {
+    'done never pushes: $triggerSource / $sourceKind',
+    ({ triggerSource, sourceKind }) => {
       const s = world({ triggerSource, ...(sourceKind ? { sourceKind } : {}) });
       const send = vi
         .spyOn(webpush, 'sendNotification')
         .mockResolvedValue({ statusCode: 201, body: '', headers: {} });
-      const startedAt = Date.now();
-      if (phase === 'done') {
-        finishTodoDone(s.svc, s.record.id, 'build');
-        expect(() => finishTodoDone(s.svc, s.record.id, 'build')).toThrow(
-          'illegal phase transition: done -> done',
-        );
-        setTodoPhase(s.svc, s.record.id, 'done');
-      } else {
-        setTodoPhase(s.svc, s.record.id, phase);
-        setTodoPhase(s.svc, s.record.id, phase);
-      }
-      const immediate = sourceKind !== 'github-issue';
-      expect(send).toHaveBeenCalledTimes(immediate ? 1 : 0);
-      expect(Date.now() - startedAt).toBeLessThan(5_000);
-      const digest = s.db.select().from(pushDigestItem).all();
-      expect(digest).toHaveLength(immediate ? 0 : 1);
-      if (immediate)
-        expect(JSON.parse(String(send.mock.calls[0]?.[1])).notification.navigate).toBe(
-          `https://cairn.local/app/todo/${s.record.id}`,
-        );
-      if (phase === 'done' && !immediate) expect(digest[0]?.body).toContain('PR #42');
+      finishTodoDone(s.svc, s.record.id, 'build');
+      expect(send).not.toHaveBeenCalled();
+      expect(s.db.select().from(pushDigestItem).all()).toHaveLength(0);
     },
   );
 
-  test.each(['done', 'failed'] as const)('autonomous scheduled %s remains digest-only', (phase) => {
-    const s = world({ triggerSource: 'schedule', userStarted: false });
+  test.each(terminalCases)(
+    'failed pushes only once retries stop: $triggerSource / $sourceKind / exhausted=$retriesExhausted',
+    ({ triggerSource, sourceKind, retriesExhausted }) => {
+      const s = world({ triggerSource, ...(sourceKind ? { sourceKind } : {}) });
+      if (retriesExhausted) exhaustRetries(s);
+      const send = vi
+        .spyOn(webpush, 'sendNotification')
+        .mockResolvedValue({ statusCode: 201, body: '', headers: {} });
+      setTodoPhase(s.svc, s.record.id, 'failed');
+      setTodoPhase(s.svc, s.record.id, 'failed');
+      expect(send).toHaveBeenCalledTimes(retriesExhausted ? 1 : 0);
+      expect(s.db.select().from(pushDigestItem).all()).toHaveLength(0);
+      if (retriesExhausted)
+        expect(JSON.parse(String(send.mock.calls[0]?.[1])).notification.navigate).toBe(
+          `https://cairn.local/app/todo/${s.record.id}`,
+        );
+    },
+  );
+
+  test('a failure another member scheduled does not push to this user', () => {
+    const s = world();
+    exhaustRetries(s);
+    s.db
+      .insert(step)
+      .values({
+        id: 'other',
+        buildId: 'build',
+        kind: 'build',
+        status: 'failed',
+        scheduledBy: 'someone-else',
+        createdAt: Date.now(),
+      })
+      .run();
     const send = vi
       .spyOn(webpush, 'sendNotification')
       .mockResolvedValue({ statusCode: 201, body: '', headers: {} });
-    setTodoPhase(s.svc, s.record.id, phase);
+    setTodoPhase(s.svc, s.record.id, 'failed');
     expect(send).not.toHaveBeenCalled();
-    expect(s.db.select().from(pushDigestItem).all()).toHaveLength(1);
   });
 });
 
-test('one-shot user schedule retains push intent after the schedule is deleted', () => {
+test('a one-shot user schedule completing does not push (#1784)', () => {
   const s = world({ triggerSource: 'schedule', userStarted: false });
   s.db.update(todo).set({ phase: 'done' }).where(eq(todo.id, s.record.id)).run();
   s.db
@@ -182,7 +198,7 @@ test('one-shot user schedule retains push intent after the schedule is deleted',
     .mockResolvedValue({ statusCode: 201, body: '', headers: {} });
   setTodoPhase(s.svc, s.record.id, 'building');
   finishTodoDone(s.svc, s.record.id, current.latestBuildId);
-  expect(send).toHaveBeenCalledTimes(1);
+  expect(send).not.toHaveBeenCalled();
   expect(s.db.select().from(pushDigestItem).all()).toHaveLength(0);
 });
 
@@ -289,7 +305,7 @@ describe('human attention push', () => {
       setTodoPhase(s.svc, s.record.id, 'review');
       setTodoPhase(s.svc, s.record.id, 'review');
       expect(send).not.toHaveBeenCalled();
-      expect(s.db.select().from(pushDigestItem).all()).toHaveLength(1);
+      expect(s.db.select().from(pushDigestItem).all()).toHaveLength(0);
     },
   );
 
@@ -413,7 +429,7 @@ describe('human attention push', () => {
     expect(send).not.toHaveBeenCalled();
   });
 
-  test('autonomous failure stays digest-only when its error requests a human', () => {
+  test('an unattended failure whose error requests a human pushes once (#1784)', () => {
     const s = world({ triggerSource: 'schedule', userStarted: false, policy: 'autonomous' });
     s.db
       .insert(step)
@@ -431,8 +447,8 @@ describe('human attention push', () => {
       .spyOn(webpush, 'sendNotification')
       .mockResolvedValue({ statusCode: 201, body: '', headers: {} });
     applyStepFailure(s.svc, row, '转人工处理: blocked on an owner decision');
-    expect(send).not.toHaveBeenCalled();
-    expect(s.db.select().from(pushDigestItem).all()).toHaveLength(1);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(s.db.select().from(pushDigestItem).all()).toHaveLength(0);
   });
 });
 
@@ -440,11 +456,11 @@ test.each([
   ['confirm', '方案已就绪'],
   ['review', '构建待审核'],
   ['failed', '任务失败'],
-  ['done', 'PR 已合并'],
 ] as const)('preserves the Chinese title for %s', (phase, title) => {
   const s = world();
   if (phase === 'confirm')
     s.db.update(todo).set({ phase: 'planning' }).where(eq(todo.id, s.record.id)).run();
+  if (phase === 'failed') exhaustRetries(s);
   const send = vi
     .spyOn(webpush, 'sendNotification')
     .mockResolvedValue({ statusCode: 201, body: '', headers: {} });
@@ -472,7 +488,7 @@ describe('thread viewing presence', () => {
       const send = vi
         .spyOn(webpush, 'sendNotification')
         .mockResolvedValue({ statusCode: 201, body: '', headers: {} });
-      setTodoPhase(s.svc, s.record.id, 'done');
+      setTodoPhase(s.svc, s.record.id, 'review');
       expect(send).toHaveBeenCalledTimes(age < 60_000 ? 0 : 1);
       const other = createTodo(s.svc, {
         teamId: s.team.id,
@@ -498,7 +514,7 @@ describe('thread viewing presence', () => {
         .where(eq(todo.id, other.id))
         .run();
       send.mockClear();
-      setTodoPhase(s.svc, other.id, 'done');
+      setTodoPhase(s.svc, other.id, 'review');
       expect(send).toHaveBeenCalledTimes(1);
     },
   );
@@ -537,9 +553,9 @@ describe('thread viewing presence', () => {
     const send = vi
       .spyOn(webpush, 'sendNotification')
       .mockResolvedValue({ statusCode: 201, body: '', headers: {} });
-    setTodoPhase(s.svc, s.record.id, 'done');
+    setTodoPhase(s.svc, s.record.id, 'review');
     expect(send).toHaveBeenCalledTimes(1);
-    setTodoPhase(s.svc, other.id, 'done');
+    setTodoPhase(s.svc, other.id, 'review');
     expect(send).toHaveBeenCalledTimes(1);
     expect(
       (
@@ -591,6 +607,7 @@ test('clearing one tab retains suppression for another tab viewing the same thre
   expect((await req(s.app, 'DELETE', path, { todoId: s.record.id, tabId: 'second' })).status).toBe(
     200,
   );
-  setTodoPhase(s.svc, s.record.id, 'done');
+  exhaustRetries(s);
+  setTodoPhase(s.svc, s.record.id, 'failed');
   expect(send).toHaveBeenCalledTimes(1);
 });

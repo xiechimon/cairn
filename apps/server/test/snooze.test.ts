@@ -228,14 +228,13 @@ describe('a snoozed thread sends no pushes', () => {
     expect(row(w)).toMatchObject({ phase: 'done', snoozeMode: 'needed' });
   });
 
-  test('the same finished run pushes after the snooze is lifted', async () => {
+  test('a failure that stopped retrying pushes after the snooze is lifted', async () => {
     const w = await world();
+    w.db.update(build).set({ prevPhase: 'failed' }).where(eq(build.id, 'snooze-build')).run();
     snoozeTodo(w.svc, w.todoId, { until: 'needed' });
     unsnoozeTodo(w.svc, w.todoId);
-    setTodoPhase(w.svc, w.todoId, 'done');
-    expect(
-      w.db.select().from(pushDigestItem).all().length + w.send.mock.calls.length,
-    ).toBeGreaterThan(0);
+    setTodoPhase(w.svc, w.todoId, 'failed');
+    expect(w.send).toHaveBeenCalled();
   });
 
   test('digest entries queued before the snooze are dropped at the sweep, not delivered', async () => {
@@ -434,6 +433,7 @@ describe('snooze end conditions (table)', () => {
       .set({ phase: 'building' })
       .where(and(eq(todo.id, w.todoId)))
       .run();
+    w.db.update(build).set({ prevPhase: 'failed' }).where(eq(build.id, 'snooze-build')).run();
     snoozeTodo(w.svc, w.todoId, { until: 'needed' });
     setTodoPhase(w.svc, w.todoId, 'failed');
     expect(row(w)?.snoozeMode).toBeNull();
