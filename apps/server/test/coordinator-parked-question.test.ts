@@ -146,6 +146,18 @@ describe('ask_user parks instead of holding the one Coordinator thread', () => {
     expect(questionRow().content.status).toBe('pending');
   });
 
+  test('an answer to a parked question of an archived project is refused and stays answerable', async () => {
+    const asker = await askFromProjectTurn(H.projectId, ASK_PARK_MS + 1);
+    await holdForQuestion({ db: H.s.db }, { threadId: H.threadId, requestId: 'ask-q', holdMs: 0 });
+    finishTurn(asker);
+    await req(H.s.app, 'POST', `/api/projects/${H.projectId}/archive`);
+    expect((await answer()).status).toBe(409);
+    expect(questionRow().content.status).toBe('pending');
+    expect(chiefSteps().map((s) => s.id)).toEqual([asker]);
+    await req(H.s.app, 'POST', `/api/projects/${H.projectId}/unarchive`);
+    expect((await answer()).status).toBe(200);
+  });
+
   test('cancel removes a parked question and starts no turn', async () => {
     const asker = await askFromProjectTurn(H.projectId, ASK_PARK_MS + 1);
     await holdForQuestion({ db: H.s.db }, { threadId: H.threadId, requestId: 'ask-q', holdMs: 0 });

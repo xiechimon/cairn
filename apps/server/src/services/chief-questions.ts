@@ -190,12 +190,12 @@ export async function holdForQuestion(
   input: { threadId: string; requestId: string; holdMs: number; signal?: AbortSignal },
 ): Promise<AskUserQuestionContent | null> {
   const deadline = Date.now() + Math.max(0, input.holdMs);
+  const askedAt = questionAskedAt(deps.db, input.threadId, input.requestId);
   for (;;) {
     if (input.signal?.aborted === true) return null;
     const content = readQuestion(deps.db, input.threadId, input.requestId);
     if (content === null || content.status !== 'pending') return content;
     if (content.parkedAt !== undefined) return parkedReply(content);
-    const askedAt = questionAskedAt(deps.db, input.threadId, input.requestId);
     if (askedAt !== null && Date.now() - askedAt >= ASK_PARK_MS) {
       const parked: AskUserQuestionContent = { ...content, parkedAt: Date.now() };
       writeQuestion(deps.db, input.threadId, input.requestId, parked, askedAt);

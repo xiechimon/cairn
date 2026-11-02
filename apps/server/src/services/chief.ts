@@ -625,27 +625,46 @@ export function answerChiefQuestion(
   teamId: string,
   input: { threadId: string; requestId: string; answers: AskUserAnswer[] },
 ): AskUserQuestionContent {
-  const answered = answerQuestion(deps, input);
-  if (answered.parkedAt === undefined) return answered;
-  const projectId =
-    deps.db
-      .select({ projectId: chiefMessage.projectId })
-      .from(chiefMessage)
-      .where(eq(chiefMessage.id, input.requestId))
-      .get()?.projectId ?? null;
+  const waiting = deps.db
+    .select()
+    .from(chiefMessage)
+    .where(and(eq(chiefMessage.id, input.requestId), eq(chiefMessage.threadId, input.threadId)))
+    .get();
+  if (askQuestionContentOf(waiting?.content)?.parkedAt === undefined) {
+    return answerQuestion(deps, input);
+  }
+  const threadRow = getChiefThread(deps, input.threadId);
+  if (!threadRow) throw new HttpError(404, `chief thread ${input.threadId}`);
+  requireWritableThread(threadRow);
+  requireBoundAgent(deps, ensureChief(deps, teamId));
+  const projectId = waiting?.projectId ?? null;
+  if (projectId !== null) requireUnarchivedProject(deps.db, projectId);
+  return deps.db.transaction(() => {
+    const answered = answerQuestion(deps, input);
+    enqueueResumedTurn(deps, teamId, input.threadId, answered, projectId);
+    return answered;
+  });
+}
+
+function enqueueResumedTurn(
+  deps: ChiefDeps,
+  teamId: string,
+  threadId: string,
+  answered: AskUserQuestionContent,
+  projectId: string | null,
+): void {
   const lines = answered.questions.map((question, i) => {
     const reply = answered.answers?.[i];
     const text = reply?.text ?? reply?.choices?.join('、') ?? '';
     return `- ${question.header}：${question.question}\n  答复：${text}`;
   });
-  enqueueChiefStep(deps, input.threadId, {
+  enqueueChiefStep(deps, threadId, {
     prompt: promptWithPickedProject(
       pickedProjectOf(deps.db, teamId, projectId),
       `你之前用 ask_user 提的问题，用户现在答复了：\n${lines.join('\n')}\n请从这里继续。`,
     ),
     trigger: 'user',
   });
-  return answered;
 }
 
 export function enqueueChiefStep(
