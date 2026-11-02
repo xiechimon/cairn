@@ -21,6 +21,7 @@ import {
   roundStops,
   stallAlert,
   stalled,
+  syncReviewCheckout,
 } from './reviewer-route.mjs';
 import { sizeFacts, sizeFactsLine } from './size-facts.mjs';
 
@@ -308,6 +309,7 @@ try {
     if (!files.length) process.exit(2);
     process.exit(files.some((p) => PROTECTED.some((re) => re.test(p))) ? 0 : 3);
   }
+  console.log(`review checkout at origin/main ${syncReviewCheckout(git).slice(0, 9)}`);
   const todo = [];
   for (const pr of prs) {
     if (pr.isDraft) continue;

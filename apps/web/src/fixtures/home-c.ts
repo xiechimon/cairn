@@ -21,6 +21,7 @@ const conversation: ChiefContent = {
   bound: true,
   threadTitle: 'Coordinator',
   threadId: 'chief-global',
+  hasEarlier: true,
   examples: undefined,
   stream: [
     {
@@ -99,6 +100,6 @@ export const homeCEmpty: FixtureSet = {
   ...boardDefault,
   projectNames: { [PROJECT_ID]: 'cairn' },
   todos: [],
-  chief: { ...conversation, stream: [], streamAt: [] },
+  chief: { ...conversation, stream: [], streamAt: [], hasEarlier: false },
   now: r7(9, 0),
 };

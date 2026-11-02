@@ -219,3 +219,22 @@ test('at phone width the number-key hint of a question is hidden', async ({ page
   await page.setViewportSize({ width: 1440, height: 900 });
   await expect(needsYou(page).getByTestId('chief-question-hint')).toBeVisible();
 });
+
+test('the sidebar Home badge counts the same items as Needs you', async ({ page }) => {
+  await page.goto(home('home-c'));
+  const badge = page.getByRole('complementary').getByTestId('attention-badge');
+  const needsYouCount = await needsYou(page).getByTestId('needs-you-count').textContent();
+  expect(needsYouCount).toBe('4');
+  await expect(badge).toHaveText(needsYouCount ?? '');
+  await page.goto('/app/schedules?scenario=home-c');
+  await expect(badge).toHaveText('4');
+});
+
+test('the earlier-messages divider shows only when the conversation reports earlier messages', async ({
+  page,
+}) => {
+  await page.goto(home('home-c'));
+  await expect(page.getByTestId('home-c-earlier')).toHaveText('Scroll up for earlier messages');
+  await page.goto(home('home-c-empty'));
+  await expect(page.getByTestId('home-c-earlier')).toHaveCount(0);
+});
