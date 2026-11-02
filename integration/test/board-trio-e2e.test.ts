@@ -248,13 +248,12 @@ afterAll(async () => {
 });
 
 describe('#1216 board UI reliability triple defect (real web dist + real server + fake machine wire)', () => {
-  test('① a draft saved from the home composer starts from its card into the dispatch flow; in-flight state rejects duplicate orchestration', async () => {
+  test('① a draft starts from its card into the dispatch flow; in-flight state rejects duplicate orchestration', async () => {
     await openBoard();
-    await page.getByRole('complementary').getByRole('button', { name: '新任务' }).click();
-    const composer = page.getByTestId('home-c').getByTestId('chief-composer-input');
-    await pexpect(composer).toBeFocused({ timeout: 30_000 });
-    await composer.fill(SPECS.oneClick);
-    await page.getByTestId('composer-save-draft').click();
+    await api(server.url, 'POST', `/api/projects/${projectId}/todos`, {
+      title: '',
+      spec: SPECS.oneClick,
+    });
 
     let todoId = '';
     let seqNum = 0;

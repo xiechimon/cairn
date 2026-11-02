@@ -55,12 +55,11 @@ import { BranchDialog } from '../detail/branch-dialog.js';
 import { substantiveChangesOf } from '../detail/empty-commit.js';
 import { mergeRejectCopy, useMergeGate } from '../detail/merge-gate.js';
 import { withoutDeleted } from '../fixtures/deletions.js';
-import { localTodo, overlayContent } from '../fixtures/fixtures.js';
+import { overlayContent } from '../fixtures/fixtures.js';
 import type { FixtureSet, OverlayState, TodoRecord } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { SearchPanel, useSearchState } from '../overlay/search-panel.js';
-import { useCreateTodo } from '../overlay/use-create-todo.js';
 import { SHEET_PANEL } from '../pages/shell.js';
 
 interface ReorderPatch {
@@ -313,16 +312,6 @@ export function BoardPage() {
     onClear: clearFilters,
     summary: chips.map((chip) => chip.label).join(' · '),
   };
-  const onFixtureSave = useCallback(
-    (spec: string) => {
-      setFixtureTodos((prev) => [
-        ...prev,
-        localTodo(prev.reduce((max, t) => Math.max(max, t.seqNum), 0) + 1, spec, fixture.now),
-      ]);
-    },
-    [fixture],
-  );
-  const saveDraft = useCreateTodo(onFixtureSave);
   const openComposer = useOpenComposer();
   const openNewTask = useCallback(() => openComposer(), [openComposer]);
   const [overlay, setOverlay] = useState<OverlayState | null>(fixture.overlay ?? null);
@@ -639,7 +628,6 @@ export function BoardPage() {
             projectId={homeProjectName === null ? null : homeProjectId}
             projectName={homeProjectName}
             banner={homeBanner}
-            onSaveDraft={saveDraft}
             machines={fixtureWithTodos.resources?.machines}
           />
         ) : (

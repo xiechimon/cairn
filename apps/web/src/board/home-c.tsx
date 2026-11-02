@@ -84,7 +84,6 @@ interface HomeCProps {
   projectId: string | null;
   projectName: string | null;
   banner?: ReactNode;
-  onSaveDraft?: (spec: string, projectId: string | null) => Promise<void>;
   machines?: readonly MachineRow[];
 }
 
@@ -95,7 +94,6 @@ export function HomeC({
   projectId,
   projectName,
   banner,
-  onSaveDraft,
   machines,
 }: HomeCProps) {
   const { t, locale } = useI18n();
@@ -367,7 +365,7 @@ export function HomeC({
           chief={{ ...chiefData, stream: conversation, examples: undefined }}
           onSend={
             surface.onSend != null
-              ? (text: string, chipProject: string | null) => surface.onSend?.(text, chipProject)
+              ? (text: string) => surface.onSend?.(text, projectId)
               : live
                 ? undefined
                 : () => Promise.resolve()
@@ -388,12 +386,6 @@ export function HomeC({
               : t('跟 Coordinator 说点什么，或描述一个新任务…')
           }
           aboveComposer={pill}
-          pinnedProjectId={projectId}
-          onSaveDraft={
-            onSaveDraft != null
-              ? (text: string, chipProject: string | null) => onSaveDraft(text, chipProject)
-              : undefined
-          }
           composerRef={(node) => {
             composerRef.current = node;
           }}

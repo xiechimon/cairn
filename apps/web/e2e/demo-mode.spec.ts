@@ -173,7 +173,7 @@ test('write: a new task is blocked with the toast and nothing is added', async (
   await page.locator('.sidebar-new-task').click();
   const input = page.getByTestId('home-c').getByTestId('chief-composer-input');
   await input.fill('演示里不该落库的任务');
-  await page.getByTestId('composer-save-draft').click();
+  await input.press('Enter');
   await expect(toast(page)).toBeVisible();
   await expect(page.locator('[data-todo-id]', { hasText: '演示里不该落库的任务' })).toHaveCount(0);
   expectQuiet(traffic);
@@ -259,8 +259,9 @@ test('the blocked toast is English under the en locale', async ({ page }) => {
   });
   await page.goto(`${demo.base}/app`);
   await page.locator('.sidebar-new-task').click();
-  await page.getByTestId('home-c').getByTestId('chief-composer-input').fill('not saved');
-  await page.getByTestId('composer-save-draft').click();
+  const input = page.getByTestId('home-c').getByTestId('chief-composer-input');
+  await input.fill('not saved');
+  await input.press('Enter');
   await expect(toast(page, BLOCKED_TOAST_EN)).toBeVisible();
 });
 

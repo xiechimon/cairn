@@ -61,7 +61,7 @@ const PAGES: AuditPage[] = [
       await expect(input).toBeFocused();
       await page.keyboard.type('probe');
     },
-    ready: (p) => p.getByTestId('composer-save-draft').and(p.locator(':enabled')),
+    ready: (p) => p.getByTestId('home-c').getByTestId('chief-composer-input'),
   },
   { name: 'detail fresh', url: '/app/todo/fresh-probe?scenario=23', ready: phaseChip },
   { name: 'detail confirm', url: '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=17b', ready: phaseChip },

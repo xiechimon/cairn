@@ -61,17 +61,16 @@ describe('spec 15 #394 title-less surface + fixed tag vocabulary (live UI → wi
     expect(rows).toHaveLength(FIXED_TAGS.length);
   });
 
-  test('a draft saved from the home composer takes its first body line as the placeholder title; detail page has no tag add surface', async () => {
+  test('a draft takes its first body line as the placeholder title; detail page has no tag add surface', async () => {
     await page.goto(`${server.url}/app?view=board`);
     await pexpect(
       page.getByRole('complementary').getByRole('button', { name: '新任务' }),
     ).toBeVisible({ timeout: 30_000 });
 
-    await page.getByRole('complementary').getByRole('button', { name: '新任务' }).click();
-    const composer = page.getByTestId('home-c').getByTestId('chief-composer-input');
-    await pexpect(composer).toBeFocused({ timeout: 30_000 });
-    await composer.fill('394 占位标题探针\n\n现在的情况：第二行不进标题');
-    await page.getByTestId('composer-save-draft').click();
+    await api(server.url, 'POST', `/api/projects/${projectId}/todos`, {
+      title: '',
+      spec: '394 占位标题探针\n\n现在的情况：第二行不进标题',
+    });
     await page.goto(`${server.url}/app?view=board`);
     await pexpect(page.getByRole('link', { name: '394 占位标题探针' })).toBeVisible({
       timeout: 30_000,

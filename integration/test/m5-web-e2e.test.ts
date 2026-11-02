@@ -176,11 +176,11 @@ async function openBoard(): Promise<void> {
 }
 
 async function createAndStart(title: string): Promise<void> {
-  await page.getByRole('complementary').getByRole('button', { name: '新任务' }).click();
-  const composer = page.getByTestId('home-c').getByTestId('chief-composer-input');
-  await pexpect(composer).toBeFocused({ timeout: 30_000 });
-  await composer.fill(title);
-  await page.getByTestId('composer-save-draft').click();
+  const projects = (await api(server.url, 'GET', '/api/projects')).body as { id: string }[];
+  await api(server.url, 'POST', `/api/projects/${projects[0]!.id}/todos`, {
+    title: '',
+    spec: title,
+  });
   await openBoard();
   await pexpect(page.getByRole('link', { name: title })).toBeVisible({
     timeout: 30_000,

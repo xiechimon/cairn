@@ -498,7 +498,6 @@ export const EN: Record<string, string> = {
   网格视图: 'Grid view',
   暂无内容: 'Nothing yet',
   '创建第一个任务以开始使用。': 'Create your first todo to get started.',
-  默认项目: 'Default Project',
   // #446（ADR 0005 读向）项目页「从 GitHub issue 建任务」入口 + 选择弹层
   // （状态过滤 / 分页 / 三态行）。
   '从 GitHub issue 建任务': 'New task from GitHub issue',
@@ -1331,7 +1330,6 @@ export const EN: Record<string, string> = {
   // —— #638 全站静默 mutation 失败面接线（toast 标题句；server 原因进
   // description 透传不译，#631 同律。已有面内 canon 位的面——merge 拒绝行 /
   // issue 导入内联 / fs-pick 提示行 / OAuth 内联 / 技能弹窗内联——不在此列）——
-  '新建任务失败，请重试。': 'Could not create the task. Try again.',
   '创建项目失败，请重试。': 'Could not create the project. Try again.',
   '移动任务失败，请重试。': 'Could not move the task. Try again.',
   '重置任务失败，请重试。': 'Could not reset the task. Try again.',
@@ -1458,8 +1456,4 @@ export const EN: Record<string, string> = {
   首页: 'Home',
   往上滑看更早的对话: 'Scroll up for earlier messages',
   'Claude 登录需要处理': 'Claude sign-in needs attention',
-  存为草稿: 'Save as draft',
-  '存为草稿，不开始': 'Save as a draft without starting',
-  已存为草稿: 'Saved as a draft',
-  项目列表还没加载: 'Projects have not loaded yet',
 };

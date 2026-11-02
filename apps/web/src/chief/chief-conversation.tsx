@@ -45,7 +45,6 @@ import {
   Plus,
   RuntimeClaudeCode,
   RuntimePi,
-  SquarePen,
 } from '../icons/index.js';
 import { uploadMessageAttachments } from '../overlay/attachment-paste.js';
 import { ComposerAttachments } from '../overlay/composer-attachments.js';
@@ -66,9 +65,6 @@ const TOOL_BTN_CLS =
 
 const PROJECT_CHIP_CLS =
   "h-7 max-w-48 cursor-pointer gap-1.5 rounded-lg border-none bg-transparent px-2 text-meta font-normal text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-(--foreground) dark:hover:bg-(--menu-hover) aria-expanded:bg-(--menu-hover) data-[set]:bg-(--menu-hover) data-[set]:text-(--foreground) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
-
-const SAVE_DRAFT_CLS =
-  'h-7 cursor-pointer gap-1.5 rounded-lg border-none bg-transparent px-2 text-meta font-normal text-content-secondary hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover) disabled:pointer-events-auto disabled:cursor-default disabled:bg-transparent disabled:text-content-tertiary disabled:opacity-100 active:not-aria-[haspopup]:translate-y-0';
 
 const SEND_BTN_CLS =
   'ml-auto size-7 cursor-pointer rounded-(--radius-control) border-0 bg-secondary text-(--text-tertiary) hover:bg-secondary hover:text-(--text-tertiary) dark:hover:bg-secondary aria-expanded:bg-transparent active:not-aria-[haspopup]:translate-y-0';
@@ -118,8 +114,6 @@ export interface ChiefConversationProps {
   onSettings?: () => void;
   onClose?: () => void;
   onSend?: (text: string, projectId: string | null) => void | Promise<void>;
-  onSaveDraft?: (text: string, projectId: string | null) => void | Promise<void>;
-  pinnedProjectId?: string | null;
   onRewind?: (messageId: string) => void;
   onAnswerQuestion?: (input: { requestId: string; answers: AskUserAnswer[] }) => void;
   onCancelQuestion?: (requestId: string) => void;
@@ -149,8 +143,6 @@ export function ChiefConversation({
   onSettings,
   onClose,
   onSend,
-  onSaveDraft,
-  pinnedProjectId = null,
   onRewind,
   onAnswerQuestion,
   onCancelQuestion,
@@ -216,32 +208,16 @@ export function ChiefConversation({
       return null;
     }
   });
-  const [pinnedPick, setPinnedPick] = useState<{ pinned: string; pick: string | null } | null>(
-    null,
-  );
-  const effectiveProjectId =
-    pinnedProjectId === null
-      ? storedProjectId
-      : pinnedPick?.pinned === pinnedProjectId
-        ? pinnedPick.pick
-        : pinnedProjectId;
-  const pickedProject = projectOptions.find((p) => p.id === effectiveProjectId) ?? null;
-  const chipVisible = onSend != null && projectOptions.length > 1;
-  const pickProject = useCallback(
-    (projectId: string | null) => {
-      if (pinnedProjectId !== null) {
-        setPinnedPick({ pinned: pinnedProjectId, pick: projectId });
-        return;
-      }
-      setStoredProjectId(projectId);
-      try {
-        if (projectId === null) localStorage.removeItem(CHIEF_PROJECT_STORAGE_KEY);
-        else localStorage.setItem(CHIEF_PROJECT_STORAGE_KEY, projectId);
-      } catch {}
-    },
-    [pinnedProjectId],
-  );
-  const chipProjectId = chipVisible ? (pickedProject?.id ?? null) : pinnedProjectId;
+  const pickedProject = projectOptions.find((p) => p.id === storedProjectId) ?? null;
+  const chipVisible = variant !== 'global' && onSend != null && projectOptions.length > 1;
+  const pickProject = useCallback((projectId: string | null) => {
+    setStoredProjectId(projectId);
+    try {
+      if (projectId === null) localStorage.removeItem(CHIEF_PROJECT_STORAGE_KEY);
+      else localStorage.setItem(CHIEF_PROJECT_STORAGE_KEY, projectId);
+    } catch {}
+  }, []);
+  const chipProjectId = chipVisible ? (pickedProject?.id ?? null) : null;
   const onAttachment =
     onSend != null ? (files: File[]) => uploadMessageAttachments(files, t) : undefined;
   const { scrollToEnd } = useMessageScroller();
@@ -295,8 +271,6 @@ export function ChiefConversation({
             scrollToEnd();
             return onSend(text, chipProjectId);
           },
-    onSaveDraft:
-      onSaveDraft == null ? undefined : (text: string) => onSaveDraft(text, chipProjectId),
     onAttachment,
     mentionGroups,
     ...(chipVisible ? { onPickProject: (p: { id: string }) => pickProject(p.id) } : {}),
@@ -790,23 +764,6 @@ export function ChiefConversation({
                   <span className="truncate">{pickedProject?.name ?? t('自动')}</span>
                   <ChevronDown width={12} height={12} />
                 </ProjectMenu>
-              )}
-              {onSaveDraft != null && (
-                <IconTooltip
-                  label={t('存为草稿，不开始')}
-                  trigger={
-                    <Button
-                      variant="ghost"
-                      data-testid="composer-save-draft"
-                      className={SAVE_DRAFT_CLS}
-                      disabled={wire.draft.trim() === '' && wire.tokens.length === 0}
-                      onClick={wire.saveDraft}
-                    />
-                  }
-                >
-                  <SquarePen width={14} height={14} />
-                  <span className="max-sm:hidden">{t('存为草稿')}</span>
-                </IconTooltip>
               )}
               {chief.running === true && turnElapsed != null && (
                 <span
