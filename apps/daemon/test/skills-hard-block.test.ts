@@ -229,9 +229,29 @@ function baseParts() {
     sessionId: 'sid-1',
     disallowedTools: ['AskUserQuestion'],
     mcpServers: {},
+    inOrb: true,
     abortController: new AbortController(),
   };
 }
+
+describe('buildClaudeSdkOptions permission mode by execution place', () => {
+  test('an orb step bypasses permissions with the SDK opt-in flag', () => {
+    const opts = buildClaudeSdkOptions(baseParts());
+    expect(opts.permissionMode).toBe('bypassPermissions');
+    expect(opts.allowDangerouslySkipPermissions).toBe(true);
+    expect(opts.allowedTools).toBeUndefined();
+  });
+
+  test('a host step never bypasses: cairn MCP and read-only tools only, Bash denied', () => {
+    const opts = buildClaudeSdkOptions({ ...baseParts(), inOrb: false, builtinTools: [] });
+    expect(opts.permissionMode).toBe('dontAsk');
+    expect(opts.allowDangerouslySkipPermissions).toBeUndefined();
+    expect(opts.allowedTools).toEqual(['mcp__cairn', 'Read', 'Glob', 'Grep']);
+    for (const tool of ['Bash', 'Edit', 'Write', 'NotebookEdit', 'WebFetch'])
+      expect(opts.allowedTools).not.toContain(tool);
+    expect(opts.tools).toEqual([]);
+  });
+});
 
 describe('buildClaudeSdkOptions (spec 14 §post-ruling scope 1/2: settingSources + deny hard block)', () => {
   test("settingSources always pinned to ['user','project','local'] ('project' = the brief-bearing slot, spec 24)", () => {
@@ -290,7 +310,6 @@ describe('buildClaudeSdkOptions (spec 14 §post-ruling scope 1/2: settingSources
   test('existing surfaces unregressed: bypass / disallowedTools / partial / model / cwd / sessionId', () => {
     const opts = buildClaudeSdkOptions(baseParts());
     expect(opts.permissionMode).toBe('bypassPermissions');
-    expect(opts.allowDangerouslySkipPermissions).toBe(true);
     expect(opts.disallowedTools).toEqual(['AskUserQuestion']);
     expect(opts.includePartialMessages).toBe(true);
     expect(opts.model).toBe('claude-test');

@@ -598,6 +598,7 @@ export function sdkTranscriptPath(cwd: string, sessionId: string): string {
 }
 
 const HOST_MCP_SERVER_NAME = 'cairn';
+const HOST_ALLOWED_TOOLS = [`mcp__${HOST_MCP_SERVER_NAME}`, 'Read', 'Glob', 'Grep'] as const;
 
 function jsonSchemaToZod(schema: unknown, where: string): z.ZodType {
   if (typeof schema !== 'object' || schema === null || Array.isArray(schema)) {
@@ -851,6 +852,7 @@ export interface ClaudeSdkOptionParts {
   sessionId: string;
   disallowedTools: string[];
   builtinTools?: string[];
+  inOrb: boolean;
   mcpServers: Record<string, McpServerConfig>;
   strictMcpConfig?: boolean;
   effort?: EffortLevel;
@@ -880,8 +882,9 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
   return {
     cwd: parts.cwd,
     model: parts.modelId,
-    permissionMode: 'bypassPermissions',
-    allowDangerouslySkipPermissions: true,
+    ...(parts.inOrb
+      ? { permissionMode: 'bypassPermissions' as const, allowDangerouslySkipPermissions: true }
+      : { permissionMode: 'dontAsk' as const, allowedTools: [...HOST_ALLOWED_TOOLS] }),
     disallowedTools: parts.disallowedTools,
     ...(parts.builtinTools !== undefined ? { tools: parts.builtinTools } : {}),
     includePartialMessages: true,
@@ -924,6 +927,7 @@ export function claudeSessionEnv(opts: SessionOpts): Record<string, string> | un
 }
 
 export interface ClaudeCodeBackendOpts {
+  inOrb?: boolean;
   skills?: { skillsDir: string; cwd: string };
   onSkillsLog?: (msg: string) => void;
   machineName?: string;
@@ -1012,6 +1016,7 @@ export class ClaudeCodeBackend implements AgentBackend {
       resumeId,
       sessionId,
       disallowedTools,
+      inOrb: this.opts.inOrb ?? process.env.CAIRN_ORB === '1',
       ...(opts.remoteToolsOnly === true ? { builtinTools: [] } : {}),
       mcpServers,
       ...(managedMcp ? { strictMcpConfig: true } : {}),
