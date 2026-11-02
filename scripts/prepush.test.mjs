@@ -868,6 +868,67 @@ test('a failed check preserves its exit status and stops the plan without writin
   }
 });
 
+const { NODE_TEST_CONTEXT: _testRunnerContext, ...outsideTestRunner } = process.env;
+
+test('a hanging node --test step fails at the per-test timeout instead of blocking the push', () => {
+  const root = mkdtempSync(join(tmpdir(), 'cairn-prepush-hang-'));
+  try {
+    writeFileSync(
+      join(root, 'hang.test.mjs'),
+      "import { test } from 'node:test';\ntest('hangs', () => new Promise(() => setInterval(() => {}, 1000)));\n",
+    );
+    const exits = [];
+    const started = Date.now();
+    runPlan([['node', '--test', 'hang.test.mjs']], {
+      cwd: root,
+      env: outsideTestRunner,
+      exit: (code) => exits.push(code),
+      testTimeoutMs: 500,
+      stepTimeoutMs: 60_000,
+    });
+    assert.notEqual(exits[0] ?? 0, 0);
+    assert.ok(Date.now() - started < 30_000);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('a node --test file that hangs before registering any test is killed at the step timeout', () => {
+  const root = mkdtempSync(join(tmpdir(), 'cairn-prepush-linger-'));
+  try {
+    writeFileSync(
+      join(root, 'linger.test.mjs'),
+      "import { writeFileSync } from 'node:fs';\nimport { test } from 'node:test';\nwriteFileSync('child.pid', String(process.pid));\nawait new Promise(() => setInterval(() => {}, 1000));\ntest('never registered', () => {});\n",
+    );
+    const exits = [];
+    const started = Date.now();
+    runPlan([['node', '--test', 'linger.test.mjs']], {
+      cwd: root,
+      env: outsideTestRunner,
+      exit: (code) => exits.push(code),
+      testTimeoutMs: 60_000,
+      stepTimeoutMs: 3000,
+    });
+    assert.deepEqual(exits, [1]);
+    assert.ok(Date.now() - started < 30_000);
+    const child = Number(readFileSync(join(root, 'child.pid'), 'utf8'));
+    const alive = () => {
+      try {
+        process.kill(child, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    const deadline = Date.now() + 5000;
+    while (alive() && Date.now() < deadline)
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
+    assert.equal(alive(), false, `hung test child ${child} survived the step timeout`);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('CI doc-reader checks select the real codeowners reader for identity documentation', () => {
   const path = 'docs/ops/agent-bot-identity.md';
   for (const mode of ['local', 'ci'])

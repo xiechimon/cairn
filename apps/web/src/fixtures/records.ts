@@ -3,6 +3,7 @@ import {
   type AgentTask,
   type AgentTodoItem,
   type ChiefDigestItem,
+  type ChiefReportContent,
   type ClaudeLogin,
   type DocumentDiffFile,
   type GithubRepoSummary,
@@ -23,6 +24,7 @@ import {
   type ThreadReportContent,
   type UsageCost,
 } from '@cairn/shared';
+import type { MachineProvider } from '../api/claude-accounts.js';
 import type { AccountsContent } from './accounts.js';
 
 export type { Phase };
@@ -273,6 +275,7 @@ export interface MachineRow {
   concurrencyRange?: { min: number; max: number };
   concurrencySource?: 'measured' | 'estimate' | 'manual';
   claudeLogin?: ClaudeLogin;
+  providers?: MachineProvider[];
 }
 
 export interface ResourcesContent {
@@ -539,6 +542,11 @@ export type ChiefStreamItem =
       reason: 'daily' | 'threshold';
       madeAt: number;
       items: ChiefDigestItem[];
+    }
+  | {
+      kind: 'daily-report';
+      id: string;
+      report: ChiefReportContent;
     }
   | {
       kind: 'streaming';

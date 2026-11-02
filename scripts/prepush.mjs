@@ -156,15 +156,60 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
       ];
 }
 
-export function runPlan(plan, { cwd, env, exit = (code) => process.exit(code) }) {
+export const NODE_TEST_TIMEOUT_MS = 300_000;
+const STEP_TIMED_OUT = 124;
+const PROCESS_GROUP_RUNNER = `
+const { spawn } = require('node:child_process');
+const [ms, command, ...args] = process.argv.slice(1);
+const child = spawn(command, args, { stdio: 'inherit', detached: true });
+const killGroup = () => { try { process.kill(-child.pid, 'SIGKILL'); } catch {} };
+const timer = setTimeout(() => { killGroup(); process.exit(${STEP_TIMED_OUT}); }, Number(ms));
+for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, () => { killGroup(); process.exit(1); });
+child.on('exit', (code) => { clearTimeout(timer); killGroup(); process.exit(code ?? 1); });
+`;
+export const NODE_TEST_STEP_TIMEOUT_MS = 15 * 60_000;
+
+export function runPlan(
+  plan,
+  {
+    cwd,
+    env,
+    exit = (code) => process.exit(code),
+    testTimeoutMs = NODE_TEST_TIMEOUT_MS,
+    stepTimeoutMs = NODE_TEST_STEP_TIMEOUT_MS,
+  },
+) {
   for (const step of plan) {
     const [command, ...commandArgs] = step;
     console.log(`[prepush] ${command} ${commandArgs.join(' ')}`);
-    const result = spawnSync(command, commandArgs, {
-      cwd,
-      stdio: 'inherit',
-      env: scrubGitEnv({ ...env }),
-    });
+    const nodeTest = command === 'node' && commandArgs[0] === '--test';
+    const result = nodeTest
+      ? spawnSync(
+          process.execPath,
+          [
+            '-e',
+            PROCESS_GROUP_RUNNER,
+            String(stepTimeoutMs),
+            command,
+            '--test',
+            '--test-force-exit',
+            `--test-timeout=${testTimeoutMs}`,
+            ...commandArgs.slice(1),
+          ],
+          { cwd, stdio: 'inherit', env: scrubGitEnv({ ...env }) },
+        )
+      : spawnSync(command, commandArgs, {
+          cwd,
+          stdio: 'inherit',
+          env: scrubGitEnv({ ...env }),
+        });
+    if (nodeTest && result.status === STEP_TIMED_OUT) {
+      console.error(
+        `[prepush] ${command} ${commandArgs.join(' ')} did not exit within ${stepTimeoutMs / 60_000} min; killed its process group`,
+      );
+      exit(1);
+      return;
+    }
     if (result.status !== 0) {
       exit(result.status ?? 1);
       return;

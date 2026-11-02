@@ -80,6 +80,7 @@ const VALID_OUTPUT = [
       { group: 'open', text: '#12 等 ian 选方案', reason: '还停在确认关口' },
       { group: 'remembered', text: '发布卡住时先查 npm 源', reason: '从 #15 学到的' },
     ],
+    retro: [],
   }),
   '```',
 ].join('\n');
@@ -687,7 +688,12 @@ describe('chief long-chat digests (#1939)', () => {
       .where(eq(chiefThread.id, w.threadId))
       .run();
     w.plan(TODAY_0830);
-    expect(w.digestSteps()).toHaveLength(0);
+    expect(
+      w
+        .digestSteps()
+        .map((r) => r.prompt ?? '')
+        .join('\n'),
+    ).not.toContain('Digest thread=');
   });
 
   test('a waiting user turn is served before any digest is queued', async () => {

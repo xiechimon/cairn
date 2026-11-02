@@ -75,7 +75,11 @@ export function failureAwaitsAutomaticRetry(
   return owedAutomaticRetry(buildRow, lastStepScheduledBuildIds(db, [buildRow.id]));
 }
 
-export function listNeedsYou(deps: BuildDeps, teamId: string, now = nowMs()): NeedsYouQuery {
+export function listNeedsYou(
+  deps: Pick<BuildDeps, 'db'>,
+  teamId: string,
+  now = nowMs(),
+): NeedsYouQuery {
   const rows = deps.db
     .select()
     .from(todo)
