@@ -230,6 +230,7 @@ function baseParts() {
     disallowedTools: ['AskUserQuestion'],
     mcpServers: {},
     inOrb: true,
+    lockedDown: false,
     abortController: new AbortController(),
   };
 }
@@ -246,6 +247,7 @@ describe('buildClaudeSdkOptions permission mode by execution place', () => {
     const opts = buildClaudeSdkOptions({
       ...baseParts(),
       inOrb: false,
+      lockedDown: true,
       plugins: [{ type: 'local', path: '/skills' }],
     });
     expect(opts.permissionMode).toBe('dontAsk');
@@ -260,6 +262,7 @@ describe('buildClaudeSdkOptions permission mode by execution place', () => {
     const opts = buildClaudeSdkOptions({
       ...baseParts(),
       inOrb: false,
+      lockedDown: true,
       mcpServers: {
         cairn: { type: 'sdk', name: 'cairn', instance: {} } as never,
         attached: { type: 'stdio', command: 'sh' },
@@ -276,9 +279,27 @@ describe('buildClaudeSdkOptions permission mode by execution place', () => {
   });
 
   test('a host step that asks for no built-ins keeps none', () => {
-    expect(buildClaudeSdkOptions({ ...baseParts(), inOrb: false, builtinTools: [] }).tools).toEqual(
-      [],
-    );
+    expect(
+      buildClaudeSdkOptions({ ...baseParts(), inOrb: false, lockedDown: true, builtinTools: [] })
+        .tools,
+    ).toEqual([]);
+  });
+
+  test('a host build step keeps the main behaviour: no lockdown, no bypass flag', () => {
+    const opts = buildClaudeSdkOptions({
+      ...baseParts(),
+      inOrb: false,
+      lockedDown: false,
+      plugins: [{ type: 'local', path: '/skills' }],
+    });
+    expect(opts.permissionMode).toBe('bypassPermissions');
+    expect(opts.allowDangerouslySkipPermissions).toBeUndefined();
+    expect(opts.allowedTools).toBeUndefined();
+    expect(opts.tools).toBeUndefined();
+    expect(opts.settingSources).toEqual(['user', 'project', 'local']);
+    expect(opts.settings).not.toHaveProperty('disableAllHooks');
+    expect(opts.disallowedTools).toEqual(['AskUserQuestion']);
+    expect(opts.plugins).toEqual([{ type: 'local', path: '/skills' }]);
   });
 
   test('an orb step keeps its tools, hooks and plugins', () => {

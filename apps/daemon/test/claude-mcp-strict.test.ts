@@ -19,6 +19,7 @@ function parts(over: Partial<ClaudeSdkOptionParts> = {}): ClaudeSdkOptionParts {
     disallowedTools: ['AskUserQuestion'],
     mcpServers: {},
     inOrb: true,
+    lockedDown: false,
     abortController: new AbortController(),
     ...over,
   };

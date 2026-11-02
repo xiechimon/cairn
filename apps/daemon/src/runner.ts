@@ -875,6 +875,7 @@ async function runClaimedStep(
     },
     ...(teamSkillsDir !== null ? { teamSkillsDir } : {}),
     ...(isReview ? { readOnly: true } : {}),
+    ...(isChief || isReview || isVerify ? { lockedDown: true } : {}),
     ...(claimed.remoteToolsOnly === true ? { remoteToolsOnly: true } : {}),
     ...(telemetry !== undefined ? { telemetry } : {}),
     ...(Object.keys(stepEnv).length > 0 ? { env: stepEnv } : {}),

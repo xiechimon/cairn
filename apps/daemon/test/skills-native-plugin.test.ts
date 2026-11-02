@@ -544,6 +544,7 @@ function baseParts() {
     disallowedTools: ['AskUserQuestion'],
     mcpServers: {},
     inOrb: true,
+    lockedDown: false,
     abortController: new AbortController(),
   };
 }

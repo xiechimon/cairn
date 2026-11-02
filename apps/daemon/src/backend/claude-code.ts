@@ -854,6 +854,7 @@ export interface ClaudeSdkOptionParts {
   disallowedTools: string[];
   builtinTools?: string[];
   inOrb: boolean;
+  lockedDown: boolean;
   mcpServers: Record<string, McpServerConfig>;
   strictMcpConfig?: boolean;
   effort?: EffortLevel;
@@ -875,10 +876,11 @@ const METERED_CLAUDE_AUTH_BLANK = {
 
 export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
   const managedMcp = parts.strictMcpConfig === true;
+  const locked = !parts.inOrb && parts.lockedDown;
   const hostMcp = Object.fromEntries(
     Object.entries(parts.mcpServers).filter(([slug]) => slug === HOST_MCP_SERVER_NAME),
   );
-  const mcpSection: Pick<Options, 'mcpServers' | 'strictMcpConfig'> = !parts.inOrb
+  const mcpSection: Pick<Options, 'mcpServers' | 'strictMcpConfig'> = locked
     ? { mcpServers: hostMcp, strictMcpConfig: true }
     : managedMcp
       ? { mcpServers: parts.mcpServers, strictMcpConfig: true }
@@ -888,17 +890,19 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
   return {
     cwd: parts.cwd,
     model: parts.modelId,
-    ...(parts.inOrb
-      ? { permissionMode: 'bypassPermissions' as const, allowDangerouslySkipPermissions: true }
-      : { permissionMode: 'dontAsk' as const, allowedTools: [...HOST_ALLOWED_TOOLS] }),
-    disallowedTools: parts.inOrb ? parts.disallowedTools : [...parts.disallowedTools, 'Bash'],
-    ...(parts.inOrb
-      ? parts.builtinTools !== undefined
+    ...(locked
+      ? { permissionMode: 'dontAsk' as const, allowedTools: [...HOST_ALLOWED_TOOLS] }
+      : parts.inOrb
+        ? { permissionMode: 'bypassPermissions' as const, allowDangerouslySkipPermissions: true }
+        : { permissionMode: 'bypassPermissions' as const }),
+    disallowedTools: locked ? [...parts.disallowedTools, 'Bash'] : parts.disallowedTools,
+    ...(locked
+      ? { tools: parts.builtinTools ?? [...HOST_BUILTIN_TOOLS] }
+      : parts.builtinTools !== undefined
         ? { tools: parts.builtinTools }
-        : {}
-      : { tools: parts.builtinTools ?? [...HOST_BUILTIN_TOOLS] }),
+        : {}),
     includePartialMessages: true,
-    settingSources: parts.inOrb ? [...CLAUDE_SETTING_SOURCES] : ['project'],
+    settingSources: locked ? ['project'] : [...CLAUDE_SETTING_SOURCES],
     ...mcpSection,
     ...(parts.effort !== undefined ? { effort: parts.effort } : {}),
     ...(parts.append !== undefined
@@ -913,7 +917,7 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
     ...(parts.resumeId !== null ? { resume: parts.resumeId } : { sessionId: parts.sessionId }),
     settings: {
       env: claudeCliEnv({}),
-      ...(parts.inOrb ? {} : { disableAllHooks: true, disableSkillShellExecution: true }),
+      ...(locked ? { disableAllHooks: true, disableSkillShellExecution: true } : {}),
       ...(parts.skillDenyRules !== undefined && parts.skillDenyRules.length > 0
         ? { permissions: { deny: [...parts.skillDenyRules] } }
         : {}),
@@ -926,7 +930,7 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
       ...parts.env,
       ...(parts.env?.CLAUDE_CODE_OAUTH_TOKEN !== undefined ? METERED_CLAUDE_AUTH_BLANK : {}),
     }),
-    ...(parts.inOrb && parts.plugins !== undefined && parts.plugins.length > 0
+    ...(!locked && parts.plugins !== undefined && parts.plugins.length > 0
       ? { plugins: parts.plugins }
       : {}),
     abortController: parts.abortController,
@@ -1030,6 +1034,7 @@ export class ClaudeCodeBackend implements AgentBackend {
       sessionId,
       disallowedTools,
       inOrb: this.opts.inOrb === true,
+      lockedDown: opts.lockedDown === true,
       ...(opts.remoteToolsOnly === true ? { builtinTools: [] } : {}),
       mcpServers,
       ...(managedMcp ? { strictMcpConfig: true } : {}),
