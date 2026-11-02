@@ -129,7 +129,12 @@ function publishRow(deps: ChiefQuestionDeps, threadId: string, requestId: string
 
 export function createOrGetQuestion(
   deps: ChiefQuestionDeps,
-  input: { threadId: string; requestId: string; questions: AskUserQuestion[] },
+  input: {
+    threadId: string;
+    requestId: string;
+    questions: AskUserQuestion[];
+    provenance?: string;
+  },
 ): { content: AskUserQuestionContent; created: boolean } {
   if (!isChiefConversationId(input.threadId)) {
     throw new HttpError(400, `thread ${input.threadId} is not a chief thread`);
@@ -142,6 +147,7 @@ export function createOrGetQuestion(
     status: 'pending',
     questions: input.questions,
     answers: null,
+    ...(input.provenance !== undefined ? { provenance: input.provenance } : {}),
   };
   writeQuestion(deps.db, input.threadId, input.requestId, content, nowMs());
   publishRow(deps, input.threadId, input.requestId);
