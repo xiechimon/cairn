@@ -1007,7 +1007,7 @@ export function useApiMutations(teamId: string | undefined) {
           clientMessageId: crypto.randomUUID(),
         }),
       onSuccess: (result) => {
-        void qc.invalidateQueries({ queryKey: ['messages', result.conversationId] });
+        void qc.invalidateQueries({ queryKey: ['messages'] });
         void qc.invalidateQueries({ queryKey: ['steps', result.conversationId] });
         void qc.invalidateQueries({ queryKey: ['todo'] });
         void qc.invalidateQueries({ queryKey: ['todos', teamId] });

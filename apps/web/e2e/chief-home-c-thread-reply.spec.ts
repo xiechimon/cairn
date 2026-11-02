@@ -153,16 +153,40 @@ test('a failed thread offers a reply that reruns it; an empty reply cannot be se
   expect(sent).toHaveLength(0);
 });
 
-test('text typed while a reply is in flight survives its success', async ({ page }) => {
+test('while a reply is in flight the box is read-only; on success the thread leaves Needs you and the conversation records it', async ({
+  page,
+}) => {
   let release = () => {};
   const hold = new Promise<void>((resolve) => {
     release = resolve;
   });
-  const sent = await stubHome(
-    page,
-    [todo('todo-7', 7, 'Split the routing migration', 'confirm', 'build-1')],
-    201,
-    hold,
+  const confirm = todo('todo-7', 7, 'Split the routing migration', 'confirm', 'build-1');
+  const todos = [confirm];
+  const sent = await stubHome(page, todos, 201, hold);
+  let delivered = false;
+  await page.route(`**/api/conversations/${THREAD.id}/messages*`, (route) =>
+    route.fulfill({
+      json: {
+        messages: delivered
+          ? [
+              {
+                id: 'marker-1',
+                role: 'system',
+                createdAt: 2,
+                content: JSON.stringify({
+                  kind: 'thread-message',
+                  todoId: 'todo-7',
+                  seqNum: 7,
+                  title: 'Split the routing migration',
+                  excerpt: 'Do A',
+                  delivered: 'revision',
+                  conversationId: 'build-1',
+                }),
+              },
+            ]
+          : [],
+      },
+    }),
   );
   await page.goto('/app');
   const target = card(page, 'Split the routing migration');
@@ -171,8 +195,10 @@ test('text typed while a reply is in flight survives its success', async ({ page
   await box.fill('Do A');
   await box.press('Enter');
   await expect.poll(() => sent.length).toBe(1);
-  await box.fill('Also do B');
+  await expect(box).not.toBeEditable();
+  todos[0] = { ...confirm, phase: 'planning' };
+  delivered = true;
   release();
-  await expect(target).toContainText('Sent to #7.');
-  await expect(box).toHaveValue('Also do B');
+  await expect(target).toHaveCount(0);
+  await expect(page.getByTestId('thread-message-marker')).toContainText('You told #7 directly: Do A');
 });

@@ -36,7 +36,7 @@ export function ThreadReply({ seq, delivery, onSend, autoFocus, className }: Thr
     setState('sending');
     onSend(text).then(
       () => {
-        setDraft((current) => (current.trim() === text ? '' : current));
+        setDraft('');
         setState('sent');
       },
       () => setState('failed'),
@@ -70,6 +70,7 @@ export function ThreadReply({ seq, delivery, onSend, autoFocus, className }: Thr
         placeholder={t('回复 #{seq}…', { seq })}
         rows={1}
         autoFocus={autoFocus}
+        readOnly={state === 'sending'}
         value={draft}
         onChange={(event) => {
           setDraft(event.target.value);
