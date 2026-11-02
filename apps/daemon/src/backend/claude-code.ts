@@ -881,6 +881,7 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
     cwd: parts.cwd,
     model: parts.modelId,
     permissionMode: 'bypassPermissions',
+    allowDangerouslySkipPermissions: true,
     disallowedTools: parts.disallowedTools,
     ...(parts.builtinTools !== undefined ? { tools: parts.builtinTools } : {}),
     includePartialMessages: true,

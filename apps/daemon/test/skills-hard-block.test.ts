@@ -290,6 +290,7 @@ describe('buildClaudeSdkOptions (spec 14 §post-ruling scope 1/2: settingSources
   test('existing surfaces unregressed: bypass / disallowedTools / partial / model / cwd / sessionId', () => {
     const opts = buildClaudeSdkOptions(baseParts());
     expect(opts.permissionMode).toBe('bypassPermissions');
+    expect(opts.allowDangerouslySkipPermissions).toBe(true);
     expect(opts.disallowedTools).toEqual(['AskUserQuestion']);
     expect(opts.includePartialMessages).toBe(true);
     expect(opts.model).toBe('claude-test');
