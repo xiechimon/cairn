@@ -602,6 +602,8 @@ async function runClaimedStep(
   deps.stepSteeringSupport?.set(stepId, backend.capabilities.steering !== false);
   const modelKey = `${provider?.providerId ?? agent.provider}/${agent.modelId}`;
   logger.raw(`using model ${modelKey}`);
+  if (provider.apiKey !== undefined && provider.apiKey === creds.claudeSubscriptionToken)
+    logger.step(`${provider.providerId} key: team Claude subscription`);
 
   let imageSupport: boolean | null = null;
   if (!isChief) {

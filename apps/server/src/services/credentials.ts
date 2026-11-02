@@ -3,6 +3,7 @@ import {
   type ProviderCompat,
   type ProviderModel,
   type SecretBox,
+  SUBSCRIPTION_PI_PROVIDER_ID,
   stepTakesSecrets,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
@@ -108,11 +109,12 @@ export function resolveStepCredentials(
     provider,
     secrets,
     git: null,
-    claudeSubscriptionToken: openClaudeSubscription(
+    claudeSubscriptionToken: subscriptionTokenFor(
       deps,
       todoRow.teamId,
       stepRow.fallback?.model?.provider ??
         agentForStep(deps.db, todoRow, stepRow.kind, stepRow.prompt)?.provider,
+      provider,
     ),
   };
 }
@@ -131,8 +133,9 @@ export function resolveChiefStepCredentials(
 
   const boxDeps: ProviderDeps & SecretDeps = deps;
   let provider: StepCredentialBundle['provider'] = null;
-  if (agentRow.provider) {
-    const opened = openProviderKey(boxDeps, threadRow.teamId, agentRow.provider);
+  const effectiveProviderId = providerId === undefined ? agentRow.provider : providerId;
+  if (effectiveProviderId) {
+    const opened = openProviderKey(boxDeps, threadRow.teamId, effectiveProviderId);
     if (opened) {
       provider = {
         providerId: opened.row.providerId,
@@ -151,10 +154,21 @@ export function resolveChiefStepCredentials(
     provider,
     secrets: {},
     git: null,
-    claudeSubscriptionToken: openClaudeSubscription(
+    claudeSubscriptionToken: subscriptionTokenFor(
       deps,
       threadRow.teamId,
-      providerId === undefined ? agentRow.provider : providerId,
+      effectiveProviderId,
+      provider,
     ),
   };
+}
+
+function subscriptionTokenFor(
+  deps: CredentialsDeps,
+  teamId: string,
+  effectiveProviderId: string | null | undefined,
+  provider: StepCredentialBundle['provider'],
+): string | undefined {
+  if (effectiveProviderId === SUBSCRIPTION_PI_PROVIDER_ID && provider !== null) return undefined;
+  return openClaudeSubscription(deps, teamId, effectiveProviderId);
 }

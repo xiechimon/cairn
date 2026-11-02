@@ -189,6 +189,8 @@ export function isBackendRuntimeId(v: unknown): v is BackendRuntimeId {
   return typeof v === 'string' && (BACKEND_RUNTIME_IDS as readonly string[]).includes(v);
 }
 
+export const SUBSCRIPTION_PI_PROVIDER_ID = 'anthropic';
+
 export const sessionRefSchema = z.object({
   conversationId: recordId,
   sessionId: z.string().nullable(),
