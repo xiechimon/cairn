@@ -31,6 +31,13 @@ test('fixture: vendor sections pool quota per window and the graph routes every 
   await page.reload();
   await expect(page.getByRole('tab', { name: /Grok 1/ })).toHaveAttribute('aria-selected', 'true');
 
+  await page.getByRole('tab', { name: /Codex 1/ }).click();
+  await page.getByRole('button', { name: '添加 ChatGPT · Codex 账户' }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  const added = new URL(page.url()).searchParams;
+  expect(added.has('vendor') || added.has('tab')).toBe(false);
+  await page.goBack();
+
   await expect(page.getByTestId('routing-section')).toHaveCount(0);
   await page.getByRole('tab', { name: '路由' }).click();
   await expect(page).toHaveURL(/tab=routing/);
@@ -194,53 +201,4 @@ test('live: rename, verify, remove and the Claude usage switch hit the agreed ro
   await page.getByRole('radio', { name: '允许按量付费' }).click();
   await expect.poll(() => calls).toContain('PATCH team allow-paid');
   await expect(page.getByTestId('claude-usage-hint')).toContainText('按 token 付费的 Claude API key');
-});
-
-test('live: machine detail toggles a runtime through enabledRuntimes', async ({ page }) => {
-  const patches: unknown[] = [];
-  const machine = {
-    id: 'm1',
-    name: 'omarchy',
-    teamId: 't1',
-    online: true,
-    latestCliVersion: null,
-    kind: 'remote',
-    enabledRuntimes: ['pi', 'claude-code'],
-    providers: [
-      {
-        runtime: 'claude-code',
-        login: 'logged-in',
-        plan: 'Max',
-        version: '2.1.289',
-        loginCommand: null,
-        enabled: true,
-        observedAt: NOW,
-      },
-      {
-        runtime: 'codex',
-        login: 'logged-out',
-        plan: null,
-        version: '0.98.0',
-        loginCommand: 'codex login',
-        enabled: false,
-        observedAt: NOW,
-      },
-    ],
-  };
-  await mockLive(page, { threads: [], messages: [], machines: [machine] }, (path, route, json) => {
-    if (path === '/api/machines/m1' && route.request().method() === 'PATCH') {
-      const body = route.request().postDataJSON();
-      patches.push(body);
-      return json({ ...machine, ...body });
-    }
-    return undefined;
-  });
-  await page.goto('/app/resources/machines/m1');
-  const section = page.getByTestId('machine-providers');
-  const claudeCode = section.locator('[data-runtime="claude-code"]');
-  const codex = section.locator('[data-runtime="codex"]');
-  await expect(codex.getByTestId('provider-login-command')).toHaveText('codex login');
-  await expect(codex.getByTestId('provider-toggle')).toBeDisabled();
-  await claudeCode.getByTestId('provider-toggle').click();
-  await expect.poll(() => patches).toEqual([{ enabledRuntimes: ['pi'] }]);
 });

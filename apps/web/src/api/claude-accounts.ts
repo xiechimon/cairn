@@ -1,4 +1,4 @@
-import type { ClaudeSubscription, MachineRecord } from '@cairn/shared';
+import type { ClaudeSubscription } from '@cairn/shared';
 
 export const ACCOUNT_STATES = ['ok', 'cooling', 'exhausted', 'expired'] as const;
 export type AccountState = (typeof ACCOUNT_STATES)[number];
@@ -85,20 +85,7 @@ export interface StickyThread {
   since: number;
 }
 
-export type ProviderRuntime = 'claude-code' | 'codex' | 'pi';
-export type ProviderLogin = 'logged-in' | 'logged-out' | 'unknown';
-
-export interface MachineProvider {
-  runtime: ProviderRuntime;
-  login: ProviderLogin;
-  plan: string | null;
-  version: string | null;
-  loginCommand: string | null;
-  enabled: boolean;
-  observedAt: number;
+export interface AccountMachine {
+  id: string;
+  name: string;
 }
-
-export type MachineWithProviders = Pick<MachineRecord, 'id' | 'name' | 'online'> & {
-  enabledRuntimes: readonly string[];
-  providers?: MachineProvider[];
-};

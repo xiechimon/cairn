@@ -1,7 +1,7 @@
 import type {
+  AccountMachine,
   AccountStep,
   ClaudeSubscriptionWire,
-  MachineWithProviders,
   StickyThread,
   SubscriptionAccount,
 } from '../api/claude-accounts.js';
@@ -15,7 +15,7 @@ export interface AccountsContent {
   otherAccounts: SubscriptionAccount[];
   stepsByAccount: Record<string, AccountStep[]>;
   stickiness: StickyThread[];
-  machines: MachineWithProviders[];
+  machines: AccountMachine[];
   providers: { id: string; label: string }[];
   routing: ModelRouting;
 }
@@ -212,77 +212,9 @@ export const ACCOUNT_STICKINESS: StickyThread[] = [
   },
 ];
 
-export const ACCOUNT_MACHINES: MachineWithProviders[] = [
-  {
-    id: MACHINE_REMOTE_ID,
-    name: MACHINE_REMOTE_NAME,
-    online: true,
-    enabledRuntimes: ['pi', 'claude-code'],
-    providers: [
-      {
-        runtime: 'claude-code',
-        login: 'logged-in',
-        plan: 'Max',
-        version: '2.1.289',
-        loginCommand: null,
-        enabled: true,
-        observedAt: NOW - MINUTE,
-      },
-      {
-        runtime: 'codex',
-        login: 'logged-in',
-        plan: 'ChatGPT Pro',
-        version: '0.98.0',
-        loginCommand: null,
-        enabled: true,
-        observedAt: NOW - MINUTE,
-      },
-      {
-        runtime: 'pi',
-        login: 'unknown',
-        plan: null,
-        version: '0.9.3',
-        loginCommand: null,
-        enabled: true,
-        observedAt: NOW - MINUTE,
-      },
-    ],
-  },
-  {
-    id: MACHINE_ID,
-    name: MACHINE_NAME,
-    online: false,
-    enabledRuntimes: ['pi'],
-    providers: [
-      {
-        runtime: 'claude-code',
-        login: 'logged-out',
-        plan: null,
-        version: '2.1.280',
-        loginCommand: 'claude /login',
-        enabled: false,
-        observedAt: NOW - 2 * HOUR,
-      },
-      {
-        runtime: 'codex',
-        login: 'logged-out',
-        plan: null,
-        version: '0.97.2',
-        loginCommand: 'codex login',
-        enabled: false,
-        observedAt: NOW - 2 * HOUR,
-      },
-      {
-        runtime: 'pi',
-        login: 'unknown',
-        plan: null,
-        version: '0.9.3',
-        loginCommand: null,
-        enabled: true,
-        observedAt: NOW - 2 * HOUR,
-      },
-    ],
-  },
+export const ACCOUNT_MACHINES: AccountMachine[] = [
+  { id: MACHINE_REMOTE_ID, name: MACHINE_REMOTE_NAME },
+  { id: MACHINE_ID, name: MACHINE_NAME },
 ];
 
 const CLAUDE_MODELS = ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'];
@@ -369,14 +301,7 @@ export const ACCOUNTS: AccountsContent = {
 export const accountsDefault: FixtureSet = {
   ...resourcesDefault,
   now: NOW,
-  resources: {
-    ...RESOURCES,
-    machines: RESOURCES.machines.map((machine) => {
-      const providers = ACCOUNT_MACHINES.find((m) => m.id === machine.id)?.providers;
-      return providers === undefined ? machine : { ...machine, providers };
-    }),
-    accounts: ACCOUNTS,
-  },
+  resources: { ...RESOURCES, accounts: ACCOUNTS },
 };
 
 export const accountsEmpty: FixtureSet = {

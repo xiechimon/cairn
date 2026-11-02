@@ -35,9 +35,7 @@ import { useI18n } from '../i18n/provider.js';
 import { PageShell } from '../pages/shell.js';
 import { SubscriptionAccounts } from './accounts-view.js';
 import { AddClaudeSubscriptionDialog } from './claude-subscriptions.js';
-import { PROVIDERS_HREF } from './providers-page.js';
-
-export const MODEL_ROUTING_HREF = '/app/resources/model-routing';
+import { MODEL_ROUTING_HREF, PROVIDERS_HREF } from './hrefs.js';
 
 type PageTabId = 'accounts' | 'routing';
 
@@ -88,12 +86,12 @@ export function ModelRoutingPage() {
   const providersQ = useProviders(teamId, live);
   const machinesQ = useMachines(teamId, live);
   const routingQ = useModelRouting(teamId, live);
-  const stickinessQ = useClaudeSubscriptionStickiness(teamId, live);
-  const subscriptionIds = (subscriptionsQ.data ?? []).map((s) => s.id);
-  const renamableIds = new Set(
-    live ? (subscriptionsQ.data ?? []).filter((s) => s.state !== undefined).map((s) => s.id) : [],
-  );
-  const stepsQ = useClaudeSubscriptionSteps(teamId, subscriptionIds, live);
+  const accountApiIds = live
+    ? (subscriptionsQ.data ?? []).filter((s) => s.state !== undefined).map((s) => s.id)
+    : [];
+  const accountApiReady = accountApiIds.length > 0;
+  const stickinessQ = useClaudeSubscriptionStickiness(teamId, live && accountApiReady);
+  const stepsQ = useClaudeSubscriptionSteps(teamId, accountApiIds, live);
   const createSubscription = useCreateClaudeSubscription(teamId);
   const deleteSubscription = useDeleteClaudeSubscription(teamId);
   const renameSubscription = useRenameClaudeSubscription(teamId);
@@ -121,7 +119,7 @@ export function ModelRoutingPage() {
       ];
   const stepsByAccount: Record<string, AccountStep[]> = live
     ? Object.fromEntries(
-        subscriptionIds.flatMap((id, index) => {
+        accountApiIds.flatMap((id, index) => {
           const page = stepsQ[index]?.data;
           return page == null || !Array.isArray(page.steps) ? [] : [[id, page.steps]];
         }),
@@ -212,8 +210,9 @@ export function ModelRoutingPage() {
               setAdding(true);
               return;
             }
-            const params = new URLSearchParams(searchParams);
-            params.set('add', VENDOR_PRESETS[vendor]);
+            const params = new URLSearchParams({ add: VENDOR_PRESETS[vendor] });
+            const scenario = searchParams.get('scenario');
+            if (scenario !== null) params.set('scenario', scenario);
             navigate({ pathname: PROVIDERS_HREF, search: params.toString() });
           }}
           statusFor={(account) =>
@@ -242,7 +241,7 @@ export function ModelRoutingPage() {
             return {
               onRemove,
               onVerify: () => void verify(account),
-              ...(renamableIds.has(account.id)
+              ...(accountApiIds.includes(account.id)
                 ? {
                     onRename: (label: string) =>
                       renameSubscription.mutate(
@@ -326,7 +325,7 @@ export function ModelRoutingPage() {
           <AlertDialogActions
             cancelLabel={t('取消')}
             confirmLabel={t('移除')}
-            confirmDisabled={deleteSubscription.isPending}
+            confirmDisabled={deleteSubscription.isPending || mutations.deleteProvider.isPending}
             onCancel={() => setRemoving(null)}
             onConfirm={() => {
               const target = removing;

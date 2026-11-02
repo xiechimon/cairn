@@ -1,15 +1,7 @@
 import { useState } from 'react';
-import {
-  type MachineWithProviders,
-  type SubscriptionAccount,
-  toClaudeAccount,
-} from '../api/claude-accounts.js';
+import { type SubscriptionAccount, toClaudeAccount } from '../api/claude-accounts.js';
 import { toRoutingGraph } from '../api/model-routing.js';
-import {
-  AccountRow,
-  MachineProvidersCard,
-  PoolWindowCard,
-} from '../components/accounts/account-parts.js';
+import { AccountRow, PoolWindowCard } from '../components/accounts/account-parts.js';
 import { RoutingGraph } from '../components/settings/routing-graph.js';
 import { SettingsCard } from '../components/settings-list.js';
 import {
@@ -24,11 +16,9 @@ import {
 import { r7 } from '../fixtures/core.js';
 import { useI18n } from '../i18n/provider.js';
 import { SubscriptionAccounts } from '../resources/accounts-view.js';
-import { OnlineStatus } from '../resources/parts.js';
 import { Section, Specimen } from './specimen.js';
 
 const NOW = r7(13, 14);
-const TOGGLEABLE: readonly string[] = ['pi', 'claude-code', 'gemini'];
 
 function useAccounts() {
   const [accounts, setAccounts] = useState<SubscriptionAccount[]>(() => [
@@ -47,7 +37,6 @@ function useAccounts() {
 export function AccountsSection() {
   const { t } = useI18n();
   const { accounts, actionsFor } = useAccounts();
-  const [machine, setMachine] = useState<MachineWithProviders | undefined>(ACCOUNT_MACHINES[0]);
   const claude = accounts.filter((a) => a.vendor === 'claude');
   const graph = toRoutingGraph(ACCOUNT_ROUTING, {
     accounts,
@@ -118,30 +107,6 @@ export function AccountsSection() {
             <RoutingGraph jobs={graph.jobs} connections={graph.connections} />
           </div>
         </div>
-      </Specimen>
-      <Specimen
-        title="Providers on one machine"
-        note="shown on the machine detail page: signed in, signed out with its login command, unknown"
-        stage="sheet"
-        code={`<MachineProvidersCard machine={machine} toggleable={canToggle} onToggle={toggle} online={<OnlineStatus on />} />`}
-      >
-        {machine !== undefined && (
-          <div className="w-full">
-            <MachineProvidersCard
-              machine={machine}
-              toggleable={(runtime) => TOGGLEABLE.includes(runtime)}
-              online={<OnlineStatus on={machine.online} />}
-              onToggle={(runtime, next) =>
-                setMachine({
-                  ...machine,
-                  providers: machine.providers?.map((p) =>
-                    p.runtime === runtime ? { ...p, enabled: next } : p,
-                  ),
-                })
-              }
-            />
-          </div>
-        )}
       </Specimen>
     </Section>
   );

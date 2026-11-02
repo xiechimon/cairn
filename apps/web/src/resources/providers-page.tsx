@@ -16,7 +16,7 @@ import { oauthReasonCopy } from '../i18n/oauth-reason.js';
 import { useI18n } from '../i18n/provider.js';
 import { PageShell } from '../pages/shell.js';
 import { CreateProviderDialog } from './create-provider-dialog.js';
-import { MODEL_ROUTING_HREF } from './model-routing-page.js';
+import { MODEL_ROUTING_HREF, PROVIDERS_HREF } from './hrefs.js';
 import {
   ResourceList,
   ResourceNewButton,
@@ -26,8 +26,6 @@ import {
   RowText,
   RowTitle,
 } from './parts.js';
-
-export const PROVIDERS_HREF = '/app/resources/providers';
 
 const RUNTIME_DESCRIPTIONS: Record<ModelSourceRuntime, string> = {
   pi: 'cairn 自有运行时。模型来自你添加的服务商。',
