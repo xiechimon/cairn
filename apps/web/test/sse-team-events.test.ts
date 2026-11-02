@@ -32,17 +32,12 @@ describe('team event → invalidation keys', () => {
     expect(keys).toContain('plans/build-1');
   });
 
-  it('notification: four keys verbatim, the project Coordinator included (the desktop-notification side effect is not in the map)', () => {
+  it('notification: three keys verbatim (the desktop-notification side effect is not in the map)', () => {
     const keys = keysOf({
       type: 'notification',
       notification: { id: 'n-1', type: 'plan_ready', entityId: 'todo-7' },
     });
-    expect(keys).toEqual([
-      `notifications/${TEAM}`,
-      `chiefThreads/${TEAM}`,
-      'projectCoordinator',
-      'todos',
-    ]);
+    expect(keys).toEqual([`notifications/${TEAM}`, `chiefThreads/${TEAM}`, 'todos']);
   });
 
   it('machine_presence carries board todo invalidation (#1257 suspended-state derived); branch_sync single key as usual', () => {

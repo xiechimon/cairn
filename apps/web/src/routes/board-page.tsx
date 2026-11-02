@@ -33,6 +33,7 @@ import { DoneConfirmDialog } from '../board/done-confirm-dialog.js';
 import type { FilterChip, FilterDimension } from '../board/filter-panel.js';
 import { FirstPrCard, firstPrCardInfo } from '../board/first-pr-card.js';
 import { BOARD_VIEW_PARAM } from '../board/home.js';
+import { HomeC } from '../board/home-c.js';
 import { NotificationBanner, useNotificationBanner } from '../board/notify-banner.js';
 import { QuotaBanner, quotaBannerInfo } from '../board/quota-banner.js';
 import {
@@ -42,8 +43,6 @@ import {
 } from '../board/repo-filter.js';
 import { ResetConfirmDialog } from '../board/reset-confirm-dialog.js';
 import { buildTagOptions, matchesTagFilter, parseTagParam } from '../board/tag-filter.js';
-import { ChiefHome } from '../chief/chief-home.js';
-import { HomeSummary } from '../chief/chief-home-summary.js';
 import { useChiefRoot } from '../chief/chief-root.js';
 import { ChiefSettings } from '../chief/chief-settings.js';
 import { cardOrchestration } from '../chief/orchestration-inflight.js';
@@ -62,7 +61,6 @@ import { useI18n } from '../i18n/provider.js';
 import { type NewTaskSurfaceApi, NewTaskSurfaceRoot } from '../overlay/new-task-surface-root.js';
 import { SearchPanel, useSearchState } from '../overlay/search-panel.js';
 import { SHEET_PANEL } from '../pages/shell.js';
-import { TaskPanel } from '../task-panel/task-panel.js';
 
 interface ReorderPatch {
   phase?: TodoRecord['phase'];
@@ -98,6 +96,14 @@ export function BoardPage() {
   const onlyColumn = parseColumnParam(searchParams.get(COLUMN_PARAM));
   const viewParam = searchParams.get(BOARD_VIEW_PARAM);
   const boardView = DEMO_MODE ? viewParam !== 'home' : viewParam === 'board';
+  const homeView = !boardView && onlyColumn == null;
+  const homeProjectId = searchParams.get('project');
+  const homeProjectName =
+    homeProjectId === null
+      ? null
+      : live
+        ? ((projectsQ.data ?? []).find((p) => p.id === homeProjectId)?.name ?? null)
+        : (fixture.projectNames?.[homeProjectId] ?? null);
   const rawProjects = searchParams.get('projects');
   const selectedProjects = useMemo(() => parseProjectsParam(rawProjects), [rawProjects]);
   const selectedProjectSet = useMemo(() => new Set(selectedProjects), [selectedProjects]);
@@ -415,7 +421,7 @@ export function BoardPage() {
     [live, orchestrateStart.orchestrate],
   );
   const orchestrationOf = useCallback(
-    (todo: TodoRecord) => cardOrchestration(chiefThreadsQ.data, todo.seqNum),
+    (todo: TodoRecord) => cardOrchestration(chiefThreadsQ.data, todo),
     [chiefThreadsQ.data],
   );
 
@@ -594,13 +600,19 @@ export function BoardPage() {
     : { ...fixture, todos };
   const quotaInfos = quotaBannerInfo(todos);
   const backupWarning = backupQ.data ?? null;
-  const todoGlances = useMemo(
-    () =>
-      new Map(
-        todos.map((todo) => [todo.id, { phase: todo.phase, seq: todo.seqNum, title: todo.title }]),
-      ),
-    [todos],
-  );
+  const homeBanner =
+    backupWarning != null ? (
+      <BackupBanner notice={backupWarning} />
+    ) : firstPrCard != null ? (
+      <FirstPrCard
+        info={firstPrCard}
+        onDismiss={() => mutations.patchTeam.mutate({ firstPrReportPrompt: { dismissed: true } })}
+      />
+    ) : quotaInfos != null ? (
+      <QuotaBanner infos={quotaInfos} />
+    ) : notifyBanner.visible ? (
+      <NotificationBanner onEnable={notifyBanner.enable} />
+    ) : undefined;
   return (
     <div className="board-shell flex h-full overflow-hidden bg-(--surface-1)" data-route="board">
       <AppSidebar
@@ -618,25 +630,21 @@ export function BoardPage() {
             onBack={() => setChiefView('drawer')}
             machines={fixture.resources?.machines}
           />
+        ) : homeView ? (
+          <HomeC
+            surface={chief}
+            todos={todos}
+            now={live ? Date.now() : fixtureWithTodos.now}
+            projectId={homeProjectName === null ? null : homeProjectId}
+            projectName={homeProjectName}
+            banner={homeBanner}
+            onNewTask={openNewTask}
+            machines={fixtureWithTodos.resources?.machines}
+          />
         ) : (
           <BoardSurface
             fixture={fixtureWithTodos}
-            banner={
-              backupWarning != null ? (
-                <BackupBanner notice={backupWarning} />
-              ) : firstPrCard != null ? (
-                <FirstPrCard
-                  info={firstPrCard}
-                  onDismiss={() =>
-                    mutations.patchTeam.mutate({ firstPrReportPrompt: { dismissed: true } })
-                  }
-                />
-              ) : quotaInfos != null ? (
-                <QuotaBanner infos={quotaInfos} />
-              ) : notifyBanner.visible ? (
-                <NotificationBanner onEnable={notifyBanner.enable} />
-              ) : undefined
-            }
+            banner={homeBanner}
             onAction={(todo) => {
               if (live) {
                 if (todo.phase === 'review' && todo.awaitingReply !== true) openFor(todo, 'accept');
@@ -658,23 +666,11 @@ export function BoardPage() {
             filters={filters}
             onlyColumn={onlyColumn}
             boardView={boardView}
-            renderHome={(home) => (
-              <ChiefHome
-                surface={chief}
-                now={fixtureWithTodos.now}
-                summary={<HomeSummary {...home} />}
-                below={home.sections}
-                brief={home.brief}
-                todoGlances={todoGlances}
-                onNewTask={openNewTask}
-              />
-            )}
             tagsById={tagIndex.tagById}
             onNewTask={openNewTask}
             loading={live && !todosQ.isSuccess}
           />
         )}
-        <TaskPanel fixture={fixtureWithTodos} />
       </div>
       <SearchPanel
         open={search.open}

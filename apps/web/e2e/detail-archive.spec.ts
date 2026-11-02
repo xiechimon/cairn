@@ -188,16 +188,14 @@ test('archived page replaces the composer; unarchive restores it without changin
   expect(unexpected).toEqual([]);
 });
 
-test('archive toast Undo restores the composer immediately and updates sidebar counts', async ({
+test('archive toast Undo restores the composer immediately', async ({
   page,
 }) => {
   const { actions, revisions, unexpected, stopReport } = await setup(page);
   await page.goto('/app/todo/todo-archive');
   await expect(page.getByTestId('composer-card')).toBeVisible();
-  await expect(page.getByTestId('sidebar-thread-row')).toHaveCount(1);
   await archive(page);
   await expect(page.getByTestId('composer-card')).toHaveCount(0);
-  await expect(page.getByTestId('sidebar-thread-row')).toHaveCount(0);
   let releaseUnarchive = () => {};
   const unarchiveAllowed = new Promise<void>((resolve) => {
     releaseUnarchive = resolve;
@@ -213,7 +211,6 @@ test('archive toast Undo restores the composer immediately and updates sidebar c
     releaseUnarchive();
   }
   await expect(page.getByTestId('archived-badge')).toHaveCount(0);
-  await expect(page.getByTestId('sidebar-thread-row')).toHaveCount(1);
   await expect
     .poll(() => actions)
     .toEqual(['/api/todos/todo-archive/archive', '/api/todos/todo-archive/unarchive']);

@@ -74,10 +74,6 @@ export function useNewTaskHotkey(onOpen: () => void): void {
   useHotkey('c', isEditableTarget, onOpen);
 }
 
-export function useChiefNewThreadHotkey(active: boolean, onNewThread: () => void): void {
-  useHotkey('n', isEditableTarget, onNewThread, active);
-}
-
 export function useProjectCycleHotkey(active: boolean, onCycle: () => void): void {
   useLayoutEffect(() => {
     if (!active) return;

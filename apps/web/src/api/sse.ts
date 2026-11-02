@@ -202,7 +202,6 @@ export function startConversationStream(
           void invalidateConverged(qc, { queryKey: ['plans'] });
           if (isChiefConversationId(conversationId)) {
             void invalidateConverged(qc, { queryKey: ['chiefThreads'] });
-            void invalidateConverged(qc, { queryKey: ['projectCoordinator'] });
           }
           onStep?.(step);
           break;

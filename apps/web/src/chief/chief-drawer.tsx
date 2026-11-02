@@ -21,8 +21,6 @@ interface DrawerProps {
   onSettings?: () => void;
   onClose: () => void;
   onSend?: (text: string, projectId: string | null) => void | Promise<void>;
-  onThread?: (title: string, index: number) => void;
-  onNewThread?: () => void;
   onRewind?: (messageId: string) => void;
   onAnswerQuestion?: (input: { requestId: string; answers: AskUserAnswer[] }) => void;
   onCancelQuestion?: (requestId: string) => void;
@@ -32,20 +30,11 @@ interface DrawerProps {
 }
 
 export function ChiefDrawer(props: DrawerProps) {
-  const { open = true, chief } = props;
+  const { open = true } = props;
   const { t } = useI18n();
-  const [threadsOpen, setThreadsOpen] = useState(chief.threadsOpen ?? false);
   const [atBottom, setAtBottom] = useState(true);
   return (
-    <DialogPrimitive.Root
-      open={open}
-      modal={false}
-      disablePointerDismissal
-      onOpenChange={(next: boolean, details?: { reason?: string }) => {
-        if (next) return;
-        if (details?.reason === 'escape-key' && threadsOpen) setThreadsOpen(false);
-      }}
-    >
+    <DialogPrimitive.Root open={open} modal={false} disablePointerDismissal>
       <DialogPrimitive.Portal keepMounted>
         <DialogPrimitive.Popup
           render={<aside className={`${WINDOW_CLS} ${WINDOW_MOTION_CLS}`} aria-label={t('总管')} />}
@@ -58,12 +47,7 @@ export function ChiefDrawer(props: DrawerProps) {
             defaultScrollPosition="end"
           >
             <ChiefFollowArmed onAtBottom={setAtBottom} />
-            <ChiefConversation
-              variant="drawer"
-              {...props}
-              threadsOpen={threadsOpen}
-              setThreadsOpen={setThreadsOpen}
-            />
+            <ChiefConversation variant="drawer" {...props} />
           </MessageScrollerProvider>
         </DialogPrimitive.Popup>
       </DialogPrimitive.Portal>

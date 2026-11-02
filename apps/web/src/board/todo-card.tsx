@@ -33,7 +33,6 @@ import { PROJECT_NAME } from '../fixtures/fixtures.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { PHASE_UI } from '../phase.js';
-import { useOpenTaskInPlace } from '../task-panel/task-panel-root.js';
 import { type CardFace, cardFace } from './columns.js';
 import { orchestrationErrorSummary } from './orchestration-error.js';
 import { relativeTime } from './rel-time.js';
@@ -97,7 +96,6 @@ export function TodoCard({
   const { t } = useI18n();
   const { search } = useLocation();
   const { live } = useLiveData();
-  const openInPlace = useOpenTaskInPlace();
   const face = cardFace(todo);
   const project = live ? projectName : (projectName ?? PROJECT_NAME);
   const suspended = suspension(todo);
@@ -157,7 +155,6 @@ export function TodoCard({
           className="todo-card-link rounded-sm text-inherit no-underline after:absolute after:inset-0 after:content-[''] [-webkit-user-drag:none]"
           to={{ pathname: `/app/todo/${todo.id}`, search }}
           draggable={false}
-          onClick={(event) => openInPlace(event, todo.id)}
         >
           {todo.title}
         </Link>

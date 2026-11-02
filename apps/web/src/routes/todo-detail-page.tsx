@@ -587,7 +587,7 @@ export function TodoDetailPage() {
 
   const actionInFlight =
     live && todo != null && canOrchestrate(todo.phase)
-      ? inflightOrchestrationFor(chiefThreadsQ.data, todo.seqNum) !== null
+      ? inflightOrchestrationFor(chiefThreadsQ.data, todo) !== null
       : false;
 
   if (todo == null) {

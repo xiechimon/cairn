@@ -4,18 +4,43 @@ export function threadTurnInFlight(thread: ChiefThread): boolean {
   return thread.turnQueue != null || thread.activeRun != null;
 }
 
+export interface ThreadOrchestration {
+  todoId: string;
+  state: 'queued' | 'running' | 'failed';
+  error: string | null;
+}
+
+type OrchestratedThread = ChiefThread & { orchestration?: ThreadOrchestration | null };
+
+interface OrchestrationTarget {
+  id: string;
+  seqNum: number;
+}
+
+function reportsOrchestration(thread: OrchestratedThread): boolean {
+  return thread.orchestration !== undefined;
+}
+
+function newest(threads: readonly OrchestratedThread[]): OrchestratedThread | null {
+  return threads.reduce<OrchestratedThread | null>(
+    (best, item) => (best === null || item.createdAt > best.createdAt ? item : best),
+    null,
+  );
+}
+
 export function inflightOrchestrationFor(
-  threads: readonly ChiefThread[] | undefined,
-  seqNum: number,
+  threads: readonly OrchestratedThread[] | undefined,
+  todo: OrchestrationTarget,
 ): ChiefThread | null {
   if (threads === undefined) return null;
-  const title = orchestrateThreadTitle(seqNum);
-  let best: ChiefThread | null = null;
-  for (const thread of threads) {
-    if (thread.title !== title || !threadTurnInFlight(thread)) continue;
-    if (best === null || thread.createdAt > best.createdAt) best = thread;
-  }
-  return best;
+  const title = orchestrateThreadTitle(todo.seqNum);
+  return newest(
+    threads.filter((thread) =>
+      reportsOrchestration(thread)
+        ? thread.orchestration?.todoId === todo.id && thread.orchestration.state !== 'failed'
+        : thread.title === title && threadTurnInFlight(thread),
+    ),
+  );
 }
 
 export interface OrchestrationWait {
@@ -44,20 +69,28 @@ export interface CardOrchestration {
 }
 
 export function cardOrchestration(
-  threads: readonly ChiefThread[] | undefined,
-  seqNum: number,
+  threads: readonly OrchestratedThread[] | undefined,
+  todo: OrchestrationTarget,
 ): CardOrchestration | null {
-  const inflight = inflightOrchestrationFor(threads, seqNum);
+  const inflight = inflightOrchestrationFor(threads, todo);
   if (inflight !== null) return { threadId: inflight.id, wait: orchestrationWait(inflight) };
-  const title = orchestrateThreadTitle(seqNum);
-  const thread = threads
-    ?.filter((item) => item.title === title)
-    .reduce<ChiefThread | null>(
-      (best, item) => (best === null || item.createdAt > best.createdAt ? item : best),
-      null,
+  const title = orchestrateThreadTitle(todo.seqNum);
+  const reported = (threads ?? []).filter(reportsOrchestration);
+  if (reported.length > 0) {
+    const failed = newest(
+      reported.filter(
+        (thread) =>
+          thread.orchestration?.todoId === todo.id && thread.orchestration.state === 'failed',
+      ),
     );
-  if (thread == null) return null;
-  return thread.lastTurnError
-    ? { threadId: thread.id, wait: null, error: thread.lastTurnError }
-    : null;
+    if (failed === null) return null;
+    return {
+      threadId: failed.id,
+      wait: null,
+      error: failed.orchestration?.error ?? failed.lastTurnError ?? '',
+    };
+  }
+  const latest = newest((threads ?? []).filter((thread) => thread.title === title));
+  if (latest === null || !latest.lastTurnError) return null;
+  return { threadId: latest.id, wait: null, error: latest.lastTurnError };
 }
