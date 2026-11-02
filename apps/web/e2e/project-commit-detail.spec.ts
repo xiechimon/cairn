@@ -167,10 +167,8 @@ test('C4 selection state keyed by (projectId, sha): old diff does not follow aft
   await historyRow(page, 'feat: alpha').click();
   await expect(pane(page).locator('.doc-file-row', { hasText: 'alpha.txt' })).toBeVisible();
 
-  await page.evaluate((url) => {
-    history.pushState(null, '', url);
-    dispatchEvent(new PopStateEvent('popstate'));
-  }, `/app/project/${PROJECT_B.id}/files`);
+  await page.locator('[data-slot="sidebar-project-row"]', { hasText: PROJECT_B.name }).click();
+  await page.getByTestId('home-c-project-links').getByRole('link', { name: '文件' }).click();
   await expect(page).toHaveURL(new RegExp(`/app/project/${PROJECT_B.id}/files`));
   await historyTab(page).click();
 

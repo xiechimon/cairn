@@ -81,11 +81,8 @@ export const EN: Record<string, string> = {
   中午好: 'Good afternoon',
   下午好: 'Good afternoon',
   晚上好: 'Good evening',
-  '{running} 个任务运行中，今天合并了 {done} 个':
-    '{running## task|# tasks} running, {done} merged today',
   '，': ', ',
   '{n} 项待你处理': '{n} waiting on you',
-  '，没有需要你的事': ', nothing needs you',
   发给哪个项目: 'Send to which project',
   '发给哪个项目：{name}': 'Send to project: {name}',
   '自动，由总管判断': 'Auto, the Chief decides',
@@ -1472,4 +1469,5 @@ export const EN: Record<string, string> = {
   收起其余: 'Show less',
   首页: 'Home',
   往上滑看更早的对话: 'Scroll up for earlier messages',
+  'Claude 登录需要处理': 'Claude sign-in needs attention',
 };

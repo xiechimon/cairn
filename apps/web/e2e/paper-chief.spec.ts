@@ -58,7 +58,7 @@ for (const theme of ['light', 'dark'] as const) {
     const card = await probe(page, 'backgroundColor', 'var(--card)');
     const secondary = await probe(page, 'backgroundColor', 'var(--secondary)');
 
-    const title = win.getByRole('heading', { name: 'Coordinator', level: 2 });
+    const title = win.getByRole('heading', { name: '总管', level: 2 });
     await expect(title, 'W1').toHaveCSS('font-family', display);
     await expect(title, 'W1').toHaveCSS('font-size', '17px');
     await expect(title, 'W1').toHaveCSS('font-weight', '650');

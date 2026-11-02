@@ -390,8 +390,9 @@ test.describe('push notification click loop (XMON-106)', () => {
     expect(page.url()).toContain('/app');
   });
 
-  test('T4 home: a chief deep link on home opens the target thread in the home chat and strips the param', async ({ page }) => {
+  test('T4 home: a chief deep link on home opens the target thread in the home chat, strips the param, and lets go once the user leaves', async ({ page }) => {
     await stubEventSource(page);
+    await page.addInitScript(() => localStorage.setItem('cairn.sidebarResourcesCollapsed', '0'));
     await mockLiveApi(page);
     await page.goto('/app?chief=chief-bbb');
 
@@ -399,6 +400,12 @@ test.describe('push notification click loop (XMON-106)', () => {
     await expect(home.getByTestId('chief-stream')).toContainText('线程乙的消息');
     await expect.poll(() => page.url()).not.toContain('chief=');
     await expect(page.locator('.chief-drawer')).toHaveCount(0);
+
+    await page.getByRole('link', { name: '技能' }).click();
+    await expect(page).toHaveURL(/\/app\/resources\/skills/);
+    await page.getByRole('complementary').locator('[data-slot="sidebar-nav-row"]', { hasText: '首页' }).click();
+    await expect(home.getByTestId('chief-stream')).toContainText('线程甲的消息');
+    await expect(home.getByTestId('chief-stream')).not.toContainText('线程乙的消息');
   });
 
   test('T4b: chief deep link pointing at a missing thread → drawer does not open, params still cleared', async ({ page }) => {
