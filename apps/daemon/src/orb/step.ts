@@ -8,6 +8,7 @@ import { type RunStepDeps, type RunStepOptions, resumePendingUpload, runStep } f
 import { StepStops } from '../step-stops.js';
 import type { OrbLifecycle } from './lifecycle.js';
 import {
+  isOrbPathId,
   ORB_STEP_METHODS,
   type OrbFrame,
   type OrbStepInput,
@@ -33,7 +34,7 @@ export async function runOrbStep(
     return;
   }
   const stepId = claimed.step.id;
-  if (!/^[a-zA-Z0-9-]+$/.test(stepId)) throw new Error('Invalid orb step id');
+  if (!isOrbPathId(stepId)) throw new Error('Invalid orb step id');
   deps.journal.claim({
     stepId,
     buildId: claimed.step.buildId,
@@ -127,8 +128,7 @@ export async function runOrbStep(
           methods,
         };
         const projectId = claimed.project?.id;
-        if (projectId && !/^[a-zA-Z0-9-]+$/.test(projectId))
-          throw new Error('Invalid orb project id');
+        if (projectId && !isOrbPathId(projectId)) throw new Error('Invalid orb project id');
         const seed =
           claimed.project?.repo?.kind === 'local'
             ? claimed.project.repo.cloneUrl
