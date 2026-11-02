@@ -29,7 +29,7 @@ import { ACT_ORDER, actRank, needsYouThreads, pendingQuestions } from './needs-y
 import { NeedsYouThreadCard } from './needs-you-thread-card.js';
 import { composeRequest } from './open-composer.js';
 import { threadCopy, threadHref, threadStatus, threadTone } from './thread-copy.js';
-import { PANE_PARAM, paneOf, type WorkPane, WorkPanel } from './work-panel.js';
+import { PANE_PARAM, paneOf, type TasksTab, type WorkPane, WorkPanel } from './work-panel.js';
 
 const GREETINGS: [number, string][] = [
   [5, '夜深了'],
@@ -118,6 +118,7 @@ export function HomeC({
   const [allOpen, setAllOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const pane = paneOf(searchParams.get(PANE_PARAM));
+  const [tasksTab, setTasksTab] = useState<TasksTab>('active');
   const showPane = (next: WorkPane | null) => {
     const params = new URLSearchParams(searchParams);
     if (next === null) params.delete(PANE_PARAM);
@@ -324,7 +325,10 @@ export function HomeC({
         variant="ghost"
         data-testid="in-progress-pill"
         aria-pressed={pane === 'tasks'}
-        onClick={() => showPane('tasks')}
+        onClick={() => {
+          setTasksTab('active');
+          showPane('tasks');
+        }}
         className="h-7 gap-2 self-start rounded-full bg-card px-3 text-meta font-normal text-content-secondary shadow-(--e1) hover:bg-card hover:text-foreground dark:hover:bg-card"
       >
         <span aria-hidden="true" className="size-1.5 rounded-full bg-running" />
@@ -448,6 +452,8 @@ export function HomeC({
               : schedules.filter((schedule) => schedule.projectId === projectId)
           }
           now={now}
+          tab={tasksTab}
+          onTab={setTasksTab}
           onClose={() => showPane(null)}
         />
       )}

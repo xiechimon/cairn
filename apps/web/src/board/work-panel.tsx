@@ -1,5 +1,4 @@
 import { PackageCheck } from 'lucide-react';
-import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { EmptyState } from '../components/empty-state.js';
 import { SegmentedTabs } from '../components/segmented.js';
@@ -22,7 +21,7 @@ export function paneOf(value: string | null): WorkPane | null {
   return value === 'tasks' || value === 'made' ? value : null;
 }
 
-type TasksTab = 'active' | 'next' | 'scheduled';
+export type TasksTab = 'active' | 'next' | 'scheduled';
 
 const live = (todo: TodoRecord) => todo.archivedAt == null;
 
@@ -31,13 +30,14 @@ interface WorkPanelProps {
   todos: readonly TodoRecord[];
   schedules: readonly ScheduleRecord[];
   now: number;
+  tab: TasksTab;
+  onTab: (tab: TasksTab) => void;
   onClose: () => void;
 }
 
-export function WorkPanel({ pane, todos, schedules, now, onClose }: WorkPanelProps) {
+export function WorkPanel({ pane, todos, schedules, now, tab, onTab, onClose }: WorkPanelProps) {
   const { t } = useI18n();
   const navigate = useNavigate();
-  const [tab, setTab] = useState<TasksTab>('active');
   const title = pane === 'tasks' ? t('任务') : t('成果');
   const row = (todo: TodoRecord, tone = threadTone(todo)) => (
     <ThreadRow
@@ -66,7 +66,7 @@ export function WorkPanel({ pane, todos, schedules, now, onClose }: WorkPanelPro
           <>
             <SegmentedTabs
               value={tab}
-              onChange={setTab}
+              onChange={onTab}
               label={t('任务视图')}
               options={[
                 { value: 'active', label: t('进行中') },

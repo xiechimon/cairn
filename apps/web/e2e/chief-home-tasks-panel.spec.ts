@@ -70,10 +70,19 @@ test('Made shows an empty state when nothing has finished', async ({ page }) => 
   await expect(madePanel(page).getByTestId('made-empty')).toBeVisible();
 });
 
-test('the in-progress pill opens the Tasks panel', async ({ page }) => {
+test('the in-progress pill opens the Tasks panel on In progress', async ({ page }) => {
   await page.goto(HOME);
   await page.getByTestId('in-progress-pill').click();
   await expect(panel(page)).toBeVisible();
+  await expect(panel(page)).toContainText('Push for finished threads');
+
+  await panel(page).getByRole('tab', { name: '定时' }).click();
+  await madeButton(page).click();
+  await page.getByTestId('in-progress-pill').click();
+  await expect(panel(page).getByRole('tab', { name: '进行中' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
   await expect(panel(page)).toContainText('Push for finished threads');
 });
 
