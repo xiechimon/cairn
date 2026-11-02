@@ -980,8 +980,19 @@ export function decideRetroProposal(
     throw new HttpError(404, `retro proposal ${proposalId}`);
   if (row.status !== 'draft') throw new HttpError(409, `retro proposal is already ${row.status}`);
   const now = Date.now();
-  let todoId: string | null = null;
-  if (decision === 'accept') {
+  db.transaction(() => {
+    const claimed = db
+      .update(retroProposal)
+      .set({
+        status: decision === 'accept' ? 'accepted' : 'dismissed',
+        decidedAt: now,
+        decidedBy: deps.user.id,
+      })
+      .where(and(eq(retroProposal.id, proposalId), eq(retroProposal.status, 'draft')))
+      .returning({ id: retroProposal.id })
+      .get();
+    if (claimed === undefined) throw new HttpError(409, 'retro proposal is already decided');
+    if (decision !== 'accept') return;
     const spec = [
       row.what,
       '',
@@ -991,7 +1002,7 @@ export function decideRetroProposal(
       '',
       `出处：${row.sourceLabel}（${row.sourceKind} ${row.sourceId}），来自 ${rec.day} 的日报复盘。`,
     ].join('\n');
-    todoId = createTodo(deps, {
+    const todoId = createTodo(deps, {
       teamId,
       projectId: row.projectId,
       title: row.title,
@@ -999,16 +1010,8 @@ export function decideRetroProposal(
       createdBy: deps.user.id,
       ownerId: deps.user.id,
     }).id;
-  }
-  db.update(retroProposal)
-    .set({
-      status: decision === 'accept' ? 'accepted' : 'dismissed',
-      todoId,
-      decidedAt: now,
-      decidedBy: deps.user.id,
-    })
-    .where(eq(retroProposal.id, proposalId))
-    .run();
+    db.update(retroProposal).set({ todoId }).where(eq(retroProposal.id, proposalId)).run();
+  });
   const reportRow = db
     .select()
     .from(chiefMessage)
