@@ -75,24 +75,10 @@
     },
     {
       "file": "apps/web/src/board/sidebar.tsx",
-      "anchor": "bg-(--hover-1) font-semibold text-foreground [&>svg:first-child]:text-(--card-button)",
-      "role": "indicator",
-      "reason": "Active sidebar row icon. DESIGN.md shell: active row = flat --hover-1 fill + accent icon.",
-      "contrast": "measured 2026-10-25 in the fixture build (light / dark): 9.14 / 6.90 on the composited --hover-1 row; non-text glyph, 3:1 gate"
-    },
-    {
-      "file": "apps/web/src/board/sidebar.tsx",
       "anchor": "const RAIL_ACTIVE = `bg-(--hover-1) text-(--card-button)",
       "role": "indicator",
       "reason": "Collapsed-rail twin of the active row icon (icon-only rows).",
       "contrast": "measured 2026-10-25 in the fixture build (light / dark): same fill as the expanded active row (9.14 / 6.90); non-text glyph, 3:1 gate"
-    },
-    {
-      "file": "apps/web/src/board/sidebar.tsx",
-      "anchor": "${RAIL_BTN} text-(--card-button)",
-      "role": "indicator",
-      "reason": "Rail 新任务 plus glyph. DESIGN.md 侧栏: 新任务 carries a terracotta plus.",
-      "contrast": "apps/web/DESIGN.md 颜色 (accent on sheet 4.99, measured in PR #1369); non-text glyph, 3:1 gate"
     },
     {
       "file": "apps/web/src/phase.ts",
