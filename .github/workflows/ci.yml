@@ -92,6 +92,10 @@ jobs:
       - name: Orb canary scratch runner (#2277)
         run: node --test scripts/ops/orb/canary-stack.test.mjs
 
+      - name: Review gate reviewer routing and checkout
+        if: ${{ !cancelled() }}
+        run: node --test scripts/ops/review-gate/checkout.test.mjs scripts/ops/review-gate/reviewer-route.test.mjs scripts/ops/review-gate/fallback.test.mjs scripts/ops/review-gate/size-facts.test.mjs
+
       - name: PR evidence regression tests
         run: python3 scripts/pr-evidence-gate.test.py
 

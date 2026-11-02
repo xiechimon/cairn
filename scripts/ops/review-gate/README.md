@@ -20,6 +20,8 @@ Files:
 - `reviewer-route.mjs`: the fallback and stall decisions, imported by the script.
 - `size-facts.test.mjs`, `verdict.test.mjs`, `glob.test.mjs`, `rearm.test.mjs`, `reviewer-route.test.mjs`, `fallback.test.mjs` (runs the script against a fake host): the checks the unit runs in `ExecStartPre` (`node verdict.test.mjs review-gate.mjs` from this directory; `fixture-1828.txt` is its input).
 
+Each round, after fetching `origin/main`, the gate detaches its checkout (`~/lanes/cairn`) at `origin/main`, because reviewers read base files from that tree. If the tree has tracked local changes, the round is refused with an error instead of reviewing against stale files.
+
 The host currently runs its own copy under `~/.cairn/tools/review-gate/`; this directory holds the same code so changes go through a PR. To run it from a checkout instead, point the unit's `ExecStart` and `ExecStartPre` at a checkout of `origin/main` with a drop-in.
 
 Known limits: reasoning effort is low, and an Anthropic-authored PR with no usable non-Anthropic model still waits, now with the stall alert.
