@@ -695,6 +695,67 @@ export const chiefMessage = sqliteTable('chief_message', {
   createdAt: epochMs('createdAt').notNull(),
 });
 
+export interface ChiefReportSourceRef {
+  kind: 'coordinator' | 'thread' | 'step';
+  id: string;
+  label: string;
+  todoId: string | null;
+  projectId: string | null;
+}
+
+export interface ChiefReportInputs {
+  covers: string;
+  coversStart: number;
+  coversEnd: number;
+  refs: Record<string, ChiefReportSourceRef>;
+  projects: Record<string, string>;
+  truncated: string[];
+}
+
+export const chiefReport = sqliteTable(
+  'chief_report',
+  {
+    id: text('id').primaryKey(),
+    chiefId: text('chiefId').notNull(),
+    teamId: text('teamId').notNull(),
+    day: text('day').notNull(),
+    threadId: text('threadId').notNull(),
+    status: text('status')
+      .$type<'running' | 'retrying' | 'posted' | 'failed' | 'empty'>()
+      .notNull(),
+    attempts: integer('attempts').notNull().default(0),
+    stepId: text('stepId'),
+    inputs: json<ChiefReportInputs | null>('inputs'),
+    pushedAt: epochMs('pushedAt'),
+    createdAt: epochMs('createdAt').notNull(),
+  },
+  (t) => [uniqueIndex('chief_report_chief_day_unique').on(t.chiefId, t.day)],
+);
+
+export const retroProposal = sqliteTable(
+  'retro_proposal',
+  {
+    id: text('id').primaryKey(),
+    reportId: text('reportId').notNull(),
+    teamId: text('teamId').notNull(),
+    projectId: text('projectId').notNull(),
+    title: text('title').notNull(),
+    what: text('what').notNull(),
+    why: text('why').notNull(),
+    safeguard: text('safeguard').notNull(),
+    sourceKind: text('sourceKind').$type<'coordinator' | 'thread' | 'step'>().notNull(),
+    sourceId: text('sourceId').notNull(),
+    sourceLabel: text('sourceLabel').notNull(),
+    sourceTodoId: text('sourceTodoId'),
+    status: text('status').$type<'draft' | 'accepted' | 'dismissed'>().notNull().default('draft'),
+    todoId: text('todoId'),
+    decidedAt: epochMs('decidedAt'),
+    decidedBy: text('decidedBy'),
+    createdAt: epochMs('createdAt').notNull(),
+  },
+  (t) => [index('retro_proposal_report_idx').on(t.reportId)],
+);
+
 export const attachment = sqliteTable('attachment', {
   todoId: text('todoId'),
   sha256: text('sha256'),

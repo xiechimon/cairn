@@ -86,7 +86,7 @@ for (const theme of ['light', 'dark'] as const) {
 
       const g = await geometry(menu, 'a.user-menu-row');
       expect(g.clipped).toBe(false);
-      expect(g.radii).toHaveLength(8);
+      expect(g.radii).toHaveLength(9);
       for (const radius of g.radii) expect(radius).toBe(g.outer - g.pad);
       expect(g.gapLeft).toBeCloseTo(g.pad, 0);
       expect(g.gapRight).toBeCloseTo(g.pad, 0);

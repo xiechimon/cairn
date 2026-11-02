@@ -22,6 +22,7 @@ import {
   Layers,
   Network,
   Puzzle,
+  Route,
   Search,
   Server,
   Users,
@@ -39,6 +40,7 @@ const NAV_ROWS = [
   { label: '密钥', Icon: Key, href: '/app/resources/secrets' },
   { label: '机器', Icon: Server, href: '/app/resources/machines' },
   { label: '模型服务', Icon: Layers, href: '/app/resources/providers' },
+  { label: '模型路由', Icon: Route, href: '/app/resources/model-routing' },
 ];
 
 const ROW_BASE =

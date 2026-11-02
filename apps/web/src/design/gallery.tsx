@@ -43,6 +43,7 @@ import {
 } from './foundations.js';
 import { TextureSection } from './foundations-texture.js';
 import { ProvidersPattern } from './patterns.js';
+import { AccountsSection } from './product-accounts.js';
 import { ProductBoardSection } from './product-board.js';
 import { ProductChiefSection } from './product-chief.js';
 import { ProductDetailSection } from './product-detail.js';
@@ -117,6 +118,7 @@ const NAV = [
       ['coordinator', 'Coordinator stream'],
       ['side-panel', 'Side panel, title menus'],
       ['routing', 'Model routing'],
+      ['accounts', 'Accounts'],
     ],
   },
   {
@@ -301,6 +303,7 @@ export function Gallery() {
           <CoordinatorStreamSection />
           <PanelSection />
           <RoutingSection />
+          <AccountsSection />
           <GroupTitle
             id="patterns"
             title="Patterns"

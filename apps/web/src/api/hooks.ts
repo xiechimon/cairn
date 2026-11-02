@@ -41,6 +41,7 @@ import type {
   PatchChiefBody,
   PatchMachineBody,
   PatchProjectBody,
+  PatchProviderBody,
   PatchTeamBody,
   PatchUserBody,
   PlanRow,
@@ -51,6 +52,7 @@ import type {
   ProjectTreeResponse,
   ProviderPreset,
   ProviderRecord,
+  RetroProposal,
   ScheduleRecord,
   SearchResponse,
   SecretRecord,
@@ -918,6 +920,11 @@ export function useApiMutations(teamId: string | undefined) {
       mutationFn: (id: string) => api.del<void>(`/api/teams/${teamId}/providers/${id}`),
       onSuccess: invalidateAll,
     }),
+    patchProvider: useMutation({
+      mutationFn: (input: { id: string; body: PatchProviderBody }) =>
+        api.patch<ProviderRecord>(`/api/teams/${teamId}/providers/${input.id}`, input.body),
+      onSuccess: invalidateAll,
+    }),
     createSecret: useMutation({
       mutationFn: (body: SetSecretBody) =>
         api.post<SecretRecord>(`/api/teams/${teamId}/secrets`, body),
@@ -967,6 +974,14 @@ export function useApiMutations(teamId: string | undefined) {
     }),
     deleteAgent: useMutation({
       mutationFn: (id: string) => api.del<void>(`/api/teams/${teamId}/agents/${id}`),
+      onSuccess: invalidateAll,
+    }),
+    decideRetroProposal: useMutation({
+      mutationFn: (input: { proposalId: string; decision: 'accept' | 'dismiss' }) =>
+        api.post<RetroProposal>(
+          `/api/teams/${teamId}/chief/retro-proposals/${input.proposalId}/${input.decision}`,
+          {},
+        ),
       onSuccess: invalidateAll,
     }),
     deleteMemory: useMutation({

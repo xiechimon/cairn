@@ -1,3 +1,4 @@
+import { accountsDefault, accountsEmpty } from './accounts.js';
 import { demoFixture } from './demo.js';
 import {
   agentDelete,
@@ -294,6 +295,8 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       '10-cc-legacy': resourcesCcLegacy,
       'machines-chief-state': machinesChiefState,
       'machines-claude-login': machinesClaudeLogin,
+      'model-routing': accountsDefault,
+      'model-routing-empty': accountsEmpty,
       'r8-78': boardR8Overlay,
       'r8-79': detailR8Confirm(),
       'r8-80': detailR8Confirm(),

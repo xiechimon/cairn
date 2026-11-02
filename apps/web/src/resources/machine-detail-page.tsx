@@ -1,9 +1,11 @@
+import { MACHINE_RUNTIMES, type MachineRuntime } from '@cairn/shared';
 import { Monitor } from 'lucide-react';
 import { useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router';
 import { useApiMutations, useMachines, useMembers, useModelSources } from '../api/hooks.js';
 import { mapMachines, mapTeam, RUNTIME_LABELS, toModelOptions } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
+import { ProviderRow } from '../components/accounts/account-parts.js';
 import { EmptyState } from '../components/empty-state.js';
 import {
   SETTINGS_SELECT_TRIGGER_CLS,
@@ -24,6 +26,9 @@ import { CreateAgentDialog } from '../routes/create-agent-dialog.js';
 import { TeamAgentGrid } from '../routes/team-agent-grid.js';
 import { CONCURRENCY_SOURCE_LABEL, MACHINES_HREF } from './machines-page.js';
 import { OnlineStatus } from './parts.js';
+
+const isMachineRuntime = (value: string): value is MachineRuntime =>
+  (MACHINE_RUNTIMES as readonly string[]).includes(value);
 
 export function MachineDetailPage() {
   const { t } = useI18n();
@@ -189,6 +194,44 @@ export function MachineDetailPage() {
             </Button>
           </SettingsRow>
         </SettingsCard>
+
+        {machine.providers !== undefined && machine.providers.length > 0 && (
+          <section data-testid="machine-providers" className="flex flex-col gap-2">
+            <h2 className="m-0 px-1 text-card-title font-medium text-foreground">
+              {t('登录与运行时')}
+            </h2>
+            <SettingsCard>
+              {machine.providers.map((provider) => {
+                const runtime = provider.runtime;
+                const toggleable = isMachineRuntime(runtime);
+                return (
+                  <ProviderRow
+                    key={runtime}
+                    provider={{
+                      ...provider,
+                      enabled: toggleable
+                        ? (machine.enabledRuntimes ?? []).includes(runtime)
+                        : provider.enabled,
+                    }}
+                    toggleable={toggleable && live}
+                    pending={mutations.patchMachine.isPending}
+                    onToggle={(next) => {
+                      if (!toggleable) return;
+                      const current = (machine.enabledRuntimes ?? []).filter(isMachineRuntime);
+                      const enabledRuntimes = next
+                        ? [...new Set([...current, runtime])]
+                        : current.filter((r) => r !== runtime);
+                      mutations.patchMachine.mutate(
+                        { id: machineId, body: { enabledRuntimes } },
+                        { onError: (error) => toastError(t('保存失败，请重试。'), error) },
+                      );
+                    }}
+                  />
+                );
+              })}
+            </SettingsCard>
+          </section>
+        )}
 
         <TeamAgentGrid
           agents={homeAgents}

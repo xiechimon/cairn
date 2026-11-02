@@ -11,7 +11,7 @@ import {
 
 export type ThreadReplyDelivery = 'steer' | 'revision' | 'restart';
 
-const HINT: Record<ThreadReplyDelivery, string> = {
+export const THREAD_REPLY_HINT: Record<ThreadReplyDelivery, string> = {
   steer: '直接发给 #{seq}，插进它这一轮。',
   revision: '作为改计划的意见发给 #{seq}，不算批准。',
   restart: '#{seq} 会带着这句话重跑。',
@@ -55,7 +55,7 @@ export function ThreadReply({ seq, delivery, onSend, autoFocus, className }: Thr
       ? t('已发给 #{seq}。', { seq })
       : state === 'failed'
         ? t('没发出去，再试一次。')
-        : t(HINT[delivery], { seq });
+        : t(THREAD_REPLY_HINT[delivery], { seq });
 
   return (
     <InputGroup

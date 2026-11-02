@@ -26,6 +26,7 @@ import {
   chiefDigestContentSchema,
   chiefModelFallbackContentSchema,
   chiefNoticeContentSchema,
+  chiefReportContentSchema,
   chiefTurnErrorContentSchema,
   chiefTurnStoppedContentSchema,
   classifySkillFact,
@@ -78,6 +79,7 @@ import type {
   WorkStep,
 } from '../fixtures/records.js';
 import { activityLabel } from './activity.js';
+import type { MachineProvider } from './claude-accounts.js';
 import type { ApiKeyRow, PlanRow, StepRow } from './hooks.js';
 
 function queueLabel(queue: NonNullable<StepRow['queue']>): {
@@ -1117,7 +1119,9 @@ export function mapApiKeys(rows: ApiKeyRow[]): DisplayApiKey[] {
   }));
 }
 
-export function mapMachines(rows: MachineRecord[]): MachineRow[] {
+export function mapMachines(
+  rows: (MachineRecord & { providers?: MachineProvider[] })[],
+): MachineRow[] {
   const local = rows.filter((m) => m.kind === 'local');
   const attached = rows.filter((m) => m.kind !== 'local');
   return [...local, ...attached].map((m) => ({
@@ -1138,6 +1142,7 @@ export function mapMachines(rows: MachineRecord[]): MachineRow[] {
     ...(m.concurrencySource !== undefined ? { concurrencySource: m.concurrencySource } : {}),
     ...(m.concurrencyRange !== undefined ? { concurrencyRange: m.concurrencyRange } : {}),
     ...(m.claudeLogin !== undefined ? { claudeLogin: m.claudeLogin } : {}),
+    ...(m.providers !== undefined ? { providers: m.providers } : {}),
   }));
 }
 
@@ -1375,6 +1380,12 @@ function collectChiefStream(
       if (notice.success) {
         pendingTools = [];
         items.push({ kind: 'robot', markdown: notice.data.message, seconds: '', id: m.id });
+        continue;
+      }
+      const dailyReport = chiefReportContentSchema.safeParse(parsed);
+      if (dailyReport.success) {
+        pendingTools = [];
+        items.push({ kind: 'daily-report', id: m.id, report: dailyReport.data });
         continue;
       }
       const digest = chiefDigestContentSchema.safeParse(parsed);
