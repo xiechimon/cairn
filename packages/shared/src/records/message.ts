@@ -349,6 +349,14 @@ export function projectConvertedNote(input: {
   return `项目形态已从 local 转换为 GitHub（${input.githubRepo}${accel}）。`;
 }
 
+export const CHIEF_MESSAGES_PAGE_LIMIT = 100;
+
+export const conversationMessagesQuerySchema = z.object({
+  before: z.string().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(CHIEF_MESSAGES_PAGE_LIMIT),
+});
+export type ConversationMessagesQuery = z.infer<typeof conversationMessagesQuerySchema>;
+
 export const conversationMessagesResponseSchema = z.object({
   messages: z.array(transcriptRowSchema),
   chips: z.unknown(),

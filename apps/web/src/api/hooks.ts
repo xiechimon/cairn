@@ -71,6 +71,7 @@ import type {
 import { backupHealthSchema, backupNotice, SKILL_ENTRY_FILE } from '@cairn/shared';
 import {
   keepPreviousData,
+  useInfiniteQuery,
   useMutation,
   useQueries,
   useQuery,
@@ -224,6 +225,26 @@ export const useMessages = (conversationId: string | null | undefined, enabled: 
       api.get<ConversationMessagesResponse>(`/api/conversations/${conversationId}/messages`),
     enabled: enabled && conversationId != null,
   });
+
+export function useChiefMessages(threadId: string | null, enabled: boolean) {
+  const query = useInfiniteQuery({
+    queryKey: ['messages', threadId, 'pages'],
+    queryFn: ({ pageParam }) =>
+      api.get<ConversationMessagesResponse>(
+        `/api/conversations/${threadId}/messages${
+          pageParam !== null ? `?before=${encodeURIComponent(pageParam)}` : ''
+        }`,
+      ),
+    initialPageParam: null as string | null,
+    getNextPageParam: (last) => (typeof last.nextCursor === 'string' ? last.nextCursor : null),
+    enabled: enabled && threadId != null,
+  });
+  const messages = useMemo(
+    () => [...(query.data?.pages ?? [])].reverse().flatMap((page) => page.messages),
+    [query.data],
+  );
+  return { query, messages };
+}
 
 export const usePlans = (buildId: string | null | undefined, enabled: boolean) =>
   useQuery({

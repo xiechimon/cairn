@@ -53,9 +53,11 @@ import { MENTION_TEXTAREA_CLS, MentionHighlight } from '../overlay/mention-highl
 import { MentionInline } from '../overlay/mention-inline.js';
 import type { MentionGroups } from '../overlay/mention-token.js';
 import { SlashHelp, SlashMenu } from '../overlay/slash-menu.js';
+import { ChiefEarlierLoader } from './chief-earlier-loader.js';
 import { ChiefStreamRow, chiefStreamRowKey, TurnElapsedContext } from './chief-message-rows.js';
 import { ChiefFallbackBanner, ChiefOutageBanner } from './chief-outage-banner.js';
 import { ProjectMenu } from './project-menu.js';
+import type { ChiefEarlier } from './use-chief-surface.js';
 
 const HEAD_ICON_BTN_CLS =
   "size-6 cursor-pointer justify-center rounded-none border-none bg-transparent p-0 text-(--text-tertiary) hover:bg-transparent hover:text-(--text-tertiary) dark:hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
@@ -120,6 +122,7 @@ export interface ChiefConversationProps {
   onWithdraw?: (messageId: string) => Promise<void>;
   onSteer?: (messageId: string) => void;
   onStop?: () => void;
+  earlier?: ChiefEarlier;
   hero?: ReactNode;
   below?: ReactNode;
   heroCollapsed?: boolean;
@@ -151,6 +154,7 @@ export function ChiefConversation({
   onWithdraw,
   onSteer,
   onStop,
+  earlier,
   hero,
   below,
   heroCollapsed = false,
@@ -236,7 +240,7 @@ export function ChiefConversation({
   );
   const [toolsOpen, setToolsOpen] = useState<Set<number>>(() => new Set());
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
-  const copyText = (key: string, text: string) => {
+  const copyText = useCallback((key: string, text: string) => {
     const clip = navigator.clipboard;
     if (!clip) return;
     void clip.writeText(text).then(
@@ -246,14 +250,21 @@ export function ChiefConversation({
       },
       () => {},
     );
-  };
-  const toggleTools = (i: number) =>
-    setToolsOpen((cur) => {
-      const next = new Set(cur);
-      if (next.has(i)) next.delete(i);
-      else next.add(i);
-      return next;
-    });
+  }, []);
+  const toggleTools = useCallback(
+    (i: number) =>
+      setToolsOpen((cur) => {
+        const next = new Set(cur);
+        if (next.has(i)) next.delete(i);
+        else next.add(i);
+        return next;
+      }),
+    [],
+  );
+  const requestRewind = useCallback(
+    (index: number, id: string | null) => setRewindConfirm({ index, id }),
+    [],
+  );
   const [liveDraft, setLiveDraft] = useState(() =>
     live ? readStoredChiefDraft(draftStorageKey) : initialDraft,
   );
@@ -378,6 +389,7 @@ export function ChiefConversation({
   const empty = (chief.stream?.length ?? 0) === 0;
   const heroLayout = home && empty && !heroCollapsed;
   const heroScrollRef = useRef<HTMLDivElement | null>(null);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
   useScrollFade(heroScrollRef, { enabled: heroLayout });
   const stopMode =
     targetPlaceholder === null &&
@@ -430,7 +442,7 @@ export function ChiefConversation({
       onCopy={copyText}
       toolsOpen={toolsOpen}
       onToggleTools={toggleTools}
-      onRewindRequest={(index, id) => setRewindConfirm({ index, id })}
+      onRewindRequest={requestRewind}
       onAnswerQuestion={onAnswerQuestion}
       onCancelQuestion={onCancelQuestion}
     />
@@ -572,7 +584,7 @@ export function ChiefConversation({
         <>
           {intro}
           <MessageScroller className={SCROLLER_ROOT_CLS}>
-            <FadeScrollerViewport data-testid="chief-body">
+            <FadeScrollerViewport ref={viewportRef} data-testid="chief-body">
               <MessageScrollerContent
                 className={home ? SCROLLER_CONTENT_HOME_CLS : SCROLLER_CONTENT_CLS}
                 data-testid="chief-stream"
@@ -599,6 +611,14 @@ export function ChiefConversation({
               <ArrowDown width={16} height={16} />
               <span className="sr-only">{t('滚动到最新')}</span>
             </JumpToLatestButton>
+            {earlier != null && (
+              <ChiefEarlierLoader
+                earlier={earlier}
+                hasEarlier={chief.hasEarlier === true}
+                rowCount={rows.length}
+                viewportRef={viewportRef}
+              />
+            )}
           </MessageScroller>
         </>
       )}

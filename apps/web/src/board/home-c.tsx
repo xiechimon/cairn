@@ -365,7 +365,7 @@ export function HomeC({
       {banner != null && (
         <div className="mx-auto w-[calc(100%-2rem)] max-w-182 flex-none pt-3">{banner}</div>
       )}
-      <MessageScrollerProvider defaultScrollPosition="start">
+      <MessageScrollerProvider defaultScrollPosition="end">
         <ChiefConversation
           variant="global"
           chief={{ ...chiefData, stream: conversation, examples: undefined }}
@@ -384,6 +384,7 @@ export function HomeC({
           onWithdraw={surface.onWithdraw}
           onSteer={surface.onSteer}
           onStop={surface.onStop}
+          earlier={surface.earlier}
           onSettings={() => surface.setChiefView('settings')}
           hero={hero}
           lead={lead}

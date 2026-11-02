@@ -13,8 +13,8 @@ import { activityStore } from '../api/activity.js';
 import {
   useApiMutations,
   useChief,
+  useChiefMessages,
   useChiefThreads,
-  useMessages,
   useNotifications,
 } from '../api/hooks.js';
 import { liveTextStore } from '../api/live-text.js';
@@ -41,8 +41,15 @@ import {
 
 export type { ChiefView };
 
+export interface ChiefEarlier {
+  loading: boolean;
+  failed: boolean;
+  onLoad: () => void;
+}
+
 export interface ChiefSurface {
   load: CoordinatorLoad;
+  earlier?: ChiefEarlier;
   retry: () => void;
   chiefView: ChiefView;
   setChiefView: (view: ChiefView) => void;
@@ -152,7 +159,10 @@ export function useChiefSurface(
     onHome,
     place,
   ]);
-  const chiefMessagesQ = useMessages(live ? (activeThread?.id ?? null) : null, live);
+  const { query: chiefMessagesQ, messages: chiefMessages } = useChiefMessages(
+    live ? (activeThread?.id ?? null) : null,
+    live,
+  );
   const streamHandlers = useMemo(
     () => ({
       onMessage: (row: TranscriptRow) => {
@@ -169,11 +179,7 @@ export function useChiefSurface(
     streamHandlers,
   );
   const activeThreadId = live ? (activeThread?.id ?? null) : null;
-  const chiefMessagesData = chiefMessagesQ.data;
-  const knownChiefIds = useMemo(
-    () => new Set((chiefMessagesData?.messages ?? []).map((m) => m.id)),
-    [chiefMessagesData],
-  );
+  const knownChiefIds = useMemo(() => new Set(chiefMessages.map((m) => m.id)), [chiefMessages]);
   const liveText = useSyncExternalStore(liveTextStore.subscribe, () =>
     activeThreadId !== null ? liveTextStore.getVisible(activeThreadId, knownChiefIds) : '',
   );
@@ -189,26 +195,38 @@ export function useChiefSurface(
   const activity = useSyncExternalStore(activityStore.subscribe, () =>
     activeThreadId !== null ? activityStore.get(activeThreadId) : null,
   );
+  const hasEarlier = chiefMessagesQ.hasNextPage;
   const liveChief = useMemo(() => {
     if (!live || !chiefQ.data) return null;
-    return mapChief(chiefQ.data, {
-      threads: liveThreads,
-      activeThreadId: activeThread?.id ?? null,
-      messages: chiefMessagesQ.data?.messages ?? [],
-      liveText,
-      liveThinking,
-      activity,
-    });
+    return {
+      ...mapChief(chiefQ.data, {
+        threads: liveThreads,
+        activeThreadId: activeThread?.id ?? null,
+        messages: chiefMessages,
+        liveText,
+        liveThinking,
+        activity,
+      }),
+      hasEarlier,
+    };
   }, [
     live,
     chiefQ.data,
     liveThreads,
     activeThread,
-    chiefMessagesQ.data,
+    chiefMessages,
+    hasEarlier,
     liveText,
     liveThinking,
     activity,
   ]);
+  const { fetchNextPage, isFetchingNextPage, isFetchNextPageError } = chiefMessagesQ;
+  const loadEarlier = useCallback(() => {
+    void fetchNextPage();
+  }, [fetchNextPage]);
+  const earlier: ChiefEarlier | undefined = live
+    ? { loading: isFetchingNextPage, failed: isFetchNextPageError, onLoad: loadEarlier }
+    : undefined;
 
   const chiefData = live ? (liveChief ?? chiefDefault) : (chief ?? chiefDefault);
   const liveUnread = live
@@ -310,6 +328,7 @@ export function useChiefSurface(
 
   return {
     load,
+    earlier,
     retry,
     chiefView,
     setChiefView,

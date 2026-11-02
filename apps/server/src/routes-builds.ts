@@ -2,6 +2,7 @@ import {
   type BuildRecord,
   buildStepActionBodySchema,
   buildStopBodySchema,
+  conversationMessagesQuerySchema,
   createBranchSyncBodySchema,
   planRowSchema,
   startBuildsBodySchema,
@@ -28,7 +29,8 @@ import {
   requestStop,
   startBuilds,
 } from './services/builds.js';
-import { chiefThreadMessages, getChiefThread } from './services/chief.js';
+import { getChiefThread } from './services/chief.js';
+import { chiefMessagePage } from './services/coordinator.js';
 import { createSerialConnection } from './services/events.js';
 import {
   projectOfTodo,
@@ -68,9 +70,10 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
     if (isChiefConversation(conversationId)) {
       const thread = getChiefThread(svc, conversationId);
       if (!thread) throw notFound(`conversation ${conversationId}`);
-      const rows = chiefThreadMessages(ctx.db, conversationId);
+      const query = parseWith(conversationMessagesQuerySchema, c.req.query(), 'query');
+      const page = chiefMessagePage(svc, conversationId, query);
       return c.json({
-        messages: rows.map((r) => ({
+        messages: page.messages.map((r) => ({
           id: r.id,
           role: r.role,
           content: r.content,
@@ -80,7 +83,7 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
         historyEpoch: 0,
         steerPending: [],
         activeRun: thread.activeRun,
-        nextCursor: null,
+        nextCursor: page.hasEarlier ? (page.messages[0]?.id ?? null) : null,
       });
     }
     const rows = ctx.db
