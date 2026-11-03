@@ -82,7 +82,6 @@ const DETAIL = [
   'accent-typo',
   'attachment-strip',
   'avatar-spiral',
-  'branch-button',
   'cds-composer',
   'cds-dialogs',
   'cds-transcript',
