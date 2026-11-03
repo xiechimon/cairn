@@ -1,4 +1,4 @@
-# A super-agent over per-project coordinators: how two-layer agent systems govern many projects
+# A super-agent over per-project coordinators: Claude Projects, and how two-layer agent systems govern many projects
 
 Researched 2026-11-03 for ian's proposal: a team-level super-agent (`总管`, after the DeepSeek DSH super-agent) on top of one coordinator per project, each like a Claude Project (instructions, knowledge, chats), each running its own threads (one claude-code or codex session each). Clicking a project in the sidebar opens that project's coordinator; clicking a task opens its thread.
 
@@ -6,25 +6,22 @@ Evidence labels: **measured** means this research ran it or read it in the produ
 
 ## 0. Conclusions
 
-1. **A Claude Project is not a coordinator (measured).** In claude.ai, two chats in one project are independent conversations. Both followed the project instructions, but the second chat could not see a code word given in the first; Claude replied that chats in one project do not share conversation content automatically and that only what is written into project documents is visible to every chat (§1.2). What a project shares is scope: instructions, files and, when memory is on, a separate per-project memory. So "Claude Projects + a super-agent on top" gives **super-agent → project scope → threads**, which is option (c) below, not a stack of three agents.
-2. **None of the two-layer systems studied adds a per-project agent layer under the router.** They govern many projects with scope and rules, not agents:
-   - **DSH** scopes one super-agent to one repository; a second repository is a second deployment with its own profile, state directory, worker slots and panel (read: README, `docs/006-deployment.md`).
-   - **sig** runs one steward over all of the owner's repos and routes each message to a Thread by explicit reference, a mentioned repo name, full-text match and recency. Each repo gets a 1,500-character project note layer and a serial/parallel setting (read: `docs/design/steward.md` §2.3, §3).
-   - **Rakazo** has no router. The user picks a bot ("one bot per job"), and hard isolation is a space (read: `docs/bots-and-chats.md`, `docs/spaces.md`).
-   - **Amp** has one personal Puck over projects that hold only configuration (read: docs).
-   - **Anthropic** describes two levels, with routing as a classify-then-dispatch step (read).
-3. **Where a middle coordinator exists, it is per effort and temporary.** Cursor Projects (one coordinator per "feature, migration, or full app"), Devin's managed-Devin coordinator and Factory Missions start a coordinator for a bounded body of work and drop it when the work ends. They grow a middle layer when one effort has many parallel workers, not when the account has many repos (read).
-4. **cairn already tried per-project coordinators and reverted them.** #2500 shipped one Coordinator conversation per project on 2026-11-01. D58 reverted it the same day, because ian found his attention scattered, and #2547 merged the conversations into one. D66 then made a sidebar project "the Coordinator in that project's context" (measured: commits `5c0659184`, `608eabac0`).
-5. **The data does not call for it yet.** Over the last 7 days, all 13 active todos were in one of 4 active projects, and 423 of 425 Coordinator messages had no project tag (measured, production database, read-only).
-6. **Recommendation:** keep one super-agent, the Coordinator, and give each project what Claude Projects and sig give it:
-   - instructions and project-scoped memory;
-   - a project chat view that is the same Coordinator filtered and primed with that project;
-   - per-project concurrency and priority;
-   - project-scoped secrets.
+1. **"Claude Projects" is now two products, and only the new one has a per-project coordinator.**
+   - **Chat Projects (claude.ai chat, unchanged):** a scope of instructions, knowledge files and independent chats, plus a separate memory per project when memory is on. Chats do not see each other (measured on ian's account; Matthew Esposito, 2026-10-29).
+   - **Redesigned Projects (Claude Code, beta since 2026-09-17, waitlist fully admitted 2026-10-09):** "threads that do the work and a coordinator that directs them". Each thread is "a Claude Code cloud session working on its own branch and copy of the repo". A shared project memory "every thread now adds to and draws from", a library and routines complete it. The user briefs the coordinator "the way you'd brief a chief of staff" and can open any thread to steer it (read: claude.com/blog/projects-redesigned; demoed in AI Foundations, 2026-10-12).
 
-   Add an on-demand effort coordinator thread only when one effort needs several parallel threads. Six PRs (§6); four decisions for ian (§7).
+   So ian's reading, "each project has its own coordinator and its own threads", is accurate for the redesigned Projects. Anthropic puts **no team-level layer above** them: memory and the library are per project only.
+2. **Two vendors converged on a per-project coordinator in September 2026.** Cursor Projects (2026-09-10) and Claude Code Projects (2026-09-17) both run one coordinator per project. The coordinator plans and routes but does not do the work, uses a cheaper setting than its workers (Claude: coordinator effort low, thread effort medium), and keeps a task view. Neither adds a super-agent over projects (read).
+3. **The router-style super-agents do not put an agent under the router per project.** They govern many projects with scope and rules:
+   - **DSH** scopes one super-agent to one repository; a second repository is a second deployment with its own profile, state, worker slots and panel.
+   - **sig** runs one steward over all repos, routes deterministically first and asks when unsure, and gives each repo a 1,500-character note layer and a serial/parallel setting.
+   - **Rakazo** lets the user pick a bot per job and walls work off with spaces.
+   - **Amp** runs one personal Puck over projects that hold configuration only (read, §3).
+4. **So ian's three-level shape exists only in halves.** Coordinator-per-project → threads is shipped by Anthropic and Cursor. A super-agent over several projects is shipped by sig and Amp, but over project scopes, not over project agents. Nobody studied ships both stacked (inferred from §3, §4).
+5. **cairn tried per-project Coordinator chats and reverted them.** #2500 shipped them on 2026-11-01; D58 reverted them the same day ("attention is scattered"), and #2547 merged them into one thread (measured: commits `5c0659184`, `608eabac0`). Last 7 days: all 13 active todos in one of 4 projects; 423 of 425 Coordinator messages untagged (measured, production database, read-only).
+6. **Recommendation.** First build the project scope that every shape needs: instructions, project memory, a scoped project view, per-project concurrency and priority, project secrets (P1–P5, §6). Then adopt Anthropic's shape as option (d): one coordinator per project, which alone dispatches that project's threads. Above them goes a thin team router that never dispatches; it only routes messages, holds team-wide rules and merges every project's "needs you" into one inbox. The router is the DSH rule ("router does not plan"), the merged inbox is sig's, and the merged inbox answers D58's attention complaint. Run (d) behind a flag on one project first. Four decisions for ian (§7).
 
-## 1. The shape ian proposes, and what a Claude Project really is
+## 1. The shape ian proposes, and what Claude Projects really are
 
 ### 1.1 The proposal
 
@@ -40,21 +37,23 @@ flowchart TB
   ian -.task row.-> T1
 ```
 
-### 1.2 Claude Projects, operated
+### 1.2 Chat Projects versus redesigned Projects
 
-Walked 2026-11-03 in claude.ai on ian's account (Max plan, Opus 5.5), with a probe project named "cairn probe: project chats":
+Videos from the last three months, newest first. Transcripts were pulled with agent-reach `yt_sub.py`, and timestamps come from the caption track.
 
-| Step | Observation | Label |
-|---|---|---|
-| Create project | The project page has a composer ("New session in …"), **Instructions**, **Context** (files) and **Scheduled** (scheduled tasks). Empty-state copy: "Claude references the same knowledge every time you talk to it in this project." In the sidebar, the pinned project shows its chats nested under it | measured |
-| Instructions | Set to "End every reply with the tag [PROBE]." The instructions dialog says they work "alongside your profile instructions" | measured |
-| Chat A | "Remember… the code word for this project is BLUE-HERON-42." Reply: it would remember the word "in this conversation" and offered to save it as a project document so other chats could see it. The reply ended with `[PROBE]` | measured |
-| Chat B (new session, same project) | Asked for the code word using any past-chat or memory tool. Claude used 2 tools, searched the project files, found nothing, said it has no tool to read other chats and that memory is off on this account, and explained that chats in one project do not share conversation content. The reply ended with `[PROBE]` | measured |
-| Per-project memory | When memory is on, "Claude creates a separate memory for each project", described as "a safety guardrail that keeps sensitive conversations contained" | read (claude.com/blog/memory, 2025-09-11) |
+| Video | What it shows |
+|---|---|
+| **Matthew Esposito, "How to Use Claude Projects (2026 Update)"**, Matthew Esposito \| AI, 2026-10-29, https://www.youtube.com/watch?v=U-WtXdXdcKY | Chat Projects. [2:15] a project is "a workspace with 3 things: your files, your instructions, and your chats in one spot". [7:08] instructions apply "in every chat in this project and only this project". [8:37] starts a new chat in the project, which uses the files unprompted. [8:37–9:20] "Memory is a separate layer and each project gets its own", next to account-level memory and instructions. No coordinator, no cross-chat sharing |
+| **AI Foundations, "Claude Projects Just Got Rebuilt (Full Guide)"**, AI Foundations, 2026-10-12, https://www.youtube.com/watch?v=MLl41Q9p3Ps | Redesigned Projects. [0:21] "They've added threads. They've added a coordinator agent. They've added a library". [1:03–2:09] one central prompt bar; the coordinator "decides what are the things that we need to do", breaks them into threads and "comes back with one unified plan". [2:30] projects for ongoing work or work with a finish line, to archive afterwards. [10:57] a threads panel: "you're no longer the one creating new threads". [12:44–13:05] settings pick a coordinator model and effort (default low) and a thread model and effort (default medium). [13:25–14:49] the memory tab holds project instructions, "loaded in at the beginning of every single new thread", and a `memory.md` that "will be accessible across every thread the coordinator agent creates". [16:14] the coordinator splits a request into two threads; [17:39] one thread receives "a message from the coordinator" about the other's results. [19:24] a "waiting on you" list. [20:26] talking straight to a thread: "I'm not even talking to the coordinator agent here. The thread agent will notify the coordinator if it needs to". [21:07] routines (scheduled tasks) run from the project |
+| **Eliot Prince, "3 Levels of Claude MEMORY Clearly Explained"**, Eliot Prince, 2026-08-31, https://www.youtube.com/watch?v=EV-NSTvb1kQ | Memory around chat Projects. [0:41] a new memory settings tab, then rolling out. [3:34] account memory works "across both chat and co-work". [7:44–8:04] project context is "a sandboxed area… so you're not getting cross-contamination across your projects". [8:45–9:06] per-project memory goes "much deeper" than general memory |
 
-So a Claude Project is a **scope**: instructions, files, scheduled tasks and its own memory, shared by independent chats. No agent sits over the chats, and nothing coordinates or dispatches work between them. Mapped onto cairn, project scope ≈ Claude Project, threads ≈ the chats inside it, and the super-agent is the one Coordinator. That is the "Claude Projects with a `总管` on top" shape without a per-project agent.
+Primary source for the redesign: Anthropic, "Projects redesigned", claude.com/blog/projects-redesigned, 2026-09-17. It covers beta access for select Pro and Max users of Claude Code cloud sessions, local execution "coming very soon", and chat and Cowork getting the update later. It warns that "projects can reach usage limits faster" and offers per-project usage and model/effort choice for coordinator and threads (read).
 
-The probe project is still in ian's claude.ai project list; the Archive menu item did not take effect. Delete it by hand if unwanted.
+ian's chat Projects, checked before the switch to videos (2026-11-03, measured): two chats in one project both followed the project instructions, but the second could not see a code word given in the first. A probe project, "cairn probe: project chats", is left in ian's claude.ai list (Archive did not take effect); delete it by hand.
+
+**Answer to "independent chats or a project-level agent?":**
+- **Chat Projects:** independent chats sharing instructions, files and a per-project memory; there is no project-level agent.
+- **Redesigned Projects:** a project-level coordinator agent with a persistent conversation, a shared `memory.md` that every thread reads and writes, and a library. Threads report to it and can be talked to directly.
 
 ## 2. What cairn does today
 
@@ -101,6 +100,7 @@ flowchart LR
 | Cursor Projects (2026-09-10) | a Project = "a feature, a migration, or a full app" | plans and delegates but "doesn't write code itself"; owns the task tracker (workers can read it, not edit it); shared Project Context; subscriptions to a Slack channel, a schedule or PRs; asks before using a new machine | until the effort ends; child coordinators exist |
 | Devin managed Devins | Devin "automatically breaks down large tasks" or the user asks to parallelize | spin up, message, sleep or terminate children; woken when a child finishes or needs input; children auto-approved unless turned off | one task |
 | Factory Missions | large multi-feature work (1–500 features) | the orchestrator manages workers; "you can talk to it"; validation per feature | one mission |
+| Claude Code Projects, redesigned (beta 2026-09-17) | one per project, for ongoing work or work with a finish line | coordinator routes work to new or existing threads; each thread is a Claude Code cloud session on its own branch; shared `memory.md` and library; "waiting on you" list; routines; coordinator effort low, thread effort medium by default | as long as the project; archive when done |
 
 ### 3.3 What this means for the five questions
 
@@ -171,32 +171,59 @@ flowchart LR
 5. **Starvation (a, c).** A busy project fills every machine slot. Fix: a per-project limit and a reserved slot for ian's own messages (DSH).
 6. **Runaway fan-out (effort thread).** Anthropic saw "spawning 50 subagents for simple queries". Fix: only the Coordinator opens an effort thread, with a child cap.
 
+### 5.3 Option (d): project coordinators under a thin team router
+
+The redesigned Claude Projects, with DSH's routing rule on top and sig's single inbox:
+
+```mermaid
+flowchart TB
+  ian((ian)) --> R[team router<br/>no dispatch, no planning<br/>team rules · merged inbox]
+  ian -.sidebar: project.-> PC1
+  R -->|message for cairn| PC1[cairn coordinator<br/>sole dispatcher for cairn<br/>instructions · memory.md]
+  R -->|message for B| PC2[B coordinator]
+  PC1 --> t1[thread] & t2[thread]
+  PC2 --> t3[thread]
+  ian -.task row, talk directly.-> t1
+  t1 & t2 & t3 -.needs you / done.-> R
+```
+
+| Concern from §5.1 | How (d) answers it | Residual risk |
+|---|---|---|
+| Conflicting dispatch | only a project's coordinator opens threads in that project; the router has no dispatch tool | cross-project work needs one coordinator to ask another (Amp Agent to Agent), which is slower |
+| Lost decisions | a verdict on a todo goes to its project's coordinator by `projectId`, deterministically. Team-wide verdicts ("pause everything") are code (`team.autonomyPaused`), not a model's memory | a verdict about a project stated in the team chat must be routed; sig's ask-when-unsure rule covers it |
+| Extra hop | messages typed in a project view skip the router; team-level messages route by deterministic signals first and use the model only when ambiguous | ambiguous team-level messages pay one cheap routing turn |
+| UI and attention (D58) | one home inbox merges every project's "needs you" and done cards, and each project gets one chat with a threads panel (the Claude Code Projects layout) | N project chats exist again, but the inbox, not the chats, is where attention goes |
+| D60 | each project coordinator is the thin router for its project: it routes to threads and does not plan the work itself | — |
+| D72 | one Pi Durable session per project coordinator plus the router; idle projects cost nothing if sessions start lazily | N summaries and recoveries to operate |
+| Cost | Anthropic's defaults put the coordinator at low effort and threads at medium | more model turns than (c) when several projects are active |
+
 ## 6. Recommendation and PR sketch
 
-Adopt (c): the Coordinator is the `总管`, a project is a Claude-Project-like scope, and threads stay as they are. Do not add a permanent per-project agent.
+Build the project scope first (P1–P5); every shape needs it, and it is (c) on its own. Then move to (d) behind a flag on one project (P6–P8). Keep the single Coordinator as the default until (d) has run on real work. P6–P8 replace the earlier "effort coordinator thread" idea: a per-project coordinator covers it.
 
 | PR | Scope | Route |
 |---|---|---|
 | P1 `server(project): project instructions` | `project.instructions` column (drizzle migration) and a settings field; injected into Coordinator turns scoped to the project and into thread prompts for its todos, after the repo's `AGENTS.md` | owner (migration) |
-| P2 `server(chief): project-scoped Coordinator memory` | memories written in a project-scoped turn get that `projectId`; `injectMemories({ agentId, projectId })`; team-wide stays `null`; scope = the todo's project, else the composer pick | normal |
-| P3 `web(sidebar): project view = scoped Coordinator` | a project click opens the Coordinator timeline filtered by project, composer pinned, scope chip, Tasks panel filtered; a structured `scopeProjectId` on the turn replaces the text prefix | normal |
+| P2 `server(chief): project-scoped memory` | memories written in a project-scoped turn get that `projectId`; `injectMemories({ agentId, projectId })`; team-wide stays `null`; scope = the todo's project, else the composer pick | normal |
+| P3 `web(sidebar): project view` | a project click opens a project chat with a threads panel and the Tasks panel filtered; a structured `scopeProjectId` on the turn replaces the text prefix | normal |
 | P4 `server(dispatch): per-project concurrency and priority` | `project.maxConcurrent` and `project.priority` checked at claim alongside machine limits; ian's own message wakes take a reserved slot | owner (machine claim files, TLA+ rerun) |
 | P5 `server(secrets): project-scoped secrets` | `secret.projectId` (nullable = team); a step gets only its project's and team secrets | owner + `/security-review` (credentials surface) |
-| P6 `server(chief): effort coordinator thread` (later, behind a flag) | a thread kind that can only create child todos, message children and read its tracker; children wake it; child cap; ian can talk to it (D65 ②) | owner (Coordinator tools) |
-
-Optional alongside P3: sig's ask-when-ambiguous rule for project routing, plus a small routing eval.
+| P6 `server(chief): project coordinator sessions` (flag) | one Coordinator session per project in the sidecar, started lazily; dispatch tools limited to its own project; coordinator and thread model/effort set per project | owner (Coordinator tools, D72 replay rules) |
+| P7 `server(chief): team router` (flag) | team-level messages routed by deterministic signals (todo mention, project name, current view), then a model pick with ask-when-ambiguous; no dispatch tools; a small routing eval as a check | owner |
+| P8 `web(home): merged inbox across projects` | the home "needs you" and done cards from every project coordinator and thread in one list, each tagged with its project | normal |
 
 ## 7. Decisions for ian
 
-1. **Shape.** Recommended: (c), one `总管` with Claude-Project-style scopes. Alternative: (b), which reopens D58 and adds a model hop and a second writer.
-2. **Project memory default.** Recommended: memories from a project-scoped turn stay project-only, and ian promotes one to team-wide when he wants. Alternative: team-wide by default.
-3. **Isolation strength.** Recommended: project-scoped secrets inside one team (P5). Alternative: a hard wall per client (a separate team, like Rakazo's spaces) for work that must never mix.
-4. **Effort coordinator (P6).** Recommended: defer until one effort needs more than about 3 parallel threads. Alternative: build now.
+1. **Shape.** Recommended: P1–P5 now, then (d) behind a flag, which partly reopens D58 by bringing back project chats while keeping one inbox. Alternatives: stop at (c), one Coordinator with project scopes; or (b) exactly as proposed, with a dispatching super-agent.
+2. **Project memory default.** Recommended: memories from a project's turns stay project-only, and ian promotes one to team-wide when he wants. Alternative: team-wide by default.
+3. **Isolation strength.** Recommended: project-scoped secrets inside one team (P5). Alternative: a hard wall per client (a separate team, like Rakazo's spaces).
+4. **Which project pilots (d).** Recommended: cairn itself, the only project with activity in the last 7 days. Alternative: a quieter project, for lower risk.
 
 ## 8. Not done
 
 - Cursor Projects, Amp Puck, Devin and Factory were read from official docs and changelogs, not operated.
-- The Claude Projects walk ran with account memory off, so per-project memory is cited from Anthropic's announcement, not observed.
+- The redesigned Claude Code Projects were not operated: the walk on ian's account used chat Projects, and the coordinator behaviour is cited from Anthropic's post and the AI Foundations video.
+- Per-project memory in chat Projects is cited from Anthropic's announcement and the videos; the account walked had memory off.
 - DSH and sig were read at pinned commits, not run in this round (DSH was installed and walked earlier in `docs/research/dsh-sig-walk-2026-11.md`). Rakazo was read from its docs at `3d0887f`.
 - No measurement of an extra hop's tokens or latency on cairn's own sidecar.
 
@@ -207,7 +234,7 @@ Optional alongside P3: sig's ask-when-ambiguous rule for project routing, plus a
 - Rakazo at `3d0887f` (2026-11-02): `docs/bots-and-chats.md`, `docs/spaces.md`, `docs/memory.md`, `docs/groups.md`, `docs/fleet-management.md`, `docs/run-execution.md`, `docs/computer.md`
 - Amp: https://ampcode.com/docs/puck ; https://ampcode.com/news/meet-puck (2026-07-20); https://ampcode.com/docs/projects
 - Anthropic: https://www.anthropic.com/engineering/building-effective-agents ; https://www.anthropic.com/engineering/multi-agent-research-system
-- Claude Projects: https://support.claude.com/en/articles/9517075-what-are-projects ; https://claude.com/blog/memory ; walk on claude.ai, 2026-11-03 (§1.2)
+- Claude Projects: https://support.claude.com/en/articles/9517075-what-are-projects ; https://claude.com/blog/memory ; https://claude.com/blog/projects-redesigned (2026-09-17); videos in §1.2 (U-WtXdXdcKY, MLl41Q9p3Ps, EV-NSTvb1kQ); walk on claude.ai, 2026-11-03
 - Claude Code: https://code.claude.com/docs/en/sub-agents ; https://code.claude.com/docs/en/agent-teams
 - Cursor: https://cursor.com/changelog/projects (2026-09-10); https://cursor.com/docs/release-notes/cloud-agents
 - Devin: https://docs.devin.ai/work-with-devin/advanced-capabilities ; https://docs.devin.ai/product-guides/memory ; https://docs.devin.ai/product-guides/knowledge
