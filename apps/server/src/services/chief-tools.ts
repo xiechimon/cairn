@@ -100,6 +100,7 @@ export interface ChiefToolCtx {
   conversationId: string;
   turnPrompt?: string | null;
   turnScopeProjectId?: string | null;
+  turnScopeMixed?: boolean;
 }
 
 function skillAuditActor(ctx: ChiefToolCtx): { type: 'member' | 'agent'; id: string } {
@@ -1032,7 +1033,14 @@ export async function executeChiefTool(
     case 'save_memory': {
       if (ctx.chiefAgentId === null)
         throw new HttpError(409, 'chief agent not bound — memory has no store');
-      const projectId = optStr(params, 'projectId') ?? ctx.turnScopeProjectId ?? null;
+      const explicitProject = optStr(params, 'projectId');
+      if (explicitProject === undefined && ctx.turnScopeMixed === true) {
+        throw new HttpError(
+          400,
+          'this turn now covers more than one project: pass projectId so the memory lands in the right project',
+        );
+      }
+      const projectId = explicitProject ?? ctx.turnScopeProjectId ?? null;
       const sourceTodoId = optStr(params, 'sourceTodoId') ?? null;
       if (projectId !== null) requireProjectRow(db, projectId, ctx.teamId);
       if (sourceTodoId !== null) requireTeamTodo(db, sourceTodoId, ctx.teamId);

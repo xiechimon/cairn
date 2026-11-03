@@ -279,7 +279,7 @@ function chiefClaimPayload(
     );
     if (hint) routeSection = formatSkillRouteSection(hint);
   }
-  const memories = injectMemories(deps.db, { agentId: agentRow.id });
+  const memories = injectMemories(deps.db, { agentId: agentRow.id, projectId: null });
   const projectSection = digest
     ? null
     : projectTurnContext(deps.db, {

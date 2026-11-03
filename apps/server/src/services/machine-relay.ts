@@ -7,8 +7,8 @@ import {
   FIXED_TAGS,
   updateSkillToolParamsSchema,
 } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
-import { agent, build, chief, chiefThread, type step, todo } from '../db/schema.js';
+import { and, eq, gte } from 'drizzle-orm';
+import { agent, build, chief, chiefMessage, chiefThread, type step, todo } from '../db/schema.js';
 import { HttpError, parseWith } from '../lib/errors.js';
 import { attachWorkerFile } from './agent-attachments.js';
 import { NotFoundError } from './builds.js';
@@ -129,10 +129,28 @@ export async function executeRelayToolCall(
       conversationId: threadId,
       turnPrompt: row.prompt,
       turnScopeProjectId: stepScopeProjectId(row),
+      turnScopeMixed: steeredFromAnotherScope(deps, row),
     },
     name,
     params,
   );
+}
+
+export function steeredFromAnotherScope(deps: MachineDeps, row: typeof step.$inferSelect): boolean {
+  if (row.claimedAt === null) return false;
+  const scope = stepScopeProjectId(row);
+  return deps.db
+    .select({ projectId: chiefMessage.projectId })
+    .from(chiefMessage)
+    .where(
+      and(
+        eq(chiefMessage.threadId, row.buildId),
+        eq(chiefMessage.role, 'user'),
+        gte(chiefMessage.createdAt, row.claimedAt),
+      ),
+    )
+    .all()
+    .some((message) => message.projectId !== scope);
 }
 
 async function executeWorkerMemoryToolCall(

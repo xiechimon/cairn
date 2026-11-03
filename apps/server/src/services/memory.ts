@@ -260,8 +260,10 @@ export function promoteMemoryEntry(
   );
   const row = db.select().from(agentMemory).where(where).get();
   if (row === undefined) return null;
-  db.update(agentMemory).set({ projectId: null, updatedAt: nowMs() }).where(where).run();
-  return { ...row, projectId: null };
+  if (row.projectId === null) return row;
+  const updatedAt = nowMs();
+  db.update(agentMemory).set({ projectId: null, updatedAt }).where(where).run();
+  return { ...row, projectId: null, updatedAt };
 }
 
 export function deleteMemoryEntry(

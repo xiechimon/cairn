@@ -1,7 +1,9 @@
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
-import { agentMemory } from '../src/db/schema.js';
+import { agentMemory, chiefMessage, step } from '../src/db/schema.js';
+import { nowMs } from '../src/lib/ids.js';
 import { composeChiefSystemPrompt } from '../src/services/chief.js';
+import { steeredFromAnotherScope } from '../src/services/machine-relay.js';
 import { saveMemoryEntry } from '../src/services/memory.js';
 import { AGENT_ID, H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
 import { postProject, req } from './helpers.js';
@@ -61,6 +63,58 @@ describe('Coordinator memory is scoped by project (D74 P2)', () => {
   });
 });
 
+describe('a turn that was steered into another project (D74 P2)', () => {
+  test('save_memory without a project is refused once the turn covers two projects', async () => {
+    await expect(
+      relay(
+        'save_memory',
+        { title: 'ambiguous', content: 'which project?' },
+        { turnScopeProjectId: H.projectId, turnScopeMixed: true },
+      ),
+    ).rejects.toThrow(/pass projectId/);
+    const other = await postProject(H.s.app, 'other');
+    const saved = (await relay(
+      'save_memory',
+      { title: 'explicit', content: 'for other', projectId: other },
+      { turnScopeProjectId: H.projectId, turnScopeMixed: true },
+    )) as { projectId: string | null };
+    expect(saved.projectId).toBe(other);
+  });
+
+  test('a user message from another project after the turn was claimed marks the turn mixed', async () => {
+    const other = await postProject(H.s.app, 'other');
+    const claimedAt = nowMs() - 1000;
+    H.s.db
+      .insert(step)
+      .values({
+        id: 'turn-a',
+        buildId: H.threadId,
+        kind: 'chief',
+        status: 'claimed',
+        prompt: 'plan it',
+        scopeProjectId: H.projectId,
+        claimedAt,
+        createdAt: claimedAt - 10,
+      })
+      .run();
+    const turn = H.s.db
+      .select()
+      .from(step)
+      .all()
+      .find((row) => row.id === 'turn-a')!;
+    const message = (id: string, projectId: string | null, createdAt: number) =>
+      H.s.db
+        .insert(chiefMessage)
+        .values({ id, threadId: H.threadId, role: 'user', content: id, projectId, createdAt })
+        .run();
+    message('own', H.projectId, claimedAt - 5);
+    message('same-project', H.projectId, claimedAt + 5);
+    expect(steeredFromAnotherScope(toolDeps() as never, turn)).toBe(false);
+    message('other-project', other, claimedAt + 10);
+    expect(steeredFromAnotherScope(toolDeps() as never, turn)).toBe(true);
+  });
+});
+
 describe('promoting a project memory to team-wide (D74 P2)', () => {
   test('promote clears the project so every turn and thread sees it', async () => {
     const row = seedMemory('promote me', 'reviews need two vendors', H.projectId);
@@ -74,6 +128,12 @@ describe('promoting a project memory to team-wide (D74 P2)', () => {
     const stored = H.s.db.select().from(agentMemory).where(eq(agentMemory.id, row.id)).get();
     expect(stored?.projectId).toBeNull();
     expect(composeChiefSystemPrompt(toolDeps(), H.teamId)).toContain('promote me');
+    const again = await req(
+      H.s.app,
+      'POST',
+      `/api/teams/${H.teamId}/agents/${AGENT_ID}/memories/${row.id}/promote`,
+    );
+    expect(again.status).toBe(200);
   });
 
   test('promoting a memory of another agent or a missing memory is 404', async () => {
