@@ -164,7 +164,7 @@ export function DiffFileBlock({
                       {t('{n} 行未改动', { n: unmodifiedBefore(file.hunks, hi) })}
                     </div>
                   )}
-                  <div className="diff-hunk-head bg-(--secondary) pl-18 font-mono text-code leading-6 text-(--text-tertiary) [font-variant-ligatures:none]">
+                  <div className="bg-(--secondary) pl-18 font-mono text-code leading-6 text-(--text-tertiary) [font-variant-ligatures:none]">
                     {hunk.header}
                   </div>
                   {hunk.lines.map((line, i) => {
@@ -275,13 +275,8 @@ function VersionMenu({
   const { t } = useI18n();
   if (menu === 'compare') {
     return (
-      <KeyedMenuContent
-        align="end"
-        side="bottom"
-        sideOffset={8}
-        className="version-menu--sub w-auto min-w-17"
-      >
-        <KeyedMenuItem className="version-menu-row" shortcut="P" onClick={onCompare}>
+      <KeyedMenuContent align="end" side="bottom" sideOffset={8} className="w-auto min-w-17">
+        <KeyedMenuItem shortcut="P" onClick={onCompare}>
           {t('上一版本')}
         </KeyedMenuItem>
       </KeyedMenuContent>
@@ -293,7 +288,7 @@ function VersionMenu({
         <KeyedMenuItem
           key={row.v}
           shortcut={i < 9 ? String(i + 1) : undefined}
-          className={`version-menu-row${i === 0 ? ' font-semibold' : ''}`}
+          className={i === 0 ? 'font-semibold' : undefined}
           onClick={() => onMenu(undefined)}
         >
           <span className="flex-1">
@@ -302,17 +297,12 @@ function VersionMenu({
           <Restore width={13} height={13} className="text-(--text-tertiary)" />
         </KeyedMenuItem>
       ))}
-      <KeyedMenuItem
-        className="version-menu-row"
-        shortcut="C"
-        closeOnClick={false}
-        onClick={() => onMenu('compare')}
-      >
+      <KeyedMenuItem shortcut="C" closeOnClick={false} onClick={() => onMenu('compare')}>
         <span className="flex-1">{t('与其他版本对比…')}</span>
         {diffOpen && diffFrom != null && <span className="text-(--text-tertiary)">{diffFrom}</span>}
       </KeyedMenuItem>
       {diffOpen && (
-        <KeyedMenuItem className="version-menu-row" shortcut="B" onClick={onBase}>
+        <KeyedMenuItem shortcut="B" onClick={onBase}>
           <span>{t('回到与 base 对比')}</span>
         </KeyedMenuItem>
       )}
@@ -340,15 +330,13 @@ function VersionControl({
   onBase?: () => void;
 }) {
   return (
-    <span className="doc-range-wrap relative inline-flex">
+    <span className="relative inline-flex">
       <DropdownMenu
         open={versionMenu != null}
         onOpenChange={(next: boolean) => onVersionMenu?.(next ? 'versions' : undefined)}
       >
         {range != null ? (
-          <DropdownMenuTrigger
-            render={<Button variant="outline" size="xs" className="doc-range-chip" />}
-          >
+          <DropdownMenuTrigger render={<Button variant="outline" size="xs" />}>
             {range.from} → {range.to}
             <ChevronDown width={12} height={12} />
           </DropdownMenuTrigger>
@@ -480,7 +468,7 @@ export function DocPane({
             </div>
           </div>
         ) : (
-          <div className="doc-empty static flex flex-1 items-center justify-center text-meta text-(--text-tertiary)">
+          <div className="static flex flex-1 items-center justify-center text-meta text-(--text-tertiary)">
             {t('暂无可显示的变更')}
           </div>
         )}
@@ -509,7 +497,7 @@ export function DocPane({
         <div className="px-3.5 pt-2 pb-4" data-testid="doc-body">
           {doc == null
             ? (emptyMeta ?? (
-                <div className="doc-empty flex h-24 items-center justify-center text-meta text-(--text-tertiary)">
+                <div className="flex h-24 items-center justify-center text-meta text-(--text-tertiary)">
                   {t('暂无方案')}
                 </div>
               ))

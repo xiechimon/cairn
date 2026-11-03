@@ -20,7 +20,7 @@ import { SKILLS_HREF } from './resources/skills-page.js';
 import { AGENTS_HREF, AgentDetailPage } from './routes/agent-detail-page.js';
 import { BoardPage } from './routes/board-page.js';
 import { MachineAuthorizePage } from './routes/machine-authorize-page.js';
-import { TodoDetailPage } from './routes/todo-detail-page.js';
+import { TodoRedirect } from './routes/todo-redirect.js';
 import { SETTINGS_HREF } from './settings/settings-href.js';
 import { SettingsPage } from './settings/settings-page.js';
 import { SettingsRedirect } from './settings/settings-redirect.js';
@@ -36,7 +36,7 @@ export const router = createBrowserRouter([
             element: <ChiefRoot />,
             children: [
               { path: '/app', element: <BoardPage /> },
-              { path: '/app/todo/:id', element: <TodoDetailPage /> },
+              { path: '/app/todo/:id', element: <TodoRedirect /> },
               { path: '/app/schedules', element: <SchedulesPage /> },
               { path: '/app/project/new', element: <ProjectNewPage /> },
               { path: '/app/project/:id', element: <ProjectHomeRedirect /> },

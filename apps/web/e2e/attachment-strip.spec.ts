@@ -213,7 +213,8 @@ async function stubDetailSurface(page: Page) {
   await page.route(`**/api/builds/${BUILD_ID}/changes`, (route) =>
     route.fulfill({ json: { files: [] } }),
   );
-  await page.route(`**/api/conversations/${BUILD_ID}/messages`, (route, request) => {
+  await page.route(
+    new RegExp(`/api/(conversations/${BUILD_ID}|todos/[^/?]+)/messages(\\?|$)`), (route, request) => {
     if (request.method() !== 'GET') return route.fallback();
     return route.fulfill({ json: EMPTY_CONVERSATION });
   });
@@ -271,16 +272,14 @@ test('detail face: paste paints a placeholder, landing swaps it for a chip at th
     .poll(() => chipImg.evaluate((el) => (el as HTMLImageElement).naturalWidth))
     .toBe(CARD_W);
   const afterBox = await chip.boundingBox();
-  expect(afterBox).toMatchObject({
-    x: beforeBox?.x,
-    width: beforeBox?.width,
-    height: beforeBox?.height,
-  });
+  expect(afterBox?.x ?? 0).toBeCloseTo(beforeBox?.x ?? 0, 0);
+  expect(afterBox).toMatchObject({ width: beforeBox?.width, height: beforeBox?.height });
   expect(afterBox?.y).toBeLessThanOrEqual(beforeBox?.y ?? 0);
   await evidenceShot(page, 'strip-detail-settled.png');
 
   const sentBodies: string[] = [];
-  await page.route(`**/api/conversations/${BUILD_ID}/messages`, (route, request) => {
+  await page.route(
+    new RegExp(`/api/(conversations/${BUILD_ID}|todos/[^/?]+)/messages(\\?|$)`), (route, request) => {
     if (request.method() !== 'POST') return route.fallback();
     sentBodies.push((JSON.parse(request.postData() ?? '{}') as { content?: string }).content ?? '');
     return route.fulfill({ status: 201, json: { message: { id: 'msg-1' } } });

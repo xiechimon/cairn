@@ -5,16 +5,13 @@ import {
   type FsListResult,
   type GithubIssueEcho,
   type GithubIssuesResponse,
-  type MergeReadiness,
   type ProjectRecord,
   type TodoRecord as SharedTodoRecord,
 } from '@cairn/shared';
 import type { ChiefQuestionItem } from '../chief/chief-question-card.js';
 import type { AgentPickerOption } from '../components/agent-picker.js';
 import type { TagChipData } from '../components/ui/tag-chip.js';
-import type { TaskMetaFields } from '../detail/task-meta-block.js';
 import type {
-  BuildOverlayContent,
   ChangesContent,
   DocBlock,
   FixtureSet,
@@ -371,84 +368,6 @@ export const CHANGES: ChangesContent = {
           ],
         },
       ],
-    },
-  ],
-};
-
-export const BUILD_CONTENT: BuildOverlayContent = {
-  token: {
-    total: '82.9k',
-    model: 'claude-sonnet-5-5',
-    modelTotal: '82.9k',
-    input: '12',
-    output: '854',
-    cacheRead: '54.2k',
-    cacheWrite: '27.8k',
-    cacheHitRate: '96%',
-    cost: { total: '$1.41', cacheRead: '$0.12', input: '$0.42', output: '$0.81' },
-  },
-  branch: {
-    branch: 'cairn/build-7f3a2c',
-    commit: '2cceb9dbf7a8',
-    machine: 'studio-mac',
-    directory: '~/code/cairn',
-  },
-  runs: [
-    { label: 'Run 2', meta: '12 minutes ago · 38.3k tokens', status: 'current' },
-    { label: 'Run 1', meta: '1 hour ago · 44.6k tokens', status: 'failed' },
-  ],
-};
-
-export const TASK_META: TaskMetaFields = {
-  sourceIssue: {
-    number: 1182,
-    title: 'Branch badge shows a stale name',
-    url: 'https://github.com',
-  },
-  branch: 'cairn/build-7f3a2c',
-  pr: { number: 1190, url: 'https://github.com' },
-  owner: 'Ian',
-  machine: 'studio-mac',
-  machineWaiting: false,
-  model: 'claude-sonnet-5-5',
-  createdAt: NOW - 3 * HOUR,
-};
-
-export const TASK_META_WAITING: TaskMetaFields = {
-  sourceIssue: null,
-  branch: null,
-  pr: null,
-  machine: 'build-box',
-  machineWaiting: true,
-  model: null,
-  createdAt: NOW - 20 * MIN,
-};
-
-export const MERGE_READY: MergeReadiness = {
-  ready: true,
-  headSha: '2cceb9dbf7a8',
-  patchDigest: 'a1b2c3',
-  policy: 'autonomous',
-  blockers: [],
-};
-
-export const MERGE_BLOCKED: MergeReadiness = {
-  ready: false,
-  headSha: '2cceb9dbf7a8',
-  patchDigest: 'a1b2c3',
-  policy: 'human',
-  blockers: [
-    {
-      code: 'verify-missing',
-      class: 'transient',
-      label: 'No verify verdict for this patch',
-      detail: [],
-    },
-    {
-      code: 'review-blocking',
-      class: 'transient',
-      label: 'Review has blocking findings',
-      detail: ['security: 1 finding'],
     },
   ],
 };

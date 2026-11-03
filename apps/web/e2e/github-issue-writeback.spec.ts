@@ -132,14 +132,14 @@ test('2. inconsistent: neutral hint appears, local title not overwritten (D5 hin
     '与本地标题不一致',
   );
 
-  await expect(page.locator('.fresh-title')).toHaveText(LOCAL_TITLE);
+  await expect(page.getByTestId('side-chat').locator('h2')).toContainText(LOCAL_TITLE);
 });
 
 test('3. unreachable (echo 404): whole row hidden, page shows no error state', async ({ page }) => {
   await stubWorld(page, { sourceRef: 'github:octo/alpha#101', echo: { mode: 'gone' } });
   await page.goto('/app/todo/todo-self-1');
 
-  await expect(page.locator('.fresh-title')).toHaveText(LOCAL_TITLE);
+  await expect(page.getByTestId('side-chat').locator('h2')).toContainText(LOCAL_TITLE);
   await expect(page.locator('.spec-block')).toContainText('复现步骤');
   await expect(page.locator('[data-testid="source-issue-echo"]')).toHaveCount(0);
   await expect(page.locator('[data-testid="source-issue-pending"]')).toHaveCount(0);

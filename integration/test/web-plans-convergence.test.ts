@@ -116,8 +116,10 @@ test('plan card converges via the team-stream phase event when the conv stream i
   });
 
   await page.goto(`${server.url}/app/todo/${todoId}`);
-  await pexpect(page.locator('.detail-shell')).toBeVisible({ timeout: 30_000 });
-  await pexpect(page.locator('.detail-chip')).toHaveText(/确认/, { timeout: 150_000 });
+  await pexpect(page.getByTestId('side-chat')).toBeVisible({ timeout: 30_000 });
+  await pexpect(page.getByTestId('side-chat')).toHaveAttribute('data-phase', 'confirm', {
+    timeout: 150_000,
+  });
   try {
     await pexpect(page.locator('.chat-plan-title').last()).toHaveText('方案 · v1', {
       timeout: 30_000,

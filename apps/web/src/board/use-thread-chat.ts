@@ -1,4 +1,4 @@
-import { STOP_MESSAGE } from '@cairn/shared';
+import { STOP_MESSAGE, type TodoRecord as WireTodo } from '@cairn/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useSearchParams } from 'react-router';
@@ -17,13 +17,13 @@ import {
 import { invalidateConverged } from '../api/invalidate.js';
 import { liveTextStore } from '../api/live-text.js';
 import { liveThinkingStore } from '../api/live-thinking.js';
-import { mapTranscript, toDisplayTodo } from '../api/mappers.js';
+import { mapPlanDoc, mapPlanVersions, mapTranscript, toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { useConversationStream } from '../api/sse.js';
 import type { QueuedCapsule } from '../components/queued-capsules.js';
 import { toastError } from '../components/ui/toaster.js';
 import { blockDemoWrite, DEMO_MODE } from '../demo/demo-gate.js';
-import type { TodoRecord, TranscriptItem } from '../fixtures/records.js';
+import type { DocBlock, PlanVersion, TodoRecord, TranscriptItem } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { uploadMessageAttachments } from '../overlay/attachment-paste.js';
@@ -40,7 +40,11 @@ export interface ThreadChat {
   buildLegDone: boolean;
   infoOutput: boolean;
   buildAgentId: string | null;
+  planDoc: DocBlock[] | undefined;
+  planVersions: PlanVersion[] | undefined;
+  wire: WireTodo | null;
   started: boolean;
+  locked: boolean;
   running: boolean;
   workingFor: { startedAt?: number; seconds?: number } | undefined;
   machineName: string | null;
@@ -142,7 +146,11 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     [machinesQ.data, steps],
   );
   const todo = live ? (wire != null ? toDisplayTodo(wire) : (listed ?? null)) : (listed ?? null);
-  const fixtureTranscript = resolveScenario(searchParams).details?.[todoId]?.transcript;
+  const fixture = resolveScenario(searchParams);
+  const fixtureDetail = fixture.details?.[todoId] ?? fixture.detail;
+  const fixtureTranscript = fixtureDetail?.transcript;
+  const plans = plansQ.data ?? [];
+  const latestPlan = plans.length > 0 ? plans[plans.length - 1] : undefined;
 
   const transcript = useMemo<TranscriptItem[]>(() => {
     if (!live) return fixtureTranscript ?? [];
@@ -255,8 +263,16 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     buildId,
     infoOutput: wire?.output === 'info',
     buildAgentId: wire?.assignment?.build?.agentId ?? null,
+    planDoc: live
+      ? latestPlan !== undefined
+        ? mapPlanDoc(latestPlan.content)
+        : undefined
+      : fixtureDetail?.doc,
+    planVersions: live ? mapPlanVersions(plans) : fixtureDetail?.planVersions,
+    wire,
     buildLegDone: steps.some((step) => step.kind === 'build' && step.status === 'done'),
     started,
+    locked: !open,
     running,
     workingFor:
       running && streamingItem?.kind === 'streaming'
@@ -282,7 +298,7 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
       : {}),
     ...(stop !== undefined ? { stop } : {}),
     ...(writable ? { attach: (files: File[]) => uploadMessageAttachments(files, t) } : {}),
-    ...(writable && buildId != null
+    ...(live && buildId != null
       ? {
           sendQueuedNow: (queuedMessageId: string, content: string) =>
             mutations.sendSteer.mutateAsync({ conversationId: buildId, content, queuedMessageId }),

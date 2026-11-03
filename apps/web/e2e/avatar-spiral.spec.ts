@@ -59,17 +59,6 @@ test('live members projection: two agents → two distinct seeded srcs; avatarUr
   await expect(gamma.locator('img')).toHaveAttribute('src', override);
 });
 
-test('detail agent picker: the agent row is seeded by its name', async ({ page }) => {
-  await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=19');
-  await page.getByTestId('agent-chip').click();
-  const picker = page.getByRole('dialog', { name: '选择执行 Agent' });
-  await expect(picker).toBeVisible();
-  await expect(picker.getByRole('option', { selected: true }).locator('img')).toHaveAttribute(
-    'src',
-    AGENT_SRC,
-  );
-});
-
 test('create-agent dialog: empty name keeps the static asset; typing previews the seeded avatar', async ({
   page,
 }) => {

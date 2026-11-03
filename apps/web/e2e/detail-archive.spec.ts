@@ -68,6 +68,14 @@ async function setup(page: Page, phase = 'building', archivedAt: number | null =
       };
       return route.fulfill({ json: todo });
     }
+    if (path === '/api/todos/todo-archive/messages' && request.method() === 'POST') {
+      const { content } = request.postDataJSON() as { content: string };
+      revisions.push({ action: 'revision', feedback: content });
+      return route.fulfill({
+        status: 201,
+        json: { todoId: 'todo-archive', conversationId: 'build-archive', delivered: 'revision' },
+      });
+    }
     if (path === '/api/builds/build-archive/steps' && request.method() === 'POST') {
       revisions.push(request.postDataJSON());
       return route.fulfill({ status: 202, json: { delegated: true } });
@@ -140,6 +148,8 @@ async function setup(page: Page, phase = 'building', archivedAt: number | null =
       '/api/teams/team-archive/model-sources': { sources: [] },
       '/api/teams/team-archive/providers': { presets: [], providers: [] },
       '/api/server/backup': { status: 'healthy' },
+      '/api/schedules': [],
+      '/api/teams/team-archive/claude-subscriptions': [],
       '/api/capabilities': { thinkingLevels: [] },
     };
     if (request.method() === 'GET' && Object.hasOwn(responses, path))
@@ -151,13 +161,12 @@ async function setup(page: Page, phase = 'building', archivedAt: number | null =
 }
 
 async function continueFromComposer(page: Page, revisions: unknown[]) {
-  await expect(page.getByTestId('phase-chip')).toHaveText('确认');
-  await expect(page.getByTestId('phase-chip')).toHaveAttribute('data-tone', 'confirm');
+  await expect(page.getByTestId('side-chat-status')).toContainText('待你决定');
   await page
     .getByTestId('composer-card')
     .getByRole('textbox')
     .fill('Continue with the retained work');
-  await page.getByRole('button', { name: '发送', exact: true }).click();
+  await page.locator('.side-panel').getByRole('button', { name: '发送', exact: true }).click();
   await expect
     .poll(() => revisions)
     .toEqual([
@@ -166,23 +175,21 @@ async function continueFromComposer(page: Page, revisions: unknown[]) {
 }
 
 async function archive(page: Page) {
-  await page.getByTestId('detail-head').getByRole('button', { name: '更多', exact: true }).click();
+  await page.getByTestId('side-chat').getByRole('button', { name: '更多操作…' }).click();
   await page.getByTestId('archive-task').click();
-  await expect(page.getByTestId('archived-badge')).toBeVisible();
+  await expect(page.locator('[data-testid="side-chat-action"][data-action="unarchive"]')).toBeVisible();
 }
 
-test('archived page replaces the composer; unarchive restores it without changing phase', async ({
+test('an archived thread locks the composer; unarchive restores it without changing phase', async ({
   page,
 }) => {
   const { actions, revisions, unexpected } = await setup(page, 'confirm', 123);
   await page.goto('/app/todo/todo-archive');
-  await expect(page.getByTestId('archived-badge')).toBeVisible();
-  await expect(page.getByTestId('composer-card')).toHaveCount(0);
-  await expect(page.getByTestId('detail-head').locator('.detail-head-action')).toHaveCount(0);
-  await expect(page.getByTestId('unarchive-task')).toHaveText('Unarchive to continue');
-  await page.getByTestId('unarchive-task').click();
-  await expect(page.getByTestId('composer-card')).toBeVisible();
-  await expect(page.getByTestId('archived-badge')).toHaveCount(0);
+  await expect(page.locator('[data-testid="side-chat-action"][data-action="unarchive"]')).toBeVisible();
+  await expect(page.locator('.side-panel textarea')).toHaveCount(0);
+  await page.locator('[data-testid="side-chat-action"][data-action="unarchive"]').getByRole('button', { name: '取消归档' }).click();
+  await expect(page.locator('.side-panel textarea')).toBeVisible();
+  await expect(page.locator('[data-testid="side-chat-action"][data-action="unarchive"]')).toHaveCount(0);
   await continueFromComposer(page, revisions);
   await expect.poll(() => actions).toEqual(['/api/todos/todo-archive/unarchive']);
   expect(unexpected).toEqual([]);
@@ -193,9 +200,9 @@ test('archive toast Undo restores the composer immediately', async ({
 }) => {
   const { actions, revisions, unexpected, stopReport } = await setup(page);
   await page.goto('/app/todo/todo-archive');
-  await expect(page.getByTestId('composer-card')).toBeVisible();
+  await expect(page.locator('.side-panel textarea')).toBeVisible();
   await archive(page);
-  await expect(page.getByTestId('composer-card')).toHaveCount(0);
+  await expect(page.locator('.side-panel textarea')).toHaveCount(0);
   let releaseUnarchive = () => {};
   const unarchiveAllowed = new Promise<void>((resolve) => {
     releaseUnarchive = resolve;
@@ -206,11 +213,11 @@ test('archive toast Undo restores the composer immediately', async ({
   });
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   try {
-    await expect(page.getByTestId('composer-card')).toBeVisible();
+    await expect(page.locator('.side-panel textarea')).toBeVisible();
   } finally {
     releaseUnarchive();
   }
-  await expect(page.getByTestId('archived-badge')).toHaveCount(0);
+  await expect(page.locator('[data-testid="side-chat-action"][data-action="unarchive"]')).toHaveCount(0);
   await expect
     .poll(() => actions)
     .toEqual(['/api/todos/todo-archive/archive', '/api/todos/todo-archive/unarchive']);
@@ -224,10 +231,10 @@ test('done tasks offer archive while retaining their done phase', async ({ page 
   const { unexpected } = await setup(page, 'done');
   await page.goto('/app/todo/todo-archive');
   await archive(page);
-  await expect(page.getByTestId('phase-chip')).toContainText('已完成');
-  await page.getByTestId('unarchive-task').click();
-  await expect(page.getByTestId('archived-badge')).toHaveCount(0);
-  await expect(page.getByTestId('phase-chip')).toContainText('已完成');
+  await expect(page.getByTestId('side-chat-status')).toContainText('已完成');
+  await page.locator('[data-testid="side-chat-action"][data-action="unarchive"]').getByRole('button', { name: '取消归档' }).click();
+  await expect(page.locator('[data-testid="side-chat-action"][data-action="unarchive"]')).toHaveCount(0);
+  await expect(page.getByTestId('side-chat-status')).toContainText('已完成');
   expect(unexpected).toEqual([]);
 });
 
@@ -239,8 +246,8 @@ test('a build stopped while archived returns to an actionable composer after una
   await archive(page);
   stopReport();
   await page.reload();
-  await expect(page.getByTestId('archived-badge')).toBeVisible();
-  await page.getByTestId('unarchive-task').click();
+  await expect(page.locator('[data-testid="side-chat-action"][data-action="unarchive"]')).toBeVisible();
+  await page.locator('[data-testid="side-chat-action"][data-action="unarchive"]').getByRole('button', { name: '取消归档' }).click();
   await continueFromComposer(page, revisions);
   expect(unexpected).toEqual([]);
 });

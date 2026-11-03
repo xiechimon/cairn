@@ -199,3 +199,16 @@ test('with a thread open, number keys leave the Coordinator question alone', asy
   await page.keyboard.press('1');
   await expect(option).toHaveAttribute('aria-pressed', 'false');
 });
+
+test('a plan waiting for approval opens in full from the card and from the transcript', async ({
+  page,
+}) => {
+  await page.goto(`${HOME}&thread=home-c-confirm`);
+  await action(page).getByRole('button', { name: '查看计划' }).click();
+  const plan = page.getByTestId('side-chat-plan');
+  await expect(plan).toBeVisible();
+  await expect(plan.locator('.doc-body, [data-testid="doc-pane"]').first()).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(plan).toHaveCount(0);
+  await expect(sideChat(page)).toBeVisible();
+});

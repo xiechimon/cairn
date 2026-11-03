@@ -257,7 +257,7 @@ for (const theme of ['light', 'dark'] as const) {
   }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=27');
-    await page.locator('.detail-head-icon--more').click();
+    await page.getByTestId('side-chat').getByRole('button', { name: '更多操作…' }).click();
     const menu = page.locator('.more-menu');
     await expect(menu).toBeVisible();
 

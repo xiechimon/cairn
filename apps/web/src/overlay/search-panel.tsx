@@ -5,6 +5,7 @@ import { useProjects } from '../api/hooks.js';
 import { useAgentAvatarUrlById, useLiveData } from '../api/provider.js';
 import { ProjectAvatar } from '../board/project-avatar.js';
 import { useProjectMark } from '../board/project-mark.js';
+import { threadHrefFrom } from '../board/thread-copy.js';
 import { StatusGlyph } from '../components/status-glyph.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_FACE, DialogShell, VIEWPORT_POP_ANIM } from '../components/ui/dialog-shell.js';
@@ -243,6 +244,10 @@ export function SearchPanel({
     navigate({ pathname, search });
     onClose();
   };
+  const goThread = (id: string) => {
+    navigate(threadHrefFrom(id, search));
+    onClose();
+  };
   const runCommand = (command: SearchCommand) => {
     onClose();
     command.run();
@@ -252,7 +257,7 @@ export function SearchPanel({
     ...(q === ''
       ? NAV_ROWS.map((row) => () => go(row.href))
       : [
-          ...todos.map((todo) => () => go(`/app/todo/${todo.id}`)),
+          ...todos.map((todo) => () => goThread(todo.id)),
           ...projects.map((project) => () => go(`/app/project/${project.id}`)),
           ...agents.map(() => () => go('/app/team')),
         ]),
@@ -396,7 +401,7 @@ export function SearchPanel({
                         selected={cursor === base + index}
                         kbd={kbd}
                         index={base + index}
-                        onActivate={() => go(`/app/todo/${todo.id}`)}
+                        onActivate={() => goThread(todo.id)}
                         projectName={
                           useServer ? todo.projectName : clientProjectName(todo.projectId)
                         }

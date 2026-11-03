@@ -66,12 +66,6 @@ test.describe('⌘J wakes the window on every shell family', () => {
   const families = [
     { name: 'board', route: '/app/schedules?scenario=01', gear: true },
     { name: 'pages', route: '/app/schedules?scenario=11', gear: true },
-    {
-      name: 'detail',
-
-      route: '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=detail-unread',
-      gear: true,
-    },
   ] as const;
 
   for (const { name, route, gear } of families) {

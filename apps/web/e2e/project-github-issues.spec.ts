@@ -175,9 +175,8 @@ test('1. connected github project: entry → sheet → pick to import → detail
   ).toHaveCount(1);
 
   await rows.filter({ hasText: ISSUE_TITLE }).click();
-  await expect(page).toHaveURL(/\/app\/todo\/todo-gh-1/);
-  await expect(page.locator('.fresh-title')).toHaveText(ISSUE_TITLE);
-  await expect(page.locator('.fresh-tag-chip')).toHaveText(['bug', 'area:auth']);
+  await expect(page).toHaveURL(/[?&]thread=todo-gh-1/);
+  await expect(page.getByTestId('side-chat').locator('h2')).toContainText(ISSUE_TITLE);
   await expect(page.locator('.spec-block')).toContainText('复现步骤');
   expect(importBodies).toEqual([{ number: 7 }]);
 });

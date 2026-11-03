@@ -10,9 +10,9 @@ async function openPanel(page: Page) {
   await pressAndExpect(page, 'Meta+k', panel(page));
 }
 
-test('detail header: the fresh task chip reads `待开始`', async ({ page }) => {
+test('side chat: the fresh task status reads `空闲`', async ({ page }) => {
   await page.goto('/app/todo/fresh-probe?scenario=23');
-  await expect(page.getByTestId('phase-chip')).toHaveText('待开始');
+  await expect(page.getByTestId('side-chat-status')).toContainText('空闲');
 });
 
 test('search rows: fresh reads `待开始`, review `审核`, done `已完成`', async ({ page }) => {

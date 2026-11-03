@@ -83,7 +83,7 @@ test('Escape after Tab keeps the keyboard focus ring', async ({ page }) => {
 
 test('transcript scroller focus ring stays inside its panel', async ({ page }) => {
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=57f');
-  const scroller = page.locator('[data-slot="message-scroller-viewport"]').first();
+  const scroller = page.locator('.side-panel [data-slot="message-scroller-viewport"]');
   await keyboardFocus(page, scroller);
   expect(await readRing(scroller)).toEqual({ focused: true, outline: 'solid 2px', clippedBy: [] });
 });

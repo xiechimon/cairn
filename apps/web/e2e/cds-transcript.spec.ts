@@ -1,16 +1,14 @@
 import { expect, test } from '@playwright/test';
 
-test('CDS transcript: tokens, fade, follow 40 / jump 120, one-line 44px header', async ({ page }) => {
+test('CDS transcript: tokens, fade, follow 40 / jump 120', async ({ page }) => {
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=16');
   await page.waitForSelector('[data-testid="transcript-col"]');
 
   const m = await page.evaluate(() => {
     const root = getComputedStyle(document.documentElement);
     const col = document.querySelector('[data-testid="transcript-col"]') as HTMLElement;
-    const head = document.querySelector('[data-testid="detail-head"]') as HTMLElement;
     const content = col?.querySelector('[data-slot="message-scroller-content"]') as HTMLElement;
     const colCs = getComputedStyle(col);
-    const headCs = getComputedStyle(head);
     const contentCs = content ? getComputedStyle(content) : null;
     return {
       chatMaxW: root.getPropertyValue('--chat-max-w').trim(),
@@ -21,7 +19,6 @@ test('CDS transcript: tokens, fade, follow 40 / jump 120, one-line 44px header',
       colPadBottom: colCs.paddingBottom,
       hasScrollFade: col.classList.contains('scroll-fade'),
       fadeBottomVar: col.style.getPropertyValue('--scroll-fade-bottom'),
-      headH: headCs.height,
       contentMaxW: contentCs?.maxWidth ?? null,
     };
   });
@@ -32,7 +29,6 @@ test('CDS transcript: tokens, fade, follow 40 / jump 120, one-line 44px header',
   expect(m.radiusBubble).toBe('14px');
   expect(m.cdsRadiusXl).toBe('12px');
   expect(m.hasScrollFade).toBe(true);
-  expect(m.headH).toBe('44px');
   expect(m.contentMaxW).toBe('768px');
   // 35vh bottom buffer — numeric px depends on viewport; just ensure >> 16
   expect(Number.parseFloat(m.colPadBottom)).toBeGreaterThanOrEqual(16);
@@ -62,7 +58,7 @@ test('CDS transcript: jump-to-latest appears past 120px and restores end', async
   });
   await page.waitForTimeout(100);
 
-  const jump = page.getByTestId('detail-center').getByTestId('jump-to-latest');
+  const jump = page.locator('.side-panel').getByTestId('jump-to-latest');
   await expect(jump).toHaveAttribute('data-active', 'false');
 
   // Scroll up so distanceFromBottom > 120
