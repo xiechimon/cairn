@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router';
 import {
   useApiMutations,
   useBackupNotice,
+  useChief,
   useMachines,
   useProjects,
   useSchedules,
@@ -36,6 +37,7 @@ export function BoardPage() {
   const schedulesQ = useSchedules(live);
   const projectsQ = useProjects(teamId, live);
   const machinesQ = useMachines(teamId, live);
+  const chiefQ = useChief(teamId, live);
   const backupQ = useBackupNotice(live);
   const mutations = useApiMutations(teamId);
   const teamsQ = useTeams(live);
@@ -105,6 +107,7 @@ export function BoardPage() {
             projectName={homeProjectName}
             banner={homeBanner}
             machines={machines}
+            coordinatorMachineId={live ? (chiefQ.data?.agentActor?.machineId ?? null) : null}
             schedules={live ? mapSchedules(schedulesQ.data ?? []) : (fixture.schedules ?? [])}
           />
         )}

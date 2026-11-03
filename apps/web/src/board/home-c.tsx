@@ -26,6 +26,7 @@ import type {
 import { useI18n } from '../i18n/provider.js';
 import { ClaudeLoginBanner } from './claude-login-banner.js';
 import { ComposerThreadTarget, useComposerThreadTarget } from './composer-thread-target.js';
+import { MachineChip, MachinesPanel } from './machines-panel.js';
 import { ACT_ORDER, actRank, needsYouThreads, pendingQuestions } from './needs-you.js';
 import { NeedsYouThreadCard } from './needs-you-thread-card.js';
 import { composeRequest } from './open-composer.js';
@@ -99,6 +100,7 @@ interface HomeCProps {
   banner?: ReactNode;
   machines?: readonly MachineRow[];
   schedules?: readonly ScheduleRecord[];
+  coordinatorMachineId?: string | null;
 }
 
 export function HomeC({
@@ -110,6 +112,7 @@ export function HomeC({
   banner,
   machines,
   schedules = [],
+  coordinatorMachineId = null,
 }: HomeCProps) {
   const { t, locale } = useI18n();
   const { user, live } = useLiveData();
@@ -119,6 +122,15 @@ export function HomeC({
   const [allOpen, setAllOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const pane = paneOf(searchParams.get(PANE_PARAM));
+  const computers = useMemo(
+    () =>
+      (machines ?? []).map((machine) =>
+        coordinatorMachineId !== null && machine.id === coordinatorMachineId
+          ? { ...machine, chiefHost: true }
+          : machine,
+      ),
+    [machines, coordinatorMachineId],
+  );
   const showPane = (next: WorkPane | null) => {
     const params = new URLSearchParams(searchParams);
     if (next === null) params.delete(PANE_PARAM);
@@ -328,6 +340,11 @@ export function HomeC({
       <h1 className="m-0 mr-auto min-w-0 truncate text-ui font-semibold text-foreground">
         {projectName ?? t('Coordinator')}
       </h1>
+      <MachineChip
+        machines={computers}
+        open={pane === 'machines'}
+        onToggle={() => togglePane('machines')}
+      />
       <Button
         variant="ghost"
         size="icon-sm"
@@ -358,19 +375,24 @@ export function HomeC({
     </header>
   );
 
-  const workPanel = pane !== null && (
-    <WorkPanel
-      pane={pane}
-      todos={scoped}
-      schedules={
-        projectId === null
-          ? schedules
-          : schedules.filter((schedule) => schedule.projectId === projectId)
-      }
-      now={now}
-      onClose={() => showPane(null)}
-    />
-  );
+  const workPanel =
+    pane === 'machines' ? (
+      <MachinesPanel machines={computers} onClose={() => showPane(null)} />
+    ) : (
+      pane !== null && (
+        <WorkPanel
+          pane={pane}
+          todos={scoped}
+          schedules={
+            projectId === null
+              ? schedules
+              : schedules.filter((schedule) => schedule.projectId === projectId)
+          }
+          now={now}
+          onClose={() => showPane(null)}
+        />
+      )
+    );
 
   if (surface.load !== 'ready') {
     return (
