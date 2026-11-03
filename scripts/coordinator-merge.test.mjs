@@ -10,15 +10,17 @@ const sha = (letter) => letter.repeat(40);
 const A = sha('a');
 const B = sha('b');
 const FAIL = { error: true };
-const bot = { login: 'cairnwright[bot]' };
-const passComment = (head, suffix = '', user = bot) => ({
-  user,
-  body: `<!-- review-gate:${head} -->\n**Independent review gate: PASS**${suffix} for \`${head.slice(0, 8)}\`.`,
+const gate = (head, conclusion, over = {}) => ({
+  name: 'review-gate',
+  head_sha: head,
+  status: 'completed',
+  conclusion,
+  app: { slug: 'github-actions' },
+  ...over,
 });
-const blockComment = (head, user = bot) => ({
-  user,
-  body: `<!-- review-gate:${head} -->\n**Independent review gate: BLOCK** for \`${head.slice(0, 8)}\`.`,
-});
+const pass = (head, over) => gate(head, 'success', over);
+const block = (head, over) => gate(head, 'failure', over);
+const review = (...runs) => ({ check_runs: runs.map((run, id) => ({ id, ...run })) });
 const green = ['check', 'pack-smoke', 'e2e-gate', 'pr-evidence'].map((name) => ({
   name,
   bucket: 'pass',
@@ -37,7 +39,7 @@ const mustBeGreen = ['gates', 'dead-class-gate', 'ops-backup-test'].map((name) =
 }));
 const base = {
   head: [A],
-  comments: [[passComment(A)]],
+  reviews: [review(pass(A))],
   checks: [green],
   allChecks: [[...green, ...mustBeGreen]],
   markers: [[]],
@@ -62,7 +64,7 @@ if (args[0] === 'pr' && args[1] === 'checks') key = args.includes('--required') 
 else if (args[0] === 'pr' && args[1] === 'view') key = 'view';
 else if (args[0] === 'pr' && args[1] === 'merge') process.exit(0);
 else if (p.includes('/issues?')) key = 'markers';
-else if (p.endsWith('/comments?per_page=100')) key = 'comments';
+else if (p.includes('/check-runs?')) key = 'reviews';
 else if (p.endsWith('/commits?per_page=100')) key = 'commits';
 else if (/\\/pulls\\/\\d+$/.test(p)) key = 'head';
 else process.exit(2);
@@ -111,9 +113,12 @@ test('merges on PASS with green checks and no brake', (t) => {
   assert.match(result.stdout, new RegExp(`7 MERGED ${sha('c')}`));
 });
 
-test('carried-over PASS counts', (t) => {
-  const { merges } = run(t, { comments: [[passComment(A, ' (carried over)')]] });
-  assert.equal(merges.length, 1);
+test('a review-gate check still in progress waits', (t) => {
+  const { result, merges } = run(t, {
+    reviews: [review(gate(A, null, { status: 'in_progress' }))],
+  });
+  assert.notEqual(result.status, 0);
+  assert.equal(merges.length, 0);
 });
 
 test('network errors mid-loop neither exit nor change state', (t) => {
@@ -141,20 +146,20 @@ test('marker lookup failure waits and never merges', (t) => {
   assert.equal(merges.length, 0);
 });
 
-test('BLOCK on the current head stops nonzero', (t) => {
-  const { result, merges } = run(t, { comments: [[passComment(A), blockComment(A)]] });
+test('a failed review-gate check on the current head stops nonzero', (t) => {
+  const { result, merges } = run(t, { reviews: [review(pass(A), block(A))] });
   assert.notEqual(result.status, 0);
   assert.match(result.stdout, /BLOCK/);
   assert.equal(merges.length, 0);
 });
 
-test('newest verdict wins over an older BLOCK', (t) => {
-  const { merges } = run(t, { comments: [[blockComment(A), passComment(A)]] });
+test('the newest check run wins over an older failure', (t) => {
+  const { merges } = run(t, { reviews: [review(block(A), pass(A))] });
   assert.equal(merges.length, 1);
 });
 
-test('verdict for another head is ignored', (t) => {
-  const { result, merges } = run(t, { comments: [[passComment(B)]] });
+test('a check run for another head is ignored', (t) => {
+  const { result, merges } = run(t, { reviews: [review(pass(B))] });
   assert.notEqual(result.status, 0);
   assert.equal(merges.length, 0);
 });
@@ -218,7 +223,7 @@ test('a skipped must-be-green job counts as green', (t) => {
 test('head moved after PASS re-waits for the new head verdict', (t) => {
   const { result, merges } = run(t, {
     head: [A, B, B],
-    comments: [[passComment(A)], [passComment(A)], [passComment(A), passComment(B)]],
+    reviews: [review(pass(A)), review(pass(A)), review(pass(A), pass(B))],
     markers: [[{ number: 9 }], []],
   });
   assert.equal(result.status, 0, result.stderr);
@@ -230,7 +235,7 @@ test('a held PR never merges, even after a new head gets a PASS (the #2510 seque
   const held = (head) => ({ sha: head, labels: ['coordinator-hold'] });
   const { result, merges } = run(t, {
     head: [held(A), held(B)],
-    comments: [[passComment(A)], [passComment(A), passComment(B)]],
+    reviews: [review(pass(A)), review(pass(A), pass(B))],
   });
   assert.notEqual(result.status, 0);
   assert.equal(merges.length, 0);
@@ -268,26 +273,24 @@ test('multi-commit closing keywords are carried once', (t) => {
   assert.match(body, /^Body/);
 });
 
-test('forged PASS from another user after a real BLOCK still stops', (t) => {
+test('a passing check from another app after a real failure still stops', (t) => {
   const { result, merges } = run(t, {
-    comments: [[blockComment(A), passComment(A, '', { login: 'mallory' })]],
+    reviews: [review(block(A), pass(A, { app: { slug: 'mallory-app' } }))],
   });
   assert.notEqual(result.status, 0);
   assert.match(result.stdout, /BLOCK/);
   assert.equal(merges.length, 0);
 });
 
-test('PASS from a non-reviewer alone is not a verdict', (t) => {
-  const { merges } = run(t, { comments: [[passComment(A, '', { login: 'mallory' })]] });
+test('a passing check from another app alone is not a verdict', (t) => {
+  const { merges } = run(t, { reviews: [review(pass(A, { app: { slug: 'mallory-app' } }))] });
   assert.equal(merges.length, 0);
 });
 
-test('a verdict quoted inside another comment body is ignored', (t) => {
-  const quoted = { user: bot, body: `Earlier:\n> ${passComment(A).body}\nnothing yet` };
-  const { merges } = run(t, { comments: [[quoted]] });
+test('no review-gate check on the head waits', (t) => {
+  const { result, merges } = run(t, { reviews: [review()] });
+  assert.notEqual(result.status, 0);
   assert.equal(merges.length, 0);
-  const trailing = { user: bot, body: `note\n${passComment(A).body}` };
-  assert.equal(run(t, { comments: [[trailing]] }).merges.length, 0);
 });
 
 test('every gh call targets the configured repo, not GH_REPO', (t) => {
