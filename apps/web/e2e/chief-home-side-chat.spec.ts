@@ -183,3 +183,16 @@ test('the more menu holds archive and delete, and Escape closes the menu first',
   await page.getByRole('menuitem', { name: /删除/ }).click();
   await expect(page.getByRole('alertdialog')).toContainText('Rerun the relay probe');
 });
+
+test('a plan waiting for approval opens in full from the card and from the transcript', async ({
+  page,
+}) => {
+  await page.goto(`${HOME}&thread=home-c-confirm`);
+  await action(page).getByRole('button', { name: '查看计划' }).click();
+  const plan = page.getByTestId('side-chat-plan');
+  await expect(plan).toBeVisible();
+  await expect(plan.locator('.doc-body, [data-testid="doc-pane"]').first()).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(plan).toHaveCount(0);
+  await expect(sideChat(page)).toBeVisible();
+});

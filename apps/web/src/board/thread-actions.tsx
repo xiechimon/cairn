@@ -1,7 +1,9 @@
+import { canOrchestrate } from '@cairn/shared';
 import { Ellipsis } from 'lucide-react';
 import { type ReactNode, useRef, useState } from 'react';
-import { useApiMutations, useBuildChanges } from '../api/hooks.js';
+import { useApiMutations, useBuildChanges, useChiefThreads } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { inflightOrchestrationFor } from '../chief/orchestration-inflight.js';
 import { useOrchestrateStart } from '../chief/use-orchestrate-start.js';
 import { Button } from '../components/ui/button.js';
 import { Spinner } from '../components/ui/spinner.js';
@@ -53,15 +55,18 @@ export function useThreadActions({
   todo,
   chat,
   onGone,
+  onViewPlan,
 }: {
   todo: TodoRecord;
   chat: ThreadChat;
   onGone: () => void;
+  onViewPlan: (() => void) | undefined;
 }): ThreadActions {
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
   const mutations = useApiMutations(teamId);
   const orchestrateStart = useOrchestrateStart();
+  const chiefThreadsQ = useChiefThreads(teamId, live);
   const [menuOpen, setMenuOpen] = useState(false);
   const [dialog, setDialog] = useState<'accept' | 'delete' | 'stop' | null>(null);
   const [acceptError, setAcceptError] = useState<string | null>(null);
@@ -165,6 +170,11 @@ export function useThreadActions({
     })();
 
   const kind = threadActionOf(todo, running);
+  const orchestrating =
+    (kind === 'start' || kind === 'retry') &&
+    live &&
+    canOrchestrate(phase) &&
+    inflightOrchestrationFor(chiefThreadsQ.data, todo) !== null;
   const pending =
     orchestrateStart.pendingId === todo.id ||
     mutations.stepAction.isPending ||
@@ -189,14 +199,25 @@ export function useThreadActions({
           {t(ACTION_COPY[kind].reason)}
         </p>
         <div className="flex flex-none gap-2">
+          {kind === 'approve' && onViewPlan !== undefined && (
+            <Button size="sm" variant="outline" onClick={onViewPlan} className="h-7 px-2.5">
+              {t('查看计划')}
+            </Button>
+          )}
           {canFinishFailed && (
             <Button size="sm" variant="outline" onClick={openAccept} className="h-7 px-2.5">
               {t('完成…')}
             </Button>
           )}
-          <Button size="sm" onClick={runPrimary[kind]} disabled={pending} className="h-7 px-2.5">
-            {pending && <Spinner data-icon="inline-start" />}
-            {t(ACTION_COPY[kind].primary)}
+          <Button
+            size="sm"
+            onClick={runPrimary[kind]}
+            disabled={pending || orchestrating}
+            data-orchestrating={orchestrating ? 'true' : undefined}
+            className="h-7 px-2.5"
+          >
+            {(pending || orchestrating) && <Spinner data-icon="inline-start" />}
+            {orchestrating ? t('编排中') : t(ACTION_COPY[kind].primary)}
           </Button>
         </div>
       </div>

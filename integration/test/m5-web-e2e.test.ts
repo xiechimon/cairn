@@ -213,13 +213,13 @@ async function createAndStart(title: string): Promise<void> {
 
 async function openDetail(title: string): Promise<void> {
   await page.getByRole('link', { name: title }).click();
-  await pexpect(page.locator('.detail-shell')).toBeVisible({ timeout: 15_000 });
+  await pexpect(page.getByTestId('side-chat')).toBeVisible({ timeout: 15_000 });
 }
 
 async function dumpSpineDiagnostics(label: string): Promise<void> {
   const out: string[] = [];
   try {
-    const chip = await page.locator('.detail-chip').textContent({ timeout: 3_000 });
+    const chip = await page.getByTestId('side-chat').getAttribute('data-phase', { timeout: 3_000 });
     out.push(`UI chip = ${JSON.stringify(chip)}`);
   } catch (err) {
     out.push(`UI chip unreadable: ${String(err).slice(0, 120)}`);
@@ -301,9 +301,11 @@ async function withDiagnostics<T>(label: string, fn: () => Promise<T>): Promise<
   }
 }
 
-async function waitChip(re: RegExp, timeoutMs = 150_000): Promise<void> {
-  await withDiagnostics(`waitChip(${String(re)})`, () =>
-    pexpect(page.locator('.detail-chip')).toHaveText(re, { timeout: timeoutMs }),
+async function waitChip(phase: string, timeoutMs = 150_000): Promise<void> {
+  await withDiagnostics(`waitChip(${phase})`, () =>
+    pexpect(page.getByTestId('side-chat')).toHaveAttribute('data-phase', phase, {
+      timeout: timeoutMs,
+    }),
   );
 }
 
@@ -329,18 +331,15 @@ describe('M5 web E2E: main sequence full chain (01 §7.4 spine, zero UI reload)'
     stream = collectConvStream(buildId);
 
     await openDetail('M5 脊柱探针');
-    await waitChip(/确认/);
+    await waitChip('confirm');
     await withDiagnostics('plan card v1 on screen', () =>
       pexpect(page.locator('.chat-plan-title').last()).toHaveText('方案 · v1', {
         timeout: 30_000,
       }),
     );
-    await pexpect(page.locator('.doc-range-wrap .doc-pane-select')).toHaveText(/v1/, {
-      timeout: 30_000,
-    });
 
-    await page.locator('.detail-head-action').click();
-    await waitChip(/审核/);
+    await page.getByTestId('side-chat-action').getByRole('button').last().click();
+    await waitChip('review');
 
     expect(
       stream.types.has('text_delta'),
@@ -350,11 +349,11 @@ describe('M5 web E2E: main sequence full chain (01 §7.4 spine, zero UI reload)'
     expect(stream.types.has('step')).toBe(true);
     stream.stop();
 
-    await page.locator('.detail-head-action').click();
+    await page.getByTestId('side-chat-action').getByRole('button').last().click();
     const accept = page.getByRole('dialog', { name: '完成任务' });
     await pexpect(accept.getByRole('button', { name: '完成' })).toBeVisible();
     await accept.getByRole('button', { name: '完成' }).click();
-    await waitChip(/已完成/);
+    await waitChip('done');
 
     await pexpect(page.locator('.chat-note', { hasText: '发起了合并' })).toBeVisible();
     await pexpect(page.locator('.chat-note', { hasText: '🎉 任务已完成' })).toBeVisible({
@@ -422,28 +421,32 @@ describe('M5 web E2E: main sequence full chain (01 §7.4 spine, zero UI reload)'
       }
     });
     await openDetail('M5 驳回探针');
-    await waitChip(/确认/);
+    await waitChip('confirm');
     await pexpect(
-      page.getByTestId('composer-card').getByRole('button', { name: '停止', exact: true }),
+      page
+        .locator('.side-panel')
+        .getByTestId('composer-card')
+        .getByRole('button', { name: '停止', exact: true }),
     ).toBeVisible();
 
     await withDiagnostics('confirm feedback requests a plan revision', async () => {
-      await page.locator('.composer-input').fill('Drop the project suffix from the title');
+      await page
+        .locator('.side-panel .composer-input')
+        .fill('Drop the project suffix from the title');
       const [revision] = await Promise.all([
         page.waitForResponse(
           (response) =>
-            response.url().endsWith(`/api/builds/${rejectBuildId}/steps`) &&
+            response.url().endsWith(`/api/todos/${target!.id}/messages`) &&
             response.request().method() === 'POST',
           { timeout: 10_000 },
         ),
-        page.locator('.composer-send').click(),
+        page.locator('.side-panel .composer-send').click(),
       ]);
       expect(revision.ok()).toBe(true);
       expect(revision.request().postDataJSON()).toMatchObject({
-        action: 'revision',
-        side: 'plan',
-        feedback: 'Drop the project suffix from the title',
+        content: 'Drop the project suffix from the title',
       });
+      expect(await revision.json()).toMatchObject({ delivered: 'revision' });
     });
     const pendingSteps = page.evaluate<{ kind: string; status: string }[]>(
       `fetch('/api/builds/${rejectBuildId}/steps', { headers: { 'x-cairn-route-drain': 'true' } }).then(response => response.json())`,
@@ -467,9 +470,6 @@ describe('M5 web E2E: main sequence full chain (01 §7.4 spine, zero UI reload)'
         timeout: 30_000,
       }),
     );
-    await pexpect(page.locator('.doc-range-wrap .doc-pane-select')).toHaveText(/v2/, {
-      timeout: 30_000,
-    });
 
     const plans = server.db
       .select()
@@ -486,16 +486,8 @@ describe('M5 web E2E: main sequence full chain (01 §7.4 spine, zero UI reload)'
       .all();
     expect(rejectSteps.filter((s) => s.kind === 'plan')).toHaveLength(2);
 
-    await page.locator('.doc-range-wrap .doc-pane-select').click();
-    await pexpect(page.locator('.version-menu-row')).toHaveCount(3, { timeout: 10_000 });
-    await pexpect(page.locator('.version-menu-row').first()).toHaveText(/v2/);
-    await page.getByRole('menuitem', { name: '与其他版本对比…' }).click();
-    await page.getByRole('menuitem', { name: '上一版本' }).click();
-    await pexpect(page.locator('.doc-range-chip')).toHaveText(/v1 → v2/);
-    await pexpect(page.locator('.doc-file-row')).toHaveText(/plan\.md/);
-
-    await page.locator('.detail-head-action').click();
-    await waitChip(/审核/);
+    await page.getByTestId('side-chat-action').getByRole('button').last().click();
+    await waitChip('review');
     expect(server.todoPhase(target!.id)).toBe('review');
   }, 300_000);
 
@@ -560,6 +552,6 @@ describe('M5 web E2E: main sequence full chain (01 §7.4 spine, zero UI reload)'
     await openProjectTasks(spineProject.projectId);
     await openDetail('M5 脊柱探针');
     await pexpect(page.locator('.chat-scheduled')).toBeVisible({ timeout: 15_000 });
-    await waitChip(/审核/);
+    await waitChip('review');
   }, 300_000);
 });

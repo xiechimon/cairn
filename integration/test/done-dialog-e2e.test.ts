@@ -182,13 +182,13 @@ async function driveToReview(spec: string, opts: { rework: boolean }) {
 
 async function openDetail(todoId: string): Promise<void> {
   await page.goto(`${server.url}/app/todo/${todoId}`);
-  await pexpect(page.locator('.detail-shell [data-testid="detail-main"]')).toBeVisible({
+  await pexpect(page.getByTestId('side-chat')).toBeVisible({
     timeout: 15_000,
   });
 }
 
 async function openAcceptDialog(): Promise<void> {
-  await page.locator('.detail-head-icon--more').click();
+  await page.getByTestId('side-chat').getByRole('button', { name: '更多操作…' }).click();
   const menu = page.getByRole('menu', { name: '更多' });
   await pexpect(menu).toBeVisible();
   await menu.getByRole('menuitem', { name: '完成' }).click();
@@ -264,7 +264,7 @@ afterAll(async () => {
 });
 
 describe('#1236 task-done confirmation dialog (real web dist + real server + fake machine wire)', () => {
-  test('① single-card query not ready: confirm does not close silently — dialog stays, alert visible, zero requests, phase unchanged', async () => {
+  test('① single-card query not ready: the side chat shows an explained error, offers no finish, zero requests, phase unchanged', async () => {
     const card = await driveToReview('静默 no-op 探针：详情单卡查询失败时确认不得静默。', {
       rework: true,
     });
@@ -276,18 +276,11 @@ describe('#1236 task-done confirmation dialog (real web dist + real server + fak
     await page.route(`**/api/todos/${card.todoId}`, (route) => route.abort());
     try {
       await page.goto(`${server.url}/app/todo/${card.todoId}`);
-      await pexpect(page.locator('.detail-shell [data-testid="detail-main"]')).toBeVisible({
-        timeout: 15_000,
-      });
-      await openAcceptDialog();
-      const dialog = acceptDialog();
-      await dialog.getByRole('button', { name: '完成' }).click();
-      await page.waitForTimeout(600);
+      const unavailable = page.getByTestId('side-chat-unavailable');
+      await pexpect(unavailable).toHaveAttribute('data-state', 'error', { timeout: 15_000 });
       await shot('silent-noop');
-      await pexpect(dialog).toBeVisible();
-      await pexpect(dialog.getByRole('alert')).toHaveText(
-        '任务数据未就绪，完成请求未送出。请刷新页面后重试。',
-      );
+      await pexpect(unavailable.getByRole('button', { name: '重试' })).toBeVisible();
+      await pexpect(page.getByTestId('side-chat-action')).toHaveCount(0);
       expect(merges).toBe(0);
       expect(server.todoPhase(card.todoId)).toBe('review');
     } finally {

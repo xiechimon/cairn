@@ -22,6 +22,7 @@ import { liveThinkingStore } from '../api/live-thinking.js';
 import { chiefTurnErrorOfContent, mapChief } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { useConversationStream } from '../api/sse.js';
+import { THREAD_PARAM } from '../board/thread-copy.js';
 import { toastError } from '../components/ui/toaster.js';
 import { blockDemoWrite, DEMO_MODE } from '../demo/demo-gate.js';
 import { chiefDefault } from '../fixtures/fixtures.js';
@@ -75,6 +76,7 @@ export const CHIEF_OPEN_STORAGE_KEY = 'cairn.chief-open';
 function placeOf(pathname: string, search: string): string {
   const params = new URLSearchParams(search);
   params.delete('chief');
+  params.delete(THREAD_PARAM);
   return `${pathname}?${params.toString()}`;
 }
 
