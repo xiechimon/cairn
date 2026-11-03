@@ -1,5 +1,5 @@
 import { X } from 'lucide-react';
-import { type ReactNode, useEffect } from 'react';
+import { type ReactNode, useEffect, useRef } from 'react';
 import { SidePanel } from '../components/side-panel.js';
 import { ToneGlyph } from '../components/stone/tone-glyph.js';
 import { Button } from '../components/ui/button.js';
@@ -11,6 +11,8 @@ import { relativeTime } from './rel-time.js';
 import { type ThreadActions, useThreadActions } from './thread-actions.js';
 import { threadCopy, threadTone } from './thread-copy.js';
 import { type ThreadChat, useThreadChat } from './use-thread-chat.js';
+
+const OVERLAY_QUERY = '(max-width: 1100px)';
 
 const OPEN_SURFACE = '.overlay, [role="dialog"], [role="menu"], [role="listbox"]';
 
@@ -96,9 +98,11 @@ function ThreadBody({
         placeholder={
           archived
             ? t('已归档，取消归档后才能继续')
-            : chat.started
-              ? t('回复 #{seq}…', { seq: todo.seqNum })
-              : t('开始后才能回复 #{seq}', { seq: todo.seqNum })
+            : todo.phase === 'closed'
+              ? t('已关闭，不能再回复')
+              : chat.started
+                ? t('回复 #{seq}…', { seq: todo.seqNum })
+                : t('开始后才能回复 #{seq}', { seq: todo.seqNum })
         }
         aiReview={false}
         streaming={chat.running}
@@ -133,6 +137,15 @@ export function SideChat({
   const chat = useThreadChat(todoId, listed);
   const todo = chat.todo;
 
+  const panelRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const panel = panelRef.current;
+    const focused = document.activeElement;
+    if (panel === null || !(focused instanceof HTMLElement)) return;
+    if (!window.matchMedia(OVERLAY_QUERY).matches || panel.contains(focused)) return;
+    focused.blur();
+  }, []);
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.defaultPrevented) return;
@@ -144,7 +157,7 @@ export function SideChat({
   }, [onClose]);
 
   return (
-    <SidePanel label={todo?.title ?? t('任务')} onDismiss={onClose}>
+    <SidePanel ref={panelRef} label={todo?.title ?? t('任务')} onDismiss={onClose}>
       {todo != null && chat.load === 'ready' ? (
         <ReadyThread todo={todo} chat={chat} now={now} onClose={onClose} />
       ) : (

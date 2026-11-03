@@ -1303,6 +1303,7 @@ export const EN: Record<string, string> = {
   '已归档。': 'Archived.',
   取消归档: 'Unarchive',
   '批准失败，请重试。': 'Could not approve. Try again.',
+  '已关闭，不能再回复': 'Closed. It takes no more replies',
   回首页: 'Back to home',
   // —— #638 全站静默 mutation 失败面接线（toast 标题句；server 原因进
   // description 透传不译，#631 同律。已有面内 canon 位的面——merge 拒绝行 /

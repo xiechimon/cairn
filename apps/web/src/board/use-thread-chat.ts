@@ -191,7 +191,7 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
           : 'missing';
 
   const started = buildId != null;
-  const open = started && todo?.archivedAt == null;
+  const open = started && todo?.archivedAt == null && todo?.phase !== 'closed';
   const writable = live && open;
   const fixtureSend = DEMO_MODE
     ? async () => {
