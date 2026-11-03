@@ -48,6 +48,8 @@ beforeAll(async () => {
     { content: 'ANSWER-TWO-CUT', delayMs: 6_000 },
     { content: 'ANSWER-TWO' },
     { content: 'ANSWER-THREE' },
+    { content: 'ANSWER-STOP-CUT', delayMs: 20_000 },
+    { content: 'ANSWER-FIVE' },
   ]);
   server = await bootRealServer({ providerBaseUrl: stub.url, claimHoldMs: 1_000 });
   const enrolled = await fetch(`${server.url}/api/machine/enroll`, {
@@ -146,6 +148,24 @@ describe('Coordinator on the Pi Durable sidecar (D72), real server and real side
     expect(last).toContain('second question');
     expect(last).toContain('ANSWER-TWO');
     expect(last).toContain('third question');
+  }, 90_000);
+
+  test('Stop mid-turn: the sidecar ends the turn as stopped and the next turn answers', async () => {
+    const before = stub.requests.length;
+    await send('fourth question');
+    await waitFor(() => stub.requests.length > before, 30_000);
+    const turn = chiefSteps().find((s) => s.status === 'claimed');
+    expect(turn).toBeDefined();
+    const stopped = await api(
+      server.url,
+      'POST',
+      `/api/teams/${server.teamId}/chief/threads/${threadId()}/stop`,
+    );
+    expect(stopped.status).toBe(200);
+    await waitFor(() => chiefSteps().find((s) => s.id === turn?.id)?.status === 'stopped', 10_000);
+    expect(assistantTexts().some((t) => t.includes('ANSWER-STOP-CUT'))).toBe(false);
+    await send('fifth question');
+    await waitFor(() => assistantTexts().some((t) => t.includes('ANSWER-FIVE')), 60_000);
   }, 90_000);
 
   test('a second sidecar on the same store refuses to start while the first runs', async () => {

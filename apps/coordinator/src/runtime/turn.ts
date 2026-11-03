@@ -8,12 +8,15 @@ import { createTurnMirror } from './mirror.js';
 import type { CoordinatorModels } from './models.js';
 import type { StepGate } from './tools.js';
 
+const STOP_POLL_MS = 1_000;
+
 export interface TurnDeps {
   harness: Harness;
   models: CoordinatorModels;
   api: MachineApi;
   context: Context;
   heartbeatMs: number;
+  stopPollMs?: number;
   now: () => number;
   gate?: StepGate;
   onModel?: (ref: ModelRef) => void;
@@ -87,8 +90,24 @@ export async function runCoordinatorTurn(
   const heartbeat = setInterval(() => void api.heartbeat(stepId).catch(() => {}), deps.heartbeatMs);
   deps.gate?.set(stepId);
   deps.onModel?.({ provider, modelId });
+  let stopPoll: ReturnType<typeof setInterval> | undefined;
   try {
     const root = await harness.root(context);
+    let stopping: Promise<void> | null = null;
+    let polling = false;
+    stopPoll = setInterval(() => {
+      if (polling || stopping !== null) return;
+      polling = true;
+      void api
+        .stop(stepId)
+        .then((discard) => {
+          if (discard !== null && stopping === null) stopping = root.abort(context);
+        })
+        .catch(() => {})
+        .finally(() => {
+          polling = false;
+        });
+    }, deps.stopPollMs ?? STOP_POLL_MS);
     await foldBeforeModelSwitch(deps, root, { provider, modelId });
     await root.configure(
       { model: { provider, modelId }, instructions: claimed.chief.systemPrompt },
@@ -100,6 +119,10 @@ export async function runCoordinatorTurn(
     watch.start(async (call) => {
       if (call.kind === 'value') await mirror.onView(call.value);
     });
+    if (stopping !== null) {
+      await stopping;
+      return done({ status: 'stopped' });
+    }
     const submission = await root.submit(
       { type: 'input', content: claimed.instruction ?? '', requestId: stepId },
       context,
@@ -111,6 +134,11 @@ export async function runCoordinatorTurn(
         ? []
         : (await root.entries({ minEntryId: settled.entry }, 500, undefined, context)).items;
     await mirror.flush(turnEntries);
+    clearInterval(stopPoll);
+    if (stopping !== null) {
+      await stopping;
+      return done({ status: 'stopped' });
+    }
     if (settled.status !== 'done' || settled.type !== 'input') {
       const reason =
         settled.status === 'unanswered'
@@ -135,6 +163,7 @@ export async function runCoordinatorTurn(
     }
     return finished;
   } finally {
+    clearInterval(stopPoll);
     deps.gate?.set(null);
     clearInterval(heartbeat);
   }

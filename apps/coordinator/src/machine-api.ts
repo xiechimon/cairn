@@ -3,6 +3,7 @@ import {
   claimedStepSchema,
   type MachineDoneBody,
   type MachineTokenResponse,
+  machineStopResponseSchema,
   machineTokenResponseSchema,
   type StepRecord,
   stepRecordSchema,
@@ -14,6 +15,7 @@ export interface MachineApi {
   recover(): Promise<StepRecord[]>;
   token(stepId: string): Promise<MachineTokenResponse>;
   heartbeat(stepId: string): Promise<void>;
+  stop(stepId: string): Promise<boolean | null>;
   relayTool(stepId: string, name: string, params: Record<string, unknown>): Promise<string>;
   transcriptRow(stepId: string, row: TranscriptRow): Promise<void>;
   transcriptDelta(stepId: string, text: string): Promise<void>;
@@ -54,6 +56,10 @@ export function httpMachineApi(serverUrl: string, machineToken: string): Machine
     heartbeat: async (stepId) => {
       await call('POST', `/api/machine/heartbeat/${stepId}`);
     },
+    stop: async (stepId) =>
+      machineStopResponseSchema.parse(
+        await call('GET', `/api/machine/stop?stepId=${encodeURIComponent(stepId)}`),
+      ).discard,
     relayTool: async (stepId, name, params) =>
       String(field(await call('POST', `/api/machine/tool/${stepId}`, { name, params }), 'text')),
     transcriptRow: async (stepId, row) => {

@@ -129,6 +129,36 @@ describe('runCoordinatorTurn', () => {
     await harness.close(ctx);
   });
 
+  it('a stop requested mid-turn ends the turn as stopped, and the next turn still answers', async () => {
+    const { coordinatorModels } = setup(5);
+    const harness = await openCoordinatorHarness(storagePath(), coordinatorModels.models, ctx);
+    const api = fakeMachineApi();
+    const deps = {
+      harness,
+      models: coordinatorModels,
+      api,
+      context: ctx,
+      heartbeatMs: 1000,
+      stopPollMs: 20,
+      now: () => 1,
+    };
+    const started = Date.now();
+    setTimeout(() => api.stopRequested.add('step-stop'), 200);
+    const result = await runCoordinatorTurn(deps, chiefStep('step-stop', 'long one'));
+    expect(result.status).toBe('stopped');
+    expect(Date.now() - started).toBeLessThan(3_000);
+    expect(api.dones).toEqual([{ stepId: 'step-stop', body: { status: 'stopped' } }]);
+    expect(new Set(api.stopPolls)).toEqual(new Set(['step-stop']));
+
+    const polls = api.stopPolls.length;
+    await new Promise((r) => setTimeout(r, 100));
+    expect(api.stopPolls.length).toBe(polls);
+
+    const next = await runCoordinatorTurn(deps, chiefStep('step-after', 'still there?'));
+    expect(next.status).toBe('success');
+    await harness.close(ctx);
+  }, 30_000);
+
   it('fails a step that carries no model', async () => {
     const { coordinatorModels } = setup();
     const harness = await openCoordinatorHarness(storagePath(), coordinatorModels.models, ctx);

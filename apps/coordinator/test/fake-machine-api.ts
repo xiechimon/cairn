@@ -16,6 +16,8 @@ export interface FakeMachineApi extends MachineApi {
   heartbeats: string[];
   tools: { stepId: string; name: string; params: Record<string, unknown> }[];
   keys: string[];
+  stopRequested: Set<string>;
+  stopPolls: string[];
 }
 
 export function fakeMachineApi(apiKey = 'sk-test'): FakeMachineApi {
@@ -28,6 +30,8 @@ export function fakeMachineApi(apiKey = 'sk-test'): FakeMachineApi {
     heartbeats: [],
     tools: [],
     keys: [],
+    stopRequested: new Set(),
+    stopPolls: [],
     claim: async () => {
       const next = api.queue.shift() ?? null;
       if (next) api.claimedByMe.push(next.step);
@@ -44,6 +48,10 @@ export function fakeMachineApi(apiKey = 'sk-test'): FakeMachineApi {
     },
     heartbeat: async (stepId) => {
       api.heartbeats.push(stepId);
+    },
+    stop: async (stepId) => {
+      api.stopPolls.push(stepId);
+      return api.stopRequested.has(stepId) ? false : null;
     },
     relayTool: async (stepId, name, params) => {
       api.tools.push({ stepId, name, params });
