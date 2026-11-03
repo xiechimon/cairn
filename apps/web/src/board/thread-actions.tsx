@@ -175,7 +175,7 @@ export function useThreadActions({
     retry: orchestrate,
     unarchive: setArchived(false),
   };
-  const canFinishFailed = phase === 'failed' && chat.buildLegDone;
+  const canFinishFailed = !archived && phase === 'failed' && chat.buildLegDone;
 
   const card =
     kind === null ? null : (
