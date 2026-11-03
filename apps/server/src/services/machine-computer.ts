@@ -17,6 +17,22 @@ export const COMPUTER_OUTPUT_PENDING_CHARS = 64 * 1024;
 
 const pendingOutput = new Map<string, string>();
 
+export function hasPendingComputerOutput(callId: string): boolean {
+  return pendingOutput.has(callId);
+}
+
+export function pendingComputerOutputRelease(db: Db, machineId: string): () => void {
+  const ids = db
+    .select({ id: computerCall.id })
+    .from(computerCall)
+    .where(eq(computerCall.machineId, machineId))
+    .all()
+    .map(({ id }) => id);
+  return () => {
+    for (const id of ids) pendingOutput.delete(id);
+  };
+}
+
 const FINISHED_STATES: ReadonlySet<ComputerCallState> = new Set(['done', 'error', 'interrupted']);
 
 type CallRow = typeof computerCall.$inferSelect;

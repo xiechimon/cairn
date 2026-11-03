@@ -1,12 +1,13 @@
 import { createHash } from 'node:crypto';
 import { machineComputerFramesResponseSchema, redactSecrets } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterEach, describe, expect, test } from 'vitest';
 import { computer, computerCall, machine } from '../src/db/schema.js';
 import {
   COMPUTER_OUTPUT_HEAD_CHARS,
   COMPUTER_OUTPUT_TAIL_CHARS,
+  hasPendingComputerOutput,
 } from '../src/services/machine-computer.js';
 import { bootServer, issueApiKey } from './helpers.js';
 
@@ -410,6 +411,30 @@ describe('computer tables and machine removal', () => {
     expect(res.status).toBe(204);
     expect(s.db.select().from(computer).all()).toEqual([]);
     expect(s.db.select().from(computerCall).all()).toEqual([]);
+  });
+
+  test('deleting a machine also drops the unsettled output of its calls', async () => {
+    const { s, owner, id } = await setup();
+    await post(s.app, `/api/machine/computer/${id}`, owner.token, {
+      frames: [{ kind: 'output', seq: 1, stream: 'stdout', text: 'still-writing' }],
+    });
+    expect(hasPendingComputerOutput(id)).toBe(true);
+    const res = await s.app.request(`/api/machines/${owner.id}`, { method: 'DELETE' });
+    expect(res.status).toBe(204);
+    expect(hasPendingComputerOutput(id)).toBe(false);
+  });
+
+  test('a machine deletion that fails keeps the unsettled output of its calls', async () => {
+    const { s, owner, id } = await setup();
+    await post(s.app, `/api/machine/computer/${id}`, owner.token, {
+      frames: [{ kind: 'output', seq: 1, stream: 'stdout', text: 'still-writing' }],
+    });
+    s.db.run(
+      sql`CREATE TRIGGER block_machine_delete BEFORE DELETE ON machine BEGIN SELECT RAISE(ABORT, 'blocked'); END`,
+    );
+    const res = await s.app.request(`/api/machines/${owner.id}`, { method: 'DELETE' });
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(hasPendingComputerOutput(id)).toBe(true);
   });
 
   test('two computers cannot share one scope key', async () => {
