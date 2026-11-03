@@ -230,4 +230,11 @@ describe('D71 a step with no assigned agent runs from the routing rule', () => {
       w.s.db.select().from(routingRule).where(eq(routingRule.id, set)).get()?.requiredCapabilities,
     ).toEqual({ mcpServers: ['context7'] });
   });
+
+  test('rules on: an agentless merge step runs from the session rule', async () => {
+    const w = await world();
+    const ruleId = rule(w, 'session');
+    const todoRow = await startWithoutAgent(w);
+    expect(agentForStep(w.s.db, todoRow, 'merge')?.id).toBe(ruleId);
+  });
 });

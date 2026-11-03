@@ -180,8 +180,8 @@ async function executeWorkerSkillTool(
   params: Record<string, unknown>,
 ): Promise<string> {
   const agentRow =
-    deps.db.select().from(agent).where(eq(agent.id, agentId)).get() ??
-    agentForStep(deps.db, todoRow, stepRow.kind, stepRow.prompt);
+    agentForStep(deps.db, todoRow, stepRow.kind, stepRow.prompt) ??
+    deps.db.select().from(agent).where(eq(agent.id, agentId)).get();
   if (!agentRow) throw new NotFoundError(`agent ${agentId}`);
   const want = name === 'create_skill' ? AGENT_TOOL_SKILL_CREATE : AGENT_TOOL_SKILL_UPDATE;
   if (!agentRow.tools.includes(want)) {
