@@ -393,6 +393,47 @@ test.describe('queue, steer and stop while the chief is replying (T5)', () => {
     await evidenceShot(page, 'stop-queued-turn.png');
   });
 
+  test('a running turn leaves the answered turn above it alone: its tools show once, under the reply header', async ({
+    page,
+  }) => {
+    const call = (id: string, name: string, at: number) => ({
+      id,
+      role: 'assistant',
+      content: {
+        kind: 'toolcall',
+        call: { id, name, arguments: {}, startedAt: at, endedAt: at + 1000, result: '{}' },
+      },
+      createdAt: at,
+    });
+    await mockLive(page, {
+      activeRun: { phase: 'chief' },
+      pending: [],
+      fallbackModel: null,
+      outage: null,
+      messages: [
+        { id: 'u-q', role: 'user', content: '？', createdAt: 1 },
+        call('t-1', 'pull_requests', 2),
+        call('t-2', 'issues', 3),
+        call('t-3', 'run_builds', 4),
+        { id: 'a-1', role: 'assistant', content: '已派发 #9。', createdAt: 5 },
+        { id: 'u-stop', role: 'user', content: '停止', createdAt: 6 },
+      ],
+    });
+    await page.goto('/app');
+    const home = page.getByTestId('home-c');
+    const reply = home.getByTestId('chief-msg').filter({ hasText: '已派发 #9。' });
+    await expect(reply).toHaveCount(1);
+    await reply.getByTestId('chief-tools-toggle').click();
+    await evidenceShot(page, 'tools-once.png');
+    const replyBox = await reply.boundingBox();
+    const question = home.getByTestId('chief-msg').filter({ hasText: '？' }).first();
+    const questionBox = await question.boundingBox();
+    expect(replyBox!.y - (questionBox!.y + questionBox!.height)).toBeLessThan(40);
+    for (const name of ['pull_requests', 'issues', 'run_builds']) {
+      await expect(home.getByText(name, { exact: true })).toHaveCount(1);
+    }
+  });
+
   test('a stopped turn says no task was created', async ({ page }) => {
     await mockLive(page, {
       activeRun: null,

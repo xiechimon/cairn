@@ -1,5 +1,4 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
-import { evidenceShot } from './evidence';
 
 declare global {
   interface Window {
@@ -855,48 +854,6 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
     state.activeRun = null;
     await page.goto('/app?view=board&chief=chief-bbb');
     await expectFolded();
-  });
-
-  test('F-R23: a running turn leaves the answered turn above it alone — its tools show once, under the reply header', async ({
-    page,
-  }) => {
-    await stubEventSource(page);
-    await stubCdnAvatar(page);
-    const call = (id: string, name: string, at: number) => ({
-      id,
-      role: 'assistant',
-      content: {
-        kind: 'toolcall',
-        call: { id, name, arguments: {}, startedAt: at, endedAt: at + 1000, result: '{}' },
-      },
-      createdAt: at,
-    });
-    await mockChiefLiveApi(page, {
-      final: false,
-      activeRun: { phase: 'chief' },
-      messages: [
-        { id: 'u-q', role: 'user', content: '？', createdAt: 1 },
-        call('t-1', 'pull_requests', 2),
-        call('t-2', 'issues', 3),
-        call('t-3', 'run_builds', 4),
-        { id: 'a-1', role: 'assistant', content: '已派发 #104。', createdAt: 5 },
-        { id: 'u-stop', role: 'user', content: '停止', createdAt: 6 },
-      ],
-    });
-    await page.goto('/app?view=board&chief=chief-bbb');
-
-    const drawer = page.locator('.chief-drawer');
-    const reply = drawer.getByTestId('chief-msg').filter({ hasText: '已派发 #104。' });
-    await expect(reply).toHaveCount(1);
-    await reply.getByTestId('chief-tools-toggle').click();
-    await evidenceShot(page, 'tools-once.png');
-    const replyBox = await reply.boundingBox();
-    const question = drawer.getByTestId('chief-msg').filter({ hasText: '？' }).first();
-    const questionBox = await question.boundingBox();
-    expect(replyBox!.y - (questionBox!.y + questionBox!.height)).toBeLessThan(40);
-    for (const name of ['pull_requests', 'issues', 'run_builds']) {
-      await expect(drawer.getByText(name, { exact: true })).toHaveCount(1);
-    }
   });
 
   test('F-R22: long preview truncated by CSS — button width ≤ column width, ellipsis works, zero horizontal overflow (#1034)', async ({
