@@ -1,7 +1,7 @@
 import type { AskUserAnswer } from '@cairn/shared';
 import { type CSSProperties, createContext, memo, type ReactNode, useContext } from 'react';
-import { Link } from 'react-router';
 import { reportStatusWord } from '../board/status-words.js';
+import { ThreadLink } from '../board/thread-link.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
 import { LivePulse, LiveRow, LiveSignal } from '../components/chat/live-row.js';
 import { TraceGroup, TraceRows, type TraceStepItem } from '../components/chat/trace-steps.js';
@@ -151,14 +151,14 @@ function HandoffRow({ todoId }: { todoId: string }) {
       <Marker variant="separator" className={MARKER_NOTE_CLS} data-testid="chief-handoff">
         <MarkerContent className={MARKER_CONTENT_CLS}>
           {t('已转给任务')}
-          <Link
-            to={`/app/todo/${todoId}`}
+          <ThreadLink
+            todoId={todoId}
             className={`${mentionChipClass('todo')} cursor-pointer`}
             data-phase={glance?.phase}
           >
             {glance != null && <TodoStatus phase={glance.phase} />}
             {glance?.seq != null ? `#${glance.seq}` : t('任务')}
-          </Link>
+          </ThreadLink>
         </MarkerContent>
       </Marker>
     </MessageScrollerItem>
@@ -210,13 +210,13 @@ function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string
             <>
               {t('已停止。停之前已经建了任务')}
               {todos.map((todo) => (
-                <Link
+                <ThreadLink
                   key={todo.id}
-                  to={`/app/todo/${todo.id}`}
+                  todoId={todo.id}
                   className={`${mentionChipClass('todo')} cursor-pointer`}
                 >
                   {`#${todo.seq} ${todo.title}`}
-                </Link>
+                </ThreadLink>
               ))}
             </>
           )}
@@ -254,13 +254,13 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
         <Marker variant="separator" className={MARKER_NOTE_CLS} data-testid="thread-report-marker">
           <MarkerContent className={MARKER_CONTENT_CLS}>
-            <Link to={`/app/todo/${item.todoId}`} className="hover:underline">
+            <ThreadLink todoId={item.todoId} className="hover:underline">
               {t('任务 #{n} {title}：{status}', {
                 n: item.seqNum,
                 title: item.title,
                 status: t(reportStatusWord(item)),
               })}
-            </Link>
+            </ThreadLink>
           </MarkerContent>
         </Marker>
       </MessageScrollerItem>
@@ -270,9 +270,9 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
         <Marker variant="separator" className={MARKER_NOTE_CLS} data-testid="thread-message-marker">
           <MarkerContent className={MARKER_CONTENT_CLS}>
-            <Link to={`/app/todo/${item.todoId}`} className="hover:underline">
+            <ThreadLink todoId={item.todoId} className="hover:underline">
               {t('你直接对 #{n} 说：{excerpt}', { n: item.seqNum, excerpt: item.excerpt })}
-            </Link>
+            </ThreadLink>
           </MarkerContent>
         </Marker>
       </MessageScrollerItem>

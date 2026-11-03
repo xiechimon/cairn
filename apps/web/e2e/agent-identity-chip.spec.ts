@@ -114,7 +114,7 @@ test.describe('agent mention chip (fixture, #741 gap 2)', () => {
 
     await expect(stream.locator('.mention-chip--todo')).toHaveAttribute(
       'href',
-      '/app/todo/r3-legacy-1',
+      '/app?thread=r3-legacy-1',
     );
   });
 });

@@ -91,7 +91,7 @@ test.describe('daily 08:00 report in the Coordinator chat (#2592)', () => {
     await expect(proposals.first()).toHaveAttribute('data-status', 'accepted');
     await expect(proposals.first().getByRole('link', { name: '已建成线程' })).toHaveAttribute(
       'href',
-      '/app/todo/todo-new',
+      '/app?thread=todo-new',
     );
     await proposals.nth(1).getByRole('button', { name: '不用了' }).click();
     await expect(proposals.nth(1)).toHaveAttribute('data-status', 'dismissed');

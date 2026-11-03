@@ -32,8 +32,12 @@ export function threadStatus(todo: TodoRecord): ThreadStatus {
   }
 }
 
-export function threadHref(id: string): string {
-  return `/app/todo/${id}`;
+export const THREAD_PARAM = 'thread';
+
+export function threadHref(id: string, homeSearch: string): string {
+  const params = new URLSearchParams(homeSearch);
+  params.set(THREAD_PARAM, id);
+  return `/app?${params.toString()}`;
 }
 
 export interface ThreadCopy {

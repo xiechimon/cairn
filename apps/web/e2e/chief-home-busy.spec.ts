@@ -482,6 +482,6 @@ test.describe('queue, steer and stop while the chief is replying (T5)', () => {
     await expect(stopped).toContainText('已停止。停之前已经建了任务');
     await evidenceShot(page, 'stopped-with-task.png');
     await stopped.getByRole('link', { name: /#9/ }).click();
-    await expect(page).toHaveURL(/\/app\/todo\/todo-1/);
+    await expect(page).toHaveURL(/[?&]thread=todo-1/);
   });
 });
