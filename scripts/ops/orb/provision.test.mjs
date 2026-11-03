@@ -711,22 +711,22 @@ function runtimeFixture(t) {
     },
     fstatSync(fd) {
       const stat = fs.fstatSync(fd);
-      return descriptors.get(fd)
+      return descriptors.get(fd)?.mounted
         ? Object.assign(stat, { dev: stat.dev + 1, ino: stat.ino + 1 })
         : stat;
     },
     openSync(path, flags, ...args) {
       const fd = fs.openSync(path, flags, ...args);
-      calls.push(['open', path, flags, fd]);
-      descriptors.set(fd, mounted);
+      calls.push(['open', path, flags]);
+      descriptors.set(fd, { path, mounted });
       return fd;
     },
     fchownSync(fd, uid, gid) {
-      calls.push(['fchown', fd, uid, gid]);
+      calls.push(['fchown', descriptors.get(fd)?.path, uid, gid]);
       fs.fchownSync(fd, uid, gid);
     },
     fchmodSync(fd, mode) {
-      calls.push(['fchmod', fd, mode]);
+      calls.push(['fchmod', descriptors.get(fd)?.path, mode]);
       fs.fchmodSync(fd, mode);
     },
   };
@@ -757,16 +757,15 @@ test('root preparation creates and opens a private directory before fd ownership
   assert.equal(stat.uid, f.options.uid);
   assert.equal(stat.gid, f.options.gid);
   assert.equal(stat.mode & 0o777, 0o700);
-  const opened = f.calls.find(([op, path]) => op === 'open' && path === f.directory);
-  assert.equal(
-    opened[2],
-    fs.constants.O_RDONLY | fs.constants.O_DIRECTORY | fs.constants.O_NOFOLLOW,
-  );
+  const opened = f.calls.filter(([op, path]) => op === 'open' && path === f.directory);
+  assert.ok(opened.length > 0);
+  for (const [, , flags] of opened)
+    assert.equal(flags, fs.constants.O_RDONLY | fs.constants.O_DIRECTORY | fs.constants.O_NOFOLLOW);
   assert.deepEqual(
     f.calls.filter(([op]) => op.startsWith('f')),
     [
-      ['fchown', opened[3], f.options.uid, f.options.gid],
-      ['fchmod', opened[3], 0o700],
+      ['fchown', f.directory, f.options.uid, f.options.gid],
+      ['fchmod', f.directory, 0o700],
     ],
   );
   assert.equal(runtimeDirectory(f.options), 0);
