@@ -94,7 +94,7 @@ const NAV = [
     id: 'product',
     title: 'Product',
     items: [
-      ['product-board', 'Filters and banners'],
+      ['product-board', 'Banners'],
       ['product-detail', 'Task detail'],
       ['product-chief', 'Coordinator'],
       ['product-thread-reply', 'Thread reply'],

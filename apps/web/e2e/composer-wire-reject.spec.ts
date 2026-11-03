@@ -192,7 +192,7 @@ async function openChiefDrawer(page: Page) {
     if (request.method() !== 'GET') return route.fallback();
     return route.fulfill({ json: [] });
   });
-  await page.goto('/app?view=board');
+  await page.goto('/app/schedules');
 
   await openChiefWindow(page);
   const input = page.getByTestId('chief-composer-input');

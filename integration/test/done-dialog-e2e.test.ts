@@ -180,9 +180,8 @@ async function driveToReview(spec: string, opts: { rework: boolean }) {
   return { todoId, buildId, title };
 }
 
-async function openDetailViaBoard(title: string): Promise<void> {
-  await page.goto(`${server.url}/app?view=board`);
-  await page.getByRole('link', { name: title }).click();
+async function openDetail(todoId: string): Promise<void> {
+  await page.goto(`${server.url}/app/todo/${todoId}`);
   await pexpect(page.locator('.detail-shell [data-testid="detail-main"]')).toBeVisible({
     timeout: 15_000,
   });
@@ -301,7 +300,7 @@ describe('#1236 task-done confirmation dialog (real web dist + real server + fak
     const card = await driveToReview('合并完成探针：rework 卡 review 点完成必须真落地。', {
       rework: true,
     });
-    await openDetailViaBoard(card.title);
+    await openDetail(card.todoId);
     await openAcceptDialog();
     const dialog = acceptDialog();
     await dialog.getByRole('button', { name: '完成' }).click();
@@ -322,7 +321,7 @@ describe('#1236 task-done confirmation dialog (real web dist + real server + fak
     const card = await driveToReview('不合并完成探针：checkbox 必须是真选项。', {
       rework: false,
     });
-    await openDetailViaBoard(card.title);
+    await openDetail(card.todoId);
     await openAcceptDialog();
     const dialog = acceptDialog();
     const box = dialog.locator('input[type="checkbox"]');
@@ -346,7 +345,7 @@ describe('#1236 task-done confirmation dialog (real web dist + real server + fak
       route.fulfill({ status: 409, json: { error: reject } }),
     );
     try {
-      await openDetailViaBoard(card.title);
+      await openDetail(card.todoId);
       await openAcceptDialog();
       const dialog = acceptDialog();
       await dialog.getByRole('button', { name: '完成' }).click();
@@ -371,7 +370,7 @@ describe('#1236 task-done confirmation dialog (real web dist + real server + fak
     await doneStep(reviewStep.id, 'failed', { errorMessage: '探针：审核步失败' });
     await waitFor(() => server.todoPhase(card.todoId) === 'failed', 15_000);
 
-    await openDetailViaBoard(card.title);
+    await openDetail(card.todoId);
     await openAcceptDialog();
     const dialog = acceptDialog();
     const box = dialog.locator('input[type="checkbox"]');

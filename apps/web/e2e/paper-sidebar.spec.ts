@@ -1,7 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 
 const sidebar = (page: Page) => page.getByRole('complementary');
-const columns = (page: Page) => page.locator('[data-column]');
 
 const top = (page: Page, selector: string) =>
   page.locator(selector).first().evaluate((el) => el.getBoundingClientRect().top);
@@ -11,7 +10,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('four parts stack top to bottom in a 248px sidebar', async ({ page }) => {
-  await page.goto('/app?scenario=01&view=board');
+  await page.goto('/app/schedules?scenario=01');
   const aside = sidebar(page);
   expect(await aside.evaluate((el) => el.getBoundingClientRect().width)).toBe(248);
 
@@ -48,19 +47,13 @@ test('four parts stack top to bottom in a 248px sidebar', async ({ page }) => {
   expect(asideBottom - userBottom).toBeLessThanOrEqual(16);
 });
 
-test('`Coordinator` badge counts the `待处理` column and opens the home view', async ({ page }) => {
-  await page.goto('/app?scenario=01&view=board');
-  const pendingCount = await page
-    .locator('[data-column="pending"] [data-testid="column-count"]')
-    .textContent();
+test('`Coordinator` opens the home view and keeps the scenario', async ({ page }) => {
+  await page.goto('/app/schedules?scenario=01');
   const home = sidebar(page).locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' });
-  await expect(sidebar(page).getByTestId('attention-badge')).toHaveText(pendingCount ?? '');
-  await expect(columns(page)).toHaveCount(4);
+  await expect(page.getByTestId('home-c')).toHaveCount(0);
 
   await home.click();
-  await expect(page).not.toHaveURL(/view=/);
-  await expect(page).toHaveURL(/[?&]scenario=01/);
-  await expect(columns(page)).toHaveCount(0);
+  await expect(page).toHaveURL(/\/app\?scenario=01$/);
   await expect(page.getByTestId('home-c')).toBeVisible();
   await expect(home).toHaveAttribute('aria-current', 'page');
 
@@ -69,7 +62,7 @@ test('`Coordinator` badge counts the `待处理` column and opens the home view'
 });
 
 test('active row = sidebar-active fill, no ring', async ({ page }) => {
-  await page.goto('/app?scenario=01&view=board');
+  await page.goto('/app?scenario=01');
   const m = await page.evaluate(() => {
     const row = document.querySelector('aside [data-slot="sidebar-nav-row"][aria-current="page"]');
     const main = document.querySelector('.board-sheet');
@@ -94,7 +87,7 @@ test('active row = sidebar-active fill, no ring', async ({ page }) => {
 test('project rows: tile letters follow --project-ink-N in order, open-task counts', async ({
   page,
 }) => {
-  await page.goto('/app?scenario=board-repos&view=board');
+  await page.goto('/app/schedules?scenario=board-repos');
   const rows = page.locator('[data-slot="sidebar-project-row"]');
   await expect(rows).toHaveCount(3);
   const probe = await rows.evaluateAll((els) => {
@@ -123,7 +116,7 @@ test('project rows: tile letters follow --project-ink-N in order, open-task coun
 });
 
 test('long project names truncate and keep the waiting count visible', async ({ page }) => {
-  await page.goto('/app?scenario=board-repos&view=board');
+  await page.goto('/app/schedules?scenario=board-repos');
   const m = await page
     .locator('[data-slot="sidebar-project-row"]')
     .first()
@@ -147,13 +140,13 @@ test('long project names truncate and keep the waiting count visible', async ({ 
 });
 
 test('user row second line reads machines online', async ({ page }) => {
-  await page.goto('/app?scenario=01&view=board');
+  await page.goto('/app/schedules?scenario=01');
   await expect(page.locator('[data-slot="sidebar-user"]')).toContainText(/\d+ machines? online/);
 });
 
 test('collapsed rail keeps `Coordinator` with its badge dot and the expand toggle', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
-  await page.goto('/app?scenario=01&view=board');
+  await page.goto('/app/schedules?scenario=01');
   const aside = sidebar(page);
   expect(await aside.evaluate((el) => el.getBoundingClientRect().width)).toBe(40);
   const home = aside.getByRole('link', { name: /Coordinator/ });

@@ -1,7 +1,6 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import { pressAndExpect } from './helpers.js';
 
-const BOARD = '/app?scenario=01&view=board';
 const SCHEDULES = '/app/schedules?scenario=01';
 
 const PROJECT = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=r2-24b&tab=tasks';
@@ -42,20 +41,20 @@ async function pressesStayHidden(
   }
 }
 
-test('⌘C and the retired N and C do nothing on the board', async ({ page }) => {
-  await page.goto(BOARD);
+test('⌘C and the retired N and C do nothing on a page', async ({ page }) => {
+  await page.goto(SCHEDULES);
   await expect(page.getByRole('complementary')).toBeVisible();
   await page.keyboard.press('Meta+c');
   await expect(home(page)).toHaveCount(0);
   await pressesStayClosed(page, 'n', home(page));
   await pressesStayClosed(page, 'c', home(page));
-  await expect(page).toHaveURL(/view=board/);
+  await expect(page).toHaveURL(/\/app\/schedules/);
 });
 
 test('Space no longer opens the drawer; ⌘J does, composer focused, default consumed', async ({
   page,
 }) => {
-  await page.goto(BOARD);
+  await page.goto(SCHEDULES);
   await expect(page.getByRole('complementary')).toBeVisible();
   // #442: the Space binding is gone — it is the native scroll key again and
   // must not wake the drawer (the ⌘N test's immediate-count negative form)
@@ -92,7 +91,7 @@ test('Space no longer opens the drawer; ⌘J does, composer focused, default con
   await expect(drawer(page)).toBeHidden();
 });
 
-test('⌘J wakes the chief drawer on a non-board route', async ({ page }) => {
+test('⌘J wakes the chief drawer on a non-home route', async ({ page }) => {
   await page.goto(SCHEDULES);
   await expect(page.getByRole('complementary')).toBeVisible();
   await pressAndExpect(page, 'Meta+j', drawer(page));
@@ -103,7 +102,7 @@ test('⌘J wakes the chief drawer on a non-board route', async ({ page }) => {
 });
 
 test('editable focus swallows C and ⌘J — the c lands IN the input', async ({ page }) => {
-  await page.goto(BOARD);
+  await page.goto(SCHEDULES);
 
   await pressAndExpect(page, 'Meta+k', page.getByRole('dialog', { name: '搜索' }));
   const field = page.getByRole('dialog', { name: '搜索' }).getByRole('textbox');
@@ -120,7 +119,7 @@ test('editable focus swallows C and ⌘J — the c lands IN the input', async ({
 });
 
 test('textarea focus (chief composer) swallows C', async ({ page }) => {
-  await page.goto(BOARD);
+  await page.goto(SCHEDULES);
   await pressAndExpect(page, 'Meta+j', drawer(page));
   const composer = page.getByTestId('chief-composer-input');
   await expect(composer).toBeFocused();
@@ -134,7 +133,7 @@ test('textarea focus (chief composer) swallows C', async ({ page }) => {
 test('Space on a focused button activates it natively; ⌘J fires past button focus', async ({
   page,
 }) => {
-  await page.goto(BOARD);
+  await page.goto(SCHEDULES);
   const searchRow = page.getByRole('button', { name: '搜索' });
   await expect(searchRow).toBeVisible();
 
@@ -159,7 +158,7 @@ test('Space on a focused button activates it natively; ⌘J fires past button fo
 test('⌘J toggles: the second press closes the drawer from its own composer focus', async ({
   page,
 }) => {
-  await page.goto(BOARD);
+  await page.goto(SCHEDULES);
   await expect(page.getByRole('complementary')).toBeVisible();
   await pressAndExpect(page, 'Meta+j', drawer(page));
   await expect(page.getByTestId('chief-composer-input')).toBeFocused();
@@ -186,7 +185,7 @@ test('⌘J toggle rides the non-board singleton hook too (schedules)', async ({ 
 });
 
 test('the collapsed rail search icon hovers the ⌘K hint', async ({ page }) => {
-  await page.goto(BOARD);
+  await page.goto(SCHEDULES);
   await page.locator('button[aria-label="收起侧边栏"]').click();
   const railSearch = page.getByRole('button', { name: '搜索' });
   await expect(railSearch).toBeVisible();
@@ -201,7 +200,7 @@ test('the collapsed rail search icon hovers the ⌘K hint', async ({ page }) => 
 test('with the drawer closed, N stays retired — neither drawer nor dialog opens', async ({
   page,
 }) => {
-  await page.goto(BOARD);
+  await page.goto(SCHEDULES);
   await expect(page.getByRole('complementary')).toBeVisible();
   await pressesStayHidden(page, 'n', drawer(page));
   await expect(dialog(page)).toHaveCount(0);

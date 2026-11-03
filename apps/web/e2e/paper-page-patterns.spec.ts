@@ -12,16 +12,12 @@ async function tokenRadius(page: Page) {
   );
 }
 
-test('board task card and account settings card share --radius-card (R1–R3)', async ({ page }) => {
+test('the account settings card rides --radius-card (R1, R3)', async ({ page }) => {
   await setTheme(page, 'light');
-  await page.goto('/app?scenario=01&view=board');
-  await expect(page.locator('.todo-card').first()).toBeVisible();
-  expect(await tokenRadius(page), 'R1').toBe('14px');
-  await expect(page.locator('.todo-card').first(), 'R2').toHaveCSS('border-top-left-radius', '14px');
-
   await page.goto('/app/account?scenario=13');
   const card = page.locator('.account-card');
   await expect(card).toBeVisible();
+  expect(await tokenRadius(page), 'R1').toBe('14px');
   await expect(card, 'R3').toHaveCSS('border-top-left-radius', await tokenRadius(page));
   await expect(card).toHaveClass(/settings-card/);
 });

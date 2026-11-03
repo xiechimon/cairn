@@ -17,7 +17,10 @@ import {
 import { openDbWithHandle } from './db/client.js';
 import { seed } from './db/seed.js';
 import { createKeyfileSecretBox } from './lib/secret-box.js';
-import { setCoordinatorServerContextEnabled } from './services/coordinator-context.js';
+import {
+  setCoordinatorMachineId,
+  setCoordinatorServerContextEnabled,
+} from './services/coordinator-context.js';
 import { setCoordinatorRouteLog } from './services/coordinator-route.js';
 import { ConversationStreamHub, TeamStreamHub } from './services/events.js';
 import { killInFlightPick } from './services/fs-pick.js';
@@ -67,6 +70,7 @@ backfillFixedTags(db);
 backfillPersonas(db);
 setRoutingRulesEnabled(config.routingRules);
 setCoordinatorServerContextEnabled(config.coordinatorServerContext);
+setCoordinatorMachineId(config.coordinatorMachineId);
 setCoordinatorRouteLog((teamId, reason) =>
   logger.warn({ teamId, reason }, 'coordinator route: falling back to the bound chief agent'),
 );

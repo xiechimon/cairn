@@ -168,8 +168,8 @@ function collectConvStream(buildId: string): { types: Set<string>; stop(): void 
   return { types, stop: () => ctrl.abort() };
 }
 
-async function openBoard(): Promise<void> {
-  await page.goto(`${server.url}/app?view=board`);
+async function openProjectTasks(projectId: string): Promise<void> {
+  await page.goto(`${server.url}/app/project/${projectId}/files?tab=tasks`);
   await pexpect(
     page.getByRole('complementary').getByRole('button', { name: 'Coordinator' }),
   ).toBeVisible({ timeout: 30_000 });
@@ -186,7 +186,7 @@ async function createAndStart(title: string): Promise<void> {
       }
     ).id;
   await api(server.url, 'POST', `/api/projects/${projectId}/todos`, { title: '', spec: title });
-  await openBoard();
+  await openProjectTasks(projectId);
   await pexpect(page.getByRole('link', { name: title })).toBeVisible({
     timeout: 30_000,
   });
@@ -312,7 +312,6 @@ describe('M5 web E2E: main sequence full chain (01 §7.4 spine, zero UI reload)'
   let stream: { types: Set<string>; stop(): void };
 
   test('create → plan → confirm → build → review → merge → done (main-sequence spine)', async () => {
-    await openBoard();
     await createAndStart('M5 脊柱探针');
 
     const todos = (await api(server.url, 'GET', '/api/todos')).body as {
@@ -379,7 +378,6 @@ describe('M5 web E2E: main sequence full chain (01 §7.4 spine, zero UI reload)'
   }, 300_000);
 
   test('reject branch: request changes at the confirm gate → replanning → plan v2 → confirm → review (r5 §4)', async () => {
-    await openBoard();
     await createAndStart('M5 驳回探针');
     const todos = (await api(server.url, 'GET', '/api/todos')).body as {
       id: string;
@@ -556,11 +554,10 @@ describe('M5 web E2E: main sequence full chain (01 §7.4 spine, zero UI reload)'
     expect(scheduledSteps.map((s) => s.kind)).toEqual(['build']);
     expect((await api(server.url, 'GET', '/api/schedules')).body as unknown[]).toHaveLength(0);
 
-    await openBoard();
-    const reviewCol = page.getByRole('region', { name: '待处理' });
-    await pexpect(reviewCol.locator('[data-todo-id]', { hasText: 'M5 脊柱探针' })).toBeVisible({
-      timeout: 15_000,
-    });
+    const spineProject = (await api(server.url, 'GET', `/api/todos/${spine!.id}`)).body as {
+      projectId: string;
+    };
+    await openProjectTasks(spineProject.projectId);
     await openDetail('M5 脊柱探针');
     await pexpect(page.locator('.chat-scheduled')).toBeVisible({ timeout: 15_000 });
     await waitChip(/审核/);
