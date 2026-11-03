@@ -50,6 +50,17 @@ describe('project secrets are stored per project (D74 P5)', () => {
     });
     expect(res.status).toBe(404);
   });
+
+  test('deleting a project deletes its secrets instead of widening them to the team', async () => {
+    const id = await createProject('cairn');
+    const team = createSecret(deps(), { teamId: s.team.id, name: 'TEAM', value: 'team-value' });
+    createSecret(deps(), { teamId: s.team.id, name: 'DEPLOY', value: 'proj-value', projectId: id });
+    expect((await req(s.app, 'DELETE', `/api/projects/${id}`)).status).toBe(204);
+    const listed = (await (await req(s.app, 'GET', `/api/teams/${s.team.id}/secrets`)).json()) as {
+      id: string;
+    }[];
+    expect(listed.map((row) => row.id)).toEqual([team.id]);
+  });
 });
 
 describe('a step only receives secrets of its own project (D74 P5)', () => {
