@@ -1,9 +1,11 @@
 import {
   OAUTH_FAMILIES,
   PROVIDER_OAUTH_PRESET_IDS,
+  PROVIDER_PRESET_DEFAULTS,
   PROVIDER_PRESET_IDS,
   PROVIDER_XAI_PRESET,
   type ProviderApi,
+  type ProviderModel,
 } from '@cairn/shared';
 import { useEffect, useState } from 'react';
 import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
@@ -12,7 +14,12 @@ import { Checkbox } from '../components/ui/checkbox.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { Field, FieldDescription, FieldError, FieldTitle } from '../components/ui/field.js';
 import { Input } from '../components/ui/input.js';
-import { InputGroup, InputGroupAddon, InputGroupInput } from '../components/ui/input-group.js';
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from '../components/ui/input-group.js';
 import {
   Select,
   SelectContent,
@@ -21,7 +28,7 @@ import {
   SelectValue,
 } from '../components/ui/select.js';
 import { useI18n } from '../i18n/provider.js';
-import { ChevronLeft, PlusSmall, Search } from '../icons/index.js';
+import { ChevronLeft, PlusSmall, Search, X } from '../icons/index.js';
 
 const FIELD_TITLE_CLS = 'text-ui font-medium text-foreground';
 
@@ -127,6 +134,8 @@ const PRESET_LABELS: Record<(typeof PROVIDER_PRESET_IDS)[number], string> = {
   'z-ai-coding-cn': 'Z.AI Coding CN',
 };
 
+const BASE_URL_PLACEHOLDER = /\{[A-Za-z_]+\}/;
+
 const WIRED_OAUTH_IDS: ReadonlySet<string> = new Set(OAUTH_FAMILIES.map((f) => f.presetId));
 
 const PRESET_ROWS = PROVIDER_PRESET_IDS.map((id) => {
@@ -150,7 +159,7 @@ interface CreateProviderDialogProps {
     baseUrl: string;
     api: ProviderApi;
     authHeader?: boolean;
-    models?: { id: string; name: string }[];
+    models?: ProviderModel[];
     apiKey?: string;
   }) => void;
   onConnect?: (presetId: string) => void;
@@ -177,9 +186,14 @@ export function CreateProviderDialog({
   const [api, setApi] = useState<ProviderApi>('openai-completions');
   const [apiKey, setApiKey] = useState('');
   const [authHeader, setAuthHeader] = useState(true);
-  const [modelIds, setModelIds] = useState<string[]>([]);
+  const [models, setModels] = useState<ProviderModel[]>([]);
 
-  const ready = providerId.trim() !== '' && label.trim() !== '' && baseUrl.trim() !== '';
+  const baseUrlHasPlaceholder = BASE_URL_PLACEHOLDER.test(baseUrl);
+  const ready =
+    providerId.trim() !== '' &&
+    label.trim() !== '' &&
+    baseUrl.trim() !== '' &&
+    !baseUrlHasPlaceholder;
 
   useEffect(() => {
     if (open) return;
@@ -192,7 +206,7 @@ export function CreateProviderDialog({
     setApi('openai-completions');
     setApiKey('');
     setAuthHeader(true);
-    setModelIds([]);
+    setModels([]);
   }, [open]);
 
   const rows =
@@ -204,31 +218,31 @@ export function CreateProviderDialog({
         });
 
   const enterForm = (entry: { id: string; label: string } | null) => {
+    const defaults = entry === null ? undefined : PROVIDER_PRESET_DEFAULTS[entry.id];
     setPreset(entry);
     setProviderId(entry?.id ?? '');
     setLabel(entry?.label ?? '');
-    setBaseUrl('');
-    setApi('openai-completions');
+    setBaseUrl(defaults?.baseUrl ?? '');
+    setApi(defaults?.api ?? 'openai-completions');
     setApiKey('');
-    setAuthHeader(true);
-    setModelIds([]);
+    setAuthHeader(defaults?.authHeader ?? true);
+    setModels(defaults?.models ?? []);
     setView('form');
   };
 
   const submit = () => {
     if (!ready || pending === true) return;
     if (onCreate != null) {
-      const models = modelIds
-        .map((id) => id.trim())
-        .filter((id) => id !== '')
-        .map((id) => ({ id, name: id }));
+      const named = models
+        .map((model) => ({ ...model, id: model.id.trim() }))
+        .filter((model) => model.id !== '');
       onCreate({
         providerId: providerId.trim(),
         label: label.trim(),
         baseUrl: baseUrl.trim(),
         api,
         authHeader,
-        ...(models.length > 0 ? { models } : {}),
+        ...(named.length > 0 ? { models: named } : {}),
         ...(apiKey !== '' ? { apiKey } : {}),
       });
     } else {
@@ -347,7 +361,11 @@ export function CreateProviderDialog({
               onChange={(event) => setLabel(event.target.value)}
             />
           </FormField>
-          <FormField label="Base URL" htmlFor="dlg-provider-baseurl">
+          <FormField
+            label="Base URL"
+            htmlFor="dlg-provider-baseurl"
+            help={baseUrlHasPlaceholder ? t('把 Base URL 中的占位符换成你的账户值') : undefined}
+          >
             <Input
               id="dlg-provider-baseurl"
               className={FORM_CONTROL_CLS}
@@ -406,23 +424,33 @@ export function CreateProviderDialog({
           </FormField>
           <Field>
             <FieldTitle className={FIELD_TITLE_CLS}>{t('模型（可选）')}</FieldTitle>
-            {modelIds.map((id, i) => (
-              <Input
-                key={i}
-                className={FORM_CONTROL_CLS}
-                aria-label={t('模型 ID')}
-                value={id}
-                placeholder="claude-sonnet-5"
-                onChange={(event) =>
-                  setModelIds((rows) => rows.map((r, j) => (i === j ? event.target.value : r)))
-                }
-              />
+            {models.map((model, i) => (
+              <InputGroup key={i} className={FORM_CONTROL_CLS}>
+                <InputGroupInput
+                  aria-label={t('模型 ID')}
+                  value={model.id}
+                  placeholder="claude-sonnet-5"
+                  onChange={(event) => {
+                    const id = event.target.value;
+                    setModels((rows) => rows.map((r, j) => (i === j ? { id, name: id } : r)));
+                  }}
+                />
+                <InputGroupAddon align="inline-end">
+                  <InputGroupButton
+                    size="icon-xs"
+                    aria-label={t('移除模型')}
+                    onClick={() => setModels((rows) => rows.filter((_, j) => j !== i))}
+                  >
+                    <X />
+                  </InputGroupButton>
+                </InputGroupAddon>
+              </InputGroup>
             ))}
             <div>
               <Button
                 variant="ghost"
                 className="px-0 text-content-secondary"
-                onClick={() => setModelIds((rows) => [...rows, ''])}
+                onClick={() => setModels((rows) => [...rows, { id: '', name: '' }])}
               >
                 <PlusSmall />
                 {t('添加模型')}

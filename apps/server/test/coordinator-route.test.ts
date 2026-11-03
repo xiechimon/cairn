@@ -1,4 +1,4 @@
-import type { ClaimedStep } from '@cairn/shared';
+import { type ClaimedStep, PROVIDER_PRESET_DEFAULTS } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, afterEach, beforeEach, describe, expect, test } from 'vitest';
@@ -274,6 +274,26 @@ describe('the coordinator route (D70 C5)', () => {
       provider: 'anthropic',
       modelId: 'claude-haiku-5-5',
     });
+  });
+
+  test('a provider added from the Anthropic preset as filled in is the keyed Coordinator route', async () => {
+    const w = await world();
+    const preset = PROVIDER_PRESET_DEFAULTS.anthropic;
+    if (preset === undefined) throw new Error('the Anthropic preset has no defaults');
+    createProvider(
+      { db: w.s.db, box: w.s.secretBox },
+      {
+        teamId: w.teamId,
+        body: { providerId: 'anthropic', label: 'Anthropic', ...preset, apiKey: BYOK_KEY },
+        createdBy: w.s.user.id,
+      },
+    );
+    allowPaidClaude(w);
+    expect((await claim(w)).agent).toMatchObject({
+      provider: 'anthropic',
+      modelId: 'claude-haiku-5-5',
+    });
+    expect(fallbacks).toEqual([]);
   });
 
   test('a keyed provider while the team is subscription-only falls back instead of spending', async () => {

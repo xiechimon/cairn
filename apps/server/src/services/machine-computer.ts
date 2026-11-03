@@ -13,6 +13,10 @@ import { nowMs } from '../lib/ids.js';
 export const COMPUTER_OUTPUT_HEAD_CHARS = 16 * 1024;
 export const COMPUTER_OUTPUT_TAIL_CHARS = 48 * 1024;
 
+export const COMPUTER_OUTPUT_PENDING_CHARS = 64 * 1024;
+
+const pendingOutput = new Map<string, string>();
+
 const FINISHED_STATES: ReadonlySet<ComputerCallState> = new Set(['done', 'error', 'interrupted']);
 
 type CallRow = typeof computerCall.$inferSelect;
@@ -22,25 +26,39 @@ function redact(text: string): string {
   return redactSecrets(text).value as string;
 }
 
-function appendOutput(
-  out: Pick<CallRow, 'outputHead' | 'outputTail' | 'outputChars'>,
-  text: string,
-): Pick<CallRow, 'outputHead' | 'outputTail' | 'outputChars'> {
-  const joined = redact(out.outputHead + out.outputTail + text);
+type Output = Pick<CallRow, 'outputHead' | 'outputTail' | 'outputChars'> & { pending: string };
+
+function appendOutput(out: Output, text: string, flush: boolean): Output {
+  const raw = out.pending + text;
+  let start = raw.length;
+  while (start > 0 && !/\s/.test(raw[start - 1] ?? '')) start--;
+  const keep = !flush && raw.length - start <= COMPUTER_OUTPUT_PENDING_CHARS;
+  const pending = keep ? raw.slice(start) : '';
+  const settled = keep ? raw.slice(0, start) : raw;
+  const joined =
+    settled === ''
+      ? out.outputHead + out.outputTail
+      : redact(out.outputHead + out.outputTail + settled);
   return {
     outputHead: joined.slice(0, COMPUTER_OUTPUT_HEAD_CHARS),
     outputTail: joined.slice(COMPUTER_OUTPUT_HEAD_CHARS).slice(-COMPUTER_OUTPUT_TAIL_CHARS),
     outputChars: out.outputChars + text.length,
+    pending,
   };
 }
 
-function applyFrames(row: CallRow, frames: readonly ComputerFrame[], now: number): CallPatch {
+function applyFrames(
+  row: CallRow,
+  frames: readonly ComputerFrame[],
+  now: number,
+): { patch: CallPatch; pending: string } {
   let expected = row.lastSeq + 1;
   let finished = false;
-  let output = {
+  let output: Output = {
     outputHead: row.outputHead,
     outputTail: row.outputTail,
     outputChars: row.outputChars,
+    pending: pendingOutput.get(row.id) ?? '',
   };
   const patch: CallPatch = {};
   for (const frame of frames) {
@@ -51,12 +69,13 @@ function applyFrames(row: CallRow, frames: readonly ComputerFrame[], now: number
     expected++;
     switch (frame.kind) {
       case 'output':
-        output = appendOutput(output, frame.text);
+        output = appendOutput(output, frame.text, false);
         break;
       case 'heartbeat':
         break;
       case 'done':
         finished = true;
+        output = appendOutput(output, '', true);
         Object.assign(patch, {
           resultText: redact(frame.text),
           resultImages: frame.images ?? null,
@@ -67,6 +86,7 @@ function applyFrames(row: CallRow, frames: readonly ComputerFrame[], now: number
         break;
       case 'error':
         finished = true;
+        output = appendOutput(output, '', true);
         Object.assign(patch, {
           errorMessage: redact(frame.message),
           errorDelivery: frame.delivery,
@@ -76,14 +96,18 @@ function applyFrames(row: CallRow, frames: readonly ComputerFrame[], now: number
         break;
     }
   }
+  const { pending, ...stored } = output;
   return {
-    ...output,
-    ...patch,
-    lastSeq: expected - 1,
-    ...(row.startedAt === null ? { startedAt: now } : {}),
-    ...(row.state === 'dispatched' && patch.state === undefined
-      ? { state: 'running' as const }
-      : {}),
+    pending,
+    patch: {
+      ...stored,
+      ...patch,
+      lastSeq: expected - 1,
+      ...(row.startedAt === null ? { startedAt: now } : {}),
+      ...(row.state === 'dispatched' && patch.state === undefined
+        ? { state: 'running' as const }
+        : {}),
+    },
   };
 }
 
@@ -93,7 +117,7 @@ export function receiveComputerFrames(
   callId: string,
   frames: readonly ComputerFrame[],
 ): MachineComputerFramesResponse {
-  return db.transaction((tx) => {
+  const result = db.transaction((tx) => {
     const row = tx.select().from(computerCall).where(eq(computerCall.id, callId)).get();
     if (!row || row.machineId !== machineId) throw new HttpError(404, 'computer call not found');
     const ordered = [...frames].sort((a, b) => a.seq - b.seq);
@@ -102,14 +126,15 @@ export function receiveComputerFrames(
     }
     const fresh = ordered.filter((f) => f.seq > row.lastSeq);
     const cancelled = row.state === 'cancelled';
-    if (fresh.length === 0) return { ok: true as const, cancelled };
+    if (fresh.length === 0) return { response: { ok: true as const, cancelled }, pending: null };
     if (FINISHED_STATES.has(row.state) || (cancelled && row.finishedAt !== null)) {
       throw new HttpError(409, `computer call already ${row.state}`);
     }
-    tx.update(computerCall)
-      .set(applyFrames(row, fresh, nowMs()))
-      .where(eq(computerCall.id, callId))
-      .run();
-    return { ok: true as const, cancelled };
+    const { patch, pending } = applyFrames(row, fresh, nowMs());
+    tx.update(computerCall).set(patch).where(eq(computerCall.id, callId)).run();
+    return { response: { ok: true as const, cancelled }, pending };
   });
+  if (result.pending === '') pendingOutput.delete(callId);
+  else if (result.pending !== null) pendingOutput.set(callId, result.pending);
+  return result.response;
 }

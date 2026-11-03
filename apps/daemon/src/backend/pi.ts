@@ -18,6 +18,11 @@ import type {
 } from '@cairn/shared';
 import { ENV_VARS, THINKING_LEVELS } from '@cairn/shared';
 import {
+  type BuiltinProvider,
+  getAllBuiltinModels,
+  getBuiltinProviders,
+} from '@earendil-works/pi-ai/providers/all';
+import {
   type AgentSession,
   createAgentSession,
   createBashToolDefinition,
@@ -1142,6 +1147,16 @@ function mergedCompat(provider: ProviderConfig): ProviderCompat | undefined {
   return hasAny ? merged : undefined;
 }
 
+function isBuiltinProvider(providerId: string): providerId is BuiltinProvider {
+  const builtin: readonly string[] = getBuiltinProviders();
+  return builtin.includes(providerId);
+}
+
+function builtinModelIds(providerId: string): ReadonlySet<string> {
+  if (!isBuiltinProvider(providerId)) return new Set();
+  return new Set(getAllBuiltinModels(providerId).map((model) => model.id));
+}
+
 export function materializeProvider(modelsPath: string, provider: ProviderConfig): void {
   if (!provider.baseUrl) return;
   const serverCompatKey = JSON.stringify(provider.compat ?? null);
@@ -1159,22 +1174,28 @@ export function materializeProvider(modelsPath: string, provider: ProviderConfig
     : {};
   const providers = raw.providers ?? {};
   const compat = mergedCompat(provider);
+  const builtin = builtinModelIds(provider.providerId);
+  const declared = (provider.models ?? []).filter((m) => !builtin.has(m.id));
   providers[provider.providerId] = {
     baseUrl: provider.baseUrl,
     api: provider.api ?? 'openai-completions',
     apiKey: MODELS_JSON_KEY_PLACEHOLDER,
     ...(provider.authHeader !== undefined ? { authHeader: provider.authHeader } : {}),
     ...(compat !== undefined ? { compat } : {}),
-    models: (provider.models ?? []).map((m) => ({
-      id: m.id,
-      name: m.name,
-      ...CUSTOM_MODEL_DEFAULTS,
-      ...(m.cost !== undefined ? { cost: m.cost } : {}),
-      ...(m.contextWindow !== undefined ? { contextWindow: m.contextWindow } : {}),
-      ...(m.maxTokens !== undefined ? { maxTokens: m.maxTokens } : {}),
-      ...(m.input !== undefined ? { input: m.input } : {}),
-      ...customModelReasoning(),
-    })),
+    ...(builtin.size > 0 && declared.length === 0
+      ? {}
+      : {
+          models: declared.map((m) => ({
+            id: m.id,
+            name: m.name,
+            ...CUSTOM_MODEL_DEFAULTS,
+            ...(m.cost !== undefined ? { cost: m.cost } : {}),
+            ...(m.contextWindow !== undefined ? { contextWindow: m.contextWindow } : {}),
+            ...(m.maxTokens !== undefined ? { maxTokens: m.maxTokens } : {}),
+            ...(m.input !== undefined ? { input: m.input } : {}),
+            ...customModelReasoning(),
+          })),
+        }),
   };
   writeFileSync(modelsPath, `${JSON.stringify({ providers }, null, 2)}\n`, 'utf8');
 }
