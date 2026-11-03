@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import { boot, FakeMachineApi, waitFor } from './machine-loop-harness.js';
+import { FakeOrbProvider } from './orb-fake.js';
 
 describe('online sequence canon (02 §5.4/r3 §1.5)', () => {
   test('unregistered → enroll → full sequence line order', async () => {
@@ -51,11 +52,43 @@ describe('online sequence canon (02 §5.4/r3 §1.5)', () => {
     expect((api.enrollBodies[0] as { capabilities?: unknown }).capabilities).toEqual({
       mcpServers: ['figma'],
       skills: ['verify-cairn'],
+      executor: 'host',
     });
     expect((api.presenceBodies[0] as { capabilities?: unknown }).capabilities).toEqual({
       mcpServers: ['figma'],
       skills: ['verify-cairn'],
+      executor: 'host',
     });
+    await handle.stop();
+    await handle.done;
+  });
+
+  test('D71 an Orb executor daemon reports executor orb on enroll and presence', async () => {
+    const { handle, api } = await boot({
+      capabilitiesProbe: () => ({ mcpServers: [], skills: [] }),
+      orbProvider: new FakeOrbProvider({
+        runner: async () => ({ code: 0, stdout: '', stderr: '' }),
+      }),
+    });
+    await waitFor(() => api.presenceBodies.length > 0);
+    expect(
+      (api.enrollBodies[0] as { capabilities?: { executor?: string } }).capabilities?.executor,
+    ).toBe('orb');
+    expect(
+      (api.presenceBodies[0] as { capabilities?: { executor?: string } }).capabilities?.executor,
+    ).toBe('orb');
+    await handle.stop();
+    await handle.done;
+  });
+
+  test('D71 a probe that names an executor cannot override the provider the daemon actually runs', async () => {
+    const { handle, api } = await boot({
+      capabilitiesProbe: () => ({ mcpServers: [], skills: [], executor: 'orb' }),
+    });
+    await waitFor(() => api.presenceBodies.length > 0);
+    expect(
+      (api.presenceBodies[0] as { capabilities?: { executor?: string } }).capabilities?.executor,
+    ).toBe('host');
     await handle.stop();
     await handle.done;
   });

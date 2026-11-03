@@ -7635,6 +7635,10 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > age
         {
           "additionalProperties": false,
           "properties": {
+            "executor": {
+              "const": "orb",
+              "type": "string",
+            },
             "mcpServers": {
               "items": {
                 "type": "string",
@@ -8406,6 +8410,13 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
         {
           "additionalProperties": false,
           "properties": {
+            "executor": {
+              "enum": [
+                "orb",
+                "host",
+              ],
+              "type": "string",
+            },
             "hardware": {
               "additionalProperties": false,
               "properties": {

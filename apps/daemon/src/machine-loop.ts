@@ -170,12 +170,22 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     });
   claudeAuth = await probeAuthAndRemember();
 
-  const capabilitiesReport =
+  const capEnv = opts.capEnv ?? process.env;
+  const orbProvider =
+    opts.orbProvider ??
+    (capEnv.CAIRN_EXECUTOR === 'orb'
+      ? new NspawnOrbProvider({ stateFile: join(paths.home, 'orb-state', 'orbs.json') })
+      : new HostOrbProvider());
+  const capabilitiesProbe =
     opts.capabilitiesProbe ??
     createMachineCapabilitiesProbe({
       mcpConfigPath: config.mcpConfigPath,
       skillsDir: config.skillsDir,
     });
+  const capabilitiesReport = (): MachineCapabilities => ({
+    ...capabilitiesProbe(),
+    executor: orbProvider.kind,
+  });
 
   let claudeBackend: AgentBackend | null = opts.claudeCodeBackend ?? null;
   let geminiBackend: AgentBackend | null = opts.geminiBackend ?? null;
@@ -288,12 +298,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
 
   let localCap = 1;
   let serverGates = false;
-  const capEnv = opts.capEnv ?? process.env;
-  const orbProvider =
-    opts.orbProvider ??
-    (capEnv.CAIRN_EXECUTOR === 'orb'
-      ? new NspawnOrbProvider({ stateFile: join(paths.home, 'orb-state', 'orbs.json') })
-      : new HostOrbProvider());
   const idleStop = Number(capEnv.CAIRN_ORB_IDLE_STOP_MS);
   const orbs = new OrbLifecycle(orbProvider, {
     max: resolveOrbCap(capEnv, localCap),
