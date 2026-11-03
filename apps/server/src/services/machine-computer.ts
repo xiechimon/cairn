@@ -26,19 +26,11 @@ function appendOutput(
   out: Pick<CallRow, 'outputHead' | 'outputTail' | 'outputChars'>,
   text: string,
 ): Pick<CallRow, 'outputHead' | 'outputTail' | 'outputChars'> {
-  const outputChars = out.outputChars + text.length;
-  if (out.outputHead.length < COMPUTER_OUTPUT_HEAD_CHARS && out.outputTail.length === 0) {
-    const joined = redact(out.outputHead + text);
-    return {
-      outputHead: joined.slice(0, COMPUTER_OUTPUT_HEAD_CHARS),
-      outputTail: joined.slice(COMPUTER_OUTPUT_HEAD_CHARS).slice(-COMPUTER_OUTPUT_TAIL_CHARS),
-      outputChars,
-    };
-  }
+  const joined = redact(out.outputHead + out.outputTail + text);
   return {
-    outputHead: out.outputHead,
-    outputTail: redact(out.outputTail + text).slice(-COMPUTER_OUTPUT_TAIL_CHARS),
-    outputChars,
+    outputHead: joined.slice(0, COMPUTER_OUTPUT_HEAD_CHARS),
+    outputTail: joined.slice(COMPUTER_OUTPUT_HEAD_CHARS).slice(-COMPUTER_OUTPUT_TAIL_CHARS),
+    outputChars: out.outputChars + text.length,
   };
 }
 

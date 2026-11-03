@@ -223,6 +223,27 @@ describe('POST /api/machine/computer/:callId', () => {
     expect(dump).toContain('[REDACTED]');
   });
 
+  test('a token split exactly at the head limit across two frames is still redacted', async () => {
+    const { s, owner, id } = await setup();
+    const suffix = 'b'.repeat(36);
+    const res = await post(s.app, `/api/machine/computer/${id}`, owner.token, {
+      frames: [
+        {
+          kind: 'output',
+          seq: 1,
+          stream: 'stdout',
+          text: `${'x'.repeat(COMPUTER_OUTPUT_HEAD_CHARS - 4)}ghp_`,
+        },
+        { kind: 'output', seq: 2, stream: 'stdout', text: `${suffix} after` },
+      ],
+    });
+    expect(res.status).toBe(200);
+    const r = row(s, id);
+    expect(r.outputHead + r.outputTail).not.toContain(suffix);
+    expect(r.outputHead.endsWith('ghp_')).toBe(false);
+    expect(r.outputHead + r.outputTail).toContain('[REDACTED] after');
+  });
+
   test('output keeps a bounded head and tail with the full character count', async () => {
     const { s, owner, id } = await setup();
     const chunk = 'x'.repeat(60 * 1024);
