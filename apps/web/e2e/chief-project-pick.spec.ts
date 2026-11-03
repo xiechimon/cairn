@@ -295,32 +295,6 @@ test.describe('the home sends to the project it is filtered to (#2531)', () => {
     await shot(page, 'home-project-phone.png');
   });
 
-  test('asking from the project home sends that projectId and opens the project chat', async ({ page }) => {
-    const state = await mockLive(page);
-    await page.goto('/app?project=proj-2');
-    await expect(page.getByTestId('project-home')).toContainText('官网 cairn.xmon.me');
-    await page.getByTestId('project-home-ask').fill('官网首页还差什么');
-    await page.getByTestId('project-home-ask').press('Enter');
-    await expect.poll(() => state.sent).toEqual([{ content: '官网首页还差什么', projectId: 'proj-2' }]);
-    await expect(page).toHaveURL(/project=proj-2.*chat=1/);
-    await expect(homeInput(page)).toHaveAttribute('placeholder', /cairn-site/);
-  });
-
-  test('a failed ask keeps the question on the project home', async ({ page }) => {
-    const state = await mockLive(page);
-    await page.route('**/api/teams/t1/chief/threads', (route) =>
-      route.request().method() === 'POST'
-        ? route.fulfill({ status: 500, json: { error: 'down' } })
-        : route.fallback(),
-    );
-    await page.goto('/app?project=proj-2');
-    await page.getByTestId('project-home-ask').fill('官网首页还差什么');
-    await page.getByTestId('project-home-ask').press('Enter');
-    await expect(page.getByTestId('project-home-ask')).toHaveValue('官网首页还差什么');
-    await expect(page).not.toHaveURL(/chat=1/);
-    expect(state.sent).toEqual([]);
-  });
-
   test('the project home shows the saved instructions and counts only merged work this week', async ({
     page,
   }) => {
@@ -367,31 +341,5 @@ test.describe('the home sends to the project it is filtered to (#2531)', () => {
     const row = page.getByTestId('project-home').getByText('Task archived');
     await expect(row).toBeVisible();
     await expect(page.getByTestId('project-home')).not.toContainText('1970');
-  });
-
-  test('a slow ask does not pull the user back after they move to another project', async ({ page }) => {
-    const state = await mockLive(page);
-    let release: () => void = () => {};
-    const gate = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    await page.route('**/api/teams/t1/chief/threads', async (route) => {
-      if (route.request().method() !== 'POST') return route.fallback();
-      await gate;
-      return route.fallback();
-    });
-    await page.goto('/app?project=proj-2');
-    await page.getByTestId('project-home-ask').fill('官网首页还差什么');
-    await page.getByTestId('project-home-ask').press('Enter');
-    await expect(page.getByTestId('project-home-ask')).toHaveAttribute('readonly', '');
-    await page.locator('[data-slot="sidebar-project-row"]', { hasText: 'radar-digest' }).click();
-    await expect(page).toHaveURL(/project=proj-3/);
-    await expect(page.getByTestId('project-home-ask')).toHaveValue('');
-    await page.getByTestId('project-home-ask').fill('雷达摘要的草稿');
-    release();
-    await expect.poll(() => state.sent.length).toBe(1);
-    await expect(page).toHaveURL(/project=proj-3/);
-    await expect(page).not.toHaveURL(/chat=1/);
-    await expect(page.getByTestId('project-home-ask')).toHaveValue('雷达摘要的草稿');
   });
 });

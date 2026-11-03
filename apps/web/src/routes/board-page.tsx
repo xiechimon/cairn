@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { useLocation, useNavigate, useSearchParams } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import {
   useApiMutations,
   useBackupNotice,
@@ -30,9 +30,6 @@ import { SHEET_PANEL } from '../pages/shell.js';
 export function BoardPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const location = useLocation();
-  const currentLocationKey = useRef(location.key);
-  currentLocationKey.current = location.key;
   const { live, teamId } = useLiveData();
   const fixture = resolveScenario(searchParams);
   const { surface: chief } = useChiefRoot();
@@ -85,19 +82,9 @@ export function BoardPage() {
   }, [homeProject, projectChat, chiefView, searchParams, navigate]);
   const schedules = live ? mapSchedules(schedulesQ.data ?? []) : (fixture.schedules ?? []);
   const now = live ? Date.now() : fixture.now;
-  const askAboutProject = async (project: ProjectHomeProject, text: string): Promise<boolean> => {
-    const originKey = location.key;
-    try {
-      await chief.onSend?.(text, project.id);
-    } catch {
-      return false;
-    }
-    if (currentLocationKey.current !== originKey) return true;
-    const params = new URLSearchParams(searchParams);
-    params.set('chat', '1');
-    navigate({ pathname: '/app', search: `?${params.toString()}` });
-    return true;
-  };
+  const chatParams = new URLSearchParams(searchParams);
+  chatParams.set('chat', '1');
+  const projectChatHref = `/app?${chatParams.toString()}`;
 
   const fixtureTodos = useMemo(() => withoutDeleted(fixture.todos), [fixture]);
   const liveTodos = useMemo(() => (todosQ.data ?? []).map(toDisplayTodo), [todosQ.data]);
@@ -149,7 +136,7 @@ export function BoardPage() {
             todos={todos}
             schedules={schedules}
             now={now}
-            onAsk={(text) => askAboutProject(homeProject, text)}
+            chatHref={projectChatHref}
           />
         ) : (
           <HomeC

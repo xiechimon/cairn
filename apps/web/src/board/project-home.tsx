@@ -1,6 +1,5 @@
 import type { ProjectColor, ProjectIcon } from '@cairn/shared';
 import {
-  ArrowUp,
   BookText,
   Brain,
   FolderOpen,
@@ -8,9 +7,10 @@ import {
   KeyRound,
   Layers,
   ListTodo,
+  MessageSquare,
   Settings2,
 } from 'lucide-react';
-import { type FormEvent, type ReactNode, useState } from 'react';
+import type { ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { EmptyState } from '../components/empty-state.js';
 import { ListCard, ListRow } from '../components/list-card.js';
@@ -20,7 +20,6 @@ import { Greeting } from '../components/stream/greeting.js';
 import { ScheduledTaskRow } from '../components/thread/scheduled-task-row.js';
 import { ThreadRow } from '../components/thread/thread-row.js';
 import { Button } from '../components/ui/button.js';
-import { InputGroup, InputGroupAddon, InputGroupInput } from '../components/ui/input-group.js';
 import type { ScheduleRecord, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { scheduleSummary } from '../pages/schedule-summary.js';
@@ -64,17 +63,16 @@ export function ProjectHome({
   todos,
   schedules,
   now,
-  onAsk,
+  chatHref,
 }: {
   project: ProjectHomeProject;
   todos: readonly TodoRecord[];
   schedules: readonly ScheduleRecord[];
   now: number;
-  onAsk: (text: string) => Promise<boolean>;
+  chatHref: string;
 }) {
   const { t } = useI18n();
   const navigate = useNavigate();
-  const [question, setQuestion] = useState('');
   const own = todos.filter((todo) => todo.projectId === project.id && todo.archivedAt == null);
   const needsYou = needsYouThreads(own);
   const running = own.filter((todo) => threadStatus(todo) === 'running');
@@ -99,16 +97,6 @@ export function ProjectHome({
       onOpen={() => navigate(threadHref(todo.id))}
     />
   );
-  const [sending, setSending] = useState(false);
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    const text = question.trim();
-    if (text === '' || sending) return;
-    setSending(true);
-    const sent = await onAsk(text);
-    setSending(false);
-    if (sent) setQuestion('');
-  };
 
   return (
     <section
@@ -173,25 +161,15 @@ export function ProjectHome({
               { value: String(mergedThisWeek), label: t('本周合并') },
             ]}
           />
-          <form onSubmit={submit} className="mt-5 max-w-160">
-            <InputGroup className="h-11 rounded-xl bg-card shadow-(--e1)">
-              <InputGroupInput
-                data-testid="project-home-ask"
-                readOnly={sending}
-                aria-busy={sending}
-                value={question}
-                onChange={(event) => setQuestion(event.target.value)}
-                placeholder={t('问 Coordinator 关于 {name} 的事…', { name: project.name })}
-                aria-label={t('问 Coordinator 关于 {name} 的事…', { name: project.name })}
-                className="text-ui"
-              />
-              <InputGroupAddon align="inline-end">
-                <Button type="submit" size="icon-sm" variant="ghost" aria-label={t('发送')}>
-                  <ArrowUp aria-hidden="true" />
-                </Button>
-              </InputGroupAddon>
-            </InputGroup>
-          </form>
+          <Button
+            variant="outline"
+            data-testid="project-home-ask"
+            className="mt-5 h-11 w-full max-w-160 justify-start gap-2 rounded-xl bg-card text-ui font-normal text-content-secondary shadow-(--e1)"
+            render={<Link to={chatHref} />}
+          >
+            <MessageSquare aria-hidden="true" className="size-4" />
+            {t('问 Coordinator 关于 {name} 的事…', { name: project.name })}
+          </Button>
           <div className="mt-8 grid grid-cols-[minmax(0,1fr)_20rem] gap-6 max-[960px]:grid-cols-1">
             <section aria-label="Threads">
               {own.length === 0 ? (

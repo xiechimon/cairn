@@ -52,13 +52,10 @@ test('the project home links to files and project settings', async ({ page }) =>
   await expect(page).toHaveURL(new RegExp(`/app/project/${PROJECT_ID}/settings`));
 });
 
-test('asking the Coordinator opens the project chat scoped to this project', async ({ page }) => {
+test('the ask link opens the project chat scoped to this project', async ({ page }) => {
   await page.goto(projectHome());
-  const ask = home(page).getByTestId('project-home-ask');
-  await ask.fill('What is left before the next release?');
-  await ask.press('Enter');
+  await home(page).getByTestId('project-home-ask').click();
   await expect(page).toHaveURL(new RegExp(`project=${PROJECT_ID}.*chat=1`));
-  await expect(page.getByTestId('home-c')).toBeVisible();
   await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toHaveAttribute(
     'placeholder',
     /cairn/,
