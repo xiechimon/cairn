@@ -14,7 +14,7 @@ const { values } = parseArgs({
 });
 if (!values.db || !values.thread || !values.summary || !values.store) {
   console.error(
-    'usage: seed-cli --db <read-only server.db backup> --thread <chief thread id> --summary <fold state.json> --store <coordinator.sqlite>',
+    'usage: seed-cli --db <read-only server.db backup> --thread <chief thread id> --summary <fold state.json> --store <threads/THREAD_ID.sqlite>',
   );
   process.exit(2);
 }

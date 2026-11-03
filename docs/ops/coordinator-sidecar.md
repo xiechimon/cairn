@@ -14,7 +14,7 @@ The Coordinator runs in `apps/coordinator`, a separate process next to the serve
 | `CAIRN_HOME` | `~/.cairn` | Token file and store live under `coordinator/` |
 | `CAIRN_COORDINATOR_SERVER_URL` | `http://127.0.0.1:8787` | Server the sidecar claims from |
 | `CAIRN_COORDINATOR_TOKEN_FILE` | `$CAIRN_HOME/coordinator/machine-token` | Machine token |
-| `CAIRN_COORDINATOR_STORE` | `$CAIRN_HOME/coordinator/coordinator.sqlite` | Pi Durable store |
+| `CAIRN_COORDINATOR_STORE_DIR` | `$CAIRN_HOME/coordinator/threads` | Directory of Pi Durable stores, one `<chief thread id>.sqlite` per Coordinator thread |
 | `CAIRN_COORDINATOR_SUMMARY_MODEL` | `claude-haiku-5-5` | Model that folds old turns, on the Coordinator's provider |
 
 ## Cutover
@@ -51,14 +51,14 @@ The Coordinator runs in `apps/coordinator`, a separate process next to the serve
    ```bash
    pnpm --filter @cairn/coordinator exec tsx src/seed-cli.ts \
      --db /tmp/coordinator-cutover.db --thread "$THREAD_ID" \
-     --summary <fold state.json> --store ~/.cairn/coordinator/coordinator.sqlite \
+     --summary <fold state.json> --store ~/.cairn/coordinator/threads/"$THREAD_ID".sqlite \
      --provider <Coordinator provider id> --model <Coordinator model id>
    ```
 
    The fold state is `{ "summary": "...", "at": <createdAt of the last folded row> }`. Rows after `at` are seeded verbatim, at most the newest 100; older ones stay readable through `read_history`.
 
 4. Restart the server with `CAIRN_COORDINATOR_MACHINE_ID=<machineId>`.
-5. Start the sidecar: `pnpm --filter @cairn/coordinator dev`. It logs `turn <step> claimed` and `turn <step> success` per turn. It holds `coordinator.sqlite.lock` with its pid; a second sidecar on the same store exits with `in use by another Coordinator sidecar`. To stop it, signal the pid in that file, not `pnpm`: killing `pnpm` with SIGKILL leaves the node process running.
+5. Start the sidecar: `pnpm --filter @cairn/coordinator dev`. It logs `turn <step> claimed` and `turn <step> success` per turn. It holds `threads.lock` beside the store directory with its pid; a second sidecar on the same directory exits with `in use by another Coordinator sidecar`. To stop it, signal the pid in that file, not `pnpm`: killing `pnpm` with SIGKILL leaves the node process running.
 6. Send the Coordinator a message and check that its answer appears in the conversation.
 
 ## Rollback
@@ -71,4 +71,4 @@ Restart the sidecar the same way. It claims its unfinished turn again under the 
 
 ## Upgrading Pi Durable
 
-Stored data migrates one way: once a newer pi-durable has written the store, an older one cannot open it. Before changing the pinned version, stop the sidecar and copy `coordinator.sqlite`; roll back by restoring that copy, which loses the turns since.
+Stored data migrates one way: once a newer pi-durable has written the store, an older one cannot open it. Before changing the pinned version, stop the sidecar and copy the `threads` directory; roll back by restoring that copy, which loses the turns since.

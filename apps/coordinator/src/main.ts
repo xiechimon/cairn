@@ -1,5 +1,4 @@
 import { mkdirSync } from 'node:fs';
-import { dirname } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { readConfig } from './config.js';
 import { claimLoop } from './loop.js';
@@ -8,8 +7,8 @@ import { startRuntime } from './runtime/start.js';
 import { acquireStoreLock } from './store-lock.js';
 
 const config = readConfig(process.env);
-mkdirSync(dirname(config.storagePath), { recursive: true, mode: 0o700 });
-const releaseStoreLock = acquireStoreLock(config.storagePath);
+mkdirSync(config.storageDir, { recursive: true, mode: 0o700 });
+const releaseStoreLock = acquireStoreLock(config.storageDir);
 const api = httpMachineApi(config.serverUrl, config.machineToken);
 const log = (line: string) => console.log(`${new Date().toISOString()} [coordinator] ${line}`);
 const runtime = await startRuntime(config, api);
@@ -20,7 +19,7 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     log(`${signal}: closing after the current turn`);
   });
 }
-log(`storage ${config.storagePath}, server ${config.serverUrl}`);
+log(`storage ${config.storageDir}, server ${config.serverUrl}`);
 await claimLoop({
   api,
   runTurn: runtime.runTurn,

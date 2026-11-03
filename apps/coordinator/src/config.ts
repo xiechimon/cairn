@@ -5,7 +5,7 @@ import { join } from 'node:path';
 export interface CoordinatorConfig {
   serverUrl: string;
   machineToken: string;
-  storagePath: string;
+  storageDir: string;
   heartbeatMs: number;
   summaryModelId: string;
 }
@@ -26,7 +26,7 @@ export function readConfig(env: NodeJS.ProcessEnv): CoordinatorConfig {
   return {
     serverUrl: env.CAIRN_COORDINATOR_SERVER_URL ?? 'http://127.0.0.1:8787',
     machineToken: readMachineToken(env.CAIRN_COORDINATOR_TOKEN_FILE ?? join(dir, 'machine-token')),
-    storagePath: env.CAIRN_COORDINATOR_STORE ?? join(dir, 'coordinator.sqlite'),
+    storageDir: env.CAIRN_COORDINATOR_STORE_DIR ?? join(dir, 'threads'),
     heartbeatMs: 15_000,
     summaryModelId: env.CAIRN_COORDINATOR_SUMMARY_MODEL ?? 'claude-haiku-5-5',
   };
