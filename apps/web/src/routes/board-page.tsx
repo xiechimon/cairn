@@ -72,11 +72,16 @@ export function BoardPage() {
   const projectChat = searchParams.get('chat') === '1';
   const schedules = live ? mapSchedules(schedulesQ.data ?? []) : (fixture.schedules ?? []);
   const now = live ? Date.now() : fixture.now;
-  const askAboutProject = (project: ProjectHomeProject, text: string) => {
+  const askAboutProject = async (project: ProjectHomeProject, text: string): Promise<boolean> => {
+    try {
+      await chief.onSend?.(text, project.id);
+    } catch {
+      return false;
+    }
     const params = new URLSearchParams(searchParams);
     params.set('chat', '1');
-    void chief.onSend?.(text, project.id);
     navigate({ pathname: '/app', search: `?${params.toString()}` });
+    return true;
   };
 
   const fixtureTodos = useMemo(() => withoutDeleted(fixture.todos), [fixture]);

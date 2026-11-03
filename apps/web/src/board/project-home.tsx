@@ -69,7 +69,7 @@ export function ProjectHome({
   todos: readonly TodoRecord[];
   schedules: readonly ScheduleRecord[];
   now: number;
-  onAsk: (text: string) => void;
+  onAsk: (text: string) => Promise<boolean>;
 }) {
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -96,12 +96,15 @@ export function ProjectHome({
       onOpen={() => navigate(threadHref(todo.id))}
     />
   );
-  const submit = (event: FormEvent) => {
+  const [sending, setSending] = useState(false);
+  const submit = async (event: FormEvent) => {
     event.preventDefault();
     const text = question.trim();
-    if (text === '') return;
-    setQuestion('');
-    onAsk(text);
+    if (text === '' || sending) return;
+    setSending(true);
+    const sent = await onAsk(text);
+    setSending(false);
+    if (sent) setQuestion('');
   };
 
   return (

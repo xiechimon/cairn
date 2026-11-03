@@ -305,4 +305,19 @@ test.describe('the home sends to the project it is filtered to (#2531)', () => {
     await expect(page).toHaveURL(/project=proj-2.*chat=1/);
     await expect(homeInput(page)).toHaveAttribute('placeholder', /cairn-site/);
   });
+
+  test('a failed ask keeps the question on the project home', async ({ page }) => {
+    const state = await mockLive(page);
+    await page.route('**/api/teams/t1/chief/threads', (route) =>
+      route.request().method() === 'POST'
+        ? route.fulfill({ status: 500, json: { error: 'down' } })
+        : route.fallback(),
+    );
+    await page.goto('/app?project=proj-2');
+    await page.getByTestId('project-home-ask').fill('官网首页还差什么');
+    await page.getByTestId('project-home-ask').press('Enter');
+    await expect(page.getByTestId('project-home-ask')).toHaveValue('官网首页还差什么');
+    await expect(page).not.toHaveURL(/chat=1/);
+    expect(state.sent).toEqual([]);
+  });
 });

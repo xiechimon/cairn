@@ -66,6 +66,14 @@ test('asking the Coordinator opens the project chat scoped to this project', asy
   await expect(home(page)).toBeVisible();
 });
 
+test('from a project chat, clicking a sidebar project opens that project home', async ({ page }) => {
+  await page.goto(projectHome('&chat=1'));
+  await expect(page.getByTestId('home-c')).toBeVisible();
+  await page.locator('[data-slot="sidebar-project-row"]', { hasText: 'Credential relay' }).click();
+  await expect(home(page)).toBeVisible();
+  await expect(page).not.toHaveURL(/chat=1/);
+});
+
 test('instructions, memory, secrets and concurrency show where they will live', async ({ page }) => {
   await page.goto(projectHome());
   for (const title of ['Instructions', 'Project memory', 'Schedules']) {
