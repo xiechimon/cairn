@@ -249,7 +249,10 @@ export function machineEligibility(input: EligibilityInput): MachineIneligibilit
   const { machine: machineRow, agent: agentRow, model } = input;
   const runtime = stepRuntimeFor(model.provider);
   if (!machineRow.enabledRuntimes.includes(runtime)) return { kind: 'runtime' };
-  const modelReject = homeMachineRejectReason(machineRow, model, input.catalog);
+  const modelReject =
+    agentRow.machineId === machineRow.id
+      ? null
+      : homeMachineRejectReason(machineRow, model, input.catalog);
   if (modelReject !== null) return { kind: 'model', reason: modelReject };
   const missing = capabilityMissingLabels(
     missingCapabilityItems(machineRow, agentRow.requiredCapabilities),

@@ -55,6 +55,7 @@ import { isNotifiedPhase, notifyTodoPhase } from './notifications.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { assertPhaseTransition, canManualMovePhase } from './phase.js';
 import type { VapidKeys } from './push.js';
+import { routeForStep } from './routing-rules.js';
 import { ARCHIVED_SCHEDULE_PAUSE_REASON, pauseTodoSchedule } from './schedules.js';
 import { endSnoozeOn } from './snooze.js';
 import { notifyThreadPhase } from './thread-push.js';
@@ -202,28 +203,24 @@ function waitingOnOf(
   if (held !== undefined) {
     return { on: 'quota', retryAt: held.holdUntil ?? null };
   }
-  for (const s of pendingSteps) {
-    const agentRow = agentForStepEligibility(deps.db, row, s.kind, s.prompt);
-    if (agentRow === null) continue;
-    if (agentRow.machineId === null) {
-      return { on: 'machine', retryAt: null };
-    }
-    const home = deps.db.select().from(machine).where(eq(machine.id, agentRow.machineId)).get();
-    if (home === undefined || !home.online) {
-      return { on: 'machine', retryAt: null };
-    }
-    if (!runtimeGatePasses(home, s.fallback?.model?.provider ?? agentRow.provider)) {
-      return { on: 'machine', retryAt: null };
-    }
-    if (!capabilityGatePasses(home, agentRow)) {
-      return { on: 'machine', retryAt: null };
-    }
-  }
   const online = deps.db
-    .select({ id: machine.id })
+    .select()
     .from(machine)
     .where(and(eq(machine.teamId, row.teamId), eq(machine.online, true)))
     .all();
+  for (const s of pendingSteps) {
+    const agentRow = agentForStepEligibility(deps.db, row, s.kind, s.prompt);
+    if (agentRow === null) continue;
+    const provider = s.fallback?.model?.provider ?? agentRow.provider;
+    const pooled = routeForStep(deps.db, row, s.kind) !== null;
+    const runnable = online.some(
+      (m) =>
+        (pooled || m.id === agentRow.machineId) &&
+        runtimeGatePasses(m, provider) &&
+        capabilityGatePasses(m, agentRow),
+    );
+    if (!runnable) return { on: 'machine', retryAt: null };
+  }
   if (online.length === 0) {
     return { on: 'machine', retryAt: null };
   }

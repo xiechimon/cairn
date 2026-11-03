@@ -52,9 +52,21 @@ import {
   publishStepStatus,
   upsertMessage,
 } from './machine-deps.js';
+import {
+  pinAllows,
+  priorSessionOf,
+  routeTargets,
+  routeVerdict,
+  targetUnavailable,
+  type WorkerStepFacts,
+  waitingSince,
+  workerIneligibility,
+} from './machine-routing.js';
 import { injectMemories } from './memory.js';
 import { effectiveModel } from './model-fallback.js';
+import { mergedCatalogModels } from './model-liveness.js';
 import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
+import { routeForStep } from './routing-rules.js';
 import { reverifyShip } from './ship-gate.js';
 import { scanLocalSkills } from './skills.js';
 import { listProjectTagVocab } from './tags.js';
@@ -332,7 +344,14 @@ async function tryClaim(
   const machineRow = db.select().from(machine).where(eq(machine.id, machineId)).get();
   if (!machineRow) return null;
   refreshClaudeRateParks(deps, teamId);
-  const claudeBlocked = claudeBlockedReader(db);
+  const catalog = mergedCatalogModels();
+  const machineCache = new Map<string, typeof machine.$inferSelect | undefined>();
+  const machineById = (id: string) => {
+    if (!machineCache.has(id)) {
+      machineCache.set(id, db.select().from(machine).where(eq(machine.id, id)).get());
+    }
+    return machineCache.get(id);
+  };
   const full = machineRunningCount(db, machineId) >= workerCapOf(machineRow, maxWorkers);
   const workerCands = full ? [] : claimCandidates(deps, machineId, teamId);
   const earliestWorker = workerCands[0]?.stepRow.createdAt ?? Number.POSITIVE_INFINITY;
@@ -382,49 +401,49 @@ async function tryClaim(
     )
       continue;
     const model = effectiveModel(agentRow, cand.stepRow);
-    const runtime = stepRuntimeFor(model.provider);
-    if (runtime === 'claude-code' && claudeBlocked(machineId)) continue;
-    if (agentRow.machineId !== machineId) {
-      if (runtime !== 'claude-code' || !claudeBlocked(agentRow.machineId)) continue;
-    }
-    if (!runtimeGatePasses(machineRow, model.provider)) continue;
-    if (localMerge === null && !claudeUsageGatePasses(deps, machineRow, model)) continue;
-    if (claudeCodeLoginBlocks(deps, machineRow, model.provider)) continue;
-    if (!capabilityGatePasses(machineRow, agentRow)) continue;
+    const now = nowMs();
+    const routed = routeForStep(db, cand.todoRow, cand.stepRow.kind) !== null;
+    const facts: WorkerStepFacts = {
+      agentRow,
+      model,
+      localProject: projectOfTodo(db, cand.todoRow)?.repoKind === 'local',
+      localMerge: localMerge !== null,
+      routed,
+    };
+    if (workerIneligibility(db, machineRow, facts, catalog, now) !== null) continue;
     if (
       agentRow.maxConcurrentTasks !== null &&
       agentRunningCount(db, agentRow.id) >= agentRow.maxConcurrentTasks
     ) {
       continue;
     }
-    const prior = db
-      .select({ sessionId: step.sessionId, machineId: step.machineId, fallback: step.fallback })
-      .from(step)
-      .where(
-        and(
-          eq(step.buildId, cand.stepRow.buildId),
-          sql`${step.sessionId} is not null`,
-          ...(cand.stepRow.kind === 'build' &&
-          (cand.buildRow.prevPhase === 'done' || cand.buildRow.prevPhase === 'review')
-            ? [eq(step.kind, 'build')]
-            : []),
-        ),
-      )
-      .orderBy(asc(step.createdAt))
-      .all();
-    const latestPrior = prior.length > 0 ? (prior[prior.length - 1] ?? null) : null;
-    const priorRow =
-      latestPrior !== null &&
-      (latestPrior.fallback?.model?.provider ?? null) ===
-        (cand.stepRow.fallback?.model?.provider ?? null)
-        ? latestPrior
-        : null;
-    const priorSessionId = priorRow?.sessionId ?? null;
-    const priorMachineId = priorRow?.machineId ?? null;
+    const { priorSessionId, priorMachineId, freshSession } = priorSessionOf(
+      db,
+      cand.stepRow,
+      cand.buildRow,
+    );
     const sessionOnOtherMachine =
       priorSessionId !== null && priorMachineId !== null && priorMachineId !== machineId;
-    const planHandoffMissing =
-      cand.stepRow.kind === 'build' && cand.buildRow.withPlan && cand.buildRow.planDocId === null;
+    const allowed = routed
+      ? routeVerdict({
+          machineId,
+          targets: routeTargets(
+            !freshSession && priorSessionId !== null ? priorMachineId : null,
+            agentRow.machineId,
+          ),
+          unavailable: (targetId) =>
+            targetUnavailable(db, machineById(targetId), teamId, facts, catalog, now),
+          waitingSince: waitingSince(cand.stepRow),
+          now,
+        }).claim
+      : pinAllows({
+          machineId,
+          pinned: agentRow.machineId === null ? undefined : machineById(agentRow.machineId),
+          pinnedId: agentRow.machineId,
+          model,
+          now,
+        });
+    if (!allowed) continue;
     const skillInjection = workerSkillInjection(deps, agentRow, cand.todoRow);
     const guardPr =
       cand.stepRow.kind === 'plan' || cand.stepRow.kind === 'build'
@@ -498,17 +517,13 @@ async function tryClaim(
     if (cand.todoRow.phase === 'queued') {
       setTodoPhase(deps, cand.todoRow.id, cand.stepRow.kind === 'plan' ? 'planning' : 'building');
     }
-    const session =
-      planHandoffMissing ||
-      cand.stepRow.kind === 'review' ||
-      cand.stepRow.kind === 'verify' ||
-      cand.stepRow.freshSession
-        ? { action: 'new' as const, sessionId: null }
-        : {
-            action: priorSessionId ? ('continue' as const) : ('new' as const),
-            sessionId: priorSessionId,
-            ...(priorMachineId !== null && sessionOnOtherMachine ? { priorMachineId } : {}),
-          };
+    const session = freshSession
+      ? { action: 'new' as const, sessionId: null }
+      : {
+          action: priorSessionId ? ('continue' as const) : ('new' as const),
+          sessionId: priorSessionId,
+          ...(priorMachineId !== null && sessionOnOtherMachine ? { priorMachineId } : {}),
+        };
     const projectRow = projectOfTodo(db, cand.todoRow);
     const repoRef = projectRepoRef(projectRow, origin);
     const mergeTarget =
