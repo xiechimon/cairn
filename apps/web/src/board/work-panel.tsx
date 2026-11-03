@@ -1,6 +1,6 @@
 import { PackageCheck } from 'lucide-react';
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link } from 'react-router';
 import { EmptyState } from '../components/empty-state.js';
 import { SidePanel, SidePanelHead, SidePanelTitle } from '../components/side-panel.js';
 import { StoneGroup, StoneTrail } from '../components/stone/stone-group.js';
@@ -11,7 +11,7 @@ import { useI18n } from '../i18n/provider.js';
 import { scheduleSummary } from '../pages/schedule-summary.js';
 import { needsYouThreads } from './needs-you.js';
 import { relativeTime } from './rel-time.js';
-import { threadCopy, threadHref, threadStatus, threadTone } from './thread-copy.js';
+import { threadCopy, threadStatus, threadTone } from './thread-copy.js';
 
 export type WorkPane = 'tasks' | 'made' | 'machines';
 
@@ -29,11 +29,11 @@ interface WorkPanelProps {
   schedules: readonly ScheduleRecord[];
   now: number;
   onClose: () => void;
+  onOpenThread: (id: string) => void;
 }
 
-export function WorkPanel({ pane, todos, schedules, now, onClose }: WorkPanelProps) {
+export function WorkPanel({ pane, todos, schedules, now, onClose, onOpenThread }: WorkPanelProps) {
   const { t } = useI18n();
-  const navigate = useNavigate();
   const [folded, setFolded] = useState<Record<string, boolean>>({});
   const fold = (id: string) => ({
     collapsed: folded[id] === true,
@@ -47,7 +47,7 @@ export function WorkPanel({ pane, todos, schedules, now, onClose }: WorkPanelPro
       tone={tone}
       reason={t(threadCopy(todo).reason)}
       age={relativeTime(todo.phaseAt, now, t)}
-      onOpen={() => navigate(threadHref(todo.id))}
+      onOpen={() => onOpenThread(todo.id)}
     />
   );
   const needsYou = needsYouThreads(todos);
@@ -103,7 +103,7 @@ export function WorkPanel({ pane, todos, schedules, now, onClose }: WorkPanelPro
                   title={`#${schedule.todo.seqNum} ${schedule.todo.title}`}
                   tone="idle"
                   reason={scheduleSummary(schedule, now, t)}
-                  onOpen={() => navigate(threadHref(schedule.todoId))}
+                  onOpen={() => onOpenThread(schedule.todoId)}
                 />
               ))}
             </StoneGroup>

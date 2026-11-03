@@ -1306,6 +1306,10 @@ export const EN: Record<string, string> = {
     'Firing again only queues one more orchestration round; it will not start sooner.',
   任务加载失败: 'Failed to load the task',
   任务不存在或已被删除: 'This task does not exist or was deleted',
+  '#{seq} 还没开始': '#{seq} has not started yet',
+  '已归档，取消归档后才能继续': 'Archived. Unarchive to continue',
+  调整面板宽度: 'Resize panel',
+  '已关闭，不能再回复': 'Closed. It takes no more replies',
   回首页: 'Back to home',
   // —— #638 全站静默 mutation 失败面接线（toast 标题句；server 原因进
   // description 透传不译，#631 同律。已有面内 canon 位的面——merge 拒绝行 /

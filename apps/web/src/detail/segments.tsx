@@ -1,6 +1,7 @@
 import { cn } from 'cn';
 import { createContext, useContext } from 'react';
 import { Link } from 'react-router';
+import { useThreadHref } from '../board/thread-link.js';
 import { StatusGlyph } from '../components/status-glyph.js';
 import type { DocSegment, Phase } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
@@ -20,9 +21,9 @@ interface SegmentsProps {
   codeClassName: string;
 }
 
-function mentionHref(seg: DocSegment): string | null {
+function mentionHref(seg: DocSegment, threadHref: (id: string) => string): string | null {
   if (seg.mentionId == null) return null;
-  if (seg.mentionKind === 'todo') return `/app/todo/${seg.mentionId}`;
+  if (seg.mentionKind === 'todo') return threadHref(seg.mentionId);
   if (seg.mentionKind === 'agent') return `${AGENTS_HREF}/${seg.mentionId}`;
   return null;
 }
@@ -43,7 +44,7 @@ export function TodoStatus({ phase }: { phase: Phase }) {
 
 function MentionChip({ seg }: { seg: DocSegment }) {
   const glances = useContext(TodoGlanceContext);
-  const href = mentionHref(seg);
+  const href = mentionHref(seg, useThreadHref());
   const className = mentionChipClass(seg.mentionKind);
   const todoId = seg.mentionKind === 'todo' ? seg.mentionId : undefined;
   const glance = todoId != null ? glances?.get(todoId) : undefined;

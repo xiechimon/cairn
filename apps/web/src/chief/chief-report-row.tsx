@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Link } from 'react-router';
 import { useApiMutations } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { ThreadLink } from '../board/thread-link.js';
 import { Button } from '../components/ui/button.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
 import { toastError } from '../components/ui/toaster.js';
@@ -20,9 +21,9 @@ function TodoRefs({ refs }: { refs: readonly ChiefReportTodoRef[] }) {
   return (
     <span className="flex flex-wrap gap-x-2">
       {refs.map((ref) => (
-        <Link key={ref.id} to={`/app/todo/${ref.id}`} className={REF_CLS}>
+        <ThreadLink key={ref.id} todoId={ref.id} className={REF_CLS}>
           #{ref.seq} {ref.title}
-        </Link>
+        </ThreadLink>
       ))}
     </span>
   );
@@ -68,9 +69,9 @@ function ProposalItem({ proposal }: { proposal: RetroProposal }) {
         {source.todoId === null ? (
           t('协调者对话')
         ) : (
-          <Link to={`/app/todo/${source.todoId}`} className={REF_CLS}>
+          <ThreadLink todoId={source.todoId} className={REF_CLS}>
             {source.label}
-          </Link>
+          </ThreadLink>
         )}
       </span>
       {status === 'draft' ? (
@@ -97,9 +98,9 @@ function ProposalItem({ proposal }: { proposal: RetroProposal }) {
             todoId === null ? (
               t('已建成线程')
             ) : (
-              <Link to={`/app/todo/${todoId}`} className={REF_CLS}>
+              <ThreadLink todoId={todoId} className={REF_CLS}>
                 {t('已建成线程')}
-              </Link>
+              </ThreadLink>
             )
           ) : (
             t('已忽略')
@@ -175,9 +176,9 @@ export function ChiefReportRow({ report }: { report: ChiefReportContent }) {
                 <span className="text-content-tertiary">{t('合并：')}</span>
                 {y.merged.map((pr) =>
                   pr.prUrl === null ? (
-                    <Link key={pr.id} to={`/app/todo/${pr.id}`} className={REF_CLS}>
+                    <ThreadLink key={pr.id} todoId={pr.id} className={REF_CLS}>
                       #{pr.seq} {pr.title}
-                    </Link>
+                    </ThreadLink>
                   ) : (
                     <a
                       key={pr.id}

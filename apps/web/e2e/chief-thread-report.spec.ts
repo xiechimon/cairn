@@ -54,7 +54,7 @@ for (const [label, phase, verified] of [
     const stream = page.getByTestId('home-c').getByTestId('chief-stream');
     const marker = stream.getByTestId('thread-report-marker');
     await expect(marker).toHaveText(`任务 #9 Repair board counts：${STATUS[label]}`);
-    await expect(marker.getByRole('link')).toHaveAttribute('href', `/app/todo/${TASK.id}`);
+    await expect(marker.getByRole('link')).toHaveAttribute('href', `/app?thread=${TASK.id}`);
     await expect(stream.getByTestId('chief-bubble')).toHaveCount(1);
     await expect(stream).not.toContainText('[wake:');
     await expect(stream).not.toContainText('Internal worker reporting instructions');
