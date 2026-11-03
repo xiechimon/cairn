@@ -1,0 +1,1 @@
+ALTER TABLE `routing_rule` ADD `requiredCapabilities` text;
