@@ -7,7 +7,7 @@ import { mustBeGreenJobs } from './merge-checks.mjs';
 
 const minimumChecks = 4;
 const closingLine = /^(?:closes|fixes|resolves) #\d+$/i;
-const reviewer = 'cairnwright[bot]';
+const gateCheck = 'review-gate';
 export const holdLabel = 'coordinator-hold';
 
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
@@ -25,15 +25,17 @@ function readPull(number) {
   }
 }
 
-export function verdictFor(comments, head) {
-  const pattern = new RegExp(
-    `^<!-- review-gate:${head} -->\\n\\*\\*Independent review gate: (PASS|BLOCK)\\*\\*(?: \\(carried over\\))? for `,
-  );
-  const verdicts = comments
-    .filter((comment) => comment.user?.login === reviewer)
-    .map((comment) => pattern.exec(comment.body ?? '')?.[1])
-    .filter(Boolean);
-  return verdicts.at(-1) ?? null;
+export function verdictFor(runs, head) {
+  const latest = runs
+    .filter(
+      (run) =>
+        run.name === gateCheck && run.head_sha === head && run.app?.slug === 'github-actions',
+    )
+    .sort((a, b) => b.id - a.id)[0];
+  if (latest?.status !== 'completed') return null;
+  if (latest.conclusion === 'success') return 'PASS';
+  if (latest.conclusion === 'failure') return 'BLOCK';
+  return null;
 }
 
 export function mergeMessage(number, messages) {
@@ -118,7 +120,9 @@ export async function coordinate(number, { iterations = 90, intervalMs = 60_000 
     let green;
     try {
       const verdict = verdictFor(
-        pages(`repos/${repo}/issues/${number}/comments?per_page=100`).flat(),
+        pages(
+          `repos/${repo}/commits/${head}/check-runs?check_name=${gateCheck}&filter=latest&per_page=100`,
+        ).flatMap((page) => page.check_runs ?? []),
         head,
       );
       if (verdict === 'BLOCK') {
