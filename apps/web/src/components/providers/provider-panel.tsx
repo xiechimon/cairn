@@ -62,11 +62,11 @@ export function ProviderInstanceRow({
         selected ? 'bg-(--sidebar-active)' : 'hover:bg-sidebar-hover',
       )}
     >
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         onClick={onSelect}
         className={cn(
-          'flex min-w-0 flex-auto items-start gap-2.5 rounded-(--radius-control) text-left outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          'h-auto min-w-0 flex-auto items-start justify-start gap-2.5 p-0 text-left font-normal whitespace-normal hover:bg-transparent active:not-aria-[haspopup]:translate-y-0 dark:hover:bg-transparent',
           item.tone === 'off' && !selected && 'opacity-60',
         )}
       >
@@ -86,7 +86,7 @@ export function ProviderInstanceRow({
             <span className="line-clamp-2">{item.status}</span>
           </span>
         </span>
-      </button>
+      </Button>
       {item.toggle !== undefined && (
         <ToggleSwitch
           aria-label={t('启用 {name}', { name: item.name })}
@@ -130,14 +130,14 @@ export function ProviderPanel({
           />
         ))}
         {onAdd !== undefined && (
-          <button
-            type="button"
+          <Button
+            variant="ghost"
             onClick={onAdd}
-            className="flex items-center gap-2.5 px-3.5 py-3 text-left text-ui text-content-tertiary transition-colors duration-(--dur-fast) outline-none hover:bg-sidebar-hover hover:text-foreground focus-visible:bg-sidebar-hover"
+            className="h-auto justify-start gap-2.5 rounded-none px-3.5 py-3 text-ui font-normal text-content-tertiary hover:bg-sidebar-hover hover:text-foreground active:not-aria-[haspopup]:translate-y-0 dark:hover:bg-sidebar-hover"
           >
             <Plus aria-hidden className="size-4" />
             {t('添加服务商')}
-          </button>
+          </Button>
         )}
       </div>
       <div data-testid="provider-editor" className="flex min-w-0 flex-col gap-6 p-4">
