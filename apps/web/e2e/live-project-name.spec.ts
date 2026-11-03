@@ -88,25 +88,6 @@ async function stubLiveBoot(page: Page): Promise<Writes> {
   return writes;
 }
 
-/** Answers every GET /api/projects 500; settled() resolves once React Query's
- *  single retry has been answered and painted. */
-async function failProjects(page: Page) {
-  let answered = 0;
-  await page.route('**/api/projects?*', (route) => {
-    answered += 1;
-    return route.fulfill({ status: 500, json: { error: 'e2e stub: projects read failed' } });
-  });
-  return {
-    settled: async () => {
-      await expect.poll(() => answered, { timeout: 10_000 }).toBeGreaterThanOrEqual(2);
-      await page.evaluate(
-        () =>
-          new Promise<void>((res) => requestAnimationFrame(() => requestAnimationFrame(() => res()))),
-      );
-    },
-  };
-}
-
 /** Holds every GET /api/projects until release(), then answers PROJECTS. */
 async function holdProjects(page: Page) {
   const held: Route[] = [];
@@ -124,8 +105,6 @@ async function holdProjects(page: Page) {
   };
 }
 
-const card = (page: Page, id: string) =>
-  page.locator(`[data-testid="board-scroller"] .todo-card[data-todo-id="${id}"]`);
 /** evidencePanelShot after the 150-200ms enter fades; regression runs skip both. */
 async function shot(page: Page, name: string, panel: Locator) {
   if (process.env.CAIRN_E2E_EVIDENCE === undefined) return;
@@ -133,86 +112,8 @@ async function shot(page: Page, name: string, panel: Locator) {
   await evidencePanelShot(page, name, panel);
 }
 
-const column = (page: Page) =>
-  page.locator('section[data-column]', { has: page.locator('[data-todo-id="todo-0"]') });
 const sidebarProject = (page: Page, name: string) =>
   page.locator('[data-slot="sidebar-project-row"]').filter({ hasText: name });
-
-test.describe('board card', () => {
-  test('projects pending: no project item, then each card’s own project', async ({ page }) => {
-    await stubLiveBoot(page);
-    const projects = await holdProjects(page);
-    await page.goto('/app?view=board');
-
-    await expect(card(page, 'todo-0')).toContainText('project probe alpha');
-    await expect.poll(projects.count).toBeGreaterThan(0);
-    await expect(card(page, 'todo-0').locator('.todo-card-meta')).toContainText('#1');
-    await shot(page, 'board-pending.png', column(page));
-    await expect(card(page, 'todo-0')).not.toContainText(FIXTURE_PROJECT);
-    await expect(card(page, 'todo-1')).not.toContainText(FIXTURE_PROJECT);
-    const pendingHeight = (await card(page, 'todo-0').boundingBox())?.height ?? Number.NaN;
-
-    await projects.release();
-    await expect(sidebarProject(page, 'atlas')).toBeVisible();
-    await shot(page, 'board-loaded.png', column(page));
-    await expect(card(page, 'todo-0')).toContainText('verify-1400');
-    await expect(card(page, 'todo-1')).toContainText('atlas');
-    await expect(card(page, 'todo-1')).not.toContainText('verify-1400');
-    // the meta row is fixed height: the name arriving does not move the card
-    expect((await card(page, 'todo-0').boundingBox())?.height).toBeCloseTo(pendingHeight, 1);
-  });
-
-  test('projects read failed: no project item', async ({ page }) => {
-    await stubLiveBoot(page);
-    const projects = await failProjects(page);
-    await page.goto('/app?view=board');
-
-    await expect(card(page, 'todo-0').locator('.todo-card-meta')).toContainText('#1');
-    await projects.settled();
-    await expect(card(page, 'todo-0')).not.toContainText(FIXTURE_PROJECT);
-    await expect(card(page, 'todo-1')).not.toContainText(FIXTURE_PROJECT);
-  });
-});
-
-/** Presses todo-0 and carries it a little way so the overlay mounts; the
- *  caller releases over the source column (same-column drop commits nothing). */
-async function liftCard(page: Page) {
-  const box = await card(page, 'todo-0').boundingBox();
-  if (box == null) throw new Error('card missing');
-  const x = box.x + box.width / 2;
-  const y = box.y + box.height / 2;
-  await page.mouse.move(x, y);
-  await page.mouse.down();
-  await page.mouse.move(x - 8, y + 6, { steps: 4 });
-  await page.mouse.move(x - 4, y + 40, { steps: 6 });
-  const overlay = page.getByTestId('drag-overlay').locator('[data-todo-id="todo-0"]');
-  await overlay.waitFor({ state: 'visible', timeout: 15_000 });
-  return { overlay, drop: () => page.mouse.up() };
-}
-
-test('drag overlay: no project while pending, the card’s own project once loaded', async ({
-  page,
-}) => {
-  const writes = await stubLiveBoot(page);
-  const projects = await holdProjects(page);
-  await page.goto('/app?view=board');
-  await expect(card(page, 'todo-0')).toContainText('project probe alpha');
-  await expect.poll(projects.count).toBeGreaterThan(0);
-
-  const pending = await liftCard(page);
-  await expect(pending.overlay).toContainText('#1');
-  await shot(page, 'drag-pending.png', pending.overlay);
-  await expect(pending.overlay).not.toContainText(FIXTURE_PROJECT);
-  await pending.drop();
-
-  await projects.release();
-  await expect(sidebarProject(page, 'atlas')).toBeVisible();
-  const loaded = await liftCard(page);
-  await expect(loaded.overlay).toContainText('verify-1400');
-  await expect(loaded.overlay).not.toContainText(FIXTURE_PROJECT);
-  await loaded.drop();
-  expect(writes.list).toEqual([]);
-});
 
 test.describe('detail head', () => {
   const openPopover = async (page: Page) => {

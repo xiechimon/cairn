@@ -61,20 +61,16 @@ function expectQuiet(traffic: Traffic) {
 const toast = (page: Page, text = BLOCKED_TOAST) =>
   page.locator('[data-sonner-toast]', { hasText: text });
 
-const cards = (page: Page) => page.locator('[data-todo-id]');
+const home = (page: Page) => page.getByTestId('home-c');
 
-test('plain /app opens the demo board; ?scenario= is ignored', async ({ page }) => {
+test('plain /app opens the demo Coordinator home; ?scenario= is ignored', async ({ page }) => {
   const traffic = watchTraffic(page);
   await page.goto(`${demo.base}/app`);
-  await expect(page.locator('section[data-column]')).toHaveCount(4);
-  for (const column of ['todo', 'building', 'pending', 'done']) {
-    await expect(page.locator(`section[data-column="${column}"] [data-todo-id]`).first()).toBeVisible();
-  }
-  expect(await cards(page).count()).toBeGreaterThanOrEqual(8);
-  await expect(page.getByRole('link', { name: '登录后合并游客购物车' })).toBeVisible();
+  await expect(home(page)).toBeVisible();
+  await expect(home(page).getByText('购物车').first()).toBeVisible();
 
   await page.goto(`${demo.base}/app?scenario=chain`);
-  await expect(page.getByRole('link', { name: '登录后合并游客购物车' })).toBeVisible();
+  await expect(home(page).getByText('购物车').first()).toBeVisible();
   await expect(page.locator('.fixture-mode-chip')).toHaveCount(0);
   expectQuiet(traffic);
 });
@@ -123,9 +119,6 @@ test('banner follows the locale', async ({ page }) => {
 test('the selling points browse end to end with no backend traffic', async ({ page }) => {
   const traffic = watchTraffic(page);
 
-  await page.goto(`${demo.base}/app`);
-  await expect(page.locator('section[data-column="pending"] [data-todo-id]')).toHaveCount(3);
-
   await page.goto(`${demo.base}/app/todo/${DEMO.cartMerge}`);
   await expect(page.getByTestId('phase-chip')).toHaveText(/确认/);
   await expect(page.locator('.doc-range-wrap .doc-pane-select')).toHaveText(/v3/);
@@ -151,10 +144,7 @@ test('the selling points browse end to end with no backend traffic', async ({ pa
   await expect(page.getByTestId('phase-chip')).toHaveText(/完成/);
 
   await page.goto(`${demo.base}/app`);
-  await openChiefWindow(page);
-  const chief = page.getByRole('dialog', { name: /总管/ });
-  await expect(chief).toBeVisible();
-  await expect(chief.getByText('购物车').first()).toBeVisible();
+  await expect(home(page).getByText('购物车').first()).toBeVisible();
 
   await page.goto(`${demo.base}/app/resources/machines`);
   await expect(page.getByRole('link', { name: 'dev-mac' })).toBeVisible();
@@ -180,27 +170,7 @@ test('write: a new task is blocked with the toast and nothing is added', async (
   await input.fill('演示里不该落库的任务');
   await input.press('Enter');
   await expect(toast(page)).toBeVisible();
-  await expect(page.locator('[data-todo-id]', { hasText: '演示里不该落库的任务' })).toHaveCount(0);
-  expectQuiet(traffic);
-});
-
-test('write: dragging a card to another column is blocked', async ({ page }) => {
-  const traffic = watchTraffic(page);
-  await page.goto(`${demo.base}/app`);
-  const card = page.locator(`section[data-column="done"] [data-todo-id="${DEMO.coupon}"]`);
-  const target = page.locator('section[data-column="pending"] [data-column-list]');
-  const from = await card.boundingBox();
-  const to = await target.boundingBox();
-  if (from == null || to == null) throw new Error('drag geometry missing');
-  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(from.x + from.width / 2 + 8, from.y + from.height / 2 + 6, { steps: 4 });
-  await page.mouse.move(to.x + to.width / 2, to.y + 40, { steps: 12 });
-  await page.mouse.up();
-  await expect(toast(page)).toBeVisible();
-  await expect(
-    page.locator(`section[data-column="done"] [data-todo-id="${DEMO.coupon}"]`),
-  ).toBeVisible();
+  await expect(home(page).getByText('演示里不该落库的任务')).toHaveCount(0);
   expectQuiet(traffic);
 });
 
@@ -226,14 +196,14 @@ test('write: the primary action and the delete confirm are blocked', async ({ pa
   await page.getByRole('menuitem', { name: '删除' }).click();
   await page.getByRole('alertdialog').getByRole('button', { name: '删除' }).click();
   await expect(page).toHaveURL(new RegExp(`/app/todo/${DEMO.cartMerge}$`));
-  await page.goto(`${demo.base}/app`);
-  await expect(page.locator(`[data-todo-id="${DEMO.cartMerge}"]`)).toBeVisible();
+  await page.reload();
+  await expect(page.getByTestId('phase-chip')).toHaveText(/确认/);
   expectQuiet(traffic);
 });
 
-test('write: sending to the chief is blocked', async ({ page }) => {
+test('write: sending to the chief drawer is blocked', async ({ page }) => {
   const traffic = watchTraffic(page);
-  await page.goto(`${demo.base}/app`);
+  await page.goto(`${demo.base}/app/schedules`);
   await openChiefWindow(page);
   const chief = page.getByRole('dialog', { name: /总管/ });
   const input = chief.getByRole('textbox');
@@ -278,9 +248,7 @@ test('the production build carries no demo content and ignores demo behaviour', 
 }) => {
   await page.goto(`${production.base}/app`);
   await expect(page.getByTestId('demo-banner')).toHaveCount(0);
-  await expect(cards(page)).toHaveCount(0);
   await page.goto(`${production.base}/app?scenario=chain`);
-  await expect(cards(page)).toHaveCount(0);
   await expect(page.locator('.fixture-mode-chip')).toHaveCount(0);
   await expect(page.getByText('登录后合并游客购物车')).toHaveCount(0);
 

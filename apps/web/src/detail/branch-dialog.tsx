@@ -3,12 +3,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { cn } from 'cn';
 import { useState } from 'react';
 import { api } from '../api/client.js';
-import { useBuild, useMachines } from '../api/hooks.js';
+import { useMachines } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
-import { SegmentedTabs } from '../components/segmented.js';
 import { ToggleSwitch } from '../components/toggle-switch.js';
 import { Button } from '../components/ui/button.js';
-import { DIALOG_PRIMARY_BUTTON, DialogShell } from '../components/ui/dialog-shell.js';
+import { DIALOG_PRIMARY_BUTTON } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
 import { Label } from '../components/ui/label.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
@@ -22,13 +21,6 @@ export const READONLY_BOX =
   'flex h-8 items-center rounded-lg border border-input px-2.5 font-mono text-xs text-(--text-tertiary)';
 
 export const MACHINE_DOT = 'size-1.5 flex-none rounded-full bg-(--badge-done)';
-
-interface BranchDialogProps {
-  open?: boolean;
-  info: BranchInfoContent;
-  buildId?: string | null;
-  onClose: () => void;
-}
 
 export function CopyButton({ value, className }: { value: string; className?: string }) {
   const { t } = useI18n();
@@ -185,83 +177,6 @@ export function useBranchSyncState(
     onForce: setForce,
     canSync: buildId !== null && live,
   };
-}
-
-export function BranchDialog({ info, buildId: buildIdProp, open, onClose }: BranchDialogProps) {
-  const { t } = useI18n();
-  const buildId = buildIdProp ?? null;
-  const [tab, setTab] = useState<'sync' | 'git'>('sync');
-  const sync = useBranchSyncState(info, buildId, open === true);
-  const buildQ = useBuild(buildId, buildId != null);
-  const pr = buildQ.data?.prUrl ?? null;
-  const prNumber = buildQ.data?.prNumber ?? null;
-
-  return (
-    <DialogShell
-      headerCenter={
-        <SegmentedTabs
-          label={t('分支与 PR')}
-          value={tab}
-          onChange={setTab}
-          options={[
-            { value: 'sync', label: t('同步到机器') },
-            { value: 'git', label: 'Git' },
-          ]}
-        />
-      }
-      open={open}
-      onClose={onClose}
-      size="m"
-      footer={
-        tab === 'sync' ? (
-          <SyncButton
-            buildId={buildId}
-            canSync={sync.canSync}
-            machineId={sync.selectedMachineId}
-            directory={sync.directory}
-            refName={info.branch}
-            commit={info.commit}
-            force={sync.force}
-            disabled={sync.selectedMachineId === null || sync.directory.trim() === ''}
-          />
-        ) : undefined
-      }
-    >
-      {tab === 'sync' ? (
-        <BranchSyncFields
-          info={info}
-          canSync={sync.canSync}
-          machines={sync.machines}
-          selectedMachineId={sync.selectedMachineId}
-          onMachineId={sync.onMachineId}
-          directory={sync.directory}
-          onDirectory={sync.onDirectory}
-          force={sync.force}
-          onForce={sync.onForce}
-          buildId={buildId}
-        />
-      ) : (
-        <div className="flex flex-col gap-4">
-          <BranchBox info={info} />
-          <div className="flex flex-col gap-2">
-            <Label>Pull Request</Label>
-            {pr !== null && prNumber != null ? (
-              <a
-                className={cn(READONLY_BOX, 'text-(--accent) underline')}
-                href={pr}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                #{prNumber}
-              </a>
-            ) : (
-              <div className={READONLY_BOX}>{t('未创建')}</div>
-            )}
-          </div>
-        </div>
-      )}
-    </DialogShell>
-  );
 }
 
 function MachinePicker({

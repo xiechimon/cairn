@@ -132,8 +132,6 @@ async function stubWorld(page: Page) {
   }
 }
 
-const card = (page: Page, todoId: string) => page.locator(`[data-todo-id="${todoId}"]`);
-
 async function openTokenSection(page: Page, todoId: string) {
   await page.goto(`/app/todo/${todoId}`);
   await expect(page.getByTestId('pane-section-token')).toBeVisible();
@@ -144,35 +142,6 @@ for (const theme of ['light', 'dark'] as const) {
   test.describe(theme, () => {
     test.beforeEach(async ({ page }) => {
       await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
-    });
-
-    test('board cards show the summed amount, `—` with a reason, or nothing', async ({ page }) => {
-      await stubWorld(page);
-      await page.goto('/app?view=board');
-      await expect(card(page, NEVER_RAN.id)).toBeVisible();
-      await evidencePanelShot(page, `card-cost-${theme}.png`, card(page, PRICED.id));
-
-      await expect(card(page, PRICED.id).getByTestId('card-cost')).toHaveText('$0.92');
-      await expect(card(page, SUB_CENT.id).getByTestId('card-cost')).toHaveText('<$0.01');
-      const unpriced = card(page, UNPRICED.id).getByTestId('card-cost');
-      await expect(unpriced).toHaveText('$—');
-      await expect(unpriced).toHaveAttribute('title', NO_PRICE_REASON);
-      const free = card(page, FREE.id).getByTestId('card-cost');
-      await expect(free).toHaveText('$0.00');
-      await expect(free).not.toHaveAttribute('title', NO_PRICE_REASON);
-      await expect(card(page, NEVER_RAN.id).getByTestId('card-cost')).toHaveCount(0);
-
-      for (const todo of [PRICED, SUB_CENT, UNPRICED, FREE]) {
-        const gaps = await card(page, todo.id).evaluate((root) => {
-          const amount = root.querySelector('[data-testid="card-cost"]')?.getBoundingClientRect();
-          const strip = root.querySelector('.todo-card-meta > div')?.getBoundingClientRect();
-          const cardBox = root.getBoundingClientRect();
-          if (!amount || !strip) throw new Error('card meta not rendered');
-          return { pastStrip: amount.right - strip.right, pastCard: amount.right - cardBox.right };
-        });
-        expect(gaps.pastStrip).toBeLessThanOrEqual(0);
-        expect(gaps.pastCard).toBeLessThanOrEqual(0);
-      }
     });
 
     test('detail: total plus `缓存读取` / `输入` / `输出` from the cost columns', async ({ page }) => {

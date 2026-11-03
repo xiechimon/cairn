@@ -1,8 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import { Outlet, useLocation, useNavigate, useSearchParams } from 'react-router';
-import { COLUMN_PARAM, parseColumnParam } from '../board/columns.js';
-import { BOARD_VIEW_PARAM } from '../board/home.js';
-import { DEMO_MODE } from '../demo/demo-gate.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { ChiefDrawer } from './chief-drawer.js';
 import { type ChiefSurface, useChiefSurface } from './use-chief-surface.js';
@@ -23,13 +20,6 @@ export function useChiefRoot(): ChiefRootApi {
   if (api === null)
     throw new Error('useChiefRoot must be consumed under the ChiefRoot layout route');
   return api;
-}
-
-export function isChiefHome(pathname: string, searchParams: URLSearchParams): boolean {
-  if (pathname !== '/app') return false;
-  if (parseColumnParam(searchParams.get(COLUMN_PARAM)) !== null) return false;
-  const view = searchParams.get(BOARD_VIEW_PARAM);
-  return DEMO_MODE ? view === 'home' : view !== 'board';
 }
 
 export function ChiefRoot() {
@@ -54,7 +44,7 @@ export function ChiefRoot() {
     }),
     [chiefParam, linkThreadId, consumeChiefParam],
   );
-  const onHome = isChiefHome(pathname, searchParams);
+  const onHome = pathname === '/app';
   const surface = useChiefSurface(fixture, deepLink, onHome);
   const onSettings = useCallback(() => {
     if (pathname === '/app') surface.setChiefView('settings');

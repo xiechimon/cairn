@@ -57,7 +57,7 @@ test('setting on + a recorded first PR shows the card; its link opens the prefil
 }) => {
   const patches: unknown[] = [];
   await stubWorld(page, ON, patches);
-  await page.goto('/app?view=board');
+  await page.goto('/app/schedules');
 
   const card = page.locator('[data-first-pr-card="true"]');
   await expect(card).toBeVisible();
@@ -76,7 +76,7 @@ test('setting on + a recorded first PR shows the card; its link opens the prefil
 test('dismissing hides it for good', async ({ page }) => {
   const patches: unknown[] = [];
   await stubWorld(page, ON, patches);
-  await page.goto('/app?view=board');
+  await page.goto('/app/schedules');
   const card = page.locator('[data-first-pr-card="true"]');
   await expect(card).toBeVisible();
 
@@ -88,7 +88,7 @@ test('dismissing hides it for good', async ({ page }) => {
 test('with the setting off nothing is shown', async ({ page }) => {
   const patches: unknown[] = [];
   await stubWorld(page, OFF, patches);
-  await page.goto('/app?view=board');
+  await page.goto('/app/schedules');
   await expect(page.locator('[data-first-pr-card="true"]')).toHaveCount(0);
   expect(patches).toEqual([]);
 });
@@ -104,7 +104,7 @@ test('users enable the team prompt, persist it, and permanently dismiss the card
   await expect(setting).toHaveAttribute('aria-checked', 'true');
   await page.reload();
   await expect(setting).toHaveAttribute('aria-checked', 'true');
-  await page.goto('/app?view=board');
+  await page.goto('/app/schedules');
   const card = page.locator('[data-first-pr-card="true"]');
   await expect(card).toBeVisible();
   await card.getByRole('button', { name: 'Do not show again' }).click();

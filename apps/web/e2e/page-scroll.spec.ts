@@ -133,7 +133,7 @@ const MEMORIES = Array.from({ length: 40 }, (_, i) => ({
 }));
 
 async function openChiefSettings(page: Page) {
-  await page.goto('/app?view=board');
+  await page.goto('/app/schedules');
   await openChiefWindow(page);
   const drawer = page.getByRole('dialog', { name: '总管' });
   await expect(drawer).toBeVisible();

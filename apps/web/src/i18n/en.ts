@@ -73,8 +73,6 @@ export const EN: Record<string, string> = {
   // #351 看板更名工作台：'Workbench'（不用 'Workspace'，避撞 daemon workspaces 概念）
   工作台: 'Workbench',
   // Paper 顶栏等你处理摘要：数字单独着色，后接本串（「3 项等你处理」→「3 waiting on you」）
-  项等你处理: 'waiting on you',
-  没有等你处理的事: 'Nothing is waiting on you',
   '{greeting}，{name}': '{greeting}, {name}',
   夜深了: 'Good night',
   早上好: 'Good morning',
@@ -107,11 +105,6 @@ export const EN: Record<string, string> = {
   '任务合并完成后会出现在这里。': 'Tasks show up here once they merge.',
   新建项目: 'New project',
   新任务: 'New task', // sidebar action row (#389) — the dialog title stays 新建任务
-  '新任务：接下来让 agent 做什么？': 'New task: What should the agent do next?',
-  '上次查看后：{done} 个完成，{failed} 个新失败':
-    '{done} completed, {failed## new failure|# new failures} since last visit',
-  '较早的 {count} 条': '{count} older',
-  '超过 7 天没动': 'untouched for over 7 days',
   需要你: 'Needs you',
   在跑: 'Running',
   看板: 'Board',
@@ -144,19 +137,10 @@ export const EN: Record<string, string> = {
   执行中: 'Running',
   已完成: 'Done',
   暂无: 'None',
-  写下想做的事: 'Write down what you want done',
-  还没有待开始的任务: 'Nothing waiting to start',
-  没有在跑的任务: 'Nothing running',
-  '最近 7 天还没有完成的任务': 'Nothing finished in the last 7 days',
   // Paper card footer (DESIGN.md 任务卡): needs-you state flag + action link
   待确认: 'Plan to confirm',
-  确认计划: 'Confirm plan',
-  待审阅: 'Ready for review',
   审阅: 'Review',
-  待回复: 'Waiting on you',
-  '最近 7 天': 'Last 7 days',
   回复: 'Reply',
-  '分支与 PR': 'Branch & PR',
   方案: 'Plan',
   分支: 'Branch',
   变更: 'Changes',
@@ -169,7 +153,6 @@ export const EN: Record<string, string> = {
   开启: 'Turn on',
 
   // —— phase chips / actions / placeholders (phase.ts canon table) ——
-  待处理: 'Pending',
   确认: 'Confirm',
   审核: 'Review',
   开始: 'Start',
@@ -238,24 +221,8 @@ export const EN: Record<string, string> = {
   清空改动记录: 'Clear the change records',
   '保留：标题、需求说明、标签与人员指派。运行历史保留，可供审计。执行机工作区文件不受影响。':
     'Kept: title, spec, tags and assignment. Run history stays for audit. Executor workspace files are untouched.',
-  '把任务标记为已完成？': 'Mark the task as done?',
-  '先停止构建再标记完成？': 'Stop the build, then mark done?',
-  确认完成: 'Confirm done',
-  停止并完成: 'Stop and mark done',
   '正在停止…': 'Stopping…',
   已取消: 'Canceled',
-  '必须先停止正在跑的构建，再标记完成。完成后 PR 不会自动合并。':
-    'The running build must stop first, then the task is marked done. The PR will not merge on its own.',
-  '确认后会停止构建，再把任务标为已完成': 'Confirm stops the build, then marks the task done.',
-  '选择结局。标记完成不算合并；已取消不算成功交付。':
-    'Choose an outcome. Done does not merge. Canceled does not count as success.',
-  '确认完成：进入已完成列，计为成功': 'Confirm done: moves to Done and counts as success.',
-  '已取消：进入已完成列并标「已取消」，不计为成功':
-    'Canceled: moves to Done with a Canceled mark and does not count as success.',
-  '已开出的 PR 保持原状，不会自动合并': 'An open PR stays as it is and will not merge on its own.',
-  '关闭则卡片留在原列。需要合入变更时，请改用卡片上的完成按钮。':
-    'Closing leaves the card where it is. To merge the changes, use the Done button on the card.',
-  '停止并完成失败，请重试。': 'Could not stop and mark done. Try again.',
   发送: 'Send',
   '当前没有运行中的会话，消息未送出': 'No active run — the message was not delivered',
   '任务状态已变化，消息未送出': 'The task state changed — the message was not delivered',
@@ -924,7 +891,6 @@ export const EN: Record<string, string> = {
   重跑: 'Rerun',
   构建分支: 'Build branch',
   目标提交: 'Target commit',
-  同步到机器: 'Sync to machine',
   目标机器: 'Target machine',
   同步目录: 'Sync directory',
   强制同步: 'Force sync',
@@ -1123,25 +1089,12 @@ export const EN: Record<string, string> = {
 
   // —— #403/#445 看板筛选面（仓库 chip 组 + 类型 popover + 空结果态）——
   类型: 'Type',
-  没有匹配筛选条件的任务: 'No tasks match the selected filters',
-  清除筛选: 'Clear filters',
 
   // —— XMON-57 统一筛选面板（两维 + 批次键 + 生效筛选条 + 空词表行）——
   // #636 批次行照参考站形：全选行（zh「全选」，本域 en 'Select all'）+ 右端
   // 反选；权限授予面改用「授予全部」避开同形碰撞（zh 源串即 key，两域必须
   // 分叉）。段内清除钮撤除——清除由全选行满选再点 / 反选 / 顶栏生效筛选条
   // 三路承接，`清除` 条目随之下架。
-  全选: 'Select all',
-  反选: 'Invert',
-  仅此: 'Only this',
-  '已选 {n}/{m}': '{n}/{m} selected',
-  清除全部: 'Clear all',
-  '搜索{name}': 'Search {name}',
-  '清除{name}筛选': 'Clear {name} filter',
-  本作用域内没有可选的仓库: 'No repositories available in this scope',
-  本作用域内没有可选的类型: 'No types available in this scope',
-  '没有与“{q}”匹配的选项': 'No options match “{q}”',
-  '筛选生效：{summary}': 'Filters active: {summary}',
 
   // —— #485 Agent 详情编辑面（三 tab + 概览字段 + 记忆/权限面）——
   // 含空格/标点的键一律引号形（对象字面量的键不是标识符）。
@@ -1303,7 +1256,6 @@ export const EN: Record<string, string> = {
   附件: 'Attachments',
   上传中: 'Uploading',
   // —— #640 开始任务单出口（直发总管编排回合；r14 §5.7 前置裁决落地）——
-  由总管创建: 'Created by chief',
   来源: 'Source',
   总管编排会话: 'Chief orchestration session',
   '这张任务将交给总管重新编排。': 'The chief will re-orchestrate this task.',
@@ -1314,14 +1266,6 @@ export const EN: Record<string, string> = {
   未能开始编排: 'Could not start orchestration',
   // —— #1216 在飞编排态（开始/重跑的可见反馈）与详情缺失三态 ——
   编排中: 'Orchestrating',
-  '上下文超出模型上限，精简任务后重试': 'Context exceeds the model limit; trim the task and retry',
-  '额度不足或请求太频繁，稍后重试': 'Out of quota or rate limited; retry later',
-  '模型服务鉴权失败，检查密钥': 'Model provider rejected the credentials; check the key',
-  '连接中断，可以重试': 'Connection dropped; retry',
-  '请求超时，可以重试': 'Request timed out; retry',
-  '模型服务暂时不可用，可以重试': 'Model provider is unavailable; retry',
-  '出了点问题，可以重试或查看会话': 'Something went wrong; retry or open the thread',
-  编排失败: 'Orchestration failed',
   '等 {machine} 上线': 'waiting for {machine} to come online',
   等机器上线: 'waiting for a machine to come online',
   '缺 {missing}': 'missing {missing}',
@@ -1332,12 +1276,11 @@ export const EN: Record<string, string> = {
     'Firing again only queues one more orchestration round; it will not start sooner.',
   任务加载失败: 'Failed to load the task',
   任务不存在或已被删除: 'This task does not exist or was deleted',
-  回看板: 'Back to board',
+  回首页: 'Back to home',
   // —— #638 全站静默 mutation 失败面接线（toast 标题句；server 原因进
   // description 透传不译，#631 同律。已有面内 canon 位的面——merge 拒绝行 /
   // issue 导入内联 / fs-pick 提示行 / OAuth 内联 / 技能弹窗内联——不在此列）——
   '创建项目失败，请重试。': 'Could not create the project. Try again.',
-  '移动任务失败，请重试。': 'Could not move the task. Try again.',
   '重置任务失败，请重试。': 'Could not reset the task. Try again.',
   '关闭任务失败，请重试。': 'Could not close the task. Try again.',
   '删除任务失败，请重试。': 'Could not delete the task. Try again.',
@@ -1433,7 +1376,6 @@ export const EN: Record<string, string> = {
   执行: 'Build',
   合并: 'Merge',
   运行中: 'Running',
-  没有待开始的任务: 'No tasks waiting to start',
   飞书机器人: 'Feishu bot',
   飞书配置加载失败: 'Could not load Feishu configuration',
   正在加载飞书配置: 'Loading Feishu configuration',

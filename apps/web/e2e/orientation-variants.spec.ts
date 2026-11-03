@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 test('filter popover separator is a 1px horizontal rule', async ({ page }) => {
-  await page.goto('/app?scenario=board-tags&view=board');
+  await page.goto('/app/schedules?scenario=board-tags');
   await page.getByRole('button', { name: '筛选', exact: true }).click();
   const separator = page.getByRole('dialog', { name: '筛选' }).locator('[data-slot="separator"]').first();
   await expect(separator).toHaveAttribute('data-orientation', 'horizontal');

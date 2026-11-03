@@ -1,8 +1,6 @@
 import { useCallback } from 'react';
 import { matchPath, useLocation, useNavigate } from 'react-router';
-import { DEMO_MODE } from '../demo/demo-gate.js';
 import { getGestureStore } from '../overlay/gesture-machine.js';
-import { BOARD_VIEW_PARAM } from './home.js';
 
 const KEPT_PARAMS = ['scenario'];
 
@@ -33,7 +31,6 @@ export function useOpenComposer(): (projectId?: string | null) => void {
       }
       const project = projectId ?? routeProject;
       if (project != null) params.set('project', project);
-      if (DEMO_MODE) params.set(BOARD_VIEW_PARAM, 'home');
       const query = params.toString();
       const target = query === '' ? '' : `?${query}`;
       const gestures = getGestureStore();

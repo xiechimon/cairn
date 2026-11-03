@@ -15,8 +15,8 @@ const WIN_BOX = { x: 1440 - 8 - 380, y: 732 - 8 - 600, width: 380, height: 600 }
 const SHEET_W = 1440 - 248 - 8;
 
 test.describe('chief panel floating form (ADR 0013)', () => {
-  test('Esc never closes the panel on the board route (D3)', async ({ page }) => {
-    await page.goto('/app?scenario=111&view=board');
+  test('Esc never closes the panel on a page route (D3)', async ({ page }) => {
+    await page.goto('/app/schedules?scenario=111');
     await expect(drawer(page)).toBeVisible();
 
     await page.keyboard.press('Escape');
@@ -38,7 +38,7 @@ test.describe('chief panel floating form (ADR 0013)', () => {
   });
 
   test('chief header and composer tools retain 24px header and 28px composer-tool targets after conversation extraction', async ({ page }, testInfo) => {
-    await page.goto('/app?scenario=111&view=board');
+    await page.goto('/app/schedules?scenario=111');
     await settled(page);
     for (const name of ['总管设置', '最小化', '添加附件']) {
       const control = drawer(page).getByRole('button', { name, exact: true });
@@ -53,7 +53,7 @@ test.describe('chief panel floating form (ADR 0013)', () => {
   });
 
   test('composer bar carries the attach tool and the send button', async ({ page }) => {
-    await page.goto('/app?scenario=111&view=board');
+    await page.goto('/app/schedules?scenario=111');
 
     const bar = page.locator('.chief-composer');
 
@@ -63,10 +63,10 @@ test.describe('chief panel floating form (ADR 0013)', () => {
     await expect(bar.locator('button[aria-label="发送"]')).toBeVisible();
   });
 
-  test('the panel floats as a 380x600 window anchored 8px off the corner (board)', async ({
+  test('the panel floats as a 380x600 window anchored 8px off the corner (page)', async ({
     page,
   }) => {
-    await page.goto('/app?scenario=111&view=board');
+    await page.goto('/app/schedules?scenario=111');
     await settled(page);
     const box = await drawer(page).boundingBox();
     expect(box).not.toBeNull();
@@ -106,47 +106,6 @@ test.describe('chief panel floating form (ADR 0013)', () => {
     // D1: the form toggle is retired — neither label exists anywhere
     await expect(page.locator('button[aria-label="全屏"]')).toHaveCount(0);
     await expect(page.locator('button[aria-label="退出全屏"]')).toHaveCount(0);
-  });
-
-  test('board content never yields to the window (D1 overlay, no yield)', async ({ page }) => {
-    await page.goto('/app?scenario=111&view=board');
-    await settled(page);
-    const main = await page.locator('.board-main').boundingBox();
-    expect(main).not.toBeNull();
-
-    expect(main!.width).toBeCloseTo(SHEET_W, 0);
-
-    const open = await page.locator('.board-scroller').evaluate((el) => ({
-      scrollable: el.scrollWidth > el.clientWidth,
-      columns: [...el.querySelectorAll('.board-column')].map((c) => c.getBoundingClientRect().width),
-    }));
-
-    expect(open.scrollable).toBe(false);
-    expect(open.columns).toHaveLength(4);
-    const first = open.columns[0] ?? 0;
-    for (const w of open.columns) expect(Math.abs(w - first)).toBeLessThanOrEqual(1);
-  });
-
-  test('minimizing leaves the board grid at the same geometry (nothing to restore)', async ({
-    page,
-  }) => {
-    await page.goto('/app?scenario=111&view=board');
-    await settled(page);
-    const openMain = await page.locator('.board-main').boundingBox();
-
-    await minimize(page).click();
-    await expect(drawer(page)).toBeHidden();
-
-    const main = await page.locator('.board-main').boundingBox();
-    expect(main!.width).toBeCloseTo(openMain!.width, 0);
-    const rest = await page.locator('.board-scroller').evaluate((el) => ({
-      scrollable: el.scrollWidth > el.clientWidth,
-      columns: [...el.querySelectorAll('.board-column')].map((c) => c.getBoundingClientRect().width),
-    }));
-    expect(rest.scrollable).toBe(false);
-    const first = rest.columns[0] ?? 0;
-    expect(first).toBeGreaterThan(0);
-    for (const w of rest.columns) expect(Math.abs(w - first)).toBeLessThanOrEqual(1);
   });
 
   for (const { name, route } of [
@@ -212,7 +171,7 @@ test.describe('chief panel floating form (ADR 0013)', () => {
   test('hero examples: the four canon prompt cards, inert on the fixture face', async ({
     page,
   }) => {
-    await page.goto('/app?scenario=111&view=board');
+    await page.goto('/app/schedules?scenario=111');
 
     const examples = page.getByTestId('chief-examples');
     const cards = examples.getByRole('button');
@@ -251,8 +210,8 @@ test.describe('chief panel floating form (ADR 0013)', () => {
       };
     };
 
-    const drafted = await measureComposer('/app?view=board&scenario=111');
-    const empty = await measureComposer('/app?view=board&scenario=114');
+    const drafted = await measureComposer('/app/schedules?scenario=111');
+    const empty = await measureComposer('/app/schedules?scenario=114');
 
     expect(drafted.height).toBe(120);
     expect(empty.height).toBe(36);
@@ -268,7 +227,7 @@ test.describe('chief panel floating form (ADR 0013)', () => {
   }) => {
 
     const placeholderAt = async (scenario: string) => {
-      await page.goto(`/app?scenario=${scenario}&view=board`);
+      await page.goto(`/app/schedules?scenario=${scenario}`);
       const composer = page.getByTestId('chief-composer-input');
       await expect(composer).toBeVisible();
       return composer.getAttribute('placeholder');
@@ -323,7 +282,7 @@ test.describe('chief panel floating form (ADR 0013)', () => {
       route.fulfill({ json: { sources: [] } }),
     );
 
-    await page.goto('/app?view=board');
+    await page.goto('/app/schedules');
     await expect(drawer(page)).toBeHidden();
 
     await openChiefWindow(page);
