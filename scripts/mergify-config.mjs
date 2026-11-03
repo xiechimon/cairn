@@ -16,7 +16,7 @@ const batchWait = '3 min';
 const checkRetries = 1;
 const scopes = {
   web: ['apps/web/**/*'],
-  backend: ['apps/server/**/*', 'apps/daemon/**/*', 'integration/**/*'],
+  backend: ['apps/server/**/*', 'apps/daemon/**/*', 'apps/coordinator/**/*', 'integration/**/*'],
 };
 const barrierFiles = ['packages/**/*'];
 
