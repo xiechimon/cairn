@@ -842,7 +842,7 @@ async function runClaimedStep(
   delete stepEnv.CLAUDE_CODE_OAUTH_TOKEN;
   if (runtimeId === 'claude-code' && creds.claudeSubscriptionToken !== undefined) {
     stepEnv.CLAUDE_CODE_OAUTH_TOKEN = creds.claudeSubscriptionToken;
-    stepEnv.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB = '1';
+    if (opts.env?.CAIRN_ORB !== '1') stepEnv.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB = '1';
   }
   const sessionOpts: SessionOpts = {
     provider,
