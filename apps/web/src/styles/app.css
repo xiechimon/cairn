@@ -327,10 +327,7 @@
 }
 
 @supports (corner-shape: superellipse(1.5)) {
-  .todo-card,
-  .board-column,
-  .board-notify-banner,
-  .board-drag-card {
+  .board-notify-banner {
     corner-shape: superellipse(1.5);
   }
 }
@@ -472,68 +469,10 @@
 }
 
 @media (max-width: 640px) {
-  .board-topbar,
   [data-testid="page-topbar"],
   [data-testid="chief-settings-topbar"],
   .side-panel [data-panel-head] {
     padding-left: 52px;
-  }
-
-  .board-topbar-schedule {
-    display: none;
-  }
-  .board-topbar button {
-    min-height: 44px;
-  }
-
-  .board-new-task-bar {
-    position: fixed;
-    right: 8px;
-    bottom: max(8px, env(safe-area-inset-bottom));
-    left: 8px;
-    z-index: var(--z-docked);
-    margin: 0;
-    width: auto;
-    max-width: none;
-  }
-
-  .board-main {
-    overflow-x: hidden;
-    overflow-y: auto;
-  }
-
-  .board-scroller {
-    flex: none;
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: none;
-    grid-auto-rows: auto;
-    align-content: start;
-    overflow: visible;
-    padding-bottom: 72px;
-  }
-
-  .board-inbox {
-    flex: none;
-    overflow: visible;
-    padding-bottom: 72px;
-  }
-
-  .board-column[data-empty="true"] {
-    display: none;
-  }
-
-  .board-column {
-    height: auto;
-    min-height: 0;
-  }
-
-  .board-column [data-column-list] {
-    flex: none;
-    overflow: visible;
-  }
-
-  .board-column [data-column-empty-new] {
-    display: none;
   }
 
   [data-testid="page-topbar"] :is(button, a) {
@@ -554,9 +493,6 @@
   .chief-drawer {
     right: max(0.5rem, env(safe-area-inset-right));
     bottom: max(0.5rem, env(safe-area-inset-bottom));
-  }
-  body:has(.board-new-task-bar) .chief-drawer {
-    transform-origin: calc(100% - 1.25rem) calc(100% - 60px - 1.25rem);
   }
 }
 

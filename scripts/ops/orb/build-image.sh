@@ -89,7 +89,7 @@ daemon=[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?)?$'
     printf 'rebuild cairn-orb-base: recipe or pinned Node/CLI versions changed\n'
   fi
 fi
-printf 'build cairn-orb-base with pacstrap: base git nodejs npm openssh ca-certificates curl bubblewrap\n'
+printf 'build cairn-orb-base with pacstrap: base git nodejs npm openssh ca-certificates curl bubblewrap socat python\n'
 printf 'pin Node major %s @anthropic-ai/claude-code@%s @openai/codex@%s pnpm@%s; create agent; install proxy settings; register image\n' "$node_major" "$claude_version" "$codex_version" "$pnpm_version"
 if [[ $filesystem == btrfs ]]; then
   printf 'create a locked staging subvolume under /var/lib/machines\n'
@@ -99,6 +99,7 @@ fi
 printf '%s\n' \
   'install pinned CLI packages and pnpm with npm lifecycle scripts disabled' \
   'create unprivileged agent user and validate its CLI and pnpm versions' \
+  'pin Claude config to /var/lib/cairn-claude/config with the weaker nested sandbox, settings root-owned' \
   'lock root login and mask SSH server units' \
   'enable guest systemd-networkd' \
   'install and enable cairn-orb-worker.service, cairn-orb-check.service and cairn-orb-check.path' \
@@ -139,7 +140,7 @@ if [[ $filesystem == btrfs ]]; then
   rmdir -- "$stage"
   btrfs subvolume create "$stage"
 fi
-pacstrap -K -M "$stage" base git nodejs npm openssh ca-certificates curl bubblewrap
+pacstrap -K -M "$stage" base git nodejs npm openssh ca-certificates curl bubblewrap socat python
 printf 'configure image and pinned tools\n'
 arch-chroot "$stage" /usr/bin/env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/bin HOME=/root HTTP_PROXY="$HTTP_PROXY" HTTPS_PROXY="$HTTPS_PROXY" http_proxy="$http_proxy" https_proxy="$https_proxy" bash -s -- "$claude_version" "$codex_version" "$agent_uid" "$daemon_entry" "$pnpm_version" "$node_major" <<'GUEST'
 set -euo pipefail
@@ -153,6 +154,20 @@ useradd --uid "$3" --create-home --shell /bin/bash agent
 [[ $(runuser -u agent -- codex --version | awk 'NR == 1 {print $NF}') == "$2" ]] || { printf 'codex %s is not runnable by agent\n' "$2" >&2; exit 1; }
 [[ $(cd /tmp && runuser -u agent -- pnpm --version) == "$5" ]] || { printf 'pnpm %s is not runnable by agent\n' "$5" >&2; exit 1; }
 runuser -u agent -- /usr/bin/bwrap --version > /dev/null || { printf 'bubblewrap is not runnable by agent\n' >&2; exit 1; }
+runuser -u agent -- /usr/bin/socat -V > /dev/null || { printf 'socat is not runnable by agent\n' >&2; exit 1; }
+runuser -u agent -- /usr/bin/python3 --version > /dev/null || { printf 'python3 is not runnable by agent\n' >&2; exit 1; }
+install -d -o root -g root -m 755 /var/lib/cairn-claude
+install -d -o root -g agent -m 1770 /var/lib/cairn-claude/config
+printf '%s\n' '{"sandbox": {"enableWeakerNestedSandbox": true}}' > /var/lib/cairn-claude/config/settings.json
+chown root:root /var/lib/cairn-claude/config/settings.json
+chmod 644 /var/lib/cairn-claude/config/settings.json
+runuser -u agent -- /usr/bin/node -e 'const s = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8")); process.exit(s.sandbox?.enableWeakerNestedSandbox === true ? 0 : 1)' /var/lib/cairn-claude/config/settings.json || { printf 'agent cannot read the Claude sandbox settings\n' >&2; exit 1; }
+runuser -u agent -- touch /var/lib/cairn-claude/config/.agent-write-check || { printf 'agent cannot write the Claude config dir\n' >&2; exit 1; }
+rm -f /var/lib/cairn-claude/config/.agent-write-check
+! runuser -u agent -- rm -f /var/lib/cairn-claude/config/settings.json 2>/dev/null || { printf 'agent can remove the Claude settings\n' >&2; exit 1; }
+! runuser -u agent -- mv /var/lib/cairn-claude/config/settings.json /var/lib/cairn-claude/config/moved.json 2>/dev/null || { printf 'agent can rename the Claude settings\n' >&2; exit 1; }
+! runuser -u agent -- sh -c 'printf x > /var/lib/cairn-claude/config/settings.json' 2>/dev/null || { printf 'agent can overwrite the Claude settings\n' >&2; exit 1; }
+! runuser -u agent -- mv /var/lib/cairn-claude/config /var/lib/cairn-claude/moved 2>/dev/null || { printf 'agent can move the Claude config dir\n' >&2; exit 1; }
 passwd --lock root
 systemctl disable sshd.service sshd.socket || true
 systemctl mask sshd.service sshd.socket
@@ -171,12 +186,14 @@ StartLimitIntervalSec=0
 [Service]
 User=agent
 Environment=CAIRN_ORB=1
+Environment=CLAUDE_CONFIG_DIR=/var/lib/cairn-claude/config
 Restart=always
 RestartSec=1
 ExecStartPre=/bin/sh -c 'while [ ! -S /run/cairn/relay.sock ]; do sleep 1; done'
 TimeoutStartSec=infinity
 ExecStart=/usr/bin/node $4 orb-step --socket /run/cairn/relay.sock
 UMask=0077
+LimitCORE=0
 
 [Install]
 WantedBy=multi-user.target

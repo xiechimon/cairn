@@ -10,12 +10,10 @@ for (const width of [360, 390]) {
       await page.setViewportSize({ width, height: 800 });
     });
 
-    test('M1 board: sidebar folds into a menu drawer, top bar actions stay on screen, no page scroll', async ({
-      page,
-    }) => {
-      await page.goto('/app?view=board');
+    test('M1 home: sidebar folds into a menu drawer, no page scroll', async ({ page }) => {
+      await page.goto('/app');
       await expect(page.locator('.board-sidebar')).toHaveCount(0);
-      await expect(page.locator('.board-topbar-title')).toBeVisible();
+      await expect(page.getByTestId('home-c')).toBeVisible();
       const menu = page.getByRole('button', { name: '展开侧边栏' });
       const menuBox = (await menu.boundingBox()) as { width: number; height: number };
       expect(menuBox.width).toBeGreaterThanOrEqual(44);
@@ -27,20 +25,11 @@ for (const width of [360, 390]) {
       ).toBeVisible();
       await page.keyboard.press('Escape');
       await expect(drawer).toBeHidden();
-      await page.goto('/app?view=board');
+      await page.goto('/app/schedules');
       await menu.click();
       await drawer.locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' }).click();
-      await expect(page).not.toHaveURL(/view=board/);
+      await expect(page).toHaveURL(/\/app(\?|$)/);
       await expect(drawer).toBeHidden();
-      await page.goto('/app?view=board');
-      for (const name of ['筛选', '新任务']) {
-        const box = (await page
-          .getByRole('button', { name: new RegExp(name) })
-          .first()
-          .boundingBox()) as { x: number; width: number };
-        expect(box.x + box.width, `${name} 右缘`).toBeLessThanOrEqual(width);
-        expect(box.x, `${name} 左缘`).toBeGreaterThanOrEqual(0);
-      }
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
       );
@@ -81,7 +70,7 @@ for (const width of [360, 390]) {
     });
 
     test('M4 Coordinator window stays inside the viewport and minimizes', async ({ page }) => {
-      await page.goto('/app?view=board');
+      await page.goto('/app/schedules');
       await expect(page.locator('.chief-fab')).toHaveCount(0);
       await openChiefWindow(page);
       const drawer = page.locator('.chief-drawer');

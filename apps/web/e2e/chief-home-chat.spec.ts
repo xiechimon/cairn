@@ -92,9 +92,9 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
     await expect(page.locator('.chief-drawer')).toBeHidden();
   });
 
-  test('the board view keeps the chief button and drawer', async ({ page }) => {
+  test('a page other than home keeps the chief drawer', async ({ page }) => {
     await mockLive(page, { threads: [THREAD], messages: HISTORY });
-    await page.goto('/app?view=board');
+    await page.goto('/app/schedules');
     await expect(page.getByTestId('home-c')).toHaveCount(0);
     await openChiefWindow(page);
     await expect(page.locator('.chief-drawer')).toBeVisible();
@@ -102,7 +102,7 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
 
   test('a task chip in the drawer opens the task page', async ({ page }) => {
     await mockLive(page, { threads: [THREAD], messages: HISTORY });
-    await page.goto('/app?view=board');
+    await page.goto('/app/schedules');
     await openChiefWindow(page);
     const drawer = page.locator('.chief-drawer');
     await drawer.locator('a.mention-chip--todo').first().click();

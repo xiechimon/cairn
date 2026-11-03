@@ -4,6 +4,7 @@ import { conversationBranch, type Phase } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import {
+  agent as agentTable,
   build as buildTable,
   message as messageTable,
   project as projectTable,
@@ -1085,6 +1086,10 @@ describe('#1403 PR reconcile for review-phase builds', () => {
 
   test('㉖b AI review: the reconcile finishes the card while the changes are read → no review step', async () => {
     const w = makeWorld();
+    w.s.db
+      .insert(agentTable)
+      .values({ id: 'agent-x', teamId: w.s.team.id, displayName: 'reviewer x' })
+      .run();
     const pending = applyBuildStepAction({ ...w.s.svc, reposDir: '/nonexistent' }, w.buildId, {
       action: 'review',
       agentId: 'agent-x',

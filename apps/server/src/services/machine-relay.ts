@@ -95,6 +95,9 @@ export async function executeRelayToolCall(
   if (!isChiefConversation(row.buildId)) {
     throw new HttpError(400, `step ${stepId} is not a chief step`);
   }
+  if (row.status !== 'claimed') {
+    throw new HttpError(409, 'Coordinator tools require a currently claimed turn');
+  }
   const threadId = row.buildId;
   assertChiefDigestTool(threadId, name);
   const threadRow = deps.db.select().from(chiefThread).where(eq(chiefThread.id, threadId)).get();
@@ -177,8 +180,8 @@ async function executeWorkerSkillTool(
   params: Record<string, unknown>,
 ): Promise<string> {
   const agentRow =
-    deps.db.select().from(agent).where(eq(agent.id, agentId)).get() ??
-    agentForStep(deps.db, todoRow, stepRow.kind, stepRow.prompt);
+    agentForStep(deps.db, todoRow, stepRow.kind, stepRow.prompt) ??
+    deps.db.select().from(agent).where(eq(agent.id, agentId)).get();
   if (!agentRow) throw new NotFoundError(`agent ${agentId}`);
   const want = name === 'create_skill' ? AGENT_TOOL_SKILL_CREATE : AGENT_TOOL_SKILL_UPDATE;
   if (!agentRow.tools.includes(want)) {

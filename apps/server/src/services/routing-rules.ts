@@ -29,7 +29,8 @@ export function routeForStep(
   kind: StepKind,
 ): RoutingRuleRow | null {
   if (!routingRulesOn) return null;
-  const use = isSessionStepKind(kind) ? 'session' : kind === 'review' ? 'review' : null;
+  const use =
+    isSessionStepKind(kind) || kind === 'merge' ? 'session' : kind === 'review' ? 'review' : null;
   if (use === null) return null;
   return (
     db
@@ -195,7 +196,27 @@ function ruleExists(db: Db, teamId: string, use: 'session' | 'review'): boolean 
   );
 }
 
+function backfillRuleConstraints(db: Db): void {
+  for (const rule of db.select().from(routingRule).all()) {
+    if (rule.requiredCapabilities !== null || rule.seededFromAgentId === null) continue;
+    if (rule.use !== 'session' && rule.use !== 'review') continue;
+    const source = db
+      .select()
+      .from(agent)
+      .where(and(eq(agent.id, rule.seededFromAgentId), eq(agent.teamId, rule.teamId)))
+      .get();
+    if (source === undefined) continue;
+    const required = seededRequirement(db, source);
+    if (required === null) continue;
+    db.update(routingRule)
+      .set({ requiredCapabilities: required })
+      .where(eq(routingRule.id, rule.id))
+      .run();
+  }
+}
+
 export function seedRoutingRules(db: Db): number {
+  backfillRuleConstraints(db);
   let inserted = 0;
   for (const { id: teamId } of db.select({ id: team.id }).from(team).all()) {
     if (ruleExists(db, teamId, 'session')) continue;
@@ -265,7 +286,9 @@ function sessionAgentIds(db: Db, rule: RoutingRuleRow): string[] {
 export function adoptAgentMemories(db: Db): number {
   let copied = 0;
   for (const rule of db.select().from(routingRule).where(eq(routingRule.use, 'session')).all()) {
+    const already = new Set(rule.adoptedAgentIds ?? []);
     const adopted = sessionAgentIds(db, rule);
+    const fresh = adopted.filter((id) => !already.has(id));
     db.transaction((tx) => {
       const held = new Set(
         tx
@@ -275,7 +298,7 @@ export function adoptAgentMemories(db: Db): number {
           .all()
           .map((row) => `${row.projectId ?? ''}\u0000${row.content}`),
       );
-      for (const agentId of adopted) {
+      for (const agentId of fresh) {
         const rows = tx
           .select()
           .from(agentMemory)

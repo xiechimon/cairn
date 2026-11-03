@@ -10,7 +10,11 @@ import {
 } from '../src/db/schema.js';
 import { newRecordId } from '../src/lib/ids.js';
 import { agentForStep } from '../src/services/dispatch-eligibility.js';
-import { seedReviewRules, setRoutingRulesEnabled } from '../src/services/routing-rules.js';
+import {
+  seedReviewRules,
+  seedRoutingRules,
+  setRoutingRulesEnabled,
+} from '../src/services/routing-rules.js';
 import { bootServer, issueApiKey, postProject, req, type TestServer } from './helpers.js';
 
 const servers: TestServer[] = [];
@@ -184,5 +188,53 @@ describe('D71 a step with no assigned agent runs from the routing rule', () => {
       modelId: 'claude-sonnet-5-5',
       machineId: w.machineId,
     });
+  });
+
+  test('a session rule seeded before it carried constraints gets its seed agent constraints backfilled, Orb included', async () => {
+    const w = await world();
+    w.s.db
+      .update(machineTable)
+      .set({ name: 'omarchy-orb', capabilities: null })
+      .where(eq(machineTable.id, w.machineId))
+      .run();
+    w.s.db
+      .insert(agentTable)
+      .values({
+        id: 'impl',
+        teamId: w.s.team.id,
+        displayName: 'impl',
+        persona: 'implementer',
+        provider: 'stub-gw',
+        modelId: 'm',
+        machineId: w.machineId,
+        requiredCapabilities: { mcpServers: ['figma'] },
+      })
+      .run();
+    const ruleId = rule(w, 'session', { seededFromAgentId: 'impl', requiredCapabilities: null });
+    seedRoutingRules(w.s.db);
+    seedRoutingRules(w.s.db);
+    expect(
+      w.s.db.select().from(routingRule).where(eq(routingRule.id, ruleId)).get()
+        ?.requiredCapabilities,
+    ).toEqual({ mcpServers: ['figma'], executor: 'orb' });
+  });
+
+  test('backfill leaves a rule that already has constraints, and a rule with no seed agent, alone', async () => {
+    const w = await world();
+    const set = rule(w, 'session', {
+      seededFromAgentId: 'missing-agent',
+      requiredCapabilities: { mcpServers: ['context7'] },
+    });
+    seedRoutingRules(w.s.db);
+    expect(
+      w.s.db.select().from(routingRule).where(eq(routingRule.id, set)).get()?.requiredCapabilities,
+    ).toEqual({ mcpServers: ['context7'] });
+  });
+
+  test('rules on: an agentless merge step runs from the session rule', async () => {
+    const w = await world();
+    const ruleId = rule(w, 'session');
+    const todoRow = await startWithoutAgent(w);
+    expect(agentForStep(w.s.db, todoRow, 'merge')?.id).toBe(ruleId);
   });
 });

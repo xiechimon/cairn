@@ -26,7 +26,11 @@ test('merge instructions require the pr-gate auto-merge verdict', () => {
   const agents = readFileSync(join(ROOT, 'AGENTS.md'), 'utf8');
   assert.match(agents, /pr-gate[^\n]*go[^\n]*`mergedBy: 'auto-merge'`/);
   assert.match(agents, /protected-path PRs[^\n]*go to ian/i);
-  assert.match(agents, /protected or security paths always get the independent review/);
+  assert.match(
+    agents,
+    /Protected or security paths need the Codex cloud review on the PR head plus `\/security-review`/,
+  );
+  assert.ok(!agents.includes('codex exec` from Claude'));
 });
 
 test('AGENTS.md and pr-cairn agree that agents never add needs-decision', () => {
