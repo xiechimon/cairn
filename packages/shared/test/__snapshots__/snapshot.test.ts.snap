@@ -8325,6 +8325,9 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > chi
               "minimum": 1,
               "type": "integer",
             },
+            "stepId": {
+              "type": "string",
+            },
             "waitingFor": {
               "anyOf": [
                 {

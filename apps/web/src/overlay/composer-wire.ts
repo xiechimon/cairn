@@ -552,6 +552,11 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
       via,
     });
     if (action === 'run' && row.builtin !== undefined) {
+      setDraft((current) => {
+        const start = Math.max(0, Math.min(range.start, current.length));
+        const end = Math.max(start, Math.min(range.end, current.length));
+        return current.slice(0, start) + current.slice(end).replace(/^ /, '');
+      });
       runBuiltin(row.builtin);
       return;
     }

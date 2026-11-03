@@ -1,5 +1,5 @@
-import type { StepQueueBlocked, StepQueueInfo } from '@cairn/shared';
-import { and, eq } from 'drizzle-orm';
+import type { ChiefThread, StepQueueBlocked, StepQueueInfo } from '@cairn/shared';
+import { and, asc, eq, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { agent, build, chief, chiefThread, machine, step, todo } from '../db/schema.js';
 import { routedChiefAgent } from './coordinator-route.js';
@@ -157,6 +157,12 @@ export function stepQueueProjector(db: Db, teamId: string) {
   }
 
   function pendingChiefOf(threadId: string): QueueTargetStep | null {
+    const turnRunning = db
+      .select({ id: step.id })
+      .from(step)
+      .where(and(eq(step.buildId, threadId), eq(step.kind, 'chief'), eq(step.status, 'claimed')))
+      .get();
+    if (turnRunning !== undefined) return null;
     const rows = chiefRows.filter((r) => r.threadId === threadId);
     const last = rows[rows.length - 1];
     if (last === undefined) return null;
@@ -169,5 +175,25 @@ export function stepQueueProjector(db: Db, teamId: string) {
     };
   }
 
-  return { project, pendingChiefOf };
+  function chiefTurnQueueOf(threadId: string): ChiefThread['turnQueue'] {
+    if (pendingChiefOf(threadId) === null) return null;
+    const oldest = db
+      .select({ id: step.id })
+      .from(step)
+      .where(and(eq(step.buildId, threadId), eq(step.kind, 'chief'), eq(step.status, 'pending')))
+      .orderBy(asc(step.createdAt), sql`rowid`)
+      .get();
+    const head = chiefRows.find((r) => r.id === oldest?.id);
+    if (head === undefined) return null;
+    const info = project({
+      id: head.id,
+      createdAt: head.createdAt,
+      homeMachineId: head.home,
+      holdReason: head.holdReason,
+      holdUntil: head.holdUntil,
+    });
+    return info === null ? null : { ...info, stepId: head.id };
+  }
+
+  return { project, pendingChiefOf, chiefTurnQueueOf };
 }

@@ -1286,13 +1286,12 @@ function handoffTodoOf(call: ToolCallRecord): string | null {
   return typeof todoId === 'string' && todoId !== '' ? todoId : null;
 }
 
-export function mapChiefStream(messages: MessageRow[], inlineTools = false): ChiefStreamItem[] {
-  return collectChiefStream(messages, inlineTools).items;
+export function mapChiefStream(messages: MessageRow[]): ChiefStreamItem[] {
+  return collectChiefStream(messages).items;
 }
 
 function collectChiefStream(
   messages: MessageRow[],
-  inlineTools = false,
   pendingIds: ReadonlyMap<string, 'queued' | 'held'> = new Map(),
 ): {
   items: ChiefStreamItem[];
@@ -1411,20 +1410,10 @@ function collectChiefStream(
           ? { seconds: Math.max(0, Math.round((call.endedAt - call.startedAt) / 1000)) }
           : {}),
         ...(call.isError === true ? { error: true } : {}),
+        ...(call.result === undefined && call.endedAt === undefined && call.isError !== true
+          ? { running: true }
+          : {}),
       });
-      if (inlineTools) {
-        items.push({
-          kind: 'tool',
-          label: pillOf(call),
-          id: m.id,
-          ...(call.startedAt !== undefined ? { startedAt: call.startedAt } : {}),
-          ...(call.startedAt !== undefined && call.endedAt !== undefined
-            ? { seconds: Math.max(0, Math.round((call.endedAt - call.startedAt) / 1000)) }
-            : {}),
-          ...(call.result === undefined ? { running: true } : {}),
-          ...(call.isError === true ? { error: true } : {}),
-        });
-      }
       const handoffTodoId = handoffTodoOf(call);
       if (handoffTodoId !== null)
         items.push({ kind: 'handoff', todoId: handoffTodoId, id: `${m.id}:handoff` });
@@ -1432,7 +1421,6 @@ function collectChiefStream(
     }
     const ask = m.role === 'assistant' ? askQuestionOfContent(m.content) : null;
     if (ask !== null) {
-      pendingTools = [];
       items.push({
         kind: 'question',
         id: m.id,
@@ -1476,7 +1464,9 @@ function collectChiefStream(
       markdown: rawText,
       seconds: '',
       id: m.id,
-      ...(pendingTools.length > 0 ? { tools: pendingTools } : {}),
+      ...(pendingTools.length > 0
+        ? { tools: pendingTools.map(({ running: _settled, ...tool }) => tool) }
+        : {}),
       ...(fallback !== null ? { fallbackModel: fallback.model } : {}),
       ...rowProject(m),
     });
@@ -1521,8 +1511,10 @@ export function mapChief(
   const pendingIds = new Map((active?.pending ?? []).map((p) => [p.messageId, p.state] as const));
   const parked = [...pendingIds.values()].includes('held');
   const running = active?.activeRun != null && !parked;
-  const collected = active === null ? null : collectChiefStream(opts.messages, running, pendingIds);
+  const collected = active === null ? null : collectChiefStream(opts.messages, pendingIds);
   const chiefStream: ChiefStreamItem[] = collected?.items ?? [];
+  const trailingTools = collected?.trailingTools ?? [];
+  let waitingTurn: ChiefContent['waitingTurn'];
   if (running && collected?.eventTurn !== true) {
     if ((opts.liveThinking ?? '').trim() !== '') {
       chiefStream.push({ kind: 'thinking', text: opts.liveThinking ?? '' });
@@ -1533,12 +1525,18 @@ export function mapChief(
         markdown: autoCloseStrong(opts.liveText ?? ''),
         typing: true,
         seconds: '',
+        ...(trailingTools.length > 0 ? { tools: trailingTools } : {}),
       });
-    } else if (chiefStream[chiefStream.length - 1]?.kind !== 'robot') {
+    } else if (chiefStream[chiefStream.length - 1]?.kind !== 'robot' || trailingTools.length > 0) {
       const lastUser = collected?.items.findLastIndex((item) => item.kind === 'user') ?? -1;
       const turnStartedAt = lastUser >= 0 ? collected?.itemsAt[lastUser] : undefined;
       const turnQueue = active?.turnQueue ?? null;
       if (turnQueue != null) {
+        const asked = collected?.items.find(
+          (item) => item.kind === 'user' && item.id !== undefined && item.id === turnQueue.stepId,
+        );
+        if (asked?.kind === 'user' && asked.id !== undefined)
+          waitingTurn = { messageId: asked.id, text: asked.markdown ?? asked.text };
         const queued = queueLabel(turnQueue);
         chiefStream.push({
           kind: 'streaming',
@@ -1553,9 +1551,7 @@ export function mapChief(
           label: actLabel?.label ?? '处理中...',
           ...(actLabel?.vars !== undefined ? { labelVars: actLabel.vars } : {}),
           ...(opts.activity != null ? { signalAt: opts.activity.at } : {}),
-          ...((collected?.trailingTools.length ?? 0) > 0
-            ? { tools: collected?.trailingTools }
-            : {}),
+          ...(trailingTools.length > 0 ? { tools: trailingTools } : {}),
         });
       }
     }
@@ -1594,6 +1590,7 @@ export function mapChief(
       : active?.activeRun?.tool != null
         ? { runningTool: active.activeRun.tool.toolName }
         : {}),
+    ...(waitingTurn !== undefined ? { waitingTurn } : {}),
     ...(opts.draft !== undefined ? { draft: opts.draft } : {}),
     ...(env.outage != null ? { outage: env.outage } : {}),
     ...(active?.fallbackModel != null ? { fallbackModel: active.fallbackModel } : {}),

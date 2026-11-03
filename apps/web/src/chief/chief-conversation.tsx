@@ -284,6 +284,7 @@ export function ChiefConversation({
       else localStorage.setItem(draftStorageKey, liveDraft);
     } catch {}
   }, [live, liveDraft, draftStorageKey]);
+  const stopTurnRef = useRef<(() => void) | undefined>(undefined);
   const wire = useComposerWire({
     editable: onSend != null,
     draft: onSend != null ? liveDraft : (chief.draft ?? ''),
@@ -305,7 +306,8 @@ export function ChiefConversation({
     ...(chipVisible ? { onPickProject: (p: { id: string }) => pickProject(p.id) } : {}),
     slash: {
       reviewAvailable: false,
-      stopAvailable: false,
+      stopAvailable: targetPlaceholder === null && chief.running === true && onStop != null,
+      onStop: () => stopTurnRef.current?.(),
     },
     growCap: 120,
   });
@@ -431,6 +433,12 @@ export function ChiefConversation({
             () => {},
           );
         };
+  const waitingTurn = chief.waitingTurn;
+  const stopTurn =
+    waitingTurn !== undefined && withdraw !== undefined
+      ? () => withdraw(waitingTurn.messageId, waitingTurn.text)
+      : onStop;
+  stopTurnRef.current = stopTurn;
   const allRows = (chief.stream ?? []).map((item, i) => ({ item, i }));
   const rows = allRows.filter(({ item }) => item.kind !== 'user' || item.pending == null);
   const latestMessage = rows.findLast(
@@ -848,7 +856,7 @@ export function ChiefConversation({
                   size="icon"
                   aria-label={t('停止总管这次回复')}
                   className={cn(SEND_BTN_CLS, STOP_CLS, turnElapsed != null && 'ml-2')}
-                  onClick={onStop}
+                  onClick={stopTurn}
                 >
                   <span className="size-2.25 rounded-(--cds-radius-xs) bg-current" />
                 </Button>
