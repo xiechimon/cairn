@@ -320,7 +320,7 @@ describe('#1251 claim capability gate', () => {
     expect((await claimAs(w, hasModel.machineId))?.step.id).toBe(runnable.stepId);
   });
 
-  test('failure mode 5: no snapshot reported fail-open -- legacy daemon machines still claim', async () => {
+  test('D71 failure mode 5: no snapshot reported fails closed -- a legacy daemon does not claim a step that requires a capability', async () => {
     const w = await setupWorld();
     insertAgent(w, { id: 'agent-cap-open', requiredCapabilities: { mcpServers: ['figma'] } });
     const legacy = await enrollMachineRest(w, { name: 'cap-open-legacy' });
@@ -328,10 +328,11 @@ describe('#1251 claim capability gate', () => {
       agentId: 'agent-cap-open',
       homeMachineId: legacy.machineId,
     });
-    expect((await claimAs(w, legacy.machineId))?.step.id).toBe(stepId);
+    expect(await claimAs(w, legacy.machineId)).toBeNull();
+    expect(stepRow(w, stepId).status).toBe('pending');
   });
 
-  test('failure mode 5: models dimension fail-open same law for claudeCodeReport null', async () => {
+  test('D71 failure mode 5: models dimension fails closed the same way for claudeCodeReport null', async () => {
     const w = await setupWorld();
     insertAgent(w, { id: 'agent-cap-open2', requiredCapabilities: { models: ['glm-5.3'] } });
     const noReport = await enrollMachineRest(w, {
@@ -342,7 +343,8 @@ describe('#1251 claim capability gate', () => {
       agentId: 'agent-cap-open2',
       homeMachineId: noReport.machineId,
     });
-    expect((await claimAs(w, noReport.machineId))?.step.id).toBe(stepId);
+    expect(await claimAs(w, noReport.machineId)).toBeNull();
+    expect(stepRow(w, stepId).status).toBe('pending');
   });
 
   test('failure mode 6: zero regression -- agent without requiredCapabilities behaves unchanged', async () => {
@@ -560,7 +562,7 @@ describe('#1251 machine-fit read surface (agent surface "which machines can run 
       runtimeOk: true,
       missing: null,
       mcpGaps: null,
-      canRun: true,
+      canRun: false,
     });
     expect(byId[noRuntime.machineId]).toMatchObject({ runtimeOk: false, canRun: false });
   });

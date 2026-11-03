@@ -46,16 +46,12 @@ export function missingCapabilityItems(
     required.executor === 'orb' && machineRow.capabilities?.executor !== 'orb';
   return {
     ...(executorMissing ? { executor: 'orb' as const } : {}),
-    mcpServers:
-      reportedMcp === undefined
-        ? []
-        : (required.mcpServers ?? [])
-            .map((slug) => slug.toLowerCase())
-            .filter((slug) => !reportedMcp.includes(slug)),
-    models:
-      reportedModels === undefined
-        ? []
-        : (required.models ?? []).filter((id) => !reportedModels.some((m) => m.id === id)),
+    mcpServers: (required.mcpServers ?? [])
+      .map((slug) => slug.toLowerCase())
+      .filter((slug) => !(reportedMcp ?? []).includes(slug)),
+    models: (required.models ?? []).filter(
+      (id) => !(reportedModels ?? []).some((m) => m.id === id),
+    ),
   };
 }
 
@@ -221,6 +217,50 @@ export function homeMachineRejectReason(
       return `机器 ${machineRow.name} 未配置模型 ${agentRow.modelId}（在该机 ~/.claude/settings.json 配上，或为 agent 换模型）。`;
     }
   }
+  return null;
+}
+
+export interface EligibilityInput {
+  machine: {
+    id: string;
+    name: string;
+    enabledRuntimes: string[];
+    claudeCodeReport: ClaudeCodeReport | null;
+    capabilities: MachineCapabilities | null;
+  };
+  agent: {
+    machineId: string | null;
+    requiredCapabilities: RequiredCapabilities | null | undefined;
+  };
+  model: { provider: string | null | undefined; modelId: string | null | undefined };
+  catalog: ReadonlyArray<{ id: string; liveness?: 'alive' | 'dead' | 'unknown' }>;
+  localProject: boolean;
+  claudeRateBlocked: boolean;
+  claudeLoginBlocked: boolean;
+  claudeUsageRefused: boolean;
+}
+
+export type MachineIneligibility =
+  | { kind: 'runtime' | 'local-path' | 'claude-blocked' | 'claude-login' | 'claude-usage' }
+  | { kind: 'model'; reason: string }
+  | { kind: 'capability'; missing: string[] };
+
+export function machineEligibility(input: EligibilityInput): MachineIneligibility | null {
+  const { machine: machineRow, agent: agentRow, model } = input;
+  const runtime = stepRuntimeFor(model.provider);
+  if (!machineRow.enabledRuntimes.includes(runtime)) return { kind: 'runtime' };
+  const modelReject = homeMachineRejectReason(machineRow, model, input.catalog);
+  if (modelReject !== null) return { kind: 'model', reason: modelReject };
+  const missing = capabilityMissingLabels(
+    missingCapabilityItems(machineRow, agentRow.requiredCapabilities),
+  );
+  if (missing.length > 0) return { kind: 'capability', missing };
+  if (input.localProject && agentRow.machineId !== null && agentRow.machineId !== machineRow.id) {
+    return { kind: 'local-path' };
+  }
+  if (runtime === 'claude-code' && input.claudeRateBlocked) return { kind: 'claude-blocked' };
+  if (runtime === 'claude-code' && input.claudeLoginBlocked) return { kind: 'claude-login' };
+  if (input.claudeUsageRefused) return { kind: 'claude-usage' };
   return null;
 }
 
