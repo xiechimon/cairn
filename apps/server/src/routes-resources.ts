@@ -543,6 +543,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
       name: body.name,
       description: body.description ?? null,
       value: body.value,
+      projectId: body.projectId ?? null,
     });
     return c.json(record, 201);
   });

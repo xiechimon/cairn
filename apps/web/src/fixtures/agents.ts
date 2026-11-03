@@ -34,8 +34,14 @@ export const agentDetail: FixtureSet = {
 };
 
 const AGENT_DETAIL_SECRETS: SecretRecord[] = [
-  { id: 'secret-stripe', teamId: TEAM_ID, name: 'STRIPE_API_KEY', description: null },
-  { id: 'secret-npm', teamId: TEAM_ID, name: 'NPM_TOKEN', description: null },
+  {
+    id: 'secret-stripe',
+    teamId: TEAM_ID,
+    projectId: null,
+    name: 'STRIPE_API_KEY',
+    description: null,
+  },
+  { id: 'secret-npm', teamId: TEAM_ID, projectId: null, name: 'NPM_TOKEN', description: null },
 ];
 
 export const agentDetailSecrets: FixtureSet = {

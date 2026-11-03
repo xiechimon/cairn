@@ -114,6 +114,10 @@ export const EN: Record<string, string> = {
   在进行: 'In progress',
   等你处理: 'Needs you',
   管理定时: 'Manage schedules',
+  全团队: 'Whole team',
+  '仅 {name}': 'Only {name}',
+  '项目密钥只发给该项目的 thread，同名时优先于团队密钥。':
+    'Project secrets go only to threads in that project and override a team secret with the same name.',
   项目说明: 'Instructions',
   保存项目说明: 'Save instructions',
   '本项目的每个 thread 和 Coordinator 都会读到，排在仓库的 AGENTS.md 之后。':

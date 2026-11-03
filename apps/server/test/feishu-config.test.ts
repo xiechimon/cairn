@@ -127,11 +127,11 @@ test('ordinary secret APIs keep feishu.bot names usable and never expose the bin
     expect(await (await req(s.app, 'GET', secretsPath)).json()).toEqual(
       expect.arrayContaining([expect.objectContaining({ id, name })]),
     );
-    expect(openSecretValues({ db: s.db, box: s.secretBox }, s.team.id, [id])).toEqual({
+    expect(openSecretValues({ db: s.db, box: s.secretBox }, s.team.id, [id], null)).toEqual({
       [name]: 'user-owned-value',
     });
     await req(s.app, 'PATCH', `${secretsPath}/${id}`, { value: 'user-owned-updated' });
-    expect(openSecretValues({ db: s.db, box: s.secretBox }, s.team.id, [id])).toEqual({
+    expect(openSecretValues({ db: s.db, box: s.secretBox }, s.team.id, [id], null)).toEqual({
       [name]: 'user-owned-updated',
     });
     expect((await req(s.app, 'DELETE', `${secretsPath}/${id}`)).status).toBe(204);
@@ -145,8 +145,8 @@ test('ordinary secret APIs keep feishu.bot names usable and never expose the bin
         .select()
         .from(feishuBinding)
         .all()
-        .map((row) => [row.appIdCipher, row.appSecretCipher])
-        .flat(),
+        .flatMap((row) => [row.appIdCipher, row.appSecretCipher]),
+      null,
     ),
   ).toEqual({});
   expect(await (await req(s.app, 'GET', s.path)).json()).toEqual({

@@ -5034,6 +5034,12 @@ exports[`body/envelope schema snapshots > setSecretBody > setSecretBody.json 1`]
     "name": {
       "type": "string",
     },
+    "projectId": {
+      "type": [
+        "string",
+        "null",
+      ],
+    },
     "value": {
       "type": "string",
     },
@@ -9402,6 +9408,12 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > sec
     "name": {
       "type": "string",
     },
+    "projectId": {
+      "type": [
+        "string",
+        "null",
+      ],
+    },
     "teamId": {
       "type": "string",
     },
@@ -9409,6 +9421,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > sec
   "required": [
     "id",
     "teamId",
+    "projectId",
     "name",
     "description",
   ],

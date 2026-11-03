@@ -1,7 +1,7 @@
 import type { SecretBox, SecretRecord } from '@cairn/shared';
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { secret } from '../db/schema.js';
+import { project, secret } from '../db/schema.js';
 import { conflict, notFound } from '../lib/errors.js';
 import { newRecordId } from '../lib/ids.js';
 
@@ -13,7 +13,13 @@ export interface SecretDeps {
 type SecretRow = typeof secret.$inferSelect;
 
 export function toSecretRecord(row: SecretRow): SecretRecord {
-  return { id: row.id, teamId: row.teamId, name: row.name, description: row.description };
+  return {
+    id: row.id,
+    teamId: row.teamId,
+    projectId: row.projectId,
+    name: row.name,
+    description: row.description,
+  };
 }
 
 function getRow(deps: SecretDeps, teamId: string, id: string): SecretRow | undefined {
@@ -24,11 +30,23 @@ function getRow(deps: SecretDeps, teamId: string, id: string): SecretRow | undef
     .get();
 }
 
-function assertNameFree(deps: SecretDeps, teamId: string, name: string, exceptId?: string): void {
+function assertNameFree(
+  deps: SecretDeps,
+  teamId: string,
+  projectId: string | null,
+  name: string,
+  exceptId?: string,
+): void {
   const dup = deps.db
     .select({ id: secret.id })
     .from(secret)
-    .where(and(eq(secret.teamId, teamId), eq(secret.name, name)))
+    .where(
+      and(
+        eq(secret.teamId, teamId),
+        eq(secret.name, name),
+        projectId === null ? isNull(secret.projectId) : eq(secret.projectId, projectId),
+      ),
+    )
     .all()
     .find((r) => r.id !== exceptId);
   if (dup) throw conflict(`secret ${name} already exists`);
@@ -46,15 +64,31 @@ export function listSecrets(deps: SecretDeps, teamId: string): SecretRecord[] {
 
 export function createSecret(
   deps: SecretDeps,
-  input: { teamId: string; name: string; description?: string | null; value: string },
+  input: {
+    teamId: string;
+    name: string;
+    description?: string | null;
+    value: string;
+    projectId?: string | null;
+  },
 ): SecretRecord {
-  assertNameFree(deps, input.teamId, input.name);
+  const projectId = input.projectId ?? null;
+  if (projectId !== null) {
+    const owned = deps.db
+      .select({ id: project.id })
+      .from(project)
+      .where(and(eq(project.id, projectId), eq(project.teamId, input.teamId)))
+      .get();
+    if (!owned) throw notFound(`project ${projectId}`);
+  }
+  assertNameFree(deps, input.teamId, projectId, input.name);
   const id = newRecordId();
   deps.db
     .insert(secret)
     .values({
       id,
       teamId: input.teamId,
+      projectId,
       name: input.name,
       description: input.description ?? null,
       valueCipher: deps.box.seal(input.value),
@@ -74,7 +108,7 @@ export function updateSecret(
   const row = getRow(deps, teamId, id);
   if (!row) throw notFound(`secret ${id}`);
   if (patch.name !== undefined && patch.name !== row.name) {
-    assertNameFree(deps, teamId, patch.name, id);
+    assertNameFree(deps, teamId, row.projectId, patch.name, id);
   }
   deps.db
     .update(secret)
@@ -101,15 +135,36 @@ export function openSecretValues(
   deps: SecretDeps,
   teamId: string,
   ids: readonly string[],
+  projectId: string | null,
 ): Record<string, string> {
   if (ids.length === 0) return {};
-  const rows = deps.db
+  const granted = deps.db
     .select()
     .from(secret)
     .where(and(eq(secret.teamId, teamId), inArray(secret.id, [...ids])))
-    .all();
+    .all()
+    .filter((row) => row.projectId === null || row.projectId === projectId);
+  const names = [...new Set(granted.map((row) => row.name))];
+  const projectRows =
+    projectId === null || names.length === 0
+      ? []
+      : deps.db
+          .select()
+          .from(secret)
+          .where(
+            and(
+              eq(secret.teamId, teamId),
+              eq(secret.projectId, projectId),
+              inArray(secret.name, names),
+            ),
+          )
+          .all();
   const values: Record<string, string> = {};
-  for (const row of rows) {
+  for (const row of [
+    ...granted.filter((r) => r.projectId === null),
+    ...projectRows,
+    ...granted.filter((r) => r.projectId !== null),
+  ]) {
     if (row.valueCipher === null) continue;
     values[row.name] = deps.box.open(row.valueCipher);
   }
