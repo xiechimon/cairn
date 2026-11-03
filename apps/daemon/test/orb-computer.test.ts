@@ -11,7 +11,16 @@ import {
 import { NspawnOrbProvider, type OrbCommandRunner } from '../src/orb/provider.js';
 import { rejectGuestExec } from './orb-fake.js';
 
-function fixture(options: { busy?: Set<string>; failClone?: boolean; noRuntime?: boolean } = {}) {
+function fixture(
+  options: {
+    busy?: Set<string>;
+    failClone?: boolean;
+    noRuntime?: boolean;
+    slowShutdownLists?: number;
+    busyProbe?: () => Promise<boolean>;
+  } = {},
+) {
+  const stopping = new Map<string, number>();
   const runtimeRoot = mkdtempSync(join(tmpdir(), 'orb-computer-run-'));
   const stateFile = join(mkdtempSync(join(tmpdir(), 'orb-computer-state-')), 'computers.json');
   const commands: string[][] = [];
@@ -30,7 +39,22 @@ function fixture(options: { busy?: Set<string>; failClone?: boolean; noRuntime?:
         mkdirSync(join(runtimeRoot, name ?? ''), { recursive: true, mode: 0o700 });
       machines.add(name ?? '');
     }
-    if (verb === 'poweroff' || verb === 'terminate') machines.delete(name ?? '');
+    if (verb === 'poweroff') {
+      if (options.slowShutdownLists) stopping.set(name ?? '', options.slowShutdownLists);
+      else machines.delete(name ?? '');
+    }
+    if (verb === 'terminate') {
+      stopping.delete(name ?? '');
+      machines.delete(name ?? '');
+    }
+    if (verb === 'list') {
+      for (const [machine, left] of stopping) {
+        if (left <= 1) {
+          stopping.delete(machine);
+          machines.delete(machine);
+        } else stopping.set(machine, left - 1);
+      }
+    }
     const stdout =
       verb === 'list'
         ? [...machines].join('\n')
@@ -46,7 +70,8 @@ function fixture(options: { busy?: Set<string>; failClone?: boolean; noRuntime?:
     stateFile,
     runtimeDirectoryTimeoutMs: 50,
     now: () => now,
-    isBusy: async (name) => options.busy?.has(name) ?? false,
+    shutdownTimeoutMs: 200,
+    isBusy: options.busyProbe ?? (async (name) => options.busy?.has(name) ?? false),
   });
   return {
     computers,
@@ -157,5 +182,53 @@ describe('computer Orbs', () => {
     expect(machines.has(name)).toBe(true);
     const restarted = new ComputerOrbs({ runner, runtimeRoot, stateFile, now: () => 0 });
     expect(restarted.known()).toEqual([name]);
+  });
+
+  test('poweroff gets time to shut down cleanly before terminate is used', async () => {
+    const { computers, machines, commands, advance } = fixture({ slowShutdownLists: 3 });
+    const name = computerMachineName('chief:c1');
+    await computers.ensure('chief:c1');
+    advance(COMPUTER_IDLE_STOP_MS + 1);
+    await computers.sweep();
+    expect(machines.has(name)).toBe(false);
+    expect(commands.some((c) => c[1] === 'terminate')).toBe(false);
+  });
+
+  test('a computer that ignores poweroff is terminated after the shutdown timeout', async () => {
+    const { computers, machines, commands, advance } = fixture({ slowShutdownLists: 10_000 });
+    const name = computerMachineName('chief:c1');
+    await computers.ensure('chief:c1');
+    advance(COMPUTER_IDLE_STOP_MS + 1);
+    await computers.sweep();
+    expect(commands.some((c) => c[1] === 'terminate')).toBe(true);
+    expect(machines.has(name)).toBe(false);
+  });
+
+  test('a computer used while the sweep waits on the busy probe is not stopped', async () => {
+    let releaseBusy: (busy: boolean) => void = () => {};
+    const busyProbe = new Promise<boolean>((resolve) => {
+      releaseBusy = resolve;
+    });
+    const { computers, machines, advance } = fixture({ busyProbe: () => busyProbe });
+    const name = computerMachineName('chief:c1');
+    await computers.ensure('chief:c1');
+    advance(COMPUTER_IDLE_STOP_MS + 1);
+    const sweeping = computers.sweep();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await computers.ensure('chief:c1');
+    releaseBusy(false);
+    await sweeping;
+    expect(machines.has(name)).toBe(true);
+  });
+
+  test('ensure during a stop waits for it and then starts the computer again', async () => {
+    const { computers, machines, advance } = fixture({ slowShutdownLists: 3 });
+    const name = computerMachineName('chief:c1');
+    await computers.ensure('chief:c1');
+    advance(COMPUTER_IDLE_STOP_MS + 1);
+    const sweeping = computers.sweep();
+    const ensuring = computers.ensure('chief:c1');
+    await Promise.all([sweeping, ensuring]);
+    expect(machines.has(name)).toBe(true);
   });
 });

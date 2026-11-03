@@ -32,10 +32,12 @@ export class ComputerOrbs {
   private readonly runtimeRoot: string;
   private readonly stateFile: string | undefined;
   private readonly runtimeDirectoryTimeoutMs: number;
+  private readonly shutdownTimeoutMs: number;
   private readonly now: () => number;
   private readonly isBusy: (name: string) => Promise<boolean>;
   private readonly computers = new Map<string, ComputerState>();
   private readonly pending = new Map<string, Promise<string>>();
+  private readonly stopping = new Map<string, Promise<void>>();
 
   constructor(
     options: {
@@ -43,6 +45,7 @@ export class ComputerOrbs {
       runtimeRoot?: string;
       stateFile?: string;
       runtimeDirectoryTimeoutMs?: number;
+      shutdownTimeoutMs?: number;
       now?: () => number;
       isBusy?: (name: string) => Promise<boolean>;
     } = {},
@@ -51,6 +54,7 @@ export class ComputerOrbs {
     this.runtimeRoot = options.runtimeRoot ?? '/run/cairn-orb';
     this.stateFile = options.stateFile;
     this.runtimeDirectoryTimeoutMs = options.runtimeDirectoryTimeoutMs ?? 60_000;
+    this.shutdownTimeoutMs = options.shutdownTimeoutMs ?? 30_000;
     this.now = options.now ?? Date.now;
     this.isBusy = options.isBusy ?? (async () => false);
     if (this.stateFile && existsSync(this.stateFile)) {
@@ -71,7 +75,9 @@ export class ComputerOrbs {
   ensure(scopeKey: string): Promise<string> {
     const running = this.pending.get(scopeKey);
     if (running) return running;
-    const operation = this.ensureRunning(scopeKey).finally(() => this.pending.delete(scopeKey));
+    const operation = (this.stopping.get(scopeKey) ?? Promise.resolve())
+      .then(() => this.ensureRunning(scopeKey))
+      .finally(() => this.pending.delete(scopeKey));
     this.pending.set(scopeKey, operation);
     return operation;
   }
@@ -92,13 +98,28 @@ export class ComputerOrbs {
 
   async sweep(): Promise<void> {
     const running = await this.runningMachines();
-    const now = this.now();
     for (const computer of this.computers.values()) {
-      if (!running.has(computer.name) || this.pending.has(computer.scopeKey)) continue;
-      if (now - computer.lastUsedAt < COMPUTER_IDLE_STOP_MS || now < computer.holdUntil) continue;
+      if (!running.has(computer.name) || !this.idle(computer)) continue;
       if (await this.isBusy(computer.name)) continue;
-      await this.stop(computer.name);
+      if (!this.idle(computer)) continue;
+      const stop = this.stop(computer.name);
+      this.stopping.set(computer.scopeKey, stop);
+      try {
+        await stop;
+      } finally {
+        this.stopping.delete(computer.scopeKey);
+      }
     }
+  }
+
+  private idle(computer: ComputerState): boolean {
+    const now = this.now();
+    return (
+      !this.pending.has(computer.scopeKey) &&
+      !this.stopping.has(computer.scopeKey) &&
+      now - computer.lastUsedAt >= COMPUTER_IDLE_STOP_MS &&
+      now >= computer.holdUntil
+    );
   }
 
   private async ensureRunning(scopeKey: string): Promise<string> {
@@ -152,7 +173,15 @@ export class ComputerOrbs {
 
   private async stop(name: string): Promise<void> {
     const poweroff = await this.runner(['machinectl', 'poweroff', name]);
-    if (poweroff.code === 0 && !(await this.runningMachines()).has(name)) return;
+    if (poweroff.code === 0) {
+      const deadline = Date.now() + this.shutdownTimeoutMs;
+      while ((await this.runningMachines()).has(name)) {
+        const remaining = deadline - Date.now();
+        if (remaining <= 0) break;
+        await delay(Math.min(100, remaining));
+      }
+      if (!(await this.runningMachines()).has(name)) return;
+    }
     await this.command(['machinectl', 'terminate', name]);
   }
 
