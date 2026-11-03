@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, test } from 'vitest';
 import { agent, chief as chiefTable, project, steerPending, step } from '../src/db/schema.js';
 import { nowMs } from '../src/lib/ids.js';
+import { saveMemoryEntry } from '../src/services/memory.js';
 import {
   bindAgentHome,
   bindAllAgents,
@@ -167,6 +168,59 @@ describe('Coordinator turns scoped to a project receive its instructions (D74 P1
     expect(instruction).toContain('plan the release');
     expect(instruction).toContain(RULES);
     expect(instruction.indexOf('plan the release')).toBeLessThan(instruction.indexOf(RULES));
+  });
+
+  test('a turn scoped to the project carries that project memories, not another project', async () => {
+    const id = await createProject('cairn');
+    const other = await createProject('site');
+    saveMemoryEntry(s.db, {
+      agentId: CHIEF_AGENT,
+      teamId: s.team.id,
+      title: 'deploy target',
+      content: 'the Mac',
+      projectId: id,
+      sourceTodoId: null,
+      sourceBuildId: null,
+    });
+    saveMemoryEntry(s.db, {
+      agentId: CHIEF_AGENT,
+      teamId: s.team.id,
+      title: 'site font',
+      content: 'serif',
+      projectId: other,
+      sourceTodoId: null,
+      sourceBuildId: null,
+    });
+    const instruction = await chiefInstruction('plan the release', id);
+    expect(instruction).toContain('deploy target：the Mac');
+    expect(instruction).not.toContain('site font');
+  });
+
+  test('the claim payload agent memories are team-wide only, never another project', async () => {
+    const id = await createProject('cairn');
+    for (const [title, content, projectId] of [
+      ['team rule', 'commits are English', null],
+      ['cairn rule', 'deploys go to the Mac', id],
+    ] as const) {
+      saveMemoryEntry(s.db, {
+        agentId: CHIEF_AGENT,
+        teamId: s.team.id,
+        title,
+        content,
+        projectId,
+        sourceTodoId: null,
+        sourceBuildId: null,
+      });
+    }
+    const sent = await req(s.app, 'POST', `/api/teams/${s.team.id}/chief/threads`, {
+      content: 'plan the release',
+      projectId: id,
+    });
+    expect(sent.status).toBe(201);
+    const token = await enroll('rules-chief');
+    bindAgentHome(s, CHIEF_AGENT, machineIdByName(s, 'rules-chief'));
+    const claimed = await claim(token);
+    expect(claimed.agent?.memories?.map((m) => m.title)).toEqual(['team rule']);
   });
 
   test('an unscoped turn carries no project instructions', async () => {

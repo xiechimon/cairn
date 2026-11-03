@@ -440,6 +440,175 @@ describe('in-product merge gate', () => {
     expect(loosened?.blockers.map((b) => b.code)).toContain('review-blocking');
   });
 
+  test('D71 reviewer identity is the model the review step actually ran: a same-vendor fallback is not independent', async () => {
+    const { s, buildId, stepId } = await world();
+    completeStep(s.svc, stepId, { hasChanges: true });
+    s.db.update(todo).set({ phase: 'review' }).where(eq(todo.id, 'todo-1794')).run();
+    const review = s.db
+      .select()
+      .from(step)
+      .where(eq(step.buildId, buildId))
+      .all()
+      .find((row) => row.kind === 'review');
+    s.db
+      .update(step)
+      .set({
+        status: 'done',
+        finishedAt: 2,
+        fallback: {
+          model: { provider: 'claude-code', modelId: 'claude-sonnet-5-5' },
+          tried: ['gpt-5.4'],
+          zeroUsageRetried: false,
+        },
+      })
+      .where(eq(step.id, review?.id ?? ''))
+      .run();
+    await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
+    const digest = computePatchDigest(
+      compareFilesFromResponse({
+        files: [
+          {
+            filename: 'apps/server/src/services/merge-gate/readiness.ts',
+            status: 'modified',
+            sha: '1'.repeat(40),
+            additions: 4,
+            deletions: 1,
+            patch: '@@ protected\n+gate\n',
+          },
+          {
+            filename: 'docs/verify/1794/shot.png',
+            status: 'added',
+            sha: '2'.repeat(40),
+            additions: 0,
+            deletions: 0,
+          },
+        ],
+      }) ?? [],
+      { expectedFileCount: 2 },
+    ).patchDigest;
+    s.db
+      .insert(gateVerdict)
+      .values({
+        stepId: review?.id ?? '',
+        buildId,
+        kind: 'review',
+        perspective: 'code_reviewer',
+        outcome: 'pass',
+        patchDigest: digest,
+        headSha: HEAD,
+        expectedHeadSha: HEAD,
+        createdAt: 3,
+      })
+      .run();
+    s.db
+      .insert(message)
+      .values({
+        id: 'msg-verdict-fallback',
+        conversationId: buildId,
+        role: 'system',
+        content: JSON.stringify({
+          kind: REVIEW_VERDICT_KIND,
+          stepId: review?.id ?? '',
+          verdict: {
+            conclusion: 'No blocking findings',
+            gateLoosening: false,
+            evalRulerChange: false,
+            findings: [],
+          },
+        }),
+        createdAt: 3,
+      })
+      .run();
+    const result = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
+    expect(result?.blockers.map((b) => b.code)).toContain('independent-review-missing');
+  });
+
+  test('D71 author identity is the model the build step actually ran: a build that fell back to the reviewer vendor is not independent', async () => {
+    const { s, buildId, stepId } = await world();
+    s.db
+      .update(step)
+      .set({
+        fallback: {
+          model: { provider: 'codex', modelId: 'gpt-5.4' },
+          tried: ['claude-opus-4-8'],
+          zeroUsageRetried: false,
+        },
+      })
+      .where(eq(step.id, stepId))
+      .run();
+    completeStep(s.svc, stepId, { hasChanges: true });
+    s.db.update(todo).set({ phase: 'review' }).where(eq(todo.id, 'todo-1794')).run();
+    const review = s.db
+      .select()
+      .from(step)
+      .where(eq(step.buildId, buildId))
+      .all()
+      .find((row) => row.kind === 'review');
+    s.db
+      .update(step)
+      .set({ status: 'done', finishedAt: 2 })
+      .where(eq(step.id, review?.id ?? ''))
+      .run();
+    await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
+    const digest = computePatchDigest(
+      compareFilesFromResponse({
+        files: [
+          {
+            filename: 'apps/server/src/services/merge-gate/readiness.ts',
+            status: 'modified',
+            sha: '1'.repeat(40),
+            additions: 4,
+            deletions: 1,
+            patch: '@@ protected\n+gate\n',
+          },
+          {
+            filename: 'docs/verify/1794/shot.png',
+            status: 'added',
+            sha: '2'.repeat(40),
+            additions: 0,
+            deletions: 0,
+          },
+        ],
+      }) ?? [],
+      { expectedFileCount: 2 },
+    ).patchDigest;
+    s.db
+      .insert(gateVerdict)
+      .values({
+        stepId: review?.id ?? '',
+        buildId,
+        kind: 'review',
+        perspective: 'code_reviewer',
+        outcome: 'pass',
+        patchDigest: digest,
+        headSha: HEAD,
+        expectedHeadSha: HEAD,
+        createdAt: 3,
+      })
+      .run();
+    s.db
+      .insert(message)
+      .values({
+        id: 'msg-verdict-author-fallback',
+        conversationId: buildId,
+        role: 'system',
+        content: JSON.stringify({
+          kind: REVIEW_VERDICT_KIND,
+          stepId: review?.id ?? '',
+          verdict: {
+            conclusion: 'No blocking findings',
+            gateLoosening: false,
+            evalRulerChange: false,
+            findings: [],
+          },
+        }),
+        createdAt: 3,
+      })
+      .run();
+    const result = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
+    expect(result?.blockers.map((b) => b.code)).toContain('independent-review-missing');
+  });
+
   test('an oversize patch gets no size blocker and no extra size review (D68)', async () => {
     const { s, buildId, stepId } = await world();
     completeStep(s.svc, stepId, { hasChanges: true });
