@@ -238,6 +238,7 @@ export class NspawnOrbProvider implements OrbProvider {
     if (!handle) {
       const suffix =
         input.conversationId !== 'base' &&
+        !/^computer/i.test(input.conversationId) &&
         /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,44}[a-zA-Z0-9])?$/.test(input.conversationId)
           ? input.conversationId
           : createHash('sha256').update(input.conversationId).digest('hex').slice(0, 54);
@@ -488,7 +489,8 @@ export class NspawnOrbProvider implements OrbProvider {
   private validate(handle: OrbHandle): void {
     if (
       !/^cairn-orb-[a-zA-Z0-9][a-zA-Z0-9-]{0,53}$/.test(handle.id) ||
-      handle.id === 'cairn-orb-base'
+      handle.id === 'cairn-orb-base' ||
+      /^cairn-orb-computer/i.test(handle.id)
     )
       throw new Error('Invalid orb machine name');
   }
