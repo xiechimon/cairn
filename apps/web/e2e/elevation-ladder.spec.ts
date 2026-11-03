@@ -176,12 +176,6 @@ for (const theme of ['light', 'dark'] as const) {
       expect(rings(drawer)).toBe(1);
       expect(drawer).toContain(edgeRing);
 
-      // e2: the menu rings once
-      await page.goto('/app?scenario=01');
-      await page.getByRole('button', { name: 'Xmon Dai' }).click();
-      const menu = await surfaceShadow(page, '.user-menu');
-      expect(rings(menu)).toBe(1);
-
       // the composer keeps its inset ring, and only that ring
       await page.goto(`${DETAIL}?scenario=16`);
       const composer = await surfaceShadow(page, '[data-testid="composer-card"]');
@@ -196,7 +190,6 @@ for (const theme of ['light', 'dark'] as const) {
       const dialogShadow = await dialog.evaluate((el) => getComputedStyle(el).boxShadow);
       expect(rings(dialogShadow)).toBe(1);
       if (theme === 'dark') {
-        expect(menu).toContain(TOP_DARK);
         expect(dialogShadow).toContain(TOP_DARK);
         expect(drawer).toContain(TOP_DARK);
       }

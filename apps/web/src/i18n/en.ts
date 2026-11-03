@@ -267,7 +267,6 @@ export const EN: Record<string, string> = {
   // #933: the collapsed tool group's identity label (transcript action row).
   尚无描述: 'No description yet',
 
-  // —— user-menu popover (r7 §3.5; 新功能/快捷键 行随 #163 隐去，键同删） ——
   账号: 'Account',
   'API 密钥': 'API keys',
   外观: 'Appearance',

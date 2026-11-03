@@ -70,20 +70,6 @@ for (const theme of ['light', 'dark'] as const) {
     expect(banner.shadow).toContain(banner.cardShadow);
   });
 
-  test(`account popover rides the V2 shell border, keeps the overlay-plate hard shadow (${theme})`, async ({
-    page,
-  }) => {
-    await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
-    await page.goto('/app?scenario=01');
-    await page.getByRole('button', { name: 'Xmon Dai' }).click();
-
-    const menu = await edgeContract(page, '.user-menu');
-    expect(menu.border).toBe('0px');
-    expect(menu.radius).toBe('12px');
-    expect(menu.shadow).not.toBe('none');
-    expect(menu.shadow).toContain('0px 0px 0px');
-  });
-
   test(`sidebar sits on canvas beside the sheet, no seam of its own (${theme})`, async ({ page }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     await page.goto('/app?scenario=01');

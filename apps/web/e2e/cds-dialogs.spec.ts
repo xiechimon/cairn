@@ -35,33 +35,3 @@ test('CDS search panel: 18px edge-radius + de-boxed input', async ({ page }) => 
   // De-boxed: no filled input plate — transparent / none over the panel surface.
   expect(m.inputBg === 'rgba(0, 0, 0, 0)' || m.inputBg === 'transparent').toBeTruthy();
 });
-
-test('Paper user-menu: 12px + shadow-popover, no solid border', async ({ page }) => {
-  await page.goto('/app?scenario=01');
-  await page.getByRole('button', { name: 'Xmon Dai' }).click();
-  await expect(page.locator('.user-menu')).toBeVisible();
-
-  const m = await page.locator('.user-menu').evaluate((el) => {
-    const cs = getComputedStyle(el);
-    const probe = document.createElement('div');
-    probe.style.boxShadow = 'var(--shadow-popover)';
-    document.body.appendChild(probe);
-    const popShadow = getComputedStyle(probe).boxShadow;
-    probe.remove();
-    return {
-      radius: cs.borderTopLeftRadius,
-      border: cs.borderTopWidth,
-      shadow: cs.boxShadow,
-      popShadow,
-      radiusPopover: getComputedStyle(document.documentElement)
-        .getPropertyValue('--radius-popover')
-        .trim(),
-    };
-  });
-  expect(m.radiusPopover).toBe('12px');
-  expect(m.radius).toBe('12px');
-  expect(m.border).toBe('0px');
-  expect(m.shadow).not.toBe('none');
-  expect(m.shadow).toContain('0px 0px 0px 1px');
-  expect(m.shadow.includes('10px 28px') || m.shadow.includes('8px 24px')).toBeTruthy();
-});

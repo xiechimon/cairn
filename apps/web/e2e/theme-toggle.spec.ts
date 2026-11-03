@@ -1,18 +1,12 @@
 import { expect, type Page, test } from '@playwright/test';
 
-const ROUTE = '/app?scenario=01';
-const USER_NAME = 'Xmon Dai';
-
-async function openUserMenu(page: Page) {
-  await page.getByRole('button', { name: USER_NAME }).click();
-  await expect(page.locator('.user-menu')).toBeVisible();
-}
+const ROUTE = '/app/settings/appearance?scenario=01';
 const THEME_KEY = 'cairn-theme'; // apps/web/src/theme.ts THEME_STORAGE_KEY
 
 const lightSeg = (page: Page) =>
-  page.locator('.user-menu-seg button', { hasText: '浅色' });
+  page.getByRole('radio', { name: '浅色' });
 const darkSeg = (page: Page) =>
-  page.locator('.user-menu-seg button', { hasText: '深色' });
+  page.getByRole('radio', { name: '深色' });
 
 const rootTheme = (page: Page) =>
   page.evaluate(() => ({
@@ -22,7 +16,6 @@ const rootTheme = (page: Page) =>
 
 test('default dark: `深色` active; `浅色` click repaints instantly + persists', async ({ page }) => {
   await page.goto(ROUTE);
-  await openUserMenu(page);
 
   expect(await rootTheme(page)).toEqual({ theme: 'dark', light: false });
   await expect(darkSeg(page)).toHaveAttribute('aria-checked', 'true');
@@ -38,12 +31,10 @@ test('default dark: `深色` active; `浅色` click repaints instantly + persist
 
 test('selection survives reload', async ({ page }) => {
   await page.goto(ROUTE);
-  await openUserMenu(page);
   await lightSeg(page).click();
   expect(await rootTheme(page)).toEqual({ theme: 'light', light: true });
 
   await page.reload();
-  await openUserMenu(page);
 
   expect(await rootTheme(page)).toEqual({ theme: 'light', light: true });
   await expect(lightSeg(page)).toHaveAttribute('aria-checked', 'true');
@@ -51,7 +42,6 @@ test('selection survives reload', async ({ page }) => {
 
   await darkSeg(page).click();
   await page.reload();
-  await openUserMenu(page);
   expect(await rootTheme(page)).toEqual({ theme: 'dark', light: false });
   await expect(darkSeg(page)).toHaveAttribute('aria-checked', 'true');
 });
@@ -60,7 +50,6 @@ test('injected storage pins the initial segment (storage injection path)', async
   // the boot reads the stored value before first paint
   await page.addInitScript((k) => localStorage.setItem(k, 'light'), THEME_KEY);
   await page.goto(ROUTE);
-  await openUserMenu(page);
 
   expect(await rootTheme(page)).toEqual({ theme: 'light', light: true });
   await expect(lightSeg(page)).toHaveAttribute('aria-checked', 'true');
@@ -68,7 +57,6 @@ test('injected storage pins the initial segment (storage injection path)', async
 
 test('clicking the active segment is a stable no-op', async ({ page }) => {
   await page.goto(ROUTE);
-  await openUserMenu(page);
   await darkSeg(page).click();
 
   expect(await rootTheme(page)).toEqual({ theme: 'dark', light: false });
@@ -85,7 +73,6 @@ test('theme flip rides the transition suppression and drops it after the paint',
   page,
 }) => {
   await page.goto(ROUTE);
-  await openUserMenu(page);
   // Record every class mutation before the flip so the add can't slip past.
   await page.evaluate(() => {
     const seen: string[] = [];

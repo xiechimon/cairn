@@ -66,18 +66,16 @@ test('theme-color follows the stored theme across reloads', async ({ page }) => 
   }
 });
 
-// The user-menu segments drive applyTheme in place, with no reload (same route
-// and scenario as theme-toggle.spec.ts).
-test('a live theme switch in the user menu rewrites theme-color without a reload', async ({
+// The settings appearance segments drive applyTheme in place, with no reload.
+test('a live theme switch in settings rewrites theme-color without a reload', async ({
   page,
 }) => {
-  await page.goto('/app?scenario=01');
-  await page.getByRole('button', { name: 'Xmon Dai' }).click();
+  await page.goto('/app/settings/appearance?scenario=01');
 
-  await page.locator('.user-menu-seg button', { hasText: '浅色' }).click();
+  await page.getByRole('radio', { name: '浅色' }).click();
   await expect.poll(() => themeColors(page)).toEqual([LIGHT_CHROME, LIGHT_CHROME]);
 
-  await page.locator('.user-menu-seg button', { hasText: '深色' }).click();
+  await page.getByRole('radio', { name: '深色' }).click();
   await expect.poll(() => themeColors(page)).toEqual([DARK_CHROME, DARK_CHROME]);
 });
 
