@@ -1,5 +1,5 @@
 import { X } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { SidePanel } from '../components/side-panel.js';
 import { ToneGlyph } from '../components/stone/tone-glyph.js';
 import { Button } from '../components/ui/button.js';
@@ -10,6 +10,8 @@ import { useI18n } from '../i18n/provider.js';
 import { relativeTime } from './rel-time.js';
 import { threadCopy, threadTone } from './thread-copy.js';
 import { type ThreadChat, useThreadChat } from './use-thread-chat.js';
+
+const OVERLAY_QUERY = '(max-width: 1100px)';
 
 const OPEN_SURFACE = '.overlay, [role="dialog"], [role="menu"], [role="listbox"]';
 
@@ -86,9 +88,11 @@ function ThreadBody({ chat, todo }: { chat: ThreadChat; todo: TodoRecord }) {
         placeholder={
           archived
             ? t('已归档，取消归档后才能继续')
-            : chat.started
-              ? t('回复 #{seq}…', { seq: todo.seqNum })
-              : t('#{seq} 还没开始', { seq: todo.seqNum })
+            : todo.phase === 'closed'
+              ? t('已关闭，不能再回复')
+              : chat.started
+                ? t('回复 #{seq}…', { seq: todo.seqNum })
+                : t('#{seq} 还没开始', { seq: todo.seqNum })
         }
         aiReview={false}
         streaming={chat.running}
@@ -123,6 +127,15 @@ export function SideChat({
   const chat = useThreadChat(todoId, listed);
   const todo = chat.todo;
 
+  const panelRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const panel = panelRef.current;
+    const focused = document.activeElement;
+    if (panel === null || !(focused instanceof HTMLElement)) return;
+    if (!window.matchMedia(OVERLAY_QUERY).matches || panel.contains(focused)) return;
+    focused.blur();
+  }, []);
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.defaultPrevented) return;
@@ -134,7 +147,7 @@ export function SideChat({
   }, [onClose]);
 
   return (
-    <SidePanel label={todo?.title ?? t('任务')} onDismiss={onClose}>
+    <SidePanel ref={panelRef} label={todo?.title ?? t('任务')} onDismiss={onClose}>
       <header
         data-testid="side-chat"
         data-todo-id={todoId}
