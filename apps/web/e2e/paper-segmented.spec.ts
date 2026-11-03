@@ -33,7 +33,7 @@ const CONTROLS: Control[] = [
   {
     name: 'providers runtime',
     url: '/app/resources/providers?scenario=10',
-    track: (page) => page.getByRole('tablist', { name: '模型服务' }),
+    track: (page) => page.getByRole('tablist', { name: '范围' }),
   },
   {
     name: 'user menu theme',
