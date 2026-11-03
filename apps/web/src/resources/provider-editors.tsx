@@ -142,7 +142,12 @@ export function TeamProviderEditor({
   const [adding, setAdding] = useState('');
   const [confirming, setConfirming] = useState(false);
   const [models, setModels] = useState(record.models);
+  const [savedModels, setSavedModels] = useState(record.models);
   const [savingModels, setSavingModels] = useState(false);
+  if (savedModels !== record.models && !savingModels) {
+    setSavedModels(record.models);
+    setModels(record.models);
+  }
   const oauth = isOAuthPreset(record.providerId);
   const fire = (body: Parameters<NonNullable<ProviderEditActions['patch']>>[0]) => {
     void actions.patch?.(body).catch(() => undefined);

@@ -84,7 +84,7 @@ function teamEntries(
       },
       editor: (
         <TeamProviderEditor
-          key={`${record.id}:${record.updatedAt}`}
+          key={record.id}
           record={record}
           deadModels={dead}
           actions={actionsFor(record)}
