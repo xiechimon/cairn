@@ -624,6 +624,13 @@
       "when": 1793629870576,
       "tag": "0088_chief_turn_usage",
       "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "6",
+      "when": 1793631308839,
+      "tag": "0089_chief_summary",
+      "breakpoints": true
     }
   ]
 }

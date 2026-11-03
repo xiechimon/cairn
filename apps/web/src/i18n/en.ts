@@ -1305,8 +1305,7 @@ export const EN: Record<string, string> = {
   '，主模型暂时用不了': ', main model unavailable',
   '可以继续说，总管恢复后会按顺序处理…':
     'Keep typing; the chief handles messages in order once it is back…',
-  '总管回完这条就看；想马上补充，发出后点「现在插话」':
-    'The chief reads this after the current reply; to add it now, send it and click Steer now',
+  发出的话会直接插进总管这一轮: "What you send goes into the chief's current reply",
   '发送失败，请重试。': 'Send failed. Try again.',
   '恢复失败，请重试。': 'Restore failed. Try again.',
   // —— #774 收单回落显式告知（成功 toast，非失败面；用户裁决静默不要）——
