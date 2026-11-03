@@ -287,6 +287,21 @@ export function notifyQuotaWait(
   });
 }
 
+export function notifyNoMachine(
+  deps: NotificationDeps,
+  todoRow: { id: string; teamId: string; title: string; projectId: string; seqNum: number },
+  snippet: string,
+): NotificationRecord {
+  return upsertAndPublish(deps, {
+    teamId: todoRow.teamId,
+    type: 'no_machine',
+    entityId: todoRow.id,
+    entityRef: { title: todoRow.title, projectId: todoRow.projectId, seqNum: todoRow.seqNum },
+    agent: { name: deps.user.displayName, avatarUrl: deps.user.avatarUrl },
+    snippet,
+  });
+}
+
 export function notifyModelFallback(
   deps: NotificationDeps,
   todoRow: { id: string; teamId: string; title: string; projectId: string; seqNum: number },

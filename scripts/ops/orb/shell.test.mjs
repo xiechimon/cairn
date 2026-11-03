@@ -360,6 +360,21 @@ test('guest image installs socat for the Claude Code sandbox and verifies it as 
   assert.match(script, /runuser -u agent -- \/usr\/bin\/socat -V/);
 });
 
+test('guest image installs Python and verifies python3 as agent', () => {
+  const script = readFileSync(join(source, 'build-image.sh'), 'utf8');
+  assert.match(script, /^pacstrap -K -M "\$stage" .*\bpython\b/m);
+  assert.match(script, /runuser -u agent -- \/usr\/bin\/python3 --version/);
+});
+
+test('the Orb worker cannot write core dumps that could hold the subscription token', () => {
+  const script = readFileSync(join(source, 'build-image.sh'), 'utf8');
+  const worker =
+    /cat > \/etc\/systemd\/system\/cairn-orb-worker.service <<WORKER\n([\s\S]+?)\nWORKER/.exec(
+      script,
+    )[1];
+  assert.match(worker, /^LimitCORE=0$/m);
+});
+
 test('guest image gives Claude a root-pinned config dir with the weaker nested sandbox the agent cannot tamper with', () => {
   const script = readFileSync(join(source, 'build-image.sh'), 'utf8');
   assert.doesNotMatch(script, /\/etc\/claude-code/);

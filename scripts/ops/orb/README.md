@@ -98,8 +98,8 @@ works with the user unit's `ProtectHome=yes`. Binary content and mode converge
 on reruns. Existing networkd-managed host links or earlier network configuration
 files stop the installer before changes.
 The image contains Node, pinned Claude Code/Codex CLIs and the repository's
-pnpm, installed with npm lifecycle scripts disabled, plus bubblewrap and
-socat: Claude Code refuses to start without bubblewrap, because it scrubs
+pnpm, installed with npm lifecycle scripts disabled, plus Python (agents reach
+for `python3` in Bash) and bubblewrap and socat: Claude Code refuses to start without bubblewrap, because it scrubs
 subprocess environments through `bwrap`, and its Bash sandbox refuses every
 command with "socat not installed" when socat is missing. Steps that carry the
 subscription token set `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB`, which makes that
@@ -282,7 +282,8 @@ Put Project seeds at `/var/lib/cairn-orb/seed/<projectId>/repo`, as `ian`.
 The image uses one `daemon_entry` variable, `/opt/cairn/daemon/cli.mjs`. The enabled
 `cairn-orb-worker.service` runs as `agent`, waits for `/run/cairn/relay.sock`,
 and runs exactly `/usr/bin/node /opt/cairn/daemon/cli.mjs orb-step --socket /run/cairn/relay.sock`
-with `Restart=always`.
+with `Restart=always` and `LimitCORE=0`, so a same-uid command that crashes the
+Claude CLI cannot leave a core dump holding the subscription token.
 The daemon relay protocol owns authentication, step binding, heartbeat, tool
 and done messages; host crash fallback and the 120-second watchdog remain
 on the host. This host/image change requires the daemon transport rework.

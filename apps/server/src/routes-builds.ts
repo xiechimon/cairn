@@ -142,6 +142,7 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
         todoIds: body.todoIds,
         assignment: body.assignment,
         withPlan: body.withPlan,
+        ...(body.routeOverride !== undefined ? { routeOverride: body.routeOverride } : {}),
       });
     } catch (err) {
       if (err instanceof PhaseTransitionError) throw conflict(err.message);

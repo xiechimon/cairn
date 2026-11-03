@@ -571,7 +571,10 @@ export function setTodoPhase(
   id: string,
   to: Phase,
   extra: Partial<
-    Pick<TodoRow, 'hasChanges' | 'hasPlan' | 'latestBuildId' | 'lastRunAt' | 'assignment'>
+    Pick<
+      TodoRow,
+      'hasChanges' | 'hasPlan' | 'latestBuildId' | 'lastRunAt' | 'assignment' | 'routeOverride'
+    >
   > = {},
   options: { landedMerge?: true } = {},
 ): TodoRecord | null {

@@ -98,7 +98,7 @@ jobs:
 
       - name: Review gate reviewer routing and checkout
         if: ${{ !cancelled() }}
-        run: node --test scripts/ops/review-gate/checkout.test.mjs scripts/ops/review-gate/reviewer-route.test.mjs scripts/ops/review-gate/fallback.test.mjs
+        run: node --test scripts/ops/review-gate/checkout.test.mjs scripts/ops/review-gate/reviewer-route.test.mjs scripts/ops/review-gate/fallback.test.mjs scripts/ops/review-gate/codex-gate-core.test.mjs scripts/ops/review-gate/codex-gate-host.test.mjs
 
       - name: PR evidence regression tests
         run: python3 scripts/pr-evidence-gate.test.py

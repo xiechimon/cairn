@@ -5067,6 +5067,37 @@ exports[`body/envelope schema snapshots > startBuildsBody > startBuildsBody.json
       ],
       "type": "object",
     },
+    "routeOverride": {
+      "additionalProperties": false,
+      "properties": {
+        "machineId": {
+          "type": "string",
+        },
+        "requiredCapabilities": {
+          "additionalProperties": false,
+          "properties": {
+            "executor": {
+              "const": "orb",
+              "type": "string",
+            },
+            "mcpServers": {
+              "items": {
+                "type": "string",
+              },
+              "type": "array",
+            },
+            "models": {
+              "items": {
+                "type": "string",
+              },
+              "type": "array",
+            },
+          },
+          "type": "object",
+        },
+      },
+      "type": "object",
+    },
     "todoIds": {
       "items": {
         "type": "string",
@@ -6263,6 +6294,7 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                 "chief_message",
                 "quota_wait",
                 "model_fallback",
+                "no_machine",
                 "todo_done",
                 "todo_failed",
                 "schedule_run",
@@ -8731,6 +8763,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > not
         "chief_message",
         "quota_wait",
         "model_fallback",
+        "no_machine",
         "todo_done",
         "todo_failed",
         "schedule_run",
