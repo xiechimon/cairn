@@ -263,12 +263,15 @@ describe('#1251 queue projection blocked bit (worker steps)', () => {
     expect(stepQueueProjector(w.s.db, w.teamId).project(target)?.blocked).toBeUndefined();
   });
 
-  test('failure mode 4: online machine never reported a snapshot -> blocked absent (fail-open display surface same law)', () => {
+  test('D71 failure mode 4: online machine never reported a snapshot -> capability-missing (fails closed like the claim)', () => {
     const w = makeWorld();
     insertAgent(w, { id: 'agent-r4', requiredCapabilities: { mcpServers: ['figma'] } });
     insertMachine(w, { id: 'm-r4', capabilities: null });
     const target = insertPendingWorkerStep(w, { agentId: 'agent-r4', homeMachineId: 'm-r4' });
-    expect(stepQueueProjector(w.s.db, w.teamId).project(target)?.blocked).toBeUndefined();
+    expect(stepQueueProjector(w.s.db, w.teamId).project(target)?.blocked).toEqual({
+      kind: 'capability-missing',
+      missing: ['MCP server "figma"'],
+    });
   });
 
   test('failure mode 5: home machine offline -> machine-offline; home machine online but missing capability -> capability-missing', () => {
