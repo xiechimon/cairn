@@ -447,6 +447,8 @@ export async function sendBuildSteer(
           continuationOptions.afterTurn && previousWork?.kind === 'plan' ? 'plan' : 'build',
           todoRow.teamId,
           body.content,
+          false,
+          human && !continuationOptions.schedule,
         );
         if (continuationOptions.schedule) {
           const wake = continuationOptions.schedule;
@@ -859,6 +861,7 @@ export function enqueueStep(
   teamId: string,
   prompt?: string,
   freshSession?: boolean,
+  byPerson?: boolean,
 ): StepRecord {
   const id = newRecordId();
   const createdAt = nowMs();
@@ -872,6 +875,7 @@ export function enqueueStep(
       status: 'pending',
       prompt: prompt ?? null,
       freshSession: freshSession === true,
+      byPerson: byPerson === true,
       createdAt,
     })
     .run();
@@ -1303,6 +1307,7 @@ export async function applyBuildStepAction(
     | { action: 'review'; agentId?: string; focus?: string }
     | { action: 'restart'; feedback: string; clientMessageId: string },
   actor?: string,
+  origin: 'person' | 'automatic' = 'person',
 ): Promise<void> {
   const row = deps.db.select().from(build).where(eq(build.id, buildId)).get();
   if (!row) throw new NotFoundError(`build ${buildId}`);
@@ -1365,6 +1370,7 @@ export async function applyBuildStepAction(
         todoRecord.teamId,
         withRetryLessons(restartPrompt, reuseKind, reuseLessons),
         true,
+        origin === 'person',
       );
       deps.db
         .update(build)
@@ -1434,6 +1440,8 @@ export async function applyBuildStepAction(
       firstKind,
       todoRecord.teamId,
       withRetryLessons(restartPrompt, firstKind, priorLessons),
+      false,
+      origin === 'person',
     );
     setTodoPhase(deps, todoRecord.id, 'queued', {
       assignment,
@@ -1569,7 +1577,7 @@ export async function applyBuildStepAction(
     todoRecord.phase === 'review'
       ? buildReviewRejectPrompt(body.feedback)
       : buildReplanPrompt(body.feedback);
-  enqueueStep(deps, buildId, 'plan', todoRecord.teamId, replanPrompt);
+  enqueueStep(deps, buildId, 'plan', todoRecord.teamId, replanPrompt, false, true);
 }
 
 function restoreFailedReview(deps: BuildDeps, row: BuildRow): void {

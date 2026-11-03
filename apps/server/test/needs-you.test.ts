@@ -119,6 +119,7 @@ describe('needs you (#1800)', () => {
       .all()
       .find((row) => row.kind === 'build');
     if (retried === undefined) throw new Error('missing retry step');
+    expect(retried.byPerson).toBe(false);
     setTodoPhase(w.deps, w.todoId, 'building');
     completeStep(w.deps, retried.id, { hasChanges: true });
 
