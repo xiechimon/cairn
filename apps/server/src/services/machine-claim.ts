@@ -67,7 +67,7 @@ import { injectMemories } from './memory.js';
 import { effectiveModel } from './model-fallback.js';
 import { mergedCatalogModels } from './model-liveness.js';
 import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
-import { routeForStep } from './routing-rules.js';
+import { memoryOwnerOf, routeForStep } from './routing-rules.js';
 import { reverifyShip } from './ship-gate.js';
 import { scanLocalSkills } from './skills.js';
 import { listProjectTagVocab } from './tags.js';
@@ -688,7 +688,7 @@ async function tryClaim(
         modelId: model.modelId,
         thinkingLevel: cand.stepRow.fallback?.model ? null : agentRow.thinkingLevel,
         memories: injectMemories(db, {
-          agentId: agentRow.id,
+          agentId: memoryOwnerOf(db, teamId, agentRow.id, cand.stepRow.kind),
           projectId: cand.todoRow.projectId,
         }),
         defaultSkill: agentRow.defaultSkill,
