@@ -138,8 +138,13 @@ export function SideChat({
     };
     releaseCovered(document.activeElement);
     const onFocusIn = (event: FocusEvent) => releaseCovered(event.target);
+    const onKeyDown = () => releaseCovered(document.activeElement);
     document.addEventListener('focusin', onFocusIn);
-    return () => document.removeEventListener('focusin', onFocusIn);
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => {
+      document.removeEventListener('focusin', onFocusIn);
+      window.removeEventListener('keydown', onKeyDown, true);
+    };
   }, []);
 
   useEffect(() => {
