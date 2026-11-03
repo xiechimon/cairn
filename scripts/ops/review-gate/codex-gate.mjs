@@ -4,6 +4,7 @@ import {
   decide,
   GATE_CHECK,
   retryStatus,
+  reviewRequested,
   STALL_LABEL,
   shouldSkip,
   trustedStateComment,
@@ -77,12 +78,12 @@ function loadThreads(repo, number) {
   }
 }
 
-function writeCheck(repo, sha, result, detailsUrl) {
+function newestOwnCheck(repo, sha) {
   const runs = ghJson([
     'api',
     `repos/${repo}/commits/${sha}/check-runs?check_name=${GATE_CHECK}&filter=latest&per_page=100`,
   ]).check_runs.filter((run) => run.app?.slug === 'github-actions');
-  const newest = runs.reduce(
+  return runs.reduce(
     (latest, run) =>
       !latest ||
       Date.parse(run.started_at) > Date.parse(latest.started_at) ||
@@ -91,6 +92,9 @@ function writeCheck(repo, sha, result, detailsUrl) {
         : latest,
     null,
   );
+}
+
+function writeCheck(repo, sha, newest, result, detailsUrl) {
   const payload = {
     name: GATE_CHECK,
     head_sha: sha,
@@ -115,22 +119,28 @@ function evaluate(repo, number) {
   const stateEntry = trustedStateComment(comments);
   const threads = loadThreads(repo, number);
   const retries = retryStatus(comments, sha, stateEntry?.comment.updated_at ?? null);
+  const check = newestOwnCheck(repo, sha);
   const result = decide(
     pr,
     stateEntry?.state ?? null,
     threads,
     retries,
     usageLimitHit(comments, stateEntry),
+    {
+      waitedMs: check ? Date.now() - Date.parse(check.started_at) : 0,
+      requested: reviewRequested(comments, sha),
+    },
   );
   console.log(
     `PR #${number} ${sha.slice(0, 7)}: ${result.status} ${result.conclusion ?? ''} ${result.title}`,
   );
 
-  if (result.retry)
+  const marker = result.retry ?? result.request;
+  if (marker)
     ghWrite('POST', `repos/${repo}/issues/${number}/comments`, {
-      body: `${result.retry}\n@codex review`,
+      body: `${marker}\n@codex review`,
     });
-  writeCheck(repo, sha, result, stateEntry?.comment.html_url);
+  writeCheck(repo, sha, check, result, stateEntry?.comment.html_url);
 
   const stalled = pr.labels.some((label) => label.name === STALL_LABEL);
   if (result.addStall && !stalled)
@@ -139,11 +149,36 @@ function evaluate(repo, number) {
     ghWrite('DELETE', `repos/${repo}/issues/${number}/labels/${STALL_LABEL}`);
 }
 
+const GATE_WORKFLOW = 'review-gate.yml';
+
+function sweep(repo) {
+  const open = listPaged(`repos/${repo}/pulls`).filter((pr) => !pr.draft);
+  let failed = 0;
+  for (const pr of open) {
+    try {
+      const check = newestOwnCheck(repo, pr.head.sha);
+      if (check?.status === 'completed' && check.conclusion === 'success') continue;
+      ghWrite('POST', `repos/${repo}/actions/workflows/${GATE_WORKFLOW}/dispatches`, {
+        ref: 'main',
+        inputs: { pr: String(pr.number) },
+      });
+    } catch (error) {
+      failed += 1;
+      console.error(`PR #${pr.number}: ${error.message}`);
+    }
+  }
+  if (failed) throw new Error(`${failed} of ${open.length} PRs could not be evaluated`);
+}
+
 function main(argv, env) {
-  if (argv[0] !== 'evaluate') throw new Error('usage: codex-gate.mjs evaluate');
-  for (const key of ['GH_TOKEN', 'REPO', 'PR_NUMBER'])
-    if (!env[key]) throw new Error(`${key} is required`);
-  evaluate(env.REPO, Number(env.PR_NUMBER));
+  const command = argv[0];
+  if (command !== 'evaluate' && command !== 'sweep')
+    throw new Error('usage: codex-gate.mjs evaluate|sweep');
+  const required =
+    command === 'evaluate' ? ['GH_TOKEN', 'REPO', 'PR_NUMBER'] : ['GH_TOKEN', 'REPO'];
+  for (const key of required) if (!env[key]) throw new Error(`${key} is required`);
+  if (command === 'sweep') sweep(env.REPO);
+  else evaluate(env.REPO, Number(env.PR_NUMBER));
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {

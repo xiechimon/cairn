@@ -23,6 +23,7 @@ const world = JSON.parse(fs.readFileSync(process.env.FAKE_WORLD, 'utf8'));
 const joined = args.join(' ');
 const out = (value) => process.stdout.write(JSON.stringify(value));
 if (/api repos\\/o\\/r\\/pulls\\/7$/.test(joined)) out(world.pr);
+else if (joined.includes('--slurp') && joined.includes('repos/o/r/pulls?')) out([world.pulls]);
 else if (joined.includes('--slurp') && joined.includes('/issues/7/comments')) out([world.comments]);
 else if (joined.includes('graphql')) {
   out({ data: { repository: { pullRequest: { reviewThreads: {
@@ -65,7 +66,7 @@ const basePr = {
   labels: [],
 };
 
-function run(world) {
+function run(world, command = 'evaluate') {
   const dir = mkdtempSync(join(tmpdir(), 'codex-gate-host-'));
   const bin = join(dir, 'bin');
   mkdirSync(bin);
@@ -75,16 +76,23 @@ function run(world) {
   const log = join(dir, 'calls.log');
   writeFileSync(
     worldPath,
-    JSON.stringify({ pr: basePr, comments: [], threads: [], checkRuns: [], ...world }),
+    JSON.stringify({
+      pr: basePr,
+      pulls: [basePr],
+      comments: [],
+      threads: [],
+      checkRuns: [],
+      ...world,
+    }),
   );
   writeFileSync(log, '');
-  const result = spawnSync(process.execPath, [gateScript, 'evaluate'], {
+  const result = spawnSync(process.execPath, [gateScript, command], {
     encoding: 'utf8',
     env: {
       PATH: `${bin}:${process.env.PATH}`,
       GH_TOKEN: 'fake',
       REPO: 'o/r',
-      PR_NUMBER: '7',
+      ...(command === 'evaluate' ? { PR_NUMBER: '7' } : {}),
       FAKE_WORLD: worldPath,
       FAKE_LOG: log,
     },
@@ -344,4 +352,73 @@ test('rejects an unknown command', () => {
     env: { PATH: process.env.PATH },
   });
   assert.notEqual(result.status, 0);
+});
+
+test('a head with no Codex review after ten minutes gets one @codex review comment', () => {
+  const out = run({ comments: [stateComment(OTHER, 'completed')], checkRuns: [ownRun()] });
+  assert.equal(out.result.status, 0, out.result.stderr);
+  assert.equal(out.commentPosts.length, 1);
+  assert.equal(
+    out.body(out.commentPosts[0]).body,
+    `<!-- review-gate-request:${SHA} -->\n@codex review`,
+  );
+  assert.equal(out.body(out.checkWrites[0]).output.title, 'Asked Codex to review ccccccc');
+  assert.equal(out.body(out.checkWrites[0]).status, 'in_progress');
+});
+
+test('no request before ten minutes, without a check run, or after one was made', () => {
+  const fresh = run({ checkRuns: [ownRun({ started_at: new Date().toISOString() })] });
+  const noCheck = run({ checkRuns: [] });
+  const asked = run({
+    checkRuns: [ownRun()],
+    comments: [
+      {
+        id: 9,
+        body: `<!-- review-gate-request:${SHA} -->\n@codex review`,
+        user: ACTIONS,
+        created_at: '2026-01-01T00:20:00Z',
+        updated_at: '2026-01-01T00:20:00Z',
+      },
+    ],
+  });
+  for (const out of [fresh, noCheck, asked]) {
+    assert.equal(out.result.status, 0, out.result.stderr);
+    assert.equal(out.commentPosts.length, 0);
+    assert.equal(
+      out.body(out.checkWrites[0]).output.title,
+      'Waiting for the Codex review of ccccccc',
+    );
+  }
+});
+
+test('sweep dispatches one per-PR evaluation for each open non-draft PR that has not passed', () => {
+  const out = run(
+    {
+      pulls: [basePr, { ...basePr, number: 8, draft: true }],
+      comments: [stateComment(SHA, 'completed')],
+      checkRuns: [ownRun()],
+    },
+    'sweep',
+  );
+  assert.equal(out.result.status, 0, out.result.stderr);
+  assert.equal(out.checkWrites.length, 0);
+  assert.equal(out.commentPosts.length, 0);
+  const dispatches = out.writes.filter((call) =>
+    /actions\/workflows\/review-gate\.yml\/dispatches/.test(call.args.join(' ')),
+  );
+  assert.equal(dispatches.length, 1);
+  assert.deepEqual(out.body(dispatches[0]), { ref: 'main', inputs: { pr: '7' } });
+});
+
+test('sweep skips a head whose gate check already passed', () => {
+  const out = run(
+    {
+      comments: [stateComment(SHA, 'completed')],
+      checkRuns: [ownRun({ status: 'completed', conclusion: 'success' })],
+    },
+    'sweep',
+  );
+  assert.equal(out.result.status, 0, out.result.stderr);
+  assert.equal(out.writes.length, 0);
+  assert.equal(out.calls.filter((call) => /pulls\/7$/.test(call.args.join(' '))).length, 0);
 });

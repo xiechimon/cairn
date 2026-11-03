@@ -27,6 +27,11 @@ fs.appendFileSync(process.env.CALLS, JSON.stringify(['gh', ...args]) + '\\n');
 const data = JSON.parse(fs.readFileSync(process.env.GH_DATA, 'utf8'));
 const expr = args[args.indexOf('--jq') + 1];
 const source = args[1] === 'view' ? data.view : data.list;
+if (args[0] === 'api' && args[1].includes('/check-runs?')) {
+  const runs = [{ id: 1, app: { slug: 'github-actions' }, status: 'completed', conclusion: 'success' }];
+  const out = spawnSync('jq', ['-r', expr], { input: JSON.stringify({ check_runs: runs }), encoding: 'utf8' });
+  process.stdout.write(out.stdout);
+}
 if (args[0] === 'pr' && (args[1] === 'view' || args[1] === 'list') && args.includes('--jq')) {
   const out = spawnSync('jq', ['-r', expr], { input: JSON.stringify(source), encoding: 'utf8' });
   process.stdout.write(out.stdout);
@@ -62,7 +67,6 @@ function fixture(t, data) {
   writeFileSync(join(home, 'gh-data.json'), JSON.stringify(data));
   writeExecutable(join(bin, 'gh'), ghStub);
   writeExecutable(join(home, '.cairn/tools/merge-order/deps-open.mjs'), 'process.exit(0);\n');
-  writeExecutable(join(home, '.cairn/tools/review-gate/review-gate.mjs'), 'process.exit(3);\n');
   writeExecutable(join(home, '.cairn/tools/app-token/as-bot.sh'), asBotStub);
   writeExecutable(join(home, '.cairn/tools/merge-pr.sh'), recorderStub('merge-pr'));
   const run = (command, args = [], options = {}) => {

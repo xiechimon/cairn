@@ -63,34 +63,6 @@ async function runPrGate(source: string, { args, review }: PrGateRun) {
   return { result, prompts };
 }
 
-function reviewGateEffective(source: string, json: string) {
-  const from = source.indexOf('const globToRe');
-  const body = source.slice(from, source.indexOf('mkdirSync(', from));
-  const gitCalls: string[][] = [];
-  const execFileSync = (_cmd: string, args: string[]) => {
-    gitCalls.push(args);
-    return json;
-  };
-  const load = new Function(
-    'execFileSync',
-    'MAIN',
-    `${body}\nreturn { repoGatePaths, repoProtected, globToRe }`,
-  ) as (
-    exec: typeof execFileSync,
-    main: string,
-  ) => {
-    repoGatePaths: () => unknown;
-    repoProtected: (paths: unknown) => RegExp[];
-    globToRe: (glob: string) => RegExp;
-  };
-  const { repoGatePaths, repoProtected, globToRe } = load(execFileSync, '/main');
-  return {
-    sources: repoProtected(repoGatePaths()).map((re) => re.source),
-    globToRe,
-    gitCalls,
-  };
-}
-
 function expandBraces(spec: string): string[] {
   const match = /\{([^{}]+)\}/.exec(spec);
   if (!match) return [spec];
@@ -198,26 +170,6 @@ describe('merge-gate-paths.json is the single source', () => {
     }
   });
 
-  test('review-gate.mjs effective list equals JSON.protected and reads origin/main', () => {
-    const source = read('scripts/ops/review-gate/review-gate.mjs');
-    const { sources, globToRe, gitCalls } = reviewGateEffective(source, JSON.stringify(gatePaths));
-    expect(sources).toEqual(gatePaths.protected.map((glob) => globToRe(glob).source));
-    expect(
-      gitCalls.every(
-        (call) => call.join(' ') === 'show origin/main:packages/shared/merge-gate-paths.json',
-      ),
-    ).toBe(true);
-    expect(source).not.toContain('gatePaths.limits');
-  });
-
-  test('negative control: review-gate.mjs follows the JSON it is given, not an inline list', () => {
-    const source = read('scripts/ops/review-gate/review-gate.mjs');
-    const tampered = JSON.stringify({ ...gatePaths, protected: ['zz-only/**'] });
-    const { sources, globToRe } = reviewGateEffective(source, tampered);
-    expect(sources).toEqual([globToRe('zz-only/**').source]);
-    expect(sources).not.toEqual(gatePaths.protected.map((glob) => globToRe(glob).source));
-  });
-
   test('merge-route.mjs takes the JSON from origin/main, beside pr-gate.js', () => {
     const source = read('scripts/merge-route.mjs');
     expect(source).toContain("'origin/main:packages/shared/merge-gate-paths.json'");
@@ -236,7 +188,6 @@ describe('merge-gate-paths.json is the single source', () => {
   test('no consumer keeps an inline copy of the lists', () => {
     for (const path of [
       '.claude/workflows/pr-gate.js',
-      'scripts/ops/review-gate/review-gate.mjs',
       'scripts/ops/host/tools/merge-pr.sh',
       'scripts/merge-route.mjs',
       'scripts/mergify-config.mjs',

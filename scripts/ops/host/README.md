@@ -77,7 +77,6 @@ Measured with `grep -rn as-bot` over `~/.cairn/tools`, `~/lanes/*.sh` and `~/.co
 | `tools/reminders/resume-1727.sh` | `gh issue create`, `gh issue edit --remove-label`, `gh issue comment` | allowed |
 | `~/.cairn/tools/review-gate/retro-review.sh` (not mirrored) | `gh issue create` | allowed |
 | `tools/schedule/issue-schedule.mjs` | `gh issue create|edit|comment|pin` | allowed |
-| `scripts/ops/review-gate/review-gate.mjs` | `git fetch -q origin main pull/N/head:review-gate-N --force`, `gh pr comment --body-file -`, `gh pr merge --disable-auto` | allowed |
 | `tools/rearm-automerge.sh` | `gh pr merge --disable-auto` | allowed |
 | `tools/weekly/evidence-prune.sh` | `git fetch`, `git commit`, `git push -u origin <branch>`, `gh pr create`, `gh pr comment` (it arms `gh pr merge --squash --auto --match-head-commit <sha>` as the human login, not through `as-bot.sh`) | allowed |
 | `tools/merge-pr.sh` | none: it merges bot-opened PRs with `gh pr merge <n> --rebase --match-head-commit <sha>` as the human login | not through `as-bot.sh` |

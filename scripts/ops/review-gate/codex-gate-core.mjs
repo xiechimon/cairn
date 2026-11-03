@@ -3,6 +3,7 @@ export const ACTIONS_LOGIN = 'github-actions[bot]';
 export const GATE_CHECK = 'review-gate';
 export const STALL_LABEL = 'review-stalled';
 export const MAX_RETRIES = 2;
+export const REQUEST_AFTER_MS = 10 * 60 * 1000;
 export const USAGE_DASHBOARD = 'https://chatgpt.com/codex/cloud/settings/usage';
 
 const STATE_RE = /<!-- codex-review-state:v1 (\{.*?\}) -->/s;
@@ -104,6 +105,17 @@ export function retryStatus(comments, sha, stateUpdatedAt) {
   };
 }
 
+export function requestMarker(sha) {
+  return `<!-- review-gate-request:${sha} -->`;
+}
+
+export function reviewRequested(comments, sha) {
+  const marker = requestMarker(sha);
+  return comments.some(
+    (comment) => comment.user?.login === ACTIONS_LOGIN && comment.body?.startsWith(marker),
+  );
+}
+
 export function shouldSkip(pr) {
   if (pr.state !== 'open') return 'the PR is closed';
   if (pr.draft) return 'the PR is a draft';
@@ -121,7 +133,7 @@ function blockedSummary(blocking) {
   return `Resolve each thread (or fix and comment \`@codex review\`):\n\n${lines.join('\n')}`;
 }
 
-export function decide(pr, state, threads, retries, limitHit = false) {
+export function decide(pr, state, threads, retries, limitHit = false, wait = null) {
   const sha = pr.head.sha;
   const reviewedHead = state?.commitSha === sha && state.status === 'completed';
   if (limitHit && !reviewedHead)
@@ -132,12 +144,21 @@ export function decide(pr, state, threads, retries, limitHit = false) {
       summary: `Codex reached its usage limit and did not review ${short(sha)}. See the [Codex usage dashboard](${USAGE_DASHBOARD}) and comment \`@codex review\` once the window resets.`,
       addStall: true,
     };
-  if (!state || state.commitSha !== sha || !state.status || state.status === 'running')
+  if (!state || state.commitSha !== sha || !state.status || state.status === 'running') {
+    const unseen = !state || state.commitSha !== sha;
+    if (unseen && wait && !wait.requested && wait.waitedMs >= REQUEST_AFTER_MS)
+      return {
+        status: 'in_progress',
+        title: `Asked Codex to review ${short(sha)}`,
+        summary: `Codex had not started a review of ${short(sha)} after ${REQUEST_AFTER_MS / 60000} minutes, so the gate commented \`@codex review\`.`,
+        request: requestMarker(sha),
+      };
     return {
       status: 'in_progress',
       title: `Waiting for the Codex review of ${short(sha)}`,
       summary: 'The Codex cloud review has not finished for this head yet.',
     };
+  }
   if (state.status === 'failed') {
     if (retries.count >= MAX_RETRIES)
       return {

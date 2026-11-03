@@ -628,6 +628,7 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
   "POST /api/machine/tool/{stepId}",
   "GET /api/machine/token/{stepId}",
   "POST /api/machine/upload-urls/{stepId}",
+  "POST /api/machine/computer/{callId}",
   "POST /api/machine/done/{stepId}",
 ]
 `;
@@ -2230,6 +2231,73 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
       "required": [
         "type",
         "sync",
+      ],
+      "type": "object",
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "call": {
+          "additionalProperties": false,
+          "properties": {
+            "callId": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string",
+            },
+            "deadlineAt": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
+            "params": {
+              "additionalProperties": {},
+              "propertyNames": {
+                "type": "string",
+              },
+              "type": "object",
+            },
+            "stepId": {
+              "type": "string",
+            },
+            "tool": {
+              "enum": [
+                "shell",
+                "list_files",
+                "read_file",
+                "write_file",
+                "attach_file",
+                "computer_observe",
+                "computer_act",
+                "open_path",
+                "launch_app",
+                "browser_navigate",
+                "browser_snapshot",
+                "browser_act",
+                "request_takeover",
+                "user_computer_shell",
+                "user_computer_observe",
+                "user_computer_act",
+              ],
+              "type": "string",
+            },
+          },
+          "required": [
+            "callId",
+            "stepId",
+            "tool",
+            "params",
+            "deadlineAt",
+          ],
+          "type": "object",
+        },
+        "type": {
+          "const": "computer",
+          "type": "string",
+        },
+      },
+      "required": [
+        "type",
+        "call",
       ],
       "type": "object",
     },
@@ -6875,6 +6943,10 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > machine surface 1
     "path": "/api/machine/upload-urls/{stepId}",
   },
   {
+    "note": "Computer call frames from the daemon (D75)",
+    "path": "/api/machine/computer/{callId}",
+  },
+  {
     "note": "步骤收尾",
     "path": "/api/machine/done/{stepId}",
   },
@@ -7142,6 +7214,8 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "routing_rule",
   "chief_turn_usage",
   "chief_summary",
+  "computer",
+  "computer_call",
 ]
 `;
 
@@ -8461,6 +8535,10 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
         {
           "additionalProperties": false,
           "properties": {
+            "computer": {
+              "const": true,
+              "type": "boolean",
+            },
             "executor": {
               "enum": [
                 "orb",
@@ -8509,6 +8587,10 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
                 "type": "string",
               },
               "type": "array",
+            },
+            "ownComputer": {
+              "const": true,
+              "type": "boolean",
             },
             "skills": {
               "items": {

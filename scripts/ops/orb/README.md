@@ -678,3 +678,29 @@ proves the detector and delivery plumbing, not Linux isolation. Only the
 coordinator's live `docs/verify/2277/canary.json` can establish nspawn, filesystem
 and egress behavior on omarchy. The macOS backend-user canary remains outside
 this item's scope.
+
+## Coordinator computer image (D75)
+
+`install-host.sh` also runs `build-computer-image.sh` after the base image. It
+snapshots `cairn-orb-base` into `cairn-orb-computer` and installs
+`xorg-server-xvfb`, `x11vnc`, `fluxbox`, `xdotool`, `chromium` and
+`imagemagick` with `systemd-nspawn --directory` and the host mirrorlist bound
+read-only. `arch-chroot` cannot install into an image that is not a mount
+point. The build refuses a guest Node major other than the base's. It installs
+a Chromium managed policy (no password manager, autofill or sync) and the
+`cairn-computer-desktop.service` unit, which runs Xvfb `:1`, fluxbox and two
+x11vnc servers on Unix sockets only: `/run/cairn-computer/vnc.sock` and the
+view-only `/run/cairn-computer/view.sock`. Chromium keeps its own sandbox
+inside the Orb (measured in spike S1), so it runs without `--no-sandbox`.
+
+Polkit treats `cairn-orb-computer` as a template, like `cairn-orb-base`: `ian`
+cannot remove, rename or start it. Only the template may be cloned to a
+`cairn-orb-computer-*` name, and the template may only be cloned to such a
+name. For `cairn-orb-computer-*` machines, `prepare-machine.sh` runs
+`computer-home.mjs` as root. It creates `/var/lib/cairn-computer/<machine>`
+(`ian:ian 0700`, refusing links and foreign owners) and binds it to
+`/home/agent` with an idmap. The image is disposable and the home persists.
+The idmap maps guest root to host root on that bind, so the installer mounts
+`/var/lib/cairn-computer` on itself with `nosuid,nodev`
+(`var-lib-cairn\x2dcomputer.mount`), and `prepare-machine.sh` refuses to start
+a computer when that mount lacks either option, as it does for `/run/cairn-orb`.
