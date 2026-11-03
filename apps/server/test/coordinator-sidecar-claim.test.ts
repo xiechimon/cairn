@@ -6,6 +6,7 @@ import {
   chief as chiefTable,
   chiefThread as chiefThreadTable,
   machine as machineTable,
+  provider as providerTable,
   step as stepTable,
   team as teamTable,
 } from '../src/db/schema.js';
@@ -157,6 +158,51 @@ function statusOf(w: World, stepId: string) {
   return { status: row.status, machineId: row.machineId };
 }
 
+function bindClaudeCodeCoordinator(w: World): void {
+  w.s.db
+    .update(agentTable)
+    .set({ provider: 'claude-code', modelId: 'haiku' })
+    .where(eq(agentTable.id, AGENT_ID))
+    .run();
+  w.s.db
+    .update(machineTable)
+    .set({
+      enabledRuntimes: ['pi', 'claude-code'],
+      claudeCodeReport: {
+        installed: true,
+        hostname: 'daemon',
+        models: [],
+        auth: { state: 'logged-in', method: 'claude.ai', provider: 'firstParty' },
+      } as never,
+    })
+    .where(eq(machineTable.id, w.daemonId))
+    .run();
+}
+
+function addKeyedAnthropicProvider(w: World): void {
+  w.s.db
+    .insert(providerTable)
+    .values({
+      id: 'prov-anthropic',
+      teamId: w.s.team.id,
+      providerId: 'anthropic-byok',
+      label: 'Anthropic',
+      baseUrl: 'https://api.anthropic.com',
+      api: 'anthropic-messages',
+      compat: {},
+      models: [{ id: 'claude-haiku-5-5', name: 'Haiku 5.5' }],
+      apiKeyCipher: 'sealed',
+      createdBy: w.s.svc.user.id,
+      createdAt: 1,
+      updatedAt: 1,
+    })
+    .run();
+}
+
+function setClaudeUsage(w: World, claudeUsage: 'allow-paid' | 'subscription-only'): void {
+  w.s.db.update(teamTable).set({ claudeUsage }).where(eq(teamTable.id, w.s.team.id)).run();
+}
+
 describe('Coordinator sidecar claim routing (D72)', () => {
   test('flag off: the coordinator role claims nothing and the daemon keeps Coordinator turns', async () => {
     const w = await setupWorld();
@@ -293,6 +339,42 @@ describe('Coordinator sidecar claim routing (D72)', () => {
       .run();
     insertChiefStep(w);
     expect(await claimAsCoordinator(w)).toBeNull();
+  });
+
+  test('flag on, no keyed provider: a claude-code Coordinator stays with the daemon', async () => {
+    const w = await setupWorld();
+    setCoordinatorMachineId(w.sidecarId);
+    bindClaudeCodeCoordinator(w);
+    const stepId = insertChiefStep(w);
+    expect(await claimAsCoordinator(w)).toBeNull();
+    expect((await claimAsDaemon(w))?.step.id).toBe(stepId);
+  });
+
+  test('flag on, keyed provider but paid Claude not allowed: the route falls back and the daemon runs the turn', async () => {
+    const w = await setupWorld();
+    setCoordinatorMachineId(w.sidecarId);
+    bindClaudeCodeCoordinator(w);
+    addKeyedAnthropicProvider(w);
+    setClaudeUsage(w, 'subscription-only');
+    const stepId = insertChiefStep(w);
+    expect(await claimAsCoordinator(w)).toBeNull();
+    expect((await claimAsDaemon(w))?.step.id).toBe(stepId);
+  });
+
+  test('flag on, keyed provider and paid Claude allowed: the sidecar runs the turn and the daemon skips it', async () => {
+    const w = await setupWorld();
+    setCoordinatorMachineId(w.sidecarId);
+    bindClaudeCodeCoordinator(w);
+    addKeyedAnthropicProvider(w);
+    setClaudeUsage(w, 'allow-paid');
+    const stepId = insertChiefStep(w);
+    expect(await claimAsDaemon(w)).toBeNull();
+    const claimed = await claimAsCoordinator(w);
+    expect(claimed?.step.id).toBe(stepId);
+    expect(claimed?.agent).toMatchObject({
+      provider: 'anthropic-byok',
+      modelId: 'claude-haiku-5-5',
+    });
   });
 
   test('the claim route rejects an unknown role', async () => {

@@ -124,8 +124,22 @@ function claimChiefCandidates(deps: MachineDeps, _machineId: string, teamId: str
     )
     .orderBy(asc(step.createdAt))
     .all()
-    .filter((row) => !coordinatorSidecarEnabled() || isChiefDigestStep(row.stepRow))
-    .map((row) => ({ ...row, agentRow: routedChiefAgent(deps.db, teamId, row.agentRow) }));
+    .map((row) => ({ ...row, agentRow: routedChiefAgent(deps.db, teamId, row.agentRow) }))
+    .filter((row) => !sidecarTakesTurn(deps, teamId, row.stepRow, row.agentRow));
+}
+
+function sidecarTakesTurn(
+  deps: MachineDeps,
+  teamId: string,
+  stepRow: typeof step.$inferSelect,
+  agentRow: typeof agent.$inferSelect,
+): boolean {
+  if (!coordinatorSidecarEnabled() || isChiefDigestStep(stepRow) || !agentRow.modelId) return false;
+  const model = effectiveModel(agentRow, stepRow);
+  return (
+    stepRuntimeFor(model.provider) === 'pi' &&
+    claudeUsageGatePasses(deps, { teamId, claudeCodeReport: null }, model)
+  );
 }
 
 function coordinatorTurnCandidates(deps: MachineDeps, machineId: string, teamId: string) {
@@ -150,8 +164,8 @@ function coordinatorTurnCandidates(deps: MachineDeps, machineId: string, teamId:
     )
     .orderBy(asc(step.createdAt))
     .all()
-    .filter((row) => !isChiefDigestStep(row.stepRow))
-    .map((row) => ({ ...row, agentRow: routedChiefAgent(deps.db, teamId, row.agentRow) }));
+    .map((row) => ({ ...row, agentRow: routedChiefAgent(deps.db, teamId, row.agentRow) }))
+    .filter((row) => sidecarTakesTurn(deps, teamId, row.stepRow, row.agentRow));
 }
 
 export function meetsMcpVersionGate(latestCliVersion: string | null): boolean {
@@ -304,10 +318,6 @@ function claimCoordinatorTurn(
   const machineRow = db.select().from(machine).where(eq(machine.id, machineId)).get();
   if (!machineRow) return null;
   for (const cand of coordinatorTurnCandidates(deps, machineId, teamId)) {
-    if (!cand.agentRow.modelId) continue;
-    const model = effectiveModel(cand.agentRow, cand.stepRow);
-    if (stepRuntimeFor(model.provider) !== 'pi') continue;
-    if (!claudeUsageGatePasses(deps, machineRow, model)) continue;
     if (cand.stepRow.status === 'claimed') {
       return chiefClaimPayload(
         deps,
