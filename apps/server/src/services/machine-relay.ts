@@ -23,6 +23,7 @@ import {
 import { executeChiefTool, executeWorkerMemoryTool } from './chief-tools.js';
 import { projectOfTodo } from './git.js';
 import { isChiefConversation, type MachineDeps, ownedStep } from './machines.js';
+import { memoryOwnerOf } from './routing-rules.js';
 import { createLocalSkill, updateLocalSkill } from './skills.js';
 import { resolveFixedTagId, resolveProjectTagIds } from './tags.js';
 import { executeThreadScheduleTool, isThreadScheduleTool } from './thread-schedule-tools.js';
@@ -155,7 +156,7 @@ async function executeWorkerMemoryToolCall(
     deps.db,
     {
       teamId: todoRow.teamId,
-      agentId,
+      agentId: memoryOwnerOf(deps.db, todoRow.teamId, agentId, row.kind),
       todoId: todoRow.id,
       projectId: projectOfTodo(deps.db, todoRow)?.id ?? null,
       buildId: row.buildId,
