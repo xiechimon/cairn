@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openChiefWindow } from './helpers.js';
 
 const DETAIL = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=26';
 
@@ -81,7 +82,7 @@ test('N3: the degradation stops at 816px — the 3-pane shell survives above it'
 test('N4: the docked chief panel cannot re-overflow the 320px shell', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 732 });
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=detail-unread');
-  await page.getByRole('button', { name: '总管' }).click();
+  await openChiefWindow(page);
   const drawer = page.locator('.chief-drawer');
   await drawer.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
   const geo = await page.evaluate(() => {

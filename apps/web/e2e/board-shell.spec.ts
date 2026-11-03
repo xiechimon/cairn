@@ -158,22 +158,9 @@ test('a short phone screen scrolls the board as one page to reach the last group
   expect(pageScroll).toBeGreaterThan(0);
 });
 
-test('the phone chief launcher clears the new-task bar on the board and sits in the corner elsewhere', async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/app?scenario=01&view=board');
-  const onBoard = await page.locator('.chief-fab').boundingBox();
-  const bar = await page.getByTestId('board-new-task-bar').boundingBox();
-  expect(onBoard!.y + onBoard!.height).toBeLessThanOrEqual(bar!.y);
-  await page.goto('/app/schedules?scenario=11');
-  const elsewhere = await page.locator('.chief-fab').boundingBox();
-  expect(844 - (elsewhere!.y + elsewhere!.height)).toBeLessThan(16);
-});
-
 for (const viewport of [{ width: 1440, height: 732 }, { width: 390, height: 844 }]) {
   for (const theme of ['light', 'dark']) {
-    test(`home and detail share a 24px composer bottom gap at ${viewport.width}px in ${theme}`, async ({ page }, testInfo) => {
+    test(`home and detail share a 24px composer gap to the sheet bottom at ${viewport.width}px in ${theme}`, async ({ page }, testInfo) => {
       await page.setViewportSize(viewport);
       await page.addInitScript((value) => localStorage.setItem('cairn-theme', value), theme);
       const gaps: number[] = [];
@@ -185,7 +172,11 @@ for (const viewport of [{ width: 1440, height: 732 }, { width: 390, height: 844 
         const composer = page.locator(route.selector);
         await expect(composer).toBeVisible();
         await page.evaluate(() => document.fonts.ready);
-        const gap = await composer.evaluate((element) => window.innerHeight - element.getBoundingClientRect().bottom);
+        const gap = await composer.evaluate((element) => {
+          const sheet = element.closest('.board-sheet, .group\\/detail-main');
+          const floor = sheet?.getBoundingClientRect().bottom ?? window.innerHeight;
+          return floor - element.getBoundingClientRect().bottom;
+        });
         gaps.push(gap);
         console.log(`${viewport.width}px ${theme} ${route.name}: ${gap}px`);
         const screenshot = testInfo.outputPath(`${route.name}-${viewport.width}-${theme}.png`);

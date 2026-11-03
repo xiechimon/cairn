@@ -1,5 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import { evidenceShot } from './evidence';
+import { openChiefWindow } from './helpers.js';
 
 const TEAM = { id: 't1', name: '团队' };
 const USER = { id: 'u1', displayName: 'ian', avatarUrl: null };
@@ -277,7 +278,7 @@ test.describe('chief unavailable (T4)', () => {
     await expect(home.getByTestId('chief-outage')).toHaveCount(0);
     await evidenceShot(page, 'fallback.png');
     await page.goto('/app?view=board');
-    await page.getByRole('button', { name: '总管', exact: true }).click();
+    await openChiefWindow(page);
     const row = page.locator('.chief-drawer').getByTestId('chief-model-row');
     await expect(row).toContainText('备用模型 relay-b/glm-4.6');
     await expect(row.getByTestId('chief-fallback-dot')).toBeVisible();

@@ -1,5 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import { evidenceShot } from './evidence';
+import { openChiefWindow } from './helpers.js';
 
 const TEAM_ID = 'team-1';
 const USER = { id: 'user-1', displayName: '我', avatarUrl: null };
@@ -49,7 +50,7 @@ async function openChiefComposer(page: Page) {
   await stubBoot(page);
   await page.goto('/app?view=board');
 
-  await page.getByRole('button', { name: '总管', exact: true }).click();
+  await openChiefWindow(page);
   const input = page.getByTestId('chief-composer-input');
   await expect(input).toBeVisible();
   await expect(input).toBeEditable();
@@ -137,7 +138,7 @@ test('live face: minimize and SPA route switches keep the draft (D6 zero regress
 
   await drawer.getByRole('button', { name: '最小化' }).click();
   await expect(drawer).toBeHidden();
-  await page.getByRole('button', { name: '总管', exact: true }).click();
+  await openChiefWindow(page);
   await expect(input).toBeVisible();
   await expect(input).toHaveValue(DRAFT);
 

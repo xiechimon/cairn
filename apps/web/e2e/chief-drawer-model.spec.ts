@@ -1,5 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import { evidencePanelShot } from './evidence';
+import { openChiefWindow } from './helpers.js';
 
 const drawer = (page: Page) => page.locator('.chief-drawer');
 
@@ -61,7 +62,7 @@ test.describe('chief drawer model row (#615)', () => {
   test('the model row carries the runtime mark, not an agent avatar', async ({ page }) => {
     await page.goto('/app?view=board&scenario=fab-avatar');
 
-    await page.locator('.chief-fab').click();
+    await openChiefWindow(page);
     await expect(drawer(page)).toBeVisible();
     await drawer(page).evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
     const row = modelRow(page);
@@ -136,7 +137,7 @@ test.describe('chief drawer model row (#615)', () => {
 
   test('the gear reaches board settings from a wake surface', async ({ page }) => {
     await page.goto('/app/team?scenario=12');
-    await page.locator('button[aria-label="总管"]').click();
+    await openChiefWindow(page);
     await expect(drawer(page)).toBeVisible();
     const gear = drawer(page).locator('button[aria-label="总管设置"]');
     await expect(gear).toBeVisible();

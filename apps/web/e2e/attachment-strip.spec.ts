@@ -1,5 +1,6 @@
 import { expect, type Page, type Route, test } from '@playwright/test';
 import { evidenceShot } from './evidence';
+import { openChiefWindow } from './helpers.js';
 
 const TEAM_ID = 'team-1';
 const USER = { id: 'user-1', displayName: '我', avatarUrl: null };
@@ -472,7 +473,7 @@ async function openChief(page: Page, art: TestArt) {
   await page.goto('/app?view=board');
   await membersLoaded;
 
-  await page.getByRole('button', { name: '总管', exact: true }).click();
+  await openChiefWindow(page);
   const drawer = page.locator('.chief-drawer');
   await expect(drawer).toBeVisible();
   const input = page.getByTestId('chief-composer-input');

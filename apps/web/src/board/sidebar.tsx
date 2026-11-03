@@ -234,7 +234,7 @@ export function BoardSidebar({
       'aria-label': label,
     });
     return (
-      <aside className="board-sidebar board-sidebar--collapsed relative z-(--z-docked) flex w-10 flex-none flex-col items-center gap-px border-r border-border bg-(--surface-1) pt-2 pb-2">
+      <aside className="board-sidebar board-sidebar--collapsed relative z-(--z-docked) flex w-10 flex-none flex-col items-center gap-px bg-(--surface-1) pt-2 pb-2">
         <Button
           variant="ghost"
           className={`rail-toggle ${RAIL_ROW} ${RAIL_BTN}`}
@@ -318,7 +318,7 @@ export function BoardSidebar({
 
   return (
     <aside
-      className={`board-sidebar relative z-(--z-docked) flex w-(--sidebar-w) flex-none flex-col overflow-hidden border-r border-border bg-(--surface-1) px-3 pt-3 pb-2.5 ${SEARCH_OPEN_DIM_CURRENT}`}
+      className={`board-sidebar relative z-(--z-docked) flex w-(--sidebar-w) flex-none flex-col overflow-hidden bg-(--surface-1) px-3 pt-3 pb-2.5 ${SEARCH_OPEN_DIM_CURRENT}`}
     >
       <div
         data-testid="team-row"

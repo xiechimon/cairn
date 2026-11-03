@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openChiefWindow } from './helpers.js';
 
 const DETAIL_ROUTE = '/app/todo/7ve0iOkQ-JBpSL98zSiGc';
 const FRESH = '/app/todo/fresh-probe?scenario=23';
@@ -21,7 +22,7 @@ test('three abutting panes: 248 sidebar | fluid center | 488 right', async ({ pa
   // panes abut — no gap, no overlap (hairline borders ride inside the boxes)
   expect(Math.round(geo.center.left)).toBe(Math.round(geo.sidebar.right));
   expect(Math.round(geo.right.left)).toBe(Math.round(geo.center.right));
-  expect(geo.center.width).toBe(1440 - 248 - 488);
+  expect(geo.center.width).toBe(1440 - 248 - 8 - 488);
   // the seam between center and right is a 1px hairline, not a shadow
   const seam = await page.evaluate(() => {
     const cs = getComputedStyle(document.querySelector('[data-testid="detail-right"]')!);
@@ -154,10 +155,10 @@ test('composer width tracks the center column; the floating window overlays with
       return { center: c.width, comp: r.width };
     });
   const pane = await measure();
-  expect(pane.center).toBe(1440 - 248 - 488);
+  expect(pane.center).toBe(1440 - 248 - 8 - 488);
   expect(pane.comp).toBeCloseTo(pane.center - 32, 0);
 
-  await page.locator('.chief-fab').click();
+  await openChiefWindow(page);
   await expect(page.getByTestId('detail-right')).toBeVisible();
   const drawer = page.locator('.chief-drawer');
   await drawer.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
@@ -246,7 +247,7 @@ test('fresh phase: the brief owns the whole center column, right pane collapses'
   const center = await page
     .getByTestId('detail-center')
     .evaluate((el) => Math.round(el.getBoundingClientRect().width));
-  expect(center).toBe(1440 - 248);
+  expect(center).toBe(1440 - 248 - 8);
 
   const title = '在 README.md 末尾追加一行「r7 rebaseline probe」';
   await expect(page.getByRole('heading', { level: 1, name: title })).toHaveText(title);

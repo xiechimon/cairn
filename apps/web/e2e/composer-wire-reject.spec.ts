@@ -1,5 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import { evidenceShot } from './evidence';
+import { openChiefWindow } from './helpers.js';
 
 // Composer wire single source (#625): both composer faces — the detail
 // conversation composer and the chief drawer composer — run the same
@@ -193,7 +194,7 @@ async function openChiefDrawer(page: Page) {
   });
   await page.goto('/app?view=board');
 
-  await page.getByRole('button', { name: '总管', exact: true }).click();
+  await openChiefWindow(page);
   const input = page.getByTestId('chief-composer-input');
   await expect(input).toBeVisible();
   await expect(input).toBeEditable();
