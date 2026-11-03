@@ -29,7 +29,7 @@ import {
   missingCapabilityItems,
   runtimeGatePasses,
 } from './services/dispatch-eligibility.js';
-import { deleteMemoryEntry, listMemoryEntries } from './services/memory.js';
+import { deleteMemoryEntry, listMemoryEntries, promoteMemoryEntry } from './services/memory.js';
 import { mergedCatalogModels } from './services/model-liveness.js';
 import { filterKnownSkillIds } from './services/skills.js';
 
@@ -44,6 +44,18 @@ export function registerAgentRoutes(app: Hono, ctx: AppContext): void {
       c.req.query('includeInvalid') === 'true',
     );
     return c.json(rows.map(toMemoryRecord));
+  });
+
+  app.post('/api/teams/:id/agents/:aid/memories/:mid/promote', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    const row = promoteMemoryEntry(ctx.db, {
+      memoryId: c.req.param('mid'),
+      agentId: c.req.param('aid'),
+      teamId,
+    });
+    if (row === null) throw notFound(`memory ${c.req.param('mid')}`);
+    return c.json(toMemoryRecord(row));
   });
 
   app.delete('/api/teams/:id/agents/:aid/memories/:mid', (c) => {
