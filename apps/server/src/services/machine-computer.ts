@@ -13,6 +13,9 @@ import { nowMs } from '../lib/ids.js';
 export const COMPUTER_OUTPUT_HEAD_CHARS = 16 * 1024;
 export const COMPUTER_OUTPUT_TAIL_CHARS = 48 * 1024;
 
+const REDACTED_MARK = '[REDACTED]';
+const CREDENTIAL_CONTINUATION = /^[A-Za-z0-9._~+/=-]+/;
+
 const FINISHED_STATES: ReadonlySet<ComputerCallState> = new Set(['done', 'error', 'interrupted']);
 
 type CallRow = typeof computerCall.$inferSelect;
@@ -26,7 +29,11 @@ function appendOutput(
   out: Pick<CallRow, 'outputHead' | 'outputTail' | 'outputChars'>,
   text: string,
 ): Pick<CallRow, 'outputHead' | 'outputTail' | 'outputChars'> {
-  const joined = redact(out.outputHead + out.outputTail + text);
+  const stored = out.outputHead + out.outputTail;
+  const continued = stored.endsWith(REDACTED_MARK)
+    ? text.replace(CREDENTIAL_CONTINUATION, '')
+    : text;
+  const joined = redact(stored + continued);
   return {
     outputHead: joined.slice(0, COMPUTER_OUTPUT_HEAD_CHARS),
     outputTail: joined.slice(COMPUTER_OUTPUT_HEAD_CHARS).slice(-COMPUTER_OUTPUT_TAIL_CHARS),

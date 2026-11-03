@@ -244,6 +244,21 @@ describe('POST /api/machine/computer/:callId', () => {
     expect(r.outputHead + r.outputTail).toContain('[REDACTED] after');
   });
 
+  test('a credential whose first characters were already redacted is not left behind in the next frame', async () => {
+    const { s, owner, id } = await setup();
+    const suffix = 'c'.repeat(36);
+    const res = await post(s.app, `/api/machine/computer/${id}`, owner.token, {
+      frames: [
+        { kind: 'output', seq: 1, stream: 'stdout', text: 'Authorization: Bearer g' },
+        { kind: 'output', seq: 2, stream: 'stdout', text: `hp_${suffix} after` },
+      ],
+    });
+    expect(res.status).toBe(200);
+    const stored = row(s, id).outputHead + row(s, id).outputTail;
+    expect(stored).not.toContain(suffix);
+    expect(stored).toBe('Authorization: [REDACTED] after');
+  });
+
   test('output keeps a bounded head and tail with the full character count', async () => {
     const { s, owner, id } = await setup();
     const chunk = 'x'.repeat(60 * 1024);
