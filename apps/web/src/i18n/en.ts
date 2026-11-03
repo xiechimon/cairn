@@ -1013,6 +1013,23 @@ export const EN: Record<string, string> = {
   '模型 ID': 'Model ID',
   添加模型: 'Add model',
   移除模型: 'Remove model',
+  连接设置: 'Connection',
+  筛选模型: 'Filter models',
+  '已选 {n} / {total}': '{n} of {total} selected',
+  全选: 'Select all',
+  全不选: 'Select none',
+  没有匹配的模型: 'No models match.',
+  添加自定义模型: 'Add custom model',
+  '添加自定义模型「{id}」': 'Add custom model "{id}"',
+  这个模型已在列表里: 'This model is already in the list.',
+  '搜索模型或输入 ID': 'Search models or type an ID',
+  添加: 'Add',
+  '填写 Base URL 和协议': 'Set the base URL and protocol',
+  原生鉴权: 'native auth',
+  '来自 pi 的模型目录，勾选的会出现在模型选择器里。':
+    "From pi's model catalog. Checked models show up in the model picker.",
+  '目录里还有 {n} 个模型，点「添加模型」搜索。':
+    '{n#1 more model|# more models} in the catalog. Use Add model to search.',
   '把 Base URL 中的占位符换成你的账户值':
     'Replace the placeholders in the Base URL with your account values',
   // #355 picker 形态(spec 11 §A6;preset 显示名 = 品牌串不译,OAuth 徽标

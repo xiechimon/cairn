@@ -44,6 +44,7 @@ import {
 import { TextureSection } from './foundations-texture.js';
 import { ProvidersPattern } from './patterns.js';
 import { AccountsSection } from './product-accounts.js';
+import { ProductAddProviderSection } from './product-add-provider.js';
 import { ProductBoardSection } from './product-board.js';
 import { ProductChiefSection } from './product-chief.js';
 import { ProductDetailSection } from './product-detail.js';
@@ -100,6 +101,7 @@ const NAV = [
       ['product-thread-reply', 'Thread reply'],
       ['product-overlays', 'Overlays and pickers'],
       ['product-pages', 'Page parts'],
+      ['product-add-provider', 'Add provider (mockups)'],
     ],
   },
   {
@@ -285,6 +287,7 @@ export function Gallery() {
             <ProductThreadReplySection />
             <ProductOverlaysSection />
             <ProductPagesSection theme={theme} />
+            <ProductAddProviderSection />
           </ProductProviders>
           <GroupTitle
             id="inbox-threads"
