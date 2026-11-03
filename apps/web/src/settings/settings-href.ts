@@ -19,12 +19,12 @@ export function settingsHref(section: SettingsSectionId): string {
   return `${SETTINGS_HREF}/${section}`;
 }
 
-let openReturnTo: string | null = null;
+let lastOutside: string | null = null;
 
-export function rememberSettingsReturn(path: string | null): void {
-  openReturnTo = path;
+export function recordOutsideLocation(path: string): void {
+  lastOutside = path;
 }
 
-export function settingsReturn(): string | null {
-  return openReturnTo;
+export function lastOutsideLocation(): string | null {
+  return lastOutside;
 }

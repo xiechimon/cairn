@@ -195,7 +195,6 @@ export function BoardSidebar({
 
   const settingsLink = {
     to: { pathname: SETTINGS_HREF, search: plain },
-    state: { returnTo: `${pathname}${search}` },
   };
   const offlineLabel = t('{n} 台机器离线', { n: machinesOffline });
 
@@ -277,18 +276,13 @@ export function BoardSidebar({
               false,
               offlineLabel,
             )}
-            state={settingsLink.state}
             data-testid="sidebar-attention"
           >
             <Server className={ICON} strokeWidth={STROKE} />
             <span className="absolute top-1 right-1 size-1.5 rounded-full bg-(--chip-confirm-fg)" />
           </Link>
         )}
-        <Link
-          {...railLink(settingsLink.to, false, t('设置'))}
-          state={settingsLink.state}
-          data-testid="sidebar-settings"
-        >
+        <Link {...railLink(settingsLink.to, false, t('设置'))} data-testid="sidebar-settings">
           <Settings className={ICON} strokeWidth={STROKE} />
         </Link>
       </aside>
@@ -409,7 +403,6 @@ export function BoardSidebar({
           <Link
             data-testid="sidebar-attention"
             to={{ pathname: settingsHref('machines'), search: plain }}
-            state={settingsLink.state}
             className={`ml-auto flex h-6 min-w-0 items-center gap-1.5 rounded-full bg-(--chip-confirm-bg) px-2 text-caption font-medium whitespace-nowrap text-(--chip-confirm-fg) no-underline ${FOCUS}`}
           >
             <span aria-hidden className="size-1.5 flex-none rounded-full bg-current" />

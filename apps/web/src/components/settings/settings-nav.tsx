@@ -24,7 +24,6 @@ export function SettingsNav({
   hrefFor,
   query,
   onQuery,
-  linkState,
   top,
 }: {
   groups: SettingsNavGroup[];
@@ -32,7 +31,6 @@ export function SettingsNav({
   hrefFor: (id: string) => To;
   query: string;
   onQuery: (next: string) => void;
-  linkState?: unknown;
   top?: ReactNode;
 }) {
   const { t } = useI18n();
@@ -76,7 +74,6 @@ export function SettingsNav({
               <Link
                 key={item.id}
                 to={hrefFor(item.id)}
-                state={linkState}
                 replace
                 data-settings-section={item.id}
                 aria-current={current === item.id ? 'page' : undefined}

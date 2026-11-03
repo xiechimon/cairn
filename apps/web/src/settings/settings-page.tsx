@@ -35,12 +35,7 @@ import { ApiKeysPage } from '../routes/api-keys-page.js';
 import { TeamPage } from '../routes/team-page.js';
 import { safeLocalStorage } from '../safe-storage.js';
 import { applyTheme, readStoredTheme, type Theme } from '../theme.js';
-import {
-  rememberSettingsReturn,
-  SETTINGS_HREF,
-  type SettingsSectionId,
-  settingsReturn,
-} from './settings-href.js';
+import { lastOutsideLocation, SETTINGS_HREF, type SettingsSectionId } from './settings-href.js';
 
 interface Section {
   id: SettingsSectionId;
@@ -133,29 +128,17 @@ function useMachineBadge(): string | undefined {
 export function SettingsPage() {
   const { t } = useI18n();
   const { section: sectionParam } = useParams();
-  const { search, state } = useLocation();
+  const { search } = useLocation();
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const machineBadge = useMachineBadge();
   const section = SECTIONS.find((s) => s.id === sectionParam) ?? null;
   const shown = section ?? SECTIONS[0];
   const [returnTo] = useState(() => {
-    const from =
-      typeof state === 'object' &&
-      state !== null &&
-      'returnTo' in state &&
-      typeof state.returnTo === 'string'
-        ? state.returnTo
-        : settingsReturn();
     const scenario = new URLSearchParams(search).get('scenario');
-    return from ?? `/app${scenario === null ? '' : `?scenario=${scenario}`}`;
+    return lastOutsideLocation() ?? `/app${scenario === null ? '' : `?scenario=${scenario}`}`;
   });
-  useEffect(() => rememberSettingsReturn(returnTo), [returnTo]);
-  const linkState = { returnTo };
-  const close = () => {
-    rememberSettingsReturn(null);
-    navigate(returnTo);
-  };
+  const close = () => navigate(returnTo);
   const windowRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef(close);
   closeRef.current = close;
@@ -218,7 +201,6 @@ export function SettingsPage() {
             hrefFor={hrefFor}
             query={query}
             onQuery={setQuery}
-            linkState={linkState}
             top={
               <div className="flex items-center justify-between px-1 md:hidden">
                 <span className="text-card-title font-medium text-foreground">{t('设置')}</span>
@@ -239,7 +221,7 @@ export function SettingsPage() {
               size="icon-sm"
               className="md:hidden"
               aria-label={t('返回设置')}
-              render={<Link to={{ pathname: SETTINGS_HREF, search }} state={linkState} replace />}
+              render={<Link to={{ pathname: SETTINGS_HREF, search }} replace />}
             >
               <ArrowLeft />
             </Button>
