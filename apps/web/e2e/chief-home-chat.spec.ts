@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { HISTORY, mockLive, THREAD } from './chief-home-mock';
 import { evidenceShot } from './evidence';
+import { openChiefWindow } from './helpers.js';
 
 test.describe('home is one continuous Coordinator chat (T1)', () => {
   test('a fresh home shows the greeting, the composer and the running count, and no chief drawer', async ({
@@ -95,14 +96,14 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
     await mockLive(page, { threads: [THREAD], messages: HISTORY });
     await page.goto('/app?view=board');
     await expect(page.getByTestId('home-c')).toHaveCount(0);
-    await page.getByRole('button', { name: '总管', exact: true }).click();
+    await openChiefWindow(page);
     await expect(page.locator('.chief-drawer')).toBeVisible();
   });
 
   test('a task chip in the drawer opens the task page', async ({ page }) => {
     await mockLive(page, { threads: [THREAD], messages: HISTORY });
     await page.goto('/app?view=board');
-    await page.getByRole('button', { name: '总管', exact: true }).click();
+    await openChiefWindow(page);
     const drawer = page.locator('.chief-drawer');
     await drawer.locator('a.mention-chip--todo').first().click();
     await expect(page).toHaveURL(/\/app\/todo\/todo-1/);

@@ -49,6 +49,7 @@ import {
 import { finishChiefTurn, notifyChiefTurn, recoverGateWake } from './chief.js';
 import { finishChiefDigest, isChiefDigestStep } from './chief-digest.js';
 import { cancelPendingQuestions } from './chief-questions.js';
+import { finishChiefSummary, isChiefSummaryStep } from './chief-summary.js';
 import { recordChiefStop, releaseUnconsumedSteer } from './chief-turns.js';
 import {
   buildCiFixPrompt,
@@ -59,6 +60,7 @@ import {
 } from './ci-loop.js';
 import { recoverClaudeRateLimitFailure } from './claude-rate-limit.js';
 import { coordinatorServerContextEnabled } from './coordinator-context.js';
+import { routedChiefAgent } from './coordinator-route.js';
 import { revokeStepGitCredential } from './credentials.js';
 import { quotaHoldBackoffMs, quotaHoldNote } from './dispatch-timeouts.js';
 import { diffTextNamesAFile, githubRepoOfProject, parseUnifiedDiff, projectOfTodo } from './git.js';
@@ -538,7 +540,8 @@ async function finishStepReport(
     recordSkillInjectionCheck(deps, stepRow, outcome.skillInjectionFacts);
   }
   if (stepRow.kind === 'chief' && isChiefDigestStep(stepRow)) {
-    finishChiefDigest(deps, stepRow, outcome, nowMs());
+    if (isChiefSummaryStep(stepRow)) finishChiefSummary(deps, stepRow, outcome, nowMs());
+    else finishChiefDigest(deps, stepRow, outcome, nowMs());
     publishStepStatus(deps, stepId);
     emitRuntimeStepSpan(deps.db, stepId);
     return;
@@ -728,11 +731,11 @@ function chiefStepAgent(
 ): typeof agent.$inferSelect | null {
   if (stepRow.kind !== 'chief' || !isChiefConversation(stepRow.buildId)) return null;
   const row = deps.db
-    .select({ agentRow: agentTable })
+    .select({ agentRow: agentTable, teamId: chiefThread.teamId })
     .from(chiefThread)
     .innerJoin(chief, eq(chiefThread.chiefId, chief.id))
     .innerJoin(agentTable, eq(chief.agentId, agentTable.id))
     .where(eq(chiefThread.id, stepRow.buildId))
     .get();
-  return row?.agentRow ?? null;
+  return row ? routedChiefAgent(deps.db, row.teamId, row.agentRow) : null;
 }

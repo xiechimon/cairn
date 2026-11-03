@@ -98,17 +98,13 @@ export const EN: Record<string, string> = {
   项目: 'Project', // sidebar group / search group / schedule-form field — one fit
   Coordinator: 'Coordinator',
   成果: 'Made',
-  接下来: 'Up next',
   在进行: 'In progress',
   等你处理: 'Needs you',
   管理定时: 'Manage schedules',
-  任务视图: 'Task view',
   没有在进行的任务: 'Nothing in progress',
-  没有排队的任务: 'Nothing queued',
+  没有空闲的任务: 'Nothing idle',
   还没有完成的工作: 'Nothing finished yet',
   '任务合并完成后会出现在这里。': 'Tasks show up here once they merge.',
-  '还没有定时任务，跟 Coordinator 说一声就能建':
-    'No schedules yet; ask the Coordinator to set one up',
   新建项目: 'New project',
   新任务: 'New task', // sidebar action row (#389) — the dialog title stays 新建任务
   '新任务：接下来让 agent 做什么？': 'New task: What should the agent do next?',
@@ -130,9 +126,6 @@ export const EN: Record<string, string> = {
   '收起{label}': 'Collapse {label}',
   '展开{label}': 'Expand {label}',
   总管: 'Chief',
-  '{n} 个总管会话有未读': '{n## chief session has unread|# chief sessions have unread}',
-  个会话未读: 'unread threads',
-  '思考中…': 'Thinking…',
   返回: 'Back',
   更多: 'More',
   关闭: 'Close',
@@ -885,7 +878,6 @@ export const EN: Record<string, string> = {
   复制链接: 'Copy link',
   暂停: 'Snooze',
   撤销: 'Undo',
-  未读: 'Unread',
   完成任务: 'Complete task',
   负责人: 'Owner',
   'issue 状态': 'Issue state',
@@ -1298,8 +1290,7 @@ export const EN: Record<string, string> = {
   '，主模型暂时用不了': ', main model unavailable',
   '可以继续说，总管恢复后会按顺序处理…':
     'Keep typing; the chief handles messages in order once it is back…',
-  '总管回完这条就看；想马上补充，发出后点「现在插话」':
-    'The chief reads this after the current reply; to add it now, send it and click Steer now',
+  发出的话会直接插进总管这一轮: "What you send goes into the chief's current reply",
   '发送失败，请重试。': 'Send failed. Try again.',
   '恢复失败，请重试。': 'Restore failed. Try again.',
   // —— #774 收单回落显式告知（成功 toast，非失败面；用户裁决静默不要）——

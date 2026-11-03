@@ -41,11 +41,11 @@ test('avatar landing fixed-size box (#983/#1003): Root renders a real box carryi
 test('kbd landing: floating hint = registry Tooltip+Kbd combo, not mounted at rest / floats on hover', async ({ page }) => {
   await page.goto('/app?scenario=01&view=board');
 
-  const fab = page.getByRole('button', { name: '总管', exact: true });
+  const search = page.locator('.board-sidebar').getByRole('button', { name: '搜索', exact: true });
   const hint = page.locator('[data-slot="tooltip-content"] [data-slot="kbd"]');
   await expect(hint).toHaveCount(0);
-  await fab.hover();
+  await search.hover();
   await expect(hint).toBeVisible();
   await expect(hint).toHaveAttribute('data-slot', 'kbd');
-  await expect(hint).toHaveText('⌘J');
+  await expect(hint).toHaveText('⌘K');
 });

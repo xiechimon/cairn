@@ -136,7 +136,6 @@ for (const theme of ['light', 'dark'] as const) {
         ['shadow-popover', 'e2'],
         ['dialog-shadow', 'e3'],
         ['edge-shadow', 'e2'],
-        ['fab-shadow', 'e2'],
         ['plate-shadow', 'e2'],
         ['chief-shadow', 'e2'],
         // pools, not rungs: their consumers draw their own --edge-ring
@@ -181,11 +180,6 @@ for (const theme of ['light', 'dark'] as const) {
       const drawer = await surfaceShadow(page, '.chief-drawer');
       expect(rings(drawer)).toBe(1);
       expect(drawer).toContain(edgeRing);
-
-      await page.goto(`${DETAIL}?scenario=detail-unread`);
-      const fab = await surfaceShadow(page, '.chief-fab');
-      expect(rings(fab)).toBe(1);
-      expect(fab.endsWith(await slot(page, 'e2'))).toBe(true);
 
       // e2: the menu rings once
       await page.goto(`${DETAIL}?scenario=17`);

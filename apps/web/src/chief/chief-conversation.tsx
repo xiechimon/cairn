@@ -144,7 +144,6 @@ export interface ChiefConversationProps {
   placeholder?: string;
   composerError?: string | null;
   composerReplacement?: ReactNode;
-  aboveComposer?: ReactNode;
   composerTools?: ReactNode;
   targetPlaceholder?: string | null;
 }
@@ -176,7 +175,6 @@ export function ChiefConversation({
   placeholder,
   composerError = null,
   composerReplacement,
-  aboveComposer,
   composerTools,
   targetPlaceholder = null,
 }: ChiefConversationProps) {
@@ -679,7 +677,6 @@ export function ChiefConversation({
           <ChiefFallbackBanner model={chief.fallbackModel} onSettings={onSettings} />
         )
       )}
-      {aboveComposer}
       {composerReplacement ?? (
         <>
           {composerError != null && (

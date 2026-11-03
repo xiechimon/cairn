@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { afterAll, describe, expect, test } from 'vitest';
+import { afterAll, describe, expect, test, vi } from 'vitest';
 import {
   agent as agentTable,
   build as buildTable,
@@ -13,6 +13,20 @@ import { listChiefThreads } from '../src/services/chief.js';
 import { claimStep } from '../src/services/machines.js';
 import { stepQueueProjector } from '../src/services/step-queue.js';
 import { bootServer, issueApiKey, postProject, req, type TestServer } from './helpers.js';
+
+const shipGate = vi.hoisted(() => ({ duringReverify: null as (() => void) | null }));
+vi.mock('../src/services/ship-gate.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/services/ship-gate.js')>();
+  return {
+    ...actual,
+    reverifyShip: async (...args: Parameters<typeof actual.reverifyShip>) => {
+      const hook = shipGate.duringReverify;
+      shipGate.duringReverify = null;
+      hook?.();
+      return actual.reverifyShip(...args);
+    },
+  };
+});
 
 const disposables: (() => void)[] = [];
 afterAll(() => {
@@ -363,5 +377,151 @@ describe('#1148/#1260 claim body maxWorkers (env fallback server consumption sur
       body: JSON.stringify({ maxWorkers: 0 }),
     });
     expect(res.status).toBe(400);
+  });
+});
+
+describe('chief turns never wait behind a worker step another machine owns', () => {
+  test('an older pending step bound to an offline machine does not hold back a newer chief turn', async () => {
+    const w = await setupWorld();
+    setCap(w, 8);
+    const key = await issueApiKey(w.s);
+    const other = await w.s.app.request('/api/machine/enroll', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ teamId: w.s.team.id, name: 'offline-orb', cliVersion: '0.1.0' }),
+    });
+    expect(other.status).toBe(200);
+    const otherMachineId = w.s.db
+      .select()
+      .from(machineTable)
+      .where(eq(machineTable.name, 'offline-orb'))
+      .get()!.id;
+    w.s.db
+      .insert(agentTable)
+      .values({
+        id: 'agent-planner-elsewhere',
+        teamId: w.s.team.id,
+        displayName: 'planner-elsewhere',
+        machineId: otherMachineId,
+        status: 'active',
+        avatarUrl: null,
+        provider: 'stub-gw',
+        modelId: 'stub-model',
+        thinkingLevel: null,
+        tools: [],
+        secrets: [],
+        skillsAllowlist: null,
+        mcpServers: [],
+      })
+      .run();
+    const elsewhere = insertPendingBuildStep(w.s, w);
+    const elsewhereRow = w.s.db.select().from(stepTable).where(eq(stepTable.id, elsewhere)).get()!;
+    w.s.db
+      .update(todoTable)
+      .set({ assignment: { plan: null, build: { agentId: 'agent-planner-elsewhere' } } })
+      .where(eq(todoTable.id, elsewhereRow.buildId.replace('build-', 'todo-')))
+      .run();
+    const chiefStepId = insertPendingChiefStep(w.s, { createdAt: elsewhereRow.createdAt + 5 });
+    expect((await claimAs(w))?.step.id).toBe(chiefStepId);
+    expect(w.s.db.select().from(stepTable).where(eq(stepTable.id, elsewhere)).get()!.status).toBe(
+      'pending',
+    );
+  });
+
+  test('an older worker step this machine can run still goes before a newer chief turn', async () => {
+    const w = await setupWorld();
+    setCap(w, 8);
+    const worker = insertPendingBuildStep(w.s, w);
+    const workerAt = w.s.db
+      .select()
+      .from(stepTable)
+      .where(eq(stepTable.id, worker))
+      .get()!.createdAt;
+    const chiefStepId = insertPendingChiefStep(w.s, { createdAt: workerAt + 5 });
+    expect((await claimAs(w))?.step.id).toBe(worker);
+    expect((await claimAs(w))?.step.id).toBe(chiefStepId);
+  });
+});
+
+describe('a chief turn claimed after the worker loop respects capacity filled meanwhile', () => {
+  test('capacity filled while the worker loop awaited leaves the newer chief turn pending', async () => {
+    const w = await setupWorld();
+    setCap(w, 1);
+    const worker = insertPendingBuildStep(w.s, w);
+    const workerRow = w.s.db.select().from(stepTable).where(eq(stepTable.id, worker)).get()!;
+    const chiefStepId = insertPendingChiefStep(w.s, { createdAt: workerRow.createdAt + 5 });
+    shipGate.duringReverify = () => {
+      w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.id, worker)).run();
+      insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() });
+    };
+    expect(await claimAs(w)).toBeNull();
+    expect(w.s.db.select().from(stepTable).where(eq(stepTable.id, chiefStepId)).get()!.status).toBe(
+      'pending',
+    );
+  });
+});
+
+describe('the late chief claim reads the machine as it is after the worker loop', () => {
+  test('a capability the machine drops while the worker loop awaited blocks the newer chief turn', async () => {
+    const w = await setupWorld();
+    setCap(w, 8);
+    w.s.db
+      .update(agentTable)
+      .set({ requiredCapabilities: { mcpServers: ['linear'] } })
+      .where(eq(agentTable.id, AGENT_ID))
+      .run();
+    w.s.db
+      .update(machineTable)
+      .set({ capabilities: { mcpServers: ['linear'], skills: [] } })
+      .where(eq(machineTable.id, w.machineAId))
+      .run();
+    const worker = insertPendingBuildStep(w.s, w);
+    const workerRow = w.s.db.select().from(stepTable).where(eq(stepTable.id, worker)).get()!;
+    const chiefStepId = insertPendingChiefStep(w.s, { createdAt: workerRow.createdAt + 5 });
+    shipGate.duringReverify = () => {
+      w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.id, worker)).run();
+      w.s.db
+        .update(machineTable)
+        .set({ capabilities: { mcpServers: [], skills: [] } })
+        .where(eq(machineTable.id, w.machineAId))
+        .run();
+    };
+    expect(await claimAs(w)).toBeNull();
+    expect(w.s.db.select().from(stepTable).where(eq(stepTable.id, chiefStepId)).get()!.status).toBe(
+      'pending',
+    );
+  });
+});
+
+describe('the late chief claim sees agent changes made while the worker loop awaited', () => {
+  test('a chief agent moved to another machine meanwhile is not claimed here', async () => {
+    const w = await setupWorld();
+    setCap(w, 8);
+    const key = await issueApiKey(w.s);
+    await w.s.app.request('/api/machine/enroll', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ teamId: w.s.team.id, name: 'other-box', cliVersion: '0.1.0' }),
+    });
+    const otherId = w.s.db
+      .select()
+      .from(machineTable)
+      .where(eq(machineTable.name, 'other-box'))
+      .get()!.id;
+    const worker = insertPendingBuildStep(w.s, w);
+    const workerRow = w.s.db.select().from(stepTable).where(eq(stepTable.id, worker)).get()!;
+    const chiefStepId = insertPendingChiefStep(w.s, { createdAt: workerRow.createdAt + 5 });
+    shipGate.duringReverify = () => {
+      w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.id, worker)).run();
+      w.s.db
+        .update(agentTable)
+        .set({ machineId: otherId })
+        .where(eq(agentTable.id, AGENT_ID))
+        .run();
+    };
+    expect(await claimAs(w)).toBeNull();
+    expect(w.s.db.select().from(stepTable).where(eq(stepTable.id, chiefStepId)).get()!.status).toBe(
+      'pending',
+    );
   });
 });

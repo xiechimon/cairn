@@ -2,6 +2,7 @@ import type { ChiefThread, StepQueueBlocked, StepQueueInfo } from '@cairn/shared
 import { and, asc, eq, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { agent, build, chief, chiefThread, machine, step, todo } from '../db/schema.js';
+import { routedChiefAgent } from './coordinator-route.js';
 import {
   agentForStep,
   agentIdForStep,
@@ -42,7 +43,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
       id: step.id,
       createdAt: step.createdAt,
       threadId: step.buildId,
-      home: agent.machineId,
+      boundAgent: agent,
       holdReason: step.holdReason,
       holdUntil: step.holdUntil,
       chiefId: chiefThread.chiefId,
@@ -52,7 +53,11 @@ export function stepQueueProjector(db: Db, teamId: string) {
     .innerJoin(chief, eq(chiefThread.chiefId, chief.id))
     .innerJoin(agent, eq(chief.agentId, agent.id))
     .where(and(eq(step.status, 'pending'), eq(step.kind, 'chief'), eq(chiefThread.teamId, teamId)))
-    .all();
+    .all()
+    .map(({ boundAgent, ...row }) => ({
+      ...row,
+      home: routedChiefAgent(db, teamId, boundAgent).machineId,
+    }));
   const queue = [...workerQueue, ...chiefRows].sort(
     (a, b) => a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1),
   );
@@ -93,7 +98,10 @@ export function stepQueueProjector(db: Db, teamId: string) {
       return base === null ? null : applyRoute(base, routeForStep(db, row.todoRow, row.kind));
     }
     const chiefRow = db.select().from(chief).where(eq(chief.id, row.chiefId)).get();
-    return agentRowOf(chiefRow?.agentId ?? null);
+    const bound = agentRowOf(chiefRow?.agentId ?? null);
+    return bound === null || chiefRow === undefined
+      ? bound
+      : routedChiefAgent(db, chiefRow.teamId, bound);
   }
 
   function blockedFor(

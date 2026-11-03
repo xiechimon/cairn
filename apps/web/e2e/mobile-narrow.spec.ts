@@ -1,4 +1,5 @@
 import { expect, test, type Locator } from '@playwright/test';
+import { openChiefWindow } from './helpers.js';
 
 const DETAIL_REVIEW = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=27';
 const REVIEW_DIALOG = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=review-dialog-fanout';
@@ -79,14 +80,10 @@ for (const width of [360, 390]) {
       expect(overflow).toBeLessThanOrEqual(0);
     });
 
-    test('M4 总管：FAB ≥44px，开窗可最小化收回', async ({ page }) => {
+    test('M4 Coordinator window stays inside the viewport and minimizes', async ({ page }) => {
       await page.goto('/app?view=board');
-      const fab = page.locator('.chief-fab');
-      await expect(fab).toBeVisible();
-      const fabBox = (await fab.boundingBox()) as { width: number; height: number };
-      expect(fabBox.width).toBeGreaterThanOrEqual(44);
-      expect(fabBox.height).toBeGreaterThanOrEqual(44);
-      await fab.click();
+      await expect(page.locator('.chief-fab')).toHaveCount(0);
+      await openChiefWindow(page);
       const drawer = page.locator('.chief-drawer');
       await expect(drawer).toBeVisible();
       const drawerBox = (await drawer.boundingBox()) as { x: number; width: number };
@@ -94,7 +91,6 @@ for (const width of [360, 390]) {
       expect(drawerBox.x + drawerBox.width).toBeLessThanOrEqual(width);
       await page.getByRole('button', { name: '最小化' }).click();
       await expect(drawer).toBeHidden();
-      await expect(fab).toBeVisible();
     });
 
     test('M5 搜索面板：整面板留在视口内，Esc 可关', async ({ page }) => {

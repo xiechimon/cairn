@@ -30,7 +30,7 @@ import { ACT_ORDER, actRank, needsYouThreads, pendingQuestions } from './needs-y
 import { NeedsYouThreadCard } from './needs-you-thread-card.js';
 import { composeRequest } from './open-composer.js';
 import { threadCopy, threadHref, threadStatus, threadTone } from './thread-copy.js';
-import { PANE_PARAM, paneOf, type TasksTab, type WorkPane, WorkPanel } from './work-panel.js';
+import { PANE_PARAM, paneOf, type WorkPane, WorkPanel } from './work-panel.js';
 
 const GREETINGS: [number, string][] = [
   [5, '夜深了'],
@@ -119,7 +119,6 @@ export function HomeC({
   const [allOpen, setAllOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const pane = paneOf(searchParams.get(PANE_PARAM));
-  const [tasksTab, setTasksTab] = useState<TasksTab>('active');
   const showPane = (next: WorkPane | null) => {
     const params = new URLSearchParams(searchParams);
     if (next === null) params.delete(PANE_PARAM);
@@ -321,29 +320,14 @@ export function HomeC({
     </section>
   );
 
-  const pill = running.length > 0 && (
-    <div className="mx-auto mb-2 flex w-[calc(100%-2rem)] max-w-182 flex-col">
-      <Button
-        variant="ghost"
-        data-testid="in-progress-pill"
-        aria-pressed={pane === 'tasks'}
-        onClick={() => {
-          setTasksTab('active');
-          showPane('tasks');
-        }}
-        className="h-7 gap-2 self-start rounded-full bg-card px-3 text-meta font-normal text-content-secondary shadow-(--e1) hover:bg-card hover:text-foreground dark:hover:bg-card"
-      >
-        <span aria-hidden="true" className="size-1.5 rounded-full bg-running" />
-        {t('{n} 件在进行', { n: running.length })}
-      </Button>
-    </div>
-  );
-
   const paneButtons = (
-    <div
+    <header
       data-testid="home-c-pane-buttons"
-      className="absolute top-2.5 right-3 z-(--z-docked) flex items-center gap-0.5"
+      className="flex h-12 flex-none items-center gap-0.5 pr-3 pl-5 max-[640px]:pl-14"
     >
+      <h1 className="m-0 mr-auto min-w-0 truncate text-ui font-semibold text-foreground">
+        {projectName ?? t('Coordinator')}
+      </h1>
       <Button
         variant="ghost"
         size="icon-sm"
@@ -371,7 +355,7 @@ export function HomeC({
       >
         <PackageCheck aria-hidden="true" />
       </Button>
-    </div>
+    </header>
   );
 
   const workPanel = pane !== null && (
@@ -384,8 +368,6 @@ export function HomeC({
           : schedules.filter((schedule) => schedule.projectId === projectId)
       }
       now={now}
-      tab={tasksTab}
-      onTab={setTasksTab}
       onClose={() => showPane(null)}
     />
   );
@@ -426,7 +408,6 @@ export function HomeC({
         aria-label={t('与 Coordinator 的对话')}
         className="relative flex min-h-0 min-w-0 flex-1 flex-col"
       >
-        <h1 className="sr-only">{t('Coordinator')}</h1>
         {paneButtons}
         {banner != null && (
           <div className="mx-auto w-[calc(100%-2rem)] max-w-182 flex-none pt-3">{banner}</div>
@@ -460,7 +441,6 @@ export function HomeC({
                 ? t('跟 Coordinator 说（在 {name} 里）…', { name: projectName })
                 : t('跟 Coordinator 说点什么，或描述一个新任务…')
             }
-            aboveComposer={pill}
             composerError={thread.error}
             targetPlaceholder={thread.placeholder}
             composerTools={

@@ -3,14 +3,13 @@ import { expect, type Page, test } from '@playwright/test';
 const PROJECT_ID = 'ZAQczKCu0MOAzC1ZqcFlX';
 const home = (scenario: string, query = '') => `/app?scenario=${scenario}${query}`;
 const needsYou = (page: Page) => page.getByTestId('needs-you');
-const pill = (page: Page) => page.getByTestId('in-progress-pill');
 const composer = (page: Page) => page.getByTestId('home-c').getByTestId('chief-composer-input');
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn.locale', 'en'));
 });
 
-test('the home is one Coordinator conversation: serif greeting, a pinned decision, the conversation, the in-progress pill and the composer', async ({
+test('the home is one Coordinator conversation: serif greeting, a pinned decision, the conversation and the composer, with no in-progress pill', async ({
   page,
 }) => {
   await page.goto(home('home-c'));
@@ -20,7 +19,8 @@ test('the home is one Coordinator conversation: serif greeting, a pinned decisio
   await expect(needsYou(page).locator('[data-slot="needs-you-item"]')).toHaveCount(3);
   await expect(needsYou(page)).toContainText('relay-186 cannot run glm-5.3-flash');
   await expect(page.getByTestId('chief-stream')).toContainText('Run the orb canary until it passes');
-  await expect(pill(page)).toHaveText(/3 in progress/);
+  await expect(page.getByTestId('in-progress-pill')).toHaveCount(0);
+  await expect(page.getByTestId('home-c').getByRole('heading', { level: 1 })).toHaveText('Coordinator');
   await expect(composer(page)).toBeVisible();
 });
 
@@ -60,11 +60,10 @@ test('"N more" opens the rest of the decisions, grouped by who acts next, a fail
   await expect(items).toHaveCount(3);
 });
 
-test('the in-progress pill opens the Tasks panel and a running row opens its thread', async ({
+test('the Tasks panel lists running threads and a running row opens its thread', async ({
   page,
 }) => {
-  await page.goto(home('home-c'));
-  await pill(page).click();
+  await page.goto(home('home-c', '&pane=tasks'));
   const rows = page
     .locator('.side-panel [data-slot="stone-group"][data-tone="working"]')
     .locator('[data-slot="thread-row"]');
@@ -73,7 +72,7 @@ test('the in-progress pill opens the Tasks panel and a running row opens its thr
   await expect(page).toHaveURL(/\/app\/todo\/home-c-working-a/);
 });
 
-test('the sidebar lists project names only, and choosing one filters the decisions, the pill and the conversation', async ({
+test('the sidebar lists project names only, and choosing one filters the decisions and the conversation', async ({
   page,
 }) => {
   await page.goto(home('home-c'));
@@ -86,6 +85,7 @@ test('the sidebar lists project names only, and choosing one filters the decisio
   await expect(page.getByTestId('chief-stream')).not.toContainText('Run the orb canary until it passes');
   await expect(page.getByTestId('chief-stream')).toContainText('Fold finished turns before review');
   await expect(composer(page)).toHaveAttribute('placeholder', /in cairn/);
+  await expect(page.getByTestId('home-c').getByRole('heading', { level: 1 })).toHaveText('cairn');
 });
 
 test('a project link lands on the home filtered to that project', async ({ page }) => {
@@ -98,7 +98,6 @@ test('a first run greets and offers starters, with nothing pinned', async ({ pag
   await page.goto(home('home-c-empty'));
   await expect(page.getByTestId('home-c-hero').getByRole('heading', { level: 2 })).toBeVisible();
   await expect(needsYou(page)).toHaveCount(0);
-  await expect(pill(page)).toHaveCount(0);
   await expect(page.getByTestId('home-c-since')).not.toContainText('waiting on you');
   await expect(page.getByTestId('home-c-since')).not.toContainText('in progress');
   await page.getByTestId('home-c-starters').getByRole('button', { name: 'Make a plan' }).click();

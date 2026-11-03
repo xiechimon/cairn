@@ -249,5 +249,4 @@ export const CHIEF_WATCHES_EMPTY_COPY =
   '暂无跟进事项。总管关注某个任务，或约定到点回头核实时，会按主题列在这里。';
 
 export const CHIEF_INPUT_PLACEHOLDER = '有什么可以帮你的？';
-export const CHIEF_INPUT_PLACEHOLDER_STEERING =
-  '总管回完这条就看；想马上补充，发出后点「现在插话」';
+export const CHIEF_INPUT_PLACEHOLDER_STEERING = '发出的话会直接插进总管这一轮';

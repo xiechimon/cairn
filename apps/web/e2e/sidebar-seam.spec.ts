@@ -26,11 +26,11 @@ test.describe('sidebar seam (Paper Grouped)', () => {
         };
       });
 
-      expect(m.borderRightW).toBe('1px');
+      expect(m.borderRightW).toBe('0px');
       expect(m.shadow).toBe('none');
       expect(m.sidebarW).toBe(248);
       expect(m.navBorderTopW).toBe('0px');
-      expect(await teamRowBox(page)).toEqual({ x: 12, y: 12, w: 223, h: 44 });
+      expect(await teamRowBox(page)).toEqual({ x: 12, y: 12, w: 224, h: 44 });
     });
 
     test(`team page: the workspace row keeps the board geometry (${theme})`, async ({
@@ -39,7 +39,7 @@ test.describe('sidebar seam (Paper Grouped)', () => {
       await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
       await page.goto('/app/team?scenario=12');
       await expect(page.locator('[data-route="team"]')).toBeVisible();
-      expect(await teamRowBox(page)).toEqual({ x: 12, y: 12, w: 223, h: 44 });
+      expect(await teamRowBox(page)).toEqual({ x: 12, y: 12, w: 224, h: 44 });
     });
 
     test(`rail: no seam either (${theme})`, async ({ page }) => {
@@ -59,7 +59,7 @@ test.describe('sidebar seam (Paper Grouped)', () => {
         };
       });
 
-      expect(m.borderRightW).toBe('1px');
+      expect(m.borderRightW).toBe('0px');
       expect(m.shadow).toBe('none');
       expect(m.railW).toBe(40);
     });
@@ -78,9 +78,9 @@ test.describe('sidebar seam (Paper Grouped)', () => {
           const ss = getComputedStyle(document.querySelector('aside')!);
           return { borderRightW: ss.borderRightWidth, shadow: ss.boxShadow };
         });
-        expect(m.borderRightW).toBe('1px');
+        expect(m.borderRightW).toBe('0px');
         expect(m.shadow).toBe('none');
-        expect(await teamRowBox(page)).toEqual({ x: 12, y: 12, w: 223, h: 44 });
+        expect(await teamRowBox(page)).toEqual({ x: 12, y: 12, w: 224, h: 44 });
       });
     }
   }

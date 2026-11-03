@@ -1,7 +1,7 @@
 import { expect, type Page, test } from '@playwright/test';
+import { openChiefWindow } from './helpers.js';
 
 const drawer = (page: Page) => page.locator('.chief-drawer');
-const fab = (page: Page) => page.locator('.chief-fab');
 const minimize = (page: Page) => drawer(page).getByRole('button', { name: '最小化' });
 
 // the window enters with fade + scale (ADR 0013 D7) — measure only after the
@@ -12,7 +12,7 @@ async function settled(page: Page) {
 
 const WIN_BOX = { x: 1440 - 8 - 380, y: 732 - 8 - 600, width: 380, height: 600 };
 
-const SHEET_W = 1440 - 248;
+const SHEET_W = 1440 - 248 - 8;
 
 test.describe('chief panel floating form (ADR 0013)', () => {
   test('Esc never closes the panel on the board route (D3)', async ({ page }) => {
@@ -29,7 +29,7 @@ test.describe('chief panel floating form (ADR 0013)', () => {
     await expect(drawer(page)).toBeHidden();
     await expect(drawer(page)).toHaveCount(1);
 
-    await fab(page).click();
+    await openChiefWindow(page);
     await settled(page);
     await expect(drawer(page)).toBeVisible();
 
@@ -162,7 +162,7 @@ test.describe('chief panel floating form (ADR 0013)', () => {
       const closed = await content.boundingBox();
       expect(closed!.width).toBeCloseTo(SHEET_W, 0);
 
-      await fab(page).click();
+      await openChiefWindow(page);
       await settled(page);
       const floating = await drawer(page).boundingBox();
       expect(floating!.x).toBeCloseTo(WIN_BOX.x, 0);
@@ -187,7 +187,7 @@ test.describe('chief panel floating form (ADR 0013)', () => {
     await expect(page.locator('.detail-right')).toBeVisible();
     const restingCenter = await page.locator('.detail-center').boundingBox();
 
-    await fab(page).click();
+    await openChiefWindow(page);
     await settled(page);
 
     await expect(page.locator('.detail-right')).toBeVisible();
@@ -274,7 +274,7 @@ test.describe('chief panel floating form (ADR 0013)', () => {
       return composer.getAttribute('placeholder');
     };
 
-    expect(await placeholderAt('113')).toBe('总管回完这条就看；想马上补充，发出后点「现在插话」');
+    expect(await placeholderAt('113')).toBe('发出的话会直接插进总管这一轮');
     expect(await placeholderAt('111')).toBe('有什么可以帮你的？');
     expect(await placeholderAt('114')).toBe('有什么可以帮你的？');
   });
@@ -326,7 +326,7 @@ test.describe('chief panel floating form (ADR 0013)', () => {
     await page.goto('/app?view=board');
     await expect(drawer(page)).toBeHidden();
 
-    await fab(page).click();
+    await openChiefWindow(page);
     await settled(page);
     await expect(drawer(page)).toBeVisible();
     await page.reload();
