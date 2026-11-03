@@ -1,5 +1,5 @@
 import { X } from 'lucide-react';
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useApiMutations } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { useChiefRoot } from '../chief/chief-root.js';
@@ -20,6 +20,8 @@ import { type ThreadActions, useThreadActions } from './thread-actions.js';
 import { threadCopy, threadTone } from './thread-copy.js';
 import { type ThreadChat, useThreadChat } from './use-thread-chat.js';
 import { useThreadMentions } from './use-thread-mentions.js';
+
+const OVERLAY_QUERY = '(max-width: 1100px)';
 
 const OPEN_SURFACE = '.overlay, [role="dialog"], [role="menu"], [role="listbox"]';
 
@@ -193,6 +195,15 @@ export function SideChat({
   const chat = useThreadChat(todoId, listed);
   const todo = chat.todo;
 
+  const panelRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const panel = panelRef.current;
+    const focused = document.activeElement;
+    if (panel === null || !(focused instanceof HTMLElement)) return;
+    if (!window.matchMedia(OVERLAY_QUERY).matches || panel.contains(focused)) return;
+    focused.blur();
+  }, []);
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.defaultPrevented) return;
@@ -204,7 +215,7 @@ export function SideChat({
   }, [onClose]);
 
   return (
-    <SidePanel label={todo?.title ?? t('任务')} onDismiss={onClose}>
+    <SidePanel ref={panelRef} label={todo?.title ?? t('任务')} onDismiss={onClose}>
       {todo != null && chat.load === 'ready' ? (
         <ReadyThread todo={todo} chat={chat} now={now} onClose={onClose} />
       ) : (
