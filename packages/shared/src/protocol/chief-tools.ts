@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { COMPUTER_IMAGES_MAX, computerImageSchema } from './computer.js';
 
 export const remoteToolDefSchema = z.object({
   name: z.string(),
@@ -17,6 +18,7 @@ export type MachineToolRelayBody = z.infer<typeof machineToolRelayBodySchema>;
 
 export const machineToolRelayResponseSchema = z.object({
   text: z.string(),
+  images: z.array(computerImageSchema).max(COMPUTER_IMAGES_MAX).optional(),
 });
 export type MachineToolRelayResponse = z.infer<typeof machineToolRelayResponseSchema>;
 
