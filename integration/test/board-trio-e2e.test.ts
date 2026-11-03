@@ -165,27 +165,11 @@ async function seedFailedTodo(
   return record;
 }
 
-async function openBoard(): Promise<void> {
-  await page.goto(`${server.url}/app?view=board`);
-  await pexpect(
-    page.getByRole('complementary').getByRole('button', { name: 'Coordinator' }),
-  ).toBeVisible({ timeout: 30_000 });
-}
-
-async function openDetailByTitle(title: string): Promise<void> {
-  await page.goto(`${server.url}/app?view=board`);
-  await page.getByRole('link', { name: title }).click();
+async function openDetail(todoId: string): Promise<void> {
+  await page.goto(`${server.url}/app/todo/${todoId}`);
   await pexpect(page.locator('.detail-shell [data-testid="detail-main"]')).toBeVisible({
     timeout: 15_000,
   });
-}
-
-function cardInColumn(columnName: string, todoId: string) {
-  return page
-    .locator('section', {
-      has: page.locator('.board-column-name', { hasText: columnName }),
-    })
-    .locator(`[data-todo-id="${todoId}"]`);
 }
 
 beforeAll(async () => {
@@ -247,9 +231,8 @@ afterAll(async () => {
   await server?.close();
 });
 
-describe('#1216 board UI reliability triple defect (real web dist + real server + fake machine wire)', () => {
-  test('① a draft starts from its card into the dispatch flow; in-flight state rejects duplicate orchestration', async () => {
-    await openBoard();
+describe('#1216 task UI reliability triple defect (real web dist + real server + fake machine wire)', () => {
+  test('① a draft starts from its detail page into the dispatch flow; in-flight state rejects duplicate orchestration', async () => {
     await api(server.url, 'POST', `/api/projects/${projectId}/todos`, {
       title: '',
       spec: SPECS.oneClick,
@@ -269,15 +252,14 @@ describe('#1216 board UI reliability triple defect (real web dist + real server 
       return true;
     }, 15_000);
     expect(orchestrationTurns(seqNum).length).toBe(0);
-    await openBoard();
-    const card = page.locator(`[data-todo-id="${todoId}"]`);
-    await card.locator('.todo-card-action').click();
+    await openDetail(todoId);
+    await pexpect(page.locator('.detail-head-action')).toHaveText('开始');
+    await page.locator('.detail-head-action').click();
     await waitFor(() => orchestrationTurns(seqNum).length === 1, 15_000);
 
-    await pexpect(card.locator('.todo-card-orchestration')).toContainText('编排中', {
-      timeout: 15_000,
-    });
-    await pexpect(card.locator('.todo-card-action')).toHaveCount(0);
+    const inflight = page.locator('.detail-head-action[data-orchestrating="true"]');
+    await pexpect(inflight).toHaveText('编排中', { timeout: 15_000 });
+    await pexpect(inflight).toBeDisabled();
     expect(orchestrationTurns(seqNum).length).toBe(1);
 
     const turn = orchestrationTurns(seqNum)[0];
@@ -297,13 +279,13 @@ describe('#1216 board UI reliability triple defect (real web dist + real server 
     expect(planStep.kind).toBe('plan');
     await waitFor(() => server.todoPhase(todoId) === 'planning', 15_000);
 
-    await pexpect(cardInColumn('执行中', todoId)).toBeVisible({ timeout: 30_000 });
+    await pexpect(page.locator('.detail-chip')).toHaveText('规划中', { timeout: 30_000 });
     expect(orchestrationTurns(seqNum).length).toBe(1);
   }, 180_000);
 
   test('② failed rerun: thread must land + visible in-flight + buildHistory grows after chief dispatch', async () => {
     const seeded = await seedFailedTodo('重跑探针卡', SPECS.rerun, tokens.m1);
-    await openDetailByTitle('重跑探针卡');
+    await openDetail(seeded.id);
 
     await pexpect(page.locator('.detail-head-action')).toHaveText('重跑');
     await page.locator('.detail-head-action').click();
@@ -345,7 +327,7 @@ describe('#1216 board UI reliability triple defect (real web dist + real server 
   test('③ failed card detail deletable; missing/failed detail shows an explained state, not an empty shell', async () => {
     const seeded = await seedFailedTodo('删除探针卡', SPECS.deletable, tokens.m1);
 
-    await openDetailByTitle('删除探针卡');
+    await openDetail(seeded.id);
     await pexpect(page.locator('.detail-head-action')).toHaveText('重跑');
 
     await page.locator('button[aria-label="更多"]').click();
@@ -358,13 +340,12 @@ describe('#1216 board UI reliability triple defect (real web dist + real server 
       return res.status === 404;
     }, 15_000);
     await pexpect(page).toHaveURL(/\/app$/);
-    await pexpect(page.locator(`[data-todo-id="${seeded.id}"]`)).toHaveCount(0);
 
     await page.goto(`${server.url}/app/todo/does-not-exist-1216`);
     const unavailable = page.locator('[data-testid="detail-unavailable"]');
     await pexpect(unavailable).toBeVisible({ timeout: 15_000 });
     await pexpect(unavailable).toHaveAttribute('data-state', 'not-found');
-    await unavailable.getByRole('button', { name: '回看板' }).click();
+    await unavailable.getByRole('button', { name: '回首页' }).click();
     await pexpect(page).toHaveURL(/\/app$/);
     await pexpect(
       page.getByRole('complementary').getByRole('button', { name: 'Coordinator' }),

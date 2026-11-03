@@ -277,7 +277,7 @@ test.describe('chief unavailable (T4)', () => {
     await expect(home.getByTestId('chief-fallback-banner')).toContainText('relay-b/glm-4.6');
     await expect(home.getByTestId('chief-outage')).toHaveCount(0);
     await evidenceShot(page, 'fallback.png');
-    await page.goto('/app?view=board');
+    await page.goto('/app/schedules');
     await openChiefWindow(page);
     const row = page.locator('.chief-drawer').getByTestId('chief-model-row');
     await expect(row).toContainText('备用模型 relay-b/glm-4.6');

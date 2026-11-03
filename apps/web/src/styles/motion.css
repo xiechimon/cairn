@@ -10,62 +10,10 @@
   }
 }
 
-@media (hover: hover) and (pointer: fine) {
-  .todo-card {
-    transition:
-      background-color var(--dur-fast) var(--ease-standard),
-      box-shadow 200ms var(--ease-out-expo),
-      translate 200ms var(--ease-out-expo);
-  }
-
-  .todo-card:hover {
-    background-color: var(--card-hover);
-  }
-}
-
-body[data-board-dragging] .todo-card:hover {
-  background-color: var(--card);
-  box-shadow: var(--panel-shadow);
-  translate: none;
-}
-
-@keyframes card-enter {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.todo-card {
-  animation: card-enter var(--dur-fast) var(--ease-pop);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .todo-card-branch {
-    transition: background-color var(--dur-fast) var(--ease-standard);
-  }
-
-  .todo-card-branch:hover {
-    background-color: var(--accent-soft);
-  }
-}
-
 button:active,
 [role="button"]:active,
 a:active {
   opacity: 0.85;
-}
-
-.todo-card:active {
-  background-color: var(--surface-press);
-}
-
-.todo-card-link:active {
-  opacity: 1;
 }
 
 @media (pointer: coarse) {
@@ -74,12 +22,6 @@ a:active {
   a:active {
     transition-duration: 0s;
   }
-}
-
-body[data-board-dragging] {
-  cursor: grabbing;
-  user-select: none;
-  -webkit-user-select: none;
 }
 
 .theme-suppress,

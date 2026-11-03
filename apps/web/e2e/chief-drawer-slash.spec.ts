@@ -90,7 +90,7 @@ async function openDrawer(page: Page) {
   const membersLoaded = page.waitForResponse(
     (r) => r.url().includes(`/api/teams/${TEAM_ID}/members`) && r.status() === 200,
   );
-  await page.goto('/app?view=board');
+  await page.goto('/app/schedules');
   await membersLoaded;
 
   await openChiefWindow(page);
