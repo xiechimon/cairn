@@ -2,7 +2,7 @@ import type { AskUserAnswer } from '@cairn/shared';
 import { type CSSProperties, createContext, memo, type ReactNode, useContext } from 'react';
 import { Link } from 'react-router';
 import { reportStatusWord } from '../board/status-words.js';
-import { ThinkingRow, ToolActivityRow } from '../components/chat/agent-rows.js';
+import { ThinkingRow } from '../components/chat/agent-rows.js';
 import { LivePulse, LiveRow, LiveSignal } from '../components/chat/live-row.js';
 import { TraceGroup, TraceRows, type TraceStepItem } from '../components/chat/trace-steps.js';
 import { Bubble, BubbleContent } from '../components/ui/bubble.js';
@@ -110,16 +110,20 @@ function Segments({ segments }: { segments: ChiefSegment[] }) {
   );
 }
 
-function turnToolSteps(tools: ChiefToolRow[] | undefined): TraceStepItem[] {
-  return (tools ?? []).map((tool, k) => ({
-    id: k,
-    step: {
-      kind: 'tool',
-      name: tool.label,
-      status: tool.error === true ? 'failed' : 'done',
-      ...(tool.seconds !== undefined ? { secs: tool.seconds } : {}),
-    },
-  }));
+function turnToolSteps(tools: ChiefToolRow[] | undefined, runningVerb?: string): TraceStepItem[] {
+  return (tools ?? []).map((tool, k) => {
+    const running = runningVerb !== undefined && tool.running === true;
+    return {
+      id: k,
+      step: {
+        kind: 'tool',
+        ...(running ? { verb: runningVerb } : {}),
+        name: tool.label,
+        status: tool.error === true ? 'failed' : running ? 'running' : 'done',
+        ...(tool.seconds !== undefined ? { secs: tool.seconds } : {}),
+      },
+    };
+  });
 }
 
 export const TurnElapsedContext = createContext(true);
@@ -166,7 +170,6 @@ export function chiefStreamRowKey(item: ChiefStreamItem, index: number): string 
     case 'user':
     case 'robot':
     case 'thinking':
-    case 'tool':
     case 'question':
     case 'handoff':
     case 'digest':
@@ -364,22 +367,6 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
         </Message>
       </MessageScrollerItem>
     );
-  if (item.kind === 'tool')
-    return (
-      <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
-        <Message className={`chief-msg ${MSG_ROW_CLS}`}>
-          <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
-            <ToolActivityRow
-              name={item.label}
-              {...(item.startedAt !== undefined ? { startedAt: item.startedAt } : {})}
-              {...(item.seconds !== undefined ? { seconds: item.seconds } : {})}
-              {...(item.running !== undefined ? { running: item.running } : {})}
-              {...(item.error !== undefined ? { error: item.error } : {})}
-            />
-          </MessageContent>
-        </Message>
-      </MessageScrollerItem>
-    );
   if (item.kind === 'question')
     return (
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
@@ -395,8 +382,9 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
       </MessageScrollerItem>
     );
   if (item.kind === 'streaming') {
+    const callRunning = item.tools?.some((tool) => tool.running === true) === true;
     const liveSteps: TraceStepItem[] = [
-      ...(runningTool != null
+      ...(runningTool != null && !callRunning
         ? [
             {
               id: 'running',
@@ -409,7 +397,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
             },
           ]
         : []),
-      ...turnToolSteps(item.tools),
+      ...turnToolSteps(item.tools, t('正在调用')),
     ];
     return (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>

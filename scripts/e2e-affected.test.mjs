@@ -7,6 +7,7 @@ import {
   listSpecs,
   parseYamlDocuments,
   selectSpecs,
+  workspacePackages,
 } from './e2e-affected-select.mjs';
 import { mergeWeights, parseWeights } from './e2e-shard-weights.mjs';
 import { partitionByWeight } from './timed-partition.mjs';
@@ -178,8 +179,24 @@ const ALL_SPECS = [
   'texture-grain.spec.ts',
   'token-gate.spec.ts',
 ];
-const select = (paths, dependencies = () => assert.fail('dependencies read without cause')) =>
-  selectSpecs({ paths, allSpecs: ALL_SPECS, dependencies });
+const select = (
+  paths,
+  dependencies = () => assert.fail('dependencies read without cause'),
+  lockfile = LOCKFILE,
+) =>
+  selectSpecs({
+    paths,
+    allSpecs: ALL_SPECS,
+    dependencies,
+    workspace: () => workspacePackages(lockfile),
+  });
+const SERVER_ONLY_PACKAGE = `${LOCKFILE.replace(
+  '      better-sqlite3:\n        specifier: 13.0.3',
+  "      '@cairn/store':\n        specifier: workspace:*\n        version: link:../../packages/store\n      better-sqlite3:\n        specifier: 13.0.3",
+).replace(
+  '\n  packages/shared:\n',
+  "\n  packages/shared-docs: {}\n\n  packages/store:\n    dependencies:\n      '@cairn/deep':\n        specifier: workspace:*\n        version: link:../deep\n\n  packages/deep: {}\n\n  packages/shared:\n",
+)}`;
 
 test('a build permission change on a package only the live server installs runs the live-server specs', () => {
   const result = impact(workspaceWith('better-sqlite3: true', 'better-sqlite3: false'));
@@ -340,6 +357,37 @@ test('server changes run the live-server specs; files outside both apps run none
   );
 });
 
+test('a workspace package the web app links runs everything', () => {
+  for (const path of ['packages/shared/src/phase.ts', 'packages/shared/merge-gate-paths.json']) {
+    const result = select([path]);
+    assert.equal(result.full, true, path);
+    assert.deepEqual(result.selection, ALL_SPECS, path);
+    assert.match(result.reasons[0], /packages\/shared/, path);
+  }
+});
+
+test('a workspace package only the live server links runs the live-server specs, through nested links', () => {
+  assert.notEqual(SERVER_ONLY_PACKAGE, LOCKFILE);
+  for (const path of ['packages/store/src/db.ts', 'packages/deep/index.ts']) {
+    const result = select([path], undefined, SERVER_ONLY_PACKAGE);
+    assert.equal(result.full, false, path);
+    assert.deepEqual(result.selection, ['live-server-boot.spec.ts', 'token-gate.spec.ts'], path);
+  }
+});
+
+test('a workspace package neither app links selects nothing, and a sibling name is not a prefix match', () => {
+  assert.deepEqual(select(['apps/daemon/src/index.ts']).selection, []);
+  assert.deepEqual(
+    select(['packages/shared-docs/readme.md'], undefined, SERVER_ONLY_PACKAGE).selection,
+    [],
+  );
+});
+
+test('an unreadable lockfile cannot say who links a package, so a path outside both apps runs everything', () => {
+  assert.equal(select(['packages/shared/src/phase.ts'], undefined, null).full, true);
+  assert.equal(select(['docs/a.md'], undefined, 'importers:\n  .: {}\n').full, true);
+});
+
 test('the committed lockfile and workspace parse, and their closures reach the packages they must', () => {
   const lockfile = readFileSync(new URL('../pnpm-lock.yaml', import.meta.url), 'utf8');
   const workspace = readFileSync(new URL('../pnpm-workspace.yaml', import.meta.url), 'utf8');
@@ -364,6 +412,10 @@ test('the committed lockfile and workspace parse, and their closures reach the p
   );
   assert.notEqual(bumped, lockfile);
   assert.equal(dependencyImpact({ base: real, head: { lockfile: bumped, workspace } }).specs, null);
+  const reach = workspacePackages(lockfile);
+  assert.equal(reach('packages/shared/src/index.ts').specs, null);
+  assert.deepEqual(reach('apps/daemon/src/index.ts').specs, []);
+  assert.deepEqual(reach('docs/README.md'), null);
 });
 
 test('the yaml reader keeps documents, quoted keys, flow values and list items apart', () => {
