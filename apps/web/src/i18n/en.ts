@@ -1034,23 +1034,12 @@ export const EN: Record<string, string> = {
   其他: 'Other',
   // #356 runtime tabs(spec 11 §A1-A4;tab 名 pi/Claude Code 不译,槽位名
   // default/opus/… 为配置标识符不译;{hostname} = 上报机器名插值)
-  'cairn 自有运行时。模型来自你添加的服务商。':
-    "cairn's own runtime. Models come from the providers you add.",
-  '执行机 Claude Code 配置（~/.claude/settings.json）的模型槽。':
-    'Model slots from the executor machine’s Claude Code config (~/.claude/settings.json).',
-  '执行机 Gemini CLI 的本地会话。': 'Local sessions of the executor machine’s Gemini CLI.',
-  '已安装在 {hostname}': 'Installed on {hostname}',
   未安装: 'Not installed',
   '已安装，未配置模型槽': 'Installed, no model slots configured',
   未登录: 'Not signed in',
   '在该机器上写 ~/.claude/settings.json 的 env.ANTHROPIC_*_MODEL 槽后，此处自动展示其模型槽。':
     'Add ANTHROPIC_*_MODEL slots to env in ~/.claude/settings.json on that machine and its model slots show up here.',
-  '安装 Claude Code 并完成一次登录后，此处自动展示其模型槽。':
-    'Install Claude Code and sign in once; its model slots appear here automatically.',
   '尚未添加服务商。': 'No providers yet.',
-  '添加后，服务商的模型会出现在这里。': 'Once you add one, its models appear here.',
-  'settings.json 未配置模型槽。': 'No model slots configured in settings.json.',
-  '尚无执行机上报模型信息。': 'No executor has reported model info yet.',
   // #231/#243 OAuth 落地 reason 三译(providers-page 喂 connectError 行)
   '授权已被取消。': 'Authorization was cancelled.',
   '令牌交换失败，请稍后重试。': 'Token exchange failed — please try again.',
@@ -1543,4 +1532,41 @@ export const EN: Record<string, string> = {
   '没发给 #{seq}，再试一次。': 'Not sent to #{seq}. Try again.',
   '#{seq} 现在收不了消息。改回 Coordinator，或换一个 thread。':
     '#{seq} cannot take a message now. Switch back to the Coordinator or pick another thread.',
+  '启用 {name}': 'Enable {name}',
+  添加服务商: 'Add provider',
+  '移除 {name}': 'Remove {name}',
+  'OAuth 登录': 'OAuth sign-in',
+  '加密保存，保存后不能再查看': 'Encrypted; cannot be viewed after saving',
+  '更换 API key': 'Replace API key',
+  '新的 API key': 'New API key',
+  协议: 'Protocol',
+  地址: 'Base URL',
+  这里的模型会出现在模型选择器里: 'These models show up in the model pickers',
+  '添加模型 ID，回车保存': 'Add a model ID, press Enter to save',
+  移除服务商: 'Remove provider',
+  '移除后，用到它的模型和路由不再可用。':
+    'After removal, the models and routes that use it stop working.',
+  '离线 · 显示最后一次上报': 'Offline · showing the last report',
+  '{machine} 上的 CLI': 'CLI on {machine}',
+  程序: 'Binary',
+  未找到: 'Not found',
+  配置: 'Config',
+  模型槽来自这台机器的这个文件: 'Model slots come from this file on the machine',
+  模型槽: 'Model slots',
+  '这台机器还没上报 Claude Code 信息。': 'This machine has not reported Claude Code yet.',
+  '{machine} 上的运行时': 'Runtime on {machine}',
+  服务商: 'Providers',
+  'pi 步骤用团队里的服务商，不读这台机器的配置':
+    "pi steps use the team's providers, not this machine's config",
+  '团队的 {n} 个服务商': "The team's {n#1 provider|# providers}",
+  'Gemini CLI 还不上报版本和模型；打开后，这台机器会接 Gemini 步骤。':
+    'Gemini CLI does not report its version or models yet; when on, this machine takes Gemini steps.',
+  '{n} 个模型': '{n#1 model|# models}',
+  '{n} 个已下架': '{n} retired',
+  使用团队的服务商: "Uses the team's providers",
+  范围: 'Scope',
+  '添加 API key、订阅或自定义端点后，它们的模型会出现在这里。':
+    'Add an API key, subscription or custom endpoint and its models show up here.',
+  还没上报: 'Not reported yet',
+  模型列表: 'Models',
 };

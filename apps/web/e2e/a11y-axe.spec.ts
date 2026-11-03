@@ -104,7 +104,7 @@ const PAGES: AuditPage[] = [
   {
     name: 'providers',
     url: '/app/resources/providers?scenario=01',
-    ready: (p) => p.getByTestId('runtime-empty'),
+    ready: (p) => p.getByTestId('provider-editor'),
   },
   {
     name: 'secrets',
