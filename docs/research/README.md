@@ -23,6 +23,7 @@ The notes and captures from the early study of todos.dev (the r1 to r9 series an
 | [r14-orchestration-parent-card.md](r14-orchestration-parent-card.md) | none | Whether the parent card stays after an orchestration split: three lines of evidence and a recommendation (XMON-98 decision point 1) |
 | [r15-multica-run-rendering.md](r15-multica-run-rendering.md) | none | How Multica renders a run (UI and event stream), source-level facts; the basis for ADR 0011 |
 | [machine-execution-plane.md](machine-execution-plane.md) | none | End-to-end research on running the same code on any machine; the basis for spec 21 (§4-7 session locality is a correctness item) |
+| [agent-machine-routing.md](agent-machine-routing.md) | none | Whether an agent is pinned to one machine or dispatched to any qualifying machine: today's pin, 13 products and schedulers compared, failure modes, and a proposed preference-plus-pool rule (draft D71) |
 | [herdr-multica-parity.md](herdr-multica-parity.md) | none | Whether herdr itself can produce the Multica experience (method research) |
 | [r16-model-catalog-liveness.md](r16-model-catalog-liveness.md) | none | Model catalog liveness: withdrawn upstream models still listed, live models rejected |
 | [1607-acp-execution-surface.md](1607-acp-execution-surface.md) | none | ACP as an execution surface |
