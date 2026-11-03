@@ -354,6 +354,12 @@ test('guest image installs bubblewrap for Claude Code subprocess isolation and v
   assert.match(script, /runuser -u agent -- \/usr\/bin\/bwrap --version/);
 });
 
+test('guest image installs socat for the Claude Code sandbox and verifies it as agent', () => {
+  const script = readFileSync(join(source, 'build-image.sh'), 'utf8');
+  assert.match(script, /^pacstrap -K -M "\$stage" .*\bsocat\b/m);
+  assert.match(script, /runuser -u agent -- \/usr\/bin\/socat -V/);
+});
+
 test("guest image runs only Claude Code's own native installer and verifies both CLIs as agent", () => {
   const script = readFileSync(join(source, 'build-image.sh'), 'utf8');
   const install = script.indexOf('npm install --global --ignore-scripts');
