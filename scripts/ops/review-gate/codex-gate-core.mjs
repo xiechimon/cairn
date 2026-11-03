@@ -123,9 +123,8 @@ function blockedSummary(blocking) {
 
 export function decide(pr, state, threads, retries, limitHit = false) {
   const sha = pr.head.sha;
-  const finished =
-    state?.commitSha === sha && (state.status === 'completed' || state.status === 'failed');
-  if (limitHit && !finished)
+  const reviewedHead = state?.commitSha === sha && state.status === 'completed';
+  if (limitHit && !reviewedHead)
     return {
       status: 'completed',
       conclusion: 'failure',

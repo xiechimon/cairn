@@ -186,24 +186,23 @@ test('decide reports an exhausted allowance without retrying', () => {
     { commitSha: OTHER, status: 'completed' },
     { commitSha: SHA, status: 'running' },
     { commitSha: OTHER, status: 'failed' },
+    { commitSha: SHA, status: 'failed' },
     null,
   ]) {
-    const result = decide(pr, state, [], noRetries, true);
-    assert.equal(result.status, 'completed');
-    assert.equal(result.conclusion, 'failure');
-    assert.equal(result.title, 'Codex allowance exhausted');
-    assert.match(result.summary, /chatgpt\.com\/codex\/cloud\/settings\/usage/);
-    assert.equal(result.addStall, true);
-    assert.equal(result.retry, undefined);
+    for (const retries of [noRetries, { count: 1, pending: true }]) {
+      const result = decide(pr, state, [], retries, true);
+      assert.equal(result.status, 'completed');
+      assert.equal(result.conclusion, 'failure');
+      assert.equal(result.title, 'Codex allowance exhausted');
+      assert.match(result.summary, /chatgpt\.com\/codex\/cloud\/settings\/usage/);
+      assert.equal(result.addStall, true);
+      assert.equal(result.retry, undefined);
+    }
   }
 });
 
-test('decide ignores the limit flag once the current head has a finished review', () => {
+test('decide ignores the limit flag once the current head has a completed review', () => {
   assert.equal(decide(pr, done, [], noRetries, true).conclusion, 'success');
-  assert.equal(
-    decide(pr, { commitSha: SHA, status: 'failed' }, [], noRetries, true).title,
-    'Codex review failed; retry 1 of 2',
-  );
 });
 
 test('usageLimitHit needs a trusted limit comment newer than the state comment', () => {
