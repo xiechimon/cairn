@@ -787,6 +787,8 @@ export const EN: Record<string, string> = {
   '排队中：等 {machine}（{running}/{cap} 在跑，前面 {ahead} 个）':
     'Queued: waiting for {machine} ({running}/{cap} running, {ahead} ahead)',
   '排队中：等空闲机器（前面 {ahead} 个）': 'Queued: waiting for a free machine ({ahead} ahead)',
+  '排队中：等首选机器 {machine}（{running}/{cap} 在跑），{time} 起其他机器可接手（前面 {ahead} 个）':
+    'Queued: waiting for preferred machine {machine} ({running}/{cap} running); another machine may take it from {time} ({ahead} ahead)',
   // #1251 visible pending reasons (queue blocked face): missing capability =
   // the fix, offline = waiting.
   '排队中：没有机器满足能力要求（缺 {missing}）——装齐后下一拍心跳即解锁（前面 {ahead} 个）':

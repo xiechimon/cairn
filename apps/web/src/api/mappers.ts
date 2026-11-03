@@ -108,6 +108,19 @@ function queueLabel(queue: NonNullable<StepRow['queue']>): {
         }
       : { label: '排队中：等机器上线（前面 {ahead} 个）', vars: { ahead } };
   }
+  if (queue.waitingFor?.fallbackAt != null) {
+    return {
+      label:
+        '排队中：等首选机器 {machine}（{running}/{cap} 在跑），{time} 起其他机器可接手（前面 {ahead} 个）',
+      vars: {
+        machine: queue.waitingFor.name,
+        running: queue.waitingFor.running,
+        cap: queue.waitingFor.capacity,
+        time: clockTime(queue.waitingFor.fallbackAt),
+        ahead,
+      },
+    };
+  }
   return queue.waitingFor != null
     ? {
         label: '排队中：等 {machine}（{running}/{cap} 在跑，前面 {ahead} 个）',

@@ -3958,6 +3958,11 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
                           "minimum": -9007199254740991,
                           "type": "integer",
                         },
+                        "fallbackAt": {
+                          "maximum": 9007199254740991,
+                          "minimum": -9007199254740991,
+                          "type": "integer",
+                        },
                         "machineId": {
                           "type": "string",
                         },
@@ -5324,6 +5329,11 @@ exports[`body/envelope schema snapshots > stepJournalRow > stepJournalRow.json 1
               "additionalProperties": false,
               "properties": {
                 "capacity": {
+                  "maximum": 9007199254740991,
+                  "minimum": -9007199254740991,
+                  "type": "integer",
+                },
+                "fallbackAt": {
                   "maximum": 9007199254740991,
                   "minimum": -9007199254740991,
                   "type": "integer",
