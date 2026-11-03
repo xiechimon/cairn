@@ -1,4 +1,9 @@
-import { isSessionStepKind, type RequiredCapabilities, type StepKind } from '@cairn/shared';
+import {
+  isSessionStepKind,
+  type RequiredCapabilities,
+  type RouteOverride,
+  type StepKind,
+} from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { agent, machine, routingRule, team, todo } from '../db/schema.js';
@@ -32,17 +37,43 @@ export function routeForStep(
   );
 }
 
-export function applyRoute(agentRow: AgentRow, route: RoutingRuleRow | null): AgentRow {
+export function withOverride(
+  rule: RequiredCapabilities | null,
+  override: RequiredCapabilities | undefined,
+): RequiredCapabilities | null {
+  if (override === undefined) return rule;
+  const union = (a: string[] | undefined, b: string[] | undefined) => {
+    const all = [...new Set([...(a ?? []), ...(b ?? [])])];
+    return all.length > 0 ? all : undefined;
+  };
+  const mcpServers = union(rule?.mcpServers, override.mcpServers);
+  const models = union(rule?.models, override.models);
+  const executor = rule?.executor ?? override.executor;
+  const merged: RequiredCapabilities = {
+    ...(mcpServers !== undefined ? { mcpServers } : {}),
+    ...(models !== undefined ? { models } : {}),
+    ...(executor !== undefined ? { executor } : {}),
+  };
+  return Object.keys(merged).length > 0 ? merged : rule;
+}
+
+export function applyRoute(
+  agentRow: AgentRow,
+  route: RoutingRuleRow | null,
+  override: RouteOverride | null = null,
+): AgentRow {
   if (route === null) return agentRow;
+  const session = route.use === 'session';
   return {
     ...agentRow,
     provider: route.provider,
     modelId: route.modelId,
     thinkingLevel: route.thinkingLevel,
     fallbackModels: route.fallbackModels,
-    machineId: route.machineId ?? agentRow.machineId,
-    requiredCapabilities:
-      route.use === 'session' ? route.requiredCapabilities : agentRow.requiredCapabilities,
+    machineId: (session ? override?.machineId : undefined) ?? route.machineId ?? agentRow.machineId,
+    requiredCapabilities: session
+      ? withOverride(route.requiredCapabilities, override?.requiredCapabilities)
+      : agentRow.requiredCapabilities,
   };
 }
 
