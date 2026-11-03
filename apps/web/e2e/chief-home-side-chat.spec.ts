@@ -132,6 +132,9 @@ test.describe('phone width', () => {
     await expect(page.getByTestId('chief-composer-input')).toBeFocused();
     await page.goto(`${HOME}&thread=home-c-working-a`);
     await expect(sideChat(page)).toBeVisible();
+    await page
+      .locator('.side-panel')
+      .evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
     await page.locator('body').click({ position: { x: 5, y: 400 } });
     await page.keyboard.type('h');
     await expect(page.getByTestId('chief-composer-input')).not.toBeFocused();
