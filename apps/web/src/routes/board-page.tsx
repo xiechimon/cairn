@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import {
   useApiMutations,
@@ -71,8 +71,11 @@ export function BoardPage() {
           color: liveProject?.color ?? fixture.projectAvatars?.[homeProjectId]?.color,
         };
   const projectChat = searchParams.get('chat') === '1';
+  const previousChiefView = useRef(chiefView);
   useEffect(() => {
-    if (homeProject === null || projectChat || chiefView !== 'drawer') return;
+    const opened = chiefView === 'drawer' && previousChiefView.current !== 'drawer';
+    previousChiefView.current = chiefView;
+    if (homeProject === null || projectChat || !opened) return;
     const params = new URLSearchParams(searchParams);
     params.set('chat', '1');
     navigate({ pathname: '/app', search: `?${params.toString()}` });
