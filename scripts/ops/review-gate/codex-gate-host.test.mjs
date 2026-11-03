@@ -391,7 +391,7 @@ test('no request before ten minutes, without a check run, or after one was made'
   }
 });
 
-test('sweep evaluates every open non-draft PR without a PR number', () => {
+test('sweep dispatches one per-PR evaluation for each open non-draft PR that has not passed', () => {
   const out = run(
     {
       pulls: [basePr, { ...basePr, number: 8, draft: true }],
@@ -401,9 +401,13 @@ test('sweep evaluates every open non-draft PR without a PR number', () => {
     'sweep',
   );
   assert.equal(out.result.status, 0, out.result.stderr);
-  assert.equal(out.checkWrites.length, 1);
-  assert.equal(out.body(out.checkWrites[0]).conclusion, 'success');
-  assert.equal(out.calls.filter((call) => /pulls\/8/.test(call.args.join(' '))).length, 0);
+  assert.equal(out.checkWrites.length, 0);
+  assert.equal(out.commentPosts.length, 0);
+  const dispatches = out.writes.filter((call) =>
+    /actions\/workflows\/review-gate\.yml\/dispatches/.test(call.args.join(' ')),
+  );
+  assert.equal(dispatches.length, 1);
+  assert.deepEqual(out.body(dispatches[0]), { ref: 'main', inputs: { pr: '7' } });
 });
 
 test('sweep skips a head whose gate check already passed', () => {
