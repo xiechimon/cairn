@@ -101,7 +101,7 @@ so the images remain reachable. Images belong outside code fences.
 
 ## Review
 
-Do not run a local `codex exec` or `claude -p` review before pushing. Codex cloud code review (`chatgpt-codex-connector[bot]`) reviews every push through the review gate. Fix confirmed findings and record skipped ones with reasons under Review.
+Do not run a local `codex exec` or `claude -p` review before pushing. Codex cloud code review (`chatgpt-codex-connector[bot]`) reviews every push through the review gate. Never write `@codex` in a PR body: Codex reads it as a task request, answers that the repository has no environment, and skips the automatic review. Fix confirmed findings and record skipped ones with reasons under Review.
 
 ## Mechanics
 
