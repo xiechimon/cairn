@@ -385,9 +385,12 @@ test.describe('the home sends to the project it is filtered to (#2531)', () => {
     await page.getByTestId('project-home-ask').press('Enter');
     await page.locator('[data-slot="sidebar-project-row"]', { hasText: 'radar-digest' }).click();
     await expect(page).toHaveURL(/project=proj-3/);
+    await expect(page.getByTestId('project-home-ask')).toHaveValue('');
+    await page.getByTestId('project-home-ask').fill('雷达摘要的草稿');
     release();
     await expect.poll(() => state.sent.length).toBe(1);
     await expect(page).toHaveURL(/project=proj-3/);
     await expect(page).not.toHaveURL(/chat=1/);
+    await expect(page.getByTestId('project-home-ask')).toHaveValue('雷达摘要的草稿');
   });
 });

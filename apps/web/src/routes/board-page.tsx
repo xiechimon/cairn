@@ -144,6 +144,7 @@ export function BoardPage() {
           />
         ) : homeProject !== null && !projectChat ? (
           <ProjectHome
+            key={homeProject.id}
             project={homeProject}
             todos={todos}
             schedules={schedules}
