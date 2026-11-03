@@ -183,7 +183,7 @@ export function SettingsPage() {
       <div
         aria-hidden
         data-testid="settings-backdrop"
-        className="fixed inset-0 z-(--z-backdrop-low) bg-black/25"
+        className="fixed inset-0 z-(--z-backdrop-low) bg-(--overlay-scrim)"
         onClick={close}
       />
       <div
