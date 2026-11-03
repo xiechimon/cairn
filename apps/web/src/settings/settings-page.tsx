@@ -32,7 +32,6 @@ import { SecretsPage } from '../resources/secrets-page.js';
 import { SkillsPage } from '../resources/skills-page.js';
 import { AccountPage } from '../routes/account-page.js';
 import { ApiKeysPage } from '../routes/api-keys-page.js';
-import { BoardPage } from '../routes/board-page.js';
 import { TeamPage } from '../routes/team-page.js';
 import { safeLocalStorage } from '../safe-storage.js';
 import { applyTheme, readStoredTheme, type Theme } from '../theme.js';
@@ -189,9 +188,7 @@ export function SettingsPage() {
   }));
   return (
     <>
-      <div inert className="contents">
-        <BoardPage />
-      </div>
+      <div aria-hidden className="h-full bg-(--surface-1)" />
       <div
         aria-hidden
         data-testid="settings-backdrop"
