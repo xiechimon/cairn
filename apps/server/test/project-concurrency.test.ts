@@ -3,7 +3,15 @@ import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, test } from 'vitest';
 import { agent, step } from '../src/db/schema.js';
 import { enqueueStep } from '../src/services/builds.js';
-import { bindAllAgents, bootServer, issueApiKey, req, type TestServer } from './helpers.js';
+import {
+  bindAgentHome,
+  bindAllAgents,
+  bootServer,
+  issueApiKey,
+  machineIdByName,
+  req,
+  type TestServer,
+} from './helpers.js';
 
 let s: TestServer;
 let token: string;
@@ -19,10 +27,12 @@ async function enroll(name: string): Promise<string> {
   return ((await res.json()) as { token: string }).token;
 }
 
-async function claim(): Promise<{ id: string; projectId: string | undefined } | null> {
+async function claim(
+  as: string = token,
+): Promise<{ id: string; projectId: string | undefined } | null> {
   const res = await s.app.request('/api/machine/tasks/claim', {
     method: 'POST',
-    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    headers: { authorization: `Bearer ${as}`, 'content-type': 'application/json' },
     body: '{}',
   });
   expect(res.status).toBe(200);
@@ -42,14 +52,14 @@ async function createProject(name: string, maxConcurrent?: number | null): Promi
   return id;
 }
 
-async function startBuild(projectId: string, title: string): Promise<string> {
+async function startBuild(projectId: string, title: string, agentId = 'cc-agent'): Promise<string> {
   const task = (await (
     await req(s.app, 'POST', `/api/projects/${projectId}/todos`, { title, spec: title })
   ).json()) as { id: string };
   const res = await req(s.app, 'POST', `/api/projects/${projectId}/builds`, {
     todoIds: [task.id],
     withPlan: false,
-    assignment: { plan: null, build: { agentId: 'cc-agent' } },
+    assignment: { plan: null, build: { agentId } },
   });
   expect(res.status).toBe(201);
   return ((await res.json()) as { builds: { id: string }[] }).builds[0]!.id;
@@ -110,11 +120,23 @@ describe('project concurrency (D74 P4)', () => {
     expect(s.db.select().from(step).where(eq(step.id, humanStep.id)).get()?.byPerson).toBe(true);
   });
 
-  test('parallel claims for a serial project admit only one', async () => {
+  test('two machines claiming different steps of a serial project at once admit only one', async () => {
+    const otherToken = await enroll('cc-builder-2');
+    s.db
+      .insert(agent)
+      .values({
+        id: 'cc-agent-2',
+        teamId: s.team.id,
+        displayName: 'Builder 2',
+        modelId: 'stub-model',
+      })
+      .run();
+    bindAgentHome(s, 'cc-agent', machineIdByName(s, 'cc-builder'));
+    bindAgentHome(s, 'cc-agent-2', machineIdByName(s, 'cc-builder-2'));
     const serial = await createProject('serial', 1);
-    await startBuild(serial, 'first');
-    await startBuild(serial, 'second');
-    const results = await Promise.all([claim(), claim()]);
+    await startBuild(serial, 'first', 'cc-agent');
+    await startBuild(serial, 'second', 'cc-agent-2');
+    const results = await Promise.all([claim(), claim(otherToken)]);
     expect(results.filter((r) => r !== null)).toHaveLength(1);
     expect(
       s.db
