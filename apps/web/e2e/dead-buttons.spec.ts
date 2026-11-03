@@ -66,19 +66,6 @@ test('schedules fixture face: topbar `新建` opens the dialog, freq tabs respon
   await expect(page.locator('.sched-card')).toContainText('每周运行');
 });
 
-test('doc pane title reads `变更` and re-selecting it keeps the pane (#306)', async ({
-  page,
-}) => {
-  await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=27');
-  const title = page.getByTestId('pane-title');
-  await expect(title).toHaveText('变更');
-  await expect(page.getByTestId('pane-view-changes')).toHaveAttribute('aria-pressed', 'true');
-  await title.click();
-  await page.getByRole('menuitem', { name: '变更' }).click();
-  await expect(page.getByTestId('doc-pane')).toBeVisible();
-  await expect(page.locator('.overlay-actions button', { hasText: '复用方案' })).toHaveCount(0);
-});
-
 test('machines rows carry only live controls, no dead inline buttons (#222 shipped + #1108 narrowed)', async ({
   page,
 }) => {
@@ -306,7 +293,7 @@ const REVIEW_DETAIL = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=27';
 
 test('more menu `完成` opens the accept dialog on the review surface (#318)', async ({ page }) => {
   await page.goto(REVIEW_DETAIL);
-  await page.locator('.detail-head-icon--more').click();
+  await page.getByTestId('side-chat').getByRole('button', { name: '更多操作…' }).click();
 
   const menu = page.getByRole('menu', { name: '更多' });
   await expect(menu).toBeVisible();
@@ -321,51 +308,24 @@ test('more menu `完成` opens the accept dialog on the review surface (#318)', 
 test('more menu `关闭` is phase-gated by the server funnel edges (#318)', async ({ page }) => {
 
   await page.goto(REVIEW_DETAIL);
-  await page.locator('.detail-head-icon--more').click();
+  await page.getByTestId('side-chat').getByRole('button', { name: '更多操作…' }).click();
   await expect(page.getByRole('menuitem', { name: '关闭' })).toBeDisabled();
 
   await page.goto('/app/todo/r8-12?scenario=54');
-  await page.locator('.detail-head-icon--more').click();
+  await page.getByTestId('side-chat').getByRole('button', { name: '更多操作…' }).click();
   const closeRow = page.getByRole('menuitem', { name: '关闭' });
   await expect(closeRow).toBeEnabled();
 
   await expect(page.getByRole('menuitem', { name: '完成' })).toBeDisabled();
   await closeRow.click();
-  await expect(page).toHaveURL('/app');
+  await expect(page.getByRole('menu')).toHaveCount(0);
 });
 
 test('todo-phase `开始` fires orchestration directly — no start dialog (#640)', async ({ page }) => {
 
   await page.goto('/app/todo/fresh-probe?scenario=23');
-  await page.locator('.detail-head-action').click();
+  await page.getByTestId('side-chat-action').getByRole('button').last().click();
   await expect(page.locator('.overlay-title')).toHaveCount(0);
-});
-
-test('failed rerun dialog is the slim single-exit face — no agent selector, no split switch, no plan/run branch (#640)', async ({
-  page,
-}) => {
-
-  await page.goto('/app/todo/r8-12?scenario=56');
-  await expect(page.locator('.overlay-title')).toHaveText('开始任务');
-  await expect(page.locator('.rerun-agent-row')).toHaveCount(0);
-  await expect(page.locator('.rerun-switch')).toHaveCount(0);
-  await expect(page.locator('.overlay-actions button', { hasText: '先做规划' })).toHaveCount(0);
-  await expect(page.locator('.overlay-actions button', { hasText: '立即执行' })).toHaveCount(0);
-
-  await expect(page.locator('.overlay-actions button', { hasText: '重跑' })).toBeVisible();
-  await expect(page.locator('.overlay-actions button', { hasText: '复用方案' })).toHaveCount(0);
-});
-
-test('reuse panel `查看方案` flips the doc pane to the plan face (#318)', async ({ page }) => {
-  await page.goto('/app/todo/r8-15?scenario=75');
-  await expect(page.locator('.overlay-title')).toHaveText('复用方案');
-
-  await expect(page.getByTestId('pane-title')).toHaveText('变更');
-
-  await page.locator('.overlay-actions button', { hasText: '查看方案' }).click();
-
-  await expect(page.locator('.overlay')).toBeHidden();
-  await expect(page.locator('.doc-empty')).toContainText('暂无方案');
 });
 
 test('project task rows and cards are real links that open the todo detail (#318, #2531)', async ({ page }) => {
@@ -376,10 +336,10 @@ test('project task rows and cards are real links that open the todo detail (#318
   await expect(row.locator('a.prj-task-link')).toHaveCount(1);
   await expect(row.locator('a.prj-task-link')).toHaveAttribute(
     'href',
-    /\/app\/todo\/[^?]+\?scenario=prj-tasks&tab=tasks/,
+    /^\/app\?scenario=prj-tasks&thread=[^&]+$/,
   );
   await row.click();
-  await expect(page).toHaveURL(/\/app\/todo\/[^?]+\?scenario=prj-tasks/);
+  await expect(page).toHaveURL(/\/app\?scenario=prj-tasks&thread=/);
 
   await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=prj-tasks&tab=tasks');
   await page.locator('.prj-tasks-view-btn').nth(1).click();
@@ -387,7 +347,7 @@ test('project task rows and cards are real links that open the todo detail (#318
   await expect(card).toBeVisible();
   await expect(card.locator('a.prj-task-link')).toHaveCount(1);
   await card.click();
-  await expect(page).toHaveURL(/\/app\/todo\/[^?]+\?scenario=prj-tasks/);
+  await expect(page).toHaveURL(/\/app\?scenario=prj-tasks&thread=/);
 });
 
 test('detail transcript action rows carry no restore glyph (#884)', async ({ page }) => {

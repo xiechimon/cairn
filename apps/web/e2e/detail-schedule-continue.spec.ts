@@ -154,7 +154,7 @@ test('a fixture scheduled run shows its wake marker, folded turn and completion'
     return route.fulfill({ status: 500, json: { error: 'e2e stub: not the surface under test' } });
   });
   await page.goto(`/app/todo/${task.id}`);
-  await expect(page.getByTestId('detail-head').getByTestId('phase-chip')).toHaveText('已完成');
+  await expect(page.getByTestId('side-chat-status')).toContainText('已完成');
   const wake = page.getByTestId('schedule-wake-marker');
   const turn = page.getByTestId('scheduled-turn');
   const completed = page.getByTestId('automation-completed');

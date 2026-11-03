@@ -233,7 +233,8 @@ async function stubDetailSurface(page: Page) {
   await page.route(`**/api/builds/${BUILD_ID}/changes`, (route) =>
     route.fulfill({ json: { files: [] } }),
   );
-  await page.route(`**/api/conversations/${BUILD_ID}/messages`, (route, request) => {
+  await page.route(
+    new RegExp(`/api/(conversations/${BUILD_ID}|todos/[^/?]+)/messages(\\?|$)`), (route, request) => {
     if (request.method() !== 'GET') return route.fallback();
     return route.fulfill({ json: EMPTY_CONVERSATION });
   });
@@ -429,7 +430,8 @@ test('detail face: Enter during the upload does not send; after it lands, Enter 
   const deferred = await deferUploads(page);
   let steers = 0;
   let lastContent = '';
-  await page.route(`**/api/conversations/${BUILD_ID}/messages`, (route, request) => {
+  await page.route(
+    new RegExp(`/api/(conversations/${BUILD_ID}|todos/[^/?]+)/messages(\\?|$)`), (route, request) => {
     if (request.method() !== 'POST') return route.fallback();
     steers += 1;
     lastContent = (JSON.parse(request.postData() ?? '{}') as { content?: string }).content ?? '';

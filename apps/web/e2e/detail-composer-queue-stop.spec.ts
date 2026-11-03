@@ -116,6 +116,16 @@ async function runningTask(page: Page) {
       return route.fulfill({ json: { delegated: true } });
     }
     if (path === `/api/builds/${build.id}/steps`) return route.fulfill({ json: steps });
+    if (path === `/api/todos/${task.id}/messages` && request.method() === 'POST') {
+      const input = request.postDataJSON() as { content: string };
+      sent.push(input);
+      const message = { id: `message-${sent.length}`, role: 'user', content: input.content, createdAt: Date.now() };
+      messages.push(message);
+      steerPending.push(input.content);
+      task.phase = 'building';
+      task.v += 1;
+      return route.fulfill({ status: 201, json: { todoId: task.id, conversationId: build.id, delivered: 'steer' } });
+    }
     if (path === `/api/conversations/${build.id}/messages`) {
       if (request.method() === 'POST') {
         const input = request.postDataJSON() as { content: string; mode?: string; queuedMessageId?: string; deliverAfterStop?: boolean; cancelQueued?: boolean };
@@ -223,7 +233,6 @@ test('Stop preserves changes without a dialog and cancelled tools show cancelled
   await expect(page.getByTestId('work-cancelled')).toBeVisible();
   await expect(page.getByTestId('work-cancelled')).toHaveText('已取消');
   await expect(page.getByTestId('work-spinner')).toHaveCount(0);
-  await expect(page.getByTestId('doc-pane').getByText('kept.ts', { exact: true })).toBeVisible();
 });
 
 test('Escape stops and a second Escape queues the draft after cancellation', async ({ page }) => {
@@ -249,7 +258,7 @@ test('Escape stops and a second Escape queues the draft after cancellation', asy
 
 test('discard is available during a running step only and requires confirmation', async ({ page }) => {
   const task = await runningTask(page);
-  await page.getByTestId('detail-head').getByRole('button', { name: '更多' }).click();
+  await page.getByTestId('side-chat').getByRole('button', { name: '更多操作…' }).click();
   await page.getByTestId('discard-changes').click();
   await expect(page.getByRole('dialog')).toBeVisible();
   expect(task.stops).toEqual([]);
@@ -263,8 +272,7 @@ test('kept changes after Stop do not expose discard', async ({ page }) => {
   await expect.poll(() => task.stops).toEqual([{ discard: false }]);
   task.finish('stopped');
   await page.reload();
-  await expect(page.getByTestId('doc-pane').getByText('kept.ts', { exact: true })).toBeVisible();
-  await page.getByTestId('detail-head').getByRole('button', { name: '更多' }).click();
+  await page.getByTestId('side-chat').getByRole('button', { name: '更多操作…' }).click();
   await expect(page.getByTestId('discard-changes')).toHaveCount(0);
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
@@ -321,7 +329,7 @@ test('queued capsules stay usable when the phase has no composer', async ({ page
   await expect(page.getByTestId('composer-card').getByTestId('queued-message')).toBeVisible();
   task.setPhase('closed');
   await page.reload();
-  await expect(page.getByTestId('composer-card')).toHaveCount(0);
+  await expect(page.getByTestId('composer-card').getByRole('textbox')).toHaveCount(0);
   const capsule = page.getByTestId('queued-capsules-standalone').getByTestId('queued-message');
   await expect(capsule).toContainText('Still queued after close');
   await capsule.getByRole('button', { name: '移除' }).click();

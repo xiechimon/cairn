@@ -32,7 +32,6 @@ export const EN: Record<string, string> = {
     '{name}: Claude subscription token expires in {days## day|# days}. Run `claude setup-token` and add a new connection.',
   Archived: 'Archived',
   Agent: 'Agent',
-  'Unarchive to continue': 'Unarchive to continue',
 
   '思考 {n} 次': 'Thought {n#once|# times}',
   '读了 {n} 个文件': 'Read {n#1 file|# files}',
@@ -196,9 +195,6 @@ export const EN: Record<string, string> = {
   '请求修改…': 'Request changes…',
   // #701 审核关口人肉打回（更多菜单入口 + reject 弹层）
   请求修改: 'Request changes',
-  '需要修改什么？打回后任务回到规划中，按反馈重新出方案。':
-    'What needs to change? The task returns to planning and gets a fresh plan from your feedback.',
-  '打回请求未送出，请重试。': 'The rejection was not sent. Try again.',
 
   // —— relative time (rel-time.ts; compact en forms avoid plural logic) ——
   刚刚: 'just now',
@@ -216,8 +212,6 @@ export const EN: Record<string, string> = {
   '上传中 {percent}%': 'Uploading {percent}%',
   '此任务为只读，请在实时工作区中打开后继续。':
     'This task is read only. Open it in the live workspace to continue.',
-  审核中: 'Reviewing',
-  'AI 审核进行中…': 'AI review in progress…',
   提及: 'Mention',
   停止: 'Stop',
   丢弃修改: 'Discard changes',
@@ -256,8 +250,6 @@ export const EN: Record<string, string> = {
   '正在停止…': 'Stopping…',
   已取消: 'Canceled',
   发送: 'Send',
-  '当前没有运行中的会话，消息未送出': 'No active run — the message was not delivered',
-  '任务状态已变化，消息未送出': 'The task state changed — the message was not delivered',
   暂无方案: 'No plan yet',
   暂无可显示的变更: 'No changes to show',
   '{n} 个文件改动': 'Files changed: {n}',
@@ -274,7 +266,6 @@ export const EN: Record<string, string> = {
   收起: 'Collapse',
   // #933: the collapsed tool group's identity label (transcript action row).
   尚无描述: 'No description yet',
-  '{y}年{mo}月{d}日 {hh}:{mm} 创建': 'Created {monthShort} {d}, {y} {hh}:{mm}',
 
   // —— user-menu popover (r7 §3.5; 新功能/快捷键 行随 #163 隐去，键同删） ——
   账号: 'Account',
@@ -291,7 +282,6 @@ export const EN: Record<string, string> = {
 
   // —— chip popover / plan dropdown (r7 19/20/29) ——
   未指派: 'Unassigned',
-  任务状态: 'Task status',
   确认方案: 'Confirm plan',
   构建中: 'Building',
   移回待开始: 'Move back to To start',
@@ -307,20 +297,8 @@ export const EN: Record<string, string> = {
   '这次运行失败了，可以重跑，或移回待开始。':
     'This run failed. Rerun it, or move it back to To start.',
   '任务已取消。': 'The task was cancelled.',
-  '更换 Agent 会重新开始当前这一步。': 'Switching agents restarts this step.',
-  '后续步骤会改由所选 Agent 执行。': 'Later steps will run on the agent you pick.',
-  '开始前更换 Agent，不会丢失任何内容。': 'Switching before you start loses nothing.',
   '执行 Agent': 'Executing agent',
   '分配给…': 'Assign to…',
-  编辑描述: 'Edit description',
-  '描述未能保存，内容仍保留在这里。':
-    'The description could not be saved. Your text is still here.',
-  '补充 Agent 需要知道的内容：设置放在哪里、做到什么程度算完成…':
-    'Add what the agent should know: where the setting lives, what done looks like…',
-  '{agent} 会先写方案，你确认之前不会改动任何东西。':
-    '{agent} writes a plan first; nothing changes until you confirm it.',
-  'Agent 会先写方案，你确认之前不会改动任何东西。':
-    'The agent writes a plan first; nothing changes until you confirm it.',
   面板视图: 'Pane view',
 
   // —— ⌘K search panel (r7 05/05b, r2 §8.4) ——
@@ -339,7 +317,6 @@ export const EN: Record<string, string> = {
   移动: 'Move',
   移除上下文: 'Drop context',
   '更多操作…': 'More actions…',
-  '编辑分配…': 'Edit assignment…',
   前往: 'Go to',
   团队: 'Team',
   '没有与“{q}”匹配的结果': 'No results matching “{q}”',
@@ -523,11 +500,7 @@ export const EN: Record<string, string> = {
   // #476（#473 决策候选 A + C 尾注）右栏方案空态任务元信息块：行 label
   // （机器复用侧栏键）+ 尾注引导句。#1259 机器行等待标注（归属机离线，
   // 步只等它上线不自动改派）。
-  '分支 / PR': 'Branch / PR',
   模型: 'Model',
-  创建时间: 'Created',
-  方案产出后显示于此: 'The plan will appear here once produced',
-  '（等待机器上线）': '(waiting for the machine to come online)',
   // #1259 创建 agent 三级级联的归属机槽（+ 无机器告警行）。
   归属机: 'Home machine',
   ' · 归属机 {machine}': ' · on {machine}',
@@ -666,9 +639,6 @@ export const EN: Record<string, string> = {
   园丁: 'Gardener',
   自治合并: 'Auto-merge',
   排期扫票: 'Schedule sweep',
-  合并闸: 'Merge gate',
-  可以合并: 'Ready to merge',
-  还不能合并: 'Not ready to merge',
   还没判过: 'Not checked yet',
   最近一次放行: 'Last check: allowed',
   '最近一次被拦：': 'Last check blocked: ',
@@ -749,24 +719,9 @@ export const EN: Record<string, string> = {
   '执行机器：{n}': 'Machine: {n}',
   // M7 #312 AI 审核模态文案（r8 §3.1 实测）：Agent 选择 + 关注点 textarea +
   // 提交按钮。dialog 选 Agent 走 dlg-form-* family 共用层,文案独立。
-  '选择审核 Agent': 'Choose review Agent',
-  '希望 Agent 审核时重点关注什么？（可选）':
-    'What do you want the Agent to focus on during review? (optional)',
-  开始审核: 'Start review',
   // #1250（ADR 0018 层 1）review fan-out 三视角（ReviewDialog 勾选行）。
-  三视角并行审: 'Run the three review perspectives in parallel',
-  'CodeReviewer · SecurityAuditor · TestEngineer 各审一轮，三份结论并行落会话':
-    'CodeReviewer · SecurityAuditor · TestEngineer each review once; three verdicts land in the conversation in parallel',
-  开始三视角审核: 'Start three-perspective review',
   // #509 审核选人独立性提示：默认值优先跨厂商；无跨厂商可选时出声。两档措辞
   // ——确证同源 vs 无法判定（未配置厂商 = 没有比对基准），都不静默。
-  选择谁来审这份方案: 'Pick who reviews this plan',
-  其他厂商: 'Other vendor',
-  与方案作者同厂商: 'same vendor as the plan author',
-  '审核人与产出该方案的 Agent 来自同一模型厂商，不构成独立复核。':
-    'The reviewer and the Agent that produced this plan use the same model vendor; this is not an independent review.',
-  '产出该方案的 Agent 或所选审核人未配置模型厂商，缺少比对基准，不构成独立复核。':
-    'Neither the producing Agent nor the selected reviewer has a model vendor configured, so there is nothing to compare against; this is not an independent review.',
   // M7 #330 AI 审核消息渲染（r8 §3.1 真 findings 上线）：结论先行 + 编号 findings
   // + 严重度后缀（(blocking)/(suggestion)/(info)）+ 方案引用块 + 修复建议。
   // 服务端消息 kind = REVIEW_VERDICT_KIND（shared/message.ts 双端单源），
@@ -884,10 +839,6 @@ export const EN: Record<string, string> = {
   'issue 状态': 'Issue state',
   总管用的模型额度已用完: "The chief's model is out of quota",
   总管用的模型暂时过载: "The chief's model is overloaded",
-  '例如：测试在远端机器上失败，请先修复':
-    'For example: tests fail on the remote machine, fix them first',
-  '重点关注什么？例如：并发、错误处理、测试覆盖（可选）':
-    'Focus on… e.g. concurrency, error handling, test coverage (optional)',
   将改动合并到默认分支: 'Merge the changes into the default branch',
   // #1313：已上报且文件集为空时完成弹层不提供合并勾选。
   '本轮没有文件改动，完成不会合并分支。':
@@ -914,31 +865,15 @@ export const EN: Record<string, string> = {
     'A failed todo can only be completed through the merge; merging cannot be skipped.',
   输入: 'Input',
   输出: 'Output',
-  缓存读取: 'Cache read',
-  缓存写入: 'Cache write',
-  缓存命中率: 'Cache hit rate',
   花费: 'Cost',
-  '输入（含缓存写入）': 'Input (incl. cache write)',
   '无价格来源：模型未声明费率，或该运行未上报费用':
     'No price source: the model declares no rates, or the run reported no cost',
   当前: 'Current',
   重跑: 'Rerun',
   构建分支: 'Build branch',
-  目标提交: 'Target commit',
-  目标机器: 'Target machine',
-  同步目录: 'Sync directory',
-  强制同步: 'Force sync',
-  '丢弃代码修改并删除非忽略的未跟踪文件；保留忽略内容。仅本次生效。':
-    'Discards code changes and removes non-ignored untracked files; ignored content is kept. This sync only.',
   同步: 'Sync',
-  未创建: 'Not created',
   // #319 分支对话框「同步到机器」结果卡四态 + 机器选择占位
   选择机器: 'Choose a machine',
-  暂无在线机器: 'No online machines',
-  等待中: 'Pending',
-  '正在同步…': 'Syncing…',
-  已同步: 'Synced',
-  同步失败: 'Sync failed',
   // run-history rows: fixture-carried chrome (exact-value keys)
   '第 1 次运行': 'Run 1',
   '第 2 次运行': 'Run 2',
@@ -961,9 +896,6 @@ export const EN: Record<string, string> = {
   上一版本: 'Previous version',
   '与其他版本对比…': 'Compare with other versions…',
   '回到与 base 对比': 'Back to comparison with base',
-  复用方案: 'Reuse plan',
-  选择接下来如何使用这个方案: 'Choose how to use this plan next',
-  查看方案: 'View plan',
   // #1258 失败行原始错误弹窗面
   查看原始错误: 'View raw error',
   原始错误: 'Raw error',
@@ -975,11 +907,9 @@ export const EN: Record<string, string> = {
   '请求被限流，请稍后重试。': 'Rate limited — retry later.',
   '运行失败，请查看原始错误排查原因后重试。':
     'Run failed — check the raw error to diagnose the cause, then retry.',
-  直接执行: 'Run directly',
   重试: 'Retry',
   失败: 'Failed',
   默认: 'Default',
-  开始任务: 'Start task',
   // #170 create-agent dialog family
   '创建 agent': 'Create agent',
   '输入 Agent 名称': 'Enter an agent name',
@@ -1291,14 +1221,12 @@ export const EN: Record<string, string> = {
   // —— #640 开始任务单出口（直发总管编排回合；r14 §5.7 前置裁决落地）——
   来源: 'Source',
   总管编排会话: 'Chief orchestration session',
-  '这张任务将交给总管重新编排。': 'The chief will re-orchestrate this task.',
   已交给总管编排: 'Handed to the chief',
   '总管将直接规划，并按活的类型派发执行。':
     'The chief plans first, then dispatches each piece to the right agent.',
   查看会话: 'View session',
   未能开始编排: 'Could not start orchestration',
   // —— #1216 在飞编排态（开始/重跑的可见反馈）与详情缺失三态 ——
-  编排中: 'Orchestrating',
   '等 {machine} 上线': 'waiting for {machine} to come online',
   等机器上线: 'waiting for a machine to come online',
   '缺 {missing}': 'missing {missing}',
@@ -1312,6 +1240,7 @@ export const EN: Record<string, string> = {
   '开始后才能回复 #{seq}': 'Start #{seq} to reply',
   '已归档，取消归档后才能继续': 'Archived. Unarchive to continue',
   调整面板宽度: 'Resize panel',
+  '已关闭，不能再回复': 'Closed. It takes no more replies',
   '计划已就绪。要改计划，直接在下面回复。': 'The plan is ready. To change it, reply below.',
   批准计划: 'Approve plan',
   '已就绪，等你审阅。要改，直接在下面回复。': 'Ready for your review. To change it, reply below.',
@@ -1321,16 +1250,12 @@ export const EN: Record<string, string> = {
   '已归档。': 'Archived.',
   取消归档: 'Unarchive',
   '批准失败，请重试。': 'Could not approve. Try again.',
-  '已关闭，不能再回复': 'Closed. It takes no more replies',
-  回首页: 'Back to home',
   // —— #638 全站静默 mutation 失败面接线（toast 标题句；server 原因进
   // description 透传不译，#631 同律。已有面内 canon 位的面——merge 拒绝行 /
   // issue 导入内联 / fs-pick 提示行 / OAuth 内联 / 技能弹窗内联——不在此列）——
   '创建项目失败，请重试。': 'Could not create the project. Try again.',
-  '重置任务失败，请重试。': 'Could not reset the task. Try again.',
   '关闭任务失败，请重试。': 'Could not close the task. Try again.',
   '删除任务失败，请重试。': 'Could not delete the task. Try again.',
-  '开始运行失败，请重试。': 'Could not start the build. Try again.',
   '重试失败，请稍后再试。': 'Retry failed. Try again later.',
   '新建定时失败，请重试。': 'Could not create the schedule. Try again.',
   '删除定时失败，请重试。': 'Could not delete the schedule. Try again.',
@@ -1342,7 +1267,6 @@ export const EN: Record<string, string> = {
   '创建 Agent 失败，请重试。': 'Could not create the agent. Try again.',
   '删除 Agent 失败，请重试。': 'Could not delete the agent. Try again.',
   '删除记忆失败，请重试。': 'Could not delete the memory. Try again.',
-  '同步失败，请重试。': 'Sync failed. Try again.',
   总管提问: 'Chief question',
   已回答: 'Answered',
   取消提问: 'Dismiss question',

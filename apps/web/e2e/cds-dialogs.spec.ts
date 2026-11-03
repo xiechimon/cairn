@@ -37,7 +37,8 @@ test('CDS search panel: 18px edge-radius + de-boxed input', async ({ page }) => 
 });
 
 test('Paper user-menu: 12px + shadow-popover, no solid border', async ({ page }) => {
-  await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=17');
+  await page.goto('/app?scenario=01');
+  await page.getByRole('button', { name: 'Xmon Dai' }).click();
   await expect(page.locator('.user-menu')).toBeVisible();
 
   const m = await page.locator('.user-menu').evaluate((el) => {

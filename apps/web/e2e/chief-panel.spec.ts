@@ -137,35 +137,6 @@ test.describe('chief panel floating form (ADR 0013)', () => {
     });
   }
 
-  test('detail: the right pane coexists with the floating window (D7 reversed)', async ({
-    page,
-  }) => {
-    await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=detail-unread');
-    await expect(page.locator('.detail-right')).toBeVisible();
-    const restingCenter = await page.locator('.detail-center').boundingBox();
-
-    await openChiefWindow(page);
-    await settled(page);
-
-    await expect(page.locator('.detail-right')).toBeVisible();
-    const box = await drawer(page).boundingBox();
-    expect(box!.x).toBeCloseTo(WIN_BOX.x, 0);
-    expect(box!.y).toBeCloseTo(WIN_BOX.y, 0);
-    expect(box!.width).toBeCloseTo(WIN_BOX.width, 0);
-    expect(box!.height).toBeCloseTo(WIN_BOX.height, 0);
-
-    // the center column stays fluid and unchanged by the overlay
-    const center = await page.locator('.detail-center').boundingBox();
-    expect(center!.width).toBeCloseTo(restingCenter!.width, 0);
-    expect(center!.width).toBeCloseTo(SHEET_W - 488, 0);
-
-    await minimize(page).click();
-    await expect(drawer(page)).toBeHidden();
-    await expect(page.locator('.detail-right')).toBeVisible();
-    const restored = await page.locator('.detail-center').boundingBox();
-    expect(restored!.width).toBe(SHEET_W - 488);
-  });
-
   test('hero examples: the four canon prompt cards, inert on the fixture face', async ({
     page,
   }) => {

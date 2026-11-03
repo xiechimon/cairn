@@ -125,7 +125,8 @@ async function openDetail(page: Page) {
     route.fulfill({ json: { files: [] } }),
   );
   const sent: string[] = [];
-  await page.route(`**/api/conversations/${BUILD_ID}/messages`, (route, request) => {
+  await page.route(
+    new RegExp(`/api/(conversations/${BUILD_ID}|todos/[^/?]+)/messages(\\?|$)`), (route, request) => {
     if (request.method() !== 'POST') return route.fulfill({ json: EMPTY_CONVERSATION });
     sent.push(request.postData() ?? '');
     return route.fulfill({ status: 201, json: { message: { id: 'msg-1' } } });

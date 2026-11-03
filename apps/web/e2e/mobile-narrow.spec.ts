@@ -2,7 +2,6 @@ import { expect, test, type Locator } from '@playwright/test';
 import { openChiefWindow } from './helpers.js';
 
 const DETAIL_REVIEW = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=27';
-const REVIEW_DIALOG = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=review-dialog-fanout';
 
 for (const width of [360, 390]) {
   test.describe(`窄屏 ${width}px`, () => {
@@ -51,9 +50,8 @@ for (const width of [360, 390]) {
     test('M3 detail: compact header controls and 44px composer controls', async ({ page }) => {
       await page.goto(DETAIL_REVIEW);
       const headControls: Locator[] = [
-        page.getByRole('link', { name: '返回' }),
-        page.getByRole('button', { name: '更多' }),
-        page.locator('.detail-head-action'),
+        page.getByTestId('side-chat').getByRole('button', { name: '更多操作…' }),
+        page.getByTestId('side-chat').getByRole('button', { name: '关闭' }),
       ];
       for (const control of headControls) {
         const box = (await control.boundingBox()) as { height: number };
@@ -94,17 +92,6 @@ for (const width of [360, 390]) {
       await expect(panel).toBeHidden();
     });
 
-    test('M6 弹层：AI 审核对话框在视口内可关', async ({ page }) => {
-      await page.goto(REVIEW_DIALOG);
-      const dialog = page.getByRole('dialog', { name: 'AI 审核' });
-      await expect(dialog).toBeVisible();
-      const box = (await dialog.boundingBox()) as { x: number; width: number };
-      expect(box.x).toBeGreaterThanOrEqual(0);
-      expect(box.x + box.width).toBeLessThanOrEqual(width);
-      await page.getByRole('button', { name: '取消' }).click();
-      await expect(dialog).toBeHidden();
-    });
-
     test('M8 paper pages keep a side gutter and visible names', async ({ page }) => {
       const pages = [
         '/app/account?scenario=13',
@@ -141,7 +128,7 @@ for (const width of [360, 390]) {
 
     test('M7 审批弹层：合并对话框在视口内可关', async ({ page }) => {
       await page.goto(DETAIL_REVIEW);
-      await page.locator('.detail-head-action').click();
+      await page.getByTestId('side-chat-action').getByRole('button').last().click();
       const dialog = page.getByRole('dialog', { name: '完成任务' });
       await expect(dialog).toBeVisible();
       const box = (await dialog.boundingBox()) as {

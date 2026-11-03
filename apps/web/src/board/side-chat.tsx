@@ -1,9 +1,15 @@
 import { X } from 'lucide-react';
 import { type ReactNode, useEffect, useRef } from 'react';
+import { useApiMutations } from '../api/hooks.js';
+import { useLiveData } from '../api/provider.js';
+import { useChiefRoot } from '../chief/chief-root.js';
+import { QueuedCapsules } from '../components/queued-capsules.js';
 import { SidePanel } from '../components/side-panel.js';
 import { ToneGlyph } from '../components/stone/tone-glyph.js';
 import { Button } from '../components/ui/button.js';
+import { toastError } from '../components/ui/toaster.js';
 import { Composer } from '../detail/composer.js';
+import { SourceIssueLine } from '../detail/source-issue.js';
 import { TranscriptColumn } from '../detail/transcript-column.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
@@ -11,6 +17,7 @@ import { relativeTime } from './rel-time.js';
 import { type ThreadActions, useThreadActions } from './thread-actions.js';
 import { threadCopy, threadTone } from './thread-copy.js';
 import { type ThreadChat, useThreadChat } from './use-thread-chat.js';
+import { useThreadMentions } from './use-thread-mentions.js';
 
 const OVERLAY_QUERY = '(max-width: 1100px)';
 
@@ -33,7 +40,7 @@ function StatusLine({
       className="m-0 flex min-w-0 items-center gap-1.5 pl-5 text-meta text-content-tertiary"
     >
       <span className="flex-none font-medium text-content-secondary">
-        {t(threadCopy(todo).state)}
+        {todo.quotaWait != null ? t('等额度') : t(threadCopy(todo).state)}
       </span>
       <span aria-hidden="true">·</span>
       <span className="min-w-0 truncate">{meta.join(' · ')}</span>
@@ -65,6 +72,25 @@ function Unavailable({ chat }: { chat: ThreadChat }) {
   );
 }
 
+function SourceLine({ wire }: { wire: NonNullable<ThreadChat['wire']> }) {
+  const { t } = useI18n();
+  const { teamId } = useLiveData();
+  const mutations = useApiMutations(teamId);
+  const { openChiefThread } = useChiefRoot();
+  return (
+    <SourceIssueLine
+      todo={wire}
+      onRetry={() =>
+        mutations.retryGithubIssue.mutate(wire.id, {
+          onError: (error) => toastError(t('重试失败，请稍后再试。'), error),
+        })
+      }
+      retryPending={mutations.retryGithubIssue.isPending}
+      onOpenThread={openChiefThread}
+    />
+  );
+}
+
 function ThreadBody({
   chat,
   todo,
@@ -75,9 +101,11 @@ function ThreadBody({
   actions: ThreadActions;
 }) {
   const { t } = useI18n();
+  const mentions = useThreadMentions(todo.projectId);
   const archived = todo.archivedAt != null;
   return (
     <>
+      {chat.wire?.sourceKind != null && <SourceLine wire={chat.wire} />}
       <TranscriptColumn
         transcript={chat.transcript}
         liveStep={null}
@@ -94,6 +122,18 @@ function ThreadBody({
         </p>
       )}
       {actions.card}
+      {chat.send === undefined && (chat.queuedMessages?.length ?? 0) > 0 && (
+        <div
+          className="mx-auto mb-2 w-[calc(100%-2rem)] max-w-(--chat-max-w) flex-none"
+          data-testid="queued-capsules-standalone"
+        >
+          <QueuedCapsules
+            messages={chat.queuedMessages ?? []}
+            onSendNow={chat.sendQueuedNow}
+            onRemove={chat.removeQueued}
+          />
+        </div>
+      )}
       <Composer
         placeholder={
           archived
@@ -108,12 +148,14 @@ function ThreadBody({
         streaming={chat.running}
         workingFor={chat.workingFor}
         editable={chat.send !== undefined}
-        readOnly={chat.send === undefined}
+        readOnly={chat.locked}
         {...(chat.send !== undefined ? { onSend: chat.send } : {})}
         {...(chat.queue !== undefined ? { onQueue: chat.queue } : {})}
         {...(chat.stopAndSend !== undefined ? { onStopAndSend: chat.stopAndSend } : {})}
         {...(chat.stop !== undefined ? { onStop: chat.stop } : {})}
         {...(chat.attach !== undefined ? { onAttachment: chat.attach } : {})}
+        mentionGroups={mentions.groups}
+        mentionFiles={mentions.files}
         queuedMessages={chat.queuedMessages}
         onSendQueuedNow={chat.sendQueuedNow}
         onRemoveQueued={chat.removeQueued}
@@ -241,7 +283,7 @@ function Head({
           size="icon-sm"
           aria-label={t('关闭')}
           onClick={onClose}
-          className="text-content-tertiary hover:text-foreground"
+          className="text-content-tertiary hover:text-foreground max-[640px]:size-8"
         >
           <X aria-hidden="true" strokeWidth={1.75} className="size-4" />
         </Button>

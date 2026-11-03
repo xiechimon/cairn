@@ -40,6 +40,11 @@ export function threadHref(id: string, homeSearch: string): string {
   return `/app?${params.toString()}`;
 }
 
+export function threadHrefFrom(id: string, search: string): string {
+  const scenario = new URLSearchParams(search).get('scenario');
+  return threadHref(id, scenario === null ? '' : new URLSearchParams({ scenario }).toString());
+}
+
 export interface ThreadCopy {
   state: string;
   reason: string;

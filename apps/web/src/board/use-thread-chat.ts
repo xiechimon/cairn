@@ -1,4 +1,4 @@
-import { STOP_MESSAGE } from '@cairn/shared';
+import { STOP_MESSAGE, type TodoRecord as WireTodo } from '@cairn/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useSearchParams } from 'react-router';
@@ -40,7 +40,9 @@ export interface ThreadChat {
   buildLegDone: boolean;
   infoOutput: boolean;
   buildAgentId: string | null;
+  wire: WireTodo | null;
   started: boolean;
+  locked: boolean;
   running: boolean;
   workingFor: { startedAt?: number; seconds?: number } | undefined;
   machineName: string | null;
@@ -142,7 +144,8 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     [machinesQ.data, steps],
   );
   const todo = live ? (wire != null ? toDisplayTodo(wire) : (listed ?? null)) : (listed ?? null);
-  const fixtureTranscript = resolveScenario(searchParams).details?.[todoId]?.transcript;
+  const fixture = resolveScenario(searchParams);
+  const fixtureTranscript = (fixture.details?.[todoId] ?? fixture.detail)?.transcript;
 
   const transcript = useMemo<TranscriptItem[]>(() => {
     if (!live) return fixtureTranscript ?? [];
@@ -255,8 +258,10 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     buildId,
     infoOutput: wire?.output === 'info',
     buildAgentId: wire?.assignment?.build?.agentId ?? null,
+    wire,
     buildLegDone: steps.some((step) => step.kind === 'build' && step.status === 'done'),
     started,
+    locked: !open,
     running,
     workingFor:
       running && streamingItem?.kind === 'streaming'
@@ -282,7 +287,7 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
       : {}),
     ...(stop !== undefined ? { stop } : {}),
     ...(writable ? { attach: (files: File[]) => uploadMessageAttachments(files, t) } : {}),
-    ...(writable && buildId != null
+    ...(live && buildId != null
       ? {
           sendQueuedNow: (queuedMessageId: string, content: string) =>
             mutations.sendSteer.mutateAsync({ conversationId: buildId, content, queuedMessageId }),

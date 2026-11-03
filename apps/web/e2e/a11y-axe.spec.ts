@@ -32,7 +32,7 @@ interface AuditPage {
 
 const row = (page: Page) => page.getByTestId('resource-row').first();
 const card = (page: Page) => page.getByTestId('page-col').locator('.settings-card').first();
-const phaseChip = (page: Page) => page.getByTestId('phase-chip');
+const sideChat = (page: Page) => page.getByTestId('side-chat');
 const searchDialog = (page: Page) => page.getByRole('dialog', { name: '搜索' });
 
 const PAGES: AuditPage[] = [
@@ -67,12 +67,20 @@ const PAGES: AuditPage[] = [
     },
     ready: (p) => p.getByTestId('home-c').getByTestId('chief-composer-input'),
   },
-  { name: 'detail fresh', url: '/app/todo/fresh-probe?scenario=23', ready: phaseChip },
-  { name: 'detail confirm', url: '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=17b', ready: phaseChip },
-  { name: 'detail review', url: '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=27', ready: phaseChip },
+  { name: 'side chat fresh', url: '/app?scenario=23&thread=fresh-probe', ready: sideChat },
   {
-    name: 'detail tool calls',
-    url: '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=28',
+    name: 'side chat confirm',
+    url: '/app?scenario=17b&thread=7ve0iOkQ-JBpSL98zSiGc',
+    ready: sideChat,
+  },
+  {
+    name: 'side chat review',
+    url: '/app?scenario=27&thread=7ve0iOkQ-JBpSL98zSiGc',
+    ready: sideChat,
+  },
+  {
+    name: 'side chat tool calls',
+    url: '/app?scenario=28&thread=7ve0iOkQ-JBpSL98zSiGc',
     ready: (p) => p.getByTestId('work-call').first(),
   },
   { name: 'chief window', url: '/app/schedules?scenario=100', ready: (p) => p.locator('.chief-drawer') },

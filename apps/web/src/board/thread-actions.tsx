@@ -76,6 +76,7 @@ export function useThreadActions({
   );
 
   const guard = (run: () => void) => () => {
+    setMenuOpen(false);
     if (live) run();
     else blockDemoWrite();
   };
@@ -214,7 +215,7 @@ export function useThreadActions({
         aria-haspopup="menu"
         aria-expanded={menuOpen}
         onClick={() => setMenuOpen(!menuOpen)}
-        className="text-content-tertiary hover:text-foreground"
+        className="text-content-tertiary hover:text-foreground max-[640px]:size-8"
       >
         <Ellipsis aria-hidden="true" />
       </Button>
