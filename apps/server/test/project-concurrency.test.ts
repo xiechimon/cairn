@@ -109,4 +109,19 @@ describe('project concurrency (D74 P4)', () => {
     expect(await claim()).toBeNull();
     expect(s.db.select().from(step).where(eq(step.id, humanStep.id)).get()?.byPerson).toBe(true);
   });
+
+  test('parallel claims for a serial project admit only one', async () => {
+    const serial = await createProject('serial', 1);
+    await startBuild(serial, 'first');
+    await startBuild(serial, 'second');
+    const results = await Promise.all([claim(), claim()]);
+    expect(results.filter((r) => r !== null)).toHaveLength(1);
+    expect(
+      s.db
+        .select()
+        .from(step)
+        .all()
+        .filter((row) => row.status === 'claimed' && row.kind === 'build'),
+    ).toHaveLength(1);
+  });
 });

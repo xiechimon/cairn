@@ -162,7 +162,7 @@ export function machineRunningCount(db: Db, machineId: string): number {
     .all().length;
 }
 
-export function projectRunningCount(db: Db, projectId: string): number {
+export function projectRunningCount(db: Pick<Db, 'select'>, projectId: string): number {
   return db
     .select({ id: step.id })
     .from(step)

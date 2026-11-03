@@ -537,13 +537,11 @@ async function tryClaim(
       continue;
     }
     const projectCap = projectOfTodo(db, cand.todoRow)?.maxConcurrent ?? null;
-    if (
+    const projectFull = (reader: Pick<typeof db, 'select'>) =>
       projectCap !== null &&
-      projectRunningCount(db, cand.todoRow.projectId) >=
-        projectCap + (cand.stepRow.byPerson ? 1 : 0)
-    ) {
-      continue;
-    }
+      projectRunningCount(reader, cand.todoRow.projectId) >=
+        projectCap + (cand.stepRow.byPerson ? 1 : 0);
+    if (projectFull(db)) continue;
     const { priorSessionId, priorMachineId, freshSession } = priorSessionOf(
       db,
       cand.stepRow,
@@ -593,6 +591,7 @@ async function tryClaim(
     let won = false;
     try {
       won = db.transaction((tx) => {
+        if (projectFull(tx)) return false;
         const res = tx
           .update(step)
           .set({
