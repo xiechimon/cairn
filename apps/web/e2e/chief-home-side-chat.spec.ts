@@ -183,3 +183,13 @@ test('the more menu holds archive and delete, and Escape closes the menu first',
   await page.getByRole('menuitem', { name: /删除/ }).click();
   await expect(page.getByRole('alertdialog')).toContainText('Rerun the relay probe');
 });
+
+test('with a thread open, number keys leave the Coordinator question alone', async ({ page }) => {
+  await page.goto(`${HOME}&thread=home-c-review`);
+  await expect(sideChat(page)).toBeVisible();
+  const option = page.getByTestId('home-c').getByTestId('chief-question-option-0-0').first();
+  await expect(option).toBeVisible();
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press('1');
+  await expect(option).toHaveAttribute('aria-pressed', 'false');
+});
