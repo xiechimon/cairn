@@ -175,6 +175,116 @@ Do both, in this order. Emulator first for GitHub; screenshots can ship independ
 | 8 | `ops(shots-4)`: prune closed-PR directories in `gardener-weekly`; add a line to `docs/pr-review.md` and `pr-cairn` skill on reading the sticky comment | **owner** if it changes `scripts/**` or the workflow | |
 | 9 | `docs(verify)`: replace hand-captured `docs/verify/<ticket>` UI evidence with a link to the sticky comment where it applies | normal | Optional, after 7 |
 
+Decisions (ian, 2026-11-03):
+
+- The weekly drift check reads `xiechimon/cairn` itself, read-only. A sandbox repository is deferred until a write path needs drift-testing.
+- Screenshot PNGs go to the orphan branch `pr-screens`, with 30-day pruning of closed-PR directories.
+- A 6th runner for the screens job is accepted. Actions-minute cost on this public repo is still unconfirmed.
+
+Sources: [LocalStack road ahead](https://blog.localstack.cloud/the-road-ahead-for-localstack/), [InfoQ](https://www.infoq.com/news/2026/02/localstack-aws-community).
+- Other options considered, not evaluated in depth (guess): MSW (request interception, stateless by default), WireMock/Prism (spec-driven stubs, no state). None gives stateful GitHub for free.
+
+### Recommendation
+
+1. **Write our own GitHub emulator** as `packages/testkit-github` (or inside `apps/server/test/fakes/`), seeded from the existing `githubFake`, rather than adopt emulate directly. Reasons: GraphQL, ETag and `rules/branches` are missing there and are cairn's core paths; emulate is an experiment; one more locked dependency conflicts with the seam discipline in `CLAUDE.md`. Reuse emulate as a **reference and test oracle**: run its object-model tests (PR merge, checks) against ours.
+2. Make it **stateful but thin**: repos, branches, pulls, checks, statuses, labels, issues, timeline; ETag and 304 handling; pagination with `Link`; rate-limit headers; a GraphQL handler for the one query. Everything else returns 501 with the route in the body so an unmodelled call fails loudly instead of passing.
+3. Keep per-test `githubFake` for narrow unit tests. Add the emulator at two levels: a Vitest helper for server tests and `integration/` (in-process, `port: 0`), and a `GITHUB_API_BASE` (or fetch-rewrite) for the e2e that boots the real server.
+4. Order: GitHub first. Second: a **model/CLI emulator** only if the scripted `AgentBackend` proves too coarse; it already enforces consumed-steps. Tailscale and Codex/Claude CLI: no emulator needed now (guess: few tests touch them and the real CLIs have their own nightly smoke).
+5. Skip Slack/Stripe/Resend/Gmail: cairn does not call them (measured: a case-insensitive grep of `apps/*/src` and `packages/*/src` finds one stray `stripe` and one `resend` word and no client code). AI-written emulators for Composio/Daytona-like services apply when cairn adds integrations; not now.
+
+### Failure modes and controls
+
+| Failure mode | Control |
+|---|---|
+| Emulator drifts from GitHub; tests pass, prod fails (false confidence) | Weekly drift check, below. Unmodelled routes return 501. Each emulated route links its REST docs page in the route table. |
+| Emulator accepts requests GitHub rejects (validation too loose) | Contract fixtures recorded from real GitHub for the 10 to 15 calls the gate depends on; replay asserts the emulator returns the same shape and status for the same request. |
+| Tests assert the emulator's behaviour instead of cairn's | Tests assert via state (`emulator.inspect()`): what is in the PR after cairn acted, as in Rakazo's MCP emulator, not request strings. |
+| State leaks between tests | `reset()` in `afterEach`; each test creates its own repo name. |
+| Emulator becomes a second product to maintain | Cap scope to routes cairn calls; a test lists the routes cairn calls (from a recording) and fails if the emulator lacks one. |
+| Agents "fix" a failing test by editing the emulator | Emulator and contract fixtures sit under a path that needs Codex cloud review (guess: add to a protected list only if this happens twice). |
+
+### Weekly drift check
+
+A scheduled workflow (`on: schedule`, weekly) that runs against the real API with a read-only token and **no secrets in PR code**:
+
+1. For each recorded contract in `packages/testkit-github/contracts/*.json` (request, plus the response with volatile fields removed), call the real GitHub against a fixed public repository (candidates: `xiechimon/cairn` itself, read-only; or a dedicated sandbox repo; decision for ian) and diff the **shape** (keys, types, status, headers such as `etag`, `link`, `x-ratelimit-*`), not values.
+2. Run the same request against the emulator and diff those shapes.
+3. Any difference opens or updates one tracking issue (the `gardener-weekly.yml` pattern already does this: schedule, summary artifact, issue write permission).
+4. GitHub's OpenAPI description is published at `github/rest-api-description`; the check also asserts each emulated route and its response schema exist in the current description (guess: this catches renames and removals without any token).
+
+The drift workflow only reads public data, so it needs no secret beyond the default `GITHUB_TOKEN`. Write operations (merge, label) are never drift-tested against the real API; those are covered by the recorded contracts and the emulator state tests.
+
+## 4. Screenshots: design
+
+### Principles
+
+- Reuse what exists: the fixture-mode app and its 101 scenarios, the gallery, `e2e-affected`'s spec selection, the `pr-evidence` image rules.
+- **No new required check and no extra time on the critical path.** Capture runs inside existing `e2e`/`e2e-affected` shards; publishing runs after, in a separate workflow.
+- Public repo: PR code must never run with secrets. Follow Rakazo's split (untrusted build, trusted publisher) but without S3.
+
+### What to capture
+
+1. **Product screens** (new): every route in the fixture app, in the scenarios that exercise distinct states, light and dark, desktop (1280×800) and phone (390×844). Start with the 11 in `screens.tsx`, grow to the scenarios the e2e specs already open (101 ids, to be de-duplicated by route and state). Estimated 11 screens × 2 themes × 2 viewports = 44 shots at the start; about 300 at full coverage (guess, scenario de-duplication unknown).
+2. **Gallery specimens**: already covered by `gallery-snapshots` baselines (212). Reuse the same renders as the PR gallery source, no second pass.
+3. **State shots from specs**: a `shot(page, name)` helper that specs call at meaningful states (as Rakazo's checkpoints). Not automatic per-test capture; automatic capture is noise.
+4. Frozen clock, `reducedMotion: 'reduce'`, `animations: 'disabled'`, same Linux Chromium: copy the determinism settings from `gallery-snapshots.spec.ts` so unchanged screens hash identically.
+
+### How to diff and what to post
+
+- Each shot is written with its PNG hash into a `screens-manifest.json` (name, route, theme, viewport, sha256, spec path).
+- On `main` pushes, the manifest of the latest successful run is stored as the baseline. Where: a `screens-baseline` artifact would expire; the practical choice is a small orphan branch `pr-screens` (manifest only, a few KB, plus the PNG blobs for changed screens).
+- On PRs, compare manifests: `new` / `changed` / `unchanged`. Post a **single sticky comment** (marker, edited in place) with: counts, a list of changed and new screens, and up to 6 inline before/after pairs (before from baseline blob, after from this run). If nothing changed, the comment says so in one line, so reviewers can rely on silence.
+- Rakazo restricts frames to specs the PR touched because its baseline lags. Cairn can avoid the lag: compare against `merge-base` instead of latest `main`, by looking up the manifest for the PR's merge-base SHA (fall back to latest main, then `unavailable`). (Inferred: this removes the "other merged PRs look new" false positive without needing the spec-stem filter. Verify on real PRs before dropping the filter.)
+- PNGs of changed screens only are stored; unchanged ones are referenced by hash. This keeps the branch small (changed shots only; guess about 0.2 to 1 MB per PR).
+
+### Storage
+
+| Option | Pros | Cons |
+|---|---|---|
+| Actions artifacts only | Zero setup, no secrets | Not embeddable in a comment (needs login, expires in days); fails the `pr-evidence` image-link rules |
+| Orphan branch in the repo (`pr-screens`) | Public, embeddable via `raw.githubusercontent.com` permalink to a commit SHA, which the pr-evidence gate already accepts; no secrets | Grows repo history unless pruned; needs a writer with `contents: write` |
+| GitHub Pages | Clean URLs, gallery HTML | Needs Pages enablement; `site-deploy.yml` already uses Pages for the site (inferred: a second Pages site is not possible, a sub-path of the existing one is) |
+| External S3 (Rakazo) | Scales | Secrets, cost, ian's account |
+
+Recommendation: **orphan branch with SHA-pinned raw links**, pruning PR directories 30 days after close via the weekly gardener workflow. Embedding SHA-pinned raw links satisfies the existing image-link rule (measured: `pr-evidence-gate.py` accepts commit-SHA permalinks).
+
+### Workflow shape
+
+1. `e2e` / `e2e-affected` shards: after the existing run, one extra step runs the screens project (`playwright test --project=screens`, only on the shard assigned to it) and uploads `screens-<run>` with the manifest and PNGs. **Owner route** (workflow).
+2. New `workflow_run` workflow `pr-screens.yml` (trusted default-branch code, like Rakazo's publisher): downloads the artifact with safe extraction (zip-slip safe; Rakazo's `extract-playwright-artifacts.py` is the pattern), compares manifests, pushes changed PNGs to `pr-screens`, edits the sticky comment. **Owner route** (workflow, `contents: write`, `pull-requests: write`).
+3. `main` push: the same publisher stores the baseline manifest.
+
+### Cost and time
+
+- Product screens in fixture mode need no server, so each shot is a navigation plus a screenshot: about 0.5 to 1 s (guess; the measured gallery spec takes up to 240 s for 212 shots in one test, about 1 s each). 44 shots ≈ 45 s; 300 shots ≈ 5 min.
+- Put the screens project on a dedicated 6th runner in parallel with the 5 `e2e-affected` shards (inferred from the current shard layout and the 3 to 4.5 min measured), so it adds a runner but not wall time while the screens project stays under about 4 min. Above that, split by viewport. If the PR does not touch `apps/web/**`, skip the job (the existing `changes` job already classifies this).
+- Publisher runs after CI, off the critical path, about 1 min.
+- Extra Actions minutes on a public repo: free (guess, needs confirmation for this account).
+
+### Failure modes
+
+- Flaky hashes (fonts, anti-aliasing, time): one render environment (CI Linux), frozen clock, `fonts.ready`, same settings as the gallery spec; comparison by pixel ratio (0.1%) rather than raw hash when raw hash flags an unchanged screen twice on `main` (decide after one week of data).
+- Stale baseline: use the merge-base manifest; report `unavailable` rather than guessing.
+- Baseline race (two merges to `main` at once): store manifests keyed by commit SHA, never overwrite a single "latest" key (Rakazo needed a recency-check script for this; keyed storage avoids it).
+- Fork PRs: no secrets and read-only token. The publisher would see no write token; for forks, post only the artifact link. Cairn PRs are same-repo (measured: branches in `xiechimon/cairn`).
+- Comment noise on every push: one sticky comment, edited, never appended.
+
+## 5. Recommendation and PR list
+
+Do both, in this order. Emulator first for GitHub; screenshots can ship independently, and its first step (adding baseline coverage for product screens) is useful alone.
+
+| # | PR | Route | Scope |
+|---|---|---|---|
+| 1 | `testkit(emu-1)`: stateful GitHub emulator core (PRs, branches, checks, statuses, labels, ETag/304, pagination, 501 for unmodelled) + `FetchLike` origin rewrite; port `github-fake.test.ts` cases | normal | New test package; no production change |
+| 2 | `testkit(emu-2)`: GraphQL handler for the closing-PR query, `rules/branches`, PR merge with `sha` pin; move `pr-merge-api`, `merge-gate-*`, `pr-reconcile` tests onto it | normal (tests only) | Touches test files, not the protected merge-gate sources |
+| 3 | `testkit(emu-3)`: recorded contracts (10 to 15 gate calls) + replay test comparing emulator shape to the recording | normal | Fixtures plus one test |
+| 4 | `ops(emu-4)`: weekly drift workflow + tracking issue (modelled on `gardener-weekly.yml`) | **owner** (workflow) | Read-only, `GITHUB_TOKEN` only |
+| 5 | `web(shots-1)`: screens project in Playwright config: every route in the gallery "Screens" list, light/dark/phone, frozen clock, baselines committed | normal if it touches only `apps/web/e2e` and baselines | 44 shots, small |
+| 6 | `ops(shots-2)`: manifest writer + compare script + sticky comment builder, unit-tested with fixtures (pure functions, no CI wiring) | **owner** if under `scripts/**`, else normal in `packages/` | Port Rakazo's `compareScreenshotsWithBaseline` and `buildScreenshotComment` logic, not their S3 code |
+| 7 | `ops(shots-3)`: CI wiring: screens job on the `e2e` shards, `pr-screens.yml` publisher, `pr-screens` branch, baseline on `main` push | **owner** (workflows) | Needs `contents: write` on the orphan branch only |
+| 8 | `ops(shots-4)`: prune closed-PR directories in `gardener-weekly`; add a line to `docs/pr-review.md` and `pr-cairn` skill on reading the sticky comment | **owner** if it changes `scripts/**` or the workflow | |
+| 9 | `docs(verify)`: replace hand-captured `docs/verify/<ticket>` UI evidence with a link to the sticky comment where it applies | normal | Optional, after 7 |
+
 Open questions for ian:
 
 - Which repository does the weekly drift check read: `xiechimon/cairn` itself (no setup) or a dedicated sandbox repo (needed if write paths are ever tested)?
