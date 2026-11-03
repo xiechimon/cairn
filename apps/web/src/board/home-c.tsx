@@ -259,7 +259,7 @@ export function HomeC({
               item={entry.item}
               onAnswer={surface.onAnswerQuestion}
               onCancel={surface.onCancelQuestion}
-              numberKeys={entry.key === questions[0]?.requestId}
+              numberKeys={threadId === null && entry.key === questions[0]?.requestId}
             />
           ) : (
             <NeedsYouThreadCard
