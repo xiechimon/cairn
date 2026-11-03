@@ -122,28 +122,28 @@ export function ProviderModelChips({
           </div>
           <div className="max-h-64 overflow-y-auto p-1">
             {options.map((model, index) => (
-              <button
+              <Button
                 key={model.id}
-                type="button"
+                variant="ghost"
                 className={cn(
-                  'grid h-8 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-md px-2 text-left hover:bg-secondary',
+                  'grid h-8 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-md px-2 text-left font-normal hover:bg-secondary',
                   index === 0 && typed !== '' && 'bg-secondary',
                 )}
                 onClick={() => add(model.id)}
               >
                 <ModelLabel model={model} />
                 <span className={CONTEXT_CLS}>{contextWindowLabel(model.contextWindow)}</span>
-              </button>
+              </Button>
             ))}
             {canAddTyped && (
-              <button
-                type="button"
-                className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-ui text-content-secondary hover:bg-secondary"
+              <Button
+                variant="ghost"
+                className="h-8 w-full justify-start gap-2 rounded-md px-2 text-ui font-normal text-content-secondary hover:bg-secondary"
                 onClick={() => add(typed)}
               >
                 <PlusSmall className="size-4" />
                 {t('添加自定义模型「{id}」', { id: typed })}
-              </button>
+              </Button>
             )}
             {options.length === 0 && !canAddTyped && (
               <p className="m-0 px-2 py-2 text-meta text-content-tertiary">{t('没有匹配的模型')}</p>
