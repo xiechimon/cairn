@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { useNavigate, useSearchParams } from 'react-router';
+import { useLocation, useNavigate, useSearchParams } from 'react-router';
 import {
   useApiMutations,
   useBackupNotice,
@@ -30,6 +30,9 @@ import { SHEET_PANEL } from '../pages/shell.js';
 export function BoardPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const currentLocationKey = useRef(location.key);
+  currentLocationKey.current = location.key;
   const { live, teamId } = useLiveData();
   const fixture = resolveScenario(searchParams);
   const { surface: chief } = useChiefRoot();
@@ -83,11 +86,13 @@ export function BoardPage() {
   const schedules = live ? mapSchedules(schedulesQ.data ?? []) : (fixture.schedules ?? []);
   const now = live ? Date.now() : fixture.now;
   const askAboutProject = async (project: ProjectHomeProject, text: string): Promise<boolean> => {
+    const originKey = location.key;
     try {
       await chief.onSend?.(text, project.id);
     } catch {
       return false;
     }
+    if (currentLocationKey.current !== originKey) return true;
     const params = new URLSearchParams(searchParams);
     params.set('chat', '1');
     navigate({ pathname: '/app', search: `?${params.toString()}` });

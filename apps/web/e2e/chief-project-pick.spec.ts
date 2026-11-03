@@ -368,4 +368,26 @@ test.describe('the home sends to the project it is filtered to (#2531)', () => {
     await expect(row).toBeVisible();
     await expect(page.getByTestId('project-home')).not.toContainText('1970');
   });
+
+  test('a slow ask does not pull the user back after they move to another project', async ({ page }) => {
+    const state = await mockLive(page);
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route('**/api/teams/t1/chief/threads', async (route) => {
+      if (route.request().method() !== 'POST') return route.fallback();
+      await gate;
+      return route.fallback();
+    });
+    await page.goto('/app?project=proj-2');
+    await page.getByTestId('project-home-ask').fill('官网首页还差什么');
+    await page.getByTestId('project-home-ask').press('Enter');
+    await page.locator('[data-slot="sidebar-project-row"]', { hasText: 'radar-digest' }).click();
+    await expect(page).toHaveURL(/project=proj-3/);
+    release();
+    await expect.poll(() => state.sent.length).toBe(1);
+    await expect(page).toHaveURL(/project=proj-3/);
+    await expect(page).not.toHaveURL(/chat=1/);
+  });
 });
