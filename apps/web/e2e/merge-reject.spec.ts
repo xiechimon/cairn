@@ -125,16 +125,6 @@ async function stubMergeSurface(page: Page, tools: string[]) {
   );
 }
 
-async function openBoardAccept(page: Page, tools: string[]) {
-  await stubBoot(page);
-  await stubMergeSurface(page, tools);
-  await page.goto('/app?view=board');
-  const card = page.locator(`.todo-card[data-todo-id="${CARD_ID}"]`);
-  await expect(card).toBeVisible();
-  await card.locator('.todo-card-action').click();
-  return page.getByRole('dialog', { name: '完成任务' });
-}
-
 async function openDetailAccept(page: Page, tools: string[]) {
   await stubBoot(page);
   await stubMergeSurface(page, tools);
@@ -149,15 +139,7 @@ const BLOCK_COPY = '缺少「推送分支」授权，无法合并。请在该 Ag
 
 const BLOCK_NOTE = /授权，无法合并/;
 
-test('board entry: completion button disabled and names the missing item when the executing Agent lacks `推送分支`', async ({ page }) => {
-  const dialog = await openBoardAccept(page, ['合并分支']);
-  await expect(dialog).toBeVisible();
-  await expect(dialog.getByRole('button', { name: '完成' })).toBeDisabled();
-  await expect(page.getByText(BLOCK_NOTE)).toHaveText(BLOCK_COPY);
-  await evidenceShot(page, 'XMON-89-board-blocked.png');
-});
-
-test('detail entry: the same Agent disabled and naming the missing item on the same sheet', async ({ page }) => {
+test('completion button disabled and names the missing item when the executing Agent lacks `推送分支`', async ({ page }) => {
   const dialog = await openDetailAccept(page, ['合并分支']);
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole('button', { name: '完成' })).toBeDisabled();
@@ -165,21 +147,14 @@ test('detail entry: the same Agent disabled and naming the missing item on the s
   await evidenceShot(page, 'XMON-89-detail-blocked.png');
 });
 
-test('when both items are missing in a non-empty authorization set, both entries are named', async ({ page }) => {
-  await openBoardAccept(page, ['远程 shell']);
+test('when both items are missing in a non-empty authorization set, both items are named', async ({ page }) => {
+  await openDetailAccept(page, ['远程 shell']);
   await expect(page.getByText(BLOCK_NOTE)).toHaveText(
     '缺少「合并分支、推送分支」授权，无法合并。请在该 Agent 的权限里开启。',
   );
 });
 
-test('empty authorization set still blocks (#994): explicit all-off = zero authorizations, both entries disabled and name both items', async ({ page }) => {
-
-  const board = await openBoardAccept(page, []);
-  await expect(board.getByRole('button', { name: '完成' })).toBeDisabled();
-  await expect(page.getByText(BLOCK_NOTE)).toHaveText(
-    '缺少「合并分支、推送分支」授权，无法合并。请在该 Agent 的权限里开启。',
-  );
-  await evidenceShot(page, '994-empty-tools-board-blocked.png');
+test('empty authorization set still blocks (#994): explicit all-off = zero authorizations, completion disabled and names both items', async ({ page }) => {
 
   const detail = await openDetailAccept(page, []);
   await expect(detail.getByRole('button', { name: '完成' })).toBeDisabled();
@@ -190,13 +165,13 @@ test('empty authorization set still blocks (#994): explicit all-off = zero autho
 });
 
 test('with both items on: no blocking, completion button clickable, no missing-item hint', async ({ page }) => {
-  const dialog = await openBoardAccept(page, ['合并分支', '推送分支']);
+  const dialog = await openDetailAccept(page, ['合并分支', '推送分支']);
   await expect(dialog.getByRole('button', { name: '完成' })).toBeEnabled();
   await expect(page.getByText(BLOCK_NOTE)).toHaveCount(0);
 });
 
-test('board entry: server really rejects (403) → the sheet stays open, server copy shown verbatim', async ({ page }) => {
-  await openBoardAccept(page, ['合并分支', '推送分支']);
+test('server really rejects (403) → the sheet stays open, server copy shown verbatim', async ({ page }) => {
+  await openDetailAccept(page, ['合并分支', '推送分支']);
   const reject = '缺少「推送分支」授权，合并被拒绝。';
   let merges = 0;
   await page.route(`**/api/builds/${BUILD_ID}/merge`, (route) => {
@@ -210,11 +185,11 @@ test('board entry: server really rejects (403) → the sheet stays open, server 
   await expect.poll(() => merges).toBe(1);
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole('alert')).toHaveText(reject);
-  await evidenceShot(page, 'XMON-89-board-403.png');
+  await evidenceShot(page, 'XMON-89-detail-403.png');
 });
 
 test('merge success (202) → the sheet closes as usual, no error row left', async ({ page }) => {
-  await openBoardAccept(page, ['合并分支', '推送分支']);
+  await openDetailAccept(page, ['合并分支', '推送分支']);
   let merges = 0;
   await page.route(`**/api/builds/${BUILD_ID}/merge`, (route) => {
     merges += 1;

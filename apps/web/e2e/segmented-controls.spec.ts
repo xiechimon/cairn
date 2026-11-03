@@ -167,21 +167,6 @@ test('user-menu appearance segment: hover steps the ink, click switches the them
   await expect(group.getByRole('radio', { name: '浅色' })).toHaveAttribute('aria-checked', 'false');
 });
 
-test('branch-dialog seg: hover steps the Git ink, click swaps the tab body', async ({ page }) => {
-  // #366: the detail route no longer opens the branch dialog (the surface
-  // is a static right-pane section there) — the board card icon remains
-  // the dialog's live trigger.
-  await page.goto('/app?scenario=01&view=board');
-  await page.locator('.todo-card-branch').first().click();
-  await expect(page.getByRole('dialog')).toBeVisible();
-  const git = page.getByRole('tab', { name: 'Git' });
-  await expectInkStep(git, page.getByRole('tab', { name: '同步到机器' }));
-
-  await git.click();
-  await expect(page.getByRole('tab', { name: 'Git', selected: true })).toBeVisible();
-  await expect(page.getByRole('tab', { name: '同步到机器', selected: false })).toBeVisible();
-});
-
 test('team layout toggle: segmented face (paper track, white ringed chip)', async ({ page }) => {
   await themed(page, 'light', '/app/team?scenario=12');
 

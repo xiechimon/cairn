@@ -1,13 +1,13 @@
 import { expect, test } from '@playwright/test';
 
-test('feedback route is gone — old URL redirects to the board', async ({ page }) => {
+test('feedback route is gone — old URL redirects to the home', async ({ page }) => {
   await page.goto('/app/feedback');
   await expect(page).toHaveURL('/app');
   await expect(page.locator('[data-route="feedback"]')).toHaveCount(0);
 });
 
 test('user menu drops its dead rows — `反馈` (#149), `新功能/快捷键` (#163)', async ({ page }) => {
-  await page.goto('/app?view=board');
+  await page.goto('/app/schedules');
   await page.locator('.sidebar-user').click();
   const menu = page.locator('.user-menu');
   await expect(menu).toBeVisible();
@@ -20,61 +20,6 @@ test('user menu drops its dead rows — `反馈` (#149), `新功能/快捷键` (
     await expect(menu).toContainText(live);
   }
   await expect(menu.locator('a.user-menu-row')).toHaveCount(9);
-});
-
-test('board topbar drops the `看板指南` button — right actions = `筛选` / `定时`, `新任务` lives in the new-task bar (#363, claude shell)', async ({
-  page,
-}) => {
-  await page.goto('/app?view=board');
-
-  await expect(page.locator('.board-guide')).toHaveCount(0);
-  await expect(page.locator('.board-guide-wrap')).toHaveCount(0);
-  await expect(page.locator('.board-guide-pop')).toHaveCount(0);
-  await expect(page.locator('[aria-label="看板指南"]')).toHaveCount(0);
-
-  const actions = page.locator('.board-topbar-actions');
-  await expect(actions).toBeVisible();
-  await expect(actions.getByRole('button')).toHaveCount(1);
-  await expect(actions.getByRole('link')).toHaveCount(1);
-  await expect(actions.getByRole('button', { name: '筛选', exact: true })).toBeVisible();
-  await expect(actions.getByRole('button', { name: '任务面板' })).toHaveCount(0);
-  await expect(actions.getByRole('link', { name: '定时' })).toBeVisible();
-  await expect(actions.getByRole('button', { name: '新任务' })).toHaveCount(0);
-
-  const bar = page.getByTestId('board-new-task-bar');
-  await expect(bar).toBeVisible();
-  await expect(bar).toContainText('新任务：接下来让 agent 做什么？');
-  await bar.click();
-  await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toBeFocused();
-  await expect(page.getByRole('dialog', { name: '新建任务' })).toHaveCount(0);
-});
-
-test('board renders exactly the four #351 columns, retired names and collapse family gone', async ({
-  page,
-}) => {
-  await page.goto('/app?scenario=01&view=board');
-
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('看板');
-
-  await expect(page.locator('.board-column')).toHaveCount(4);
-  for (const [id, name] of [
-    ['todo', '待开始'],
-    ['building', '执行中'],
-    ['pending', '待处理'],
-    ['done', '已完成'],
-  ] as const) {
-    await expect(
-      page.locator(`.board-column[data-column="${id}"] .board-column-name`),
-    ).toHaveText(name);
-  }
-
-  for (const retired of ['规划中', '待确认', '待验收']) {
-    await expect(page.locator('.board-column-name', { hasText: retired })).toHaveCount(0);
-  }
-
-  await expect(page.locator('.board-column-collapse')).toHaveCount(0);
-  await expect(page.locator('.board-column-strip')).toHaveCount(0);
-  await expect(page.locator('.board-column--collapsed')).toHaveCount(0);
 });
 
 test('project files pane: no export button, static branch chip, wired `文件|历史` segment', async ({
@@ -279,7 +224,7 @@ test('project settings drops the avatar `更换` ink (#307, supersedes the #177 
 test('chief drawer drops the ⋮ `更多` button and the new-topic button — thread view keeps two head actions (#306, #2531)', async ({
   page,
 }) => {
-  await page.goto('/app?scenario=114&view=board');
+  await page.goto('/app/schedules?scenario=114');
   const drawer = page.locator('.chief-drawer');
 
   const actions = drawer

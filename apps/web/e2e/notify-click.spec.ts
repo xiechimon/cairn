@@ -379,7 +379,7 @@ test.describe('push notification click loop (XMON-106)', () => {
   test('T4: chief deep link → drawer opens on the target thread, params consumed once and stripped from the URL', async ({ page }) => {
     await stubEventSource(page);
     await mockLiveApi(page);
-    await page.goto('/app?view=board&chief=chief-bbb');
+    await page.goto('/app/schedules?chief=chief-bbb');
 
     const drawer = page.locator('.chief-drawer');
     await expect(drawer).toBeVisible();

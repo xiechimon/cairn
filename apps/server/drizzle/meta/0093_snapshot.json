@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "4443f004-b2cc-4d1d-b2db-0facfc296e69",
-  "prevId": "5c918851-6d9c-4111-9175-503e5c84a88a",
+  "id": "b796c283-84ca-4e1f-9c00-7298680a5e87",
+  "prevId": "a6fe7343-c56c-4cd3-ba9e-a8c82ead121d",
   "tables": {
     "agent": {
       "name": "agent",
@@ -3648,13 +3648,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "adoptedAgentIds": {
-          "name": "adoptedAgentIds",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "seededFromAgentId": {
           "name": "seededFromAgentId",
           "type": "text",
@@ -4256,6 +4249,13 @@
         },
         "prompt": {
           "name": "prompt",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "scopeProjectId": {
+          "name": "scopeProjectId",
           "type": "text",
           "primaryKey": false,
           "notNull": false,

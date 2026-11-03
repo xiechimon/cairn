@@ -10,7 +10,6 @@ import {
   type TodoRecord as SharedTodoRecord,
 } from '@cairn/shared';
 import type { ChiefQuestionItem } from '../chief/chief-question-card.js';
-import type { CardOrchestration } from '../chief/orchestration-inflight.js';
 import type { AgentPickerOption } from '../components/agent-picker.js';
 import type { TagChipData } from '../components/ui/tag-chip.js';
 import type { TaskMetaFields } from '../detail/task-meta-block.js';
@@ -93,132 +92,129 @@ export function todo(patch: Partial<TodoRecord> & Pick<TodoRecord, 'title' | 'ph
   };
 }
 
-export const CARD_FACES: { label: string; todo: TodoRecord; orchestration?: CardOrchestration }[] =
-  [
-    {
-      label: 'To start',
-      todo: todo({
-        title: 'Add a dark mode toggle to settings',
-        phase: 'todo',
-        phaseAt: NOW - 3 * HOUR,
-      }),
-    },
-    {
-      label: 'To start, being orchestrated',
-      todo: todo({ title: 'Split the schedules page into tabs', phase: 'todo' }),
-      orchestration: { threadId: 'thread-1', wait: null },
-    },
-    {
-      label: 'To start, orchestration failed',
-      todo: todo({ title: 'Rename the API keys page', phase: 'todo' }),
-      orchestration: { threadId: 'thread-2', wait: null, error: 'no_machine_online' },
-    },
-    {
-      label: 'Queued',
-      todo: todo({ title: 'Upgrade the test runner', phase: 'queued', phaseAt: NOW - 2 * MIN }),
-    },
-    {
-      label: 'Planning',
-      todo: todo({
-        title: 'Cache the project file tree',
-        phase: 'planning',
-        phaseAt: NOW - 5 * MIN,
-      }),
-    },
-    {
-      label: 'Building',
-      todo: todo({
-        title: 'Fix the stale branch badge on cards',
-        phase: 'building',
-        phaseAt: NOW - MIN,
-      }),
-    },
-    {
-      label: 'Waiting on quota',
-      todo: todo({
-        title: 'Translate the onboarding copy',
-        phase: 'building',
-        quotaWait: {
-          kind: 'quota',
-          providerId: 'claude',
-          label: 'Claude',
-          retryAfterMs: 30 * MIN,
-          probeAt: NOW + 30 * MIN,
-        },
-      }),
-    },
-    {
-      label: 'Waiting on a machine',
-      todo: todo({
-        title: 'Rebuild the search index',
-        phase: 'queued',
-        waitingOn: { on: 'machine', retryAt: null },
-      }),
-    },
-    {
-      label: 'Failed',
-      todo: todo({
-        title: 'Migrate the schedules table',
-        phase: 'failed',
-        phaseAt: NOW - 40 * MIN,
-      }),
-    },
-    {
-      label: 'Waiting on you',
-      todo: todo({ title: 'Choose the export format', phase: 'review', awaitingReply: true }),
-    },
-    {
-      label: 'Confirm plan',
-      todo: todo({
-        title: 'Add retries to the webhook sender',
-        phase: 'confirm',
-        chiefCreated: true,
-      }),
-    },
-    {
-      label: 'Review',
-      todo: todo({
-        title: 'Paginate the GitHub issues dialog',
-        phase: 'review',
-        phaseAt: NOW - 25 * MIN,
-      }),
-    },
-    {
-      label: 'Done',
-      todo: todo({
-        title: 'Remove the legacy token page',
-        phase: 'done',
-        phaseAt: NOW - 26 * HOUR,
-      }),
-    },
-    {
-      label: 'Canceled',
-      todo: todo({
-        title: 'Prototype a mobile layout',
-        phase: 'closed',
-        phaseAt: NOW - 3 * 24 * HOUR,
-      }),
-    },
-    {
-      label: 'With tag and cost',
-      todo: todo({
-        title: 'Fix the composer losing the draft on reload',
-        phase: 'review',
-        tagIds: ['tag-bug'],
-        usageCost: { input: 0.42, output: 0.81, cacheRead: 0.12, cacheWrite: 0.06, total: 1.41 },
-      }),
-    },
-    {
-      label: 'Unpriced cost, long title',
-      todo: todo({
-        title:
-          'Make the board remember which column was scrolled and restore it after a reload, including the done column',
-        phase: 'building',
-        tagIds: ['tag-feature'],
-        usageCost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0, priced: false },
-      }),
-    },
-  ];
+export const CARD_FACES: { label: string; todo: TodoRecord }[] = [
+  {
+    label: 'To start',
+    todo: todo({
+      title: 'Add a dark mode toggle to settings',
+      phase: 'todo',
+      phaseAt: NOW - 3 * HOUR,
+    }),
+  },
+  {
+    label: 'To start, next in line',
+    todo: todo({ title: 'Split the schedules page into tabs', phase: 'todo' }),
+  },
+  {
+    label: 'To start, older',
+    todo: todo({ title: 'Rename the API keys page', phase: 'todo' }),
+  },
+  {
+    label: 'Queued',
+    todo: todo({ title: 'Upgrade the test runner', phase: 'queued', phaseAt: NOW - 2 * MIN }),
+  },
+  {
+    label: 'Planning',
+    todo: todo({
+      title: 'Cache the project file tree',
+      phase: 'planning',
+      phaseAt: NOW - 5 * MIN,
+    }),
+  },
+  {
+    label: 'Building',
+    todo: todo({
+      title: 'Fix the stale branch badge on cards',
+      phase: 'building',
+      phaseAt: NOW - MIN,
+    }),
+  },
+  {
+    label: 'Waiting on quota',
+    todo: todo({
+      title: 'Translate the onboarding copy',
+      phase: 'building',
+      quotaWait: {
+        kind: 'quota',
+        providerId: 'claude',
+        label: 'Claude',
+        retryAfterMs: 30 * MIN,
+        probeAt: NOW + 30 * MIN,
+      },
+    }),
+  },
+  {
+    label: 'Waiting on a machine',
+    todo: todo({
+      title: 'Rebuild the search index',
+      phase: 'queued',
+      waitingOn: { on: 'machine', retryAt: null },
+    }),
+  },
+  {
+    label: 'Failed',
+    todo: todo({
+      title: 'Migrate the schedules table',
+      phase: 'failed',
+      phaseAt: NOW - 40 * MIN,
+    }),
+  },
+  {
+    label: 'Waiting on you',
+    todo: todo({ title: 'Choose the export format', phase: 'review', awaitingReply: true }),
+  },
+  {
+    label: 'Confirm plan',
+    todo: todo({
+      title: 'Add retries to the webhook sender',
+      phase: 'confirm',
+      chiefCreated: true,
+    }),
+  },
+  {
+    label: 'Review',
+    todo: todo({
+      title: 'Paginate the GitHub issues dialog',
+      phase: 'review',
+      phaseAt: NOW - 25 * MIN,
+    }),
+  },
+  {
+    label: 'Done',
+    todo: todo({
+      title: 'Remove the legacy token page',
+      phase: 'done',
+      phaseAt: NOW - 26 * HOUR,
+    }),
+  },
+  {
+    label: 'Canceled',
+    todo: todo({
+      title: 'Prototype a mobile layout',
+      phase: 'closed',
+      phaseAt: NOW - 3 * 24 * HOUR,
+    }),
+  },
+  {
+    label: 'With tag and cost',
+    todo: todo({
+      title: 'Fix the composer losing the draft on reload',
+      phase: 'review',
+      tagIds: ['tag-bug'],
+      usageCost: { input: 0.42, output: 0.81, cacheRead: 0.12, cacheWrite: 0.06, total: 1.41 },
+    }),
+  },
+  {
+    label: 'Unpriced cost, long title',
+    todo: todo({
+      title:
+        'Make the board remember which column was scrolled and restore it after a reload, including the done column',
+      phase: 'building',
+      tagIds: ['tag-feature'],
+      usageCost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0, priced: false },
+    }),
+  },
+];
 
 export const BOARD_FIXTURE: FixtureSet = {
   now: NOW,

@@ -17,7 +17,7 @@ import { HttpError, parseWith } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { notifyChiefMessage } from './notifications.js';
-import { pickedProjectIdOf } from './picked-project.js';
+import { stepScopeProjectId } from './picked-project.js';
 import { pushToUserSafely, type VapidKeys } from './push.js';
 
 export interface ChiefQuestionDeps {
@@ -67,11 +67,11 @@ function readQuestion(db: Db, threadId: string, requestId: string): AskUserQuest
 
 function askingTurnProjectId(db: Db, threadId: string): string | null {
   const turn = db
-    .select({ prompt: step.prompt })
+    .select({ prompt: step.prompt, scopeProjectId: step.scopeProjectId })
     .from(step)
     .where(and(eq(step.buildId, threadId), eq(step.kind, 'chief'), eq(step.status, 'claimed')))
     .get();
-  return pickedProjectIdOf(turn?.prompt ?? null);
+  return turn === undefined ? null : stepScopeProjectId(turn);
 }
 
 function questionAskedAt(db: Db, threadId: string, requestId: string): number | null {

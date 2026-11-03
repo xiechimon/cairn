@@ -1,7 +1,7 @@
 import { expect, type Page, test } from '@playwright/test';
 
 test('avatar landing: sidebar portrait goes to the components/ui landing', async ({ page }) => {
-  await page.goto('/app?scenario=22d&view=board');
+  await page.goto('/app/schedules?scenario=22d');
   await page.evaluate(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
   await page.reload();
   await expect(page.locator('.rail-user [data-slot="avatar-image"]')).toHaveCount(1);
@@ -11,7 +11,7 @@ test('avatar landing fixed-size box (#983/#1003): Root renders a real box carryi
   page,
 }) => {
   await page.addInitScript(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
-  await page.goto('/app?scenario=22d&view=board');
+  await page.goto('/app/schedules?scenario=22d');
   const probe = await page.evaluate(() => {
     const root = document.querySelector('.rail-user [data-slot="avatar"]')!;
     const img = document.querySelector('.rail-user [data-slot="avatar-image"]')!;
@@ -39,7 +39,7 @@ test('avatar landing fixed-size box (#983/#1003): Root renders a real box carryi
 });
 
 test('kbd landing: floating hint = registry Tooltip+Kbd combo, not mounted at rest / floats on hover', async ({ page }) => {
-  await page.goto('/app?scenario=01&view=board');
+  await page.goto('/app/schedules?scenario=01');
 
   const search = page.locator('.board-sidebar').getByRole('button', { name: '搜索', exact: true });
   const hint = page.locator('[data-slot="tooltip-content"] [data-slot="kbd"]');

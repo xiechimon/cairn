@@ -1449,6 +1449,16 @@ export async function applyBuildStepAction(
     return;
   }
   if (body.action === 'review') {
+    if (
+      body.agentId !== undefined &&
+      deps.db
+        .select({ id: agent.id })
+        .from(agent)
+        .where(and(eq(agent.id, body.agentId), eq(agent.teamId, todoRecord.teamId)))
+        .get() === undefined
+    ) {
+      throw new NotFoundError(`agent ${body.agentId}`);
+    }
     restoreFailedReview(deps, row);
     if (todoRecord.phase === 'failed') {
       const restored = getTodo(deps, row.todoId);

@@ -85,6 +85,23 @@ const conversation: ChiefContent = {
 
 export const homeC: FixtureSet = {
   ...boardDefault,
+  resources: {
+    skills: [],
+    mcpServers: [],
+    providerSources: [],
+    machines: [
+      {
+        id: 'home-c-mac',
+        kind: 'local',
+        name: 'xmonsMac',
+        online: true,
+        chiefHost: true,
+        runningSteps: 2,
+        maxConcurrent: 8,
+      },
+      { id: 'home-c-omarchy', kind: 'remote', name: 'omarchy', online: false, maxConcurrent: 16 },
+    ],
+  },
   projectNames: { [PROJECT_ID]: 'cairn', [HOME_C_CRED]: 'Credential relay' },
   todos: [
     homeTodo('home-c-confirm', 2301, 'Connect a Claude subscription token', 'confirm', PROJECT_ID),

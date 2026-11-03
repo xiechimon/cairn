@@ -12,6 +12,7 @@ import {
   listSpecs,
   SHARED_SURFACE_ONLY,
   selectSpecs,
+  workspacePackages,
 } from './e2e-affected-select.mjs';
 import {
   acquireSlot,
@@ -146,6 +147,7 @@ const { full, selection, reasons } = selectSpecs({
       head: { lockfile: readInTree(lockfile), workspace: readInTree(workspace) },
     });
   },
+  workspace: () => workspacePackages(readInTree(DEPENDENCY_FILES[0])),
 });
 console.log(`[e2e:affected] changed paths (${source}):`);
 console.log(reasons.join('\n'));

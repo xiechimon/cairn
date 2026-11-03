@@ -1,4 +1,4 @@
-import type { ClaimedStep } from '@cairn/shared';
+import type { ClaimedStep, MachineClaimBody } from '@cairn/shared';
 import {
   AGENT_TOOL_TAG,
   appendMergedPrGuard,
@@ -35,6 +35,7 @@ import {
 import { hasEarlierLiveChiefStep } from './chief-turns.js';
 import { claudeUsageGatePasses, refreshClaudeRateParks } from './claude-rate-limit.js';
 import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
+import { coordinatorMachineId, coordinatorSidecarEnabled } from './coordinator-context.js';
 import { routedChiefAgent } from './coordinator-route.js';
 import {
   agentRunningCount,
@@ -135,7 +136,48 @@ function claimChiefCandidates(deps: MachineDeps, _machineId: string, teamId: str
     )
     .orderBy(asc(step.createdAt))
     .all()
-    .map((row) => ({ ...row, agentRow: routedChiefAgent(deps.db, teamId, row.agentRow) }));
+    .map((row) => ({ ...row, agentRow: routedChiefAgent(deps.db, teamId, row.agentRow) }))
+    .filter((row) => !sidecarTakesTurn(deps, teamId, row.stepRow, row.agentRow));
+}
+
+function sidecarTakesTurn(
+  deps: MachineDeps,
+  teamId: string,
+  stepRow: typeof step.$inferSelect,
+  agentRow: typeof agent.$inferSelect,
+): boolean {
+  if (!coordinatorSidecarEnabled() || isChiefDigestStep(stepRow) || !agentRow.modelId) return false;
+  const model = effectiveModel(agentRow, stepRow);
+  return (
+    stepRuntimeFor(model.provider) === 'pi' &&
+    claudeUsageGatePasses(deps, { teamId, claudeCodeReport: null }, model)
+  );
+}
+
+function coordinatorTurnCandidates(deps: MachineDeps, machineId: string, teamId: string) {
+  return deps.db
+    .select({ stepRow: step, threadRow: chiefThread, agentRow: agent })
+    .from(step)
+    .innerJoin(chiefThread, eq(step.buildId, chiefThread.id))
+    .innerJoin(chief, eq(chiefThread.chiefId, chief.id))
+    .innerJoin(agent, eq(chief.agentId, agent.id))
+    .where(
+      and(
+        eq(step.kind, 'chief'),
+        eq(chiefThread.teamId, teamId),
+        or(
+          and(eq(step.status, 'claimed'), eq(step.machineId, machineId)),
+          and(
+            eq(step.status, 'pending'),
+            or(isNull(step.holdUntil), lte(step.holdUntil, sql`${nowMs()}`)),
+          ),
+        ),
+      ),
+    )
+    .orderBy(asc(step.createdAt))
+    .all()
+    .map((row) => ({ ...row, agentRow: routedChiefAgent(deps.db, teamId, row.agentRow) }))
+    .filter((row) => sidecarTakesTurn(deps, teamId, row.stepRow, row.agentRow));
 }
 
 export function meetsMcpVersionGate(latestCliVersion: string | null): boolean {
@@ -207,6 +249,18 @@ function buildChiefClaim(
     .where(and(eq(step.id, stepRow.id), eq(step.status, 'pending')))
     .run();
   if (res.changes === 0) return null;
+  return chiefClaimPayload(deps, machineId, stepRow, threadRow, agentRow, machineRow);
+}
+
+function chiefClaimPayload(
+  deps: MachineDeps,
+  machineId: string,
+  stepRow: typeof step.$inferSelect,
+  threadRow: typeof chiefThread.$inferSelect,
+  agentRow: typeof agent.$inferSelect,
+  machineRow?: typeof machine.$inferSelect,
+): ClaimedStep {
+  const model = effectiveModel(agentRow, stepRow);
   const digest = isChiefDigestStep(stepRow);
   const ctx = digest ? null : chiefClaimContext(deps, threadRow.id);
   const trigger = parseChiefTrigger(stepRow.prompt);
@@ -264,6 +318,54 @@ function buildChiefClaim(
     ...(chiefMcp !== undefined ? { mcpServers: chiefMcp } : {}),
     ...(digest ? { remoteToolsOnly: true as const } : {}),
   };
+}
+
+function claimCoordinatorTurn(
+  deps: MachineDeps,
+  machineId: string,
+  teamId: string,
+): ClaimedStep | null {
+  if (machineId !== coordinatorMachineId()) return null;
+  const { db } = deps;
+  const machineRow = db.select().from(machine).where(eq(machine.id, machineId)).get();
+  if (!machineRow) return null;
+  for (const cand of coordinatorTurnCandidates(deps, machineId, teamId)) {
+    if (cand.stepRow.status === 'claimed') {
+      return chiefClaimPayload(
+        deps,
+        machineId,
+        cand.stepRow,
+        cand.threadRow,
+        cand.agentRow,
+        machineRow,
+      );
+    }
+    if (hasEarlierLiveChiefStep(db, cand.stepRow)) continue;
+    const claimedAt = nowMs();
+    const res = db
+      .update(step)
+      .set({
+        status: 'claimed',
+        machineId,
+        claimedAt,
+        lastHeartbeatAt: claimedAt,
+        holdReason: null,
+        holdUntil: null,
+      })
+      .where(and(eq(step.id, cand.stepRow.id), eq(step.status, 'pending')))
+      .run();
+    if (res.changes === 0) continue;
+    publishStepStatus(deps, cand.stepRow.id);
+    return chiefClaimPayload(
+      deps,
+      machineId,
+      cand.stepRow,
+      cand.threadRow,
+      cand.agentRow,
+      machineRow,
+    );
+  }
+  return null;
 }
 
 function claudeBlockedReader(db: MachineDeps['db']): (id: string | null) => boolean {
@@ -614,10 +716,18 @@ export async function claimStep(
   holdMs: number,
   origin: string,
   signal?: AbortSignal,
-  body?: { maxWorkers?: number },
+  body?: MachineClaimBody,
 ): Promise<ClaimedStep | null> {
   if (signal?.aborted) return null;
   const sinceWake = deps.machineHub.wakeSeq(teamId);
+  if (body?.role === 'coordinator') {
+    if (machineId !== coordinatorMachineId()) return null;
+    const first = claimCoordinatorTurn(deps, machineId, teamId);
+    if (first) return first;
+    await deps.machineHub.waitWake(teamId, holdMs, signal, sinceWake);
+    if (signal?.aborted) return null;
+    return claimCoordinatorTurn(deps, machineId, teamId);
+  }
   const first = await tryClaim(deps, machineId, teamId, origin, body?.maxWorkers);
   if (first) return first;
   await deps.machineHub.waitWake(teamId, holdMs, signal, sinceWake);
