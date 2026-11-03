@@ -50,6 +50,27 @@ async function stubWorld(page: Page, prompt: Record<string, unknown>, patches: u
   await page.route('**/api/user/me', (route) => route.fulfill({ json: USER }));
   await page.route('**/api/projects?*', (route) => route.fulfill({ json: [] }));
   await page.route('**/api/todos?*', (route) => route.fulfill({ json: [] }));
+  await page.route(`**/api/teams/${TEAM_ID}/chief`, (route) =>
+    route.fulfill({
+      json: {
+        chief: {
+          id: `chief-${USER.id}-${TEAM_ID}`,
+          userId: USER.id,
+          teamId: TEAM_ID,
+          agent: null,
+          charter: null,
+          lastTurnAt: null,
+          createdAt: 0,
+          tz: null,
+        },
+        agentActor: null,
+        context: null,
+        watches: [],
+        wakes: [],
+      },
+    }),
+  );
+  await page.route(`**/api/teams/${TEAM_ID}/chief/threads`, (route) => route.fulfill({ json: [] }));
 }
 
 test('setting on + a recorded first PR shows the card; its link opens the prefilled discussion', async ({
@@ -57,7 +78,7 @@ test('setting on + a recorded first PR shows the card; its link opens the prefil
 }) => {
   const patches: unknown[] = [];
   await stubWorld(page, ON, patches);
-  await page.goto('/app/schedules');
+  await page.goto('/app');
 
   const card = page.locator('[data-first-pr-card="true"]');
   await expect(card).toBeVisible();
@@ -76,7 +97,7 @@ test('setting on + a recorded first PR shows the card; its link opens the prefil
 test('dismissing hides it for good', async ({ page }) => {
   const patches: unknown[] = [];
   await stubWorld(page, ON, patches);
-  await page.goto('/app/schedules');
+  await page.goto('/app');
   const card = page.locator('[data-first-pr-card="true"]');
   await expect(card).toBeVisible();
 
@@ -88,7 +109,7 @@ test('dismissing hides it for good', async ({ page }) => {
 test('with the setting off nothing is shown', async ({ page }) => {
   const patches: unknown[] = [];
   await stubWorld(page, OFF, patches);
-  await page.goto('/app/schedules');
+  await page.goto('/app');
   await expect(page.locator('[data-first-pr-card="true"]')).toHaveCount(0);
   expect(patches).toEqual([]);
 });
@@ -104,7 +125,7 @@ test('users enable the team prompt, persist it, and permanently dismiss the card
   await expect(setting).toHaveAttribute('aria-checked', 'true');
   await page.reload();
   await expect(setting).toHaveAttribute('aria-checked', 'true');
-  await page.goto('/app/schedules');
+  await page.goto('/app');
   const card = page.locator('[data-first-pr-card="true"]');
   await expect(card).toBeVisible();
   await card.getByRole('button', { name: 'Do not show again' }).click();

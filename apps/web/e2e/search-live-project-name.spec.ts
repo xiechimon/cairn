@@ -107,10 +107,11 @@ test('live, projects loaded: pre-response rows carry each todo’s own project',
   const search = holdSearch(page);
   await search.install();
 
+  const todosRead = page.waitForResponse((response) => response.url().includes('/api/todos?'));
   await page.goto('/app/schedules');
-  // both reads landed: sidebar project rows (projects) + a board card (todos)
+  // both reads landed: sidebar project rows (projects) + the todos list
   await expect(page.locator('[data-slot="sidebar-project-row"]').filter({ hasText: 'atlas' })).toBeVisible();
-  await expect(page.getByText('search probe beta').first()).toBeVisible();
+  await todosRead;
   await openPanel(page);
 
   await typeQuery(page, 'search probe');
@@ -144,8 +145,9 @@ test('live, projects read failed: pre-response rows show no project line', async
   const search = holdSearch(page);
   await search.install();
 
+  const todosRead = page.waitForResponse((response) => response.url().includes('/api/todos?'));
   await page.goto('/app/schedules');
-  await expect(page.getByText('search probe alpha').first()).toBeVisible();
+  await todosRead;
   await openPanel(page);
 
   await typeQuery(page, 'search probe');

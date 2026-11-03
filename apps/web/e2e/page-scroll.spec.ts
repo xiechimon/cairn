@@ -139,8 +139,6 @@ async function openChiefSettings(page: Page) {
   await expect(drawer).toBeVisible();
   await drawer.locator('button[aria-label="总管设置"]').click();
   await expect(page.getByRole('heading', { name: '总管设置' })).toBeVisible();
-
-  await expect(page.locator('.chief-drawer')).toBeAttached();
 }
 
 test('all three long-content tabs of chief settings scroll to the bottom (#1032)', async ({ page }) => {

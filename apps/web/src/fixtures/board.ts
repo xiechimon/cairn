@@ -92,83 +92,12 @@ function tagFilterProbe(
   return { ...probeTodo(phase, r7(13, 40)), id, seqNum, title, spec: title, tagIds };
 }
 
-function dragMatrixProbe(
-  id: string,
-  seqNum: number,
-  title: string,
-  phase: TodoRecord['phase'],
-  over?: Partial<TodoRecord>,
-): TodoRecord {
-  return { ...probeTodo(phase, r7(13, 40)), id, seqNum, title, spec: title, tagIds: [], ...over };
-}
-
-export const boardDragMatrix: FixtureSet = {
-  ...boardDefault,
-  todos: [
-    dragMatrixProbe('dm-todo', 51, 'dragmatrix 探针（待开始）', 'todo'),
-    dragMatrixProbe('dm-building', 52, 'dragmatrix 探针（执行中）', 'building'),
-    dragMatrixProbe('dm-failed', 53, 'dragmatrix 探针（失败）', 'failed', { hasChanges: true }),
-    dragMatrixProbe('dm-review', 54, 'dragmatrix 探针（待验收）', 'review', {
-      awaitingReply: true,
-    }),
-    dragMatrixProbe('dm-confirm', 55, 'dragmatrix 探针（待确认）', 'confirm'),
-    dragMatrixProbe('dm-done-changes', 56, 'dragmatrix 探针（已完成·有变更）', 'done', {
-      phaseAt: r7(13, 20),
-      orderIndex: 0,
-    }),
-    dragMatrixProbe('dm-done-plain', 57, 'dragmatrix 探针（已完成·无变更）', 'done', {
-      hasChanges: false,
-      phaseAt: r7(13, 50),
-      orderIndex: 10,
-    }),
-  ],
-  now: r7(13, 55),
-};
-
-const resetGateProbe = (
-  id: string,
-  seqNum: number,
-  title: string,
-  phase: TodoRecord['phase'],
-  over?: Partial<TodoRecord>,
-): TodoRecord => ({
-  ...dragMatrixProbe(id, seqNum, title, phase),
-  latestBuildId: null,
-  lastRunAt: null,
-  hasChanges: false,
-  hasPlan: false,
-  buildHistory: [],
-  ...over,
-});
-
-export const boardResetGate: FixtureSet = {
-  ...boardDefault,
-  todos: [
-    dragMatrixProbe('rg-todo', 61, 'resetgate 探针（待开始）', 'todo'),
-    dragMatrixProbe('rg-building', 62, 'resetgate 探针（执行中·有历史）', 'building'),
-    dragMatrixProbe('rg-done-history', 63, 'resetgate 探针（已完成·有变更）', 'done'),
-    resetGateProbe('rg-confirm-fresh', 64, 'resetgate 探针（待确认·零历史）', 'confirm'),
-    resetGateProbe('rg-done-fresh', 65, 'resetgate 探针（已完成·零历史）', 'done'),
-  ],
-  now: r7(13, 55),
-};
-
 export const boardTagFilter: FixtureSet = {
   ...boardDefault,
   todos: [
     tagFilterProbe('tagfilter-bug', 41, 'tagfilter 探针（bug）', 'todo', ['tag-bug']),
     tagFilterProbe('tagfilter-docs', 42, 'tagfilter 探针（docs）', 'building', ['tag-docs']),
     tagFilterProbe('tagfilter-plain', 43, 'tagfilter 探针（无标签）', 'review', []),
-  ],
-  now: r7(13, 55),
-  tags: tagFilterRows,
-};
-
-export const boardTagFilterEmpty: FixtureSet = {
-  ...boardDefault,
-  todos: [
-    tagFilterProbe('tagfilter-e-bug', 44, 'tagfilter 空态探针（bug）', 'todo', ['tag-bug']),
-    tagFilterProbe('tagfilter-e-docs', 45, 'tagfilter 空态探针（docs）', 'building', ['tag-docs']),
   ],
   now: r7(13, 55),
   tags: tagFilterRows,
@@ -304,18 +233,6 @@ export const boardRepoFilter: FixtureSet = {
   tags: tagFilterRows,
 };
 
-function overflowProbe(id: string, seqNum: number, title: string): TodoRecord {
-  return { ...probeTodo('todo', r7(13, 40)), id, seqNum, title, spec: title };
-}
-
-export const boardOverflow: FixtureSet = {
-  ...boardDefault,
-  todos: Array.from({ length: 12 }, (_, i) =>
-    overflowProbe(`overflow-${String(i + 1).padStart(2, '0')}`, 51 + i, `溢出探针 #${i + 1}`),
-  ),
-  now: r7(13, 55),
-};
-
 export const boardQuotaWait: FixtureSet = {
   ...boardDefault,
   todos: [
@@ -344,37 +261,6 @@ export const boardQuotaWait: FixtureSet = {
     legacyDone,
   ],
   now: r7(13, 54),
-};
-
-function stressProbe(
-  id: string,
-  seqNum: number,
-  title: string,
-  phase: TodoRecord['phase'],
-): TodoRecord {
-  return { ...probeTodo(phase, r7(13, 40)), id, seqNum, title, spec: title };
-}
-
-export const boardStress: FixtureSet = {
-  ...boardDefault,
-  todos: [
-    stressProbe(
-      'stress-title',
-      51,
-      '重构 SuperCalendarUnavailableNamespaceController 并同步 docs/2026-09-30-architecture-decision-records/supplementary-review-notes.md 里的全部引用路径与脚注编号',
-      'todo',
-    ),
-    ...Array.from({ length: 120 }, (_, i) =>
-      stressProbe(
-        `stress-build-${String(i + 1).padStart(3, '0')}`,
-        100 + i,
-        `批量探针 #${i + 1}`,
-        'building',
-      ),
-    ),
-    stressProbe('stress-done', 900, '常规完成卡', 'done'),
-  ],
-  now: r7(13, 55),
 };
 
 export function boardWithProbe(
