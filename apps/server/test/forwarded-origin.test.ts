@@ -73,6 +73,8 @@ describe('forwardedOrigin', () => {
     'evil example',
     'evil.example:99999',
     'evil.example\\x',
+    '[.]',
+    '999.999.999.999',
   ])('a malformed forwarded host %j keeps the request origin', (host) => {
     expect(forwardedOrigin({ url: direct, loopbackPeer: true, proto: 'https', host })).toBe(
       'http://127.0.0.1:8787',

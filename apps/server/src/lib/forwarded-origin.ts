@@ -25,5 +25,5 @@ export function forwardedOrigin(input: {
   if (proto === undefined || !FORWARDED_PROTOCOLS.has(proto)) return requestUrl.origin;
   const host = firstListValue(input.host) ?? requestUrl.host;
   if (!validHost(host)) return requestUrl.origin;
-  return new URL(`${proto}://${host}`).origin;
+  return URL.parse(`${proto}://${host}`)?.origin ?? requestUrl.origin;
 }
