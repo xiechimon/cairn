@@ -28,6 +28,7 @@ The notes and captures from the early study of todos.dev (the r1 to r9 series an
 | [1607-acp-execution-surface.md](1607-acp-execution-surface.md) | none | ACP as an execution surface |
 | [2330-claude-entrypoint-and-setup-token-quota.md](2330-claude-entrypoint-and-setup-token-quota.md) | none | `claude -p` (sdk-cli) and interactive mode cost the same allowance; setup-token rate-limit events not yet measurable on omarchy (D50 spike) |
 | [mergify-merge-queue-spike.md](mergify-merge-queue-spike.md) | none | Mergify merge queue on a personal-account scratch repo: free install, semantic conflict caught with batching and bisect, label/status entry gates, author/committer, outside merges; go as a cairn pilot |
+| [review-gate-alternatives.md](review-gate-alternatives.md) | [assets/review-gate-hosted-reviewers-notes.md](assets/review-gate-hosted-reviewers-notes.md) | Why the omarchy review gate exists and runs on a timer, how hosted AI reviewers (CodeRabbit, Copilot, Greptile, PR-Agent, Claude and Codex actions, others) trigger, post and block, and a recommendation to move the gate to a `pull_request_target` workflow |
 
 ### Design system and front-end craft (from 2026-09-23)
 
