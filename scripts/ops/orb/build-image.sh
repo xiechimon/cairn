@@ -99,7 +99,7 @@ fi
 printf '%s\n' \
   'install pinned CLI packages and pnpm with npm lifecycle scripts disabled' \
   'create unprivileged agent user and validate its CLI and pnpm versions' \
-  'record bypass consent in root-owned /etc/claude-code/managed-settings.json' \
+  'pin Claude config to /var/lib/cairn-claude/config with the weaker nested sandbox, settings root-owned' \
   'lock root login and mask SSH server units' \
   'enable guest systemd-networkd' \
   'install and enable cairn-orb-worker.service, cairn-orb-check.service and cairn-orb-check.path' \
@@ -155,12 +155,18 @@ useradd --uid "$3" --create-home --shell /bin/bash agent
 [[ $(cd /tmp && runuser -u agent -- pnpm --version) == "$5" ]] || { printf 'pnpm %s is not runnable by agent\n' "$5" >&2; exit 1; }
 runuser -u agent -- /usr/bin/bwrap --version > /dev/null || { printf 'bubblewrap is not runnable by agent\n' >&2; exit 1; }
 runuser -u agent -- /usr/bin/socat -V > /dev/null || { printf 'socat is not runnable by agent\n' >&2; exit 1; }
-install -d -o root -g root -m 755 /etc/claude-code
-printf '%s\n' '{"skipDangerousModePermissionPrompt": true}' > /etc/claude-code/managed-settings.json
-chown root:root /etc/claude-code/managed-settings.json
-chmod 644 /etc/claude-code/managed-settings.json
-runuser -u agent -- /usr/bin/node -e 'const s = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8")); process.exit(s.skipDangerousModePermissionPrompt === true ? 0 : 1)' /etc/claude-code/managed-settings.json || { printf 'agent cannot read bypass consent from managed settings\n' >&2; exit 1; }
-runuser -u agent -- test ! -w /etc/claude-code/managed-settings.json || { printf 'agent can edit managed settings\n' >&2; exit 1; }
+install -d -o root -g root -m 755 /var/lib/cairn-claude
+install -d -o root -g agent -m 1770 /var/lib/cairn-claude/config
+printf '%s\n' '{"sandbox": {"enableWeakerNestedSandbox": true}}' > /var/lib/cairn-claude/config/settings.json
+chown root:root /var/lib/cairn-claude/config/settings.json
+chmod 644 /var/lib/cairn-claude/config/settings.json
+runuser -u agent -- /usr/bin/node -e 'const s = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8")); process.exit(s.sandbox?.enableWeakerNestedSandbox === true ? 0 : 1)' /var/lib/cairn-claude/config/settings.json || { printf 'agent cannot read the Claude sandbox settings\n' >&2; exit 1; }
+runuser -u agent -- touch /var/lib/cairn-claude/config/.agent-write-check || { printf 'agent cannot write the Claude config dir\n' >&2; exit 1; }
+rm -f /var/lib/cairn-claude/config/.agent-write-check
+! runuser -u agent -- rm -f /var/lib/cairn-claude/config/settings.json 2>/dev/null || { printf 'agent can remove the Claude settings\n' >&2; exit 1; }
+! runuser -u agent -- mv /var/lib/cairn-claude/config/settings.json /var/lib/cairn-claude/config/moved.json 2>/dev/null || { printf 'agent can rename the Claude settings\n' >&2; exit 1; }
+! runuser -u agent -- sh -c 'printf x > /var/lib/cairn-claude/config/settings.json' 2>/dev/null || { printf 'agent can overwrite the Claude settings\n' >&2; exit 1; }
+! runuser -u agent -- mv /var/lib/cairn-claude/config /var/lib/cairn-claude/moved 2>/dev/null || { printf 'agent can move the Claude config dir\n' >&2; exit 1; }
 passwd --lock root
 systemctl disable sshd.service sshd.socket || true
 systemctl mask sshd.service sshd.socket
@@ -179,6 +185,7 @@ StartLimitIntervalSec=0
 [Service]
 User=agent
 Environment=CAIRN_ORB=1
+Environment=CLAUDE_CONFIG_DIR=/var/lib/cairn-claude/config
 Restart=always
 RestartSec=1
 ExecStartPre=/bin/sh -c 'while [ ! -S /run/cairn/relay.sock ]; do sleep 1; done'
