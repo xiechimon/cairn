@@ -1307,6 +1307,7 @@ export async function applyBuildStepAction(
     | { action: 'review'; agentId?: string; focus?: string }
     | { action: 'restart'; feedback: string; clientMessageId: string },
   actor?: string,
+  origin: 'person' | 'automatic' = 'person',
 ): Promise<void> {
   const row = deps.db.select().from(build).where(eq(build.id, buildId)).get();
   if (!row) throw new NotFoundError(`build ${buildId}`);
@@ -1369,7 +1370,7 @@ export async function applyBuildStepAction(
         todoRecord.teamId,
         withRetryLessons(restartPrompt, reuseKind, reuseLessons),
         true,
-        true,
+        origin === 'person',
       );
       deps.db
         .update(build)
@@ -1440,7 +1441,7 @@ export async function applyBuildStepAction(
       todoRecord.teamId,
       withRetryLessons(restartPrompt, firstKind, priorLessons),
       false,
-      true,
+      origin === 'person',
     );
     setTodoPhase(deps, todoRecord.id, 'queued', {
       assignment,
