@@ -36,6 +36,9 @@ export interface ThreadChat {
   load: ThreadChatLoad;
   todo: TodoRecord | null;
   transcript: TranscriptItem[];
+  buildId: string | null;
+  buildLegDone: boolean;
+  infoOutput: boolean;
   started: boolean;
   running: boolean;
   workingFor: { startedAt?: number; seconds?: number } | undefined;
@@ -232,6 +235,9 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     load,
     todo,
     transcript,
+    buildId,
+    infoOutput: wire?.output === 'info',
+    buildLegDone: steps.some((step) => step.kind === 'build' && step.status === 'done'),
     started,
     running,
     workingFor:
