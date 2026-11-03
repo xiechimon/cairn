@@ -1,5 +1,5 @@
 import { ArrowUp, BookText, Brain, FolderOpen, KeyRound, Layers, Settings2 } from 'lucide-react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import { ListCard, ListRow } from '../components/list-card.js';
 import { StatStrip } from '../components/stat-strip.js';
 import { StoneGroup, StoneTrail } from '../components/stone/stone-group.js';
@@ -110,9 +110,15 @@ export function ProjectHomeMock({
 }) {
   const { t } = useI18n();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const openThread = (id: string) => {
+    const next = new URLSearchParams(searchParams);
+    next.set('thread', id);
+    setSearchParams(next);
+  };
   const scoped = todos.filter((todo) => todo.projectId === projectId);
   const { needsYou, running, idle, done } = useThreadGroups(scoped);
-  const ask = () => navigate(`/app?scenario=home-c&project=${projectId}`);
+  const ask = () => navigate('/app?scenario=home-c');
   const row = (todo: TodoRecord, tone = threadTone(todo)) => (
     <ThreadRow
       key={todo.id}
@@ -120,7 +126,7 @@ export function ProjectHomeMock({
       tone={tone}
       reason={t(threadCopy(todo).reason)}
       age={relativeTime(todo.phaseAt, now, t)}
-      onOpen={() => navigate(threadHref(todo.id))}
+      onOpen={() => openThread(todo.id)}
     />
   );
   return (
