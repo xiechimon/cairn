@@ -66,7 +66,13 @@ export function replyRouteOf(
   phase: TodoRecord['phase'],
   steps: readonly { status: string }[],
 ): 'queue' | 'message' {
-  return phase === 'todo' && steps.some((step) => step.status === 'stopped') ? 'queue' : 'message';
+  if (phase === 'todo')
+    return steps.some((step) => step.status === 'stopped') ? 'queue' : 'message';
+  const waitingForMachine =
+    (phase === 'queued' || phase === 'planning') &&
+    !steps.some((step) => step.status === 'claimed') &&
+    steps.some((step) => step.status === 'pending' || step.status === 'waiting_quota');
+  return waitingForMachine ? 'queue' : 'message';
 }
 
 export function useThreadChat(todoId: string, listed: TodoRecord | undefined): ThreadChat {
@@ -195,7 +201,7 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
   const started = buildId != null;
   const open = started && todo?.archivedAt == null && todo?.phase !== 'closed';
   const writable = live && open;
-  const stoppedBeforeStart = todo != null && replyRouteOf(todo.phase, steps) === 'queue';
+  const queueReply = todo != null && replyRouteOf(todo.phase, steps) === 'queue';
   const queueSteer =
     writable && buildId != null
       ? (text: string, deliverAfterStop: boolean) =>
@@ -209,7 +215,7 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
             .then(() => undefined)
       : undefined;
   const send = writable
-    ? stoppedBeforeStart && queueSteer !== undefined
+    ? queueReply && queueSteer !== undefined
       ? (text: string) => queueSteer(text, false)
       : async (text: string) => {
           await mutations.messageThread.mutateAsync({ todoId, content: text });
@@ -270,7 +276,9 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     stopped: buildQ.data?.errorMessage === STOP_MESSAGE,
     sendError: mutations.messageThread.isError
       ? mutations.messageThread.error?.message || t('发送失败，请重试。')
-      : null,
+      : mutations.sendSteer.isError && mutations.sendSteer.variables?.cancelQueued !== true
+        ? mutations.sendSteer.error?.message || t('发送失败，请重试。')
+        : null,
     queuedMessages: live ? messagesQ.data?.queuedMessages : undefined,
     retry: () => {
       void todoQ.refetch();
