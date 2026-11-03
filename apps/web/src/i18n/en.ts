@@ -1012,6 +1012,9 @@ export const EN: Record<string, string> = {
   '模型（可选）': 'Models (optional)',
   '模型 ID': 'Model ID',
   添加模型: 'Add model',
+  移除模型: 'Remove model',
+  '把 Base URL 中的占位符换成你的账户值':
+    'Replace the placeholders in the Base URL with your account values',
   // #355 picker 形态(spec 11 §A6;preset 显示名 = 品牌串不译,OAuth 徽标
   // 同为英文字面)
   '搜索服务商...': 'Search providers...',

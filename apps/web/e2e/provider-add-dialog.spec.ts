@@ -98,13 +98,53 @@ test('api_key row enters its preset key form prefilled; xai form shows the oauth
   await expect(dialog.locator('#dlg-provider-id')).toHaveValue('deepseek');
   await expect(dialog.locator('#dlg-provider-label')).toHaveValue('DeepSeek');
 
-  await expect(dialog.locator('#dlg-provider-baseurl')).toHaveValue('');
+  await expect(dialog.locator('#dlg-provider-baseurl')).toHaveValue('https://api.deepseek.com');
 
   await dialog.getByRole('button', { name: '返回' }).click();
   await dialog.locator('[data-preset-id]', { hasText: 'xAI' }).click();
   await expect(dialog.locator('#dlg-provider-id')).toHaveValue('xai');
   await expect(dialog.locator('#dlg-provider-label')).toHaveValue('xAI');
   await expect(dialog.getByText('Sign in with SuperGrok or X Premium')).toBeVisible();
+});
+
+test('Anthropic fills its pi catalog route: api.anthropic.com, Anthropic Messages, x-api-key, Claude models', async ({
+  page,
+}) => {
+  const dialog = await openPicker(page);
+  await dialog.locator('[data-preset-id="anthropic"]').click();
+  await expect(dialog.locator('#dlg-provider-id')).toHaveValue('anthropic');
+  await expect(dialog.locator('#dlg-provider-label')).toHaveValue('Anthropic');
+  await expect(dialog.locator('#dlg-provider-baseurl')).toHaveValue('https://api.anthropic.com');
+  await expect(dialog.getByRole('combobox', { name: 'API 协议' })).toContainText(
+    'Anthropic Messages',
+  );
+  await expect(dialog.locator('#dlg-provider-authheader')).not.toBeChecked();
+  const models = dialog.locator('[aria-label="模型 ID"]');
+  const ids = await models.evaluateAll((els) => els.map((el) => (el as HTMLInputElement).value));
+  expect(ids).toEqual(
+    expect.arrayContaining(['claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5']),
+  );
+  const count = await models.count();
+  await dialog.getByRole('button', { name: '移除模型' }).first().click();
+  await expect(models).toHaveCount(count - 1);
+
+  await dialog.locator('#dlg-provider-baseurl').fill('https://relay.example.com');
+  await expect(dialog.locator('#dlg-provider-baseurl')).toHaveValue('https://relay.example.com');
+  await expect(dialog.getByRole('button', { name: '添加模型服务' })).toBeEnabled();
+});
+
+test('a templated base URL blocks the submit until its placeholders are replaced', async ({
+  page,
+}) => {
+  const dialog = await openPicker(page);
+  await dialog.locator('[data-preset-id="cloudflare-workers-ai"]').click();
+  const baseUrl = dialog.locator('#dlg-provider-baseurl');
+  await expect(baseUrl).toHaveValue(/\{CLOUDFLARE_ACCOUNT_ID\}/);
+  const submit = dialog.getByRole('button', { name: '添加模型服务' });
+  await expect(submit).toBeDisabled();
+  await expect(dialog.getByText('把 Base URL 中的占位符换成你的账户值')).toBeVisible();
+  await baseUrl.fill('https://api.cloudflare.com/client/v4/accounts/acc-1/ai/v1');
+  await expect(submit).toBeEnabled();
 });
 
 test('family law: X, Escape and backdrop dismiss; panel clicks do not', async ({ page }) => {
