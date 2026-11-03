@@ -89,7 +89,7 @@ daemon=[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?)?$'
     printf 'rebuild cairn-orb-base: recipe or pinned Node/CLI versions changed\n'
   fi
 fi
-printf 'build cairn-orb-base with pacstrap: base git nodejs npm openssh ca-certificates curl bubblewrap socat\n'
+printf 'build cairn-orb-base with pacstrap: base git nodejs npm openssh ca-certificates curl bubblewrap socat python\n'
 printf 'pin Node major %s @anthropic-ai/claude-code@%s @openai/codex@%s pnpm@%s; create agent; install proxy settings; register image\n' "$node_major" "$claude_version" "$codex_version" "$pnpm_version"
 if [[ $filesystem == btrfs ]]; then
   printf 'create a locked staging subvolume under /var/lib/machines\n'
@@ -140,7 +140,7 @@ if [[ $filesystem == btrfs ]]; then
   rmdir -- "$stage"
   btrfs subvolume create "$stage"
 fi
-pacstrap -K -M "$stage" base git nodejs npm openssh ca-certificates curl bubblewrap socat
+pacstrap -K -M "$stage" base git nodejs npm openssh ca-certificates curl bubblewrap socat python
 printf 'configure image and pinned tools\n'
 arch-chroot "$stage" /usr/bin/env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/bin HOME=/root HTTP_PROXY="$HTTP_PROXY" HTTPS_PROXY="$HTTPS_PROXY" http_proxy="$http_proxy" https_proxy="$https_proxy" bash -s -- "$claude_version" "$codex_version" "$agent_uid" "$daemon_entry" "$pnpm_version" "$node_major" <<'GUEST'
 set -euo pipefail
@@ -155,6 +155,7 @@ useradd --uid "$3" --create-home --shell /bin/bash agent
 [[ $(cd /tmp && runuser -u agent -- pnpm --version) == "$5" ]] || { printf 'pnpm %s is not runnable by agent\n' "$5" >&2; exit 1; }
 runuser -u agent -- /usr/bin/bwrap --version > /dev/null || { printf 'bubblewrap is not runnable by agent\n' >&2; exit 1; }
 runuser -u agent -- /usr/bin/socat -V > /dev/null || { printf 'socat is not runnable by agent\n' >&2; exit 1; }
+runuser -u agent -- /usr/bin/python3 --version > /dev/null || { printf 'python3 is not runnable by agent\n' >&2; exit 1; }
 install -d -o root -g root -m 755 /var/lib/cairn-claude
 install -d -o root -g agent -m 1770 /var/lib/cairn-claude/config
 printf '%s\n' '{"sandbox": {"enableWeakerNestedSandbox": true}}' > /var/lib/cairn-claude/config/settings.json
@@ -192,6 +193,7 @@ ExecStartPre=/bin/sh -c 'while [ ! -S /run/cairn/relay.sock ]; do sleep 1; done'
 TimeoutStartSec=infinity
 ExecStart=/usr/bin/node $4 orb-step --socket /run/cairn/relay.sock
 UMask=0077
+LimitCORE=0
 
 [Install]
 WantedBy=multi-user.target
