@@ -29,12 +29,20 @@ describe('machine stream', () => {
   test('an event type this daemon does not know is skipped and later events still arrive', async () => {
     const client = sseClient([
       `data: ${JSON.stringify({ type: 'screen_open', capability: 'x' })}\n\n`,
-      'data: {not json\n\n',
       `data: ${JSON.stringify({ type: 'wake' })}\n\n`,
     ]);
     const seen: MachineStreamEvent[] = [];
     await client.stream(new AbortController().signal, (ev) => seen.push(ev));
     expect(seen).toEqual([{ type: 'wake' }]);
+  });
+
+  test('a malformed event of a known type still fails the stream so wire drift is not hidden', async () => {
+    const malformed = sseClient([
+      `data: ${JSON.stringify({ type: 'computer', call: { callId: 'short' } })}\n\n`,
+    ]);
+    await expect(malformed.stream(new AbortController().signal, () => {})).rejects.toThrow();
+    const broken = sseClient(['data: {not json\n\n']);
+    await expect(broken.stream(new AbortController().signal, () => {})).rejects.toThrow();
   });
 
   test('a computer event is parsed with its call', async () => {
