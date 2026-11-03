@@ -147,3 +147,62 @@ A GitHub webhook to the cairn server enqueues a review step. Any registered mach
 | 6 | Optional: install CodeRabbit as advisory only, never required | ian (App install) |
 
 Before any of these land, normal-path merges stay blocked. Running the same timer from the Mac as a stopgap is a separate operational decision for the coordinator.
+
+## 6. CodeRabbit in practice on busy public repos
+
+> **Question (follow-up).** How do busy public repos that merge many AI-authored PRs, some through a merge queue, actually use CodeRabbit? Does it block merges, how fast is it, does it hit rate limits, and does anyone pair it with a second reviewer or a custom gate?
+>
+> **Method.**
+> - **Repos:** found with `gh search code --filename .coderabbit.yaml` (and `.yml`, plus content queries such as `request_changes_workflow: true`), 392 repos in all, ranked by stars and merged-PR count. Nine busy repos were kept. Mergify users were found with `gh search code coderabbitai --filename .mergify.yml`.
+> - **What was read:** each repo's `.coderabbit.yaml` and its default-branch rulesets (`GET /repos/{o}/{r}/rules/branches/{b}`, which is public).
+> - **PR sample:** the 25 most recently updated merged PRs per repo through GraphQL (225 in all), read on 2026-11-03.
+> - **Limits:** classic branch protection is admin-only, so only rulesets are visible. "Time to first review" runs from PR creation to CodeRabbit's first formal review, so PRs opened as drafts inflate the tail. "AI-marked" is a keyword match on body, branch and commit messages (Claude, Codex, Cursor, Copilot, "Generated with") and can overcount from PR templates.
+> - All numbers are **measured** unless tagged.
+
+### 6.1 Repos by usage mode
+
+| Repo | Stars | Merge path | CodeRabbit config | How it gates | Second reviewer / custom gate | AI-marked PRs (of 25) |
+|---|---|---|---|---|---|---|
+| [kyverno/kyverno](https://github.com/kyverno/kyverno/blob/main/.coderabbit.yaml) | 8.3k | Ruleset: 1 approval, dismiss stale, last-push approval, threads resolved, required CI | assertive, `request_changes_workflow: true`, path instructions, pre-merge checks (one `error`) | **Approval counts**: 3/40 merged PRs had only a CodeRabbit approval (#18399, #18320, #16748). Change requests get dismissed on push; 7/40 merged with CodeRabbit's last review not an approval | Copilot code review ruleset rule (`review_on_push: true`) | 19 |
+| [appsmithorg/appsmith](https://github.com/appsmithorg/appsmith/blob/release/.coderabbit.yaml) | 41k | Ruleset shows only Copilot review; classic protection not visible | chill, `auto_approvals.enabled: true`, `max_merge_risk: low` | **Approval as the de facto gate**: 25/40 merged PRs had only a CodeRabbit approval (e.g. #42548, #42540); whether it is *required* is not visible (unverified) | Copilot code review rule | 17 |
+| [TryGhost/Ghost](https://github.com/TryGhost/Ghost/blob/main/.coderabbit.yaml) | 56k | Ruleset: 0 approvals, two aggregate CI checks required | quiet, no request-changes, pre-merge custom checks in `error` mode (TypeScript-only new files, tooling ownership) | Advisory: `CodeRabbit` not in required checks; `error` checks act only through reviews | none seen | 4 |
+| [mastra-ai/mastra](https://github.com/mastra-ai/mastra/blob/main/.coderabbit.yaml) | 29k | Ruleset: 1 approval, Lint + tests required | assertive, `commit_status: true`, `fail_commit_status: false`, incremental on | Advisory | none seen | 18 |
+| [webpack/webpack](https://github.com/webpack/webpack/blob/main/.coderabbit.yaml) | 66k | Ruleset: 1 approval, no required checks | chill, `commit_status: false`, incremental on | Advisory | none seen | 24 |
+| [prisma/orm](https://github.com/prisma/orm/blob/main/.coderabbit.yaml) | 48k | **GitHub merge queue** (ALLGREEN, 5 per group), 1 approval + code owners, required CI | 9-line config: path filters, base branches | Advisory: not in required checks | none seen | 22 |
+| [formbricks/formbricks](https://github.com/formbricks/formbricks/blob/main/.coderabbit.yaml) | 13k | **GitHub merge queue**, 1 approval, dismiss stale, threads resolved, required CI + SonarQube | assertive, 686 lines of path instructions, `fail_commit_status: false`, a CI job validating the CodeRabbit config | Advisory, but required thread resolution makes its open threads blocking (inferred) | SonarQube required | 25 |
+| [assistant-ui/assistant-ui](https://github.com/assistant-ui/assistant-ui/blob/main/.coderabbit.yaml) | 13k | **GitHub merge queue**, required `review-tier` check | 9 lines, pre-merge checks off | Advisory | **Custom gate** [`scripts/review-tier.mjs`](https://github.com/assistant-ui/assistant-ui/blob/main/scripts/review-tier.mjs) computes a risk tier and reads reviews with their `commit { oid }`; Claude (8/25 PRs) and Codex connector (1/25) also comment | 17 |
+| [langwatch/langwatch](https://github.com/langwatch/langwatch/blob/main/.coderabbit.yaml) | 5k | Ruleset: 1 approval, dismiss stale, threads resolved, required `review` + `ci-complete` | chill, `auto_incremental_review: false`, all linters off | Advisory | **Required Claude review job** ([`pr-review-bot.yml`](https://github.com/langwatch/langwatch/blob/main/.github/workflows/pr-review-bot.yml), `pull_request`, same-repo only, `CLAUDE_CODE_OAUTH_TOKEN`) is the `review` check; **LLM auto-approve** ([`pr-auto-approve.yml`](https://github.com/langwatch/langwatch/blob/main/.github/workflows/pr-auto-approve.yml), `pull_request_target`) approves low-risk PRs per head SHA, relying on stale-review dismissal | 20 |
+
+Mergify plus CodeRabbit appears only in small repos:
+
+- [doxynix/doxynix](https://github.com/doxynix/doxynix/blob/main/.mergify.yml) (4 stars) has an auto-merge rule with `approved-reviews-by = coderabbitai[bot]`. In its last 15 merged PRs, Mergify merged only release-bot PRs; the author-gated rule never fired, and CodeRabbit left no review on those PRs (measured).
+- [dangreco/os](https://github.com/dangreco/os/blob/main/.mergify.yml) (0 stars) has `approved-reviews-by = coderabbitai` for dependency PRs.
+- [rmems/synthetic-factory](https://github.com/rmems/synthetic-factory/blob/main/.mergify.yml) (1 star) requires `check-success=CodeRabbit`. Its comment explains why it does not gate on approvals: every approval in that repo comes from a bot, so an approval gate "would either deadlock every merge or rubber-stamp it".
+- [AditthyaSS/iloveAgents](https://github.com/AditthyaSS/iloveAgents/blob/main/.mergify.yml) (150 stars) only comments when `check-failure = CodeRabbit`.
+
+### 6.2 Key numbers (225 merged PRs, 9 repos)
+
+| Metric | Value |
+|---|---|
+| Median time to CodeRabbit's first formal review | 7.7 to 11.4 min in 7 repos (kyverno 7.7, appsmith 7.9, assistant-ui 8.6, webpack 9.0, langwatch 10.4, Ghost 11.3, prisma 11.4); formbricks 22.3; mastra 104.7 (drafts) |
+| Re-reviewed a later commit (multi-commit PRs CodeRabbit reviewed) | prisma 21/22, formbricks 11/12, appsmith 14/16, webpack 17/20, mastra 8/12, Ghost 5/8, langwatch 8/14 (incremental off), assistant-ui 3/11 |
+| Explicit rate-limit block | 1 of 225 (formbricks #9895, on the OSS plan per the comment footer; the reason shown was "Too many files!") |
+| "Review skipped" comments | Common: langwatch 16/25 ("Auto incremental reviews are disabled on this repository"), kyverno 6, Ghost 5, formbricks 5; causes include incremental reviews off, too many files, and base branch filters |
+| `CodeRabbit` check conclusion on the merged head | Mostly `SUCCESS` or `SKIPPED`; assistant-ui 18/23 `SKIPPED`; never `FAILURE` in the sample |
+| `CodeRabbit` as a required check in a ruleset | 0 of 9 repos |
+| CodeRabbit review threads resolved before merge | 302 of 329 (92%) |
+| Human `@coderabbitai` commands | appsmith 22, langwatch 11, kyverno 10, webpack 8; others 0 to 3 |
+
+### 6.3 Answers to the open questions
+
+- **Rate limits on a busy free public repo.** In practice they were not a problem: 1 rate-limit-marked comment in 225 merged PRs across repos merging dozens of PRs a day, including one on the OSS plan (measured). Skipped reviews are far more common than rate limits, and a skip leaves the `CodeRabbit` check `SKIPPED`, which a `check-success` gate would treat as not passed (measured, matching section 2's Mergify fact).
+- **Mergify `approved-reviews-by = coderabbitai[bot]`.** Used only in tiny repos, and the one with history (doxynix) never fired in the sample (measured). Whether Mergify's write-permission filter accepts the bot remains unverified.
+- **Do CodeRabbit approvals count toward required approvals?** Yes, in practice. kyverno's ruleset requires one approval and three merged PRs had no approval other than CodeRabbit's; GraphQL reports `authorCanPushToRepository: true` for the bot (measured). That this satisfied the rule rather than an admin bypass is inferred, because bypass actors are not visible.
+- **Does a CodeRabbit request-changes review gate merges?** Weakly. In kyverno, stale-review dismissal clears it on each push and CodeRabbit does not always re-request, so 7 of 40 merged PRs ended with CodeRabbit's last review not an approval (measured).
+- **Pairing.** The two repos closest to cairn's problem treat CodeRabbit as advice and gate on their own Actions job:
+  - langwatch: a required Claude review job, plus LLM auto-approval bound to the head SHA.
+  - assistant-ui: a required custom `review-tier` check.
+
+  Four others add Copilot's ruleset reviewer (measured). This matches option (a). Note that langwatch's review job runs on `pull_request` with a secret. A same-repo PR that edits that workflow would run the edited version with the secret, which is the risk section 4 avoids with `pull_request_target` (inferred).
+
+**Effect on the recommendation.** None. Real repos confirm that CodeRabbit is fast and reliable as an advisor (about 8 to 11 minutes, rare rate limits). No busy repo uses its check as a required gate. The repos that gate on AI review do it with their own Actions job, which is option (a). CodeRabbit as an advisory second opinion (PR 6) stays optional.
