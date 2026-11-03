@@ -25,6 +25,7 @@ import { useI18n } from '../i18n/provider.js';
 import { ChevronLeft, PlusSmall, Search } from '../icons/index.js';
 import { ProviderConnectionDisclosure } from './provider-connection-disclosure.js';
 import { ProviderModelChips, pickedModels } from './provider-model-list.js';
+import { PROVIDER_PRESET_DEFAULTS } from './provider-preset-data.js';
 
 const FIELD_TITLE_CLS = 'text-ui font-medium text-foreground';
 
@@ -230,8 +231,7 @@ export function CreateProviderDialog({
           return row.label.toLowerCase().includes(q) || row.id.includes(q);
         });
 
-  const enterForm = async (entry: { id: string; label: string } | null) => {
-    const { PROVIDER_PRESET_DEFAULTS } = await import('./provider-preset-data.js');
+  const enterForm = (entry: { id: string; label: string } | null) => {
     const defaults = entry === null ? undefined : PROVIDER_PRESET_DEFAULTS[entry.id];
     setPreset(entry);
     setProviderId(entry?.id ?? '');
@@ -318,7 +318,7 @@ export function CreateProviderDialog({
                           ? onConnect != null
                             ? onConnect(row.id)
                             : onClose()
-                          : void enterForm({ id: row.id, label: row.label })
+                          : enterForm({ id: row.id, label: row.label })
                       }
                     >
                       <span aria-hidden className={PICKER_TILE_CLS}>
@@ -336,11 +336,7 @@ export function CreateProviderDialog({
             })}
             <fieldset className={PICKER_GROUP_CLS}>
               <legend className={PICKER_GROUP_HEAD_CLS}>{t('其他')}</legend>
-              <Button
-                variant="ghost"
-                className={PICKER_ROW_CLS}
-                onClick={() => void enterForm(null)}
-              >
+              <Button variant="ghost" className={PICKER_ROW_CLS} onClick={() => enterForm(null)}>
                 <span aria-hidden className={PICKER_TILE_CLS}>
                   <PlusSmall />
                 </span>

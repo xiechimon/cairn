@@ -1010,7 +1010,6 @@ export const EN: Record<string, string> = {
   '密钥将加密存储，保存后无法再次查看。':
     'The key is stored encrypted and cannot be viewed again after saving.',
   '模型（可选）': 'Models (optional)',
-  '模型 ID': 'Model ID',
   添加模型: 'Add model',
   移除模型: 'Remove model',
   连接设置: 'Connection',
