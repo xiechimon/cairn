@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { machineComputerFramesResponseSchema } from '@cairn/shared';
+import { machineComputerFramesResponseSchema, redactSecrets } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterEach, describe, expect, test } from 'vitest';
@@ -235,6 +235,7 @@ describe('POST /api/machine/computer/:callId', () => {
           text: `${'x'.repeat(COMPUTER_OUTPUT_HEAD_CHARS - 4)}ghp_`,
         },
         { kind: 'output', seq: 2, stream: 'stdout', text: `${suffix} after` },
+        { kind: 'done', seq: 3, text: '' },
       ],
     });
     expect(res.status).toBe(200);
@@ -251,6 +252,7 @@ describe('POST /api/machine/computer/:callId', () => {
       frames: [
         { kind: 'output', seq: 1, stream: 'stdout', text: 'Authorization: Bearer g' },
         { kind: 'output', seq: 2, stream: 'stdout', text: `hp_${suffix} after` },
+        { kind: 'done', seq: 3, text: '' },
       ],
     });
     expect(res.status).toBe(200);
@@ -259,26 +261,61 @@ describe('POST /api/machine/computer/:callId', () => {
     expect(stored).toBe('Authorization: [REDACTED] after');
   });
 
-  test('a complete credential right after a redacted one is still redacted', async () => {
+  test('credentials split anywhere across frames are stored as if the output arrived whole', async () => {
+    const { s, owner } = await setup();
+    const streams = [
+      'Authorization: Bearer first-secret\nBearer second-secret\n',
+      `envelope v1:${'A'.repeat(44)}\nnext line`,
+      `token ghp_${'b'.repeat(36)} ok\nsk-${'c'.repeat(24)}`,
+      `x Bearer ${'d'.repeat(30)}`,
+    ];
+    let n = 0;
+    for (const stream of streams) {
+      const cuts: number[][] = [];
+      for (let i = 1; i < stream.length; i++) {
+        cuts.push([i]);
+        for (let j = i + 1; j < stream.length; j += 7) cuts.push([i, j]);
+      }
+      for (const cut of cuts) {
+        const id = insertCall(s, owner.id, `split-${n++}`);
+        const bounds = [0, ...cut, stream.length];
+        const frames = [
+          ...bounds.slice(1).map((end, i) => ({
+            kind: 'output' as const,
+            seq: i + 1,
+            stream: 'stdout' as const,
+            text: stream.slice(bounds[i], end),
+          })),
+          { kind: 'done' as const, seq: bounds.length, text: '' },
+        ];
+        for (const frame of frames) {
+          const res = await post(s.app, `/api/machine/computer/${id}`, owner.token, {
+            frames: [frame],
+          });
+          expect(res.status).toBe(200);
+        }
+        const r = row(s, id);
+        expect(r.outputHead + r.outputTail, `${JSON.stringify(stream)} cut at ${cut}`).toBe(
+          redactSecrets(stream).value,
+        );
+      }
+    }
+  }, 120_000);
+
+  test('output still being written is held back until it settles and flushed when the call ends', async () => {
     const { s, owner, id } = await setup();
-    const envelope = `v1:${'A'.repeat(44)}`;
-    const res = await post(s.app, `/api/machine/computer/${id}`, owner.token, {
-      frames: [
-        { kind: 'output', seq: 1, stream: 'stdout', text: 'Authorization: Bearer first-secret' },
-        { kind: 'output', seq: 2, stream: 'stdout', text: 'Bearer second-secret' },
-        { kind: 'output', seq: 3, stream: 'stdout', text: 'Bearer third-secret' },
-        { kind: 'output', seq: 4, stream: 'stdout', text: envelope },
-        { kind: 'output', seq: 5, stream: 'stdout', text: 'suffixBearer fourth-secret' },
-        { kind: 'output', seq: 6, stream: 'stdout', text: `suffixv1:${'C'.repeat(44)}` },
-      ],
+    await post(s.app, `/api/machine/computer/${id}`, owner.token, {
+      frames: [{ kind: 'output', seq: 1, stream: 'stdout', text: 'Authorization: Bearer ' }],
     });
-    expect(res.status).toBe(200);
-    const stored = row(s, id).outputHead + row(s, id).outputTail;
-    expect(stored).not.toContain('second-secret');
-    expect(stored).not.toContain('third-secret');
-    expect(stored).not.toContain('fourth-secret');
-    expect(stored).not.toContain('C'.repeat(20));
-    expect(stored).not.toContain('A'.repeat(20));
+    await post(s.app, `/api/machine/computer/${id}`, owner.token, {
+      frames: [{ kind: 'output', seq: 2, stream: 'stdout', text: 'partial-sec' }],
+    });
+    expect(row(s, id).outputHead).toBe('Authorization: Bearer ');
+    expect(row(s, id).outputChars).toBe(33);
+    await post(s.app, `/api/machine/computer/${id}`, owner.token, {
+      frames: [{ kind: 'error', seq: 3, message: 'killed', delivery: 'unknown' }],
+    });
+    expect(row(s, id).outputHead).toBe('Authorization: [REDACTED]');
   });
 
   test('output keeps a bounded head and tail with the full character count', async () => {
@@ -290,6 +327,7 @@ describe('POST /api/machine/computer/:callId', () => {
       stream: 'stdout',
       text: seq === 3 ? `${chunk.slice(4)}LAST` : chunk,
     }));
+    frames.push({ kind: 'done', seq: 4, stream: 'stdout', text: '' });
     const res = await post(s.app, `/api/machine/computer/${id}`, owner.token, { frames });
     expect(res.status).toBe(200);
     const r = row(s, id);
