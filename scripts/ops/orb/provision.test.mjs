@@ -693,6 +693,15 @@ test('installer provisions root-owned bind parents and owner content directories
       readFileSync(join(f.root, 'usr/local/lib/cairn-orb/runtime-directory.mjs'), 'utf8'),
       readFileSync(new URL('./runtime-directory.mjs', import.meta.url), 'utf8'),
     );
+    const homeMount = readFileSync(
+      join(f.root, 'etc/systemd/system/var-lib-cairn\\x2dcomputer.mount'),
+      'utf8',
+    );
+    assert.match(homeMount, /^What=\/var\/lib\/cairn-computer$/m);
+    assert.match(homeMount, /^Where=\/var\/lib\/cairn-computer$/m);
+    assert.match(homeMount, /^Options=bind,nosuid,nodev$/m);
+    assert.ok(f.calls.includes('systemctl enable var-lib-cairn\\x2dcomputer.mount'));
+    assert.ok(f.calls.includes('systemctl start var-lib-cairn\\x2dcomputer.mount'));
     assert.equal(
       readFileSync(join(f.root, 'usr/local/lib/cairn-orb/computer-home.mjs'), 'utf8'),
       readFileSync(new URL('./computer-home.mjs', import.meta.url), 'utf8'),

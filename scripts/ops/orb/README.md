@@ -700,3 +700,7 @@ name. For `cairn-orb-computer-*` machines, `prepare-machine.sh` runs
 `computer-home.mjs` as root. It creates `/var/lib/cairn-computer/<machine>`
 (`ian:ian 0700`, refusing links and foreign owners) and binds it to
 `/home/agent` with an idmap. The image is disposable and the home persists.
+The idmap maps guest root to host root on that bind, so the installer mounts
+`/var/lib/cairn-computer` on itself with `nosuid,nodev`
+(`var-lib-cairn\x2dcomputer.mount`), and `prepare-machine.sh` refuses to start
+a computer when that mount lacks either option, as it does for `/run/cairn-orb`.

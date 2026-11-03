@@ -31,6 +31,8 @@ else
   if $stop; then printf '%s changes\n' "$changes"; exit 0; fi
   expected="CAIRN_ORB_BINDS=${CAIRN_ORB_FIXED_BINDS:?Missing fixed bind configuration}"
   if [[ $name == cairn-orb-computer-* ]]; then
+    home_options=$(findmnt --noheadings --output OPTIONS --target "$host_root/var/lib/cairn-computer")
+    [[ ,$home_options, == *,nosuid,* && ,$home_options, == *,nodev,* ]] || { printf 'Computer homes require a nosuid,nodev mount at /var/lib/cairn-computer\n' >&2; exit 1; }
     home_args=("$name")
     if $dry_run; then home_args=(--dry-run "${home_args[@]}"); fi
     home_changes=$("${CAIRN_ORB_NODE:-/usr/local/lib/cairn-orb/node}" "$(dirname -- "${BASH_SOURCE[0]}")/computer-home.mjs" "${home_args[@]}")

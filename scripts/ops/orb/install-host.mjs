@@ -3,6 +3,8 @@ import { join, resolve } from 'node:path';
 import { changes } from './host-files.mjs';
 import { missingUfwRules } from './ufw-rules.mjs';
 
+const COMPUTER_HOME_MOUNT = 'var-lib-cairn\\x2dcomputer.mount';
+
 export function installHost(options = {}) {
   const {
     root = '/',
@@ -93,6 +95,10 @@ export function installHost(options = {}) {
       '[Unit]\nRequires=cairn-orb-firewall.service\nAfter=cairn-orb-firewall.service\n\n[Service]\nExecStartPre=+/usr/local/lib/cairn-orb/prepare-machine.sh %i\nExecStopPost=\nExecStopPost=+/usr/local/lib/cairn-orb/prepare-machine.sh --stop %i\nExecStopPost=-systemd-nspawn --cleanup --machine=%i\nEnvironment=CAIRN_ORB_BINDS=\nEnvironment="CAIRN_ORB_FIXED_BINDS=--bind=/run/cairn-orb/%i:/run/cairn:idmap,norbind --bind-ro=/var/lib/cairn-orb/dist:/opt/cairn/daemon:idmap,norbind --bind-ro=/var/lib/cairn-orb/seed:/seed:idmap,norbind"\nEnvironmentFile=-/run/systemd/nspawn/%i.binds\nExecStart=\nExecStart=systemd-nspawn --quiet --keep-unit --boot --link-journal=try-guest --network-veth -U --settings=override --machine=%i $CAIRN_ORB_BINDS\n',
     ],
     [
+      `/etc/systemd/system/${COMPUTER_HOME_MOUNT}`,
+      '[Unit]\nDescription=Coordinator computer homes without setuid or device files\nRequiresMountsFor=/var/lib\n\n[Mount]\nWhat=/var/lib/cairn-computer\nWhere=/var/lib/cairn-computer\nType=none\nOptions=bind,nosuid,nodev\n\n[Install]\nWantedBy=local-fs.target\n',
+    ],
+    [
       '/etc/systemd/system/systemd-networkd.service.d/20-cairn-orb.conf',
       '[Unit]\nRequires=cairn-orb-firewall.service\nAfter=cairn-orb-firewall.service\n',
     ],
@@ -159,6 +165,13 @@ export function installHost(options = {}) {
   }
   if (change.probe('systemctl', ['is-enabled', 'cairn-orb-firewall.service']).status !== 0)
     change.exec('systemctl', ['enable', 'cairn-orb-firewall.service']);
+  for (const [probe, action] of [
+    ['is-enabled', 'enable'],
+    ['is-active', 'start'],
+  ]) {
+    if (change.probe('systemctl', [probe, COMPUTER_HOME_MOUNT]).status !== 0)
+      change.exec('systemctl', [action, COMPUTER_HOME_MOUNT]);
+  }
   if (change.probe('systemctl', ['is-active', 'ufw']).status === 0) {
     const rules = readFileSync(join(root, 'etc/ufw/user.rules'), 'utf8');
     for (const { args } of missingUfwRules(rules)) change.exec('ufw', args);

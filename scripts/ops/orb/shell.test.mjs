@@ -74,7 +74,7 @@ if (cmd === 'pacstrap') {
   }
   if (process.env.MOUNTED_STAGE) writeFileSync(join(root, 'active-mount'), args[2] + '/dev');
 }
-if (cmd === 'findmnt' && args.includes('--target')) { console.log(process.env.RUN_MOUNT_OPTIONS ?? 'rw,nosuid,nodev'); process.exit(0); }
+if (cmd === 'findmnt' && args.includes('--target')) { console.log(args.at(-1).includes('cairn-computer') ? (process.env.HOME_MOUNT_OPTIONS ?? 'rw,nosuid,nodev') : (process.env.RUN_MOUNT_OPTIONS ?? 'rw,nosuid,nodev')); process.exit(0); }
 if (cmd === 'findmnt' && existsSync(join(root, 'active-mount'))) {
   const active = readFileSync(join(root, 'active-mount'), 'utf8');
   console.log(join(realpathSync(dirname(active)), basename(active)));
@@ -312,6 +312,21 @@ test('a computer Orb gets its persistent home bind and the computer template nev
         ),
     );
     assert.notEqual(f.run('prepare-machine.sh', ['--stop', 'cairn-orb-computer']).status, 0);
+    for (const options of ['rw,nodev', 'rw,nosuid', 'rw', '']) {
+      const before = f.calls().length;
+      const refused = f.run('prepare-machine.sh', ['cairn-orb-computer-def'], {
+        HOME_MOUNT_OPTIONS: options,
+      });
+      assert.notEqual(refused.status, 0, options);
+      assert.match(refused.stderr, /nosuid,nodev/);
+      const later = f.calls().slice(before);
+      assert.ok(
+        later.some(
+          (call) => call[0] === 'findmnt' && call.at(-1) === `${f.root}/var/lib/cairn-computer`,
+        ),
+      );
+      assert.ok(!later.some((call) => call[1]?.endsWith?.('/computer-home.mjs')));
+    }
   } finally {
     rmSync(f.root, { recursive: true, force: true });
   }
