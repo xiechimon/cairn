@@ -55,12 +55,13 @@ test('rail project group collapse hides member rows and survives reload', async 
   await expect(page.locator('.rail-row .project-avatar')).toHaveCount(0);
 });
 
-test('resources live in the user menu, not the sidebar', async ({ page }) => {
+test('resources live in settings, not the sidebar', async ({ page }) => {
   await page.goto('/app?scenario=01');
   await expect(skills(page)).toHaveCount(0);
   await expect(page.locator('.sidebar-group', { hasText: '资源' })).toHaveCount(0);
-  await page.locator('.sidebar-user').click();
+  await page.getByTestId('sidebar-settings').click();
+  const settings = page.getByRole('dialog', { name: '设置' });
   for (const name of ['技能', 'MCP', '密钥', '机器', '模型服务', '团队', 'API 密钥', '账号']) {
-    await expect(page.getByRole('link', { name, exact: true })).toBeVisible();
+    await expect(settings.getByRole('link', { name, exact: true })).toBeVisible();
   }
 });

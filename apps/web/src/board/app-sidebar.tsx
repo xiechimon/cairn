@@ -12,6 +12,7 @@ import { useI18n } from '../i18n/provider.js';
 import { useTypeToCompose } from '../overlay/hotkeys.js';
 import { SearchPanel, useSearchState } from '../overlay/search-panel.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
+import { recordOutsideLocation } from '../settings/settings-href.js';
 import { needsYouCount } from './needs-you.js';
 import { BoardSidebar, type SidebarProject, type SidebarSelected } from './sidebar.js';
 
@@ -76,7 +77,8 @@ export function AppSidebar({
   );
   const [drawerOpen, setDrawerOpen] = useState(false);
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
-  const { key: locationKey } = useLocation();
+  const location = useLocation();
+  const { key: locationKey } = location;
   useEffect(() => {
     setDrawerOpen(false);
   }, [locationKey]);
@@ -99,11 +101,20 @@ export function AppSidebar({
       : fixture.chief != null
         ? 1
         : 0;
+  const machinesOffline = live
+    ? (machinesQ.data ?? []).filter((m) => !m.online).length
+    : (fixtureMachines ?? []).filter((m) => m.online === false).length;
+  const { pathname, search: locationSearch } = location;
+  useEffect(
+    () => recordOutsideLocation(`${pathname}${locationSearch}`),
+    [pathname, locationSearch],
+  );
   useTypeToCompose();
   const chiefStream = useOptionalChiefRoot()?.surface.chiefData.stream ?? [];
   const sidebarProps = {
     attention: needsYouCount(resolvedTodos, chiefStream),
     machinesOnline,
+    machinesOffline,
     todos: resolvedTodos,
     onSearch: onSearch ?? (() => search.setOpen(true)),
     usageNav: fixture.usageNav === true,

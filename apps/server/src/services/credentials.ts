@@ -108,7 +108,7 @@ export function resolveStepCredentials(
 
   const secrets =
     todoRow.assignment?.source !== 'intake-label' && agentRow && stepTakesSecrets(stepRow.kind)
-      ? openSecretValues(boxDeps, todoRow.teamId, agentRow.secrets)
+      ? openSecretValues(boxDeps, todoRow.teamId, agentRow.secrets, todoRow.projectId)
       : {};
 
   return {

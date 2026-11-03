@@ -1,5 +1,6 @@
-import { Server } from 'lucide-react';
+import { Layers, Palette, Server, User } from 'lucide-react';
 import { useState } from 'react';
+import { MemoryRouter } from 'react-router';
 import {
   type MachineWithProviders,
   type SubscriptionAccount,
@@ -18,6 +19,7 @@ import {
   ProviderPanel,
 } from '../components/providers/provider-panel.js';
 import { RoutingGraph } from '../components/settings/routing-graph.js';
+import { SettingsNav } from '../components/settings/settings-nav.js';
 import { SettingsCard } from '../components/settings-list.js';
 import {
   ACCOUNT_MACHINES,
@@ -97,6 +99,44 @@ function ProviderPanelSpecimen() {
         <ProviderModelRow name="default-sonnet" id="claude-sonnet-5-5" />
       </SettingsCard>
     </ProviderPanel>
+  );
+}
+
+function SettingsNavSpecimen() {
+  const [current, setCurrent] = useState('providers');
+  const [query, setQuery] = useState('');
+  return (
+    <MemoryRouter>
+      <div className="h-80 w-60 rounded-(--radius-card) bg-(--surface-1)">
+        <SettingsNav
+          groups={[
+            {
+              heading: null,
+              items: [
+                { id: 'account', label: 'Account', Icon: User },
+                { id: 'appearance', label: 'Appearance', Icon: Palette },
+              ],
+            },
+            {
+              heading: 'Models & accounts',
+              items: [
+                { id: 'providers', label: 'Providers', Icon: Layers },
+                { id: 'machines', label: 'Machines', Icon: Server, badge: '4/5' },
+              ],
+            },
+          ]}
+          current={current}
+          hrefFor={(id) => {
+            return { hash: id };
+          }}
+          query={query}
+          onQuery={(next) => {
+            setQuery(next);
+            if (next === '') setCurrent('providers');
+          }}
+        />
+      </div>
+    </MemoryRouter>
   );
 }
 
@@ -184,6 +224,14 @@ export function AccountsSection() {
         <div className="w-full">
           <ProviderPanelSpecimen />
         </div>
+      </Specimen>
+      <Specimen
+        title="Settings nav"
+        note="Settings window: search narrows the list, groups with a heading, current section highlighted, optional count badge"
+        stage="sheet"
+        code={`<SettingsNav groups={groups} current={id} hrefFor={hrefFor} query={q} onQuery={setQ} />`}
+      >
+        <SettingsNavSpecimen />
       </Specimen>
       <Specimen
         title="Providers on one machine"

@@ -33,12 +33,12 @@ test.describe('sidebar seam (Paper Grouped)', () => {
       expect(await teamRowBox(page)).toEqual({ x: 12, y: 12, w: 224, h: 44 });
     });
 
-    test(`team page: the workspace row keeps the board geometry (${theme})`, async ({
+    test(`schedules page: the workspace row keeps the board geometry (${theme})`, async ({
       page,
     }) => {
       await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
-      await page.goto('/app/team?scenario=12');
-      await expect(page.locator('[data-route="team"]')).toBeVisible();
+      await page.goto('/app/schedules?scenario=12');
+      await expect(page.locator('[data-route="schedules"]')).toBeVisible();
       expect(await teamRowBox(page)).toEqual({ x: 12, y: 12, w: 224, h: 44 });
     });
 
@@ -66,7 +66,6 @@ test.describe('sidebar seam (Paper Grouped)', () => {
 
     for (const [name, url] of [
       ['pages', '/app/schedules?scenario=11'],
-      ['resources', '/app/resources/skills?scenario=06'],
       ['detail', '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=detail-unread'],
     ] as const) {
       test(`${name} shell: no seam, same workspace row (${theme})`, async ({

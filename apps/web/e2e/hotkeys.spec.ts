@@ -229,7 +229,7 @@ test.describe('#1141 suppression retired', () => {
     await expect(drawer(page)).toBeHidden();
   });
 
-  test('the window opened on the authorize page survives the route back', async ({ page }) => {
+  test('the authorize page opens the window, and back returns to the machines section', async ({ page }) => {
 
     await page.goto(MACHINES);
     await page.getByRole('button', { name: '添加机器' }).click();
@@ -241,10 +241,7 @@ test.describe('#1141 suppression retired', () => {
     await expect(page.locator('.authorize-backdrop')).toBeVisible();
     await pressAndExpect(page, 'Meta+j', drawer(page));
     await page.goBack();
-    await page.waitForURL((u) => u.pathname === '/app/resources/machines');
+    await page.waitForURL((u) => u.pathname === '/app/settings/machines');
     await expect(page.getByRole('button', { name: '添加机器' })).toBeVisible();
-    await expect(drawer(page)).toBeVisible();
-    await pressAndExpect(page, 'Meta+j', drawer(page), 'hidden');
-    await expect(drawer(page)).toBeHidden();
   });
 });

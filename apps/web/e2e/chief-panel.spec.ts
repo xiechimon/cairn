@@ -24,7 +24,7 @@ test.describe('chief panel floating form (ADR 0013)', () => {
   });
 
   test('Esc never closes the panel on a wake surface', async ({ page }) => {
-    await page.goto('/app/team?scenario=12');
+    await page.goto('/app/schedules?scenario=12');
 
     await expect(drawer(page)).toBeHidden();
     await expect(drawer(page)).toHaveCount(1);
@@ -110,8 +110,6 @@ test.describe('chief panel floating form (ADR 0013)', () => {
 
   for (const { name, route } of [
     { name: 'pages', route: '/app/schedules?scenario=11' },
-    { name: 'resources', route: '/app/resources/skills?scenario=06' },
-    { name: 'secondary', route: '/app/team?scenario=12' },
   ] as const) {
     test(`${name}: the main column never narrows while the window is open`, async ({ page }) => {
       await page.goto(route);

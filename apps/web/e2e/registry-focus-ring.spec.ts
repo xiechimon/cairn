@@ -245,9 +245,9 @@ test.describe('#1244 registry focus: outline on buttons, field ring on text fiel
     expect(info.boxShadow).not.toContain('0px 0px 0px 3px');
   });
 
-  test('the sidebar user button uses the global outline', async ({ page }) => {
-    await themed(page, 'dark', SKILLS);
-    const user = page.locator('.sidebar-user');
+  test('the sidebar settings link uses the global outline', async ({ page }) => {
+    await themed(page, 'dark', '/app/schedules?scenario=01');
+    const user = page.getByTestId('sidebar-settings');
     await expect(user).toBeVisible();
     await focusKeyboard(user);
     const info = await readFocus(user);
