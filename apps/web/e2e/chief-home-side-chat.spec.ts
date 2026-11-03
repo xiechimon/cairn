@@ -101,6 +101,17 @@ test('an unknown thread id shows a not-found state', async ({ page }) => {
   await expect(page.getByTestId('side-chat-unavailable')).toContainText('任务不存在或已被删除');
 });
 
+test('a wide panel re-clamps when the window narrows', async ({ page }) => {
+  await page.setViewportSize({ width: 2000, height: 900 });
+  await page.goto(`${HOME}&thread=home-c-review`);
+  await handle(page).focus();
+  await page.keyboard.press('End');
+  expect(await panelWidth(page)).toBe(1200);
+  await page.setViewportSize({ width: 1200, height: 900 });
+  await expect.poll(() => panelWidth(page)).toBe(720);
+  await expect(handle(page)).toHaveAttribute('aria-valuenow', '720');
+});
+
 test.describe('phone width', () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
@@ -112,6 +123,18 @@ test.describe('phone width', () => {
     expect(await panelWidth(page)).toBe(390);
     await expect(page.locator('.app-menu-trigger')).toBeHidden();
     await expect(handle(page)).toBeHidden();
+  });
+
+  test('typing never lands in the Coordinator composer the side chat covers', async ({ page }) => {
+    await page.goto(HOME);
+    await page.locator('body').click({ position: { x: 5, y: 400 } });
+    await page.keyboard.type('h');
+    await expect(page.getByTestId('chief-composer-input')).toBeFocused();
+    await page.goto(`${HOME}&thread=home-c-working-a`);
+    await expect(sideChat(page)).toBeVisible();
+    await page.locator('body').click({ position: { x: 5, y: 400 } });
+    await page.keyboard.type('h');
+    await expect(page.getByTestId('chief-composer-input')).not.toBeFocused();
   });
 });
 
