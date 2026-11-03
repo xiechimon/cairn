@@ -225,6 +225,7 @@ export const step = sqliteTable(
     lastHeartbeatAt: epochMs('lastHeartbeatAt'),
     finishedAt: epochMs('finishedAt'),
     prompt: text('prompt'),
+    scopeProjectId: text('scopeProjectId'),
     freshSession: bool('freshSession').notNull().default(false),
     skillInjection: json<SkillInjectionRecord>('skillInjection'),
     blockerHandoff: json<BlockerHandoffRecord>('blockerHandoff'),

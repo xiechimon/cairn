@@ -68,7 +68,7 @@ import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { injectMemories } from './memory.js';
 import { notifyChiefMessage } from './notifications.js';
-import { PICKED_PROJECT_OPEN, pickedProjectIdOf } from './picked-project.js';
+import { PICKED_PROJECT_OPEN, stepScopeProjectId } from './picked-project.js';
 import { scanLocalSkills } from './skills.js';
 import { stepQueueProjector } from './step-queue.js';
 import { getTodo } from './todos.js';
@@ -642,6 +642,7 @@ export function sendChiefMessage(
     prompt: promptWithPickedProject(picked, `${directNote ?? ''}${body.content}`),
     trigger: 'user',
     id: message.id,
+    scopeProjectId: picked?.id ?? null,
   });
   return {
     thread: toChiefThreadRecord(
@@ -715,6 +716,7 @@ function enqueueResumedTurn(
       `你之前用 ask_user 提的问题，用户现在答复了：\n${lines.join('\n')}\n请从这里继续。`,
     ),
     trigger: 'user',
+    scopeProjectId: projectId,
   });
 }
 
@@ -758,7 +760,7 @@ export function requireTurnProvenance(
 export function enqueueChiefStep(
   deps: ChiefDeps,
   threadId: string,
-  opts: { prompt: string; id?: string } & ChiefStepTrigger,
+  opts: { prompt: string; id?: string; scopeProjectId?: string | null } & ChiefStepTrigger,
 ): string {
   const threadRow = getChiefThread(deps, threadId);
   if (!threadRow) throw new HttpError(404, `chief thread ${threadId}`);
@@ -776,6 +778,7 @@ export function enqueueChiefStep(
       machineId: null,
       status: 'pending',
       prompt,
+      scopeProjectId: opts.scopeProjectId ?? null,
       createdAt: nowMs(),
     })
     .run();
@@ -844,6 +847,7 @@ export function rewindChiefThread(
   enqueueChiefStep(deps, threadId, {
     prompt: promptWithPickedProject(pickedProjectOf(deps.db, teamId, anchor.projectId), content),
     trigger: 'user',
+    scopeProjectId: anchor.projectId,
   });
   const fresh = getChiefThread(deps, threadId);
   if (!fresh) throw new Error('chief thread missing after rewind');
@@ -957,6 +961,7 @@ export function triggerChiefWakes(deps: ChiefDeps, todoRecord: TodoRecord, to: P
           prompt: facts,
           trigger: kind,
           provenance: watchProvenance(todoRecord.id),
+          scopeProjectId: todoRecord.projectId,
         });
       }
     }
@@ -991,6 +996,7 @@ function enqueueGateWake(
     prompt: `${facts}\n${metadata}`,
     trigger: 'gate',
     provenance: watchProvenance(record.id),
+    scopeProjectId: record.projectId,
   });
   if (retry) deps.db.update(step).set({ freshSession: true }).where(eq(step.id, id)).run();
 }
@@ -1139,6 +1145,7 @@ export function fireDueChiefWakes(deps: ChiefDeps, now: number): void {
         prompt: `${note}。请回头核实相关任务状态；只有需要用户知道或决定时，才用 notify_user 或 ask_user 告诉用户。`,
         trigger: 'wake',
         provenance: wakeProvenance(String(wake.id)),
+        scopeProjectId: wakeTodoProjectId(deps.db, chiefRow.teamId, wake.todoId),
       });
     }
   }
@@ -1334,12 +1341,12 @@ export function finishChiefTurn(deps: { db: Db }, threadId: string, body: Machin
 function writingTurnProjectId(db: Db, row: { id: string; threadId: string }): string | null {
   const turn = row.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX)
     ? db
-        .select({ prompt: step.prompt })
+        .select({ prompt: step.prompt, scopeProjectId: step.scopeProjectId })
         .from(step)
         .where(eq(step.id, row.id.slice(TRANSCRIPT_PROMPT_ROW_ID_PREFIX.length)))
         .get()
     : db
-        .select({ prompt: step.prompt })
+        .select({ prompt: step.prompt, scopeProjectId: step.scopeProjectId })
         .from(step)
         .where(
           and(eq(step.buildId, row.threadId), eq(step.kind, 'chief'), eq(step.status, 'claimed')),
@@ -1347,7 +1354,18 @@ function writingTurnProjectId(db: Db, row: { id: string; threadId: string }): st
         .orderBy(desc(step.claimedAt), sql`rowid desc`)
         .limit(1)
         .get();
-  return pickedProjectIdOf(turn?.prompt ?? null);
+  return turn === undefined ? null : stepScopeProjectId(turn);
+}
+
+function wakeTodoProjectId(db: Db, teamId: string, todoId: unknown): string | null {
+  if (typeof todoId !== 'string') return null;
+  return (
+    db
+      .select({ projectId: todo.projectId })
+      .from(todo)
+      .where(and(eq(todo.id, todoId), eq(todo.teamId, teamId)))
+      .get()?.projectId ?? null
+  );
 }
 
 export function upsertChiefMessage(
