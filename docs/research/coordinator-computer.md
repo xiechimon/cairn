@@ -268,7 +268,13 @@ Spikes run first, with no PR:
 - S1: Rakazo's computer image stack inside nspawn with `PrivateUsers=pick` behind the relay;
 - S2: noVNC through an outbound daemon websocket;
 - S3: an image tool result through Pi in the sidecar;
-- S4: agent-desktop on the omarchy host session (Hyprland is guessed from the distribution, not measured; omarchy was unreachable on 11-03).
+- S4: agent-desktop on the omarchy host session. Measured 2026-11-03 over ssh:
+  - seat0 runs a Hyprland Wayland session with rootless Xwayland on `:0`;
+  - the at-spi bus is running (at-spi2-core 2.62.1);
+  - `ian` has NOPASSWD sudo;
+  - `/var/lib/machines` is btrfs.
+
+  The spike checks semantic actions on Wayland apps, and pointer input on Xwayland apps.
 
 | # | PR | Main paths | Route |
 |---|---|---|---|
