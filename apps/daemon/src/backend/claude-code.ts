@@ -1,8 +1,10 @@
+import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { existsSync, realpathSync } from 'node:fs';
 import { homedir, hostname } from 'node:os';
 import { join } from 'node:path';
 import {
+  type CanUseTool,
   createSdkMcpServer,
   type EffortLevel,
   type McpServerConfig,
@@ -14,6 +16,8 @@ import {
   type SdkMcpToolDefinition,
   type SdkPluginConfig,
   type SettingSource,
+  type SpawnedProcess,
+  type SpawnOptions,
   tool,
 } from '@anthropic-ai/claude-agent-sdk';
 import type {
@@ -874,9 +878,56 @@ const METERED_CLAUDE_AUTH_BLANK = {
   CLAUDE_CODE_USE_FOUNDRY: '',
 };
 
+function approveUnlessDisallowed(disallowedTools: readonly string[]): CanUseTool {
+  return async (toolName, input) =>
+    disallowedTools.includes(toolName)
+      ? { behavior: 'deny', message: `${toolName} is not available in this step` }
+      : { behavior: 'allow', updatedInput: input };
+}
+
+const OAUTH_TOKEN_FD = 3;
+
+function spawnWithOAuthTokenOnFd(token: string): (options: SpawnOptions) => SpawnedProcess {
+  return ({ command, args, cwd, env, signal }) => {
+    const child = spawn(command, args, {
+      ...(cwd !== undefined ? { cwd } : {}),
+      env,
+      signal,
+      stdio: ['pipe', 'pipe', 'ignore', 'pipe'],
+      windowsHide: true,
+    });
+    const channel = child.stdio[OAUTH_TOKEN_FD];
+    if (channel !== null && channel !== undefined && 'end' in channel) {
+      channel.on('error', () => {});
+      channel.end(token);
+    }
+    const { stdin, stdout } = child;
+    if (stdin === null || stdout === null)
+      throw new Error('Claude Code process has no stdio pipes');
+    return Object.assign(child, { stdin, stdout });
+  };
+}
+
 export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
   const managedMcp = parts.strictMcpConfig === true;
   const locked = !parts.inOrb && parts.lockedDown;
+  const stepToken = parts.env?.CLAUDE_CODE_OAUTH_TOKEN;
+  const inheritedEnv = claudeCliEnv({
+    ...process.env,
+    ...parts.env,
+    ...(stepToken !== undefined ? METERED_CLAUDE_AUTH_BLANK : {}),
+  });
+  const fdToken = parts.inOrb ? stepToken : undefined;
+  const env =
+    fdToken !== undefined
+      ? {
+          ...Object.fromEntries(
+            Object.entries(inheritedEnv).filter(([key]) => key !== 'CLAUDE_CODE_OAUTH_TOKEN'),
+          ),
+          CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR: String(OAUTH_TOKEN_FD),
+        }
+      : inheritedEnv;
+  const scrubbed = env.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB === '1';
   const hostMcp = Object.fromEntries(
     Object.entries(parts.mcpServers).filter(([slug]) => slug === HOST_MCP_SERVER_NAME),
   );
@@ -892,9 +943,14 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
     model: parts.modelId,
     ...(locked
       ? { permissionMode: 'dontAsk' as const, allowedTools: [...HOST_ALLOWED_TOOLS] }
-      : parts.inOrb
-        ? { permissionMode: 'bypassPermissions' as const, allowDangerouslySkipPermissions: true }
-        : { permissionMode: 'bypassPermissions' as const }),
+      : scrubbed
+        ? {
+            permissionMode: 'default' as const,
+            canUseTool: approveUnlessDisallowed(parts.disallowedTools),
+          }
+        : parts.inOrb
+          ? { permissionMode: 'bypassPermissions' as const, allowDangerouslySkipPermissions: true }
+          : { permissionMode: 'bypassPermissions' as const }),
     disallowedTools: locked ? [...parts.disallowedTools, 'Bash'] : parts.disallowedTools,
     ...(locked
       ? { tools: parts.builtinTools ?? [...HOST_BUILTIN_TOOLS] }
@@ -925,11 +981,8 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
     ...(parts.executablePath !== undefined
       ? { pathToClaudeCodeExecutable: parts.executablePath }
       : {}),
-    env: claudeCliEnv({
-      ...process.env,
-      ...parts.env,
-      ...(parts.env?.CLAUDE_CODE_OAUTH_TOKEN !== undefined ? METERED_CLAUDE_AUTH_BLANK : {}),
-    }),
+    env,
+    ...(fdToken !== undefined ? { spawnClaudeCodeProcess: spawnWithOAuthTokenOnFd(fdToken) } : {}),
     ...(!locked && parts.plugins !== undefined && parts.plugins.length > 0
       ? { plugins: parts.plugins }
       : {}),
@@ -1063,7 +1116,9 @@ export class ClaudeCodeBackend implements AgentBackend {
             opts.telemetry,
             { provider: opts.provider.providerId, model: opts.modelId },
             undefined,
-            credentialRedactor(sdkOptions.env?.CLAUDE_CODE_OAUTH_TOKEN),
+            credentialRedactor(
+              sessionEnv?.CLAUDE_CODE_OAUTH_TOKEN ?? sdkOptions.env?.CLAUDE_CODE_OAUTH_TOKEN,
+            ),
           )
         : undefined;
     return new ClaudeSessionHandle(

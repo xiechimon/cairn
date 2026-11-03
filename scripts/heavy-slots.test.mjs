@@ -619,7 +619,7 @@ test('e2e:affected queues for a slot, but a dry run never waits', async () => {
   try {
     const holder = startHolder(env);
     await until(holder, 'out', /SLOT 1/);
-    const spec = 'apps/web/e2e/branch-button.spec.ts';
+    const spec = 'apps/web/e2e/dialog-viewport.spec.ts';
     const dry = spawnSync(process.execPath, ['scripts/e2e-affected.mjs', '--dry-run', spec], {
       env,
       encoding: 'utf8',
@@ -640,7 +640,7 @@ test('e2e:affected outside prepush uses only the port of the slot it acquired an
   try {
     const holder = startHolder(env);
     await until(holder, 'out', /SLOT 1/);
-    const run = watch(process.execPath, [e2eAffectedCli, 'apps/web/e2e/branch-button.spec.ts'], {
+    const run = watch(process.execPath, [e2eAffectedCli, 'apps/web/e2e/dialog-viewport.spec.ts'], {
       env: fake.withFakePnpm(env),
     });
     assert.equal(await run.exited, 0, run.out + run.err);
@@ -657,7 +657,7 @@ test('e2e:affected outside prepush uses only the port of the slot it acquired an
     assert.equal(call.CAIRN_HEAVY_SLOT, '2');
     assert.equal(call.E2E_DIST_DIR, join(env.TMPDIR, 'cairn-heavy-slot-2', 'web-dist'));
     assert.notEqual(call.E2E_PORT, env.E2E_AFFECTED_PORT);
-    assert.ok(call.argv.includes('e2e/branch-button.spec.ts'));
+    assert.ok(call.argv.includes('e2e/dialog-viewport.spec.ts'));
     const configPath = call.argv[call.argv.indexOf('--config') + 1];
     const config = readFileSync(configPath, 'utf8');
     assert.match(config, new RegExp(`http://127\\.0\\.0\\.1:${slotTwoPort}`));
@@ -680,7 +680,7 @@ test('a squatted slot port fails e2e:affected before playwright and names the ho
     const squatterCwd = realpathSync(join(dir, 'squatter'));
     const squatter = startSquatter(env, Number(env.E2E_AFFECTED_PORT) + 10, squatterCwd);
     await until(squatter, 'out', /SQUATTER-READY/);
-    const run = watch(process.execPath, [e2eAffectedCli, 'apps/web/e2e/branch-button.spec.ts'], {
+    const run = watch(process.execPath, [e2eAffectedCli, 'apps/web/e2e/dialog-viewport.spec.ts'], {
       env: fake.withFakePnpm(env),
     });
     assert.equal(await run.exited, 1);

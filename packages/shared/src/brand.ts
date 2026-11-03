@@ -65,6 +65,7 @@ export const ENV_VARS = {
   intakeAgentAllowlist: 'CAIRN_INTAKE_AGENT_ALLOWLIST',
   scheduling: 'CAIRN_SCHEDULING',
   coordinatorServerContext: 'CAIRN_COORDINATOR_SERVER_CONTEXT',
+  coordinatorMachineId: 'CAIRN_COORDINATOR_MACHINE_ID',
   routingRules: 'CAIRN_ROUTING_RULES',
   trajectoryOutcomeBackfill: 'CAIRN_TRAJ_OUTCOME_BACKFILL',
   trajectoryReflectCurate: 'CAIRN_TRAJ_REFLECT_CURATE',

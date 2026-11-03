@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "5c918851-6d9c-4111-9175-503e5c84a88a",
-  "prevId": "d0136613-7f7e-456d-8f54-d6d83db00c7a",
+  "id": "a6fe7343-c56c-4cd3-ba9e-a8c82ead121d",
+  "prevId": "b8551377-77a1-4d1c-ae1f-517e2151da9e",
   "tables": {
     "agent": {
       "name": "agent",
@@ -3613,41 +3613,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "tools": {
-          "name": "tools",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "mcpServers": {
-          "name": "mcpServers",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "skillsAllowlist": {
-          "name": "skillsAllowlist",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "defaultSkill": {
-          "name": "defaultSkill",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "secrets": {
-          "name": "secrets",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "seededFromAgentId": {
           "name": "seededFromAgentId",
           "type": "text",
@@ -4249,6 +4214,13 @@
         },
         "prompt": {
           "name": "prompt",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "scopeProjectId": {
+          "name": "scopeProjectId",
           "type": "text",
           "primaryKey": false,
           "notNull": false,

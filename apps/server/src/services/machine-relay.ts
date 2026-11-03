@@ -95,6 +95,9 @@ export async function executeRelayToolCall(
   if (!isChiefConversation(row.buildId)) {
     throw new HttpError(400, `step ${stepId} is not a chief step`);
   }
+  if (row.status !== 'claimed') {
+    throw new HttpError(409, 'Coordinator tools require a currently claimed turn');
+  }
   const threadId = row.buildId;
   assertChiefDigestTool(threadId, name);
   const threadRow = deps.db.select().from(chiefThread).where(eq(chiefThread.id, threadId)).get();

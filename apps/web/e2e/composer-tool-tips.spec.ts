@@ -1,7 +1,7 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 const DETAIL = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=16';
-const CHIEF = '/app?view=board&scenario=chief-question';
+const CHIEF = '/app/schedules?scenario=chief-question';
 
 async function expectTip(page: Page, button: Locator, label: string) {
   await button.hover();
@@ -23,16 +23,18 @@ test('chief composer tools name themselves on hover', async ({ page }) => {
   await expectTip(page, chief.getByRole('button', { name: '添加附件' }), '添加附件');
 });
 
-test('light: chief composer is the same white field as the workbench new-task bar', async ({
+test('light: the drawer composer is the same white field as the home composer', async ({
   page,
 }) => {
   await page.emulateMedia({ colorScheme: 'light' });
-  await page.goto(CHIEF);
-  const bar = await page
-    .getByTestId('board-new-task-bar')
-    .evaluate((el) => getComputedStyle(el).backgroundColor);
-  const composer = await page
+  await page.goto('/app?scenario=chief-question');
+  const home = await page
+    .getByTestId('home-c')
     .locator('.chief-composer')
     .evaluate((el) => getComputedStyle(el).backgroundColor);
-  expect(composer).toBe(bar);
+  await page.goto(CHIEF);
+  const drawer = await page
+    .locator('.chief-drawer .chief-composer')
+    .evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(drawer).toBe(home);
 });

@@ -646,7 +646,7 @@ export function TodoDetailPage() {
                 variant={state === 'error' ? 'outline' : 'default'}
                 onClick={() => navigate('/app')}
               >
-                {t('回看板')}
+                {t('回首页')}
               </Button>
             </div>
           </div>

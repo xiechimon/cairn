@@ -528,15 +528,6 @@ export type ChiefStreamItem =
       id?: string;
     }
   | {
-      kind: 'tool';
-      label: string;
-      startedAt?: number;
-      seconds?: number;
-      running?: boolean;
-      error?: boolean;
-      id?: string;
-    }
-  | {
       kind: 'digest';
       id: string;
       reason: 'daily' | 'threshold';
@@ -562,6 +553,7 @@ export interface ChiefToolRow {
   label: string;
   seconds?: number;
   error?: boolean;
+  running?: boolean;
 }
 
 export interface ChiefThreadRef {
@@ -596,6 +588,7 @@ export interface ChiefContent {
   streamAt?: number[];
   running?: boolean;
   runningTool?: string;
+  waitingTurn?: { messageId: string; text: string };
   outage?: { reason: 'quota' | 'capacity'; model: string | null; retryAt: number | null };
   fallbackModel?: string;
   hasEarlier?: boolean;

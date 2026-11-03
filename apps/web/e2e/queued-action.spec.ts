@@ -1,4 +1,4 @@
-import { expect, type Locator, type Page, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import { evidencePanelShot, evidenceShot } from './evidence';
 
 const TEAM = { id: 'team-1', name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null };
@@ -93,13 +93,6 @@ async function stubLiveBoot(page: Page) {
   );
 }
 
-/** Let hover transitions finish before an evidence shot. */
-async function settle(locator: Locator) {
-  await locator.evaluate((el) =>
-    Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished.catch(() => undefined))),
-  );
-}
-
 test.beforeEach(async ({ page }) => {
   await stubLiveBoot(page);
 });
@@ -120,26 +113,4 @@ test('detail: a todo task keeps its `开始`', async ({ page }) => {
   const head = page.getByTestId('detail-head');
   await expect(head.getByTestId('phase-chip')).toHaveText('待开始');
   await expect(head.getByRole('button', { name: '开始', exact: true })).toBeVisible();
-});
-
-test('board: the queued card renders no `开始`, the todo card shows it on hover', async ({
-  page,
-}) => {
-  await page.goto('/app?view=board');
-
-  const running = page.locator('.board-column[data-column="building"]');
-  const queued = running.locator(`[data-todo-id="${QUEUED_ID}"]`);
-  const fresh = page.locator(`.board-column[data-column="todo"] [data-todo-id="${FRESH_ID}"]`);
-  await expect(queued).toBeVisible();
-  await expect(queued).toContainText('等机器');
-
-  // No button in the DOM at all, so neither hover nor keyboard focus can show one.
-  await queued.hover();
-  await settle(queued);
-  await evidencePanelShot(page, 'board-queued-hover.png', running);
-  await expect(queued.getByRole('button', { name: '开始', exact: true })).toHaveCount(0);
-
-  await fresh.hover();
-  const start = fresh.getByRole('button', { name: '开始', exact: true });
-  await expect(start).toHaveCSS('opacity', '1');
 });

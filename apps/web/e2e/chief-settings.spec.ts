@@ -1,18 +1,18 @@
 import { expect, type Page, test } from '@playwright/test';
 import { evidencePanelShot } from './evidence';
 
-const AGENT_TAB = '/app?view=board&scenario=101';
+const AGENT_TAB = '/app?scenario=101';
 
 const settingsView = (page: Page) => page.getByRole('heading', { name: '总管设置' });
 
-test('back button works: click returns to the chief drawer (#811)', async ({ page }) => {
+test('back button works: click returns to the home conversation (#811)', async ({ page }) => {
   await page.goto(AGENT_TAB);
   await expect(settingsView(page)).toBeVisible();
   await page.getByRole('button', { name: '返回' }).click();
   await expect(settingsView(page)).toBeHidden();
-  await expect(page.getByRole('dialog', { name: '总管' })).toBeVisible();
+  await expect(page.getByTestId('home-c')).toBeVisible();
 });
-const CHARTER_TAB = '/app?view=board&scenario=102';
+const CHARTER_TAB = '/app?scenario=102';
 
 async function openAgentDialog(page: Page) {
   await page.goto(AGENT_TAB);
