@@ -9,7 +9,7 @@ import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
 import { AcceptDialog } from '../detail/accept-dialog.js';
 import { substantiveChangesOf } from '../detail/empty-commit.js';
-import { mergeRejectCopy } from '../detail/merge-gate.js';
+import { mergeRejectCopy, useMergeGate } from '../detail/merge-gate.js';
 import { StopConfirmDialog } from '../detail/stop-confirm-dialog.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
@@ -67,6 +67,7 @@ export function useThreadActions({
   const [acceptError, setAcceptError] = useState<string | null>(null);
   const moreRef = useRef<HTMLButtonElement | null>(null);
   const { buildId, running } = chat;
+  const missingTools = useMergeGate(live ? chat.buildAgentId : null);
   const phase = todo.phase;
   const archived = todo.archivedAt != null;
   const changesQ = useBuildChanges(
@@ -262,6 +263,7 @@ export function useThreadActions({
         open={dialog === 'accept'}
         onClose={() => setDialog(null)}
         rejectReason={acceptError}
+        missingTools={missingTools}
         substantiveChanges={live ? substantiveChangesOf(changesQ.data, changesQ.isSuccess) : null}
         mergeLocked={phase === 'failed'}
         infoOutput={chat.infoOutput}
