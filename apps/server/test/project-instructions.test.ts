@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, test } from 'vitest';
 import { agent, chief as chiefTable, project, steerPending, step } from '../src/db/schema.js';
 import { nowMs } from '../src/lib/ids.js';
+import { saveMemoryEntry } from '../src/services/memory.js';
 import {
   bindAgentHome,
   bindAllAgents,
@@ -167,6 +168,32 @@ describe('Coordinator turns scoped to a project receive its instructions (D74 P1
     expect(instruction).toContain('plan the release');
     expect(instruction).toContain(RULES);
     expect(instruction.indexOf('plan the release')).toBeLessThan(instruction.indexOf(RULES));
+  });
+
+  test('a turn scoped to the project carries that project memories, not another project', async () => {
+    const id = await createProject('cairn');
+    const other = await createProject('site');
+    saveMemoryEntry(s.db, {
+      agentId: CHIEF_AGENT,
+      teamId: s.team.id,
+      title: 'deploy target',
+      content: 'the Mac',
+      projectId: id,
+      sourceTodoId: null,
+      sourceBuildId: null,
+    });
+    saveMemoryEntry(s.db, {
+      agentId: CHIEF_AGENT,
+      teamId: s.team.id,
+      title: 'site font',
+      content: 'serif',
+      projectId: other,
+      sourceTodoId: null,
+      sourceBuildId: null,
+    });
+    const instruction = await chiefInstruction('plan the release', id);
+    expect(instruction).toContain('deploy target：the Mac');
+    expect(instruction).not.toContain('site font');
   });
 
   test('an unscoped turn carries no project instructions', async () => {

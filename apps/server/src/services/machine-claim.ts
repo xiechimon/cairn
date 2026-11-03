@@ -67,7 +67,7 @@ import { injectMemories } from './memory.js';
 import { effectiveModel } from './model-fallback.js';
 import { mergedCatalogModels } from './model-liveness.js';
 import { stepScopeProjectId } from './picked-project.js';
-import { projectInstructionsSection } from './project-instructions.js';
+import { projectTurnContext } from './project-instructions.js';
 import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
 import { memoryOwnerOf, routeForStep } from './routing-rules.js';
 import { reverifyShip } from './ship-gate.js';
@@ -282,7 +282,11 @@ function chiefClaimPayload(
   const memories = injectMemories(deps.db, { agentId: agentRow.id });
   const projectSection = digest
     ? null
-    : projectInstructionsSection(deps.db, threadRow.teamId, stepScopeProjectId(stepRow));
+    : projectTurnContext(deps.db, {
+        teamId: threadRow.teamId,
+        agentId: agentRow.id,
+        projectId: stepScopeProjectId(stepRow),
+      });
   const instruction =
     stepRow.prompt === null
       ? null

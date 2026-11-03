@@ -23,6 +23,7 @@ import {
 import { executeChiefTool, executeWorkerMemoryTool } from './chief-tools.js';
 import { projectOfTodo } from './git.js';
 import { isChiefConversation, type MachineDeps, ownedStep } from './machines.js';
+import { stepScopeProjectId } from './picked-project.js';
 import { memoryOwnerOf } from './routing-rules.js';
 import { createLocalSkill, updateLocalSkill } from './skills.js';
 import { resolveFixedTagId, resolveProjectTagIds } from './tags.js';
@@ -127,6 +128,7 @@ export async function executeRelayToolCall(
       chiefAgentId: chiefRow.agentId,
       conversationId: threadId,
       turnPrompt: row.prompt,
+      turnScopeProjectId: stepScopeProjectId(row),
     },
     name,
     params,
