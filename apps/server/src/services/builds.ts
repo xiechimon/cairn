@@ -1369,6 +1369,7 @@ export async function applyBuildStepAction(
         todoRecord.teamId,
         withRetryLessons(restartPrompt, reuseKind, reuseLessons),
         true,
+        true,
       );
       deps.db
         .update(build)
@@ -1438,6 +1439,8 @@ export async function applyBuildStepAction(
       firstKind,
       todoRecord.teamId,
       withRetryLessons(restartPrompt, firstKind, priorLessons),
+      false,
+      true,
     );
     setTodoPhase(deps, todoRecord.id, 'queued', {
       assignment,
@@ -1573,7 +1576,7 @@ export async function applyBuildStepAction(
     todoRecord.phase === 'review'
       ? buildReviewRejectPrompt(body.feedback)
       : buildReplanPrompt(body.feedback);
-  enqueueStep(deps, buildId, 'plan', todoRecord.teamId, replanPrompt);
+  enqueueStep(deps, buildId, 'plan', todoRecord.teamId, replanPrompt, false, true);
 }
 
 function restoreFailedReview(deps: BuildDeps, row: BuildRow): void {

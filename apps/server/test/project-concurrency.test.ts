@@ -1,7 +1,7 @@
 import { claimedStepSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, test } from 'vitest';
-import { agent, step } from '../src/db/schema.js';
+import { agent, build, step, todo } from '../src/db/schema.js';
 import { enqueueStep } from '../src/services/builds.js';
 import {
   bindAgentHome,
@@ -118,6 +118,29 @@ describe('project concurrency (D74 P4)', () => {
     expect(reserved?.id).toBe(humanStep.id);
     expect(await claim()).toBeNull();
     expect(s.db.select().from(step).where(eq(step.id, humanStep.id)).get()?.byPerson).toBe(true);
+  });
+
+  test('restarting a failed thread in a full project counts as a person message', async () => {
+    const serial = await createProject('serial', 1);
+    await startBuild(serial, 'first');
+    const failedBuild = await startBuild(serial, 'second');
+    expect((await claim())?.projectId).toBe(serial);
+    s.db.update(step).set({ status: 'failed' }).where(eq(step.buildId, failedBuild)).run();
+    const todoId = s.db.select().from(build).where(eq(build.id, failedBuild)).get()!.todoId;
+    s.db.update(todo).set({ phase: 'failed' }).where(eq(todo.id, todoId)).run();
+    const restarted = await req(s.app, 'POST', `/api/builds/${failedBuild}/steps`, {
+      action: 'restart',
+      feedback: 'try again with the fix',
+      clientMessageId: 'restart-1',
+    });
+    expect(restarted.status).toBe(202);
+    const restartStep = s.db
+      .select()
+      .from(step)
+      .all()
+      .find((row) => row.status === 'pending');
+    expect(restartStep?.byPerson).toBe(true);
+    expect((await claim())?.id).toBe(restartStep?.id);
   });
 
   test('two machines claiming different steps of a serial project at once admit only one', async () => {
