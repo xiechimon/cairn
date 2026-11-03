@@ -7,8 +7,9 @@ import {
   chiefThread as chiefThreadTable,
   machine as machineTable,
   step as stepTable,
+  team as teamTable,
 } from '../src/db/schema.js';
-import { setCoordinatorSidecarEnabled } from '../src/services/coordinator-context.js';
+import { setCoordinatorMachineId } from '../src/services/coordinator-context.js';
 import { claimStep } from '../src/services/machines.js';
 import { bootServer, issueApiKey, type TestServer } from './helpers.js';
 
@@ -16,7 +17,7 @@ const disposables: (() => void)[] = [];
 afterAll(() => {
   for (const d of disposables) d();
 });
-afterEach(() => setCoordinatorSidecarEnabled(false));
+afterEach(() => setCoordinatorMachineId(null));
 
 const AGENT_ID = 'agent-coord-sidecar';
 
@@ -25,6 +26,7 @@ interface World {
   daemonId: string;
   sidecarId: string;
   sidecarToken: string;
+  daemonToken: string;
   chiefId: string;
 }
 
@@ -76,7 +78,14 @@ async function setupWorld(): Promise<World> {
     })
     .onConflictDoUpdate({ target: chiefTable.id, set: { agentId: AGENT_ID } })
     .run();
-  return { s, daemonId: daemon.id, sidecarId: sidecar.id, sidecarToken: sidecar.token, chiefId };
+  return {
+    s,
+    daemonId: daemon.id,
+    daemonToken: daemon.token,
+    sidecarId: sidecar.id,
+    sidecarToken: sidecar.token,
+    chiefId,
+  };
 }
 
 let seq = 0;
@@ -159,7 +168,7 @@ describe('Coordinator sidecar claim routing (D72)', () => {
 
   test('flag on: daemons skip Coordinator turns and the sidecar claims them with the chief context', async () => {
     const w = await setupWorld();
-    setCoordinatorSidecarEnabled(true);
+    setCoordinatorMachineId(w.sidecarId);
     const stepId = insertChiefStep(w);
     expect(await claimAsDaemon(w)).toBeNull();
     const claimed = await claimAsCoordinator(w);
@@ -173,18 +182,17 @@ describe('Coordinator sidecar claim routing (D72)', () => {
 
   test('flag on: a restarted sidecar gets its claimed turn again; another machine never does', async () => {
     const w = await setupWorld();
-    setCoordinatorSidecarEnabled(true);
+    setCoordinatorMachineId(w.sidecarId);
     const stepId = insertChiefStep(w);
     expect((await claimAsCoordinator(w))?.step.id).toBe(stepId);
     expect((await claimAsCoordinator(w))?.step.id).toBe(stepId);
-    expect(await claimAsCoordinator(w, w.daemonId)).toBeNull();
     expect(await claimAsDaemon(w)).toBeNull();
     expect(statusOf(w, stepId)).toEqual({ status: 'claimed', machineId: w.sidecarId });
   });
 
   test('flag on: turns of one thread go one at a time, oldest first', async () => {
     const w = await setupWorld();
-    setCoordinatorSidecarEnabled(true);
+    setCoordinatorMachineId(w.sidecarId);
     const first = insertChiefStep(w, { threadId: 'chief-coord-shared', createdAt: 10 });
     const second = insertChiefStep(w, { threadId: 'chief-coord-shared', createdAt: 20 });
     expect((await claimAsCoordinator(w))?.step.id).toBe(first);
@@ -195,7 +203,7 @@ describe('Coordinator sidecar claim routing (D72)', () => {
 
   test('flag on: digest steps stay with daemons', async () => {
     const w = await setupWorld();
-    setCoordinatorSidecarEnabled(true);
+    setCoordinatorMachineId(w.sidecarId);
     const digest = insertChiefStep(w, { threadId: chiefDigestThreadId(w.chiefId) });
     expect(await claimAsCoordinator(w)).toBeNull();
     expect((await claimAsDaemon(w))?.step.id).toBe(digest);
@@ -203,13 +211,13 @@ describe('Coordinator sidecar claim routing (D72)', () => {
 
   test('flag on: the sidecar is never handed worker steps or an empty queue', async () => {
     const w = await setupWorld();
-    setCoordinatorSidecarEnabled(true);
+    setCoordinatorMachineId(w.sidecarId);
     expect(await claimAsCoordinator(w)).toBeNull();
   });
 
   test('flag on: the sidecar reads the provider bundle for its own turn over the machine API', async () => {
     const w = await setupWorld();
-    setCoordinatorSidecarEnabled(true);
+    setCoordinatorMachineId(w.sidecarId);
     const stepId = insertChiefStep(w);
     await claimAsCoordinator(w);
     const res = await w.s.app.request(`/api/machine/token/${stepId}`, {
@@ -220,7 +228,7 @@ describe('Coordinator sidecar claim routing (D72)', () => {
 
   test('the claim route accepts the coordinator role', async () => {
     const w = await setupWorld();
-    setCoordinatorSidecarEnabled(true);
+    setCoordinatorMachineId(w.sidecarId);
     const stepId = insertChiefStep(w);
     const res = await w.s.app.request('/api/machine/tasks/claim', {
       method: 'POST',
@@ -229,6 +237,62 @@ describe('Coordinator sidecar claim routing (D72)', () => {
     });
     expect(res.status).toBe(200);
     expect(((await res.json()) as { step: { step: { id: string } } }).step.step.id).toBe(stepId);
+  });
+
+  test('flag on: another enrolled machine sending the coordinator role gets nothing', async () => {
+    const w = await setupWorld();
+    setCoordinatorMachineId(w.sidecarId);
+    const stepId = insertChiefStep(w);
+    expect(await claimAsCoordinator(w, w.daemonId)).toBeNull();
+    expect(statusOf(w, stepId)).toEqual({ status: 'pending', machineId: null });
+    await claimAsCoordinator(w);
+    expect(await claimAsCoordinator(w, w.daemonId)).toBeNull();
+  });
+
+  test('flag on: a machine that does not hold a Coordinator step cannot read its provider key', async () => {
+    const w = await setupWorld();
+    setCoordinatorMachineId(w.sidecarId);
+    const stepId = insertChiefStep(w);
+    await claimAsCoordinator(w);
+    const res = await w.s.app.request(`/api/machine/token/${stepId}`, {
+      headers: { authorization: `Bearer ${w.daemonToken}` },
+    });
+    expect(res.status).toBe(404);
+  });
+
+  test('flag on: the sidecar does not take a Claude turn the team forbids paying for', async () => {
+    const w = await setupWorld();
+    setCoordinatorMachineId(w.sidecarId);
+    w.s.db
+      .update(agentTable)
+      .set({ provider: 'anthropic', modelId: 'claude-haiku-5-5' })
+      .where(eq(agentTable.id, AGENT_ID))
+      .run();
+    w.s.db
+      .update(teamTable)
+      .set({ claudeUsage: 'subscription-only' })
+      .where(eq(teamTable.id, w.s.team.id))
+      .run();
+    const stepId = insertChiefStep(w);
+    expect(await claimAsCoordinator(w)).toBeNull();
+    w.s.db
+      .update(teamTable)
+      .set({ claudeUsage: 'allow-paid' })
+      .where(eq(teamTable.id, w.s.team.id))
+      .run();
+    expect((await claimAsCoordinator(w))?.step.id).toBe(stepId);
+  });
+
+  test('flag on: the sidecar does not take a turn routed to the claude-code runtime', async () => {
+    const w = await setupWorld();
+    setCoordinatorMachineId(w.sidecarId);
+    w.s.db
+      .update(agentTable)
+      .set({ provider: 'claude-code', modelId: 'haiku' })
+      .where(eq(agentTable.id, AGENT_ID))
+      .run();
+    insertChiefStep(w);
+    expect(await claimAsCoordinator(w)).toBeNull();
   });
 
   test('the claim route rejects an unknown role', async () => {

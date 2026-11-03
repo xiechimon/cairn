@@ -35,7 +35,7 @@ import {
 import { hasEarlierLiveChiefStep } from './chief-turns.js';
 import { claudeUsageGatePasses, refreshClaudeRateParks } from './claude-rate-limit.js';
 import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
-import { coordinatorSidecarEnabled } from './coordinator-context.js';
+import { coordinatorMachineId, coordinatorSidecarEnabled } from './coordinator-context.js';
 import { routedChiefAgent } from './coordinator-route.js';
 import {
   agentRunningCount,
@@ -299,12 +299,15 @@ function claimCoordinatorTurn(
   machineId: string,
   teamId: string,
 ): ClaimedStep | null {
-  if (!coordinatorSidecarEnabled()) return null;
+  if (machineId !== coordinatorMachineId()) return null;
   const { db } = deps;
   const machineRow = db.select().from(machine).where(eq(machine.id, machineId)).get();
   if (!machineRow) return null;
   for (const cand of coordinatorTurnCandidates(deps, machineId, teamId)) {
     if (!cand.agentRow.modelId) continue;
+    const model = effectiveModel(cand.agentRow, cand.stepRow);
+    if (stepRuntimeFor(model.provider) !== 'pi') continue;
+    if (!claudeUsageGatePasses(deps, machineRow, model)) continue;
     if (cand.stepRow.status === 'claimed') {
       return chiefClaimPayload(
         deps,
@@ -693,6 +696,7 @@ export async function claimStep(
   if (signal?.aborted) return null;
   const sinceWake = deps.machineHub.wakeSeq(teamId);
   if (body?.role === 'coordinator') {
+    if (machineId !== coordinatorMachineId()) return null;
     const first = claimCoordinatorTurn(deps, machineId, teamId);
     if (first) return first;
     await deps.machineHub.waitWake(teamId, holdMs, signal, sinceWake);
