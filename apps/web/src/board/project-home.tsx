@@ -36,6 +36,7 @@ export interface ProjectHomeProject {
   id: string;
   name: string;
   description?: string | undefined;
+  instructions?: string | undefined;
   repo?: string | undefined;
   baseBranch?: string | null | undefined;
   icon?: ProjectIcon | null | undefined;
@@ -81,7 +82,9 @@ export function ProjectHome({
   const done = own
     .filter((todo) => threadStatus(todo) === 'done')
     .sort((a, b) => b.phaseAt - a.phaseAt);
-  const mergedThisWeek = done.filter((todo) => now - todo.phaseAt <= WEEK_MS).length;
+  const mergedThisWeek = done.filter(
+    (todo) => todo.phase === 'done' && now - todo.phaseAt <= WEEK_MS,
+  ).length;
   const ownSchedules = schedules.filter((schedule) => schedule.projectId === project.id);
   const facts = [project.repo, project.baseBranch].filter(
     (fact): fact is string => fact != null && fact !== '',
@@ -233,10 +236,34 @@ export function ProjectHome({
             </section>
             <aside className="flex flex-col gap-4">
               <ListCard>
-                <CardHead icon={<BookText className="size-3.5" />} title={t('项目说明')} />
-                <CardNote>
-                  {t('写在这里的规则会被本项目的每个 thread 读到。即将支持编辑。')}
-                </CardNote>
+                <CardHead
+                  icon={<BookText className="size-3.5" />}
+                  title={t('项目说明')}
+                  action={
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      className="text-meta text-content-secondary"
+                      render={<Link to={`/app/project/${project.id}/settings`} />}
+                    >
+                      {t('编辑')}
+                    </Button>
+                  }
+                />
+                {project.instructions != null && project.instructions !== '' ? (
+                  <p
+                    data-testid="project-home-instructions"
+                    className="m-0 line-clamp-6 px-3.5 pb-3 text-meta whitespace-pre-line text-content-secondary"
+                  >
+                    {project.instructions}
+                  </p>
+                ) : (
+                  <CardNote>
+                    {t(
+                      '还没有项目说明。写在这里的规则会被本项目的每个 thread 和 Coordinator 读到。',
+                    )}
+                  </CardNote>
+                )}
               </ListCard>
               <ListCard>
                 <CardHead icon={<Brain className="size-3.5" />} title={t('项目记忆')} />

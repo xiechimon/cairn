@@ -172,6 +172,7 @@ export const claimedStepSchema = z.object({
     .object({
       id: recordId,
       name: z.string(),
+      instructions: z.string().optional(),
       repo: z
         .object({
           kind: z.enum(PROJECT_REPO_KINDS),

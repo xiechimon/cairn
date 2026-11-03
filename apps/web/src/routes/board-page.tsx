@@ -64,6 +64,7 @@ export function BoardPage() {
           id: homeProjectId,
           name: homeProjectName,
           description: liveProject?.description,
+          instructions: liveProject?.instructions,
           repo: liveProject?.githubRepo ?? liveProject?.repoName,
           baseBranch: liveProject?.baseBranch,
           icon: liveProject?.icon ?? fixture.projectAvatars?.[homeProjectId]?.icon,

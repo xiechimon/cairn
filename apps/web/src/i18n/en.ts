@@ -126,12 +126,18 @@ export const EN: Record<string, string> = {
   '这个项目还没有 thread': 'No threads in this project yet',
   '在上面问 Coordinator，它会开 thread 来做。':
     'Ask the Coordinator above and it will open threads for the work.',
-  '写在这里的规则会被本项目的每个 thread 读到。即将支持编辑。':
-    'Every thread in this project will read the rules written here. Editing is coming soon.',
+  '还没有项目说明。写在这里的规则会被本项目的每个 thread 和 Coordinator 读到。':
+    'No instructions yet. Every thread and the Coordinator in this project will read the rules written here.',
   'Coordinator 在本项目学到的事会记在这里，默认只在本项目内使用。即将上线。':
     'What the Coordinator learns in this project will be kept here, used only in this project by default. Coming soon.',
   目前用团队密钥: 'Team secrets for now',
   目前跟随机器上限: 'Machine limits for now',
+  保存项目说明: 'Save instructions',
+  '本项目的每个 thread 和 Coordinator 都会读到，排在仓库的 AGENTS.md 之后。':
+    'Every thread and the Coordinator read these in this project, after the repository AGENTS.md.',
+  '例如：仓库内容用英文；改动后跑 pnpm lint；不要 force push。':
+    'For example: repository content is English; run pnpm lint after changes; never force push.',
+  '项目说明保存失败，请重试。': 'Could not save the instructions. Try again.',
   没有在进行的任务: 'Nothing in progress',
   没有空闲的任务: 'Nothing idle',
   还没有完成的工作: 'Nothing finished yet',

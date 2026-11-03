@@ -320,4 +320,20 @@ test.describe('the home sends to the project it is filtered to (#2531)', () => {
     await expect(page).not.toHaveURL(/chat=1/);
     expect(state.sent).toEqual([]);
   });
+
+  test('the project home shows the saved instructions and counts only merged work this week', async ({
+    page,
+  }) => {
+    const state = await mockLive(page, {
+      projects: [{ ...PROJECTS[0]!, instructions: '仓库内容用英文；不要 force push。' }, PROJECTS[1]!],
+    });
+    state.todos.push(
+      todo({ id: 'todo-closed', projectId: 'proj-1', title: '放弃的任务', phase: 'closed', seqNum: 13 }),
+    );
+    await page.goto('/app?project=proj-1');
+    await expect(page.getByTestId('project-home-instructions')).toHaveText('仓库内容用英文；不要 force push。');
+    await expect(page.getByTestId('project-home').locator('[data-slot="stat-strip"]')).toContainText(
+      '1本周合并',
+    );
+  });
 });

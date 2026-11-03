@@ -21,6 +21,7 @@ import { nowMs } from '../lib/ids.js';
 import type { ConversationStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { stepScopeProjectId } from './picked-project.js';
+import { projectInstructionsSection } from './project-instructions.js';
 import { publishStepRow } from './quota-wait.js';
 
 type StepRow = typeof step.$inferSelect;
@@ -221,7 +222,17 @@ export function steerChiefMessage(
   const running = liveChiefSteps(deps.db, threadId).find((row) => row.status === 'claimed');
   if (running === undefined) return { steered: false };
   if (STEER_HOLDS.includes(waiting.holdReason ?? '')) return { steered: true };
-  const content = waiting.prompt ?? (typeof message.content === 'string' ? message.content : '');
+  const scope = stepScopeProjectId(waiting);
+  const projectSection =
+    scope !== null && scope !== stepScopeProjectId(running)
+      ? projectInstructionsSection(deps.db, thread.teamId, scope)
+      : null;
+  const content = [
+    waiting.prompt ?? (typeof message.content === 'string' ? message.content : ''),
+    projectSection,
+  ]
+    .filter((part) => part)
+    .join('\n\n');
   const now = nowMs();
   const prior = deps.db
     .select()
