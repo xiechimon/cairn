@@ -1,7 +1,6 @@
 import {
   OAUTH_FAMILIES,
   PROVIDER_OAUTH_PRESET_IDS,
-  PROVIDER_PRESET_DEFAULTS,
   PROVIDER_PRESET_IDS,
   PROVIDER_XAI_PRESET,
   type ProviderApi,
@@ -14,12 +13,7 @@ import { Checkbox } from '../components/ui/checkbox.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { Field, FieldDescription, FieldError, FieldTitle } from '../components/ui/field.js';
 import { Input } from '../components/ui/input.js';
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupButton,
-  InputGroupInput,
-} from '../components/ui/input-group.js';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '../components/ui/input-group.js';
 import {
   Select,
   SelectContent,
@@ -28,7 +22,10 @@ import {
   SelectValue,
 } from '../components/ui/select.js';
 import { useI18n } from '../i18n/provider.js';
-import { ChevronLeft, PlusSmall, Search, X } from '../icons/index.js';
+import { ChevronLeft, PlusSmall, Search } from '../icons/index.js';
+import { ProviderConnectionDisclosure } from './provider-connection-disclosure.js';
+import { ProviderModelChips, pickedModels } from './provider-model-list.js';
+import { PROVIDER_PRESET_DEFAULTS } from './provider-preset-data.js';
 
 const FIELD_TITLE_CLS = 'text-ui font-medium text-foreground';
 
@@ -136,6 +133,20 @@ const PRESET_LABELS: Record<(typeof PROVIDER_PRESET_IDS)[number], string> = {
 
 const BASE_URL_PLACEHOLDER = /\{[A-Za-z_]+\}/;
 
+function connectionSummary(
+  connection: { baseUrl: string; api: ProviderApi; authHeader: boolean },
+  t: (source: string) => string,
+): string {
+  let host = '';
+  try {
+    host = new URL(connection.baseUrl).host;
+  } catch {
+    return t('填写 Base URL 和协议');
+  }
+  const protocol = API_OPTIONS.find((option) => option.value === connection.api)?.label ?? '';
+  return [host, protocol, connection.authHeader ? 'Bearer' : t('原生鉴权')].join(' · ');
+}
+
 const WIRED_OAUTH_IDS: ReadonlySet<string> = new Set(OAUTH_FAMILIES.map((f) => f.presetId));
 
 const PRESET_ROWS = PROVIDER_PRESET_IDS.map((id) => {
@@ -186,7 +197,9 @@ export function CreateProviderDialog({
   const [api, setApi] = useState<ProviderApi>('openai-completions');
   const [apiKey, setApiKey] = useState('');
   const [authHeader, setAuthHeader] = useState(true);
-  const [models, setModels] = useState<ProviderModel[]>([]);
+  const [catalog, setCatalog] = useState<ProviderModel[]>([]);
+  const [modelIds, setModelIds] = useState<string[]>([]);
+  const [connectionOpen, setConnectionOpen] = useState(true);
 
   const baseUrlHasPlaceholder = BASE_URL_PLACEHOLDER.test(baseUrl);
   const ready =
@@ -206,7 +219,8 @@ export function CreateProviderDialog({
     setApi('openai-completions');
     setApiKey('');
     setAuthHeader(true);
-    setModels([]);
+    setCatalog([]);
+    setModelIds([]);
   }, [open]);
 
   const rows =
@@ -226,16 +240,16 @@ export function CreateProviderDialog({
     setApi(defaults?.api ?? 'openai-completions');
     setApiKey('');
     setAuthHeader(defaults?.authHeader ?? true);
-    setModels(defaults?.models ?? []);
+    setCatalog(defaults?.models ?? []);
+    setModelIds(defaults?.picks ?? []);
+    setConnectionOpen(defaults === undefined || BASE_URL_PLACEHOLDER.test(defaults.baseUrl));
     setView('form');
   };
 
   const submit = () => {
     if (!ready || pending === true) return;
     if (onCreate != null) {
-      const named = models
-        .map((model) => ({ ...model, id: model.id.trim() }))
-        .filter((model) => model.id !== '');
+      const named = pickedModels(catalog, modelIds);
       onCreate({
         providerId: providerId.trim(),
         label: label.trim(),
@@ -344,15 +358,6 @@ export function CreateProviderDialog({
           {preset?.id === PROVIDER_XAI_PRESET.id && (
             <FieldDescription>{PROVIDER_XAI_PRESET.oauthLabel}</FieldDescription>
           )}
-          <FormField label={t('服务商 ID')} htmlFor="dlg-provider-id">
-            <Input
-              id="dlg-provider-id"
-              className={FORM_CONTROL_CLS}
-              value={providerId}
-              onChange={(event) => setProviderId(event.target.value)}
-              placeholder={t('例如 my-relay')}
-            />
-          </FormField>
           <FormField label={t('名称')} htmlFor="dlg-provider-label">
             <Input
               id="dlg-provider-label"
@@ -362,40 +367,10 @@ export function CreateProviderDialog({
             />
           </FormField>
           <FormField
-            label="Base URL"
-            htmlFor="dlg-provider-baseurl"
-            help={baseUrlHasPlaceholder ? t('把 Base URL 中的占位符换成你的账户值') : undefined}
+            label={t('API 密钥')}
+            htmlFor="dlg-provider-apikey"
+            help={t('密钥将加密存储，保存后无法再次查看。')}
           >
-            <Input
-              id="dlg-provider-baseurl"
-              className={FORM_CONTROL_CLS}
-              value={baseUrl}
-              onChange={(event) => setBaseUrl(event.target.value)}
-              placeholder="https://api.example.com/v1"
-            />
-          </FormField>
-          <FormField label={t('API 协议')} htmlFor="dlg-provider-api">
-            <Select
-              value={api}
-              onValueChange={(next) => {
-                if (next !== null) setApi(next as ProviderApi);
-              }}
-            >
-              <SelectTrigger id="dlg-provider-api" className={FORM_CONTROL_CLS}>
-                <SelectValue>
-                  {API_OPTIONS.find((option) => option.value === api)?.label}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent aria-label={t('API 协议')}>
-                {API_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </FormField>
-          <FormField label={t('API 密钥')} htmlFor="dlg-provider-apikey">
             <Input
               id="dlg-provider-apikey"
               className={FORM_CONTROL_CLS}
@@ -404,6 +379,55 @@ export function CreateProviderDialog({
               onChange={(event) => setApiKey(event.target.value)}
               placeholder={t('无密钥网关可留空')}
             />
+          </FormField>
+          <ProviderConnectionDisclosure
+            open={connectionOpen}
+            onOpenChange={setConnectionOpen}
+            summary={connectionSummary({ baseUrl, api, authHeader }, t)}
+          >
+            <FormField label={t('服务商 ID')} htmlFor="dlg-provider-id">
+              <Input
+                id="dlg-provider-id"
+                className={FORM_CONTROL_CLS}
+                value={providerId}
+                onChange={(event) => setProviderId(event.target.value)}
+                placeholder={t('例如 my-relay')}
+              />
+            </FormField>
+            <FormField
+              label="Base URL"
+              htmlFor="dlg-provider-baseurl"
+              help={baseUrlHasPlaceholder ? t('把 Base URL 中的占位符换成你的账户值') : undefined}
+            >
+              <Input
+                id="dlg-provider-baseurl"
+                className={FORM_CONTROL_CLS}
+                value={baseUrl}
+                onChange={(event) => setBaseUrl(event.target.value)}
+                placeholder="https://api.example.com/v1"
+              />
+            </FormField>
+            <FormField label={t('API 协议')} htmlFor="dlg-provider-api">
+              <Select
+                value={api}
+                onValueChange={(next) => {
+                  if (next !== null) setApi(next as ProviderApi);
+                }}
+              >
+                <SelectTrigger id="dlg-provider-api" className={FORM_CONTROL_CLS}>
+                  <SelectValue>
+                    {API_OPTIONS.find((option) => option.value === api)?.label}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent aria-label={t('API 协议')}>
+                  {API_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormField>
             <div>
               {/* biome-ignore lint/a11y/noLabelWithoutControl: Base UI Checkbox.Root renders its hidden native input inside this label at runtime; the static check cannot see through the component. */}
               <label className="inline-flex w-fit cursor-pointer items-center gap-2">
@@ -418,44 +442,21 @@ export function CreateProviderDialog({
                 </span>
               </label>
             </div>
-            <FieldDescription className="text-meta text-content-tertiary">
-              {t('密钥将加密存储，保存后无法再次查看。')}
-            </FieldDescription>
-          </FormField>
+          </ProviderConnectionDisclosure>
           <Field>
             <FieldTitle className={FIELD_TITLE_CLS}>{t('模型（可选）')}</FieldTitle>
-            {models.map((model, i) => (
-              <InputGroup key={i} className={FORM_CONTROL_CLS}>
-                <InputGroupInput
-                  aria-label={t('模型 ID')}
-                  value={model.id}
-                  placeholder="claude-sonnet-5"
-                  onChange={(event) => {
-                    const id = event.target.value;
-                    setModels((rows) => rows.map((r, j) => (i === j ? { id, name: id } : r)));
-                  }}
-                />
-                <InputGroupAddon align="inline-end">
-                  <InputGroupButton
-                    size="icon-xs"
-                    aria-label={t('移除模型')}
-                    onClick={() => setModels((rows) => rows.filter((_, j) => j !== i))}
-                  >
-                    <X />
-                  </InputGroupButton>
-                </InputGroupAddon>
-              </InputGroup>
-            ))}
-            <div>
-              <Button
-                variant="ghost"
-                className="px-0 text-content-secondary"
-                onClick={() => setModels((rows) => [...rows, { id: '', name: '' }])}
-              >
-                <PlusSmall />
-                {t('添加模型')}
-              </Button>
-            </div>
+            <ProviderModelChips
+              catalog={catalog}
+              selected={modelIds}
+              onSelectedChange={setModelIds}
+            />
+            {catalog.length > modelIds.length && (
+              <FieldDescription className="text-meta text-content-tertiary">
+                {t('目录里还有 {n} 个模型，点「添加模型」搜索。', {
+                  n: catalog.filter((model) => !modelIds.includes(model.id)).length,
+                })}
+              </FieldDescription>
+            )}
           </Field>
         </FormStack>
       )}

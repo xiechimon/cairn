@@ -1017,9 +1017,16 @@ export const EN: Record<string, string> = {
   '密钥将加密存储，保存后无法再次查看。':
     'The key is stored encrypted and cannot be viewed again after saving.',
   '模型（可选）': 'Models (optional)',
-  '模型 ID': 'Model ID',
   添加模型: 'Add model',
   移除模型: 'Remove model',
+  连接设置: 'Connection',
+  没有匹配的模型: 'No models match.',
+  '添加自定义模型「{id}」': 'Add custom model "{id}"',
+  '搜索模型或输入 ID': 'Search models or type an ID',
+  '填写 Base URL 和协议': 'Set the base URL and protocol',
+  原生鉴权: 'native auth',
+  '目录里还有 {n} 个模型，点「添加模型」搜索。':
+    '{n#1 more model|# more models} in the catalog. Use Add model to search.',
   '把 Base URL 中的占位符换成你的账户值':
     'Replace the placeholders in the Base URL with your account values',
   // #355 picker 形态(spec 11 §A6;preset 显示名 = 品牌串不译,OAuth 徽标
