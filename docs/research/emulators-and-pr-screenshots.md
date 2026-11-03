@@ -80,7 +80,7 @@ Cairn's GitHub usage that decides correctness is the merge gate and PR reconcile
 2. Make it **stateful but thin**: repos, branches, pulls, checks, statuses, labels, issues, timeline; ETag and 304 handling; pagination with `Link`; rate-limit headers; a GraphQL handler for the one query. Everything else returns 501 with the route in the body so an unmodelled call fails loudly instead of passing.
 3. Keep per-test `githubFake` for narrow unit tests. Add the emulator at two levels: a Vitest helper for server tests and `integration/` (in-process, `port: 0`), and a `GITHUB_API_BASE` (or fetch-rewrite) for the e2e that boots the real server.
 4. Order: GitHub first. Second: a **model/CLI emulator** only if the scripted `AgentBackend` proves too coarse; it already enforces consumed-steps. Tailscale and Codex/Claude CLI: no emulator needed now (guess: few tests touch them and the real CLIs have their own nightly smoke).
-5. Skip Slack/Stripe/Resend/Gmail: cairn does not call them (measured: grep of `apps` and `packages` finds none). AI-written emulators for Composio/Daytona-like services apply when cairn adds integrations; not now.
+5. Skip Slack/Stripe/Resend/Gmail: cairn does not call them (measured: a case-insensitive grep of `apps/*/src` and `packages/*/src` finds one stray `stripe` and one `resend` word and no client code). AI-written emulators for Composio/Daytona-like services apply when cairn adds integrations; not now.
 
 ### Failure modes and controls
 
@@ -141,7 +141,7 @@ Recommendation: **orphan branch with SHA-pinned raw links**, pruning PR director
 ### Workflow shape
 
 1. `e2e` / `e2e-affected` shards: after the existing run, one extra step runs the screens project (`playwright test --project=screens`, only on the shard assigned to it) and uploads `screens-<run>` with the manifest and PNGs. **Owner route** (workflow).
-2. New `workflow_run` workflow `pr-screens.yml` (trusted default-branch code, like Rakazo's publisher): downloads the artifact with safe extraction (zip-slip safe; copy `extract-playwright-artifacts.py` from Rakazo as a pattern), compares manifests, pushes changed PNGs to `pr-screens`, edits the sticky comment. **Owner route** (workflow, `contents: write`, `pull-requests: write`).
+2. New `workflow_run` workflow `pr-screens.yml` (trusted default-branch code, like Rakazo's publisher): downloads the artifact with safe extraction (zip-slip safe; Rakazo's `extract-playwright-artifacts.py` is the pattern), compares manifests, pushes changed PNGs to `pr-screens`, edits the sticky comment. **Owner route** (workflow, `contents: write`, `pull-requests: write`).
 3. `main` push: the same publisher stores the baseline manifest.
 
 ### Cost and time
