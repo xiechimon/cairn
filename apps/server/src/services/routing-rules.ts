@@ -1,12 +1,13 @@
+import { createHash } from 'node:crypto';
 import {
   isSessionStepKind,
   type RequiredCapabilities,
   type RouteOverride,
   type StepKind,
 } from '@cairn/shared';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { agent, machine, routingRule, team, todo } from '../db/schema.js';
+import { agent, agentMemory, chief, machine, routingRule, team, todo } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 
 type AgentRow = typeof agent.$inferSelect;
@@ -164,4 +165,102 @@ export function seedRoutingRules(db: Db): number {
     inserted += 1;
   }
   return inserted;
+}
+
+function sessionRuleOf(db: Pick<Db, 'select'>, teamId: string): RoutingRuleRow | undefined {
+  return db
+    .select()
+    .from(routingRule)
+    .where(and(eq(routingRule.teamId, teamId), eq(routingRule.use, 'session')))
+    .get();
+}
+
+export function memoryOwnerOf(
+  db: Pick<Db, 'select'>,
+  teamId: string,
+  agentId: string,
+  kind: StepKind,
+): string {
+  if (!routingRulesOn || !isSessionStepKind(kind)) return agentId;
+  const rule = sessionRuleOf(db, teamId);
+  return rule?.adoptedAgentIds?.includes(agentId) ? rule.id : agentId;
+}
+
+function sessionAgentIds(db: Db, rule: RoutingRuleRow): string[] {
+  const chiefAgents = new Set(
+    db
+      .select({ agentId: chief.agentId })
+      .from(chief)
+      .where(eq(chief.teamId, rule.teamId))
+      .all()
+      .map((row) => row.agentId)
+      .filter((id): id is string => id !== null),
+  );
+  const ids = new Set<string>();
+  if (rule.seededFromAgentId !== null) ids.add(rule.seededFromAgentId);
+  for (const { assignment } of db
+    .select({ assignment: todo.assignment })
+    .from(todo)
+    .where(eq(todo.teamId, rule.teamId))
+    .all()) {
+    for (const slot of [assignment?.plan, assignment?.build, assignment?.verify]) {
+      if (slot?.agentId != null) ids.add(slot.agentId);
+    }
+  }
+  return [...ids].filter((id) => !chiefAgents.has(id)).sort();
+}
+
+export function adoptAgentMemories(db: Db): number {
+  let copied = 0;
+  for (const rule of db.select().from(routingRule).where(eq(routingRule.use, 'session')).all()) {
+    const adopted = sessionAgentIds(db, rule);
+    db.transaction((tx) => {
+      const held = new Set(
+        tx
+          .select({ projectId: agentMemory.projectId, content: agentMemory.content })
+          .from(agentMemory)
+          .where(and(eq(agentMemory.agentId, rule.id), isNull(agentMemory.invalidAt)))
+          .all()
+          .map((row) => `${row.projectId ?? ''}\u0000${row.content}`),
+      );
+      for (const agentId of adopted) {
+        const rows = tx
+          .select()
+          .from(agentMemory)
+          .where(
+            and(
+              eq(agentMemory.agentId, agentId),
+              eq(agentMemory.teamId, rule.teamId),
+              isNull(agentMemory.invalidAt),
+            ),
+          )
+          .all();
+        for (const row of rows) {
+          const key = `${row.projectId ?? ''}\u0000${row.content}`;
+          if (held.has(key)) continue;
+          held.add(key);
+          const res = tx
+            .insert(agentMemory)
+            .values({
+              ...row,
+              id: createHash('sha256')
+                .update(JSON.stringify(['adopt', rule.id, row.id]))
+                .digest('hex'),
+              agentId: rule.id,
+              supersededBy: null,
+              lastInjectedAt: null,
+            })
+            .onConflictDoNothing()
+            .run();
+          copied += res.changes;
+        }
+      }
+      const union = [...new Set([...(rule.adoptedAgentIds ?? []), ...adopted])].sort();
+      tx.update(routingRule)
+        .set({ adoptedAgentIds: union })
+        .where(eq(routingRule.id, rule.id))
+        .run();
+    });
+  }
+  return copied;
 }
