@@ -192,6 +192,165 @@ Estimate: 6–8 PRs, at least two on the owner route (lockfile, machine protocol
 6. Host-ordered model switch: `compact()` on the old model, then `configure()`.
 7. Close #2637 and C4 as superseded; C2 stays as the seed source.
 
+## 9. Follow-up: Pi Durable as a control-plane sidecar
+
+> **Question.** §5 rejected Pi Durable mainly because of D69's split. ian accepts a Coordinator-only Pi process next to the server. What does that cost?
+>
+> **Setup.** A separate process next to the Hono server (ian's Mac today, a 1 GB VPS later). It owns pi-durable with its own SQLite file, runs the Coordinator loop and model calls with the team's Anthropic key, and calls the server over a local API for the Coordinator tools. Daemons no longer claim Coordinator steps; threads stay on executor machines.
+>
+> **Method.** Measured 2026-11-03 with the §2 prototype (`/tmp/pd-spike/proto`, pi-durable 1.4.0) and a 1.5.0 copy (`/tmp/pd-spike/proto15`), the stub model, and the production thread imported into Pi storage (`import.mjs`, `mem.mjs`, `seedcheck.mjs`). Nothing in the repo, the lockfile, production or #2637 was touched.
+
+### 9.1 Recommendation
+
+**Path A still wins. The sidecar is feasible (memory fits a 1 GB VPS, crash resume works), but it costs about 10 PRs against Path A's 4. It also adds a second supervised process, a new authenticated local API that carries the model key, and a dependency whose minor releases broke 54 APIs in one month and migrate stored data one way.**
+
+| | Path A (C3 + C4 + replay rule) | Sidecar Pi Durable |
+|---|---|---|
+| PRs left | 4, one on the owner route (#2637: machine protocol) | 10, three on the owner route (API and key delivery, claim-path deletion, seam rule) plus one lockfile change |
+| New runtime pieces | none | one process, one SQLite file, one local API with its own token |
+| New dependency | none (pi 1.4.0 already in the daemon) | pi-durable, chord 1.0.4 → 1.4.0, pi-codemode, pi-telemetry |
+| Upgrade load | none beyond today's pi 1.4.0 pin | about one minor a week; 1.5.0 alone has 34 breaking items; storage upgrades cannot be rolled back (§9.5) |
+| What it buys | — | turn-level checkpoint resume, a durable inbox and steering, forks (unused, §3) |
+
+Choose the sidecar only if checkpoint resume within a turn becomes a requirement that the step claim plus the replay rule cannot meet (inferred).
+
+### 9.2 Memory (measured)
+
+| Process | RSS |
+|---|---|
+| Production server today (`pid 98968`, tsx dev mode, Mac) | 150 MB; D69 recorded 190–250 MB on omarchy |
+| Bare Node 24 | 41–44 MB |
+| Sidecar after importing pi-ai + pi-durable (+ Anthropic provider) | 81–83 MB |
+| Sidecar idle, seeded thread open (C2 summary + newest 100 rows) | 84 MB |
+| Same, peak during one turn | 92 MB; 94 MB idle after |
+| Sidecar with the whole production thread imported raw (4,651 rows, 39.8 MB SQLite), context loaded | 207 MB |
+| Same, peak during the turn that triggered a blocking compaction (a 2.6M-token summarizer request, accepted by the stub) | 409 MB |
+| 1.5.0, seeded thread, peak during one turn | 85 MB |
+
+- `node_modules` for the sidecar is 113 MB on disk, mostly pi-ai's provider SDKs (measured).
+- On a 1 GB VPS, the server plus a sidecar in steady state (~250 + ~95 MB) fits under D69's budget. A turn over an uncompacted, raw-imported thread does not (409 MB alone, above the ~384 MB heap target), so migration must seed, never import raw, and tool results need a cap (inferred).
+
+### 9.3 What goes away and what gets written
+
+Deleted or replaced, on `origin/main` (c5b4cfda4) unless noted (measured, line counts):
+
+| Code | Lines | Fate |
+|---|---|---|
+| `machine-claim.ts`: `claimChiefCandidates`, `buildChiefClaim`, `claimChiefTurn` | ~160 of 611 | deleted (owner route) |
+| `chief-turns.ts` (turn ordering of Coordinator steps) | 430 | replaced by Pi's inbox |
+| `chief-summary.ts` (C2 scheduling; prompt kept) | 251 | replaced by Pi compaction + a `beforeCompact` hook |
+| `chief-digest.ts` step queueing for summaries | part of 662 | replaced |
+| `coordinator-route.ts` (route the Coordinator to the keyed provider) | 122 | moves into sidecar config |
+| `machine-relay.ts` Coordinator tool relay through step tokens | part | replaced by the sidecar tool endpoint |
+| `apps/daemon/src/runner.ts` Coordinator branches | ~15 `isChief` sites in 2,231 | deleted |
+| #2637 `coordinator-history.ts` and the daemon seeding (unmerged) | ~300 | never merged |
+
+Kept: `chief_message` stays the UI's store (14 server and web files read `chiefMessage` on main, measured), `chief-tools.ts` keeps executing the 70 tools in `CHIEF_REMOTE_TOOLS` (measured), and `chief.ts` keeps the conversation API.
+
+New code (inferred, sized from the prototype):
+
+1. A sidecar package (for example `apps/coordinator`): open SQLite storage, models, settings with `modelOverrides` tuned near 70k (§1.2), `resume()` on boot, health endpoint. Also a `biome.json` change, since today `@earendil-works/*` may only be imported under `apps/daemon/src/backend/`.
+2. Server ↔ sidecar API over loopback:
+   - server → sidecar: submit a message with a `requestId`, abort, set the model, status;
+   - sidecar → server: execute a tool (`executeChiefTool`), write mirrored entries, fetch the provider key;
+   - a server-side outbox, so messages sent while the sidecar is down are delivered on restart;
+   - auth: a random token in a 0600 file, read by both processes; refuse non-loopback callers.
+   This is a new external entry point and a credential path: owner route and `/security-review`.
+3. Tools: wrap the 70 `CHIEF_REMOTE_TOOLS` definitions with `defineTool`, each with a replay rule (reads `safe`, dispatch and writes `never`), plus a test that fails when a tool has no rule.
+4. Compaction: a `beforeCompact` hook that runs C2's prompt in bounded batches on Haiku, so no summarizer request outgrows its window (§4). Thresholds per model through `modelOverrides`, with a CJK-aware estimate until #10583 lands.
+5. Mirror: `conversation.watch()` → `chief_message` rows and the live stream the web shows today. In 1.4.0 this would be built on `watchEvents()`, which 1.5.0 removed.
+6. Model switch: `compact()` on the old model, then `configure()` (C4's logic, ported).
+7. Migration and cutover flag (§9.6).
+8. Ops: a launchd agent on the Mac, a systemd unit on the VPS, and an upgrade runbook that backs up the SQLite file first.
+
+PR list (owner route marked **O**, lockfile **L**):
+
+| # | PR | Route |
+|---|---|---|
+| S1 | Add pi-durable 1.4.0, bump chord; `biome.json` seam rule for the sidecar package | **L**, **O** (seam rule) |
+| S2 | Sidecar skeleton: storage, models, settings, resume, health; stub-model tests | normal |
+| S3 | Server ↔ sidecar API, token auth, key delivery, outbox | **O** (credentials, external entry) |
+| S4 | Tool wrappers with replay rules and the coverage test | normal |
+| S5 | Compaction hook (C2 prompt, batched, Haiku), `modelOverrides`, CJK estimate | normal |
+| S6 | Mirror into `chief_message` and the live stream | normal |
+| S7 | Model switch ordering | normal |
+| S8 | Migration and cutover flag | normal |
+| S9 | Delete the daemon Coordinator path, the claim path, `chief-turns.ts`, C2 scheduling; close #2637 | **O** (`machine-claim.ts`) |
+| S10 | launchd and systemd units, upgrade runbook | normal |
+
+Path A for comparison:
+
+- #2637, owner route.
+- C4, built and unpushed.
+- The replay rule.
+- The C2 prompt line.
+
+### 9.4 Ops
+
+- **Start and restart (measured for today, inferred for the sidecar).**
+  - Today the Mac server runs as `pnpm --filter @xiechimon/cairn dev`, i.e. `tsx watch` in the `run-local` worktree, with no supervisor. A launchd script exists in `~/.cairn/cairn-server-run.sh` but is not what runs now.
+  - The sidecar would need its own launchd agent (`KeepAlive`) on the Mac and a `Restart=always` systemd unit next to the server on the VPS. Both run a prebuilt bundle, per D69.
+  - Upgrades: stop, back up the SQLite file, swap the bundle, start. Rollback means restoring the backup, which loses any turns since then (§9.5).
+- **Crash mid-turn (measured, §2 plus 1.5.0 rerun).**
+
+  | Killed during | 1.4.0 | 1.5.0 |
+  |---|---|---|
+  | Model streaming | The request is resent on open (8.6 s) | The interrupted request counts as a failed attempt, and the retry follows after backoff (10.5 s); the CHANGELOG lists this as a breaking change |
+  | A `never` tool | Comes back to the model as interrupted; executed once | Same; executed once |
+  | A `safe` tool | Reruns | Reruns |
+
+  - Same `requestId`: same submission, no duplicate.
+  - While the sidecar is down, the server must queue messages, so the outbox in S3 is required.
+- **API key.**
+  - Today: the key is stored encrypted as `provider.apiKeyCipher` in the server DB (C5, #2632). The server decrypts it and hands it to the daemon in the Coordinator claim (`credentials.ts`, `coordinator-route.ts`).
+  - Sidecar, recommended: fetch the key from the server over the authenticated loopback API and hold it in memory only. A rotated key then works without a restart, and it never lands in a unit file or environment dump.
+  - Sidecar, alternative: the server spawns the sidecar with the key in its environment. Simpler, but a restart is needed on rotation, and the VPS's systemd unit could not own the process.
+  - Either way, this touches `credentials.ts`, a credentials security surface: owner route and `/security-review` (inferred).
+
+### 9.5 What 1.4.0 → 1.5.0 would have cost (measured)
+
+- Breaking-change bullets per release in the CHANGELOG:
+
+  | Release | Breaking items |
+  |---|---|
+  | 1.0.3 | 4 |
+  | 1.0.4 | 2 |
+  | 1.1.0 | 2 |
+  | 1.2.0 | 6 |
+  | 1.4.0 | 6 |
+  | 1.5.0 (2026-11-02, 12 days after 1.4.0) | 34 |
+
+- Running the prototype on 1.5.0: `import { Type } from "@earendil-works/pi-ai"` no longer exists. Every `defineTool` schema had to move to `@earendil-works/pi-schema` builders before anything loaded; after that, crash, fork and memory scripts ran unchanged.
+- Items that would hit the sidecar:
+  - every tool wrapper (schema types, S4);
+  - the mirror, because `watchEvents()` was removed and watch listener and observer shapes changed (S6);
+  - `onReport` and `SessionEnd` shapes (S2);
+  - crash semantics for an in-flight model request (§9.4);
+  - a custom `Storage`, if one existed (`commit()` signature) — not needed with the bundled SQLite.
+- Stored data: 1.5.0 opened the 1.4.0 file and ran a turn. Reopening the same file with 1.4.0 then failed: `Document 2 (pi.live) has newer version 3 than 1`. Upgrades are one-way; a rollback needs the pre-upgrade backup.
+- Estimate: one PR of about the size of S4 + S6 per minor release, about weekly at the current pace, each needing the crash tests rerun (inferred).
+
+### 9.6 Migrating `chief-01a199d6` (measured)
+
+- Production has no `chief_summary` rows yet (`CAIRN_COORDINATOR_SERVER_CONTEXT` is off), so either path first needs a C2 summary of the whole thread. At §1.3's pace (47 Haiku calls and 68 minutes for 1,154 rows), the 6,431 rows take about 6 hours of background folding (inferred). The cost is the same for both paths.
+- Seeding: `import.mjs seed` writes the newest 100 rows as Pi entries, then a `CompactionEntry` whose `head` is the first kept row and whose text is the C2 summary (§1.3's slice summary stood in). It took 28 ms and produced a 0.9 MB file. The first context opens with the summary and has 141 messages.
+- Uncapped, those 100 rows are 213k tokens (54k of them tool results; largest message 26k). With C3's 8,000-char cap they are 59k (measured, CJK-aware estimate). So the seed must apply the same cap, or the first turn starts above the tuned compaction threshold and compacts at once.
+- Old rows stay in `chief_message` for the UI and `read_history`; Pi never sees them except through the summary.
+
+### 9.7 Answer for the coordinator
+
+- **Verdict:** Path A.
+  - Path A: 4 PRs, 1 owner route, no new process, no new dependency.
+  - Sidecar: 10 PRs, 3 owner route, 1 lockfile change, plus a recurring upgrade PR about weekly.
+- **What the sidecar would buy:**
+  - checkpoint resume inside a turn: the replay rule covers the dangerous case;
+  - a durable inbox and steering: `queued_message` covers queuing;
+  - forks: unused.
+- **What it would cost:**
+  - a second supervised process at 84–94 MB, 409 MB on an uncompacted thread;
+  - a new loopback API that carries the model key;
+  - one-way storage upgrades.
+
 ## 8. Artifacts
 
-All outside the repo, under `/tmp/pd-spike/` (not committed): `proto/` (prototype and `node_modules`), `crash*.log`, `fork-switch*.log`, `tokens.log`, `sim/` (replay and recall scripts), `recall/` (summaries, per-call logs, Q&A).
+All outside the repo, under `/tmp/pd-spike/` (not committed): `proto/` (prototype and `node_modules`; §9 adds `import.mjs`, `mem.mjs`, `seedcheck.mjs`), `proto15/` (the 1.5.0 port), `crash15.log`, `crash*.log`, `fork-switch*.log`, `tokens.log`, `sim/` (replay and recall scripts), `recall/` (summaries, per-call logs, Q&A).
