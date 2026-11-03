@@ -236,3 +236,56 @@ for (const [scenario, scope, status] of [
     await expect(instance(page, 'claude-code')).toContainText(status);
   });
 }
+
+test('live: a second model edit waits for the first and keeps its result', async ({ page }) => {
+  const bodies: string[] = [];
+  let release: () => void = () => undefined;
+  const firstHeld = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const provider = {
+    kind: 'custom',
+    id: 'p1',
+    providerId: 'anthropic',
+    label: 'Anthropic',
+    baseUrl: 'https://api.anthropic.com',
+    api: 'anthropic-messages',
+    authHeader: true,
+    compat: { supportsDeveloperRole: false },
+    models: [{ id: 'claude-haiku-5-5', name: 'Claude Haiku 5.5' }],
+    createdBy: 'u1',
+    createdAt: NOW,
+    updatedAt: NOW,
+  };
+  await mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
+    if (path === '/api/teams/t1/providers') return json({ presets: [], providers: [provider] });
+    if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
+    if (path === '/api/teams/t1/machines') return json([]);
+    if (path === '/api/teams/t1/providers/p1' && route.request().method() === 'PATCH') {
+      const body = route.request().postDataJSON();
+      bodies.push(JSON.stringify(body.models.map((m: { id: string }) => m.id)));
+      const reply = () => json({ ...provider, ...body });
+      return bodies.length === 1 ? firstHeld.then(reply) : reply();
+    }
+    return undefined;
+  });
+  await page.goto('/app/resources/providers');
+
+  const add = editor(page).getByLabel('添加模型');
+  await add.fill('claude-opus-5-5');
+  await add.press('Enter');
+  await expect.poll(() => bodies.length).toBe(1);
+  await expect(editor(page).getByRole('button', { name: '移除 Claude Haiku 5.5' })).toBeDisabled();
+  await expect(add).toHaveAttribute('readonly', '');
+
+  release();
+  await expect(editor(page).getByRole('button', { name: '移除 Claude Haiku 5.5' })).toBeEnabled();
+  await add.fill('claude-sonnet-5-5');
+  await add.press('Enter');
+  await expect
+    .poll(() => bodies)
+    .toEqual([
+      '["claude-haiku-5-5","claude-opus-5-5"]',
+      '["claude-haiku-5-5","claude-opus-5-5","claude-sonnet-5-5"]',
+    ]);
+});

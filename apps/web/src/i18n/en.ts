@@ -1569,4 +1569,5 @@ export const EN: Record<string, string> = {
     'Add an API key, subscription or custom endpoint and its models show up here.',
   还没上报: 'Not reported yet',
   模型列表: 'Models',
+  '已安装，登录状态未知': 'Installed, sign-in unknown',
 };

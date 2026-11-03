@@ -84,7 +84,7 @@ function teamEntries(
       },
       editor: (
         <TeamProviderEditor
-          key={record.id}
+          key={`${record.id}:${record.updatedAt}`}
           record={record}
           deadModels={dead}
           actions={actionsFor(record)}
@@ -218,10 +218,10 @@ export function ProvidersPage() {
     live
       ? {
           patch: (body) =>
-            mutations.patchProvider.mutate(
-              { id: record.id, body },
-              { onError: (error) => toastError(t('保存失败，请重试。'), error) },
-            ),
+            mutations.patchProvider.mutateAsync({ id: record.id, body }).catch((error) => {
+              toastError(t('保存失败，请重试。'), error);
+              throw error;
+            }),
           remove: () =>
             mutations.deleteProvider.mutate(record.id, {
               onError: (error) => toastError(t('移除失败，请重试。'), error),

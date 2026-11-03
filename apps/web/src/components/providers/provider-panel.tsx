@@ -194,11 +194,13 @@ export function ProviderModelRow({
   name,
   id,
   dead = false,
+  busy = false,
   onRemove,
 }: {
   name: string;
   id: string;
   dead?: boolean;
+  busy?: boolean;
   onRemove?: () => void;
 }) {
   const { t } = useI18n();
@@ -225,6 +227,7 @@ export function ProviderModelRow({
           size="icon-xs"
           className="text-content-tertiary"
           aria-label={t('移除 {name}', { name })}
+          disabled={busy}
           onClick={onRemove}
         >
           <X />

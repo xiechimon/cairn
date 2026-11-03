@@ -125,7 +125,7 @@ export interface ProviderEditActions {
     body: Partial<Pick<ProviderRecord, 'label' | 'baseUrl' | 'models'>> & {
       apiKey?: string;
     },
-  ) => void;
+  ) => Promise<unknown>;
   remove?: () => void;
 }
 
@@ -141,12 +141,27 @@ export function TeamProviderEditor({
   const { t } = useI18n();
   const [adding, setAdding] = useState('');
   const [confirming, setConfirming] = useState(false);
+  const [models, setModels] = useState(record.models);
+  const [savingModels, setSavingModels] = useState(false);
   const oauth = isOAuthPreset(record.providerId);
+  const fire = (body: Parameters<NonNullable<ProviderEditActions['patch']>>[0]) => {
+    void actions.patch?.(body).catch(() => undefined);
+  };
+  const saveModels = (next: ProviderRecord['models']) => {
+    if (actions.patch === undefined) return;
+    setModels(next);
+    setSavingModels(true);
+    actions
+      .patch({ models: next })
+      .catch(() => setModels(record.models))
+      .finally(() => setSavingModels(false));
+  };
   const addModel = () => {
     const id = adding.trim();
+    if (id === '' || savingModels) return;
     setAdding('');
-    if (id === '' || record.models.some((m) => m.id === id)) return;
-    actions.patch?.({ models: [...record.models, { id, name: id }] });
+    if (models.some((m) => m.id === id)) return;
+    saveModels([...models, { id, name: id }]);
   };
   return (
     <>
@@ -161,7 +176,7 @@ export function TeamProviderEditor({
             key={`label:${record.label}`}
             label={t('名称')}
             value={record.label}
-            onCommit={(label) => actions.patch?.({ label })}
+            onCommit={(label) => fire({ label })}
           />
         </SettingsRow>
         <SettingsRow label={t('协议')}>{PROTOCOL_LABELS[record.api]}</SettingsRow>
@@ -170,22 +185,21 @@ export function TeamProviderEditor({
             key={`base:${record.baseUrl}`}
             label={t('地址')}
             value={record.baseUrl}
-            onCommit={(baseUrl) => actions.patch?.({ baseUrl })}
+            onCommit={(baseUrl) => fire({ baseUrl })}
           />
         </SettingsRow>
-        {!oauth && <KeyRow onReplace={(apiKey) => actions.patch?.({ apiKey })} />}
+        {!oauth && <KeyRow onReplace={(apiKey) => fire({ apiKey })} />}
       </SettingsCard>
       <ProviderSection title={t('模型列表')} hint={t('这里的模型会出现在模型选择器里')}>
         <SettingsCard>
-          {record.models.map((model) => (
+          {models.map((model) => (
             <ProviderModelRow
               key={model.id}
               id={model.id}
               name={model.name !== '' ? model.name : model.id}
               dead={deadModels.has(model.id)}
-              onRemove={() =>
-                actions.patch?.({ models: record.models.filter((m) => m.id !== model.id) })
-              }
+              busy={savingModels}
+              onRemove={() => saveModels(models.filter((m) => m.id !== model.id))}
             />
           ))}
           <div className="flex min-h-11 items-center gap-2 px-4 py-1.5">
@@ -194,6 +208,8 @@ export function TeamProviderEditor({
               placeholder={t('添加模型 ID，回车保存')}
               className={cn(FORM_CONTROL_CLS, 'w-full')}
               value={adding}
+              aria-busy={savingModels}
+              readOnly={savingModels}
               onChange={(event) => setAdding(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') addModel();
@@ -239,7 +255,9 @@ export function claudeCodeStatus(
   if (source.bin === null) return { status: '未安装', tone: 'warn' };
   if (source.auth?.state === 'not-logged-in') return { status: '未登录', tone: 'warn' };
   if (source.models.length === 0) return { status: '已安装，未配置模型槽', tone: 'warn' };
-  return { status: '已登录', tone: 'ok' };
+  if (source.auth?.state === 'logged-in') return { status: '已登录', tone: 'ok' };
+  if (source.auth?.state === 'unknown') return { status: '已安装，登录状态未知', tone: 'warn' };
+  return { status: '已安装', tone: 'ok' };
 }
 
 export function ClaudeCodeEditor({
