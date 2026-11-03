@@ -336,4 +336,36 @@ test.describe('the home sends to the project it is filtered to (#2531)', () => {
       '1本周合并',
     );
   });
+
+  test('a paused schedule shows as paused with its reason, not a next run', async ({ page }) => {
+    await mockLive(page);
+    await page.route('**/api/schedules', (route) =>
+      route.fulfill({
+        json: [
+          {
+            id: 'sch-1',
+            teamId: 't1',
+            projectId: 'proj-1',
+            todoId: 'todo-1',
+            kind: 'daily',
+            cron: null,
+            prompt: '',
+            enabled: false,
+            at: 1,
+            tz: 'UTC',
+            nextRunAt: null,
+            lastRunAt: null,
+            lastRunStatus: null,
+            pausedReason: 'Task archived',
+            createdBy: 'u1',
+            todo: { seqNum: 11, title: '修 README 里的失效链接', phase: 'todo', projectName: 'cairn', ownerId: 'u1' },
+          },
+        ],
+      }),
+    );
+    await page.goto('/app?project=proj-1');
+    const row = page.getByTestId('project-home').getByText('Task archived');
+    await expect(row).toBeVisible();
+    await expect(page.getByTestId('project-home')).not.toContainText('1970');
+  });
 });

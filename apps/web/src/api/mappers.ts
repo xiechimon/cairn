@@ -1092,6 +1092,8 @@ export function mapSchedules(rows: WireSchedule[]): DisplaySchedule[] {
     tz: r.tz,
     nextRunAt: r.nextRunAt ?? 0,
     createdBy: r.createdBy,
+    enabled: r.enabled,
+    pausedReason: r.pausedReason,
     todo: r.todo,
   }));
 }

@@ -281,8 +281,12 @@ export function ProjectHome({
                       <ScheduledTaskRow
                         key={schedule.id}
                         name={schedule.todo.title}
-                        trigger={scheduleSummary(schedule, now, t)}
-                        state="active"
+                        trigger={
+                          schedule.enabled === false
+                            ? (schedule.pausedReason ?? t('已暂停'))
+                            : scheduleSummary(schedule, now, t)
+                        }
+                        state={schedule.enabled === false ? 'paused' : 'active'}
                         onOpen={() => navigate(threadHref(schedule.todoId))}
                       />
                     ))}

@@ -115,6 +115,7 @@ export const EN: Record<string, string> = {
   等你处理: 'Needs you',
   管理定时: 'Manage schedules',
   接下来: 'Up next',
+  已暂停: 'Paused',
   本周合并: 'Merged this week',
   项目说明: 'Instructions',
   项目记忆: 'Project memory',

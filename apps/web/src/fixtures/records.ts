@@ -142,6 +142,8 @@ export interface ScheduleRecord {
   tz: string;
   nextRunAt: number;
   createdBy: string;
+  enabled?: boolean;
+  pausedReason?: string | null;
   todo: {
     seqNum: number;
     title: string;

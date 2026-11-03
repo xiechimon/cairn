@@ -74,6 +74,16 @@ test('from a project chat, clicking a sidebar project opens that project home', 
   await expect(page).not.toHaveURL(/chat=1/);
 });
 
+test('the Coordinator shortcut on a project home opens the project chat with the composer focused', async ({
+  page,
+}) => {
+  await page.goto(projectHome());
+  await expect(home(page)).toBeVisible();
+  await page.keyboard.press('ControlOrMeta+j');
+  await expect(page).toHaveURL(/chat=1/);
+  await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toBeFocused();
+});
+
 test('instructions, memory, secrets and concurrency show where they will live', async ({ page }) => {
   await page.goto(projectHome());
   for (const title of ['Instructions', 'Project memory', 'Schedules']) {

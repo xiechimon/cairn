@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import {
   useApiMutations,
@@ -71,6 +71,12 @@ export function BoardPage() {
           color: liveProject?.color ?? fixture.projectAvatars?.[homeProjectId]?.color,
         };
   const projectChat = searchParams.get('chat') === '1';
+  useEffect(() => {
+    if (homeProject === null || projectChat || chiefView !== 'drawer') return;
+    const params = new URLSearchParams(searchParams);
+    params.set('chat', '1');
+    navigate({ pathname: '/app', search: `?${params.toString()}` });
+  }, [homeProject, projectChat, chiefView, searchParams, navigate]);
   const schedules = live ? mapSchedules(schedulesQ.data ?? []) : (fixture.schedules ?? []);
   const now = live ? Date.now() : fixture.now;
   const askAboutProject = async (project: ProjectHomeProject, text: string): Promise<boolean> => {
