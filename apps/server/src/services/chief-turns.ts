@@ -279,6 +279,31 @@ export function takeChiefSteer(db: Db, threadId: string): boolean {
   return true;
 }
 
+export function steeredMessageScopes(db: Db, running: StepRow): (string | null)[] {
+  if (running.claimedAt === null) return [];
+  const claimedAt = running.claimedAt;
+  return db
+    .select({ id: chiefMessage.id, projectId: chiefMessage.projectId })
+    .from(chiefMessage)
+    .where(
+      and(
+        eq(chiefMessage.threadId, running.buildId),
+        eq(chiefMessage.role, 'user'),
+        gt(chiefMessage.createdAt, claimedAt),
+      ),
+    )
+    .all()
+    .filter((message) => {
+      const queued = db
+        .select({ holdReason: step.holdReason })
+        .from(step)
+        .where(eq(step.id, message.id))
+        .get();
+      return queued === undefined || STEER_HOLDS.includes(queued.holdReason ?? '');
+    })
+    .map((message) => message.projectId);
+}
+
 export function ackChiefSteer(
   deps: Pick<ChiefTurnDeps, 'db' | 'convHub' | 'machineHub'>,
   teamId: string,

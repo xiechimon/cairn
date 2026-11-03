@@ -81,7 +81,7 @@ describe('a turn that was steered into another project (D74 P2)', () => {
     expect(saved.projectId).toBe(other);
   });
 
-  test('a user message from another project after the turn was claimed marks the turn mixed', async () => {
+  test('only a message steered into the turn from another project marks it mixed, not a queued one', async () => {
     const other = await postProject(H.s.app, 'other');
     const claimedAt = nowMs() - 1000;
     H.s.db
@@ -109,6 +109,20 @@ describe('a turn that was steered into another project (D74 P2)', () => {
         .run();
     message('own', H.projectId, claimedAt - 5);
     message('same-project', H.projectId, claimedAt + 5);
+    expect(steeredFromAnotherScope(toolDeps() as never, turn)).toBe(false);
+    message('queued-other', other, claimedAt + 8);
+    H.s.db
+      .insert(step)
+      .values({
+        id: 'queued-other',
+        buildId: H.threadId,
+        kind: 'chief',
+        status: 'pending',
+        prompt: 'queued-other',
+        scopeProjectId: other,
+        createdAt: claimedAt + 8,
+      })
+      .run();
     expect(steeredFromAnotherScope(toolDeps() as never, turn)).toBe(false);
     message('other-project', other, claimedAt + 10);
     expect(steeredFromAnotherScope(toolDeps() as never, turn)).toBe(true);
