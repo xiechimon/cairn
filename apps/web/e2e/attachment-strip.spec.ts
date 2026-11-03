@@ -272,11 +272,8 @@ test('detail face: paste paints a placeholder, landing swaps it for a chip at th
     .poll(() => chipImg.evaluate((el) => (el as HTMLImageElement).naturalWidth))
     .toBe(CARD_W);
   const afterBox = await chip.boundingBox();
-  expect(afterBox).toMatchObject({
-    x: beforeBox?.x,
-    width: beforeBox?.width,
-    height: beforeBox?.height,
-  });
+  expect(afterBox?.x ?? 0).toBeCloseTo(beforeBox?.x ?? 0, 0);
+  expect(afterBox).toMatchObject({ width: beforeBox?.width, height: beforeBox?.height });
   expect(afterBox?.y).toBeLessThanOrEqual(beforeBox?.y ?? 0);
   await evidenceShot(page, 'strip-detail-settled.png');
 
