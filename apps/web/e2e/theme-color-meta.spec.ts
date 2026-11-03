@@ -66,7 +66,6 @@ test('theme-color follows the stored theme across reloads', async ({ page }) => 
   }
 });
 
-// The settings appearance segments drive applyTheme in place, with no reload.
 test('a live theme switch in settings rewrites theme-color without a reload', async ({
   page,
 }) => {
