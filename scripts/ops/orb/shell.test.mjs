@@ -360,20 +360,34 @@ test('guest image installs socat for the Claude Code sandbox and verifies it as 
   assert.match(script, /runuser -u agent -- \/usr\/bin\/socat -V/);
 });
 
-test('guest image records bypass consent as root-owned managed settings the agent can read but not edit', () => {
+test('guest image gives Claude a root-pinned config dir with the weaker nested sandbox the agent cannot tamper with', () => {
   const script = readFileSync(join(source, 'build-image.sh'), 'utf8');
+  assert.doesNotMatch(script, /\/etc\/claude-code/);
   assert.match(
     script,
-    /install -d -o root -g root -m 755 \/etc\/claude-code\n.*'\{"skipDangerousModePermissionPrompt": true\}'.*> \/etc\/claude-code\/managed-settings\.json\nchown root:root \/etc\/claude-code\/managed-settings\.json\nchmod 644 \/etc\/claude-code\/managed-settings\.json/,
+    /install -d -o root -g root -m 755 \/var\/lib\/cairn-claude\ninstall -d -o root -g agent -m 1770 \/var\/lib\/cairn-claude\/config\nprintf '%s\\n' '\{"sandbox": \{"enableWeakerNestedSandbox": true\}\}' > \/var\/lib\/cairn-claude\/config\/settings\.json\nchown root:root \/var\/lib\/cairn-claude\/config\/settings\.json\nchmod 644 \/var\/lib\/cairn-claude\/config\/settings\.json/,
   );
-  assert.match(
-    script,
-    /runuser -u agent -- \/usr\/bin\/node -e .*skipDangerousModePermissionPrompt === true.*\/etc\/claude-code\/managed-settings\.json/,
-  );
-  assert.match(script, /runuser -u agent -- test ! -w \/etc\/claude-code\/managed-settings\.json/);
-  const consent = script.indexOf('/etc/claude-code/managed-settings.json');
+  for (const check of [
+    /runuser -u agent -- \/usr\/bin\/node -e .*enableWeakerNestedSandbox === true.*\/var\/lib\/cairn-claude\/config\/settings\.json/,
+    /runuser -u agent -- touch \/var\/lib\/cairn-claude\/config\/\.agent-write-check/,
+    /! runuser -u agent -- rm -f \/var\/lib\/cairn-claude\/config\/settings\.json/,
+    /! runuser -u agent -- mv \/var\/lib\/cairn-claude\/config\/settings\.json/,
+    /! runuser -u agent -- sh -c 'printf x > \/var\/lib\/cairn-claude\/config\/settings\.json'/,
+    /! runuser -u agent -- mv \/var\/lib\/cairn-claude\/config \/var\/lib\/cairn-claude\/moved/,
+  ]) {
+    assert.match(script, check);
+  }
+  const worker =
+    /cat > \/etc\/systemd\/system\/cairn-orb-worker.service <<WORKER\n([\s\S]+?)\nWORKER/.exec(
+      script,
+    )[1];
+  assert.match(worker, /^Environment=CLAUDE_CONFIG_DIR=\/var\/lib\/cairn-claude\/config$/m);
+  const settings = script.indexOf('/var/lib/cairn-claude/config/settings.json');
   const marker = script.indexOf('> "$stage/etc/cairn-orb-image"');
-  assert.ok(consent >= 0 && consent < marker, 'consent is written before the completion marker');
+  assert.ok(
+    settings >= 0 && settings < marker,
+    'settings are written before the completion marker',
+  );
 });
 
 test("guest image runs only Claude Code's own native installer and verifies both CLIs as agent", () => {
