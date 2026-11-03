@@ -195,7 +195,27 @@ function ruleExists(db: Db, teamId: string, use: 'session' | 'review'): boolean 
   );
 }
 
+function backfillRuleConstraints(db: Db): void {
+  for (const rule of db.select().from(routingRule).all()) {
+    if (rule.requiredCapabilities !== null || rule.seededFromAgentId === null) continue;
+    if (rule.use !== 'session' && rule.use !== 'review') continue;
+    const source = db
+      .select()
+      .from(agent)
+      .where(and(eq(agent.id, rule.seededFromAgentId), eq(agent.teamId, rule.teamId)))
+      .get();
+    if (source === undefined) continue;
+    const required = seededRequirement(db, source);
+    if (required === null) continue;
+    db.update(routingRule)
+      .set({ requiredCapabilities: required })
+      .where(eq(routingRule.id, rule.id))
+      .run();
+  }
+}
+
 export function seedRoutingRules(db: Db): number {
+  backfillRuleConstraints(db);
   let inserted = 0;
   for (const { id: teamId } of db.select({ id: team.id }).from(team).all()) {
     if (ruleExists(db, teamId, 'session')) continue;
