@@ -259,6 +259,24 @@ describe('POST /api/machine/computer/:callId', () => {
     expect(stored).toBe('Authorization: [REDACTED] after');
   });
 
+  test('a complete credential right after a redacted one is still redacted', async () => {
+    const { s, owner, id } = await setup();
+    const envelope = `v1:${'A'.repeat(44)}`;
+    const res = await post(s.app, `/api/machine/computer/${id}`, owner.token, {
+      frames: [
+        { kind: 'output', seq: 1, stream: 'stdout', text: 'Authorization: Bearer first-secret' },
+        { kind: 'output', seq: 2, stream: 'stdout', text: 'Bearer second-secret' },
+        { kind: 'output', seq: 3, stream: 'stdout', text: 'Bearer third-secret' },
+        { kind: 'output', seq: 4, stream: 'stdout', text: envelope },
+      ],
+    });
+    expect(res.status).toBe(200);
+    const stored = row(s, id).outputHead + row(s, id).outputTail;
+    expect(stored).not.toContain('second-secret');
+    expect(stored).not.toContain('third-secret');
+    expect(stored).not.toContain('A'.repeat(20));
+  });
+
   test('output keeps a bounded head and tail with the full character count', async () => {
     const { s, owner, id } = await setup();
     const chunk = 'x'.repeat(60 * 1024);
