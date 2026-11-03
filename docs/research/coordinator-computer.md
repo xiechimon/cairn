@@ -260,7 +260,7 @@ Rakazo's numbers, kept as they are:
 | Secret on screen or in output | Commands in the feed are redacted (`redactSecrets`, as in Rakazo's `computer.command`). Browser snapshots mask passwords and saved logins. Protected input goes through `request_takeover`, never through chat. No cairn credentials exist inside the Coordinator computer | A token-shaped string in stdout reaches neither DB nor hub |
 | Prompt injection from a web page | The page content stays in the container. Once outside content has entered the turn, ian's own computer and dispatch tools always ask (§3.6). The protection guard stops the bot from killing its own stack. Content boundaries come from agent-browser | A red-team page telling the bot to run `curl … \| sh` on the host: a card appears and nothing runs |
 | Two drivers | Fenced execution and control leases; takeover is refused while the bot drives | A lease test |
-| Wayland on the omarchy host | agent-desktop on Wayland refuses pointer input and window control (agent-desktop README). `user_computer_act` returns that refusal, and semantic actions still work | Spike S4 |
+| Wayland on the omarchy host | Known v1 limit (accepted 2026-11-03). Measured in S4: Wayland apps get semantic actions only, and only on elements that advertise them (GTK4 list rows with only `Select` cannot be driven). Keys, pointer and per-window screenshots are refused; full-screen screenshots work. Xwayland windows accept pointer input through XTEST in X11 coordinates, which are Hyprland's logical coordinates times the monitor scale (1.25). `user_computer_act` returns agent-desktop's refusal as is | S4 refusal cases as fixtures |
 
 ## 5. PR list
 
@@ -289,6 +289,15 @@ Spikes run first, with no PR:
 | P9 | Browser tools on agent-browser with the ref recheck and password masking | `apps/daemon/src/computer/browser*.ts`, image | **owner** (image) + `/security-review` |
 
 Order: S1–S4 → P1 → P2 ∥ P6 → P3 → P4 → P5 → P8 (feed and screen) → P7 → P9. Own-computer tools ship only after P5. Browser tools ship only after P5 and P9.
+
+## 5a. Spike results (measured 2026-11-03)
+
+| Spike | Result |
+|---|---|
+| S1 stack in nspawn | A clone of `cairn-orb-base` (`PrivateUsers=pick`, uid map `0 291766272 65536`) with `xorg-server-xvfb`, `x11vnc`, `fluxbox`, `xdotool`, `chromium` and `imagemagick` added is 3.1 GB. Run as `agent`: Xvfb, fluxbox, x11vnc on a Unix socket and Chromium start. Chromium runs with its full sandbox (zygote up), so unlike Rakazo's Docker computer it needs no `--no-sandbox`. `xdotool` click changed the page title; `import -window root` took a screenshot. RSS about 1.05 GB with one page (Chromium 937 MB). Egress through the relay returns 200; a private address through the relay returns 403; direct egress fails to resolve. `arch-chroot` cannot install into an image that is not a mount point, so P2 builds the computer image with `systemd-nspawn -D` or `pacstrap` |
+| S2 noVNC over an outbound daemon websocket | Two x11vnc Unix sockets (`vnc.sock`, and `view.sock` with `-viewonly`) in a cap-drop-ALL container. The daemon holds one outbound control websocket and opens one outbound data websocket per viewer; the server pipes raw RFB. The browser uses `@novnc/novnc` from npm, so no websockify is needed. Connect 238 to 438 ms. Control clicks work, view clicks do nothing, revoking closes the live viewer and refuses reconnects, and a daemon death disconnects the viewer. Full motion at 1280x800 is about 150 KB/s |
+| S3 image tool result through Pi | A pi-durable 1.5.0 tool returning an image content part reached `claude-haiku-5-5`, which read the text and shapes correctly. After reopening the store, the model answered from the stored image with no tool rerun. Images are stored inline in the durable store, so P6 downscales and keeps only recent frames in context |
+| S4 agent-desktop on the omarchy host | See the Wayland row in §4. Chromium only appears to at-spi with `ACCESSIBILITY_ENABLED=1`; ian's own Wayland Chromium is not visible to it |
 
 ## 6. Decisions for ian
 
