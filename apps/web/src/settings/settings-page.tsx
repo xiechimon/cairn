@@ -36,7 +36,12 @@ import { BoardPage } from '../routes/board-page.js';
 import { TeamPage } from '../routes/team-page.js';
 import { safeLocalStorage } from '../safe-storage.js';
 import { applyTheme, readStoredTheme, type Theme } from '../theme.js';
-import { SETTINGS_HREF, type SettingsSectionId } from './settings-href.js';
+import {
+  rememberSettingsReturn,
+  SETTINGS_HREF,
+  type SettingsSectionId,
+  settingsReturn,
+} from './settings-href.js';
 
 interface Section {
   id: SettingsSectionId;
@@ -135,16 +140,23 @@ export function SettingsPage() {
   const machineBadge = useMachineBadge();
   const section = SECTIONS.find((s) => s.id === sectionParam) ?? null;
   const shown = section ?? SECTIONS[0];
-  const scenario = new URLSearchParams(search).get('scenario');
-  const returnTo =
-    typeof state === 'object' &&
-    state !== null &&
-    'returnTo' in state &&
-    typeof state.returnTo === 'string'
-      ? state.returnTo
-      : `/app${scenario === null ? '' : `?scenario=${scenario}`}`;
+  const [returnTo] = useState(() => {
+    const from =
+      typeof state === 'object' &&
+      state !== null &&
+      'returnTo' in state &&
+      typeof state.returnTo === 'string'
+        ? state.returnTo
+        : settingsReturn();
+    const scenario = new URLSearchParams(search).get('scenario');
+    return from ?? `/app${scenario === null ? '' : `?scenario=${scenario}`}`;
+  });
+  useEffect(() => rememberSettingsReturn(returnTo), [returnTo]);
   const linkState = { returnTo };
-  const close = () => navigate(returnTo);
+  const close = () => {
+    rememberSettingsReturn(null);
+    navigate(returnTo);
+  };
   const windowRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef(close);
   closeRef.current = close;
