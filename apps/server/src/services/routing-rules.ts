@@ -28,14 +28,41 @@ export function routeForStep(
   todoRow: Pick<typeof todo.$inferSelect, 'teamId'>,
   kind: StepKind,
 ): RoutingRuleRow | null {
-  if (!routingRulesOn || !isSessionStepKind(kind)) return null;
+  if (!routingRulesOn) return null;
+  const use =
+    isSessionStepKind(kind) || kind === 'merge' ? 'session' : kind === 'review' ? 'review' : null;
+  if (use === null) return null;
   return (
     db
       .select()
       .from(routingRule)
-      .where(and(eq(routingRule.teamId, todoRow.teamId), eq(routingRule.use, 'session')))
+      .where(and(eq(routingRule.teamId, todoRow.teamId), eq(routingRule.use, use)))
       .get() ?? null
   );
+}
+
+export function ruleAgent(route: RoutingRuleRow): AgentRow {
+  return {
+    id: route.id,
+    teamId: route.teamId,
+    displayName: route.use === 'review' ? 'Reviewer' : 'Session',
+    description: null,
+    status: 'active',
+    avatarUrl: null,
+    provider: route.provider,
+    modelId: route.modelId,
+    thinkingLevel: route.thinkingLevel,
+    persona: null,
+    machineId: route.machineId,
+    tools: route.tools ?? [],
+    secrets: route.secrets ?? [],
+    defaultSkill: route.defaultSkill,
+    skillsAllowlist: route.skillsAllowlist,
+    mcpServers: route.mcpServers ?? [],
+    maxConcurrentTasks: null,
+    requiredCapabilities: route.requiredCapabilities,
+    fallbackModels: route.fallbackModels,
+  };
 }
 
 export function withOverride(
@@ -65,6 +92,7 @@ export function applyRoute(
 ): AgentRow {
   if (route === null) return agentRow;
   const session = route.use === 'session';
+  const owned = session || route.use === 'review';
   return {
     ...agentRow,
     provider: route.provider,
@@ -74,12 +102,14 @@ export function applyRoute(
     machineId: (session ? override?.machineId : undefined) ?? route.machineId ?? agentRow.machineId,
     requiredCapabilities: session
       ? withOverride(route.requiredCapabilities, override?.requiredCapabilities)
-      : agentRow.requiredCapabilities,
-    tools: (session ? route.tools : null) ?? agentRow.tools,
-    mcpServers: (session ? route.mcpServers : null) ?? agentRow.mcpServers,
-    skillsAllowlist: (session ? route.skillsAllowlist : null) ?? agentRow.skillsAllowlist,
-    defaultSkill: (session ? route.defaultSkill : null) ?? agentRow.defaultSkill,
-    secrets: (session ? route.secrets : null) ?? agentRow.secrets,
+      : owned
+        ? route.requiredCapabilities
+        : agentRow.requiredCapabilities,
+    tools: (owned ? route.tools : null) ?? agentRow.tools,
+    mcpServers: (owned ? route.mcpServers : null) ?? agentRow.mcpServers,
+    skillsAllowlist: (owned ? route.skillsAllowlist : null) ?? agentRow.skillsAllowlist,
+    defaultSkill: (owned ? route.defaultSkill : null) ?? agentRow.defaultSkill,
+    secrets: (owned ? route.secrets : null) ?? agentRow.secrets,
   };
 }
 
@@ -128,41 +158,84 @@ function seededRequirement(db: Db, source: AgentRow): RequiredCapabilities | nul
   return { ...(own ?? {}), executor: 'orb' };
 }
 
-export function seedRoutingRules(db: Db): number {
-  let inserted = 0;
-  for (const { id: teamId } of db.select({ id: team.id }).from(team).all()) {
-    const existing = db
+function seedRule(db: Db, teamId: string, use: 'session' | 'review', source: AgentRow): number {
+  if (source.provider == null || source.modelId == null) return 0;
+  const now = nowMs();
+  return db
+    .insert(routingRule)
+    .values({
+      id: newRecordId(),
+      teamId,
+      use,
+      provider: source.provider,
+      modelId: source.modelId,
+      thinkingLevel: source.thinkingLevel,
+      fallbackModels: source.fallbackModels,
+      machineId: source.machineId,
+      requiredCapabilities: seededRequirement(db, source),
+      tools: source.tools,
+      mcpServers: source.mcpServers,
+      skillsAllowlist: source.skillsAllowlist,
+      defaultSkill: source.defaultSkill,
+      secrets: source.secrets,
+      seededFromAgentId: source.id,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoNothing()
+    .run().changes;
+}
+
+function ruleExists(db: Db, teamId: string, use: 'session' | 'review'): boolean {
+  return (
+    db
       .select({ id: routingRule.id })
       .from(routingRule)
-      .where(and(eq(routingRule.teamId, teamId), eq(routingRule.use, 'session')))
+      .where(and(eq(routingRule.teamId, teamId), eq(routingRule.use, use)))
+      .get() !== undefined
+  );
+}
+
+function backfillRuleConstraints(db: Db): void {
+  for (const rule of db.select().from(routingRule).all()) {
+    if (rule.requiredCapabilities !== null || rule.seededFromAgentId === null) continue;
+    if (rule.use !== 'session' && rule.use !== 'review') continue;
+    const source = db
+      .select()
+      .from(agent)
+      .where(and(eq(agent.id, rule.seededFromAgentId), eq(agent.teamId, rule.teamId)))
       .get();
-    if (existing !== undefined) continue;
-    const source = sessionSeedAgent(db, teamId);
-    if (source?.provider == null || source.modelId == null) continue;
-    const now = nowMs();
-    db.insert(routingRule)
-      .values({
-        id: newRecordId(),
-        teamId,
-        use: 'session',
-        provider: source.provider,
-        modelId: source.modelId,
-        thinkingLevel: source.thinkingLevel,
-        fallbackModels: source.fallbackModels,
-        machineId: source.machineId,
-        requiredCapabilities: seededRequirement(db, source),
-        tools: source.tools,
-        mcpServers: source.mcpServers,
-        skillsAllowlist: source.skillsAllowlist,
-        defaultSkill: source.defaultSkill,
-        secrets: source.secrets,
-        seededFromAgentId: source.id,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .onConflictDoNothing()
+    if (source === undefined) continue;
+    const required = seededRequirement(db, source);
+    if (required === null) continue;
+    db.update(routingRule)
+      .set({ requiredCapabilities: required })
+      .where(eq(routingRule.id, rule.id))
       .run();
-    inserted += 1;
+  }
+}
+
+export function seedRoutingRules(db: Db): number {
+  backfillRuleConstraints(db);
+  let inserted = 0;
+  for (const { id: teamId } of db.select({ id: team.id }).from(team).all()) {
+    if (ruleExists(db, teamId, 'session')) continue;
+    const source = sessionSeedAgent(db, teamId);
+    if (source !== null) inserted += seedRule(db, teamId, 'session', source);
+  }
+  return inserted;
+}
+
+export function seedReviewRules(db: Db): number {
+  let inserted = 0;
+  for (const { id: teamId } of db.select({ id: team.id }).from(team).all()) {
+    if (ruleExists(db, teamId, 'review')) continue;
+    const reviewer = db
+      .select()
+      .from(agent)
+      .where(and(eq(agent.teamId, teamId), eq(agent.persona, 'code_reviewer')))
+      .get();
+    if (reviewer !== undefined) inserted += seedRule(db, teamId, 'review', reviewer);
   }
   return inserted;
 }
@@ -213,7 +286,9 @@ function sessionAgentIds(db: Db, rule: RoutingRuleRow): string[] {
 export function adoptAgentMemories(db: Db): number {
   let copied = 0;
   for (const rule of db.select().from(routingRule).where(eq(routingRule.use, 'session')).all()) {
+    const already = new Set(rule.adoptedAgentIds ?? []);
     const adopted = sessionAgentIds(db, rule);
+    const fresh = adopted.filter((id) => !already.has(id));
     db.transaction((tx) => {
       const held = new Set(
         tx
@@ -223,7 +298,7 @@ export function adoptAgentMemories(db: Db): number {
           .all()
           .map((row) => `${row.projectId ?? ''}\u0000${row.content}`),
       );
-      for (const agentId of adopted) {
+      for (const agentId of fresh) {
         const rows = tx
           .select()
           .from(agentMemory)

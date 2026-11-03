@@ -1,4 +1,4 @@
-import type { MachineAskBody, MachineAskResponse } from '@cairn/shared';
+import type { MachineAskBody, MachineAskResponse, StepKind } from '@cairn/shared';
 import {
   AGENT_TOOL_SKILL_CREATE,
   AGENT_TOOL_SKILL_UPDATE,
@@ -21,10 +21,11 @@ import {
   holdForQuestion,
 } from './chief-questions.js';
 import { executeChiefTool, executeWorkerMemoryTool } from './chief-tools.js';
+import { agentForStep } from './dispatch-eligibility.js';
 import { projectOfTodo } from './git.js';
 import { isChiefConversation, type MachineDeps, ownedStep } from './machines.js';
 import { stepScopeProjectId } from './picked-project.js';
-import { memoryOwnerOf } from './routing-rules.js';
+import { memoryOwnerOf, routeForStep } from './routing-rules.js';
 import { createLocalSkill, updateLocalSkill } from './skills.js';
 import { resolveFixedTagId, resolveProjectTagIds } from './tags.js';
 import { executeThreadScheduleTool, isThreadScheduleTool } from './thread-schedule-tools.js';
@@ -169,10 +170,10 @@ async function executeWorkerMemoryToolCall(
   if (name === 'attach_file') return attachWorkerFile(deps, row, todoRow, params);
   if (name === 'set_task_meta') return setTaskMeta(deps, todoRow, params);
   const slot = row.kind === 'plan' ? todoRow.assignment?.plan : todoRow.assignment?.build;
-  const agentId = slot?.agentId;
+  const agentId = slot?.agentId ?? routeForStep(deps.db, todoRow, row.kind)?.id;
   if (name === 'create_skill' || name === 'update_skill') {
     if (!agentId) throw new HttpError(409, 'step has no assigned agent — skill write has no actor');
-    return executeWorkerSkillTool(deps, todoRow, agentId, name, params);
+    return executeWorkerSkillTool(deps, todoRow, row, agentId, name, params);
   }
   if (!agentId) throw new HttpError(409, 'step has no assigned agent — memory has no store');
   return executeWorkerMemoryTool(
@@ -193,11 +194,14 @@ async function executeWorkerMemoryToolCall(
 async function executeWorkerSkillTool(
   deps: MachineDeps,
   todoRow: typeof todo.$inferSelect,
+  stepRow: { kind: StepKind; prompt: string | null },
   agentId: string,
   name: 'create_skill' | 'update_skill',
   params: Record<string, unknown>,
 ): Promise<string> {
-  const agentRow = deps.db.select().from(agent).where(eq(agent.id, agentId)).get();
+  const agentRow =
+    agentForStep(deps.db, todoRow, stepRow.kind, stepRow.prompt) ??
+    deps.db.select().from(agent).where(eq(agent.id, agentId)).get();
   if (!agentRow) throw new NotFoundError(`agent ${agentId}`);
   const want = name === 'create_skill' ? AGENT_TOOL_SKILL_CREATE : AGENT_TOOL_SKILL_UPDATE;
   if (!agentRow.tools.includes(want)) {

@@ -363,3 +363,21 @@ describe('#1241 parseReportedCapabilities (field-level tightening)', () => {
     expect(machineHardwareSchema.safeParse({ ...hardware, cpuCores: 2.5 }).success).toBe(false);
   });
 });
+
+describe('computer capabilities (D75)', () => {
+  it('a machine reports that it hosts the Coordinator computer or is an own computer', () => {
+    expect(
+      parseReportedCapabilities({ mcpServers: [], skills: [], computer: true, ownComputer: true }),
+    ).toEqual({ mcpServers: [], skills: [], computer: true, ownComputer: true });
+  });
+
+  it('anything but literal true is dropped, so an unclear report never grants a computer', () => {
+    expect(
+      parseReportedCapabilities({ mcpServers: [], skills: [], computer: 'yes', ownComputer: 1 }),
+    ).toEqual({ mcpServers: [], skills: [] });
+    expect(parseReportedCapabilities({ mcpServers: [], skills: [], computer: false })).toEqual({
+      mcpServers: [],
+      skills: [],
+    });
+  });
+});

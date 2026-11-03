@@ -133,15 +133,40 @@ describe('D71 memory owned by the session rule', () => {
   test('adoption is idempotent and a second run never drops a memory', async () => {
     const w = await world();
     remember(w, 'builder', 'run pnpm lint before push');
+    remember(w, 'planner', 'split migrations from code');
     adoptAgentMemories(w.s.db);
     const first = ruleMemories(w);
-    remember(w, 'planner', 'new planner lesson');
     adoptAgentMemories(w.s.db);
     adoptAgentMemories(w.s.db);
-    expect(ruleMemories(w)).toEqual([...first, 'new planner lesson'].sort());
+    expect(ruleMemories(w)).toEqual(first);
     expect(
       w.s.db.select().from(agentMemory).where(eq(agentMemory.agentId, 'builder')).all(),
     ).toHaveLength(1);
+  });
+
+  test('a rule memory a worker deleted is not brought back by the next adoption run', async () => {
+    const w = await world();
+    remember(w, 'builder', 'run pnpm lint before push');
+    adoptAgentMemories(w.s.db);
+    w.s.db.delete(agentMemory).where(eq(agentMemory.agentId, w.ruleId)).run();
+    adoptAgentMemories(w.s.db);
+    expect(ruleMemories(w)).toEqual([]);
+  });
+
+  test('an agent first assigned after the last run is adopted on the next run', async () => {
+    const w = await world();
+    adoptAgentMemories(w.s.db);
+    w.s.db
+      .insert(agentTable)
+      .values({ id: 'late', teamId: w.teamId, displayName: 'late', provider: 'p', modelId: 'm' })
+      .run();
+    remember(w, 'late', 'late lesson');
+    w.s.db
+      .update(todoTable)
+      .set({ assignment: { plan: null, build: { agentId: 'late' } } })
+      .run();
+    adoptAgentMemories(w.s.db);
+    expect(ruleMemories(w)).toEqual(['late lesson']);
   });
 
   test('rules on: an adopted agent reads and writes memory through the rule; the chief and reviewer keep their own', async () => {

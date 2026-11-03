@@ -5,6 +5,8 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
   issue_comment:
     types: [created, edited]
+  schedule:
+    - cron: '*/10 * * * *'
   workflow_dispatch:
     inputs:
       pr:
@@ -24,7 +26,7 @@ jobs:
       pull-requests: write
       issues: write
     concurrency:
-      group: review-gate-${{ github.event.pull_request.number || github.event.issue.number || inputs.pr }}
+      group: review-gate-${{ github.event.pull_request.number || github.event.issue.number || inputs.pr || 'sweep' }}
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -33,8 +35,9 @@ jobs:
           persist-credentials: false
 
       - name: Evaluate the Codex review
-        run: node scripts/ops/review-gate/codex-gate.mjs evaluate
+        run: node scripts/ops/review-gate/codex-gate.mjs "$COMMAND"
         env:
           GH_TOKEN: ${{ github.token }}
+          COMMAND: ${{ github.event_name == 'schedule' && 'sweep' || 'evaluate' }}
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number || inputs.pr }}
