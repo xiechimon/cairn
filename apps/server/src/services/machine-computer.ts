@@ -13,7 +13,7 @@ import { nowMs } from '../lib/ids.js';
 export const COMPUTER_OUTPUT_HEAD_CHARS = 16 * 1024;
 export const COMPUTER_OUTPUT_TAIL_CHARS = 48 * 1024;
 
-export const COMPUTER_OUTPUT_PENDING_CHARS = 512;
+export const COMPUTER_OUTPUT_PENDING_CHARS = 64 * 1024;
 
 const pendingOutput = new Map<string, string>();
 
@@ -30,9 +30,11 @@ type Output = Pick<CallRow, 'outputHead' | 'outputTail' | 'outputChars'> & { pen
 
 function appendOutput(out: Output, text: string, flush: boolean): Output {
   const raw = out.pending + text;
-  const run = flush ? '' : (/\S*$/.exec(raw)?.[0] ?? '');
-  const pending = run.slice(-COMPUTER_OUTPUT_PENDING_CHARS);
-  const settled = raw.slice(0, raw.length - pending.length);
+  let start = raw.length;
+  while (start > 0 && !/\s/.test(raw[start - 1] ?? '')) start--;
+  const keep = !flush && raw.length - start <= COMPUTER_OUTPUT_PENDING_CHARS;
+  const pending = keep ? raw.slice(start) : '';
+  const settled = keep ? raw.slice(0, start) : raw;
   const joined =
     settled === ''
       ? out.outputHead + out.outputTail

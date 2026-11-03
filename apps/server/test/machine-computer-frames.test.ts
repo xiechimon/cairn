@@ -302,6 +302,40 @@ describe('POST /api/machine/computer/:callId', () => {
     }
   }, 120_000);
 
+  test('a credential longer than any single frame boundary is redacted whole', async () => {
+    const { s, owner, id } = await setup();
+    await post(s.app, `/api/machine/computer/${id}`, owner.token, {
+      frames: [
+        {
+          kind: 'output',
+          seq: 1,
+          stream: 'stdout',
+          text: `Authorization: Bearer ${'a'.repeat(600)}`,
+        },
+        { kind: 'output', seq: 2, stream: 'stdout', text: 'a'.repeat(40) },
+        { kind: 'done', seq: 3, text: '' },
+      ],
+    });
+    const stored = row(s, id).outputHead + row(s, id).outputTail;
+    expect(stored).not.toContain('a'.repeat(8));
+    expect(stored).toBe('Authorization: [REDACTED]');
+  });
+
+  test('long lines are settled in linear time', async () => {
+    const { s, owner, id } = await setup();
+    const started = performance.now();
+    const res = await post(s.app, `/api/machine/computer/${id}`, owner.token, {
+      frames: [1, 2, 3, 4].map((seq) => ({
+        kind: 'output',
+        seq,
+        stream: 'stdout',
+        text: `${'x'.repeat(65_534)}\n`,
+      })),
+    });
+    expect(res.status).toBe(200);
+    expect(performance.now() - started).toBeLessThan(2_000);
+  });
+
   test('output still being written is held back until it settles and flushed when the call ends', async () => {
     const { s, owner, id } = await setup();
     await post(s.app, `/api/machine/computer/${id}`, owner.token, {
