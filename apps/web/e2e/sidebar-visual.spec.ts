@@ -91,24 +91,3 @@ for (const theme of ['light', 'dark'] as const) {
   });
 }
 
-test('machine-online dot sits centered on the user menu `机器` row', async ({ page }) => {
-  await page.addInitScript(() => {
-    localStorage.setItem('cairn-theme', 'dark');
-  });
-  await page.goto('/app?scenario=100');
-  await page.locator('.sidebar-user').click();
-
-  const dot = await page.evaluate(() => {
-    const el = document.querySelector('[data-testid="online-dot"]');
-    const row = el?.closest('a');
-    if (!el || !row) throw new Error('machine-online dot missing');
-    const dr = el.getBoundingClientRect();
-    const rr = row.getBoundingClientRect();
-    return {
-      centerYDelta: Math.abs(dr.y + dr.height / 2 - (rr.y + rr.height / 2)),
-      insideRow: dr.right <= rr.right && dr.left >= rr.left,
-    };
-  });
-  expect(dot.centerYDelta).toBeLessThan(2);
-  expect(dot.insideRow).toBe(true);
-});

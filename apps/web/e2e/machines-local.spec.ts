@@ -20,7 +20,7 @@ test('local row pinned first: data-kind=local + id handle + hostname canon', asy
 test('managed facade row removed (spec 11 A8 negative)', async ({ page }) => {
   await page.goto(MACHINES);
   await expect(page.locator(LOCAL_ROW)).toBeVisible();
-  await expect(page.locator(`${SHELL} .page-main`)).not.toContainText('Cairn 托管机器');
+  await expect(page.locator(SHELL)).not.toContainText('Cairn 托管机器');
 });
 
 test('per-runtime brand mark: both present + brightness split = enabledRuntimes canon', async ({ page }) => {
@@ -80,6 +80,7 @@ test('row body not clickable; machine name = link to the machine detail page (#1
 
 test('mark geometry: 16×16 mark, on/off opacity split, row-height contract unbroken', async ({ page }) => {
   await page.goto(MACHINES);
+  await expect(page.locator(`${LOCAL_ROW} [data-runtime="pi"]`)).toBeVisible();
   const m = await page.evaluate(
     ({ sel }) => {
       const read = (runtime: string) => {

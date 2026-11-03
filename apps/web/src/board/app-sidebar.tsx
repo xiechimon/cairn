@@ -99,11 +99,15 @@ export function AppSidebar({
       : fixture.chief != null
         ? 1
         : 0;
+  const machinesOffline = live
+    ? (machinesQ.data ?? []).filter((m) => !m.online).length
+    : (fixtureMachines ?? []).filter((m) => m.online === false).length;
   useTypeToCompose();
   const chiefStream = useOptionalChiefRoot()?.surface.chiefData.stream ?? [];
   const sidebarProps = {
     attention: needsYouCount(resolvedTodos, chiefStream),
     machinesOnline,
+    machinesOffline,
     todos: resolvedTodos,
     onSearch: onSearch ?? (() => search.setOpen(true)),
     usageNav: fixture.usageNav === true,

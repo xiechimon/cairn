@@ -65,11 +65,10 @@ test('fixture: empty team shows every vendor with an add action and no quota', a
   await expect(page.getByTestId('routing-empty')).toBeVisible();
 });
 
-test('the user menu opens model routing', async ({ page }) => {
+test('settings opens model routing from the providers section', async ({ page }) => {
   await page.goto('/app/resources/providers?scenario=10');
-  await page.locator('.sidebar-user').click();
-  await page.locator('.user-menu').getByRole('link', { name: '模型路由' }).click();
-  await expect(page).toHaveURL(/\/app\/resources\/model-routing/);
+  await page.getByRole('dialog', { name: '设置' }).getByRole('link', { name: '订阅与路由' }).click();
+  await expect(page).toHaveURL(/\/app\/settings\/routing\?scenario=10/);
   await expect(page.getByRole('heading', { name: '模型路由' })).toBeVisible();
 });
 

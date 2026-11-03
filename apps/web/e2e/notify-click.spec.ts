@@ -400,9 +400,10 @@ test.describe('push notification click loop (XMON-106)', () => {
     await expect.poll(() => page.url()).not.toContain('chief=');
     await expect(page.locator('.chief-drawer')).toHaveCount(0);
 
-    await page.locator('.sidebar-user').click();
-    await page.getByRole('link', { name: '技能' }).click();
-    await expect(page).toHaveURL(/\/app\/resources\/skills/);
+    await page.getByTestId('sidebar-settings').click();
+    await page.getByRole('dialog', { name: '设置' }).getByRole('link', { name: '技能' }).click();
+    await expect(page).toHaveURL(/\/app\/settings\/skills/);
+    await page.getByRole('dialog', { name: '设置' }).getByRole('button', { name: '关闭设置' }).click();
     await page.getByRole('complementary').locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' }).click();
     await expect(home.getByTestId('chief-stream')).toContainText('线程甲的消息');
     await expect(home.getByTestId('chief-stream')).not.toContainText('线程乙的消息');

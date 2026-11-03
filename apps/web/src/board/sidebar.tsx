@@ -1,18 +1,13 @@
 import { BRAND, type ProjectColor, type ProjectIcon } from '@cairn/shared';
-import { ChevronDown, EllipsisVertical, PanelLeft, Plus, Search } from 'lucide-react';
-import { type ReactElement, useCallback, useMemo, useRef, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router';
-import { useLiveData } from '../api/provider.js';
+import { ChartColumn, ChevronDown, PanelLeft, Plus, Search, Server, Settings } from 'lucide-react';
+import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
+import { Link, type To, useLocation, useNavigate } from 'react-router';
 import { SpiralMark } from '../chief/chief-fab-icon.js';
 import { SidebarNavRow } from '../components/shell/sidebar-nav-row.js';
 import { SidebarProjectRow } from '../components/shell/sidebar-project.js';
-import { SidebarUser } from '../components/shell/sidebar-user.js';
 import { Button } from '../components/ui/button.js';
 import { Kbd } from '../components/ui/kbd.js';
-import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
-import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
-import { UserMenu } from '../detail/user-menu.js';
 import { isDeleted } from '../fixtures/deletions.js';
 import { PROJECT_ID, PROJECT_NAME } from '../fixtures/fixtures.js';
 import type { TodoRecord } from '../fixtures/records.js';
@@ -20,7 +15,7 @@ import { scrollFadeClassName, useScrollFade } from '../hooks/use-scroll-fade.js'
 import { useI18n } from '../i18n/provider.js';
 import { FOCUS_RING_INSET } from '../lib/focus-ring.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
-import { readStoredTheme } from '../theme.js';
+import { SETTINGS_HREF, settingsHref } from '../settings/settings-href.js';
 import { needsYouThreads } from './needs-you.js';
 import { ProjectAvatar } from './project-avatar.js';
 
@@ -50,6 +45,7 @@ interface BoardSidebarProps {
   onToggle?: () => void;
   attention?: number;
   machinesOnline?: number;
+  machinesOffline?: number;
   onSearch?: () => void;
   usageNav?: boolean;
   selected?: SidebarSelected;
@@ -103,41 +99,36 @@ const RAIL_ACTIVE = `bg-(--hover-1) text-(--card-button) hover:bg-(--hover-1) ho
 const RAIL_BTN =
   'cursor-pointer border-none bg-transparent p-0 dark:hover:bg-sidebar-hover aria-expanded:bg-transparent aria-expanded:text-content-tertiary aria-expanded:hover:bg-sidebar-hover aria-expanded:hover:text-foreground active:not-aria-[haspopup]:translate-y-0';
 
-function UserMenuPopover({
-  open,
-  onOpenChange,
-  trigger,
-  usageNav,
-  machinesOnline,
+function SidebarFooterIcon({
+  label,
+  to,
+  state,
+  testId,
+  children,
 }: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  trigger: ReactElement;
-  usageNav: boolean;
-  machinesOnline: number;
+  label: string;
+  to: To;
+  state?: unknown;
+  testId?: string;
+  children: ReactNode;
 }) {
-  const { t } = useI18n();
   return (
-    <Popover open={open} onOpenChange={onOpenChange}>
-      <PopoverTrigger render={trigger} />
-      <PopoverContent
-        side="top"
-        align="start"
-        alignOffset={0}
-        sideOffset={4}
-        collisionPadding={8}
-        collisionAvoidance={{ align: 'none' }}
-        aria-label={t('用户菜单')}
-        className="block w-auto rounded-none border-none bg-transparent p-0 shadow-none ring-0"
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Link
+            to={to}
+            state={state}
+            aria-label={label}
+            data-testid={testId}
+            className={`grid size-8 place-items-center rounded-(--cds-radius-lg) text-content-tertiary hover:bg-sidebar-hover hover:text-foreground ${FOCUS}`}
+          />
+        }
       >
-        <UserMenu
-          floating
-          theme={readStoredTheme(safeLocalStorage())}
-          usageNav={usageNav}
-          machinesOnline={machinesOnline}
-        />
-      </PopoverContent>
-    </Popover>
+        {children}
+      </TooltipTrigger>
+      <TooltipContent side="top">{label}</TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -156,7 +147,7 @@ export function BoardSidebar({
   collapsed = false,
   onToggle,
   attention = 0,
-  machinesOnline = 0,
+  machinesOffline = 0,
   onSearch,
   usageNav = false,
   selected = 'board',
@@ -164,7 +155,6 @@ export function BoardSidebar({
   todos,
 }: BoardSidebarProps) {
   const { t } = useI18n();
-  const { user } = useLiveData();
   const navigate = useNavigate();
   const { search, pathname } = useLocation();
   const baseParams = new URLSearchParams(search);
@@ -189,7 +179,6 @@ export function BoardSidebar({
     return counts;
   }, [todos]);
 
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [projectsCollapsed, setProjectsCollapsed] = useState(() =>
     readProjectsCollapsed(safeLocalStorage()),
   );
@@ -204,14 +193,11 @@ export function BoardSidebar({
   const coordinatorLabel = attention > 0 ? `${t('Coordinator')} ${attention}` : t('Coordinator');
   const coordinatorActive = selected === 'board' && activeProject === null;
 
-  const userAvatar = (
-    <SeededAvatar
-      className="size-6"
-      name={user.displayName}
-      src={user.avatarUrl}
-      fallback="/avatar-user.png"
-    />
-  );
+  const settingsLink = {
+    to: { pathname: SETTINGS_HREF, search: plain },
+    state: { returnTo: `${pathname}${search}` },
+  };
+  const offlineLabel = t('{n} 台机器离线', { n: machinesOffline });
 
   if (collapsed) {
     const railLink = (
@@ -284,21 +270,27 @@ export function BoardSidebar({
               );
             })}
         </nav>
-        <UserMenuPopover
-          open={userMenuOpen}
-          onOpenChange={setUserMenuOpen}
-          usageNav={usageNav}
-          machinesOnline={machinesOnline}
-          trigger={
-            <Button
-              variant="ghost"
-              className={`rail-user mt-1 h-9 w-8 ${RAIL_BTN} hover:bg-sidebar-hover aria-expanded:bg-transparent [&_img]:block [&_img]:size-6 [&_img]:rounded-full`}
-              aria-label={user.displayName}
-            >
-              {userAvatar}
-            </Button>
-          }
-        />
+        {machinesOffline > 0 && (
+          <Link
+            {...railLink(
+              { pathname: settingsHref('machines'), search: plain },
+              false,
+              offlineLabel,
+            )}
+            state={settingsLink.state}
+            data-testid="sidebar-attention"
+          >
+            <Server className={ICON} strokeWidth={STROKE} />
+            <span className="absolute top-1 right-1 size-1.5 rounded-full bg-(--chip-confirm-fg)" />
+          </Link>
+        )}
+        <Link
+          {...railLink(settingsLink.to, false, t('设置'))}
+          state={settingsLink.state}
+          data-testid="sidebar-settings"
+        >
+          <Settings className={ICON} strokeWidth={STROKE} />
+        </Link>
       </aside>
     );
   }
@@ -404,32 +396,26 @@ export function BoardSidebar({
           ))}
       </nav>
 
-      <div className="flex flex-none flex-col gap-px pt-2">
-        <UserMenuPopover
-          open={userMenuOpen}
-          onOpenChange={setUserMenuOpen}
-          usageNav={usageNav}
-          machinesOnline={machinesOnline}
-          trigger={
-            <Button
-              variant="ghost"
-              className="sidebar-user mt-1 h-auto w-full flex-none cursor-pointer justify-start rounded-(--cds-radius-lg) border-none bg-transparent p-0 font-normal hover:bg-sidebar-hover dark:hover:bg-sidebar-hover aria-expanded:bg-sidebar-hover [&>div]:w-full"
-              aria-label={user.displayName}
-            >
-              <SidebarUser
-                avatar={userAvatar}
-                name={user.displayName}
-                machinesOnline={machinesOnline}
-                action={
-                  <EllipsisVertical
-                    className="size-3.5 text-content-tertiary"
-                    strokeWidth={STROKE}
-                  />
-                }
-              />
-            </Button>
-          }
-        />
+      <div data-testid="sidebar-footer" className="flex flex-none items-center gap-0.5 pt-2">
+        <SidebarFooterIcon label={t('设置')} testId="sidebar-settings" {...settingsLink}>
+          <Settings className={ICON} strokeWidth={STROKE} />
+        </SidebarFooterIcon>
+        {usageNav && (
+          <SidebarFooterIcon label={t('用量')} to={{ pathname: '/app/usage', search: plain }}>
+            <ChartColumn className={ICON} strokeWidth={STROKE} />
+          </SidebarFooterIcon>
+        )}
+        {machinesOffline > 0 && (
+          <Link
+            data-testid="sidebar-attention"
+            to={{ pathname: settingsHref('machines'), search: plain }}
+            state={settingsLink.state}
+            className={`ml-auto flex h-6 min-w-0 items-center gap-1.5 rounded-full bg-(--chip-confirm-bg) px-2 text-caption font-medium whitespace-nowrap text-(--chip-confirm-fg) no-underline ${FOCUS}`}
+          >
+            <span aria-hidden className="size-1.5 flex-none rounded-full bg-current" />
+            <span className="truncate">{offlineLabel}</span>
+          </Link>
+        )}
       </div>
     </aside>
   );

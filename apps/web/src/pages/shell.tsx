@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { createContext, type ReactNode, useContext } from 'react';
 import { Link, type To } from 'react-router';
 import { AppSidebar } from '../board/app-sidebar.js';
 import type { SidebarSelected } from '../board/sidebar.js';
@@ -9,6 +9,8 @@ import { ChevronLeft } from '../icons/index.js';
 
 export const SHEET_PANEL =
   'relative isolate my-2 mr-2 flex min-w-0 flex-1 overflow-hidden rounded-(--radius-card) bg-background shadow-(--e1) max-[640px]:m-0 max-[640px]:rounded-none max-[640px]:shadow-none';
+
+export const EmbeddedShell = createContext(false);
 
 export interface PageTab {
   id: string;
@@ -69,10 +71,18 @@ export function PageShell({
   children,
 }: PageShellProps) {
   const { t } = useI18n();
+  const embedded = useContext(EmbeddedShell);
   return (
-    <div className="page-shell flex h-full overflow-hidden bg-(--surface-1)" data-route={route}>
-      <AppSidebar fixture={fixture} selected={selected} />
-      <div className={`page-main ${SHEET_PANEL}`}>
+    <div
+      className={
+        embedded
+          ? 'flex h-full min-w-0 flex-1 overflow-hidden'
+          : 'page-shell flex h-full overflow-hidden bg-(--surface-1)'
+      }
+      data-route={route}
+    >
+      {!embedded && <AppSidebar fixture={fixture} selected={selected} />}
+      <div className={embedded ? 'flex min-w-0 flex-1' : `page-main ${SHEET_PANEL}`}>
         <div className="page-main-col flex min-w-0 flex-1 flex-col">
           <header
             data-testid="page-topbar"

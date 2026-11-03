@@ -67,7 +67,7 @@ test('family-law close: cancel / X / Esc / backdrop — no delete, no navigation
 test('confirm delete → lands on the team page, deleted card gone, neighbor cards remain', async ({ page }) => {
   const dialog = await openConfirm(page);
   await dialog.locator('.delete-confirm-delete').click();
-  await expect(page).toHaveURL(/\/app\/team/);
+  await expect(page).toHaveURL(/\/app\/settings\/team/);
 
   const cards = page.getByTestId('team-agent-card');
   await expect(cards).toHaveCount(1);
@@ -80,7 +80,7 @@ test('confirm delete → lands on the team page, deleted card gone, neighbor car
 test('in-session back navigation to the detail route lands the `找不到该 Agent` state, no white screen', async ({ page }) => {
   const dialog = await openConfirm(page);
   await dialog.locator('.delete-confirm-delete').click();
-  await expect(page).toHaveURL(/\/app\/team/);
+  await expect(page).toHaveURL(/\/app\/settings\/team/);
 
   await page.goBack();
   await expect(page).toHaveURL(/agent-delete/);

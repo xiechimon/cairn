@@ -36,12 +36,12 @@ test('four parts stack top to bottom in a 248px sidebar', async ({ page }) => {
     await top(page, '[data-testid="team-row"]'),
     await aside.locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' }).evaluate((el) => el.getBoundingClientRect().top),
     await top(page, '[data-testid="project-group"]'),
-    await top(page, '.sidebar-user'),
+    await top(page, '[data-testid="sidebar-footer"]'),
   ];
   expect([...order].sort((a, b) => a - b)).toEqual(order);
 
   const userBottom = await page
-    .locator('.sidebar-user')
+    .getByTestId('sidebar-footer')
     .evaluate((el) => el.getBoundingClientRect().bottom);
   const asideBottom = await aside.evaluate((el) => el.getBoundingClientRect().bottom);
   expect(asideBottom - userBottom).toBeLessThanOrEqual(16);
@@ -137,11 +137,6 @@ test('long project names truncate and keep the waiting count visible', async ({ 
   expect(m.ellipsis).toBe('ellipsis');
   expect(m.countInside).toBe(true);
   expect(m.rowHeight).toBe(32);
-});
-
-test('user row second line reads machines online', async ({ page }) => {
-  await page.goto('/app/schedules?scenario=01');
-  await expect(page.locator('[data-slot="sidebar-user"]')).toContainText(/\d+ machines? online/);
 });
 
 test('collapsed rail keeps `Coordinator` with its badge dot and the expand toggle', async ({ page }) => {

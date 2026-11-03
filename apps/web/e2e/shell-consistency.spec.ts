@@ -17,9 +17,7 @@ const rootTheme = (page: Page) =>
  *  makes the measurement below deterministic. */
 const ROUTE_ANCHOR: Record<string, string> = {
   '/app': '[data-route="board"]',
-  '/app/team': '[data-route="team"]',
   '/app/schedules': '[data-route="schedules"]',
-  '/app/resources/skills': '[data-route="/app/resources/skills"]',
 };
 
 /** Assert the sidebar box on `route` matches `box`: wait for the route's
@@ -68,8 +66,6 @@ test.describe('⌘J wakes the window on every shell family', () => {
   const families = [
     { name: 'board', route: '/app/schedules?scenario=01', gear: true },
     { name: 'pages', route: '/app/schedules?scenario=11', gear: true },
-    { name: 'resources', route: '/app/resources/skills?scenario=06', gear: true },
-    { name: 'secondary', route: '/app/team?scenario=12', gear: true },
     {
       name: 'detail',
 
@@ -101,42 +97,33 @@ test.describe('⌘J wakes the window on every shell family', () => {
 });
 
 test.describe('sidebar form is route-invariant', () => {
-  test('expanded sidebar keeps identical geometry across /app ↔ /app/team ↔ resources hops', async ({
+  test('expanded sidebar keeps identical geometry across /app ↔ /app/schedules hops', async ({
     page,
   }) => {
     await page.goto('/app?scenario=01');
     const sidebar = page.getByRole('complementary');
     const boardBox = await captureSidebarBox(page, sidebar, '/app');
 
-    await page.locator('.sidebar-user').click();
-    await page.getByRole('link', { name: '团队' }).click();
-    await expect(page).toHaveURL('/app/team?scenario=01');
-    await expectSidebarBox(page, sidebar, '/app/team', boardBox);
-
-    await page.locator('.sidebar-user').click();
-    await page.getByRole('link', { name: '技能' }).click();
-    await expect(page).toHaveURL('/app/resources/skills?scenario=01');
-    await expectSidebarBox(page, sidebar, '/app/resources/skills', boardBox);
+    await page.goto('/app/schedules?scenario=01');
+    await expectSidebarBox(page, sidebar, '/app/schedules', boardBox);
 
     await page.getByRole('complementary').locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' }).click();
     await expect(page).toHaveURL('/app?scenario=01');
     await expectSidebarBox(page, sidebar, '/app', boardBox);
   });
 
-  test('the brand head holds its inner geometry across the /app → /app/team hop', async ({
+  test('the brand head holds its inner geometry across the /app → /app/schedules hop', async ({
     page,
   }) => {
     await page.goto('/app?scenario=01');
     await expect(page.locator(ROUTE_ANCHOR['/app'])).toBeVisible();
     const board = await headContentX(page);
 
-    await page.locator('.sidebar-user').click();
-    await page.getByRole('link', { name: '团队' }).click();
-    await expect(page).toHaveURL('/app/team?scenario=01');
+    await page.goto('/app/schedules?scenario=01');
     // the active face repaints the row's background only (Paper Grouped
     // sidebar: sheet + hairline); the icon and the name must not drift as it
     // lights.
-    await expect(page.locator(ROUTE_ANCHOR['/app/team'])).toBeVisible();
+    await expect(page.locator(ROUTE_ANCHOR['/app/schedules'])).toBeVisible();
     await expect.poll(() => headContentX(page)).toEqual(board);
   });
 
@@ -148,20 +135,13 @@ test.describe('sidebar form is route-invariant', () => {
     const rail = page.getByRole('complementary');
     const railBox = await captureSidebarBox(page, rail, '/app');
 
-    await page.locator('.rail-user').click();
-    await page.getByRole('link', { name: '技能' }).click();
-    await expect(page).toHaveURL('/app/resources/skills?scenario=03');
-    // the rail box (40px) doubles as the collapsed-state probe: an
-    // expanded sidebar on the new route would never equal it
-    await expectSidebarBox(page, rail, '/app/resources/skills', railBox);
-
     await page.goto('/app/schedules?scenario=03');
     await expectSidebarBox(page, rail, '/app/schedules', railBox);
   });
 
   test('the collapse toggle works off-board and the state rides back', async ({ page }) => {
-    await page.goto('/app/team?scenario=12');
-    await expect(page.locator('[data-route="team"]')).toBeVisible();
+    await page.goto('/app/schedules?scenario=12');
+    await expect(page.locator('[data-route="schedules"]')).toBeVisible();
     await page.getByRole('button', { name: '收起侧边栏' }).click();
     await expect(page.getByRole('complementary')).toBeVisible();
     // the toggle writes storage synchronously before its state flip; poll

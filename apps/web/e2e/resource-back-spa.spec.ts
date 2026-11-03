@@ -34,7 +34,7 @@ test('agent detail back is an in-SPA navigation, not a document reload', async (
   await expectBackIsSpaNavigation(
     page,
     '/app/resources/agents/r3-builder?scenario=agent-detail',
-    '/app/team',
+    '/app/settings/team',
     '[data-route="team"]',
   );
 });
@@ -45,7 +45,7 @@ test('machine detail back is an in-SPA navigation, not a document reload', async
   await expectBackIsSpaNavigation(
     page,
     '/app/resources/machines/Kd8fG2hJ4mN9pQ1rStUvWx3?scenario=06',
-    '/app/resources/machines',
+    '/app/settings/machines',
     '[data-route="/app/resources/machines"] h1:text-is("机器")',
   );
 });
