@@ -30,10 +30,9 @@ function appendOutput(
   text: string,
 ): Pick<CallRow, 'outputHead' | 'outputTail' | 'outputChars'> {
   const stored = out.outputHead + out.outputTail;
-  const continued =
-    stored.endsWith(REDACTED_MARK) && !redact(text).startsWith(REDACTED_MARK)
-      ? text.replace(CREDENTIAL_CONTINUATION, '')
-      : text;
+  const continued = stored.endsWith(REDACTED_MARK)
+    ? redact(text).replace(CREDENTIAL_CONTINUATION, '')
+    : text;
   const joined = redact(stored + continued);
   return {
     outputHead: joined.slice(0, COMPUTER_OUTPUT_HEAD_CHARS),

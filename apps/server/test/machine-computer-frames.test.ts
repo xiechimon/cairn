@@ -268,12 +268,16 @@ describe('POST /api/machine/computer/:callId', () => {
         { kind: 'output', seq: 2, stream: 'stdout', text: 'Bearer second-secret' },
         { kind: 'output', seq: 3, stream: 'stdout', text: 'Bearer third-secret' },
         { kind: 'output', seq: 4, stream: 'stdout', text: envelope },
+        { kind: 'output', seq: 5, stream: 'stdout', text: 'suffixBearer fourth-secret' },
+        { kind: 'output', seq: 6, stream: 'stdout', text: `suffixv1:${'C'.repeat(44)}` },
       ],
     });
     expect(res.status).toBe(200);
     const stored = row(s, id).outputHead + row(s, id).outputTail;
     expect(stored).not.toContain('second-secret');
     expect(stored).not.toContain('third-secret');
+    expect(stored).not.toContain('fourth-secret');
+    expect(stored).not.toContain('C'.repeat(20));
     expect(stored).not.toContain('A'.repeat(20));
   });
 
