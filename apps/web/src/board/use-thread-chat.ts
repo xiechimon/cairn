@@ -42,6 +42,7 @@ export interface ThreadChat {
   planDoc: DocBlock[] | undefined;
   planVersions: PlanVersion[] | undefined;
   wire: WireTodo | null;
+  buildAgentId: string | null;
   started: boolean;
   locked: boolean;
   running: boolean;
@@ -264,6 +265,7 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
       : fixtureDetail?.doc,
     planVersions: live ? mapPlanVersions(plans) : fixtureDetail?.planVersions,
     wire,
+    buildAgentId: wire?.assignment?.build?.agentId ?? null,
     buildLegDone: steps.some((step) => step.kind === 'build' && step.status === 'done'),
     started,
     locked: !open,
