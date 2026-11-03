@@ -7,6 +7,7 @@ export const NOTIFICATION_TYPES = [
   'chief_message',
   'quota_wait',
   'model_fallback',
+  'no_machine',
   'todo_done',
   'todo_failed',
   'schedule_run',
