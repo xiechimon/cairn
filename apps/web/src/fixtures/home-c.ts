@@ -131,6 +131,7 @@ export const homeC: FixtureSet = {
     {
       ...scheduleOnce,
       id: 'home-c-schedule-running',
+      projectId: HOME_C_CRED,
       todoId: 'home-c-working-c',
       todo: { ...scheduleOnce.todo, seqNum: 75, title: 'Orb canary round 7', phase: 'building' },
     },

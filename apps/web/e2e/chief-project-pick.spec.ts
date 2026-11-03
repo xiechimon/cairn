@@ -269,7 +269,7 @@ test.describe('the home sends to the project it is filtered to (#2531)', () => {
     page,
   }) => {
     const state = await mockLive(page);
-    await page.goto('/app?project=proj-2');
+    await page.goto('/app?project=proj-2&chat=1');
     await expect(homeInput(page)).toHaveAttribute('placeholder', /cairn-site/);
     await expect(page.getByTestId('home-c').getByTestId('chief-project-chip')).toHaveCount(0);
     await homeInput(page).fill('把按钮颜色统一一下');
@@ -288,10 +288,21 @@ test.describe('the home sends to the project it is filtered to (#2531)', () => {
   test('phone width keeps the composer on screen', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await mockLive(page);
-    await page.goto('/app?project=proj-2');
+    await page.goto('/app?project=proj-2&chat=1');
     await expect(homeInput(page)).toBeInViewport();
     const width = await page.evaluate(() => document.documentElement.scrollWidth);
     expect(width).toBeLessThanOrEqual(390);
     await shot(page, 'home-project-phone.png');
+  });
+
+  test('asking from the project home sends that projectId and opens the project chat', async ({ page }) => {
+    const state = await mockLive(page);
+    await page.goto('/app?project=proj-2');
+    await expect(page.getByTestId('project-home')).toContainText('官网 cairn.xmon.me');
+    await page.getByTestId('project-home-ask').fill('官网首页还差什么');
+    await page.getByTestId('project-home-ask').press('Enter');
+    await expect.poll(() => state.sent).toEqual([{ content: '官网首页还差什么', projectId: 'proj-2' }]);
+    await expect(page).toHaveURL(/project=proj-2.*chat=1/);
+    await expect(homeInput(page)).toHaveAttribute('placeholder', /cairn-site/);
   });
 });
