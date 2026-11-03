@@ -1,5 +1,5 @@
 import { X } from 'lucide-react';
-import { type ReactNode, useEffect, useRef } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useApiMutations } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { useChiefRoot } from '../chief/chief-root.js';
@@ -7,8 +7,10 @@ import { QueuedCapsules } from '../components/queued-capsules.js';
 import { SidePanel } from '../components/side-panel.js';
 import { ToneGlyph } from '../components/stone/tone-glyph.js';
 import { Button } from '../components/ui/button.js';
+import { DialogShell } from '../components/ui/dialog-shell.js';
 import { toastError } from '../components/ui/toaster.js';
 import { Composer } from '../detail/composer.js';
+import { DocPane } from '../detail/docpane.js';
 import { SourceIssueLine } from '../detail/source-issue.js';
 import { TranscriptColumn } from '../detail/transcript-column.js';
 import type { TodoRecord } from '../fixtures/records.js';
@@ -72,7 +74,13 @@ function Unavailable({ chat }: { chat: ThreadChat }) {
   );
 }
 
-function SourceLine({ wire }: { wire: NonNullable<ThreadChat['wire']> }) {
+function SourceLine({
+  wire,
+  onLeave,
+}: {
+  wire: NonNullable<ThreadChat['wire']>;
+  onLeave: () => void;
+}) {
   const { t } = useI18n();
   const { teamId } = useLiveData();
   const mutations = useApiMutations(teamId);
@@ -86,7 +94,10 @@ function SourceLine({ wire }: { wire: NonNullable<ThreadChat['wire']> }) {
         })
       }
       retryPending={mutations.retryGithubIssue.isPending}
-      onOpenThread={openChiefThread}
+      onOpenThread={(threadId) => {
+        onLeave();
+        openChiefThread(threadId);
+      }}
     />
   );
 }
@@ -95,21 +106,26 @@ function ThreadBody({
   chat,
   todo,
   actions,
+  onOpenPlan,
+  onClose,
 }: {
   chat: ThreadChat;
   todo: TodoRecord;
   actions: ThreadActions;
+  onOpenPlan: (() => void) | undefined;
+  onClose: () => void;
 }) {
   const { t } = useI18n();
   const mentions = useThreadMentions(todo.projectId);
   const archived = todo.archivedAt != null;
   return (
     <>
-      {chat.wire?.sourceKind != null && <SourceLine wire={chat.wire} />}
+      {chat.wire?.sourceKind != null && <SourceLine wire={chat.wire} onLeave={onClose} />}
       <TranscriptColumn
         transcript={chat.transcript}
         liveStep={null}
         agent={null}
+        onOpenPlan={onOpenPlan}
         spec={todo.spec.trim() !== '' ? todo.spec : undefined}
         autoScroll={chat.transcript.length > 0}
       />
@@ -234,13 +250,40 @@ function ReadyThread({
   now: number;
   onClose: () => void;
 }) {
-  const actions = useThreadActions({ todo, chat, onGone: onClose });
+  const { t } = useI18n();
+  const [planOpen, setPlanOpen] = useState(false);
+  const openPlan = chat.planDoc !== undefined ? () => setPlanOpen(true) : undefined;
+  const actions = useThreadActions({ todo, chat, onGone: onClose, onViewPlan: openPlan });
   return (
     <>
       <Head todoId={todo.id} todo={todo} onClose={onClose} menu={actions.menu}>
         <StatusLine todo={todo} machineName={chat.machineName} now={now} />
       </Head>
-      <ThreadBody chat={chat} todo={todo} actions={actions} />
+      <ThreadBody
+        chat={chat}
+        todo={todo}
+        actions={actions}
+        onOpenPlan={openPlan}
+        onClose={onClose}
+      />
+      <DialogShell
+        open={planOpen}
+        onClose={() => setPlanOpen(false)}
+        size="l"
+        title={t('方案')}
+        subtitle={`#${todo.seqNum} ${todo.title}`}
+      >
+        <div data-testid="side-chat-plan" className="flex h-[min(70vh,720px)] min-h-0 flex-col">
+          <DocPane
+            mode="plan"
+            doc={chat.planDoc}
+            changes={undefined}
+            now={now}
+            onDocView={() => undefined}
+            planVersions={chat.planVersions}
+          />
+        </div>
+      </DialogShell>
     </>
   );
 }
@@ -263,6 +306,7 @@ function Head({
     <header
       data-testid="side-chat"
       data-todo-id={todoId}
+      data-phase={todo?.phase}
       className="flex flex-none flex-col gap-0.5 border-b border-border pt-2.5 pr-2.5 pb-2.5 pl-4"
     >
       <div className="flex min-w-0 items-center gap-1">

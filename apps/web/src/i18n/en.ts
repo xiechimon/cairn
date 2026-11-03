@@ -1240,6 +1240,8 @@ export const EN: Record<string, string> = {
   '开始后才能回复 #{seq}': 'Start #{seq} to reply',
   '已归档，取消归档后才能继续': 'Archived. Unarchive to continue',
   调整面板宽度: 'Resize panel',
+  编排中: 'Orchestrating',
+  查看计划: 'View plan',
   '已关闭，不能再回复': 'Closed. It takes no more replies',
   '计划已就绪。要改计划，直接在下面回复。': 'The plan is ready. To change it, reply below.',
   批准计划: 'Approve plan',
