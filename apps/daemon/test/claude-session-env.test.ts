@@ -87,9 +87,10 @@ test.each([undefined, {}])(
   },
 );
 
-test('subscription authentication reaches the CLI through env with subprocess scrubbing', () => {
+test('subscription authentication reaches the CLI on fd 3 and never through its environment', async () => {
   const token = `sk-ant-oat01-${'s'.repeat(64)}`;
-  const env = { CLAUDE_CODE_OAUTH_TOKEN: token, CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: '1' };
+  vi.stubEnv('CLAUDE_CODE_OAUTH_TOKEN', `sk-ant-oat01-${'i'.repeat(64)}`);
+  const env = { CLAUDE_CODE_OAUTH_TOKEN: token };
   const options = buildClaudeSdkOptions({
     cwd: '/tmp/ws',
     modelId: 'sonnet',
@@ -102,12 +103,56 @@ test('subscription authentication reaches the CLI through env with subprocess sc
     abortController: new AbortController(),
     env,
   });
+  expect(options.env?.CLAUDE_CODE_OAUTH_TOKEN).toBeUndefined();
+  expect(options.env?.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB).toBeUndefined();
+  expect(options.env?.CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR).toBe('3');
+  expect(JSON.stringify(options.env)).not.toContain(token);
+  expect(options.permissionMode).toBe('bypassPermissions');
+  expect(env.CLAUDE_CODE_OAUTH_TOKEN).toBe(token);
+  const probe = [
+    "const { readFileSync } = require('node:fs');",
+    "const { execFileSync } = require('node:child_process');",
+    'const fd = readFileSync(Number(process.env.CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR), "utf8");',
+    'const child = execFileSync(process.execPath, ["-e", "process.stdout.write(JSON.stringify(process.env))"]).toString();',
+    'process.stdout.write(JSON.stringify({ fd, env: JSON.stringify(process.env), child }));',
+  ].join('\n');
+  const spawned = options.spawnClaudeCodeProcess?.({
+    command: process.execPath,
+    args: ['-e', probe],
+    env: options.env ?? {},
+    signal: new AbortController().signal,
+  });
+  expect(spawned).toBeDefined();
+  spawned?.stdin.end();
+  let out = '';
+  spawned?.stdout.on('data', (chunk: Buffer) => {
+    out += chunk.toString();
+  });
+  await new Promise<void>((resolve) => spawned?.on('exit', () => resolve()));
+  const seen = JSON.parse(out) as { fd: string; env: string; child: string };
+  expect(seen.fd).toBe(token);
+  expect(seen.env).not.toContain(token);
+  expect(seen.child).not.toContain(token);
+});
+
+test('a host step keeps the subscription token in env, where it outranks a local Claude login', () => {
+  const token = `sk-ant-oat01-${'h'.repeat(64)}`;
+  const options = buildClaudeSdkOptions({
+    cwd: '/tmp/ws',
+    modelId: 'sonnet',
+    resumeId: null,
+    sessionId: 'host-env-test',
+    disallowedTools: [],
+    mcpServers: {},
+    inOrb: false,
+    lockedDown: false,
+    abortController: new AbortController(),
+    env: { CLAUDE_CODE_OAUTH_TOKEN: token, CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: '1' },
+  });
   expect(options.env?.CLAUDE_CODE_OAUTH_TOKEN).toBe(token);
   expect(options.env?.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB).toBe('1');
   expect(options.env?.CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR).toBeUndefined();
   expect(options.spawnClaudeCodeProcess).toBeUndefined();
-  expect(env.CLAUDE_CODE_OAUTH_TOKEN).toBe(token);
-  expect(process.env.CLAUDE_CODE_OAUTH_TOKEN).not.toBe(token);
 });
 
 test('a team subscription token blanks inherited metered Claude auth so the CLI cannot fall back to paid use', () => {
@@ -132,7 +177,8 @@ test('a team subscription token blanks inherited metered Claude auth so the CLI 
     ...base,
     env: { CLAUDE_CODE_OAUTH_TOKEN: token, ANTHROPIC_API_KEY: 'sk-ant-api03-step' },
   });
-  expect(team.env?.CLAUDE_CODE_OAUTH_TOKEN).toBe(token);
+  expect(team.env?.CLAUDE_CODE_OAUTH_TOKEN).toBeUndefined();
+  expect(team.env?.CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR).toBe('3');
   for (const key of [
     'ANTHROPIC_API_KEY',
     'ANTHROPIC_AUTH_TOKEN',
