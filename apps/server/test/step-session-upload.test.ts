@@ -160,3 +160,37 @@ describe('session JSONL upload and per-step retrieval (#1512)', () => {
     expect(existsSync(path)).toBe(false);
   });
 });
+
+async function uploadUrlFor(w: World, headers: Record<string, string>, remoteAddress: string) {
+  const res = await w.s.app.request(
+    `/api/machine/upload-urls/${w.stepId}`,
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${w.token}`,
+        ...headers,
+      },
+      body: JSON.stringify({ files: [{ name: SESSION_FILE_NAME, size: 1 }] }),
+    },
+    { incoming: { socket: { remoteAddress } } },
+  );
+  expect(res.status).toBe(200);
+  return machineUploadUrlsResponseSchema.parse(await res.json()).uploads[0]!.url;
+}
+
+describe('upload URLs behind a TLS-terminating proxy', () => {
+  const forwarded = { 'x-forwarded-proto': 'https', 'x-forwarded-host': 'box.example.ts.net' };
+
+  test('a loopback proxy gets https upload URLs on the host it was reached at', async () => {
+    const w = await setupWorld();
+    const url = await uploadUrlFor(w, forwarded, '127.0.0.1');
+    expect(new URL(url).origin).toBe('https://box.example.ts.net');
+  });
+
+  test('forwarded headers from a non-loopback peer do not change the upload origin', async () => {
+    const w = await setupWorld();
+    const url = await uploadUrlFor(w, forwarded, '100.64.0.2');
+    expect(new URL(url).origin).toBe('http://localhost');
+  });
+});

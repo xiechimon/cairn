@@ -28,12 +28,12 @@ who did not watch the work. Use this order:
    `## Risk`, separated from the HTML tags by blank lines and closed with
    `</details>`. Keep this block collapsed.
 
-For code changes, use one review round. A fresh, other-vendor independent
-review is required only for protected or security paths, documentation
-included; other docs-only changes need no code review. After three rounds, rethink or hand the PR to ian.
-Review records the review performed, its verdict and unfixed findings with
-reasons; when independent review is required, include vendor, model, fresh
-context and reviewed head SHA. Risk states one-way or two-way
+For code changes, the Codex cloud review on the PR head is the other-vendor
+review. Protected or security paths, documentation included, also need
+`/security-review`; other docs-only changes need no code review. After three
+rounds, rethink or hand the PR to ian.
+Review links the Codex cloud review on the head SHA, states its verdict and
+lists unfixed findings with reasons. Risk states one-way or two-way
 door, blast radius and whether the owner must merge. Put longer overlap
 results and optional Upstream analysis inside the details block. Include
 Upstream only when adding a mechanism; name an existing equivalent or the
@@ -99,16 +99,9 @@ Use the side-branch commit SHA, never the implementation head or a branch
 name. Push before linking and never merge the asset branch. Keep the branch
 so the images remain reachable. Images belong outside code fences.
 
-## Pre-push review
+## Review
 
-Before every push of a code change, get a fresh-context review from the other vendor and fix what it confirms before pushing. With Claude as the implementer, run Codex:
-
-```
-git diff origin/main...HEAD > /tmp/review.diff
-codex exec --sandbox read-only "Review /tmp/review.diff against docs/pr-review.md. List only defects with file:line, why it is wrong and a concrete failure. Say NO FINDINGS if there are none." < /dev/null
-```
-
-With Codex as the implementer, run the same prompt through `claude -p --permission-mode default --tools Read,Grep,Glob`. Fix each confirmed finding and rerun the review on the new diff. Record a skipped finding with its reason under Review. Docs-only changes outside protected paths skip this step.
+Do not run a local `codex exec` or `claude -p` review before pushing. Codex cloud code review (`chatgpt-codex-connector[bot]`) reviews every push through the review gate. Fix confirmed findings and record skipped ones with reasons under Review.
 
 ## Mechanics
 

@@ -36,10 +36,9 @@ const phaseChip = (page: Page) => page.getByTestId('phase-chip');
 const searchDialog = (page: Page) => page.getByRole('dialog', { name: '搜索' });
 
 const PAGES: AuditPage[] = [
-  { name: 'board', url: '/app?scenario=board-drag-matrix&view=board', ready: (p) => p.locator('[data-todo-id]').first() },
   {
-    name: 'board search',
-    url: '/app?scenario=01&view=board',
+    name: 'search',
+    url: '/app/schedules?scenario=01',
     open: async (page) => {
       await pressAndExpect(page, 'Meta+k', searchDialog(page));
       await page.keyboard.type('probe');
@@ -48,14 +47,14 @@ const PAGES: AuditPage[] = [
   },
   {
     name: 'new task home composer',
-    url: '/app?scenario=01&view=board',
+    url: '/app/schedules?scenario=01',
     open: (page) =>
       page.getByRole('complementary').locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' }).click(),
     ready: (p) => p.getByTestId('home-c').getByTestId('chief-composer-input'),
   },
   {
     name: 'new task home composer filled',
-    url: '/app?scenario=01&view=board',
+    url: '/app/schedules?scenario=01',
     open: async (page) => {
       await page
         .getByRole('complementary')
@@ -76,7 +75,7 @@ const PAGES: AuditPage[] = [
     url: '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=28',
     ready: (p) => p.getByTestId('work-call').first(),
   },
-  { name: 'chief window', url: '/app?scenario=100&view=board', ready: (p) => p.locator('.chief-drawer') },
+  { name: 'chief window', url: '/app/schedules?scenario=100', ready: (p) => p.locator('.chief-drawer') },
   { name: 'schedules list', url: '/app/schedules?scenario=r3-93', ready: (p) => p.locator('.sched-card').first() },
   { name: 'schedules form', url: '/app/schedules?scenario=r3-92', ready: (p) => p.getByRole('dialog', { name: '新建定时' }) },
   {

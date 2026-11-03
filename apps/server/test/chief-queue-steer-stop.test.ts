@@ -55,6 +55,7 @@ interface ThreadView {
   activeRun: unknown;
   pending?: PendingEntry[];
   fallbackModel?: string | null;
+  turnQueue?: unknown;
 }
 
 async function setupWorld(fallbackModels: { provider: string; modelId: string }[] | null = null) {
@@ -265,6 +266,24 @@ describe('chief turn queue (T5): one turn per thread, oldest first', () => {
     expect(await w.fetchSteer(first!.step.id)).toBeNull();
   });
 
+  test('a message queued behind a running turn does not make the thread look queued for a machine', async () => {
+    const w = await setupWorld();
+    const first = await w.send('第一句');
+    expect((await w.thread()).turnQueue).toMatchObject({ stepId: first });
+    await w.claim();
+    w.queue('第二句');
+    const view = await w.thread();
+    expect(view.pending?.map((p) => p.state)).toEqual(['queued']);
+    expect(view.turnQueue ?? null).toBeNull();
+  });
+
+  test('with two messages waiting for a machine, the thread names the oldest as the waiting turn', async () => {
+    const w = await setupWorld();
+    const first = await w.send('第一句');
+    await w.send('第二句');
+    expect((await w.thread()).turnQueue).toMatchObject({ stepId: first });
+  });
+
   test('sending never creates a task by itself', async () => {
     const w = await setupWorld();
     await w.send('把看板计数修一下');
@@ -301,6 +320,7 @@ describe('chief turn queue (T5): one turn per thread, oldest first', () => {
         .run();
     }
     expect((await w.thread()).pending?.map((p) => p.messageId)).toEqual(['turn-a']);
+    expect((await w.thread()).turnQueue).toMatchObject({ stepId: 'turn-z' });
     const first = await w.claim();
     expect(first?.step.id).toBe('turn-z');
     expect(await w.claim()).toBeNull();

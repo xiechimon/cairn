@@ -59,7 +59,7 @@ import {
   deadLoopMessage,
 } from './ci-loop.js';
 import { recoverClaudeRateLimitFailure } from './claude-rate-limit.js';
-import { coordinatorServerContextEnabled } from './coordinator-context.js';
+import { coordinatorRunsOnPi } from './coordinator-context.js';
 import { routedChiefAgent } from './coordinator-route.js';
 import { revokeStepGitCredential } from './credentials.js';
 import { quotaHoldBackoffMs, quotaHoldNote } from './dispatch-timeouts.js';
@@ -418,7 +418,7 @@ async function finishStepReport(
       })
       .run();
     if (
-      coordinatorServerContextEnabled() &&
+      coordinatorRunsOnPi() &&
       stepRow.kind === 'chief' &&
       isChiefConversation(stepRow.buildId) &&
       !isChiefDigestStep(stepRow)
