@@ -9,6 +9,10 @@ const panelWidth = (page: Page) =>
   page
     .locator('aside.side-panel')
     .evaluate((node) => Math.round(node.getBoundingClientRect().width));
+const slideInDone = (page: Page) =>
+  page
+    .locator('.side-panel')
+    .evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
 
 test('a task row opens its thread beside the Coordinator, and closing it returns to the list', async ({
   page,
@@ -60,6 +64,7 @@ test('the panel is resizable by keyboard and by drag, shared with Tasks, and rem
   await expect(handle(page)).toHaveAttribute('aria-valuenow', '452');
   expect(await panelWidth(page)).toBe(452);
 
+  await slideInDone(page);
   const box = await handle(page).boundingBox();
   if (box == null) throw new Error('resize handle has no box');
   const x = box.x + box.width / 2;
@@ -90,7 +95,7 @@ test('the panel is resizable by keyboard and by drag, shared with Tasks, and rem
 test('a thread that has not started says so and takes no message', async ({ page }) => {
   await page.goto(`${HOME}&thread=home-c-idle`);
   await expect(page.locator('.side-panel').getByTestId('composer-placeholder')).toHaveText(
-    '#2240 还没开始',
+    '开始后才能回复 #2240',
   );
   await expect(page.locator('.side-panel textarea')).toHaveCount(0);
 });
@@ -132,10 +137,57 @@ test.describe('phone width', () => {
     await expect(page.getByTestId('chief-composer-input')).toBeFocused();
     await page.goto(`${HOME}&thread=home-c-working-a`);
     await expect(sideChat(page)).toBeVisible();
+    await slideInDone(page);
     await page.locator('body').click({ position: { x: 5, y: 400 } });
     await page.keyboard.type('h');
     await expect(page.getByTestId('chief-composer-input')).not.toBeFocused();
   });
+});
+
+const action = (page: Page) => page.getByTestId('side-chat-action');
+
+test('each waiting phase puts its next step in a card above the composer', async ({ page }) => {
+  const cases = [
+    ['home-c-idle', 'start', '开始'],
+    ['home-c-confirm', 'approve', '批准计划'],
+    ['home-c-review', 'finish', '完成…'],
+    ['home-c-failed', 'retry', '重试'],
+  ] as const;
+  for (const [id, kind, label] of cases) {
+    await page.goto(`${HOME}&thread=${id}`);
+    await expect(action(page), id).toHaveAttribute('data-action', kind);
+    await expect(action(page).getByRole('button', { name: label })).toBeVisible();
+  }
+  await page.goto(`${HOME}&thread=home-c-working-a`);
+  await expect(sideChat(page)).toBeVisible();
+  await expect(action(page)).toHaveCount(0);
+});
+
+test('finishing a reviewed thread asks to merge or keep the branch', async ({ page }) => {
+  await page.goto(`${HOME}&thread=home-c-review`);
+  await action(page).getByRole('button', { name: '完成…' }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(sideChat(page)).toBeVisible();
+});
+
+test('the more menu holds archive and delete, and Escape closes the menu first', async ({
+  page,
+}) => {
+  await page.goto(`${HOME}&thread=home-c-failed`);
+  await sideChat(page).getByRole('button', { name: '更多操作…' }).click();
+  const menu = page.getByRole('menu');
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole('menuitem', { name: /删除/ })).toBeVisible();
+  await expect(menu.getByRole('menuitem', { name: /Archive|归档/ })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await expect(sideChat(page)).toBeVisible();
+
+  await sideChat(page).getByRole('button', { name: '更多操作…' }).click();
+  await page.getByRole('menuitem', { name: /删除/ }).click();
+  await expect(page.getByRole('alertdialog')).toContainText('Rerun the relay probe');
 });
 
 test('with a thread open, number keys leave the Coordinator question alone', async ({ page }) => {

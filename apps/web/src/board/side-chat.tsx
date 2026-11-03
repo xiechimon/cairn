@@ -1,5 +1,5 @@
 import { X } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { type ReactNode, useEffect, useRef } from 'react';
 import { SidePanel } from '../components/side-panel.js';
 import { ToneGlyph } from '../components/stone/tone-glyph.js';
 import { Button } from '../components/ui/button.js';
@@ -8,6 +8,7 @@ import { TranscriptColumn } from '../detail/transcript-column.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { relativeTime } from './rel-time.js';
+import { type ThreadActions, useThreadActions } from './thread-actions.js';
 import { threadCopy, threadTone } from './thread-copy.js';
 import { type ThreadChat, useThreadChat } from './use-thread-chat.js';
 
@@ -64,7 +65,15 @@ function Unavailable({ chat }: { chat: ThreadChat }) {
   );
 }
 
-function ThreadBody({ chat, todo }: { chat: ThreadChat; todo: TodoRecord }) {
+function ThreadBody({
+  chat,
+  todo,
+  actions,
+}: {
+  chat: ThreadChat;
+  todo: TodoRecord;
+  actions: ThreadActions;
+}) {
   const { t } = useI18n();
   const archived = todo.archivedAt != null;
   return (
@@ -84,6 +93,7 @@ function ThreadBody({ chat, todo }: { chat: ThreadChat; todo: TodoRecord }) {
           {chat.sendError}
         </p>
       )}
+      {actions.card}
       <Composer
         placeholder={
           archived
@@ -92,7 +102,7 @@ function ThreadBody({ chat, todo }: { chat: ThreadChat; todo: TodoRecord }) {
               ? t('已关闭，不能再回复')
               : chat.started
                 ? t('回复 #{seq}…', { seq: todo.seqNum })
-                : t('#{seq} 还没开始', { seq: todo.seqNum })
+                : t('开始后才能回复 #{seq}', { seq: todo.seqNum })
         }
         aiReview={false}
         streaming={chat.running}
@@ -159,44 +169,84 @@ export function SideChat({
 
   return (
     <SidePanel ref={panelRef} label={todo?.title ?? t('任务')} onDismiss={onClose}>
-      <header
-        data-testid="side-chat"
-        data-todo-id={todoId}
-        className="flex flex-none flex-col gap-0.5 border-b border-border pt-2.5 pr-2.5 pb-2.5 pl-4"
-      >
-        <div className="flex min-w-0 items-center gap-1.5">
-          {todo != null && <ToneGlyph tone={threadTone(todo)} className="size-3.5 flex-none" />}
-          <h2 className="m-0 min-w-0 flex-1 truncate text-ui font-semibold text-foreground">
-            {todo != null ? (
-              <>
-                <span className="font-normal text-content-tertiary tabular-nums">
-                  #{todo.seqNum}
-                </span>{' '}
-                {todo.title}
-              </>
-            ) : (
-              t('任务')
-            )}
-          </h2>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={t('关闭')}
-            onClick={onClose}
-            className="text-content-tertiary hover:text-foreground"
-          >
-            <X aria-hidden="true" strokeWidth={1.75} className="size-4" />
-          </Button>
-        </div>
-        {todo != null && chat.load === 'ready' && (
-          <StatusLine todo={todo} machineName={chat.machineName} now={now} />
-        )}
-      </header>
       {todo != null && chat.load === 'ready' ? (
-        <ThreadBody chat={chat} todo={todo} />
+        <ReadyThread todo={todo} chat={chat} now={now} onClose={onClose} />
       ) : (
-        <Unavailable chat={chat} />
+        <>
+          <Head todoId={todoId} todo={null} onClose={onClose} />
+          <Unavailable chat={chat} />
+        </>
       )}
     </SidePanel>
+  );
+}
+
+function ReadyThread({
+  todo,
+  chat,
+  now,
+  onClose,
+}: {
+  todo: TodoRecord;
+  chat: ThreadChat;
+  now: number;
+  onClose: () => void;
+}) {
+  const actions = useThreadActions({ todo, chat, onGone: onClose });
+  return (
+    <>
+      <Head todoId={todo.id} todo={todo} onClose={onClose} menu={actions.menu}>
+        <StatusLine todo={todo} machineName={chat.machineName} now={now} />
+      </Head>
+      <ThreadBody chat={chat} todo={todo} actions={actions} />
+    </>
+  );
+}
+
+function Head({
+  todoId,
+  todo,
+  onClose,
+  menu,
+  children,
+}: {
+  todoId: string;
+  todo: TodoRecord | null;
+  onClose: () => void;
+  menu?: ReactNode;
+  children?: ReactNode;
+}) {
+  const { t } = useI18n();
+  return (
+    <header
+      data-testid="side-chat"
+      data-todo-id={todoId}
+      className="flex flex-none flex-col gap-0.5 border-b border-border pt-2.5 pr-2.5 pb-2.5 pl-4"
+    >
+      <div className="flex min-w-0 items-center gap-1">
+        {todo != null && <ToneGlyph tone={threadTone(todo)} className="size-3.5 flex-none" />}
+        <h2 className="m-0 ml-0.5 min-w-0 flex-1 truncate text-ui font-semibold text-foreground">
+          {todo != null ? (
+            <>
+              <span className="font-normal text-content-tertiary tabular-nums">#{todo.seqNum}</span>{' '}
+              {todo.title}
+            </>
+          ) : (
+            t('任务')
+          )}
+        </h2>
+        {menu}
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={t('关闭')}
+          onClick={onClose}
+          className="text-content-tertiary hover:text-foreground"
+        >
+          <X aria-hidden="true" strokeWidth={1.75} className="size-4" />
+        </Button>
+      </div>
+      {children}
+    </header>
   );
 }
