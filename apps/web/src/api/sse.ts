@@ -94,7 +94,9 @@ function fireDesktopNotification(record: NotificationRecord): void {
           ? t('等额度')
           : record.type === 'model_fallback'
             ? t('已换备用模型')
-            : record.entityRef.title;
+            : record.type === 'no_machine'
+              ? t('没有机器能跑')
+              : record.entityRef.title;
   const body =
     record.snippet ??
     (record.entityRef.seqNum !== null

@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "7f2e9e90-67f9-4034-bb26-e8daea25b7ff",
-  "prevId": "b796c283-84ca-4e1f-9c00-7298680a5e87",
+  "id": "78628831-45d4-4e80-925c-99d39b0baa52",
+  "prevId": "e58696b1-cb33-479d-a7da-9bb76bbcf480",
   "tables": {
     "agent": {
       "name": "agent",
@@ -3650,6 +3650,13 @@
         },
         "secrets": {
           "name": "secrets",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "adoptedAgentIds": {
+          "name": "adoptedAgentIds",
           "type": "text",
           "primaryKey": false,
           "notNull": false,

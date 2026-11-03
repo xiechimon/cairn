@@ -560,6 +560,7 @@ export const EN: Record<string, string> = {
   等额度: 'Waiting for quota',
   // #1493 降级链：桌面通知标题。
   已换备用模型: 'Switched to fallback model',
+  没有机器能跑: 'No machine can run it',
   '等额度：{lane} {kind}，{probe} 自动探测续跑':
     'Waiting for quota: {lane} {kind}, auto-probe at {probe}',
   '{lane} {kind}，{count} 个任务挂起等额度':

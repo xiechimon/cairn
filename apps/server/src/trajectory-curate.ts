@@ -20,6 +20,7 @@ import { build, memoryCandidate, todo } from './db/schema.js';
 import { HttpError } from './lib/errors.js';
 import { newRecordId, nowMs } from './lib/ids.js';
 import { memoriesInScope, overlaps, saveMemoryEntry } from './services/memory.js';
+import { memoryOwnerOf } from './services/routing-rules.js';
 import { resolveLocalSkill } from './services/skills.js';
 
 export class CurateError extends Error {}
@@ -206,7 +207,11 @@ export function curateCandidates(
         summary.skillNew++;
         continue;
       }
-      const memoryScope = { ...scope, projectId: placement.projectId };
+      const memoryScope = {
+        ...scope,
+        agentId: memoryOwnerOf(tx, scope.teamId, scope.agentId, 'build'),
+        projectId: placement.projectId,
+      };
       const memories = memoriesInScope(tx, memoryScope);
       if (memories.some((memory) => memory.content === candidate.content)) {
         summary.memoryKnown++;

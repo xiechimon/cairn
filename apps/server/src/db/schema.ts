@@ -438,6 +438,7 @@ export const routingRule = sqliteTable(
     skillsAllowlist: json<string[] | null>('skillsAllowlist'),
     defaultSkill: text('defaultSkill'),
     secrets: json<string[] | null>('secrets'),
+    adoptedAgentIds: json<string[] | null>('adoptedAgentIds'),
     seededFromAgentId: text('seededFromAgentId'),
     createdAt: epochMs('createdAt').notNull(),
     updatedAt: epochMs('updatedAt').notNull(),

@@ -29,7 +29,11 @@ import { MachineWakeHub } from './services/machine-wake-hub.js';
 import { backfillMachineConcurrency, seedLocalMachine } from './services/machines.js';
 import { backfillPersonas } from './services/personas.js';
 import { loadOrCreateVapidKeys } from './services/push.js';
-import { seedRoutingRules, setRoutingRulesEnabled } from './services/routing-rules.js';
+import {
+  adoptAgentMemories,
+  seedRoutingRules,
+  setRoutingRulesEnabled,
+} from './services/routing-rules.js';
 import {
   createScheduler,
   issueIntakeRunOf,
@@ -74,7 +78,10 @@ setCoordinatorMachineId(config.coordinatorMachineId);
 setCoordinatorRouteLog((teamId, reason) =>
   logger.warn({ teamId, reason }, 'coordinator route: falling back to the bound chief agent'),
 );
-if (config.routingRules) seedRoutingRules(db);
+if (config.routingRules) {
+  seedRoutingRules(db);
+  adoptAgentMemories(db);
+}
 backfillTokenUsageCost(db);
 const concurrencyBackfilled = backfillMachineConcurrency(db);
 if (concurrencyBackfilled > 0) {
