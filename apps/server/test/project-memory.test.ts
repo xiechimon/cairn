@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
-import { agentMemory, chiefMessage, step } from '../src/db/schema.js';
+import { agentMemory, chiefMessage, project, step } from '../src/db/schema.js';
 import { nowMs } from '../src/lib/ids.js';
 import { composeChiefSystemPrompt } from '../src/services/chief.js';
 import { steeredFromAnotherScope } from '../src/services/machine-relay.js';
@@ -43,6 +43,17 @@ describe('Coordinator memory is scoped by project (D74 P2)', () => {
       { turnScopeProjectId: H.projectId },
     )) as { projectId: string | null };
     expect(saved.projectId).toBe(H.projectId);
+  });
+
+  test('the default project of a scoped turn is refused once that project is archived', async () => {
+    H.s.db.update(project).set({ archivedAt: nowMs() }).where(eq(project.id, H.projectId)).run();
+    await expect(
+      relay(
+        'save_memory',
+        { title: 'late', content: 'after archive' },
+        { turnScopeProjectId: H.projectId },
+      ),
+    ).rejects.toThrow(/archived/);
   });
 
   test('a memory saved in an unscoped turn stays team-wide', async () => {

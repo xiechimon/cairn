@@ -1042,7 +1042,10 @@ export async function executeChiefTool(
       }
       const projectId = explicitProject ?? ctx.turnScopeProjectId ?? null;
       const sourceTodoId = optStr(params, 'sourceTodoId') ?? null;
-      if (projectId !== null) requireProjectRow(db, projectId, ctx.teamId);
+      if (projectId !== null) {
+        requireProjectRow(db, projectId, ctx.teamId);
+        requireUnarchivedTargets(db, ctx.teamId, name, { projectId });
+      }
       if (sourceTodoId !== null) requireTeamTodo(db, sourceTodoId, ctx.teamId);
       const row = saveMemoryEntry(db, {
         agentId: ctx.chiefAgentId,
