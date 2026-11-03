@@ -18,6 +18,11 @@ import { BackupBanner } from '../board/backup-banner.js';
 import { FirstPrCard, firstPrCardInfo } from '../board/first-pr-card.js';
 import { HomeC } from '../board/home-c.js';
 import { NotificationBanner, useNotificationBanner } from '../board/notify-banner.js';
+import {
+  ProjectHomeMock,
+  ProjectHybridHeader,
+  projectPageMockOf,
+} from '../board/project-page-mocks.js';
 import { QuotaBanner, quotaBannerInfo } from '../board/quota-banner.js';
 import { useChiefRoot } from '../chief/chief-root.js';
 import { ChiefSettings } from '../chief/chief-settings.js';
@@ -48,6 +53,7 @@ export function BoardPage() {
       : firstPrCardInfo(team.firstPrReportPrompt, team.createdAt);
 
   const homeProjectId = searchParams.get('project');
+  const mock = live ? null : projectPageMockOf(searchParams.get('mock'));
   const homeProjectName =
     homeProjectId === null
       ? null
@@ -98,6 +104,14 @@ export function BoardPage() {
             onBack={() => setChiefView('drawer')}
             machines={fixture.resources?.machines}
           />
+        ) : mock === 'home' && homeProjectId !== null && homeProjectName !== null ? (
+          <ProjectHomeMock
+            projectId={homeProjectId}
+            projectName={homeProjectName}
+            todos={todos}
+            schedules={fixture.schedules ?? []}
+            now={fixture.now}
+          />
         ) : (
           <HomeC
             surface={chief}
@@ -109,6 +123,19 @@ export function BoardPage() {
             machines={machines}
             coordinatorMachineId={live ? (chiefQ.data?.agentActor?.machineId ?? null) : null}
             schedules={live ? mapSchedules(schedulesQ.data ?? []) : (fixture.schedules ?? [])}
+            {...(mock === 'hybrid' && homeProjectId !== null && homeProjectName !== null
+              ? {
+                  projectHeader: (
+                    <ProjectHybridHeader
+                      projectId={homeProjectId}
+                      projectName={homeProjectName}
+                      todos={todos}
+                      schedules={fixture.schedules ?? []}
+                      now={fixture.now}
+                    />
+                  ),
+                }
+              : {})}
           />
         )}
       </div>

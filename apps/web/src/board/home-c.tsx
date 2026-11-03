@@ -101,6 +101,7 @@ interface HomeCProps {
   machines?: readonly MachineRow[];
   schedules?: readonly ScheduleRecord[];
   coordinatorMachineId?: string | null;
+  projectHeader?: ReactNode;
 }
 
 export function HomeC({
@@ -113,6 +114,7 @@ export function HomeC({
   machines,
   schedules = [],
   coordinatorMachineId = null,
+  projectHeader,
 }: HomeCProps) {
   const { t, locale } = useI18n();
   const { user, live } = useLiveData();
@@ -294,9 +296,13 @@ export function HomeC({
       data-testid="home-c-hero"
       className="mx-auto w-[calc(100%-2rem)] max-w-182 flex-none pt-[6vh]"
     >
-      {greeting}
-      {since}
-      {projectLinks}
+      {projectHeader == null && (
+        <>
+          {greeting}
+          {since}
+          {projectLinks}
+        </>
+      )}
       <ClaudeLoginBanner machines={machines} now={now} />
       {needsYou}
       {entries.length === 0 && (
@@ -316,9 +322,13 @@ export function HomeC({
 
   const lead = (
     <section data-testid="home-c-lead" aria-label={t('首页概况')} className="pt-6 pb-8">
-      {greeting}
-      {since}
-      {projectLinks}
+      {projectHeader == null && (
+        <>
+          {greeting}
+          {since}
+          {projectLinks}
+        </>
+      )}
       <ClaudeLoginBanner machines={machines} now={now} />
       {needsYou}
       {chiefData.hasEarlier === true && (
@@ -431,6 +441,11 @@ export function HomeC({
         className="relative flex min-h-0 min-w-0 flex-1 flex-col"
       >
         {paneButtons}
+        {projectHeader != null && (
+          <div className="flex-none border-b border-border">
+            <div className="mx-auto w-[calc(100%-2rem)] max-w-182 pt-2 pb-3">{projectHeader}</div>
+          </div>
+        )}
         {banner != null && (
           <div className="mx-auto w-[calc(100%-2rem)] max-w-182 flex-none pt-3">{banner}</div>
         )}
