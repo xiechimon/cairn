@@ -129,7 +129,8 @@ async function stubDetailSurface(page: Page) {
   await page.route(`**/api/builds/${BUILD_ID}/changes`, (route) =>
     route.fulfill({ json: { files: [] } }),
   );
-  await page.route(`**/api/conversations/${BUILD_ID}/messages`, (route, request) => {
+  await page.route(
+    new RegExp(`/api/(conversations/${BUILD_ID}|todos/[^/?]+)/messages(\\?|$)`), (route, request) => {
     if (request.method() !== 'GET') return route.fallback();
     return route.fulfill({ json: EMPTY_CONVERSATION });
   });
@@ -141,7 +142,8 @@ test('detail face: a rejected steer (409) keeps the draft word for word', async 
   await stubBoot(page);
   await stubDetailSurface(page);
   let posts = 0;
-  await page.route(`**/api/conversations/${BUILD_ID}/messages`, (route, request) => {
+  await page.route(
+    new RegExp(`/api/(conversations/${BUILD_ID}|todos/[^/?]+)/messages(\\?|$)`), (route, request) => {
     if (request.method() !== 'POST') return route.fallback();
     posts += 1;
     return route.fulfill({ status: 409, json: { error: 'no active step' } });
@@ -165,7 +167,8 @@ test('detail face: an accepted steer clears the draft', async ({ page }) => {
   await stubBoot(page);
   await stubDetailSurface(page);
   let posts = 0;
-  await page.route(`**/api/conversations/${BUILD_ID}/messages`, (route, request) => {
+  await page.route(
+    new RegExp(`/api/(conversations/${BUILD_ID}|todos/[^/?]+)/messages(\\?|$)`), (route, request) => {
     if (request.method() !== 'POST') return route.fallback();
     posts += 1;
     return route.fulfill({ status: 201, json: { message: { id: 'msg-1' } } });

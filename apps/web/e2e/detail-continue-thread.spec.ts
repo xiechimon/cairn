@@ -100,7 +100,10 @@ test('a completed task accepts a follow-up and shows its user bubble and running
     if (path === `/api/builds/${build.id}/gate`) return route.fulfill({ json: { state: null } });
     if (path === `/api/builds/${build.id}/changes`) return route.fulfill({ json: { files: [] } });
     if (path === `/api/builds/${build.id}/steps`) return route.fulfill({ json: steps });
-    if (path === `/api/conversations/${build.id}/messages`) {
+    if (
+      path === `/api/conversations/${build.id}/messages` ||
+      path === `/api/todos/${task.id}/messages`
+    ) {
       if (request.method() === 'POST') {
         if (rejectNext) {
           rejectNext = false;
@@ -148,7 +151,7 @@ test('a completed task accepts a follow-up and shows its user bubble and running
     return route.fulfill({ status: 500, json: { error: 'e2e stub: not the surface under test' } });
   });
   await page.goto(`/app/todo/${task.id}`);
-  await expect(page.getByTestId('detail-head').getByTestId('phase-chip')).toHaveText('已完成');
+  await expect(page.getByTestId('side-chat-status')).toContainText('已完成');
   const composer = page.getByTestId('composer-card');
   const input = composer.getByRole('textbox');
   await expect(input).toBeEnabled();
@@ -163,7 +166,7 @@ test('a completed task accepts a follow-up and shows its user bubble and running
     page.getByTestId('user-bubble').filter({ hasText: 'Add a regression test' }),
   ).toBeVisible();
   await expect(page.getByTestId('live-row')).toBeVisible();
-  await expect(page.getByTestId('detail-head').getByTestId('phase-chip')).toHaveText('执行中');
+  await expect(page.getByTestId('side-chat-status')).toContainText('运行中');
   await expect(input).toHaveValue('');
   expect(pageErrors).toEqual([]);
 });

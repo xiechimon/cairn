@@ -233,6 +233,7 @@ function makeRecord(over: Record<string, unknown>): Record<string, unknown> {
 }
 
 const DETAIL_HREF = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=16';
+const DETAIL_LANDING = '/app?scenario=16&thread=7ve0iOkQ-JBpSL98zSiGc';
 
 test.describe('push notification click loop (XMON-106)', () => {
   test('T1: click with an open window → client-side routing to href, no full reload, pending slot cleared', async ({
@@ -249,8 +250,8 @@ test.describe('push notification click loop (XMON-106)', () => {
 
     await dispatchNotificationClick(worker, DETAIL_HREF);
 
-    await expect.poll(() => page.url()).toContain(DETAIL_HREF);
-    await expect(page.locator('[data-route="todo-detail"]')).toBeVisible();
+    await expect.poll(() => page.url()).toContain(DETAIL_LANDING);
+    await expect(page.getByTestId('side-chat')).toBeVisible();
 
     expect(await page.evaluate(() => window.__stay)).toBe('no-reload');
 
@@ -286,8 +287,8 @@ test.describe('push notification click loop (XMON-106)', () => {
 
     const woken = await context.newPage();
     await woken.goto('/app?scenario=01');
-    await expect.poll(() => woken.url()).toContain(DETAIL_HREF);
-    await expect(woken.locator('[data-route="todo-detail"]')).toBeVisible();
+    await expect.poll(() => woken.url()).toContain(DETAIL_LANDING);
+    await expect(woken.getByTestId('side-chat')).toBeVisible();
     await expect
       .poll(() =>
         woken.evaluate(async () => {
@@ -336,10 +337,10 @@ test.describe('push notification click loop (XMON-106)', () => {
     expect(calls[0].title).toBe('构建待审核');
     expect(calls[0].options.body).toBe('#42 修一下按钮');
     expect(calls[0].options.tag).toBe('u1:todo-x');
-    expect(calls[0].options.data).toEqual({ href: '/app/todo/todo-x' });
+    expect(calls[0].options.data).toEqual({ href: '/app?thread=todo-x' });
 
     expect(calls[1].title).toBe('方案已就绪');
-    expect(calls[1].options.data).toEqual({ href: '/app/todo/todo-def' });
+    expect(calls[1].options.data).toEqual({ href: '/app?thread=todo-def' });
 
     expect(calls[2].title).toBe('线程主题');
     expect(calls[2].options.body).toBe('消息全文');
@@ -373,7 +374,7 @@ test.describe('push notification click loop (XMON-106)', () => {
     expect(fallen.onclickType).toBe('function');
 
     await page.evaluate(() => window.__pageNotifs[0].onclick?.());
-    await page.waitForURL('**/app/todo/todo-fb');
+    await page.waitForURL('**/app?thread=todo-fb');
   });
 
   test('T4: chief deep link → drawer opens on the target thread, params consumed once and stripped from the URL', async ({ page }) => {
@@ -440,7 +441,7 @@ test.describe('push notification click loop (XMON-106)', () => {
     await fireTeamNotification(page, makeRecord({ entityId: 'todo-y', id: 'u1:todo-y' }));
     await expect.poll(() => page.evaluate(() => window.__swNotifs.length)).toBe(1);
     expect(await page.evaluate(() => window.__swNotifs[0].options.data)).toEqual({
-      href: '/app/todo/todo-y',
+      href: '/app?thread=todo-y',
     });
     expect(await page.evaluate(() => window.__pageNotifs.length)).toBe(0);
   });

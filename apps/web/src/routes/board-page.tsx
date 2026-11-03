@@ -19,6 +19,9 @@ import { FirstPrCard, firstPrCardInfo } from '../board/first-pr-card.js';
 import { HomeC } from '../board/home-c.js';
 import { NotificationBanner, useNotificationBanner } from '../board/notify-banner.js';
 import { QuotaBanner, quotaBannerInfo } from '../board/quota-banner.js';
+import { SideChat } from '../board/side-chat.js';
+import { THREAD_PARAM } from '../board/thread-copy.js';
+import { useCloseThread } from '../board/thread-link.js';
 import { useChiefRoot } from '../chief/chief-root.js';
 import { ChiefSettings } from '../chief/chief-settings.js';
 import { withoutDeleted } from '../fixtures/deletions.js';
@@ -48,6 +51,8 @@ export function BoardPage() {
       : firstPrCardInfo(team.firstPrReportPrompt, team.createdAt);
 
   const homeProjectId = searchParams.get('project');
+  const threadId = searchParams.get(THREAD_PARAM);
+  const closeThread = useCloseThread();
   const homeProjectName =
     homeProjectId === null
       ? null
@@ -109,6 +114,18 @@ export function BoardPage() {
             machines={machines}
             coordinatorMachineId={live ? (chiefQ.data?.agentActor?.machineId ?? null) : null}
             schedules={live ? mapSchedules(schedulesQ.data ?? []) : (fixture.schedules ?? [])}
+          />
+        )}
+        {threadId !== null && (
+          <SideChat
+            key={threadId}
+            todoId={threadId}
+            listed={
+              todos.find((todo) => todo.id === threadId) ??
+              (!live && todos.length === 1 ? todos[0] : undefined)
+            }
+            now={live ? Date.now() : fixture.now}
+            onClose={closeThread}
           />
         )}
       </div>

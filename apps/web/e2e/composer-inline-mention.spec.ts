@@ -152,7 +152,8 @@ async function openDetail(
     route.fulfill({ json: { files: [] } }),
   );
   const sent: string[] = [];
-  await page.route(`**/api/conversations/${BUILD_ID}/messages`, (route, request) => {
+  await page.route(
+    new RegExp(`/api/(conversations/${BUILD_ID}|todos/[^/?]+)/messages(\\?|$)`), (route, request) => {
     if (request.method() !== 'POST') return route.fulfill({ json: EMPTY_CONVERSATION });
     sent.push(request.postData() ?? '');
     return route.fulfill({ status: 201, json: { message: { id: 'msg-1' } } });
@@ -370,7 +371,7 @@ test('close set: Esc closes the listbox and stays on the detail (#634 layering)'
   await input.press('Escape');
   await expect(listbox).toBeHidden();
   // The Esc was consumed by the listbox — the detail page did not exit.
-  await expect(page).toHaveURL(/\/todo\//);
+  await expect(page).toHaveURL(/[?&]thread=/);
   await expect(input).toHaveValue('@bu'); // text untouched
 
   // The dismissing key's own keyup re-judges the (unchanged) token — the
@@ -444,7 +445,7 @@ test('close set: clicking outside the composer closes the list', async ({ page }
   const { input, listbox } = await openDetail(page);
   await input.fill('@bu');
   await expect(listbox).toBeVisible();
-  await page.getByTestId('detail-body').click({ position: { x: 4, y: 4 } });
+  await page.getByTestId('side-chat').click({ position: { x: 4, y: 4 } });
   await expect(listbox).toBeHidden();
   await expect(input).toHaveValue('@bu'); // the draft survives the dismiss
 });

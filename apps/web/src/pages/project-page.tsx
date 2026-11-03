@@ -23,6 +23,7 @@ import { mapCommits, mapDiffFiles, toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { useOpenComposer } from '../board/open-composer.js';
 import { relativeTime } from '../board/rel-time.js';
+import { threadHrefFrom } from '../board/thread-copy.js';
 import { EmptyState } from '../components/empty-state.js';
 import { KeyedMenuContent, KeyedMenuRadioItem } from '../components/menu-keys.js';
 import { SegmentedTabs } from '../components/segmented.js';
@@ -627,7 +628,7 @@ function TasksPane({
                     "prj-task-link truncate text-ui no-underline after:absolute after:inset-0 after:content-['']",
                     isSettled(todo.phase) ? 'text-content-tertiary' : 'text-foreground',
                   )}
-                  to={{ pathname: `/app/todo/${todo.id}`, search }}
+                  to={threadHrefFrom(todo.id, search)}
                 >
                   {todo.title}
                 </Link>
@@ -663,7 +664,7 @@ function TasksPane({
                     ? 'font-normal text-content-tertiary'
                     : 'font-medium text-foreground',
                 )}
-                to={{ pathname: `/app/todo/${todo.id}`, search }}
+                to={threadHrefFrom(todo.id, search)}
               >
                 {todo.title}
               </Link>
@@ -786,7 +787,7 @@ export function ProjectPage() {
   const onIssueImported = useCallback(
     (record: { id: string }) => {
       setIssuesOpen(false);
-      navigate({ pathname: `/app/todo/${record.id}`, search });
+      navigate(threadHrefFrom(record.id, search));
     },
     [navigate, search],
   );

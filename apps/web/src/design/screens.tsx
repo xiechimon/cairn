@@ -13,13 +13,13 @@ const SCREENS = [
     parts: 'Sidebar, chief greeting, composer, needs-you inbox',
   },
   {
-    title: 'Task detail: confirm the plan',
-    url: '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=17b',
-    parts: 'Phase chip, plan, conversation, composer',
+    title: 'Side chat: confirm the plan',
+    url: '/app?scenario=17b&thread=7ve0iOkQ-JBpSL98zSiGc',
+    parts: 'Coordinator home with the thread side chat, plan card, composer',
   },
   {
-    title: 'Task detail: tool calls',
-    url: '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=28',
+    title: 'Side chat: tool calls',
+    url: '/app?scenario=28&thread=7ve0iOkQ-JBpSL98zSiGc',
     parts: 'Agent turns, tool activity rows, live row',
   },
   {

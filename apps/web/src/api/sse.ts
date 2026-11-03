@@ -56,7 +56,7 @@ export function useTeamStream(teamId: string | undefined, enabled: boolean): voi
 function notificationHref(record: NotificationRecord): string {
   return record.type === 'chief_message'
     ? `/app?chief=${encodeURIComponent(record.entityId)}`
-    : `/app/todo/${encodeURIComponent(record.entityId)}`;
+    : `/app?thread=${encodeURIComponent(record.entityId)}`;
 }
 
 async function showViaServiceWorker(

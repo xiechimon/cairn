@@ -120,28 +120,23 @@ test('the selling points browse end to end with no backend traffic', async ({ pa
   const traffic = watchTraffic(page);
 
   await page.goto(`${demo.base}/app/todo/${DEMO.cartMerge}`);
-  await expect(page.getByTestId('phase-chip')).toHaveText(/确认/);
-  await expect(page.locator('.doc-range-wrap .doc-pane-select')).toHaveText(/v3/);
+  await expect(page.getByTestId('side-chat-status')).toContainText('待你决定');
   await expect(page.getByText('AI 审核', { exact: false }).first()).toBeVisible();
   await expect(page.getByText('blocking').first()).toBeVisible();
-  await page.locator('.doc-range-wrap .doc-pane-select').click();
-  await expect(page.locator('.version-menu-row')).toHaveCount(3);
-  await page.keyboard.press('Escape');
 
   await page.goto(`${demo.base}/app/todo/${DEMO.rateLimit}`);
-  await expect(page.getByTestId('phase-chip')).toHaveText(/审核/);
-  await expect(page.locator('.doc-file-row').first()).toBeVisible();
+  await expect(page.getByTestId('side-chat-status')).toContainText('待你决定');
   await expect(page.getByText('验证未通过').first()).toBeVisible();
   await expect(page.getByText('验证通过').first()).toBeVisible();
 
   await page.goto(`${demo.base}/app/todo/${DEMO.search}`);
-  await expect(page.getByTestId('phase-chip')).toHaveText(/执行中/);
+  await expect(page.getByTestId('side-chat-status')).toContainText('运行中');
 
   await page.goto(`${demo.base}/app/todo/${DEMO.migration}`);
-  await expect(page.getByTestId('phase-chip')).toHaveText(/失败/);
+  await expect(page.getByTestId('side-chat-status')).toContainText('失败');
 
   await page.goto(`${demo.base}/app/todo/${DEMO.coupon}`);
-  await expect(page.getByTestId('phase-chip')).toHaveText(/完成/);
+  await expect(page.getByTestId('side-chat-status')).toContainText('已完成');
 
   await page.goto(`${demo.base}/app`);
   await expect(home(page).getByText('购物车').first()).toBeVisible();
@@ -177,10 +172,10 @@ test('write: a new task is blocked with the toast and nothing is added', async (
 test('write: sending in the detail composer is blocked', async ({ page }) => {
   const traffic = watchTraffic(page);
   await page.goto(`${demo.base}/app/todo/${DEMO.cartMerge}`);
-  await page.getByPlaceholder('请求修改…').fill('请改成先合并再校验库存');
-  await page.locator('.composer-send').click();
+  await page.locator('.side-panel textarea').fill('请改成先合并再校验库存');
+  await page.locator('.side-panel .composer-send').click();
   await expect(toast(page)).toBeVisible();
-  await expect(page.getByTestId('phase-chip')).toHaveText(/确认/);
+  await expect(page.getByTestId('side-chat-status')).toContainText('待你决定');
   await expect(page.locator('.chat-streaming-label')).toHaveCount(0);
   expectQuiet(traffic);
 });
@@ -188,16 +183,16 @@ test('write: sending in the detail composer is blocked', async ({ page }) => {
 test('write: the primary action and the delete confirm are blocked', async ({ page }) => {
   const traffic = watchTraffic(page);
   await page.goto(`${demo.base}/app/todo/${DEMO.cartMerge}`);
-  await page.locator('.detail-head-action').click();
+  await page.getByTestId('side-chat-action').getByRole('button').last().click();
   await expect(toast(page)).toBeVisible();
-  await expect(page.getByTestId('phase-chip')).toHaveText(/确认/);
+  await expect(page.getByTestId('side-chat-status')).toContainText('待你决定');
 
-  await page.getByRole('button', { name: '更多' }).click();
+  await page.getByTestId('side-chat').getByRole('button', { name: '更多操作…' }).click();
   await page.getByRole('menuitem', { name: '删除' }).click();
   await page.getByRole('alertdialog').getByRole('button', { name: '删除' }).click();
-  await expect(page).toHaveURL(new RegExp(`/app/todo/${DEMO.cartMerge}$`));
+  await expect(page).toHaveURL(new RegExp(`[?&]thread=${DEMO.cartMerge}$`));
   await page.reload();
-  await expect(page.getByTestId('phase-chip')).toHaveText(/确认/);
+  await expect(page.getByTestId('side-chat-status')).toContainText('待你决定');
   expectQuiet(traffic);
 });
 

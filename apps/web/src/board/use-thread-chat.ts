@@ -1,4 +1,4 @@
-import { STOP_MESSAGE } from '@cairn/shared';
+import { STOP_MESSAGE, type TodoRecord as WireTodo } from '@cairn/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useSearchParams } from 'react-router';
@@ -39,7 +39,9 @@ export interface ThreadChat {
   buildId: string | null;
   buildLegDone: boolean;
   infoOutput: boolean;
+  wire: WireTodo | null;
   started: boolean;
+  locked: boolean;
   running: boolean;
   workingFor: { startedAt?: number; seconds?: number } | undefined;
   machineName: string | null;
@@ -128,7 +130,8 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     [machinesQ.data, steps],
   );
   const todo = live ? (wire != null ? toDisplayTodo(wire) : (listed ?? null)) : (listed ?? null);
-  const fixtureTranscript = resolveScenario(searchParams).details?.[todoId]?.transcript;
+  const fixture = resolveScenario(searchParams);
+  const fixtureTranscript = (fixture.details?.[todoId] ?? fixture.detail)?.transcript;
 
   const transcript = useMemo<TranscriptItem[]>(() => {
     if (!live) return fixtureTranscript ?? [];
@@ -178,20 +181,16 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
           : 'missing';
 
   const started = buildId != null;
-  const open = started && todo?.archivedAt == null;
+  const open = started && todo?.archivedAt == null && todo?.phase !== 'closed';
   const writable = live && open;
-  const fixtureSend = DEMO_MODE
-    ? async () => {
-        blockDemoWrite();
-      }
-    : () => Promise.resolve();
-
   const send = writable
     ? async (text: string) => {
         await mutations.messageThread.mutateAsync({ todoId, content: text });
       }
-    : !live && open
-      ? fixtureSend
+    : !live && open && DEMO_MODE
+      ? async () => {
+          blockDemoWrite();
+        }
       : undefined;
   const queueSteer =
     writable && buildId != null
@@ -237,8 +236,10 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     transcript,
     buildId,
     infoOutput: wire?.output === 'info',
+    wire,
     buildLegDone: steps.some((step) => step.kind === 'build' && step.status === 'done'),
     started,
+    locked: !open,
     running,
     workingFor:
       running && streamingItem?.kind === 'streaming'
@@ -255,14 +256,12 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     },
     ...(send !== undefined ? { send } : {}),
     ...(queueSteer !== undefined && running
-      ? {
-          queue: (text: string) => queueSteer(text, false),
-          stopAndSend: (text: string) => queueSteer(text, true),
-        }
+      ? { queue: (text: string) => queueSteer(text, false) }
       : {}),
+    ...(queueSteer !== undefined ? { stopAndSend: (text: string) => queueSteer(text, true) } : {}),
     ...(stop !== undefined ? { stop } : {}),
     ...(writable ? { attach: (files: File[]) => uploadMessageAttachments(files, t) } : {}),
-    ...(writable && buildId != null
+    ...(live && buildId != null
       ? {
           sendQueuedNow: (queuedMessageId: string, content: string) =>
             mutations.sendSteer.mutateAsync({ conversationId: buildId, content, queuedMessageId }),

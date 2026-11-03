@@ -67,7 +67,6 @@ test.describe('sidebar seam (Paper Grouped)', () => {
     for (const [name, url] of [
       ['pages', '/app/schedules?scenario=11'],
       ['resources', '/app/resources/skills?scenario=06'],
-      ['detail', '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=detail-unread'],
     ] as const) {
       test(`${name} shell: no seam, same workspace row (${theme})`, async ({
         page,

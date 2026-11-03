@@ -5,7 +5,7 @@ import {
   PackageCheck,
   Settings2,
 } from 'lucide-react';
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { useLiveData } from '../api/provider.js';
 import { ChiefConversation } from '../chief/chief-conversation.js';
@@ -30,8 +30,8 @@ import { MachineChip, MachinesPanel } from './machines-panel.js';
 import { ACT_ORDER, actRank, needsYouThreads, pendingQuestions } from './needs-you.js';
 import { NeedsYouThreadCard } from './needs-you-thread-card.js';
 import { composeRequest } from './open-composer.js';
-import { SideChat } from './side-chat.js';
 import { THREAD_PARAM, threadCopy, threadStatus, threadTone } from './thread-copy.js';
+import { useOpenThread } from './thread-link.js';
 import { PANE_PARAM, paneOf, type WorkPane, WorkPanel } from './work-panel.js';
 
 const GREETINGS: [number, string][] = [
@@ -141,21 +141,7 @@ export function HomeC({
     setSearchParams(params, { replace: true, state: location.state });
   };
   const togglePane = (next: WorkPane) => showPane(pane === next && threadId === null ? null : next);
-  const openThread = (id: string) => {
-    const params = new URLSearchParams(searchParams);
-    params.set(THREAD_PARAM, id);
-    setSearchParams(params, { state: location.state });
-  };
-  const closeThread = useCallback(() => {
-    setSearchParams(
-      (prev) => {
-        const params = new URLSearchParams(prev);
-        params.delete(THREAD_PARAM);
-        return params;
-      },
-      { replace: true },
-    );
-  }, [setSearchParams]);
+  const openThread = useOpenThread();
   const [prefill, setPrefill] = useState<{ text: string; key: number } | null>(null);
   const { chiefData, chiefView, setChiefView } = surface;
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
@@ -394,15 +380,7 @@ export function HomeC({
   );
 
   const workPanel =
-    threadId !== null ? (
-      <SideChat
-        key={threadId}
-        todoId={threadId}
-        listed={todos.find((todo) => todo.id === threadId)}
-        now={now}
-        onClose={closeThread}
-      />
-    ) : pane === 'machines' ? (
+    threadId !== null ? null : pane === 'machines' ? (
       <MachinesPanel machines={computers} onClose={() => showPane(null)} />
     ) : (
       pane !== null && (

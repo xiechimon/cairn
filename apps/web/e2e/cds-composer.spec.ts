@@ -140,7 +140,7 @@ test('CDS composer: multi-line draft grows the card and text clears the toolbar'
 }) => {
   await stubLiveDetail(page);
   await page.goto(`/app/todo/${CARD_ID}`);
-  const card = page.locator('[data-testid="composer-card"]');
+  const card = page.locator('.side-panel [data-testid="composer-card"]');
   const input = card.locator('textarea');
   await expect(input).toBeVisible();
 
@@ -171,7 +171,7 @@ test('CDS composer: multi-line draft grows the card and text clears the toolbar'
 test('CDS composer: a wrapped single paragraph also clears the toolbar', async ({ page }) => {
   await stubLiveDetail(page);
   await page.goto(`/app/todo/${CARD_ID}`);
-  const card = page.locator('[data-testid="composer-card"]');
+  const card = page.locator('.side-panel [data-testid="composer-card"]');
   const input = card.locator('textarea');
   await expect(input).toBeVisible();
 
@@ -198,7 +198,7 @@ test('CDS composer: a width change that wraps the draft re-reserves toolbar clea
 }) => {
   await stubLiveDetail(page);
   await page.goto(`/app/todo/${CARD_ID}`);
-  const card = page.locator('[data-testid="composer-card"]');
+  const card = page.locator('.side-panel [data-testid="composer-card"]');
   const input = card.locator('textarea');
   await expect(input).toBeVisible();
 
@@ -208,12 +208,12 @@ test('CDS composer: a width change that wraps the draft re-reserves toolbar clea
   const wide = await card.evaluate((el) => el.getBoundingClientRect().height);
   expect(Math.round(wide)).toBe(86);
 
-  await page.setViewportSize({ width: 900, height: 732 });
+  await page.setViewportSize({ width: 360, height: 732 });
 
   await expect
     .poll(() =>
       page.evaluate(() => {
-        const cardEl = document.querySelector('[data-testid="composer-card"]')!;
+        const cardEl = document.querySelector('.side-panel [data-testid="composer-card"]')!;
         const ta = cardEl.querySelector('textarea')!;
         const toolbar = cardEl.querySelector('[data-testid="composer-toolbar"]')!;
         const linesWrapped = ta.scrollHeight > 60;

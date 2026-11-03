@@ -177,7 +177,8 @@ for (const theme of ['light', 'dark'] as const) {
       expect(drawer).toContain(edgeRing);
 
       // e2: the menu rings once
-      await page.goto(`${DETAIL}?scenario=17`);
+      await page.goto('/app?scenario=01');
+      await page.getByRole('button', { name: 'Xmon Dai' }).click();
       const menu = await surfaceShadow(page, '.user-menu');
       expect(rings(menu)).toBe(1);
 

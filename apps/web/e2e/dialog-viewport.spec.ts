@@ -103,6 +103,7 @@ test('chief-agent list state (buttonless read face) panel stays within the viewp
 
 test('accept(34): `取消`/done stay in the viewport', async ({ page }) => {
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=34');
+  await page.getByTestId('side-chat-action').getByRole('button', { name: '完成…' }).click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
   await expectShellCapped(dialog);

@@ -91,10 +91,10 @@ test.describe('agent mention chip (fixture, #741 gap 2)', () => {
     await page.waitForURL((u) => u.pathname === '/app/resources/agents/a1');
   });
 
-  test('F-E6: detail page transcript face follows the same law (second consumer of the single-source segments)', async ({ page }) => {
+  test('F-E6: side chat transcript face follows the same law (second consumer of the single-source segments)', async ({ page }) => {
     await page.goto('/app/todo/r3-legacy-1?scenario=chief-agent-chip');
 
-    const chip = page.locator('.detail-center .mention-chip--agent');
+    const chip = page.locator('.side-panel .mention-chip--agent');
     await expect(chip).toHaveCount(1);
     await expect(chip).toHaveAttribute('href', '/app/resources/agents/a1');
     await chip.click();
@@ -114,7 +114,7 @@ test.describe('agent mention chip (fixture, #741 gap 2)', () => {
 
     await expect(stream.locator('.mention-chip--todo')).toHaveAttribute(
       'href',
-      '/app?thread=r3-legacy-1',
+      /^\/app\?(scenario=[^&]+&)?thread=r3-legacy-1$/,
     );
   });
 });

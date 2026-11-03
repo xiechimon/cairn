@@ -46,7 +46,7 @@ test('the confirm sheet is not re-wired by root re-render: a single Escape still
   page,
 }) => {
   await page.goto(DETAIL);
-  await page.locator('.detail-head-icon--more').click();
+  await page.getByTestId('side-chat').getByRole('button', { name: '更多操作…' }).click();
   await page.getByRole('menuitem', { name: '删除' }).click();
   await expect(confirmDialog(page)).toBeVisible();
   await installEscapeTap(page);

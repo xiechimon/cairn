@@ -644,7 +644,7 @@ test('overview: with running tasks rows are listed, section header carries the c
 test('overview: clicking a row opens the task page (#1937, #2531)', async ({ page }) => {
   await page.goto(`${DETAIL.replace('agent-detail', 'agent-detail-active')}`);
   await page.locator('.agent-task-row').first().click();
-  await expect(page).toHaveURL(/\/app\/todo\/r3-legacy-12(\?|$)/);
+  await expect(page).toHaveURL(/[?&]thread=r3-legacy-12(&|$)/);
 });
 
 const OVERVIEW_LABELS = ['职责', '默认 skill', '运行时', '模型', '思考强度'];
