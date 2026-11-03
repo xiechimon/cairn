@@ -5,8 +5,11 @@ import {
   blockingThreads,
   decide,
   parseState,
+  REQUEST_AFTER_MS,
+  requestMarker,
   retryMarker,
   retryStatus,
+  reviewRequested,
   shouldSkip,
   threadTitle,
   trustedStateComment,
@@ -269,4 +272,52 @@ test('shouldSkip names why a PR is not gated', () => {
     /merge queue/,
   );
   assert.match(shouldSkip({ ...base, author_association: 'CONTRIBUTOR' }), /write access/);
+});
+
+test('decide asks Codex once when a head has waited ten minutes without a review', () => {
+  const late = { waitedMs: REQUEST_AFTER_MS, requested: false };
+  for (const state of [null, { commitSha: OTHER, status: 'completed' }]) {
+    const result = decide(pr, state, [], noRetries, false, late);
+    assert.equal(result.status, 'in_progress');
+    assert.equal(result.request, requestMarker(SHA));
+    assert.equal(result.title, 'Asked Codex to review aaaaaaa');
+  }
+});
+
+test('decide does not ask Codex early, twice, while it runs, or without a wait', () => {
+  const cases = [
+    [null, { waitedMs: REQUEST_AFTER_MS - 1, requested: false }],
+    [null, { waitedMs: REQUEST_AFTER_MS * 3, requested: true }],
+    [
+      { commitSha: SHA, status: 'running' },
+      { waitedMs: REQUEST_AFTER_MS * 3, requested: false },
+    ],
+    [
+      { commitSha: SHA, status: null },
+      { waitedMs: REQUEST_AFTER_MS * 3, requested: false },
+    ],
+    [null, null],
+  ];
+  for (const [state, wait] of cases) {
+    const result = decide(pr, state, [], noRetries, false, wait);
+    assert.equal(result.request, undefined, JSON.stringify({ state, wait }));
+    assert.equal(result.title, 'Waiting for the Codex review of aaaaaaa');
+  }
+  assert.equal(
+    decide(pr, null, [], noRetries, true, { waitedMs: REQUEST_AFTER_MS, requested: false }).title,
+    'Codex allowance exhausted',
+  );
+});
+
+test('reviewRequested counts only the marker the gate posted for this head', () => {
+  const comment = (body, user) => ({ body, user });
+  const actions = { login: 'github-actions[bot]', type: 'Bot' };
+  const marker = `${requestMarker(SHA)}\n@codex review`;
+  assert.equal(reviewRequested([comment(marker, actions)], SHA), true);
+  assert.equal(reviewRequested([comment(marker, { login: 'mallory', type: 'User' })], SHA), false);
+  assert.equal(
+    reviewRequested([comment(`${requestMarker(OTHER)}\n@codex review`, actions)], SHA),
+    false,
+  );
+  assert.equal(reviewRequested([], SHA), false);
 });
