@@ -144,4 +144,10 @@ test('opening settings leaves the Coordinator window as it was', async ({ page }
   await settings(page).getByRole('button', { name: '关闭设置' }).click();
   await expect(page).toHaveURL(/\/app\/schedules\?scenario=11$/);
   await expect(page.locator('.chief-drawer')).toBeVisible();
+
+  await page.getByTestId('sidebar-settings').click();
+  await settings(page).getByRole('heading', { name: '账号' }).first().click();
+  await page.keyboard.press('Escape');
+  await expect(settings(page)).toHaveCount(0);
+  await expect(page.locator('.chief-drawer')).toBeVisible();
 });

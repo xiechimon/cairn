@@ -162,8 +162,11 @@ export function SettingsPage() {
   useEffect(() => {
     windowRef.current?.focus();
     const onKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || event.defaultPrevented) return;
-      if (document.querySelector('[data-open]') !== null) return;
+      if (event.key !== 'Escape') return;
+      const overlayOpen = [...document.querySelectorAll('[data-open]')].some(
+        (el) => el.closest('.chief-drawer') === null,
+      );
+      if (overlayOpen) return;
       const target = event.target;
       if (
         target instanceof HTMLElement &&
@@ -173,8 +176,8 @@ export function SettingsPage() {
       }
       closeRef.current();
     };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
+    document.addEventListener('keydown', onKey, true);
+    return () => document.removeEventListener('keydown', onKey, true);
   }, []);
   const hrefFor = (id: string): To => ({ pathname: `${SETTINGS_HREF}/${id}`, search });
   const groups: SettingsNavGroup[] = GROUPS.map((group) => ({
