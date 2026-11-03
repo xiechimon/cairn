@@ -11,6 +11,8 @@ import { PROVIDER_PRESET_DEFAULTS } from '../src/records/provider-preset-data.js
 import {
   AGGREGATOR_PRESET_IDS,
   derivePresetDefaults,
+  MAX_DEFAULT_PICKS,
+  newestPerFamily,
   type PresetCatalog,
   type PresetCatalogModel,
 } from '../src/records/provider-presets.js';
@@ -65,6 +67,32 @@ describe('provider preset defaults', () => {
     for (const id of ['claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5']) {
       expect(byId.get(id)?.contextWindow).toBeGreaterThan(0);
     }
+    expect(anthropic?.picks).toEqual([
+      'claude-sonnet-5-5',
+      'claude-opus-5-5',
+      'claude-haiku-5-5',
+      'claude-fable-5-1',
+    ]);
+  });
+
+  test('newest per family: version digits and date suffixes do not split a family', () => {
+    const models = [
+      'claude-sonnet-5-5',
+      'claude-sonnet-4-5-20250929',
+      'o4-mini',
+      'o3-mini',
+      'qwen3.8-max',
+      'qwen3.10-max',
+      'gpt-6.1-mini',
+      'gpt-6.1',
+    ].map((id) => ({ id, name: id }));
+    expect(newestPerFamily(models)).toEqual([
+      'claude-sonnet-5-5',
+      'o4-mini',
+      'qwen3.10-max',
+      'gpt-6.1-mini',
+      'gpt-6.1',
+    ]);
   });
 
   const oauth: readonly string[] = PROVIDER_OAUTH_PRESET_IDS;
@@ -79,14 +107,13 @@ describe('provider preset defaults', () => {
     if (defaults === undefined) return;
     expect(defaults.baseUrl).toMatch(/^https:\/\//);
     expect(defaults.authHeader).toBe(false);
-    if (AGGREGATOR_PRESET_IDS.includes(id)) {
-      expect(defaults.models).toEqual([]);
-    } else {
-      expect(defaults.models.length).toBeGreaterThan(0);
-      for (const model of defaults.models) providerModelSchema.parse(model);
-      const ids = defaults.models.map((m) => m.id);
-      expect(new Set(ids).size).toBe(ids.length);
-    }
+    expect(defaults.models.length).toBeGreaterThan(0);
+    for (const model of defaults.models) providerModelSchema.parse(model);
+    const ids = defaults.models.map((m) => m.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(defaults.picks.length).toBeLessThanOrEqual(MAX_DEFAULT_PICKS);
+    for (const pick of defaults.picks) expect(ids).toContain(pick);
+    if (AGGREGATOR_PRESET_IDS.includes(id)) expect(defaults.picks).toEqual([]);
   });
 
   test('oauth presets carry no key-form defaults', () => {
@@ -123,6 +150,7 @@ describe('provider preset defaults', () => {
         { id: 'c', name: 'c' },
         { id: 'b', name: 'b' },
       ],
+      picks: ['c', 'b'],
     });
     expect(out.google).toBeUndefined();
   });

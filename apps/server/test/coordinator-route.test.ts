@@ -1,4 +1,5 @@
-import { type ClaimedStep, PROVIDER_PRESET_DEFAULTS } from '@cairn/shared';
+import type { ClaimedStep } from '@cairn/shared';
+import { PROVIDER_PRESET_DEFAULTS } from '@cairn/shared/provider-preset-data';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, afterEach, beforeEach, describe, expect, test } from 'vitest';

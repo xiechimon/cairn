@@ -101,7 +101,7 @@ const NAV = [
       ['product-thread-reply', 'Thread reply'],
       ['product-overlays', 'Overlays and pickers'],
       ['product-pages', 'Page parts'],
-      ['product-add-provider', 'Add provider (mockups)'],
+      ['product-add-provider', 'Add provider'],
     ],
   },
   {

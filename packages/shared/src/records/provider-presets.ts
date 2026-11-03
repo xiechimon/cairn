@@ -11,6 +11,7 @@ export interface ProviderPresetDefaults {
   api: ProviderApi;
   authHeader: boolean;
   models: ProviderModel[];
+  picks: string[];
 }
 
 export interface PresetCatalogModel {
@@ -71,6 +72,35 @@ function presetModel(model: PresetCatalogModel): ProviderModel {
   };
 }
 
+export const MAX_DEFAULT_PICKS = 8;
+
+function modelFamily(id: string): string {
+  return id
+    .toLowerCase()
+    .split('-')
+    .map((token) => token.replace(/\d+(\.\d+)*/g, '#'))
+    .filter((token) => token !== '#')
+    .join('-');
+}
+
+export function newestPerFamily(models: readonly ProviderModel[]): string[] {
+  const newest = new Map<string, string>();
+  for (const { id } of models) {
+    const family = modelFamily(id);
+    const current = newest.get(family);
+    if (current === undefined || id.localeCompare(current, 'en', { numeric: true }) > 0) {
+      newest.set(family, id);
+    }
+  }
+  const picked = new Set(newest.values());
+  return models.map((model) => model.id).filter((id) => picked.has(id));
+}
+
+function defaultPicks(catalog: readonly ProviderModel[]): string[] {
+  const picks = newestPerFamily(catalog);
+  return picks.length <= MAX_DEFAULT_PICKS ? picks : [];
+}
+
 function presetDefaults(
   presetId: string,
   models: readonly PresetCatalogModel[],
@@ -93,13 +123,15 @@ function presetDefaults(
       a.baseUrl.localeCompare(b.baseUrl),
   )[0];
   if (route === undefined) return undefined;
+  const catalog = route.models
+    .map(presetModel)
+    .sort((a, b) => (a.id < b.id ? 1 : a.id > b.id ? -1 : 0));
   return {
     baseUrl: route.baseUrl,
     api: route.api,
     authHeader: false,
-    models: AGGREGATOR_PRESET_IDS.includes(presetId)
-      ? []
-      : route.models.map(presetModel).sort((a, b) => (a.id < b.id ? 1 : a.id > b.id ? -1 : 0)),
+    models: catalog,
+    picks: AGGREGATOR_PRESET_IDS.includes(presetId) ? [] : defaultPicks(catalog),
   };
 }
 
