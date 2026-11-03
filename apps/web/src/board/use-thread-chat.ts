@@ -60,6 +60,13 @@ export interface ThreadChat {
 
 const ACTIVE_STEP = new Set(['claimed', 'pending', 'waiting_quota']);
 
+export function replyRouteOf(
+  phase: TodoRecord['phase'],
+  steps: readonly { status: string }[],
+): 'queue' | 'message' {
+  return phase === 'todo' && steps.some((step) => step.status === 'stopped') ? 'queue' : 'message';
+}
+
 export function useThreadChat(todoId: string, listed: TodoRecord | undefined): ThreadChat {
   const { live, teamId, userName } = useLiveData();
   const { t } = useI18n();
@@ -183,15 +190,7 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
   const started = buildId != null;
   const open = started && todo?.archivedAt == null && todo?.phase !== 'closed';
   const writable = live && open;
-  const send = writable
-    ? async (text: string) => {
-        await mutations.messageThread.mutateAsync({ todoId, content: text });
-      }
-    : !live && open && DEMO_MODE
-      ? async () => {
-          blockDemoWrite();
-        }
-      : undefined;
+  const stoppedBeforeStart = todo != null && replyRouteOf(todo.phase, steps) === 'queue';
   const queueSteer =
     writable && buildId != null
       ? (text: string, deliverAfterStop: boolean) =>
@@ -203,6 +202,17 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
               deliverAfterStop,
             })
             .then(() => undefined)
+      : undefined;
+  const send = writable
+    ? stoppedBeforeStart && queueSteer !== undefined
+      ? (text: string) => queueSteer(text, false)
+      : async (text: string) => {
+          await mutations.messageThread.mutateAsync({ todoId, content: text });
+        }
+    : !live && open && DEMO_MODE
+      ? async () => {
+          blockDemoWrite();
+        }
       : undefined;
   const stop =
     writable && buildId != null && running
