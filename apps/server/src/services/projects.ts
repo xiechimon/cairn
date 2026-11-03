@@ -166,6 +166,7 @@ export async function updateProject(
     body.name !== undefined ||
     body.splitPolicy !== undefined ||
     body.description !== undefined ||
+    body.instructions !== undefined ||
     body.repoKind !== undefined ||
     body.githubRepo !== undefined ||
     body.localPath !== undefined ||
@@ -175,7 +176,7 @@ export async function updateProject(
   if (!carriesKey) {
     throw new HttpError(
       400,
-      'invalid body: nothing to update (at least one of name/description/repoKind/githubRepo/localPath/baseBranch/icon/color)',
+      'invalid body: nothing to update (at least one of name/description/instructions/repoKind/githubRepo/localPath/baseBranch/icon/color)',
     );
   }
 
@@ -292,6 +293,12 @@ export async function updateProject(
       githubRepo: nextGithubRepo,
       localPath: nextLocalPath,
       description: nextDescription,
+      instructions:
+        body.instructions === undefined
+          ? row.instructions
+          : body.instructions === null || body.instructions.trim() === ''
+            ? null
+            : body.instructions,
       baseBranch: body.baseBranch !== undefined ? body.baseBranch : row.baseBranch,
       icon: body.icon !== undefined ? body.icon : row.icon,
       color: body.color !== undefined ? body.color : row.color,

@@ -234,6 +234,9 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
         "id": {
           "type": "string",
         },
+        "instructions": {
+          "type": "string",
+        },
         "name": {
           "type": "string",
         },
@@ -886,6 +889,9 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
               "additionalProperties": false,
               "properties": {
                 "id": {
+                  "type": "string",
+                },
+                "instructions": {
                   "type": "string",
                 },
                 "name": {
@@ -9002,6 +9008,9 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > pro
       ],
     },
     "id": {
+      "type": "string",
+    },
+    "instructions": {
       "type": "string",
     },
     "localChecks": {

@@ -89,6 +89,7 @@ export const project = sqliteTable('project', {
     .references(() => team.id),
   splitPolicy: text('splitPolicy').$type<SplitPolicy>().notNull().default('human'),
   description: text('description'),
+  instructions: text('instructions'),
   repoKind: text('repoKind').$type<ProjectRepoKind>(),
   repoName: text('repoName'),
   githubRepo: text('githubRepo'),
