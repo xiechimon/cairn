@@ -75,6 +75,7 @@ const INFERRED_ROUTES = [
   'DELETE /api/machines/{id}',
   'POST /api/machines/{id}/evacuate',
   'DELETE /api/teams/{id}/agents/{aid}/memories/{mid}',
+  'POST /api/teams/{id}/agents/{aid}/memories/{mid}/promote',
   'DELETE /api/teams/{id}/agents/{aid}',
   'GET /api/teams/{id}/agents/{aid}/machine-fit',
   'GET /api/projects/{id}/commits',

@@ -1170,7 +1170,9 @@ export function buildChiefSystemPrompt(
   const projects = deps.db.select().from(project).where(eq(project.teamId, teamId)).all();
   const agents = deps.db.select().from(agent).where(eq(agent.teamId, teamId)).all();
   const skills = scanLocalSkills(deps.skillsDir);
-  const memories = agentRow ? injectMemories(deps.db, { agentId: agentRow.id }) : [];
+  const memories = agentRow
+    ? injectMemories(deps.db, { agentId: agentRow.id, projectId: null })
+    : [];
 
   const digestRows = deps.db
     .select({ content: chiefMessage.content })

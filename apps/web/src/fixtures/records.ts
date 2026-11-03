@@ -7,6 +7,7 @@ import {
   type ClaudeLogin,
   type DocumentDiffFile,
   type GithubRepoSummary,
+  type MachineExecutor,
   type MachineHardware,
   type MemoryRecord,
   type ModelSource,
@@ -271,7 +272,12 @@ export interface MachineRow {
   chiefWaiting?: boolean;
   maxConcurrent?: number;
   runningSteps?: number;
-  capabilities?: { mcpServers: string[]; skills: string[]; hardware?: MachineHardware } | null;
+  capabilities?: {
+    mcpServers: string[];
+    skills: string[];
+    hardware?: MachineHardware;
+    executor?: MachineExecutor;
+  } | null;
   maxConcurrentOverridden?: boolean;
   recommendedConcurrent?: number;
   concurrencyRange?: { min: number; max: number };

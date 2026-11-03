@@ -1,3 +1,4 @@
+import { Server } from 'lucide-react';
 import { useState } from 'react';
 import {
   type MachineWithProviders,
@@ -10,6 +11,12 @@ import {
   MachineProvidersCard,
   PoolWindowCard,
 } from '../components/accounts/account-parts.js';
+import { ClaudeMark } from '../components/brand-marks.js';
+import {
+  type ProviderItem,
+  ProviderModelRow,
+  ProviderPanel,
+} from '../components/providers/provider-panel.js';
 import { RoutingGraph } from '../components/settings/routing-graph.js';
 import { SettingsCard } from '../components/settings-list.js';
 import {
@@ -43,6 +50,54 @@ function useAccounts() {
     onRemove: () => setAccounts((rows) => rows.filter((row) => row.id !== account.id)),
   });
   return { accounts, actionsFor };
+}
+
+function ProviderPanelSpecimen() {
+  const [selected, setSelected] = useState('anthropic');
+  const [cli, setCli] = useState(true);
+  const items: ProviderItem[] = [
+    {
+      id: 'anthropic',
+      name: 'Anthropic',
+      Mark: ClaudeMark,
+      status: 'API key · 1 model',
+      tone: 'ok',
+    },
+    {
+      id: 'relay',
+      name: 'Gateway',
+      Mark: Server,
+      status: 'Custom endpoint · 1 retired',
+      tone: 'warn',
+    },
+    {
+      id: 'claude-code',
+      name: 'Claude Code',
+      Mark: ClaudeMark,
+      version: '2.1.316',
+      status: 'Not signed in',
+      tone: cli ? 'warn' : 'off',
+      toggle: { checked: cli, onChange: setCli },
+    },
+  ];
+  return (
+    <ProviderPanel
+      items={items}
+      selectedId={selected}
+      onSelect={setSelected}
+      onAdd={() => undefined}
+    >
+      <SettingsCard>
+        <ProviderModelRow
+          name="Claude Haiku 5.5"
+          id="claude-haiku-5-5"
+          onRemove={() => undefined}
+        />
+        <ProviderModelRow name="claude-opus-4-5" id="claude-opus-4-5" dead />
+        <ProviderModelRow name="default-sonnet" id="claude-sonnet-5-5" />
+      </SettingsCard>
+    </ProviderPanel>
+  );
 }
 
 export function AccountsSection() {
@@ -118,6 +173,16 @@ export function AccountsSection() {
           <div className="min-w-160">
             <RoutingGraph jobs={graph.jobs} connections={graph.connections} />
           </div>
+        </div>
+      </Specimen>
+      <Specimen
+        title="Provider panel"
+        note="Providers page: list of instances (status dot ok, warn, off; optional runtime switch) beside the selected one's editor; model rows show name, id, retired, remove"
+        stage="sheet"
+        code={`<ProviderPanel items={items} selectedId={id} onSelect={select} onAdd={add}>{editor}</ProviderPanel>`}
+      >
+        <div className="w-full">
+          <ProviderPanelSpecimen />
         </div>
       </Specimen>
       <Specimen

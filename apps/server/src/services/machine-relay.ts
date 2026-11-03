@@ -21,9 +21,11 @@ import {
   holdForQuestion,
 } from './chief-questions.js';
 import { executeChiefTool, executeWorkerMemoryTool } from './chief-tools.js';
+import { steeredMessageScopes } from './chief-turns.js';
 import { agentForStep } from './dispatch-eligibility.js';
 import { projectOfTodo } from './git.js';
 import { isChiefConversation, type MachineDeps, ownedStep } from './machines.js';
+import { stepScopeProjectId } from './picked-project.js';
 import { memoryOwnerOf, routeForStep } from './routing-rules.js';
 import { createLocalSkill, updateLocalSkill } from './skills.js';
 import { resolveFixedTagId, resolveProjectTagIds } from './tags.js';
@@ -128,10 +130,17 @@ export async function executeRelayToolCall(
       chiefAgentId: chiefRow.agentId,
       conversationId: threadId,
       turnPrompt: row.prompt,
+      turnScopeProjectId: stepScopeProjectId(row),
+      turnScopeMixed: steeredFromAnotherScope(deps, row),
     },
     name,
     params,
   );
+}
+
+export function steeredFromAnotherScope(deps: MachineDeps, row: typeof step.$inferSelect): boolean {
+  const scope = stepScopeProjectId(row);
+  return steeredMessageScopes(deps.db, row).some((projectId) => projectId !== scope);
 }
 
 async function executeWorkerMemoryToolCall(

@@ -50,6 +50,7 @@ import type { GateGithubPort } from './merge-gate/github-port.js';
 import { type GateVerdictView, isFullSha, mergeReadiness } from './merge-gate/readiness.js';
 import { type FinalVerdictLine, parseFinalVerdictLine } from './merge-gate/verdict-line.js';
 import { githubGatePort } from './merge-gate-github.js';
+import { effectiveModel } from './model-fallback.js';
 import { projectMergeConfigOf } from './projects.js';
 import { notifyEvaluatedReview, pendingReviewPushEntry } from './thread-push.js';
 import { insertMessageRow } from './transcript.js';
@@ -239,6 +240,10 @@ export async function evaluateMergeGate(
     if (!parsed.success) continue;
     answers.set(record.stepId, parsed.data);
   }
+  const reviewModelOf = (reviewStep: typeof step.$inferSelect): string | null => {
+    const reviewer = agentForStep(deps.db, todoRow, 'review', reviewStep.prompt);
+    return reviewer === null ? null : effectiveModel(reviewer, reviewStep).modelId;
+  };
   const perspectiveOf = (prompt: string | null): string => {
     const id = parseReviewPromptMeta(prompt)?.agentId;
     return (id !== undefined ? agents.get(id)?.persona : null) ?? 'review';
@@ -255,7 +260,7 @@ export async function evaluateMergeGate(
       patchDigest: row.patchDigest,
       headSha: row.headSha,
       reviewerId,
-      reviewerModel: reviewerId !== null ? (agents.get(reviewerId)?.modelId ?? null) : null,
+      reviewerModel: reviewStep?.kind === 'review' ? reviewModelOf(reviewStep) : null,
       gateLoosening: answer?.gateLoosening ?? null,
       evalRulerChange: answer?.evalRulerChange ?? null,
     };
@@ -283,7 +288,10 @@ export async function evaluateMergeGate(
   );
   const readiness = mergeReadiness({
     correction: isCorrectionTask(deps.db, todoRow.id),
-    author: authorAgent !== null ? { id: authorAgent.id, model: authorAgent.modelId ?? '' } : null,
+    author:
+      authorAgent !== null && authorStep !== undefined
+        ? { id: authorAgent.id, model: effectiveModel(authorAgent, authorStep).modelId ?? '' }
+        : null,
     policy: {
       mergePolicy: projectMergeConfigOf(projectRow).mergePolicy,
       requireUpToDate: projectMergeConfigOf(projectRow).requireUpToDate,
@@ -432,8 +440,7 @@ export async function evaluateMergeGate(
     .sort((a, b) => (a.finishedAt ?? a.createdAt) - (b.finishedAt ?? b.createdAt));
   const latestReview = reviewSteps.at(-1);
   if (latestReview !== undefined && latestReview.status === 'done') {
-    const reviewerId = parseReviewPromptMeta(latestReview.prompt)?.agentId ?? null;
-    const modelId = reviewerId !== null ? (agents.get(reviewerId)?.modelId ?? null) : null;
+    const modelId = reviewModelOf(latestReview);
     const rawOutput = deps.db
       .select()
       .from(message)

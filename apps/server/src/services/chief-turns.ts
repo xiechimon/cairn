@@ -21,7 +21,7 @@ import { nowMs } from '../lib/ids.js';
 import type { ConversationStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { stepScopeProjectId } from './picked-project.js';
-import { projectInstructionsSection } from './project-instructions.js';
+import { projectTurnContext } from './project-instructions.js';
 import { publishStepRow } from './quota-wait.js';
 
 type StepRow = typeof step.$inferSelect;
@@ -225,7 +225,16 @@ export function steerChiefMessage(
   const scope = stepScopeProjectId(waiting);
   const projectSection =
     scope !== null && scope !== stepScopeProjectId(running)
-      ? projectInstructionsSection(deps.db, thread.teamId, scope)
+      ? projectTurnContext(deps.db, {
+          teamId: thread.teamId,
+          agentId:
+            deps.db
+              .select({ agentId: chief.agentId })
+              .from(chief)
+              .where(eq(chief.id, thread.chiefId))
+              .get()?.agentId ?? null,
+          projectId: scope,
+        })
       : null;
   const content = [
     waiting.prompt ?? (typeof message.content === 'string' ? message.content : ''),
@@ -268,6 +277,31 @@ export function takeChiefSteer(db: Db, threadId: string): boolean {
     )
     .run();
   return true;
+}
+
+export function steeredMessageScopes(db: Db, running: StepRow): (string | null)[] {
+  if (running.claimedAt === null) return [];
+  const claimedAt = running.claimedAt;
+  return db
+    .select({ id: chiefMessage.id, projectId: chiefMessage.projectId })
+    .from(chiefMessage)
+    .where(
+      and(
+        eq(chiefMessage.threadId, running.buildId),
+        eq(chiefMessage.role, 'user'),
+        gt(chiefMessage.createdAt, claimedAt),
+      ),
+    )
+    .all()
+    .filter((message) => {
+      const queued = db
+        .select({ holdReason: step.holdReason })
+        .from(step)
+        .where(eq(step.id, message.id))
+        .get();
+      return queued === undefined || STEER_HOLDS.includes(queued.holdReason ?? '');
+    })
+    .map((message) => message.projectId);
 }
 
 export function ackChiefSteer(
