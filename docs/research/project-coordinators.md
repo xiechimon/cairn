@@ -1,12 +1,12 @@
 # A super-agent over per-project coordinators: how two-layer agent systems govern many projects
 
-Researched 2026-11-03 for ian's proposal: a team-level super-agent (总管, after the DeepSeek DSH super-agent) on top of one coordinator per project, each like a Claude Project (instructions, knowledge, chats), each running its own threads (one claude-code or codex session each). Clicking a project in the sidebar opens that project's coordinator; clicking a task opens its thread.
+Researched 2026-11-03 for ian's proposal: a team-level super-agent (`总管`, after the DeepSeek DSH super-agent) on top of one coordinator per project, each like a Claude Project (instructions, knowledge, chats), each running its own threads (one claude-code or codex session each). Clicking a project in the sidebar opens that project's coordinator; clicking a task opens its thread.
 
 Evidence labels: **measured** means this research ran it or read it in the product or database; **read** means a pinned primary source says so; **inferred** means it follows from measured or read facts and can be rechecked.
 
 ## 0. Conclusions
 
-1. **A Claude Project is not a coordinator (measured).** In claude.ai, two chats in one project are independent conversations. Both followed the project instructions, but the second chat could not see a code word given in the first; Claude said "同一个项目里的不同聊天，并不会自动共享对话内容。只有写进项目文档的东西，所有聊天才都能读到" (§1.2). What a project shares is scope: instructions, files and, when memory is on, a separate per-project memory. So "Claude Projects + a super-agent on top" gives **super-agent → project scope → threads**, which is option (c) below, not a stack of three agents.
+1. **A Claude Project is not a coordinator (measured).** In claude.ai, two chats in one project are independent conversations. Both followed the project instructions, but the second chat could not see a code word given in the first; Claude replied that chats in one project do not share conversation content automatically and that only what is written into project documents is visible to every chat (§1.2). What a project shares is scope: instructions, files and, when memory is on, a separate per-project memory. So "Claude Projects + a super-agent on top" gives **super-agent → project scope → threads**, which is option (c) below, not a stack of three agents.
 2. **None of the two-layer systems studied adds a per-project agent layer under the router.** They govern many projects with scope and rules, not agents:
    - **DSH** scopes one super-agent to one repository; a second repository is a second deployment with its own profile, state directory, worker slots and panel (read: README, `docs/006-deployment.md`).
    - **sig** runs one steward over all of the owner's repos and routes each message to a Thread by explicit reference, a mentioned repo name, full-text match and recency. Each repo gets a 1,500-character project note layer and a serial/parallel setting (read: `docs/design/steward.md` §2.3, §3).
@@ -48,11 +48,11 @@ Walked 2026-11-03 in claude.ai on ian's account (Max plan, Opus 5.5), with a pro
 |---|---|---|
 | Create project | The project page has a composer ("New session in …"), **Instructions**, **Context** (files) and **Scheduled** (scheduled tasks). Empty-state copy: "Claude references the same knowledge every time you talk to it in this project." In the sidebar, the pinned project shows its chats nested under it | measured |
 | Instructions | Set to "End every reply with the tag [PROBE]." The instructions dialog says they work "alongside your profile instructions" | measured |
-| Chat A | "Remember… the code word for this project is BLUE-HERON-42." Reply: it would remember "在本次对话里" and offered to save it as a project document so other chats could see it. The reply ended with `[PROBE]` | measured |
+| Chat A | "Remember… the code word for this project is BLUE-HERON-42." Reply: it would remember the word "in this conversation" and offered to save it as a project document so other chats could see it. The reply ended with `[PROBE]` | measured |
 | Chat B (new session, same project) | Asked for the code word using any past-chat or memory tool. Claude used 2 tools, searched the project files, found nothing, said it has no tool to read other chats and that memory is off on this account, and explained that chats in one project do not share conversation content. The reply ended with `[PROBE]` | measured |
 | Per-project memory | When memory is on, "Claude creates a separate memory for each project", described as "a safety guardrail that keeps sensitive conversations contained" | read (claude.com/blog/memory, 2025-09-11) |
 
-So a Claude Project is a **scope**: instructions, files, scheduled tasks and its own memory, shared by independent chats. No agent sits over the chats, and nothing coordinates or dispatches work between them. Mapped onto cairn, project scope ≈ Claude Project, threads ≈ the chats inside it, and the super-agent is the one Coordinator. That is the "Claude Projects with a 总管 on top" shape without a per-project agent.
+So a Claude Project is a **scope**: instructions, files, scheduled tasks and its own memory, shared by independent chats. No agent sits over the chats, and nothing coordinates or dispatches work between them. Mapped onto cairn, project scope ≈ Claude Project, threads ≈ the chats inside it, and the super-agent is the one Coordinator. That is the "Claude Projects with a `总管` on top" shape without a per-project agent.
 
 The probe project is still in ian's claude.ai project list; the Archive menu item did not take effect. Delete it by hand if unwanted.
 
@@ -146,25 +146,25 @@ flowchart LR
 
 ### 5.1 Trade-offs
 
-| Dimension | (a) flat, project = filter | (b) 总管 → per-project coordinators → threads | (c) 总管 + project scope (+ effort thread) |
+| Dimension | (a) flat, project = filter | (b) `总管` → per-project coordinators → threads | (c) `总管` + project scope (+ effort thread) |
 |---|---|---|---|
-| Routing | the Coordinator picks the project from the composer pick or the todo | the 总管 picks the project, then the project coordinator picks the thread: two model decisions, two places to get it wrong | as (a), plus sig's rule: ask when the project is ambiguous |
-| Context and tokens | one window holds every project | smaller windows per project, but a message through the 总管 costs a 总管 turn plus a project turn. Anthropic measures multi-agent at ~15× chat tokens | one window; project instructions and memory added only in scope |
+| Routing | the Coordinator picks the project from the composer pick or the todo | the `总管` picks the project, then the project coordinator picks the thread: two model decisions, two places to get it wrong | as (a), plus sig's rule: ask when the project is ambiguous |
+| Context and tokens | one window holds every project | smaller windows per project, but a message through the `总管` costs a `总管` turn plus a project turn. Anthropic measures multi-agent at ~15× chat tokens | one window; project instructions and memory added only in scope |
 | Memory isolation | team-wide | strong by construction | as strong as Claude Projects: project memory only in scope; D72's per-turn context selection can prefer the project's history |
-| Latency | — | one extra model turn before any thread starts for 总管-routed messages | — |
+| Latency | — | one extra model turn before any thread starts for `总管`-routed messages | — |
 | Concurrency and priority | per machine and agent | each coordinator dispatches into the same machines; still needs a shared limit | per-project limit and priority on the dispatch queue (DSH-style slots, human wakes first) |
 | Secret isolation | team-wide | the layer does not isolate secrets; a scope does | project-scoped secrets, as in Amp's projects or Rakazo's spaces |
-| Conflicting dispatch | impossible: one writer | the 总管 and a project coordinator can both open threads on one repo; DSH's "one writer per state" is broken unless the 总管 stops dispatching, which makes it a router to routers | one writer; an effort thread owns only the children it creates |
+| Conflicting dispatch | impossible: one writer | the `总管` and a project coordinator can both open threads on one repo; DSH's "one writer per state" is broken unless the `总管` stops dispatching, which makes it a router to routers | one writer; an effort thread owns only the children it creates |
 | Lost decisions | none | "stop X" said to one layer is missed by the other; the Pi Durable spike measured recall of ian's verdicts as weak already (C2 3.5/6, Pi 0/6) | one transcript |
 | UI | one chat | N+1 chats, the shape D58 removed | one chat; a project click = the scoped view (D66) |
-| D60 thin router | fits | a project coordinator either duplicates the 总管 (routing only) or plans (against D60 ③) | fits; an effort thread owns its outcome, which D60 says threads do |
+| D60 thin router | fits | a project coordinator either duplicates the `总管` (routing only) or plans (against D60 ③) | fits; an effort thread owns its outcome, which D60 says threads do |
 | D72 Pi Durable | one durable session | N+1 durable sessions, summaries and recoveries | one durable session |
 | D71 routing | fits | independent | fits |
 | Idle cost now | — | 3 of 4 projects idle for 7 days | none |
 
 ### 5.2 Failure modes
 
-1. **Double dispatch (b).** The 总管 and the cairn coordinator both act on "fix the flaky test". Avoiding it needs a per-project dispatch lock.
+1. **Double dispatch (b).** The `总管` and the cairn coordinator both act on "fix the flaky test". Avoiding it needs a per-project dispatch lock.
 2. **Stale verdict (b).** "Stop #2510" lands in one layer only; cairn has had this class of incident (#2510 merged early).
 3. **Misrouted project (all).** sig's answer: deterministic signals first, ask when not unique, and a routing eval as a merge check.
 4. **Scope leak (c).** Project A's memory is injected into a turn about project B. Fix: scope by the todo's `projectId` when a turn acts on a todo, not by the composer pick, and show the scope chip.
@@ -173,7 +173,7 @@ flowchart LR
 
 ## 6. Recommendation and PR sketch
 
-Adopt (c): the Coordinator is the 总管, a project is a Claude-Project-like scope, and threads stay as they are. Do not add a permanent per-project agent.
+Adopt (c): the Coordinator is the `总管`, a project is a Claude-Project-like scope, and threads stay as they are. Do not add a permanent per-project agent.
 
 | PR | Scope | Route |
 |---|---|---|
@@ -188,7 +188,7 @@ Optional alongside P3: sig's ask-when-ambiguous rule for project routing, plus a
 
 ## 7. Decisions for ian
 
-1. **Shape.** Recommended: (c), one 总管 with Claude-Project-style scopes. Alternative: (b), which reopens D58 and adds a model hop and a second writer.
+1. **Shape.** Recommended: (c), one `总管` with Claude-Project-style scopes. Alternative: (b), which reopens D58 and adds a model hop and a second writer.
 2. **Project memory default.** Recommended: memories from a project-scoped turn stay project-only, and ian promotes one to team-wide when he wants. Alternative: team-wide by default.
 3. **Isolation strength.** Recommended: project-scoped secrets inside one team (P5). Alternative: a hard wall per client (a separate team, like Rakazo's spaces) for work that must never mix.
 4. **Effort coordinator (P6).** Recommended: defer until one effort needs more than about 3 parallel threads. Alternative: build now.
