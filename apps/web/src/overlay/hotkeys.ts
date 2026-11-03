@@ -24,10 +24,17 @@ const blockingLayerOpen = (): boolean =>
     (el) => !el.matches(CHIEF_DRAWER) && el.checkVisibility(),
   );
 
+function isOnTop(el: HTMLElement): boolean {
+  const box = el.getBoundingClientRect();
+  const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+  const surface = el.closest('.composer, .chief-composer') ?? el;
+  return hit !== null && surface.contains(hit);
+}
+
 function visibleComposeTarget(): HTMLTextAreaElement | null {
   const usable = [
     ...document.querySelectorAll<HTMLTextAreaElement>(`textarea[${COMPOSE_TARGET_ATTR}]`),
-  ].filter((el) => !el.readOnly && !el.disabled && el.checkVisibility());
+  ].filter((el) => !el.readOnly && !el.disabled && el.checkVisibility() && isOnTop(el));
   return usable.find((el) => el.closest(CHIEF_DRAWER) === null) ?? usable[0] ?? null;
 }
 
