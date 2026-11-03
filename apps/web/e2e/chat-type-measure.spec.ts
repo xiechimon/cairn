@@ -82,20 +82,19 @@ test('68ch measure cap binds the body text and the centered note', async ({ page
   expect(overflow.scroll).toBeLessThanOrEqual(overflow.client + 1);
 });
 
-test('composer placeholder sits at 15px (text-card-title) — the same size as the 15px body', async ({ page }) => {
+test('composer placeholder sits at 15px (text-card-title)', async ({ page }) => {
+  await page.goto('/app?scenario=home-c&thread=home-c-idle');
+  const placeholder = page.locator('.side-panel [data-testid="composer-placeholder"]');
+  await expect(placeholder).toHaveCSS('font-size', '15px');
+});
+
+test('agent text sits at 15px', async ({ page }) => {
   await page.goto(CONFIRM);
   await page.locator('.side-panel [data-testid="transcript-col"]').waitFor();
-  await page.locator('.side-panel [data-testid=\"transcript-col\"]').waitFor();
-  const sizes = await page.evaluate(() => {
-    const ph = document.querySelector('.side-panel [data-testid="composer-placeholder"]')!;
-    const text = document.querySelector('.side-panel [data-testid="agent-text"]')!;
-    return {
-      placeholder: getComputedStyle(ph).fontSize,
-      body: getComputedStyle(text).fontSize,
-    };
-  });
-  expect(sizes.placeholder).toBe('15px');
-  expect(sizes.body).toBe('15px');
+  await expect(page.locator('.side-panel [data-testid="agent-text"]').first()).toHaveCSS(
+    'font-size',
+    '15px',
+  );
 });
 
 test('bubble / footer keep their own geometry, replies carry no avatar column', async ({ page }) => {
