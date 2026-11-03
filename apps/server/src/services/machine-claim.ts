@@ -66,8 +66,10 @@ import {
 import { injectMemories } from './memory.js';
 import { effectiveModel } from './model-fallback.js';
 import { mergedCatalogModels } from './model-liveness.js';
+import { stepScopeProjectId } from './picked-project.js';
+import { projectTurnContext } from './project-instructions.js';
 import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
-import { routeForStep } from './routing-rules.js';
+import { memoryOwnerOf, routeForStep } from './routing-rules.js';
 import { reverifyShip } from './ship-gate.js';
 import { scanLocalSkills } from './skills.js';
 import { listProjectTagVocab } from './tags.js';
@@ -277,7 +279,18 @@ function chiefClaimPayload(
     );
     if (hint) routeSection = formatSkillRouteSection(hint);
   }
-  const memories = injectMemories(deps.db, { agentId: agentRow.id });
+  const memories = injectMemories(deps.db, { agentId: agentRow.id, projectId: null });
+  const projectSection = digest
+    ? null
+    : projectTurnContext(deps.db, {
+        teamId: threadRow.teamId,
+        agentId: agentRow.id,
+        projectId: stepScopeProjectId(stepRow),
+      });
+  const instruction =
+    stepRow.prompt === null
+      ? null
+      : [stepRow.prompt, projectSection, routeSection].filter((part) => part).join('\n\n');
   const chiefMcp = digest
     ? []
     : claimMcpSlugs(machineRow?.latestCliVersion ?? null, agentRow.mcpServers);
@@ -294,10 +307,9 @@ function chiefClaimPayload(
       action: !stepRow.freshSession && threadRow.sessionId !== '' ? 'continue' : 'new',
       sessionId: !stepRow.freshSession && threadRow.sessionId !== '' ? threadRow.sessionId : null,
     },
-    ...(stepRow.prompt !== null
+    ...(instruction !== null
       ? {
-          instruction:
-            routeSection === '' ? stepRow.prompt : `${stepRow.prompt}\n\n${routeSection}`,
+          instruction,
         }
       : {}),
     agent: {
@@ -679,7 +691,12 @@ async function tryClaim(
         ...(blockerHandoff !== null ? { blockerHandoff } : {}),
         output: cand.todoRow.output,
       },
-      project: { id: cand.todoRow.projectId, name: projectRow?.name ?? '', repo },
+      project: {
+        id: cand.todoRow.projectId,
+        name: projectRow?.name ?? '',
+        ...(projectRow?.instructions != null ? { instructions: projectRow.instructions } : {}),
+        repo,
+      },
       agent: {
         id: agentRow.id,
         displayName: agentRow.displayName,
@@ -688,7 +705,7 @@ async function tryClaim(
         modelId: model.modelId,
         thinkingLevel: cand.stepRow.fallback?.model ? null : agentRow.thinkingLevel,
         memories: injectMemories(db, {
-          agentId: agentRow.id,
+          agentId: memoryOwnerOf(db, teamId, agentRow.id, cand.stepRow.kind),
           projectId: cand.todoRow.projectId,
         }),
         defaultSkill: agentRow.defaultSkill,

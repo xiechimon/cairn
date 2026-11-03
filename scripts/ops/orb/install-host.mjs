@@ -3,6 +3,8 @@ import { join, resolve } from 'node:path';
 import { changes } from './host-files.mjs';
 import { missingUfwRules } from './ufw-rules.mjs';
 
+const COMPUTER_HOME_MOUNT = 'var-lib-cairn\\x2dcomputer.mount';
+
 export function installHost(options = {}) {
   const {
     root = '/',
@@ -56,6 +58,7 @@ export function installHost(options = {}) {
     ],
     ['prepare-machine.sh', '/usr/local/lib/cairn-orb/prepare-machine.sh', 0o755],
     ['runtime-directory.mjs', '/usr/local/lib/cairn-orb/runtime-directory.mjs'],
+    ['computer-home.mjs', '/usr/local/lib/cairn-orb/computer-home.mjs'],
     ['egress-relay.mjs', '/usr/local/lib/cairn-orb/egress-relay.mjs'],
     ['firewall.nft', '/etc/cairn-orb/firewall.nft'],
     ['cairn-orb-firewall.service', '/etc/systemd/system/cairn-orb-firewall.service'],
@@ -70,6 +73,7 @@ export function installHost(options = {}) {
     ['/var/lib/cairn-orb', 'root', 'root'],
     ['/var/lib/cairn-orb/dist', 'ian', '-'],
     ['/var/lib/cairn-orb/seed', 'ian', '-'],
+    ['/var/lib/cairn-computer', 'root', 'root'],
   ];
   const tmpfiles = `${directories.map(([path, owner, group]) => `d ${path} 0755 ${owner} ${group} -`).join('\n')}\n`;
   const foreignRules = [
@@ -89,6 +93,10 @@ export function installHost(options = {}) {
     [
       '/etc/systemd/system/systemd-nspawn@.service.d/20-cairn-orb.conf',
       '[Unit]\nRequires=cairn-orb-firewall.service\nAfter=cairn-orb-firewall.service\n\n[Service]\nExecStartPre=+/usr/local/lib/cairn-orb/prepare-machine.sh %i\nExecStopPost=\nExecStopPost=+/usr/local/lib/cairn-orb/prepare-machine.sh --stop %i\nExecStopPost=-systemd-nspawn --cleanup --machine=%i\nEnvironment=CAIRN_ORB_BINDS=\nEnvironment="CAIRN_ORB_FIXED_BINDS=--bind=/run/cairn-orb/%i:/run/cairn:idmap,norbind --bind-ro=/var/lib/cairn-orb/dist:/opt/cairn/daemon:idmap,norbind --bind-ro=/var/lib/cairn-orb/seed:/seed:idmap,norbind"\nEnvironmentFile=-/run/systemd/nspawn/%i.binds\nExecStart=\nExecStart=systemd-nspawn --quiet --keep-unit --boot --link-journal=try-guest --network-veth -U --settings=override --machine=%i $CAIRN_ORB_BINDS\n',
+    ],
+    [
+      `/etc/systemd/system/${COMPUTER_HOME_MOUNT}`,
+      '[Unit]\nDescription=Coordinator computer homes without setuid or device files\nRequiresMountsFor=/var/lib\n\n[Mount]\nWhat=/var/lib/cairn-computer\nWhere=/var/lib/cairn-computer\nType=none\nOptions=bind,nosuid,nodev\n\n[Install]\nWantedBy=local-fs.target\n',
     ],
     [
       '/etc/systemd/system/systemd-networkd.service.d/20-cairn-orb.conf',
@@ -157,6 +165,13 @@ export function installHost(options = {}) {
   }
   if (change.probe('systemctl', ['is-enabled', 'cairn-orb-firewall.service']).status !== 0)
     change.exec('systemctl', ['enable', 'cairn-orb-firewall.service']);
+  for (const [probe, action] of [
+    ['is-enabled', 'enable'],
+    ['is-active', 'start'],
+  ]) {
+    if (change.probe('systemctl', [probe, COMPUTER_HOME_MOUNT]).status !== 0)
+      change.exec('systemctl', [action, COMPUTER_HOME_MOUNT]);
+  }
   if (change.probe('systemctl', ['is-active', 'ufw']).status === 0) {
     const rules = readFileSync(join(root, 'etc/ufw/user.rules'), 'utf8');
     for (const { args } of missingUfwRules(rules)) change.exec('ufw', args);
@@ -207,21 +222,26 @@ export function installHost(options = {}) {
     if (change.probe('runuser', [...userctl, probe, 'egress-relay.service']).status !== 0)
       change.exec('runuser', [...userctl, action, 'egress-relay.service']);
   }
-  if (dryRun) log('plan: bash build-image.sh --dry-run');
-  const image = change.probe('bash', [
-    resolve(import.meta.dirname, 'build-image.sh'),
-    ...(dryRun ? ['--dry-run'] : []),
-  ]);
-  if (image.stderr?.trim()) log(image.stderr.trim());
-  if (image.status !== 0) {
-    if (image.stdout?.trim()) log(image.stdout.trim());
-    throw new Error(`build-image failed: ${image.stderr || image.stdout}`);
+  let imageChanges = 0;
+  for (const script of ['build-image.sh', 'build-computer-image.sh']) {
+    if (dryRun) log(`plan: bash ${script} --dry-run`);
+    const image = change.probe('bash', [
+      resolve(import.meta.dirname, script),
+      ...(dryRun ? ['--dry-run'] : []),
+    ]);
+    if (image.stderr?.trim()) log(image.stderr.trim());
+    if (image.status !== 0) {
+      if (image.stdout?.trim()) log(image.stdout.trim());
+      throw new Error(`${script.replace(/\.sh$/, '')} failed: ${image.stderr || image.stdout}`);
+    }
+    if (image.stdout?.trim() !== '0 changes') {
+      log(image.stdout?.trim());
+      imageChanges += 1;
+    }
   }
-  const imageChanged = image.stdout?.trim() !== '0 changes';
-  if (imageChanged) log(image.stdout?.trim());
   if (change.count > 0 || previousPending)
     change.file('/var/lib/cairn-orb/install-pending', 'complete\n');
-  log(`${change.count + (imageChanged ? 1 : 0)}${dryRun ? ' planned' : ''} changes`);
+  log(`${change.count + imageChanges}${dryRun ? ' planned' : ''} changes`);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {

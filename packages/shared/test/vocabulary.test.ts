@@ -126,8 +126,8 @@ describe('phase nine values authoritative single source (02 §4.1, locked)', () 
 });
 
 describe('machine protocol (02 §5, r3 §1.6)', () => {
-  it('has the 14 machine-face endpoints', () => {
-    expect(MACHINE_ENDPOINTS).toHaveLength(14);
+  it('has the 15 machine-face endpoints', () => {
+    expect(MACHINE_ENDPOINTS).toHaveLength(15);
     expect(MACHINE_ENDPOINTS.map((e) => e.path)).toEqual([
       '/api/machine/enroll',
       '/api/machine/enroll/start',
@@ -142,6 +142,7 @@ describe('machine protocol (02 §5, r3 §1.6)', () => {
       '/api/machine/tool/{stepId}',
       '/api/machine/token/{stepId}',
       '/api/machine/upload-urls/{stepId}',
+      '/api/machine/computer/{callId}',
       '/api/machine/done/{stepId}',
     ]);
   });
@@ -517,9 +518,11 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
   });
 });
 
-describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; #310 +attachment; #319 +branch_sync; spec 12 +github_connection; spec 13 −skill −mcp_server; XMON-109 +skill_audit; XMON-108 +shell_command; #1029 −document_diff; #1137 +webhook_token; #1404 +gate_*; #1491 +autonomy_state +member_activity; #1686 +push_subscription; #2243 +claude_subscription; #2233 +queued_message; #2592 +chief_report +retro_proposal)', () => {
+describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; #310 +attachment; #319 +branch_sync; spec 12 +github_connection; spec 13 −skill −mcp_server; XMON-109 +skill_audit; XMON-108 +shell_command; #1029 −document_diff; #1137 +webhook_token; #1404 +gate_*; #1491 +autonomy_state +member_activity; #1686 +push_subscription; #2243 +claude_subscription; #2233 +queued_message; #2592 +chief_report +retro_proposal; D75 +computer +computer_call)', () => {
   it('DB table registry keeps schedules and drops whats_new, webhook_token, and shell_command (#1796)', () => {
-    expect(DB_TABLES).toHaveLength(52);
+    expect(DB_TABLES).toHaveLength(54);
+    expect(INTERNAL_ONLY_TABLES).toContain('computer');
+    expect(INTERNAL_ONLY_TABLES).toContain('computer_call');
     expect(INTERNAL_ONLY_TABLES).toContain('chief_report');
     expect(INTERNAL_ONLY_TABLES).toContain('retro_proposal');
     expect(DB_TABLES).toContain('queued_message');
@@ -617,8 +620,8 @@ describe('thinking-level capability read surface (XMON-16 / #499 B3 ruling A)', 
 });
 
 describe('machine wire (02 §5 canonical, wire layer enters CI)', () => {
-  it('MACHINE_WIRE covers exactly the 14 endpoint paths (single source)', () => {
-    expect(MACHINE_WIRE).toHaveLength(14);
+  it('MACHINE_WIRE covers exactly the 15 endpoint paths (single source)', () => {
+    expect(MACHINE_WIRE).toHaveLength(15);
     expect(MACHINE_WIRE.map((w) => w.path)).toEqual(MACHINE_ENDPOINTS.map((e) => e.path));
   });
 

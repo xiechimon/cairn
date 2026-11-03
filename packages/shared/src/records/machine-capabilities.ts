@@ -18,6 +18,8 @@ export const machineCapabilitiesSchema = z.object({
   skills: z.array(z.string()),
   hardware: machineHardwareSchema.optional(),
   executor: machineExecutorSchema.optional(),
+  computer: z.literal(true).optional(),
+  ownComputer: z.literal(true).optional(),
 });
 export type MachineCapabilities = z.infer<typeof machineCapabilitiesSchema>;
 
@@ -37,6 +39,8 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
     ...base.data,
     ...(hardware.success ? { hardware: hardware.data } : {}),
     ...(executor.success ? { executor: executor.data } : {}),
+    ...(rec.computer === true ? { computer: true as const } : {}),
+    ...(rec.ownComputer === true ? { ownComputer: true as const } : {}),
   };
 }
 

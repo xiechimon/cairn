@@ -28,6 +28,7 @@ import {
 } from './claude-code-auth.js';
 import { type ClaudeBinInfo, probeClaudeBin } from './claude-code-bin.js';
 import { readClaudeCodeReport } from './claude-code-models.js';
+import { rejectComputerCall } from './computer/dispatch.js';
 import type { DaemonConfig } from './config.js';
 import { StepJournal, type TranscriptBuffer } from './journal.js';
 import type { DaemonLogger } from './log.js';
@@ -576,6 +577,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
             if (ev.type === 'steer') void deliverSteer(ev.stepId);
             if (ev.type === 'stop') void deliverStop(ev.stepId);
             if (ev.type === 'sync') void deliverSync(ev.sync);
+            if (ev.type === 'computer') void rejectComputerCall(client, ev.call).catch(() => {});
           },
           () => {
             if (!announced) {

@@ -147,7 +147,7 @@
   "provider-oauth.spec.ts": 3484,
   "providers-claude-subscription.spec.ts": 7100,
   "providers-model-routing.spec.ts": 4505,
-  "providers-tabs.spec.ts": 5904,
+  "providers-scope.spec.ts": 5904,
   "push-device-switch.spec.ts": 1382,
   "queued-action.spec.ts": 1929,
   "quota-wait-board.spec.ts": 2634,

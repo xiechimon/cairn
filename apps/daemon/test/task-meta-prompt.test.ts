@@ -62,3 +62,20 @@ describe('the taskMeta switch of composeWorkerSystemPrompt', () => {
     expect(text).not.toContain('- bug：修坏的东西');
   });
 });
+
+describe('composeWorkerSystemPrompt project instructions (D74 P1)', () => {
+  it('adds the project instructions after the agent description and before memories', () => {
+    const text = composeWorkerSystemPrompt('builder', [{ title: 'm', content: 'remembered' }], {
+      project: { name: 'cairn', instructions: 'Never force push.' },
+    });
+    expect(text).toContain('## 项目说明（cairn）\nNever force push.');
+    expect(text?.indexOf('builder')).toBeLessThan(text?.indexOf('Never force push.') ?? -1);
+    expect(text?.indexOf('Never force push.')).toBeLessThan(text?.indexOf('remembered') ?? -1);
+  });
+
+  it('adds nothing when the project has no instructions', () => {
+    expect(
+      composeWorkerSystemPrompt(undefined, undefined, { project: { name: 'cairn' } }),
+    ).toBeUndefined();
+  });
+});

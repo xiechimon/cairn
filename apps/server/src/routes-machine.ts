@@ -1,11 +1,13 @@
 import type { ToolCallRecord } from '@cairn/shared';
 import {
   claudeRateLimitReportSchema,
+  computerCallIdSchema,
   machineActivityBodySchema,
   machineAgentTodoBodySchema,
   machineAskBodySchema,
   machineClaimBodySchema,
   machineClosedOrbsBodySchema,
+  machineComputerFramesBodySchema,
   machineDoneBodySchema,
   machineEnrollBodySchema,
   machineEnrollConfirmBodySchema,
@@ -41,6 +43,7 @@ import {
 import { transitionBranchSync } from './services/branch-sync.js';
 import { recordBuildProvenance } from './services/build-provenance.js';
 import { recordClaudeRateLimit } from './services/claude-rate-limit.js';
+import { receiveComputerFrames } from './services/machine-computer.js';
 import { executeRelayToolCall, machineAsk } from './services/machine-relay.js';
 import {
   createUploadUrls,
@@ -141,6 +144,7 @@ function unauthorized(): HttpError {
 }
 
 const CLOSED_ORBS_MAX_BODY_BYTES = 64 * 1024;
+const COMPUTER_FRAMES_MAX_BODY_BYTES = 24 * 1024 * 1024;
 
 async function jsonBody(c: Context): Promise<unknown> {
   return c.req.json().catch(() => null);
@@ -539,4 +543,18 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
     );
     return c.json({ ok: true as const });
   });
+
+  app.post(
+    '/api/machine/computer/:callId',
+    bodyLimit({
+      maxSize: COMPUTER_FRAMES_MAX_BODY_BYTES,
+      onError: (c) => c.json({ error: 'computer frames body too large' }, 413),
+    }),
+    async (c) => {
+      const row = me(c);
+      const callId = parseWith(computerCallIdSchema, c.req.param('callId'), 'callId');
+      const body = parseWith(machineComputerFramesBodySchema, await jsonBody(c), 'body');
+      return c.json(receiveComputerFrames(ctx.db, row.id, callId, body.frames));
+    },
+  );
 }

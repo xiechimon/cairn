@@ -21,6 +21,7 @@ import { nowMs } from '../lib/ids.js';
 import type { ConversationStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { stepScopeProjectId } from './picked-project.js';
+import { projectTurnContext } from './project-instructions.js';
 import { publishStepRow } from './quota-wait.js';
 
 type StepRow = typeof step.$inferSelect;
@@ -221,7 +222,26 @@ export function steerChiefMessage(
   const running = liveChiefSteps(deps.db, threadId).find((row) => row.status === 'claimed');
   if (running === undefined) return { steered: false };
   if (STEER_HOLDS.includes(waiting.holdReason ?? '')) return { steered: true };
-  const content = waiting.prompt ?? (typeof message.content === 'string' ? message.content : '');
+  const scope = stepScopeProjectId(waiting);
+  const projectSection =
+    scope !== null && scope !== stepScopeProjectId(running)
+      ? projectTurnContext(deps.db, {
+          teamId: thread.teamId,
+          agentId:
+            deps.db
+              .select({ agentId: chief.agentId })
+              .from(chief)
+              .where(eq(chief.id, thread.chiefId))
+              .get()?.agentId ?? null,
+          projectId: scope,
+        })
+      : null;
+  const content = [
+    waiting.prompt ?? (typeof message.content === 'string' ? message.content : ''),
+    projectSection,
+  ]
+    .filter((part) => part)
+    .join('\n\n');
   const now = nowMs();
   const prior = deps.db
     .select()
@@ -257,6 +277,31 @@ export function takeChiefSteer(db: Db, threadId: string): boolean {
     )
     .run();
   return true;
+}
+
+export function steeredMessageScopes(db: Db, running: StepRow): (string | null)[] {
+  if (running.claimedAt === null) return [];
+  const claimedAt = running.claimedAt;
+  return db
+    .select({ id: chiefMessage.id, projectId: chiefMessage.projectId })
+    .from(chiefMessage)
+    .where(
+      and(
+        eq(chiefMessage.threadId, running.buildId),
+        eq(chiefMessage.role, 'user'),
+        gt(chiefMessage.createdAt, claimedAt),
+      ),
+    )
+    .all()
+    .filter((message) => {
+      const queued = db
+        .select({ holdReason: step.holdReason })
+        .from(step)
+        .where(eq(step.id, message.id))
+        .get();
+      return queued === undefined || STEER_HOLDS.includes(queued.holdReason ?? '');
+    })
+    .map((message) => message.projectId);
 }
 
 export function ackChiefSteer(

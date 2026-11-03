@@ -1,117 +1,162 @@
-import { MODEL_SOURCE_RUNTIMES, type ModelSource, type ModelSourceRuntime } from '@cairn/shared';
-import { cn } from 'cn';
-import { CircleAlert, CircleCheck, Cpu } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import type { MachineRuntime, ModelSource, ProviderRecord } from '@cairn/shared';
+import { MACHINE_RUNTIMES } from '@cairn/shared';
+import { Cpu } from 'lucide-react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { useApiMutations, useModelSources } from '../api/hooks.js';
-import { RUNTIME_LABELS } from '../api/mappers.js';
+import { useApiMutations, useMachines, useModelSources, useProviders } from '../api/hooks.js';
+import { mapMachines } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { ClaudeMark, GeminiMark, PiMark } from '../components/brand-marks.js';
 import { EmptyState } from '../components/empty-state.js';
+import { type ProviderItem, ProviderPanel } from '../components/providers/provider-panel.js';
 import { SegmentedTabs } from '../components/segmented.js';
 import { Button } from '../components/ui/button.js';
 import { toastError } from '../components/ui/toaster.js';
+import type { MachineRow } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { oauthReasonCopy } from '../i18n/oauth-reason.js';
 import { useI18n } from '../i18n/provider.js';
+import type { TFunc } from '../i18n/translate.js';
 import { PageShell } from '../pages/shell.js';
 import { CreateProviderDialog } from './create-provider-dialog.js';
 import { MODEL_ROUTING_HREF, PROVIDERS_HREF } from './hrefs.js';
+import { ResourceNewButton } from './parts.js';
 import {
-  ResourceList,
-  ResourceNewButton,
-  ResourceRow,
-  RowDesc,
-  RowMeta,
-  RowText,
-  RowTitle,
-} from './parts.js';
+  ClaudeCodeEditor,
+  claudeCodeStatus,
+  GeminiEditor,
+  PiEditor,
+  type ProviderEditActions,
+  providerKind,
+  providerMark,
+  TeamProviderEditor,
+} from './provider-editors.js';
 
-const RUNTIME_DESCRIPTIONS: Record<ModelSourceRuntime, string> = {
-  pi: 'cairn 自有运行时。模型来自你添加的服务商。',
-  'claude-code': '执行机 Claude Code 配置（~/.claude/settings.json）的模型槽。',
-  gemini: '执行机 Gemini CLI 的本地会话。',
-};
+const TEAM_SCOPE = 'team';
 
-const RUNTIME_MARKS: Record<ModelSourceRuntime, typeof PiMark> = {
-  pi: PiMark,
-  'claude-code': ClaudeMark,
-  gemini: GeminiMark,
-};
-
-const NEEDS_YOU_INK = 'text-(--card-button)';
-
-const isRuntime = (value: string | null): value is ModelSourceRuntime =>
-  value !== null && (MODEL_SOURCE_RUNTIMES as readonly string[]).includes(value);
-
-function parseRuntime(searchParams: URLSearchParams): ModelSourceRuntime {
-  const raw = searchParams.get('runtime');
-  return isRuntime(raw) ? raw : 'pi';
+interface Entry {
+  item: ProviderItem;
+  editor: ReactNode;
 }
 
-type HeadState = 'installed' | 'no-config' | 'bin-missing' | 'unknown';
+const isMachineRuntime = (value: string): value is MachineRuntime =>
+  (MACHINE_RUNTIMES as readonly string[]).includes(value);
 
-function headState(source: ModelSource): HeadState {
-  const bin = source.bin;
-  if (typeof bin === 'object' && bin !== null) return source.installed ? 'installed' : 'no-config';
-  if (bin === null) return 'bin-missing';
-  return source.installed ? 'installed' : 'unknown';
+function scopeLabel(machine: MachineRow, t: TFunc): string {
+  if (machine.online === false) return `${machine.name} · ${t('离线')}`;
+  if (machine.capabilities?.executor === 'orb') return `${machine.name} · Orb`;
+  return machine.name;
 }
 
-function RuntimeHead({ source }: { source: ModelSource }) {
-  const { t } = useI18n();
-  const bin = source.bin;
-  const state = headState(source);
-  const binFound = typeof bin === 'object' && bin !== null;
-  const notLoggedIn = source.auth?.state === 'not-logged-in';
-  const guidance =
-    state === 'no-config'
-      ? t(
-          '在该机器上写 ~/.claude/settings.json 的 env.ANTHROPIC_*_MODEL 槽后，此处自动展示其模型槽。',
-        )
-      : state === 'bin-missing' || state === 'unknown'
-        ? t('安装 Claude Code 并完成一次登录后，此处自动展示其模型槽。')
-        : null;
-  const needsYou = state === 'bin-missing' || state === 'unknown';
-  const StateIcon = needsYou ? CircleAlert : CircleCheck;
+function sourceFor(machine: MachineRow, sources: readonly ModelSource[]): ModelSource | undefined {
+  const claude = sources.filter((s) => s.runtime === 'claude-code');
   return (
-    <div
-      data-testid="runtime-head"
-      data-runtime={source.runtime}
-      data-auth={source.auth?.state}
-      data-state={state}
-      className="mt-6 flex flex-col gap-0.5 px-1"
-    >
-      <div className="flex items-center gap-2">
-        <span className="text-ui font-medium text-foreground">
-          {RUNTIME_LABELS[source.runtime]}
-        </span>
-        <span
-          className={cn(
-            'inline-flex items-center gap-1 text-meta',
-            needsYou ? NEEDS_YOU_INK : 'text-content-tertiary',
-          )}
-        >
-          <StateIcon aria-hidden strokeWidth={1.75} className="size-3.5" />
-          {state === 'installed'
-            ? t('已安装在 {hostname}', { hostname: source.hostname })
-            : state === 'no-config'
-              ? t('已安装，未配置模型槽')
-              : t('未安装')}
-        </span>
-      </div>
-      {binFound && (
-        <p data-testid="runtime-bin" className="m-0 text-meta text-content-tertiary">
-          {`claude${bin.version !== null ? ` ${bin.version}` : ''} · ${bin.path}`}
-          {notLoggedIn && <span className={NEEDS_YOU_INK}>{` · ${t('未登录')}`}</span>}
-        </p>
-      )}
-      <p className="m-0 text-meta text-content-tertiary">
-        {t(RUNTIME_DESCRIPTIONS[source.runtime])}
-      </p>
-      {guidance !== null && <p className="m-0 text-meta text-content-tertiary">{guidance}</p>}
-    </div>
+    claude.find((s) => s.machineId !== undefined && s.machineId === machine.id) ??
+    claude.find((s) => s.machineId === undefined && s.hostname === machine.name)
   );
+}
+
+function deadModelIds(sources: readonly ModelSource[]): Set<string> {
+  return new Set(
+    sources
+      .filter((s) => s.runtime === 'pi')
+      .flatMap((s) => s.models.filter((m) => m.liveness === 'dead').map((m) => m.id)),
+  );
+}
+
+function teamEntries(
+  providers: readonly ProviderRecord[],
+  dead: ReadonlySet<string>,
+  actionsFor: (record: ProviderRecord) => ProviderEditActions,
+  t: TFunc,
+): Entry[] {
+  return providers.map((record) => {
+    const retired = record.models.filter((m) => dead.has(m.id)).length;
+    const parts = [t(providerKind(record)), t('{n} 个模型', { n: record.models.length })];
+    if (retired > 0) parts.push(t('{n} 个已下架', { n: retired }));
+    return {
+      item: {
+        id: `provider:${record.id}`,
+        name: record.label,
+        Mark: providerMark(record),
+        status: parts.join(' · '),
+        tone: retired > 0 ? 'warn' : 'ok',
+      },
+      editor: (
+        <TeamProviderEditor
+          key={record.id}
+          record={record}
+          deadModels={dead}
+          actions={actionsFor(record)}
+        />
+      ),
+    };
+  });
+}
+
+function machineEntries(
+  machine: MachineRow,
+  source: ModelSource | undefined,
+  providerCount: number,
+  toggle: ((runtime: MachineRuntime, next: boolean) => void) | undefined,
+  onShowTeam: () => void,
+  t: TFunc,
+): Entry[] {
+  const enabled = new Set(machine.enabledRuntimes ?? []);
+  const online = machine.online !== false;
+  const switchFor = (runtime: MachineRuntime) => ({
+    checked: enabled.has(runtime),
+    disabled: toggle === undefined || !online,
+    onChange: (next: boolean) => toggle?.(runtime, next),
+  });
+  const claude = claudeCodeStatus(source, online);
+  const bin = typeof source?.bin === 'object' && source.bin !== null ? source.bin : null;
+  const offTone = (runtime: MachineRuntime, tone: ProviderItem['tone']) =>
+    enabled.has(runtime) ? tone : 'off';
+  return [
+    {
+      item: {
+        id: 'claude-code',
+        name: 'Claude Code',
+        Mark: ClaudeMark,
+        version: bin?.version ?? null,
+        status: t(claude.status),
+        tone: claude.tone === 'warn' ? 'warn' : offTone('claude-code', claude.tone),
+        toggle: switchFor('claude-code'),
+      },
+      editor: (
+        <ClaudeCodeEditor source={source} machineName={machine.name} status={claude.status} />
+      ),
+    },
+    {
+      item: {
+        id: 'pi',
+        name: 'pi',
+        Mark: PiMark,
+        status: online ? t('使用团队的服务商') : t('离线'),
+        tone: online ? offTone('pi', 'ok') : 'warn',
+        toggle: switchFor('pi'),
+      },
+      editor: (
+        <PiEditor
+          machineName={machine.name}
+          providerCount={providerCount}
+          onShowTeam={onShowTeam}
+        />
+      ),
+    },
+    {
+      item: {
+        id: 'gemini',
+        name: 'Gemini CLI',
+        Mark: GeminiMark,
+        status: t('还没上报'),
+        tone: 'off',
+        toggle: switchFor('gemini'),
+      },
+      editor: <GeminiEditor machineName={machine.name} />,
+    },
+  ];
 }
 
 export function ProvidersPage() {
@@ -121,14 +166,19 @@ export function ProvidersPage() {
   const fixture = resolveScenario(searchParams);
   const { live, teamId } = useLiveData();
   const sourcesQ = useModelSources(teamId, live);
-  const sources = live
-    ? (sourcesQ.data?.sources ?? [])
-    : (fixture.resources?.providerSources ?? []);
-  const runtime = parseRuntime(searchParams);
-  const matching = sources.filter((source) => source.runtime === runtime);
+  const providersQ = useProviders(teamId, live);
+  const machinesQ = useMachines(teamId, live);
   const mutations = useApiMutations(teamId);
   const [createOpen, setCreateOpen] = useState(false);
   const [connectError, setConnectError] = useState<string | null>(null);
+
+  const sources = live
+    ? (sourcesQ.data?.sources ?? [])
+    : (fixture.resources?.providerSources ?? []);
+  const providers = live
+    ? (providersQ.data?.providers ?? [])
+    : (fixture.resources?.providers ?? []);
+  const machines = live ? mapMachines(machinesQ.data ?? []) : (fixture.resources?.machines ?? []);
 
   useEffect(() => {
     const oauth = searchParams.get('oauth');
@@ -151,11 +201,63 @@ export function ProvidersPage() {
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
-  const selectRuntime = (next: ModelSourceRuntime) => {
+  const setParams = (patch: Record<string, string | null>, replace = false) => {
     const params = new URLSearchParams(searchParams);
-    params.set('runtime', next);
-    setSearchParams(params);
+    for (const [key, value] of Object.entries(patch)) {
+      if (value === null) params.delete(key);
+      else params.set(key, value);
+    }
+    setSearchParams(params, { replace });
   };
+
+  const scopeParam = searchParams.get('scope');
+  const machine = machines.find((m) => m.id !== undefined && m.id === scopeParam);
+  const scope = machine?.id ?? TEAM_SCOPE;
+
+  const actionsFor = (record: ProviderRecord): ProviderEditActions =>
+    live
+      ? {
+          patch: (body) =>
+            mutations.patchProvider.mutateAsync({ id: record.id, body }).catch((error) => {
+              toastError(t('保存失败，请重试。'), error);
+              throw error;
+            }),
+          remove: () =>
+            mutations.deleteProvider.mutate(record.id, {
+              onError: (error) => toastError(t('移除失败，请重试。'), error),
+            }),
+        }
+      : {};
+
+  const toggleRuntime = (target: MachineRow) =>
+    live && target.id !== undefined
+      ? (runtime: MachineRuntime, next: boolean) => {
+          const current = (target.enabledRuntimes ?? []).filter(isMachineRuntime);
+          const enabledRuntimes = next
+            ? [...new Set([...current, runtime])]
+            : current.filter((r) => r !== runtime);
+          const id = target.id;
+          if (id === undefined) return;
+          mutations.patchMachine.mutate(
+            { id, body: { enabledRuntimes } },
+            { onError: (error) => toastError(t('保存失败，请重试。'), error) },
+          );
+        }
+      : undefined;
+
+  const entries =
+    machine === undefined
+      ? teamEntries(providers, deadModelIds(sources), actionsFor, t)
+      : machineEntries(
+          machine,
+          sourceFor(machine, sources),
+          providers.length,
+          toggleRuntime(machine),
+          () => setParams({ scope: null, item: null }),
+          t,
+        );
+  const itemParam = searchParams.get('item');
+  const selected = entries.find((e) => e.item.id === itemParam) ?? entries[0];
 
   return (
     <PageShell
@@ -178,75 +280,37 @@ export function ProvidersPage() {
       }
       fixture={fixture}
     >
-      <SegmentedTabs
-        label={t('模型服务')}
-        value={runtime}
-        onChange={selectRuntime}
-        options={MODEL_SOURCE_RUNTIMES.map((rt) => {
-          const Mark = RUNTIME_MARKS[rt];
-          return {
-            value: rt,
-            label: RUNTIME_LABELS[rt],
-            icon: <Mark className="block flex-none" />,
-            data: { 'data-runtime': rt },
-          };
-        })}
-      />
-      {matching.map((source, si) => (
-        <div key={`${source.hostname}:${si}`}>
-          <RuntimeHead source={source} />
-          {source.models.length > 0 ? (
-            <ResourceList className="mt-3">
-              {source.models.map((model, i) => (
-                <ResourceRow
-                  key={`${model.id}:${i}`}
-                  className={cn(model.liveness === 'dead' && 'opacity-50')}
-                  data-runtime={source.runtime}
-                  data-model-id={model.id}
-                  data-liveness={model.liveness ?? 'unknown'}
-                >
-                  <RowText>
-                    <RowTitle>{model.name}</RowTitle>
-                    <RowDesc>{model.id}</RowDesc>
-                  </RowText>
-                  {(model.slot != null || model.liveness === 'dead') && (
-                    <span className="flex items-center gap-3">
-                      {model.liveness === 'dead' && <RowMeta>{t('已下架')}</RowMeta>}
-                      {model.slot != null && <RowMeta className="font-mono">{model.slot}</RowMeta>}
-                    </span>
-                  )}
-                </ResourceRow>
-              ))}
-            </ResourceList>
-          ) : source.runtime === 'pi' ? (
+      <div className="mx-auto flex w-full max-w-240 flex-col gap-3 pt-2 pb-16">
+        <div className="overflow-x-auto pb-1">
+          <SegmentedTabs
+            label={t('范围')}
+            value={scope}
+            onChange={(next) => setParams({ scope: next === TEAM_SCOPE ? null : next, item: null })}
+            options={[
+              { value: TEAM_SCOPE, label: t('团队') },
+              ...machines.flatMap((m) =>
+                m.id === undefined ? [] : [{ value: m.id, label: scopeLabel(m, t) }],
+              ),
+            ]}
+          />
+        </div>
+        <ProviderPanel
+          items={entries.map((e) => e.item)}
+          selectedId={selected?.item.id ?? null}
+          onSelect={(id) => setParams({ item: id })}
+          onAdd={machine === undefined ? () => setCreateOpen(true) : undefined}
+          empty={
             <EmptyState
-              testId="runtime-empty"
-              className="mt-3"
+              testId="providers-empty"
               icon={Cpu}
               title={t('尚未添加服务商。')}
-              description={t('添加后，服务商的模型会出现在这里。')}
-              action={{ label: t('添加模型服务'), onClick: () => setCreateOpen(true) }}
+              description={t('添加 API key、订阅或自定义端点后，它们的模型会出现在这里。')}
             />
-          ) : (
-            source.installed && (
-              <EmptyState
-                testId="runtime-empty"
-                className="mt-3"
-                icon={Cpu}
-                title={t('settings.json 未配置模型槽。')}
-              />
-            )
-          )}
-        </div>
-      ))}
-      {matching.length === 0 && (
-        <EmptyState
-          testId="runtime-empty"
-          className="mt-6"
-          icon={Cpu}
-          title={t('尚无执行机上报模型信息。')}
-        />
-      )}
+          }
+        >
+          {selected?.editor}
+        </ProviderPanel>
+      </div>
       <CreateProviderDialog
         open={createOpen}
         onClose={() => {

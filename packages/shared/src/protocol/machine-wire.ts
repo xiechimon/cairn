@@ -18,6 +18,11 @@ import {
   machineToolRelayResponseSchema,
   remoteToolDefSchema,
 } from './chief-tools.js';
+import {
+  computerCallSchema,
+  machineComputerFramesBodySchema,
+  machineComputerFramesResponseSchema,
+} from './computer.js';
 import { machineJsonSchema } from './executor.js';
 
 export const MACHINE_AUTH_HEADER = 'authorization';
@@ -172,6 +177,7 @@ export const claimedStepSchema = z.object({
     .object({
       id: recordId,
       name: z.string(),
+      instructions: z.string().optional(),
       repo: z
         .object({
           kind: z.enum(PROJECT_REPO_KINDS),
@@ -244,6 +250,7 @@ export const machineStreamEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('steer'), stepId: recordId }),
   z.object({ type: z.literal('stop'), stepId: recordId }),
   z.object({ type: z.literal('sync'), sync: machineSyncCommandSchema }),
+  z.object({ type: z.literal('computer'), call: computerCallSchema }),
 ]);
 export type MachineStreamEvent = z.infer<typeof machineStreamEventSchema>;
 
@@ -570,6 +577,12 @@ export const MACHINE_WIRE = [
     path: '/api/machine/upload-urls/{stepId}',
     request: machineUploadUrlsBodySchema,
     response: machineUploadUrlsResponseSchema,
+  },
+  {
+    method: 'POST',
+    path: '/api/machine/computer/{callId}',
+    request: machineComputerFramesBodySchema,
+    response: machineComputerFramesResponseSchema,
   },
   {
     method: 'POST',

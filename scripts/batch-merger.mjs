@@ -73,7 +73,6 @@ function eligibility(number, expectedHead) {
   if (pr.head.repo?.full_name !== repo) reasons.push('head-repo-mismatch');
   if (!/^[a-f0-9]{40}$/.test(pr.head.sha) || pr.head.sha !== expectedHead)
     reasons.push('head-changed-or-invalid');
-  if (!pr.labels.some((label) => label.name === 'review-gate')) reasons.push('no-review-label');
   if (pr.draft) reasons.push('draft');
   if (pr.base.ref !== 'main') reasons.push('base-not-main');
   for (const label of ['needs-decision', 'cairn-recovery'])
@@ -101,20 +100,15 @@ function eligibility(number, expectedHead) {
     if (latest?.status !== 'completed' || !['success', 'skipped'].includes(latest.conclusion))
       reasons.push(`check:${name}`);
   }
-  const verdict = pages(`repos/${repo}/issues/${number}/comments?per_page=100`)
-    .flat()
+  const review = runs
     .filter(
-      (comment) =>
-        comment.user?.login === 'cairnwright[bot]' &&
-        comment.body.includes(`<!-- review-gate:${pr.head.sha} -->`),
+      (run) =>
+        run.name === 'review-gate' &&
+        run.head_sha === pr.head.sha &&
+        run.app?.slug === 'github-actions',
     )
     .sort((a, b) => b.id - a.id)[0];
-  if (
-    !verdict ||
-    !new RegExp(
-      `^<!-- review-gate:${pr.head.sha} -->\\n\\*\\*Independent review gate: PASS\\*\\*(?: \\(carried over\\))? for `,
-    ).test(verdict.body)
-  )
+  if (review?.status !== 'completed' || review.conclusion !== 'success')
     reasons.push('review-not-pass');
   if (markers().length) reasons.push('autonomy-paused');
   return { pr, reasons };
