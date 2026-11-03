@@ -14,7 +14,7 @@ import { openClaudeSubscription } from './claude-subscriptions.js';
 import { routedChiefAgent } from './coordinator-route.js';
 import { agentForStep } from './dispatch-eligibility.js';
 import { openProviderKey, type ProviderDeps } from './providers.js';
-import { applyRoute, routeForStep } from './routing-rules.js';
+import { applyRoute, routeForStep, ruleAgent } from './routing-rules.js';
 import { openSecretValues, type SecretDeps } from './secrets.js';
 
 export interface CredentialsDeps {
@@ -81,9 +81,9 @@ export function resolveStepCredentials(
   const assignedAgent = agentId
     ? deps.db.select().from(agent).where(eq(agent.id, agentId)).get()
     : undefined;
-  const agentRow = assignedAgent
-    ? applyRoute(assignedAgent, routeForStep(deps.db, todoRow, stepRow.kind))
-    : null;
+  const route = routeForStep(deps.db, todoRow, stepRow.kind);
+  const base = assignedAgent ?? (route === null ? null : ruleAgent(route));
+  const agentRow = base === null ? null : applyRoute(base, route);
 
   const boxDeps: ProviderDeps & SecretDeps = deps;
   let provider: StepCredentialBundle['provider'] = null;

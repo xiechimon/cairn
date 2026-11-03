@@ -47,6 +47,7 @@ import {
   REVIEW_ANNOUNCEMENT,
   REVIEW_FANOUT_ROLES,
   REVIEW_VERDICT_KIND,
+  type RouteOverride,
   reconcileVerifyVerdict,
   STOP_MESSAGE,
   type TodoOutputKind,
@@ -142,6 +143,7 @@ import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
 import type { VapidKeys } from './push.js';
 import { publishStepRow, toQuotaWait } from './quota-wait.js';
 import { retryLessonsOf } from './retry-lessons.js';
+import { routeForStep } from './routing-rules.js';
 import { finishScheduledStep } from './schedules.js';
 import {
   appendShipGateInstruction,
@@ -445,6 +447,8 @@ export async function sendBuildSteer(
           continuationOptions.afterTurn && previousWork?.kind === 'plan' ? 'plan' : 'build',
           todoRow.teamId,
           body.content,
+          false,
+          human && !continuationOptions.schedule,
         );
         if (continuationOptions.schedule) {
           const wake = continuationOptions.schedule;
@@ -857,6 +861,7 @@ export function enqueueStep(
   teamId: string,
   prompt?: string,
   freshSession?: boolean,
+  byPerson?: boolean,
 ): StepRecord {
   const id = newRecordId();
   const createdAt = nowMs();
@@ -870,6 +875,7 @@ export function enqueueStep(
       status: 'pending',
       prompt: prompt ?? null,
       freshSession: freshSession === true,
+      byPerson: byPerson === true,
       createdAt,
     })
     .run();
@@ -945,6 +951,7 @@ export function startBuilds(
     todoIds: string[];
     assignment: Assignment;
     withPlan: boolean;
+    routeOverride?: RouteOverride;
     triggerSource?: TriggerSource;
     scheduledBy?: string;
     prompt?: string;
@@ -961,6 +968,17 @@ export function startBuilds(
       throw new NotFoundError(`project ${input.projectId}`);
     }
     requireIntakeAssignment(deps, todoRecord.teamId, input.assignment);
+    const overrideMachine = input.routeOverride?.machineId;
+    if (
+      overrideMachine !== undefined &&
+      deps.db
+        .select({ id: machine.id })
+        .from(machine)
+        .where(and(eq(machine.id, overrideMachine), eq(machine.teamId, todoRecord.teamId)))
+        .get() === undefined
+    ) {
+      throw new NotFoundError(`machine ${overrideMachine}`);
+    }
     const previous =
       todoRecord.latestBuildId === null
         ? undefined
@@ -1011,6 +1029,7 @@ export function startBuilds(
     );
     setTodoPhase(deps, todoId, 'queued', {
       assignment: input.assignment,
+      routeOverride: input.routeOverride ?? null,
       latestBuildId: id,
       lastRunAt: createdAt,
     });
@@ -1099,7 +1118,8 @@ export function maybeEnqueueIndependentReview(
     .from(agent)
     .where(and(eq(agent.teamId, todoRow.teamId), eq(agent.persona, 'code_reviewer')))
     .get();
-  const agentId = slotted ?? personaReviewer?.id ?? null;
+  const agentId =
+    slotted ?? personaReviewer?.id ?? routeForStep(deps.db, todoRow, 'review')?.id ?? null;
   if (agentId === null) return;
   const reviewer = deps.db.select().from(agent).where(eq(agent.id, agentId)).get();
   const focus = reviewer?.persona != null ? personaByRole(reviewer.persona).reviewFocus : undefined;
@@ -1287,6 +1307,7 @@ export async function applyBuildStepAction(
     | { action: 'review'; agentId?: string; focus?: string }
     | { action: 'restart'; feedback: string; clientMessageId: string },
   actor?: string,
+  origin: 'person' | 'automatic' = 'person',
 ): Promise<void> {
   const row = deps.db.select().from(build).where(eq(build.id, buildId)).get();
   if (!row) throw new NotFoundError(`build ${buildId}`);
@@ -1349,6 +1370,7 @@ export async function applyBuildStepAction(
         todoRecord.teamId,
         withRetryLessons(restartPrompt, reuseKind, reuseLessons),
         true,
+        origin === 'person',
       );
       deps.db
         .update(build)
@@ -1418,6 +1440,8 @@ export async function applyBuildStepAction(
       firstKind,
       todoRecord.teamId,
       withRetryLessons(restartPrompt, firstKind, priorLessons),
+      false,
+      origin === 'person',
     );
     setTodoPhase(deps, todoRecord.id, 'queued', {
       assignment,
@@ -1435,6 +1459,16 @@ export async function applyBuildStepAction(
     return;
   }
   if (body.action === 'review') {
+    if (
+      body.agentId !== undefined &&
+      deps.db
+        .select({ id: agent.id })
+        .from(agent)
+        .where(and(eq(agent.id, body.agentId), eq(agent.teamId, todoRecord.teamId)))
+        .get() === undefined
+    ) {
+      throw new NotFoundError(`agent ${body.agentId}`);
+    }
     restoreFailedReview(deps, row);
     if (todoRecord.phase === 'failed') {
       const restored = getTodo(deps, row.todoId);
@@ -1543,7 +1577,7 @@ export async function applyBuildStepAction(
     todoRecord.phase === 'review'
       ? buildReviewRejectPrompt(body.feedback)
       : buildReplanPrompt(body.feedback);
-  enqueueStep(deps, buildId, 'plan', todoRecord.teamId, replanPrompt);
+  enqueueStep(deps, buildId, 'plan', todoRecord.teamId, replanPrompt, false, true);
 }
 
 function restoreFailedReview(deps: BuildDeps, row: BuildRow): void {

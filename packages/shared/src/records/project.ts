@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { BRIEF_MARKER_BEGIN, BRIEF_MARKER_END } from '../brief-file.js';
 import { epochMs, recordId } from './common.js';
 import { diffFileSchema } from './document-diff.js';
 import { mergePolicySchema } from './merge-gate.js';
@@ -57,6 +58,8 @@ export const projectRecordSchema = z.object({
   teamId: recordId,
   splitPolicy: splitPolicySchema.default('human'),
   description: z.string().optional(),
+  instructions: z.string().optional(),
+  maxConcurrent: z.number().int().optional(),
   repoKind: projectRepoKindSchema.optional(),
   repoName: z.string().optional(),
   githubRepo: z.string().optional(),
@@ -115,11 +118,23 @@ export const createProjectBodySchema = z.object({
 });
 export type CreateProjectBody = z.infer<typeof createProjectBodySchema>;
 
+export const PROJECT_INSTRUCTIONS_MAX = 16_000;
+export const PROJECT_MAX_CONCURRENT = 16;
+
 export const patchProjectBodySchema = z
   .object({
     name: z.string().optional(),
     splitPolicy: splitPolicySchema.optional(),
     description: z.string().nullish(),
+    instructions: z
+      .string()
+      .max(PROJECT_INSTRUCTIONS_MAX)
+      .refine(
+        (text) => !text.includes(BRIEF_MARKER_BEGIN) && !text.includes(BRIEF_MARKER_END),
+        'Must not contain the Cairn runtime markers',
+      )
+      .nullish(),
+    maxConcurrent: z.number().int().min(1).max(PROJECT_MAX_CONCURRENT).nullable().optional(),
     repoKind: projectRepoKindSchema.optional(),
     githubRepo: z.string().optional(),
     localPath: z.string().nullish(),

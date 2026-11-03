@@ -287,7 +287,11 @@ function taskMetaOpts(
 export function composeWorkerSystemPrompt(
   description: string | null | undefined,
   memories: readonly { title: string; content: string }[] | undefined,
-  opts?: { taskMeta?: { currentTitle: string; meta?: TaskMetaForm }; attachments?: boolean },
+  opts?: {
+    taskMeta?: { currentTitle: string; meta?: TaskMetaForm };
+    attachments?: boolean;
+    project?: { name: string; instructions?: string | undefined };
+  },
 ): string | undefined {
   const parts: string[] = [];
   if (opts?.attachments) {
@@ -296,6 +300,9 @@ export function composeWorkerSystemPrompt(
     );
   }
   if (description) parts.push(description);
+  if (opts?.project?.instructions) {
+    parts.push(`## 项目说明（${opts.project.name}）\n${opts.project.instructions}`);
+  }
   if (memories && memories.length > 0) {
     parts.push(`## 记忆\n${memories.map((m) => `- ${m.title}：${m.content}`).join('\n')}`);
   }
@@ -705,6 +712,7 @@ async function runClaimedStep(
       : composeWorkerSystemPrompt(agent.description, agent.memories, {
           ...taskMetaOpts(claimed.todo),
           attachments: true,
+          ...(claimed.project !== undefined ? { project: claimed.project } : {}),
         });
   const remoteTools = claimed.remoteTools;
   const claimedMcp = claimed.mcpServers;
@@ -842,7 +850,7 @@ async function runClaimedStep(
   delete stepEnv.CLAUDE_CODE_OAUTH_TOKEN;
   if (runtimeId === 'claude-code' && creds.claudeSubscriptionToken !== undefined) {
     stepEnv.CLAUDE_CODE_OAUTH_TOKEN = creds.claudeSubscriptionToken;
-    stepEnv.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB = '1';
+    if (opts.env?.CAIRN_ORB !== '1') stepEnv.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB = '1';
   }
   const sessionOpts: SessionOpts = {
     provider,

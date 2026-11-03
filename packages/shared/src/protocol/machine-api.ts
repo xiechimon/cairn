@@ -23,6 +23,7 @@ export const MACHINE_ENDPOINTS: readonly MachineEndpoint[] = [
     note: 'per-step 凭证下发（模型 key + 托管 repo git 凭证），不落盘常驻 [推断]（02 §5.4/§8）',
   },
   { path: '/api/machine/upload-urls/{stepId}', note: '预签名产物上传：transcript/产物（r3 §1.6）' },
+  { path: '/api/machine/computer/{callId}', note: 'Computer call frames from the daemon (D75)' },
   { path: '/api/machine/done/{stepId}', note: '步骤收尾' },
 ];
 

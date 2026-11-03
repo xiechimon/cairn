@@ -7,3 +7,6 @@ P5_ArchivedNeverClaimed__ClaimIgnoresArchive FAIL ArchiveCard,EnqueueAfterArchiv
 P6_ArchivedStopSettles PASS
 P6_ArchivedStopSettles__ApplyIgnoresArchive FAIL TryClaim,FinishSession,ArchiveCard,FinishStepOwnedCheck
 P7_ArchiveFlagMatchesStep PASS
+P8_OrbOnlyOnOrb PASS
+P8_OrbOnlyOnOrb__ClaimIgnoresExecutor FAIL TryClaim
+P8_OrbOnlyOnOrb__OverrideDropsOrb FAIL TryClaim

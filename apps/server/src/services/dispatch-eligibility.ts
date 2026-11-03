@@ -14,7 +14,7 @@ import {
 import { and, eq, like, ne, not } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { agent, build, chief, chiefThread, step, todo } from '../db/schema.js';
-import { applyRoute, routeForStep } from './routing-rules.js';
+import { applyRoute, routeForStep, ruleAgent } from './routing-rules.js';
 
 export function stepRuntimeFor(
   agentProvider: string | null | undefined,
@@ -101,10 +101,12 @@ export function agentForStep(
   prompt: string | null = null,
 ): typeof agent.$inferSelect | null {
   const agentId = agentIdForStep(todoRow, kind, prompt);
-  if (agentId === null) return null;
-  const agentRow = db.select().from(agent).where(eq(agent.id, agentId)).get();
-  if (agentRow === undefined) return null;
-  return applyRoute(agentRow, routeForStep(db, todoRow, kind));
+  const route = routeForStep(db, todoRow, kind);
+  const agentRow =
+    agentId === null ? undefined : db.select().from(agent).where(eq(agent.id, agentId)).get();
+  const base = agentRow ?? (route === null ? null : ruleAgent(route));
+  if (base === null) return null;
+  return applyRoute(base, route, todoRow.routeOverride);
 }
 
 function planSlotFor(
@@ -157,6 +159,16 @@ export function machineRunningCount(db: Db, machineId: string): number {
     .select({ id: step.id })
     .from(step)
     .where(and(eq(step.machineId, machineId), eq(step.status, 'claimed')))
+    .all().length;
+}
+
+export function projectRunningCount(db: Pick<Db, 'select'>, projectId: string): number {
+  return db
+    .select({ id: step.id })
+    .from(step)
+    .innerJoin(build, eq(step.buildId, build.id))
+    .innerJoin(todo, eq(build.todoId, todo.id))
+    .where(and(eq(step.status, 'claimed'), ne(step.kind, 'chief'), eq(todo.projectId, projectId)))
     .all().length;
 }
 
@@ -249,7 +261,10 @@ export function machineEligibility(input: EligibilityInput): MachineIneligibilit
   const { machine: machineRow, agent: agentRow, model } = input;
   const runtime = stepRuntimeFor(model.provider);
   if (!machineRow.enabledRuntimes.includes(runtime)) return { kind: 'runtime' };
-  const modelReject = homeMachineRejectReason(machineRow, model, input.catalog);
+  const modelReject =
+    agentRow.machineId === machineRow.id
+      ? null
+      : homeMachineRejectReason(machineRow, model, input.catalog);
   if (modelReject !== null) return { kind: 'model', reason: modelReject };
   const missing = capabilityMissingLabels(
     missingCapabilityItems(machineRow, agentRow.requiredCapabilities),

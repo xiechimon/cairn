@@ -20,21 +20,22 @@ async function expectBodyOverflows(dialog: Locator) {
   expect(size.scroll).toBeGreaterThan(size.client);
 }
 
-test('provider: 3 model rows overflow the body, submit pinned to the bottom and does not move on scroll', async ({ page }) => {
+test('provider: 3 model chips overflow the body, submit pinned to the bottom and does not move on scroll', async ({ page }) => {
   await page.goto('/app/resources/providers?scenario=01');
   await page.getByRole('button', { name: '新建', exact: true }).click();
-  const dialog = page.getByRole('dialog');
+  const dialog = page.getByRole('dialog', { name: '添加模型服务' });
   await expect(dialog).toBeVisible();
 
   await expectBodyOverflows(dialog);
   await expectShellCapped(dialog);
 
   await dialog.getByRole('button', { name: '自定义端点' }).click();
-  const addModel = dialog.getByRole('button', { name: '添加模型', exact: true });
-  await addModel.click();
-  await addModel.click();
-  await addModel.click();
-  await expect(dialog.locator('[aria-label="模型 ID"]')).toHaveCount(3);
+  for (const id of ['relay-a', 'relay-b', 'relay-c']) {
+    await dialog.getByRole('button', { name: '添加模型', exact: true }).click();
+    await page.getByLabel('搜索模型或输入 ID').fill(id);
+    await page.keyboard.press('Enter');
+  }
+  await expect(dialog.locator('[data-model-chip]')).toHaveCount(3);
   await expectBodyOverflows(dialog);
   await expectShellCapped(dialog);
   const submit = dialog.getByRole('button', { name: '添加模型服务' });

@@ -58,7 +58,10 @@ export function listMemoryEntries(
     .all();
 }
 
-export function injectMemories(db: Db, scope: { agentId: string; projectId?: string }) {
+export function injectMemories(
+  db: Db,
+  scope: { agentId: string; projectId?: string | null; projectOnly?: boolean },
+) {
   return db.transaction((tx) => {
     const rows = tx
       .select({ id: agentMemory.id, title: agentMemory.title, content: agentMemory.content })
@@ -69,7 +72,11 @@ export function injectMemories(db: Db, scope: { agentId: string; projectId?: str
           stillValid,
           scope.projectId === undefined
             ? undefined
-            : or(eq(agentMemory.projectId, scope.projectId), isNull(agentMemory.projectId)),
+            : scope.projectId === null
+              ? isNull(agentMemory.projectId)
+              : scope.projectOnly === true
+                ? eq(agentMemory.projectId, scope.projectId)
+                : or(eq(agentMemory.projectId, scope.projectId), isNull(agentMemory.projectId)),
         ),
       )
       .orderBy(asc(agentMemory.createdAt), asc(agentMemory.id))
@@ -240,6 +247,23 @@ export function updateMemoryEntry(
       .run();
     return successor;
   });
+}
+
+export function promoteMemoryEntry(
+  db: Db,
+  input: { memoryId: string; agentId: string; teamId: string },
+): typeof agentMemory.$inferSelect | null {
+  const where = and(
+    eq(agentMemory.id, input.memoryId),
+    eq(agentMemory.agentId, input.agentId),
+    eq(agentMemory.teamId, input.teamId),
+  );
+  const row = db.select().from(agentMemory).where(where).get();
+  if (row === undefined) return null;
+  if (row.projectId === null) return row;
+  const updatedAt = nowMs();
+  db.update(agentMemory).set({ projectId: null, updatedAt }).where(where).run();
+  return { ...row, projectId: null, updatedAt };
 }
 
 export function deleteMemoryEntry(

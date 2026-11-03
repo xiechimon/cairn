@@ -12,7 +12,11 @@ export function runtimeDirectory({
   io = fs,
   run = spawnSync,
 }) {
-  if (!/^cairn-orb-[a-zA-Z0-9][a-zA-Z0-9-]*$/.test(name) || name === 'cairn-orb-base')
+  if (
+    !/^cairn-orb-[a-zA-Z0-9][a-zA-Z0-9-]*$/.test(name) ||
+    name === 'cairn-orb-base' ||
+    name === 'cairn-orb-computer'
+  )
     throw new Error('Invalid machine name');
   if (![uid, gid].every((id) => Number.isInteger(id) && id > 0 && id < 65534))
     throw new Error('Invalid runtime owner');

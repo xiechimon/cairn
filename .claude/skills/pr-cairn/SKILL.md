@@ -101,7 +101,7 @@ so the images remain reachable. Images belong outside code fences.
 
 ## Review
 
-Do not run a local `codex exec` or `claude -p` review before pushing. Codex cloud code review (`chatgpt-codex-connector[bot]`) reviews every push through the review gate. Fix confirmed findings and record skipped ones with reasons under Review.
+Do not run a local `codex exec` or `claude -p` review before pushing. Codex cloud code review (`chatgpt-codex-connector[bot]`) reviews every push through the review gate. Never write `@codex` in a PR body: Codex reads it as a task request, answers that the repository has no environment, and skips the automatic review. Fix confirmed findings and record skipped ones with reasons under Review.
 
 ## Mechanics
 
@@ -139,7 +139,7 @@ Do not run a local `codex exec` or `claude -p` review before pushing. Codex clou
 - Before an agent enables merge, require passing CI checks and a pr-gate verdict of go with `mergedBy: 'auto-merge'` (`AGENTS.md`, "Merge routes"; protected-path PRs and every other route go to ian), with no unchecked tasks anywhere in the body. ian may admin-merge; agents may not use that authority.
 - Read the PR opener and every commit author: `gh pr view <n> --json author,commits`. Follow `docs/ops/agent-bot-identity.md` for the identity checks.
 - Bot-opened PRs require exactly one commit authored by `Cairnwright` (`merge-pr.sh` also accepts `cairnwright[bot]` with `Cairn-Thread:` and `Co-authored-by: xiechimon` trailers; see `docs/pr-review.md`, "Merge method by commit author") before a rebase merge. Use the dispatcher's `~/.cairn/tools/merge-pr.sh`; inspect its source and usage on the dispatch host before invoking it. If the helper is unavailable or the commit identity is wrong, stop and return the PR to the dispatcher.
-- PRs that `.mergify.yml` admits (not protected, not owner-routed, a `review-gate` success status and a green `merge-route` check) enter the Mergify merge queue automatically: add the `review-gate` label, then never `gh pr merge` them; the required `Mergify Merge Queue` check refuses a direct merge while a PR is queued. That check and `Mergify Merge Protections` list any unmet condition; a new push dequeues the PR and it re-enters once CI passes again. Protected and owner-routed PRs keep the human route.
+- PRs that `.mergify.yml` admits (not protected, not owner-routed, a green `review-gate` check from GitHub Actions and a green `merge-route` check) enter the Mergify merge queue automatically: never `gh pr merge` them; the required `Mergify Merge Queue` check refuses a direct merge while a PR is queued. That check and `Mergify Merge Protections` list any unmet condition; a new push dequeues the PR and it re-enters once CI passes again. Protected and owner-routed PRs keep the human route.
 - Human-opened PRs that Mergify does not admit use `gh pr merge <n> --squash --auto` after verifying their commits contain no `cairnwright[bot]` author, on the route `AGENTS.md` gives them. After a merge, read the main commit author and the `commit-author` Actions result.
 - Prepare commits outside the App token wrapper, following `docs/ops/agent-bot-identity.md`. Verify that neither the author name nor email of any prepared commit contains `cairnwright[bot]` before pushing.
 - If main's author check fails, follow the recovery procedure in `docs/ops/agent-bot-identity.md`. Preserve main history. A subsequent compliant push checks its own `BEFORE_SHA..HEAD` range; verify the actual main commit author and Actions result after merging.

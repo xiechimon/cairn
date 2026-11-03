@@ -1,5 +1,6 @@
 export * from './chief-tools.js';
 export * from './client-state.js';
+export * from './computer.js';
 export * from './executor.js';
 export * from './feishu.js';
 export * from './fs-list.js';

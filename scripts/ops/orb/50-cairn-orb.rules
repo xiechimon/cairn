@@ -3,6 +3,12 @@ polkit.addRule(function(action, subject) {
     function orb(name) {
         return typeof name === 'string' && /^cairn-orb-[a-zA-Z0-9][a-zA-Z0-9-]*$/.test(name);
     }
+    function template(name) {
+        return name === 'cairn-orb-base' || name === 'cairn-orb-computer';
+    }
+    function computer(name) {
+        return typeof name === 'string' && /^cairn-orb-computer-[a-zA-Z0-9][a-zA-Z0-9-]*$/.test(name);
+    }
     if (action.id === 'org.freedesktop.machine1.manage-images') {
         var image = action.lookup('image');
         var verb = action.lookup('verb');
@@ -10,13 +16,15 @@ polkit.addRule(function(action, subject) {
         if (!orb(image)) return polkit.Result.NOT_HANDLED;
         if (verb === 'clone') {
             var destination = action.lookup('new_name');
-            return orb(destination) && destination !== 'cairn-orb-base' ? polkit.Result.YES : polkit.Result.NO;
+            if (!orb(destination) || template(destination)) return polkit.Result.NO;
+            if (computer(destination) !== (image === 'cairn-orb-computer')) return polkit.Result.NO;
+            return polkit.Result.YES;
         }
-        return verb === 'remove' && image !== 'cairn-orb-base' ? polkit.Result.YES : polkit.Result.NO;
+        return verb === 'remove' && !template(image) ? polkit.Result.YES : polkit.Result.NO;
     }
     if (action.id.indexOf('org.freedesktop.machine1.') === 0) {
         var machine = action.lookup('machine');
-        if (typeof machine !== 'string' || machine === 'cairn-orb-base') return polkit.Result.NO;
+        if (typeof machine !== 'string' || template(machine)) return polkit.Result.NO;
         if (!orb(machine)) return polkit.Result.NOT_HANDLED;
         if (action.id === 'org.freedesktop.machine1.manage-machines') {
             var operation = action.lookup('verb');
@@ -29,8 +37,8 @@ polkit.addRule(function(action, subject) {
         var unitOperation = action.lookup('verb');
         if (typeof unit !== 'string') return polkit.Result.NO;
         if (unit.indexOf('systemd-nspawn@cairn-orb-') !== 0) return polkit.Result.NOT_HANDLED;
-        return typeof unit === 'string' && /^systemd-nspawn@cairn-orb-[a-zA-Z0-9][a-zA-Z0-9-]*\.service$/.test(unit) &&
-            unit !== 'systemd-nspawn@cairn-orb-base.service' &&
+        return /^systemd-nspawn@cairn-orb-[a-zA-Z0-9][a-zA-Z0-9-]*\.service$/.test(unit) &&
+            !template(unit.slice('systemd-nspawn@'.length, -'.service'.length)) &&
             unitOperation === 'start' ? polkit.Result.YES : polkit.Result.NO;
     }
     return polkit.Result.NOT_HANDLED;

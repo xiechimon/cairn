@@ -9,6 +9,8 @@ import {
   type MachineCapabilities,
   type MachineClaimBody,
   type MachineClosedOrbsBody,
+  type MachineComputerFramesBody,
+  type MachineComputerFramesResponse,
   type MachineDoneBody,
   type MachineEnrollResponse,
   type MachineHeartbeatBody,
@@ -24,6 +26,7 @@ import {
   machineAttachmentResponseSchema,
   machineClaimResponseSchema,
   machineClosedOrbsResponseSchema,
+  machineComputerFramesResponseSchema,
   machineEnrollPollResponseSchema,
   machineEnrollResponseSchema,
   machineEnrollStartResponseSchema,
@@ -59,6 +62,16 @@ export class MachineApiError extends Error {
 export function isTransientUploadError(err: unknown): boolean {
   if (err instanceof MachineApiError) return err.status === 404 || err.status >= 500;
   return true;
+}
+
+const KNOWN_STREAM_EVENT_TYPES: ReadonlySet<string> = new Set(
+  machineStreamEventSchema.options.map((option) => option.shape.type.value),
+);
+
+function hasKnownStreamEventType(raw: unknown): boolean {
+  if (raw === null || typeof raw !== 'object') return false;
+  const type = (raw as { type?: unknown }).type;
+  return typeof type === 'string' && KNOWN_STREAM_EVENT_TYPES.has(type);
 }
 
 export interface MachineClientOpts {
@@ -131,6 +144,10 @@ export interface MachineApi {
   steerAck?(stepId: string): Promise<void>;
   stop(stepId: string): Promise<boolean | null>;
   syncResult(syncId: string, body: MachineSyncResultBody): Promise<void>;
+  computerFrames?(
+    callId: string,
+    body: MachineComputerFramesBody,
+  ): Promise<MachineComputerFramesResponse>;
   stream(
     signal: AbortSignal,
     onEvent: (ev: MachineStreamEvent) => void,
@@ -545,6 +562,16 @@ export class MachineClient implements MachineApi {
     });
   }
 
+  async computerFrames(
+    callId: string,
+    body: MachineComputerFramesBody,
+  ): Promise<MachineComputerFramesResponse> {
+    return this.request('POST', `/api/machine/computer/${callId}`, {
+      body,
+      parse: (raw) => machineComputerFramesResponseSchema.parse(raw),
+    });
+  }
+
   async stream(
     signal: AbortSignal,
     onEvent: (ev: MachineStreamEvent) => void,
@@ -574,7 +601,10 @@ export class MachineClient implements MachineApi {
           buf = buf.slice(idx + 2);
           for (const line of frame.split('\n')) {
             if (!line.startsWith('data:')) continue;
-            onEvent(machineStreamEventSchema.parse(JSON.parse(line.slice(5).trim())));
+            const raw: unknown = JSON.parse(line.slice(5).trim());
+            const parsed = machineStreamEventSchema.safeParse(raw);
+            if (parsed.success) onEvent(parsed.data);
+            else if (hasKnownStreamEventType(raw)) throw parsed.error;
           }
           idx = buf.indexOf('\n\n');
         }

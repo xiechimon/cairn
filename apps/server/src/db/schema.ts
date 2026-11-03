@@ -10,6 +10,11 @@ import type {
   ClaudeCodeReport,
   ClaudeRateLimitWindow,
   ClaudeUsage,
+  ComputerCallState,
+  ComputerControlHolder,
+  ComputerImage,
+  ComputerState,
+  ComputerTool,
   DocumentDiffFile,
   MachineCapabilities,
   MemoryCandidateStatus,
@@ -26,6 +31,7 @@ import type {
   ProviderCompat,
   ProviderModel,
   RequiredCapabilities,
+  RouteOverride,
   RouteUse,
   ScheduleKind,
   ScheduleReport,
@@ -83,6 +89,8 @@ export const project = sqliteTable('project', {
     .references(() => team.id),
   splitPolicy: text('splitPolicy').$type<SplitPolicy>().notNull().default('human'),
   description: text('description'),
+  instructions: text('instructions'),
+  maxConcurrent: integer('maxConcurrent'),
   repoKind: text('repoKind').$type<ProjectRepoKind>(),
   repoName: text('repoName'),
   githubRepo: text('githubRepo'),
@@ -116,6 +124,7 @@ export const todo = sqliteTable(
     seqNum: integer('seqNum').notNull(),
     orderIndex: real('orderIndex').notNull().default(0),
     assignment: json<Assignment | null>('assignment'),
+    routeOverride: json<RouteOverride | null>('routeOverride'),
     latestBuildId: text('latestBuildId'),
     lastRunAt: epochMs('lastRunAt'),
     hasChanges: bool('hasChanges').notNull().default(false),
@@ -223,6 +232,8 @@ export const step = sqliteTable(
     lastHeartbeatAt: epochMs('lastHeartbeatAt'),
     finishedAt: epochMs('finishedAt'),
     prompt: text('prompt'),
+    scopeProjectId: text('scopeProjectId'),
+    byPerson: bool('byPerson').notNull().default(false),
     freshSession: bool('freshSession').notNull().default(false),
     skillInjection: json<SkillInjectionRecord>('skillInjection'),
     blockerHandoff: json<BlockerHandoffRecord>('blockerHandoff'),
@@ -291,6 +302,73 @@ export const branchSync = sqliteTable('branch_sync', {
   startedAt: epochMs('startedAt'),
   finishedAt: epochMs('finishedAt'),
 });
+
+export const computer = sqliteTable(
+  'computer',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id),
+    scope: text('scope').$type<'private'>().notNull().default('private'),
+    scopeKey: text('scopeKey').notNull(),
+    machineId: text('machineId')
+      .notNull()
+      .references(() => machine.id, { onDelete: 'cascade' }),
+    kind: text('kind').$type<'orb'>().notNull().default('orb'),
+    providerRef: text('providerRef').notNull(),
+    state: text('state').$type<ComputerState>().notNull().default('stopped'),
+    runningSince: epochMs('runningSince'),
+    executionStepId: text('executionStepId'),
+    executionLeaseExpiresAt: epochMs('executionLeaseExpiresAt'),
+    executionFence: integer('executionFence').notNull().default(0),
+    controlHolder: text('controlHolder').$type<ComputerControlHolder>().notNull().default('none'),
+    controlLeaseId: text('controlLeaseId'),
+    controlLeaseExpiresAt: epochMs('controlLeaseExpiresAt'),
+    controlFence: integer('controlFence').notNull().default(0),
+    screenGeneration: integer('screenGeneration').notNull().default(0),
+    createdAt: epochMs('createdAt').notNull(),
+    updatedAt: epochMs('updatedAt').notNull(),
+  },
+  (t) => [uniqueIndex('computer_scope_key_idx').on(t.scopeKey)],
+);
+
+export const computerCall = sqliteTable(
+  'computer_call',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id),
+    stepId: text('stepId').notNull(),
+    toolCallId: text('toolCallId').notNull(),
+    machineId: text('machineId')
+      .notNull()
+      .references(() => machine.id, { onDelete: 'cascade' }),
+    computerId: text('computerId').references(() => computer.id, { onDelete: 'set null' }),
+    tool: text('tool').$type<ComputerTool>().notNull(),
+    replaySafe: bool('replaySafe').notNull(),
+    params: json<Record<string, unknown>>('params').notNull(),
+    state: text('state').$type<ComputerCallState>().notNull().default('dispatched'),
+    lastSeq: integer('lastSeq').notNull().default(0),
+    outputHead: text('outputHead').notNull().default(''),
+    outputTail: text('outputTail').notNull().default(''),
+    outputChars: integer('outputChars').notNull().default(0),
+    resultText: text('resultText'),
+    resultImages: json<ComputerImage[] | null>('resultImages'),
+    exitCode: integer('exitCode'),
+    errorMessage: text('errorMessage'),
+    errorDelivery: text('errorDelivery').$type<'not_delivered' | 'unknown'>(),
+    deadlineAt: epochMs('deadlineAt').notNull(),
+    createdAt: epochMs('createdAt').notNull(),
+    startedAt: epochMs('startedAt'),
+    finishedAt: epochMs('finishedAt'),
+  },
+  (t) => [
+    index('computer_call_step_idx').on(t.stepId),
+    index('computer_call_machine_state_idx').on(t.machineId, t.state),
+  ],
+);
 
 export const queuedMessage = sqliteTable(
   'queued_message',
@@ -429,6 +507,12 @@ export const routingRule = sqliteTable(
     fallbackModels: json<ModelRef[] | null>('fallbackModels'),
     machineId: text('machineId').references(() => machine.id),
     requiredCapabilities: json<RequiredCapabilities | null>('requiredCapabilities'),
+    tools: json<string[] | null>('tools'),
+    mcpServers: json<string[] | null>('mcpServers'),
+    skillsAllowlist: json<string[] | null>('skillsAllowlist'),
+    defaultSkill: text('defaultSkill'),
+    secrets: json<string[] | null>('secrets'),
+    adoptedAgentIds: json<string[] | null>('adoptedAgentIds'),
     seededFromAgentId: text('seededFromAgentId'),
     createdAt: epochMs('createdAt').notNull(),
     updatedAt: epochMs('updatedAt').notNull(),

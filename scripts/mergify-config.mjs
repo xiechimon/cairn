@@ -16,7 +16,7 @@ const batchWait = '3 min';
 const checkRetries = 1;
 const scopes = {
   web: ['apps/web/**/*'],
-  backend: ['apps/server/**/*', 'apps/daemon/**/*', 'integration/**/*'],
+  backend: ['apps/server/**/*', 'apps/daemon/**/*', 'apps/coordinator/**/*', 'integration/**/*'],
 };
 const barrierFiles = ['packages/**/*'];
 
@@ -64,7 +64,7 @@ export function mergifyConfig(prGateSource, gatePaths) {
     `          - -head ~= ${batchHeadRe}`,
     `          - label = ${admitLabel}`,
     '      - check-success = commit-author',
-    '      - status-success = review-gate',
+    '      - check-success = @github-actions/review-gate',
     '      - check-success = merge-route',
     ...prChecks.map(passedOrSkipped),
     `      - ${quoted(`-files ~= ${protectedRe}`)}`,

@@ -4,7 +4,9 @@ EXTENDS Naturals, FiniteSets
 
 CONSTANTS Machines, NoMachine, ExecIds, InitialHome,
           MaxClaims, MaxPartitions, MaxCrashes, MaxRebinds,
-          MaxLateEnqueues, ClaimChecksArchive, ApplyChecksArchive
+          MaxLateEnqueues, ClaimChecksArchive, ApplyChecksArchive,
+          OrbMachines, RequiresOrb, ClaimChecksExecutor,
+          OverrideRequestsDrop, MergeKeepsRule
 
 VARIABLES
   st, sm, fresh, progressed, probeDue,
@@ -94,13 +96,17 @@ Carrier(m)  == IF InFlight(m) = {} THEN None ELSE CHOOSE e \in InFlight(m) : TRU
 
 ClaimAllowed == ~(ClaimChecksArchive /\ archived)
 
+EffectiveRequiresOrb == RequiresOrb /\ (MergeKeepsRule \/ ~OverrideRequestsDrop)
+ExecutorOk(m) == ~(ClaimChecksExecutor /\ EffectiveRequiresOrb) \/ m \in OrbMachines
+Eligible == {m \in Machines : ExecutorOk(m)}
+
 SettledAs(o) == IF ApplyChecksArchive /\ archiveStop /= "none" THEN "stopped" ELSE o
 
 ----------------------------------------------------------------------------
 
 TryClaim(m) ==
   /\ dm[m] = "up" /\ connected[m]
-  /\ st = "pending" /\ home = m
+  /\ st = "pending" /\ m \in Eligible
   /\ ClaimAllowed
   /\ claims < MaxClaims
   /\ IF Carrier(m) /= None
@@ -121,7 +127,7 @@ TryClaim(m) ==
 
 TryClaimResponseLost(m) ==
   /\ dm[m] = "up" /\ connected[m]
-  /\ st = "pending" /\ home = m
+  /\ st = "pending" /\ m \in Eligible
   /\ ClaimAllowed
   /\ claims < MaxClaims
   /\ st' = "claimed" /\ sm' = m /\ fresh' = TRUE /\ progressed' = FALSE
@@ -457,6 +463,11 @@ ArchivedNeverClaimed ==
 
 ArchivedStopSettles ==
   [][(archived /\ st = "claimed") => st' \in {"claimed", "stopped"}]_vars
+
+OrbOnlyOnOrb ==
+  RequiresOrb =>
+    /\ (st = "claimed" => sm \in OrbMachines)
+    /\ \A e \in ExecIds : ex[e].stage \in Live \cup {"orphan"} => ex[e].mach \in OrbMachines
 
 ArchiveFlagMatchesStep ==
   /\ (archived /\ st = "claimed") => archiveStop /= "none"

@@ -1,7 +1,7 @@
 import type { BuildRecord, StepActivity, StepJournalRow, ToolCallRecord } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { activityLabel } from '../src/api/activity.js';
-import { mapChief, mapTranscript } from '../src/api/mappers.js';
+import { clockTime, mapChief, mapTranscript } from '../src/api/mappers.js';
 import type { TranscriptItem } from '../src/fixtures/records.js';
 import { NOW, todo } from './helpers.js';
 
@@ -313,6 +313,23 @@ describe('mapTranscript queue projection (#1108 Q1–Q5)', () => {
       kind: 'streaming',
       label: '排队中：等 {machine}（{running}/{cap} 在跑，前面 {ahead} 个）',
       labelVars: { machine: 'xmonsMac', running: 2, cap: 3, ahead: 1 },
+    });
+  });
+
+  test('D71: a step waiting on its preferred machine names when another machine may take it', () => {
+    const fallbackAt = Date.UTC(2026, 10, 3, 4, 10);
+    const items = render({
+      steps: [
+        queuedStep({
+          position: 1,
+          waitingFor: { machineId: 'm1', name: 'omarchy', running: 3, capacity: 3, fallbackAt },
+        }),
+      ],
+    });
+    expect(tail(items)).toMatchObject({
+      kind: 'streaming',
+      label: '排队中：等首选机器 {machine}（{running}/{cap} 在跑），{time} 起其他机器可接手（前面 {ahead} 个）',
+      labelVars: { machine: 'omarchy', running: 3, cap: 3, time: clockTime(fallbackAt), ahead: 0 },
     });
   });
 

@@ -37,6 +37,7 @@ import { effectiveModel } from './model-fallback.js';
 import { isClaudeModel, machineUsesClaudeSubscription } from './model-routing.js';
 import { notifyQuotaWait } from './notifications.js';
 import { publishStepRow } from './quota-wait.js';
+import { routeForStep } from './routing-rules.js';
 import { getTodo } from './todos.js';
 
 type StepRow = typeof step.$inferSelect;
@@ -138,10 +139,15 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
     const model = effectiveModel(agentRow, stepRow);
     const owner = agentRow.machineId ? byId.get(agentRow.machineId) : undefined;
     const ownerBlock = owner ? claudeRateBlock(owner.claudeRateLimits ?? [], now) : null;
+    const pinned =
+      todoRow === null ||
+      stepRow.kind === 'chief' ||
+      routeForStep(deps.db, todoRow, stepRow.kind) === null;
     const claimants = machines.filter(
       (row) =>
         row.online &&
-        (row.id === agentRow.machineId ||
+        (!pinned ||
+          row.id === agentRow.machineId ||
           (stepRuntimeFor(model.provider) === 'claude-code' && ownerBlock !== null)) &&
         runtimeGatePasses(row, model.provider) &&
         capabilityGatePasses(row, agentRow) &&

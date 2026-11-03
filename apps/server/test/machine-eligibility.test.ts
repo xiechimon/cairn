@@ -73,6 +73,17 @@ describe('D71 machineEligibility: hard constraints for a worker step on a machin
     expect(gap?.kind).toBe('model');
   });
 
+  test('the preferred machine keeps its bind-time model check and is not re-checked at claim', () => {
+    expect(
+      machineEligibility(
+        input({
+          machine: { id: 'omarchy', claudeCodeReport: null },
+          agent: { machineId: 'omarchy' },
+        }),
+      ),
+    ).toBeNull();
+  });
+
   test('a pi step needs no claude-code model report', () => {
     expect(
       machineEligibility(

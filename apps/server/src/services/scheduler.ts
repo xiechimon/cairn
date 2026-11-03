@@ -72,6 +72,7 @@ import {
 import { createScheduling, SCHEDULE_INTERVAL_MS, type SchedulingRun } from './scheduling/sweep.js';
 import { sweepSnoozeExpiry } from './snooze.js';
 import { insertMessageRow } from './transcript.js';
+import { sweepUnplaceableSteps } from './unplaceable-steps.js';
 
 export interface SchedulerOptions {
   tickMs: number;
@@ -495,6 +496,7 @@ export function createScheduler(
     sweepZombieQueuedTodos(deps, now);
     sweepPlanAutoConfirm(deps, now);
     sweepQuotaWaitSteps(deps, now);
+    sweepUnplaceableSteps(deps, now);
     void sweepFailedRetries(deps).catch(() => {});
     const digestTimes = opts.pushDigestTimes ?? [];
     if (digestTimes.length > 0 && !digestSweeping) {

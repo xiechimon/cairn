@@ -234,6 +234,9 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
         "id": {
           "type": "string",
         },
+        "instructions": {
+          "type": "string",
+        },
         "name": {
           "type": "string",
         },
@@ -625,6 +628,7 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
   "POST /api/machine/tool/{stepId}",
   "GET /api/machine/token/{stepId}",
   "POST /api/machine/upload-urls/{stepId}",
+  "POST /api/machine/computer/{callId}",
   "POST /api/machine/done/{stepId}",
 ]
 `;
@@ -885,6 +889,9 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
               "additionalProperties": false,
               "properties": {
                 "id": {
+                  "type": "string",
+                },
+                "instructions": {
                   "type": "string",
                 },
                 "name": {
@@ -2224,6 +2231,73 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
       "required": [
         "type",
         "sync",
+      ],
+      "type": "object",
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "call": {
+          "additionalProperties": false,
+          "properties": {
+            "callId": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string",
+            },
+            "deadlineAt": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
+            "params": {
+              "additionalProperties": {},
+              "propertyNames": {
+                "type": "string",
+              },
+              "type": "object",
+            },
+            "stepId": {
+              "type": "string",
+            },
+            "tool": {
+              "enum": [
+                "shell",
+                "list_files",
+                "read_file",
+                "write_file",
+                "attach_file",
+                "computer_observe",
+                "computer_act",
+                "open_path",
+                "launch_app",
+                "browser_navigate",
+                "browser_snapshot",
+                "browser_act",
+                "request_takeover",
+                "user_computer_shell",
+                "user_computer_observe",
+                "user_computer_act",
+              ],
+              "type": "string",
+            },
+          },
+          "required": [
+            "callId",
+            "stepId",
+            "tool",
+            "params",
+            "deadlineAt",
+          ],
+          "type": "object",
+        },
+        "type": {
+          "const": "computer",
+          "type": "string",
+        },
+      },
+      "required": [
+        "type",
+        "call",
       ],
       "type": "object",
     },
@@ -3958,6 +4032,11 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
                           "minimum": -9007199254740991,
                           "type": "integer",
                         },
+                        "fallbackAt": {
+                          "maximum": 9007199254740991,
+                          "minimum": -9007199254740991,
+                          "type": "integer",
+                        },
                         "machineId": {
                           "type": "string",
                         },
@@ -5062,6 +5141,37 @@ exports[`body/envelope schema snapshots > startBuildsBody > startBuildsBody.json
       ],
       "type": "object",
     },
+    "routeOverride": {
+      "additionalProperties": false,
+      "properties": {
+        "machineId": {
+          "type": "string",
+        },
+        "requiredCapabilities": {
+          "additionalProperties": false,
+          "properties": {
+            "executor": {
+              "const": "orb",
+              "type": "string",
+            },
+            "mcpServers": {
+              "items": {
+                "type": "string",
+              },
+              "type": "array",
+            },
+            "models": {
+              "items": {
+                "type": "string",
+              },
+              "type": "array",
+            },
+          },
+          "type": "object",
+        },
+      },
+      "type": "object",
+    },
     "todoIds": {
       "items": {
         "type": "string",
@@ -5324,6 +5434,11 @@ exports[`body/envelope schema snapshots > stepJournalRow > stepJournalRow.json 1
               "additionalProperties": false,
               "properties": {
                 "capacity": {
+                  "maximum": 9007199254740991,
+                  "minimum": -9007199254740991,
+                  "type": "integer",
+                },
+                "fallbackAt": {
                   "maximum": 9007199254740991,
                   "minimum": -9007199254740991,
                   "type": "integer",
@@ -6253,6 +6368,7 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                 "chief_message",
                 "quota_wait",
                 "model_fallback",
+                "no_machine",
                 "todo_done",
                 "todo_failed",
                 "schedule_run",
@@ -6827,6 +6943,10 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > machine surface 1
     "path": "/api/machine/upload-urls/{stepId}",
   },
   {
+    "note": "Computer call frames from the daemon (D75)",
+    "path": "/api/machine/computer/{callId}",
+  },
+  {
     "note": "步骤收尾",
     "path": "/api/machine/done/{stepId}",
   },
@@ -7094,6 +7214,8 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "routing_rule",
   "chief_turn_usage",
   "chief_summary",
+  "computer",
+  "computer_call",
 ]
 `;
 
@@ -8413,6 +8535,10 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
         {
           "additionalProperties": false,
           "properties": {
+            "computer": {
+              "const": true,
+              "type": "boolean",
+            },
             "executor": {
               "enum": [
                 "orb",
@@ -8461,6 +8587,10 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
                 "type": "string",
               },
               "type": "array",
+            },
+            "ownComputer": {
+              "const": true,
+              "type": "boolean",
             },
             "skills": {
               "items": {
@@ -8721,6 +8851,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > not
         "chief_message",
         "quota_wait",
         "model_fallback",
+        "no_machine",
         "todo_done",
         "todo_failed",
         "schedule_run",
@@ -8879,6 +9010,9 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > pro
     "id": {
       "type": "string",
     },
+    "instructions": {
+      "type": "string",
+    },
     "localChecks": {
       "items": {
         "minLength": 1,
@@ -8888,6 +9022,11 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > pro
     },
     "localPath": {
       "type": "string",
+    },
+    "maxConcurrent": {
+      "maximum": 9007199254740991,
+      "minimum": -9007199254740991,
+      "type": "integer",
     },
     "mergePolicy": {
       "enum": [

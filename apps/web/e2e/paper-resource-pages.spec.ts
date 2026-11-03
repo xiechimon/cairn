@@ -56,9 +56,9 @@ test('machines: `添加机器` sits in the top bar, no dashed full-width bar', a
   await expect(local.locator('[data-on]')).toHaveCSS('background-color', 'rgb(95, 143, 79)');
 });
 
-test('providers runtime tabs: canvas track, chosen tab white with a 1px ring', async ({ page }) => {
+test('providers scope tabs: canvas track, chosen tab white with a 1px ring', async ({ page }) => {
   await light(page, '/app/resources/providers?scenario=06');
-  const list = page.getByRole('tablist', { name: '模型服务' });
+  const list = page.getByRole('tablist', { name: '范围' });
   await expect(list).toHaveCSS('background-color', 'rgb(230, 231, 225)');
   const chosen = list.getByRole('tab', { selected: true });
   await expect(chosen).toHaveCSS('background-color', 'rgb(253, 253, 251)');
