@@ -98,6 +98,21 @@ export const EN: Record<string, string> = {
   项目: 'Project', // sidebar group / search group / schedule-form field — one fit
   Coordinator: 'Coordinator',
   成果: 'Made',
+  电脑: 'Computers',
+  '{n}/{max} 在跑': '{n}/{max} running',
+  '{n} 在跑': '{n} running',
+  已安装: 'Installed',
+  '打开桌面控制后，这里显示屏幕': 'The screen shows here once desktop control is on',
+  电脑离线: 'Computer offline',
+  'Coordinator 在这台': 'Coordinator runs here',
+  桌面控制: 'Desktop control',
+  '让 agent 操作这台电脑上的应用。macOS 要在辅助功能里授权。':
+    'Lets agents operate apps on this computer. macOS needs Accessibility permission.',
+  浏览器: 'Browser',
+  '让 agent 打开网页、点击和填表。': 'Lets agents open pages, click and fill forms.',
+  '没有其他电脑时，任务都在 Coordinator 这台电脑上跑。':
+    'With no other computer, work runs on the Coordinator’s computer.',
+  添加电脑: 'Add computer',
   在进行: 'In progress',
   等你处理: 'Needs you',
   管理定时: 'Manage schedules',

@@ -7,6 +7,7 @@ import {
   useApiMutations,
   useBackupNotice,
   useBuildChanges,
+  useChief,
   useChiefThreads,
   useMachines,
   useProjects,
@@ -557,6 +558,7 @@ export function BoardPage() {
   const branchQueryId = branchOpen ? branchBuildId : null;
   const branchStepsQ = useSteps(branchQueryId, live && branchQueryId != null);
   const machinesQ = useMachines(teamId, live);
+  const chiefQ = useChief(teamId, live);
   const backupQ = useBackupNotice(live);
   const branchInfo =
     overlayTodo == null
@@ -631,6 +633,7 @@ export function BoardPage() {
             projectName={homeProjectName}
             banner={homeBanner}
             machines={fixtureWithTodos.resources?.machines}
+            coordinatorMachineId={live ? (chiefQ.data?.agentActor?.machineId ?? null) : null}
             schedules={live ? mapSchedules(schedulesQ.data ?? []) : (fixture.schedules ?? [])}
           />
         ) : (
