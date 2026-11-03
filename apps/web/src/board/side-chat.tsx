@@ -197,11 +197,17 @@ export function SideChat({
 
   const panelRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
-    const panel = panelRef.current;
-    const focused = document.activeElement;
-    if (panel === null || !(focused instanceof HTMLElement)) return;
-    if (!window.matchMedia(OVERLAY_QUERY).matches || panel.contains(focused)) return;
-    focused.blur();
+    const releaseCovered = (target: EventTarget | null) => {
+      const panel = panelRef.current;
+      if (panel === null || !(target instanceof HTMLElement)) return;
+      if (!window.matchMedia(OVERLAY_QUERY).matches || panel.contains(target)) return;
+      if (target.closest('[role="dialog"], [role="alertdialog"], [role="menu"]') !== null) return;
+      target.blur();
+    };
+    releaseCovered(document.activeElement);
+    const onFocusIn = (event: FocusEvent) => releaseCovered(event.target);
+    document.addEventListener('focusin', onFocusIn);
+    return () => document.removeEventListener('focusin', onFocusIn);
   }, []);
 
   useEffect(() => {
