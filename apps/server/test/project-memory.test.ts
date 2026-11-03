@@ -137,6 +137,17 @@ describe('a turn that was steered into another project (D74 P2)', () => {
     expect(steeredFromAnotherScope(toolDeps() as never, turn)).toBe(false);
     message('other-project', other, claimedAt + 10);
     expect(steeredFromAnotherScope(toolDeps() as never, turn)).toBe(true);
+    H.s.db
+      .update(step)
+      .set({ claimedAt: claimedAt + 1000 })
+      .where(eq(step.id, 'turn-a'))
+      .run();
+    const reclaimed = H.s.db
+      .select()
+      .from(step)
+      .all()
+      .find((row) => row.id === 'turn-a')!;
+    expect(steeredFromAnotherScope(toolDeps() as never, reclaimed)).toBe(true);
   });
 });
 

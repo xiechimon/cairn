@@ -4,7 +4,7 @@ import {
   type ChiefPendingMessage,
   type ChiefTurnStoppedContent,
 } from '@cairn/shared';
-import { and, asc, eq, gt, inArray, lt, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, isNotNull, lt, ne, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   agent,
@@ -280,8 +280,21 @@ export function takeChiefSteer(db: Db, threadId: string): boolean {
 }
 
 export function steeredMessageScopes(db: Db, running: StepRow): (string | null)[] {
-  if (running.claimedAt === null) return [];
-  const claimedAt = running.claimedAt;
+  const previousTurnEnd =
+    db
+      .select({ finishedAt: step.finishedAt })
+      .from(step)
+      .where(
+        and(
+          eq(step.buildId, running.buildId),
+          eq(step.kind, 'chief'),
+          ne(step.id, running.id),
+          isNotNull(step.finishedAt),
+        ),
+      )
+      .orderBy(desc(step.finishedAt))
+      .limit(1)
+      .get()?.finishedAt ?? 0;
   return db
     .select({ id: chiefMessage.id, projectId: chiefMessage.projectId })
     .from(chiefMessage)
@@ -289,7 +302,7 @@ export function steeredMessageScopes(db: Db, running: StepRow): (string | null)[
       and(
         eq(chiefMessage.threadId, running.buildId),
         eq(chiefMessage.role, 'user'),
-        gt(chiefMessage.createdAt, claimedAt),
+        gt(chiefMessage.createdAt, previousTurnEnd),
       ),
     )
     .all()
