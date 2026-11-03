@@ -254,43 +254,39 @@ function buildChiefClaim(
   };
 }
 
-async function tryClaim(
+function claudeBlockedReader(db: MachineDeps['db']): (id: string | null) => boolean {
+  const cache = new Map<string, boolean>();
+  return (id) => {
+    if (id === null) return false;
+    const cached = cache.get(id);
+    if (cached !== undefined) return cached;
+    const row = db.select().from(machine).where(eq(machine.id, id)).get();
+    const blocked = claudeRateBlock(row?.claudeRateLimits ?? [], nowMs()) !== null;
+    cache.set(id, blocked);
+    return blocked;
+  };
+}
+
+function workerCapOf(machineRow: typeof machine.$inferSelect, maxWorkers?: number): number {
+  return Math.min(machineRow.maxConcurrent, ...(maxWorkers !== undefined ? [maxWorkers] : []));
+}
+
+function claimChiefTurn(
   deps: MachineDeps,
   machineId: string,
   teamId: string,
-  origin: string,
-  maxWorkers?: number,
-): Promise<ClaimedStep | null> {
+  maxWorkers: number | undefined,
+  createdUpTo: number,
+): ClaimedStep | null {
   const { db } = deps;
   const machineRow = db.select().from(machine).where(eq(machine.id, machineId)).get();
   if (!machineRow) return null;
-  refreshClaudeRateParks(deps, teamId);
-  const blockedCache = new Map<string, boolean>();
-  const claudeBlocked = (id: string | null): boolean => {
-    if (id === null) return false;
-    const cached = blockedCache.get(id);
-    if (cached !== undefined) return cached;
-    const row =
-      id === machineId ? machineRow : db.select().from(machine).where(eq(machine.id, id)).get();
-    const blocked = claudeRateBlock(row?.claudeRateLimits ?? [], nowMs()) !== null;
-    blockedCache.set(id, blocked);
-    return blocked;
-  };
-  const running = machineRunningCount(db, machineId);
-  const workerCap = Math.min(
-    machineRow.maxConcurrent,
-    ...(maxWorkers !== undefined ? [maxWorkers] : []),
-  );
-  const full = running >= workerCap;
-  const workerCands = full ? [] : claimCandidates(deps, machineId, teamId);
-  const chiefCands = full
-    ? []
-    : claimChiefCandidates(deps, machineId, teamId).sort(
-        (a, b) => Number(isChiefDigestStep(a.stepRow)) - Number(isChiefDigestStep(b.stepRow)),
-      );
-  const earliestWorker = workerCands[0]?.stepRow.createdAt ?? Number.POSITIVE_INFINITY;
-  for (const cand of chiefCands) {
-    if (cand.stepRow.createdAt > earliestWorker) break;
+  if (machineRunningCount(db, machineId) >= workerCapOf(machineRow, maxWorkers)) return null;
+  const claudeBlocked = claudeBlockedReader(db);
+  const cands = claimChiefCandidates(deps, machineId, teamId)
+    .filter((cand) => cand.stepRow.createdAt <= createdUpTo)
+    .sort((a, b) => Number(isChiefDigestStep(a.stepRow)) - Number(isChiefDigestStep(b.stepRow)));
+  for (const cand of cands) {
     if (hasEarlierLiveChiefStep(db, cand.stepRow)) continue;
     if (
       isChiefDigestStep(cand.stepRow) &&
@@ -322,6 +318,26 @@ async function tryClaim(
       return claimed;
     }
   }
+  return null;
+}
+
+async function tryClaim(
+  deps: MachineDeps,
+  machineId: string,
+  teamId: string,
+  origin: string,
+  maxWorkers?: number,
+): Promise<ClaimedStep | null> {
+  const { db } = deps;
+  const machineRow = db.select().from(machine).where(eq(machine.id, machineId)).get();
+  if (!machineRow) return null;
+  refreshClaudeRateParks(deps, teamId);
+  const claudeBlocked = claudeBlockedReader(db);
+  const full = machineRunningCount(db, machineId) >= workerCapOf(machineRow, maxWorkers);
+  const workerCands = full ? [] : claimCandidates(deps, machineId, teamId);
+  const earliestWorker = workerCands[0]?.stepRow.createdAt ?? Number.POSITIVE_INFINITY;
+  const chiefAhead = claimChiefTurn(deps, machineId, teamId, maxWorkers, earliestWorker);
+  if (chiefAhead) return chiefAhead;
 
   for (const cand of workerCands) {
     const shipRefusal = await reverifyShip(deps, cand.stepRow);
@@ -573,7 +589,7 @@ async function tryClaim(
       ...(workerMcp !== undefined ? { mcpServers: workerMcp } : {}),
     };
   }
-  return null;
+  return claimChiefTurn(deps, machineId, teamId, maxWorkers, Number.POSITIVE_INFINITY);
 }
 
 export async function claimStep(
