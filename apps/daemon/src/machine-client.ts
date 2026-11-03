@@ -9,6 +9,8 @@ import {
   type MachineCapabilities,
   type MachineClaimBody,
   type MachineClosedOrbsBody,
+  type MachineComputerFramesBody,
+  type MachineComputerFramesResponse,
   type MachineDoneBody,
   type MachineEnrollResponse,
   type MachineHeartbeatBody,
@@ -24,6 +26,7 @@ import {
   machineAttachmentResponseSchema,
   machineClaimResponseSchema,
   machineClosedOrbsResponseSchema,
+  machineComputerFramesResponseSchema,
   machineEnrollPollResponseSchema,
   machineEnrollResponseSchema,
   machineEnrollStartResponseSchema,
@@ -59,6 +62,14 @@ export class MachineApiError extends Error {
 export function isTransientUploadError(err: unknown): boolean {
   if (err instanceof MachineApiError) return err.status === 404 || err.status >= 500;
   return true;
+}
+
+function parseJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
 }
 
 export interface MachineClientOpts {
@@ -131,6 +142,10 @@ export interface MachineApi {
   steerAck?(stepId: string): Promise<void>;
   stop(stepId: string): Promise<boolean | null>;
   syncResult(syncId: string, body: MachineSyncResultBody): Promise<void>;
+  computerFrames?(
+    callId: string,
+    body: MachineComputerFramesBody,
+  ): Promise<MachineComputerFramesResponse>;
   stream(
     signal: AbortSignal,
     onEvent: (ev: MachineStreamEvent) => void,
@@ -545,6 +560,16 @@ export class MachineClient implements MachineApi {
     });
   }
 
+  async computerFrames(
+    callId: string,
+    body: MachineComputerFramesBody,
+  ): Promise<MachineComputerFramesResponse> {
+    return this.request('POST', `/api/machine/computer/${callId}`, {
+      body,
+      parse: (raw) => machineComputerFramesResponseSchema.parse(raw),
+    });
+  }
+
   async stream(
     signal: AbortSignal,
     onEvent: (ev: MachineStreamEvent) => void,
@@ -574,7 +599,8 @@ export class MachineClient implements MachineApi {
           buf = buf.slice(idx + 2);
           for (const line of frame.split('\n')) {
             if (!line.startsWith('data:')) continue;
-            onEvent(machineStreamEventSchema.parse(JSON.parse(line.slice(5).trim())));
+            const parsed = machineStreamEventSchema.safeParse(parseJson(line.slice(5).trim()));
+            if (parsed.success) onEvent(parsed.data);
           }
           idx = buf.indexOf('\n\n');
         }
