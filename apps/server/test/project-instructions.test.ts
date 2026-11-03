@@ -1,7 +1,7 @@
 import { claimedStepSchema, PROJECT_INSTRUCTIONS_MAX } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, test } from 'vitest';
-import { agent, chief as chiefTable, project } from '../src/db/schema.js';
+import { agent, chief as chiefTable, project, steerPending, step } from '../src/db/schema.js';
 import { nowMs } from '../src/lib/ids.js';
 import {
   bindAgentHome,
@@ -168,5 +168,45 @@ describe('Coordinator turns scoped to a project receive its instructions (D74 P1
     await req(s.app, 'PATCH', `/api/projects/${withRules}`, { instructions: RULES });
     const plain = await createProject('site');
     expect(await chiefInstruction('fix the header', plain)).not.toContain(RULES);
+  });
+
+  async function sendToCoordinator(content: string, projectId?: string): Promise<string> {
+    const res = await req(s.app, 'POST', `/api/teams/${s.team.id}/coordinator/messages`, {
+      content,
+      ...(projectId === undefined ? {} : { projectId }),
+    });
+    expect(res.status).toBe(201);
+    return ((await res.json()) as { message: { id: string } }).message.id;
+  }
+
+  test('a scoped message steered into a running unscoped turn carries its project instructions', async () => {
+    const id = await createProject('cairn');
+    await req(s.app, 'PATCH', `/api/projects/${id}`, { instructions: RULES });
+    const runningId = await sendToCoordinator('how is everything');
+    s.db
+      .update(step)
+      .set({ status: 'claimed', claimedAt: nowMs() })
+      .where(eq(step.id, runningId))
+      .run();
+    await sendToCoordinator('plan the release', id);
+    const pending = s.db.select().from(steerPending).get();
+    expect(pending?.stepId).toBe(runningId);
+    expect(pending?.content).toContain('plan the release');
+    expect(pending?.content).toContain(RULES);
+  });
+
+  test('a message steered into a turn already scoped to the same project does not repeat the instructions', async () => {
+    const id = await createProject('cairn');
+    await req(s.app, 'PATCH', `/api/projects/${id}`, { instructions: RULES });
+    const runningId = await sendToCoordinator('plan the release', id);
+    s.db
+      .update(step)
+      .set({ status: 'claimed', claimedAt: nowMs() })
+      .where(eq(step.id, runningId))
+      .run();
+    await sendToCoordinator('and the changelog', id);
+    const pending = s.db.select().from(steerPending).get();
+    expect(pending?.content).toContain('and the changelog');
+    expect(pending?.content).not.toContain(RULES);
   });
 });
