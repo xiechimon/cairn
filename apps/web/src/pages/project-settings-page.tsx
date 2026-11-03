@@ -30,6 +30,7 @@ import { ChevronDown, SquarePen } from '../icons/index.js';
 import { DeleteProjectConfirm } from '../overlay/delete-project-confirm.js';
 import { ProjectAutonomyCard } from './project-autonomy-card.js';
 import { ProjectBaseBranchSelect } from './project-base-branch-select.js';
+import { ProjectConcurrencySelect } from './project-concurrency-select.js';
 import { PageShell, TabGroup } from './shell.js';
 
 const TABS = [
@@ -238,6 +239,14 @@ export function ProjectSettingsPage() {
               </span>
             )}
           </SettingsRow>
+          {live && wireProject !== undefined && (
+            <SettingsRow
+              label={t('并发与优先级')}
+              hint={t('本项目同时运行的 thread 上限。你发的消息会插队，并可多用一个位置。')}
+            >
+              <ProjectConcurrencySelect project={wireProject} />
+            </SettingsRow>
+          )}
           {live && wireProject?.repoKind === 'github' && (
             <SettingsRow label={t('本机加速路径')}>
               <Input

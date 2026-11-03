@@ -9029,6 +9029,11 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > pro
     "localPath": {
       "type": "string",
     },
+    "maxConcurrent": {
+      "maximum": 9007199254740991,
+      "minimum": -9007199254740991,
+      "type": "integer",
+    },
     "mergePolicy": {
       "enum": [
         "human",

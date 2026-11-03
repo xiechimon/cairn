@@ -160,6 +160,7 @@ export async function sweepFailedRetries(deps: BuildDeps): Promise<void> {
         buildRow.id,
         { action: 'restart', feedback: '', clientMessageId: newRecordId() },
         'cairn',
+        'automatic',
       );
     } catch (err) {
       if (

@@ -118,6 +118,12 @@ export const EN: Record<string, string> = {
   '仅 {name}': 'Only {name}',
   '项目密钥只发给该项目的 thread，同名时优先于团队密钥。':
     'Project secrets go only to threads in that project and override a team secret with the same name.',
+  并发与优先级: 'Concurrency and priority',
+  '不限（跟随机器上限）': 'No limit (machine limits apply)',
+  '串行，一次一个': 'Serial, one at a time',
+  '最多 {n} 个': 'Up to {n}',
+  '本项目同时运行的 thread 上限。你发的消息会插队，并可多用一个位置。':
+    'How many threads in this project run at once. Your own messages go first and may use one extra slot.',
   项目说明: 'Instructions',
   保存项目说明: 'Save instructions',
   '本项目的每个 thread 和 Coordinator 都会读到，排在仓库的 AGENTS.md 之后。':
@@ -1021,8 +1027,18 @@ export const EN: Record<string, string> = {
   '密钥将加密存储，保存后无法再次查看。':
     'The key is stored encrypted and cannot be viewed again after saving.',
   '模型（可选）': 'Models (optional)',
-  '模型 ID': 'Model ID',
   添加模型: 'Add model',
+  移除模型: 'Remove model',
+  连接设置: 'Connection',
+  没有匹配的模型: 'No models match.',
+  '添加自定义模型「{id}」': 'Add custom model "{id}"',
+  '搜索模型或输入 ID': 'Search models or type an ID',
+  '填写 Base URL 和协议': 'Set the base URL and protocol',
+  原生鉴权: 'native auth',
+  '目录里还有 {n} 个模型，点「添加模型」搜索。':
+    '{n#1 more model|# more models} in the catalog. Use Add model to search.',
+  '把 Base URL 中的占位符换成你的账户值':
+    'Replace the placeholders in the Base URL with your account values',
   // #355 picker 形态(spec 11 §A6;preset 显示名 = 品牌串不译,OAuth 徽标
   // 同为英文字面)
   '搜索服务商...': 'Search providers...',

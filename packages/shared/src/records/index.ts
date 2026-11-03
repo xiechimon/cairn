@@ -50,6 +50,7 @@ export * from './plan.js';
 export * from './project.js';
 export * from './prompts.js';
 export * from './provider.js';
+export * from './provider-presets.js';
 export * from './push.js';
 export * from './recording-trigger.js';
 export * from './report.js';

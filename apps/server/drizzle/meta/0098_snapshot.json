@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "9154a6ef-59f5-43b3-9ebd-ba8dfb33d779",
-  "prevId": "3db9fe86-0934-4c91-932e-7ffc1912c029",
+  "id": "61519b5e-5f7e-4562-8c11-e29a2984f4f8",
+  "prevId": "b08a1743-cc92-40b9-b856-eaf7b39b3d41",
   "tables": {
     "agent": {
       "name": "agent",
@@ -3348,6 +3348,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "maxConcurrent": {
+          "name": "maxConcurrent",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "repoKind": {
           "name": "repoKind",
           "type": "text",
@@ -4711,6 +4718,14 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "byPerson": {
+          "name": "byPerson",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
         },
         "freshSession": {
           "name": "freshSession",

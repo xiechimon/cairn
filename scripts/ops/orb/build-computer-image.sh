@@ -11,7 +11,14 @@ machines_dir=$host_root/var/lib/machines
 base=$machines_dir/cairn-orb-base
 image=$machines_dir/cairn-orb-computer
 packages=(xorg-server-xvfb x11vnc fluxbox xdotool chromium imagemagick)
-[[ -f $base/etc/cairn-orb-image ]] || { printf 'Build cairn-orb-base first: %s has no completion marker\n' "$base" >&2; exit 1; }
+if [[ ! -f $base/etc/cairn-orb-image ]]; then
+  if $dry_run; then
+    printf 'snapshot cairn-orb-base after cairn-orb-base is built, then install: %s\n1 planned changes\n' "${packages[*]}"
+    exit 0
+  fi
+  printf 'Build cairn-orb-base first: %s has no completion marker\n' "$base" >&2
+  exit 1
+fi
 base_marker=$(cat "$base/etc/cairn-orb-image")
 node_major=$(sed -n 's/^node_major=\([1-9][0-9]*\)$/\1/p' <<< "$base_marker")
 [[ $node_major =~ ^[1-9][0-9]*$ ]] || { printf 'cairn-orb-base marker has no Node major; rebuild the base\n' >&2; exit 1; }
