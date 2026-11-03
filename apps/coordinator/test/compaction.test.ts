@@ -165,7 +165,7 @@ describe('a normal-sized Coordinator thread', () => {
       ctx,
       {
         extensions: [
-          coordinatorToolsExtension(api.relayTool, gate),
+          coordinatorToolsExtension(api, gate),
           coordinatorCompactionExtension(() => ({ provider: 'stub', modelId: 'sum' })),
         ],
         settings: () => ({

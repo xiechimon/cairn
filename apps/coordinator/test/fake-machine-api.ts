@@ -1,5 +1,6 @@
 import type {
   ClaimedStep,
+  MachineAskBody,
   MachineDoneBody,
   MachineTokenResponse,
   StepRecord,
@@ -18,6 +19,7 @@ export interface FakeMachineApi extends MachineApi {
   keys: string[];
   stopRequested: Set<string>;
   stopPolls: string[];
+  asks: { stepId: string; body: MachineAskBody }[];
 }
 
 export function fakeMachineApi(apiKey = 'sk-test'): FakeMachineApi {
@@ -32,6 +34,7 @@ export function fakeMachineApi(apiKey = 'sk-test'): FakeMachineApi {
     keys: [],
     stopRequested: new Set(),
     stopPolls: [],
+    asks: [],
     claim: async () => {
       const next = api.queue.shift() ?? null;
       if (next) api.claimedByMe.push(next.step);
@@ -52,6 +55,10 @@ export function fakeMachineApi(apiKey = 'sk-test'): FakeMachineApi {
     stop: async (stepId) => {
       api.stopPolls.push(stepId);
       return api.stopRequested.has(stepId) ? false : null;
+    },
+    askUser: async (stepId, body) => {
+      api.asks.push({ stepId, body });
+      return { status: 'cancelled', requestId: body.requestId, answers: null, reason: 'no user' };
     },
     relayTool: async (stepId, name, params) => {
       api.tools.push({ stepId, name, params });

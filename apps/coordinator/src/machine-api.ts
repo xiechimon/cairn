@@ -1,8 +1,11 @@
 import {
   type ClaimedStep,
   claimedStepSchema,
+  type MachineAskBody,
+  type MachineAskResponse,
   type MachineDoneBody,
   type MachineTokenResponse,
+  machineAskResponseSchema,
   machineStopResponseSchema,
   machineTokenResponseSchema,
   type StepRecord,
@@ -17,9 +20,24 @@ export interface MachineApi {
   heartbeat(stepId: string): Promise<void>;
   stop(stepId: string): Promise<boolean | null>;
   relayTool(stepId: string, name: string, params: Record<string, unknown>): Promise<string>;
+  askUser(stepId: string, body: MachineAskBody, signal?: AbortSignal): Promise<MachineAskResponse>;
   transcriptRow(stepId: string, row: TranscriptRow): Promise<void>;
   transcriptDelta(stepId: string, text: string): Promise<void>;
   done(stepId: string, body: MachineDoneBody): Promise<void>;
+}
+
+const ASK_HOLD_MS = 70_000;
+const ASK_REQUEST_TIMEOUT_MS = ASK_HOLD_MS + 15_000;
+const ASK_RETRY_MS = 2_000;
+
+export class MachineApiError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'MachineApiError';
+  }
 }
 
 function field(body: unknown, name: string): unknown {
@@ -30,16 +48,27 @@ function field(body: unknown, name: string): unknown {
 }
 
 export function httpMachineApi(serverUrl: string, machineToken: string): MachineApi {
-  const call = async (method: 'GET' | 'POST', path: string, body?: unknown): Promise<unknown> => {
+  const call = async (
+    method: 'GET' | 'POST',
+    path: string,
+    body?: unknown,
+    signal?: AbortSignal,
+  ): Promise<unknown> => {
     const res = await fetch(new URL(path, serverUrl), {
       method,
+      ...(signal === undefined ? {} : { signal }),
       headers: {
         authorization: `Bearer ${machineToken}`,
         ...(body === undefined ? {} : { 'content-type': 'application/json' }),
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
-    if (!res.ok) throw new Error(`${method} ${path} -> ${res.status} ${await res.text()}`);
+    if (!res.ok) {
+      throw new MachineApiError(
+        res.status,
+        `${method} ${path} -> ${res.status} ${await res.text()}`,
+      );
+    }
     return res.json();
   };
   return {
@@ -60,6 +89,26 @@ export function httpMachineApi(serverUrl: string, machineToken: string): Machine
       machineStopResponseSchema.parse(
         await call('GET', `/api/machine/stop?stepId=${encodeURIComponent(stepId)}`),
       ).discard,
+    askUser: async (stepId, body, signal) => {
+      for (;;) {
+        const timeout = AbortSignal.timeout(ASK_REQUEST_TIMEOUT_MS);
+        try {
+          const settled = machineAskResponseSchema.parse(
+            await call(
+              'POST',
+              `/api/machine/ask/${stepId}`,
+              body,
+              signal === undefined ? timeout : AbortSignal.any([signal, timeout]),
+            ),
+          );
+          if (settled.status !== 'pending') return settled;
+        } catch (error) {
+          if (error instanceof MachineApiError && error.status < 500) throw error;
+          if (signal?.aborted === true) throw error;
+          await new Promise((r) => setTimeout(r, ASK_RETRY_MS));
+        }
+      }
+    },
     relayTool: async (stepId, name, params) =>
       String(field(await call('POST', `/api/machine/tool/${stepId}`, { name, params }), 'text')),
     transcriptRow: async (stepId, row) => {

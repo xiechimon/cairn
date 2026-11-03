@@ -1,13 +1,14 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { CHIEF_REMOTE_TOOLS } from '@cairn/shared';
+import { ASK_REQUEST_ID_PATTERN, CHIEF_REMOTE_TOOLS } from '@cairn/shared';
 import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context';
 import { fauxAssistantMessage, fauxProvider, fauxToolCall } from '@earendil-works/pi-ai';
 import { afterEach, describe, expect, it } from 'vitest';
 import { openCoordinatorHarness } from '../src/runtime/harness.js';
 import { createCoordinatorModels } from '../src/runtime/models.js';
 import {
+  askRequestId,
   COORDINATOR_TOOL_OUTPUT_MAX_BYTES,
   coordinatorToolsExtension,
   createStepGate,
@@ -29,7 +30,7 @@ function storagePath(): string {
 
 type FauxContext = { messages: { role: string; content: unknown }[] };
 
-function toolThenAnswer(name: string, args: { [key: string]: string }) {
+function toolThenAnswer(name: string, args: Parameters<typeof fauxToolCall>[1]) {
   const seenResults: string[] = [];
   const faux = fauxProvider({ provider: 'stub', models: [{ id: 'm', contextWindow: 200_000 }] });
   faux.setResponses(
@@ -47,7 +48,7 @@ function toolThenAnswer(name: string, args: { [key: string]: string }) {
 
 describe('coordinator tools', () => {
   it('offers every Coordinator tool with its replay rule from the shared definitions', () => {
-    const extension = coordinatorToolsExtension(async () => '', createStepGate());
+    const extension = coordinatorToolsExtension(fakeMachineApi(), createStepGate());
     const tools = extension.tools ?? [];
     expect(tools.map((t) => t.name).sort()).toEqual(CHIEF_REMOTE_TOOLS.map((t) => t.name).sort());
     for (const def of CHIEF_REMOTE_TOOLS) {
@@ -70,7 +71,7 @@ describe('coordinator tools', () => {
     const api = fakeMachineApi();
     const gate = createStepGate();
     const harness = await openCoordinatorHarness(storagePath(), coordinatorModels.models, ctx, {
-      extensions: [coordinatorToolsExtension(api.relayTool, gate)],
+      extensions: [coordinatorToolsExtension(api, gate)],
     });
     await runCoordinatorTurn(
       {
@@ -100,7 +101,7 @@ describe('coordinator tools', () => {
     };
     const gate = createStepGate();
     const harness = await openCoordinatorHarness(storagePath(), coordinatorModels.models, ctx, {
-      extensions: [coordinatorToolsExtension(api.relayTool, gate)],
+      extensions: [coordinatorToolsExtension(api, gate)],
     });
     await runCoordinatorTurn(
       {
@@ -127,7 +128,7 @@ describe('coordinator tools', () => {
     api.relayTool = async () => 'x'.repeat(COORDINATOR_TOOL_OUTPUT_MAX_BYTES * 10);
     const gate = createStepGate();
     const harness = await openCoordinatorHarness(storagePath(), coordinatorModels.models, ctx, {
-      extensions: [coordinatorToolsExtension(api.relayTool, gate)],
+      extensions: [coordinatorToolsExtension(api, gate)],
     });
     await runCoordinatorTurn(
       {
@@ -143,6 +144,87 @@ describe('coordinator tools', () => {
     );
     expect(seenResults[0]?.length ?? 0).toBeLessThan(COORDINATOR_TOOL_OUTPUT_MAX_BYTES * 2);
     await harness.close(ctx);
+  });
+
+  it("ask_user blocks on the answer channel and returns the user's answer as the tool result", async () => {
+    const questions = [
+      { header: 'Merge', question: 'Merge #12 now?', options: [{ label: 'Yes' }] },
+    ];
+    const { coordinatorModels, seenResults } = toolThenAnswer('ask_user', { questions });
+    const api = fakeMachineApi();
+    api.askUser = async (stepId, body) => {
+      api.asks.push({ stepId, body });
+      await new Promise((r) => setTimeout(r, 200));
+      return {
+        status: 'answered',
+        requestId: body.requestId,
+        answers: [{ header: 'Merge', choices: ['Yes'] }],
+        reason: null,
+      };
+    };
+    const gate = createStepGate();
+    const harness = await openCoordinatorHarness(storagePath(), coordinatorModels.models, ctx, {
+      extensions: [coordinatorToolsExtension(api, gate)],
+    });
+    await runCoordinatorTurn(
+      {
+        harness,
+        models: coordinatorModels,
+        api,
+        context: ctx,
+        heartbeatMs: 1000,
+        now: () => 1,
+        gate,
+      },
+      chiefStep('step-ask', 'merge it?'),
+    );
+    expect(api.tools).toEqual([]);
+    expect(api.asks).toHaveLength(1);
+    expect(api.asks[0]?.stepId).toBe('step-ask');
+    expect(api.asks[0]?.body.questions).toEqual(questions);
+    expect(api.asks[0]?.body.requestId).toMatch(ASK_REQUEST_ID_PATTERN);
+    expect(seenResults[0]).toContain('answered');
+    expect(seenResults[0]).toContain('Yes');
+    expect(api.dones.map((d) => d.body.status)).toEqual(['success']);
+    await harness.close(ctx);
+  });
+
+  it('ask_user that cannot reach the answer channel comes back cancelled instead of failing the turn', async () => {
+    const { coordinatorModels, seenResults } = toolThenAnswer('ask_user', {
+      questions: [{ header: 'H', question: 'Q?', options: [] }],
+    });
+    const api = fakeMachineApi();
+    api.askUser = async () => {
+      throw new Error('POST /api/machine/ask/step-ask2 -> 409 not claimed');
+    };
+    const gate = createStepGate();
+    const harness = await openCoordinatorHarness(storagePath(), coordinatorModels.models, ctx, {
+      extensions: [coordinatorToolsExtension(api, gate)],
+    });
+    await runCoordinatorTurn(
+      {
+        harness,
+        models: coordinatorModels,
+        api,
+        context: ctx,
+        heartbeatMs: 1000,
+        now: () => 1,
+        gate,
+      },
+      chiefStep('step-ask2', 'hi'),
+    );
+    expect(seenResults[0]).toContain('cancelled');
+    expect(seenResults[0]).toContain('409 not claimed');
+    expect(api.dones.map((d) => d.body.status)).toEqual(['success']);
+    await harness.close(ctx);
+  });
+
+  it('a replayed ask_user call asks with the same request id, so it rejoins the same card', () => {
+    const id = askRequestId('step-1', 'toolu_01AbC');
+    expect(id).toMatch(ASK_REQUEST_ID_PATTERN);
+    expect(askRequestId('step-1', 'toolu_01AbC')).toBe(id);
+    expect(askRequestId('step-1', 'toolu_02XyZ')).not.toBe(id);
+    expect(askRequestId('step-2', 'toolu_01AbC')).not.toBe(id);
   });
 
   it('holds a resumed tool call until its step is claimed again', async () => {

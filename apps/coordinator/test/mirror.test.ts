@@ -47,7 +47,7 @@ async function runToolTurn(tokensPerSecond: number) {
     coordinatorModels.models,
     ctx,
     {
-      extensions: [coordinatorToolsExtension(api.relayTool, gate)],
+      extensions: [coordinatorToolsExtension(api, gate)],
     },
   );
   await runCoordinatorTurn(

@@ -50,6 +50,21 @@ beforeAll(async () => {
     { content: 'ANSWER-THREE' },
     { content: 'ANSWER-STOP-CUT', delayMs: 20_000 },
     { content: 'ANSWER-FIVE' },
+    {
+      toolCall: {
+        name: 'ask_user',
+        arguments: {
+          questions: [
+            {
+              header: 'Merge',
+              question: 'Merge #12 now?',
+              options: [{ label: 'Yes' }, { label: 'No' }],
+            },
+          ],
+        },
+      },
+    },
+    { content: 'ANSWER-AFTER-ASK' },
   ]);
   server = await bootRealServer({ providerBaseUrl: stub.url, claimHoldMs: 1_000 });
   const enrolled = await fetch(`${server.url}/api/machine/enroll`, {
@@ -166,6 +181,45 @@ describe('Coordinator on the Pi Durable sidecar (D72), real server and real side
     expect(assistantTexts().some((t) => t.includes('ANSWER-STOP-CUT'))).toBe(false);
     await send('fifth question');
     await waitFor(() => assistantTexts().some((t) => t.includes('ANSWER-FIVE')), 60_000);
+  }, 90_000);
+
+  test('ask_user blocks the turn until the user answers the card, then the turn continues with the answer', async () => {
+    const before = stub.requests.length;
+    await send('sixth question');
+    let card: { requestId: string; status: string } | undefined;
+    await waitFor(() => {
+      card = server.db
+        .select()
+        .from(chiefMessage)
+        .where(eq(chiefMessage.threadId, threadId()))
+        .all()
+        .map(
+          (r) =>
+            (typeof r.content === 'string' && r.content.startsWith('{')
+              ? JSON.parse(r.content)
+              : r.content) as {
+              kind?: string;
+              requestId: string;
+              status: string;
+            },
+        )
+        .find((c) => c.kind === 'ask_user_question');
+      return card !== undefined;
+    }, 30_000);
+    await new Promise((r) => setTimeout(r, 1_500));
+    expect(stub.requests.length).toBe(before + 1);
+    expect(chiefSteps().find((s) => s.status === 'claimed')).toBeDefined();
+    const answered = await api(
+      server.url,
+      'POST',
+      `/api/teams/${server.teamId}/chief/threads/${threadId()}/questions/${card?.requestId}/answer`,
+      { answers: [{ header: 'Merge', choices: ['Yes'] }] },
+    );
+    expect(answered.status).toBe(200);
+    await waitFor(() => assistantTexts().some((t) => t.includes('ANSWER-AFTER-ASK')), 60_000);
+    const toolResult = JSON.stringify(stub.requests.at(-1)?.messages.at(-1));
+    expect(toolResult).toContain('answered');
+    expect(toolResult).toContain('Yes');
   }, 90_000);
 
   test('a second sidecar on the same store refuses to start while the first runs', async () => {
