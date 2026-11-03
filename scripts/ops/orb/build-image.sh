@@ -99,6 +99,7 @@ fi
 printf '%s\n' \
   'install pinned CLI packages and pnpm with npm lifecycle scripts disabled' \
   'create unprivileged agent user and validate its CLI and pnpm versions' \
+  'record bypass consent in root-owned /etc/claude-code/managed-settings.json' \
   'lock root login and mask SSH server units' \
   'enable guest systemd-networkd' \
   'install and enable cairn-orb-worker.service, cairn-orb-check.service and cairn-orb-check.path' \
@@ -154,6 +155,12 @@ useradd --uid "$3" --create-home --shell /bin/bash agent
 [[ $(cd /tmp && runuser -u agent -- pnpm --version) == "$5" ]] || { printf 'pnpm %s is not runnable by agent\n' "$5" >&2; exit 1; }
 runuser -u agent -- /usr/bin/bwrap --version > /dev/null || { printf 'bubblewrap is not runnable by agent\n' >&2; exit 1; }
 runuser -u agent -- /usr/bin/socat -V > /dev/null || { printf 'socat is not runnable by agent\n' >&2; exit 1; }
+install -d -o root -g root -m 755 /etc/claude-code
+printf '%s\n' '{"skipDangerousModePermissionPrompt": true}' > /etc/claude-code/managed-settings.json
+chown root:root /etc/claude-code/managed-settings.json
+chmod 644 /etc/claude-code/managed-settings.json
+runuser -u agent -- /usr/bin/node -e 'const s = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8")); process.exit(s.skipDangerousModePermissionPrompt === true ? 0 : 1)' /etc/claude-code/managed-settings.json || { printf 'agent cannot read bypass consent from managed settings\n' >&2; exit 1; }
+runuser -u agent -- test ! -w /etc/claude-code/managed-settings.json || { printf 'agent can edit managed settings\n' >&2; exit 1; }
 passwd --lock root
 systemctl disable sshd.service sshd.socket || true
 systemctl mask sshd.service sshd.socket

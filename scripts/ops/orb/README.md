@@ -101,7 +101,12 @@ The image contains Node, pinned Claude Code/Codex CLIs and the repository's
 pnpm, installed with npm lifecycle scripts disabled, plus bubblewrap and
 socat: Claude Code refuses to start without bubblewrap, because it scrubs
 subprocess environments through `bwrap`, and its Bash sandbox refuses every
-command with "socat not installed" when socat is missing. The pnpm version lives in
+command with "socat not installed" when socat is missing. The image also
+writes root-owned, mode `0644` `/etc/claude-code/managed-settings.json` with
+`{"skipDangerousModePermissionPrompt": true}`: Claude Code downgrades the Orb's
+`bypassPermissions` session to `default` unless policy or user settings record
+that consent, and the SDK's own settings option does not count. The agent can
+read the file but not edit it. The pnpm version lives in
 `pnpm.version` beside the script, because `cairn-ops-run` materializes only
 `scripts/ops/orb`; `shell.test.mjs` fails when it differs from the root
 `packageManager`. Node 25 and later ship no corepack, so project

@@ -360,6 +360,22 @@ test('guest image installs socat for the Claude Code sandbox and verifies it as 
   assert.match(script, /runuser -u agent -- \/usr\/bin\/socat -V/);
 });
 
+test('guest image records bypass consent as root-owned managed settings the agent can read but not edit', () => {
+  const script = readFileSync(join(source, 'build-image.sh'), 'utf8');
+  assert.match(
+    script,
+    /install -d -o root -g root -m 755 \/etc\/claude-code\n.*'\{"skipDangerousModePermissionPrompt": true\}'.*> \/etc\/claude-code\/managed-settings\.json\nchown root:root \/etc\/claude-code\/managed-settings\.json\nchmod 644 \/etc\/claude-code\/managed-settings\.json/,
+  );
+  assert.match(
+    script,
+    /runuser -u agent -- \/usr\/bin\/node -e .*skipDangerousModePermissionPrompt === true.*\/etc\/claude-code\/managed-settings\.json/,
+  );
+  assert.match(script, /runuser -u agent -- test ! -w \/etc\/claude-code\/managed-settings\.json/);
+  const consent = script.indexOf('/etc/claude-code/managed-settings.json');
+  const marker = script.indexOf('> "$stage/etc/cairn-orb-image"');
+  assert.ok(consent >= 0 && consent < marker, 'consent is written before the completion marker');
+});
+
 test("guest image runs only Claude Code's own native installer and verifies both CLIs as agent", () => {
   const script = readFileSync(join(source, 'build-image.sh'), 'utf8');
   const install = script.indexOf('npm install --global --ignore-scripts');
