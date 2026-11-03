@@ -664,6 +664,7 @@ export const secret = sqliteTable('secret', {
   teamId: text('teamId')
     .notNull()
     .references(() => team.id),
+  projectId: text('projectId').references(() => project.id),
   name: text('name').notNull(),
   description: text('description'),
   valueCipher: text('valueCipher'),

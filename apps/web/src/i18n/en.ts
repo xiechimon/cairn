@@ -117,6 +117,10 @@ export const EN: Record<string, string> = {
   接下来: 'Up next',
   已暂停: 'Paused',
   本周合并: 'Merged this week',
+  全团队: 'Whole team',
+  '仅 {name}': 'Only {name}',
+  '项目密钥只发给该项目的 thread，同名时优先于团队密钥。':
+    'Project secrets go only to threads in that project and override a team secret with the same name.',
   并发与优先级: 'Concurrency and priority',
   '不限（跟随机器上限）': 'No limit (machine limits apply)',
   '串行，一次一个': 'Serial, one at a time',
@@ -725,7 +729,6 @@ export const EN: Record<string, string> = {
   关注与提醒: 'Watches & reminders',
   未设置: 'Not set',
   // #854 收编 popover 后用户菜单面板的 aria-label（原 FloatingShell 壳无标签）
-  用户菜单: 'User menu',
   '尚无章程。点击编辑，为总管添加常设指示。':
     'No charter yet. Click edit to give the Chief standing instructions.',
   编辑: 'Edit',
@@ -1607,4 +1610,16 @@ export const EN: Record<string, string> = {
   还没上报: 'Not reported yet',
   模型列表: 'Models',
   '已安装，登录状态未知': 'Installed, sign-in unknown',
+  '{n} 台机器离线': '{n#1 machine|# machines} offline',
+  设置分区: 'Settings sections',
+  搜索设置: 'Search settings',
+  没有匹配的设置: 'No matching settings',
+  只影响这台设备: 'Applies to this device only',
+  模型与账户: 'Models & accounts',
+  订阅与路由: 'Subscriptions & routing',
+  执行环境: 'Execution',
+  团队与访问: 'Team & access',
+  关闭设置: 'Close settings',
+  返回设置: 'Back to settings',
+  颜色主题: 'Color theme',
 };

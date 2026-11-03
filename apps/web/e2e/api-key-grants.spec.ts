@@ -20,7 +20,7 @@ test('the existing key flow submits MCP grant labels for Coordinator Thread entr
   });
   await page.goto('/app/api-keys');
   await page.getByRole('button', { name: '新建密钥', exact: true }).click();
-  const dialog = page.getByRole('dialog');
+  const dialog = page.getByRole('dialog', { name: '新建密钥' });
   await dialog.getByRole('checkbox', { name: /^MCP 访问/ }).check();
   const read = ['Projects', 'Read Thread', 'Threads Waiting on Me', 'Thread Pull Requests'];
   const write = ['Start Thread', 'Reply Thread'];
@@ -50,7 +50,7 @@ test('the existing key flow submits MCP grant labels for Coordinator Thread entr
 test('grant all submits each tool only in its registry kind column', async ({ page }) => {
   await page.goto('/app/api-keys');
   await page.getByRole('button', { name: '新建密钥' }).first().click();
-  const dialog = page.getByRole('dialog');
+  const dialog = page.getByRole('dialog', { name: '新建密钥' });
   await dialog.getByRole('button', { name: '授予全部', exact: true }).click();
   const submitted = page.waitForRequest(
     (request) =>

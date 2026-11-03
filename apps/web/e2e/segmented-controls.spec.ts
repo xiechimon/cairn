@@ -151,22 +151,6 @@ test('files seg + tasks view toggle: hover steps the unselected ink (dark)', asy
   );
 });
 
-test('user-menu appearance segment: hover steps the ink, click switches the theme', async ({ page }) => {
-  await themed(page, 'light', '/app?scenario=01');
-  await page.click('.sidebar-user');
-  const group = page.getByRole('radiogroup', { name: '外观' });
-  const dark = group.getByRole('radio', { name: '深色' });
-
-  await expectInkStep(dark, group.getByRole('radio', { name: '浅色' }));
-
-  await dark.click();
-  await expect(dark).toHaveAttribute('aria-checked', 'true');
-
-  await expect(page.locator('html')).not.toHaveClass(/light/);
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
-  await expect(group.getByRole('radio', { name: '浅色' })).toHaveAttribute('aria-checked', 'false');
-});
-
 test('team layout toggle: segmented face (paper track, white ringed chip)', async ({ page }) => {
   await themed(page, 'light', '/app/team?scenario=12');
 

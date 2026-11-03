@@ -4,6 +4,7 @@ import { recordId } from './common.js';
 export const secretRecordSchema = z.object({
   id: recordId,
   teamId: recordId,
+  projectId: recordId.nullable(),
   name: z.string(),
   description: z.string().nullable(),
 });
@@ -13,6 +14,7 @@ export const setSecretBodySchema = z.object({
   name: z.string(),
   description: z.string().nullish(),
   value: z.string(),
+  projectId: recordId.nullish(),
 });
 export type SetSecretBody = z.infer<typeof setSecretBodySchema>;
 

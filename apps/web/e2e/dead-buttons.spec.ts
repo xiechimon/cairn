@@ -6,22 +6,6 @@ test('feedback route is gone — old URL redirects to the home', async ({ page }
   await expect(page.locator('[data-route="feedback"]')).toHaveCount(0);
 });
 
-test('user menu drops its dead rows — `反馈` (#149), `新功能/快捷键` (#163)', async ({ page }) => {
-  await page.goto('/app/schedules');
-  await page.locator('.sidebar-user').click();
-  const menu = page.locator('.user-menu');
-  await expect(menu).toBeVisible();
-
-  for (const dead of ['反馈', '新功能', '快捷键']) {
-    await expect(menu).not.toContainText(dead);
-  }
-
-  for (const live of ['外观', '账号', 'API 密钥', 'MCP']) {
-    await expect(menu).toContainText(live);
-  }
-  await expect(menu.locator('a.user-menu-row')).toHaveCount(9);
-});
-
 test('project files pane: no export button, static branch chip, wired `文件|历史` segment', async ({
   page,
 }) => {
@@ -195,7 +179,8 @@ test('mcp page is read-only: no create entry, no per-row more-menu ink, empty st
   await page.goto('/app/resources/mcp-servers?scenario=07');
   await expect(page.locator('[data-testid="resource-row"][data-mcp]')).toHaveCount(1);
   await expect(page.locator('[data-testid="resource-row"] button')).toHaveCount(0);
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('dialog')).toHaveCount(1);
+  await expect(page.getByRole('dialog', { name: '设置' })).toBeVisible();
   await expect(page.getByRole('button', { name: '新建', exact: true })).toHaveCount(0);
 });
 

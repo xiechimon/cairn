@@ -8,20 +8,6 @@ const AGENT_SRC = spiralAvatarUrl('r3-builder');
 const SVG_BODY =
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><circle cx="12" cy="12" r="12"/></svg>';
 
-test('sidebar avatar chip (rail) and user-menu head share one seeded src', async ({
-  page,
-}) => {
-  await page.goto('/app?scenario=01');
-  await page.locator('.sidebar-user').click();
-  await expect(page.locator('.user-menu-head img')).toHaveAttribute('src', USER_SRC);
-  await expect(page.locator('.user-menu-mail')).toHaveCount(0);
-  await page.keyboard.press('Escape');
-
-  await page.evaluate(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
-  await page.reload();
-  await expect(page.locator('.rail-user img')).toHaveAttribute('src', USER_SRC);
-});
-
 test('team agent card seeds by agent displayName — user/agent srcs differ (different names, different avatars)', async ({
   page,
 }) => {
@@ -140,8 +126,8 @@ test('no avatar surface reaches a third-party avatar host', async ({ page }) => 
   page.on('request', (request) => {
     if (request.url().includes('api.dicebear.com')) hits.push(request.url());
   });
-  await page.goto('/app?scenario=01');
-  await expect(page.locator('.sidebar-user')).toBeVisible();
+  await page.goto('/app/account?scenario=01');
+  await expect(page.locator('.account-avatar img')).toBeVisible();
   await page.goto('/app/team?scenario=12');
   await expect(page.getByTestId('team-agent-card').first().locator('img')).toBeVisible();
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=36');

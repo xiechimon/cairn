@@ -165,6 +165,7 @@
   "search-task-context.spec.ts": 3382,
   "secret-add-dialog.spec.ts": 4112,
   "segmented-controls.spec.ts": 10401,
+  "settings-window.spec.ts": 20000,
   "shadcn-primitives.spec.ts": 1878,
   "shell-consistency.spec.ts": 10817,
   "shell-locale-default.spec.ts": 6809,
@@ -195,7 +196,5 @@
   "token-gate.spec.ts": 3881,
   "transcript-user-words.spec.ts": 4318,
   "user-menu-geometry.spec.ts": 4226,
-  "user-menu-nav.spec.ts": 2259,
-  "user-menu-trigger.spec.ts": 6367,
   "visual-polish.spec.ts": 6263
 }

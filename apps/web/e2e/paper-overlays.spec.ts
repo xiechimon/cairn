@@ -185,23 +185,6 @@ test('Paper menu: 32px rows, 14px text, 15px icons, 12px panel corners, 4px padd
   await evidenceShot(page, 'more-menu.png');
 });
 
-test('user menu rides the same Paper menu face', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
-  await page.goto('/app?scenario=01');
-  await page.getByRole('complementary').getByRole('button', { name: 'Xmon Dai' }).click();
-  const menu = page.locator('.user-menu');
-  await expect(menu).toBeVisible();
-  await settle(menu.locator('..'));
-  await expect(menu).toHaveCSS('border-top-left-radius', '12px');
-  await expect(menu).toHaveCSS('padding-top', '4px');
-  for (const label of ['账号', 'API 密钥', 'MCP']) {
-    const row = menu.locator('a.user-menu-row', { hasText: label });
-    expect((await row.boundingBox())?.height).toBe(32);
-    await expect(row).toHaveCSS('font-size', '14px');
-  }
-  await evidenceShot(page, 'user-menu.png');
-});
-
 test('provider picker: grouped rows, search hides empty groups', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
   const dialog = await openFromTopbar(page, PROVIDERS, '添加模型服务');

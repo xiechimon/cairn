@@ -27,9 +27,8 @@ test(`connects, verifies and deletes a subscription on the model routing page ($
       return route.fulfill({ status: 204 });
     }
   });
-  await page.goto('/app/resources/providers');
-  await page.getByTestId('open-subscription-accounts').click();
-  await expect(page).toHaveURL(/\/app\/resources\/model-routing/);
+  await page.goto('/app/resources/model-routing');
+  await expect(page).toHaveURL(/\/app\/settings\/routing/);
 
   await page.getByRole('button', { name: locale === 'zh' ? '添加 Claude 账户' : 'Add a Claude account' }).click();
   const dialog = page.getByRole('dialog', { name: 'Add Claude subscription' });

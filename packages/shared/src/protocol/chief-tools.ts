@@ -536,20 +536,29 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   },
   {
     name: 'set_secret',
-    description: 'Create or overwrite a team secret (value is write-only, encrypted at rest).',
+    description:
+      'Create or overwrite a secret (value is write-only, encrypted at rest). Team-wide unless projectId is given.',
     parameters: obj(
       {
         name: str('Secret name (env var name).'),
         value: str('Secret value.'),
         description: str('Optional description.'),
+        projectId: str('Optional project id: the secret belongs to that project only.'),
       },
       ['name', 'value'],
     ),
   },
   {
     name: 'delete_secrets',
-    description: 'Delete team secrets by name or id.',
-    parameters: obj({ names: idArr('Secret names or ids to delete.') }, ['names']),
+    description:
+      'Delete secrets by name or id. Names match team-wide secrets unless projectId is given.',
+    parameters: obj(
+      {
+        names: idArr('Secret names or ids to delete.'),
+        projectId: str('Optional project id whose secrets the names refer to.'),
+      },
+      ['names'],
+    ),
   },
   {
     name: 'schedule_todo',

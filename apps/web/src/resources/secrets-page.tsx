@@ -1,7 +1,7 @@
 import { KeyRound, Lightbulb } from 'lucide-react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { useApiMutations, useSecrets } from '../api/hooks.js';
+import { useApiMutations, useProjects, useSecrets } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { EmptyState } from '../components/empty-state.js';
 import { toastError } from '../components/ui/toaster.js';
@@ -28,6 +28,13 @@ export function SecretsPage() {
   const secretsQ = useSecrets(teamId, live);
   const secrets = live ? (secretsQ.data ?? []) : (fixture.resources?.secrets ?? []);
   const mutations = useApiMutations(teamId);
+  const projectsQ = useProjects(teamId, live);
+  const projects = (projectsQ.data ?? []).map((project) => ({
+    id: project.id,
+    name: project.name,
+  }));
+  const projectName = (id: string | null | undefined) =>
+    id == null ? null : (projects.find((project) => project.id === id)?.name ?? null);
   const [createOpen, setCreateOpen] = useState(false);
 
   return (
@@ -59,13 +66,23 @@ export function SecretsPage() {
             <ResourceRow key={secret.id}>
               <RowText>
                 <RowTitle className="font-mono">{secret.name}</RowTitle>
-                {secret.description != null && <RowDesc>{secret.description}</RowDesc>}
+                <RowDesc>
+                  {[
+                    projectName(secret.projectId) === null
+                      ? t('全团队')
+                      : t('仅 {name}', { name: projectName(secret.projectId) ?? '' }),
+                    ...(secret.description != null ? [secret.description] : []),
+                  ].join(' · ')}
+                </RowDesc>
               </RowText>
             </ResourceRow>
           ))}
         </ResourceList>
       )}
       <CreateSecretDialog
+        key={searchParams.get('project') ?? ''}
+        projects={projects}
+        defaultProjectId={searchParams.get('project')}
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         onCreate={

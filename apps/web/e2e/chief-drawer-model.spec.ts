@@ -136,7 +136,7 @@ test.describe('chief drawer model row (#615)', () => {
   });
 
   test('the gear reaches the chief settings from a wake surface', async ({ page }) => {
-    await page.goto('/app/team?scenario=12');
+    await page.goto('/app/schedules?scenario=12');
     await openChiefWindow(page);
     await expect(drawer(page)).toBeVisible();
     const gear = drawer(page).locator('button[aria-label="总管设置"]');

@@ -774,22 +774,33 @@ export async function executeChiefTool(
     case 'set_secret': {
       const keysvc = { db, box: deps.box };
       const name = str(params, 'name');
-      const existing = listSecrets(keysvc, ctx.teamId).find((s) => s.name === name);
+      const projectId = optStr(params, 'projectId') ?? null;
+      const existing = listSecrets(keysvc, ctx.teamId).find(
+        (s) => s.name === name && s.projectId === projectId,
+      );
       const value = str(params, 'value');
       const description = optStr(params, 'description') ?? null;
       if (existing) {
         return json(updateSecret(keysvc, ctx.teamId, existing.id, { name, value, description }));
       }
-      const record = createSecret(keysvc, { teamId: ctx.teamId, name, description, value });
+      const record = createSecret(keysvc, {
+        teamId: ctx.teamId,
+        name,
+        description,
+        value,
+        projectId,
+      });
       return json(record);
     }
     case 'delete_secrets': {
       const keysvc = { db, box: deps.box };
       const names = strArr(params, 'names');
+      const projectId = optStr(params, 'projectId') ?? null;
       const all = listSecrets(keysvc, ctx.teamId);
       const deleted: string[] = [];
       for (const n of names) {
-        const hit = all.find((s) => s.name === n || s.id === n);
+        const hit =
+          all.find((s) => s.id === n) ?? all.find((s) => s.name === n && s.projectId === projectId);
         if (hit && deleteSecret(keysvc, ctx.teamId, hit.id)) deleted.push(n);
       }
       return json({ deleted });

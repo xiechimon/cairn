@@ -2,7 +2,7 @@ import type { MachineRuntime, ModelSource, ProviderRecord } from '@cairn/shared'
 import { MACHINE_RUNTIMES } from '@cairn/shared';
 import { Cpu } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router';
+import { useSearchParams } from 'react-router';
 import { useApiMutations, useMachines, useModelSources, useProviders } from '../api/hooks.js';
 import { mapMachines } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
@@ -10,7 +10,6 @@ import { ClaudeMark, GeminiMark, PiMark } from '../components/brand-marks.js';
 import { EmptyState } from '../components/empty-state.js';
 import { type ProviderItem, ProviderPanel } from '../components/providers/provider-panel.js';
 import { SegmentedTabs } from '../components/segmented.js';
-import { Button } from '../components/ui/button.js';
 import { toastError } from '../components/ui/toaster.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
@@ -19,7 +18,7 @@ import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { PageShell } from '../pages/shell.js';
 import { CreateProviderDialog } from './create-provider-dialog.js';
-import { MODEL_ROUTING_HREF, PROVIDERS_HREF } from './hrefs.js';
+import { PROVIDERS_HREF } from './hrefs.js';
 import { ResourceNewButton } from './parts.js';
 import {
   ClaudeCodeEditor,
@@ -162,7 +161,6 @@ function machineEntries(
 export function ProvidersPage() {
   const { t } = useI18n();
   const [searchParams, setSearchParams] = useSearchParams();
-  const navigate = useNavigate();
   const fixture = resolveScenario(searchParams);
   const { live, teamId } = useLiveData();
   const sourcesQ = useModelSources(teamId, live);
@@ -264,20 +262,7 @@ export function ProvidersPage() {
       route={PROVIDERS_HREF}
       title={t('模型服务')}
       selected={PROVIDERS_HREF}
-      actions={
-        <>
-          <Button
-            data-testid="open-subscription-accounts"
-            variant="ghost"
-            onClick={() =>
-              navigate({ pathname: MODEL_ROUTING_HREF, search: searchParams.toString() })
-            }
-          >
-            {t('订阅账户')}
-          </Button>
-          <ResourceNewButton onClick={() => setCreateOpen(true)} />
-        </>
-      }
+      actions={<ResourceNewButton onClick={() => setCreateOpen(true)} />}
       fixture={fixture}
     >
       <div className="mx-auto flex w-full max-w-240 flex-col gap-3 pt-2 pb-16">
