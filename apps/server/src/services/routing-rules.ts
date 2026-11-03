@@ -74,6 +74,11 @@ export function applyRoute(
     requiredCapabilities: session
       ? withOverride(route.requiredCapabilities, override?.requiredCapabilities)
       : agentRow.requiredCapabilities,
+    tools: (session ? route.tools : null) ?? agentRow.tools,
+    mcpServers: (session ? route.mcpServers : null) ?? agentRow.mcpServers,
+    skillsAllowlist: (session ? route.skillsAllowlist : null) ?? agentRow.skillsAllowlist,
+    defaultSkill: (session ? route.defaultSkill : null) ?? agentRow.defaultSkill,
+    secrets: (session ? route.secrets : null) ?? agentRow.secrets,
   };
 }
 
@@ -145,6 +150,11 @@ export function seedRoutingRules(db: Db): number {
         fallbackModels: source.fallbackModels,
         machineId: source.machineId,
         requiredCapabilities: seededRequirement(db, source),
+        tools: source.tools,
+        mcpServers: source.mcpServers,
+        skillsAllowlist: source.skillsAllowlist,
+        defaultSkill: source.defaultSkill,
+        secrets: source.secrets,
         seededFromAgentId: source.id,
         createdAt: now,
         updatedAt: now,
