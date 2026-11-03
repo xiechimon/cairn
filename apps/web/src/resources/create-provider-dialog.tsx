@@ -231,7 +231,7 @@ export function CreateProviderDialog({
         });
 
   const enterForm = async (entry: { id: string; label: string } | null) => {
-    const { PROVIDER_PRESET_DEFAULTS } = await import('@cairn/shared/provider-preset-data');
+    const { PROVIDER_PRESET_DEFAULTS } = await import('./provider-preset-data.js');
     const defaults = entry === null ? undefined : PROVIDER_PRESET_DEFAULTS[entry.id];
     setPreset(entry);
     setProviderId(entry?.id ?? '');

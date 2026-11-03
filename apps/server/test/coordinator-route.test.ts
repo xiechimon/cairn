@@ -1,5 +1,7 @@
-import type { ClaimedStep } from '@cairn/shared';
-import { PROVIDER_PRESET_DEFAULTS } from '@cairn/shared/provider-preset-data';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { type ClaimedStep, derivePresetDefaults, type PresetCatalogModel } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, afterEach, beforeEach, describe, expect, test } from 'vitest';
@@ -17,6 +19,22 @@ import {
 import { resolveChiefStepCredentials } from '../src/services/credentials.js';
 import { createProvider } from '../src/services/providers.js';
 import { bootServer, issueApiKey, type TestServer } from './helpers.js';
+
+const ANTHROPIC_CATALOG = join(
+  dirname(fileURLToPath(import.meta.url)),
+  '../../daemon/node_modules/@earendil-works/pi-ai/dist/providers/data/anthropic.json',
+);
+
+function anthropicPreset() {
+  const raw = JSON.parse(readFileSync(ANTHROPIC_CATALOG, 'utf8')) as Record<
+    string,
+    Record<string, PresetCatalogModel>
+  >;
+  const models = Object.values(raw).flatMap((group) => Object.values(group));
+  const preset = derivePresetDefaults([{ provider: 'anthropic', models }]).anthropic;
+  if (preset === undefined) throw new Error('the Anthropic preset has no defaults');
+  return preset;
+}
 
 const AGENT_ID = 'agent-chief-route';
 const BYOK_KEY = 'sk-ant-api-test-byok';
@@ -279,13 +297,20 @@ describe('the coordinator route (D70 C5)', () => {
 
   test('a provider added from the Anthropic preset as filled in is the keyed Coordinator route', async () => {
     const w = await world();
-    const preset = PROVIDER_PRESET_DEFAULTS.anthropic;
-    if (preset === undefined) throw new Error('the Anthropic preset has no defaults');
+    const preset = anthropicPreset();
     createProvider(
       { db: w.s.db, box: w.s.secretBox },
       {
         teamId: w.teamId,
-        body: { providerId: 'anthropic', label: 'Anthropic', ...preset, apiKey: BYOK_KEY },
+        body: {
+          providerId: 'anthropic',
+          label: 'Anthropic',
+          baseUrl: preset.baseUrl,
+          api: preset.api,
+          authHeader: preset.authHeader,
+          models: preset.models.filter((model) => preset.picks.includes(model.id)),
+          apiKey: BYOK_KEY,
+        },
         createdBy: w.s.user.id,
       },
     );
