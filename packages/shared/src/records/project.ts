@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { BRIEF_MARKER_BEGIN, BRIEF_MARKER_END } from '../brief-file.js';
 import { epochMs, recordId } from './common.js';
 import { diffFileSchema } from './document-diff.js';
 import { mergePolicySchema } from './merge-gate.js';
@@ -123,7 +124,14 @@ export const patchProjectBodySchema = z
     name: z.string().optional(),
     splitPolicy: splitPolicySchema.optional(),
     description: z.string().nullish(),
-    instructions: z.string().max(PROJECT_INSTRUCTIONS_MAX).nullish(),
+    instructions: z
+      .string()
+      .max(PROJECT_INSTRUCTIONS_MAX)
+      .refine(
+        (text) => !text.includes(BRIEF_MARKER_BEGIN) && !text.includes(BRIEF_MARKER_END),
+        'Must not contain the Cairn runtime markers',
+      )
+      .nullish(),
     repoKind: projectRepoKindSchema.optional(),
     githubRepo: z.string().optional(),
     localPath: z.string().nullish(),

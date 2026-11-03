@@ -1,4 +1,4 @@
-import { claimedStepSchema, PROJECT_INSTRUCTIONS_MAX } from '@cairn/shared';
+import { BRIEF_MARKER_END, claimedStepSchema, PROJECT_INSTRUCTIONS_MAX } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, test } from 'vitest';
 import { agent, chief as chiefTable, project, steerPending, step } from '../src/db/schema.js';
@@ -72,6 +72,18 @@ describe('project instructions are stored on the project (D74 P1)', () => {
     await req(s.app, 'PATCH', `/api/projects/${id}`, { instructions: RULES });
     const res = await req(s.app, 'PATCH', `/api/projects/${id}`, {
       instructions: 'x'.repeat(PROJECT_INSTRUCTIONS_MAX + 1),
+    });
+    expect(res.status).toBe(400);
+    expect(s.db.select().from(project).where(eq(project.id, id)).get()?.instructions).toBe(RULES);
+  });
+});
+
+describe('instructions cannot break the worker brief (D74 P1)', () => {
+  test('instructions containing a runtime marker are refused and nothing changes', async () => {
+    const id = await createProject('rules');
+    await req(s.app, 'PATCH', `/api/projects/${id}`, { instructions: RULES });
+    const res = await req(s.app, 'PATCH', `/api/projects/${id}`, {
+      instructions: `copied from CLAUDE.md\n${BRIEF_MARKER_END}`,
     });
     expect(res.status).toBe(400);
     expect(s.db.select().from(project).where(eq(project.id, id)).get()?.instructions).toBe(RULES);
