@@ -59,6 +59,7 @@ export const projectRecordSchema = z.object({
   splitPolicy: splitPolicySchema.default('human'),
   description: z.string().optional(),
   instructions: z.string().optional(),
+  maxConcurrent: z.number().int().optional(),
   repoKind: projectRepoKindSchema.optional(),
   repoName: z.string().optional(),
   githubRepo: z.string().optional(),
@@ -118,6 +119,7 @@ export const createProjectBodySchema = z.object({
 export type CreateProjectBody = z.infer<typeof createProjectBodySchema>;
 
 export const PROJECT_INSTRUCTIONS_MAX = 16_000;
+export const PROJECT_MAX_CONCURRENT = 16;
 
 export const patchProjectBodySchema = z
   .object({
@@ -132,6 +134,7 @@ export const patchProjectBodySchema = z
         'Must not contain the Cairn runtime markers',
       )
       .nullish(),
+    maxConcurrent: z.number().int().min(1).max(PROJECT_MAX_CONCURRENT).nullable().optional(),
     repoKind: projectRepoKindSchema.optional(),
     githubRepo: z.string().optional(),
     localPath: z.string().nullish(),

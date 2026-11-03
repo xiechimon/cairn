@@ -38,9 +38,9 @@ describe('segments mention navigation seam (#741)', () => {
     expect(markup).toMatch(/<span [^>]*class="[^"]*mention-chip--agent/);
   });
 
-  test('F-U3: todo segment navigation unregressed (#675 existing behavior)', () => {
+  test('F-U3: a todo mention opens its thread in the side chat on the home', () => {
     const markup = render([{ text: '#1', style: 'mention', mentionKind: 'todo', mentionId: 't1' }]);
-    expect(markup).toMatch(/<a [^>]*href="\/app\/todo\/t1"/);
+    expect(markup).toMatch(/<a [^>]*href="\/app\?thread=t1"/);
   });
 
   test('F-U4: skill/project/machine segments with id stay spans (negative — landing unproven, not in this ticket)', () => {

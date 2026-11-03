@@ -117,11 +117,16 @@ export const EN: Record<string, string> = {
   接下来: 'Up next',
   已暂停: 'Paused',
   本周合并: 'Merged this week',
+  并发与优先级: 'Concurrency and priority',
+  '不限（跟随机器上限）': 'No limit (machine limits apply)',
+  '串行，一次一个': 'Serial, one at a time',
+  '最多 {n} 个': 'Up to {n}',
+  '本项目同时运行的 thread 上限。你发的消息会插队，并可多用一个位置。':
+    'How many threads in this project run at once. Your own messages go first and may use one extra slot.',
   项目说明: 'Instructions',
   项目记忆: 'Project memory',
   定时任务: 'Schedules',
   没有定时任务: 'No schedules',
-  并发与优先级: 'Concurrency and priority',
   项目主页: 'Project home',
   '问 Coordinator 关于 {name} 的事…': 'Ask the Coordinator about {name}…',
   '这个项目还没有 thread': 'No threads in this project yet',
@@ -1035,8 +1040,18 @@ export const EN: Record<string, string> = {
   '密钥将加密存储，保存后无法再次查看。':
     'The key is stored encrypted and cannot be viewed again after saving.',
   '模型（可选）': 'Models (optional)',
-  '模型 ID': 'Model ID',
   添加模型: 'Add model',
+  移除模型: 'Remove model',
+  连接设置: 'Connection',
+  没有匹配的模型: 'No models match.',
+  '添加自定义模型「{id}」': 'Add custom model "{id}"',
+  '搜索模型或输入 ID': 'Search models or type an ID',
+  '填写 Base URL 和协议': 'Set the base URL and protocol',
+  原生鉴权: 'native auth',
+  '目录里还有 {n} 个模型，点「添加模型」搜索。':
+    '{n#1 more model|# more models} in the catalog. Use Add model to search.',
+  '把 Base URL 中的占位符换成你的账户值':
+    'Replace the placeholders in the Base URL with your account values',
   // #355 picker 形态(spec 11 §A6;preset 显示名 = 品牌串不译,OAuth 徽标
   // 同为英文字面)
   '搜索服务商...': 'Search providers...',
@@ -1308,6 +1323,10 @@ export const EN: Record<string, string> = {
     'Firing again only queues one more orchestration round; it will not start sooner.',
   任务加载失败: 'Failed to load the task',
   任务不存在或已被删除: 'This task does not exist or was deleted',
+  '#{seq} 还没开始': '#{seq} has not started yet',
+  '已归档，取消归档后才能继续': 'Archived. Unarchive to continue',
+  调整面板宽度: 'Resize panel',
+  '已关闭，不能再回复': 'Closed. It takes no more replies',
   回首页: 'Back to home',
   // —— #638 全站静默 mutation 失败面接线（toast 标题句；server 原因进
   // description 透传不译，#631 同律。已有面内 canon 位的面——merge 拒绝行 /

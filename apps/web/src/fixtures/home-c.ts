@@ -1,6 +1,7 @@
 import { boardDefault } from './board.js';
 import { chiefDefault } from './chief.js';
 import { PROJECT_ID, probeTodo, r7 } from './core.js';
+import { detailBuilding, detailConfirm, detailReview } from './detail.js';
 import type { ChiefContent, FixtureSet, TodoRecord } from './records.js';
 import { scheduleOnce } from './schedules.js';
 
@@ -120,6 +121,13 @@ export const homeC: FixtureSet = {
     homeTodo('home-c-done', 2201, 'Unread dot on threads', 'done', PROJECT_ID),
   ],
   chief: conversation,
+  details: {
+    'home-c-confirm': detailConfirm(false).detail ?? { transcript: [] },
+    'home-c-review': detailReview({ userMenuOpen: false, changesExpanded: false }).detail ?? {
+      transcript: [],
+    },
+    'home-c-working-a': detailBuilding(true).detail ?? { transcript: [] },
+  },
   schedules: [
     scheduleOnce,
     {

@@ -41,6 +41,7 @@ import {
   agentRunningCount,
   capabilityGatePasses,
   machineRunningCount,
+  projectRunningCount,
   runtimeGatePasses,
   stepRuntimeFor,
   unassignedStepReason,
@@ -467,8 +468,12 @@ async function tryClaim(
     return machineCache.get(id);
   };
   const full = machineRunningCount(db, machineId) >= workerCapOf(machineRow, maxWorkers);
-  const workerCands = full ? [] : claimCandidates(deps, machineId, teamId);
-  const earliestWorker = workerCands[0]?.stepRow.createdAt ?? Number.POSITIVE_INFINITY;
+  const queued = full ? [] : claimCandidates(deps, machineId, teamId);
+  const earliestWorker = queued[0]?.stepRow.createdAt ?? Number.POSITIVE_INFINITY;
+  const workerCands = [
+    ...queued.filter((cand) => cand.stepRow.byPerson),
+    ...queued.filter((cand) => !cand.stepRow.byPerson),
+  ];
   const chiefAhead = claimChiefTurn(deps, machineId, teamId, maxWorkers, earliestWorker);
   if (chiefAhead) return chiefAhead;
 
@@ -531,6 +536,12 @@ async function tryClaim(
     ) {
       continue;
     }
+    const projectCap = projectOfTodo(db, cand.todoRow)?.maxConcurrent ?? null;
+    const projectFull = (reader: Pick<typeof db, 'select'>) =>
+      projectCap !== null &&
+      projectRunningCount(reader, cand.todoRow.projectId) >=
+        projectCap + (cand.stepRow.byPerson ? 1 : 0);
+    if (projectFull(db)) continue;
     const { priorSessionId, priorMachineId, freshSession } = priorSessionOf(
       db,
       cand.stepRow,
@@ -580,6 +591,7 @@ async function tryClaim(
     let won = false;
     try {
       won = db.transaction((tx) => {
+        if (projectFull(tx)) return false;
         const res = tx
           .update(step)
           .set({

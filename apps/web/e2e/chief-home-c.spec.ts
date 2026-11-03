@@ -69,7 +69,8 @@ test('the Tasks panel lists running threads and a running row opens its thread',
     .locator('[data-slot="thread-row"]');
   await expect(rows).toHaveCount(3);
   await rows.filter({ hasText: 'Push for finished threads' }).getByRole('button').first().click();
-  await expect(page).toHaveURL(/\/app\/todo\/home-c-working-a/);
+  await expect(page).toHaveURL(/\/app\?.*thread=home-c-working-a/);
+  await expect(page.getByTestId('side-chat')).toContainText('Push for finished threads');
 });
 
 test('the sidebar lists project names only, and the project chat filters the decisions and the conversation', async ({

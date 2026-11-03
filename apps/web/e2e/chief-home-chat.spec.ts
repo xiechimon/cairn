@@ -80,7 +80,7 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
       '已经补给它了',
     );
     await page.getByTestId('home-c').locator('a.mention-chip--todo').first().click();
-    await expect(page).toHaveURL(/\/app\/todo\/todo-1/);
+    await expect(page).toHaveURL(/[?&]thread=todo-1/);
   });
 
   test('cmd+J on home focuses the home composer instead of opening the drawer', async ({ page }) => {
@@ -106,7 +106,7 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
     await openChiefWindow(page);
     const drawer = page.locator('.chief-drawer');
     await drawer.locator('a.mention-chip--todo').first().click();
-    await expect(page).toHaveURL(/\/app\/todo\/todo-1/);
+    await expect(page).toHaveURL(/[?&]thread=todo-1/);
   });
 
   test('phone width: the chat fills the screen and the composer stays on screen', async ({ page }) => {

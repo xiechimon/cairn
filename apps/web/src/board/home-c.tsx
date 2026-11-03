@@ -6,7 +6,7 @@ import {
   PackageCheck,
   Settings2,
 } from 'lucide-react';
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { useLiveData } from '../api/provider.js';
 import { ChiefConversation } from '../chief/chief-conversation.js';
@@ -31,7 +31,8 @@ import { MachineChip, MachinesPanel } from './machines-panel.js';
 import { ACT_ORDER, actRank, needsYouThreads, pendingQuestions } from './needs-you.js';
 import { NeedsYouThreadCard } from './needs-you-thread-card.js';
 import { composeRequest } from './open-composer.js';
-import { threadCopy, threadHref, threadStatus, threadTone } from './thread-copy.js';
+import { SideChat } from './side-chat.js';
+import { THREAD_PARAM, threadCopy, threadStatus, threadTone } from './thread-copy.js';
 import { PANE_PARAM, paneOf, type WorkPane, WorkPanel } from './work-panel.js';
 
 const GREETINGS: [number, string][] = [
@@ -138,13 +139,30 @@ export function HomeC({
       ),
     [machines, coordinatorMachineId],
   );
+  const threadId = searchParams.get(THREAD_PARAM);
   const showPane = (next: WorkPane | null) => {
     const params = new URLSearchParams(searchParams);
+    params.delete(THREAD_PARAM);
     if (next === null) params.delete(PANE_PARAM);
     else params.set(PANE_PARAM, next);
     setSearchParams(params, { replace: true, state: location.state });
   };
-  const togglePane = (next: WorkPane) => showPane(pane === next ? null : next);
+  const togglePane = (next: WorkPane) => showPane(pane === next && threadId === null ? null : next);
+  const openThread = (id: string) => {
+    const params = new URLSearchParams(searchParams);
+    params.set(THREAD_PARAM, id);
+    setSearchParams(params, { state: location.state });
+  };
+  const closeThread = useCallback(() => {
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        params.delete(THREAD_PARAM);
+        return params;
+      },
+      { replace: true },
+    );
+  }, [setSearchParams]);
   const [prefill, setPrefill] = useState<{ text: string; key: number } | null>(null);
   const { chiefData, chiefView, setChiefView } = surface;
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
@@ -271,7 +289,7 @@ export function HomeC({
               item={entry.item}
               onAnswer={surface.onAnswerQuestion}
               onCancel={surface.onCancelQuestion}
-              numberKeys={entry.key === questions[0]?.requestId}
+              numberKeys={threadId === null && entry.key === questions[0]?.requestId}
             />
           ) : (
             <NeedsYouThreadCard
@@ -283,11 +301,11 @@ export function HomeC({
               {...(threadCopy(entry.todo).primary != null
                 ? {
                     primaryLabel: t(threadCopy(entry.todo).primary ?? ''),
-                    onPrimary: () => navigate(threadHref(entry.todo.id)),
+                    onPrimary: () => openThread(entry.todo.id),
                   }
                 : {})}
               viewLabel={t('查看 thread')}
-              onView={() => navigate(threadHref(entry.todo.id))}
+              onView={() => openThread(entry.todo.id)}
             />
           )}
         </div>
@@ -358,14 +376,14 @@ export function HomeC({
       </h1>
       <MachineChip
         machines={computers}
-        open={pane === 'machines'}
+        open={pane === 'machines' && threadId === null}
         onToggle={() => togglePane('machines')}
       />
       <Button
         variant="ghost"
         size="icon-sm"
         aria-label={t('任务')}
-        aria-pressed={pane === 'tasks'}
+        aria-pressed={pane === 'tasks' && threadId === null}
         onClick={() => togglePane('tasks')}
         className="relative text-content-tertiary hover:text-foreground aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
       >
@@ -382,7 +400,7 @@ export function HomeC({
         variant="ghost"
         size="icon-sm"
         aria-label={t('成果')}
-        aria-pressed={pane === 'made'}
+        aria-pressed={pane === 'made' && threadId === null}
         onClick={() => togglePane('made')}
         className="text-content-tertiary hover:text-foreground aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
       >
@@ -392,7 +410,15 @@ export function HomeC({
   );
 
   const workPanel =
-    pane === 'machines' ? (
+    threadId !== null ? (
+      <SideChat
+        key={threadId}
+        todoId={threadId}
+        listed={todos.find((todo) => todo.id === threadId)}
+        now={now}
+        onClose={closeThread}
+      />
+    ) : pane === 'machines' ? (
       <MachinesPanel machines={computers} onClose={() => showPane(null)} />
     ) : (
       pane !== null && (
@@ -406,6 +432,7 @@ export function HomeC({
           }
           now={now}
           onClose={() => showPane(null)}
+          onOpenThread={openThread}
         />
       )
     );

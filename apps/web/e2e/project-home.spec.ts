@@ -36,10 +36,12 @@ test('the threads are this project only, grouped by state with counts', async ({
   await expect(stats).toContainText('2In progress');
 });
 
-test('a thread row opens that thread', async ({ page }) => {
+test('a thread row opens that thread in the side chat over the project home', async ({ page }) => {
   await page.goto(projectHome());
   await group(page, 'In progress').getByRole('button', { name: /Push for finished threads/ }).click();
-  await expect(page).toHaveURL(/\/app\/todo\/home-c-working-a/);
+  await expect(page).toHaveURL(/\/app\?.*thread=home-c-working-a/);
+  await expect(page.getByTestId('side-chat')).toContainText('Push for finished threads');
+  await expect(page.getByTestId('project-home')).toBeVisible();
 });
 
 test('the project home links to files and project settings', async ({ page }) => {

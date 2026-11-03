@@ -225,7 +225,7 @@ test.describe('chief drawer markdown face (fixture, #650)', () => {
     await expect(chip).toHaveCount(1);
     await expect(chip).toHaveText('#1');
 
-    await expect(chip).toHaveAttribute('href', '/app/todo/r3-legacy-1');
+    await expect(chip).toHaveAttribute('href', /^\/app\?(.*&)?thread=r3-legacy-1$/);
 
     await expect(stream).toContainText('prose #12 与 [伪链](todos:t2) 保持字面');
     expect(await stream.locator('.mention-chip').count()).toBe(
@@ -234,7 +234,7 @@ test.describe('chief drawer markdown face (fixture, #650)', () => {
     );
 
     await chip.click();
-    await expect(page).toHaveURL(/\/app\/todo\/r3-legacy-1/);
+    await expect(page).toHaveURL(/[?&]thread=r3-legacy-1/);
   });
 
   test('F-R4/R5: typing rows have no foot; final rows keep the foot (copy + done 44s)', async ({ page }) => {
@@ -600,13 +600,13 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
     const chip = bubble.locator('.mention-chip--todo');
     await expect(chip).toHaveCount(1);
     await expect(chip).toHaveText('#16');
-    await expect(chip).toHaveAttribute('href', '/app/todo/t16');
+    await expect(chip).toHaveAttribute('href', /^\/app\?(.*&)?thread=t16$/);
 
     await expect(bubble).toContainText('prose #12 与 [伪链](todos:t2) [空](todo:) 保持字面');
     await expect(bubble.locator('.mention-chip')).toHaveCount(1);
 
     await chip.click();
-    await expect(page).toHaveURL(/\/app\/todo\/t16/);
+    await expect(page).toHaveURL(/[?&]thread=t16/);
   });
 
   test('F-R15: copy payload = markdown source (not rendered output); the two-button row (copy/restore) is unaffected', async ({

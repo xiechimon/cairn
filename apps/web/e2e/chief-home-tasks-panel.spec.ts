@@ -34,10 +34,11 @@ test('the Tasks button opens one list grouped as needs you, in progress, idle', 
   await expect(page).not.toHaveURL(/pane=/);
 });
 
-test('an idle row opens its thread', async ({ page }) => {
+test('an idle row opens its thread in the side chat', async ({ page }) => {
   await page.goto(`${HOME}&pane=tasks`);
   await panel(page).getByText('Sidebar status groups').click();
-  await expect(page).toHaveURL(/\/app\/todo\/home-c-idle/);
+  await expect(page).toHaveURL(/[?&]thread=home-c-idle/);
+  await expect(page.getByTestId('side-chat')).toContainText('Sidebar status groups');
 });
 
 test('a schedule sits in idle once, never beside its own running or idle task, and links to the full schedules page', async ({ page }) => {

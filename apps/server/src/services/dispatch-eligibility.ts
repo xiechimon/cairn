@@ -162,6 +162,16 @@ export function machineRunningCount(db: Db, machineId: string): number {
     .all().length;
 }
 
+export function projectRunningCount(db: Pick<Db, 'select'>, projectId: string): number {
+  return db
+    .select({ id: step.id })
+    .from(step)
+    .innerJoin(build, eq(step.buildId, build.id))
+    .innerJoin(todo, eq(build.todoId, todo.id))
+    .where(and(eq(step.status, 'claimed'), ne(step.kind, 'chief'), eq(todo.projectId, projectId)))
+    .all().length;
+}
+
 export function agentRunningCount(db: Db, agentId: string): number {
   const rows = db
     .select({ kind: step.kind, prompt: step.prompt, todoRow: todo })
