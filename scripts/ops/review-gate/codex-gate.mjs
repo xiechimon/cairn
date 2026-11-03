@@ -149,6 +149,8 @@ function evaluate(repo, number) {
     ghWrite('DELETE', `repos/${repo}/issues/${number}/labels/${STALL_LABEL}`);
 }
 
+const GATE_WORKFLOW = 'review-gate.yml';
+
 function sweep(repo) {
   const open = listPaged(`repos/${repo}/pulls`).filter((pr) => !pr.draft);
   let failed = 0;
@@ -156,7 +158,10 @@ function sweep(repo) {
     try {
       const check = newestOwnCheck(repo, pr.head.sha);
       if (check?.status === 'completed' && check.conclusion === 'success') continue;
-      evaluate(repo, pr.number);
+      ghWrite('POST', `repos/${repo}/actions/workflows/${GATE_WORKFLOW}/dispatches`, {
+        ref: 'main',
+        inputs: { pr: String(pr.number) },
+      });
     } catch (error) {
       failed += 1;
       console.error(`PR #${pr.number}: ${error.message}`);

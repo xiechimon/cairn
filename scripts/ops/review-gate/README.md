@@ -27,7 +27,7 @@ Known limits: reasoning effort is low, and an Anthropic-authored PR with no usab
 
 ## Codex cloud gate
 
-`.github/workflows/review-gate.yml` runs `codex-gate.mjs evaluate` (decision logic in `codex-gate-core.mjs`) on `pull_request_target`, on issue comments by `chatgpt-codex-connector[bot]`, every 10 minutes on a schedule (`codex-gate.mjs sweep` over open non-draft PRs whose head check has not passed), and by hand through `workflow_dispatch` with the PR number. GitHub Actions has no event for resolving a review thread, so the sweep picks that up. It always runs the script from `main`, never executes PR code and uses no secrets. It writes one check run named `review-gate` per head SHA through the Checks API (the newest run of the `github-actions` app is updated, never duplicated).
+`.github/workflows/review-gate.yml` runs `codex-gate.mjs evaluate` (decision logic in `codex-gate-core.mjs`) on `pull_request_target`, on issue comments by `chatgpt-codex-connector[bot]`, every 10 minutes on a schedule (`codex-gate.mjs sweep` dispatches the workflow for each open non-draft PR whose head check has not passed, so every evaluation of a PR runs in that PR's concurrency group), and by hand through `workflow_dispatch` with the PR number. GitHub Actions has no event for resolving a review thread, so the sweep picks that up. It always runs the script from `main`, never executes PR code and uses no secrets. It writes one check run named `review-gate` per head SHA through the Checks API (the newest run of the `github-actions` app is updated, never duplicated).
 
 The check reads the Codex state comment (`<!-- codex-review-state:v1 ... -->`, trusted only from the Codex bot) and the PR review threads:
 
