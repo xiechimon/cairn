@@ -31,6 +31,7 @@ import { backfillPersonas } from './services/personas.js';
 import { loadOrCreateVapidKeys } from './services/push.js';
 import {
   adoptAgentMemories,
+  seedReviewRules,
   seedRoutingRules,
   setRoutingRulesEnabled,
 } from './services/routing-rules.js';
@@ -80,6 +81,7 @@ setCoordinatorRouteLog((teamId, reason) =>
 );
 if (config.routingRules) {
   seedRoutingRules(db);
+  seedReviewRules(db);
   adoptAgentMemories(db);
 }
 backfillTokenUsageCost(db);

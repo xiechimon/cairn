@@ -51,6 +51,8 @@ export const DB_TABLES = [
   'routing_rule',
   'chief_turn_usage',
   'chief_summary',
+  'computer',
+  'computer_call',
 ] as const;
 
 export type DbTable = (typeof DB_TABLES)[number];
@@ -88,4 +90,6 @@ export const INTERNAL_ONLY_TABLES = [
   'routing_rule',
   'chief_turn_usage',
   'chief_summary',
+  'computer',
+  'computer_call',
 ] as const;

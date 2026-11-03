@@ -143,6 +143,7 @@ import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
 import type { VapidKeys } from './push.js';
 import { publishStepRow, toQuotaWait } from './quota-wait.js';
 import { retryLessonsOf } from './retry-lessons.js';
+import { routeForStep } from './routing-rules.js';
 import { finishScheduledStep } from './schedules.js';
 import {
   appendShipGateInstruction,
@@ -1113,7 +1114,8 @@ export function maybeEnqueueIndependentReview(
     .from(agent)
     .where(and(eq(agent.teamId, todoRow.teamId), eq(agent.persona, 'code_reviewer')))
     .get();
-  const agentId = slotted ?? personaReviewer?.id ?? null;
+  const agentId =
+    slotted ?? personaReviewer?.id ?? routeForStep(deps.db, todoRow, 'review')?.id ?? null;
   if (agentId === null) return;
   const reviewer = deps.db.select().from(agent).where(eq(agent.id, agentId)).get();
   const focus = reviewer?.persona != null ? personaByRole(reviewer.persona).reviewFocus : undefined;
