@@ -15,7 +15,7 @@ if $stop && [[ $name != cairn-orb-* ]]; then exit 0; fi
 if [[ $name != cairn-orb-* ]]; then
   expected='CAIRN_ORB_BINDS='
 else
-  [[ $name != cairn-orb-base ]] || exit 2
+  [[ $name != cairn-orb-base && $name != cairn-orb-computer ]] || exit 2
   if ! $stop; then
     [[ $(sysctl -n fs.protected_hardlinks) == 1 ]] || { printf 'Runtime idmap requires fs.protected_hardlinks=1\n' >&2; exit 1; }
     mount_options=$(findmnt --noheadings --output OPTIONS --target "$host_root/run/cairn-orb")
@@ -30,6 +30,14 @@ else
   changes=${runtime_changes%% *}
   if $stop; then printf '%s changes\n' "$changes"; exit 0; fi
   expected="CAIRN_ORB_BINDS=${CAIRN_ORB_FIXED_BINDS:?Missing fixed bind configuration}"
+  if [[ $name == cairn-orb-computer-* ]]; then
+    home_args=("$name")
+    if $dry_run; then home_args=(--dry-run "${home_args[@]}"); fi
+    home_changes=$("${CAIRN_ORB_NODE:-/usr/local/lib/cairn-orb/node}" "$(dirname -- "${BASH_SOURCE[0]}")/computer-home.mjs" "${home_args[@]}")
+    [[ $home_changes =~ ^[01]' changes'$ ]] || { printf 'Invalid computer home preparation result\n' >&2; exit 1; }
+    changes=$((changes + ${home_changes%% *}))
+    expected="$expected --bind=/var/lib/cairn-computer/$name:/home/agent:idmap,norbind"
+  fi
 fi
 if [[ ! -f $bind_file || $(cat "$bind_file") != "$expected" ]]; then
   printf 'install %s mode 644\n' "$bind_file"

@@ -56,6 +56,7 @@ export function installHost(options = {}) {
     ],
     ['prepare-machine.sh', '/usr/local/lib/cairn-orb/prepare-machine.sh', 0o755],
     ['runtime-directory.mjs', '/usr/local/lib/cairn-orb/runtime-directory.mjs'],
+    ['computer-home.mjs', '/usr/local/lib/cairn-orb/computer-home.mjs'],
     ['egress-relay.mjs', '/usr/local/lib/cairn-orb/egress-relay.mjs'],
     ['firewall.nft', '/etc/cairn-orb/firewall.nft'],
     ['cairn-orb-firewall.service', '/etc/systemd/system/cairn-orb-firewall.service'],
@@ -70,6 +71,7 @@ export function installHost(options = {}) {
     ['/var/lib/cairn-orb', 'root', 'root'],
     ['/var/lib/cairn-orb/dist', 'ian', '-'],
     ['/var/lib/cairn-orb/seed', 'ian', '-'],
+    ['/var/lib/cairn-computer', 'root', 'root'],
   ];
   const tmpfiles = `${directories.map(([path, owner, group]) => `d ${path} 0755 ${owner} ${group} -`).join('\n')}\n`;
   const foreignRules = [
@@ -207,21 +209,26 @@ export function installHost(options = {}) {
     if (change.probe('runuser', [...userctl, probe, 'egress-relay.service']).status !== 0)
       change.exec('runuser', [...userctl, action, 'egress-relay.service']);
   }
-  if (dryRun) log('plan: bash build-image.sh --dry-run');
-  const image = change.probe('bash', [
-    resolve(import.meta.dirname, 'build-image.sh'),
-    ...(dryRun ? ['--dry-run'] : []),
-  ]);
-  if (image.stderr?.trim()) log(image.stderr.trim());
-  if (image.status !== 0) {
-    if (image.stdout?.trim()) log(image.stdout.trim());
-    throw new Error(`build-image failed: ${image.stderr || image.stdout}`);
+  let imageChanges = 0;
+  for (const script of ['build-image.sh', 'build-computer-image.sh']) {
+    if (dryRun) log(`plan: bash ${script} --dry-run`);
+    const image = change.probe('bash', [
+      resolve(import.meta.dirname, script),
+      ...(dryRun ? ['--dry-run'] : []),
+    ]);
+    if (image.stderr?.trim()) log(image.stderr.trim());
+    if (image.status !== 0) {
+      if (image.stdout?.trim()) log(image.stdout.trim());
+      throw new Error(`${script.replace(/\.sh$/, '')} failed: ${image.stderr || image.stdout}`);
+    }
+    if (image.stdout?.trim() !== '0 changes') {
+      log(image.stdout?.trim());
+      imageChanges += 1;
+    }
   }
-  const imageChanged = image.stdout?.trim() !== '0 changes';
-  if (imageChanged) log(image.stdout?.trim());
   if (change.count > 0 || previousPending)
     change.file('/var/lib/cairn-orb/install-pending', 'complete\n');
-  log(`${change.count + (imageChanged ? 1 : 0)}${dryRun ? ' planned' : ''} changes`);
+  log(`${change.count + imageChanges}${dryRun ? ' planned' : ''} changes`);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
