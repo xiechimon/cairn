@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { machineComputerFramesResponseSchema, redactSecrets } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterEach, describe, expect, test } from 'vitest';
 import { computer, computerCall, machine } from '../src/db/schema.js';
@@ -422,6 +422,19 @@ describe('computer tables and machine removal', () => {
     const res = await s.app.request(`/api/machines/${owner.id}`, { method: 'DELETE' });
     expect(res.status).toBe(204);
     expect(hasPendingComputerOutput(id)).toBe(false);
+  });
+
+  test('a machine deletion that fails keeps the unsettled output of its calls', async () => {
+    const { s, owner, id } = await setup();
+    await post(s.app, `/api/machine/computer/${id}`, owner.token, {
+      frames: [{ kind: 'output', seq: 1, stream: 'stdout', text: 'still-writing' }],
+    });
+    s.db.run(
+      sql`CREATE TRIGGER block_machine_delete BEFORE DELETE ON machine BEGIN SELECT RAISE(ABORT, 'blocked'); END`,
+    );
+    const res = await s.app.request(`/api/machines/${owner.id}`, { method: 'DELETE' });
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(hasPendingComputerOutput(id)).toBe(true);
   });
 
   test('two computers cannot share one scope key', async () => {

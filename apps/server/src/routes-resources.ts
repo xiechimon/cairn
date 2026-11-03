@@ -42,7 +42,7 @@ import {
   readGithubConnectionStatus,
   teamGithubToken,
 } from './services/github-connection.js';
-import { dropPendingComputerOutput } from './services/machine-computer.js';
+import { pendingComputerOutputRelease } from './services/machine-computer.js';
 import {
   machineConcurrencyPatch,
   machineRunningCount,
@@ -177,8 +177,9 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
       );
     }
     ctx.db.update(routingRule).set({ machineId: null }).where(eq(routingRule.machineId, id)).run();
-    dropPendingComputerOutput(ctx.db, id);
+    const releasePendingOutput = pendingComputerOutputRelease(ctx.db, id);
     ctx.db.delete(machine).where(eq(machine.id, id)).run();
+    releasePendingOutput();
     return c.body(null, 204);
   });
 
