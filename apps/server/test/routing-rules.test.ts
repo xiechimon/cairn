@@ -393,6 +393,11 @@ describe('D71 the session rule carries the hard constraints', () => {
       fallbackModels: null,
       machineId: null,
       requiredCapabilities: { executor: 'orb' as const },
+      tools: null,
+      mcpServers: null,
+      skillsAllowlist: null,
+      defaultSkill: null,
+      secrets: null,
       seededFromAgentId: null,
       createdAt: 1,
       updatedAt: 1,
@@ -451,5 +456,111 @@ describe('D71 thread override set at dispatch', () => {
     const w = await setupWorld();
     const { res } = await start(w, { machineId: newRecordId() });
     expect(res.status).toBe(404);
+  });
+});
+
+describe('D71 tools, MCP, skills and secrets live on the session rule', () => {
+  test('flag on: the rule values replace the agent values', async () => {
+    const w = await setupWorld();
+    w.s.db
+      .update(agentTable)
+      .set({
+        tools: ['agent-tool'],
+        mcpServers: ['agent-mcp'],
+        skillsAllowlist: ['agent-skill'],
+        defaultSkill: 'agent-skill',
+        secrets: ['AGENT_SECRET'],
+      })
+      .where(eq(agentTable.id, AGENT_BUILD))
+      .run();
+    insertRule(w.s, {
+      teamId: w.s.team.id,
+      tools: ['rule-tool'],
+      mcpServers: ['rule-mcp'],
+      skillsAllowlist: ['rule-skill'],
+      defaultSkill: 'rule-skill',
+      secrets: ['RULE_SECRET'],
+    });
+    const todoRow = await buildTodo(w);
+    expect(agentForStep(w.s.db, todoRow, 'build')).toMatchObject({
+      tools: ['rule-tool'],
+      mcpServers: ['rule-mcp'],
+      skillsAllowlist: ['rule-skill'],
+      defaultSkill: 'rule-skill',
+      secrets: ['RULE_SECRET'],
+    });
+  });
+
+  test('flag on: a rule that leaves a value unset inherits the agent value during the transition', async () => {
+    const w = await setupWorld();
+    w.s.db
+      .update(agentTable)
+      .set({ mcpServers: ['agent-mcp'], secrets: ['AGENT_SECRET'] })
+      .where(eq(agentTable.id, AGENT_BUILD))
+      .run();
+    insertRule(w.s, { teamId: w.s.team.id, mcpServers: [] });
+    const todoRow = await buildTodo(w);
+    expect(agentForStep(w.s.db, todoRow, 'build')).toMatchObject({
+      mcpServers: [],
+      secrets: ['AGENT_SECRET'],
+    });
+  });
+
+  test('the coordinator rule leaves the bound agent tools and secrets alone', async () => {
+    const w = await setupWorld();
+    const agentRow = {
+      ...w.s.db.select().from(agentTable).where(eq(agentTable.id, AGENT_BUILD)).get()!,
+      secrets: ['AGENT_SECRET'],
+    };
+    const rule = {
+      id: 'r',
+      teamId: w.s.team.id,
+      use: 'coordinator' as const,
+      provider: 'p',
+      modelId: 'm',
+      thinkingLevel: null,
+      fallbackModels: null,
+      machineId: null,
+      requiredCapabilities: null,
+      tools: null,
+      mcpServers: null,
+      skillsAllowlist: null,
+      defaultSkill: null,
+      secrets: ['RULE_SECRET'],
+      seededFromAgentId: null,
+      createdAt: 1,
+      updatedAt: 1,
+    };
+    expect(applyRoute(agentRow, rule).secrets).toEqual(['AGENT_SECRET']);
+  });
+
+  test('seed copies the seed agent tools, MCP, skills and secrets onto the session rule', async () => {
+    const w = await setupWorld();
+    w.s.db.delete(agentTable).where(eq(agentTable.persona, 'implementer')).run();
+    w.s.db
+      .insert(agentTable)
+      .values({
+        id: 'agent-impl',
+        teamId: w.s.team.id,
+        displayName: 'impl',
+        persona: 'implementer',
+        provider: 'claude-code',
+        modelId: 'claude-sonnet-5-5',
+        machineId: w.machineId,
+        tools: ['create_tag'],
+        mcpServers: ['figma'],
+        skillsAllowlist: ['verify-cairn'],
+        defaultSkill: 'verify-cairn',
+        secrets: ['NPM_TOKEN'],
+      })
+      .run();
+    expect(seedRoutingRules(w.s.db)).toBe(1);
+    expect(w.s.db.select().from(routingRule).get()).toMatchObject({
+      tools: ['create_tag'],
+      mcpServers: ['figma'],
+      skillsAllowlist: ['verify-cairn'],
+      defaultSkill: 'verify-cairn',
+      secrets: ['NPM_TOKEN'],
+    });
   });
 });

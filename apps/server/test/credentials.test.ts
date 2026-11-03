@@ -340,4 +340,31 @@ describe('resolveStepCredentials under CAIRN_ROUTING_RULES', () => {
       apiKey: RELAY_KEY,
     });
   });
+
+  test('D71 a session rule that names secrets decides which team secrets a build step opens', async () => {
+    const s = await withAgentStack();
+    s.db
+      .insert(routingRule)
+      .values({
+        id: 'rule-secrets',
+        teamId: s.team.id,
+        use: 'session',
+        provider: 'r3-gw',
+        modelId: 'claude-sonnet-5',
+        secrets: [],
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      .run();
+    const buildStepId = addStep(s, s.buildId, 'build');
+    setRoutingRulesEnabled(true);
+    try {
+      expect(resolveStepCredentials(s.keysvc, buildStepId).secrets).toEqual({});
+    } finally {
+      setRoutingRulesEnabled(false);
+    }
+    expect(resolveStepCredentials(s.keysvc, buildStepId).secrets).toEqual({
+      STRIPE_API_KEY: STRIPE_VALUE,
+    });
+  });
 });
