@@ -114,6 +114,13 @@ export const EN: Record<string, string> = {
   在进行: 'In progress',
   等你处理: 'Needs you',
   管理定时: 'Manage schedules',
+  项目说明: 'Instructions',
+  保存项目说明: 'Save instructions',
+  '本项目的每个 thread 和 Coordinator 都会读到，排在仓库的 AGENTS.md 之后。':
+    'Every thread and the Coordinator read these in this project, after the repository AGENTS.md.',
+  '例如：仓库内容用英文；改动后跑 pnpm lint；不要 force push。':
+    'For example: repository content is English; run pnpm lint after changes; never force push.',
+  '项目说明保存失败，请重试。': 'Could not save the instructions. Try again.',
   没有在进行的任务: 'Nothing in progress',
   没有空闲的任务: 'Nothing idle',
   还没有完成的工作: 'Nothing finished yet',
