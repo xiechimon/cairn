@@ -98,9 +98,21 @@ works with the user unit's `ProtectHome=yes`. Binary content and mode converge
 on reruns. Existing networkd-managed host links or earlier network configuration
 files stop the installer before changes.
 The image contains Node, pinned Claude Code/Codex CLIs and the repository's
-pnpm, installed with npm lifecycle scripts disabled, plus bubblewrap: Claude
-Code refuses to start without it, because it scrubs subprocess environments
-through `bwrap`. The pnpm version lives in
+pnpm, installed with npm lifecycle scripts disabled, plus bubblewrap and
+socat: Claude Code refuses to start without bubblewrap, because it scrubs
+subprocess environments through `bwrap`, and its Bash sandbox refuses every
+command with "socat not installed" when socat is missing. Steps that carry the
+subscription token set `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB`, which makes that
+sandbox mandatory, and inside nspawn bubblewrap cannot mount a fresh `/proc`
+("Can't mount proc on /proc: Operation not permitted"). The worker unit
+therefore sets `CLAUDE_CONFIG_DIR=/var/lib/cairn-claude/config`, whose
+`settings.json` enables `sandbox.enableWeakerNestedSandbox` so bubblewrap binds
+the Orb's `/proc` instead. A process inside that sandbox still cannot read
+`/proc/<pid>/environ` of processes outside it (measured on omarchy, 2026-11-03).
+`/var/lib/cairn-claude` is `root:root 0755`, `config` is `root:agent 1770`
+(sticky) and `settings.json` is `root:root 0644`, so the agent can write its
+own Claude state there but cannot remove, rename or overwrite the settings or
+move the directory; the image build checks each of these as `agent`. The pnpm version lives in
 `pnpm.version` beside the script, because `cairn-ops-run` materializes only
 `scripts/ops/orb`; `shell.test.mjs` fails when it differs from the root
 `packageManager`. Node 25 and later ship no corepack, so project

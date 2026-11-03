@@ -3,6 +3,7 @@ import { existsSync, realpathSync } from 'node:fs';
 import { homedir, hostname } from 'node:os';
 import { join } from 'node:path';
 import {
+  type CanUseTool,
   createSdkMcpServer,
   type EffortLevel,
   type McpServerConfig,
@@ -874,9 +875,17 @@ const METERED_CLAUDE_AUTH_BLANK = {
   CLAUDE_CODE_USE_FOUNDRY: '',
 };
 
+function approveUnlessDisallowed(disallowedTools: readonly string[]): CanUseTool {
+  return async (toolName, input) =>
+    disallowedTools.includes(toolName)
+      ? { behavior: 'deny', message: `${toolName} is not available in this step` }
+      : { behavior: 'allow', updatedInput: input };
+}
+
 export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
   const managedMcp = parts.strictMcpConfig === true;
   const locked = !parts.inOrb && parts.lockedDown;
+  const scrubbed = parts.env?.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB === '1';
   const hostMcp = Object.fromEntries(
     Object.entries(parts.mcpServers).filter(([slug]) => slug === HOST_MCP_SERVER_NAME),
   );
@@ -892,9 +901,14 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
     model: parts.modelId,
     ...(locked
       ? { permissionMode: 'dontAsk' as const, allowedTools: [...HOST_ALLOWED_TOOLS] }
-      : parts.inOrb
-        ? { permissionMode: 'bypassPermissions' as const, allowDangerouslySkipPermissions: true }
-        : { permissionMode: 'bypassPermissions' as const }),
+      : scrubbed
+        ? {
+            permissionMode: 'default' as const,
+            canUseTool: approveUnlessDisallowed(parts.disallowedTools),
+          }
+        : parts.inOrb
+          ? { permissionMode: 'bypassPermissions' as const, allowDangerouslySkipPermissions: true }
+          : { permissionMode: 'bypassPermissions' as const }),
     disallowedTools: locked ? [...parts.disallowedTools, 'Bash'] : parts.disallowedTools,
     ...(locked
       ? { tools: parts.builtinTools ?? [...HOST_BUILTIN_TOOLS] }

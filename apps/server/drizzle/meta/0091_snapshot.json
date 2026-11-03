@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "d0136613-7f7e-456d-8f54-d6d83db00c7a",
+  "id": "b8551377-77a1-4d1c-ae1f-517e2151da9e",
   "prevId": "16a74819-12a4-4085-ad24-0f81cd7eed9d",
   "tables": {
     "agent": {
@@ -4219,6 +4219,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "scopeProjectId": {
+          "name": "scopeProjectId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "freshSession": {
           "name": "freshSession",
           "type": "integer",
@@ -4615,13 +4622,6 @@
         },
         "assignment": {
           "name": "assignment",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "routeOverride": {
-          "name": "routeOverride",
           "type": "text",
           "primaryKey": false,
           "notNull": false,

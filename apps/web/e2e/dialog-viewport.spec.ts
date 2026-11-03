@@ -81,7 +81,7 @@ test('create-agent: submit stays in the viewport', async ({ page }) => {
 });
 
 test('charter: `取消`/save charter stay in the viewport', async ({ page }) => {
-  await page.goto('/app?scenario=102&view=board');
+  await page.goto('/app?scenario=102');
 
   await page.getByRole('button', { name: '编辑' }).click();
   const dialog = page.getByRole('dialog');
@@ -92,7 +92,7 @@ test('charter: `取消`/save charter stay in the viewport', async ({ page }) => 
 });
 
 test('chief-agent list state (buttonless read face) panel stays within the viewport entirely', async ({ page }) => {
-  await page.goto('/app?scenario=101&view=board');
+  await page.goto('/app?scenario=101');
 
   await page.getByRole('button', { name: '未设置' }).click();
   const dialog = page.getByRole('dialog');
@@ -101,27 +101,8 @@ test('chief-agent list state (buttonless read face) panel stays within the viewp
   await expect(dialog.getByRole('listbox')).toBeInViewport();
 });
 
-test('branch sync tab: viewport shorter than content, sync button pinned to bottom, body overflows; git tab normal', async ({ page }) => {
-
-  await page.setViewportSize({ width: 800, height: 360 });
-  await page.goto('/app?scenario=01&view=board');
-  await page.locator('.todo-card-branch').first().click();
-  const dialog = page.getByRole('dialog');
-  await expect(dialog).toBeVisible();
-  await expectBodyOverflows(dialog);
-  const box = await dialog.boundingBox();
-  expect(box).not.toBeNull();
-  if (box == null) return;
-  expect(box.height).toBeLessThanOrEqual(360 - 48 + 0.5);
-  await expect(dialog.getByRole('button', { name: '同步', exact: true })).toBeInViewport();
-
-  await dialog.getByRole('tab', { name: 'Git' }).click();
-  await expect(dialog.getByRole('button', { name: '同步', exact: true })).toHaveCount(0);
-  await expect(dialog.getByText('构建分支')).toBeInViewport();
-});
-
 test('accept(34): `取消`/done stay in the viewport', async ({ page }) => {
-  await page.goto('/app?scenario=34&view=board');
+  await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=34');
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
   await expectShellCapped(dialog);

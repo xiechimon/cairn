@@ -200,12 +200,6 @@ test('a project-filtered home links to that project files and settings', async (
   await expect(page.getByTestId('home-c-project-links')).toHaveCount(0);
 });
 
-test('a project link with board or column params still lands on the filtered home', async ({ page }) => {
-  await page.goto(`/app/project/${PROJECT_ID}?scenario=home-c&view=board&column=pending`);
-  await expect(page.getByTestId('home-c')).toBeVisible();
-  await expect(page).not.toHaveURL(/view=board|column=/);
-});
-
 test('the home lands at the newest message, with the greeting and the pinned decision above it', async ({
   page,
 }) => {

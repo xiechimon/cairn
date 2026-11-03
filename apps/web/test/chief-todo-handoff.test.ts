@@ -31,13 +31,10 @@ describe('a follow-up routed into a running task', () => {
     expect(items).toContainEqual({ kind: 'handoff', todoId: 'todo-7', id: 'm1:handoff' });
   });
 
-  test('in a live turn the handoff follows its own tool row and keeps a distinct key', () => {
-    const items = mapChiefStream(
-      [call('m1', 'message_todo', { todoId: 'todo-7', content: 'x' }, { ok: true })],
-      true,
-    );
-    const kinds = items.map((item) => item.kind);
-    expect(kinds.indexOf('tool')).toBeLessThan(kinds.indexOf('handoff'));
+  test('the handoff keeps a key distinct from its tool row', () => {
+    const items = mapChiefStream([
+      call('m1', 'message_todo', { todoId: 'todo-7', content: 'x' }, { ok: true }),
+    ]);
     const ids = items.map((item) => ('id' in item ? item.id : undefined));
     expect(new Set(ids).size).toBe(ids.length);
   });

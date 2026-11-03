@@ -133,9 +133,9 @@ test('boot skeleton paints the dark tokens before the bundle mounts', async ({ p
   expect(paint.staticChrome).toBe(paint.canvas);
 });
 
-test('a sample-data board leaves the boot skeleton shape alone', async ({ page }) => {
-  await page.goto('/app?scenario=board-drag-matrix&view=board');
-  await expect(page.locator('[data-todo-id]').first()).toBeVisible();
+test('a sample-data home leaves the boot skeleton shape alone', async ({ page }) => {
+  await page.goto('/app?scenario=01');
+  await expect(page.getByTestId('home-c')).toBeVisible();
   await page.waitForTimeout(300);
   expect(await page.evaluate(() => localStorage.getItem('cairn-boot-shape'))).toBeNull();
 });
