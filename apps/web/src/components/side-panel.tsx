@@ -33,7 +33,7 @@ function currentWidth(): number {
     safeLocalStorage()?.getItem(PANEL_WIDTH_STORAGE_KEY) ?? null,
     viewportWidth(),
   );
-  return widthNow;
+  return clampPanelWidth(widthNow, viewportWidth());
 }
 
 function setWidth(next: number, persist: boolean): void {
@@ -44,7 +44,11 @@ function setWidth(next: number, persist: boolean): void {
 
 function subscribe(listener: () => void): () => void {
   listeners.add(listener);
-  return () => listeners.delete(listener);
+  window.addEventListener('resize', listener);
+  return () => {
+    listeners.delete(listener);
+    window.removeEventListener('resize', listener);
+  };
 }
 
 function useSidePanelWidth(): number {
