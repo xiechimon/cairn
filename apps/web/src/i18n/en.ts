@@ -114,6 +114,12 @@ export const EN: Record<string, string> = {
   在进行: 'In progress',
   等你处理: 'Needs you',
   管理定时: 'Manage schedules',
+  并发与优先级: 'Concurrency and priority',
+  '不限（跟随机器上限）': 'No limit (machine limits apply)',
+  '串行，一次一个': 'Serial, one at a time',
+  '最多 {n} 个': 'Up to {n}',
+  '本项目同时运行的 thread 上限。你发的消息会插队，并可多用一个位置。':
+    'How many threads in this project run at once. Your own messages go first and may use one extra slot.',
   项目说明: 'Instructions',
   保存项目说明: 'Save instructions',
   '本项目的每个 thread 和 Coordinator 都会读到，排在仓库的 AGENTS.md 之后。':

@@ -41,6 +41,7 @@ import {
   agentRunningCount,
   capabilityGatePasses,
   machineRunningCount,
+  projectRunningCount,
   runtimeGatePasses,
   stepRuntimeFor,
   unassignedStepReason,
@@ -467,8 +468,12 @@ async function tryClaim(
     return machineCache.get(id);
   };
   const full = machineRunningCount(db, machineId) >= workerCapOf(machineRow, maxWorkers);
-  const workerCands = full ? [] : claimCandidates(deps, machineId, teamId);
-  const earliestWorker = workerCands[0]?.stepRow.createdAt ?? Number.POSITIVE_INFINITY;
+  const queued = full ? [] : claimCandidates(deps, machineId, teamId);
+  const earliestWorker = queued[0]?.stepRow.createdAt ?? Number.POSITIVE_INFINITY;
+  const workerCands = [
+    ...queued.filter((cand) => cand.stepRow.byPerson),
+    ...queued.filter((cand) => !cand.stepRow.byPerson),
+  ];
   const chiefAhead = claimChiefTurn(deps, machineId, teamId, maxWorkers, earliestWorker);
   if (chiefAhead) return chiefAhead;
 
@@ -528,6 +533,14 @@ async function tryClaim(
     if (
       agentRow.maxConcurrentTasks !== null &&
       agentRunningCount(db, agentRow.id) >= agentRow.maxConcurrentTasks
+    ) {
+      continue;
+    }
+    const projectCap = projectOfTodo(db, cand.todoRow)?.maxConcurrent ?? null;
+    if (
+      projectCap !== null &&
+      projectRunningCount(db, cand.todoRow.projectId) >=
+        projectCap + (cand.stepRow.byPerson ? 1 : 0)
     ) {
       continue;
     }

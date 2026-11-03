@@ -447,6 +447,8 @@ export async function sendBuildSteer(
           continuationOptions.afterTurn && previousWork?.kind === 'plan' ? 'plan' : 'build',
           todoRow.teamId,
           body.content,
+          false,
+          human && !continuationOptions.schedule,
         );
         if (continuationOptions.schedule) {
           const wake = continuationOptions.schedule;
@@ -859,6 +861,7 @@ export function enqueueStep(
   teamId: string,
   prompt?: string,
   freshSession?: boolean,
+  byPerson?: boolean,
 ): StepRecord {
   const id = newRecordId();
   const createdAt = nowMs();
@@ -872,6 +875,7 @@ export function enqueueStep(
       status: 'pending',
       prompt: prompt ?? null,
       freshSession: freshSession === true,
+      byPerson: byPerson === true,
       createdAt,
     })
     .run();
