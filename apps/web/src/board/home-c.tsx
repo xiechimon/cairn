@@ -1,5 +1,6 @@
 import {
   FolderOpen,
+  House,
   ListChecks,
   MessageSquareWarning,
   PackageCheck,
@@ -102,6 +103,12 @@ interface HomeCProps {
   machines?: readonly MachineRow[];
   schedules?: readonly ScheduleRecord[];
   coordinatorMachineId?: string | null;
+}
+
+function projectHomeSearch(params: URLSearchParams): string {
+  const next = new URLSearchParams(params);
+  next.delete('chat');
+  return `?${next.toString()}`;
 }
 
 export function HomeC({
@@ -218,6 +225,15 @@ export function HomeC({
       aria-label={t('项目')}
       className="mt-2 -ml-2.5 flex gap-1"
     >
+      <Button
+        variant="ghost"
+        size="sm"
+        className="text-meta text-content-secondary"
+        render={<Link to={{ pathname: '/app', search: projectHomeSearch(searchParams) }} />}
+      >
+        <House aria-hidden="true" className="size-3.5" />
+        {t('项目主页')}
+      </Button>
       <Button
         variant="ghost"
         size="sm"

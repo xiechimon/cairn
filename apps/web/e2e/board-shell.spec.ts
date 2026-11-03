@@ -10,7 +10,7 @@ test('a project filter keeps home and marks the project; an unknown project leav
   const unfiltered = await page.getByTestId('home-c-since').textContent();
 
   await page.goto('/app?scenario=home-c&project=ZAQczKCu0MOAzC1ZqcFlX');
-  await expect(page.getByTestId('home-c')).toBeVisible();
+  await expect(page.getByTestId('project-home')).toBeVisible();
   await expect(workbench).not.toHaveAttribute('aria-current', 'page');
   await expect(
     page.locator('[data-slot="sidebar-project-row"][aria-current="page"]'),

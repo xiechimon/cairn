@@ -160,6 +160,7 @@ export function BoardSidebar({
   const baseParams = new URLSearchParams(search);
   const projectParam = pathname === '/app' ? baseParams.get('project') : null;
   baseParams.delete('project');
+  baseParams.delete('chat');
   const projectHref = (id: string) => {
     const next = new URLSearchParams(baseParams);
     next.set('project', id);

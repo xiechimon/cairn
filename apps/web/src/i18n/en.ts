@@ -113,6 +113,9 @@ export const EN: Record<string, string> = {
   在进行: 'In progress',
   等你处理: 'Needs you',
   管理定时: 'Manage schedules',
+  接下来: 'Up next',
+  已暂停: 'Paused',
+  本周合并: 'Merged this week',
   全团队: 'Whole team',
   '仅 {name}': 'Only {name}',
   '项目密钥只发给该项目的 thread，同名时优先于团队密钥。':
@@ -124,6 +127,20 @@ export const EN: Record<string, string> = {
   '本项目同时运行的 thread 上限。你发的消息会插队，并可多用一个位置。':
     'How many threads in this project run at once. Your own messages go first and may use one extra slot.',
   项目说明: 'Instructions',
+  项目记忆: 'Project memory',
+  定时任务: 'Schedules',
+  没有定时任务: 'No schedules',
+  项目主页: 'Project home',
+  '问 Coordinator 关于 {name} 的事…': 'Ask the Coordinator about {name}…',
+  '这个项目还没有 thread': 'No threads in this project yet',
+  '在上面问 Coordinator，它会开 thread 来做。':
+    'Ask the Coordinator above and it will open threads for the work.',
+  '还没有项目说明。写在这里的规则会被本项目的每个 thread 和 Coordinator 读到。':
+    'No instructions yet. Every thread and the Coordinator in this project will read the rules written here.',
+  'Coordinator 在本项目学到的事会记在这里，默认只在本项目内使用。即将上线。':
+    'What the Coordinator learns in this project will be kept here, used only in this project by default. Coming soon.',
+  目前用团队密钥: 'Team secrets for now',
+  目前跟随机器上限: 'Machine limits for now',
   保存项目说明: 'Save instructions',
   '本项目的每个 thread 和 Coordinator 都会读到，排在仓库的 AGENTS.md 之后。':
     'Every thread and the Coordinator read these in this project, after the repository AGENTS.md.',

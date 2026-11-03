@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { useSearchParams } from 'react-router';
+import { useEffect, useMemo, useRef } from 'react';
+import { useNavigate, useSearchParams } from 'react-router';
 import {
   useApiMutations,
   useBackupNotice,
@@ -18,6 +18,7 @@ import { BackupBanner } from '../board/backup-banner.js';
 import { FirstPrCard, firstPrCardInfo } from '../board/first-pr-card.js';
 import { HomeC } from '../board/home-c.js';
 import { NotificationBanner, useNotificationBanner } from '../board/notify-banner.js';
+import { ProjectHome, type ProjectHomeProject } from '../board/project-home.js';
 import { QuotaBanner, quotaBannerInfo } from '../board/quota-banner.js';
 import { SideChat } from '../board/side-chat.js';
 import { THREAD_PARAM } from '../board/thread-copy.js';
@@ -31,6 +32,7 @@ import { SHEET_PANEL } from '../pages/shell.js';
 
 export function BoardPage() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { live, teamId } = useLiveData();
   const fixture = resolveScenario(searchParams);
   const { surface: chief } = useChiefRoot();
@@ -59,6 +61,35 @@ export function BoardPage() {
       : live
         ? ((projectsQ.data ?? []).find((p) => p.id === homeProjectId)?.name ?? null)
         : (fixture.projectNames?.[homeProjectId] ?? null);
+  const liveProject = live ? (projectsQ.data ?? []).find((p) => p.id === homeProjectId) : undefined;
+  const homeProject: ProjectHomeProject | null =
+    homeProjectId === null || homeProjectName === null
+      ? null
+      : {
+          id: homeProjectId,
+          name: homeProjectName,
+          description: liveProject?.description,
+          instructions: liveProject?.instructions,
+          repo: liveProject?.githubRepo ?? liveProject?.repoName,
+          baseBranch: liveProject?.baseBranch,
+          icon: liveProject?.icon ?? fixture.projectAvatars?.[homeProjectId]?.icon,
+          color: liveProject?.color ?? fixture.projectAvatars?.[homeProjectId]?.color,
+        };
+  const projectChat = searchParams.get('chat') === '1';
+  const previousChiefView = useRef(chiefView);
+  useEffect(() => {
+    const opened = chiefView === 'drawer' && previousChiefView.current !== 'drawer';
+    previousChiefView.current = chiefView;
+    if (homeProject === null || projectChat || !opened) return;
+    const params = new URLSearchParams(searchParams);
+    params.set('chat', '1');
+    navigate({ pathname: '/app', search: `?${params.toString()}` });
+  }, [homeProject, projectChat, chiefView, searchParams, navigate]);
+  const schedules = live ? mapSchedules(schedulesQ.data ?? []) : (fixture.schedules ?? []);
+  const now = live ? Date.now() : fixture.now;
+  const chatParams = new URLSearchParams(searchParams);
+  chatParams.set('chat', '1');
+  const projectChatHref = `/app?${chatParams.toString()}`;
 
   const fixtureTodos = useMemo(() => withoutDeleted(fixture.todos), [fixture]);
   const liveTodos = useMemo(() => (todosQ.data ?? []).map(toDisplayTodo), [todosQ.data]);
@@ -103,17 +134,26 @@ export function BoardPage() {
             onBack={() => setChiefView('drawer')}
             machines={fixture.resources?.machines}
           />
+        ) : homeProject !== null && !projectChat ? (
+          <ProjectHome
+            key={homeProject.id}
+            project={homeProject}
+            todos={todos}
+            schedules={schedules}
+            now={now}
+            chatHref={projectChatHref}
+          />
         ) : (
           <HomeC
             surface={chief}
             todos={todos}
-            now={live ? Date.now() : fixture.now}
+            now={now}
             projectId={homeProjectName === null ? null : homeProjectId}
             projectName={homeProjectName}
             banner={homeBanner}
             machines={machines}
             coordinatorMachineId={live ? (chiefQ.data?.agentActor?.machineId ?? null) : null}
-            schedules={live ? mapSchedules(schedulesQ.data ?? []) : (fixture.schedules ?? [])}
+            schedules={schedules}
           />
         )}
         {threadId !== null && (

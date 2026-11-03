@@ -30,7 +30,10 @@ export function useOpenComposer(): (projectId?: string | null) => void {
         if (value !== null) params.set(key, value);
       }
       const project = projectId ?? routeProject;
-      if (project != null) params.set('project', project);
+      if (project != null) {
+        params.set('project', project);
+        params.set('chat', '1');
+      }
       const query = params.toString();
       const target = query === '' ? '' : `?${query}`;
       const gestures = getGestureStore();

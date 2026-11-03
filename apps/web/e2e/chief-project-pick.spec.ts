@@ -269,7 +269,7 @@ test.describe('the home sends to the project it is filtered to (#2531)', () => {
     page,
   }) => {
     const state = await mockLive(page);
-    await page.goto('/app?project=proj-2');
+    await page.goto('/app?project=proj-2&chat=1');
     await expect(homeInput(page)).toHaveAttribute('placeholder', /cairn-site/);
     await expect(page.getByTestId('home-c').getByTestId('chief-project-chip')).toHaveCount(0);
     await homeInput(page).fill('把按钮颜色统一一下');
@@ -288,10 +288,58 @@ test.describe('the home sends to the project it is filtered to (#2531)', () => {
   test('phone width keeps the composer on screen', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await mockLive(page);
-    await page.goto('/app?project=proj-2');
+    await page.goto('/app?project=proj-2&chat=1');
     await expect(homeInput(page)).toBeInViewport();
     const width = await page.evaluate(() => document.documentElement.scrollWidth);
     expect(width).toBeLessThanOrEqual(390);
     await shot(page, 'home-project-phone.png');
+  });
+
+  test('the project home shows the saved instructions and counts only merged work this week', async ({
+    page,
+  }) => {
+    const state = await mockLive(page, {
+      projects: [{ ...PROJECTS[0]!, instructions: '仓库内容用英文；不要 force push。' }, PROJECTS[1]!],
+    });
+    state.todos.push(
+      todo({ id: 'todo-closed', projectId: 'proj-1', title: '放弃的任务', phase: 'closed', seqNum: 13 }),
+    );
+    await page.goto('/app?project=proj-1');
+    await expect(page.getByTestId('project-home-instructions')).toHaveText('仓库内容用英文；不要 force push。');
+    await expect(page.getByTestId('project-home').locator('[data-slot="stat-strip"]')).toContainText(
+      '1本周合并',
+    );
+  });
+
+  test('a paused schedule shows as paused with its reason, not a next run', async ({ page }) => {
+    await mockLive(page);
+    await page.route('**/api/schedules', (route) =>
+      route.fulfill({
+        json: [
+          {
+            id: 'sch-1',
+            teamId: 't1',
+            projectId: 'proj-1',
+            todoId: 'todo-1',
+            kind: 'daily',
+            cron: null,
+            prompt: '',
+            enabled: false,
+            at: 1,
+            tz: 'UTC',
+            nextRunAt: null,
+            lastRunAt: null,
+            lastRunStatus: null,
+            pausedReason: 'Task archived',
+            createdBy: 'u1',
+            todo: { seqNum: 11, title: '修 README 里的失效链接', phase: 'todo', projectName: 'cairn', ownerId: 'u1' },
+          },
+        ],
+      }),
+    );
+    await page.goto('/app?project=proj-1');
+    const row = page.getByTestId('project-home').getByText('Task archived');
+    await expect(row).toBeVisible();
+    await expect(page.getByTestId('project-home')).not.toContainText('1970');
   });
 });

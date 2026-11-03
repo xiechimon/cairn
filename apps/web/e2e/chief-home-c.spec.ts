@@ -73,7 +73,7 @@ test('the Tasks panel lists running threads and a running row opens its thread',
   await expect(page.getByTestId('side-chat')).toContainText('Push for finished threads');
 });
 
-test('the sidebar lists project names only, and choosing one filters the decisions and the conversation', async ({
+test('the sidebar lists project names only, and the project chat filters the decisions and the conversation', async ({
   page,
 }) => {
   await page.goto(home('home-c'));
@@ -81,6 +81,8 @@ test('the sidebar lists project names only, and choosing one filters the decisio
   await expect(rows).toHaveCount(2);
   await rows.filter({ hasText: 'cairn' }).click();
   await expect(page).toHaveURL(new RegExp(`project=${PROJECT_ID}`));
+  await expect(page.getByTestId('project-home')).toBeVisible();
+  await page.goto(home('home-c', `&project=${PROJECT_ID}&chat=1`));
   await expect(page.getByTestId('home-c-since')).toContainText('2 waiting on you · 2 in progress');
   await expect(needsYou(page)).toContainText('Connect a Claude subscription token');
   await expect(page.getByTestId('chief-stream')).not.toContainText('Run the orb canary until it passes');
@@ -89,10 +91,10 @@ test('the sidebar lists project names only, and choosing one filters the decisio
   await expect(page.getByTestId('home-c').getByRole('heading', { level: 1 })).toHaveText('cairn');
 });
 
-test('a project link lands on the home filtered to that project', async ({ page }) => {
+test('a project link lands on that project home', async ({ page }) => {
   await page.goto(`/app/project/${PROJECT_ID}?scenario=home-c`);
   await expect(page).toHaveURL(new RegExp(`/app\\?.*project=${PROJECT_ID}`));
-  await expect(page.getByTestId('home-c')).toBeVisible();
+  await expect(page.getByTestId('project-home')).toBeVisible();
 });
 
 test('a first run greets and offers starters, with nothing pinned', async ({ page }) => {
@@ -189,14 +191,17 @@ test('a failed conversation load shows Retry instead of the greeting, with no co
   await expect(composer(page)).toBeVisible();
 });
 
-test('a project-filtered home links to that project files and settings', async ({ page }) => {
-  await page.goto(home('home-c', `&project=${PROJECT_ID}`));
+test('a project chat links to that project home, files and settings', async ({ page }) => {
+  await page.goto(home('home-c', `&project=${PROJECT_ID}&chat=1`));
   const links = page.getByTestId('home-c-project-links');
   await links.getByRole('link', { name: 'Files' }).click();
   await expect(page).toHaveURL(new RegExp(`/app/project/${PROJECT_ID}/files`));
   await page.goBack();
   await links.getByRole('link', { name: 'Project settings' }).click();
   await expect(page).toHaveURL(new RegExp(`/app/project/${PROJECT_ID}/settings`));
+  await page.goBack();
+  await links.getByRole('link', { name: 'Project home' }).click();
+  await expect(page.getByTestId('project-home')).toBeVisible();
   await page.goto(home('home-c'));
   await expect(page.getByTestId('home-c-project-links')).toHaveCount(0);
 });
