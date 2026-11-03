@@ -109,7 +109,6 @@ export function BoardPage() {
             projectId={homeProjectId}
             projectName={homeProjectName}
             todos={todos}
-            schedules={fixture.schedules ?? []}
             now={fixture.now}
           />
         ) : (
@@ -130,7 +129,6 @@ export function BoardPage() {
                       projectId={homeProjectId}
                       projectName={homeProjectName}
                       todos={todos}
-                      schedules={fixture.schedules ?? []}
                       now={fixture.now}
                     />
                   ),

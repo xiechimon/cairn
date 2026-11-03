@@ -8,7 +8,7 @@ import { ScheduledTaskRow } from '../components/thread/scheduled-task-row.js';
 import { ThreadRow } from '../components/thread/thread-row.js';
 import { Button } from '../components/ui/button.js';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '../components/ui/input-group.js';
-import type { ScheduleRecord, TodoRecord } from '../fixtures/records.js';
+import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { needsYouThreads } from './needs-you.js';
 import { ProjectAvatar } from './project-avatar.js';
@@ -101,13 +101,11 @@ export function ProjectHomeMock({
   projectId,
   projectName,
   todos,
-  schedules,
   now,
 }: {
   projectId: string;
   projectName: string;
   todos: readonly TodoRecord[];
-  schedules: readonly ScheduleRecord[];
   now: number;
 }) {
   const { t } = useI18n();
@@ -260,13 +258,11 @@ export function ProjectHybridHeader({
   projectId,
   projectName,
   todos,
-  schedules,
   now,
 }: {
   projectId: string;
   projectName: string;
   todos: readonly TodoRecord[];
-  schedules: readonly ScheduleRecord[];
   now: number;
 }) {
   const { t } = useI18n();
