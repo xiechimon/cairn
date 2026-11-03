@@ -1068,6 +1068,23 @@ test('computer image dry run plans the build without touching anything', () => {
   }
 });
 
+test('computer image dry run on a fresh host plans the build after the base instead of failing', () => {
+  const f = computerFixture();
+  try {
+    rmSync(join(f.root, 'var/lib/machines/cairn-orb-base'), { recursive: true });
+    const result = f.run('build-computer-image.sh', ['--dry-run']);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /after cairn-orb-base is built/);
+    assert.match(result.stdout, /1 planned changes/);
+    assert.ok(
+      !f.calls().some(([cmd]) => ['systemd-nspawn', 'mv', 'flock', 'btrfs', 'cp'].includes(cmd)),
+    );
+    assert.notEqual(f.run('build-computer-image.sh').status, 0);
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
 test('computer image builds from the base with the host mirrorlist read-only and converges', () => {
   const f = computerFixture();
   try {
