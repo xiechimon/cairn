@@ -109,7 +109,6 @@ test('live, projects loaded: pre-response rows carry each todo’s own project',
 
   const todosRead = page.waitForResponse((response) => response.url().includes('/api/todos?'));
   await page.goto('/app/schedules');
-  // both reads landed: sidebar project rows (projects) + the todos list
   await expect(page.locator('[data-slot="sidebar-project-row"]').filter({ hasText: 'atlas' })).toBeVisible();
   await todosRead;
   await openPanel(page);
