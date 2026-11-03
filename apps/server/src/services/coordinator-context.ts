@@ -5,6 +5,7 @@ import { chiefThread, chiefTurnUsage, provider } from '../db/schema.js';
 export const DEFAULT_CONTEXT_WINDOW = 128_000;
 
 let serverContextOn = false;
+let sidecarOn = false;
 
 export function setCoordinatorServerContextEnabled(on: boolean): void {
   serverContextOn = on;
@@ -12,6 +13,18 @@ export function setCoordinatorServerContextEnabled(on: boolean): void {
 
 export function coordinatorServerContextEnabled(): boolean {
   return serverContextOn;
+}
+
+export function setCoordinatorSidecarEnabled(on: boolean): void {
+  sidecarOn = on;
+}
+
+export function coordinatorSidecarEnabled(): boolean {
+  return sidecarOn;
+}
+
+export function coordinatorRunsOnPi(): boolean {
+  return serverContextOn || sidecarOn;
 }
 
 function contextWindowOf(db: Db, teamId: string, usageModel: string): number {

@@ -87,6 +87,7 @@ export type MachineRecoverResponse = z.infer<typeof machineRecoverResponseSchema
 
 export const machineClaimBodySchema = z.object({
   maxWorkers: z.number().int().min(1).optional(),
+  role: z.literal('coordinator').optional(),
 });
 export type MachineClaimBody = z.infer<typeof machineClaimBodySchema>;
 

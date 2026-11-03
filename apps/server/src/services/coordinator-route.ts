@@ -2,7 +2,7 @@ import { and, eq, isNotNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { type agent, provider, routingRule, team } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
-import { coordinatorServerContextEnabled } from './coordinator-context.js';
+import { coordinatorRunsOnPi } from './coordinator-context.js';
 import { applyRoute } from './routing-rules.js';
 
 type AgentRow = typeof agent.$inferSelect;
@@ -91,7 +91,7 @@ function coordinatorRule(db: Db, teamId: string) {
 }
 
 export function coordinatorRoute(db: Db, teamId: string) {
-  if (!coordinatorServerContextEnabled()) return null;
+  if (!coordinatorRunsOnPi()) return null;
   const rule = coordinatorRule(db, teamId) ?? seedCoordinatorRule(db, teamId);
   if (rule === undefined) return fallback(teamId, 'no-api-key-provider');
   const keyed = db

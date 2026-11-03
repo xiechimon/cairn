@@ -63,7 +63,7 @@ import {
   settleChiefActiveRun,
   steerChiefMessage,
 } from './chief-turns.js';
-import { coordinatorServerContextEnabled, lastTurnContext } from './coordinator-context.js';
+import { coordinatorRunsOnPi, lastTurnContext } from './coordinator-context.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { injectMemories } from './memory.js';
@@ -253,9 +253,7 @@ export function getChiefEnvelope(deps: ChiefDeps, teamId: string): ChiefGetRespo
   return {
     chief: toChiefRecord(row),
     agentActor: agentRow ? agentRecordOfRow(agentRow) : null,
-    context: coordinatorServerContextEnabled()
-      ? lastTurnContext(deps.db, row)
-      : chiefContext(deps, row.id),
+    context: coordinatorRunsOnPi() ? lastTurnContext(deps.db, row) : chiefContext(deps, row.id),
     watches: refreshWatches(deps, row.watches),
     wakes: row.wakes,
     orchestration: chiefOrchestration(deps, teamId, row),
