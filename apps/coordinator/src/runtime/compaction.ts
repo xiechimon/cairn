@@ -1,0 +1,180 @@
+import {
+  COORDINATOR_SUMMARY_MAX_CHARS,
+  COORDINATOR_SUMMARY_PROMPT_HEAD,
+  COORDINATOR_SUMMARY_TRANSCRIPT_MAX_CHARS,
+} from '@cairn/shared';
+import type { Message } from '@earendil-works/pi-ai';
+import {
+  type CompactionSettings,
+  CompactionTask,
+  defineExtension,
+  hook,
+} from '@earendil-works/pi-durable';
+
+export const BACKGROUND_COMPACTION_AT = 70_000;
+export const COMPACTION_RESERVE_TOKENS = 16_384;
+export const KEEP_RECENT_TOKENS = 8_000;
+const TOOL_ARGS_CHARS = 200;
+const SUMMARY_MEMO = 'cairn-c2-summary';
+const SUMMARY_SYSTEM_PROMPT = "You are Cairn's Coordinator summarization step.";
+
+export interface ModelRef {
+  provider: string;
+  modelId: string;
+}
+
+export interface CompactionWindow {
+  blockingAt: number;
+  backgroundAt: number;
+}
+
+export function compactionWindow(contextWindow: number): CompactionWindow {
+  const blockingAt = contextWindow - COMPACTION_RESERVE_TOKENS;
+  return {
+    blockingAt,
+    backgroundAt: Math.min(BACKGROUND_COMPACTION_AT, Math.floor(blockingAt / 2)),
+  };
+}
+
+export function coordinatorCompactionSettings(
+  models: readonly { provider: string; id: string; contextWindow: number }[],
+): CompactionSettings {
+  const modelOverrides: Record<string, { backgroundTokens: number }> = {};
+  for (const model of models) {
+    const { blockingAt, backgroundAt } = compactionWindow(model.contextWindow);
+    modelOverrides[`${model.provider}/${model.id}`] = {
+      backgroundTokens: blockingAt - backgroundAt,
+    };
+  }
+  return {
+    enabled: true,
+    reserveTokens: COMPACTION_RESERVE_TOKENS,
+    keepRecentTokens: KEEP_RECENT_TOKENS,
+    modelOverrides,
+  };
+}
+
+export function estimateTokens(text: string): number {
+  let total = 0;
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i);
+    total += code < 128 ? 0.3 : code < 0x0590 ? 0.6 : 1.25;
+  }
+  return Math.ceil(total);
+}
+
+function textOf(content: Message['content']): string {
+  if (typeof content === 'string') return content;
+  return content
+    .flatMap((block) => (block.type === 'text' ? [block.text] : []))
+    .join('\n')
+    .trim();
+}
+
+export function splitPreviousSummary(messages: readonly Message[]): {
+  previous: string | null;
+  rest: readonly Message[];
+} {
+  const first = messages[0];
+  if (first?.role !== 'user') return { previous: null, rest: messages };
+  const match = /<summary>\n([\s\S]*)\n<\/summary>/.exec(textOf(first.content));
+  return match?.[1] === undefined
+    ? { previous: null, rest: messages }
+    : { previous: match[1], rest: messages.slice(1) };
+}
+
+export function transcriptLines(messages: readonly Message[]): string[] {
+  const lines: string[] = [];
+  for (const message of messages) {
+    if (message.role === 'user') {
+      const text = textOf(message.content);
+      if (text !== '') lines.push(`用户：${text}`);
+    } else if (message.role === 'assistant') {
+      const text = textOf(message.content);
+      if (text !== '') lines.push(`总管：${text}`);
+      for (const block of message.content) {
+        if (block.type === 'toolCall') {
+          lines.push(
+            `总管调用工具 ${block.name} ${JSON.stringify(block.arguments).slice(0, TOOL_ARGS_CHARS)}`,
+          );
+        }
+      }
+    }
+  }
+  return lines;
+}
+
+export function summaryBatches(
+  lines: readonly string[],
+  maxChars = COORDINATOR_SUMMARY_TRANSCRIPT_MAX_CHARS,
+): string[] {
+  const batches: string[] = [];
+  let current: string[] = [];
+  let used = 0;
+  for (const line of lines) {
+    const kept = line.length > maxChars ? `${line.slice(0, maxChars)} (cut for length)` : line;
+    if (current.length > 0 && used + kept.length + 1 > maxChars) {
+      batches.push(current.join('\n'));
+      current = [];
+      used = 0;
+    }
+    current.push(kept);
+    used += kept.length + 1;
+  }
+  if (current.length > 0) batches.push(current.join('\n'));
+  return batches;
+}
+
+export function summaryPrompt(previous: string | null, batch: string): string {
+  return `${COORDINATOR_SUMMARY_PROMPT_HEAD}\n\nEarlier summary:\n${previous ?? '(none yet)'}\n\nNew messages:\n${batch}`;
+}
+
+export async function foldSummary(
+  previous: string | null,
+  batches: readonly string[],
+  summarize: (prompt: string) => Promise<string>,
+): Promise<string> {
+  let summary = previous;
+  for (const batch of batches) {
+    const out = (await summarize(summaryPrompt(summary, batch))).trim();
+    summary = out.slice(0, COORDINATOR_SUMMARY_MAX_CHARS);
+  }
+  return summary ?? '';
+}
+
+export function coordinatorCompactionExtension(summaryModel: () => ModelRef | null) {
+  return defineExtension({
+    name: 'cairn-coordinator-compaction',
+    hooks: [
+      hook(CompactionTask, {
+        beforeCompact: async (compaction, api, context) => {
+          const cached = await api.memo<string>(SUMMARY_MEMO, context);
+          if (cached !== undefined) return { summary: cached };
+          const ref = summaryModel();
+          const model = ref === null ? undefined : api.models.getModel(ref.provider, ref.modelId);
+          if (model === undefined) {
+            throw new Error(`summary model ${ref?.provider}/${ref?.modelId} is not available`);
+          }
+          const { previous, rest } = splitPreviousSummary(compaction.messages);
+          const summary = await foldSummary(
+            previous,
+            summaryBatches(transcriptLines(rest)),
+            async (prompt) => {
+              const reply = await api.models.completeSimple(model, {
+                systemPrompt: SUMMARY_SYSTEM_PROMPT,
+                messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
+              });
+              if (reply.stopReason !== 'stop') {
+                throw new Error(
+                  `summary request ended ${reply.stopReason}: ${reply.errorMessage ?? ''}`,
+                );
+              }
+              return textOf(reply.content);
+            },
+          );
+          return { summary: await api.memo(SUMMARY_MEMO, summary, context) };
+        },
+      }),
+    ],
+  });
+}

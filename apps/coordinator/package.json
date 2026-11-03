@@ -8,6 +8,7 @@
     "node": ">=22.19.0"
   },
   "scripts": {
+    "dev": "node --import tsx src/main.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
