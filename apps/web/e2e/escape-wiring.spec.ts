@@ -1,12 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import { pressAndExpect } from './helpers.js';
 
-const EMPTY = '/app?scenario=board-tags-empty&view=board';
-
-const typeBtn = (page: Page) => page.locator('.board-type-filter');
-const typePopover = (page: Page) => page.locator('.type-filter-popover');
-const typeOption = (page: Page, name: string) =>
-  page.locator(`.type-filter-option[data-tag="${name}"]`);
 
 async function installEscapeTap(page: Page) {
   await page.evaluate(() => {
@@ -41,30 +35,6 @@ const readEscapeTap = (page: Page) =>
         docRems: number;
       },
   );
-
-async function openTypePopover(page: Page) {
-  await typeBtn(page).click();
-  await expect(typePopover(page)).toBeVisible();
-}
-
-test('an open layer is not re-wired by re-render: a single Escape still closes the layer after URL write-back', async ({ page }) => {
-  await page.goto(EMPTY);
-  await openTypePopover(page);
-  await installEscapeTap(page);
-
-  await typeOption(page, 'chore').click();
-  await expect(page).toHaveURL(/[\?&]tags=chore(&|$)/);
-  await expect(page.locator('.board-filter-empty')).toBeVisible();
-
-  expect(await readEscapeTap(page)).toEqual({
-    winAdds: 0,
-    winRems: 0,
-    docAdds: 0,
-    docRems: 0,
-  });
-  await page.keyboard.press('Escape');
-  await expect(typePopover(page)).not.toBeVisible();
-});
 
 const DETAIL = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=27';
 

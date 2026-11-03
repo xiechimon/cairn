@@ -174,7 +174,7 @@ async function settledDrawer(drawer: Locator) {
 
 test.describe('chief drawer markdown face (fixture, #650)', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/app?view=board&scenario=chief-md');
+    await page.goto('/app/schedules?scenario=chief-md');
     await expect(page.locator('.chief-drawer')).toBeVisible();
   });
 
@@ -269,7 +269,7 @@ test.describe('chief drawer markdown face (fixture, #650)', () => {
   test('F-R9: frozen capture face r5 114 does not drift — segment arrays walk the original .chief-para/.chief-bullet paths', async ({
     page,
   }) => {
-    await page.goto('/app?view=board&scenario=114');
+    await page.goto('/app/schedules?scenario=114');
     await expect(page.locator('.chief-drawer')).toBeVisible();
     const stream = page.getByTestId('chief-stream');
 
@@ -286,7 +286,7 @@ test.describe('chief drawer markdown face (fixture, #650)', () => {
     page,
   }) => {
 
-    await page.goto('/app?view=board&scenario=113');
+    await page.goto('/app/schedules?scenario=113');
     await expect(page.locator('.chief-drawer')).toBeVisible();
     const stream = page.getByTestId('chief-stream');
 
@@ -303,7 +303,7 @@ test.describe('chief drawer streaming face (live mock, #651)', () => {
     await stubCdnAvatar(page);
     const state = { final: false };
     await mockChiefLiveApi(page, state);
-    await page.goto('/app?view=board&chief=chief-bbb');
+    await page.goto('/app/schedules?chief=chief-bbb');
 
     const drawer = page.locator('.chief-drawer');
     await expect(drawer).toBeVisible();
@@ -358,7 +358,7 @@ test.describe('chief drawer streaming face (live mock, #651)', () => {
       ],
     };
     await mockChiefLiveApi(page, state);
-    await page.goto('/app?view=board&chief=chief-bbb');
+    await page.goto('/app/schedules?chief=chief-bbb');
 
     const drawer = page.locator('.chief-drawer');
     await expect(drawer).toBeVisible();
@@ -381,7 +381,7 @@ test.describe('chief drawer streaming face (live mock, #651)', () => {
 
     const state = { final: false };
     await mockChiefLiveApi(page, state);
-    await page.goto('/app?view=board&chief=chief-bbb');
+    await page.goto('/app/schedules?chief=chief-bbb');
 
     const drawer = page.locator('.chief-drawer');
     await expect(drawer).toBeVisible();
@@ -421,7 +421,7 @@ test.describe('chief drawer streaming face (live mock, #651)', () => {
     await stubCdnAvatar(page);
     const state: Parameters<typeof mockChiefLiveApi>[1] = { final: false };
     await mockChiefLiveApi(page, state);
-    await page.goto('/app?view=board&chief=chief-bbb');
+    await page.goto('/app/schedules?chief=chief-bbb');
 
     const drawer = page.locator('.chief-drawer');
     await expect(drawer).toBeVisible();
@@ -484,7 +484,7 @@ test.describe('chief drawer streaming face (live mock, #651)', () => {
       ],
     };
     await mockChiefLiveApi(page, state);
-    await page.goto('/app?view=board&chief=chief-bbb');
+    await page.goto('/app/schedules?chief=chief-bbb');
 
     const drawer = page.locator('.chief-drawer');
     await expect(drawer).toBeVisible();
@@ -539,7 +539,7 @@ test.describe('chief drawer streaming face (live mock, #651)', () => {
     await stubEventSource(page);
     await stubCdnAvatar(page);
     await mockChiefLiveApi(page, { final: true });
-    await page.goto('/app?view=board&chief=chief-bbb');
+    await page.goto('/app/schedules?chief=chief-bbb');
 
     const drawer = page.locator('.chief-drawer');
     await expect(drawer).toBeVisible();
@@ -577,7 +577,7 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
         { id: 'm9', role: 'assistant', content: '三件都办完。', createdAt: 9 },
       ],
     });
-    await page.goto('/app?view=board&chief=chief-bbb');
+    await page.goto('/app/schedules?chief=chief-bbb');
     const drawer = page.locator('.chief-drawer');
     await expect(drawer).toBeVisible();
     await settledDrawer(drawer);
@@ -665,7 +665,7 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
   test('F-R17: fixture capture face user bubbles zero drift — bare paths stay literal (no --md class, no chat-md blocks)', async ({
     page,
   }) => {
-    await page.goto('/app?view=board&scenario=chief-md');
+    await page.goto('/app/schedules?scenario=chief-md');
     await expect(page.locator('.chief-drawer')).toBeVisible();
     const bubble = page.getByTestId('chief-stream').getByTestId('chief-bubble');
     await expect(bubble).toHaveCount(1);
@@ -708,7 +708,7 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
       ],
     };
     await mockChiefLiveApi(page, state);
-    await page.goto('/app?view=board&chief=chief-bbb');
+    await page.goto('/app/schedules?chief=chief-bbb');
 
     const drawer = page.locator('.chief-drawer');
     await expect(drawer).toBeVisible();
@@ -775,7 +775,7 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
       ],
     };
     await mockChiefLiveApi(page, state);
-    await page.goto('/app?view=board&chief=chief-bbb');
+    await page.goto('/app/schedules?chief=chief-bbb');
 
     const drawer = page.locator('.chief-drawer');
     const bashRow = drawer.locator('.chief-msg', { hasText: /正在调用\s*Bash/ });
@@ -832,7 +832,7 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
       messages: [USER_ROW, ...segRows],
     };
     await mockChiefLiveApi(page, state);
-    await page.goto('/app?view=board&chief=chief-bbb');
+    await page.goto('/app/schedules?chief=chief-bbb');
 
     const drawer = page.locator('.chief-drawer');
     await expect(drawer).toBeVisible();
@@ -856,7 +856,7 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
     }
 
     state.activeRun = null;
-    await page.goto('/app?view=board&chief=chief-bbb');
+    await page.goto('/app/schedules?chief=chief-bbb');
     const settled = drawer.locator('.chief-msg, [data-testid="chief-msg"]');
     await expect(settled).toHaveCount(5);
     await expect(settled.nth(2)).toContainText('先看现状');
@@ -899,7 +899,7 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
     await stubEventSource(page);
     await stubCdnAvatar(page);
     await mockChiefLiveApi(page, state);
-    await page.goto('/app?view=board&chief=chief-bbb');
+    await page.goto('/app/schedules?chief=chief-bbb');
 
     const drawer = page.locator('.chief-drawer');
     await expect(drawer).toBeVisible();

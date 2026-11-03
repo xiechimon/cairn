@@ -639,6 +639,10 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
       "minimum": 1,
       "type": "integer",
     },
+    "role": {
+      "const": "coordinator",
+      "type": "string",
+    },
   },
   "type": "object",
 }
@@ -6599,6 +6603,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > executor minimum-
   ],
   "ENV_VARS": {
     "apiKey": "CAIRN_API_KEY",
+    "coordinatorMachineId": "CAIRN_COORDINATOR_MACHINE_ID",
     "coordinatorServerContext": "CAIRN_COORDINATOR_SERVER_CONTEXT",
     "customModelReasoning": "CAIRN_CUSTOM_MODEL_REASONING",
     "githubCreateHourlyCap": "CAIRN_GITHUB_CREATE_HOURLY_CAP",

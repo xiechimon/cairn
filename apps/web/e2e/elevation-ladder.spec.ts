@@ -85,7 +85,7 @@ for (const theme of ['light', 'dark'] as const) {
     });
 
     test('each rung is its pool plus one ring, ring last', async ({ page }) => {
-      await page.goto('/app?scenario=01&view=board');
+      await page.goto('/app/schedules?scenario=01');
       await page.waitForSelector('.board-sidebar');
       const ringColor = theme === 'light' ? 'border' : 'ring-inset-highlight';
       const borderRing = await ringIn(page, 'border');
@@ -102,7 +102,7 @@ for (const theme of ['light', 'dark'] as const) {
     });
 
     test('pools hold the faint layered shadows; --top only in dark e2/e3', async ({ page }) => {
-      await page.goto('/app?scenario=01&view=board');
+      await page.goto('/app/schedules?scenario=01');
       await page.waitForSelector('.board-sidebar');
       const top = await slot(page, 'top');
       const e1 = await slot(page, 'e1');
@@ -129,7 +129,7 @@ for (const theme of ['light', 'dark'] as const) {
     });
 
     test('old slot names alias the ladder', async ({ page }) => {
-      await page.goto('/app?scenario=01&view=board');
+      await page.goto('/app/schedules?scenario=01');
       await page.waitForSelector('.board-sidebar');
       const pairs: Array<[string, string]> = [
         ['panel-shadow', 'e1'],
@@ -161,22 +161,17 @@ for (const theme of ['light', 'dark'] as const) {
 
     test('one ring per edge on the rendered surfaces', async ({ page }) => {
       const edgeRing = await (async () => {
-        await page.goto('/app?scenario=01&view=board');
+        await page.goto('/app/schedules?scenario=01');
         await page.waitForSelector('.board-sidebar');
         return slot(page, 'edge-ring');
       })();
 
-      // e1: the card rings once, flat, no inset
-      const card = await surfaceShadow(page, '.todo-card');
-      expect(rings(card)).toBe(1);
-      expect(card).not.toContain('inset');
-
-      await page.goto('/app?scenario=notify-banner&view=board');
+      await page.goto('/app?scenario=notify-banner');
       const banner = await surfaceShadow(page, '.board-notify-banner');
       expect(rings(banner)).toBe(1);
       expect(banner.endsWith(await slot(page, 'e1'))).toBe(true);
 
-      await page.goto('/app?scenario=111&view=board');
+      await page.goto('/app/schedules?scenario=111');
       const drawer = await surfaceShadow(page, '.chief-drawer');
       expect(rings(drawer)).toBe(1);
       expect(drawer).toContain(edgeRing);
