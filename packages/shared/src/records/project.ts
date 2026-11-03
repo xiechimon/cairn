@@ -57,6 +57,7 @@ export const projectRecordSchema = z.object({
   teamId: recordId,
   splitPolicy: splitPolicySchema.default('human'),
   description: z.string().optional(),
+  instructions: z.string().optional(),
   repoKind: projectRepoKindSchema.optional(),
   repoName: z.string().optional(),
   githubRepo: z.string().optional(),
@@ -115,11 +116,14 @@ export const createProjectBodySchema = z.object({
 });
 export type CreateProjectBody = z.infer<typeof createProjectBodySchema>;
 
+export const PROJECT_INSTRUCTIONS_MAX = 16_000;
+
 export const patchProjectBodySchema = z
   .object({
     name: z.string().optional(),
     splitPolicy: splitPolicySchema.optional(),
     description: z.string().nullish(),
+    instructions: z.string().max(PROJECT_INSTRUCTIONS_MAX).nullish(),
     repoKind: projectRepoKindSchema.optional(),
     githubRepo: z.string().optional(),
     localPath: z.string().nullish(),

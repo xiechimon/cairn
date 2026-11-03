@@ -66,6 +66,8 @@ import {
 import { injectMemories } from './memory.js';
 import { effectiveModel } from './model-fallback.js';
 import { mergedCatalogModels } from './model-liveness.js';
+import { stepScopeProjectId } from './picked-project.js';
+import { projectInstructionsSection } from './project-instructions.js';
 import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
 import { routeForStep } from './routing-rules.js';
 import { reverifyShip } from './ship-gate.js';
@@ -278,6 +280,13 @@ function chiefClaimPayload(
     if (hint) routeSection = formatSkillRouteSection(hint);
   }
   const memories = injectMemories(deps.db, { agentId: agentRow.id });
+  const projectSection = digest
+    ? null
+    : projectInstructionsSection(deps.db, threadRow.teamId, stepScopeProjectId(stepRow));
+  const instruction =
+    stepRow.prompt === null
+      ? null
+      : [stepRow.prompt, projectSection, routeSection].filter((part) => part).join('\n\n');
   const chiefMcp = digest
     ? []
     : claimMcpSlugs(machineRow?.latestCliVersion ?? null, agentRow.mcpServers);
@@ -294,10 +303,9 @@ function chiefClaimPayload(
       action: !stepRow.freshSession && threadRow.sessionId !== '' ? 'continue' : 'new',
       sessionId: !stepRow.freshSession && threadRow.sessionId !== '' ? threadRow.sessionId : null,
     },
-    ...(stepRow.prompt !== null
+    ...(instruction !== null
       ? {
-          instruction:
-            routeSection === '' ? stepRow.prompt : `${stepRow.prompt}\n\n${routeSection}`,
+          instruction,
         }
       : {}),
     agent: {
@@ -679,7 +687,12 @@ async function tryClaim(
         ...(blockerHandoff !== null ? { blockerHandoff } : {}),
         output: cand.todoRow.output,
       },
-      project: { id: cand.todoRow.projectId, name: projectRow?.name ?? '', repo },
+      project: {
+        id: cand.todoRow.projectId,
+        name: projectRow?.name ?? '',
+        ...(projectRow?.instructions != null ? { instructions: projectRow.instructions } : {}),
+        repo,
+      },
       agent: {
         id: agentRow.id,
         displayName: agentRow.displayName,
