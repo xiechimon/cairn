@@ -9,6 +9,10 @@ const panelWidth = (page: Page) =>
   page
     .locator('aside.side-panel')
     .evaluate((node) => Math.round(node.getBoundingClientRect().width));
+const slideInDone = (page: Page) =>
+  page
+    .locator('.side-panel')
+    .evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
 
 test('a task row opens its thread beside the Coordinator, and closing it returns to the list', async ({
   page,
@@ -60,6 +64,7 @@ test('the panel is resizable by keyboard and by drag, shared with Tasks, and rem
   await expect(handle(page)).toHaveAttribute('aria-valuenow', '452');
   expect(await panelWidth(page)).toBe(452);
 
+  await slideInDone(page);
   const box = await handle(page).boundingBox();
   if (box == null) throw new Error('resize handle has no box');
   const x = box.x + box.width / 2;
@@ -132,9 +137,7 @@ test.describe('phone width', () => {
     await expect(page.getByTestId('chief-composer-input')).toBeFocused();
     await page.goto(`${HOME}&thread=home-c-working-a`);
     await expect(sideChat(page)).toBeVisible();
-    await page
-      .locator('.side-panel')
-      .evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+    await slideInDone(page);
     await page.locator('body').click({ position: { x: 5, y: 400 } });
     await page.keyboard.type('h');
     await expect(page.getByTestId('chief-composer-input')).not.toBeFocused();
