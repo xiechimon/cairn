@@ -36,9 +36,8 @@ const CONTROLS: Control[] = [
     track: (page) => page.getByRole('tablist', { name: '范围' }),
   },
   {
-    name: 'user menu theme',
-    url: '/app?scenario=01',
-    open: (page) => page.click('.sidebar-user'),
+    name: 'settings appearance',
+    url: '/app/settings/appearance?scenario=01',
     track: (page) => page.getByRole('radiogroup', { name: '外观' }),
   },
 ];

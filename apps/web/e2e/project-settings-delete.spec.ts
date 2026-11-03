@@ -16,7 +16,7 @@ async function openConfirm(page: Page) {
 
 test('project topbar gear reaches the settings danger zone (#1174 entry)', async ({ page }) => {
   await page.goto(PROJECT_PAGE);
-  await page.getByRole('link', { name: '设置', exact: true }).click();
+  await page.getByTestId('page-topbar').getByRole('link', { name: '设置', exact: true }).click();
   await expect(page).toHaveURL(SETTINGS);
   await expect(page.getByText('危险操作')).toHaveText('危险操作');
 });

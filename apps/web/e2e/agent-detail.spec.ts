@@ -240,8 +240,10 @@ test('permissions tab: zero-secret empty state has an entry to add secrets, clic
   await expect(entry).toBeVisible();
   await expect(entry).toHaveText('去添加密钥');
   await entry.click();
-  await expect(page).toHaveURL(/\/app\/resources\/secrets/);
+  await expect(page).toHaveURL(/\/app\/settings\/secrets/);
   await expect(page.getByRole('heading', { level: 1, name: '密钥' })).toHaveText('密钥');
+  await page.getByRole('dialog', { name: '设置' }).getByRole('button', { name: '关闭设置' }).click();
+  await expect(page).toHaveURL(/\/app\/resources\/agents\//);
 });
 
 test('permissions tab: with secrets, no `去添加密钥` entry', async ({ page }) => {

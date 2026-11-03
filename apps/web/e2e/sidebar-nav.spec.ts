@@ -48,18 +48,18 @@ test('nav rows hop client-side: no reload, pill + aria-current follow', async ({
   await expect(board).not.toHaveAttribute('aria-current', 'page');
 });
 
-test('user menu resource and team links hop client-side', async ({ page }) => {
+test('settings sections hop client-side', async ({ page }) => {
   await page.goto('/app?scenario=01');
   await plantCanary(page);
 
-  await page.locator('.sidebar-user').click();
-  await page.getByRole('link', { name: '技能' }).click();
-  await expect(page).toHaveURL('/app/resources/skills?scenario=01');
+  await page.getByTestId('sidebar-settings').click();
+  const settings = page.getByRole('dialog', { name: '设置' });
+  await settings.getByRole('link', { name: '技能' }).click();
+  await expect(page).toHaveURL('/app/settings/skills?scenario=01');
   expect(await page.evaluate(() => window.__spaCanary)).toBe('alive');
 
-  await page.locator('.sidebar-user').click();
-  await page.getByRole('link', { name: '团队' }).click();
-  await expect(page).toHaveURL('/app/team?scenario=01');
+  await settings.getByRole('link', { name: '团队' }).click();
+  await expect(page).toHaveURL('/app/settings/team?scenario=01');
   expect(await page.evaluate(() => window.__spaCanary)).toBe('alive');
 });
 
@@ -79,7 +79,7 @@ test('install-app entries are gone from both sidebar states', async ({ page }) =
   await expect(page.getByRole('link', { name: /安装/ })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /安装/ })).toHaveCount(0);
   await expect(page.locator('a[href^="/zh/install"]')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Xmon Dai' })).toBeVisible();
+  await expect(page.getByTestId('sidebar-settings')).toBeVisible();
 });
 
 test('collapsed rail carries no install icon', async ({ page }) => {

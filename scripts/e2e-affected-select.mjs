@@ -37,6 +37,7 @@ const BOARD = [
 ];
 const SIDEBAR = [
   'menu-keys',
+  'settings-',
   'sidebar-',
   'collapse-',
   'visual-',
@@ -187,6 +188,7 @@ const PAGES = [
 ];
 const RESOURCES = [
   'menu-keys',
+  'settings-',
   'machine-',
   'machines-',
   'agent-settings-row-label',
@@ -293,6 +295,7 @@ export const DIR_RULES = [
   { prefix: 'apps/web/src/overlay/', specs: OVERLAY },
   { prefix: 'apps/web/src/pages/', specs: PAGES },
   { prefix: 'apps/web/src/resources/', specs: RESOURCES },
+  { prefix: 'apps/web/src/settings/', specs: [...RESOURCES, ...SIDEBAR] },
   { prefix: 'apps/web/src/secondary/', specs: SECONDARY },
   { prefix: 'apps/web/src/pwa/', specs: ['notify-', 'push-device-switch'] },
   { prefix: 'apps/web/src/components/texture/', specs: ['texture-'] },

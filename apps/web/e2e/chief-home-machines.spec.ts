@@ -45,7 +45,7 @@ test('the chip opens one card per computer, the Coordinator machine first, with 
   await expect(panel(page)).toContainText('辅助功能');
 
   await panel(page).getByRole('link', { name: '添加电脑' }).click();
-  await expect(page).toHaveURL(/\/app\/resources\/machines/);
+  await expect(page).toHaveURL(/\/app\/settings\/machines/);
 });
 
 test('with one computer the panel says work runs on the Coordinator machine', async ({ page }) => {
