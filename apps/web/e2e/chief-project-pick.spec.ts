@@ -186,7 +186,7 @@ const input = (page: Page) => drawer(page).getByTestId('chief-composer-input');
 const homeInput = (page: Page) => page.getByTestId('home-c').getByTestId('chief-composer-input');
 
 async function openDrawer(page: Page) {
-  await page.goto('/app?view=board');
+  await page.goto('/app/schedules');
   await openChiefWindow(page);
   await expect(drawer(page)).toBeVisible();
 }

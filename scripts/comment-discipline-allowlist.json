@@ -80,16 +80,6 @@
     "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
   },
   {
-    "path": "apps/server/src/routes-webhook.ts",
-    "line": "// mgmt 三端点（requireTeam 闸，api-keys 同族；不豁免 CAIRN_TOKEN——管理面",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/server/src/routes-webhook.ts",
-    "line": "  // —— token mgmt（api-keys 三端点同族；管理面不豁免 CAIRN_TOKEN）————————",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
     "path": "apps/server/src/services/api-keys.ts",
     "line": "// - 创建：生成 `cairn_<48hex>` 明文，响应含明文一次（一次性展示，02 §8；",
     "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
@@ -225,23 +215,8 @@
     "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
   },
   {
-    "path": "apps/server/src/services/webhook-tokens.ts",
-    "line": "// - 创建：`cairn_wh_<36hex>` 明文一次性返回（前缀区分 apiKey 凭证族）；",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/server/src/services/webhook-tokens.ts",
-    "line": "/** `cairn_wh_<36hex>`（webhook 凭证族形态；hex 小写，apiKey 同律）。 */",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
     "path": "apps/web/e2e/account-team-cleanse.spec.ts",
     "line": "  // the choice survives a reload (cairn.teamMembersLayout)",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/e2e/board-dnd.spec.ts",
-    "line": "// #391's 250ms flight was a cairn invention; the reference snaps ----",
     "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
   },
   {
@@ -713,11 +688,6 @@
     "path": "apps/daemon/test/claude-transcript-path.test.ts",
     "line": "// macOS spawn cwd is symlink-resolved; transcript slug must match or resume misses.",
     "reason": "external quirk: macOS resolves the CLI spawn cwd through symlinks"
-  },
-  {
-    "path": "apps/daemon/test/shell-channel.test.ts",
-    "line": "    // macOS tmpdir symlinks /var to /private/var; pwd is resolved.",
-    "reason": "external quirk: macOS tmpdir is a symlink (/var -> /private/var)"
   },
   {
     "path": "apps/web/src/resources/skill-dialog.tsx",

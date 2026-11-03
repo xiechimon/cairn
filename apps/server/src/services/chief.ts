@@ -63,7 +63,7 @@ import {
   settleChiefActiveRun,
   steerChiefMessage,
 } from './chief-turns.js';
-import { coordinatorServerContextEnabled, lastTurnContext } from './coordinator-context.js';
+import { coordinatorRunsOnPi, lastTurnContext } from './coordinator-context.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { injectMemories } from './memory.js';
@@ -253,9 +253,7 @@ export function getChiefEnvelope(deps: ChiefDeps, teamId: string): ChiefGetRespo
   return {
     chief: toChiefRecord(row),
     agentActor: agentRow ? agentRecordOfRow(agentRow) : null,
-    context: coordinatorServerContextEnabled()
-      ? lastTurnContext(deps.db, row)
-      : chiefContext(deps, row.id),
+    context: coordinatorRunsOnPi() ? lastTurnContext(deps.db, row) : chiefContext(deps, row.id),
     watches: refreshWatches(deps, row.watches),
     wakes: row.wakes,
     orchestration: chiefOrchestration(deps, teamId, row),
@@ -370,10 +368,8 @@ export function coordinatorThreadRow(deps: ChiefDeps, chiefRow: ChiefRow): Threa
 }
 
 export function chiefThreadView(deps: ChiefDeps, teamId: string, r: ThreadRow): ChiefThread {
-  const projector = stepQueueProjector(deps.db, teamId);
-  const pending = projector.pendingChiefOf(r.id);
   const record = {
-    ...toChiefThreadRecord(r, pending === null ? null : projector.project(pending)),
+    ...toChiefThreadRecord(r, stepQueueProjector(deps.db, teamId).chiefTurnQueueOf(r.id)),
     pending: chiefPendingMessages(deps.db, r.id),
     fallbackModel: chiefThreadFallbackModel(deps.db, r.id),
   };
@@ -647,12 +643,10 @@ export function sendChiefMessage(
     trigger: 'user',
     id: message.id,
   });
-  const projector = stepQueueProjector(deps.db, teamId);
-  const pendingTurn = projector.pendingChiefOf(threadRow.id);
   return {
     thread: toChiefThreadRecord(
       threadRow,
-      pendingTurn === null ? null : projector.project(pendingTurn),
+      stepQueueProjector(deps.db, teamId).chiefTurnQueueOf(threadRow.id),
     ),
     message,
   };
@@ -853,13 +847,11 @@ export function rewindChiefThread(
   });
   const fresh = getChiefThread(deps, threadId);
   if (!fresh) throw new Error('chief thread missing after rewind');
-  const projector = stepQueueProjector(deps.db, teamId);
-  const pendingTurn = projector.pendingChiefOf(threadId);
   return {
     deletedCount: doomed.length,
     thread: toChiefThreadRecord(
       fresh,
-      pendingTurn === null ? null : projector.project(pendingTurn),
+      stepQueueProjector(deps.db, teamId).chiefTurnQueueOf(threadId),
     ),
   };
 }

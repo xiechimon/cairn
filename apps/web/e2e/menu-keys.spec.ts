@@ -173,11 +173,3 @@ test('gallery menu: composing text does not fire a row', async ({ page }) => {
   await expect(menu).toBeVisible();
   await expect(page.getByText('Last picked: Delete')).toHaveCount(0);
 });
-
-test('the board new-task bar carries no key hint now that C is retired', async ({ page }) => {
-  await page.goto('/app?view=board');
-  const bar = page.getByTestId('board-new-task-bar');
-  await expect(bar).toBeVisible();
-  await expect(bar.locator('[data-slot="kbd"]')).toHaveCount(0);
-  await expect(bar.locator('[data-slot="key-hint"]')).toHaveCount(0);
-});

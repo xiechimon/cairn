@@ -31,8 +31,13 @@ import { streamSSE } from 'hono/streaming';
 import type { AppContext } from './context.js';
 import { build, type machine as machineTable, step, todo } from './db/schema.js';
 import { HttpError, parseWith } from './lib/errors.js';
+import { forwardedOrigin } from './lib/forwarded-origin.js';
 import { newRecordId } from './lib/ids.js';
-import { matchesAllowlistedTailscaleIdentity, matchesAuthToken } from './lib/token-auth.js';
+import {
+  isLoopbackPeer,
+  matchesAllowlistedTailscaleIdentity,
+  matchesAuthToken,
+} from './lib/token-auth.js';
 import { transitionBranchSync } from './services/branch-sync.js';
 import { recordBuildProvenance } from './services/build-provenance.js';
 import { recordClaudeRateLimit } from './services/claude-rate-limit.js';
@@ -142,7 +147,12 @@ async function jsonBody(c: Context): Promise<unknown> {
 }
 
 function originOf(c: Context): string {
-  return new URL(c.req.url).origin;
+  return forwardedOrigin({
+    url: c.req.url,
+    loopbackPeer: isLoopbackPeer(c),
+    proto: c.req.header('x-forwarded-proto'),
+    host: c.req.header('x-forwarded-host'),
+  });
 }
 
 export function registerMachineRoutes(app: Hono, ctx: AppContext): void {

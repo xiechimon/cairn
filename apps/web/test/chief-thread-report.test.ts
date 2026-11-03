@@ -35,7 +35,6 @@ describe('chief thread reports and quiet event turns (#1784)', () => {
           row('thinking', 'assistant', [{ type: 'thinking', thinking: 'checking' }]),
           row('reply', 'assistant', 'The worker result has been checked.'),
         ],
-        true,
       );
       expect(items).toEqual([{ ...REPORT, phase, id: 'report-1' }]);
     },

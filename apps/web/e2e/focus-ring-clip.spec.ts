@@ -1,13 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { keyboardFocus, readRing, settleTransitions } from './helpers.js';
 
-test('filter chip focus ring stays whole inside the chip strip', async ({ page }) => {
-  await page.goto('/app?column=pending');
-  const chip = page.getByRole('button', { name: '清除待处理筛选' });
-  await keyboardFocus(page, chip);
-  expect(await readRing(chip)).toEqual({ focused: true, outline: 'solid 2px', clippedBy: [] });
-});
-
 test('api key permission checkboxes keep whole focus rings while the list scrolls', async ({
   page,
 }) => {

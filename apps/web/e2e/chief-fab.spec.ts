@@ -2,12 +2,11 @@ import { expect, test } from '@playwright/test';
 import { openChiefWindow } from './helpers.js';
 
 const ROUTES = [
-  ['board', '/app?scenario=01&view=board'],
   ['home', '/app?scenario=home-c'],
   ['pages', '/app/schedules?scenario=11'],
   ['team', '/app/team?scenario=12'],
   ['detail with unread', '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=detail-unread'],
-  ['unread at the cap', '/app?scenario=chief-unread-cap&view=board'],
+  ['unread at the cap', '/app/schedules?scenario=chief-unread-cap'],
 ] as const;
 
 test.describe('no floating chief launcher on any route', () => {

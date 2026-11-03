@@ -6,7 +6,7 @@ const AGENT =
 const SKILLS = '/app/resources/skills?scenario=01';
 const TASKS = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=prj-tasks&tab=tasks';
 const AGENT_PERMS = '/app/resources/agents/r3-builder?scenario=agent-detail';
-const ACCEPT = '/app?scenario=34';
+const ACCEPT = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=34';
 
 const BADGES = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=57f';
 const SCHEDULES = '/app/schedules?scenario=r3-92';

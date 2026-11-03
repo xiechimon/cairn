@@ -12,7 +12,6 @@ import { Kbd } from '../components/ui/kbd.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
-import { DEMO_MODE } from '../demo/demo-gate.js';
 import { UserMenu } from '../detail/user-menu.js';
 import { isDeleted } from '../fixtures/deletions.js';
 import { PROJECT_ID, PROJECT_NAME } from '../fixtures/fixtures.js';
@@ -22,14 +21,11 @@ import { useI18n } from '../i18n/provider.js';
 import { FOCUS_RING_INSET } from '../lib/focus-ring.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { readStoredTheme } from '../theme.js';
-import { withColumnParam } from './columns.js';
-import { withoutBoardView } from './home.js';
 import { needsYouThreads } from './needs-you.js';
 import { ProjectAvatar } from './project-avatar.js';
 
 export type SidebarSelected =
   | 'board'
-  | 'kanban'
   | 'schedules'
   | 'team'
   | 'none'
@@ -171,19 +167,15 @@ export function BoardSidebar({
   const { user } = useLiveData();
   const navigate = useNavigate();
   const { search, pathname } = useLocation();
-  const stripped = withoutBoardView(withColumnParam(search, null));
-  const baseParams = new URLSearchParams(stripped.startsWith('?') ? stripped.slice(1) : stripped);
+  const baseParams = new URLSearchParams(search);
   const projectParam = pathname === '/app' ? baseParams.get('project') : null;
   baseParams.delete('project');
-  const homeParams = new URLSearchParams(baseParams);
-  if (DEMO_MODE) homeParams.set('view', 'home');
   const projectHref = (id: string) => {
-    const next = new URLSearchParams(homeParams);
+    const next = new URLSearchParams(baseParams);
     next.set('project', id);
     return { pathname: '/app', search: `?${next}` };
   };
   const plain = `?${baseParams}`;
-  const homeSearch = `?${homeParams}`;
   const projectRows = useMemo(
     () => (projects ?? [CANON_PROJECT]).filter((row) => !isDeleted(row.id)),
     [projects],
@@ -210,8 +202,7 @@ export function BoardSidebar({
   const navRef = useRef<HTMLElement | null>(null);
   useScrollFade(navRef, { enabled: !collapsed });
   const coordinatorLabel = attention > 0 ? `${t('Coordinator')} ${attention}` : t('Coordinator');
-  const coordinatorActive =
-    (selected === 'board' || selected === 'kanban') && activeProject === null;
+  const coordinatorActive = selected === 'board' && activeProject === null;
 
   const userAvatar = (
     <SeededAvatar
@@ -262,11 +253,7 @@ export function BoardSidebar({
         </Tooltip>
         <nav className="mt-2 flex min-h-0 flex-1 flex-col items-center gap-px overflow-y-auto">
           <Link
-            {...railLink(
-              { pathname: '/app', search: homeSearch },
-              coordinatorActive,
-              coordinatorLabel,
-            )}
+            {...railLink({ pathname: '/app', search: plain }, coordinatorActive, coordinatorLabel)}
           >
             <SpiralMark busy={false} className={ICON} />
             {attention > 0 && (
@@ -361,7 +348,7 @@ export function BoardSidebar({
             icon={<SpiralMark busy={false} className="size-4" />}
             label={t('Coordinator')}
             active={coordinatorActive}
-            onClick={() => navigate({ pathname: '/app', search: homeSearch })}
+            onClick={() => navigate({ pathname: '/app', search: plain })}
           />
           {attention > 0 && (
             <span className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2">
