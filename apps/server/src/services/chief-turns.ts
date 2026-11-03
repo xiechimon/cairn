@@ -20,7 +20,7 @@ import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import type { ConversationStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
-import { pickedProjectIdOf } from './picked-project.js';
+import { stepScopeProjectId } from './picked-project.js';
 import { publishStepRow } from './quota-wait.js';
 
 type StepRow = typeof step.$inferSelect;
@@ -416,7 +416,7 @@ export function recordChiefStop(
     threadId: stepRow.buildId,
     role: 'system' as const,
     content: JSON.stringify(content),
-    projectId: pickedProjectIdOf(stepRow.prompt),
+    projectId: stepScopeProjectId(stepRow),
     createdAt: nowMs(),
   };
   db.insert(chiefMessage)
