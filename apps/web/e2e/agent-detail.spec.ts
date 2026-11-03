@@ -675,12 +675,12 @@ test('memory tab: memory rows live in the template card', async ({ page }) => {
   await expect(card.locator('.settings-row.agent-memory-row')).toHaveCount(3);
 });
 
-test('permissions tab: five switch groups each live in their own template card (#1251 adds the machine-match section)', async ({ page }) => {
+test('permissions tab: six switch groups each live in their own template card (#1251 machine-match section, D71 Orb sandbox card)', async ({ page }) => {
   const detail = await openDetail(page);
   await detail.locator('.agent-tab').nth(2).click();
   const cards = detail.locator('.agent-perms .settings-card');
 
-  await expect(cards).toHaveCount(5);
+  await expect(cards).toHaveCount(6);
 
   await expect(cards.first().locator('.settings-row')).toHaveCount(5);
   await expect(cards.first().locator('.agent-tool-switch')).toHaveCount(5);
@@ -698,7 +698,7 @@ test('memory/permission cards: first row has no background, no top border (no sq
   await detail.locator('.agent-tab').nth(2).click();
 
   const permFirst = detail.locator('.agent-perms .settings-card > .settings-row:first-child');
-  await expect(permFirst).toHaveCount(5);
+  await expect(permFirst).toHaveCount(6);
   await assertTopCorner(permFirst);
 });
 

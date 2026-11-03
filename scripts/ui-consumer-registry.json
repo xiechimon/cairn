@@ -96,9 +96,9 @@
     },
     {
       "file": "apps/web/src/routes/team-agent-grid.tsx",
-      "anchor": "unassigned: { icon: CircleAlert, label: '未设归属机', cls: 'text-(--card-button)' }",
+      "anchor": "unassigned: { icon: CircleAlert, label: '未设首选机器', cls: 'text-(--card-button)' }",
       "role": "indicator",
-      "reason": "Team agent card status for an agent with no home machine (icon + 未设归属机). It cannot take steps until the user assigns a machine, a needs-you state; DESIGN.md 颜色: accent is reserved for needs-you states, every status = icon + color + label.",
+      "reason": "Team agent card status for an agent with no preferred machine (icon + 未设首选机器). It cannot take steps until the user assigns a machine, a needs-you state; DESIGN.md 颜色: accent is reserved for needs-you states, every status = icon + color + label.",
       "contrast": "apps/web/DESIGN.md 颜色 (accent on card 4.99, AA for 12px text)"
     },
     {

@@ -30,7 +30,7 @@ test('card status is icon + colour + label for each home-machine state', async (
   const expected = [
     ['r3-builder', 'online', '在线'],
     ['r7-reviewer', 'offline', '离线'],
-    ['r9-scout', 'unassigned', '未设归属机'],
+    ['r9-scout', 'unassigned', '未设首选机器'],
   ] as const;
   const colors = new Set<string>();
   for (const [name, state, label] of expected) {
@@ -85,7 +85,7 @@ test('create dialog: labels point at controls, `取消` closes, `创建` sits ri
   const dialog = page.getByRole('dialog', { name: '创建 agent' });
   await expect(dialog.getByLabel('名称')).toHaveAttribute('id', 'dlg-agent-name');
   await expect(dialog.getByLabel('运行时')).toHaveAttribute('id', 'dlg-agent-runtime');
-  await expect(dialog.getByLabel('归属机')).toHaveAttribute('id', 'dlg-agent-machine');
+  await expect(dialog.getByLabel('首选机器')).toHaveAttribute('id', 'dlg-agent-machine');
   await expect(dialog.getByLabel('模型')).toHaveAttribute('id', 'dlg-agent-model');
   const cancel = dialog.getByRole('button', { name: '取消' });
   const create = dialog.getByRole('button', { name: '创建', exact: true });

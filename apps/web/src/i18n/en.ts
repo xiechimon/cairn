@@ -530,7 +530,10 @@ export const EN: Record<string, string> = {
   方案产出后显示于此: 'The plan will appear here once produced',
   '（等待机器上线）': '(waiting for the machine to come online)',
   // #1259 创建 agent 三级级联的归属机槽（+ 无机器告警行）。
-  归属机: 'Home machine',
+  首选机器: 'Preferred machine',
+  未设首选机器: 'no preferred machine',
+  '首选机器 {machine} 未开启 {runtime} runtime，运行时会跳过该备选':
+    'Preferred machine {machine} has the {runtime} runtime off; this fallback is skipped there',
   ' · 归属机 {machine}': ' · on {machine}',
   模型与归属机: 'Model & home machine',
   '跟随绑定 Agent：模型 {model} · 归属机 {machine}':
@@ -1165,14 +1168,18 @@ export const EN: Record<string, string> = {
   '保存失败，请重试。': 'Save failed. Try again.',
   // #1251 机器匹配段（权限 tab 第五组：执行要求写面 + 「哪些机器可跑它」读面）。
   机器匹配: 'Machine fit',
-  '执行要求 = 派发硬闸：能力快照不满足的机器不领该 Agent 的步（排队面会给可见成因）；从未上报快照的机器按可跑放行。':
-    'Execution requirements are a hard dispatch gate: machines whose capability snapshot does not satisfy them never claim this agent’s steps (the queue shows a visible reason); machines that never reported a snapshot are let through.',
+  '执行要求 = 派发硬闸：能力快照不满足的机器不领该 Agent 的步（排队面会给可见成因）；从未上报快照的机器按不满足处理。':
+    'Execution requirements are a hard dispatch gate: machines whose capability snapshot does not satisfy them never claim this agent’s steps (the queue shows a visible reason); machines that never reported a snapshot count as not satisfying them.',
+  'Orb 沙箱': 'Orb sandbox',
+  '只在 Orb 沙箱执行机上运行，从不退到无沙箱主机':
+    'Runs only on an Orb sandbox executor, never falls back to an unsandboxed host',
+  '要求 Orb 沙箱': 'Require the Orb sandbox',
   '要求执行机已安装该 MCP 服务器': 'Require this MCP server installed on the executing machine',
   '要求安装 {name}': 'Require {name} installed',
   离线: 'Offline',
   '未开启该 Agent 所需的 runtime': 'Required runtime not enabled for this agent',
   '缺 {missing}（在该机装齐即解锁）': 'Missing {missing} (install on that machine to unlock)',
-  '能力快照未上报——按可跑放行': 'Capability snapshot not reported — treated as runnable',
+  '能力快照未上报——按不满足处理': 'Capability snapshot not reported — treated as not satisfied',
   '可跑；声明的 MCP 缺 {gaps}（执行时跳过）':
     'Runnable; declared MCP missing {gaps} (skipped at runtime)',
   可跑: 'Runnable',
@@ -1382,8 +1389,6 @@ export const EN: Record<string, string> = {
   选完模型后才会保存: 'Saved once a model is chosen',
   当前可选列表里没有该模型: 'This model is not in the current list',
   '已下架，运行时会跳过该备选': 'Delisted; this fallback is skipped at run time',
-  '归属机 {machine} 未开启 {runtime} runtime，运行时会跳过该备选':
-    'Home machine {machine} has the {runtime} runtime off; this fallback is skipped at run time',
   已忘掉: 'Forgotten',
   查看这条记忆: 'View this memory',
   让总管忘掉这条: 'Make the chief forget this',

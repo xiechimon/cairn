@@ -1,0 +1,1 @@
+UPDATE `agent` SET `requiredCapabilities` = json_set(CASE WHEN `requiredCapabilities` IS NULL OR `requiredCapabilities` = 'null' THEN '{}' ELSE `requiredCapabilities` END, '$.executor', 'orb') WHERE `machineId` IN (SELECT `m`.`id` FROM `machine` `m` WHERE json_extract(`m`.`capabilities`, '$.executor') = 'orb' OR `m`.`name` LIKE '%-orb');

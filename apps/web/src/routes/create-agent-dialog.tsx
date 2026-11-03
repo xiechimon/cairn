@@ -139,7 +139,7 @@ export function CreateAgentDialog({
                 triggerClassName={CONTROL_CLS}
               />
             </FormField>
-            <FormField label={t('归属机')} htmlFor="dlg-agent-machine">
+            <FormField label={t('首选机器')} htmlFor="dlg-agent-machine">
               <Select
                 value={machineId}
                 onValueChange={(next) => {
@@ -155,7 +155,7 @@ export function CreateAgentDialog({
                     {machineCandidates.find((m) => m.id === machineId)?.name ?? t('选择机器')}
                   </SelectValue>
                 </SelectTrigger>
-                <SelectContent aria-label={t('归属机')}>
+                <SelectContent aria-label={t('首选机器')}>
                   {machineCandidates.map((m) => (
                     <SelectItem key={m.id} className="dlg-agent-machine-row" value={m.id ?? ''}>
                       {m.name}

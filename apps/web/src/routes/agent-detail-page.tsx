@@ -7,6 +7,7 @@ import {
   MEMORY_QUOTA_PER_AGENT,
   MEMORY_UI_COPY,
   type PatchAgentBody,
+  type RequiredCapabilities,
   THINKING_LEVELS,
 } from '@cairn/shared';
 import { cn } from 'cn';
@@ -75,13 +76,21 @@ const AGENT_ICON_EDIT_CLS = 'text-muted-foreground';
 const AGENT_TASK_ROW_CLS =
   'agent-task-row h-auto w-full justify-start gap-2 px-4 py-2.5 text-left font-normal';
 
+function normalizedRequirement(next: RequiredCapabilities): RequiredCapabilities | null {
+  const empty =
+    (next.mcpServers ?? []).length === 0 &&
+    (next.models ?? []).length === 0 &&
+    next.executor === undefined;
+  return empty ? null : next;
+}
+
 function machineFitHint(m: AgentMachineFitRow, t: TFunc): string {
   if (!m.online) return t('离线');
   if (!m.runtimeOk) return t('未开启该 Agent 所需的 runtime');
   if (m.missing !== null && m.missing.length > 0) {
     return t('缺 {missing}（在该机装齐即解锁）', { missing: m.missing.join('、') });
   }
-  if (m.missing === null) return t('能力快照未上报——按可跑放行');
+  if (m.missing === null && !m.canRun) return t('能力快照未上报——按不满足处理');
   if (m.mcpGaps !== null && m.mcpGaps.length > 0) {
     return t('可跑；声明的 MCP 缺 {gaps}（执行时跳过）', { gaps: m.mcpGaps.join('、') });
   }
@@ -259,10 +268,13 @@ export function AgentDetailPage() {
     const nextMcp = on
       ? [...(current.mcpServers ?? []), id]
       : (current.mcpServers ?? []).filter((v) => v !== id);
-    const hasModels = (current.models ?? []).length > 0;
+    patch({ requiredCapabilities: normalizedRequirement({ ...current, mcpServers: nextMcp }) });
+  };
+  const requirementSaving = live && (mutations.patchAgent.isPending || agentQ.isFetching);
+  const toggleRequiredOrb = (on: boolean) => {
+    const { executor: _executor, ...rest } = agent.requiredCapabilities ?? {};
     patch({
-      requiredCapabilities:
-        nextMcp.length === 0 && !hasModels ? null : { ...current, mcpServers: nextMcp },
+      requiredCapabilities: normalizedRequirement(on ? { ...rest, executor: 'orb' } : rest),
     });
   };
   const toggleAllowlistSkill = (id: string, on: boolean) => {
@@ -699,9 +711,23 @@ export function AgentDetailPage() {
               <h3 className="m-0 text-card-title font-medium text-foreground">{t('机器匹配')}</h3>
               <p className={SETTINGS_HINT_CLS}>
                 {t(
-                  '执行要求 = 派发硬闸：能力快照不满足的机器不领该 Agent 的步（排队面会给可见成因）；从未上报快照的机器按可跑放行。',
+                  '执行要求 = 派发硬闸：能力快照不满足的机器不领该 Agent 的步（排队面会给可见成因）；从未上报快照的机器按不满足处理。',
                 )}
               </p>
+              <SettingsCard>
+                <SettingsRow
+                  label={t('Orb 沙箱')}
+                  hint={t('只在 Orb 沙箱执行机上运行，从不退到无沙箱主机')}
+                  hintClassName="agent-perm-hint"
+                >
+                  <ToggleSwitch
+                    aria-label={t('要求 Orb 沙箱')}
+                    checked={agent.requiredCapabilities?.executor === 'orb'}
+                    disabled={requirementSaving}
+                    onCheckedChange={toggleRequiredOrb}
+                  />
+                </SettingsRow>
+              </SettingsCard>
               {mcpOptions.length === 0 ? (
                 <SettingsCard>
                   <div className={cn(SETTINGS_ROW_CLS, 'gap-2')}>
@@ -722,6 +748,7 @@ export function AgentDetailPage() {
                       <ToggleSwitch
                         aria-label={t('要求安装 {name}', { name: server.name })}
                         checked={(agent.requiredCapabilities?.mcpServers ?? []).includes(server.id)}
+                        disabled={requirementSaving}
                         onCheckedChange={(checked) => toggleRequiredMcp(server.id, checked)}
                       />
                     </SettingsRow>

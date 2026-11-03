@@ -20,7 +20,7 @@ type MachineStatus = 'online' | 'offline' | 'unassigned';
 const STATUS_FACE: Record<MachineStatus, { icon: LucideIcon; label: string; cls: string }> = {
   online: { icon: CircleDot, label: '在线', cls: 'text-running-text' },
   offline: { icon: CircleDashed, label: '离线', cls: 'text-content-tertiary' },
-  unassigned: { icon: CircleAlert, label: '未设归属机', cls: 'text-(--card-button)' },
+  unassigned: { icon: CircleAlert, label: '未设首选机器', cls: 'text-(--card-button)' },
 };
 
 interface TeamAgentGridProps {

@@ -244,7 +244,7 @@ test('owner machine missing the runtime a fallback needs: editing shows a hint, 
   ]);
   await openDetail(page, agentId);
   await expect(page.locator('.agent-fallback-row').nth(1)).toContainText(
-    `归属机 ${machineName} 未开启 claude-code runtime`,
+    `首选机器 ${machineName} 未开启 claude-code runtime`,
   );
   await expect(page.locator('.agent-fallback-row').nth(0)).not.toContainText('未开启');
   expect(await savedFallbackModels(agentId)).toHaveLength(2);

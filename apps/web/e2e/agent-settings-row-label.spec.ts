@@ -22,3 +22,17 @@ test('the required-MCP switch keeps its deliberate name', async ({ page }) => {
   await page.locator('.agent-tab').nth(2).click();
   await expect(page.getByRole('switch', { name: '要求安装 r3-mcp' })).toBeVisible();
 });
+
+test('D71 the Orb requirement survives toggling an MCP requirement off', async ({ page }) => {
+  await page.goto(AGENT_DETAIL);
+  await page.locator('.agent-tab').nth(2).click();
+  const orb = page.getByRole('switch', { name: '要求 Orb 沙箱' });
+  const mcp = page.getByRole('switch', { name: '要求安装 r3-mcp' });
+  await orb.click();
+  await expect(orb).toBeChecked();
+  await mcp.click();
+  await expect(mcp).toBeChecked();
+  await mcp.click();
+  await expect(mcp).not.toBeChecked();
+  await expect(orb).toBeChecked();
+});

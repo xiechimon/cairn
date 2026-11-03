@@ -91,7 +91,7 @@ export function FallbackModelsSection({
               const runtime = isBackendRuntimeId(row.provider) ? 'claude-code' : 'pi';
               if (homeMachine !== null && !homeMachine.enabledRuntimes.includes(runtime)) {
                 warnings.push(
-                  t('归属机 {machine} 未开启 {runtime} runtime，运行时会跳过该备选', {
+                  t('首选机器 {machine} 未开启 {runtime} runtime，运行时会跳过该备选', {
                     machine: homeMachine.name,
                     runtime,
                   }),
