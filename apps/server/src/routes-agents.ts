@@ -23,6 +23,7 @@ import {
 } from './routes-helpers.js';
 import { deleteAgent } from './services/agents.js';
 import {
+  capabilityGatePasses,
   declaredMcpGaps,
   homeMachineRejectReason,
   missingCapabilityItems,
@@ -228,7 +229,7 @@ export function registerAgentRoutes(app: Hono, ctx: AppContext): void {
         runtimeOk,
         missing,
         mcpGaps: declaredMcpGaps(m, row),
-        canRun: runtimeOk && (missing === null || missing.length === 0),
+        canRun: runtimeOk && capabilityGatePasses(m, row),
       };
     });
     return c.json(agentMachineFitResponseSchema.parse({ machines: rows }));

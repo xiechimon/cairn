@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   agentMachineFitResponseSchema,
   agentRecordSchema,
+  capabilityMissingLabels,
   createAgentBodySchema,
   machineCapabilitiesSchema,
   machineEnrollBodySchema,
@@ -257,6 +258,48 @@ describe('agentMachineFitResponseSchema (agent-facing "which machines can run it
     expect(
       agentMachineFitResponseSchema.safeParse({ machines: [{ machineId: 'm1' }] }).success,
     ).toBe(false);
+  });
+});
+
+describe('D71 executor kind (Orb sandbox vs plain host)', () => {
+  it('a machine report carries executor orb or host', () => {
+    expect(
+      machineCapabilitiesSchema.parse({ mcpServers: [], skills: [], executor: 'orb' }).executor,
+    ).toBe('orb');
+    expect(
+      machineCapabilitiesSchema.parse({ mcpServers: [], skills: [], executor: 'host' }).executor,
+    ).toBe('host');
+  });
+
+  it('an unknown executor kind is rejected on the wire', () => {
+    expect(
+      machineCapabilitiesSchema.safeParse({ mcpServers: [], skills: [], executor: 'vm' }).success,
+    ).toBe(false);
+  });
+
+  it('the server keeps a reported executor and drops a malformed one without losing the list', () => {
+    expect(parseReportedCapabilities({ mcpServers: [], skills: [], executor: 'orb' })).toEqual({
+      mcpServers: [],
+      skills: [],
+      executor: 'orb',
+    });
+    expect(parseReportedCapabilities({ mcpServers: ['a'], skills: [], executor: 7 })).toEqual({
+      mcpServers: ['a'],
+      skills: [],
+    });
+  });
+
+  it('an old daemon that reports no executor stays unreported, never defaulted to host', () => {
+    expect(parseReportedCapabilities({ mcpServers: [], skills: [] })?.executor).toBeUndefined();
+  });
+
+  it('an agent can require the Orb executor and nothing weaker', () => {
+    expect(requiredCapabilitiesSchema.parse({ executor: 'orb' })).toEqual({ executor: 'orb' });
+    expect(requiredCapabilitiesSchema.safeParse({ executor: 'host' }).success).toBe(false);
+  });
+
+  it('a missing Orb executor is labelled for the queue and fit views', () => {
+    expect(capabilityMissingLabels({ executor: 'orb' })).toEqual(['Orb sandbox executor']);
   });
 });
 

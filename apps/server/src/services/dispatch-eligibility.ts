@@ -38,11 +38,14 @@ export interface MachineCapabilityFacts {
 export function missingCapabilityItems(
   machineRow: MachineCapabilityFacts,
   required: RequiredCapabilities | null | undefined,
-): { mcpServers: string[]; models: string[] } {
+): { mcpServers: string[]; models: string[]; executor?: 'orb' } {
   if (required == null) return { mcpServers: [], models: [] };
   const reportedMcp = machineRow.capabilities?.mcpServers;
   const reportedModels = machineRow.claudeCodeReport?.models;
+  const executorMissing =
+    required.executor === 'orb' && machineRow.capabilities?.executor !== 'orb';
   return {
+    ...(executorMissing ? { executor: 'orb' as const } : {}),
     mcpServers:
       reportedMcp === undefined
         ? []
