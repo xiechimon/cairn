@@ -457,6 +457,7 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
       scheduling,
       routingRules,
       coordinatorServerContext,
+      coordinatorMachineId,
       trajectoryOutcomeBackfill,
       trajectoryReflectCurate,
       trajectoryReflectOpenGuardIssues,
@@ -487,6 +488,7 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
     expect(scheduling).toBe('CAIRN_SCHEDULING');
     expect(routingRules).toBe('CAIRN_ROUTING_RULES');
     expect(coordinatorServerContext).toBe('CAIRN_COORDINATOR_SERVER_CONTEXT');
+    expect(coordinatorMachineId).toBe('CAIRN_COORDINATOR_MACHINE_ID');
     expect(trajectoryOutcomeBackfill).toBe('CAIRN_TRAJ_OUTCOME_BACKFILL');
     expect(trajectoryReflectCurate).toBe('CAIRN_TRAJ_REFLECT_CURATE');
     expect(trajectoryReflectOpenGuardIssues).toBe('CAIRN_TRAJ_REFLECT_OPEN_GUARD_ISSUES');
