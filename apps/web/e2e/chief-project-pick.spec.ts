@@ -383,6 +383,7 @@ test.describe('the home sends to the project it is filtered to (#2531)', () => {
     await page.goto('/app?project=proj-2');
     await page.getByTestId('project-home-ask').fill('官网首页还差什么');
     await page.getByTestId('project-home-ask').press('Enter');
+    await expect(page.getByTestId('project-home-ask')).toHaveAttribute('readonly', '');
     await page.locator('[data-slot="sidebar-project-row"]', { hasText: 'radar-digest' }).click();
     await expect(page).toHaveURL(/project=proj-3/);
     await expect(page.getByTestId('project-home-ask')).toHaveValue('');

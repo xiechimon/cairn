@@ -177,6 +177,8 @@ export function ProjectHome({
             <InputGroup className="h-11 rounded-xl bg-card shadow-(--e1)">
               <InputGroupInput
                 data-testid="project-home-ask"
+                readOnly={sending}
+                aria-busy={sending}
                 value={question}
                 onChange={(event) => setQuestion(event.target.value)}
                 placeholder={t('问 Coordinator 关于 {name} 的事…', { name: project.name })}
