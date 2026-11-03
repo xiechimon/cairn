@@ -1,7 +1,7 @@
-import { isSessionStepKind, type StepKind } from '@cairn/shared';
+import { isSessionStepKind, type RequiredCapabilities, type StepKind } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { agent, routingRule, team, todo } from '../db/schema.js';
+import { agent, machine, routingRule, team, todo } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 
 type AgentRow = typeof agent.$inferSelect;
@@ -41,6 +41,8 @@ export function applyRoute(agentRow: AgentRow, route: RoutingRuleRow | null): Ag
     thinkingLevel: route.thinkingLevel,
     fallbackModels: route.fallbackModels,
     machineId: route.machineId ?? agentRow.machineId,
+    requiredCapabilities:
+      route.use === 'session' ? route.requiredCapabilities : agentRow.requiredCapabilities,
   };
 }
 
@@ -75,6 +77,20 @@ function sessionSeedAgent(db: Db, teamId: string): AgentRow | null {
   return best;
 }
 
+function seededRequirement(db: Db, source: AgentRow): RequiredCapabilities | null {
+  const seedMachine =
+    source.machineId === null
+      ? undefined
+      : db.select().from(machine).where(eq(machine.id, source.machineId)).get();
+  const orb =
+    seedMachine !== undefined &&
+    (seedMachine.capabilities?.executor === 'orb' ||
+      (seedMachine.capabilities?.executor === undefined && seedMachine.name.endsWith('-orb')));
+  const own = source.requiredCapabilities ?? null;
+  if (!orb) return own;
+  return { ...(own ?? {}), executor: 'orb' };
+}
+
 export function seedRoutingRules(db: Db): number {
   let inserted = 0;
   for (const { id: teamId } of db.select({ id: team.id }).from(team).all()) {
@@ -97,6 +113,7 @@ export function seedRoutingRules(db: Db): number {
         thinkingLevel: source.thinkingLevel,
         fallbackModels: source.fallbackModels,
         machineId: source.machineId,
+        requiredCapabilities: seededRequirement(db, source),
         seededFromAgentId: source.id,
         createdAt: now,
         updatedAt: now,

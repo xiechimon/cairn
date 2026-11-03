@@ -11,7 +11,11 @@ import {
 } from '../src/db/schema.js';
 import { newRecordId } from '../src/lib/ids.js';
 import { agentForStep } from '../src/services/dispatch-eligibility.js';
-import { seedRoutingRules, setRoutingRulesEnabled } from '../src/services/routing-rules.js';
+import {
+  applyRoute,
+  seedRoutingRules,
+  setRoutingRulesEnabled,
+} from '../src/services/routing-rules.js';
 import {
   bindAllAgents,
   bootServer,
@@ -271,5 +275,127 @@ describe('seedRoutingRules: one session rule per team from its agents', () => {
     w.s.db.update(agentTable).set({ modelId: null }).run();
     expect(seedRoutingRules(w.s.db)).toBe(0);
     expect(w.s.db.select().from(routingRule).all()).toEqual([]);
+  });
+});
+
+describe('D71 the session rule carries the hard constraints', () => {
+  test('flag on: the rule constraints replace the agent constraints', async () => {
+    const w = await setupWorld();
+    w.s.db
+      .update(agentTable)
+      .set({ requiredCapabilities: { mcpServers: ['figma'] } })
+      .where(eq(agentTable.id, AGENT_BUILD))
+      .run();
+    insertRule(w.s, { teamId: w.s.team.id, requiredCapabilities: { executor: 'orb' } });
+    const todoRow = await buildTodo(w);
+    expect(agentForStep(w.s.db, todoRow, 'build')?.requiredCapabilities).toEqual({
+      executor: 'orb',
+    });
+  });
+
+  test('flag on: a rule without constraints requires nothing even when the agent did', async () => {
+    const w = await setupWorld();
+    w.s.db
+      .update(agentTable)
+      .set({ requiredCapabilities: { executor: 'orb' } })
+      .where(eq(agentTable.id, AGENT_BUILD))
+      .run();
+    insertRule(w.s, { teamId: w.s.team.id });
+    const todoRow = await buildTodo(w);
+    expect(agentForStep(w.s.db, todoRow, 'build')?.requiredCapabilities ?? null).toBeNull();
+  });
+
+  test('flag off: the agent constraints stand', async () => {
+    const w = await setupWorld();
+    setRoutingRulesEnabled(false);
+    w.s.db
+      .update(agentTable)
+      .set({ requiredCapabilities: { executor: 'orb' } })
+      .where(eq(agentTable.id, AGENT_BUILD))
+      .run();
+    insertRule(w.s, { teamId: w.s.team.id });
+    const todoRow = await buildTodo(w);
+    expect(agentForStep(w.s.db, todoRow, 'build')?.requiredCapabilities).toEqual({
+      executor: 'orb',
+    });
+  });
+
+  async function seedFrom(
+    w: World,
+    machine: { name: string; capabilities: unknown },
+    required: { mcpServers?: string[] } | null = null,
+  ) {
+    w.s.db.delete(agentTable).where(eq(agentTable.persona, 'implementer')).run();
+    w.s.db
+      .update(machineTable)
+      .set({ name: machine.name, capabilities: machine.capabilities as never })
+      .where(eq(machineTable.id, w.machineId))
+      .run();
+    w.s.db
+      .insert(agentTable)
+      .values({
+        id: 'agent-impl',
+        teamId: w.s.team.id,
+        displayName: 'impl',
+        persona: 'implementer',
+        provider: 'claude-code',
+        modelId: 'claude-sonnet-5-5',
+        machineId: w.machineId,
+        requiredCapabilities: required,
+      })
+      .run();
+    expect(seedRoutingRules(w.s.db)).toBe(1);
+    return w.s.db.select().from(routingRule).get()!.requiredCapabilities;
+  }
+
+  test('seed: an implementer on a machine that reports executor orb gives an Orb-required rule', async () => {
+    const w = await setupWorld();
+    expect(
+      await seedFrom(w, {
+        name: 'sandbox',
+        capabilities: { mcpServers: [], skills: [], executor: 'orb' },
+      }),
+    ).toEqual({ executor: 'orb' });
+  });
+
+  test('seed: an implementer on an -orb machine that never reported its executor is treated as Orb', async () => {
+    const w = await setupWorld();
+    expect(await seedFrom(w, { name: 'omarchy-orb', capabilities: null })).toEqual({
+      executor: 'orb',
+    });
+  });
+
+  test('seed: an implementer on a host keeps its own constraints and gains no Orb requirement', async () => {
+    const w = await setupWorld();
+    expect(
+      await seedFrom(
+        w,
+        { name: 'mac', capabilities: { mcpServers: [], skills: [], executor: 'host' } },
+        { mcpServers: ['figma'] },
+      ),
+    ).toEqual({ mcpServers: ['figma'] });
+  });
+
+  test('the coordinator rule does not touch the bound agent constraints (chief path unchanged)', async () => {
+    const w = await setupWorld();
+    const agentRow = {
+      ...w.s.db.select().from(agentTable).where(eq(agentTable.id, AGENT_BUILD)).get()!,
+      requiredCapabilities: { mcpServers: ['figma'] },
+    };
+    const rule = {
+      id: 'r',
+      teamId: w.s.team.id,
+      use: 'coordinator' as const,
+      provider: 'p',
+      modelId: 'm',
+      thinkingLevel: null,
+      fallbackModels: null,
+      machineId: null,
+      requiredCapabilities: { executor: 'orb' as const },
+      seededFromAgentId: null,
+      createdAt: 1,
+      updatedAt: 1,
+    };
+    expect(applyRoute(agentRow, rule).requiredCapabilities).toEqual({ mcpServers: ['figma'] });
   });
 });

@@ -428,6 +428,7 @@ export const routingRule = sqliteTable(
     thinkingLevel: text('thinkingLevel'),
     fallbackModels: json<ModelRef[] | null>('fallbackModels'),
     machineId: text('machineId').references(() => machine.id),
+    requiredCapabilities: json<RequiredCapabilities | null>('requiredCapabilities'),
     seededFromAgentId: text('seededFromAgentId'),
     createdAt: epochMs('createdAt').notNull(),
     updatedAt: epochMs('updatedAt').notNull(),
