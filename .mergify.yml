@@ -11,7 +11,7 @@ queue_rules:
           - -head ~= ^B[0-9]+/
           - label = queue-admit
       - check-success = commit-author
-      - status-success = review-gate
+      - check-success = @github-actions/review-gate
       - check-success = merge-route
       - or:
           - check-success = check
@@ -78,7 +78,7 @@ queue_rules:
           - -head ~= ^B[0-9]+/
           - label = queue-admit
       - check-success = commit-author
-      - status-success = review-gate
+      - check-success = @github-actions/review-gate
       - check-success = merge-route
       - or:
           - check-success = check

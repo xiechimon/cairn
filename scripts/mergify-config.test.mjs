@@ -75,10 +75,11 @@ for (const [name, author, method] of [
   ['default', '- -author = cairnwright[bot]', 'squash'],
   ['bot', '- author = cairnwright[bot]', 'rebase'],
 ])
-  test(`the ${name} rule requires the review-gate status and keeps PR-only gates off the draft`, () => {
+  test(`the ${name} rule requires the review-gate check from GitHub Actions and keeps PR-only gates off the draft`, () => {
     const [queue, merge] = rules[name].split('    merge_conditions:\n');
     assert.ok(queue.includes(`      ${author}\n`));
-    assert.match(queue, /- status-success = review-gate\n/);
+    assert.match(queue, /- check-success = @github-actions\/review-gate\n/);
+    assert.doesNotMatch(queue, /status-success = review-gate/);
     assert.match(queue, /- check-success = merge-route\n/);
     assert.doesNotMatch(queue, /check-skipped = merge-route/);
     assert.match(queue, /- -label = owner-route\n/);

@@ -64,7 +64,7 @@ export function mergifyConfig(prGateSource, gatePaths) {
     `          - -head ~= ${batchHeadRe}`,
     `          - label = ${admitLabel}`,
     '      - check-success = commit-author',
-    '      - status-success = review-gate',
+    '      - check-success = @github-actions/review-gate',
     '      - check-success = merge-route',
     ...prChecks.map(passedOrSkipped),
     `      - ${quoted(`-files ~= ${protectedRe}`)}`,
