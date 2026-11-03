@@ -31,13 +31,7 @@ export function matchesAuthToken(expected: string, provided: string): boolean {
   return makeVerifier(expected)(provided);
 }
 
-export function matchesAllowlistedTailscaleIdentity(
-  c: Context,
-  tailscaleUsers: readonly string[],
-): boolean {
-  if (tailscaleUsers.length === 0) return false;
-  const tailscaleLogin = c.req.header('tailscale-user-login');
-  if (tailscaleLogin === undefined || !tailscaleUsers.includes(tailscaleLogin)) return false;
+export function isLoopbackPeer(c: Context): boolean {
   let peerAddress: string | undefined;
   try {
     peerAddress = getConnInfo(c).remote.address;
@@ -45,6 +39,16 @@ export function matchesAllowlistedTailscaleIdentity(
     if (!(error instanceof TypeError)) throw error;
   }
   return peerAddress !== undefined && LOOPBACK_PEER_ADDRESSES.has(peerAddress);
+}
+
+export function matchesAllowlistedTailscaleIdentity(
+  c: Context,
+  tailscaleUsers: readonly string[],
+): boolean {
+  if (tailscaleUsers.length === 0) return false;
+  const tailscaleLogin = c.req.header('tailscale-user-login');
+  if (tailscaleLogin === undefined || !tailscaleUsers.includes(tailscaleLogin)) return false;
+  return isLoopbackPeer(c);
 }
 
 export function registerTokenAuth(
