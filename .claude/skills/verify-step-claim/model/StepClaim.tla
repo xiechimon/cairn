@@ -5,7 +5,8 @@ EXTENDS Naturals, FiniteSets
 CONSTANTS Machines, NoMachine, ExecIds, InitialHome,
           MaxClaims, MaxPartitions, MaxCrashes, MaxRebinds,
           MaxLateEnqueues, ClaimChecksArchive, ApplyChecksArchive,
-          OrbMachines, RequiresOrb, ClaimChecksExecutor
+          OrbMachines, RequiresOrb, ClaimChecksExecutor,
+          OverrideRequestsDrop, MergeKeepsRule
 
 VARIABLES
   st, sm, fresh, progressed, probeDue,
@@ -95,7 +96,8 @@ Carrier(m)  == IF InFlight(m) = {} THEN None ELSE CHOOSE e \in InFlight(m) : TRU
 
 ClaimAllowed == ~(ClaimChecksArchive /\ archived)
 
-ExecutorOk(m) == ~(ClaimChecksExecutor /\ RequiresOrb) \/ m \in OrbMachines
+EffectiveRequiresOrb == RequiresOrb /\ (MergeKeepsRule \/ ~OverrideRequestsDrop)
+ExecutorOk(m) == ~(ClaimChecksExecutor /\ EffectiveRequiresOrb) \/ m \in OrbMachines
 Eligible == {m \in Machines : ExecutorOk(m)}
 
 SettledAs(o) == IF ApplyChecksArchive /\ archiveStop /= "none" THEN "stopped" ELSE o

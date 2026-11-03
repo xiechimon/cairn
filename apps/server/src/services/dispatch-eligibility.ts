@@ -104,7 +104,7 @@ export function agentForStep(
   if (agentId === null) return null;
   const agentRow = db.select().from(agent).where(eq(agent.id, agentId)).get();
   if (agentRow === undefined) return null;
-  return applyRoute(agentRow, routeForStep(db, todoRow, kind));
+  return applyRoute(agentRow, routeForStep(db, todoRow, kind), todoRow.routeOverride);
 }
 
 function planSlotFor(

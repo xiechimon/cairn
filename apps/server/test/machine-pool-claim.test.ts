@@ -430,4 +430,47 @@ describe('D71 worker steps route by a capability pool plus a preferred machine',
     expect(queue?.waitingFor).toBeNull();
     expect(queue?.blocked).toBeUndefined();
   });
+
+  test('a thread override cannot drop the rule Orb requirement, even by sending empty constraints', async () => {
+    const w = await world();
+    const orb = await machineOf(w, 'omarchy-orb', { online: false, executor: 'orb' });
+    const mac = await machineOf(w, 'mac');
+    agentOf(w, 'implementer', orb, { executor: 'orb' });
+    const stepId = pendingStep(w, 'implementer', { ageMs: OVERFLOW_AFTER_MS * 2 });
+    setOverride(w, stepId, { machineId: mac, requiredCapabilities: {} });
+    expect(await claimOn(w, mac)).toBeNull();
+    expect(statusOf(w, stepId)).toBe('pending');
+  });
+
+  test('a thread override moves the preference to another machine', async () => {
+    const w = await world();
+    const omarchy = await machineOf(w, 'omarchy');
+    const mac = await machineOf(w, 'mac');
+    agentOf(w, 'builder', omarchy);
+    const stepId = pendingStep(w, 'builder');
+    setOverride(w, stepId, { machineId: mac });
+    expect(await claimOn(w, omarchy)).toBeNull();
+    expect((await claimOn(w, mac))?.step.id).toBe(stepId);
+  });
+
+  test('a thread override adds a constraint the rule did not have', async () => {
+    const w = await world();
+    const mac = await machineOf(w, 'mac');
+    await machineOf(w, 'mac-orb', { executor: 'orb', online: false });
+    agentOf(w, 'builder', mac);
+    const stepId = pendingStep(w, 'builder');
+    setOverride(w, stepId, { requiredCapabilities: { executor: 'orb' } });
+    expect(await claimOn(w, mac)).toBeNull();
+    expect(statusOf(w, stepId)).toBe('pending');
+  });
 });
+
+function setOverride(
+  w: World,
+  stepId: string,
+  routeOverride: { machineId?: string; requiredCapabilities?: { executor?: 'orb' } },
+): void {
+  const buildId = w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()!.buildId;
+  const todoId = w.s.db.select().from(buildTable).where(eq(buildTable.id, buildId)).get()!.todoId;
+  w.s.db.update(todoTable).set({ routeOverride }).where(eq(todoTable.id, todoId)).run();
+}

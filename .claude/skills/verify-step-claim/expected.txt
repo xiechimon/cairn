@@ -9,3 +9,4 @@ P6_ArchivedStopSettles__ApplyIgnoresArchive FAIL TryClaim,FinishSession,ArchiveC
 P7_ArchiveFlagMatchesStep PASS
 P8_OrbOnlyOnOrb PASS
 P8_OrbOnlyOnOrb__ClaimIgnoresExecutor FAIL TryClaim
+P8_OrbOnlyOnOrb__OverrideDropsOrb FAIL TryClaim

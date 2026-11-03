@@ -5063,6 +5063,37 @@ exports[`body/envelope schema snapshots > startBuildsBody > startBuildsBody.json
       ],
       "type": "object",
     },
+    "routeOverride": {
+      "additionalProperties": false,
+      "properties": {
+        "machineId": {
+          "type": "string",
+        },
+        "requiredCapabilities": {
+          "additionalProperties": false,
+          "properties": {
+            "executor": {
+              "const": "orb",
+              "type": "string",
+            },
+            "mcpServers": {
+              "items": {
+                "type": "string",
+              },
+              "type": "array",
+            },
+            "models": {
+              "items": {
+                "type": "string",
+              },
+              "type": "array",
+            },
+          },
+          "type": "object",
+        },
+      },
+      "type": "object",
+    },
     "todoIds": {
       "items": {
         "type": "string",

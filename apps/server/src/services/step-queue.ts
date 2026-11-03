@@ -117,7 +117,9 @@ export function stepQueueProjector(db: Db, teamId: string) {
   function agentForRow(row: (typeof queue)[number]): typeof agent.$inferSelect | null {
     if ('todoRow' in row) {
       const base = agentRowOf(agentIdForStep(row.todoRow, row.kind, row.prompt));
-      return base === null ? null : applyRoute(base, routeForStep(db, row.todoRow, row.kind));
+      return base === null
+        ? null
+        : applyRoute(base, routeForStep(db, row.todoRow, row.kind), row.todoRow.routeOverride);
     }
     const chiefRow = db.select().from(chief).where(eq(chief.id, row.chiefId)).get();
     const bound = agentRowOf(chiefRow?.agentId ?? null);

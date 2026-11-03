@@ -15,6 +15,7 @@ import {
   applyRoute,
   seedRoutingRules,
   setRoutingRulesEnabled,
+  withOverride,
 } from '../src/services/routing-rules.js';
 import {
   bindAllAgents,
@@ -397,5 +398,58 @@ describe('D71 the session rule carries the hard constraints', () => {
       updatedAt: 1,
     };
     expect(applyRoute(agentRow, rule).requiredCapabilities).toEqual({ mcpServers: ['figma'] });
+  });
+});
+
+describe('D71 thread override merge: add, never remove', () => {
+  test('union of rule and override; the rule Orb requirement survives an override without it', () => {
+    expect(
+      withOverride({ executor: 'orb', mcpServers: ['figma'] }, { mcpServers: ['context7'] }),
+    ).toEqual({ executor: 'orb', mcpServers: ['figma', 'context7'] });
+    expect(withOverride({ executor: 'orb' }, {})).toEqual({ executor: 'orb' });
+    expect(withOverride(null, { executor: 'orb' })).toEqual({ executor: 'orb' });
+    expect(withOverride(null, undefined)).toBeNull();
+  });
+});
+
+describe('D71 thread override set at dispatch', () => {
+  async function start(w: World, routeOverride: unknown) {
+    const todoRes = await req(w.s.app, 'POST', `/api/projects/${w.projectId}/todos`, {
+      title: 'override probe',
+      spec: 'probe body',
+    });
+    const todoId = ((await todoRes.json()) as { id: string }).id;
+    const res = await req(w.s.app, 'POST', `/api/projects/${w.projectId}/builds`, {
+      todoIds: [todoId],
+      assignment: { plan: null, build: { agentId: AGENT_BUILD } },
+      withPlan: false,
+      routeOverride,
+    });
+    return { res, todoId };
+  }
+
+  test('the override is stored on the task with the dispatch and read by the route', async () => {
+    const w = await setupWorld();
+    insertRule(w.s, { teamId: w.s.team.id, requiredCapabilities: { executor: 'orb' } });
+    const { res, todoId } = await start(w, {
+      machineId: w.machineId,
+      requiredCapabilities: { mcpServers: ['figma'] },
+    });
+    expect(res.status).toBe(201);
+    const todoRow = w.s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get()!;
+    expect(todoRow.routeOverride).toEqual({
+      machineId: w.machineId,
+      requiredCapabilities: { mcpServers: ['figma'] },
+    });
+    expect(agentForStep(w.s.db, todoRow, 'build')?.requiredCapabilities).toEqual({
+      mcpServers: ['figma'],
+      executor: 'orb',
+    });
+  });
+
+  test('an override naming a machine outside the team is refused', async () => {
+    const w = await setupWorld();
+    const { res } = await start(w, { machineId: newRecordId() });
+    expect(res.status).toBe(404);
   });
 });

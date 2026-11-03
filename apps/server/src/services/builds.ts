@@ -47,6 +47,7 @@ import {
   REVIEW_ANNOUNCEMENT,
   REVIEW_FANOUT_ROLES,
   REVIEW_VERDICT_KIND,
+  type RouteOverride,
   reconcileVerifyVerdict,
   STOP_MESSAGE,
   type TodoOutputKind,
@@ -945,6 +946,7 @@ export function startBuilds(
     todoIds: string[];
     assignment: Assignment;
     withPlan: boolean;
+    routeOverride?: RouteOverride;
     triggerSource?: TriggerSource;
     scheduledBy?: string;
     prompt?: string;
@@ -961,6 +963,17 @@ export function startBuilds(
       throw new NotFoundError(`project ${input.projectId}`);
     }
     requireIntakeAssignment(deps, todoRecord.teamId, input.assignment);
+    const overrideMachine = input.routeOverride?.machineId;
+    if (
+      overrideMachine !== undefined &&
+      deps.db
+        .select({ id: machine.id })
+        .from(machine)
+        .where(and(eq(machine.id, overrideMachine), eq(machine.teamId, todoRecord.teamId)))
+        .get() === undefined
+    ) {
+      throw new NotFoundError(`machine ${overrideMachine}`);
+    }
     const previous =
       todoRecord.latestBuildId === null
         ? undefined
@@ -1011,6 +1024,7 @@ export function startBuilds(
     );
     setTodoPhase(deps, todoId, 'queued', {
       assignment: input.assignment,
+      routeOverride: input.routeOverride ?? null,
       latestBuildId: id,
       lastRunAt: createdAt,
     });
