@@ -135,16 +135,6 @@ async function stubSurface(
   );
 }
 
-async function openBoard(page: Page) {
-  await page.goto('/app?view=board');
-  const card = page.locator(`.todo-card[data-todo-id="${CARD_ID}"]`);
-  await expect(card).toBeVisible();
-  await card.locator('.todo-card-action').click();
-  const dialog = page.getByRole('dialog', { name: '完成任务' });
-  await expect(dialog).toBeVisible();
-  return dialog;
-}
-
 async function openDetail(page: Page) {
   await page.goto(`/app/todo/${CARD_ID}`);
   const action = page.locator('.detail-head-action');
@@ -155,7 +145,7 @@ async function openDetail(page: Page) {
   return dialog;
 }
 
-test('board: a review card with a reported empty diff completes without merging and without blocking authorization', async ({ page }) => {
+test('a review card with a reported empty diff completes without merging and without blocking authorization', async ({ page }) => {
   await stubBoot(page);
   await stubSurface(page, { files: [], reported: true }, ['推送分支']);
   let merges = 0;
@@ -171,7 +161,7 @@ test('board: a review card with a reported empty diff completes without merging 
     return route.fulfill({ json: { ...WIRE_CARD, phase: body.phase ?? 'done' } });
   });
 
-  const dialog = await openBoard(page);
+  const dialog = await openDetail(page);
   await expect(dialog.getByText(MERGE_LABEL)).toHaveCount(0);
   await expect(dialog.getByText(EMPTY_NOTE)).toBeVisible();
   await expect(dialog.getByText(/授权，无法合并/)).toHaveCount(0);
@@ -181,19 +171,10 @@ test('board: a review card with a reported empty diff completes without merging 
   expect(donePhase).toBe('done');
 });
 
-test('detail: a review card with a reported empty diff likewise shows no merge row and completion is clickable', async ({ page }) => {
-  await stubBoot(page);
-  await stubSurface(page, { files: [], reported: true }, ['推送分支']);
-  const dialog = await openDetail(page);
-  await expect(dialog.getByText(MERGE_LABEL)).toHaveCount(0);
-  await expect(dialog.getByText(EMPTY_NOTE)).toBeVisible();
-  await expect(dialog.getByRole('button', { name: '完成', exact: true })).toBeEnabled();
-});
-
 test('cards with real file changes still show the merge row; completion disabled when authorization is missing', async ({ page }) => {
   await stubBoot(page);
   await stubSurface(page, { files: [FILE_DIFF], reported: true }, ['推送分支']);
-  const dialog = await openBoard(page);
+  const dialog = await openDetail(page);
   await expect(dialog.getByText(MERGE_LABEL)).toBeVisible();
   await expect(dialog.getByRole('button', { name: '完成', exact: true })).toBeDisabled();
   await expect(dialog.getByText(/授权，无法合并/)).toHaveText(
@@ -204,7 +185,7 @@ test('cards with real file changes still show the merge row; completion disabled
 test('git still has file headers but the parsed file set is empty: merge is not skipped', async ({ page }) => {
   await stubBoot(page);
   await stubSurface(page, { files: [], reported: true, changed: true }, ['推送分支']);
-  const dialog = await openBoard(page);
+  const dialog = await openDetail(page);
   await expect(dialog.getByText(MERGE_LABEL)).toBeVisible();
   await expect(dialog.getByRole('button', { name: '完成', exact: true })).toBeDisabled();
   await expect(dialog.getByText(EMPTY_NOTE)).toHaveCount(0);
@@ -213,7 +194,7 @@ test('git still has file headers but the parsed file set is empty: merge is not 
 test('changes not reported (no reported key) is not treated as an empty commit; merge row and authorization gate stay', async ({ page }) => {
   await stubBoot(page);
   await stubSurface(page, { files: [] }, ['推送分支']);
-  const dialog = await openBoard(page);
+  const dialog = await openDetail(page);
   await expect(dialog.getByText(MERGE_LABEL)).toBeVisible();
   await expect(dialog.getByRole('button', { name: '完成', exact: true })).toBeDisabled();
 });

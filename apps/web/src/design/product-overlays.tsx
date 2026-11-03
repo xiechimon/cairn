@@ -1,6 +1,5 @@
 import { Play } from 'lucide-react';
 import { useId, useRef, useState } from 'react';
-import { DoneConfirmDialog } from '../board/done-confirm-dialog.js';
 import { ResetConfirmDialog } from '../board/reset-confirm-dialog.js';
 import { AgentPickerPanel } from '../components/agent-picker.js';
 import { Button } from '../components/ui/button.js';
@@ -352,8 +351,6 @@ function ConfirmsSpecimen() {
   const triggers = [
     ['delete', 'Delete task'],
     ['delete-project', 'Delete project'],
-    ['done', 'Mark done'],
-    ['done-inflight', 'Mark done while running'],
     ['reset', 'Move back to To start'],
     ['reset-stale', 'Reset, stale'],
   ] as const;
@@ -381,19 +378,6 @@ function ConfirmsSpecimen() {
         open={open === 'delete-project'}
         onClose={close}
         onConfirm={() => done('project deleted')}
-      />
-      <DoneConfirmDialog
-        open={open === 'done'}
-        onClose={close}
-        onConfirmDone={() => done('done')}
-        onConfirmCanceled={() => done('canceled')}
-      />
-      <DoneConfirmDialog
-        open={open === 'done-inflight'}
-        mode="inflight"
-        onClose={close}
-        onConfirmDone={() => done('done')}
-        onConfirmStopThenDone={() => done('stopped then done')}
       />
       <ResetConfirmDialog open={open === 'reset'} onClose={close} onConfirm={() => done('reset')} />
       <ResetConfirmDialog
