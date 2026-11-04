@@ -10,6 +10,7 @@ import { z } from 'zod';
 import type { Db } from '../db/client.js';
 import { chiefReport, message, retroProposal, todo } from '../db/schema.js';
 import { newRecordId } from '../lib/ids.js';
+import { checkedResearchReport } from './research-citations.js';
 
 const DAY_MS = 86_400_000;
 const FIELD_MAX = 400;
@@ -185,7 +186,18 @@ export function ingestIntake(
     if (ingested.has(intake.id) || intake.latestBuildId === null) continue;
     const text = landedReport(db, intake.latestBuildId);
     if (text === null) continue;
+    const checked = checkedResearchReport(db, intake.latestBuildId);
+    if (checked === null) continue;
     for (const item of parseIntakeItems(text)) {
+      if (
+        !checked.claims.some(
+          (claim) =>
+            claim.verdict === 'supported' &&
+            normalizeIntakeUrl(claim.url) === item.url &&
+            claim.claim.trim().slice(0, FIELD_MAX) === item.claim,
+        )
+      )
+        continue;
       if (slots <= 0) break;
       if (seen.has(item.url)) continue;
       seen.add(item.url);

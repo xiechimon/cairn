@@ -14,15 +14,17 @@ import {
   chiefReport,
   chief as chiefTable,
   chiefThread,
-  message,
   retroProposal,
   todo,
+  tokenUsage,
   user,
 } from '../src/db/schema.js';
 import { planChiefDigests } from '../src/services/chief-digest.js';
 import { decideRetroProposal } from '../src/services/chief-report.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
+import { storeInfoReport } from '../src/services/info-handoff.js';
 import { intakeTally, normalizeIntakeUrl, parseIntakeItems } from '../src/services/intake-items.js';
+import { openCitationCheck } from '../src/services/research-citations.js';
 import { planResearchIntake } from '../src/services/research-intake.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import { flushSelfIssueWrites } from '../src/services/todos.js';
@@ -77,6 +79,16 @@ async function world(opts: { github?: { calls: string[] } } = {}) {
       displayName: 'opus',
       provider: 'claude-code',
       modelId: 'claude-opus-5-5',
+    })
+    .run();
+  s.db
+    .insert(agent)
+    .values({
+      id: 'citation-checker',
+      teamId,
+      displayName: 'Checker',
+      provider: 'openai-codex',
+      modelId: 'gpt-6.1-sol',
     })
     .run();
   s.db
@@ -179,20 +191,62 @@ function openThread(w: World, seq: number, title: string, phase: 'todo' | 'done'
 function land(w: World, todoId: string, report: string): void {
   const buildId = w.s.db.select().from(todo).where(eq(todo.id, todoId)).get()?.latestBuildId;
   if (!buildId) throw new Error('intake todo has no build');
+  storeInfoReport(
+    { db: w.s.db, attachmentsDir: w.s.attachmentsDir },
+    {
+      buildId,
+      teamId: w.teamId,
+      createdBy: w.s.user.id,
+      report,
+    },
+  );
   w.s.db
-    .insert(message)
-    .values({
-      id: `info-report-${buildId}`,
-      conversationId: buildId,
-      role: 'system',
-      content: JSON.stringify({
-        kind: 'info-report',
-        attachmentId: 'att',
-        attachmentToken: 'tok',
-        content: report,
-      }),
-      createdAt: 1,
-    })
+    .insert(tokenUsage)
+    .values({ buildId, model: 'claude-opus-5-5', input: 1, output: 1 })
+    .onConflictDoNothing()
+    .run();
+  const checker = openCitationCheck(w.s.svc, buildId);
+  if (!checker) return;
+  let items: unknown = [];
+  try {
+    const raw = [...report.matchAll(/```json\s*\n([\s\S]*?)\n```/g)].at(-1)?.[1];
+    items = raw ? JSON.parse(raw) : [];
+  } catch {
+    items = [];
+  }
+  const claims = (Array.isArray(items) ? items : []).flatMap((item) => {
+    if (
+      typeof item !== 'object' ||
+      item === null ||
+      typeof item.url !== 'string' ||
+      !/^https?:/.test(item.url)
+    )
+      return [];
+    const claim = typeof item.claim === 'string' ? item.claim.trim() : '';
+    return [
+      {
+        url: item.url,
+        claim: claim || 'No supported claim',
+        verdict: claim ? 'supported' : 'unsupported',
+        reason: 'Fixture release feed',
+        quote: claim,
+        fetchedAt: '2026-10-27',
+        quality: 'primary',
+      },
+    ];
+  });
+  storeInfoReport(
+    { db: w.s.db, attachmentsDir: w.s.attachmentsDir },
+    {
+      buildId: checker.buildId,
+      teamId: w.teamId,
+      createdBy: w.s.user.id,
+      report: `Citation audit\n\n\`\`\`json\n${JSON.stringify({ claims })}\n\`\`\``,
+    },
+  );
+  w.s.db
+    .insert(tokenUsage)
+    .values({ buildId: checker.buildId, model: 'gpt-6.1-sol', input: 1, output: 1 })
     .run();
 }
 
