@@ -81,33 +81,48 @@ export function threadTitle(body) {
   return '';
 }
 
-export function addedLinesOf(patch) {
-  const added = new Set();
+export function touchedLinesOf(patch) {
+  const touched = new Set();
+  let hunkLines = [];
+  let hunkAdded = [];
+  let removed = false;
   let line = 0;
+  const closeHunk = () => {
+    for (const touchedLine of removed ? hunkLines : hunkAdded) touched.add(touchedLine);
+    hunkLines = [];
+    hunkAdded = [];
+    removed = false;
+  };
   for (const text of String(patch ?? '').split('\n')) {
     const hunk = HUNK_RE.exec(text);
     if (hunk) {
+      closeHunk();
       line = Number(hunk[1]);
-      continue;
+    } else if (text.startsWith('+')) {
+      hunkLines.push(line);
+      hunkAdded.push(line++);
+    } else if (text.startsWith(' ')) {
+      hunkLines.push(line++);
+    } else if (text.startsWith('-')) {
+      removed = true;
     }
-    if (text.startsWith('+')) added.add(line++);
-    else if (text.startsWith(' ')) line += 1;
   }
-  return added;
+  closeHunk();
+  return touched;
 }
 
 export function markPreExisting(threads, files) {
-  const addedByPath = new Map(
-    files.map((file) => [file.filename, file.patch ? addedLinesOf(file.patch) : null]),
+  const touchedByPath = new Map(
+    files.map((file) => [file.filename, file.patch ? touchedLinesOf(file.patch) : null]),
   );
   return threads.map((thread) => {
-    const added = addedByPath.get(thread.path);
+    const touched = touchedByPath.get(thread.path);
     const last = thread.line;
     const first = thread.startLine ?? last;
     const settled =
-      !thread.isOutdated && thread.diffSide === 'RIGHT' && Number.isInteger(last) && added;
+      !thread.isOutdated && thread.diffSide === 'RIGHT' && Number.isInteger(last) && touched;
     if (!settled) return thread;
-    for (let line = first; line <= last; line += 1) if (added.has(line)) return thread;
+    for (let line = first; line <= last; line += 1) if (touched.has(line)) return thread;
     return { ...thread, preExisting: true };
   });
 }

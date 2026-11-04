@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  addedLinesOf,
   BLOCK_ROUND_CAP,
   badgeOf,
   blockingThreads,
@@ -17,6 +16,7 @@ import {
   reviewRequested,
   shouldSkip,
   threadTitle,
+  touchedLinesOf,
   trustedStateComment,
   usageLimitHit,
 } from './codex-gate-core.mjs';
@@ -327,10 +327,10 @@ test('reviewRequested counts only the marker the gate posted for this head', () 
   assert.equal(reviewRequested([], SHA), false);
 });
 
+const DELETION_PATCH = ['@@ -40,3 +40,2 @@', ' before', '-guard', ' after'].join('\n');
 const PATCH = [
-  '@@ -10,3 +10,4 @@ ctx',
+  '@@ -10,2 +10,4 @@ ctx',
   ' keep',
-  '-old',
   '+new one',
   '+new two',
   ' tail',
@@ -338,35 +338,59 @@ const PATCH = [
 ].join('\n');
 const located = (level, over = {}) =>
   thread(level, { path: 'src/a.ts', line: 50, startLine: null, diffSide: 'RIGHT', ...over });
-const files = [{ filename: 'src/a.ts', patch: PATCH }, { filename: 'src/big.bin' }];
+const files = [
+  { filename: 'src/a.ts', patch: PATCH },
+  { filename: 'src/del.ts', patch: DELETION_PATCH },
+  { filename: 'src/big.bin' },
+];
 const actionsComment = (body) => ({ user: { login: 'github-actions[bot]' }, body });
 
-test('addedLinesOf numbers added lines on the new side of each hunk', () => {
-  assert.deepEqual([...addedLinesOf(PATCH)], [11, 12]);
+test('touchedLinesOf numbers added lines, and every new-side line of a hunk with a removal', () => {
+  assert.deepEqual([...touchedLinesOf(PATCH)], [11, 12]);
   assert.deepEqual(
-    [...addedLinesOf('@@ -1 +1,2 @@\n+a\n+b\n@@ -20,2 +30,3 @@\n x\n+c\n y')],
+    [...touchedLinesOf('@@ -1 +1,2 @@\n+a\n+b\n@@ -20,2 +30,3 @@\n x\n+c\n y')],
     [1, 2, 31],
   );
-  assert.deepEqual([...addedLinesOf(undefined)], []);
+  assert.deepEqual([...touchedLinesOf(DELETION_PATCH)], [40, 41]);
+  assert.deepEqual([...touchedLinesOf(undefined)], []);
 });
 
 test('markPreExisting flags only open right-side threads wholly outside the added lines', () => {
-  const [outside, onAdded, rangeTouchesAdded, outdated, left, noPatch, unknownFile, noLocation] =
-    markPreExisting(
-      [
-        located('P1', { line: 10 }),
-        located('P1', { line: 11 }),
-        located('P1', { startLine: 9, line: 11 }),
-        located('P1', { line: 10, isOutdated: true }),
-        located('P1', { line: 10, diffSide: 'LEFT' }),
-        located('P1', { path: 'src/big.bin', line: 10 }),
-        located('P1', { path: 'src/other.ts', line: 10 }),
-        thread('P1'),
-      ],
-      files,
-    );
+  const [
+    outside,
+    onAdded,
+    rangeTouchesAdded,
+    outdated,
+    left,
+    noPatch,
+    unknownFile,
+    noLocation,
+    afterDeletion,
+  ] = markPreExisting(
+    [
+      located('P1', { line: 10 }),
+      located('P1', { line: 11 }),
+      located('P1', { startLine: 9, line: 11 }),
+      located('P1', { line: 10, isOutdated: true }),
+      located('P1', { line: 10, diffSide: 'LEFT' }),
+      located('P1', { path: 'src/big.bin', line: 10 }),
+      located('P1', { path: 'src/other.ts', line: 10 }),
+      thread('P1'),
+      located('P1', { path: 'src/del.ts', line: 41 }),
+    ],
+    files,
+  );
   assert.equal(outside.preExisting, true);
-  for (const kept of [onAdded, rangeTouchesAdded, outdated, left, noPatch, unknownFile, noLocation])
+  for (const kept of [
+    onAdded,
+    rangeTouchesAdded,
+    outdated,
+    left,
+    noPatch,
+    unknownFile,
+    noLocation,
+    afterDeletion,
+  ])
     assert.equal(kept.preExisting, undefined);
 });
 
