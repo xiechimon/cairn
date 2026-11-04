@@ -32,7 +32,7 @@ import type { DaemonConfig } from './config.js';
 import { StepJournal, type TranscriptBuffer } from './journal.js';
 import type { DaemonLogger } from './log.js';
 import { createMachineCapabilitiesProbe } from './machine-capabilities.js';
-import { type MachineApi, MachineClient } from './machine-client.js';
+import { type MachineApi, MachineApiError, MachineClient } from './machine-client.js';
 import { OrbLifecycle, resolveOrbCap } from './orb/lifecycle.js';
 import type { OrbProvider } from './orb/provider.js';
 import { createOrbProvider } from './orb/select.js';
@@ -68,6 +68,7 @@ export interface MachineLoopOpts {
   client?: MachineApi;
   claimTimeoutMs?: number;
   presenceIntervalMs?: number;
+  presenceTimeoutMs?: number;
   claimBackoffBaseMs?: number;
   proxyEnv?: NodeJS.ProcessEnv;
   capEnv?: NodeJS.ProcessEnv;
@@ -90,6 +91,9 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export function nextBackoffMs(current: number, cap = CLAIM_BACKOFF_CAP_MS): number {
   return Math.min(current * 2, cap);
 }
+
+export const PRESENCE_TIMEOUT_MS = 20_000;
+export const DISPATCHER_RESET_FAILURE_THRESHOLD = 3;
 
 export const DAEMON_MAX_CONCURRENT_ENV = 'CAIRN_DAEMON_MAX_CONCURRENT';
 
@@ -119,7 +123,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const acpBackends = configuredAcpBackends(process.env.CAIRN_ACP_AGENTS);
   ensureStateDirs(paths);
   loadOrCreateDeviceJson(paths);
-  setupProxy(logger, opts.proxyEnv ?? process.env, config.serverUrl);
+  const proxyHandle = setupProxy(logger, opts.proxyEnv ?? process.env, config.serverUrl);
 
   let daemonOtel: DaemonOtel | null = opts.otel ?? null;
   if (opts.otel === undefined) {
@@ -371,6 +375,12 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         );
       });
   };
+  const removedOutboxFiles = journal.sweepOrphanFiles({
+    now: Date.now(),
+    ttlMs: opts.orphanTtlMs ?? ORPHAN_WORKTREE_TTL_MS,
+  });
+  if (removedOutboxFiles.length > 0)
+    logger.workspace(`orphan outbox files removed: ${removedOutboxFiles.length}`);
   sweepOrphans();
   const orphanTimer = setInterval(sweepOrphans, 24 * 60 * 60 * 1000);
   orphanTimer.unref?.();
@@ -590,16 +600,48 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     }
   })();
 
-  const presenceTimer = setInterval(() => {
-    void refreshCap();
-    void probeAuthAndRemember()
-      .then(() =>
+  const presenceTimeoutMs = opts.presenceTimeoutMs ?? PRESENCE_TIMEOUT_MS;
+  let networkFailures = 0;
+  const sendPresence = async () => {
+    let timer: NodeJS.Timeout | undefined;
+    const timedOut = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`presence timed out after ${presenceTimeoutMs}ms`)),
+        presenceTimeoutMs,
+      );
+    });
+    try {
+      await Promise.race([
         client.presence({
           cliVersion: DAEMON_VERSION,
           claudeCode: claudeReport(),
           capabilities: capabilitiesReport(),
         }),
-      )
+        timedOut,
+      ]);
+      networkFailures = 0;
+    } catch (err) {
+      if (err instanceof MachineApiError) {
+        networkFailures = 0;
+      } else {
+        networkFailures += 1;
+        if (networkFailures >= DISPATCHER_RESET_FAILURE_THRESHOLD) {
+          networkFailures = 0;
+          proxyHandle.reset();
+          logger.machine(
+            `http dispatcher reset after ${DISPATCHER_RESET_FAILURE_THRESHOLD} network failures`,
+          );
+        }
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+  const presenceTimer = setInterval(() => {
+    void refreshCap();
+    void probeAuthAndRemember()
+      .then(sendPresence)
       .catch((err: unknown) => {
         logger.machine(`presence failed: ${err instanceof Error ? err.message : String(err)}`);
       });

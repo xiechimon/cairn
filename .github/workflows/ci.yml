@@ -6,6 +6,10 @@ on:
     branches: [main, 'prototype/**']
   pull_request:
 
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('ci-pr-{0}', github.event.pull_request.number) || github.ref == 'refs/heads/main' && 'ci-main' || format('ci-ref-{0}', github.ref) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   changes:
     runs-on: ubuntu-latest
@@ -389,7 +393,7 @@ jobs:
 
       - name: Mergify queue config follows pr-gate routing
         if: ${{ !cancelled() }}
-        run: node --test scripts/mergify-config.test.mjs scripts/merge-route.test.mjs
+        run: node --test scripts/mergify-config.test.mjs scripts/merge-route.test.mjs scripts/workflow-concurrency.test.mjs scripts/autonomy-brake.test.mjs scripts/autonomy-brake-workflow.test.mjs
 
       - name: UI debt ledger only shrinks against main
         if: ${{ !cancelled() }}
@@ -409,7 +413,7 @@ jobs:
 
       - name: Gardener sweep self-test (#1617)
         if: ${{ !cancelled() }}
-        run: node --test scripts/gardener-ratchet.test.mjs scripts/gardener-weekly.test.mjs scripts/doc-drift.test.mjs scripts/evidence-prune.test.mjs scripts/delivery-metrics.test.mjs
+        run: node --test scripts/gardener-ratchet.test.mjs scripts/gardener-weekly.test.mjs scripts/doc-drift.test.mjs scripts/evidence-prune.test.mjs scripts/delivery-metrics.test.mjs scripts/issue-coverage.test.mjs
 
       - name: Merge routing size caps (#2371)
         if: ${{ !cancelled() }}

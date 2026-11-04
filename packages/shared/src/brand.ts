@@ -70,6 +70,7 @@ export const ENV_VARS = {
   trajectoryOutcomeBackfill: 'CAIRN_TRAJ_OUTCOME_BACKFILL',
   trajectoryReflectCurate: 'CAIRN_TRAJ_REFLECT_CURATE',
   trajectoryReflectOpenGuardIssues: 'CAIRN_TRAJ_REFLECT_OPEN_GUARD_ISSUES',
+  researchIntakeProjectId: 'CAIRN_RESEARCH_INTAKE_PROJECT_ID',
 } as const;
 
 export const API_KEY_PATTERN = /^cairn_[0-9a-f]{48}$/;

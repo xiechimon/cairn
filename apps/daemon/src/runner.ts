@@ -77,6 +77,7 @@ import {
   piWorktreeSkillDirs,
   type SkillsCatalogOpts,
 } from './backend/skills.js';
+import { prepareWebTools } from './backend/web-search.js';
 import { type BriefHandle, caseInsensitiveFsFor, cleanupBrief, writeBrief } from './brief-file.js';
 import {
   type ClaudeCodeAuthProbe,
@@ -747,9 +748,18 @@ async function runClaimedStep(
     await failStep(deps, heartbeat, stepId, `team skills distribution failed: ${reason}`);
     return;
   }
+  const isPi = backend.brief?.backendId === 'pi';
+  const webTools = prepareWebTools({
+    enabled: isPi && !isChief && !isReview && claimed.remoteToolsOnly !== true,
+    metered: opts.env?.CAIRN_ORB !== '1',
+    creds,
+    stepId,
+    home: deps.paths.home,
+    log: (line) => logger.step(line),
+  });
   const secretTool = stepTakesSecrets(claimed.step.kind)
     ? buildSecretTool({
-        creds,
+        creds: webTools.secretCreds,
         stepId,
         agentId: agent?.id ?? null,
         onAudit: (line) => logger.step(line),
@@ -762,12 +772,13 @@ async function runClaimedStep(
   const createTagTool = (claimed.localTools ?? []).includes(LOCAL_TOOL_CREATE_TAG)
     ? buildCreateTagTool({ repoDir: ws?.cwd ?? null, cred: creds.git, identity: stepIdentity })
     : null;
-  const localToolDefs = [secretTool, createTagTool].filter((t): t is LocalToolDef => t !== null);
+  const localToolDefs = [secretTool, createTagTool, ...webTools.tools].filter(
+    (t): t is LocalToolDef => t !== null,
+  );
   const injectedForSession =
     agent.injectedSkills === undefined || agent.defaultSkill == null
       ? agent.injectedSkills
       : [agent.defaultSkill, ...agent.injectedSkills.filter((id) => id !== agent.defaultSkill)];
-  const isPi = backend.brief?.backendId === 'pi';
   const skillsRootDir = deps.skillsDir;
   const canSkillTool = isPi && skillsRootDir !== undefined;
   if (canSkillTool) {
@@ -2090,7 +2101,6 @@ async function runClaimedStep(
   }
   clearCredentials(creds);
   journal.remove(stepId);
-  rmSync(join(deps.paths.outboxDir, `step-${stepId}.session.jsonl`), { force: true });
   logger.raw(`finished (${running - 1} running)`);
 }
 
@@ -2213,7 +2223,6 @@ export async function resumePendingUpload(
     }
   }
   journal.remove(stepId);
-  rmSync(join(deps.paths.outboxDir, `step-${stepId}.session.jsonl`), { force: true });
   deps.sessionHandles?.delete(stepId);
   logger.raw(`finished (${running - 1} running)`);
 }

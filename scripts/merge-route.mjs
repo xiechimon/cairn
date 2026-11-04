@@ -71,13 +71,53 @@ humanReasons`,
   return reasons;
 }
 
+const OWNER_ROUTE_LABEL = 'owner-route';
+
+export function syncOwnerRouteLabel(repo, pr, head, routed, gh) {
+  const liveHead = gh(['api', `repos/${repo}/pulls/${pr}`, '--jq', '.head.sha']).trim();
+  if (liveHead !== head) return false;
+  const labels = gh(['api', `repos/${repo}/issues/${pr}/labels`, '--jq', '.[].name'])
+    .split('\n')
+    .filter(Boolean);
+  const has = labels.includes(OWNER_ROUTE_LABEL);
+  if (routed && !has)
+    gh([
+      'api',
+      '--method',
+      'POST',
+      `repos/${repo}/issues/${pr}/labels`,
+      '-f',
+      `labels[]=${OWNER_ROUTE_LABEL}`,
+    ]);
+  if (!routed && has)
+    gh(['api', '--method', 'DELETE', `repos/${repo}/issues/${pr}/labels/${OWNER_ROUTE_LABEL}`]);
+  return true;
+}
+
+const runGh = (args) => execFileSync('gh', args, { encoding: 'utf8' });
+
 if (process.argv[1] && realpathSync(process.argv[1]) === import.meta.filename) {
-  const head = process.argv[2] ?? '';
-  if (!/^[0-9a-f]{40}$/.test(head)) {
-    console.error('usage: merge-route.mjs <40-hex head sha>');
+  const [head = '', ...rest] = process.argv.slice(2);
+  const labelFlag = rest.indexOf('--label-pr');
+  const labelPr = labelFlag === -1 ? null : rest[labelFlag + 1];
+  const repo = process.env.GITHUB_REPOSITORY ?? '';
+  if (
+    !/^[0-9a-f]{40}$/.test(head) ||
+    (labelFlag !== -1 && (!/^[1-9][0-9]*$/.test(labelPr ?? '') || !/^[\w.-]+\/[\w.-]+$/.test(repo)))
+  ) {
+    console.error(
+      'usage: merge-route.mjs <40-hex head sha> [--label-pr <number>] (needs GITHUB_REPOSITORY)',
+    );
     process.exit(2);
   }
   const reasons = ownerRouting(head);
+  if (labelPr) {
+    try {
+      syncOwnerRouteLabel(repo, labelPr, head, reasons.length > 0, runGh);
+    } catch (error) {
+      console.error(`merge-route: could not sync the ${OWNER_ROUTE_LABEL} label: ${error.message}`);
+    }
+  }
   if (reasons.length > 0) {
     console.log(`merge-route: owner route for ${head.slice(0, 8)}:`);
     for (const reason of reasons) console.log(`- ${reason}`);

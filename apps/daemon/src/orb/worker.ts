@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync, realpathSync, rmSync } from 'node:fs';
+import { userInfo } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { type AgentBackend, type AgentSessionHandle, conversationBranch } from '@cairn/shared';
@@ -18,8 +19,13 @@ import { WorkspaceManager } from '../workspace.js';
 import { type OrbFrame, orbReleaseKeySchema } from './protocol.js';
 import { OrbStaleReleaseError, RelayMachineApi } from './relay.js';
 
-export const ORB_AGENT_HOME = '/home/agent';
-export const ORB_WORKSPACES_ROOT = `${ORB_AGENT_HOME}/work`;
+export function orbAgentHome(): string {
+  return userInfo().homedir;
+}
+
+export function orbWorkspacesRoot(): string {
+  return `${orbAgentHome()}/work`;
+}
 
 export const ORB_CLAUDE_BIN = '/usr/bin/claude';
 
@@ -146,8 +152,8 @@ export async function runOrbWorker(options: {
           send({ type: 'log', message: args.at(-1) ?? '' }),
     });
     setupProxy(logger, { ...process.env, ...input.options.env });
-    const workspacesDir = options.workspacesRoot ?? ORB_WORKSPACES_ROOT;
-    const paths = statePaths(options.home ?? `${ORB_AGENT_HOME}/.cairn`, workspacesDir);
+    const workspacesDir = options.workspacesRoot ?? orbWorkspacesRoot();
+    const paths = statePaths(options.home ?? `${orbAgentHome()}/.cairn`, workspacesDir);
     ensureStateDirs(paths);
     const backendFor =
       options.backendFor ?? orbBackendFor({ paths, machineName: input.machineName });
@@ -188,7 +194,7 @@ export async function runOrbWorker(options: {
           }
         })(paths.outboxDir),
         workspacesDir,
-        mcpConfigPath: `${ORB_AGENT_HOME}/.cairn/mcp.json`,
+        mcpConfigPath: `${orbAgentHome()}/.cairn/mcp.json`,
         machineName: input.machineName,
         workspace: new (class extends WorkspaceManager {
           override async push(...args: Parameters<WorkspaceManager['push']>): Promise<void> {
