@@ -16,6 +16,7 @@ import { cancelBuild, stoppedBeforeFirstRun } from './builds.js';
 import type { ChiefToolCtx, ChiefToolDeps } from './chief-tools.js';
 import { listNeedsYou } from './needs-you.js';
 import { PhaseTransitionError } from './phase.js';
+import { holdCodeThreadForPriorResearch } from './research-before-plan.js';
 import { routingRulesEnabled } from './routing-rules.js';
 import { messageThreadAsUser, startThreadBuild } from './thread-message.js';
 import { pendingWorkerQuestions } from './worker-question-store.js';
@@ -96,6 +97,7 @@ function openThread(deps: ChiefToolDeps, ctx: ChiefToolCtx, params: Params): str
   if (projectRow?.teamId !== ctx.teamId) throw new HttpError(404, `project ${row.projectId}`);
   try {
     const buildId = startThreadBuild(deps, row, { origin: 'coordinator', actor: 'Chief' });
+    holdCodeThreadForPriorResearch(deps, row.id, buildId);
     return json({ todoId: row.id, seqNum: row.seqNum, buildId });
   } catch (error) {
     if (error instanceof PhaseTransitionError) throw new HttpError(409, error.message);

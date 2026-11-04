@@ -55,6 +55,7 @@ import { createPrFeedbackPoller, PR_FEEDBACK_INTERVAL_MS } from './pr-feedback.j
 import { digestSlotDueAt, digestSlotsDue, sweepPushDigest } from './push.js';
 import { sweepPendingPushAlerts } from './push-alerts.js';
 import { sweepQuotaWaitSteps } from './quota-wait.js';
+import { releaseResearchBeforePlanHolds } from './research-before-plan.js';
 import { planResearchIntake } from './research-intake.js';
 import {
   ARCHIVED_SCHEDULE_PAUSE_REASON,
@@ -490,6 +491,7 @@ export function createScheduler(
     sweepSnoozeExpiry(deps, now);
     fireDueChiefWakes(deps, now);
     try {
+      releaseResearchBeforePlanHolds(deps);
       planResearchIntake(deps, opts.researchIntakeProjectId ?? null, now);
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
