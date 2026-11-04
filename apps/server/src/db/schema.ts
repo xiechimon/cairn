@@ -1127,3 +1127,14 @@ export const claudeSubscription = sqliteTable('claude_subscription', {
   expiresAt: epochMs('expiresAt'),
   createdAt: epochMs('createdAt').notNull(),
 });
+
+export const clientMessage = sqliteTable(
+  'client_message',
+  {
+    scopeId: text('scopeId').notNull(),
+    clientMessageId: text('clientMessageId').notNull(),
+    response: json<unknown>('response'),
+    createdAt: epochMs('createdAt').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.scopeId, t.clientMessageId] })],
+);
