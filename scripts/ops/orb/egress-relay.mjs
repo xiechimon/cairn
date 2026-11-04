@@ -265,7 +265,7 @@ export function createRelay(options = {}) {
 
 async function assertPrivateDirectory(directory) {
   const stats = await lstat(directory);
-  if (!stats.isDirectory() || stats.uid !== process.getuid() || (stats.mode & 0o022) !== 0)
+  if (!stats.isDirectory() || stats.uid !== process.getuid() || (stats.mode & 0o077) !== 0)
     throw new Error(`Insecure socket directory ${directory}`);
 }
 
