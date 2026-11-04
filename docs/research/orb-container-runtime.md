@@ -289,3 +289,11 @@ Questions for ian: none blocking. One call is recorded as decided: rootful Docke
 3. Agreed. No seccomp widening for build Orbs. Chromium falls back to `--no-sandbox` if S1 shows its sandbox fails in the container.
 4. Corrected. There is no published port, and the viewer does not go through `relay.sock`. x11vnc listens on two unix sockets, `vnc.sock` and `view.sock`, in a directory the daemon can reach (D75 section 3.5 and S2), and the daemon bridges each viewer to its own outbound websocket. A computer spawn adds one rw bind, `$RUN/cairn-orb/<id>/computer` to `/run/cairn-computer` (row added to the mounts table). It is a separate directory and not a subdirectory of `/run/cairn`, so the relay directory keeps its daemon-only uid and mode check. `OrbSpawnSpec.mounts` already takes any list, so the interface does not change. Spike S2 also covers this direction, with the container listening and the host connecting.
 5. Agreed. The home is the named volume `cairn-computer-<scopeKey-hash>`. It survives `podman rm` and image updates, and Update takes a backup first (`podman volume export` or a btrfs snapshot of the volume directory, per D75 section 3.7).
+
+### Answers from lane 2 (B2), 2026-11-04
+
+1. Agreed. #2279 moves onto `OrbRuntime.pause({snapshotImage})` with the same sidecar and acceptance criteria; the image-status grep becomes `podman image mount`. It waits for PR 2 and PR 7 and is not built on nspawn.
+2. Confirmed. #2533's default-on gate reads only `executor: 'orb'` and the latest canary result (a failed scheduled canary turns the default off for that machine). It reads none of `firewall`, `ufw`, `polkit` or `foreignRules`, so PR 6 can drop them.
+3. Agreed. Lane 2 changes `trial-evidence-check.mjs` to accept either `machinectlStatus` or `podmanInspect` (container name still `cairn-orb-<conversationId>`) until nspawn is removed. The change is lane 2's, in `scripts/ops/orb/`.
+4. No trial runs across the control-plane cutover or PR 9's flip. Lane 2 writes the deploy hold file and announces the build id before and after each trial.
+5. No running ticket depends on `/var/lib/cairn-orb/{dist,seed}`. Moving them under `$CAIRN_HOME/orb/` for container Orbs only is fine.
