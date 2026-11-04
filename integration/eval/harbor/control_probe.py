@@ -69,10 +69,23 @@ def require_isolated(isolation):
         raise ValueError(f"containers with network mode {', '.join(bad)}")
 
 
+OUTCOME_NAMES = ("reward", "outcome", "result")
+PUBLISHED_OUTCOME_FILES = ("outcome.json", "result.json", "reward.txt", "reward.json")
+
+
 def agent_wrote_outcome(trial):
-    agent = Path(trial) / "agent"
-    return agent.is_dir() and any(
-        path.is_file() and "reward" in path.name.lower() for path in agent.rglob("*")
+    trial = Path(trial)
+    agent = trial / "agent"
+    if agent.is_dir() and any(
+        path.is_file() and any(name in path.name.lower() for name in OUTCOME_NAMES)
+        for path in agent.rglob("*")
+    ):
+        return True
+    published = trial / "artifacts" / "logs" / "artifacts"
+    return any(
+        (directory / name).is_file()
+        for directory in (published, published / "workspace")
+        for name in PUBLISHED_OUTCOME_FILES
     )
 
 

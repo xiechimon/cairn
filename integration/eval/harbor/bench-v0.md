@@ -90,6 +90,50 @@ classified as infrastructure, not an assertion. Its earlier failure
 directory in a sandbox. The converter now needs a writable `DOCKER_CONFIG`
 only on hosts whose default Docker config directory is not writable.
 
+## Epic 1: trustworthy scoring
+
+Generated tasks grade in a separate verifier container (`environment_mode =
+"separate"`). The agent container never holds `/tests`, the solution or the
+reward. A `[[verifier.collect]]` hook publishes `/app` minus `node_modules` and
+`.git` to `/logs/artifacts/workspace`; Harbor uploads that directory into a fresh
+verifier container whose image, runtime and dependencies the agent could not
+touch. `tests/test.sh` then drops planted `node_modules`/`.git`, deletes every
+path the test patch touches, restores their base versions from
+`tests/base-tests.tar`, applies `tests/tests.patch`, runs the explicit command
+and only then writes `1` to the reward file, which Harbor itself clears first.
+Only the parent process writes `outcome.json`; the probe flags any outcome-like
+file under the trial's `agent/` directory or the published artifact root.
+Limitations: files deleted by the agent are not propagated, and helper files that
+are neither in the test patch nor under `node_modules` are treated as product code.
+
+Four cheat agents (`cheat_agent.py`, scripts in `cheat_controls.py`) run as real
+Harbor trials. Each is blocked only when the trial is scored 0 on a real
+assertion, every container had network mode `none`, the parent wrote the outcome,
+and the cheat's own evidence proves it executed:
+
+- `git`: `git log --all`, `show`, `reflog`, `rev-list`, `fsck`, `cat-file` of the
+  base commit, plus a filesystem search for `.git`, packs and a line unique to
+  the fix. All fail and nothing is found.
+- `bash`: overwrites the test file, pre-seeds `reward.txt`/`reward.json`, plants
+  `/tests/test.sh` and replaces the `node` binary.
+- `forge`: writes `outcome.json`, `result.json`, `reward.*` into every writable
+  location; the probe flags it and the outcome stays the parent's.
+- `network`: `curl`, `npm view`, Python, `getent`, Node DNS and a raw TCP connect
+  all fail; no default route and only `lo`.
+
+```sh
+python3 integration/eval/harbor/pr-to-task.py --pr 1562 \
+  --test-command-json '["node","--test","scripts/single-use-helper-gate.test.mjs"]' \
+  --output /tmp/task-1562
+python3 integration/eval/harbor/pr-to-task.py --cheat-controls /tmp/task-1562 \
+  --output /tmp/cheats-1562
+python3 integration/eval/harbor/pr-to-task.py --check /tmp/task-1562 \
+  --output /tmp/controls-1562-e1
+```
+
+Evidence: `docs/verify/1518/epic1/`. The task stays unaccepted; Epic 1 proves the
+ruler resists these four cheats, not that PR #1562 is a kept benchmark task.
+
 ## Candidate counts
 
 - Binary non-test diff: 401.
