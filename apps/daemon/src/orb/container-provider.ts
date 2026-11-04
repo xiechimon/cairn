@@ -177,7 +177,9 @@ export class ContainerOrbProvider implements OrbProvider {
       try {
         await this.runtime.spawn(this.spawnSpec(handle), { signal: options.signal });
       } catch (error) {
-        await this.runtime.pause(handle.id).catch(() => {});
+        const owned = await this.runtime.list().catch(() => []);
+        if (owned.some((orb) => orb.orbId === handle.id))
+          await this.runtime.pause(handle.id).catch(() => {});
         throw error;
       }
       handle.running = true;

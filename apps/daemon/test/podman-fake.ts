@@ -71,7 +71,12 @@ export class FakePodman {
           if (!container) return { code: 125, stdout: '[]', stderr: `no such container "${name}"` };
           return ok(
             JSON.stringify([
-              { Name: name, ImageName: container.image, State: { Status: container.state } },
+              {
+                Name: name,
+                ImageName: container.image,
+                State: { Status: container.state },
+                Config: { Labels: container.labels },
+              },
             ]),
           );
         }

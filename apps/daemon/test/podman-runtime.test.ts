@@ -6,6 +6,13 @@ import { FakePodman } from './podman-fake.js';
 
 const IMAGE = 'cairn-orb-base:0123456789ab';
 const ORB = 'cairn-orb-alpha';
+const ORB_LABELS = { 'cairn.orb': '1', 'cairn.conversation': 'alpha' };
+const FOREIGN_LABELS: Record<string, string>[] = [
+  {},
+  { 'cairn.orb': '1' },
+  { 'cairn.orb': '0', 'cairn.conversation': 'alpha' },
+  { 'cairn.orb': '1', 'cairn.conversation': 'someone-else' },
+];
 
 function spec(overrides: Partial<OrbSpawnSpec> = {}): OrbSpawnSpec {
   return {
@@ -241,6 +248,48 @@ describe('PodmanOrbRuntime.spawn argv', () => {
 });
 
 describe('PodmanOrbRuntime.spawn lifecycle', () => {
+  test.each(FOREIGN_LABELS)(
+    'refuses a same-name container with mismatched ownership labels %j',
+    async (labels) => {
+      const { podman, runtime } = fixture();
+      podman.containers.set(ORB, {
+        name: ORB,
+        image: IMAGE,
+        state: 'running',
+        labels,
+        create: [],
+      });
+      await expect(runtime.spawn(spec())).rejects.toThrow('Orb ownership labels do not match');
+      expect(podman.callsOf('start')).toEqual([]);
+      expect(podman.callsOf('unpause')).toEqual([]);
+      expect(podman.callsOf('rm')).toEqual([]);
+    },
+  );
+
+  test('refuses a foreign container that wins the create race without modifying it', async () => {
+    const { podman } = fixture();
+    const original = podman.runner;
+    const runtime = new PodmanOrbRuntime({
+      runner: async (argv, options) => {
+        if (argv[1] === 'create') {
+          podman.containers.set(ORB, {
+            name: ORB,
+            image: IMAGE,
+            state: 'exited',
+            labels: {},
+            create: [],
+          });
+          return { code: 125, stdout: '', stderr: 'container name is already in use' };
+        }
+        return original(argv, options);
+      },
+    });
+    await expect(runtime.spawn(spec())).rejects.toThrow('Orb ownership labels do not match');
+    expect(podman.callsOf('start')).toEqual([]);
+    expect(podman.callsOf('rm')).toEqual([]);
+    expect(podman.containers.get(ORB)?.state).toBe('exited');
+  });
+
   test('a running container is a no-op', async () => {
     const { podman, runtime } = fixture();
     await runtime.spawn(spec());
@@ -255,7 +304,13 @@ describe('PodmanOrbRuntime.spawn lifecycle', () => {
     'a %s container is started, not created',
     async (state) => {
       const { podman, runtime } = fixture();
-      podman.containers.set(ORB, { name: ORB, image: IMAGE, state, labels: {}, create: [] });
+      podman.containers.set(ORB, {
+        name: ORB,
+        image: IMAGE,
+        state,
+        labels: ORB_LABELS,
+        create: [],
+      });
       await runtime.spawn(spec());
       expect(podman.callsOf('create')).toEqual([]);
       expect(podman.callsOf('start')).toEqual([['podman', 'start', ORB]]);
@@ -269,7 +324,7 @@ describe('PodmanOrbRuntime.spawn lifecycle', () => {
       name: ORB,
       image: IMAGE,
       state: 'paused',
-      labels: {},
+      labels: ORB_LABELS,
       create: [],
     });
     await runtime.spawn(spec());
@@ -283,7 +338,7 @@ describe('PodmanOrbRuntime.spawn lifecycle', () => {
       name: ORB,
       image: 'cairn-orb-base:old',
       state: 'exited',
-      labels: {},
+      labels: ORB_LABELS,
       create: [],
     });
     await runtime.spawn(spec());
@@ -324,7 +379,7 @@ describe('PodmanOrbRuntime.spawn lifecycle', () => {
       name: ORB,
       image: IMAGE,
       state: 'exited',
-      labels: {},
+      labels: ORB_LABELS,
       create: [],
     });
     const original = podman.runner;
@@ -376,7 +431,7 @@ describe('PodmanOrbRuntime.spawn lifecycle', () => {
       name: ORB,
       image: IMAGE,
       state: 'exited',
-      labels: {},
+      labels: ORB_LABELS,
       create: [],
     });
     podman.failWhen((argv) => argv[1] === 'start', { code: 125, stdout: '', stderr: 'boom' });
@@ -402,7 +457,7 @@ describe('PodmanOrbRuntime.spawn lifecycle', () => {
       name: ORB,
       image: IMAGE,
       state: 'exited',
-      labels: {},
+      labels: ORB_LABELS,
       create: [],
     });
     podman.failWhen((argv) => argv[1] === 'container' && argv[2] === 'inspect', {
@@ -422,12 +477,12 @@ describe('PodmanOrbRuntime.spawn lifecycle', () => {
       name: ORB,
       image: IMAGE,
       state: 'exited',
-      labels: {},
+      labels: ORB_LABELS,
       create: [],
     });
     podman.failWhen((argv) => argv[1] === 'container' && argv[2] === 'inspect', {
       code: 0,
-      stdout: JSON.stringify([{ State: { Status: 'removing' } }]),
+      stdout: JSON.stringify([{ State: { Status: 'removing' }, Config: { Labels: ORB_LABELS } }]),
       stderr: '',
     });
     await expect(runtime.spawn(spec())).rejects.toThrow('unexpected container state');
@@ -537,6 +592,17 @@ describe('PodmanOrbRuntime.remove', () => {
 });
 
 describe('PodmanOrbRuntime.list', () => {
+  test('excludes a labelled container whose conversation label does not match its name', async () => {
+    const { podman, runtime } = fixture();
+    podman.containers.set(ORB, {
+      name: ORB,
+      image: IMAGE,
+      state: 'running',
+      labels: { 'cairn.orb': '1', 'cairn.conversation': 'someone-else' },
+      create: [],
+    });
+    expect(await runtime.list()).toEqual([]);
+  });
   test('filters on the orb label and maps states', async () => {
     const { podman, runtime } = fixture();
     const labels = { 'cairn.orb': '1' };
@@ -544,28 +610,28 @@ describe('PodmanOrbRuntime.list', () => {
       name: 'cairn-orb-a',
       image: IMAGE,
       state: 'running',
-      labels,
+      labels: { ...labels, 'cairn.conversation': 'a' },
       create: [],
     });
     podman.containers.set('cairn-orb-b', {
       name: 'cairn-orb-b',
       image: IMAGE,
       state: 'exited',
-      labels,
+      labels: { ...labels, 'cairn.conversation': 'b' },
       create: [],
     });
     podman.containers.set('cairn-orb-c', {
       name: 'cairn-orb-c',
       image: IMAGE,
       state: 'created',
-      labels,
+      labels: { ...labels, 'cairn.conversation': 'c' },
       create: [],
     });
     podman.containers.set('unrelated', {
       name: 'unrelated',
       image: 'x',
       state: 'running',
-      labels: {},
+      labels: ORB_LABELS,
       create: [],
     });
     expect(await runtime.list()).toEqual([

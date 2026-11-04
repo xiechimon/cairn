@@ -25,9 +25,22 @@ const VARIABLE_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const MISSING_CONTAINER = /no such container|no container with name or ID/i;
 const NAME_IN_USE = /already in use/i;
 
-const inspectSchema = z.array(z.object({ State: z.object({ Status: z.string() }) })).min(1);
+const labelsSchema = z.record(z.string(), z.string()).nullish();
+const inspectSchema = z
+  .array(
+    z.object({
+      State: z.object({ Status: z.string() }),
+      Config: z.object({ Labels: labelsSchema }).optional(),
+    }),
+  )
+  .min(1);
 const listSchema = z.array(
-  z.object({ Names: z.array(z.string()).min(1), Image: z.string(), State: z.string() }),
+  z.object({
+    Names: z.array(z.string()).min(1),
+    Image: z.string(),
+    State: z.string(),
+    Labels: labelsSchema,
+  }),
 );
 const infoSchema = z.object({
   version: z.object({ Version: z.string() }),
@@ -36,6 +49,12 @@ const infoSchema = z.object({
 
 function assertContainerName(orbId: string): void {
   if (!ORB_NAME_PATTERN.test(orbId)) throw new Error('Invalid orb container name');
+}
+
+function orbLabelsMatch(orbId: string, labels: Record<string, string> | null | undefined): boolean {
+  return (
+    labels?.[ORB_LABEL] === '1' && labels[CONVERSATION_LABEL] === orbId.slice(NAME_PREFIX.length)
+  );
 }
 
 function assertImageReference(reference: string): void {
@@ -204,7 +223,7 @@ export class PodmanOrbRuntime implements OrbRuntime {
     ]);
     return this.parse('ps', result.stdout, listSchema).flatMap((row) => {
       const orbId = row.Names[0] ?? '';
-      return ORB_NAME_PATTERN.test(orbId)
+      return ORB_NAME_PATTERN.test(orbId) && orbLabelsMatch(orbId, row.Labels)
         ? [{ orbId, image: row.Image, state: listedState(row.State) }]
         : [];
     });
@@ -364,7 +383,10 @@ export class PodmanOrbRuntime implements OrbRuntime {
     if (exists.code === 1) return undefined;
     if (exists.code !== 0) throw this.failure(['container'], exists);
     const inspect = await this.run(['container', 'inspect', '--format', 'json', orbId], { signal });
-    return this.parse('container inspect', inspect.stdout, inspectSchema)[0]?.State.Status;
+    const [container] = this.parse('container inspect', inspect.stdout, inspectSchema);
+    if (!container || !orbLabelsMatch(orbId, container.Config?.Labels))
+      throw new Error(`Refusing to adopt ${orbId}: Orb ownership labels do not match`);
+    return container.State.Status;
   }
 
   private parse<T>(label: string, stdout: string, schema: z.ZodType<T>): T {
