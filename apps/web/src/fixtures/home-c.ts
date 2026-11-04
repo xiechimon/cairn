@@ -73,11 +73,13 @@ const conversation: ChiefContent = {
       id: 'home-c-ask-fold',
       text: 'Fold finished turns before review.',
       projectId: PROJECT_ID,
+      createdAt: r7(20, 5),
     },
     {
       kind: 'robot',
       id: 'home-c-reply-fold',
       seconds: '',
+      createdAt: r7(20, 5) + 4 * 60_000,
       paragraphs: [[{ text: 'Started it; the PR is up for your review.' }]],
     },
   ],
