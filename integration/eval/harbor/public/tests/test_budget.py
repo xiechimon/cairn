@@ -192,7 +192,7 @@ def test_trial_cost_uses_reported_usd_from_agent_result(tmp_path: Path) -> None:
     assert trial.cost_source == "agent-reported total_cost_usd"
 
 
-def test_trial_cost_fails_closed_for_unpriced_model_without_report(
+def test_unpriced_trial_without_report_keeps_its_result_with_unknown_cost(
     tmp_path: Path,
 ) -> None:
     trial_dir = tmp_path / "task__abc"
@@ -200,10 +200,11 @@ def test_trial_cost_fails_closed_for_unpriced_model_without_report(
     (trial_dir / "result.json").write_text(
         json.dumps({"agent_result": {"n_input_tokens": 10, "n_output_tokens": 5}})
     )
-    with pytest.raises(MissingCostError):
-        summarize_trial(
-            trial_dir, name=trial_dir.name, voided=False, model="claude-unpriced"
-        )
+    trial = summarize_trial(
+        trial_dir, name=trial_dir.name, voided=False, model="claude-unpriced"
+    )
+    assert trial.cost_usd is None
+    assert trial.cost_source.startswith("unknown")
 
 
 def _trial(cost: float | None) -> TrialCost:
@@ -239,7 +240,7 @@ def test_report_marks_unknown_cost_instead_of_zero() -> None:
     assert "Total cost: unknown" in report
 
 
-def test_partially_reported_step_costs_fail_closed(tmp_path: Path) -> None:
+def test_partially_reported_step_costs_are_unknown(tmp_path: Path) -> None:
     trial_dir = tmp_path / "task__abc"
     trial_dir.mkdir()
     (trial_dir / "result.json").write_text(
@@ -252,10 +253,10 @@ def test_partially_reported_step_costs_fail_closed(tmp_path: Path) -> None:
             }
         )
     )
-    with pytest.raises(MissingCostError):
-        summarize_trial(
-            trial_dir, name=trial_dir.name, voided=False, model="claude-unpriced"
-        )
+    trial = summarize_trial(
+        trial_dir, name=trial_dir.name, voided=False, model="claude-unpriced"
+    )
+    assert trial.cost_usd is None
 
 
 def test_run_with_an_unknown_trial_cost_settles_at_its_reservation() -> None:
@@ -293,3 +294,29 @@ def test_a_step_without_tokens_or_cost_does_not_hide_reported_costs(
         trial_dir, name=trial_dir.name, voided=False, model="claude-unpriced"
     )
     assert trial.cost_usd == 0.10
+
+
+@pytest.mark.parametrize("amount", [-1.0, float("nan"), float("inf")])
+def test_reserve_rejects_negative_or_non_finite_amounts(ledger: Path, amount: float) -> None:
+    with pytest.raises(ValueError):
+        budget.reserve("run-1", amount, now=NOV)
+    assert not ledger.exists() or entries(ledger) == []
+
+
+@pytest.mark.parametrize("amount", [-1.0, float("nan")])
+def test_settle_rejects_negative_or_non_finite_amounts(ledger: Path, amount: float) -> None:
+    budget.reserve("run-1", 5.0, now=NOV)
+    with pytest.raises(ValueError):
+        budget.settle("run-1", amount, "x", now=NOV)
+
+
+def test_unknown_cost_settlement_never_drops_below_known_spending() -> None:
+    usd, source = budget.settlement([_trial(60.0), _trial(None)], reserved_usd=4.0)
+    assert usd == 60.0
+    assert source == budget.UNKNOWN_SETTLED_AT_RESERVATION
+
+
+def test_a_run_with_no_collected_trials_settles_at_its_reservation() -> None:
+    usd, source = budget.settlement([], reserved_usd=4.0)
+    assert usd == 4.0
+    assert source == budget.UNKNOWN_SETTLED_AT_RESERVATION

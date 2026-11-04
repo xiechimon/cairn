@@ -121,6 +121,10 @@ def config_model(config_path: Path) -> str | None:
     return agents[0].get("model_name") if agents else None
 
 
+def config_job_name(config_path: Path) -> str | None:
+    return json.loads(config_path.read_text()).get("job_name")
+
+
 def is_metered(model: str | None) -> bool:
     return model is not None and not model.endswith(":free")
 
@@ -301,6 +305,11 @@ def main() -> None:
                 for path in paths:
                     if not path.is_file():
                         raise ValueError(f"missing harness session: {path}")
+        configured_name = config_job_name(args.config)
+        if configured_name != args.job_name:
+            parser.error(
+                f"--job-name {args.job_name} does not match the config's job_name {configured_name}"
+            )
         model = config_model(args.config)
         metered = is_metered(model)
         if metered and args.max_run_usd is None:

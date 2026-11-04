@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from cairn_harbor.budget import resolve_cost
+from cairn_harbor.budget import MissingCostError, resolve_cost
 from cairn_harbor.scan import ScanFinding, scan_session_text
 
 _UNIT_FACTORS = {
@@ -186,9 +186,12 @@ def summarize_trial(
         findings = _session_findings(trial_dir)
     cost_usd, cost_source = usage.cost_usd, ""
     if model is not None:
-        cost_usd, cost_source = resolve_cost(
-            usage.cost_usd, usage.input_tokens, usage.output_tokens, model
-        )
+        try:
+            cost_usd, cost_source = resolve_cost(
+                usage.cost_usd, usage.input_tokens, usage.output_tokens, model
+            )
+        except MissingCostError as error:
+            cost_usd, cost_source = None, f"unknown: {error}"
     return TrialCost(
         name=trial_task_name(name),
         dataset=dataset,

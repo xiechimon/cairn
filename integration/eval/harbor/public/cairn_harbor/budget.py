@@ -1,5 +1,6 @@
 import fcntl
 import json
+import math
 import os
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -98,7 +99,13 @@ def _committed_usd(entries: list[dict], month: str) -> Decimal:
     return total
 
 
+def _require_amount(usd: float) -> None:
+    if not math.isfinite(usd) or usd < 0:
+        raise ValueError(f"amount must be a finite non-negative number of USD, got {usd}")
+
+
 def reserve(run_id: str, estimate_usd: float, now: datetime | None = None) -> None:
+    _require_amount(estimate_usd)
     moment = now or _now()
     month = _month(moment)
     cap = Decimal(str(monthly_cap_usd()))
@@ -139,6 +146,7 @@ def reserve(run_id: str, estimate_usd: float, now: datetime | None = None) -> No
 def settle(
     run_id: str, actual_usd: float, source: str, now: datetime | None = None
 ) -> None:
+    _require_amount(actual_usd)
     moment = now or _now()
     with _locked_ledger() as path:
         reservation = _open_reservations(_read(path)).get(run_id)
@@ -180,7 +188,8 @@ def resolve_cost(
 def settlement(
     trials: Sequence[CostedTrial], reserved_usd: float
 ) -> tuple[float, str]:
-    if any(trial.cost_usd is None for trial in trials):
-        return reserved_usd, UNKNOWN_SETTLED_AT_RESERVATION
+    known = sum(trial.cost_usd for trial in trials if trial.cost_usd is not None)
+    if not trials or any(trial.cost_usd is None for trial in trials):
+        return max(reserved_usd, known), UNKNOWN_SETTLED_AT_RESERVATION
     sources = sorted({trial.cost_source for trial in trials if trial.cost_source})
-    return sum(trial.cost_usd or 0.0 for trial in trials), "; ".join(sources) or NO_TOKENS_SOURCE
+    return known, "; ".join(sources) or NO_TOKENS_SOURCE

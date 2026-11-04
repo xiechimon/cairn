@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from cairn_harbor.run_baseline import (
     collect_outcomes,
     systemd_wrap_command,
@@ -169,3 +171,47 @@ def test_config_model_reads_the_first_agent(tmp_path: Path) -> None:
     assert config_model(path) == "claude-test"
     path.write_text(json.dumps({"agents": [{"name": "oracle"}]}))
     assert config_model(path) is None
+
+
+def test_config_job_name_reads_the_configured_name(tmp_path: Path) -> None:
+    from cairn_harbor.run_baseline import config_job_name
+
+    path = tmp_path / "job.json"
+    path.write_text(json.dumps({"job_name": "b-1", "agents": []}))
+    assert config_job_name(path) == "b-1"
+    path.write_text(json.dumps({"agents": []}))
+    assert config_job_name(path) is None
+
+
+def test_run_refuses_a_job_name_that_differs_from_the_config(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from cairn_harbor import run_baseline
+
+    config = tmp_path / "job.json"
+    config.write_text(json.dumps({"job_name": "real", "agents": [{"model_name": "claude-test"}]}))
+    tasks = tmp_path / "tasks.json"
+    tasks.write_text(
+        json.dumps(
+            {
+                "seed": 1,
+                run_baseline.SWE_DATASET_DIR_NAME: [],
+                run_baseline.TB_DATASET_DIR_NAME: [],
+            }
+        )
+    )
+    monkeypatch.setenv("CAIRN_EVAL_LEDGER", str(tmp_path / "spend.jsonl"))
+    started = []
+    monkeypatch.setattr(run_baseline, "run_job", lambda *a, **k: started.append(a))
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "run_baseline", "run", "--config", str(config), "--arm-label", "B",
+            "--jobs-dir", str(tmp_path / "jobs"), "--job-name", "other",
+            "--tasks", str(tasks), "--max-run-usd", "1", "--out-dir", str(tmp_path / "out"),
+        ],
+    )
+    with pytest.raises(SystemExit):
+        run_baseline.main()
+    assert started == []
+    assert not (tmp_path / "spend.jsonl").exists()
