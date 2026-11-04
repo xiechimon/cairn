@@ -654,9 +654,9 @@ test('a regular file, directory or symlink at the socket path is never removed',
   assert.equal(lstatSync(link).isSymbolicLink(), true);
 });
 
-test('group or world writable, symlinked, missing and relative socket directories are refused', async (t) => {
+test('socket directories reachable by group or others, symlinked, missing or relative are refused', async (t) => {
   const base = privateDirectory(t);
-  for (const mode of [0o770, 0o707, 0o777, 0o720]) {
+  for (const mode of [0o770, 0o707, 0o777, 0o720, 0o755, 0o750, 0o711, 0o701]) {
     const directory = join(base, `mode-${mode.toString(8)}`);
     mkdirSync(directory);
     chmodSync(directory, mode);

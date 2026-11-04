@@ -8,6 +8,7 @@ import { ApiError } from '../api/client.js';
 import {
   useApiMutations,
   useBuild,
+  useBuildChanges,
   useMachines,
   useMessages,
   usePlans,
@@ -20,6 +21,7 @@ import { liveThinkingStore } from '../api/live-thinking.js';
 import { mapPlanDoc, mapPlanVersions, mapTranscript, toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { useConversationStream } from '../api/sse.js';
+import { useSendKey } from '../api/use-send-key.js';
 import type { QueuedCapsule } from '../components/queued-capsules.js';
 import { toastError } from '../components/ui/toaster.js';
 import { blockDemoWrite, DEMO_MODE } from '../demo/demo-gate.js';
@@ -28,6 +30,7 @@ import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { uploadMessageAttachments } from '../overlay/attachment-paste.js';
 import { useThreadPresence } from '../pwa/thread-presence.js';
+import { deriveThreadChanges, type ThreadChanges } from './thread-changes.js';
 import { useMarkThreadRead } from './use-mark-thread-read.js';
 
 export type ThreadChatLoad = 'ready' | 'loading' | 'error' | 'missing';
@@ -42,6 +45,10 @@ export interface ThreadChat {
   buildAgentId: string | null;
   planDoc: DocBlock[] | undefined;
   planVersions: PlanVersion[] | undefined;
+  changes: ThreadChanges;
+  changesExpanded: boolean;
+  toggleChangesExpanded: () => void;
+  retryChanges: () => void;
   wire: WireTodo | null;
   started: boolean;
   locked: boolean;
@@ -82,6 +89,7 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
   const qc = useQueryClient();
   const [searchParams] = useSearchParams();
   const mutations = useApiMutations(teamId);
+  const sendKey = useSendKey();
   const [stopping, setStopping] = useState(false);
   const stopRequested = useRef(false);
 
@@ -91,6 +99,8 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
   useMarkThreadRead(todoId);
   const buildId = live ? (wire?.latestBuildId ?? null) : (listed?.latestBuildId ?? null);
   const buildQ = useBuild(buildId, live);
+  const changesQ = useBuildChanges(buildId, live);
+  const [changesExpanded, setChangesExpanded] = useState(true);
   const stepsQ = useSteps(buildId, live);
   const messagesQ = useMessages(buildId, live);
   const plansQ = usePlans(buildId, live);
@@ -209,24 +219,40 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     : () => Promise.resolve();
 
   const queueReply = todo != null && replyRouteOf(todo.phase, steps) === 'queue';
-  const queueSteer =
+  const postQueued =
     writable && buildId != null
-      ? (text: string, deliverAfterStop: boolean) =>
-          mutations.sendSteer
-            .mutateAsync({
-              conversationId: buildId,
-              content: text,
-              mode: 'queue',
-              deliverAfterStop,
-            })
-            .then(() => undefined)
+      ? (text: string, deliverAfterStop: boolean, clientMessageId: string) =>
+          mutations.sendSteer.mutateAsync({
+            conversationId: buildId,
+            content: text,
+            mode: 'queue',
+            deliverAfterStop,
+            clientMessageId,
+          })
+      : undefined;
+  const queueSteer =
+    postQueued !== undefined
+      ? async (text: string, deliverAfterStop: boolean) => {
+          const { key } = sendKey.attempt([todoId, deliverAfterStop, text].join('\n'), 'queue');
+          await postQueued(text, deliverAfterStop, key);
+          sendKey.settle();
+        }
       : undefined;
   const send = writable
-    ? queueReply && queueSteer !== undefined
-      ? (text: string) => queueSteer(text, false)
-      : async (text: string) => {
-          await mutations.messageThread.mutateAsync({ todoId, content: text });
-        }
+    ? async (text: string) => {
+        const { key, route } = sendKey.attempt(
+          [todoId, false, text].join('\n'),
+          queueReply && postQueued !== undefined ? 'queue' : 'thread',
+        );
+        if (route === 'queue' && postQueued !== undefined) await postQueued(text, false, key);
+        else
+          await mutations.messageThread.mutateAsync({
+            todoId,
+            content: text,
+            clientMessageId: key,
+          });
+        sendKey.settle();
+      }
     : !live && open
       ? fixtureSend
       : undefined;
@@ -254,6 +280,14 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
         }
       : undefined;
 
+  const changes = deriveThreadChanges({
+    live,
+    buildId,
+    query: { status: changesQ.status, data: changesQ.data },
+    fixture: fixtureDetail?.changes,
+    expanded: changesExpanded,
+  });
+
   const streamingItem = transcript.findLast((item) => item.kind === 'streaming');
 
   return {
@@ -269,6 +303,12 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
         : undefined
       : fixtureDetail?.doc,
     planVersions: live ? mapPlanVersions(plans) : fixtureDetail?.planVersions,
+    changes,
+    changesExpanded,
+    toggleChangesExpanded: () => setChangesExpanded((value) => !value),
+    retryChanges: () => {
+      void changesQ.refetch();
+    },
     wire,
     buildLegDone: steps.some((step) => step.kind === 'build' && step.status === 'done'),
     started,

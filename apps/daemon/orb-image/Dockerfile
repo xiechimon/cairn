@@ -11,7 +11,7 @@ RUN set -eu; \
     pacman -Syu --noconfirm; \
     node_package=$(pacman -Ss '^nodejs(-lts-[a-z]+)?$' | awk -v major="$NODE_MAJOR" '$1 ~ /^extra\/nodejs/ { split($2, version, "."); if (version[1] == major) { sub("^extra/", "", $1); print $1; exit } }'); \
     test -n "$node_package" || { echo "No Arch package provides Node $NODE_MAJOR" >&2; exit 1; }; \
-    pacman -S --noconfirm --needed base git "$node_package" npm openssh ca-certificates curl bubblewrap socat python sudo tmux; \
+    pacman -S --noconfirm --needed base git "$node_package" npm openssh ca-certificates curl bubblewrap socat python sudo tmux jq rsync lsof patch diffutils which inetutils ripgrep unzip sqlite; \
     rm -rf /var/cache/pacman/pkg/* /var/lib/pacman/sync/*
 
 RUN set -eu; \
@@ -30,10 +30,7 @@ RUN set -eu; \
     test "$(runuser -u user -- claude --version | awk 'NR == 1 {print $1}')" = "$CLAUDE_VERSION"; \
     test "$(runuser -u user -- codex --version | awk 'NR == 1 {print $NF}')" = "$CODEX_VERSION"; \
     test "$(cd /tmp && runuser -u user -- pnpm --version)" = "$PNPM_VERSION"; \
-    runuser -u user -- bwrap --version > /dev/null; \
-    runuser -u user -- socat -V > /dev/null; \
-    runuser -u user -- python3 --version > /dev/null; \
-    runuser -u user -- tmux -V > /dev/null
+    for tool in git node npm pnpm claude codex python3 bwrap socat tmux sudo jq rsync lsof patch diff which hostname rg unzip sqlite3 ss flock timeout curl ssh; do runuser -u user -- sh -c 'command -v "$1"' sh "$tool" > /dev/null || { echo "user cannot run $tool" >&2; exit 1; }; done
 
 RUN set -eu; \
     install -d -o root -g root -m 755 /var/lib/cairn-claude; \

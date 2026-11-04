@@ -1,4 +1,5 @@
 import argparse
+import hashlib
 import json
 import os
 import subprocess
@@ -12,6 +13,7 @@ from cairn_harbor.costs import (
     parse_systemd_show,
     summarize_trial,
 )
+from cairn_harbor.harness import harness_sha
 from cairn_harbor.report import arm_summary, build_report, scan_summary
 from cairn_harbor.scan import scan_trial_dir
 from cairn_harbor.subset import sample_task_names
@@ -28,9 +30,52 @@ CAIRN_IMPORT_PATH = "cairn_harbor.cairn_executor:CairnExecutor"
 SKILLS_DIR = Path(__file__).resolve().parent.parent / "skills" / "cairn-worker"
 
 
-def agent_config(arm: str) -> dict:
+EVAL_KEY_ENV = "CAIRN_EVAL_ANTHROPIC_API_KEY"
+PROVIDER_KEY_ENV = {"anthropic": "ANTHROPIC_API_KEY"}
+UNRELATED_CREDENTIAL_ENV = (
+    "OPENAI_API_KEY",
+    "OPENAI_BASE_URL",
+    "OPENAI_API_BASE",
+    "OPENROUTER_API_KEY",
+    "GEMINI_API_KEY",
+    "GOOGLE_API_KEY",
+    "ANTHROPIC_OAUTH_TOKEN",
+    "ANTHROPIC_BASE_URL",
+    "ANTHROPIC_API_BASE",
+    EVAL_KEY_ENV,
+)
+
+
+class MissingKeyError(Exception):
+    pass
+
+
+def job_env(model: str | None, environ: dict[str, str]) -> dict[str, str]:
+    if model is None or not is_metered(model):
+        return {key: environ[key] for key in (API_KEY_NAME,) if environ.get(key)}
+    provider = model.split("/", 1)[0]
+    harbor_name = PROVIDER_KEY_ENV.get(provider)
+    if harbor_name is None:
+        raise ValueError(f"unsupported provider for metered model {model}: {provider}")
+    value = environ.get(EVAL_KEY_ENV)
+    if not value:
+        raise MissingKeyError(f"{EVAL_KEY_ENV} is not set; a metered run needs it")
+    return {harbor_name: value}
+
+
+def agent_config(arm: str, model: str | None = None) -> dict:
     if arm == "oracle":
         return {"name": "oracle"}
+    if model is not None:
+        if arm == "pi":
+            return {"name": "pi", "model_name": model}
+        if arm == "cairn":
+            return {
+                "import_path": CAIRN_IMPORT_PATH,
+                "skills": [str(SKILLS_DIR)],
+                "model_name": model,
+            }
+        raise ValueError(f"unknown arm: {arm}")
     common = {
         "model_name": MODEL,
         "base_url": BASE_URL,
@@ -50,6 +95,7 @@ def job_config(
     arm: str,
     job_name: str,
     n_attempts: int = 1,
+    model: str | None = None,
 ) -> dict:
     tasks: list[dict] = []
     for dataset_name in (SWE_DATASET_DIR_NAME, TB_DATASET_DIR_NAME):
@@ -61,7 +107,7 @@ def job_config(
     return {
         "job_name": job_name,
         "n_attempts": n_attempts,
-        "agents": [agent_config(arm)],
+        "agents": [agent_config(arm, model)],
         "tasks": tasks,
     }
 
@@ -114,6 +160,10 @@ def _dataset_for_trial(trial_dir: Path) -> str:
     if TB_DATASET_DIR_NAME in task_path:
         return TB_DATASET_DIR_NAME
     return ""
+
+
+def task_set_sha(tasks_path: Path) -> str:
+    return hashlib.sha256(tasks_path.read_bytes()).hexdigest()
 
 
 def config_model(config_path: Path) -> str | None:
@@ -200,13 +250,21 @@ def systemd_wrap_command(
         "-p",
         f"MemoryMax={memory_max}",
     ]
-    for key, value in env.items():
-        wrapped.extend(["--setenv", f"{key}={value}"])
+    unset = [name for name in UNRELATED_CREDENTIAL_ENV if name not in env]
+    wrapped.extend(["-p", f"UnsetEnvironment={' '.join(unset)}"])
+    for key in env:
+        wrapped.extend(["--setenv", key])
     wrapped.extend(["--", *command])
     return wrapped
 
 
-def run_job(config_path: Path, jobs_dir: Path, n_concurrent: int, memory_max: str) -> dict:
+def run_job(
+    config_path: Path,
+    jobs_dir: Path,
+    n_concurrent: int,
+    memory_max: str,
+    env: dict[str, str],
+) -> dict:
     harbor = Path(__file__).resolve().parent.parent / ".venv" / "bin" / "harbor"
     unit_name = f"cairn-harbor-{int(time.time())}"
     command = [
@@ -220,10 +278,17 @@ def run_job(config_path: Path, jobs_dir: Path, n_concurrent: int, memory_max: st
         str(n_concurrent),
         "--yes",
     ]
-    env = {key: os.environ[key] for key in (API_KEY_NAME,) if os.environ.get(key)}
     wrapped = systemd_wrap_command(command, unit_name, memory_max, env)
+    process_env = {
+        key: value
+        for key, value in os.environ.items()
+        if key not in UNRELATED_CREDENTIAL_ENV
+    }
+    process_env.update(env)
     peak_container_mib: dict[str, int] = {}
-    process = subprocess.Popen(wrapped, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    process = subprocess.Popen(
+        wrapped, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=process_env
+    )
     while process.poll() is None:
         for name, mib in _peak_container_mib().items():
             peak_container_mib[name] = max(peak_container_mib.get(name, 0), mib)
@@ -255,6 +320,7 @@ def main() -> None:
     config.add_argument("--job-name", type=str, required=True)
     config.add_argument("--out", type=Path, required=True)
     config.add_argument("--attempts", type=int, default=1)
+    config.add_argument("--model", type=str)
 
     run = subparsers.add_parser("run", help="Run a job under a memory cgroup.")
     run.add_argument("--config", type=Path, required=True)
@@ -264,6 +330,7 @@ def main() -> None:
     run.add_argument("--tasks", type=Path, required=True)
     run.add_argument("--harness-sessions", type=Path)
     run.add_argument("--max-run-usd", type=float)
+    run.add_argument("--gate", action="store_true")
     run.add_argument("--n-concurrent", type=int, default=3)
     run.add_argument("--memory-max", type=str, default="20G")
     run.add_argument("--out-dir", type=Path, required=True)
@@ -282,7 +349,7 @@ def main() -> None:
     if args.command == "job-config":
         payload = json.loads(args.tasks.read_text())
         config_payload = job_config(
-            payload, args.datasets_dir, args.arm, args.job_name, args.attempts
+            payload, args.datasets_dir, args.arm, args.job_name, args.attempts, args.model
         )
         args.out.write_text(json.dumps(config_payload, indent=2) + "\n")
         return
@@ -314,13 +381,21 @@ def main() -> None:
         metered = is_metered(model)
         if metered and args.max_run_usd is None:
             parser.error(f"--max-run-usd is required for metered model {model}")
+        if args.gate and not metered:
+            parser.error(f"gate mode needs a pinned metered model, got {model}")
+        try:
+            forwarded_env = job_env(model, dict(os.environ))
+        except (MissingKeyError, ValueError) as error:
+            parser.error(str(error))
         run_id = f"{args.job_name}:{args.arm_label}"
         if metered:
             try:
                 budget.reserve(run_id, args.max_run_usd)
             except budget.BudgetExceeded as error:
                 raise SystemExit(f"budget cap reached, run not started: {error}")
-        run_info = run_job(args.config, args.jobs_dir, args.n_concurrent, args.memory_max)
+        run_info = run_job(
+            args.config, args.jobs_dir, args.n_concurrent, args.memory_max, forwarded_env
+        )
         outcomes = collect_outcomes(
             args.jobs_dir,
             args.job_name,
@@ -333,6 +408,10 @@ def main() -> None:
         payload = {
             "arm": args.arm_label,
             "job_name": args.job_name,
+            "run_id": run_id,
+            "model": model,
+            "task_set_sha": task_set_sha(args.tasks),
+            "harness_sha": harness_sha(),
             "n_concurrent": args.n_concurrent,
             "memory_max": args.memory_max,
             "finished_at": datetime.now(timezone.utc).isoformat(),
