@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { matchesGlob } from 'node:path';
+
 export const CODEX_LOGIN = 'chatgpt-codex-connector';
 export const ACTIONS_LOGIN = 'github-actions[bot]';
 export const GATE_CHECK = 'review-gate';
@@ -7,6 +10,22 @@ export const BLOCK_ROUND_CAP = 3;
 export const MAX_RETRIES = 2;
 export const REQUEST_AFTER_MS = 10 * 60 * 1000;
 export const USAGE_DASHBOARD = 'https://chatgpt.com/codex/cloud/settings/usage';
+
+const gatePaths = JSON.parse(
+  readFileSync(new URL('../../../packages/shared/merge-gate-paths.json', import.meta.url), 'utf8'),
+);
+const securityPatterns = ['credentials', 'machineAndCommandBoundary', 'externalEntryAuth'].flatMap(
+  (category) => gatePaths.humanQueue[category],
+);
+
+export function requiresSecurityReview(files) {
+  return files.some((file) =>
+    [file.filename, file.previous_filename].some(
+      (path) =>
+        typeof path === 'string' && securityPatterns.some((pattern) => matchesGlob(path, pattern)),
+    ),
+  );
+}
 
 const STATE_RE = /<!-- codex-review-state:v1 (\{.*?\}) -->/s;
 const BADGE_RE = /^\s*\*\*<sub><sub>!\[(P[0-3]) Badge\]/;
@@ -19,13 +38,19 @@ const MERGE_QUEUE_PREFIX = 'mergify/merge-queue/';
 const short = (sha) => sha.slice(0, 7);
 const stripBot = (login) => String(login ?? '').replace(/\[bot\]$/, '');
 
-export function parseState(body) {
+export function parseState(body, kind = 'code_review') {
   const match = STATE_RE.exec(body ?? '');
   if (!match) return null;
   try {
-    const review = JSON.parse(match[1]).code_review;
+    const review = JSON.parse(match[1])[kind];
     if (!review || typeof review !== 'object') return null;
-    return { commitSha: review.commit_sha ?? null, status: review.status ?? null };
+    return {
+      commitSha: review.commit_sha ?? null,
+      status: review.status ?? null,
+      ...(kind === 'security_review'
+        ? { hasUnresolvedFindings: review.has_unresolved_findings }
+        : {}),
+    };
   } catch {
     return null;
   }
@@ -35,12 +60,14 @@ export function isCodexAuthor(login, type) {
   return type === 'Bot' && stripBot(login) === CODEX_LOGIN;
 }
 
-export function trustedStateComment(comments) {
+export function trustedStateComment(comments, kind = 'code_review') {
   const trusted = comments
     .filter((comment) => isCodexAuthor(comment.user?.login, comment.user?.type))
     .flatMap((comment) => {
-      const state = parseState(comment.body);
-      return state ? [{ comment, state }] : [];
+      const state = parseState(comment.body, kind);
+      return state || (kind === 'security_review' && STATE_RE.test(comment.body ?? ''))
+        ? [{ comment, state }]
+        : [];
     });
   return trusted.reduce(
     (latest, entry) =>
@@ -213,6 +240,147 @@ function carriedNote(carried) {
   return `\n\nNot blocking, because the flagged lines predate this PR; file a follow-up issue instead:\n\n${lines.join('\n')}`;
 }
 
+const SECURITY_RECEIPT_HEADER = /^#{2,3} (?:🛡️ )?Codex Security Review\s*$/m;
+const SECURITY_FINDING =
+  /<!-- codex-security-review-finding:v1 -->|^#{2,3} (?:🛡️ )?Codex Security Review\s*$/m;
+const CLEAN_SECURITY =
+  /^Security review completed\. No security issues were found in this pull request\.$/m;
+const REVIEWED_COMMIT = /^\*\*Reviewed commit:\*\* `([0-9a-f]{7,40})`\s*$/gm;
+const SECURITY_COMPLETION =
+  /^\| 🔒 \*\*Security Review\*\* \| ✅ \*\*Completed\*\* <relative-time datetime="([^"]+)"/gm;
+const RECEIPT_WINDOW_MS = 60_000;
+const FULL_SHA = /^[0-9a-f]{40}$/;
+const trustedTime = (value) =>
+  typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/.test(value)
+    ? Date.parse(value)
+    : Number.NaN;
+
+export function securityReceiptComment(comments) {
+  const receipts = comments.filter(
+    (comment) =>
+      isCodexAuthor(comment.user?.login, comment.user?.type) &&
+      comment.body?.startsWith('<!-- codex-review-receipt:v1 -->') &&
+      SECURITY_RECEIPT_HEADER.test(comment.body),
+  );
+  if (receipts.some((comment) => !Number.isFinite(trustedTime(comment.created_at)))) return null;
+  return receipts.reduce(
+    (latest, comment) =>
+      !latest ||
+      trustedTime(comment.created_at) > trustedTime(latest.created_at) ||
+      (comment.created_at === latest.created_at && Number(comment.id) > Number(latest.id))
+        ? comment
+        : latest,
+    null,
+  );
+}
+
+export function receiptCommit(receipt) {
+  const matches = [...String(receipt?.body ?? '').matchAll(REVIEWED_COMMIT)];
+  return matches.length === 1 ? matches[0][1] : null;
+}
+
+export function securityThreads(threads) {
+  return threads.filter(
+    (thread) =>
+      isCodexAuthor(thread.authorLogin, thread.authorType) &&
+      (SECURITY_FINDING.test(thread.body ?? '') || SECURITY_FINDING.test(thread.reviewBody ?? '')),
+  );
+}
+
+function securityThreadsClear(threads) {
+  return (
+    Array.isArray(threads) &&
+    threads.every(
+      (thread) =>
+        thread &&
+        (thread.isResolved === true ||
+          (thread.isResolved === false &&
+            typeof thread.authorLogin === 'string' &&
+            thread.authorLogin.length > 0 &&
+            ['Bot', 'User'].includes(thread.authorType) &&
+            typeof thread.body === 'string')),
+    ) &&
+    securityThreads(threads).every((thread) => thread.isResolved === true)
+  );
+}
+
+export function cleanSecurityReceipt(pr, evidence, threads) {
+  if (
+    !evidence ||
+    !Array.isArray(evidence.comments) ||
+    !Array.isArray(evidence.commits) ||
+    !Array.isArray(evidence.forcePushes) ||
+    !Array.isArray(evidence.refMatches)
+  )
+    return false;
+  if (evidence.comments.some((comment) => !comment || typeof comment !== 'object')) return false;
+  const entry = trustedStateComment(evidence.comments, 'security_review');
+  if (
+    entry?.state?.commitSha !== pr.head.sha ||
+    entry.state.status !== 'completed' ||
+    entry.state.hasUnresolvedFindings !== null
+  )
+    return false;
+  const receipt = securityReceiptComment(evidence.comments);
+  const prefix = receiptCommit(receipt);
+  if (
+    !receipt ||
+    !prefix ||
+    !CLEAN_SECURITY.test(receipt.body) ||
+    !pr.head.sha.startsWith(prefix) ||
+    evidence.resolvedSha !== pr.head.sha
+  )
+    return false;
+  if (
+    !evidence.refMatches.every(
+      (ref) =>
+        typeof ref === 'string' && ref !== `refs/heads/${prefix}` && ref !== `refs/tags/${prefix}`,
+    )
+  )
+    return false;
+  const commits = evidence.commits;
+  if (
+    !Number.isSafeInteger(pr.commits) ||
+    pr.commits < 1 ||
+    commits.length !== pr.commits ||
+    !commits.every((sha) => typeof sha === 'string' && FULL_SHA.test(sha)) ||
+    new Set(commits).size !== commits.length ||
+    commits.filter((sha) => sha.startsWith(prefix)).length !== 1 ||
+    !commits.includes(pr.head.sha)
+  )
+    return false;
+  const completed = [...entry.comment.body.matchAll(SECURITY_COMPLETION)];
+  if (completed.length !== 1) return false;
+  const finishedAt = trustedTime(completed[0][1]);
+  const createdAt = trustedTime(receipt.created_at);
+  const updatedAt = trustedTime(receipt.updated_at);
+  const summaryCreated = trustedTime(entry.comment.created_at);
+  const summaryUpdated = trustedTime(entry.comment.updated_at);
+  const prCreated = trustedTime(pr.created_at);
+  if (
+    ![finishedAt, createdAt, updatedAt, summaryCreated, summaryUpdated, prCreated].every(
+      Number.isFinite,
+    ) ||
+    createdAt < prCreated ||
+    createdAt < summaryCreated ||
+    updatedAt < createdAt ||
+    updatedAt > summaryUpdated ||
+    finishedAt > summaryUpdated ||
+    Math.abs(createdAt - finishedAt) > RECEIPT_WINDOW_MS
+  )
+    return false;
+  for (const event of evidence.forcePushes) {
+    const at = trustedTime(event?.createdAt);
+    if (!Number.isFinite(at) || at >= createdAt) return false;
+  }
+  for (const comment of evidence.comments) {
+    if (!/^@codex security review\s*$/m.test(comment.body ?? '')) continue;
+    const at = trustedTime(comment.created_at);
+    if (!Number.isFinite(at) || at >= createdAt) return false;
+  }
+  return securityThreadsClear(threads);
+}
+
 const NO_ROUNDS = { others: 0, marked: false };
 
 export function decide(
@@ -223,8 +391,40 @@ export function decide(
   limitHit = false,
   wait = null,
   rounds = NO_ROUNDS,
+  security = null,
 ) {
   const sha = pr.head.sha;
+  let receiptApproved = false;
+  if (security) {
+    const review = security.state;
+    const threadsClear = securityThreadsClear(threads);
+    receiptApproved =
+      threadsClear &&
+      review?.hasUnresolvedFindings === null &&
+      cleanSecurityReceipt(pr, security.receiptEvidence, threads);
+    const clean =
+      review?.commitSha === sha &&
+      review.status === 'completed' &&
+      threadsClear &&
+      (review.hasUnresolvedFindings === false || receiptApproved);
+    if (!clean) {
+      const reason = !review
+        ? 'No trusted security review state is available.'
+        : review.commitSha !== sha
+          ? 'The security review is bound to another head.'
+          : !threadsClear
+            ? 'Security findings remain unresolved or thread attribution is unknown.'
+            : review.status !== 'completed'
+              ? 'The security review has not completed successfully.'
+              : 'The security review does not explicitly report zero unresolved findings.';
+      return {
+        status: 'completed',
+        conclusion: 'failure',
+        title: `Codex security review required for ${short(sha)}`,
+        summary: `Canonical security surfaces require a trusted Codex security review completed on ${sha} with has_unresolved_findings=false or the narrowly verified D88 null-state receipt proof. ${reason} Request \`@codex security review\`; resolve every security finding regardless of severity or builtin merge-gate settings.`,
+      };
+    }
+  }
   const reviewedHead = state?.commitSha === sha && state.status === 'completed';
   if (limitHit && !reviewedHead)
     return {
@@ -276,7 +476,7 @@ export function decide(
       title: `No open P0/P1 Codex findings for ${short(sha)}`,
       summary: `Codex reviewed this head and no unresolved P0 or P1 thread remains.${
         blockedHeads > 0 ? ` Cycles to pass: ${blockedHeads} blocked head(s) before this one.` : ''
-      }${carried}`,
+      }${security ? (receiptApproved ? ' Codex security reviewed this exact head: D88 clean receipt verified against commit identity, freshness and unresolved security threads.' : ' Codex security reviewed this exact head with no unresolved findings.') : ''}${carried}`,
       removeStall: true,
     };
   const round = rounds.others + 1;
