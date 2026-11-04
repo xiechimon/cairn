@@ -91,9 +91,9 @@ import {
   prepareCredentialSessionUpload,
 } from './credential-output.js';
 import { clearCredentials, pushCredential } from './credentials.js';
+import { buildExecutorRecord } from './executor-record.js';
 import { GitPushHookError, withGitCredentialFallback } from './git.js';
 import { githubRepoRefOf, probeGithubPr } from './github-probe.js';
-import { computeHarnessHash } from './harness-hash.js';
 import { type StepJournal, type StepJournalEntry, TranscriptBuffer } from './journal.js';
 import { landLocalMerge } from './local-merge.js';
 import type { DaemonLogger } from './log.js';
@@ -1047,14 +1047,21 @@ async function runClaimedStep(
         .filter(([name]) => injectedNames === undefined || injectedNames.includes(name))
         .map(([name, path]) => ({ name, content: readFileSync(path, 'utf8') }));
       provenance.baseSha = headAtStart;
-      provenance.harnessHash = computeHarnessHash({
-        systemPrompt: systemPrompt ?? '',
-        skills,
-        tools: [...(remoteTools ?? []), ...localToolDefs].map(({ name, description }) => ({
-          name,
-          description,
-        })),
+      const executorRecord = buildExecutorRecord({
+        backend: backend.capabilities.name,
+        model: modelKey,
+        effort: agent.thinkingLevel,
+        harness: {
+          systemPrompt: systemPrompt ?? '',
+          skills,
+          tools: [...(remoteTools ?? []), ...localToolDefs].map(({ name, description }) => ({
+            name,
+            description,
+          })),
+        },
       });
+      provenance.harnessHash = executorRecord.harness_sha;
+      logger.step(`executor record ${JSON.stringify(executorRecord)}`);
       await client.heartbeat(stepId, provenance);
     } catch (err: unknown) {
       logger.step(

@@ -75,6 +75,40 @@ Arm B adds the Cairn working loop only. Neither its prompt nor its skill disclos
 the evaluator's test-edit or benchmark-access rules. The same external scan
 applies to both arms; arm A remains Harbor's unmodified built-in pi agent.
 
+## Executor parity
+
+Plan section 8.5 requires that one task run under the product daemon and under the eval runner records the same four fields: backend, server model, prompt/skill version and effort (issue #1950).
+
+What each path records today:
+
+| Field | Product daemon (`apps/daemon/src/runner.ts`) | Eval runner (before this change) |
+|---|---|---|
+| backend | `backend.capabilities.name` (`pi`, `claude-code`, `gemini`), never persisted | implicit (`Pi` subclass), not recorded |
+| server model | `provider/modelId` of the step (`modelKey`); the pack keeps `input.model` from the transcript | `model_name` in the job config and in `results/<arm>.json` |
+| prompt/skill version | `computeHarnessHash(systemPrompt, skills, tools)`, sent as `harnessHash` in the step heartbeat and stored on the build | none |
+| effort | `agent.thinkingLevel`, passed to the backend as `thinkingLevel`, never persisted | Harbor `reasoning_effort`, not recorded |
+
+The two executors still differ in what they feed in: the product composes its worker prompt in `composeWorkerSystemPrompt` and discovers skills and tools at run time, while the eval executor uploads `cairn-worker-prompt.md` and `skills/cairn-worker/SKILL.md` into a stock Harbor `Pi` agent. Making the inputs identical needs the daemon itself, which is split into PR B below.
+
+PR A (this change) makes the record identical in shape and derivation:
+
+- `apps/daemon/src/executor-record.ts` (`buildExecutorRecord`) is the product side. The runner now builds its `harnessHash` through it and logs the record as `executor record {...}`.
+- `cairn_harbor/executor_record.py` (`build_executor_record`) is the eval side. `CairnExecutor.install` writes `agent/executor-record.json` in each trial directory from the same prompt, skills and effort it uploads, and `run` copies every trial's record into `results/<arm>.json` under `executor_records` (`null` marks a trial that wrote none).
+- `parity-vectors.json` holds shared inputs with expected records. `apps/daemon/test/executor-record-parity.test.ts` and `tests/test_executor_record.py` both build every vector and compare, so a change to either side's hashing, ordering, escaping or field set fails one of them.
+- The hash sorts skills and tools by UTF-16 code units on both sides (the daemon previously used locale order, which no other language can reproduce). A harness whose names mix case or punctuation gets a new `harnessHash` once.
+
+Failure modes covered by tests: the two hashes diverge on unicode, control characters, astral names or ordering; the eval executor changes its prompt or skills without the record following; an unset effort recorded as `""` on one side and `null` on the other; a trial that wrote no record being counted as matching; an extra or missing field.
+
+PR B plan (the daemon in the Harbor container, #1950):
+
+1. Regression first: a real-daemon scenario with a repository-backed project and a `.git`-less task directory, retaining the failure from the old `/app` symlink.
+2. Add an explicit task-workspace contract to `WorkspaceManager.prepare()` in `apps/daemon/src/workspace.ts` so a conversation directory marked as a task workspace is kept as is instead of being removed and recreated as a worktree.
+3. Install the daemon in the task container and run it with `CAIRN_WORKSPACES_DIR` pointing at the directory Harbor collects, one claimed step per trial, stopped on completion, failure and timeout with credentials removed from artifacts.
+4. Replace the stock `Pi` upload path: the step carries the product prompt and skills, so `executor-record.json` is the daemon's own `executor record` log line and both sides then hash identical inputs.
+5. Replay fixtures expose only the pinned base history (no later refs, no fetch).
+
+PR B needs a server to hand the daemon a claimed step; if that cannot be done without `routes-machine.ts` or `services/machine*.ts` (security surfaces), it needs ian's sign-off.
+
 ## Reward-hacking scan
 
 Every trajectory is scanned (`cairn_harbor/scan.py`); a flagged trial is voided and counts as a scored zero in the pass-rate denominator (infrastructure failures stay excluded and are counted separately):
