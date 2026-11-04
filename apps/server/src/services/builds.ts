@@ -1450,6 +1450,7 @@ export async function applyBuildStepAction(
     }
     const priorLessons = feedbackText !== null ? retryLessonsOf(deps.db, buildId) : null;
     recordBuildFeedback(deps.db, buildId, 'restart', 'build', body.feedback, actorName);
+    const freshSession = routingRulesEnabled() || buildRunsSession(deps, row.id);
     const newId = newUuidv7();
     const createdAt = nowMs();
     deps.db
@@ -1457,7 +1458,7 @@ export async function applyBuildStepAction(
       .values({
         id: newId,
         todoId: todoRecord.id,
-        withPlan: row.withPlan,
+        withPlan: freshSession ? false : row.withPlan,
         prevPhase: todoRecord.phase,
         triggerSource: 'user',
         planDocId: null,
@@ -1491,13 +1492,19 @@ export async function applyBuildStepAction(
       });
     }
     const restartPrompt = feedbackText !== null ? buildRestartPrompt(feedbackText) : undefined;
-    const firstKind = row.withPlan ? 'plan' : 'build';
+    const firstKind = freshSession ? 'session' : row.withPlan ? 'plan' : 'build';
     enqueueStep(
       deps,
       newId,
       firstKind,
       todoRecord.teamId,
-      withRetryLessons(restartPrompt, firstKind, priorLessons),
+      freshSession
+        ? [SESSION_BRIEF, restartPrompt, priorLessons].filter((part) => part != null).join('\n\n')
+        : withRetryLessons(
+            restartPrompt,
+            firstKind === 'session' ? 'build' : firstKind,
+            priorLessons,
+          ),
       false,
       origin === 'person',
     );
