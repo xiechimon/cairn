@@ -26,6 +26,20 @@ node scripts/dispatch-agent.mjs wait 1556-impl
 
 Do not continue on a banned model from the "Do not use" line of the "Model roles" section in `AGENTS.md` (including `deepseek-v4-flash`; `deepseek-v4.1-flash` remains allowed). If `ai-route` selects a banned model, stop and exit non-zero so the dispatcher can retry. If you abort without opening a PR (overlapping work, human decision required, or any other stop), exit the process with a non-zero status.
 
+## Dependent work on unmerged PRs (#2566)
+
+Measured on 2026-11-02 in a scratch repo set up like cairn (results on #2566):
+
+- A held lower layer blocks every layer above it from reaching `main` while they stay stacked: `gh stack merge`, `gh pr merge`, both REST merge APIs, auto-merge and Mergify all refuse. Unstacking is the only leak: the upper PR then merges into the held layer's unprotected branch, so never unstack a layer to merge it.
+- Mergify cannot land a stacked PR (its merge fails on its own `Mergify Merge Queue` check), and `.mergify.yml` requires `base = main`. Only `gh stack merge` lands a stack.
+- GitHub rebases an upper layer server-side after the layer below squash-merges. Its head SHA changes, so the `review-gate` check re-runs on the new head.
+
+Rules:
+
+- Layers that are owner-routed (protected paths): build them with `gh stack` (`gh extension install github/gh-stack`), one PR per layer, and report the stack ready once every layer has CI and a Codex review on its head. Only the owner (or the coordinator, or an agent with ian's chat authorization) lands it, bottom-up with `gh stack merge`; green checks alone never authorize merging protected paths. The Codex review reads each PR against its own base, so each layer is reviewed on its own diff.
+- Layers the merge queue would admit: do not stack them. Open the lower PR on `main`, wait for the queue to merge it, then branch the next one from the new `origin/main`. A stacked PR would sit outside the queue.
+- Never point a PR at a lane branch by hand; a hand-made base branch has no stack rule behind it.
+
 ## Accessing GitHub
 
 Look up GitHub names, PRs and CI status only with the authenticated `gh api` (`gh api /users/<name>`; 404 means free), one request per name. Do not make unauthenticated batch or looped requests to `github.com/...` pages (curl and browser automation both count). Poll PR / CI status no more often than every 5 minutes. Unauthenticated page requests count against GitHub's secondary rate limit per egress IP, and everyone on the same IP gets blocked together (ledger: GitHub secondary rate limit).
