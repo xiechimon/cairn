@@ -108,7 +108,6 @@ type ThreadView = 'chat' | 'changes';
 
 function ChangesView({ chat, now }: { chat: ThreadChat; now: number }) {
   const { t } = useI18n();
-  const [versionMenu, setVersionMenu] = useState<'versions' | 'compare' | undefined>(undefined);
   const { changes } = chat;
   if (changes.status === 'loading' || changes.status === 'error') {
     return (
@@ -140,11 +139,7 @@ function ChangesView({ chat, now }: { chat: ThreadChat; now: number }) {
         changes={changes.content}
         now={now}
         onDocView={() => undefined}
-        planVersions={chat.planVersions}
-        versionMenu={versionMenu}
-        onVersionMenu={setVersionMenu}
-        onCompare={() => setVersionMenu(undefined)}
-        onBase={() => setVersionMenu(undefined)}
+        hideVersion
         onToggleExpand={chat.toggleChangesExpanded}
         buildId={chat.buildId}
       />

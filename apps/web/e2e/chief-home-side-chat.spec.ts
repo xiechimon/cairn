@@ -228,6 +228,7 @@ test('a reviewed thread shows its diff counts in the header and swaps the transc
   await expect(button).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByTestId('side-chat-changes-view').getByTestId('doc-pane')).toBeVisible();
   await expect(page.getByTestId('side-chat-changes-view')).toContainText('README.md');
+  await expect(page.getByTestId('doc-pane').getByRole('button', { name: /^v\d/ })).toHaveCount(0);
   await expect(page.getByTestId('transcript-col')).toHaveCount(0);
 
   await button.click();
