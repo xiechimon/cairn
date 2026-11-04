@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { test } from 'node:test';
 
 const NODE_MAJOR = readFileSync(new URL('../../.nvmrc', import.meta.url), 'utf8').trim();
@@ -30,6 +32,54 @@ test('the server binds loopback port 8787', () => {
   const { env } = units['cairn-server'];
   assert.equal(env.HOST, '127.0.0.1');
   assert.equal(env.PORT, '8787');
+});
+
+test('the deployed server fetch uses its configured HTTP proxy', { timeout: 10000 }, async (t) => {
+  const proxy = createServer();
+  proxy.on('connect', (request, socket) => {
+    t.after(() => socket.destroy());
+    assert.equal(request.url, 'cairn-egress-probe.invalid:80');
+    socket.write('HTTP/1.1 200 Connection established\r\n\r\n');
+    socket.once('data', (data) => {
+      assert.match(data.toString(), /^GET \/check HTTP\/1\.1/);
+      socket.end('HTTP/1.1 200 OK\r\nContent-Length: 7\r\nConnection: close\r\n\r\nproxied');
+    });
+  });
+  await new Promise((ready) => proxy.listen(0, '127.0.0.1', ready));
+  t.after(() => proxy.close());
+  const child = spawn(
+    process.execPath,
+    [
+      '--input-type=module',
+      '-e',
+      "console.log(await (await fetch('http://cairn-egress-probe.invalid/check', { signal: AbortSignal.timeout(5000) })).text())",
+    ],
+    {
+      env: {
+        PATH: process.env.PATH,
+        ...units['cairn-server'].env,
+        HTTP_PROXY: `http://127.0.0.1:${proxy.address().port}`,
+        NO_PROXY: 'localhost,127.0.0.1,::1',
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 8000,
+    },
+  );
+  t.after(() => child.kill());
+  let output = '';
+  let error = '';
+  child.stdout.on('data', (chunk) => {
+    output += chunk;
+  });
+  child.stderr.on('data', (chunk) => {
+    error += chunk;
+  });
+  const code = await new Promise((done, reject) => {
+    child.once('error', reject);
+    child.once('exit', done);
+  });
+  assert.equal(code, 0, error);
+  assert.equal(output.trim(), 'proxied');
 });
 
 test('every ExecStart runs the Node major in .nvmrc', () => {
