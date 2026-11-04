@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdirSync } from 'node:fs';
+import { chmodSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -37,7 +37,7 @@ const goodInput = () => ({
   subgid: true,
   cgroupControllers: 'cpuset cpu io memory hugetlb pids rdma misc',
   image: { tag: IMAGE, exists: true },
-  relay: { directory: 'ok', socket: 'ok', listening: true, unit: 'active' },
+  relay: { directory: 'ok', socket: 'ok', boundary: 'ok', listening: true, unit: 'active' },
   probe: goodProbe(),
   probeError: null,
 });
@@ -96,6 +96,8 @@ test('the record carries no nspawn-only fields', () => {
 });
 
 const failures = [
+  ['the relay export has sibling files', (x) => (x.relay.boundary = 'siblings')],
+  ['the relay export boundary is unknown', (x) => delete x.relay.boundary],
   ['podman is rootful', (x) => (x.podman.rootless = false)],
   ['podman is not installed', (x) => (x.podman = null)],
   ['the user has no subuid range', (x) => (x.subuid = false)],
@@ -216,6 +218,8 @@ function deps(overrides = {}) {
       if (!(path in stats)) throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
       return stats[path];
     },
+    entries: () => ['egress.sock'],
+    realpath: (path) => path,
     connect: async () => true,
     probe: (options) => {
       calls.push(['probe', options.image, options.orbId, options.egressSocketPath]);
@@ -351,7 +355,7 @@ test('a throwing probe is reported and fails the check', async () => {
 test('the real filesystem and connect checks accept a live 0600 socket and refuse a wider one', async (t) => {
   const root = makeTestTempDir('orb-host-check-');
   t.after(() => releaseTestTempDir(root));
-  const directory = join(root, 'relay');
+  const directory = join(root, 'cairn-orb-egress');
   mkdirSync(directory, { mode: 0o700 });
   const path = join(directory, 'egress.sock');
   const server = createServer((socket) => socket.destroy());
@@ -362,10 +366,16 @@ test('the real filesystem and connect checks accept a live 0600 socket and refus
       env: { CAIRN_ORB_IMAGE: IMAGE, CAIRN_ORB_EGRESS_SOCKET: path },
       uid: process.getuid(),
       stat: undefined,
+      entries: undefined,
+      realpath: undefined,
       connect: undefined,
     }).options;
   chmodSync(path, 0o600);
   assert.equal((await checkContainerHost(real())).relay, 'ok');
+  const sibling = join(directory, 'private.pem');
+  writeFileSync(sibling, 'synthetic private file', { mode: 0o600 });
+  assert.notEqual((await checkContainerHost(real())).relay, 'ok');
+  rmSync(sibling);
   chmodSync(path, 0o644);
   assert.equal((await checkContainerHost(real())).relay, 'mode');
   chmodSync(path, 0o600);

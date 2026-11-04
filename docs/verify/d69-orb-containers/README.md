@@ -15,6 +15,8 @@ Failure controls were written and observed failing before the fixes: missing pro
 
 The fresh source commit is `57afe4047`; subsequent evidence-only commits do not change the executed implementation. The image is `cairn-orb-base:eb01c9191591ca17`.
 
+The relay export must be a canonical, nonsymlink directory named `cairn-orb-egress` or `cairn-orb-egress-<lowercase suffix>`, owned by the daemon user with mode 0700. It must contain exactly the configured socket, owned by that user with mode 0600. Sibling files, general home directories, symbolic aliases and unsafe ownership or modes fail before any container action. The runtime and host collector share this validation; the validated directory is mounted read-only so a recreated socket remains visible. The installed relay unit uses the dedicated deployment checkout and pinned fnm Node 24.
+
 The container canary requires `XDG_RUNTIME_DIR`, a pinned `CAIRN_ORB_IMAGE`, and `CAIRN_ORB_EGRESS_SOCKET` pointing to a live private relay. Run `CAIRN_ORB_RUNTIME=podman node scripts/ops/orb/canary.mjs --json --out /tmp/new-container-canary.json`. It uses the actual host relay socket as a host-runtime-path isolation target. A generic guest `/run/user/1000` directory is expected and does not identify a mounted host runtime directory.
 
 The relay restart probe is reproducible from `apps/daemon` with `XDG_RUNTIME_DIR=/run/user/$(id -u) node --import tsx ../../docs/verify/d69-orb-containers/relay-restart.mjs`. It allocates its own relay directory and container and removes both. The image must already exist.

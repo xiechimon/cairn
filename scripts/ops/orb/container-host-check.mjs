@@ -1,9 +1,10 @@
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { lstatSync, readFileSync } from 'node:fs';
+import { lstatSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
 import { connect } from 'node:net';
 import { userInfo } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import { inspectEgressBoundary } from './egress-boundary.mjs';
 
 export const EXPECTED_CAP_BND = '00000000800000eb';
 export const REQUIRED_CONTROLLERS = ['cpu', 'memory', 'pids'];
@@ -22,6 +23,7 @@ const RELAY_UNIT = 'cairn-orb-egress.service';
 function relayStatus(relay) {
   if (relay.directory !== 'ok') return relay.directory;
   if (relay.socket !== 'ok') return relay.socket;
+  if (relay.boundary !== 'ok') return relay.boundary ?? 'unknown-boundary';
   return relay.listening === true ? 'ok' : 'not-listening';
 }
 
@@ -159,6 +161,8 @@ export async function checkContainerHost({
     }),
   readFile = (path) => readFileSync(path, 'utf8'),
   stat = (path) => lstatSync(path, { throwIfNoEntry: false }) ?? null,
+  entries = readdirSync,
+  realpath = realpathSync,
   connect: accepts = socketAccepts,
   probe = runProbeHelper,
   orbId = `cairn-orb-check-${randomUUID().slice(0, 8)}`,
@@ -223,14 +227,18 @@ export async function checkContainerHost({
   const relay = {
     directory: classify(statOptional(dirname(socketPath)), 'directory', uid),
     socket: classify(statOptional(socketPath), 'socket', uid),
+    boundary: inspectEgressBoundary(socketPath, { uid, stat: statOptional, entries, realpath })
+      .reason,
     unit: unit || 'unknown',
   };
   relay.listening =
-    relay.directory === 'ok' && relay.socket === 'ok' ? await accepts(socketPath) : false;
+    relay.directory === 'ok' && relay.socket === 'ok' && relay.boundary === 'ok'
+      ? await accepts(socketPath)
+      : false;
 
   let probeResult = null;
   let probeError = null;
-  if (podman?.rootless === true && exists) {
+  if (podman?.rootless === true && exists && relay.boundary === 'ok') {
     try {
       const result = probe({
         image: tag,

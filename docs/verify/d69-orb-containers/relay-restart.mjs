@@ -1,17 +1,26 @@
 import assert from 'node:assert/strict';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
+import { mkdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { PodmanOrbRuntime } from '../../../apps/daemon/src/orb/podman.ts';
 import { createRelay, listenOnUnixSocket } from '../../../scripts/ops/orb/egress-relay.mjs';
-const directory = makeTestTempDir('d69-relay-restart-');
-const path = join(directory, 'egress.sock');
+const directory = makeTestTempDir('egress-');
+const relayDirectory = join(directory, 'cairn-orb-egress');
+mkdirSync(relayDirectory, { mode: 0o700 });
+const path = join(relayDirectory, 'egress.sock');
 const id = `cairn-orb-check-${randomUUID().slice(0, 8)}`;
 const runtime = new PodmanOrbRuntime({ ownerId: `probe-${randomUUID()}`, command: ['sleep', '120'] });
 let server = createRelay();
 try {
   await listenOnUnixSocket(server, path);
-  await runtime.spawn({orbId:id,image:'cairn-orb-base:eb01c9191591ca17',mounts:[],env:{},limits:{cpus:1,memoryBytes:536870912,pids:128},egress:{socketPath:path}});
+  const spawn = () => runtime.spawn({orbId:id,image:'cairn-orb-base:eb01c9191591ca17',mounts:[],env:{},limits:{cpus:1,memoryBytes:536870912,pids:128},egress:{socketPath:path}});
+  const sibling = join(relayDirectory, 'private.pem');
+  writeFileSync(sibling, 'synthetic private file', { flag: 'wx', mode: 0o600 });
+  await assert.rejects(spawn(), /dedicated.*boundary/);
+  assert.deepEqual(await runtime.list(), []);
+  unlinkSync(sibling);
+  await spawn();
   const query = () => runtime.exec(id,['sh','-c', 'printf "CONNECT 10.0.0.1:443 HTTP/1.1\\r\\nHost: 10.0.0.1:443\\r\\n\\r\\n" | socat -T3 - "UNIX-CONNECT:$CAIRN_ORB_EGRESS_SOCKET" | head -n1'],{signal:AbortSignal.timeout(10000)});
   const before = await query();
   assert.match(before.stdout, /^HTTP\/1.1 403/);
@@ -23,7 +32,7 @@ try {
   await listenOnUnixSocket(server, path);
   const after = await query();
   assert.match(after.stdout, /^HTTP\/1.1 403/);
-  console.log(JSON.stringify({ok:true,before:before.stdout.trim(),after:after.stdout.trim(),replacementVisible:true,sudoUnlinkDenied:true,containerRestarted:false}));
+  console.log(JSON.stringify({ok:true,adjacentFileRejected:true,exportDirectoryOnlySocket:true,before:before.stdout.trim(),after:after.stdout.trim(),replacementVisible:true,sudoUnlinkDenied:true,containerRestarted:false}));
 } finally {
   await runtime.remove(id);
   await new Promise((done) => server.close(done));
