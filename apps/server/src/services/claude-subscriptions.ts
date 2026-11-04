@@ -1,4 +1,9 @@
-import type { ClaudeSubscription, CreateClaudeSubscription, SecretBox } from '@cairn/shared';
+import type {
+  ClaudeSubscription,
+  ClaudeSubscriptionVerifyResult,
+  CreateClaudeSubscription,
+  SecretBox,
+} from '@cairn/shared';
 import { and, desc, eq, gt, isNull, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { claudeSubscription } from '../db/schema.js';
@@ -54,7 +59,7 @@ export async function verifySubscriptionConnection(
   deps: Deps,
   teamId: string,
   id: string,
-): Promise<{ ok: boolean }> {
+): Promise<ClaudeSubscriptionVerifyResult> {
   const row = deps.db
     .select()
     .from(claudeSubscription)
@@ -76,9 +81,9 @@ export async function verifySubscriptionConnection(
   windows.set(row.id, now + 10_000);
   verificationWindows.set(deps.db, windows);
   try {
-    return { ok: await verifyClaudeSubscription(deps.box.open(row.tokenCipher)) };
+    return await verifyClaudeSubscription(deps.box.open(row.tokenCipher));
   } catch {
-    return { ok: false };
+    return { ok: false, reason: 'failed' };
   }
 }
 
