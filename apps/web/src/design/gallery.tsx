@@ -25,6 +25,7 @@ import {
   SidebarSection,
 } from './components-shell.js';
 import { StoneSection, ThreadCardSection, ThreadRowSection } from './components-stone.js';
+import { ThreadUsageSection } from './components-thread-usage.js';
 import {
   PermissionSection,
   PlanSection,
@@ -116,6 +117,7 @@ const NAV = [
       ['thread-row', 'Thread row and bulk bar'],
       ['permission', 'Permission and proposal'],
       ['plan', 'Plan approval, usage'],
+      ['thread-usage', 'Thread usage footer'],
       ['pr-bar', 'Pull request bar'],
       ['pr-card', 'PR card'],
       ['scheduled', 'Scheduled task row'],
@@ -304,6 +306,7 @@ export function Gallery() {
           <ThreadRowSection />
           <PermissionSection />
           <PlanSection />
+          <ThreadUsageSection />
           <PrBarSection />
           <PrCardSection />
           <ScheduledSection />
