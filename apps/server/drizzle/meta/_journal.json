@@ -708,6 +708,13 @@
       "when": 1793768070087,
       "tag": "0100_feature_flag",
       "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "6",
+      "when": 1793777168721,
+      "tag": "0101_abandoned_northstar",
+      "breakpoints": true
     }
   ]
 }
