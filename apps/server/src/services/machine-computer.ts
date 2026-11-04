@@ -199,7 +199,12 @@ export function receiveComputerFrames(
     const fresh = ordered.filter((f) => f.seq > row.lastSeq);
     const cancelled = row.state === 'cancelled';
     if (fresh.length === 0) {
-      return { response: { ok: true as const, cancelled }, pending: null, finished: cancelled };
+      return {
+        response: { ok: true as const, cancelled },
+        pending: null,
+        finished: cancelled,
+        publishOutput: false,
+      };
     }
     if (FINISHED_STATES.has(row.state) || (cancelled && row.finishedAt !== null)) {
       throw new HttpError(409, `computer call already ${row.state}`);
@@ -210,11 +215,17 @@ export function receiveComputerFrames(
       response: { ok: true as const, cancelled },
       pending,
       finished: patch.finishedAt !== undefined || cancelled,
+      publishOutput: fresh.some((frame) => frame.kind === 'output'),
     };
   });
   if (result.pending === '') pendingOutput.delete(callId);
   else if (result.pending !== null) pendingOutput.set(callId, result.pending);
   if (result.finished) settleComputerCall(db, callId);
+  else if (result.publishOutput) {
+    const pending = pendingCalls.get(callId);
+    const row = db.select().from(computerCall).where(eq(computerCall.id, callId)).get();
+    if (pending && row) publishFeed(pending.hub, pending.teamId, row);
+  }
   return result.response;
 }
 
