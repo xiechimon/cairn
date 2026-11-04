@@ -1213,24 +1213,42 @@ export function clearChiefWake(deps: ChiefDeps, teamId: string, wakeId: string):
 
 export function fireDueChiefWakes(deps: ChiefDeps, now: number): void {
   const chiefs = deps.db.select().from(chief).all();
+  const failures: unknown[] = [];
   for (const chiefRow of chiefs) {
     const due = chiefRow.wakes.filter((w) => typeof w.at === 'number' && w.at <= now);
-    if (due.length === 0) continue;
-    deps.db
-      .update(chief)
-      .set({ wakes: chiefRow.wakes.filter((w) => !due.includes(w)) })
-      .where(eq(chief.id, chiefRow.id))
-      .run();
     for (const wake of due) {
-      const note = typeof wake.note === 'string' ? wake.note : '约定时间已到';
-      enqueueChiefStep(deps, String(wake.threadId), {
-        prompt: `${note}。请回头核实相关任务状态；只有需要用户知道或决定时，才用 notify_user 或 ask_user 告诉用户。`,
-        trigger: 'wake',
-        provenance: wakeProvenance(String(wake.id)),
-        scopeProjectId: wakeTodoProjectId(deps.db, chiefRow.teamId, wake.todoId),
-      });
+      try {
+        fireChiefWake(deps, chiefRow.id, chiefRow.teamId, wake);
+      } catch (error) {
+        failures.push(error);
+      }
     }
   }
+  if (failures.length > 0) throw failures[0];
+}
+
+function fireChiefWake(
+  deps: ChiefDeps,
+  chiefId: string,
+  teamId: string,
+  wake: (typeof chief.$inferSelect)['wakes'][number],
+): void {
+  const note = typeof wake.note === 'string' ? wake.note : '约定时间已到';
+  deps.db.transaction(() => {
+    const current = deps.db.select().from(chief).where(eq(chief.id, chiefId)).get();
+    if (!current?.wakes.some((w) => w.id === wake.id)) return;
+    deps.db
+      .update(chief)
+      .set({ wakes: current.wakes.filter((w) => w.id !== wake.id) })
+      .where(eq(chief.id, chiefId))
+      .run();
+    enqueueChiefStep(deps, String(wake.threadId), {
+      prompt: `${note}。请回头核实相关任务状态；只有需要用户知道或决定时，才用 notify_user 或 ask_user 告诉用户。`,
+      trigger: 'wake',
+      provenance: wakeProvenance(String(wake.id)),
+      scopeProjectId: wakeTodoProjectId(deps.db, teamId, wake.todoId),
+    });
+  });
 }
 
 const CHIEF_DIGEST_PROMPT_DIGESTS = 3;
