@@ -6,7 +6,7 @@ import {
   THREAD_REPORT_LINE_MAX,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
-import { build, type step, todo } from '../db/schema.js';
+import { build, message, type step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import { postThreadReport } from './chief.js';
@@ -52,8 +52,14 @@ function openQuestion(
   row: StepRow,
   body: MachineAskBody,
 ): { content: AskUserQuestionContent; askedAt: number } {
+  const stored = deps.db.select().from(message).where(eq(message.id, body.requestId)).get();
+  if (stored !== undefined && stored.conversationId !== row.buildId) {
+    throw new HttpError(409, 'question request id belongs to another conversation');
+  }
   const existing = readWorkerQuestion(deps.db, row.buildId, body.requestId);
-  if (existing !== null) return { content: existing, askedAt: nowMs() };
+  if (stored !== undefined && existing !== null) {
+    return { content: existing, askedAt: stored.createdAt };
+  }
   const askedAt = nowMs();
   const content: AskUserQuestionContent = {
     kind: ASK_USER_QUESTION_KIND,
@@ -111,7 +117,10 @@ export function recordThreadReportLine(deps: TodoDeps, row: StepRow, line: unkno
   if (typeof line !== 'string' || line.trim() === '') {
     throw new HttpError(400, 'thread_report expects a non-empty line');
   }
-  const trimmed = line.trim();
+  const trimmed = line
+    .replace(/\p{Cc}/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
   if (trimmed.length > THREAD_REPORT_LINE_MAX) {
     throw new HttpError(
       400,

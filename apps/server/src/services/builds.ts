@@ -306,7 +306,6 @@ export async function sendBuildSteer(
     throw new HttpError(409, 'Task cannot accept a message');
   let targetBuildId = conversationId;
   let prClosed: 'closed' | null = null;
-  if (continuationOptions.human === true) settleWorkerReply(deps, conversationId, body.content);
   if (running && continuationOptions.schedule) {
     throw new HttpError(409, 'Scheduled continuation requires an idle thread');
   }
@@ -354,6 +353,7 @@ export async function sendBuildSteer(
   if (!running && todoRow.assignment !== null)
     requireIntakeAssignment(deps, todoRow.teamId, todoRow.assignment);
   const sent = db.transaction(() => {
+    if (continuationOptions.human === true) settleWorkerReply(deps, conversationId, body.content);
     if (continuationOptions.schedule) {
       const wake = continuationOptions.schedule;
       const current = db.select().from(schedule).where(eq(schedule.id, wake.id)).get();
@@ -434,7 +434,7 @@ export async function sendBuildSteer(
         deps.machineHub?.steerSignal(todoRow.teamId, running.id);
       } else {
         db.update(build)
-          .set({ errorMessage: null, prevPhase: todoRow?.phase ?? 'done' })
+          .set({ errorMessage: null, reportLine: null, prevPhase: todoRow?.phase ?? 'done' })
           .where(eq(build.id, targetBuildId))
           .run();
         const nextPhase =

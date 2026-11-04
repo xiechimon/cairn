@@ -115,8 +115,8 @@ export async function messageThreadAsUser(
   if (row.latestBuildId === null) {
     throw new HttpError(409, `thread #${row.seqNum} has not started yet`);
   }
-  settleWorkerReply(deps, row.latestBuildId, body.content);
   const sent = await deliver(deps, row, row.latestBuildId, body);
+  settleWorkerReply(deps, row.latestBuildId, body.content);
   recordInCoordinator(deps, row, body.content, sent);
   return { todoId: row.id, ...sent };
 }

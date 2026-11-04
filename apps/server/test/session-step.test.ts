@@ -1,6 +1,6 @@
 import { SESSION_BRIEF, threadReportContentSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { build, chiefMessage, message, step, todo } from '../src/db/schema.js';
 import { startBuilds } from '../src/services/builds.js';
 import { setRoutingRulesEnabled } from '../src/services/routing-rules.js';
@@ -205,6 +205,87 @@ describe('worker ask_user on a session step', () => {
     expect(content.status).toBe('cancelled');
   });
 
+  test('a request id owned by another build is rejected and its message untouched', async () => {
+    const { todoId, stepRow } = startSession(false);
+    H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
+    H.s.db
+      .insert(message)
+      .values({
+        id: REQUEST,
+        conversationId: 'other-build',
+        role: 'assistant',
+        content: 'foreign',
+        createdAt: 5,
+        actor: null,
+      })
+      .run();
+    const claimed = claim(stepRow.id);
+    await expect(
+      askWorkerQuestion(
+        deps(),
+        claimed,
+        { requestId: REQUEST, questions: QUESTIONS },
+        { holdMs: 0 },
+      ),
+    ).rejects.toMatchObject({ status: 409 });
+    const kept = H.s.db.select().from(message).where(eq(message.id, REQUEST)).get()!;
+    expect(kept.conversationId).toBe('other-build');
+    expect(kept.content).toBe('foreign');
+  });
+
+  test('a retried ask keeps the stored creation time', async () => {
+    const { todoId, buildId, stepRow } = startSession(false);
+    H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
+    const claimed = claim(stepRow.id);
+    await askWorkerQuestion(
+      deps(),
+      claimed,
+      { requestId: REQUEST, questions: QUESTIONS },
+      { holdMs: 0 },
+    );
+    const { ASK_PARK_MS } = await import('../src/services/chief-questions.js');
+    const old = Date.now() - ASK_PARK_MS - 1_000;
+    H.s.db.update(message).set({ createdAt: old }).where(eq(message.id, REQUEST)).run();
+    const retried = await askWorkerQuestion(
+      deps(),
+      claimed,
+      { requestId: REQUEST, questions: QUESTIONS },
+      { holdMs: 5_000 },
+    );
+    expect(retried.status).toBe('cancelled');
+    expect(H.s.db.select().from(message).where(eq(message.id, REQUEST)).get()!.conversationId).toBe(
+      buildId,
+    );
+  });
+
+  test('a delivery that throws leaves the question pending and awaitingReply set', async () => {
+    const { todoId, stepRow } = startSession(false);
+    H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
+    const claimed = claim(stepRow.id);
+    await askWorkerQuestion(
+      deps(),
+      claimed,
+      { requestId: REQUEST, questions: QUESTIONS },
+      { holdMs: 0 },
+    );
+    const failing = {
+      ...deps(),
+      machineHub: {
+        steerSignal: vi.fn(() => {
+          throw new Error('delivery down');
+        }),
+      },
+    } as never;
+    await expect(
+      messageThreadAsUser(failing, H.teamId, todoId, { content: 'JSON', clientMessageId: 'c-9' }),
+    ).rejects.toThrow('delivery down');
+    expect(getTodo(deps(), todoId)!.awaitingReply).toBe(true);
+    const content = H.s.db.select().from(message).where(eq(message.id, REQUEST)).get()!.content as {
+      status: string;
+    };
+    expect(content.status).toBe('pending');
+  });
+
   test('a non-session worker step still cannot ask', async () => {
     const { stepRow } = startSession(false);
     H.s.db
@@ -253,6 +334,14 @@ describe('D65 report line on every thread', () => {
     const { stepRow } = startSession(false);
     expect(() => recordThreadReportLine(deps(), stepRow, 'x'.repeat(201))).toThrow(/200/);
     expect(() => recordThreadReportLine(deps(), stepRow, '   ')).toThrow();
+  });
+
+  test('whitespace and control characters collapse before the cap', () => {
+    const { buildId, stepRow } = startSession(false);
+    recordThreadReportLine(deps(), stepRow, `a\n\n  b\u0007\tc${' '.repeat(300)}d`);
+    expect(H.s.db.select().from(build).where(eq(build.id, buildId)).get()!.reportLine).toBe(
+      'a b c d',
+    );
   });
 
   test('flag off writes no report for an unwatched thread', () => {
