@@ -13,7 +13,7 @@ export interface QuerySplit {
   text: string;
 }
 
-function trailingTokenStart(query: string): number {
+function trailingTokenBounds(query: string): { start: number; inQuote: boolean } {
   let inQuote = false;
   let start = 0;
   for (let i = 0; i < query.length; i += 1) {
@@ -21,11 +21,17 @@ function trailingTokenStart(query: string): number {
     if (ch === '"') inQuote = !inQuote;
     else if (!inQuote && /\s/.test(ch)) start = i + 1;
   }
-  return start;
+  return { start, inQuote };
+}
+
+export function endsInFilter(text: string, nowMs: number): boolean {
+  if (text === '' || /\s$/.test(text)) return false;
+  const { start, inQuote } = trailingTokenBounds(text);
+  return !inQuote && parseSearchQuery(text.slice(start), nowMs).filters.length === 1;
 }
 
 export function splitQuery(query: string, nowMs: number): QuerySplit {
-  const start = trailingTokenStart(query);
+  const { start } = trailingTokenBounds(query);
   const head = query.slice(0, start);
   const trailing = query.slice(start);
   const parsed = parseSearchQuery(head, nowMs);
@@ -51,7 +57,7 @@ export function removeChipAt(
 }
 
 export function completeTrailingToken(text: string): string | null {
-  const start = trailingTokenStart(text);
+  const { start } = trailingTokenBounds(text);
   const head = text.slice(0, start);
   const trailing = text.slice(start);
   const negated = trailing.startsWith('-');

@@ -13,17 +13,19 @@ import { DIALOG_FACE, DialogShell, VIEWPORT_POP_ANIM } from '../components/ui/di
 import { Input } from '../components/ui/input.js';
 import { Kbd } from '../components/ui/kbd.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
+import { withoutDeleted } from '../fixtures/deletions.js';
 import { PROJECT_ID, PROJECT_NAME } from '../fixtures/fixtures.js';
 import type { AgentRef, FixtureSet, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { Clock, Kanban, Search, Settings, X } from '../icons/index.js';
 import { PHASE_STATUS, PHASE_UI } from '../phase.js';
 import { ACTIVITY_PATH, activityHref } from '../search/activity-href.js';
-import { searchTodosLocally } from '../search/activity-model.js';
+import { activityTodosForHits, searchTodosLocally } from '../search/activity-model.js';
 import { ChipProblems, QueryChip, SyntaxHelp } from '../search/query-chip.js';
 import {
   chipProblem,
   completeTrailingToken,
+  endsInFilter,
   joinQuery,
   removeChipAt,
   splitQuery,
@@ -134,11 +136,6 @@ function TodoRow({
       </span>
     </Button>
   );
-}
-
-function endsInFilter(text: string): boolean {
-  const trailing = text.slice(text.search(/\S+$/));
-  return trailing !== '' && !/\s$/.test(text) && parseSearchQuery(trailing, 0).filters.length === 1;
 }
 
 let openPanelCount = 0;
@@ -262,7 +259,10 @@ export function SearchPanel({
     navigate(activityHref(query, search));
     onClose();
   };
-  const viewAllCount = todos.length;
+  const viewAllCount = activityTodosForHits(
+    todos,
+    live ? fixture.todos : withoutDeleted(fixture.todos),
+  ).length;
   const showViewAll = q !== '' && viewAllCount > 0;
   const [helpOpen, setHelpOpen] = useState(false);
   useEffect(() => {
@@ -392,7 +392,11 @@ export function SearchPanel({
                       : actions.length - 1
                     : (prev + step + actions.length) % actions.length,
                 );
-              } else if (event.key === 'Enter' && cursor == null && endsInFilter(text)) {
+              } else if (
+                event.key === 'Enter' &&
+                cursor == null &&
+                endsInFilter(text, Date.now())
+              ) {
                 event.preventDefault();
                 onQuery(`${query} `);
               } else if (event.key === 'Enter' && cursor != null) {

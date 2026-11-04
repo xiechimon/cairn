@@ -3,6 +3,7 @@ import { describe, expect, test } from 'vitest';
 import {
   chipProblem,
   completeTrailingToken,
+  endsInFilter,
   joinQuery,
   removeChipAt,
   splitQuery,
@@ -102,6 +103,40 @@ describe('joinQuery', () => {
 
   test('an empty query joins to an empty string', () => {
     expect(joinQuery([], '')).toBe('');
+  });
+});
+
+describe('endsInFilter', () => {
+  test('Enter recognizes a quoted filter value as one complete token', () => {
+    for (const value of [
+      'project:"my project"',
+      'fold project:"my project"',
+      '-project:"my project"',
+      'is:failed by:"builder one"',
+      'project:"my project "',
+    ]) {
+      expect(endsInFilter(value, NOW), value).toBe(true);
+    }
+  });
+
+  test('unfinished quotes, committed tokens and trailing words do not commit', () => {
+    for (const value of [
+      '',
+      'project:"my',
+      'project:"my project',
+      'project:"my project" ',
+      'project:"my project" fold',
+      '"project:my project"',
+      '"is:failed"',
+    ]) {
+      expect(endsInFilter(value, NOW), value).toBe(false);
+    }
+  });
+
+  test('ordinary and invalid filters still commit for chip validation', () => {
+    expect(endsInFilter('is:failed', NOW)).toBe(true);
+    expect(endsInFilter('cost:lots', NOW)).toBe(true);
+    expect(endsInFilter('foo:bar', NOW)).toBe(false);
   });
 });
 

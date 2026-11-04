@@ -27,6 +27,7 @@ import {
   type ActivityGroup,
   type ActivityRow,
   activityRows,
+  activityTodosForHits,
   groupByDay,
   pageRows,
   searchTodosLocally,
@@ -35,6 +36,7 @@ import { ChipProblems, QueryChip, SyntaxHelp } from '../search/query-chip.js';
 import {
   chipProblem,
   completeTrailingToken,
+  endsInFilter,
   joinQuery,
   removeChipAt,
   splitQuery,
@@ -146,9 +148,7 @@ export function ActivityPage() {
     trimmed === ''
       ? allTodos
       : live
-        ? (searchQ.data?.todos ?? []).flatMap(
-            (hit) => allTodos.find((todo) => todo.id === hit.id) ?? [],
-          )
+        ? activityTodosForHits(searchQ.data?.todos ?? [], allTodos)
         : (local?.todos ?? []);
   const serverFilters: readonly SearchFilterResult[] | undefined = live
     ? searchQ.data?.filters
@@ -227,12 +227,9 @@ export function ActivityPage() {
                 if (completed === null) return;
                 event.preventDefault();
                 setQuery(joinQuery(chips, completed));
-              } else if (event.key === 'Enter' && text !== '' && !/\s$/.test(text)) {
-                const lastToken = text.slice(text.search(/\S+$/));
-                if (parseSearchQuery(lastToken, now).filters.length === 1) {
-                  event.preventDefault();
-                  setQuery(`${query} `);
-                }
+              } else if (event.key === 'Enter' && endsInFilter(text, now)) {
+                event.preventDefault();
+                setQuery(`${query} `);
               }
             }}
             className="h-6 min-w-24 flex-1 rounded-none border-none bg-transparent p-0 text-ui text-foreground shadow-none ring-0 focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent md:text-ui"

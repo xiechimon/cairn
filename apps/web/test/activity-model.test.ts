@@ -3,6 +3,7 @@ import { describe, expect, test } from 'vitest';
 import {
   type ActivityRow,
   activityRows,
+  activityTodosForHits,
   groupByDay,
   ACTIVITY_PAGE_SIZE,
   pageRows,
@@ -104,6 +105,27 @@ describe('pageRows', () => {
 
   test('pages are taken from the newest end', () => {
     expect(pageRows(rows, 1)[0]?.id).toBe('r0');
+  });
+});
+
+describe('activityTodosForHits', () => {
+  test('View all counts only hits that Activity can display, including fixture archive state', () => {
+    const active = { ...todo(1, 'done'), id: 'active' };
+    const archived = { ...todo(2, 'done'), id: 'archived', archivedAt: NOW };
+    const hits = [{ id: 'archived' }, { id: 'missing-from-current-team' }, { id: 'active' }];
+    const matched = activityTodosForHits(hits, [archived, active]);
+    expect(matched).toEqual([active]);
+    expect(matched.length).toBe(activityRows(matched, () => 'cairn').length);
+  });
+
+  test('an archived-only live hit has no Activity count when todos exclude it', () => {
+    expect(activityTodosForHits([{ id: 'archived' }], [todo(1, 'done')])).toEqual([]);
+  });
+
+  test('matched records retain search order and their full Activity detail', () => {
+    const first = { ...todo(1, 'failed'), id: 'first' };
+    const second = { ...todo(2, 'done'), id: 'second', usageCost: { total: 2.5, priced: true, input: 1, output: 1, cacheRead: 0, cacheWrite: 0 } };
+    expect(activityTodosForHits([{ id: 'second' }, { id: 'first' }], [first, second])).toEqual([second, first]);
   });
 });
 

@@ -68,6 +68,21 @@ test('a link with q opens with the chips and results already applied', async ({ 
   await expect(rows(page)).toHaveCount(3);
 });
 
+test('Enter commits a closed quoted filter after words and leaves an open quote in the field', async ({
+  page,
+}) => {
+  await page.goto(ACTIVITY);
+  const field = page.getByRole('textbox', { name: 'Filter activity' });
+  await field.fill('fold project:"my project');
+  await field.press('Enter');
+  await expect(chips(page)).toHaveCount(0);
+  await expect(field).toHaveValue('fold project:"my project');
+  await field.fill('fold project:"my project"');
+  await field.press('Enter');
+  await expect(chips(page)).toHaveText(['project:my project']);
+  await expect(field).toHaveValue('fold ');
+});
+
 test('the palette can replace the filters while Activity is already open', async ({ page }) => {
   await page.goto(`${ACTIVITY}&q=is%3Afailed`);
   await expect(rows(page)).toHaveCount(3);

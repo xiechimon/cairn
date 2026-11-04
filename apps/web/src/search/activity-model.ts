@@ -24,6 +24,16 @@ export interface ActivityGroup {
   unpriced: number;
 }
 
+export function activityTodosForHits(
+  hits: readonly Pick<TodoRecord, 'id'>[],
+  todos: readonly TodoRecord[],
+): TodoRecord[] {
+  const visible = new Map(
+    todos.filter((todo) => todo.archivedAt == null).map((todo) => [todo.id, todo]),
+  );
+  return hits.flatMap((hit) => visible.get(hit.id) ?? []);
+}
+
 export function activityRows(
   todos: readonly TodoRecord[],
   projectName: (projectId: string) => string | undefined,

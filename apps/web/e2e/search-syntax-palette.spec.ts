@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
-import { mockLive } from './chief-home-mock';
+import { mockLive, TASK } from './chief-home-mock';
 import { evidencePanelShot } from './evidence.js';
 import { pressAndExpect, settleTransitions } from './helpers.js';
 
@@ -54,6 +54,20 @@ test('Enter commits a filter token that is still being typed', async ({ page }) 
   await expect(chips(page)).toHaveCount(0);
   await field(page).press('Enter');
   await expect(chips(page)).toHaveText(['is:review']);
+});
+
+test('Enter commits a closed quoted filter after words and leaves an open quote in the field', async ({
+  page,
+}) => {
+  await openPalette(page);
+  await field(page).fill('fold project:"my project');
+  await field(page).press('Enter');
+  await expect(chips(page)).toHaveCount(0);
+  await expect(field(page)).toHaveValue('fold project:"my project');
+  await field(page).fill('fold project:"my project"');
+  await field(page).press('Enter');
+  await expect(chips(page)).toHaveText(['project:my project']);
+  await expect(field(page)).toHaveValue('fold ');
 });
 
 test('an invalid value is flagged on its chip with a readable reason', async ({ page }) => {
@@ -134,6 +148,50 @@ test('View all N in Activity carries the query, by click and by Cmd+Enter', asyn
   await field(page).press('Meta+Enter');
   await expect(page).toHaveURL(/\/app\/activity\?.*q=project%3Acairn/);
   await expect(page.getByTestId('activity-group').first()).toBeVisible();
+});
+
+test('View all advertises only the live hits Activity can display and retains archived search hits', async ({
+  page,
+}) => {
+  const active = { ...TASK, title: 'Active match', phase: 'done', phaseAt: Date.now() };
+  const archivedHit = { id: 'archived-match', seqNum: 10, title: 'Archived match', phase: 'done', phaseAt: Date.now(), projectName: 'cairn' };
+  await mockLive(page, { threads: [], messages: [], todos: [active] }, (path, _route, json) => {
+    if (path !== '/api/search') return undefined;
+    return json({
+      todos: [{ ...active, projectName: 'cairn' }, archivedHit],
+      projects: [],
+      agents: [],
+    });
+  });
+  await openPalette(page, '/app');
+  await field(page).fill('match');
+  await expect(todoRows(page)).toHaveCount(2);
+  await expect(todoRows(page).filter({ hasText: 'Archived match' })).toBeVisible();
+  const viewAll = panel(page).locator('[data-row-kind="activity"]');
+  await expect(viewAll).toContainText('View all 1 in Activity');
+  await viewAll.click();
+  await expect(page).toHaveURL(/\/app\/activity\?.*q=match/);
+  await expect(page.locator('[data-slot="thread-row"]')).toHaveCount(1);
+  await expect(page.locator('[data-slot="thread-row"]')).toContainText('Active match');
+  await expect(page.getByTestId('activity-summary')).toContainText('1 thread ·');
+});
+
+test('an archived-only live search remains openable without advertising an empty Activity list', async ({
+  page,
+}) => {
+  await mockLive(page, { threads: [], messages: [], todos: [TASK] }, (path, _route, json) => {
+    if (path !== '/api/search') return undefined;
+    return json({
+      todos: [{ id: 'archived-match', seqNum: 10, title: 'Archived match', phase: 'done', phaseAt: Date.now(), projectName: 'cairn' }],
+      projects: [],
+      agents: [],
+    });
+  });
+  await openPalette(page, '/app');
+  await field(page).fill('match');
+  await expect(todoRows(page)).toHaveCount(1);
+  await expect(todoRows(page)).toContainText('Archived match');
+  await expect(panel(page).locator('[data-row-kind="activity"]')).toHaveCount(0);
 });
 
 test('the empty palette lists only places that land somewhere distinct', async ({ page }) => {
