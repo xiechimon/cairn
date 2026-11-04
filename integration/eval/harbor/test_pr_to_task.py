@@ -1,6 +1,7 @@
 import importlib.util
 from pathlib import Path
 import subprocess
+import sys
 
 import pytest
 
@@ -47,7 +48,7 @@ def test_separates_answers_and_runs_both_controls(repository, tmp_path):
         head,
         "Add positive numbers.\n",
         task,
-        ["python3", "-m", "pytest", "test_add.py"],
+        [sys.executable, "-m", "pytest", "test_add.py"],
         42,
     )
     assert "Add positive numbers.\n" in (task / "instruction.md").read_text()
@@ -77,7 +78,7 @@ def test_separates_answers_and_runs_both_controls(repository, tmp_path):
                 check=True,
             )
         run = subprocess.run(
-            ["python3", "-m", "pytest", "test_add.py"],
+            [sys.executable, "-m", "pytest", "test_add.py"],
             cwd=work,
             capture_output=True,
             text=True,

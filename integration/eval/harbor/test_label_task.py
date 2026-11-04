@@ -87,3 +87,30 @@ def test_prompt_digest_is_stable(task):
     assert labeler.prompt_digest(labeler.build_prompt(task)) == labeler.prompt_digest(
         labeler.build_prompt(task)
     )
+
+
+def test_parse_label_accepts_braces_inside_the_reason():
+    raw = 'Done.\n{"verdict": "accept", "reason": "The tests check the empty object {} case."}'
+    label = labeler.parse_label(raw, "gpt-6.1-sol", "abc", "2026-11-04T00:00:00Z")
+    assert label["reason"] == "The tests check the empty object {} case."
+
+
+def test_parse_label_accepts_nested_objects_and_takes_the_last_verdict():
+    raw = (
+        '{"verdict": "reject", "reason": "draft"}\n'
+        '{"verdict": "accept", "reason": "final", "detail": {"k": 1}}'
+    )
+    label = labeler.parse_label(raw, "gpt-6.1-sol", "abc", "2026-11-04T00:00:00Z")
+    assert label["verdict"] == "accept"
+
+
+def test_main_keeps_the_raw_response_when_parsing_fails(task, tmp_path, monkeypatch):
+    output = tmp_path / "label.json"
+    monkeypatch.setattr(labeler, "run_labeler", lambda task, model: "no verdict here")
+    monkeypatch.setattr(
+        "sys.argv", ["label-task.py", str(task), "--output", str(output)]
+    )
+    with pytest.raises(ValueError):
+        labeler.main()
+    assert (tmp_path / "label.json.raw.txt").read_text() == "no verdict here"
+    assert not output.exists()

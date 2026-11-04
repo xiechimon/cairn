@@ -60,14 +60,18 @@ def codex_command(model, output, workdir, prompt):
 
 def parse_label(raw, model, digest, labeled_at):
     require_allowed_model(model)
+    decoder = json.JSONDecoder()
     found = None
-    for match in re.finditer(r"\{[^{}]*\}", raw):
+    position = raw.find("{")
+    while position != -1:
         try:
-            candidate = json.loads(match.group())
+            candidate, end = decoder.raw_decode(raw, position)
         except json.JSONDecodeError:
+            position = raw.find("{", position + 1)
             continue
         if isinstance(candidate, dict) and "verdict" in candidate:
             found = candidate
+        position = raw.find("{", end)
     if found is None:
         raise ValueError("No JSON verdict in labeler output")
     reason = found.get("reason")
@@ -84,8 +88,7 @@ def parse_label(raw, model, digest, labeled_at):
     }
 
 
-def label(task, model):
-    prompt = build_prompt(task)
+def run_labeler(prompt, model):
     with tempfile.TemporaryDirectory() as scratch:
         output = Path(scratch) / "last-message.txt"
         subprocess.run(
@@ -96,10 +99,7 @@ def label(task, model):
             capture_output=True,
             timeout=900,
         )
-        raw = output.read_text()
-    return parse_label(
-        raw, model, prompt_digest(prompt), datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    )
+        return output.read_text()
 
 
 def main():
@@ -108,7 +108,13 @@ def main():
     parser.add_argument("--model", default="gpt-6.1-sol")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
-    args.output.write_text(json.dumps(label(args.task, args.model), indent=2) + "\n")
+    prompt = build_prompt(args.task)
+    raw = run_labeler(prompt, args.model)
+    args.output.with_name(f"{args.output.name}.raw.txt").write_text(raw)
+    label = parse_label(
+        raw, args.model, prompt_digest(prompt), datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    )
+    args.output.write_text(json.dumps(label, indent=2) + "\n")
 
 
 if __name__ == "__main__":
