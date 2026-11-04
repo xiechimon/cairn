@@ -404,7 +404,7 @@ Shared fixture migrations already merged: apps/server/test/helpers.ts and integr
 | `integration/test/web-plans-convergence.test.ts:62:10` | `mkdtempSync` | Pending: Vitest onTestFinished/afterEach/afterAll release after child shutdown |
 | `integration/test/web-search-pi-e2e.test.ts:88:10` | `mkdtempSync` | Pending: Vitest onTestFinished/afterEach/afterAll release after child shutdown |
 | `integration/test/write-verify.test.ts:132:16` | `mkdtempSync` | Pending: Vitest onTestFinished/afterEach/afterAll release after child shutdown |
-| `integration/verify/image-fallback-live.mts:59:16` | `mkdtempSync` | Pending: Vitest onTestFinished/afterEach/afterAll release after child shutdown |
+| `integration/verify/image-fallback-live.mts:59:16` | `mkdtempSync` | Pending: CLI stop() and process-exit release after startup failure or daemon/server shutdown |
 | `packages/shared/test/github-create-gate.test.ts:14:21` | `mkdtemp` | Pending: Vitest onTestFinished/afterEach/afterAll release after child shutdown |
 | `packages/shared/test/github-create-gate.test.ts:53:21` | `mkdtemp` | Pending: Vitest onTestFinished/afterEach/afterAll release after child shutdown |
 | `packages/shared/test/github-create-gate.test.ts:73:22` | `mkdtemp` | Pending: Vitest onTestFinished/afterEach/afterAll release after child shutdown |

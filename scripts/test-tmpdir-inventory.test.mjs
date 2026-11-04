@@ -134,3 +134,14 @@ test('eval CLI and harness allocations have function-level ownership rather than
     assert.match(row, /finally|close|dispose/);
   }
 });
+
+test('live verification CLI allocation names stop and process-exit ownership rather than Vitest hooks', () => {
+  const markdown = readFileSync(resolve(root, 'docs/verify/1951/inventory.md'), 'utf8');
+  const rows = markdown
+    .split('\n')
+    .filter((line) => line.includes('integration/verify/image-fallback-live.mts'));
+  assert.equal(rows.length, 1);
+  assert.doesNotMatch(rows[0], /Vitest|onTestFinished|afterEach|afterAll/);
+  assert.match(rows[0], /stop\(\)/);
+  assert.match(rows[0], /process-exit/);
+});
