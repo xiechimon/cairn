@@ -1,14 +1,26 @@
+import { createHash } from 'node:crypto';
 import {
+  COMPUTER_FEED_TOOLS,
+  COMPUTER_REPLAY_SAFE_TOOLS,
+  type ComputerCall,
   type ComputerCallState,
+  type ComputerCommand,
   type ComputerFrame,
+  type ComputerRelayResult,
+  type ComputerTool,
   type MachineComputerFramesResponse,
+  type MachineComputerRelayBody,
   redactSecrets,
 } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { computerCall } from '../db/schema.js';
+import { chiefThread, computer, computerCall, machine, step } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
-import { nowMs } from '../lib/ids.js';
+import { newRecordId, nowMs } from '../lib/ids.js';
+import { NotFoundError } from './builds.js';
+import type { TeamStreamHub } from './events.js';
+import { isChiefConversation, type MachineDeps, ownedStep } from './machine-deps.js';
+import type { MachineWakeHub } from './machine-wake-hub.js';
 
 export const COMPUTER_OUTPUT_HEAD_CHARS = 16 * 1024;
 export const COMPUTER_OUTPUT_TAIL_CHARS = 48 * 1024;
@@ -16,6 +28,32 @@ export const COMPUTER_OUTPUT_TAIL_CHARS = 48 * 1024;
 export const COMPUTER_OUTPUT_PENDING_CHARS = 64 * 1024;
 
 const pendingOutput = new Map<string, string>();
+
+export const COMPUTER_SHELL_COMMAND_TIMEOUT_DEFAULT_MS = 5 * 60_000;
+export const COMPUTER_SHELL_COMMAND_TIMEOUT_MAX_MS = 60 * 60_000;
+export const COMPUTER_SHELL_DEADLINE_SLACK_MS = 30_000;
+export const COMPUTER_SCREEN_DEADLINE_MS = 2 * 60_000;
+export const COMPUTER_OTHER_DEADLINE_MS = 10 * 60_000;
+export const COMPUTER_EXECUTION_LEASE_MS = 5 * 60_000;
+export const COMPUTER_FEED_OUTPUT_CHARS = 4 * 1024;
+export const COMPUTER_STORED_PARAM_CHARS = 8 * 1024;
+
+export const COMPUTER_NOT_CONNECTED = 'the computer is not connected';
+export const COMPUTER_BUSY = 'the computer is busy with another Coordinator turn';
+export const COMPUTER_USER_CONTROL = 'ian has control of this computer';
+export const COMPUTER_INTERRUPTED = 'interrupted, may have partially run; it was not retried';
+export const COMPUTER_CANCELLED = 'cancelled because the Coordinator turn was stopped';
+
+const SHELL_TOOLS: ReadonlySet<ComputerTool> = new Set(['shell', 'user_computer_shell']);
+const SCREEN_TOOLS: ReadonlySet<ComputerTool> = new Set([
+  'computer_observe',
+  'computer_act',
+  'user_computer_observe',
+  'user_computer_act',
+  'open_path',
+  'launch_app',
+]);
+const FEED_TOOLS: ReadonlySet<string> = new Set(COMPUTER_FEED_TOOLS);
 
 export function hasPendingComputerOutput(callId: string): boolean {
   return pendingOutput.has(callId);
@@ -127,6 +165,10 @@ function applyFrames(
   };
 }
 
+export function clearPendingComputerOutput(callId: string): void {
+  pendingOutput.delete(callId);
+}
+
 export function receiveComputerFrames(
   db: Db,
   machineId: string,
@@ -136,21 +178,477 @@ export function receiveComputerFrames(
   const result = db.transaction((tx) => {
     const row = tx.select().from(computerCall).where(eq(computerCall.id, callId)).get();
     if (!row || row.machineId !== machineId) throw new HttpError(404, 'computer call not found');
+    if (row.state === 'dispatched' || row.state === 'running') {
+      const owner = tx
+        .select({ status: step.status })
+        .from(step)
+        .where(eq(step.id, row.stepId))
+        .get();
+      if (owner && owner.status !== 'claimed') {
+        tx.update(computerCall)
+          .set({ state: 'cancelled' })
+          .where(eq(computerCall.id, callId))
+          .run();
+        row.state = 'cancelled';
+      }
+    }
     const ordered = [...frames].sort((a, b) => a.seq - b.seq);
     if (new Set(ordered.map((f) => f.seq)).size !== ordered.length) {
       throw new HttpError(400, 'computer frames repeat a sequence number');
     }
     const fresh = ordered.filter((f) => f.seq > row.lastSeq);
     const cancelled = row.state === 'cancelled';
-    if (fresh.length === 0) return { response: { ok: true as const, cancelled }, pending: null };
+    if (fresh.length === 0) {
+      return { response: { ok: true as const, cancelled }, pending: null, finished: cancelled };
+    }
     if (FINISHED_STATES.has(row.state) || (cancelled && row.finishedAt !== null)) {
       throw new HttpError(409, `computer call already ${row.state}`);
     }
     const { patch, pending } = applyFrames(row, fresh, nowMs());
     tx.update(computerCall).set(patch).where(eq(computerCall.id, callId)).run();
-    return { response: { ok: true as const, cancelled }, pending };
+    return {
+      response: { ok: true as const, cancelled },
+      pending,
+      finished: patch.finishedAt !== undefined || cancelled,
+    };
   });
   if (result.pending === '') pendingOutput.delete(callId);
   else if (result.pending !== null) pendingOutput.set(callId, result.pending);
+  if (result.finished) settleComputerCall(db, callId);
   return result.response;
+}
+
+interface PendingCall {
+  result: Promise<ComputerRelayResult>;
+  teamId: string;
+  hub: TeamStreamHub;
+  resolve: (result: ComputerRelayResult) => void;
+  dispose: () => void;
+}
+
+const pendingCalls = new Map<string, PendingCall>();
+
+export function dropComputerWaiters(): void {
+  for (const call of pendingCalls.values()) call.dispose();
+  pendingCalls.clear();
+}
+
+export function computerCallId(stepId: string, toolCallId: string): string {
+  return createHash('sha256').update(`${stepId}\0${toolCallId}`).digest('hex');
+}
+
+export function computerMachineName(scopeKey: string): string {
+  return `cairn-orb-computer-${createHash('sha256').update(scopeKey).digest('hex').slice(0, 40)}`;
+}
+
+export function computerDeadlineMs(tool: ComputerTool, params: Record<string, unknown>): number {
+  if (SHELL_TOOLS.has(tool)) {
+    const asked = params.timeoutMs;
+    const timeout =
+      typeof asked === 'number' &&
+      Number.isInteger(asked) &&
+      asked > 0 &&
+      asked <= COMPUTER_SHELL_COMMAND_TIMEOUT_MAX_MS
+        ? asked
+        : COMPUTER_SHELL_COMMAND_TIMEOUT_DEFAULT_MS;
+    return timeout + COMPUTER_SHELL_DEADLINE_SLACK_MS;
+  }
+  return SCREEN_TOOLS.has(tool) ? COMPUTER_SCREEN_DEADLINE_MS : COMPUTER_OTHER_DEADLINE_MS;
+}
+
+function isFinalState(state: ComputerCallState): boolean {
+  return state !== 'dispatched' && state !== 'running';
+}
+
+function storedParams(params: Record<string, unknown>): Record<string, unknown> {
+  const clip = (value: unknown): unknown => {
+    if (typeof value === 'string') {
+      return value.length > COMPUTER_STORED_PARAM_CHARS
+        ? `${value.slice(0, COMPUTER_STORED_PARAM_CHARS)}[truncated ${value.length - COMPUTER_STORED_PARAM_CHARS} chars]`
+        : value;
+    }
+    if (Array.isArray(value)) return value.map(clip);
+    if (value !== null && typeof value === 'object') {
+      return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, clip(v)]));
+    }
+    return value;
+  };
+  return clip(redactSecrets(params).value) as Record<string, unknown>;
+}
+
+function resultOfRow(row: CallRow): ComputerRelayResult {
+  switch (row.state) {
+    case 'done': {
+      const text = row.resultText ?? redact(row.outputHead + row.outputTail);
+      const exit =
+        row.exitCode !== null && row.exitCode !== 0 ? `\n[exit code ${row.exitCode}]` : '';
+      const images = row.resultImages ?? undefined;
+      return { text: text + exit, ...(images && images.length > 0 ? { images } : {}) };
+    }
+    case 'error': {
+      const note =
+        row.errorDelivery === 'not_delivered'
+          ? 'the action did not run'
+          : 'the action may have partially run';
+      return { text: `computer error: ${row.errorMessage ?? 'unknown error'} (${note})` };
+    }
+    case 'interrupted':
+      return { text: `computer call ${COMPUTER_INTERRUPTED}` };
+    case 'cancelled':
+      return { text: `computer call ${COMPUTER_CANCELLED}` };
+    default:
+      return { text: 'computer call is still running' };
+  }
+}
+
+function feedOf(row: CallRow): ComputerCommand | null {
+  if (!FEED_TOOLS.has(row.tool)) return null;
+  const param = (key: string): string => {
+    const value = row.params[key];
+    return typeof value === 'string' ? value : '';
+  };
+  const shell = SHELL_TOOLS.has(row.tool);
+  const command = shell
+    ? param('command')
+    : row.tool === 'launch_app'
+      ? [param('application'), param('uri')].filter((part) => part !== '').join(' ')
+      : param('path');
+  const streamed = row.outputHead + row.outputTail;
+  const output = shell
+    ? streamed || (row.resultText ?? row.errorMessage ?? '')
+    : (row.errorMessage ?? '');
+  return {
+    callId: row.id,
+    stepId: row.stepId,
+    tool: row.tool as ComputerCommand['tool'],
+    command: redact(command),
+    cwd: shell ? redact(param('cwd') || '.') : '.',
+    status: isFinalState(row.state) ? (row.state as ComputerCommand['status']) : 'running',
+    exitCode: row.exitCode,
+    output: redact(output).slice(-COMPUTER_FEED_OUTPUT_CHARS),
+    at: row.finishedAt ?? row.startedAt ?? row.createdAt,
+  };
+}
+
+function publishFeed(hub: TeamStreamHub, teamId: string, row: CallRow): void {
+  const command = feedOf(row);
+  if (command) hub.publish(teamId, () => ({ type: 'computer.command', command }));
+}
+
+export function settleComputerCall(db: Db, callId: string): void {
+  const live = pendingCalls.get(callId);
+  if (!live) return;
+  const row = db.select().from(computerCall).where(eq(computerCall.id, callId)).get();
+  if (!row || !isFinalState(row.state)) return;
+  pendingCalls.delete(callId);
+  live.dispose();
+  publishFeed(live.hub, live.teamId, row);
+  live.resolve(resultOfRow(row));
+}
+
+function expireComputerCall(db: Db, callId: string): void {
+  const row = db.select().from(computerCall).where(eq(computerCall.id, callId)).get();
+  if (row && !isFinalState(row.state)) {
+    db.update(computerCall)
+      .set({
+        ...(row.replaySafe
+          ? { state: 'error' as const, errorMessage: 'the computer call timed out' }
+          : { state: 'interrupted' as const, errorMessage: 'the deadline passed with no result' }),
+        errorDelivery: 'unknown',
+        finishedAt: nowMs(),
+      })
+      .where(eq(computerCall.id, callId))
+      .run();
+  }
+  settleComputerCall(db, callId);
+}
+
+function openPending(
+  deps: MachineDeps,
+  teamId: string,
+  call: { callId: string; stepId: string; deadlineAt: number },
+): PendingCall {
+  let resolve!: (result: ComputerRelayResult) => void;
+  const result = new Promise<ComputerRelayResult>((r) => {
+    resolve = r;
+  });
+  const timer = setTimeout(
+    () => expireComputerCall(deps.db, call.callId),
+    Math.max(0, call.deadlineAt - nowMs()),
+  );
+  timer.unref();
+  const offStop = deps.machineHub.onStop(call.stepId, () => stopStepComputer(deps, call.stepId));
+  const pending: PendingCall = {
+    result,
+    teamId,
+    hub: deps.hub,
+    resolve,
+    dispose: () => {
+      clearTimeout(timer);
+      offStop();
+    },
+  };
+  pendingCalls.set(call.callId, pending);
+  return pending;
+}
+
+function releaseExecutionLease(db: Db, stepId: string): void {
+  db.update(computer)
+    .set({ executionStepId: null, executionLeaseExpiresAt: null, updatedAt: nowMs() })
+    .where(eq(computer.executionStepId, stepId))
+    .run();
+}
+
+export function stopStepComputer(
+  deps: Pick<MachineDeps, 'db'> & { machineHub?: MachineWakeHub },
+  stepId: string,
+): void {
+  const { db } = deps;
+  const open = db
+    .select({ id: computerCall.id })
+    .from(computerCall)
+    .where(
+      and(eq(computerCall.stepId, stepId), inArray(computerCall.state, ['dispatched', 'running'])),
+    )
+    .all();
+  if (open.length > 0) {
+    db.update(computerCall)
+      .set({ state: 'cancelled' })
+      .where(
+        and(
+          eq(computerCall.stepId, stepId),
+          inArray(computerCall.state, ['dispatched', 'running']),
+          isNull(computerCall.finishedAt),
+        ),
+      )
+      .run();
+  }
+  for (const { id } of open) settleComputerCall(db, id);
+  releaseExecutionLease(db, stepId);
+}
+
+function selectTarget(
+  deps: MachineDeps,
+  teamId: string,
+  chiefId: string,
+  tool: ComputerTool,
+): { machineId: string; computerId: string | null; scopeKey?: string } {
+  const { db, machineHub } = deps;
+  const wantsOwn = tool.startsWith('user_computer_');
+  const capable = (row: typeof machine.$inferSelect): boolean =>
+    wantsOwn ? row.capabilities?.ownComputer === true : row.capabilities?.computer === true;
+  const fleet = db
+    .select()
+    .from(machine)
+    .where(eq(machine.teamId, teamId))
+    .orderBy(desc(machine.lastSeenAt))
+    .all()
+    .filter(capable);
+  const live = fleet.filter((row) => machineHub.isConnected(row.id));
+
+  if (wantsOwn) {
+    const chosen = live[0];
+    if (chosen) return { machineId: chosen.id, computerId: null };
+    throw new HttpError(
+      409,
+      fleet.length === 0
+        ? 'no machine in this team offers its own computer'
+        : COMPUTER_NOT_CONNECTED,
+    );
+  }
+
+  const scopeKey = `chief:${chiefId}`;
+  const existing = db.select().from(computer).where(eq(computer.scopeKey, scopeKey)).get();
+  if (existing) {
+    if (!machineHub.isConnected(existing.machineId)) {
+      throw new HttpError(409, COMPUTER_NOT_CONNECTED);
+    }
+    return { machineId: existing.machineId, computerId: existing.id, scopeKey };
+  }
+  const chosen = live[0];
+  if (!chosen) {
+    throw new HttpError(
+      409,
+      fleet.length === 0
+        ? 'no machine in this team offers a Coordinator computer'
+        : COMPUTER_NOT_CONNECTED,
+    );
+  }
+  const now = nowMs();
+  const id = newRecordId();
+  db.insert(computer)
+    .values({
+      id,
+      teamId,
+      scopeKey,
+      machineId: chosen.id,
+      providerRef: computerMachineName(scopeKey),
+      createdAt: now,
+      updatedAt: now,
+    })
+    .run();
+  return { machineId: chosen.id, computerId: id, scopeKey };
+}
+
+function acquireExecutionLease(
+  db: Db,
+  computerId: string,
+  stepId: string,
+  readOnly: boolean,
+  deadlineAt: number,
+): void {
+  const row = db.select().from(computer).where(eq(computer.id, computerId)).get();
+  if (!row) return;
+  const now = nowMs();
+  const userHolds =
+    row.controlHolder === 'user' &&
+    (row.controlLeaseExpiresAt === null || row.controlLeaseExpiresAt > now);
+  if (userHolds) {
+    if (readOnly) return;
+    throw new HttpError(409, COMPUTER_USER_CONTROL);
+  }
+  const held =
+    row.executionStepId !== null &&
+    row.executionLeaseExpiresAt !== null &&
+    row.executionLeaseExpiresAt > now;
+  if (held && row.executionStepId !== stepId) throw new HttpError(409, COMPUTER_BUSY);
+  db.update(computer)
+    .set({
+      executionStepId: stepId,
+      executionLeaseExpiresAt: Math.max(now + COMPUTER_EXECUTION_LEASE_MS, deadlineAt),
+      executionFence: held ? row.executionFence : row.executionFence + 1,
+      updatedAt: now,
+    })
+    .where(eq(computer.id, computerId))
+    .run();
+}
+
+async function waitForCall(
+  pending: PendingCall,
+  signal: AbortSignal | undefined,
+): Promise<ComputerRelayResult> {
+  if (!signal) return pending.result;
+  let onAbort = (): void => {};
+  const aborted = new Promise<never>((_, reject) => {
+    onAbort = () => reject(new Error('computer request aborted'));
+    if (signal.aborted) onAbort();
+    else signal.addEventListener('abort', onAbort, { once: true });
+  });
+  try {
+    return await Promise.race([pending.result, aborted]);
+  } finally {
+    signal.removeEventListener('abort', onAbort);
+  }
+}
+
+export const OWN_COMPUTER_UNGATED_MESSAGE =
+  "ian's own computer tools stay off until their approval gate ships";
+
+export type OwnComputerGate = (input: { stepId: string; tool: ComputerTool }) => void;
+
+export const refuseOwnComputerUntilGated: OwnComputerGate = () => {
+  throw new HttpError(403, OWN_COMPUTER_UNGATED_MESSAGE);
+};
+
+export async function forwardComputerCall(
+  deps: MachineDeps,
+  machineId: string,
+  stepId: string,
+  body: MachineComputerRelayBody,
+  opts: { signal?: AbortSignal; ownComputerGate?: OwnComputerGate } = {},
+): Promise<ComputerRelayResult> {
+  const { db } = deps;
+  const stepRow = ownedStep(deps, machineId, stepId);
+  if (stepRow.kind !== 'chief' || !isChiefConversation(stepRow.buildId)) {
+    throw new HttpError(400, `step ${stepId} is not a chief step`);
+  }
+  if (stepRow.status !== 'claimed') {
+    throw new HttpError(409, 'Coordinator tools require a currently claimed turn');
+  }
+  const thread = db.select().from(chiefThread).where(eq(chiefThread.id, stepRow.buildId)).get();
+  if (!thread) throw new NotFoundError(`chief thread ${stepRow.buildId}`);
+
+  const tool = body.name;
+  if (tool.startsWith('user_computer_')) {
+    (opts.ownComputerGate ?? refuseOwnComputerUntilGated)({ stepId, tool });
+  }
+  const safe = COMPUTER_REPLAY_SAFE_TOOLS.has(tool);
+  const callId = computerCallId(stepId, body.toolCallId);
+
+  const existing = db.select().from(computerCall).where(eq(computerCall.id, callId)).get();
+  if (existing && existing.tool !== tool) {
+    throw new HttpError(409, `tool call ${body.toolCallId} was already used for ${existing.tool}`);
+  }
+  const live = pendingCalls.get(callId);
+  if (live) return waitForCall(live, opts.signal);
+
+  if (existing && !existing.replaySafe) {
+    if (!isFinalState(existing.state)) {
+      db.update(computerCall)
+        .set({
+          state: 'interrupted',
+          errorMessage: 'the server lost track of this call',
+          errorDelivery: 'unknown',
+          finishedAt: nowMs(),
+        })
+        .where(eq(computerCall.id, callId))
+        .run();
+      return resultOfRow({ ...existing, state: 'interrupted' });
+    }
+    return resultOfRow(existing);
+  }
+
+  const target = selectTarget(deps, thread.teamId, thread.chiefId, tool);
+  const now = nowMs();
+  const deadlineAt = now + computerDeadlineMs(tool, body.params);
+  if (target.computerId !== null) {
+    acquireExecutionLease(db, target.computerId, stepId, safe, deadlineAt);
+  }
+
+  const fresh = {
+    machineId: target.machineId,
+    computerId: target.computerId,
+    tool,
+    replaySafe: safe,
+    params: storedParams(body.params),
+    state: 'dispatched' as const,
+    lastSeq: 0,
+    outputHead: '',
+    outputTail: '',
+    outputChars: 0,
+    resultText: null,
+    resultImages: null,
+    exitCode: null,
+    errorMessage: null,
+    errorDelivery: null,
+    deadlineAt,
+    createdAt: now,
+    startedAt: null,
+    finishedAt: null,
+  };
+  if (existing) {
+    clearPendingComputerOutput(callId);
+    db.update(computerCall).set(fresh).where(eq(computerCall.id, callId)).run();
+  } else {
+    db.insert(computerCall)
+      .values({ id: callId, teamId: thread.teamId, stepId, toolCallId: body.toolCallId, ...fresh })
+      .run();
+  }
+
+  const call: ComputerCall = {
+    callId,
+    stepId,
+    tool,
+    params: body.params,
+    deadlineAt,
+    ...(target.scopeKey !== undefined ? { scopeKey: target.scopeKey } : {}),
+  };
+  if (!deps.machineHub.pushComputer(target.machineId, call)) {
+    db.delete(computerCall).where(eq(computerCall.id, callId)).run();
+    throw new HttpError(409, COMPUTER_NOT_CONNECTED);
+  }
+  const pending = openPending(deps, thread.teamId, call);
+  const row = db.select().from(computerCall).where(eq(computerCall.id, callId)).get();
+  if (row) publishFeed(deps.hub, thread.teamId, row);
+  return waitForCall(pending, opts.signal);
 }
