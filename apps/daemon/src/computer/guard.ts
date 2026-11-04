@@ -1,4 +1,5 @@
 import { cairnHostRefusal } from './guard-cairn.js';
+import { executablePatternRefusal, shellExecutablePatternRefusal } from './guard-executable.js';
 import {
   braceExpansionHazard,
   executesWrittenHeredoc,
@@ -17,7 +18,7 @@ import {
   teeDestinationPaths,
 } from './guard-heredoc.js';
 import { quotedHeredocLifecycleHazard } from './guard-quoted.js';
-import { parseShellWords } from './guard-shell-parse.js';
+import { parseShellWords, preserveShellCommandBoundaries } from './guard-shell-parse.js';
 import {
   assignmentEntries,
   commandBaseAt,
@@ -318,6 +319,12 @@ function prepareDesktopGuardCommand(source: string): PreparedDesktopCommand {
         } else {
           const hazard = heredocBodyHazard(body.content);
           if (hazard) return { reason: hazard };
+          try {
+            const pattern = shellExecutablePatternRefusal(body.content);
+            if (pattern) return { reason: pattern };
+          } catch {
+            return { reason: 'uninspectable shell syntax' };
+          }
           out += body.content;
         }
         cursor = body.end;
@@ -431,31 +438,6 @@ function shellCFlagProgram(words: readonly string[], interpreterIndex: number): 
   return undefined;
 }
 
-function preserveShellCommandBoundaries(command: string): string {
-  let quote: "'" | '"' | undefined;
-  let result = '';
-  for (let index = 0; index < command.length; index += 1) {
-    const character = command[index];
-    const next = command[index + 1];
-    if (character === '\\' && quote !== "'") {
-      if (next === '\n') {
-        index += 1;
-        continue;
-      }
-      result += character;
-      if (next !== undefined) {
-        result += next;
-        index += 1;
-      }
-      continue;
-    }
-    if (character === quote) quote = undefined;
-    else if (!quote && (character === "'" || character === '"')) quote = character;
-    result += character === '\n' && !quote ? '\n;' : character;
-  }
-  return result;
-}
-
 function shellTokenReason(entry: object): string | undefined {
   if ('comment' in entry) return 'comment';
   if ('expansion' in entry && typeof entry.expansion === 'string') {
@@ -480,6 +462,8 @@ function tokenizeProtectedShellCommand(
       separated,
       (name) => literals[name] ?? STATIC_SHELL_EXPANSIONS[name] ?? { expansion: name },
     );
+    const patternRefusal = executablePatternRefusal(parsed);
+    if (patternRefusal) return { reason: patternRefusal };
     const words: string[] = [];
     let commandPosition = true;
     let redirectTarget = false;

@@ -1,4 +1,3 @@
-import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { constants } from 'node:fs';
 import {
@@ -16,6 +15,7 @@ import {
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { awaitWithSignal } from './cancellation.js';
+import { spawnContainedCommand } from './contained-spawn.js';
 import { COMPUTER_MARKER_ENV, ProcessTree } from './process-tree.js';
 import {
   type ComputerExecuteRequest,
@@ -251,9 +251,9 @@ export class HostComputerProvider implements ComputerProvider {
       ...hostCommandEnvironment(this.env, request.env),
       [COMPUTER_MARKER_ENV]: marker,
     };
-    let child: ReturnType<typeof spawn>;
+    let child: ReturnType<typeof spawnContainedCommand>;
     try {
-      child = spawn(command, args, {
+      child = spawnContainedCommand(command, args, {
         cwd,
         env,
         detached: true,
