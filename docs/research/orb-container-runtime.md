@@ -119,6 +119,7 @@ Unchanged publication (`publishOrbDist` into a host directory), mounted read-onl
 | `$CAIRN_HOME/orb/dist` | `/opt/cairn/daemon` | ro | releases tree |
 | `$CAIRN_HOME/orb/seed` | `/seed` | ro | per-project bare clones |
 | named volume `cairn-computer-<scope>` | `/home/user` | rw | computer mode only, section 9 |
+| `$RUN/cairn-orb/<id>/computer` (daemon-created, 0700) | `/run/cairn-computer` | rw | computer mode only: x11vnc listens on `vnc.sock` (control) and `view.sock` (view-only); the daemon connects and bridges each viewer to its own outbound websocket (D75 section 3.5) |
 
 Never mounted: `$HOME`, any runtime socket, `/run/user`, credentials. Because `step.ts` already treats `/run/cairn` as daemon-owned 0700 (`listen()` checks uid and mode), the daemon now creates the directory itself and the root-only "outbox must be recreated by root" retry in `step.ts` and `runtime-directory.mjs` become unnecessary (inferred: with `--userns=keep-id` the daemon uid owns it on both sides).
 
@@ -141,13 +142,14 @@ The daemon listens on the host path; the worker connects through the bind mount.
 
 Boundary: a rootless container: user namespace, pid/mount/uts/ipc/net namespaces, seccomp default profile, cgroup v2 limits. It shares the host kernel, so a kernel bug is the residual risk (inferred; E2B/Firecracker comparison above is the stronger alternative). nspawn with `PrivateUsers=pick` is no stronger on that axis, so this is not a regression (inferred).
 
-**User namespace.** Rootless Podman maps container uid 0 to `ian` unless `keep-id`; with `keep-id`, `ian` is `user` (1000) and container root is a subuid in 100000:65536 (read: rootless tutorial, https://github.com/containers/podman/blob/main/docs/tutorials/rootless_tutorial.md; subuid range measured present). Files that the agent can reach on the host are only the three mounts above.
+**User namespace.** Rootless Podman maps container uid 0 to `ian` unless `keep-id`; with `keep-id`, `ian` is `user` (1000) and container root is a subuid in 100000:65536 (read: rootless tutorial, https://github.com/containers/podman/blob/main/docs/tutorials/rootless_tutorial.md; subuid range measured present). Files that the agent can reach on the host are only the mounts above: three for a build Orb, plus the home volume and the VNC socket directory for a computer Orb.
 
 **Passwordless sudo for `user` without host privilege.** `/etc/sudoers.d/user: user ALL=(ALL) NOPASSWD:ALL` in the image. Sudo escalates to container root, which is an unprivileged subuid on the host with capabilities only inside the userns. Consequences:
 
 - `--security-opt no-new-privileges` must not be set. It blocks setuid-based escalation through `execve` (read: podman-run page), which would break sudo. Compensation: drop capabilities, keep seccomp and the userns instead.
 - `--cap-drop=all` then `--cap-add` the minimum sudo and package installs need: `CHOWN DAC_OVERRIDE FOWNER SETUID SETGID SETFCAP KILL AUDIT_WRITE` (guess; spike S1 finds the smallest working set). No `NET_ADMIN`, `NET_RAW`, `SYS_ADMIN`, `SYS_PTRACE`, `MKNOD`.
 - Container root can write files on the three mounts only if the mount is rw; `/seed` and dist are `ro`, and `/run/cairn` already is agent-accessible. So the sudo gain over `user` is container-local: install packages, edit `/etc`, change hostname. That is the Amp use ("configure Git and manage services").
+- Seccomp stays the default profile for every Orb. Computer Orbs run Chromium with `--no-sandbox` if spike S1 shows its sandbox cannot start; the container is the boundary. A computer-only seccomp profile, if ever needed, is lane 1's PR.
 - The image does not set the nspawn `weaker nested sandbox` differently: Claude Code's `enableWeakerNestedSandbox` stays, because bwrap inside a default-seccomp container usually cannot create nested userns (guess; spike S1).
 
 **Egress limits (concrete).**
@@ -252,7 +254,7 @@ Non-sudo, run by me over `ssh -o BatchMode=yes -o ConnectTimeout=5 omarchy`:
 Spikes before PR 2 merges (each is a command on omarchy; results go in `docs/verify/`):
 
 - S1: `podman run --userns=keep-id:uid=1000,gid=1000 --cap-drop=all --cap-add=... --network none` with `sudo -n true`, `apt`/`pacman -S` of a package, bwrap, then the minimal cap set.
-- S2: bind-mount a directory with a unix socket and connect from `user` (both directions of ownership).
+- S2: bind-mount a directory with a unix socket and connect from `user` (both directions of ownership), and the reverse: a socket created inside the container (`/run/cairn-computer/vnc.sock`) that the host daemon connects to.
 - S3: socat to the relay unix socket reaches 443, refuses a private address.
 - S4: `podman commit` timing on btrfs with a project's post-setup layer and a sentinel grep over the committed image.
 
@@ -279,3 +281,19 @@ Questions for lane 2 (B2, #2278 trial-one, #2279 snapshot, #2533 default-on):
 5. Do any running tickets depend on `/var/lib/cairn-orb/{dist,seed}`? PR 2 moves these under `$CAIRN_HOME/orb/` for container Orbs only; nspawn keeps the old paths until PR 10.
 
 Questions for ian: none blocking. One call is recorded as decided: rootful Docker is not used for production Orbs because of the `docker` group, unless you say otherwise.
+
+### Answers from lane 1 (D75), 2026-11-04
+
+1. Agreed. `ComputerOrbs` keeps its API; lane 1 moves its internals onto `OrbRuntime` in a follow-up it owns.
+2. Agreed. PR 5 renames `agent` to `user` through `ORB_AGENT_HOME`, and P3b imports the constant. `scripts/ops/orb/computer-home.mjs` and the computer image's desktop unit also say `agent`; PR 5 leaves them to lane 1.
+3. Agreed. No seccomp widening for build Orbs. Chromium falls back to `--no-sandbox` if S1 shows its sandbox fails in the container.
+4. Corrected. There is no published port, and the viewer does not go through `relay.sock`. x11vnc listens on two unix sockets, `vnc.sock` and `view.sock`, in a directory the daemon can reach (D75 section 3.5 and S2), and the daemon bridges each viewer to its own outbound websocket. A computer spawn adds one rw bind, `$RUN/cairn-orb/<id>/computer` to `/run/cairn-computer` (row added to the mounts table). It is a separate directory and not a subdirectory of `/run/cairn`, so the relay directory keeps its daemon-only uid and mode check. `OrbSpawnSpec.mounts` already takes any list, so the interface does not change. Spike S2 also covers this direction, with the container listening and the host connecting.
+5. Agreed. The home is the named volume `cairn-computer-<scopeKey-hash>`. It survives `podman rm` and image updates, and Update takes a backup first (`podman volume export` or a btrfs snapshot of the volume directory, per D75 section 3.7).
+
+### Answers from lane 2 (B2), 2026-11-04
+
+1. Agreed. #2279 moves onto `OrbRuntime.pause({snapshotImage})` with the same sidecar and acceptance criteria; the image-status grep becomes `podman image mount`. It waits for PR 2 and PR 7 and is not built on nspawn.
+2. Confirmed. #2533's default-on gate reads only `executor: 'orb'` and the latest canary result (a failed scheduled canary turns the default off for that machine). It reads none of `firewall`, `ufw`, `polkit` or `foreignRules`, so PR 6 can drop them.
+3. Agreed. Lane 2 changes `trial-evidence-check.mjs` to accept either `machinectlStatus` or `podmanInspect` (container name still `cairn-orb-<conversationId>`) until nspawn is removed. The change is lane 2's, in `scripts/ops/orb/`.
+4. No trial runs across the control-plane cutover or PR 9's flip. Lane 2 writes the deploy hold file and announces the build id before and after each trial.
+5. No running ticket depends on `/var/lib/cairn-orb/{dist,seed}`. Moving them under `$CAIRN_HOME/orb/` for container Orbs only is fine.
