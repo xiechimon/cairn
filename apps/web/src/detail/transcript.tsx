@@ -15,7 +15,13 @@ import type { RobotPara, TranscriptItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { Clock, Copy, ExternalLink, FileTab } from '../icons/index.js';
-import { groupTurns, type TurnRow, type TurnSegment, transcriptTurns } from '../lib/turn-fold.js';
+import {
+  groupTurns,
+  latestOpenTurnId,
+  type TurnRow,
+  type TurnSegment,
+  transcriptTurns,
+} from '../lib/turn-fold.js';
 import { ChatMarkdown, TaskCard } from './chat-markdown.js';
 import { Segments } from './segments.js';
 import { InjectedSkills, WorkTrace } from './work-trace.js';
@@ -668,6 +674,7 @@ export function Transcript({
   const segments: TurnSegment<TranscriptItem>[] = fold
     ? groupTurns(transcript, transcriptTurns)
     : transcript.map((item, index) => ({ kind: 'row', row: { item, index } }));
+  const openTurnId = latestOpenTurnId(segments, transcriptTurns);
   const renderRow = ({ item, index }: TurnRow<TranscriptItem>) => {
     const id = 'id' in item ? item.id : undefined;
     return (
@@ -695,7 +702,7 @@ export function Transcript({
           <TurnFold
             key={segment.turn.id}
             turn={segment.turn}
-            open={turnFold.isOpen(segment.turn)}
+            open={turnFold.isOpen(segment.turn, openTurnId)}
             onToggle={turnFold.toggle}
           >
             {segment.turn.rows.map(renderRow)}

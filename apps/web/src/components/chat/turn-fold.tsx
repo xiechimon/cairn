@@ -3,7 +3,7 @@ import { memo, type ReactNode, useCallback, useState } from 'react';
 import { useI18n } from '../../i18n/provider.js';
 import type { TFunc } from '../../i18n/translate.js';
 import { ChevronRight } from '../../icons/index.js';
-import type { Turn } from '../../lib/turn-fold.js';
+import { isTurnOpen, type Turn } from '../../lib/turn-fold.js';
 import { Button } from '../ui/button.js';
 import { MessageScrollerItem } from '../ui/message-scroller.js';
 
@@ -17,7 +17,8 @@ export function formatTurnDuration(seconds: number, t: TFunc): string {
 
 export function useTurnFold() {
   const [flipped, setFlipped] = useState<ReadonlySet<string>>(() => new Set());
-  const isOpen = (turn: Pick<Turn<unknown>, 'id'>) => flipped.has(turn.id);
+  const isOpen = (turn: Pick<Turn<unknown>, 'id'>, defaultOpenId: string | null) =>
+    isTurnOpen(turn.id, defaultOpenId, flipped);
   const toggle = useCallback(
     (id: string) =>
       setFlipped((current) => {

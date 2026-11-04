@@ -7,6 +7,8 @@ import {
   type ChiefRow,
   chiefTurns,
   groupTurns,
+  isTurnOpen,
+  latestOpenTurnId,
   PURPOSE_MAX_LENGTH,
   purposeOf,
   transcriptTurns,
@@ -190,5 +192,39 @@ describe('Coordinator turns', () => {
   test('rows keep their stream index for the row renderer', () => {
     const [segment] = groupTurns(rows([chiefUser('a'), chiefRobot('b')]), chiefTurns);
     expect(segment?.kind === 'turn' && segment.turn.rows.map((row) => row.item.i)).toEqual([0, 1]);
+  });
+});
+
+describe('default-open turn', () => {
+  const finished = (id: string): TranscriptItem[] => [user(id, `ask ${id}`), robot(`r-${id}`)];
+  const segmentsOf = (items: TranscriptItem[]) => groupTurns(items, transcriptTurns);
+
+  test('the last finished turn is the default-open one and earlier turns fold', () => {
+    const segments = segmentsOf([...finished('a'), ...finished('b')]);
+    expect(latestOpenTurnId(segments, transcriptTurns)).toBe('b');
+  });
+
+  test('a trailing marker row does not fold the last turn', () => {
+    const segments = segmentsOf([
+      ...finished('a'),
+      { kind: 'run' },
+    ]);
+    expect(latestOpenTurnId(segments, transcriptTurns)).toBe('a');
+  });
+
+  test('a following user row folds the previous turn', () => {
+    const segments = segmentsOf([...finished('a'), user('b', 'next'), streaming]);
+    expect(latestOpenTurnId(segments, transcriptTurns)).toBeNull();
+  });
+
+  test('no turn segments means no default-open turn', () => {
+    expect(latestOpenTurnId(segmentsOf([work]), transcriptTurns)).toBeNull();
+  });
+
+  test('a manual toggle flips relative to the default', () => {
+    expect(isTurnOpen('b', 'b', new Set())).toBe(true);
+    expect(isTurnOpen('b', 'b', new Set(['b']))).toBe(false);
+    expect(isTurnOpen('a', 'b', new Set())).toBe(false);
+    expect(isTurnOpen('a', 'b', new Set(['a']))).toBe(true);
   });
 });

@@ -55,7 +55,7 @@ import {
   RuntimeClaudeCode,
   RuntimePi,
 } from '../icons/index.js';
-import { chiefTurns, groupTurns } from '../lib/turn-fold.js';
+import { chiefTurns, groupTurns, latestOpenTurnId } from '../lib/turn-fold.js';
 import { uploadMessageAttachments } from '../overlay/attachment-paste.js';
 import { ComposerAttachments } from '../overlay/composer-attachments.js';
 import { useComposerWire } from '../overlay/composer-wire.js';
@@ -497,6 +497,7 @@ export function ChiefConversation({
       onCancelQuestion={onCancelQuestion}
     />
   );
+  const openTurnId = latestOpenTurnId(groupTurns(rows, chiefTurns), chiefTurns);
   const foldedRows = (list: { item: ChiefStreamItem; i: number }[]) =>
     groupTurns(list, chiefTurns).map((segment) =>
       segment.kind === 'row' ? (
@@ -505,7 +506,7 @@ export function ChiefConversation({
         <TurnFold
           key={segment.turn.id}
           turn={segment.turn}
-          open={turnFold.isOpen(segment.turn)}
+          open={turnFold.isOpen(segment.turn, openTurnId)}
           onToggle={turnFold.toggle}
         >
           {segment.turn.rows.map((row) => streamRow(row.item))}

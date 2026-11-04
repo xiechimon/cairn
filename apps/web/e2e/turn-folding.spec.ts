@@ -73,24 +73,26 @@ test.describe('thread transcript', () => {
 });
 
 test.describe('Coordinator conversation', () => {
-  test('finished turns fold, show a duration when timed, and open from the keyboard', async ({
+  test('the latest finished turn stays open, earlier ones fold, and the header toggles from the keyboard', async ({
     page,
   }) => {
     await page.goto('/app?scenario=home-c');
     const headers = page.getByTestId('turn-header');
     await expect(headers).toHaveCount(2);
+    await expect(headers.first()).toHaveAttribute('aria-expanded', 'false');
     await expect(page.getByText('Round 6 found no /work in the orb')).toHaveCount(0);
 
-    const timed = headers.nth(1);
-    await expect(timed).toHaveText(/^Fold finished turns before review\. · 4 minutes$/);
-    await expect(timed).toHaveAttribute('aria-expanded', 'false');
-    await expect(page.getByText('Started it; the PR is up for your review.')).toHaveCount(0);
+    const latest = headers.nth(1);
+    await expect(latest).toHaveText(/^Fold finished turns before review\. · 4 minutes$/);
+    await expect(latest).toHaveAttribute('aria-expanded', 'true');
+    const reply = page.getByText('Started it; the PR is up for your review.');
+    await expect(reply).toBeVisible();
 
-    await timed.click();
-    await expect(page.getByText('Started it; the PR is up for your review.')).toBeVisible();
-    await timed.press('Enter');
-    await expect(page.getByText('Started it; the PR is up for your review.')).toHaveCount(0);
-    await timed.press('Space');
-    await expect(timed).toHaveAttribute('aria-expanded', 'true');
+    await latest.press('Enter');
+    await expect(latest).toHaveAttribute('aria-expanded', 'false');
+    await expect(reply).toHaveCount(0);
+    await latest.press('Space');
+    await expect(latest).toHaveAttribute('aria-expanded', 'true');
+    await expect(reply).toBeVisible();
   });
 });
