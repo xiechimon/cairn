@@ -1,6 +1,5 @@
 import { type ChildProcess, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { join } from 'node:path';
 import type {
   AgentBackend,
   AgentSessionHandle,
@@ -173,8 +172,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   claudeAuth = await probeAuthAndRemember();
 
   const capEnv = opts.capEnv ?? process.env;
-  const orbProvider =
-    opts.orbProvider ?? createOrbProvider(capEnv, join(paths.home, 'orb-state', 'orbs.json'));
+  const orbProvider = opts.orbProvider ?? createOrbProvider(capEnv, paths.home);
   const capabilitiesProbe =
     opts.capabilitiesProbe ??
     createMachineCapabilitiesProbe({

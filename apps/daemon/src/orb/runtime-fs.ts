@@ -102,3 +102,15 @@ export function cleanOrbOutbox(directory: string): void {
     if (descriptor !== undefined) closeSync(descriptor);
   }
 }
+
+export function checkOrbDirectory(directory: string, label: string, mode?: number): boolean {
+  const stats = lstatSync(directory, { throwIfNoEntry: false });
+  if (!stats) return false;
+  if (!stats.isDirectory()) throw new Error(`${label} must be a real directory: ${directory}`);
+  const uid = process.getuid?.();
+  if (uid === undefined || stats.uid !== uid)
+    throw new Error(`${label} must be owned by daemon uid ${uid}: ${directory}`);
+  if (mode !== undefined && (stats.mode & 0o7777) !== mode)
+    throw new Error(`${label} must have mode 0700: ${directory}`);
+  return true;
+}
