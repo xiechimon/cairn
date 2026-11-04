@@ -983,6 +983,10 @@ const WORKER_SCHEDULE_TOOLS: readonly RemoteToolDef[] = [
   },
 ];
 
+export const WORKER_ASK_USER_TOOL: RemoteToolDef = CHIEF_REMOTE_TOOLS.find(
+  (t) => t.name === 'ask_user',
+) as RemoteToolDef;
+
 export const WORKER_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   ...WORKER_MEMORY_REMOTE_TOOLS,
   WORKER_ATTACHMENT_TOOL,

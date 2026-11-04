@@ -265,6 +265,7 @@ function continuationTodo(
   const resumable =
     row?.phase === 'done' ||
     (options.allowReviewContinuation === true && row?.phase === 'review') ||
+    (row?.awaitingReply === true && (row.phase === 'building' || row.phase === 'planning')) ||
     (options.afterTurn === true &&
       row !== undefined &&
       (['planning', 'building', 'confirm', 'review', 'failed'].includes(row.phase) ||

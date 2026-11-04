@@ -7,6 +7,7 @@ import {
   startBuilds,
 } from '../src/services/builds.js';
 import { createCiPoller } from '../src/services/ci-loop.js';
+import { workerRemoteTools } from '../src/services/machine-claim.js';
 import { setRoutingRulesEnabled } from '../src/services/routing-rules.js';
 import { messageThreadAsUser } from '../src/services/thread-message.js';
 import { getTodo, setTodoPhase } from '../src/services/todos.js';
@@ -478,5 +479,49 @@ describe('worker question hardening', () => {
     await poller.sweep();
     expect(todoId).toBeTruthy();
     expect(fetched.some((url) => url.includes('/pulls/7'))).toBe(true);
+  });
+});
+
+describe('worker ask_user tool dispatch and parked replies', () => {
+  test('session steps get ask_user for both repo types, build steps never, flag off unchanged', () => {
+    for (const github of [false, true]) {
+      expect(workerRemoteTools('session', github).map((t) => t.name)).toContain('ask_user');
+      expect(workerRemoteTools('build', github).map((t) => t.name)).not.toContain('ask_user');
+    }
+    setRoutingRulesEnabled(false);
+    expect(workerRemoteTools('session', false).map((t) => t.name)).not.toContain('ask_user');
+  });
+
+  test('a reply to a parked session with no claimed step is delivered, answers the question and continues', async () => {
+    const { todoId, buildId, stepRow } = startSession(false);
+    H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
+    H.s.db.update(build).set({ prNumber: 7 }).where(eq(build.id, buildId)).run();
+    H.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, stepRow.id)).run();
+    const claimed = H.s.db.select().from(step).where(eq(step.id, stepRow.id)).get()!;
+    await askWorkerQuestion(
+      deps(),
+      claimed,
+      { requestId: REQUEST, questions: QUESTIONS },
+      { holdMs: 0 },
+    );
+    H.s.db.update(step).set({ status: 'done' }).where(eq(step.id, stepRow.id)).run();
+    expect(getTodo(deps(), todoId)!.awaitingReply).toBe(true);
+    const sent = await messageThreadAsUser(deps(), H.teamId, todoId, {
+      content: 'JSON please',
+      clientMessageId: 'c-parked',
+    });
+    expect(sent.delivered).toBe('new-turn');
+    expect(getTodo(deps(), todoId)!.awaitingReply).toBeUndefined();
+    const content = H.s.db.select().from(message).where(eq(message.id, REQUEST)).get()!.content as {
+      status: string;
+    };
+    expect(content.status).toBe('answered');
+    const pending = H.s.db
+      .select()
+      .from(step)
+      .where(eq(step.buildId, buildId))
+      .all()
+      .filter((s) => s.status === 'pending');
+    expect(pending.length).toBeGreaterThan(0);
   });
 });
