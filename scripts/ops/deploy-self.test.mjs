@@ -543,6 +543,23 @@ test('watch deploys the newest green main commit and skips a SHA that already fa
   assert.match(skipped.stderr, /already failed/);
 });
 
+test('watch skips a newest main commit whose ci run was cancelled and deploys the newest green one', () => {
+  const f = fixture();
+  const green = pushTarget(f, 'green');
+  const cancelled = pushTarget(f, 'cancelled');
+  writeFileSync(
+    join(f.fake, `checks-${cancelled}`),
+    'check\tcancelled\npack-smoke\tcancelled\ne2e-gate\tcancelled\n',
+  );
+  const result = f.run(WATCH, [], { CAIRN_DEPLOY_SCRIPT: DEPLOY });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), green);
+  const newest = pushTarget(f, 'newest');
+  const next = f.run(WATCH, [], { CAIRN_DEPLOY_SCRIPT: DEPLOY });
+  assert.equal(next.status, 0, next.stderr);
+  assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), newest);
+});
+
 test('watch raises one lag alarm per main head after two hours and closes it once caught up', () => {
   const f = fixture();
   const old = new Date(Date.now() - 3 * 3600 * 1000).toISOString();

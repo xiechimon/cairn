@@ -37,7 +37,7 @@ else if (path.includes('/statuses/') && d.statusError) process.exit(1);
 else if (path.includes('/actions/workflows/')) console.log(JSON.stringify([{workflow_runs:d.runs ?? []}]));
 else if (path.includes('/labels?')) console.log(JSON.stringify([d.labels ?? []]));
 else if (path.includes('/pulls?')) console.log(JSON.stringify([d.pulls ?? []]));
-else if (path.includes('/check-runs')) console.log(JSON.stringify([{check_runs:d.latestFailure && path.includes(d.main) ? [{id:1,name:'check',conclusion:'success',status:'completed',app:{slug:'github-actions'}},{id:2,name:'check',conclusion:'failure',status:'completed',app:{slug:'github-actions'}}] : [{id:1,name:'check', conclusion: path.includes(d.green) ? 'success':'failure',status:'completed',app:{slug:'github-actions'}}]}]));
+else if (path.includes('/check-runs')) console.log(JSON.stringify([{check_runs:d.latestFailure && path.includes(d.main) ? [{id:1,name:'check',conclusion:'success',status:'completed',app:{slug:'github-actions'}},{id:2,name:'check',conclusion:'failure',status:'completed',app:{slug:'github-actions'}}] : [{id:1,name:'check', conclusion: path.includes(d.green) ? 'success':(d.nonGreen ?? 'failure'),status:'completed',app:{slug:'github-actions'}}]}]));
 else if(path.endsWith('/commits')) console.log(JSON.stringify([d.commits]));
 else if(path.includes('/pulls/')) console.log(JSON.stringify(d.pr));
 else if(path.includes('/branches/main')) console.log(JSON.stringify({commit:{sha:d.main}}));
@@ -89,6 +89,7 @@ for (const mode of [
   'extra file',
   'one byte',
   'latest failure',
+  'cancelled intermediate',
   'multiple reverts',
   'green target',
   'no green',
@@ -138,6 +139,7 @@ for (const mode of [
         green: mode === 'green target' ? main : mode === 'no green' ? 'none' : green,
         main,
         latestFailure: mode === 'latest failure',
+        nonGreen: mode === 'cancelled intermediate' ? 'cancelled' : 'failure',
         pr: {
           labels: [{ name: 'cairn-recovery' }],
           base: { ref: 'main', sha: main },
@@ -159,7 +161,9 @@ for (const mode of [
     const r = f.run(['verify-recovery', '7']);
     assert.equal(
       r.status,
-      ['valid', 'latest failure', 'multiple reverts'].includes(mode) ? 0 : 1,
+      ['valid', 'latest failure', 'cancelled intermediate', 'multiple reverts'].includes(mode)
+        ? 0
+        : 1,
       r.stderr,
     );
     if (mode === 'extra file' || mode === 'one byte')
