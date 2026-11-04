@@ -1,12 +1,7 @@
 {
   "paths": [
     "integration/eval/harbor/public/cairn_harbor/cairn_executor.py",
-    "integration/eval/harbor/public/cairn_harbor/constants.py",
     "integration/eval/harbor/public/cairn_harbor/cairn-worker-prompt.md",
-    "integration/eval/harbor/public/skills/cairn-worker/**",
-    "apps/daemon/src/backend/pi.ts",
-    "apps/server/src/services/chief-tools.ts",
-    "apps/server/src/services/chief.ts",
-    "packages/shared/src/protocol/chief-tools.ts"
+    "integration/eval/harbor/public/skills/cairn-worker/**"
   ]
 }

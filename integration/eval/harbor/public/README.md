@@ -121,7 +121,7 @@ No `results/<date>-baseline.md` can be produced before measured trials exist.
 
 `cairn_harbor/gate.py` compares a base harness with a candidate harness on the same task set, and `.github/workflows/eval-gate.yml` runs it for pull requests.
 
-Harness definition: `harness-paths.json` lists the harness files (the Harbor cairn executor, its prompt and skill, and the shared product paths of the Chief and the pi backend). `python -m cairn_harbor.gate trigger --files <changed-files.txt>` exits 0 only when a diff touches one of them, and the workflow path filters are held equal to the list by `tests/test_harness.py`. A diff touching none does not start the gate.
+Harness definition: `harness-paths.json` lists the harness files (the Harbor cairn executor, its prompt and skill). The scan policy in `constants.py` is ruler, so changing it refuses the gate. Product paths (the Chief, the pi backend) are left out until the executor runs the product daemon (Epic 3), because a comparison that never executes them would be no evidence. `python -m cairn_harbor.gate trigger --files <changed-files.txt>` exits 0 only when a diff touches one of them, and the workflow path filters are held equal to the list by `tests/test_harness.py`. A diff touching none does not start the gate.
 
 Inputs: one `run_baseline run` result file per repeat and arm. Each file pins `model`, `task_set_sha` (SHA-256 of the `--tasks` file), `harness_sha` (SHA-256 over the harness files) and the budget `run_id`. A differing model or task set between arms, or a missing pin, is refused (exit 2).
 

@@ -18,7 +18,24 @@ def test_an_empty_diff_does_not_trigger() -> None:
 
 
 def test_an_exact_harness_file_triggers() -> None:
-    assert harness.touches_harness(["apps/daemon/src/backend/pi.ts"])
+    assert harness.touches_harness(["integration/eval/harbor/public/cairn_harbor/cairn_executor.py"])
+
+
+def test_scan_policy_constants_are_ruler_not_harness() -> None:
+    path = "integration/eval/harbor/public/cairn_harbor/constants.py"
+    assert not harness.touches_harness([path])
+    assert harness.is_ruler_path(path)
+
+
+def test_product_paths_the_executor_never_runs_do_not_trigger() -> None:
+    assert not harness.touches_harness(
+        [
+            "apps/daemon/src/backend/pi.ts",
+            "apps/server/src/services/chief.ts",
+            "apps/server/src/services/chief-tools.ts",
+            "packages/shared/src/protocol/chief-tools.ts",
+        ]
+    )
 
 
 def test_a_file_under_a_directory_pattern_triggers() -> None:

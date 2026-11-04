@@ -293,7 +293,7 @@ def test_cli_refusal_exits_two_and_writes_a_refusal(tmp_path: Path, monkeypatch:
 
 def test_cli_trigger_exits_zero_only_for_harness_diffs(tmp_path: Path) -> None:
     touching = tmp_path / "touching.txt"
-    touching.write_text("README.md\napps/daemon/src/backend/pi.ts\n")
+    touching.write_text("README.md\nintegration/eval/harbor/public/cairn_harbor/cairn-worker-prompt.md\n")
     untouching = tmp_path / "untouching.txt"
     untouching.write_text("README.md\n")
     assert gate.main(["trigger", "--files", str(touching)]) == 0

@@ -5,13 +5,8 @@ on:
     types: [labeled, synchronize, reopened]
     paths:
       - 'integration/eval/harbor/public/cairn_harbor/cairn_executor.py'
-      - 'integration/eval/harbor/public/cairn_harbor/constants.py'
       - 'integration/eval/harbor/public/cairn_harbor/cairn-worker-prompt.md'
       - 'integration/eval/harbor/public/skills/cairn-worker/**'
-      - 'apps/daemon/src/backend/pi.ts'
-      - 'apps/server/src/services/chief-tools.ts'
-      - 'apps/server/src/services/chief.ts'
-      - 'packages/shared/src/protocol/chief-tools.ts'
   workflow_dispatch:
     inputs:
       base_ref:
@@ -48,7 +43,7 @@ jobs:
       REPEATS: ${{ github.event.inputs.repeats || '5' }}
       MAX_RUN_USD: ${{ github.event.inputs.max_run_usd || vars.CAIRN_EVAL_GATE_MAX_RUN_USD }}
       DATASETS_DIR: ${{ vars.CAIRN_EVAL_DATASETS_DIR }}
-      RESULTS_DIR: ${{ github.workspace }}/eval-gate-results
+      RESULTS_DIR: ${{ github.workspace }}/eval-gate-results/${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
@@ -74,6 +69,11 @@ jobs:
             echo "triggered=false" >> "$GITHUB_OUTPUT"
             echo "::notice::eval gate not triggered: no harness path changed"
           fi
+      - name: Fresh results directory
+        if: steps.trigger.outputs.triggered == 'true'
+        run: |
+          rm -rf "$GITHUB_WORKSPACE/eval-gate-results"
+          mkdir -p "$RESULTS_DIR"
       - name: Refuse a changed ruler
         if: steps.trigger.outputs.triggered == 'true'
         working-directory: ruler/integration/eval/harbor/public
