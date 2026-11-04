@@ -3,15 +3,14 @@ import {
   existsSync,
   lstatSync,
   mkdirSync,
-  mkdtempSync,
   readFileSync,
   readlinkSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
-import { describe, expect, test, vi } from 'vitest';
+import { describe, expect, onTestFinished, test, vi } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { ContainerOrbProvider } from '../src/orb/container-provider.js';
 import { OrbLifecycle } from '../src/orb/lifecycle.js';
 import { PodmanOrbRuntime } from '../src/orb/podman.js';
@@ -77,7 +76,10 @@ class FakeRuntime implements OrbRuntime {
 }
 
 function fixture(overrides: { runtime?: OrbRuntime; egressSocketPath?: string } = {}) {
-  const root = mkdtempSync(join(tmpdir(), 'container-provider-'));
+  const root = makeTestTempDir('container-provider-');
+  onTestFinished(() => {
+    releaseTestTempDir(root);
+  });
   const checkout = createOrbCheckout(root);
   const fake = new FakeRuntime();
   const runtimeRoot = join(root, 'run', 'cairn-orb');
