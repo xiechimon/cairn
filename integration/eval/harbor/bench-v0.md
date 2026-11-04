@@ -141,6 +141,45 @@ python3 integration/eval/harbor/pr-to-task.py --check /tmp/task-1562 \
 Evidence: `docs/verify/1518/epic1/` (recorded before the protected-pattern restore and the config and setup tampering in the `bash` cheat; it needs a re-run), including a counterfactual: the same `bash` cheat (runtime replaced, no test edit) against the earlier shared-verifier task scores reward 1, and against the separate verifier scores 0. The task stays unaccepted; Epic 1 proves the
 ruler resists these four cheats, not that PR #1562 is a kept benchmark task.
 
+## Epic 2: conversion and labels
+
+All 53 eligible PRs converted with `batch_tasks.py convert` (task `task-<PR>`, test
+command derived from the changed test files: `node --test` for `node:test` files,
+`pnpm exec vitest run` for the rest, chained with `sh -c` when mixed). Conversion
+failures: 0. Static checks without Docker: every `tests.patch` applies to the base
+archive and every `solution.patch` applies on top; the grader, solution, protected-path
+and protected-regex lists are non-empty in all 53. Five gold solutions touch protected
+infrastructure (`package.json` or `pnpm-lock.yaml`: PRs 1552, 1641, 1716, 1824, 1905);
+they are listed in `solution-paths.txt` as designed. Thirteen tasks were flagged for
+network-looking text in the test patch (URL strings, `gh`/`npx` text); inspection shows
+URL fixtures and mocks, with PR 1697 injecting `fetchFn`. None is confirmed
+network-dependent, and none was run, since Docker was unavailable.
+
+One OpenAI label per task (`gpt-6.1-sol`, direct `codex exec`, prompt from
+`label-task.py`) accepts 6 and rejects 47. Accepted: PRs 1289, 1310, 1538, 1562, 1729,
+1835. The main rejection reasons are tests that require interfaces or wording the issue
+leaves open (CLI names, exact messages, schemas) and tests that omit part of the issue.
+Thirty accepted tasks are therefore not yet reachable from this pool; the label prompt
+was not changed to raise the count.
+
+The tasks live in the private repository `xiechimon/cairn-eval-tasks` (commit
+`a33d97a5f0ca7fb23d3403491c410576c2646c4b`), without `base.tar`, which
+`regenerate-base.sh` rebuilds from `git archive` and checks against stored digests.
+Per-PR status is in the `conversion` section of `bench-v0.json`. Controls (oracle, nop,
+cheats) are pending; `complete` stays false and `tasks` stays empty.
+
+Later, run the controls over every accepted task, one at a time:
+
+```sh
+python3 integration/eval/harbor/batch_tasks.py controls-script \
+  --tasks ~/cairn-eval/tasks/v0 --output ~/cairn-eval/controls > /tmp/controls.sh
+sh /tmp/controls.sh
+```
+
+Each line takes `flock /tmp/cairn-eval-batch.lock`. `pr-to-task.py` takes
+`/tmp/cairn-heavy.lock` itself, so wrapping it in `flock /tmp/cairn-heavy.lock` would
+deadlock; failures append to `failures.txt` in the output directory.
+
 ## Candidate counts
 
 - Binary non-test diff: 401.

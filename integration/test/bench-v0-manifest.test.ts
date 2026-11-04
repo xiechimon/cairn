@@ -42,3 +42,22 @@ test('bench-v0 records only independently agreed tasks with paired control evide
     expect(manifest.blockers.length).toBeGreaterThan(0);
   }
 });
+
+test('bench-v0 conversion status is consistent and keeps the benchmark incomplete until controls run', () => {
+  const manifest = JSON.parse(readFileSync(join(root, 'bench-v0.json'), 'utf8'));
+  const { conversion } = manifest;
+  expect(conversion.taskRepoCommit).toMatch(/^[a-f0-9]{40}$/);
+  expect(conversion.perPr).toHaveLength(conversion.converted + conversion.failed);
+  const accepted = conversion.perPr.filter(
+    (row: { openaiLabel: string }) => row.openaiLabel === 'accept',
+  );
+  expect(accepted).toHaveLength(conversion.openaiAccepted);
+  expect(conversion.openaiAccepted + conversion.openaiRejected).toBe(conversion.converted);
+  for (const row of conversion.perPr) {
+    expect(row.partition).toBe(row.issue % 2 === 0 ? 'optimize' : 'holdout');
+  }
+  if (conversion.controls === 'pending') {
+    expect(manifest.complete).toBe(false);
+    expect(manifest.tasks).toHaveLength(0);
+  }
+});
