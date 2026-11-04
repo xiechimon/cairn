@@ -17,6 +17,7 @@ import {
   findClientMessage,
   replayAfterConflict,
 } from './client-message.js';
+import { holdSecondRejectionRework } from './research-stuck.js';
 import { answerWorkerQuestionsById, pendingWorkerQuestionIds } from './worker-question-store.js';
 
 type TodoRow = typeof todo.$inferSelect;
@@ -68,6 +69,7 @@ async function deliver(
       feedback: body.content,
       clientMessageId: body.clientMessageId,
     });
+    holdSecondRejectionRework(deps, buildId);
     return { conversationId: latestBuildOf(deps, row.id) ?? buildId, delivered: 'revision' };
   }
   if (row.phase === 'failed') {

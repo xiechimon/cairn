@@ -469,6 +469,29 @@ describe('daily intake tick', () => {
     expect(spec).toContain('https://example.com/recent recent claim');
     expect(spec).not.toContain('old claim');
   });
+
+  test('an open stuck-research todo is not an intake search cue', async () => {
+    const w = await world();
+    openThread(w, 1, 'real work', 'todo');
+    w.s.db
+      .insert(todo)
+      .values({
+        id: 'todo-stuck-research',
+        teamId: w.teamId,
+        projectId: w.projectId,
+        title: 'Research: Fix flaky export',
+        phase: 'building',
+        phaseAt: 500,
+        seqNum: 9,
+        sourceKind: 'research-stuck',
+        sourceRef: 'build:0',
+      })
+      .run();
+    runIntake(w, D1_0630);
+    const spec = intakeTodos(w)[0]?.spec ?? '';
+    expect(spec).toContain('real work');
+    expect(spec).not.toContain('Research: Fix flaky export');
+  });
 });
 
 describe('intake items in the 08:00 report', () => {
