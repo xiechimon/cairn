@@ -30,7 +30,7 @@ test('four parts stack top to bottom in a 248px sidebar', async ({ page }) => {
   const nameFont = await team
     .getByText('Cairn', { exact: true })
     .evaluate((el) => getComputedStyle(el).fontFamily);
-  expect(nameFont).toContain('bricolageGrotesque');
+  expect(nameFont).toContain('instrumentSans');
 
   const order = [
     await top(page, '[data-testid="team-row"]'),
