@@ -520,6 +520,26 @@ export const routingRule = sqliteTable(
   (t) => [uniqueIndex('routing_rule_team_use_unique').on(t.teamId, t.use)],
 );
 
+export const workPolicy = sqliteTable(
+  'work_policy',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id),
+    use: text('use').$type<'session' | 'review'>().notNull(),
+    tools: json<string[]>('tools').notNull(),
+    mcpServers: json<string[]>('mcpServers').notNull(),
+    skillsAllowlist: json<string[] | null>('skillsAllowlist'),
+    defaultSkill: text('defaultSkill'),
+    secrets: json<string[]>('secrets').notNull(),
+    seededFromAgentId: text('seededFromAgentId'),
+    createdAt: epochMs('createdAt').notNull(),
+    updatedAt: epochMs('updatedAt').notNull(),
+  },
+  (t) => [uniqueIndex('work_policy_team_use_unique').on(t.teamId, t.use)],
+);
+
 export const agentMemory = sqliteTable('agent_memory', {
   id: text('id').primaryKey(),
   agentId: text('agentId').notNull(),

@@ -1,5 +1,10 @@
 import type { ClaimedStep } from '@cairn/shared';
-import { claimedStepSchema } from '@cairn/shared';
+import {
+  AGENT_TOOL_MERGE,
+  AGENT_TOOL_PUSH,
+  AGENT_TOOL_SKILL_CREATE,
+  claimedStepSchema,
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, afterEach, beforeEach, describe, expect, test } from 'vitest';
 import {
@@ -8,12 +13,15 @@ import {
   routingRule,
   team as teamTable,
   todo as todoTable,
+  workPolicy,
 } from '../src/db/schema.js';
 import { newRecordId } from '../src/lib/ids.js';
 import { agentForStep } from '../src/services/dispatch-eligibility.js';
 import {
   applyRoute,
+  seedReviewRules,
   seedRoutingRules,
+  seedWorkPolicies,
   setRoutingRulesEnabled,
   withOverride,
 } from '../src/services/routing-rules.js';
@@ -460,9 +468,27 @@ describe('D71 thread override set at dispatch', () => {
   });
 });
 
-describe('D71 tools, MCP, skills and secrets live on the session rule', () => {
-  test('flag on: the rule values replace the agent values', async () => {
-    const w = await setupWorld();
+function insertPolicy(
+  s: TestServer,
+  values: Partial<typeof workPolicy.$inferInsert> & { teamId: string },
+): void {
+  s.db
+    .insert(workPolicy)
+    .values({
+      id: newRecordId(),
+      use: 'session',
+      tools: [],
+      mcpServers: [],
+      secrets: [],
+      createdAt: 1,
+      updatedAt: 1,
+      ...values,
+    })
+    .run();
+}
+
+describe('work_policy: tools, MCP, skills and secrets live on the policy', () => {
+  async function agentWithPermissions(w: World): Promise<void> {
     w.s.db
       .update(agentTable)
       .set({
@@ -474,36 +500,84 @@ describe('D71 tools, MCP, skills and secrets live on the session rule', () => {
       })
       .where(eq(agentTable.id, AGENT_BUILD))
       .run();
+  }
+
+  test('flag on: the policy values replace the agent values', async () => {
+    const w = await setupWorld();
+    await agentWithPermissions(w);
+    insertRule(w.s, { teamId: w.s.team.id });
+    insertPolicy(w.s, {
+      teamId: w.s.team.id,
+      tools: ['policy-tool'],
+      mcpServers: ['policy-mcp'],
+      skillsAllowlist: ['policy-skill'],
+      defaultSkill: 'policy-skill',
+      secrets: ['POLICY_SECRET'],
+    });
+    const todoRow = await buildTodo(w);
+    expect(agentForStep(w.s.db, todoRow, 'build')).toMatchObject({
+      tools: ['policy-tool'],
+      mcpServers: ['policy-mcp'],
+      skillsAllowlist: ['policy-skill'],
+      defaultSkill: 'policy-skill',
+      secrets: ['POLICY_SECRET'],
+    });
+  });
+
+  test('flag on: permission columns left on the routing rule grant nothing', async () => {
+    const w = await setupWorld();
+    await agentWithPermissions(w);
     insertRule(w.s, {
       teamId: w.s.team.id,
       tools: ['rule-tool'],
       mcpServers: ['rule-mcp'],
-      skillsAllowlist: ['rule-skill'],
-      defaultSkill: 'rule-skill',
       secrets: ['RULE_SECRET'],
     });
     const todoRow = await buildTodo(w);
     expect(agentForStep(w.s.db, todoRow, 'build')).toMatchObject({
-      tools: ['rule-tool'],
-      mcpServers: ['rule-mcp'],
-      skillsAllowlist: ['rule-skill'],
-      defaultSkill: 'rule-skill',
-      secrets: ['RULE_SECRET'],
+      tools: ['agent-tool'],
+      mcpServers: ['agent-mcp'],
+      secrets: ['AGENT_SECRET'],
     });
   });
 
-  test('flag on: a rule that leaves a value unset inherits the agent value during the transition', async () => {
+  test('flag off: the policy is ignored and the agent values stand', async () => {
     const w = await setupWorld();
-    w.s.db
-      .update(agentTable)
-      .set({ mcpServers: ['agent-mcp'], secrets: ['AGENT_SECRET'] })
-      .where(eq(agentTable.id, AGENT_BUILD))
-      .run();
-    insertRule(w.s, { teamId: w.s.team.id, mcpServers: [] });
+    await agentWithPermissions(w);
+    insertRule(w.s, { teamId: w.s.team.id });
+    insertPolicy(w.s, { teamId: w.s.team.id, tools: ['policy-tool'], secrets: ['POLICY_SECRET'] });
     const todoRow = await buildTodo(w);
+    setRoutingRulesEnabled(false);
     expect(agentForStep(w.s.db, todoRow, 'build')).toMatchObject({
-      mcpServers: [],
+      tools: ['agent-tool'],
       secrets: ['AGENT_SECRET'],
+    });
+  });
+
+  test('another team policy is never applied', async () => {
+    const w = await setupWorld();
+    await agentWithPermissions(w);
+    const otherTeam = newRecordId();
+    w.s.db
+      .insert(teamTable)
+      .values({ ...w.s.db.select().from(teamTable).get()!, id: otherTeam, name: 'other-team' })
+      .run();
+    insertPolicy(w.s, { teamId: otherTeam, secrets: ['OTHER_SECRET'] });
+    const todoRow = await buildTodo(w);
+    expect(agentForStep(w.s.db, todoRow, 'build')?.secrets).toEqual(['AGENT_SECRET']);
+  });
+
+  test('an agentless session step with no policy gets no permissions', async () => {
+    const w = await setupWorld();
+    await agentWithPermissions(w);
+    insertRule(w.s, { teamId: w.s.team.id });
+    const todoRow = await buildTodo(w);
+    const agentless = { ...todoRow, assignment: null };
+    expect(agentForStep(w.s.db, agentless, 'build')).toMatchObject({
+      tools: [],
+      mcpServers: [],
+      secrets: [],
+      skillsAllowlist: [],
     });
   });
 
@@ -536,7 +610,7 @@ describe('D71 tools, MCP, skills and secrets live on the session rule', () => {
     expect(applyRoute(agentRow, rule).secrets).toEqual(['AGENT_SECRET']);
   });
 
-  test('seed copies the seed agent tools, MCP, skills and secrets onto the session rule', async () => {
+  test('seed copies only the seed agent permissions, never another agent secrets, and is idempotent', async () => {
     const w = await setupWorld();
     w.s.db.delete(agentTable).where(eq(agentTable.persona, 'implementer')).run();
     w.s.db
@@ -556,13 +630,41 @@ describe('D71 tools, MCP, skills and secrets live on the session rule', () => {
         secrets: ['NPM_TOKEN'],
       })
       .run();
-    expect(seedRoutingRules(w.s.db)).toBe(1);
-    expect(w.s.db.select().from(routingRule).get()).toMatchObject({
+    w.s.db
+      .update(agentTable)
+      .set({ secrets: ['OTHER_AGENT_SECRET'] })
+      .where(eq(agentTable.id, AGENT_BUILD))
+      .run();
+    seedRoutingRules(w.s.db);
+    expect(seedWorkPolicies(w.s.db)).toBe(1);
+    expect(seedWorkPolicies(w.s.db)).toBe(0);
+    expect(w.s.db.select().from(workPolicy).get()).toMatchObject({
+      use: 'session',
       tools: ['create_tag'],
       mcpServers: ['figma'],
       skillsAllowlist: ['verify-cairn'],
       defaultSkill: 'verify-cairn',
       secrets: ['NPM_TOKEN'],
+      seededFromAgentId: 'agent-impl',
     });
+  });
+
+  test('the review policy is read-only: no write tools and no secrets', async () => {
+    const w = await setupWorld();
+    w.s.db
+      .update(agentTable)
+      .set({
+        persona: 'code_reviewer',
+        tools: [AGENT_TOOL_MERGE, AGENT_TOOL_PUSH, AGENT_TOOL_SKILL_CREATE, 'read-only-tool'],
+        secrets: ['REVIEW_SECRET'],
+      })
+      .where(eq(agentTable.id, AGENT_BUILD))
+      .run();
+    expect(seedReviewRules(w.s.db)).toBe(1);
+    expect(seedWorkPolicies(w.s.db)).toBe(1);
+    const policy = w.s.db.select().from(workPolicy).get()!;
+    expect(policy.use).toBe('review');
+    expect(policy.tools).toEqual(['read-only-tool']);
+    expect(policy.secrets).toEqual([]);
   });
 });

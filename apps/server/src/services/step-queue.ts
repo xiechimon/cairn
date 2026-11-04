@@ -28,7 +28,7 @@ import {
 } from './machine-routing.js';
 import { effectiveModel } from './model-fallback.js';
 import { mergedCatalogModels } from './model-liveness.js';
-import { applyRoute, routeForStep } from './routing-rules.js';
+import { applyRoute, policyForStep, routeForStep } from './routing-rules.js';
 
 export interface QueueTargetStep {
   id: string;
@@ -120,7 +120,12 @@ export function stepQueueProjector(db: Db, teamId: string) {
       const base = agentRowOf(agentIdForStep(row.todoRow, row.kind, row.prompt));
       return base === null
         ? null
-        : applyRoute(base, routeForStep(db, row.todoRow, row.kind), row.todoRow.routeOverride);
+        : applyRoute(
+            base,
+            routeForStep(db, row.todoRow, row.kind),
+            row.todoRow.routeOverride,
+            policyForStep(db, row.todoRow, row.kind),
+          );
     }
     const chiefRow = db.select().from(chief).where(eq(chief.id, row.chiefId)).get();
     const bound = agentRowOf(chiefRow?.agentId ?? null);

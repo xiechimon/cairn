@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
-import { agent, routingRule, step as stepTable, todo } from '../src/db/schema.js';
+import { agent, routingRule, step as stepTable, todo, workPolicy } from '../src/db/schema.js';
 import { createEphemeralSecretBox, SecretBoxError } from '../src/lib/secret-box.js';
 import { startBuilds } from '../src/services/builds.js';
 import { resolveStepCredentials } from '../src/services/credentials.js';
@@ -341,7 +341,7 @@ describe('resolveStepCredentials under CAIRN_ROUTING_RULES', () => {
     });
   });
 
-  test('D71 a session rule that names secrets decides which team secrets a build step opens', async () => {
+  test('a session work policy that names secrets decides which team secrets a build step opens', async () => {
     const s = await withAgentStack();
     s.db
       .insert(routingRule)
@@ -351,6 +351,19 @@ describe('resolveStepCredentials under CAIRN_ROUTING_RULES', () => {
         use: 'session',
         provider: 'r3-gw',
         modelId: 'claude-sonnet-5',
+        secrets: ['STRIPE_API_KEY'],
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      .run();
+    s.db
+      .insert(workPolicy)
+      .values({
+        id: 'policy-secrets',
+        teamId: s.team.id,
+        use: 'session',
+        tools: [],
+        mcpServers: [],
         secrets: [],
         createdAt: 1,
         updatedAt: 1,
