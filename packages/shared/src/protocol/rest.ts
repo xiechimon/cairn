@@ -20,6 +20,11 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
     note: 'backup-status.json next to server.db (#2162)',
   },
   {
+    method: 'GET',
+    path: '/api/server/deploy',
+    note: 'deploy.json next to server.db, written by deploy-self.sh (#2427)',
+  },
+  {
     method: 'POST',
     path: '/api/flags/{key}/release',
     note: 'owner releases a feature flag to every user (#2427)',
