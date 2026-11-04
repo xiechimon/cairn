@@ -768,6 +768,7 @@ export async function claimStep(
   origin: string,
   signal?: AbortSignal,
   body?: MachineClaimBody,
+  stillAuthorized: () => boolean = () => true,
 ): Promise<ClaimedStep | null> {
   if (signal?.aborted) return null;
   const sinceWake = deps.machineHub.wakeSeq(teamId);
@@ -776,12 +777,12 @@ export async function claimStep(
     const first = claimCoordinatorTurn(deps, machineId, teamId);
     if (first) return first;
     await deps.machineHub.waitWake(teamId, holdMs, signal, sinceWake);
-    if (signal?.aborted) return null;
+    if (signal?.aborted || !stillAuthorized()) return null;
     return claimCoordinatorTurn(deps, machineId, teamId);
   }
   const first = await tryClaim(deps, machineId, teamId, origin, body?.maxWorkers);
   if (first) return first;
   await deps.machineHub.waitWake(teamId, holdMs, signal, sinceWake);
-  if (signal?.aborted) return null;
+  if (signal?.aborted || !stillAuthorized()) return null;
   return tryClaim(deps, machineId, teamId, origin, body?.maxWorkers);
 }

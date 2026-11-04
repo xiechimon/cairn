@@ -335,6 +335,8 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
   app.post('/api/machine/tasks/claim', async (c) => {
     const row = me(c);
     const body = parseWith(machineClaimBodySchema, (await jsonBody(c)) ?? {}, 'body');
+    const token = bearer(c) ?? '';
+    const stillAuthorized = () => findMachineByToken(ctx.db, token)?.id === row.id;
     const step = await claimStep(
       deps,
       row.id,
@@ -343,7 +345,9 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       originOf(c),
       c.req.raw.signal,
       body,
+      stillAuthorized,
     );
+    if (!stillAuthorized()) throw unauthorized();
     return c.json({ step });
   });
 

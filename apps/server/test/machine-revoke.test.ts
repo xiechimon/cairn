@@ -286,6 +286,40 @@ describe('machine token revocation (#2494)', () => {
     }
   });
 
+  test('a claim already waiting when the token is revoked gets 401 and takes no work queued afterwards', async () => {
+    const w = await setupWorld();
+    try {
+      const projectId = await postProject(w.s.app);
+      const todoRes = await call(w.s.app, 'POST', `/api/projects/${projectId}/todos`, {
+        body: { title: 'late work', spec: 'queued after revoke' },
+      });
+      const todo = (await todoRes.json()) as { id: string };
+      const waiting = call(w.s.app, 'POST', '/api/machine/tasks/claim', {
+        cred: w.a.token,
+        body: {},
+      });
+      await new Promise((r) => setTimeout(r, 30));
+      const revoke = await call(w.s.app, 'POST', `/api/machines/${w.a.machineId}/revoke`);
+      expect(revoke.status).toBe(204);
+      const started = await call(w.s.app, 'POST', `/api/projects/${projectId}/builds`, {
+        body: {
+          todoIds: [todo.id],
+          assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
+          withPlan: true,
+        },
+      });
+      expect(started.status).toBe(201);
+
+      const result = await waiting;
+      expect(result.status).toBe(401);
+      const steps = w.s.db.select().from(stepTable).all();
+      expect(steps.length).toBeGreaterThan(0);
+      expect(steps.every((row) => row.machineId === null && row.status === 'pending')).toBe(true);
+    } finally {
+      w.s.dispose();
+    }
+  });
+
   test('revoking machine A leaves machine B stream and token working', async () => {
     const w = await setupWorld();
     try {
