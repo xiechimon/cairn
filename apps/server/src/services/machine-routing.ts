@@ -1,4 +1,4 @@
-import { claudeLoginBlocksClaim, claudeRateBlock } from '@cairn/shared';
+import { claudeLoginBlocksClaim, claudeRateBlock, isBuildStepKind } from '@cairn/shared';
 import { and, asc, eq, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { type agent, type build, type machine, step } from '../db/schema.js';
@@ -80,9 +80,9 @@ export function priorSessionOf(
       and(
         eq(step.buildId, stepRow.buildId),
         sql`${step.sessionId} is not null`,
-        ...(stepRow.kind === 'build' &&
+        ...(isBuildStepKind(stepRow.kind) &&
         (buildRow.prevPhase === 'done' || buildRow.prevPhase === 'review')
-          ? [eq(step.kind, 'build')]
+          ? [eq(step.kind, stepRow.kind)]
           : []),
       ),
     )

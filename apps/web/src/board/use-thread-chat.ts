@@ -1,4 +1,9 @@
-import { STOP_MESSAGE, type TodoRecord as WireTodo } from '@cairn/shared';
+import {
+  isBuildStepKind,
+  STOP_MESSAGE,
+  type StepKind,
+  type TodoRecord as WireTodo,
+} from '@cairn/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useSearchParams } from 'react-router';
@@ -63,6 +68,10 @@ export interface ThreadChat {
 }
 
 const ACTIVE_STEP = new Set(['claimed', 'pending', 'waiting_quota']);
+
+export function hasDoneBuildLeg(steps: readonly { kind: StepKind; status: string }[]): boolean {
+  return steps.some((step) => isBuildStepKind(step.kind) && step.status === 'done');
+}
 
 export function replyRouteOf(
   phase: TodoRecord['phase'],
@@ -288,7 +297,7 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
       : fixtureDetail?.doc,
     planVersions: live ? mapPlanVersions(plans) : fixtureDetail?.planVersions,
     wire,
-    buildLegDone: steps.some((step) => step.kind === 'build' && step.status === 'done'),
+    buildLegDone: hasDoneBuildLeg(steps),
     started,
     locked: !open,
     running,

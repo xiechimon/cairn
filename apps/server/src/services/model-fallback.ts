@@ -17,7 +17,7 @@ import { providerHealth } from './provider-health.js';
 type AgentRow = typeof agent.$inferSelect;
 type StepRow = typeof step.$inferSelect;
 
-export const FALLBACK_STEP_KINDS: readonly StepKind[] = ['plan', 'build'];
+export const FALLBACK_STEP_KINDS: readonly StepKind[] = ['plan', 'build', 'session'];
 
 const MODEL_FALLBACK_STEP_KINDS: readonly StepKind[] = [...FALLBACK_STEP_KINDS, 'chief'];
 

@@ -34,6 +34,7 @@ import {
   EVIDENCE_PREFIX,
   GATE_LIMITS,
   hasBlockingFinding,
+  isBuildStepKind,
   isPlanContractRewritePrompt,
   MERGE_ANNOUNCEMENT,
   PLAN_PRIOR_ART_RULE,
@@ -49,6 +50,8 @@ import {
   REVIEW_VERDICT_KIND,
   type RouteOverride,
   reconcileVerifyVerdict,
+  SESSION_BRIEF,
+  SESSION_REWORK_BRIEF,
   STOP_MESSAGE,
   type TodoOutputKind,
   VERIFY_ANNOUNCEMENT,
@@ -149,7 +152,7 @@ import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
 import type { VapidKeys } from './push.js';
 import { publishStepRow, toQuotaWait } from './quota-wait.js';
 import { retryLessonsOf } from './retry-lessons.js';
-import { routeForStep } from './routing-rules.js';
+import { routeForStep, routingRulesEnabled } from './routing-rules.js';
 import { finishScheduledStep } from './schedules.js';
 import {
   appendShipGateInstruction,
@@ -460,13 +463,22 @@ export async function sendBuildSteer(
           const previousWork = db
             .select({ kind: step.kind })
             .from(step)
-            .where(and(eq(step.buildId, conversationId), inArray(step.kind, ['plan', 'build'])))
+            .where(
+              and(
+                eq(step.buildId, conversationId),
+                inArray(step.kind, ['plan', 'build', 'session']),
+              ),
+            )
             .orderBy(desc(step.createdAt))
             .get();
           const continuedStep = enqueueStep(
             deps,
             targetBuildId,
-            continuationOptions.afterTurn && previousWork?.kind === 'plan' ? 'plan' : 'build',
+            continuationOptions.afterTurn && previousWork?.kind === 'plan'
+              ? 'plan'
+              : previousWork?.kind === 'session'
+                ? 'session'
+                : 'build',
             todoRow.teamId,
             body.content,
             false,
@@ -1017,6 +1029,7 @@ export function startBuilds(
     if (todoRecord.archivedAt != null) throw new HttpError(409, 'Unarchive to continue');
     assertSplitProposalExecutable(previous?.errorMessage ?? null);
   }
+  const useSession = routingRulesEnabled();
   const created: BuildRecord[] = [];
   for (const todoId of input.todoIds) {
     const todoRecord = getTodo(deps, todoId);
@@ -1029,7 +1042,7 @@ export function startBuilds(
       .values({
         id,
         todoId,
-        withPlan: input.withPlan,
+        withPlan: useSession ? false : input.withPlan,
         prevPhase: todoRecord.phase,
         triggerSource,
         scheduledBy: input.scheduledBy ?? null,
@@ -1042,18 +1055,28 @@ export function startBuilds(
         createdAt,
       })
       .run();
-    const firstKind = input.withPlan ? 'plan' : 'build';
     const lessons =
       todoRecord.phase === 'failed' && todoRecord.latestBuildId !== null
         ? retryLessonsOf(deps.db, todoRecord.latestBuildId)
         : null;
-    enqueueStep(
-      deps,
-      id,
-      firstKind,
-      todoRecord.teamId,
-      withRetryLessons(input.prompt, firstKind, lessons),
-    );
+    if (useSession) {
+      enqueueStep(
+        deps,
+        id,
+        'session',
+        todoRecord.teamId,
+        [SESSION_BRIEF, input.prompt, lessons].filter((part) => part != null).join('\n\n'),
+      );
+    } else {
+      const firstKind = input.withPlan ? 'plan' : 'build';
+      enqueueStep(
+        deps,
+        id,
+        firstKind,
+        todoRecord.teamId,
+        withRetryLessons(input.prompt, firstKind, lessons),
+      );
+    }
     setTodoPhase(deps, todoId, 'queued', {
       assignment: input.assignment,
       routeOverride: input.routeOverride ?? null,
@@ -1357,7 +1380,7 @@ export async function applyBuildStepAction(
       .where(
         and(
           eq(step.buildId, row.id),
-          eq(step.kind, 'build'),
+          inArray(step.kind, ['build', 'session']),
           eq(step.status, 'failed'),
           isNotNull(step.checkpointCommit),
         ),
@@ -1389,13 +1412,21 @@ export async function applyBuildStepAction(
         createdAt: now,
       });
       const restartPrompt = feedbackText !== null ? buildRestartPrompt(feedbackText) : undefined;
-      const reuseKind = reworkTarget.withPlan ? 'plan' : 'build';
+      const reuseKind = buildRunsSession(deps, reworkTarget.id)
+        ? 'session'
+        : reworkTarget.withPlan
+          ? 'plan'
+          : 'build';
       enqueueStep(
         deps,
         reworkTarget.id,
         reuseKind,
         todoRecord.teamId,
-        withRetryLessons(restartPrompt, reuseKind, reuseLessons),
+        withRetryLessons(
+          restartPrompt,
+          reuseKind === 'session' ? 'build' : reuseKind,
+          reuseLessons,
+        ),
         true,
         origin === 'person',
       );
@@ -1599,6 +1630,20 @@ export async function applyBuildStepAction(
     content: body.feedback,
     createdAt: nowMs(),
   });
+  if (todoRecord.phase === 'review' && buildRunsSession(deps, buildId)) {
+    deps.db.update(build).set({ prevPhase: 'review' }).where(eq(build.id, buildId)).run();
+    setTodoPhase(deps, todoRecord.id, 'queued');
+    enqueueStep(
+      deps,
+      buildId,
+      'session',
+      todoRecord.teamId,
+      `${SESSION_REWORK_BRIEF}\n\n${body.feedback}`,
+      false,
+      true,
+    );
+    return;
+  }
   setTodoPhase(deps, todoRecord.id, 'planning');
   const replanPrompt =
     todoRecord.phase === 'review'
@@ -1614,12 +1659,22 @@ function restoreFailedReview(deps: BuildDeps, row: BuildRow): void {
   setTodoPhase(deps, todoRow.id, 'review');
 }
 
+export function buildRunsSession(deps: BuildDeps, buildId: string): boolean {
+  return (
+    deps.db
+      .select({ id: step.id })
+      .from(step)
+      .where(and(eq(step.buildId, buildId), eq(step.kind, 'session')))
+      .get() !== undefined
+  );
+}
+
 function assertDeliveredBuild(deps: BuildDeps, row: BuildRow): void {
   const { db } = deps;
   const buildStep = db
     .select()
     .from(step)
-    .where(and(eq(step.buildId, row.id), eq(step.kind, 'build')))
+    .where(and(eq(step.buildId, row.id), inArray(step.kind, ['build', 'session'])))
     .orderBy(asc(step.createdAt))
     .all()
     .at(-1);
@@ -1777,6 +1832,7 @@ function assertMergeTools(deps: BuildDeps, todoRow: TodoRow): void {
 const STEP_KIND_TEXT: Record<StepKind, string> = {
   plan: '规划',
   build: '执行',
+  session: '会话',
   merge: '合并',
   chief: '编排',
   review: '审核',
@@ -2359,7 +2415,7 @@ export function applyStepFailure(
   }
   finishScheduledStep(deps, stepRow, { status: 'failed', error: errorMessage });
   db.update(build).set({ errorMessage }).where(eq(build.id, buildRow.id)).run();
-  if (stepRow.kind === 'build') {
+  if (isBuildStepKind(stepRow.kind)) {
     const changes = buildRow.changes;
     const files =
       changes == null
@@ -2436,7 +2492,7 @@ export function sweepAbandonedBuildSteps(deps: BuildDeps, now: number = nowMs())
     .from(step)
     .where(
       and(
-        inArray(step.kind, ['plan', 'build', 'merge', 'review', 'verify']),
+        inArray(step.kind, ['plan', 'build', 'session', 'merge', 'review', 'verify']),
         inArray(step.status, ['pending', 'claimed']),
       ),
     )
@@ -2587,7 +2643,7 @@ function stepArtifactGate(
     if (priorPlanStep === undefined) return null;
     return '规划未产出方案';
   }
-  if (stepRow.kind === 'build') {
+  if (isBuildStepKind(stepRow.kind)) {
     if (outcome.output === 'info') {
       return outcome.report === undefined ? '信息卡未产出报告' : null;
     }
@@ -2773,7 +2829,7 @@ export function completeStep(
   );
   if (gateFailure !== null) {
     const refuseDriftRecord =
-      stepRow.kind === 'build' &&
+      isBuildStepKind(stepRow.kind) &&
       outcome.workBranchDrift !== undefined &&
       outcome.hasChanges !== false;
     if (refuseDriftRecord) {
@@ -2821,7 +2877,7 @@ export function completeStep(
     setTodoPhase(deps, todoRow.id, 'confirm', { hasPlan: true });
     return;
   }
-  if (stepRow.kind === 'build' && todoRow.output === 'info') {
+  if (isBuildStepKind(stepRow.kind) && todoRow.output === 'info') {
     if (outcome.report !== undefined && deps.attachmentsDir !== undefined) {
       storeInfoReport(
         { db: deps.db, attachmentsDir: deps.attachmentsDir },
@@ -2838,7 +2894,7 @@ export function completeStep(
     setTodoPhase(deps, todoRow.id, 'review', { hasChanges: false });
     return;
   }
-  if (stepRow.kind === 'build') {
+  if (isBuildStepKind(stepRow.kind)) {
     const deliveredGithubPr = githubPrOf(deps, todoRow, buildRow.prNumber) !== null;
     if (!deliveredGithubPr) {
       setTodoPhase(deps, todoRow.id, 'review', {
@@ -2981,7 +3037,7 @@ export function roundStart(deps: BuildDeps, buildId: string): number {
     deps.db
       .select({ at: step.createdAt })
       .from(step)
-      .where(and(eq(step.buildId, buildId), inArray(step.kind, ['build', 'plan'])))
+      .where(and(eq(step.buildId, buildId), inArray(step.kind, ['build', 'session', 'plan'])))
       .orderBy(desc(step.createdAt))
       .get()?.at ?? 0
   );
