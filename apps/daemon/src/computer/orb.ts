@@ -3,6 +3,7 @@ import {
   closeSync,
   constants,
   fchmodSync,
+  fstatSync,
   lstatSync,
   openSync,
   unlinkSync,
@@ -63,7 +64,7 @@ interface Pending {
 
 export interface OrbComputerProviderOptions {
   orbs: Pick<ComputerOrbs, 'ensure' | 'touch'>;
-  runtimeRoot?: string;
+  runtimeRoot?: string | (() => string);
   expectedRelease?: () => string | undefined;
   release?: {
     publish(): Promise<string>;
@@ -96,6 +97,7 @@ class GuestLink {
   private nextId = 0;
   private closed = false;
   private ownsFiles = false;
+  private directoryDescriptor: number | undefined;
   private readonly pending = new Map<number, Pending>();
   private readonly waiters = new Set<() => void>();
   private readonly sockets = new Set<Socket>();
@@ -107,7 +109,12 @@ class GuestLink {
   ) {}
 
   private get socketPath(): string {
-    return join(this.directory, ORB_COMPUTER_SOCKET);
+    return join(
+      process.platform === 'linux' && this.directoryDescriptor !== undefined
+        ? `/proc/self/fd/${this.directoryDescriptor}`
+        : this.directory,
+      ORB_COMPUTER_SOCKET,
+    );
   }
 
   listen(): Promise<void> {
@@ -128,6 +135,22 @@ class GuestLink {
       throw new ComputerTransportError(
         'Computer runtime directory must be a 0700 directory owned by the daemon',
       );
+    const descriptor = openSync(
+      this.directory,
+      constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW,
+    );
+    const opened = fstatSync(descriptor);
+    if (
+      !opened.isDirectory() ||
+      opened.dev !== directory.dev ||
+      opened.ino !== directory.ino ||
+      opened.uid !== process.getuid?.() ||
+      (opened.mode & 0o7777) !== 0o700
+    ) {
+      closeSync(descriptor);
+      throw new ComputerTransportError('Computer runtime directory changed before opening');
+    }
+    this.directoryDescriptor = descriptor;
     const paths = [this.socketPath, `${this.socketPath}.token`];
     for (const path of paths) {
       const metadata = lstatSync(path, { throwIfNoEntry: false });
@@ -150,17 +173,27 @@ class GuestLink {
         process.umask(mask);
       }
     });
+    if (this.closed) throw new ComputerTransportError('Computer link closed during startup');
     this.ownsFiles = true;
-    const descriptor = openSync(
+    const current = lstatSync(this.directory);
+    if (
+      !current.isDirectory() ||
+      current.dev !== opened.dev ||
+      current.ino !== opened.ino ||
+      current.uid !== opened.uid ||
+      (current.mode & 0o7777) !== 0o700
+    )
+      throw new ComputerTransportError('Computer runtime directory changed while opening');
+    const tokenDescriptor = openSync(
       `${this.socketPath}.token`,
       constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
       0o600,
     );
     try {
-      fchmodSync(descriptor, 0o600);
-      writeFileSync(descriptor, this.token);
+      fchmodSync(tokenDescriptor, 0o600);
+      writeFileSync(tokenDescriptor, this.token);
     } finally {
-      closeSync(descriptor);
+      closeSync(tokenDescriptor);
     }
     this.watchdog = setInterval(
       () => this.checkHeartbeat(),
@@ -436,12 +469,18 @@ class GuestLink {
     for (const socket of this.sockets) socket.destroy();
     const server = this.server;
     if (server) await new Promise<void>((resolve) => server.close(() => resolve()));
-    if (!this.ownsFiles) return;
-    for (const path of [this.socketPath, `${this.socketPath}.token`]) {
-      try {
-        const metadata = lstatSync(path, { throwIfNoEntry: false });
-        if (metadata?.isFile() || metadata?.isSocket()) unlinkSync(path);
-      } catch {}
+    try {
+      if (this.ownsFiles) {
+        for (const path of [this.socketPath, `${this.socketPath}.token`]) {
+          try {
+            const metadata = lstatSync(path, { throwIfNoEntry: false });
+            if (metadata?.isFile() || metadata?.isSocket()) unlinkSync(path);
+          } catch {}
+        }
+      }
+    } finally {
+      if (this.directoryDescriptor !== undefined) closeSync(this.directoryDescriptor);
+      this.directoryDescriptor = undefined;
     }
   }
 }
@@ -453,7 +492,7 @@ export class OrbComputerProvider implements ScopedComputerProviders {
   private publishing: Promise<string> | undefined;
   private readonly connectTimeoutMs: number;
   private readonly touchMs: number;
-  private readonly runtimeRoot: string;
+  private readonly runtimeRoot: string | (() => string);
 
   constructor(private readonly options: OrbComputerProviderOptions) {
     this.runtimeRoot = options.runtimeRoot ?? DEFAULT_RUNTIME_ROOT;
@@ -596,7 +635,10 @@ export class OrbComputerProvider implements ScopedComputerProviders {
       this.options.onError?.(`computer ${scopeKey} could not start: ${String(error)}`);
       throw new ComputerRefusal('The computer could not be started, so nothing ran');
     }
-    const directory = join(this.runtimeRoot, name);
+    const directory = join(
+      typeof this.runtimeRoot === 'function' ? this.runtimeRoot() : this.runtimeRoot,
+      name,
+    );
     let link = this.links.get(scopeKey);
     if (link && link.directory !== directory) {
       await link.close();
@@ -610,6 +652,8 @@ export class OrbComputerProvider implements ScopedComputerProviders {
       await this.beforeDelivery(link.listen.bind(link), signal);
     } catch (error) {
       this.options.onError?.(`computer ${scopeKey} socket failed: ${String(error)}`);
+      await link.close();
+      if (this.links.get(scopeKey) === link) this.links.delete(scopeKey);
       throw new ComputerRefusal('The computer link could not be opened, so nothing ran');
     }
     await link.connected(this.connectTimeoutMs, signal);
