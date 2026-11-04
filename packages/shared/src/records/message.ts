@@ -51,6 +51,34 @@ export const REVIEW_VERDICT_KIND = 'review_verdict';
 
 export const VERIFY_VERDICT_KIND = 'verify_verdict';
 
+export const RESEARCH_REQUESTED_KIND = 'research-requested';
+export const RESEARCH_REPORT_KIND = 'research-report';
+export const RESEARCH_TIMEOUT_KIND = 'research-timeout';
+export const RESEARCH_INJECT_MAX_BYTES = 2_400;
+
+export const researchRequestedMessageSchema = z.object({
+  kind: z.literal(RESEARCH_REQUESTED_KIND),
+  todoId: z.string(),
+  round: z.number().int().nonnegative(),
+});
+export type ResearchRequestedMessage = z.infer<typeof researchRequestedMessageSchema>;
+
+export const researchReportMessageSchema = z.object({
+  kind: z.literal(RESEARCH_REPORT_KIND),
+  attachmentId: z.string(),
+  todoId: z.string(),
+  round: z.number().int().nonnegative(),
+  acceptedAudit: z.string().min(1).optional(),
+});
+export type ResearchReportMessage = z.infer<typeof researchReportMessageSchema>;
+
+export const researchTimeoutMessageSchema = z.object({
+  kind: z.literal(RESEARCH_TIMEOUT_KIND),
+  todoId: z.string(),
+  round: z.number().int().nonnegative(),
+});
+export type ResearchTimeoutMessage = z.infer<typeof researchTimeoutMessageSchema>;
+
 export const CHIEF_TURN_ERROR_KIND = 'chief_turn_error';
 export const chiefTurnErrorContentSchema = z.object({
   kind: z.literal(CHIEF_TURN_ERROR_KIND),

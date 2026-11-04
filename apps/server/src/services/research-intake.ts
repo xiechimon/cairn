@@ -1,6 +1,7 @@
 import {
   RESEARCH_INTAKE_SOURCE_KIND,
   RESEARCH_INTAKE_THREAD_TITLES_MAX,
+  RESEARCH_STUCK_SOURCE_KIND,
   researchIntakeQuestion,
 } from '@cairn/shared';
 import { and, desc, eq, inArray, isNull, notInArray, or } from 'drizzle-orm';
@@ -48,7 +49,11 @@ export function planResearchIntake(deps: BuildDeps, projectId: string | null, no
         isNull(todo.archivedAt),
         or(
           isNull(todo.sourceKind),
-          notInArray(todo.sourceKind, [RESEARCH_INTAKE_SOURCE_KIND, 'research-citation-check']),
+          notInArray(todo.sourceKind, [
+            RESEARCH_INTAKE_SOURCE_KIND,
+            'research-citation-check',
+            RESEARCH_STUCK_SOURCE_KIND,
+          ]),
         ),
       ),
     )
