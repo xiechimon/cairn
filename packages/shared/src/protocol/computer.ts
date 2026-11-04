@@ -146,3 +146,20 @@ export const computerCommandSchema = z.object({
   at: epochMs,
 });
 export type ComputerCommand = z.infer<typeof computerCommandSchema>;
+
+export const computerRecordSchema = z.object({
+  id: recordId,
+  scopeKey: z.string(),
+  state: z.enum(COMPUTER_STATES),
+  controlHolder: z.enum(COMPUTER_CONTROL_HOLDERS),
+  machine: z.object({ id: z.string(), name: z.string(), online: z.boolean() }),
+});
+export type ComputerRecord = z.infer<typeof computerRecordSchema>;
+
+export const COMPUTER_COMMANDS_LIMIT_DEFAULT = 50;
+export const COMPUTER_COMMANDS_LIMIT_MAX = 200;
+
+export const computerCommandsResponseSchema = z.object({
+  commands: z.array(computerCommandSchema),
+});
+export type ComputerCommandsResponse = z.infer<typeof computerCommandsResponseSchema>;
