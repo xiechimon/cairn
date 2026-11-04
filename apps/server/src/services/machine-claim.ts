@@ -14,9 +14,12 @@ import {
   MCP_MIN_CLI_VERSION,
   mergedPrGuardNoteRowId,
   parseLocalMergeInstruction,
+  type RemoteToolDef,
   type SkillInjectionRecord,
+  type StepKind,
   selectSkillsForTask,
   suggestSkillsForMessage,
+  WORKER_ASK_USER_TOOL,
   WORKER_REMOTE_TOOLS,
   WORKER_REMOTE_TOOLS_GITHUB,
 } from '@cairn/shared';
@@ -71,7 +74,7 @@ import { mergedCatalogModels } from './model-liveness.js';
 import { stepScopeProjectId } from './picked-project.js';
 import { projectTurnContext } from './project-instructions.js';
 import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
-import { memoryOwnerOf, routeForStep } from './routing-rules.js';
+import { memoryOwnerOf, routeForStep, routingRulesEnabled } from './routing-rules.js';
 import { reverifyShip } from './ship-gate.js';
 import { scanLocalSkills } from './skills.js';
 import { listProjectTagVocab } from './tags.js';
@@ -726,17 +729,19 @@ async function tryClaim(
         injectedSkills: skillInjection.hits.map((h) => h.id),
         tools: [...agentRow.tools],
       },
-      remoteTools: (isGithubProject ? WORKER_REMOTE_TOOLS_GITHUB : WORKER_REMOTE_TOOLS).filter(
-        (tool) =>
-          cand.stepRow.kind === 'plan' ||
-          isBuildStepKind(cand.stepRow.kind) ||
-          !isThreadScheduleTool(tool.name),
-      ),
+      remoteTools: workerRemoteTools(cand.stepRow.kind, isGithubProject),
       localTools: claimLocalTools(agentRow.tools),
       ...(workerMcp !== undefined ? { mcpServers: workerMcp } : {}),
     };
   }
   return claimChiefTurn(deps, machineId, teamId, maxWorkers, Number.POSITIVE_INFINITY);
+}
+
+export function workerRemoteTools(kind: StepKind, isGithubProject: boolean): RemoteToolDef[] {
+  const base = (isGithubProject ? WORKER_REMOTE_TOOLS_GITHUB : WORKER_REMOTE_TOOLS).filter(
+    (tool) => kind === 'plan' || isBuildStepKind(kind) || !isThreadScheduleTool(tool.name),
+  );
+  return kind === 'session' && routingRulesEnabled() ? [...base, WORKER_ASK_USER_TOOL] : [...base];
 }
 
 export async function claimStep(

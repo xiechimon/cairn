@@ -1300,6 +1300,7 @@ export const EN: Record<string, string> = {
   '删除记忆失败，请重试。': 'Could not delete the memory. Try again.',
   总管提问: 'Chief question',
   已回答: 'Answered',
+  等待你的回复: 'Waiting for your reply',
   取消提问: 'Dismiss question',
   提交回答: 'Submit answers',
   输入你的回答: 'Type your answer',

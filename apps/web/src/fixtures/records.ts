@@ -374,6 +374,19 @@ export type TranscriptItem =
   | { kind: 'chief' }
   | { kind: 'fail'; title: string; body: string; createdAt?: number }
   | {
+      kind: 'question';
+      id: string;
+      requestId: string;
+      status: 'pending' | 'answered' | 'cancelled';
+      questions: {
+        header: string;
+        question: string;
+        options: { label: string; description?: string; recommended?: boolean }[];
+        multiSelect?: boolean;
+      }[];
+      answers: { header: string; choices?: string[]; text?: string }[] | null;
+    }
+  | {
       kind: 'review';
       createdAt?: number;
       conclusion: string;

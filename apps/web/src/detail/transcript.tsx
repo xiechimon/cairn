@@ -220,6 +220,37 @@ function Row({
           )}
         </div>
       );
+    case 'question':
+      return (
+        <div
+          data-testid="transcript-question"
+          className="mt-3.5 flex flex-col gap-2 rounded-(--radius-card) border border-border bg-card px-3.5 py-3 text-ui"
+        >
+          {item.questions.map((q) => (
+            <div key={q.header} className="flex flex-col gap-1">
+              <div className="text-meta text-(--text-tertiary)">{q.header}</div>
+              <div className="text-foreground">{q.question}</div>
+              {q.options.length > 0 && (
+                <ul className="list-disc pl-5 text-(--text-secondary)">
+                  {q.options.map((o) => (
+                    <li key={o.label}>
+                      {o.label}
+                      {o.description !== undefined && ` — ${o.description}`}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ))}
+          <div className="text-meta text-(--text-tertiary)">
+            {item.status === 'pending'
+              ? t('等待你的回复')
+              : item.status === 'answered'
+                ? t('已回答')
+                : t('已取消')}
+          </div>
+        </div>
+      );
     case 'note':
       return (
         <TurnRule className="mt-5" testId="transcript-note">

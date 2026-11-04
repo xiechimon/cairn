@@ -17,6 +17,7 @@ import {
   findClientMessage,
   replayAfterConflict,
 } from './client-message.js';
+import { answerWorkerQuestionsById, pendingWorkerQuestionIds } from './worker-question-store.js';
 
 type TodoRow = typeof todo.$inferSelect;
 
@@ -132,7 +133,9 @@ export async function messageThreadAsUser(
   }
   const buildId = row.latestBuildId;
   return coalesceClientMessage(deps.db, row.id, body.clientMessageId, async () => {
+    const parked = pendingWorkerQuestionIds(deps.db, buildId);
     const sent = await deliver(deps, row, buildId, body);
+    answerWorkerQuestionsById(deps, buildId, parked, body.content);
     try {
       recordInCoordinator(deps, row, body, sent);
     } catch (error) {

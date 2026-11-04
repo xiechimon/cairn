@@ -27,11 +27,12 @@ import { agentForStep } from './dispatch-eligibility.js';
 import { projectOfTodo } from './git.js';
 import { isChiefConversation, type MachineDeps, ownedStep } from './machines.js';
 import { stepScopeProjectId } from './picked-project.js';
-import { memoryOwnerOf, routeForStep } from './routing-rules.js';
+import { memoryOwnerOf, routeForStep, routingRulesEnabled } from './routing-rules.js';
 import { createLocalSkill, updateLocalSkill } from './skills.js';
 import { resolveFixedTagId, resolveProjectTagIds } from './tags.js';
 import { executeThreadScheduleTool, isThreadScheduleTool } from './thread-schedule-tools.js';
 import { updateTodo, writebackSelfIssueTitle } from './todos.js';
+import { askWorkerQuestion } from './worker-questions.js';
 
 export async function machineAsk(
   deps: MachineDeps,
@@ -41,6 +42,9 @@ export async function machineAsk(
   opts: { holdMs: number; signal?: AbortSignal } = { holdMs: ASK_HOLD_MS },
 ): Promise<MachineAskResponse> {
   const row = ownedStep(deps, machineId, stepId);
+  if (row.kind === 'session' && routingRulesEnabled()) {
+    return askWorkerQuestion(deps, row, body, opts);
+  }
   if (row.kind !== 'chief' || !isChiefConversation(row.buildId)) {
     throw new HttpError(400, `step ${stepId} is not a chief step`);
   }
