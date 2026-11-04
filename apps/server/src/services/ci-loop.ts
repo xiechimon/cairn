@@ -40,7 +40,13 @@ import { githubTokenOrNull } from './github-connection.js';
 import { recoverRedAutonomousMain } from './github-recovery.js';
 import { githubText } from './github-text.js';
 import { evaluateMergeGate } from './merge-gate-run.js';
-import { CI_FIX_FAILURES_HEAD, CI_FIX_PROMPT_HEAD, CI_FIX_PUSH_RULE } from './retry-lessons.js';
+import { holdLastCiFixForResearch } from './research-stuck.js';
+import {
+  CI_FIX_FAILURES_HEAD,
+  CI_FIX_PROMPT_HEAD,
+  CI_FIX_PUSH_RULE,
+  retryLessonsOf,
+} from './retry-lessons.js';
 import { setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
 import { blockingWorkerQuestions } from './worker-question-store.js';
@@ -954,17 +960,23 @@ export function createCiPoller(
         tally.failed += 1;
         return;
       }
+      if (holdLastCiFixForResearch(deps, cand.buildId, rounds, CI_FIX_ROUNDS_MAX, now)) {
+        tally.pending += 1;
+        return;
+      }
+      const lessons = retryLessonsOf(deps.db, cand.buildId);
+      const fixPrompt = buildCiFixPrompt({
+        prNumber: buildRow.prNumber,
+        prUrl: buildRow.prUrl,
+        round: rounds + 1,
+        failures: verdict.failures,
+      });
       enqueueStep(
         deps,
         cand.buildId,
         'build',
         todoRow.teamId,
-        buildCiFixPrompt({
-          prNumber: buildRow.prNumber,
-          prUrl: buildRow.prUrl,
-          round: rounds + 1,
-          failures: verdict.failures,
-        }),
+        lessons === null ? fixPrompt : `${fixPrompt}\n\n${lessons}`,
       );
       tally.appended += 1;
       return;
