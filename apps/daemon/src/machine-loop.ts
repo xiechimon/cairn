@@ -379,6 +379,12 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         );
       });
   };
+  const removedOutboxFiles = journal.sweepOrphanFiles({
+    now: Date.now(),
+    ttlMs: opts.orphanTtlMs ?? ORPHAN_WORKTREE_TTL_MS,
+  });
+  if (removedOutboxFiles.length > 0)
+    logger.workspace(`orphan outbox files removed: ${removedOutboxFiles.length}`);
   sweepOrphans();
   const orphanTimer = setInterval(sweepOrphans, 24 * 60 * 60 * 1000);
   orphanTimer.unref?.();
