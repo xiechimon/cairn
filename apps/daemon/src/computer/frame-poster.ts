@@ -1,3 +1,4 @@
+import { setTimeout as delay } from 'node:timers/promises';
 import type { ComputerFrame } from '@cairn/shared';
 import { COMPUTER_FRAME_TEXT_MAX_CHARS, COMPUTER_FRAMES_PER_POST_MAX } from '@cairn/shared';
 import { type MachineApi, MachineApiError } from '../machine-client.js';
@@ -27,24 +28,39 @@ export interface FramePosterOptions {
   now: () => number;
   onStop: (reason: 'cancelled' | 'unreachable') => void;
   postTimeoutMs?: number;
+  signal?: AbortSignal;
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  let timer: NodeJS.Timeout | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new FramePostTimeoutError()), Math.max(ms, 0));
-    timer.unref();
+async function withTimeout<T>(
+  run: (signal: AbortSignal) => Promise<T> | undefined,
+  ms: number,
+  lifetime: AbortSignal,
+): Promise<T | undefined> {
+  lifetime.throwIfAborted();
+  const request = new AbortController();
+  const onAbort = () => request.abort(lifetime.reason);
+  lifetime.addEventListener('abort', onAbort, { once: true });
+  const stopped = new Promise<never>((_resolve, reject) => {
+    request.signal.addEventListener('abort', () => reject(request.signal.reason), { once: true });
   });
-  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+  const timer = setTimeout(() => request.abort(new FramePostTimeoutError()), Math.max(ms, 0));
+  timer.unref();
+  try {
+    const posting = Promise.resolve().then(() => {
+      request.signal.throwIfAborted();
+      return run(request.signal);
+    });
+    return await Promise.race([posting, stopped]);
+  } finally {
+    clearTimeout(timer);
+    lifetime.removeEventListener('abort', onAbort);
+    request.abort();
+  }
 }
 
 function isTerminalPostError(error: unknown): boolean {
   if (!(error instanceof MachineApiError)) return false;
-  const retryable = [401, 408, 425, 429];
+  const retryable = [408, 425, 429];
   return error.status >= 400 && error.status < 500 && !retryable.includes(error.status);
 }
 
@@ -67,11 +83,15 @@ export class FramePoster {
   private readonly heartbeatTimer: NodeJS.Timeout;
   private finished = false;
   private gaveUp = false;
+  private readonly lifetime = new AbortController();
+  private readonly onAbort = () => this.giveUp();
 
   constructor(private readonly options: FramePosterOptions) {
     this.lastActivity = options.now();
     this.heartbeatTimer = setInterval(() => this.heartbeat(), options.heartbeatMs);
     this.heartbeatTimer.unref();
+    if (options.signal?.aborted) this.giveUp();
+    else options.signal?.addEventListener('abort', this.onAbort, { once: true });
   }
 
   get abandoned(): boolean {
@@ -108,14 +128,18 @@ export class FramePoster {
   }
 
   async finish(final: ComputerFrameBody): Promise<void> {
-    if (this.finished) return;
+    if (this.finished || this.gaveUp) return;
     this.flushBuffer();
     this.finished = true;
     clearInterval(this.heartbeatTimer);
     this.enqueue(final);
-    while (!this.gaveUp && (this.sending || this.queue.length > 0)) {
-      this.kick();
-      await this.sending;
+    try {
+      while (!this.gaveUp && (this.sending || this.queue.length > 0)) {
+        this.kick();
+        await this.sending;
+      }
+    } finally {
+      this.clearTimers();
     }
   }
 
@@ -153,10 +177,20 @@ export class FramePoster {
     });
   }
 
+  private clearTimers(): void {
+    clearInterval(this.heartbeatTimer);
+    clearTimeout(this.flushTimer);
+    this.flushTimer = undefined;
+    this.options.signal?.removeEventListener('abort', this.onAbort);
+    this.lifetime.abort();
+  }
+
   private giveUp(): void {
+    if (this.gaveUp) return;
     this.gaveUp = true;
     this.queue = [];
-    clearInterval(this.heartbeatTimer);
+    this.buffer = '';
+    this.clearTimers();
     this.options.onStop('unreachable');
   }
 
@@ -165,12 +199,16 @@ export class FramePoster {
     while (this.queue.length > 0 && !this.gaveUp) {
       const batch = this.queue.slice(0, COMPUTER_FRAMES_PER_POST_MAX);
       try {
-        const post = this.options.client.computerFrames?.(this.options.callId, { frames: batch });
         const budget = Math.min(
           this.options.postTimeoutMs ?? FRAME_POST_TIMEOUT_MS,
           this.options.deadlineAt - this.options.now(),
         );
-        const response = post && (await withTimeout(post, budget));
+        const response = await withTimeout(
+          (signal) =>
+            this.options.client.computerFrames?.(this.options.callId, { frames: batch }, signal),
+          budget,
+          this.lifetime.signal,
+        );
         if (!response) return this.giveUp();
         this.queue.splice(0, batch.length);
         this.lastActivity = this.options.now();
@@ -178,8 +216,12 @@ export class FramePoster {
         if (response.cancelled) this.options.onStop('cancelled');
       } catch (error) {
         const remaining = this.options.deadlineAt - this.options.now();
-        if (isTerminalPostError(error) || remaining <= 0) return this.giveUp();
-        await sleep(Math.min(backoff, remaining));
+        if (this.gaveUp || isTerminalPostError(error) || remaining <= 0) return this.giveUp();
+        try {
+          await delay(Math.min(backoff, remaining), undefined, { signal: this.lifetime.signal });
+        } catch {
+          return this.giveUp();
+        }
         backoff = Math.min(backoff * 2, this.options.retryMaxMs);
       }
     }

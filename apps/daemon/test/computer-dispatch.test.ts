@@ -1,6 +1,10 @@
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
+import { once } from 'node:events';
 import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 import {
   COMPUTER_FRAME_TEXT_MAX_CHARS,
   COMPUTER_FRAMES_PER_POST_MAX,
@@ -413,6 +417,78 @@ describe('computer dispatcher: cancel, retry and shutdown', () => {
     expect(api.posts.length).toBe(postsAtEnd);
     await expectGone(pidsIn(pidFile));
   });
+
+  test('an authentication rejection stops the command without retrying an unchanged token', async () => {
+    const pidFile = path.join(home, 'pids');
+    let deny = true;
+    let attempted: () => void = () => {};
+    const firstAttempt = new Promise<void>((resolve) => {
+      attempted = resolve;
+    });
+    const api = fakeClient(() => {
+      attempted();
+      if (deny) throw new MachineApiError(401, 'machine token revoked');
+      return { ok: true, cancelled: false };
+    });
+    const dispatcher = createComputerDispatcher({ client: api.client, host: host(), ...FAST });
+    const running = dispatcher.dispatch(
+      call({
+        command: script('auth.sh', `sleep 60 & echo $! >> ${pidFile}\necho started\nsleep 60\n`),
+      }),
+    );
+    await firstAttempt;
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    const attempts = api.attempts;
+    const stillAlive = pidsIn(pidFile).filter(alive);
+    deny = false;
+    await dispatcher.close();
+    await running;
+    expect(attempts).toBe(1);
+    expect(stillAlive).toEqual([]);
+  });
+
+  test.each(['reject', 'stalled'])(
+    'shutdown permits natural process exit while a frame POST is %s',
+    async (mode) => {
+      const { stdout } = await promisify(execFile)(
+        process.execPath,
+        [
+          '--import',
+          import.meta.resolve('tsx'),
+          fileURLToPath(new URL('./computer-dispatch-exit-fixture.ts', import.meta.url)),
+          mode,
+        ],
+        { cwd: home, timeout: 4000 },
+      );
+      expect(stdout).toBe('closed\n');
+    },
+    10000,
+  );
+
+  test('shutdown aborts a real frame fetch whose server never answers', async () => {
+    const server = createServer((request) => request.resume());
+    server.listen(0, '127.0.0.1');
+    await once(server, 'listening');
+    try {
+      const address = server.address();
+      if (!address || typeof address === 'string') throw new Error('fixture server has no port');
+      const { stdout } = await promisify(execFile)(
+        process.execPath,
+        [
+          '--import',
+          import.meta.resolve('tsx'),
+          fileURLToPath(new URL('./computer-dispatch-exit-fixture.ts', import.meta.url)),
+          'fetch',
+          `http://127.0.0.1:${address.port}`,
+        ],
+        { cwd: home, timeout: 5000 },
+      );
+      expect(stdout).toBe('closed\n');
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  }, 10000);
 
   test('a failed POST is retried with the same sequence numbers and leaves no gap', async () => {
     const attemptedSeqs: number[][] = [];

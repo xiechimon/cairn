@@ -52,15 +52,12 @@ export interface ComputerDispatcher {
   close(): Promise<void>;
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 export function createComputerDispatcher(options: ComputerDispatcherOptions): ComputerDispatcher {
   const now = options.now ?? Date.now;
   const inFlight = new Map<string, { controller: AbortController; settled: Promise<void> }>();
   const seen = new Set<string>();
   let closing = false;
+  const postingLifetime = new AbortController();
 
   function remember(callId: string): void {
     seen.add(callId);
@@ -74,6 +71,7 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
     return new FramePoster({
       client: options.client,
       callId: call.callId,
+      signal: postingLifetime.signal,
       deadlineAt: call.deadlineAt,
       flushMs: options.flushMs ?? COMPUTER_FLUSH_MS,
       heartbeatMs: options.heartbeatMs ?? COMPUTER_HEARTBEAT_MS,
@@ -198,12 +196,20 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
     async close() {
       closing = true;
       const running = [...inFlight.values()];
-      for (const { controller } of running) controller.abort('shutdown');
-      await options.host?.killAll();
-      await Promise.race([
-        Promise.allSettled(running.map(({ settled }) => settled)),
-        sleep(CLOSE_WAIT_MS),
-      ]);
+      let deadlineTimer: NodeJS.Timeout | undefined;
+      try {
+        for (const { controller } of running) controller.abort('shutdown');
+        await options.host?.killAll();
+        await Promise.race([
+          Promise.allSettled(running.map(({ settled }) => settled)),
+          new Promise<void>((resolve) => {
+            deadlineTimer = setTimeout(resolve, CLOSE_WAIT_MS);
+          }),
+        ]);
+      } finally {
+        clearTimeout(deadlineTimer);
+        postingLifetime.abort();
+      }
     },
   };
 }
