@@ -156,3 +156,39 @@ test('a needs-you report offers no reply once the question is answered', async (
   await expect(stream.getByTestId('thread-report-marker')).toBeVisible();
   await expect(stream.getByTestId('thread-report-reply')).toHaveCount(0);
 });
+
+test('only the newest needs-you report of a thread offers a reply', async ({ page }) => {
+  const asked = (id: string, line: string, createdAt: number) => ({
+    id,
+    role: 'system',
+    content: JSON.stringify({
+      kind: 'thread-report',
+      todoId: TASK.id,
+      phase: 'needs-you',
+      seqNum: TASK.seqNum,
+      title: 'Add an export',
+      line,
+    }),
+    createdAt,
+  });
+  await mockLive(page, {
+    threads: [THREAD],
+    messages: [
+      { id: 'request', role: 'user', content: 'Add an export', createdAt: 10 },
+      asked('first-question', 'Which export format?', 20),
+      asked('second-question', 'Which delimiter?', 30),
+    ],
+    todos: [{ ...TASK, phase: 'building', awaitingReply: true }],
+  });
+  await page.goto('/app');
+  const stream = page.getByTestId('home-c').getByTestId('chief-stream');
+  await expect(stream.getByTestId('thread-report-marker')).toHaveCount(2);
+  await expect(stream.getByTestId('thread-report-reply')).toHaveCount(1);
+  const replyAfter = (text: string) =>
+    stream
+      .getByTestId('thread-report-marker')
+      .filter({ hasText: text })
+      .locator('xpath=following-sibling::*[@data-testid="thread-report-reply"]');
+  await expect(replyAfter('Which delimiter?')).toHaveCount(1);
+  await expect(replyAfter('Which export format?')).toHaveCount(0);
+});

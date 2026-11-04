@@ -672,6 +672,21 @@ function stopFallbackPhase(db: Db, buildRow: BuildRow): Phase {
   return buildRow.prevPhase ?? 'todo';
 }
 
+export function stoppedBeforeFirstRun(
+  db: Db,
+  row: Pick<typeof todo.$inferSelect, 'phase' | 'latestBuildId'>,
+): boolean {
+  if (row.phase !== 'todo' || row.latestBuildId === null) return false;
+  const latest = db.select().from(build).where(eq(build.id, row.latestBuildId)).get();
+  if (latest?.errorMessage !== STOP_MESSAGE) return false;
+  const steps = db
+    .select({ status: step.status })
+    .from(step)
+    .where(eq(step.buildId, latest.id))
+    .all();
+  return steps.length > 0 && steps.every((s) => s.status === 'stopped');
+}
+
 function releaseUnissuedMergeAdmission(db: Db, row: typeof step.$inferSelect): void {
   if (row.kind !== 'merge') return;
   if (row.prompt?.includes('"local-merge"') && (row.status === 'claimed' || row.claimedAt !== null))

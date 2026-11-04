@@ -431,6 +431,75 @@ describe('flag on', () => {
       );
     });
 
+    test('a thread stopped before its first run is resumed by message_thread', async () => {
+      const { todoId, buildId } = await openThread();
+      await relay('stop_thread', { todoId });
+      const stopped = H.s.db.select().from(todo).where(eq(todo.id, todoId)).get()!;
+      expect(stopped.phase).toBe('todo');
+      expect(stopped.latestBuildId).toBe(buildId);
+      const out = (await relay('message_thread', { todoId, content: 'Try again, smaller' })) as {
+        delivered: string;
+        conversationId: string;
+      };
+      const resumed = H.s.db.select().from(todo).where(eq(todo.id, todoId)).get()!;
+      expect(resumed.phase).toBe('queued');
+      expect(resumed.latestBuildId).not.toBe(buildId);
+      expect(out).toMatchObject({ delivered: 'restart', conversationId: resumed.latestBuildId });
+      const session = H.s.db
+        .select()
+        .from(step)
+        .where(eq(step.buildId, resumed.latestBuildId as string))
+        .get()!;
+      expect(session).toMatchObject({ kind: 'session', status: 'pending' });
+      expect(session.prompt).toContain('Try again, smaller');
+      const markers = H.s.db
+        .select()
+        .from(chiefMessage)
+        .all()
+        .filter((row) => String(row.content).includes('thread-message'));
+      expect(markers).toHaveLength(1);
+      expect(JSON.parse(String(markers[0]!.content))).toMatchObject({
+        delivered: 'restart',
+        by: 'coordinator',
+      });
+    });
+
+    test('a thread stopped before its first run is reopened by open_thread', async () => {
+      const { todoId, buildId } = await openThread();
+      await relay('stop_thread', { todoId });
+      const out = (await relay('open_thread', { todoId })) as { buildId: string };
+      expect(out.buildId).not.toBe(buildId);
+      const row = H.s.db.select().from(todo).where(eq(todo.id, todoId)).get()!;
+      expect(row).toMatchObject({ phase: 'queued', latestBuildId: out.buildId });
+      await expectRejected(relay('open_thread', { todoId }), 409, /already open/);
+    });
+
+    test('a stopped-before-first-run thread keeps the intake-label marker on resume', async () => {
+      const assignment = {
+        source: 'intake-label' as const,
+        plan: { agentId: AGENT2_ID },
+        build: { agentId: AGENT2_ID },
+      };
+      const { todoId } = await openThread({ assignment });
+      await relay('stop_thread', { todoId });
+      await relay('message_thread', { todoId, content: 'Go on' });
+      expect(H.s.db.select().from(todo).where(eq(todo.id, todoId)).get()!.assignment).toEqual(
+        assignment,
+      );
+    });
+
+    test('a todo in phase todo whose build ran a step is still refused', async () => {
+      const { todoId, buildId } = await openThread();
+      H.s.db.update(step).set({ status: 'done' }).where(eq(step.buildId, buildId)).run();
+      H.s.db.update(todo).set({ phase: 'todo' }).where(eq(todo.id, todoId)).run();
+      await expectRejected(
+        relay('message_thread', { todoId, content: 'hi' }),
+        409,
+        /cannot take a message/,
+      );
+      await expectRejected(relay('open_thread', { todoId }), 409, /already open/);
+    });
+
     test('rejects an unstarted thread and another team', async () => {
       const unstarted = seedTodo();
       await expectRejected(relay('stop_thread', { todoId: unstarted }), 409, /not started/);

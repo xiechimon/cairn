@@ -11,7 +11,13 @@ import { chiefMessage, step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { tidyText } from '../lib/tidy-text.js';
-import { applyBuildStepAction, type BuildDeps, sendBuildSteer } from './builds.js';
+import {
+  applyBuildStepAction,
+  type BuildDeps,
+  sendBuildSteer,
+  startBuilds,
+  stoppedBeforeFirstRun,
+} from './builds.js';
 import { coordinatorThreadRow, ensureChief } from './chief.js';
 import {
   claimClientMessage,
@@ -57,6 +63,31 @@ function latestBuildOf(deps: BuildDeps, todoId: string): string | null {
   );
 }
 
+export function startThreadBuild(
+  deps: BuildDeps,
+  row: TodoRow,
+  origin: ThreadMessageOrigin,
+  prompt?: string,
+): string {
+  const [started] = startBuilds(deps, {
+    projectId: row.projectId,
+    todoIds: [row.id],
+    assignment:
+      row.assignment?.source === 'intake-label'
+        ? {
+            source: row.assignment.source,
+            plan: row.assignment.plan,
+            build: row.assignment.build,
+          }
+        : { plan: null, build: null },
+    withPlan: false,
+    triggerSource: origin.origin === 'user' ? 'user' : 'chief',
+    prompt,
+  });
+  if (!started) throw new Error('build missing after start');
+  return started.id;
+}
+
 async function deliver(
   deps: BuildDeps,
   row: TodoRow,
@@ -96,6 +127,12 @@ async function deliver(
       ...stepActionAttribution(origin),
     );
     return { conversationId: latestBuildOf(deps, row.id) ?? buildId, delivered: 'restart' };
+  }
+  if (stoppedBeforeFirstRun(deps.db, row)) {
+    return {
+      conversationId: startThreadBuild(deps, row, origin, body.content),
+      delivered: 'restart',
+    };
   }
   throw new HttpError(409, `thread #${row.seqNum} cannot take a message while ${row.phase}`);
 }

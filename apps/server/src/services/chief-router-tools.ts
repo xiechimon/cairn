@@ -12,12 +12,12 @@ import { agent, build, project, todo } from '../db/schema.js';
 import { HttpError, parseWith } from '../lib/errors.js';
 import { newRecordId } from '../lib/ids.js';
 import { tidyText } from '../lib/tidy-text.js';
-import { cancelBuild, startBuilds } from './builds.js';
+import { cancelBuild, stoppedBeforeFirstRun } from './builds.js';
 import type { ChiefToolCtx, ChiefToolDeps } from './chief-tools.js';
 import { listNeedsYou } from './needs-you.js';
 import { PhaseTransitionError } from './phase.js';
 import { routingRulesEnabled } from './routing-rules.js';
-import { messageThreadAsUser } from './thread-message.js';
+import { messageThreadAsUser, startThreadBuild } from './thread-message.js';
 import { pendingWorkerQuestions } from './worker-question-store.js';
 
 type Params = Record<string, unknown>;
@@ -86,7 +86,7 @@ function tidy(text: string, max: number): string {
 
 function openThread(deps: ChiefToolDeps, ctx: ChiefToolCtx, params: Params): string {
   const row = teamTodo(deps.db, str(params, 'todoId'), ctx.teamId);
-  if (row.latestBuildId !== null) {
+  if (row.latestBuildId !== null && !stoppedBeforeFirstRun(deps.db, row)) {
     throw new HttpError(
       409,
       `thread #${row.seqNum} is already open; use message_thread to talk to it`,
@@ -95,21 +95,8 @@ function openThread(deps: ChiefToolDeps, ctx: ChiefToolCtx, params: Params): str
   const projectRow = deps.db.select().from(project).where(eq(project.id, row.projectId)).get();
   if (projectRow?.teamId !== ctx.teamId) throw new HttpError(404, `project ${row.projectId}`);
   try {
-    const [started] = startBuilds(deps, {
-      projectId: row.projectId,
-      todoIds: [row.id],
-      assignment:
-        row.assignment?.source === 'intake-label'
-          ? {
-              source: row.assignment.source,
-              plan: row.assignment.plan,
-              build: row.assignment.build,
-            }
-          : { plan: null, build: null },
-      withPlan: false,
-      triggerSource: 'chief',
-    });
-    return json({ todoId: row.id, seqNum: row.seqNum, buildId: started?.id ?? null });
+    const buildId = startThreadBuild(deps, row, { origin: 'coordinator', actor: 'Chief' });
+    return json({ todoId: row.id, seqNum: row.seqNum, buildId });
   } catch (error) {
     if (error instanceof PhaseTransitionError) throw new HttpError(409, error.message);
     throw error;

@@ -187,6 +187,7 @@ interface ChiefStreamRowProps {
   item: ChiefStreamItem;
   index: number;
   latest: boolean;
+  replyable?: boolean;
   bound: ChiefContent['bound'];
   agent: ChiefContent['agent'];
   runningTool: ChiefContent['runningTool'];
@@ -236,6 +237,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   item,
   index: i,
   latest,
+  replyable = false,
   bound,
   agent,
   runningTool,
@@ -270,7 +272,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
             {item.line !== undefined && <span className="ml-1.5">{item.line}</span>}
           </MarkerContent>
         </Marker>
-        {item.phase === 'needs-you' && <ThreadReportReply todoId={item.todoId} />}
+        {item.phase === 'needs-you' && replyable && <ThreadReportReply todoId={item.todoId} />}
       </MessageScrollerItem>
     );
   if (item.kind === 'thread-message')
