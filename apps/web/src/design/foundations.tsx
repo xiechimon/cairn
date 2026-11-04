@@ -354,7 +354,7 @@ export function TypeSection() {
     <Section
       id="type"
       title="Type"
-      lede="Six sizes. Bricolage Grotesque for titles and the brand, Instrument Sans for everything you read, JetBrains Mono for code and times."
+      lede="Seven sizes. Source Serif 4 for the greeting and page titles, Instrument Sans for everything else, JetBrains Mono for code and times."
     >
       <Specimen
         title="Scale"

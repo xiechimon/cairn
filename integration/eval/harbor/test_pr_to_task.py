@@ -1,6 +1,7 @@
 import importlib.util
 from pathlib import Path
 import subprocess
+import sys
 
 import pytest
 
@@ -47,7 +48,7 @@ def test_separates_answers_and_runs_both_controls(repository, tmp_path):
         head,
         "Add positive numbers.\n",
         task,
-        ["python3", "-m", "pytest", "test_add.py"],
+        [sys.executable, "-m", "pytest", "test_add.py"],
         42,
     )
     assert "Add positive numbers.\n" in (task / "instruction.md").read_text()
@@ -77,7 +78,7 @@ def test_separates_answers_and_runs_both_controls(repository, tmp_path):
                 check=True,
             )
         run = subprocess.run(
-            ["python3", "-m", "pytest", "test_add.py"],
+            [sys.executable, "-m", "pytest", "test_add.py"],
             cwd=work,
             capture_output=True,
             text=True,
@@ -179,3 +180,26 @@ def test_rejects_non_array_test_commands(repository, tmp_path, command):
     repo, base, head = repository
     with pytest.raises(ValueError):
         converter.convert(repo, base, head, "Fixture", tmp_path / "task", command, 42)
+
+
+def test_missing_reward_is_infrastructure_for_both_controls():
+    for agent in ("oracle", "nop"):
+        assert (
+            converter.classify_control(
+                {"verifier_result": None, "exception_info": None},
+                "AssertionError: expected 5",
+                agent,
+            )
+            == "infrastructure"
+        )
+
+
+def test_nop_that_passes_is_not_a_failed_control():
+    assert (
+        converter.classify_control(
+            {"verifier_result": {"rewards": {"reward": 1}}, "exception_info": None},
+            "",
+            "nop",
+        )
+        == "pass"
+    )

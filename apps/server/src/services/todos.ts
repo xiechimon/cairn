@@ -182,7 +182,7 @@ export function toTodoRecord(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoReco
             cacheRead: usage.cacheRead,
             cacheWrite: usage.cacheWrite,
             total: usage.total,
-            ...(usage.priced > 0 ? (usage.total === 0 ? { priced: true } : {}) : { priced: false }),
+            priced: usage.priced === usage.rows,
           },
         }
       : {}),
