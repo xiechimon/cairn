@@ -1,0 +1,43 @@
+[
+  {
+    "request": {
+      "method": "POST",
+      "path": "/fixtures/answered-session-check"
+    },
+    "response": {
+      "mode": "SIMULATED API and GitHub data; actual checker execution; NOT trial acceptance",
+      "codeHead": "9d5d365688071d9d8280c2232a197cc8945a1f7d",
+      "checker": {
+        "ok": true,
+        "failures": [],
+        "lines": [
+          "push: ok",
+          "dist: ok",
+          "server: checked",
+          "trial-one: ok"
+        ]
+      }
+    }
+  },
+  {
+    "request": {
+      "method": "POST",
+      "path": "/fixtures/parked-session-check"
+    },
+    "response": {
+      "mode": "SIMULATED API and GitHub data; actual checker execution; NOT trial acceptance",
+      "codeHead": "9d5d365688071d9d8280c2232a197cc8945a1f7d",
+      "checker": {
+        "ok": false,
+        "failures": [
+          "server-reply: trial Thread must not be waiting for a user reply"
+        ],
+        "lines": [
+          "push: ok",
+          "dist: ok",
+          "server-reply: trial Thread must not be waiting for a user reply"
+        ]
+      }
+    }
+  }
+]
