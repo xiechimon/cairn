@@ -63,15 +63,80 @@ def test_arm_summary_counts_infra_failures_separately() -> None:
     assert summary.pass_rate == 0.5
 
 
-def test_arm_summary_excludes_voided_trials_from_the_denominator() -> None:
+def test_voided_passing_trial_counts_as_a_scored_zero() -> None:
     outcomes = [
         _trial("t1", passed=True),
         _trial("t2", passed=False, voided=True),
     ]
     summary = arm_summary(outcomes, label="B")
+    assert summary.scored == 2
+    assert summary.passed == 1
+    assert summary.voided == 1
+    assert summary.pass_rate == 0.5
+
+
+def test_voiding_a_pass_cannot_raise_the_pass_rate() -> None:
+    honest = arm_summary([_trial("t1", True), _trial("t2", False)], label="A")
+    voided = arm_summary(
+        [_trial("t1", True), _trial("t2", False, voided=True)], label="A"
+    )
+    assert voided.pass_rate <= honest.pass_rate
+
+
+def test_infra_failures_stay_excluded_beside_voided_trials() -> None:
+    outcomes = [
+        _trial("t1", passed=True),
+        _trial("t2", passed=False, voided=True),
+        _trial("t3", passed=False, infra=True),
+    ]
+    summary = arm_summary(outcomes, label="B")
+    assert summary.total == 3
+    assert summary.scored == 2
+    assert summary.infra_failures == 1
+    assert summary.voided == 1
+    assert summary.pass_rate == 0.5
+
+
+def test_a_voided_trial_that_also_crashed_is_counted_once_as_voided() -> None:
+    summary = arm_summary(
+        [_trial("t1", passed=False, voided=True, infra=True)], label="B"
+    )
     assert summary.scored == 1
     assert summary.voided == 1
-    assert summary.pass_rate == 1.0
+    assert summary.infra_failures == 0
+
+
+def test_all_voided_arm_reports_zero_without_dividing_by_zero() -> None:
+    summary = arm_summary(
+        [_trial("t1", passed=False, voided=True), _trial("t2", False, voided=True)],
+        label="B",
+    )
+    assert summary.scored == 2
+    assert summary.pass_rate == 0.0
+    assert summary.wilson_lower == 0.0
+
+
+def test_voided_trials_contribute_to_mean_wall_and_tokens() -> None:
+    cheap = TrialCost(
+        name="t1", dataset="d", passed=True, voided=False, infra=False,
+        wall_sec=100.0, tokens=10, findings=(),
+    )
+    voided = TrialCost(
+        name="t2", dataset="d", passed=False, voided=True, infra=False,
+        wall_sec=300.0, tokens=30, findings=(),
+    )
+    summary = arm_summary([cheap, voided], label="B")
+    assert summary.mean_wall_sec == 200.0
+    assert summary.mean_tokens == 20.0
+
+
+def test_build_report_states_voided_trials_scored_zero() -> None:
+    report = build_report(
+        arms={"B": arm_summary([_trial("t1", False, voided=True)], label="B")},
+        task_names=["t1"], seed=1, model="free",
+    )
+    assert "scored zero" in report
+    assert "never as an agent failure" not in report
 
 
 def _write_trial_dir(
