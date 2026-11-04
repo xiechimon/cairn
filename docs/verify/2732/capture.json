@@ -1,0 +1,44 @@
+{
+  "sourceUrl": "https://raw.githubusercontent.com/xiechimon/cairn/3e1bde9971ce50552be344dd49396e82dbbd0a6c/docs/ops/control-plane-omarchy.md",
+  "sourceSha256": "258076f81da9868b46772ec7eae44fe46fa817fddd2310f6b1f5dd6923ddfe9d",
+  "head": "3826416501817186b886e3e3d67494f52c7098df",
+  "nodeVersion": "v24.22.2",
+  "unitState": {
+    "active": "active",
+    "substate": "running",
+    "restarts": 0,
+    "samePid": true
+  },
+  "proxyEnvironmentObserved": true,
+  "api": {
+    "method": "GET",
+    "path": "/api/user/me",
+    "status": 401,
+    "response": {
+      "error": "Unauthorized"
+    }
+  },
+  "swaggerUi": {
+    "release": "v5.34.1",
+    "commit": "d3296954a6b813898d298815ac3e68daa1cf7408",
+    "files": {
+      "index.html": "84ae62d3dad6004f2ba250cf69b4148eeb7c253d",
+      "swagger-ui.css": "630f8c7cf44a8dfa7c0826b22b70993a9f350e51",
+      "swagger-ui-bundle.js": "ac88a259fa8be74dc92d7ef504f204a9b916d8c8",
+      "swagger-ui-standalone-preset.js": "8432132e2e30f3f49ace50e6d3fd24d3ba9ee0ed",
+      "swagger-initializer.js": "8ea0ea3afc39da4d2cb66232b9c2208cdd821570"
+    }
+  },
+  "scope": {
+    "server": "real transient systemd user unit",
+    "credentials": "synthetic scratch token; anonymous API request",
+    "overrides": "scratch HOME/data and reviewed checkout path; no production EnvironmentFile",
+    "cors": "API tool browser disabled cross-origin enforcement; product CORS not evaluated",
+    "production": "not installed or deployed",
+    "uncovered": [
+      "phone/Tailscale",
+      "push delivery",
+      "real provider fetch through deployed proxy"
+    ]
+  }
+}
