@@ -54,6 +54,7 @@ export * from './provider-presets.js';
 export * from './push.js';
 export * from './recording-trigger.js';
 export * from './report.js';
+export * from './research-prompts.js';
 export * from './review.js';
 export * from './routing-rule.js';
 export * from './schedule.js';

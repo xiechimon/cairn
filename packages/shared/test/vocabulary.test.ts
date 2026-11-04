@@ -465,6 +465,7 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
       trajectoryOutcomeBackfill,
       trajectoryReflectCurate,
       trajectoryReflectOpenGuardIssues,
+      researchIntakeProjectId,
       ...observed
     } = ENV_VARS;
     expect(observed).toEqual({
@@ -496,6 +497,7 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
     expect(trajectoryOutcomeBackfill).toBe('CAIRN_TRAJ_OUTCOME_BACKFILL');
     expect(trajectoryReflectCurate).toBe('CAIRN_TRAJ_REFLECT_CURATE');
     expect(trajectoryReflectOpenGuardIssues).toBe('CAIRN_TRAJ_REFLECT_OPEN_GUARD_ISSUES');
+    expect(researchIntakeProjectId).toBe('CAIRN_RESEARCH_INTAKE_PROJECT_ID');
   });
 
   it('credential formats match the observed shapes (key prefix follows the BRAND slot)', () => {

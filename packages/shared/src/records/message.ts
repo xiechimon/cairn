@@ -92,6 +92,8 @@ export const CHIEF_REPORT_KIND = 'chief_daily_report';
 export const CHIEF_REPORT_ROW_ID_PREFIX = 'chief-report-';
 export const CHIEF_REPORT_REF_MAX = 8;
 export const CHIEF_REPORT_RETRO_MAX = 5;
+export const CHIEF_REPORT_INTAKE_MAX = 5;
+export const INTAKE_SOURCE_KIND = 'intake';
 
 const chiefReportTodoRefSchema = z.object({
   id: z.string(),
@@ -130,6 +132,18 @@ export const retroProposalSchema = z.object({
 });
 export type RetroProposal = z.infer<typeof retroProposalSchema>;
 
+export const intakeItemSchema = z.object({
+  id: z.string(),
+  url: z.string(),
+  claim: z.string().min(1).max(400),
+  matches: z.string().max(400),
+  action: z.string().max(400),
+  projectId: z.string(),
+  status: retroProposalStatusSchema,
+  todoId: z.string().nullable(),
+});
+export type IntakeItem = z.infer<typeof intakeItemSchema>;
+
 export const chiefReportLedgerSchema = z.object({
   finished: z.array(chiefReportTodoRefSchema),
   finishedCount: z.number().int(),
@@ -156,6 +170,7 @@ export const chiefReportContentSchema = z.object({
     questions: z.number().int(),
   }),
   retro: z.array(retroProposalSchema),
+  intake: z.array(intakeItemSchema).optional(),
   retroRan: z.boolean(),
   truncated: z.array(z.string()),
 });
