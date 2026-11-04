@@ -28,6 +28,7 @@ import { isChiefConversation } from './services/machines.js';
 import {
   cancelQueuedMessage,
   deliverQueuedMessage,
+  editQueuedMessage,
   queueTaskMessage,
 } from './services/task-message-queue.js';
 
@@ -167,7 +168,9 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
         body.queuedMessageId !== undefined
           ? body.cancelQueued
             ? cancelQueuedMessage(svc, conversationId, body.queuedMessageId)
-            : await deliverQueuedMessage(humanSvc, conversationId, body.queuedMessageId, true)
+            : body.editQueued
+              ? editQueuedMessage(svc, conversationId, body.queuedMessageId, body.content)
+              : await deliverQueuedMessage(humanSvc, conversationId, body.queuedMessageId, true)
           : body.mode === 'queue'
             ? await queueTaskMessage(
                 humanSvc,
