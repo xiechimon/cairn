@@ -6,6 +6,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+from cairn_harbor import budget
 from cairn_harbor.costs import (
     parse_docker_stats_peak,
     parse_systemd_show,
@@ -77,6 +78,7 @@ def read_subset_seed(subset_path: Path | None) -> int:
 def collect_outcomes(
     jobs_dir: Path, job_name: str, arm_label: str,
     harness_sessions: dict[str, list[Path]] | None = None,
+    model: str | None = None,
 ):
     job_dir = jobs_dir / job_name
     outcomes = []
@@ -94,6 +96,7 @@ def collect_outcomes(
             voided=bool(findings),
             dataset=_dataset_for_trial(trial_dir),
             findings=findings,
+            model=model,
         )
         outcomes.append(outcome)
     return outcomes
@@ -111,6 +114,15 @@ def _dataset_for_trial(trial_dir: Path) -> str:
     if TB_DATASET_DIR_NAME in task_path:
         return TB_DATASET_DIR_NAME
     return ""
+
+
+def config_model(config_path: Path) -> str | None:
+    agents = json.loads(config_path.read_text()).get("agents") or []
+    return agents[0].get("model_name") if agents else None
+
+
+def is_metered(model: str | None) -> bool:
+    return model is not None and not model.endswith(":free")
 
 
 def measure_trial_disk(jobs_dir: Path, job_name: str) -> dict[str, int]:
@@ -247,6 +259,7 @@ def main() -> None:
     run.add_argument("--job-name", type=str, required=True)
     run.add_argument("--tasks", type=Path, required=True)
     run.add_argument("--harness-sessions", type=Path)
+    run.add_argument("--max-run-usd", type=float)
     run.add_argument("--n-concurrent", type=int, default=3)
     run.add_argument("--memory-max", type=str, default="20G")
     run.add_argument("--out-dir", type=Path, required=True)
@@ -288,10 +301,31 @@ def main() -> None:
                 for path in paths:
                     if not path.is_file():
                         raise ValueError(f"missing harness session: {path}")
+        model = config_model(args.config)
+        metered = is_metered(model)
+        if metered and args.max_run_usd is None:
+            parser.error(f"--max-run-usd is required for metered model {model}")
+        run_id = f"{args.job_name}:{args.arm_label}"
+        if metered:
+            try:
+                budget.reserve(run_id, args.max_run_usd)
+            except budget.BudgetExceeded as error:
+                raise SystemExit(f"budget cap reached, run not started: {error}")
         run_info = run_job(args.config, args.jobs_dir, args.n_concurrent, args.memory_max)
         outcomes = collect_outcomes(
-            args.jobs_dir, args.job_name, args.arm_label, harness_sessions
+            args.jobs_dir,
+            args.job_name,
+            args.arm_label,
+            harness_sessions,
+            model=model if metered else None,
         )
+        if metered:
+            budget.settle(
+                run_id,
+                sum(outcome.cost_usd or 0.0 for outcome in outcomes),
+                "; ".join(sorted({o.cost_source for o in outcomes if o.cost_source}))
+                or budget.NO_TOKENS_SOURCE,
+            )
         payload = {
             "arm": args.arm_label,
             "job_name": args.job_name,
@@ -314,7 +348,7 @@ def main() -> None:
             arms={args.arm_label: arm_summary(outcomes, args.arm_label)},
             task_names=task_names,
             seed=seed,
-            model=MODEL,
+            model=model or MODEL,
         )
         (args.out_dir / f"{args.arm_label}.report.md").write_text(report + "\n")
 

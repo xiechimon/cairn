@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from cairn_harbor.budget import resolve_cost
 from cairn_harbor.scan import ScanFinding, scan_session_text
 
 _UNIT_FACTORS = {
@@ -21,6 +22,7 @@ _UNIT_FACTORS = {
 class StepUsage:
     input_tokens: int
     output_tokens: int
+    cost_usd: float | None = None
 
 
 @dataclass(frozen=True)
@@ -33,6 +35,8 @@ class TrialCost:
     wall_sec: float
     tokens: int
     findings: tuple[ScanFinding, ...]
+    cost_usd: float | None = None
+    cost_source: str = ""
 
 
 def _read_json(path: Path) -> dict | None:
@@ -66,7 +70,16 @@ def read_step_usage(trial_dir: Path) -> StepUsage:
     output_tokens = sum(
         int(context.get("n_output_tokens") or 0) for context in step_contexts
     )
-    return StepUsage(input_tokens=input_tokens, output_tokens=output_tokens)
+    reported = [
+        float(context["cost_usd"])
+        for context in step_contexts
+        if context.get("cost_usd") is not None
+    ]
+    return StepUsage(
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        cost_usd=sum(reported) if reported else None,
+    )
 
 
 def _parse_stamp(value: str | None) -> datetime | None:
@@ -151,6 +164,7 @@ def summarize_trial(
     voided: bool,
     dataset: str = "",
     findings: tuple[ScanFinding, ...] | None = None,
+    model: str | None = None,
 ) -> TrialCost:
     result = _read_json(trial_dir / "result.json")
     if result is None:
@@ -167,6 +181,11 @@ def summarize_trial(
     usage = read_step_usage(trial_dir)
     if findings is None:
         findings = _session_findings(trial_dir)
+    cost_usd, cost_source = usage.cost_usd, ""
+    if model is not None:
+        cost_usd, cost_source = resolve_cost(
+            usage.cost_usd, usage.input_tokens, usage.output_tokens, model
+        )
     return TrialCost(
         name=trial_task_name(name),
         dataset=dataset,
@@ -176,6 +195,8 @@ def summarize_trial(
         wall_sec=_wall_sec(result),
         tokens=usage.input_tokens + usage.output_tokens,
         findings=findings,
+        cost_usd=cost_usd,
+        cost_source=cost_source,
     )
 
 
