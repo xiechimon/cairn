@@ -17,4 +17,10 @@ describe('research search requirements', () => {
     expect(question).toContain('至少检查 5 个直接依赖');
     expect(question).toContain('只有完成上述检索后');
   });
+
+  test('the source audit goes before the final intake JSON block', () => {
+    const question = researchIntakeQuestion({ openThreadTitles: [], previousItems: [] });
+    const prompt = researchPrompt({ tier: 2, title: 'Daily intake', question });
+    expect(prompt).toContain('引用清单放在最终 JSON 代码块之前');
+  });
 });
