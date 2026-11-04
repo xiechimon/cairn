@@ -9,6 +9,7 @@ import { toTeamRecord } from './db/seed.js';
 import { parseWith } from './lib/errors.js';
 import { agentRecordOf, jsonBody, requireTeam, SESSION_COOKIE } from './routes-helpers.js';
 import { readBackupHealth } from './services/backup-status.js';
+import { readDeployStatus } from './services/deploy-status.js';
 import { createSerialConnection } from './services/events.js';
 import { readFirstPrReportPrompt, setFirstPrReportPrompt } from './services/first-pr-report.js';
 import { pauseTeamGithubRepos } from './services/github-autonomy-brake.js';
@@ -44,6 +45,7 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
   });
 
   app.get('/api/server/backup', (c) => c.json(readBackupHealth(ctx.backupStatusPath)));
+  app.get('/api/server/deploy', (c) => c.json(readDeployStatus(ctx.deployRecordPath)));
 
   app.get('/api/teams', (c) => {
     const row = ctx.db.select().from(team).where(eq(team.id, ctx.team.id)).get();
