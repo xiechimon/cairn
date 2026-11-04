@@ -1,0 +1,22 @@
+[Unit]
+Description=Cairn Orb egress relay on a unix socket
+
+[Service]
+Type=simple
+Environment=PATH=%h/.local/share/mise/installs/node/24/bin:/usr/local/bin:/usr/bin:/bin
+Environment=CAIRN_ORB_ALLOWED_PORTS=80,443,22
+Environment=CAIRN_ORB_EGRESS_SOCKET=%t/cairn-orb-egress/egress.sock
+RuntimeDirectory=cairn-orb-egress
+RuntimeDirectoryMode=0700
+RuntimeDirectoryPreserve=restart
+ExecStartPre=/usr/bin/install -d -m 0700 %t/cairn-orb-egress
+ExecStart=/usr/bin/env node %h/Code/AgentProjects/cairn/scripts/ops/orb/egress-relay.mjs
+Restart=on-failure
+RestartSec=2
+UMask=0077
+TasksMax=256
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=default.target

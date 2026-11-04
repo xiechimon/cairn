@@ -172,13 +172,21 @@ describe('PodmanOrbRuntime.spawn argv', () => {
     );
     const argv = socket.podman.callsOf('create')[0] ?? [];
     const mounts = argv.flatMap((arg, index) => (argv[index - 1] === '-v' ? [arg] : []));
-    expect(mounts.at(-1)).toBe('/run/egress/egress.sock:/run/cairn-egress/egress.sock:rw');
+    expect(mounts.at(-1)).toBe('/run/egress:/run/cairn-egress:ro');
     expect(mounts).toHaveLength(4);
     expect(argv.slice(argv.indexOf('-e'), argv.indexOf('-e') + 2)).toEqual([
       '-e',
       'CAIRN_ORB_EGRESS_SOCKET=/run/cairn-egress/egress.sock',
     ]);
     expect(argv).toContain('none');
+  });
+
+  test('a relay socket with a different basename keeps its name in the mounted directory', async () => {
+    const { podman, runtime } = fixture();
+    await runtime.spawn(spec({ egress: { socketPath: '/run/egress/custom.sock' } }));
+    const argv = podman.callsOf('create')[0] ?? [];
+    expect(argv).toContain('/run/egress:/run/cairn-egress:ro');
+    expect(argv).toContain('CAIRN_ORB_EGRESS_SOCKET=/run/cairn-egress/custom.sock');
   });
 
   test('persistent home is a named volume mounted after the bind mounts', async () => {

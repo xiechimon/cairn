@@ -1,5 +1,5 @@
 import { homedir } from 'node:os';
-import { isAbsolute, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { z } from 'zod';
 import { ORB_NAME_PATTERN } from './names.js';
 import {
@@ -262,8 +262,10 @@ export class PodmanOrbRuntime implements OrbRuntime {
     }
     const environment = { ...spec.env };
     if (spec.egress !== 'none') {
-      mounts.push(...bindMount(spec.egress.socketPath, ORB_EGRESS_TARGET, false));
-      environment[ORB_EGRESS_ENV] = ORB_EGRESS_TARGET;
+      assertMount(spec.egress.socketPath, ORB_EGRESS_TARGET);
+      const targetDirectory = dirname(ORB_EGRESS_TARGET);
+      mounts.push(...bindMount(dirname(spec.egress.socketPath), targetDirectory, true));
+      environment[ORB_EGRESS_ENV] = join(targetDirectory, basename(spec.egress.socketPath));
     }
     const variables = Object.entries(environment).flatMap(([name, value]) => {
       assertVariableName(name, 'environment variable');
