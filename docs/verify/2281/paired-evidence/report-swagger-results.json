@@ -1,0 +1,801 @@
+[
+  {
+    "request": {
+      "method": "POST",
+      "path": "/fixtures/report-20"
+    },
+    "response": {
+      "mode": "SIMULATED API/GitHub/trial/canary data; actual report execution; NOT real20-ticket acceptance",
+      "codeHead": "109cd77136a99ee5e20669d86cae777d252cb7f6",
+      "report": {
+        "ok": true,
+        "total": 20,
+        "merged": 10,
+        "failures": [],
+        "firstRow": {
+          "issue": 3000,
+          "buildIds": [
+            "trial-0"
+          ],
+          "attempts": [
+            {
+              "buildId": "trial-0",
+              "todoId": "todo-0",
+              "sourceRef": "github:xiechimon/cairn#3000",
+              "createdAt": 1000,
+              "machineId": "orb-machine",
+              "executionSteps": [
+                {
+                  "id": "step-0",
+                  "kind": "build",
+                  "machineId": "orb-machine",
+                  "status": "done"
+                }
+              ],
+              "pr": 4000,
+              "mergeCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0",
+              "mergedAt": 1500,
+              "reachableFromMain": true
+            }
+          ],
+          "prs": [
+            4000
+          ],
+          "merged": true,
+          "reason": null,
+          "verified": true
+        }
+      }
+    },
+    "fullResult": {
+      "ok": true,
+      "repo": "xiechimon/cairn",
+      "finishedAt": 2000,
+      "canaryCheckedAt": 3000,
+      "total": 20,
+      "merged": 10,
+      "rows": [
+        {
+          "issue": 3000,
+          "buildIds": [
+            "trial-0"
+          ],
+          "attempts": [
+            {
+              "buildId": "trial-0",
+              "todoId": "todo-0",
+              "sourceRef": "github:xiechimon/cairn#3000",
+              "createdAt": 1000,
+              "machineId": "orb-machine",
+              "executionSteps": [
+                {
+                  "id": "step-0",
+                  "kind": "build",
+                  "machineId": "orb-machine",
+                  "status": "done"
+                }
+              ],
+              "pr": 4000,
+              "mergeCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0",
+              "mergedAt": 1500,
+              "reachableFromMain": true
+            }
+          ],
+          "prs": [
+            4000
+          ],
+          "merged": true,
+          "reason": null,
+          "verified": true
+        },
+        {
+          "issue": 3001,
+          "buildIds": [
+            "trial-1"
+          ],
+          "attempts": [
+            {
+              "buildId": "trial-1",
+              "todoId": "todo-1",
+              "sourceRef": "github:xiechimon/cairn#3001",
+              "createdAt": 1000,
+              "machineId": "orb-machine",
+              "executionSteps": [
+                {
+                  "id": "step-1",
+                  "kind": "session",
+                  "machineId": "orb-machine",
+                  "status": "done"
+                }
+              ],
+              "pr": 4001,
+              "mergeCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1",
+              "mergedAt": 1500,
+              "reachableFromMain": true
+            }
+          ],
+          "prs": [
+            4001
+          ],
+          "merged": true,
+          "reason": null,
+          "verified": true
+        },
+        {
+          "issue": 3002,
+          "buildIds": [
+            "trial-2"
+          ],
+          "attempts": [
+            {
+              "buildId": "trial-2",
+              "todoId": "todo-2",
+              "sourceRef": "github:xiechimon/cairn#3002",
+              "createdAt": 1000,
+              "machineId": "orb-machine",
+              "executionSteps": [
+                {
+                  "id": "step-2",
+                  "kind": "build",
+                  "machineId": "orb-machine",
+                  "status": "done"
+                }
+              ],
+              "pr": 4002,
+              "mergeCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa2",
+              "mergedAt": 1500,
+              "reachableFromMain": true
+            }
+          ],
+          "prs": [
+            4002
+          ],
+          "merged": true,
+          "reason": null,
+          "verified": true
+        },
+        {
+          "issue": 3003,
+          "buildIds": [
+            "trial-3"
+          ],
+          "attempts": [
+            {
+              "buildId": "trial-3",
+              "todoId": "todo-3",
+              "sourceRef": "github:xiechimon/cairn#3003",
+              "createdAt": 1000,
+              "machineId": "orb-machine",
+              "executionSteps": [
+                {
+                  "id": "step-3",
+                  "kind": "session",
+                  "machineId": "orb-machine",
+                  "status": "done"
+                }
+              ],
+              "pr": 4003,
+              "mergeCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa3",
+              "mergedAt": 1500,
+              "reachableFromMain": true
+            }
+          ],
+          "prs": [
+            4003
+          ],
+          "merged": true,
+          "reason": null,
+          "verified": true
+        },
+        {
+          "issue": 3004,
+          "buildIds": [
+            "trial-4"
+          ],
+          "attempts": [
+            {
+              "buildId": "trial-4",
+              "todoId": "todo-4",
+              "sourceRef": "github:xiechimon/cairn#3004",
+              "createdAt": 1000,
+              "machineId": "orb-machine",
+              "executionSteps": [
+                {
+                  "id": "step-4",
+                  "kind": "build",
+                  "machineId": "orb-machine",
+                  "status": "done"
+                }
+              ],
+              "pr": 4004,
+              "mergeCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4",
+              "mergedAt": 1500,
+              "reachableFromMain": true
+            }
+          ],
+          "prs": [
+            4004
+          ],
+          "merged": true,
+          "reason": null,
+          "verified": true
+        },
+        {
+          "issue": 3005,
+          "buildIds": [
+            "trial-5"
+          ],
+          "attempts": [
+            {
+              "buildId": "trial-5",
+              "todoId": "todo-5",
+              "sourceRef": "github:xiechimon/cairn#3005",
+              "createdAt": 1000,
+              "machineId": "orb-machine",
+              "executionSteps": [
+                {
+                  "id": "step-5",
+                  "kind": "session",
+                  "machineId": "orb-machine",
+                  "status": "done"
+                }
+              ],
+              "pr": 4005,
+              "mergeCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa5",
+              "mergedAt": 1500,
+              "reachableFromMain": true
+            }
+          ],
+          "prs": [
+            4005
+          ],
+          "merged": true,
+          "reason": null,
+          "verified": true
+        },
+        {
+          "issue": 3006,
+          "buildIds": [
+            "trial-6"
+          ],
+          "attempts": [
+            {
+              "buildId": "trial-6",
+              "todoId": "todo-6",
+              "sourceRef": "github:xiechimon/cairn#3006",
+              "createdAt": 1000,
+              "machineId": "orb-machine",
+              "executionSteps": [
+                {
+                  "id": "step-6",
+                  "kind": "build",
+                  "machineId": "orb-machine",
+                  "status": "done"
+                }
+              ],
+              "pr": 4006,
+              "mergeCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa6",
+              "mergedAt": 1500,
+              "reachableFromMain": true
+            }
+          ],
+          "prs": [
+            4006
+          ],
+          "merged": true,
+          "reason": null,
+          "verified": true
+        },
+        {
+          "issue": 3007,
+          "buildIds": [
+            "trial-7"
+          ],
+          "attempts": [
+            {
+              "buildId": "trial-7",
+              "todoId": "todo-7",
+              "sourceRef": "github:xiechimon/cairn#3007",
+              "createdAt": 1000,
+              "machineId": "orb-machine",
+              "executionSteps": [
+                {
+                  "id": "step-7",
+                  "kind": "session",
+                  "machineId": "orb-machine",
+                  "status": "done"
+                }
+              ],
+              "pr": 4007,
+              "mergeCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa7",
+              "mergedAt": 1500,
+              "reachableFromMain": true
+            }
+          ],
+          "prs": [
+            4007
+          ],
+          "merged": true,
+          "reason": null,
+          "verified": true
+        },
+        {
+          "issue": 3008,
+          "buildIds": [
+            "trial-8"
+          ],
+          "attempts": [
+            {
+              "buildId": "trial-8",
+              "todoId": "todo-8",
+              "sourceRef": "github:xiechimon/cairn#3008",
+              "createdAt": 1000,
+              "machineId": "orb-machine",
+              "executionSteps": [
+                {
+                  "id": "step-8",
+                  "kind": "build",
+                  "machineId": "orb-machine",
+                  "status": "done"
+                }
+              ],
+              "pr": 4008,
+              "mergeCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa8",
+              "mergedAt": 1500,
+              "reachableFromMain": true
+            }
+          ],
+          "prs": [
+            4008
+          ],
+          "merged": true,
+          "reason": null,
+          "verified": true
+        },
+        {
+          "issue": 3009,
+          "buildIds": [
+            "trial-9"
+          ],
+          "attempts": [
+            {
+              "buildId": "trial-9",
+              "todoId": "todo-9",
+              "sourceRef": "github:xiechimon/cairn#3009",
+              "createdAt": 1000,
+              "machineId": "orb-machine",
+              "executionSteps": [
+                {
+                  "id": "step-9",
+                  "kind": "session",
+                  "machineId": "orb-machine",
+                  "status": "done"
+                }
+              ],
+              "pr": 4009,
+              "mergeCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa9",
+              "mergedAt": 1500,
+              "reachableFromMain": true
+            }
+          ],
+          "prs": [
+            4009
+          ],
+          "merged": true,
+          "reason": null,
+          "verified": true
+        },
+        {
+          "issue": 3010,
+          "buildIds": [
+            "trial-10"
+          ],
+          "attempts": [
+            {
+              "buildId": "trial-10",
+              "todoId": "todo-10",
+              "sourceRef": "github:xiechimon/cairn#3010",
+              "createdAt": 1000,
+              "machineId": "orb-machine",
+              "executionSteps": [
+                {
+                  "id": "step-10",
+                  "kind": "build",
+                  "machineId": "orb-machine",
+                  "status": "failed"
+                }
+              ],
+              "pr": null
+            }
+          ],
+          "prs": [],
+          "merged": false,
+          "reason": {
+            "code": "agent_gave_up",
+            "detail": "Stopped after the bounded retry budget."
+          },
+          "verified": true
+        },
+        {
+          "issue": 3011,
+          "buildIds": [
+            "trial-11"
+          ],
+          "attempts": [
+            {
+              "buildId": "trial-11",
+              "todoId": "todo-11",
+              "sourceRef": "github:xiechimon/cairn#3011",
+              "createdAt": 1000,
+              "machineId": "orb-machine",
+              "executionSteps": [
+                {
+                  "id": "step-11",
+                  "kind": "session",
+                  "machineId": "orb-machine",
+                  "status": "failed"
+                }
+              ],
+              "pr": null
+            }
+          ],
+          "prs": [],
+          "merged": false,
+          "reason": {
+            "code": "agent_gave_up",
+            "detail": "Stopped after the bounded retry budget."
+          },
+          "verified": true
+        },
+        {
+          "issue": 3012,
+          "buildIds": [
+            "trial-12"
+          ],
+          "attempts": [
+            {
+              "buildId": "trial-12",
+              "todoId": "todo-12",
+              "sourceRef": "github:xiechimon/cairn#3012",
+              "createdAt": 1000,
+              "machineId": "orb-machine",
+              "executionSteps": [
+                {
+                  "id": "step-12",
+                  "kind": "build",
+                  "machineId": "orb-machine",
+                  "status": "failed"
+                }
+              ],
+              "pr": null
+            }
+          ],
+          "prs": [],
+          "merged": false,
+          "reason": {
+            "code": "agent_gave_up",
+            "detail": "Stopped after the bounded retry budget."
+          },
+          "verified": true
+        },
+        {
+          "issue": 3013,
+          "buildIds": [
+            "trial-13"
+          ],
+          "attempts": [
+            {
+              "buildId": "trial-13",
+              "todoId": "todo-13",
+              "sourceRef": "github:xiechimon/cairn#3013",
+              "createdAt": 1000,
+              "machineId": "orb-machine",
+              "executionSteps": [
+                {
+                  "id": "step-13",
+                  "kind": "session",
+                  "machineId": "orb-machine",
+                  "status": "failed"
+                }
+              ],
+              "pr": null
+            }
+          ],
+          "prs": [],
+          "merged": false,
+          "reason": {
+            "code": "agent_gave_up",
+            "detail": "Stopped after the bounded retry budget."
+          },
+          "verified": true
+        },
+        {
+          "issue": 3014,
+          "buildIds": [
+            "trial-14"
+          ],
+          "attempts": [
+            {
+              "buildId": "trial-14",
+              "todoId": "todo-14",
+              "sourceRef": "github:xiechimon/cairn#3014",
+              "createdAt": 1000,
+              "machineId": "orb-machine",
+              "executionSteps": [
+                {
+                  "id": "step-14",
+                  "kind": "build",
+                  "machineId": "orb-machine",
+                  "status": "failed"
+                }
+              ],
+              "pr": null
+            }
+          ],
+          "prs": [],
+          "merged": false,
+          "reason": {
+            "code": "agent_gave_up",
+            "detail": "Stopped after the bounded retry budget."
+          },
+          "verified": true
+        },
+        {
+          "issue": 3015,
+          "buildIds": [
+            "trial-15"
+          ],
+          "attempts": [
+            {
+              "buildId": "trial-15",
+              "todoId": "todo-15",
+              "sourceRef": "github:xiechimon/cairn#3015",
+              "createdAt": 1000,
+              "machineId": "orb-machine",
+              "executionSteps": [
+                {
+                  "id": "step-15",
+                  "kind": "session",
+                  "machineId": "orb-machine",
+                  "status": "failed"
+                }
+              ],
+              "pr": null
+            }
+          ],
+          "prs": [],
+          "merged": false,
+          "reason": {
+            "code": "agent_gave_up",
+            "detail": "Stopped after the bounded retry budget."
+          },
+          "verified": true
+        },
+        {
+          "issue": 3016,
+          "buildIds": [
+            "trial-16"
+          ],
+          "attempts": [
+            {
+              "buildId": "trial-16",
+              "todoId": "todo-16",
+              "sourceRef": "github:xiechimon/cairn#3016",
+              "createdAt": 1000,
+              "machineId": "orb-machine",
+              "executionSteps": [
+                {
+                  "id": "step-16",
+                  "kind": "build",
+                  "machineId": "orb-machine",
+                  "status": "failed"
+                }
+              ],
+              "pr": null
+            }
+          ],
+          "prs": [],
+          "merged": false,
+          "reason": {
+            "code": "agent_gave_up",
+            "detail": "Stopped after the bounded retry budget."
+          },
+          "verified": true
+        },
+        {
+          "issue": 3017,
+          "buildIds": [
+            "trial-17"
+          ],
+          "attempts": [
+            {
+              "buildId": "trial-17",
+              "todoId": "todo-17",
+              "sourceRef": "github:xiechimon/cairn#3017",
+              "createdAt": 1000,
+              "machineId": "orb-machine",
+              "executionSteps": [
+                {
+                  "id": "step-17",
+                  "kind": "session",
+                  "machineId": "orb-machine",
+                  "status": "failed"
+                }
+              ],
+              "pr": null
+            }
+          ],
+          "prs": [],
+          "merged": false,
+          "reason": {
+            "code": "agent_gave_up",
+            "detail": "Stopped after the bounded retry budget."
+          },
+          "verified": true
+        },
+        {
+          "issue": 3018,
+          "buildIds": [
+            "trial-18"
+          ],
+          "attempts": [
+            {
+              "buildId": "trial-18",
+              "todoId": "todo-18",
+              "sourceRef": "github:xiechimon/cairn#3018",
+              "createdAt": 1000,
+              "machineId": "orb-machine",
+              "executionSteps": [
+                {
+                  "id": "step-18",
+                  "kind": "build",
+                  "machineId": "orb-machine",
+                  "status": "failed"
+                }
+              ],
+              "pr": null
+            }
+          ],
+          "prs": [],
+          "merged": false,
+          "reason": {
+            "code": "agent_gave_up",
+            "detail": "Stopped after the bounded retry budget."
+          },
+          "verified": true
+        },
+        {
+          "issue": 3019,
+          "buildIds": [
+            "trial-19"
+          ],
+          "attempts": [
+            {
+              "buildId": "trial-19",
+              "todoId": "todo-19",
+              "sourceRef": "github:xiechimon/cairn#3019",
+              "createdAt": 1000,
+              "machineId": "orb-machine",
+              "executionSteps": [
+                {
+                  "id": "step-19",
+                  "kind": "session",
+                  "machineId": "orb-machine",
+                  "status": "failed"
+                }
+              ],
+              "pr": null
+            }
+          ],
+          "prs": [],
+          "merged": false,
+          "reason": {
+            "code": "agent_gave_up",
+            "detail": "Stopped after the bounded retry budget."
+          },
+          "verified": true
+        }
+      ],
+      "failures": []
+    }
+  },
+  {
+    "request": {
+      "method": "POST",
+      "path": "/fixtures/retry-only"
+    },
+    "response": {
+      "mode": "SIMULATED API/GitHub/trial/canary data; actual report execution; NOT real20-ticket acceptance",
+      "codeHead": "109cd77136a99ee5e20669d86cae777d252cb7f6",
+      "report": {
+        "ok": false,
+        "total": 1,
+        "merged": 1,
+        "failures": [
+          "denominator: expected 20 distinct issues, found 1",
+          "merged: expected at least 10 reachable merged PRs, found 1"
+        ],
+        "firstRow": {
+          "issue": 3000,
+          "buildIds": [
+            "trial-0"
+          ],
+          "attempts": [
+            {
+              "buildId": "trial-0",
+              "todoId": "todo-0",
+              "sourceRef": "github:xiechimon/cairn#3000",
+              "createdAt": 1000,
+              "machineId": "orb-machine",
+              "executionSteps": [
+                {
+                  "id": "step-0",
+                  "kind": "build",
+                  "machineId": "orb-machine",
+                  "status": "done"
+                }
+              ],
+              "pr": 4000,
+              "mergeCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0",
+              "mergedAt": 1500,
+              "reachableFromMain": true
+            }
+          ],
+          "prs": [
+            4000
+          ],
+          "merged": true,
+          "reason": null,
+          "verified": true
+        }
+      }
+    },
+    "fullResult": {
+      "ok": false,
+      "repo": "xiechimon/cairn",
+      "finishedAt": 2000,
+      "canaryCheckedAt": 3000,
+      "total": 1,
+      "merged": 1,
+      "rows": [
+        {
+          "issue": 3000,
+          "buildIds": [
+            "trial-0"
+          ],
+          "attempts": [
+            {
+              "buildId": "trial-0",
+              "todoId": "todo-0",
+              "sourceRef": "github:xiechimon/cairn#3000",
+              "createdAt": 1000,
+              "machineId": "orb-machine",
+              "executionSteps": [
+                {
+                  "id": "step-0",
+                  "kind": "build",
+                  "machineId": "orb-machine",
+                  "status": "done"
+                }
+              ],
+              "pr": 4000,
+              "mergeCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0",
+              "mergedAt": 1500,
+              "reachableFromMain": true
+            }
+          ],
+          "prs": [
+            4000
+          ],
+          "merged": true,
+          "reason": null,
+          "verified": true
+        }
+      ],
+      "failures": [
+        "denominator: expected 20 distinct issues, found 1",
+        "merged: expected at least 10 reachable merged PRs, found 1"
+      ]
+    }
+  }
+]
