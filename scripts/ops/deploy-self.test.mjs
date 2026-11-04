@@ -110,10 +110,13 @@ function fixture({ claimed = 0 } = {}) {
   );
   for (let i = 0; i < claimed; i++) sqlite(db, `insert into step values ('s${i}', 'claimed')`);
 
+  fakeTool(bin, 'gh-wrapper', 'exec env GH_TOKEN=fixture-scoped-app-token "$@"');
+
   fakeTool(
     bin,
     'gh',
     `echo "gh $*" >> "${fake}/gh.log"
+[ "\${GH_TOKEN-}" != fixture-scoped-app-token ] || echo authenticated >> "${fake}/gh-auth.log"
 case "$1 $2" in
   "api repos/"*)
     sha=$(echo "$2" | sed -E 's#.*/commits/([0-9a-f]+)/check-runs.*#\\1#')
@@ -127,12 +130,18 @@ esac`,
   fakeTool(
     bin,
     'pnpm',
-    `echo "pnpm $* @ $(git -C "${checkout}" rev-parse HEAD 2>/dev/null)" >> "${fake}/pnpm.log"; [ -f "${fake}/pnpm-fail" ] && [[ "$*" == *web* ]] && exit 1; exit 0`,
+    `for variable in GH_TOKEN GITHUB_TOKEN GIT_CONFIG_VALUE_0; do
+  [ -z "\${!variable-}" ] || echo "$variable" >> "${fake}/artifact-credential-names"
+done
+echo "pnpm $* @ $(git -C "${checkout}" rev-parse HEAD 2>/dev/null)" >> "${fake}/pnpm.log"; [ -f "${fake}/pnpm-fail" ] && [[ "$*" == *web* ]] && exit 1; exit 0`,
   );
   fakeTool(
     bin,
     'node',
-    `echo "node $*" >> "${fake}/node.log"
+    `for variable in GH_TOKEN GITHUB_TOKEN GIT_CONFIG_VALUE_0; do
+  [ -z "\${!variable-}" ] || echo "$variable" >> "${fake}/artifact-credential-names"
+done
+echo "node $*" >> "${fake}/node.log"
 [ -f "${fake}/migrate-fail" ] && exit 1
 db="\${@: -1}"
 sqlite3 "$db" "insert into __drizzle_migrations(hash) values ('m1')"`,
@@ -211,6 +220,7 @@ else printf 000; fi`,
     CAIRN_DEPLOY_BACKUPS: backups,
     CAIRN_DEPLOY_SCRATCH: join(dir, 'scratch'),
     CAIRN_REPO: 'xiechimon/cairn',
+    CAIRN_GH_WRAPPER: join(bin, 'gh-wrapper'),
     CAIRN_HEALTH_URL: 'http://127.0.0.1:8787',
     CAIRN_HEALTH_TRIES: '3',
     CAIRN_HEALTH_INTERVAL: '0',
@@ -798,3 +808,25 @@ test('a stable Coordinator clears its start alarm only after three matching acti
   assert.equal(existsSync(alarm), false);
   assert.equal(readFileSync(join(f.fake, 'coordinator-health-count'), 'utf8').trim(), '3');
 });
+
+for (const script of [DEPLOY, WATCH]) {
+  test(`${script.endsWith('deploy-self.sh') ? 'deployment' : 'watch'} scopes App credentials to individual gh calls`, () => {
+    const f = fixture();
+    const target = pushTarget(f);
+    const result = f.run(script, script === DEPLOY ? [target] : [], {
+      CAIRN_DEPLOY_SCRIPT: DEPLOY,
+      GH_TOKEN: 'fixture-inherited-app-token',
+      GITHUB_TOKEN: 'fixture-inherited-github-token',
+      GIT_CONFIG_COUNT: '1',
+      GIT_CONFIG_KEY_0: 'http.https://example.invalid/.extraheader',
+      GIT_CONFIG_VALUE_0: 'Authorization: fixture-inherited-header',
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(f.log('artifact-credential-names'), '');
+    assert.ok(f.log('gh-auth.log').trim().split('\n').length > 0);
+    assert.equal(
+      f.log('gh-auth.log').trim().split('\n').length,
+      f.log('gh.log').trim().split('\n').length,
+    );
+  });
+}

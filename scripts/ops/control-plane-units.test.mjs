@@ -137,8 +137,8 @@ test('no unit pins a removed mount or a tailnet address', () => {
 
 test('self-deploy authenticates gh with a GitHub App token', () => {
   const [exec] = selfDeploy.entries.get('ExecStart');
-  assert.match(exec, /%h\/\.cairn\/tools\/app-token\/token\.mjs/);
-  assert.match(exec, /GH_TOKEN/);
+  assert.equal(selfDeploy.env.CAIRN_GH_WRAPPER, '%h/.cairn/tools/app-token/as-bot.sh');
+  assert.doesNotMatch(exec, /GH_TOKEN|token\.mjs/);
   assert.match(exec, /deploy-watch\.sh/);
 });
 

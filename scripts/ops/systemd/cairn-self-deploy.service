@@ -8,7 +8,8 @@ Environment=PATH=%h/.local/share/mise/installs/node/24/bin:%h/.local/share/mise/
 Environment=CAIRN_CHECKOUT=%h/Code/AgentProjects/cairn-exec
 Environment=CAIRN_DATA_DIR=%h/.cairn/server
 Environment=CAIRN_DEPLOY_STATE=%h/.local/state/cairn-deploy
-ExecStart=/bin/bash -c 'GH_TOKEN="$$(node "%h/.cairn/tools/app-token/token.mjs")" && export GH_TOKEN && exec /bin/bash "$${CAIRN_CHECKOUT}/scripts/ops/deploy-watch.sh"'
+Environment=CAIRN_GH_WRAPPER=%h/.cairn/tools/app-token/as-bot.sh
+ExecStart=/bin/bash -c 'exec /bin/bash "$${CAIRN_CHECKOUT}/scripts/ops/deploy-watch.sh"'
 StandardOutput=append:%h/.local/state/cairn-self-deploy.log
 StandardError=append:%h/.local/state/cairn-self-deploy.log
 TimeoutStartSec=45min

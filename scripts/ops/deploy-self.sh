@@ -2,6 +2,18 @@
 set -euo pipefail
 umask 077
 
+unset GH_TOKEN GITHUB_TOKEN
+for credential_variable in ${!GIT_CONFIG_@}; do
+  case "$credential_variable" in
+    GIT_CONFIG_COUNT | GIT_CONFIG_KEY_* | GIT_CONFIG_VALUE_* | GIT_CONFIG_PARAMETERS) unset "$credential_variable" ;;
+  esac
+done
+GITHUB_COMMAND_WRAPPER="${CAIRN_GH_WRAPPER:-$HOME/.cairn/tools/app-token/as-bot.sh}"
+
+gh() {
+  "$GITHUB_COMMAND_WRAPPER" gh "$@"
+}
+
 usage() {
   cat >&2 <<'EOF'
 usage: deploy-self.sh <40-hex sha on origin/main> | --recover
@@ -26,6 +38,7 @@ Environment (defaults in brackets):
   CAIRN_REQUIRED_CHECKS [check pack-smoke e2e-gate]  CAIRN_HEALTH_URL [http://127.0.0.1:8787]
   CAIRN_HEALTH_TRIES [60]  CAIRN_HEALTH_INTERVAL [2]  CAIRN_MACHINE_NAME [hostname -s]
   CAIRN_DEPLOY_KEEP_SNAPSHOTS [10]
+  CAIRN_GH_WRAPPER [~/.cairn/tools/app-token/as-bot.sh]
 EOF
   exit 2
 }
