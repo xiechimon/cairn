@@ -61,6 +61,12 @@ describe('createOrbProvider', () => {
     expect(createOrbProvider(podmanEnv, home)).toBeInstanceOf(ContainerOrbProvider);
   });
 
+  test('two daemon homes never share the transport runtime directory', () => {
+    const first = createOrbProvider(podmanEnv, `${home}/first`) as ContainerOrbProvider;
+    const second = createOrbProvider(podmanEnv, `${home}/second`) as ContainerOrbProvider;
+    expect(first.runtimeRoot).not.toBe(second.runtimeRoot);
+  });
+
   test.each([
     [
       'without an image',

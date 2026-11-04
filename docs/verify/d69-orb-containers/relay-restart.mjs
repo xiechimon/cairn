@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { PodmanOrbRuntime } from '../../../apps/daemon/src/orb/podman.ts';
 import { createRelay, listenOnUnixSocket } from '../../../scripts/ops/orb/egress-relay.mjs';
-const directory = mkdtempSync(join(process.env.XDG_RUNTIME_DIR, 'd69-relay-restart-'));
+const directory = makeTestTempDir('d69-relay-restart-');
 const path = join(directory, 'egress.sock');
 const id = `cairn-orb-check-${randomUUID().slice(0, 8)}`;
-const runtime = new PodmanOrbRuntime({ command: ['sleep', '120'] });
+const runtime = new PodmanOrbRuntime({ ownerId: `probe-${randomUUID()}`, command: ['sleep', '120'] });
 let server = createRelay();
 try {
   await listenOnUnixSocket(server, path);
@@ -27,5 +27,5 @@ try {
 } finally {
   await runtime.remove(id);
   await new Promise((done) => server.close(done));
-  rmSync(directory, { recursive: true, force: true });
+  releaseTestTempDir(directory);
 }

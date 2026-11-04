@@ -1,6 +1,8 @@
+import { createHash } from 'node:crypto';
 import type { OrbCommandRunner, OrbExecOptions, OrbExecResult } from '../src/orb/provider.js';
 
 export interface FakeContainer {
+  id?: string;
   name: string;
   image: string;
   state: 'created' | 'running' | 'exited' | 'paused';
@@ -48,6 +50,17 @@ export class FakePodman {
     return this.calls.filter((argv) => argv[1] === subcommand);
   }
 
+  idOf(name: string): string {
+    return this.containers.get(name)?.id ?? createHash('sha256').update(name).digest('hex');
+  }
+
+  private findContainer(reference: string): FakeContainer | undefined {
+    return (
+      this.containers.get(reference) ??
+      [...this.containers.values()].find((container) => this.idOf(container.name) === reference)
+    );
+  }
+
   readonly runner: OrbCommandRunner = async (argv, options) => {
     options?.signal?.throwIfAborted();
     this.calls.push([...argv]);
@@ -65,13 +78,19 @@ export class FakePodman {
     switch (command) {
       case 'container': {
         const name = rest.at(-1) ?? '';
-        const container = this.containers.get(name);
+        const container = this.findContainer(name);
         if (rest[0] === 'exists') return container ? ok() : fail(1, '');
         if (rest[0] === 'inspect') {
           if (!container) return { code: 125, stdout: '[]', stderr: `no such container "${name}"` };
           return ok(
             JSON.stringify([
-              { Name: name, ImageName: container.image, State: { Status: container.state } },
+              {
+                Id: this.idOf(container.name),
+                Name: name,
+                ImageName: container.image,
+                State: { Status: container.state },
+                Config: { Labels: container.labels },
+              },
             ]),
           );
         }
@@ -81,24 +100,25 @@ export class FakePodman {
         return this.create(rest);
       case 'start':
       case 'unpause': {
-        const container = this.containers.get(rest.at(-1) ?? '');
+        const container = this.findContainer(rest.at(-1) ?? '');
         if (!container) return fail(125, 'no container with name or ID found: no such container');
         container.state = 'running';
         return ok(container.name);
       }
       case 'stop': {
-        const container = this.containers.get(rest.at(-1) ?? '');
+        const container = this.findContainer(rest.at(-1) ?? '');
         if (!container) return fail(125, 'no container with name or ID found: no such container');
         container.state = 'exited';
         return ok(container.name);
       }
       case 'rm': {
-        this.containers.delete(rest.at(-1) ?? '');
+        const container = this.findContainer(rest.at(-1) ?? '');
+        if (container) this.containers.delete(container.name);
         return ok();
       }
       case 'commit': {
         const [name, snapshot] = rest.filter((arg) => !arg.startsWith('-')).slice(-2);
-        if (!this.containers.has(name ?? '')) return fail(125, 'no such container');
+        if (!this.findContainer(name ?? '')) return fail(125, 'no such container');
         this.images.add(snapshot ?? '');
         return ok('sha256:abc');
       }
@@ -151,6 +171,6 @@ export class FakePodman {
       return fail(125, `the container name "${name}" is already in use by abc`);
     if (!this.images.has(image)) return fail(125, `${image}: image not known`);
     this.containers.set(name, { name, image, state: 'created', labels, create: [...args] });
-    return ok('abc123');
+    return ok(this.idOf(name));
   }
 }

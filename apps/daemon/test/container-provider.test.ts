@@ -331,16 +331,29 @@ describe('ContainerOrbProvider.start', () => {
     expect(context.fake.callsTo('spawn')).toEqual([]);
   });
 
-  test('a failing spawn surfaces the error, pauses best effort and leaves the handle stopped', async () => {
+  test('a failing spawn surfaces the error without pausing an absent container', async () => {
     const context = fixture();
     context.fake.spawnError = new Error('podman create failed (125): boom');
     const handle = await context.provider.ensure({ conversationId: 'C', projectId: 'P' });
     await context.provider.prepare(handle);
     await expect(context.provider.start(handle)).rejects.toThrow('boom');
     expect(handle.running).toBe(false);
-    expect(context.fake.callsTo('pause')).toEqual(['pause cairn-orb-C']);
+    expect(context.fake.callsTo('pause')).toEqual([]);
     const saved = JSON.parse(readFileSync(context.stateFile, 'utf8')) as OrbHandle[];
     expect(saved[0]?.running).toBe(false);
+  });
+
+  test('a spawn that leaves an owned container running pauses it on failure', async () => {
+    const context = fixture();
+    context.fake.spawn = async (spec) => {
+      context.fake.containers.set(spec.orbId, { image: spec.image, state: 'running' });
+      throw new Error('partial spawn');
+    };
+    const handle = await context.provider.ensure({ conversationId: 'C', projectId: 'P' });
+    await context.provider.prepare(handle);
+    await expect(context.provider.start(handle)).rejects.toThrow('partial spawn');
+    expect(context.fake.callsTo('pause')).toEqual(['pause cairn-orb-C']);
+    expect(handle.running).toBe(false);
   });
 
   test('a failed start can be retried', async () => {
@@ -365,7 +378,7 @@ describe('ContainerOrbProvider.start', () => {
     expect(handle.running).toBe(false);
   });
 
-  test('an abort during spawn is propagated and pauses what may have started', async () => {
+  test('an abort before the container is created leaves nothing to pause', async () => {
     const context = fixture();
     const handle = await context.provider.ensure({ conversationId: 'C', projectId: 'P' });
     await context.provider.prepare(handle);
@@ -376,7 +389,7 @@ describe('ContainerOrbProvider.start', () => {
       return spawn(spec, options);
     };
     await expect(context.provider.start(handle, { signal: controller.signal })).rejects.toThrow();
-    expect(context.fake.callsTo('pause')).toEqual(['pause cairn-orb-C']);
+    expect(context.fake.callsTo('pause')).toEqual([]);
     expect(handle.running).toBe(false);
   });
 
@@ -513,10 +526,42 @@ describe('ContainerOrbProvider recovery', () => {
 });
 
 describe('ContainerOrbProvider over PodmanOrbRuntime', () => {
+  test('refuses a foreign same-name container without pausing or adopting it', async () => {
+    const podman = new FakePodman();
+    podman.images.add(IMAGE);
+    podman.containers.set('cairn-orb-C', {
+      name: 'cairn-orb-C',
+      image: IMAGE,
+      state: 'running',
+      labels: {},
+      create: [],
+    });
+    const context = fixture({
+      runtime: new PodmanOrbRuntime({ ownerId: 'machine-alpha', runner: podman.runner }),
+    });
+    const handle = await context.provider.ensure({ conversationId: 'C', projectId: 'P' });
+    await context.provider.prepare(handle);
+    await expect(context.provider.start(handle)).rejects.toThrow(
+      'Orb ownership labels do not match',
+    );
+    expect(podman.containers.get('cairn-orb-C')?.state).toBe('running');
+    expect(handle.running).toBe(false);
+    await expect(context.provider.destroy(handle)).rejects.toThrow(
+      'Orb ownership labels do not match',
+    );
+    expect(podman.containers.get('cairn-orb-C')?.state).toBe('running');
+    const lifecycle = new OrbLifecycle(context.provider, { max: 2 });
+    await lifecycle
+      .sweep({ activeConversationIds: [], now: Date.now() + 73 * 60 * 60_000 })
+      .catch(() => {});
+    expect(podman.containers.get('cairn-orb-C')?.state).toBe('running');
+  });
   test('every create carries --network none and no widening flag', async () => {
     const podman = new FakePodman();
     podman.images.add(IMAGE);
-    const context = fixture({ runtime: new PodmanOrbRuntime({ runner: podman.runner }) });
+    const context = fixture({
+      runtime: new PodmanOrbRuntime({ ownerId: 'machine-alpha', runner: podman.runner }),
+    });
     for (const conversationId of ['A', 'B']) await started(context, conversationId);
     const creates = podman.callsOf('create');
     expect(creates).toHaveLength(2);
@@ -535,7 +580,9 @@ describe('ContainerOrbProvider over PodmanOrbRuntime', () => {
     const podman = new FakePodman();
     podman.images.add(IMAGE);
     podman.info = { version: { Version: '6.1.4' }, host: { security: { rootless: false } } };
-    const context = fixture({ runtime: new PodmanOrbRuntime({ runner: podman.runner }) });
+    const context = fixture({
+      runtime: new PodmanOrbRuntime({ ownerId: 'machine-alpha', runner: podman.runner }),
+    });
     const handle = await context.provider.ensure({ conversationId: 'C', projectId: 'P' });
     await context.provider.prepare(handle);
     await expect(context.provider.start(handle)).rejects.toThrow('must be rootless');
@@ -546,7 +593,9 @@ describe('ContainerOrbProvider over PodmanOrbRuntime', () => {
     const podman = new FakePodman();
     podman.images.add(IMAGE);
     podman.psOutput = 'Error: database is locked';
-    const context = fixture({ runtime: new PodmanOrbRuntime({ runner: podman.runner }) });
+    const context = fixture({
+      runtime: new PodmanOrbRuntime({ ownerId: 'machine-alpha', runner: podman.runner }),
+    });
     const handle = await context.provider.ensure({ conversationId: 'C', projectId: 'P' });
     await context.provider.prepare(handle);
     await expect(context.provider.start(handle)).rejects.toThrow(

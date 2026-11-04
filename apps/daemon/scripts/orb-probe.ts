@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
 import { PodmanOrbRuntime } from '../src/orb/podman.js';
 import { probeContainer } from '../src/orb/probe.js';
@@ -5,7 +6,10 @@ import { probeContainer } from '../src/orb/probe.js';
 const [image, orbId, egressSocketPath] = process.argv.slice(2);
 if (!image || !orbId) throw new Error('Usage: orb-probe.ts IMAGE ORB_ID [EGRESS_SOCKET]');
 
-const runtime = new PodmanOrbRuntime({ command: ['sleep', '300'] });
+const runtime = new PodmanOrbRuntime({
+  ownerId: `probe-${randomUUID()}`,
+  command: ['sleep', '300'],
+});
 try {
   const probe = await probeContainer(runtime, {
     image,

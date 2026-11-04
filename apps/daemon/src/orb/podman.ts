@@ -15,6 +15,7 @@ export const ORB_EGRESS_ENV = 'CAIRN_ORB_EGRESS_SOCKET';
 
 const ORB_LABEL = 'cairn.orb';
 const CONVERSATION_LABEL = 'cairn.conversation';
+const OWNER_LABEL = 'cairn.owner';
 const NAME_PREFIX = 'cairn-orb-';
 const STOP_GRACE_SECONDS = '5';
 const KEEP_ID_USERNS = '--userns=keep-id:uid=1000,gid=1000';
@@ -24,10 +25,35 @@ const VOLUME_NAME = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/;
 const VARIABLE_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const MISSING_CONTAINER = /no such container|no container with name or ID/i;
 const NAME_IN_USE = /already in use/i;
+const containerIdSchema = z.string().regex(/^[a-f0-9]{64}$/);
 
-const inspectSchema = z.array(z.object({ State: z.object({ Status: z.string() }) })).min(1);
+type PodmanArgv =
+  | readonly ['container', 'exists' | 'inspect', ...string[]]
+  | readonly ['image', 'exists', string]
+  | readonly ['build' | 'create' | 'info' | 'ps' | 'rmi', ...string[]];
+type ContainerOperation = 'start' | 'unpause' | 'stop' | 'commit' | 'rm' | 'exec';
+interface OwnedContainer {
+  readonly id: string;
+  readonly state: string;
+}
+
+const labelsSchema = z.record(z.string(), z.string()).nullish();
+const inspectSchema = z
+  .array(
+    z.object({
+      Id: containerIdSchema,
+      State: z.object({ Status: z.string() }),
+      Config: z.object({ Labels: labelsSchema }).optional(),
+    }),
+  )
+  .min(1);
 const listSchema = z.array(
-  z.object({ Names: z.array(z.string()).min(1), Image: z.string(), State: z.string() }),
+  z.object({
+    Names: z.array(z.string()).min(1),
+    Image: z.string(),
+    State: z.string(),
+    Labels: labelsSchema,
+  }),
 );
 const infoSchema = z.object({
   version: z.object({ Version: z.string() }),
@@ -36,6 +62,18 @@ const infoSchema = z.object({
 
 function assertContainerName(orbId: string): void {
   if (!ORB_NAME_PATTERN.test(orbId)) throw new Error('Invalid orb container name');
+}
+
+function orbLabelsMatch(
+  orbId: string,
+  labels: Record<string, string> | null | undefined,
+  owner: string,
+): boolean {
+  return (
+    labels?.[ORB_LABEL] === '1' &&
+    labels[CONVERSATION_LABEL] === orbId.slice(NAME_PREFIX.length) &&
+    labels[OWNER_LABEL] === owner
+  );
 }
 
 function assertImageReference(reference: string): void {
@@ -106,13 +144,28 @@ export class PodmanOrbRuntime implements OrbRuntime {
   private readonly binary: string;
   private readonly command: readonly string[];
   private readonly spawning = new Map<string, Promise<void>>();
+  private readonly ownerSource: string | (() => string);
+  private resolvedOwner: string | undefined;
 
-  constructor(
-    options: { runner?: OrbCommandRunner; binary?: string; command?: readonly string[] } = {},
-  ) {
+  constructor(options: {
+    ownerId: string | (() => string);
+    runner?: OrbCommandRunner;
+    binary?: string;
+    command?: readonly string[];
+  }) {
     this.runner = options.runner ?? runOrbCommand;
     this.binary = options.binary ?? 'podman';
     this.command = options.command ?? [];
+    this.ownerSource = options.ownerId;
+  }
+
+  private ownerId(): string {
+    if (this.resolvedOwner !== undefined) return this.resolvedOwner;
+    const owner = typeof this.ownerSource === 'function' ? this.ownerSource() : this.ownerSource;
+    if (typeof owner !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(owner))
+      throw new Error('Orb owner machine ID must be a nonempty machine identifier');
+    this.resolvedOwner = owner;
+    return owner;
   }
 
   async health(): Promise<{ version: string; rootless: boolean }> {
@@ -168,43 +221,51 @@ export class PodmanOrbRuntime implements OrbRuntime {
   async pause(orbId: string, options: { snapshotImage?: string } = {}): Promise<void> {
     assertContainerName(orbId);
     if (options.snapshotImage !== undefined) assertImageReference(options.snapshotImage);
-    const stop = await this.podman(['stop', '--time', STOP_GRACE_SECONDS, orbId]);
+    const container = await this.ownedContainer(orbId);
+    if (!container) {
+      if (options.snapshotImage !== undefined)
+        throw new Error(`Cannot snapshot ${orbId}: no such container`);
+      return;
+    }
+    const stop = await this.containerCommand('stop', container, ['--time', STOP_GRACE_SECONDS]);
     if (stop.code !== 0) {
       if (!MISSING_CONTAINER.test(stop.stderr)) throw this.failure(['stop'], stop);
       if (options.snapshotImage !== undefined)
         throw new Error(`Cannot snapshot ${orbId}: no such container`);
       return;
     }
-    if (options.snapshotImage !== undefined)
-      await this.run(['commit', '--quiet', orbId, options.snapshotImage]);
+    if (options.snapshotImage !== undefined) {
+      const committed = await this.containerCommand(
+        'commit',
+        container,
+        ['--quiet'],
+        [options.snapshotImage],
+      );
+      if (committed.code !== 0) throw this.failure(['commit'], committed);
+    }
   }
 
   async remove(orbId: string): Promise<void> {
     assertContainerName(orbId);
-    const result = await this.podman([
-      'rm',
-      '--force',
-      '--ignore',
-      '--time',
-      STOP_GRACE_SECONDS,
-      orbId,
-    ]);
-    if (result.code !== 0 && !MISSING_CONTAINER.test(result.stderr))
-      throw this.failure(['rm'], result);
+    const container = await this.ownedContainer(orbId);
+    if (container) await this.removeOwned(container);
   }
 
   async list(): Promise<OrbRuntimeState[]> {
+    const owner = this.ownerId();
     const result = await this.run([
       'ps',
       '--all',
       '--filter',
       `label=${ORB_LABEL}=1`,
+      '--filter',
+      `label=${OWNER_LABEL}=${owner}`,
       '--format',
       'json',
     ]);
     return this.parse('ps', result.stdout, listSchema).flatMap((row) => {
       const orbId = row.Names[0] ?? '';
-      return ORB_NAME_PATTERN.test(orbId)
+      return ORB_NAME_PATTERN.test(orbId) && orbLabelsMatch(orbId, row.Labels, owner)
         ? [{ orbId, image: row.Image, state: listedState(row.State) }]
         : [];
     });
@@ -222,15 +283,17 @@ export class PodmanOrbRuntime implements OrbRuntime {
       return value === undefined ? [] : ['--env', `${name}=${value}`];
     });
     const interactive = options.input !== undefined || options.onInput !== undefined;
-    return this.podman(
+    const container = await this.ownedContainer(orbId, options.signal);
+    if (!container) throw new Error(`No owned Orb container ${orbId}`);
+    return this.containerCommand(
+      'exec',
+      container,
       [
-        'exec',
         ...(interactive ? ['--interactive'] : []),
         ...environment,
         ...(options.cwd === undefined ? [] : ['--workdir', options.cwd]),
-        orbId,
-        ...argv,
       ],
+      argv,
       {
         signal: options.signal,
         input: options.input,
@@ -246,7 +309,7 @@ export class PodmanOrbRuntime implements OrbRuntime {
     await this.run(['rmi', '--ignore', ref]);
   }
 
-  private createArgv(spec: OrbSpawnSpec, image = spec.image): string[] {
+  private createArgv(spec: OrbSpawnSpec, image = spec.image): ['create', ...string[]] {
     assertContainerName(spec.orbId);
     assertImageReference(spec.image);
     if (spec.snapshotImage !== undefined) assertImageReference(spec.snapshotImage);
@@ -279,6 +342,8 @@ export class PodmanOrbRuntime implements OrbRuntime {
       `${ORB_LABEL}=1`,
       '--label',
       `${CONVERSATION_LABEL}=${spec.orbId.slice(NAME_PREFIX.length)}`,
+      '--label',
+      `${OWNER_LABEL}=${this.ownerId()}`,
       KEEP_ID_USERNS,
       '--network',
       'none',
@@ -305,12 +370,12 @@ export class PodmanOrbRuntime implements OrbRuntime {
 
   private async spawnContainer(
     spec: OrbSpawnSpec,
-    createArgv: string[],
+    createArgv: PodmanArgv,
     signal: AbortSignal | undefined,
   ): Promise<void> {
     signal?.throwIfAborted();
-    const existing = await this.containerStatus(spec.orbId, signal);
-    if (existing !== undefined) return this.resume(spec.orbId, existing, signal);
+    const existing = await this.ownedContainer(spec.orbId, signal);
+    if (existing !== undefined) return this.resume(existing, signal);
     const snapshot =
       spec.snapshotImage !== undefined && (await this.imageExists(spec.snapshotImage))
         ? spec.snapshotImage
@@ -320,53 +385,77 @@ export class PodmanOrbRuntime implements OrbRuntime {
     const created = await this.podman(argv, { signal });
     if (created.code !== 0) {
       if (NAME_IN_USE.test(created.stderr)) {
-        const raced = await this.containerStatus(spec.orbId, signal);
-        if (raced !== undefined) return this.resume(spec.orbId, raced, signal);
+        const raced = await this.ownedContainer(spec.orbId, signal);
+        if (raced !== undefined) return this.resume(raced, signal);
       }
       throw this.failure(['create'], created);
     }
+    const createdId = containerIdSchema.parse(created.stdout.trim());
+    const container = await this.inspectOwned(createdId, spec.orbId);
     try {
       signal?.throwIfAborted();
-      await this.run(['start', spec.orbId], { signal });
+      const started = await this.containerCommand('start', container, [], [], { signal });
+      if (started.code !== 0) throw this.failure(['start'], started);
     } catch (error) {
-      await this.podman([
-        'rm',
-        '--force',
-        '--ignore',
-        '--time',
-        STOP_GRACE_SECONDS,
-        spec.orbId,
-      ]).catch(() => {});
+      await this.removeOwned(container).catch(() => {});
       throw error;
     }
   }
 
-  private async resume(
-    orbId: string,
-    status: string,
-    signal: AbortSignal | undefined,
-  ): Promise<void> {
-    if (status === 'running') return;
-    if (status === 'paused') {
-      await this.run(['unpause', orbId], { signal });
-      return;
-    }
-    if (['created', 'exited', 'stopped', 'configured'].includes(status)) {
-      await this.run(['start', orbId], { signal });
-      return;
-    }
-    throw new Error(`podman reported unexpected container state "${status}" for ${orbId}`);
+  private async resume(container: OwnedContainer, signal: AbortSignal | undefined): Promise<void> {
+    if (container.state === 'running') return;
+    if (!['paused', 'created', 'exited', 'stopped', 'configured'].includes(container.state))
+      throw new Error(
+        `podman reported unexpected container state "${container.state}" for ${container.id}`,
+      );
+    const operation = container.state === 'paused' ? 'unpause' : 'start';
+    const result = await this.containerCommand(operation, container, [], [], { signal });
+    if (result.code !== 0) throw this.failure([operation], result);
   }
 
-  private async containerStatus(
+  private async ownedContainer(
     orbId: string,
-    signal: AbortSignal | undefined,
-  ): Promise<string | undefined> {
+    signal?: AbortSignal,
+  ): Promise<OwnedContainer | undefined> {
     const exists = await this.podman(['container', 'exists', orbId], { signal });
     if (exists.code === 1) return undefined;
     if (exists.code !== 0) throw this.failure(['container'], exists);
-    const inspect = await this.run(['container', 'inspect', '--format', 'json', orbId], { signal });
-    return this.parse('container inspect', inspect.stdout, inspectSchema)[0]?.State.Status;
+    return this.inspectOwned(orbId, orbId, signal);
+  }
+
+  private async inspectOwned(
+    reference: string,
+    orbId: string,
+    signal?: AbortSignal,
+  ): Promise<OwnedContainer> {
+    const inspect = await this.run(['container', 'inspect', '--format', 'json', reference], {
+      signal,
+    });
+    const [container] = this.parse('container inspect', inspect.stdout, inspectSchema);
+    if (!container || !orbLabelsMatch(orbId, container.Config?.Labels, this.ownerId()))
+      throw new Error(`Refusing to adopt ${orbId}: Orb ownership labels do not match`);
+    return { id: container.Id, state: container.State.Status };
+  }
+
+  private async removeOwned(container: OwnedContainer): Promise<void> {
+    const result = await this.containerCommand('rm', container, [
+      '--force',
+      '--ignore',
+      '--time',
+      STOP_GRACE_SECONDS,
+    ]);
+    if (result.code !== 0 && !MISSING_CONTAINER.test(result.stderr))
+      throw this.failure(['rm'], result);
+  }
+
+  private containerCommand(
+    operation: ContainerOperation,
+    container: OwnedContainer,
+    before: readonly string[] = [],
+    after: readonly string[] = [],
+    options?: OrbExecOptions,
+  ): Promise<OrbExecResult> {
+    return this.runner([this.binary, operation, ...before, container.id, ...after], options);
   }
 
   private parse<T>(label: string, stdout: string, schema: z.ZodType<T>): T {
@@ -386,11 +475,11 @@ export class PodmanOrbRuntime implements OrbRuntime {
     return parsed.data;
   }
 
-  private podman(args: readonly string[], options?: OrbExecOptions): Promise<OrbExecResult> {
+  private podman(args: PodmanArgv, options?: OrbExecOptions): Promise<OrbExecResult> {
     return this.runner([this.binary, ...args], options);
   }
 
-  private async run(args: readonly string[], options?: OrbExecOptions): Promise<OrbExecResult> {
+  private async run(args: PodmanArgv, options?: OrbExecOptions): Promise<OrbExecResult> {
     const result = await this.podman(args, options);
     if (result.code !== 0) throw this.failure(args, result);
     return result;

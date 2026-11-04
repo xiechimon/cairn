@@ -209,7 +209,11 @@ describe('probeContainer with the real PodmanOrbRuntime argv', () => {
   test('creates the probe with the Orb flags: keep-id, no network, dropped capabilities', async () => {
     const podman = new FakePodman();
     podman.images.add(IMAGE);
-    const runtime = new PodmanOrbRuntime({ runner: podman.runner, command: ['sleep', '120'] });
+    const runtime = new PodmanOrbRuntime({
+      ownerId: 'machine-alpha',
+      runner: podman.runner,
+      command: ['sleep', '120'],
+    });
     await probeContainer(runtime, options);
     const create = podman.callsOf('create')[0] ?? [];
     expect(create).toContain('--userns=keep-id:uid=1000,gid=1000');

@@ -6,6 +6,20 @@ import { FakePodman } from './podman-fake.js';
 
 const IMAGE = 'cairn-orb-base:0123456789ab';
 const ORB = 'cairn-orb-alpha';
+const ORB_LABELS = {
+  'cairn.orb': '1',
+  'cairn.conversation': 'alpha',
+  'cairn.owner': 'machine-alpha',
+};
+const FOREIGN_LABELS: Record<string, string>[] = [
+  {},
+  { 'cairn.orb': '1', 'cairn.conversation': 'alpha' },
+  { 'cairn.owner': 'machine-alpha' },
+  { 'cairn.orb': '1', 'cairn.owner': 'machine-alpha' },
+  { 'cairn.orb': '0', 'cairn.conversation': 'alpha', 'cairn.owner': 'machine-alpha' },
+  { 'cairn.orb': '1', 'cairn.conversation': 'someone-else', 'cairn.owner': 'machine-alpha' },
+  { 'cairn.orb': '1', 'cairn.conversation': 'alpha', 'cairn.owner': 'someone-else' },
+];
 
 function spec(overrides: Partial<OrbSpawnSpec> = {}): OrbSpawnSpec {
   return {
@@ -26,7 +40,11 @@ function spec(overrides: Partial<OrbSpawnSpec> = {}): OrbSpawnSpec {
 function fixture(options: { command?: readonly string[] } = {}) {
   const podman = new FakePodman();
   podman.images.add(IMAGE);
-  const runtime = new PodmanOrbRuntime({ runner: podman.runner, ...options });
+  const runtime = new PodmanOrbRuntime({
+    ownerId: 'machine-alpha',
+    runner: podman.runner,
+    ...options,
+  });
   return { podman, runtime };
 }
 
@@ -80,7 +98,8 @@ describe('PodmanOrbRuntime.spawn argv', () => {
     expect(podman.calls.map((argv) => argv.slice(0, 3))).toEqual([
       ['podman', 'container', 'exists'],
       ['podman', 'create', '--name'],
-      ['podman', 'start', ORB],
+      ['podman', 'container', 'inspect'],
+      ['podman', 'start', podman.idOf(ORB)],
     ]);
     expect(podman.callsOf('create')[0]).toEqual([
       'podman',
@@ -91,6 +110,8 @@ describe('PodmanOrbRuntime.spawn argv', () => {
       'cairn.orb=1',
       '--label',
       'cairn.conversation=alpha',
+      '--label',
+      'cairn.owner=machine-alpha',
       '--userns=keep-id:uid=1000,gid=1000',
       '--network',
       'none',
@@ -249,6 +270,170 @@ describe('PodmanOrbRuntime.spawn argv', () => {
 });
 
 describe('PodmanOrbRuntime.spawn lifecycle', () => {
+  test('owner identity resolves lazily after enrollment and stays bound for this runtime', async () => {
+    const podman = new FakePodman();
+    podman.images.add(IMAGE);
+    let machineId = '';
+    const runtime = new PodmanOrbRuntime({ ownerId: () => machineId, runner: podman.runner });
+    await expect(runtime.spawn(spec())).rejects.toThrow('Orb owner machine ID');
+    expect(podman.calls).toEqual([]);
+    machineId = 'machine-alpha';
+    await runtime.spawn(spec());
+    machineId = 'machine-other';
+    await runtime.pause(ORB);
+    expect(podman.containers.get(ORB)?.labels['cairn.owner']).toBe('machine-alpha');
+    expect(podman.containers.get(ORB)?.state).toBe('exited');
+  });
+
+  test.each(['list', 'spawn', 'pause', 'remove', 'exec'] as const)(
+    'a second daemon cannot %s the first daemon container in a shared store',
+    async (operation) => {
+      const podman = new FakePodman();
+      podman.images.add(IMAGE);
+      const first = new PodmanOrbRuntime({ ownerId: 'machine-one', runner: podman.runner });
+      const second = new PodmanOrbRuntime({ ownerId: 'machine-two', runner: podman.runner });
+      await first.spawn(spec());
+      if (operation === 'list') expect(await second.list()).toEqual([]);
+      else {
+        const action =
+          operation === 'spawn'
+            ? second.spawn(spec())
+            : operation === 'pause'
+              ? second.pause(ORB)
+              : operation === 'remove'
+                ? second.remove(ORB)
+                : second.exec(ORB, ['true']);
+        await expect(action).rejects.toThrow('Orb ownership labels do not match');
+      }
+      expect(podman.containers.get(ORB)?.state).toBe('running');
+      expect(await first.list()).toHaveLength(1);
+    },
+  );
+  test.each(['pause', 'snapshot', 'remove', 'exec'] as const)(
+    '%s refuses a foreign replacement without stopping, deleting or executing it',
+    async (operation) => {
+      const { podman, runtime } = fixture();
+      await runtime.spawn(spec());
+      podman.containers.set(ORB, {
+        name: ORB,
+        image: IMAGE,
+        state: 'running',
+        labels: {},
+        create: [],
+      });
+      podman.calls.length = 0;
+      const action =
+        operation === 'pause'
+          ? runtime.pause(ORB)
+          : operation === 'snapshot'
+            ? runtime.pause(ORB, { snapshotImage: 'cairn-orb-snap:foreign' })
+            : operation === 'remove'
+              ? runtime.remove(ORB)
+              : runtime.exec(ORB, ['true']);
+      await expect(action).rejects.toThrow('Orb ownership labels do not match');
+      for (const command of ['stop', 'rm', 'exec', 'commit'])
+        expect(podman.callsOf(command)).toEqual([]);
+      expect(podman.containers.get(ORB)?.state).toBe('running');
+    },
+  );
+
+  test.each(['pause', 'remove', 'exec', 'resume'] as const)(
+    '%s consumes the inspected ID when the name is replaced after inspection',
+    async (operation) => {
+      const { podman } = fixture();
+      podman.containers.set(ORB, {
+        name: ORB,
+        image: IMAGE,
+        state: 'exited',
+        labels: ORB_LABELS,
+        create: [],
+      });
+      const inspectedId = podman.idOf(ORB);
+      const original = podman.runner;
+      const runtime = new PodmanOrbRuntime({
+        ownerId: 'machine-alpha',
+        runner: async (argv, options) => {
+          const result = await original(argv, options);
+          if (argv[1] === 'container' && argv[2] === 'inspect')
+            podman.containers.set(ORB, {
+              id: 'f'.repeat(64),
+              name: ORB,
+              image: IMAGE,
+              state: 'running',
+              labels: {},
+              create: [],
+            });
+          return result;
+        },
+      });
+      const action =
+        operation === 'pause'
+          ? runtime.pause(ORB)
+          : operation === 'remove'
+            ? runtime.remove(ORB)
+            : operation === 'exec'
+              ? runtime.exec(ORB, ['true'])
+              : runtime.spawn(spec());
+      await action.catch(() => {});
+      const verb =
+        operation === 'pause'
+          ? 'stop'
+          : operation === 'remove'
+            ? 'rm'
+            : operation === 'exec'
+              ? 'exec'
+              : 'start';
+      const calls = podman.callsOf(verb);
+      expect(calls).toHaveLength(1);
+      expect(calls[0]).toContain(inspectedId);
+      expect(calls[0]).not.toContain(ORB);
+      expect(podman.containers.get(ORB)?.state).toBe('running');
+      expect(podman.containers.get(ORB)?.id).toBe('f'.repeat(64));
+    },
+  );
+  test.each(FOREIGN_LABELS)(
+    'refuses a same-name container with mismatched ownership labels %j',
+    async (labels) => {
+      const { podman, runtime } = fixture();
+      podman.containers.set(ORB, {
+        name: ORB,
+        image: IMAGE,
+        state: 'running',
+        labels,
+        create: [],
+      });
+      await expect(runtime.spawn(spec())).rejects.toThrow('Orb ownership labels do not match');
+      expect(podman.callsOf('start')).toEqual([]);
+      expect(podman.callsOf('unpause')).toEqual([]);
+      expect(podman.callsOf('rm')).toEqual([]);
+    },
+  );
+
+  test('refuses a foreign container that wins the create race without modifying it', async () => {
+    const { podman } = fixture();
+    const original = podman.runner;
+    const runtime = new PodmanOrbRuntime({
+      ownerId: 'machine-alpha',
+      runner: async (argv, options) => {
+        if (argv[1] === 'create') {
+          podman.containers.set(ORB, {
+            name: ORB,
+            image: IMAGE,
+            state: 'exited',
+            labels: {},
+            create: [],
+          });
+          return { code: 125, stdout: '', stderr: 'container name is already in use' };
+        }
+        return original(argv, options);
+      },
+    });
+    await expect(runtime.spawn(spec())).rejects.toThrow('Orb ownership labels do not match');
+    expect(podman.callsOf('start')).toEqual([]);
+    expect(podman.callsOf('rm')).toEqual([]);
+    expect(podman.containers.get(ORB)?.state).toBe('exited');
+  });
+
   test('a running container is a no-op', async () => {
     const { podman, runtime } = fixture();
     await runtime.spawn(spec());
@@ -263,10 +448,16 @@ describe('PodmanOrbRuntime.spawn lifecycle', () => {
     'a %s container is started, not created',
     async (state) => {
       const { podman, runtime } = fixture();
-      podman.containers.set(ORB, { name: ORB, image: IMAGE, state, labels: {}, create: [] });
+      podman.containers.set(ORB, {
+        name: ORB,
+        image: IMAGE,
+        state,
+        labels: ORB_LABELS,
+        create: [],
+      });
       await runtime.spawn(spec());
       expect(podman.callsOf('create')).toEqual([]);
-      expect(podman.callsOf('start')).toEqual([['podman', 'start', ORB]]);
+      expect(podman.callsOf('start')).toEqual([['podman', 'start', podman.idOf(ORB)]]);
       expect(podman.containers.get(ORB)?.state).toBe('running');
     },
   );
@@ -277,11 +468,11 @@ describe('PodmanOrbRuntime.spawn lifecycle', () => {
       name: ORB,
       image: IMAGE,
       state: 'paused',
-      labels: {},
+      labels: ORB_LABELS,
       create: [],
     });
     await runtime.spawn(spec());
-    expect(podman.callsOf('unpause')).toEqual([['podman', 'unpause', ORB]]);
+    expect(podman.callsOf('unpause')).toEqual([['podman', 'unpause', podman.idOf(ORB)]]);
     expect(podman.callsOf('start')).toEqual([]);
   });
 
@@ -291,7 +482,7 @@ describe('PodmanOrbRuntime.spawn lifecycle', () => {
       name: ORB,
       image: 'cairn-orb-base:old',
       state: 'exited',
-      labels: {},
+      labels: ORB_LABELS,
       create: [],
     });
     await runtime.spawn(spec());
@@ -332,12 +523,13 @@ describe('PodmanOrbRuntime.spawn lifecycle', () => {
       name: ORB,
       image: IMAGE,
       state: 'exited',
-      labels: {},
+      labels: ORB_LABELS,
       create: [],
     });
     const original = podman.runner;
     let first = true;
     const racing = new PodmanOrbRuntime({
+      ownerId: 'machine-alpha',
       runner: async (argv, options) => {
         if (first && argv[1] === 'container' && argv[2] === 'exists') {
           first = false;
@@ -384,7 +576,7 @@ describe('PodmanOrbRuntime.spawn lifecycle', () => {
       name: ORB,
       image: IMAGE,
       state: 'exited',
-      labels: {},
+      labels: ORB_LABELS,
       create: [],
     });
     podman.failWhen((argv) => argv[1] === 'start', { code: 125, stdout: '', stderr: 'boom' });
@@ -410,7 +602,7 @@ describe('PodmanOrbRuntime.spawn lifecycle', () => {
       name: ORB,
       image: IMAGE,
       state: 'exited',
-      labels: {},
+      labels: ORB_LABELS,
       create: [],
     });
     podman.failWhen((argv) => argv[1] === 'container' && argv[2] === 'inspect', {
@@ -430,12 +622,14 @@ describe('PodmanOrbRuntime.spawn lifecycle', () => {
       name: ORB,
       image: IMAGE,
       state: 'exited',
-      labels: {},
+      labels: ORB_LABELS,
       create: [],
     });
     podman.failWhen((argv) => argv[1] === 'container' && argv[2] === 'inspect', {
       code: 0,
-      stdout: JSON.stringify([{ State: { Status: 'removing' } }]),
+      stdout: JSON.stringify([
+        { Id: podman.idOf(ORB), State: { Status: 'removing' }, Config: { Labels: ORB_LABELS } },
+      ]),
       stderr: '',
     });
     await expect(runtime.spawn(spec())).rejects.toThrow('unexpected container state');
@@ -450,7 +644,7 @@ describe('PodmanOrbRuntime.spawn lifecycle', () => {
     expect(podman.calls).toEqual([]);
   });
 
-  test('the abort signal reaches every podman call, halts the sequence and removes the fresh container', async () => {
+  test('the abort signal halts work while identity-checked cleanup removes the fresh container', async () => {
     const { podman, runtime } = fixture();
     const controller = new AbortController();
     podman.failWhen((argv) => {
@@ -459,19 +653,46 @@ describe('PodmanOrbRuntime.spawn lifecycle', () => {
     }, new Error('unused'));
     await expect(runtime.spawn(spec(), { signal: controller.signal })).rejects.toThrow();
     expect(podman.callsOf('start')).toEqual([]);
-    podman.calls.forEach((argv, index) => {
-      if (argv[1] !== 'rm') expect(podman.execOptions[index]?.signal).toBe(controller.signal);
+    podman.execOptions.forEach((options) => {
+      if (options?.signal !== undefined) expect(options.signal).toBe(controller.signal);
     });
     expect(podman.containers.size).toBe(0);
   });
 });
 
 describe('PodmanOrbRuntime.pause', () => {
+  test('a snapshot commit cannot follow a name replacement after stop', async () => {
+    const { podman } = fixture();
+    const original = podman.runner;
+    const runtime = new PodmanOrbRuntime({
+      ownerId: 'machine-alpha',
+      runner: async (argv, options) => {
+        const result = await original(argv, options);
+        if (argv[1] === 'stop')
+          podman.containers.set(ORB, {
+            id: 'f'.repeat(64),
+            name: ORB,
+            image: IMAGE,
+            state: 'running',
+            labels: {},
+            create: [],
+          });
+        return result;
+      },
+    });
+    await runtime.spawn(spec());
+    const inspectedId = podman.idOf(ORB);
+    await expect(runtime.pause(ORB, { snapshotImage: 'cairn-orb-snap:swap' })).rejects.toThrow();
+    expect(podman.containers.get(ORB)?.state).toBe('running');
+    expect(podman.images.has('cairn-orb-snap:swap')).toBe(false);
+    expect(podman.callsOf('commit')[0]).toContain(inspectedId);
+    expect(podman.callsOf('commit')[0]).not.toContain(ORB);
+  });
   test('stops with a five second grace', async () => {
     const { podman, runtime } = fixture();
     await runtime.spawn(spec());
     await runtime.pause(ORB);
-    expect(podman.callsOf('stop')).toEqual([['podman', 'stop', '--time', '5', ORB]]);
+    expect(podman.callsOf('stop')).toEqual([['podman', 'stop', '--time', '5', podman.idOf(ORB)]]);
     expect(podman.callsOf('commit')).toEqual([]);
     expect(podman.containers.get(ORB)?.state).toBe('exited');
   });
@@ -485,7 +706,7 @@ describe('PodmanOrbRuntime.pause', () => {
       'podman',
       'commit',
       '--quiet',
-      ORB,
+      podman.idOf(ORB),
       'cairn-orb-snap:p1',
     ]);
     expect(podman.images.has('cairn-orb-snap:p1')).toBe(true);
@@ -521,7 +742,7 @@ describe('PodmanOrbRuntime.remove', () => {
     await runtime.spawn(spec());
     await runtime.remove(ORB);
     expect(podman.callsOf('rm')).toEqual([
-      ['podman', 'rm', '--force', '--ignore', '--time', '5', ORB],
+      ['podman', 'rm', '--force', '--ignore', '--time', '5', podman.idOf(ORB)],
     ]);
     expect(podman.callsOf('rm')[0]).not.toContain('--volumes');
     expect(podman.containers.size).toBe(0);
@@ -539,41 +760,53 @@ describe('PodmanOrbRuntime.remove', () => {
 
   test('any other failure carries stderr', async () => {
     const { podman, runtime } = fixture();
+    await runtime.spawn(spec());
     podman.failWhen((argv) => argv[1] === 'rm', { code: 125, stdout: '', stderr: 'device busy' });
     await expect(runtime.remove(ORB)).rejects.toThrow('podman rm failed (125): device busy');
   });
 });
 
 describe('PodmanOrbRuntime.list', () => {
+  test('excludes a labelled container whose conversation label does not match its name', async () => {
+    const { podman, runtime } = fixture();
+    podman.containers.set(ORB, {
+      name: ORB,
+      image: IMAGE,
+      state: 'running',
+      labels: { 'cairn.orb': '1', 'cairn.conversation': 'someone-else' },
+      create: [],
+    });
+    expect(await runtime.list()).toEqual([]);
+  });
   test('filters on the orb label and maps states', async () => {
     const { podman, runtime } = fixture();
-    const labels = { 'cairn.orb': '1' };
+    const labels = { 'cairn.orb': '1', 'cairn.owner': 'machine-alpha' };
     podman.containers.set('cairn-orb-a', {
       name: 'cairn-orb-a',
       image: IMAGE,
       state: 'running',
-      labels,
+      labels: { ...labels, 'cairn.conversation': 'a' },
       create: [],
     });
     podman.containers.set('cairn-orb-b', {
       name: 'cairn-orb-b',
       image: IMAGE,
       state: 'exited',
-      labels,
+      labels: { ...labels, 'cairn.conversation': 'b' },
       create: [],
     });
     podman.containers.set('cairn-orb-c', {
       name: 'cairn-orb-c',
       image: IMAGE,
       state: 'created',
-      labels,
+      labels: { ...labels, 'cairn.conversation': 'c' },
       create: [],
     });
     podman.containers.set('unrelated', {
       name: 'unrelated',
       image: 'x',
       state: 'running',
-      labels: {},
+      labels: ORB_LABELS,
       create: [],
     });
     expect(await runtime.list()).toEqual([
@@ -582,7 +815,17 @@ describe('PodmanOrbRuntime.list', () => {
       { orbId: 'cairn-orb-c', image: IMAGE, state: 'paused' },
     ]);
     expect(podman.callsOf('ps')).toEqual([
-      ['podman', 'ps', '--all', '--filter', 'label=cairn.orb=1', '--format', 'json'],
+      [
+        'podman',
+        'ps',
+        '--all',
+        '--filter',
+        'label=cairn.orb=1',
+        '--filter',
+        'label=cairn.owner=machine-alpha',
+        '--format',
+        'json',
+      ],
     ]);
   });
 
@@ -735,6 +978,9 @@ describe('PodmanOrbRuntime images', () => {
 describe('PodmanOrbRuntime.exec', () => {
   test('runs the argv inside the container with env, cwd and input passed as flags', async () => {
     const { podman, runtime } = fixture();
+    await runtime.spawn(spec());
+    podman.calls.length = 0;
+    podman.execOptions.length = 0;
     const result = await runtime.exec(ORB, ['id', '-u'], {
       env: { A: '1', B: undefined, PATH: '/usr/bin' },
       cwd: '/home/user',
@@ -751,7 +997,7 @@ describe('PodmanOrbRuntime.exec', () => {
       'PATH=/usr/bin',
       '--workdir',
       '/home/user',
-      ORB,
+      podman.idOf(ORB),
       'id',
       '-u',
     ]);
@@ -761,9 +1007,12 @@ describe('PodmanOrbRuntime.exec', () => {
 
   test('without input there is no stdin flag, and the signal is passed on', async () => {
     const { podman, runtime } = fixture();
+    await runtime.spawn(spec());
+    podman.calls.length = 0;
+    podman.execOptions.length = 0;
     const controller = new AbortController();
     await runtime.exec(ORB, ['true'], { signal: controller.signal });
-    expect(podman.callsOf('exec')[0]).toEqual(['podman', 'exec', ORB, 'true']);
+    expect(podman.callsOf('exec')[0]).toEqual(['podman', 'exec', podman.idOf(ORB), 'true']);
     expect(podman.execOptions.at(-1)?.signal).toBe(controller.signal);
   });
 

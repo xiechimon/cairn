@@ -1,4 +1,6 @@
-import { isAbsolute, join } from 'node:path';
+import { createHash } from 'node:crypto';
+import { isAbsolute, join, resolve } from 'node:path';
+import { loadMachineJson, statePaths } from '../state.js';
 import { ContainerOrbProvider, type ContainerOrbProviderOptions } from './container-provider.js';
 import { ORB_EGRESS_ENV, PodmanOrbRuntime } from './podman.js';
 import { HostOrbProvider, NspawnOrbProvider, type OrbProvider } from './provider.js';
@@ -38,9 +40,20 @@ export function podmanProviderOptions(
   if (egressSocketPath !== undefined && !isAbsolute(egressSocketPath))
     throw new Error(`${ORB_EGRESS_ENV} must be an absolute path (got ${egressSocketPath})`);
   return {
-    runtime: new PodmanOrbRuntime(),
+    runtime: new PodmanOrbRuntime({
+      ownerId: () => {
+        const machine = loadMachineJson(statePaths(home));
+        if (!machine)
+          throw new Error('Orb owner machine ID is unavailable; enroll this daemon first');
+        return machine.machineId;
+      },
+    }),
     image,
-    runtimeRoot: join(runtimeDirectory, 'cairn-orb'),
+    runtimeRoot: join(
+      runtimeDirectory,
+      'cairn-orb',
+      createHash('sha256').update(resolve(home)).digest('hex').slice(0, 16),
+    ),
     distRoot: join(home, 'orb', 'dist'),
     seedRoot: join(home, 'orb', 'seed'),
     stateFile: join(home, 'orb-state', 'containers.json'),
