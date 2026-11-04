@@ -17,7 +17,7 @@ rs() { rsync -a -e 'ssh -o BatchMode=yes -o ConnectTimeout=5' "$@"; }
 | Web push keys | `server/vapid.json` | keeps existing push subscriptions valid on the server side |
 | Access token | `token` | if absent, the server runs with auth off; see the check in step 4 |
 | Attachments, repos, exports | `server/{attachments,repos,trajectory-exports}/` | `rsync -a` |
-| Server environment | the Mac server's launch script and env file | carry every `CAIRN_*` variable into `~/.config/cairn/server.env` on omarchy (600); set `CAIRN_WEB_ORIGIN` to `https://<omarchy>` |
+| Server environment | `~/.config/cairn/server.env` on both hosts (600; the Mac launch script sources it, the omarchy unit reads it as `EnvironmentFile`) | carry every `CAIRN_*` variable into omarchy's file; set `CAIRN_WEB_ORIGIN` to `https://<omarchy>` |
 
 Machine tokens live in the database, so daemons keep their identity; only their server URL changes.
 
@@ -64,11 +64,28 @@ curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8787/app
 curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8787/api/user/me
 ```
 
-Expect `200`, then `401`. A `200` from `/api/user/me` without a token means auth is off: stop the server and fix the token before going further. Then:
+Expect `200`, then `401`. A `200` from `/api/user/me` without a token means auth is off: stop the server and fix the token before going further. Run the environment check below; a missing key means the unit did not read the file, so fix it and restart before going further. Then:
 
 ```sh
 tailscale serve --bg http://127.0.0.1:8787
 tailscale serve status
+```
+
+### Environment check
+
+A server started without its env file runs with issue intake and GitHub sign-in silently off. On whichever host is about to serve, the file must exist and the listening process must carry every key in it. This prints names only, never values; empty output after `missing:` is a pass.
+
+```sh
+env_file=~/.config/cairn/server.env
+test -s "$env_file" && ls -l "$env_file"
+pid=$(lsof -tiTCP:8787 -sTCP:LISTEN | head -n1)
+file_keys() { sed -nE 's/^(export[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*)=.*/\2/p' "$env_file" | sort -u; }
+if [ -r "/proc/$pid/environ" ]; then
+  proc_keys() { tr '\0' '\n' < "/proc/$pid/environ" | cut -d= -f1 | sort -u; }
+else
+  proc_keys() { ps eww -o command= -p "$pid" | tr ' ' '\n' | sed -nE 's/^([A-Za-z_][A-Za-z0-9_]*)=.*/\1/p' | sort -u; }
+fi
+echo "missing:"; comm -23 <(file_keys) <(proc_keys)
 ```
 
 ## 5. Repoint the daemons
@@ -98,5 +115,5 @@ Rename the Mac server, web and deploy launch agents to `*.disabled-<date>` so a 
 
 1. On omarchy: `systemctl --user disable --now cairn-self-deploy.timer cairn-server.service`, `tailscale serve reset`.
 2. If omarchy took writes worth keeping, copy its state back to the Mac as a set: `server.db` through `sqlite3 .backup`, plus `attachments/`, `repos/` and `trajectory-exports/` with `rs`. Attachment bytes live in files beside the database, so a database alone leaves rows whose files exist only on omarchy. Otherwise the Mac's own copy is the state at the freeze.
-3. Restore the Mac launch agents and its `tailscale serve`, and start them.
+3. Restore the Mac launch agents and its `tailscale serve`, and start them. Run the environment check on the Mac before pointing anything at it.
 4. Point both daemons back at `https://<mac>`.
