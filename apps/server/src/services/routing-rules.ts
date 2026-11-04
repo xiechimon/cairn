@@ -362,7 +362,7 @@ export function memoryOwnerOf(
 }
 
 export function memoryOpsAreTeamScoped(kind: StepKind): boolean {
-  return kind !== 'review';
+  return kind !== 'review' && kind !== 'verify';
 }
 
 export function memoryInjectTeamId(kind: StepKind, teamId: string): string | undefined {

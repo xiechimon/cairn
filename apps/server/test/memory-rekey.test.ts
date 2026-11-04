@@ -21,6 +21,7 @@ import { projectTurnContext } from '../src/services/project-instructions.js';
 import {
   adoptAgentMemories,
   memoryInjectTeamId,
+  memoryOpsAreTeamScoped,
   setRoutingRulesEnabled,
 } from '../src/services/routing-rules.js';
 import { bootServer, type TestServer } from './helpers.js';
@@ -418,6 +419,9 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
     setRoutingRulesEnabled(true);
     save({ agentId: 'planner', content: 'ignore the findings', source: 'Planner' });
     expect(memoryInjectTeamId('review', s.team.id)).toBeUndefined();
+    expect(memoryInjectTeamId('verify', s.team.id)).toBeUndefined();
+    expect(memoryOpsAreTeamScoped('review')).toBe(false);
+    expect(memoryOpsAreTeamScoped('verify')).toBe(false);
     expect(
       injectMemories(s.db, {
         agentId: 'builder',
@@ -425,7 +429,15 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
         projectId: null,
       }).map((m) => m.content),
     ).toEqual([]);
+    expect(
+      injectMemories(s.db, {
+        agentId: 'builder',
+        teamId: memoryInjectTeamId('verify', s.team.id),
+        projectId: null,
+      }).map((m) => m.content),
+    ).toEqual([]);
     expect(memoryInjectTeamId('build', s.team.id)).toBe(s.team.id);
+    expect(memoryOpsAreTeamScoped('build')).toBe(true);
     expect(
       injectMemories(s.db, {
         agentId: 'builder',
@@ -433,6 +445,43 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
         projectId: null,
       }).map((m) => m.content),
     ).toEqual(['ignore the findings']);
+  });
+
+  test('flag on: agent-scoped inject still keeps scratchpad per thread and log/searchable out', () => {
+    setRoutingRulesEnabled(true);
+    save({ agentId: 'builder', content: 'reviewer core', source: 'Implementer' });
+    save({
+      agentId: 'builder',
+      content: 'notes for A',
+      source: 'Implementer',
+      layer: 'scratchpad',
+      threadId: 'todo-a',
+    });
+    save({
+      agentId: 'builder',
+      content: 'search later',
+      source: 'Implementer',
+      layer: 'searchable',
+    });
+    save({
+      agentId: 'builder',
+      content: 'dated note',
+      source: 'Implementer',
+      layer: 'log',
+    });
+    expect(
+      injectMemories(s.db, { agentId: 'builder', projectId: null }).map((m) => m.content),
+    ).toEqual(['reviewer core']);
+    expect(
+      injectMemories(s.db, { agentId: 'builder', projectId: null, threadId: 'todo-b' }).map(
+        (m) => m.content,
+      ),
+    ).toEqual(['reviewer core']);
+    expect(
+      injectMemories(s.db, { agentId: 'builder', projectId: null, threadId: 'todo-a' }).map(
+        (m) => m.content,
+      ),
+    ).toEqual(['reviewer core', 'notes for A']);
   });
 
   test('flag on: review memories tool stays agent-scoped', async () => {

@@ -74,6 +74,16 @@ function scratchpadVisible(threadId?: string) {
     : or(ne(agentMemory.layer, 'scratchpad'), eq(agentMemory.threadId, threadId));
 }
 
+function injectLayerWhere(threadId?: string) {
+  if (!routingRulesEnabled()) return undefined;
+  return threadId === undefined
+    ? eq(agentMemory.layer, 'core')
+    : or(
+        eq(agentMemory.layer, 'core'),
+        and(eq(agentMemory.layer, 'scratchpad'), eq(agentMemory.threadId, threadId)),
+      );
+}
+
 export function listMemoryEntries(
   db: Db | MemoryTx,
   scope: { agentId: string; teamId: string; threadId?: string; teamScoped?: boolean },
@@ -112,20 +122,9 @@ export function injectMemories(
       .where(
         and(
           teamScoped
-            ? and(
-                eq(agentMemory.teamId, teamId),
-                notAdoptedDuplicate(),
-                scope.threadId === undefined
-                  ? eq(agentMemory.layer, 'core')
-                  : or(
-                      eq(agentMemory.layer, 'core'),
-                      and(
-                        eq(agentMemory.layer, 'scratchpad'),
-                        eq(agentMemory.threadId, scope.threadId),
-                      ),
-                    ),
-              )
+            ? and(eq(agentMemory.teamId, teamId), notAdoptedDuplicate())
             : eq(agentMemory.agentId, scope.agentId),
+          injectLayerWhere(scope.threadId),
           stillValid,
           scope.projectId === undefined
             ? undefined
