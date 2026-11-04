@@ -237,3 +237,59 @@ def test_report_marks_unknown_cost_instead_of_zero() -> None:
         arms={"A": summary}, task_names=["t1"], seed=1, model="free"
     )
     assert "Total cost: unknown" in report
+
+
+def test_partially_reported_step_costs_fail_closed(tmp_path: Path) -> None:
+    trial_dir = tmp_path / "task__abc"
+    trial_dir.mkdir()
+    (trial_dir / "result.json").write_text(
+        json.dumps(
+            {
+                "step_results": [
+                    {"agent_result": {"n_input_tokens": 10, "cost_usd": 0.10}},
+                    {"agent_result": {"n_input_tokens": 900, "n_output_tokens": 90}},
+                ]
+            }
+        )
+    )
+    with pytest.raises(MissingCostError):
+        summarize_trial(
+            trial_dir, name=trial_dir.name, voided=False, model="claude-unpriced"
+        )
+
+
+def test_run_with_an_unknown_trial_cost_settles_at_its_reservation() -> None:
+    usd, source = budget.settlement([_trial(0.5), _trial(None)], reserved_usd=4.0)
+    assert usd == 4.0
+    assert source == budget.UNKNOWN_SETTLED_AT_RESERVATION
+
+
+def test_run_with_known_costs_settles_at_their_sum() -> None:
+    usd, _ = budget.settlement([_trial(0.5), _trial(0.25)], reserved_usd=4.0)
+    assert usd == 0.75
+
+
+def test_run_spending_past_its_reservation_settles_at_the_actual() -> None:
+    usd, _ = budget.settlement([_trial(6.0)], reserved_usd=4.0)
+    assert usd == 6.0
+
+
+def test_a_step_without_tokens_or_cost_does_not_hide_reported_costs(
+    tmp_path: Path,
+) -> None:
+    trial_dir = tmp_path / "task__abc"
+    trial_dir.mkdir()
+    (trial_dir / "result.json").write_text(
+        json.dumps(
+            {
+                "step_results": [
+                    {"agent_result": {"n_input_tokens": 10, "cost_usd": 0.10}},
+                    {"agent_result": {"n_input_tokens": 0}},
+                ]
+            }
+        )
+    )
+    trial = summarize_trial(
+        trial_dir, name=trial_dir.name, voided=False, model="claude-unpriced"
+    )
+    assert trial.cost_usd == 0.10

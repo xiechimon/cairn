@@ -320,12 +320,7 @@ def main() -> None:
             model=model if metered else None,
         )
         if metered:
-            budget.settle(
-                run_id,
-                sum(outcome.cost_usd or 0.0 for outcome in outcomes),
-                "; ".join(sorted({o.cost_source for o in outcomes if o.cost_source}))
-                or budget.NO_TOKENS_SOURCE,
-            )
+            budget.settle(run_id, *budget.settlement(outcomes, args.max_run_usd))
         payload = {
             "arm": args.arm_label,
             "job_name": args.job_name,

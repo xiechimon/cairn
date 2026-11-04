@@ -70,15 +70,18 @@ def read_step_usage(trial_dir: Path) -> StepUsage:
     output_tokens = sum(
         int(context.get("n_output_tokens") or 0) for context in step_contexts
     )
-    reported = [
-        float(context["cost_usd"])
+    reported = [context for context in step_contexts if context.get("cost_usd") is not None]
+    unreported_usage = any(
+        context.get("cost_usd") is None
+        and int(context.get("n_input_tokens") or 0) + int(context.get("n_output_tokens") or 0) > 0
         for context in step_contexts
-        if context.get("cost_usd") is not None
-    ]
+    )
     return StepUsage(
         input_tokens=input_tokens,
         output_tokens=output_tokens,
-        cost_usd=sum(reported) if reported else None,
+        cost_usd=None
+        if unreported_usage or not reported
+        else sum(float(context["cost_usd"]) for context in reported),
     )
 
 

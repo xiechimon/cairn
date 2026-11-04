@@ -5,6 +5,7 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
+from typing import Protocol, Sequence
 
 DEFAULT_MONTHLY_CAP_USD = "50"
 DEFAULT_LEDGER = Path.home() / ".local/state/cairn-eval/spend.jsonl"
@@ -12,8 +13,14 @@ DEFAULT_LEDGER = Path.home() / ".local/state/cairn-eval/spend.jsonl"
 REPORTED_SOURCE = "agent-reported total_cost_usd"
 PRICE_TABLE_SOURCE = "tokens x price table"
 NO_TOKENS_SOURCE = "no tokens recorded"
+UNKNOWN_SETTLED_AT_RESERVATION = "unknown trial cost; settled at the reservation"
 
 PRICES_USD_PER_MTOK: dict[str, tuple[float, float]] = {}
+
+
+class CostedTrial(Protocol):
+    cost_usd: float | None
+    cost_source: str
 
 
 class BudgetExceeded(Exception):
@@ -168,3 +175,12 @@ def resolve_cost(
     input_price, output_price = prices
     usd = (input_tokens * input_price + output_tokens * output_price) / 1_000_000
     return usd, PRICE_TABLE_SOURCE
+
+
+def settlement(
+    trials: Sequence[CostedTrial], reserved_usd: float
+) -> tuple[float, str]:
+    if any(trial.cost_usd is None for trial in trials):
+        return reserved_usd, UNKNOWN_SETTLED_AT_RESERVATION
+    sources = sorted({trial.cost_source for trial in trials if trial.cost_source})
+    return sum(trial.cost_usd or 0.0 for trial in trials), "; ".join(sources) or NO_TOKENS_SOURCE
