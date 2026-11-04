@@ -42,6 +42,7 @@ import type {
   PatchMachineBody,
   PatchProjectBody,
   PatchProviderBody,
+  PatchScheduleBody,
   PatchTeamBody,
   PatchUserBody,
   PlanRow,
@@ -780,6 +781,11 @@ export function useApiMutations(teamId: string | undefined) {
     }),
     createSchedule: useMutation({
       mutationFn: (body: CreateScheduleBody) => api.post<ScheduleRecord>('/api/schedules', body),
+      onSuccess: invalidateAll,
+    }),
+    patchSchedule: useMutation({
+      mutationFn: (input: { id: string; body: PatchScheduleBody }) =>
+        api.patch<ScheduleRecord>(`/api/schedules/${input.id}`, input.body),
       onSuccess: invalidateAll,
     }),
     deleteSchedule: useMutation({

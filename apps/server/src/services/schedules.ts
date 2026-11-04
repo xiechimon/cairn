@@ -1,4 +1,10 @@
-import type { CreateScheduleBody, ScheduleKind, ScheduleRecord, UserRecord } from '@cairn/shared';
+import type {
+  CreateScheduleBody,
+  PatchScheduleBody,
+  ScheduleKind,
+  ScheduleRecord,
+  UserRecord,
+} from '@cairn/shared';
 import { classifyStepFailure, isProviderOutage, SCHEDULE_MINUTE_STEPS } from '@cairn/shared';
 import { CronExpressionParser } from 'cron-parser';
 import { and, desc, eq, isNotNull, isNull, like, lte, max, or } from 'drizzle-orm';
@@ -205,6 +211,36 @@ export function deleteSchedule(deps: ScheduleDeps & { user: UserRecord }, id: st
   deps.db.delete(schedule).where(eq(schedule.id, id)).run();
   endSnoozeOn(deps, row.todoId, 'schedule-cleared');
   return true;
+}
+
+export function setScheduleEnabled(
+  deps: ScheduleDeps,
+  id: string,
+  body: PatchScheduleBody,
+): ScheduleRecord | null {
+  const row = deps.db.select().from(schedule).where(eq(schedule.id, id)).get();
+  if (!row) return null;
+  if (row.enabled !== body.enabled) {
+    if (body.enabled) {
+      const now = nowMs();
+      const nextRunAt = isRecurring(row.kind)
+        ? computeNextRunAt(row.kind, row.at, row.tz, now, row.cron)
+        : Math.max(row.at ?? now, now);
+      deps.db
+        .update(schedule)
+        .set({ enabled: true, nextRunAt, pausedReason: null, retryNotBefore: null })
+        .where(eq(schedule.id, id))
+        .run();
+    } else {
+      deps.db
+        .update(schedule)
+        .set({ enabled: false, nextRunAt: null })
+        .where(eq(schedule.id, id))
+        .run();
+    }
+  }
+  const updated = deps.db.select().from(schedule).where(eq(schedule.id, id)).get();
+  return updated ? toScheduleRecord(deps, updated) : null;
 }
 
 export function dueSchedules(deps: ScheduleDeps, nowMsValue: number): ScheduleRow[] {
