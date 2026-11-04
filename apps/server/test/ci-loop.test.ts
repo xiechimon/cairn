@@ -1,15 +1,18 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { conversationBranch, type Phase } from '@cairn/shared';
+import { conversationBranch, type Phase, RESEARCH_STUCK_SOURCE_KIND } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import {
+  agent as agentTable,
   build as buildTable,
   machine as machineTable,
+  message as messageTable,
   project as projectTable,
   step as stepTable,
   todo as todoTable,
+  tokenUsage as tokenUsageTable,
 } from '../src/db/schema.js';
 import type { FetchLike } from '../src/lib/github.js';
 import { completeStep } from '../src/services/builds.js';
@@ -23,7 +26,9 @@ import {
   createCiPoller,
 } from '../src/services/ci-loop.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
+import { storeInfoReport } from '../src/services/info-handoff.js';
 import { finishStep } from '../src/services/machine-finish-step.js';
+import { openCitationCheck } from '../src/services/research-citations.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import { bootServer, type TestServer } from './helpers.js';
 
@@ -669,6 +674,188 @@ describe('#1150 (3) fix-step dead-loop gate (stop after N consecutive red rounds
     const before = w.mock.requests.length;
     await w.poller.sweep();
     expect(w.mock.requests.length).toBe(before);
+  });
+
+  function addResearchAgents(w: PrWorld) {
+    w.s.db
+      .insert(agentTable)
+      .values([
+        {
+          id: `agent-research-${w.buildId}`,
+          teamId: w.teamId,
+          displayName: 'Research',
+          provider: 'claude-code',
+          modelId: 'claude-sonnet-5-5',
+        },
+        {
+          id: `agent-checker-${w.buildId}`,
+          teamId: w.teamId,
+          displayName: 'Checker',
+          provider: 'openai-codex',
+          modelId: 'gpt-6.1-sol',
+        },
+      ])
+      .run();
+  }
+
+  test('an earlier red CI round still appends a fix step and does not open research', async () => {
+    const w = makePrWorld({
+      checks: [{ name: 'lint', status: 'completed', conclusion: 'failure' }],
+    });
+    addResearchAgents(w);
+    await w.poller.sweep();
+    expect(w.fixRoundSteps()).toHaveLength(1);
+    expect(
+      w.s.db
+        .select()
+        .from(todoTable)
+        .where(eq(todoTable.sourceKind, RESEARCH_STUCK_SOURCE_KIND))
+        .all(),
+    ).toHaveLength(0);
+  });
+
+  test('the last CI retry opens one research thread and a repeat sweep does not open another', async () => {
+    const w = makePrWorld({
+      checks: [{ name: 'lint', status: 'completed', conclusion: 'failure' }],
+      fixRounds: CI_FIX_ROUNDS_MAX - 1,
+    });
+    addResearchAgents(w);
+    await w.poller.sweep();
+    expect(w.fixRoundSteps()).toHaveLength(CI_FIX_ROUNDS_MAX - 1);
+    expect(w.todoRow().phase).toBe('building');
+    const research = w.s.db
+      .select()
+      .from(todoTable)
+      .where(eq(todoTable.sourceKind, RESEARCH_STUCK_SOURCE_KIND))
+      .all();
+    expect(research).toHaveLength(1);
+    expect(research[0]?.sourceRef).toBe(`${w.buildId}:0`);
+    await w.poller.sweep();
+    expect(
+      w.s.db
+        .select()
+        .from(todoTable)
+        .where(eq(todoTable.sourceKind, RESEARCH_STUCK_SOURCE_KIND))
+        .all(),
+    ).toHaveLength(1);
+    expect(w.fixRoundSteps()).toHaveLength(CI_FIX_ROUNDS_MAX - 1);
+  });
+
+  test('the last CI retry proceeds after 20 minutes without a report', async () => {
+    const w = makePrWorld({
+      checks: [{ name: 'lint', status: 'completed', conclusion: 'failure' }],
+      fixRounds: CI_FIX_ROUNDS_MAX - 1,
+    });
+    addResearchAgents(w);
+    await w.poller.sweep();
+    const requested = w.s.db
+      .select()
+      .from(messageTable)
+      .where(eq(messageTable.id, `research-requested-${w.buildId}-0`))
+      .get();
+    expect(requested).toBeDefined();
+    w.s.db
+      .update(messageTable)
+      .set({ createdAt: Date.now() - 21 * 60_000 })
+      .where(eq(messageTable.id, `research-requested-${w.buildId}-0`))
+      .run();
+    await w.poller.sweep();
+    expect(w.fixRoundSteps()).toHaveLength(CI_FIX_ROUNDS_MAX);
+    expect(w.fixRoundSteps().at(-1)?.prompt).toContain('没有在等待时间内回来');
+    expect(
+      w.s.db
+        .select()
+        .from(messageTable)
+        .where(eq(messageTable.id, `research-timeout-${w.buildId}-0`))
+        .get(),
+    ).toBeDefined();
+  });
+
+  test('the last CI retry quotes a checked research report inside the fix prompt', async () => {
+    const w = makePrWorld({
+      checks: [{ name: 'lint', status: 'completed', conclusion: 'failure' }],
+      fixRounds: CI_FIX_ROUNDS_MAX - 1,
+    });
+    addResearchAgents(w);
+    await w.poller.sweep();
+    const research = w.s.db
+      .select()
+      .from(todoTable)
+      .where(eq(todoTable.sourceKind, RESEARCH_STUCK_SOURCE_KIND))
+      .all();
+    const researchBuildId = research[0]?.latestBuildId;
+    expect(researchBuildId).toBeTruthy();
+    if (researchBuildId === undefined || researchBuildId === null) return;
+    const claim = 'Cursor export keeps the original row order.';
+    storeInfoReport(
+      { db: w.s.db, attachmentsDir: w.s.attachmentsDir },
+      {
+        buildId: researchBuildId,
+        teamId: w.teamId,
+        createdBy: w.s.user.id,
+        report: `${claim}\nhttps://example.com/cursors`,
+      },
+    );
+    w.s.db
+      .insert(tokenUsageTable)
+      .values({ buildId: researchBuildId, model: 'claude-sonnet-5-5', input: 1, output: 1 })
+      .run();
+    const check = openCitationCheck(w.s.svc, researchBuildId);
+    expect(check).not.toBeNull();
+    if (!check) return;
+    storeInfoReport(
+      { db: w.s.db, attachmentsDir: w.s.attachmentsDir },
+      {
+        buildId: check.buildId,
+        teamId: w.teamId,
+        createdBy: w.s.user.id,
+        report: `\`\`\`json\n${JSON.stringify({
+          claims: [
+            {
+              url: 'https://example.com/cursors',
+              claim,
+              verdict: 'supported',
+              reason: 'Fixture reference supports this claim.',
+              quote: 'Fixture reference.',
+              fetchedAt: '2026-11-04',
+              quality: 'primary',
+            },
+          ],
+        })}\n\`\`\``,
+      },
+    );
+    w.s.db
+      .insert(tokenUsageTable)
+      .values({ buildId: check.buildId, model: 'gpt-6.1-sol', input: 1, output: 1 })
+      .run();
+    await w.poller.sweep();
+    const prompt = w.fixRoundSteps().at(-1)?.prompt ?? '';
+    expect(w.fixRoundSteps()).toHaveLength(CI_FIX_ROUNDS_MAX);
+    expect(prompt).toContain('Outside research');
+    expect(prompt).toContain(claim);
+    expect(prompt).toContain('> ');
+  });
+
+  test('an infra failure on the last CI retry does not open research', async () => {
+    const w = makePrWorld({
+      checks: [{ name: 'lint', status: 'completed', conclusion: 'failure' }],
+      fixRounds: CI_FIX_ROUNDS_MAX - 1,
+    });
+    addResearchAgents(w);
+    w.s.db
+      .update(buildTable)
+      .set({ errorMessage: 'monthly usage limit' })
+      .where(eq(buildTable.id, w.buildId))
+      .run();
+    await w.poller.sweep();
+    expect(w.fixRoundSteps()).toHaveLength(CI_FIX_ROUNDS_MAX);
+    expect(
+      w.s.db
+        .select()
+        .from(todoTable)
+        .where(eq(todoTable.sourceKind, RESEARCH_STUCK_SOURCE_KIND))
+        .all(),
+    ).toHaveLength(0);
   });
 
   test('count criteria = fix-round steps with a marker prompt (original execution steps not counted)', () => {
