@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { MemoryRouter } from 'react-router';
+import { ProjectNotFound, ProjectsFailed } from '../board/project-not-found.js';
 import { ChiefIdentity } from '../chief/chief-identity.js';
 import { TraceGroup, type TraceStep, TraceSteps } from '../components/chat/trace-steps.js';
 import { EmptyState } from '../components/empty-state.js';
@@ -114,6 +115,41 @@ export function EmptySection() {
           </div>
         </div>
       </Specimen>
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+        <Specimen title="Project not found" note="An unknown project link, with close names">
+          <MemoryRouter>
+            <ProjectNotFound
+              unknownId="cairn-old"
+              suggestions={{
+                kind: 'close',
+                projects: [{ id: 'p1', name: 'cairn', lastActiveAt: 2 }],
+              }}
+              projectHref={() => '#'}
+            />
+          </MemoryRouter>
+        </Specimen>
+        <Specimen title="Project not found, recent" note="Nothing is close, so the latest projects">
+          <MemoryRouter>
+            <ProjectNotFound
+              unknownId="zzzzzzzz"
+              suggestions={{
+                kind: 'recent',
+                projects: [
+                  { id: 'p1', name: 'relay', lastActiveAt: 3 },
+                  { id: 'p2', name: 'docs-site', lastActiveAt: 2 },
+                  { id: 'p3', name: 'orb', lastActiveAt: 1 },
+                ],
+              }}
+              projectHref={() => '#'}
+            />
+          </MemoryRouter>
+        </Specimen>
+        <Specimen title="Projects failed to load" note="Retry, or leave for the Coordinator">
+          <MemoryRouter>
+            <ProjectsFailed onRetry={() => undefined} />
+          </MemoryRouter>
+        </Specimen>
+      </div>
     </Section>
   );
 }
