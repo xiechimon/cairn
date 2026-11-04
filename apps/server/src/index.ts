@@ -7,6 +7,7 @@ import { BUNDLED_FORM } from './bundle-form.js';
 import {
   attachmentsDirOf,
   backupStatusPathOf,
+  deployRecordPathOf,
   loadConfig,
   logTokenAuthStartup,
   missingRequiredTokenError,
@@ -125,6 +126,7 @@ const app = createApp(
     reposDir,
     attachmentsDir,
     backupStatusPath: backupStatusPathOf(config),
+    deployRecordPath: deployRecordPathOf(config),
     skillsDir: config.skillsDir,
     skillSourcesPath: join(config.dataDir, 'skill-sources.json'),
     webDir: config.webDir,

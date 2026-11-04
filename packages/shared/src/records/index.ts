@@ -31,6 +31,7 @@ export * from './chief.js';
 export * from './claude-login.js';
 export * from './claude-rate-limit.js';
 export * from './common.js';
+export * from './deploy-status.js';
 export * from './document-diff.js';
 export * from './first-pr-report.js';
 export * from './github.js';
