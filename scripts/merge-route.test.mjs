@@ -113,6 +113,7 @@ function fakeGh(t, { labels = [], failWrites = false } = {}) {
 echo "$*" >> "${log}"
 case "$*" in
   *"--method"*) ${failWrites ? 'echo denied >&2; exit 1' : 'exit 0'} ;;
+  *"/pulls/"*) printf '%s\\n' "$FAKE_LIVE_HEAD" ;;
   *) printf '%s\\n' ${labels.map((name) => `'${name}'`).join(' ')} ;;
 esac
 `,
@@ -125,11 +126,16 @@ esac
   return { bin, writes };
 }
 
-const routeLabelling = ({ dir, head }, gh) =>
+const routeLabelling = ({ dir, head }, gh, liveHead = head) =>
   spawnSync(process.execPath, [script, head, '--label-pr', '7'], {
     cwd: dir,
     encoding: 'utf8',
-    env: { ...process.env, PATH: `${gh.bin}:${process.env.PATH}`, GITHUB_REPOSITORY: 'o/r' },
+    env: {
+      ...process.env,
+      PATH: `${gh.bin}:${process.env.PATH}`,
+      GITHUB_REPOSITORY: 'o/r',
+      FAKE_LIVE_HEAD: liveHead,
+    },
   });
 
 const protectedChange = { 'scripts/x.mjs': 'export {};\n' };
@@ -163,6 +169,16 @@ test('a queueable head without the label is not written', (t) => {
   const result = routeLabelling(repoWith(t, queueableChange), gh);
   assert.equal(result.status, 0, result.stdout + result.stderr);
   assert.deepEqual(gh.writes(), []);
+});
+
+test('a run for a superseded head leaves the label alone', (t) => {
+  const newerHead = 'f'.repeat(40);
+  const owner = fakeGh(t, { labels: [] });
+  assert.equal(routeLabelling(repoWith(t, protectedChange), owner, newerHead).status, 1);
+  assert.deepEqual(owner.writes(), []);
+  const queueable = fakeGh(t, { labels: ['owner-route'] });
+  assert.equal(routeLabelling(repoWith(t, queueableChange), queueable, newerHead).status, 0);
+  assert.deepEqual(queueable.writes(), []);
 });
 
 test('a failed label write keeps the routing verdict', (t) => {

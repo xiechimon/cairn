@@ -73,7 +73,9 @@ humanReasons`,
 
 const OWNER_ROUTE_LABEL = 'owner-route';
 
-export function syncOwnerRouteLabel(repo, pr, routed, gh) {
+export function syncOwnerRouteLabel(repo, pr, head, routed, gh) {
+  const liveHead = gh(['api', `repos/${repo}/pulls/${pr}`, '--jq', '.head.sha']).trim();
+  if (liveHead !== head) return false;
   const labels = gh(['api', `repos/${repo}/issues/${pr}/labels`, '--jq', '.[].name'])
     .split('\n')
     .filter(Boolean);
@@ -89,6 +91,7 @@ export function syncOwnerRouteLabel(repo, pr, routed, gh) {
     ]);
   if (!routed && has)
     gh(['api', '--method', 'DELETE', `repos/${repo}/issues/${pr}/labels/${OWNER_ROUTE_LABEL}`]);
+  return true;
 }
 
 const runGh = (args) => execFileSync('gh', args, { encoding: 'utf8' });
@@ -110,7 +113,7 @@ if (process.argv[1] && realpathSync(process.argv[1]) === import.meta.filename) {
   const reasons = ownerRouting(head);
   if (labelPr) {
     try {
-      syncOwnerRouteLabel(repo, labelPr, reasons.length > 0, runGh);
+      syncOwnerRouteLabel(repo, labelPr, head, reasons.length > 0, runGh);
     } catch (error) {
       console.error(`merge-route: could not sync the ${OWNER_ROUTE_LABEL} label: ${error.message}`);
     }
