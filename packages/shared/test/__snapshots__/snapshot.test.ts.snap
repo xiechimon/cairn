@@ -7223,6 +7223,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "chief_summary",
   "computer",
   "computer_call",
+  "client_message",
 ]
 `;
 
@@ -7346,7 +7347,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
   },
   {
     "method": "POST",
-    "note": "body {content, projectId?}; projectId only tags the turn, 409 when that project is archived",
+    "note": "body {content, projectId?, clientMessageId?}; projectId only tags the turn, 409 when that project is archived; a repeated clientMessageId returns the first response and starts no new turn",
     "path": "/api/teams/{id}/coordinator/messages",
   },
   {
@@ -7419,7 +7420,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
   },
   {
     "method": "POST",
-    "note": "body {content, clientMessageId}; a person messages the thread directly (steer, plan revision or restart by phase) and the Coordinator gets a thread-message row (D65)",
+    "note": "body {content, clientMessageId}; a repeated clientMessageId returns the first response and delivers nothing again; a person messages the thread directly (steer, plan revision or restart by phase) and the Coordinator gets a thread-message row (D65)",
     "path": "/api/todos/{id}/messages",
   },
   {

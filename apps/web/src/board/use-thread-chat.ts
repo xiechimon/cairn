@@ -20,6 +20,7 @@ import { liveThinkingStore } from '../api/live-thinking.js';
 import { mapPlanDoc, mapPlanVersions, mapTranscript, toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { useConversationStream } from '../api/sse.js';
+import { useSendKey } from '../api/use-send-key.js';
 import type { QueuedCapsule } from '../components/queued-capsules.js';
 import { toastError } from '../components/ui/toaster.js';
 import { blockDemoWrite, DEMO_MODE } from '../demo/demo-gate.js';
@@ -82,6 +83,7 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
   const qc = useQueryClient();
   const [searchParams] = useSearchParams();
   const mutations = useApiMutations(teamId);
+  const sendKey = useSendKey();
   const [stopping, setStopping] = useState(false);
   const stopRequested = useRef(false);
 
@@ -218,14 +220,20 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
               content: text,
               mode: 'queue',
               deliverAfterStop,
+              clientMessageId: sendKey.keyFor(text),
             })
-            .then(() => undefined)
+            .then(() => sendKey.settle())
       : undefined;
   const send = writable
     ? queueReply && queueSteer !== undefined
       ? (text: string) => queueSteer(text, false)
       : async (text: string) => {
-          await mutations.messageThread.mutateAsync({ todoId, content: text });
+          await mutations.messageThread.mutateAsync({
+            todoId,
+            content: text,
+            clientMessageId: sendKey.keyFor(text),
+          });
+          sendKey.settle();
         }
     : !live && open
       ? fixtureSend

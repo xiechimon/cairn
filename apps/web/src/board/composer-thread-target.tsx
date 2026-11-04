@@ -1,6 +1,7 @@
 import { type RefObject, useMemo, useRef, useState } from 'react';
 import { useApiMutations } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { useSendKey } from '../api/use-send-key.js';
 import { PROJECT_CHIP_CLS, TOOL_BTN_CLS } from '../chief/chief-conversation.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { THREAD_REPLY_HINT, type ThreadReplyDelivery } from '../components/thread/thread-reply.js';
@@ -46,6 +47,7 @@ export function useComposerThreadTarget(todos: readonly TodoRecord[]) {
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
   const mutations = useApiMutations(teamId);
+  const sendKey = useSendKey();
   const targets = useMemo(() => threadTargetsOf(todos), [todos]);
   const [picked, setPicked] = useState<PickedThread | null>(null);
   const pickedRef = useRef<PickedThread | null>(null);
@@ -73,7 +75,12 @@ export function useComposerThreadTarget(todos: readonly TodoRecord[]) {
     const seq = target.todo.seqNum;
     setFailed(null);
     try {
-      await mutations.messageThread.mutateAsync({ todoId, content: text });
+      await mutations.messageThread.mutateAsync({
+        todoId,
+        content: text,
+        clientMessageId: sendKey.keyFor(text),
+      });
+      sendKey.settle();
     } catch (error) {
       if (pickedRef.current?.todoId === todoId) setFailed(t('没发给 #{seq}，再试一次。', { seq }));
       throw error;
