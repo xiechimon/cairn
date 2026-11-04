@@ -193,6 +193,7 @@ export function toDisplayTodo(w: WireTodo): DisplayTodo {
     sourceRef: w.sourceRef,
     usageCost: w.usageCost,
     ...(w.verified !== undefined ? { verified: w.verified } : {}),
+    ...(w.awaitingReply === true ? { awaitingReply: true } : {}),
   };
 }
 
@@ -634,6 +635,21 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
             claimedSince !== null && m.createdAt >= claimedSince,
             owner?.status === 'stopped',
           ),
+        },
+      });
+      continue;
+    }
+    const ask = m.role === 'assistant' ? askQuestionOfContent(m.content) : null;
+    if (ask !== null) {
+      entries.push({
+        at: m.createdAt,
+        item: {
+          kind: 'question',
+          id: m.id,
+          requestId: ask.requestId,
+          status: ask.status,
+          questions: ask.questions,
+          answers: ask.answers,
         },
       });
       continue;
@@ -1257,12 +1273,13 @@ export function askQuestionOfContent(content: unknown): {
   }[];
   answers: { header: string; choices?: string[]; text?: string }[] | null;
 } | null {
-  if (typeof content !== 'string') return null;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(content);
-  } catch {
-    return null;
+  let parsed: unknown = content;
+  if (typeof content === 'string') {
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      return null;
+    }
   }
   if (
     parsed === null ||

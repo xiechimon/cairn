@@ -715,6 +715,13 @@
       "when": 1793772077239,
       "tag": "0101_client_message",
       "breakpoints": true
+    },
+    {
+      "idx": 102,
+      "version": "6",
+      "when": 1793782567953,
+      "tag": "0102_simple_cammi",
+      "breakpoints": true
     }
   ]
 }

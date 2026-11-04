@@ -1,0 +1,385 @@
+import { eq } from 'drizzle-orm';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { build, message, project, step, todo } from '../src/db/schema.js';
+import {
+  completeStep,
+  maybeEnqueueIndependentReview,
+  startBuilds,
+} from '../src/services/builds.js';
+import { createCiPoller } from '../src/services/ci-loop.js';
+import { setRoutingRulesEnabled } from '../src/services/routing-rules.js';
+import { messageThreadAsUser } from '../src/services/thread-message.js';
+import { getTodo, setTodoPhase } from '../src/services/todos.js';
+import { askWorkerQuestion } from '../src/services/worker-questions.js';
+import { AGENT_ID, H, registerChiefHarness } from './chief-harness.js';
+
+registerChiefHarness();
+beforeEach(() => setRoutingRulesEnabled(true));
+afterEach(() => setRoutingRulesEnabled(false));
+
+const REQUEST = 'ask-11111111-2222-3333-4444-555555555555';
+const QUESTIONS = [
+  {
+    header: 'Format',
+    question: 'Which export format?',
+    options: [{ label: 'CSV' }, { label: 'JSON' }],
+  },
+];
+
+function deps() {
+  return {
+    db: H.s.db,
+    hub: H.s.hub,
+    convHub: H.s.convHub,
+    machineHub: H.s.machineHub,
+    user: H.s.user,
+  };
+}
+
+function seedTodo(id = 'session-todo') {
+  H.s.db
+    .insert(todo)
+    .values({
+      id,
+      teamId: H.teamId,
+      projectId: H.projectId,
+      title: 'Export the board',
+      spec: 'Add an export.',
+      phase: 'todo',
+      phaseAt: 1,
+      seqNum: 3,
+    })
+    .run();
+  return id;
+}
+
+function startSession(withPlan = true) {
+  const todoId = seedTodo();
+  const [started] = startBuilds(deps(), {
+    projectId: H.projectId,
+    todoIds: [todoId],
+    assignment: { plan: null, build: { agentId: AGENT_ID } },
+    withPlan,
+  });
+  const stepRow = H.s.db.select().from(step).where(eq(step.buildId, started!.id)).get()!;
+  return { todoId, buildId: started!.id, stepRow };
+}
+
+describe('worker ask_user on a session step', () => {
+  function claim(stepId: string) {
+    H.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, stepId)).run();
+    return H.s.db.select().from(step).where(eq(step.id, stepId)).get()!;
+  }
+
+  test('the question parks the thread: awaitingReply is set and a needs-you report is written', async () => {
+    const { todoId, stepRow } = startSession(false);
+    H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
+    const claimed = claim(stepRow.id);
+    const settled = await askWorkerQuestion(
+      deps(),
+      claimed,
+      { requestId: REQUEST, questions: QUESTIONS },
+      { holdMs: 0 },
+    );
+    expect(settled.status).toBe('pending');
+    expect(getTodo(deps(), todoId)!.awaitingReply).toBe(true);
+    const rows = H.s.db.select().from(message).where(eq(message.id, REQUEST)).all();
+    expect(rows).toHaveLength(1);
+    await askWorkerQuestion(
+      deps(),
+      claimed,
+      { requestId: REQUEST, questions: QUESTIONS },
+      { holdMs: 0 },
+    );
+    expect(H.s.db.select().from(message).where(eq(message.id, REQUEST)).all()).toHaveLength(1);
+  });
+
+  test('the answer delivered through the thread message clears awaitingReply and settles the held ask', async () => {
+    const { todoId, stepRow } = startSession(false);
+    H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
+    const claimed = claim(stepRow.id);
+    const held = askWorkerQuestion(
+      deps(),
+      claimed,
+      { requestId: REQUEST, questions: QUESTIONS },
+      { holdMs: 5_000 },
+    );
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    await messageThreadAsUser(deps(), H.teamId, todoId, {
+      content: 'JSON please',
+      clientMessageId: 'c-2',
+    });
+    const settled = await held;
+    expect(settled.status).toBe('answered');
+    expect(settled.answers).toEqual([{ header: 'Format', text: 'JSON please' }]);
+    expect(getTodo(deps(), todoId)!.awaitingReply).toBeUndefined();
+  });
+
+  test('a parked step keeps awaitingReply through the move to review and clears it when the thread moves on', async () => {
+    const { todoId, stepRow } = startSession(false);
+    H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
+    const claimed = claim(stepRow.id);
+    await askWorkerQuestion(
+      deps(),
+      claimed,
+      { requestId: REQUEST, questions: QUESTIONS },
+      { holdMs: 0 },
+    );
+    setTodoPhase(deps(), todoId, 'review');
+    expect(getTodo(deps(), todoId)!.awaitingReply).toBe(true);
+    setTodoPhase(deps(), todoId, 'queued');
+    expect(getTodo(deps(), todoId)!.awaitingReply).toBeUndefined();
+    const content = H.s.db.select().from(message).where(eq(message.id, REQUEST)).get()!.content as {
+      status: string;
+    };
+    expect(content.status).toBe('cancelled');
+  });
+
+  test('a request id owned by another build is rejected and its message untouched', async () => {
+    const { todoId, stepRow } = startSession(false);
+    H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
+    H.s.db
+      .insert(message)
+      .values({
+        id: REQUEST,
+        conversationId: 'other-build',
+        role: 'assistant',
+        content: 'foreign',
+        createdAt: 5,
+        actor: null,
+      })
+      .run();
+    const claimed = claim(stepRow.id);
+    await expect(
+      askWorkerQuestion(
+        deps(),
+        claimed,
+        { requestId: REQUEST, questions: QUESTIONS },
+        { holdMs: 0 },
+      ),
+    ).rejects.toMatchObject({ status: 409 });
+    const kept = H.s.db.select().from(message).where(eq(message.id, REQUEST)).get()!;
+    expect(kept.conversationId).toBe('other-build');
+    expect(kept.content).toBe('foreign');
+  });
+
+  test('a retried ask keeps the stored creation time', async () => {
+    const { todoId, buildId, stepRow } = startSession(false);
+    H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
+    const claimed = claim(stepRow.id);
+    await askWorkerQuestion(
+      deps(),
+      claimed,
+      { requestId: REQUEST, questions: QUESTIONS },
+      { holdMs: 0 },
+    );
+    const { ASK_PARK_MS } = await import('../src/services/chief-questions.js');
+    const old = Date.now() - ASK_PARK_MS - 1_000;
+    H.s.db.update(message).set({ createdAt: old }).where(eq(message.id, REQUEST)).run();
+    const retried = await askWorkerQuestion(
+      deps(),
+      claimed,
+      { requestId: REQUEST, questions: QUESTIONS },
+      { holdMs: 5_000 },
+    );
+    expect(retried.status).toBe('cancelled');
+    expect(H.s.db.select().from(message).where(eq(message.id, REQUEST)).get()!.conversationId).toBe(
+      buildId,
+    );
+  });
+
+  test('a delivery that throws leaves the question pending and awaitingReply set', async () => {
+    const { todoId, stepRow } = startSession(false);
+    H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
+    const claimed = claim(stepRow.id);
+    await askWorkerQuestion(
+      deps(),
+      claimed,
+      { requestId: REQUEST, questions: QUESTIONS },
+      { holdMs: 0 },
+    );
+    const failing = {
+      ...deps(),
+      machineHub: {
+        steerSignal: vi.fn(() => {
+          throw new Error('delivery down');
+        }),
+      },
+    } as never;
+    await expect(
+      messageThreadAsUser(failing, H.teamId, todoId, { content: 'JSON', clientMessageId: 'c-9' }),
+    ).rejects.toThrow('delivery down');
+    expect(getTodo(deps(), todoId)!.awaitingReply).toBe(true);
+    const content = H.s.db.select().from(message).where(eq(message.id, REQUEST)).get()!.content as {
+      status: string;
+    };
+    expect(content.status).toBe('pending');
+  });
+
+  test('a non-session worker step still cannot ask', async () => {
+    const { stepRow } = startSession(false);
+    H.s.db
+      .update(step)
+      .set({ kind: 'verify', status: 'claimed' })
+      .where(eq(step.id, stepRow.id))
+      .run();
+    const { machineAsk } = await import('../src/services/machine-relay.js');
+    await expect(
+      machineAsk(
+        { ...deps(), vapidKeys: null } as never,
+        'no-machine',
+        stepRow.id,
+        { requestId: REQUEST, questions: QUESTIONS },
+        { holdMs: 0 },
+      ),
+    ).rejects.toThrow();
+  });
+});
+
+describe('session steps share the build-step paths', () => {
+  function claim(stepId: string) {
+    H.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, stepId)).run();
+    return H.s.db.select().from(step).where(eq(step.id, stepId)).get()!;
+  }
+
+  test('a session turn that parked on an unanswered ask with no changes parks instead of failing', async () => {
+    const { todoId, stepRow } = startSession(false);
+    H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
+    const claimed = claim(stepRow.id);
+    await askWorkerQuestion(
+      deps(),
+      claimed,
+      { requestId: REQUEST, questions: QUESTIONS },
+      { holdMs: 0 },
+    );
+    completeStep(deps(), stepRow.id, { hasChanges: false });
+    const record = getTodo(deps(), todoId)!;
+    expect(record.phase).not.toBe('failed');
+    expect(record.awaitingReply).toBe(true);
+    const content = H.s.db.select().from(message).where(eq(message.id, REQUEST)).get()!.content as {
+      status: string;
+    };
+    expect(content.status).toBe('pending');
+  });
+
+  test('a parked session with a verifier assigned does not dispatch verification', async () => {
+    const { todoId, buildId, stepRow } = startSession(false);
+    H.s.db
+      .update(todo)
+      .set({
+        phase: 'building',
+        assignment: { plan: null, build: { agentId: AGENT_ID }, verify: { agentId: AGENT_ID } },
+      })
+      .where(eq(todo.id, todoId))
+      .run();
+    const claimed = claim(stepRow.id);
+    await askWorkerQuestion(
+      deps(),
+      claimed,
+      { requestId: REQUEST, questions: QUESTIONS },
+      { holdMs: 0 },
+    );
+    completeStep(deps(), stepRow.id, { hasChanges: false });
+    const kinds = H.s.db
+      .select()
+      .from(step)
+      .where(eq(step.buildId, buildId))
+      .all()
+      .map((r) => r.kind);
+    expect(kinds).toEqual(['session']);
+  });
+
+  test('a session turn with no changes and no question still fails the artifact gate', () => {
+    const { todoId, stepRow } = startSession(false);
+    H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
+    claim(stepRow.id);
+    completeStep(deps(), stepRow.id, { hasChanges: false });
+    expect(getTodo(deps(), todoId)!.phase).toBe('failed');
+  });
+
+  test('a reply that moves a review thread on marks the parked question answered', async () => {
+    const { todoId, stepRow } = startSession(false);
+    H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
+    const claimed = claim(stepRow.id);
+    await askWorkerQuestion(
+      deps(),
+      claimed,
+      { requestId: REQUEST, questions: QUESTIONS },
+      { holdMs: 0 },
+    );
+    H.s.db
+      .update(step)
+      .set({ status: 'done', sessionId: 'sess-1' })
+      .where(eq(step.id, stepRow.id))
+      .run();
+    setTodoPhase(deps(), todoId, 'review');
+    H.s.db.update(todo).set({ awaitingReply: true }).where(eq(todo.id, todoId)).run();
+    const sent = await messageThreadAsUser(deps(), H.teamId, todoId, {
+      content: 'JSON please',
+      clientMessageId: 'c-q',
+    });
+    expect(sent.delivered).toBe('revision');
+    const content = H.s.db.select().from(message).where(eq(message.id, REQUEST)).get()!.content as {
+      status: string;
+      answers: unknown;
+    };
+    expect(content.status).toBe('answered');
+    expect(content.answers).toEqual([{ header: 'Format', text: 'JSON please' }]);
+    expect(getTodo(deps(), todoId)!.awaitingReply).toBeUndefined();
+  });
+});
+
+describe('a parked worker question holds the gates', () => {
+  async function parked(withPr: boolean) {
+    const { todoId, buildId, stepRow } = startSession(false);
+    H.s.db
+      .update(project)
+      .set({ repoKind: 'github', githubRepo: 'owner/repo' })
+      .where(eq(project.id, H.projectId))
+      .run();
+    H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
+    if (withPr) H.s.db.update(build).set({ prNumber: 7 }).where(eq(build.id, buildId)).run();
+    H.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, stepRow.id)).run();
+    const claimed = H.s.db.select().from(step).where(eq(step.id, stepRow.id)).get()!;
+    await askWorkerQuestion(
+      deps(),
+      claimed,
+      { requestId: REQUEST, questions: QUESTIONS },
+      { holdMs: 0 },
+    );
+    return { todoId, buildId };
+  }
+
+  test('independent review is not dispatched while the question is pending', async () => {
+    const { todoId, buildId } = await parked(true);
+    const row = H.s.db.select().from(todo).where(eq(todo.id, todoId)).get()!;
+    maybeEnqueueIndependentReview(deps(), row, buildId);
+    expect(
+      H.s.db
+        .select()
+        .from(step)
+        .where(eq(step.buildId, buildId))
+        .all()
+        .filter((r) => r.kind === 'review'),
+    ).toHaveLength(0);
+  });
+
+  test.each(['building', 'review'] as const)(
+    'the CI poller does not touch a %s thread with a pending question and an open PR',
+    async (phase) => {
+      const { todoId } = await parked(true);
+      H.s.db.update(todo).set({ phase }).where(eq(todo.id, todoId)).run();
+      H.s.db.update(step).set({ status: 'done' }).where(eq(step.kind, 'session')).run();
+      const fetched: string[] = [];
+      const poller = createCiPoller(deps(), {
+        githubFetch: async (url) => {
+          fetched.push(String(url));
+          return new Response('{}', { status: 404 });
+        },
+      });
+      await poller.sweep();
+      expect(fetched.filter((url) => url.includes('/pulls/7'))).toEqual([]);
+      expect(getTodo(deps(), todoId)!.phase).toBe(phase);
+    },
+  );
+});

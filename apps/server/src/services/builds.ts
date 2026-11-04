@@ -173,6 +173,8 @@ import {
   splitBlockersSatisfied,
 } from './todos.js';
 import { insertGateAnnouncement, insertMessageRow } from './transcript.js';
+import { pendingWorkerQuestions } from './worker-question-store.js';
+import { settleWorkerReply } from './worker-questions.js';
 
 export interface BuildDeps {
   intakeAgentAllowlist?: readonly string[];
@@ -401,6 +403,7 @@ export async function sendBuildSteer(
       const now = nowMs();
       const human =
         continuationOptions.human ?? deps.steerOptions?.human ?? body.queuedMessageId !== undefined;
+      if (human) settleWorkerReply(deps, conversationId, body.content);
       const messageRow = {
         id: human ? `human-${newRecordId()}` : newRecordId(),
         actor: human ? deps.user.displayName : null,
@@ -1103,6 +1106,7 @@ export function maybeEnqueueVerifyStep(
 ): void {
   const verifyAgentId = todoRow.assignment?.verify?.agentId;
   if (verifyAgentId == null) return;
+  if (pendingWorkerQuestions(deps.db, buildId).length > 0) return;
   const existing = deps.db
     .select({ id: step.id })
     .from(step)
@@ -1144,6 +1148,7 @@ export function maybeEnqueueIndependentReview(
   todoRow: TodoRow,
   buildId: string,
 ): void {
+  if (pendingWorkerQuestions(deps.db, buildId).length > 0) return;
   const buildRow = deps.db.select().from(build).where(eq(build.id, buildId)).get();
   if (buildRow === undefined || githubPrOf(deps, todoRow, buildRow.prNumber) === null) return;
   const head = dispatchHeadSha(deps, buildId);
@@ -2651,6 +2656,9 @@ function stepArtifactGate(
     return '规划未产出方案';
   }
   if (isBuildStepKind(stepRow.kind)) {
+    if (stepRow.kind === 'session' && pendingWorkerQuestions(deps.db, stepRow.buildId).length > 0) {
+      return null;
+    }
     if (outcome.output === 'info') {
       return outcome.report === undefined ? '信息卡未产出报告' : null;
     }
