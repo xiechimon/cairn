@@ -302,12 +302,13 @@ export function useChiefSurface(
 
   const onSend = live
     ? (text: string, projectId: string | null) => {
+        const { key } = sendKey.attempt([projectId ?? '', text].join('\n'), 'chief');
         return mutations.chiefSend
           .mutateAsync({
             threadId: activeThread?.id ?? null,
             content: text,
             projectId,
-            clientMessageId: sendKey.keyFor(text),
+            clientMessageId: key,
           })
           .then(() => sendKey.settle())
           .catch((error: unknown) => {

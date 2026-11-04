@@ -41,7 +41,7 @@ export function NeedsYouThreadCard({ todo, ...card }: NeedsYouThreadCardProps) {
     await mutations.messageThread.mutateAsync({
       todoId: todo.id,
       content,
-      clientMessageId: sendKey.keyFor(content),
+      clientMessageId: sendKey.attempt([todo.id, content].join('\n'), 'thread').key,
     });
     sendKey.settle();
   };

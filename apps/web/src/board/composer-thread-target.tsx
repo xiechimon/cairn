@@ -78,7 +78,7 @@ export function useComposerThreadTarget(todos: readonly TodoRecord[]) {
       await mutations.messageThread.mutateAsync({
         todoId,
         content: text,
-        clientMessageId: sendKey.keyFor(text),
+        clientMessageId: sendKey.attempt([todoId, text].join('\n'), 'thread').key,
       });
       sendKey.settle();
     } catch (error) {

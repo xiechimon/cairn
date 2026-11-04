@@ -1,20 +1,26 @@
 import { useState } from 'react';
 
+export interface SendAttempt<Route extends string> {
+  key: string;
+  route: Route;
+}
+
 export interface SendKey {
-  keyFor(content: string): string;
+  attempt<Route extends string>(identity: string, route: Route): SendAttempt<Route>;
   settle(): void;
 }
 
 export function createSendKey(): SendKey {
-  let attempt: { content: string; key: string } | null = null;
+  let current: { identity: string; key: string; route: string } | null = null;
   return {
-    keyFor(content) {
-      if (attempt?.content === content) return attempt.key;
-      attempt = { content, key: crypto.randomUUID() };
-      return attempt.key;
+    attempt<Route extends string>(identity: string, route: Route): SendAttempt<Route> {
+      if (current?.identity !== identity) {
+        current = { identity, key: crypto.randomUUID(), route };
+      }
+      return { key: current.key, route: current.route as Route };
     },
     settle() {
-      attempt = null;
+      current = null;
     },
   };
 }

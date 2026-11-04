@@ -211,30 +211,40 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     : () => Promise.resolve();
 
   const queueReply = todo != null && replyRouteOf(todo.phase, steps) === 'queue';
-  const queueSteer =
+  const postQueued =
     writable && buildId != null
-      ? (text: string, deliverAfterStop: boolean) =>
-          mutations.sendSteer
-            .mutateAsync({
-              conversationId: buildId,
-              content: text,
-              mode: 'queue',
-              deliverAfterStop,
-              clientMessageId: sendKey.keyFor(text),
-            })
-            .then(() => sendKey.settle())
+      ? (text: string, deliverAfterStop: boolean, clientMessageId: string) =>
+          mutations.sendSteer.mutateAsync({
+            conversationId: buildId,
+            content: text,
+            mode: 'queue',
+            deliverAfterStop,
+            clientMessageId,
+          })
+      : undefined;
+  const queueSteer =
+    postQueued !== undefined
+      ? async (text: string, deliverAfterStop: boolean) => {
+          const { key } = sendKey.attempt([todoId, deliverAfterStop, text].join('\n'), 'queue');
+          await postQueued(text, deliverAfterStop, key);
+          sendKey.settle();
+        }
       : undefined;
   const send = writable
-    ? queueReply && queueSteer !== undefined
-      ? (text: string) => queueSteer(text, false)
-      : async (text: string) => {
+    ? async (text: string) => {
+        const { key, route } = sendKey.attempt(
+          [todoId, false, text].join('\n'),
+          queueReply && postQueued !== undefined ? 'queue' : 'thread',
+        );
+        if (route === 'queue' && postQueued !== undefined) await postQueued(text, false, key);
+        else
           await mutations.messageThread.mutateAsync({
             todoId,
             content: text,
-            clientMessageId: sendKey.keyFor(text),
+            clientMessageId: key,
           });
-          sendKey.settle();
-        }
+        sendKey.settle();
+      }
     : !live && open
       ? fixtureSend
       : undefined;
