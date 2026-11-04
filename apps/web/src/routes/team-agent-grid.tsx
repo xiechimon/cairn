@@ -73,7 +73,8 @@ export function TeamAgentGrid({
                     : 'online';
             const face = status === null ? null : STATUS_FACE[status];
             const meta = [
-              agent.model + (agent.isDefault ? t(' · 默认') : ''),
+              (agent.model === '' ? t('未配置模型') : agent.model) +
+                (agent.isDefault ? t(' · 默认') : ''),
               machine?.name,
             ].filter((part) => part != null && part !== '');
             return (

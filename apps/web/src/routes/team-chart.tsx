@@ -85,7 +85,7 @@ function ChartNode({ agent, crown }: { agent: TeamAgentCard; crown?: boolean }) 
             </span>
           ) : null}
           <span className="truncate text-meta text-content-tertiary" data-testid="team-chart-model">
-            {agent.model}
+            {agent.model === '' ? t('未配置模型') : agent.model}
             {agent.isDefault ? t(' · 默认') : ''}
           </span>
         </span>
