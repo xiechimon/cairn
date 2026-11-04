@@ -14,6 +14,7 @@ import {
   queuedMessage,
   steerPending,
   step,
+  stopPending,
   team,
   todo,
 } from '../src/db/schema.js';
@@ -22,14 +23,23 @@ import { patchChief, sendChiefMessage } from '../src/services/chief.js';
 import { createOrGetQuestion } from '../src/services/chief-questions.js';
 import { bootServer, postProject, type TestServer } from './helpers.js';
 
-const READ = ['Threads Waiting on Me', 'Read Thread', 'Thread Pull Requests'];
-const WRITE = ['Start Thread', 'Reply Thread'];
+const READ = [
+  'Threads Waiting on Me',
+  'Read Thread',
+  'Thread Pull Requests',
+  'Wait Thread',
+  'Search Threads',
+];
+const WRITE = ['Start Thread', 'Reply Thread', 'Interrupt Thread'];
 const NAMES = [
   'start_thread',
   'threads_waiting_on_me',
   'read_thread',
   'reply_thread',
   'thread_pull_requests',
+  'wait_thread',
+  'interrupt_thread',
+  'search_threads',
 ];
 
 async function connect(s: TestServer, read = READ, write = WRITE, teamId = s.team.id) {
@@ -91,7 +101,7 @@ function insertWork(
   s: TestServer,
   projectId: string,
   id: string,
-  phase: 'review' | 'building' = 'review',
+  phase: (typeof todo.$inferInsert)['phase'] = 'review',
 ) {
   s.db
     .insert(todo)
@@ -333,6 +343,9 @@ describe('Coordinator terminal entry through an MCP client', () => {
       ['Read Thread', 'read_thread'],
       ['Threads Waiting on Me', 'threads_waiting_on_me'],
       ['Thread Pull Requests', 'thread_pull_requests'],
+      ['Wait Thread', 'wait_thread'],
+      ['Interrupt Thread', 'interrupt_thread'],
+      ['Search Threads', 'search_threads'],
     ]) {
       const read = READ.includes(grant!) ? [grant!] : [];
       const write = WRITE.includes(grant!) ? [grant!] : [];
@@ -345,7 +358,7 @@ describe('Coordinator terminal entry through an MCP client', () => {
     const s = bootServer();
     const client = await connect(s, ['Projects', ...WRITE], []);
     expect((await client.listTools()).tools.map((tool) => tool.name)).toEqual(['projects']);
-    for (const name of ['start_thread', 'reply_thread']) {
+    for (const name of ['start_thread', 'reply_thread', 'interrupt_thread']) {
       const result = await client.callTool({
         name,
         arguments: { projectId: 'missing', threadId: 'missing', content: 'Denied' },
@@ -570,7 +583,13 @@ describe('Coordinator terminal entry through an MCP client', () => {
     const denied = [
       ['start_thread', { projectId: 'foreign-project', content: 'No' }],
       ['threads_waiting_on_me', { projectId: 'foreign-project' }],
-      ...['read_thread', 'reply_thread', 'thread_pull_requests'].flatMap((name) =>
+      ...[
+        'read_thread',
+        'reply_thread',
+        'thread_pull_requests',
+        'wait_thread',
+        'interrupt_thread',
+      ].flatMap((name) =>
         [foreign, 'foreign-work', 'missing'].map((id) => [
           name,
           { threadId: id, content: 'No', mode: 'steer' },
@@ -594,6 +613,9 @@ describe('Coordinator terminal entry through an MCP client', () => {
     }
     expect(await call(client, 'threads_waiting_on_me', {})).toEqual([]);
     expect(await call(client, 'thread_pull_requests', { threadId })).toEqual([]);
+    for (const query of ['Private', 'private/repo'])
+      expect(await call(client, 'search_threads', { query })).toEqual([]);
+    expect(s.db.select().from(stopPending).all()).toEqual([]);
     expect(s.db.select().from(chiefThread).all()).toEqual(before.threads);
     expect(s.db.select().from(chiefMessage).all()).toEqual(before.messages);
     expect(s.db.select().from(step).all()).toEqual(before.steps);
@@ -612,6 +634,231 @@ describe('Coordinator terminal entry through an MCP client', () => {
       });
       expect(result.isError).toBe(true);
       expect(JSON.stringify(result)).not.toContain('private/repo');
+    }
+  });
+});
+
+interface WaitResponse {
+  thread: { id: string; status: string };
+  questions: { requestId: string }[];
+  waitTimedOut: boolean;
+}
+
+interface SearchHit {
+  id: string;
+  kind: 'coordinator' | 'work';
+  projectId: string | null;
+  title: string;
+  status: string;
+}
+
+function insertStep(s: TestServer, buildId: string, status: 'pending' | 'claimed') {
+  s.db
+    .insert(step)
+    .values({ id: `step-${buildId}`, buildId, kind: 'build', status, createdAt: 1 })
+    .run();
+}
+
+describe('Thread wait, interrupt and search through an MCP client', () => {
+  test('wait returns at once for a Thread that is not working', async () => {
+    const { s, client, projectId } = await world();
+    insertWork(s, projectId, 'ready');
+    const started = Date.now();
+    const result = await call<WaitResponse>(client, 'wait_thread', {
+      threadId: 'ready',
+      timeoutSeconds: 5,
+    });
+    expect(result).toMatchObject({
+      thread: { id: 'ready', status: 'review' },
+      waitTimedOut: false,
+    });
+    expect(Date.now() - started).toBeLessThan(1000);
+  });
+
+  test('wait times out on a working Thread without stopping it', async () => {
+    const { s, client, threadId } = await world();
+    const before = s.db.select().from(step).all();
+    const result = await call<WaitResponse>(client, 'wait_thread', {
+      threadId,
+      timeoutSeconds: 1,
+    });
+    expect(result).toMatchObject({
+      thread: { id: threadId, status: 'working' },
+      waitTimedOut: true,
+    });
+    expect(s.db.select().from(step).all()).toEqual(before);
+    expect(s.db.select().from(stopPending).all()).toEqual([]);
+  });
+
+  test('wait returns when a work Thread leaves its working phase', async () => {
+    const { s, client, projectId } = await world();
+    insertWork(s, projectId, 'busy', 'building');
+    setTimeout(() => {
+      s.db.update(todo).set({ phase: 'review' }).where(eq(todo.id, 'busy')).run();
+    }, 300);
+    const started = Date.now();
+    const result = await call<WaitResponse>(client, 'wait_thread', {
+      threadId: 'busy',
+      timeoutSeconds: 10,
+    });
+    expect(result).toMatchObject({ thread: { id: 'busy', status: 'review' }, waitTimedOut: false });
+    expect(Date.now() - started).toBeLessThan(5000);
+  });
+
+  test('wait returns when the Coordinator asks a question', async () => {
+    const { s, client, threadId } = await world();
+    setTimeout(() => {
+      createOrGetQuestion(s.svc, {
+        threadId,
+        requestId: 'mid-wait',
+        questions: [{ header: 'Scope', question: 'Which API?', options: [] }],
+      });
+    }, 300);
+    const result = await call<WaitResponse>(client, 'wait_thread', {
+      threadId,
+      timeoutSeconds: 10,
+    });
+    expect(result.waitTimedOut).toBe(false);
+    expect(result.thread.status).toBe('waiting_on_you');
+    expect(result.questions.map((q) => q.requestId)).toEqual(['mid-wait']);
+  });
+
+  test.each([0, 51, 1.5])('wait rejects timeoutSeconds %s', async (timeoutSeconds) => {
+    const { client, threadId } = await world();
+    const result = await client.callTool({
+      name: 'wait_thread',
+      arguments: { threadId, timeoutSeconds },
+    });
+    expect(result.isError).toBe(true);
+  });
+
+  test('interrupt asks the running Coordinator turn to stop and keeps the Thread', async () => {
+    const { s, client, threadId } = await world();
+    const signal = vi.spyOn(s.machineHub, 'stopSignal');
+    const idle = await client.callTool({ name: 'interrupt_thread', arguments: { threadId } });
+    expect(idle.isError).toBe(true);
+    s.db.update(step).set({ status: 'claimed' }).where(eq(step.buildId, threadId)).run();
+    const result = await call<{ threadId: string; delegated: boolean }>(
+      client,
+      'interrupt_thread',
+      { threadId },
+    );
+    expect(result).toEqual({ threadId, delegated: true });
+    expect(s.db.select().from(stopPending).get()).toMatchObject({
+      conversationId: threadId,
+      discard: false,
+    });
+    expect(signal).toHaveBeenCalledOnce();
+    expect(s.db.select().from(chiefMessage).all()).toHaveLength(1);
+  });
+
+  test('interrupt stops a claimed work run without discarding its changes', async () => {
+    const { s, client, projectId } = await world();
+    insertWork(s, projectId, 'claimed-work', 'building');
+    insertStep(s, 'run-claimed-work', 'claimed');
+    const signal = vi.spyOn(s.machineHub, 'stopSignal');
+    const result = await call<{ threadId: string; delegated: boolean }>(
+      client,
+      'interrupt_thread',
+      { threadId: 'claimed-work' },
+    );
+    expect(result).toEqual({ threadId: 'claimed-work', delegated: true });
+    expect(s.db.select().from(stopPending).get()).toMatchObject({
+      conversationId: 'run-claimed-work',
+      stepId: 'step-run-claimed-work',
+      discard: false,
+    });
+    expect(signal).toHaveBeenCalledOnce();
+  });
+
+  test('interrupt stops a pending work step at once', async () => {
+    const { s, client, projectId } = await world();
+    insertWork(s, projectId, 'pending-work', 'queued');
+    insertStep(s, 'run-pending-work', 'pending');
+    const result = await call<{ delegated: boolean }>(client, 'interrupt_thread', {
+      threadId: 'pending-work',
+    });
+    expect(result.delegated).toBe(false);
+    expect(s.db.select().from(step).where(eq(step.id, 'step-run-pending-work')).get()?.status).toBe(
+      'stopped',
+    );
+  });
+
+  test('interrupt refuses a work Thread with no run or no active step', async () => {
+    const { s, client, projectId } = await world();
+    insertWork(s, projectId, 'idle-work');
+    insertWork(s, projectId, 'no-run');
+    s.db.update(todo).set({ latestBuildId: null }).where(eq(todo.id, 'no-run')).run();
+    for (const threadId of ['idle-work', 'no-run']) {
+      const result = await client.callTool({ name: 'interrupt_thread', arguments: { threadId } });
+      expect(result.isError, threadId).toBe(true);
+    }
+    expect(s.db.select().from(stopPending).all()).toEqual([]);
+  });
+
+  test('search finds Threads by title, spec and message text within the team', async () => {
+    const { s, client, projectId, threadId } = await world();
+    insertWork(s, projectId, 'title-hit');
+    s.db
+      .update(todo)
+      .set({ title: 'Rotate the webhook secret' })
+      .where(eq(todo.id, 'title-hit'))
+      .run();
+    insertWork(s, projectId, 'spec-hit');
+    s.db
+      .update(todo)
+      .set({ spec: 'The webhook retries twice' })
+      .where(eq(todo.id, 'spec-hit'))
+      .run();
+    insertWork(s, projectId, 'message-hit');
+    s.db
+      .insert(message)
+      .values({
+        id: 'webhook-message',
+        conversationId: 'run-message-hit',
+        role: 'assistant',
+        content: 'Patched the webhook handler',
+        createdAt: 1,
+      })
+      .run();
+    insertWork(s, projectId, 'miss');
+    const hits = await call<SearchHit[]>(client, 'search_threads', { query: 'WEBHOOK' });
+    expect(hits.map((hit) => hit.id).sort()).toEqual(['message-hit', 'spec-hit', 'title-hit']);
+    expect(hits.find((hit) => hit.id === 'title-hit')).toMatchObject({
+      kind: 'work',
+      projectId,
+      title: 'Rotate the webhook secret',
+      status: 'review',
+    });
+    const coordinator = await call<SearchHit[]>(client, 'search_threads', {
+      query: 'Improve the Project',
+    });
+    expect(coordinator).toMatchObject([{ id: threadId, kind: 'coordinator', status: 'working' }]);
+    const otherProject = await postProject(s.app, 'Other Project');
+    expect(
+      await call<SearchHit[]>(client, 'search_threads', {
+        query: 'webhook',
+        projectId: otherProject,
+      }),
+    ).toEqual([]);
+    const unknown = await client.callTool({
+      name: 'search_threads',
+      arguments: { query: 'webhook', projectId: 'missing' },
+    });
+    expect(unknown.isError).toBe(true);
+  });
+
+  test('search treats LIKE wildcards literally, bounds results and rejects blank queries', async () => {
+    const { s, client, projectId } = await world();
+    for (let i = 0; i < 4; i++) insertWork(s, projectId, `match-${i}`);
+    expect(await call<SearchHit[]>(client, 'search_threads', { query: '%' })).toEqual([]);
+    expect(await call<SearchHit[]>(client, 'search_threads', { query: '_' })).toEqual([]);
+    expect(
+      await call<SearchHit[]>(client, 'search_threads', { query: 'match', limit: 2 }),
+    ).toHaveLength(2);
+    for (const args of [{ query: '   ' }, { query: 'match', limit: 51 }]) {
+      const result = await client.callTool({ name: 'search_threads', arguments: args });
+      expect(result.isError).toBe(true);
     }
   });
 });

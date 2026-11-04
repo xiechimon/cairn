@@ -26,6 +26,8 @@ export const MCP_TOOLS_READ = [
   'Threads Waiting on Me',
   'Read Thread',
   'Thread Pull Requests',
+  'Wait Thread',
+  'Search Threads',
 ] as const;
 
 export const MCP_TOOLS_WRITE = [
@@ -44,6 +46,7 @@ export const MCP_TOOLS_WRITE = [
   'Unschedule Todo',
   'Start Thread',
   'Reply Thread',
+  'Interrupt Thread',
 ] as const;
 
 export const MCP_CAPABILITY_GROUPS = [
@@ -127,6 +130,8 @@ export const MCP_TOOL_REGISTRY = [
   { grant: 'Threads Waiting on Me', name: 'threads_waiting_on_me', kind: 'read' },
   { grant: 'Read Thread', name: 'read_thread', kind: 'read' },
   { grant: 'Thread Pull Requests', name: 'thread_pull_requests', kind: 'read' },
+  { grant: 'Wait Thread', name: 'wait_thread', kind: 'read' },
+  { grant: 'Search Threads', name: 'search_threads', kind: 'read' },
   { grant: 'Create Todo', name: 'create_todo', kind: 'write' },
   { grant: 'Update Todo', name: 'update_todo', kind: 'write' },
   { grant: 'Message Todo', name: 'message_todo', kind: 'write' },
@@ -142,6 +147,7 @@ export const MCP_TOOL_REGISTRY = [
   { grant: 'Unschedule Todo', name: 'unschedule_todo', kind: 'write' },
   { grant: 'Start Thread', name: 'start_thread', kind: 'write' },
   { grant: 'Reply Thread', name: 'reply_thread', kind: 'write' },
+  { grant: 'Interrupt Thread', name: 'interrupt_thread', kind: 'write' },
 ] as const satisfies readonly { grant: string; name: string; kind: 'read' | 'write' }[];
 
 export type McpToolKind = (typeof MCP_TOOL_REGISTRY)[number]['kind'];

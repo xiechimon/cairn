@@ -306,9 +306,9 @@ describe('SSE channels (02 §1.2, all SSE, no WS)', () => {
 });
 
 describe('MCP vocabulary (02 §7.2, r3 §6 matrix 1:1)', () => {
-  it('server-face whitelist = 14 read groups + 15 write tools = 29', () => {
-    expect(MCP_TOOLS_READ).toHaveLength(14);
-    expect(MCP_TOOLS_WRITE).toHaveLength(15);
+  it('server-face whitelist = 16 read groups + 16 write tools = 32', () => {
+    expect(MCP_TOOLS_READ).toHaveLength(16);
+    expect(MCP_TOOLS_WRITE).toHaveLength(16);
     expect(MCP_TOOLS_READ).toEqual([
       'Todos',
       'Projects',
@@ -324,6 +324,8 @@ describe('MCP vocabulary (02 §7.2, r3 §6 matrix 1:1)', () => {
       'Threads Waiting on Me',
       'Read Thread',
       'Thread Pull Requests',
+      'Wait Thread',
+      'Search Threads',
     ]);
     expect(MCP_TOOLS_WRITE).toEqual([
       'Create Todo',
@@ -341,6 +343,7 @@ describe('MCP vocabulary (02 §7.2, r3 §6 matrix 1:1)', () => {
       'Unschedule Todo',
       'Start Thread',
       'Reply Thread',
+      'Interrupt Thread',
     ]);
   });
 
@@ -355,16 +358,16 @@ describe('MCP vocabulary (02 §7.2, r3 §6 matrix 1:1)', () => {
     ]);
   });
 
-  it('tool registry = 29 grant-to-name pairs, whitelist labels remain one-to-one', () => {
+  it('tool registry = 32 grant-to-name pairs, whitelist labels remain one-to-one', () => {
     const read = MCP_TOOL_REGISTRY.filter((t) => t.kind === 'read');
     const write = MCP_TOOL_REGISTRY.filter((t) => t.kind === 'write');
     expect(read.map((t) => t.grant)).toEqual([...MCP_TOOLS_READ]);
     expect(write.map((t) => t.grant)).toEqual([...MCP_TOOLS_WRITE]);
-    expect(MCP_TOOL_REGISTRY).toHaveLength(29);
+    expect(MCP_TOOL_REGISTRY).toHaveLength(32);
     const names = MCP_TOOL_REGISTRY.map((t) => t.name);
-    expect(new Set(names).size).toBe(29);
+    expect(new Set(names).size).toBe(32);
     for (const name of names) expect(name).toMatch(/^[a-z][a-z0-9_]*$/);
-    expect(MCP_REGISTRY_BY_NAME.size).toBe(29);
+    expect(MCP_REGISTRY_BY_NAME.size).toBe(32);
   });
 
   it('executor minimum-version gate shape (02 §7.1: value self-determined per replica version line [design])', () => {
