@@ -2,27 +2,27 @@ import { execFileSync } from 'node:child_process';
 import {
   chmodSync,
   mkdirSync,
-  mkdtempSync,
   readdirSync,
   readFileSync,
   realpathSync,
-  rmSync,
   statSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { HostComputerProvider } from '../src/computer/host.js';
 import { type ComputerProcessEvent, ComputerRefusal } from '../src/computer/provider.js';
 
+let allocatedRoot: string;
 let root: string;
 let home: string;
 let outside: string;
 
 beforeEach(() => {
-  root = realpathSync(mkdtempSync(path.join(tmpdir(), 'cairn-host-')));
+  allocatedRoot = makeTestTempDir('cairn-host-');
+  root = realpathSync(allocatedRoot);
   home = path.join(root, 'home');
   outside = path.join(root, 'outside');
   mkdirSync(home);
@@ -30,7 +30,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  rmSync(root, { recursive: true, force: true });
+  expect(releaseTestTempDir(allocatedRoot)).toBe(true);
 });
 
 function provider(overrides: ConstructorParameters<typeof HostComputerProvider>[0] = {}) {
@@ -160,6 +160,14 @@ describe('host computer execute', () => {
       'if [ -n "$CAIRN_COMPUTER_CALL" ]; then c=set; else c=; fi; echo "token=[$CAIRN_MACHINE_TOKEN] call=[$c]"',
     );
     expect(result.stdout.trim()).toBe('token=[] call=[set]');
+  });
+
+  test('a command that exits before its timeout keeps its exit code while output drains', async () => {
+    const result = await run(provider({ streamDrainMs: 1_500 }), 'echo completed; exit 0', {
+      timeoutMs: 700,
+    });
+    expect(result.stdout).toBe('completed\n');
+    expect(result.exit).toEqual({ kind: 'exit', code: 0 });
   });
 
   test('kills the whole process tree when the timeout passes', async () => {

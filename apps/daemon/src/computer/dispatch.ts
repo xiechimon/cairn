@@ -102,15 +102,12 @@ function listingText(entries: ComputerFileEntry[]): string {
   return lines.join('');
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 export function createComputerDispatcher(options: ComputerDispatcherOptions): ComputerDispatcher {
   const now = options.now ?? Date.now;
   const inFlight = new Map<string, { controller: AbortController; settled: Promise<void> }>();
   const finishedUnsafe = new Set<string>();
   let closing = false;
+  const postingLifetime = new AbortController();
 
   function remember(callId: string): void {
     finishedUnsafe.add(callId);
@@ -138,6 +135,7 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
     return new FramePoster({
       client: options.client,
       callId: call.callId,
+      signal: postingLifetime.signal,
       deadlineAt: call.deadlineAt,
       flushMs: options.flushMs ?? COMPUTER_FLUSH_MS,
       heartbeatMs: options.heartbeatMs ?? COMPUTER_HEARTBEAT_MS,
@@ -196,18 +194,18 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
     }
     if (poster.abandoned) return;
     const reason = controller.signal.reason;
-    if (controller.signal.aborted) {
-      const message =
-        reason === 'shutdown'
-          ? 'The daemon shut down while the command ran; its process tree was killed'
-          : 'The call was cancelled and its process tree was killed';
-      await poster.finish({ kind: 'error', message, delivery: 'unknown' });
-    } else if (exit?.reason === 'timeout') {
+    if (reason === 'timeout' || exit?.reason === 'timeout') {
       await poster.finish({
         kind: 'error',
         message: `Command timed out after ${timeoutMs} ms and its process tree was killed`,
         delivery: 'unknown',
       });
+    } else if (controller.signal.aborted) {
+      const message =
+        reason === 'shutdown'
+          ? 'The daemon shut down while the command ran; its process tree was killed'
+          : 'The call was cancelled and its process tree was killed';
+      await poster.finish({ kind: 'error', message, delivery: 'unknown' });
     } else {
       const code = exit?.code ?? null;
       await poster.finish({
@@ -238,13 +236,22 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
       await refuse(call, desktopProtectionGuardMessage(refusal));
       return;
     }
-    const budget = remaining - FINAL_FRAME_MARGIN_MS;
-    if (budget < MIN_COMMAND_TIMEOUT_MS) {
+    const executionDeadline = Math.min(
+      now() + (options.commandTimeoutMs ?? COMPUTER_COMMAND_TIMEOUT_MS),
+      call.deadlineAt - FINAL_FRAME_MARGIN_MS,
+    );
+    const timeoutMs = Math.max(0, executionDeadline - now());
+    if (call.deadlineAt - FINAL_FRAME_MARGIN_MS - now() < MIN_COMMAND_TIMEOUT_MS) {
       await refuse(call, 'Too little time was left before the call deadline, so nothing ran');
       return;
     }
-    const timeoutMs = Math.min(options.commandTimeoutMs ?? COMPUTER_COMMAND_TIMEOUT_MS, budget);
-    await runShell(call, route.provider, params.data, timeoutMs, controller);
+    const deadlineTimer = setTimeout(() => controller.abort('timeout'), timeoutMs);
+    deadlineTimer.unref();
+    try {
+      await runShell(call, route.provider, params.data, timeoutMs, controller);
+    } finally {
+      clearTimeout(deadlineTimer);
+    }
   }
 
   async function fileText(
@@ -340,12 +347,20 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
     async close() {
       closing = true;
       const running = [...inFlight.values()];
-      for (const { controller } of running) controller.abort('shutdown');
-      await Promise.all([options.host?.killAll(), options.orb?.killAll()]);
-      await Promise.race([
-        Promise.allSettled(running.map(({ settled }) => settled)),
-        sleep(CLOSE_WAIT_MS),
-      ]);
+      let deadlineTimer: NodeJS.Timeout | undefined;
+      try {
+        for (const { controller } of running) controller.abort('shutdown');
+        await Promise.all([options.host?.killAll(), options.orb?.killAll()]);
+        await Promise.race([
+          Promise.allSettled(running.map(({ settled }) => settled)),
+          new Promise<void>((resolve) => {
+            deadlineTimer = setTimeout(resolve, CLOSE_WAIT_MS);
+          }),
+        ]);
+      } finally {
+        clearTimeout(deadlineTimer);
+        postingLifetime.abort();
+      }
     },
   };
 }
