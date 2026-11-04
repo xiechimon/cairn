@@ -33,6 +33,7 @@ export interface WebToolsOpts {
 
 export interface PrepareWebToolsOpts extends Omit<WebToolsOpts, 'keys'> {
   enabled: boolean;
+  metered: boolean;
   creds: StepCredentials;
 }
 
@@ -87,8 +88,9 @@ function hideProviderKeys(vault: SecretVault): SecretVault {
 
 export function prepareWebTools(opts: PrepareWebToolsOpts): PreparedWebTools {
   if (!opts.enabled) return { tools: [], secretCreds: opts.creds };
-  const { enabled: _enabled, creds, ...rest } = opts;
-  const tools = buildWebTools({ ...rest, keys: takeProviderKeys(creds.secrets) });
+  const { enabled: _enabled, metered, creds, ...rest } = opts;
+  const keys = takeProviderKeys(creds.secrets);
+  const tools = buildWebTools({ ...rest, keys: metered ? keys : {} });
   const secretCreds: StepCredentials = Object.create(creds, {
     secrets: { get: () => hideProviderKeys(creds.secrets), enumerable: true },
   });
@@ -465,6 +467,12 @@ export function buildWebTools(opts: WebToolsOpts): LocalToolDef[] {
       target = new URL(raw);
     } catch {
       return 'web_fetch refused: not a valid URL.';
+    }
+    try {
+      await assertPublicHost(target);
+    } catch (err) {
+      logCall(WEB_FETCH_TOOL_NAME, 'plain', 0, 0, target.toString());
+      return redact(err instanceof Error ? err.message : String(err));
     }
     const exaKey = opts.keys.exa;
     if (exaKey !== undefined && budgetMessage() === null) {

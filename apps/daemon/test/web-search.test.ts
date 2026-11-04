@@ -257,9 +257,10 @@ describe('tool availability', () => {
     );
   }
 
-  function prepared(enabled: boolean) {
+  function prepared(enabled: boolean, metered = true) {
     return prepareWebTools({
       enabled,
+      metered,
       creds: creds(),
       stepId: 'step-1',
       home,
@@ -276,6 +277,13 @@ describe('tool availability', () => {
 
   test('not enabled (locked, remoteToolsOnly or non-pi) gives no tools', () => {
     expect(prepared(false).tools).toEqual([]);
+  });
+
+  test('unmetered (Orb) steps get only web_fetch and the key stays hidden', () => {
+    const result = prepared(true, false);
+    expect(result.tools.map((t) => t.name)).toEqual([WEB_FETCH_TOOL_NAME]);
+    expect(result.secretCreds.secrets.names).not.toContain(WEB_EXA_KEY_SECRET);
+    expect(result.secretCreds.secrets.take(WEB_EXA_KEY_SECRET)).toBeNull();
   });
 
   test('not enabled leaves the vault untouched', async () => {
@@ -300,6 +308,7 @@ describe('the key never reaches the agent', () => {
     );
     const { secretCreds } = prepareWebTools({
       enabled: true,
+      metered: true,
       creds: credentials,
       stepId: 'step-1',
       home,
@@ -328,6 +337,7 @@ describe('the key never reaches the agent', () => {
     );
     const { secretCreds } = prepareWebTools({
       enabled: true,
+      metered: true,
       creds: credentials,
       stepId: 'step-1',
       home,
@@ -471,6 +481,28 @@ describe('plain web_fetch', () => {
     expect(out.results[0]?.text).not.toContain('secret');
     expect(out.results[0]?.text).not.toContain('color:red');
     expect(out.results[0]?.fetchedAt).toBe(NOW.toISOString());
+  });
+
+  test('with an Exa key, private and non-http targets are refused before reaching Exa', async () => {
+    const built = buildWebTools({
+      keys: { exa: EXA_KEY },
+      stepId: 's',
+      home,
+      log: () => undefined,
+      fetch: fakeFetch(() => json({ results: [{ url: 'x', title: 't', text: 'leak' }] })),
+      now: () => NOW,
+      env: {},
+      lookup: async () => ['127.0.0.1'],
+    });
+    const fetchTool = built.find((t) => t.name === WEB_FETCH_TOOL_NAME);
+    for (const url of [
+      'http://127.0.0.1/private',
+      'https://internal.example/',
+      'file:///etc/passwd',
+    ]) {
+      expect(await fetchTool?.execute({ url })).toContain('web_fetch refused');
+    }
+    expect(calls).toHaveLength(0);
   });
 
   test('rejects non-http(s) schemes', async () => {

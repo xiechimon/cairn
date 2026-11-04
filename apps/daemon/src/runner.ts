@@ -751,6 +751,7 @@ async function runClaimedStep(
   const isPi = backend.brief?.backendId === 'pi';
   const webTools = prepareWebTools({
     enabled: isPi && !isChief && !isReview && claimed.remoteToolsOnly !== true,
+    metered: opts.env?.CAIRN_ORB !== '1',
     creds,
     stepId,
     home: deps.paths.home,
