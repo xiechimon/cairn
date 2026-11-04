@@ -1,5 +1,11 @@
 import { BRAND, PROXY_ENV_VARS } from '@cairn/shared';
-import { EnvHttpProxyAgent, setGlobalDispatcher } from 'undici';
+import {
+  Agent,
+  type Dispatcher,
+  EnvHttpProxyAgent,
+  getGlobalDispatcher,
+  setGlobalDispatcher,
+} from 'undici';
 import type { DaemonLogger } from './log.js';
 
 export function detectProxyEnv(env: NodeJS.ProcessEnv = process.env): string | null {
@@ -32,20 +38,37 @@ export function loopbackNoProxy(
   return list.join(',');
 }
 
+export interface ProxyHandle {
+  reset(): void;
+}
+
 export function setupProxy(
   logger: DaemonLogger,
   env: NodeJS.ProcessEnv = process.env,
   serverUrl?: string,
-): void {
+): ProxyHandle {
   const proxy = detectProxyEnv(env);
-  if (!proxy) return;
   const noProxy = loopbackNoProxy(env, serverUrl);
-  setGlobalDispatcher(
-    new EnvHttpProxyAgent({
-      httpProxy: env.http_proxy ?? env.HTTP_PROXY,
-      httpsProxy: env.https_proxy ?? env.HTTPS_PROXY,
-      noProxy: noProxy ?? env.no_proxy ?? env.NO_PROXY,
-    }),
-  );
-  logger.raw(`[${BRAND.cliCommandName}] Proxy: ${proxy}`);
+  const build = (): Dispatcher =>
+    proxy
+      ? new EnvHttpProxyAgent({
+          httpProxy: env.http_proxy ?? env.HTTP_PROXY,
+          httpsProxy: env.https_proxy ?? env.HTTPS_PROXY,
+          noProxy: noProxy ?? env.no_proxy ?? env.NO_PROXY,
+        })
+      : new Agent();
+  let installed: Dispatcher | null = null;
+  if (proxy) {
+    installed = build();
+    setGlobalDispatcher(installed);
+    logger.raw(`[${BRAND.cliCommandName}] Proxy: ${proxy}`);
+  }
+  return {
+    reset() {
+      const previous = installed ?? getGlobalDispatcher();
+      installed = build();
+      setGlobalDispatcher(installed);
+      previous.destroy().catch(() => {});
+    },
+  };
 }
