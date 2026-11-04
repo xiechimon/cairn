@@ -1,4 +1,4 @@
-import { expect, type Page, type Route, test } from '@playwright/test';
+import { expect, type Locator, type Page, type Route, test } from '@playwright/test';
 import { evidenceShot } from './evidence';
 import { openChiefWindow } from './helpers.js';
 
@@ -49,6 +49,31 @@ async function renderTestCard(page: Page): Promise<string> {
     },
     { w: CARD_W, h: CARD_H },
   );
+}
+
+async function settledBox(target: Locator) {
+  type Box = NonNullable<Awaited<ReturnType<Locator['boundingBox']>>>;
+  let previous: Box | null = null;
+  let settled: Box | null = null;
+  await expect
+    .poll(
+      async () => {
+        const box = await target.boundingBox();
+        const unchanged =
+          box !== null &&
+          previous !== null &&
+          box.x === previous.x &&
+          box.y === previous.y &&
+          box.width === previous.width &&
+          box.height === previous.height;
+        previous = box;
+        settled = unchanged ? box : null;
+        return unchanged;
+      },
+      { intervals: [50, 100, 100, 250] },
+    )
+    .toBe(true);
+  return settled as Box | null;
 }
 
 async function stubBoot(page: Page, art: TestArt) {
@@ -253,7 +278,7 @@ test('detail face: paste paints a placeholder, landing swaps it for a chip at th
     .poll(() => thumb.evaluate((el) => (el as HTMLImageElement).naturalWidth))
     .toBe(CARD_W);
   await expect(input).toHaveValue('');
-  const beforeBox = await placeholder.boundingBox();
+  const beforeBox = await settledBox(placeholder);
   expect(beforeBox).not.toBeNull();
   await evidenceShot(page, 'strip-detail-placeholder.png');
 
@@ -271,7 +296,7 @@ test('detail face: paste paints a placeholder, landing swaps it for a chip at th
   await expect
     .poll(() => chipImg.evaluate((el) => (el as HTMLImageElement).naturalWidth))
     .toBe(CARD_W);
-  const afterBox = await chip.boundingBox();
+  const afterBox = await settledBox(chip);
   expect(afterBox?.x ?? 0).toBeCloseTo(beforeBox?.x ?? 0, 0);
   expect(afterBox).toMatchObject({ width: beforeBox?.width, height: beforeBox?.height });
   expect(afterBox?.y).toBeLessThanOrEqual(beforeBox?.y ?? 0);
