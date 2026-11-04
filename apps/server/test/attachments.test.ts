@@ -1,4 +1,4 @@
-import { createHash, createHmac } from 'node:crypto';
+import { createHash, createHmac, randomBytes } from 'node:crypto';
 import {
   existsSync,
   mkdirSync,
@@ -61,6 +61,32 @@ async function callMultipart(
   );
   return app.request(path, { method: 'POST', body: form });
 }
+
+function tamperSignature(sig: string): string {
+  const first = sig.startsWith('A') ? 'B' : 'A';
+  return `${first}${sig.slice(1)}`;
+}
+
+describe('tamperSignature', () => {
+  test.each([
+    ['ends in AA', `${'x'.repeat(41)}AA`],
+    ['starts with A', `A${'x'.repeat(42)}`],
+    ['all A', 'A'.repeat(43)],
+    ['trailing unused bits only differ', `${'x'.repeat(42)}Q`],
+  ])('always changes the decoded signature bytes when the signature %s', (_name, sig) => {
+    const tampered = tamperSignature(sig);
+    expect(tampered).not.toBe(sig);
+    expect(Buffer.from(tampered, 'base64url').equals(Buffer.from(sig, 'base64url'))).toBe(false);
+  });
+
+  test('changes the decoded bytes for random 32-byte signatures', () => {
+    for (let i = 0; i < 200; i++) {
+      const sig = randomBytes(32).toString('base64url');
+      const tampered = tamperSignature(sig);
+      expect(Buffer.from(tampered, 'base64url').equals(Buffer.from(sig, 'base64url'))).toBe(false);
+    }
+  });
+});
 
 describe('attachments -- grant side', () => {
   test('valid request -> 200 {uploadUrl, grant, key}; grant is base64url(payload).hmac', async () => {
@@ -212,7 +238,7 @@ describe('attachments -- upload side', () => {
       const parts = g.grant.split('.');
       const head = parts[0] ?? '';
       const sig = parts[1] ?? '';
-      const tampered = `${head}.${sig.slice(0, -2)}AA`;
+      const tampered = `${head}.${tamperSignature(sig)}`;
       const bytes = new TextEncoder().encode('x');
       const res = await callMultipart(
         s.app,
