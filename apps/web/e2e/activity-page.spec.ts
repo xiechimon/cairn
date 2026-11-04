@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
-import { mockLive } from './chief-home-mock';
+import { mockLive, TASK } from './chief-home-mock';
 import { evidenceShot } from './evidence.js';
 
 const ACTIVITY = '/app/activity?scenario=activity';
@@ -218,4 +218,32 @@ test('at 390px nothing overflows sideways and rows stay readable', async ({ page
   expect(titleLeft).toBeGreaterThanOrEqual((menuBox?.x ?? 0) + (menuBox?.width ?? 0));
   await expect(rows(page).first().getByTestId('activity-row-cost')).toBeVisible();
   await evidenceShot(page, 'activity-phone.png');
+});
+
+test.describe('viewer-local calendar groups', () => {
+  test.use({ timezoneId: 'America/Los_Angeles' });
+
+  test('a prior local date is Yesterday even when UTC+8 considers it today', async ({ page }) => {
+    await page.clock.install({ time: Date.UTC(2026, 10, 2, 8, 30) });
+    await mockLive(page, {
+      threads: [], messages: [],
+      todos: [{ ...TASK, phase: 'done', phaseAt: Date.UTC(2026, 10, 2, 7, 30) }],
+    });
+    await page.goto('/app/activity');
+    await expect(groups(page)).toHaveCount(1);
+    await expect(group(page, 'yesterday')).toContainText(TASK.title);
+    await expect(group(page, 'today')).toHaveCount(0);
+  });
+
+  test('Monday does not label the previous Saturday as earlier this week', async ({ page }) => {
+    await page.clock.install({ time: Date.UTC(2026, 10, 9, 20) });
+    await mockLive(page, {
+      threads: [], messages: [],
+      todos: [{ ...TASK, phase: 'done', phaseAt: Date.UTC(2026, 10, 7, 20) }],
+    });
+    await page.goto('/app/activity');
+    await expect(groups(page)).toHaveCount(1);
+    await expect(group(page, 'older')).toContainText(TASK.title);
+    await expect(group(page, 'week')).toHaveCount(0);
+  });
 });

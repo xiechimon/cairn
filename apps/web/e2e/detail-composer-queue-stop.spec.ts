@@ -128,9 +128,15 @@ async function runningTask(page: Page) {
     }
     if (path === `/api/conversations/${build.id}/messages`) {
       if (request.method() === 'POST') {
-        const input = request.postDataJSON() as { content: string; clientMessageId?: string; mode?: string; queuedMessageId?: string; deliverAfterStop?: boolean; cancelQueued?: boolean };
+        const input = request.postDataJSON() as { content: string; clientMessageId?: string; mode?: string; queuedMessageId?: string; deliverAfterStop?: boolean; cancelQueued?: boolean; editQueued?: boolean };
         sent.push(input);
         const message = { id: `message-${sent.length}`, role: 'user', content: input.content, createdAt: Date.now(), deliverAfterStop: input.deliverAfterStop };
+        if (input.editQueued) {
+          const row = queuedMessages.find((item) => item.id === input.queuedMessageId);
+          if (!row) return route.fulfill({ status: 409, json: { error: 'Queued message was already delivered' } });
+          row.content = input.content;
+          return route.fulfill({ status: 201, json: { conversationId: build.id } });
+        }
         if (input.cancelQueued) {
           queuedMessages.splice(queuedMessages.findIndex((row) => row.id === input.queuedMessageId), 1);
           return route.fulfill({ status: 201, json: { conversationId: build.id } });
@@ -210,6 +216,52 @@ test('send now delivers the queued capsule immediately and plain Enter still ste
   await task.input.fill('Plain steer');
   await task.input.press('Enter');
   await expect.poll(() => task.steerPending).toEqual(['Queued steer', 'Plain steer']);
+});
+
+test('a queued capsule is edited in place: Enter saves, Esc cancels, empty text cancels', async ({ page }) => {
+  const task = await runningTask(page);
+  await task.input.fill('First draft');
+  await task.input.press('Control+Enter');
+  const capsule = page.getByTestId('composer-card').getByTestId('queued-message');
+  await capsule.getByRole('button', { name: '编辑排队消息' }).click();
+  const edit = page.getByRole('textbox', { name: '编辑排队消息' });
+  await expect(edit).toBeFocused();
+  await expect(page.getByTestId('save-queued-message')).toBeVisible();
+  await expect(page.getByTestId('cancel-edit-queued-message')).toBeVisible();
+  await expect(page.getByText('回车保存 · Esc 取消')).toBeVisible();
+  await edit.fill('Changed and abandoned');
+  await edit.press('Escape');
+  await expect(capsule).toContainText('First draft');
+  expect(task.sent.filter((body) => body.editQueued)).toEqual([]);
+
+  await capsule.getByTestId('queued-message-text').press('Enter');
+  await page.getByRole('textbox', { name: '编辑排队消息' }).fill('   ');
+  await page.getByRole('textbox', { name: '编辑排队消息' }).press('Enter');
+  await expect(capsule).toContainText('First draft');
+  expect(task.sent.filter((body) => body.editQueued)).toEqual([]);
+
+  await capsule.getByTestId('queued-message-text').click();
+  await page.getByRole('textbox', { name: '编辑排队消息' }).fill('Second draft');
+  await page.getByRole('textbox', { name: '编辑排队消息' }).press('Enter');
+  await expect(capsule).toContainText('Second draft');
+  expect(task.queuedMessages.map((row) => row.content)).toEqual(['Second draft']);
+  expect(task.sent.filter((body) => body.editQueued)).toHaveLength(1);
+});
+
+test('a capsule dispatched while it is being edited is not resurrected and its edit lands in the composer', async ({ page }) => {
+  const task = await runningTask(page);
+  await task.input.fill('Dispatch me');
+  await task.input.press('Control+Enter');
+  const capsule = page.getByTestId('composer-card').getByTestId('queued-message');
+  await capsule.getByTestId('queued-message-text').click();
+  await page.getByRole('textbox', { name: '编辑排队消息' }).fill('Dispatch me, edited');
+  task.finish();
+  await page.getByTestId('save-queued-message').click();
+  await expect(page.getByTestId('composer-card').getByTestId('queued-message')).toHaveCount(0);
+  await expect(task.input).toHaveValue('Dispatch me, edited');
+  await expect(page.getByText('这条排队消息已经发出，改动没有生效')).toBeVisible();
+  expect(task.queuedMessages).toEqual([]);
+  expect(task.turns()).toBe(1);
 });
 
 test('Stop preserves changes without a dialog and cancelled tools show cancelled', async ({ page }) => {

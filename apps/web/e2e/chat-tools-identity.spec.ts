@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import { expandTurns } from './helpers.js';
 
 const ROUTE = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=md-toolout';
 const summary = (page: Page) => page.getByTestId('work-summary');
@@ -11,6 +12,7 @@ async function readClipboard(page: Page): Promise<string> {
 
 test('I1: the summary names the work performed and ends in a triangle', async ({ page }) => {
   await page.goto(ROUTE);
+  await expandTurns(page);
   await expect(summary(page)).toContainText('跑了 2 条命令');
   await expect(summary(page)).not.toContainText('19s');
   await expect(summary(page).locator('svg').first()).toBeVisible();
@@ -18,6 +20,7 @@ test('I1: the summary names the work performed and ends in a triangle', async ({
 
 test('I2: copy is available only while the work block is expanded', async ({ page }) => {
   await page.goto(ROUTE);
+  await expandTurns(page);
   await expect(summary(page)).toHaveAttribute('aria-expanded', 'true');
   await expect(block(page).getByRole('button', { name: '复制', exact: true })).toHaveCount(1);
   await summary(page).click();
@@ -29,6 +32,7 @@ test('I2: copy is available only while the work block is expanded', async ({ pag
 
 test('I3: copying work includes commands and outputs', async ({ page }) => {
   await page.goto(ROUTE);
+  await expandTurns(page);
   await readClipboard(page);
   await block(page).getByRole('button', { name: '复制', exact: true }).click();
   const clip = await readClipboard(page);
@@ -39,6 +43,7 @@ test('I3: copying work includes commands and outputs', async ({ page }) => {
 
 test('I4: call rows sit flush in a hairline card at 36px', async ({ page }) => {
   await page.goto(ROUTE);
+  await expandTurns(page);
   const geometry = await block(page).evaluate((el) => {
     const row = el.querySelector('[data-testid="work-call"]')!;
     return { inset: getComputedStyle(el).paddingLeft, height: row.getBoundingClientRect().height };
@@ -49,6 +54,7 @@ test('I4: call rows sit flush in a hairline card at 36px', async ({ page }) => {
 
 test('I5: work summaries keep the transcript boundary free of horizontal rules', async ({ page }) => {
   await page.goto(ROUTE);
+  await expandTurns(page);
   const borders = await summary(page).evaluate((el) => {
     const style = getComputedStyle(el);
     return [style.borderTopWidth, style.borderBottomWidth];

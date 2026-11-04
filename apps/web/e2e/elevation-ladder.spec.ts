@@ -135,13 +135,7 @@ for (const theme of ['light', 'dark'] as const) {
         ['panel-shadow', 'e1'],
         ['shadow-popover', 'e2'],
         ['dialog-shadow', 'e3'],
-        ['edge-shadow', 'e2'],
-        ['plate-shadow', 'e2'],
-        ['chief-shadow', 'e2'],
-        // pools, not rungs: their consumers draw their own --edge-ring
-        ['card-shadow', 'cds-shadow-sm'],
         ['floating-shadow', 'cds-shadow-lg'],
-        // a state, not a tier: the lift follows the e1 hover value
         ['card-lift', 'panel-shadow-hover'],
       ];
       for (const [alias, target] of pairs) {

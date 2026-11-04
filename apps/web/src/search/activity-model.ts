@@ -9,8 +9,6 @@ import type { TodoRecord } from '../fixtures/records.js';
 
 export const ACTIVITY_PAGE_SIZE = 25;
 
-const DAY_MS = 86_400_000;
-
 export interface ActivityRow {
   id: string;
   todo: TodoRecord;
@@ -43,26 +41,34 @@ export function activityRows(
     }));
 }
 
-const TZ_OFFSET_MS = 8 * 3_600_000;
-
-function startOfDay(ms: number): number {
-  return Math.floor((ms + TZ_OFFSET_MS) / DAY_MS) * DAY_MS - TZ_OFFSET_MS;
-}
-
-function groupId(phaseAt: number, today: number): ActivityGroup['id'] {
+function groupId(
+  phaseAt: number,
+  today: number,
+  yesterday: number,
+  weekStart: number,
+): ActivityGroup['id'] {
   if (phaseAt >= today) return 'today';
-  if (phaseAt >= today - DAY_MS) return 'yesterday';
-  if (phaseAt >= today - 6 * DAY_MS) return 'week';
+  if (phaseAt >= yesterday) return 'yesterday';
+  if (phaseAt >= weekStart) return 'week';
   return 'older';
 }
 
 const GROUP_ORDER: ActivityGroup['id'][] = ['today', 'yesterday', 'week', 'older'];
 
 export function groupByDay(rows: readonly ActivityRow[], now: number): ActivityGroup[] {
-  const today = startOfDay(now);
+  const localToday = new Date(now);
+  localToday.setHours(0, 0, 0, 0);
+  const today = localToday.getTime();
+  const localYesterday = new Date(today);
+  localYesterday.setDate(localYesterday.getDate() - 1);
+  const localMonday = new Date(today);
+  localMonday.setDate(localMonday.getDate() - ((localMonday.getDay() + 6) % 7));
   const sorted = [...rows].sort((a, b) => b.todo.phaseAt - a.todo.phaseAt);
   return GROUP_ORDER.flatMap((id) => {
-    const inGroup = sorted.filter((row) => groupId(row.todo.phaseAt, today) === id);
+    const inGroup = sorted.filter(
+      (row) =>
+        groupId(row.todo.phaseAt, today, localYesterday.getTime(), localMonday.getTime()) === id,
+    );
     if (inGroup.length === 0) return [];
     return [
       {

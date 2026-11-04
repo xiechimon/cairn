@@ -32,12 +32,13 @@ describe('segment-row projection (F1..F6)', () => {
       row('m2', 'assistant', text('乙'), 3),
     ]);
     expect(items.map((i) => i.kind)).toEqual(['robot', 'robot']);
-    expect(items[0]).toEqual({ kind: 'robot', markdown: '甲', seconds: '', id: 'm1' });
+    expect(items[0]).toEqual({ kind: 'robot', markdown: '甲', seconds: '', id: 'm1', createdAt: 1 });
     expect(items[1]).toEqual({
       kind: 'robot',
       markdown: '乙',
       seconds: '',
       id: 'm2',
+      createdAt: 3,
       tools: [{ label: 'bash', seconds: 2 }],
     });
   });

@@ -1,8 +1,10 @@
-import { at, PROJECT_ID, probeTodo, R7_DAY, r7 } from './core.js';
+import { PROJECT_ID, probeTodo } from './core.js';
 import { HOME_C_CRED, homeC } from './home-c.js';
 import type { FixtureSet, TodoRecord } from './records.js';
 
-const day = (date: string, h: number, m: number) => at(date, h, m);
+const ACTIVITY_DAY = '2026-09-23';
+const day = (date: string, h: number, m: number) =>
+  Date.parse(`${date}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`);
 
 function activityTodo(
   id: string,
@@ -47,28 +49,44 @@ export const activityTodos: TodoRecord[] = [
     'Fold finished turns in the transcript',
     'failed',
     CAIRN,
-    r7(20, 0),
+    day(ACTIVITY_DAY, 20, 0),
     1.84,
   ),
-  activityTodo('act-gallery', 438, 'Trim the gallery frame', 'building', CAIRN, r7(19, 30), 0.31),
-  activityTodo('act-bump', 120, 'Dependency bump', 'confirm', RELAY, r7(18, 0), 0.08),
+  activityTodo(
+    'act-gallery',
+    438,
+    'Trim the gallery frame',
+    'building',
+    CAIRN,
+    day(ACTIVITY_DAY, 19, 30),
+    0.31,
+  ),
+  activityTodo(
+    'act-bump',
+    120,
+    'Dependency bump',
+    'confirm',
+    RELAY,
+    day(ACTIVITY_DAY, 18, 0),
+    0.08,
+  ),
   activityTodo(
     'act-routing',
     402,
     'Move routing rules behind the work policy',
     'failed',
     CAIRN,
-    day('2026-09-20', 15, 0),
+    day('2026-09-22', 15, 0),
     4.1,
   ),
-  activityTodo('act-flip', 377, 'Flip detector', 'review', CAIRN, day('2026-09-20', 9, 0), 0.62),
+  activityTodo('act-flip', 377, 'Flip detector', 'review', CAIRN, day('2026-09-22', 9, 0), 0.62),
   activityTodo(
     'act-sweep',
     88,
     'Weekly flaky-test sweep',
     'done',
     RELAY,
-    day('2026-09-18', 11, 0),
+    day('2026-09-21', 11, 0),
     2.47,
   ),
   activityTodo(
@@ -93,7 +111,7 @@ export const activityTodos: TodoRecord[] = [
 export const activityFixture: FixtureSet = {
   ...homeC,
   todos: activityTodos,
-  now: r7(20, 30),
+  now: day(ACTIVITY_DAY, 20, 30),
 };
 
 export const activityManyFixture: FixtureSet = {
@@ -105,7 +123,7 @@ export const activityManyFixture: FixtureSet = {
       `Thread ${i + 1}`,
       'done',
       CAIRN,
-      Date.parse(`${R7_DAY}T20:00:00+08:00`) - i * 60_000,
+      day(ACTIVITY_DAY, 20, 0) - i * 60_000,
       0.5,
     ),
   ),

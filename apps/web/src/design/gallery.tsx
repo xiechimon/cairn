@@ -54,6 +54,7 @@ import { ProductOverlaysSection } from './product-overlays.js';
 import { ProductPagesSection } from './product-pages.js';
 import { ProductProviders } from './product-providers.js';
 import { ProductThreadReplySection } from './product-thread-reply.js';
+import { ProductTurnFoldSection } from './product-turn-fold.js';
 import { ScreensSection } from './screens.js';
 import { GroupTitle } from './specimen.js';
 
@@ -101,6 +102,7 @@ const NAV = [
       ['product-detail', 'Task detail'],
       ['product-chief', 'Coordinator'],
       ['product-thread-reply', 'Thread reply'],
+      ['product-turn-fold', 'Turn folding'],
       ['product-overlays', 'Overlays and pickers'],
       ['product-pages', 'Page parts'],
       ['product-add-provider', 'Add provider'],
@@ -289,6 +291,7 @@ export function Gallery() {
             <ProductDetailSection />
             <ProductChiefSection />
             <ProductThreadReplySection />
+            <ProductTurnFoldSection />
             <ProductOverlaysSection />
             <ProductPagesSection theme={theme} />
             <ProductAddProviderSection />

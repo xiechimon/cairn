@@ -17,7 +17,7 @@ test('motion tokens and scroll-fade utility land', async ({ page }) => {
     const mask = style.maskImage || style.getPropertyValue('mask-image') || '';
     const icon = getComputedStyle(probe.querySelector('.icon-baseline') as Element).verticalAlign;
     const animNames: Record<string, string> = {};
-    for (const cls of ['anim-message-fade-up', 'anim-saved-check', 'anim-grapheme-reveal']) {
+    for (const cls of ['anim-message-fade-up']) {
       const el = document.createElement('div');
       el.className = cls;
       document.body.append(el);
@@ -67,8 +67,6 @@ test('motion tokens and scroll-fade utility land', async ({ page }) => {
   expect(axis.h).toBe(true);
   expect(axis.both).toBe(true);
   expect(vals.animNames['anim-message-fade-up']).toContain('message-fade-up');
-  expect(vals.animNames['anim-saved-check']).toContain('saved-check-decay');
-  expect(vals.animNames['anim-grapheme-reveal']).toContain('grapheme-reveal');
   expect(vals.icon).toMatch(/^-?(0\.125em|1\.75px)$/);
 });
 

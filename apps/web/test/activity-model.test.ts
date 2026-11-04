@@ -13,7 +13,7 @@ import { NOW, todo } from './helpers.js';
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
-const NOON = Date.UTC(2026, 10, 4, 4);
+const NOON = new Date(2026, 10, 4, 12).getTime();
 
 function row(id: string, ageMs: number, cost: number | null): ActivityRow {
   return {
@@ -31,7 +31,7 @@ describe('groupByDay', () => {
         row('a', HOUR, 1),
         row('b', 11 * HOUR, 1),
         row('c', 13 * HOUR, 2),
-        row('d', 3 * DAY, 4),
+        row('d', 2 * DAY, 4),
         row('e', 20 * DAY, 8),
       ],
       NOON,
@@ -42,6 +42,37 @@ describe('groupByDay', () => {
       ['week', ['d']],
       ['older', ['e']],
     ]);
+  });
+
+  test('the viewer local midnight separates today from yesterday', () => {
+    const now = new Date(2026, 10, 2, 0, 30).getTime();
+    const rows = [
+      { ...row('today', 0, 0), todo: { ...todo(1, 'done'), phaseAt: new Date(2026, 10, 2, 0, 15).getTime() } },
+      { ...row('yesterday', 0, 0), todo: { ...todo(2, 'done'), phaseAt: new Date(2026, 10, 1, 23, 30).getTime() } },
+    ];
+    expect(groupByDay(rows, now).map((group) => [group.id, group.rows.map((item) => item.id)])).toEqual([
+      ['today', ['today']],
+      ['yesterday', ['yesterday']],
+    ]);
+  });
+
+  test('a Monday starts a new week instead of including six prior days', () => {
+    const now = new Date(2026, 10, 9, 12).getTime();
+    const rows = [9, 8, 7, 4].map((day) => ({
+      ...row(`day-${day}`, 0, 0),
+      todo: { ...todo(day, 'done'), phaseAt: new Date(2026, 10, day, 10).getTime() },
+    }));
+    expect(groupByDay(rows, now).map((group) => [group.id, group.rows.map((item) => item.id)])).toEqual([
+      ['today', ['day-9']],
+      ['yesterday', ['day-8']],
+      ['older', ['day-7', 'day-4']],
+    ]);
+  });
+
+  test('yesterday uses its local calendar date across a daylight-saving transition', () => {
+    const now = new Date(2026, 10, 2, 0, 30).getTime();
+    const previous = { ...row('previous-midnight', 0, 0), todo: { ...todo(1, 'done'), phaseAt: new Date(2026, 10, 1, 0, 15).getTime() } };
+    expect(groupByDay([previous], now).map((group) => group.id)).toEqual(['yesterday']);
   });
 
   test('each group carries its count and the sum of known costs', () => {
