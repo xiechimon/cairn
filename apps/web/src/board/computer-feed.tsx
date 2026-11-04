@@ -1,5 +1,6 @@
 import type { ComputerCommand, ComputerRecord, ComputerState } from '@cairn/shared';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useAuth } from '../api/auth.js';
 import { computerFeedStore, mergeComputerFeed } from '../api/computer-feed.js';
 import { useComputerCommands, useComputers } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
@@ -162,8 +163,9 @@ function CommandEntry({ command, now }: { command: ComputerCommand; now: number 
 
 function CommandFeed({ computerId }: { computerId: string }) {
   const { t } = useI18n();
+  const { teamId } = useLiveData();
   const now = useNow();
-  const history = useComputerCommands(computerId);
+  const history = useComputerCommands(teamId, computerId);
   const liveCommands = useSyncExternalStore(
     computerFeedStore.subscribe,
     computerFeedStore.snapshot,
@@ -256,5 +258,6 @@ function ComputerSection() {
 
 export function CoordinatorComputer() {
   const { live } = useLiveData();
-  return live ? <ComputerSection /> : null;
+  const auth = useAuth();
+  return live && !auth.gateOpen ? <ComputerSection /> : null;
 }

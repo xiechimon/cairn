@@ -17,6 +17,7 @@ import { activityStore } from './activity.js';
 import { agentTodoStore } from './agent-todo.js';
 import { readStoredToken, useAuth } from './auth.js';
 import { computerFeedStore } from './computer-feed.js';
+import { computerQueryKeys } from './computer-query-scope.js';
 import { invalidateConverged } from './invalidate.js';
 import { liveTextStore } from './live-text.js';
 import { liveThinkingStore } from './live-thinking.js';
@@ -38,11 +39,11 @@ export function useTeamStream(teamId: string | undefined, enabled: boolean): voi
       computerFeedStore.clear();
       return;
     }
-    return startTeamStream(teamId, qc);
+    return startTeamStream(teamId, qc, auth.generation);
   }, [teamId, enabled, qc, auth]);
 }
 
-export function startTeamStream(teamId: string, qc: QueryClient): () => void {
+export function startTeamStream(teamId: string, qc: QueryClient, generation = 0): () => void {
   computerFeedStore.clear();
   const resync = () => {
     computerFeedStore.clear();
@@ -76,6 +77,9 @@ export function startTeamStream(teamId: string, qc: QueryClient): () => void {
   return () => {
     disconnect();
     computerFeedStore.clear();
+    for (const queryKey of Object.values(computerQueryKeys(teamId, generation))) {
+      qc.removeQueries({ queryKey });
+    }
   };
 }
 
