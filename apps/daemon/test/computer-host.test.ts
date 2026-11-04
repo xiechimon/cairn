@@ -2,18 +2,16 @@ import { execFileSync } from 'node:child_process';
 import {
   chmodSync,
   mkdirSync,
-  mkdtempSync,
   readdirSync,
   readFileSync,
   realpathSync,
-  rmSync,
   statSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { HostComputerProvider } from '../src/computer/host.js';
 import { type ComputerProcessEvent, ComputerRefusal } from '../src/computer/provider.js';
 
@@ -22,7 +20,7 @@ let home: string;
 let outside: string;
 
 beforeEach(() => {
-  root = realpathSync(mkdtempSync(path.join(tmpdir(), 'cairn-host-')));
+  root = realpathSync(makeTestTempDir('cairn-host-'));
   home = path.join(root, 'home');
   outside = path.join(root, 'outside');
   mkdirSync(home);
@@ -30,7 +28,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  rmSync(root, { recursive: true, force: true });
+  releaseTestTempDir(root);
 });
 
 function provider(overrides: ConstructorParameters<typeof HostComputerProvider>[0] = {}) {

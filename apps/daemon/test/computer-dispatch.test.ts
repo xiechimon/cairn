@@ -1,6 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import {
   COMPUTER_FRAME_TEXT_MAX_CHARS,
@@ -11,6 +10,7 @@ import {
   type MachineComputerFramesResponse,
 } from '@cairn/shared';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
   COMPUTER_COMMAND_TIMEOUT_MS,
   createComputerDispatcher,
@@ -31,13 +31,13 @@ let root: string;
 let home: string;
 
 beforeEach(() => {
-  root = realpathSync(mkdtempSync(path.join(tmpdir(), 'cairn-dispatch-')));
+  root = realpathSync(makeTestTempDir('cairn-dispatch-'));
   home = path.join(root, 'home');
   mkdirSync(home);
 });
 
 afterEach(() => {
-  rmSync(root, { recursive: true, force: true });
+  releaseTestTempDir(root);
 });
 
 function fakeClient(handler?: Handler) {
