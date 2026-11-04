@@ -29,7 +29,7 @@ def test_prompt_contains_instruction_and_test_patch_only(task):
     prompt = labeler.build_prompt(task)
     assert "Make add() sum." in prompt
     assert "assert add(2, 3) == 5" in prompt
-    assert "two experts would agree" in prompt
+    assert "testValidity" in prompt
     for marker in ("SECRET_SOLUTION_MARKER", "SECRET_SOLVE_MARKER", "SECRET_TITLE_MARKER"):
         assert marker not in prompt
 
@@ -55,14 +55,32 @@ def test_command_is_direct_codex_exec_never_ai_route():
     assert command[command.index("-m") + 1] == "gpt-6.1-sol"
 
 
+def graded(under=0, valid=0, under_reason="Clear.", valid_reason="Fine."):
+    return json.dumps(
+        {
+            "underspecification": under,
+            "underspecificationReason": under_reason,
+            "testValidity": valid,
+            "testValidityReason": valid_reason,
+        }
+    )
+
+
+def parse(raw):
+    return labeler.parse_label(raw, "gpt-6.1-sol", "abc123", "2026-11-04T00:00:00Z")
+
+
 def test_parse_label_takes_last_json_object_and_stamps_metadata():
-    raw = 'thinking {"verdict": "reject"}\nfinal:\n{"verdict": "accept", "reason": "Tests assert the sum."}\n'
-    label = labeler.parse_label(raw, "gpt-6.1-sol", "abc123", "2026-11-04T00:00:00Z")
-    assert label == {
+    raw = 'thinking {"underspecification": 3}\nfinal:\n' + graded(1, 0, "Some blanks.", "Fine.")
+    assert parse(raw) == {
         "vendor": "openai",
         "model": "gpt-6.1-sol",
+        "rubric": "graded-v1",
+        "underspecification": 1,
+        "underspecificationReason": "Some blanks.",
+        "testValidity": 0,
+        "testValidityReason": "Fine.",
         "verdict": "accept",
-        "reason": "Tests assert the sum.",
         "labeledAt": "2026-11-04T00:00:00Z",
         "promptSha256": "abc123",
         "route": "direct-codex-exec",
@@ -70,17 +88,56 @@ def test_parse_label_takes_last_json_object_and_stamps_metadata():
 
 
 @pytest.mark.parametrize(
+    "under,valid,verdict",
+    [(0, 0, "accept"), (1, 1, "accept"), (2, 0, "reject"), (0, 2, "reject"), (3, 3, "reject"), (1, 3, "reject")],
+)
+def test_verdict_is_computed_from_the_scores(under, valid, verdict):
+    assert parse(graded(under, valid))["verdict"] == verdict
+
+
+def test_model_supplied_verdict_is_ignored():
+    raw = json.dumps(
+        {
+            "verdict": "accept",
+            "underspecification": 3,
+            "underspecificationReason": "Vague.",
+            "testValidity": 0,
+            "testValidityReason": "Fine.",
+        }
+    )
+    assert parse(raw)["verdict"] == "reject"
+
+
+@pytest.mark.parametrize(
     "raw",
     [
         "no json at all",
-        '{"verdict": "maybe", "reason": "x"}',
-        '{"verdict": "accept"}',
-        '{"verdict": "accept", "reason": ""}',
+        graded(4, 0),
+        graded(-1, 0),
+        graded(0, 1.5),
+        graded(0, "1"),
+        graded(0, True),
+        graded(0, 0, under_reason=""),
+        graded(0, 0, valid_reason="  "),
+        '{"underspecification": 0, "underspecificationReason": "x", "testValidity": 0}',
     ],
 )
-def test_parse_label_rejects_malformed_output(raw):
+def test_parse_label_rejects_malformed_scores(raw):
     with pytest.raises(ValueError):
-        labeler.parse_label(raw, "gpt-6.1-sol", "abc", "2026-11-04T00:00:00Z")
+        parse(raw)
+
+
+def test_prompt_defines_both_scales(task):
+    prompt = labeler.build_prompt(task)
+    for text in (
+        "underspecification",
+        "testValidity",
+        "almost impossible to know what is asked",
+        "too narrow, too broad, or check something else",
+        "accept every reasonable solution",
+    ):
+        assert text in prompt
+    assert '"verdict"' not in prompt
 
 
 def test_prompt_digest_is_stable(task):
@@ -90,18 +147,8 @@ def test_prompt_digest_is_stable(task):
 
 
 def test_parse_label_accepts_braces_inside_the_reason():
-    raw = 'Done.\n{"verdict": "accept", "reason": "The tests check the empty object {} case."}'
-    label = labeler.parse_label(raw, "gpt-6.1-sol", "abc", "2026-11-04T00:00:00Z")
-    assert label["reason"] == "The tests check the empty object {} case."
-
-
-def test_parse_label_accepts_nested_objects_and_takes_the_last_verdict():
-    raw = (
-        '{"verdict": "reject", "reason": "draft"}\n'
-        '{"verdict": "accept", "reason": "final", "detail": {"k": 1}}'
-    )
-    label = labeler.parse_label(raw, "gpt-6.1-sol", "abc", "2026-11-04T00:00:00Z")
-    assert label["verdict"] == "accept"
+    raw = graded(0, 0, "The empty object {} case is stated.", "Checks {} too.")
+    assert parse(raw)["underspecificationReason"] == "The empty object {} case is stated."
 
 
 def test_main_keeps_the_raw_response_when_parsing_fails(task, tmp_path, monkeypatch):

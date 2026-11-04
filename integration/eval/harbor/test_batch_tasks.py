@@ -156,3 +156,16 @@ def test_only_accepted_tasks_get_controls(tmp_path):
         (tmp_path / name / "label.openai.json").write_text(f'{{"verdict": "{verdict}"}}')
     (tmp_path / "task-4").mkdir()
     assert batch.accepted_tasks(tmp_path) == ["task-1", "task-3"]
+
+
+def test_discovery_keeps_only_prs_after_the_last_scanned_one_in_order():
+    prs = [{"number": 5}, {"number": 2046}, {"number": 2045}, {"number": 2050}]
+    assert [pr["number"] for pr in batch.prs_after(prs, 2045)] == [2046, 2050]
+
+
+def test_discovery_row_records_a_failure_instead_of_raising():
+    def inspect(pr):
+        raise ValueError("bad object")
+
+    row = batch.discover_row({"number": 9}, inspect)
+    assert row == {"pr": 9, "reason": "Discovery infrastructure failure: bad object"}

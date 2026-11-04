@@ -8,12 +8,23 @@ import subprocess
 import tempfile
 
 BANNED_MODELS = re.compile(r"gpt-6-astra|gpt-5\.6|minimax-m3|deepseek-v4-flash", re.I)
-QUESTION = (
-    "Decide whether two experts would agree that the tests in the test patch verify "
-    "the requirement described in the issue: a correct implementation passes them, an "
-    "incorrect or missing one fails them, and they do not demand behavior the issue "
-    "does not state."
+RUBRIC = "graded-v1"
+UNDERSPECIFICATION = (
+    "0 = well specified; 1 = some blanks to fill, but a sensible interpretation of what a "
+    "solution needs exists; 2 = vague, room for ambiguity, unclear what a solution looks like; "
+    "3 = almost impossible to know what is asked without more information."
 )
+TEST_VALIDITY = (
+    "0 = the tests accept every reasonable solution; 1 = the tests accept most reasonable "
+    "solutions, though some unusual valid ones could fail; 2 = the tests check behavior the "
+    "issue does not ask for (names, messages, schemas) and would reject many reasonable "
+    "solutions; 3 = the tests are too narrow, too broad, or check something else."
+)
+SCORES = (
+    ("underspecification", "underspecificationReason"),
+    ("testValidity", "testValidityReason"),
+)
+ACCEPT_AT_MOST = 1
 
 
 def require_allowed_model(model):
@@ -28,9 +39,12 @@ def build_prompt(task):
     return (
         "You are reviewing a software task for a benchmark. You see only the issue and the "
         "test patch. Do not run commands or read any other files.\n\n"
-        f"{QUESTION}\n\n"
+        "Score the task on two scales from 0 to 3.\n\n"
+        f"underspecification: {UNDERSPECIFICATION}\n\n"
+        f"testValidity: {TEST_VALIDITY}\n\n"
         "Answer with one JSON object and nothing after it: "
-        '{"verdict": "accept" or "reject", "reason": "<one or two sentences>"}\n\n'
+        '{"underspecification": <0-3>, "underspecificationReason": "<one or two sentences>", '
+        '"testValidity": <0-3>, "testValidityReason": "<one or two sentences>"}\n\n'
         f"=== ISSUE ===\n{instruction}\n=== TEST PATCH ===\n{tests}\n=== END ===\n"
     )
 
@@ -58,6 +72,20 @@ def codex_command(model, output, workdir, prompt):
     ]
 
 
+def valid_scores(candidate):
+    for score, reason in SCORES:
+        value = candidate.get(score)
+        text = candidate.get(reason)
+        if (
+            type(value) is not int
+            or not 0 <= value <= 3
+            or not isinstance(text, str)
+            or not text.strip()
+        ):
+            return False
+    return True
+
+
 def parse_label(raw, model, digest, labeled_at):
     require_allowed_model(model)
     decoder = json.JSONDecoder()
@@ -69,19 +97,21 @@ def parse_label(raw, model, digest, labeled_at):
         except json.JSONDecodeError:
             position = raw.find("{", position + 1)
             continue
-        if isinstance(candidate, dict) and "verdict" in candidate:
+        if isinstance(candidate, dict) and "underspecification" in candidate:
             found = candidate
         position = raw.find("{", end)
-    if found is None:
-        raise ValueError("No JSON verdict in labeler output")
-    reason = found.get("reason")
-    if found["verdict"] not in ("accept", "reject") or not isinstance(reason, str) or not reason.strip():
-        raise ValueError("Verdict must be accept or reject with a reason")
+    if found is None or not valid_scores(found):
+        raise ValueError("No valid graded scores in labeler output")
+    accepted = all(found[score] <= ACCEPT_AT_MOST for score, _ in SCORES)
     return {
         "vendor": "openai",
         "model": model,
-        "verdict": found["verdict"],
-        "reason": reason.strip(),
+        "rubric": RUBRIC,
+        "underspecification": found["underspecification"],
+        "underspecificationReason": found["underspecificationReason"].strip(),
+        "testValidity": found["testValidity"],
+        "testValidityReason": found["testValidityReason"].strip(),
+        "verdict": "accept" if accepted else "reject",
         "labeledAt": labeled_at,
         "promptSha256": digest,
         "route": "direct-codex-exec",

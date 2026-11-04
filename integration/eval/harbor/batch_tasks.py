@@ -118,6 +118,32 @@ def controls_script(tasks, output, names):
     return "\n".join(lines) + "\n"
 
 
+def prs_after(prs, last):
+    return sorted((pr for pr in prs if pr["number"] > last), key=lambda pr: pr["number"])
+
+
+def discover_row(pr, inspect):
+    try:
+        return inspect(pr)
+    except (subprocess.CalledProcessError, ValueError) as error:
+        return {"pr": pr["number"], "reason": f"Discovery infrastructure failure: {error}"}
+
+
+def discover_new(manifest_path):
+    manifest = json.loads(Path(manifest_path).read_text())
+    last = max(row["pr"] for row in manifest["candidates"])
+    prs = converter.gh_json(
+        "pr", "list", "-R", converter.REPOSITORY, "--state", "merged", "--limit", "5000",
+        "--json", "number,mergedAt,mergeCommit,title",
+    )
+    rows = [discover_row(pr, converter.inspect_pr) for pr in prs_after(prs, last)]
+    manifest["candidates"].extend(rows)
+    manifest["scanned"] = len(manifest["candidates"])
+    manifest["eligible"] = sum(1 for row in manifest["candidates"] if row.get("reason") is None)
+    Path(manifest_path).write_text(json.dumps(manifest, indent=2) + "\n")
+    return last, rows
+
+
 def accepted_tasks(tasks):
     return sorted(
         label.parent.name
@@ -157,11 +183,16 @@ def main():
     check = sub.add_parser("static")
     check.add_argument("--tasks", type=Path, required=True)
     check.add_argument("--report", type=Path, required=True)
+    discover = sub.add_parser("discover-new")
+    discover.add_argument("--manifest", type=Path, required=True)
     controls = sub.add_parser("controls-script")
     controls.add_argument("--tasks", type=Path, required=True)
     controls.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
-    if args.action == "convert":
+    if args.action == "discover-new":
+        last, rows = discover_new(args.manifest)
+        print(f"after {last}: {len(rows)} new, {sum(1 for r in rows if r.get('reason') is None)} eligible")
+    elif args.action == "convert":
         rows = [
             row
             for row in json.loads(args.manifest.read_text())["candidates"]

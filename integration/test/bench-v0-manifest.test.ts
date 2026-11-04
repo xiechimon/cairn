@@ -53,8 +53,19 @@ test('bench-v0 conversion status is consistent and keeps the benchmark incomplet
   );
   expect(accepted).toHaveLength(conversion.openaiAccepted);
   expect(conversion.openaiAccepted + conversion.openaiRejected).toBe(conversion.converted);
+  expect(conversion.labelRubric).toBe('graded-v1');
   for (const row of conversion.perPr) {
     expect(row.partition).toBe(row.issue % 2 === 0 ? 'optimize' : 'holdout');
+    expect(row.openaiLabel).toBe(
+      row.underspecification <= 1 && row.testValidity <= 1 ? 'accept' : 'reject',
+    );
+  }
+  for (const key of ['underspecificationDistribution', 'testValidityDistribution']) {
+    const total = Object.values(conversion[key] as Record<string, number>).reduce(
+      (sum, count) => sum + count,
+      0,
+    );
+    expect(total).toBe(conversion.converted);
   }
   if (conversion.controls === 'pending') {
     expect(manifest.complete).toBe(false);

@@ -143,27 +143,34 @@ ruler resists these four cheats, not that PR #1562 is a kept benchmark task.
 
 ## Epic 2: conversion and labels
 
-All 53 eligible PRs converted with `batch_tasks.py convert` (task `task-<PR>`, test
+Discovery now covers every merged PR through #2766 (1370 examined; the 398 PRs
+after #2045 were scanned with the same owner rules). The new range gives 29 more eligible
+PRs, 82 in total. PR #2118 could not be examined because its merge commit is not in the
+repository (recorded as a discovery failure).
+
+All 82 eligible PRs converted with `batch_tasks.py convert` (task `task-<PR>`, test
 command derived from the changed test files: `node --test` for `node:test` files,
 `pnpm exec vitest run` for the rest, chained with `sh -c` when mixed). Conversion
 failures: 0. Static checks without Docker: every `tests.patch` applies to the base
 archive and every `solution.patch` applies on top; the grader, solution, protected-path
-and protected-regex lists are non-empty in all 53. Five gold solutions touch protected
+and protected-regex lists are non-empty in all 82. Five gold solutions touch protected
 infrastructure (`package.json` or `pnpm-lock.yaml`: PRs 1552, 1641, 1716, 1824, 1905);
-they are listed in `solution-paths.txt` as designed. Thirteen tasks were flagged for
-network-looking text in the test patch (URL strings, `gh`/`npx` text); inspection shows
-URL fixtures and mocks, with PR 1697 injecting `fetchFn`. None is confirmed
-network-dependent, and none was run, since Docker was unavailable.
+they are listed in `solution-paths.txt` as designed. 21 tasks were flagged for
+network-looking text in the test patch (URL strings, `gh`/`npx` text); inspection of the
+first batch shows URL fixtures and mocks. None is confirmed network-dependent, and none
+was run, since Docker was unavailable.
 
-One OpenAI label per task (`gpt-6.1-sol`, direct `codex exec`, prompt from
-`label-task.py`) accepts 6 and rejects 47. Accepted: PRs 1289, 1310, 1538, 1562, 1729,
-1835. The main rejection reasons are tests that require interfaces or wording the issue
-leaves open (CLI names, exact messages, schemas) and tests that omit part of the issue.
-Thirty accepted tasks are therefore not yet reachable from this pool; the label prompt
-was not changed to raise the count.
+Labels use the graded rubric `graded-v1` (`gpt-6.1-sol`, direct `codex exec`): the model
+scores `underspecification` and `testValidity` from 0 to 3 with written definitions and a
+reason for each, and code computes `accept` only when both scores are at most 1. The
+earlier binary labels are kept as `label.openai.binary.json`. Graded rubric: 12 accepted,
+70 rejected (binary rubric: 10 accepted).
+`underspecification` distribution (0/1/2/3): 30/50/2/0.
+`testValidity` distribution (0/1/2/3): 2/10/59/11.
+Thirty accepted tasks are not yet reachable from this pool.
 
 The tasks live in the private repository `xiechimon/cairn-eval-tasks` (commit
-`a33d97a5f0ca7fb23d3403491c410576c2646c4b`), without `base.tar`, which
+`9fcd6494641667034f8546393acf6bce7ec2f103`), without `base.tar`, which
 `regenerate-base.sh` rebuilds from `git archive` and checks against stored digests.
 Per-PR status is in the `conversion` section of `bench-v0.json`. Controls (oracle, nop,
 cheats) are pending; `complete` stays false and `tasks` stays empty.
