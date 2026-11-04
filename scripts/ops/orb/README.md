@@ -99,7 +99,7 @@ on reruns. Existing networkd-managed host links or earlier network configuration
 files stop the installer before changes.
 The image contains Node, pinned Claude Code/Codex CLIs and the repository's
 pnpm, installed with npm lifecycle scripts disabled, plus Python (agents reach
-for `python3` in Bash) and bubblewrap and socat: Claude Code refuses to start without bubblewrap, because it scrubs
+for `python3` in Bash), the CLI tools repository scripts call (`jq`, `diff`, `patch`, `which`, `hostname`, `rsync`, `lsof`, `rg`, `unzip`; `pnpm prepush` fails without `jq`) and bubblewrap and socat: Claude Code refuses to start without bubblewrap, because it scrubs
 subprocess environments through `bwrap`, and its Bash sandbox refuses every
 command with "socat not installed" when socat is missing. Steps that carry the
 subscription token set `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB`, which makes that

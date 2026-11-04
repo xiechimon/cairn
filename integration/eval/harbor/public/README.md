@@ -150,3 +150,36 @@ Acceptance remains blocked, not reduced: ian must decide whether to supply an
 omarchy execution environment with container-inclusive memory enforcement and
 complete steps 1–3, or explicitly accept a separate adapter-only delivery.
 No `results/<date>-baseline.md` can be produced before measured trials exist.
+
+## Regression gate (C2 Epic 4)
+
+`cairn_harbor/gate.py` compares a base harness with a candidate harness on the same task set, and `.github/workflows/eval-gate.yml` runs it for pull requests.
+
+Harness definition: `harness-paths.json` lists the harness files (the Harbor cairn executor, its prompt and skill). The scan policy in `constants.py` is ruler, so changing it refuses the gate. Product paths (the Chief, the pi backend) are left out until the executor runs the product daemon (Epic 3), because a comparison that never executes them would be no evidence. `python -m cairn_harbor.gate trigger --files <changed-files.txt>` exits 0 only when a diff touches one of them, and the workflow path filters are held equal to the list by `tests/test_harness.py`. A diff touching none does not start the gate.
+
+Inputs: one `run_baseline run` result file per repeat and arm. Each file pins `model`, `task_set_sha` (SHA-256 of the `--tasks` file), `harness_sha` (SHA-256 over the harness files) and the budget `run_id`. A differing model or task set between arms, or a missing pin, is refused (exit 2).
+
+Pairing follows `integration/eval/adoption/judge.mts`: pairs are on matching tasks; an infrastructure trial is dropped, and a task with no scored trial on a side is excluded, never counted as a regression; a voided trial stays a scored zero.
+
+MDE: for each paired task `t`, `s2_t` is the sample variance of the unchanged harness's pass scores over its repeats, `nb_t` and `nc_t` are the scored trials per side, and `N` is the number of paired tasks.
+
+```
+SE  = sqrt(sum_t(s2_t * (1/nb_t + 1/nc_t))) / N
+MDE = max((1.96 + 0.8416) * SE, 1 / (N * candidate repeats))
+```
+
+That is a two-sided 5% test at 80% power; the floor is one flipped trial. `delta` is the mean over paired tasks of the candidate pass rate minus the base pass rate.
+
+Verdicts: `better` when `delta >= MDE`; `worse` when `delta <= -MDE`; `no-detectable-difference` between; `broken` when the candidate completed no agent run (every trial infrastructure or zero tokens); `insufficient-data` with fewer than 5 base repeats or fewer than 5 paired tasks. The gate blocks on `worse`, `broken` and `insufficient-data`. Exit codes: 0 pass, 1 blocked, 2 refused.
+
+Controls (`tests/test_gate.py`, synthetic fixtures shaped like `run_baseline` output): a known-better harness is `better`, an identical harness is not blocked, and a candidate whose agent never runs is `broken`.
+
+The results file records `model`, `taskSetSha`, `harnessShaBase`, `harnessShaCandidate`, repeats, `delta`, `mde` and `costUsd` (the sum of the budget ledger settlements of the runs; `null` with `unsettledRuns` when any run is unsettled).
+
+Workflow: runs on a self-hosted Linux runner labelled `cairn-eval` (Harbor needs Docker, `systemd-run --user` and the datasets directory, which GitHub-hosted runners lack), only when the PR carries the `eval-gate` label and comes from this repository, or by `workflow_dispatch`. `CAIRN_EVAL_ANTHROPIC_API_KEY` is exposed to the run step only, `--max-run-usd` is mandatory, and `eval-gate-results.json` is uploaded as an artifact. Runner setup: `CAIRN_EVAL_DATASETS_DIR` and `CAIRN_EVAL_GATE_MAX_RUN_USD` repository variables.
+
+Model and credential: the model is explicit (`job-config --model anthropic/<id>`, from the `model` dispatch input or the `CAIRN_EVAL_GATE_MODEL` variable; the workflow has no default). Harbor 0.25.0's Pi agent resolves provider `anthropic` to `ANTHROPIC_API_KEY` against `https://api.anthropic.com` (`harbor/agents/agent_auth_resolution.py`, `harbor/agents/installed/pi.py`). `run_baseline run` maps `CAIRN_EVAL_ANTHROPIC_API_KEY` to that variable only, passes it to `systemd-run` by name (never on the command line) and unsets other provider credentials (`OPENAI_API_KEY`, `ANTHROPIC_OAUTH_TOKEN`, base-URL overrides). `--gate` refuses a free model, and a metered model always goes through `budget.reserve`/`settle`; a missing key fails before the reservation.
+
+Not yet exercised: no metered run has happened, so the first real gate run is still the proof of this wiring.
+
+Ruler integrity: the trigger, `ruler` check and judge run from a checkout of the default branch, never from the PR. `python -m cairn_harbor.gate ruler` refuses (exit 2, `refused: ruler changed`) when the base..candidate diff touches a ruler path (`integration/eval/**` minus the harness paths in `harness-paths.json`, and `.github/workflows/eval-gate.yml`), or when either arm checkout's ruler files differ from the default branch's. A diff touching no harness path ends the job green with a "not triggered" notice and skips the later steps.

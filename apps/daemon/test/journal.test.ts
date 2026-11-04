@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, statSync } from 'node:fs';
+import { existsSync, mkdtempSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ClaimedStep } from '@cairn/shared';
@@ -125,5 +125,75 @@ describe('outbox journal/transcript file modes (#2056)', () => {
       t.upsert({ id: 'm1', role: 'user', content: 'hi', createdAt: 1 });
       expect(modeBits(join(dir, 'step-s1.transcript.json'))).toBe(0o600);
     });
+  });
+});
+
+describe('outbox step files follow the journal entry', () => {
+  const claim = (j: StepJournal, stepId: string) =>
+    j.claim({
+      stepId,
+      buildId: 'b1',
+      kind: 'plan',
+      conversationId: 'b1',
+      sessionAction: 'new',
+      prompt: null,
+      claimed,
+    });
+  const seedFiles = (dir: string, stepId: string) => {
+    new TranscriptBuffer(dir, stepId).upsert({
+      id: 'm',
+      role: 'user',
+      content: 'hi',
+      createdAt: 1,
+    });
+    writeFileSync(join(dir, `step-${stepId}.session.jsonl`), '{}\n');
+  };
+  const age = (dir: string, stepId: string, ageMs: number) => {
+    const when = new Date(Date.now() - ageMs);
+    for (const suffix of ['.transcript.json', '.session.jsonl'])
+      utimesSync(join(dir, `step-${stepId}${suffix}`), when, when);
+  };
+  const files = (dir: string, stepId: string) =>
+    ['.transcript.json', '.session.jsonl'].filter((suffix) =>
+      existsSync(join(dir, `step-${stepId}${suffix}`)),
+    );
+
+  test('remove deletes the transcript and session files of that step only', () => {
+    const dir = tmp();
+    const j = new StepJournal(dir);
+    claim(j, 's1');
+    seedFiles(dir, 's1');
+    seedFiles(dir, 's2');
+    j.remove('s1');
+    expect(files(dir, 's1')).toEqual([]);
+    expect(files(dir, 's2')).toHaveLength(2);
+  });
+
+  test('a pending entry keeps its files until it is removed', () => {
+    const dir = tmp();
+    const j = new StepJournal(dir);
+    claim(j, 's1');
+    j.update('s1', { state: 'awaiting-upload', doneBody: { status: 'success' } });
+    seedFiles(dir, 's1');
+    expect(j.sweepOrphanFiles({ now: Date.now() + 10_000, ttlMs: 1 })).toEqual([]);
+    expect(files(dir, 's1')).toHaveLength(2);
+  });
+
+  test('sweep removes old orphans, keeps fresh ones and ones with a journal entry', () => {
+    const dir = tmp();
+    const j = new StepJournal(dir);
+    claim(j, 'journaled');
+    seedFiles(dir, 'journaled');
+    seedFiles(dir, 'old');
+    seedFiles(dir, 'fresh');
+    age(dir, 'journaled', 10_000);
+    age(dir, 'old', 10_000);
+    age(dir, 'fresh', 10);
+    const removed = j.sweepOrphanFiles({ now: Date.now(), ttlMs: 5_000 });
+    expect(removed.sort()).toEqual(['step-old.session.jsonl', 'step-old.transcript.json']);
+    expect(files(dir, 'old')).toEqual([]);
+    expect(files(dir, 'fresh')).toHaveLength(2);
+    expect(files(dir, 'journaled')).toHaveLength(2);
+    expect(existsSync(join(dir, 'step-journaled.json'))).toBe(true);
   });
 });
