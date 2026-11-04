@@ -2,12 +2,16 @@ export const CODEX_LOGIN = 'chatgpt-codex-connector';
 export const ACTIONS_LOGIN = 'github-actions[bot]';
 export const GATE_CHECK = 'review-gate';
 export const STALL_LABEL = 'review-stalled';
+export const HUMAN_LABEL = 'review-gate-human';
+export const BLOCK_ROUND_CAP = 3;
 export const MAX_RETRIES = 2;
 export const REQUEST_AFTER_MS = 10 * 60 * 1000;
 export const USAGE_DASHBOARD = 'https://chatgpt.com/codex/cloud/settings/usage';
 
 const STATE_RE = /<!-- codex-review-state:v1 (\{.*?\}) -->/s;
 const BADGE_RE = /^\s*\*\*<sub><sub>!\[(P[0-3]) Badge\]/;
+const HUNK_RE = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/;
+const BLOCK_MARKER_RE = /^<!-- review-gate-block:([0-9a-f]+) -->/;
 const LIMIT_RE = /reached your Codex usage limits/i;
 const BLOCKING = new Set(['P0', 'P1']);
 const WRITE_ASSOCIATIONS = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
@@ -77,13 +81,80 @@ export function threadTitle(body) {
   return '';
 }
 
-export function blockingThreads(threads) {
-  return threads.filter(
+export function touchedLinesOf(patch) {
+  const touched = new Set();
+  let hunkLines = [];
+  let hunkAdded = [];
+  let removed = false;
+  let line = 0;
+  const closeHunk = () => {
+    for (const touchedLine of removed ? hunkLines : hunkAdded) touched.add(touchedLine);
+    hunkLines = [];
+    hunkAdded = [];
+    removed = false;
+  };
+  for (const text of String(patch ?? '').split('\n')) {
+    const hunk = HUNK_RE.exec(text);
+    if (hunk) {
+      closeHunk();
+      line = Number(hunk[1]);
+    } else if (text.startsWith('+')) {
+      hunkLines.push(line);
+      hunkAdded.push(line++);
+    } else if (text.startsWith(' ')) {
+      hunkLines.push(line++);
+    } else if (text.startsWith('-')) {
+      removed = true;
+    }
+  }
+  closeHunk();
+  return touched;
+}
+
+export function markPreExisting(threads, files) {
+  const touchedByPath = new Map(
+    files.map((file) => [file.filename, file.patch ? touchedLinesOf(file.patch) : null]),
+  );
+  return threads.map((thread) => {
+    const touched = touchedByPath.get(thread.path);
+    const last = thread.line;
+    const first = thread.startLine ?? last;
+    const settled =
+      !thread.isOutdated && thread.diffSide === 'RIGHT' && Number.isInteger(last) && touched;
+    if (!settled) return thread;
+    for (let line = first; line <= last; line += 1) if (touched.has(line)) return thread;
+    return { ...thread, preExisting: true };
+  });
+}
+
+const openCodexFindings = (threads) =>
+  threads.filter(
     (thread) =>
       !thread.isResolved &&
       isCodexAuthor(thread.authorLogin, thread.authorType) &&
       BLOCKING.has(badgeOf(thread.body)),
   );
+
+export function blockingThreads(threads) {
+  return openCodexFindings(threads).filter((thread) => !thread.preExisting);
+}
+
+export function preExistingThreads(threads) {
+  return openCodexFindings(threads).filter((thread) => thread.preExisting);
+}
+
+export function blockMarker(sha) {
+  return `<!-- review-gate-block:${sha} -->`;
+}
+
+export function blockRounds(comments, sha) {
+  const heads = new Set();
+  for (const comment of comments) {
+    if (comment.user?.login !== ACTIONS_LOGIN) continue;
+    const match = BLOCK_MARKER_RE.exec(comment.body ?? '');
+    if (match) heads.add(match[1]);
+  }
+  return { others: heads.size - (heads.has(sha) ? 1 : 0), marked: heads.has(sha) };
 }
 
 export function retryMarker(sha, k) {
@@ -133,7 +204,26 @@ function blockedSummary(blocking) {
   return `Resolve each thread (or fix and comment \`@codex review\`):\n\n${lines.join('\n')}`;
 }
 
-export function decide(pr, state, threads, retries, limitHit = false, wait = null) {
+function carriedNote(carried) {
+  if (carried.length === 0) return '';
+  const lines = carried.map(
+    (thread) =>
+      `- ${badgeOf(thread.body)} ${threadTitle(thread.body).replace(/^P[0-3]\s+/, '')}: ${thread.url}`,
+  );
+  return `\n\nNot blocking, because the flagged lines predate this PR; file a follow-up issue instead:\n\n${lines.join('\n')}`;
+}
+
+const NO_ROUNDS = { others: 0, marked: false };
+
+export function decide(
+  pr,
+  state,
+  threads,
+  retries,
+  limitHit = false,
+  wait = null,
+  rounds = NO_ROUNDS,
+) {
   const sha = pr.head.sha;
   const reviewedHead = state?.commitSha === sha && state.status === 'completed';
   if (limitHit && !reviewedHead)
@@ -177,18 +267,32 @@ export function decide(pr, state, threads, retries, limitHit = false, wait = nul
     };
   }
   const blocking = blockingThreads(threads);
+  const carried = carriedNote(preExistingThreads(threads));
+  const blockedHeads = rounds.others + (rounds.marked ? 1 : 0);
   if (blocking.length === 0)
     return {
       status: 'completed',
       conclusion: 'success',
       title: `No open P0/P1 Codex findings for ${short(sha)}`,
-      summary: 'Codex reviewed this head and no unresolved P0 or P1 thread remains.',
+      summary: `Codex reviewed this head and no unresolved P0 or P1 thread remains.${
+        blockedHeads > 0 ? ` Cycles to pass: ${blockedHeads} blocked head(s) before this one.` : ''
+      }${carried}`,
       removeStall: true,
     };
+  const round = rounds.others + 1;
+  const capped = round >= BLOCK_ROUND_CAP;
   return {
     status: 'completed',
     conclusion: 'failure',
-    title: `${blocking.length} open P0/P1 Codex findings`,
-    summary: blockedSummary(blocking),
+    title: capped
+      ? `${blocking.length} open P0/P1 Codex findings; round ${round}, reconsider the approach`
+      : `${blocking.length} open P0/P1 Codex findings`,
+    summary: `${
+      capped
+        ? `Review block round ${round} (cap ${BLOCK_ROUND_CAP}): stop fixing findings one line at a time. Name the bug class behind them, fix every instance, or change the approach; the PR is labelled \`${HUMAN_LABEL}\` for a human. The check stays red until the threads are resolved.\n\n`
+        : ''
+    }${blockedSummary(blocking)}${carried}`,
+    ...(rounds.marked ? {} : { block: blockMarker(sha) }),
+    ...(capped && !rounds.marked ? { addHuman: true } : {}),
   };
 }

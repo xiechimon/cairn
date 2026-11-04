@@ -23,6 +23,7 @@ const world = JSON.parse(fs.readFileSync(process.env.FAKE_WORLD, 'utf8'));
 const joined = args.join(' ');
 const out = (value) => process.stdout.write(JSON.stringify(value));
 if (/api repos\\/o\\/r\\/pulls\\/7$/.test(joined)) out(world.pr);
+else if (joined.includes('--slurp') && joined.includes('/pulls/7/files')) out([world.files ?? []]);
 else if (joined.includes('--slurp') && joined.includes('repos/o/r/pulls?')) out([world.pulls]);
 else if (joined.includes('--slurp') && joined.includes('/issues/7/comments')) out([world.comments]);
 else if (joined.includes('graphql')) {
@@ -45,6 +46,10 @@ const stateComment = (sha, status) => ({
 const thread = (level, over = {}) => ({
   isResolved: false,
   isOutdated: false,
+  path: 'src/a.ts',
+  line: 10,
+  startLine: null,
+  diffSide: 'RIGHT',
   comments: {
     nodes: [
       {
@@ -421,4 +426,59 @@ test('sweep skips a head whose gate check already passed', () => {
   assert.equal(out.result.status, 0, out.result.stderr);
   assert.equal(out.writes.length, 0);
   assert.equal(out.calls.filter((call) => /pulls\/7$/.test(call.args.join(' '))).length, 0);
+});
+
+const actionsComment = (body, createdAt = '2026-01-01T00:02:00Z') => ({
+  id: 9,
+  body,
+  user: ACTIONS,
+  created_at: createdAt,
+  updated_at: createdAt,
+});
+
+test('a finding on a line the PR did not change is listed but passes the check', () => {
+  const out = run({
+    comments: [stateComment(SHA, 'completed')],
+    threads: [thread('P1')],
+    files: [{ filename: 'src/a.ts', patch: '@@ -40,1 +40,2 @@\n ctx\n+added' }],
+    checkRuns: [ownRun()],
+  });
+  const body = out.body(out.checkWrites[0]);
+  assert.equal(body.conclusion, 'success');
+  assert.match(body.output.summary, /predate this PR/);
+  assert.equal(out.commentPosts.length, 0);
+});
+
+test('the same finding on an added line blocks and records the block once', () => {
+  const world = {
+    comments: [stateComment(SHA, 'completed')],
+    threads: [thread('P1')],
+    files: [{ filename: 'src/a.ts', patch: '@@ -9,1 +9,3 @@\n ctx\n+added\n+added2' }],
+    checkRuns: [ownRun()],
+  };
+  const out = run(world);
+  assert.equal(out.body(out.checkWrites[0]).conclusion, 'failure');
+  assert.equal(out.commentPosts.length, 1);
+  assert.match(out.body(out.commentPosts[0]).body, new RegExp(`review-gate-block:${SHA}`));
+  const repeat = run({
+    ...world,
+    comments: [...world.comments, actionsComment(`<!-- review-gate-block:${SHA} -->\nx`)],
+  });
+  assert.equal(repeat.commentPosts.length, 0);
+});
+
+test('the third blocked head labels the PR review-gate-human while the check stays red', () => {
+  const prior = ['1', '2'].map((digit) =>
+    actionsComment(`<!-- review-gate-block:${digit.repeat(40)} -->\nx`),
+  );
+  const out = run({
+    comments: [stateComment(SHA, 'completed'), ...prior],
+    threads: [thread('P1', { path: null, line: null })],
+    checkRuns: [ownRun()],
+  });
+  const body = out.body(out.checkWrites[0]);
+  assert.equal(body.conclusion, 'failure');
+  assert.match(body.output.title, /reconsider the approach/);
+  assert.equal(out.labelAdds.length, 1);
+  assert.deepEqual(out.body(out.labelAdds[0]).labels, ['review-gate-human']);
 });
