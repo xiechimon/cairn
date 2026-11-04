@@ -2,7 +2,11 @@
 
 The control plane is the server: database, secret-box key, push keys and attachments. It moves from the Mac (launchd agents, `127.0.0.1:8787` behind `tailscale serve`) to omarchy (systemd user units from `scripts/ops/systemd/`, the same loopback bind behind `tailscale serve`). Both machines keep running daemons as executors. The service is reachable only inside the tailnet, never through Funnel.
 
-Host-specific names (tailnet hostnames, launchd labels, machine ids) live in the operator's host notes, not here. Below, `<mac>` and `<omarchy>` are the MagicDNS names, `$MAC_DATA` is `~/.cairn` on the Mac and `$OM` is `ssh -o BatchMode=yes -o ConnectTimeout=5 omarchy` and `$RS` is `rsync -a -e 'ssh -o BatchMode=yes -o ConnectTimeout=5'`.
+Host-specific names (tailnet hostnames, launchd labels, machine ids) live in the operator's host notes, not here. Below, `<mac>` and `<omarchy>` are the MagicDNS names, `$MAC_DATA` is `~/.cairn` on the Mac and `$OM` is `ssh -o BatchMode=yes -o ConnectTimeout=5 omarchy`. Copies use a shell function, so the quoted `-e` command reaches rsync as one argument:
+
+```sh
+rs() { rsync -a -e 'ssh -o BatchMode=yes -o ConnectTimeout=5' "$@"; }
+```
 
 ## What moves
 
@@ -19,7 +23,7 @@ Machine tokens live in the database, so daemons keep their identity; only their 
 
 ## 1. Prepare omarchy (no downtime)
 
-- `scripts/ops/systemd/*.service` installed into `~/.config/systemd/user/` and `daemon-reload`ed, not started.
+- `scripts/ops/systemd/*.service` from a main that includes #2732 installed into `~/.config/systemd/user/` and `daemon-reload`ed, not started. Those units, `cairn-daemon-orb.service` and the self-deploy `CAIRN_CHECKOUT` all use `~/Code/AgentProjects/cairn-exec`; units from an older main point at the lanes' checkout and must not be installed.
 - Remove host drop-ins that point at mounts or addresses that no longer exist (for example a `TMPDIR` on a removed disk). Keep the proxy drop-ins the daemons need for outbound traffic, and the server drop-in that sets `CAIRN_TAILSCALE_USERS`.
 - `tailscale set --operator=$USER` done once with sudo, so `tailscale serve` runs without sudo.
 - `~/Code/AgentProjects/cairn-exec` fetched. It is the only checkout the units and self-deploy use; lanes never work in it.
@@ -39,10 +43,10 @@ On the Mac:
 sqlite3 "$MAC_DATA/server/server.db" ".backup '$MAC_DATA/backups/server-cutover.db'"
 sqlite3 "$MAC_DATA/backups/server-cutover.db" "pragma integrity_check"
 $OM 'install -d -m 700 ~/.cairn ~/.cairn/server'
-$RS "$MAC_DATA/backups/server-cutover.db" omarchy:.cairn/server/server.db
-$RS "$MAC_DATA/server/"{secretbox.key,vapid.json} omarchy:.cairn/server/
-$RS "$MAC_DATA/server/"{attachments,repos,trajectory-exports} omarchy:.cairn/server/
-$RS "$MAC_DATA/token" omarchy:.cairn/token
+rs "$MAC_DATA/backups/server-cutover.db" omarchy:.cairn/server/server.db
+rs "$MAC_DATA/server/"{secretbox.key,vapid.json} omarchy:.cairn/server/
+rs "$MAC_DATA/server/"{attachments,repos,trajectory-exports} omarchy:.cairn/server/
+rs "$MAC_DATA/token" omarchy:.cairn/token
 shasum -a 256 "$MAC_DATA/backups/server-cutover.db" "$MAC_DATA/server/secretbox.key"
 $OM 'chmod 600 ~/.cairn/token ~/.cairn/server/{server.db,secretbox.key,vapid.json}; sha256sum ~/.cairn/server/{server.db,secretbox.key}'
 ```
@@ -91,6 +95,6 @@ Rename the Mac server, web and deploy launch agents to `*.disabled-<date>` so a 
 ## Rollback (within 7 days)
 
 1. On omarchy: `systemctl --user disable --now cairn-self-deploy.timer cairn-server.service`, `tailscale serve reset`.
-2. Copy omarchy's `server.db` back to the Mac with `sqlite3 .backup` if it took writes worth keeping. Otherwise the Mac's own copy is the state at the freeze.
+2. If omarchy took writes worth keeping, copy its state back to the Mac as a set: `server.db` through `sqlite3 .backup`, plus `attachments/`, `repos/` and `trajectory-exports/` with `rs`. Attachment bytes live in files beside the database, so a database alone leaves rows whose files exist only on omarchy. Otherwise the Mac's own copy is the state at the freeze.
 3. Restore the Mac launch agents and its `tailscale serve`, and start them.
 4. Point both daemons back at `https://<mac>`.
