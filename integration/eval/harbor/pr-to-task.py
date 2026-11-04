@@ -37,19 +37,38 @@ WORKSPACE_COLLECT = (
 )
 
 
+PROTECTED_REGEX = (
+    r"(^|/)(package\.json|package-lock\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb|"
+    r"pnpm-workspace\.yaml|\.npmrc|conftest\.py|pytest\.ini|tox\.ini|setup\.cfg|"
+    r"pyproject\.toml)$"
+    r"|(^|/)(vitest|vite|jest|playwright)[^/]*\.(config|setup|workspace)[^/]*$"
+    r"|(^|/)(\.mocharc|\.babelrc|babel\.config)[^/]*$"
+    r"|(^|/)tsconfig[^/]*\.json$"
+    r"|\.(test|spec)\.[^/]+$"
+    r"|(^|/)test_[^/]+\.py$"
+    r"|(^|/)(test|tests|__tests__|e2e|fixtures)/"
+)
+
+
+def is_protected(path):
+    return bool(re.search(PROTECTED_REGEX, path))
+
+
 def verifier_script(command):
     return (
         "#!/bin/sh\nset -eu\nmkdir -p /logs/verifier\n"
         "printf '0\\n' > /logs/verifier/reward.txt\n"
         "rm -f /logs/verifier/reward.json\ncd /app\n"
-        "if [ -d /logs/artifacts/workspace ]; then\n"
-        "  find /logs/artifacts/workspace \\( -name node_modules -o -name .git \\) "
+        "workspace=/logs/artifacts/workspace\n"
+        'if [ -d "$workspace" ]; then\n'
+        '  find "$workspace" \\( -name node_modules -o -name .git \\) '
         "-prune -exec rm -rf {} +\n"
-        "  cp -a /logs/artifacts/workspace/. /app/\n"
+        '  (cd "$workspace" && find . ! -type d | sed \'s|^\\./||\' '
+        "| grep -E -f /tests/protected-regex.txt "
+        "| grep -vxF -f /tests/solution-paths.txt || true) "
+        '| while IFS= read -r path; do rm -f -- "$workspace/$path"; done\n'
+        '  cp -a "$workspace"/. /app/\n'
         "fi\n"
-        'while IFS= read -r path; do rm -rf -- "/app/$path"; done '
-        "< /tests/grader-paths.txt\n"
-        "tar -xf /tests/base-tests.tar -C /app\n"
         "git apply /tests/tests.patch\n"
         + shlex.join(command)
         + " > /logs/verifier/test-output.txt 2>&1\n"
@@ -57,26 +76,22 @@ def verifier_script(command):
     )
 
 
-def write_grader_inputs(repo, base, tests, directory):
-    (directory / "grader-paths.txt").write_text("".join(f"{path}\n" for path in tests))
-    existing = [
-        path
-        for path in run(
-            "git", "ls-tree", "-r", "--name-only", "-z", base, "--", *tests, cwd=repo
-        )
-        .rstrip("\0")
-        .split("\0")
-        if path
-    ]
-    archive = directory / "base-tests.tar"
-    if existing:
-        subprocess.run(
-            ["git", "archive", "--format=tar", f"--output={archive.resolve()}", base, "--", *existing],
-            cwd=repo,
-            check=True,
-        )
-    else:
-        tarfile.open(archive, "w").close()
+def write_grader_inputs(repo, base, tests, product, directory):
+    def listing(name, paths):
+        (directory / name).write_text("".join(f"{path}\n" for path in paths))
+
+    listing("grader-paths.txt", tests)
+    listing("solution-paths.txt", product)
+    (directory / "protected-regex.txt").write_text(PROTECTED_REGEX + "\n")
+    tracked = run("git", "ls-tree", "-r", "--name-only", "-z", base, cwd=repo)
+    listing(
+        "protected-paths.txt",
+        sorted(
+            path
+            for path in tracked.rstrip("\0").split("\0")
+            if path and is_protected(path) and path not in product
+        ),
+    )
 
 
 def run(*args, cwd=None):
@@ -245,7 +260,7 @@ def convert(repo, base, head, issue_body, destination, command, issue):
         "#!/bin/sh\nset -eu\ncd /app\ngit apply /solution/solution.patch\n"
     )
     (destination / "tests/test.sh").write_text(verifier_script(command))
-    write_grader_inputs(repo, base, tests, destination / "tests")
+    write_grader_inputs(repo, base, tests, product, destination / "tests")
     return {
         "issue": issue,
         "baseSha": base,

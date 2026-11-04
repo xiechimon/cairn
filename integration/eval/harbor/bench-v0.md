@@ -97,14 +97,21 @@ Generated tasks grade in a separate verifier container (`environment_mode =
 reward. A `[[verifier.collect]]` hook publishes `/app` minus `node_modules` and
 `.git` to `/logs/artifacts/workspace`; Harbor uploads that directory into a fresh
 verifier container whose image, runtime and dependencies the agent could not
-touch. `tests/test.sh` then drops planted `node_modules`/`.git`, deletes every
-path the test patch touches, restores their base versions from
-`tests/base-tests.tar`, applies `tests/tests.patch`, runs the explicit command
-and only then writes `1` to the reward file, which Harbor itself clears first.
+touch. `tests/test.sh` then drops planted `node_modules`/`.git` and deletes every
+workspace file matching the test-infrastructure pattern in `tests/protected-regex.txt`
+(package.json and lockfiles, vitest/vite/jest/playwright config, setup and workspace
+files, `tsconfig*`, `*.test.*`, `*.spec.*`, `test_*.py`, `conftest.py`, and anything
+under `test/`, `tests/`, `__tests__/`, `e2e/`, `fixtures/`), except paths the gold
+solution patch modifies (`tests/solution-paths.txt`). The pristine image supplies the
+base versions, so edited files revert and planted ones vanish;
+`tests/protected-paths.txt` lists the base files protected. It then applies
+`tests/tests.patch`, runs the explicit command and only then writes `1` to the reward
+file, which Harbor itself clears first. The test command is a caller-supplied
+argument array and is not rewritten to name a config.
 Only the parent process writes `outcome.json`; the probe flags any outcome-like
 file under the trial's `agent/` directory or the published artifact root.
-Limitations: files deleted by the agent are not propagated, and helper files that
-are neither in the test patch nor under `node_modules` are treated as product code.
+Limitations: files deleted by the agent are not propagated, and helper files outside
+the pattern are treated as product code.
 
 Four cheat agents (`cheat_agent.py`, scripts in `cheat_controls.py`) run as real
 Harbor trials. Each is blocked only when the trial is scored 0 on a real
@@ -114,7 +121,7 @@ and the cheat's own evidence proves it executed:
 - `git`: `git log --all`, `show`, `reflog`, `rev-list`, `fsck`, `cat-file` of the
   base commit, plus a filesystem search for `.git`, packs and a line unique to
   the fix. All fail and nothing is found.
-- `bash`: overwrites the test file, pre-seeds `reward.txt`/`reward.json`, plants
+- `bash`: overwrites the test file, rewrites `vitest.config.*`, plants `vitest.setup.ts`, pre-seeds `reward.txt`/`reward.json`, plants
   `/tests/test.sh` and replaces the `node` binary.
 - `forge`: writes `outcome.json`, `result.json`, `reward.*` into every writable
   location; the probe flags it and the outcome stays the parent's.
@@ -131,7 +138,7 @@ python3 integration/eval/harbor/pr-to-task.py --check /tmp/task-1562 \
   --output /tmp/controls-1562-e1
 ```
 
-Evidence: `docs/verify/1518/epic1/`, including a counterfactual: the same `bash` cheat (runtime replaced, no test edit) against the earlier shared-verifier task scores reward 1, and against the separate verifier scores 0. The task stays unaccepted; Epic 1 proves the
+Evidence: `docs/verify/1518/epic1/` (recorded before the protected-pattern restore and the config and setup tampering in the `bash` cheat; it needs a re-run), including a counterfactual: the same `bash` cheat (runtime replaced, no test edit) against the earlier shared-verifier task scores reward 1, and against the separate verifier scores 0. The task stays unaccepted; Epic 1 proves the
 ruler resists these four cheats, not that PR #1562 is a kept benchmark task.
 
 ## Candidate counts

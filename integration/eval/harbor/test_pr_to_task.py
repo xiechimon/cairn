@@ -263,7 +263,7 @@ def grade(task, tmp_path, agent_files, preseed=None):
         ["tar", "xf", str(task / "environment/base.tar"), "-C", str(app)], check=True
     )
     tests.mkdir()
-    for name in ("tests.patch", "grader-paths.txt", "base-tests.tar", "test.sh"):
+    for name in ("tests.patch", "grader-paths.txt", "protected-regex.txt", "protected-paths.txt", "solution-paths.txt", "test.sh"):
         (tests / name).write_bytes((task / "tests" / name).read_bytes())
     workspace = logs / "artifacts" / "workspace"
     workspace.mkdir(parents=True)
@@ -304,12 +304,174 @@ def test_task_grades_in_a_separate_verifier_that_receives_the_workspace(edited_t
 
 def test_grader_inputs_live_only_in_the_tests_directory(edited_task):
     assert (edited_task / "tests/grader-paths.txt").read_text() == "test_add.py\n"
-    with tarfile.open(edited_task / "tests/base-tests.tar") as contents:
-        assert contents.getnames() == ["test_add.py"]
-        assert contents.extractfile("test_add.py").read().decode() == BASE_TEST
+    assert (edited_task / "tests/protected-paths.txt").read_text() == (
+        "test_add.py\n"
+    )
+    assert (edited_task / "tests/solution-paths.txt").read_text() == "add.py\n"
     for name in ("environment", "solution"):
         for path in (edited_task / name).rglob("*"):
-            assert path.name not in ("grader-paths.txt", "base-tests.tar", "tests.patch")
+            assert path.name not in (
+                "grader-paths.txt",
+                "protected-paths.txt",
+                "protected-regex.txt",
+                "tests.patch",
+            )
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "vitest.config.ts",
+        "apps/web/vitest.config.mts",
+        "apps/web/vitest.setup.ts",
+        "vite.config.ts",
+        "jest.config.js",
+        "playwright.config.ts",
+        "package.json",
+        "apps/server/package.json",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
+        "tsconfig.json",
+        "packages/a/tsconfig.build.json",
+        "src/a.test.ts",
+        "src/a.spec.mjs",
+        "conftest.py",
+        "pytest.ini",
+        "test_add.py",
+        "test/helper.mjs",
+        "apps/x/__tests__/a.ts",
+        "e2e/a.ts",
+        "src/fixtures/a.json",
+    ],
+)
+def test_protected_pattern_covers_test_infrastructure(path):
+    assert converter.is_protected(path)
+    grep = subprocess.run(
+        ["grep", "-E", converter.PROTECTED_REGEX], input=path + "\n", text=True
+    )
+    assert grep.returncode == 0
+
+
+@pytest.mark.parametrize(
+    "path",
+    ["src/add.py", "docs/guide.md", "scripts/gate.mjs", "apps/web/src/App.tsx"],
+)
+def test_protected_pattern_leaves_product_code_alone(path):
+    assert not converter.is_protected(path)
+
+
+PYTEST_PASS_ALL = (
+    "import pytest\n\n@pytest.hookimpl(hookwrapper=True)\n"
+    "def pytest_runtest_makereport(item, call):\n"
+    "    outcome = yield\n    outcome.get_result().outcome = 'passed'\n"
+)
+
+
+@pytest.fixture
+def infrastructure_task(tmp_path):
+    repo = tmp_path / "infra-repo"
+    repo.mkdir()
+
+    def git(*args):
+        return subprocess.check_output(
+            ["git", "-C", str(repo), *args], text=True
+        ).strip()
+
+    git("init")
+    git("config", "user.email", "fixture@example.com")
+    git("config", "user.name", "Fixture")
+    (repo / "add.py").write_text("def add(a, b):\n    return a - b\n")
+    (repo / "package.json").write_text('{"version": 1}\n')
+    (repo / "conftest.py").write_text("")
+    (repo / "vitest.config.ts").write_text("export default {}\n")
+    (repo / "test_add.py").write_text(BASE_TEST)
+    git("add", "-A")
+    git("commit", "-m", "base")
+    base = git("rev-parse", "HEAD")
+    (repo / "add.py").write_text(FIXED_ADD)
+    (repo / "package.json").write_text('{"version": 2}\n')
+    (repo / "test_add.py").write_text(
+        BASE_TEST + "def test_add():\n    assert add(2, 3) == 5\n"
+    )
+    git("add", "-A")
+    git("commit", "-m", "fix\n\nCloses #42")
+    task = tmp_path / "infra-task"
+    converter.convert(
+        repo,
+        base,
+        git("rev-parse", "HEAD"),
+        "Fix.\n",
+        task,
+        [sys.executable, "-m", "pytest", "-q", "test_add.py"],
+        42,
+    )
+    return task
+
+
+def test_protected_list_is_auditable_and_excludes_solution_paths(infrastructure_task):
+    listed = (infrastructure_task / "tests/protected-paths.txt").read_text().split()
+    assert listed == ["conftest.py", "test_add.py", "vitest.config.ts"]
+    assert (infrastructure_task / "tests/solution-paths.txt").read_text().split() == [
+        "add.py",
+        "package.json",
+    ]
+
+
+def test_edited_test_infrastructure_is_restored(infrastructure_task, tmp_path):
+    reward, _, logs = grade(
+        infrastructure_task,
+        tmp_path,
+        {"conftest.py": PYTEST_PASS_ALL, "vitest.config.ts": "export default {exclude: ['*']}\n"},
+    )
+    assert reward == "0"
+    assert "AssertionError" in (logs / "verifier/test-output.txt").read_text()
+    app = tmp_path / "sandbox/app"
+    assert (app / "conftest.py").read_text() == ""
+    assert (app / "vitest.config.ts").read_text() == "export default {}\n"
+
+
+def test_planted_test_infrastructure_is_removed(infrastructure_task, tmp_path):
+    reward, _, logs = grade(
+        infrastructure_task,
+        tmp_path,
+        {
+            "pytest.ini": "[pytest]\naddopts = --collect-only\n",
+            "tests/helper.py": "x = 1\n",
+            "vitest.setup.ts": "stub\n",
+        },
+    )
+    app = tmp_path / "sandbox/app"
+    assert reward == "0"
+    assert not (app / "pytest.ini").exists()
+    assert not (app / "tests/helper.py").exists()
+    assert not (app / "vitest.setup.ts").exists()
+
+
+def test_solution_touched_files_are_not_restored(infrastructure_task, tmp_path):
+    reward, _, _ = grade(
+        infrastructure_task,
+        tmp_path,
+        {"add.py": FIXED_ADD, "package.json": '{"version": 2}\n'},
+    )
+    assert reward == "1"
+    assert (tmp_path / "sandbox/app/package.json").read_text() == '{"version": 2}\n'
+
+
+def test_empty_protected_set_still_grades(repository, tmp_path):
+    repo, base, head = repository
+    task = tmp_path / "plain-task"
+    converter.convert(
+        repo,
+        base,
+        head,
+        "Add.\n",
+        task,
+        [sys.executable, "-m", "pytest", "-q", "test_add.py"],
+        42,
+    )
+    assert (task / "tests/protected-paths.txt").read_text() == ""
+    reward, _, _ = grade(task, tmp_path / "run", {"add.py": FIXED_ADD})
+    assert reward == "1"
 
 
 def test_verifier_passes_a_real_fix_and_fails_the_unfixed_workspace(edited_task, tmp_path):
