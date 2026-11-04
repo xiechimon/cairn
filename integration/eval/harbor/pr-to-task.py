@@ -54,14 +54,14 @@ def closing_issues(message):
     )
 
 
-def selection_reason(merged, message, product_lines, paths):
+def selection_reason(merged, message, product_lines, paths, ignore_e2e=False):
     if not merged or merged < "2026-07-01T00:00:00Z":
         return "Not merged on or after 2026-07-01"
     if len(closing_issues(message)) != 1:
         return "Requires exactly one closes #N issue reference"
     if any(path.startswith("integration/eval/") for path in paths):
         return "Touches the evaluation surface"
-    if any(
+    if not ignore_e2e and any(
         "/e2e/" in f"/{path}" or "e2e.test." in path or "playwright" in path.lower()
         for path in paths
     ):

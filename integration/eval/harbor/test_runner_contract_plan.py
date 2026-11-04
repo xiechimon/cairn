@@ -240,6 +240,90 @@ def test_original_server_reuse_is_recorded_and_the_config_is_not_rewritten():
     assert "https://example.invalid/not-egress-proof" in plan["observations"]["urlExpressions"]
 
 
+CONVERTER_SPEC = importlib.util.spec_from_file_location(
+    "pr_to_task_selection", Path(__file__).with_name("pr-to-task.py")
+)
+converter = importlib.util.module_from_spec(CONVERTER_SPEC)
+CONVERTER_SPEC.loader.exec_module(converter)
+
+E2E_SPEC = "apps/web/e2e/skills-add-import.spec.ts"
+E2E_REASON = "Contains Playwright or e2e tests"
+
+
+def e2e_contract():
+    return contract(
+        pr=155,
+        workspace="@pacman/web",
+        changedBrowserSpecPaths=[E2E_SPEC],
+        changedUnitRegressionPaths=[],
+        changedIntegrationPaths=[],
+        changedTestHelperOrAssetPaths=[],
+        requiredPaths=[E2E_SPEC],
+        pins={**contract()["pins"], "workspace": "@pacman/web"},
+    )
+
+
+def e2e_fields(**overrides):
+    fields = dict(
+        merged="2026-10-01T00:00:00Z",
+        message="Closes #42",
+        product_lines=30,
+        paths=["apps/web/src/board.tsx", E2E_SPEC],
+    )
+    fields.update(overrides)
+    return fields
+
+
+def test_a_covering_plan_lifts_only_the_e2e_rejection_and_does_not_qualify():
+    fields = e2e_fields()
+    reason = converter.selection_reason(**fields)
+    remaining = converter.selection_reason(**fields, ignore_e2e=True)
+    assert reason == E2E_REASON
+    assert remaining is None
+    decision = planner.selection_after_plan(reason, fields["paths"], e2e_contract(), remaining)
+    assert decision["reason"] is None
+    assert decision["conversionAllowed"] is True
+    assert decision["qualifiedTask"] is False
+    assert decision["qualificationCredit"] == 0
+    assert decision["verified"] is False
+
+
+def test_a_partial_plan_keeps_the_e2e_rejection():
+    fields = e2e_fields()
+    reason = converter.selection_reason(**fields)
+    partial = e2e_contract()
+    partial["changedBrowserSpecPaths"] = []
+    partial["requiredPaths"] = []
+    decision = planner.selection_after_plan(reason, fields["paths"], partial, None)
+    assert decision["conversionAllowed"] is False
+    assert decision["reason"] == E2E_REASON
+    assert decision["qualifiedTask"] is False
+    assert E2E_SPEC in decision["missingPaths"]
+
+
+def test_date_issue_surface_and_size_rules_survive_a_covering_plan():
+    for overrides, expected in (
+        (dict(product_lines=19), "Non-test diff outside 20-400 lines"),
+        (dict(product_lines=401), "Non-test diff outside 20-400 lines"),
+        (dict(message="Closes #42\nCloses #43"), "Requires exactly one closes #N issue reference"),
+        (dict(merged="2026-06-30T00:00:00Z"), "Not merged on or after 2026-07-01"),
+        (
+            dict(paths=["integration/eval/a.ts", "a.test.ts", E2E_SPEC]),
+            "Touches the evaluation surface",
+        ),
+    ):
+        fields = e2e_fields(**overrides)
+        reason = converter.selection_reason(**fields)
+        remaining = converter.selection_reason(**fields, ignore_e2e=True)
+        decision = planner.selection_after_plan(
+            reason, fields["paths"], e2e_contract(), remaining
+        )
+        assert decision["conversionAllowed"] is False
+        assert decision["qualifiedTask"] is False
+        assert decision["qualificationCredit"] == 0
+        assert expected in (decision["reason"], remaining)
+
+
 def test_plan_is_deterministic_and_does_not_execute_the_config(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     first = planner.plan_runner_contract(contract())
