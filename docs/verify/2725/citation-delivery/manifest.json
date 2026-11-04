@@ -1,0 +1,27 @@
+{
+  "testedCommit": "ed22eea79418be8dc751c24921b4b9420f8030ca",
+  "tool": "Official Swagger UI v5.34.1; actual isolated Cairn GET Execute",
+  "api": "http://127.0.0.1:35089/api/conversations/chief-d63-evidence/messages?limit=1",
+  "providerMode": "Mock source/checker reports; real Hono/SQLite/scheduler restart and report refresh. No real model/auth.",
+  "beforeItems": 0,
+  "supportedCandidates": 7,
+  "afterItems": 5,
+  "errors": [],
+  "sourceRequirement": "https://github.com/xiechimon/cairn/blob/3e1bde9971ce50552be344dd49396e82dbbd0a6c/docs/research/research-loop-plan.md#12-decisions",
+  "candidatePublished": true,
+  "verification": {
+    "targetedTests": 209,
+    "affectedE2EPassed": 1235,
+    "affectedE2EFailed": 2,
+    "limits": "Both gallery light/dark failures reproduce on clean main5af926739. No real independent checker, metered search, central Login or raw wire-model identity verified."
+  },
+  "fileHashes": {
+    "source-requirement-citations.png": "3215e5816bb4683de68aef481fbb26e939ed1c8fa897c4606fbdfba715b0229f",
+    "source-requirement-decisions.png": "24346d1d920d59cb779907a5897e0b63c7a825f464f2a5fbb54a8a53d1db4ad4",
+    "swagger-before.png": "1368ea7a01dbe71b4282bac456de454310eeec18fcc9ec9ceea050bab3c3d329",
+    "swagger-after.png": "b58db724820c91b44adb1343b4ab6b3b4cbcdbecbdc35453f20f601fe59ac02c",
+    "before.json": "1ecad174d8295e769aa9f5c4eae3600f13e8b06077f3b8970466b7e1dfad1e94",
+    "after.json": "d26728085fa30c635c4229297447dd6e057bce1c67506cf1d5568131f1970ee5",
+    "runtime-result.json": "449d939e9917fe6f1a96aa39e4cd6e030ff6c70aec250ff995c33c2e0393198c"
+  }
+}
