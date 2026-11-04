@@ -35,7 +35,7 @@ class ArmSummary:
 
 def arm_summary(trials: list[TrialCost], label: str) -> ArmSummary:
     scored = [trial for trial in trials if trial.voided or not trial.infra]
-    passed = sum(1 for trial in scored if trial.passed)
+    passed = sum(1 for trial in scored if trial.passed and not trial.voided)
     lower, upper = wilson_interval(passed, len(scored))
     wall_times = [trial.wall_sec for trial in scored if trial.wall_sec > 0]
     tokens = [trial.tokens for trial in scored if trial.tokens > 0]

@@ -75,6 +75,13 @@ def test_voided_passing_trial_counts_as_a_scored_zero() -> None:
     assert summary.pass_rate == 0.5
 
 
+def test_voided_trial_marked_passed_still_scores_zero() -> None:
+    summary = arm_summary([_trial("t1", passed=True, voided=True)], label="B")
+    assert summary.scored == 1
+    assert summary.passed == 0
+    assert summary.pass_rate == 0.0
+
+
 def test_voiding_a_pass_cannot_raise_the_pass_rate() -> None:
     honest = arm_summary([_trial("t1", True), _trial("t2", False)], label="A")
     voided = arm_summary(
