@@ -8,6 +8,8 @@ import {
   classifyUserText,
   composeTaskPromptWithInstruction,
   RESTART_FEEDBACK_MAX_CHARS,
+  SESSION_BRIEF,
+  SESSION_REWORK_BRIEF,
 } from '../src/records/prompts.js';
 
 const TITLE = '重启探针';
@@ -138,5 +140,25 @@ describe('classifyUserText combined-line recognition (failure modes 4/5)', () =>
   test('user text containing a restart header but not matching the template -> user', () => {
     const text = '看这段\n\n上一轮执行失败。用户反馈：「还没写完';
     expect(classifyUserText(text, task)).toBe('user');
+  });
+});
+
+describe('session briefs are daemon-injected, not user bubbles', () => {
+  const task = { title: TITLE, spec: SPEC };
+  test('session brief variants classify synthetic', () => {
+    const first = [SESSION_BRIEF, TASK_TEXT].join('\n\n');
+    expect(classifyUserText(SESSION_BRIEF, task)).toBe('synthetic');
+    expect(classifyUserText(first, task)).toBe('synthetic');
+    expect(classifyUserText(composeTaskPromptWithInstruction(TASK_TEXT, first), task)).toBe(
+      'synthetic',
+    );
+    expect(classifyUserText(`${SESSION_REWORK_BRIEF}\n\n改一下`, task)).toBe('synthetic');
+    expect(
+      classifyUserText(
+        composeTaskPromptWithInstruction(TASK_TEXT, `${SESSION_REWORK_BRIEF}\n\n改一下`),
+        task,
+      ),
+    ).toBe('synthetic');
+    expect(classifyUserText('我自己写的话', task)).toBe('user');
   });
 });

@@ -1,5 +1,5 @@
 import { conversationBranch } from '@cairn/shared';
-import { and, desc, eq, isNotNull, isNull, like, ne } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, isNull, like, ne } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, step, todo } from '../db/schema.js';
 import {
@@ -175,7 +175,13 @@ export function countMarkedRounds(db: Db, buildId: string, head: string): number
   return db
     .select({ id: step.id })
     .from(step)
-    .where(and(eq(step.buildId, buildId), eq(step.kind, 'build'), like(step.prompt, `${head}%`)))
+    .where(
+      and(
+        eq(step.buildId, buildId),
+        inArray(step.kind, ['build', 'session']),
+        like(step.prompt, `${head}%`),
+      ),
+    )
     .all().length;
 }
 

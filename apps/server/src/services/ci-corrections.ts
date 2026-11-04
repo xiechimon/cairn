@@ -1,5 +1,5 @@
 import { findDuplicateTicket, ticketDedupeKey, ticketDedupeMarker } from '@cairn/shared';
-import { and, eq, like, sql } from 'drizzle-orm';
+import { and, eq, inArray, like, sql } from 'drizzle-orm';
 import { build, message, step, todo } from '../db/schema.js';
 import {
   type FetchLike,
@@ -49,7 +49,7 @@ export async function drainCiCorrections(deps: BuildDeps, githubFetch: FetchLike
       .where(
         and(
           eq(step.buildId, event.buildId),
-          eq(step.kind, 'build'),
+          inArray(step.kind, ['build', 'session']),
           eq(step.status, 'done'),
           like(step.prompt, '[ci-fix]%'),
         ),
