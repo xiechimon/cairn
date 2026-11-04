@@ -1,6 +1,7 @@
+import { threadReportContentSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { build, message, project, step, todo } from '../src/db/schema.js';
+import { build, chiefMessage, message, project, step, todo } from '../src/db/schema.js';
 import {
   applyStoppedStep,
   completeStep,
@@ -68,6 +69,15 @@ function startSession(withPlan = true) {
 }
 
 describe('worker ask_user on a session step', () => {
+  function questionReports() {
+    return H.s.db
+      .select()
+      .from(chiefMessage)
+      .all()
+      .filter((row) => String(row.content).includes('thread-report'))
+      .map((row) => threadReportContentSchema.parse(JSON.parse(String(row.content))));
+  }
+
   function claim(stepId: string) {
     H.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, stepId)).run();
     return H.s.db.select().from(step).where(eq(step.id, stepId)).get()!;
@@ -94,6 +104,55 @@ describe('worker ask_user on a session step', () => {
       { holdMs: 0 },
     );
     expect(H.s.db.select().from(message).where(eq(message.id, REQUEST)).all()).toHaveLength(1);
+    expect(questionReports()).toHaveLength(1);
+  });
+
+  test('the needs-you report row carries the question own words, collapsed and capped', async () => {
+    const { todoId, stepRow } = startSession(false);
+    H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
+    const claimed = claim(stepRow.id);
+    const long = `Which   export\nformat ${'and encoding '.repeat(30)}should it use?`;
+    await askWorkerQuestion(
+      deps(),
+      claimed,
+      { requestId: REQUEST, questions: [{ ...QUESTIONS[0]!, question: long }] },
+      { holdMs: 0 },
+    );
+    const [report] = questionReports();
+    expect(report!.phase).toBe('review');
+    expect(report!.todoId).toBe(todoId);
+    expect(report!.line!.startsWith('Which export format and encoding')).toBe(true);
+    expect(report!.line!.length).toBeLessThanOrEqual(200);
+    expect(report!.line).not.toMatch(/\s{2}|\n/);
+  });
+
+  test('invisible format characters in the question never reach the report line', async () => {
+    const { todoId, stepRow } = startSession(false);
+    H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
+    await askWorkerQuestion(
+      deps(),
+      claim(stepRow.id),
+      {
+        requestId: REQUEST,
+        questions: [{ ...QUESTIONS[0]!, question: '\uFEFFWhich\u202E export\u200B format?' }],
+      },
+      { holdMs: 0 },
+    );
+    const [line] = questionReports().map((r) => r.line);
+    expect(line).not.toMatch(/[\p{Cc}\p{Cf}]/u);
+    expect(line).toBe('Which export format?');
+  });
+
+  test('a short question is the report line verbatim', async () => {
+    const { todoId, stepRow } = startSession(false);
+    H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
+    await askWorkerQuestion(
+      deps(),
+      claim(stepRow.id),
+      { requestId: REQUEST, questions: QUESTIONS },
+      { holdMs: 0 },
+    );
+    expect(questionReports().map((r) => r.line)).toEqual(['Which export format?']);
   });
 
   test('the answer delivered through the thread message clears awaitingReply and settles the held ask', async () => {

@@ -4,11 +4,13 @@ import {
   type MachineAskBody,
   type MachineAskResponse,
   redactSecrets,
+  THREAD_REPORT_LINE_MAX,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { build, message, type step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
+import { postThreadReport } from './chief.js';
 import { ASK_PARK_MS } from './chief-questions.js';
 import { notifyTodoPhase } from './notifications.js';
 import { pushWorkerQuestion } from './thread-push.js';
@@ -41,6 +43,21 @@ function safeBody(text: string | undefined): string {
   if (text === undefined || text.trim() === '') return 'needs your decision';
   const clean = (redactSecrets(text).value as string).replace(/\s+/g, ' ').trim();
   return clean.length > PUSH_BODY_MAX ? `${clean.slice(0, PUSH_BODY_MAX - 1)}…` : clean;
+}
+
+function tidyReportText(text: string): string {
+  return text
+    .replace(/[\p{Cc}\p{Cf}]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function questionReportLine(text: string | undefined): string | undefined {
+  const clean = tidyReportText(redactSecrets(text ?? '').value as string);
+  if (clean === '') return undefined;
+  return clean.length > THREAD_REPORT_LINE_MAX
+    ? `${clean.slice(0, THREAD_REPORT_LINE_MAX - 1)}…`
+    : clean;
 }
 
 function parkedReply(content: AskUserQuestionContent): AskUserQuestionContent {
@@ -87,6 +104,7 @@ function openQuestion(
   const record = setTodoPhase(deps, todoRow.id, todoRow.phase, { awaitingReply: true });
   if (record !== null) {
     notifyTodoPhase(deps, record, 'review', safeBody(body.questions[0]?.question));
+    postThreadReport(deps, record, 'review', questionReportLine(body.questions[0]?.question));
     pushWorkerQuestion(
       deps,
       row.buildId,
@@ -133,4 +151,17 @@ export function settleWorkerReply(deps: TodoDeps, buildId: string, text: string)
   if (!todoRow.awaitingReply) return;
   answerPendingWorkerQuestions(deps, buildId, text);
   setTodoPhase(deps, todoRow.id, todoRow.phase, { awaitingReply: false });
+}
+
+export function recordThreadReportLine(deps: TodoDeps, row: StepRow, line: unknown): string {
+  const text = typeof line === 'string' ? tidyReportText(redactSecrets(line).value as string) : '';
+  if (text === '') throw new HttpError(400, 'thread_report expects a non-empty line');
+  if (text.length > THREAD_REPORT_LINE_MAX) {
+    throw new HttpError(
+      400,
+      `thread_report line is ${text.length} characters; the limit is ${THREAD_REPORT_LINE_MAX}`,
+    );
+  }
+  deps.db.update(build).set({ reportLine: text }).where(eq(build.id, row.buildId)).run();
+  return 'report line recorded';
 }

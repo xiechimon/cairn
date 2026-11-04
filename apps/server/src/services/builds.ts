@@ -953,6 +953,9 @@ export function enqueueStep(
       createdAt,
     })
     .run();
+  if (isBuildStepKind(kind)) {
+    deps.db.update(build).set({ reportLine: null }).where(eq(build.id, buildId)).run();
+  }
   deps.machineHub?.wake(teamId);
   deps.convHub?.publishStep(buildId, {
     id,

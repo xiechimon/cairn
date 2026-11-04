@@ -75,6 +75,7 @@ import type { MachineWakeHub } from './machine-wake-hub.js';
 import { injectMemories } from './memory.js';
 import { notifyChiefMessage } from './notifications.js';
 import { PICKED_PROJECT_OPEN, stepScopeProjectId } from './picked-project.js';
+import { routingRulesEnabled } from './routing-rules.js';
 import { scanLocalSkills } from './skills.js';
 import { stepQueueProjector } from './step-queue.js';
 import { getTodo } from './todos.js';
@@ -982,8 +983,85 @@ export function removeChiefWatches(deps: ChiefDeps, teamId: string, todoIds: str
   }
 }
 
+function reportLineOf(deps: ChiefDeps, todoRecord: TodoRecord): string | null {
+  if (todoRecord.latestBuildId === null) return null;
+  const line = deps.db
+    .select({ line: build.reportLine })
+    .from(build)
+    .where(eq(build.id, todoRecord.latestBuildId))
+    .get()?.line;
+  return line === undefined || line === null || line === '' ? null : line;
+}
+
+function insertThreadReport(
+  deps: ChiefDeps,
+  threadId: string,
+  todoRecord: TodoRecord,
+  phase: ThreadReportContent['phase'],
+  options: { wakeStepId?: string; line?: string } = {},
+): void {
+  const buildId = todoRecord.latestBuildId;
+  const line = options.line ?? reportLineOf(deps, todoRecord);
+  const content = {
+    kind: 'thread-report',
+    todoId: todoRecord.id,
+    phase,
+    seqNum: todoRecord.seqNum,
+    title: todoRecord.title,
+    ...(options.wakeStepId !== undefined ? { wakeStepId: options.wakeStepId } : {}),
+    ...(phase === 'done' ? { verified: buildId !== null && buildVerified(deps.db, buildId) } : {}),
+    ...(line !== null ? { line } : {}),
+  } satisfies ThreadReportContent;
+  const report = {
+    id: newRecordId(),
+    threadId,
+    role: 'system' as const,
+    content: JSON.stringify(content),
+    createdAt: nowMs(),
+  };
+  upsertChiefMessage(deps.db, { ...report, projectId: todoRecord.projectId });
+  deps.convHub?.publishMessage(threadId, report);
+}
+
+function isWatched(chiefs: ChiefRow[], todoId: string): boolean {
+  return chiefs.some((chiefRow) => chiefRow.watches.some((w) => w.todoId === todoId));
+}
+
+export function postThreadReport(
+  deps: ChiefDeps,
+  todoRecord: TodoRecord,
+  phase: ThreadReportContent['phase'],
+  line?: string,
+): void {
+  const options = line !== undefined ? { line } : {};
+  const chiefs = deps.db.select().from(chief).where(eq(chief.teamId, todoRecord.teamId)).all();
+  if (!isWatched(chiefs, todoRecord.id)) {
+    const coordinator = coordinatorThreadRow(deps, ensureChief(deps, todoRecord.teamId));
+    insertThreadReport(deps, coordinator.id, todoRecord, phase, options);
+    return;
+  }
+  for (const chiefRow of chiefs) {
+    for (const watch of chiefRow.watches) {
+      if (watch.todoId === todoRecord.id && getChiefThread(deps, watch.threadId)) {
+        insertThreadReport(deps, watch.threadId, todoRecord, phase, options);
+      }
+    }
+  }
+}
+
 export function triggerChiefWakes(deps: ChiefDeps, todoRecord: TodoRecord, to: Phase): void {
   if (to !== 'confirm' && to !== 'review' && to !== 'done' && to !== 'failed') return;
+  if (routingRulesEnabled() && to !== 'confirm') {
+    const teamChiefs = deps.db
+      .select()
+      .from(chief)
+      .where(eq(chief.teamId, todoRecord.teamId))
+      .all();
+    if (!isWatched(teamChiefs, todoRecord.id)) {
+      const coordinator = coordinatorThreadRow(deps, ensureChief(deps, todoRecord.teamId));
+      insertThreadReport(deps, coordinator.id, todoRecord, to);
+    }
+  }
   const chiefs = deps.db.select().from(chief).where(eq(chief.teamId, todoRecord.teamId)).all();
   for (const chiefRow of chiefs) {
     const watches = chiefRow.watches.filter((w) => w.todoId === todoRecord.id);
@@ -1004,26 +1082,7 @@ export function triggerChiefWakes(deps: ChiefDeps, todoRecord: TodoRecord, to: P
       }
       const wakeStepId = newRecordId();
       if (to !== 'confirm') {
-        const content = {
-          kind: 'thread-report',
-          todoId: todoRecord.id,
-          phase: to,
-          seqNum: todoRecord.seqNum,
-          title: todoRecord.title,
-          wakeStepId,
-          ...(to === 'done'
-            ? { verified: buildId !== null && buildVerified(deps.db, buildId) }
-            : {}),
-        } satisfies ThreadReportContent;
-        const report = {
-          id: newRecordId(),
-          threadId: watch.threadId,
-          role: 'system' as const,
-          content: JSON.stringify(content),
-          createdAt: nowMs(),
-        };
-        upsertChiefMessage(deps.db, { ...report, projectId: todoRecord.projectId });
-        deps.convHub?.publishMessage(watch.threadId, report);
+        insertThreadReport(deps, watch.threadId, todoRecord, to, { wakeStepId });
       }
       if (kind === 'gate') {
         enqueueGateWake(

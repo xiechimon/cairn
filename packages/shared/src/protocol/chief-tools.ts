@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { THREAD_REPORT_LINE_MAX } from '../records/message.js';
 import { COMPUTER_IMAGES_MAX, computerImageSchema } from './computer.js';
 
 export const remoteToolDefSchema = z.object({
@@ -986,6 +987,14 @@ const WORKER_SCHEDULE_TOOLS: readonly RemoteToolDef[] = [
 export const WORKER_ASK_USER_TOOL: RemoteToolDef = CHIEF_REMOTE_TOOLS.find(
   (t) => t.name === 'ask_user',
 ) as RemoteToolDef;
+
+export const WORKER_THREAD_REPORT_TOOL: RemoteToolDef = {
+  name: 'thread_report',
+  description: `Write the one-line report the Coordinator conversation shows for this thread (at most ${THREAD_REPORT_LINE_MAX} characters, your own words, plain text). Call it before you finish, ask the user a question, or give up.`,
+  parameters: obj({ line: str(`The report line, at most ${THREAD_REPORT_LINE_MAX} characters.`) }, [
+    'line',
+  ]),
+};
 
 export const WORKER_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   ...WORKER_MEMORY_REMOTE_TOOLS,

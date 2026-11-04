@@ -261,6 +261,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
                 status: t(reportStatusWord(item)),
               })}
             </ThreadLink>
+            {item.line !== undefined && <span className="ml-1.5">{item.line}</span>}
           </MarkerContent>
         </Marker>
       </MessageScrollerItem>

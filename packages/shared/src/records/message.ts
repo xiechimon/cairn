@@ -192,6 +192,8 @@ export const chiefModelFallbackContentSchema = z.object({
 });
 export type ChiefModelFallbackContent = z.infer<typeof chiefModelFallbackContentSchema>;
 
+export const THREAD_REPORT_LINE_MAX = 200;
+
 export const threadReportContentSchema = z.object({
   kind: z.literal('thread-report'),
   todoId: recordId,
@@ -200,6 +202,7 @@ export const threadReportContentSchema = z.object({
   title: z.string(),
   wakeStepId: recordId.optional(),
   verified: z.boolean().optional(),
+  line: z.string().max(THREAD_REPORT_LINE_MAX).optional(),
 });
 export type ThreadReportContent = z.infer<typeof threadReportContentSchema>;
 
