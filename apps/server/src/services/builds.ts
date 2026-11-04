@@ -2875,7 +2875,9 @@ export function completeStep(
       setTodoPhase(deps, todoRow.id, 'review', {
         hasChanges: outcome.hasChanges ?? true,
       });
-      maybeEnqueueVerifyStep(deps, todoRow, stepRow.buildId);
+      if (pendingWorkerQuestions(deps.db, stepRow.buildId).length === 0) {
+        maybeEnqueueVerifyStep(deps, todoRow, stepRow.buildId);
+      }
       return;
     }
     if (todoRow.phase === 'building' || canTransitionPhase(todoRow.phase, 'building')) {

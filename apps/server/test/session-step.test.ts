@@ -381,6 +381,33 @@ describe('session steps share the build-step paths', () => {
     expect(content.status).toBe('pending');
   });
 
+  test('a parked session with a verifier assigned does not dispatch verification', async () => {
+    const { todoId, buildId, stepRow } = startSession(false);
+    H.s.db
+      .update(todo)
+      .set({
+        phase: 'building',
+        assignment: { plan: null, build: { agentId: AGENT_ID }, verify: { agentId: AGENT_ID } },
+      })
+      .where(eq(todo.id, todoId))
+      .run();
+    const claimed = claim(stepRow.id);
+    await askWorkerQuestion(
+      deps(),
+      claimed,
+      { requestId: REQUEST, questions: QUESTIONS },
+      { holdMs: 0 },
+    );
+    completeStep(deps(), stepRow.id, { hasChanges: false });
+    const kinds = H.s.db
+      .select()
+      .from(step)
+      .where(eq(step.buildId, buildId))
+      .all()
+      .map((r) => r.kind);
+    expect(kinds).toEqual(['session']);
+  });
+
   test('a session turn with no changes and no question still fails the artifact gate', () => {
     const { todoId, stepRow } = startSession(false);
     H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
