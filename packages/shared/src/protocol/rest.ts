@@ -25,6 +25,11 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
     note: 'deploy.json next to server.db, written by deploy-self.sh (#2427)',
   },
   {
+    method: 'GET',
+    path: '/api/flags',
+    note: 'owner lists registered flags and their global release state (#2427)',
+  },
+  {
     method: 'POST',
     path: '/api/flags/{key}/release',
     note: 'owner releases a feature flag to every user (#2427)',

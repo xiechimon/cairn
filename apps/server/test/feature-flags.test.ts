@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { afterEach, describe, expect, test } from 'vitest';
 import { user as userTable } from '../src/db/schema.js';
 import {
@@ -98,5 +99,49 @@ describe('POST /api/flags/:key/release', () => {
     const s = boot();
     const res = await req(s.app, 'POST', '/api/flags/Bad%20Key/release');
     expect(res.status).toBe(400);
+  });
+});
+
+describe('GET /api/flags', () => {
+  test('lists each registered key once in key order, with its global release state', async () => {
+    const s = boot();
+    setUserFlag(s.db, 'zeta', s.user.id, true);
+    setUserFlag(s.db, 'zeta', 'user-b', false);
+    releaseFlag(s.db, 'alpha');
+    setUserFlag(s.db, 'alpha', 'user-a', false);
+
+    const res = await req(s.app, 'GET', '/api/flags');
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      flags: [
+        { key: 'alpha', released: true },
+        { key: 'zeta', released: false },
+      ],
+    });
+  });
+
+  test('returns an empty list before a flag has been registered', async () => {
+    const s = boot();
+
+    const res = await req(s.app, 'GET', '/api/flags');
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ flags: [] });
+  });
+
+  test('a non-owner cannot list or release flags', async () => {
+    const s = boot();
+    setUserFlag(s.db, 'private-beta', 'user-a', true);
+    s.db.insert(userTable).values({ id: 'user-c', displayName: 'C', avatarUrl: null }).run();
+    s.db.run(sql`UPDATE user SET rowid = 0 WHERE id = 'user-b'`);
+    expect(isOwner(s.db, s.user.id)).toBe(false);
+
+    const list = await req(s.app, 'GET', '/api/flags');
+    const release = await req(s.app, 'POST', '/api/flags/private-beta/release');
+
+    expect(list.status).toBe(403);
+    expect(release.status).toBe(403);
+    expect(flag(s.db, 'private-beta', 'user-c')).toBe(false);
   });
 });

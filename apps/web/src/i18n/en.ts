@@ -1611,4 +1611,14 @@ export const EN: Record<string, string> = {
   解决: 'Resolve',
   '查看 diff': 'View diff',
   '在 GitHub 打开': 'Open on GitHub',
+  新功能发布: 'Feature releases',
+  '发布后对所有成员开启，不能在这里关闭。':
+    'Releasing enables the feature for every member. It cannot be turned off here.',
+  新功能列表加载失败: 'Could not load feature releases',
+  还没有登记的新功能: 'No features registered yet',
+  '向所有成员发布 {key}': 'Release {key} to every member',
+  '发布失败，请重试。': 'Release failed. Try again.',
+  功能标识: 'Feature key',
+  '输入开发者提供的功能标识。': 'Enter the feature key provided by its developer.',
+  发布新功能: 'Release feature',
 };
