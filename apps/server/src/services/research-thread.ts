@@ -1,10 +1,13 @@
 import type { Assignment, ResearchTier, TodoSourceKind } from '@cairn/shared';
 import { researchPrompt } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
-import { agent, chief, todo } from '../db/schema.js';
+import { agent, chief, machine, project, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
+import { nowMs } from '../lib/ids.js';
 import { type BuildDeps, startBuilds } from './builds.js';
-import { routeForStep } from './routing-rules.js';
+import { pinAllows, workerIneligibility } from './machine-routing.js';
+import { mergedCatalogModels } from './model-liveness.js';
+import { applyRoute, policyForStep, routeForStep } from './routing-rules.js';
 import { createTodo } from './todos.js';
 
 export const RESEARCH_AGENT_PROVIDER = 'claude-code';
@@ -30,7 +33,11 @@ export interface OpenedResearchThread {
   agentId: string;
 }
 
-function chooseResearchAgent(deps: BuildDeps, input: OpenResearchThreadInput): string {
+function chooseResearchAgent(
+  deps: BuildDeps,
+  input: OpenResearchThreadInput,
+  route: ReturnType<typeof routeForStep>,
+): string {
   const { db } = deps;
   if (input.agentId !== undefined) {
     const row = db
@@ -61,7 +68,42 @@ function chooseResearchAgent(deps: BuildDeps, input: OpenResearchThreadInput): s
       ),
     )
     .all()
-    .filter((row) => !coordinators.has(row.id));
+    .filter(
+      (row) => !coordinators.has(row.id) && (route?.modelId ?? row.modelId ?? '').trim().length > 0,
+    );
+  const machines = db.select().from(machine).where(eq(machine.teamId, input.teamId)).all();
+  const policy = policyForStep(db, { teamId: input.teamId }, 'build');
+  const localProject =
+    db.select().from(project).where(eq(project.id, input.projectId)).get()?.repoKind === 'local';
+  const catalog = mergedCatalogModels();
+  const now = nowMs();
+  const runnable = new Set(
+    candidates
+      .filter((row) => {
+        const effective = applyRoute(row, route, null, policy);
+        const facts = {
+          agentRow: effective,
+          model: effective,
+          localProject,
+          localMerge: false,
+          routed: route !== null,
+        };
+        return machines.some(
+          (host) =>
+            host.online &&
+            workerIneligibility(db, host, facts, catalog, now) === null &&
+            (route !== null ||
+              pinAllows({
+                machineId: host.id,
+                pinnedId: effective.machineId,
+                pinned: machines.find((candidate) => candidate.id === effective.machineId),
+                model: effective,
+                now,
+              })),
+        );
+      })
+      .map((row) => row.id),
+  );
   const preferred = PREFERRED_MODEL[input.tier];
   const rank = (row: { modelId: string | null }) =>
     row.modelId === preferred
@@ -69,7 +111,13 @@ function chooseResearchAgent(deps: BuildDeps, input: OpenResearchThreadInput): s
       : Object.values(PREFERRED_MODEL).includes(row.modelId ?? '')
         ? 1
         : 2;
-  const [best] = candidates.sort((a, b) => rank(a) - rank(b) || a.id.localeCompare(b.id));
+  const [best] = candidates.sort(
+    (a, b) =>
+      Number(!runnable.has(a.id)) - Number(!runnable.has(b.id)) ||
+      Number(a.persona !== null) - Number(b.persona !== null) ||
+      rank(a) - rank(b) ||
+      a.id.localeCompare(b.id),
+  );
   if (best === undefined) {
     throw new HttpError(
       409,
@@ -111,7 +159,7 @@ export function openResearchThread(
       `Research needs a Claude Code route, but this team's session route runs ${route.provider}/${route.modelId}.`,
     );
   }
-  const agentId = chooseResearchAgent(deps, input);
+  const agentId = chooseResearchAgent(deps, input, route);
   const todoId =
     existing?.id ??
     createTodo(deps, {
