@@ -18,6 +18,7 @@ import { chiefThread, computer, computerCall, machine, step } from '../db/schema
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { NotFoundError } from './builds.js';
+import { computerCallOwnerUserId } from './computer-access.js';
 import type { TeamStreamHub } from './events.js';
 import { isChiefConversation, type MachineDeps, ownedStep } from './machine-deps.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
@@ -224,14 +225,13 @@ export function receiveComputerFrames(
   else if (result.publishOutput) {
     const pending = pendingCalls.get(callId);
     const row = db.select().from(computerCall).where(eq(computerCall.id, callId)).get();
-    if (pending && row) publishFeed(pending.hub, pending.teamId, row);
+    if (pending && row) publishFeed(db, pending.hub, row);
   }
   return result.response;
 }
 
 interface PendingCall {
   result: Promise<ComputerRelayResult>;
-  teamId: string;
   hub: TeamStreamHub;
   resolve: (result: ComputerRelayResult) => void;
   dispose: () => void;
@@ -366,9 +366,11 @@ export function feedOf(row: CallRow): ComputerCommand | null {
   };
 }
 
-function publishFeed(hub: TeamStreamHub, teamId: string, row: CallRow): void {
+function publishFeed(db: Db, hub: TeamStreamHub, row: CallRow): void {
   const command = feedOf(row);
-  if (command) hub.publish(teamId, () => ({ type: 'computer.command', command }));
+  if (!command) return;
+  const userId = computerCallOwnerUserId(db, row);
+  if (userId) hub.publishPrivate(row.teamId, userId, () => ({ type: 'computer.command', command }));
 }
 
 export function settleComputerCall(db: Db, callId: string): void {
@@ -378,7 +380,7 @@ export function settleComputerCall(db: Db, callId: string): void {
   if (!row || !isFinalState(row.state)) return;
   pendingCalls.delete(callId);
   live.dispose();
-  publishFeed(live.hub, live.teamId, row);
+  publishFeed(db, live.hub, row);
   live.resolve(resultOfRow(row));
 }
 
@@ -401,7 +403,6 @@ function expireComputerCall(db: Db, callId: string): void {
 
 function openPending(
   deps: MachineDeps,
-  teamId: string,
   call: { callId: string; stepId: string; deadlineAt: number },
 ): PendingCall {
   let resolve!: (result: ComputerRelayResult) => void;
@@ -416,7 +417,6 @@ function openPending(
   const offStop = deps.machineHub.onStop(call.stepId, () => stopStepComputer(deps, call.stepId));
   const pending: PendingCall = {
     result,
-    teamId,
     hub: deps.hub,
     resolve,
     dispose: () => {
@@ -703,8 +703,8 @@ export async function forwardComputerCall(
     db.delete(computerCall).where(eq(computerCall.id, dispatchId)).run();
     throw new HttpError(409, COMPUTER_NOT_CONNECTED);
   }
-  const pending = openPending(deps, thread.teamId, call);
+  const pending = openPending(deps, call);
   const row = db.select().from(computerCall).where(eq(computerCall.id, dispatchId)).get();
-  if (row) publishFeed(deps.hub, thread.teamId, row);
+  if (row) publishFeed(db, deps.hub, row);
   return waitForCall(pending, opts.signal);
 }

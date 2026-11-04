@@ -1,9 +1,15 @@
+import { chiefIdFormat } from '@cairn/shared';
+import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test } from 'vitest';
 import {
+  chief as chiefTable,
+  chiefThread as chiefThreadTable,
   computerCall as computerCallTable,
   computer as computerTable,
   machine as machineTable,
+  step as stepTable,
   team as teamTable,
+  user as userTable,
 } from '../src/db/schema.js';
 import { bootServer, req, type TestServer } from './helpers.js';
 
@@ -34,13 +40,44 @@ function addMachine(s: TestServer, teamId: string, id: string, online = true) {
     .run();
 }
 
-function addComputer(s: TestServer, teamId: string, id: string, machineId: string) {
+function addComputer(
+  s: TestServer,
+  teamId: string,
+  id: string,
+  machineId: string,
+  userId = s.user.id,
+) {
+  const chiefId = chiefIdFormat(userId, teamId);
+  s.db.insert(userTable).values({ id: userId, displayName: 'Owner' }).onConflictDoNothing().run();
+  s.db
+    .insert(chiefTable)
+    .values({ id: chiefId, userId, teamId, createdAt: 1 })
+    .onConflictDoNothing()
+    .run();
+  s.db
+    .insert(chiefThreadTable)
+    .values({
+      id: `chief-thread-${id}`,
+      chiefId,
+      userId,
+      teamId,
+      title: id,
+      sessionId: '',
+      sessionOpenedAt: 1,
+      createdAt: 1,
+      updatedAt: 1,
+    })
+    .run();
+  s.db
+    .insert(stepTable)
+    .values({ id: `step-${id}`, buildId: `chief-thread-${id}`, kind: 'chief', createdAt: 1 })
+    .run();
   s.db
     .insert(computerTable)
     .values({
       id,
       teamId,
-      scopeKey: `scope-${id}`,
+      scopeKey: `chief:${chiefId}`,
       machineId,
       providerRef: `ref-${id}`,
       state: 'running',
@@ -63,7 +100,7 @@ function addCall(
     .values({
       id: n.toString(16).padStart(64, '0'),
       teamId,
-      stepId: 'step-1',
+      stepId: `step-${computerId}`,
       toolCallId: `tc-${n}`,
       machineId,
       computerId,
@@ -88,7 +125,24 @@ async function commands(s: TestServer, id: string, query = '') {
 }
 
 describe('computer feed routes', () => {
-  test('lists the team computers with machine name, state and control holder', async () => {
+  test('history applies the stored owner rule to foreign-step and missing-owner calls', async () => {
+    const s = boot();
+    addMachine(s, s.team.id, 'm1');
+    addComputer(s, s.team.id, 'c1', 'm1');
+    addComputer(s, s.team.id, 'c2', 'm1', 'other-user');
+    addCall(s, s.team.id, 'c1', 'm1', 1);
+    addCall(s, s.team.id, 'c1', 'm1', 2, { stepId: 'step-c2', outputTail: 'foreign-output' });
+    addCall(s, s.team.id, 'c1', 'm1', 3, { stepId: 'missing-step', outputTail: 'orphan-output' });
+    expect(
+      (await commands(s, 'c1')).body.commands.map((command) => Number.parseInt(command.callId, 16)),
+    ).toEqual([1]);
+    s.db
+      .delete(chiefTable)
+      .where(eq(chiefTable.id, chiefIdFormat(s.user.id, s.team.id)))
+      .run();
+    expect((await commands(s, 'c1')).body.commands).toEqual([]);
+  });
+  test('lists the current user private computer with machine name, state and control holder', async () => {
     const s = boot();
     addMachine(s, s.team.id, 'm1', false);
     addComputer(s, s.team.id, 'c1', 'm1');
@@ -97,7 +151,7 @@ describe('computer feed routes', () => {
       computers: [
         {
           id: 'c1',
-          scopeKey: 'scope-c1',
+          scopeKey: `chief:${chiefIdFormat(s.user.id, s.team.id)}`,
           state: 'running',
           controlHolder: 'none',
           machine: { id: 'm1', name: 'name-m1', online: false },
@@ -185,7 +239,7 @@ describe('computer feed routes', () => {
     const s = boot();
     addMachine(s, s.team.id, 'm1');
     addComputer(s, s.team.id, 'c1', 'm1');
-    addComputer(s, s.team.id, 'c2', 'm1');
+    addComputer(s, s.team.id, 'c2', 'm1', 'another-user');
     addCall(s, s.team.id, 'c1', 'm1', 1);
     addCall(s, s.team.id, 'c2', 'm1', 2);
     const { body } = await commands(s, 'c1');
