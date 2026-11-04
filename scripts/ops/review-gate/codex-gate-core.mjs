@@ -48,7 +48,7 @@ export function parseState(body, kind = 'code_review') {
       commitSha: review.commit_sha ?? null,
       status: review.status ?? null,
       ...(kind === 'security_review'
-        ? { hasUnresolvedFindings: review.has_unresolved_findings ?? null }
+        ? { hasUnresolvedFindings: review.has_unresolved_findings }
         : {}),
     };
   } catch {
@@ -240,6 +240,136 @@ function carriedNote(carried) {
   return `\n\nNot blocking, because the flagged lines predate this PR; file a follow-up issue instead:\n\n${lines.join('\n')}`;
 }
 
+const SECURITY_RECEIPT_HEADER = /^#{2,3} (?:🛡️ )?Codex Security Review\s*$/m;
+const SECURITY_FINDING =
+  /<!-- codex-security-review-finding:v1 -->|^#{2,3} (?:🛡️ )?Codex Security Review\s*$/m;
+const CLEAN_SECURITY =
+  /^Security review completed\. No security issues were found in this pull request\.$/m;
+const REVIEWED_COMMIT = /^\*\*Reviewed commit:\*\* `([0-9a-f]{7,40})`\s*$/gm;
+const SECURITY_COMPLETION =
+  /^\| 🔒 \*\*Security Review\*\* \| ✅ \*\*Completed\*\* <relative-time datetime="([^"]+)"/gm;
+const RECEIPT_WINDOW_MS = 60_000;
+const FULL_SHA = /^[0-9a-f]{40}$/;
+const trustedTime = (value) =>
+  typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/.test(value)
+    ? Date.parse(value)
+    : Number.NaN;
+
+export function securityReceiptComment(comments) {
+  const receipts = comments.filter(
+    (comment) =>
+      isCodexAuthor(comment.user?.login, comment.user?.type) &&
+      comment.body?.startsWith('<!-- codex-review-receipt:v1 -->') &&
+      SECURITY_RECEIPT_HEADER.test(comment.body),
+  );
+  if (receipts.some((comment) => !Number.isFinite(trustedTime(comment.created_at)))) return null;
+  return receipts.reduce(
+    (latest, comment) =>
+      !latest ||
+      trustedTime(comment.created_at) > trustedTime(latest.created_at) ||
+      (comment.created_at === latest.created_at && Number(comment.id) > Number(latest.id))
+        ? comment
+        : latest,
+    null,
+  );
+}
+
+export function receiptCommit(receipt) {
+  const matches = [...String(receipt?.body ?? '').matchAll(REVIEWED_COMMIT)];
+  return matches.length === 1 ? matches[0][1] : null;
+}
+
+export function securityThreads(threads) {
+  return threads.filter(
+    (thread) =>
+      isCodexAuthor(thread.authorLogin, thread.authorType) &&
+      (SECURITY_FINDING.test(thread.body ?? '') || SECURITY_FINDING.test(thread.reviewBody ?? '')),
+  );
+}
+
+export function cleanSecurityReceipt(pr, evidence, threads) {
+  if (
+    !evidence ||
+    !Array.isArray(evidence.comments) ||
+    !Array.isArray(evidence.commits) ||
+    !Array.isArray(evidence.forcePushes) ||
+    !Array.isArray(evidence.refMatches)
+  )
+    return false;
+  if (evidence.comments.some((comment) => !comment || typeof comment !== 'object')) return false;
+  const entry = trustedStateComment(evidence.comments, 'security_review');
+  if (
+    entry?.state?.commitSha !== pr.head.sha ||
+    entry.state.status !== 'completed' ||
+    entry.state.hasUnresolvedFindings !== null
+  )
+    return false;
+  const receipt = securityReceiptComment(evidence.comments);
+  const prefix = receiptCommit(receipt);
+  if (
+    !receipt ||
+    !prefix ||
+    !CLEAN_SECURITY.test(receipt.body) ||
+    !pr.head.sha.startsWith(prefix) ||
+    evidence.resolvedSha !== pr.head.sha
+  )
+    return false;
+  if (
+    !evidence.refMatches.every(
+      (ref) =>
+        typeof ref === 'string' && ref !== `refs/heads/${prefix}` && ref !== `refs/tags/${prefix}`,
+    )
+  )
+    return false;
+  if (
+    threads.some(
+      (thread) => thread.isResolved !== true && (!thread.authorLogin || !thread.authorType),
+    )
+  )
+    return false;
+  const commits = evidence.commits;
+  if (
+    !Number.isSafeInteger(pr.commits) ||
+    pr.commits < 1 ||
+    commits.length !== pr.commits ||
+    !commits.every((sha) => typeof sha === 'string' && FULL_SHA.test(sha)) ||
+    new Set(commits).size !== commits.length ||
+    commits.filter((sha) => sha.startsWith(prefix)).length !== 1 ||
+    !commits.includes(pr.head.sha)
+  )
+    return false;
+  const completed = [...entry.comment.body.matchAll(SECURITY_COMPLETION)];
+  if (completed.length !== 1) return false;
+  const finishedAt = trustedTime(completed[0][1]);
+  const createdAt = trustedTime(receipt.created_at);
+  const updatedAt = trustedTime(receipt.updated_at);
+  const summaryCreated = trustedTime(entry.comment.created_at);
+  const summaryUpdated = trustedTime(entry.comment.updated_at);
+  const prCreated = trustedTime(pr.created_at);
+  if (
+    ![finishedAt, createdAt, updatedAt, summaryCreated, summaryUpdated, prCreated].every(
+      Number.isFinite,
+    ) ||
+    createdAt < prCreated ||
+    createdAt < summaryCreated ||
+    updatedAt < createdAt ||
+    updatedAt > summaryUpdated ||
+    finishedAt > summaryUpdated ||
+    Math.abs(createdAt - finishedAt) > RECEIPT_WINDOW_MS
+  )
+    return false;
+  for (const event of evidence.forcePushes) {
+    const at = trustedTime(event?.createdAt);
+    if (!Number.isFinite(at) || at >= createdAt) return false;
+  }
+  for (const comment of evidence.comments) {
+    if (!/^@codex security review\s*$/m.test(comment.body ?? '')) continue;
+    const at = trustedTime(comment.created_at);
+    if (!Number.isFinite(at) || at >= createdAt) return false;
+  }
+  return securityThreads(threads).every((thread) => thread.isResolved === true);
+}
+
 const NO_ROUNDS = { others: 0, marked: false };
 
 export function decide(
@@ -253,12 +383,16 @@ export function decide(
   security = null,
 ) {
   const sha = pr.head.sha;
+  let receiptApproved = false;
   if (security) {
     const review = security.state;
+    receiptApproved =
+      review?.hasUnresolvedFindings === null &&
+      cleanSecurityReceipt(pr, security.receiptEvidence, threads);
     const clean =
       review?.commitSha === sha &&
       review.status === 'completed' &&
-      review.hasUnresolvedFindings === false;
+      (review.hasUnresolvedFindings === false || receiptApproved);
     if (!clean) {
       const reason = !review
         ? 'No trusted security review state is available.'
@@ -271,7 +405,7 @@ export function decide(
         status: 'completed',
         conclusion: 'failure',
         title: `Codex security review required for ${short(sha)}`,
-        summary: `Canonical security surfaces require a trusted Codex security review completed on ${sha} with has_unresolved_findings=false. ${reason} Request \`@codex security review\`; resolve every security finding regardless of severity or builtin merge-gate settings.`,
+        summary: `Canonical security surfaces require a trusted Codex security review completed on ${sha} with has_unresolved_findings=false or the narrowly verified D88 null-state receipt proof. ${reason} Request \`@codex security review\`; resolve every security finding regardless of severity or builtin merge-gate settings.`,
       };
     }
   }
@@ -326,7 +460,7 @@ export function decide(
       title: `No open P0/P1 Codex findings for ${short(sha)}`,
       summary: `Codex reviewed this head and no unresolved P0 or P1 thread remains.${
         blockedHeads > 0 ? ` Cycles to pass: ${blockedHeads} blocked head(s) before this one.` : ''
-      }${security ? ' Codex security reviewed this exact head with no unresolved findings.' : ''}${carried}`,
+      }${security ? (receiptApproved ? ' Codex security reviewed this exact head: D88 clean receipt verified against commit identity, freshness and unresolved security threads.' : ' Codex security reviewed this exact head with no unresolved findings.') : ''}${carried}`,
       removeStall: true,
     };
   const round = rounds.others + 1;

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
   BLOCK_ROUND_CAP,
@@ -558,4 +559,158 @@ test('every canonical security pattern is covered without expanding to other hum
     '.github/workflows/release.yml',
   ])
     assert.equal(requiresSecurityReview([{ filename }]), false, filename);
+});
+
+const receiptFixture = JSON.parse(
+  readFileSync(new URL('../../../docs/verify/D88/receipt-fixture.json', import.meta.url), 'utf8'),
+);
+function receiptDecision(fixture, threads = []) {
+  const state = parseState(fixture.evidence.comments[0].body, 'security_review');
+  return decide(
+    fixture.pr,
+    { commitSha: fixture.pr.head.sha, status: 'completed' },
+    threads,
+    noRetries,
+    false,
+    null,
+    undefined,
+    { state, receiptEvidence: fixture.evidence },
+  );
+}
+
+test('D88 accepts the live exact-head null verdict only with a fresh clean unambiguous SECURITY receipt and no open security threads', () => {
+  assert.equal(receiptDecision(receiptFixture).conclusion, 'success');
+});
+
+test('D88 never substitutes a receipt for invalid or missing security state fields', () => {
+  for (const raw of [
+    null,
+    {},
+    { commit_sha: receiptFixture.pr.head.sha, status: 'completed' },
+    ...[true, 'false', 0, undefined].map((has_unresolved_findings) => ({
+      commit_sha: receiptFixture.pr.head.sha,
+      status: 'completed',
+      has_unresolved_findings,
+    })),
+    ...['running', 'failed', null, undefined].map((status) => ({
+      commit_sha: receiptFixture.pr.head.sha,
+      status,
+      has_unresolved_findings: null,
+    })),
+    { commit_sha: OTHER, status: 'completed', has_unresolved_findings: null },
+  ]) {
+    const fixture = structuredClone(receiptFixture);
+    fixture.evidence.comments[0].body = fixture.evidence.comments[0].body.replace(
+      /<!-- codex-review-state:v1 .* -->/,
+      `<!-- codex-review-state:v1 ${JSON.stringify({ security_review: raw })} -->`,
+    );
+    assert.equal(receiptDecision(fixture).conclusion, 'failure', JSON.stringify(raw));
+  }
+});
+
+test('D88 rejects forged, code-only, stale, edited-to-look-fresh, ambiguous or unprovable receipts', () => {
+  const mutations = [
+    (f) => {
+      f.evidence.comments[1].user = { login: 'mallory', type: 'User' };
+    },
+    (f) => {
+      f.evidence.comments[1].user.type = 'User';
+    },
+    (f) => {
+      f.evidence.comments[1].body = f.evidence.comments[1].body.replace(
+        'Codex Security Review',
+        'Codex Review',
+      );
+    },
+    (f) => {
+      f.evidence.comments[1].body = f.evidence.comments[1].body.replace(
+        'No security issues were found',
+        'Security issues were found',
+      );
+    },
+    (f) => {
+      f.evidence.comments[1].body = f.evidence.comments[1].body.replace('7cd6bab608', 'bbbbbbbbbb');
+    },
+    (f) => {
+      f.evidence.comments[1].created_at = '2026-11-04T08:40:00Z';
+      f.evidence.comments[1].updated_at = '2026-11-04T08:53:18Z';
+    },
+    (f) => {
+      f.evidence.forcePushes = [{ createdAt: '2026-11-04T08:53:19Z' }];
+    },
+    (f) => {
+      f.evidence.forcePushes = null;
+    },
+    (f) => {
+      f.evidence.resolvedSha = OTHER;
+    },
+    (f) => {
+      delete f.evidence.resolvedSha;
+    },
+    (f) => {
+      f.evidence.commits.push(`7cd6bab608${'0'.repeat(30)}`);
+      f.pr.commits = 2;
+    },
+    (f) => {
+      f.pr.commits = 2;
+    },
+    (f) => {
+      f.evidence.comments[0].body = f.evidence.comments[0].body.split('\n')[0];
+    },
+    (f) => {
+      f.evidence.comments.push({
+        ...f.evidence.comments[1],
+        id: 9999999999,
+        body: f.evidence.comments[1].body.replace(
+          'No security issues were found',
+          'Security issues were found',
+        ),
+        created_at: '2026-11-04T08:53:19Z',
+      });
+    },
+    (f) => {
+      f.evidence.comments.push({
+        id: 9,
+        user: { login: 'owner', type: 'User' },
+        body: '@codex security review',
+        created_at: '2026-11-04T08:53:19Z',
+      });
+    },
+  ];
+  mutations.push(
+    (f) => {
+      delete f.evidence.refMatches;
+    },
+    (f) => {
+      f.evidence.refMatches = ['refs/tags/7cd6bab608'];
+    },
+    (f) => {
+      f.evidence.forcePushes = [{ createdAt: f.evidence.comments[1].created_at }];
+    },
+  );
+  for (const [i, mutate] of mutations.entries()) {
+    const fixture = structuredClone(receiptFixture);
+    mutate(fixture);
+    assert.equal(receiptDecision(fixture).conclusion, 'failure', `mutation ${i}`);
+  }
+});
+
+test('D88 open security findings block at every severity even outdated or pre-existing; code review stays independent', () => {
+  for (const level of ['P0', 'P1', 'P2', 'P3']) {
+    const securityThread = thread(level, {
+      body: `<!-- codex-security-review-finding:v1 -->\n${badge(level, 'Security finding')}`,
+      isOutdated: true,
+      preExisting: true,
+    });
+    assert.equal(receiptDecision(receiptFixture, [securityThread]).conclusion, 'failure', level);
+  }
+  assert.equal(receiptDecision(receiptFixture, [thread('P1')]).conclusion, 'failure');
+  const missing = structuredClone(receiptFixture);
+  assert.equal(
+    decide(missing.pr, null, [], noRetries, false, null, undefined, {
+      state: parseState(missing.evidence.comments[0].body, 'security_review'),
+      receiptEvidence: missing.evidence,
+    }).status,
+    'in_progress',
+  );
 });

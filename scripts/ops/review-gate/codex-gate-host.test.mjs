@@ -25,8 +25,13 @@ const out = (value) => process.stdout.write(JSON.stringify(value));
 if (/api repos\\/o\\/r\\/pulls\\/7$/.test(joined)) out(world.pr);
 else if (joined.includes('--slurp') && joined.includes('/pulls/7/files')) out(world.filePages ?? [world.files ?? []]);
 else if (joined.includes('--slurp') && joined.includes('repos/o/r/pulls?')) out([world.pulls]);
+else if (joined.includes('--slurp') && joined.includes('/git/matching-refs/')) out([world.matchingRefs ?? []]);
+else if (joined.includes('--slurp') && joined.includes('/pulls/7/commits')) out([world.commits ?? []]);
+else if (/api repos\\/o\\/r\\/commits\\/[a-f0-9]+$/.test(joined)) out({sha:world.resolvedSha});
 else if (joined.includes('--slurp') && joined.includes('/issues/7/comments')) out([world.comments]);
-else if (joined.includes('graphql')) {
+else if (joined.includes('HEAD_REF_FORCE_PUSHED_EVENT')) {
+  out({data:{repository:{pullRequest:{timelineItems:{nodes:world.forcePushes,pageInfo:{hasNextPage:false,endCursor:null}}}}}});
+} else if (joined.includes('graphql')) {
   out({ data: { repository: { pullRequest: { reviewThreads: {
     nodes: world.threads, pageInfo: { hasNextPage: false, endCursor: null } } } } } });
 } else if (joined.includes('/check-runs?')) out({ check_runs: world.checkRuns });
@@ -69,6 +74,7 @@ const basePr = {
   user: { login: 'dev' },
   author_association: 'OWNER',
   labels: [],
+  changed_files: 1,
 };
 
 function run(world, command = 'evaluate') {
@@ -87,6 +93,7 @@ function run(world, command = 'evaluate') {
       comments: [],
       threads: [],
       checkRuns: [],
+      files: [{ filename: 'src/a.ts' }],
       ...world,
     }),
   );
@@ -600,5 +607,64 @@ test('security classification includes later file pages and invalidates malforme
     const malformed = run({ files, comments: [stateComment(SHA, 'completed')] });
     assert.equal(malformed.body(malformed.checkWrites[0]).conclusion, 'failure');
     assert.match(malformed.body(malformed.checkWrites[0]).output.summary, /file list/i);
+  }
+});
+
+test('sweep verifies the full PR file count when list metadata omits it', () => {
+  const { changed_files, ...listed } = basePr;
+  assert.equal(changed_files, 1);
+  const out = run(
+    {
+      pr: { ...basePr, changed_files: 2 },
+      pulls: [listed],
+      files: [{ filename: 'apps/web/src/main.ts' }],
+      checkRuns: [ownRun({ status: 'completed', conclusion: 'success' })],
+    },
+    'sweep',
+  );
+  assert.equal(out.result.status, 0, out.result.stderr);
+  assert.equal(out.writes.length, 1);
+  assert.match(out.writes[0].args.join(' '), /dispatches/);
+});
+
+const receiptFixture = JSON.parse(
+  readFileSync(new URL('../../../docs/verify/D88/receipt-fixture.json', import.meta.url), 'utf8'),
+);
+const receiptWorld = () => ({
+  pr: { ...basePr, ...receiptFixture.pr, head: { ...basePr.head, ...receiptFixture.pr.head } },
+  files: secureFiles,
+  comments: structuredClone(receiptFixture.evidence.comments),
+  commits: receiptFixture.evidence.commits.map((sha) => ({ sha })),
+  resolvedSha: receiptFixture.evidence.resolvedSha,
+  forcePushes: [],
+});
+
+test('D88 host publishes success only after verifying the real clean SECURITY receipt provenance', () => {
+  const out = run(receiptWorld());
+  assert.equal(out.result.status, 0, out.result.stderr);
+  const check = out.body(out.checkWrites[0]);
+  assert.equal(check.conclusion, 'success');
+  assert.match(check.output.summary, /D88 clean receipt verified/);
+  assert.ok(out.calls.some((call) => call.args.join(' ').includes('repos/o/r/commits/7cd6bab608')));
+  assert.ok(out.calls.some((call) => call.args.join(' ').includes('HEAD_REF_FORCE_PUSHED_EVENT')));
+});
+
+test('D88 host refuses stale, ambiguous or unavailable identity proof and all unresolved security findings', () => {
+  const worlds = [
+    { ...receiptWorld(), resolvedSha: OTHER },
+    { ...receiptWorld(), matchingRefs: [{ ref: 'refs/heads/7cd6bab608' }] },
+    { ...receiptWorld(), commits: [] },
+    { ...receiptWorld(), forcePushes: null },
+    { ...receiptWorld(), forcePushes: [{ createdAt: '2026-11-04T08:53:19Z' }] },
+    ...['P0', 'P1', 'P2', 'P3'].map((level) => {
+      const finding = thread(level, { isOutdated: true });
+      finding.comments.nodes[0].body = `<!-- codex-security-review-finding:v1 -->\n${finding.comments.nodes[0].body}`;
+      return { ...receiptWorld(), threads: [finding] };
+    }),
+  ];
+  for (const [i, world] of worlds.entries()) {
+    const out = run(world);
+    assert.equal(out.result.status, 0, out.result.stderr);
+    assert.equal(out.body(out.checkWrites[0]).conclusion, 'failure', `world ${i}`);
   }
 });
