@@ -35,7 +35,8 @@ import type { DaemonLogger } from './log.js';
 import { createMachineCapabilitiesProbe } from './machine-capabilities.js';
 import { type MachineApi, MachineApiError, MachineClient } from './machine-client.js';
 import { OrbLifecycle, resolveOrbCap } from './orb/lifecycle.js';
-import { HostOrbProvider, NspawnOrbProvider, type OrbProvider } from './orb/provider.js';
+import type { OrbProvider } from './orb/provider.js';
+import { createOrbProvider } from './orb/select.js';
 import { relayOrbStopped, runOrbStep } from './orb/step.js';
 import { setupProxy } from './proxy.js';
 import { resumePendingUpload } from './runner.js';
@@ -177,10 +178,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
 
   const capEnv = opts.capEnv ?? process.env;
   const orbProvider =
-    opts.orbProvider ??
-    (capEnv.CAIRN_EXECUTOR === 'orb'
-      ? new NspawnOrbProvider({ stateFile: join(paths.home, 'orb-state', 'orbs.json') })
-      : new HostOrbProvider());
+    opts.orbProvider ?? createOrbProvider(capEnv, join(paths.home, 'orb-state', 'orbs.json'));
   const capabilitiesProbe =
     opts.capabilitiesProbe ??
     createMachineCapabilitiesProbe({
