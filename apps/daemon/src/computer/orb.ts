@@ -310,12 +310,25 @@ class GuestLink {
     if (this.pending.has(id) && this.guest) writeOrbComputerFrame(this.guest, { cancel: id });
   }
 
-  call(request: FileCall, timeoutMs: number): Promise<unknown> {
+  call(request: FileCall, timeoutMs: number, signal?: AbortSignal): Promise<unknown> {
+    if (signal?.aborted)
+      return Promise.reject(new ComputerRefusal('The call was cancelled before delivery'));
     return new Promise<unknown>((resolve, reject) => {
       let result: unknown;
+      const cleanup = () => {
+        clearTimeout(timer);
+        signal?.removeEventListener('abort', onAbort);
+        this.pending.delete(id);
+      };
+      const onAbort = () => {
+        this.cancel(id);
+        cleanup();
+        reject(new ComputerTransportError('The file operation was cancelled after delivery'));
+      };
       const timer = setTimeout(
         () => {
-          this.pending.delete(id);
+          this.cancel(id);
+          cleanup();
           reject(new ComputerTransportError('The computer did not answer in time'));
         },
         Math.min(this.settings.requestTimeoutMs, timeoutMs),
@@ -326,19 +339,19 @@ class GuestLink {
           result = value;
         },
         done: () => {
-          clearTimeout(timer);
+          cleanup();
           resolve(result);
         },
         error: (error) => {
-          clearTimeout(timer);
+          cleanup();
           reject(error);
         },
       });
+      signal?.addEventListener('abort', onAbort, { once: true });
       try {
         this.send({ id, ...request } as OrbComputerRequest);
       } catch (error) {
-        this.pending.delete(id);
-        clearTimeout(timer);
+        cleanup();
         reject(error);
       }
     });
@@ -472,7 +485,16 @@ export class OrbComputerProvider implements ScopedComputerProviders {
         options?.timeoutMs ?? this.settings.requestTimeoutMs,
       );
       if (timeoutMs <= 0) throw new ComputerRefusal('No time was left for the file operation');
-      return keepAlive(AbortSignal.timeout(timeoutMs), (link) => link.call(call, timeoutMs));
+      const endsAt = Date.now() + timeoutMs;
+      const signal = AbortSignal.any([
+        AbortSignal.timeout(timeoutMs),
+        ...(options?.signal ? [options.signal] : []),
+      ]);
+      return keepAlive(signal, (link) => {
+        const remaining = endsAt - Date.now();
+        if (remaining <= 0) throw new ComputerRefusal('No time was left for the file operation');
+        return link.call(call, remaining, options?.signal);
+      });
     };
     return {
       execute: async (request) => {
@@ -538,11 +560,23 @@ export class OrbComputerProvider implements ScopedComputerProviders {
     }
   }
 
+  private async beforeDelivery<T>(run: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+    if (signal?.aborted) throw new ComputerRefusal('The call was cancelled before delivery');
+    if (!signal) return run();
+    return new Promise<T>((resolve, reject) => {
+      const onAbort = () => reject(new ComputerRefusal('The call was cancelled before delivery'));
+      signal.addEventListener('abort', onAbort, { once: true });
+      void (async () => run())()
+        .then(resolve, reject)
+        .finally(() => signal.removeEventListener('abort', onAbort));
+    });
+  }
+
   private async link(scopeKey: string, signal?: AbortSignal): Promise<GuestLink> {
-    await this.ensurePublished();
+    await this.beforeDelivery(() => this.ensurePublished(), signal);
     let name: string;
     try {
-      name = await this.options.orbs.ensure(scopeKey);
+      name = await this.beforeDelivery(() => this.options.orbs.ensure(scopeKey), signal);
     } catch (error) {
       this.options.onError?.(`computer ${scopeKey} could not start: ${String(error)}`);
       throw new ComputerRefusal('The computer could not be started, so nothing ran');
@@ -564,6 +598,7 @@ export class OrbComputerProvider implements ScopedComputerProviders {
       throw new ComputerRefusal('The computer link could not be opened, so nothing ran');
     }
     await link.connected(this.connectTimeoutMs, signal);
+    if (signal?.aborted) throw new ComputerRefusal('The call was cancelled before delivery');
     return link;
   }
 
