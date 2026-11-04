@@ -5,6 +5,7 @@ import { computerFeedStore, mergeComputerFeed } from '../src/api/computer-feed.j
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const cmd = (n: number, patch: Partial<ComputerCommand> = {}): ComputerCommand => ({
   callId: id(n),
+  computerId: 'comp-1',
   stepId: 'step-1',
   tool: 'shell',
   command: `echo ${n}`,
@@ -50,9 +51,27 @@ describe('computerFeedStore', () => {
     expect(computerFeedStore.snapshot()).toHaveLength(0);
   });
 
+  test('rejects live commands without computer identity', () => {
+    const unscoped: Record<string, unknown> = { ...cmd(1) };
+    delete unscoped.computerId;
+    expect(computerFeedStore.push(unscoped)).toBe(false);
+    expect(computerFeedStore.snapshot()).toEqual([]);
+  });
+
   test('reports a call id as new once', () => {
     expect(computerFeedStore.push(cmd(1, { status: 'running', exitCode: null }))).toBe(true);
     expect(computerFeedStore.push(cmd(1))).toBe(false);
     expect(computerFeedStore.snapshot()).toHaveLength(1);
+  });
+
+  test('retains computer scope on live events, including host calls without an Orb', () => {
+    computerFeedStore.push({ ...cmd(1), computerId: 'first-computer' });
+    computerFeedStore.push({ ...cmd(2), computerId: 'second-computer' });
+    computerFeedStore.push({ ...cmd(3), computerId: null });
+    expect(computerFeedStore.snapshot()).toEqual([
+      expect.objectContaining({ computerId: 'first-computer' }),
+      expect.objectContaining({ computerId: 'second-computer' }),
+      expect.objectContaining({ computerId: null }),
+    ]);
   });
 });

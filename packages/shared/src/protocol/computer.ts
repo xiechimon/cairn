@@ -136,6 +136,7 @@ export type ComputerFeedTool = (typeof COMPUTER_FEED_TOOLS)[number];
 
 export const computerCommandSchema = z.object({
   callId: computerCallIdSchema,
+  computerId: recordId.nullable(),
   stepId: recordId,
   tool: z.enum(COMPUTER_FEED_TOOLS),
   command: z.string(),

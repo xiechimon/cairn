@@ -6537,6 +6537,12 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
             "command": {
               "type": "string",
             },
+            "computerId": {
+              "type": [
+                "string",
+                "null",
+              ],
+            },
             "cwd": {
               "type": "string",
             },
@@ -6582,6 +6588,7 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
           },
           "required": [
             "callId",
+            "computerId",
             "stepId",
             "tool",
             "command",
