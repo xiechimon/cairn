@@ -383,3 +383,100 @@ describe('a parked worker question holds the gates', () => {
     },
   );
 });
+
+describe('worker question hardening', () => {
+  test('a request id owned by a non-question message in the same build is a 409 and stays intact', async () => {
+    const { buildId, stepRow } = startSession(false);
+    H.s.db
+      .insert(message)
+      .values({
+        id: REQUEST,
+        conversationId: buildId,
+        role: 'user',
+        content: 'plain text',
+        createdAt: 1,
+        actor: null,
+      })
+      .run();
+    H.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, stepRow.id)).run();
+    const claimed = H.s.db.select().from(step).where(eq(step.id, stepRow.id)).get()!;
+    await expect(
+      askWorkerQuestion(
+        deps(),
+        claimed,
+        { requestId: REQUEST, questions: QUESTIONS },
+        { holdMs: 0 },
+      ),
+    ).rejects.toMatchObject({ status: 409 });
+    const row = H.s.db.select().from(message).where(eq(message.id, REQUEST)).get()!;
+    expect(row.content).toBe('plain text');
+  });
+
+  test('the push and notification body is capped and scrubbed', async () => {
+    const { todoId, stepRow } = startSession(false);
+    H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
+    H.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, stepRow.id)).run();
+    const claimed = H.s.db.select().from(step).where(eq(step.id, stepRow.id)).get()!;
+    const secret = 'sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGH';
+    const bodies: string[] = [];
+    const push = await import('../src/services/thread-push.js');
+    const spy = vi.spyOn(push, 'pushWorkerQuestion').mockImplementation((_d, _c, body) => {
+      bodies.push(body);
+    });
+    await askWorkerQuestion(
+      deps(),
+      claimed,
+      {
+        requestId: REQUEST,
+        questions: [
+          {
+            header: 'Key',
+            question: `Use ${secret} ${'x'.repeat(400)}?`,
+            options: [{ label: 'yes' }, { label: 'no' }],
+          },
+        ],
+      },
+      { holdMs: 0 },
+    );
+    spy.mockRestore();
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]!.length).toBeLessThanOrEqual(120);
+    expect(bodies[0]).not.toContain(secret);
+  });
+
+  test('flag off: a stale pending question row does not block the CI poller', async () => {
+    const { todoId, buildId } = await (async () => {
+      const s = startSession(false);
+      H.s.db
+        .update(project)
+        .set({ repoKind: 'github', githubRepo: 'owner/repo' })
+        .where(eq(project.id, H.projectId))
+        .run();
+      H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, s.todoId)).run();
+      H.s.db.update(build).set({ prNumber: 7 }).where(eq(build.id, s.buildId)).run();
+      H.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, s.stepRow.id)).run();
+      const claimed = H.s.db.select().from(step).where(eq(step.id, s.stepRow.id)).get()!;
+      await askWorkerQuestion(
+        deps(),
+        claimed,
+        { requestId: REQUEST, questions: QUESTIONS },
+        { holdMs: 0 },
+      );
+      return s;
+    })();
+    setRoutingRulesEnabled(false);
+    const { blockingWorkerQuestions } = await import('../src/services/worker-question-store.js');
+    expect(blockingWorkerQuestions(H.s.db, buildId)).toHaveLength(0);
+    H.s.db.update(step).set({ status: 'done' }).where(eq(step.kind, 'session')).run();
+    const fetched: string[] = [];
+    const poller = createCiPoller(deps(), {
+      githubFetch: async (url) => {
+        fetched.push(String(url));
+        return new Response('{}', { status: 404 });
+      },
+    });
+    await poller.sweep();
+    expect(todoId).toBeTruthy();
+    expect(fetched.some((url) => url.includes('/pulls/7'))).toBe(true);
+  });
+});

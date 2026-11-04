@@ -43,7 +43,7 @@ import { evaluateMergeGate } from './merge-gate-run.js';
 import { CI_FIX_FAILURES_HEAD, CI_FIX_PROMPT_HEAD, CI_FIX_PUSH_RULE } from './retry-lessons.js';
 import { setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
-import { pendingWorkerQuestions } from './worker-question-store.js';
+import { blockingWorkerQuestions } from './worker-question-store.js';
 
 export const CI_POLL_INTERVAL_MS = 60_000;
 
@@ -495,7 +495,7 @@ export function createCiPoller(
     liveKeys.add(key);
     if (
       hasActiveStep(deps, cand.buildId) ||
-      pendingWorkerQuestions(deps.db, cand.buildId).length > 0
+      blockingWorkerQuestions(deps.db, cand.buildId).length > 0
     ) {
       forgetClose(key);
       tally.reviewSkipped += 1;
@@ -809,7 +809,7 @@ export function createCiPoller(
     grindKeys.add(key);
     if (
       hasActiveStep(deps, cand.buildId) ||
-      pendingWorkerQuestions(deps.db, cand.buildId).length > 0
+      blockingWorkerQuestions(deps.db, cand.buildId).length > 0
     ) {
       tally.skipped += 1;
       return;

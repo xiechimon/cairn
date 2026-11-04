@@ -173,7 +173,7 @@ import {
   splitBlockersSatisfied,
 } from './todos.js';
 import { insertGateAnnouncement, insertMessageRow } from './transcript.js';
-import { pendingWorkerQuestions } from './worker-question-store.js';
+import { blockingWorkerQuestions } from './worker-question-store.js';
 import { settleWorkerReply } from './worker-questions.js';
 
 export interface BuildDeps {
@@ -1106,7 +1106,7 @@ export function maybeEnqueueVerifyStep(
 ): void {
   const verifyAgentId = todoRow.assignment?.verify?.agentId;
   if (verifyAgentId == null) return;
-  if (pendingWorkerQuestions(deps.db, buildId).length > 0) return;
+  if (blockingWorkerQuestions(deps.db, buildId).length > 0) return;
   const existing = deps.db
     .select({ id: step.id })
     .from(step)
@@ -1148,7 +1148,7 @@ export function maybeEnqueueIndependentReview(
   todoRow: TodoRow,
   buildId: string,
 ): void {
-  if (pendingWorkerQuestions(deps.db, buildId).length > 0) return;
+  if (blockingWorkerQuestions(deps.db, buildId).length > 0) return;
   const buildRow = deps.db.select().from(build).where(eq(build.id, buildId)).get();
   if (buildRow === undefined || githubPrOf(deps, todoRow, buildRow.prNumber) === null) return;
   const head = dispatchHeadSha(deps, buildId);
@@ -2656,7 +2656,10 @@ function stepArtifactGate(
     return '规划未产出方案';
   }
   if (isBuildStepKind(stepRow.kind)) {
-    if (stepRow.kind === 'session' && pendingWorkerQuestions(deps.db, stepRow.buildId).length > 0) {
+    if (
+      stepRow.kind === 'session' &&
+      blockingWorkerQuestions(deps.db, stepRow.buildId).length > 0
+    ) {
       return null;
     }
     if (outcome.output === 'info') {

@@ -3,6 +3,7 @@ import {
   type AskUserQuestionContent,
   type MachineAskBody,
   type MachineAskResponse,
+  redactSecrets,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { build, message, type step, todo } from '../db/schema.js';
@@ -15,6 +16,7 @@ import { setTodoPhase, type TodoDeps } from './todos.js';
 import {
   answerPendingWorkerQuestions,
   readWorkerQuestion,
+  updateWorkerQuestion,
   writeWorkerQuestion,
 } from './worker-question-store.js';
 
@@ -31,6 +33,14 @@ function todoOfBuild(deps: TodoDeps, buildId: string): typeof todo.$inferSelect 
   const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
   if (!todoRow) throw new HttpError(404, `todo ${buildRow.todoId}`);
   return todoRow;
+}
+
+const PUSH_BODY_MAX = 120;
+
+function safeBody(text: string | undefined): string {
+  if (text === undefined || text.trim() === '') return 'needs your decision';
+  const clean = (redactSecrets(text).value as string).replace(/\s+/g, ' ').trim();
+  return clean.length > PUSH_BODY_MAX ? `${clean.slice(0, PUSH_BODY_MAX - 1)}…` : clean;
 }
 
 function parkedReply(content: AskUserQuestionContent): AskUserQuestionContent {
@@ -59,6 +69,9 @@ function openQuestion(
   if (stored !== undefined && existing !== null) {
     return { content: existing, askedAt: stored.createdAt };
   }
+  if (stored !== undefined) {
+    throw new HttpError(409, 'question request id belongs to another message');
+  }
   const askedAt = nowMs();
   const content: AskUserQuestionContent = {
     kind: ASK_USER_QUESTION_KIND,
@@ -67,17 +80,21 @@ function openQuestion(
     questions: body.questions,
     answers: null,
   };
-  writeWorkerQuestion(deps, row.buildId, body.requestId, content, askedAt);
+  if (!writeWorkerQuestion(deps, row.buildId, body.requestId, content, askedAt)) {
+    throw new HttpError(409, 'question request id belongs to another message');
+  }
   const todoRow = todoOfBuild(deps, row.buildId);
   const record = setTodoPhase(deps, todoRow.id, todoRow.phase, { awaitingReply: true });
   if (record !== null) {
-    notifyTodoPhase(deps, record, 'review', body.questions[0]?.question ?? null);
+    notifyTodoPhase(deps, record, 'review', safeBody(body.questions[0]?.question));
     pushWorkerQuestion(
       deps,
       row.buildId,
-      body.questions
-        .map((q) => [q.question, ...q.options.map((o) => o.label)].join('\n'))
-        .join('\n'),
+      safeBody(
+        body.questions
+          .map((q) => [q.question, ...q.options.map((o) => o.label)].join('\n'))
+          .join('\n'),
+      ),
     );
   }
   return { content, askedAt };
@@ -100,7 +117,7 @@ export async function askWorkerQuestion(
     }
     if (Date.now() - askedAt >= ASK_PARK_MS) {
       const parked: AskUserQuestionContent = { ...content, parkedAt: Date.now() };
-      writeWorkerQuestion(deps, row.buildId, body.requestId, parked, askedAt);
+      updateWorkerQuestion(deps, row.buildId, body.requestId, parked, askedAt);
       return responseOf(body.requestId, parkedReply(parked));
     }
     if (opts.signal?.aborted === true || Date.now() >= deadline) {

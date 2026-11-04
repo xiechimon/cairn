@@ -8,6 +8,7 @@ import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { message } from '../db/schema.js';
 import type { ConversationStreamHub } from './events.js';
+import { routingRulesEnabled } from './routing-rules.js';
 
 interface StoreDeps {
   db: Db;
@@ -34,14 +35,30 @@ export function readWorkerQuestion(
   return row === undefined ? null : contentOf(row.content);
 }
 
-export function writeWorkerQuestion(
+function publishQuestion(
   deps: StoreDeps,
   buildId: string,
   requestId: string,
   content: AskUserQuestionContent,
   createdAt: number,
 ): void {
-  deps.db
+  deps.convHub?.publishMessage(buildId, {
+    id: requestId,
+    role: 'assistant',
+    content,
+    createdAt,
+    actor: null,
+  });
+}
+
+export function writeWorkerQuestion(
+  deps: StoreDeps,
+  buildId: string,
+  requestId: string,
+  content: AskUserQuestionContent,
+  createdAt: number,
+): boolean {
+  const inserted = deps.db
     .insert(message)
     .values({
       id: requestId,
@@ -51,15 +68,27 @@ export function writeWorkerQuestion(
       createdAt,
       actor: null,
     })
-    .onConflictDoUpdate({ target: message.id, set: { content } })
+    .onConflictDoNothing()
     .run();
-  deps.convHub?.publishMessage(buildId, {
-    id: requestId,
-    role: 'assistant',
-    content,
-    createdAt,
-    actor: null,
-  });
+  if (inserted.changes === 0) return false;
+  publishQuestion(deps, buildId, requestId, content, createdAt);
+  return true;
+}
+
+export function updateWorkerQuestion(
+  deps: StoreDeps,
+  buildId: string,
+  requestId: string,
+  content: AskUserQuestionContent,
+  createdAt: number,
+): void {
+  if (readWorkerQuestion(deps.db, buildId, requestId) === null) return;
+  deps.db
+    .update(message)
+    .set({ content })
+    .where(and(eq(message.id, requestId), eq(message.conversationId, buildId)))
+    .run();
+  publishQuestion(deps, buildId, requestId, content, createdAt);
 }
 
 function pendingRows(db: Db, buildId: string) {
@@ -99,12 +128,22 @@ export function answerWorkerQuestionsById(
       text,
     }));
     const { cancelReason: _cancelled, ...rest } = content;
-    writeWorkerQuestion(deps, buildId, id, { ...rest, status: 'answered', answers }, row.createdAt);
+    updateWorkerQuestion(
+      deps,
+      buildId,
+      id,
+      { ...rest, status: 'answered', answers },
+      row.createdAt,
+    );
   }
 }
 
 export function pendingWorkerQuestions(db: Db, buildId: string): AskUserQuestionContent[] {
   return pendingRows(db, buildId).map((row) => row.content);
+}
+
+export function blockingWorkerQuestions(db: Db, buildId: string): AskUserQuestionContent[] {
+  return routingRulesEnabled() ? pendingWorkerQuestions(db, buildId) : [];
 }
 
 export function answerPendingWorkerQuestions(
@@ -118,7 +157,7 @@ export function answerPendingWorkerQuestions(
       header: question.header,
       text,
     }));
-    writeWorkerQuestion(
+    updateWorkerQuestion(
       deps,
       buildId,
       row.id,
@@ -135,7 +174,7 @@ export function cancelPendingWorkerQuestions(
   reason: string,
 ): void {
   for (const row of pendingRows(deps.db, buildId)) {
-    writeWorkerQuestion(
+    updateWorkerQuestion(
       deps,
       buildId,
       row.id,
