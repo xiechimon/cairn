@@ -1,7 +1,8 @@
 const SYSTEMCTL_NAMES = /^(?:systemctl|service)$/;
 const UNIT_MUTATIONS =
   /^(?:stop|restart|kill|try-restart|reload|reload-or-restart|try-reload-or-restart|disable|mask|revert|edit|set-property|freeze|clean)$/;
-const HOST_POWER_ACTIONS = /^(?:poweroff|reboot|halt|kexec|isolate|daemon-reexec)$/;
+const HOST_POWER_ACTIONS =
+  /^(?:default|rescue|emergency|poweroff|reboot|halt|kexec|soft-reboot|exit|switch-root|sleep|suspend|hibernate|hybrid-sleep|suspend-then-hibernate|isolate|daemon-reexec)$/;
 const HOST_POWER_COMMANDS = /^(?:shutdown|reboot|poweroff|halt)$/;
 const MACHINECTL_MUTATIONS =
   /^(?:poweroff|terminate|stop|reboot|kill|remove|disable|clean|rename|reset|set-limit|clone)$/;
