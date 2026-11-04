@@ -45,6 +45,7 @@ import {
   FIXED_TAGS,
   INFO_REPORT_MAX_BYTES,
   isBackendRuntimeId,
+  isBuildStepKind,
   isIssueSourcedTask,
   LOCAL_TOOL_CREATE_TAG,
   LocalRepoUnreachableError,
@@ -233,14 +234,14 @@ function confirmedPlanFile(plansDir: string, convId: string): string | null {
 
 function degradedFreshPrompt(claimed: ClaimedStep, plansDir: string, convId: string): string {
   let text = buildTaskPrompt(claimed);
-  if (claimed.step.kind === 'build') {
+  if (isBuildStepKind(claimed.step.kind)) {
     const planFile = confirmedPlanFile(plansDir, convId);
     if (planFile !== null) text = appendConfirmedPlanNote(text, planFile);
   } else if (claimed.step.kind === 'plan') {
     text = appendPlanLocationNote(text, join(plansDir, convId, PLAN_FILE_NAME));
   }
   if (
-    (claimed.step.kind === 'build' ||
+    (isBuildStepKind(claimed.step.kind) ||
       claimed.step.kind === 'merge' ||
       claimed.step.kind === 'verify') &&
     (claimed.project?.repo ?? null) !== null
@@ -450,7 +451,7 @@ async function runClaimedStep(
       : claimed.session.action === 'continue' && claimed.session.sessionId
         ? (claimed.instruction ?? CONTINUE_PROMPTS[claimed.step.kind])
         : buildTaskPrompt(claimed));
-  const isInfoBuild = claimed.step.kind === 'build' && claimed.todo?.output === 'info';
+  const isInfoBuild = isBuildStepKind(claimed.step.kind) && claimed.todo?.output === 'info';
   const readonlyWorkspace = !isChief && claimed.todo?.output === 'info';
   const reportFile = join(deps.paths.reportsDir, convId, REPORT_FILE_NAME);
   const promptWithPlanNote =
@@ -463,7 +464,7 @@ async function runClaimedStep(
     promptWithPlanNote !== null &&
     promptWithPlanNote.trim() !== '' &&
     !isInfoBuild &&
-    (claimed.step.kind === 'build' ||
+    (isBuildStepKind(claimed.step.kind) ||
       claimed.step.kind === 'merge' ||
       claimed.step.kind === 'verify') &&
     (claimed.project?.repo ?? null) !== null
@@ -1090,7 +1091,7 @@ async function runClaimedStep(
   } | null = null;
   let networkRetries = 0;
   const networkRetryDelays =
-    claimed.step.kind === 'plan' || claimed.step.kind === 'build'
+    claimed.step.kind === 'plan' || isBuildStepKind(claimed.step.kind)
       ? PROVIDER_NETWORK_RETRY_DELAYS_MS
       : [0, 5_000];
   const envFirstMs = envPositiveMs(STREAM_FIRST_EVENT_ENV);
@@ -1165,7 +1166,8 @@ async function runClaimedStep(
   const absoluteDurationCapMs = envPositiveMs(STREAM_DURATION_CAP_ENV);
   const streamDurationCapMs =
     absoluteDurationCapMs ?? opts.streamDurationCapMs ?? STREAM_DURATION_CAP_DEFAULT_MS;
-  const progressResetsDuration = claimed.step.kind === 'build' && absoluteDurationCapMs === null;
+  const progressResetsDuration =
+    isBuildStepKind(claimed.step.kind) && absoluteDurationCapMs === null;
   let timedOut = false;
   let timeoutArm: StreamTimeoutArm | null = null;
   const runningToolCalls = new Set<string>();
@@ -1916,7 +1918,7 @@ async function runClaimedStep(
   }
 
   let pushHookOutput: string | null = null;
-  if (claimed.step.kind === 'build' && closingPushHookError !== null) {
+  if (isBuildStepKind(claimed.step.kind) && closingPushHookError !== null) {
     pushHookOutput = stripAnsiEscapes(closingPushHookError.message);
     lastError = null;
     if (ws !== null && deps.workspace) {
@@ -1927,7 +1929,7 @@ async function runClaimedStep(
 
   let preservedCommits: string[] = [];
   if (
-    claimed.step.kind === 'build' &&
+    isBuildStepKind(claimed.step.kind) &&
     lastError !== null &&
     !stopped &&
     ws !== null &&

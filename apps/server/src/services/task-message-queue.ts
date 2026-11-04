@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, queuedMessage, step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
@@ -151,6 +151,31 @@ export function cancelQueuedMessage(deps: BuildDeps, conversationId: string, mes
     .where(and(eq(queuedMessage.id, messageId), eq(queuedMessage.conversationId, conversationId)))
     .run();
   return { conversationId };
+}
+
+export function editQueuedMessage(
+  deps: BuildDeps,
+  conversationId: string,
+  messageId: string,
+  content: string,
+) {
+  const updated = deps.db
+    .update(queuedMessage)
+    .set({ content })
+    .where(
+      and(
+        eq(queuedMessage.id, messageId),
+        eq(queuedMessage.conversationId, conversationId),
+        isNull(queuedMessage.error),
+      ),
+    )
+    .returning({ id: queuedMessage.id })
+    .all();
+  if (updated.length === 0) throw new HttpError(409, 'Queued message was already delivered');
+  const row = deps.db.select().from(build).where(eq(build.id, conversationId)).get();
+  const task = row && deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
+  if (task) addUserMessageAttachmentGrants(deps.db, task.id, task.teamId, content);
+  return { conversationId, message: { id: messageId, content } };
 }
 
 export async function drainTaskMessageQueue(

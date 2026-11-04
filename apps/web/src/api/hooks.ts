@@ -1025,6 +1025,7 @@ export function useApiMutations(teamId: string | undefined) {
         mode?: 'queue';
         deliverAfterStop?: boolean;
         cancelQueued?: boolean;
+        editQueued?: boolean;
         queuedMessageId?: string;
         clientMessageId?: string;
       }) =>
@@ -1034,11 +1035,15 @@ export function useApiMutations(teamId: string | undefined) {
             content: input.content,
             ...(input.deliverAfterStop ? { deliverAfterStop: true } : {}),
             ...(input.cancelQueued ? { cancelQueued: true } : {}),
+            ...(input.editQueued ? { editQueued: true } : {}),
             ...(input.mode ? { mode: input.mode } : {}),
             ...(input.queuedMessageId ? { queuedMessageId: input.queuedMessageId } : {}),
             ...(input.clientMessageId ? { clientMessageId: input.clientMessageId } : {}),
           },
         ),
+      onError: (_error, input) => {
+        void qc.invalidateQueries({ queryKey: ['messages', input.conversationId] });
+      },
       onSuccess: (_data, input) => {
         void qc.invalidateQueries({ queryKey: ['messages', input.conversationId] });
         void qc.invalidateQueries({ queryKey: ['steps', input.conversationId] });

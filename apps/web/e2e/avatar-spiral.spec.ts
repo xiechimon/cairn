@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { spiralAvatarSvg, spiralAvatarUrl } from '../src/lib/spiral-avatar.js';
-import { pressAndExpect } from './helpers.js';
+import { pressAndExpect, expandTurns } from './helpers.js';
 
 const USER_SRC = spiralAvatarUrl('Xmon Dai');
 const AGENT_SRC = spiralAvatarUrl('r3-builder');
@@ -120,6 +120,7 @@ test('no avatar surface reaches a third-party avatar host', async ({ page }) => 
   await page.goto('/app/team?scenario=12');
   await expect(page.getByTestId('team-agent-card').first().locator('img')).toBeVisible();
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=36');
+  await expandTurns(page);
   await expect(page.locator('.chat-row--agent').first()).toBeVisible();
   expect(hits).toEqual([]);
 });
@@ -147,6 +148,7 @@ test('conversation transcript: replies carry no avatar column, user rows are gra
   page,
 }) => {
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=36');
+  await expandTurns(page);
   await expect(page.locator('.chat-row--agent').first()).toBeVisible();
   await expect(page.locator('.chat-row--user').first()).toBeVisible();
   await expect(page.locator('.chat-avatar')).toHaveCount(0);
@@ -165,6 +167,7 @@ test('a working agent shows a pulse under the last line; finished rows stay stil
   page,
 }) => {
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=26');
+  await expandTurns(page);
   await expect(page.getByTestId('live-pulse')).toHaveCount(1);
   await expect(page.getByTestId('live-pulse')).toHaveCSS('animation-name', 'live-pulse');
   await expect(page.locator('.chat-row--agent').first().getByTestId('live-pulse')).toHaveCount(0);
@@ -172,6 +175,7 @@ test('a working agent shows a pulse under the last line; finished rows stay stil
 
 test('the unbound chief reply carries no face and no avatar column', async ({ page }) => {
   await page.goto('/app/schedules?scenario=114');
+  await expandTurns(page);
   const reply = page.getByTestId('chief-stream').getByTestId('chief-msg');
   await expect(reply.first()).toBeVisible();
   await expect(reply.locator('> svg')).toHaveCount(0);

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { expandTurns } from './helpers.js';
 
 const DONE = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=36';
 const CONFIRM = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=17b';
@@ -7,6 +8,7 @@ test('chat body reads at 15px (text-card-title) on the unitless 1.5 type line he
   page,
 }) => {
   await page.goto(DONE);
+  await expandTurns(page);
   await page.locator('.side-panel [data-testid="transcript-col"]').waitFor();
   await page.locator('.side-panel [data-testid=\"transcript-col\"]').waitFor();
   const text = page.getByTestId('agent-text').first();
@@ -27,6 +29,7 @@ test('chat body reads at 15px (text-card-title) on the unitless 1.5 type line he
 test('68ch measure cap binds the body text and the centered note', async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 900 });
   await page.goto(DONE);
+  await expandTurns(page);
   await page.locator('.side-panel [data-testid="transcript-col"]').waitFor();
   await page.locator('.side-panel [data-testid=\"transcript-col\"]').waitFor();
   const caps = await page.evaluate(() => {
@@ -90,6 +93,7 @@ test('composer placeholder sits at 15px (text-card-title)', async ({ page }) => 
 
 test('agent text sits at 15px', async ({ page }) => {
   await page.goto(CONFIRM);
+  await expandTurns(page);
   await page.locator('.side-panel [data-testid="transcript-col"]').waitFor();
   await expect(page.locator('.side-panel [data-testid="agent-text"]').first()).toHaveCSS(
     'font-size',
@@ -99,6 +103,7 @@ test('agent text sits at 15px', async ({ page }) => {
 
 test('bubble / footer keep their own geometry, replies carry no avatar column', async ({ page }) => {
   await page.goto(DONE);
+  await expandTurns(page);
   await page.locator('.side-panel [data-testid="transcript-col"]').waitFor();
   await page.locator('.side-panel [data-testid=\"transcript-col\"]').waitFor();
   const geo = await page.evaluate(() => {
@@ -131,6 +136,7 @@ test('turn boundary is air, not a rule: no divider between a user turn and the a
 }) => {
 
   await page.goto(DONE);
+  await expandTurns(page);
   await page.locator('.side-panel [data-testid="transcript-col"]').waitFor();
   await page.locator('.side-panel [data-testid=\"transcript-col\"]').waitFor();
   const probe = await page.evaluate(() => {
