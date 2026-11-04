@@ -40,6 +40,7 @@ Machine tokens live in the database, so daemons keep their identity; only their 
 On the Mac:
 
 ```sh
+mkdir -p "$MAC_DATA/backups"
 sqlite3 "$MAC_DATA/server/server.db" ".backup '$MAC_DATA/backups/server-cutover.db'"
 sqlite3 "$MAC_DATA/backups/server-cutover.db" "pragma integrity_check"
 $OM 'install -d -m 700 ~/.cairn ~/.cairn/server'
@@ -74,6 +75,7 @@ tailscale serve status
 
 - omarchy: the repo `cairn-daemon.service` already uses `--server http://127.0.0.1:8787`; the Orb daemon's drop-in gets the same URL. Set `serverUrl` in each daemon's `machine.json` to match, so a later start without the flag agrees with it. `--server` wins over `machine.json`; a mismatch only warns.
 - Mac: start the daemon agent with `--server https://<omarchy>` and the same `serverUrl` in its `machine.json`.
+- Start both omarchy executors on the new units: `systemctl --user daemon-reload && systemctl --user enable cairn-daemon.service cairn-daemon-orb.service && systemctl --user restart cairn-daemon.service cairn-daemon-orb.service` (`restart` also starts a unit that is not running). Each logs `Online (machineId=...); polling http://127.0.0.1:8787`.
 
 ## 6. Verify
 
