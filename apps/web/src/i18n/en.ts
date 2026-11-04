@@ -1352,6 +1352,10 @@ export const EN: Record<string, string> = {
   没有等你的事: 'Nothing is waiting on you',
   '{n} 件等你，去处理': '{n## item|# items} waiting on you, open the inbox',
   复盘: 'Retro',
+  外部动态: 'Outside developments',
+  '来源：': 'Source: ',
+  '对应：{matches}': 'Matches: {matches}',
+  '建议动作：{action}': 'Suggested action: {action}',
   昨天的对话里没找到值得改的地方: "Nothing in yesterday's conversations needs a safeguard",
   '这些来源太长，只读了后面的部分：{sources}。':
     'These sources were too long, so only their latest part was read: {sources}. ',
