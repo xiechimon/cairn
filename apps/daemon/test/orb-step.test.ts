@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { AgentBackend, MachineDoneBody, SessionOpts } from '@cairn/shared';
@@ -59,7 +59,7 @@ describe('orb step dispatch', () => {
     const provider = new FakeOrbProvider({ runner: workerRunner(backend) });
     const api = new FakeMachineApi();
     api.claimQueue.push(CLAIMED);
-    const { handle } = await boot({
+    const { handle, paths } = await boot({
       api,
       orbProvider: provider,
       capEnv: { CAIRN_EXECUTOR: 'orb' },
@@ -73,6 +73,9 @@ describe('orb step dispatch', () => {
       expect(text).toContain('orb: started in');
       expect(text.indexOf('orb: creating')).toBeLessThan(text.indexOf('orb: started in'));
       expect(api.doneBodies[0]?.body.status).toBe('success');
+      expect(readdirSync(paths.outboxDir).filter((name) => name.startsWith('step-s1.'))).toEqual(
+        [],
+      );
     } finally {
       await handle.stop();
       await handle.done;
@@ -175,7 +178,7 @@ test('idle stop notes reach the completed step transcript', async () => {
   const provider = new FakeOrbProvider({
     runner: workerRunner(fakeBackend([{ type: 'done', usage: [] }]).backend),
   });
-  const { handle } = await boot({
+  const { handle, paths } = await boot({
     api,
     orbProvider: provider,
     capEnv: { CAIRN_EXECUTOR: 'orb', CAIRN_ORB_IDLE_STOP_MS: '10' },
@@ -184,6 +187,7 @@ test('idle stop notes reach the completed step transcript', async () => {
     await waitFor(() => rows.some((row) => row.includes('orb: stopped')));
     expect(api.doneBodies[0]?.body.status).toBe('success');
     expect(rows.some((row) => row.includes('.agents/setup hook ok'))).toBe(true);
+    expect(readdirSync(paths.outboxDir).filter((name) => name.startsWith('step-s1.'))).toEqual([]);
   } finally {
     await handle.stop();
     await handle.done;

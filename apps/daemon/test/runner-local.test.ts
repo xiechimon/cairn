@@ -386,14 +386,9 @@ describe('runner repo shape wiring (spec 12 G2-T2)', () => {
 });
 
 describe('runner permission gate: merge branch / push branch (XMON-77)', () => {
-  function transcriptRows(paths: {
-    outboxDir: string;
-  }): { id: string; role: string; content: unknown }[] {
-    return JSON.parse(readFileSync(join(paths.outboxDir, 'step-s1.transcript.json'), 'utf8')) as {
-      id: string;
-      role: string;
-      content: unknown;
-    }[];
+  function transcriptRows(client: FakeClient): TranscriptUpload['messages'] {
+    const upload = client.uploads.findLast((u) => typeof u.body !== 'string')?.body;
+    return typeof upload === 'object' ? upload.messages : [];
   }
 
   test('failure mode 6: merge step carries tools but misses either switch → failStep before the session, errorMessage names the missing entry', async () => {
@@ -436,12 +431,12 @@ describe('runner permission gate: merge branch / push branch (XMON-77)', () => {
   });
 
   test('failure mode 8: build step missing "push branch" → commits stay local, no push, transcript lands a push-skip line', async () => {
-    const { client, calls, paths, lines } = await setup(
+    const { client, calls, lines } = await setup(
       claimedStep('build', { kind: 'local', cloneUrl: USER_REPO }, { tools: ['合并分支'] }),
     );
     expect(calls).toEqual([`prepare:${USER_REPO}`, 'commitAll']);
     expect(client.doneBodies[0]!.body.status).toBe('success');
-    const skip = transcriptRows(paths).find((r) => r.id === 'push-skip-s1');
+    const skip = transcriptRows(client).find((r) => r.id === 'push-skip-s1');
     expect(skip?.role).toBe('system');
     expect(String(skip?.content)).toContain('推送分支');
     expect(lines.some((l) => l.includes('推送分支'))).toBe(true);
@@ -784,14 +779,16 @@ for (const baseBranch of ['dev', 'nope']) {
 }
 
 test('a configured GitHub base reaches the agent prompt and PR probe', async () => {
-  const { paths } = await setup(
+  const { client } = await setup(
     claimedStep('build', {
       kind: 'github',
       cloneUrl: 'https://github.com/o/r.git',
       baseBranch: 'dev',
     }),
   );
-  const transcript = readFileSync(join(paths.outboxDir, 'step-s1.transcript.json'), 'utf8');
+  const transcript = JSON.stringify(
+    client.uploads.findLast((u) => typeof u.body !== 'string')?.body,
+  );
   expect(transcript).toContain("--base 'dev'");
   expect(probeMock).toHaveBeenCalledWith(expect.objectContaining({ baseBranch: 'dev' }));
 });
