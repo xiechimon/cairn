@@ -2090,7 +2090,6 @@ async function runClaimedStep(
   }
   clearCredentials(creds);
   journal.remove(stepId);
-  rmSync(join(deps.paths.outboxDir, `step-${stepId}.session.jsonl`), { force: true });
   logger.raw(`finished (${running - 1} running)`);
 }
 
@@ -2213,7 +2212,6 @@ export async function resumePendingUpload(
     }
   }
   journal.remove(stepId);
-  rmSync(join(deps.paths.outboxDir, `step-${stepId}.session.jsonl`), { force: true });
   deps.sessionHandles?.delete(stepId);
   logger.raw(`finished (${running - 1} running)`);
 }
