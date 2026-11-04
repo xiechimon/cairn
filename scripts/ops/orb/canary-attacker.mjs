@@ -1,5 +1,6 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { lookup as resolveName } from 'node:dns/promises';
 import {
   closeSync,
   constants,
@@ -17,7 +18,22 @@ import {
 import { connect } from 'node:net';
 import { basename, join, resolve } from 'node:path';
 
+export const publicDirectTargets = ['http://1.1.1.1:443'];
+
+const DNS_TARGET = 'direct dns github.com';
+const DNS_FAILURES = ['ENOTFOUND', 'EAI_AGAIN', 'ECONNREFUSED', 'ESERVFAIL', 'ETIMEOUT', 'ENODATA'];
+
+export function isContainerConfig(config) {
+  return config.runtime === 'podman';
+}
+
 export function networkTargets(config) {
+  if (isContainerConfig(config))
+    return [
+      'http://127.0.0.1:8787',
+      `http://127.0.0.1:${config.serverPort}`,
+      `http://tailnet-server:${config.serverPort}`,
+    ];
   return [
     'http://127.0.0.1:8787',
     `http://127.0.0.1:${config.serverPort}`,
@@ -26,8 +42,35 @@ export function networkTargets(config) {
   ];
 }
 
+export function refusedTargets() {
+  return [
+    'http://10.0.0.1:443',
+    'http://192.168.1.1:80',
+    'http://172.16.0.1:443',
+    'http://169.254.169.254:80',
+    'http://100.64.0.1:443',
+    'http://127.0.0.1:443',
+    'http://1.1.1.1:25',
+  ];
+}
+
+function socketPaths(config) {
+  return [
+    '/var/run/docker.sock',
+    ...(isContainerConfig(config)
+      ? [
+          '/run/docker.sock',
+          '/run/podman/podman.sock',
+          `/run/user/${config.hostUid}/podman/podman.sock`,
+          `/run/user/${config.hostUid}/docker.sock`,
+        ]
+      : []),
+  ];
+}
+
 export function expectedTargets(config) {
   const paths = [...config.sentinels.map((entry) => entry.path), ...config.realPaths];
+  const container = isContainerConfig(config);
   return {
     directRead: [
       ...paths.flatMap((path) => [path, `/proc/1/root${path}`]),
@@ -36,9 +79,21 @@ export function expectedTargets(config) {
     ],
     symlinkPush: paths,
     socketAndServer: [
-      '/var/run/docker.sock',
+      ...socketPaths(config),
       ...networkTargets(config).flatMap((target) => [`direct ${target}`, `proxy ${target}`]),
+      ...(container
+        ? [
+            ...refusedTargets(config).flatMap((target) => [`direct ${target}`, `proxy ${target}`]),
+            ...publicDirectTargets.map((target) => `direct ${target}`),
+            DNS_TARGET,
+          ]
+        : []),
     ],
+    ...(container
+      ? {
+          sudoRead: [...paths.map((path) => `sudo ${path}`), `sudo ${config.hostHome} enumeration`],
+        }
+      : {}),
   };
 }
 
@@ -135,9 +190,18 @@ export async function attack(
     network = true,
     connectTarget = connectionProbe,
     run = spawnSync,
+    lookup = resolveName,
+    rootProbe = defaultRootProbe,
   } = {},
 ) {
-  const routes = { directRead: [], symlinkPush: [], socketAndServer: [] };
+  const container = isContainerConfig(config);
+  const inOrb = env.CAIRN_ORB === '1';
+  const routes = {
+    directRead: [],
+    symlinkPush: [],
+    socketAndServer: [],
+    ...(container ? { sudoRead: [] } : {}),
+  };
   const leaked = new Set();
   const targets = [
     ...config.sentinels.map((sentinel) => ({ path: sentinel.path, sentinel })),
@@ -186,75 +250,167 @@ export async function attack(
     }
   }
   let githubReach = { ok: false, ms: 0 };
+  let sudo;
   if (network) {
-    routes.socketAndServer.push({
-      target: '/var/run/docker.sock',
-      ...(await connectTarget({ path: '/var/run/docker.sock' })),
-    });
-    const proxy = new URL(env.HTTP_PROXY ?? 'http://10.203.0.1:7890');
+    for (const path of socketPaths(config))
+      routes.socketAndServer.push({ target: path, ...(await connectTarget({ path })) });
+    const proxy = new URL(
+      env.HTTP_PROXY ?? `http://${container ? '127.0.0.1' : '10.203.0.1'}:7890`,
+    );
+    const viaProxy = !container || inOrb;
+    const probeThroughProxy = async (target, label) => {
+      const url = new URL(target);
+      const host = url.hostname === 'tailnet-server' ? config.tailnetAddress : url.hostname;
+      const probe = await connectTarget(
+        { host: proxy.hostname, port: Number(proxy.port) },
+        `CONNECT ${host}:${url.port || '80'} HTTP/1.1\r\nHost: ${host}:${url.port || '80'}\r\n\r\n`,
+      );
+      routes.socketAndServer.push({
+        target: label,
+        ...probe,
+        blocked: probe.blocked && probe.detail === 'proxy HTTP 403',
+      });
+    };
     for (const target of networkTargets(config)) {
       const url = new URL(target);
       const host = url.hostname === 'tailnet-server' ? config.tailnetAddress : url.hostname;
-      const direct = await connectTarget({ host, port: Number(url.port) });
+      const direct = await connectTarget({ host, port: Number(url.port || '80') });
       routes.socketAndServer.push({
         target: `direct ${target}`,
         ...direct,
         blocked: direct.blocked,
         detail:
-          url.hostname === '127.0.0.1' && env.CAIRN_ORB === '1'
+          url.hostname === '127.0.0.1' && inOrb
             ? `orb own loopback; ${direct.detail}`
             : direct.detail,
       });
-      const probe = await connectTarget(
-        { host: proxy.hostname, port: Number(proxy.port) },
-        `CONNECT ${host}:${url.port} HTTP/1.1\r\nHost: ${host}:${url.port}\r\n\r\n`,
-      );
-      routes.socketAndServer.push({
-        target: `proxy ${target}`,
-        ...probe,
-        blocked: probe.blocked && probe.detail === 'proxy HTTP 403',
-      });
+      if (viaProxy) await probeThroughProxy(target, `proxy ${target}`);
     }
-    const started = performance.now();
-    const git = run(
-      'git',
-      [
-        '-c',
-        'credential.helper=',
-        '-c',
-        `http.proxy=${proxy.href}`,
-        'ls-remote',
-        'https://github.com/xiechimon/cairn.git',
-        'HEAD',
-      ],
-      {
-        encoding: 'utf8',
-        timeout: 30000,
-        maxBuffer: 4096,
-        env: {
-          ...env,
-          NO_PROXY: '',
-          no_proxy: '',
-          GIT_TERMINAL_PROMPT: '0',
-          GIT_CONFIG_GLOBAL: '/dev/null',
-          GIT_CONFIG_NOSYSTEM: '1',
+    if (container && inOrb) {
+      for (const target of refusedTargets(config)) {
+        const url = new URL(target);
+        routes.socketAndServer.push({
+          target: `direct ${target}`,
+          ...(await connectTarget({ host: url.hostname, port: Number(url.port || '80') })),
+        });
+        await probeThroughProxy(target, `proxy ${target}`);
+      }
+      for (const target of publicDirectTargets) {
+        const url = new URL(target);
+        routes.socketAndServer.push({
+          target: `direct ${target}`,
+          ...(await connectTarget({ host: url.hostname, port: Number(url.port || '80') })),
+        });
+      }
+      try {
+        await lookup('github.com');
+        routes.socketAndServer.push({ target: DNS_TARGET, blocked: false, detail: 'resolved' });
+      } catch (error) {
+        routes.socketAndServer.push({
+          target: DNS_TARGET,
+          blocked: DNS_FAILURES.includes(error.code),
+          detail: error.code ?? 'lookup error',
+        });
+      }
+    }
+    if (viaProxy) {
+      const started = performance.now();
+      const git = run(
+        'git',
+        [
+          '-c',
+          'credential.helper=',
+          '-c',
+          `http.proxy=${proxy.href}`,
+          'ls-remote',
+          'https://github.com/xiechimon/cairn.git',
+          'HEAD',
+        ],
+        {
+          encoding: 'utf8',
+          timeout: 30000,
+          maxBuffer: 4096,
+          env: {
+            ...env,
+            NO_PROXY: '',
+            no_proxy: '',
+            GIT_TERMINAL_PROMPT: '0',
+            GIT_CONFIG_GLOBAL: '/dev/null',
+            GIT_CONFIG_NOSYSTEM: '1',
+          },
         },
-      },
-    );
-    githubReach = {
-      ok: git.status === 0 && /^[a-f0-9]{40,64}\s+HEAD\s*$/.test(git.stdout ?? ''),
-      ms: Math.round(performance.now() - started),
-    };
+      );
+      githubReach = {
+        ok: git.status === 0 && /^[a-f0-9]{40,64}\s+HEAD\s*$/.test(git.stdout ?? ''),
+        ms: Math.round(performance.now() - started),
+      };
+    }
+  }
+  if (container && inOrb) {
+    const identity = run('sudo', ['-n', 'id', '-u'], { encoding: 'utf8', timeout: 10000 });
+    sudo = { works: identity.status === 0 && identity.stdout?.trim() === '0' };
+    if (sudo.works) {
+      const root = rootProbe(config, run);
+      routes.sudoRead.push(...root.rows);
+      for (const path of root.leaked) leaked.add(path);
+    }
   }
   return {
-    executor: env.CAIRN_ORB === '1' ? 'orb' : 'host',
+    executor: inOrb ? 'orb' : 'host',
     routes,
     leaked: [...leaked],
     githubReach,
+    ...(sudo ? { sudo } : {}),
   };
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
+export function rootReadRows(config, probe = fileProbe, list = readdirSync) {
+  const rows = [];
+  const leaked = [];
+  for (const { path, sentinel } of [
+    ...config.sentinels.map((entry) => ({ path: entry.path, sentinel: entry })),
+    ...config.realPaths.map((path) => ({ path })),
+  ]) {
+    const result = probe(path, sentinel);
+    if (result.marker) leaked.push(path);
+    rows.push({ target: `sudo ${path}`, blocked: result.blocked, detail: result.detail });
+  }
+  try {
+    list(config.hostHome);
+    rows.push({
+      target: `sudo ${config.hostHome} enumeration`,
+      blocked: false,
+      detail: 'host home enumerable',
+    });
+  } catch (error) {
+    rows.push({
+      target: `sudo ${config.hostHome} enumeration`,
+      blocked: error.code === 'ENOENT',
+      detail: error.code ?? 'enumeration error',
+    });
+  }
+  return { rows, leaked };
+}
+
+function defaultRootProbe(config, run) {
+  const result = run('sudo', ['-n', process.execPath, import.meta.filename, '--root-read'], {
+    input: JSON.stringify(config),
+    encoding: 'utf8',
+    timeout: 30000,
+    maxBuffer: 1024 * 1024,
+  });
+  if (result.status !== 0) throw new Error('Root probe failed');
+  return JSON.parse(result.stdout);
+}
+
+if (
+  process.argv[1] &&
+  resolve(process.argv[1]) === import.meta.filename &&
+  process.argv[2] === '--root-read'
+) {
+  const config = JSON.parse(readFileSync(0, 'utf8'));
+  process.stdout.write(`${JSON.stringify(rootReadRows(config))}\n`);
+} else if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
   const config = JSON.parse(readFileSync(process.argv[2], 'utf8'));
   const result = await attack(config, { network: config.probeNetwork !== false });
   writeFileSync('canary-result.json', `${JSON.stringify(result)}\n`, { flag: 'wx', mode: 0o600 });

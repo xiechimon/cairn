@@ -1,5 +1,9 @@
+import { chmodSync, mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:net';
 import { homedir } from 'node:os';
-import { describe, expect, test } from 'vitest';
+import { join } from 'node:path';
+import { describe, expect, onTestFinished, test } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { PodmanOrbRuntime } from '../src/orb/podman.js';
 import type { OrbSpawnSpec } from '../src/orb/runtime.js';
 import { FakePodman } from './podman-fake.js';
@@ -46,6 +50,21 @@ function fixture(options: { command?: readonly string[] } = {}) {
     ...options,
   });
   return { podman, runtime };
+}
+
+async function relayFixture(directoryName = 'cairn-orb-egress', socketName = 'egress.sock') {
+  const root = makeTestTempDir('egr-');
+  const directory = join(root, directoryName);
+  mkdirSync(directory, { mode: 0o700 });
+  const socketPath = join(directory, socketName);
+  const server = createServer((socket) => socket.destroy());
+  await new Promise<void>((resolve) => server.listen(socketPath, resolve));
+  chmodSync(socketPath, 0o600);
+  onTestFinished(async () => {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    releaseTestTempDir(root);
+  });
+  return { root, directory, socketPath };
 }
 
 describe('PodmanOrbRuntime orb ids', () => {
@@ -146,9 +165,10 @@ describe('PodmanOrbRuntime.spawn argv', () => {
 
   test('never widens the sandbox', async () => {
     const { podman, runtime } = fixture();
+    const relay = await relayFixture();
     await runtime.spawn(
       spec({
-        egress: { socketPath: '/run/user/1000/cairn-orb/egress.sock' },
+        egress: { socketPath: relay.socketPath },
         persistentHome: { volume: 'cairn-computer-a', target: '/home/user' },
       }),
     );
@@ -188,18 +208,26 @@ describe('PodmanOrbRuntime.spawn argv', () => {
     expect(noneArgv.filter((arg) => arg === '-v')).toHaveLength(3);
 
     const socket = fixture();
-    await socket.runtime.spawn(
-      spec({ env: {}, egress: { socketPath: '/run/egress/egress.sock' } }),
-    );
+    const relay = await relayFixture();
+    await socket.runtime.spawn(spec({ env: {}, egress: { socketPath: relay.socketPath } }));
     const argv = socket.podman.callsOf('create')[0] ?? [];
     const mounts = argv.flatMap((arg, index) => (argv[index - 1] === '-v' ? [arg] : []));
-    expect(mounts.at(-1)).toBe('/run/egress/egress.sock:/run/cairn-egress/egress.sock:rw');
+    expect(mounts.at(-1)).toBe(`${relay.directory}:/run/cairn-egress:ro`);
     expect(mounts).toHaveLength(4);
     expect(argv.slice(argv.indexOf('-e'), argv.indexOf('-e') + 2)).toEqual([
       '-e',
       'CAIRN_ORB_EGRESS_SOCKET=/run/cairn-egress/egress.sock',
     ]);
     expect(argv).toContain('none');
+  });
+
+  test('a relay socket with a different basename keeps its name in the mounted directory', async () => {
+    const { podman, runtime } = fixture();
+    const relay = await relayFixture('cairn-orb-egress', 'custom.sock');
+    await runtime.spawn(spec({ egress: { socketPath: relay.socketPath } }));
+    const argv = podman.callsOf('create')[0] ?? [];
+    expect(argv).toContain(`${relay.directory}:/run/cairn-egress:ro`);
+    expect(argv).toContain('CAIRN_ORB_EGRESS_SOCKET=/run/cairn-egress/custom.sock');
   });
 
   test('persistent home is a named volume mounted after the bind mounts', async () => {
@@ -1016,4 +1044,50 @@ describe('PodmanOrbRuntime.exec', () => {
     );
     expect(podman.calls).toEqual([]);
   });
+});
+
+describe('dedicated egress export boundary', () => {
+  test.each(['secret.pem', '.credentials'])(
+    'refuses a relay directory containing adjacent %s',
+    async (name) => {
+      const relay = await relayFixture();
+      writeFileSync(join(relay.directory, name), 'synthetic private file', { mode: 0o600 });
+      const { podman, runtime } = fixture();
+      await expect(
+        runtime.spawn(spec({ egress: { socketPath: relay.socketPath } })),
+      ).rejects.toThrow(/dedicated|boundary/i);
+      expect(podman.calls).toEqual([]);
+    },
+  );
+  test('refuses a general directory even when it currently contains only the socket', async () => {
+    const relay = await relayFixture('ssh');
+    const { podman, runtime } = fixture();
+    await expect(runtime.spawn(spec({ egress: { socketPath: relay.socketPath } }))).rejects.toThrow(
+      /dedicated|boundary/i,
+    );
+    expect(podman.calls).toEqual([]);
+  });
+  test.each(['directory', 'socket', 'directory-link', 'socket-link'] as const)(
+    'refuses unsafe %s for the relay export',
+    async (kind) => {
+      const relay = await relayFixture();
+      let socketPath = relay.socketPath;
+      if (kind === 'directory') chmodSync(relay.directory, 0o755);
+      if (kind === 'socket') chmodSync(relay.socketPath, 0o644);
+      if (kind === 'directory-link') {
+        const alias = join(relay.root, 'cairn-orb-egress-alias');
+        symlinkSync(relay.directory, alias);
+        socketPath = join(alias, 'egress.sock');
+      }
+      if (kind === 'socket-link') {
+        socketPath = join(relay.directory, 'alias.sock');
+        symlinkSync(relay.socketPath, socketPath);
+      }
+      const { podman, runtime } = fixture();
+      await expect(runtime.spawn(spec({ egress: { socketPath } }))).rejects.toThrow(
+        /dedicated|boundary/i,
+      );
+      expect(podman.calls).toEqual([]);
+    },
+  );
 });
