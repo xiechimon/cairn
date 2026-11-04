@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { evidenceShot } from './evidence';
 import { expandTurns } from './helpers.js';
 
 const REVIEW = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=28';
@@ -58,9 +59,7 @@ for (const phone of [false, true]) {
         const copy = row.locator('.chat-copy');
         await label.scrollIntoViewIfNeeded();
         await page.mouse.move(0, 0);
-        if (process.env.FOOTER_SCREENSHOT_PHASE) {
-          await page.screenshot({ path: `../../docs/verify/2423/${process.env.FOOTER_SCREENSHOT_PHASE}-${phone ? 'phone' : 'desktop'}-${theme}.png` });
-        }
+        await evidenceShot(page, `${process.env.FOOTER_SCREENSHOT_PHASE ?? 'after'}-${phone ? 'phone' : 'desktop'}-${theme}.png`);
         const textBox = await row.locator('.chat-preview').boundingBox();
         const labelBox = await label.boundingBox();
         const copyBox = await copy.boundingBox();
