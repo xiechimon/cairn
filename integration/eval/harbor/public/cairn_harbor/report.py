@@ -34,7 +34,7 @@ class ArmSummary:
 
 
 def arm_summary(trials: list[TrialCost], label: str) -> ArmSummary:
-    scored = [trial for trial in trials if not trial.infra and not trial.voided]
+    scored = [trial for trial in trials if trial.voided or not trial.infra]
     passed = sum(1 for trial in scored if trial.passed)
     lower, upper = wilson_interval(passed, len(scored))
     wall_times = [trial.wall_sec for trial in scored if trial.wall_sec > 0]
@@ -50,7 +50,9 @@ def arm_summary(trials: list[TrialCost], label: str) -> ArmSummary:
         total=len(trials),
         scored=len(scored),
         passed=passed,
-        infra_failures=sum(1 for trial in trials if trial.infra),
+        infra_failures=sum(
+            1 for trial in trials if trial.infra and not trial.voided
+        ),
         voided=sum(1 for trial in trials if trial.voided),
         pass_rate=passed / len(scored) if scored else 0.0,
         wilson_lower=lower,
@@ -86,8 +88,8 @@ def build_report(
         "",
         "Infra failures (image build errors, setup timeouts, provider outages) are",
         "counted separately and excluded from pass-rate denominators. A trial whose",
-        "trajectory touched a test file or a benchmark site is voided and counted",
-        "the same way, never as an agent failure.",
+        "trajectory touched a test file or a benchmark site is voided and stays in",
+        "the denominator as a scored zero, so voiding can never raise a pass rate.",
         "",
         "## Pass rates",
         "",
