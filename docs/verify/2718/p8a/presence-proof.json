@@ -1,0 +1,12 @@
+{
+  "surface": "isolated live stack, actual REST and SSE",
+  "providerMode": "synthetic daemon credential and HTTP connection; no provider",
+  "transitions": [
+    "offline",
+    "online after POST /api/machine/presence",
+    "offline after machine SSE disconnect"
+  ],
+  "historyCount": 3,
+  "pageReloaded": false,
+  "result": "PASS"
+}

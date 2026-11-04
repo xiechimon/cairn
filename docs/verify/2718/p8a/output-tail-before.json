@@ -1,0 +1,16 @@
+{
+  "surface": "live Vite app with mocked REST/SSE boundary",
+  "initial": {
+    "scroll": 1824,
+    "height": 2016,
+    "viewport": 192
+  },
+  "changed": {
+    "scroll": 1824,
+    "height": 2616,
+    "viewport": 192
+  },
+  "followed": false,
+  "scrolledUp": 0,
+  "result": "FAIL"
+}

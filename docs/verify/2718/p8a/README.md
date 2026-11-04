@@ -1,0 +1,15 @@
+# D75 P8a computer panel proof
+
+The before image runs base `a35e83f5b02977780f89050d2c3a9bedb1692f8d` in an isolated server/Vite stack. The after images run the P8a source with the dispatch timestamp correction. Both stacks use fresh scratch homes and synthetic machine/computer/command rows. URLs use `/app?pane=machines`, without fixture scenarios. The unchanged image is the base Coordinator home with the panel closed.
+
+The live API returns three command records. The browser shows the same three records at desktop width 1280 and an emulated iPhone width of 390, in light and dark themes, with no horizontal document overflow. The output is expanded for the failed command. The persisted API response is in `live-proof.json`.
+
+The isolated test data includes completed, failed, and running commands. No model, daemon, or computer provider was exercised in these screenshots. This is panel/API proof, not the final D75 live-provider proof.
+
+Focused fixture regression covers live command settlement, history/event races, scrolling, redacted output, empty/offline states, long command expansion and machine presence changes. Fixture screenshots are retained locally under `/tmp/d75-p8/` and are not presented as live-app screenshots.
+
+A stateful synthetic daemon connects through the real machine REST/SSE endpoints. `presence-proof.json` records the badge changing from offline to online after `POST /api/machine/presence`, then back to offline after that daemon stream disconnects. The page stays open and retains its three history entries. The final offline state is captured in `live-offline-transition.png`.
+
+The output-tail runtime probe uses the real Vite-rendered component with a mocked REST/SSE boundary. Before the fix, appending lines grows the output from 2016 to 2616 pixels while `scrollTop` stays at 1824, leaving the new tail below view. After the fix, `scrollTop` advances to 2424. A deliberate scroll upward stays at zero after another update. Results are in `output-tail-before.json` and `output-tail-after.json`.
+
+Implementation commit: `2bcadd6639a087dc9a10800cf80927e71421ded9`. Its mandatory hooks passed lint, all workspace typechecks and spec parsing. Focused Playwright regression passed 19 active cases; 20 screenshot-only cases were skipped in that final regression run, after the initial 20-scene screenshot capture. Focused feed/forward/frame tests passed 58 cases; lifecycle/store/SSE tests passed 25 cases. The full suites and cloud review run in CI.

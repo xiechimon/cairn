@@ -1,0 +1,79 @@
+[
+  {
+    "url": "http://127.0.0.1:5351/app?pane=machines",
+    "rows": 3,
+    "width": 1280,
+    "theme": "light",
+    "overflow": false,
+    "path": "/tmp/d75-p8/live-history-1280-light.png",
+    "providerMode": "not exercised; synthetic computer rows"
+  },
+  {
+    "url": "http://127.0.0.1:5351/app?pane=machines",
+    "rows": 3,
+    "width": 390,
+    "theme": "light",
+    "overflow": false,
+    "path": "/tmp/d75-p8/live-history-390-light.png",
+    "providerMode": "not exercised; synthetic computer rows"
+  },
+  {
+    "url": "http://127.0.0.1:5351/app?pane=machines",
+    "rows": 3,
+    "width": 1280,
+    "theme": "dark",
+    "overflow": false,
+    "path": "/tmp/d75-p8/live-history-1280-dark.png",
+    "providerMode": "not exercised; synthetic computer rows"
+  },
+  {
+    "url": "http://127.0.0.1:5351/app?pane=machines",
+    "rows": 3,
+    "width": 390,
+    "theme": "dark",
+    "overflow": false,
+    "path": "/tmp/d75-p8/live-history-390-dark.png",
+    "providerMode": "not exercised; synthetic computer rows"
+  },
+  {
+    "api": "/api/computers/c-proof/commands",
+    "status": 200,
+    "body": {
+      "commands": [
+        {
+          "callId": "0000000000000000000000000000000000000000000000000000000000000001",
+          "stepId": "proof-step",
+          "tool": "shell",
+          "command": "git status --short",
+          "cwd": ".",
+          "status": "done",
+          "exitCode": 0,
+          "output": " M sample.ts",
+          "at": 1793780465117
+        },
+        {
+          "callId": "0000000000000000000000000000000000000000000000000000000000000002",
+          "stepId": "proof-step",
+          "tool": "shell",
+          "command": "pnpm test",
+          "cwd": ".",
+          "status": "error",
+          "exitCode": 1,
+          "output": "FAIL sample.test.ts",
+          "at": 1793780465118
+        },
+        {
+          "callId": "0000000000000000000000000000000000000000000000000000000000000003",
+          "stepId": "proof-step",
+          "tool": "shell",
+          "command": "sleep 60",
+          "cwd": ".",
+          "status": "running",
+          "exitCode": null,
+          "output": "",
+          "at": 1793780465119
+        }
+      ]
+    }
+  }
+]
