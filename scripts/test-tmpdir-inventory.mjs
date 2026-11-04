@@ -104,11 +104,28 @@ export function rawAllocationSites(source, file = 'fixture.ts') {
   return sites;
 }
 
-export function trackedAllocationSites(root) {
-  return execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' })
+export function trackedAllocationSites(root, revision) {
+  if (revision !== undefined && !/^[a-f0-9]{40}$/.test(revision))
+    throw new TypeError('Snapshot revision must be a full commit SHA');
+  const files = execFileSync(
+    'git',
+    revision === undefined ? ['ls-files', '-z'] : ['ls-tree', '-r', '--name-only', '-z', revision],
+    { cwd: root, encoding: 'utf8' },
+  );
+  return files
     .split('\0')
     .filter((file) => TEST_SOURCE.test(file))
-    .flatMap((file) => rawAllocationSites(readFileSync(join(root, file), 'utf8'), file));
+    .flatMap((file) =>
+      rawAllocationSites(
+        revision === undefined
+          ? readFileSync(join(root, file), 'utf8')
+          : execFileSync('git', ['show', `${revision}:${file}`], {
+              cwd: root,
+              encoding: 'utf8',
+            }),
+        file,
+      ),
+    );
 }
 
 export function inventoryKeys(markdown) {

@@ -1,14 +1,14 @@
 # Tracked test temporary-allocation inventory
 
-Snapshot: origin/main 5af926739fe144f15097ea85d55dfb70fabea519. This is an inventory slice of #1951, not completion of its migration. Every pending row still uses a raw allocator; its proposed owner must be implemented and exercised before it can count as migrated.
+Snapshot: origin/main 5af926739fe144f15097ea85d55dfb70fabea519. This is an inventory slice of #1951, not completion of its migration. Every pending row used a raw allocator at that snapshot; its proposed owner must be implemented and exercised before it can count as migrated.
 
 The scanner tokenizes tracked test sources under apps/*/test, apps/web/e2e, integration, packages/*/test and scripts/*.test.*. It records sync, async, namespace, bracket and aliased calls with line and column. Comments, regex examples and string/template text are excluded; calls inside template interpolations are included. Alias matching is conservative across a file, not a type-checker proof of Node API identity.
 
-Run: cairn-heavy node --max-old-space-size=192 --test scripts/test-tmpdir-inventory.test.mjs. No prepush/CI wiring is changed in this slice. Re-run against current main before publication.
+Run: cairn-heavy node --max-old-space-size=192 --test scripts/test-tmpdir-inventory.test.mjs. The snapshot check reads committed source at the declared full SHA, not the CI merge tree or working tree. Later allocations and migrations do not rewrite this historical ledger. Refresh the snapshot deliberately when recording a new inventory; the existing ratchet independently guards current raw-allocation counts. No prepush/CI wiring is changed in this slice.
 
 ## Ownership conventions
 
-Vitest migrations use makeTestTempDir and onTestFinished/afterEach/afterAll release, preserving early cleanup and stopping/awaiting processes before release. Node tests use test-context after or try/finally release. Playwright helpers expose fixture teardown/dispose and release only after child/server shutdown. These are proposed ownership mechanisms for pending rows, not verified current teardown.
+Vitest migrations use makeTestTempDir and onTestFinished/afterEach/afterAll release, preserving early cleanup and stopping/awaiting processes before release. Node tests use test-context after or try/finally release. Playwright helpers expose fixture teardown/dispose and release only after child/server shutdown. CLI and harness allocations use function-level try/finally or explicit close/dispose ownership, including startup failures before a handle is returned. These are proposed ownership mechanisms for pending rows, not verified current teardown.
 
 Shared fixture migrations already merged: apps/server/test/helpers.ts and integration/test/helpers.ts own teardown; apps/daemon/test/machine-loop-harness.ts migrated in #2852. The review-gate host fixtures also migrated in #2857. They have no remaining raw call in this snapshot. The shared allocator scripts/test-tmpdir.mjs is an intentional implementation boundary outside the test-source scope.
 
@@ -322,14 +322,14 @@ Shared fixture migrations already merged: apps/server/test/helpers.ts and integr
 | `apps/server/test/trajectory-reflect.test.ts:82:15` | `mkdtempSync` | Pending: Vitest onTestFinished/afterEach/afterAll release after child shutdown |
 | `apps/web/e2e/demo-server.ts:34:16` | `mkdtempSync` | Pending: Playwright fixture/dispose after server and child shutdown |
 | `apps/web/e2e/live-server.ts:72:16` | `mkdtempSync` | Pending: Playwright fixture/dispose after server and child shutdown |
-| `integration/eval/chief-dispatch-real/run-heldout.mts:28:16` | `mkdtempSync` | Pending: Vitest onTestFinished/afterEach/afterAll release after child shutdown |
-| `integration/eval/chief-dispatch/stack.mts:140:16` | `mkdtempSync` | Pending: Vitest onTestFinished/afterEach/afterAll release after child shutdown |
-| `integration/eval/chief-dispatch/stack.mts:141:21` | `mkdtempSync` | Pending: Vitest onTestFinished/afterEach/afterAll release after child shutdown |
-| `integration/eval/chief-dispatch/stack.mts:286:16` | `mkdtempSync` | Pending: Vitest onTestFinished/afterEach/afterAll release after child shutdown |
-| `integration/eval/git-push-proof/observe.mts:10:17` | `mkdtempSync` | Pending: Vitest onTestFinished/afterEach/afterAll release after child shutdown |
-| `integration/eval/routing/boundary-check.mts:41:14` | `mkdtempSync` | Pending: Vitest onTestFinished/afterEach/afterAll release after child shutdown |
-| `integration/eval/routing/boundary.mts:29:21` | `mkdtempSync` | Pending: Vitest onTestFinished/afterEach/afterAll release after child shutdown |
-| `integration/eval/routing/run.mts:278:23` | `mkdtempSync` | Pending: Vitest onTestFinished/afterEach/afterAll release after child shutdown |
+| `integration/eval/chief-dispatch-real/run-heldout.mts:28:16` | `mkdtempSync` | Pending: runHeldOut try/finally release after evaluator completion or failure |
+| `integration/eval/chief-dispatch/stack.mts:140:16` | `mkdtempSync` | Pending: bootStack startup-failure finally and Stack.close disposal after daemon/server shutdown and escapee reaping |
+| `integration/eval/chief-dispatch/stack.mts:141:21` | `mkdtempSync` | Pending: bootStack startup-failure finally and Stack.close disposal after daemon/server shutdown and escapee reaping |
+| `integration/eval/chief-dispatch/stack.mts:286:16` | `mkdtempSync` | Pending: seedRepoContent try/finally release after Git subprocess completion or failure |
+| `integration/eval/git-push-proof/observe.mts:10:17` | `mkdtempSync` | Pending: top-level observation try/finally release after awaited Git push and evidence capture |
+| `integration/eval/routing/boundary-check.mts:41:14` | `mkdtempSync` | Pending: CLI top-level try/finally release after boundary subprocess checks |
+| `integration/eval/routing/boundary.mts:29:21` | `mkdtempSync` | Pending: executeBounded try/finally release after compiler/runner subprocess completion or failure |
+| `integration/eval/routing/run.mts:278:23` | `mkdtempSync` | Pending: runExperiment try/finally release across empty-run return, job failures and report writing after worker shutdown |
 | `integration/test/adoption-judge.test.ts:253:17` | `mkdtempSync` | Pending: Vitest onTestFinished/afterEach/afterAll release after child shutdown |
 | `integration/test/adoption-judge.test.ts:423:17` | `mkdtempSync` | Pending: Vitest onTestFinished/afterEach/afterAll release after child shutdown |
 | `integration/test/ansi-errormessage-e2e.test.ts:54:12` | `mkdtempSync` | Pending: Vitest onTestFinished/afterEach/afterAll release after child shutdown |

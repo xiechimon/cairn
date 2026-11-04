@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
+import { makeTestTempDir, releaseTestTempDir } from './test-tmpdir.mjs';
 import {
   allocationKey,
   inventoryKeys,
@@ -64,9 +66,11 @@ test('allocation inventory preserves each call location on a shared line', () =>
   );
 });
 
-test('every raw mkdtemp site in tracked test sources is listed in docs/verify/1951/inventory.md', () => {
-  const expected = trackedAllocationSites(root).map(allocationKey).sort();
+test('every raw mkdtemp site at the documented snapshot is listed in docs/verify/1951/inventory.md', () => {
   const markdown = readFileSync(resolve(root, 'docs/verify/1951/inventory.md'), 'utf8');
+  const revision = markdown.match(/^Snapshot: origin\/main ([a-f0-9]{40})\./m)?.[1];
+  assert.ok(revision, 'inventory must name its full snapshot commit SHA');
+  const expected = trackedAllocationSites(root, revision).map(allocationKey).sort();
   const actual = inventoryKeys(markdown).sort();
   assert.equal(
     new Set(actual).size,
@@ -74,4 +78,59 @@ test('every raw mkdtemp site in tracked test sources is listed in docs/verify/19
     'inventory contains duplicate allocation sites',
   );
   assert.deepEqual(actual, expected);
+});
+
+test('allocation snapshot reads committed sources despite staged and working tree changes', () => {
+  const fixture = makeTestTempDir('inventory-snapshot-');
+  try {
+    const git = (...args) =>
+      execFileSync('git', args, {
+        cwd: fixture,
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+    git('init', '--quiet');
+    mkdirSync(resolve(fixture, 'scripts'));
+    const file = resolve(fixture, 'scripts/fixture.test.mjs');
+    writeFileSync(file, 'RAW_SYNC("snapshot");'.replace('RAW_SYNC', 'mkdtempSync'));
+    git('add', '--', 'scripts/fixture.test.mjs');
+    git(
+      '-c',
+      'user.name=Fixture',
+      '-c',
+      'user.email=fixture@example.invalid',
+      'commit',
+      '--quiet',
+      '-m',
+      'snapshot',
+    );
+    const revision = git('rev-parse', 'HEAD').trim();
+    writeFileSync(file, 'makeTestTempDir("migrated");');
+    writeFileSync(
+      resolve(fixture, 'scripts/new.test.mjs'),
+      'RAW_SYNC("later");'.replace('RAW_SYNC', 'mkdtempSync'),
+    );
+    git('add', '--', 'scripts/new.test.mjs');
+    assert.deepEqual(trackedAllocationSites(fixture, revision).map(allocationKey), [
+      'scripts/fixture.test.mjs:1:1',
+    ]);
+    assert.deepEqual(trackedAllocationSites(fixture).map(allocationKey), [
+      'scripts/new.test.mjs:1:1',
+    ]);
+    assert.throws(() =>
+      trackedAllocationSites(fixture, '0000000000000000000000000000000000000000'),
+    );
+  } finally {
+    releaseTestTempDir(fixture);
+  }
+});
+
+test('eval CLI and harness allocations have function-level ownership rather than Vitest hooks', () => {
+  const markdown = readFileSync(resolve(root, 'docs/verify/1951/inventory.md'), 'utf8');
+  const rows = markdown.split('\n').filter((line) => line.startsWith('| `integration/eval/'));
+  assert.equal(rows.length, 8);
+  for (const row of rows) {
+    assert.doesNotMatch(row, /Vitest|onTestFinished|afterEach|afterAll/);
+    assert.match(row, /finally|close|dispose/);
+  }
 });
