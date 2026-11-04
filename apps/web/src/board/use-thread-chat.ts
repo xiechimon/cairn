@@ -142,8 +142,12 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
       onMessage: () => {
         void invalidateConverged(qc, { queryKey: ['todo', todoId] });
       },
+      onStep: () => {
+        void invalidateConverged(qc, { queryKey: ['todo', todoId] });
+        if (buildId !== null) void invalidateConverged(qc, { queryKey: ['usage', buildId] });
+      },
     }),
-    [qc, todoId],
+    [qc, todoId, buildId],
   );
   useConversationStream(buildId ?? undefined, live, streamHandlers);
 
