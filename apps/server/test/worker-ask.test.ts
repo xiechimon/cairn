@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { build, message, project, step, todo } from '../src/db/schema.js';
 import {
+  applyStoppedStep,
   completeStep,
   maybeEnqueueIndependentReview,
   startBuilds,
@@ -383,6 +384,27 @@ describe('a parked worker question holds the gates', () => {
       expect(getTodo(deps(), todoId)!.phase).toBe(phase);
     },
   );
+});
+
+describe('stopping a session with a pending question', () => {
+  test('clears awaitingReply and cancels the question', async () => {
+    const { todoId, buildId, stepRow } = startSession(false);
+    H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
+    H.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, stepRow.id)).run();
+    const claimed = H.s.db.select().from(step).where(eq(step.id, stepRow.id)).get()!;
+    await askWorkerQuestion(
+      deps(),
+      claimed,
+      { requestId: REQUEST, questions: QUESTIONS },
+      { holdMs: 0 },
+    );
+    expect(getTodo(deps(), todoId)!.awaitingReply).toBe(true);
+    applyStoppedStep(deps(), stepRow.id);
+    expect(getTodo(deps(), todoId)!.awaitingReply).toBeFalsy();
+    const rows = H.s.db.select().from(message).where(eq(message.conversationId, buildId)).all();
+    expect(JSON.stringify(rows)).toContain('cancelled');
+    expect(JSON.stringify(rows)).not.toContain('"status":"pending"');
+  });
 });
 
 describe('worker question hardening', () => {

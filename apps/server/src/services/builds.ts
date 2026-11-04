@@ -173,7 +173,7 @@ import {
   splitBlockersSatisfied,
 } from './todos.js';
 import { insertGateAnnouncement, insertMessageRow } from './transcript.js';
-import { blockingWorkerQuestions } from './worker-question-store.js';
+import { blockingWorkerQuestions, cancelPendingWorkerQuestions } from './worker-question-store.js';
 import { settleWorkerReply } from './worker-questions.js';
 
 export interface BuildDeps {
@@ -578,6 +578,22 @@ function hasLeftExecution(phase: Phase): boolean {
   return phase === 'closed' || phase === 'done' || phase === 'todo';
 }
 
+function dropQuestionOnPhaseChange(
+  deps: BuildDeps,
+  todoRow: typeof todo.$inferSelect,
+  to: Phase,
+): { awaitingReply?: false } {
+  if (!todoRow.awaitingReply || to === 'review') return {};
+  if (todoRow.latestBuildId !== null) {
+    cancelPendingWorkerQuestions(
+      deps,
+      todoRow.latestBuildId,
+      'The thread moved on before an answer.',
+    );
+  }
+  return { awaitingReply: false };
+}
+
 function landReservedPhase(
   deps: BuildDeps,
   todoRow: typeof todo.$inferSelect,
@@ -586,7 +602,12 @@ function landReservedPhase(
   if (todoRow.phase !== desired) {
     deps.db
       .update(todo)
-      .set({ phase: desired, phaseAt: nowMs(), v: todoRow.v + 1 })
+      .set({
+        ...dropQuestionOnPhaseChange(deps, todoRow, desired),
+        phase: desired,
+        phaseAt: nowMs(),
+        v: todoRow.v + 1,
+      })
       .where(eq(todo.id, todoRow.id))
       .run();
     const record = getTodo(deps, todoRow.id);
@@ -687,7 +708,12 @@ export function applyStoppedStep(deps: BuildDeps, stepId: string): void {
   const target = stopFallbackPhase(db, buildRow);
   if (todoRow.phase === target) return;
   db.update(todo)
-    .set({ phase: target, phaseAt: nowMs(), v: todoRow.v + 1 })
+    .set({
+      ...dropQuestionOnPhaseChange(deps, todoRow, target),
+      phase: target,
+      phaseAt: nowMs(),
+      v: todoRow.v + 1,
+    })
     .where(eq(todo.id, todoRow.id))
     .run();
   const record = getTodo(deps, todoRow.id);
@@ -707,7 +733,12 @@ function releaseZombieQueued(
   const target = stopFallbackPhase(db, buildRow);
   if (todoRow.phase === target) return;
   db.update(todo)
-    .set({ phase: target, phaseAt: nowMs(), v: todoRow.v + 1 })
+    .set({
+      ...dropQuestionOnPhaseChange(deps, todoRow, target),
+      phase: target,
+      phaseAt: nowMs(),
+      v: todoRow.v + 1,
+    })
     .where(eq(todo.id, todoRow.id))
     .run();
   const fresh = db.select().from(build).where(eq(build.id, buildRow.id)).get();
