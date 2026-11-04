@@ -11,7 +11,7 @@
 - Keep GitOps, MCP and LLM provider access behind `apps/daemon/src/backend/`; check the seam before moving files or adding dependencies.
 - Never kill another lane's processes; inspect the PID, command and working directory before stopping a process you started.
 - Do not set `TMPDIR` without `CAIRN_HEAVY_SLOTS_DIR`; all lanes must share the heavy-work slot directory.
-- Run `/security-review` before opening a PR touching any security surface below; fix confirmed findings, or record the reason in Risk and ask ian to confirm an unfixed finding.
+- Before merging a PR touching a canonical security surface below, require trusted Codex `security_review` state on the exact head with `status=completed` and `has_unresolved_findings=false`, plus green CI and `review-gate` SUCCESS. Request `@codex security review` when needed; fix and resolve every security finding regardless of severity. If no security review arrives within 30 minutes, ask ian. D88 permits an explicitly null unresolved field only with a trusted fresh clean SECURITY receipt unambiguously bound to this head. Both approval paths require zero unresolved security-review threads at every severity; unknown thread attribution blocks. Missing fields, malformed values and explicit true stay blocked; code review remains independent. Codex security review replaces `/security-review`; no later Claude rerun is required.
 
 Security surfaces (the `credentials`, `machineAndCommandBoundary` and `externalEntryAuth` lists in `packages/shared/merge-gate-paths.json`, the one source for protected and auto-merge paths; `apps/server/test/merge-gate-paths-json.test.ts` fails when this list differs):
 
@@ -38,7 +38,7 @@ Security surfaces (the `credentials`, `machineAndCommandBoundary` and `externalE
 
 - Required CI checks must pass on the PR's current head before an agent enables merge; a local pass does not substitute for CI.
 - Agents may enable merge only when `.claude/workflows/pr-gate.js` returns go with `mergedBy: 'auto-merge'`; protected-path PRs and every other route go to ian. Never merge or arm auto-merge on ian's route unless ian authorizes it in chat.
-- ian may admin-merge. That authority does not extend to agents.
+- ian may admin-merge. When ian authorizes a named PR on his route in chat, an agent may merge it with `gh pr merge <n> --admin`, using the merge method `docs/ops/agent-bot-identity.md` gives its opener (`--squash` for a human-opened PR, `--rebase` for one opened by `app/cairnwright`), once every required check passes on the current head, `review-gate` included, and the PR body has no unchecked task. Without that per-PR authorization, agents never use `--admin`.
 - The eval ruler is protected so no PR can edit what judges it: `integration/eval/**`, `.claude/hillclimb/**`, the trajectory exporter, its outcome fields and the pack schema (the eval globs in `packages/shared/merge-gate-paths.json`).
 - Never add the `needs-decision` label. Agents decide by their own recommendation, say what they chose and why in chat, and continue; ask ian for payments, credentials, intended-behavior or design changes, and decisions explicitly routed to him. A `needs-decision` label already on a PR keeps `pr-evidence` red and disarms auto-merge until it is removed; agents remove it only with `CAIRN_DECIDED=1` after ian gave the decision in chat.
 - Before asking ian about a PR with auto-merge armed, disarm it with `gh pr merge <n> --disable-auto`.
@@ -59,13 +59,20 @@ Security surfaces (the `credentials`, `machineAndCommandBoundary` and `externalE
 - Run `pnpm prepush` before pushing. It runs fast checks only; tests run in CI. A push is unverified until CI reports on that head. Run the exact command of any CI step your diff changes.
 - Verify mechanism changes on compiled output, runtime logs or snapshots; use `.claude/skills/verify-cairn/SKILL.md` for acceptance guidance.
 - Do not run a local `codex exec` or `claude -p` review before pushing. Codex cloud code review (`chatgpt-codex-connector[bot]`) reviews every push through the review gate, and that review on the PR head satisfies the other-vendor review. Fix confirmed findings, and record unfixed findings with reasons in Risk.
-- Protected or security paths need the Codex cloud review on the PR head plus `/security-review`; fix confirmed findings or record the reason in Risk. Docs-only changes outside protected or security paths skip code review.
+- Protected paths require Codex cloud code review on the PR head. Canonical security surfaces also require the exact-head Codex security approval defined under Safety; ordinary code review alone is insufficient. Docs-only changes outside protected or security paths skip code review.
 - After three review rounds, rethink the approach or hand the PR to ian.
 - Review PRs with `docs/pr-review.md`; read diffs without switching branches in a shared worktree.
 - Decisions are recorded in the owner's plan decision table, not as ADRs; rules that must hold are enforced by checks (tests, gates, `packages/shared/merge-gate-paths.json`).
 - Small changes need no issue or overlap lookup. Reuse an existing issue or PR when it already covers the request.
 - Write PR bodies per `.claude/skills/pr-cairn/SKILL.md`: Proof first, then What, with Review and Risk collapsed; visible prose is capped at 600 characters.
 - Commit format: `<scope>(<ticket>): <subject>`, in English. Put `closes #N` in the commit message for the closing segment, never only in the PR body; do not close a parent ticket from an intermediate segment.
+
+## Review guidelines
+
+- Review only what the PR changes. Report a defect on a line the PR did not add or modify only when the PR's change makes it reachable or worse; otherwise leave it for the nightly scan, which files old-code problems as issues.
+- On a later review of the same PR, read only the commits pushed since the last review and do not repeat a finding that is already raised or resolved.
+- Name the bug class of each finding and list every instance of it in the diff, so one push fixes the class instead of one line per round.
+- Use P0 or P1 only for a defect that breaks behavior, loses data or opens a security hole. Ordinary code-review P2/P3 findings do not block; canonical security surfaces require zero unresolved security findings at every severity.
 
 ## Worktrees and ports
 

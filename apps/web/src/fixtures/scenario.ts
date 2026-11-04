@@ -111,6 +111,7 @@ import {
 } from './fixtures.js';
 import { homeC, homeCEmpty } from './home-c.js';
 import type { FixtureSet } from './records.js';
+import { turnFoldThread } from './turn-fold.js';
 
 export const SCENARIO_PARAM = 'scenario';
 
@@ -151,6 +152,7 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       'sidebar-snooze': sidebarSnooze,
       'sidebar-groups': sidebarGroups,
       'home-c': homeC,
+      'turn-fold-thread': turnFoldThread,
       'home-c-empty': homeCEmpty,
       'sidebar-thread-statuses': sidebarThreadStatuses,
       'board-inbox': boardInbox,

@@ -5,6 +5,7 @@ import {
   createSkillBodySchema,
   derivePlaceholderTitle,
   FIXED_TAGS,
+  isBuildStepKind,
   updateSkillToolParamsSchema,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
@@ -26,11 +27,12 @@ import { agentForStep } from './dispatch-eligibility.js';
 import { projectOfTodo } from './git.js';
 import { isChiefConversation, type MachineDeps, ownedStep } from './machines.js';
 import { stepScopeProjectId } from './picked-project.js';
-import { memoryOwnerOf, routeForStep } from './routing-rules.js';
+import { memoryOwnerOf, routeForStep, routingRulesEnabled } from './routing-rules.js';
 import { createLocalSkill, updateLocalSkill } from './skills.js';
 import { resolveFixedTagId, resolveProjectTagIds } from './tags.js';
 import { executeThreadScheduleTool, isThreadScheduleTool } from './thread-schedule-tools.js';
 import { updateTodo, writebackSelfIssueTitle } from './todos.js';
+import { askWorkerQuestion, recordThreadReportLine } from './worker-questions.js';
 
 export async function machineAsk(
   deps: MachineDeps,
@@ -40,6 +42,9 @@ export async function machineAsk(
   opts: { holdMs: number; signal?: AbortSignal } = { holdMs: ASK_HOLD_MS },
 ): Promise<MachineAskResponse> {
   const row = ownedStep(deps, machineId, stepId);
+  if (row.kind === 'session' && routingRulesEnabled()) {
+    return askWorkerQuestion(deps, row, body, opts);
+  }
   if (row.kind !== 'chief' || !isChiefConversation(row.buildId)) {
     throw new HttpError(400, `step ${stepId} is not a chief step`);
   }
@@ -84,7 +89,7 @@ export async function executeRelayToolCall(
 ): Promise<string> {
   const row = ownedStep(deps, machineId, stepId);
   if (isThreadScheduleTool(name)) {
-    if (row.kind !== 'plan' && row.kind !== 'build') {
+    if (row.kind !== 'plan' && !isBuildStepKind(row.kind)) {
       throw new HttpError(400, 'schedule tools require a plan or build step');
     }
     if (row.status !== 'claimed') {
@@ -155,6 +160,12 @@ async function executeWorkerMemoryToolCall(
   if (!todoRow) throw new NotFoundError(`todo ${buildRow.todoId}`);
   if (isThreadScheduleTool(name)) {
     return executeThreadScheduleTool(deps, todoRow, `worker:${row.id}`, name, params);
+  }
+  if (name === 'thread_report' && row.kind === 'session' && routingRulesEnabled()) {
+    if (row.status !== 'claimed') {
+      throw new HttpError(409, 'thread_report requires a currently claimed step');
+    }
+    return recordThreadReportLine(deps, row, params.line);
   }
   if (name === 'attach_file') return attachWorkerFile(deps, row, todoRow, params);
   if (name === 'set_task_meta') return setTaskMeta(deps, todoRow, params);

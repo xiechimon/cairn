@@ -1,4 +1,4 @@
-import { and, desc, eq, isNotNull, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, gateState, message, step, tag, type todo, todoTag } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
@@ -58,7 +58,7 @@ export function assertCorrectionDone(
       .where(
         and(
           eq(step.buildId, latest.id),
-          eq(step.kind, 'build'),
+          inArray(step.kind, ['build', 'session']),
           eq(step.status, 'done'),
           isNotNull(step.checkpointCommit),
         ),

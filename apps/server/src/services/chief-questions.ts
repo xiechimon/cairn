@@ -149,8 +149,6 @@ export function createOrGetQuestion(
     answers: null,
     ...(input.provenance !== undefined ? { provenance: input.provenance } : {}),
   };
-  writeQuestion(deps.db, input.threadId, input.requestId, content, nowMs());
-  publishRow(deps, input.threadId, input.requestId);
   const threadRow = deps.db
     .select()
     .from(chiefThread)
@@ -164,18 +162,22 @@ export function createOrGetQuestion(
     chiefRow?.agentId !== undefined && chiefRow.agentId !== null
       ? deps.db.select().from(agent).where(eq(agent.id, chiefRow.agentId)).get()
       : undefined;
-  if (deps.hub !== undefined && deps.user !== undefined) {
-    notifyChiefMessage(
-      { db: deps.db, hub: deps.hub, user: deps.user },
-      {
-        threadId: input.threadId,
-        message: input.questions[0]?.question ?? '',
-        ...(agentRow
-          ? { agent: { name: agentRow.displayName, avatarUrl: agentRow.avatarUrl } }
-          : { agent: { name: deps.user.displayName, avatarUrl: deps.user.avatarUrl } }),
-      },
-    );
-  }
+  deps.db.transaction(() => {
+    writeQuestion(deps.db, input.threadId, input.requestId, content, nowMs());
+    if (deps.hub !== undefined && deps.user !== undefined) {
+      notifyChiefMessage(
+        { db: deps.db, hub: deps.hub, user: deps.user },
+        {
+          threadId: input.threadId,
+          message: input.questions[0]?.question ?? '',
+          ...(agentRow
+            ? { agent: { name: agentRow.displayName, avatarUrl: agentRow.avatarUrl } }
+            : { agent: { name: deps.user.displayName, avatarUrl: deps.user.avatarUrl } }),
+        },
+      );
+    }
+  });
+  publishRow(deps, input.threadId, input.requestId);
   if (deps.user !== undefined && deps.vapidKeys != null) {
     const questionLines = input.questions.map((q) => {
       const options = q.options.map((o) => o.label).join(' / ');

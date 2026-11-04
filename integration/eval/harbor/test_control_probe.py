@@ -58,7 +58,7 @@ def test_sampler_keeps_peak_usage_and_first_network_mode_per_container():
     state.observe("abc", "trial-main-1", "none", 1_000_000)
     state.observe("abc", "trial-main-1", "none", 3_000_000)
     state.observe("abc", "trial-main-1", "none", 2_000_000)
-    state.observe("def", "trial-verifier-1", "none", None)
+    state.observe("def", "trial-verifier-1", "none", 0)
     assert state.cpu_seconds() == 3.0
     assert state.isolation() == [
         {"id": "abc", "name": "trial-main-1", "networkMode": "none"},
@@ -151,3 +151,16 @@ def test_outcome_is_written_by_the_parent_with_its_pid(tmp_path):
         "writer": "host-parent-process",
         "writerPid": 4242,
     }
+
+
+def test_cpu_is_unavailable_when_no_container_reported_usage():
+    state = probe.ContainerState()
+    state.observe("abc", "trial-main-1", "none", None)
+    assert state.cpu_seconds() is None
+
+
+def test_cpu_is_unavailable_when_any_container_lacks_usage():
+    state = probe.ContainerState()
+    state.observe("abc", "trial-main-1", "none", 2_000_000)
+    state.observe("def", "trial-verifier-1", "none", None)
+    assert state.cpu_seconds() is None

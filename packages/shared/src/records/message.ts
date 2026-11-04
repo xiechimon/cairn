@@ -92,6 +92,8 @@ export const CHIEF_REPORT_KIND = 'chief_daily_report';
 export const CHIEF_REPORT_ROW_ID_PREFIX = 'chief-report-';
 export const CHIEF_REPORT_REF_MAX = 8;
 export const CHIEF_REPORT_RETRO_MAX = 5;
+export const CHIEF_REPORT_INTAKE_MAX = 5;
+export const INTAKE_SOURCE_KIND = 'intake';
 
 const chiefReportTodoRefSchema = z.object({
   id: z.string(),
@@ -130,6 +132,18 @@ export const retroProposalSchema = z.object({
 });
 export type RetroProposal = z.infer<typeof retroProposalSchema>;
 
+export const intakeItemSchema = z.object({
+  id: z.string(),
+  url: z.string(),
+  claim: z.string().min(1).max(400),
+  matches: z.string().max(400),
+  action: z.string().max(400),
+  projectId: z.string(),
+  status: retroProposalStatusSchema,
+  todoId: z.string().nullable(),
+});
+export type IntakeItem = z.infer<typeof intakeItemSchema>;
+
 export const chiefReportLedgerSchema = z.object({
   finished: z.array(chiefReportTodoRefSchema),
   finishedCount: z.number().int(),
@@ -156,6 +170,7 @@ export const chiefReportContentSchema = z.object({
     questions: z.number().int(),
   }),
   retro: z.array(retroProposalSchema),
+  intake: z.array(intakeItemSchema).optional(),
   retroRan: z.boolean(),
   truncated: z.array(z.string()),
 });
@@ -177,6 +192,8 @@ export const chiefModelFallbackContentSchema = z.object({
 });
 export type ChiefModelFallbackContent = z.infer<typeof chiefModelFallbackContentSchema>;
 
+export const THREAD_REPORT_LINE_MAX = 200;
+
 export const threadReportContentSchema = z.object({
   kind: z.literal('thread-report'),
   todoId: recordId,
@@ -185,6 +202,7 @@ export const threadReportContentSchema = z.object({
   title: z.string(),
   wakeStepId: recordId.optional(),
   verified: z.boolean().optional(),
+  line: z.string().max(THREAD_REPORT_LINE_MAX).optional(),
 });
 export type ThreadReportContent = z.infer<typeof threadReportContentSchema>;
 
@@ -384,7 +402,9 @@ export const buildSteerBodySchema = z.object({
   mode: z.literal('queue').optional(),
   deliverAfterStop: z.boolean().optional(),
   cancelQueued: z.boolean().optional(),
+  editQueued: z.boolean().optional(),
   queuedMessageId: recordId.optional(),
+  clientMessageId: z.string().min(1).max(200).optional(),
 });
 export type BuildSteerBody = z.infer<typeof buildSteerBodySchema>;
 

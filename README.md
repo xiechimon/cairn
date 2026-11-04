@@ -1,17 +1,12 @@
 <div align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="site/img/banner-dark.webp">
-    <img alt="Cairn: agents stacking a cairn on a mountain path while a person waits at the gate" src="site/img/banner-light.webp" width="100%">
-  </picture>
-
-  <p><b>Tell one Coordinator what you want. Agents build it in isolated threads on your machines. Autonomous merges pass an evidence gate bound to the exact patch.</b></p>
-
-  <p>A self-hosted, open-source agent team that also develops itself.</p>
+  <img src="site/logo.svg" alt="Cairn" width="64" height="64">
+  <h1>Cairn</h1>
 
   <p>
+    <b>English</b> ·
+    <a href="./README.zh.md">Simplified Chinese</a> ·
     <a href="https://cairn.xmon.me">Website</a> ·
-    <a href="#quickstart">Quickstart</a> ·
-    <a href="./README.zh.md">Simplified Chinese</a>
+    <a href="#quickstart">Quickstart</a>
   </p>
 
   <p>
@@ -21,15 +16,24 @@
     <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-173a2f?style=flat-square">
     <img alt="Self-hosted" src="https://img.shields.io/badge/self--hosted-SQLite-173a2f?style=flat-square">
   </p>
+
+  <p><b>Tell one Coordinator what you want. Agents build it in isolated threads on your machines, and nothing merges without evidence.</b></p>
+
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="site/img/hero-dark.webp">
+    <img alt="Cairn on desktop: the Coordinator conversation with the decisions waiting on you pinned, and a thread open on a phone" src="site/img/hero-light.webp" width="100%">
+  </picture>
+
+  <img alt="Cairn on a phone: decisions waiting on you, a thread, a project home and all work" src="site/img/phones.webp" width="100%">
 </div>
 
-## Highlights
-
-- **One Coordinator, many threads.** You talk to a single Coordinator from any device. It listens, opens a thread for each piece of work and stays out of the way. Each thread runs one agent session (Claude Code or Gemini CLI on your subscription, or the built-in pi runtime on any provider) and carries the work from plan to pull request on its own.
-- **Only what needs you.** The home page pins the decisions waiting on you; progress and results stay in the conversation and a daily summary. A push notification goes out only when a person must act.
-- **An evidence-bound merge gate.** Before an agent merges, the gate counts only review verdicts bound to the PR's current patch digest and refuses if the head moved after the verdict; its rules are model-checked in TLA+. The manual merge button still checks only the pinned commit (spec 18, F1). Protected paths still stop for you; the AI reviewer can block a merge, not just comment on it.
-- **Eval-gated harness changes.** Every build records its base SHA and a harness hash, and rejections are stored as structured records. Changes to the Coordinator's dispatch harness must clear an eval regression floor before they merge; paired-trial adoption for prompt, skill and routing changes is planned. "Training" here means improving the harness, never fine-tuning weights.
+- **Coordinator.** You talk to a single Coordinator from any device. It listens, opens a thread for each piece of work and reports back in one conversation that never ends.
+- **Threads.** One unit of work, one agent session: Claude Code or Gemini CLI on your subscription, or the built-in pi runtime on any provider. A thread carries the work from plan to pull request, and you can open it in a side chat to steer it.
+- **Only what needs you.** The home page pins the decisions waiting on you and shows what is in progress. A push notification goes out only when a person must act.
+- **Evidence-bound merge gate.** Before an agent merges, the gate counts only review verdicts bound to the PR's current patch digest and refuses if the head moved after the verdict; its rules are model-checked in TLA+. The manual merge button still checks only the pinned commit (spec 18, F1). Protected paths still stop for you, and the AI reviewer can block a merge, not just comment on it.
+- **Eval-gated harness.** Every build records its base SHA and a harness hash, and rejections are stored as structured records. Changes to the Coordinator's dispatch harness must clear an eval regression floor before they merge; paired-trial adoption for prompt, skill and routing changes is planned. "Training" here means improving the harness, never fine-tuning weights.
 - **Your machines.** Register any host by running the daemon on it. A thread runs on any machine that meets its runtime, model and tool constraints, in its own git worktree, or in a throwaway per-task Orb container where the host supports it (`CAIRN_EXECUTOR=orb`, opt-in for now). Plans, diffs and tool calls stream back live.
+- **Projects.** A project home with its instructions, memory, secrets and a concurrency limit; a person's message always jumps the queue. Repos are hosted by the server itself or connected from GitHub.
 - **Bootstrap loop.** Cairn takes its own tickets, implements them, reviews them and opens the PRs: it is being used to build itself.
 
 ## Showcase
@@ -189,7 +193,7 @@ After your team's first pull request merges, Cairn can show a dismissible card l
 ## Third-party credits
 
 - Avatar font [Lorelei](https://www.figma.com/community/file/1198749693280469639) — © Lisa Wischofsky, CC0 1.0
-- Fonts Instrument Sans / Bricolage Grotesque / Source Serif 4 / JetBrains Mono — SIL Open Font License 1.1
+- Fonts Instrument Sans / Source Serif 4 / JetBrains Mono — SIL Open Font License 1.1
 - Icons [lucide](https://lucide.dev) — ISC License
 - Emoji curation data [gitmoji](https://gitmoji.dev) — MIT License
 - Execution engine [pi SDK](https://github.com/badlogic/pi-mono) — MIT License

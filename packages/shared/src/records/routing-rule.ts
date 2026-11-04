@@ -7,7 +7,7 @@ export const ROUTE_USES = ['coordinator', 'session', 'review', 'digest', 'compac
 export type RouteUse = (typeof ROUTE_USES)[number];
 export const routeUseSchema = z.enum(ROUTE_USES);
 
-const SESSION_STEP_KINDS: ReadonlySet<StepKind> = new Set(['plan', 'build', 'verify']);
+const SESSION_STEP_KINDS: ReadonlySet<StepKind> = new Set(['plan', 'build', 'session', 'verify']);
 
 export const routeOverrideSchema = z.object({
   machineId: recordId.optional(),

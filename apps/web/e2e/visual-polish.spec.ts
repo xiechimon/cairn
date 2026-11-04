@@ -7,11 +7,7 @@ async function edgeContract(page: Page, selector: string) {
     const colorProbe = document.createElement('div');
     colorProbe.style.backgroundColor = 'var(--border)';
     const cardShadowProbe = document.createElement('div');
-    cardShadowProbe.style.boxShadow = 'var(--card-shadow)';
-    const edgeShadowProbe = document.createElement('div');
-    edgeShadowProbe.style.boxShadow = 'var(--edge-shadow)';
-    const plateShadowProbe = document.createElement('div');
-    plateShadowProbe.style.boxShadow = 'var(--plate-shadow)';
+    cardShadowProbe.style.boxShadow = 'var(--cds-shadow-sm)';
     const cardLiftProbe = document.createElement('div');
     cardLiftProbe.style.boxShadow = 'var(--card-lift)';
     const panelShadowProbe = document.createElement('div');
@@ -22,8 +18,6 @@ async function edgeContract(page: Page, selector: string) {
       ringProbe,
       colorProbe,
       cardShadowProbe,
-      edgeShadowProbe,
-      plateShadowProbe,
       cardLiftProbe,
       panelShadowProbe,
       borderTokenProbe,
@@ -36,8 +30,6 @@ async function edgeContract(page: Page, selector: string) {
       borderToken: getComputedStyle(borderTokenProbe).backgroundColor,
       borderColorOwn: cs.borderTopColor,
       cardShadow: getComputedStyle(cardShadowProbe).boxShadow,
-      edgeShadow: getComputedStyle(edgeShadowProbe).boxShadow,
-      plateShadow: getComputedStyle(plateShadowProbe).boxShadow,
       cardLift: getComputedStyle(cardLiftProbe).boxShadow,
       panelShadow: getComputedStyle(panelShadowProbe).boxShadow,
       radius: cs.borderTopLeftRadius,
@@ -46,8 +38,6 @@ async function edgeContract(page: Page, selector: string) {
     ringProbe.remove();
     colorProbe.remove();
     cardShadowProbe.remove();
-    edgeShadowProbe.remove();
-    plateShadowProbe.remove();
     cardLiftProbe.remove();
     panelShadowProbe.remove();
     borderTokenProbe.remove();

@@ -8,6 +8,7 @@ import {
   machineClaimBodySchema,
   machineClosedOrbsBodySchema,
   machineComputerFramesBodySchema,
+  machineComputerRelayBodySchema,
   machineDoneBodySchema,
   machineEnrollBodySchema,
   machineEnrollConfirmBodySchema,
@@ -43,7 +44,7 @@ import {
 import { transitionBranchSync } from './services/branch-sync.js';
 import { recordBuildProvenance } from './services/build-provenance.js';
 import { recordClaudeRateLimit } from './services/claude-rate-limit.js';
-import { receiveComputerFrames } from './services/machine-computer.js';
+import { forwardComputerCall, receiveComputerFrames } from './services/machine-computer.js';
 import { executeRelayToolCall, machineAsk } from './services/machine-relay.js';
 import {
   createUploadUrls,
@@ -79,6 +80,10 @@ import {
   stepToken,
   toMachineRecord,
 } from './services/machines.js';
+
+function isComputerRelayBody(raw: unknown): boolean {
+  return raw !== null && typeof raw === 'object' && 'computer' in raw && raw.computer === true;
+}
 
 function isRelayBody(raw: unknown): boolean {
   return raw !== null && typeof raw === 'object' && 'params' in raw && !('id' in raw);
@@ -424,6 +429,14 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       const seg = parseWith(machineTranscriptRowBodySchema, raw, 'body');
       reportTranscriptRow(deps, row.id, c.req.param('stepId'), seg.row);
       return c.json({ ok: true as const });
+    }
+    if (isComputerRelayBody(raw)) {
+      const relay = parseWith(machineComputerRelayBodySchema, raw, 'body');
+      return c.json(
+        await forwardComputerCall(deps, row.id, c.req.param('stepId'), relay, {
+          signal: c.req.raw.signal,
+        }),
+      );
     }
     if (isRelayBody(raw)) {
       const relay = parseWith(machineToolRelayBodySchema, raw, 'body');

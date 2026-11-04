@@ -211,7 +211,7 @@ describe('routeForStep: the session rule replaces the agent model and machine', 
     insertRule(w.s, { teamId: w.s.team.id });
     await buildTodo(w);
     const claimed = await claim(w);
-    expect(claimed?.step.kind).toBe('build');
+    expect(claimed?.step.kind).toBe('session');
     expect(claimed?.agent?.modelId).toBe('rule-model');
     expect(claimed?.agent?.provider).toBe('rule-provider');
   });

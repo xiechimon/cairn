@@ -29,6 +29,7 @@ import {
   PermissionSection,
   PlanSection,
   PrBarSection,
+  PrCardSection,
   ScheduledSection,
 } from './components-threads.js';
 import type { GalleryTheme } from './design-doc.js';
@@ -52,6 +53,7 @@ import { ProductOverlaysSection } from './product-overlays.js';
 import { ProductPagesSection } from './product-pages.js';
 import { ProductProviders } from './product-providers.js';
 import { ProductThreadReplySection } from './product-thread-reply.js';
+import { ProductTurnFoldSection } from './product-turn-fold.js';
 import { ScreensSection } from './screens.js';
 import { GroupTitle } from './specimen.js';
 
@@ -99,6 +101,7 @@ const NAV = [
       ['product-detail', 'Task detail'],
       ['product-chief', 'Coordinator'],
       ['product-thread-reply', 'Thread reply'],
+      ['product-turn-fold', 'Turn folding'],
       ['product-overlays', 'Overlays and pickers'],
       ['product-pages', 'Page parts'],
       ['product-add-provider', 'Add provider'],
@@ -114,6 +117,7 @@ const NAV = [
       ['permission', 'Permission and proposal'],
       ['plan', 'Plan approval, usage'],
       ['pr-bar', 'Pull request bar'],
+      ['pr-card', 'PR card'],
       ['scheduled', 'Scheduled task row'],
       ['sidebar', 'Sidebar parts'],
       ['projects-lists', 'Projects, lists, phone'],
@@ -285,6 +289,7 @@ export function Gallery() {
             <ProductDetailSection />
             <ProductChiefSection />
             <ProductThreadReplySection />
+            <ProductTurnFoldSection />
             <ProductOverlaysSection />
             <ProductPagesSection theme={theme} />
             <ProductAddProviderSection />
@@ -300,6 +305,7 @@ export function Gallery() {
           <PermissionSection />
           <PlanSection />
           <PrBarSection />
+          <PrCardSection />
           <ScheduledSection />
           <SidebarSection />
           <ProjectsSection />

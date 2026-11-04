@@ -28,6 +28,7 @@ import { isChiefConversation } from './services/machines.js';
 import {
   cancelQueuedMessage,
   deliverQueuedMessage,
+  editQueuedMessage,
   queueTaskMessage,
 } from './services/task-message-queue.js';
 
@@ -45,8 +46,11 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
     const body = parseWith(coordinatorSendBodySchema, await jsonBody(c), 'body');
-    const result = sendChiefMessageFromComposer(svc, teamId, { threadId: null, ...body });
-    ctx.convHub?.publishMessage(result.thread.id, { ...result.message });
+    const { result, replayed } = sendChiefMessageFromComposer(svc, teamId, {
+      threadId: null,
+      ...body,
+    });
+    if (!replayed) ctx.convHub?.publishMessage(result.thread.id, { ...result.message });
     return c.json(result, 201);
   });
 
@@ -72,14 +76,23 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
   app.post('/api/teams/:id/chief/threads', async (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
-    const raw = (await jsonBody(c)) as { content?: unknown; projectId?: unknown };
+    const raw = (await jsonBody(c)) as {
+      content?: unknown;
+      projectId?: unknown;
+      clientMessageId?: unknown;
+    };
     const body = parseWith(
       chiefSendMessageBodySchema,
-      { threadId: null, content: raw?.content, projectId: raw?.projectId },
+      {
+        threadId: null,
+        content: raw?.content,
+        projectId: raw?.projectId,
+        clientMessageId: raw?.clientMessageId,
+      },
       'body',
     );
-    const result = sendChiefMessageFromComposer(svc, teamId, body);
-    ctx.convHub?.publishMessage(result.thread.id, { ...result.message });
+    const { result, replayed } = sendChiefMessageFromComposer(svc, teamId, body);
+    if (!replayed) ctx.convHub?.publishMessage(result.thread.id, { ...result.message });
     return c.json(result, 201);
   });
 
@@ -155,22 +168,39 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
         body.queuedMessageId !== undefined
           ? body.cancelQueued
             ? cancelQueuedMessage(svc, conversationId, body.queuedMessageId)
-            : await deliverQueuedMessage(humanSvc, conversationId, body.queuedMessageId, true)
+            : body.editQueued
+              ? editQueuedMessage(svc, conversationId, body.queuedMessageId, body.content)
+              : await deliverQueuedMessage(humanSvc, conversationId, body.queuedMessageId, true)
           : body.mode === 'queue'
-            ? await queueTaskMessage(humanSvc, conversationId, body.content, body.deliverAfterStop)
+            ? await queueTaskMessage(
+                humanSvc,
+                conversationId,
+                body.content,
+                body.deliverAfterStop,
+                body.clientMessageId,
+              )
             : await sendBuildSteer(svc, conversationId, body, { human: true });
       return c.json(result, 201);
     }
-    const raw = (await jsonBody(c)) as { content?: unknown; projectId?: unknown };
+    const raw = (await jsonBody(c)) as {
+      content?: unknown;
+      projectId?: unknown;
+      clientMessageId?: unknown;
+    };
     const thread = getChiefThread(svc, conversationId);
     if (!thread) throw notFound(`conversation ${conversationId}`);
     const body = parseWith(
       chiefSendMessageBodySchema,
-      { threadId: conversationId, content: raw?.content, projectId: raw?.projectId },
+      {
+        threadId: conversationId,
+        content: raw?.content,
+        projectId: raw?.projectId,
+        clientMessageId: raw?.clientMessageId,
+      },
       'body',
     );
-    const result = sendChiefMessageFromComposer(svc, thread.teamId, body);
-    ctx.convHub?.publishMessage(conversationId, { ...result.message });
+    const { result, replayed } = sendChiefMessageFromComposer(svc, thread.teamId, body);
+    if (!replayed) ctx.convHub?.publishMessage(conversationId, { ...result.message });
     return c.json(result, 201);
   });
 }

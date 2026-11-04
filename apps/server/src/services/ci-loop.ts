@@ -1,5 +1,5 @@
 import { conversationBranch } from '@cairn/shared';
-import { and, desc, eq, isNotNull, isNull, like, ne } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, isNull, like, ne } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, step, todo } from '../db/schema.js';
 import {
@@ -43,6 +43,7 @@ import { evaluateMergeGate } from './merge-gate-run.js';
 import { CI_FIX_FAILURES_HEAD, CI_FIX_PROMPT_HEAD, CI_FIX_PUSH_RULE } from './retry-lessons.js';
 import { setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
+import { blockingWorkerQuestions } from './worker-question-store.js';
 
 export const CI_POLL_INTERVAL_MS = 60_000;
 
@@ -175,7 +176,13 @@ export function countMarkedRounds(db: Db, buildId: string, head: string): number
   return db
     .select({ id: step.id })
     .from(step)
-    .where(and(eq(step.buildId, buildId), eq(step.kind, 'build'), like(step.prompt, `${head}%`)))
+    .where(
+      and(
+        eq(step.buildId, buildId),
+        inArray(step.kind, ['build', 'session']),
+        like(step.prompt, `${head}%`),
+      ),
+    )
     .all().length;
 }
 
@@ -486,7 +493,10 @@ export function createCiPoller(
     const prNumber = buildRow.prNumber;
     const key = `${target.fullName}#${prNumber}`;
     liveKeys.add(key);
-    if (hasActiveStep(deps, cand.buildId)) {
+    if (
+      hasActiveStep(deps, cand.buildId) ||
+      blockingWorkerQuestions(deps.db, cand.buildId).length > 0
+    ) {
       forgetClose(key);
       tally.reviewSkipped += 1;
       return;
@@ -797,7 +807,10 @@ export function createCiPoller(
     }
     const key = `${target.fullName}#${buildRow.prNumber}`;
     grindKeys.add(key);
-    if (hasActiveStep(deps, cand.buildId)) {
+    if (
+      hasActiveStep(deps, cand.buildId) ||
+      blockingWorkerQuestions(deps.db, cand.buildId).length > 0
+    ) {
       tally.skipped += 1;
       return;
     }

@@ -79,9 +79,22 @@ export function transcriptPromptRowId(stepId: string): string {
   return `${TRANSCRIPT_PROMPT_ROW_ID_PREFIX}${stepId}`;
 }
 
+export const SESSION_BRIEF = [
+  'You own this task end to end in one session. Work in this order:',
+  '1. Plan: read the task and the code it touches, then write a short plan in your own notes (what changes, which edge cases, how you will check it). Do not wait for approval; decide from the repository and state the assumptions you made.',
+  '2. Write tests first: add or update tests that fail for the right reason before you change behavior.',
+  '3. Implement: make the smallest change that passes the tests, commit on the work branch and push as your instructions say.',
+  '4. Self-check with evidence: run the checks named in the task and the project instructions, run the new tests, and exercise the changed behavior the way a user would. Quote the commands and their results in your final message; do not claim a check you did not run.',
+  'Before you finish, ask a question, or give up, call thread_report with one line (at most 200 characters, your own words) saying where the thread stands.',
+].join('\n');
+
+export const SESSION_REWORK_BRIEF =
+  'Rework request on this same session: keep the plan, tests and branch you already have, address the feedback below, rerun the self-check and quote the new evidence, then call thread_report.';
+
 export const CONTINUE_PROMPTS: Record<StepKind, string> = {
   plan: '请重新规划该任务，输出更新后的方案。',
   build: '方案已确认。请按方案执行，完成改动。',
+  session: 'Continue this session from where it stopped and finish the task.',
   merge: '请把本会话分支的改动合并到默认分支。',
   chief: '',
   review: '',
@@ -445,6 +458,9 @@ function wrappedBy(text: string, head: string, tail: string): boolean {
 function matchesSyntheticTemplates(text: string): boolean {
   return (
     SYNTHETIC_EXACT.has(text) ||
+    text === SESSION_BRIEF ||
+    text.startsWith(`${SESSION_BRIEF}\n\n`) ||
+    text.startsWith(SESSION_REWORK_BRIEF) ||
     wrappedBy(text, REPLAN_HEAD, REPLAN_TAIL) ||
     wrappedBy(text, REVIEW_REJECT_HEAD, REVIEW_REJECT_TAIL) ||
     wrappedBy(text, RESTART_HEAD, RESTART_TAIL) ||

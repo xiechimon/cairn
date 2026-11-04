@@ -86,6 +86,7 @@ const DETAIL = [
   'cds-composer',
   'cds-dialogs',
   'cds-transcript',
+  'turn-folding',
   'checkbox-unified',
   'composer-inline-mention',
   'composer-paste',
@@ -130,6 +131,7 @@ const AGENT = [
   'chief-home-digest',
 ];
 export const LIVE_SERVER = [
+  'account-feature-releases',
   'token-gate',
   'live-server-',
   'agent-fallback-models',
@@ -208,6 +210,7 @@ const RESOURCES = [
 ];
 export const SHARED_SURFACE_ONLY = [
   'cds-motion',
+  'motion-quiet',
   'color-freeze',
   'fixture-mode-chip',
   'orientation-variants',
@@ -215,6 +218,8 @@ export const SHARED_SURFACE_ONLY = [
 const SECONDARY = ['title-', 'shell-', 'segmented-'];
 
 export const FILE_RULES = new Map([
+  ['apps/web/src/components/thread/pr-card.tsx', ['pr-card']],
+  ['apps/web/src/components/thread/pr-card-model.ts', ['pr-card']],
   ['apps/web/src/design/components-overlays.tsx', ['menu-keys', 'shadcn-primitives']],
   [
     'apps/web/src/components/menu-keys.tsx',
@@ -243,6 +248,7 @@ export const FILE_RULES = new Map([
     ['account-', 'user-menu-', 'cds-density', 'push-device-switch'],
   ],
   ['apps/web/src/routes/feishu-settings.tsx', ['account-feishu']],
+  ['apps/web/src/routes/feature-releases.tsx', ['account-feature-releases']],
   ['apps/web/src/routes/agent-detail-page.tsx', AGENT],
   ['apps/web/src/routes/agent-model-select.tsx', AGENT],
   ['apps/web/src/routes/agent-fallback-models.tsx', AGENT],

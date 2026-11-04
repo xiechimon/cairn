@@ -55,7 +55,10 @@ class ContainerState:
             known["usage"] = usage_usec
 
     def cpu_seconds(self):
-        return sum(item["usage"] or 0 for item in self.containers.values()) / 1_000_000
+        usages = [item["usage"] for item in self.containers.values()]
+        if not usages or any(usage is None for usage in usages):
+            return None
+        return sum(usages) / 1_000_000
 
     def isolation(self):
         return [
