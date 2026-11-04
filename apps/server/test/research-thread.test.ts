@@ -1,7 +1,8 @@
 import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test } from 'vitest';
-import { agent, build, chief, step, todo } from '../src/db/schema.js';
+import { agent, build, chief, routingRule, step, todo } from '../src/db/schema.js';
 import { openResearchThread } from '../src/services/research-thread.js';
+import { setRoutingRulesEnabled } from '../src/services/routing-rules.js';
 import { bootServer, postProject, type TestServer } from './helpers.js';
 
 const disposables: (() => void)[] = [];
@@ -37,6 +38,33 @@ function addAgent(
 const base = { title: 'Pick a queue library', question: 'Which queue library fits?' };
 
 describe('openResearchThread', () => {
+  test('refuses, creating nothing, when the session route sends builds to a runtime other than Claude Code', async () => {
+    const w = await world();
+    addAgent(w.s, 'agent-sonnet');
+    w.s.db
+      .insert(routingRule)
+      .values({
+        id: 'rule-session',
+        teamId: w.teamId,
+        use: 'session',
+        provider: 'openai-codex',
+        modelId: 'gpt-6.1-sol',
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      .run();
+    setRoutingRulesEnabled(true);
+    try {
+      const before = w.s.db.select().from(todo).all().length;
+      expect(() =>
+        openResearchThread(w.s.svc, { teamId: w.teamId, projectId: w.projectId, tier: 1, ...base }),
+      ).toThrow(/Claude Code/);
+      expect(w.s.db.select().from(todo).all()).toHaveLength(before);
+    } finally {
+      setRoutingRulesEnabled(false);
+    }
+  });
+
   test('creates an info todo and starts only its build step on the chosen agent', async () => {
     const w = await world();
     addAgent(w.s, 'agent-sonnet');

@@ -130,7 +130,7 @@ export function ingestIntake(db: Db, report: { id: string; teamId: string }, now
     .reverse();
   if (recent.length === 0) return 0;
   const history = db
-    .select({ sourceId: retroProposal.sourceId, sourceTodoId: retroProposal.sourceTodoId })
+    .select({ sourceId: retroProposal.sourceId })
     .from(retroProposal)
     .where(
       and(
@@ -141,7 +141,22 @@ export function ingestIntake(db: Db, report: { id: string; teamId: string }, now
     )
     .all();
   const seen = new Set(history.map((row) => row.sourceId));
-  const ingested = new Set(history.map((row) => row.sourceTodoId));
+  const ingested = new Set(
+    db
+      .select({ sourceTodoId: retroProposal.sourceTodoId })
+      .from(retroProposal)
+      .where(
+        and(
+          eq(retroProposal.sourceKind, INTAKE_SOURCE_KIND),
+          inArray(
+            retroProposal.sourceTodoId,
+            recent.map((row) => row.id),
+          ),
+        ),
+      )
+      .all()
+      .map((row) => row.sourceTodoId),
+  );
   let slots =
     CHIEF_REPORT_INTAKE_MAX -
     (db

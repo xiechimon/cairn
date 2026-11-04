@@ -4,6 +4,7 @@ import { and, eq } from 'drizzle-orm';
 import { agent, chief, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { type BuildDeps, startBuilds } from './builds.js';
+import { routeForStep } from './routing-rules.js';
 import { createTodo } from './todos.js';
 
 export const RESEARCH_AGENT_PROVIDER = 'claude-code';
@@ -102,6 +103,13 @@ export function openResearchThread(
       buildId: existing.latestBuildId,
       agentId: existing.assignment?.build?.agentId ?? '',
     };
+  }
+  const route = routeForStep(deps.db, { teamId: input.teamId }, 'build');
+  if (route !== null && route.provider !== RESEARCH_AGENT_PROVIDER) {
+    throw new HttpError(
+      409,
+      `Research needs a Claude Code route, but this team's session route runs ${route.provider}/${route.modelId}.`,
+    );
   }
   const agentId = chooseResearchAgent(deps, input);
   const todoId =

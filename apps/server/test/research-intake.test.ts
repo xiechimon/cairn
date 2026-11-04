@@ -459,6 +459,15 @@ describe('intake items in the 08:00 report', () => {
     expect(w.s.db.select().from(retroProposal).all()).toHaveLength(1);
   });
 
+  test('a consumed thread is not listed again after the 7-day url window passes', async () => {
+    const w = await dayWithIntake(block([item(1)]));
+    runReport(w, D1_0830);
+    const later = D1_0830 + 9 * DAY_MS;
+    finishedYesterday(w, later);
+    runReport(w, later);
+    expect(w.s.db.select().from(retroProposal).all()).toHaveLength(1);
+  });
+
   test('a day with only intake still posts a report', async () => {
     const w = await world();
     runIntake(w, D1_0630);
