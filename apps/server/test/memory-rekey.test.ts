@@ -249,6 +249,96 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
     ).toContain('project scratch');
   });
 
+  test('flag on: a new memory owned by a routing rule is listed, injected and updated', () => {
+    setRoutingRulesEnabled(true);
+    s.db
+      .insert(routingRule)
+      .values({
+        id: 'session-rule',
+        teamId: s.team.id,
+        use: 'session',
+        provider: 'stub-gw',
+        modelId: 'stub-model',
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      .run();
+    const row = save({
+      agentId: 'session-rule',
+      content: 'from the session',
+      source: 'Implementer',
+    });
+    expect(
+      listMemoryEntries(s.db, { agentId: 'builder', teamId: s.team.id }).map((m) => m.content),
+    ).toEqual(['from the session']);
+    expect(
+      injectMemories(s.db, {
+        agentId: 'builder',
+        teamId: s.team.id,
+        projectId: null,
+      }).map((m) => m.content),
+    ).toEqual(['from the session']);
+    expect(
+      updateMemoryEntry(s.db, {
+        memoryId: row.id,
+        agentId: 'builder',
+        teamId: s.team.id,
+        content: 'from the session, revised',
+      }).content,
+    ).toBe('from the session, revised');
+  });
+
+  test('flag on: an adopted copy stays hidden after the original is updated', () => {
+    setRoutingRulesEnabled(true);
+    const original = save({ agentId: 'planner', content: 'english commits', source: 'Planner' });
+    s.db
+      .insert(routingRule)
+      .values({
+        id: 'session-rule',
+        teamId: s.team.id,
+        use: 'session',
+        provider: 'stub-gw',
+        modelId: 'stub-model',
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      .run();
+    const now = nowMs();
+    s.db
+      .insert(agentMemory)
+      .values({
+        id: newRecordId(),
+        agentId: 'session-rule',
+        teamId: s.team.id,
+        title: 'english commits',
+        content: 'english commits',
+        projectId: null,
+        sourceTodoId: null,
+        sourceBuildId: null,
+        source: 'Planner',
+        layer: 'core',
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
+    updateMemoryEntry(s.db, {
+      memoryId: original.id,
+      agentId: 'builder',
+      teamId: s.team.id,
+      content: 'commits stay English',
+    });
+    expect(
+      listMemoryEntries(s.db, { agentId: 'builder', teamId: s.team.id }).map((m) => m.content),
+    ).toEqual(['commits stay English']);
+    expect(
+      injectMemories(s.db, {
+        agentId: 'builder',
+        teamId: s.team.id,
+        projectId: null,
+      }).map((m) => m.content),
+    ).toEqual(['commits stay English']);
+  });
+
   test('flag on: worker save_memory records the actor name when the owner is a routing rule', async () => {
     setRoutingRulesEnabled(true);
     s.db

@@ -45,13 +45,25 @@ type MemoryTx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
 const stillValid = isNull(agentMemory.invalidAt);
 
-function notAdoptedCopy() {
-  return sql`not exists (select 1 from routing_rule where id = ${agentMemory.agentId})`;
+function notAdoptedDuplicate() {
+  return sql`not exists (
+    select 1 from routing_rule
+    where routing_rule.id = ${agentMemory.agentId}
+      and exists (
+        select 1 from agent_memory as orig
+        where orig."teamId" = ${agentMemory.teamId}
+          and orig."agentId" != ${agentMemory.agentId}
+          and orig.content = ${agentMemory.content}
+          and coalesce(orig."projectId", '') = coalesce(${agentMemory.projectId}, '')
+          and orig.layer = ${agentMemory.layer}
+          and coalesce(orig."threadId", '') = coalesce(${agentMemory.threadId}, '')
+      )
+  )`;
 }
 
 function ownerWhere(scope: { agentId: string; teamId: string }) {
   return routingRulesEnabled()
-    ? and(eq(agentMemory.teamId, scope.teamId), notAdoptedCopy())
+    ? and(eq(agentMemory.teamId, scope.teamId), notAdoptedDuplicate())
     : and(eq(agentMemory.agentId, scope.agentId), eq(agentMemory.teamId, scope.teamId));
 }
 
@@ -114,7 +126,7 @@ export function injectMemories(
           teamScoped
             ? and(
                 eq(agentMemory.teamId, teamId),
-                notAdoptedCopy(),
+                notAdoptedDuplicate(),
                 scope.threadId === undefined
                   ? eq(agentMemory.layer, 'core')
                   : or(
