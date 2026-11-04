@@ -3,7 +3,7 @@ import { memo, type ReactNode, useCallback, useState } from 'react';
 import { useI18n } from '../../i18n/provider.js';
 import type { TFunc } from '../../i18n/translate.js';
 import { ChevronRight } from '../../icons/index.js';
-import type { Turn } from '../../lib/turn-fold.js';
+import { isTurnOpen, type Turn } from '../../lib/turn-fold.js';
 import { Button } from '../ui/button.js';
 import { MessageScrollerItem } from '../ui/message-scroller.js';
 
@@ -16,14 +16,14 @@ export function formatTurnDuration(seconds: number, t: TFunc): string {
 }
 
 export function useTurnFold() {
-  const [flipped, setFlipped] = useState<ReadonlySet<string>>(() => new Set());
-  const isOpen = (turn: Pick<Turn<unknown>, 'id'>) => flipped.has(turn.id);
+  const [overrides, setOverrides] = useState<ReadonlyMap<string, boolean>>(() => new Map());
+  const isOpen = (turn: Pick<Turn<unknown>, 'id'>, defaultOpenId: string | null) =>
+    isTurnOpen(turn.id, defaultOpenId, overrides);
   const toggle = useCallback(
-    (id: string) =>
-      setFlipped((current) => {
-        const next = new Set(current);
-        if (next.has(id)) next.delete(id);
-        else next.add(id);
+    (id: string, defaultOpenId: string | null) =>
+      setOverrides((current) => {
+        const next = new Map(current);
+        next.set(id, !isTurnOpen(id, defaultOpenId, current));
         return next;
       }),
     [],
@@ -96,13 +96,19 @@ export function TurnFold({
   turn,
   open,
   onToggle,
+  defaultOpenId = null,
   children,
 }: {
   turn: Pick<Turn<unknown>, 'id' | 'purpose' | 'status' | 'seconds'>;
   open: boolean;
-  onToggle: (id: string) => void;
+  onToggle: (id: string, defaultOpenId: string | null) => void;
+  defaultOpenId?: string | null;
   children: ReactNode;
 }) {
+  const toggle = useCallback(
+    (id: string) => onToggle(id, defaultOpenId),
+    [onToggle, defaultOpenId],
+  );
   return (
     <>
       <TurnHeader
@@ -111,7 +117,7 @@ export function TurnFold({
         status={turn.status}
         seconds={turn.seconds}
         open={open}
-        onToggle={onToggle}
+        onToggle={toggle}
       />
       {open && children}
     </>

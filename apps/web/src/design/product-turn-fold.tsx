@@ -48,7 +48,7 @@ export function ProductTurnFoldSection() {
     <Section
       id="product-turn-fold"
       title="Turn folding"
-      lede="Once a turn ends, its messages and work trace fold under one quiet header: purpose first, muted duration after. The header opens on click, Enter or Space. A turn that is still running stays open with no header; a failed turn reads in the destructive tone."
+      lede="Finished turns have one quiet header: purpose first, muted duration after. The latest reply stays open; earlier turns fold. The header opens on click, Enter or Space. A turn that is still running stays open with no header; a failed turn reads in the destructive tone."
     >
       <Specimen
         title="Folded headers"

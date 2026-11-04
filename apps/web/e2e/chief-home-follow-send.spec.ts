@@ -57,11 +57,11 @@ const messageOf = (page: Page, text: string) =>
 test('a sent message scrolls into view even when the reader was scrolled up', async ({ page }) => {
   await mockSlowSend(page);
   await page.goto('/app');
-  await expect(row(page, 'question 248')).toBeInViewport();
+  await expect(row(page, 'answer 249')).toBeInViewport();
   await viewport(page).evaluate((node) => {
     node.scrollTop = node.scrollHeight - node.clientHeight - 600;
   });
-  await expect(row(page, 'question 248')).not.toBeInViewport();
+  await expect(row(page, 'answer 249')).not.toBeInViewport();
 
   const input = home(page).getByTestId('chief-composer-input');
   await input.fill('follow me down');
@@ -80,7 +80,7 @@ test('a sent message scrolls into view even when the reader was scrolled up', as
   await expect
     .poll(() => opacityOf(messageOf(page, 'follow me down').getByTestId('chief-msg-tools')))
     .toBe(1);
-  await evidenceShot(page, 'chief-follow-send');
+  await evidenceShot(page, 'chief-follow-send.png');
 });
 
 test('only the newest message keeps its actions visible; older ones show them on hover', async ({
@@ -92,6 +92,7 @@ test('only the newest message keeps its actions visible; older ones show them on
   await viewport(page).evaluate((node) => {
     node.scrollTop = node.scrollHeight;
   });
+  await page.mouse.move(0, 0);
   await expect(row(page, 'answer 5')).toBeInViewport();
 
   const newestFoot = messageOf(page, 'answer 5').getByTestId('chief-msg-foot');

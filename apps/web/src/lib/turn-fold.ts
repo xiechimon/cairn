@@ -92,6 +92,29 @@ export function groupTurns<T>(items: readonly T[], adapter: TurnAdapter<T>): Tur
   return out;
 }
 
+export function latestOpenTurnId<T>(
+  segments: readonly TurnSegment<T>[],
+  adapter: TurnAdapter<T>,
+): string | null {
+  const last = segments.at(-1);
+  if (last?.kind === 'turn') return last.turn.id;
+  for (let index = segments.length - 1; index >= 0; index -= 1) {
+    const segment = segments[index];
+    if (segment === undefined) continue;
+    if (segment.kind === 'turn') return segment.turn.id;
+    if (adapter.startsTurn(segment.row.item)) return null;
+  }
+  return null;
+}
+
+export function isTurnOpen(
+  id: string,
+  defaultOpenId: string | null,
+  overrides: ReadonlyMap<string, boolean>,
+): boolean {
+  return overrides.get(id) ?? id === defaultOpenId;
+}
+
 const TRANSCRIPT_BOUNDARIES: ReadonlySet<TranscriptItem['kind']> = new Set([
   'run',
   'chief',

@@ -56,7 +56,7 @@ test('a long Coordinator history opens on its newest page, at the newest message
 }) => {
   const requested = await mockPagedHistory(page);
   await page.goto('/app');
-  await expect(row(page, 'question 248')).toBeInViewport();
+  await expect(row(page, 'answer 249')).toBeInViewport();
   await expect(row(page, 'question 150')).toHaveCount(1);
   await expect(row(page, 'question 148')).toHaveCount(0);
   await expect(page.getByTestId('home-c-earlier')).toHaveText('往上滑看更早的对话');
@@ -69,7 +69,7 @@ test('scrolling to the top loads the older page and keeps the reading position',
 }) => {
   const requested = await mockPagedHistory(page);
   await page.goto('/app');
-  await expect(row(page, 'question 248')).toBeInViewport();
+  await expect(row(page, 'answer 249')).toBeInViewport();
   const before = await offsetOf(page, 'question 150', true);
   await expect(row(page, 'question 148')).toHaveCount(1);
   expect(requested).toEqual([null, 'h-0150']);
@@ -97,7 +97,7 @@ test('a failing older page is not retried on its own while the reader stays at t
 }) => {
   const requested = await mockPagedHistory(page, 250, 100, true);
   await page.goto('/app');
-  await expect(row(page, 'question 248')).toBeInViewport();
+  await expect(row(page, 'answer 249')).toBeInViewport();
   await offsetOf(page, 'question 150', true);
   await expect.poll(() => requested.filter((before) => before !== null).length).toBe(2);
   await page.waitForTimeout(3_000);
@@ -108,7 +108,7 @@ test('a failing older page is not retried on its own while the reader stays at t
 test('typing in the composer does not re-render the conversation rows', async ({ page }) => {
   await mockPagedHistory(page, 40, 100);
   await page.goto('/app');
-  await expect(row(page, 'question 38')).toBeInViewport();
+  await expect(row(page, 'answer 39')).toBeInViewport();
   const rowProps = () =>
     viewport(page).evaluate((node) => {
       const w = window as unknown as { __rowProps?: unknown[] };
@@ -126,8 +126,8 @@ test('typing in the composer does not re-render the conversation rows', async ({
         rerendered: props.filter((p, i) => p === null || p !== before[i]).length,
       };
     });
-  expect((await rowProps()).rows).toBe(20);
+  expect((await rowProps()).rows).toBe(22);
   await page.getByTestId('home-c').getByTestId('chief-composer-input').pressSequentially('hello');
   await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toHaveValue('hello');
-  expect(await rowProps()).toEqual({ rows: 20, rerendered: 0 });
+  expect(await rowProps()).toEqual({ rows: 22, rerendered: 0 });
 });
