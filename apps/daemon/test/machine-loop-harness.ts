@@ -261,6 +261,7 @@ export async function boot(opts: {
   claudeCodeAuthProbe?: () => Promise<ClaudeCodeAuthProbe>;
   readClaudeOauthExpiresAt?: () => number | null;
   presenceIntervalMs?: number;
+  presenceTimeoutMs?: number;
   capabilitiesProbe?: () => MachineCapabilities;
   withMachineJson?: boolean;
   preEnrolled?: { serverUrl: string };
@@ -307,6 +308,7 @@ export async function boot(opts: {
     ...(opts.capabilitiesProbe !== undefined ? { capabilitiesProbe: opts.capabilitiesProbe } : {}),
     idleSleepPrevention: false,
     presenceIntervalMs: opts.presenceIntervalMs ?? 60_000,
+    ...(opts.presenceTimeoutMs !== undefined ? { presenceTimeoutMs: opts.presenceTimeoutMs } : {}),
     claimBackoffBaseMs: 10,
     proxyEnv: {},
     ...(opts.orbProvider !== undefined ? { orbProvider: opts.orbProvider } : {}),
