@@ -544,6 +544,15 @@ describe('ContainerOrbProvider over PodmanOrbRuntime', () => {
     );
     expect(podman.containers.get('cairn-orb-C')?.state).toBe('running');
     expect(handle.running).toBe(false);
+    await expect(context.provider.destroy(handle)).rejects.toThrow(
+      'Orb ownership labels do not match',
+    );
+    expect(podman.containers.get('cairn-orb-C')?.state).toBe('running');
+    const lifecycle = new OrbLifecycle(context.provider, { max: 2 });
+    await lifecycle
+      .sweep({ activeConversationIds: [], now: Date.now() + 73 * 60 * 60_000 })
+      .catch(() => {});
+    expect(podman.containers.get('cairn-orb-C')?.state).toBe('running');
   });
   test('every create carries --network none and no widening flag', async () => {
     const podman = new FakePodman();
