@@ -108,20 +108,19 @@ def parse_evidence(text):
 
 
 def fix_needle(patch, base_archive):
-    base = {}
+    archive = ""
     with tarfile.open(base_archive) as contents:
         for member in contents:
             if member.isfile():
-                base[member.name] = contents.extractfile(member).read().decode(
-                    "utf-8", "replace"
-                )
+                archive += contents.extractfile(member).read().decode("utf-8", "replace")
+                archive += "\n"
     path = None
     for line in patch.splitlines():
         if line.startswith("+++ b/"):
             path = line[6:]
-        elif line.startswith("+") and not line.startswith("+++"):
+        elif line.startswith("+") and not line.startswith("+++") and path:
             text = line[1:].strip()
-            if len(text) >= NEEDLE_MIN_LENGTH and text not in base.get(path, ""):
+            if len(text) >= NEEDLE_MIN_LENGTH and text not in archive:
                 return text
     raise ValueError("Patch has no distinctive added line to search for")
 

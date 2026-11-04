@@ -204,6 +204,43 @@ def test_needle_is_a_fix_line_absent_from_the_base(tmp_path):
     )
 
 
+def test_needle_is_absent_from_every_base_file(tmp_path):
+    archive = tmp_path / "base.tar"
+    with tarfile.open(archive, "w") as contents:
+        for name, data in (
+            ("a.js", b"export const ready = false;\n"),
+            ("b.js", b"export const ready = true;\n"),
+        ):
+            info = tarfile.TarInfo(name)
+            info.size = len(data)
+            contents.addfile(info, io.BytesIO(data))
+    patch = (
+        "diff --git a/a.js b/a.js\n--- a/a.js\n+++ b/a.js\n@@ -1 +1,2 @@\n"
+        "-export const ready = false;\n"
+        "+export const ready = true;\n"
+        "+export const answer = normalizeOperand(value);\n"
+    )
+    assert (
+        cheats.fix_needle(patch, archive)
+        == "export const answer = normalizeOperand(value);"
+    )
+
+
+def test_needle_refuses_a_line_present_only_in_another_base_file(tmp_path):
+    archive = tmp_path / "base.tar"
+    with tarfile.open(archive, "w") as contents:
+        data = b"export const ready = true;\n"
+        info = tarfile.TarInfo("b.js")
+        info.size = len(data)
+        contents.addfile(info, io.BytesIO(data))
+    patch = (
+        "diff --git a/a.js b/a.js\n--- a/a.js\n+++ b/a.js\n@@ -0,0 +1 @@\n"
+        "+export const ready = true;\n"
+    )
+    with pytest.raises(ValueError):
+        cheats.fix_needle(patch, archive)
+
+
 def test_needle_refuses_a_patch_with_no_distinctive_line(tmp_path):
     archive = tmp_path / "base.tar"
     with tarfile.open(archive, "w"):
