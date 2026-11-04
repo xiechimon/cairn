@@ -536,7 +536,9 @@ describe('ContainerOrbProvider over PodmanOrbRuntime', () => {
       labels: {},
       create: [],
     });
-    const context = fixture({ runtime: new PodmanOrbRuntime({ runner: podman.runner }) });
+    const context = fixture({
+      runtime: new PodmanOrbRuntime({ ownerId: 'machine-alpha', runner: podman.runner }),
+    });
     const handle = await context.provider.ensure({ conversationId: 'C', projectId: 'P' });
     await context.provider.prepare(handle);
     await expect(context.provider.start(handle)).rejects.toThrow(
@@ -557,7 +559,9 @@ describe('ContainerOrbProvider over PodmanOrbRuntime', () => {
   test('every create carries --network none and no widening flag', async () => {
     const podman = new FakePodman();
     podman.images.add(IMAGE);
-    const context = fixture({ runtime: new PodmanOrbRuntime({ runner: podman.runner }) });
+    const context = fixture({
+      runtime: new PodmanOrbRuntime({ ownerId: 'machine-alpha', runner: podman.runner }),
+    });
     for (const conversationId of ['A', 'B']) await started(context, conversationId);
     const creates = podman.callsOf('create');
     expect(creates).toHaveLength(2);
@@ -576,7 +580,9 @@ describe('ContainerOrbProvider over PodmanOrbRuntime', () => {
     const podman = new FakePodman();
     podman.images.add(IMAGE);
     podman.info = { version: { Version: '6.1.4' }, host: { security: { rootless: false } } };
-    const context = fixture({ runtime: new PodmanOrbRuntime({ runner: podman.runner }) });
+    const context = fixture({
+      runtime: new PodmanOrbRuntime({ ownerId: 'machine-alpha', runner: podman.runner }),
+    });
     const handle = await context.provider.ensure({ conversationId: 'C', projectId: 'P' });
     await context.provider.prepare(handle);
     await expect(context.provider.start(handle)).rejects.toThrow('must be rootless');
@@ -587,7 +593,9 @@ describe('ContainerOrbProvider over PodmanOrbRuntime', () => {
     const podman = new FakePodman();
     podman.images.add(IMAGE);
     podman.psOutput = 'Error: database is locked';
-    const context = fixture({ runtime: new PodmanOrbRuntime({ runner: podman.runner }) });
+    const context = fixture({
+      runtime: new PodmanOrbRuntime({ ownerId: 'machine-alpha', runner: podman.runner }),
+    });
     const handle = await context.provider.ensure({ conversationId: 'C', projectId: 'P' });
     await context.provider.prepare(handle);
     await expect(context.provider.start(handle)).rejects.toThrow(

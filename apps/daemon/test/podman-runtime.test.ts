@@ -6,12 +6,19 @@ import { FakePodman } from './podman-fake.js';
 
 const IMAGE = 'cairn-orb-base:0123456789ab';
 const ORB = 'cairn-orb-alpha';
-const ORB_LABELS = { 'cairn.orb': '1', 'cairn.conversation': 'alpha' };
+const ORB_LABELS = {
+  'cairn.orb': '1',
+  'cairn.conversation': 'alpha',
+  'cairn.owner': 'machine-alpha',
+};
 const FOREIGN_LABELS: Record<string, string>[] = [
   {},
-  { 'cairn.orb': '1' },
-  { 'cairn.orb': '0', 'cairn.conversation': 'alpha' },
-  { 'cairn.orb': '1', 'cairn.conversation': 'someone-else' },
+  { 'cairn.orb': '1', 'cairn.conversation': 'alpha' },
+  { 'cairn.owner': 'machine-alpha' },
+  { 'cairn.orb': '1', 'cairn.owner': 'machine-alpha' },
+  { 'cairn.orb': '0', 'cairn.conversation': 'alpha', 'cairn.owner': 'machine-alpha' },
+  { 'cairn.orb': '1', 'cairn.conversation': 'someone-else', 'cairn.owner': 'machine-alpha' },
+  { 'cairn.orb': '1', 'cairn.conversation': 'alpha', 'cairn.owner': 'someone-else' },
 ];
 
 function spec(overrides: Partial<OrbSpawnSpec> = {}): OrbSpawnSpec {
@@ -33,7 +40,11 @@ function spec(overrides: Partial<OrbSpawnSpec> = {}): OrbSpawnSpec {
 function fixture(options: { command?: readonly string[] } = {}) {
   const podman = new FakePodman();
   podman.images.add(IMAGE);
-  const runtime = new PodmanOrbRuntime({ runner: podman.runner, ...options });
+  const runtime = new PodmanOrbRuntime({
+    ownerId: 'machine-alpha',
+    runner: podman.runner,
+    ...options,
+  });
   return { podman, runtime };
 }
 
@@ -99,6 +110,8 @@ describe('PodmanOrbRuntime.spawn argv', () => {
       'cairn.orb=1',
       '--label',
       'cairn.conversation=alpha',
+      '--label',
+      'cairn.owner=machine-alpha',
       '--userns=keep-id:uid=1000,gid=1000',
       '--network',
       'none',
@@ -249,6 +262,45 @@ describe('PodmanOrbRuntime.spawn argv', () => {
 });
 
 describe('PodmanOrbRuntime.spawn lifecycle', () => {
+  test('owner identity resolves lazily after enrollment and stays bound for this runtime', async () => {
+    const podman = new FakePodman();
+    podman.images.add(IMAGE);
+    let machineId = '';
+    const runtime = new PodmanOrbRuntime({ ownerId: () => machineId, runner: podman.runner });
+    await expect(runtime.spawn(spec())).rejects.toThrow('Orb owner machine ID');
+    expect(podman.calls).toEqual([]);
+    machineId = 'machine-alpha';
+    await runtime.spawn(spec());
+    machineId = 'machine-other';
+    await runtime.pause(ORB);
+    expect(podman.containers.get(ORB)?.labels['cairn.owner']).toBe('machine-alpha');
+    expect(podman.containers.get(ORB)?.state).toBe('exited');
+  });
+
+  test.each(['list', 'spawn', 'pause', 'remove', 'exec'] as const)(
+    'a second daemon cannot %s the first daemon container in a shared store',
+    async (operation) => {
+      const podman = new FakePodman();
+      podman.images.add(IMAGE);
+      const first = new PodmanOrbRuntime({ ownerId: 'machine-one', runner: podman.runner });
+      const second = new PodmanOrbRuntime({ ownerId: 'machine-two', runner: podman.runner });
+      await first.spawn(spec());
+      if (operation === 'list') expect(await second.list()).toEqual([]);
+      else {
+        const action =
+          operation === 'spawn'
+            ? second.spawn(spec())
+            : operation === 'pause'
+              ? second.pause(ORB)
+              : operation === 'remove'
+                ? second.remove(ORB)
+                : second.exec(ORB, ['true']);
+        await expect(action).rejects.toThrow('Orb ownership labels do not match');
+      }
+      expect(podman.containers.get(ORB)?.state).toBe('running');
+      expect(await first.list()).toHaveLength(1);
+    },
+  );
   test.each(['pause', 'snapshot', 'remove', 'exec'] as const)(
     '%s refuses a foreign replacement without stopping, deleting or executing it',
     async (operation) => {
@@ -291,6 +343,7 @@ describe('PodmanOrbRuntime.spawn lifecycle', () => {
       const inspectedId = podman.idOf(ORB);
       const original = podman.runner;
       const runtime = new PodmanOrbRuntime({
+        ownerId: 'machine-alpha',
         runner: async (argv, options) => {
           const result = await original(argv, options);
           if (argv[1] === 'container' && argv[2] === 'inspect')
@@ -352,6 +405,7 @@ describe('PodmanOrbRuntime.spawn lifecycle', () => {
     const { podman } = fixture();
     const original = podman.runner;
     const runtime = new PodmanOrbRuntime({
+      ownerId: 'machine-alpha',
       runner: async (argv, options) => {
         if (argv[1] === 'create') {
           podman.containers.set(ORB, {
@@ -467,6 +521,7 @@ describe('PodmanOrbRuntime.spawn lifecycle', () => {
     const original = podman.runner;
     let first = true;
     const racing = new PodmanOrbRuntime({
+      ownerId: 'machine-alpha',
       runner: async (argv, options) => {
         if (first && argv[1] === 'container' && argv[2] === 'exists') {
           first = false;
@@ -602,6 +657,7 @@ describe('PodmanOrbRuntime.pause', () => {
     const { podman } = fixture();
     const original = podman.runner;
     const runtime = new PodmanOrbRuntime({
+      ownerId: 'machine-alpha',
       runner: async (argv, options) => {
         const result = await original(argv, options);
         if (argv[1] === 'stop')
@@ -716,7 +772,7 @@ describe('PodmanOrbRuntime.list', () => {
   });
   test('filters on the orb label and maps states', async () => {
     const { podman, runtime } = fixture();
-    const labels = { 'cairn.orb': '1' };
+    const labels = { 'cairn.orb': '1', 'cairn.owner': 'machine-alpha' };
     podman.containers.set('cairn-orb-a', {
       name: 'cairn-orb-a',
       image: IMAGE,
@@ -751,7 +807,17 @@ describe('PodmanOrbRuntime.list', () => {
       { orbId: 'cairn-orb-c', image: IMAGE, state: 'paused' },
     ]);
     expect(podman.callsOf('ps')).toEqual([
-      ['podman', 'ps', '--all', '--filter', 'label=cairn.orb=1', '--format', 'json'],
+      [
+        'podman',
+        'ps',
+        '--all',
+        '--filter',
+        'label=cairn.orb=1',
+        '--filter',
+        'label=cairn.owner=machine-alpha',
+        '--format',
+        'json',
+      ],
     ]);
   });
 

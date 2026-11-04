@@ -1,4 +1,6 @@
-import { join } from 'node:path';
+import { createHash } from 'node:crypto';
+import { join, resolve } from 'node:path';
+import { loadMachineJson, statePaths } from '../state.js';
 import { ContainerOrbProvider } from './container-provider.js';
 import { PodmanOrbRuntime } from './podman.js';
 import { HostOrbProvider, NspawnOrbProvider, type OrbProvider } from './provider.js';
@@ -32,9 +34,20 @@ function createPodmanProvider(env: NodeJS.ProcessEnv, home: string): OrbProvider
   if (!runtimeDirectory)
     throw new Error(`XDG_RUNTIME_DIR must be set when ${ORB_RUNTIME_ENV}=podman`);
   return new ContainerOrbProvider({
-    runtime: new PodmanOrbRuntime(),
+    runtime: new PodmanOrbRuntime({
+      ownerId: () => {
+        const machine = loadMachineJson(statePaths(home));
+        if (!machine)
+          throw new Error('Orb owner machine ID is unavailable; enroll this daemon first');
+        return machine.machineId;
+      },
+    }),
     image,
-    runtimeRoot: join(runtimeDirectory, 'cairn-orb'),
+    runtimeRoot: join(
+      runtimeDirectory,
+      'cairn-orb',
+      createHash('sha256').update(resolve(home)).digest('hex').slice(0, 16),
+    ),
     distRoot: join(home, 'orb', 'dist'),
     seedRoot: join(home, 'orb', 'seed'),
     stateFile: join(home, 'orb-state', 'containers.json'),

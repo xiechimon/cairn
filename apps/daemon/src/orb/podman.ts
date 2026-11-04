@@ -15,6 +15,7 @@ export const ORB_EGRESS_ENV = 'CAIRN_ORB_EGRESS_SOCKET';
 
 const ORB_LABEL = 'cairn.orb';
 const CONVERSATION_LABEL = 'cairn.conversation';
+const OWNER_LABEL = 'cairn.owner';
 const NAME_PREFIX = 'cairn-orb-';
 const STOP_GRACE_SECONDS = '5';
 const KEEP_ID_USERNS = '--userns=keep-id:uid=1000,gid=1000';
@@ -63,9 +64,15 @@ function assertContainerName(orbId: string): void {
   if (!ORB_NAME_PATTERN.test(orbId)) throw new Error('Invalid orb container name');
 }
 
-function orbLabelsMatch(orbId: string, labels: Record<string, string> | null | undefined): boolean {
+function orbLabelsMatch(
+  orbId: string,
+  labels: Record<string, string> | null | undefined,
+  owner: string,
+): boolean {
   return (
-    labels?.[ORB_LABEL] === '1' && labels[CONVERSATION_LABEL] === orbId.slice(NAME_PREFIX.length)
+    labels?.[ORB_LABEL] === '1' &&
+    labels[CONVERSATION_LABEL] === orbId.slice(NAME_PREFIX.length) &&
+    labels[OWNER_LABEL] === owner
   );
 }
 
@@ -137,13 +144,28 @@ export class PodmanOrbRuntime implements OrbRuntime {
   private readonly binary: string;
   private readonly command: readonly string[];
   private readonly spawning = new Map<string, Promise<void>>();
+  private readonly ownerSource: string | (() => string);
+  private resolvedOwner: string | undefined;
 
-  constructor(
-    options: { runner?: OrbCommandRunner; binary?: string; command?: readonly string[] } = {},
-  ) {
+  constructor(options: {
+    ownerId: string | (() => string);
+    runner?: OrbCommandRunner;
+    binary?: string;
+    command?: readonly string[];
+  }) {
     this.runner = options.runner ?? runOrbCommand;
     this.binary = options.binary ?? 'podman';
     this.command = options.command ?? [];
+    this.ownerSource = options.ownerId;
+  }
+
+  private ownerId(): string {
+    if (this.resolvedOwner !== undefined) return this.resolvedOwner;
+    const owner = typeof this.ownerSource === 'function' ? this.ownerSource() : this.ownerSource;
+    if (typeof owner !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(owner))
+      throw new Error('Orb owner machine ID must be a nonempty machine identifier');
+    this.resolvedOwner = owner;
+    return owner;
   }
 
   async health(): Promise<{ version: string; rootless: boolean }> {
@@ -230,17 +252,20 @@ export class PodmanOrbRuntime implements OrbRuntime {
   }
 
   async list(): Promise<OrbRuntimeState[]> {
+    const owner = this.ownerId();
     const result = await this.run([
       'ps',
       '--all',
       '--filter',
       `label=${ORB_LABEL}=1`,
+      '--filter',
+      `label=${OWNER_LABEL}=${owner}`,
       '--format',
       'json',
     ]);
     return this.parse('ps', result.stdout, listSchema).flatMap((row) => {
       const orbId = row.Names[0] ?? '';
-      return ORB_NAME_PATTERN.test(orbId) && orbLabelsMatch(orbId, row.Labels)
+      return ORB_NAME_PATTERN.test(orbId) && orbLabelsMatch(orbId, row.Labels, owner)
         ? [{ orbId, image: row.Image, state: listedState(row.State) }]
         : [];
     });
@@ -315,6 +340,8 @@ export class PodmanOrbRuntime implements OrbRuntime {
       `${ORB_LABEL}=1`,
       '--label',
       `${CONVERSATION_LABEL}=${spec.orbId.slice(NAME_PREFIX.length)}`,
+      '--label',
+      `${OWNER_LABEL}=${this.ownerId()}`,
       KEEP_ID_USERNS,
       '--network',
       'none',
@@ -403,7 +430,7 @@ export class PodmanOrbRuntime implements OrbRuntime {
       signal,
     });
     const [container] = this.parse('container inspect', inspect.stdout, inspectSchema);
-    if (!container || !orbLabelsMatch(orbId, container.Config?.Labels))
+    if (!container || !orbLabelsMatch(orbId, container.Config?.Labels, this.ownerId()))
       throw new Error(`Refusing to adopt ${orbId}: Orb ownership labels do not match`);
     return { id: container.Id, state: container.State.Status };
   }
