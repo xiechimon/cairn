@@ -368,6 +368,10 @@
     "2912": {
       "destination": "existing-executors",
       "reason": "autonomy brake from main CI 41826798704; lane 6 B-UI refreshes gallery baselines for project-not-found, project-not-found-recent and projects-failed-to-load; close when main is stably green"
+    },
+    "2941": {
+      "destination": "existing-executors",
+      "reason": "autonomy brake from main CI 41836633036 at 243a64eac (#2907 merge); #2934 gallery baselines on 36fa13ebd; close when main is stably green"
     }
   }
 }
