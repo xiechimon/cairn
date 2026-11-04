@@ -792,6 +792,11 @@ export function useApiMutations(teamId: string | undefined) {
       mutationFn: (id: string) => api.del<void>(`/api/schedules/${id}`),
       onSuccess: invalidateAll,
     }),
+    runSchedule: useMutation({
+      mutationFn: (id: string) => api.post<ScheduleRecord>(`/api/schedules/${id}/run`, {}),
+      onSuccess: invalidateAll,
+      onError: invalidateAll,
+    }),
     patchMachine: useMutation({
       mutationFn: (input: { id: string; body: PatchMachineBody }) =>
         api.patch<MachineRecord>(`/api/machines/${input.id}`, input.body),
