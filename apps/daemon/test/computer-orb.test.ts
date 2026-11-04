@@ -2,15 +2,12 @@ import { spawnSync } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
-  mkdtempSync,
   readFileSync,
   realpathSync,
-  rmSync,
   statSync,
   writeFileSync,
 } from 'node:fs';
 import { createConnection, type Socket } from 'node:net';
-import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type {
   ComputerCall,
@@ -19,6 +16,7 @@ import type {
   MachineComputerFramesResponse,
 } from '@cairn/shared';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { createComputerDispatcher } from '../src/computer/dispatch.js';
 import { HostComputerProvider } from '../src/computer/host.js';
 import { OrbComputerProvider, type OrbComputerProviderOptions } from '../src/computer/orb.js';
@@ -46,7 +44,7 @@ let touched: string[];
 let ensured: string[];
 
 beforeEach(() => {
-  root = realpathSync(mkdtempSync(path.join(tmpdir(), 'co-')));
+  root = realpathSync(makeTestTempDir('co-'));
   runtime = path.join(root, 'r');
   mkdirSync(path.join(runtime, NAME), { recursive: true, mode: 0o700 });
   home = path.join(root, 'home');
@@ -63,7 +61,7 @@ afterEach(async () => {
   await provider?.close();
   provider = undefined;
   await Promise.allSettled(guests);
-  rmSync(root, { recursive: true, force: true });
+  releaseTestTempDir(root);
 });
 
 function makeProvider(overrides: Partial<OrbComputerProviderOptions> = {}) {
