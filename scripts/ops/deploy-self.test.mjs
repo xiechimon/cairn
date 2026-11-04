@@ -148,6 +148,26 @@ sqlite3 "$db" "insert into __drizzle_migrations(hash) values ('m1')"`,
   esac
 fi
 echo "systemctl $*" >> "${fake}/systemctl.log"
+if [ "$2" = show ]; then
+  case "$3" in
+    cairn-coordinator.service) slug=coordinator ;;
+    cairn-daemon-orb.service) slug=orb ;;
+    *) exit 1 ;;
+  esac
+  count=$(cat "${fake}/$slug-health-count" 2>/dev/null || echo 0)
+  count=$((count + 1))
+  echo "$count" > "${fake}/$slug-health-count"
+  mode=$(cat "${fake}/$slug-health-mode" 2>/dev/null || true)
+  state=active; substate=running; pid=123; restarts=0
+  case "$mode" in
+    inactive) state=activating; substate=auto-restart; pid=0 ;;
+    restarts) restarts=$count ;;
+    pid) pid=$((123 + count)) ;;
+    one-active) if [ "$count" -gt 1 ]; then state=failed; substate=failed; pid=0; fi ;;
+  esac
+  printf 'ActiveState=%s\\nSubState=%s\\nMainPID=%s\\nNRestarts=%s\\n' "$state" "$substate" "$pid" "$restarts"
+  exit 0
+fi
 [ ! -f "${fake}/orb-$2-fail" ] || [ "$3" != cairn-daemon-orb.service ] || exit 1
 [ ! -f "${fake}/coordinator-$2-fail" ] || [ "$3" != cairn-coordinator.service ] || exit 1
 [ ! -f "${fake}/phase-on-start" ] || [ "$2" != start ] || echo "start $3 @ $(sed -n 's/^phase=//p' "${dir}/state/in-progress" 2>/dev/null)" >> "${fake}/phases.log"
@@ -703,4 +723,78 @@ test('a failing Coordinator start does not fail the deploy', () => {
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stderr, /coordinator-unit-start-failed/);
   assert.equal(existsSync(join(f.state, 'alarms', 'coordinator-unit-start-failed')), true);
+});
+
+for (const mode of ['inactive', 'restarts', 'pid', 'one-active']) {
+  test(`a Coordinator ${mode} startup preserves its alarm after a successful start command`, () => {
+    const f = fixture();
+    writeFileSync(join(f.fake, 'coordinator-enabled'), '');
+    writeFileSync(join(f.fake, 'coordinator-health-mode'), mode);
+    mkdirSync(join(f.state, 'alarms'), { recursive: true });
+    const alarm = join(f.state, 'alarms', 'coordinator-unit-start-failed');
+    writeFileSync(alarm, '');
+    const result = f.run(DEPLOY, [pushTarget(f)]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(existsSync(alarm), true);
+    assert.match(result.stderr, /coordinator-unit-start-failed/);
+  });
+}
+
+test('a Coordinator restart that returns success without staying active preserves both alarms', () => {
+  const f = fixture();
+  writeFileSync(join(f.fake, 'coordinator-enabled'), '');
+  writeFileSync(join(f.fake, 'coordinator-stop-fail'), '');
+  writeFileSync(join(f.fake, 'coordinator-health-mode'), 'inactive');
+  mkdirSync(join(f.state, 'alarms'), { recursive: true });
+  writeFileSync(join(f.state, 'alarms', 'coordinator-unit-start-failed'), '');
+  const result = f.run(DEPLOY, [pushTarget(f)]);
+  assert.equal(result.status, 0, result.stderr);
+  for (const action of ['start', 'stop'])
+    assert.equal(existsSync(join(f.state, 'alarms', `coordinator-unit-${action}-failed`)), true);
+});
+
+test('rollback preserves the Coordinator alarm when the old sidecar also crash-loops', () => {
+  const f = fixture();
+  const target = pushTarget(f);
+  writeFileSync(join(f.fake, 'broken-sha'), target);
+  writeFileSync(join(f.fake, 'coordinator-enabled'), '');
+  writeFileSync(join(f.fake, 'coordinator-health-mode'), 'restarts');
+  const result = f.run(DEPLOY, [target]);
+  assert.equal(result.status, 1, result.stderr);
+  assert.equal(existsSync(join(f.state, 'alarms', 'coordinator-unit-start-failed')), true);
+});
+
+test('interrupted deployment recovery does not clear a crash-looping Coordinator alarm', () => {
+  const f = fixture();
+  const target = pushTarget(f);
+  git(f.checkout, 'fetch', '-q', 'origin', 'main');
+  git(f.checkout, 'checkout', '-q', '--detach', target);
+  mkdirSync(f.state, { recursive: true });
+  mkdirSync(f.backups, { recursive: true });
+  const snapshot = join(f.backups, 'stopped-interrupted.db');
+  sqlite(f.db, `vacuum into '${snapshot}'`);
+  writeFileSync(
+    join(f.state, 'in-progress'),
+    `phase=switching\ntarget=${target}\nprevious=${f.previous}\nsnapshot=${snapshot}\n`,
+  );
+  writeFileSync(join(f.fake, 'coordinator-enabled'), '');
+  writeFileSync(join(f.fake, 'coordinator-health-mode'), 'inactive');
+  mkdirSync(join(f.state, 'alarms'), { recursive: true });
+  const alarm = join(f.state, 'alarms', 'coordinator-unit-start-failed');
+  writeFileSync(alarm, '');
+  const result = f.run(DEPLOY, ['--recover']);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(existsSync(alarm), true);
+});
+
+test('a stable Coordinator clears its start alarm only after three matching active observations', () => {
+  const f = fixture();
+  writeFileSync(join(f.fake, 'coordinator-enabled'), '');
+  mkdirSync(join(f.state, 'alarms'), { recursive: true });
+  const alarm = join(f.state, 'alarms', 'coordinator-unit-start-failed');
+  writeFileSync(alarm, '');
+  const result = f.run(DEPLOY, [pushTarget(f)]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(existsSync(alarm), false);
+  assert.equal(readFileSync(join(f.fake, 'coordinator-health-count'), 'utf8').trim(), '3');
 });

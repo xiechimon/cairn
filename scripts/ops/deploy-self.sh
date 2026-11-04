@@ -226,6 +226,26 @@ unit_recovered() {
   for action in "$@"; do rm -f "$STATE/alarms/$slug-unit-$action-failed"; done
 }
 
+optional_unit_healthy() {
+  local unit="$1" previous="" current streak=0 i
+  for ((i = 0; i < HEALTH_TRIES; i++)); do
+    current="$(systemctl --user show "$unit" -p ActiveState -p SubState -p MainPID -p NRestarts)" || current=""
+    if grep -qxF 'ActiveState=active' <<<"$current" &&
+      grep -qxF 'SubState=running' <<<"$current" &&
+      grep -qE '^MainPID=[1-9][0-9]*$' <<<"$current" &&
+      grep -qE '^NRestarts=[0-9]+$' <<<"$current"; then
+      if [ "$current" = "$previous" ]; then streak=$((streak + 1)); else streak=1; fi
+      previous="$current"
+      [ "$streak" -ge 3 ] && return 0
+    else
+      streak=0
+      previous=""
+    fi
+    sleep "$HEALTH_INTERVAL"
+  done
+  return 1
+}
+
 STOP_FAILED=""
 
 stop_optional_unit() {
@@ -244,12 +264,12 @@ start_optional_unit() {
   local unit="$1" slug="$2" title="$3"
   systemctl --user is-enabled --quiet "$unit" || return 0
   if [[ "$STOP_FAILED" == *" $slug"* ]]; then
-    if systemctl --user restart "$unit"; then
+    if systemctl --user restart "$unit" && optional_unit_healthy "$unit"; then
       unit_recovered "$slug" stop start
     else
       unit_alarm "$unit" "$slug" start "$title"
     fi
-  elif systemctl --user start "$unit"; then
+  elif systemctl --user start "$unit" && optional_unit_healthy "$unit"; then
     unit_recovered "$slug" start
   else
     unit_alarm "$unit" "$slug" start "$title"
