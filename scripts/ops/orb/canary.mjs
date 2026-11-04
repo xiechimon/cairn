@@ -3,8 +3,8 @@ import { randomBytes } from 'node:crypto';
 import { lstatSync, mkdtempSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { isIPv4 } from 'node:net';
 import { homedir, tmpdir, userInfo } from 'node:os';
-import { join, resolve } from 'node:path';
-import { expectedTargets, networkTargets } from './canary-attacker.mjs';
+import { isAbsolute, join, resolve } from 'node:path';
+import { expectedTargets, isContainerConfig, networkTargets } from './canary-attacker.mjs';
 import { runCommand, withCleanup } from './canary-process.mjs';
 import { plantSentinels, recoverSentinels, remainingSentinels } from './canary-sentinels.mjs';
 import { startStack } from './canary-stack.mjs';
@@ -40,6 +40,8 @@ export function aggregateResult({
   durationMs,
 }) {
   const targets = expectedTargets(config);
+  const container = isContainerConfig(config);
+  const sudoWorks = !container || orb?.sudo?.works === true;
   const routes = Object.fromEntries(
     Object.keys(targets).map((name) => [name, orb?.routes?.[name] ?? []]),
   );
@@ -95,6 +97,7 @@ export function aggregateResult({
   };
   const githubReach = orb?.githubReach ?? { ok: false, ms: 0 };
   return redact({
+    ...(container ? { runtime: config.runtime, sudo: { works: sudoWorks } } : {}),
     routes,
     sentinels: config.sentinels,
     pushedObjectsClean,
@@ -111,6 +114,7 @@ export function aggregateResult({
     durationMs,
     ok:
       complete &&
+      sudoWorks &&
       orb?.executor === 'orb' &&
       pushedObjectsClean === true &&
       validControl &&
@@ -157,6 +161,7 @@ export async function scanObjects(repo, branch, markers) {
 
 export async function runCanary({
   signal,
+  runtime = process.env.CAIRN_ORB_RUNTIME || 'nspawn',
   preflight = async () => {
     if (process.platform !== 'linux' || userInfo().username !== 'ian' || process.getuid() === 0)
       throw new Error('Run on the provisioned Linux host as ian without sudo');
@@ -164,7 +169,7 @@ export async function runCanary({
       await runCommand(
         process.execPath,
         [join(import.meta.dirname, 'orb-host-check.mjs'), '--json'],
-        { timeout: null, detached: true },
+        { timeout: null, detached: true, env: { ...process.env, CAIRN_ORB_RUNTIME: runtime } },
       ),
     );
     if (!result.ok) throw new Error(`Orb host prerequisites failed: ${result.errors.join('; ')}`);
@@ -173,10 +178,15 @@ export async function runCanary({
     return { tailnetAddress };
   },
   home = homedir(),
+  egressSocketPath = process.env.CAIRN_ORB_EGRESS_SOCKET,
   stackFactory = startStack,
   runId = process.env.CAIRN_CANARY_RUN_ID ?? randomBytes(12).toString('hex'),
   timeout = 1800000,
 } = {}) {
+  if (!['nspawn', 'podman'].includes(runtime))
+    throw new Error(`CAIRN_ORB_RUNTIME must be nspawn or podman for the canary (got ${runtime})`);
+  if (runtime === 'podman' && !isAbsolute(egressSocketPath ?? ''))
+    throw new Error('CAIRN_ORB_EGRESS_SOCKET must name the absolute host relay socket path');
   const started = Date.now();
   signal = AbortSignal.any([...(signal ? [signal] : []), AbortSignal.timeout(timeout)]);
   try {
@@ -204,11 +214,14 @@ export async function runCanary({
       ];
       const secretbox = join(home, '.cairn/secretbox.key');
       if (lstatSync(secretbox, { throwIfNoEntry: false })) realPaths.push(secretbox);
+      const hostUid = process.getuid();
+      if (runtime === 'podman') realPaths.push(egressSocketPath);
       const config = {
         hostHome: home,
         sentinels: planted.sentinels,
         realPaths,
         tailnetAddress: prerequisites?.tailnetAddress,
+        ...(runtime === 'podman' ? { runtime, hostUid } : {}),
       };
       const stack = await stackFactory({ root, config, defer, signal, record: planted.record });
       config.serverPort = stack.port;

@@ -2,7 +2,12 @@ import { describe, expect, test } from 'vitest';
 import { ContainerOrbProvider } from '../src/orb/container-provider.js';
 import { HostOrbProvider, NspawnOrbProvider } from '../src/orb/provider.js';
 import type { OrbRuntime, OrbSpawnSpec } from '../src/orb/runtime.js';
-import { createOrbProvider, ORB_RUNTIME_ENV, resolveOrbRuntime } from '../src/orb/select.js';
+import {
+  createOrbProvider,
+  ORB_RUNTIME_ENV,
+  podmanProviderOptions,
+  resolveOrbRuntime,
+} from '../src/orb/select.js';
 import { boot, FakeMachineApi, waitFor } from './machine-loop-harness.js';
 
 describe('resolveOrbRuntime', () => {
@@ -77,6 +82,31 @@ describe('createOrbProvider', () => {
     ['without a runtime directory', { XDG_RUNTIME_DIR: undefined }, 'XDG_RUNTIME_DIR must be set'],
   ])('executor orb with podman %s fails instead of falling back', (_name, override, message) => {
     expect(() => createOrbProvider({ ...podmanEnv, ...override }, home)).toThrow(message);
+  });
+
+  test('the relay socket named by CAIRN_ORB_EGRESS_SOCKET reaches the provider options', () => {
+    expect(
+      podmanProviderOptions(
+        { ...podmanEnv, CAIRN_ORB_EGRESS_SOCKET: '/run/user/1000/cairn-orb-egress/egress.sock' },
+        home,
+      ).egressSocketPath,
+    ).toBe('/run/user/1000/cairn-orb-egress/egress.sock');
+  });
+
+  test.each([undefined, ''])(
+    'without a relay socket (%j) the Orb gets no network at all',
+    (value) => {
+      expect(
+        podmanProviderOptions({ ...podmanEnv, CAIRN_ORB_EGRESS_SOCKET: value }, home)
+          .egressSocketPath,
+      ).toBeUndefined();
+    },
+  );
+
+  test('a relative relay socket path is refused before any Orb starts', () => {
+    expect(() =>
+      podmanProviderOptions({ ...podmanEnv, CAIRN_ORB_EGRESS_SOCKET: 'egress.sock' }, home),
+    ).toThrow('CAIRN_ORB_EGRESS_SOCKET must be an absolute path');
   });
 
   test.each(['docker', 'apple'])(

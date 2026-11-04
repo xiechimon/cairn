@@ -166,7 +166,8 @@ export class ContainerOrbProvider implements OrbProvider {
     const seed = join(this.seedRoot, handle.projectId, 'current');
     handle.seedKey = existsSync(seed) ? readlinkSync(seed) : null;
     const listed = (await this.runtime.list()).find((orb) => orb.orbId === handle.id);
-    if (!(handle.running && listed?.state === 'running')) {
+    const retainedRunning = handle.running && listed?.state === 'running';
+    if (!retainedRunning) {
       handle.running = false;
       handle.releaseKey = existsSync(release) ? basename(readlinkSync(release)) : undefined;
       handle.notes.push(orbNote('orb: setup'));
@@ -174,16 +175,18 @@ export class ContainerOrbProvider implements OrbProvider {
       const directory = join(this.runtimeRoot, handle.id);
       if (!checkOrbDirectory(directory, 'Orb runtime directory', 0o700))
         throw new Error(`Orb runtime directory must exist before start: ${directory}`);
-      try {
-        await this.runtime.spawn(this.spawnSpec(handle), { signal: options.signal });
-      } catch (error) {
-        const owned = await this.runtime.list().catch(() => []);
-        if (owned.some((orb) => orb.orbId === handle.id))
-          await this.runtime.pause(handle.id).catch(() => {});
-        throw error;
-      }
-      handle.running = true;
     }
+    try {
+      await this.runtime.spawn(this.spawnSpec(handle), { signal: options.signal });
+    } catch (error) {
+      handle.running = false;
+      const owned = await this.runtime.list().catch(() => []);
+      if (owned.some((orb) => orb.orbId === handle.id))
+        await this.runtime.pause(handle.id).catch(() => {});
+      this.save();
+      throw error;
+    }
+    handle.running = true;
     this.save();
   }
 
