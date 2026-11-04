@@ -7,6 +7,7 @@ import {
   machine as machineTable,
   routingRule,
   todo as todoTable,
+  workPolicy,
 } from '../src/db/schema.js';
 import { newRecordId } from '../src/lib/ids.js';
 import { agentForStep } from '../src/services/dispatch-eligibility.js';
@@ -71,7 +72,6 @@ function rule(
       modelId: `${use}-model`,
       thinkingLevel: null,
       machineId: w.machineId,
-      tools: ['rule-tool'],
       createdAt: 1,
       updatedAt: 1,
       ...values,
@@ -109,13 +109,26 @@ describe('D71 a step with no assigned agent runs from the routing rule', () => {
   test('rules on: a build with an empty assignment gets an agent-shaped row from the session rule', async () => {
     const w = await world();
     const ruleId = rule(w, 'session');
+    w.s.db
+      .insert(workPolicy)
+      .values({
+        id: newRecordId(),
+        teamId: w.s.team.id,
+        use: 'session',
+        tools: ['policy-tool'],
+        mcpServers: [],
+        secrets: [],
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      .run();
     const todoRow = await startWithoutAgent(w);
     expect(agentForStep(w.s.db, todoRow, 'build')).toMatchObject({
       id: ruleId,
       provider: 'stub-gw',
       modelId: 'session-model',
       machineId: w.machineId,
-      tools: ['rule-tool'],
+      tools: ['policy-tool'],
     });
   });
 

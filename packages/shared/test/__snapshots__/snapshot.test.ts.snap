@@ -7218,6 +7218,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "chief_report",
   "retro_proposal",
   "routing_rule",
+  "work_policy",
   "chief_turn_usage",
   "chief_summary",
   "computer",

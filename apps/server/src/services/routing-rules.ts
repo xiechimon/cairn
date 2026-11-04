@@ -1,5 +1,10 @@
 import { createHash } from 'node:crypto';
 import {
+  AGENT_TOOL_MERGE,
+  AGENT_TOOL_PUSH,
+  AGENT_TOOL_SKILL_CREATE,
+  AGENT_TOOL_SKILL_UPDATE,
+  AGENT_TOOL_TAG,
   isSessionStepKind,
   type RequiredCapabilities,
   type RouteOverride,
@@ -7,11 +12,29 @@ import {
 } from '@cairn/shared';
 import { and, eq, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { agent, agentMemory, chief, machine, routingRule, team, todo } from '../db/schema.js';
+import {
+  agent,
+  agentMemory,
+  chief,
+  machine,
+  routingRule,
+  team,
+  todo,
+  workPolicy,
+} from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 
 type AgentRow = typeof agent.$inferSelect;
 type RoutingRuleRow = typeof routingRule.$inferSelect;
+type WorkPolicyRow = typeof workPolicy.$inferSelect;
+
+const REVIEWER_DENIED_TOOLS: readonly string[] = [
+  AGENT_TOOL_MERGE,
+  AGENT_TOOL_PUSH,
+  AGENT_TOOL_TAG,
+  AGENT_TOOL_SKILL_CREATE,
+  AGENT_TOOL_SKILL_UPDATE,
+];
 
 let routingRulesOn = false;
 
@@ -41,7 +64,29 @@ export function routeForStep(
   );
 }
 
-export function ruleAgent(route: RoutingRuleRow): AgentRow {
+function policyUse(kind: StepKind): 'session' | 'review' | null {
+  if (isSessionStepKind(kind) || kind === 'merge') return 'session';
+  return kind === 'review' ? 'review' : null;
+}
+
+export function policyForStep(
+  db: Pick<Db, 'select'>,
+  todoRow: Pick<typeof todo.$inferSelect, 'teamId'>,
+  kind: StepKind,
+): WorkPolicyRow | null {
+  if (!routingRulesOn) return null;
+  const use = policyUse(kind);
+  if (use === null) return null;
+  return (
+    db
+      .select()
+      .from(workPolicy)
+      .where(and(eq(workPolicy.teamId, todoRow.teamId), eq(workPolicy.use, use)))
+      .get() ?? null
+  );
+}
+
+export function ruleAgent(route: RoutingRuleRow, policy: WorkPolicyRow | null = null): AgentRow {
   return {
     id: route.id,
     teamId: route.teamId,
@@ -54,11 +99,11 @@ export function ruleAgent(route: RoutingRuleRow): AgentRow {
     thinkingLevel: route.thinkingLevel,
     persona: null,
     machineId: route.machineId,
-    tools: route.tools ?? [],
-    secrets: route.secrets ?? [],
-    defaultSkill: route.defaultSkill,
-    skillsAllowlist: route.skillsAllowlist,
-    mcpServers: route.mcpServers ?? [],
+    tools: policy?.tools ?? [],
+    secrets: policy?.secrets ?? [],
+    defaultSkill: policy?.defaultSkill ?? null,
+    skillsAllowlist: policy?.skillsAllowlist ?? [],
+    mcpServers: policy?.mcpServers ?? [],
     maxConcurrentTasks: null,
     requiredCapabilities: route.requiredCapabilities,
     fallbackModels: route.fallbackModels,
@@ -85,16 +130,30 @@ export function withOverride(
   return Object.keys(merged).length > 0 ? merged : rule;
 }
 
+export function applyPolicy(agentRow: AgentRow, policy: WorkPolicyRow | null): AgentRow {
+  if (policy === null) return agentRow;
+  return {
+    ...agentRow,
+    tools: policy.tools,
+    mcpServers: policy.mcpServers,
+    skillsAllowlist: policy.skillsAllowlist,
+    defaultSkill: policy.defaultSkill,
+    secrets: policy.secrets,
+  };
+}
+
 export function applyRoute(
   agentRow: AgentRow,
   route: RoutingRuleRow | null,
   override: RouteOverride | null = null,
+  policy: WorkPolicyRow | null = null,
 ): AgentRow {
-  if (route === null) return agentRow;
+  const policed = applyPolicy(agentRow, policy);
+  if (route === null) return policed;
   const session = route.use === 'session';
   const owned = session || route.use === 'review';
   return {
-    ...agentRow,
+    ...policed,
     provider: route.provider,
     modelId: route.modelId,
     thinkingLevel: route.thinkingLevel,
@@ -105,11 +164,6 @@ export function applyRoute(
       : owned
         ? route.requiredCapabilities
         : agentRow.requiredCapabilities,
-    tools: (owned ? route.tools : null) ?? agentRow.tools,
-    mcpServers: (owned ? route.mcpServers : null) ?? agentRow.mcpServers,
-    skillsAllowlist: (owned ? route.skillsAllowlist : null) ?? agentRow.skillsAllowlist,
-    defaultSkill: (owned ? route.defaultSkill : null) ?? agentRow.defaultSkill,
-    secrets: (owned ? route.secrets : null) ?? agentRow.secrets,
   };
 }
 
@@ -173,11 +227,30 @@ function seedRule(db: Db, teamId: string, use: 'session' | 'review', source: Age
       fallbackModels: source.fallbackModels,
       machineId: source.machineId,
       requiredCapabilities: seededRequirement(db, source),
-      tools: source.tools,
+      seededFromAgentId: source.id,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoNothing()
+    .run().changes;
+}
+
+function seedPolicy(db: Db, teamId: string, use: 'session' | 'review', source: AgentRow): number {
+  const reviewer = use === 'review';
+  const now = nowMs();
+  return db
+    .insert(workPolicy)
+    .values({
+      id: newRecordId(),
+      teamId,
+      use,
+      tools: reviewer
+        ? source.tools.filter((tool) => !REVIEWER_DENIED_TOOLS.includes(tool))
+        : source.tools,
       mcpServers: source.mcpServers,
       skillsAllowlist: source.skillsAllowlist,
       defaultSkill: source.defaultSkill,
-      secrets: source.secrets,
+      secrets: reviewer ? [] : source.secrets,
       seededFromAgentId: source.id,
       createdAt: now,
       updatedAt: now,
@@ -222,6 +295,28 @@ export function seedRoutingRules(db: Db): number {
     if (ruleExists(db, teamId, 'session')) continue;
     const source = sessionSeedAgent(db, teamId);
     if (source !== null) inserted += seedRule(db, teamId, 'session', source);
+  }
+  return inserted;
+}
+
+export function seedWorkPolicies(db: Db): number {
+  let inserted = 0;
+  for (const rule of db.select().from(routingRule).all()) {
+    if (rule.use !== 'session' && rule.use !== 'review') continue;
+    if (rule.seededFromAgentId === null) continue;
+    const exists =
+      db
+        .select({ id: workPolicy.id })
+        .from(workPolicy)
+        .where(and(eq(workPolicy.teamId, rule.teamId), eq(workPolicy.use, rule.use)))
+        .get() !== undefined;
+    if (exists) continue;
+    const source = db
+      .select()
+      .from(agent)
+      .where(and(eq(agent.id, rule.seededFromAgentId), eq(agent.teamId, rule.teamId)))
+      .get();
+    if (source !== undefined) inserted += seedPolicy(db, rule.teamId, rule.use, source);
   }
   return inserted;
 }

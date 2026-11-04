@@ -33,6 +33,7 @@ import {
   adoptAgentMemories,
   seedReviewRules,
   seedRoutingRules,
+  seedWorkPolicies,
   setRoutingRulesEnabled,
 } from './services/routing-rules.js';
 import {
@@ -82,6 +83,7 @@ setCoordinatorRouteLog((teamId, reason) =>
 if (config.routingRules) {
   seedRoutingRules(db);
   seedReviewRules(db);
+  seedWorkPolicies(db);
   adoptAgentMemories(db);
 }
 backfillTokenUsageCost(db);
