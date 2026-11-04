@@ -23,6 +23,7 @@ import {
   listenOnUnixSocket,
   relayDefaults,
   unixClientIdentity,
+  unixPeerPid,
 } from './egress-relay.mjs';
 
 const relayScript = new URL('./egress-relay.mjs', import.meta.url).pathname;
@@ -608,6 +609,39 @@ test('one unix client cannot spend another client connection quota', async (t) =
     await f.exchange('CONNECT public.example:443 HTTP/1.1\r\nHost: ignored\r\n\r\nping'),
     /^HTTP\/1.1 200/,
   );
+});
+
+test('a unix peer pid is the other process holding the socket', async (t) => {
+  const seen = [];
+  const f = await fixture(
+    t,
+    {
+      idleTimeout: 1000,
+      clientIdentity: (socket) => {
+        seen.push(unixPeerPid(socket));
+        return 'orb:peer';
+      },
+    },
+    { unix: true },
+  );
+  const child = spawn(process.execPath, [
+    '-e',
+    `const {connect}=require('node:net'); const socket=connect(${JSON.stringify(f.socketPath)}); socket.on('connect', () => socket.pause());`,
+  ]);
+  t.after(() => child.kill());
+  await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('peer pid missing')), 3000);
+    const poll = () => {
+      if (seen.length) {
+        clearTimeout(timer);
+        resolve();
+        return;
+      }
+      setTimeout(poll, 20);
+    };
+    poll();
+  });
+  assert.equal(seen[0], child.pid);
 });
 
 test('unix peers outside a container share one unknown quota', async (t) => {

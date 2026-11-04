@@ -1,9 +1,13 @@
+import { execFileSync } from 'node:child_process';
 import { lookup } from 'node:dns/promises';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, renameSync } from 'node:fs';
 import { chmod, lstat, readFile, readlink, unlink } from 'node:fs/promises';
 import { Agent, createServer, request } from 'node:http';
+import { createRequire } from 'node:module';
 import { BlockList, connect, isIP } from 'node:net';
-import { dirname, isAbsolute, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export const relayDefaults = {
   host: '10.203.0.1',
@@ -44,57 +48,51 @@ export function identityFromCgroup(text) {
   return id ? `orb:${id}` : 'unknown';
 }
 
-let containerSockets = { at: 0, byInode: new Map() };
+const peerCred = loadPeerCred();
 
-function containerSocketsByInode() {
-  const now = Date.now();
-  if (now - containerSockets.at < 1000) return containerSockets.byInode;
-  const byInode = new Map();
-  let pids = [];
+function loadPeerCred() {
+  const binary = join(tmpdir(), `cairn-egress-peercred-${process.versions.modules}.node`);
   try {
-    pids = readdirSync('/proc');
+    if (!existsSync(binary)) {
+      const source = fileURLToPath(new URL('./egress-peercred.c', import.meta.url));
+      const include = join(dirname(process.execPath), '../include/node');
+      const temporary = `${binary}.${process.pid}`;
+      execFileSync(
+        'gcc',
+        [
+          '-shared',
+          '-fPIC',
+          `-I${include}`,
+          '-Wl,--unresolved-symbols=ignore-all',
+          source,
+          '-o',
+          temporary,
+        ],
+        { stdio: 'ignore' },
+      );
+      renameSync(temporary, binary);
+    }
+    return createRequire(import.meta.url)(binary).peerPid;
   } catch {
-    pids = [];
+    return null;
   }
-  for (const pid of pids) {
-    if (!/^\d+$/.test(pid)) continue;
-    let identity;
-    try {
-      identity = identityFromCgroup(readFileSync(`/proc/${pid}/cgroup`, 'utf8'));
-    } catch {
-      continue;
-    }
-    if (identity === 'unknown') continue;
-    let entries;
-    try {
-      entries = readdirSync(`/proc/${pid}/fd`);
-    } catch {
-      continue;
-    }
-    for (const entry of entries) {
-      let stats;
-      try {
-        stats = statSync(`/proc/${pid}/fd/${entry}`);
-      } catch {
-        stats = undefined;
-      }
-      if (stats?.isSocket()) byInode.set(stats.ino, identity);
-    }
-  }
-  containerSockets = { at: now, byInode };
-  return byInode;
+}
+
+export function unixPeerPid(socket) {
+  const fd = socket?._handle?.fd;
+  if (!peerCred || !Number.isInteger(fd) || fd < 0) return undefined;
+  const pid = peerCred(fd);
+  return Number.isInteger(pid) && pid > 0 ? pid : undefined;
 }
 
 export function unixClientIdentity(socket) {
-  const fd = socket?._handle?.fd;
-  if (!Number.isInteger(fd) || fd < 0) return 'unknown';
-  let inode;
+  const pid = unixPeerPid(socket);
+  if (!pid) return 'unknown';
   try {
-    inode = statSync(`/proc/self/fd/${fd}`).ino;
+    return identityFromCgroup(readFileSync(`/proc/${pid}/cgroup`, 'utf8'));
   } catch {
     return 'unknown';
   }
-  return containerSocketsByInode().get(inode) ?? 'unknown';
 }
 
 function publicAddress(address) {
