@@ -33,6 +33,7 @@ export const TASK_SOURCE_KINDS = [
   'orchestration',
   RESEARCH_INTAKE_SOURCE_KIND,
   RESEARCH_INTAKE_ITEM_SOURCE_KIND,
+  'research-citation-check',
 ] as const;
 export const todoSourceKindSchema = z.enum(TASK_SOURCE_KINDS);
 export type TodoSourceKind = z.infer<typeof todoSourceKindSchema>;
