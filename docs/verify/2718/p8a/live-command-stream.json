@@ -1,0 +1,15 @@
+{
+  "testedCommit": "e19a59f5ebd4c63ba8f6840aefed7cdda085ef16",
+  "surface": "isolated live server/Vite; no scenario URL or browser event injection",
+  "providerMode": "stateful synthetic daemon using actual machine SSE/POST; no Orb/provider/model",
+  "dispatchReceived": true,
+  "intermediateOutputVisibleBeforeDone": true,
+  "splitTokenRedactedInPageAndDatabase": true,
+  "computerIdentityPresent": true,
+  "finalStatus": "done",
+  "forwardStatus": 200,
+  "forwardBody": {
+    "text": "finished"
+  },
+  "result": "PASS"
+}
