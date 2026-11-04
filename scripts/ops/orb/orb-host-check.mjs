@@ -5,6 +5,7 @@ import { isIPv4 } from 'node:net';
 import { userInfo } from 'node:os';
 import { join, resolve } from 'node:path';
 
+import { checkContainerHost } from './container-host-check.mjs';
 import { readMetadata, validatePorts } from './guest-check.mjs';
 import { cleanupMachine } from './machine-cleanup.mjs';
 import { missingUfwRules } from './ufw-rules.mjs';
@@ -349,7 +350,12 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
   if (process.argv.length !== 3 || process.argv[2] !== '--json')
     throw new Error('Usage: orb-host-check.sh --json');
   try {
-    const result = checkHost();
+    const runtime = process.env.CAIRN_ORB_RUNTIME || 'nspawn';
+    if (!['nspawn', 'podman'].includes(runtime))
+      throw new Error(
+        `CAIRN_ORB_RUNTIME must be nspawn or podman for the host check (got ${runtime})`,
+      );
+    const result = runtime === 'podman' ? await checkContainerHost() : checkHost();
     console.log(JSON.stringify(result, null, 2));
     process.exitCode = result.ok ? 0 : 1;
   } catch (error) {

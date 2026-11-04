@@ -82,17 +82,7 @@ export class FakePodman {
         if (rest[0] === 'exists') return container ? ok() : fail(1, '');
         if (rest[0] === 'inspect') {
           if (!container) return { code: 125, stdout: '[]', stderr: `no such container "${name}"` };
-          return ok(
-            JSON.stringify([
-              {
-                Id: this.idOf(container.name),
-                Name: name,
-                ImageName: container.image,
-                State: { Status: container.state },
-                Config: { Labels: container.labels },
-              },
-            ]),
-          );
+          return ok(JSON.stringify([this.inspectRecord(container)]));
         }
         break;
       }
@@ -138,6 +128,46 @@ export class FakePodman {
         return ok('1000\n');
     }
     throw new Error(`FakePodman: unexpected command ${argv.join(' ')}`);
+  }
+
+  private inspectRecord(container: FakeContainer) {
+    const mounts: {
+      Type: string;
+      Source: string;
+      Destination: string;
+      Mode: string;
+      RW: boolean;
+    }[] = [];
+    const env: string[] = [];
+    for (let index = 0; index < container.create.length; index += 1) {
+      const arg = container.create[index] ?? '';
+      if (arg !== '-v' && arg !== '--volume' && arg !== '-e' && arg !== '--env') continue;
+      index += 1;
+      const raw = container.create[index] ?? '';
+      if (arg === '-e' || arg === '--env') {
+        env.push(raw);
+        continue;
+      }
+      const pieces = raw.split(':');
+      const mode = pieces.length >= 3 ? (pieces.at(-1) ?? '') : '';
+      const destination = pieces.length >= 3 ? (pieces.at(-2) ?? '') : (pieces[1] ?? '');
+      const source = pieces.length >= 3 ? pieces.slice(0, -2).join(':') : (pieces[0] ?? '');
+      mounts.push({
+        Type: source.startsWith('/') ? 'bind' : 'volume',
+        Source: source,
+        Destination: destination,
+        Mode: mode,
+        RW: !mode.split(',').includes('ro'),
+      });
+    }
+    return {
+      Id: this.idOf(container.name),
+      Name: container.name,
+      ImageName: container.image,
+      State: { Status: container.state },
+      Mounts: mounts,
+      Config: { Labels: container.labels, Env: env },
+    };
   }
 
   private psRows() {
