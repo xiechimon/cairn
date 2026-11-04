@@ -5,12 +5,14 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
 import {
+  blockedHeadsOf,
   computeMetrics,
   fetchMainRuns,
   fetchPrs,
   isBot,
   isoWeek,
   renderReport,
+  reviewCycles,
   stripAnsi,
 } from './delivery-metrics.mjs';
 
@@ -556,4 +558,53 @@ test('CLI reads a ledger file for outcomes and usage', () => {
   const result = cli('--fixture', input, '--ledger', ledger, '--out', join(dir, 'metrics'));
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /Change failure rate \| 50\.0%/);
+});
+
+const gateComment = (author, sha) => ({ author, body: `<!-- review-gate-block:${sha} -->\nx` });
+
+test('blockedHeadsOf counts distinct heads from github-actions comments only', () => {
+  const comments = [
+    gateComment('github-actions', 'a1'),
+    gateComment('github-actions', 'a1'),
+    gateComment('github-actions', 'b2'),
+    gateComment('mallory', 'c3'),
+    { author: 'github-actions', body: 'unrelated' },
+  ];
+  assert.equal(blockedHeadsOf(comments), 2);
+  assert.equal(blockedHeadsOf([]), 0);
+});
+
+test('reviewCycles averages blocked heads over PRs with a count and skips unknown ones', () => {
+  assert.deepEqual(
+    reviewCycles([pr(1, { blockedHeads: 0 }), pr(2, { blockedHeads: 3 }), pr(3, {})]),
+    {
+      prs: 3,
+      known: 2,
+      blocked: 1,
+      max: 3,
+      mean: 1.5,
+    },
+  );
+  assert.deepEqual(reviewCycles([]), { prs: 0, known: 0, blocked: 0, max: null, mean: null });
+});
+
+test('fetchPrs counts the gate block markers on each PR and the report shows them', () => {
+  const node = {
+    ...prNode(5),
+    comments: {
+      nodes: [
+        { author: { login: 'github-actions' }, body: '<!-- review-gate-block:abc123 -->\nx' },
+        { author: { login: 'github-actions' }, body: '<!-- review-gate-block:def456 -->\nx' },
+      ],
+    },
+  };
+  const { prs } = fetchPrs({
+    repo: 'o/r',
+    now: NOW,
+    gh: () => JSON.stringify(searchPage([node], null)),
+  });
+  assert.equal(prs[0].blockedHeads, 2);
+  const metrics = computeMetrics({ prs, runs: [], now: NOW });
+  assert.deepEqual(metrics.reviewCycles, { prs: 1, known: 1, blocked: 1, max: 2, mean: 2 });
+  assert.match(renderReport(metrics), /Blocked review heads per merged PR \| 2 \(1 of 1/);
 });

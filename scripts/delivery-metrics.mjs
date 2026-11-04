@@ -187,6 +187,31 @@ function usageSummary(prs, ledger, field) {
   };
 }
 
+const GATE_BLOCK_MARKER = /^<!-- review-gate-block:([0-9a-f]+) -->/;
+
+export function blockedHeadsOf(comments) {
+  const heads = new Set();
+  for (const comment of comments) {
+    if (comment.author !== 'github-actions') continue;
+    const match = GATE_BLOCK_MARKER.exec(comment.body ?? '');
+    if (match) heads.add(match[1]);
+  }
+  return heads.size;
+}
+
+export function reviewCycles(prs) {
+  const known = prs.filter((pr) => Number.isInteger(pr.blockedHeads));
+  const counts = known.map((pr) => pr.blockedHeads);
+  const total = counts.reduce((sum, count) => sum + count, 0);
+  return {
+    prs: prs.length,
+    known: known.length,
+    blocked: counts.filter((count) => count > 0).length,
+    max: counts.length === 0 ? null : Math.max(...counts),
+    mean: counts.length === 0 ? null : Math.round((total / counts.length) * 100) / 100,
+  };
+}
+
 export function computeMetrics({ prs, runs, ledger = {}, now, incompleteReasons = [] }) {
   const nowDate = now instanceof Date ? now : new Date(now);
   const seen = new Set();
@@ -244,6 +269,7 @@ export function computeMetrics({ prs, runs, ledger = {}, now, incompleteReasons 
     },
     mainRed: mainRed(runs, nowDate),
     humanIntervention: humanIntervention(weekPrs),
+    reviewCycles: reviewCycles(weekPrs),
     tokens: usageSummary(weekPrs, ledger, 'tokens'),
     costUsd: usageSummary(weekPrs, ledger, 'costUsd'),
     complete: incompleteReasons.length === 0,
@@ -285,6 +311,10 @@ export function renderReport(metrics) {
   lines.push(
     `| Human intervention | ${formatRate(metrics.humanIntervention.rate)} (${metrics.humanIntervention.intervened} of ${metrics.humanIntervention.prs}) |`,
   );
+  const cycles = metrics.reviewCycles;
+  lines.push(
+    `| Blocked review heads per merged PR | ${cycles.mean === null ? 'no data' : cycles.mean} (${cycles.blocked} of ${cycles.known} known PRs blocked at least once, max ${cycles.max ?? 'none'}) |`,
+  );
   lines.push(
     `| Tokens per merged PR | ${metrics.tokens.mean === null ? 'missing data' : metrics.tokens.mean} (known ${metrics.tokens.known}, missing data ${metrics.tokens.missing}) |`,
   );
@@ -307,6 +337,7 @@ const PR_SEARCH_FIELDS = `
   autoMergeRequest { enabledAt }
   commits(last: 100) { nodes { commit { authors(first: 10) { nodes { name user { login } } } } } }
   reviews(first: 20, states: CHANGES_REQUESTED) { nodes { state author { login ... on Bot { __typename } } } }
+  comments(first: 100) { nodes { author { login } body } }
 `;
 
 const isRateLimit = (error) => /rate limit/i.test(String(error?.message ?? error));
@@ -364,6 +395,12 @@ export function fetchPrs({ repo, now, gh }) {
           (slot.commit?.authors?.nodes ?? []).map((author) => ({
             login: author.user?.login ?? null,
             name: author.name ?? null,
+          })),
+        ),
+        blockedHeads: blockedHeadsOf(
+          (node.comments?.nodes ?? []).map((comment) => ({
+            author: comment.author?.login ?? null,
+            body: comment.body,
           })),
         ),
         reviews: (node.reviews?.nodes ?? []).map((review) => ({
