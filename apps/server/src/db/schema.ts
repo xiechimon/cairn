@@ -586,6 +586,7 @@ export const agentMemory = sqliteTable('agent_memory', {
   source: text('source'),
   layer: text('layer').$type<MemoryLayer>().notNull().default('core'),
   threadId: text('threadId'),
+  adoptedFrom: text('adoptedFrom'),
   history: json<{ title: string; content: string; updatedAt: number }[]>('history')
     .notNull()
     .default(sql`'[]'`),

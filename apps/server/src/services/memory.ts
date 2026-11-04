@@ -46,19 +46,7 @@ type MemoryTx = Parameters<Parameters<Db['transaction']>[0]>[0];
 const stillValid = isNull(agentMemory.invalidAt);
 
 function notAdoptedDuplicate() {
-  return sql`not exists (
-    select 1 from routing_rule
-    where routing_rule.id = ${agentMemory.agentId}
-      and exists (
-        select 1 from agent_memory as orig
-        where orig."teamId" = ${agentMemory.teamId}
-          and orig."agentId" != ${agentMemory.agentId}
-          and orig.content = ${agentMemory.content}
-          and coalesce(orig."projectId", '') = coalesce(${agentMemory.projectId}, '')
-          and orig.layer = ${agentMemory.layer}
-          and coalesce(orig."threadId", '') = coalesce(${agentMemory.threadId}, '')
-      )
-  )`;
+  return isNull(agentMemory.adoptedFrom);
 }
 
 function ownerWhere(scope: { agentId: string; teamId: string }) {
@@ -340,6 +328,7 @@ export function updateMemoryEntry(
         source: row.source,
         layer: row.layer,
         threadId: row.threadId,
+        adoptedFrom: row.adoptedFrom,
         history: [
           ...row.history,
           { title: row.title, content: row.content, updatedAt: row.updatedAt },

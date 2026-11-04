@@ -424,6 +424,7 @@ export function adoptAgentMemories(db: Db): number {
                 .update(JSON.stringify(['adopt', rule.id, row.id]))
                 .digest('hex'),
               agentId: rule.id,
+              adoptedFrom: row.id,
               supersededBy: null,
               lastInjectedAt: null,
             })
@@ -431,6 +432,27 @@ export function adoptAgentMemories(db: Db): number {
             .run();
           copied += res.changes;
         }
+      }
+      const unmarked = tx
+        .select({ id: agentMemory.id })
+        .from(agentMemory)
+        .where(and(eq(agentMemory.teamId, rule.teamId), isNull(agentMemory.adoptedFrom)))
+        .all();
+      for (const orig of unmarked) {
+        tx.update(agentMemory)
+          .set({ adoptedFrom: orig.id })
+          .where(
+            and(
+              eq(
+                agentMemory.id,
+                createHash('sha256')
+                  .update(JSON.stringify(['adopt', rule.id, orig.id]))
+                  .digest('hex'),
+              ),
+              isNull(agentMemory.adoptedFrom),
+            ),
+          )
+          .run();
       }
       const union = [...new Set([...(rule.adoptedAgentIds ?? []), ...adopted])].sort();
       tx.update(routingRule)

@@ -11,6 +11,7 @@ import {
   deleteMemoryEntry,
   injectMemories,
   listMemoryEntries,
+  promoteMemoryEntry,
   saveMemoryEntry,
   updateMemoryEntry,
 } from '../src/services/memory.js';
@@ -61,6 +62,49 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
     });
     if (!('id' in row)) throw new Error('memory not saved');
     return row;
+  }
+
+  function insertSessionRule() {
+    s.db
+      .insert(routingRule)
+      .values({
+        id: 'session-rule',
+        teamId: s.team.id,
+        use: 'session',
+        provider: 'stub-gw',
+        modelId: 'stub-model',
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      .run();
+  }
+
+  function insertAdoptedCopy(original: {
+    id: string;
+    title: string;
+    content: string;
+    projectId: string | null;
+    source?: string | null;
+  }) {
+    const now = nowMs();
+    s.db
+      .insert(agentMemory)
+      .values({
+        id: newRecordId(),
+        agentId: 'session-rule',
+        teamId: s.team.id,
+        title: original.title,
+        content: original.content,
+        projectId: original.projectId,
+        sourceTodoId: null,
+        sourceBuildId: null,
+        source: original.source ?? null,
+        layer: 'core',
+        adoptedFrom: original.id,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
   }
 
   test('flag off: a second agent does not see the first agent’s memories', () => {
@@ -154,37 +198,9 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
 
   test('flag on: an adopted routing-rule copy is not listed or injected beside the original', () => {
     setRoutingRulesEnabled(true);
-    save({ agentId: 'planner', content: 'english commits', source: 'Planner' });
-    s.db
-      .insert(routingRule)
-      .values({
-        id: 'session-rule',
-        teamId: s.team.id,
-        use: 'session',
-        provider: 'stub-gw',
-        modelId: 'stub-model',
-        createdAt: 1,
-        updatedAt: 1,
-      })
-      .run();
-    const now = nowMs();
-    s.db
-      .insert(agentMemory)
-      .values({
-        id: newRecordId(),
-        agentId: 'session-rule',
-        teamId: s.team.id,
-        title: 'english commits',
-        content: 'english commits',
-        projectId: null,
-        sourceTodoId: null,
-        sourceBuildId: null,
-        source: 'Planner',
-        layer: 'core',
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
+    const original = save({ agentId: 'planner', content: 'english commits', source: 'Planner' });
+    insertSessionRule();
+    insertAdoptedCopy(original);
     const listed = listMemoryEntries(s.db, { agentId: 'builder', teamId: s.team.id });
     expect(listed).toHaveLength(1);
     expect(listed[0]?.agentId).toBe('planner');
@@ -251,18 +267,7 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
 
   test('flag on: a new memory owned by a routing rule is listed, injected and updated', () => {
     setRoutingRulesEnabled(true);
-    s.db
-      .insert(routingRule)
-      .values({
-        id: 'session-rule',
-        teamId: s.team.id,
-        use: 'session',
-        provider: 'stub-gw',
-        modelId: 'stub-model',
-        createdAt: 1,
-        updatedAt: 1,
-      })
-      .run();
+    insertSessionRule();
     const row = save({
       agentId: 'session-rule',
       content: 'from the session',
@@ -291,36 +296,8 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
   test('flag on: an adopted copy stays hidden after the original is updated', () => {
     setRoutingRulesEnabled(true);
     const original = save({ agentId: 'planner', content: 'english commits', source: 'Planner' });
-    s.db
-      .insert(routingRule)
-      .values({
-        id: 'session-rule',
-        teamId: s.team.id,
-        use: 'session',
-        provider: 'stub-gw',
-        modelId: 'stub-model',
-        createdAt: 1,
-        updatedAt: 1,
-      })
-      .run();
-    const now = nowMs();
-    s.db
-      .insert(agentMemory)
-      .values({
-        id: newRecordId(),
-        agentId: 'session-rule',
-        teamId: s.team.id,
-        title: 'english commits',
-        content: 'english commits',
-        projectId: null,
-        sourceTodoId: null,
-        sourceBuildId: null,
-        source: 'Planner',
-        layer: 'core',
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
+    insertSessionRule();
+    insertAdoptedCopy(original);
     updateMemoryEntry(s.db, {
       memoryId: original.id,
       agentId: 'builder',
@@ -339,20 +316,78 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
     ).toEqual(['commits stay English']);
   });
 
+  test('flag on: deleting the original does not unmask its adopted copy', () => {
+    setRoutingRulesEnabled(true);
+    const original = save({ agentId: 'planner', content: 'english commits', source: 'Planner' });
+    insertSessionRule();
+    insertAdoptedCopy(original);
+    expect(
+      deleteMemoryEntry(s.db, {
+        memoryId: original.id,
+        agentId: 'builder',
+        teamId: s.team.id,
+      }),
+    ).toBe(1);
+    expect(listMemoryEntries(s.db, { agentId: 'builder', teamId: s.team.id })).toEqual([]);
+    expect(
+      injectMemories(s.db, {
+        agentId: 'builder',
+        teamId: s.team.id,
+        projectId: null,
+      }),
+    ).toEqual([]);
+  });
+
+  test('flag on: promoting the original does not unmask its project-scoped adopted copy', () => {
+    setRoutingRulesEnabled(true);
+    s.db.insert(projectTable).values({ id: 'proj-1', name: 'one', teamId: s.team.id }).run();
+    const original = save({
+      agentId: 'planner',
+      content: 'project fact',
+      projectId: 'proj-1',
+      source: 'Planner',
+    });
+    insertSessionRule();
+    insertAdoptedCopy(original);
+    expect(
+      promoteMemoryEntry(s.db, {
+        memoryId: original.id,
+        agentId: 'builder',
+        teamId: s.team.id,
+      })?.projectId,
+    ).toBeNull();
+    const listed = listMemoryEntries(s.db, { agentId: 'builder', teamId: s.team.id });
+    expect(listed).toHaveLength(1);
+    expect(listed[0]?.id).toBe(original.id);
+    expect(listed[0]?.projectId).toBeNull();
+  });
+
+  test('flag on: a new rule-owned save is listed even when an invalid original has the same content', () => {
+    setRoutingRulesEnabled(true);
+    const original = save({ agentId: 'planner', content: 'old wording', source: 'Planner' });
+    updateMemoryEntry(s.db, {
+      memoryId: original.id,
+      agentId: 'builder',
+      teamId: s.team.id,
+      content: 'new wording',
+    });
+    insertSessionRule();
+    save({
+      agentId: 'session-rule',
+      content: 'old wording',
+      source: 'Implementer',
+      force: true,
+    });
+    expect(
+      listMemoryEntries(s.db, { agentId: 'builder', teamId: s.team.id })
+        .map((m) => m.content)
+        .sort(),
+    ).toEqual(['new wording', 'old wording']);
+  });
+
   test('flag on: worker save_memory records the actor name when the owner is a routing rule', async () => {
     setRoutingRulesEnabled(true);
-    s.db
-      .insert(routingRule)
-      .values({
-        id: 'session-rule',
-        teamId: s.team.id,
-        use: 'session',
-        provider: 'stub-gw',
-        modelId: 'stub-model',
-        createdAt: 1,
-        updatedAt: 1,
-      })
-      .run();
+    insertSessionRule();
     const row = JSON.parse(
       await executeWorkerMemoryTool(
         s.db,
