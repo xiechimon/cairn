@@ -29,7 +29,7 @@ jobs:
           node scripts/issue-coverage.mjs > coverage-report.md || status=$?
           cat coverage-report.md >> "$GITHUB_STEP_SUMMARY"
           if [ "$status" -ne 0 ]; then
-            last=$(gh api "repos/$GITHUB_REPOSITORY/issues/$TRACKING_ISSUE/comments?per_page=100" --jq '[.[] | select(.user.login == "github-actions[bot]")] | last | .body // ""')
+            last=$(gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/issues/$TRACKING_ISSUE/comments?per_page=100" | jq -r 'flatten | [.[] | select(.user.login == "github-actions[bot]")] | last | .body // ""')
             body=$(printf 'Daily issue-coverage check found issues without a valid destination (add them to `docs/ops/issue-coverage.json` or a `.claude/epics` manifest, or close them):\n\n%s\n' "$(cat coverage-report.md)")
             if [ "$last" != "$body" ]; then
               gh issue comment "$TRACKING_ISSUE" --repo "$GITHUB_REPOSITORY" --body "$body"
