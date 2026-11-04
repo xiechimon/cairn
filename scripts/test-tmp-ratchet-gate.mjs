@@ -8,7 +8,11 @@ const REPO_ROOT = resolve(import.meta.dirname, '..');
 const BASELINE_REL = 'scripts/test-tmp-baseline.json';
 const TEST_SOURCE =
   /^(?:apps\/[^/]+\/test\/|apps\/web\/e2e\/|integration\/|packages\/[^/]+\/test\/).*\.(?:[cm]?[jt]sx?)$|^scripts\/.*\.test\.[cm]?[jt]sx?$/;
-const EXEMPT = new Set(['scripts/test-tmpdir.mjs', 'scripts/test-tmp-ratchet-gate.mjs']);
+const EXEMPT = new Set([
+  'scripts/test-tmpdir.mjs',
+  'scripts/test-tmp-ratchet-gate.mjs',
+  'packages/shared/test/test-tmp-ratchet.test.ts',
+]);
 const MKDTEMP = '(?:mkdtemp|mkdtempSync)';
 
 function aliasesOf(source) {
