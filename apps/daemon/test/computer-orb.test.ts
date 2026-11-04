@@ -2,14 +2,12 @@ import { spawnSync } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
-  mkdtempSync,
   readFileSync,
   realpathSync,
-  rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import { createConnection, type Socket } from 'node:net';
-import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type {
   ComputerCall,
@@ -18,6 +16,7 @@ import type {
   MachineComputerFramesResponse,
 } from '@cairn/shared';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { createComputerDispatcher } from '../src/computer/dispatch.js';
 import { HostComputerProvider } from '../src/computer/host.js';
 import { OrbComputerProvider, type OrbComputerProviderOptions } from '../src/computer/orb.js';
@@ -45,7 +44,7 @@ let touched: string[];
 let ensured: string[];
 
 beforeEach(() => {
-  root = realpathSync(mkdtempSync(path.join(tmpdir(), 'co-')));
+  root = realpathSync(makeTestTempDir('co-'));
   runtime = path.join(root, 'r');
   mkdirSync(path.join(runtime, NAME), { recursive: true, mode: 0o700 });
   home = path.join(root, 'home');
@@ -62,7 +61,7 @@ afterEach(async () => {
   await provider?.close();
   provider = undefined;
   await Promise.allSettled(guests);
-  rmSync(root, { recursive: true, force: true });
+  releaseTestTempDir(root);
 });
 
 function makeProvider(overrides: Partial<OrbComputerProviderOptions> = {}) {
@@ -398,6 +397,132 @@ describe('orb computer silent commands and file deadlines', () => {
   });
 });
 
+describe('orb computer setup deadlines', () => {
+  test('file setup is bounded while the computer is still starting', async () => {
+    const orb = makeProvider({
+      orbs: {
+        ensure: async () => {
+          await new Promise((resolve) => setTimeout(resolve, 400));
+          return NAME;
+        },
+        touch: () => {},
+      },
+    });
+    const started = Date.now();
+    await expect(orb.forScope(SCOPE).readFile('a.txt', { timeoutMs: 50 })).rejects.toBeInstanceOf(
+      ComputerRefusal,
+    );
+    expect(Date.now() - started).toBeLessThan(250);
+    expect(existsSync(socketPath)).toBe(false);
+  });
+
+  test('file setup is bounded while the daemon release is being published', async () => {
+    const orb = makeProvider({
+      release: {
+        publish: async () => {
+          await new Promise((resolve) => setTimeout(resolve, 400));
+          return RELEASE;
+        },
+        authenticated: () => {},
+      },
+    });
+    const started = Date.now();
+    await expect(orb.forScope(SCOPE).readFile('a.txt', { timeoutMs: 50 })).rejects.toBeInstanceOf(
+      ComputerRefusal,
+    );
+    expect(Date.now() - started).toBeLessThan(250);
+    expect(ensured).toEqual([]);
+  });
+
+  test('connecting the guest does not restart a file request budget', async () => {
+    const orb = makeProvider();
+    const writing = orb.forScope(SCOPE).writeFile('a.txt', 'x', { timeoutMs: 500 });
+    const settled = writing.then(
+      () => 'resolved',
+      (error: Error) => error.message,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    await fakeGuest('good');
+    const result = await Promise.race([
+      settled,
+      new Promise<string>((resolve) => setTimeout(() => resolve('still waiting'), 350)),
+    ]);
+    expect(result).toContain('did not answer in time');
+  });
+
+  test('stopping during provisioning never later sends a file write', async () => {
+    let started = false;
+    let release: () => void = () => {};
+    const hold = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const orb = makeProvider({
+      connectTimeoutMs: 100,
+      orbs: {
+        ensure: async () => {
+          started = true;
+          await hold;
+          return NAME;
+        },
+        touch: () => {},
+      },
+    });
+    const fake = fakeClient();
+    const dispatcher = createComputerDispatcher({ client: fake.client, orb, ...FAST });
+    const writing = dispatcher.dispatch(
+      call({ tool: 'write_file', params: { path: 'a.txt', content: 'x' } }),
+    );
+    await until(() => started);
+    const closing = dispatcher.close();
+    release();
+    await Promise.all([writing, closing]);
+    expect(existsSync(socketPath)).toBe(false);
+    expect(lastFrame(fake.frames)).toMatchObject({ kind: 'error', delivery: 'not_delivered' });
+  });
+
+  test('cancelling a delivered file write sends cancel and reports uncertain delivery', async () => {
+    const orb = makeProvider();
+    const controller = new AbortController();
+    const writing = orb
+      .forScope(SCOPE)
+      .writeFile('a.txt', 'x', { timeoutMs: 1000, signal: controller.signal });
+    const settled = writing.then(
+      () => undefined,
+      (error: Error) => error,
+    );
+    const guest = await fakeGuest('good');
+    const request = () =>
+      guest.frames.find((frame) => (frame as { method?: string })?.method === 'writeFile') as
+        | { id: number }
+        | undefined;
+    await until(() => request() !== undefined);
+    controller.abort();
+    const result = await settled;
+    expect(result?.message).toContain('cancelled after delivery');
+    expect(result).not.toBeInstanceOf(ComputerRefusal);
+    await until(() =>
+      guest.frames.some((frame) => (frame as { cancel?: number })?.cancel === request()?.id),
+    );
+  });
+
+  test('an aborted execute cannot send a new command to a connected guest', async () => {
+    const orb = makeProvider();
+    startGuest();
+    const scoped = orb.forScope(SCOPE);
+    await scoped.listFiles('');
+    const controller = new AbortController();
+    controller.abort();
+    await expect(
+      scoped.execute({
+        argv: ['touch', 'must-not-run'],
+        timeoutMs: 1000,
+        signal: controller.signal,
+      }),
+    ).rejects.toBeInstanceOf(ComputerRefusal);
+    expect(existsSync(path.join(home, 'must-not-run'))).toBe(false);
+  });
+});
+
 describe('orb computer link failures', () => {
   test('a guest that never connects gives not_delivered after the connect timeout, without hanging', async () => {
     const orb = makeProvider({ connectTimeoutMs: 300 });
@@ -492,7 +617,6 @@ describe('orb computer link failures', () => {
     startGuest();
     await orb.forScope(SCOPE).listFiles('');
     expect(readFileSync(`${socketPath}.token`, 'utf8')).toMatch(/^[a-f0-9]{64}$/);
-    const { statSync } = await import('node:fs');
     expect(statSync(`${socketPath}.token`).mode & 0o777).toBe(0o600);
     expect(statSync(socketPath).mode & 0o777).toBe(0o600);
     await orb.close();

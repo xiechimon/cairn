@@ -330,6 +330,7 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
     try {
       text = await fileText(call, route.provider, {
         timeoutMs: call.deadlineAt - now() - FINAL_FRAME_MARGIN_MS,
+        signal: controller.signal,
       });
     } catch (error) {
       await poster.finish(

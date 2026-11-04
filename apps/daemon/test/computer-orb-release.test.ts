@@ -1,15 +1,7 @@
-import {
-  mkdirSync,
-  mkdtempSync,
-  readdirSync,
-  readlinkSync,
-  rmSync,
-  utimesSync,
-  writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, readdirSync, readlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { HostComputerProvider } from '../src/computer/host.js';
 import { OrbComputerProvider } from '../src/computer/orb.js';
 import { runOrbComputerAgent } from '../src/computer/orb-agent.js';
@@ -22,11 +14,11 @@ const cleanups: Array<() => Promise<unknown>> = [];
 
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup().catch(() => undefined);
-  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+  for (const root of roots.splice(0)) releaseTestTempDir(root);
 });
 
 async function setup(connectTimeoutMs = 10_000) {
-  const root = mkdtempSync(join(tmpdir(), 'cr-'));
+  const root = makeTestTempDir('cr-');
   roots.push(root);
   const host = createOrbCheckout(root);
   const distRoot = join(root, 'dist');

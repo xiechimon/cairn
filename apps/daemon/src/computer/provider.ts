@@ -19,6 +19,7 @@ export interface ComputerFileEntry {
 
 export interface ComputerFileOptions {
   timeoutMs?: number;
+  signal?: AbortSignal;
 }
 
 export class ComputerRefusal extends Error {
